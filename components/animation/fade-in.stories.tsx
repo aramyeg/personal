@@ -104,6 +104,9 @@ export const LargeDistance: Story = {
 }
 
 export const SequentialFade: Story = {
+  args: {
+    children: <ExampleCard />,
+  },
   render: () => (
     <div className="flex flex-col gap-4">
       <FadeIn delay={0}>
@@ -120,6 +123,9 @@ export const SequentialFade: Story = {
 }
 
 export const DirectionShowcase: Story = {
+  args: {
+    children: <ExampleCard />,
+  },
   render: () => (
     <div className="grid grid-cols-2 gap-8 p-8">
       <FadeIn direction="up" delay={0}>
