@@ -44,8 +44,22 @@ storybook-static
 *.swp
 *.swo
 
-# AI/Claude
+# AI Assistants
+.claude/
 .claude-session
 *.claude-cache
+.cursor/
+.cursorignore
+.aider*
+.copilot/
+.codeium/
+.tabnine/
+.continue/
+.sourcery/
+.windsurf/
+.bolt/
+.idx/
+.replit
+.v0/
 
 *storybook.log
