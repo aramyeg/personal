@@ -47,3 +47,5 @@ storybook-static
 # AI/Claude
 .claude-session
 *.claude-cache
+
+*storybook.log
