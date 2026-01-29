@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
@@ -17,8 +17,8 @@ import {
 import { FadeIn } from '@/components/animation'
 import {
   useTaskStore,
-  selectFilteredTasks,
-  selectTaskCounts,
+  getFilteredTasks,
+  getTaskCounts,
   type Task,
   type TaskStatus,
 } from '@/lib/store'
@@ -35,16 +35,22 @@ const statusOrder: TaskStatus[] = ['todo', 'in-progress', 'done']
 export function StateDemo() {
   const [newTask, setNewTask] = useState('')
   const [showCode, setShowCode] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
-  const tasks = useTaskStore(selectFilteredTasks)
-  const counts = useTaskStore(selectTaskCounts)
+  // Get raw state values
+  const allTasks = useTaskStore((state) => state.tasks)
   const filter = useTaskStore((state) => state.filter)
   const lastAction = useTaskStore((state) => state.lastAction)
   const { addTask, removeTask, moveTask, setFilter, clearCompleted, resetDemo } = useTaskStore()
 
+  // Compute derived values with useMemo to avoid recalculation
+  const tasks = useMemo(() => getFilteredTasks(allTasks, filter), [allTasks, filter])
+  const counts = useMemo(() => getTaskCounts(allTasks), [allTasks])
+
+  // Handle hydration
   useEffect(() => {
-    setMounted(true)
+    useTaskStore.persist.rehydrate()
+    setHydrated(true)
   }, [])
 
   const handleAddTask = () => {
@@ -60,7 +66,7 @@ export function StateDemo() {
     moveTask(task.id, statusOrder[nextIndex])
   }
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <section id="state-demo" className="py-24 sm:py-32">
         <div className="section-container">

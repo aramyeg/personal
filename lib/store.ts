@@ -91,21 +91,25 @@ export const useTaskStore = create<TaskState & TaskActions>()(
       })),
       {
         name: 'task-store',
+        skipHydration: true,
       }
     ),
     { name: 'TaskStore' }
   )
 )
 
-// Selectors for optimized re-renders
-export const selectFilteredTasks = (state: TaskState) => {
-  if (state.filter === 'all') return state.tasks
-  return state.tasks.filter((task) => task.status === state.filter)
+// Helper to get filtered tasks (use inside component, not as selector)
+export function getFilteredTasks(tasks: Task[], filter: TaskStatus | 'all'): Task[] {
+  if (filter === 'all') return tasks
+  return tasks.filter((task) => task.status === filter)
 }
 
-export const selectTaskCounts = (state: TaskState) => ({
-  all: state.tasks.length,
-  todo: state.tasks.filter((t) => t.status === 'todo').length,
-  'in-progress': state.tasks.filter((t) => t.status === 'in-progress').length,
-  done: state.tasks.filter((t) => t.status === 'done').length,
-})
+// Helper to get counts (use inside component, not as selector)
+export function getTaskCounts(tasks: Task[]) {
+  return {
+    all: tasks.length,
+    todo: tasks.filter((t) => t.status === 'todo').length,
+    'in-progress': tasks.filter((t) => t.status === 'in-progress').length,
+    done: tasks.filter((t) => t.status === 'done').length,
+  }
+}
