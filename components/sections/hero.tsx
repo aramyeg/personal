@@ -31,12 +31,12 @@ export function Hero() {
 
       {/* Floating tech icons around avatar */}
       <motion.div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none z-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1, duration: 1 }}
       >
-        <FloatingIcons className="absolute inset-0 hidden sm:block" />
+        <FloatingIcons className="absolute inset-0 hidden sm:block opacity-60" />
       </motion.div>
 
       {/* Pixelated Avatar */}
@@ -228,73 +228,76 @@ function PixelAvatar() {
             {/* Background */}
             <rect width="16" height="20" fill="currentColor" className="text-card" />
 
-            {/* Hair - Full head with man-bun at back */}
+            {/* Hair - Longer flowing hair with man-bun on top */}
+            {/* Man-bun on top */}
+            <rect x="6" y="0" width="4" height="1" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="5" y="1" width="6" height="1" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="6" y="2" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
             {/* Top of head hair */}
-            <rect x="4" y="1" width="8" height="1" className="fill-foreground" />
-            <rect x="3" y="2" width="10" height="1" className="fill-foreground" />
-            <rect x="3" y="3" width="2" height="1" className="fill-foreground" />
-            <rect x="11" y="3" width="2" height="1" className="fill-foreground" />
-            {/* Man-bun gathered at back-top */}
-            <rect x="11" y="1" width="2" height="3" className="fill-foreground" />
-            <rect x="12" y="0" width="2" height="2" className="fill-foreground" />
-            <rect x="13" y="2" width="1" height="2" className="fill-foreground" />
+            <rect x="4" y="2" width="8" height="1" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="3" y="3" width="10" height="1" className="fill-stone-800 dark:fill-stone-300" />
+            {/* Side hair flowing down */}
+            <rect x="2" y="3" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="3" y="4" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="12" y="4" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
+            <rect x="13" y="3" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
+            {/* Hair highlights */}
+            <rect x="4" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="11" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
 
             {/* Face - Skin tone */}
-            <rect x="4" y="3" width="7" height="5" className="fill-amber-200 dark:fill-amber-100" />
-            <rect x="5" y="8" width="5" height="1" className="fill-amber-200 dark:fill-amber-100" />
+            <rect x="4" y="4" width="8" height="4" className="fill-amber-200 dark:fill-amber-300" />
+            <rect x="5" y="8" width="6" height="1" className="fill-amber-200 dark:fill-amber-300" />
 
             {/* Eyes - with blink animation */}
             <AnimatePresence mode="wait">
               {isBlinking ? (
                 <>
-                  <rect x="5" y="5" width="2" height="1" className="fill-foreground/40" />
-                  <rect x="9" y="5" width="2" height="1" className="fill-foreground/40" />
+                  <rect x="5" y="5" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
+                  <rect x="9" y="5" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
                 </>
               ) : (
                 <>
-                  <rect x="5" y="5" width="2" height="2" className="fill-foreground" />
-                  <rect x="9" y="5" width="2" height="2" className="fill-foreground" />
+                  <rect x="5" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
+                  <rect x="9" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
                   {/* Eye shine */}
-                  <rect x="5" y="5" width="1" height="1" className="fill-white/50" />
-                  <rect x="9" y="5" width="1" height="1" className="fill-white/50" />
+                  <rect x="5" y="5" width="1" height="1" className="fill-white/60" />
+                  <rect x="9" y="5" width="1" height="1" className="fill-white/60" />
                 </>
               )}
             </AnimatePresence>
 
             {/* Eyebrows */}
-            <rect x="5" y="4" width="2" height="1" className="fill-foreground/60" />
-            <rect x="9" y="4" width="2" height="1" className="fill-foreground/60" />
+            <rect x="5" y="4" width="2" height="1" className="fill-stone-700 dark:fill-stone-500" />
+            <rect x="9" y="4" width="2" height="1" className="fill-stone-700 dark:fill-stone-500" />
 
             {/* Nose */}
-            <rect x="7" y="6" width="1" height="1" className="fill-amber-300/50 dark:fill-amber-200/50" />
+            <rect x="7" y="6" width="2" height="1" className="fill-amber-300/60 dark:fill-amber-400/60" />
 
             {/* Friendly smile */}
-            <rect x="6" y="7" width="3" height="1" className="fill-foreground/40" />
+            <rect x="6" y="7" width="4" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
             {/* Neck */}
-            <rect x="6" y="9" width="3" height="1" className="fill-amber-200 dark:fill-amber-100" />
+            <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-300" />
 
-            {/* T-shirt - Black in light mode, off-white in dark mode */}
+            {/* T-shirt - Black in light mode, cream in dark mode */}
             {/* Main torso */}
-            <rect x="2" y="10" width="11" height="5" className="fill-gray-900 dark:fill-stone-200" />
+            <rect x="2" y="10" width="12" height="5" className="fill-stone-900 dark:fill-stone-100" />
             {/* Collar detail */}
-            <rect x="6" y="10" width="3" height="1" className="fill-gray-800 dark:fill-stone-300" />
+            <rect x="6" y="10" width="4" height="1" className="fill-stone-800 dark:fill-stone-200" />
             {/* Shoulders */}
-            <rect x="1" y="11" width="1" height="4" className="fill-gray-900 dark:fill-stone-200" />
-            <rect x="13" y="11" width="1" height="4" className="fill-gray-900 dark:fill-stone-200" />
+            <rect x="1" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
+            <rect x="14" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
             {/* Shirt bottom */}
-            <rect x="3" y="15" width="9" height="3" className="fill-gray-900 dark:fill-stone-200" />
+            <rect x="3" y="15" width="10" height="3" className="fill-stone-900 dark:fill-stone-100" />
 
-            {/* Arms - muscular */}
-            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-100" />
-            <rect x="14" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-100" />
-            {/* Bicep detail */}
-            <rect x="0" y="12" width="1" height="2" className="fill-amber-300/50 dark:fill-amber-200/50" />
-            <rect x="14" y="12" width="1" height="2" className="fill-amber-300/50 dark:fill-amber-200/50" />
+            {/* Arms */}
+            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
+            <rect x="15" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
 
-            {/* Pants/bottom hint */}
-            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
-            <rect x="8" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+            {/* Pants hint */}
+            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
+            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
           </svg>
         </motion.div>
       </motion.div>

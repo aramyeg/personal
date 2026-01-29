@@ -322,7 +322,6 @@ Type 'help' to see available commands.`,
                   onKeyDown={handleKeyDown}
                   className="flex-1 bg-transparent outline-none text-green-300 caret-green-400"
                   placeholder="Type a command..."
-                  autoFocus
                   aria-label="Terminal command input"
                 />
                 <motion.span

@@ -69,24 +69,26 @@ export function Contact() {
   return (
     <section id="contact" className="py-24 sm:py-32 relative overflow-hidden">
       {/* Animated background particles */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute text-2xl"
+            style={{
+              left: `${(i * 7) % 100}%`,
+            }}
             initial={{
-              x: Math.random() * 100 + '%',
-              y: '100%',
+              y: '100vh',
               opacity: 0,
             }}
             animate={{
-              y: '-20%',
-              opacity: [0, 0.5, 0],
+              y: '-100px',
+              opacity: [0, 0.6, 0],
             }}
             transition={{
-              duration: 10 + Math.random() * 10,
+              duration: 12 + (i % 5) * 2,
               repeat: Infinity,
-              delay: Math.random() * 10,
+              delay: i * 0.8,
               ease: 'linear',
             }}
           >
@@ -206,69 +208,76 @@ export function Contact() {
           {/* Main CTA - Email */}
           <FadeIn delay={0.2}>
             <div className="text-center mb-12">
-              <motion.a
+              <a
                 href={`mailto:${siteConfig.email}`}
                 onMouseEnter={() => setEmailHovered(true)}
                 onMouseLeave={() => setEmailHovered(false)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="group relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
+                className="group relative inline-block"
               >
-                {/* Animated background */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
-                  animate={{ x: emailHovered ? ['-100%', '100%'] : '-100%' }}
-                  transition={{ duration: 0.6 }}
-                />
-
-                <motion.div animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}>
-                  <Mail className="h-7 w-7" />
-                </motion.div>
-
-                <span className="relative">
-                  {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
-                </span>
-
-                <motion.div
-                  animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
-                  transition={{ type: 'spring' }}
+                  className="relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
+                  animate={{ scale: emailHovered ? 1.05 : 1 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
                 >
-                  <Send className="h-6 w-6" />
-                </motion.div>
+                  {/* Animated background */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
+                    animate={{ x: emailHovered ? ['-100%', '100%'] : '-100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
 
-                {/* Sparkles on hover */}
-                <AnimatePresence>
-                  {emailHovered && (
-                    <>
-                      {[...Array(6)].map((_, i) => (
-                        <motion.div
-                          key={i}
-                          className="absolute"
-                          initial={{ scale: 0, x: 0, y: 0 }}
-                          animate={{
-                            scale: [0, 1, 0],
-                            x: (Math.random() - 0.5) * 100,
-                            y: (Math.random() - 0.5) * 60,
-                          }}
-                          exit={{ scale: 0 }}
-                          transition={{ duration: 0.5, delay: i * 0.05 }}
-                        >
-                          <Star className="h-4 w-4 text-yellow-300" fill="currentColor" />
-                        </motion.div>
-                      ))}
-                    </>
-                  )}
-                </AnimatePresence>
-              </motion.a>
+                  <motion.div animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}>
+                    <Mail className="h-7 w-7" />
+                  </motion.div>
+
+                  <span className="relative">
+                    {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
+                  </span>
+
+                  <motion.div
+                    animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
+                    transition={{ type: 'spring' }}
+                  >
+                    <Send className="h-6 w-6" />
+                  </motion.div>
+
+                  {/* Sparkles on hover */}
+                  <AnimatePresence>
+                    {emailHovered && (
+                      <>
+                        {[...Array(6)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="absolute"
+                            style={{
+                              left: `${20 + i * 12}%`,
+                              top: '50%',
+                            }}
+                            initial={{ scale: 0, y: 0 }}
+                            animate={{
+                              scale: [0, 1, 0],
+                              y: [(i % 2 === 0 ? -1 : 1) * 30],
+                            }}
+                            exit={{ scale: 0 }}
+                            transition={{ duration: 0.5, delay: i * 0.05 }}
+                          >
+                            <Star className="h-4 w-4 text-yellow-300" fill="currentColor" />
+                          </motion.div>
+                        ))}
+                      </>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </a>
 
               {/* Location */}
               <motion.div
-                className="mt-6 inline-flex items-center gap-2 text-muted-foreground"
+                className="mt-8 inline-flex items-center gap-2 text-muted-foreground"
                 whileHover={{ scale: 1.05 }}
               >
                 <MapPin className="h-5 w-5" />
                 <span>{siteConfig.location} 🇦🇲</span>
-                <span className="text-xs">(Remote-first though!)</span>
+                <span className="text-xs ml-1">(Remote-first though!)</span>
               </motion.div>
             </div>
           </FadeIn>

@@ -118,12 +118,10 @@ function ProjectCard({
 }) {
   return (
     <motion.article
-      layout
       initial={{ opacity: 0, y: 50 }}
       whileInView={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
       viewport={{ once: true, margin: '-100px' }}
-      transition={{ duration: 0.5, delay: index * 0.15 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
       className="group relative"
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
