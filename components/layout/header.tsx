@@ -48,10 +48,15 @@ export function Header() {
           backgroundColor: 'hsl(var(--background) / 0.8)',
         }}
       />
-      <nav className="relative section-container flex items-center justify-between h-16">
+      <nav
+        className="relative section-container flex items-center justify-between h-16"
+        role="navigation"
+        aria-label="Main navigation"
+      >
         <Link
           href="/"
           className="font-semibold text-lg tracking-tight hover:text-primary transition-colors"
+          aria-label="Go to homepage"
         >
           AY
         </Link>

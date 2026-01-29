@@ -278,6 +278,9 @@ Type 'help' to see available commands.`,
             <div
               ref={terminalRef}
               className="p-4 min-h-[400px] max-h-[500px] overflow-y-auto font-mono text-sm"
+              role="log"
+              aria-live="polite"
+              aria-label="Terminal output"
             >
               <AnimatePresence>
                 {history.map((item) => (
@@ -320,6 +323,7 @@ Type 'help' to see available commands.`,
                   className="flex-1 bg-transparent outline-none text-green-300 caret-green-400"
                   placeholder="Type a command..."
                   autoFocus
+                  aria-label="Terminal command input"
                 />
                 <motion.span
                   className="w-2 h-5 bg-green-400"

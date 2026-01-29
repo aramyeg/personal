@@ -33,7 +33,10 @@ export function Footer() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex flex-wrap items-center justify-center gap-6">
+          <nav
+            className="flex flex-wrap items-center justify-center gap-6"
+            aria-label="Footer navigation"
+          >
             {navLinks.map((link) => (
               <a
                 key={link.label}
