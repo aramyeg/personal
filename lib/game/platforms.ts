@@ -171,6 +171,8 @@ export function createPlatform(config: {
   year: string
   company: string
   icon?: string
+  experienceId: string
+  technologies: string[]
 }): Platform {
   const style = config.style || 'tech_block'
   const circuitSeed = Math.floor(Math.random() * 10000)
@@ -189,6 +191,8 @@ export function createPlatform(config: {
     icon: config.icon || '💼',
     reached: false,
     glowIntensity: 0,
+    experienceId: config.experienceId,
+    technologies: config.technologies,
     circuitSeed,
     codeLines: style === 'code_block' ? getCodeSnippet(circuitSeed) : undefined,
     serverLights:
@@ -236,6 +240,8 @@ export function generatePlatforms(
       year,
       company: exp.company,
       icon: getRoleIcon(exp.role),
+      experienceId: exp.id,
+      technologies: exp.technologies || [],
     })
   })
 }
