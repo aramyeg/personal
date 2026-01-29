@@ -35,9 +35,22 @@ import {
   emitStarBurst,
   emitConfetti,
   emitTrail,
+  emitDamage,
+  emitRespawn,
   type ParticleEmitter,
 } from '@/lib/game/particles'
 import type { Platform, GameConfig, InputState } from '@/lib/game/types'
+import {
+  useGameState,
+  useLives,
+  useScore,
+  useIsGameOver,
+  useIsGameWon,
+  useIsGameStarted,
+  GAME_MODE_CONFIGS,
+} from '@/lib/game/gameState'
+import { GameHUD } from '@/components/game/GameHUD'
+import { GameOverScreen } from '@/components/game/GameOverScreen'
 
 // Game configuration
 const CONFIG: GameConfig = {
@@ -53,6 +66,9 @@ const CONFIG: GameConfig = {
 const CANVAS_WIDTH = 620
 const CANVAS_HEIGHT = 220
 
+// Death zone (below canvas)
+const DEATH_ZONE_Y = CANVAS_HEIGHT + 50
+
 // Player state type
 type Player = {
   x: number
@@ -64,6 +80,8 @@ type Player = {
   grounded: boolean
   wasGrounded: boolean
   facingRight: boolean
+  invulnerable: boolean
+  invulnerableTimer: number
 }
 
 /**
@@ -80,15 +98,35 @@ function createPlayer(startX: number, startY: number): Player {
     grounded: false,
     wasGrounded: false,
     facingRight: true,
+    invulnerable: false,
+    invulnerableTimer: 0,
   }
 }
 
 export function CareerGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [gameStarted, setGameStarted] = useState(false)
-  const [gameWon, setGameWon] = useState(false)
   const [currentMilestone, setCurrentMilestone] = useState<string | null>(null)
-  const [score, setScore] = useState(0)
+
+  // Game state from Zustand store
+  const {
+    initGame,
+    startGame,
+    resetGame: resetGameState,
+    loseLife,
+    addScore,
+    reachPlatform,
+    collectTech,
+    updateGameTime,
+    setGameWon,
+    getCheckpointIndex,
+    mode,
+  } = useGameState()
+
+  const lives = useLives()
+  const score = useScore()
+  const gameOver = useIsGameOver()
+  const gameWon = useIsGameWon()
+  const gameStarted = useIsGameStarted()
 
   // Theme-aware palette
   const [palette, setPalette] = useState<ColorPalette>(() => getPalette(false))
@@ -138,6 +176,11 @@ export function CareerGame() {
     setBackgroundState(generateBackground(CANVAS_WIDTH, CANVAS_HEIGHT))
   }, [])
 
+  // Initialize game state
+  useEffect(() => {
+    initGame('classic', initialPlatforms.length, initialCollectibles.length)
+  }, [initGame, initialPlatforms.length, initialCollectibles.length])
+
   // Update palette on theme change
   useEffect(() => {
     const updatePalette = () => {
@@ -155,6 +198,36 @@ export function CareerGame() {
     return () => observer.disconnect()
   }, [])
 
+  /**
+   * Respawns player at checkpoint or start
+   */
+  const respawnPlayer = useCallback(() => {
+    const checkpointIndex = getCheckpointIndex()
+    let respawnX = 40
+    let respawnY = 140
+
+    if (checkpointIndex >= 0 && checkpointIndex < platforms.length) {
+      const checkpoint = platforms[checkpointIndex]
+      respawnX = checkpoint.x + 20
+      respawnY = checkpoint.y - CONFIG.playerHeight - 10
+    }
+
+    // Reset player state
+    playerRef.current = {
+      ...createPlayer(respawnX, respawnY),
+      invulnerable: true,
+      invulnerableTimer: 2000, // 2 seconds of invulnerability
+    }
+
+    // Emit respawn particles
+    particleEmitterRef.current = emitRespawn(
+      particleEmitterRef.current,
+      respawnX + CONFIG.playerWidth / 2,
+      respawnY + CONFIG.playerHeight / 2,
+      16
+    )
+  }, [getCheckpointIndex, platforms])
+
   const resetGame = useCallback(() => {
     playerRef.current = createPlayer(40, 140)
     characterStateRef.current = createCharacterState()
@@ -162,26 +235,44 @@ export function CareerGame() {
     wasInAirRef.current = false
     setPlatforms(initialPlatforms)
     setCollectibles(initialCollectibles)
-    setGameWon(false)
     setCurrentMilestone(null)
-    setScore(0)
     cameraXRef.current = 0
     gameTimeRef.current = 0
-  }, [initialPlatforms, initialCollectibles])
+    resetGameState()
+  }, [initialPlatforms, initialCollectibles, resetGameState])
+
+  const handleStartGame = useCallback(() => {
+    resetGame()
+    startGame()
+  }, [resetGame, startGame])
+
+  const handleReturnToMenu = useCallback(() => {
+    resetGame()
+  }, [resetGame])
 
   const gameLoop = useCallback(
     (timestamp: number) => {
       const canvas = canvasRef.current
       const ctx = canvas?.getContext('2d')
-      if (!canvas || !ctx || !gameStarted || !backgroundState) return
+      if (!canvas || !ctx || !gameStarted || gameOver || gameWon || !backgroundState) return
 
       // Calculate delta time
       const deltaTime = lastTimeRef.current ? timestamp - lastTimeRef.current : 16
       lastTimeRef.current = timestamp
       gameTimeRef.current += deltaTime
+      updateGameTime(deltaTime)
 
       const player = playerRef.current
       const keys = keysRef.current
+
+      // Update invulnerability timer
+      if (player.invulnerable) {
+        player.invulnerableTimer -= deltaTime
+        if (player.invulnerableTimer <= 0) {
+          player.invulnerable = false
+          player.invulnerableTimer = 0
+        }
+      }
 
       // Store previous grounded state
       player.wasGrounded = player.grounded
@@ -209,8 +300,26 @@ export function CareerGame() {
       // Clamp velocity
       player.vx = Math.max(-CONFIG.moveSpeed, Math.min(CONFIG.moveSpeed, player.vx))
 
-      // World bounds
-      player.x = Math.max(0, Math.min(CANVAS_WIDTH - player.width, player.x))
+      // World bounds (horizontal only - can fall off bottom)
+      player.x = Math.max(0, player.x)
+
+      // Check death zone (fell off screen)
+      if (player.y > DEATH_ZONE_Y && !player.invulnerable) {
+        // Emit damage particles at last known position
+        particleEmitterRef.current = emitDamage(
+          particleEmitterRef.current,
+          player.x + player.width / 2,
+          CANVAS_HEIGHT,
+          15
+        )
+
+        const isGameOver = loseLife()
+
+        if (!isGameOver) {
+          // Respawn at checkpoint
+          respawnPlayer()
+        }
+      }
 
       // Ground collision
       const groundY = CANVAS_HEIGHT - 20
@@ -245,6 +354,9 @@ export function CareerGame() {
               setCurrentMilestone(`${platform.icon} ${platform.year}: ${platform.company}`)
               setTimeout(() => setCurrentMilestone(null), 2500)
 
+              // Update game state
+              reachPlatform(index)
+
               // Emit star burst for reaching milestone
               particleEmitterRef.current = emitStarBurst(
                 particleEmitterRef.current,
@@ -256,7 +368,7 @@ export function CareerGame() {
 
               // Check if this is the final platform
               if (index === prev.length - 1) {
-                setGameWon(true)
+                setGameWon()
                 // Emit confetti for winning
                 particleEmitterRef.current = emitConfetti(
                   particleEmitterRef.current,
@@ -290,14 +402,12 @@ export function CareerGame() {
 
       if (collisionResult.collected.length > 0) {
         setCollectibles(collisionResult.collectibles)
-        const points = collisionResult.collected.reduce(
-          (sum, c) => sum + getCollectibleValue(c.type),
-          0
-        )
-        setScore((prev) => prev + points)
 
-        // Emit sparkles for collected items
+        // Update game state for each collected item
         collisionResult.collected.forEach((c) => {
+          collectTech(c.type, getCollectibleValue(c.type))
+
+          // Emit sparkles for collected items
           particleEmitterRef.current = emitSparkles(
             particleEmitterRef.current,
             c.x + 4,
@@ -368,26 +478,37 @@ export function CareerGame() {
       // Render collectibles
       renderCollectibles(ctx, collectibles, cameraXRef.current, gameTimeRef.current, palette)
 
-      // Render character
+      // Render character (with flashing effect if invulnerable)
       const screenX = player.x - cameraXRef.current
-      renderCharacter(ctx, screenX, player.y, characterStateRef.current, palette, 1.5)
+      const shouldRender = !player.invulnerable || Math.floor(gameTimeRef.current / 100) % 2 === 0
+      if (shouldRender) {
+        renderCharacter(ctx, screenX, player.y, characterStateRef.current, palette, 1.5)
+      }
 
       // Render particles (on top of character)
       renderParticles(ctx, particleEmitterRef.current, cameraXRef.current)
 
-      // Render score
-      ctx.fillStyle = palette.ui.text
-      ctx.font = 'bold 12px monospace'
-      ctx.textAlign = 'left'
-      ctx.fillText(`Score: ${score}`, 10, 20)
-
       animationRef.current = requestAnimationFrame(gameLoop)
     },
-    [gameStarted, platforms, collectibles, palette, backgroundState, score]
+    [
+      gameStarted,
+      gameOver,
+      gameWon,
+      platforms,
+      collectibles,
+      palette,
+      backgroundState,
+      updateGameTime,
+      loseLife,
+      respawnPlayer,
+      reachPlatform,
+      setGameWon,
+      collectTech,
+    ]
   )
 
   useEffect(() => {
-    if (gameStarted && !gameWon) {
+    if (gameStarted && !gameWon && !gameOver) {
       lastTimeRef.current = 0
       animationRef.current = requestAnimationFrame(gameLoop)
     }
@@ -396,7 +517,7 @@ export function CareerGame() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [gameStarted, gameWon, gameLoop])
+  }, [gameStarted, gameWon, gameOver, gameLoop])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -454,6 +575,8 @@ export function CareerGame() {
   // Screen reader announcement
   const announcement = gameWon
     ? `Journey Complete! Reached ${finalPlatform?.label} at ${finalPlatform?.company}. Score: ${score}`
+    : gameOver
+    ? `Game Over! Score: ${score}`
     : currentMilestone
 
   return (
@@ -481,6 +604,9 @@ export function CareerGame() {
           tabIndex={gameStarted ? 0 : -1}
         />
 
+        {/* HUD overlay */}
+        {gameStarted && !gameOver && !gameWon && <GameHUD />}
+
         {/* Start overlay */}
         <AnimatePresence>
           {!gameStarted && (
@@ -497,8 +623,11 @@ export function CareerGame() {
                 <br />
                 Collect tech icons and reach each company platform.
               </p>
+              <p className="text-xs text-muted-foreground">
+                You have {GAME_MODE_CONFIGS[mode].lives} lives. Don&apos;t fall!
+              </p>
               <motion.button
-                onClick={() => setGameStarted(true)}
+                onClick={handleStartGame}
                 className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -509,13 +638,20 @@ export function CareerGame() {
           )}
         </AnimatePresence>
 
+        {/* Game Over overlay */}
+        <AnimatePresence>
+          {gameOver && (
+            <GameOverScreen onRetry={handleStartGame} onMainMenu={handleReturnToMenu} />
+          )}
+        </AnimatePresence>
+
         {/* Win overlay */}
         <AnimatePresence>
           {gameWon && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-4"
+              className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-4 z-20"
             >
               <motion.div
                 animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.2, 1] }}
@@ -531,8 +667,13 @@ export function CareerGame() {
               <p className="text-sm text-muted-foreground">
                 {finalPlatform?.icon} Reached {finalPlatform?.label} at {finalPlatform?.company}
               </p>
+              {lives === GAME_MODE_CONFIGS[mode].lives && (
+                <p className="text-xs text-green-500 font-medium">
+                  Flawless run - no lives lost!
+                </p>
+              )}
               <motion.button
-                onClick={resetGame}
+                onClick={handleStartGame}
                 className="flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -546,12 +687,12 @@ export function CareerGame() {
 
         {/* Milestone notification */}
         <AnimatePresence>
-          {currentMilestone && (
+          {currentMilestone && !gameOver && !gameWon && (
             <motion.div
               initial={{ y: -50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -50, opacity: 0 }}
-              className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium"
+              className="absolute top-12 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium z-10"
             >
               {currentMilestone}
             </motion.div>

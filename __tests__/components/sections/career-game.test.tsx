@@ -2,6 +2,52 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
+// Mock the game state store with reactive state
+let mockGameStarted = false
+const mockStartGame = vi.fn(() => {
+  mockGameStarted = true
+})
+const mockResetGame = vi.fn(() => {
+  mockGameStarted = false
+})
+
+vi.mock('@/lib/game/gameState', () => ({
+  useGameState: () => ({
+    initGame: vi.fn(),
+    startGame: mockStartGame,
+    resetGame: mockResetGame,
+    loseLife: vi.fn(() => false),
+    addScore: vi.fn(),
+    reachPlatform: vi.fn(),
+    collectTech: vi.fn(),
+    updateGameTime: vi.fn(),
+    setGameWon: vi.fn(),
+    getCheckpointIndex: vi.fn(() => -1),
+    mode: 'classic',
+  }),
+  useLives: () => 3,
+  useMaxLives: () => 3,
+  useScore: () => 0,
+  useGameTime: () => 0,
+  useTimeLimit: () => null,
+  useActivePowerUps: () => [],
+  useGameMode: () => 'classic',
+  useIsGameOver: () => false,
+  useIsGameWon: () => false,
+  useIsGameStarted: () => mockGameStarted,
+  GAME_MODE_CONFIGS: {
+    classic: { lives: 3, timeLimit: null, scoreMultiplier: 1, hasCheckpoints: true, powerUpsEnabled: true },
+    speedrun: { lives: 3, timeLimit: 60000, scoreMultiplier: 1.5, hasCheckpoints: true, powerUpsEnabled: true },
+    hardcore: { lives: 1, timeLimit: null, scoreMultiplier: 2, hasCheckpoints: false, powerUpsEnabled: false },
+  },
+  formatTime: (ms: number) => {
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`
+  },
+  getRemainingTime: () => null,
+}))
+
 // Mock framer-motion
 vi.mock('framer-motion', async () => {
   const actual = await vi.importActual('framer-motion')
@@ -35,6 +81,15 @@ vi.mock('framer-motion', async () => {
           {children as React.ReactNode}
         </button>
       ),
+      span: ({
+        children,
+        className,
+        ...props
+      }: Record<string, unknown>) => (
+        <span className={className as string} {...props}>
+          {children as React.ReactNode}
+        </span>
+      ),
     },
   }
 })
@@ -66,6 +121,7 @@ import { CareerGame } from '@/components/sections/career-game'
 describe('CareerGame Accessibility', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    mockGameStarted = false
   })
 
   afterEach(() => {
@@ -97,8 +153,8 @@ describe('CareerGame Accessibility', () => {
     expect(startButton.tagName).toBe('BUTTON')
 
     fireEvent.click(startButton)
-    // After click, the start overlay should be removed
-    expect(screen.queryByText('Start Game')).not.toBeInTheDocument()
+    // After click, the startGame function should be called
+    expect(mockStartGame).toHaveBeenCalled()
   })
 
   it('mobile controls have aria-labels', () => {
@@ -150,6 +206,7 @@ describe('CareerGame Structure', () => {
 describe('CareerGame Keyboard Controls', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    mockGameStarted = false
   })
 
   afterEach(() => {
@@ -187,6 +244,10 @@ describe('CareerGame Keyboard Controls', () => {
 })
 
 describe('CareerGame Game States', () => {
+  beforeEach(() => {
+    mockGameStarted = false
+  })
+
   it('shows win overlay when game is won', async () => {
     render(<CareerGame />)
 
