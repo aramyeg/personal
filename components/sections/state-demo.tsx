@@ -25,9 +25,9 @@ import {
 import { cn } from '@/lib/utils'
 
 const statusConfig: Record<TaskStatus, { label: string; icon: typeof ListTodo; color: string }> = {
-  todo: { label: 'To Do', icon: ListTodo, color: 'text-amber-500' },
-  'in-progress': { label: 'In Progress', icon: Clock, color: 'text-blue-500' },
-  done: { label: 'Done', icon: CheckCircle2, color: 'text-emerald-500' },
+  todo: { label: 'To Do', icon: ListTodo, color: 'text-amber-600' },
+  'in-progress': { label: 'In Progress', icon: Clock, color: 'text-sky-500' },
+  done: { label: 'Done', icon: CheckCircle2, color: 'text-primary' },
 }
 
 const statusOrder: TaskStatus[] = ['todo', 'in-progress', 'done']
@@ -354,10 +354,10 @@ function TaskCard({
         className={cn(
           'h-8 w-8 rounded-lg flex items-center justify-center transition-colors',
           task.status === 'done'
-            ? 'bg-emerald-500/20'
+            ? 'bg-primary/20'
             : task.status === 'in-progress'
-              ? 'bg-blue-500/20'
-              : 'bg-amber-500/20'
+              ? 'bg-sky-500/20'
+              : 'bg-amber-600/20'
         )}
       >
         <Icon className={cn('h-4 w-4', config.color)} />
