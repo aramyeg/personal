@@ -1,5 +1,45 @@
 import type { Skill, SkillCategory } from '@/types'
 
+// Focus skills - Modern stack the user is highly confident in despite less time
+export type FocusSkill = {
+  name: string
+  description: string
+  confidence: 'High' | 'Very High'
+  growth: string
+  icon: string
+}
+
+export const focusSkills: FocusSkill[] = [
+  {
+    name: 'Zustand',
+    description: 'Lightweight, fast state management with minimal boilerplate',
+    confidence: 'Very High',
+    growth: 'Mastered in 2 years, now my go-to for state',
+    icon: '🐻',
+  },
+  {
+    name: 'Shadcn/ui',
+    description: 'Beautifully designed, accessible components built on Radix',
+    confidence: 'Very High',
+    growth: 'Daily driver for all new projects',
+    icon: '✨',
+  },
+  {
+    name: 'TanStack Query',
+    description: 'Powerful async state management for server state',
+    confidence: 'High',
+    growth: 'Essential for every data-fetching need',
+    icon: '⚡',
+  },
+  {
+    name: 'Next.js App Router',
+    description: 'Modern React framework with RSC and streaming',
+    confidence: 'Very High',
+    growth: 'Embraced early, production-ready expertise',
+    icon: '🚀',
+  },
+]
+
 export const skills: Skill[] = [
   // Frontend
   { name: 'React', years: 8, category: 'frontend', level: 'expert' },
