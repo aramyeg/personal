@@ -69,3 +69,6 @@ IMPROVEMENT_PLAN.md
 docs/
 
 *storybook.log
+
+.vercel
+.env*.local
