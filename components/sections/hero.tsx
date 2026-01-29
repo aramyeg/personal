@@ -3,22 +3,45 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
-import { TextReveal } from '@/components/animation'
+import { TextReveal, Typewriter, FloatingIcons } from '@/components/animation'
 import { siteConfig } from '@/lib/constants'
+
+const taglines = [
+  'Building exceptional web experiences',
+  'From fintech to proptech and beyond',
+  'React, TypeScript, Next.js enthusiast',
+  'Remote-first, globally connected',
+]
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+        {/* Additional subtle gradient orbs */}
+        <motion.div
+          className="absolute top-1/3 right-1/3 w-64 h-64 bg-accent/5 rounded-full blur-3xl"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </div>
+
+      {/* Floating tech icons around avatar */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1, duration: 1 }}
+      >
+        <FloatingIcons className="absolute inset-0 hidden sm:block" />
+      </motion.div>
 
       {/* Pixelated Avatar */}
       <motion.div
-        className="relative mb-8"
+        className="relative mb-8 z-10"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
@@ -30,13 +53,13 @@ export function Hero() {
       <TextReveal
         text={siteConfig.name}
         as="h1"
-        className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-center"
+        className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-center z-10"
         delay={0.3}
       />
 
       {/* Title */}
       <motion.p
-        className="mt-4 text-lg sm:text-xl md:text-2xl text-muted-foreground text-center"
+        className="mt-4 text-lg sm:text-xl md:text-2xl text-muted-foreground text-center z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.8 }}
@@ -44,22 +67,34 @@ export function Hero() {
         {siteConfig.title}
       </motion.p>
 
-      {/* Tagline */}
-      <motion.p
-        className="mt-2 text-sm sm:text-base text-muted-foreground/70 text-center max-w-md"
+      {/* Animated Tagline with Typewriter */}
+      <motion.div
+        className="mt-3 h-8 text-sm sm:text-base text-muted-foreground/70 text-center max-w-md z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 1.1 }}
       >
-        8+ years crafting exceptional web & mobile experiences
-      </motion.p>
+        <Typewriter texts={taglines} typingSpeed={40} deletingSpeed={25} pauseDuration={2500} />
+      </motion.div>
+
+      {/* Experience badge */}
+      <motion.div
+        className="mt-4 px-4 py-1.5 rounded-full bg-muted/50 border border-border z-10"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 1.2 }}
+      >
+        <span className="text-sm text-muted-foreground">
+          8+ years of frontend expertise
+        </span>
+      </motion.div>
 
       {/* Status badge */}
       <motion.div
-        className="mt-6 flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20"
+        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 z-10"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: 1.3 }}
+        transition={{ duration: 0.4, delay: 1.4 }}
       >
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
