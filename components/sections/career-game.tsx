@@ -49,8 +49,8 @@ import {
   useIsGameStarted,
   GAME_MODE_CONFIGS,
 } from '@/lib/game/gameState'
-import { GameHUD } from '@/components/game/GameHUD'
-import { GameOverScreen } from '@/components/game/GameOverScreen'
+import { GameHUD, GameOverScreen, ExperiencePopupCard } from '@/components/game'
+import type { Experience } from '@/types'
 
 // Game configuration
 const CONFIG: GameConfig = {
@@ -105,7 +105,7 @@ function createPlayer(startX: number, startY: number): Player {
 
 export function CareerGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [currentMilestone, setCurrentMilestone] = useState<string | null>(null)
+  const [currentExperience, setCurrentExperience] = useState<Experience | null>(null)
 
   // Game state from Zustand store
   const {
@@ -235,7 +235,7 @@ export function CareerGame() {
     wasInAirRef.current = false
     setPlatforms(initialPlatforms)
     setCollectibles(initialCollectibles)
-    setCurrentMilestone(null)
+    setCurrentExperience(null)
     cameraXRef.current = 0
     gameTimeRef.current = 0
     resetGameState()
@@ -351,8 +351,11 @@ export function CareerGame() {
 
             if (!platform.reached) {
               updated = true
-              setCurrentMilestone(`${platform.icon} ${platform.year}: ${platform.company}`)
-              setTimeout(() => setCurrentMilestone(null), 2500)
+              // Find the experience data for this platform
+              const experience = experiences.find(exp => exp.id === platform.experienceId)
+              if (experience) {
+                setCurrentExperience(experience)
+              }
 
               // Update game state
               reachPlatform(index)
@@ -577,7 +580,9 @@ export function CareerGame() {
     ? `Journey Complete! Reached ${finalPlatform?.label} at ${finalPlatform?.company}. Score: ${score}`
     : gameOver
     ? `Game Over! Score: ${score}`
-    : currentMilestone
+    : currentExperience
+    ? `Reached ${currentExperience.company}: ${currentExperience.role}`
+    : null
 
   return (
     <div className="relative">
@@ -685,17 +690,13 @@ export function CareerGame() {
           )}
         </AnimatePresence>
 
-        {/* Milestone notification */}
+        {/* Experience popup card */}
         <AnimatePresence>
-          {currentMilestone && !gameOver && !gameWon && (
-            <motion.div
-              initial={{ y: -50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -50, opacity: 0 }}
-              className="absolute top-12 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium z-10"
-            >
-              {currentMilestone}
-            </motion.div>
+          {currentExperience && !gameOver && !gameWon && (
+            <ExperiencePopupCard
+              experience={currentExperience}
+              onDismiss={() => setCurrentExperience(null)}
+            />
           )}
         </AnimatePresence>
       </div>
