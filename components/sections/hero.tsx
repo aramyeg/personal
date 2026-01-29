@@ -131,6 +131,21 @@ export function Hero() {
 
 function PixelAvatar() {
   const [isBlinking, setIsBlinking] = useState(false)
+  const [clickCount, setClickCount] = useState(0)
+  const [showMessage, setShowMessage] = useState<string | null>(null)
+
+  const clickMessages = [
+    '',
+    '',
+    '',
+    'Hey there! 👋',
+    'You found me!',
+    'Still clicking?',
+    "You're persistent! 😄",
+    'Okay okay, here is a cookie 🍪',
+    'Achievement unlocked: Avatar Clicker!',
+    '🎉 You win the clicking game! 🎉',
+  ]
 
   // Blink animation every 3-5 seconds
   useEffect(() => {
@@ -144,8 +159,36 @@ function PixelAvatar() {
     return () => clearInterval(interval)
   }, [])
 
+  const handleClick = () => {
+    const newCount = clickCount + 1
+    setClickCount(newCount)
+    if (newCount >= 3 && newCount < clickMessages.length) {
+      setShowMessage(clickMessages[newCount])
+      setTimeout(() => setShowMessage(null), 2000)
+    }
+    if (newCount >= 10) {
+      console.log(
+        '%c 🏆 Achievement Unlocked: Persistent Clicker! ',
+        'background: gold; color: black; padding: 10px; font-size: 14px; font-weight: bold;'
+      )
+    }
+  }
+
   return (
-    <div className="relative">
+    <div className="relative cursor-pointer" onClick={handleClick}>
+      {/* Click message */}
+      <AnimatePresence>
+        {showMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: -20, scale: 1 }}
+            exit={{ opacity: 0, y: -40 }}
+            className="absolute -top-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium whitespace-nowrap z-50"
+          >
+            {showMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Glow effect */}
       <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150" />
 

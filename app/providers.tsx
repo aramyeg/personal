@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from 'next-themes'
 import type { ReactNode } from 'react'
+import { EasterEggProvider } from '@/components/easter-egg-provider'
 
 type ProvidersProps = {
   children: ReactNode
@@ -15,7 +16,7 @@ export function Providers({ children }: ProvidersProps) {
       enableSystem
       disableTransitionOnChange={false}
     >
-      {children}
+      <EasterEggProvider>{children}</EasterEggProvider>
     </ThemeProvider>
   )
 }
