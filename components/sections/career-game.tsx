@@ -49,9 +49,10 @@ import {
   useIsGameWon,
   useIsGameStarted,
   useActivePowerUps,
+  useRecentAchievement,
   GAME_MODE_CONFIGS,
 } from '@/lib/game/gameState'
-import { GameHUD, GameOverScreen, ExperiencePopupCard } from '@/components/game'
+import { GameHUD, GameOverScreen, ExperiencePopupCard, AchievementNotification } from '@/components/game'
 import type { Experience } from '@/types'
 
 // Game configuration
@@ -125,6 +126,7 @@ export function CareerGame() {
     updatePowerUps,
     hasPowerUp,
     getPowerUpMultiplier,
+    clearRecentAchievement,
     mode,
   } = useGameState()
 
@@ -134,6 +136,7 @@ export function CareerGame() {
   const gameWon = useIsGameWon()
   const gameStarted = useIsGameStarted()
   const activePowerUps = useActivePowerUps()
+  const recentAchievement = useRecentAchievement()
 
   // Theme-aware palette
   const [palette, setPalette] = useState<ColorPalette>(() => getPalette(false))
@@ -733,6 +736,16 @@ export function CareerGame() {
             <ExperiencePopupCard
               experience={currentExperience}
               onDismiss={() => setCurrentExperience(null)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Achievement notification */}
+        <AnimatePresence>
+          {recentAchievement && (
+            <AchievementNotification
+              achievement={recentAchievement}
+              onDismiss={clearRecentAchievement}
             />
           )}
         </AnimatePresence>
