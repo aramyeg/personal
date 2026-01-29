@@ -43,16 +43,33 @@ export type Player = {
   animationState: AnimationState
 }
 
+// Platform visual styles
+export type PlatformStyle =
+  | 'tech_block'    // Circuit board pattern
+  | 'code_block'    // Syntax-highlighted code
+  | 'server_rack'   // Server/infrastructure
+  | 'mobile_device' // Phone/tablet shape
+  | 'cloud'         // Cloud platform
+  | 'terminal'      // Command line terminal
+
 // Platform representing a career milestone
 export type Platform = {
   x: number
   y: number
   width: number
+  height: number   // Added for varied platform heights
+  style: PlatformStyle
   label: string    // Role title (shortened)
+  subLabel?: string // Additional info (year, period)
   year: string     // Start year
   company: string  // Company name
   icon: string     // Emoji icon
   reached: boolean // Has player landed on this?
+  glowIntensity: number // 0-1, animated when reached
+  // Style-specific properties
+  circuitSeed?: number  // For deterministic circuit patterns
+  codeLines?: string[]  // For code_block style
+  serverLights?: boolean[] // For server_rack style
 }
 
 // Parallax background element

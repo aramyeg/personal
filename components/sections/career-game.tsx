@@ -2,27 +2,69 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Gamepad2, ArrowLeft, ArrowRight, ArrowUp, RotateCcw, Trophy } from 'lucide-react'
+import { Gamepad2, ArrowLeft, ArrowRight, ArrowUp, RotateCcw, Trophy, Star } from 'lucide-react'
 
 import { experiences } from '@/data'
-import { getGameColors, isDarkMode } from '@/lib/game/colors'
-import { generatePlatforms } from '@/lib/game/platforms'
-import { generateParallaxLayers, getElementPosition, renderElement } from '@/lib/game/parallax'
-import type { Platform, Player, GameColors, ParallaxLayer, GameConfig, InputState } from '@/lib/game/types'
+import { getPalette, isDarkMode, type ColorPalette } from '@/lib/game/palette'
+import { generateBackground, renderBackground, type BackgroundState } from '@/lib/game/backgrounds'
+import {
+  createCharacterState,
+  updateCharacterAnimation,
+  getAnimationFromPhysics,
+  renderCharacter,
+  type CharacterState,
+} from '@/lib/game/character'
+import {
+  generatePlatforms,
+  renderPlatforms,
+  updatePlatform,
+} from '@/lib/game/platforms'
+import {
+  generateCollectibles,
+  renderCollectibles,
+  checkCollectibleCollision,
+  getCollectibleValue,
+  type Collectible,
+} from '@/lib/game/collectibles'
+import {
+  createEmitter,
+  updateParticles,
+  renderParticles,
+  emitDust,
+  emitSparkles,
+  emitStarBurst,
+  emitConfetti,
+  emitTrail,
+  type ParticleEmitter,
+} from '@/lib/game/particles'
+import type { Platform, GameConfig, InputState } from '@/lib/game/types'
 
 // Game configuration
 const CONFIG: GameConfig = {
   gravity: 0.5,
-  jumpForce: -12,
+  jumpForce: -11,
   moveSpeed: 4,
   friction: 0.85,
-  playerWidth: 20,
-  playerHeight: 30,
+  playerWidth: 16,
+  playerHeight: 24,
 }
 
 // Canvas dimensions
 const CANVAS_WIDTH = 620
 const CANVAS_HEIGHT = 220
+
+// Player state type
+type Player = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  width: number
+  height: number
+  grounded: boolean
+  wasGrounded: boolean
+  facingRight: boolean
+}
 
 /**
  * Creates initial player state
@@ -36,126 +78,9 @@ function createPlayer(startX: number, startY: number): Player {
     width: CONFIG.playerWidth,
     height: CONFIG.playerHeight,
     grounded: false,
+    wasGrounded: false,
     facingRight: true,
-    animationState: 'idle',
   }
-}
-
-/**
- * Draws pixel art character
- * Custom pixel art design: man with dark hair (man-bun style)
- */
-function drawPixelCharacter(
-  ctx: CanvasRenderingContext2D,
-  player: Player,
-  colors: GameColors
-): void {
-  const { x, y, width, facingRight } = player
-  const scale = width / 16
-
-  ctx.save()
-  if (!facingRight) {
-    ctx.translate(x + width, y)
-    ctx.scale(-1, 1)
-  } else {
-    ctx.translate(x, y)
-  }
-
-  // Hair (man-bun style)
-  ctx.fillStyle = '#5c4033'
-  ctx.fillRect(4 * scale, 0, 8 * scale, 2 * scale)
-  ctx.fillRect(3 * scale, 2 * scale, 10 * scale, 3 * scale)
-
-  // Face
-  ctx.fillStyle = '#f5d0a9'
-  ctx.fillRect(3 * scale, 5 * scale, 10 * scale, 8 * scale)
-
-  // Eyes
-  ctx.fillStyle = colors.text
-  ctx.fillRect(5 * scale, 7 * scale, 2 * scale, 2 * scale)
-  ctx.fillRect(9 * scale, 7 * scale, 2 * scale, 2 * scale)
-
-  // Body (dark shirt)
-  ctx.fillStyle = '#1a1a1a'
-  ctx.fillRect(2 * scale, 13 * scale, 12 * scale, 10 * scale)
-
-  // Arms
-  ctx.fillStyle = '#f5d0a9'
-  ctx.fillRect(0, 14 * scale, 2 * scale, 6 * scale)
-  ctx.fillRect(14 * scale, 14 * scale, 2 * scale, 6 * scale)
-
-  // Pants
-  ctx.fillStyle = '#374151'
-  ctx.fillRect(3 * scale, 23 * scale, 4 * scale, 7 * scale)
-  ctx.fillRect(9 * scale, 23 * scale, 4 * scale, 7 * scale)
-
-  ctx.restore()
-}
-
-/**
- * Draws a platform with pixel art style
- */
-function drawPlatform(ctx: CanvasRenderingContext2D, platform: Platform, colors: GameColors): void {
-  const { x, y, width, reached } = platform
-
-  // Platform base
-  ctx.fillStyle = reached ? colors.platformReached : colors.platformDefault
-  ctx.fillRect(x, y, width, 12)
-
-  // Platform top highlight
-  ctx.fillStyle = reached ? colors.platformReachedHighlight : colors.platformHighlight
-  ctx.fillRect(x, y, width, 4)
-
-  // Pixel detail pattern
-  ctx.fillStyle = reached ? colors.platformReached : colors.platformDefault
-  for (let i = 0; i < width; i += 8) {
-    ctx.fillRect(x + i, y + 8, 4, 4)
-  }
-}
-
-/**
- * Draws platform labels (year, role, icon)
- */
-function drawPlatformLabels(
-  ctx: CanvasRenderingContext2D,
-  platform: Platform,
-  colors: GameColors
-): void {
-  const { x, y, width, year, label, icon, reached } = platform
-
-  ctx.fillStyle = reached ? colors.platformReached : colors.textMuted
-  ctx.font = 'bold 10px monospace'
-  ctx.textAlign = 'center'
-  ctx.fillText(year, x + width / 2, y - 8)
-  ctx.fillText(label, x + width / 2, y - 20)
-  ctx.font = '16px sans-serif'
-  ctx.fillText(icon, x + width / 2, y - 32)
-}
-
-/**
- * Draws the ground
- */
-function drawGround(ctx: CanvasRenderingContext2D, colors: GameColors): void {
-  ctx.fillStyle = colors.ground
-  ctx.fillRect(0, CANVAS_HEIGHT - 20, CANVAS_WIDTH, 20)
-  ctx.fillStyle = colors.groundHighlight
-  ctx.fillRect(0, CANVAS_HEIGHT - 20, CANVAS_WIDTH, 4)
-}
-
-/**
- * Draws parallax background layers
- */
-function drawParallaxLayers(
-  ctx: CanvasRenderingContext2D,
-  layers: ParallaxLayer[],
-  cameraX: number
-): void {
-  layers.forEach((layer) => {
-    layer.elements.forEach((element) => {
-      const adjustedX = getElementPosition(element.x, cameraX, layer.speed, CANVAS_WIDTH)
-      renderElement(ctx, { ...element, x: adjustedX })
-    })
-  })
 }
 
 export function CareerGame() {
@@ -163,9 +88,10 @@ export function CareerGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const [gameWon, setGameWon] = useState(false)
   const [currentMilestone, setCurrentMilestone] = useState<string | null>(null)
+  const [score, setScore] = useState(0)
 
-  // Theme-aware colors
-  const [colors, setColors] = useState<GameColors>(() => getGameColors(false))
+  // Theme-aware palette
+  const [palette, setPalette] = useState<ColorPalette>(() => getPalette(false))
 
   // Generate platforms from experience data
   const initialPlatforms = useMemo(
@@ -174,32 +100,53 @@ export function CareerGame() {
   )
   const [platforms, setPlatforms] = useState<Platform[]>(initialPlatforms)
 
-  // Generate parallax layers
-  const parallaxLayers = useMemo(
-    () => generateParallaxLayers(CANVAS_WIDTH, CANVAS_HEIGHT, colors),
-    [colors]
+  // Generate collectibles
+  const initialCollectibles = useMemo(
+    () => generateCollectibles(initialPlatforms, 15),
+    [initialPlatforms]
   )
+  const [collectibles, setCollectibles] = useState<Collectible[]>(initialCollectibles)
+
+  // Generate background
+  const [backgroundState, setBackgroundState] = useState<BackgroundState | null>(null)
 
   // Player state
   const playerRef = useRef<Player>(createPlayer(40, 140))
+
+  // Character animation state
+  const characterStateRef = useRef<CharacterState>(createCharacterState())
 
   // Input state
   const keysRef = useRef<InputState>({ left: false, right: false, jump: false })
   const animationRef = useRef<number | null>(null)
 
+  // Time tracking
+  const lastTimeRef = useRef<number>(0)
+  const gameTimeRef = useRef<number>(0)
+
   // Camera position for parallax
   const cameraXRef = useRef(0)
 
-  // Update colors on theme change
+  // Particle emitter
+  const particleEmitterRef = useRef<ParticleEmitter>(createEmitter(150))
+
+  // Track landing state for dust emission
+  const wasInAirRef = useRef(false)
+
+  // Initialize background on mount
   useEffect(() => {
-    const updateColors = () => {
-      setColors(getGameColors(isDarkMode()))
+    setBackgroundState(generateBackground(CANVAS_WIDTH, CANVAS_HEIGHT))
+  }, [])
+
+  // Update palette on theme change
+  useEffect(() => {
+    const updatePalette = () => {
+      setPalette(getPalette(isDarkMode()))
     }
 
-    updateColors()
+    updatePalette()
 
-    // Watch for theme changes
-    const observer = new MutationObserver(updateColors)
+    const observer = new MutationObserver(updatePalette)
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
@@ -210,136 +157,238 @@ export function CareerGame() {
 
   const resetGame = useCallback(() => {
     playerRef.current = createPlayer(40, 140)
+    characterStateRef.current = createCharacterState()
+    particleEmitterRef.current = createEmitter(150)
+    wasInAirRef.current = false
     setPlatforms(initialPlatforms)
+    setCollectibles(initialCollectibles)
     setGameWon(false)
     setCurrentMilestone(null)
+    setScore(0)
     cameraXRef.current = 0
-  }, [initialPlatforms])
+    gameTimeRef.current = 0
+  }, [initialPlatforms, initialCollectibles])
 
-  const gameLoop = useCallback(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx || !gameStarted) return
+  const gameLoop = useCallback(
+    (timestamp: number) => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx || !gameStarted || !backgroundState) return
 
-    const player = playerRef.current
-    const keys = keysRef.current
+      // Calculate delta time
+      const deltaTime = lastTimeRef.current ? timestamp - lastTimeRef.current : 16
+      lastTimeRef.current = timestamp
+      gameTimeRef.current += deltaTime
 
-    // Handle input
-    if (keys.left) {
-      player.vx -= CONFIG.moveSpeed * 0.3
-      player.facingRight = false
-      player.animationState = 'walking'
-    }
-    if (keys.right) {
-      player.vx += CONFIG.moveSpeed * 0.3
-      player.facingRight = true
-      player.animationState = 'walking'
-    }
-    if (keys.jump && player.grounded) {
-      player.vy = CONFIG.jumpForce
-      player.grounded = false
-      player.animationState = 'jumping'
-    }
+      const player = playerRef.current
+      const keys = keysRef.current
 
-    // Apply physics
-    player.vx *= CONFIG.friction
-    player.vy += CONFIG.gravity
-    player.x += player.vx
-    player.y += player.vy
+      // Store previous grounded state
+      player.wasGrounded = player.grounded
 
-    // Update animation state
-    if (!player.grounded) {
-      player.animationState = 'jumping'
-    } else if (Math.abs(player.vx) < 0.1) {
-      player.animationState = 'idle'
-    }
-
-    // Clamp velocity
-    player.vx = Math.max(-CONFIG.moveSpeed, Math.min(CONFIG.moveSpeed, player.vx))
-
-    // World bounds
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x))
-
-    // Ground collision
-    if (player.y + player.height > canvas.height - 20) {
-      player.y = canvas.height - 20 - player.height
-      player.vy = 0
-      player.grounded = true
-    }
-
-    // Platform collision
-    player.grounded = player.y + player.height >= canvas.height - 20
-
-    setPlatforms((prev) => {
-      let updated = false
-      const newPlatforms = prev.map((platform, index) => {
-        const onPlatform =
-          player.x + player.width > platform.x &&
-          player.x < platform.x + platform.width &&
-          player.y + player.height >= platform.y &&
-          player.y + player.height <= platform.y + 16 &&
-          player.vy >= 0
-
-        if (onPlatform) {
-          player.y = platform.y - player.height
-          player.vy = 0
-          player.grounded = true
-
-          if (!platform.reached) {
-            updated = true
-            setCurrentMilestone(`${platform.icon} ${platform.year}: ${platform.label}`)
-            setTimeout(() => setCurrentMilestone(null), 2500)
-
-            // Check if this is the final platform
-            if (index === prev.length - 1) {
-              setGameWon(true)
-            }
-
-            return { ...platform, reached: true }
-          }
-        }
-        return platform
-      })
-      return updated ? newPlatforms : prev
-    })
-
-    // Update camera (follow player)
-    cameraXRef.current = player.x - CANVAS_WIDTH / 3
-
-    // Clear and draw background
-    ctx.fillStyle = colors.background
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // Draw pixel grid background pattern
-    ctx.fillStyle = colors.backgroundAlt
-    for (let x = 0; x < canvas.width; x += 16) {
-      for (let y = 0; y < canvas.height; y += 16) {
-        if ((x + y) % 32 === 0) {
-          ctx.fillRect(x, y, 16, 16)
-        }
+      // Handle input
+      if (keys.left) {
+        player.vx -= CONFIG.moveSpeed * 0.3
+        player.facingRight = false
       }
-    }
+      if (keys.right) {
+        player.vx += CONFIG.moveSpeed * 0.3
+        player.facingRight = true
+      }
+      if (keys.jump && player.grounded) {
+        player.vy = CONFIG.jumpForce
+        player.grounded = false
+      }
 
-    // Draw parallax layers
-    drawParallaxLayers(ctx, parallaxLayers, cameraXRef.current)
+      // Apply physics
+      player.vx *= CONFIG.friction
+      player.vy += CONFIG.gravity
+      player.x += player.vx
+      player.y += player.vy
 
-    // Draw ground
-    drawGround(ctx, colors)
+      // Clamp velocity
+      player.vx = Math.max(-CONFIG.moveSpeed, Math.min(CONFIG.moveSpeed, player.vx))
 
-    // Draw platforms
-    platforms.forEach((platform) => {
-      drawPlatform(ctx, platform, colors)
-      drawPlatformLabels(ctx, platform, colors)
-    })
+      // World bounds
+      player.x = Math.max(0, Math.min(CANVAS_WIDTH - player.width, player.x))
 
-    // Draw player
-    drawPixelCharacter(ctx, player, colors)
+      // Ground collision
+      const groundY = CANVAS_HEIGHT - 20
+      if (player.y + player.height > groundY) {
+        player.y = groundY - player.height
+        player.vy = 0
+        player.grounded = true
+      }
 
-    animationRef.current = requestAnimationFrame(gameLoop)
-  }, [gameStarted, platforms, colors, parallaxLayers])
+      // Platform collision
+      let onAnyPlatform = player.y + player.height >= groundY
+
+      setPlatforms((prev) => {
+        let updated = false
+        const newPlatforms = prev.map((platform, index) => {
+          const platformHeight = platform.height || 28
+          const onPlatform =
+            player.x + player.width > platform.x &&
+            player.x < platform.x + platform.width &&
+            player.y + player.height >= platform.y &&
+            player.y + player.height <= platform.y + platformHeight &&
+            player.vy >= 0
+
+          if (onPlatform) {
+            player.y = platform.y - player.height
+            player.vy = 0
+            player.grounded = true
+            onAnyPlatform = true
+
+            if (!platform.reached) {
+              updated = true
+              setCurrentMilestone(`${platform.icon} ${platform.year}: ${platform.company}`)
+              setTimeout(() => setCurrentMilestone(null), 2500)
+
+              // Emit star burst for reaching milestone
+              particleEmitterRef.current = emitStarBurst(
+                particleEmitterRef.current,
+                platform.x + platform.width / 2,
+                platform.y,
+                12,
+                palette
+              )
+
+              // Check if this is the final platform
+              if (index === prev.length - 1) {
+                setGameWon(true)
+                // Emit confetti for winning
+                particleEmitterRef.current = emitConfetti(
+                  particleEmitterRef.current,
+                  platform.x + platform.width / 2,
+                  platform.y - 20,
+                  30,
+                  palette
+                )
+              }
+
+              return { ...platform, reached: true }
+            }
+          }
+
+          // Update platform glow animation
+          return updatePlatform(platform, deltaTime)
+        })
+        return updated ? newPlatforms : prev
+      })
+
+      player.grounded = onAnyPlatform
+
+      // Check collectible collisions
+      const collisionResult = checkCollectibleCollision(
+        player.x,
+        player.y,
+        player.width,
+        player.height,
+        collectibles
+      )
+
+      if (collisionResult.collected.length > 0) {
+        setCollectibles(collisionResult.collectibles)
+        const points = collisionResult.collected.reduce(
+          (sum, c) => sum + getCollectibleValue(c.type),
+          0
+        )
+        setScore((prev) => prev + points)
+
+        // Emit sparkles for collected items
+        collisionResult.collected.forEach((c) => {
+          particleEmitterRef.current = emitSparkles(
+            particleEmitterRef.current,
+            c.x + 4,
+            c.y + 4,
+            8,
+            palette.tech.primary
+          )
+        })
+      }
+
+      // Emit dust particles when landing
+      const justLanded = player.grounded && wasInAirRef.current
+      if (justLanded) {
+        particleEmitterRef.current = emitDust(
+          particleEmitterRef.current,
+          player.x + player.width / 2,
+          player.y + player.height,
+          5,
+          palette
+        )
+      }
+      wasInAirRef.current = !player.grounded
+
+      // Emit trail when moving fast
+      if (Math.abs(player.vx) > 2 && player.grounded) {
+        particleEmitterRef.current = emitTrail(
+          particleEmitterRef.current,
+          player.x + player.width / 2,
+          player.y + player.height - 2,
+          palette
+        )
+      }
+
+      // Update particles
+      particleEmitterRef.current = updateParticles(particleEmitterRef.current, deltaTime)
+
+      // Update character animation
+      const newAnimation = getAnimationFromPhysics(
+        player.grounded,
+        player.wasGrounded,
+        player.vy,
+        player.vx,
+        characterStateRef.current.animation
+      )
+      characterStateRef.current = updateCharacterAnimation(
+        characterStateRef.current,
+        deltaTime,
+        newAnimation
+      )
+      characterStateRef.current = {
+        ...characterStateRef.current,
+        facingRight: player.facingRight,
+      }
+
+      // Update camera (follow player with smooth lag)
+      const targetCameraX = player.x - CANVAS_WIDTH / 3
+      cameraXRef.current += (targetCameraX - cameraXRef.current) * 0.1
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      // Render beautiful parallax background
+      renderBackground(ctx, backgroundState, cameraXRef.current, gameTimeRef.current, palette)
+
+      // Render platforms
+      renderPlatforms(ctx, platforms, cameraXRef.current, gameTimeRef.current, palette)
+
+      // Render collectibles
+      renderCollectibles(ctx, collectibles, cameraXRef.current, gameTimeRef.current, palette)
+
+      // Render character
+      const screenX = player.x - cameraXRef.current
+      renderCharacter(ctx, screenX, player.y, characterStateRef.current, palette, 1.5)
+
+      // Render particles (on top of character)
+      renderParticles(ctx, particleEmitterRef.current, cameraXRef.current)
+
+      // Render score
+      ctx.fillStyle = palette.ui.text
+      ctx.font = 'bold 12px monospace'
+      ctx.textAlign = 'left'
+      ctx.fillText(`Score: ${score}`, 10, 20)
+
+      animationRef.current = requestAnimationFrame(gameLoop)
+    },
+    [gameStarted, platforms, collectibles, palette, backgroundState, score]
+  )
 
   useEffect(() => {
     if (gameStarted && !gameWon) {
+      lastTimeRef.current = 0
       animationRef.current = requestAnimationFrame(gameLoop)
     }
     return () => {
@@ -404,7 +453,7 @@ export function CareerGame() {
 
   // Screen reader announcement
   const announcement = gameWon
-    ? `Journey Complete! Reached ${finalPlatform?.label} at ${finalPlatform?.company}`
+    ? `Journey Complete! Reached ${finalPlatform?.label} at ${finalPlatform?.company}. Score: ${score}`
     : currentMilestone
 
   return (
@@ -446,7 +495,7 @@ export function CareerGame() {
               <p className="text-sm text-muted-foreground text-center max-w-xs">
                 Navigate through my career milestones!
                 <br />
-                Use arrow keys or WASD to move, Space to jump.
+                Collect tech icons and reach each company platform.
               </p>
               <motion.button
                 onClick={() => setGameStarted(true)}
@@ -475,6 +524,10 @@ export function CareerGame() {
                 <Trophy className="h-16 w-16 text-yellow-400" />
               </motion.div>
               <h3 className="text-2xl font-bold">Journey Complete!</h3>
+              <div className="flex items-center gap-2 text-lg font-medium text-primary">
+                <Star className="h-5 w-5 fill-current" />
+                Score: {score}
+              </div>
               <p className="text-sm text-muted-foreground">
                 {finalPlatform?.icon} Reached {finalPlatform?.label} at {finalPlatform?.company}
               </p>
