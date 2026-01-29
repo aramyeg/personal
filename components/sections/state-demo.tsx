@@ -1,323 +1,373 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Plus,
-  Trash2,
-  ChevronRight,
-  RotateCcw,
-  Code2,
-  Eye,
-  Sparkles,
-  CheckCircle2,
-  Clock,
-  ListTodo,
-} from 'lucide-react'
+import { Terminal, Sparkles, ChevronRight, Coffee, Code2, Zap, Heart } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
-import {
-  useTaskStore,
-  getFilteredTasks,
-  getTaskCounts,
-  type Task,
-  type TaskStatus,
-} from '@/lib/store'
 import { cn } from '@/lib/utils'
 
-const statusConfig: Record<TaskStatus, { label: string; icon: typeof ListTodo; color: string }> = {
-  todo: { label: 'To Do', icon: ListTodo, color: 'text-amber-500' },
-  'in-progress': { label: 'In Progress', icon: Clock, color: 'text-blue-500' },
-  done: { label: 'Done', icon: CheckCircle2, color: 'text-emerald-500' },
+type CommandOutput = {
+  id: string
+  command: string
+  output: string | React.ReactNode
+  type: 'success' | 'error' | 'info' | 'special'
 }
 
-const statusOrder: TaskStatus[] = ['todo', 'in-progress', 'done']
+const ASCII_LOGO = `
+   _____
+  /  _  \\____________    _____
+ /  /_\\  \\_  __ \\__  \\  /     \\
+/    |    \\  | \\// __ \\|  Y Y  \\
+\\____|__  /__|  (____  /__|_|  /
+        \\/           \\/      \\/
+`
+
+const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: CommandOutput['type'] }> = {
+  help: () => ({
+    output: `Available commands:
+  whoami       - Who am I?
+  skills       - My tech stack
+  music        - Current coding playlist
+  joke         - Developer humor
+  contact      - How to reach me
+  projects     - Featured work
+  ascii        - Show ASCII art
+  motivate     - Need motivation?
+  clear        - Clear terminal
+  neofetch     - System info (dev edition)`,
+    type: 'info',
+  }),
+  whoami: () => ({
+    output: `Aram Yeghiazaryan
+├── Role: Senior Frontend Engineer & Technical Lead
+├── Location: Yerevan, Armenia 🇦🇲
+├── Experience: 8+ years
+├── Specialty: React, TypeScript, Zustand, Next.js
+└── Status: Building cool things at xDataGroup 🚀`,
+    type: 'success',
+  }),
+  skills: () => ({
+    output: `Tech Stack:
+┌─ Frontend ────────────────────────┐
+│ React ██████████████████████ 95%  │
+│ TypeScript ████████████████████ 92%│
+│ Next.js ██████████████████░░ 88%  │
+│ Zustand ████████████████████ 90%  │
+└───────────────────────────────────┘
+┌─ Tools ───────────────────────────┐
+│ TanStack Query, Shadcn/ui, Tailwind│
+│ GraphQL, REST, Node.js, Git        │
+└───────────────────────────────────┘`,
+    type: 'success',
+  }),
+  music: () => ({
+    output: `🎸 Coding Playlist:
+├── Black Sabbath - Paranoid
+├── Led Zeppelin - Kashmir
+├── Polyphia - G.O.A.T.
+├── MF DOOM - Doomsday
+├── Gorillaz - Feel Good Inc
+├── System of a Down - Chop Suey!
+└── Currently: ${['Black Sabbath', 'Led Zeppelin', 'Polyphia', 'MF DOOM', 'Gorillaz', 'SOAD'][Math.floor(Math.random() * 6)]}
+
+🤘 ░░▒▓█████████████████▓▒░░ 🤘`,
+    type: 'special',
+  }),
+  joke: () => {
+    const jokes = [
+      "Why do programmers prefer dark mode?\nBecause light attracts bugs! 🐛",
+      "A SQL query walks into a bar, walks up to two tables and asks...\n'Can I join you?' 🍺",
+      "Why do Java developers wear glasses?\nBecause they can't C# 👓",
+      "!false - It's funny because it's true 🤣",
+      "There are only 10 types of people:\nThose who understand binary and those who don't 🔢",
+      "What's a programmer's favorite hangout place?\nFoo Bar 🍸",
+    ]
+    return {
+      output: jokes[Math.floor(Math.random() * jokes.length)],
+      type: 'special',
+    }
+  },
+  contact: () => ({
+    output: `📫 Let's Connect:
+├── Email: aram@example.com
+├── GitHub: github.com/aram
+├── LinkedIn: linkedin.com/in/aram
+└── Or scroll down to the contact section! 👇`,
+    type: 'success',
+  }),
+  projects: () => ({
+    output: `🚀 Featured Projects:
+┌─────────────────────────────────────────┐
+│ AMIO Bank iBank [CURRENT]               │
+│ └── Technical Lead @ xDataGroup         │
+├─────────────────────────────────────────┤
+│ 360dialog Platform                      │
+│ └── 50K+ businesses, 4B+ messages       │
+├─────────────────────────────────────────┤
+│ SNB Mobile Banking                      │
+│ └── 5M+ downloads, 4.7★ rating          │
+└─────────────────────────────────────────┘
+↑ Check the Projects section above!`,
+    type: 'success',
+  }),
+  ascii: () => ({
+    output: ASCII_LOGO,
+    type: 'special',
+  }),
+  motivate: () => {
+    const quotes = [
+      '"Code is like humor. When you have to explain it, it\'s bad."\n— Cory House',
+      '"First, solve the problem. Then, write the code."\n— John Johnson',
+      '"The best error message is the one that never shows up."\n— Thomas Fuchs',
+      '"Simplicity is the soul of efficiency."\n— Austin Freeman',
+      '"Make it work, make it right, make it fast."\n— Kent Beck',
+    ]
+    return {
+      output: `💡 ${quotes[Math.floor(Math.random() * quotes.length)]}`,
+      type: 'special',
+    }
+  },
+  neofetch: () => ({
+    output: `         .--.              aram@portfolio
+        |o_o |             ──────────────────
+        |:_/ |             OS: Developer Edition
+       //   \\ \\            Host: xDataGroup
+      (|     | )           Kernel: React 19.x
+     /'\\_   _/\`\\           Uptime: 8+ years coding
+     \\___)=(___/           Packages: Too many node_modules
+                           Shell: Zsh + Oh-My-Zsh
+                           Terminal: This portfolio
+                           CPU: Metal-powered 🤘
+                           Memory: Stack Overflow tabs`,
+    type: 'info',
+  }),
+}
 
 export function StateDemo() {
-  const [newTask, setNewTask] = useState('')
-  const [showCode, setShowCode] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
+  const [input, setInput] = useState('')
+  const [history, setHistory] = useState<CommandOutput[]>([
+    {
+      id: 'welcome',
+      command: '',
+      output: `Welcome to Aram's Interactive Terminal! 🖥️
+Type 'help' to see available commands.`,
+      type: 'info',
+    },
+  ])
+  const [commandHistory, setCommandHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Get raw state values
-  const allTasks = useTaskStore((state) => state.tasks)
-  const filter = useTaskStore((state) => state.filter)
-  const lastAction = useTaskStore((state) => state.lastAction)
-  const { addTask, removeTask, moveTask, setFilter, clearCompleted, resetDemo } = useTaskStore()
-
-  // Compute derived values with useMemo to avoid recalculation
-  const tasks = useMemo(() => getFilteredTasks(allTasks, filter), [allTasks, filter])
-  const counts = useMemo(() => getTaskCounts(allTasks), [allTasks])
-
-  // Handle hydration
   useEffect(() => {
-    useTaskStore.persist.rehydrate()
-    setHydrated(true)
-  }, [])
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    }
+  }, [history])
 
-  const handleAddTask = () => {
-    if (newTask.trim()) {
-      addTask(newTask.trim())
-      setNewTask('')
+  const handleCommand = (cmd: string) => {
+    const trimmedCmd = cmd.trim().toLowerCase()
+
+    if (!trimmedCmd) return
+
+    setCommandHistory((prev) => [...prev, trimmedCmd])
+    setHistoryIndex(-1)
+
+    if (trimmedCmd === 'clear') {
+      setHistory([])
+      return
+    }
+
+    const commandFn = COMMANDS[trimmedCmd]
+    if (commandFn) {
+      const result = commandFn()
+      setHistory((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          command: cmd,
+          output: result.output,
+          type: result.type,
+        },
+      ])
+    } else {
+      setHistory((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          command: cmd,
+          output: `Command not found: ${trimmedCmd}\nType 'help' for available commands.`,
+          type: 'error',
+        },
+      ])
     }
   }
 
-  const handleMoveTask = (task: Task) => {
-    const currentIndex = statusOrder.indexOf(task.status)
-    const nextIndex = (currentIndex + 1) % statusOrder.length
-    moveTask(task.id, statusOrder[nextIndex])
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleCommand(input)
+      setInput('')
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (commandHistory.length > 0) {
+        const newIndex = historyIndex < commandHistory.length - 1 ? historyIndex + 1 : historyIndex
+        setHistoryIndex(newIndex)
+        setInput(commandHistory[commandHistory.length - 1 - newIndex] || '')
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1
+        setHistoryIndex(newIndex)
+        setInput(commandHistory[commandHistory.length - 1 - newIndex] || '')
+      } else {
+        setHistoryIndex(-1)
+        setInput('')
+      }
+    }
   }
 
-  if (!hydrated) {
-    return (
-      <section id="state-demo" className="py-24 sm:py-32">
-        <div className="section-container">
-          <div className="h-96 flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Loading demo...</div>
-          </div>
-        </div>
-      </section>
-    )
+  const focusInput = () => {
+    inputRef.current?.focus()
   }
 
   return (
-    <section id="state-demo" className="py-24 sm:py-32 bg-muted/30">
+    <section id="playground" className="py-24 sm:py-32">
       <div className="section-container">
         <FadeIn>
           <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h2 className="text-3xl sm:text-4xl font-bold">State Management</h2>
+            <Terminal className="h-8 w-8 text-primary" />
+            <h2 className="text-3xl sm:text-4xl font-bold">Interactive Terminal</h2>
           </div>
           <div className="h-1 w-12 bg-primary rounded-full mb-4" />
           <p className="text-muted-foreground max-w-2xl mb-8">
-            Interactive demo showcasing Zustand with immer for immutable state updates. Try adding,
-            moving, and removing tasks to see the state changes in real-time.
+            A fun way to explore! Type commands to learn more about me. Try{' '}
+            <code className="px-1.5 py-0.5 rounded bg-muted text-primary text-sm">help</code> to get
+            started.
           </p>
         </FadeIn>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Task Board */}
-          <FadeIn delay={0.1} className="lg:col-span-2">
-            <div className="bg-card rounded-2xl border border-border p-6">
-              {/* Header with add task */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <div className="flex-1 flex gap-2">
-                  <input
-                    type="text"
-                    value={newTask}
-                    onChange={(e) => setNewTask(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                    placeholder="Add a new task..."
-                    className="flex-1 px-4 py-2 rounded-lg bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                  />
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleAddTask}
-                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add</span>
-                  </motion.button>
+        <FadeIn delay={0.1}>
+          <div
+            className="bg-gray-950 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl cursor-text"
+            onClick={focusInput}
+          >
+            {/* Terminal header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span className="w-3 h-3 rounded-full bg-green-500" />
                 </div>
-                <div className="flex gap-2">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={clearCompleted}
-                    className="px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors text-sm"
-                  >
-                    Clear Done
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={resetDemo}
-                    className="px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </motion.button>
-                </div>
+                <span className="ml-2 text-xs text-gray-400 font-mono">aram@portfolio ~ zsh</span>
               </div>
+              <div className="flex items-center gap-2 text-gray-500">
+                <Sparkles className="h-4 w-4" />
+              </div>
+            </div>
 
-              {/* Filter tabs */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {(['all', ...statusOrder] as const).map((status) => {
-                  const count = status === 'all' ? counts.all : counts[status]
-                  return (
-                    <button
-                      key={status}
-                      onClick={() => setFilter(status)}
+            {/* Terminal content */}
+            <div
+              ref={terminalRef}
+              className="p-4 min-h-[400px] max-h-[500px] overflow-y-auto font-mono text-sm"
+              role="log"
+              aria-live="polite"
+              aria-label="Terminal output"
+            >
+              <AnimatePresence>
+                {history.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4"
+                  >
+                    {item.command && (
+                      <div className="flex items-center gap-2 text-green-400 mb-1">
+                        <ChevronRight className="h-4 w-4" />
+                        <span>{item.command}</span>
+                      </div>
+                    )}
+                    <pre
                       className={cn(
-                        'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
-                        filter === status
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+                        'whitespace-pre-wrap pl-6',
+                        item.type === 'success' && 'text-green-300',
+                        item.type === 'error' && 'text-red-400',
+                        item.type === 'info' && 'text-blue-300',
+                        item.type === 'special' && 'text-amber-300'
                       )}
                     >
-                      {status === 'all' ? 'All' : statusConfig[status].label}
-                      <span className="ml-1.5 opacity-70">({count})</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Task list */}
-              <div className="space-y-2 min-h-[200px]">
-                <AnimatePresence mode="popLayout">
-                  {tasks.length === 0 ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-center py-12 text-muted-foreground"
-                    >
-                      No tasks found. Add one above!
-                    </motion.div>
-                  ) : (
-                    tasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onMove={() => handleMoveTask(task)}
-                        onRemove={() => removeTask(task.id)}
-                      />
-                    ))
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </FadeIn>
-
-          {/* State Inspector */}
-          <FadeIn delay={0.2}>
-            <div className="bg-card rounded-2xl border border-border overflow-hidden h-fit">
-              {/* Toggle between state view and code */}
-              <div className="flex border-b border-border">
-                <button
-                  onClick={() => setShowCode(false)}
-                  className={cn(
-                    'flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors',
-                    !showCode
-                      ? 'bg-primary/10 text-primary border-b-2 border-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Eye className="h-4 w-4" />
-                  State
-                </button>
-                <button
-                  onClick={() => setShowCode(true)}
-                  className={cn(
-                    'flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors',
-                    showCode
-                      ? 'bg-primary/10 text-primary border-b-2 border-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Code2 className="h-4 w-4" />
-                  Code
-                </button>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {showCode ? (
-                  <motion.div
-                    key="code"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-4"
-                  >
-                    <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
-                      <code>{storeCode}</code>
+                      {item.output}
                     </pre>
                   </motion.div>
-                ) : (
-                  <motion.div
-                    key="state"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="p-4 space-y-4"
-                  >
-                    {/* Last action */}
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Last Action</p>
-                      <AnimatePresence mode="wait">
-                        <motion.p
-                          key={lastAction}
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="text-sm text-primary font-mono"
-                        >
-                          {lastAction || 'No actions yet'}
-                        </motion.p>
-                      </AnimatePresence>
-                    </div>
-
-                    {/* State tree */}
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">State Tree</p>
-                      <pre className="text-xs font-mono bg-muted/50 rounded-lg p-3 overflow-x-auto max-h-[300px] overflow-y-auto">
-                        <code className="text-foreground/80">
-                          {JSON.stringify(
-                            {
-                              filter,
-                              taskCount: tasks.length,
-                              tasks: tasks.slice(0, 3).map((t) => ({
-                                id: t.id.slice(0, 8) + '...',
-                                title: t.title.slice(0, 20) + (t.title.length > 20 ? '...' : ''),
-                                status: t.status,
-                              })),
-                              '...': tasks.length > 3 ? `+${tasks.length - 3} more` : undefined,
-                            },
-                            null,
-                            2
-                          )}
-                        </code>
-                      </pre>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {statusOrder.map((status) => {
-                        const config = statusConfig[status]
-                        const Icon = config.icon
-                        return (
-                          <div
-                            key={status}
-                            className="bg-muted/50 rounded-lg p-2 text-center"
-                          >
-                            <Icon className={cn('h-4 w-4 mx-auto mb-1', config.color)} />
-                            <p className="text-lg font-bold">{counts[status]}</p>
-                            <p className="text-xs text-muted-foreground">{config.label}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </motion.div>
-                )}
+                ))}
               </AnimatePresence>
+
+              {/* Input line */}
+              <div className="flex items-center gap-2 text-green-400">
+                <ChevronRight className="h-4 w-4" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="flex-1 bg-transparent outline-none text-green-300 caret-green-400"
+                  placeholder="Type a command..."
+                  aria-label="Terminal command input"
+                />
+                <motion.span
+                  className="w-2 h-5 bg-green-400"
+                  animate={{ opacity: [1, 0] }}
+                  transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
+                />
+              </div>
             </div>
-          </FadeIn>
-        </div>
+          </div>
+        </FadeIn>
+
+        {/* Quick command suggestions */}
+        <FadeIn delay={0.2}>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <span className="text-sm text-muted-foreground mr-2">Try:</span>
+            {['help', 'whoami', 'skills', 'joke', 'music', 'neofetch'].map((cmd) => (
+              <motion.button
+                key={cmd}
+                onClick={() => {
+                  setInput(cmd)
+                  inputRef.current?.focus()
+                }}
+                className="px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {cmd}
+              </motion.button>
+            ))}
+          </div>
+        </FadeIn>
 
         {/* Feature highlights */}
         <FadeIn delay={0.3} className="mt-8">
-          <div className="grid sm:grid-cols-3 gap-4">
-            {features.map((feature, index) => (
+          <div className="grid sm:grid-cols-4 gap-4">
+            {[
+              { icon: Code2, label: 'Interactive', desc: 'Real terminal experience' },
+              { icon: Coffee, label: 'Fun', desc: 'Easter eggs included' },
+              { icon: Zap, label: 'Fast', desc: 'Instant responses' },
+              { icon: Heart, label: 'Made with ❤️', desc: 'Built with React' },
+            ].map((feature, index) => (
               <motion.div
-                key={feature.title}
+                key={feature.label}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="p-4 rounded-xl bg-card border border-border"
+                className="p-4 rounded-xl bg-card border border-border text-center"
               >
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                  <feature.icon className="h-4 w-4 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-1">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <feature.icon className="h-5 w-5 text-primary mx-auto mb-2" />
+                <h3 className="font-semibold text-sm">{feature.label}</h3>
+                <p className="text-xs text-muted-foreground">{feature.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -326,120 +376,3 @@ export function StateDemo() {
     </section>
   )
 }
-
-function TaskCard({
-  task,
-  onMove,
-  onRemove,
-}: {
-  task: Task
-  onMove: () => void
-  onRemove: () => void
-}) {
-  const config = statusConfig[task.status]
-  const Icon = config.icon
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8, x: -100 }}
-      className="group flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-    >
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={onMove}
-        className={cn(
-          'h-8 w-8 rounded-lg flex items-center justify-center transition-colors',
-          task.status === 'done'
-            ? 'bg-emerald-500/20'
-            : task.status === 'in-progress'
-              ? 'bg-blue-500/20'
-              : 'bg-amber-500/20'
-        )}
-      >
-        <Icon className={cn('h-4 w-4', config.color)} />
-      </motion.button>
-
-      <div className="flex-1 min-w-0">
-        <p
-          className={cn(
-            'font-medium truncate transition-all',
-            task.status === 'done' && 'line-through text-muted-foreground'
-          )}
-        >
-          {task.title}
-        </p>
-        <p className="text-xs text-muted-foreground">{config.label}</p>
-      </div>
-
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={onMove}
-        className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </motion.button>
-
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={onRemove}
-        className="h-8 w-8 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <Trash2 className="h-4 w-4" />
-      </motion.button>
-    </motion.div>
-  )
-}
-
-const features = [
-  {
-    icon: Sparkles,
-    title: 'Zustand + Immer',
-    description: 'Type-safe immutable state updates with familiar mutable syntax.',
-  },
-  {
-    icon: Eye,
-    title: 'DevTools Ready',
-    description: 'Built-in Redux DevTools integration for debugging state changes.',
-  },
-  {
-    icon: Code2,
-    title: 'Minimal Boilerplate',
-    description: 'Clean API without actions, reducers, or context providers.',
-  },
-]
-
-const storeCode = `const useTaskStore = create(
-  devtools(
-    persist(
-      immer((set) => ({
-        tasks: [],
-        filter: 'all',
-
-        addTask: (title) =>
-          set((state) => {
-            state.tasks.push({
-              id: crypto.randomUUID(),
-              title,
-              status: 'todo',
-            })
-          }),
-
-        moveTask: (id, status) =>
-          set((state) => {
-            const task = state.tasks
-              .find((t) => t.id === id)
-            if (task) {
-              task.status = status
-            }
-          }),
-      })),
-      { name: 'task-store' }
-    )
-  )
-)`

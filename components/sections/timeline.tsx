@@ -1,14 +1,19 @@
 'use client'
 
-import { motion, useScroll, useTransform } from 'framer-motion'
-import { useRef } from 'react'
-import { MapPin, Calendar } from 'lucide-react'
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
+import { useRef, useState, useMemo } from 'react'
+import { MapPin, Calendar, ChevronDown, Briefcase, Filter, X } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { experiences } from '@/data/experience'
 import type { Experience } from '@/types'
+import { cn } from '@/lib/utils'
+import { CareerGame } from './career-game'
 
 export function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [selectedTech, setSelectedTech] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ['start end', 'end start'],
@@ -16,17 +21,124 @@ export function Timeline() {
 
   const lineHeight = useTransform(scrollYProgress, [0, 1], ['0%', '100%'])
 
+  // Get all unique technologies
+  const allTechnologies = useMemo(() => {
+    const techSet = new Set<string>()
+    experiences.forEach((exp) => exp.technologies.forEach((tech) => techSet.add(tech)))
+    return Array.from(techSet).sort()
+  }, [])
+
+  // Filter experiences by selected tech
+  const filteredExperiences = useMemo(() => {
+    if (!selectedTech) return experiences
+    return experiences.filter((exp) => exp.technologies.includes(selectedTech))
+  }, [selectedTech])
+
+  // Calculate career stats
+  const careerStats = useMemo(() => {
+    const totalYears = 8
+    const totalCompanies = new Set(experiences.map((e) => e.company)).size
+    const totalCountries = new Set(experiences.map((e) => e.location.split(', ').pop())).size
+    return { totalYears, totalCompanies, totalCountries }
+  }, [])
+
   return (
-    <section id="experience" className="py-24 sm:py-32">
+    <section id="experience" className="py-24 sm:py-32 bg-muted/30">
       <div className="section-container">
         <FadeIn>
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Experience</h2>
           <div className="h-1 w-12 bg-primary rounded-full mb-8" />
         </FadeIn>
 
-        <div ref={containerRef} className="relative">
-          {/* Animated timeline line */}
-          <div className="absolute left-0 md:left-1/2 top-0 bottom-0 w-px bg-border md:-translate-x-1/2">
+        {/* Career Journey Stats */}
+        <FadeIn delay={0.1}>
+          <div className="grid grid-cols-3 gap-4 mb-8 p-4 rounded-2xl bg-card border border-border">
+            <div className="text-center">
+              <motion.div
+                className="text-2xl sm:text-3xl font-bold text-primary"
+                initial={{ opacity: 0, scale: 0.5 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+              >
+                {careerStats.totalYears}+
+              </motion.div>
+              <p className="text-xs sm:text-sm text-muted-foreground">Years Coding</p>
+            </div>
+            <div className="text-center border-x border-border">
+              <motion.div
+                className="text-2xl sm:text-3xl font-bold text-primary"
+                initial={{ opacity: 0, scale: 0.5 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+              >
+                {careerStats.totalCompanies}
+              </motion.div>
+              <p className="text-xs sm:text-sm text-muted-foreground">Companies</p>
+            </div>
+            <div className="text-center">
+              <motion.div
+                className="text-2xl sm:text-3xl font-bold text-primary"
+                initial={{ opacity: 0, scale: 0.5 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+              >
+                {careerStats.totalCountries}
+              </motion.div>
+              <p className="text-xs sm:text-sm text-muted-foreground">Countries</p>
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* Technology Filter */}
+        <FadeIn delay={0.2}>
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filter by technology:</span>
+              {selectedTech && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={() => setSelectedTech(null)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs"
+                >
+                  {selectedTech}
+                  <X className="h-3 w-3" />
+                </motion.button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {allTechnologies.slice(0, 10).map((tech) => (
+                <motion.button
+                  key={tech}
+                  onClick={() => setSelectedTech(selectedTech === tech ? null : tech)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
+                    selectedTech === tech
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                  )}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {tech}
+                </motion.button>
+              ))}
+              {allTechnologies.length > 10 && (
+                <span className="px-3 py-1.5 text-xs text-muted-foreground">
+                  +{allTechnologies.length - 10} more
+                </span>
+              )}
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* Timeline container with isolated stacking context */}
+        <div ref={containerRef} className="relative" style={{ isolation: 'isolate' }}>
+          {/* Animated timeline line - z-0 (bottom layer) */}
+          <div className="absolute left-2 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-border z-0">
             <motion.div
               className="w-full bg-gradient-to-b from-primary via-primary to-transparent"
               style={{ height: lineHeight }}
@@ -34,17 +146,41 @@ export function Timeline() {
           </div>
 
           {/* Timeline items */}
-          <div className="space-y-12">
-            {experiences.map((experience, index) => (
-              <TimelineItem
-                key={experience.id}
-                experience={experience}
-                index={index}
-                isLeft={index % 2 === 0}
-              />
-            ))}
-          </div>
+          <AnimatePresence mode="popLayout">
+            <div className="space-y-12">
+              {filteredExperiences.map((experience, index) => (
+                <TimelineItem
+                  key={experience.id}
+                  experience={experience}
+                  index={index}
+                  isLeft={index % 2 === 0}
+                  isExpanded={expandedId === experience.id}
+                  onToggle={() =>
+                    setExpandedId(expandedId === experience.id ? null : experience.id)
+                  }
+                  highlightTech={selectedTech}
+                />
+              ))}
+            </div>
+          </AnimatePresence>
+
+          {filteredExperiences.length === 0 && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-muted-foreground py-12"
+            >
+              No experience found with &ldquo;{selectedTech}&rdquo;
+            </motion.p>
+          )}
         </div>
+
+        {/* Career Journey Game */}
+        <FadeIn delay={0.3}>
+          <div className="mt-12">
+            <CareerGame />
+          </div>
+        </FadeIn>
       </div>
     </section>
   )
@@ -54,10 +190,16 @@ function TimelineItem({
   experience,
   index,
   isLeft,
+  isExpanded,
+  onToggle,
+  highlightTech,
 }: {
   experience: Experience
   index: number
   isLeft: boolean
+  isExpanded: boolean
+  onToggle: () => void
+  highlightTech: string | null
 }) {
   const isCurrentRole = experience.endDate === null
 
@@ -65,26 +207,50 @@ function TimelineItem({
     <motion.div
       initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
       whileInView={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
       viewport={{ once: true, margin: '-100px' }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
       className={`relative flex flex-col md:flex-row gap-8 ${
         isLeft ? 'md:flex-row-reverse' : ''
       }`}
     >
-      {/* Timeline dot */}
-      <div className="absolute left-0 md:left-1/2 w-4 h-4 -translate-x-1/2 md:-translate-x-1/2 top-0">
-        <span
-          className={`block w-4 h-4 rounded-full border-2 ${
+      {/* Timeline dot with pulse animation - z-10 (above line, below cards) */}
+      <div className="absolute left-0 md:left-1/2 md:-translate-x-1/2 top-6 z-10">
+        <motion.span
+          className={cn(
+            'block w-4 h-4 rounded-full border-2 transition-all duration-300',
             isCurrentRole
-              ? 'bg-primary border-primary animate-pulse'
-              : 'bg-card border-primary/50'
-          }`}
+              ? 'bg-primary border-primary'
+              : isExpanded
+                ? 'bg-primary/50 border-primary'
+                : 'bg-card border-primary/50'
+          )}
+          animate={
+            isCurrentRole
+              ? {
+                  scale: [1, 1.2, 1],
+                  boxShadow: [
+                    '0 0 0 0 rgba(var(--primary), 0.4)',
+                    '0 0 0 10px rgba(var(--primary), 0)',
+                    '0 0 0 0 rgba(var(--primary), 0)',
+                  ],
+                }
+              : {}
+          }
+          transition={{ duration: 2, repeat: isCurrentRole ? Infinity : 0 }}
         />
       </div>
 
-      {/* Content */}
-      <div className={`flex-1 pl-8 md:pl-0 ${isLeft ? 'md:pr-12' : 'md:pl-12'}`}>
-        <div className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/30 transition-all duration-300">
+      {/* Content - z-20 (above dots) */}
+      <div className={`flex-1 pl-8 md:pl-0 relative z-20 ${isLeft ? 'md:pr-16' : 'md:pl-16'}`}>
+        <motion.div
+          className={cn(
+            'group p-6 rounded-2xl bg-card border border-border cursor-pointer transition-all duration-300',
+            isExpanded ? 'border-primary shadow-lg shadow-primary/10' : 'hover:border-primary/30'
+          )}
+          onClick={onToggle}
+          whileHover={{ y: -2 }}
+        >
           {/* Header */}
           <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
             <div>
@@ -93,11 +259,19 @@ function TimelineItem({
               </h3>
               <p className="text-primary font-medium">{experience.company}</p>
             </div>
-            {isCurrentRole && (
-              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                Current
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {isCurrentRole && (
+                <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  Current
+                </span>
+              )}
+              <motion.div
+                animate={{ rotate: isExpanded ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              </motion.div>
+            </div>
           </div>
 
           {/* Meta info */}
@@ -115,28 +289,61 @@ function TimelineItem({
           {/* Description */}
           <p className="text-muted-foreground mb-4">{experience.description}</p>
 
-          {/* Highlights */}
-          <ul className="space-y-2 mb-4">
-            {experience.highlights.map((highlight, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                <span className="text-muted-foreground">{highlight}</span>
-              </li>
-            ))}
-          </ul>
+          {/* Expandable content */}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                {/* Highlights */}
+                <div className="mb-4 pt-4 border-t border-border">
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    Key Achievements
+                  </h4>
+                  <ul className="space-y-2">
+                    {experience.highlights.map((highlight, i) => (
+                      <motion.li
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="flex items-start gap-2 text-sm"
+                      >
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                        <span className="text-muted-foreground">{highlight}</span>
+                      </motion.li>
+                    ))}
+                  </ul>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Technologies */}
+          {/* Technologies - always visible but with highlight */}
           <div className="flex flex-wrap gap-2">
-            {experience.technologies.map((tech) => (
-              <span
+            {experience.technologies.map((tech, techIndex) => (
+              <motion.span
                 key={tech}
-                className="px-2 py-1 rounded-md bg-muted text-xs font-medium text-muted-foreground"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: techIndex * 0.02 }}
+                className={cn(
+                  'px-2 py-1 rounded-md text-xs font-medium transition-all duration-200',
+                  highlightTech === tech
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                )}
               >
                 {tech}
-              </span>
+              </motion.span>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Empty space for alternating layout on desktop */}

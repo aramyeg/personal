@@ -61,5 +61,14 @@ storybook-static
 .idx/
 .replit
 .v0/
+CLAUDE.md
+.agents/
+IMPROVEMENT_PLAN.md
+
+# Documentation (internal)
+docs/
 
 *storybook.log
+
+.vercel
+.env*.local

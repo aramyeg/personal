@@ -1,23 +1,47 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
-import { TextReveal } from '@/components/animation'
+import { TextReveal, Typewriter, FloatingIcons } from '@/components/animation'
 import { siteConfig } from '@/lib/constants'
+
+const taglines = [
+  'Building exceptional web experiences',
+  'From fintech to proptech and beyond',
+  'React, TypeScript, Next.js enthusiast',
+  'Remote-first, globally connected',
+]
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+        {/* Additional subtle gradient orbs */}
+        <motion.div
+          className="absolute top-1/3 right-1/3 w-64 h-64 bg-accent/5 rounded-full blur-3xl"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+        />
       </div>
+
+      {/* Floating tech icons around avatar */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none z-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1, duration: 1 }}
+      >
+        <FloatingIcons className="absolute inset-0 hidden sm:block opacity-60" />
+      </motion.div>
 
       {/* Pixelated Avatar */}
       <motion.div
-        className="relative mb-8"
+        className="relative mb-8 z-10"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
@@ -29,13 +53,13 @@ export function Hero() {
       <TextReveal
         text={siteConfig.name}
         as="h1"
-        className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-center"
+        className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-center z-10"
         delay={0.3}
       />
 
       {/* Title */}
       <motion.p
-        className="mt-4 text-lg sm:text-xl md:text-2xl text-muted-foreground text-center"
+        className="mt-4 text-lg sm:text-xl md:text-2xl text-muted-foreground text-center z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.8 }}
@@ -43,22 +67,34 @@ export function Hero() {
         {siteConfig.title}
       </motion.p>
 
-      {/* Tagline */}
-      <motion.p
-        className="mt-2 text-sm sm:text-base text-muted-foreground/70 text-center max-w-md"
+      {/* Animated Tagline with Typewriter */}
+      <motion.div
+        className="mt-3 h-8 text-sm sm:text-base text-muted-foreground/70 text-center max-w-md z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 1.1 }}
       >
-        8+ years crafting exceptional web & mobile experiences
-      </motion.p>
+        <Typewriter texts={taglines} typingSpeed={40} deletingSpeed={25} pauseDuration={2500} />
+      </motion.div>
+
+      {/* Experience badge */}
+      <motion.div
+        className="mt-4 px-4 py-1.5 rounded-full bg-muted/50 border border-border z-10"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 1.2 }}
+      >
+        <span className="text-sm text-muted-foreground">
+          8+ years of frontend expertise
+        </span>
+      </motion.div>
 
       {/* Status badge */}
       <motion.div
-        className="mt-6 flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20"
+        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 z-10"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: 1.3 }}
+        transition={{ duration: 0.4, delay: 1.4 }}
       >
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
@@ -94,79 +130,205 @@ export function Hero() {
 }
 
 function PixelAvatar() {
-  // 8-bit style avatar - buff figure with man-bun
-  // Using CSS to create a pixelated effect
+  const [isBlinking, setIsBlinking] = useState(false)
+  const [clickCount, setClickCount] = useState(0)
+  const [showMessage, setShowMessage] = useState<string | null>(null)
+
+  const clickMessages = [
+    '',
+    '',
+    '',
+    'Hey there! 👋',
+    'You found me!',
+    'Still clicking?',
+    "You're persistent! 😄",
+    'Okay okay, here is a cookie 🍪',
+    'Achievement unlocked: Avatar Clicker!',
+    '🎉 You win the clicking game! 🎉',
+  ]
+
+  // Blink animation every 3-5 seconds
+  useEffect(() => {
+    const blink = () => {
+      setIsBlinking(true)
+      setTimeout(() => setIsBlinking(false), 150)
+    }
+    const interval = setInterval(() => {
+      blink()
+    }, 3000 + Math.random() * 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleClick = () => {
+    const newCount = clickCount + 1
+    setClickCount(newCount)
+    if (newCount >= 3 && newCount < clickMessages.length) {
+      setShowMessage(clickMessages[newCount])
+      setTimeout(() => setShowMessage(null), 2000)
+    }
+    if (newCount >= 10) {
+      console.log(
+        '%c 🏆 Achievement Unlocked: Persistent Clicker! ',
+        'background: gold; color: black; padding: 10px; font-size: 14px; font-weight: bold;'
+      )
+    }
+  }
+
   return (
-    <div className="relative">
+    <div className="relative cursor-pointer" onClick={handleClick}>
+      {/* Click message */}
+      <AnimatePresence>
+        {showMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: -20, scale: 1 }}
+            exit={{ opacity: 0, y: -40 }}
+            className="absolute -top-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium whitespace-nowrap z-50"
+          >
+            {showMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Glow effect */}
       <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150" />
 
-      {/* Avatar container with pixel art style */}
-      <div
-        className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
-        style={{ imageRendering: 'pixelated' }}
+      {/* Floating avatar container with idle animation */}
+      <motion.div
+        animate={{
+          y: [0, -8, 0],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
       >
-        {/* Pixel grid background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
-
-        {/* Simplified pixel art representation */}
-        <svg
-          viewBox="0 0 16 16"
-          className="w-full h-full"
+        {/* Avatar container with pixel art style */}
+        <motion.div
+          className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
           style={{ imageRendering: 'pixelated' }}
+          animate={{
+            scale: [1, 1.02, 1],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
         >
-          {/* Background */}
-          <rect width="16" height="16" fill="currentColor" className="text-card" />
+          {/* Pixel grid background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
 
-          {/* Man-bun */}
-          <rect x="6" y="1" width="4" height="2" className="fill-foreground" />
-          <rect x="7" y="0" width="2" height="1" className="fill-foreground" />
+          {/* Pixel art avatar */}
+          <svg
+            viewBox="0 0 16 20"
+            className="w-full h-full"
+            style={{ imageRendering: 'pixelated' }}
+          >
+            {/* Background */}
+            <rect width="16" height="20" fill="currentColor" className="text-card" />
 
-          {/* Head */}
-          <rect x="5" y="3" width="6" height="5" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Man-bun on top */}
+            <rect x="6" y="0" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="5" y="1" width="6" height="1" className="fill-stone-700 dark:fill-stone-400" />
 
-          {/* Hair sides */}
-          <rect x="4" y="3" width="1" height="3" className="fill-foreground" />
-          <rect x="11" y="3" width="1" height="3" className="fill-foreground" />
+            {/* Top of head hair - thick and wavy */}
+            <rect x="3" y="2" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="3" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
 
-          {/* Eyes */}
-          <rect x="6" y="5" width="1" height="1" className="fill-foreground" />
-          <rect x="9" y="5" width="1" height="1" className="fill-foreground" />
+            {/* Side hair flowing down - longer */}
+            <rect x="2" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="12" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="13" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
 
-          {/* Smile */}
-          <rect x="7" y="6" width="2" height="1" className="fill-foreground/50" />
+            {/* Face - Skin tone */}
+            <rect x="4" y="4" width="8" height="5" className="fill-amber-200 dark:fill-amber-300" />
 
-          {/* Neck */}
-          <rect x="7" y="8" width="2" height="1" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Forehead hair strands */}
+            <rect x="4" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="10" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
-          {/* Shoulders/Body (buff) */}
-          <rect x="3" y="9" width="10" height="4" className="fill-primary" />
-          <rect x="2" y="10" width="1" height="3" className="fill-primary" />
-          <rect x="13" y="10" width="1" height="3" className="fill-primary" />
+            {/* Eyes - with blink animation */}
+            <AnimatePresence mode="wait">
+              {isBlinking ? (
+                <>
+                  <rect x="5" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
+                  <rect x="9" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
+                </>
+              ) : (
+                <>
+                  <rect x="5" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
+                  <rect x="9" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
+                  {/* Eye shine */}
+                  <rect x="5" y="5" width="1" height="1" className="fill-white/70" />
+                  <rect x="9" y="5" width="1" height="1" className="fill-white/70" />
+                </>
+              )}
+            </AnimatePresence>
 
-          {/* Arms (muscular) */}
-          <rect x="1" y="10" width="1" height="4" className="fill-amber-200 dark:fill-amber-100" />
-          <rect x="14" y="10" width="1" height="4" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Eyebrows */}
+            <rect x="5" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="9" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
-          {/* Torso */}
-          <rect x="5" y="13" width="6" height="3" className="fill-primary" />
-        </svg>
-      </div>
+            {/* Nose shadow */}
+            <rect x="7" y="7" width="2" height="1" className="fill-amber-300/50 dark:fill-amber-400/50" />
 
-      {/* Floating code symbols */}
+            {/* Mouth - simple line, not smile shaped like mustache */}
+            <rect x="7" y="8" width="2" height="1" className="fill-rose-400/60 dark:fill-rose-300/60" />
+
+            {/* Neck */}
+            <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-300" />
+
+            {/* T-shirt - Black in light mode, cream in dark mode */}
+            <rect x="2" y="10" width="12" height="5" className="fill-stone-900 dark:fill-stone-100" />
+            {/* Collar V-neck */}
+            <rect x="7" y="10" width="2" height="2" className="fill-stone-800 dark:fill-stone-200" />
+            {/* Shoulders */}
+            <rect x="1" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
+            <rect x="14" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
+            {/* Shirt bottom */}
+            <rect x="3" y="15" width="10" height="3" className="fill-stone-900 dark:fill-stone-100" />
+
+            {/* Arms */}
+            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
+            <rect x="15" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
+
+            {/* Pants hint */}
+            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+          </svg>
+        </motion.div>
+      </motion.div>
+
+      {/* Floating code symbols positioned at sides of avatar */}
       <motion.span
-        className="absolute -top-2 -right-4 text-2xl"
-        animate={{ y: [0, -5, 0], rotate: [0, 10, 0] }}
-        transition={{ duration: 3, repeat: Infinity }}
+        className="absolute -top-2 -right-12 text-2xl font-mono text-primary/70"
+        animate={{ y: [0, -8, 0], rotate: [0, 10, 0], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       >
         {'</>'}
       </motion.span>
       <motion.span
-        className="absolute -bottom-2 -left-4 text-xl text-primary"
-        animate={{ y: [0, 5, 0], rotate: [0, -10, 0] }}
-        transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
+        className="absolute top-1/2 -left-14 text-xl font-mono text-accent/70"
+        animate={{ x: [0, -5, 0], rotate: [0, -10, 0], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 2.5, repeat: Infinity, delay: 0.5, ease: 'easeInOut' }}
       >
         {'{ }'}
+      </motion.span>
+      <motion.span
+        className="absolute top-1/2 -right-14 text-lg font-mono text-muted-foreground/60"
+        animate={{ x: [0, 5, 0], opacity: [0.4, 0.7, 0.4] }}
+        transition={{ duration: 4, repeat: Infinity, delay: 1, ease: 'easeInOut' }}
+      >
+        {'( )'}
+      </motion.span>
+      <motion.span
+        className="absolute -bottom-2 -left-12 text-lg font-mono text-primary/60"
+        animate={{ y: [0, 6, 0], opacity: [0.4, 0.7, 0.4] }}
+        transition={{ duration: 3.5, repeat: Infinity, delay: 0.8, ease: 'easeInOut' }}
+      >
+        {'=>'}
       </motion.span>
     </div>
   )

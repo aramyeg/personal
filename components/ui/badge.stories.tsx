@@ -86,7 +86,7 @@ export const SkillLevels: Story = {
 export const StatusBadges: Story = {
   render: () => (
     <div className="flex flex-wrap gap-2">
-      <Badge className="bg-emerald-500/20 text-emerald-500">Available</Badge>
+      <Badge className="bg-primary/20 text-primary">Available</Badge>
       <Badge className="bg-amber-500/20 text-amber-500">In Progress</Badge>
       <Badge variant="destructive">Urgent</Badge>
     </div>
