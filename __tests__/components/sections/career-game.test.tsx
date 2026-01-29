@@ -96,6 +96,24 @@ vi.mock('framer-motion', async () => {
           {children as React.ReactNode}
         </span>
       ),
+      p: ({
+        children,
+        className,
+        ...props
+      }: Record<string, unknown>) => (
+        <p className={className as string} {...props}>
+          {children as React.ReactNode}
+        </p>
+      ),
+      h3: ({
+        children,
+        className,
+        ...props
+      }: Record<string, unknown>) => (
+        <h3 className={className as string} {...props}>
+          {children as React.ReactNode}
+        </h3>
+      ),
     },
   }
 })
@@ -144,29 +162,32 @@ describe('CareerGame Accessibility', () => {
     )
   })
 
-  it('renders start overlay with accessible content', () => {
+  it('renders mode selector with accessible content', () => {
     render(<CareerGame />)
 
     expect(screen.getByText('Career Journey')).toBeInTheDocument()
-    expect(screen.getByText('Start Game')).toBeInTheDocument()
-    expect(screen.getByText(/Navigate through my career milestones!/)).toBeInTheDocument()
+    expect(screen.getByText('Choose your challenge')).toBeInTheDocument()
+    expect(screen.getByText('Classic')).toBeInTheDocument()
+    expect(screen.getByText('Speedrun')).toBeInTheDocument()
+    expect(screen.getByText('Hardcore')).toBeInTheDocument()
   })
 
-  it('start button is focusable and clickable', () => {
+  it('mode button is focusable and clickable', () => {
     render(<CareerGame />)
 
-    const startButton = screen.getByText('Start Game')
-    expect(startButton.tagName).toBe('BUTTON')
+    const classicButton = screen.getByText('Classic')
+    expect(classicButton.tagName).toBe('H3') // Title in the button
 
-    fireEvent.click(startButton)
+    // Click the parent button
+    fireEvent.click(classicButton.closest('button')!)
     // After click, the startGame function should be called
     expect(mockStartGame).toHaveBeenCalled()
   })
 
   it('mobile controls have aria-labels', () => {
     render(<CareerGame />)
-    // Start the game first
-    fireEvent.click(screen.getByText('Start Game'))
+    // Start the game first by selecting a mode
+    fireEvent.click(screen.getByText('Classic').closest('button')!)
 
     const leftButton = screen.getByLabelText('Move left')
     const rightButton = screen.getByLabelText('Move right')
@@ -180,7 +201,7 @@ describe('CareerGame Accessibility', () => {
   it('includes keyboard controls hint', () => {
     render(<CareerGame />)
 
-    expect(screen.getByText(/Use ← → to move, ↑ or Space to jump/)).toBeInTheDocument()
+    expect(screen.getByText(/Use arrow keys to move, Space to jump/)).toBeInTheDocument()
   })
 
   it('has aria-live region for screen reader announcements', () => {
@@ -222,8 +243,8 @@ describe('CareerGame Keyboard Controls', () => {
   it('prevents default on arrow keys to stop page scroll', () => {
     render(<CareerGame />)
 
-    // Start the game
-    fireEvent.click(screen.getByText('Start Game'))
+    // Start the game by selecting a mode
+    fireEvent.click(screen.getByText('Classic').closest('button')!)
 
     const preventDefault = vi.fn()
     const event = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
@@ -237,7 +258,7 @@ describe('CareerGame Keyboard Controls', () => {
   it('prevents default on space key', () => {
     render(<CareerGame />)
 
-    fireEvent.click(screen.getByText('Start Game'))
+    fireEvent.click(screen.getByText('Classic').closest('button')!)
 
     const preventDefault = vi.fn()
     const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true })
@@ -254,17 +275,17 @@ describe('CareerGame Game States', () => {
     mockGameStarted = false
   })
 
-  it('shows win overlay when game is won', async () => {
+  it('shows mode selector when game is not started', async () => {
     render(<CareerGame />)
 
-    // The win overlay should show "Journey Complete!" text
-    // We can't easily trigger the win condition in tests, but we verify the component structure
-    expect(screen.getByText('Start Game')).toBeInTheDocument()
+    // The mode selector should show game mode options
+    expect(screen.getByText('Classic')).toBeInTheDocument()
+    expect(screen.getByText('Speedrun')).toBeInTheDocument()
+    expect(screen.getByText('Hardcore')).toBeInTheDocument()
   })
 
-  it('has play again button in win state', () => {
-    // This test verifies the component has the replay functionality
-    // Full game loop testing would require E2E tests
+  it('has game title in mode selector', () => {
+    // This test verifies the component has the title
     render(<CareerGame />)
     expect(screen.getByText('Career Journey')).toBeInTheDocument()
   })

@@ -52,7 +52,8 @@ import {
   useRecentAchievement,
   GAME_MODE_CONFIGS,
 } from '@/lib/game/gameState'
-import { GameHUD, GameOverScreen, ExperiencePopupCard, AchievementNotification } from '@/components/game'
+import { GameHUD, GameOverScreen, ExperiencePopupCard, AchievementNotification, GameModeSelector } from '@/components/game'
+import type { GameMode } from '@/lib/game/types'
 import type { Experience } from '@/types'
 
 // Game configuration
@@ -109,6 +110,7 @@ function createPlayer(startX: number, startY: number): Player {
 export function CareerGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [currentExperience, setCurrentExperience] = useState<Experience | null>(null)
+  const [showModeSelector, setShowModeSelector] = useState(true)
 
   // Game state from Zustand store
   const {
@@ -251,13 +253,22 @@ export function CareerGame() {
     resetGameState()
   }, [initialPlatforms, initialCollectibles, resetGameState])
 
+  const handleSelectMode = useCallback((selectedMode: GameMode) => {
+    resetGame()
+    initGame(selectedMode, initialPlatforms.length, initialCollectibles.length)
+    setShowModeSelector(false)
+    startGame()
+  }, [resetGame, initGame, initialPlatforms.length, initialCollectibles.length, startGame])
+
   const handleStartGame = useCallback(() => {
     resetGame()
+    setShowModeSelector(false)
     startGame()
   }, [resetGame, startGame])
 
   const handleReturnToMenu = useCallback(() => {
     resetGame()
+    setShowModeSelector(true)
   }, [resetGame])
 
   const gameLoop = useCallback(
@@ -652,34 +663,10 @@ export function CareerGame() {
         {/* HUD overlay */}
         {gameStarted && !gameOver && !gameWon && <GameHUD />}
 
-        {/* Start overlay */}
+        {/* Mode selection / Start overlay */}
         <AnimatePresence>
-          {!gameStarted && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-4"
-            >
-              <Gamepad2 className="h-12 w-12 text-primary animate-pulse" />
-              <h3 className="text-xl font-bold">Career Journey</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-xs">
-                Navigate through my career milestones!
-                <br />
-                Collect tech icons and reach each company platform.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                You have {GAME_MODE_CONFIGS[mode].lives} lives. Don&apos;t fall!
-              </p>
-              <motion.button
-                onClick={handleStartGame}
-                className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Start Game
-              </motion.button>
-            </motion.div>
+          {!gameStarted && showModeSelector && (
+            <GameModeSelector onSelectMode={handleSelectMode} />
           )}
         </AnimatePresence>
 

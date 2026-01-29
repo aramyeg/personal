@@ -92,7 +92,7 @@ import { Timeline } from '@/components/sections/timeline';
 describe('Timeline Section', () => {
   it('renders the section title', () => {
     render(<Timeline />);
-    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Experience/i })).toBeInTheDocument();
   });
 
   it('renders career stats', () => {
