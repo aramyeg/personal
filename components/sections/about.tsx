@@ -2,7 +2,6 @@
 
 import { MapPin, Briefcase, GraduationCap, Globe } from 'lucide-react'
 import { FadeIn, StaggerChildren, StaggerItem } from '@/components/animation'
-import { siteConfig } from '@/lib/constants'
 
 const highlights = [
   { icon: Briefcase, label: '8+ Years', description: 'Frontend Experience' },
@@ -24,24 +23,24 @@ export function About() {
           {/* Bio */}
           <FadeIn className="lg:col-span-3 space-y-6" delay={0.1}>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              I'm a <span className="text-foreground font-medium">Senior Frontend Engineer</span> and{' '}
+              I&apos;m a <span className="text-foreground font-medium">Senior Frontend Engineer</span> and{' '}
               <span className="text-foreground font-medium">Technical Lead</span> with over 8 years
               of experience building production applications for international clients.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               My journey started in 2016 when I transitioned from marketing to software development.
-              Since then, I've worked remotely for companies across{' '}
+              Since then, I&apos;ve worked remotely for companies across{' '}
               <span className="text-foreground">Switzerland, Germany, Estonia, Ireland, and the UAE</span>,
               specializing in fintech and enterprise platforms.
             </p>
             <p className="text-muted-foreground leading-relaxed">
               Currently at <span className="text-primary font-medium">xDataGroup</span>, I lead
-              frontend development for AMIO Bank's retail banking platform while collaborating
+              frontend development for AMIO Bank&apos;s retail banking platform while collaborating
               directly with founders on an early-stage PropTech startup.
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              I'm passionate about building performant, accessible interfaces and mentoring
-              developers. When I'm not coding, I'm exploring the latest in React, TypeScript,
+              I&apos;m passionate about building performant, accessible interfaces and mentoring
+              developers. When I&apos;m not coding, I&apos;m exploring the latest in React, TypeScript,
               and modern web technologies.
             </p>
           </FadeIn>

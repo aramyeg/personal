@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FadeIn, StaggerChildren, StaggerItem } from '@/components/animation'
+import { FadeIn } from '@/components/animation'
 import { skills, skillCategories, getSkillsByCategory } from '@/data/skills'
 import type { SkillCategory, Skill } from '@/types'
 import { cn } from '@/lib/utils'

@@ -2,7 +2,7 @@
 
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { useRef } from 'react'
-import { Briefcase, MapPin, Calendar } from 'lucide-react'
+import { MapPin, Calendar } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { experiences } from '@/data/experience'
 import type { Experience } from '@/types'

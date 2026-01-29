@@ -51,11 +51,7 @@
     "vitest": "^4.0.18",
     "playwright": "^1.58.0",
     "@vitest/browser-playwright": "^4.0.18",
-    "@vitest/coverage-v8": "^4.0.18"
-  },
-  "eslintConfig": {
-    "extends": [
-      "plugin:storybook/recommended"
-    ]
+    "@vitest/coverage-v8": "^4.0.18",
+    "@eslint/eslintrc": "^3.2.0"
   }
 }
