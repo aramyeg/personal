@@ -5,6 +5,7 @@
 
 import type { ColorPalette } from './palette'
 import { withAlpha } from './palette'
+import type { PowerUpType } from './types'
 
 // ============================================
 // TYPES
@@ -438,4 +439,68 @@ export function getCollectibleValue(type: CollectibleType): number {
     coin: 50,
   }
   return values[type]
+}
+
+// ============================================
+// POWER-UP MAPPING
+// ============================================
+
+/**
+ * Maps collectible types to power-ups they grant
+ * Tech collectibles give thematic power-ups:
+ * - react/nextjs: speed_boost (fast frameworks)
+ * - typescript/graphql: super_jump (type safety = confidence)
+ * - docker/aws: shield (infrastructure protection)
+ * - nodejs/git: magnet (backend attracts everything)
+ * - star: random power-up
+ * - coin: no power-up (just points)
+ */
+const COLLECTIBLE_POWERUP_MAP: Partial<Record<CollectibleType, PowerUpType>> = {
+  react: 'speed_boost',
+  nextjs: 'speed_boost',
+  typescript: 'super_jump',
+  graphql: 'super_jump',
+  docker: 'shield',
+  aws: 'shield',
+  nodejs: 'magnet',
+  git: 'magnet',
+}
+
+// Power-up durations in milliseconds
+const POWERUP_DURATIONS: Record<PowerUpType, number> = {
+  speed_boost: 5000,
+  super_jump: 6000,
+  shield: 4000,
+  magnet: 7000,
+}
+
+/**
+ * Gets the power-up type and duration for a collectible
+ * Returns null if the collectible doesn't grant a power-up
+ */
+export function getCollectiblePowerUp(type: CollectibleType): { powerUp: PowerUpType; duration: number } | null {
+  // Star gives random power-up
+  if (type === 'star') {
+    const powerUps: PowerUpType[] = ['speed_boost', 'super_jump', 'shield', 'magnet']
+    const randomPowerUp = powerUps[Math.floor(Math.random() * powerUps.length)]
+    return {
+      powerUp: randomPowerUp,
+      duration: POWERUP_DURATIONS[randomPowerUp],
+    }
+  }
+
+  const powerUp = COLLECTIBLE_POWERUP_MAP[type]
+  if (!powerUp) return null
+
+  return {
+    powerUp,
+    duration: POWERUP_DURATIONS[powerUp],
+  }
+}
+
+/**
+ * Checks if a collectible type grants a power-up
+ */
+export function collectibleGrantsPowerUp(type: CollectibleType): boolean {
+  return type === 'star' || type in COLLECTIBLE_POWERUP_MAP
 }

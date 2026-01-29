@@ -24,6 +24,7 @@ import {
   renderCollectibles,
   checkCollectibleCollision,
   getCollectibleValue,
+  getCollectiblePowerUp,
   type Collectible,
 } from '@/lib/game/collectibles'
 import {
@@ -47,6 +48,7 @@ import {
   useIsGameOver,
   useIsGameWon,
   useIsGameStarted,
+  useActivePowerUps,
   GAME_MODE_CONFIGS,
 } from '@/lib/game/gameState'
 import { GameHUD, GameOverScreen, ExperiencePopupCard } from '@/components/game'
@@ -119,6 +121,10 @@ export function CareerGame() {
     updateGameTime,
     setGameWon,
     getCheckpointIndex,
+    activatePowerUp,
+    updatePowerUps,
+    hasPowerUp,
+    getPowerUpMultiplier,
     mode,
   } = useGameState()
 
@@ -127,6 +133,7 @@ export function CareerGame() {
   const gameOver = useIsGameOver()
   const gameWon = useIsGameWon()
   const gameStarted = useIsGameStarted()
+  const activePowerUps = useActivePowerUps()
 
   // Theme-aware palette
   const [palette, setPalette] = useState<ColorPalette>(() => getPalette(false))
@@ -261,6 +268,7 @@ export function CareerGame() {
       lastTimeRef.current = timestamp
       gameTimeRef.current += deltaTime
       updateGameTime(deltaTime)
+      updatePowerUps() // Clean up expired power-ups
 
       const player = playerRef.current
       const keys = keysRef.current
@@ -277,17 +285,23 @@ export function CareerGame() {
       // Store previous grounded state
       player.wasGrounded = player.grounded
 
+      // Get power-up multipliers
+      const speedMultiplier = getPowerUpMultiplier('speed')
+      const jumpMultiplier = getPowerUpMultiplier('jump')
+      const effectiveSpeed = CONFIG.moveSpeed * speedMultiplier
+      const effectiveJump = CONFIG.jumpForce * jumpMultiplier
+
       // Handle input
       if (keys.left) {
-        player.vx -= CONFIG.moveSpeed * 0.3
+        player.vx -= effectiveSpeed * 0.3
         player.facingRight = false
       }
       if (keys.right) {
-        player.vx += CONFIG.moveSpeed * 0.3
+        player.vx += effectiveSpeed * 0.3
         player.facingRight = true
       }
       if (keys.jump && player.grounded) {
-        player.vy = CONFIG.jumpForce
+        player.vy = effectiveJump
         player.grounded = false
       }
 
@@ -297,27 +311,39 @@ export function CareerGame() {
       player.x += player.vx
       player.y += player.vy
 
-      // Clamp velocity
-      player.vx = Math.max(-CONFIG.moveSpeed, Math.min(CONFIG.moveSpeed, player.vx))
+      // Clamp velocity (with power-up boost)
+      player.vx = Math.max(-effectiveSpeed, Math.min(effectiveSpeed, player.vx))
 
       // World bounds (horizontal only - can fall off bottom)
       player.x = Math.max(0, player.x)
 
       // Check death zone (fell off screen)
       if (player.y > DEATH_ZONE_Y && !player.invulnerable) {
-        // Emit damage particles at last known position
-        particleEmitterRef.current = emitDamage(
-          particleEmitterRef.current,
-          player.x + player.width / 2,
-          CANVAS_HEIGHT,
-          15
-        )
-
-        const isGameOver = loseLife()
-
-        if (!isGameOver) {
-          // Respawn at checkpoint
+        // Shield power-up protects from death
+        if (hasPowerUp('shield')) {
+          // Emit respawn particles and reset position
+          particleEmitterRef.current = emitRespawn(
+            particleEmitterRef.current,
+            player.x + player.width / 2,
+            CANVAS_HEIGHT - 50,
+            12
+          )
           respawnPlayer()
+        } else {
+          // Emit damage particles at last known position
+          particleEmitterRef.current = emitDamage(
+            particleEmitterRef.current,
+            player.x + player.width / 2,
+            CANVAS_HEIGHT,
+            15
+          )
+
+          const isGameOver = loseLife()
+
+          if (!isGameOver) {
+            // Respawn at checkpoint
+            respawnPlayer()
+          }
         }
       }
 
@@ -409,6 +435,12 @@ export function CareerGame() {
         // Update game state for each collected item
         collisionResult.collected.forEach((c) => {
           collectTech(c.type, getCollectibleValue(c.type))
+
+          // Check if collectible grants a power-up
+          const powerUpGrant = getCollectiblePowerUp(c.type)
+          if (powerUpGrant && GAME_MODE_CONFIGS[mode].powerUpsEnabled) {
+            activatePowerUp(powerUpGrant.powerUp, powerUpGrant.duration)
+          }
 
           // Emit sparkles for collected items
           particleEmitterRef.current = emitSparkles(
@@ -502,11 +534,16 @@ export function CareerGame() {
       palette,
       backgroundState,
       updateGameTime,
+      updatePowerUps,
       loseLife,
       respawnPlayer,
       reachPlatform,
       setGameWon,
       collectTech,
+      activatePowerUp,
+      hasPowerUp,
+      getPowerUpMultiplier,
+      mode,
     ]
   )
 
