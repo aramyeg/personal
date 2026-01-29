@@ -1,6 +1,7 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { TextReveal } from '@/components/animation'
 import { siteConfig } from '@/lib/constants'
@@ -94,79 +95,160 @@ export function Hero() {
 }
 
 function PixelAvatar() {
-  // 8-bit style avatar - buff figure with man-bun
-  // Using CSS to create a pixelated effect
+  const [isBlinking, setIsBlinking] = useState(false)
+
+  // Blink animation every 3-5 seconds
+  useEffect(() => {
+    const blink = () => {
+      setIsBlinking(true)
+      setTimeout(() => setIsBlinking(false), 150)
+    }
+    const interval = setInterval(() => {
+      blink()
+    }, 3000 + Math.random() * 2000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <div className="relative">
       {/* Glow effect */}
       <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150" />
 
-      {/* Avatar container with pixel art style */}
-      <div
-        className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
-        style={{ imageRendering: 'pixelated' }}
+      {/* Floating avatar container with idle animation */}
+      <motion.div
+        animate={{
+          y: [0, -8, 0],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
       >
-        {/* Pixel grid background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
-
-        {/* Simplified pixel art representation */}
-        <svg
-          viewBox="0 0 16 16"
-          className="w-full h-full"
+        {/* Avatar container with pixel art style */}
+        <motion.div
+          className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
           style={{ imageRendering: 'pixelated' }}
+          animate={{
+            scale: [1, 1.02, 1],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
         >
-          {/* Background */}
-          <rect width="16" height="16" fill="currentColor" className="text-card" />
+          {/* Pixel grid background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
 
-          {/* Man-bun */}
-          <rect x="6" y="1" width="4" height="2" className="fill-foreground" />
-          <rect x="7" y="0" width="2" height="1" className="fill-foreground" />
+          {/* Pixel art avatar */}
+          <svg
+            viewBox="0 0 16 20"
+            className="w-full h-full"
+            style={{ imageRendering: 'pixelated' }}
+          >
+            {/* Background */}
+            <rect width="16" height="20" fill="currentColor" className="text-card" />
 
-          {/* Head */}
-          <rect x="5" y="3" width="6" height="5" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Hair - Full head with man-bun at back */}
+            {/* Top of head hair */}
+            <rect x="4" y="1" width="8" height="1" className="fill-foreground" />
+            <rect x="3" y="2" width="10" height="1" className="fill-foreground" />
+            <rect x="3" y="3" width="2" height="1" className="fill-foreground" />
+            <rect x="11" y="3" width="2" height="1" className="fill-foreground" />
+            {/* Man-bun gathered at back-top */}
+            <rect x="11" y="1" width="2" height="3" className="fill-foreground" />
+            <rect x="12" y="0" width="2" height="2" className="fill-foreground" />
+            <rect x="13" y="2" width="1" height="2" className="fill-foreground" />
 
-          {/* Hair sides */}
-          <rect x="4" y="3" width="1" height="3" className="fill-foreground" />
-          <rect x="11" y="3" width="1" height="3" className="fill-foreground" />
+            {/* Face - Skin tone */}
+            <rect x="4" y="3" width="7" height="5" className="fill-amber-200 dark:fill-amber-100" />
+            <rect x="5" y="8" width="5" height="1" className="fill-amber-200 dark:fill-amber-100" />
 
-          {/* Eyes */}
-          <rect x="6" y="5" width="1" height="1" className="fill-foreground" />
-          <rect x="9" y="5" width="1" height="1" className="fill-foreground" />
+            {/* Eyes - with blink animation */}
+            <AnimatePresence mode="wait">
+              {isBlinking ? (
+                <>
+                  <rect x="5" y="5" width="2" height="1" className="fill-foreground/40" />
+                  <rect x="9" y="5" width="2" height="1" className="fill-foreground/40" />
+                </>
+              ) : (
+                <>
+                  <rect x="5" y="5" width="2" height="2" className="fill-foreground" />
+                  <rect x="9" y="5" width="2" height="2" className="fill-foreground" />
+                  {/* Eye shine */}
+                  <rect x="5" y="5" width="1" height="1" className="fill-white/50" />
+                  <rect x="9" y="5" width="1" height="1" className="fill-white/50" />
+                </>
+              )}
+            </AnimatePresence>
 
-          {/* Smile */}
-          <rect x="7" y="6" width="2" height="1" className="fill-foreground/50" />
+            {/* Eyebrows */}
+            <rect x="5" y="4" width="2" height="1" className="fill-foreground/60" />
+            <rect x="9" y="4" width="2" height="1" className="fill-foreground/60" />
 
-          {/* Neck */}
-          <rect x="7" y="8" width="2" height="1" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Nose */}
+            <rect x="7" y="6" width="1" height="1" className="fill-amber-300/50 dark:fill-amber-200/50" />
 
-          {/* Shoulders/Body (buff) */}
-          <rect x="3" y="9" width="10" height="4" className="fill-primary" />
-          <rect x="2" y="10" width="1" height="3" className="fill-primary" />
-          <rect x="13" y="10" width="1" height="3" className="fill-primary" />
+            {/* Friendly smile */}
+            <rect x="6" y="7" width="3" height="1" className="fill-foreground/40" />
 
-          {/* Arms (muscular) */}
-          <rect x="1" y="10" width="1" height="4" className="fill-amber-200 dark:fill-amber-100" />
-          <rect x="14" y="10" width="1" height="4" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Neck */}
+            <rect x="6" y="9" width="3" height="1" className="fill-amber-200 dark:fill-amber-100" />
 
-          {/* Torso */}
-          <rect x="5" y="13" width="6" height="3" className="fill-primary" />
-        </svg>
-      </div>
+            {/* T-shirt - Black in light mode, off-white in dark mode */}
+            {/* Main torso */}
+            <rect x="2" y="10" width="11" height="5" className="fill-gray-900 dark:fill-stone-200" />
+            {/* Collar detail */}
+            <rect x="6" y="10" width="3" height="1" className="fill-gray-800 dark:fill-stone-300" />
+            {/* Shoulders */}
+            <rect x="1" y="11" width="1" height="4" className="fill-gray-900 dark:fill-stone-200" />
+            <rect x="13" y="11" width="1" height="4" className="fill-gray-900 dark:fill-stone-200" />
+            {/* Shirt bottom */}
+            <rect x="3" y="15" width="9" height="3" className="fill-gray-900 dark:fill-stone-200" />
 
-      {/* Floating code symbols */}
+            {/* Arms - muscular */}
+            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-100" />
+            <rect x="14" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Bicep detail */}
+            <rect x="0" y="12" width="1" height="2" className="fill-amber-300/50 dark:fill-amber-200/50" />
+            <rect x="14" y="12" width="1" height="2" className="fill-amber-300/50 dark:fill-amber-200/50" />
+
+            {/* Pants/bottom hint */}
+            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+            <rect x="8" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+          </svg>
+        </motion.div>
+      </motion.div>
+
+      {/* Floating code symbols with enhanced animations */}
       <motion.span
-        className="absolute -top-2 -right-4 text-2xl"
-        animate={{ y: [0, -5, 0], rotate: [0, 10, 0] }}
-        transition={{ duration: 3, repeat: Infinity }}
+        className="absolute -top-4 -right-6 text-2xl font-mono text-primary/80"
+        animate={{ y: [0, -8, 0], rotate: [0, 15, 0], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       >
         {'</>'}
       </motion.span>
       <motion.span
-        className="absolute -bottom-2 -left-4 text-xl text-primary"
-        animate={{ y: [0, 5, 0], rotate: [0, -10, 0] }}
-        transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
+        className="absolute -bottom-4 -left-6 text-xl font-mono text-accent"
+        animate={{ y: [0, 8, 0], rotate: [0, -15, 0], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 2.5, repeat: Infinity, delay: 0.5, ease: 'easeInOut' }}
       >
         {'{ }'}
+      </motion.span>
+      <motion.span
+        className="absolute top-1/2 -right-8 text-lg font-mono text-muted-foreground"
+        animate={{ x: [0, 5, 0], opacity: [0.4, 0.8, 0.4] }}
+        transition={{ duration: 4, repeat: Infinity, delay: 1, ease: 'easeInOut' }}
+      >
+        {'( )'}
+      </motion.span>
+      <motion.span
+        className="absolute top-1/3 -left-8 text-sm font-mono text-primary/60"
+        animate={{ y: [0, -6, 0], opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 3.5, repeat: Infinity, delay: 0.8, ease: 'easeInOut' }}
+      >
+        {'=>'}
       </motion.span>
     </div>
   )
