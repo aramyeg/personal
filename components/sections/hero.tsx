@@ -228,63 +228,62 @@ function PixelAvatar() {
             {/* Background */}
             <rect width="16" height="20" fill="currentColor" className="text-card" />
 
-            {/* Hair - Longer flowing hair with man-bun on top */}
             {/* Man-bun on top */}
-            <rect x="6" y="0" width="4" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="5" y="1" width="6" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="6" y="2" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            {/* Top of head hair */}
-            <rect x="4" y="2" width="8" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="3" y="3" width="10" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            {/* Side hair flowing down */}
-            <rect x="2" y="3" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="3" y="4" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="12" y="4" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="13" y="3" width="1" height="4" className="fill-stone-800 dark:fill-stone-300" />
-            {/* Hair highlights */}
-            <rect x="4" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="11" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="6" y="0" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="5" y="1" width="6" height="1" className="fill-stone-700 dark:fill-stone-400" />
+
+            {/* Top of head hair - thick and wavy */}
+            <rect x="3" y="2" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="3" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
+
+            {/* Side hair flowing down - longer */}
+            <rect x="2" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="12" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="13" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
 
             {/* Face - Skin tone */}
-            <rect x="4" y="4" width="8" height="4" className="fill-amber-200 dark:fill-amber-300" />
-            <rect x="5" y="8" width="6" height="1" className="fill-amber-200 dark:fill-amber-300" />
+            <rect x="4" y="4" width="8" height="5" className="fill-amber-200 dark:fill-amber-300" />
+
+            {/* Forehead hair strands */}
+            <rect x="4" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="10" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
             {/* Eyes - with blink animation */}
             <AnimatePresence mode="wait">
               {isBlinking ? (
                 <>
-                  <rect x="5" y="5" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
-                  <rect x="9" y="5" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
+                  <rect x="5" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
+                  <rect x="9" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
                 </>
               ) : (
                 <>
-                  <rect x="5" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
-                  <rect x="9" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
+                  <rect x="5" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
+                  <rect x="9" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
                   {/* Eye shine */}
-                  <rect x="5" y="5" width="1" height="1" className="fill-white/60" />
-                  <rect x="9" y="5" width="1" height="1" className="fill-white/60" />
+                  <rect x="5" y="5" width="1" height="1" className="fill-white/70" />
+                  <rect x="9" y="5" width="1" height="1" className="fill-white/70" />
                 </>
               )}
             </AnimatePresence>
 
             {/* Eyebrows */}
-            <rect x="5" y="4" width="2" height="1" className="fill-stone-700 dark:fill-stone-500" />
-            <rect x="9" y="4" width="2" height="1" className="fill-stone-700 dark:fill-stone-500" />
+            <rect x="5" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="9" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
-            {/* Nose */}
-            <rect x="7" y="6" width="2" height="1" className="fill-amber-300/60 dark:fill-amber-400/60" />
+            {/* Nose shadow */}
+            <rect x="7" y="7" width="2" height="1" className="fill-amber-300/50 dark:fill-amber-400/50" />
 
-            {/* Friendly smile */}
-            <rect x="6" y="7" width="4" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            {/* Mouth - simple line, not smile shaped like mustache */}
+            <rect x="7" y="8" width="2" height="1" className="fill-rose-400/60 dark:fill-rose-300/60" />
 
             {/* Neck */}
             <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-300" />
 
             {/* T-shirt - Black in light mode, cream in dark mode */}
-            {/* Main torso */}
             <rect x="2" y="10" width="12" height="5" className="fill-stone-900 dark:fill-stone-100" />
-            {/* Collar detail */}
-            <rect x="6" y="10" width="4" height="1" className="fill-stone-800 dark:fill-stone-200" />
+            {/* Collar V-neck */}
+            <rect x="7" y="10" width="2" height="2" className="fill-stone-800 dark:fill-stone-200" />
             {/* Shoulders */}
             <rect x="1" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
             <rect x="14" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
@@ -296,37 +295,37 @@ function PixelAvatar() {
             <rect x="15" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
 
             {/* Pants hint */}
-            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
-            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
+            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
           </svg>
         </motion.div>
       </motion.div>
 
-      {/* Floating code symbols with enhanced animations */}
+      {/* Floating code symbols positioned at sides of avatar */}
       <motion.span
-        className="absolute -top-4 -right-6 text-2xl font-mono text-primary/80"
-        animate={{ y: [0, -8, 0], rotate: [0, 15, 0], opacity: [0.6, 1, 0.6] }}
+        className="absolute -top-2 -right-12 text-2xl font-mono text-primary/70"
+        animate={{ y: [0, -8, 0], rotate: [0, 10, 0], opacity: [0.5, 0.8, 0.5] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       >
         {'</>'}
       </motion.span>
       <motion.span
-        className="absolute -bottom-4 -left-6 text-xl font-mono text-accent"
-        animate={{ y: [0, 8, 0], rotate: [0, -15, 0], opacity: [0.6, 1, 0.6] }}
+        className="absolute top-1/2 -left-14 text-xl font-mono text-accent/70"
+        animate={{ x: [0, -5, 0], rotate: [0, -10, 0], opacity: [0.5, 0.8, 0.5] }}
         transition={{ duration: 2.5, repeat: Infinity, delay: 0.5, ease: 'easeInOut' }}
       >
         {'{ }'}
       </motion.span>
       <motion.span
-        className="absolute top-1/2 -right-8 text-lg font-mono text-muted-foreground"
-        animate={{ x: [0, 5, 0], opacity: [0.4, 0.8, 0.4] }}
+        className="absolute top-1/2 -right-14 text-lg font-mono text-muted-foreground/60"
+        animate={{ x: [0, 5, 0], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 4, repeat: Infinity, delay: 1, ease: 'easeInOut' }}
       >
         {'( )'}
       </motion.span>
       <motion.span
-        className="absolute top-1/3 -left-8 text-sm font-mono text-primary/60"
-        animate={{ y: [0, -6, 0], opacity: [0.3, 0.7, 0.3] }}
+        className="absolute -bottom-2 -left-12 text-lg font-mono text-primary/60"
+        animate={{ y: [0, 6, 0], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 3.5, repeat: Infinity, delay: 0.8, ease: 'easeInOut' }}
       >
         {'=>'}

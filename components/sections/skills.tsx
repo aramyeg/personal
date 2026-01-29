@@ -123,10 +123,10 @@ function FocusSkillCard({ skill, index }: { skill: FocusSkill; index: number }) 
         <span className="text-2xl">{skill.icon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+            <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
               {skill.name}
             </h4>
-            <span className="flex items-center gap-1 text-xs font-medium text-primary">
+            <span className="flex items-center gap-1 text-xs font-medium text-primary whitespace-nowrap flex-shrink-0">
               <Zap className="h-3 w-3" />
               {skill.confidence}
             </span>

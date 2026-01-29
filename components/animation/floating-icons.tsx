@@ -63,32 +63,37 @@ type FloatingIconsProps = {
 }
 
 export function FloatingIcons({ className }: FloatingIconsProps) {
+  // Fixed positions to keep icons on sides, not behind text
+  const positions = [
+    { x: -220, y: -60 },  // React - top left
+    { x: 220, y: -40 },   // TypeScript - top right (moved away from center)
+    { x: -200, y: 80 },   // Next.js - bottom left
+    { x: 240, y: 60 },    // Tailwind - bottom right
+    { x: -180, y: 10 },   // Zustand - middle left
+  ]
+
   return (
     <div className={className}>
       {techIcons.map((tech, index) => {
-        // Position icons in an orbit around center
-        const angle = (index / techIcons.length) * Math.PI * 2
-        const radius = 140
-        const x = Math.cos(angle) * radius
-        const y = Math.sin(angle) * radius * 0.6 // Elliptical orbit
+        const pos = positions[index] || { x: 0, y: 0 }
 
         return (
           <motion.div
             key={tech.name}
             className="absolute"
             style={{
-              left: `calc(50% + ${x}px)`,
-              top: `calc(50% + ${y}px)`,
+              left: `calc(50% + ${pos.x}px)`,
+              top: `calc(50% + ${pos.y}px)`,
             }}
             initial={{ opacity: 0, scale: 0 }}
             animate={{
-              opacity: [0.4, 0.8, 0.4],
-              scale: [0.9, 1.1, 0.9],
-              x: [0, Math.cos(angle) * 10, 0],
-              y: [0, Math.sin(angle) * 10, 0],
+              opacity: [0.3, 0.6, 0.3],
+              scale: [0.9, 1.05, 0.9],
+              x: [0, (index % 2 === 0 ? 8 : -8), 0],
+              y: [0, (index % 2 === 0 ? -6 : 6), 0],
             }}
             transition={{
-              duration: 4 + index * 0.5,
+              duration: 5 + index * 0.5,
               repeat: Infinity,
               delay: tech.delay,
               ease: 'easeInOut',

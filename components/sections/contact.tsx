@@ -9,12 +9,12 @@ import {
   Linkedin,
   ArrowUpRight,
   Sparkles,
-  Coffee,
   Heart,
   Zap,
   Star,
   Send,
   MessageCircle,
+  Rocket,
 } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { siteConfig, socialLinks } from '@/lib/constants'
@@ -24,19 +24,19 @@ const iconMap: Record<string, typeof Github> = {
   linkedin: Linkedin,
 }
 
-const floatingEmojis = ['🚀', '💻', '☕', '⚡', '✨', '🎯', '💡', '🔥']
+const floatingEmojis = ['🚀', '💻', '🎸', '⚡', '✨', '🎯', '💡', '🔥']
 
 const funPhrases = [
   "Let's make something awesome! 🚀",
   "Warning: May contain excessive enthusiasm 🔥",
-  "Caffeine included, bugs excluded ☕",
+  "Metal-powered coding sessions 🎸",
   "Ready to turn ideas into reality ✨",
   "Let's build the future together 💡",
 ]
 
 export function Contact() {
   const [emailHovered, setEmailHovered] = useState(false)
-  const [coffeesClicked, setCoffeesClicked] = useState(0)
+  const [rockClicked, setRockClicked] = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
   const [currentPhrase, setCurrentPhrase] = useState(0)
   const [powerLevel, setPowerLevel] = useState(0)
@@ -58,9 +58,9 @@ export function Contact() {
     return () => clearInterval(interval)
   }, [powerLevel])
 
-  const handleCoffeeClick = () => {
-    setCoffeesClicked((prev) => prev + 1)
-    if (coffeesClicked === 4) {
+  const handleRockClick = () => {
+    setRockClicked((prev) => prev + 1)
+    if (rockClicked === 4) {
       setShowConfetti(true)
       setTimeout(() => setShowConfetti(false), 3000)
     }
@@ -212,62 +212,66 @@ export function Contact() {
                 href={`mailto:${siteConfig.email}`}
                 onMouseEnter={() => setEmailHovered(true)}
                 onMouseLeave={() => setEmailHovered(false)}
-                className="group relative inline-block"
+                className="group relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
               >
                 <motion.div
-                  className="relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
+                  className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary to-primary/80"
                   animate={{ scale: emailHovered ? 1.05 : 1 }}
                   transition={{ type: 'spring', stiffness: 300 }}
+                />
+                {/* Shimmer effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
+                  initial={{ x: '-100%' }}
+                  animate={{ x: emailHovered ? '100%' : '-100%' }}
+                  transition={{ duration: 0.6, ease: 'easeInOut' }}
+                />
+
+                <motion.div
+                  className="relative z-10"
+                  animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}
                 >
-                  {/* Animated background */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
-                    animate={{ x: emailHovered ? ['-100%', '100%'] : '-100%' }}
-                    transition={{ duration: 0.6 }}
-                  />
-
-                  <motion.div animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}>
-                    <Mail className="h-7 w-7" />
-                  </motion.div>
-
-                  <span className="relative">
-                    {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
-                  </span>
-
-                  <motion.div
-                    animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
-                    transition={{ type: 'spring' }}
-                  >
-                    <Send className="h-6 w-6" />
-                  </motion.div>
-
-                  {/* Sparkles on hover */}
-                  <AnimatePresence>
-                    {emailHovered && (
-                      <>
-                        {[...Array(6)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="absolute"
-                            style={{
-                              left: `${20 + i * 12}%`,
-                              top: '50%',
-                            }}
-                            initial={{ scale: 0, y: 0 }}
-                            animate={{
-                              scale: [0, 1, 0],
-                              y: [(i % 2 === 0 ? -1 : 1) * 30],
-                            }}
-                            exit={{ scale: 0 }}
-                            transition={{ duration: 0.5, delay: i * 0.05 }}
-                          >
-                            <Star className="h-4 w-4 text-yellow-300" fill="currentColor" />
-                          </motion.div>
-                        ))}
-                      </>
-                    )}
-                  </AnimatePresence>
+                  <Mail className="h-7 w-7" />
                 </motion.div>
+
+                <span className="relative z-10">
+                  {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
+                </span>
+
+                <motion.div
+                  className="relative z-10"
+                  animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
+                  transition={{ type: 'spring' }}
+                >
+                  <Send className="h-6 w-6" />
+                </motion.div>
+
+                {/* Sparkles on hover */}
+                <AnimatePresence>
+                  {emailHovered && (
+                    <>
+                      {[...Array(6)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute z-20"
+                          style={{
+                            left: `${20 + i * 12}%`,
+                            top: '50%',
+                          }}
+                          initial={{ scale: 0, y: 0 }}
+                          animate={{
+                            scale: [0, 1, 0],
+                            y: [(i % 2 === 0 ? -1 : 1) * 30],
+                          }}
+                          exit={{ scale: 0 }}
+                          transition={{ duration: 0.5, delay: i * 0.05 }}
+                        >
+                          <Star className="h-4 w-4 text-yellow-300" fill="currentColor" />
+                        </motion.div>
+                      ))}
+                    </>
+                  )}
+                </AnimatePresence>
               </a>
 
               {/* Location */}
@@ -285,31 +289,31 @@ export function Contact() {
           {/* Fun interaction cards */}
           <FadeIn delay={0.3}>
             <div className="grid sm:grid-cols-3 gap-4 mb-12">
-              {/* Coffee card */}
+              {/* Music card */}
               <motion.div
                 className="p-6 rounded-2xl bg-card border border-border cursor-pointer text-center group"
-                onClick={handleCoffeeClick}
+                onClick={handleRockClick}
                 whileHover={{ scale: 1.02, y: -4 }}
                 whileTap={{ scale: 0.98 }}
               >
                 <motion.div
-                  animate={coffeesClicked > 0 ? { rotate: [0, 10, -10, 0] } : {}}
+                  animate={rockClicked > 0 ? { rotate: [0, 10, -10, 0] } : {}}
                   className="text-4xl mb-3"
                 >
-                  ☕
+                  🎸
                 </motion.div>
-                <h3 className="font-bold mb-1">Buy Me a Coffee?</h3>
+                <h3 className="font-bold mb-1">Rock On!</h3>
                 <p className="text-sm text-muted-foreground">
-                  Clicked {coffeesClicked} time{coffeesClicked !== 1 ? 's' : ''}
-                  {coffeesClicked >= 5 && ' 🎉'}
+                  Clicked {rockClicked} time{rockClicked !== 1 ? 's' : ''}
+                  {rockClicked >= 5 && ' 🤘'}
                 </p>
-                {coffeesClicked >= 5 && (
+                {rockClicked >= 5 && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="text-xs text-primary mt-2"
                   >
-                    Thanks! You&apos;re awesome! 💕
+                    You rock! 🎸🔥
                   </motion.p>
                 )}
               </motion.div>
@@ -401,8 +405,8 @@ export function Contact() {
                 transition={{ duration: 2, repeat: Infinity }}
               >
                 <Heart className="h-4 w-4 text-rose-500" fill="currentColor" />
-                <span>Made with love, coffee, and probably too many hours debugging CSS</span>
-                <Coffee className="h-4 w-4 text-amber-600" />
+                <span>Made with love, metal, and probably too many hours debugging CSS</span>
+                <Rocket className="h-4 w-4 text-primary" />
               </motion.div>
             </motion.div>
           </FadeIn>

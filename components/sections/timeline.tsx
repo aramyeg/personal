@@ -2,11 +2,12 @@
 
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { useRef, useState, useMemo } from 'react'
-import { MapPin, Calendar, ChevronDown, Briefcase, TrendingUp, Filter, X } from 'lucide-react'
+import { MapPin, Calendar, ChevronDown, Briefcase, Filter, X } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { experiences } from '@/data/experience'
 import type { Experience } from '@/types'
 import { cn } from '@/lib/utils'
+import { CareerGame } from './career-game'
 
 export function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -173,55 +174,10 @@ export function Timeline() {
           )}
         </div>
 
-        {/* Career progression indicator */}
+        {/* Career Journey Game */}
         <FadeIn delay={0.3}>
-          <div className="mt-12 p-6 rounded-2xl bg-card border border-border">
-            <div className="flex items-center gap-2 mb-6">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Career Journey</span>
-            </div>
-
-            {/* Visual progression */}
-            <div className="relative">
-              {/* Progress line */}
-              <div className="absolute top-4 left-0 right-0 h-1 bg-muted rounded-full">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-primary/60 via-primary to-primary rounded-full"
-                  initial={{ width: 0 }}
-                  whileInView={{ width: '100%' }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 2, ease: 'easeOut' }}
-                />
-              </div>
-
-              {/* Milestones */}
-              <div className="relative flex justify-between">
-                {[
-                  { year: '2016', role: 'Marketing', icon: '📈' },
-                  { year: '2017', role: 'Developer', icon: '💻' },
-                  { year: '2020', role: 'Senior', icon: '⚡' },
-                  { year: '2024', role: 'Tech Lead', icon: '🚀' },
-                ].map((milestone, i) => (
-                  <motion.div
-                    key={milestone.year}
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.2, duration: 0.5 }}
-                  >
-                    <motion.div
-                      className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm mb-2"
-                      whileHover={{ scale: 1.2 }}
-                    >
-                      {milestone.icon}
-                    </motion.div>
-                    <span className="text-xs font-medium">{milestone.role}</span>
-                    <span className="text-xs text-muted-foreground">{milestone.year}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
+          <div className="mt-12">
+            <CareerGame />
           </div>
         </FadeIn>
       </div>
@@ -248,7 +204,6 @@ function TimelineItem({
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, x: isLeft ? -50 : 50 }}
       whileInView={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -259,7 +214,7 @@ function TimelineItem({
       }`}
     >
       {/* Timeline dot with pulse animation */}
-      <div className="absolute left-0 md:left-1/2 md:-translate-x-1/2 top-6 z-10">
+      <div className="absolute left-0 md:left-1/2 md:-translate-x-1/2 top-6 z-20">
         <motion.span
           className={cn(
             'block w-4 h-4 rounded-full border-2 transition-all duration-300',
@@ -286,7 +241,7 @@ function TimelineItem({
       </div>
 
       {/* Content */}
-      <div className={`flex-1 pl-8 md:pl-0 ${isLeft ? 'md:pr-16' : 'md:pl-16'}`}>
+      <div className={`flex-1 pl-8 md:pl-0 relative z-10 ${isLeft ? 'md:pr-16' : 'md:pl-16'}`}>
         <motion.div
           className={cn(
             'group p-6 rounded-2xl bg-card border border-border cursor-pointer transition-all duration-300',

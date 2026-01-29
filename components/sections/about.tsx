@@ -38,10 +38,10 @@ const highlights = [
 ]
 
 const funFacts = [
-  { emoji: '☕', fact: 'Coffee-powered coding sessions' },
+  { emoji: '🎸', fact: 'Heavy metal fueled coding sessions' },
   { emoji: '🎮', fact: 'Casual gamer when not debugging' },
   { emoji: '📚', fact: 'Always learning something new' },
-  { emoji: '🎵', fact: 'Codes best with lo-fi beats' },
+  { emoji: '🎵', fact: 'Black Sabbath, Led Zeppelin enthusiast' },
 ]
 
 export function About() {
@@ -221,7 +221,7 @@ export function About() {
                 <StaggerItem key={item.label}>
                   <motion.div
                     className={cn(
-                      'relative p-4 rounded-xl bg-card border border-border cursor-pointer overflow-hidden group',
+                      'relative p-4 rounded-xl bg-card border border-border cursor-pointer overflow-hidden group min-h-[130px]',
                       'hover:border-primary/50 transition-all duration-300'
                     )}
                     onClick={() =>

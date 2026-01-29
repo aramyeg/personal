@@ -27,7 +27,6 @@ const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: C
     output: `Available commands:
   whoami       - Who am I?
   skills       - My tech stack
-  coffee       - Coffee counter
   music        - Current coding playlist
   joke         - Developer humor
   contact      - How to reach me
@@ -61,23 +60,17 @@ const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: C
 └───────────────────────────────────┘`,
     type: 'success',
   }),
-  coffee: () => {
-    const cups = Math.floor(Math.random() * 4) + 2
-    return {
-      output: `☕ Today's coffee count: ${cups} cups
-${Array(cups).fill('☕').join(' ')}
-${cups >= 4 ? "I might be vibrating at this point..." : "Perfectly caffeinated!"}`,
-      type: 'info',
-    }
-  },
   music: () => ({
-    output: `🎵 Coding Playlist:
-├── Lo-fi Beats to Code/Relax to
-├── Synthwave Retro Mix
-├── Focus Flow - Deep Work
-└── Currently: ${['lo-fi chill', 'epic orchestral', 'silence (debugging)', 'synthwave'][Math.floor(Math.random() * 4)]}
+    output: `🎸 Coding Playlist:
+├── Black Sabbath - Paranoid
+├── Led Zeppelin - Kashmir
+├── Polyphia - G.O.A.T.
+├── MF DOOM - Doomsday
+├── Gorillaz - Feel Good Inc
+├── System of a Down - Chop Suey!
+└── Currently: ${['Black Sabbath', 'Led Zeppelin', 'Polyphia', 'MF DOOM', 'Gorillaz', 'SOAD'][Math.floor(Math.random() * 6)]}
 
-♪ ░░▒▓█████████████████▓▒░░ ♪`,
+🤘 ░░▒▓█████████████████▓▒░░ 🤘`,
     type: 'special',
   }),
   joke: () => {
@@ -144,7 +137,7 @@ ${cups >= 4 ? "I might be vibrating at this point..." : "Perfectly caffeinated!"
      \\___)=(___/           Packages: Too many node_modules
                            Shell: Zsh + Oh-My-Zsh
                            Terminal: This portfolio
-                           CPU: Coffee-powered
+                           CPU: Metal-powered 🤘
                            Memory: Stack Overflow tabs`,
     type: 'info',
   }),
@@ -338,7 +331,7 @@ Type 'help' to see available commands.`,
         <FadeIn delay={0.2}>
           <div className="mt-6 flex flex-wrap gap-2">
             <span className="text-sm text-muted-foreground mr-2">Try:</span>
-            {['help', 'whoami', 'skills', 'joke', 'coffee', 'neofetch'].map((cmd) => (
+            {['help', 'whoami', 'skills', 'joke', 'music', 'neofetch'].map((cmd) => (
               <motion.button
                 key={cmd}
                 onClick={() => {
