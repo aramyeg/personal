@@ -208,17 +208,22 @@ export function Contact() {
           {/* Main CTA - Email */}
           <FadeIn delay={0.2}>
             <div className="text-center mb-12">
-              <a
-                href={`mailto:${siteConfig.email}`}
+              {/* Stable wrapper for consistent hover area */}
+              <div
+                className="inline-block"
                 onMouseEnter={() => setEmailHovered(true)}
                 onMouseLeave={() => setEmailHovered(false)}
-                className="group relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
               >
-                <motion.div
-                  className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary to-primary/80"
-                  animate={{ scale: emailHovered ? 1.05 : 1 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                />
+                <a
+                  href={`mailto:${siteConfig.email}`}
+                  className="group relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-visible"
+                >
+                  <motion.div
+                    className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary to-primary/80"
+                    animate={{ scale: emailHovered ? 1.05 : 1 }}
+                    transition={{ type: 'spring', stiffness: 300 }}
+                    style={{ transformOrigin: 'center' }}
+                  />
                 {/* Shimmer effect */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
@@ -272,11 +277,12 @@ export function Contact() {
                     </>
                   )}
                 </AnimatePresence>
-              </a>
+                </a>
+              </div>
 
-              {/* Location */}
+              {/* Location - increased spacing from email button */}
               <motion.div
-                className="mt-8 inline-flex items-center gap-2 text-muted-foreground"
+                className="mt-12 inline-flex items-center gap-2 text-muted-foreground"
                 whileHover={{ scale: 1.05 }}
               >
                 <MapPin className="h-5 w-5" />

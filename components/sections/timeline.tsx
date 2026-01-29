@@ -135,9 +135,10 @@ export function Timeline() {
           </div>
         </FadeIn>
 
-        <div ref={containerRef} className="relative">
-          {/* Animated timeline line */}
-          <div className="absolute left-2 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-border">
+        {/* Timeline container with isolated stacking context */}
+        <div ref={containerRef} className="relative" style={{ isolation: 'isolate' }}>
+          {/* Animated timeline line - z-0 (bottom layer) */}
+          <div className="absolute left-2 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-border z-0">
             <motion.div
               className="w-full bg-gradient-to-b from-primary via-primary to-transparent"
               style={{ height: lineHeight }}
@@ -213,8 +214,8 @@ function TimelineItem({
         isLeft ? 'md:flex-row-reverse' : ''
       }`}
     >
-      {/* Timeline dot with pulse animation */}
-      <div className="absolute left-0 md:left-1/2 md:-translate-x-1/2 top-6 z-20">
+      {/* Timeline dot with pulse animation - z-10 (above line, below cards) */}
+      <div className="absolute left-0 md:left-1/2 md:-translate-x-1/2 top-6 z-10">
         <motion.span
           className={cn(
             'block w-4 h-4 rounded-full border-2 transition-all duration-300',
@@ -240,8 +241,8 @@ function TimelineItem({
         />
       </div>
 
-      {/* Content */}
-      <div className={`flex-1 pl-8 md:pl-0 relative z-10 ${isLeft ? 'md:pr-16' : 'md:pl-16'}`}>
+      {/* Content - z-20 (above dots) */}
+      <div className={`flex-1 pl-8 md:pl-0 relative z-20 ${isLeft ? 'md:pr-16' : 'md:pl-16'}`}>
         <motion.div
           className={cn(
             'group p-6 rounded-2xl bg-card border border-border cursor-pointer transition-all duration-300',

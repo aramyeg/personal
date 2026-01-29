@@ -216,19 +216,26 @@ export function About() {
 
           {/* Interactive highlight cards */}
           <StaggerChildren className="lg:col-span-2" staggerDelay={0.1} delayStart={0.3}>
-            <div className="grid grid-cols-2 gap-4">
+            {/* CSS containment prevents layout shift from propagating to other sections */}
+            <div className="grid grid-cols-2 gap-4" style={{ contain: 'layout' }}>
               {highlights.map((item) => (
                 <StaggerItem key={item.label}>
                   <motion.div
+                    data-testid="about-card"
                     className={cn(
-                      'relative p-4 rounded-xl bg-card border border-border cursor-pointer overflow-hidden group min-h-[130px]',
-                      'hover:border-primary/50 transition-all duration-300'
+                      'relative p-4 rounded-xl bg-card border border-border cursor-pointer overflow-hidden group',
+                      'hover:border-primary/50 transition-colors duration-300'
                     )}
+                    style={{
+                      contain: 'layout',
+                      minHeight: '130px',
+                    }}
                     onClick={() =>
                       setExpandedCard(expandedCard === item.label ? null : item.label)
                     }
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
+                    layout="position"
                   >
                     {/* Gradient background on hover */}
                     <div
@@ -249,12 +256,14 @@ export function About() {
                       <p className="text-sm text-muted-foreground">{item.description}</p>
 
                       {/* Expanded detail */}
-                      <AnimatePresence>
+                      <AnimatePresence mode="wait">
                         {expandedCard === item.label && (
                           <motion.p
+                            key={`${item.label}-detail`}
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
                             className="text-xs text-primary mt-2 overflow-hidden"
                           >
                             {item.detail}
