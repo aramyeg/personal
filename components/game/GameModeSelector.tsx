@@ -3,7 +3,6 @@
 import { motion } from 'framer-motion'
 import { Gamepad2, Zap, Skull, Clock, Heart, Shield, Star } from 'lucide-react'
 import type { GameMode } from '@/lib/game/types'
-import { GAME_MODE_CONFIGS } from '@/lib/game/gameState'
 
 type GameModeSelectorProps = {
   onSelectMode: (mode: GameMode) => void
@@ -78,7 +77,6 @@ export function GameModeSelector({ onSelectMode }: GameModeSelectorProps) {
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xl">
         {modes.map((mode, index) => {
           const details = MODE_DETAILS[mode]
-          const config = GAME_MODE_CONFIGS[mode]
 
           return (
             <motion.button

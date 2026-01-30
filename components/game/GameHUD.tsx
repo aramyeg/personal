@@ -13,10 +13,17 @@ import {
   formatTime,
   getRemainingTime,
 } from '@/lib/game/gameState'
+import {
+  useUnlockedSkills,
+  useSkillState,
+  SKILLS,
+  type SkillId,
+} from '@/lib/game/world'
 import type { PowerUpType } from '@/lib/game/types'
 
 type GameHUDProps = {
   className?: string
+  showSkills?: boolean
 }
 
 const POWER_UP_ICONS: Record<PowerUpType, typeof Zap> = {
@@ -33,7 +40,7 @@ const POWER_UP_COLORS: Record<PowerUpType, string> = {
   magnet: 'text-pink-400',
 }
 
-export function GameHUD({ className = '' }: GameHUDProps) {
+export function GameHUD({ className = '', showSkills = false }: GameHUDProps) {
   const lives = useLives()
   const maxLives = useMaxLives()
   const score = useScore()
@@ -41,9 +48,33 @@ export function GameHUD({ className = '' }: GameHUDProps) {
   const timeLimit = useTimeLimit()
   const activePowerUps = useActivePowerUps()
   const mode = useGameMode()
+  const unlockedSkills = useUnlockedSkills()
+  const skillState = useSkillState()
 
   const remainingTime = getRemainingTime(gameTime, timeLimit)
   const isLowTime = remainingTime !== null && remainingTime < 10000
+
+  // Get skill cooldown info
+  const getSkillCooldownProgress = (skillId: SkillId): number => {
+    if (skillId === 'dash') {
+      const { cooldownRemaining } = skillState.dash
+      if (cooldownRemaining <= 0) return 1
+      return 1 - cooldownRemaining / 2000
+    }
+    if (skillId === 'shield') {
+      const { cooldownRemaining } = skillState.shield
+      if (cooldownRemaining <= 0) return 1
+      return 1 - cooldownRemaining / 10000
+    }
+    return 1
+  }
+
+  const isSkillActive = (skillId: SkillId): boolean => {
+    if (skillId === 'dash') return skillState.dash.isDashing
+    if (skillId === 'shield') return skillState.shield.isActive
+    if (skillId === 'float') return skillState.float.isFloating
+    return false
+  }
 
   return (
     <div
@@ -152,6 +183,45 @@ export function GameHUD({ className = '' }: GameHUDProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Unlocked Skills (for world mode) */}
+      {showSkills && unlockedSkills.length > 0 && (
+        <div className="absolute bottom-2 left-2 flex gap-1">
+          {unlockedSkills.map((skillId) => {
+            const skill = SKILLS[skillId]
+            const cooldownProgress = getSkillCooldownProgress(skillId)
+            const active = isSkillActive(skillId)
+            const isReady = cooldownProgress >= 1
+
+            return (
+              <motion.div
+                key={skillId}
+                className={`relative w-8 h-8 rounded-md bg-background/80 backdrop-blur-sm border flex items-center justify-center ${
+                  active
+                    ? 'border-primary bg-primary/20'
+                    : isReady
+                    ? 'border-border/50'
+                    : 'border-muted opacity-60'
+                }`}
+                animate={active ? { scale: [1, 1.1, 1] } : {}}
+                transition={{ repeat: active ? Infinity : 0, duration: 0.5 }}
+                title={`${skill.name}: ${skill.control}`}
+              >
+                <span className="text-sm">{skill.icon}</span>
+                {/* Cooldown overlay */}
+                {cooldownProgress < 1 && (
+                  <div
+                    className="absolute inset-0 bg-background/60 rounded-md"
+                    style={{
+                      clipPath: `inset(${cooldownProgress * 100}% 0 0 0)`,
+                    }}
+                  />
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
