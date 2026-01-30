@@ -45,9 +45,6 @@ storybook-static
 *.swo
 
 # AI Assistants
-.claude/
-.claude-session
-*.claude-cache
 .cursor/
 .cursorignore
 .aider*
@@ -61,13 +58,8 @@ storybook-static
 .idx/
 .replit
 .v0/
-CLAUDE.md
-.agents/
 IMPROVEMENT_PLAN.md
 
-# Documentation (internal - except game design)
-docs/
-!docs/GAME_DESIGN.md
 
 *storybook.log
 
