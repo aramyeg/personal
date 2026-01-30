@@ -16,6 +16,8 @@ export type ParticleType =
   | 'star'      // Star burst
   | 'confetti'  // Win celebration
   | 'trail'     // Movement trail
+  | 'damage'    // Player damage effect
+  | 'respawn'   // Respawn swirl effect
 
 export type Particle = {
   x: number
@@ -270,6 +272,94 @@ export function emitTrail(
 
   if (newParticles.length < emitter.maxParticles) {
     newParticles.push(createTrailParticle(x, y, palette))
+  }
+
+  return { ...emitter, particles: newParticles }
+}
+
+/**
+ * Creates a damage particle (red/orange burst)
+ */
+function createDamageParticle(x: number, y: number): Particle {
+  const angle = Math.random() * Math.PI * 2
+  const speed = 2 + Math.random() * 4
+  const colors = ['#ff4444', '#ff6644', '#ff8844', '#ffaa44']
+
+  return {
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed - 2,
+    life: 1,
+    maxLife: 1,
+    type: 'damage',
+    size: 2 + Math.random() * 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    gravity: 0.15,
+    friction: 0.95,
+    rotation: Math.random() * Math.PI * 2,
+    rotationSpeed: (Math.random() - 0.5) * 0.3,
+  }
+}
+
+/**
+ * Creates a respawn particle (blue/white swirl)
+ */
+function createRespawnParticle(x: number, y: number, index: number, total: number): Particle {
+  const angle = (index / total) * Math.PI * 2
+  const radius = 20 + Math.random() * 10
+  const colors = ['#4488ff', '#66aaff', '#88ccff', '#ffffff']
+
+  return {
+    x: x + Math.cos(angle) * radius,
+    y: y + Math.sin(angle) * radius,
+    vx: -Math.cos(angle) * 2,
+    vy: -Math.sin(angle) * 2,
+    life: 1,
+    maxLife: 1,
+    type: 'respawn',
+    size: 2 + Math.random() * 2,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    gravity: 0,
+    friction: 0.92,
+    rotation: angle,
+    rotationSpeed: 0.1,
+  }
+}
+
+/**
+ * Emits damage particles when player is hit
+ */
+export function emitDamage(
+  emitter: ParticleEmitter,
+  x: number,
+  y: number,
+  count: number
+): ParticleEmitter {
+  const newParticles = [...emitter.particles]
+  const particlesToAdd = Math.min(count, emitter.maxParticles - newParticles.length)
+
+  for (let i = 0; i < particlesToAdd; i++) {
+    newParticles.push(createDamageParticle(x, y))
+  }
+
+  return { ...emitter, particles: newParticles }
+}
+
+/**
+ * Emits respawn particles spiraling inward
+ */
+export function emitRespawn(
+  emitter: ParticleEmitter,
+  x: number,
+  y: number,
+  count: number
+): ParticleEmitter {
+  const newParticles = [...emitter.particles]
+  const particlesToAdd = Math.min(count, emitter.maxParticles - newParticles.length)
+
+  for (let i = 0; i < particlesToAdd; i++) {
+    newParticles.push(createRespawnParticle(x, y, i, particlesToAdd))
   }
 
   return { ...emitter, particles: newParticles }

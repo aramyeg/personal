@@ -65,8 +65,9 @@ CLAUDE.md
 .agents/
 IMPROVEMENT_PLAN.md
 
-# Documentation (internal)
+# Documentation (internal - except game design)
 docs/
+!docs/GAME_DESIGN.md
 
 *storybook.log
 

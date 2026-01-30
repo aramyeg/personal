@@ -66,6 +66,9 @@ export type Platform = {
   icon: string     // Emoji icon
   reached: boolean // Has player landed on this?
   glowIntensity: number // 0-1, animated when reached
+  // Experience link
+  experienceId: string  // Links to experience data
+  technologies: string[] // Technologies for context-aware collectibles
   // Style-specific properties
   circuitSeed?: number  // For deterministic circuit patterns
   codeLines?: string[]  // For code_block style
@@ -120,7 +123,7 @@ export type InputState = {
   jump: boolean
 }
 
-// Overall game state
+// Overall game state (legacy, kept for compatibility)
 export type GameState = {
   player: Player
   platforms: Platform[]
@@ -131,4 +134,127 @@ export type GameState = {
   gameWon: boolean
   currentMilestone: string | null
   cameraX: number
+}
+
+// ============================================
+// GAME MODES
+// ============================================
+
+export type GameMode = 'classic' | 'speedrun' | 'hardcore'
+
+export type GameModeConfig = {
+  id: GameMode
+  name: string
+  description: string
+  icon: string
+  lives: number
+  hasTimer: boolean
+  targetTime?: number      // ms for speedrun
+  hasCheckpoints: boolean
+  scoreMultiplier: number
+  powerUpsEnabled: boolean
+}
+
+// ============================================
+// POWER-UPS
+// ============================================
+
+export type PowerUpType = 'speed_boost' | 'super_jump' | 'shield' | 'magnet'
+
+export type PowerUpConfig = {
+  type: PowerUpType
+  name: string
+  description: string
+  duration: number      // ms
+  icon: string          // Emoji
+  color: string         // Primary color
+  effect: {
+    speedMultiplier?: number
+    jumpMultiplier?: number
+    invincible?: boolean
+    magnetRadius?: number
+  }
+}
+
+export type ActivePowerUp = {
+  type: PowerUpType
+  expiresAt: number    // Timestamp when effect ends
+  duration: number     // Total duration for UI progress
+}
+
+export type PowerUpCollectible = {
+  x: number
+  y: number
+  type: PowerUpType
+  collected: boolean
+  animOffset: number
+}
+
+// ============================================
+// ACHIEVEMENTS
+// ============================================
+
+export type AchievementId =
+  | 'first_platform'
+  | 'all_platforms'
+  | 'first_tech'
+  | 'all_tech'
+  | 'speedrun_60s'
+  | 'speedrun_30s'
+  | 'no_damage'
+  | 'collector'
+  | 'hardcore_complete'
+
+export type Achievement = {
+  id: AchievementId
+  name: string
+  description: string
+  icon: string
+  unlocked: boolean
+  unlockedAt?: number   // Timestamp
+}
+
+// ============================================
+// EXTENDED GAME STATE
+// ============================================
+
+export type ExtendedGameState = {
+  // Game mode
+  mode: GameMode
+
+  // Lives system
+  lives: number
+  maxLives: number
+
+  // Game flow
+  gameStarted: boolean
+  gamePaused: boolean
+  gameOver: boolean
+  gameWon: boolean
+
+  // Timing
+  gameTime: number      // Elapsed ms
+  timeLimit: number | null
+
+  // Score
+  score: number
+  scoreMultiplier: number
+
+  // Power-ups
+  activePowerUps: ActivePowerUp[]
+
+  // Platform progress
+  platformsReached: number
+  totalPlatforms: number
+  currentPlatformIndex: number | null
+  lastCheckpointIndex: number
+
+  // Collectibles
+  techCollected: string[]
+  totalCollectibles: number
+  collectiblesCollected: number
+
+  // Achievements
+  achievements: Achievement[]
+  recentAchievement: Achievement | null
 }
