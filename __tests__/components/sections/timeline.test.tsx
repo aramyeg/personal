@@ -98,7 +98,8 @@ describe('Timeline Section', () => {
   it('renders career stats', () => {
     render(<Timeline />);
     expect(screen.getByText('Years Coding')).toBeInTheDocument();
-    expect(screen.getByText('Companies')).toBeInTheDocument();
+    // "Companies" may appear multiple times (in Timeline stats and SkillTree QuickStats)
+    expect(screen.getAllByText('Companies').length).toBeGreaterThan(0);
     expect(screen.getByText('Countries')).toBeInTheDocument();
   });
 

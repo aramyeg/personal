@@ -10,14 +10,17 @@ mockIntersectionObserver.mockReturnValue({
 });
 window.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
 
-// Mock ResizeObserver
-const mockResizeObserver = vi.fn();
-mockResizeObserver.mockReturnValue({
-  observe: () => null,
-  unobserve: () => null,
-  disconnect: () => null,
-});
-window.ResizeObserver = mockResizeObserver as unknown as typeof ResizeObserver;
+// Mock ResizeObserver as a proper class
+class MockResizeObserver {
+  callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+window.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {

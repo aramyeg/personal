@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEasterEggs } from '@/hooks'
 
@@ -21,33 +21,39 @@ export function useEasterEggContext() {
 export function EasterEggProvider({ children }: { children: ReactNode }) {
   const { showNotification, isKonamiActive, isSecretActive } = useEasterEggs()
 
+  // Pre-calculate matrix rain elements (client-only to avoid hydration mismatch)
+  const [matrixElements] = useState(() => {
+    if (typeof window === 'undefined') return []
+    const chars = ['0', '1', '♦', '♠', '◆', '▲', '●']
+    return Array.from({ length: 30 }, () => ({
+      left: Math.random() * 100,
+      char: chars[Math.floor(Math.random() * chars.length)],
+      duration: 3 + Math.random() * 2,
+      delay: Math.random() * 2,
+    }))
+  })
+
   return (
     <EasterEggContext.Provider value={{ isKonamiActive, isSecretActive }}>
       {/* Konami code effect - matrix rain */}
       <AnimatePresence>
         {isKonamiActive && (
           <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-            {[...Array(30)].map((_, i) => (
+            {matrixElements.map((el, i) => (
               <motion.div
                 key={i}
                 className="absolute text-primary/30 text-sm font-mono"
-                initial={{
-                  x: Math.random() * 100 + '%',
-                  y: -20,
-                  opacity: 0,
-                }}
-                animate={{
-                  y: '100vh',
-                  opacity: [0, 1, 1, 0],
-                }}
+                style={{ left: `${el.left}%` }}
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: '100vh', opacity: [0, 1, 1, 0] }}
                 transition={{
-                  duration: 3 + Math.random() * 2,
+                  duration: el.duration,
                   repeat: 3,
-                  delay: Math.random() * 2,
+                  delay: el.delay,
                   ease: 'linear',
                 }}
               >
-                {['0', '1', '♦', '♠', '◆', '▲', '●'][Math.floor(Math.random() * 7)]}
+                {el.char}
               </motion.div>
             ))}
           </div>

@@ -1,13 +1,12 @@
 'use client'
 
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import { MapPin, Calendar, ChevronDown, Briefcase, Filter, X } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { experiences } from '@/data/experience'
 import type { Experience } from '@/types'
 import { cn } from '@/lib/utils'
-import { CareerGame } from './career-game'
 
 export function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -175,12 +174,6 @@ export function Timeline() {
           )}
         </div>
 
-        {/* Career Journey Game */}
-        <FadeIn delay={0.3}>
-          <div className="mt-12">
-            <CareerGame />
-          </div>
-        </FadeIn>
       </div>
     </section>
   )
@@ -202,6 +195,39 @@ function TimelineItem({
   highlightTech: string | null
 }) {
   const isCurrentRole = experience.endDate === null
+
+  // Rock hands easter egg state
+  // NOTE: console.log in this component is an intentional easter egg output
+  const [rockMode, setRockMode] = useState(false)
+  const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const rockModeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current)
+      if (rockModeTimeoutRef.current) clearTimeout(rockModeTimeoutRef.current)
+    }
+  }, [])
+
+  const handleCompanyMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card toggle
+    holdTimeoutRef.current = setTimeout(() => {
+      setRockMode(true)
+      console.log(
+        '%c 🤘 ROCK ON! 🎸 ',
+        'background: linear-gradient(90deg, #8b5cf6, #ec4899); color: white; font-size: 20px; padding: 10px; border-radius: 5px;'
+      )
+      rockModeTimeoutRef.current = setTimeout(() => setRockMode(false), 2000)
+    }, 3000)
+  }
+
+  const handleCompanyMouseUp = () => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current)
+      holdTimeoutRef.current = null
+    }
+  }
 
   return (
     <motion.div
@@ -257,7 +283,33 @@ function TimelineItem({
               <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                 {experience.role}
               </h3>
-              <p className="text-primary font-medium">{experience.company}</p>
+              <motion.p
+                className={cn(
+                  'font-medium cursor-pointer select-none transition-all duration-300',
+                  rockMode
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent'
+                    : 'text-primary'
+                )}
+                onMouseDown={handleCompanyMouseDown}
+                onMouseUp={handleCompanyMouseUp}
+                onMouseLeave={handleCompanyMouseUp}
+                animate={rockMode ? {
+                  scale: [1, 1.1, 1],
+                  rotate: [-2, 2, -2, 0]
+                } : {}}
+                transition={{ duration: 0.5 }}
+              >
+                {experience.company}
+                {rockMode && (
+                  <motion.span
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="ml-2"
+                  >
+                    🤘
+                  </motion.span>
+                )}
+              </motion.p>
             </div>
             <div className="flex items-center gap-2">
               {isCurrentRole && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ExternalLink,
@@ -10,6 +10,7 @@ import {
   Calendar,
   Zap,
   ChevronRight,
+  Rocket,
 } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { projects, categoryLabels, type ExtendedProject, type ProjectCategory } from '@/data/projects'
@@ -18,6 +19,68 @@ import { cn } from '@/lib/utils'
 export function Projects() {
   const [activeCategory, setActiveCategory] = useState<ProjectCategory | 'all'>('all')
   const [hoveredProject, setHoveredProject] = useState<string | null>(null)
+
+  // Launch sequence easter egg
+  // NOTE: console.log statements are intentional easter egg outputs
+  const [launchSequence, setLaunchSequence] = useState(false)
+  const [zapClickCount, setZapClickCount] = useState(0)
+  const zapClickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const launchTimeoutsRef = useRef<NodeJS.Timeout[]>([])
+
+  // Pre-generate confetti positions (client-only to avoid hydration mismatch)
+  const [confettiParticles] = useState(() => {
+    if (typeof window === 'undefined') return []
+    return Array.from({ length: 40 }, () => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.5,
+      duration: 2 + Math.random(),
+      rotation: Math.random() * 720,
+    }))
+  })
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (zapClickTimeoutRef.current) clearTimeout(zapClickTimeoutRef.current)
+      launchTimeoutsRef.current.forEach(clearTimeout)
+    }
+  }, [])
+
+  const handleZapClick = () => {
+    if (zapClickTimeoutRef.current) {
+      clearTimeout(zapClickTimeoutRef.current)
+    }
+
+    const newCount = zapClickCount + 1
+    setZapClickCount(newCount)
+
+    if (newCount >= 3) {
+      triggerLaunchSequence()
+      setZapClickCount(0)
+    } else {
+      // Reset count after 500ms of no clicks
+      zapClickTimeoutRef.current = setTimeout(() => {
+        setZapClickCount(0)
+      }, 500)
+    }
+  }
+
+  const triggerLaunchSequence = () => {
+    setLaunchSequence(true)
+
+    // Clear any existing launch timeouts
+    launchTimeoutsRef.current.forEach(clearTimeout)
+
+    // Console deployment log with tracked timeouts
+    console.log('%c 🚀 DEPLOYMENT INITIATED ', 'background: #0070f3; color: white; font-size: 16px; padding: 8px; border-radius: 4px;')
+    launchTimeoutsRef.current = [
+      setTimeout(() => console.log('%c ✓ Building production bundle...', 'color: #22c55e;'), 200),
+      setTimeout(() => console.log('%c ✓ Optimizing assets...', 'color: #22c55e;'), 400),
+      setTimeout(() => console.log('%c ✓ Deploying to edge network...', 'color: #22c55e;'), 600),
+      setTimeout(() => console.log('%c 🎉 LAUNCH SUCCESSFUL! ', 'background: #22c55e; color: white; font-size: 16px; padding: 8px; border-radius: 4px;'), 1000),
+      setTimeout(() => setLaunchSequence(false), 3000),
+    ]
+  }
 
   const filteredProjects =
     activeCategory === 'all'
@@ -35,14 +98,45 @@ export function Projects() {
       </div>
 
       <div className="section-container relative">
+        {/* Launch sequence confetti */}
+        <AnimatePresence>
+          {launchSequence && (
+            <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+              {confettiParticles.map((particle, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    background: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'][i % 4],
+                    left: `${particle.left}%`,
+                  }}
+                  initial={{ y: -20, opacity: 1 }}
+                  animate={{ y: '100vh', opacity: 0, rotate: particle.rotation }}
+                  transition={{ duration: particle.duration, delay: particle.delay }}
+                />
+              ))}
+            </div>
+          )}
+        </AnimatePresence>
+
         <FadeIn>
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-3xl sm:text-4xl font-bold">Featured Projects</h2>
             <motion.div
-              animate={{ rotate: [0, 15, -15, 0] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 4 }}
+              onClick={handleZapClick}
+              className="cursor-pointer"
+              animate={launchSequence ? {
+                y: [0, -20, -100],
+                rotate: [0, 0, -45],
+                scale: [1, 1.2, 0.5],
+              } : { rotate: [0, 15, -15, 0] }}
+              transition={launchSequence ? { duration: 1 } : { duration: 2, repeat: Infinity, repeatDelay: 4 }}
             >
-              <Zap className="h-6 w-6 text-primary" />
+              {launchSequence ? (
+                <Rocket className="h-6 w-6 text-primary" />
+              ) : (
+                <Zap className="h-6 w-6 text-primary" />
+              )}
             </motion.div>
           </div>
           <div className="h-1 w-12 bg-primary rounded-full mb-4" />
@@ -84,6 +178,7 @@ export function Projects() {
                 isHovered={hoveredProject === project.id}
                 onHover={() => setHoveredProject(project.id)}
                 onLeave={() => setHoveredProject(null)}
+                isLaunching={launchSequence}
               />
             ))}
           </div>
@@ -109,12 +204,14 @@ function ProjectCard({
   isHovered,
   onHover,
   onLeave,
+  isLaunching,
 }: {
   project: ExtendedProject
   index: number
   isHovered: boolean
   onHover: () => void
   onLeave: () => void
+  isLaunching: boolean
 }) {
   return (
     <motion.article
@@ -122,6 +219,7 @@ function ProjectCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-100px' }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
+      animate={isLaunching ? { y: [0, -30, 0] } : {}}
       className="group relative"
       onMouseEnter={onHover}
       onMouseLeave={onLeave}

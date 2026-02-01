@@ -38,6 +38,7 @@ export type SkillCategory =
   | 'styling'
   | 'backend'
   | 'tools'
+  | 'fun'
 
 export type SocialLink = {
   name: string

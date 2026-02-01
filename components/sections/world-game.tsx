@@ -63,6 +63,11 @@ const CANVAS_HEIGHT = 220
 const MAP_HEIGHT = 300
 const TILE_SIZE = 32
 
+// Debug mode constants (IDDQD easter egg)
+const CHEAT_CODE = ['i', 'd', 'd', 'q', 'd']
+const DEBUG_DURATION = 30 // seconds
+const ALL_SKILLS = ['double_jump', 'wall_slide', 'dash', 'shield', 'magnet', 'float'] as const
+
 // Simple platform type for world mode (different from career-game's Platform)
 type WorldPlatform = {
   id: string
@@ -254,6 +259,14 @@ export function WorldGame() {
     jumpPressed: false,
   })
 
+  // Debug mode (IDDQD easter egg)
+  const [debugMode, setDebugMode] = useState(false)
+  const [debugTimeRemaining, setDebugTimeRemaining] = useState(0)
+  const cheatSequenceRef = useRef<string[]>([])
+
+  // Effective skills (debug mode gives all skills)
+  const effectiveSkills = debugMode ? [...ALL_SKILLS] : unlockedSkills
+
   // Animation and timing
   const animationRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number>(0)
@@ -292,6 +305,37 @@ export function WorldGame() {
   useEffect(() => {
     skillStateRef.current = skillState
   }, [skillState])
+
+  // Debug mode countdown timer
+  useEffect(() => {
+    if (!debugMode) return
+
+    const interval = setInterval(() => {
+      setDebugTimeRemaining((prev) => {
+        if (prev <= 1) {
+          setDebugMode(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [debugMode])
+
+  // Activate debug mode
+  const activateDebugMode = useCallback(() => {
+    if (debugMode) return // Already active
+
+    setDebugMode(true)
+    setDebugTimeRemaining(DEBUG_DURATION)
+
+    console.log(
+      '%c ⚡ GOD MODE ACTIVATED! ⚡ ',
+      'background: linear-gradient(90deg, #ffd700, #ff8c00); color: black; padding: 12px 20px; font-size: 18px; font-weight: bold; border-radius: 5px;'
+    )
+    console.log('%c All skills unlocked for 30 seconds! ', 'color: #ffd700; font-size: 14px;')
+  }, [debugMode])
 
   // Handle starting a level
   // Called after LevelSelectModal calls enterLevel() which sets currentLevelId
@@ -480,7 +524,7 @@ export function WorldGame() {
       playerPhysics,
       skillStateRef.current,
       skillInput,
-      unlockedSkills,
+      effectiveSkills,
       deltaTime
     )
 
@@ -510,7 +554,7 @@ export function WorldGame() {
     // Death zone
     const deathZoneY = CANVAS_HEIGHT + 50
     if (player.y > deathZoneY && !player.invulnerable) {
-      if (!skillResult.effects.isShielded && canTakeDamage(unlockedSkills, skillStateRef.current)) {
+      if (!skillResult.effects.isShielded && canTakeDamage(effectiveSkills, skillStateRef.current)) {
         particleEmitterRef.current = emitDamage(
           particleEmitterRef.current,
           player.x + player.width / 2,
@@ -584,7 +628,7 @@ export function WorldGame() {
     player.grounded = onAnyPlatform
 
     // Collectible collision
-    const collectRadius = getCollectRadius(20, unlockedSkills)
+    const collectRadius = getCollectRadius(20, effectiveSkills)
     setCollectibles(prev => {
       let changed = false
       const updated = prev.map(c => {
@@ -803,7 +847,7 @@ export function WorldGame() {
     platforms,
     collectibles,
     palette,
-    unlockedSkills,
+    effectiveSkills,
     handleDeath,
     respawnPlayer,
     checkExitCollision,
@@ -839,6 +883,20 @@ export function WorldGame() {
       }
       if (e.key === 'Shift') keys.dash = true
       if (e.key === 'q') keys.shield = true
+
+      // IDDQD cheat code detection (only during level gameplay)
+      if (isPlaying && !gameOver && currentScreen === 'level') {
+        const key = e.key.toLowerCase()
+        if (/^[a-z]$/.test(key)) {
+          const newSequence = [...cheatSequenceRef.current.slice(-4), key]
+          cheatSequenceRef.current = newSequence
+
+          if (newSequence.join('') === CHEAT_CODE.join('')) {
+            activateDebugMode()
+            cheatSequenceRef.current = []
+          }
+        }
+      }
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -856,7 +914,7 @@ export function WorldGame() {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [])
+  }, [isPlaying, gameOver, currentScreen, activateDebugMode])
 
   // Touch controls
   const handleTouchMove = useCallback((direction: 'left' | 'right') => {
@@ -954,13 +1012,30 @@ export function WorldGame() {
               </div>
             )}
 
+            {/* Debug mode indicator */}
+            {debugMode && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute top-12 left-1/2 -translate-x-1/2 z-20"
+              >
+                <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-lg shadow-lg">
+                  <span className="text-lg">⚡</span>
+                  <span>GOD MODE</span>
+                  <span className="font-mono">{debugTimeRemaining}s</span>
+                </div>
+              </motion.div>
+            )}
+
             {/* Skills indicator */}
-            {isPlaying && unlockedSkills.length > 0 && (
+            {isPlaying && effectiveSkills.length > 0 && (
               <div className="absolute bottom-2 left-2 flex gap-1">
-                {unlockedSkills.map(skillId => (
+                {effectiveSkills.map(skillId => (
                   <div
                     key={skillId}
-                    className="w-8 h-8 rounded bg-background/80 backdrop-blur-sm border border-border/50 flex items-center justify-center text-xs"
+                    className={`w-8 h-8 rounded bg-background/80 backdrop-blur-sm border flex items-center justify-center text-xs ${
+                      debugMode ? 'border-yellow-500/50 shadow-[0_0_8px_rgba(234,179,8,0.3)]' : 'border-border/50'
+                    }`}
                     title={skillId}
                   >
                     {skillId === 'double_jump' && '⬆️'}

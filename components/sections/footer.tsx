@@ -1,8 +1,10 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Github, Linkedin, ArrowUp } from 'lucide-react'
 import { siteConfig, socialLinks } from '@/lib/constants'
+import { cn } from '@/lib/utils'
 
 const iconMap: Record<string, typeof Github> = {
   github: Github,
@@ -17,13 +19,58 @@ const navLinks = [
   { label: 'Contact', href: '#contact' },
 ]
 
+type Era = 'modern' | '90s' | '2000s'
+
+const eraConfig = {
+  modern: {
+    year: new Date().getFullYear(),
+    message: null,
+  },
+  '90s': {
+    year: 1999,
+    message: '🚧 Under Construction! Best viewed in Netscape Navigator 🚧',
+  },
+  '2000s': {
+    year: 2005,
+    message: '✨ Web 2.0 Edition ✨',
+  },
+}
+
 export function Footer() {
+  const [yearClicks, setYearClicks] = useState(0)
+  const [era, setEra] = useState<Era>('modern')
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleYearClick = () => {
+    const newClicks = yearClicks + 1
+    setYearClicks(newClicks)
+
+    if (newClicks >= 5) {
+      // Cycle through eras
+      const nextEra: Era = era === 'modern' ? '90s' : era === '90s' ? '2000s' : 'modern'
+      setEra(nextEra)
+      setYearClicks(0)
+
+      console.log(
+        `%c ⏰ Time traveling to ${nextEra === 'modern' ? 'the present' : `the ${nextEra}`}... `,
+        'color: #9333ea; font-style: italic; font-size: 14px;'
+      )
+    }
+  }
+
   return (
-    <footer className="py-12 bg-muted/30 border-t border-border">
+    <footer
+      className={cn(
+        'py-12 border-t transition-all duration-500',
+        era === '90s' && 'bg-gradient-to-r from-fuchsia-500 via-cyan-400 to-yellow-400',
+        era === '2000s' && 'bg-gradient-to-b from-blue-600 to-blue-800 text-white',
+        era === 'modern' && 'bg-muted/30 border-border'
+      )}
+      style={era === '90s' ? { fontFamily: 'Comic Sans MS, cursive' } : undefined}
+    >
       <div className="section-container">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Logo/Name */}
@@ -80,15 +127,60 @@ export function Footer() {
         </div>
 
         {/* Copyright */}
-        <div className="mt-8 pt-8 border-t border-border text-center">
-          <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+        <div className={cn(
+          'mt-8 pt-8 border-t text-center',
+          era === '90s' && 'border-yellow-400',
+          era === '2000s' && 'border-blue-400/50',
+          era === 'modern' && 'border-border'
+        )}>
+          <p className={cn(
+            'text-sm flex items-center justify-center gap-1',
+            era === '90s' && 'text-black font-bold',
+            era === '2000s' && 'text-blue-100',
+            era === 'modern' && 'text-muted-foreground'
+          )}>
             Built with
-            <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+            <Heart className={cn(
+              'h-4 w-4',
+              era === '90s' ? 'text-black fill-black' : 'text-red-500 fill-red-500'
+            )} />
             using Next.js, Tailwind CSS, and Framer Motion
           </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+          <p className={cn(
+            'text-xs mt-2',
+            era === '90s' && 'text-black',
+            era === '2000s' && 'text-blue-200',
+            era === 'modern' && 'text-muted-foreground'
+          )}>
+            &copy;{' '}
+            <motion.span
+              onClick={handleYearClick}
+              className="cursor-pointer hover:text-primary transition-colors inline-block"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {eraConfig[era].year}
+            </motion.span>{' '}
+            {siteConfig.name}. All rights reserved.
           </p>
+
+          {/* Era message */}
+          <AnimatePresence>
+            {eraConfig[era].message && (
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={cn(
+                  'text-xs mt-3 font-medium',
+                  era === '90s' && 'text-black animate-pulse',
+                  era === '2000s' && 'text-blue-100'
+                )}
+              >
+                {eraConfig[era].message}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </footer>

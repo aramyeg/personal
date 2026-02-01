@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, TrendingUp, Zap } from 'lucide-react'
+import { Sparkles, TrendingUp, Zap, Gamepad2 } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
 import { skills, skillCategories, getSkillsByCategory, focusSkills, type FocusSkill } from '@/data/skills'
 import type { SkillCategory, Skill } from '@/types'
 import { cn } from '@/lib/utils'
+
+const COMBO_TIMEOUT = 5000 // 5 seconds to click all categories
+const STORAGE_KEY = 'fun-skills-unlocked'
 
 const levelColors = {
   expert: 'bg-primary/20 text-primary border-primary/30',
@@ -22,6 +25,67 @@ const levelLabels = {
 
 export function Skills() {
   const [activeCategory, setActiveCategory] = useState<SkillCategory>('frontend')
+
+  // Combo easter egg state
+  const [clickedCategories, setClickedCategories] = useState<Set<SkillCategory>>(new Set())
+  const [showCombo, setShowCombo] = useState(false)
+  const [funUnlocked, setFunUnlocked] = useState(false)
+  const comboStartTimeRef = useRef<number | null>(null)
+
+  // Load persisted state on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored === 'true') {
+      setFunUnlocked(true)
+    }
+  }, [])
+
+  const handleCategoryClick = (category: SkillCategory) => {
+    setActiveCategory(category)
+
+    // Skip combo logic if already unlocked or clicking fun category
+    if (funUnlocked || category === 'fun') return
+
+    const now = Date.now()
+
+    // Reset if timeout exceeded
+    if (comboStartTimeRef.current && now - comboStartTimeRef.current > COMBO_TIMEOUT) {
+      setClickedCategories(new Set([category]))
+      comboStartTimeRef.current = now
+      return
+    }
+
+    // Start timer on first click
+    if (clickedCategories.size === 0) {
+      comboStartTimeRef.current = now
+    }
+
+    const newClicked = new Set(clickedCategories)
+    newClicked.add(category)
+    setClickedCategories(newClicked)
+
+    // Check if all 6 main categories clicked
+    if (newClicked.size === 6) {
+      setShowCombo(true)
+      setFunUnlocked(true)
+      localStorage.setItem(STORAGE_KEY, 'true')
+
+      // Console log with style
+      console.log(
+        '%c 🎮 COMBO COMPLETE! Fun Skills Unlocked! ',
+        'background: linear-gradient(90deg, #8b5cf6, #ec4899); color: white; padding: 10px; font-size: 16px; font-weight: bold; border-radius: 5px;'
+      )
+
+      setTimeout(() => setShowCombo(false), 3000)
+      setClickedCategories(new Set())
+    }
+  }
+
+  // Build visible categories (add fun when unlocked)
+  const visibleCategories = funUnlocked
+    ? [...skillCategories, { id: 'fun' as SkillCategory, label: '🎮 Fun Skills' }]
+    : skillCategories
+
   const filteredSkills = getSkillsByCategory(activeCategory)
 
   return (
@@ -58,20 +122,37 @@ export function Skills() {
           </div>
         </FadeIn>
 
+        {/* Combo notification */}
+        <AnimatePresence>
+          {showCombo && (
+            <motion.div
+              initial={{ scale: 0, y: -50, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0, y: -50, opacity: 0 }}
+              className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-8 py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white font-bold text-xl rounded-2xl shadow-2xl flex items-center gap-3"
+            >
+              <Gamepad2 className="h-6 w-6" />
+              <span>COMBO COMPLETE! Fun Skills Unlocked!</span>
+              <Gamepad2 className="h-6 w-6" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Category tabs */}
         <FadeIn delay={0.2} className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <p className="text-sm font-medium text-muted-foreground">Browse by category</p>
             <div className="flex flex-wrap gap-2">
-              {skillCategories.map((category) => (
+              {visibleCategories.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
+                  onClick={() => handleCategoryClick(category.id)}
                   className={cn(
                     'px-4 py-2 rounded-full text-sm font-medium transition-all duration-300',
                     activeCategory === category.id
                       ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-                      : 'bg-card hover:bg-card/80 text-muted-foreground hover:text-foreground border border-border'
+                      : 'bg-card hover:bg-card/80 text-muted-foreground hover:text-foreground border border-border',
+                    category.id === 'fun' && 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/30'
                   )}
                 >
                   {category.label}

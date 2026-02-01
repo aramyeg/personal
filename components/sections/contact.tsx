@@ -208,65 +208,60 @@ export function Contact() {
           {/* Main CTA - Email */}
           <FadeIn delay={0.2}>
             <div className="text-center mb-12">
-              {/* Stable wrapper for consistent hover area */}
+              {/* Stable wrapper for consistent hover area and sparkle positioning */}
               <div
-                className="inline-block"
+                className="inline-block relative"
                 onMouseEnter={() => setEmailHovered(true)}
                 onMouseLeave={() => setEmailHovered(false)}
               >
-                <a
+                <motion.a
                   href={`mailto:${siteConfig.email}`}
-                  className="group relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-visible"
+                  className="relative inline-flex items-center gap-4 px-10 py-6 rounded-3xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xl font-bold overflow-hidden"
+                  animate={{ scale: emailHovered ? 1.05 : 1 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 >
+                  {/* Shimmer effect */}
                   <motion.div
-                    className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary to-primary/80"
-                    animate={{ scale: emailHovered ? 1.05 : 1 }}
-                    transition={{ type: 'spring', stiffness: 300 }}
-                    style={{ transformOrigin: 'center' }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: emailHovered ? '100%' : '-100%' }}
+                    transition={{ duration: 0.6, ease: 'easeInOut' }}
                   />
-                {/* Shimmer effect */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
-                  initial={{ x: '-100%' }}
-                  animate={{ x: emailHovered ? '100%' : '-100%' }}
-                  transition={{ duration: 0.6, ease: 'easeInOut' }}
-                />
 
-                <motion.div
-                  className="relative z-10"
-                  animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}
-                >
-                  <Mail className="h-7 w-7" />
-                </motion.div>
+                  <motion.div animate={{ rotate: emailHovered ? [0, 15, -15, 0] : 0 }}>
+                    <Mail className="h-7 w-7 relative" />
+                  </motion.div>
 
-                <span className="relative z-10">
-                  {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
-                </span>
+                  <span className="relative">
+                    {emailHovered ? "Let's do this! 🚀" : siteConfig.email}
+                  </span>
 
-                <motion.div
-                  className="relative z-10"
-                  animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
-                  transition={{ type: 'spring' }}
-                >
-                  <Send className="h-6 w-6" />
-                </motion.div>
+                  <motion.div
+                    className="relative"
+                    animate={{ x: emailHovered ? 5 : 0, rotate: emailHovered ? 45 : 0 }}
+                    transition={{ type: 'spring' }}
+                  >
+                    <Send className="h-6 w-6" />
+                  </motion.div>
+                </motion.a>
 
-                {/* Sparkles on hover */}
+                {/* Sparkles on hover - positioned outside button for visibility */}
                 <AnimatePresence>
                   {emailHovered && (
                     <>
                       {[...Array(6)].map((_, i) => (
                         <motion.div
                           key={i}
-                          className="absolute z-20"
+                          className="absolute pointer-events-none"
                           style={{
-                            left: `${20 + i * 12}%`,
+                            left: `${15 + i * 14}%`,
                             top: '50%',
                           }}
                           initial={{ scale: 0, y: 0 }}
                           animate={{
                             scale: [0, 1, 0],
-                            y: [(i % 2 === 0 ? -1 : 1) * 30],
+                            y: [(i % 2 === 0 ? -1 : 1) * 45],
                           }}
                           exit={{ scale: 0 }}
                           transition={{ duration: 0.5, delay: i * 0.05 }}
@@ -277,12 +272,11 @@ export function Contact() {
                     </>
                   )}
                 </AnimatePresence>
-                </a>
               </div>
 
-              {/* Location - increased spacing from email button */}
+              {/* Location - with comfortable spacing from email button */}
               <motion.div
-                className="mt-12 inline-flex items-center gap-2 text-muted-foreground"
+                className="mt-16 inline-flex items-center gap-2 text-muted-foreground"
                 whileHover={{ scale: 1.05 }}
               >
                 <MapPin className="h-5 w-5" />

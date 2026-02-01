@@ -86,5 +86,15 @@ export const skillCategories: { id: SkillCategory; label: string }[] = [
   { id: 'tools', label: 'Tools' },
 ]
 
+// Hidden fun skills - unlocked via combo easter egg
+export const funSkills: Skill[] = [
+  { name: 'Easter Egg Hunting', years: 10, category: 'fun', level: 'expert' },
+  { name: 'Rubber Duck Debugging', years: 8, category: 'fun', level: 'expert' },
+  { name: 'Stack Overflow Navigation', years: 8, category: 'fun', level: 'expert' },
+  { name: 'Coffee-Driven Development', years: 8, category: 'fun', level: 'expert' },
+  { name: 'Deadline Speedrunning', years: 6, category: 'fun', level: 'advanced' },
+  { name: 'Meeting Survival', years: 5, category: 'fun', level: 'advanced' },
+]
+
 export const getSkillsByCategory = (category: SkillCategory) =>
-  skills.filter((skill) => skill.category === category)
+  category === 'fun' ? funSkills : skills.filter((skill) => skill.category === category)
