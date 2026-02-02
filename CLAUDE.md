@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Personal portfolio website with an integrated Super Mario World-style career platformer game. Built with Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Framer Motion, and Zustand.
+Personal portfolio website with interactive Bento Grid experience section. Built with Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Framer Motion, and Zustand.
 
 ## Commands
 
@@ -33,29 +33,14 @@ pnpm build-storybook        # Build static
 ## Architecture
 
 ### Portfolio Sections
-The main page (`app/page.tsx`) renders sections sequentially: Hero, About, Skills, Timeline, Projects, StateDemo, CareerGame, Contact.
+The main page (`app/page.tsx`) renders sections sequentially: Hero, About, Skills, ExperienceBento, Projects, Contact.
 
-### Career Platformer Game
+### Experience Bento Grid
 
-The game is a canvas-based 2D platformer where completing "worlds" (based on real work experience) unlocks skills:
-
-| World | Company | Skill Unlocked |
-|-------|---------|----------------|
-| 1 | BlueNet | double_jump |
-| 2 | FLYERBEE | wall_slide |
-| 3 | 360dialog | dash |
-| 4 | Accenture | shield |
-| 5 | AKNA | magnet |
-| 6 | xDataGroup | float |
-
-**Key game files:**
-- `components/sections/world-game.tsx` - Main game loop, rendering, screen management (~1000 lines)
-- `lib/game/world/worldState.ts` - Zustand store for progression (persisted to localStorage)
-- `lib/game/world/skillPhysics.ts` - Skill mechanics, physics processing
-- `lib/game/world/levelGenerator.ts` - Procedural platform/collectible generation
-- `lib/game/world/index.ts` - Public API barrel export
-
-**Screen state machine:** `overworld → level → level_complete → skill_unlock → overworld`
+Interactive grid showcasing work experience with hover reveals:
+- `components/sections/experience-bento.tsx` - Main section with career stats and grid
+- `components/experience/bento-cell.tsx` - Individual cell with hover effects
+- `lib/experience-grid.ts` - Grid configuration (sizes, colors, featured status)
 
 ### State Management Pattern
 
@@ -73,39 +58,16 @@ create<State>()(
 
 ## Critical Patterns
 
-### Immutability (MANDATORY for game code)
+### Immutability (MANDATORY)
 
 Zustand+Immer freezes state. Direct mutation causes runtime errors:
 ```typescript
 // ❌ WRONG - causes error
-skillState.doubleJump.jumpsRemaining -= 1
+state.value = newValue
 
 // ✅ CORRECT - create new objects
-const newSkillState = {
-  ...skillState,
-  doubleJump: { ...skillState.doubleJump, jumpsRemaining: skillState.doubleJump.jumpsRemaining - 1 }
-}
+return { ...state, value: newValue }
 ```
-
-### Game Loop Refs
-
-Use refs for values accessed every frame to avoid re-renders:
-```typescript
-const skillStateRef = useRef<SkillState>(createInitialSkillState())
-const keysRef = useRef<Set<string>>(new Set())
-```
-
-### Delta Time Physics
-
-Always use delta time for frame-rate independence:
-```typescript
-const deltaTime = Math.min((now - lastTime) / 16.67, 2)
-player.x += player.vx * deltaTime
-```
-
-### Seeded Random
-
-Level generation uses deterministic seeded random for consistent levels.
 
 ## Testing
 

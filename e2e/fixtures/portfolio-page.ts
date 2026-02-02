@@ -14,7 +14,7 @@ export class PortfolioPage {
   readonly skillsSection: Locator;
   readonly contactSection: Locator;
   readonly aboutCards: Locator;
-  readonly careerGame: Locator;
+  readonly experienceSection: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -26,7 +26,7 @@ export class PortfolioPage {
     this.skillsSection = page.locator('#skills');
     this.contactSection = page.locator('#contact');
     this.aboutCards = page.locator('[data-testid="about-card"]');
-    this.careerGame = page.locator('#career-game');
+    this.experienceSection = page.locator('#experience');
   }
 
   async goto() {
