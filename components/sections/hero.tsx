@@ -225,8 +225,6 @@ function PixelAvatar() {
             className="w-full h-full"
             style={{ imageRendering: 'pixelated' }}
           >
-            {/* Background */}
-            <rect width="16" height="20" fill="currentColor" className="text-card" />
 
             {/* Man-bun on top */}
             <rect x="6" y="0" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
