@@ -131,7 +131,6 @@ export function Hero() {
 
 function PixelAvatar() {
   const [isBlinking, setIsBlinking] = useState(false)
-  const [eyeDirection, setEyeDirection] = useState<'center' | 'left' | 'right'>('center')
   const [clickCount, setClickCount] = useState(0)
   const [showMessage, setShowMessage] = useState<string | null>(null)
 
@@ -160,18 +159,6 @@ function PixelAvatar() {
     return () => clearInterval(interval)
   }, [])
 
-  // Eye movement - occasionally look left or right
-  useEffect(() => {
-    const lookAround = () => {
-      const directions: ('center' | 'left' | 'right')[] = ['center', 'left', 'right', 'center', 'center']
-      const randomDirection = directions[Math.floor(Math.random() * directions.length)]
-      setEyeDirection(randomDirection)
-      setTimeout(() => setEyeDirection('center'), 800 + Math.random() * 400)
-    }
-    const interval = setInterval(lookAround, 4000 + Math.random() * 3000)
-    return () => clearInterval(interval)
-  }, [])
-
   const handleClick = () => {
     const newCount = clickCount + 1
     setClickCount(newCount)
@@ -179,10 +166,13 @@ function PixelAvatar() {
       setShowMessage(clickMessages[newCount])
       setTimeout(() => setShowMessage(null), 2000)
     }
+    if (newCount >= 10) {
+      console.log(
+        '%c 🏆 Achievement Unlocked: Persistent Clicker! ',
+        'background: gold; color: black; padding: 10px; font-size: 14px; font-weight: bold;'
+      )
+    }
   }
-
-  // Eye position offsets based on direction
-  const eyeOffset = eyeDirection === 'left' ? -1 : eyeDirection === 'right' ? 1 : 0
 
   return (
     <div className="relative cursor-pointer" onClick={handleClick}>
@@ -199,89 +189,67 @@ function PixelAvatar() {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Glow effect */}
-      <motion.div
-        className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150"
-        animate={{ opacity: [0.4, 0.6, 0.4] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-      />
+      <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150" />
 
       {/* Floating avatar container with idle animation */}
       <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{
+          y: [0, -8, 0],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
       >
         {/* Avatar container with pixel art style */}
         <motion.div
-          className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30 dark:border-primary/40"
+          className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
           style={{ imageRendering: 'pixelated' }}
-          animate={{ scale: [1, 1.02, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          animate={{
+            scale: [1, 1.02, 1],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
         >
-          {/* Pixel art avatar - 16x20 grid with flowing long hair */}
+          {/* Pixel grid background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
+
+          {/* Pixel art avatar */}
           <svg
             viewBox="0 0 16 20"
             className="w-full h-full"
             style={{ imageRendering: 'pixelated' }}
           >
-            {/* Background - solid card color */}
+            {/* Background */}
             <rect width="16" height="20" fill="currentColor" className="text-card" />
 
-            {/* === LONG FLOWING HAIR === */}
-            {/* Hair top - parted slightly */}
-            <rect x="4" y="1" width="8" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="3" y="2" width="10" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="6" y="1" width="1" height="1" className="fill-stone-600 dark:fill-stone-200" />
-            <rect x="5" y="2" width="2" height="1" className="fill-stone-600 dark:fill-stone-200" />
+            {/* Man-bun on top */}
+            <rect x="6" y="0" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="5" y="1" width="6" height="1" className="fill-stone-700 dark:fill-stone-400" />
 
-            {/* Hair sides - flowing down past shoulders */}
-            {/* Left side hair */}
-            <rect x="2" y="3" width="2" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="1" y="4" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="1" y="5" width="3" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="0" y="6" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="0" y="7" width="3" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="0" y="8" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="0" y="9" width="2" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="0" y="10" width="2" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="0" y="11" width="2" height="2" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="0" y="13" width="1" height="2" className="fill-stone-800 dark:fill-stone-300" />
-            {/* Left hair highlight */}
-            <rect x="1" y="5" width="1" height="1" className="fill-stone-500 dark:fill-stone-200" />
-            <rect x="1" y="8" width="1" height="1" className="fill-stone-500 dark:fill-stone-200" />
+            {/* Top of head hair - thick and wavy */}
+            <rect x="3" y="2" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="3" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
 
-            {/* Right side hair */}
-            <rect x="12" y="3" width="2" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="12" y="4" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="12" y="5" width="3" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="13" y="6" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="13" y="7" width="3" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="13" y="8" width="3" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="14" y="9" width="2" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="14" y="10" width="2" height="1" className="fill-stone-800 dark:fill-stone-300" />
-            <rect x="14" y="11" width="2" height="2" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="15" y="13" width="1" height="2" className="fill-stone-800 dark:fill-stone-300" />
-            {/* Right hair highlight */}
-            <rect x="14" y="5" width="1" height="1" className="fill-stone-500 dark:fill-stone-200" />
-            <rect x="14" y="8" width="1" height="1" className="fill-stone-500 dark:fill-stone-200" />
+            {/* Side hair flowing down - longer */}
+            <rect x="2" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="3" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="12" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="13" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
 
-            {/* Hair framing face */}
-            <rect x="3" y="3" width="1" height="3" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="12" y="3" width="1" height="3" className="fill-stone-700 dark:fill-stone-400" />
-
-            {/* === FACE === */}
-            <rect x="4" y="3" width="8" height="6" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Face - Skin tone */}
+            <rect x="4" y="4" width="8" height="5" className="fill-amber-200 dark:fill-amber-300" />
 
             {/* Forehead hair strands */}
-            <rect x="4" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="11" y="3" width="1" height="1" className="fill-stone-700 dark:fill-stone-400" />
+            <rect x="4" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="10" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
-            {/* Eyebrows */}
-            <rect x="5" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
-            <rect x="9" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
-
-            {/* === EYES - with direction and blink === */}
+            {/* Eyes - with blink animation */}
             <AnimatePresence mode="wait">
               {isBlinking ? (
                 <>
@@ -290,80 +258,73 @@ function PixelAvatar() {
                 </>
               ) : (
                 <>
-                  {/* Eye area */}
-                  <rect x="5" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
-                  <rect x="9" y="5" width="2" height="2" className="fill-stone-900 dark:fill-stone-800" />
-                  {/* Eye shine - moves with direction */}
-                  <rect
-                    x={5 + eyeOffset}
-                    y="5"
-                    width="1"
-                    height="1"
-                    className="fill-white"
-                  />
-                  <rect
-                    x={9 + eyeOffset}
-                    y="5"
-                    width="1"
-                    height="1"
-                    className="fill-white"
-                  />
+                  <rect x="5" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
+                  <rect x="9" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
+                  {/* Eye shine */}
+                  <rect x="5" y="5" width="1" height="1" className="fill-white/70" />
+                  <rect x="9" y="5" width="1" height="1" className="fill-white/70" />
                 </>
               )}
             </AnimatePresence>
 
-            {/* Nose hint */}
-            <rect x="7" y="7" width="2" height="1" className="fill-amber-300/50 dark:fill-amber-200/50" />
+            {/* Eyebrows */}
+            <rect x="5" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+            <rect x="9" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
 
-            {/* Mouth */}
-            <rect x="6" y="8" width="4" height="1" className="fill-rose-400/80 dark:fill-rose-300/80" />
+            {/* Nose shadow */}
+            <rect x="7" y="7" width="2" height="1" className="fill-amber-300/50 dark:fill-amber-400/50" />
 
-            {/* === NECK === */}
-            <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-100" />
+            {/* Mouth - simple line, not smile shaped like mustache */}
+            <rect x="7" y="8" width="2" height="1" className="fill-rose-400/60 dark:fill-rose-300/60" />
 
-            {/* === T-SHIRT - simple, clean === */}
-            <rect x="3" y="10" width="10" height="5" className="fill-stone-900 dark:fill-stone-100" />
-            {/* Collar */}
-            <rect x="6" y="10" width="4" height="1" className="fill-amber-200 dark:fill-amber-100" />
-            <rect x="7" y="11" width="2" height="1" className="fill-stone-800 dark:fill-stone-200" />
-            {/* Shoulders extend behind hair */}
-            <rect x="2" y="11" width="1" height="3" className="fill-stone-900 dark:fill-stone-100" />
-            <rect x="13" y="11" width="1" height="3" className="fill-stone-900 dark:fill-stone-100" />
+            {/* Neck */}
+            <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-300" />
 
+            {/* T-shirt - Black in light mode, cream in dark mode */}
+            <rect x="2" y="10" width="12" height="5" className="fill-stone-900 dark:fill-stone-100" />
+            {/* Collar V-neck */}
+            <rect x="7" y="10" width="2" height="2" className="fill-stone-800 dark:fill-stone-200" />
+            {/* Shoulders */}
+            <rect x="1" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
+            <rect x="14" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
             {/* Shirt bottom */}
-            <rect x="4" y="15" width="8" height="3" className="fill-stone-900 dark:fill-stone-100" />
+            <rect x="3" y="15" width="10" height="3" className="fill-stone-900 dark:fill-stone-100" />
 
-            {/* === PANTS === */}
-            <rect x="5" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
-            <rect x="8" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-500" />
+            {/* Arms */}
+            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
+            <rect x="15" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
+
+            {/* Pants hint */}
+            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
+            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
           </svg>
         </motion.div>
       </motion.div>
 
-      {/* Floating code symbols */}
+      {/* Floating code symbols positioned at sides of avatar */}
       <motion.span
-        className="absolute -top-2 -right-12 text-2xl font-mono text-primary/80"
+        className="absolute -top-2 -right-12 text-2xl font-mono text-primary/70"
         animate={{ y: [0, -8, 0], rotate: [0, 10, 0], opacity: [0.5, 0.8, 0.5] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
       >
         {'</>'}
       </motion.span>
       <motion.span
-        className="absolute top-1/2 -left-14 text-xl font-mono text-accent/80"
+        className="absolute top-1/2 -left-14 text-xl font-mono text-accent/70"
         animate={{ x: [0, -5, 0], rotate: [0, -10, 0], opacity: [0.5, 0.8, 0.5] }}
         transition={{ duration: 2.5, repeat: Infinity, delay: 0.5, ease: 'easeInOut' }}
       >
         {'{ }'}
       </motion.span>
       <motion.span
-        className="absolute top-1/2 -right-14 text-lg font-mono text-muted-foreground/70"
+        className="absolute top-1/2 -right-14 text-lg font-mono text-muted-foreground/60"
         animate={{ x: [0, 5, 0], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 4, repeat: Infinity, delay: 1, ease: 'easeInOut' }}
       >
         {'( )'}
       </motion.span>
       <motion.span
-        className="absolute -bottom-2 -left-12 text-lg font-mono text-primary/70"
+        className="absolute -bottom-2 -left-12 text-lg font-mono text-primary/60"
         animate={{ y: [0, 6, 0], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 3.5, repeat: Infinity, delay: 0.8, ease: 'easeInOut' }}
       >
