@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Briefcase, GraduationCap, Globe, ChevronRight, Sparkles } from 'lucide-react'
 import { FadeIn, StaggerChildren, StaggerItem, TextReveal } from '@/components/animation'
@@ -44,6 +44,28 @@ const funFacts = [
   { emoji: '🎵', fact: 'Black Sabbath, Led Zeppelin enthusiast' },
 ]
 
+// Memoized header to prevent re-animation when card state changes
+const AboutHeader = memo(function AboutHeader() {
+  return (
+    <FadeIn>
+      <div className="flex items-center gap-3 mb-4">
+        <TextReveal
+          text="About Me"
+          as="h2"
+          className="text-3xl sm:text-4xl font-bold"
+        />
+        <motion.div
+          animate={{ rotate: [0, 10, -10, 0] }}
+          transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+        >
+          <Sparkles className="h-6 w-6 text-primary" />
+        </motion.div>
+      </div>
+      <div className="h-1 w-12 bg-primary rounded-full mb-8" />
+    </FadeIn>
+  )
+})
+
 export function About() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
   const [showFunFacts, setShowFunFacts] = useState(false)
@@ -71,22 +93,7 @@ export function About() {
       </div>
 
       <div className="section-container relative">
-        <FadeIn>
-          <div className="flex items-center gap-3 mb-4">
-            <TextReveal
-              text="About Me"
-              as="h2"
-              className="text-3xl sm:text-4xl font-bold"
-            />
-            <motion.div
-              animate={{ rotate: [0, 10, -10, 0] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-            >
-              <Sparkles className="h-6 w-6 text-primary" />
-            </motion.div>
-          </div>
-          <div className="h-1 w-12 bg-primary rounded-full mb-8" />
-        </FadeIn>
+        <AboutHeader />
 
         <div className="grid lg:grid-cols-5 gap-12">
           {/* Bio with animated paragraphs */}
