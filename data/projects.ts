@@ -10,9 +10,9 @@ export type ExtendedProject = Project & {
 }
 
 export const categoryLabels: Record<ProjectCategory, { label: string; color: string }> = {
-  fintech: { label: 'Fintech', color: 'bg-sky-500/20 text-sky-600 dark:text-sky-400' },
-  messaging: { label: 'Messaging', color: 'bg-amber-500/20 text-amber-600 dark:text-amber-400' },
-  proptech: { label: 'PropTech', color: 'bg-rose-500/20 text-rose-600 dark:text-rose-400' },
+  fintech: { label: 'Fintech', color: 'bg-primary/15 text-primary' },
+  messaging: { label: 'Messaging', color: 'bg-accent/25 text-foreground/80' },
+  proptech: { label: 'PropTech', color: 'bg-muted text-muted-foreground' },
 }
 
 export const projects: ExtendedProject[] = [
@@ -22,10 +22,10 @@ export const projects: ExtendedProject[] = [
     description:
       'Retail banking web platform for AMIO Bank, providing comprehensive financial services in Armenia.',
     longDescription:
-      'Leading frontend development for the internet banking platform. Architecting core features including transfers, account management, and transaction history with state-of-the-art security.',
-    role: 'Technical Lead',
+      'Frontend development for the internet banking platform: transfers, account management, and transaction history across a full retail banking suite.',
+    role: 'Senior Frontend Engineer',
     company: 'xDataGroup (for AMIO Bank)',
-    metrics: ['Full retail banking suite', 'Technical leadership', 'Ongoing development'],
+    metrics: ['Full retail banking suite', 'Transfers, accounts, transactions', 'Ongoing development'],
     technologies: [
       'Next.js',
       'TypeScript',

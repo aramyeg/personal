@@ -41,11 +41,10 @@ export function Header() {
       transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
     >
       <motion.div
-        className="absolute inset-0 border-b border-border/50"
+        className="absolute inset-0 border-b border-border/50 bg-background/80"
         style={{
           opacity: headerOpacity,
           backdropFilter: useTransform(headerBlur, (v) => `blur(${v}px)`),
-          backgroundColor: 'hsl(var(--background) / 0.8)',
         }}
       />
       <nav

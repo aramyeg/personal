@@ -13,39 +13,44 @@ export type BentoGridConfig = {
   featured?: boolean
 }
 
+// Accents stay inside the site's warm terracotta system:
+// featured roles carry the primary hue, the rest a warm neutral.
+const TERRACOTTA = '#b0563d'
+const WARM_NEUTRAL = '#a08c7a'
+
 // Grid configuration per experience ID
 const gridConfig: Record<string, BentoGridConfig> = {
   xdatagroup: {
     gridSize: 'large',
-    accentColor: '#3B82F6', // Blue - banking/fintech
+    accentColor: TERRACOTTA,
     featured: true,
   },
   akna: {
     gridSize: 'medium',
-    accentColor: '#8B5CF6', // Purple - e-commerce
+    accentColor: WARM_NEUTRAL,
   },
   accenture: {
     gridSize: 'medium',
-    accentColor: '#A855F7', // Purple - enterprise
+    accentColor: WARM_NEUTRAL,
   },
   '360dialog': {
     gridSize: 'large',
-    accentColor: '#22C55E', // WhatsApp green
+    accentColor: TERRACOTTA,
   },
   flyerbee: {
     gridSize: 'small',
-    accentColor: '#F59E0B', // Amber - logistics
+    accentColor: WARM_NEUTRAL,
   },
   bluenet: {
     gridSize: 'small',
-    accentColor: '#06B6D4', // Cyan - hotel/hospitality
+    accentColor: WARM_NEUTRAL,
   },
 }
 
 // Default config for unknown experiences
 const defaultConfig: BentoGridConfig = {
   gridSize: 'small',
-  accentColor: '#64748B',
+  accentColor: WARM_NEUTRAL,
 }
 
 /**

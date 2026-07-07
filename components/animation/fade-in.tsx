@@ -38,13 +38,15 @@ export function FadeIn({
   delay = 0,
   duration = 0.5,
   direction = 'up',
-  distance = 24,
+  distance = 12,
   once = true,
   amount = 0.3,
 }: FadeInProps) {
+  // Content must never be hidden: it renders fully visible before hydration
+  // and the scroll trigger only adds a subtle settle-into-place translate.
   const variants: Variants = {
     hidden: {
-      opacity: 0,
+      opacity: 1,
       ...getDirectionOffset(direction, distance),
     },
     visible: {

@@ -20,8 +20,10 @@ export function StaggerChildren({
   once = true,
   amount = 0.2,
 }: StaggerChildrenProps) {
+  // Containers and items stay visible pre-hydration; the stagger only
+  // animates a subtle settle-into-place translate.
   const containerVariants: Variants = {
-    hidden: { opacity: 0 },
+    hidden: { opacity: 1 },
     visible: {
       opacity: 1,
       transition: {
@@ -55,7 +57,7 @@ export function StaggerItem({
   children,
   className,
   direction = 'up',
-  distance = 20,
+  distance = 10,
 }: StaggerItemProps) {
   const getOffset = () => {
     switch (direction) {
@@ -74,7 +76,7 @@ export function StaggerItem({
 
   const itemVariants: Variants = {
     hidden: {
-      opacity: 0,
+      opacity: 1,
       ...getOffset(),
     },
     visible: {

@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Terminal, Sparkles, ChevronRight, Coffee, Code2, Zap, Heart } from 'lucide-react'
+import { Terminal, ChevronRight } from 'lucide-react'
 import { FadeIn } from '@/components/animation'
+import { siteConfig, socialLinks } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 type CommandOutput = {
@@ -39,24 +40,22 @@ const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: C
   }),
   whoami: () => ({
     output: `Aram Yeghiazaryan
-├── Role: Senior Frontend Engineer & Technical Lead
+├── Role: Senior Frontend Engineer
 ├── Location: Yerevan, Armenia 🇦🇲
-├── Experience: 8+ years
+├── Experience: 8 years
 ├── Specialty: React, TypeScript, Zustand, Next.js
-└── Status: Building cool things at xDataGroup 🚀`,
+└── Status: Building AMIO Bank's iBank at xDataGroup`,
     type: 'success',
   }),
   skills: () => ({
     output: `Tech Stack:
-┌─ Frontend ────────────────────────┐
-│ React ██████████████████████ 95%  │
-│ TypeScript ████████████████████ 92%│
-│ Next.js ██████████████████░░ 88%  │
-│ Zustand ████████████████████ 90%  │
+┌─ Daily drivers ───────────────────┐
+│ React · TypeScript · Next.js       │
+│ Zustand · TanStack Query           │
 └───────────────────────────────────┘
-┌─ Tools ───────────────────────────┐
-│ TanStack Query, Shadcn/ui, Tailwind│
-│ GraphQL, REST, Node.js, Git        │
+┌─ Also in the toolbox ─────────────┐
+│ Shadcn/ui · Tailwind · GraphQL     │
+│ REST · Node.js · React Native      │
 └───────────────────────────────────┘`,
     type: 'success',
   }),
@@ -89,9 +88,9 @@ const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: C
   },
   contact: () => ({
     output: `📫 Let's Connect:
-├── Email: aram@example.com
-├── GitHub: github.com/aram
-├── LinkedIn: linkedin.com/in/aram
+├── Email: ${siteConfig.email}
+├── GitHub: ${socialLinks.find((l) => l.icon === 'github')?.url.replace('https://', '') ?? ''}
+├── LinkedIn: ${socialLinks.find((l) => l.icon === 'linkedin')?.url.replace('https://', '') ?? ''}
 └── Or scroll down to the contact section! 👇`,
     type: 'success',
   }),
@@ -99,7 +98,7 @@ const COMMANDS: Record<string, () => { output: string | React.ReactNode; type: C
     output: `🚀 Featured Projects:
 ┌─────────────────────────────────────────┐
 │ AMIO Bank iBank [CURRENT]               │
-│ └── Technical Lead @ xDataGroup         │
+│ └── Senior Frontend @ xDataGroup        │
 ├─────────────────────────────────────────┤
 │ 360dialog Platform                      │
 │ └── 50K+ businesses, 4B+ messages       │
@@ -241,7 +240,7 @@ Type 'help' to see available commands.`,
           </div>
           <div className="h-1 w-12 bg-primary rounded-full mb-4" />
           <p className="text-muted-foreground max-w-2xl mb-8">
-            A fun way to explore! Type commands to learn more about me. Try{' '}
+            Type commands to explore. Try{' '}
             <code className="px-1.5 py-0.5 rounded bg-muted text-primary text-sm">help</code> to get
             started.
           </p>
@@ -249,21 +248,18 @@ Type 'help' to see available commands.`,
 
         <FadeIn delay={0.1}>
           <div
-            className="bg-gray-950 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl cursor-text"
+            className="bg-[#1a1816] rounded-2xl border border-[#3a332c] overflow-hidden cursor-text"
             onClick={focusInput}
           >
             {/* Terminal header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#211d1a] border-b border-[#3a332c]">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-500" />
-                  <span className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <span className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="w-3 h-3 rounded-full bg-[#e2725b]" />
+                  <span className="w-3 h-3 rounded-full bg-[#e0a878]" />
+                  <span className="w-3 h-3 rounded-full bg-[#a3b18a]" />
                 </div>
-                <span className="ml-2 text-xs text-gray-400 font-mono">aram@portfolio ~ zsh</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-500">
-                <Sparkles className="h-4 w-4" />
+                <span className="ml-2 text-xs text-[#8a7d6f] font-mono">aram@portfolio ~ zsh</span>
               </div>
             </div>
 
@@ -284,7 +280,7 @@ Type 'help' to see available commands.`,
                     className="mb-4"
                   >
                     {item.command && (
-                      <div className="flex items-center gap-2 text-green-400 mb-1">
+                      <div className="flex items-center gap-2 text-[#e0a878] mb-1">
                         <ChevronRight className="h-4 w-4" />
                         <span>{item.command}</span>
                       </div>
@@ -292,10 +288,10 @@ Type 'help' to see available commands.`,
                     <pre
                       className={cn(
                         'whitespace-pre-wrap pl-6',
-                        item.type === 'success' && 'text-green-300',
-                        item.type === 'error' && 'text-red-400',
-                        item.type === 'info' && 'text-blue-300',
-                        item.type === 'special' && 'text-amber-300'
+                        item.type === 'success' && 'text-[#e6d8c8]',
+                        item.type === 'error' && 'text-[#e2725b]',
+                        item.type === 'info' && 'text-[#b3a595]',
+                        item.type === 'special' && 'text-[#e0a878]'
                       )}
                     >
                       {item.output}
@@ -305,7 +301,7 @@ Type 'help' to see available commands.`,
               </AnimatePresence>
 
               {/* Input line */}
-              <div className="flex items-center gap-2 text-green-400">
+              <div className="flex items-center gap-2 text-[#e0a878]">
                 <ChevronRight className="h-4 w-4" />
                 <input
                   ref={inputRef}
@@ -313,12 +309,12 @@ Type 'help' to see available commands.`,
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="flex-1 bg-transparent outline-none text-green-300 caret-green-400"
+                  className="flex-1 bg-transparent outline-none text-[#e6d8c8] caret-[#e0a878]"
                   placeholder="Type a command..."
                   aria-label="Terminal command input"
                 />
                 <motion.span
-                  className="w-2 h-5 bg-green-400"
+                  className="w-2 h-5 bg-[#e0a878]"
                   animate={{ opacity: [1, 0] }}
                   transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
                 />
@@ -348,30 +344,6 @@ Type 'help' to see available commands.`,
           </div>
         </FadeIn>
 
-        {/* Feature highlights */}
-        <FadeIn delay={0.3} className="mt-8">
-          <div className="grid sm:grid-cols-4 gap-4">
-            {[
-              { icon: Code2, label: 'Interactive', desc: 'Real terminal experience' },
-              { icon: Coffee, label: 'Fun', desc: 'Easter eggs included' },
-              { icon: Zap, label: 'Fast', desc: 'Instant responses' },
-              { icon: Heart, label: 'Made with ❤️', desc: 'Built with React' },
-            ].map((feature, index) => (
-              <motion.div
-                key={feature.label}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="p-4 rounded-xl bg-card border border-border text-center"
-              >
-                <feature.icon className="h-5 w-5 text-primary mx-auto mb-2" />
-                <h3 className="font-semibold text-sm">{feature.label}</h3>
-                <p className="text-xs text-muted-foreground">{feature.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </FadeIn>
       </div>
     </section>
   )
