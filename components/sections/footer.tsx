@@ -17,6 +17,7 @@ const navLinks = [
   { label: 'Experience', href: '#experience' },
   { label: 'Projects', href: '#projects' },
   { label: 'Contact', href: '#contact' },
+  { label: 'Style Lab', href: '/labs' },
 ]
 
 type Era = 'modern' | '90s' | '2000s'
