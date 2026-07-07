@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { siteConfig } from '@/lib/constants'
 
@@ -40,10 +40,92 @@ export function Hero() {
   )
 }
 
+type Px = [x: number, y: number, w: number, h: number]
+
+const px = (list: Px[], className: string) =>
+  list.map(([x, y, w, h], i) => (
+    <rect key={`${className}-${i}`} x={x} y={y} width={w} height={h} className={className} />
+  ))
+
+// 32×37 grid, drawn in layers bottom-up. Tee is theme-reactive
+// (black in light mode, cream in dark) like the original avatar.
+const BUZZ_TOP: Px[] = [
+  [11, 2, 10, 1],
+  [10, 3, 12, 1],
+  [9, 4, 2, 1],
+  [21, 4, 2, 1],
+]
+const BUZZ_FADE: Px[] = [
+  [11, 4, 10, 1],
+  [9, 5, 1, 2],
+  [22, 5, 1, 2],
+]
+const FACE: Px[] = [
+  [10, 5, 12, 2],
+  [9, 7, 14, 2],
+  [10, 9, 12, 3],
+  [11, 12, 10, 1],
+  [12, 13, 8, 1],
+  [8, 7, 1, 2], // left ear
+  [23, 7, 1, 2], // right ear
+  [13, 14, 6, 2], // neck
+]
+const BROWS: Px[] = [
+  [11, 5, 3, 1],
+  [18, 5, 3, 1],
+]
+const EYE_WHITES: Px[] = [
+  [11, 7, 3, 2],
+  [18, 7, 3, 2],
+]
+const LASHES: Px[] = [
+  [11, 8, 3, 1],
+  [18, 8, 3, 1],
+]
+const STUBBLE: Px[] = [
+  [11, 12, 10, 1],
+  [12, 13, 8, 1],
+]
+const TEE: Px[] = [
+  [8, 16, 16, 1],
+  [6, 17, 20, 1],
+  [5, 18, 22, 10],
+  [3, 18, 2, 4], // left sleeve
+  [27, 18, 2, 4], // right sleeve
+]
+const TEE_PRINT: Px[] = [
+  [16, 19, 2, 1],
+  [14, 20, 3, 1],
+  [13, 21, 3, 1],
+  [15, 22, 3, 1],
+  [14, 23, 2, 1],
+  [13, 24, 1, 1],
+]
+const ARMS: Px[] = [
+  [3, 22, 2, 5],
+  [27, 22, 2, 5],
+]
+const HANDS: Px[] = [
+  [3, 27, 2, 2],
+  [27, 27, 2, 2],
+]
+const JEANS: Px[] = [
+  [7, 28, 18, 2],
+  [7, 30, 8, 4],
+  [17, 30, 8, 4],
+]
+const BOOTS: Px[] = [
+  [6, 34, 9, 2],
+  [17, 34, 9, 2],
+]
+
 function PixelAvatar() {
   const [isBlinking, setIsBlinking] = useState(false)
   const [clickCount, setClickCount] = useState(0)
   const [showMessage, setShowMessage] = useState<string | null>(null)
+  // Pupil offset in whole pixels: x/y each in {-1, 0, 1}
+  const [look, setLook] = useState({ x: 0, y: 0 })
+  const figureRef = useRef<HTMLDivElement>(null)
 
   const clickMessages = [
     '',
@@ -58,16 +140,41 @@ function PixelAvatar() {
     '🎉 You win the clicking game! 🎉',
   ]
 
-  // Blink animation every 3-5 seconds
+  // Blink every 3-5 seconds
   useEffect(() => {
-    const blink = () => {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) return
+    const interval = setInterval(() => {
       setIsBlinking(true)
       setTimeout(() => setIsBlinking(false), 150)
-    }
-    const interval = setInterval(() => {
-      blink()
     }, 3000 + Math.random() * 2000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Eyes follow the cursor, snapping in whole-pixel steps
+  useEffect(() => {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) return
+    let raf = 0
+    const onMove = (e: MouseEvent) => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const el = figureRef.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        const dx = e.clientX - (r.left + r.width / 2)
+        const dy = e.clientY - (r.top + r.height * 0.22) // eye line, not figure center
+        setLook({
+          x: Math.abs(dx) < 40 ? 0 : Math.sign(dx),
+          y: dy < -50 ? -1 : dy > 90 ? 1 : 0,
+        })
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      cancelAnimationFrame(raf)
+    }
   }, [])
 
   const handleClick = () => {
@@ -80,13 +187,18 @@ function PixelAvatar() {
     if (newCount >= 10) {
       console.log(
         '%c 🏆 Achievement Unlocked: Persistent Clicker! ',
-        'background: gold; color: black; padding: 10px; font-size: 14px; font-weight: bold;'
+        'background: #b0563d; color: #faf8f5; padding: 10px; font-size: 14px; font-weight: bold;'
       )
     }
   }
 
+  // Pupils: 1×2 column centered in each 3×2 eye; looking up/down shrinks
+  // to the top/bottom row so the shift stays on the pixel grid.
+  const pupilY = look.y === 0 ? 7 : look.y < 0 ? 7 : 8
+  const pupilH = look.y === 0 ? 2 : 1
+
   return (
-    <div className="relative cursor-pointer" onClick={handleClick}>
+    <div className="relative cursor-pointer" onClick={handleClick} ref={figureRef}>
       {/* Click message */}
       <AnimatePresence>
         {showMessage && (
@@ -100,113 +212,78 @@ function PixelAvatar() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Floating avatar container with idle animation */}
+
+      {/* Floating figure with idle animation — no frame, the figure IS the element */}
       <motion.div
-        animate={{
-          y: [0, -8, 0],
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        className="w-40 sm:w-48"
       >
-        {/* Avatar container with pixel art style */}
-        <motion.div
-          className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-primary/30"
-          style={{ imageRendering: 'pixelated' }}
-          animate={{
-            scale: [1, 1.02, 1],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
+        <svg
+          viewBox="0 0 32 37"
+          className="w-full h-auto"
+          shapeRendering="crispEdges"
+          role="img"
+          aria-label="Pixel-art portrait of Aram: buzz cut, band tee, jeans"
         >
-          {/* Pixel grid background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
+          {/* Hair — buzz cut with fade */}
+          {px(BUZZ_TOP, 'fill-stone-800 dark:fill-stone-300')}
+          {px(BUZZ_FADE, 'fill-stone-600 dark:fill-stone-400')}
 
-          {/* Pixel art avatar */}
-          <svg
-            viewBox="0 0 16 20"
-            className="w-full h-full"
-            style={{ imageRendering: 'pixelated' }}
-          >
+          {/* Face, ears, neck */}
+          {px(FACE, 'fill-[#eec9a2] dark:fill-[#e3b98f]')}
+          {/* Neck shadow */}
+          <rect x={13} y={14} width={6} height={1} className="fill-[#d9a878]/70 dark:fill-[#c99666]/70" />
 
-            {/* Man-bun on top */}
-            <rect x="6" y="0" width="4" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="5" y="1" width="6" height="1" className="fill-stone-700 dark:fill-stone-400" />
+          {/* Brows */}
+          {px(BROWS, 'fill-stone-600 dark:fill-stone-400')}
 
-            {/* Top of head hair - thick and wavy */}
-            <rect x="3" y="2" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="3" y="3" width="10" height="1" className="fill-stone-700 dark:fill-stone-400" />
+          {/* Eyes */}
+          {isBlinking ? (
+            px(LASHES, 'fill-stone-600 dark:fill-stone-500')
+          ) : (
+            <>
+              {px(EYE_WHITES, 'fill-stone-50')}
+              <rect
+                x={12 + look.x}
+                y={pupilY}
+                width={1}
+                height={pupilH}
+                className="fill-stone-900"
+              />
+              <rect
+                x={19 + look.x}
+                y={pupilY}
+                width={1}
+                height={pupilH}
+                className="fill-stone-900"
+              />
+            </>
+          )}
 
-            {/* Side hair flowing down - longer */}
-            <rect x="2" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
-            <rect x="3" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
-            <rect x="12" y="4" width="1" height="5" className="fill-stone-600 dark:fill-stone-500" />
-            <rect x="13" y="3" width="1" height="6" className="fill-stone-700 dark:fill-stone-400" />
+          {/* Nose shadow */}
+          <rect x={15} y={9} width={2} height={2} className="fill-[#d9a878]/70 dark:fill-[#c99666]/70" />
 
-            {/* Face - Skin tone */}
-            <rect x="4" y="4" width="8" height="5" className="fill-amber-200 dark:fill-amber-300" />
+          {/* Mouth */}
+          <rect x={14} y={11} width={3} height={1} className="fill-[#c08862] dark:fill-[#b07a55]" />
 
-            {/* Forehead hair strands */}
-            <rect x="4" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
-            <rect x="10" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+          {/* Stubble over the jaw */}
+          {px(STUBBLE, 'fill-stone-700/25 dark:fill-stone-400/25')}
 
-            {/* Eyes - with blink animation */}
-            <AnimatePresence mode="wait">
-              {isBlinking ? (
-                <>
-                  <rect x="5" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
-                  <rect x="9" y="6" width="2" height="1" className="fill-stone-700 dark:fill-stone-600" />
-                </>
-              ) : (
-                <>
-                  <rect x="5" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
-                  <rect x="9" y="5" width="2" height="2" className="fill-stone-800 dark:fill-stone-700" />
-                  {/* Eye shine */}
-                  <rect x="5" y="5" width="1" height="1" className="fill-white/70" />
-                  <rect x="9" y="5" width="1" height="1" className="fill-white/70" />
-                </>
-              )}
-            </AnimatePresence>
+          {/* Band tee — theme-reactive, with abstract bolt print */}
+          {px(TEE, 'fill-stone-900 dark:fill-stone-100')}
+          <rect x={13} y={16} width={6} height={1} className="fill-stone-800 dark:fill-stone-200" />
+          {px(TEE_PRINT, 'fill-[#e0a878] dark:fill-[#8c5b45]')}
 
-            {/* Eyebrows */}
-            <rect x="5" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
-            <rect x="9" y="4" width="2" height="1" className="fill-stone-600 dark:fill-stone-500" />
+          {/* Arms and hands */}
+          {px(ARMS, 'fill-[#eec9a2] dark:fill-[#e3b98f]')}
+          {px(HANDS, 'fill-[#dfb389] dark:fill-[#d3a276]')}
 
-            {/* Nose shadow */}
-            <rect x="7" y="7" width="2" height="1" className="fill-amber-300/50 dark:fill-amber-400/50" />
-
-            {/* Mouth - simple line, not smile shaped like mustache */}
-            <rect x="7" y="8" width="2" height="1" className="fill-rose-400/60 dark:fill-rose-300/60" />
-
-            {/* Neck */}
-            <rect x="6" y="9" width="4" height="1" className="fill-amber-200 dark:fill-amber-300" />
-
-            {/* T-shirt - Black in light mode, cream in dark mode */}
-            <rect x="2" y="10" width="12" height="5" className="fill-stone-900 dark:fill-stone-100" />
-            {/* Collar V-neck */}
-            <rect x="7" y="10" width="2" height="2" className="fill-stone-800 dark:fill-stone-200" />
-            {/* Shoulders */}
-            <rect x="1" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
-            <rect x="14" y="11" width="1" height="4" className="fill-stone-900 dark:fill-stone-100" />
-            {/* Shirt bottom */}
-            <rect x="3" y="15" width="10" height="3" className="fill-stone-900 dark:fill-stone-100" />
-
-            {/* Arms */}
-            <rect x="0" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
-            <rect x="15" y="11" width="1" height="5" className="fill-amber-200 dark:fill-amber-300" />
-
-            {/* Pants hint */}
-            <rect x="4" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
-            <rect x="9" y="18" width="3" height="2" className="fill-slate-700 dark:fill-slate-600" />
-          </svg>
-        </motion.div>
+          {/* Jeans and boots */}
+          {px(JEANS, 'fill-stone-600 dark:fill-stone-500')}
+          {px(BOOTS, 'fill-stone-800 dark:fill-stone-700')}
+        </svg>
       </motion.div>
-
     </div>
   )
 }
