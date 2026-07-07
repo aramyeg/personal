@@ -68,7 +68,7 @@ const FACE: Px[] = [
   [12, 13, 8, 1],
   [8, 7, 1, 2], // left ear
   [23, 7, 1, 2], // right ear
-  [13, 14, 6, 2], // neck
+  [12, 14, 8, 2], // thick neck
 ]
 const BROWS: Px[] = [
   [11, 5, 3, 1],
@@ -86,37 +86,55 @@ const STUBBLE: Px[] = [
   [11, 12, 10, 1],
   [12, 13, 8, 1],
 ]
+// Buff build: traps rising to the neck, wide shoulders, V-taper to the waist
 const TEE: Px[] = [
-  [8, 16, 16, 1],
-  [6, 17, 20, 1],
-  [5, 18, 22, 10],
-  [3, 18, 2, 4], // left sleeve
-  [27, 18, 2, 4], // right sleeve
+  [10, 15, 3, 1], // left trap
+  [19, 15, 3, 1], // right trap
+  [6, 16, 20, 1],
+  [4, 17, 24, 1],
+  [4, 18, 24, 5], // chest
+  [6, 23, 20, 5], // waist taper
+  [1, 17, 3, 5], // left sleeve (delt)
+  [28, 17, 3, 5], // right sleeve (delt)
 ]
-const TEE_PRINT: Px[] = [
-  [16, 19, 2, 1],
-  [14, 20, 3, 1],
-  [13, 21, 3, 1],
-  [15, 22, 3, 1],
-  [14, 23, 2, 1],
-  [13, 24, 1, 1],
+// Pec line hinted in the collar shade
+const PECS: Px[] = [
+  [10, 20, 5, 1],
+  [17, 20, 5, 1],
+]
+// Diagonal sword print, point up-right — reads as sword, not cross
+const SWORD_BLADE: Px[] = [
+  [14, 22, 2, 1],
+  [15, 21, 2, 1],
+  [16, 20, 2, 1],
+  [17, 19, 2, 1],
+  [18, 18, 2, 1],
+]
+const SWORD_HILT: Px[] = [
+  [12, 20, 1, 1], // guard, upper arm
+  [13, 21, 1, 1],
+  [15, 23, 1, 1], // guard, lower arm
+  [16, 24, 1, 1],
+  [13, 23, 1, 1], // grip
+  [12, 24, 1, 1],
+  [11, 25, 1, 1], // pommel
 ]
 const ARMS: Px[] = [
-  [3, 22, 2, 5],
-  [27, 22, 2, 5],
+  [1, 22, 3, 5],
+  [28, 22, 3, 5],
 ]
 const HANDS: Px[] = [
-  [3, 27, 2, 2],
-  [27, 27, 2, 2],
+  [1, 27, 3, 2],
+  [28, 27, 3, 2],
 ]
 const JEANS: Px[] = [
-  [7, 28, 18, 2],
-  [7, 30, 8, 4],
-  [17, 30, 8, 4],
+  [8, 28, 16, 2],
+  [8, 30, 7, 4],
+  [17, 30, 7, 4],
 ]
 const BOOTS: Px[] = [
-  [6, 34, 9, 2],
-  [17, 34, 9, 2],
+  [7, 34, 8, 2],
+  [17, 34, 8, 2],
 ]
 
 function PixelAvatar() {
@@ -224,7 +242,7 @@ function PixelAvatar() {
           className="w-full h-auto"
           shapeRendering="crispEdges"
           role="img"
-          aria-label="Pixel-art portrait of Aram: buzz cut, band tee, jeans"
+          aria-label="Pixel-art portrait of Aram: buzz cut, muscular build, sword-print tee, jeans"
         >
           {/* Hair — buzz cut with fade */}
           {px(BUZZ_TOP, 'fill-stone-800 dark:fill-stone-300')}
@@ -270,10 +288,12 @@ function PixelAvatar() {
           {/* Stubble over the jaw */}
           {px(STUBBLE, 'fill-stone-700/25 dark:fill-stone-400/25')}
 
-          {/* Band tee — theme-reactive, with abstract bolt print */}
+          {/* Band tee — theme-reactive, with pixel sword print */}
           {px(TEE, 'fill-stone-900 dark:fill-stone-100')}
           <rect x={13} y={16} width={6} height={1} className="fill-stone-800 dark:fill-stone-200" />
-          {px(TEE_PRINT, 'fill-[#e0a878] dark:fill-[#8c5b45]')}
+          {px(PECS, 'fill-stone-800 dark:fill-stone-200')}
+          {px(SWORD_BLADE, 'fill-[#e0a878] dark:fill-[#8c5b45]')}
+          {px(SWORD_HILT, 'fill-[#b0563d] dark:fill-[#6b4433]')}
 
           {/* Arms and hands */}
           {px(ARMS, 'fill-[#eec9a2] dark:fill-[#e3b98f]')}

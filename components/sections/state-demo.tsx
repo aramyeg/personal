@@ -246,9 +246,9 @@ Type 'help' to see available commands.`,
           </p>
         </FadeIn>
 
-        <FadeIn delay={0.1}>
+        <div className="grid lg:grid-cols-3 gap-6 items-start">
           <div
-            className="bg-[#1a1816] rounded-2xl border border-[#3a332c] overflow-hidden cursor-text"
+            className="lg:col-span-2 bg-[#1a1816] rounded-2xl border border-[#3a332c] overflow-hidden cursor-text"
             onClick={focusInput}
           >
             {/* Terminal header */}
@@ -321,29 +321,59 @@ Type 'help' to see available commands.`,
               </div>
             </div>
           </div>
-        </FadeIn>
 
-        {/* Quick command suggestions */}
-        <FadeIn delay={0.2}>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <span className="text-sm text-muted-foreground mr-2">Try:</span>
-            {['help', 'whoami', 'skills', 'joke', 'music', 'neofetch'].map((cmd) => (
-              <motion.button
-                key={cmd}
-                onClick={() => {
-                  setInput(cmd)
-                  inputRef.current?.focus()
-                }}
-                className="px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {cmd}
-              </motion.button>
-            ))}
+          {/* Side panel: quick commands + system card fill the column */}
+          <div className="space-y-6">
+            <div className="p-5 rounded-2xl bg-card border border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Quick commands</p>
+              <div className="grid grid-cols-2 gap-2">
+                {['help', 'whoami', 'skills', 'projects', 'music', 'joke', 'neofetch', 'motivate'].map((cmd) => (
+                  <button
+                    key={cmd}
+                    onClick={() => {
+                      handleCommand(cmd)
+                      inputRef.current?.focus()
+                    }}
+                    className="px-3 py-2 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-sm font-mono text-muted-foreground text-left transition-colors"
+                  >
+                    ▸ {cmd}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* System status card, styled like the terminal */}
+            <div className="rounded-2xl bg-[#1a1816] border border-[#3a332c] overflow-hidden font-mono text-sm">
+              <div className="px-4 py-2.5 bg-[#211d1a] border-b border-[#3a332c] text-xs text-[#8a7d6f]">
+                system --status
+              </div>
+              <dl className="p-4 space-y-2.5 text-[#e6d8c8]">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#8a7d6f]">status</dt>
+                  <dd className="text-right">
+                    <span className="text-[#a3b18a]">●</span> open to opportunities
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#8a7d6f]">location</dt>
+                  <dd className="text-right">Yerevan · remote-first</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#8a7d6f]">uptime</dt>
+                  <dd className="text-right">8 yrs in production</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#8a7d6f]">stack</dt>
+                  <dd className="text-right">React 19 · Next 15 · TS</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[#8a7d6f]">audio</dt>
+                  <dd className="text-right text-[#e0a878]">Black Sabbath 🤘</dd>
+                </div>
+              </dl>
+            </div>
           </div>
-        </FadeIn>
-
+        </div>
       </div>
     </section>
   )
