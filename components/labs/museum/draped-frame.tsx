@@ -34,7 +34,7 @@ export function DrapedFrame({ labCount }: { labCount: number }) {
     <group position={placement.position} rotation-y={placement.rotationY}>
       {/* Frame edges peeking out behind the cloth */}
       <mesh position={[0, 0, 0.02]}>
-        <boxGeometry args={[W + 0.3, H + 0.3, 0.08]} />
+        <boxGeometry args={[W + 0.7, H + 0.8, 0.08]} />
         <meshStandardMaterial color={GOLD} metalness={0.75} roughness={0.3} />
       </mesh>
       {/* The cloth */}
@@ -42,7 +42,7 @@ export function DrapedFrame({ labCount }: { labCount: number }) {
         <meshStandardMaterial color="#6d1f2c" roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
       {/* Placard */}
-      <mesh position={[0, -(H / 2 + 0.55), 0.05]}>
+      <mesh position={[0, -(H / 2 + 0.35), 0.05]}>
         <planeGeometry args={[0.9, 0.45]} />
         <meshStandardMaterial map={placard} roughness={0.4} metalness={0.3} />
       </mesh>
