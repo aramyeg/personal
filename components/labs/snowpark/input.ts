@@ -49,7 +49,7 @@ export function createInput(): InputController {
       case 'Escape':
         if (playing) {
           e.preventDefault()
-          pendingEscape = true
+          if (!e.repeat) pendingEscape = true
         }
         break
       default:
