@@ -116,6 +116,16 @@ function GameShell() {
     inputRef.current?.setPlaying(phase === 'playing')
   }, [phase])
 
+  // Dev-only probe for milestone-gate playtests (never ships behavior).
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
+    const w = window as Window & { __powder?: () => RiderState }
+    w.__powder = () => riderRef.current
+    return () => {
+      delete w.__powder
+    }
+  }, [])
+
   // P toggles pause (spec: keyboard pause); ignored once finished.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
