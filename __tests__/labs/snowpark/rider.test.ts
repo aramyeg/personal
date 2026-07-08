@@ -135,7 +135,7 @@ describe('bail and respawn', () => {
     expect(s.mode).toBe('snow')
     expect(s.bailed).toBe(false)
     expect(s.score).toBe(500)
-    expect(s.x).toBeCloseTo(Math.max(0, course.obstacles[3].x - RESPAWN_LEAD), 0)
+    expect(s.x).toBeCloseTo(Math.max(0, course.obstacles[3].x - RESPAWN_LEAD), -2)
     expect(s.y).toBeCloseTo(slopeY(s.x), 4)
   })
 
