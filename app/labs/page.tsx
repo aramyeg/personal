@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { LabsList } from '@/components/labs/labs-list'
+import { LabsViewSwitch } from '@/components/labs/labs-view-switch'
 
 export const metadata: Metadata = {
   title: 'Style Lab | Aram Yeghiazaryan',
@@ -10,7 +12,9 @@ export const metadata: Metadata = {
 export default function LabsPage() {
   return (
     <main className="min-h-screen">
-      <LabsList />
+      <Suspense fallback={<LabsList />}>
+        <LabsViewSwitch />
+      </Suspense>
     </main>
   )
 }
