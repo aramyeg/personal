@@ -11,8 +11,16 @@ describe('slope', () => {
     expect(slopeY(1234)).toBe(slopeY(1234))
   })
 
-  it('descends overall (y grows downward with x)', () => {
-    expect(slopeY(10_000)).toBeGreaterThan(slopeY(0))
+  it('never tips uphill (gradient stays positive)', () => {
+    for (let x = 0; x <= 40_000; x += 37) {
+      expect(slopeGradient(x)).toBeGreaterThan(0)
+    }
+  })
+
+  it('keeps the slope rideable (max gradient below 0.75)', () => {
+    for (let x = 0; x <= 40_000; x += 37) {
+      expect(slopeGradient(x)).toBeLessThan(0.75)
+    }
   })
 
   it('gradient matches the numeric derivative of slopeY', () => {

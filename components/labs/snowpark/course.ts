@@ -27,9 +27,11 @@ export type Course = {
   finishX: number
 }
 
-export const START_X = 800
-export const OBSTACLE_SPACING = 1000
-export const STRETCH_GAP = 600
+// Spaced to the slope rhythm: one obstacle roughly every other primary
+// roller (wavelength 520) at cruise, so features land on the pumpable tempo.
+export const START_X = 900
+export const OBSTACLE_SPACING = 1150
+export const STRETCH_GAP = 500
 export const OBSTACLE_LENGTH: Record<ObstacleType, number> = {
   kicker: 120,
   rail: 220,

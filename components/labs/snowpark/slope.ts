@@ -1,26 +1,36 @@
 /**
  * The mountain master curve. World coords: x increases in the direction of
  * travel, y increases DOWNWARD (canvas convention) — a descending slope has
- * positive gradient. One base grade plus two long sine waves gives rolling
- * terrain without ever tipping past vertical.
+ * positive gradient. A base grade plus one long pumpable roller and a gentle
+ * secondary texture gives momentum-friendly terrain that never tips uphill.
  */
-const BASE_GRADE = 0.32
-const WAVE_A = { amp: 60, wavelength: 210 }
-const WAVE_B = { amp: 30, wavelength: 97, phase: 1.7 }
+export const RHYTHM = {
+  BASE_GRADE: 0.38,
+  /** primary rollers — the pumpable build/launch/land tempo */
+  PRIMARY: { amp: 110, wavelength: 520 },
+  /** secondary texture — keeps lines from feeling synthetic */
+  SECONDARY: { amp: 22, wavelength: 173, phase: 2.1 },
+} as const
+
+// Gradient bounds (guaranteed regardless of phase alignment):
+//   downhill max: 0.38 + 110/520 + 22/173 ≈ 0.72  (< 0.75, rideable)
+//   flattest:     0.38 − 110/520 − 22/173 ≈ 0.04  (> 0, always descending)
 
 export function slopeY(x: number): number {
   return (
-    BASE_GRADE * x +
-    WAVE_A.amp * Math.sin(x / WAVE_A.wavelength) +
-    WAVE_B.amp * Math.sin(x / WAVE_B.wavelength + WAVE_B.phase)
+    RHYTHM.BASE_GRADE * x +
+    RHYTHM.PRIMARY.amp * Math.sin(x / RHYTHM.PRIMARY.wavelength) +
+    RHYTHM.SECONDARY.amp * Math.sin(x / RHYTHM.SECONDARY.wavelength + RHYTHM.SECONDARY.phase)
   )
 }
 
 export function slopeGradient(x: number): number {
   return (
-    BASE_GRADE +
-    (WAVE_A.amp / WAVE_A.wavelength) * Math.cos(x / WAVE_A.wavelength) +
-    (WAVE_B.amp / WAVE_B.wavelength) * Math.cos(x / WAVE_B.wavelength + WAVE_B.phase)
+    RHYTHM.BASE_GRADE +
+    (RHYTHM.PRIMARY.amp / RHYTHM.PRIMARY.wavelength) *
+      Math.cos(x / RHYTHM.PRIMARY.wavelength) +
+    (RHYTHM.SECONDARY.amp / RHYTHM.SECONDARY.wavelength) *
+      Math.cos(x / RHYTHM.SECONDARY.wavelength + RHYTHM.SECONDARY.phase)
   )
 }
 
