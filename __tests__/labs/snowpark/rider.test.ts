@@ -100,22 +100,41 @@ describe('createRider', () => {
 })
 
 describe('snow momentum', () => {
-  it('accelerates under gravity, staying within the speed clamps', () => {
-    const s = run(createRider(course), idle, 2)
-    expect(s.speed).toBeGreaterThan(PHYS.START_SPEED)
-    expect(s.speed).toBeGreaterThanOrEqual(PHYS.MIN_SPEED)
-    expect(s.speed).toBeLessThanOrEqual(PHYS.MAX_SPEED)
+  it('converges toward a sub-MAX equilibrium under quadratic drag (no railing)', () => {
+    // Linear drag let idle rail at MAX; quadratic drag settles speed into a band
+    // that tracks the local slope (~150–360 on this curve) — never a wall at MAX.
+    const dt = 1 / 120
+    let s = createRider(course)
+    const speeds: number[] = []
+    for (let t = 0; t < 8; t += dt) {
+      s = stepRider(s, idle, dt, course)
+      if (t > 1) speeds.push(s.speed) // drop the startup transient
+    }
+    const max = Math.max(...speeds)
+    const min = Math.min(...speeds)
+    expect(max).toBeLessThan(PHYS.MAX_SPEED - 60) // never rails at MAX
+    expect(min).toBeGreaterThanOrEqual(PHYS.MIN_SPEED)
+    expect(max - min).toBeGreaterThan(30) // oscillates around a moving equilibrium
   })
 
-  it('tucking accelerates harder than idling and charges to full', () => {
-    // Both saturate at MAX_SPEED within ~0.5 s, so the acceleration edge shows
-    // early; the full charge needs the longer hold.
-    const idleShort = run(createRider(course), idle, 0.3)
-    const tuckShort = run(createRider(course), { ...idle, jumpHeld: true }, 0.3)
-    expect(tuckShort.speed).toBeGreaterThan(idleShort.speed)
-
-    const tuckFull = run(createRider(course), { ...idle, jumpHeld: true }, 1.5)
-    expect(tuckFull.charge).toBeGreaterThan(0.99)
+  it('tucking sustains far more speed than idling and charges to full', () => {
+    // Equilibria desync the two riders' positions, so compare AVERAGE speed over
+    // the run rather than a single instant (a fixed-time point can invert).
+    const dt = 1 / 120
+    let si = createRider(course)
+    let st = createRider(course)
+    let sumI = 0
+    let sumT = 0
+    let n = 0
+    for (let t = 0; t < 3; t += dt) {
+      si = stepRider(si, idle, dt, course)
+      st = stepRider(st, { ...idle, jumpHeld: true }, dt, course)
+      sumI += si.speed
+      sumT += st.speed
+      n += 1
+    }
+    expect(sumT / n).toBeGreaterThan(sumI / n + 80)
+    expect(st.charge).toBeGreaterThan(0.99)
   })
 })
 

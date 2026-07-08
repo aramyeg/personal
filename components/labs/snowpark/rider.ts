@@ -96,9 +96,10 @@ export type RiderState = {
  */
 export const PHYS = {
   GRAVITY: 1800,
-  /** on-snow accel = GRAVITY * sin(angle) * (tucking ? TUCK_ACCEL : 1) - DRAG */
-  TUCK_ACCEL: 1.55,
-  DRAG: 90,
+  /** on-snow accel = GRAVITY * sin(angle) * (tucking ? TUCK_ACCEL : 1) - DRAG_K * speed² */
+  TUCK_ACCEL: 2.2,
+  /** quadratic drag coefficient (drag = DRAG_K * speed²) — gives real speed equilibria */
+  DRAG_K: 0.0078,
   MIN_SPEED: 130,
   MAX_SPEED: 560,
   START_SPEED: 220,
@@ -279,7 +280,9 @@ function stepSnow(
   const time = state.time + dt
   const tucking = input.jumpHeld
   const angle = slopeAngle(state.x)
-  const accel = PHYS.GRAVITY * Math.sin(angle) * (tucking ? PHYS.TUCK_ACCEL : 1) - PHYS.DRAG
+  const accel =
+    PHYS.GRAVITY * Math.sin(angle) * (tucking ? PHYS.TUCK_ACCEL : 1) -
+    PHYS.DRAG_K * state.speed * state.speed
   const speed = clamp(state.speed + accel * dt, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
   const x = advanceAlongSlope(state.x, speed * dt)
   const y = slopeY(x)
