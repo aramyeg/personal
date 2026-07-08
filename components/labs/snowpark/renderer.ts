@@ -266,10 +266,11 @@ function drawRider(sc: Scene): void {
   const angle = s.mode === 'air' ? s.rotationDeg * DEG2RAD : slopeAngle(s.x)
   const bodyLen = s.grabbing ? 9 : 16
   drawBoard(sc, sc.rx, sc.ry, angle)
-  drawBody(sc, sc.rx, sc.ry, angle, bodyLen)
+  const [hx, hy] = drawBody(sc, sc.rx, sc.ry, angle, bodyLen)
+  drawHead(sc, hx, hy)
 }
 
-/** Board + leaning body + head, spinning apart as the bail timer runs down. */
+/** Board, body, and head as three independent primitives spinning apart. */
 function drawBailedRider(sc: Scene): void {
   const t = 1 - sc.s.bailTimer / BAIL_TIME
   const seed = Math.floor((sc.s.time - (BAIL_TIME - sc.s.bailTimer)) * 1000)
@@ -298,7 +299,14 @@ function drawBoard(sc: Scene, cx: number, cy: number, angle: number): void {
   ctx.stroke()
 }
 
-function drawBody(sc: Scene, cx: number, cy: number, angle: number, len: number): void {
+/** Two-stroke leaning body only; returns the head anchor for the caller. */
+function drawBody(
+  sc: Scene,
+  cx: number,
+  cy: number,
+  angle: number,
+  len: number
+): [number, number] {
   const { ctx } = sc
   const ux = Math.cos(angle - Math.PI / 2)
   const uy = Math.sin(angle - Math.PI / 2)
@@ -316,7 +324,7 @@ function drawBody(sc: Scene, cx: number, cy: number, angle: number, len: number)
   ctx.moveTo(hipX, hipY)
   ctx.lineTo(shX, shY)
   ctx.stroke()
-  drawHead(sc, shX + ux * 4, shY + uy * 4)
+  return [shX + ux * 4, shY + uy * 4]
 }
 
 function drawHead(sc: Scene, x: number, y: number): void {
