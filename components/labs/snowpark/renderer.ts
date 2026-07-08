@@ -8,7 +8,7 @@
  */
 import type { Course, CourseObstacle } from './course'
 import { slopeAngle, slopeY } from './slope'
-import { BAIL_TIME, obstacleSurfaceY, type RiderState } from './rider'
+import { PHYS, obstacleSurfaceY, type RiderState } from './rider'
 import { palette } from './palette'
 
 export type Renderer = {
@@ -272,8 +272,8 @@ function drawRider(sc: Scene): void {
 
 /** Board, body, and head as three independent primitives spinning apart. */
 function drawBailedRider(sc: Scene): void {
-  const t = 1 - sc.s.bailTimer / BAIL_TIME
-  const seed = Math.floor((sc.s.time - (BAIL_TIME - sc.s.bailTimer)) * 1000)
+  const t = 1 - sc.s.bailTimer / PHYS.BAIL_TIME
+  const seed = Math.floor((sc.s.time - (PHYS.BAIL_TIME - sc.s.bailTimer)) * 1000)
   const parts = [0, 1, 2]
   for (const part of parts) {
     const dir = hash(seed + part * 31) * Math.PI * 2

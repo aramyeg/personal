@@ -8,16 +8,25 @@ export type InputController = {
 }
 
 const SWIPE_THRESHOLD = 30
+/** how long a touch swipe holds its spin direction (ms) */
+const SWIPE_HOLD_MS = 400
 
 export function createInput(): InputController {
   let jumpHeld = false
   let grabHeld = false
   let jumpPressed = false
-  let spinLeftPressed = false
-  let spinRightPressed = false
+  let leftHeld = false
+  let rightHeld = false
   let retryPressed = false
   let pendingEscape = false
   let playing = false
+
+  // Touch spin: a swipe sets a held direction that expires after SWIPE_HOLD_MS.
+  let touchSpinDir: -1 | 0 | 1 = 0
+  let touchSpinExpiry = 0
+
+  const now = (): number =>
+    typeof performance !== 'undefined' ? performance.now() : Date.now()
 
   // Touch bookkeeping: primary finger for jump + swipe, second finger for grab.
   let touchStartX: number | null = null
@@ -33,11 +42,11 @@ export function createInput(): InputController {
         break
       case 'ArrowLeft':
         e.preventDefault()
-        if (!e.repeat) spinLeftPressed = true
+        leftHeld = true
         break
       case 'ArrowRight':
         e.preventDefault()
-        if (!e.repeat) spinRightPressed = true
+        rightHeld = true
         break
       case 'ArrowUp':
         e.preventDefault()
@@ -64,6 +73,12 @@ export function createInput(): InputController {
         break
       case 'ArrowUp':
         grabHeld = false
+        break
+      case 'ArrowLeft':
+        leftHeld = false
+        break
+      case 'ArrowRight':
+        rightHeld = false
         break
       default:
         break
@@ -92,10 +107,12 @@ export function createInput(): InputController {
       if (t.identifier !== primaryTouchId) continue
       const dx = t.clientX - touchStartX
       if (dx >= SWIPE_THRESHOLD) {
-        spinRightPressed = true
+        touchSpinDir = 1
+        touchSpinExpiry = now() + SWIPE_HOLD_MS
         touchStartX = t.clientX
       } else if (dx <= -SWIPE_THRESHOLD) {
-        spinLeftPressed = true
+        touchSpinDir = -1
+        touchSpinExpiry = now() + SWIPE_HOLD_MS
         touchStartX = t.clientX
       }
     }
@@ -136,17 +153,17 @@ export function createInput(): InputController {
   }
 
   const sample = (): RiderInput => {
+    // Both arrows held cancel; keyboard wins over a still-live touch swipe.
+    const keyDir: -1 | 0 | 1 = leftHeld === rightHeld ? 0 : leftHeld ? -1 : 1
+    const touchDir: -1 | 0 | 1 = now() < touchSpinExpiry ? touchSpinDir : 0
     const frame: RiderInput = {
       jumpHeld,
       jumpPressed,
-      spinLeftPressed,
-      spinRightPressed,
       grabHeld,
+      spinDir: keyDir !== 0 ? keyDir : touchDir,
       retryPressed,
     }
     jumpPressed = false
-    spinLeftPressed = false
-    spinRightPressed = false
     retryPressed = false
     return frame
   }
