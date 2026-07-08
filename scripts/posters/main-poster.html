@@ -1,0 +1,115 @@
+<!-- scripts/posters/main-poster.html -->
+<!doctype html>
+<meta charset="utf-8" />
+<style>html,body{margin:0;background:#faf8f5}canvas{display:block}</style>
+<canvas id="c" width="768" height="1024"></canvas>
+<script>
+  const c = document.getElementById('c')
+  const g = c.getContext('2d')
+  const W = c.width, H = c.height
+  g.imageSmoothingEnabled = false
+
+  // Cream background
+  g.fillStyle = '#faf8f5'
+  g.fillRect(0, 0, W, H)
+
+  // Pixel avatar — transcribed EXACTLY from components/sections/hero.tsx
+  // (32×37 grid). Light-mode colors.
+  const BUZZ_TOP = [[11,2,10,1],[10,3,12,1],[9,4,2,1],[21,4,2,1]]
+  const BUZZ_FADE = [[11,4,10,1],[9,5,1,2],[22,5,1,2]]
+  const FACE = [
+    [10,5,12,2],[9,7,14,2],[10,9,12,3],[11,12,10,1],[12,13,8,1],
+    [8,7,1,2],[23,7,1,2],[12,14,8,2],
+  ]
+  const BROWS = [[11,5,3,1],[18,5,3,1]]
+  const EYE_WHITES = [[11,7,3,2],[18,7,3,2]]
+  const STUBBLE = [[11,12,10,1],[12,13,8,1]]
+  const TEE = [
+    [10,15,3,1],[19,15,3,1],[6,16,20,1],[4,17,24,1],[4,18,24,5],
+    [6,23,20,5],[1,17,3,5],[28,17,3,5],
+  ]
+  const PECS = [[10,20,5,1],[17,20,5,1]]
+  const SWORD_BLADE = [[14,22,2,1],[15,21,2,1],[16,20,2,1],[17,19,2,1],[18,18,2,1]]
+  const SWORD_HILT = [
+    [12,20,1,1],[13,21,1,1],[15,23,1,1],[16,24,1,1],
+    [13,23,1,1],[12,24,1,1],[11,25,1,1],
+  ]
+  const ARMS = [[1,22,3,5],[28,22,3,5]]
+  const HANDS = [[1,27,3,2],[28,27,3,2]]
+  const JEANS = [[8,28,16,2],[8,30,7,4],[17,30,7,4]]
+  const BOOTS = [[7,34,8,2],[17,34,8,2]]
+
+  const S = 16 // 32-wide grid × 16px = 512px wide
+  const gridW = 32 * S, gridH = 37 * S
+  const ox = Math.round((W - gridW) / 2) // centered horizontally
+  const oy = 118
+
+  // Soft peach radial glow behind the avatar, low alpha
+  const glow = g.createRadialGradient(
+    ox + gridW / 2, oy + gridH * 0.42, 30,
+    ox + gridW / 2, oy + gridH * 0.42, 340
+  )
+  glow.addColorStop(0, 'rgba(224,168,120,0.28)')
+  glow.addColorStop(1, 'rgba(224,168,120,0)')
+  g.fillStyle = glow
+  g.fillRect(0, 0, W, H)
+
+  const draw = (list, color) => {
+    g.fillStyle = color
+    for (const [x, y, w, h] of list) {
+      g.fillRect(ox + x * S, oy + y * S, w * S, h * S)
+    }
+  }
+
+  // Layers, bottom-up (same order as hero.tsx)
+  draw(BUZZ_TOP, '#292524')            // stone-800
+  draw(BUZZ_FADE, '#57534e')           // stone-600
+  draw(FACE, '#eec9a2')                // skin
+  draw([[13,14,6,1]], 'rgba(217,168,120,0.7)') // neck shadow (#d9a878 @70%)
+  draw(BROWS, '#57534e')               // stone-600
+  draw(EYE_WHITES, '#fafaf9')          // stone-50
+  draw([[12,7,1,2],[19,7,1,2]], '#1c1917') // pupils (stone-900)
+  draw([[15,9,2,2]], 'rgba(217,168,120,0.7)')  // nose shadow (#d9a878 @70%)
+  draw([[14,11,3,1]], '#c08862')       // mouth
+  draw(STUBBLE, 'rgba(68,64,60,0.25)') // stone-700 @25%
+  draw(TEE, '#1c1917')                 // stone-900 near-black
+  draw([[13,16,6,1]], '#292524')       // collar (stone-800)
+  draw(PECS, '#292524')                // stone-800
+  draw(SWORD_BLADE, '#e0a878')         // blade
+  draw(SWORD_HILT, '#b0563d')          // hilt
+  draw(ARMS, '#eec9a2')                // skin
+  draw(HANDS, '#dfb389')               // hands
+  draw(JEANS, '#57534e')               // stone-600
+  draw(BOOTS, '#292524')               // stone-800
+
+  const cx = W / 2
+  const typeTop = oy + gridH + 60
+
+  // Title
+  g.fillStyle = '#1a1816'
+  g.font = '700 92px Arial, Helvetica, sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'alphabetic'
+  g.fillText('Terracotta', cx, typeTop)
+
+  // Terracotta heading rule
+  g.fillStyle = '#b0563d'
+  const barW = 96, barH = 8
+  g.fillRect(cx - barW / 2, typeTop + 30, barW, barH)
+
+  // Subtitle — uppercase letterspaced mono
+  g.fillStyle = '#6b5f52'
+  g.font = '400 24px monospace'
+  const label = 'STYLE LAB — DEFAULT'
+  const ls = 6 // letter spacing in px
+  let total = 0
+  const widths = []
+  for (const ch of label) { const w = g.measureText(ch).width; widths.push(w); total += w + ls }
+  total -= ls
+  let x = cx - total / 2
+  g.textAlign = 'left'
+  for (let i = 0; i < label.length; i++) {
+    g.fillText(label[i], x, typeTop + 92)
+    x += widths[i] + ls
+  }
+</script>

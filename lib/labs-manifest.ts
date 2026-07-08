@@ -5,6 +5,11 @@
  * own components in components/labs/<slug>/. Labs are free-form (a full site,
  * a game screen, a newspaper — anything), with one rule: content comes from
  * the shared data/ files so every experiment re-skins the same substance.
+ *
+ * Every lab also ships a poster at public/labs/<slug>/poster.jpg
+ * (portrait ~3:4, <=200 KB) — it hangs in the /labs museum and thumbnails
+ * the list view. Generators live in scripts/posters/. Each lab page wraps
+ * its content in <GalleryChrome> for the back-to-gallery button and Esc.
  */
 
 export type LabEntry = {
@@ -15,9 +20,20 @@ export type LabEntry = {
   /** One-line statement of what the experiment explores */
   thesis: string
   status: 'live' | 'wip'
+  /** Route the artwork opens; defaults to /labs/<slug> */
+  href?: string
 }
 
 export const labs: LabEntry[] = [
+  {
+    slug: 'main',
+    title: 'Terracotta',
+    date: '2026-07-08',
+    thesis:
+      'The daily driver — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
+    status: 'live',
+    href: '/',
+  },
   {
     slug: 'ps1',
     title: 'PS1 / Y2K',
