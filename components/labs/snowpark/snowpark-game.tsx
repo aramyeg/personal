@@ -421,8 +421,8 @@ function SkillColumn({
               </div>
               {group.map((s) => (
                 <div key={s.name} className="font-mono text-xs" style={{ color: palette.ink }}>
-                  <span style={{ color: markerColor }}>{marker}</span> {s.name} · {s.years} yrs ·{' '}
-                  {s.level}
+                  <span style={{ color: markerColor }}>{marker}</span> <span>{s.name}</span> ·{' '}
+                  {s.years} yrs · {s.level}
                 </div>
               ))}
             </div>
