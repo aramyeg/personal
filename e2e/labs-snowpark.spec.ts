@@ -13,6 +13,11 @@ test.describe('snowpark lab', () => {
     await page.keyboard.press('Escape')
     await expect(page.getByText('paused', { exact: true })).toBeVisible()
     await expect(page).toHaveURL(/\/labs\/snowpark/)
+    // Guard against a false green: a navigation that merely lags route
+    // compilation could still slip through if we asserted the URL only once,
+    // right after the first Escape. Wait and re-assert before the second Escape.
+    await page.waitForTimeout(700)
+    await expect(page).toHaveURL(/\/labs\/snowpark/)
     await page.keyboard.press('Escape')
     await expect(page).toHaveURL(/\/labs(\?.*)?$/)
   })
