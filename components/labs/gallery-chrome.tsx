@@ -13,6 +13,7 @@ export function GalleryChrome({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return
       if (e.key === 'Escape') router.push('/labs')
     }
     window.addEventListener('keydown', onKey)
