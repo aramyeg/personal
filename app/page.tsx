@@ -16,9 +16,9 @@ export default function Home() {
         <Hero />
         <About />
         <Skills />
+        <StateDemo />
         <ExperienceBento />
         <Projects />
-        <StateDemo />
         <Contact />
       </main>
       <Footer />

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, Github, Linkedin, ArrowUp } from 'lucide-react'
+import { Github, Linkedin, ArrowUp } from 'lucide-react'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -14,9 +14,10 @@ const iconMap: Record<string, typeof Github> = {
 const navLinks = [
   { label: 'About', href: '#about' },
   { label: 'Skills', href: '#skills' },
-  { label: 'Experience', href: '#timeline' },
+  { label: 'Experience', href: '#experience' },
   { label: 'Projects', href: '#projects' },
   { label: 'Contact', href: '#contact' },
+  { label: 'Style Lab', href: '/labs' },
 ]
 
 type Era = 'modern' | '90s' | '2000s'
@@ -56,7 +57,7 @@ export function Footer() {
 
       console.log(
         `%c ⏰ Time traveling to ${nextEra === 'modern' ? 'the present' : `the ${nextEra}`}... `,
-        'color: #9333ea; font-style: italic; font-size: 14px;'
+        'color: #b0563d; font-style: italic; font-size: 14px;'
       )
     }
   }
@@ -133,19 +134,6 @@ export function Footer() {
           era === '2000s' && 'border-blue-400/50',
           era === 'modern' && 'border-border'
         )}>
-          <p className={cn(
-            'text-sm flex items-center justify-center gap-1',
-            era === '90s' && 'text-black font-bold',
-            era === '2000s' && 'text-blue-100',
-            era === 'modern' && 'text-muted-foreground'
-          )}>
-            Built with
-            <Heart className={cn(
-              'h-4 w-4',
-              era === '90s' ? 'text-black fill-black' : 'text-red-500 fill-red-500'
-            )} />
-            using Next.js, Tailwind CSS, and Framer Motion
-          </p>
           <p className={cn(
             'text-xs mt-2',
             era === '90s' && 'text-black',

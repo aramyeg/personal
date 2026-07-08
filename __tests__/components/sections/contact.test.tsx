@@ -89,8 +89,9 @@ import { Contact } from '@/components/sections/contact';
 describe('Contact Section', () => {
   it('renders the section heading', () => {
     render(<Contact />);
-    // Check for the main heading text
-    expect(screen.getByText("Let's Create Some")).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toBeInTheDocument();
+    expect(heading.textContent).toContain('Contact');
   });
 
   it('renders email button', () => {
@@ -133,23 +134,16 @@ describe('Contact Section Layout', () => {
 });
 
 describe('Contact Section Interactions', () => {
-  it('rock on card increments click counter', () => {
+  it('guitar easter egg turns into horns after five clicks', () => {
     render(<Contact />);
-    // Find the clickable card (the motion.div parent of the "Rock On!" heading)
-    const rockHeading = screen.getByText('Rock On!');
-    // The clickable card is 3 parents up (h3 -> inner div -> motion.div)
-    const rockCard = rockHeading.closest('.cursor-pointer');
-    expect(rockCard).toBeInTheDocument();
+    const rockButton = screen.getByRole('button', { name: /rock on/i });
+    expect(rockButton).toBeInTheDocument();
+    expect(rockButton.textContent).toContain('🎸');
 
-    if (rockCard) {
-      // Initial state
-      expect(screen.getByText(/Clicked 0 times/i)).toBeInTheDocument();
-
-      fireEvent.click(rockCard);
-      expect(screen.getByText(/Clicked 1 time(?!s)/)).toBeInTheDocument();
-
-      fireEvent.click(rockCard);
-      expect(screen.getByText(/Clicked 2 times/i)).toBeInTheDocument();
+    for (let i = 0; i < 5; i++) {
+      fireEvent.click(rockButton);
     }
+
+    expect(rockButton.textContent).toContain('🤘');
   });
 });

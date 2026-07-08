@@ -23,19 +23,16 @@ export function BentoCell({ experience, config, index }: Props) {
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 1, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-50px' }}
       transition={{
         duration: shouldReduceMotion ? 0 : 0.4,
-        delay: shouldReduceMotion ? 0 : index * 0.1,
+        delay: shouldReduceMotion ? 0 : index * 0.05,
       }}
-      whileHover={shouldReduceMotion ? {} : { y: -4, scale: 1.01 }}
       className={cn(
         'group relative overflow-hidden rounded-2xl',
         'bg-card border border-border',
-        'transition-shadow duration-300',
-        'hover:shadow-xl hover:shadow-black/10',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
         gridSpanClass,
         minHeightClass
@@ -49,16 +46,8 @@ export function BentoCell({ experience, config, index }: Props) {
     >
       {/* Accent border on hover */}
       <div
-        className="absolute inset-0 rounded-2xl border-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+        className="absolute inset-0 rounded-2xl border opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
         style={{ borderColor: config.accentColor }}
-      />
-
-      {/* Accent glow on hover */}
-      <div
-        className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at 50% 0%, ${config.accentColor}15 0%, transparent 50%)`,
-        }}
       />
 
       <div className="relative p-6 h-full flex flex-col">

@@ -4,16 +4,16 @@ export const experiences: Experience[] = [
   {
     id: 'xdatagroup',
     company: 'xDataGroup',
-    role: 'Technical Lead / Senior Frontend Engineer',
+    role: 'Senior Frontend Engineer',
     location: 'Estonia (Remote)',
     period: 'May 2023 - Present',
     startDate: '2023-05',
     endDate: null,
     description:
-      'Leading frontend development for AMIO Bank retail banking platform and a property management startup. Architecting core features, mentoring developers, and working directly with founders on product definition.',
+      'Building the frontend of AMIO Bank’s retail banking platform and a property management startup. Developing core features, mentoring developers, and working directly with founders on product definition.',
     highlights: [
-      'Lead frontend architecture for AMIO Bank iBank web platform',
-      'Architect core banking features: transfers, account management, transactions',
+      'Build core frontend of the AMIO Bank iBank web platform',
+      'Develop core banking features: transfers, account management, transactions',
       'Work directly with founders on PropTech startup from specs to code',
       'Mentor junior and mid-level developers',
     ],

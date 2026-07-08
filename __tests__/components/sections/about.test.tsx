@@ -101,7 +101,7 @@ describe('About Section', () => {
 
   it('renders all highlight cards', () => {
     render(<About />);
-    expect(screen.getByText('8+ Years')).toBeInTheDocument();
+    expect(screen.getByText('8 Years')).toBeInTheDocument();
     expect(screen.getByText('Remote')).toBeInTheDocument();
     expect(screen.getByText('Armenia')).toBeInTheDocument();
     expect(screen.getByText('Marketing')).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe('About Section', () => {
     render(<About />);
 
     // Find the first card by its label
-    const card = screen.getByText('8+ Years').closest('div');
+    const card = screen.getByText('8 Years').closest('[data-testid="about-card"]');
     expect(card).toBeInTheDocument();
 
     // Click to expand
@@ -141,7 +141,6 @@ describe('About Section', () => {
   it('renders professional title and bio', () => {
     render(<About />);
     expect(screen.getByText('Senior Frontend Engineer')).toBeInTheDocument();
-    expect(screen.getByText('Technical Lead')).toBeInTheDocument();
   });
 });
 

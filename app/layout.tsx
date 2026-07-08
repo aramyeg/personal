@@ -6,14 +6,13 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Aram Yeghiazaryan | Senior Frontend Engineer',
   description:
-    'Senior Frontend Engineer with 8+ years of experience building exceptional web and mobile applications. Specializing in React, Next.js, and TypeScript.',
+    'Senior Frontend Engineer building the frontend of AMIO Bank’s retail banking platform. Eight years of fintech and enterprise work with React, Next.js, and TypeScript.',
   keywords: [
     'Frontend Engineer',
     'React',
     'Next.js',
     'TypeScript',
     'React Native',
-    'Technical Lead',
     'Aram Yeghiazaryan',
   ],
   authors: [{ name: 'Aram Yeghiazaryan' }],
@@ -21,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Aram Yeghiazaryan | Senior Frontend Engineer',
     description:
-      'Senior Frontend Engineer with 8+ years of experience building exceptional web and mobile applications.',
+      'Senior Frontend Engineer building the frontend of AMIO Bank’s retail banking platform.',
     type: 'website',
     locale: 'en_US',
     siteName: 'Aram Yeghiazaryan Portfolio',
@@ -30,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Aram Yeghiazaryan | Senior Frontend Engineer',
     description:
-      'Senior Frontend Engineer with 8+ years of experience building exceptional web and mobile applications.',
+      'Senior Frontend Engineer building the frontend of AMIO Bank’s retail banking platform.',
   },
   robots: {
     index: true,

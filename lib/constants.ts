@@ -2,8 +2,8 @@ export const siteConfig = {
   name: 'Aram Yeghiazaryan',
   title: 'Senior Frontend Engineer',
   description:
-    'Senior Frontend Engineer with 8+ years of experience building exceptional web and mobile applications.',
-  email: 'aramyeg@gmail.com',
+    'Senior Frontend Engineer building AMIO Bank’s retail banking platform. Eight years of fintech and enterprise work for teams across Europe and the Middle East.',
+  email: 'aramyeg96@gmail.com',
   location: 'Yerevan, Armenia',
   available: true,
 }
