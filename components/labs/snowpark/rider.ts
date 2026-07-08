@@ -111,6 +111,8 @@ export const PHYS = {
   DETACH_G: 220,
   COYOTE_S: 0.1,
   BUFFER_S: 0.1,
+  /** a hop shorter than this glues back silently — not a trick landing (s) */
+  MIN_AIR_S: 0.25,
   /** deg/s while a rotation input is held (backflip via Space, spins via arrows) */
   SPIN_RATE: 420,
   SNAP_DEG: 20,
@@ -411,8 +413,25 @@ function stepAir(
 
   const snap = trySnapToRail(moved, course)
   if (snap) return snap
-  if (moved.y >= slopeY(moved.x)) return landOrBail(moved, course)
+  if (moved.y >= slopeY(moved.x)) {
+    // A hop too brief to be a trick (e.g. a crest micro-detach) is not a landing.
+    return moved.airtime >= PHYS.MIN_AIR_S ? landOrBail(moved, course) : glueBack(moved)
+  }
   return moved
+}
+
+/** Reconnect with the snow after a sub-trick hop: keep the chain, fire nothing. */
+function glueBack(s: RiderState): RiderState {
+  const angle = slopeAngle(s.x)
+  return {
+    ...s,
+    ...clearAir(),
+    mode: 'snow',
+    y: slopeY(s.x),
+    speed: clamp(project(s.vx, s.vy, angle), PHYS.MIN_SPEED, PHYS.MAX_SPEED),
+    coyoteT: 0,
+    bufferT: 0,
+  }
 }
 
 /** If dropping onto a rail/box surface within reach, lock into a grind. */
@@ -613,5 +632,7 @@ function respawn(state: RiderState, course: Course): RiderState {
     coyoteT: 0,
     bufferT: 0,
     impact: 0,
+    chain: 0,
+    combo: 0,
   }
 }

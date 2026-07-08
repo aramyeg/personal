@@ -142,6 +142,42 @@ describe('natural detach', () => {
     expect(s.justLaunched).toBe(true)
     expect(s.coyoteT).toBeCloseTo(PHYS.COYOTE_S, 5)
   })
+
+  it('treats sub-MIN_AIR_S crest hops as neutral — no clean landings, chain untouched', () => {
+    // Riding a beat crest at top speed detaches and re-lands within a few frames
+    // (< MIN_AIR_S), which must glue back silently rather than bank a "clean".
+    let crestX = 0
+    let maxK = -Infinity
+    for (let x = 0; x <= 4000; x += 1) {
+      const k = slopeCurvature(x)
+      if (k > maxK) {
+        maxK = k
+        crestX = x
+      }
+    }
+    let s: RiderState = {
+      ...createRider(course),
+      x: crestX,
+      y: slopeY(crestX),
+      speed: PHYS.MAX_SPEED,
+    }
+    let sawAir = false
+    let hops = 0
+    let anyJustLanded = false
+    let prevMode = s.mode
+    const dt = 1 / 120
+    for (let t = 0; t < 1; t += dt) {
+      s = stepRider(s, idle, dt, course)
+      if (s.mode === 'air') sawAir = true
+      if (prevMode === 'air' && s.mode === 'snow') hops += 1
+      if (s.justLanded !== null) anyJustLanded = true
+      prevMode = s.mode
+    }
+    expect(sawAir).toBe(true)
+    expect(hops).toBeGreaterThanOrEqual(1) // detached and re-landed at least once
+    expect(anyJustLanded).toBe(false)
+    expect(s.chain).toBe(0)
+  })
 })
 
 describe('forgiveness windows', () => {
@@ -270,7 +306,7 @@ describe('grind', () => {
     expect(later.grindLength).toBeGreaterThan(0)
   })
 
-  it('grind then clean landing collects the skill and raises the chain', () => {
+  it('grind then ollie into a clean landing collects the skill and raises the chain', () => {
     const rail = course.obstacles.find((o) => o.type === 'rail')!
     const idx = course.obstacles.indexOf(rail)
     let s: RiderState = {
@@ -278,13 +314,18 @@ describe('grind', () => {
       mode: 'air',
       x: rail.x + 5,
       y: obstacleSurfaceY(rail, rail.x + 5) - 10,
-      vx: PHYS.START_SPEED,
+      vx: 300,
       vy: 40,
       nextObstacle: idx,
       chain: 1,
       combo: 1,
     }
-    for (let i = 0; i < 600 && !s.collected[idx]; i++) s = stepRider(s, idle, 1 / 120, course)
+    s = run(s, idle, 0.4) // snap on and grind a stretch of the rail
+    expect(s.mode).toBe('grind')
+    // Ollie off (GRIND_EXIT_POP gives a full air arc, clearing MIN_AIR_S); a
+    // low roll-off would glue back silently on gentle sections — see report.
+    s = stepRider(s, { ...idle, jumpPressed: true }, 1 / 120, course)
+    for (let i = 0; i < 240 && !s.collected[idx]; i++) s = stepRider(s, idle, 1 / 120, course)
     expect(s.collected[idx]).toBe(true)
     expect(s.chain).toBeGreaterThan(1)
     expect(s.score).toBeGreaterThan(0)
@@ -317,6 +358,14 @@ describe('bail and respawn', () => {
     const s = stepRider(s0, { ...idle, retryPressed: true }, 1 / 120, course)
     expect(s.mode).toBe('snow')
     expect(s.x).toBeCloseTo(Math.max(0, course.obstacles[1].x - PHYS.RESPAWN_LEAD), 0)
+  })
+
+  it('R retry resets the chain (respawn is unconditional)', () => {
+    const s0 = { ...createRider(course), x: 400, nextObstacle: 1, chain: 5, combo: 5 }
+    const s = stepRider(s0, { ...idle, retryPressed: true }, 1 / 120, course)
+    expect(s.mode).toBe('snow')
+    expect(s.chain).toBe(0)
+    expect(s.combo).toBe(0)
   })
 })
 
