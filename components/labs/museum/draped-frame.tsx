@@ -42,7 +42,7 @@ export function DrapedFrame({ labCount }: { labCount: number }) {
         <meshStandardMaterial color="#6d1f2c" roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
       {/* Placard */}
-      <mesh position={[0, -(H / 2 + 0.35), 0.05]}>
+      <mesh position={[0, -(H / 2 + 0.35), 0.28]}>
         <planeGeometry args={[0.9, 0.45]} />
         <meshStandardMaterial map={placard} roughness={0.4} metalness={0.3} />
       </mesh>
