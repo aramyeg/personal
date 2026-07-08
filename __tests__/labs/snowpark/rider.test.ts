@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compileCourse } from '@/components/labs/snowpark/course'
-import { slopeAngle, slopeY } from '@/components/labs/snowpark/slope'
+import { slopeAngle, slopeCurvature, slopeY } from '@/components/labs/snowpark/slope'
 import {
   PHYS,
   createRider,
@@ -115,18 +115,29 @@ describe('snow momentum', () => {
 })
 
 describe('natural detach', () => {
-  it('leaves the snow off a crest when the terrain outruns a ballistic step', () => {
-    // The per-frame ballistic gap is sub-pixel (< DETACH_EPS) on these gentle
-    // rollers at 120 Hz, so the rule only fires with a coarse step here. Real
-    // crest auto-launch is a GATE-A tuning of DETACH_EPS — see the task report.
-    const crestX = 5841 // steepest convex rollover in the opening stretch
+  it('leaves the snow off a convex crest at 120 Hz when curvature outruns gravity', () => {
+    // Curvature peaks where the primary and secondary rollers beat into phase
+    // (~every 3260 u), NOT within a single primary period; the first such crest
+    // is near x≈2600. The rule is frame-rate independent, so a normal 1/120 step
+    // fires there at top speed (the intended "earn your air near max speed" tune).
+    let crestX = 0
+    let maxK = -Infinity
+    for (let x = 0; x <= 4000; x += 1) {
+      const k = slopeCurvature(x)
+      if (k > maxK) {
+        maxK = k
+        crestX = x
+      }
+    }
+    const vx = Math.cos(slopeAngle(crestX)) * PHYS.MAX_SPEED
+    expect(slopeCurvature(crestX) * vx * vx).toBeGreaterThan(PHYS.DETACH_G) // precondition
     const s0: RiderState = {
       ...createRider(course),
       x: crestX,
       y: slopeY(crestX),
       speed: PHYS.MAX_SPEED,
     }
-    const s = stepRider(s0, idle, 0.15, course)
+    const s = stepRider(s0, idle, 1 / 120, course)
     expect(s.mode).toBe('air')
     expect(s.justLaunched).toBe(true)
     expect(s.coyoteT).toBeCloseTo(PHYS.COYOTE_S, 5)

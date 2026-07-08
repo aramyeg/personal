@@ -34,6 +34,16 @@ export function slopeGradient(x: number): number {
   )
 }
 
+/** Second derivative of slopeY — surface curvature; positive where the slope steepens. */
+export function slopeCurvature(x: number): number {
+  return (
+    -(RHYTHM.PRIMARY.amp / RHYTHM.PRIMARY.wavelength ** 2) *
+      Math.sin(x / RHYTHM.PRIMARY.wavelength) -
+    (RHYTHM.SECONDARY.amp / RHYTHM.SECONDARY.wavelength ** 2) *
+      Math.sin(x / RHYTHM.SECONDARY.wavelength + RHYTHM.SECONDARY.phase)
+  )
+}
+
 /** Tangent angle in radians; positive tilts downhill (screen-down). */
 export function slopeAngle(x: number): number {
   return Math.atan(slopeGradient(x))

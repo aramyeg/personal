@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   advanceAlongSlope,
   slopeAngle,
+  slopeCurvature,
   slopeGradient,
   slopeY,
 } from '@/components/labs/snowpark/slope'
@@ -28,6 +29,14 @@ describe('slope', () => {
     for (const x of [0, 137, 999, 5_000, 20_000]) {
       const numeric = (slopeY(x + h) - slopeY(x - h)) / (2 * h)
       expect(slopeGradient(x)).toBeCloseTo(numeric, 3)
+    }
+  })
+
+  it('curvature matches the numeric second derivative of slopeY', () => {
+    const h = 0.05
+    for (const x of [0, 137, 999, 5_000, 20_000]) {
+      const numeric = (slopeY(x + h) - 2 * slopeY(x) + slopeY(x - h)) / (h * h)
+      expect(slopeCurvature(x)).toBeCloseTo(numeric, 4)
     }
   })
 

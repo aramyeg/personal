@@ -1,5 +1,5 @@
 import type { Course, CourseObstacle } from './course'
-import { advanceAlongSlope, slopeAngle, slopeY } from './slope'
+import { advanceAlongSlope, slopeAngle, slopeCurvature, slopeY } from './slope'
 import { collectLine, trickName, trickScore } from './tricks'
 
 export type RiderMode = 'snow' | 'air' | 'grind' | 'bail' | 'finish'
@@ -87,7 +87,12 @@ export type RiderState = {
  * KICKER_BOOST and IMPACT_DECAY are additions to the brief's block: the brief
  * requires "pop × 1.45" on kickers and an impact value that "decays in state"
  * but omitted both from the block. They live here (not inline / not scattered)
- * to keep PHYS the one place gates tune. Every other value is verbatim.
+ * to keep PHYS the one place gates tune.
+ *
+ * DETACH_G replaces the brief's DETACH_EPS per the amended plan: the ballistic-
+ * gap rule was frame-rate dependent (gap ∝ dt²) and sub-pixel on these rollers,
+ * so it never fired. Detach is now the frame-rate-independent curvature rule
+ * `slopeCurvature(x) * vx² > DETACH_G`. Every other value is verbatim.
  */
 export const PHYS = {
   GRAVITY: 1800,
@@ -102,8 +107,8 @@ export const PHYS = {
   MAX_CHARGE_S: 0.5,
   /** kicker footprint pop multiplier (kept from v1) */
   KICKER_BOOST: 1.45,
-  /** ballistic-vs-terrain detach epsilon (world units) */
-  DETACH_EPS: 2,
+  /** convex-crest detach threshold: fly off when slopeCurvature(x) * vx² exceeds it (u/s²) */
+  DETACH_G: 220,
   COYOTE_S: 0.1,
   BUFFER_S: 0.1,
   /** deg/s while a rotation input is held (backflip via Space, spins via arrows) */
@@ -290,10 +295,11 @@ function stepSnow(
     return { ...state, time, speed, x, y, nextObstacle, charge, impact, tucking, mode: 'finish' }
   }
 
-  // Natural detach: the terrain fell away faster than a ballistic step would.
-  const by = state.y + Math.sin(angle) * speed * dt
-  if (slopeY(x) - by > PHYS.DETACH_EPS) {
-    return detach(state, { time, speed, x, y, nextObstacle, charge, impact }, angle, tucking)
+  // Natural detach: a convex crest whose turn needs more than gravity can give.
+  const detachAngle = slopeAngle(x)
+  const vxAir = Math.cos(detachAngle) * speed
+  if (slopeCurvature(x) * vxAir * vxAir > PHYS.DETACH_G) {
+    return detach(state, { time, speed, x, y, nextObstacle, charge, impact }, detachAngle, tucking)
   }
 
   return { ...state, time, speed, x, y, nextObstacle, charge, impact, tucking, mode: 'snow' }
