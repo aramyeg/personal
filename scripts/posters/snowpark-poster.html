@@ -1,0 +1,107 @@
+<!-- scripts/posters/snowpark-poster.html -->
+<!doctype html>
+<meta charset="utf-8" />
+<style>html,body{margin:0;background:#eef3f6}canvas{display:block}</style>
+<canvas id="c" width="768" height="1024"></canvas>
+<script>
+  const c = document.getElementById('c')
+  const g = c.getContext('2d')
+  const W = c.width, H = c.height
+
+  const ICE = '#eef3f6'
+  const BLUE_PALE = '#b8d4e2'
+  const BLUE_MID = '#6e9cb4'
+  const BLUE_DEEP = '#2e5468'
+  const INK = '#122630'
+  const AMBER = '#d9a441'
+
+  // Flat ice field
+  g.fillStyle = ICE
+  g.fillRect(0, 0, W, H)
+
+  // Flat sun disc, upper right — no gradient
+  g.fillStyle = AMBER
+  g.beginPath()
+  g.arc(624, 150, 64, 0, Math.PI * 2)
+  g.fill()
+
+  // Long parallel terrain polylines — straight segments only, far to near
+  const cols = [0, 96, 192, 288, 384, 480, 576, 672, 768]
+  const shape = [0, -0.6, 0.3, -1, 0.5, -0.3, 0.8, -0.4, 0]
+  const lines = [
+    { y: 250, amp: 14, color: BLUE_PALE, width: 4 },
+    { y: 330, amp: 18, color: BLUE_PALE, width: 4 },
+    { y: 420, amp: 22, color: BLUE_MID, width: 5 },
+    { y: 520, amp: 28, color: BLUE_MID, width: 5 },
+    { y: 640, amp: 34, color: BLUE_DEEP, width: 6 },
+    { y: 780, amp: 42, color: BLUE_DEEP, width: 6 },
+  ]
+  for (const line of lines) {
+    g.strokeStyle = line.color
+    g.lineWidth = line.width
+    g.lineJoin = 'miter'
+    g.beginPath()
+    for (let i = 0; i < cols.length; i++) {
+      const x = cols[i]
+      const y = line.y + shape[i] * line.amp
+      if (i === 0) g.moveTo(x, y)
+      else g.lineTo(x, y)
+    }
+    g.stroke()
+  }
+
+  // Kicker wedge — straight-edged ramp on the nearest line
+  const kx = 470, ky = 780 + shape[5] * 42
+  g.fillStyle = INK
+  g.beginPath()
+  g.moveTo(kx, ky)
+  g.lineTo(kx + 96, ky)
+  g.lineTo(kx + 96, ky - 46)
+  g.closePath()
+  g.fill()
+
+  // Minimal ink rider silhouette, mid-air above the kicker
+  const rx = kx + 150, ry = ky - 120
+  g.fillStyle = INK
+  // board
+  g.fillRect(rx - 34, ry + 40, 68, 8)
+  // legs
+  g.fillRect(rx - 16, ry + 20, 8, 22)
+  g.fillRect(rx + 8, ry + 20, 8, 22)
+  // torso, tilted via two stacked rects
+  g.fillRect(rx - 14, ry - 6, 28, 30)
+  // arms
+  g.fillRect(rx - 30, ry - 2, 16, 8)
+  g.fillRect(rx + 14, ry - 10, 16, 8)
+  // head
+  g.fillRect(rx - 8, ry - 24, 16, 16)
+
+  // Wordmark
+  const cx = W / 2
+  g.fillStyle = INK
+  g.textAlign = 'center'
+  g.textBaseline = 'alphabetic'
+  g.font = '800 84px "Arial Narrow", Arial, sans-serif'
+  g.fillText('Powder Lines', cx, 900)
+
+  // Thin amber rule
+  g.fillStyle = AMBER
+  const barW = 100, barH = 6
+  g.fillRect(cx - barW / 2, 924, barW, barH)
+
+  // Caption — mono
+  g.fillStyle = BLUE_DEEP
+  g.font = '400 24px monospace'
+  const label = 'STYLE LAB — № 2'
+  const ls = 5
+  let total = 0
+  const widths = []
+  for (const ch of label) { const w = g.measureText(ch).width; widths.push(w); total += w + ls }
+  total -= ls
+  let x = cx - total / 2
+  g.textAlign = 'left'
+  for (let i = 0; i < label.length; i++) {
+    g.fillText(label[i], x, 966)
+    x += widths[i] + ls
+  }
+</script>

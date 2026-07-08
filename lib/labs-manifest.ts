@@ -42,4 +42,12 @@ export const labs: LabEntry[] = [
       'PS1-era software rendering — flat shading, ordered dithering, vertex snap at 384px — on a Y2K grid world. Projects become memory-card saves.',
     status: 'live',
   },
+  {
+    slug: 'snowpark',
+    title: 'Powder Lines',
+    date: '2026-07-08',
+    thesis:
+      'A playable snowboard descent drawn as pure geometry — every kicker, rail and box is a real skill; land the trick to collect it.',
+    status: 'live',
+  },
 ]
