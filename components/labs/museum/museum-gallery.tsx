@@ -1,11 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Canvas } from '@react-three/fiber'
 import { labs } from '@/lib/labs-manifest'
 import { hallLength, PLAYER } from './layout'
 import { Hall } from './hall'
+import { PlayerControls, type MoveVec } from './player-controls'
+import { MobileJoystick } from './mobile-joystick'
 
 /**
  * The /labs museum: a first-person classical gallery.
@@ -15,6 +17,9 @@ export default function MuseumGallery() {
   const length = useMemo(() => hallLength(labs.length), [])
   const [focused, setFocused] = useState<string | null>(null)
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
+  const moveRef = useRef<MoveVec>({ x: 0, y: 0 })
+  const [coarse, setCoarse] = useState(false)
+  useEffect(() => setCoarse(window.matchMedia('(pointer: coarse)').matches), [])
 
   return (
     <div className="fixed inset-0 z-40 bg-black">
@@ -27,7 +32,10 @@ export default function MuseumGallery() {
       >
         <ambientLight intensity={0.35} color="#fff3e0" />
         <Hall length={length} />
+        <PlayerControls length={length} moveRef={moveRef} />
       </Canvas>
+
+      {coarse && <MobileJoystick moveRef={moveRef} />}
 
       {/* Crosshair */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70" />
@@ -41,7 +49,7 @@ export default function MuseumGallery() {
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">
-        Click to walk · WASD + mouse · Esc to release
+        {coarse ? 'Joystick to walk · drag to look · tap art to enter' : 'Click to walk · WASD + mouse · Esc to release'}
       </div>
 
       {/* Escape hatch to the list */}
