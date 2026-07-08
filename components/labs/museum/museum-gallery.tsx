@@ -9,6 +9,7 @@ import { labs } from '@/lib/labs-manifest'
 import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
 import { Painting } from './painting'
+import { DrapedFrame } from './draped-frame'
 import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
@@ -54,6 +55,7 @@ export default function MuseumGallery() {
             <Painting key={p.slug} placement={p} focused={focused === p.slug} register={register} />
           ))}
         </Suspense>
+        <DrapedFrame labCount={labs.length} />
         <FocusProbe targets={targets} onChange={setFocused} />
         <PlayerControls length={length} moveRef={moveRef} />
       </Canvas>
