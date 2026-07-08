@@ -1,11 +1,15 @@
 'use client'
 
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Canvas } from '@react-three/fiber'
+import * as THREE from 'three'
 import { labs } from '@/lib/labs-manifest'
-import { hallLength, PLAYER } from './layout'
+import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
+import { Painting } from './painting'
+import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
 
@@ -14,12 +18,24 @@ import { MobileJoystick } from './mobile-joystick'
  * Everything inside <Canvas> is three.js; overlay UI is plain DOM.
  */
 export default function MuseumGallery() {
+  const router = useRouter()
   const length = useMemo(() => hallLength(labs.length), [])
+  const placements = useMemo(() => paintingPlacements(labs), [])
+  const targets = useRef(new Map<string, THREE.Object3D>())
   const [focused, setFocused] = useState<string | null>(null)
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
   const moveRef = useRef<MoveVec>({ x: 0, y: 0 })
   const [coarse, setCoarse] = useState(false)
   useEffect(() => setCoarse(window.matchMedia('(pointer: coarse)').matches), [])
+
+  const register = useCallback((slug: string, obj: THREE.Object3D | null) => {
+    if (obj) targets.current.set(slug, obj)
+    else targets.current.delete(slug)
+  }, [])
+
+  const enterFocused = useCallback(() => {
+    if (focused) router.push(`/labs/${focused}`)
+  }, [focused, router])
 
   return (
     <div className="fixed inset-0 z-40 bg-black">
@@ -29,9 +45,16 @@ export default function MuseumGallery() {
         aria-hidden="true"
         camera={{ fov: 62, near: 0.1, far: 80, position: [0, PLAYER.eyeHeight, -2] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
+        onClick={enterFocused}
       >
         <ambientLight intensity={0.35} color="#fff3e0" />
         <Hall length={length} />
+        <Suspense fallback={null}>
+          {placements.map((p) => (
+            <Painting key={p.slug} placement={p} focused={focused === p.slug} register={register} />
+          ))}
+        </Suspense>
+        <FocusProbe targets={targets} onChange={setFocused} />
         <PlayerControls length={length} moveRef={moveRef} />
       </Canvas>
 
