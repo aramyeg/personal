@@ -27,7 +27,7 @@ export function PlayerControls({
   moveRef: RefObject<MoveVec>
 }) {
   const { camera, gl } = useThree()
-  const yaw = useRef(Math.PI) // face down the hall (-z)
+  const yaw = useRef(0) // face down the hall (-z); 0 = camera default -Z
   const pitch = useRef(0)
   const keys = useRef<MoveVec>({ x: 0, y: 0 })
   const pressed = useRef(new Set<string>())
