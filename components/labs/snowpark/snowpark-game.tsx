@@ -15,7 +15,8 @@ import {
 } from './rider'
 import { createInput, type InputController } from './input'
 import { useGameLoop } from './use-game-loop'
-import { createRenderer, type Renderer } from './renderer'
+import { createRenderer, type Renderer } from './render/renderer'
+import { addShake, createCamera, updateCamera, type CameraState } from './camera'
 import { palette } from './palette'
 
 /** The course is pure geometry over static data — compiled once at module load. */
@@ -79,6 +80,7 @@ function GameShell() {
   const rendererRef = useRef<Renderer | null>(null)
   const inputRef = useRef<InputController | null>(null)
   const riderRef = useRef<RiderState>(createRider(course))
+  const cameraRef = useRef<CameraState | null>(null)
   const hudRef = useRef<Hud | null>(null)
 
   const [phase, setPhase] = useState<Phase>('playing')
@@ -166,8 +168,13 @@ function GameShell() {
       if (!input) return
       const frame = input.sample()
       if (input.consumeEscape() && phase === 'playing') setPhase('paused')
-      const next = stepRider(riderRef.current, frame, dt, course)
+      const prev = riderRef.current
+      const next = stepRider(prev, frame, dt, course)
       riderRef.current = next
+      let cam = updateCamera(cameraRef.current ?? createCamera(next), next, dt)
+      if (next.justLanded) cam = addShake(cam, next.impact * 12)
+      if (next.mode === 'bail' && prev.mode !== 'bail') cam = addShake(cam, 14)
+      cameraRef.current = cam
       if (next.mode === 'finish' && phase !== 'finished') setPhase('finished')
       mirrorHud(next)
     },
@@ -175,7 +182,8 @@ function GameShell() {
   )
 
   const render = useCallback(() => {
-    rendererRef.current?.draw(riderRef.current, course)
+    const cam = cameraRef.current ?? createCamera(riderRef.current)
+    rendererRef.current?.draw(riderRef.current, course, cam)
   }, [])
 
   useGameLoop({
@@ -187,6 +195,7 @@ function GameShell() {
 
   const restart = useCallback(() => {
     riderRef.current = createRider(course)
+    cameraRef.current = null
     hudRef.current = null
     setHud(INITIAL_HUD)
     setEvent(null)
