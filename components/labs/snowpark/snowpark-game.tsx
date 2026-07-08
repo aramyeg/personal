@@ -1,0 +1,447 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import type { Skill, SkillCategory } from '@/types'
+import { skillCategories, skills } from '@/data/skills'
+import { compileCourse } from './course'
+import {
+  BAIL_LINE,
+  createRider,
+  stepRider,
+  type CollectEvent,
+  type RiderMode,
+  type RiderState,
+} from './rider'
+import { createInput, type InputController } from './input'
+import { useGameLoop } from './use-game-loop'
+import { createRenderer, type Renderer } from './renderer'
+import { palette } from './palette'
+
+/** The course is pure geometry over static data — compiled once at module load. */
+const course = compileCourse()
+
+/** Skill categories that map to slope stretches (the joke category is excluded). */
+const CATEGORIES: { id: SkillCategory; label: string }[] = skillCategories.filter(
+  (c) => c.id !== 'fun'
+)
+
+type Phase = 'playing' | 'paused' | 'finished'
+
+type Hud = {
+  score: number
+  combo: number
+  stretchName: string
+  lastEvent: CollectEvent | null
+  bailed: boolean
+  mode: RiderMode
+}
+
+const INITIAL_HUD: Hud = {
+  score: 0,
+  combo: 0,
+  stretchName: '',
+  lastEvent: null,
+  bailed: false,
+  mode: 'snow',
+}
+
+/** mm:ss for the recap clock. */
+function formatTime(seconds: number): string {
+  const total = Math.floor(seconds)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/**
+ * The lab entry point. Honours reduced-motion by never auto-running the loop:
+ * it offers a static skill sheet first, and only mounts the game on request.
+ * `reduced === null` until the media query is read, keeping SSR/CSR in step.
+ */
+export function SnowparkGame() {
+  const [reduced, setReduced] = useState<boolean | null>(null)
+  const [started, setStarted] = useState(false)
+
+  useEffect(() => {
+    setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  }, [])
+
+  if (reduced === null) return null
+  if (reduced && !started) return <ReducedMotionSheet onStart={() => setStarted(true)} />
+  return <GameShell />
+}
+
+// --- the running game -------------------------------------------------------
+
+function GameShell() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rendererRef = useRef<Renderer | null>(null)
+  const inputRef = useRef<InputController | null>(null)
+  const riderRef = useRef<RiderState>(createRider(course))
+  const hudRef = useRef<Hud | null>(null)
+
+  const [phase, setPhase] = useState<Phase>('playing')
+  const [hud, setHud] = useState<Hud>(INITIAL_HUD)
+
+  // The collect card renders `event`; `eventShown` drives its fade after ~2s.
+  const [event, setEvent] = useState<CollectEvent | null>(null)
+  const [eventShown, setEventShown] = useState(false)
+
+  // Renderer + input live for the lifetime of the shell.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const renderer = createRenderer(canvas)
+    rendererRef.current = renderer
+    renderer.resize()
+    const input = createInput()
+    inputRef.current = input
+    const detach = input.attach(canvas)
+    const onResize = () => renderer.resize()
+    window.addEventListener('resize', onResize)
+    return () => {
+      detach()
+      window.removeEventListener('resize', onResize)
+      rendererRef.current = null
+      inputRef.current = null
+    }
+  }, [])
+
+  // Keep the input controller's Esc handling in sync: it only swallows Esc
+  // while playing, so a paused Esc bubbles up to GalleryChrome → /labs.
+  useEffect(() => {
+    inputRef.current?.setPlaying(phase === 'playing')
+  }, [phase])
+
+  // P toggles pause (spec: keyboard pause); ignored once finished.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyP') return
+      e.preventDefault()
+      setPhase((p) => (p === 'playing' ? 'paused' : p === 'paused' ? 'playing' : p))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Fade the collect card: re-arm on every fresh scored landing.
+  useEffect(() => {
+    if (!hud.lastEvent) return
+    setEvent(hud.lastEvent)
+    setEventShown(true)
+    const hide = setTimeout(() => setEventShown(false), 2000)
+    return () => clearTimeout(hide)
+  }, [hud.lastEvent])
+
+  const mirrorHud = useCallback((s: RiderState) => {
+    const stretch = course.stretches.find((st) => s.x >= st.startX && s.x < st.endX)
+    const snap: Hud = {
+      score: s.score,
+      combo: s.combo,
+      stretchName: stretch ? stretch.name : '',
+      lastEvent: s.lastEvent,
+      bailed: s.bailed,
+      mode: s.mode,
+    }
+    const prev = hudRef.current
+    if (
+      prev &&
+      prev.score === snap.score &&
+      prev.combo === snap.combo &&
+      prev.stretchName === snap.stretchName &&
+      prev.lastEvent === snap.lastEvent &&
+      prev.bailed === snap.bailed &&
+      prev.mode === snap.mode
+    ) {
+      return
+    }
+    hudRef.current = snap
+    setHud(snap)
+  }, [])
+
+  const step = useCallback(
+    (dt: number) => {
+      const input = inputRef.current
+      if (!input) return
+      const frame = input.sample()
+      if (input.consumeEscape() && phase === 'playing') setPhase('paused')
+      const next = stepRider(riderRef.current, frame, dt, course)
+      riderRef.current = next
+      if (next.mode === 'finish' && phase !== 'finished') setPhase('finished')
+      mirrorHud(next)
+    },
+    [phase, mirrorHud]
+  )
+
+  const render = useCallback(() => {
+    rendererRef.current?.draw(riderRef.current, course)
+  }, [])
+
+  useGameLoop({
+    step,
+    render,
+    paused: phase !== 'playing',
+    onHidden: () => setPhase((p) => (p === 'playing' ? 'paused' : p)),
+  })
+
+  const restart = useCallback(() => {
+    riderRef.current = createRider(course)
+    hudRef.current = null
+    setHud(INITIAL_HUD)
+    setEvent(null)
+    setEventShown(false)
+    setPhase('playing')
+  }, [])
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 block h-full w-full"
+        style={{ background: palette.ice, touchAction: 'none' }}
+      />
+
+      {/* HUD — DOM overlay, nothing else on it */}
+      <div className="pointer-events-none fixed inset-0 z-10 select-none">
+        {/* top-left: current stretch */}
+        {hud.stretchName && (
+          <div
+            className="absolute left-4 top-16 font-mono text-xs lowercase tracking-wide"
+            style={{ color: palette.ink }}
+          >
+            {hud.stretchName}
+          </div>
+        )}
+
+        {/* top-right: score, combo, pause glyph */}
+        <div className="absolute right-4 top-16 flex flex-col items-end gap-2">
+          <div
+            data-testid="hud-score"
+            className="font-mono text-2xl tabular-nums"
+            style={{ color: palette.amber }}
+          >
+            {hud.score}
+          </div>
+          {hud.combo >= 2 && (
+            <div className="font-mono text-sm" style={{ color: palette.amber }}>
+              x{hud.combo}
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label="pause"
+            onClick={() => setPhase('paused')}
+            className="pointer-events-auto flex items-center gap-1 p-1"
+          >
+            <span style={{ width: 5, height: 16, background: palette.ink }} />
+            <span style={{ width: 5, height: 16, background: palette.ink }} />
+          </button>
+        </div>
+
+        {/* bottom-center: collect card or bail line */}
+        {hud.bailed ? (
+          <div
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 font-mono text-sm lowercase"
+            style={{ color: palette.ink }}
+          >
+            {BAIL_LINE}
+          </div>
+        ) : (
+          event && (
+            <div
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-md border px-4 py-2 font-mono text-sm"
+              style={{
+                borderColor: palette.ink,
+                color: palette.ink,
+                background: palette.ice,
+                opacity: eventShown ? 1 : 0,
+                transform: `translate(-50%, ${eventShown ? 0 : 8}px)`,
+                transition: 'opacity 400ms ease, transform 400ms ease',
+              }}
+            >
+              {event.line} <span style={{ color: palette.amber }}>+{event.points}</span>
+            </div>
+          )
+        )}
+
+        {/* bottom-right: quiet control hint */}
+        <div
+          className="absolute bottom-4 right-4 font-mono text-[11px] lowercase tracking-wide"
+          style={{ color: palette.ink, opacity: 0.6 }}
+        >
+          space jump · ←/→ spin · ↑ grab · R retry · P pause
+        </div>
+      </div>
+
+      {phase === 'paused' && (
+        <PauseOverlay onResume={() => setPhase('playing')} onRestart={restart} />
+      )}
+      {phase === 'finished' && <Recap rider={riderRef.current} onReplay={restart} />}
+    </>
+  )
+}
+
+// --- overlays ---------------------------------------------------------------
+
+function PauseOverlay({ onResume, onRestart }: { onResume: () => void; onRestart: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-20 flex flex-col items-center justify-center gap-6"
+      style={{ background: 'rgba(18,38,48,0.55)' }}
+    >
+      <h2 className="font-mono text-3xl lowercase" style={{ color: palette.ice }}>
+        paused
+      </h2>
+      <div className="flex gap-4">
+        <PillButton onClick={onResume}>resume</PillButton>
+        <PillButton onClick={onRestart}>restart run</PillButton>
+      </div>
+      <p className="font-mono text-xs lowercase" style={{ color: palette.bluePale }}>
+        Esc again → gallery
+      </p>
+    </div>
+  )
+}
+
+function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void }) {
+  const collectedNames = new Set<string>()
+  course.obstacles.forEach((o, i) => {
+    if (rider.collected[i]) collectedNames.add(o.skill.name)
+  })
+  const nonFun = skills.filter((s) => s.category !== 'fun')
+  const collected = nonFun.filter((s) => collectedNames.has(s.name))
+  const missed = nonFun.filter((s) => !collectedNames.has(s.name))
+
+  return (
+    <div
+      className="fixed inset-0 z-20 overflow-y-auto"
+      style={{ background: palette.ice }}
+    >
+      <div className="mx-auto max-w-3xl px-6 py-20">
+        <h2 className="font-mono text-3xl lowercase" style={{ color: palette.ink }}>
+          expedition log
+        </h2>
+
+        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-2 font-mono text-sm">
+          <Stat label="run time" value={formatTime(rider.time)} />
+          <Stat label="score" value={String(rider.score)} accent />
+          {rider.bestTrick && (
+            <Stat label="best trick" value={`${rider.bestTrick.name} — ${rider.bestTrick.points}`} />
+          )}
+        </dl>
+
+        <div className="mt-10 grid gap-10 sm:grid-cols-2">
+          <SkillColumn title="collected" items={collected} marker="●" markerColor={palette.amber} />
+          <SkillColumn title="missed" items={missed} marker="○" markerColor={palette.ink} />
+        </div>
+
+        <div className="mt-12 flex gap-4">
+          <PillButton onClick={onReplay}>run it back</PillButton>
+          <Link
+            href="/labs"
+            className="rounded-full border px-5 py-2 font-mono text-sm lowercase transition-colors"
+            style={{ borderColor: palette.ink, color: palette.ink }}
+          >
+            ← gallery
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReducedMotionSheet({ onStart }: { onStart: () => void }) {
+  const nonFun = skills.filter((s) => s.category !== 'fun')
+  return (
+    <div className="fixed inset-0 overflow-y-auto" style={{ background: palette.ice }}>
+      <div className="mx-auto max-w-3xl px-6 py-20">
+        <h2 className="font-mono text-3xl lowercase" style={{ color: palette.ink }}>
+          expedition log
+        </h2>
+        <p className="mt-3 font-mono text-xs lowercase" style={{ color: palette.blueDeep }}>
+          reduced motion is on — here is the run as a static sheet.
+        </p>
+
+        <div className="mt-10">
+          <SkillColumn title="the skills" items={nonFun} marker="●" markerColor={palette.blueMid} />
+        </div>
+
+        <div className="mt-12">
+          <PillButton onClick={onStart}>start the run anyway</PillButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- small building blocks --------------------------------------------------
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div>
+      <dt className="text-[11px] uppercase tracking-widest" style={{ color: palette.blueMid }}>
+        {label}
+      </dt>
+      <dd style={{ color: accent ? palette.amber : palette.ink }}>{value}</dd>
+    </div>
+  )
+}
+
+function SkillColumn({
+  title,
+  items,
+  marker,
+  markerColor,
+}: {
+  title: string
+  items: Skill[]
+  marker: string
+  markerColor: string
+}) {
+  return (
+    <div>
+      <h3
+        className="font-mono text-[11px] uppercase tracking-widest"
+        style={{ color: palette.blueDeep }}
+      >
+        {title}
+      </h3>
+      <div className="mt-3 flex flex-col gap-4">
+        {CATEGORIES.map((cat) => {
+          const group = items.filter((s) => s.category === cat.id)
+          if (group.length === 0) return null
+          return (
+            <div key={cat.id}>
+              <div
+                className="font-mono text-[10px] uppercase tracking-widest"
+                style={{ color: palette.blueMid }}
+              >
+                {cat.label}
+              </div>
+              {group.map((s) => (
+                <div key={s.name} className="font-mono text-xs" style={{ color: palette.ink }}>
+                  <span style={{ color: markerColor }}>{marker}</span> {s.name} · {s.years} yrs ·{' '}
+                  {s.level}
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PillButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full px-5 py-2 font-mono text-sm lowercase transition-opacity hover:opacity-85"
+      style={{ background: palette.ink, color: palette.ice }}
+    >
+      {children}
+    </button>
+  )
+}
