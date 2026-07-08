@@ -414,8 +414,11 @@ function stepAir(
   const snap = trySnapToRail(moved, course)
   if (snap) return snap
   if (moved.y >= slopeY(moved.x)) {
-    // A hop too brief to be a trick (e.g. a crest micro-detach) is not a landing.
-    return moved.airtime >= PHYS.MIN_AIR_S ? landOrBail(moved, course) : glueBack(moved)
+    // A hop too brief to be a trick (a crest micro-detach) glues back silently;
+    // a grind-exit air always completes its trick, however short (the grind is
+    // the earned action), so grindLength > 0 forces the landing bands to run.
+    const completesTrick = moved.airtime >= PHYS.MIN_AIR_S || moved.grindLength > 0
+    return completesTrick ? landOrBail(moved, course) : glueBack(moved)
   }
   return moved
 }

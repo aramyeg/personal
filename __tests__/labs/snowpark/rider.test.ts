@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { compileCourse } from '@/components/labs/snowpark/course'
-import { slopeAngle, slopeCurvature, slopeY } from '@/components/labs/snowpark/slope'
+import {
+  slopeAngle,
+  slopeCurvature,
+  slopeGradient,
+  slopeY,
+} from '@/components/labs/snowpark/slope'
 import {
   PHYS,
   createRider,
@@ -330,6 +335,57 @@ describe('grind', () => {
     expect(s.chain).toBeGreaterThan(1)
     expect(s.score).toBeGreaterThan(0)
     expect(s.lastEvent?.line).toContain(rail.skill.name)
+  })
+
+  it('grind roll-off (no jump) on a gentle section still banks the skill', () => {
+    // The gentlest rail gives the shortest roll-off air; grindLength (not airtime)
+    // is what completes the trick here, so the skill must still bank.
+    const rail = course.obstacles
+      .filter((o) => o.type === 'rail')
+      .reduce((a, b) =>
+        slopeGradient(b.x + b.length) < slopeGradient(a.x + a.length) ? b : a
+      )
+    const idx = course.obstacles.indexOf(rail)
+    let s: RiderState = {
+      ...createRider(course),
+      mode: 'air',
+      x: rail.x + 5,
+      y: obstacleSurfaceY(rail, rail.x + 5) - 10,
+      vx: PHYS.START_SPEED,
+      vy: 40,
+      nextObstacle: idx,
+      chain: 2,
+      combo: 2,
+    }
+    for (let i = 0; i < 600 && !s.collected[idx]; i++) s = stepRider(s, idle, 1 / 120, course)
+    expect(s.collected[idx]).toBe(true)
+    expect(s.chain).toBeGreaterThan(2)
+    expect(s.score).toBeGreaterThan(0)
+  })
+
+  it('a sub-MIN_AIR_S grind-exit air still completes the trick (grindLength banks it)', () => {
+    // Fully controlled guard: 0.1 s of air (below MIN_AIR_S) but grindLength > 0.
+    const rail = course.obstacles.find((o) => o.type === 'rail')!
+    const idx = course.obstacles.indexOf(rail)
+    const landingX = rail.x + rail.length + 40
+    const a = slopeAngle(landingX)
+    const s0: RiderState = {
+      ...createRider(course),
+      mode: 'air',
+      x: landingX,
+      y: slopeY(landingX) - 0.5,
+      vx: Math.cos(a) * 250,
+      vy: 200,
+      launchAngleDeg: slopeAngleDeg(landingX), // boardDiff ≈ 0 → clean
+      grindLength: 150,
+      airtime: 0.1,
+      attributedObstacle: idx,
+    }
+    expect(s0.airtime).toBeLessThan(PHYS.MIN_AIR_S) // would glue without the grind clause
+    const landed = stepRider(s0, idle, 1 / 120, course)
+    expect(landed.justLanded).toBe('clean')
+    expect(landed.collected[idx]).toBe(true)
+    expect(landed.lastEvent?.line).toContain(rail.skill.name)
   })
 })
 
