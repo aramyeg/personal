@@ -6,6 +6,7 @@ function escapeEvent(repeat = false): KeyboardEvent {
     code: 'Escape',
     key: 'Escape',
     cancelable: true,
+    bubbles: true,
     repeat,
   })
 }
@@ -25,7 +26,7 @@ describe('createInput Escape handling', () => {
     input.setPlaying(true)
 
     const event = escapeEvent()
-    window.dispatchEvent(event)
+    document.body.dispatchEvent(event)
 
     expect(event.defaultPrevented).toBe(true)
     expect(input.consumeEscape()).toBe(true)
@@ -38,11 +39,11 @@ describe('createInput Escape handling', () => {
     detach = input.attach(target)
     input.setPlaying(true)
 
-    window.dispatchEvent(escapeEvent())
+    document.body.dispatchEvent(escapeEvent())
     expect(input.consumeEscape()).toBe(true)
 
     const repeatEvent = escapeEvent(true)
-    window.dispatchEvent(repeatEvent)
+    document.body.dispatchEvent(repeatEvent)
 
     expect(repeatEvent.defaultPrevented).toBe(true)
     expect(input.consumeEscape()).toBe(false)
@@ -55,7 +56,7 @@ describe('createInput Escape handling', () => {
     input.setPlaying(false)
 
     const event = escapeEvent()
-    window.dispatchEvent(event)
+    document.body.dispatchEvent(event)
 
     expect(event.defaultPrevented).toBe(false)
     expect(input.consumeEscape()).toBe(false)
@@ -76,7 +77,7 @@ describe('createInput Escape handling', () => {
     input.setPlaying(true)
 
     try {
-      window.dispatchEvent(escapeEvent())
+      document.body.dispatchEvent(escapeEvent())
       expect(seenDefaultPrevented).toBe(true)
     } finally {
       window.removeEventListener('keydown', bubbleListener)
