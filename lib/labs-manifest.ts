@@ -5,6 +5,11 @@
  * own components in components/labs/<slug>/. Labs are free-form (a full site,
  * a game screen, a newspaper — anything), with one rule: content comes from
  * the shared data/ files so every experiment re-skins the same substance.
+ *
+ * Every lab also ships a poster at public/labs/<slug>/poster.jpg
+ * (portrait ~3:4, <=200 KB) — it hangs in the /labs museum and thumbnails
+ * the list view. Generators live in scripts/posters/. Each lab page wraps
+ * its content in <GalleryChrome> for the back-to-gallery button and Esc.
  */
 
 export type LabEntry = {

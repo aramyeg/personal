@@ -1,0 +1,71 @@
+<!-- scripts/posters/ps1-poster.html -->
+<!doctype html>
+<meta charset="utf-8" />
+<style>html,body{margin:0;background:#07090d}canvas{display:block}</style>
+<canvas id="c" width="768" height="1024"></canvas>
+<script>
+  const c = document.getElementById('c')
+  const g = c.getContext('2d')
+  const W = c.width, H = c.height
+
+  // Background
+  g.fillStyle = '#07090d'
+  g.fillRect(0, 0, W, H)
+
+  // Horizon glow
+  const glow = g.createRadialGradient(W / 2, H * 0.62, 40, W / 2, H * 0.62, 420)
+  glow.addColorStop(0, 'rgba(85,131,255,0.35)')
+  glow.addColorStop(1, 'rgba(85,131,255,0)')
+  g.fillStyle = glow
+  g.fillRect(0, 0, W, H)
+
+  // Perspective grid floor
+  g.strokeStyle = 'rgba(90,104,122,0.9)'
+  g.lineWidth = 1
+  const horizon = H * 0.62
+  for (let i = -14; i <= 14; i++) {
+    g.beginPath()
+    g.moveTo(W / 2 + i * 26, horizon)
+    g.lineTo(W / 2 + i * 130, H)
+    g.stroke()
+  }
+  for (let r = 1; r <= 12; r++) {
+    const y = horizon + Math.pow(r / 12, 2.2) * (H - horizon)
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke()
+  }
+
+  // Dithered flat-shaded sphere (2x2 ordered bayer)
+  const cx = W / 2, cy = H * 0.36, R = 190
+  const light = { x: -0.55, y: -0.65, z: 0.52 }
+  const bayer = [[0, 2], [3, 1]]
+  const px = 4
+  for (let y = -R; y < R; y += px) {
+    for (let x = -R; x < R; x += px) {
+      const d2 = x * x + y * y
+      if (d2 > R * R) continue
+      const z = Math.sqrt(R * R - d2)
+      const n = { x: x / R, y: y / R, z: z / R }
+      let lum = Math.max(0, n.x * light.x + n.y * light.y + n.z * light.z)
+      lum = Math.pow(lum, 0.9) * 4.6
+      const cell = bayer[(y / px & 1) ? 1 : 0][(x / px & 1) ? 1 : 0]
+      const on = lum > cell
+      g.fillStyle = on
+        ? (lum > 3.4 ? '#e8edf4' : lum > 2 ? '#5583ff' : '#2f4f8f')
+        : '#0b1020'
+      g.fillRect(cx + x, cy + y, px, px)
+    }
+  }
+
+  // Scanlines
+  g.fillStyle = 'rgba(0,0,0,0.22)'
+  for (let y = 0; y < H; y += 4) g.fillRect(0, y, W, 1)
+
+  // Type
+  g.fillStyle = '#e8edf4'
+  g.font = '900 92px Arial Black, Arial, sans-serif'
+  g.textAlign = 'center'
+  g.fillText('PS1 / Y2K', W / 2, H - 130)
+  g.fillStyle = '#59d999'
+  g.font = '400 26px monospace'
+  g.fillText('STYLE LAB — № 1', W / 2, H - 82)
+</script>
