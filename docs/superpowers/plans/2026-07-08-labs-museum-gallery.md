@@ -889,8 +889,11 @@ export default function MuseumGallery() {
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
 
   return (
-    <div className="fixed inset-0 z-40 bg-black" aria-hidden="true">
+    <div className="fixed inset-0 z-40 bg-black">
+      {/* The 3D scene is decorative to assistive tech; the list view is the
+          accessible alternative. The overlay links/buttons stay reachable. */}
       <Canvas
+        aria-hidden="true"
         camera={{ fov: 62, near: 0.1, far: 80, position: [0, PLAYER.eyeHeight, -2] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
