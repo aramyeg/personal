@@ -1,14 +1,20 @@
 import { vi, beforeAll, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// Mock IntersectionObserver
-const mockIntersectionObserver = vi.fn();
-mockIntersectionObserver.mockReturnValue({
-  observe: () => null,
-  unobserve: () => null,
-  disconnect: () => null,
-});
-window.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
+// Mock IntersectionObserver as a proper class (next/link's prefetcher calls `new IntersectionObserver(...)`)
+class MockIntersectionObserver {
+  observe() {
+    return null;
+  }
+  unobserve() {
+    return null;
+  }
+  disconnect() {
+    return null;
+  }
+}
+window.IntersectionObserver =
+  MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver as a proper class
 class MockResizeObserver {
