@@ -31,6 +31,6 @@ test.describe('Style Lab gallery', () => {
     const back = page.getByRole('link', { name: /gallery/i })
     await expect(back).toBeVisible()
     await back.click()
-    await expect(page).toHaveURL(/\/labs/)
+    await expect(page).toHaveURL(/\/labs$/)
   })
 })

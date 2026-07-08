@@ -26,6 +26,11 @@ describe('resolveLabsView', () => {
     expect(resolveLabsView({ ...desktop, param: '3d', webglSupported: false })).toBe('list')
   })
 
+  it('ignores an unrecognized ?view= param and falls through to the heuristics', () => {
+    expect(resolveLabsView({ ...desktop, param: 'foo' })).toBe('3d')
+    expect(resolveLabsView({ ...desktop, param: 'foo', coarsePointer: true })).toBe('list')
+  })
+
   it('defaults to list on coarse pointers (touch)', () => {
     expect(resolveLabsView({ ...desktop, coarsePointer: true })).toBe('list')
   })

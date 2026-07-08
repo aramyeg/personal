@@ -15,6 +15,16 @@ const KEYMAP: Record<string, [keyof MoveVec, number]> = {
 }
 
 /**
+ * Chrome's requestPointerLock returns a Promise that can reject
+ * (WrongDocumentError/SecurityError); Firefox returns undefined. The DOM lib
+ * types it as void, so cast through unknown to guard the rejection safely.
+ */
+function requestPointerLockSafe(el: Element) {
+  const result = (el.requestPointerLock() as unknown) as Promise<void> | undefined
+  result?.catch?.(() => {})
+}
+
+/**
  * First-person rig: pointer-lock mouse look + WASD on desktop,
  * drag-look + joystick vector on touch. Camera stays at eye height,
  * clamped inside the hall.
@@ -51,7 +61,7 @@ export function PlayerControls({
     }
 
     const onClick = () => {
-      if (document.pointerLockElement !== el) el.requestPointerLock()
+      if (document.pointerLockElement !== el) requestPointerLockSafe(el)
     }
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== el) return
@@ -99,6 +109,11 @@ export function PlayerControls({
     const my = keys.current.y + joy.y
     if (mx === 0 && my === 0) return
 
+    // Normalize so diagonals and stacked keyboard+joystick don't exceed unit speed.
+    const len = Math.hypot(mx, my)
+    const nx2 = len > 1 ? mx / len : mx
+    const ny2 = len > 1 ? my / len : my
+
     const dir = new THREE.Vector3()
     camera.getWorldDirection(dir)
     dir.y = 0
@@ -106,8 +121,8 @@ export function PlayerControls({
     const right = new THREE.Vector3(dir.z, 0, -dir.x).negate()
 
     const step = PLAYER.speed * Math.min(delta, 0.05)
-    const nx = camera.position.x + (dir.x * my + right.x * mx) * step
-    const nz = camera.position.z + (dir.z * my + right.z * mx) * step
+    const nx = camera.position.x + (dir.x * ny2 + right.x * nx2) * step
+    const nz = camera.position.z + (dir.z * ny2 + right.z * nx2) * step
     const clamped = clampToHall(nx, nz, length)
     camera.position.set(clamped.x, PLAYER.eyeHeight, clamped.z)
   })

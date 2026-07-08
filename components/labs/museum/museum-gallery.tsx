@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import { labs } from '@/lib/labs-manifest'
 import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
-import { Painting } from './painting'
+import { Painting, PaintingBoundary } from './painting'
 import { DrapedFrame } from './draped-frame'
 import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
@@ -52,7 +52,9 @@ export default function MuseumGallery() {
         <Hall length={length} />
         <Suspense fallback={null}>
           {placements.map((p) => (
-            <Painting key={p.slug} placement={p} focused={focused === p.slug} register={register} />
+            <PaintingBoundary key={p.slug}>
+              <Painting placement={p} focused={focused === p.slug} register={register} />
+            </PaintingBoundary>
           ))}
         </Suspense>
         <DrapedFrame labCount={labs.length} />
@@ -74,7 +76,7 @@ export default function MuseumGallery() {
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">
-        {coarse ? 'Joystick to walk · drag to look · tap art to enter' : 'Click to walk · WASD + mouse · Esc to release'}
+        {coarse ? 'Joystick to walk · drag to look · center art, tap to enter' : 'Click to walk · WASD + mouse · Esc to release'}
       </div>
 
       {/* Escape hatch to the list */}

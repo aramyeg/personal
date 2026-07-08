@@ -77,17 +77,29 @@ export function makePlacardTexture(title: string, date: string, thesis: string):
   g.font = 'italic 24px Georgia, serif'
   g.fillText(date, 256, 118)
   g.font = '20px Georgia, serif'
-  // naive two-line wrap for the thesis
+  // Word-wrap the thesis to at most three lines (the border ends at y=236;
+  // three lines starting at y=160 with 30px spacing end at y=220).
+  const MAX_LINES = 3
   const words = thesis.split(' ')
-  let line = ''
   const lines: string[] = []
+  let line = ''
+  let consumed = 0
   for (const w of words) {
-    if ((line + ' ' + w).length > 44 && line) { lines.push(line); line = w }
-    else line = line ? line + ' ' + w : w
-    if (lines.length === 2) break
+    if ((line + ' ' + w).length > 44 && line) {
+      lines.push(line)
+      line = w
+      if (lines.length === MAX_LINES) break
+    } else {
+      line = line ? line + ' ' + w : w
+    }
+    consumed++
   }
-  if (lines.length < 2 && line) lines.push(line)
-  lines.slice(0, 2).forEach((l, i) => g.fillText(l, 256, 160 + i * 30))
+  if (lines.length < MAX_LINES && line) { lines.push(line); consumed = words.length }
+  // If words remain unrendered, mark the final line with an ellipsis.
+  if (consumed < words.length && lines.length) {
+    lines[lines.length - 1] = lines[lines.length - 1] + ' …'
+  }
+  lines.slice(0, MAX_LINES).forEach((l, i) => g.fillText(l, 256, 160 + i * 30))
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return tex

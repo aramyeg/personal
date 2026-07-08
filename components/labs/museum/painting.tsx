@@ -1,10 +1,27 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { useTexture } from '@react-three/drei'
 import { makePlacardTexture } from './textures'
 import type { PaintingPlacement } from './layout'
+
+/**
+ * Catches render errors from a single painting (e.g. a missing poster.jpg that
+ * makes drei's useTexture throw) so one bad lab removes only its own frame
+ * instead of taking down the whole gallery. Fails silently — the wall stays empty.
+ */
+export class PaintingBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
 
 const GOLD = '#b08d3f'
 // poster is 3:4 portrait
