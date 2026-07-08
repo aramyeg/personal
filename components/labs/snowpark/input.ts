@@ -116,14 +116,17 @@ export function createInput(): InputController {
   }
 
   const attach = (target: HTMLElement): (() => void) => {
-    window.addEventListener('keydown', onKeyDown)
+    // Capture phase: must run before GalleryChrome's bubble-phase Escape
+    // handler regardless of which mounts first, or the pause preventDefault
+    // loses the race and Esc navigates away instead of pausing.
+    window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('keyup', onKeyUp)
     target.addEventListener('touchstart', onTouchStart, { passive: true })
     target.addEventListener('touchmove', onTouchMove, { passive: true })
     target.addEventListener('touchend', onTouchEnd, { passive: true })
     target.addEventListener('touchcancel', onTouchEnd, { passive: true })
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('keyup', onKeyUp)
       target.removeEventListener('touchstart', onTouchStart)
       target.removeEventListener('touchmove', onTouchMove)
