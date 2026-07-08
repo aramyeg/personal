@@ -65,3 +65,4 @@ IMPROVEMENT_PLAN.md
 
 .vercel
 .env*.local
+.superpowers/
