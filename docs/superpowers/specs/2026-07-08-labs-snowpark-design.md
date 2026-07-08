@@ -1,7 +1,7 @@
 # Style Lab — Powder Lines (Snowboard Run) Design Spec
 
 **Date:** 2026-07-08
-**Status:** Approved for planning
+**Status:** SUPERSEDED by `2026-07-09-labs-snowpark-redesign-design.md` (v1 shipped, rejected on visual/fun quality)
 **Route:** `/labs/snowpark` · Lab #2 in the Style Lab series
 
 ## Summary
