@@ -8,7 +8,7 @@ describe('LabsList', () => {
     render(<LabsList />)
     for (const lab of labs) {
       const link = screen.getByRole('link', { name: new RegExp(lab.title) })
-      expect(link).toHaveAttribute('href', `/labs/${lab.slug}`)
+      expect(link).toHaveAttribute('href', lab.href ?? `/labs/${lab.slug}`)
     }
   })
 

@@ -35,7 +35,9 @@ export default function MuseumGallery() {
   }, [])
 
   const enterFocused = useCallback(() => {
-    if (focused) router.push(`/labs/${focused}`)
+    if (!focused) return
+    const lab = labs.find((l) => l.slug === focused)
+    router.push(lab?.href ?? `/labs/${focused}`)
   }, [focused, router])
 
   return (

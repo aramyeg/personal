@@ -20,9 +20,20 @@ export type LabEntry = {
   /** One-line statement of what the experiment explores */
   thesis: string
   status: 'live' | 'wip'
+  /** Route the artwork opens; defaults to /labs/<slug> */
+  href?: string
 }
 
 export const labs: LabEntry[] = [
+  {
+    slug: 'main',
+    title: 'Terracotta',
+    date: '2026-07-08',
+    thesis:
+      'The daily driver — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
+    status: 'live',
+    href: '/',
+  },
   {
     slug: 'ps1',
     title: 'PS1 / Y2K',

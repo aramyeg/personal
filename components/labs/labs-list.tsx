@@ -28,7 +28,7 @@ export function LabsList() {
         {labs.map((lab) => (
           <Link
             key={lab.slug}
-            href={`/labs/${lab.slug}`}
+            href={lab.href ?? `/labs/${lab.slug}`}
             className="group flex items-start gap-5 p-5 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
