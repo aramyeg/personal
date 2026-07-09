@@ -16,6 +16,7 @@ import { CAM, shakeOffset, type CameraState } from '../camera'
 import { palette } from '../palette'
 import { createParticles } from './particles'
 import { createFx } from './fx'
+import { drawSky } from './sky'
 
 export type Renderer = {
   draw(state: RiderState, course: Course, cam: CameraState): void
@@ -105,8 +106,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     stepJuice(scene)
 
-    ctx.fillStyle = palette.ice
-    ctx.fillRect(0, 0, cssW, cssH)
+    const p = clamp(state.x / course.finishX, 0, 1)
+    drawSky(ctx, cssW, cssH, p, state.time)
     drawTerrainLine(scene)
     drawObstacles(scene, course)
     drawParticlesLayer(scene)
