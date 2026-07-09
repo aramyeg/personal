@@ -18,4 +18,11 @@ describe('labs manifest attic split', () => {
   it('every attic entry carries a retrospective', () => {
     expect(atticLabs.every((l) => !!l.retrospective)).toBe(true)
   })
+
+  it('hangs the xp lab in the hall', () => {
+    const xp = hallLabs.find((l) => l.slug === 'xp')
+    expect(xp).toBeDefined()
+    expect(xp!.title).toBe('Bliss')
+    expect(xp!.status).toBe('live')
+  })
 })
