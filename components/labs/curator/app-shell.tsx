@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import OverviewModule from './modules/overview'
 
 export type CuratorModule =
   | 'overview' | 'rooms' | 'personnel' | 'pipeline'
@@ -46,7 +47,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             Portfolio Operations Platform
           </span>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <OverviewModule />}</main>
       </div>
     </div>
   )
