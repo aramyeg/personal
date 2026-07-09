@@ -10,6 +10,7 @@ import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
 import { Painting, PaintingBoundary } from './painting'
 import { DrapedFrame } from './draped-frame'
+import { AtticRoom } from './attic-room'
 import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
@@ -60,6 +61,7 @@ export default function MuseumGallery() {
           ))}
         </Suspense>
         <DrapedFrame labCount={hallLabs.length} />
+        <AtticRoom hallLen={length} register={register} focused={focused} />
         <FocusProbe targets={targets} onChange={setFocused} />
         <PlayerControls length={length} moveRef={moveRef} />
       </Canvas>

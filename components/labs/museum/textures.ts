@@ -104,3 +104,58 @@ export function makePlacardTexture(title: string, date: string, thesis: string):
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
 }
+
+/** Rough grey-brown attic floorboards. */
+export function makePlankTexture(): THREE.CanvasTexture {
+  const [c, g] = canvas(512)
+  const rnd = mulberry32(29)
+  g.fillStyle = '#6b5844'
+  g.fillRect(0, 0, 512, 512)
+  const plankW = 64
+  for (let col = 0; col < 512 / plankW; col++) {
+    const tone = 0.75 + rnd() * 0.4
+    g.fillStyle = `rgb(${Math.round(112 * tone)}, ${Math.round(92 * tone)}, ${Math.round(70 * tone)})`
+    g.fillRect(col * plankW + 1, 0, plankW - 2, 512)
+    // sparse grain scratches
+    for (let i = 0; i < 14; i++) {
+      const y = rnd() * 512
+      g.fillStyle = 'rgba(0,0,0,0.08)'
+      g.fillRect(col * plankW + 4 + rnd() * (plankW - 8), y, 2, 8 + rnd() * 30)
+    }
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+/** Aged paper plaque for the attic — more body room than the brass placard. */
+export function makeAtticPlaqueTexture(title: string, body: string): THREE.CanvasTexture {
+  const [c, g] = canvas(512)
+  g.fillStyle = '#d8cdb4'
+  g.fillRect(0, 0, 512, 512)
+  g.strokeStyle = 'rgba(60,45,20,0.5)'
+  g.lineWidth = 5
+  g.strokeRect(12, 12, 488, 488)
+  g.fillStyle = '#3a2d16'
+  g.textAlign = 'center'
+  g.font = '700 34px Georgia, serif'
+  g.fillText(title, 256, 70)
+  g.font = '21px Georgia, serif'
+  const words = body.split(' ')
+  const lines: string[] = []
+  let line = ''
+  for (const w of words) {
+    if ((line + ' ' + w).length > 42 && line) {
+      lines.push(line)
+      line = w
+    } else {
+      line = line ? line + ' ' + w : w
+    }
+  }
+  if (line) lines.push(line)
+  lines.slice(0, 13).forEach((l, i) => g.fillText(l, 256, 122 + i * 29))
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
