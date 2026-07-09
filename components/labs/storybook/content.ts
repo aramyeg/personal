@@ -26,7 +26,7 @@ export type Chapter = {
 
 export const SPREAD_COUNT = 10
 export const BOOK_TITLE = 'A Tale of Six Kingdoms'
-export const BOOK_SUBTITLE = "being the true chronicle of one frontend engineer's quest"
+export const BOOK_SUBTITLE = "being the true chronicle of one frontend engineer’s quest"
 
 const layerDefaults = (ch: number): SceneLayer[] => [
   { id: `ch${ch}-backdrop`, kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 2.0, standAngle: 90 },
@@ -43,7 +43,7 @@ export const CHAPTERS: readonly Chapter[] = [
     kicker: 'Chapter the First',
     title: 'The Inn of a Hundred Keys',
     narration:
-      "Once upon a time, in a stone-built city beneath a sleeping mountain, a young clerk of the merchant's guild grew tired of selling things and resolved instead to make them. He apprenticed himself to the code-wrights of BlueNet, and his first great labor was an enchanted ledger for the Inn of a Hundred Keys — a book that knew every guest, every room, and every candle lit therein. And the innkeepers marveled, for nothing was ever lost again.",
+      "Once upon a time, in a stone-built city beneath a sleeping mountain, a young clerk of the merchant’s guild grew tired of selling things and resolved instead to make them. He apprenticed himself to the code-wrights of BlueNet, and his first great labor was an enchanted ledger for the Inn of a Hundred Keys — a book that knew every guest, every room, and every candle lit therein. And the innkeepers marveled, for nothing was ever lost again.",
     accents: ['#6a8f5f', '#b0603f', '#e8a978'],
     layers: layerDefaults(1),
   },
@@ -54,7 +54,7 @@ export const CHAPTERS: readonly Chapter[] = [
     kicker: 'Chapter the Second',
     title: 'The Carrier Swarm',
     narration:
-      "Word of the apprentice's craft crossed the mountains to the alpine city of Zürich, where the Guild of the Bee kept a thousand couriers aloft. 'Build us a looking-glass,' said the beekeepers, 'that we may see every wing at once.' So he built it from nothing at all — his first work made to be carried in a pocket — and from that day no parcel, however small, ever wandered from its path.",
+      "Word of the apprentice’s craft crossed the mountains to the alpine city of Zürich, where the Guild of the Bee kept a thousand couriers aloft. ‘Build us a looking-glass,’ said the beekeepers, ‘that we may see every wing at once.’ So he built it from nothing at all — his first work made to be carried in a pocket — and from that day no parcel, however small, ever wandered from its path.",
     accents: ['#7d9bb5', '#8a5a3b', '#d9a441'],
     layers: layerDefaults(2),
   },
@@ -76,7 +76,7 @@ export const CHAPTERS: readonly Chapter[] = [
     kicker: 'Chapter the Fourth',
     title: 'The Vault-Dragon of the Golden Dunes',
     narration:
-      "Then came a summons from the golden dunes, where a great bank kept a dragon of renown coiled about its treasure. None doubted the beast's strength; the trouble was teaching it manners. The hero built passages of glass through which the people could reach their gold — safely, swiftly, and without waking so much as one scale — and he even taught the dragon to lease out carriages.",
+      "Then came a summons from the golden dunes, where a great bank kept a dragon of renown coiled about its treasure. None doubted the beast’s strength; the trouble was teaching it manners. The hero built passages of glass through which the people could reach their gold — safely, swiftly, and without waking so much as one scale — and he even taught the dragon to lease out carriages.",
     accents: ['#d9a24a', '#d96f4a', '#4f8f85', '#e6c65a'],
     layers: layerDefaults(4),
   },
