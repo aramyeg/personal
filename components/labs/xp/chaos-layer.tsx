@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useXpStore } from './store'
 import { playSound } from './sounds'
 import styles from './xp.module.css'
@@ -20,13 +20,17 @@ export function ChaosLayer() {
   const chaos = useXpStore((s) => s.chaos)
   const dialogs = useXpStore((s) => s.chaosDialogs)
   const [rebooting, setRebooting] = useState(false)
+  const rebootingRef = useRef(false)
 
   useEffect(() => {
     if (chaos !== 'bsod') return
+    let timeoutId: NodeJS.Timeout | undefined
     const reboot = (e: Event) => {
+      if (rebootingRef.current) return
+      rebootingRef.current = true
       e.preventDefault()
       setRebooting(true)
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         setRebooting(false)
         useXpStore.getState().rebootFromBsod()
       }, 900)
@@ -36,6 +40,8 @@ export function ChaosLayer() {
     return () => {
       window.removeEventListener('keydown', reboot, { capture: true })
       window.removeEventListener('pointerdown', reboot, { capture: true })
+      if (timeoutId) clearTimeout(timeoutId)
+      rebootingRef.current = false
     }
   }, [chaos])
 
