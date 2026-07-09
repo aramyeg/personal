@@ -6,8 +6,9 @@
  * pose). Two exports drive the render layer:
  *
  *   - `computePose` / `drawRider` — the kinematic chain (board → legs → hips →
- *     torso → neck → head + two arms) drawn as round-capped ink strokes, with
- *     the fx squash/stretch spring applied around the board contact point.
+ *     torso → neck → head + two arms) drawn as filled ink volume — a parka
+ *     mass, tapered limbs, a board slab — with the fx squash/stretch spring
+ *     applied around the board contact point.
  *   - `riderJoints(state)` — the pure joint contract the scarf (and future
  *     needs) consume: the neck anchor and board center in WORLD units. Pure,
  *     no canvas; during a bail it tracks the tumbling torso piece.
@@ -50,8 +51,8 @@ export const RIG = {
   // --- pose knobs (additions, tuned the same way) ---
   /** feet at ±this fraction of board length from center */
   FOOT_SPREAD: 0.3,
-  /** feet rest half a board-thickness above the contact line */
-  BOARD_THICK: 5,
+  /** feet rest this far above the contact line (½ the pre-slab board thickness) */
+  FOOT_REST: 2.5,
   /** hips biased slightly back of board center (world −x) */
   HIP_BACK: -2,
   /** forward knee jut (grows with crouch) and its small downward droop */
@@ -73,12 +74,28 @@ export const RIG = {
   ELBOW_BULGE: 4,
   /** grab: front hand reaches to this fraction of front-foot x, on the deck */
   GRAB_REACH: 0.7,
-  /** stroke widths */
-  BOARD_W: 5,
+  // --- fill dimensions (silhouette volume; draw-only, no pose effect) ---
+  /** board slab thickness — a filled rounded slab along the board axis */
+  BOARD_THICK: 7,
+  /** thin snow-deck highlight line laid along the board top */
   DECK_W: 1,
-  LEG_W: 3,
-  TORSO_W: 4,
-  ARM_W: 2.5,
+  /** parka mass: shoulder width tapering to the hips, plus a back drape */
+  TORSO_W: 10,
+  TORSO_HIP_W: 7,
+  TORSO_BACK_CURVE: 2,
+  /** collar: the parka rises this far past the neck so the head seams in */
+  COLLAR: 1.5,
+  /** legs: full width at the hip tapering to the ankle */
+  LIMB_W: 4.5,
+  LIMB_ANKLE_W: 3,
+  /** arms: full width at the shoulder tapering to the wrist */
+  ARM_W: 4,
+  ARM_WRIST_W: 2.5,
+  /** head: a filled disc (a touch larger than HEAD_R) under a beanie cap */
+  HEAD_DRAW_R: 6.2,
+  BEANIE_R: 7,
+  /** half-arc (rad) of the beanie cap segment seated on the crown */
+  BEANIE_ARC: 1.25,
   // --- bail tumble ---
   BAIL_GRAV: 500,
   BAIL_POP: 170,
@@ -173,7 +190,7 @@ export function computePose(state: RiderState): Pose {
   const airborne = state.mode === 'air' || state.mode === 'bail'
 
   const footX = RIG.BOARD_LEN * RIG.FOOT_SPREAD
-  const footY = -RIG.BOARD_THICK * 0.5
+  const footY = -RIG.FOOT_REST
   const backFoot = { x: -footX, y: footY }
   const frontFoot = { x: footX, y: footY }
 
@@ -267,46 +284,123 @@ function seg(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, 
   ctx.stroke()
 }
 
-function chain(ctx: CanvasRenderingContext2D, pts: Pt[]): void {
+/** Filled disc — a rounded joint, or the head. */
+function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   ctx.beginPath()
-  ctx.moveTo(pts[0].x, pts[0].y)
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-  ctx.stroke()
+  ctx.arc(x, y, r, 0, TAU)
+  ctx.fill()
 }
 
-/** Lay the posed strokes at the board-local origin (caller owns the transform). */
+/**
+ * A tapered filled limb between two joints: a quad with a round cap at each
+ * end, so consecutive segments overlap without cracking open at the bend.
+ * `wA`/`wB` are full widths (diameters) at the endpoints.
+ */
+function limb(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, wA: number, wB: number): void {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy) || 1
+  const nx = -dy / len
+  const ny = dx / len
+  const hA = wA / 2
+  const hB = wB / 2
+  ctx.beginPath()
+  ctx.moveTo(a.x + nx * hA, a.y + ny * hA)
+  ctx.lineTo(b.x + nx * hB, b.y + ny * hB)
+  ctx.lineTo(b.x - nx * hB, b.y - ny * hB)
+  ctx.lineTo(a.x - nx * hA, a.y - ny * hA)
+  ctx.closePath()
+  ctx.fill()
+  disc(ctx, a.x, a.y, hA)
+  disc(ctx, b.x, b.y, hB)
+}
+
+/** Horizontal filled slab (a stadium) from x0..x1 at y=0 — the board. */
+function slab(ctx: CanvasRenderingContext2D, x0: number, x1: number, halfThick: number): void {
+  ctx.beginPath()
+  ctx.moveTo(x0, -halfThick)
+  ctx.lineTo(x1, -halfThick)
+  ctx.arc(x1, 0, halfThick, -Math.PI / 2, Math.PI / 2)
+  ctx.lineTo(x0, halfThick)
+  ctx.arc(x0, 0, halfThick, Math.PI / 2, (3 * Math.PI) / 2)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/**
+ * The parka: a filled quad from wide shoulders down to narrower hips, its back
+ * edge drawn with a slight outward drape (an Alto-style poncho mass). `ux`/`uy`
+ * is the torso up-vector; the collar rises past the neck so the head seams in.
+ */
+function parka(ctx: CanvasRenderingContext2D, hip: Pt, neck: Pt, ux: number, uy: number): void {
+  const px = -uy // front perpendicular (world +x / downhill at zero lean)
+  const py = ux
+  const halfTop = RIG.TORSO_W / 2
+  const halfBot = RIG.TORSO_HIP_W / 2
+  const collarX = neck.x + ux * RIG.COLLAR
+  const collarY = neck.y + uy * RIG.COLLAR
+  const frontTop = { x: collarX + px * halfTop, y: collarY + py * halfTop }
+  const backTop = { x: collarX - px * halfTop, y: collarY - py * halfTop }
+  const frontBot = { x: hip.x + px * halfBot, y: hip.y + py * halfBot }
+  const backBot = { x: hip.x - px * halfBot, y: hip.y - py * halfBot }
+  const backMidX = (backTop.x + backBot.x) / 2 - px * RIG.TORSO_BACK_CURVE
+  const backMidY = (backTop.y + backBot.y) / 2 - py * RIG.TORSO_BACK_CURVE
+  ctx.beginPath()
+  ctx.moveTo(frontTop.x, frontTop.y)
+  ctx.lineTo(frontBot.x, frontBot.y)
+  ctx.lineTo(backBot.x, backBot.y)
+  ctx.quadraticCurveTo(backMidX, backMidY, backTop.x, backTop.y)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** Head disc plus a beanie cap segment seated on the crown (up = ux,uy). */
+function drawHead(ctx: CanvasRenderingContext2D, c: Pt, ux: number, uy: number): void {
+  disc(ctx, c.x, c.y, RIG.HEAD_DRAW_R)
+  const up = Math.atan2(uy, ux)
+  ctx.beginPath()
+  ctx.arc(c.x, c.y, RIG.BEANIE_R, up - RIG.BEANIE_ARC, up + RIG.BEANIE_ARC)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** Lay the posed fills at the board-local origin (caller owns the transform). */
 function drawPose(ctx: CanvasRenderingContext2D, pose: Pose, colors: PhaseColors): void {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = palette.ink
+  ctx.fillStyle = palette.ink
 
-  // Board plank, then a thin snow-colored deck highlight along its top.
-  ctx.lineWidth = RIG.BOARD_W
-  seg(ctx, pose.boardBack.x, pose.boardBack.y, pose.boardFront.x, pose.boardFront.y)
+  // Board slab, then a thin snow-colored deck highlight along its top.
+  slab(ctx, pose.boardBack.x, pose.boardFront.x, RIG.BOARD_THICK / 2)
   ctx.strokeStyle = colors.snow
   ctx.lineWidth = RIG.DECK_W
-  seg(ctx, pose.boardBack.x * 0.82, -RIG.BOARD_W * 0.35, pose.boardFront.x * 0.82, -RIG.BOARD_W * 0.35)
-  ctx.strokeStyle = palette.ink
+  const deckY = -RIG.BOARD_THICK * 0.3
+  seg(ctx, pose.boardBack.x * 0.82, deckY, pose.boardFront.x * 0.82, deckY)
 
-  // Legs.
-  ctx.lineWidth = RIG.LEG_W
-  chain(ctx, [pose.backFoot, pose.backKnee, pose.hip])
-  chain(ctx, [pose.frontFoot, pose.frontKnee, pose.hip])
+  // Legs — tapered ankle → knee → hip (drawn under the parka so the hip seams).
+  const kneeW = (RIG.LIMB_W + RIG.LIMB_ANKLE_W) / 2
+  limb(ctx, pose.backFoot, pose.backKnee, RIG.LIMB_ANKLE_W, kneeW)
+  limb(ctx, pose.backKnee, pose.hip, kneeW, RIG.LIMB_W)
+  limb(ctx, pose.frontFoot, pose.frontKnee, RIG.LIMB_ANKLE_W, kneeW)
+  limb(ctx, pose.frontKnee, pose.hip, kneeW, RIG.LIMB_W)
 
-  // Torso.
-  ctx.lineWidth = RIG.TORSO_W
-  seg(ctx, pose.hip.x, pose.hip.y, pose.neck.x, pose.neck.y)
+  // Torso parka mass — the up-vector is the (hip → neck) axis.
+  const tdx = pose.neck.x - pose.hip.x
+  const tdy = pose.neck.y - pose.hip.y
+  const tlen = Math.hypot(tdx, tdy) || 1
+  const tux = tdx / tlen
+  const tuy = tdy / tlen
+  parka(ctx, pose.hip, pose.neck, tux, tuy)
 
-  // Arms.
-  ctx.lineWidth = RIG.ARM_W
-  chain(ctx, [pose.shoulder, pose.backElbow, pose.backHand])
-  chain(ctx, [pose.shoulder, pose.frontElbow, pose.frontHand])
+  // Arms — tapered shoulder → elbow → wrist, over the parka so the shoulder seams.
+  const elbowW = (RIG.ARM_W + RIG.ARM_WRIST_W) / 2
+  limb(ctx, pose.shoulder, pose.backElbow, RIG.ARM_W, elbowW)
+  limb(ctx, pose.backElbow, pose.backHand, elbowW, RIG.ARM_WRIST_W)
+  limb(ctx, pose.shoulder, pose.frontElbow, RIG.ARM_W, elbowW)
+  limb(ctx, pose.frontElbow, pose.frontHand, elbowW, RIG.ARM_WRIST_W)
 
-  // Head.
-  ctx.fillStyle = palette.ink
-  ctx.beginPath()
-  ctx.arc(pose.head.x, pose.head.y, RIG.HEAD_R, 0, TAU)
-  ctx.fill()
+  // Head + beanie, seated in the parka collar.
+  drawHead(ctx, pose.head, tux, tuy)
 }
 
 /**
@@ -390,33 +484,40 @@ function bailPiecePos(state: RiderState, i: number): Pt {
 function drawPiece(ctx: CanvasRenderingContext2D, kind: PieceKind): void {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = palette.ink
   ctx.fillStyle = palette.ink
   switch (kind) {
     case 'board':
-      ctx.lineWidth = RIG.BOARD_W
-      seg(ctx, -RIG.BOARD_LEN / 2, 0, RIG.BOARD_LEN / 2, 0)
+      slab(ctx, -RIG.BOARD_LEN / 2, RIG.BOARD_LEN / 2, RIG.BOARD_THICK / 2)
       break
     case 'legs': {
-      ctx.lineWidth = RIG.LEG_W
       const fx = RIG.BOARD_LEN * RIG.FOOT_SPREAD * 0.4
-      seg(ctx, -fx, RIG.LEG * 0.5, 0, -RIG.LEG * 0.5)
-      seg(ctx, fx, RIG.LEG * 0.5, 0, -RIG.LEG * 0.5)
+      const footY = RIG.LEG * 0.5
+      const hipY = -RIG.LEG * 0.5
+      limb(ctx, { x: -fx, y: footY }, { x: 0, y: hipY }, RIG.LIMB_ANKLE_W, RIG.LIMB_W)
+      limb(ctx, { x: fx, y: footY }, { x: 0, y: hipY }, RIG.LIMB_ANKLE_W, RIG.LIMB_W)
       break
     }
     case 'torso':
-      ctx.lineWidth = RIG.TORSO_W
-      seg(ctx, 0, RIG.TORSO * 0.5, 0, -RIG.TORSO * 0.5)
+      limb(ctx, { x: 0, y: RIG.TORSO * 0.5 }, { x: 0, y: -RIG.TORSO * 0.5 }, RIG.TORSO_HIP_W, RIG.TORSO_W)
       break
     case 'arms':
-      ctx.lineWidth = RIG.ARM_W
-      seg(ctx, -RIG.ARM * 0.5, -RIG.ARM * 0.35, RIG.ARM * 0.5, RIG.ARM * 0.35)
-      seg(ctx, -RIG.ARM * 0.5, RIG.ARM * 0.35, RIG.ARM * 0.5, -RIG.ARM * 0.35)
+      limb(
+        ctx,
+        { x: -RIG.ARM * 0.5, y: -RIG.ARM * 0.35 },
+        { x: RIG.ARM * 0.5, y: RIG.ARM * 0.35 },
+        RIG.ARM_W,
+        RIG.ARM_WRIST_W
+      )
+      limb(
+        ctx,
+        { x: -RIG.ARM * 0.5, y: RIG.ARM * 0.35 },
+        { x: RIG.ARM * 0.5, y: -RIG.ARM * 0.35 },
+        RIG.ARM_W,
+        RIG.ARM_WRIST_W
+      )
       break
     case 'head':
-      ctx.beginPath()
-      ctx.arc(0, 0, RIG.HEAD_R, 0, TAU)
-      ctx.fill()
+      drawHead(ctx, { x: 0, y: 0 }, 0, -1)
       break
   }
 }
