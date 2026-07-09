@@ -20,12 +20,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
   return (
     <div className="grid h-full grid-cols-[232px_1fr]">
       <aside className="flex flex-col bg-[var(--c-navy)] text-white/85">
-        <div className="flex items-center gap-2 px-4 py-4">
-          <span aria-hidden className="h-4 w-4 rounded-[3px] bg-[var(--c-blue)]" />
-          <span className="text-[14px] font-semibold tracking-tight text-white">Curator</span>
-          <span className="ml-auto font-[family-name:var(--font-data)] text-[10px] text-white/40">v4.2.1</span>
-        </div>
-        <nav className="mt-2 flex-1 px-2" aria-label="Modules">
+        <nav className="mt-4 flex-1 px-2" aria-label="Modules">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -42,7 +37,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-col">
-        <header className="flex h-14 shrink-0 items-center border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6">
+          <span aria-hidden className="h-4 w-4 rounded-[3px] bg-[var(--c-blue)]" />
+          <span className="text-[14px] font-semibold tracking-tight">Curator</span>
+          <span className="font-[family-name:var(--font-data)] text-[10px] text-[var(--c-text-soft)]">v4.2.1</span>
+          <span aria-hidden className="h-4 w-px bg-[var(--c-border)]" />
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">
             Portfolio Operations Platform
           </span>
