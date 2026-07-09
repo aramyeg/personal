@@ -8,6 +8,7 @@ describe('resolveSbView', () => {
   it('honors explicit params', () => {
     expect(resolveSbView({ ...base, param: 'plain' })).toBe('plain')
     expect(resolveSbView({ ...base, param: 'book', reducedMotion: true })).toBe('book')
+    expect(resolveSbView({ ...base, param: 'book', webglSupported: false })).toBe('plain')
   })
   it('falls back to plain on reduced motion or no WebGL', () => {
     expect(resolveSbView({ ...base, reducedMotion: true })).toBe('plain')
