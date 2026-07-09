@@ -296,6 +296,22 @@ function activeKicker(x: number, course: Course): ActiveKicker | null {
   return null
 }
 
+/** Ground height at `x` for the airborne/landing path: the kicker face when
+ * inside a footprint (the ramp is SOLID — an airborne rider drops onto the face,
+ * not through it to the buried snowline), else the open snowline. */
+function surfaceY(x: number, course: Course): number {
+  const active = activeKicker(x, course)
+  return active ? kickerSurfaceY(active.o, x) : slopeY(x)
+}
+
+/** Surface tangent angle (rad) at `x`: the kicker face angle inside a footprint,
+ * else the slope tangent. Landing board-vs-surface judgments read this so a
+ * clean line down the face isn't judged against the open slope it's raised over. */
+function surfaceAngle(x: number, course: Course): number {
+  const active = activeKicker(x, course)
+  return active ? kickerFaceAngle(active.o) : slopeAngle(x)
+}
+
 type SnowMotion = {
   time: number
   speed: number
@@ -319,7 +335,10 @@ function stepSnow(
   // pull/drag/advance exactly as the slope tangent does everywhere else.
   const active = activeKicker(state.x, course)
   const angle = active ? kickerFaceAngle(active.o) : slopeAngle(state.x)
-  const pull = PHYS.GRAVITY * Math.sin(angle) * (tucking ? PHYS.TUCK_ACCEL : 1)
+  const sinA = Math.sin(angle)
+  // Tuck only boosts pull downhill (positive sin). On a kicker's uphill face it
+  // would merely amplify the climb's deceleration, so the boost gates off there.
+  const pull = PHYS.GRAVITY * sinA * (tucking && sinA > 0 ? PHYS.TUCK_ACCEL : 1)
   const drag = PHYS.DRAG_K * state.speed * state.speed * (tucking ? PHYS.TUCK_DRAG : 1)
   const accel = pull - drag
   const speed = clamp(state.speed + accel * dt, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
@@ -501,24 +520,24 @@ function stepAir(
 
   const snap = trySnapToRail(moved, course)
   if (snap) return snap
-  if (moved.y >= slopeY(moved.x)) {
+  if (moved.y >= surfaceY(moved.x, course)) {
     // A hop too brief to be a trick (a crest micro-detach) glues back silently;
     // a grind-exit air always completes its trick, however short (the grind is
     // the earned action), so grindLength > 0 forces the landing bands to run.
     const completesTrick = moved.airtime >= PHYS.MIN_AIR_S || moved.grindLength > 0
-    return completesTrick ? landOrBail(moved, course) : glueBack(moved)
+    return completesTrick ? landOrBail(moved, course) : glueBack(moved, course)
   }
   return moved
 }
 
 /** Reconnect with the snow after a sub-trick hop: keep the chain, fire nothing. */
-function glueBack(s: RiderState): RiderState {
-  const angle = slopeAngle(s.x)
+function glueBack(s: RiderState, course: Course): RiderState {
+  const angle = surfaceAngle(s.x, course)
   return {
     ...s,
     ...clearAir(),
     mode: 'snow',
-    y: slopeY(s.x),
+    y: surfaceY(s.x, course),
     speed: clamp(project(s.vx, s.vy, angle), PHYS.MIN_SPEED, PHYS.MAX_SPEED),
     coyoteT: 0,
     bufferT: 0,
@@ -546,17 +565,19 @@ function trySnapToRail(s: RiderState, course: Course): RiderState | null {
   return null
 }
 
-/** Board-vs-slope landing check: clean snaps and boosts, scrubbed bleeds speed, worse bails. */
+/** Board-vs-surface landing check: clean snaps and boosts, scrubbed bleeds speed,
+ * worse bails. The surface is the kicker face inside a footprint (solid ground),
+ * else the open slope — so a clean line down a ramp isn't judged against the
+ * buried snowline it's raised over. */
 function landOrBail(s: RiderState, course: Course): RiderState {
-  const slopeAngleDeg = slopeAngle(s.x) * DEG
-  const boardDiff = wrap180(s.launchAngleDeg + s.rotationDeg - slopeAngleDeg)
+  const angle = surfaceAngle(s.x, course)
+  const boardDiff = wrap180(s.launchAngleDeg + s.rotationDeg - angle * DEG)
   const mag = Math.abs(boardDiff)
   if (mag > PHYS.LANDING_TOLERANCE_DEG) return bail(s)
-  const angle = slopeAngle(s.x)
   const proj = project(s.vx, s.vy, angle)
   return mag <= PHYS.SNAP_DEG
     ? landClean(s, proj, angle, course)
-    : landScrubbed(s, proj, angle)
+    : landScrubbed(s, proj, angle, course)
 }
 
 function landClean(s: RiderState, proj: number, angle: number, course: Course): RiderState {
@@ -569,7 +590,7 @@ function landClean(s: RiderState, proj: number, angle: number, course: Course): 
   const landed: RiderState = {
     ...s,
     mode: 'snow',
-    y: slopeY(s.x),
+    y: surfaceY(s.x, course),
     speed,
     rotationDeg: snapped,
     chain,
@@ -581,14 +602,14 @@ function landClean(s: RiderState, proj: number, angle: number, course: Course): 
   return maybeBufferedRelaunch(bankTrick(landed, s, late, course), angle)
 }
 
-function landScrubbed(s: RiderState, proj: number, angle: number): RiderState {
+function landScrubbed(s: RiderState, proj: number, angle: number, course: Course): RiderState {
   const speed = clamp(proj * PHYS.SCRUB_FACTOR, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
   const impact = clamp(Math.abs(s.vy) / 900, 0.2, 1)
   // chain PRESERVED (no boost, no trick bank).
   const landed: RiderState = {
     ...s,
     mode: 'snow',
-    y: slopeY(s.x),
+    y: surfaceY(s.x, course),
     speed,
     impact,
     coyoteT: 0,

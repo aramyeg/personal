@@ -81,7 +81,9 @@ const BODY_DARKEN = 0.12
 /** Rim light: 3px lit crest then a 1px snow core. */
 const RIM_WIDTH = 3
 const RIM_ALPHA = 0.9
-const RIM_TINT = 0.5
+/** Sun→white mix of the lit crest; drawKicker reuses it so the ramp face
+ * catches the same rim light as the snowline. */
+export const RIM_TINT = 0.5
 const CORE_WIDTH = 1
 /** Carve line raked into the surface. */
 const CARVE_WIDTH = 1.5

@@ -292,6 +292,45 @@ describe('kicker as rideable geometry', () => {
       6
     )
   })
+
+  it('the face is SOLID for landings: an air into the footprint lands on the face, judged by the face angle', () => {
+    // Pick the kicker whose face contrasts most with the open slope beneath it,
+    // so a board aligned to the face would BAIL if judged against the slope.
+    const kickerIdxs = course.obstacles
+      .map((o, i) => (o.type === 'kicker' ? i : -1))
+      .filter((i) => i >= 0)
+    const faceVsSlope = (i: number): number =>
+      slopeAngle(course.obstacles[i].x + course.obstacles[i].length / 2) -
+      kickerFaceAngle(course.obstacles[i])
+    const index = kickerIdxs.reduce((a, b) => (faceVsSlope(b) > faceVsSlope(a) ? b : a))
+    const kicker = course.obstacles[index]
+    const x = kicker.x + kicker.length * 0.5 // mid-face
+    const faceAngle = kickerFaceAngle(kicker)
+
+    // Precondition: board aligned to the face differs from the open slope by more
+    // than the landing tolerance — judged against the buried snowline this bails.
+    expect(Math.abs(slopeAngleDeg(x) - faceAngle * DEG)).toBeGreaterThan(
+      PHYS.LANDING_TOLERANCE_DEG
+    )
+
+    const s0: RiderState = {
+      ...createRider(course),
+      mode: 'air',
+      x,
+      y: kickerSurfaceY(kicker, x) - 0.5, // just above the solid face
+      vx: Math.cos(faceAngle) * 300,
+      vy: 200, // descending into the footprint
+      launchAngleDeg: faceAngle * DEG, // board aligned to the face → clean
+      rotationDeg: 0,
+      airtime: 0.3,
+      attributedObstacle: index,
+    }
+    const landed = stepRider(s0, idle, 1 / 120, course)
+    expect(landed.mode).toBe('snow')
+    expect(landed.justLanded).toBe('clean') // face judgment; slope judgment would bail
+    expect(landed.y).toBeCloseTo(kickerSurfaceY(kicker, landed.x), 6) // on the face
+    expect(landed.y).toBeLessThan(slopeY(landed.x) - 20) // not the buried snowline
+  })
 })
 
 describe('forgiveness windows', () => {

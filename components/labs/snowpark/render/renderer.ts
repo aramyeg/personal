@@ -28,6 +28,7 @@ import {
   drawStretchProps,
   drawTerrain,
   mix,
+  RIM_TINT,
   type TerrainView,
 } from './terrain'
 
@@ -344,7 +345,7 @@ function drawKicker(sc: Scene, o: CourseObstacle): void {
   ctx.stroke()
 
   // Rim light along the ride face (entry → lip), same tint as the snowline rim.
-  ctx.strokeStyle = mix(sc.colors.sun, '#ffffff', 0.5)
+  ctx.strokeStyle = mix(sc.colors.sun, '#ffffff', RIM_TINT)
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(entryX, entryY)
