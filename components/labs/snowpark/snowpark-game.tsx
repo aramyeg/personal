@@ -105,6 +105,12 @@ function GameShell() {
   // below to restart its CSS animation (snowpark.module.css).
   const [scoreBump, setScoreBump] = useState(0)
   const prevScoreRef = useRef(hud.score)
+  // Chain pop: bumped whenever chain rises. Chain can rise on a clean landing
+  // with no attributed/uncollected obstacle (a plain pop, a crest detach, a
+  // buffered relaunch), which doesn't move the score — so the multiplier
+  // needs its own trigger, not just scoreBump, or it'd change value silently.
+  const [chainBump, setChainBump] = useState(0)
+  const prevChainRef = useRef(hud.chain)
 
   // Renderer + input live for the lifetime of the shell.
   useEffect(() => {
@@ -168,6 +174,13 @@ function GameShell() {
     if (hud.score > prevScoreRef.current) setScoreBump((n) => n + 1)
     prevScoreRef.current = hud.score
   }, [hud.score])
+
+  // Chain pop: bump the key whenever chain rises (never on a scrub-hold or a
+  // bail's reset to 0, since neither is an increase).
+  useEffect(() => {
+    if (hud.chain > prevChainRef.current) setChainBump((n) => n + 1)
+    prevChainRef.current = hud.chain
+  }, [hud.chain])
 
   const mirrorHud = useCallback((s: RiderState) => {
     const stretch = course.stretches.find((st) => s.x >= st.startX && s.x < st.endX)
@@ -262,7 +275,10 @@ function GameShell() {
 
         {/* top-right: score, chain multiplier, pause glyph */}
         <div className="absolute right-4 top-16 flex flex-col items-end gap-2">
-          <div key={scoreBump} className={`flex flex-col items-end gap-1 ${styles.comboPop}`}>
+          <div
+            key={`${scoreBump}-${chainBump}`}
+            className={`flex flex-col items-end gap-1 ${styles.comboPop}`}
+          >
             <div
               data-testid="hud-score"
               className="font-mono text-sm tabular-nums"
