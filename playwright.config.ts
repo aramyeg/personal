@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright configuration for E2E testing
  * @see https://playwright.dev/docs/test-configuration
  */
+const port = Number(process.env.E2E_PORT ?? 3000);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -15,7 +17,7 @@ export default defineConfig({
     ['list'],
   ],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -45,8 +47,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    command: `pnpm dev -- -p ${port}`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
