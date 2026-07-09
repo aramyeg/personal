@@ -21,6 +21,7 @@ import {
 } from './scene/cameras'
 import { hotspotById, hotspotsForAngle, type Hotspot } from './scene/hotspots'
 import { Boot } from './boot'
+import { createPS1Audio, type PS1Audio } from './audio'
 import { MenuPanel } from './panels/menu-panel'
 import { AboutPanel } from './panels/about-panel'
 import { ProjectsPanel } from './panels/projects-panel'
@@ -31,10 +32,9 @@ import { LabsPanel } from './panels/labs-panel'
 type Hover = { id: string; label: string }
 
 /**
- * Task 9 shell: boots the PSX world, drives the fixed-angle hard cuts, picks
- * hotspots by raycast, and owns the Esc chain + keyboard a11y skeleton. Panels
- * are still placeholders — Task 10 swaps `PanelHost`'s internals; the dispatch
- * call sites (and `state.soundOn`) are where Task 11 hangs audio.
+ * The PSX world shell: boots it, drives the fixed-angle hard cuts, picks
+ * hotspots by raycast, owns the Esc chain + keyboard a11y skeleton, renders
+ * the real panels, and hangs the synth SFX off each dispatch call site.
  */
 export function Ps1Experience() {
   const [state, dispatch] = useReducer(experienceReducer, initialState)
@@ -49,6 +49,57 @@ export function Ps1Experience() {
     // Reduced motion skips the boot entirely: gate straight to the room.
     if (m) dispatch({ type: 'BOOT_DONE' })
   }, [])
+
+  // Audio: created client-side only (it reads localStorage, so building it
+  // during a server render would throw). Its own enabled() may already carry
+  // a persisted 'on' from a previous visit — reconcile state.soundOn to match
+  // once, here, rather than the reverse (which would immediately re-persist
+  // 'off' and clobber the very preference we're trying to read).
+  const audioRef = useRef<PS1Audio | null>(null)
+  useEffect(() => {
+    const audio = createPS1Audio()
+    audioRef.current = audio
+    if (audio.enabled() !== state.soundOn) dispatch({ type: 'TOGGLE_SOUND' })
+    return () => audio.dispose()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: reconciles the initial soundOn once against the freshly-created audio's persisted state.
+  }, [])
+
+  // First user gesture anywhere unlocks the AudioContext (autoplay law).
+  useEffect(() => {
+    const onGesture = () => {
+      audioRef.current?.resume()
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+    }
+    window.addEventListener('pointerdown', onGesture)
+    window.addEventListener('keydown', onGesture)
+    return () => {
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+    }
+  }, [])
+
+  // Room tone runs exactly while booted and sound is on; toggling either off
+  // kills it immediately.
+  useEffect(() => {
+    audioRef.current?.setRoomTone(state.booted && state.soundOn)
+  }, [state.booted, state.soundOn])
+
+  // The boot chime fires once, when the boot overlay actually starts (reduced
+  // motion skips it) — never again, even if sound is toggled mid-boot.
+  const bootChimedRef = useRef(false)
+  useEffect(() => {
+    if (reduced !== false || bootChimedRef.current) return
+    bootChimedRef.current = true
+    audioRef.current?.boot()
+  }, [reduced])
+
+  // Hover-enter blip: fires only when hover changes to a real hotspot, never
+  // on hover-leave. Safe to key on the whole `hover` object — handleHover's
+  // dedupe already only produces a new reference when the id actually changes.
+  useEffect(() => {
+    if (hover) audioRef.current?.blip()
+  }, [hover])
 
   // A cut (or a panel open/close) can leave the old hover pointing at a hotspot
   // that is no longer under the cursor — drop it until the next pointer move.
@@ -69,6 +120,7 @@ export function Ps1Experience() {
       if (e.key === 'Escape') {
         if (panelRef.current !== null) {
           e.preventDefault()
+          audioRef.current?.back()
           dispatch({ type: 'ESCAPE' })
         }
         return
@@ -79,9 +131,11 @@ export function Ps1Experience() {
       if (panelRef.current !== null || !bootedRef.current) return
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
+        audioRef.current?.blip()
         dispatch({ type: 'CUT', dir: -1 })
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
+        audioRef.current?.blip()
         dispatch({ type: 'CUT', dir: 1 })
       }
     }
@@ -90,7 +144,20 @@ export function Ps1Experience() {
   }, [])
 
   const openPanel = useCallback((panel: Exclude<PanelId, null>) => {
+    audioRef.current?.select()
     dispatch({ type: 'OPEN_PANEL', panel })
+  }, [])
+
+  const cutWithSound = useCallback((a: { type: 'CUT'; dir: 1 | -1 }) => {
+    audioRef.current?.blip()
+    dispatch(a)
+  }, [])
+
+  const toggleSound = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.setEnabled(!audio.enabled())
+    dispatch({ type: 'TOGGLE_SOUND' })
   }, [])
 
   // Hover dedupe: pointer picking fires on every move, but the experience only
@@ -146,6 +213,17 @@ export function Ps1Experience() {
         </div>
       )}
 
+      {/* Sound toggle — HUD corner, persistent once booted. */}
+      {state.booted && (
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="fixed right-4 top-4 z-10 rounded-sm border border-[#3a5b57] bg-black/60 px-3 py-1.5 font-mono text-xs lowercase tracking-wide text-[#cfe9e6] outline-none transition-colors hover:bg-black/80 hover:text-white focus-visible:ring-2 focus-visible:ring-[#7de8e0]"
+        >
+          {state.soundOn ? 'sound: on' : 'sound: off'}
+        </button>
+      )}
+
       {/* Bottom-center hotspot hint (dry lowercase hotspot label). */}
       {showChip && (
         <div className="pointer-events-none absolute bottom-16 left-1/2 z-10 -translate-x-1/2 rounded-sm border border-[#3a5b57] bg-black/70 px-3 py-1.5 font-mono text-xs lowercase tracking-wide text-[#e8f6f4]">
@@ -156,15 +234,18 @@ export function Ps1Experience() {
       {/* On-screen cuts — 44px hit areas for touch. */}
       {showControls && (
         <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-3">
-          <CutButton dir={-1} label="previous angle" onCut={dispatch} />
-          <CutButton dir={1} label="next angle" onCut={dispatch} />
+          <CutButton dir={-1} label="previous angle" onCut={cutWithSound} />
+          <CutButton dir={1} label="next angle" onCut={cutWithSound} />
         </div>
       )}
 
       {state.panel && (
         <PanelHost
           panel={state.panel}
-          onClose={() => dispatch({ type: 'CLOSE_PANEL' })}
+          onClose={() => {
+            audioRef.current?.back()
+            dispatch({ type: 'CLOSE_PANEL' })
+          }}
           onNavigate={openPanel}
         />
       )}
