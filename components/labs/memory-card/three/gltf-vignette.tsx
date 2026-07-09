@@ -76,6 +76,39 @@ function disposeScene(root: THREE.Object3D): void {
 }
 
 /**
+ * World-space bounds of a loaded scene, skinning-aware. `Box3.setFromObject`
+ * measures a `SkinnedMesh`'s bind-space geometry, which for skeleton-driven
+ * assets can be wildly larger or smaller than the posed, rendered size,
+ * starving `fitToStage` of a usable height. Skinned meshes are measured via
+ * `computeBoundingBox()` (skinning-aware since three r151) instead.
+ */
+function measureScene(scene: THREE.Object3D): THREE.Box3 {
+  scene.updateMatrixWorld(true)
+  const box = new THREE.Box3()
+  const tmp = new THREE.Box3()
+  scene.traverse((o) => {
+    const skinned = o as THREE.SkinnedMesh
+    if (skinned.isSkinnedMesh) {
+      skinned.computeBoundingBox()
+      if (skinned.boundingBox) {
+        tmp.copy(skinned.boundingBox).applyMatrix4(skinned.matrixWorld)
+        box.union(tmp)
+      }
+      return
+    }
+    const mesh = o as THREE.Mesh
+    if (mesh.isMesh && mesh.geometry) {
+      mesh.geometry.computeBoundingBox()
+      if (mesh.geometry.boundingBox) {
+        tmp.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld)
+        box.union(tmp)
+      }
+    }
+  })
+  return box
+}
+
+/**
  * Missing/failed-load stand-in: a slowly turning wireframe rounded box in the
  * shell grey, sized like a generic hero object so the slot doesn't read empty.
  */
@@ -138,7 +171,9 @@ function GltfModel({
   const reduced = usePrefersReducedMotion()
 
   const fit = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(gltf.scene)
+    const box = measureScene(gltf.scene)
+    if (box.isEmpty())
+      return { scale: 1, offset: [0, floorY, 0] as [number, number, number] }
     return fitToStage(
       [box.min.x, box.min.y, box.min.z],
       [box.max.x, box.max.y, box.max.z],
