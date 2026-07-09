@@ -11,6 +11,9 @@ import { WinAddRemove, sizeOnDisk } from '@/components/labs/xp/win-add-remove'
 import { WinRecycleBin } from '@/components/labs/xp/win-recycle-bin'
 import { atticLabs } from '@/lib/labs-manifest'
 import { skills } from '@/data'
+import { WinMessenger } from '@/components/labs/xp/win-messenger'
+import { WinIE } from '@/components/labs/xp/win-ie'
+import { socialLinks } from '@/lib/constants'
 
 beforeEach(() => useXpStore.setState({ windows: [], chaos: 'idle', startOpen: false, activeId: null }))
 
@@ -72,5 +75,19 @@ describe('recycle bin', () => {
       expect(screen.getByText(lab.title)).toBeInTheDocument()
       expect(screen.getByRole('link', { name: `Restore ${lab.title}` })).toHaveAttribute('href', lab.href ?? `/labs/${lab.slug}`)
     }
+  })
+})
+
+describe('messenger + ie', () => {
+  it('messenger renders contact links and a nudge', () => {
+    render(<WinMessenger />)
+    expect(screen.getByRole('link', { name: /aramyeg96@gmail.com/ })).toHaveAttribute('href', 'mailto:aramyeg96@gmail.com')
+    for (const l of socialLinks) expect(screen.getByRole('link', { name: l.name })).toHaveAttribute('href', l.url)
+    expect(screen.getByRole('button', { name: 'Send nudge' })).toBeInTheDocument()
+  })
+
+  it('ie frames the main site', () => {
+    render(<WinIE />)
+    expect(screen.getByTitle('aram.dev')).toHaveAttribute('src', '/')
   })
 })

@@ -9,19 +9,17 @@ import { WinProjectDetail } from './win-project-detail'
 import { WinMyComputer } from './win-my-computer'
 import { WinAddRemove } from './win-add-remove'
 import { WinRecycleBin } from './win-recycle-bin'
-
-function Stub({ win }: { win: XpWindow }) {
-  return <div style={{ padding: 12 }}>{win.title}</div>
-}
+import { WinMessenger } from './win-messenger'
+import { WinIE } from './win-ie'
 
 export const WINDOW_CONTENTS: Record<XpAppId, ComponentType<{ win: XpWindow }>> = {
-  'my-computer': WinMyComputer,
-  'my-projects': WinProjects,
+  'my-computer': WinMyComputer as ComponentType<{ win: XpWindow }>,
+  'my-projects': WinProjects as ComponentType<{ win: XpWindow }>,
   'project-detail': WinProjectDetail,
-  resume: WinResume,
-  about: WinAbout,
-  messenger: Stub,
-  'internet-explorer': Stub,
+  resume: WinResume as ComponentType<{ win: XpWindow }>,
+  about: WinAbout as ComponentType<{ win: XpWindow }>,
+  messenger: WinMessenger as ComponentType<{ win: XpWindow }>,
+  'internet-explorer': WinIE as ComponentType<{ win: XpWindow }>,
   'add-remove': WinAddRemove as ComponentType<{ win: XpWindow }>,
   'recycle-bin': WinRecycleBin as ComponentType<{ win: XpWindow }>,
 }
