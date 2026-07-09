@@ -1,0 +1,86 @@
+.desktop {
+  --luna-face: #ece9d8;
+  --luna-blue: #0855dd;
+  --luna-border: #0831d9;
+  --luna-selection: #316ac5;
+  --luna-title-grad: linear-gradient(180deg, #0997ff 0%, #0053ee 8%, #0050ee 40%, #0066ff 88%, #005bff 93%, #003dd7 100%);
+  --luna-taskbar-grad: linear-gradient(180deg, #1f2f86 0, #3165c4 3%, #3682e5 6%, #4490e6 10%, #2b71e0 15%, #2663da 18%, #235bd6 25%, #2157d6 38%, #245ddb 54%, #2562df 86%, #245fdc 89%, #2158d4 92%, #1d4ec0 95%, #1941a5 98%);
+  --luna-start-grad: linear-gradient(180deg, #7bd062 0%, #4fb033 10%, #3d9932 45%, #34862c 90%, #2d7529 100%);
+  --xp-font: Tahoma, 'Segoe UI', sans-serif;
+  position: fixed; inset: 0; overflow: hidden;
+  font-family: var(--xp-font); font-size: 11px;
+  user-select: none; color: #000;
+}
+.wallpaper { position: absolute; inset: 0 0 30px 0; background: #235cdb center / cover no-repeat; }
+.windowFrame {
+  position: absolute; display: flex; flex-direction: column;
+  border: 3px solid var(--luna-border); border-top: none; border-radius: 8px 8px 0 0;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); background: var(--luna-face);
+}
+.titleBar {
+  display: flex; align-items: center; height: 28px; padding: 0 4px 0 8px;
+  border-radius: 7px 7px 0 0; background: var(--luna-title-grad);
+  filter: saturate(0.55) brightness(1.08); /* inactive */
+}
+.windowActive .titleBar { filter: none; }
+.titleText {
+  flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  color: #fff; font: bold 13px 'Trebuchet MS', var(--xp-font);
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.6);
+}
+.titleButtons { display: flex; gap: 2px; }
+.titleBtn {
+  width: 21px; height: 21px; border-radius: 3px; border: 1px solid #fff;
+  background: linear-gradient(180deg, #7ba2e7 0%, #3a6ce0 50%, #2a54c8 100%);
+  color: #fff; font-size: 11px; line-height: 1; cursor: pointer;
+}
+.closeBtn { background: linear-gradient(180deg, #e9967c 0%, #d75440 40%, #b33324 100%); }
+.windowBody { flex: 1; overflow: auto; background: #fff; margin: 0 3px 3px; }
+.taskbar {
+  position: absolute; inset: auto 0 0 0; height: 30px; z-index: 10000;
+  display: flex; align-items: stretch; background: var(--luna-taskbar-grad);
+}
+.startButton {
+  display: flex; align-items: center; gap: 5px; padding: 0 18px 0 10px;
+  border: none; border-radius: 0 8px 8px 0; background: var(--luna-start-grad);
+  color: #fff; font: bold italic 16px 'Trebuchet MS', var(--xp-font);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); cursor: pointer;
+}
+.taskButton {
+  display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 160px;
+  flex: 0 1 160px; margin: 3px 0 3px 4px; padding: 0 8px; border: none; border-radius: 3px;
+  background: linear-gradient(180deg, #3c81f3 0%, #2864d8 50%, #2a68dc 100%);
+  color: #fff; font-family: var(--xp-font); font-size: 11px; cursor: pointer;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.taskButtonActive { background: linear-gradient(180deg, #1d53c2 0%, #164194 100%); box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.5); }
+.tray {
+  display: flex; align-items: center; gap: 8px; margin-left: auto; padding: 0 10px 0 12px;
+  background: linear-gradient(180deg, #0c59b9 0%, #139ee9 3%, #18b5f2 6%, #1290e8 12%, #0d8dea 25%, #0d9beb 60%, #0f9eed 75%, #119be9 85%, #1392e2 92%, #137ed7 98%);
+  border-left: 1px solid #092e51; color: #fff; font-size: 11px;
+}
+.icon {
+  width: 76px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 2px; border: 1px solid transparent; cursor: default; text-align: center;
+}
+.iconSelected { background: rgba(49, 106, 197, 0.55); border: 1px dotted #fff; }
+.iconGlyph { font-size: 30px; line-height: 1; filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.5)); }
+.iconLabel { color: #fff; font-size: 11px; text-shadow: 1px 1px 2px #000; word-break: break-word; }
+.dialog {
+  position: absolute; border: 3px solid var(--luna-border); border-top: none;
+  border-radius: 8px 8px 0 0; background: var(--luna-face);
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); min-width: 320px;
+}
+.bevelBtn {
+  padding: 3px 16px; border-radius: 3px; border: 1px solid #003c74;
+  background: linear-gradient(180deg, #fff 0%, #ece9d8 100%);
+  font-family: var(--xp-font); font-size: 11px; cursor: pointer;
+}
+.bevelBtn:hover { box-shadow: inset 0 0 0 1px #f8b334; }
+.menuBar { display: flex; gap: 2px; padding: 2px 4px; background: var(--luna-face); font-size: 11px; }
+.menuBar span { padding: 2px 6px; }
+.startMenu {
+  position: absolute; left: 0; bottom: 30px; z-index: 10001; width: 380px;
+  border: 1px solid #0831d9; border-radius: 6px 6px 0 0; overflow: hidden;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.5); background: #fff;
+}
