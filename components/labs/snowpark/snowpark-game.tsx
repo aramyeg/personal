@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { Skill, SkillCategory } from '@/types'
-import { skillCategories, skills } from '@/data/skills'
 import { compileCourse } from './course'
 import {
   BAIL_LINE,
@@ -19,17 +17,13 @@ import { createRenderer, type Renderer } from './render/renderer'
 import { addShake, createCamera, updateCamera, type CameraState } from './camera'
 import { palette } from './palette'
 import { CHAIN_STEP } from './tricks'
+import { SkillsSummary, type SkillMarks } from './skills-summary'
 import styles from './snowpark.module.css'
 
 /** The course is pure geometry over static data — compiled once at module load. */
 const course = compileCourse()
 
-/** Skill categories that map to slope stretches (the joke category is excluded). */
-const CATEGORIES: { id: SkillCategory; label: string }[] = skillCategories.filter(
-  (c) => c.id !== 'fun'
-)
-
-type Phase = 'playing' | 'paused' | 'finished'
+type Phase = 'playing' | 'paused' | 'finished' | 'sheet'
 
 type Hud = {
   score: number
@@ -76,7 +70,7 @@ export function SnowparkGame() {
   }, [])
 
   if (reduced === null) return null
-  if (reduced && !started) return <ReducedMotionSheet onStart={() => setStarted(true)} />
+  if (reduced && !started) return <SkillsSheet onStart={() => setStarted(true)} />
   return <GameShell />
 }
 
@@ -338,10 +332,25 @@ function GameShell() {
         </div>
       </div>
 
+      {/* bottom-left: skip affordance — outside the pointer-events-none HUD
+          wrapper (needs clicks) and above the pause overlay so it's reachable
+          in both 'playing' and 'paused'. */}
+      {(phase === 'playing' || phase === 'paused') && (
+        <button
+          type="button"
+          onClick={() => setPhase('sheet')}
+          className="fixed bottom-4 left-4 z-30 select-none font-mono text-[11px] lowercase tracking-wide"
+          style={{ color: palette.ink, opacity: 0.6 }}
+        >
+          skip to the skills
+        </button>
+      )}
+
       {phase === 'paused' && (
         <PauseOverlay onResume={() => setPhase('playing')} onRestart={restart} />
       )}
       {phase === 'finished' && <Recap rider={riderRef.current} onReplay={restart} />}
+      {phase === 'sheet' && <SkillsSheet onStart={restart} />}
     </>
   )
 }
@@ -369,19 +378,13 @@ function PauseOverlay({ onResume, onRestart }: { onResume: () => void; onRestart
 }
 
 function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void }) {
-  const collectedNames = new Set<string>()
+  const marks: SkillMarks = new Map()
   course.obstacles.forEach((o, i) => {
-    if (rider.collected[i]) collectedNames.add(o.skill.name)
+    marks.set(o.skill.name, rider.collected[i] ? 'collected' : 'missed')
   })
-  const nonFun = skills.filter((s) => s.category !== 'fun')
-  const collected = nonFun.filter((s) => collectedNames.has(s.name))
-  const missed = nonFun.filter((s) => !collectedNames.has(s.name))
 
   return (
-    <div
-      className="fixed inset-0 z-20 overflow-y-auto"
-      style={{ background: palette.ice }}
-    >
+    <div className="fixed inset-0 z-20 overflow-y-auto" style={{ background: palette.ice }}>
       <div className="mx-auto max-w-3xl px-6 py-20">
         <h2 className="font-mono text-3xl lowercase" style={{ color: palette.ink }}>
           expedition log
@@ -395,9 +398,8 @@ function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void })
           )}
         </dl>
 
-        <div className="mt-10 grid gap-10 sm:grid-cols-2">
-          <SkillColumn title="collected" items={collected} marker="●" markerColor={palette.amber} />
-          <SkillColumn title="missed" items={missed} marker="○" markerColor={palette.ink} />
+        <div className="mt-10">
+          <SkillsSummary marks={marks} />
         </div>
 
         <div className="mt-12 flex gap-4">
@@ -415,24 +417,27 @@ function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void })
   )
 }
 
-function ReducedMotionSheet({ onStart }: { onStart: () => void }) {
-  const nonFun = skills.filter((s) => s.category !== 'fun')
+/**
+ * The skill list as a static sheet with a start button — no run, no marks.
+ * Doubles as the reduced-motion landing (motion never auto-runs) and the
+ * skip-link target mid-game; `onStart` decides what "starting" means for
+ * each caller.
+ */
+function SkillsSheet({ onStart }: { onStart: () => void }) {
   return (
-    <div className="fixed inset-0 overflow-y-auto" style={{ background: palette.ice }}>
+    <div className="fixed inset-0 z-20 overflow-y-auto" style={{ background: palette.ice }}>
       <div className="mx-auto max-w-3xl px-6 py-20">
-        <h2 className="font-mono text-3xl lowercase" style={{ color: palette.ink }}>
-          expedition log
-        </h2>
-        <p className="mt-3 font-mono text-xs lowercase" style={{ color: palette.blueDeep }}>
-          reduced motion is on — here is the run as a static sheet.
-        </p>
+        <SkillsSummary />
 
-        <div className="mt-10">
-          <SkillColumn title="the skills" items={nonFun} marker="●" markerColor={palette.blueMid} />
-        </div>
-
-        <div className="mt-12">
-          <PillButton onClick={onStart}>start the run anyway</PillButton>
+        <div className="mt-12 flex gap-4">
+          <PillButton onClick={onStart}>start the run</PillButton>
+          <Link
+            href="/labs"
+            className="rounded-full border px-5 py-2 font-mono text-sm lowercase transition-colors"
+            style={{ borderColor: palette.ink, color: palette.ink }}
+          >
+            ← gallery
+          </Link>
         </div>
       </div>
     </div>
@@ -448,51 +453,6 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
         {label}
       </dt>
       <dd style={{ color: accent ? palette.amber : palette.ink }}>{value}</dd>
-    </div>
-  )
-}
-
-function SkillColumn({
-  title,
-  items,
-  marker,
-  markerColor,
-}: {
-  title: string
-  items: Skill[]
-  marker: string
-  markerColor: string
-}) {
-  return (
-    <div>
-      <h3
-        className="font-mono text-[11px] uppercase tracking-widest"
-        style={{ color: palette.blueDeep }}
-      >
-        {title}
-      </h3>
-      <div className="mt-3 flex flex-col gap-4">
-        {CATEGORIES.map((cat) => {
-          const group = items.filter((s) => s.category === cat.id)
-          if (group.length === 0) return null
-          return (
-            <div key={cat.id}>
-              <div
-                className="font-mono text-[10px] uppercase tracking-widest"
-                style={{ color: palette.blueMid }}
-              >
-                {cat.label}
-              </div>
-              {group.map((s) => (
-                <div key={s.name} className="font-mono text-xs" style={{ color: palette.ink }}>
-                  <span style={{ color: markerColor }}>{marker}</span> <span>{s.name}</span> ·{' '}
-                  {s.years} yrs · {s.level}
-                </div>
-              ))}
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { SnowparkGameLoader } from '@/components/labs/snowpark/game-loader'
+import { CrawlableSkills } from '@/components/labs/snowpark/crawlable-skills'
 
 export const metadata: Metadata = {
   title: 'Powder Lines — Style Lab | Aram Yeghiazaryan',
@@ -20,6 +21,7 @@ export default function SnowparkLabPage() {
       <main className="fixed inset-0 overflow-hidden">
         <SnowparkGameLoader />
       </main>
+      <CrawlableSkills />
     </GalleryChrome>
   )
 }

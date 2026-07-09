@@ -25,7 +25,22 @@ test.describe('snowpark lab', () => {
   test('reduced motion renders the static skill sheet, not the running game', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/labs/snowpark')
-    await expect(page.getByRole('button', { name: 'start the run anyway' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'start the run' })).toBeVisible()
     await expect(page.getByText('React', { exact: true })).toBeVisible()
+  })
+
+  test('skip path reaches the skills without playing', async ({ page }) => {
+    await page.goto('/labs/snowpark')
+    await expect(page.getByTestId('hud-score')).toBeVisible()
+    await page.getByText('skip to the skills', { exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'skills' })).toBeVisible()
+    await expect(page.getByText('React Native', { exact: true })).toBeVisible()
+  })
+
+  test('skill list is server-rendered for crawlers', async ({ request }) => {
+    const res = await request.get('/labs/snowpark')
+    const html = await res.text()
+    expect(html).toContain('TypeScript')
+    expect(html).toContain('skills summary')
   })
 })
