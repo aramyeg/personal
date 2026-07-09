@@ -8,6 +8,8 @@ import { Taskbar } from './taskbar'
 import { StartMenu } from './start-menu'
 import { BootScreen } from './boot-screen'
 import { WelcomeScreen } from './welcome-screen'
+import { Clippy } from './clippy'
+import { BalloonTip } from './balloon-tip'
 import styles from './xp.module.css'
 
 export function XpDesktop() {
@@ -36,6 +38,8 @@ export function XpDesktop() {
       <DesktopIcons />
       <WindowsLayer />
       <StartMenu />
+      <Clippy />
+      <BalloonTip />
       <Taskbar />
     </div>
   )
