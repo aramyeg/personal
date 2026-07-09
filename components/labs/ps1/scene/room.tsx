@@ -6,7 +6,6 @@ import { makePSXMaterial } from './psx-materials'
 import {
   makeCarpetTexture,
   makeWallTexture,
-  makeStickerSheetTexture,
   makeBoxSpineTexture,
 } from './textures'
 import {
@@ -93,9 +92,11 @@ function buildShell(): THREE.Group {
   mkWall(wallGeoX, -HALF_X, 0, Math.PI / 2) // −x (posters)
   mkWall(wallGeoX.clone(), HALF_X, 0, -Math.PI / 2) // +x (shelf)
 
+  // Ceiling faces down, away from the window key, so it only takes ambient —
+  // keep its multiplier light so ambient alone renders dim plaster, not black.
   const ceil = new THREE.Mesh(
     new THREE.PlaneGeometry(HALF_X * 2, HALF_Z * 2),
-    makePSXMaterial({ map: wall, color: '#8a8578' }),
+    makePSXMaterial({ map: wall, color: '#ffffff' }),
   )
   ceil.position.y = CEIL
   ceil.rotation.x = Math.PI / 2
@@ -103,85 +104,80 @@ function buildShell(): THREE.Group {
   return shell
 }
 
-/** A taped sticker sheet plane (transparent) at a wall spot. */
-function wallSticker(size: number, x: number, y: number, z: number, ry: number): THREE.Mesh {
-  const m = makePSXMaterial({ map: makeStickerSheetTexture(), color: '#ffffff' })
-  m.transparent = true
-  m.depthWrite = false
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), m)
-  mesh.position.set(x, y, z)
-  mesh.rotation.y = ry
-  return mesh
-}
-
-/** Cheap wall dressing so no framing shows empty plaster: a sticker cluster on
- * the +x wall, a lower dressing shelf of tapes below the real shelf, a sticker
- * + wall clock on the +z wall (the TV framing's back wall). */
+/** Wall dressing — believable objects only (no floating stickers): a lower
+ * dressing shelf of tapes below the real shelf (fills the shelf close-up), and
+ * a wall clock on the bare +x wall in the TV corner. */
 function buildWallDressing(): THREE.Group {
   const grp = new THREE.Group()
-  const XW = HALF_X - 0.02
   const RY_X = -Math.PI / 2
 
-  // +x wall (shelf framing): a sticker cluster above and below the shelf.
-  grp.add(wallSticker(0.42, XW, 1.95, -0.35, RY_X))
-  grp.add(wallSticker(0.5, XW, 0.72, -0.9, RY_X))
-  grp.add(wallSticker(0.32, XW, 0.7, 0.35, RY_X))
-
-  // Lower dressing shelf on the +x wall with a row of leaning tapes.
+  // Lower dressing shelf on the +x wall (mounted back-face ~0.05 off the wall so
+  // it never clips the corner). A short row of leaning tapes.
   const lower = new THREE.Group()
   const plank = new THREE.Mesh(
-    new THREE.BoxGeometry(0.26, 0.05, 1.3),
+    new THREE.BoxGeometry(0.24, 0.05, 1.0),
     makePSXMaterial({ color: '#7c6446' }),
   )
   lower.add(plank)
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     const spine = makePSXMaterial({ map: makeBoxSpineTexture(i + 2), color: '#ffffff' })
     const tape = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.15, 0.11), makePSXMaterial({ color: '#b4b0a4' }))
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.13), spine)
-    face.position.x = -0.01
+    face.position.x = -0.02
     face.rotation.y = RY_X
     const tapeGrp = new THREE.Group()
     tapeGrp.add(tape)
     tapeGrp.add(face)
-    tapeGrp.position.set(-0.05, 0.1, -0.5 + i * 0.16)
+    tapeGrp.position.set(-0.02, 0.1, -0.38 + i * 0.19)
     tapeGrp.rotation.z = (i % 2 ? 1 : -1) * 0.04
     lower.add(tapeGrp)
   }
-  lower.position.set(HALF_X - 0.15, 0.98, -0.3)
+  lower.position.set(HALF_X - 0.17, 0.98, -0.35)
   grp.add(lower)
 
-  // +z wall (TV framing back wall): a sticker + a simple wall clock.
-  grp.add(wallSticker(0.44, 0.5, 1.55, HALF_Z - 0.02, Math.PI))
+  // Wall clock on the +z wall — the wall the window key lights (the bright,
+  // "blinding-empty" wall in the tv framing). Faces −z into the room.
   const clock = new THREE.Group()
   const disc = new THREE.Mesh(
     new THREE.CylinderGeometry(0.19, 0.19, 0.03, 16),
     makePSXMaterial({ color: '#d8d3c4' }),
   )
-  disc.rotation.x = Math.PI / 2
+  disc.rotation.x = Math.PI / 2 // lay the disc flat against the +z wall
   clock.add(disc)
   clock.add(place(new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.12, 0.01), makePSXMaterial({ color: '#2c2e2c' })), 0, 0.04, -0.02))
   clock.add(place(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.014, 0.01), makePSXMaterial({ color: '#2c2e2c' })), 0.03, 0, -0.02))
-  clock.position.set(-0.85, 1.95, HALF_Z - 0.03)
+  clock.position.set(1.15, 1.62, HALF_Z - 0.03)
   clock.rotation.y = Math.PI
   grp.add(clock)
   return grp
 }
 
-/** Neutral floor clutter (cushion + magazine stack + soda can) to fill the open
- * carpet the establishing and TV framings would otherwise show empty. */
+/** A single grey CD jewel case (thin slab + darker tray inset), lying flat. */
+function cdCase(x: number, z: number, ry: number): THREE.Group {
+  const jc = new THREE.Group()
+  jc.add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.012, 0.15), makePSXMaterial({ color: '#b4b0a4' })))
+  jc.add(place(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.014, 0.11), makePSXMaterial({ color: '#5a5d59' })), 0, 0.002, 0))
+  jc.position.set(x, 0.007, z)
+  jc.rotation.y = ry
+  return jc
+}
+
+/** Neutral floor clutter: a flat cushion + magazine stack + can (kept off the
+ * TV sightline centre), plus the loose CD cases scattered into the establishing
+ * shot's otherwise-empty mid-floor. */
 function buildFloorClutter(): THREE.Group {
   const grp = new THREE.Group()
 
-  // Squashed floor cushion — neutral fabric, no accent.
+  // Flat floor cushion — a low, wide lozenge, off the tv frame's centre.
   const cushion = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 10, 8),
+    new THREE.SphereGeometry(0.34, 12, 8),
     makePSXMaterial({ color: '#8b7f63' }),
   )
-  cushion.scale.set(1, 0.42, 1)
-  cushion.position.set(0.55, 0.13, 0.85)
+  cushion.scale.set(1.5, 0.15, 1.2)
+  cushion.position.set(-0.2, 0.05, 1.35)
   grp.add(cushion)
 
-  // Stack of magazines mid-floor.
+  // Magazine stack + soda can beside the cushion.
   const stack = new THREE.Group()
   for (let i = 0; i < 3; i++) {
     const mag = new THREE.Mesh(
@@ -192,16 +188,24 @@ function buildFloorClutter(): THREE.Group {
     mag.rotation.y = (i - 1) * 0.18
     stack.add(mag)
   }
-  stack.position.set(-0.15, 0, 1.45)
+  stack.position.set(-0.75, 0, 1.5)
   grp.add(stack)
 
-  // Soda can by the cushion.
   const can = new THREE.Mesh(
     new THREE.CylinderGeometry(0.033, 0.033, 0.12, 10),
     makePSXMaterial({ color: '#b9b6ad' }),
   )
-  can.position.set(1.0, 0.06, 1.15)
+  can.position.set(0.15, 0.06, 1.25)
   grp.add(can)
+
+  // Loose CD cases + a magazine scattered into the establishing shot's mid-floor.
+  grp.add(cdCase(0.45, 0.5, 0.4))
+  grp.add(cdCase(0.62, 0.32, -0.5))
+  grp.add(cdCase(0.3, 0.28, 1.1))
+  const loose = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.018, 0.28), makePSXMaterial({ color: '#8f8a76' }))
+  loose.position.set(0.05, 0.009, 0.55)
+  loose.rotation.y = 0.6
+  grp.add(loose)
   return grp
 }
 
@@ -230,11 +234,16 @@ function buildRoom(): THREE.Group {
   tv.rotation.y = -2.27
   root.add(tv)
 
-  // Leaned skate deck — foreground occluder at desk-frame left.
-  const deck = place(buildDeck(), -1.35, 0.44, -1.7)
-  deck.rotation.z = 0.16
-  deck.rotation.y = 0.25
-  root.add(deck)
+  // Skate deck leaning against the +x wall beside the TV (reads in the tv
+  // framing). Nested groups: mount handles facing + position, lean handles the
+  // tilt about the now-horizontal local x so the graphic still faces the room.
+  const deckLean = new THREE.Group()
+  deckLean.add(buildDeck())
+  deckLean.rotation.x = -0.2 // tilt the top toward the +x wall
+  const deckMount = place(new THREE.Group(), 2.28, 0.45, 1.2)
+  deckMount.rotation.y = -Math.PI / 2 // deck graphic (+z) faces −x into the room
+  deckMount.add(deckLean)
+  root.add(deckMount)
 
   // Floor clutter filling the open carpet in the establishing / TV framings.
   root.add(buildFloorClutter())
@@ -242,7 +251,7 @@ function buildRoom(): THREE.Group {
   // Baked ground-contact shadows (era had no real-time shadows).
   root.add(place(buildShadow(1.8, 0.9), -0.65, 0.02, -2.05))
   root.add(place(buildShadow(0.9, 0.85), 1.7, 0.02, 1.85))
-  root.add(place(buildShadow(0.42, 0.36), -1.3, 0.02, -1.55))
+  root.add(place(buildShadow(0.4, 0.32), 2.16, 0.02, 1.2))
   return root
 }
 

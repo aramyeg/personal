@@ -342,11 +342,11 @@ export function buildCorkboard(): THREE.Group {
 
 // ── scattered clutter ────────────────────────────────────────────────────────
 
-/** CD spindle (squashed cylinder stack), mug, cable crate, 3 loose CD cases.
- * Positioned prop-local around a desk corner; room.tsx places the group. */
+/** CD spindle (squashed cylinder stack), mug, and cable crate around the desk
+ * corner. The loose CD cases live in room.tsx's floor clutter (scattered into
+ * the establishing shot's mid-floor). Positioned prop-local; room.tsx places it. */
 export function buildClutter(): THREE.Group {
   const grp = new THREE.Group()
-  const rnd = mulberry32(937)
   const s = BUILD.deskH
 
   // CD spindle on the desk: a rod through a stack of thin platters.
@@ -371,12 +371,5 @@ export function buildClutter(): THREE.Group {
     crate.add(loop)
   }
   grp.add(at(crate, -0.85, 0.07, 0.28))
-
-  // Three loose jewel cases fanned on the floor.
-  for (let i = 0; i < 3; i++) {
-    const jc = at(box(0.13, 0.012, 0.14, { color: GREY, lo: LO.dress }), -0.6 + i * 0.08, 0.008 + i * 0.014, 0.34)
-    jc.rotation.y = (rnd() - 0.5) * 1.2
-    grp.add(jc)
-  }
   return grp
 }

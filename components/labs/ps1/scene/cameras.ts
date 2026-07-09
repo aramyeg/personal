@@ -31,8 +31,8 @@ export const ANGLES: Record<AngleId, CameraAngle> = {
   },
   shelf: {
     id: 'shelf',
-    position: [0.4, 1.35, 0.2],
-    lookAt: [2.0, 1.3, -0.4],
+    position: [1.2, 1.32, -0.12],
+    lookAt: [2.3, 1.26, -0.4],
     fov: 52,
     label: 'the shelf',
   },
