@@ -1,13 +1,14 @@
 'use client'
 
 /**
- * CRTModel — a small molded-plastic CRT set with a gently curved, glowing
- * screen running a bitmap-font ticker.
+ * CRTModel — a 4:3 molded-plastic tube TV, shot as a product.
  *
- * The screen is a windowed sphere section (so it bulges convex toward the
- * camera like real glass), lit by an emissiveMap of the bitmap ticker over a
- * dark phosphor field — a soft self-glow, never a blown-out emissive. The
- * ticker canvas scrolls upward each frame; scanlines keep it reading as a tube.
+ * The `MC.warmGrey` shell wraps the screen on all four sides (~10% bezel per
+ * side); a raised bezel lip frames a recess so the glass sits a few mm INTO the
+ * set with a dark gasket shadow line. The screen is a gently convex sphere
+ * section lit by an evenly-glowing emissive ticker — the curvature is felt as a
+ * tight specular glint sweeping the glass (low roughness), never as a dim
+ * geometric vignette. A stand foot reads below the shell.
  */
 
 import { useEffect, useMemo } from 'react'
@@ -17,22 +18,33 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { MC } from '../tokens'
 import { drawBitmapText, measureBitmapText } from '../lib/bitmap-font'
 
-const SHELL_W = 3.2
-const SHELL_H = 2.6
-const SHELL_D = 2.4
-const PLACE_Y = 1.42 // foot bottom rests at y=0
+const SHELL_W = 3.4
+const SHELL_H = 2.5
+const SHELL_D = 2.1
+const FOOT_H = 0.24
+const PLACE_Y = SHELL_H / 2 + FOOT_H // foot bottom rests at y=0
+
+const FACE_Z = SHELL_D / 2 // shell front face
+const LIP = 0.12 // how far the bezel lip stands proud of the face
+// Bezel lip frame — outer near the shell edge, inner is the screen opening.
+const OUT_HW = 1.6
+const OUT_HH = 1.16
+const IN_HW = 1.37
+const IN_HH = 1.01
+// Curved glass sits recessed inside the opening. A subtly bulged plane fills
+// the rectangular opening evenly (a trimmed sphere-section patch rendered as a
+// rounded blob with dark corners — the plane is the read the brief allows).
+const GLASS_W = 2.72
+const GLASS_H = 2.0
+const GLASS_BULGE = 0.07
+const GLASS_FRONT_Z = 1.13 // bulge apex, ~0.05 behind the lip front
+
 const TICK_W = 640
 const TICK_H = 480
-// Screen cap: a section of a large-radius sphere reads as a gently convex
-// tube face (a small radius collapses to a dark spotlit circle).
-const SCREEN_R = 9
-const SCREEN_HW = 1.24 // half-width of the visible cap
-const SCREEN_HH = 0.96 // half-height
-const SCREEN_FACE_Z = 1.24 // where the cap bulge sits, just proud of the shell
 
-/** Phosphor ticker: bitmap lines on a dark field, with scanlines. The four
- *  lines are spaced evenly over the full canvas height so the upward scroll
- *  wraps seamlessly. */
+/** Phosphor ticker: bitmap lines on a dark field, with scanlines. The lines
+ *  are spaced evenly over the full canvas height so the upward scroll wraps
+ *  seamlessly. */
 function makeTickerTexture(lines: string[]): THREE.CanvasTexture {
   const c = document.createElement('canvas')
   c.width = TICK_W
@@ -66,6 +78,23 @@ function makeTickerTexture(lines: string[]): THREE.CanvasTexture {
   return tex
 }
 
+/** Soft elliptical highlight used as a faked glass glint (additive). */
+function makeGlintTexture(): THREE.CanvasTexture {
+  const S = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2)
+  grad.addColorStop(0, 'rgba(255,255,255,0.5)')
+  grad.addColorStop(0.5, 'rgba(210,240,255,0.14)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, S, S)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
 export type CRTModelProps = { lines: string[] }
 
 export function CRTModel({ lines }: CRTModelProps) {
@@ -75,63 +104,97 @@ export function CRTModel({ lines }: CRTModelProps) {
   )
   useEffect(() => () => shell.dispose(), [shell])
 
-  // Sphere-section screen: a cap of a big sphere, windowed around +z so it
-  // bulges gently toward the viewer like tube glass.
   const screenGeo = useMemo(() => {
-    const dPhi = SCREEN_HW / SCREEN_R
-    const dTheta = SCREEN_HH / SCREEN_R
-    const g = new THREE.SphereGeometry(
-      SCREEN_R,
-      64,
-      48,
-      Math.PI / 2 - dPhi,
-      dPhi * 2,
-      Math.PI / 2 - dTheta,
-      dTheta * 2
-    )
-    // pull the cap forward so its bulge sits just proud of the shell face
-    g.translate(0, 0, SCREEN_FACE_Z - SCREEN_R)
+    const g = new THREE.PlaneGeometry(GLASS_W, GLASS_H, 40, 30)
+    const pos = g.attributes.position
+    const hw = GLASS_W / 2
+    const hh = GLASS_H / 2
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const z = GLASS_BULGE * (1 - (x / hw) ** 2) * (1 - (y / hh) ** 2)
+      pos.setZ(i, z)
+    }
+    pos.needsUpdate = true
+    g.computeVertexNormals()
+    g.translate(0, 0, GLASS_FRONT_Z - GLASS_BULGE)
     return g
   }, [])
   useEffect(() => () => screenGeo.dispose(), [screenGeo])
 
+  const shellMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: MC.warmGrey,
+        roughness: 0.6,
+        metalness: 0.06,
+      }),
+    []
+  )
+  useEffect(() => () => shellMat.dispose(), [shellMat])
+
   const ticker = useMemo(() => makeTickerTexture(lines), [lines])
   useEffect(() => () => ticker.dispose(), [ticker])
+
+  const glint = useMemo(() => makeGlintTexture(), [])
+  useEffect(() => () => glint.dispose(), [glint])
 
   useFrame((_, dt) => {
     ticker.offset.y = (ticker.offset.y + dt * 0.02) % 1
   })
 
+  // Four warmGrey bars forming the raised bezel lip around the opening.
+  const bezelBars: [number, number, number, number][] = [
+    // [w, h, x, y] with shared depth; top / bottom / left / right
+    [OUT_HW * 2, OUT_HH - IN_HH, 0, (IN_HH + OUT_HH) / 2],
+    [OUT_HW * 2, OUT_HH - IN_HH, 0, -(IN_HH + OUT_HH) / 2],
+    [OUT_HW - IN_HW, IN_HH * 2, -(IN_HW + OUT_HW) / 2, 0],
+    [OUT_HW - IN_HW, IN_HH * 2, (IN_HW + OUT_HW) / 2, 0],
+  ]
+  const barZ = FACE_Z + LIP / 2 - 0.005
+  const barD = LIP + 0.02
+
   return (
     <group position={[0, PLACE_Y, 0]}>
       {/* Molded plastic shell */}
-      <mesh geometry={shell}>
-        <meshStandardMaterial color={MC.warmGrey} roughness={0.62} metalness={0.05} />
+      <mesh geometry={shell} material={shellMat} />
+
+      {/* Raised bezel lip framing the screen recess */}
+      {bezelBars.map(([w, h, x, y], i) => (
+        <mesh key={i} position={[x, y, barZ]} material={shellMat}>
+          <boxGeometry args={[w, h, barD]} />
+        </mesh>
+      ))}
+
+      {/* Dark gasket at the back of the recess (shadow line around the glass) */}
+      <mesh position={[0, 0, FACE_Z + 0.006]}>
+        <planeGeometry args={[IN_HW * 2, IN_HH * 2]} />
+        <meshStandardMaterial color="#131208" roughness={0.85} metalness={0} />
       </mesh>
 
-      {/* Dark screen faceplate framing the tube, just proud of the shell */}
-      <mesh position={[0, 0, SHELL_D / 2 + 0.001]}>
-        <planeGeometry args={[2.86, 2.24]} />
-        <meshStandardMaterial color="#15140f" roughness={0.85} metalness={0} />
-      </mesh>
-
-      {/* Curved glowing screen — emissive white lets the ticker colors read
-          at full strength; the dark field self-glows as idle phosphor. */}
+      {/* Curved glowing glass — UNLIT (basic) so the phosphor field is
+          perfectly even edge to edge; the scene's broad specular used to read
+          as a dim central vignette on the near-flat cap. */}
       <mesh geometry={screenGeo}>
-        <meshStandardMaterial
-          color="#060d0c"
-          emissive="#eafffb"
-          emissiveIntensity={1.15}
-          emissiveMap={ticker}
-          roughness={0.42}
-          metalness={0}
+        <meshBasicMaterial map={ticker} toneMapped={false} />
+      </mesh>
+
+      {/* Faked glass glint — a soft off-axis highlight (additive) that sells
+          the curvature without lighting the whole screen. */}
+      <mesh position={[-0.6, 0.52, GLASS_FRONT_Z + 0.02]} rotation={[0, 0, 0.55]}>
+        <planeGeometry args={[1.25, 0.52]} />
+        <meshBasicMaterial
+          map={glint}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          opacity={0.4}
         />
       </mesh>
 
-      {/* Foot */}
-      <mesh position={[0, -(SHELL_H / 2 + 0.12), 0]}>
-        <boxGeometry args={[2.4, 0.24, 1.8]} />
-        <meshStandardMaterial color={MC.warmGrey} roughness={0.65} metalness={0.05} />
+      {/* Stand foot */}
+      <mesh position={[0, -(SHELL_H / 2 + FOOT_H / 2), -0.1]} material={shellMat}>
+        <boxGeometry args={[2.4, FOOT_H, 1.8]} />
       </mesh>
     </group>
   )

@@ -35,21 +35,21 @@ const CAM: Record<'character' | 'card' | 'crt', {
   glyph: GlyphName
 }> = {
   character: {
-    camera: { position: [0.4, 1.7, 6.2], fov: 30 },
-    target: [0, 1.35, 0],
+    camera: { position: [0.4, 1.75, 6.3], fov: 30 },
+    target: [0, 1.4, 0],
     shadowRadius: 2.3,
     glyph: 'triangle',
   },
   card: {
-    camera: { position: [0.2, 1.6, 5.4], fov: 28 },
+    camera: { position: [0.25, 1.5, 6.8], fov: 25 },
     target: [0, 1.42, 0],
     shadowRadius: 1.5,
     glyph: 'circle',
   },
   crt: {
-    camera: { position: [0.3, 1.7, 6.0], fov: 32 },
-    target: [0, 1.4, 0],
-    shadowRadius: 2.1,
+    camera: { position: [0.35, 1.72, 6.4], fov: 32 },
+    target: [0, 1.5, 0],
+    shadowRadius: 2.2,
     glyph: 'cross',
   },
 }
@@ -94,7 +94,7 @@ function StageColumn({
 function models(): Record<'character' | 'card' | 'crt', React.ReactNode> {
   return {
     character: <VoxelCharacter spin />,
-    card: <CardModel label={CARD_LABEL} tilt={{ x: -0.05, y: -0.5 }} backLines={featured.metrics} />,
+    card: <CardModel label={CARD_LABEL} tilt={{ x: -0.13, y: -0.42 }} backLines={featured.metrics} />,
     crt: <CRTModel lines={CRT_LINES} />,
   }
 }
