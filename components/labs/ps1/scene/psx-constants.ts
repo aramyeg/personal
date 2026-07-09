@@ -18,6 +18,13 @@ export const PSX = {
     keyIntensity: 3.7,
     ambient: '#4d5f5a',
     ambientIntensity: 5.8,
+    /**
+     * Faint teal PointLight at the CRT face (color = TEX.crtTeal). Physical
+     * units, so these run far above the brief's legacy 0.6/1.2 — the value
+     * that visibly tints the desk without blowing out lives here; gates tune it.
+     */
+    crtIntensity: 3.4,
+    crtDistance: 1.7,
   },
   TEX: {
     wall: '#b3ac9b',
