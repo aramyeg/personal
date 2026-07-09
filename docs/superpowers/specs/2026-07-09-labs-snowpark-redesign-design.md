@@ -218,3 +218,15 @@ corrections happen at milestones, not after the whole build.
 
 Audio (later polish pass), endless mode, leaderboards, 3D, per-skill custom
 mechanics, multiplayer, real weather simulation beyond the snowfall ramp.
+
+## Addendum (2026-07-09, post-v2 user review)
+
+V2 verdict: ramps draw-only ("do not change the trajectory... do not produce
+more air"), rider still reads stick-figure, trick vocabulary collapses to one
+button. Approved correction: **fix pass on this version** (ramps become
+rideable geometry launching off the lip; rider gains filled silhouette
+volume; tricks split into flips/spins/two grabs with distinct poses, names
+and scores). Plan: `docs/superpowers/plans/2026-07-09-labs-snowpark-fixpass.md`.
+A rhythm-game variant (Rayman-musical-level style, needs an audio track) was
+discussed and deferred as a possible future lab. The user also floated a
+"failed experiments" museum wing — recorded as a Style Lab idea.
