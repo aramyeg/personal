@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useXpStore } from './store'
 import { DesktopIcons } from './desktop-icons'
 import { WindowsLayer } from './windows-layer'
+import { Taskbar } from './taskbar'
 import styles from './xp.module.css'
 
 export function XpDesktop() {
@@ -23,6 +24,7 @@ export function XpDesktop() {
       />
       <DesktopIcons />
       <WindowsLayer />
+      <Taskbar />
     </div>
   )
 }
