@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { width: 768px; height: 1024px; overflow: hidden; font-family: Tahoma, sans-serif; }
+  .sky { position: absolute; inset: 0; background: linear-gradient(180deg, #2f6fd8 0%, #5f9be8 45%, #a8cdf2 62%, #cfe6f8 70%); }
+  .hill { position: absolute; left: -20%; right: -20%; bottom: -12%; height: 52%; background: linear-gradient(180deg, #7ec850 0%, #4ea82e 55%, #2e7d1e 100%); border-radius: 50% 50% 0 0 / 80% 60% 0 0; }
+  .cloud { position: absolute; background: #fff; border-radius: 50px; opacity: .9; filter: blur(6px); }
+  .win { position: absolute; left: 84px; top: 200px; width: 600px; border: 3px solid #0831d9; border-top: none; border-radius: 10px 10px 0 0; box-shadow: 4px 6px 18px rgba(0,0,0,.35); }
+  .tb { height: 36px; border-radius: 9px 9px 0 0; background: linear-gradient(180deg,#0997ff 0%,#0053ee 8%,#0050ee 40%,#0066ff 88%,#003dd7 100%); display: flex; align-items: center; padding: 0 10px; color: #fff; font: bold 17px 'Trebuchet MS'; text-shadow: 1px 1px 1px rgba(0,0,0,.6); }
+  .tb .btns { margin-left: auto; display: flex; gap: 3px; }
+  .tb .b { width: 25px; height: 25px; border-radius: 3px; border: 1px solid #fff; background: linear-gradient(180deg,#7ba2e7,#2a54c8); color:#fff; text-align:center; line-height:25px; font-size:13px; }
+  .tb .x { background: linear-gradient(180deg,#e9967c,#b33324); }
+  .body { background: #ece9d8; padding: 26px; }
+  .body h1 { font: bold italic 54px 'Trebuchet MS'; color: #1d3f9e; }
+  .body h1 span { color: #f6821f; }
+  .body p { margin-top: 10px; font-size: 19px; color: #333; line-height: 1.45; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: linear-gradient(180deg,#1f2f86 0,#3165c4 6%,#4490e6 12%,#2b71e0 22%,#235bd6 38%,#245ddb 60%,#1d4ec0 92%,#1941a5 100%); }
+  .start { position: absolute; left: 0; bottom: 0; height: 46px; padding: 0 30px 0 16px; border-radius: 0 12px 12px 0; background: linear-gradient(180deg,#7bd062,#3d9932 60%,#2d7529); color: #fff; font: bold italic 24px 'Trebuchet MS'; line-height: 46px; text-shadow: 1px 1px 2px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+  <div class="sky"></div>
+  <div class="cloud" style="left:60px;top:90px;width:190px;height:44px"></div>
+  <div class="cloud" style="left:420px;top:150px;width:240px;height:52px"></div>
+  <div class="cloud" style="left:220px;top:840px;width:200px;height:40px;opacity:.5"></div>
+  <div class="hill"></div>
+  <div class="win">
+    <div class="tb">Bliss — Style Lab #3<span class="btns"><span class="b">_</span><span class="b">□</span><span class="b x">✕</span></span></div>
+    <div class="body">
+      <h1>Windows <span>XP</span></h1>
+      <p>The portfolio as a desktop.<br/>Luna chrome, boot chime,<br/>one helpful paperclip.</p>
+    </div>
+  </div>
+  <div class="bar"></div>
+  <div class="start">start</div>
+</body>
+</html>
