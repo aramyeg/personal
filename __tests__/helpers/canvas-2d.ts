@@ -19,6 +19,8 @@
  *
  * Implements only what's exercised today: fillStyle (hex3/hex6 and
  * rgb()/rgba()), fillRect, createLinearGradient/addColorStop,
+ * beginPath/moveTo/lineTo/closePath/fill (an even-odd scanline polygon
+ * rasterizer used by the poster/sticker/deck graphic generators), and
  * getImageData/putImageData. Extend as later tasks need more of the API.
  */
 
@@ -84,11 +86,15 @@ class LinearGradientShim {
   }
 }
 
+type Point = { x: number; y: number }
+
 class Context2DShim {
   fillStyle: string | LinearGradientShim = '#000000'
   private readonly width: number
   private readonly height: number
   private readonly data: Uint8ClampedArray
+  /** Current path as a list of subpaths; each is auto-closed at fill time. */
+  private subpaths: Point[][] = []
 
   constructor(canvasEl: HTMLCanvasElement) {
     this.width = canvasEl.width
@@ -100,6 +106,13 @@ class Context2DShim {
     return new LinearGradientShim(x0, y0, x1, y1)
   }
 
+  /** The fill color at (px, py) — a flat color or a projected gradient sample. */
+  private sample(px: number, py: number): RGBA {
+    return this.fillStyle instanceof LinearGradientShim
+      ? this.fillStyle.colorAt(px, py)
+      : parseColor(this.fillStyle)
+  }
+
   fillRect(x: number, y: number, w: number, h: number): void {
     const x0 = Math.max(0, Math.floor(x))
     const y0 = Math.max(0, Math.floor(y))
@@ -107,11 +120,70 @@ class Context2DShim {
     const y1 = Math.min(this.height, Math.ceil(y + h))
     for (let py = y0; py < y1; py++) {
       for (let px = x0; px < x1; px++) {
-        const [r, g, b, a] =
-          this.fillStyle instanceof LinearGradientShim
-            ? this.fillStyle.colorAt(px, py)
-            : parseColor(this.fillStyle)
+        const [r, g, b, a] = this.sample(px, py)
         this.blend(px, py, r, g, b, a)
+      }
+    }
+  }
+
+  beginPath(): void {
+    this.subpaths = []
+  }
+
+  moveTo(x: number, y: number): void {
+    this.subpaths.push([{ x, y }])
+  }
+
+  lineTo(x: number, y: number): void {
+    if (this.subpaths.length === 0) this.subpaths.push([])
+    this.subpaths[this.subpaths.length - 1].push({ x, y })
+  }
+
+  /** No-op: fill() implicitly closes each subpath, matching canvas fill semantics. */
+  closePath(): void {}
+
+  /**
+   * Even-odd scanline fill of the current path. Each subpath is treated as a
+   * closed polygon; a pixel is inside when its center crosses an odd number of
+   * edges to its left. All the generators' shapes (torn edges, stars, bolts,
+   * arrows, polygonal circles) are simple polygons, for which even-odd and the
+   * canvas default nonzero rule agree.
+   */
+  fill(): void {
+    const polys = this.subpaths.filter((sp) => sp.length >= 2)
+    if (polys.length === 0) return
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const sp of polys) {
+      for (const p of sp) {
+        if (p.y < minY) minY = p.y
+        if (p.y > maxY) maxY = p.y
+      }
+    }
+    const yStart = Math.max(0, Math.floor(minY))
+    const yEnd = Math.min(this.height - 1, Math.ceil(maxY))
+    for (let py = yStart; py <= yEnd; py++) {
+      const yc = py + 0.5
+      const crossings: number[] = []
+      for (const sp of polys) {
+        const n = sp.length
+        for (let i = 0; i < n; i++) {
+          const a = sp[i]
+          const b = sp[(i + 1) % n]
+          // Half-open edge test avoids double-counting shared vertices.
+          if ((a.y <= yc && b.y > yc) || (b.y <= yc && a.y > yc)) {
+            crossings.push(a.x + ((yc - a.y) / (b.y - a.y)) * (b.x - a.x))
+          }
+        }
+      }
+      crossings.sort((p, q) => p - q)
+      for (let k = 0; k + 1 < crossings.length; k += 2) {
+        const xStart = Math.max(0, Math.ceil(crossings[k] - 0.5))
+        const xEnd = Math.min(this.width - 1, Math.floor(crossings[k + 1] - 0.5))
+        for (let px = xStart; px <= xEnd; px++) {
+          const [r, g, b, a] = this.sample(px, py)
+          this.blend(px, py, r, g, b, a)
+        }
       }
     }
   }
