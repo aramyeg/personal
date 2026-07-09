@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useXpStore } from './store'
 import { DesktopIcons } from './desktop-icons'
 import { WindowsLayer } from './windows-layer'
@@ -12,6 +12,7 @@ import styles from './xp.module.css'
 
 export function XpDesktop() {
   const phase = useXpStore((s) => s.phase)
+  const [resolved, setResolved] = useState(false)
 
   useEffect(() => {
     const booted = window.sessionStorage.getItem('xp-booted') === '1'
@@ -20,11 +21,12 @@ export function XpDesktop() {
       window.sessionStorage.setItem('xp-booted', '1')
       useXpStore.getState().setPhase('desktop')
     }
+    setResolved(true)
   }, [])
 
+  if (!resolved) return <div className={styles.desktop} />
   if (phase === 'boot') return <BootScreen />
   if (phase === 'welcome') return <WelcomeScreen />
-  if (phase !== 'desktop') return <div className={styles.desktop} />
   return (
     <div className={styles.desktop}>
       <div
