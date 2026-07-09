@@ -43,11 +43,14 @@ export const SKY = {
   /** night-glow ramp window (progress) */
   GLOW_LO: 0.78,
   GLOW_HI: 0.92,
-  /** sun arc: screen-fraction position as a function of p */
-  SUN_X0: 0.78,
-  SUN_X1: 0.5,
-  SUN_Y0: 0.16,
-  SUN_Y1: 0.42,
+  // Sun arc — direct coefficients on p (NOT p=0/p=1 endpoints). Position is
+  //   sx = (SUN_X_BASE - SUN_X_RATE*p)*w,  sy = (SUN_Y_BASE + SUN_Y_RATE*p)*h
+  // so at p=0 the sun sits at (0.78w, 0.16h) and fully descends to (0.28w,
+  // 0.58h) into the horizon by night (p=1).
+  SUN_X_BASE: 0.78,
+  SUN_X_RATE: 0.5,
+  SUN_Y_BASE: 0.16,
+  SUN_Y_RATE: 0.42,
   /** disc radius as a fraction of height; halo extends to HALO_MUL× that */
   SUN_R: 0.055,
   HALO_MUL: 2.2,
@@ -245,8 +248,8 @@ export function drawSky(
 
   // Sun arcs from upper-right toward the horizon as p rises; past night it is
   // the same disc reading as a moon via the night sun color.
-  const sunX = (SKY.SUN_X0 - (SKY.SUN_X0 - SKY.SUN_X1) * p) * w
-  const sunY = (SKY.SUN_Y0 + (SKY.SUN_Y1 - SKY.SUN_Y0) * p) * h
+  const sunX = (SKY.SUN_X_BASE - SKY.SUN_X_RATE * p) * w
+  const sunY = (SKY.SUN_Y_BASE + SKY.SUN_Y_RATE * p) * h
   const sunR = SKY.SUN_R * h
   const haloR = sunR * SKY.HALO_MUL
 
