@@ -95,7 +95,7 @@ const FG_FACTOR = 1.35
 const FG_ALPHA = 0.9
 const FG_SPACING_MUL = 4.5
 const FG_MARGIN = 0.35
-const FG_HEIGHT = 0.7
+const FG_HEIGHT = 0.3
 const FG_SEED = 91
 
 // --- color helpers ----------------------------------------------------------

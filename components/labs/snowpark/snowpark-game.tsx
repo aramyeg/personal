@@ -342,7 +342,7 @@ function GameShell() {
         <button
           type="button"
           onClick={() => setPhase('sheet')}
-          className="fixed bottom-4 left-4 z-30 select-none font-mono text-[11px] lowercase tracking-wide"
+          className="fixed bottom-4 left-16 z-30 select-none font-mono text-[11px] lowercase tracking-wide"
           style={{ color: palette.ink, opacity: 0.6 }}
         >
           skip to the skills
