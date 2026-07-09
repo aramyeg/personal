@@ -69,7 +69,10 @@ function CoveredFrame({
   h?: number
 }) {
   const cloth = useMemo(() => clothGeometry(w + 0.35, h + 0.4, seed, 0.07), [w, h, seed])
-  const side = x > 0 ? -1 : 1 // lean toward the room center
+  // Tops rest against the knee wall, bottoms kick toward the room — how a
+  // frame actually leans. The slight overhang past the wall plane stays
+  // hidden behind the opaque knee wall (no exterior camera exists).
+  const side = x > 0 ? -1 : 1
   return (
     <group position={[x, STAIR.rise, z]} rotation-z={side * lean} rotation-y={side > 0 ? 0.35 : -0.35}>
       {/* The hidden frame gives the sheet its silhouette */}
