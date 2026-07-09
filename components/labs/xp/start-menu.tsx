@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useXpStore, type XpAppId } from './store'
+import { playSound } from './sounds'
 import { APPS, openApp } from './apps'
 import { PixelAvatar } from './pixel-avatar'
 import styles from './xp.module.css'
@@ -18,7 +19,7 @@ export function StartMenu() {
   if (!open && !confirming) return null
 
   const turnOff = () => {
-    // playSound('shutdown') — wired in Task 8
+    playSound('shutdown')
     router.push('/labs')
   }
   const restart = () => {
