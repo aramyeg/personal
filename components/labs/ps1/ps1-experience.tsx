@@ -56,6 +56,8 @@ export function Ps1Experience() {
   // Arrow keys cut, but only while no panel holds the scene.
   const panelRef = useRef<PanelId>(state.panel)
   panelRef.current = state.panel
+  const bootedRef = useRef(state.booted)
+  bootedRef.current = state.booted
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -65,7 +67,10 @@ export function Ps1Experience() {
         }
         return
       }
-      if (panelRef.current !== null) return
+      // Arrows cut only once booted and with no panel holding the scene. The
+      // boot gate matters: during the boot overlay an arrow should ONLY skip
+      // the boot (Boot consumes it), never queue a cut.
+      if (panelRef.current !== null || !bootedRef.current) return
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         dispatch({ type: 'CUT', dir: -1 })
@@ -82,6 +87,16 @@ export function Ps1Experience() {
     dispatch({ type: 'OPEN_PANEL', panel })
   }, [])
 
+  // Hover dedupe: pointer picking fires on every move, but the experience only
+  // needs to re-render when the picked hotspot id changes. The functional
+  // update returns the previous reference when the id is unchanged, so React
+  // bails out of the render. Comparing against the live hover state (rather than
+  // a private ref) keeps it in step with the cut/panel clear below — no stale
+  // id can suppress a legitimate re-hover after an angle change.
+  const handleHover = useCallback((next: Hover | null) => {
+    setHover((prev) => ((prev?.id ?? null) === (next?.id ?? null) ? prev : next))
+  }, [])
+
   const angleHotspots = hotspotsForAngle(state.angle)
   const showChip = hover !== null && state.panel === null
   const showControls = state.booted && state.panel === null
@@ -94,7 +109,7 @@ export function Ps1Experience() {
       <PSXCanvas>
         <FixedCamera angle={state.angle} />
         <Room staticFrame={reduced === true} />
-        <ScenePointer onHover={setHover} onPick={openPanel} />
+        <ScenePointer onHover={handleHover} onPick={openPanel} />
         <HotspotPulse hoveredId={hover?.id ?? null} enabled={reduced === false} />
       </PSXCanvas>
 
@@ -238,8 +253,14 @@ function ScenePointer({
   const scene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
 
-  const raycaster = useRef(new THREE.Raycaster()).current
-  const ndc = useRef(new THREE.Vector2()).current
+  // Lazy-init: one raycaster + NDC vector for the component's life, without
+  // constructing a throwaway on every render.
+  const raycasterRef = useRef<THREE.Raycaster | null>(null)
+  if (!raycasterRef.current) raycasterRef.current = new THREE.Raycaster()
+  const raycaster = raycasterRef.current
+  const ndcRef = useRef<THREE.Vector2 | null>(null)
+  if (!ndcRef.current) ndcRef.current = new THREE.Vector2()
+  const ndc = ndcRef.current
   const onHoverRef = useRef(onHover)
   onHoverRef.current = onHover
   const onPickRef = useRef(onPick)
@@ -300,7 +321,10 @@ function HotspotPulse({
   const scene = useThree((s) => s.scene)
   const activeRef = useRef<string | null>(null)
   const originalsRef = useRef(new Map<THREE.Material, THREE.Color>())
-  const white = useRef(new THREE.Color('#ffffff')).current
+  // Lazy-init the shared white target so it isn't reconstructed each render.
+  const whiteRef = useRef<THREE.Color | null>(null)
+  if (!whiteRef.current) whiteRef.current = new THREE.Color('#ffffff')
+  const white = whiteRef.current
 
   const restore = useCallback(() => {
     originalsRef.current.forEach((color, mat) => {
