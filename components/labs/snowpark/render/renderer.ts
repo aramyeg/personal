@@ -1,17 +1,20 @@
 /**
- * Powder Lines renderer (M1 placeholder).
+ * Powder Lines renderer (M1 placeholder + M2 juice).
  *
  * This pass exists to prove the FEEL: camera transform (zoom, lead, shake)
  * over flat placeholder art — ice sky, one terrain line, v1 obstacle shapes,
- * the rider as a rotated ink rectangle. Milestones 2-4 replace the art layer
- * by layer (particles, sky cycle, filled terrain, jointed rig); the camera
- * plumbing and layer ordering established here survive.
+ * the rider as a rotated ink rectangle — plus pooled carve spray, landing/
+ * bail bursts, and a tapering trail ribbon (particles.ts). Milestones 3-4
+ * replace the remaining art layer by layer (sky cycle, filled terrain,
+ * jointed rig); the camera plumbing and layer ordering established here
+ * survive.
  */
 import type { Course, CourseObstacle } from '../course'
 import { slopeAngle, slopeY } from '../slope'
 import { PHYS, obstacleSurfaceY, type RiderState } from '../rider'
 import { CAM, shakeOffset, type CameraState } from '../camera'
 import { palette } from '../palette'
+import { createParticles } from './particles'
 
 export type Renderer = {
   draw(state: RiderState, course: Course, cam: CameraState): void
@@ -21,6 +24,23 @@ export type Renderer = {
 const DEG2RAD = Math.PI / 180
 const TERRAIN_STEP_PX = 16
 const OFFSCREEN_MARGIN = 80
+/** Respawn tell: the rider's world x jumps back by more than this in one
+ * frame (v1 convention) — the renderer's cue to clear particles/trail. */
+const RESPAWN_JUMP = 50
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v
+}
+
+/** 0..1 along-slope speed, the shared "how fast" input for camera/juice. */
+function speed01(state: RiderState): number {
+  return clamp((state.speed - PHYS.MIN_SPEED) / (PHYS.MAX_SPEED - PHYS.MIN_SPEED), 0, 1)
+}
+
+/** `min(floor(chain/3), 3)` — raises trail width (and, from M3, brightness). */
+function chainTierOf(state: RiderState): number {
+  return Math.min(Math.floor(state.chain / 3), 3)
+}
 
 /** Everything a layer helper needs: context, size, state, camera transform. */
 type Scene = {
@@ -45,6 +65,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   let cssW = 0
   let cssH = 0
+  const particles = createParticles()
+  // Render-layer internal state (documented exception, see particles.ts):
+  // tracks sim-time delta and one-frame transitions the draw call itself
+  // has no other way to see (draw() only receives the latest state).
+  let lastTime = 0
+  let lastX = Number.NEGATIVE_INFINITY
+  let lastMode: RiderState['mode'] | null = null
 
   function resize(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -74,12 +101,51 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     ctx.textBaseline = 'alphabetic'
     ctx.font = '11px ui-monospace, monospace'
 
+    stepParticles(scene)
+
     ctx.fillStyle = palette.ice
     ctx.fillRect(0, 0, cssW, cssH)
     drawTerrainLine(scene)
     drawObstacles(scene, course)
+    drawParticlesLayer(scene)
     drawFinish(scene, course)
     drawRider(scene)
+  }
+
+  /** Feed this frame's flags into the particle system (renderer stays the
+   * only caller; sim state is read-only). Runs before any drawing so a
+   * respawn-triggered clear() lands before draw(). */
+  function stepParticles(sc: Scene): void {
+    const s = sc.s
+    const dt = Math.max(0, s.time - lastTime)
+    lastTime = s.time
+
+    if (s.x < lastX - RESPAWN_JUMP) particles.clear()
+    lastX = s.x
+
+    // Bail fires once, on the frame mode transitions into it — justLaunched
+    // fires on tiny crest hops too, so launch FX are deliberately NOT hooked
+    // here (Task 6 gates that on vy).
+    if (s.mode === 'bail' && lastMode !== 'bail') particles.burst(s.x, s.y, 1)
+    lastMode = s.mode
+
+    if (s.mode === 'snow') particles.spray(s.x, s.y, speed01(s), dt)
+    if (s.justLanded) particles.burst(s.x, s.y, s.impact)
+    particles.pushTrail(s.x, s.y, chainTierOf(s))
+    particles.update(dt)
+  }
+
+  /** Particles/trail draw in world units under a local camera transform —
+   * same zoom-scaling the rider rect gets, without threading zoom through
+   * the ParticleSystem interface. */
+  function drawParticlesLayer(sc: Scene): void {
+    const { ctx: c } = sc
+    c.save()
+    c.translate(sc.ox, sc.oy)
+    c.scale(sc.cam.zoom, sc.cam.zoom)
+    c.translate(-sc.cam.x, -sc.cam.y)
+    particles.draw(c, chainTierOf(sc.s))
+    c.restore()
   }
 
   return { draw, resize }
