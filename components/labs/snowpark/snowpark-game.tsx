@@ -343,7 +343,7 @@ function GameShell() {
           className="absolute bottom-4 right-4 font-mono text-[11px] lowercase tracking-wide"
           style={{ color: palette.ink, opacity: 0.6 }}
         >
-          space jump · ←/→ spin · ↑ grab · R retry · P pause
+          space jump/flip · ←/→ spin · ↑/↓ grab · R retry · P pause
         </div>
       </div>
 

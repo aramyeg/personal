@@ -314,11 +314,12 @@ function drawObstacles(sc: Scene, course: Course): void {
   }
 }
 
-/** A kicker is packed snow fused to the slope: a filled wedge (entry → lip →
- * lip base) with a snow body gradient, an ink outline, a sun rim-light along the
- * ride face (matching the snowline crest), and an inked lip post. The lip sits
- * PHYS.LIP_RAISE above the snow — the same face the rider climbs and launches
- * off in the sim. */
+/** A kicker is packed snow fused to the slope: a filled wedge whose base
+ * follows the slope curve (no chord gap underneath), a snow body gradient lit
+ * toward the lip, a sun rim-light plus a thin ink edge along the ride face
+ * only, and a snow-shadow back cut instead of an inked post — a full outline
+ * made it read as a propped-up cutout (GATE G). The lip sits PHYS.LIP_RAISE
+ * above the snow — the same face the rider climbs and launches off in the sim. */
 function drawKicker(sc: Scene, o: CourseObstacle): void {
   const { ctx } = sc
   const entryX = sx(sc, o.x)
@@ -327,37 +328,43 @@ function drawKicker(sc: Scene, o: CourseObstacle): void {
   const lipTopY = sy(sc, slopeY(o.x + o.length) - PHYS.LIP_RAISE)
   const lipBaseY = sy(sc, slopeY(o.x + o.length))
 
-  // Body: snow gradient, lit toward the lip, seated darker into the slope.
+  // Body: snow gradient, lit toward the lip, seated into the slope along the
+  // slope's own curve back to the entry.
   const grad = ctx.createLinearGradient(0, lipTopY, 0, lipBaseY)
   grad.addColorStop(0, mix(sc.colors.snow, '#ffffff', 0.15))
-  grad.addColorStop(1, darken(sc.colors.snow, 0.12))
+  grad.addColorStop(1, darken(sc.colors.snow, 0.06))
   ctx.beginPath()
   ctx.moveTo(entryX, entryY)
   ctx.lineTo(lipX, lipTopY)
-  ctx.lineTo(lipX, lipBaseY)
+  for (let t = 0; t <= 1; t += 0.25) {
+    const wx = o.x + o.length * (1 - t)
+    ctx.lineTo(sx(sc, wx), sy(sc, slopeY(wx)))
+  }
   ctx.closePath()
   ctx.fillStyle = grad
   ctx.fill()
 
-  // Ink outline around the whole wedge — reads as part of the mountain.
-  ctx.strokeStyle = sc.obStroke
-  ctx.lineWidth = 2
+  // Back cut in shadow — packed snow sliced at the lip, not a post.
+  ctx.strokeStyle = darken(sc.colors.snow, 0.28)
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(lipX, lipTopY)
+  ctx.lineTo(lipX, lipBaseY)
   ctx.stroke()
 
-  // Rim light along the ride face (entry → lip), same tint as the snowline rim.
-  ctx.strokeStyle = mix(sc.colors.sun, '#ffffff', RIM_TINT)
-  ctx.lineWidth = 2
+  // The ride face carries the definition: a thin ink edge under the same sun
+  // rim used on the snowline crest.
+  ctx.strokeStyle = sc.obStroke
+  ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.moveTo(entryX, entryY)
   ctx.lineTo(lipX, lipTopY)
   ctx.stroke()
-
-  // Lip post (the vertical back edge) in ink.
-  ctx.strokeStyle = palette.ink
+  ctx.strokeStyle = mix(sc.colors.sun, '#ffffff', RIM_TINT)
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(lipX, lipTopY)
-  ctx.lineTo(lipX, lipBaseY)
+  ctx.moveTo(entryX, entryY - 1.5)
+  ctx.lineTo(lipX, lipTopY - 1.5)
   ctx.stroke()
 }
 

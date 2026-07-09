@@ -101,8 +101,14 @@ export const PHYS = {
   GRAVITY: 1800,
   /** on-snow: pull = GRAVITY·sin(angle)·(tuck? TUCK_ACCEL:1); drag = DRAG_K·speed²·(tuck? TUCK_DRAG:1) */
   TUCK_ACCEL: 1.8,
-  /** quadratic drag coefficient — gives real speed equilibria per grade */
-  DRAG_K: 0.0045,
+  /** quadratic drag coefficient — gives real speed equilibria per grade.
+   * GATE G: 0.0045 → 0.0028. At 0.0045 speed re-equilibrated to the local
+   * grade in ~0.5 s, so carried momentum evaporated before every kicker and
+   * riders arrived at the MIN_SPEED clamp (traced live: both launches at
+   * exactly 130). 0.0036 is the lowest K whose idle equilibrium on the
+   * steepest roller backside stays inside the no-railing band (< MAX − 60)
+   * while letting noticeably more speed carry through runouts. */
+  DRAG_K: 0.0036,
   /** tucking is an aero crouch: it cuts drag as well as adding pull */
   TUCK_DRAG: 0.55,
   MIN_SPEED: 130,
@@ -114,6 +120,20 @@ export const PHYS = {
   /** kicker face height at the lip: the rider climbs this ramp and launches off
    * it (replaces the draw-only 34 and the retired pop-multiplier KICKER_BOOST) */
   LIP_RAISE: 80,
+  /** GATE G: fraction of gravity's along-face deceleration applied while riding
+   * a kicker face. Raw gravity over an 80 u climb costs 2·G·80 = 288 000 in v²
+   * terms — more than a MAX_SPEED rider carries (560² = 313 600), so every
+   * approach stalled to the MIN_SPEED clamp before the lip. Riders pump a
+   * transition; the face keeps a token bleed for risk/reward, not a wall. */
+  KICKER_FACE_BLEED: 0.15,
+  /** GATE G: world launch angle off the lip (deg, up-forward). A real kicker
+   * curves upward at the lip — the straight mean face (~16°) is the riding
+   * surface, not the exit tangent. Full lip speed redirects along this angle. */
+  LIP_ANGLE_DEG: 38,
+  /** GATE G: deg/s the board pitch eases toward the terrain below during air
+   * while the player is NOT flipping — the board follows the arc (Alto's rule),
+   * so bails come from unfinished flips, never from plain kicker geometry. */
+  AIR_ALIGN_DEG_S: 160,
   /** convex-crest detach threshold: fly off when slopeCurvature(x) * vx² exceeds it (u/s²) */
   DETACH_G: 220,
   COYOTE_S: 0.1,
@@ -122,8 +142,12 @@ export const PHYS = {
   MIN_AIR_S: 0.25,
   /** deg/s of board pitch while Space is held — the flip (backflip) rate */
   SPIN_RATE: 420,
-  /** deg/s of flat spin while an arrow is held — spins turn slower than flips */
-  SPIN_RATE_SPIN: 300,
+  /** deg/s of flat spin while an arrow is held — spins turn slower than flips.
+   * GATE G: 300 → 360. The biggest air in the game (charged pop off a kicker,
+   * ~1.1 s) × 300°/s = 330° — a 360 spin could never settle, and the spec's
+   * own binding trick is a 360. 360°/s fits a full spin into the big-air
+   * window while staying under the flip's 420. */
+  SPIN_RATE_SPIN: 360,
   SNAP_DEG: 20,
   LANDING_TOLERANCE_DEG: 35,
   CLEAN_BOOST: 60,
@@ -351,7 +375,12 @@ function stepSnow(
   const sinA = Math.sin(angle)
   // Tuck only boosts pull downhill (positive sin). On a kicker's uphill face it
   // would merely amplify the climb's deceleration, so the boost gates off there.
-  const pull = PHYS.GRAVITY * sinA * (tucking && sinA > 0 ? PHYS.TUCK_ACCEL : 1)
+  // Climbing a kicker face bleeds at KICKER_FACE_BLEED of raw gravity (a pumped
+  // transition), or the lip could never be reached above the MIN_SPEED clamp.
+  const pull =
+    PHYS.GRAVITY *
+    sinA *
+    (active && sinA < 0 ? PHYS.KICKER_FACE_BLEED : tucking && sinA > 0 ? PHYS.TUCK_ACCEL : 1)
   const drag = PHYS.DRAG_K * state.speed * state.speed * (tucking ? PHYS.TUCK_DRAG : 1)
   const accel = pull - drag
   const speed = clamp(state.speed + accel * dt, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
@@ -429,16 +458,18 @@ function launch(
   }
 }
 
-/** Ride off a kicker lip into real air: velocity carries along the face (upward
- * at speed), the kicker banks the air, and a coyote window keeps a late pop
+/** Ride off a kicker lip into real air: the full lip speed redirects along
+ * LIP_ANGLE_DEG (the curved lip's exit tangent, steeper than the straight mean
+ * face), the kicker banks the air, and a coyote window keeps a late pop
  * alive — a natural detach that happens to be earned off a ramp. No button. */
 function launchOffLip(
   state: RiderState,
   m: SnowMotion,
-  angle: number,
+  _angle: number,
   active: ActiveKicker,
   tucking: boolean
 ): RiderState {
+  const lip = -PHYS.LIP_ANGLE_DEG / DEG
   return {
     ...state,
     ...clearAir(),
@@ -449,9 +480,9 @@ function launchOffLip(
     nextObstacle: m.nextObstacle,
     impact: m.impact,
     mode: 'air',
-    vx: Math.cos(angle) * m.speed,
-    vy: Math.sin(angle) * m.speed,
-    launchAngleDeg: angle * DEG,
+    vx: Math.cos(lip) * m.speed,
+    vy: Math.sin(lip) * m.speed,
+    launchAngleDeg: lip * DEG,
     attributedObstacle: active.index,
     charge: m.charge,
     tucking,
@@ -507,6 +538,18 @@ function stepAir(
   const spinDeg = spinning ? state.spinDeg + PHYS.SPIN_RATE_SPIN * dt : state.spinDeg
   const rotationIdleS = flipping || spinning ? 0 : state.rotationIdleS + dt
 
+  // While the player isn't flipping, the base board pitch eases toward the
+  // terrain below — the board follows the arc, so a steep lip launch stays
+  // landable and bails come from unfinished flips, not from plain geometry.
+  const alignTarget = surfaceAngle(x, course) * DEG
+  const alignErr = alignTarget - state.launchAngleDeg
+  const alignStep = PHYS.AIR_ALIGN_DEG_S * dt
+  const launchAngleDeg = flipping
+    ? state.launchAngleDeg
+    : Math.abs(alignErr) <= alignStep
+      ? alignTarget
+      : state.launchAngleDeg + Math.sign(alignErr) * alignStep
+
   let charge = state.charge
   let bufferT = decayTo0(state.bufferT, dt, 1)
   // Coyote: a held jump released inside the grace window still pops.
@@ -531,6 +574,7 @@ function stepAir(
     flipDeg,
     spinDeg,
     rotationIdleS,
+    launchAngleDeg,
     grab: input.grab,
     grabTrick: input.grab !== 'none' ? input.grab : state.grabTrick,
     tucking: input.jumpHeld,
