@@ -82,10 +82,12 @@ export type RiderState = {
  * The single tuning surface. Values are binding starting points that the
  * orchestrator tunes at live-play gates (see the redesign plan's GATE protocol).
  *
- * KICKER_BOOST and IMPACT_DECAY are additions to the brief's block: the brief
- * requires "pop × 1.45" on kickers and an impact value that "decays in state"
- * but omitted both from the block. They live here (not inline / not scattered)
- * to keep PHYS the one place gates tune.
+ * IMPACT_DECAY and LIP_RAISE are additions to the brief's block: IMPACT_DECAY
+ * backs the "impact decays in state" requirement; LIP_RAISE is the kicker face
+ * height at the lip that makes a ramp real rideable geometry. The fixpass
+ * retired the old pop-multiplier KICKER_BOOST — riding the face and launching
+ * off the lip IS the boost now. They live here (not inline / not scattered) to
+ * keep PHYS the one place gates tune.
  *
  * DETACH_G replaces the brief's DETACH_EPS per the amended plan: the ballistic-
  * gap rule was frame-rate dependent (gap ∝ dt²) and sub-pixel on these rollers,
@@ -106,8 +108,9 @@ export const PHYS = {
   BASE_POP: 340,
   CHARGE_POP: 330,
   MAX_CHARGE_S: 0.5,
-  /** kicker footprint pop multiplier (kept from v1) */
-  KICKER_BOOST: 1.45,
+  /** kicker face height at the lip: the rider climbs this ramp and launches off
+   * it (replaces the draw-only 34 and the retired pop-multiplier KICKER_BOOST) */
+  LIP_RAISE: 80,
   /** convex-crest detach threshold: fly off when slopeCurvature(x) * vx² exceeds it (u/s²) */
   DETACH_G: 220,
   COYOTE_S: 0.1,
@@ -208,6 +211,22 @@ export function obstacleSurfaceY(o: CourseObstacle, x: number): number {
   return y0 + (y1 - y0) * t
 }
 
+/** The kicker face: a straight ramp from snow level at the entry to LIP_RAISE
+ * above snow at the lip. Riding it up bleeds speed (negative sin); cresting the
+ * lip at speed throws real air. `x` is clamped to the footprint. */
+export function kickerSurfaceY(o: CourseObstacle, x: number): number {
+  const t = clamp((x - o.x) / o.length, 0, 1)
+  const y0 = slopeY(o.x)
+  const y1 = slopeY(o.x + o.length) - PHYS.LIP_RAISE
+  return y0 + (y1 - y0) * t
+}
+
+/** Tangent angle of the kicker face (rad). Negative points up-slope (screen-up)
+ * — the source of the air. Straight ramp, so it's constant along the face. */
+export function kickerFaceAngle(o: CourseObstacle): number {
+  return Math.atan((slopeY(o.x + o.length) - PHYS.LIP_RAISE - slopeY(o.x)) / o.length)
+}
+
 export function stepRider(
   state: RiderState,
   input: RiderInput,
@@ -264,6 +283,19 @@ function advanceObstacleCursor(x: number, nextObstacle: number, course: Course):
   return next
 }
 
+type ActiveKicker = { o: CourseObstacle; index: number }
+
+/** The kicker whose footprint contains `x`, or null. Rails and boxes are grind
+ * targets, not ride-up surfaces, so only kickers participate here. */
+function activeKicker(x: number, course: Course): ActiveKicker | null {
+  const os = course.obstacles
+  for (let i = 0; i < os.length; i++) {
+    const o = os[i]
+    if (o.type === 'kicker' && x >= o.x && x <= o.x + o.length) return { o, index: i }
+  }
+  return null
+}
+
 type SnowMotion = {
   time: number
   speed: number
@@ -282,19 +314,36 @@ function stepSnow(
 ): RiderState {
   const time = state.time + dt
   const tucking = input.jumpHeld
-  const angle = slopeAngle(state.x)
+  // Active surface: the kicker face when we're inside a kicker footprint, the
+  // open slope otherwise. The face is a straight ramp, so its angle drives
+  // pull/drag/advance exactly as the slope tangent does everywhere else.
+  const active = activeKicker(state.x, course)
+  const angle = active ? kickerFaceAngle(active.o) : slopeAngle(state.x)
   const pull = PHYS.GRAVITY * Math.sin(angle) * (tucking ? PHYS.TUCK_ACCEL : 1)
   const drag = PHYS.DRAG_K * state.speed * state.speed * (tucking ? PHYS.TUCK_DRAG : 1)
   const accel = pull - drag
   const speed = clamp(state.speed + accel * dt, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
-  const x = advanceAlongSlope(state.x, speed * dt)
-  const y = slopeY(x)
+  const x = state.x + speed * dt * Math.cos(angle)
+  const y = active ? kickerSurfaceY(active.o, x) : slopeY(x)
   const nextObstacle = advanceObstacleCursor(x, state.nextObstacle, course)
   const impact = decayImpact(state.impact, dt)
 
-  // Releasing a held charge is a deliberate pop off the snow.
+  // Releasing a held charge is a deliberate pop off the snow — aligned with the
+  // active surface, banked to the kicker when it pops off the face.
   if (!input.jumpHeld && state.charge > 0) {
-    return launch(state, { time, speed, x, y, nextObstacle, charge: 0, impact }, course)
+    return launch(state, { time, speed, x, y, nextObstacle, charge: 0, impact }, angle, active)
+  }
+
+  // Rode past a kicker lip → real air with velocity along the face (upward at
+  // speed), no button, the air banked to the kicker.
+  if (active && x > active.o.x + active.o.length) {
+    return launchOffLip(
+      state,
+      { time, speed, x, y, nextObstacle, charge: state.charge, impact },
+      angle,
+      active,
+      tucking
+    )
   }
 
   const charge = tucking ? Math.min(state.charge + dt / PHYS.MAX_CHARGE_S, 1) : state.charge
@@ -304,27 +353,28 @@ function stepSnow(
   }
 
   // Natural detach: a convex crest whose turn needs more than gravity can give.
-  const detachAngle = slopeAngle(x)
-  const vxAir = Math.cos(detachAngle) * speed
-  if (slopeCurvature(x) * vxAir * vxAir > PHYS.DETACH_G) {
-    return detach(state, { time, speed, x, y, nextObstacle, charge, impact }, detachAngle, tucking)
+  // Open slope only — the kicker face is straight (zero curvature); its launch
+  // is the lip, handled above.
+  if (!active) {
+    const detachAngle = slopeAngle(x)
+    const vxAir = Math.cos(detachAngle) * speed
+    if (slopeCurvature(x) * vxAir * vxAir > PHYS.DETACH_G) {
+      return detach(state, { time, speed, x, y, nextObstacle, charge, impact }, detachAngle, tucking)
+    }
   }
 
   return { ...state, time, speed, x, y, nextObstacle, charge, impact, tucking, mode: 'snow' }
 }
 
-/** Leave the snow with an upward pop, aligned with the slope, boosted on a kicker. */
-function launch(state: RiderState, m: SnowMotion, course: Course): RiderState {
-  let pop = PHYS.BASE_POP + state.charge * PHYS.CHARGE_POP
-  let attributedObstacle: number | null = null
-  const ki = course.obstacles.findIndex(
-    (o) => o.type === 'kicker' && m.x >= o.x && m.x <= o.x + o.length
-  )
-  if (ki !== -1) {
-    pop *= PHYS.KICKER_BOOST
-    attributedObstacle = ki
-  }
-  const ang = slopeAngle(m.x)
+/** Leave the snow with an upward pop, aligned with the active surface. Off a
+ * kicker face the pop stacks with the ramp and the air is banked to the kicker. */
+function launch(
+  state: RiderState,
+  m: SnowMotion,
+  angle: number,
+  active: ActiveKicker | null
+): RiderState {
+  const pop = PHYS.BASE_POP + state.charge * PHYS.CHARGE_POP
   return {
     ...state,
     ...clearAir(),
@@ -335,13 +385,45 @@ function launch(state: RiderState, m: SnowMotion, course: Course): RiderState {
     nextObstacle: m.nextObstacle,
     impact: m.impact,
     mode: 'air',
-    vx: Math.cos(ang) * m.speed,
-    vy: Math.sin(ang) * m.speed - pop,
-    launchAngleDeg: ang * DEG,
-    attributedObstacle,
+    vx: Math.cos(angle) * m.speed,
+    vy: Math.sin(angle) * m.speed - pop,
+    launchAngleDeg: angle * DEG,
+    attributedObstacle: active ? active.index : null,
     charge: 0,
     tucking: false,
     coyoteT: 0,
+    bufferT: 0,
+    justLaunched: true,
+  }
+}
+
+/** Ride off a kicker lip into real air: velocity carries along the face (upward
+ * at speed), the kicker banks the air, and a coyote window keeps a late pop
+ * alive — a natural detach that happens to be earned off a ramp. No button. */
+function launchOffLip(
+  state: RiderState,
+  m: SnowMotion,
+  angle: number,
+  active: ActiveKicker,
+  tucking: boolean
+): RiderState {
+  return {
+    ...state,
+    ...clearAir(),
+    time: m.time,
+    speed: m.speed,
+    x: m.x,
+    y: m.y,
+    nextObstacle: m.nextObstacle,
+    impact: m.impact,
+    mode: 'air',
+    vx: Math.cos(angle) * m.speed,
+    vy: Math.sin(angle) * m.speed,
+    launchAngleDeg: angle * DEG,
+    attributedObstacle: active.index,
+    charge: m.charge,
+    tucking,
+    coyoteT: PHYS.COYOTE_S,
     bufferT: 0,
     justLaunched: true,
   }

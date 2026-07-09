@@ -9,6 +9,8 @@ import {
 import {
   PHYS,
   createRider,
+  kickerFaceAngle,
+  kickerSurfaceY,
   obstacleSurfaceY,
   stepRider,
   type RiderInput,
@@ -119,13 +121,18 @@ describe('snow momentum', () => {
   it('tucking sustains far more speed than idling and charges to full', () => {
     // Equilibria desync the two riders' positions, so compare AVERAGE speed over
     // the run rather than a single instant (a fixed-time point can invert).
+    // Measured over the open-slope approach BEFORE the first kicker (x=900):
+    // kickers are now rideable ramps (Task 1) that bleed speed on the climb and
+    // throw the held-jump rider into a backflip bail, so straddling one would
+    // compare aero tuck against ramp physics rather than against idling. 1.5 s
+    // keeps both riders on the same open snow — the aero comparison this asserts.
     const dt = 1 / 120
     let si = createRider(course)
     let st = createRider(course)
     let sumI = 0
     let sumT = 0
     let n = 0
-    for (let t = 0; t < 3; t += dt) {
+    for (let t = 0; t < 1.5; t += dt) {
       si = stepRider(si, idle, dt, course)
       st = stepRider(st, { ...idle, jumpHeld: true }, dt, course)
       sumI += si.speed
@@ -200,6 +207,90 @@ describe('natural detach', () => {
     expect(hops).toBeGreaterThanOrEqual(1) // detached and re-landed at least once
     expect(anyJustLanded).toBe(false)
     expect(s.chain).toBe(0)
+  })
+})
+
+describe('kicker as rideable geometry', () => {
+  // First kicker whose face points up-slope (the designed common case: base
+  // grade 0.38 over length 120 against LIP_RAISE 80 → a face that throws air).
+  const rideableKickerIndex = (): number =>
+    course.obstacles.findIndex((o) => o.type === 'kicker' && kickerFaceAngle(o) < 0)
+
+  /** Sit the rider at a kicker's entry at `entrySpeed` and ride it untucked
+   * until it goes airborne; returns the launch-frame state (or null). */
+  function rideKickerFromEntry(index: number, entrySpeed: number): RiderState | null {
+    const o = course.obstacles[index]
+    let s: RiderState = {
+      ...createRider(course),
+      x: o.x,
+      y: slopeY(o.x),
+      speed: entrySpeed,
+      nextObstacle: index,
+    }
+    const dt = 1 / 120
+    for (let i = 0; i < 300; i++) {
+      s = stepRider(s, idle, dt, course)
+      if (s.mode === 'air' && s.justLaunched) return s
+    }
+    return null
+  }
+
+  it('ridden at cruise with no jump, launches off the lip attributed to the kicker', () => {
+    const index = rideableKickerIndex()
+    expect(index).toBeGreaterThanOrEqual(0)
+    const launched = rideKickerFromEntry(index, 300)
+    expect(launched).not.toBeNull()
+    expect(launched!.mode).toBe('air')
+    expect(launched!.attributedObstacle).toBe(index) // the air is banked to the kicker
+    expect(launched!.vy).toBeLessThan(0) // real air off the lip — no button
+  })
+
+  it('climbing the face bleeds speed — slower at the lip than at entry (untucked cruise)', () => {
+    const index = rideableKickerIndex()
+    const entrySpeed = 300
+    const launched = rideKickerFromEntry(index, entrySpeed)
+    expect(launched).not.toBeNull()
+    expect(launched!.speed).toBeLessThan(entrySpeed) // the risk: hit ramps fast
+  })
+
+  it('the same crest without a kicker does NOT launch at cruise (contrast)', () => {
+    const index = rideableKickerIndex()
+    const kicker = course.obstacles[index]
+    const noKicker = { ...course, obstacles: course.obstacles.filter((_, i) => i !== index) }
+    let s: RiderState = {
+      ...createRider(noKicker),
+      x: kicker.x,
+      y: slopeY(kicker.x),
+      speed: 300,
+    }
+    const dt = 1 / 120
+    let wentAir = false
+    const past = kicker.x + kicker.length + 120
+    for (let i = 0; i < 300 && s.x < past; i++) {
+      s = stepRider(s, idle, dt, noKicker)
+      if (s.mode === 'air') wentAir = true
+    }
+    expect(wentAir).toBe(false) // plain terrain at cruise stays glued — air is the kicker's
+    expect(s.mode).toBe('snow')
+  })
+
+  it('an Ollie (0 rotation) off a kicker still banks the skill — the air was earned', () => {
+    const index = rideableKickerIndex()
+    const s0 = airAboveLanding({ landingX: 2000, diff: 0, rotationDeg: 0, attributedObstacle: index })
+    const landed = stepRider(s0, idle, 1 / 120, course)
+    expect(landed.justLanded).toBe('clean')
+    expect(landed.collected[index]).toBe(true)
+    expect(landed.score).toBeGreaterThan(0)
+    expect(landed.lastEvent?.line).toContain(course.obstacles[index].skill.name)
+  })
+
+  it('kickerSurfaceY runs snow-level at entry to LIP_RAISE above snow at the lip', () => {
+    const kicker = course.obstacles.find((o) => o.type === 'kicker')!
+    expect(kickerSurfaceY(kicker, kicker.x)).toBeCloseTo(slopeY(kicker.x), 6)
+    expect(kickerSurfaceY(kicker, kicker.x + kicker.length)).toBeCloseTo(
+      slopeY(kicker.x + kicker.length) - PHYS.LIP_RAISE,
+      6
+    )
   })
 })
 

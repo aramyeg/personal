@@ -21,6 +21,7 @@ import { createScarf } from './scarf'
 import { drawSky, skyColors, type PhaseColors } from './sky'
 import {
   BANDS,
+  darken,
   drawForeground,
   drawHazeVeil,
   drawParallax,
@@ -312,18 +313,50 @@ function drawObstacles(sc: Scene, course: Course): void {
   }
 }
 
+/** A kicker is packed snow fused to the slope: a filled wedge (entry → lip →
+ * lip base) with a snow body gradient, an ink outline, a sun rim-light along the
+ * ride face (matching the snowline crest), and an inked lip post. The lip sits
+ * PHYS.LIP_RAISE above the snow — the same face the rider climbs and launches
+ * off in the sim. */
 function drawKicker(sc: Scene, o: CourseObstacle): void {
   const { ctx } = sc
-  const baseY = sy(sc, slopeY(o.x))
+  const entryX = sx(sc, o.x)
+  const entryY = sy(sc, slopeY(o.x))
   const lipX = sx(sc, o.x + o.length)
-  const lipY = sy(sc, slopeY(o.x + o.length) - 34)
-  ctx.strokeStyle = sc.obStroke
-  ctx.lineWidth = 2.5
+  const lipTopY = sy(sc, slopeY(o.x + o.length) - PHYS.LIP_RAISE)
+  const lipBaseY = sy(sc, slopeY(o.x + o.length))
+
+  // Body: snow gradient, lit toward the lip, seated darker into the slope.
+  const grad = ctx.createLinearGradient(0, lipTopY, 0, lipBaseY)
+  grad.addColorStop(0, mix(sc.colors.snow, '#ffffff', 0.15))
+  grad.addColorStop(1, darken(sc.colors.snow, 0.12))
   ctx.beginPath()
-  ctx.moveTo(sx(sc, o.x), baseY)
-  ctx.lineTo(lipX, lipY)
-  ctx.lineTo(lipX, sy(sc, slopeY(o.x + o.length)))
+  ctx.moveTo(entryX, entryY)
+  ctx.lineTo(lipX, lipTopY)
+  ctx.lineTo(lipX, lipBaseY)
   ctx.closePath()
+  ctx.fillStyle = grad
+  ctx.fill()
+
+  // Ink outline around the whole wedge — reads as part of the mountain.
+  ctx.strokeStyle = sc.obStroke
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  // Rim light along the ride face (entry → lip), same tint as the snowline rim.
+  ctx.strokeStyle = mix(sc.colors.sun, '#ffffff', 0.5)
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(entryX, entryY)
+  ctx.lineTo(lipX, lipTopY)
+  ctx.stroke()
+
+  // Lip post (the vertical back edge) in ink.
+  ctx.strokeStyle = palette.ink
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(lipX, lipTopY)
+  ctx.lineTo(lipX, lipBaseY)
   ctx.stroke()
 }
 
