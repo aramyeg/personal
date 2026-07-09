@@ -9,24 +9,11 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { MC, accentFor, type GlyphName } from '@/components/labs/memory-card/tokens'
+import { MC, type GlyphName } from '@/components/labs/memory-card/tokens'
 import { VignetteCanvas } from '@/components/labs/memory-card/three/stage'
-import { VoxelCharacter } from '@/components/labs/memory-card/three/voxel-character'
-import { CardModel, type CardLabel } from '@/components/labs/memory-card/three/card-model'
-import { CRTModel } from '@/components/labs/memory-card/three/crt-model'
-import { projects } from '@/data/projects'
+import { GltfVignette } from '@/components/labs/memory-card/three/gltf-vignette'
 
 type CameraSpec = { position: [number, number, number]; fov: number }
-
-const featured = projects[0]
-const CARD_LABEL: CardLabel = {
-  title: featured.title,
-  company: featured.company,
-  year: featured.year,
-  slot: '01',
-  accent: accentFor(0),
-}
-const CRT_LINES = ['LOADING BIO...', '8 YRS FINTECH', 'YEREVAN / WORLDWIDE', 'PRESS START']
 
 const CAM: Record<'character' | 'card' | 'crt', {
   camera: CameraSpec
@@ -93,9 +80,9 @@ function StageColumn({
 
 function models(): Record<'character' | 'card' | 'crt', React.ReactNode> {
   return {
-    character: <VoxelCharacter spin />,
-    card: <CardModel label={CARD_LABEL} tilt={{ x: -0.13, y: -0.42 }} backLines={featured.metrics} />,
-    crt: <CRTModel lines={CRT_LINES} />,
+    character: <GltfVignette src="/labs/memory-card/models/character.glb" fitHeight={2.6} />,
+    card: <GltfVignette src="/labs/memory-card/models/memory-card.glb" fitHeight={1.9} />,
+    crt: <GltfVignette src="/labs/memory-card/models/crt.glb" fitHeight={2.1} />,
   }
 }
 
