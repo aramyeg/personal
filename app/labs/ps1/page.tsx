@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { PS1Scene } from '@/components/labs/ps1/ps1-scene'
-import { MemoryCard } from '@/components/labs/ps1/memory-card'
+import { Ps1Experience } from '@/components/labs/ps1/ps1-experience'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 
 export const metadata: Metadata = {
@@ -20,8 +19,7 @@ export default function PS1LabPage() {
     <GalleryChrome>
       {/* The lab owns its whole visual world — the site theme does not apply here */}
       <main className="min-h-dvh bg-[#07090d] text-[#e8edf4] font-mono">
-        <PS1Scene />
-        <MemoryCard />
+        <Ps1Experience />
 
         <footer className="max-w-[860px] mx-auto px-5 pb-24 pt-6 flex flex-wrap items-center justify-between gap-4 text-[11px] tracking-[.18em] uppercase text-[#87919f]">
           <span>
