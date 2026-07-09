@@ -7,6 +7,10 @@ import { WinProjects } from '@/components/labs/xp/win-projects'
 import { WinProjectDetail } from '@/components/labs/xp/win-project-detail'
 import { WinMyComputer } from '@/components/labs/xp/win-my-computer'
 import { experiences, projects } from '@/data'
+import { WinAddRemove, sizeOnDisk } from '@/components/labs/xp/win-add-remove'
+import { WinRecycleBin } from '@/components/labs/xp/win-recycle-bin'
+import { atticLabs } from '@/lib/labs-manifest'
+import { skills } from '@/data'
 
 beforeEach(() => useXpStore.setState({ windows: [], chaos: 'idle', startOpen: false, activeId: null }))
 
@@ -46,5 +50,27 @@ describe('explorer windows', () => {
     render(<WinMyComputer />)
     fireEvent.doubleClick(screen.getByText('Add or Remove Programs'))
     expect(useXpStore.getState().windows.some((w) => w.app === 'add-remove')).toBe(true)
+  })
+})
+
+describe('add or remove programs', () => {
+  it('sizeOnDisk scales with years and level', () => {
+    expect(sizeOnDisk({ name: 'x', years: 8, category: 'frontend', level: 'expert' })).toBe('1.00 GB')
+    expect(sizeOnDisk({ name: 'x', years: 2, category: 'tools', level: 'intermediate' })).toBe('64 MB')
+  })
+
+  it('lists every skill as an installed program', () => {
+    render(<WinAddRemove />)
+    for (const s of skills.slice(0, 5)) expect(screen.getByText(s.name)).toBeInTheDocument()
+  })
+})
+
+describe('recycle bin', () => {
+  it('shows retired labs with retrospectives and a restore link', () => {
+    render(<WinRecycleBin />)
+    for (const lab of atticLabs) {
+      expect(screen.getByText(lab.title)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: `Restore ${lab.title}` })).toHaveAttribute('href', lab.href ?? `/labs/${lab.slug}`)
+    }
   })
 })
