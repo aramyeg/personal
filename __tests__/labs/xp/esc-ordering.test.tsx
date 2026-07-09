@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { XpDesktop } from '@/components/labs/xp/xp-desktop'
 import { useXpStore } from '@/components/labs/xp/store'
@@ -30,9 +30,12 @@ describe('esc ordering with GalleryChrome', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('esc with the screensaver up dismisses it and does NOT navigate', () => {
+  it('esc with the screensaver up dismisses it and does NOT navigate', async () => {
     render(<GalleryChrome><XpDesktop /></GalleryChrome>)
     act(() => useXpStore.getState().setScreensaver(true))
+    // Screensaver is lazy-loaded (next/dynamic); wait for its chunk to mount
+    // and register its own Escape capture listener before dispatching Escape.
+    await screen.findByTestId('screensaver')
     pressEscOnBody()
     expect(useXpStore.getState().screensaver).toBe(false)
     expect(push).not.toHaveBeenCalled()
