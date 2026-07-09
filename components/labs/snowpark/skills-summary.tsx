@@ -53,8 +53,9 @@ export function SkillsSummary({
                   return (
                     <li key={s.name} className="font-mono text-xs" style={{ color: palette.ink }}>
                       {mark && (
-                        <span aria-hidden style={{ color: MARK_COLOR[mark] }}>
-                          {MARK_GLYPH[mark]}{' '}
+                        <span style={{ color: MARK_COLOR[mark] }}>
+                          <span aria-hidden>{MARK_GLYPH[mark]}</span>{' '}
+                          <span className="sr-only">{mark === 'collected' ? 'collected' : 'missed'}</span>
                         </span>
                       )}
                       <span>{s.name}</span> <span>{s.years} yrs · {s.level}</span>

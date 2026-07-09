@@ -25,7 +25,7 @@ test.describe('snowpark lab', () => {
   test('reduced motion renders the static skill sheet, not the running game', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/labs/snowpark')
-    await expect(page.getByRole('button', { name: 'start the run' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'start the run anyway' })).toBeVisible()
     await expect(page.getByText('React', { exact: true })).toBeVisible()
   })
 

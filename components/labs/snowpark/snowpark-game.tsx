@@ -70,7 +70,10 @@ export function SnowparkGame() {
   }, [])
 
   if (reduced === null) return null
-  if (reduced && !started) return <SkillsSheet onStart={() => setStarted(true)} />
+  if (reduced && !started)
+    return (
+      <SkillsSheet onStart={() => setStarted(true)} startLabel="start the run anyway" />
+    )
   return <GameShell />
 }
 
@@ -350,7 +353,7 @@ function GameShell() {
         <PauseOverlay onResume={() => setPhase('playing')} onRestart={restart} />
       )}
       {phase === 'finished' && <Recap rider={riderRef.current} onReplay={restart} />}
-      {phase === 'sheet' && <SkillsSheet onStart={restart} />}
+      {phase === 'sheet' && <SkillsSheet onStart={restart} startLabel="start the run" />}
     </>
   )
 }
@@ -421,16 +424,22 @@ function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void })
  * The skill list as a static sheet with a start button — no run, no marks.
  * Doubles as the reduced-motion landing (motion never auto-runs) and the
  * skip-link target mid-game; `onStart` decides what "starting" means for
- * each caller.
+ * each caller, `startLabel` keeps each context's own kept-from-v1/new copy.
  */
-function SkillsSheet({ onStart }: { onStart: () => void }) {
+function SkillsSheet({
+  onStart,
+  startLabel,
+}: {
+  onStart: () => void
+  startLabel: string
+}) {
   return (
     <div className="fixed inset-0 z-20 overflow-y-auto" style={{ background: palette.ice }}>
       <div className="mx-auto max-w-3xl px-6 py-20">
         <SkillsSummary />
 
         <div className="mt-12 flex gap-4">
-          <PillButton onClick={onStart}>start the run</PillButton>
+          <PillButton onClick={onStart}>{startLabel}</PillButton>
           <Link
             href="/labs"
             className="rounded-full border px-5 py-2 font-mono text-sm lowercase transition-colors"
