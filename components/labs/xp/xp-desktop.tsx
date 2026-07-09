@@ -12,6 +12,7 @@ import { WelcomeScreen } from './welcome-screen'
 import { Clippy } from './clippy'
 import { BalloonTip } from './balloon-tip'
 import { Screensaver } from './screensaver'
+import { ChaosLayer } from './chaos-layer'
 import styles from './xp.module.css'
 
 export function XpDesktop() {
@@ -47,6 +48,7 @@ export function XpDesktop() {
       <BalloonTip />
       <Taskbar />
       <Screensaver />
+      <ChaosLayer />
     </div>
   )
 }
