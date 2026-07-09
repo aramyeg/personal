@@ -276,6 +276,8 @@ function chain(ctx: CanvasRenderingContext2D, pts: Pt[]): void {
 
 /** Lay the posed strokes at the board-local origin (caller owns the transform). */
 function drawPose(ctx: CanvasRenderingContext2D, pose: Pose, colors: PhaseColors): void {
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
   ctx.strokeStyle = palette.ink
 
   // Board plank, then a thin snow-colored deck highlight along its top.
@@ -386,6 +388,8 @@ function bailPiecePos(state: RiderState, i: number): Pt {
 }
 
 function drawPiece(ctx: CanvasRenderingContext2D, kind: PieceKind): void {
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
   ctx.strokeStyle = palette.ink
   ctx.fillStyle = palette.ink
   switch (kind) {
