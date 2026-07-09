@@ -178,9 +178,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     if (s.mode === 'snow') {
       // Spray from the board's REAR contact point, not its center: offset
-      // half a board length back along the slope tangent (board is 24 units).
+      // half a board length back along the slope tangent (RIG.BOARD_LEN 46).
       const a = slopeAngle(s.x)
-      particles.spray(s.x - Math.cos(a) * 12, s.y - Math.sin(a) * 12, speed01(s), dt)
+      particles.spray(s.x - Math.cos(a) * 23, s.y - Math.sin(a) * 23, speed01(s), dt)
     }
     if (s.justLanded) particles.burst(s.x, s.y, s.impact)
     particles.pushTrail(s.x, s.y, chainTierOf(s))
