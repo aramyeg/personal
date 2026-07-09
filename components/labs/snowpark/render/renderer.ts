@@ -5,9 +5,9 @@
  * layered Alto-style scene: the day-cycle sky, three cached parallax bands
  * fogged toward the horizon, the near snowfield as a filled rim-lit body with
  * the rider's carve line, phase-aware obstacle shapes, pooled spray/trail
- * juice, and a rare foreground occluder. The rider is still a placeholder rect
- * (+ fx squash) until M4 gives it a jointed rig. Layer ordering is the load-
- * bearing contract here.
+ * juice, and a rare foreground occluder. The rider is a procedural jointed rig
+ * with a verlet scarf (M4, render/rider-rig.ts + render/scarf.ts). Layer
+ * ordering is the load-bearing contract here.
  */
 import type { Course, CourseObstacle } from '../course'
 import { slopeAngle, slopeY } from '../slope'
@@ -16,6 +16,8 @@ import { CAM, shakeOffset, type CameraState } from '../camera'
 import { palette } from '../palette'
 import { createParticles } from './particles'
 import { createFx } from './fx'
+import { boardAngle, drawRider, riderJoints } from './rider-rig'
+import { createScarf } from './scarf'
 import { drawSky, skyColors, type PhaseColors } from './sky'
 import {
   BANDS,
@@ -32,7 +34,6 @@ export type Renderer = {
   resize(): void
 }
 
-const DEG2RAD = Math.PI / 180
 const OFFSCREEN_MARGIN = 80
 /** Obstacle strokes tint toward the band color so they read as part of the
  * mountain, not a diagram overlaid on it. */
@@ -81,12 +82,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let cssH = 0
   const particles = createParticles()
   const fx = createFx()
+  const scarf = createScarf()
   // Render-layer internal state (documented exception, see particles.ts):
   // tracks sim-time delta and one-frame transitions the draw call itself
   // has no other way to see (draw() only receives the latest state).
   let lastTime = 0
   let lastX = Number.NEGATIVE_INFINITY
   let lastMode: RiderState['mode'] | null = null
+  let scarfSeeded = false
 
   function resize(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -146,7 +149,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     drawTrailLayer(scene)
     drawObstacles(scene, course)
     drawParticleLayer(scene)
-    drawRider(scene, fx.riderScale())
+    drawRiderLayer(scene)
     drawForeground(ctx, view, colors)
     fx.drawSpeedLines(ctx, cssW, cssH, speed01(state))
     drawFinish(scene, course)
@@ -163,7 +166,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const dt = Math.max(0, s.time - lastTime)
     lastTime = s.time
 
-    if (s.x < lastX - RESPAWN_JUMP) particles.clear()
+    const respawned = s.x < lastX - RESPAWN_JUMP
+    if (respawned) particles.clear()
     lastX = s.x
 
     // Bail fires once, on the frame mode transitions into it — justLaunched
@@ -185,6 +189,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (s.justLaunched && s.vy < 0) fx.onLaunch()
     if (s.justLanded) fx.onLand(s.impact)
     fx.update(dt)
+
+    // Scarf: verlet cloth pinned at the fx-scaled neck, wind opposing travel.
+    // On snow/grind the equivalent horizontal speed is the along-slope speed
+    // projected flat; airborne it is vx. Reset on a respawn's backward x-jump
+    // (and once on the first frame) so the chain never streaks across the seam.
+    const anchor = scarfAnchor(s, fx.riderScale())
+    if (respawned || !scarfSeeded) {
+      scarf.reset(anchor.x, anchor.y)
+      scarfSeeded = true
+    }
+    const vxEquiv =
+      s.mode === 'air' || s.mode === 'bail' ? s.vx : Math.cos(slopeAngle(s.x)) * s.speed
+    scarf.update(anchor.x, anchor.y, -vxEquiv * 0.9, dt)
   }
 
   /** Carve ribbon under the obstacles (world units, local camera transform —
@@ -208,6 +225,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     c.scale(sc.cam.zoom, sc.cam.zoom)
     c.translate(-sc.cam.x, -sc.cam.y)
     particles.drawParticles(c)
+    c.restore()
+  }
+
+  /** The rider and scarf, in world units under the same local camera transform
+   * as the juice layers. Scarf under the body so its root tucks behind the
+   * shoulder while the trailing flag flows free behind the figure. */
+  function drawRiderLayer(sc: Scene): void {
+    const { ctx: c } = sc
+    c.save()
+    c.translate(sc.ox, sc.oy)
+    c.scale(sc.cam.zoom, sc.cam.zoom)
+    c.translate(-sc.cam.x, -sc.cam.y)
+    scarf.draw(c)
+    drawRider(c, sc.s, fx.riderScale(), sc.colors)
     c.restore()
   }
 
@@ -313,21 +344,25 @@ function drawFinish(sc: Scene, course: Course): void {
   ctx.fillText('finish', x0 + 23, y1 - 8)
 }
 
-function boardAngle(s: RiderState): number {
-  if (s.mode === 'air') return (s.launchAngleDeg + s.rotationDeg) * DEG2RAD
-  if (s.mode === 'bail') return s.bailTimer * 12
-  return slopeAngle(s.x)
-}
-
-function drawRider(sc: Scene, scale: { sx: number; sy: number }): void {
-  const { ctx } = sc
-  const px = sx(sc, sc.s.x)
-  const py = sy(sc, sc.s.y)
-  ctx.save()
-  ctx.translate(px, py)
-  ctx.rotate(boardAngle(sc.s))
-  ctx.scale(scale.sx, scale.sy)
-  ctx.fillStyle = palette.ink
-  ctx.fillRect(-12 * sc.cam.zoom, -8 * sc.cam.zoom, 24 * sc.cam.zoom, 8 * sc.cam.zoom)
-  ctx.restore()
+/**
+ * The scarf's pinned root in WORLD units: the neck joint with the fx squash/
+ * stretch applied exactly as `drawRider` applies it (in the board-local frame,
+ * around the contact point), so the cloth stays glued to the shoulder through a
+ * landing squash. During a bail the neck already rides the torso piece and no
+ * scale is in play, so the joint is used as-is.
+ */
+function scarfAnchor(state: RiderState, scale: { sx: number; sy: number }): { x: number; y: number } {
+  const neck = riderJoints(state).neck
+  if (state.mode === 'bail') return neck
+  const a = boardAngle(state)
+  const dx = neck.x - state.x
+  const dy = neck.y - state.y
+  // World offset → board-local (rotate by −a) → squash → back to world.
+  const ci = Math.cos(-a)
+  const si = Math.sin(-a)
+  const lx = (dx * ci - dy * si) * scale.sx
+  const ly = (dx * si + dy * ci) * scale.sy
+  const c = Math.cos(a)
+  const s = Math.sin(a)
+  return { x: state.x + lx * c - ly * s, y: state.y + lx * s + ly * c }
 }
