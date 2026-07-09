@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPS1Audio } from '@/components/labs/ps1/audio'
+import { createPS1Audio } from '@/components/labs/memory-card/audio'
 
 /**
  * A hand-rolled AudioContext mock — no WebAudio implementation exists in
@@ -146,13 +146,13 @@ describe('createPS1Audio', () => {
   })
 
   it('reads a persisted "on" preference from localStorage on construction', () => {
-    window.localStorage.setItem('ps1-sound', 'on')
+    window.localStorage.setItem('memory-card-sound', 'on')
     const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
     expect(audio.enabled()).toBe(true)
   })
 
   it('treats any non-"on" persisted value as muted', () => {
-    window.localStorage.setItem('ps1-sound', 'off')
+    window.localStorage.setItem('memory-card-sound', 'off')
     expect(createPS1Audio(ctxFactory as unknown as () => AudioContext).enabled()).toBe(false)
   })
 
@@ -160,11 +160,11 @@ describe('createPS1Audio', () => {
     const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
 
     audio.setEnabled(true)
-    expect(window.localStorage.getItem('ps1-sound')).toBe('on')
+    expect(window.localStorage.getItem('memory-card-sound')).toBe('on')
     expect(createPS1Audio(ctxFactory as unknown as () => AudioContext).enabled()).toBe(true)
 
     audio.setEnabled(false)
-    expect(window.localStorage.getItem('ps1-sound')).toBe('off')
+    expect(window.localStorage.getItem('memory-card-sound')).toBe('off')
     expect(createPS1Audio(ctxFactory as unknown as () => AudioContext).enabled()).toBe(false)
   })
 

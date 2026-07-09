@@ -1,6 +1,6 @@
 import '../../helpers/canvas-2d'
 import { describe, expect, it } from 'vitest'
-import { drawBitmapText, measureBitmapText } from '@/components/labs/ps1/scene/bitmap-font'
+import { drawBitmapText, measureBitmapText } from '@/components/labs/memory-card/lib/bitmap-font'
 
 describe('bitmap font', () => {
   it('draws every supported glyph with nonzero ink', () => {

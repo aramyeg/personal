@@ -6,7 +6,7 @@
  * a mock AudioContext and never touch a real one in jsdom.
  */
 
-const STORAGE_KEY = 'ps1-sound'
+const STORAGE_KEY = 'memory-card-sound'
 
 export type PS1Audio = {
   /** Call on the first user gesture — lazily builds the real AudioContext. */

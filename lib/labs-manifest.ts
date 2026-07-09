@@ -38,11 +38,11 @@ export const labs: LabEntry[] = [
     href: '/',
   },
   {
-    slug: 'ps1',
-    title: 'PS1 / Y2K',
-    date: '2026-07-08',
+    slug: 'memory-card',
+    title: 'Memory Card',
+    date: '2026-07-10',
     thesis:
-      'PS1-era software rendering — flat shading, ordered dithering, vertex snap at 384px — on a Y2K grid world. Projects become memory-card saves.',
+      'The PS1 memory-card manager as an editorial site — crisp retro-3D product shots, save-slot typography, four button-glyph accents. No pixelation, all nostalgia.',
     status: 'live',
   },
   {
