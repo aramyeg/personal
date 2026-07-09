@@ -5,6 +5,8 @@ export const PSX = {
   SNAP_W: 320,
   SNAP_H: 180,
   FPS: 30,
+  /** Rotating-cube speed (rad/s) for the temporary GATE-A proof scene only. */
+  PROOF_CUBE_SPIN: 0.35,
   TEX: {
     wall: '#8a8578',
     wallShade: '#6f6a5f',
