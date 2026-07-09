@@ -7,16 +7,26 @@
  * EXCEPTION (documented, per the redesign plan): the pool and the trail ring
  * buffer are private, mutable render-layer state for performance — zero
  * per-frame allocation. Sim state (`RiderState`) is never touched; the
- * renderer is the sole caller, reading state flags read-only.
+ * renderer is the sole caller, reading state flags read-only. `trailPositions`
+ * hands the terrain layer a live view of the ring for its carve line — read
+ * only, valid for the current frame only (same exception).
  */
 import { palette } from '../palette'
+
+/** Live view of the trail ring — the terrain carve line's source. */
+export type TrailView = { x: Float64Array; y: Float64Array; len: number }
 
 export type ParticleSystem = {
   spray(x: number, y: number, speed01: number, dt: number): void
   burst(x: number, y: number, impact: number): void
   pushTrail(x: number, y: number, chainTier: number): void
   update(dt: number): void
-  draw(ctx: CanvasRenderingContext2D, chainTier: number): void
+  /** Tapering carve ribbon — its own layer, drawn under the obstacles. */
+  drawTrail(ctx: CanvasRenderingContext2D, chainTier: number): void
+  /** Spray/burst pool — its own layer, drawn over the obstacles. */
+  drawParticles(ctx: CanvasRenderingContext2D): void
+  /** Live ring arrays for the carve line (read-only, this frame only). */
+  trailPositions(): TrailView
   clear(): void
 }
 
@@ -228,7 +238,7 @@ function pushTrailPoint(trail: Trail, x: number, y: number, chainTier: number): 
  * segment's width floors against the LIVE chainTier, so the whole visible
  * ribbon always reads at least the current combo state, while a still-fresh
  * higher historical tier (e.g. just after a bail) keeps showing its peak. */
-function drawTrail(ctx: CanvasRenderingContext2D, trail: Trail, chainTier: number): void {
+function strokeTrailRibbon(ctx: CanvasRenderingContext2D, trail: Trail, chainTier: number): void {
   if (trail.len < 2) return
   ctx.strokeStyle = palette.bluePale
   ctx.lineCap = 'round'
@@ -286,9 +296,17 @@ export function createParticles(): ParticleSystem {
     updatePool(pool, dt)
   }
 
-  function draw(ctx: CanvasRenderingContext2D, chainTier: number): void {
-    drawTrail(ctx, trail, chainTier)
+  function drawTrail(ctx: CanvasRenderingContext2D, chainTier: number): void {
+    strokeTrailRibbon(ctx, trail, chainTier)
+  }
+
+  function drawParticles(ctx: CanvasRenderingContext2D): void {
     drawPool(pool, ctx)
+  }
+
+  /** Live ring arrays for the carve line — read-only, valid this frame only. */
+  function trailPositions(): TrailView {
+    return { x: trail.x, y: trail.y, len: trail.len }
   }
 
   function clear(): void {
@@ -297,5 +315,5 @@ export function createParticles(): ParticleSystem {
     sprayCarry = 0
   }
 
-  return { spray, burst, pushTrail, update, draw, clear }
+  return { spray, burst, pushTrail, update, drawTrail, drawParticles, trailPositions, clear }
 }

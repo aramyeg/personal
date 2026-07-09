@@ -1,13 +1,13 @@
 /**
- * Powder Lines renderer (M1 placeholder + M2 juice).
+ * Powder Lines renderer (M3 atmosphere).
  *
- * This pass exists to prove the FEEL: camera transform (zoom, lead, shake)
- * over flat placeholder art — ice sky, one terrain line, v1 obstacle shapes,
- * the rider as a rotated ink rectangle — plus pooled carve spray, landing/
- * bail bursts, and a tapering trail ribbon (particles.ts). Milestones 3-4
- * replace the remaining art layer by layer (sky cycle, filled terrain,
- * jointed rig); the camera plumbing and layer ordering established here
- * survive.
+ * The camera transform (zoom, lead, shake) established in M1 now drives a
+ * layered Alto-style scene: the day-cycle sky, three cached parallax bands
+ * fogged toward the horizon, the near snowfield as a filled rim-lit body with
+ * the rider's carve line, phase-aware obstacle shapes, pooled spray/trail
+ * juice, and a rare foreground occluder. The rider is still a placeholder rect
+ * (+ fx squash) until M4 gives it a jointed rig. Layer ordering is the load-
+ * bearing contract here.
  */
 import type { Course, CourseObstacle } from '../course'
 import { slopeAngle, slopeY } from '../slope'
@@ -16,7 +16,16 @@ import { CAM, shakeOffset, type CameraState } from '../camera'
 import { palette } from '../palette'
 import { createParticles } from './particles'
 import { createFx } from './fx'
-import { drawSky } from './sky'
+import { drawSky, skyColors, type PhaseColors } from './sky'
+import {
+  BANDS,
+  drawForeground,
+  drawHazeVeil,
+  drawParallax,
+  drawTerrain,
+  mix,
+  type TerrainView,
+} from './terrain'
 
 export type Renderer = {
   draw(state: RiderState, course: Course, cam: CameraState): void
@@ -24,8 +33,10 @@ export type Renderer = {
 }
 
 const DEG2RAD = Math.PI / 180
-const TERRAIN_STEP_PX = 16
 const OFFSCREEN_MARGIN = 80
+/** Obstacle strokes tint toward the band color so they read as part of the
+ * mountain, not a diagram overlaid on it. */
+const OBSTACLE_STROKE_TINT = 0.15
 /** Respawn tell: the rider's world x jumps back by more than this in one
  * frame (v1 convention) — the renderer's cue to clear particles/trail. */
 const RESPAWN_JUMP = 50
@@ -44,7 +55,8 @@ function chainTierOf(state: RiderState): number {
   return Math.min(Math.floor(state.chain / 3), 3)
 }
 
-/** Everything a layer helper needs: context, size, state, camera transform. */
+/** Everything a layer helper needs: context, size, state, camera transform,
+ * and this frame's phase colors (obstacle stroke precomputed). */
 type Scene = {
   ctx: CanvasRenderingContext2D
   w: number
@@ -53,12 +65,12 @@ type Scene = {
   cam: CameraState
   ox: number
   oy: number
+  colors: PhaseColors
+  obStroke: string
 }
 
 const sx = (sc: Scene, wx: number): number => (wx - sc.cam.x) * sc.cam.zoom + sc.ox
 const sy = (sc: Scene, wy: number): number => (wy - sc.cam.y) * sc.cam.zoom + sc.oy
-/** inverse of sx — which world x sits at this screen x */
-const wx = (sc: Scene, screenX: number): number => (screenX - sc.ox) / sc.cam.zoom + sc.cam.x
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const maybeCtx = canvas.getContext('2d')
@@ -89,14 +101,30 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function draw(state: RiderState, course: Course, cam: CameraState): void {
     if (cssW === 0) resize()
     const shake = shakeOffset(cam)
+    const ox = cssW * CAM.ANCHOR_X + shake.x
+    const oy = cssH * CAM.ANCHOR_Y + shake.y
+    const p = clamp(state.x / course.finishX, 0, 1)
+    const colors = skyColors(p)
     const scene: Scene = {
       ctx,
       w: cssW,
       h: cssH,
       s: state,
       cam,
-      ox: cssW * CAM.ANCHOR_X + shake.x,
-      oy: cssH * CAM.ANCHOR_Y + shake.y,
+      ox,
+      oy,
+      colors,
+      obStroke: mix(palette.ink, colors.band, OBSTACLE_STROKE_TINT),
+    }
+    const view: TerrainView = {
+      camX: cam.x,
+      camY: cam.y,
+      zoom: cam.zoom,
+      ox,
+      oy,
+      w: cssW,
+      h: cssH,
+      p,
     }
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -106,14 +134,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     stepJuice(scene)
 
-    const p = clamp(state.x / course.finishX, 0, 1)
+    // Back-to-front: sky, three hazed parallax bands, the filled snowfield,
+    // the carve ribbon, the course, the spray, the rider, a foreground pine,
+    // then the screen-space speed lines and finish banner.
     drawSky(ctx, cssW, cssH, p, state.time)
-    drawTerrainLine(scene)
+    for (let i = 0; i < BANDS.length; i++) {
+      drawParallax(ctx, view, colors, BANDS[i], i)
+      drawHazeVeil(ctx, colors, cssW, cssH)
+    }
+    drawTerrain(ctx, view, colors, particles.trailPositions())
+    drawTrailLayer(scene)
     drawObstacles(scene, course)
-    drawParticlesLayer(scene)
-    drawFinish(scene, course)
+    drawParticleLayer(scene)
     drawRider(scene, fx.riderScale())
+    drawForeground(ctx, view, colors)
     fx.drawSpeedLines(ctx, cssW, cssH, speed01(state))
+    drawFinish(scene, course)
   }
 
   /** Feed this frame's flags into the particle system and the fx spring
@@ -151,16 +187,27 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     fx.update(dt)
   }
 
-  /** Particles/trail draw in world units under a local camera transform —
-   * same zoom-scaling the rider rect gets, without threading zoom through
-   * the ParticleSystem interface. */
-  function drawParticlesLayer(sc: Scene): void {
+  /** Carve ribbon under the obstacles (world units, local camera transform —
+   * the same zoom-scaling the rider rect gets, without threading zoom through
+   * the ParticleSystem interface). */
+  function drawTrailLayer(sc: Scene): void {
     const { ctx: c } = sc
     c.save()
     c.translate(sc.ox, sc.oy)
     c.scale(sc.cam.zoom, sc.cam.zoom)
     c.translate(-sc.cam.x, -sc.cam.y)
-    particles.draw(c, chainTierOf(sc.s))
+    particles.drawTrail(c, chainTierOf(sc.s))
+    c.restore()
+  }
+
+  /** Spray/burst pool over the obstacles (same local camera transform). */
+  function drawParticleLayer(sc: Scene): void {
+    const { ctx: c } = sc
+    c.save()
+    c.translate(sc.ox, sc.oy)
+    c.scale(sc.cam.zoom, sc.cam.zoom)
+    c.translate(-sc.cam.x, -sc.cam.y)
+    particles.drawParticles(c)
     c.restore()
   }
 
@@ -168,20 +215,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 }
 
 // --- layers -----------------------------------------------------------------
-
-function drawTerrainLine(sc: Scene): void {
-  const { ctx } = sc
-  ctx.strokeStyle = palette.blueDeep
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  for (let px = -TERRAIN_STEP_PX; px <= sc.w + TERRAIN_STEP_PX; px += TERRAIN_STEP_PX) {
-    const worldX = wx(sc, px)
-    const py = sy(sc, slopeY(worldX))
-    if (px === -TERRAIN_STEP_PX) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  }
-  ctx.stroke()
-}
 
 function visible(sc: Scene, worldX: number, length: number): boolean {
   const left = sx(sc, worldX)
@@ -205,7 +238,7 @@ function drawKicker(sc: Scene, o: CourseObstacle): void {
   const baseY = sy(sc, slopeY(o.x))
   const lipX = sx(sc, o.x + o.length)
   const lipY = sy(sc, slopeY(o.x + o.length) - 34)
-  ctx.strokeStyle = palette.ink
+  ctx.strokeStyle = sc.obStroke
   ctx.lineWidth = 2.5
   ctx.beginPath()
   ctx.moveTo(sx(sc, o.x), baseY)
@@ -217,7 +250,7 @@ function drawKicker(sc: Scene, o: CourseObstacle): void {
 
 function drawRail(sc: Scene, o: CourseObstacle): void {
   const { ctx } = sc
-  ctx.strokeStyle = palette.ink
+  ctx.strokeStyle = sc.obStroke
   ctx.lineWidth = 3
   ctx.beginPath()
   ctx.moveTo(sx(sc, o.x), sy(sc, obstacleSurfaceY(o, o.x)))
@@ -239,7 +272,7 @@ function drawBox(sc: Scene, o: CourseObstacle): void {
   const y0 = sy(sc, obstacleSurfaceY(o, o.x))
   const x1 = sx(sc, o.x + o.length)
   const y1 = sy(sc, slopeY(o.x + o.length / 2))
-  ctx.strokeStyle = palette.ink
+  ctx.strokeStyle = sc.obStroke
   ctx.lineWidth = 2.5
   ctx.beginPath()
   ctx.roundRect(x0, y0, x1 - x0, Math.max(y1 - y0, 10), 6)
