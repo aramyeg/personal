@@ -21,6 +21,12 @@ import {
 } from './scene/cameras'
 import { hotspotById, hotspotsForAngle, type Hotspot } from './scene/hotspots'
 import { Boot } from './boot'
+import { MenuPanel } from './panels/menu-panel'
+import { AboutPanel } from './panels/about-panel'
+import { ProjectsPanel } from './panels/projects-panel'
+import { SkillsPanel } from './panels/skills-panel'
+import { ContactPanel } from './panels/contact-panel'
+import { LabsPanel } from './panels/labs-panel'
 
 type Hover = { id: string; label: string }
 
@@ -156,7 +162,11 @@ export function Ps1Experience() {
       )}
 
       {state.panel && (
-        <PanelHost panel={state.panel} onClose={() => dispatch({ type: 'CLOSE_PANEL' })} />
+        <PanelHost
+          panel={state.panel}
+          onClose={() => dispatch({ type: 'CLOSE_PANEL' })}
+          onNavigate={openPanel}
+        />
       )}
 
       {reduced === false && !state.booted && (
@@ -189,35 +199,33 @@ function CutButton({
 }
 
 /**
- * Placeholder panel — Task 10 replaces the internals with the real content.
- * Kept to a bare labelled dialog + close button on purpose.
+ * Routes the open panel id to its real content panel. Each panel wraps itself in
+ * PanelShell (the era chrome + focus trap); `menu` gets `onNavigate` so its list
+ * dispatches OPEN_PANEL just like a hotspot click would.
  */
 function PanelHost({
   panel,
   onClose,
+  onNavigate,
 }: {
   panel: Exclude<PanelId, null>
   onClose: () => void
+  onNavigate: (panel: Exclude<PanelId, null>) => void
 }) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={panel}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75"
-    >
-      <div className="min-w-[220px] rounded-sm border border-[#3a5b57] bg-[#0b1413] px-6 py-5 text-center font-mono text-[#e8f6f4]">
-        <p className="mb-4 lowercase tracking-widest">{panel}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-sm border border-[#3a5b57] px-4 py-1.5 text-xs lowercase tracking-widest text-[#cfe9e6] transition-colors hover:bg-black/60 hover:text-white"
-        >
-          close
-        </button>
-      </div>
-    </div>
-  )
+  switch (panel) {
+    case 'menu':
+      return <MenuPanel onClose={onClose} onNavigate={onNavigate} />
+    case 'about':
+      return <AboutPanel onClose={onClose} />
+    case 'projects':
+      return <ProjectsPanel onClose={onClose} />
+    case 'skills':
+      return <SkillsPanel onClose={onClose} />
+    case 'contact':
+      return <ContactPanel onClose={onClose} />
+    case 'labs':
+      return <LabsPanel onClose={onClose} />
+  }
 }
 
 // ── r3f layer ───────────────────────────────────────────────────────────────
