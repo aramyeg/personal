@@ -1,4 +1,5 @@
 import type { LayerKind } from '../content'
+import { assertBrowser, createCanvas, clampByte } from './canvas-utils'
 
 /**
  * Placeholder "paper-cut" silhouettes for the pop-up book's four layer
@@ -19,21 +20,6 @@ const CANVAS_H = 512
 const OUTLINE_LIGHTEN = 18
 const OUTLINE_WIDTH = 3
 
-function assertBrowser(fnName: string): void {
-  if (typeof document === 'undefined') {
-    throw new Error(`storybook/procedural: ${fnName}() is client-only and requires document`)
-  }
-}
-
-function createCanvas(w: number, h: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('storybook/procedural: 2d canvas context unavailable')
-  return { canvas, ctx }
-}
-
 /**
  * mulberry32: a tiny, fast, deterministic 32-bit PRNG. Same seed always
  * produces the same sequence, which is what makes a chapter's placeholder
@@ -48,10 +34,6 @@ function mulberry32(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-}
-
-function clampByte(v: number): number {
-  return Math.min(255, Math.max(0, v))
 }
 
 /** Lightens a `#rrggbb` hex color by `amount` per channel (clamped). */
@@ -77,11 +59,6 @@ function paintCutout(ctx: CanvasRenderingContext2D, path: Path2D, color: string)
   ctx.stroke(path)
 }
 
-/**
- * A rounded hump silhouette (mountain, skyline swell, or mound), base on
- * `baseY`, centered at `cx`. `wobble` (0..1 of height) jitters the two
- * curve control points via `rand` so repeated humps don't look identical.
- */
 /**
  * A rounded hump (mountain, skyline swell, or mound) built from two
  * quarter-ellipse arcs sharing an apex at `(cx, baseY - height)`. Using

@@ -11,30 +11,13 @@
  * keep the two files in sync if the palette changes.
  */
 
+import { assertBrowser, createCanvas, clampByte } from './canvas-utils'
+
 const PAPER = '#e7d5a8' // --sb-paper
 const PAPER_AGED = '#c9b078' // --sb-paper-aged
 const LEATHER = '#641e26' // --sb-leather
 const LEATHER_SHADOW = '#4a151c' // --sb-leather-shadow
 const GOLD = '#c9a227' // --sb-gold
-
-function assertBrowser(fnName: string): void {
-  if (typeof document === 'undefined') {
-    throw new Error(`storybook/procedural: ${fnName}() is client-only and requires document`)
-  }
-}
-
-function createCanvas(w: number, h: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('storybook/procedural: 2d canvas context unavailable')
-  return { canvas, ctx }
-}
-
-function clampByte(v: number): number {
-  return Math.min(255, Math.max(0, v))
-}
 
 /** Adds per-pixel luminance noise in [-amount, amount] across the canvas. */
 function applyGrain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number): void {
