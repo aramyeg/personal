@@ -12,6 +12,7 @@
  * only, valid for the current frame only (same exception).
  */
 import { palette } from '../palette'
+import { mix } from './terrain'
 
 /** Live view of the trail ring — the terrain carve line's source. */
 export type TrailView = { x: Float64Array; y: Float64Array; len: number }
@@ -61,6 +62,11 @@ export const PARTICLES = {
   /** width added per chain tier (0..3), floored against the live tier so a
    * fresh bail doesn't leave visibly out-of-date fat trail behind it */
   TRAIL_TIER_WIDTH: 1,
+  /** chain-lit trail (Task 12): ribbon color lerps bluePale → amber by tier/3,
+   * so the trail visibly heats up as chain climbs, not just widens. Tunable
+   * ceiling (1 = full amber at tier 3) so GATE can pull it back without
+   * touching the lerp math. */
+  TRAIL_TIER_AMBER_MAX: 1,
 } as const
 
 /** Deterministic 0..1 hash of two integers (pool slot, spawn count) — the v1
@@ -240,13 +246,13 @@ function pushTrailPoint(trail: Trail, x: number, y: number, chainTier: number): 
  * higher historical tier (e.g. just after a bail) keeps showing its peak. */
 function strokeTrailRibbon(ctx: CanvasRenderingContext2D, trail: Trail, chainTier: number): void {
   if (trail.len < 2) return
-  ctx.strokeStyle = palette.bluePale
   ctx.lineCap = 'round'
   const last = trail.len - 1
   for (let i = 1; i <= last; i++) {
     const t = i / last
     const tier = Math.max(trail.tier[i], chainTier)
     ctx.lineWidth = t * (PARTICLES.TRAIL_WIDTH + tier * PARTICLES.TRAIL_TIER_WIDTH)
+    ctx.strokeStyle = mix(palette.bluePale, palette.amber, (tier / 3) * PARTICLES.TRAIL_TIER_AMBER_MAX)
     ctx.globalAlpha = t * PARTICLES.TRAIL_ALPHA
     ctx.beginPath()
     ctx.moveTo(trail.x[i - 1], trail.y[i - 1])

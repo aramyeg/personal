@@ -57,6 +57,16 @@ function formatMultiplier(chain: number): string {
 }
 
 /**
+ * Task 12: the finish crescendo (rider.ts's FINISH_DECEL) only plays out if
+ * `step` keeps running after mode flips to 'finish' — but useGameLoop's
+ * `paused` (driven by `phase !== 'playing'`) freezes `step` the instant
+ * `phase` becomes 'finished'. So the recap is deliberately delayed past the
+ * mode transition, until the glide has mostly bled off speed, rather than
+ * opening on the same frame the rider crosses the line.
+ */
+const FINISH_RECAP_SPEED = 40
+
+/**
  * The lab entry point. Honours reduced-motion by never auto-running the loop:
  * it offers a static skill sheet first, and only mounts the game on request.
  * `reduced === null` until the media query is read, keeping SSR/CSR in step.
@@ -219,7 +229,9 @@ function GameShell() {
       if (next.mode === 'bail' && prev.mode !== 'bail') cam = addShake(cam, 14)
       cameraRef.current = cam
       if (next.bigMoment) freezeRef.current(4)
-      if (next.mode === 'finish' && phase !== 'finished') setPhase('finished')
+      if (next.mode === 'finish' && next.speed < FINISH_RECAP_SPEED && phase !== 'finished') {
+        setPhase('finished')
+      }
       mirrorHud(next)
     },
     [phase, mirrorHud]

@@ -24,6 +24,7 @@ import {
   drawForeground,
   drawHazeVeil,
   drawParallax,
+  drawStretchProps,
   drawTerrain,
   mix,
   type TerrainView,
@@ -41,6 +42,21 @@ const OBSTACLE_STROKE_TINT = 0.15
 /** Respawn tell: the rider's world x jumps back by more than this in one
  * frame (v1 convention) — the renderer's cue to clear particles/trail. */
 const RESPAWN_JUMP = 50
+
+/**
+ * GATE C: plain ink obstacle labels are illegible once the sky goes to
+ * night. The sanctioned fix (Task 12) is a soft amber halo behind labels,
+ * collected dots, and the finish banner, scaled by `colors.glow01` so it's
+ * invisible by day and never overpowers the scene at night — alpha is
+ * capped at GLOW_ALPHA_MAX·glow01.
+ */
+const GLOW_ALPHA_MAX = 0.5
+/** "Radius 2× glyph": the label/finish font is 11px, so 22px covers a word
+ * without engulfing the whole HUD-adjacent area. */
+const GLOW_RADIUS_TEXT = 22
+/** Same "2× glyph" rule applied to the collected dot's own size (2× its
+ * 8px diameter) rather than the font. */
+const GLOW_RADIUS_DOT = 16
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v
@@ -146,6 +162,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawHazeVeil(ctx, colors, cssW, cssH)
     }
     drawTerrain(ctx, view, colors, particles.trailPositions())
+    drawStretchProps(ctx, view, colors, course)
     drawTrailLayer(scene)
     drawObstacles(scene, course)
     drawParticleLayer(scene)
@@ -247,6 +264,37 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
 // --- layers -----------------------------------------------------------------
 
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function rgba(hex: string, a: number): string {
+  const [r, g, b] = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}
+
+/** Soft radial halo, the sanctioned night-glow treatment (see GLOW_ALPHA_MAX
+ * above). No-op below GATE C's night-glow ramp so daylight frames skip the
+ * gradient allocation entirely. */
+function drawGlow(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  color: string,
+  alpha: number,
+): void {
+  if (alpha <= 0) return
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
+  g.addColorStop(0, rgba(color, alpha))
+  g.addColorStop(1, rgba(color, 0))
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+  ctx.fill()
+}
+
 function visible(sc: Scene, worldX: number, length: number): boolean {
   const left = sx(sc, worldX)
   const right = sx(sc, worldX + length)
@@ -314,12 +362,17 @@ function drawLabel(sc: Scene, o: CourseObstacle, collected: boolean): void {
   const { ctx } = sc
   const cx = sx(sc, o.x + o.length / 2)
   const cy = sy(sc, slopeY(o.x + o.length / 2) - PHYS.SURFACE_RAISE) - 16
+  const glowAlpha = GLOW_ALPHA_MAX * sc.colors.glow01
+  if (glowAlpha > 0) drawGlow(ctx, cx, cy - 4, GLOW_RADIUS_TEXT, palette.amber, glowAlpha)
   ctx.fillStyle = palette.ink
   ctx.fillText(o.skill.name.toLowerCase(), cx, cy)
   if (collected) {
+    const dotX = cx + ctx.measureText(o.skill.name).width / 2 + 10
+    const dotY = cy - 3
+    if (glowAlpha > 0) drawGlow(ctx, dotX, dotY, GLOW_RADIUS_DOT, palette.amber, glowAlpha)
     ctx.fillStyle = palette.amber
     ctx.beginPath()
-    ctx.arc(cx + ctx.measureText(o.skill.name).width / 2 + 10, cy - 3, 4, 0, Math.PI * 2)
+    ctx.arc(dotX, dotY, 4, 0, Math.PI * 2)
     ctx.fill()
   }
 }
@@ -328,18 +381,32 @@ function drawFinish(sc: Scene, course: Course): void {
   if (!visible(sc, course.finishX, 60)) return
   const { ctx } = sc
   const x0 = sx(sc, course.finishX)
+  const x1 = x0 + 46
   const y0 = sy(sc, slopeY(course.finishX))
   const y1 = sy(sc, slopeY(course.finishX) - 90)
+  const glow01 = sc.colors.glow01
+  const glowAlpha = GLOW_ALPHA_MAX * glow01
+
+  // Posts: always ink — only the banner line and text carry the night glow.
   ctx.strokeStyle = palette.ink
   ctx.lineWidth = 3
   ctx.beginPath()
   ctx.moveTo(x0, y0)
   ctx.lineTo(x0, y1)
-  ctx.moveTo(x0 + 46, sy(sc, slopeY(course.finishX + 46)))
-  ctx.lineTo(x0 + 46, y1)
-  ctx.moveTo(x0, y1)
-  ctx.lineTo(x0 + 46, y1)
+  ctx.moveTo(x1, sy(sc, slopeY(course.finishX + 46)))
+  ctx.lineTo(x1, y1)
   ctx.stroke()
+
+  // Banner line: amber + glow scaled by glow01 — the finish crescendo.
+  if (glowAlpha > 0) drawGlow(ctx, (x0 + x1) / 2, y1, GLOW_RADIUS_TEXT, palette.amber, glowAlpha)
+  ctx.strokeStyle = glow01 > 0 ? mix(palette.ink, palette.amber, glow01) : palette.ink
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(x0, y1)
+  ctx.lineTo(x1, y1)
+  ctx.stroke()
+
+  if (glowAlpha > 0) drawGlow(ctx, x0 + 23, y1 - 8, GLOW_RADIUS_TEXT, palette.amber, glowAlpha)
   ctx.fillStyle = palette.ink
   ctx.fillText('finish', x0 + 23, y1 - 8)
 }

@@ -129,6 +129,10 @@ export const PHYS = {
   BAIL_TIME: 1.2,
   RESPAWN_LEAD: 600,
   GRIND_EXIT_POP: 200,
+  /** finish-mode deceleration (u/s²) — bleeds a cruise-speed crossing to 0
+   * over roughly 1.5s while the rider keeps gliding along the slope, instead
+   * of the old hard stop. */
+  FINISH_DECEL: 300,
 } as const
 
 export const BAIL_LINE = 'washed out — press R to retry the section'
@@ -211,7 +215,7 @@ export function stepRider(
   course: Course
 ): RiderState {
   const s = clearOneStepFlags(state)
-  if (s.mode === 'finish') return s
+  if (s.mode === 'finish') return stepFinish(s, dt)
   if (input.retryPressed) return respawn(s, course)
   switch (s.mode) {
     case 'snow':
@@ -612,6 +616,17 @@ function stepBail(state: RiderState, dt: number, course: Course): RiderState {
   const bailTimer = state.bailTimer - dt
   if (bailTimer <= 0) return respawn({ ...state, time }, course)
   return { ...state, time, impact, bailTimer }
+}
+
+/** Finish crescendo: ease speed to 0 at FINISH_DECEL while still advancing
+ * along the slope, instead of freezing in place the instant the mode flips.
+ * Retry is intentionally not handled here (see stepRider) — the run is over;
+ * "run it back" is the shell's restart, not a mid-glide respawn. */
+function stepFinish(state: RiderState, dt: number): RiderState {
+  const time = state.time + dt
+  const speed = decayTo0(state.speed, dt, PHYS.FINISH_DECEL)
+  const x = speed > 0 ? advanceAlongSlope(state.x, speed * dt) : state.x
+  return { ...state, time, speed, x, y: slopeY(x) }
 }
 
 /** Drop the rider back on the snow a lead-in before the next obstacle. */

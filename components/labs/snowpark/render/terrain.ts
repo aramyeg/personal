@@ -24,6 +24,7 @@
  */
 import { slopeY } from '../slope'
 import { palette } from '../palette'
+import type { Course, Stretch } from '../course'
 import type { PhaseColors } from './sky'
 
 /**
@@ -419,5 +420,188 @@ export function drawForeground(
     ctx.globalAlpha = FG_ALPHA
     drawPine(ctx, screenX + jitter, v.h + hgt * 0.1, hgt)
     ctx.globalAlpha = 1
+  }
+}
+
+// --- per-stretch props (Task 12) --------------------------------------------
+//
+// course.stretches carries real course geometry — the same world-x units as
+// the obstacles and the carve line. The three parallax bands above are the
+// opposite: rasterized once into 2×-viewport offscreen strips and tiled by a
+// scroll factor (see ensureBandCache/drawParallax), with no fixed
+// relationship to world x — baking stretch-specific props into a strip would
+// desync from the actual stretch boundary the moment that strip repeats. So
+// stretch flavor is a separate, uncached, live pass: drawn every frame with
+// the SAME factor-1 world transform (tsx/tsy) as the near terrain body,
+// scattered directly against `slopeY`, so a prop sits exactly where its
+// stretch is and scrolls in lockstep with the obstacles it borders.
+
+const STRETCH_PROP_STEP = 150
+const STRETCH_PROP_MARGIN = 0.2
+const STRETCH_PROP_MIX = 0.45
+/** hash namespace offset so this pass never rhymes with band-pine scatter */
+const STRETCH_SEED = 500
+
+type PropKind = 'pine-dense' | 'rock-spur' | 'flag' | 'sparse' | 'boulder' | 'gate'
+
+/** Spec: "each stretch shifts palette/props subtly" — one silhouette
+ * variation per category, same ink-line language, no new colors. */
+const PROP_KIND_BY_CATEGORY: Record<Stretch['category'], PropKind> = {
+  frontend: 'pine-dense',
+  mobile: 'rock-spur',
+  state: 'flag',
+  styling: 'sparse',
+  backend: 'boulder',
+  tools: 'gate',
+  fun: 'sparse', // course.stretches never emits a 'fun' stretch; exhaustive fallback
+}
+
+/** Spacing multiplier, skip-chance, and height multiplier per prop kind —
+ * the "subtly" in the spec: denser/sparser/taller, never a new shape family
+ * for kinds that share one (pine-dense and sparse both reuse `drawPine`). */
+const PROP_TUNING: Record<PropKind, { stepMul: number; sparsity: number; heightMul: number }> = {
+  'pine-dense': { stepMul: 0.55, sparsity: 0.2, heightMul: 1 },
+  'rock-spur': { stepMul: 1, sparsity: 0.35, heightMul: 0.8 },
+  flag: { stepMul: 1.3, sparsity: 0.3, heightMul: 0.6 },
+  // styling bowl: sparse and pulled back — mostly skipped, and small when it
+  // does spawn, so the bowl reads open rather than tree-lined.
+  sparse: { stepMul: 2.2, sparsity: 0.75, heightMul: 0.55 },
+  boulder: { stepMul: 1.1, sparsity: 0.4, heightMul: 0.7 },
+  gate: { stepMul: 0.8, sparsity: 0.25, heightMul: 0.9 },
+}
+
+/** Mobile ridge: an angular rock outcrop silhouette (vs. the pine's soft
+ * triangles) — same ink-fill convention, different shape family. */
+function drawRockSpur(ctx: CanvasRenderingContext2D, x: number, baseY: number, hgt: number): void {
+  const w = hgt * 0.55
+  ctx.beginPath()
+  ctx.moveTo(x - w, baseY)
+  ctx.lineTo(x - w * 0.25, baseY - hgt * 0.6)
+  ctx.lineTo(x + w * 0.1, baseY - hgt)
+  ctx.lineTo(x + w * 0.5, baseY - hgt * 0.35)
+  ctx.lineTo(x + w, baseY)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** State park: a small flag on a post — caller sets fill/stroke once per
+ * stretch, so this only draws. */
+function drawFlagPost(ctx: CanvasRenderingContext2D, x: number, baseY: number, hgt: number): void {
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(x, baseY)
+  ctx.lineTo(x, baseY - hgt)
+  ctx.stroke()
+  const fw = hgt * 0.55
+  ctx.beginPath()
+  ctx.moveTo(x, baseY - hgt)
+  ctx.lineTo(x + fw, baseY - hgt * 0.82)
+  ctx.lineTo(x, baseY - hgt * 0.66)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** Backend flats: a small cluster of round boulders, hashed off `seedI` so a
+ * reused step index never repeats the same cluster shape. */
+function drawBoulderCluster(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  baseY: number,
+  hgt: number,
+  seedI: number,
+): void {
+  for (let k = 0; k < 3; k++) {
+    const bx = x + (hash(seedI, STRETCH_SEED + 10 + k) - 0.5) * hgt * 1.3
+    const br = hgt * (0.22 + hash(seedI, STRETCH_SEED + 20 + k) * 0.2)
+    ctx.beginPath()
+    ctx.arc(bx, baseY - br, br, 0, TAU)
+    ctx.fill()
+  }
+}
+
+/** Tooling run-out: a slalom-style gate pole — thin post with a small ball
+ * tip, spaced tighter than the other kinds (see PROP_TUNING) for the
+ * run-out's gate rhythm. */
+function drawGatePole(ctx: CanvasRenderingContext2D, x: number, baseY: number, hgt: number): void {
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(x, baseY)
+  ctx.lineTo(x, baseY - hgt)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x, baseY - hgt, 2.5, 0, TAU)
+  ctx.fill()
+}
+
+function drawStretchProp(
+  ctx: CanvasRenderingContext2D,
+  kind: PropKind,
+  x: number,
+  baseY: number,
+  hgt: number,
+  seedI: number,
+): void {
+  switch (kind) {
+    case 'pine-dense':
+    case 'sparse':
+      drawPine(ctx, x, baseY, hgt)
+      return
+    case 'rock-spur':
+      drawRockSpur(ctx, x, baseY, hgt)
+      return
+    case 'flag':
+      drawFlagPost(ctx, x, baseY, hgt)
+      return
+    case 'boulder':
+      drawBoulderCluster(ctx, x, baseY, hgt, seedI)
+      return
+    case 'gate':
+      drawGatePole(ctx, x, baseY, hgt)
+      return
+  }
+}
+
+function stretchOnScreen(v: TerrainView, stretch: Stretch): boolean {
+  const left = tsx(v, stretch.startX)
+  const right = tsx(v, stretch.endX)
+  return right > -v.w * STRETCH_PROP_MARGIN && left < v.w * (1 + STRETCH_PROP_MARGIN)
+}
+
+function drawOneStretch(
+  ctx: CanvasRenderingContext2D,
+  v: TerrainView,
+  stretch: Stretch,
+  fill: string,
+): void {
+  if (!stretchOnScreen(v, stretch)) return
+  const kind = PROP_KIND_BY_CATEGORY[stretch.category]
+  const tuning = PROP_TUNING[kind]
+  const step = STRETCH_PROP_STEP * tuning.stepMul
+  ctx.fillStyle = fill
+  ctx.strokeStyle = fill
+  const start = Math.floor(stretch.startX / step) * step
+  let i = Math.round(start / step)
+  for (let wx = start; wx < stretch.endX; wx += step, i++) {
+    if (wx < stretch.startX) continue
+    if (hash(i, STRETCH_SEED) < tuning.sparsity) continue
+    const jx = wx + (hash(i, STRETCH_SEED + 1) - 0.5) * step * 0.4
+    if (jx < stretch.startX || jx >= stretch.endX) continue
+    const hgt = PINE_BASE_H * tuning.heightMul * (0.75 + hash(i, STRETCH_SEED + 2) * 0.5)
+    drawStretchProp(ctx, kind, tsx(v, jx), tsy(v, slopeY(jx)), hgt, i)
+  }
+}
+
+/** Live per-stretch prop pass — each category stretch reads distinct without
+ * a new color or a new silhouette family. See the file-level note above for
+ * why this can't be baked into the cached band strips. */
+export function drawStretchProps(
+  ctx: CanvasRenderingContext2D,
+  v: TerrainView,
+  colors: PhaseColors,
+  course: Course,
+): void {
+  const fill = mix(palette.ink, colors.band, STRETCH_PROP_MIX)
+  for (const stretch of course.stretches) {
+    drawOneStretch(ctx, v, stretch, fill)
   }
 }

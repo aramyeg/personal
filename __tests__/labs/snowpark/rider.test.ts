@@ -441,12 +441,28 @@ describe('bail and respawn', () => {
 })
 
 describe('finish', () => {
-  it('enters finish mode past finishX and stops advancing', () => {
+  it('enters finish mode past finishX and decelerates to a stop within 2s', () => {
     const nearEnd: RiderState = { ...createRider(course), x: course.finishX - 50 }
     const s = run(nearEnd, idle, 2)
     expect(s.mode).toBe('finish')
+    expect(s.speed).toBe(0)
     const after = stepRider(s, idle, 1 / 120, course)
     expect(after.x).toBe(s.x)
+  })
+
+  it('still advances along the slope while decelerating, unlike the old hard stop', () => {
+    const nearEnd: RiderState = { ...createRider(course), x: course.finishX - 50 }
+    const justCrossed = run(nearEnd, idle, 0)
+    // Drive a couple of snow steps to actually cross finishX, then confirm
+    // the very next finish-mode step still moves x (speed hasn't decayed
+    // away yet at FINISH_DECEL = 300 u/s²).
+    let s = justCrossed
+    while (s.mode !== 'finish') s = stepRider(s, idle, 1 / 120, course)
+    const xAtFinish = s.x
+    const after = stepRider(s, idle, 1 / 120, course)
+    expect(after.mode).toBe('finish')
+    expect(after.x).toBeGreaterThan(xAtFinish)
+    expect(after.speed).toBeLessThan(s.speed)
   })
 })
 
