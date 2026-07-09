@@ -7,14 +7,26 @@ export const PSX = {
   FPS: 30,
   /** Rotating-cube speed (rad/s) for the temporary GATE-A proof scene only. */
   PROOF_CUBE_SPIN: 0.35,
+  /**
+   * The room light rig (overcast neutral key + teal-leaning ambient fill).
+   * Scenes consume these — never hardcode light colors/intensities in a
+   * component. Ambient runs hot so shadow sides stay readable teal, never
+   * grey-black (tone law).
+   */
+  LIGHTS: {
+    key: '#e8e6e0',
+    keyIntensity: 3.7,
+    ambient: '#4d5f5a',
+    ambientIntensity: 5.8,
+  },
   TEX: {
-    wall: '#8a8578',
-    wallShade: '#6f6a5f',
-    plywood: '#8f7350',
-    plywoodDark: '#6b5238',
-    carpet: '#5f6258',
-    carpetDark: '#4a4d45',
-    concrete: '#7d7f7a',
+    wall: '#b3ac9b',
+    wallShade: '#968f7e',
+    plywood: '#a8895f',
+    plywoodDark: '#816545',
+    carpet: '#7e8272',
+    carpetDark: '#646859',
+    concrete: '#9b9d97',
     shadowTeal: '#3d5450',
     crtTeal: '#7de8e0',
     crtTealDark: '#2e6b66',

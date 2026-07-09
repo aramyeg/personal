@@ -2,6 +2,7 @@
 import { useEffect, useMemo, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { PSX } from './psx-constants'
 import { makeCarpetTexture, makePlywoodTexture, makeWallTexture } from './textures'
 import { makePSXMaterial } from './psx-materials'
 
@@ -50,9 +51,9 @@ export function ProofScene({ cubeRef }: { cubeRef: RefObject<THREE.Mesh | null> 
 
   return (
     <>
-      {/* Neutral key + teal-leaning ambient shadow (the brief's two lights). */}
-      <directionalLight color="#e8e6e0" intensity={1.1} position={[5, 9, 4]} />
-      <ambientLight color="#3d5450" intensity={0.55} />
+      {/* Neutral key + teal-leaning ambient shadow, from the single tuning surface. */}
+      <directionalLight color={PSX.LIGHTS.key} intensity={PSX.LIGHTS.keyIntensity} position={[5, 9, 4]} />
+      <ambientLight color={PSX.LIGHTS.ambient} intensity={PSX.LIGHTS.ambientIntensity} />
 
       <mesh material={materials.floor} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[18, 16]} />
