@@ -53,8 +53,6 @@ export type RiderState = {
   collected: boolean[]
   /** momentum chain — clean landings raise it, scrubs hold, bails reset it */
   chain: number
-  /** mirror of `chain` for the v1 HUD until Task 10 rescores (always === chain) */
-  combo: number
   score: number
   bestTrick: { name: string; points: number } | null
   /** set on a clean scored landing; shell shows it then clears it */
@@ -182,7 +180,6 @@ export function createRider(course: Course): RiderState {
     nextObstacle: 0,
     collected: course.obstacles.map(() => false),
     chain: 0,
-    combo: 0,
     score: 0,
     bestTrick: null,
     lastEvent: null,
@@ -490,7 +487,6 @@ function landClean(s: RiderState, proj: number, angle: number, course: Course): 
     speed,
     rotationDeg: snapped,
     chain,
-    combo: chain,
     impact,
     coyoteT: 0,
     justLanded: 'clean',
@@ -522,7 +518,6 @@ function bail(s: RiderState): RiderState {
     bailTimer: PHYS.BAIL_TIME,
     bailed: true,
     chain: 0,
-    combo: 0,
     impact: 1,
     bigMoment: true,
   }
@@ -560,6 +555,7 @@ function bankTrick(
     rotationDeg: landed.rotationDeg,
     grab: s.grabHappened,
     grindLength: s.grindLength,
+    late,
   }
   const name = trickName(trick)
   const points = trickScore(trick, skill.years, s.chain)
@@ -641,6 +637,5 @@ function respawn(state: RiderState, course: Course): RiderState {
     bufferT: 0,
     impact: 0,
     chain: 0,
-    combo: 0,
   }
 }

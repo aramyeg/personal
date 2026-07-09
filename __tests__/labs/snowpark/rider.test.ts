@@ -74,7 +74,6 @@ function airAboveLanding(opts: {
     rotationDeg,
     rotationIdleS,
     chain,
-    combo: chain,
     attributedObstacle,
     airtime: 0.3,
   }
@@ -342,7 +341,6 @@ describe('grind', () => {
       vy: 40,
       nextObstacle: idx,
       chain: 1,
-      combo: 1,
     }
     s = run(s, idle, 0.4) // snap on and grind a stretch of the rail
     expect(s.mode).toBe('grind')
@@ -374,7 +372,6 @@ describe('grind', () => {
       vy: 40,
       nextObstacle: idx,
       chain: 2,
-      combo: 2,
     }
     for (let i = 0; i < 600 && !s.collected[idx]; i++) s = stepRider(s, idle, 1 / 120, course)
     expect(s.collected[idx]).toBe(true)
@@ -436,11 +433,10 @@ describe('bail and respawn', () => {
   })
 
   it('R retry resets the chain (respawn is unconditional)', () => {
-    const s0 = { ...createRider(course), x: 400, nextObstacle: 1, chain: 5, combo: 5 }
+    const s0 = { ...createRider(course), x: 400, nextObstacle: 1, chain: 5 }
     const s = stepRider(s0, { ...idle, retryPressed: true }, 1 / 120, course)
     expect(s.mode).toBe('snow')
     expect(s.chain).toBe(0)
-    expect(s.combo).toBe(0)
   })
 })
 

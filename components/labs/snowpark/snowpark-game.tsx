@@ -18,6 +18,7 @@ import { useGameLoop } from './use-game-loop'
 import { createRenderer, type Renderer } from './render/renderer'
 import { addShake, createCamera, updateCamera, type CameraState } from './camera'
 import { palette } from './palette'
+import { CHAIN_STEP } from './tricks'
 import styles from './snowpark.module.css'
 
 /** The course is pure geometry over static data — compiled once at module load. */
@@ -32,7 +33,7 @@ type Phase = 'playing' | 'paused' | 'finished'
 
 type Hud = {
   score: number
-  combo: number
+  chain: number
   stretchName: string
   lastEvent: CollectEvent | null
   bailed: boolean
@@ -41,7 +42,7 @@ type Hud = {
 
 const INITIAL_HUD: Hud = {
   score: 0,
-  combo: 0,
+  chain: 0,
   stretchName: '',
   lastEvent: null,
   bailed: false,
@@ -54,6 +55,11 @@ function formatTime(seconds: number): string {
   const m = Math.floor(total / 60)
   const s = total % 60
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/** `×2.5` / `×1.25` — trailing zeros trimmed, the loud HUD multiplier. */
+function formatMultiplier(chain: number): string {
+  return (1 + CHAIN_STEP * chain).toFixed(2).replace(/\.?0+$/, '')
 }
 
 /**
@@ -167,7 +173,7 @@ function GameShell() {
     const stretch = course.stretches.find((st) => s.x >= st.startX && s.x < st.endX)
     const snap: Hud = {
       score: s.score,
-      combo: s.combo,
+      chain: s.chain,
       stretchName: stretch ? stretch.name : '',
       lastEvent: s.lastEvent,
       bailed: s.bailed,
@@ -177,7 +183,7 @@ function GameShell() {
     if (
       prev &&
       prev.score === snap.score &&
-      prev.combo === snap.combo &&
+      prev.chain === snap.chain &&
       prev.stretchName === snap.stretchName &&
       prev.lastEvent === snap.lastEvent &&
       prev.bailed === snap.bailed &&
@@ -254,19 +260,19 @@ function GameShell() {
           </div>
         )}
 
-        {/* top-right: score, combo, pause glyph */}
+        {/* top-right: score, chain multiplier, pause glyph */}
         <div className="absolute right-4 top-16 flex flex-col items-end gap-2">
-          <div key={scoreBump} className={`flex flex-col items-end gap-2 ${styles.comboPop}`}>
+          <div key={scoreBump} className={`flex flex-col items-end gap-1 ${styles.comboPop}`}>
             <div
               data-testid="hud-score"
-              className="font-mono text-2xl tabular-nums"
+              className="font-mono text-sm tabular-nums"
               style={{ color: palette.amber }}
             >
               {hud.score}
             </div>
-            {hud.combo >= 2 && (
-              <div className="font-mono text-sm" style={{ color: palette.amber }}>
-                x{hud.combo}
+            {hud.chain >= 1 && (
+              <div className="font-mono text-3xl tabular-nums" style={{ color: palette.amber }}>
+                ×{formatMultiplier(hud.chain)}
               </div>
             )}
           </div>
