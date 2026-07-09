@@ -1,0 +1,77 @@
+/* Storybook lab tokens — spec §3.1. The lab owns its full-viewport world. */
+.sb-root {
+  --sb-leather: #641e26;
+  --sb-leather-shadow: #4a151c;
+  --sb-leather-worn: #7b2a33;
+  --sb-gold: #c9a227;
+  --sb-gold-bright: #e6c65a;
+  --sb-gold-deep: #8f6f1a;
+  --sb-paper: #e7d5a8;
+  --sb-paper-aged: #c9b078;
+  --sb-paper-deep: #b89c66;
+  --sb-ink: #3b2a1a;
+  --sb-desk: #17100b;
+  --sb-candle: #ff9f4d;
+  --sb-seal: #7a1f2b;
+
+  --font-sb-display: 'Grenze Gotisch Variable', serif;
+  --font-sb-body: 'Alegreya Variable', georgia, serif;
+  --font-sb-caps: 'Alegreya SC', georgia, serif;
+
+  background: var(--sb-desk);
+  color: var(--sb-ink);
+  font-family: var(--font-sb-body);
+}
+
+.sb-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 60% at 50% 42%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Narration typography — used by overlay (Task 12) and plain view (Task 5). */
+.sb-narration {
+  font-size: clamp(1rem, 1.6vw, 1.1875rem);
+  line-height: 1.62;
+  max-width: 34em;
+}
+.sb-narration::first-letter {
+  font-family: var(--font-sb-display);
+  font-weight: 700;
+  font-size: 3.4em;
+  float: left;
+  line-height: 0.82;
+  padding: 0.04em 0.08em 0 0;
+  color: var(--sb-gold-deep);
+  background: linear-gradient(160deg, var(--sb-gold-bright), var(--sb-gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sb-chapter-kicker {
+  font-family: var(--font-sb-caps);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  font-variant: small-caps;
+  color: var(--sb-gold-deep);
+}
+.sb-chapter-title {
+  font-family: var(--font-sb-display);
+  font-weight: 600;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.sb-plaque {
+  border: 1px solid var(--sb-gold);
+  outline: 1px solid color-mix(in srgb, var(--sb-gold) 40%, transparent);
+  outline-offset: 3px;
+  padding: 0.9rem 1.1rem;
+  font-family: var(--font-sb-caps);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--sb-paper-aged) 30%, transparent);
+}
+.sb-plaque strong { font-weight: 700; letter-spacing: 0.06em; }

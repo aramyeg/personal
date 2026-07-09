@@ -8,13 +8,22 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/alegreya':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@fontsource-variable/bricolage-grotesque':
         specifier: ^5.2.10
         version: 5.2.10
+      '@fontsource-variable/grenze-gotisch':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
       '@fontsource-variable/jetbrains-mono':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/alegreya-sc':
         specifier: ^5.2.8
         version: 5.2.8
       '@radix-ui/react-separator':
@@ -539,14 +548,23 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
+  '@fontsource-variable/alegreya@5.2.8':
+    resolution: {integrity: sha512-gQcIA7j76KYTOcdkfo1Xee9xLBi5mya4qTkzlgeoHf9SjOL/gJj5GSSOg/7ba/ciUU18K92i7VGxXzFhDsowGg==}
+
   '@fontsource-variable/bricolage-grotesque@5.2.10':
     resolution: {integrity: sha512-5EDsCqgGpKVcJWE4sg9ydli+t5WM97mISYw5lla/Ev4z71FwXh1oN0YUU8xjkRW9+wBCGD9R+ntAvI8G4bUFJg==}
+
+  '@fontsource-variable/grenze-gotisch@5.2.8':
+    resolution: {integrity: sha512-oaPiHrk37gpxiQLG82W94pD9WwfRaU+sjfysvGTcUSgHJB73hTYMfQqQ1+0DOs6XGxAGRsrs/5OrYjddk3l/8A==}
 
   '@fontsource-variable/inter@5.2.8':
     resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
 
   '@fontsource-variable/jetbrains-mono@5.2.8':
     resolution: {integrity: sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q==}
+
+  '@fontsource/alegreya-sc@5.2.8':
+    resolution: {integrity: sha512-28ZMhxJ/bx7f9S2oTTPeXvKchAu5VxPbEG95RI+EI9l3/1YyomEXzUqX0lCdCQb5fDXhdmVwHSD07P0BL4ueQA==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -4210,11 +4228,17 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
+  '@fontsource-variable/alegreya@5.2.8': {}
+
   '@fontsource-variable/bricolage-grotesque@5.2.10': {}
+
+  '@fontsource-variable/grenze-gotisch@5.2.8': {}
 
   '@fontsource-variable/inter@5.2.8': {}
 
   '@fontsource-variable/jetbrains-mono@5.2.8': {}
+
+  '@fontsource/alegreya-sc@5.2.8': {}
 
   '@humanfs/core@0.19.1': {}
 
