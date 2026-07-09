@@ -32,6 +32,21 @@ export function XpDesktop() {
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   useIdle(60_000, () => useXpStore.getState().setScreensaver(true), phase === 'desktop' && !reduced)
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const s = useXpStore.getState()
+      if (s.startOpen) {
+        e.preventDefault()
+        s.setStartOpen(false)
+      }
+      // screensaver, bsod and boot each own their keys via their own
+      // capture listeners; anything else falls through to GalleryChrome.
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [])
+
   if (!resolved) return <div className={styles.desktop} />
   if (phase === 'boot') return <BootScreen />
   if (phase === 'welcome') return <WelcomeScreen />
