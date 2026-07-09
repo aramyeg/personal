@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { XpDesktopLoader } from '@/components/labs/xp/desktop-loader'
+import { CrawlableCv } from '@/components/labs/xp/crawlable-cv'
 
 export const metadata: Metadata = {
   title: 'Bliss — Style Lab | Aram Yeghiazaryan',
@@ -20,6 +21,7 @@ export default function XpLabPage() {
       <main className="fixed inset-0 overflow-hidden">
         <XpDesktopLoader />
       </main>
+      <CrawlableCv />
     </GalleryChrome>
   )
 }
