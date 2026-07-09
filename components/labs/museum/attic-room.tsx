@@ -156,23 +156,43 @@ export function AtticRoom({
   )
 }
 
-/** Corridor interior: ramp floor, flanking walls, low ceiling. */
+/** Corridor interior: plank walls, stepped treads, low ceiling, and its own
+ * small bulb — from the hall the doorway glows instead of reading as a void
+ * (user note at preview: "you can see nothing the moment entering"). The
+ * visual steps sit under the smooth floorY ramp the camera actually walks;
+ * the ≤0.12 u mismatch is invisible at eye height. */
+const STEPS = 10
+
 function StairShaft({ hallLen }: { hallLen: number }) {
   const midZ = -(hallLen + STAIR.run / 2)
-  const rampLen = Math.hypot(STAIR.run, STAIR.rise)
-  const rampAngle = Math.atan2(STAIR.rise, STAIR.run)
   const w = STAIR.doorWidth + 0.4
+
+  const boards = useMemo(() => {
+    const t = makePlankTexture()
+    t.repeat.set(2.5, 3)
+    return t
+  }, [])
+
+  const stepDepth = STAIR.run / STEPS
+  const stepRise = STAIR.rise / STEPS
+
   return (
     <group>
-      {/* Ramp floor (reads as stairs from the walk feel; treads are visual noise at this scale) */}
-      <mesh
-        position={[STAIR.doorX, STAIR.rise / 2, midZ]}
-        rotation-x={-Math.PI / 2 + rampAngle}
-      >
-        <planeGeometry args={[w, rampLen]} />
-        <meshStandardMaterial color="#5c4b38" roughness={0.9} side={THREE.DoubleSide} />
-      </mesh>
-      {/* Side walls */}
+      {/* Stepped treads: each step is a full-height box up to its tread top */}
+      {Array.from({ length: STEPS }, (_, i) => (
+        <mesh
+          key={i}
+          position={[
+            STAIR.doorX,
+            ((i + 1) * stepRise) / 2,
+            -(hallLen + (i + 0.5) * stepDepth),
+          ]}
+        >
+          <boxGeometry args={[w, (i + 1) * stepRise, stepDepth]} />
+          <meshStandardMaterial color="#6b5844" roughness={0.9} />
+        </mesh>
+      ))}
+      {/* Side walls in rough boards */}
       {[-1, 1].map((s) => (
         <mesh
           key={s}
@@ -180,14 +200,22 @@ function StairShaft({ hallLen }: { hallLen: number }) {
           rotation-y={s > 0 ? -Math.PI / 2 : Math.PI / 2}
         >
           <planeGeometry args={[STAIR.run, STAIR.rise + 3.4]} />
-          <meshStandardMaterial color="#4a3c2d" roughness={0.95} side={THREE.DoubleSide} />
+          <meshStandardMaterial map={boards} color="#b9a58c" roughness={0.95} side={THREE.DoubleSide} />
         </mesh>
       ))}
       {/* Shaft ceiling */}
       <mesh position={[STAIR.doorX, STAIR.rise + 2.7, midZ]} rotation-x={Math.PI / 2}>
         <planeGeometry args={[w, STAIR.run]} />
-        <meshStandardMaterial color="#33291d" roughness={1} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#4a3c2d" roughness={1} side={THREE.DoubleSide} />
       </mesh>
+      {/* The stairwell's own bulb — visible as a warm glow from the hall */}
+      <pointLight
+        position={[STAIR.doorX, STAIR.rise + 1.6, midZ]}
+        intensity={7}
+        distance={8}
+        decay={1.8}
+        color="#ffdcae"
+      />
     </group>
   )
 }

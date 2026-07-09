@@ -114,11 +114,8 @@ function EndWall({ length, fabric }: { length: number; fabric: THREE.Texture }) 
         <planeGeometry args={[STAIR.doorWidth, HALL.height - STAIR.doorHeight]} />
         <meshStandardMaterial map={fabric} roughness={0.9} />
       </mesh>
-      {/* Door jambs: dark reveal so the opening reads as depth, not a hole */}
-      <mesh position={[STAIR.doorX, STAIR.doorHeight / 2, -0.06]}>
-        <planeGeometry args={[STAIR.doorWidth, STAIR.doorHeight]} />
-        <meshBasicMaterial color="#181410" />
-      </mesh>
+      {/* The stair shaft's own lit interior shows through the opening (the
+          old dark reveal plane masked it — the doorway read as a void). */}
       {/* Small lowercase sign above the lintel */}
       <mesh position={[STAIR.doorX, STAIR.doorHeight + 0.35, 0.02]}>
         <planeGeometry args={[0.6, 0.3]} />
