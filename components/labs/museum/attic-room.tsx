@@ -10,6 +10,7 @@ import {
   atticPlacements,
   atticPlaquePlacement,
 } from './layout'
+import { AtticDressing, CornerDrape } from './attic-dressing'
 import { Painting, PaintingBoundary } from './painting'
 import { makeAtticPlaqueTexture, makePlankTexture } from './textures'
 
@@ -147,6 +148,10 @@ export function AtticRoom({
         <planeGeometry args={[1.15, 1.15]} />
         <meshStandardMaterial map={plaque} roughness={0.9} />
       </mesh>
+
+      {/* Inert set dressing: sheeted frames, covered statues, a corner drape */}
+      <AtticDressing hallLen={hallLen} />
+      {placements[0] && <CornerDrape placement={placements[0]} />}
     </group>
   )
 }
