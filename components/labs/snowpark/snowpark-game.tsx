@@ -18,6 +18,7 @@ import { useGameLoop } from './use-game-loop'
 import { createRenderer, type Renderer } from './render/renderer'
 import { addShake, createCamera, updateCamera, type CameraState } from './camera'
 import { palette } from './palette'
+import styles from './snowpark.module.css'
 
 /** The course is pure geometry over static data — compiled once at module load. */
 const course = compileCourse()
@@ -82,6 +83,10 @@ function GameShell() {
   const riderRef = useRef<RiderState>(createRider(course))
   const cameraRef = useRef<CameraState | null>(null)
   const hudRef = useRef<Hud | null>(null)
+  // useGameLoop's freeze() is consumed by `step`, which is defined (and
+  // passed into useGameLoop) before that call returns it — routed through a
+  // ref so `step` can call the latest freeze without a circular dependency.
+  const freezeRef = useRef<(frames: number) => void>(() => {})
 
   const [phase, setPhase] = useState<Phase>('playing')
   const [hud, setHud] = useState<Hud>(INITIAL_HUD)
@@ -89,6 +94,11 @@ function GameShell() {
   // The collect card renders `event`; `eventShown` drives its fade after ~2s.
   const [event, setEvent] = useState<CollectEvent | null>(null)
   const [eventShown, setEventShown] = useState(false)
+
+  // Combo/score pop: bumped whenever score rises, keyed onto the HUD block
+  // below to restart its CSS animation (snowpark.module.css).
+  const [scoreBump, setScoreBump] = useState(0)
+  const prevScoreRef = useRef(hud.score)
 
   // Renderer + input live for the lifetime of the shell.
   useEffect(() => {
@@ -146,6 +156,13 @@ function GameShell() {
     return () => clearTimeout(hide)
   }, [hud.lastEvent])
 
+  // Combo pop: bump the key whenever score rises (never on restart's reset
+  // to 0, since that's a decrease).
+  useEffect(() => {
+    if (hud.score > prevScoreRef.current) setScoreBump((n) => n + 1)
+    prevScoreRef.current = hud.score
+  }, [hud.score])
+
   const mirrorHud = useCallback((s: RiderState) => {
     const stretch = course.stretches.find((st) => s.x >= st.startX && s.x < st.endX)
     const snap: Hud = {
@@ -185,6 +202,7 @@ function GameShell() {
       if (next.justLanded) cam = addShake(cam, next.impact * 12)
       if (next.mode === 'bail' && prev.mode !== 'bail') cam = addShake(cam, 14)
       cameraRef.current = cam
+      if (next.bigMoment) freezeRef.current(4)
       if (next.mode === 'finish' && phase !== 'finished') setPhase('finished')
       mirrorHud(next)
     },
@@ -196,12 +214,15 @@ function GameShell() {
     rendererRef.current?.draw(riderRef.current, course, cam)
   }, [])
 
-  useGameLoop({
+  const { freeze } = useGameLoop({
     step,
     render,
     paused: phase !== 'playing',
     onHidden: () => setPhase((p) => (p === 'playing' ? 'paused' : p)),
   })
+  useEffect(() => {
+    freezeRef.current = freeze
+  }, [freeze])
 
   const restart = useCallback(() => {
     riderRef.current = createRider(course)
@@ -235,18 +256,20 @@ function GameShell() {
 
         {/* top-right: score, combo, pause glyph */}
         <div className="absolute right-4 top-16 flex flex-col items-end gap-2">
-          <div
-            data-testid="hud-score"
-            className="font-mono text-2xl tabular-nums"
-            style={{ color: palette.amber }}
-          >
-            {hud.score}
-          </div>
-          {hud.combo >= 2 && (
-            <div className="font-mono text-sm" style={{ color: palette.amber }}>
-              x{hud.combo}
+          <div key={scoreBump} className={`flex flex-col items-end gap-2 ${styles.comboPop}`}>
+            <div
+              data-testid="hud-score"
+              className="font-mono text-2xl tabular-nums"
+              style={{ color: palette.amber }}
+            >
+              {hud.score}
             </div>
-          )}
+            {hud.combo >= 2 && (
+              <div className="font-mono text-sm" style={{ color: palette.amber }}>
+                x{hud.combo}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             aria-label="pause"

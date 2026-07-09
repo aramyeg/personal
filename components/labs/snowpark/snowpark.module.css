@@ -1,0 +1,28 @@
+/* Combo/score pop (Task 6): re-keyed on every score bump so the animation
+ * restarts. Colors are literal — palette.ts is JS-only, this is the one
+ * place a hex has to be duplicated to animate it in a keyframe. Keep in
+ * sync with palette.amber. */
+.comboPop {
+  animation: combo-pop 180ms ease;
+}
+
+@keyframes combo-pop {
+  0% {
+    transform: scale(1);
+    color: #d9a441;
+  }
+  50% {
+    transform: scale(1.18);
+    color: #ffffff;
+  }
+  100% {
+    transform: scale(1);
+    color: #d9a441;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comboPop {
+    animation: none;
+  }
+}

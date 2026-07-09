@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 export const FIXED_DT = 1 / 120
 
@@ -12,11 +12,26 @@ type GameLoopOptions = {
   onHidden?: () => void
 }
 
-export function useGameLoop(opts: GameLoopOptions): void {
+export type GameLoopHandle = {
+  /** Hold the sim for `frames` rAF ticks — render keeps running, step()
+   * doesn't — and take the stronger of any in-flight freeze so overlapping
+   * triggers can't cut one short. The hit-stop hook for big moments. */
+  freeze(frames: number): void
+}
+
+export function useGameLoop(opts: GameLoopOptions): GameLoopHandle {
   // Latest opts live in a ref so the effect attaches once and the rAF loop
   // never restarts mid-game when props change.
   const optsRef = useRef(opts)
   optsRef.current = opts
+
+  // Read/written by the rAF loop below. Lives in a ref (not effect-local
+  // state) because freeze() must be callable the instant this hook returns —
+  // callers capture it before the mount effect below has necessarily run.
+  const freezeFramesRef = useRef(0)
+  const freeze = useCallback((frames: number) => {
+    freezeFramesRef.current = Math.max(freezeFramesRef.current, frames)
+  }, [])
 
   useEffect(() => {
     let frame = 0
@@ -31,6 +46,13 @@ export function useGameLoop(opts: GameLoopOptions): void {
 
       if (current.paused) {
         // Hold the accumulator empty so unpausing never catches up.
+        accumulator = 0
+        wasPaused = true
+      } else if (freezeFramesRef.current > 0) {
+        // Hit-stop: render holds the frame, sim time doesn't accumulate —
+        // same "reset accumulator, don't catch up" treatment as a pause, so
+        // unfreezing behaves exactly like unpausing.
+        freezeFramesRef.current -= 1
         accumulator = 0
         wasPaused = true
       } else {
@@ -64,4 +86,6 @@ export function useGameLoop(opts: GameLoopOptions): void {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
+
+  return { freeze }
 }

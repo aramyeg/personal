@@ -15,6 +15,7 @@ import { PHYS, obstacleSurfaceY, type RiderState } from '../rider'
 import { CAM, shakeOffset, type CameraState } from '../camera'
 import { palette } from '../palette'
 import { createParticles } from './particles'
+import { createFx } from './fx'
 
 export type Renderer = {
   draw(state: RiderState, course: Course, cam: CameraState): void
@@ -66,6 +67,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let cssW = 0
   let cssH = 0
   const particles = createParticles()
+  const fx = createFx()
   // Render-layer internal state (documented exception, see particles.ts):
   // tracks sim-time delta and one-frame transitions the draw call itself
   // has no other way to see (draw() only receives the latest state).
@@ -101,7 +103,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     ctx.textBaseline = 'alphabetic'
     ctx.font = '11px ui-monospace, monospace'
 
-    stepParticles(scene)
+    stepJuice(scene)
 
     ctx.fillStyle = palette.ice
     ctx.fillRect(0, 0, cssW, cssH)
@@ -109,13 +111,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     drawObstacles(scene, course)
     drawParticlesLayer(scene)
     drawFinish(scene, course)
-    drawRider(scene)
+    drawRider(scene, fx.riderScale())
+    fx.drawSpeedLines(ctx, cssW, cssH, speed01(state))
   }
 
-  /** Feed this frame's flags into the particle system (renderer stays the
-   * only caller; sim state is read-only). Runs before any drawing so a
-   * respawn-triggered clear() lands before draw(). */
-  function stepParticles(sc: Scene): void {
+  /** Feed this frame's flags into the particle system and the fx spring
+   * (renderer stays the only caller; sim state is read-only). Runs before
+   * any drawing so a respawn-triggered clear() lands before draw(). The fx
+   * spring's own clock is driven by this same dt, so it freezes right along
+   * with everything else during hit-stop (dt collapses to 0 while step()
+   * is on hold — see use-game-loop.ts). */
+  function stepJuice(sc: Scene): void {
     const s = sc.s
     const dt = Math.max(0, s.time - lastTime)
     lastTime = s.time
@@ -124,8 +130,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     lastX = s.x
 
     // Bail fires once, on the frame mode transitions into it — justLaunched
-    // fires on tiny crest hops too, so launch FX are deliberately NOT hooked
-    // here (Task 6 gates that on vy).
+    // fires on tiny crest hops too, so launch FX are gated on vy below
+    // (upward launches only: pops, kicker exits, grind ollies).
     if (s.mode === 'bail' && lastMode !== 'bail') particles.burst(s.x, s.y, 1)
     lastMode = s.mode
 
@@ -138,6 +144,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (s.justLanded) particles.burst(s.x, s.y, s.impact)
     particles.pushTrail(s.x, s.y, chainTierOf(s))
     particles.update(dt)
+
+    if (s.justLaunched && s.vy < 0) fx.onLaunch()
+    if (s.justLanded) fx.onLand(s.impact)
+    fx.update(dt)
   }
 
   /** Particles/trail draw in world units under a local camera transform —
@@ -275,13 +285,14 @@ function boardAngle(s: RiderState): number {
   return slopeAngle(s.x)
 }
 
-function drawRider(sc: Scene): void {
+function drawRider(sc: Scene, scale: { sx: number; sy: number }): void {
   const { ctx } = sc
   const px = sx(sc, sc.s.x)
   const py = sy(sc, sc.s.y)
   ctx.save()
   ctx.translate(px, py)
   ctx.rotate(boardAngle(sc.s))
+  ctx.scale(scale.sx, scale.sy)
   ctx.fillStyle = palette.ink
   ctx.fillRect(-12 * sc.cam.zoom, -8 * sc.cam.zoom, 24 * sc.cam.zoom, 8 * sc.cam.zoom)
   ctx.restore()
