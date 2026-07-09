@@ -19,9 +19,12 @@ export type LabEntry = {
   date: string
   /** One-line statement of what the experiment explores */
   thesis: string
-  status: 'live' | 'wip'
+  status: 'live' | 'wip' | 'attic'
   /** Route the artwork opens; defaults to /labs/<slug> */
   href?: string
+  /** The honest saga shown on the attic plaque and in the list view.
+   * Required in practice for status 'attic'. */
+  retrospective?: string
 }
 
 export const labs: LabEntry[] = [
@@ -48,6 +51,14 @@ export const labs: LabEntry[] = [
     date: '2026-07-08',
     thesis:
       'A playable snowboard descent drawn as pure geometry — every kicker, rail and box is a real skill; land the trick to collect it.',
-    status: 'live',
+    status: 'attic',
+    retrospective:
+      'Three passes, three verdicts. v1: flat polylines and a stick figure — "a cheap copy of Happy Wheels." v2: Alto-style rebuild — day cycle, parallax, jointed rider — but the ramps were painted on and one button did everything. v3: real ramp physics, flips, spins, grabs — better bones, same cheap read. Retired here, still playable, as evidence.',
   },
 ]
+
+/** What hangs in the main hall — everything not retired to the attic. */
+export const hallLabs: LabEntry[] = labs.filter((l) => l.status !== 'attic')
+
+/** The failed experiments upstairs. */
+export const atticLabs: LabEntry[] = labs.filter((l) => l.status === 'attic')
