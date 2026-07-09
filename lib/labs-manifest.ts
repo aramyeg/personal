@@ -55,6 +55,14 @@ export const labs: LabEntry[] = [
     retrospective:
       'Three passes, three verdicts. v1: flat polylines and a stick figure — "a cheap copy of Happy Wheels." v2: Alto-style rebuild — day cycle, parallax, jointed rider — but the ramps were painted on and one button did everything. v3: real ramp physics, flips, spins, grabs — better bones, same cheap read. Retired here, still playable, as evidence.',
   },
+  {
+    slug: 'xp',
+    title: 'Bliss',
+    date: '2026-07-09',
+    thesis:
+      'The portfolio as a Windows XP desktop — Luna chrome, the real boot chime, a helpful paperclip. The most beloved OS ever shipped, rebuilt as a design system.',
+    status: 'live',
+  },
 ]
 
 /** What hangs in the main hall — everything not retired to the attic. */
