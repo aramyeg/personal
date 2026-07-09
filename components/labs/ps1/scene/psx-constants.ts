@@ -34,5 +34,7 @@ export const PSX = {
     accentYellow: '#d9b23a',
     accentRed: '#b8402e',
     accentBlue: '#3e6fb8',
+    /** Window view's dull-yellow lit-window accent — its only warm note. */
+    litWindow: '#c9a94e',
   },
 } as const

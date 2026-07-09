@@ -391,8 +391,13 @@ export function makeDeckTexture(): THREE.CanvasTexture {
 
 /** CRT-black screen field — a near-black with a teal cast, not `#000`. */
 const CRT_BG = '#0c1a18'
-/** Dull ochre of a distant lit window — the window view's only warm accent. */
-const LIT_WINDOW = '#c9a94e'
+
+/** `#rrggbb` → an `rgba(r,g,b,a)` string, so an accent hex reused at partial
+ * alpha stays a single source of truth (no re-typed channel literals). */
+function rgbaFromHex(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
+}
 
 /** Blank a canvas element and hand back its 2D context. */
 function canvasOf(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -616,7 +621,7 @@ export function makeWindowViewTexture(): THREE.CanvasTexture {
     [lefts[3] + 5, tops[3] + 14],
     [lefts[5] + 8, tops[5] + 10],
   ]
-  g.fillStyle = LIT_WINDOW
+  g.fillStyle = PSX.TEX.litWindow
   for (const [wx, wy] of lit) {
     if (wx < W && wy < streetTop) g.fillRect(wx, wy, 3, 4)
   }
@@ -624,7 +629,7 @@ export function makeWindowViewTexture(): THREE.CanvasTexture {
   // Wet street band with faint window reflections.
   g.fillStyle = '#82857f'
   g.fillRect(0, streetTop, W, H - streetTop)
-  g.fillStyle = 'rgba(201,169,78,0.18)'
+  g.fillStyle = rgbaFromHex(PSX.TEX.litWindow, 0.18)
   for (const [wx] of lit) {
     if (wx < W) g.fillRect(wx, streetTop, 3, H - streetTop)
   }
