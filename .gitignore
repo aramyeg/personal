@@ -66,3 +66,7 @@ IMPROVEMENT_PLAN.md
 .vercel
 .env*.local
 .superpowers/
+
+# Playwright artifacts
+/playwright-report/
+/test-results/

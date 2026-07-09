@@ -1,0 +1,331 @@
+<!-- scripts/posters/snowpark-poster.html -->
+<!doctype html>
+<meta charset="utf-8" />
+<style>html,body{margin:0;background:#a9bcd8}canvas{display:block}</style>
+<canvas id="c" width="768" height="1024"></canvas>
+<script>
+  const c = document.getElementById('c')
+  const g = c.getContext('2d')
+  const W = c.width, H = c.height
+  const TAU = Math.PI * 2
+  const DEG2RAD = Math.PI / 180
+
+  // Alpenglow phase stop (sky.ts PHASES, p=0.58) — the only source colors,
+  // plus ink + amber. White/black appear only inside mix()/darken(), exactly
+  // as terrain.ts's own RIM_TINT and darken() do against the real renderer.
+  const TOP = '#a9bcd8'
+  const HORIZON = '#eab387'
+  const SUN = '#d9843f'
+  const HAZE = '#c9c3cf'
+  const SNOW = '#e8e3e6'
+  const BAND = '#6d7f9e'
+  const INK = '#122630'
+  const AMBER = '#d9a441'
+
+  // --- color helpers (mirrors terrain.ts mix/darken) ------------------------
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+  function toHex(r, gc, b) {
+    const h = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+    return `#${h(r)}${h(gc)}${h(b)}`
+  }
+  function mix(a, b, t) {
+    const [ar, ag, ab] = hexToRgb(a)
+    const [br, bg, bb] = hexToRgb(b)
+    return toHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t)
+  }
+  function darken(hex, amt) { return mix(hex, '#000000', amt) }
+  function rgba(hex, a) {
+    const [r, gc, b] = hexToRgb(hex)
+    return `rgba(${r}, ${gc}, ${b}, ${a})`
+  }
+  function hash(i, n) {
+    const v = Math.sin(i * 127.1 + n * 311.7) * 43758.5453
+    return v - Math.floor(v)
+  }
+
+  // --- sky --------------------------------------------------------------
+  const sky = g.createLinearGradient(0, 0, 0, H)
+  sky.addColorStop(0, TOP)
+  sky.addColorStop(1, HORIZON)
+  g.fillStyle = sky
+  g.fillRect(0, 0, W, H)
+
+  const sunX = 512, sunY = 300, sunR = 56, haloR = sunR * 2.2
+  const halo = g.createRadialGradient(sunX, sunY, 0, sunX, sunY, haloR)
+  halo.addColorStop(0, rgba(SUN, 0.35))
+  halo.addColorStop(1, rgba(SUN, 0))
+  g.fillStyle = halo
+  g.beginPath(); g.arc(sunX, sunY, haloR, 0, TAU); g.fill()
+  g.fillStyle = SUN
+  g.beginPath(); g.arc(sunX, sunY, sunR, 0, TAU); g.fill()
+
+  // --- three hazed parallax bands, farthest first ------------------------
+  function drawPine(x, baseY, hgt, fill) {
+    const wd = hgt * 0.42
+    g.fillStyle = fill
+    g.beginPath()
+    g.moveTo(x, baseY - hgt); g.lineTo(x - wd, baseY); g.lineTo(x + wd, baseY)
+    g.closePath(); g.fill()
+    g.beginPath()
+    g.moveTo(x, baseY - hgt * 1.45)
+    g.lineTo(x - wd * 0.62, baseY - hgt * 0.5)
+    g.lineTo(x + wd * 0.62, baseY - hgt * 0.5)
+    g.closePath(); g.fill()
+  }
+
+  const BANDS = [
+    { baseY: 440, ampA: 14, ampB: 6, freqA: TAU / 300, freqB: TAU / 118, seed: 0.7, hazeMix: 0.6 },
+    { baseY: 566, ampA: 20, ampB: 9, freqA: TAU / 280, freqB: TAU / 104, seed: 2.4, hazeMix: 0.375 },
+    { baseY: 692, ampA: 28, ampB: 13, freqA: TAU / 260, freqB: TAU / 92, seed: 4.2, hazeMix: 0.15 },
+  ]
+  function ridgeY(x, b) {
+    return b.baseY + b.ampA * Math.sin(x * b.freqA + b.seed) + b.ampB * Math.sin(x * b.freqB + b.seed * 2)
+  }
+  const PINE_STEP = 128
+  const PINE_BASE_H = 30
+  BANDS.forEach((b, i) => {
+    const fill = mix(BAND, HAZE, b.hazeMix)
+    g.beginPath()
+    g.moveTo(0, ridgeY(0, b))
+    for (let x = 8; x <= W; x += 8) g.lineTo(x, ridgeY(x, b))
+    g.lineTo(W, H); g.lineTo(0, H); g.closePath()
+    g.fillStyle = fill
+    g.fill()
+
+    const pineFill = mix(INK, fill, 0.5)
+    const size = PINE_BASE_H * (0.6 + i * 0.35)
+    let k = 0
+    for (let x = PINE_STEP * 0.5; x < W - PINE_STEP * 0.5; x += PINE_STEP) {
+      k += 1
+      if (hash(k, i * 3 + 1) < 0.4) continue
+      const jx = x + (hash(k, i * 3 + 2) - 0.5) * PINE_STEP * 0.5
+      drawPine(jx, ridgeY(jx, b), size * (0.75 + hash(k, i * 3 + 3) * 0.5), pineFill)
+    }
+  })
+
+  // --- near terrain: filled body + rim-lit snowline ----------------------
+  function snowlineY(x) {
+    return 828 + 20 * Math.sin(x * TAU / 340 + 1.1) + 8 * Math.sin(x * TAU / 130 + 0.4)
+  }
+  function traceSnowline() {
+    g.moveTo(-8, snowlineY(-8))
+    for (let x = 0; x <= W + 8; x += 8) g.lineTo(x, snowlineY(x))
+  }
+
+  const bodyGrad = g.createLinearGradient(0, 760, 0, H)
+  bodyGrad.addColorStop(0, SNOW)
+  bodyGrad.addColorStop(1, darken(SNOW, 0.12))
+  g.beginPath(); traceSnowline(); g.lineTo(W + 8, H); g.lineTo(-8, H); g.closePath()
+  g.fillStyle = bodyGrad
+  g.fill()
+
+  g.beginPath(); traceSnowline()
+  g.globalAlpha = 0.9
+  g.lineWidth = 5
+  g.strokeStyle = mix(SUN, '#ffffff', 0.55)
+  g.stroke()
+  g.globalAlpha = 1
+  g.lineWidth = 2
+  g.strokeStyle = SNOW
+  g.stroke()
+
+  // --- kicker wedge --------------------------------------------------------
+  const kx = 372, kx2 = 522, kH = 76
+  const ky = snowlineY(kx), ky2 = snowlineY(kx2)
+  g.beginPath()
+  g.moveTo(kx, ky)
+  g.lineTo(kx2, ky2)
+  g.lineTo(kx2, ky2 - kH)
+  g.closePath()
+  g.fillStyle = INK
+  g.fill()
+
+  // small kicked-up spray near the lip
+  for (let i = 0; i < 7; i++) {
+    const t = hash(i, 900)
+    const sx = kx2 - 10 + t * 46
+    const sy = ky2 - kH * 0.7 - t * 40 - hash(i, 901) * 24
+    g.fillStyle = rgba(SNOW, 0.85 - t * 0.3)
+    g.beginPath()
+    g.arc(sx, sy, 1.4 + hash(i, 902) * 2, 0, TAU)
+    g.fill()
+  }
+
+  // --- rider rig (ports render/rider-rig.ts RIG + computePose, air pose) ---
+  const RIG = {
+    BOARD_LEN: 46, LEG: 16, TORSO: 20, ARM: 14, HEAD_R: 5.5,
+    CROUCH_MAX: 0.45,
+    FOOT_SPREAD: 0.3, BOARD_THICK: 5, HIP_BACK: -2,
+    KNEE_BULGE: 6, KNEE_DROP: 2,
+    AIR_CURL: 0.85, AIR_TUCK: 0.35, AIR_TUCK_FLIP: 0.35, AIR_TUCK_GRAB: 0.2,
+    SHOULDER_DROP: 4, NECK_GAP: 1.5, ELBOW_BULGE: 4, GRAB_REACH: 0.7,
+    BOARD_W: 5, DECK_W: 1, LEG_W: 3, TORSO_W: 4, ARM_W: 2.5,
+  }
+
+  function elbowOf(shoulder, hand, bulge) {
+    const mx = (shoulder.x + hand.x) / 2, my = (shoulder.y + hand.y) / 2
+    const dx = hand.x - shoulder.x, dy = hand.y - shoulder.y
+    const len = Math.hypot(dx, dy) || 1
+    let nx = -dy / len, ny = dx / len
+    if (ny < 0) { nx = -nx; ny = -ny }
+    return { x: mx + nx * bulge, y: my + ny * bulge }
+  }
+
+  // Mid-backflip, tucked and grabbing — mirrors crouch01/torsoLean's airborne
+  // branch (mode==='air'), where slope never enters the pose.
+  function computeAirPose() {
+    const crouch = Math.min(1, RIG.AIR_TUCK + RIG.AIR_TUCK_FLIP + RIG.AIR_TUCK_GRAB)
+    const lean = RIG.AIR_CURL
+    const grabbing = true
+
+    const footX = RIG.BOARD_LEN * RIG.FOOT_SPREAD
+    const footY = -RIG.BOARD_THICK * 0.5
+    const backFoot = { x: -footX, y: footY }
+    const frontFoot = { x: footX, y: footY }
+
+    const hipHeight = RIG.LEG * (1 - RIG.CROUCH_MAX * crouch)
+    const hip = { x: RIG.HIP_BACK, y: footY - hipHeight }
+
+    const kneeBulge = RIG.KNEE_BULGE * (0.4 + crouch)
+    const backKnee = { x: (backFoot.x + hip.x) / 2 + kneeBulge, y: (backFoot.y + hip.y) / 2 + RIG.KNEE_DROP }
+    const frontKnee = { x: (frontFoot.x + hip.x) / 2 + kneeBulge, y: (frontFoot.y + hip.y) / 2 + RIG.KNEE_DROP }
+
+    const ux = Math.sin(lean), uy = -Math.cos(lean)
+    const neck = { x: hip.x + ux * RIG.TORSO, y: hip.y + uy * RIG.TORSO }
+    const shoulder = { x: hip.x + ux * (RIG.TORSO - RIG.SHOULDER_DROP), y: hip.y + uy * (RIG.TORSO - RIG.SHOULDER_DROP) }
+    const head = { x: neck.x + ux * (RIG.HEAD_R + RIG.NECK_GAP), y: neck.y + uy * (RIG.HEAD_R + RIG.NECK_GAP) }
+
+    const armS01 = 0.4
+    const frontHand = grabbing
+      ? { x: frontFoot.x * RIG.GRAB_REACH, y: footY }
+      : { x: shoulder.x + RIG.ARM * (0.35 - 0.45 * armS01), y: shoulder.y + RIG.ARM * 0.55 }
+    const backHand = { x: shoulder.x - RIG.ARM * (0.45 + 0.4 * armS01), y: shoulder.y + RIG.ARM * 0.5 }
+
+    return {
+      boardBack: { x: -RIG.BOARD_LEN / 2, y: 0 },
+      boardFront: { x: RIG.BOARD_LEN / 2, y: 0 },
+      backFoot, frontFoot, backKnee, frontKnee, hip, neck, shoulder, head,
+      backElbow: elbowOf(shoulder, backHand, RIG.ELBOW_BULGE), backHand,
+      frontElbow: elbowOf(shoulder, frontHand, RIG.ELBOW_BULGE), frontHand,
+    }
+  }
+
+  function localToWorld(p, origin, angle) {
+    const cs = Math.cos(angle), sn = Math.sin(angle)
+    return { x: origin.x + p.x * cs - p.y * sn, y: origin.y + p.x * sn + p.y * cs }
+  }
+
+  function seg(x0, y0, x1, y1) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke() }
+  function chain(pts) {
+    g.beginPath(); g.moveTo(pts[0].x, pts[0].y)
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y)
+    g.stroke()
+  }
+
+  function drawPose(pose) {
+    g.lineCap = 'round'; g.lineJoin = 'round'
+    g.strokeStyle = INK
+    g.lineWidth = RIG.BOARD_W
+    seg(pose.boardBack.x, pose.boardBack.y, pose.boardFront.x, pose.boardFront.y)
+    g.strokeStyle = SNOW
+    g.lineWidth = RIG.DECK_W
+    seg(pose.boardBack.x * 0.82, -RIG.BOARD_W * 0.35, pose.boardFront.x * 0.82, -RIG.BOARD_W * 0.35)
+    g.strokeStyle = INK
+
+    g.lineWidth = RIG.LEG_W
+    chain([pose.backFoot, pose.backKnee, pose.hip])
+    chain([pose.frontFoot, pose.frontKnee, pose.hip])
+
+    g.lineWidth = RIG.TORSO_W
+    seg(pose.hip.x, pose.hip.y, pose.neck.x, pose.neck.y)
+
+    g.lineWidth = RIG.ARM_W
+    chain([pose.shoulder, pose.backElbow, pose.backHand])
+    chain([pose.shoulder, pose.frontElbow, pose.frontHand])
+
+    g.fillStyle = INK
+    g.beginPath(); g.arc(pose.head.x, pose.head.y, RIG.HEAD_R, 0, TAU); g.fill()
+  }
+
+  const UNIT = 5.4
+  const riderOrigin = { x: 546, y: 574 }
+  const riderAngleDeg = -150
+  const riderAngleRad = riderAngleDeg * DEG2RAD
+  const pose = computeAirPose()
+
+  g.save()
+  g.translate(riderOrigin.x, riderOrigin.y)
+  g.rotate(riderAngleRad)
+  g.scale(UNIT, UNIT)
+  drawPose(pose)
+  g.restore()
+
+  // --- scarf: flowing tapered amber ribbon off the shoulder anchor --------
+  // Anchored at the shoulder rather than the neck — the neck sits only
+  // HEAD_R+NECK_GAP away from the head disc, and a scarf's-width start point
+  // there reads as coming out of the face. The shoulder is far enough back
+  // along the torso axis to clear the head cleanly.
+  const shoulderPx = localToWorld({ x: pose.shoulder.x * UNIT, y: pose.shoulder.y * UNIT }, riderOrigin, riderAngleRad)
+  const scarfPts = [
+    shoulderPx,
+    { x: shoulderPx.x - 40, y: shoulderPx.y - 62 },
+    { x: shoulderPx.x - 110, y: shoulderPx.y - 82 },
+    { x: shoulderPx.x - 184, y: shoulderPx.y - 50 },
+    { x: shoulderPx.x - 228, y: shoulderPx.y + 18 },
+    { x: shoulderPx.x - 238, y: shoulderPx.y + 86 },
+  ]
+  function bezierPoint(pts, t) {
+    let cur = pts.slice()
+    while (cur.length > 1) {
+      const next = []
+      for (let i = 0; i < cur.length - 1; i++) {
+        next.push({ x: cur[i].x + (cur[i + 1].x - cur[i].x) * t, y: cur[i].y + (cur[i + 1].y - cur[i].y) * t })
+      }
+      cur = next
+    }
+    return cur[0]
+  }
+  const SCARF_STEPS = 22
+  const scarfSampled = []
+  for (let i = 0; i <= SCARF_STEPS; i++) scarfSampled.push(bezierPoint(scarfPts, i / SCARF_STEPS))
+
+  g.lineCap = 'round'; g.lineJoin = 'round'
+  g.globalAlpha = 0.94
+  g.strokeStyle = AMBER
+  for (let i = 0; i < scarfSampled.length - 1; i++) {
+    const t = i / (scarfSampled.length - 2)
+    g.lineWidth = 13 + (3 - 13) * t
+    seg(scarfSampled[i].x, scarfSampled[i].y, scarfSampled[i + 1].x, scarfSampled[i + 1].y)
+  }
+  g.globalAlpha = 1
+
+  // --- wordmark + caption --------------------------------------------------
+  const cx = W / 2
+  g.textAlign = 'center'
+  g.textBaseline = 'alphabetic'
+  g.fillStyle = INK
+  g.font = '800 74px "Arial Narrow", Arial, sans-serif'
+  g.fillText('Powder Lines', cx, 918)
+
+  g.fillStyle = AMBER
+  const barW = 100, barH = 5
+  g.fillRect(cx - barW / 2, 940, barW, barH)
+
+  g.fillStyle = mix(INK, BAND, 0.3)
+  g.font = '400 23px ui-monospace, "SF Mono", Consolas, monospace'
+  const label = 'STYLE LAB — № 2'
+  const ls = 5
+  let total = 0
+  const widths = []
+  for (const ch of label) { const w = g.measureText(ch).width; widths.push(w); total += w + ls }
+  total -= ls
+  let x = cx - total / 2
+  g.textAlign = 'left'
+  for (let i = 0; i < label.length; i++) {
+    g.fillText(label[i], x, 980)
+    x += widths[i] + ls
+  }
+</script>
