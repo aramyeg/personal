@@ -39,17 +39,17 @@ describe('HOTSPOTS registry', () => {
   it('binds the exact content mapping from the brief', () => {
     const byId = Object.fromEntries(HOTSPOTS.map((h) => [h.id, h]))
     expect(byId.crt.panel).toBe('menu')
-    expect(byId.crt.angles.sort()).toEqual(['desk', 'room'].sort())
+    expect([...byId.crt.angles].sort()).toEqual(['desk', 'room'].sort())
     expect(byId.memcards.panel).toBe('projects')
-    expect(byId.memcards.angles.sort()).toEqual(['shelf', 'room'].sort())
+    expect([...byId.memcards.angles].sort()).toEqual(['shelf', 'room'].sort())
     expect(byId.posters.panel).toBe('skills')
-    expect(byId.posters.angles.sort()).toEqual(['room', 'desk'].sort())
+    expect([...byId.posters.angles].sort()).toEqual(['room', 'desk'].sort())
     expect(byId.pager.panel).toBe('contact')
     expect(byId.pager.angles).toEqual(['desk'])
     expect(byId.gameboxes.panel).toBe('labs')
     expect(byId.gameboxes.angles).toEqual(['shelf'])
     expect(byId.tv.panel).toBe('about')
-    expect(byId.tv.angles.sort()).toEqual(['tv', 'room'].sort())
+    expect([...byId.tv.angles].sort()).toEqual(['tv', 'room'].sort())
   })
 
   it('labels are lowercase', () => {
@@ -74,8 +74,8 @@ describe('hotspotsForAngle', () => {
       }
     }
   })
-  it('returns an empty array for an angle with no hotspots, if any', () => {
-    // sanity: function never throws for a valid angle id
-    expect(() => hotspotsForAngle('tv')).not.toThrow()
+  it("returns only the 'tv' hotspot for the 'tv' angle", () => {
+    const ids = hotspotsForAngle('tv').map((h) => h.id)
+    expect(ids).toEqual(['tv'])
   })
 })
