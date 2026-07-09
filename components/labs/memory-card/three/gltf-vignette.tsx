@@ -182,12 +182,12 @@ function GltfModel({
     )
   }, [gltf.scene, fitHeight, floorY])
 
-  useEffect(() => {
-    return () => {
-      disposeScene(gltf.scene)
-      useLoader.clear(GLTFLoader, src)
-    }
-  }, [gltf.scene, src])
+  // No per-component disposal: `useLoader`'s cache is shared, and React
+  // StrictMode's dev double-mount makes an unmount-time dispose destroy GPU
+  // buffers the surviving mount still renders (observed live: model reduced
+  // to a corrupt sliver). GPU memory is reclaimed when `VignetteCanvas`
+  // unmounts the whole canvas (IO gating) and drops the GL context; the
+  // parsed GLB stays in the loader cache by design, like any asset cache.
 
   useFrame((_, delta) => {
     if (spin && !reduced && groupRef.current) {
