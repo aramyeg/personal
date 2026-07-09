@@ -23,8 +23,8 @@ export const PSX = {
      * units, so these run far above the brief's legacy 0.6/1.2 — the value
      * that visibly tints the desk without blowing out lives here; gates tune it.
      */
-    crtIntensity: 3.4,
-    crtDistance: 1.7,
+    crtIntensity: 1.1,
+    crtDistance: 1.3,
   },
   TEX: {
     wall: '#b3ac9b',
