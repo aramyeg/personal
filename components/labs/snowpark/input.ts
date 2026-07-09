@@ -176,6 +176,14 @@ export function createInput(): InputController {
 
   const setPlaying = (next: boolean): void => {
     playing = next
+    // Leaving play discards buffered one-shot intents: an Escape that raced
+    // a same-frame phase change must not pause the NEXT run, and an R pressed
+    // while paused must not respawn the rider on resume (final-review LOW-1/2).
+    if (!next) {
+      pendingEscape = false
+      retryPressed = false
+      jumpPressed = false
+    }
   }
 
   return { attach, sample, consumeEscape, setPlaying }
