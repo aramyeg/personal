@@ -1,7 +1,13 @@
 import { useXpStore } from './store'
 
-const NAMES = ['startup', 'error', 'balloon', 'nudge', 'recycle', 'click', 'shutdown'] as const
-export type SoundName = (typeof NAMES)[number]
+export type SoundName =
+  | 'startup'
+  | 'error'
+  | 'balloon'
+  | 'nudge'
+  | 'recycle'
+  | 'click'
+  | 'shutdown'
 
 let unlocked = false
 
