@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useXpStore } from './store'
 import { useIdle } from './use-idle'
+import { isCoarse } from './apps'
+import { unlockSounds } from './sounds'
 import { DesktopIcons } from './desktop-icons'
 import { WindowsLayer } from './windows-layer'
 import { Taskbar } from './taskbar'
@@ -11,12 +14,14 @@ import { BootScreen } from './boot-screen'
 import { WelcomeScreen } from './welcome-screen'
 import { Clippy } from './clippy'
 import { BalloonTip } from './balloon-tip'
-import { Screensaver } from './screensaver'
 import { ChaosLayer } from './chaos-layer'
 import styles from './xp.module.css'
 
+const Screensaver = dynamic(() => import('./screensaver').then((m) => m.Screensaver), { ssr: false })
+
 export function XpDesktop() {
   const phase = useXpStore((s) => s.phase)
+  const chaos = useXpStore((s) => s.chaos)
   const [resolved, setResolved] = useState(false)
 
   useEffect(() => {
@@ -26,11 +31,24 @@ export function XpDesktop() {
       window.sessionStorage.setItem('xp-booted', '1')
       useXpStore.getState().setPhase('desktop')
     }
+    if (window.sessionStorage.getItem('xp-muted') === '1') {
+      useXpStore.setState({ muted: true })
+    }
+    window.addEventListener('pointerdown', unlockSounds, { once: true })
+    window.addEventListener('keydown', unlockSounds, { once: true })
     setResolved(true)
+    return () => {
+      window.removeEventListener('pointerdown', unlockSounds)
+      window.removeEventListener('keydown', unlockSounds)
+    }
   }, [])
 
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  useIdle(60_000, () => useXpStore.getState().setScreensaver(true), phase === 'desktop' && !reduced)
+  useIdle(
+    60_000,
+    () => useXpStore.getState().setScreensaver(true),
+    phase === 'desktop' && !reduced && !isCoarse() && chaos === 'idle'
+  )
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

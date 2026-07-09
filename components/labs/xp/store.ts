@@ -145,7 +145,14 @@ export const useXpStore = create<XpState>()(
         }),
 
       setStartOpen: (open) => set((s) => { s.startOpen = open }),
-      toggleMuted: () => set((s) => { s.muted = !s.muted }),
+      toggleMuted: () =>
+        set((s) => {
+          const next = !s.muted
+          s.muted = next
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('xp-muted', next ? '1' : '0')
+          }
+        }),
       dismissClippy: () => set((s) => { s.clippyDismissed = true }),
       setScreensaver: (on) => set((s) => { s.screensaver = on }),
 

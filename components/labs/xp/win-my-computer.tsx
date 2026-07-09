@@ -1,6 +1,6 @@
 'use client'
 
-import { openApp } from './apps'
+import { isCoarse, openApp } from './apps'
 import type { XpAppId } from './store'
 
 const SHORTCUTS: { app: XpAppId; label: string; icon: string }[] = [
@@ -31,6 +31,7 @@ export function WinMyComputer() {
           <button
             key={s.app}
             type="button"
+            onClick={() => { if (isCoarse()) openApp(s.app) }}
             onDoubleClick={() => openApp(s.app)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, padding: 4 }}
           >

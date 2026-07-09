@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { projects, categoryLabels } from '@/data/projects'
-import { openApp } from './apps'
+import { isCoarse, openApp } from './apps'
 import styles from './xp.module.css'
 
 export function WinProjects() {
@@ -39,7 +39,7 @@ export function WinProjects() {
             <li key={p.id}>
               <button
                 type="button"
-                onClick={() => setSelectedId(p.id)}
+                onClick={() => { if (isCoarse()) openApp('project-detail', p.id, p.title); else setSelectedId(p.id) }}
                 onDoubleClick={() => openApp('project-detail', p.id, p.title)}
                 style={{ width: 110, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 6, background: selectedId === p.id ? '#316ac5' : 'none', color: selectedId === p.id ? '#fff' : '#000', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, textAlign: 'center' }}
               >
