@@ -1,15 +1,16 @@
 import { useXpStore, type XpAppId } from './store'
+import { playSound } from './sounds'
 
-export const APPS: Record<XpAppId, { title: string; icon: string; w: number; h: number }> = {
-  'my-computer':       { title: 'My Computer',            icon: '🖥️', w: 560, h: 380 },
-  'my-projects':       { title: 'My Projects',            icon: '📁', w: 640, h: 440 },
-  'project-detail':    { title: 'Project',                icon: '📄', w: 520, h: 420 },
-  resume:              { title: 'resume.doc - WordPad',   icon: '📝', w: 620, h: 500 },
-  about:               { title: 'about-me.txt - Notepad', icon: '🗒️', w: 480, h: 360 },
-  messenger:           { title: 'Aram - Conversation',    icon: '💬', w: 420, h: 480 },
-  'internet-explorer': { title: 'aram.dev - Microsoft Internet Explorer', icon: '🌐', w: 760, h: 540 },
-  'add-remove':        { title: 'Add or Remove Programs', icon: '🧩', w: 640, h: 480 },
-  'recycle-bin':       { title: 'Recycle Bin',            icon: '🗑️', w: 560, h: 400 },
+export const APPS: Record<XpAppId, { title: string; menuLabel: string; icon: string; w: number; h: number }> = {
+  'my-computer':       { title: 'My Computer',            menuLabel: 'My Computer',              icon: '🖥️', w: 560, h: 380 },
+  'my-projects':       { title: 'My Projects',            menuLabel: 'My Projects',              icon: '📁', w: 640, h: 440 },
+  'project-detail':    { title: 'Project',                menuLabel: 'Project',                  icon: '📄', w: 520, h: 420 },
+  resume:              { title: 'resume.doc - WordPad',   menuLabel: 'resume.doc',               icon: '📝', w: 620, h: 500 },
+  about:               { title: 'about-me.txt - Notepad', menuLabel: 'about-me.txt',              icon: '🗒️', w: 480, h: 360 },
+  messenger:           { title: 'Aram - Conversation',    menuLabel: 'Messenger',                icon: '💬', w: 420, h: 480 },
+  'internet-explorer': { title: 'aram.dev - Microsoft Internet Explorer', menuLabel: 'Internet Explorer', icon: '🌐', w: 760, h: 540 },
+  'add-remove':        { title: 'Add or Remove Programs', menuLabel: 'Add or Remove Programs',   icon: '🧩', w: 640, h: 480 },
+  'recycle-bin':       { title: 'Recycle Bin',            menuLabel: 'Recycle Bin',              icon: '🗑️', w: 560, h: 400 },
 }
 
 export const DESKTOP_ICONS: { app: XpAppId | 'chaos'; label: string; icon: string }[] = [
@@ -27,6 +28,7 @@ export const isCoarse = () =>
   typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
 export function openApp(app: XpAppId, param?: string, title?: string) {
+  playSound('click')
   const meta = APPS[app]
   useXpStore.getState().openWindow(app, {
     param,

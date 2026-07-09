@@ -1,8 +1,14 @@
 'use client'
 
+import { useEffect } from 'react'
 import { atticLabs } from '@/lib/labs-manifest'
+import { playSound } from './sounds'
 
 export function WinRecycleBin() {
+  useEffect(() => {
+    playSound('recycle')
+  }, [])
+
   return (
     <div style={{ padding: 12, fontSize: 11, userSelect: 'text' }}>
       {atticLabs.length === 0 && <p>The Recycle Bin is empty.</p>}

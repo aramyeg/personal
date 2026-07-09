@@ -29,7 +29,7 @@ export function BalloonTip() {
   return (
     <div
       role="status"
-      style={{ position: 'absolute', right: 12, bottom: 40, zIndex: 14000, maxWidth: 240, background: '#ffffe1', border: '1px solid #000', borderRadius: 6, padding: '8px 10px', fontFamily: 'Tahoma, sans-serif', fontSize: 11, boxShadow: '2px 2px 6px rgba(0,0,0,.3)' }}
+      style={{ position: 'absolute', right: 96, bottom: 40, zIndex: 14000, maxWidth: 240, background: '#ffffe1', border: '1px solid #000', borderRadius: 6, padding: '8px 10px', fontFamily: 'Tahoma, sans-serif', fontSize: 11, boxShadow: '2px 2px 6px rgba(0,0,0,.3)' }}
     >
       <button
         type="button"

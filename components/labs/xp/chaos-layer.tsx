@@ -72,7 +72,7 @@ export function ChaosLayer() {
           key={seed}
           role="alertdialog"
           className={styles.dialog}
-          style={{ left: 120 + ((seed * 47) % 320), top: 80 + ((seed * 31) % 240), zIndex: 25000 + seed }}
+          style={{ left: `min(${120 + ((seed * 47) % 320)}px, calc(100vw - 330px))`, top: 80 + ((seed * 31) % 240), zIndex: 25000 + seed }}
         >
           <header className={styles.titleBar}>
             <span className={styles.titleText}>free_ringtones.exe</span>

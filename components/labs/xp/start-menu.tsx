@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useXpStore, type XpAppId } from './store'
 import { playSound } from './sounds'
@@ -15,6 +15,17 @@ export function StartMenu() {
   const open = useXpStore((s) => s.startOpen)
   const [confirming, setConfirming] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!confirming) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setConfirming(false)
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [confirming])
 
   if (!open && !confirming) return null
 
@@ -43,7 +54,7 @@ export function StartMenu() {
                 <li key={app}>
                   <button type="button" onClick={() => openApp(app)} style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', padding: '6px 8px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11 }}>
                     <span aria-hidden style={{ fontSize: 22 }}>{APPS[app].icon}</span>
-                    {app === 'resume' ? 'resume.doc' : app === 'about' ? 'about-me.txt' : APPS[app].title.split(' - ')[0]}
+                    {APPS[app].menuLabel}
                   </button>
                 </li>
               ))}
@@ -53,7 +64,7 @@ export function StartMenu() {
                 <li key={app}>
                   <button type="button" onClick={() => openApp(app)} style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', padding: '6px 8px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 600, color: 'inherit' }}>
                     <span aria-hidden style={{ fontSize: 18 }}>{APPS[app].icon}</span>
-                    {APPS[app].title}
+                    {APPS[app].menuLabel}
                   </button>
                 </li>
               ))}
