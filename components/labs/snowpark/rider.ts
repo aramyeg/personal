@@ -1,6 +1,6 @@
 import type { Course, CourseObstacle } from './course'
 import { advanceAlongSlope, slopeAngle, slopeCurvature, slopeY } from './slope'
-import { collectLine, trickName, trickScore } from './tricks'
+import { collectLine, trickName, trickScore, type Grab } from './tricks'
 
 export type RiderMode = 'snow' | 'air' | 'grind' | 'bail' | 'finish'
 
@@ -8,7 +8,8 @@ export type RiderInput = {
   jumpHeld: boolean
   /** true only on the frame the key went down */
   jumpPressed: boolean
-  grabHeld: boolean
+  /** grab held this frame: none, toward the nose, or back over the tail */
+  grab: Grab
   /** held spin direction: -1 left, +1 right, 0 none (both held cancels) */
   spinDir: -1 | 0 | 1
   retryPressed: boolean
@@ -34,14 +35,16 @@ export type RiderState = {
   speed: number
   /** jump charge 0..1, accumulates while tucking on snow */
   charge: number
-  /** rotation magnitude progressed so far this air (deg; direction is a render concern) */
-  rotationDeg: number
+  /** board pitch progressed this air (deg; Space-held) — the flip, judged vs the slope on landing */
+  flipDeg: number
+  /** flat spin progressed this air (deg; arrow-held) — must settle to a 360 multiple to land clean */
+  spinDeg: number
   /** jump button held this frame — tuck on snow, held-flip in air */
   tucking: boolean
   /** grab currently held (drawn by renderer) */
-  grabbing: boolean
-  /** grab was held at any point this air (counts for the trick) */
-  grabHappened: boolean
+  grab: Grab
+  /** the grab that counts for the trick — the last one held this air (none if never grabbed) */
+  grabTrick: Grab
   /** board orientation at takeoff (deg) — landing compares board vs slope */
   launchAngleDeg: number
   /** obstacle this air/grind is attributed to, or null */
@@ -117,8 +120,10 @@ export const PHYS = {
   BUFFER_S: 0.1,
   /** a hop shorter than this glues back silently — not a trick landing (s) */
   MIN_AIR_S: 0.25,
-  /** deg/s while a rotation input is held (backflip via Space, spins via arrows) */
+  /** deg/s of board pitch while Space is held — the flip (backflip) rate */
   SPIN_RATE: 420,
+  /** deg/s of flat spin while an arrow is held — spins turn slower than flips */
+  SPIN_RATE_SPIN: 300,
   SNAP_DEG: 20,
   LANDING_TOLERANCE_DEG: 35,
   CLEAN_BOOST: 60,
@@ -156,6 +161,12 @@ function wrap180(deg: number): number {
   return mod(deg + 90, 180) - 90
 }
 
+/** Signed distance (deg) from the nearest multiple of 360 — the spin-settle
+ * error at landing (0 when a spin has come all the way around). */
+function wrap360(deg: number): number {
+  return mod(deg + 180, 360) - 180
+}
+
 /** Component of a velocity along the slope tangent. */
 function project(vx: number, vy: number, angle: number): number {
   return vx * Math.cos(angle) + vy * Math.sin(angle)
@@ -176,10 +187,11 @@ export function createRider(course: Course): RiderState {
     vy: 0,
     speed: PHYS.START_SPEED,
     charge: 0,
-    rotationDeg: 0,
+    flipDeg: 0,
+    spinDeg: 0,
     tucking: false,
-    grabbing: false,
-    grabHappened: false,
+    grab: 'none',
+    grabTrick: 'none',
     launchAngleDeg: 0,
     attributedObstacle: null,
     grindLength: 0,
@@ -259,12 +271,13 @@ function clearOneStepFlags(s: RiderState): RiderState {
 /** Reset the air/trick fields to their neutral values (charge/timers set by callers). */
 function clearAir(): Pick<
   RiderState,
-  'rotationDeg' | 'grabbing' | 'grabHappened' | 'grindLength' | 'airtime' | 'rotationIdleS'
+  'flipDeg' | 'spinDeg' | 'grab' | 'grabTrick' | 'grindLength' | 'airtime' | 'rotationIdleS'
 > {
   return {
-    rotationDeg: 0,
-    grabbing: false,
-    grabHappened: false,
+    flipDeg: 0,
+    spinDeg: 0,
+    grab: 'none',
+    grabTrick: 'none',
     grindLength: 0,
     airtime: 0,
     rotationIdleS: 0,
@@ -486,9 +499,13 @@ function stepAir(
   const impact = decayImpact(state.impact, dt)
   const coyoteT = decayTo0(state.coyoteT, dt, 1)
 
-  const spinning = input.spinDir !== 0 || input.jumpHeld
-  const rotationDeg = spinning ? state.rotationDeg + PHYS.SPIN_RATE * dt : state.rotationDeg
-  const rotationIdleS = spinning ? 0 : state.rotationIdleS + dt
+  // Flips (Space) pitch the board; spins (arrows) turn the figure through
+  // profile. They accumulate independently and are judged separately at landing.
+  const flipping = input.jumpHeld
+  const spinning = input.spinDir !== 0
+  const flipDeg = flipping ? state.flipDeg + PHYS.SPIN_RATE * dt : state.flipDeg
+  const spinDeg = spinning ? state.spinDeg + PHYS.SPIN_RATE_SPIN * dt : state.spinDeg
+  const rotationIdleS = flipping || spinning ? 0 : state.rotationIdleS + dt
 
   let charge = state.charge
   let bufferT = decayTo0(state.bufferT, dt, 1)
@@ -511,10 +528,11 @@ function stepAir(
     coyoteT,
     charge,
     bufferT,
-    rotationDeg,
+    flipDeg,
+    spinDeg,
     rotationIdleS,
-    grabbing: input.grabHeld,
-    grabHappened: state.grabHappened || input.grabHeld,
+    grab: input.grab,
+    grabTrick: input.grab !== 'none' ? input.grab : state.grabTrick,
     tucking: input.jumpHeld,
   }
 
@@ -571,28 +589,33 @@ function trySnapToRail(s: RiderState, course: Course): RiderState | null {
  * buried snowline it's raised over. */
 function landOrBail(s: RiderState, course: Course): RiderState {
   const angle = surfaceAngle(s.x, course)
-  const boardDiff = wrap180(s.launchAngleDeg + s.rotationDeg - angle * DEG)
-  const mag = Math.abs(boardDiff)
-  if (mag > PHYS.LANDING_TOLERANCE_DEG) return bail(s)
+  // Only the flip pitches the board, so only the flip can bail: land it too far
+  // off the slope and you wash out. Spins are a separate, lower-risk judgment —
+  // a spin that hasn't come all the way around scrubs, it never bails.
+  const flipOff = Math.abs(wrap180(s.launchAngleDeg + s.flipDeg - angle * DEG))
+  if (flipOff > PHYS.LANDING_TOLERANCE_DEG) return bail(s)
+  const spinOff = Math.abs(wrap360(s.spinDeg))
   const proj = project(s.vx, s.vy, angle)
-  return mag <= PHYS.SNAP_DEG
+  return flipOff <= PHYS.SNAP_DEG && spinOff <= PHYS.SNAP_DEG
     ? landClean(s, proj, angle, course)
     : landScrubbed(s, proj, angle, course)
 }
 
 function landClean(s: RiderState, proj: number, angle: number, course: Course): RiderState {
-  const snapped = Math.round(s.rotationDeg / 180) * 180
+  const flipDeg = Math.round(s.flipDeg / 180) * 180
+  const spinDeg = Math.round(s.spinDeg / 360) * 360
   const speed = clamp(proj + PHYS.CLEAN_BOOST, PHYS.MIN_SPEED, PHYS.MAX_SPEED)
   const impact = clamp(Math.abs(s.vy) / 900, 0.2, 1)
   const chain = s.chain + 1
-  const late = snapped >= 180 && s.rotationIdleS <= PHYS.LATE_WINDOW_S
-  const big = snapped >= 360 || s.grindLength >= 100
+  const late = (flipDeg >= 180 || spinDeg >= 360) && s.rotationIdleS <= PHYS.LATE_WINDOW_S
+  const big = flipDeg >= 360 || spinDeg >= 360 || s.grindLength >= 100
   const landed: RiderState = {
     ...s,
     mode: 'snow',
     y: surfaceY(s.x, course),
     speed,
-    rotationDeg: snapped,
+    flipDeg,
+    spinDeg,
     chain,
     impact,
     coyoteT: 0,
@@ -659,8 +682,9 @@ function bankTrick(
   if (i === null || s.collected[i]) return landed
   const skill = course.obstacles[i].skill
   const trick = {
-    rotationDeg: landed.rotationDeg,
-    grab: s.grabHappened,
+    flipDeg: landed.flipDeg,
+    spinDeg: landed.spinDeg,
+    grab: s.grabTrick,
     grindLength: s.grindLength,
     late,
   }

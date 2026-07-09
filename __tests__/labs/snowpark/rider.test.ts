@@ -24,7 +24,7 @@ const slopeAngleDeg = (x: number): number => slopeAngle(x) * DEG
 const idle: RiderInput = {
   jumpHeld: false,
   jumpPressed: false,
-  grabHeld: false,
+  grab: 'none',
   spinDir: 0,
   retryPressed: false,
 }
@@ -40,12 +40,14 @@ function run(state: RiderState, input: RiderInput, seconds: number): RiderState 
 /**
  * Build an airborne state positioned just above the snow at `landingX` so that a
  * single step touches down. `launchAngleDeg` is chosen so the board-vs-slope diff
- * at touchdown equals `diff` degrees (accounting for any pre-set `rotationDeg`).
+ * at touchdown equals `diff` degrees (accounting for any pre-set `flipDeg` — only
+ * the flip pitches the board). `spinDeg` is judged independently of the board.
  */
 function airAboveLanding(opts: {
   landingX: number
   diff: number
-  rotationDeg?: number
+  flipDeg?: number
+  spinDeg?: number
   vx?: number
   vy?: number
   aboveBy?: number
@@ -56,7 +58,8 @@ function airAboveLanding(opts: {
   const {
     landingX,
     diff,
-    rotationDeg = 0,
+    flipDeg = 0,
+    spinDeg = 0,
     aboveBy = 0.5,
     chain = 0,
     rotationIdleS = 0,
@@ -72,8 +75,9 @@ function airAboveLanding(opts: {
     y: slopeY(landingX) - aboveBy,
     vx,
     vy,
-    launchAngleDeg: slopeAngleDeg(landingX) + diff - rotationDeg,
-    rotationDeg,
+    launchAngleDeg: slopeAngleDeg(landingX) + diff - flipDeg,
+    flipDeg,
+    spinDeg,
     rotationIdleS,
     chain,
     attributedObstacle,
@@ -276,7 +280,7 @@ describe('kicker as rideable geometry', () => {
 
   it('an Ollie (0 rotation) off a kicker still banks the skill — the air was earned', () => {
     const index = rideableKickerIndex()
-    const s0 = airAboveLanding({ landingX: 2000, diff: 0, rotationDeg: 0, attributedObstacle: index })
+    const s0 = airAboveLanding({ landingX: 2000, diff: 0, flipDeg: 0, attributedObstacle: index })
     const landed = stepRider(s0, idle, 1 / 120, course)
     expect(landed.justLanded).toBe('clean')
     expect(landed.collected[index]).toBe(true)
@@ -321,7 +325,7 @@ describe('kicker as rideable geometry', () => {
       vx: Math.cos(faceAngle) * 300,
       vy: 200, // descending into the footprint
       launchAngleDeg: faceAngle * DEG, // board aligned to the face → clean
-      rotationDeg: 0,
+      flipDeg: 0,
       airtime: 0.3,
       attributedObstacle: index,
     }
@@ -368,8 +372,8 @@ describe('forgiveness windows', () => {
 })
 
 describe('air rotation', () => {
-  it('rotates continuously while a rotation input is held', () => {
-    const airborne: RiderState = {
+  function highAir(): RiderState {
+    return {
       ...createRider(course),
       mode: 'air',
       x: 1400,
@@ -378,10 +382,22 @@ describe('air rotation', () => {
       vy: -100,
       launchAngleDeg: slopeAngleDeg(1400),
     }
-    const s = run(airborne, { ...idle, jumpHeld: true }, 0.5)
+  }
+
+  it('flips (Space) pitch the board at SPIN_RATE and leave the spin untouched', () => {
+    const s = run(highAir(), { ...idle, jumpHeld: true }, 0.5)
     expect(s.mode).toBe('air')
-    expect(s.rotationDeg).toBeGreaterThan(PHYS.SPIN_RATE * 0.5 - 5)
-    expect(s.rotationDeg).toBeLessThan(PHYS.SPIN_RATE * 0.5 + 5)
+    expect(s.flipDeg).toBeGreaterThan(PHYS.SPIN_RATE * 0.5 - 5)
+    expect(s.flipDeg).toBeLessThan(PHYS.SPIN_RATE * 0.5 + 5)
+    expect(s.spinDeg).toBe(0)
+  })
+
+  it('spins (arrows) turn at SPIN_RATE_SPIN and leave the flip untouched', () => {
+    const s = run(highAir(), { ...idle, spinDir: 1 }, 0.5)
+    expect(s.mode).toBe('air')
+    expect(s.spinDeg).toBeGreaterThan(PHYS.SPIN_RATE_SPIN * 0.5 - 5)
+    expect(s.spinDeg).toBeLessThan(PHYS.SPIN_RATE_SPIN * 0.5 + 5)
+    expect(s.flipDeg).toBe(0)
   })
 })
 
@@ -396,7 +412,7 @@ describe('landing quality', () => {
 
     const landed = stepRider(s0, idle, dt, course)
     expect(landed.justLanded).toBe('clean')
-    expect(landed.rotationDeg % 180).toBe(0)
+    expect(landed.flipDeg % 180).toBe(0)
     expect(landed.speed).toBeGreaterThanOrEqual(proj + PHYS.CLEAN_BOOST * 0.5)
     expect(landed.chain).toBe(1)
   })
@@ -429,13 +445,44 @@ describe('landing quality', () => {
     const s0 = airAboveLanding({
       landingX: 2000,
       diff: 0,
-      rotationDeg: 180,
+      flipDeg: 180,
       rotationIdleS: 0.1,
       attributedObstacle: kickerIdx,
     })
     const landed = stepRider(s0, idle, 1 / 120, course)
     expect(landed.justLanded).toBe('clean')
     expect(landed.lastEvent?.late).toBe(true)
+  })
+})
+
+describe('flips vs spins at landing', () => {
+  it('a settled spin (multiple of 360) lands clean; the flip judges the board angle', () => {
+    // Clean board (flip offset ≈ 0) with a full 360 spin: both judgments pass.
+    const s0 = airAboveLanding({ landingX: 2000, diff: 0, spinDeg: 360 })
+    const landed = stepRider(s0, idle, 1 / 120, course)
+    expect(landed.justLanded).toBe('clean')
+    expect(landed.spinDeg).toBe(360)
+  })
+
+  it('an unsettled spin scrubs the landing — it never bails (lower risk than the flip)', () => {
+    // Clean board, but the spin is stuck at a half-turn (180 off a 360 multiple):
+    // that scrubs, it does not wipe out.
+    const s0 = airAboveLanding({ landingX: 2000, diff: 0, spinDeg: 180, chain: 2 })
+    const landed = stepRider(s0, idle, 1 / 120, course)
+    expect(landed.mode).toBe('snow')
+    expect(landed.justLanded).toBe('scrubbed')
+    expect(landed.chain).toBe(2) // scrub preserves the chain
+  })
+
+  it('a flip landed past tolerance bails, where an equally-off spin would only scrub', () => {
+    // Same 50° of error: as a flip offset it wipes out; as a spin offset it scrubs.
+    const flipOff = airAboveLanding({ landingX: 2000, diff: 50, chain: 3 })
+    expect(stepRider(flipOff, idle, 1 / 120, course).mode).toBe('bail')
+
+    const spinOff = airAboveLanding({ landingX: 2000, diff: 0, spinDeg: 50, chain: 3 })
+    const scrubbed = stepRider(spinOff, idle, 1 / 120, course)
+    expect(scrubbed.mode).toBe('snow')
+    expect(scrubbed.justLanded).toBe('scrubbed')
   })
 })
 

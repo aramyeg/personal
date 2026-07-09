@@ -11,6 +11,10 @@ function escapeEvent(repeat = false): KeyboardEvent {
   })
 }
 
+function keyEvent(type: 'keydown' | 'keyup', code: string): KeyboardEvent {
+  return new KeyboardEvent(type, { code, key: code, cancelable: true, bubbles: true })
+}
+
 describe('createInput Escape handling', () => {
   let detach: (() => void) | null = null
 
@@ -60,6 +64,46 @@ describe('createInput Escape handling', () => {
 
     expect(event.defaultPrevented).toBe(false)
     expect(input.consumeEscape()).toBe(false)
+  })
+
+  it('latches a tail grab while ArrowDown is held and releases it on keyup', () => {
+    const input = createInput()
+    const target = document.createElement('div')
+    detach = input.attach(target)
+
+    expect(input.sample().grab).toBe('none')
+
+    document.body.dispatchEvent(keyEvent('keydown', 'ArrowDown'))
+    expect(input.sample().grab).toBe('tail')
+
+    document.body.dispatchEvent(keyEvent('keyup', 'ArrowDown'))
+    expect(input.sample().grab).toBe('none')
+  })
+
+  it('latches a nose grab on ArrowUp, distinct from the tail grab', () => {
+    const input = createInput()
+    const target = document.createElement('div')
+    detach = input.attach(target)
+
+    document.body.dispatchEvent(keyEvent('keydown', 'ArrowUp'))
+    expect(input.sample().grab).toBe('nose')
+
+    document.body.dispatchEvent(keyEvent('keyup', 'ArrowUp'))
+    expect(input.sample().grab).toBe('none')
+  })
+
+  it('with both grab keys held, the most recently pressed wins', () => {
+    const input = createInput()
+    const target = document.createElement('div')
+    detach = input.attach(target)
+
+    document.body.dispatchEvent(keyEvent('keydown', 'ArrowUp'))
+    document.body.dispatchEvent(keyEvent('keydown', 'ArrowDown'))
+    expect(input.sample().grab).toBe('tail') // ArrowDown pressed most recently
+
+    // Releasing the newer key falls back to the one still held.
+    document.body.dispatchEvent(keyEvent('keyup', 'ArrowDown'))
+    expect(input.sample().grab).toBe('nose')
   })
 
   it('prevents default before a pre-existing bubble-phase listener runs (capture ordering)', () => {

@@ -20,7 +20,7 @@ import { skyColors } from '@/components/labs/snowpark/render/sky'
 const NEUTRAL: RiderInput = {
   jumpHeld: false,
   jumpPressed: false,
-  grabHeld: false,
+  grab: 'none',
   spinDir: 0,
   retryPressed: false,
 }
@@ -53,8 +53,9 @@ describe('rider rig — pose model', () => {
     let s = createRider(course)
     const scripts: RiderInput[] = [
       { ...NEUTRAL, jumpHeld: true, jumpPressed: true },
-      { ...NEUTRAL, grabHeld: true, spinDir: 1 },
+      { ...NEUTRAL, grab: 'nose', spinDir: 1 },
       { ...NEUTRAL, jumpHeld: true, spinDir: -1 },
+      { ...NEUTRAL, grab: 'tail' },
       NEUTRAL,
     ]
     const modes = new Set<string>()
@@ -80,13 +81,31 @@ describe('rider rig — pose model', () => {
   })
 
   it('reaches the front hand to the board deck when grabbing', () => {
-    const air = { mode: 'air' as const, x: 0, launchAngleDeg: 0, rotationDeg: 0 }
-    const noGrab = computePose(riderAt({ ...air, grabbing: false }))
-    const grab = computePose(riderAt({ ...air, grabbing: true }))
+    const air = { mode: 'air' as const, x: 0, launchAngleDeg: 0, flipDeg: 0 }
+    const noGrab = computePose(riderAt({ ...air, grab: 'none' }))
+    const grab = computePose(riderAt({ ...air, grab: 'nose' }))
     // Grab pulls the front hand down to the deck (much larger y than the
     // shoulder-height trailing pose).
     expect(grab.frontHand.y).toBeGreaterThan(noGrab.frontHand.y)
     expect(grab.frontHand.y).toBeGreaterThan(grab.shoulder.y)
+  })
+
+  it('poses nose and tail grabs as distinct reaches (nose toward the front, tail the back)', () => {
+    const air = { mode: 'air' as const, x: 0, launchAngleDeg: 0, flipDeg: 0 }
+    const nose = computePose(riderAt({ ...air, grab: 'nose' }))
+    const tail = computePose(riderAt({ ...air, grab: 'tail' }))
+    // Both hands drop to the deck, but the nose reach is forward (+x) of the
+    // tail reach (−x) — two visibly different poses, not one.
+    expect(nose.frontHand.x).toBeGreaterThan(tail.frontHand.x)
+    expect(nose.frontHand.x).toBeGreaterThan(0)
+    expect(tail.frontHand.x).toBeLessThan(0)
+  })
+
+  it('boardAngle follows the flip pitch and ignores the flat spin', () => {
+    const base = { mode: 'air' as const, x: 0, launchAngleDeg: 0 }
+    // A spin leaves the board flat; a flip pitches it.
+    expect(boardAngle(riderAt({ ...base, flipDeg: 0, spinDeg: 360 }))).toBeCloseTo(0, 6)
+    expect(boardAngle(riderAt({ ...base, flipDeg: 90, spinDeg: 0 }))).not.toBeCloseTo(0, 6)
   })
 
   it('reads its overall height in the intended ~2.5× range', () => {

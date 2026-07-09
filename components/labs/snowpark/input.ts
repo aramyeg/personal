@@ -1,4 +1,5 @@
 import type { RiderInput } from './rider'
+import type { Grab } from './tricks'
 
 export type InputController = {
   attach: (target: HTMLElement) => () => void
@@ -13,13 +14,20 @@ const SWIPE_HOLD_MS = 400
 
 export function createInput(): InputController {
   let jumpHeld = false
-  let grabHeld = false
   let jumpPressed = false
   let leftHeld = false
   let rightHeld = false
   let retryPressed = false
   let pendingEscape = false
   let playing = false
+
+  // Grabs: ArrowUp reaches to the nose, ArrowDown back over the tail. Both held
+  // → the most recently pressed wins (tracked in `lastGrabKey`). A second touch
+  // finger is a nose grab.
+  let noseHeld = false
+  let tailHeld = false
+  let lastGrabKey: 'nose' | 'tail' | null = null
+  let grabTouchHeld = false
 
   // Touch spin: a swipe sets a held direction that expires after SWIPE_HOLD_MS.
   let touchSpinDir: -1 | 0 | 1 = 0
@@ -50,7 +58,13 @@ export function createInput(): InputController {
         break
       case 'ArrowUp':
         e.preventDefault()
-        grabHeld = true
+        noseHeld = true
+        lastGrabKey = 'nose'
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        tailHeld = true
+        lastGrabKey = 'tail'
         break
       case 'KeyR':
         if (!e.repeat) retryPressed = true
@@ -72,7 +86,12 @@ export function createInput(): InputController {
         jumpHeld = false
         break
       case 'ArrowUp':
-        grabHeld = false
+        noseHeld = false
+        if (lastGrabKey === 'nose') lastGrabKey = tailHeld ? 'tail' : null
+        break
+      case 'ArrowDown':
+        tailHeld = false
+        if (lastGrabKey === 'tail') lastGrabKey = noseHeld ? 'nose' : null
         break
       case 'ArrowLeft':
         leftHeld = false
@@ -95,7 +114,7 @@ export function createInput(): InputController {
         jumpHeld = true
       } else if (grabTouchId === null) {
         grabTouchId = t.identifier
-        grabHeld = true
+        grabTouchHeld = true
       }
     }
   }
@@ -127,7 +146,7 @@ export function createInput(): InputController {
         jumpHeld = false
       } else if (t.identifier === grabTouchId) {
         grabTouchId = null
-        grabHeld = false
+        grabTouchHeld = false
       }
     }
   }
@@ -156,10 +175,13 @@ export function createInput(): InputController {
     // Both arrows held cancel; keyboard wins over a still-live touch swipe.
     const keyDir: -1 | 0 | 1 = leftHeld === rightHeld ? 0 : leftHeld ? -1 : 1
     const touchDir: -1 | 0 | 1 = now() < touchSpinExpiry ? touchSpinDir : 0
+    // Grab: with both grab keys down the most recent wins; a lone touch is nose.
+    const keyGrab: Grab = noseHeld && tailHeld ? (lastGrabKey ?? 'nose') : noseHeld ? 'nose' : tailHeld ? 'tail' : 'none'
+    const grab: Grab = keyGrab !== 'none' ? keyGrab : grabTouchHeld ? 'nose' : 'none'
     const frame: RiderInput = {
       jumpHeld,
       jumpPressed,
-      grabHeld,
+      grab,
       spinDir: keyDir !== 0 ? keyDir : touchDir,
       retryPressed,
     }

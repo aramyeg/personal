@@ -72,8 +72,10 @@ export const RIG = {
   NECK_GAP: 1.5,
   /** elbow bulge perpendicular to the arm */
   ELBOW_BULGE: 4,
-  /** grab: front hand reaches to this fraction of front-foot x, on the deck */
+  /** grab: the reaching hand travels to this fraction of the nose/tail foot x, on the deck */
   GRAB_REACH: 0.7,
+  /** flat-spin render: the figure squashes to |cos(spin)| in x, never thinner than this */
+  SPIN_SQUASH_MIN: 0.25,
   // --- fill dimensions (silhouette volume; draw-only, no pose effect) ---
   /** board slab thickness — a filled rounded slab along the board axis */
   BOARD_THICK: 7,
@@ -134,10 +136,19 @@ function speed01(state: RiderState): number {
 }
 
 /** Board orientation: on snow/grind the slope tangent; airborne the physics
- * truth `launchAngle + rotation` (the flip IS the board turning over). */
+ * truth `launchAngle + flip` (the flip IS the board pitching over — spins turn
+ * the figure in the flat and never touch the board angle). */
 export function boardAngle(s: RiderState): number {
-  if (s.mode === 'air') return (s.launchAngleDeg + s.rotationDeg) * DEG2RAD
+  if (s.mode === 'air') return (s.launchAngleDeg + s.flipDeg) * DEG2RAD
   return slopeAngle(s.x)
+}
+
+/** Flat-spin foreshortening: the whole figure squashes in x by |cos(spinDeg)|
+ * as it turns through profile, floored so it never vanishes edge-on. Only while
+ * airborne — a spin only accumulates in the air. Draw-only (see `drawRider`). */
+function spinSquashX(s: RiderState): number {
+  if (s.mode !== 'air' || s.spinDeg === 0) return 1
+  return Math.max(Math.abs(Math.cos(s.spinDeg * DEG2RAD)), RIG.SPIN_SQUASH_MIN)
 }
 
 /** Knee/hip compression 0..1. On snow: the held charge while tucking. Airborne:
@@ -147,7 +158,9 @@ export function boardAngle(s: RiderState): number {
 function crouch01(state: RiderState): number {
   if (state.mode === 'air' || state.mode === 'bail') {
     return clamp(
-      RIG.AIR_TUCK + (state.tucking ? RIG.AIR_TUCK_FLIP : 0) + (state.grabbing ? RIG.AIR_TUCK_GRAB : 0),
+      RIG.AIR_TUCK +
+        (state.tucking ? RIG.AIR_TUCK_FLIP : 0) +
+        (state.grab !== 'none' ? RIG.AIR_TUCK_GRAB : 0),
       0,
       1
     )
@@ -220,12 +233,16 @@ export function computePose(state: RiderState): Pose {
     y: neck.y + uy * (RIG.HEAD_R + RIG.NECK_GAP),
   }
 
-  // Arms: the front reaches to the board deck when grabbing, else both trail
-  // down-and-back, trailing harder with speed.
+  // Arms: the trailing arm reaches to the deck when grabbing — forward to the
+  // nose (front foot) or back over the tail (back foot), two distinct poses —
+  // else both trail down-and-back, trailing harder with speed.
   const armS01 = airborne ? 0.4 : s01
-  const frontHand = state.grabbing
-    ? { x: frontFoot.x * RIG.GRAB_REACH, y: footY }
-    : { x: shoulder.x + RIG.ARM * (0.35 - 0.45 * armS01), y: shoulder.y + RIG.ARM * 0.55 }
+  const frontHand =
+    state.grab === 'nose'
+      ? { x: frontFoot.x * RIG.GRAB_REACH, y: footY }
+      : state.grab === 'tail'
+        ? { x: backFoot.x * RIG.GRAB_REACH, y: footY }
+        : { x: shoulder.x + RIG.ARM * (0.35 - 0.45 * armS01), y: shoulder.y + RIG.ARM * 0.55 }
   const backHand = {
     x: shoulder.x - RIG.ARM * (0.45 + 0.4 * armS01),
     y: shoulder.y + RIG.ARM * 0.5,
@@ -406,8 +423,14 @@ function drawPose(ctx: CanvasRenderingContext2D, pose: Pose, colors: PhaseColors
 /**
  * Draw the rider in WORLD units — the caller has already applied the camera
  * transform. On snow/air the posed figure gets the board-local transform plus
- * the fx squash/stretch around the contact point (board stays planted). On a
- * bail the pieces tumble instead.
+ * the fx squash/stretch around the contact point (board stays planted) and,
+ * mid-spin, a horizontal foreshorten around that same board-midpoint origin. On
+ * a bail the pieces tumble instead.
+ *
+ * The spin squash is DRAW-ONLY: it lives here, inside the board-local transform,
+ * and never touches `riderJoints` — the scarf anchor reads the unsquashed
+ * world-space neck (Task 2's principle), so the cloth root stays put while the
+ * silhouette turns through profile.
  */
 export function drawRider(
   ctx: CanvasRenderingContext2D,
@@ -423,6 +446,9 @@ export function drawRider(
   ctx.translate(state.x, state.y)
   ctx.rotate(boardAngle(state))
   ctx.scale(scale.sx, scale.sy)
+  // Board-local origin is the board midpoint, so this x-only scale foreshortens
+  // the figure around its own center, composing with the fx squash above.
+  ctx.scale(spinSquashX(state), 1)
   drawPose(ctx, computePose(state), colors)
   ctx.restore()
 }
