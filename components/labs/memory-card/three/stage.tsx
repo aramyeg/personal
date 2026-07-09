@@ -21,6 +21,7 @@ import {
 } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { MC, GLYPH_PATHS, type GlyphName } from '../tokens'
 
 type CameraSpec = { position: [number, number, number]; fov: number }
@@ -83,14 +84,51 @@ function LookAt({ target }: { target: [number, number, number] }) {
   return null
 }
 
-/** Three-point studio rig + ambient fill (values from the brief's recipe). */
+/**
+ * Studio HDRI: bakes `RoomEnvironment` into a PMREM and assigns it as the
+ * scene's image-based light, so every PBR material picks up soft, wrapping
+ * studio reflections instead of flat directional fill. Built once per canvas
+ * mount; the render target + generator are disposed and `scene.environment`
+ * cleared on unmount so a page of vignettes doesn't leak GPU memory.
+ */
+function StudioEnvironment({ intensity }: { intensity: number }) {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl)
+    const room = new RoomEnvironment()
+    const envRT = pmrem.fromScene(room, 0.04)
+    scene.environment = envRT.texture
+    room.dispose()
+    return () => {
+      scene.environment = null
+      envRT.dispose()
+      pmrem.dispose()
+    }
+  }, [gl, scene])
+
+  useEffect(() => {
+    scene.environmentIntensity = intensity
+    return () => {
+      scene.environmentIntensity = 1
+    }
+  }, [scene, intensity])
+
+  return null
+}
+
+/**
+ * Key + rim only. The environment map now supplies the broad fill that the old
+ * fill light and ambient used to fake, so those are dropped: the key (kept, at
+ * reduced intensity) still anchors the contact-shadow direction and carves the
+ * primary form; the rim separates the object from the background.
+ */
 function LightRig() {
   return (
     <>
-      <directionalLight color="#ffffff" intensity={2.2} position={[3, 4, 2.5]} />
-      <directionalLight color="#dfe8e6" intensity={0.8} position={[-3, 1.5, 2]} />
-      <directionalLight color="#ffffff" intensity={1.4} position={[0, 3, -4]} />
-      <ambientLight color="#404448" intensity={0.5} />
+      <directionalLight color="#ffffff" intensity={1.2} position={[3, 4, 2.5]} />
+      <directionalLight color="#ffffff" intensity={0.9} position={[0, 3, -4]} />
     </>
   )
 }
@@ -101,6 +139,8 @@ export type VignetteCanvasProps = {
   camera?: CameraSpec
   target?: [number, number, number]
   shadowRadius?: number
+  /** Scene-wide multiplier on the studio environment light. Default 1. */
+  envIntensity?: number
   fallbackGlyph?: GlyphName
   children: ReactNode
 }
@@ -111,6 +151,7 @@ export function VignetteCanvas({
   camera = DEFAULT_CAMERA,
   target = DEFAULT_TARGET,
   shadowRadius,
+  envIntensity = 1,
   fallbackGlyph = 'triangle',
   children,
 }: VignetteCanvasProps) {
@@ -151,9 +192,11 @@ export function VignetteCanvas({
             gl.setClearColor(0x000000, 0)
             gl.toneMapping = THREE.ACESFilmicToneMapping
             gl.toneMappingExposure = 1.05
+            gl.outputColorSpace = THREE.SRGBColorSpace
           }}
         >
           <LookAt target={target} />
+          <StudioEnvironment intensity={envIntensity} />
           <LightRig />
           {children}
           <ContactShadow radius={shadowRadius ?? 2.6} />
