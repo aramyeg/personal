@@ -13,13 +13,13 @@ import { WinMessenger } from './win-messenger'
 import { WinIE } from './win-ie'
 
 export const WINDOW_CONTENTS: Record<XpAppId, ComponentType<{ win: XpWindow }>> = {
-  'my-computer': WinMyComputer as ComponentType<{ win: XpWindow }>,
-  'my-projects': WinProjects as ComponentType<{ win: XpWindow }>,
+  'my-computer': WinMyComputer,
+  'my-projects': WinProjects,
   'project-detail': WinProjectDetail,
-  resume: WinResume as ComponentType<{ win: XpWindow }>,
-  about: WinAbout as ComponentType<{ win: XpWindow }>,
-  messenger: WinMessenger as ComponentType<{ win: XpWindow }>,
-  'internet-explorer': WinIE as ComponentType<{ win: XpWindow }>,
-  'add-remove': WinAddRemove as ComponentType<{ win: XpWindow }>,
-  'recycle-bin': WinRecycleBin as ComponentType<{ win: XpWindow }>,
+  resume: WinResume,
+  about: WinAbout,
+  messenger: WinMessenger,
+  'internet-explorer': WinIE,
+  'add-remove': WinAddRemove,
+  'recycle-bin': WinRecycleBin,
 }
