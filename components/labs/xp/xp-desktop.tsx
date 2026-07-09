@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useXpStore } from './store'
+import { useIdle } from './use-idle'
 import { DesktopIcons } from './desktop-icons'
 import { WindowsLayer } from './windows-layer'
 import { Taskbar } from './taskbar'
@@ -10,6 +11,7 @@ import { BootScreen } from './boot-screen'
 import { WelcomeScreen } from './welcome-screen'
 import { Clippy } from './clippy'
 import { BalloonTip } from './balloon-tip'
+import { Screensaver } from './screensaver'
 import styles from './xp.module.css'
 
 export function XpDesktop() {
@@ -26,6 +28,9 @@ export function XpDesktop() {
     setResolved(true)
   }, [])
 
+  const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  useIdle(60_000, () => useXpStore.getState().setScreensaver(true), phase === 'desktop' && !reduced)
+
   if (!resolved) return <div className={styles.desktop} />
   if (phase === 'boot') return <BootScreen />
   if (phase === 'welcome') return <WelcomeScreen />
@@ -41,6 +46,7 @@ export function XpDesktop() {
       <Clippy />
       <BalloonTip />
       <Taskbar />
+      <Screensaver />
     </div>
   )
 }
