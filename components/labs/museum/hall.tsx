@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { HALL } from './layout'
-import { makeParquetTexture, makeWallTexture } from './textures'
+import { HALL, STAIR } from './layout'
+import { makeParquetTexture, makeWallTexture, makePlacardTexture } from './textures'
 
 const GOLD = '#b08d3f'
 const MARBLE = '#d8d3c8'
@@ -93,6 +93,41 @@ function Stanchions({ z }: { z: number }) {
   )
 }
 
+/** End wall split around the attic doorway, with a lintel and a small sign. */
+function EndWall({ length, fabric }: { length: number; fabric: THREE.Texture }) {
+  const doorLeft = STAIR.doorX - STAIR.doorWidth / 2
+  const doorRight = STAIR.doorX + STAIR.doorWidth / 2
+  const leftW = doorLeft - -(HALL.width / 2)
+  const rightW = HALL.width / 2 - doorRight
+  const sign = useMemo(() => makePlacardTexture('attic', '', ''), [])
+  return (
+    <group position={[0, 0, -length]}>
+      <Wall
+        width={leftW}
+        position={[-(HALL.width / 2) + leftW / 2 - 0, 0, 0]}
+        rotationY={0}
+        fabric={fabric}
+      />
+      <Wall width={rightW} position={[doorRight + rightW / 2, 0, 0]} rotationY={0} fabric={fabric} />
+      {/* Lintel above the door opening */}
+      <mesh position={[STAIR.doorX, STAIR.doorHeight + (HALL.height - STAIR.doorHeight) / 2, 0]}>
+        <planeGeometry args={[STAIR.doorWidth, HALL.height - STAIR.doorHeight]} />
+        <meshStandardMaterial map={fabric} roughness={0.9} />
+      </mesh>
+      {/* Door jambs: dark reveal so the opening reads as depth, not a hole */}
+      <mesh position={[STAIR.doorX, STAIR.doorHeight / 2, -0.06]}>
+        <planeGeometry args={[STAIR.doorWidth, STAIR.doorHeight]} />
+        <meshBasicMaterial color="#181410" />
+      </mesh>
+      {/* Small lowercase sign above the lintel */}
+      <mesh position={[STAIR.doorX, STAIR.doorHeight + 0.35, 0.02]}>
+        <planeGeometry args={[0.6, 0.3]} />
+        <meshStandardMaterial map={sign} roughness={0.4} metalness={0.3} />
+      </mesh>
+    </group>
+  )
+}
+
 /** The museum room: floor, walls, coved ceiling with skylight, dressing. */
 export function Hall({ length }: { length: number }) {
   const parquet = useMemo(() => {
@@ -139,7 +174,8 @@ export function Hall({ length }: { length: number }) {
       {/* Walls */}
       <Wall width={length} position={[-HALL.width / 2, 0, midZ]} rotationY={Math.PI / 2} fabric={fabric} />
       <Wall width={length} position={[HALL.width / 2, 0, midZ]} rotationY={-Math.PI / 2} fabric={fabric} />
-      <Wall width={HALL.width} position={[0, 0, -length]} rotationY={0} fabric={fabric} />
+      {/* End wall with the attic doorway cut beside the draped frame */}
+      <EndWall length={length} fabric={fabric} />
       <Wall width={HALL.width} position={[0, 0, 0]} rotationY={Math.PI} fabric={fabric} />
 
       {/* Dressing down the center line */}

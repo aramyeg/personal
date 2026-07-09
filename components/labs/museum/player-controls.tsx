@@ -3,7 +3,7 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PLAYER, clampToHall } from './layout'
+import { PLAYER, clampToRegions, floorY } from './layout'
 
 export type MoveVec = { x: number; y: number }
 
@@ -90,6 +90,18 @@ export function PlayerControls({
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
+
+    // Dev-only probe for orchestrator gate walkthroughs (mirrors snowpark's __powder).
+    if (process.env.NODE_ENV !== 'production') {
+      ;(window as unknown as Record<string, unknown>).__museum = {
+        pos: () => camera.position.toArray(),
+        place: (x: number, z: number, yawRad: number) => {
+          yaw.current = yawRad
+          camera.position.set(x, 0, z) // y is recomputed by the next frame's floorY
+        },
+      }
+    }
+
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
@@ -98,8 +110,11 @@ export function PlayerControls({
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
+      if (process.env.NODE_ENV !== 'production') {
+        delete (window as unknown as Record<string, unknown>).__museum
+      }
     }
-  }, [gl])
+  }, [gl, camera])
 
   useFrame((_, delta) => {
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ')
@@ -107,7 +122,10 @@ export function PlayerControls({
     const joy = moveRef.current ?? { x: 0, y: 0 }
     const mx = keys.current.x + joy.x
     const my = keys.current.y + joy.y
-    if (mx === 0 && my === 0) return
+    if (mx === 0 && my === 0) {
+      camera.position.y = floorY(camera.position.z, length) + PLAYER.eyeHeight
+      return
+    }
 
     // Normalize so diagonals and stacked keyboard+joystick don't exceed unit speed.
     const len = Math.hypot(mx, my)
@@ -123,8 +141,12 @@ export function PlayerControls({
     const step = PLAYER.speed * Math.min(delta, 0.05)
     const nx = camera.position.x + (dir.x * ny2 + right.x * nx2) * step
     const nz = camera.position.z + (dir.z * ny2 + right.z * nx2) * step
-    const clamped = clampToHall(nx, nz, length)
-    camera.position.set(clamped.x, PLAYER.eyeHeight, clamped.z)
+    const clamped = clampToRegions(
+      { x: camera.position.x, z: camera.position.z },
+      { x: nx, z: nz },
+      length
+    )
+    camera.position.set(clamped.x, floorY(clamped.z, length) + PLAYER.eyeHeight, clamped.z)
   })
 
   return null

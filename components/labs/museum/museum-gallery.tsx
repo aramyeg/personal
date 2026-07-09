@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
-import { labs } from '@/lib/labs-manifest'
+import { hallLabs, labs } from '@/lib/labs-manifest'
 import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
 import { Painting, PaintingBoundary } from './painting'
@@ -20,8 +20,8 @@ import { MobileJoystick } from './mobile-joystick'
  */
 export default function MuseumGallery() {
   const router = useRouter()
-  const length = useMemo(() => hallLength(labs.length), [])
-  const placements = useMemo(() => paintingPlacements(labs), [])
+  const length = useMemo(() => hallLength(hallLabs.length), [])
+  const placements = useMemo(() => paintingPlacements(hallLabs), [])
   const targets = useRef(new Map<string, THREE.Object3D>())
   const [focused, setFocused] = useState<string | null>(null)
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
@@ -59,7 +59,7 @@ export default function MuseumGallery() {
             </PaintingBoundary>
           ))}
         </Suspense>
-        <DrapedFrame labCount={labs.length} />
+        <DrapedFrame labCount={hallLabs.length} />
         <FocusProbe targets={targets} onChange={setFocused} />
         <PlayerControls length={length} moveRef={moveRef} />
       </Canvas>
