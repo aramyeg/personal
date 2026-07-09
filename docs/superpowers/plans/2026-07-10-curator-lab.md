@@ -759,14 +759,16 @@ export function LineChart({ data, annotations = [], title, caption }: {
 }) {
   const pts = scalePoints(data.map((p) => p.visitors), W, H, 8)
   const xByDate = new Map(data.map((p, i) => [p.date, pts[i]?.x ?? 0]))
-  const [drawn, setDrawn] = useState(false)
+  // one line per date — several labs can ship the same day
+  const uniqueAnnotations = [...new Map(annotations.map((a) => [a.date, a])).values()]
+  const [anim, setAnim] = useState<'pending' | 'draw' | 'off'>('pending')
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setDrawn(true)
+      setAnim('off')
       return
     }
-    const id = requestAnimationFrame(() => setDrawn(true))
+    const id = requestAnimationFrame(() => setAnim('draw'))
     return () => cancelAnimationFrame(id)
   }, [])
 
@@ -777,7 +779,7 @@ export function LineChart({ data, annotations = [], title, caption }: {
       </figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-[180px] w-full" preserveAspectRatio="none" role="img" aria-label={title}>
         <path d={areaPath(pts, H)} fill="var(--c-blue)" opacity={0.08} />
-        {annotations.map((a) => {
+        {uniqueAnnotations.map((a) => {
           const x = xByDate.get(a.date)
           if (x === undefined) return null
           return <line key={a.date} x1={x} x2={x} y1={0} y2={H} stroke="var(--c-border)" strokeDasharray="3 3" />
@@ -785,8 +787,8 @@ export function LineChart({ data, annotations = [], title, caption }: {
         <path
           d={linePath(pts)}
           fill="none" stroke="var(--c-blue)" strokeWidth={1.5}
-          pathLength={1} strokeDasharray={1} strokeDashoffset={drawn ? 0 : 1}
-          style={{ transition: 'stroke-dashoffset 600ms ease-out' }}
+          pathLength={1} strokeDasharray={1} strokeDashoffset={anim === 'pending' ? 1 : 0}
+          style={{ transition: anim === 'draw' ? 'stroke-dashoffset 600ms ease-out' : 'none' }}
         />
       </svg>
       <div className="mt-1 flex justify-between font-[family-name:var(--font-data)] text-[10px] text-[var(--c-text-soft)]">
