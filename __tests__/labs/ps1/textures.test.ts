@@ -7,6 +7,12 @@ import {
   makePosterTexture,
   makeStickerSheetTexture,
   makeDeckTexture,
+  makeCRTScreenTexture,
+  makeTVScreenTexture,
+  makeBoxSpineTexture,
+  makeWindowViewTexture,
+  makeCorkboardTexture,
+  makeMemcardTexture,
 } from '@/components/labs/ps1/scene/textures'
 import type { SkillCategory } from '@/types'
 
@@ -202,6 +208,206 @@ describe('makeDeckTexture', () => {
   it('is deterministic — two calls produce byte-identical pixels', () => {
     const a = pixelsOf(texCanvas(makeDeckTexture()))
     const b = pixelsOf(texCanvas(makeDeckTexture()))
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+})
+
+/** True if any pixel is unmistakably teal — both g and b clear r by >40. */
+function hasTealPixel(data: Uint8ClampedArray): boolean {
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 1] - data[i] > 40 && data[i + 2] - data[i] > 40) return true
+  }
+  return false
+}
+
+/** True if any pixel is near-white in all three channels (paper / bright UI). */
+function hasNearWhitePixel(data: Uint8ClampedArray, threshold = 200): boolean {
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] > threshold && data[i + 1] > threshold && data[i + 2] > threshold) return true
+  }
+  return false
+}
+
+describe('makeCRTScreenTexture', () => {
+  it('is a 128x96 menu canvas', () => {
+    const canvas = texCanvas(makeCRTScreenTexture())
+    expect(canvas.width).toBe(128)
+    expect(canvas.height).toBe(96)
+  })
+
+  it('draws more than a flat fill (bar, rows, highlight, scanlines)', () => {
+    const data = pixelsOf(texCanvas(makeCRTScreenTexture()))
+    expect(distinctColors(data)).toBeGreaterThan(1)
+  })
+
+  it('carries the teal accent — some pixel has g and b each exceeding r by >40', () => {
+    // This is THE teal moment of the lab; crtTeal (#7de8e0) menu text must survive
+    // the dither+quantize and read as unmistakably teal.
+    const data = pixelsOf(texCanvas(makeCRTScreenTexture()))
+    expect(hasTealPixel(data)).toBe(true)
+  })
+
+  it('is deterministic — two calls produce byte-identical pixels', () => {
+    const a = pixelsOf(texCanvas(makeCRTScreenTexture()))
+    const b = pixelsOf(texCanvas(makeCRTScreenTexture()))
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+})
+
+describe('makeTVScreenTexture', () => {
+  it('is a 96x72 canvas', () => {
+    const canvas = texCanvas(makeTVScreenTexture())
+    expect(canvas.width).toBe(96)
+    expect(canvas.height).toBe(72)
+  })
+
+  it('is a noise field — many distinct greys, not a flat fill', () => {
+    const data = pixelsOf(texCanvas(makeTVScreenTexture()))
+    expect(distinctColors(data)).toBeGreaterThan(8)
+  })
+
+  it('has a bright centered word over the static', () => {
+    const data = pixelsOf(texCanvas(makeTVScreenTexture()))
+    expect(hasNearWhitePixel(data)).toBe(true)
+  })
+
+  it('is deterministic — two calls produce byte-identical pixels', () => {
+    const a = pixelsOf(texCanvas(makeTVScreenTexture()))
+    const b = pixelsOf(texCanvas(makeTVScreenTexture()))
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+})
+
+describe('makeBoxSpineTexture', () => {
+  it('is a 24x96 spine canvas for each lab index', () => {
+    for (const i of [0, 1, 2]) {
+      const canvas = texCanvas(makeBoxSpineTexture(i))
+      expect(canvas.width).toBe(24)
+      expect(canvas.height).toBe(96)
+    }
+  })
+
+  it('draws more than a flat fill (accent field, top band, vertical title)', () => {
+    for (const i of [0, 1, 2]) {
+      const data = pixelsOf(texCanvas(makeBoxSpineTexture(i)))
+      expect(distinctColors(data)).toBeGreaterThan(1)
+    }
+  })
+
+  it('has a near-white publisher band', () => {
+    const data = pixelsOf(texCanvas(makeBoxSpineTexture(0)))
+    expect(hasNearWhitePixel(data)).toBe(true)
+  })
+
+  it('gives different indices different accent-driven pixels', () => {
+    const a = Array.from(pixelsOf(texCanvas(makeBoxSpineTexture(0))))
+    const b = Array.from(pixelsOf(texCanvas(makeBoxSpineTexture(1))))
+    expect(a).not.toEqual(b)
+  })
+
+  it('is deterministic per index — two calls produce byte-identical pixels', () => {
+    for (const i of [0, 1, 2]) {
+      const a = pixelsOf(texCanvas(makeBoxSpineTexture(i)))
+      const b = pixelsOf(texCanvas(makeBoxSpineTexture(i)))
+      expect(Array.from(a)).toEqual(Array.from(b))
+    }
+  })
+})
+
+describe('makeWindowViewTexture', () => {
+  it('is a 192x144 canvas', () => {
+    const canvas = texCanvas(makeWindowViewTexture())
+    expect(canvas.width).toBe(192)
+    expect(canvas.height).toBe(144)
+  })
+
+  it('draws more than a flat fill (sky, rooftops, props, street)', () => {
+    const data = pixelsOf(texCanvas(makeWindowViewTexture()))
+    expect(distinctColors(data)).toBeGreaterThan(1)
+  })
+
+  it('has a light overcast sky along its top row', () => {
+    // Crude-tone law: the sky is flat grey-white, so the top row averages light
+    // and roughly neutral — never a saturated sunset.
+    const canvas = texCanvas(makeWindowViewTexture())
+    const top = canvas.getContext('2d')!.getImageData(0, 0, 192, 1).data
+    let r = 0, gg = 0, b = 0
+    for (let i = 0; i < top.length; i += 4) { r += top[i]; gg += top[i + 1]; b += top[i + 2] }
+    const n = top.length / 4
+    r /= n; gg /= n; b /= n
+    expect(r).toBeGreaterThan(150)
+    expect(gg).toBeGreaterThan(150)
+    expect(b).toBeGreaterThan(150)
+    // Near-neutral: no channel dominates by more than a hair (no sunset warm cast).
+    expect(Math.max(r, gg, b) - Math.min(r, gg, b)).toBeLessThan(30)
+  })
+
+  it('lights exactly a few warm windows — the only warm accent', () => {
+    // Dull-yellow lit windows are the sole warm pixels; assert some exist so the
+    // scene is not pure grey, but the palette stays crude.
+    const data = pixelsOf(texCanvas(makeWindowViewTexture()))
+    let warm = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > data[i + 1] && data[i + 1] > data[i + 2] && data[i] - data[i + 2] > 40) warm++
+    }
+    expect(warm).toBeGreaterThan(0)
+  })
+
+  it('is deterministic — two calls produce byte-identical pixels', () => {
+    const a = pixelsOf(texCanvas(makeWindowViewTexture()))
+    const b = pixelsOf(texCanvas(makeWindowViewTexture()))
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+})
+
+describe('makeCorkboardTexture', () => {
+  it('is a 128x96 canvas', () => {
+    const canvas = texCanvas(makeCorkboardTexture())
+    expect(canvas.width).toBe(128)
+    expect(canvas.height).toBe(96)
+  })
+
+  it('draws more than a flat fill (cork speckle, polaroids, pins)', () => {
+    const data = pixelsOf(texCanvas(makeCorkboardTexture()))
+    expect(distinctColors(data)).toBeGreaterThan(1)
+  })
+
+  it('has near-white polaroid borders', () => {
+    const data = pixelsOf(texCanvas(makeCorkboardTexture()))
+    expect(hasNearWhitePixel(data)).toBe(true)
+  })
+
+  it('has red pin dots', () => {
+    const data = pixelsOf(texCanvas(makeCorkboardTexture()))
+    let red = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] - data[i + 1] > 40 && data[i] - data[i + 2] > 40) red++
+    }
+    expect(red).toBeGreaterThan(0)
+  })
+
+  it('is deterministic — two calls produce byte-identical pixels', () => {
+    const a = pixelsOf(texCanvas(makeCorkboardTexture()))
+    const b = pixelsOf(texCanvas(makeCorkboardTexture()))
+    expect(Array.from(a)).toEqual(Array.from(b))
+  })
+})
+
+describe('makeMemcardTexture', () => {
+  it('is a 64x64 canvas', () => {
+    const canvas = texCanvas(makeMemcardTexture())
+    expect(canvas.width).toBe(64)
+    expect(canvas.height).toBe(64)
+  })
+
+  it('draws more than a flat fill (shell, connector slots, label)', () => {
+    const data = pixelsOf(texCanvas(makeMemcardTexture()))
+    expect(distinctColors(data)).toBeGreaterThan(1)
+  })
+
+  it('is deterministic — two calls produce byte-identical pixels', () => {
+    const a = pixelsOf(texCanvas(makeMemcardTexture()))
+    const b = pixelsOf(texCanvas(makeMemcardTexture()))
     expect(Array.from(a)).toEqual(Array.from(b))
   })
 })

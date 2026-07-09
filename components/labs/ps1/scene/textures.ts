@@ -2,6 +2,7 @@
 import * as THREE from 'three'
 import type { SkillCategory } from '@/types'
 import { getSkillsByCategory } from '@/data/skills'
+import { labs } from '@/lib/labs-manifest'
 import { PSX } from './psx-constants'
 import { drawBitmapText, measureBitmapText } from './bitmap-font'
 
@@ -380,6 +381,321 @@ export function makeDeckTexture(): THREE.CanvasTexture {
     outlinedPolygon(g, starPoints(11, y, 6, 2.4), PSX.TEX.accentYellow, INK, 1)
     outlinedPolygon(g, starPoints(53, y + 23, 6, 2.4), PSX.TEX.accentYellow, INK, 1)
   }
+
+  return makeTexture(c)
+}
+
+// ── Screen / prop textures: the CRT is the lab's single teal accent moment, the
+// window a hero piece bound by the crude-tone law. Screens read as real BIOS /
+// broadcast surfaces at texel resolution; the outside world stays flat and grey.
+
+/** CRT-black screen field — a near-black with a teal cast, not `#000`. */
+const CRT_BG = '#0c1a18'
+/** Dull ochre of a distant lit window — the window view's only warm accent. */
+const LIT_WINDOW = '#c9a94e'
+
+/** Blank a canvas element and hand back its 2D context. */
+function canvasOf(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  return [c, c.getContext('2d')!]
+}
+
+/** Draw `text` as a column of stacked glyphs centered in a `w`-wide field. */
+function drawVerticalText(
+  g: CanvasRenderingContext2D,
+  text: string,
+  w: number,
+  topY: number,
+  step: number,
+  color: string,
+  shadow?: string
+): void {
+  const gx = Math.floor((w - 5) / 2)
+  for (let i = 0; i < text.length; i++) {
+    const y = topY + i * step
+    if (shadow) drawBitmapText(g, text[i], gx + 1, y + 1, { scale: 1, color: shadow })
+    drawBitmapText(g, text[i], gx, y, { scale: 1, color })
+  }
+}
+
+/**
+ * The desk CRT's menu — a BIOS/memory-manager mock in crtTeal on near-black.
+ * Title bar `AY-01 · MENU`, five stacked menu rows (the site's real sections),
+ * an inverse-video highlight on the first row, and 2px scanline stripes at 12%
+ * black over the whole tube. This is where the lab spends its teal.
+ */
+export function makeCRTScreenTexture(): THREE.CanvasTexture {
+  const W = 128, H = 96
+  const [c, g] = canvasOf(W, H)
+
+  g.fillStyle = CRT_BG
+  g.fillRect(0, 0, W, H)
+
+  // Title bar.
+  g.fillStyle = PSX.TEX.crtTealDark
+  g.fillRect(0, 0, W, 12)
+  drawBitmapText(g, 'AY-01 · MENU', 4, 3, { scale: 1, color: PSX.TEX.crtTeal })
+
+  // Five menu rows; the first is the selected/highlighted entry (inverse video).
+  const rows = ['ABOUT', 'PROJECTS', 'SKILLS', 'CONTACT', 'LABS']
+  rows.forEach((label, i) => {
+    const y = 20 + i * 14
+    if (i === 0) {
+      g.fillStyle = PSX.TEX.crtTeal
+      g.fillRect(4, y - 2, W - 8, 11)
+      drawBitmapText(g, label, 8, y, { scale: 1, color: CRT_BG })
+    } else {
+      drawBitmapText(g, label, 8, y, { scale: 1, color: PSX.TEX.crtTeal })
+    }
+  })
+
+  // Scanlines: a 1px dark line every 2px, faint, over everything.
+  g.fillStyle = 'rgba(0,0,0,0.12)'
+  for (let y = 0; y < H; y += 2) g.fillRect(0, y, W, 1)
+
+  return makeTexture(c)
+}
+
+/**
+ * The floor tube-TV — a seeded broadcast-static field (per-pixel random greys),
+ * darkened toward the corners like a curved tube, with a bright `ABOUT` caps
+ * word on a dim backing plate so it reads through the snow.
+ */
+export function makeTVScreenTexture(): THREE.CanvasTexture {
+  const W = 96, H = 72
+  const [c, g] = canvasOf(W, H)
+  const rnd = mulberry32(701)
+
+  // Broadcast static: an independent random grey per pixel.
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const v = Math.floor(rnd() * 256)
+      g.fillStyle = `rgb(${v},${v},${v})`
+      g.fillRect(x, y, 1, 1)
+    }
+  }
+
+  // Tube vignette: darken by squared distance from center (real, deterministic).
+  const cx = (W - 1) / 2, cy = (H - 1) / 2
+  const maxD = Math.hypot(cx, cy)
+  const img = g.getImageData(0, 0, W, H)
+  const d = img.data
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const t = Math.hypot(x - cx, y - cy) / maxD
+      const vig = Math.max(0.15, 1 - 0.95 * t * t)
+      const i = (y * W + x) * 4
+      d[i] *= vig
+      d[i + 1] *= vig
+      d[i + 2] *= vig
+    }
+  }
+  g.putImageData(img, 0, 0)
+
+  // Bright caps word on a dim plate, centered.
+  const word = 'ABOUT'
+  const tw = measureBitmapText(word, 2)
+  const tx = Math.floor((W - tw) / 2)
+  const ty = Math.floor((H - 14) / 2)
+  g.fillStyle = 'rgba(0,0,0,0.55)'
+  g.fillRect(tx - 4, ty - 3, tw + 8, 20)
+  drawBitmapText(g, word, tx, ty, { scale: 2, color: BONE })
+
+  return makeTexture(c)
+}
+
+/** Jewel-case spines cycle the saturated accents by index. */
+const SPINE_ACCENTS = [
+  PSX.TEX.accentOrange,
+  PSX.TEX.accentYellow,
+  PSX.TEX.accentRed,
+  PSX.TEX.accentBlue,
+]
+
+/**
+ * A game-box spine (24×96) for the shelf of jewel cases — a saturated accent
+ * field cycled by `i`, a thin bone "publisher" band across the top, and the
+ * lab's real title in vertical bone caps (per-glyph stacked baselines, with a
+ * 1px ink drop-shadow so the letters read over any accent).
+ */
+export function makeBoxSpineTexture(i: number): THREE.CanvasTexture {
+  const W = 24, H = 96
+  const [c, g] = canvasOf(W, H)
+  const accent = SPINE_ACCENTS[i % SPINE_ACCENTS.length]
+  const lab = labs[((i % labs.length) + labs.length) % labs.length]
+
+  g.fillStyle = accent
+  g.fillRect(0, 0, W, H)
+
+  // Thin publisher strip across the top.
+  const band = 4
+  g.fillStyle = BONE
+  g.fillRect(0, 0, W, band)
+
+  // Vertical title, centered in the space below the band.
+  const title = lab.title.toUpperCase()
+  const availTop = band + 4
+  const availH = H - availTop - 3
+  const step = Math.min(9, Math.max(6, Math.floor(availH / title.length)))
+  const blockH = (title.length - 1) * step + 7
+  const topY = availTop + Math.max(0, Math.floor((availH - blockH) / 2))
+  drawVerticalText(g, title, W, topY, step, BONE, INK)
+
+  return makeTexture(c)
+}
+
+/**
+ * The bedroom window's overcast view (crude-tone law): a flat grey-white sky
+ * with a hair of vertical darkening, a ragged row of flat rooftop silhouettes,
+ * a water tower and a distant crane in darker grey, three dull-yellow lit
+ * windows (the only warm accent), and a wet grey street band with faint
+ * reflection streaks. No sunset, no neon — grey THPS, not golden hour.
+ */
+export function makeWindowViewTexture(): THREE.CanvasTexture {
+  const W = 192, H = 144
+  const [c, g] = canvasOf(W, H)
+  const rnd = mulberry32(709)
+  const ROOF = PSX.TEX.wallShade // '#968f7e' reads as flat far-building grey
+  const STRUCT = '#5f625f' // darker silhouette grey for tower/crane
+  const streetTop = 120
+
+  // Sky: near-flat grey-white, a touch darker toward the rooftops.
+  const sky = g.createLinearGradient(0, 0, 0, streetTop)
+  sky.addColorStop(0, '#cdcfc8')
+  sky.addColorStop(1, '#b8bab2')
+  g.fillStyle = sky
+  g.fillRect(0, 0, W, streetTop)
+
+  // Rooftop silhouettes: a ragged skyline of flat blocks down to the street.
+  const roofColor = '#6f7270'
+  const tops: number[] = []
+  const lefts: number[] = []
+  let x = -4
+  while (x < W) {
+    const bw = 16 + Math.floor(rnd() * 16)
+    const top = 60 + Math.floor(rnd() * 34)
+    g.fillStyle = roofColor
+    g.fillRect(x, top, bw + 1, streetTop - top)
+    lefts.push(x)
+    tops.push(top)
+    // A slightly darker seam so adjacent blocks read as separate buildings.
+    g.fillStyle = ROOF
+    g.fillRect(x, top, 1, streetTop - top)
+    x += bw
+  }
+
+  // Water tower on an early building: legs, tank body, conical cap.
+  {
+    const bx = 44, baseTop = 66
+    g.fillStyle = STRUCT
+    g.fillRect(bx, baseTop - 14, 2, 14) // left leg
+    g.fillRect(bx + 12, baseTop - 14, 2, 14) // right leg
+    g.fillRect(bx - 1, baseTop - 24, 16, 11) // tank body
+    fillPolygon(g, [
+      { x: bx - 1, y: baseTop - 24 },
+      { x: bx + 15, y: baseTop - 24 },
+      { x: bx + 7, y: baseTop - 30 },
+    ]) // conical cap
+  }
+
+  // Distant crane: mast, jib, short counter-jib, hanging cable.
+  {
+    const mx = 150, top = 40, jibY = 46
+    g.fillStyle = STRUCT
+    g.fillRect(mx, top, 2, streetTop - top) // mast
+    g.fillRect(mx - 22, jibY, 46, 2) // jib + counter-jib
+    g.fillRect(mx + 20, jibY, 1, 12) // hanging cable
+    g.fillRect(mx - 20, jibY - 3, 4, 5) // counterweight block
+  }
+
+  // Three dull-yellow lit windows scattered on the rooftops.
+  const lit: Array<[number, number]> = [
+    [lefts[1] + 6, tops[1] + 8],
+    [lefts[3] + 5, tops[3] + 14],
+    [lefts[5] + 8, tops[5] + 10],
+  ]
+  g.fillStyle = LIT_WINDOW
+  for (const [wx, wy] of lit) {
+    if (wx < W && wy < streetTop) g.fillRect(wx, wy, 3, 4)
+  }
+
+  // Wet street band with faint window reflections.
+  g.fillStyle = '#82857f'
+  g.fillRect(0, streetTop, W, H - streetTop)
+  g.fillStyle = 'rgba(201,169,78,0.18)'
+  for (const [wx] of lit) {
+    if (wx < W) g.fillRect(wx, streetTop, 3, H - streetTop)
+  }
+  // A couple of horizontal wet-sheen streaks.
+  g.fillStyle = 'rgba(255,255,255,0.05)'
+  for (let i = 0; i < 3; i++) g.fillRect(0, streetTop + 4 + i * 7, W, 1)
+
+  return makeTexture(c)
+}
+
+/**
+ * The corkboard over the desk — a speckled cork field with three pinned
+ * polaroids (bone border, grey photo, a red pin dot at the top). Straight
+ * rectangles only; the era look comes from the speckle and the flat photos.
+ */
+export function makeCorkboardTexture(): THREE.CanvasTexture {
+  const W = 128, H = 96
+  const [c, g] = canvasOf(W, H)
+  const rnd = mulberry32(713)
+
+  // Cork base + two-tone speckle.
+  g.fillStyle = '#c2a878'
+  g.fillRect(0, 0, W, H)
+  for (let i = 0; i < 1400; i++) {
+    g.fillStyle = rnd() > 0.5 ? 'rgba(90,60,30,0.14)' : 'rgba(255,240,210,0.10)'
+    g.fillRect(Math.floor(rnd() * W), Math.floor(rnd() * H), 1 + Math.floor(rnd() * 2), 1)
+  }
+
+  // Three pinned polaroids.
+  const cards: Array<[number, number]> = [[12, 14], [52, 30], [92, 12]]
+  for (const [px, py] of cards) {
+    const cw = 30, ch = 34
+    g.fillStyle = BONE
+    g.fillRect(px, py, cw, ch) // white border
+    g.fillStyle = '#8a8b86'
+    g.fillRect(px + 3, py + 3, cw - 6, ch - 12) // grey photo
+    outlinedPolygon(g, circlePoints(px + cw / 2, py + 3, 3), PSX.TEX.accentRed, INK, 1) // pin
+  }
+
+  return makeTexture(c)
+}
+
+/**
+ * A memory card on the desk tray — grey shell tone with a speckle of wear, a
+ * dark ribbed connector band along one edge, and a tiny bone label chip with a
+ * hand-stamped code. The literal "projects" object, palm-sized.
+ */
+export function makeMemcardTexture(): THREE.CanvasTexture {
+  const W = 64, H = 64
+  const [c, g] = canvasOf(W, H)
+  const rnd = mulberry32(719)
+
+  // Grey plastic shell + faint wear speckle.
+  g.fillStyle = '#b8b4a8'
+  g.fillRect(0, 0, W, H)
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = rnd() > 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'
+    g.fillRect(Math.floor(rnd() * W), Math.floor(rnd() * H), 1, 1)
+  }
+
+  // Ribbed connector band along the top edge.
+  g.fillStyle = '#3a3d3a'
+  g.fillRect(0, 0, W, 12)
+  g.fillStyle = '#5a5d59'
+  for (let x = 4; x < W - 3; x += 6) g.fillRect(x, 3, 3, 6)
+
+  // Label chip with a hand-stamped code.
+  g.fillStyle = BONE
+  g.fillRect(10, 26, 44, 18)
+  drawBitmapText(g, 'AY-01', 14, 30, { scale: 1, color: INK })
+  drawBitmapText(g, 'SAVE', 14, 38, { scale: 1, color: PSX.TEX.crtTealDark })
 
   return makeTexture(c)
 }
