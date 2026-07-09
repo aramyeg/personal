@@ -123,7 +123,11 @@ export function AtticDressing({ hallLen }: { hallLen: number }) {
       <CoveredFrame x={-(ATTIC.halfWidth - 0.7)} z={entryZ - 2.1} lean={0.22} seed={11} w={1.0} h={1.4} />
       <CoveredFrame x={ATTIC.halfWidth - 0.6} z={entryZ - 3.4} lean={0.14} seed={19} />
       <CoveredStatue x={-2.6} z={-(far - 1.2)} height={1.7} seed={23} />
-      <CoveredStatue x={2.7} z={entryZ - 1.4} height={1.1} seed={31} />
+      {/* GATE H: moved off the stair-exit lane (was entryZ - 1.4 at x 2.7 —
+          you emerged from the stairs straight through it). Now against the
+          entry wall left of the opening: behind you as you arrive, clear of
+          the exit lane and the diagonal to the exhibit. */}
+      <CoveredStatue x={0.8} z={entryZ - 0.55} height={1.1} seed={31} />
     </group>
   )
 }
