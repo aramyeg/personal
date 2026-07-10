@@ -41,16 +41,36 @@ describe('storybook content', () => {
     }
   })
 
-  it('every chapter has the four pop-up layers in depth order', () => {
+  it('every chapter has a bespoke construction: a backdrop, its own mix, no duplicate template', () => {
+    const signatures = new Set<string>()
     for (const ch of CHAPTERS) {
-      expect(ch.layers.map((l) => l.kind)).toEqual([
-        'backdrop',
-        'midground',
-        'hero',
-        'foreground',
-      ])
-      const zs = ch.layers.map((l) => l.apexZ)
-      expect([...zs].sort((a, b) => a - b)).toEqual(zs) // far → near
+      // every scene is anchored by a backdrop wall and has depth to it
+      expect(ch.layers[0].kind).toBe('backdrop')
+      expect(ch.layers.length).toBeGreaterThanOrEqual(3)
+      // page-glued pieces come far -> near; children ride their parents and
+      // sit next to them in the list instead
+      const zs = ch.layers.filter((l) => l.mech === 'vfold').map((l) => l.apexZ)
+      expect([...zs].sort((a, b) => a - b)).toEqual(zs)
+      // the variation phase's whole point: no two chapters share a
+      // construction (mechanism sequence + sizes)
+      signatures.add(
+        ch.layers
+          .map((l) => `${l.mech}:${l.mech === 'parallel' ? l.glueL + l.glueR : l.width}`)
+          .join('|')
+      )
+    }
+    expect(signatures.size).toBe(CHAPTERS.length)
+  })
+
+  it('children reference an earlier v-fold in their own spread', () => {
+    for (const ch of CHAPTERS) {
+      for (const layer of ch.layers) {
+        if (layer.mech !== 'child') continue
+        const parentIndex = ch.layers.findIndex((l) => l.id === layer.parentId)
+        expect(parentIndex).toBeGreaterThanOrEqual(0)
+        expect(parentIndex).toBeLessThan(ch.layers.indexOf(layer))
+        expect(ch.layers[parentIndex].mech).toBe('vfold')
+      }
     }
   })
 

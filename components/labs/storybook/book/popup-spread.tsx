@@ -1,10 +1,11 @@
 'use client'
 
 /**
- * A pop-up book spread: one v-fold paper mechanism per `SceneLayer`, posed
- * every frame by the pure closed-form solver in popup-mechanics.ts. Each
- * piece is glued to BOTH pages of its spread, so its pose is a function of
- * nothing but the spread's dihedral angle:
+ * A pop-up book spread: one paper mechanism per `SceneLayer`, posed every
+ * frame by the pure closed-form solvers in popup-mechanics.ts. Each piece
+ * is glued to BOTH pages of its spread (or to its parent piece's panels,
+ * for cascaded children), so its pose is a function of nothing but the
+ * spread's dihedral angle:
  *
  *  - 'current' (at rest): pages flat, dihedral PI — the scene stands open.
  *  - 'outgoing': this spread's dihedral closes PI -> 0 with the turning
@@ -16,8 +17,10 @@
  *  - 'hidden': a warm-texture neighbor; never visible.
  *
  * No springs, no timers, no per-layer easing: one shared driving angle,
- * like real glued paper (benchmark B9). Mounted by book.tsx for the current
- * spread ± 1 so neighboring textures are warm before you turn to them.
+ * like real glued paper (benchmark B9) — a child piece moves because its
+ * parent's fold opens it, second-hand from the same page. Mounted by
+ * book.tsx for the current spread ± 1 so neighboring textures are warm
+ * before you turn to them.
  *
  * Convention (matches page-geometry.ts): the enclosing group sits at the
  * open page's surface height, so a layer's local y=0 is the page plane;
@@ -31,11 +34,10 @@ import type { SceneLayer } from '../content'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import {
-  solveVFold,
+  solveLayerPose,
   spreadPageAngles,
   type PanelQuad,
   type SpreadRole,
-  type VFoldSpec,
 } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -65,29 +67,42 @@ type PopupSpreadProps = {
   frame: RefObject<TurnFrame | null>
 }
 
-const toSpec = (layer: SceneLayer): VFoldSpec => ({
-  apexZ: layer.apexZ,
-  vDir: layer.vDir,
-  phi: (layer.phiDeg * Math.PI) / 180,
-  rho: (layer.rhoDeg * Math.PI) / 180,
-  width: layer.width,
-  height: layer.height,
-})
+/** Fold-line position in texture u, fixed per die-cut: where the art's
+ *  crease falls for v-folds/children, where the ridge splits a parallel
+ *  strip's two slopes. */
+const foldSplit = (layer: SceneLayer): number =>
+  layer.mech === 'parallel'
+    ? (layer.glueR + layer.rise) / (layer.glueL + layer.glueR + 2 * layer.rise)
+    : (layer.creaseU ?? 0.5)
 
-/** 4-corner quad geometry with fixed uvs selecting one art half; positions
- *  are rewritten from the solver every frame. u runs 0.5 at the central
- *  crease to `uOuter` at the glue edge, so the print continues seamlessly
- *  across the fold (benchmark B6). */
-function makePanelGeometry(uOuter: 0 | 1): THREE.BufferGeometry {
+/** Per-corner uvs (matching PanelQuad order) selecting one panel's share of
+ *  the layer's art, split at the fold line so the print continues
+ *  seamlessly across it (benchmark B6). V-folds read u across the width
+ *  and v up the standing panel; parallel strips read u across the fold and
+ *  v along their span. */
+function panelUvs(layer: SceneLayer, side: 'right' | 'left'): Float32Array {
+  const s = foldSplit(layer)
+  if (layer.mech === 'parallel') {
+    // corners: [glue@z0, glue@z1, ridge@z1, ridge@z0] (left) and
+    // [ridge@z0, ridge@z1, glue@z1, glue@z0] (right)
+    return side === 'left'
+      ? new Float32Array([0, 0, 0, 1, s, 1, s, 0])
+      : new Float32Array([s, 0, s, 1, 1, 1, 1, 0])
+  }
+  // corners: [apex, bottom-outer, top-outer, top-inner]
+  return side === 'left'
+    ? new Float32Array([s, 0, 0, 0, 0, 1, s, 1])
+    : new Float32Array([s, 0, 1, 0, 1, 1, s, 1])
+}
+
+/** 4-corner quad geometry with fixed uvs; positions are rewritten from the
+ *  solver every frame. */
+function makePanelGeometry(uvs: Float32Array): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
   const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
   positions.setUsage(THREE.DynamicDrawUsage)
   geometry.setAttribute('position', positions)
-  // corner order matches PanelQuad: [apex, bottom-outer, top-outer, top-inner]
-  geometry.setAttribute(
-    'uv',
-    new THREE.BufferAttribute(new Float32Array([0.5, 0, uOuter, 0, uOuter, 1, 0.5, 1]), 2)
-  )
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   geometry.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
   return geometry
 }
@@ -104,27 +119,53 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
   geometry.computeBoundingSphere()
 }
 
+/** Contact-shadow footprint per mechanism: v-folds shade across their glue
+ *  fan, parallel strips shade the band between their glue lines. Children
+ *  ride high on a parent and cast no page-contact shadow of their own —
+ *  the parent's is already there. */
+function shadowPlacement(
+  layer: SceneLayer
+): { position: [number, number, number]; size: [number, number] } | null {
+  if (layer.mech === 'vfold') {
+    return {
+      position: [0, SHADOW_Y_LIFT, layer.apexZ + layer.vDir * 0.04],
+      size: [layer.width * 0.9, SHADOW_HEIGHT],
+    }
+  }
+  if (layer.mech === 'parallel') {
+    return {
+      position: [(layer.glueR - layer.glueL) / 2, SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2],
+      size: [(layer.glueL + layer.glueR) * 0.85, (layer.z1 - layer.z0) * 0.95],
+    }
+  }
+  return null
+}
+
 function PopupLayer({
   layer,
+  parent,
   accents,
   role,
   frame,
 }: {
   layer: SceneLayer
+  parent: SceneLayer | undefined
   accents: readonly string[]
   role: PopupRole
   frame: RefObject<TurnFrame | null>
 }) {
   const texture = useLayerTexture(layer.id, layer.kind, accents)
-  const spec = useMemo(() => toSpec(layer), [layer])
   const cutoutRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   const rightMeshRef = useRef<THREE.Mesh>(null)
   const leftMeshRef = useRef<THREE.Mesh>(null)
 
   const geometries = useMemo(
-    () => ({ right: makePanelGeometry(1), left: makePanelGeometry(0) }),
-    []
+    () => ({
+      right: makePanelGeometry(panelUvs(layer, 'right')),
+      left: makePanelGeometry(panelUvs(layer, 'left')),
+    }),
+    [layer]
   )
 
   // Unlit print materials — the artwork carries its own light, like ink on
@@ -152,6 +193,7 @@ function PopupLayer({
     materials.left.needsUpdate = true
   }, [texture, materials])
 
+  const shadow = useMemo(() => shadowPlacement(layer), [layer])
   const shadowCanvas = useMemo(() => makeShadowCanvas(), [])
   const shadowTexture = useMemo(() => makeCanvasTexture(shadowCanvas), [shadowCanvas])
   const shadowMaterial = useMemo(
@@ -179,8 +221,7 @@ function PopupLayer({
 
   useFrame(() => {
     const cutout = cutoutRef.current
-    const shadow = shadowRef.current
-    if (!cutout || !shadow) return
+    if (!cutout) return
 
     const f = frame.current
     // At eased t=0 both turn roles coincide with their rest/flat pose for
@@ -196,10 +237,10 @@ function PopupLayer({
 
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
     cutout.visible = visible
-    shadow.visible = visible
+    if (shadowRef.current) shadowRef.current.visible = visible && shadow !== null
     if (!visible) return
 
-    const pose = solveVFold(spec, thetaL, thetaR)
+    const pose = solveLayerPose(layer, parent, thetaL, thetaR)
     if (rightMeshRef.current) writeQuad(geometries.right, pose.right)
     if (leftMeshRef.current) writeQuad(geometries.left, pose.left)
 
@@ -217,27 +258,39 @@ function PopupLayer({
         <mesh ref={rightMeshRef} geometry={geometries.right} material={materials.right} renderOrder={0} />
         <mesh ref={leftMeshRef} geometry={geometries.left} material={materials.left} renderOrder={0} />
       </group>
-      <mesh
-        ref={shadowRef}
-        position={[0, SHADOW_Y_LIFT, layer.apexZ + layer.vDir * 0.04]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        material={shadowMaterial}
-        renderOrder={0}
-        visible={false}
-      >
-        <planeGeometry args={[layer.width * 0.9, SHADOW_HEIGHT]} />
-      </mesh>
+      {shadow && (
+        <mesh
+          ref={shadowRef}
+          position={shadow.position}
+          rotation={[-Math.PI / 2, 0, 0]}
+          material={shadowMaterial}
+          renderOrder={0}
+          visible={false}
+        >
+          <planeGeometry args={shadow.size} />
+        </mesh>
+      )}
     </>
   )
 }
 
 /** One spread's worth of pop-up layers. Always mounted (for the current
- *  spread ± 1) but only visible while `role !== 'hidden'`. */
+ *  spread ± 1) but only visible while `role !== 'hidden'`. Children find
+ *  their parent in the same spread's layer list. */
 export function PopupSpread({ layers, accents, spreadIndex, role, frame }: PopupSpreadProps) {
   return (
     <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
       {layers.map((layer) => (
-        <PopupLayer key={layer.id} layer={layer} accents={accents} role={role} frame={frame} />
+        <PopupLayer
+          key={layer.id}
+          layer={layer}
+          parent={
+            layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
+          }
+          accents={accents}
+          role={role}
+          frame={frame}
+        />
       ))}
     </group>
   )

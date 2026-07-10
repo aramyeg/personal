@@ -32,16 +32,30 @@ function hashLayerId(id: string): number {
 }
 
 /**
+ * The set of art ids that actually exist, from the manifest the prepare-art
+ * pipeline writes next to the images. Consulting it BEFORE any image
+ * request is the only reliable way to keep the console clean: Chrome logs
+ * "Failed to load resource" for ANY 404 — <img>, TextureLoader, and plain
+ * fetch alike — no matter how quietly the response is handled. With the
+ * manifest, art that hasn't been generated yet (most of it, by design)
+ * costs zero requests and zero console noise; the manifest itself is a
+ * committed file, so its own fetch always resolves. Fetched once per
+ * session, shared by every layer.
+ */
+let manifestPromise: Promise<ReadonlySet<string>> | null = null
+function artManifest(): Promise<ReadonlySet<string>> {
+  manifestPromise ??= fetch('/labs/storybook/art/manifest.json')
+    .then((res) => (res.ok ? (res.json() as Promise<string[]>) : []))
+    .then((ids) => new Set(ids))
+    .catch(() => new Set<string>())
+  return manifestPromise
+}
+
+/**
  * Loads `/labs/storybook/art/<id>.webp`, routing success to `onLoad` and
- * any failure (404, decode error, ...) to `onError` — both silently, per
- * the file header. Probes with `fetch` FIRST and only hands the bytes to
- * `THREE.TextureLoader` (via an object URL) when they exist: a missing
- * file resolves as a plain 404 response instead of a failed <img>
- * subresource, which the browser would log as a console error no matter
- * how quietly we handle it (art is optional by design — most of it hasn't
- * been generated yet, and the console must stay clean). Returns a `cancel`
- * function so the caller's effect cleanup can suppress a load that
- * resolves after unmount.
+ * any failure (not in the manifest, decode error, ...) to `onError` — both
+ * silently, per the file header. Returns a `cancel` function so the
+ * caller's effect cleanup can suppress a load that resolves after unmount.
  */
 export function loadArtTexture(
   id: string,
@@ -49,34 +63,28 @@ export function loadArtTexture(
   onError: () => void
 ): { cancel: () => void } {
   let cancelled = false
-  fetch(`/labs/storybook/art/${id}.webp`)
-    .then((res) => {
-      if (cancelled) return undefined
-      if (!res.ok) {
+  artManifest()
+    .then((ids) => {
+      if (cancelled) return
+      if (!ids.has(id)) {
         onError()
-        return undefined
+        return
       }
-      return res.blob().then((blob) => {
-        if (cancelled) return
-        const objectUrl = URL.createObjectURL(blob)
-        new THREE.TextureLoader().load(
-          objectUrl,
-          (loaded) => {
-            URL.revokeObjectURL(objectUrl)
-            if (cancelled) {
-              loaded.dispose()
-              return
-            }
-            loaded.colorSpace = THREE.SRGBColorSpace
-            onLoad(loaded)
-          },
-          undefined,
-          () => {
-            URL.revokeObjectURL(objectUrl)
-            if (!cancelled) onError()
+      new THREE.TextureLoader().load(
+        `/labs/storybook/art/${id}.webp`,
+        (loaded) => {
+          if (cancelled) {
+            loaded.dispose()
+            return
           }
-        )
-      })
+          loaded.colorSpace = THREE.SRGBColorSpace
+          onLoad(loaded)
+        },
+        undefined,
+        () => {
+          if (!cancelled) onError()
+        }
+      )
     })
     .catch(() => {
       if (!cancelled) onError()

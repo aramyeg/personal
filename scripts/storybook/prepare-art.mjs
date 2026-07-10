@@ -17,7 +17,7 @@
  * No-op (clean exit) when art-src is missing or empty.
  */
 
-import { mkdir, readdir } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -225,6 +225,21 @@ function printTable(rows) {
   process.stdout.write(lines.join('\n') + '\n')
 }
 
+/** The runtime consults this manifest before requesting any art, so ids
+ *  without generated files cost zero network requests and zero console
+ *  noise (use-layer-texture.ts). Rebuilt from the OUTPUT directory listing
+ *  on every run, so it also picks up files from earlier batches. */
+async function writeManifest() {
+  const entries = await readdir(OUT_DIR, { withFileTypes: true })
+  const ids = entries
+    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.webp'))
+    .map((e) => e.name.replace(/\.webp$/i, ''))
+    .sort()
+  const manifestPath = path.join(OUT_DIR, 'manifest.json')
+  await writeFile(manifestPath, JSON.stringify(ids, null, 2) + '\n')
+  process.stdout.write(`manifest: ${ids.length} art ids -> ${path.relative(REPO_ROOT, manifestPath)}\n`)
+}
+
 async function main() {
   const files = await readSourceFiles()
   if (files.length === 0) {
@@ -238,6 +253,7 @@ async function main() {
     rows.push(await processOne(file))
   }
   printTable(rows)
+  await writeManifest()
 }
 
 main().catch((err) => {

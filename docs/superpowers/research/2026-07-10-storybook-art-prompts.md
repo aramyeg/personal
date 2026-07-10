@@ -132,189 +132,240 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 
 ---
 
-# Batch 2 — remaining spreads (32 assets)
+# Batch 2 — remaining spreads (v3, variation phase)
 
-Same four-layer pattern as Chapter IV (backdrop panorama with a torn-paper
-skyline top edge → midground set-piece strip → hero figurine group → foreground
-fringe strip), generated per §4's scene descriptions and §3.1's accents, plus the
-title page, the satchel and its six items, and the closing pages.
+**v3 addendum — fold-aware die-cuts (read before generating).** The engine now
+poses three mechanism families, and each piece's art must be drawn around its
+fold line:
 
-**Chapter I — The Inn of a Hundred Keys**
+- **Standing cutouts (v-folds).** The subject must sit ON the bottom edge of
+  the canvas — that edge is glued to the page. The piece folds along ONE
+  vertical line at the percentage given per asset below ("fold at N% from
+  left"); place a natural seam there (a tower edge, a peak, the dragon's
+  spine) so the crease disappears into the drawing. The artwork continues
+  seamlessly across the fold. Some pieces LEAN in the book (asymmetric
+  fold) — draw the subject upright; the lean comes from the paper, not the
+  art.
+- **Tents (parallel folds).** The strip is glued along BOTH long edges and
+  ridges along the line given per asset ("ridge at N% from left"); the left
+  portion of the canvas becomes the left slope, the rest the right slope.
+  Draw it like a printed strip seen flat — the fold gives it the pitch.
+- **Riders (children).** Small standalone cutouts glued onto a bigger
+  piece's fold — a raven on the rookery, coins off the dragon. Center fold
+  unless stated. Keep silhouettes bold and readable at small size; they
+  render about a fifth the size of a hero piece.
+- Backdrops are trimmed tight and creased like everything else now — no
+  dead margin, and the panorama needs a believable vertical seam at its
+  fold percentage.
+- After a batch lands, run `node scripts/storybook/prepare-art.mjs` (it also
+  rebuilds the art manifest); world sizes are then re-derived from the
+  trimmed aspect ratios exactly as Chapter IV's were, and the fold
+  percentages here must stay in sync with `creaseU` in content.ts.
 
-## ch1-backdrop — 1536×1024
+**Chapter I — The Inn of a Hundred Keys** *(mountain wall, the inn with its
+hanging key-sign, a low field wall)*
 
-*Chapter I — The Inn of a Hundred Keys — backdrop layer*
+## ch1-backdrop — 1536×1024 · fold at 42% from left, slight lean
 
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide panorama of a stone-built village beneath snow-capped twin peaks (echoing Mount Ararat), spring-green foothills in layered strips, dawn-peach sky; decorative torn-paper skyline top edge (mountain silhouette), transparent above. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch1-midground — 1536×1024
-
-*Chapter I — The Inn of a Hundred Keys — midground layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. skyline strip of a stone-built village climbing a hillside: terracotta-roofed stone houses, a many-windowed inn glowing with warm light, a narrow cobbled lane; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch1-hero — 1024×1024
-
-*Chapter I — The Inn of a Hundred Keys — hero layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, an oversized brass key tucked through his belt and one hand raised in greeting, standing before the open door of a stone inn glowing with many lit windows; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch1-foreground — 1536×1024
-
-*Chapter I — The Inn of a Hundred Keys — foreground layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. foreground fringe strip: cobblestones scattered with fallen apple-blossom petals, a couple of spare brass keys, and a patch of lingering snow; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
----
-
-**Chapter II — The Carrier Swarm**
-
-## ch2-backdrop — 1536×1024
-
-*Chapter II — The Carrier Swarm — backdrop layer*
+*Chapter I — sleeping-mountain panorama*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441, bee black. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide alpine panorama: layered snow-dusted mountain peaks in cool blue, honey-gold late-afternoon sky, distant valley haze; decorative torn-paper skyline top edge (jagged peaks), transparent above. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide panorama of a stone-built village beneath snow-capped twin peaks (echoing Mount Ararat), the taller peak rising at about forty percent from the left where a clean ridge line runs top to bottom, spring-green foothills in layered strips, dawn-peach sky; decorative torn-paper skyline top edge (mountain silhouette), transparent above, village rooftops resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch2-midground — 1536×1024
+## ch1-inn — 1024×1024 · fold at 55% from left, leans
 
-*Chapter II — The Carrier Swarm — midground layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441, bee black. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. skyline strip of timber chalets stepped down a pine slope: steep gabled roofs, dark ranks of pine trees, small glowing windows; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch2-hero — 1024×1024
-
-*Chapter II — The Carrier Swarm — hero layer*
+*Chapter I — the inn itself, hero at the door*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441, bee black. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, a small glowing paper map unrolled between both hands with faint golden route-lines, flanked by two giant friendly striped paper bees hovering beside him each carrying a tiny parcel; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978, snow white. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a tall stone inn with many glowing windows and a terracotta roof, its front corner edge falling at about fifty-five percent from the left where the building visibly turns (a clean vertical corner seam top to bottom), and standing at the open door the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, one hand raised in greeting; the whole group resting on the flat bottom edge; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch2-foreground — 1536×1024
+## ch1-sign — 1024×1024 · rider on the inn's fold, center fold
 
-*Chapter II — The Carrier Swarm — foreground layer*
+*Chapter I — hanging key-sign*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441, bee black. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. foreground fringe strip: scattered pine needles and a few fallen honeycomb fragments along a low wooden fence rail, one small trail of bee footprints; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: antique gold #c9a227, terracotta #b0603f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a small hanging tavern sign: an oversized brass key on a wooden shield-shaped board, dangling from a simple wrought-iron bracket, bold simple silhouette readable at tiny size, the bracket base resting on the flat bottom edge; isolated object, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch1-wall — 1536×1024 · center fold
+
+*Chapter I — low field wall*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. long low dry-stone field wall strip with tufts of spring grass and apple-blossom sprigs along its top, a wooden gate exactly at the center of the strip (a clean vertical seam there), the wall base resting on the flat bottom edge; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
 ---
 
-**Chapter III — The Rookery of Four Billion Ravens**
+**Chapter II — The Carrier Swarm** *(one big alpine ridge with two bees riding
+its fold, the courier balloon — deliberately airy, no foreground)*
 
-## ch3-backdrop — 1536×1024
+## ch2-backdrop — 1536×1024 · fold at 60% from left, slight lean
 
-*Chapter III — The Rookery of Four Billion Ravens — backdrop layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide grey-citadel panorama at dusk: slate rooftops and a single tall spire silhouette (television-tower nod), dusk-violet sky, scattered amber window lights; decorative torn-paper skyline top edge, transparent above. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch3-midground — 1536×1024
-
-*Chapter III — The Rookery of Four Billion Ravens — midground layer*
+*Chapter II — alpine ridge panorama*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. skyline strip of a tall stone rookery tower dense with roosting ravens on its ledges, small arched openings, a weathervane at the top; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441, bee black. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide alpine panorama: layered snow-dusted mountain peaks in cool blue with timber chalets stepped down the lower slopes, the highest peak rising at about sixty percent from the left where a clean ridge line runs top to bottom, honey-gold late-afternoon sky; decorative torn-paper skyline top edge (jagged peaks), transparent above, the valley floor resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch3-hero — 1024×1024
+## ch2-bee-a — 1024×1024 · rider on the ridge's fold, center fold
 
-*Chapter III — The Rookery of Four Billion Ravens — hero layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, standing before a huge wooden dispatch board covered in scroll-letters and pinned paper routes, one raven landing on his outstretched arm with a scroll in its beak; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch3-foreground — 1536×1024
-
-*Chapter III — The Rookery of Four Billion Ravens — foreground layer*
+*Chapter II — courier bee, wings spread*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. foreground fringe strip: a cobblestone edge scattered with a few black feathers and a couple of dropped scroll-letters tied with amber ribbon; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: honey gold #d9a441, bee black, alpine blue #7d9bb5. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one plump friendly striped paper bee seen head-on with both wings spread wide and symmetrical, carrying a tiny wrapped parcel under its body, bold simple silhouette readable at tiny size, the body centered so the vertical centerline runs between the wings, sitting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
----
+## ch2-bee-b — 1024×1024 · second rider, center fold
 
-**Chapter V — The Bazaar of a Thousand Stalls**
-
-## ch5-backdrop — 1536×1024
-
-*Chapter V — The Bazaar of a Thousand Stalls — backdrop layer*
+*Chapter II — smaller courier bee, letter in legs*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide rose-stone city panorama: sun-warmed pink-tuff domes and arches in layered strips, warm cream sky, distant low hills; decorative torn-paper skyline top edge, transparent above. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: honey gold #d9a441, bee black, sealing-wax red. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one small friendly striped paper bee seen head-on with wings spread symmetrically, clutching a folded letter with a wax seal in its legs, bold simple silhouette readable at very small size, vertical centerline between the wings, sitting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch5-midground — 1536×1024
+## ch2-hero — 1024×1024 · fold at 45% from left, leans
 
-*Chapter V — The Bazaar of a Thousand Stalls — midground layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. skyline strip of an arched bazaar row: pink-tuff archways, red-and-cream striped awnings, hanging fruit baskets and strung lanterns; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch5-hero — 1024×1024
-
-*Chapter V — The Bazaar of a Thousand Stalls — hero layer*
+*Chapter II — the hero's courier balloon*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, carving a small glowing golden pattern-stone with a chisel, a row of identical paper market stalls springing up mid-assembly beside him; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch5-foreground — 1536×1024
-
-*Chapter V — The Bazaar of a Thousand Stalls — foreground layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. foreground fringe strip: scattered fruit (pomegranates, apricots, figs) and a few pink-tuff stone chips along a market-stall counter edge; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a charming paper hot-air balloon with a honey-gold striped envelope and a small wicker basket, and leaning out of the basket the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, looking through a small brass looking-glass; the balloon's left seam line falling at about forty-five percent from the left (a clean vertical seam top to bottom), the basket resting on the flat bottom edge; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
 ---
 
-**Chapter VI — The Northern Treasury**
+**Chapter III — The Rookery of Four Billion Ravens** *(two ranks of towers
+with ravens riding both folds, and a dispatch-counter tent — the citadel IS
+the scene, no separate hero figurine piece; the hero works at the counter)*
 
-## ch6-backdrop — 1536×1024
+## ch3-towers — 1536×1024 · fold at 34% from left, slight lean
 
-*Chapter VI — The Northern Treasury — backdrop layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide northern panorama: a dark pine forest ridgeline in layered strips, night-navy sky with a soft teal-and-violet aurora ribbon overhead; decorative torn-paper skyline top edge (treeline), transparent above. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch6-midground — 1536×1024
-
-*Chapter VI — The Northern Treasury — midground layer*
+*Chapter III — tall citadel rank*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. skyline strip of a glass-and-stone treasury building rising among pines: tall glass panels, stone buttresses, warm interior glow through the windows; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. tall grey-citadel skyline at dusk: a great stone rookery tower rising at about one third from the left where its sheer corner edge runs top to bottom (a clean vertical seam), lower slate towers and a single spire (television-tower nod) stepping away to the right, ravens circling, scattered amber window lights; torn-paper top edge, transparent above, the street line resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch6-hero — 1024×1024
+## ch3-raven-a — 1024×1024 · rider high on the towers' fold, center fold
 
-*Chapter VI — The Northern Treasury — hero layer*
-
-```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, flanked by two smaller apprentice paper figurines, all three gathered around a table of unrolled paper plans and looking down at them together; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
-```
-
-## ch6-foreground — 1536×1024
-
-*Chapter VI — The Northern Treasury — foreground layer*
+*Chapter III — raven, wings spread*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. foreground fringe strip: snow-dusted pine branches and a scatter of pinecones along a stone ledge; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one paper raven seen head-on with both wings spread wide and symmetrical, a small scroll in its beak, bold simple silhouette readable at tiny size, vertical centerline down the body, feet resting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch3-rank — 1536×1024 · fold at 64% from left, slight lean
+
+*Chapter III — second tower rank*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. lower rank of rookery rooftops and chimneys with ravens roosting on the ledges, arched dovecote openings glowing amber, a stout gate-tower at about two thirds from the left where its corner edge runs top to bottom (a clean vertical seam); torn-paper top edge, transparent above, the rooftop line resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch3-raven-b — 1024×1024 · second rider, center fold
+
+*Chapter III — small raven, folded wings*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: raven black #2b2d33, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one small paper raven perched upright seen head-on, wings tucked, head tilted curiously, a sealed letter at its feet, bold simple silhouette readable at very small size, vertical centerline down the body, feet resting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch3-counter — 1536×1024 · TENT strip, ridge at 54% from left
+
+*Chapter III — dispatch counter (the hero works here)*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, raven black #2b2d33, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. full-bleed printed strip for a folded counter piece, edge to edge with NO transparent margin: a long wooden dispatch counter covered edge to edge with pinned paper routes, sorted scroll-letters, brass stamps and an inkwell, and standing behind it at about the middle the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, sorting the letters while two ravens watch; the counter's front edge line runs horizontally at just past half the height, the composition reads correctly when the strip is later folded along the vertical line at fifty-four percent from the left. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+---
+
+**Chapter IV — one addition to the approved Batch-1 set**
+
+## ch4-coins — 1024×1024 · rider on the dragon's fold, center fold
+
+*Chapter IV — spilling coins*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: coin gold #e6c65a, dune gold #d9a24a. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a small cascade of overlapping gold paper coins tumbling from a tipped bronze goblet, a few coins mid-air, bold simple silhouette readable at tiny size, symmetrical about its vertical centerline, the coin pile resting on the flat bottom edge; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+---
+
+**Chapter V — The Bazaar of a Thousand Stalls** *(rose-stone skyline, the
+master-pattern archway with a hanging lantern, and a striped awning tented
+over the gutter)*
+
+## ch5-city — 1536×1024 · fold at 58% from left, slight lean
+
+*Chapter V — rose-stone skyline*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide rose-stone city panorama: sun-warmed pink-tuff domes and arches in layered strips, a great domed hall rising at about fifty-eight percent from the left where its edge runs top to bottom (a clean vertical seam), warm cream sky, distant low hills; decorative torn-paper skyline top edge, transparent above, the street line resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch5-arch — 1024×1024 · center fold
+
+*Chapter V — the master-pattern archway, hero carving*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, antique gold #c9a227. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a grand pink-tuff stone archway carved with repeating master patterns, its keystone exactly on the vertical centerline (the arch symmetrical left-to-right), and beneath it the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, chiseling a small glowing golden pattern-stone; the arch feet resting on the flat bottom edge; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch5-lantern — 1024×1024 · rider on the arch's fold, center fold
+
+*Chapter V — hanging market lantern*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: window amber #d98e3f, awning red #a63d2f, antique gold #c9a227. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one glowing paper market lantern with a warm amber panel and a red tassel, hanging from a small curved bracket, bold simple silhouette readable at tiny size, symmetrical about its vertical centerline, the bracket base resting on the flat bottom edge; isolated object, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch5-awning — 1536×1024 · TENT strip, ridge at 50% from left
+
+*Chapter V — market awning canopy*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: awning red #a63d2f, awning cream, fruit tones. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. full-bleed printed strip for a folded awning piece, edge to edge with NO transparent margin: bold red-and-cream awning stripes running left to right, a scalloped fringe along both long edges, small hanging fruit bundles and one strung lantern along the lower stripe; the design symmetrical about the vertical centerline where the ridge will fold. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+---
+
+**Chapter VI — The Northern Treasury** *(pine treeline, the largest hero of
+the book — the glass treasury, leaning — its raised banner, and a pine
+fringe)*
+
+## ch6-pines — 1536×1024 · fold at 44% from left, slight lean
+
+*Chapter VI — pine treeline under the aurora*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. wide northern panorama: a dark pine forest ridgeline in layered strips, the tallest pine rising at about forty-four percent from the left (a clean vertical seam runs top to bottom through it), night-navy sky with a soft teal-and-violet aurora ribbon overhead; decorative torn-paper top edge (treeline), transparent above, the forest floor resting on the flat bottom edge. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch6-treasury — 1024×1024 · fold at 47% from left, leans
+
+*Chapter VI — the glass treasury, hero and founders*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a tall treasury hall with walls of glass panels between stone buttresses, warm golden light glowing from within so tiny stacked vault shelves show through the glass, its front corner edge falling at about forty-seven percent from the left where the building visibly turns (a clean vertical corner seam top to bottom), and before the door the Hero: a small paper-cut figurine of a young man with short dark hair, warm friendly eyes and a slight smile, wearing a simple forest-green tunic with rolled sleeves, brown trousers and boots, a leather satchel across his chest, holding a faintly glowing golden quill, unrolling paper plans with two founder figures in long northern coats; the whole group resting on the flat bottom edge; isolated group, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch6-banner — 1024×1024 · rider on the treasury's fold, center fold
+
+*Chapter VI — raised vault banner*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: aurora teal #4fd6b8, night navy #1d2a45, antique gold #c9a227. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a small heraldic banner on a short flagpole: deep navy field with a round gold vault-door emblem at its center (a circle with radiating spokes, no letters), two swallow-tail points, bold simple silhouette readable at tiny size, symmetrical about the vertical centerline of the pole, the pole base resting on the flat bottom edge; isolated object, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch6-fringe — 1536×1024 · center fold
+
+*Chapter VI — snowy pine fringe*
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, night navy #1d2a45. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. low foreground fringe strip: snow-dusted pine branches and a scatter of pinecones along a stone ledge, one small snow drift exactly at the center of the strip (a clean vertical seam there), the ledge resting on the flat bottom edge; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
 ---
@@ -401,7 +452,7 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 
 **The End & back cover**
 
-## end-letter — 1024×1024
+## end-letter — 1024×1024 · center fold
 
 *The End — folded letter*
 
@@ -409,12 +460,12 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: seal burgundy #641e26, slate #5a6470. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a folded parchment letter sealed with a burgundy wax seal stamped with a small dragon crest, one corner gently curled; isolated on transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## end-raven — 1024×1024
+## end-raven — 1024×1024 · rider on the letter's fold, center fold
 
-*The End — raven messenger*
+*The End — raven messenger (the raven the closing line asks the reader to send)*
 
 ```
-Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: seal burgundy #641e26, slate #5a6470. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. a paper raven in flight with wings spread, carrying a small rolled letter in its beak; isolated on transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: seal burgundy #641e26, slate #5a6470. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one paper raven seen head-on with both wings spread wide and symmetrical, carrying a small rolled letter in its beak, bold simple silhouette readable at tiny size, vertical centerline down the body, feet resting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
 ## back-crest — 1024×1024

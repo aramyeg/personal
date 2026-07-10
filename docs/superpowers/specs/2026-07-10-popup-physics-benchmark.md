@@ -152,3 +152,45 @@ B13. **Depth-ordered rise.** At a partial-open frame, layer rise progress
   Batch-2 / page-print generation, not physics.
 - Full stack at verdict: 311/311 unit, lint, production build, e2e CI mode
   122 passed / 0 failed.
+
+## Variation phase — 2026-07-10 (post-verdict)
+
+User verdict on the benchmark pass: physics confirmed; next complaint was
+composition ("cutouts are all too similar... more variation, different
+sizes, asymmetry, visual storytelling"). The engine grew from one mechanism
+to three — all validated numerically in
+`.superpowers/sdd/bench/derive-variation.mjs` before landing, all still
+posed by nothing but the spread dihedral:
+
+1. **Asymmetric v-fold** (lit doc §3.3): one `skewDeg` knob keeps the
+   Kawasaki flat-fold pairing (phiL + rhoL = phiR + rhoR) true by
+   construction; the crease is solved as the general two-cone intersection
+   and the piece LEANS. Wall regime caps at |skew| < (rho − phi)/2 before a
+   panel stops standing — walls take their asymmetry mostly from off-center
+   creases (`creaseU`), deep-V heroes lean with real skew.
+2. **Parallel fold** (lit doc §4): planar four-bar strip creased along the
+   spine (tents/awnings/counters); `wA = glueR + rise, wC = glueL + rise`
+   folds it exactly flat at closed and stands it by `rise` of slack when
+   open. Closed reach = glueL + glueR + rise must fit the page.
+3. **Cascaded child v-fold** (Glassner generations, lit doc §5): rides a
+   parent's central crease, driven by the parent's own panel dihedral.
+   Frame-free construction (`g = cos(phi)·Zc + sin(phi)·b_panel`,
+   `c = cos(Λ(eta))·Zc + sin(Λ(eta))·bisector`) satisfies the spherical
+   linkage equation identically — machine-precision glue (1e-16).
+
+Invariant suite extended to every mechanism and every shipped layer
+(94 tests): A1 covers parallel glue lines and child glue-on-panel planes;
+**A11 (new)** proves children are glued to actual parent paper (panel-basis
+decomposition within the die-cut bounds); A9 runs per spread with
+child↔parent contact excluded by the wedge-convexity argument (a child's
+material cannot leave its parent's panel wedge). Flat-fold tolerance for
+skewed/child pieces is 1e-5 (two-cone tangency sqrt noise) vs 1e-9
+analytic for symmetric ones — paper is 0.02 thick.
+
+Content: uniform `layerDefaults` abolished; six bespoke chapter
+constructions (guarded by a no-two-chapters-share-a-signature test).
+Batch-2 call sheet rewritten fold-aware (crease percentages, lean notes,
+rider/tent conventions). Also fixed while verifying: art 404 console noise
+eliminated deterministically via a committed art manifest consulted before
+any request (Chrome logs fetch 404s too — the fetch-first probe only
+narrowed the race).
