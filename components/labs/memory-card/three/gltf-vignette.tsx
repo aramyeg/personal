@@ -54,33 +54,14 @@ function usePrefersReducedMotion(): boolean {
   return reduced
 }
 
-/** Dispose a material and any textures it references (map, normalMap, …). */
-function disposeMaterial(material: THREE.Material): void {
-  for (const value of Object.values(material)) {
-    const texture = value as THREE.Texture | null
-    if (texture && texture.isTexture) texture.dispose()
-  }
-  material.dispose()
-}
-
-/** Free every geometry/material/texture the loaded scene owns. */
-function disposeScene(root: THREE.Object3D): void {
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh
-    if (!mesh.isMesh) return
-    if (mesh.geometry) mesh.geometry.dispose()
-    const material = mesh.material
-    if (Array.isArray(material)) material.forEach(disposeMaterial)
-    else if (material) disposeMaterial(material)
-  })
-}
-
 /**
- * World-space bounds of a loaded scene, skinning-aware. `Box3.setFromObject`
- * measures a `SkinnedMesh`'s bind-space geometry, which for skeleton-driven
- * assets can be wildly larger or smaller than the posed, rendered size,
- * starving `fitToStage` of a usable height. Skinned meshes are measured via
- * `computeBoundingBox()` (skinning-aware since three r151) instead.
+ * World-space bounds of a loaded scene, safe for skinned content. The key is
+ * the up-front `updateMatrixWorld(true)`: `Box3.setFromObject`'s own traversal
+ * updates each node's world matrix lazily in DFS order, so a `SkinnedMesh`
+ * visited before its skeleton's bone nodes computes its skinning-aware bounds
+ * from stale bone matrices (observed live as a near-zero box). Refreshing the
+ * whole subtree first makes `SkinnedMesh.computeBoundingBox()` (bone-aware
+ * since three r151) read settled matrices.
  */
 function measureScene(scene: THREE.Object3D): THREE.Box3 {
   scene.updateMatrixWorld(true)
