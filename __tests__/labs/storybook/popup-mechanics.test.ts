@@ -238,7 +238,10 @@ describe('A5 reachability — solve is finite everywhere', () => {
 })
 
 describe('A6 continuity — no jumps, no branch flips', () => {
-  it('corner displacement is bounded by the angle step', () => {
+  // 720 samples x 8 corners x every shipped layer is the suite's heaviest
+  // sweep (~2s alone, longer when the full suite's workers share the CPU) —
+  // the default 5s timeout flakes under load, so it gets its own budget.
+  it('corner displacement is bounded by the angle step', { timeout: 30_000 }, () => {
     for (const [, layer, layers] of ALL_LAYERS) {
       const steps = 720
       // A rigid piece of this size cannot displace any corner more than

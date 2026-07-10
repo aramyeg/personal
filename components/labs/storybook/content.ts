@@ -51,7 +51,11 @@ export const END_CLOSING_LINE =
 
 // VARIATION PHASE: every chapter gets a bespoke construction — different
 // mechanism mixes, layer counts, sizes, asymmetry, and storytelling
-// micro-pieces — instead of one uniform four-wall template. Parameter
+// micro-pieces — instead of one uniform four-wall template. RICHER-
+// STRUCTURE PHASE on top of it: compound scenes assembled from several
+// pieces (a parent fold carrying two children at different heights reads
+// as one multi-story building; paired asymmetric tents read as a row of
+// stalls), and the chapter centerpieces grew. Parameter
 // regimes (kinematics research + containment analysis, benchmark spec):
 // reader-facing walls take phi near 90 with rho a few degrees above; the
 // standing margin rho - phi caps wall skew at |skew| < (rho - phi) / 2
@@ -62,35 +66,52 @@ export const END_CLOSING_LINE =
 // the full Part-A invariant suite (flat fold, containment, no tearing,
 // separation) — sizes were chosen against those bounds.
 
-// Chapter I — stone city beneath a sleeping mountain; the inn, its hanging
-// key-sign swinging off the inn's own fold, a low field wall up front.
+// Chapter I — stone city beneath a sleeping mountain. RICHER-STRUCTURE
+// PHASE: the inn is now a compound two-story coaching inn — one bigger
+// parent wall carrying TWO children (the hanging key-sign low on the fold,
+// an attic dormer above it — the stories of the building are literally
+// stories of the fold), the stable tented in the yard IN FRONT of it
+// (asymmetric parallel, ridge toward the left page — pieces placed behind
+// a taller mid-page piece are invisible from the reading camera), and the
+// low field wall pushed to the very front edge. Four depth planes plus a
+// cascade — the densest chapter open.
 const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-backdrop', kind: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.88 },
-  { id: 'ch1-inn', kind: 'hero', mech: 'vfold', apexZ: 0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.82, height: 0.5 },
-  { id: 'ch1-sign', kind: 'hero', mech: 'child', parentId: 'ch1-inn', mount: 0.34, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.22, height: 0.16 },
-  { id: 'ch1-wall', kind: 'foreground', mech: 'vfold', apexZ: 0.42, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.26 },
+  { id: 'ch1-inn', kind: 'hero', mech: 'vfold', apexZ: -0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.95, height: 0.62 },
+  { id: 'ch1-sign', kind: 'hero', mech: 'child', parentId: 'ch1-inn', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.22, height: 0.16 },
+  { id: 'ch1-dormer', kind: 'midground', mech: 'child', parentId: 'ch1-inn', mount: 0.52, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.2, height: 0.14 },
+  // kind 'backdrop' picks the solid placeholder painter — a tent's faces
+  // are full printed paper, not a fringe silhouette (same for every
+  // parallel strip below)
+  { id: 'ch1-stable', kind: 'backdrop', mech: 'parallel', glueL: 0.44, glueR: 0.28, rise: 0.11, z0: 0.3, z1: 0.54 },
+  { id: 'ch1-wall', kind: 'foreground', mech: 'vfold', apexZ: 0.6, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.26 },
 ]
 
 // Chapter II — airy alpine spread, no foreground fringe: one big leaning
-// ridge with two bees popping off its fold, and the courier balloon hero.
+// ridge with two bees popping off its fold, the courier balloon hero with
+// a third bee circling it. Deliberately the SPARSEST chapter — density
+// contrast is part of the variation.
 const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-backdrop', kind: 'backdrop', mech: 'vfold', apexZ: -0.45, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: 1.5, creaseU: 0.6, width: 1.65, height: 0.72 },
   { id: 'ch2-bee-a', kind: 'hero', mech: 'child', parentId: 'ch2-backdrop', mount: 0.48, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.2, height: 0.17 },
   { id: 'ch2-bee-b', kind: 'hero', mech: 'child', parentId: 'ch2-backdrop', mount: 0.22, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.12 },
   { id: 'ch2-hero', kind: 'hero', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 78, skewDeg: -4, creaseU: 0.45, width: 0.88, height: 0.58 },
+  { id: 'ch2-bee-c', kind: 'hero', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.13, height: 0.1 },
 ]
 
-// Chapter III — the rookery: two ranks of towers (no hero centerpiece —
-// the citadel IS the scene), ravens riding both folds, and a low dispatch
-// counter creased parallel to the spine.
+// Chapter III — the rookery: the great tower now carries a dispatch
+// BALCONY jutting off its fold at mid-height with a raven perched above it
+// (one compound multi-story piece), a second rank of towers with its own
+// raven, and the dispatch counter tented off-center toward the right page.
 const CH3_LAYERS: readonly SceneLayer[] = [
   { id: 'ch3-towers', kind: 'backdrop', mech: 'vfold', apexZ: -0.38, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.5, creaseU: 0.34, width: 1.5, height: 1.0 },
-  { id: 'ch3-raven-a', kind: 'hero', mech: 'child', parentId: 'ch3-towers', mount: 0.72, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.15 },
+  // deeper V than the ravens so it juts clear of the facade; the scalloped
+  // 'foreground' painter reads as its railing until real art lands
+  { id: 'ch3-balcony', kind: 'foreground', mech: 'child', parentId: 'ch3-towers', mount: 0.46, vDir: 1, phiDeg: 52, rhoDeg: 78, width: 0.34, height: 0.19 },
+  { id: 'ch3-raven-a', kind: 'hero', mech: 'child', parentId: 'ch3-towers', mount: 0.78, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.15 },
   { id: 'ch3-rank', kind: 'midground', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.6 },
   { id: 'ch3-raven-b', kind: 'hero', mech: 'child', parentId: 'ch3-rank', mount: 0.38, vDir: -1, phiDeg: 66, rhoDeg: 86, width: 0.16, height: 0.12 },
-  // kind 'backdrop' picks the solid placeholder painter — a tent's faces
-  // are full printed paper, not a fringe silhouette
-  { id: 'ch3-counter', kind: 'backdrop', mech: 'parallel', glueL: 0.34, glueR: 0.42, rise: 0.12, z0: 0.3, z1: 0.62 },
+  { id: 'ch3-counter', kind: 'backdrop', mech: 'parallel', glueL: 0.3, glueR: 0.48, rise: 0.12, z0: 0.3, z1: 0.62 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
@@ -107,23 +128,30 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   { id: 'ch4-foreground', kind: 'foreground', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
-// Chapter V — the bazaar: rose-stone skyline, the master-pattern archway
-// with a lantern hung on its fold, and a market awning tented over the
-// gutter (parallel fold — its ridge runs along the spine).
+// Chapter V — the bazaar: rose-stone skyline, then a ROW of identical
+// stall fronts flanking the archway (the "master patterns" story told as
+// repetition — its wide flanks stay visible past the arch), the archway
+// strung with TWO lanterns (children at different heights on one fold),
+// and the market awning tented out front, ridge toward the right page and
+// sized so the arch shows over it.
 const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-city', kind: 'backdrop', mech: 'vfold', apexZ: -0.44, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.2, creaseU: 0.58, width: 1.7, height: 0.66 },
-  { id: 'ch5-arch', kind: 'hero', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.78, height: 0.5 },
+  { id: 'ch5-stalls', kind: 'midground', mech: 'vfold', apexZ: -0.24, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.2, creaseU: 0.62, width: 1.15, height: 0.42 },
+  { id: 'ch5-arch', kind: 'hero', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.84, height: 0.54 },
   { id: 'ch5-lantern', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.14 },
-  { id: 'ch5-awning', kind: 'backdrop', mech: 'parallel', glueL: 0.46, glueR: 0.46, rise: 0.18, z0: 0.26, z1: 0.6 },
+  { id: 'ch5-lantern-b', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.44, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.14, height: 0.11 },
+  { id: 'ch5-awning', kind: 'backdrop', mech: 'parallel', glueL: 0.3, glueR: 0.44, rise: 0.14, z0: 0.32, z1: 0.6 },
 ]
 
-// Chapter VI — the crescendo: pine treeline, the largest hero of the book
-// (the glass treasury, leaning with real skew), its raised banner, and a
-// low pine fringe.
+// Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —
+// the glass treasury grown to a true multi-story compound: vault door low
+// on the fold (ground story), banner raised high (top story), the whole
+// piece leaning with real skew. Low pine fringe up front.
 const CH6_LAYERS: readonly SceneLayer[] = [
   { id: 'ch6-pines', kind: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.4, creaseU: 0.44, width: 1.7, height: 0.76 },
-  { id: 'ch6-treasury', kind: 'hero', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 48, rhoDeg: 76, skewDeg: -3, creaseU: 0.47, width: 0.95, height: 0.65 },
-  { id: 'ch6-banner', kind: 'hero', mech: 'child', parentId: 'ch6-treasury', mount: 0.5, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.26, height: 0.2 },
+  { id: 'ch6-treasury', kind: 'hero', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 48, rhoDeg: 76, skewDeg: -3, creaseU: 0.47, width: 1.0, height: 0.72 },
+  { id: 'ch6-door', kind: 'midground', mech: 'child', parentId: 'ch6-treasury', mount: 0.18, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.16 },
+  { id: 'ch6-banner', kind: 'hero', mech: 'child', parentId: 'ch6-treasury', mount: 0.56, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.26, height: 0.2 },
   { id: 'ch6-fringe', kind: 'foreground', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.28 },
 ]
 
@@ -204,6 +232,7 @@ export const CHAPTERS: readonly Chapter[] = [
 export const TITLE_LAYERS: readonly SceneLayer[] = [
   { id: 'title-border', kind: 'backdrop', mech: 'vfold', apexZ: -0.25, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.5 },
   { id: 'title-hero', kind: 'hero', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.7, height: 0.45 },
+  { id: 'title-crest', kind: 'hero', mech: 'child', parentId: 'title-hero', mount: 0.24, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.13 },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 

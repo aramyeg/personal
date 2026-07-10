@@ -194,3 +194,36 @@ rider/tent conventions). Also fixed while verifying: art 404 console noise
 eliminated deterministically via a committed art manifest consulted before
 any request (Chrome logs fetch 404s too — the fetch-first probe only
 narrowed the race).
+
+## Richer-structure phase — 2026-07-10 (compound scenes)
+
+User direction after the page-5 print landed: "richer pages... more paper
+cutouts, maybe some that are bigger, some multi story ones different
+cutouts making one scene." Pure composition work — zero engine changes;
+the three mechanisms already compose:
+
+- **Multi-story compounds** = one parent v-fold carrying SEVERAL children
+  at different mounts/vDirs on the same crease: the coaching inn (key-sign
+  + attic dormer), the rookery tower (dispatch balcony at mid-height +
+  raven perched above), the treasury (vault door low, banner high).
+- **Bigger centerpieces**: inn 0.95×0.62, treasury 1.00×0.72 (the book's
+  largest hero) — checked against the closed-containment budget
+  (corner reach glueLen·sin φ + h·sin(φ+ρ) ≤ PAGE_W).
+- **Paired/asymmetric tents**: innyard stable (ridge at 41%), dispatch
+  counter (59%), market awning (57%) — standing ridges pushed off-center
+  toward opposite pages per spread.
+- **Composition rule discovered in review**: from the fixed reading camera
+  (+Z, elevation ~40°), a piece in the z-band behind a taller mid-page
+  piece is fully occluded at rest (sight-line over a 0.6-tall hero lands
+  ~0.8 behind it). Rich pieces therefore go IN FRONT of their hero or get
+  flank width beyond it (the ch5 stall row's flanks read past the arch;
+  the first-draft rear tents did not and were moved).
+
+Suite grew 94 → 102 mechanics tests purely from the data-driven sweep
+picking up the new layers (45 shipped pieces); A6's 720-sample sweep got
+an explicit 30s timeout after flaking at the 5s default under full-suite
+CPU contention. Full stack: 344/344 unit, lint, build 15 kB (three.js
+still lazy). Captures: bench/out/rich-*.png, rich2-*.png. Call sheet:
+eight new prompts (ch1-dormer/stable, ch2-bee-c, ch3-balcony,
+ch5-stalls/lantern-b, ch6-door, title-crest), generation-order sessions
+updated, tent ridge percentages re-derived.
