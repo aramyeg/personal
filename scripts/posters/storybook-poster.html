@@ -1,0 +1,441 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Alegreya+SC:wght@400;700&family=Grenze+Gotisch:wght@500;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --sb-leather: #641e26;
+    --sb-leather-shadow: #4a151c;
+    --sb-leather-worn: #7b2a33;
+    --sb-gold: #c9a227;
+    --sb-gold-bright: #e6c65a;
+    --sb-gold-deep: #8f6f1a;
+    --sb-paper: #e7d5a8;
+    --sb-ink: #3b2a1a;
+    --sb-desk: #17100b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 768px; height: 1024px; overflow: hidden; background: var(--sb-desk); }
+  body { position: relative; font-family: 'Alegreya', georgia, serif; }
+
+  /* ---------------------------------------------------------------- desk */
+  .desk {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 620px 420px at 50% 8%, rgba(255, 170, 90, 0.14), transparent 62%),
+      radial-gradient(ellipse 900px 700px at 50% 50%, #241611 0%, var(--sb-desk) 60%, #0b0705 100%);
+  }
+  .desk::after {
+    content: '';
+    position: absolute; inset: 0;
+    box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.75);
+  }
+
+  /* --------------------------------------------------------------- cover */
+  .cover {
+    position: absolute;
+    left: 58px; top: 46px; right: 58px; bottom: 46px;
+    border-radius: 5px;
+    background:
+      radial-gradient(ellipse 420px 300px at 28% 18%, var(--sb-leather-worn) 0%, transparent 60%),
+      radial-gradient(ellipse 380px 320px at 78% 82%, var(--sb-leather-worn) 0%, transparent 58%),
+      radial-gradient(ellipse 700px 900px at 50% 42%, var(--sb-leather) 0%, var(--sb-leather-shadow) 100%);
+    box-shadow:
+      0 26px 60px 10px rgba(0, 0, 0, 0.65),
+      0 4px 0 rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+  }
+  .cover::before {
+    /* worn diagonal sheen */
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0%, transparent 16%, transparent 82%, rgba(0, 0, 0, 0.28) 100%);
+  }
+  .cover::after {
+    /* inner edge vignette so the frame reads as inset into the leather */
+    content: '';
+    position: absolute; inset: 0;
+    box-shadow: inset 0 0 90px 18px rgba(0, 0, 0, 0.55);
+  }
+  .grain {
+    position: absolute; inset: 0;
+    opacity: 0.16;
+    mix-blend-mode: overlay;
+  }
+  .spine-hinge {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 34px;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent);
+  }
+  .fore-edge {
+    position: absolute; right: 10px; top: 26px; bottom: 26px; width: 5px;
+    background: repeating-linear-gradient(180deg, var(--sb-paper) 0 2px, var(--sb-paper-deep, #b89c66) 2px 4px);
+    opacity: 0.55;
+    border-radius: 2px;
+    filter: blur(0.2px);
+  }
+
+  /* ------------------------------------------------------------- borders */
+  .frame-outer, .frame-inner {
+    position: absolute;
+    border-style: solid;
+    pointer-events: none;
+  }
+  .frame-outer {
+    inset: 26px;
+    border-width: 3px;
+    border-color: var(--sb-gold-bright);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.5),
+      0 1px 1px rgba(255, 255, 255, 0.25) inset;
+  }
+  .frame-inner {
+    inset: 38px;
+    border-width: 1.5px;
+    border-color: var(--sb-gold-deep);
+    opacity: 0.9;
+  }
+
+  /* --------------------------------------------------------- corner motif */
+  .corner { position: absolute; width: 84px; height: 84px; }
+  .corner svg { width: 100%; height: 100%; display: block; }
+  .corner.tl { left: 22px; top: 22px; }
+  .corner.tr { right: 22px; top: 22px; transform: scaleX(-1); }
+  .corner.bl { left: 22px; bottom: 22px; transform: scaleY(-1); }
+  .corner.br { right: 22px; bottom: 22px; transform: scale(-1, -1); }
+
+  /* -------------------------------------------------------------- content */
+  .content {
+    position: absolute;
+    left: 74px; right: 74px; top: 68px; bottom: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .title {
+    margin-top: 30px;
+    font-family: 'Grenze Gotisch', serif;
+    font-weight: 600;
+    font-size: 58px;
+    line-height: 1.08;
+    letter-spacing: 0.5px;
+    color: var(--sb-gold-bright);
+    background: linear-gradient(180deg, #f6dd93 0%, var(--sb-gold-bright) 38%, var(--sb-gold) 72%, var(--sb-gold-deep) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter:
+      drop-shadow(0 1px 0 rgba(255, 235, 190, 0.35))
+      drop-shadow(0 2px 1px rgba(0, 0, 0, 0.65))
+      drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+  }
+  .subtitle {
+    margin-top: 20px;
+    max-width: 400px;
+    font-family: 'Alegreya', georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 19px;
+    line-height: 1.45;
+    color: var(--sb-paper);
+    opacity: 0.92;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .rule {
+    margin-top: 26px;
+    width: 220px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rule svg { width: 100%; height: 100%; overflow: visible; }
+
+  .crest-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    width: 100%;
+  }
+  #crest { width: 330px; height: 330px; overflow: visible; }
+
+  .footer {
+    margin-bottom: 8px;
+    font-family: 'Alegreya SC', georgia, serif;
+    font-weight: 400;
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--sb-paper);
+    opacity: 0.85;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+</style>
+</head>
+<body>
+  <div class="desk"></div>
+
+  <div class="cover">
+    <svg class="grain" viewBox="0 0 640 928" preserveAspectRatio="none">
+      <filter id="noise">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="n" />
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.9 0" />
+      </filter>
+      <rect width="640" height="928" filter="url(#noise)" />
+    </svg>
+    <div class="spine-hinge"></div>
+    <div class="fore-edge"></div>
+  </div>
+
+  <div class="frame-outer"></div>
+  <div class="frame-inner"></div>
+
+  <div class="corner tl">
+    <svg viewBox="0 0 84 84">
+      <defs>
+        <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#f6dd93" />
+          <stop offset="0.5" stop-color="#c9a227" />
+          <stop offset="1" stop-color="#8f6f1a" />
+        </linearGradient>
+      </defs>
+      <path d="M6,58 L6,14 Q6,6 14,6 L58,6" fill="none" stroke="url(#cg)" stroke-width="4" stroke-linecap="round" />
+      <path d="M6,34 C20,34 30,30 34,20 C37,12 33,6 26,6" fill="none" stroke="url(#cg)" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M34,20 C40,20 44,26 40,32 C37,36.5 30,35 30,28 C30,23 34,20 34,20 Z" fill="url(#cg)" />
+      <circle cx="6" cy="6" r="3" fill="url(#cg)" />
+      <path d="M14,44 C14,40 18,38 21,40" fill="none" stroke="url(#cg)" stroke-width="1.6" stroke-linecap="round" opacity="0.85" />
+      <path d="M44,14 C40,14 38,18 40,21" fill="none" stroke="url(#cg)" stroke-width="1.6" stroke-linecap="round" opacity="0.85" />
+    </svg>
+  </div>
+  <div class="corner tr">
+    <svg viewBox="0 0 84 84">
+      <path d="M6,58 L6,14 Q6,6 14,6 L58,6" fill="none" stroke="url(#cg)" stroke-width="4" stroke-linecap="round" />
+      <path d="M6,34 C20,34 30,30 34,20 C37,12 33,6 26,6" fill="none" stroke="url(#cg)" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M34,20 C40,20 44,26 40,32 C37,36.5 30,35 30,28 C30,23 34,20 34,20 Z" fill="url(#cg)" />
+      <circle cx="6" cy="6" r="3" fill="url(#cg)" />
+    </svg>
+  </div>
+  <div class="corner bl">
+    <svg viewBox="0 0 84 84">
+      <path d="M6,58 L6,14 Q6,6 14,6 L58,6" fill="none" stroke="url(#cg)" stroke-width="4" stroke-linecap="round" />
+      <path d="M6,34 C20,34 30,30 34,20 C37,12 33,6 26,6" fill="none" stroke="url(#cg)" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M34,20 C40,20 44,26 40,32 C37,36.5 30,35 30,28 C30,23 34,20 34,20 Z" fill="url(#cg)" />
+      <circle cx="6" cy="6" r="3" fill="url(#cg)" />
+    </svg>
+  </div>
+  <div class="corner br">
+    <svg viewBox="0 0 84 84">
+      <path d="M6,58 L6,14 Q6,6 14,6 L58,6" fill="none" stroke="url(#cg)" stroke-width="4" stroke-linecap="round" />
+      <path d="M6,34 C20,34 30,30 34,20 C37,12 33,6 26,6" fill="none" stroke="url(#cg)" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M34,20 C40,20 44,26 40,32 C37,36.5 30,35 30,28 C30,23 34,20 34,20 Z" fill="url(#cg)" />
+      <circle cx="6" cy="6" r="3" fill="url(#cg)" />
+    </svg>
+  </div>
+
+  <div class="content">
+    <div class="title">A Tale of<br />Six Kingdoms</div>
+    <div class="subtitle">being the true chronicle of one<br />frontend engineer&rsquo;s quest</div>
+
+    <div class="rule">
+      <svg viewBox="0 0 220 12">
+        <line x1="0" y1="6" x2="94" y2="6" stroke="#c9a227" stroke-width="1.2" opacity="0.85" />
+        <line x1="126" y1="6" x2="220" y2="6" stroke="#c9a227" stroke-width="1.2" opacity="0.85" />
+        <rect x="106" y="2" width="8" height="8" transform="rotate(45 110 6)" fill="#e6c65a" />
+      </svg>
+    </div>
+
+    <div class="crest-wrap">
+      <svg id="crest" viewBox="0 0 240 240"></svg>
+    </div>
+
+    <div class="rule">
+      <svg viewBox="0 0 220 12">
+        <line x1="0" y1="6" x2="94" y2="6" stroke="#c9a227" stroke-width="1.2" opacity="0.85" />
+        <line x1="126" y1="6" x2="220" y2="6" stroke="#c9a227" stroke-width="1.2" opacity="0.85" />
+        <rect x="106" y="2" width="8" height="8" transform="rotate(45 110 6)" fill="#e6c65a" />
+      </svg>
+    </div>
+
+    <div class="footer">STYLE&nbsp;LAB&nbsp;N&ordm;&nbsp;5&nbsp;&middot;&nbsp;STORYBOOK</div>
+  </div>
+
+<script>
+  // ---- dragon-and-quill crest, computed so the coil is a true circular
+  // arc (no hand-fudged blob points) -------------------------------------
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('crest');
+  const cx = 120, cy = 120;
+
+  function el(name, attrs) {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function pt(r, aDeg) {
+    const t = (aDeg * Math.PI) / 180;
+    return [cx + r * Math.cos(t), cy + r * Math.sin(t)];
+  }
+  function fmt(n) { return Math.round(n * 100) / 100; }
+
+  // defs: gradients ---------------------------------------------------
+  const defs = el('defs', {});
+  const goldGrad = el('linearGradient', { id: 'dragonGold', x1: '0', y1: '0', x2: '1', y2: '1' });
+  goldGrad.appendChild(el('stop', { offset: '0', 'stop-color': '#f6dd93' }));
+  goldGrad.appendChild(el('stop', { offset: '0.55', 'stop-color': '#c9a227' }));
+  goldGrad.appendChild(el('stop', { offset: '1', 'stop-color': '#8f6f1a' }));
+  defs.appendChild(goldGrad);
+  const plateGrad = el('radialGradient', { id: 'platePlate', cx: '0.35', cy: '0.32', r: '0.75' });
+  plateGrad.appendChild(el('stop', { offset: '0', 'stop-color': '#7b2a33' }));
+  plateGrad.appendChild(el('stop', { offset: '0.7', 'stop-color': '#4a151c' }));
+  plateGrad.appendChild(el('stop', { offset: '1', 'stop-color': '#320e14' }));
+  defs.appendChild(plateGrad);
+  svg.appendChild(defs);
+
+  // medallion plate -----------------------------------------------------
+  svg.appendChild(el('circle', { cx, cy, r: 116, fill: 'url(#platePlate)', stroke: '#8f6f1a', 'stroke-width': 1, opacity: 0.9 }));
+  svg.appendChild(el('circle', { cx, cy, r: 116, fill: 'none', stroke: '#e6c65a', 'stroke-width': 2.5 }));
+  svg.appendChild(el('circle', { cx, cy, r: 108, fill: 'none', stroke: '#8f6f1a', 'stroke-width': 1, opacity: 0.8 }));
+
+  // ---- coil: single true arc from head angle, sweeping `sweep` degrees
+  const R = 74;
+  const headA = 270;   // top, 12 o'clock
+  const sweep = 336;   // leaves a ~24deg mouth/tail gap at the top
+  const tailA = (headA + sweep) % 360;
+
+  function arcPath(r, startA, sweepDeg) {
+    const [x0, y0] = pt(r, startA);
+    let d = `M ${fmt(x0)},${fmt(y0)} `;
+    const step = 30;
+    let covered = 0;
+    let a = startA;
+    while (covered < sweepDeg) {
+      const seg = Math.min(step, sweepDeg - covered);
+      a += seg;
+      covered += seg;
+      const [x, y] = pt(r, a);
+      d += `A ${r},${r} 0 0 1 ${fmt(x)},${fmt(y)} `;
+    }
+    return d.trim();
+  }
+
+  const coil = el('path', {
+    d: arcPath(R, headA, sweep),
+    fill: 'none',
+    stroke: 'url(#dragonGold)',
+    'stroke-width': 12,
+    'stroke-linecap': 'round',
+  });
+  svg.appendChild(coil);
+  // thin bright spine highlight along the same arc
+  svg.appendChild(el('path', {
+    d: arcPath(R + 4, headA, sweep),
+    fill: 'none',
+    stroke: '#f6dd93',
+    'stroke-width': 1.4,
+    'stroke-linecap': 'round',
+    opacity: 0.55,
+  }));
+
+  // spikes along the spine, tapering from neck to tail -------------------
+  const spikeOffsets = [22, 62, 104, 146, 188, 230, 272, 310];
+  spikeOffsets.forEach((off, i) => {
+    const a = headA + off;
+    const scale = 1 - (off / sweep) * 0.55;
+    const len = 15 * scale;
+    const half = 6 * scale;
+    const [bx, by] = pt(R + 7, a);
+    const t = (a * Math.PI) / 180;
+    const ox = Math.cos(t), oy = Math.sin(t); // outward
+    const tx = -Math.sin(t), ty = Math.cos(t); // tangent
+    const tipX = bx + ox * len, tipY = by + oy * len;
+    const p1x = bx + tx * half, p1y = by + ty * half;
+    const p2x = bx - tx * half, p2y = by - ty * half;
+    svg.appendChild(el('path', {
+      d: `M ${fmt(p1x)},${fmt(p1y)} L ${fmt(tipX)},${fmt(tipY)} L ${fmt(p2x)},${fmt(p2y)} Z`,
+      fill: 'url(#dragonGold)',
+      stroke: '#4a3410',
+      'stroke-width': 0.4,
+    }));
+  });
+
+  // head, at headA (top), facing toward the tail gap (up-and-left) -------
+  // A simple wedge skull + pointed snout — deliberately low-detail so it
+  // reads as a dragon head at poster scale instead of dissolving into a
+  // blob of curves.
+  const [hxBase, hyBase] = pt(R + 6, headA);
+  const headGroup = el('g', { transform: `translate(${fmt(hxBase)},${fmt(hyBase)})` });
+  const skullPath =
+    'M 7,7 L 10,-5 L -1,-17 L -15,-11 L -36,-7 L -18,1 L -6,3 Z';
+  headGroup.appendChild(el('path', {
+    d: skullPath,
+    fill: 'url(#dragonGold)',
+    stroke: '#3a2408',
+    'stroke-width': 1,
+    'stroke-linejoin': 'round',
+  }));
+  // horns, swept back off the crown
+  headGroup.appendChild(el('path', { d: 'M -1,-17 C 2,-27 -2,-35 -10,-40', fill: 'none', stroke: 'url(#dragonGold)', 'stroke-width': 3, 'stroke-linecap': 'round' }));
+  headGroup.appendChild(el('path', { d: 'M 6,-12 C 11,-20 10,-28 4,-33', fill: 'none', stroke: 'url(#dragonGold)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }));
+  // brow + eye
+  headGroup.appendChild(el('path', { d: 'M -3,-9 L -14,-8', fill: 'none', stroke: '#3a2408', 'stroke-width': 1.4, 'stroke-linecap': 'round' }));
+  headGroup.appendChild(el('circle', { cx: -9, cy: -6, r: 2, fill: '#2a1a08' }));
+  // lower-jaw fang at the snout tip
+  headGroup.appendChild(el('path', { d: 'M -36,-7 L -44,-2 L -32,-2 Z', fill: '#f6dd93', stroke: '#3a2408', 'stroke-width': 0.5 }));
+  svg.appendChild(headGroup);
+
+  // tail tip flourish -----------------------------------------------------
+  const [tx2, ty2] = pt(R, tailA);
+  const tt = (tailA * Math.PI) / 180;
+  const tailTipX = tx2 + Math.cos(tt) * 10, tailTipY = ty2 + Math.sin(tt) * 10;
+  svg.appendChild(el('path', {
+    d: `M ${fmt(tx2)},${fmt(ty2)} Q ${fmt(tx2 + Math.cos(tt) * 6 - Math.sin(tt) * 6)},${fmt(ty2 + Math.sin(tt) * 6 + Math.cos(tt) * 6)} ${fmt(tailTipX)},${fmt(tailTipY)}`,
+    fill: 'none', stroke: 'url(#dragonGold)', 'stroke-width': 4, 'stroke-linecap': 'round',
+  }));
+
+  // ---- quill, through the center, independent of the coil geometry -----
+  const quill = el('g', {});
+  // shaft
+  quill.appendChild(el('path', {
+    d: `M ${cx + 4},${cy + 58} C ${cx + 2},${cy + 20} ${cx - 6},${cy - 10} ${cx - 10},${cy - 44}`,
+    fill: 'none', stroke: '#e7d5a8', 'stroke-width': 2.6, 'stroke-linecap': 'round',
+  }));
+  // nib
+  quill.appendChild(el('path', {
+    d: `M ${cx + 4},${cy + 58} L ${cx + 1},${cy + 68} L ${cx - 3},${cy + 60} Z`,
+    fill: '#e7d5a8',
+  }));
+  // feather vane — two lobes of barbs off the upper shaft
+  const vane = el('path', {
+    d:
+      `M ${cx - 10},${cy - 44} ` +
+      `C ${cx + 14},${cy - 40} ${cx + 22},${cy - 20} ${cx + 8},${cy - 2} ` +
+      `C ${cx + 2},${cy - 12} ${cx - 2},${cy - 22} ${cx - 10},${cy - 44} Z`,
+    fill: '#e7d5a8', opacity: 0.94,
+  });
+  const vane2 = el('path', {
+    d:
+      `M ${cx - 10},${cy - 44} ` +
+      `C ${cx - 30},${cy - 34} ${cx - 34},${cy - 12} ${cx - 16},${cy + 4} ` +
+      `C ${cx - 14},${cy - 10} ${cx - 14},${cy - 26} ${cx - 10},${cy - 44} Z`,
+    fill: '#c9b078', opacity: 0.9,
+  });
+  quill.appendChild(vane2);
+  quill.appendChild(vane);
+  // barb lines
+  for (let i = 0; i < 5; i++) {
+    const t0 = i / 4;
+    const y = cy - 40 + t0 * 34;
+    quill.appendChild(el('line', { x1: cx - 8 + t0 * 4, y1: y, x2: cx + 6 - t0 * 2, y2: y - 6, stroke: '#b89c66', 'stroke-width': 0.8, opacity: 0.7 }));
+    quill.appendChild(el('line', { x1: cx - 8 + t0 * 4, y1: y, x2: cx - 20 + t0 * 6, y2: y - 4, stroke: '#b89c66', 'stroke-width': 0.8, opacity: 0.6 }));
+  }
+  svg.appendChild(quill);
+</script>
+</body>
+</html>
