@@ -14,12 +14,17 @@ import { AtticRoom } from './attic-room'
 import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
+import { LoadSignal } from './load-signal'
 
 /**
  * The /labs museum: a first-person classical gallery.
  * Everything inside <Canvas> is three.js; overlay UI is plain DOM.
  */
-export default function MuseumGallery() {
+export default function MuseumGallery({
+  onLoadChange,
+}: {
+  onLoadChange?: (progress: number, ready: boolean) => void
+}) {
   const router = useRouter()
   const length = useMemo(() => hallLength(hallLabs.length), [])
   const placements = useMemo(() => paintingPlacements(hallLabs), [])
@@ -64,6 +69,7 @@ export default function MuseumGallery() {
         <AtticRoom hallLen={length} register={register} focused={focused} />
         <FocusProbe targets={targets} onChange={setFocused} />
         <PlayerControls length={length} moveRef={moveRef} />
+        {onLoadChange && <LoadSignal onChange={onLoadChange} />}
       </Canvas>
 
       {coarse && <MobileJoystick moveRef={moveRef} />}
