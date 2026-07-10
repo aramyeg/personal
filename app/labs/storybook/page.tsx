@@ -17,7 +17,9 @@ export const metadata: Metadata = {
 export default function StorybookLabPage() {
   return (
     <GalleryChrome>
-      <main className="fixed inset-0 overflow-hidden">
+      {/* StorybookLoader's own `.sb-root` already covers the viewport
+          (fixed inset-0 overflow-hidden); no need to duplicate it here. */}
+      <main>
         <StorybookLoader />
       </main>
     </GalleryChrome>

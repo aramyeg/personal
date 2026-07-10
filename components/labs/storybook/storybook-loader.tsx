@@ -7,6 +7,8 @@ import '@fontsource-variable/alegreya'
 import '@fontsource/alegreya-sc/400.css'
 import '@fontsource/alegreya-sc/700.css'
 import { useStorybookStore } from './store'
+import { useBookInput } from './use-book-input'
+import { BookNav } from './overlay/nav'
 
 // three.js only ever reaches the browser: ssr is off and nothing outside
 // book-scene.tsx (and its book/ neighbors) may import it, so the route's
@@ -25,29 +27,26 @@ const BookScene = dynamic(() => import('./book/book-scene'), {
 /** Client entry for the lab: the WebGL stage plus the chrome that sits above it. */
 export function StorybookLoader() {
   const spread = useStorybookStore((s) => s.spread)
+  const turning = useStorybookStore((s) => s.turning)
   const requestTurn = useStorybookStore((s) => s.requestTurn)
-  const completeTurn = useStorybookStore((s) => s.completeTurn)
 
-  const openBook = () => {
-    requestTurn('next')
-    // TODO(task-10): remove snap. Task 10 adds the turn driver that calls
-    // completeTurn() once the cover animation finishes; until then, snap
-    // straight to the open spread so it's reachable and visually verifiable.
-    completeTurn()
-  }
+  // Book view is the only view this loader ever mounts (there's no plain-
+  // view branch here yet), so input is always on.
+  useBookInput(true)
 
   return (
     <div className="sb-root fixed inset-0 overflow-hidden">
       <BookScene />
-      {spread === 0 && (
+      {spread === 0 && !turning && (
         <button
           type="button"
-          onClick={openBook}
-          className="sb-chapter-kicker absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full border border-[var(--sb-gold)] bg-black/30 px-6 py-2.5 backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15"
+          onClick={() => requestTurn('next')}
+          className="sb-chapter-kicker absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-[var(--sb-gold)] bg-black/30 px-6 py-2.5 backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15"
         >
           Open the book
         </button>
       )}
+      <BookNav />
       <div className="sb-vignette" />
     </div>
   )

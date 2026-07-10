@@ -8,17 +8,21 @@
  * "left"/read stack), +Y up.
  *
  * Vertical stack when closed, bottom to top: desk -> back cover -> page
- * block -> front cover. The front cover pivots at the spine; Task 10 will
- * drive `rotation.z` continuously through the 0..PI turn. For now it snaps
- * per the spread's open/closed state.
+ * block -> front cover. The front cover pivots at the spine; its
+ * `rotation.z` rests at the spread's open/closed pose but is driven
+ * continuously through the 0..PI turn by the useFrame below whenever a
+ * cover turn is in flight (see use-turn-driver.ts).
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStorybookStore } from '../store'
 import { SPREAD_COUNT } from '../content'
-import { PAGE_H, PAGE_W, buildPageTemplate } from './page-geometry'
+import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
+import { useTurnDriver } from './use-turn-driver'
+import { TurningPage } from './turning-page'
 
 export const BOOK = {
   coverW: 1.22,
@@ -109,11 +113,16 @@ function usePageGeometry(): THREE.BufferGeometry {
   return geometry
 }
 
-/** Closed burgundy tome that snaps to a flat two-page spread once `spread > 0`. */
+/** Open burgundy tome, its front cover and centering offset animated live by
+ * the turn driver instead of snapping between the closed/open poses. */
 export function Book() {
   const spread = useStorybookStore((s) => s.spread)
+  const turning = useStorybookStore((s) => s.turning)
   const { paper, leather, crease } = useBookTextures()
   const pageGeometry = usePageGeometry()
+  const frame = useTurnDriver()
+  const outerGroupRef = useRef<THREE.Group>(null)
+  const frontCoverRef = useRef<THREE.Group>(null)
 
   const leatherMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: leather, roughness: 0.55 }),
@@ -142,13 +151,46 @@ export function Book() {
     [leatherMaterial, edgeMaterial, paperMaterial, creaseMaterial]
   )
 
-  const isOpen = spread > 0
+  // Committed open/closed state — drives the cover's *rest* pose and the
+  // spine's standing-vs-flat shape. Deliberately NOT blended with `turning`
+  // (unlike `isOpen` below): the cover's rotation during a turn is owned
+  // entirely by the useFrame below, and a rest-pose prop that also flipped
+  // mid-turn would fight it every render.
+  const spreadOpen = spread > 0
+  // Content-reveal state: open while resting past the cover, or while the
+  // cover itself is turning (spread is still 0 the whole time a spread-0
+  // "next" turn is in flight — the block/pages must already be visible so
+  // the lifting cover reveals them, rather than popping in only once the
+  // turn commits).
+  const isOpen = spreadOpen || turning !== null
   const rightHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
   const leftHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
-  const spineHeight = isOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
+  const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
+  // The turning page's resting height: wherever it's departing from (the
+  // right stack for a 'next' turn, the left stack for 'prev'), matching the
+  // static pages' own height formula below exactly.
+  const turnOriginY = BACK_COVER_TOP + (turning === 'prev' ? leftHeight : rightHeight) + BOOK.pageLift
+
+  useFrame(() => {
+    const f = frame.current
+    const cover = frontCoverRef.current
+    const outer = outerGroupRef.current
+    if (!f || !f.isCover || !cover || !outer) return
+
+    const eased = easeTurn(f.t)
+    const openAmount = f.dir === 'next' ? eased : 1 - eased
+    // Positive theta (not the naive -pi*eased mirror of curlPositions):
+    // FRONT_LOCAL_Y is positive (the cover mesh sits above its pivot at
+    // rest), so a positive rotation swings it up through +Y first, arcing
+    // over the spine like a real hinge. The opposite sign sends it straight
+    // through the desk (verified: worldY dips to ~-0.52 at the midpoint,
+    // well below the y=0 desk plane — invisible, not lifting).
+    cover.rotation.z = f.dir === 'next' ? Math.PI * eased : Math.PI * (1 - eased)
+    outer.position.x = CLOSED_CENTER_OFFSET_X * (1 - openAmount)
+  })
 
   return (
-    <group position={[spread === 0 ? CLOSED_CENTER_OFFSET_X : 0, 0, 0]}>
+    <group ref={outerGroupRef} position={[spread === 0 ? CLOSED_CENTER_OFFSET_X : 0, 0, 0]}>
       {/* Spine: a standing ridge along the hinge edge when closed; lies flat
           under the spread once open (real open books have no wall down the
           middle) — same footprint, just collapsed to cover thickness. */}
@@ -176,10 +218,11 @@ export function Book() {
         <boxGeometry args={[BLOCK_WIDTH, rightHeight, BLOCK_DEPTH]} />
       </mesh>
 
-      {/* Left page block: nonexistent at spread 0 (a zero-height box still
-          renders coincident top/bottom faces, so it's skipped entirely
-          rather than shrunk to zero), grows once the book is open. */}
-      {isOpen && (
+      {/* Left page block: nonexistent at spread 0 or mid-cover-turn (a
+          zero-height box still renders coincident top/bottom faces, so it's
+          skipped entirely rather than shrunk to zero), grows once a page has
+          actually turned. */}
+      {isOpen && leftHeight > 0 && (
         <mesh
           position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + leftHeight / 2, 0]}
           material={edgeMaterial}
@@ -210,9 +253,13 @@ export function Book() {
         </>
       )}
 
-      {/* Front cover pivot: rotation.z snaps 0 (closed, on top) -> PI (open,
-          flat left). Task 10 drives this continuously during the turn. */}
-      <group position={[0, FRONT_PIVOT_Y, 0]} rotation={[0, 0, isOpen ? Math.PI : 0]}>
+      {/* The page currently mid-turn; hidden except during a non-cover turn. */}
+      <TurningPage frame={frame} originY={turnOriginY} />
+
+      {/* Front cover pivot: rotation.z rests at 0 (closed, on top) / PI
+          (open, flat left); the turn driver takes over continuously
+          in-between whenever a cover turn is in flight. */}
+      <group ref={frontCoverRef} position={[0, FRONT_PIVOT_Y, 0]} rotation={[0, 0, spreadOpen ? Math.PI : 0]}>
         <mesh position={[BOOK.coverW / 2, FRONT_LOCAL_Y, 0]} material={leatherMaterial}>
           <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
         </mesh>
