@@ -36,7 +36,7 @@ export const briefs: EngineeringBrief[] = [
     pattern:
       'Rooms, Personnel, and Pipeline never read data/experience.ts or the labs manifest directly — they call adapters.ts, a single layer of pure functions that maps those two sources into typed view models (RoomRow, PersonnelRow, DealCard).',
     rationale:
-      'Shipping a new lab is one manifest entry; it surfaces in the Rooms table, the Overview KPIs, and the Pipeline’s activity feed without a single module component changing. The adapters are plain functions, testable independent of React.',
+      'Shipping a new lab is one manifest entry; it surfaces in the Rooms table, the Overview KPIs, and the Overview activity feed without a single module component changing. The adapters are plain functions, testable independent of React.',
   },
   {
     id: 'EB-004',
@@ -66,7 +66,7 @@ export const briefs: EngineeringBrief[] = [
     pattern:
       'The ticket form validates against two focused zod schemas — requesterSchema and detailsSchema — one per wizard step, merged into a single ticketSchema that types the assembled draft. Each step’s "Continue" runs safeParse and maps failed issues to a flat field-to-message record rendered inline under the offending input.',
     rationale:
-      'Validating per step means a user on step 2 has already cleared step 1 — nothing re-validates fields they’ve moved past. For a three-field, three-step form, zod plus component state covers the full validate/error/submit cycle without the bundle or abstraction cost of a form library.',
+      'Validating per step means a user on step 2 has already cleared step 1 — nothing re-validates fields they’ve moved past. For a five-field, three-step form, zod plus component state covers the full validate/error/submit cycle without the bundle or abstraction cost of a form library.',
   },
   {
     id: 'EB-007',

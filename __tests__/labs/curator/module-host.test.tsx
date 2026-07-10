@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { ModuleHost } from '@/components/labs/curator/module-host'
 import { useCuratorStore } from '@/components/labs/curator/store'
 
@@ -16,7 +16,7 @@ describe('ModuleHost', () => {
 
   it('switches modules from the store and syncs the URL', async () => {
     render(<ModuleHost />)
-    useCuratorStore.getState().setModule('pipeline')
+    act(() => useCuratorStore.getState().setModule('pipeline'))
     await waitFor(() => expect(window.location.search).toBe('?m=pipeline'))
   })
 

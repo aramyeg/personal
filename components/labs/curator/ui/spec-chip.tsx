@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
 import { getBrief } from '../annotations'
 import { useEscCapture } from '../use-esc-capture'
 import { BriefFields, BriefHeader } from './brief-fields'
@@ -11,11 +10,7 @@ export function SpecChip({ briefId }: { briefId: string }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // flushSync: Escape is captured by a raw window listener (useEscCapture), outside
-  // React's event system, so the close must commit synchronously — callers that
-  // dispatch the keydown directly (bypassing RTL's act-wrapped fireEvent) still see
-  // the popover gone by the time dispatchEvent() returns.
-  const close = () => flushSync(() => setOpen(false))
+  const close = () => setOpen(false)
   useEscCapture(open, close)
 
   useEffect(() => {

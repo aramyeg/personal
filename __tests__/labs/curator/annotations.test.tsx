@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { briefs, getBrief } from '@/components/labs/curator/annotations'
 import { SpecChip } from '@/components/labs/curator/ui/spec-chip'
 
@@ -19,7 +19,9 @@ describe('SpecChip', () => {
     fireEvent.click(screen.getByRole('button', { name: /spec/i }))
     expect(screen.getByText(/ENGINEERING BRIEF · EB-001/)).toBeInTheDocument()
     const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-    document.body.dispatchEvent(escape)
+    act(() => {
+      document.body.dispatchEvent(escape)
+    })
     expect(escape.defaultPrevented).toBe(true)
     expect(screen.queryByText(/ENGINEERING BRIEF/)).not.toBeInTheDocument()
   })
