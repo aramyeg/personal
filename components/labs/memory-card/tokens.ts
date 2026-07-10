@@ -80,12 +80,3 @@ export const TYPE = {
   label: '0.75rem', // mono, letter-spacing 0.2em, uppercase
   body: '1.0625rem', // Space Grotesk, line-height 1.6
 } as const
-
-/** Skills-section HP-bar geometry + empty-segment color (ink at low opacity). */
-export const HP_BAR = {
-  totalSegments: 12,
-  segmentWidth: 18,
-  segmentHeight: 8,
-  gap: 3,
-  emptyColor: inkAlpha(0.12),
-} as const

@@ -25,8 +25,8 @@ vi.mock('@/components/labs/memory-card/three/gltf-vignette', () => ({
 
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
 import { HeroSection } from '@/components/labs/memory-card/sections/hero'
-import { LEVEL_SEGMENTS, SkillsSection, skillSlug } from '@/components/labs/memory-card/sections/skills'
-import { skills, skillCategories, getSkillsByCategory } from '@/data/skills'
+import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
+import { WRITTEN_WITH } from '@/components/labs/memory-card/lib/written-with'
 
 describe('MemoryCardChrome', () => {
   it('renders the four section anchors with correct hrefs', () => {
@@ -91,40 +91,18 @@ describe('SkillsSection', () => {
     expect(container.querySelector('section#skills')).toBeInTheDocument()
   })
 
-  it('renders every skill name from the imported data', () => {
+  it('renders every curated entry name and its usage note as real text', () => {
     render(<SkillsSection />)
-    for (const skill of skills) {
-      expect(screen.getByText(skill.name)).toBeInTheDocument()
+    for (const entry of WRITTEN_WITH) {
+      expect(screen.getByText(entry.name)).toBeInTheDocument()
+      expect(screen.getByText(entry.note)).toBeInTheDocument()
     }
   })
 
-  it('renders every category label with a non-empty skill list', () => {
+  it('links out to the full stack on the main site', () => {
     render(<SkillsSection />)
-    for (const category of skillCategories) {
-      if (getSkillsByCategory(category.id).length > 0) {
-        expect(screen.getByText(category.label)).toBeInTheDocument()
-      }
-    }
-  })
-
-  it('renders each skill row as an accessible group with name/level/years', () => {
-    render(<SkillsSection />)
-    const react = skills.find((s) => s.name === 'React')!
     expect(
-      screen.getByRole('group', { name: `${react.name}: ${react.level}, ${react.years} yrs` })
-    ).toBeInTheDocument()
-  })
-
-  it('renders an HP bar with segment count computed from the imported LEVEL_SEGMENTS map', () => {
-    const { container } = render(<SkillsSection />)
-    // Prisma is the lone 'intermediate' skill in the data — an unambiguous fixture.
-    const prisma = skills.find((s) => s.name === 'Prisma')!
-    const bar = container.querySelector(`[data-testid="hp-bar-${skillSlug(prisma.name)}"]`)
-    expect(bar).toBeTruthy()
-    expect(bar).toHaveAttribute('aria-hidden', 'true')
-    const filled = bar!.querySelectorAll('[data-filled="true"]')
-    const empty = bar!.querySelectorAll('[data-filled="false"]')
-    expect(filled.length).toBe(LEVEL_SEGMENTS[prisma.level])
-    expect(filled.length + empty.length).toBe(12)
+      screen.getByRole('link', { name: /full save data lives in the main site/i })
+    ).toHaveAttribute('href', '/#skills')
   })
 })
