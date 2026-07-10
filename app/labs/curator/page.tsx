@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { CuratorRoot } from '@/components/labs/curator/curator-root'
+import { SESSION_COOKIE, verifySession } from '@/components/labs/curator/server/session'
 
 export const metadata: Metadata = {
   title: 'Curator — Style Lab | Aram Yeghiazaryan',
@@ -14,10 +16,12 @@ export const metadata: Metadata = {
   },
 }
 
-export default function CuratorLabPage() {
+export default async function CuratorLabPage() {
+  const jar = await cookies()
+  const session = await verifySession(jar.get(SESSION_COOKIE)?.value)
   return (
     <GalleryChrome>
-      <CuratorRoot />
+      <CuratorRoot session={session} />
     </GalleryChrome>
   )
 }

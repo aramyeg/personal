@@ -1,11 +1,13 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Landmark, Users, SquareKanban, Ticket, BookOpen, Settings,
+  LayoutDashboard, Landmark, Users, SquareKanban, Ticket, BookOpen, Settings, ChevronsUpDown,
   type LucideIcon,
 } from 'lucide-react'
 import OverviewModule from './modules/overview'
+import { useEscCapture } from './use-esc-capture'
 
 export type CuratorModule =
   | 'overview' | 'rooms' | 'personnel' | 'pipeline'
@@ -21,7 +23,7 @@ export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[]
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
-export function AppShell({ children }: { children?: ReactNode }) {
+export function AppShell({ email, children }: { email: string; children?: ReactNode }) {
   // Static until Task 8 wires module switching through the store.
   const activeModule: CuratorModule = 'overview'
   return (
@@ -53,10 +55,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             })}
           </div>
         </nav>
-        <div className="border-t border-white/10 px-4 py-3">
-          <p className="text-[13px] font-medium text-white">Aram Yeghiazaryan</p>
-          <p className="text-[11px] text-white/50">Workspace Owner</p>
-        </div>
+        <UserMenu email={email} />
       </aside>
       <div className="flex min-w-0 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6">
@@ -70,6 +69,65 @@ export function AppShell({ children }: { children?: ReactNode }) {
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <OverviewModule />}</main>
       </div>
+    </div>
+  )
+}
+
+function UserMenu({ email }: { email: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const close = () => setOpen(false)
+  useEscCapture(open, close)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) close()
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
+
+  async function signOut(): Promise<void> {
+    await fetch('/api/labs/curator/session', { method: 'DELETE' })
+    router.refresh()
+  }
+
+  return (
+    <div ref={rootRef} className="relative border-t border-white/10 px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2.5 rounded-[6px] py-1 text-left transition-colors duration-150 hover:bg-white/10"
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-medium text-white">
+          AY
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium text-white">Aram Yeghiazaryan</span>
+          <span className="block truncate text-[11px] text-white/50">Workspace Owner</span>
+        </span>
+        <ChevronsUpDown aria-hidden className="h-3.5 w-3.5 shrink-0 text-white/50" strokeWidth={1.75} />
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full left-4 right-4 mb-2 rounded-[8px] border border-[var(--c-border)] bg-[var(--c-surface)] p-1 text-[var(--c-text)] shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
+          <p className="truncate px-2 py-1.5 font-[family-name:var(--font-data)] text-[11px] text-[var(--c-text-soft)]">
+            {email}
+          </p>
+          <div className="my-1 h-px bg-[var(--c-border)]" />
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="w-full rounded-[4px] px-2 py-1.5 text-left text-[13px] text-[var(--c-text)] transition-colors duration-150 hover:bg-[#fafbfd]"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   )
 }
