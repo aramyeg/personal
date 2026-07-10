@@ -33,9 +33,11 @@ function requestPointerLockSafe(el: Element) {
 export function PlayerControls({
   length,
   moveRef,
+  paused = false,
 }: {
   length: number
   moveRef: RefObject<MoveVec>
+  paused?: boolean
 }) {
   const { camera, gl } = useThree()
   const yaw = useRef(0) // face down the hall (-z); 0 = camera default -Z
@@ -44,6 +46,8 @@ export function PlayerControls({
   const pressed = useRef(new Set<string>())
   const sprint = useRef(false)
   const jump = useRef<JumpState>(GROUNDED)
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
 
   useEffect(() => {
     const el = gl.domElement
@@ -57,6 +61,7 @@ export function PlayerControls({
       keys.current = { x: Math.sign(v.x), y: Math.sign(v.y) }
     }
     const onKeyDown = (e: KeyboardEvent) => {
+      if (pausedRef.current) return
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sprint.current = true; return }
       if (e.code === 'Space') { jump.current = tryJump(jump.current); e.preventDefault(); return }
       if (KEYMAP[e.code]) { pressed.current.add(e.code); recomputeKeys(); e.preventDefault() }
@@ -123,6 +128,7 @@ export function PlayerControls({
   }, [gl, camera])
 
   useFrame((_, delta) => {
+    if (pausedRef.current) return
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ')
 
     const dt = Math.min(delta, 0.05)

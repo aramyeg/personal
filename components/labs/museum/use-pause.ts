@@ -33,7 +33,14 @@ export function usePause(suppressRef: RefObject<boolean>) {
   useEffect(() => {
     const onLockChange = () => {
       const locked = document.pointerLockElement != null
-      if (!locked && wasLocked.current && !suppressRef.current) setPaused(true)
+      if (!locked && wasLocked.current) {
+        if (suppressRef.current) {
+          // consume the one navigation-driven lock loss, then re-arm
+          suppressRef.current = false
+        } else {
+          setPaused(true)
+        }
+      }
       wasLocked.current = locked
     }
     document.addEventListener('pointerlockchange', onLockChange)

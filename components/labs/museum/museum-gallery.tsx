@@ -75,7 +75,7 @@ export default function MuseumGallery({
         <DrapedFrame labCount={hallLabs.length} />
         <AtticRoom hallLen={length} register={register} focused={focused} />
         <FocusProbe targets={targets} onChange={setFocused} />
-        <PlayerControls length={length} moveRef={moveRef} />
+        <PlayerControls length={length} moveRef={moveRef} paused={paused} />
         {onLoadChange && <LoadSignal onChange={onLoadChange} />}
       </Canvas>
 
@@ -119,7 +119,7 @@ export default function MuseumGallery({
             className="rounded-md border border-[#d6b968]/45 bg-[#16090d]/95 px-10 py-8 shadow-2xl backdrop-blur-sm"
           >
             <VisitorGuide />
-            <p className="mt-6 border-t border-[#d6b968]/30 pt-4 text-center font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-[#f0d998]">
+            <p className="mt-6 border-t border-[#d6b968]/30 pt-4 text-center font-mono text-sm font-bold uppercase tracking-[0.25em] text-[#f0d998]">
               Right-click or Esc to resume &middot; then click to walk
             </p>
           </div>

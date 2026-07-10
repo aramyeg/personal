@@ -43,7 +43,7 @@ describe('usePause', () => {
     expect(result.current.paused).toBe(true)
   })
 
-  it('does not open when the lock is lost during lab navigation', () => {
+  it('does not open when the lock is lost during lab navigation, then self-heals', () => {
     suppress.current = true
     const { result } = renderHook(() => usePause(suppress))
     act(() => {
@@ -53,6 +53,15 @@ describe('usePause', () => {
       fireLockChange()
     })
     expect(result.current.paused).toBe(false)
+    expect(suppress.current).toBe(false)
+
+    act(() => {
+      setPointerLock(document.body)
+      fireLockChange()
+      setPointerLock(null)
+      fireLockChange()
+    })
+    expect(result.current.paused).toBe(true)
   })
 
   it('closes on Escape (capture + preventDefault) while open', () => {
