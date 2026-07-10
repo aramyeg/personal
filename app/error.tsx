@@ -1,7 +1,5 @@
 'use client'
 
-import Link from 'next/link'
-
 /**
  * Root error boundary. The museum's front door must degrade to the printed
  * catalogue, never to the framework's default error screen — a rejected
@@ -29,12 +27,16 @@ export default function RootError({ reset }: { error: Error; reset: () => void }
           >
             Try again
           </button>
-          <Link
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- deliberate
+              hard navigation: the error boundary only resets on pathname change
+              (/ → /?view=list is search-only), and a full document load is the
+              safest recovery from a poisoned client state */}
+          <a
             href="/?view=list"
             className="font-mono text-xs uppercase tracking-[0.2em] text-[#d6b968] underline underline-offset-4"
           >
             View the catalogue
-          </Link>
+          </a>
         </div>
       </div>
     </main>
