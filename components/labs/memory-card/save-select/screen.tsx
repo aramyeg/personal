@@ -81,7 +81,13 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
         }}
       />
 
-      <div className="relative z-10 flex h-full flex-col overflow-y-auto px-5 pb-24 pt-[4.5rem] sm:px-8 lg:grid lg:grid-cols-[minmax(0,44%)_1fr] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-x-12 lg:overflow-hidden lg:pb-16 lg:pt-[4.5rem]">
+      {/* `pb-[7rem]` clears the fixed credits footer (chrome.tsx), whose
+          real rendered height is ~68px across 320–390px mobile viewports
+          (3 wrapped credit lines + padding + hairline) — comfortable buffer
+          so the last strip and the stat line always scroll fully clear of
+          it. Desktop never scrolls this column (`lg:overflow-hidden`), so
+          `lg:pb-16` stays the original, unrelated spacing value. */}
+      <div className="relative z-10 flex h-full flex-col overflow-y-auto px-5 pb-[7rem] pt-[4.5rem] sm:px-8 lg:grid lg:grid-cols-[minmax(0,44%)_1fr] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-x-12 lg:overflow-hidden lg:pb-16 lg:pt-[4.5rem]">
         {/* Stage — first on mobile, right column on desktop. */}
         <div className="order-1 flex h-[38svh] min-h-0 shrink-0 flex-col lg:order-2 lg:col-start-2 lg:row-start-1 lg:h-auto">
           <div className="relative min-h-0 flex-1">

@@ -99,7 +99,7 @@ export function MemoryCardChrome({
         style={{
           ['--mc-ring' as string]: RING,
           background: MC.ink,
-          borderTop: `1px solid ${paperAlpha(0.12)}`,
+          borderTop: `1px solid ${paperAlpha(0.16)}`,
           fontFamily: monoFamily,
           fontSize: '0.625rem',
           letterSpacing: '0.06em',
