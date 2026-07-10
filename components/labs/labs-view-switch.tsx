@@ -49,20 +49,15 @@ export function LabsViewSwitch() {
   // Server render + first client paint: the list (fast, accessible, SEO)
   if (view !== '3d') {
     return (
-      <>
-        <LabsList />
-        {view === 'list' && webgl && (
-          <div className="section-container max-w-3xl pb-16">
-            <button
-              type="button"
-              onClick={() => setView('3d')}
-              className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium hover:border-primary/50 transition-colors"
-            >
+      <LabsList
+        enterAction={
+          view === 'list' && webgl ? (
+            <button type="button" onClick={() => setView('3d')}>
               Enter the 3D gallery
             </button>
-          </div>
-        )}
-      </>
+          ) : undefined
+        }
+      />
     )
   }
 
