@@ -1,60 +1,70 @@
 /**
- * Pure math driving pop-up layer fold/rise progress directly from a page
- * turn's t∈[0,1], instead of an independent per-layer spring, whenever a
- * turn is in flight (task 18: the old spring let incoming paper stand up —
- * or outgoing paper stay standing — while the turning page was still
- * airborne overhead). No three.js imports here, same jsdom-testable
- * convention as page-geometry.ts; popup-spread.tsx is the only consumer.
+ * Pure math driving pop-up layer fold/rise progress from the turning page's
+ * own motion — no three.js imports, same jsdom-testable convention as
+ * page-geometry.ts; popup-spread.tsx is the only consumer.
  *
- * Shared timeline (every layer only shifts within it by a small
- * `phaseOffset` window fraction, computed by the caller from a fixed
- * per-layer ms stagger and the turn's actual duration):
+ * v2 mechanics (user pivot: "when a new page is turned, from the page
+ * itself these cutouts should be unfolded like a real pop-up book would"):
+ * fold progress is a function of the page's EASED sweep progress — i.e. of
+ * the page's actual angle, since theta = PI * easedProgress — not of the
+ * raw clock. The mechanical model is a real book's linkage:
  *
- *   t ∈ [0, FOLD_END_T]              outgoing spread folds `start` -> 0
- *   t ∈ (FOLD_END_T, RISE_START_T)   both spreads lie flat — the turning
- *                                    page sweeps overhead during this gap
- *   t ∈ [RISE_START_T, 1]            incoming spread rises 0 -> RISE_LANDING_STAND
+ *   page rising 0..vertical   (eased p ∈ [0, 0.5])  the departing page
+ *     pushes/pulls its own spread's paper flat — every piece is folded by
+ *     the time the page stands vertical over the gutter;
+ *   page falling vertical..flat (eased p ∈ [0.5, 1])  the arriving page
+ *     drags the new spread's paper upright, finishing exactly as the page
+ *     lays flat.
+ *
+ * Because both sides key off the same eased progress the paper moves when
+ * — and only when — the page moves; if the page's easing slows near its
+ * ends, the paper slows with it, the way glued paper must.
  *
  * The last stretch from RISE_LANDING_STAND to a full stand of 1 is *not*
- * handled here — the caller's existing spring takes it once the layer's
- * role flips from "incoming" to "current" at commit, landing as a small,
- * natural overshoot-settle rather than a kinematic snap.
+ * handled here — the caller's spring takes over once the layer's role
+ * flips from "incoming" to "current" at commit, landing as a small,
+ * natural paper-snap settle rather than a kinematic stop.
  */
 
-import { easeTurn } from './page-geometry'
-
-export const FOLD_END_T = 0.4
-export const RISE_START_T = 0.62
-export const RISE_LANDING_STAND = 0.92
+export const PAGE_VERTICAL_P = 0.5
+export const RISE_LANDING_STAND = 0.95
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 
 /**
- * Outgoing-spread fold progress: `start` (whatever stand value this layer
- * was actually captured at when it became the outgoing spread — see
- * popup-spread.tsx's foldStart ref — never assumed to be 1) eases down to
- * 0 across t ∈ [phaseOffset, FOLD_END_T]. Clamped flat for any t at or past
- * FOLD_END_T regardless of phaseOffset, so every layer — whatever its
- * stagger — is guaranteed flat well before the incoming spread starts
- * rising at RISE_START_T.
+ * Outgoing-spread fold progress, driven by the page's eased sweep progress
+ * `p` (0 = page flat at rest, PAGE_VERTICAL_P = page vertical over the
+ * gutter): `start` (whatever stand value the layer was captured at when it
+ * became outgoing — never assumed 1) closes down to 0 as the page rises,
+ * reaching flat exactly when the page reaches vertical. `phaseOffset`
+ * (small, per-layer) lets foreground paper lead by a hair without ever
+ * pushing the finish past vertical.
  */
-export function outgoingFoldStand(t: number, start: number, phaseOffset: number): number {
+export function outgoingFoldStand(p: number, start: number, phaseOffset: number): number {
   if (start <= 0) return 0
-  if (t <= phaseOffset) return start
-  if (t >= FOLD_END_T) return 0
-  const u = clamp01((t - phaseOffset) / (FOLD_END_T - phaseOffset))
-  return start * (1 - easeTurn(u))
+  const windowEnd = PAGE_VERTICAL_P
+  const windowStart = Math.min(phaseOffset, windowEnd - 0.05)
+  if (p <= windowStart) return start
+  if (p >= windowEnd) return 0
+  const u = clamp01((p - windowStart) / (windowEnd - windowStart))
+  // cos-shaped closure: paper glued to a rotating page closes on a cosine
+  // of the page angle, fastest mid-swing, gentle at both ends.
+  return start * (0.5 + 0.5 * Math.cos(Math.PI * u))
 }
 
 /**
- * Incoming-spread rise progress: held at 0 until t = RISE_START_T +
- * phaseOffset, then eases up to RISE_LANDING_STAND by t = 1. Never reaches
- * a full stand under this function alone by design — see file header.
+ * Incoming-spread rise progress, driven by the same eased sweep progress:
+ * 0 while the page is still rising (p < PAGE_VERTICAL_P), then dragged
+ * upright by the descending page, reaching RISE_LANDING_STAND exactly as
+ * the page lays flat at p = 1. `phaseOffset` lets backdrop paper engage a
+ * hair earlier than foreground, inside the same window.
  */
-export function incomingRiseStand(t: number, phaseOffset: number): number {
-  const windowStart = Math.min(RISE_START_T + phaseOffset, 1)
-  if (t <= windowStart) return 0
-  if (t >= 1) return RISE_LANDING_STAND
-  const u = clamp01((t - windowStart) / (1 - windowStart))
-  return RISE_LANDING_STAND * easeTurn(u)
+export function incomingRiseStand(p: number, phaseOffset: number): number {
+  const windowStart = Math.max(PAGE_VERTICAL_P - phaseOffset, 0.05)
+  if (p <= windowStart) return 0
+  if (p >= 1) return RISE_LANDING_STAND
+  const u = clamp01((p - windowStart) / (1 - windowStart))
+  // sin-shaped opening: the mirror of the fold — slow engagement as the
+  // page passes vertical, decisive through the middle, easing into flat.
+  return RISE_LANDING_STAND * (0.5 - 0.5 * Math.cos(Math.PI * u))
 }

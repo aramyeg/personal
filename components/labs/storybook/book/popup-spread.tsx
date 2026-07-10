@@ -43,6 +43,7 @@ import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { incomingRiseStand, outgoingFoldStand } from './popup-kinematics'
 import { COVER_MS, TURN_MS, type TurnFrame } from './use-turn-driver'
+import { easeTurnWeighted } from './page-geometry'
 import { useLayerTexture } from './use-layer-texture'
 
 // Manual spring integrator constants (semi-implicit Euler): k is stiffness,
@@ -275,25 +276,30 @@ function PopupLayer({
 
     if (role === 'outgoing' && f) {
       const duration = f.isCover ? COVER_MS : TURN_MS
-      // Foreground-most layers (highest index) lead the fold — they're the
-      // first thing the lifting page would otherwise sweep through.
+      // v2 mechanics: paper is geared to the page's EASED sweep progress —
+      // a proxy for its actual angle (theta = PI * eased) — so the pieces
+      // move exactly when and how fast the page does (see
+      // popup-kinematics.ts). Foreground-most layers (highest index) lead
+      // the fold — they're nearest the lifting edge's path.
+      const p = easeTurnWeighted(f.t)
       const phaseOffset = ((layerCount - 1 - index) * PHASE_STEP_MS) / duration
-      stand.current = outgoingFoldStand(f.t, foldStart.current, phaseOffset)
+      stand.current = outgoingFoldStand(p, foldStart.current, phaseOffset)
       velocity.current = 0
       risingClock.current = null
     } else if (role === 'incoming' && f) {
       const duration = f.isCover ? COVER_MS : TURN_MS
-      // Backdrop-most layers (lowest index) lead the rise, same order the
-      // idle stagger below uses — foreground trails in last.
+      // Backdrop-most layers (lowest index) engage a hair earlier as the
+      // arriving page passes vertical and starts dragging the spread open.
+      const p = easeTurnWeighted(f.t)
       const phaseOffset = (index * PHASE_STEP_MS) / duration
-      stand.current = incomingRiseStand(f.t, phaseOffset)
+      stand.current = incomingRiseStand(p, phaseOffset)
       velocity.current = 0
       risingClock.current = null
     } else {
       // Landing from the kinematic rise (role just flipped 'incoming' ->
       // 'current' at commit): seed the stagger clock so this frame's spring
       // target is already 1, continuing the settle from wherever
-      // incomingRiseStand left `stand` (~0.92, see popup-kinematics.ts).
+      // incomingRiseStand left `stand` (~0.95, see popup-kinematics.ts).
       // Without this, risingClock starts back at (near) 0 — same as a
       // fresh mount/reveal — so the staggered target stays 0 until
       // index * STAGGER_S elapses, pulling the already-risen layer back
