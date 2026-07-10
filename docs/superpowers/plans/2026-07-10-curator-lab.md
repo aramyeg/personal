@@ -14,7 +14,7 @@
 
 - Every task's requirements implicitly include this section.
 - **Worktree:** all work happens in this worktree on branch `worktree-labs-curator`. Never touch the main checkout.
-- **Design tokens (exact):** `--c-navy: #0C2340`, `--c-blue: #1F5EDC`, `--c-canvas: #F6F8FB`, `--c-surface: #FFFFFF`, `--c-border: #E2E8F0`, `--c-text: #111C2E`, `--c-text-soft: #5A6B82`, `--c-ok: #0E7A4B`, `--c-warn: #B45309`, `--c-bad: #C0334D`. No drop shadows anywhere; 1px `--c-border` hairlines carry structure. Cards: 6px radius. Light theme only.
+- **Design tokens (exact):** `--c-navy: #0C2340`, `--c-blue: #1F5EDC`, `--c-canvas: #F6F8FB`, `--c-surface: #FFFFFF`, `--c-border: #E2E8F0`, `--c-text: #111C2E`, `--c-text-soft: #5A6B82`, `--c-ok: #0E7A4B`, `--c-warn: #B45309`, `--c-bad: #C0334D`, `--c-hover: #FAFBFD` (row/item hover tint). No drop shadows anywhere; 1px `--c-border` hairlines carry structure. Cards: 6px radius — every card/popover surface, no exceptions. Light theme only.
 - **Type:** UI = Inter (already global via `lib/fonts.ts`), 13px body / 12px table cells / 11px uppercase tracked labels / 18px module titles, max weight 600. Data (KPI numerals, IDs, timestamps, EB headers) = IBM Plex Mono (`@fontsource/ibm-plex-mono`), tabular.
 - **Motion:** 150ms ease-out transitions; charts draw in once 600ms; skeleton shimmer ~400ms; all skipped under `prefers-reduced-motion`. Default cursor everywhere.
 - **Copy voice:** dead-straight corporate. Exactly ONE gag in the whole lab (the NPS survey, Task 15). Never claim Lead/Technical Lead titles — roles come verbatim from `data/experience.ts`.
@@ -1643,7 +1643,7 @@ Replace `modules/rooms.tsx` wholesale. Client component, default export. Header:
 
 - Columns: Room (title 13px medium + slug in mono 11px soft), Status (`Badge tone={status === 'live' ? 'ok' : 'neutral'}` labeled `live`/`attic`), Shipped (mono 12px date), Thesis (12px soft, `max-w-[420px] truncate`, `title={thesis}`), Actions (`<a href={href}>Open</a>` — plain anchor styled as 12px `--c-blue` link; internal next/link not required for a full-page lab jump).
 - Header cells: 11px uppercase tracked soft, `text-left`, `border-b border-[var(--c-border)]`.
-- Body rows: `border-b border-[var(--c-border)]` hairlines, `hover:bg-[#fafbfd]` transition, row height driven by density: `useCuratorStore((s) => s.density)` → `py-3` comfortable / `py-1.5` compact on cells.
+- Body rows: `border-b border-[var(--c-border)]` hairlines, `hover:bg-[var(--c-hover)]` transition, row height driven by density: `useCuratorStore((s) => s.density)` → `py-3` comfortable / `py-1.5` compact on cells.
 
 ```tsx
 'use client'
@@ -1682,7 +1682,7 @@ export default function RoomsModule() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.slug} className="border-b border-[var(--c-border)] transition-colors duration-150 last:border-0 hover:bg-[#fafbfd]">
+              <tr key={r.slug} className="border-b border-[var(--c-border)] transition-colors duration-150 last:border-0 hover:bg-[var(--c-hover)]">
                 <td className={`px-4 ${pad}`}>
                   <p className="text-[13px] font-medium">{r.title}</p>
                   <p className="font-[family-name:var(--font-data)] text-[11px] text-[var(--c-text-soft)]">{r.slug}</p>
