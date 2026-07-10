@@ -20,24 +20,32 @@ const CAM: Record<'character' | 'card' | 'crt', {
   target: [number, number, number]
   shadowRadius: number
   glyph: GlyphName
+  yaw: number
+  envIntensity: number
 }> = {
   character: {
     camera: { position: [0.4, 1.75, 6.3], fov: 30 },
     target: [0, 1.4, 0],
     shadowRadius: 2.3,
     glyph: 'triangle',
+    yaw: 0.7,
+    envIntensity: 1.15,
   },
   card: {
     camera: { position: [0.25, 1.5, 6.8], fov: 25 },
     target: [0, 1.42, 0],
     shadowRadius: 1.5,
     glyph: 'circle',
+    yaw: 2.8,
+    envIntensity: 0.35,
   },
   crt: {
     camera: { position: [0.35, 1.72, 6.4], fov: 32 },
     target: [0, 1.5, 0],
     shadowRadius: 2.2,
     glyph: 'cross',
+    yaw: -1.0,
+    envIntensity: 0.7,
   },
 }
 
@@ -70,6 +78,7 @@ function StageColumn({
           target={cfg.target}
           shadowRadius={cfg.shadowRadius}
           fallbackGlyph={cfg.glyph}
+          envIntensity={cfg.envIntensity}
         >
           {children}
         </VignetteCanvas>
@@ -80,9 +89,23 @@ function StageColumn({
 
 function models(): Record<'character' | 'card' | 'crt', React.ReactNode> {
   return {
-    character: <GltfVignette src="/labs/memory-card/models/character.glb" fitHeight={2.6} />,
-    card: <GltfVignette src="/labs/memory-card/models/memory-card.glb" fitHeight={1.9} />,
-    crt: <GltfVignette src="/labs/memory-card/models/crt.glb" fitHeight={2.1} />,
+    character: (
+      <GltfVignette
+        src="/labs/memory-card/models/character.glb"
+        fitHeight={2.6}
+        yaw={CAM.character.yaw}
+      />
+    ),
+    card: (
+      <GltfVignette
+        src="/labs/memory-card/models/memory-card.glb"
+        fitHeight={1.9}
+        yaw={CAM.card.yaw}
+      />
+    ),
+    crt: (
+      <GltfVignette src="/labs/memory-card/models/crt.glb" fitHeight={2.1} yaw={CAM.crt.yaw} />
+    ),
   }
 }
 
