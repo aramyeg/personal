@@ -38,7 +38,12 @@ export function LineChart({ data, annotations = [], title, caption, action }: {
         {uniqueAnnotations.map((a) => {
           const x = xByDate.get(a.date)
           if (x === undefined) return null
-          return <line key={a.date} x1={x} x2={x} y1={0} y2={H} stroke="var(--c-border)" strokeDasharray="3 3" />
+          return (
+            <g key={a.date}>
+              <title>{a.label}</title>
+              <line x1={x} x2={x} y1={0} y2={H} stroke="var(--c-border)" strokeDasharray="3 3" />
+            </g>
+          )
         })}
         <path
           d={linePath(pts)}

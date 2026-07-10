@@ -59,7 +59,7 @@ export function getActivity(): ActivityEvent[] {
 }
 
 export function getRealKpis(now = new Date()) {
-  const first = experiences[experiences.length - 1].startDate
+  const first = experiences.map((e) => e.startDate).sort()[0]
   return {
     rooms: labs.length,
     attic: labs.filter((l) => l.status === 'attic').length,

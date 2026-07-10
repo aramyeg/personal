@@ -85,6 +85,7 @@ export const useCuratorStore = create<CuratorState>()(
       })),
       {
         name: 'labs-curator',
+        version: 1,
         partialize: (s) => ({
           density: s.density, notifications: s.notifications, pipeline: s.pipeline, npsDone: s.npsDone,
         }),
