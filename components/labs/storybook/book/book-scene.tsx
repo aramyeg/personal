@@ -7,11 +7,12 @@
  * it — three.js must never reach the route's initial (server-rendered) chunk.
  */
 
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Book } from './book'
 import { Dust } from './dust'
+import { makeDeskCanvas } from '../procedural/paper-texture'
 
 const CAMERA_POSITION: [number, number, number] = [0, 2.6, 2.9]
 const CAMERA_LOOKAT: [number, number, number] = [0, 0, 0.15]
@@ -20,16 +21,33 @@ const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
 const CANDLE_POSITION: [number, number, number] = [1.6, 1.1, 1.4]
 const CANDLE_COLOR = '#ff9f4d'
-const CANDLE_BASE_INTENSITY = 2.2
+// Lowered from the original 2.2/6 pairing (task-9 concern: candle falloff
+// over a flat page washed the paper texture to near-white). A shorter
+// `distance` cutoff also gives the desk plane a visible light-pool falloff
+// instead of an even wash clear out to its edges.
+const CANDLE_BASE_INTENSITY = 1.3
+const CANDLE_DISTANCE = 3.6
 const PARALLAX_TILT_X = 0.03
 const PARALLAX_TILT_Y = 0.05
 const PARALLAX_EASE_RATE = 4
 
+/** Desk surface: a baked warm light-pool texture (see makeDeskCanvas) rather
+ * than a flat fill, so the near-black desk reads as a lit surface the tome
+ * sits on instead of blending into the background void. */
 function Desk() {
+  const deskCanvas = useMemo(() => makeDeskCanvas(), [])
+  const deskTexture = useMemo(() => {
+    const texture = new THREE.CanvasTexture(deskCanvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    return texture
+  }, [deskCanvas])
+
+  useEffect(() => () => deskTexture.dispose(), [deskTexture])
+
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]}>
       <planeGeometry args={DESK_SIZE} />
-      <meshStandardMaterial color={DESK_COLOR} roughness={0.95} />
+      <meshStandardMaterial map={deskTexture} roughness={0.95} />
     </mesh>
   )
 }
@@ -51,7 +69,7 @@ function CandleLight() {
       position={CANDLE_POSITION}
       color={CANDLE_COLOR}
       intensity={CANDLE_BASE_INTENSITY}
-      distance={6}
+      distance={CANDLE_DISTANCE}
     />
   )
 }
@@ -84,8 +102,8 @@ export default function BookScene() {
       onCreated={(state) => state.camera.lookAt(...CAMERA_LOOKAT)}
     >
       <color attach="background" args={[DESK_COLOR]} />
-      <ambientLight color="#ffe8c8" intensity={0.55} />
-      <directionalLight position={[2, 4, 2]} color="#fff1d6" intensity={1.5} />
+      <ambientLight color="#ffe8c8" intensity={0.32} />
+      <directionalLight position={[2, 4, 2]} color="#fff1d6" intensity={0.7} />
       <CandleLight />
       <Desk />
       <Dust />

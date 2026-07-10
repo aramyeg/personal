@@ -1,9 +1,10 @@
 /**
  * Procedural canvas textures for the WebGL pop-up book: aged paper,
- * tooled leather, and a soft contact-shadow sprite. Client-only — canvas
- * 2D context doesn't exist during SSR — every export throws a clear error
- * if invoked before the component mounts in the browser. Consumers wrap
- * the result in `new THREE.CanvasTexture(...)` (Task 9+).
+ * tooled leather, a page-gutter crease shadow, a desk light-pool, and a
+ * soft contact-shadow sprite. Client-only — canvas 2D context doesn't
+ * exist during SSR — every export throws a clear error if invoked before
+ * the component mounts in the browser. Consumers wrap the result in
+ * `new THREE.CanvasTexture(...)` (Task 9+).
  *
  * Color values mirror the `--sb-*` custom properties in ./storybook.css.
  * Canvas fillStyle/strokeStyle can't read CSS custom properties without an
@@ -18,6 +19,10 @@ const PAPER_AGED = '#c9b078' // --sb-paper-aged
 const LEATHER = '#641e26' // --sb-leather
 const LEATHER_SHADOW = '#4a151c' // --sb-leather-shadow
 const GOLD = '#c9a227' // --sb-gold
+const INK_TRANSPARENT = '#3b2a1a00' // --sb-ink, alpha 0
+const INK_CREASE = '#3b2a1a8c' // --sb-ink, alpha ~0.55
+const DESK = '#17100b' // --sb-desk
+const DESK_POOL = '#8a5326' // warm --sb-desk/--sb-candle blend, baked pool center
 
 /** Adds per-pixel luminance noise in [-amount, amount] across the canvas. */
 function applyGrain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number): void {
@@ -33,9 +38,12 @@ function applyGrain(ctx: CanvasRenderingContext2D, w: number, h: number, amount:
 }
 
 /**
- * 512×512 aged paper texture: `--sb-paper` base fill, ±6 luminance grain,
- * a `--sb-paper-aged` vignette darkening toward the edges, and a faint 1px
- * gold frame inset 6% from each side.
+ * 512×512 aged paper texture: `--sb-paper` base fill, ±7 luminance grain,
+ * an even `--sb-paper-aged` aging wash so the base tone reads as warm
+ * cream rather than a lit-white sheet, a continuous radial vignette
+ * darkening smoothly from center to edge (no flat untouched center disc,
+ * which is what previously read as a blown-out hotspot under scene
+ * lighting), and a faint gold frame inset 6% from each side.
  */
 export function makePaperCanvas(w = 512, h = 512): HTMLCanvasElement {
   assertBrowser('makePaperCanvas')
@@ -44,28 +52,26 @@ export function makePaperCanvas(w = 512, h = 512): HTMLCanvasElement {
   ctx.fillStyle = PAPER
   ctx.fillRect(0, 0, w, h)
 
-  applyGrain(ctx, w, h, 6)
+  applyGrain(ctx, w, h, 7)
 
-  const vignette = ctx.createRadialGradient(
-    w / 2,
-    h / 2,
-    Math.min(w, h) * 0.32,
-    w / 2,
-    h / 2,
-    Math.min(w, h) * 0.72
-  )
+  ctx.fillStyle = PAPER_AGED
+  ctx.globalAlpha = 0.14
+  ctx.fillRect(0, 0, w, h)
+  ctx.globalAlpha = 1
+
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.75)
   vignette.addColorStop(0, 'rgba(0,0,0,0)')
   vignette.addColorStop(1, PAPER_AGED)
   ctx.fillStyle = vignette
-  ctx.globalAlpha = 0.5
+  ctx.globalAlpha = 0.6
   ctx.fillRect(0, 0, w, h)
   ctx.globalAlpha = 1
 
   const insetX = w * 0.06
   const insetY = h * 0.06
   ctx.strokeStyle = GOLD
-  ctx.globalAlpha = 0.35
-  ctx.lineWidth = 1
+  ctx.globalAlpha = 0.55
+  ctx.lineWidth = 2
   ctx.strokeRect(insetX, insetY, w - insetX * 2, h - insetY * 2)
   ctx.globalAlpha = 1
 
@@ -137,6 +143,51 @@ export function makeLeatherCanvas(): HTMLCanvasElement {
   }
 
   drawEmbossedBorder(ctx, w, h)
+
+  return canvas
+}
+
+/**
+ * 64×256 dark transparent gradient strip: fully transparent along both
+ * long edges, `--sb-ink`-tinted and ~55% opaque along the centerline. Maps
+ * onto a narrow plane laid over the open spread's gutter (x≈0) as the
+ * crease shadow where the two pages meet.
+ */
+export function makeCreaseCanvas(w = 64, h = 256): HTMLCanvasElement {
+  assertBrowser('makeCreaseCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+
+  const gradient = ctx.createLinearGradient(0, 0, w, 0)
+  gradient.addColorStop(0, INK_TRANSPARENT)
+  gradient.addColorStop(0.5, INK_CREASE)
+  gradient.addColorStop(1, INK_TRANSPARENT)
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, w, h)
+
+  return canvas
+}
+
+/**
+ * 512×512 desk surface texture: `--sb-desk` base fill with a soft warm
+ * light-pool baked in near the canvas center (where the tome sits under
+ * the candle), fading back to near-black toward the edges of the frame —
+ * gives the desk a visible "surface" even though it's otherwise a flat,
+ * near-black color that would else blend into the void background.
+ */
+export function makeDeskCanvas(w = 512, h = 512): HTMLCanvasElement {
+  assertBrowser('makeDeskCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+
+  ctx.fillStyle = DESK
+  ctx.fillRect(0, 0, w, h)
+
+  const pool = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.3)
+  pool.addColorStop(0, DESK_POOL)
+  pool.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = pool
+  ctx.fillRect(0, 0, w, h)
+
+  applyGrain(ctx, w, h, 4)
 
   return canvas
 }

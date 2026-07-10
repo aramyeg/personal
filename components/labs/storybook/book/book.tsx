@@ -18,7 +18,7 @@ import * as THREE from 'three'
 import { useStorybookStore } from '../store'
 import { SPREAD_COUNT } from '../content'
 import { PAGE_H, PAGE_W, buildPageTemplate } from './page-geometry'
-import { makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
+import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 
 export const BOOK = {
   coverW: 1.22,
@@ -44,6 +44,21 @@ const OPEN_FRONT_COVER_Y = BOOK.coverT / 2
 const FRONT_PIVOT_Y = (CLOSED_FRONT_COVER_Y + OPEN_FRONT_COVER_Y) / 2
 const FRONT_LOCAL_Y = (CLOSED_FRONT_COVER_Y - OPEN_FRONT_COVER_Y) / 2
 const SPINE_HEIGHT = BOOK.coverT * 2 + BOOK.blockMaxH
+// Open state: the spine board lies flat under the spread (real open books
+// have no standing wall down the middle) — same thickness as a cover, its
+// BOOK.coverH depth still exceeds the page block's BLOCK_DEPTH, so it
+// peeks out beyond the pages at the near/far (top/bottom) edges only.
+const SPINE_FLAT_HEIGHT = BOOK.coverT
+// Gutter crease: a narrow dark-transparent-gradient strip laid flat over
+// the seam where the open pages meet, sitting just above the taller of
+// the two page blocks so it never z-fights with either page.
+const CREASE_WIDTH = 0.1
+const CREASE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift + 0.001
+// Closed book extends only toward +X from the spine (x=0), so it sits
+// right of the HTML CTA's centerline; open, the two blocks/pages already
+// straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
+// when closed centers it under the CTA without touching any local layout.
+const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
 
 function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
@@ -52,22 +67,29 @@ function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   return texture
 }
 
-/** Builds the two procedural CanvasTextures once per mount and disposes them on unmount. */
-function useBookTextures(): { paper: THREE.CanvasTexture; leather: THREE.CanvasTexture } {
+/** Builds the three procedural CanvasTextures once per mount and disposes them on unmount. */
+function useBookTextures(): {
+  paper: THREE.CanvasTexture
+  leather: THREE.CanvasTexture
+  crease: THREE.CanvasTexture
+} {
   const paperCanvas = useMemo(() => makePaperCanvas(), [])
   const leatherCanvas = useMemo(() => makeLeatherCanvas(), [])
+  const creaseCanvas = useMemo(() => makeCreaseCanvas(), [])
   const paper = useMemo(() => makeCanvasTexture(paperCanvas), [paperCanvas])
   const leather = useMemo(() => makeCanvasTexture(leatherCanvas), [leatherCanvas])
+  const crease = useMemo(() => makeCanvasTexture(creaseCanvas), [creaseCanvas])
 
   useEffect(
     () => () => {
       paper.dispose()
       leather.dispose()
+      crease.dispose()
     },
-    [paper, leather]
+    [paper, leather, crease]
   )
 
-  return { paper, leather }
+  return { paper, leather, crease }
 }
 
 /** Flat page BufferGeometry shared by both static pages (built once, disposed on unmount). */
@@ -90,7 +112,7 @@ function usePageGeometry(): THREE.BufferGeometry {
 /** Closed burgundy tome that snaps to a flat two-page spread once `spread > 0`. */
 export function Book() {
   const spread = useStorybookStore((s) => s.spread)
-  const { paper, leather } = useBookTextures()
+  const { paper, leather, crease } = useBookTextures()
   const pageGeometry = usePageGeometry()
 
   const leatherMaterial = useMemo(
@@ -105,26 +127,41 @@ export function Book() {
     () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
     [paper]
   )
+  const creaseMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ map: crease, transparent: true, depthWrite: false }),
+    [crease]
+  )
 
   useEffect(
     () => () => {
       leatherMaterial.dispose()
       edgeMaterial.dispose()
       paperMaterial.dispose()
+      creaseMaterial.dispose()
     },
-    [leatherMaterial, edgeMaterial, paperMaterial]
+    [leatherMaterial, edgeMaterial, paperMaterial, creaseMaterial]
   )
 
   const isOpen = spread > 0
   const rightHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
   const leftHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
+  const spineHeight = isOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
 
   return (
-    <group>
-      {/* Spine ridge: static, always visible along the hinge edge. */}
-      <mesh position={[-0.02, SPINE_HEIGHT / 2, 0]} material={leatherMaterial}>
-        <boxGeometry args={[0.05, SPINE_HEIGHT, BOOK.coverH]} />
+    <group position={[spread === 0 ? CLOSED_CENTER_OFFSET_X : 0, 0, 0]}>
+      {/* Spine: a standing ridge along the hinge edge when closed; lies flat
+          under the spread once open (real open books have no wall down the
+          middle) — same footprint, just collapsed to cover thickness. */}
+      <mesh position={[-0.02, spineHeight / 2, 0]} material={leatherMaterial}>
+        <boxGeometry args={[0.05, spineHeight, BOOK.coverH]} />
       </mesh>
+
+      {/* Gutter crease: soft dark shadow where the open pages meet the spine. */}
+      {isOpen && (
+        <mesh position={[0, CREASE_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} material={creaseMaterial}>
+          <planeGeometry args={[CREASE_WIDTH, BOOK.coverH]} />
+        </mesh>
+      )}
 
       {/* Back cover: fixed support board, always under the right-hand stack. */}
       <mesh position={[BOOK.coverW / 2, BACK_COVER_Y, 0]} material={leatherMaterial}>
