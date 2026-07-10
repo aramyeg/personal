@@ -49,7 +49,7 @@ export function SkillsSection({ reduced: reducedProp }: SkillsSectionProps) {
     <section
       id="skills"
       style={{ ['--mc-ring' as string]: SKILLS_ACCENT, background: MC.paper, color: MC.ink }}
-      className="relative px-6 py-24 sm:px-12 sm:py-32"
+      className="relative px-6 py-14 sm:px-12 sm:py-32"
     >
       {/* Hairline transition edge — the ink-to-paper flip is deliberate. */}
       <div
@@ -138,7 +138,9 @@ export function SkillsSection({ reduced: reducedProp }: SkillsSectionProps) {
         </div>
 
         {/* Closing line — the curated subset here, the full stack elsewhere. */}
-        <div className="mt-6 flex justify-center sm:justify-end">
+        {/* Right-aligned at every width — the gallery FAB owns the bottom-left,
+            and the mobile left inset keeps the long label wrapping clear of it. */}
+        <div className="mt-6 flex justify-end pl-16 sm:pl-0">
           <Link
             href="/#skills"
             style={{

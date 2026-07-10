@@ -129,9 +129,10 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
           />
         </VignetteCanvas>
 
-        {/* Rim nameplate — one small mono chip, character-select energy. */}
+        {/* Rim nameplate — one small mono chip, character-select energy. Sits
+            below the figure's feet (bottom 2.5%), clear of the shoe geometry. */}
         <div
-          className="absolute bottom-[6%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1"
+          className="absolute bottom-[2.5%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1"
           style={{ border: `1px solid ${paperAlpha(0.18)}`, background: inkAlpha(0.5) }}
         >
           <span
