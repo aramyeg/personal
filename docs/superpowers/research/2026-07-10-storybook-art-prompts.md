@@ -118,6 +118,14 @@ And a quality gate:
 > Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or
 > any text/letters appear anywhere in the image.
 
+**Flat white/solid backgrounds are salvageable — don't regenerate for that
+alone.** The prep pipeline flood-keys any uniform background connected to
+the image border (Batch-2 experience: many outputs ignored both the
+transparency ask and the magenta fallback and landed on flat white).
+Interior whites — glowing windows, snow — survive, since only
+border-connected background is removed. Full-bleed strips and page prints
+are exempt (their varied edge colors fail the uniformity vote).
+
 ## Sizes
 
 Backdrops, midgrounds, and foregrounds render **1536×1024**; figurines,

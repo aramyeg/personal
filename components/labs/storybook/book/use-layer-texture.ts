@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react'
 import * as THREE from 'three'
+import { artManifest } from '../art-manifest'
 import type { LayerKind } from '../content'
 import { makePlaceholderLayer } from '../procedural/placeholder-art'
 import { makeCanvasTexture } from './book'
@@ -29,26 +30,6 @@ function hashLayerId(id: string): number {
     hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0
   }
   return hash
-}
-
-/**
- * The set of art ids that actually exist, from the manifest the prepare-art
- * pipeline writes next to the images. Consulting it BEFORE any image
- * request is the only reliable way to keep the console clean: Chrome logs
- * "Failed to load resource" for ANY 404 — <img>, TextureLoader, and plain
- * fetch alike — no matter how quietly the response is handled. With the
- * manifest, art that hasn't been generated yet (most of it, by design)
- * costs zero requests and zero console noise; the manifest itself is a
- * committed file, so its own fetch always resolves. Fetched once per
- * session, shared by every layer.
- */
-let manifestPromise: Promise<ReadonlySet<string>> | null = null
-function artManifest(): Promise<ReadonlySet<string>> {
-  manifestPromise ??= fetch('/labs/storybook/art/manifest.json')
-    .then((res) => (res.ok ? (res.json() as Promise<string[]>) : []))
-    .then((ids) => new Set(ids))
-    .catch(() => new Set<string>())
-  return manifestPromise
 }
 
 /**

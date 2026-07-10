@@ -80,7 +80,7 @@ const foldSplit = (layer: SceneLayer): number =>
  *  seamlessly across it (benchmark B6). V-folds read u across the width
  *  and v up the standing panel; parallel strips read u across the fold and
  *  v along their span. */
-function panelUvs(layer: SceneLayer, side: 'right' | 'left'): Float32Array {
+export function panelUvs(layer: SceneLayer, side: 'right' | 'left'): Float32Array {
   const s = foldSplit(layer)
   if (layer.mech === 'parallel') {
     // corners: [glue@z0, glue@z1, ridge@z1, ridge@z0] (left) and
@@ -89,7 +89,19 @@ function panelUvs(layer: SceneLayer, side: 'right' | 'left'): Float32Array {
       ? new Float32Array([0, 0, 0, 1, s, 1, s, 0])
       : new Float32Array([s, 0, s, 1, 1, 1, 1, 0])
   }
-  // corners: [apex, bottom-outer, top-outer, top-inner]
+  // corners: [apex, bottom-outer, top-outer, top-inner]. A HANGING child
+  // (vDir -1) extends DOWN its parent's crease — its "top" corners are
+  // physically the lowest — so its die is printed rotated 180 degrees
+  // ((u,v) -> (1-u, 1-v), a rotation, not a mirror: paper can't be
+  // mirror-printed) to read upright, exactly like a real fabricator would
+  // rotate the die before gluing. Hanging children are center-fold only
+  // (all shipped ones are): an off-center creaseU would land the art's
+  // painted seam at 1-s instead of s after the rotation.
+  if (layer.mech === 'child' && layer.vDir === -1) {
+    return side === 'left'
+      ? new Float32Array([1 - s, 1, 1, 1, 1, 0, 1 - s, 0])
+      : new Float32Array([1 - s, 1, 0, 1, 0, 0, 1 - s, 0])
+  }
   return side === 'left'
     ? new Float32Array([s, 0, 0, 0, 0, 1, s, 1])
     : new Float32Array([s, 0, 1, 0, 1, 1, s, 1])

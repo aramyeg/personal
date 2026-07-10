@@ -139,6 +139,97 @@ function hasMagentaCorners(raw, info) {
   return hits >= 3
 }
 
+// Some generations ignore BOTH the transparency ask and the magenta
+// fallback and land on a flat white (or near-white) card. Those are keyed
+// by FLOOD FILL from the border: only background connected to the image
+// edge is removed, so interior whites (glowing windows, snow, cream
+// paper) survive untouched.
+const BACKED_TOLERANCE = 22 // max per-channel distance from the corner color
+const BACKED_BORDER_FRACTION = 0.8 // border ring must be this uniform
+
+/** Detects a flat opaque background color from the corners + border ring.
+ *  Returns the color, or null when the image is transparent-backed or a
+ *  genuine full-bleed painting (page prints, tent strips): those have
+ *  VARIED border colors and fail the uniformity vote. */
+function uniformBorderColor(raw, info) {
+  const { width, height, channels } = info
+  const px = (x, y) => {
+    const i = (y * width + x) * channels
+    return [raw[i], raw[i + 1], raw[i + 2], raw[i + 3]]
+  }
+  const corners = [px(0, 0), px(width - 1, 0), px(0, height - 1), px(width - 1, height - 1)]
+  if (corners.some((c) => c[3] < 250)) return null // transparent-backed
+  const bg = [0, 1, 2].map((ch) => Math.round(corners.reduce((s, c) => s + c[ch], 0) / 4))
+  if (corners.some((c) => Math.max(...[0, 1, 2].map((ch) => Math.abs(c[ch] - bg[ch]))) > BACKED_TOLERANCE)) {
+    return null // corners disagree with each other
+  }
+  if (magentaDistance(bg[0], bg[1], bg[2]) <= CORNER_TOLERANCE) return null // magenta path owns this
+  let hits = 0
+  let total = 0
+  const matches = (x, y) => {
+    const i = (y * width + x) * channels
+    return (
+      raw[i + 3] >= 250 &&
+      Math.abs(raw[i] - bg[0]) <= BACKED_TOLERANCE &&
+      Math.abs(raw[i + 1] - bg[1]) <= BACKED_TOLERANCE &&
+      Math.abs(raw[i + 2] - bg[2]) <= BACKED_TOLERANCE
+    )
+  }
+  for (let x = 0; x < width; x += 2) {
+    total += 2
+    if (matches(x, 0)) hits += 1
+    if (matches(x, height - 1)) hits += 1
+  }
+  for (let y = 0; y < height; y += 2) {
+    total += 2
+    if (matches(0, y)) hits += 1
+    if (matches(width - 1, y)) hits += 1
+  }
+  return hits / total >= BACKED_BORDER_FRACTION ? bg : null
+}
+
+/** Clears (alpha 0) every pixel within tolerance of `bg` that is 4-connected
+ *  to the image border — the classic background flood, leaving interior
+ *  regions of the same color alone. Returns a new buffer. */
+function floodKeyBackground(raw, info, bg) {
+  const { width, height, channels } = info
+  const out = Buffer.from(raw)
+  const visited = new Uint8Array(width * height)
+  const stack = []
+  const tryPush = (x, y) => {
+    const p = y * width + x
+    if (visited[p]) return
+    const i = p * channels
+    if (
+      Math.abs(out[i] - bg[0]) <= BACKED_TOLERANCE &&
+      Math.abs(out[i + 1] - bg[1]) <= BACKED_TOLERANCE &&
+      Math.abs(out[i + 2] - bg[2]) <= BACKED_TOLERANCE
+    ) {
+      visited[p] = 1
+      stack.push(p)
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    tryPush(x, 0)
+    tryPush(x, height - 1)
+  }
+  for (let y = 0; y < height; y++) {
+    tryPush(0, y)
+    tryPush(width - 1, y)
+  }
+  while (stack.length > 0) {
+    const p = stack.pop()
+    out[p * channels + 3] = 0
+    const x = p % width
+    const y = (p - x) / width
+    if (x > 0) tryPush(x - 1, y)
+    if (x < width - 1) tryPush(x + 1, y)
+    if (y > 0) tryPush(x, y - 1)
+    if (y < height - 1) tryPush(x, y + 1)
+  }
+  return out
+}
+
 /** Per-pixel chroma-key + de-fringe over a raw RGBA buffer (returns a new
  *  buffer; never mutates the input). */
 function chromaKey(raw, info) {
@@ -177,7 +268,13 @@ async function processOne(fileName) {
   const srcPath = path.join(SRC_DIR, fileName)
 
   const { data, info } = await sharp(srcPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const pixels = hasMagentaCorners(data, info) ? chromaKey(data, info) : data
+  let pixels = hasMagentaCorners(data, info) ? chromaKey(data, info) : data
+  // Page prints are full-bleed page faces by design — never background-key
+  // them even if a sky corner happens to read uniform.
+  if (!id.startsWith('page-')) {
+    const backed = uniformBorderColor(pixels, info)
+    if (backed) pixels = floodKeyBackground(pixels, info, backed)
+  }
 
   let pipeline = sharp(pixels, {
     raw: { width: info.width, height: info.height, channels: info.channels },

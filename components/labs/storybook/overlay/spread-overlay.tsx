@@ -27,6 +27,7 @@
 import { useEffect, useState } from 'react'
 import { skills } from '@/data'
 import { siteConfig, socialLinks } from '@/lib/constants'
+import { useArtIds } from '../art-manifest'
 import { useStorybookStore } from '../store'
 import {
   BOOK_SUBTITLE,
@@ -108,6 +109,9 @@ function ChapterContent({ chapter }: { chapter: Chapter }) {
 }
 
 function SatchelContent() {
+  // Manifest-gated like every other art consumer: an <img> for ungenerated
+  // art would 404 in the console even with onError handled.
+  const artIds = useArtIds()
   return (
     <>
       <div className="sb-col-left">
@@ -129,16 +133,20 @@ function SatchelContent() {
             const skill = satchelSkill(item)
             return (
               <li key={item.assetId} className="sb-satchel-item">
-                {/* eslint-disable-next-line @next/next/no-img-element -- art
-                    ships incrementally; onError hides the placeholder gap. */}
-                <img
-                  src={`/labs/storybook/art/${item.assetId}.webp`}
-                  alt=""
-                  className="sb-satchel-img"
-                  onError={(event) => {
-                    event.currentTarget.style.display = 'none'
-                  }}
-                />
+                {artIds?.has(item.assetId) && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- art
+                        ships incrementally; onError hides the placeholder gap. */}
+                    <img
+                      src={`/labs/storybook/art/${item.assetId}.webp`}
+                      alt=""
+                      className="sb-satchel-img"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  </>
+                )}
                 <div className="sb-satchel-tag">
                   <p className="sb-satchel-name">{item.itemName}</p>
                   <p className="sb-chapter-kicker">
