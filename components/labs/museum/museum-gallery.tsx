@@ -121,7 +121,10 @@ export default function MuseumGallery({
           className="absolute inset-0 z-10 grid place-items-center bg-black/60"
           onClick={() => setGuideOpen(false)}
         >
-          <div onClick={(e) => e.stopPropagation()}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-md border border-[#d6b968]/45 bg-[#16090d]/95 px-10 py-8 shadow-2xl backdrop-blur-sm"
+          >
             <VisitorGuide />
           </div>
         </div>
