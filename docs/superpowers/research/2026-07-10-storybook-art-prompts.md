@@ -424,3 +424,81 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 ```
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: leather burgundy #641e26, antique gold #c9a227. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. small circular heraldic dragon crest medallion, simpler than the front cover crest, antique gold foil paper with a coiled dragon motif; isolated on transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
+
+---
+
+# v2 addendum — printed page spreads (the missing half of the medium)
+
+The pivot (2026-07-10 evening): real pop-up books print the world onto the
+page itself — cutouts rise out of a fully illustrated spread, never out of
+blank paper. This adds ONE new asset class: a full-bleed printed spread per
+page, `page-<spread>.png` → 9 assets. These are **opaque full rectangles,
+1536×1024, NO transparency** — the pipeline detects `page-` ids and skips
+trimming/rims.
+
+**Also, when generating the remaining Batch-2 CUTOUTS from the prompts
+above, append one sentence:**
+- to every `chX-hero` prompt: *"Composed to stay readable with a vertical
+  center fold — balance the main mass evenly across the middle."* (heroes
+  are v-fold centerpieces; the crease runs through the art)
+- to every `chX-midground` prompt: *"Keep a clean horizontal band at about
+  60% of the piece's height — a paper fold line will cross there."*
+
+Every page print below shares the same structure: printed FLAT on aged
+parchment (paper grain showing through), ground plane covering the lower
+half, sky/air above, printed saturation a step quieter than the cutouts,
+nothing that belongs to a pop-up piece, no text, no border.
+
+## page-5 — 1536×1024 — Chapter IV spread (GENERATE FIRST — validates the system with the art you already made)
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: dune gold #d9a24a, sunset coral #d96f4a, oasis teal #4f8f85, coin gold #e6c65a. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: rolling golden dune-sand ground with printed sand ripples covering the lower half, scattered printed gold coins and small caravan footprints wandering toward the center gutter, a coral-to-gold sunset sky filling the upper half with soft printed cloud bands; printed saturation a step quieter than a paper cutout would be; no dragon, no figures, no buildings; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-2 — 1536×1024 — Chapter I spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta #b0603f, dawn peach #e8a978. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a spring-green village meadow ground covering the lower half with a winding printed cobblestone path crossing the center gutter, tiny printed wildflowers and scattered brass keys, a dawn-peach sky filling the upper half with soft printed clouds and a faint distant hill line; printed saturation a step quieter than a paper cutout; no buildings, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-3 — 1536×1024 — Chapter II spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: alpine blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: an alpine valley floor covering the lower half with printed snow patches, pine-needle scatter and a winding trail of tiny printed honey-drop dots crossing the center gutter, a pale alpine-blue sky filling the upper half with soft printed cloud bands and a faint printed peak line at the horizon; printed saturation a step quieter than a paper cutout; no chalets, no bees, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-4 — 1536×1024 — Chapter III spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: slate #5a6470, dusk violet #6f5a7d, window amber #d98e3f. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a slate cobblestone plaza ground covering the lower half with a few scattered printed scroll-letters and black feathers drifting toward the center gutter, a dusk-violet sky filling the upper half with tiny printed raven silhouettes very far away and a warm amber glow along the horizon line; printed saturation a step quieter than a paper cutout; no towers, no perched ravens, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-6 — 1536×1024 — Chapter V spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: tuff rose #c4766a, awning red #a63d2f, awning cream. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a rose-pink tuff-stone paving ground covering the lower half with printed woven-rug motifs and scattered printed apricots and pomegranate seeds near the center gutter, a warm cream late-afternoon sky filling the upper half with soft printed shadow arcs cast by unseen awnings; printed saturation a step quieter than a paper cutout; no market stalls, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-7 — 1536×1024 — Chapter VI spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: pine #2e5244, aurora teal #4fd6b8, aurora violet #8a6fd6, night navy #1d2a45. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a dark pine-forest floor covering the lower half with printed moss patches, soft pine-needle texture and a few unrolled printed blueprint scrolls near the center gutter, a night-navy sky filling the upper half crossed by one soft printed aurora ribbon in teal and violet with tiny printed stars; printed saturation a step quieter than a paper cutout; no buildings, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-1 — 1536×1024 — title spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: antique gold #c9a227, forest green #6a8f5f. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: warm parchment with delicate printed golden vine tendrils curling in from the four corners, tiny printed quill and star motifs scattered sparsely, a soft radiant cream glow at the center of each page; printed saturation quiet and elegant; no figures; no border, no text. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-8 — 1536×1024 — satchel spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: antique gold #c9a227, saddle leather #8a5a3b. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a craftsman's workbench tabletop seen from above covering the whole spread, printed wood grain, faint printed stitched-leather seams, a printed measuring cord winding across the center gutter, small printed buckles and thread spools scattered sparsely; printed saturation a step quieter than a paper cutout; no satchel itself, no tools standing up, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+## page-9 — 1536×1024 — end spread
+
+```
+Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: seal burgundy #7a1f2b, slate #5a6470. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a scholar's writing desk seen from above covering the whole spread, printed dark wood grain, faint printed ink rings from an inkwell, a few printed drips of burgundy sealing wax, one printed black feather lying across the center gutter, the soft printed glow of an unseen candle warming one corner; printed saturation a step quieter than a paper cutout; no letter, no raven, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
