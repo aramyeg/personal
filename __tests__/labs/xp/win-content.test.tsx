@@ -88,6 +88,6 @@ describe('messenger + ie', () => {
 
   it('ie frames the main site', () => {
     render(<WinIE />)
-    expect(screen.getByTitle('aram.dev')).toHaveAttribute('src', '/')
+    expect(screen.getByTitle('aram.dev')).toHaveAttribute('src', '/classic-claude')
   })
 })

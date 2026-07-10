@@ -28,11 +28,11 @@ export default function PS1LabPage() {
             Style Lab № 1 — same content, different world.{' '}
           </span>
           <span className="flex gap-6">
-            <Link href="/labs" className="hover:text-[#5583ff] transition-colors">
+            <Link href="/" className="hover:text-[#5583ff] transition-colors">
               ← All experiments
             </Link>
-            <Link href="/" className="hover:text-[#5583ff] transition-colors">
-              Main site
+            <Link href="/classic-claude" className="hover:text-[#5583ff] transition-colors">
+              Classic Claude
             </Link>
           </span>
         </footer>

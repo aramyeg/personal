@@ -94,7 +94,7 @@ export default function MuseumGallery({
 
       {/* Escape hatch to the list */}
       <Link
-        href="/labs?view=list"
+        href="/?view=list"
         className="absolute top-4 right-4 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
       >
         List view
