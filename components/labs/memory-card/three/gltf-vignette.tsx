@@ -24,7 +24,7 @@ import {
   type JSX,
   type ReactNode,
 } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -39,7 +39,14 @@ export type GltfVignetteProps = {
   spin?: boolean // default true; ignored (static) under reduced motion
   spinSpeed?: number // rad/s, default 0.45
   floorY?: number // where the model's bottom sits, default 0
+  animation?: string // clip name to play as an idle; omit for a still model
 }
+
+/**
+ * Where to sample a baked idle when motion is suppressed: a second into the
+ * clip lands on a natural mid-pose rather than the frame-0 rest/A-pose.
+ */
+const REDUCED_MOTION_POSE_TIME = 0.6
 
 /** Live `(prefers-reduced-motion: reduce)` state, resolved client-side. */
 function usePrefersReducedMotion(): boolean {
@@ -135,9 +142,11 @@ class ModelErrorBoundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
-type GltfModelProps = Required<GltfVignetteProps>
+type GltfModelProps = Required<Omit<GltfVignetteProps, 'animation'>> & {
+  animation?: string
+}
 
-/** Suspends on `useLoader`; fits, spins, and disposes the resolved GLB. */
+/** Suspends on `useLoader`; fits, animates, spins, and disposes the resolved GLB. */
 function GltfModel({
   src,
   fitHeight,
@@ -146,10 +155,42 @@ function GltfModel({
   spin,
   spinSpeed,
   floorY,
+  animation,
 }: GltfModelProps) {
   const gltf = useLoader(GLTFLoader, src)
   const groupRef = useRef<THREE.Group>(null)
   const reduced = usePrefersReducedMotion()
+  const invalidate = useThree((s) => s.invalidate)
+
+  // Only build a mixer when an idle clip is requested; still models (look-dev,
+  // card, crt) keep their existing rest-pose-plus-turntable behavior untouched.
+  const mixer = useMemo(
+    () =>
+      animation && gltf.animations.length > 0
+        ? new THREE.AnimationMixer(gltf.scene)
+        : null,
+    [animation, gltf.scene, gltf.animations]
+  )
+
+  useEffect(() => {
+    if (!mixer) return
+    // Exact-name lookup with a safe fallback to the first clip: a renamed or
+    // absent idle never crashes — the model just plays whatever it ships with.
+    const clip =
+      gltf.animations.find((c) => c.name === animation) ?? gltf.animations[0]
+    const action = mixer.clipAction(clip)
+    action.reset().play()
+    if (reduced) {
+      // Under reduced motion the stage runs a demand frameloop that never
+      // advances the mixer, so sample one natural pose up front and force a
+      // single repaint — otherwise the model would freeze on the A-pose.
+      mixer.update(REDUCED_MOTION_POSE_TIME)
+      invalidate()
+    }
+    return () => {
+      mixer.stopAllAction()
+    }
+  }, [mixer, gltf.animations, animation, reduced, invalidate])
 
   const fit = useMemo(() => {
     const box = measureScene(gltf.scene)
@@ -171,6 +212,7 @@ function GltfModel({
   // parsed GLB stays in the loader cache by design, like any asset cache.
 
   useFrame((_, delta) => {
+    if (mixer && !reduced) mixer.update(delta)
     if (spin && !reduced && groupRef.current) {
       groupRef.current.rotation.y += spinSpeed * delta
     }
@@ -193,6 +235,7 @@ export function GltfVignette({
   spin = true,
   spinSpeed = 0.45,
   floorY = 0,
+  animation,
 }: GltfVignetteProps): JSX.Element {
   return (
     <ModelErrorBoundary fallback={<ModelPlaceholder floorY={floorY} />}>
@@ -205,6 +248,7 @@ export function GltfVignette({
           spin={spin}
           spinSpeed={spinSpeed}
           floorY={floorY}
+          animation={animation}
         />
       </Suspense>
     </ModelErrorBoundary>

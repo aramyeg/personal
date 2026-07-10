@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
+import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
+import { HeroSection } from '@/components/labs/memory-card/sections/hero'
+import { MC } from '@/components/labs/memory-card/tokens'
 
 export const metadata: Metadata = {
   title: 'Memory Card — Style Lab | Aram Yeghiazaryan',
@@ -16,8 +19,9 @@ export const metadata: Metadata = {
 export default function MemoryCardLabPage() {
   return (
     <GalleryChrome>
-      <main className="min-h-screen" style={{ background: '#101014', color: '#e9e7e0' }}>
-        <h1 className="p-8 text-2xl">memory card</h1>
+      <MemoryCardChrome />
+      <main className="min-h-screen" style={{ background: MC.ink, color: MC.paper }}>
+        <HeroSection />
       </main>
     </GalleryChrome>
   )
