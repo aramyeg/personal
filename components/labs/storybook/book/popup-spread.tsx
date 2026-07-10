@@ -120,8 +120,14 @@ function PopupLayer({
     const group = groupRef.current
     if (!group) return
 
+    // Clamp to a 30fps-equivalent step: after the tab is backgrounded and
+    // resumed, three.js's next `delta` can be seconds long, which would
+    // blow up the spring integrator (and the stagger clock below) for one
+    // frame and flash the pose/opacity.
+    const dt = Math.min(delta, 1 / 30)
+
     if (rising) {
-      risingClock.current = (risingClock.current ?? 0) + delta
+      risingClock.current = (risingClock.current ?? 0) + dt
     } else {
       risingClock.current = null
     }
@@ -130,8 +136,8 @@ function PopupLayer({
     const target = risingClock.current !== null && risingClock.current >= staggerDelay ? 1 : 0
 
     const accel = SPRING_K * (target - stand.current) - SPRING_C * velocity.current
-    velocity.current += accel * delta
-    stand.current += velocity.current * delta
+    velocity.current += accel * dt
+    stand.current += velocity.current * dt
 
     const standRad = (layer.standAngle * Math.PI) / 180
     // Extra per-layer parallax sway on top of the spring pose — deeper

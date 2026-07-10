@@ -126,7 +126,7 @@ const END_LAYERS: readonly SceneLayer[] = [
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 
-export const EXTRA_SPREAD_LAYERS: Record<number, readonly SceneLayer[]> = {
+export const EXTRA_SPREAD_LAYERS: Readonly<Record<number, readonly SceneLayer[]>> = {
   1: TITLE_LAYERS,
   8: SATCHEL_LAYERS,
   9: END_LAYERS,
