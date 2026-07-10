@@ -50,7 +50,7 @@ function PipelineColumnShell({
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{col.label}</span>
         <span className="font-[family-name:var(--font-data)] text-[11px] tabular-nums text-[var(--c-text-soft)]">{cardIds.length}</span>
       </div>
-      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="min-h-[80px] space-y-2">
           {cards.map((deal) => (
             <SortableDealCard key={deal.id} id={deal.id} deal={deal} />
@@ -75,7 +75,8 @@ export default function PipelineModule() {
 
   const won = pipeline['closed-won'].length
   const lost = 0
-  const winRate = Math.round((won / (won + lost)) * 100)
+  const total = won + lost
+  const winRate = total === 0 ? '—' : `${Math.round((won / total) * 100)}%`
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id))
@@ -113,7 +114,7 @@ export default function PipelineModule() {
     <div className="space-y-4">
       <header>
         <h1 className="text-[18px] font-semibold">Pipeline</h1>
-        <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Opportunity management — win rate {winRate}%</p>
+        <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Opportunity management — win rate {winRate}</p>
       </header>
       <DndContext
         sensors={sensors}

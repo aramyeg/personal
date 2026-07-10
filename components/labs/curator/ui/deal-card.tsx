@@ -1,4 +1,4 @@
-import type { DealCard } from '../adapters'
+import { OPEN_DEAL_ID, type DealCard } from '../adapters'
 import { Badge } from './badge'
 
 export function DealCardView({ deal, dragging = false }: { deal: DealCard; dragging?: boolean }) {
@@ -9,7 +9,7 @@ export function DealCardView({ deal, dragging = false }: { deal: DealCard; dragg
     >
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-[13px] font-medium">{deal.company}</p>
-        {deal.id === 'your-company'
+        {deal.id === OPEN_DEAL_ID
           ? <Badge tone="warn">open</Badge>
           : <Badge tone="ok">won</Badge>}
       </div>

@@ -24,4 +24,11 @@ describe('PipelineModule', () => {
     const closedWon = screen.getByTestId('column-closed-won')
     expect(within(closedWon).getAllByText(/\d+ mo/).length).toBeGreaterThan(0)
   })
+  it('renders an em-dash win rate when closed-won is empty', () => {
+    const { pipeline, movePipelineCard } = useCuratorStore.getState()
+    for (const id of [...pipeline['closed-won']]) movePipelineCard(id, 'sourced', 0)
+    render(<PipelineModule />)
+    expect(screen.getByText(/win rate —/)).toBeInTheDocument()
+    expect(screen.queryByText(/NaN/)).toBeNull()
+  })
 })
