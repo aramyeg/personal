@@ -142,7 +142,7 @@ function SatchelContent() {
                 <div className="sb-satchel-tag">
                   <p className="sb-satchel-name">{item.itemName}</p>
                   <p className="sb-chapter-kicker">
-                    {skill.name} · {skill.years} yrs
+                    {skill.name} · {skill.years} yrs · {skill.level}
                   </p>
                   <p className="sb-satchel-blurb">{item.blurb}</p>
                 </div>

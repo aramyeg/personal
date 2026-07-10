@@ -130,17 +130,31 @@
   .sb-drawer-header {
     padding-top: 0.9rem;
   }
+  /* `visibility` rides along with the max-height/opacity collapse so the
+     mailto/sigil links (End spread) and any other focusable content inside
+     a collapsed drawer body can't be tabbed to while it reads as gone —
+     without it, max-height:0/opacity:0 hides the content visually but
+     leaves it in the tab order. Delayed 0s→260ms so it only *becomes*
+     hidden once the collapse animation finishes (staying visible through
+     the transition you can see), while the expand direction below flips it
+     back to visible immediately so the reveal animates on-screen instead
+     of popping in after the fact. */
   .sb-drawer-body {
     max-height: 0;
     margin-top: 0;
     opacity: 0;
     overflow: hidden;
-    transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease;
+    visibility: hidden;
+    transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease,
+      visibility 0s linear 260ms;
   }
   .sb-overlay[data-expanded='true'] .sb-drawer-body {
     max-height: 60vh;
     margin-top: 0.85rem;
     opacity: 1;
+    visibility: visible;
+    transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease,
+      visibility 0s linear;
   }
   .sb-col-right.sb-drawer-body {
     margin-top: 0;

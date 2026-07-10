@@ -22,7 +22,12 @@
  *    overhead. The spring resumes automatically the instant the layer's
  *    role flips back to 'current' at commit, continuing from wherever the
  *    kinematic function left `stand` (~0.92) for a small natural overshoot
- *    settle — no special-cased handoff needed.
+ *    settle. That handoff does seed the spring's staggered-rise clock
+ *    (`risingClock`) to this layer's own stagger delay on the transition
+ *    frame — without it, the clock would restart from ~0 like a fresh
+ *    mount/reveal, holding the spring's target at 0 until the stagger
+ *    elapses and pulling the already-risen layer back down before
+ *    re-raising it. See the incoming->current branch below.
  *
  * Convention (matches page-geometry.ts): the enclosing group already sits
  * at the open page's surface height, so a layer's local y=0 is the page.
@@ -178,8 +183,21 @@ function PopupLayer({
     const dt = Math.min(delta, 1 / 30)
     const f = frame.current
 
+    // Captured the instant `role` first becomes 'outgoing', independent of
+    // whether the driver frame ref (`f`) happens to be populated yet this
+    // same tick. Hardening (task 18 review): this used to live inside the
+    // `role === 'outgoing' && f` branch below, so a frame where `f` was
+    // still null on that first outgoing tick would skip the capture — and
+    // since `prevRole.current` flips to 'outgoing' regardless (see the
+    // unconditional assignment below), the real capture opportunity on the
+    // *next* tick (once `f` arrives) would already be gone, leaving
+    // `foldStart` stale and folding from the wrong value (a visible snap).
+    // Splitting the capture out so it can never depend on mount order.
+    if (role === 'outgoing' && prevRole.current !== 'outgoing') {
+      foldStart.current = stand.current
+    }
+
     if (role === 'outgoing' && f) {
-      if (prevRole.current !== 'outgoing') foldStart.current = stand.current
       const duration = f.isCover ? COVER_MS : TURN_MS
       // Foreground-most layers (highest index) lead the fold — they're the
       // first thing the lifting page would otherwise sweep through.
@@ -196,6 +214,21 @@ function PopupLayer({
       velocity.current = 0
       risingClock.current = null
     } else {
+      // Landing from the kinematic rise (role just flipped 'incoming' ->
+      // 'current' at commit): seed the stagger clock so this frame's spring
+      // target is already 1, continuing the settle from wherever
+      // incomingRiseStand left `stand` (~0.92, see popup-kinematics.ts).
+      // Without this, risingClock starts back at (near) 0 — same as a
+      // fresh mount/reveal — so the staggered target stays 0 until
+      // index * STAGGER_S elapses, pulling the already-risen layer back
+      // down before re-raising it (worse for later-indexed/foreground
+      // layers, which can dip enough to cross STAND_EPSILON and blink
+      // invisible). Seeding to exactly the stagger delay reproduces the
+      // "already past its own stagger" state instead of restarting it.
+      if (prevRole.current === 'incoming' && role === 'current') {
+        risingClock.current = index * STAGGER_S
+      }
+
       const rising = role === 'current'
       risingClock.current = rising ? (risingClock.current ?? 0) + dt : null
 
