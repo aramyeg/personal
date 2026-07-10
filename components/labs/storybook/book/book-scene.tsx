@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Book, makeCanvasTexture } from './book'
 import { Dust } from './dust'
+import { PageRectReporter } from './page-rect-reporter'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 
 const CAMERA_POSITION: [number, number, number] = [0, 2.6, 2.9]
@@ -103,6 +104,7 @@ export default function BookScene() {
       <CandleLight />
       <Desk />
       <Dust />
+      <PageRectReporter />
       <ParallaxRig>
         <Book />
       </ParallaxRig>

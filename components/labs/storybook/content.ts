@@ -28,6 +28,16 @@ export const SPREAD_COUNT = 10
 export const BOOK_TITLE = 'A Tale of Six Kingdoms'
 export const BOOK_SUBTITLE = "being the true chronicle of one frontend engineer’s quest"
 
+// Title/satchel/end page copy — verbatim from spec §4, kept alongside the
+// chapter narration so every scrap of the tale's prose lives in one file.
+export const TITLE_OPENING_LINE =
+  'Once upon a time — which is to say, in the year two thousand and sixteen —'
+export const SATCHEL_HEADING = 'The Hero’s Satchel'
+export const SATCHEL_INTRO =
+  'No knight sets out unarmed. Herein, the satchel, unpacked for the curious.'
+export const END_CLOSING_LINE =
+  'Here ends — for now — the Tale of Six Kingdoms. Should you have need of the hero — a kingdom to raise, a dragon to gentle — send a raven.'
+
 const layerDefaults = (ch: number): SceneLayer[] => [
   { id: `ch${ch}-backdrop`, kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 2.0, standAngle: 90 },
   { id: `ch${ch}-midground`, kind: 'midground', hingeZ: -0.18, height: 0.7, width: 1.9, standAngle: 78 },

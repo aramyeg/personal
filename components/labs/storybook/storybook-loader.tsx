@@ -9,6 +9,8 @@ import '@fontsource/alegreya-sc/700.css'
 import { useStorybookStore } from './store'
 import { useBookInput } from './use-book-input'
 import { BookNav } from './overlay/nav'
+import { QuillCursor } from './overlay/quill-cursor'
+import { SpreadOverlay } from './overlay/spread-overlay'
 
 // three.js only ever reaches the browser: ssr is off and nothing outside
 // book-scene.tsx (and its book/ neighbors) may import it, so the route's
@@ -36,18 +38,23 @@ export function StorybookLoader() {
 
   return (
     <div className="sb-root fixed inset-0 overflow-hidden">
-      <BookScene />
-      {spread === 0 && !turning && (
-        <button
-          type="button"
-          onClick={() => requestTurn('next')}
-          className="sb-chapter-kicker absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-[var(--sb-gold)] bg-black/30 px-6 py-2.5 backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15"
-        >
-          Open the book
-        </button>
-      )}
+      <div className="sb-canvas-wrap">
+        <BookScene />
+        {spread === 0 && !turning && (
+          <button
+            type="button"
+            onClick={() => requestTurn('next')}
+            data-sb-hover
+            className="sb-chapter-kicker absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-[var(--sb-gold)] bg-black/30 px-6 py-2.5 backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15"
+          >
+            Open the book
+          </button>
+        )}
+        <div className="sb-vignette" />
+      </div>
+      <SpreadOverlay />
       <BookNav />
-      <div className="sb-vignette" />
+      <QuillCursor />
     </div>
   )
 }

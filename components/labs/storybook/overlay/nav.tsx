@@ -47,6 +47,7 @@ export function BookNav() {
           aria-label="Turn back"
           disabled={atStart}
           onClick={() => requestTurn('prev')}
+          data-sb-hover
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
         >
           <span aria-hidden="true">‹</span>
@@ -61,6 +62,7 @@ export function BookNav() {
           aria-label="Turn the page"
           disabled={atEnd}
           onClick={() => requestTurn('next')}
+          data-sb-hover
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
         >
           <span aria-hidden="true">›</span>
