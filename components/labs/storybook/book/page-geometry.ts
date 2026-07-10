@@ -24,7 +24,11 @@ const ROW_VERTS = PAGE_SEGMENTS + 1
  *
  * Vertex layout: two rows of (PAGE_SEGMENTS+1) vertices — row 0 at
  * z=-PAGE_H/2 (vertices 0..PAGE_SEGMENTS), row 1 at z=+PAGE_H/2 (vertices
- * PAGE_SEGMENTS+1..2*PAGE_SEGMENTS+1). uvs are u=x/PAGE_W, v=row.
+ * PAGE_SEGMENTS+1..2*PAGE_SEGMENTS+1). uvs are u=x/PAGE_W, v=1-row: the
+ * camera views the desk from +Z (book-scene.tsx), so the image's top row
+ * (v=1 under three's default flipY) must land on the FAR page edge at
+ * z=-PAGE_H/2 — v=row put the printed sky at the reader's edge, rendering
+ * every page print upside down.
  */
 export function buildPageTemplate(): {
   positions: Float32Array
@@ -46,7 +50,7 @@ export function buildPageTemplate(): {
       positions[vertex * 3 + 2] = z
 
       uvs[vertex * 2] = x / PAGE_W
-      uvs[vertex * 2 + 1] = row
+      uvs[vertex * 2 + 1] = 1 - row
     }
   }
 

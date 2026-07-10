@@ -31,6 +31,16 @@ describe('buildPageTemplate', () => {
     expect(uvs[lastUvBase]).toBeCloseTo(1, 5)
   })
 
+  it('uv v puts the image top on the far page edge (camera views from +Z)', () => {
+    // Row 0 sits at z=-PAGE_H/2 (far edge) and must sample the top of the
+    // print (v=1 under three's default flipY); row 1 (near edge, toward the
+    // reader) samples the bottom. v=row rendered every page print upside
+    // down — sky at the reader's edge.
+    expect(uvs[1]).toBeCloseTo(1, 5) // first vertex: row 0, far edge
+    const lastUvBase = (uvs.length / 2 - 1) * 2
+    expect(uvs[lastUvBase + 1]).toBeCloseTo(0, 5) // last vertex: row 1, near edge
+  })
+
   it('emits two CCW triangles per segment', () => {
     expect(indices.length).toBe(PAGE_SEGMENTS * 6)
   })
