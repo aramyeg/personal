@@ -27,8 +27,8 @@ export default function RoomsModule() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[var(--c-border)]">
-              {['Room', 'Status', 'Shipped', 'Thesis', ''].map((h, i) => (
-                <th key={i} className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{h}</th>
+              {['Room', 'Status', 'Shipped', 'Thesis', 'Actions'].map((h) => (
+                <th key={h} scope="col" className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{h}</th>
               ))}
             </tr>
           </thead>
@@ -43,7 +43,7 @@ export default function RoomsModule() {
                 <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{r.date}</td>
                 <td className={`px-4 ${pad} max-w-[420px] truncate text-[12px] text-[var(--c-text-soft)]`} title={r.thesis}>{r.thesis}</td>
                 <td className={`px-4 ${pad} text-right`}>
-                  <a href={r.href} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
+                  <a href={r.href} aria-label={`Open ${r.title}`} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
                 </td>
               </tr>
             ))}
