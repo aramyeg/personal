@@ -1523,7 +1523,7 @@ Temporary module files (`modules/rooms.tsx` etc., six of them): `export default 
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MODULE_IDS, useCuratorStore, type CuratorModule } from './store'
 import { SkeletonModule } from './ui/skeleton-module'
 
@@ -1542,7 +1542,8 @@ const isModule = (v: string | null): v is CuratorModule =>
   v !== null && (MODULE_IDS as string[]).includes(v)
 
 export function ModuleHost() {
-  const module = useCuratorStore((s) => s.module)
+  // named activeModule: `module` trips @next/next/no-assign-module-variable
+  const activeModule = useCuratorStore((s) => s.module)
   const setModule = useCuratorStore((s) => s.setModule)
 
   // Single effect: adopt a valid ?m= on the first pass (skipping the write so the
@@ -1561,9 +1562,9 @@ export function ModuleHost() {
     window.history.replaceState(null, '', url)
   }, [activeModule, setModule])
 
-  const Active = MODULES[module]
+  const Active = MODULES[activeModule]
   return (
-    <div key={module} className="animate-[curator-enter_150ms_ease-out]">
+    <div key={activeModule} className={styles.moduleEnter}>
       <Active />
     </div>
   )
