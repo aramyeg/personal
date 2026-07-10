@@ -1,37 +1,57 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import {
+  LayoutDashboard, Landmark, Users, SquareKanban, Ticket, BookOpen, Settings,
+  type LucideIcon,
+} from 'lucide-react'
 import OverviewModule from './modules/overview'
 
 export type CuratorModule =
   | 'overview' | 'rooms' | 'personnel' | 'pipeline'
   | 'tickets' | 'engineering' | 'settings'
 
-export const NAV_ITEMS: { id: CuratorModule; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'rooms', label: 'Rooms' },
-  { id: 'personnel', label: 'Personnel' },
-  { id: 'pipeline', label: 'Pipeline' },
-  { id: 'tickets', label: 'Tickets' },
-  { id: 'engineering', label: 'Engineering' },
-  { id: 'settings', label: 'Settings' },
+export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'rooms', label: 'Rooms', icon: Landmark },
+  { id: 'personnel', label: 'Personnel', icon: Users },
+  { id: 'pipeline', label: 'Pipeline', icon: SquareKanban },
+  { id: 'tickets', label: 'Tickets', icon: Ticket },
+  { id: 'engineering', label: 'Engineering', icon: BookOpen },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export function AppShell({ children }: { children?: ReactNode }) {
+  // Static until Task 8 wires module switching through the store.
+  const activeModule: CuratorModule = 'overview'
   return (
     <div className="grid h-full grid-cols-[232px_1fr]">
       <aside className="flex flex-col bg-[var(--c-navy)] text-white/85">
         {/* mt-14 clears GalleryChrome's fixed "← Gallery" pill (top-4 left-4, z-50) */}
         <nav className="mt-14 flex-1 px-2" aria-label="Modules">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="block w-full rounded-[6px] px-3 py-2 text-left text-[13px] text-white/75 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-            >
-              {item.label}
-            </button>
-          ))}
+          <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-white/40">
+            Workspace
+          </p>
+          <div className="space-y-1">
+            {NAV_ITEMS.map((item) => {
+              const active = item.id === activeModule
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex w-full items-center gap-2.5 rounded-[6px] px-3 py-2 text-left text-[13px] transition-colors duration-150 ${
+                    active
+                      ? 'bg-white font-medium text-[var(--c-navy)]'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <item.icon aria-hidden className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
         </nav>
         <div className="border-t border-white/10 px-4 py-3">
           <p className="text-[13px] font-medium text-white">Aram Yeghiazaryan</p>

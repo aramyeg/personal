@@ -1578,7 +1578,7 @@ If Tailwind's arbitrary `animate-[…]` + `:global` keyframes fight, fall back t
 
 `ui/toast.tsx` — `ToastViewport`: `role="status"` fixed bottom-right `z-50` column of card-chrome toasts (title 13px medium, optional description 12px soft, × dismiss button calling `dismissToast(id)`); each toast auto-dismisses after 5s via `setTimeout` in an effect keyed on `toast.id`; slide-in 150ms.
 
-`app-shell.tsx`: nav buttons call `setModule(item.id)`; active item gets `bg-white/10 text-white` + a 2px `--c-blue` left indicator; `aria-current="page"` on the active button. Main renders `<ModuleHost />` (drop the Task 4 fallback and the direct OverviewModule import — overview now loads through the host). Mount `<ToastViewport />` once, next to `<main>`. Topbar right side gains the document-title effect: `useEffect` setting `document.title = \`${label} · Curator\`` on module change.
+`app-shell.tsx`: nav buttons call `setModule(item.id)`. The active styling (inverted pill: `bg-white font-medium text-[var(--c-navy)]`, icons, `aria-current="page"`) ALREADY EXISTS from the Gate 0 pass — preserve it exactly and only replace the hardcoded `const activeModule: CuratorModule = 'overview'` with the store's `module` value. Main renders `<ModuleHost />` (drop the Task 4 fallback and the direct OverviewModule import — overview now loads through the host). Mount `<ToastViewport />` once, next to `<main>`. Topbar right side gains the document-title effect: `useEffect` setting `document.title = \`${label} · Curator\`` on module change.
 
 - [ ] **Step 4: Run tests, verify PASS** (new file + full unit run).
 
