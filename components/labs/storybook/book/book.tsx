@@ -262,7 +262,7 @@ export function Book() {
 
     const eased = easeTurn(f.t)
     const openAmount = f.dir === 'next' ? eased : 1 - eased
-    // Positive theta (not the naive -pi*eased mirror of curlPositions):
+    // Positive theta (not the naive -pi*eased mirror of the sheet angle):
     // FRONT_LOCAL_Y is positive (the cover mesh sits above its pivot at
     // rest), so a positive rotation swings it up through +Y first, arcing
     // over the spine like a real hinge. The opposite sign sends it straight

@@ -3,33 +3,34 @@ import type { Experience } from '@/types'
 
 export type LayerKind = 'backdrop' | 'midground' | 'hero' | 'foreground'
 
-/** Paper-engineering structure of a pop-up piece (v2 pivot — real pop-up
- *  books are folded mechanisms, not flat billboards on hinges):
- *  - 'vfold': two half-panels joined at a vertical center crease that opens
- *    into a V as the piece stands — the classic centerpiece mechanism, the
- *    fold line running visibly through the printed art.
- *  - 'crease': a horizontal fold partway up; the upper segment leans back,
- *    giving the piece paper relief instead of a flat face.
- *  - 'flat': a single plane (backdrops planted at the horizon, low fringes).
+/** Every pop-up piece is a symmetric V-FOLD — a real paper mechanism glued
+ *  to BOTH pages of its spread and posed purely by the spread's dihedral
+ *  angle (see book/popup-mechanics.ts and the physics benchmark spec).
+ *  These fields ARE the die-cut: apex position on the spine, glue-line
+ *  angle phi, panel corner angle rho, V direction, and art size. Walls that
+ *  face the reader use phi near 90 deg (glue lines nearly perpendicular to
+ *  the spine); the hero centerpiece uses a deeper V. Constraints enforced
+ *  by tests: rho > phi (stands when open), |cos rho| <= cos phi (linkage
+ *  reachable at every angle), and the folded piece must fit inside the
+ *  closed page ("nothing sticks out").
  */
-export type LayerFold = 'vfold' | 'crease' | 'flat'
-
 export type SceneLayer = {
   id: string
   kind: LayerKind
-  hingeZ: number
-  height: number
+  /** Apex position along the spine (world z, + toward the camera). */
+  apexZ: number
+  /** Which way along the spine the V opens: +1 toward the camera, -1 away.
+   *  The piece folds flat in the OPPOSITE direction when the book closes. */
+  vDir: 1 | -1
+  /** Glue-line angle from the gutter, degrees. */
+  phiDeg: number
+  /** Panel corner angle (glue crease to central crease), degrees. */
+  rhoDeg: number
+  /** Full art width across both halves (world units). */
   width: number
-  standAngle: number
-  offsetX?: number
-  /** Defaults per kind when omitted: hero → 'vfold', midground → 'crease',
-   *  backdrop/foreground → 'flat'. */
-  fold?: LayerFold
+  /** Art height along the central crease (world units). */
+  height: number
 }
-
-/** Resolves a layer's fold structure, applying the per-kind defaults above. */
-export const layerFold = (layer: SceneLayer): LayerFold =>
-  layer.fold ?? (layer.kind === 'hero' ? 'vfold' : layer.kind === 'midground' ? 'crease' : 'flat')
 
 export type Chapter = {
   spread: number
@@ -56,43 +57,32 @@ export const SATCHEL_INTRO =
 export const END_CLOSING_LINE =
   'Here ends — for now — the Tale of Six Kingdoms. Should you have need of the hero — a kingdom to raise, a dragon to gentle — send a raven.'
 
-// task 18: the foreground layer's standAngle was 65 — with book-scene.tsx's
-// current tighter/steeper camera (fov 34, raised lookAt), a layer that far
-// from vertical sits at a viewing angle so oblique to the camera it reads
-// as a near-edge-on dark bar instead of a scalloped strip with a visible
-// face (see task-17-chapter.png). Bumped to 84°, close to `hero`'s already-
-// readable 85 — still the shortest/widest layer of the four (the fringe
-// silhouette), just no longer nearly perpendicular to the camera's sightline.
+// Physics rework: every layer is a v-fold die-cut. Parameter regimes (from
+// the kinematics research + containment analysis in the benchmark spec):
+// walls that must face the reader take phi near 90 (glue lines nearly
+// perpendicular to the spine) with rho a few degrees above phi — they stand
+// tall with an authentic lean and fold flat ALONG the spine (vDir chooses
+// which way, picked so the folded piece stays on the page). The hero takes
+// a deeper V (phi ~52) for a pronounced 3-D centerpiece. rho - phi sets the
+// lean AND the late-bloom snap: smaller gap = sharper bloom near flat-open.
 const layerDefaults = (ch: number): SceneLayer[] => [
-  { id: `ch${ch}-backdrop`, kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 2.0, standAngle: 90 },
-  { id: `ch${ch}-midground`, kind: 'midground', hingeZ: -0.18, height: 0.7, width: 1.9, standAngle: 78 },
-  { id: `ch${ch}-hero`, kind: 'hero', hingeZ: 0.12, height: 0.62, width: 1.0, standAngle: 85 },
-  { id: `ch${ch}-foreground`, kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 2.1, standAngle: 84 },
+  { id: `ch${ch}-backdrop`, kind: 'backdrop', apexZ: -0.4, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.95 },
+  { id: `ch${ch}-midground`, kind: 'midground', apexZ: -0.05, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 1.9, height: 0.55 },
+  { id: `ch${ch}-hero`, kind: 'hero', apexZ: 0.06, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 1.0, height: 0.55 },
+  { id: `ch${ch}-foreground`, kind: 'foreground', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.32 },
 ]
 
-// task 19 (Batch-1 art look-dev): chapter IV's real baked art trims to a
-// noticeably different aspect ratio per layer than the 1024×512 placeholder
-// canvas every `layerDefaults` width/height pair above was tuned against —
-// backdrop 1536×1024 (1.5), midground 1465×363 (a much wider/shorter strip,
-// 4.04), hero 949×741 (1.28), foreground 1422×280 (an even wider strip,
-// 5.08). Reusing layerDefaults(4) stretched every layer non-uniformly to
-// fill its old width×height box, squashing the dragon coil and smearing the
-// dune-city skyline. These widths are each layer's old height re-derived
-// through its art's real aspect ratio instead (height held constant — the
-// standing scale that was already verified clear of the camera frustum,
-// see book-scene.tsx) so every plane displays its art undistorted; hingeZ/
-// standAngle are untouched. See task-19-report.md for the before/after gate
-// screenshots.
-// v2 pivot re-plant: backdrop pushed to the page's far edge and leaned back
-// (a stage flat planted at the printed horizon, no air gap to the midground),
-// midground pulled back to give the v-fold hero the center of the spread,
-// hero hinge just past the gutter — v-fold centerpieces live at the middle
-// of a real pop-up spread, their crease continuing the gutter's line.
+// Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
+// sizes re-derived from the trimmed art's true aspect ratios — backdrop
+// 1536x1024 (1.5), midground 1465x363 (4.04), hero 949x741 (1.28),
+// foreground 1422x280 (5.08) — so every panel displays its print
+// undistorted. Widths chosen so the folded pieces pass the closed-book
+// containment test (see popup-mechanics.test.ts).
 const CH4_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch4-backdrop', kind: 'backdrop', hingeZ: -0.58, height: 1.05, width: 1.575, standAngle: 83 },
-  { id: 'ch4-midground', kind: 'midground', hingeZ: -0.3, height: 0.7, width: 2.825, standAngle: 78 },
-  { id: 'ch4-hero', kind: 'hero', hingeZ: 0.04, height: 0.62, width: 0.794, standAngle: 85 },
-  { id: 'ch4-foreground', kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 1.524, standAngle: 84 },
+  { id: 'ch4-backdrop', kind: 'backdrop', apexZ: -0.4, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 1.0 },
+  { id: 'ch4-midground', kind: 'midground', apexZ: -0.05, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 2.0, height: 0.495 },
+  { id: 'ch4-hero', kind: 'hero', apexZ: 0.06, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.794, height: 0.62 },
+  { id: 'ch4-foreground', kind: 'foreground', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [
@@ -170,19 +160,19 @@ export const CHAPTERS: readonly Chapter[] = [
 // one-off decorative sets instead, since there's no career experience to
 // derive them from.
 export const TITLE_LAYERS: readonly SceneLayer[] = [
-  { id: 'title-border', kind: 'backdrop', hingeZ: -0.3, height: 0.5, width: 1.6, standAngle: 85 },
-  { id: 'title-hero', kind: 'hero', hingeZ: 0.2, height: 0.45, width: 0.7, standAngle: 88, offsetX: 0.55 },
+  { id: 'title-border', kind: 'backdrop', apexZ: -0.25, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.5 },
+  { id: 'title-hero', kind: 'hero', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.7, height: 0.45 },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
-  { id: 'satchel-bag', kind: 'hero', hingeZ: -0.25, height: 0.6, width: 0.9, standAngle: 85 },
+  { id: 'satchel-bag', kind: 'hero', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
 const END_LAYERS: readonly SceneLayer[] = [
-  { id: 'end-letter', kind: 'hero', hingeZ: -0.2, height: 0.5, width: 0.75, standAngle: 85 },
-  { id: 'end-raven', kind: 'midground', hingeZ: -0.45, height: 0.55, width: 0.8, standAngle: 80 },
+  { id: 'end-letter', kind: 'hero', apexZ: -0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.75, height: 0.5 },
+  { id: 'end-raven', kind: 'midground', apexZ: -0.45, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 0.8, height: 0.55 },
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 

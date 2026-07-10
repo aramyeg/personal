@@ -49,7 +49,7 @@ describe('storybook content', () => {
         'hero',
         'foreground',
       ])
-      const zs = ch.layers.map((l) => l.hingeZ)
+      const zs = ch.layers.map((l) => l.apexZ)
       expect([...zs].sort((a, b) => a - b)).toEqual(zs) // far → near
     }
   })

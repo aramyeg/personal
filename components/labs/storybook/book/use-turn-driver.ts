@@ -9,9 +9,10 @@
  * `{ t, dir, isCover }` for the duration of a turn.
  */
 
-import { useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { sbSound } from '../sound'
+import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
 
 // task 18: nudged up from 1100/1400 — paired with page-geometry's
@@ -26,6 +27,31 @@ export const COVER_MS = 1600
 const FLIP_AT_T = 0.15
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
+
+/** Dev-only deterministic pose override for the physics benchmark harness
+ *  (see .superpowers/sdd/bench/capture.mjs): `?sbpose=<spread>` opens the
+ *  book at rest on that spread; `?sbpose=<spread>:<t>:<dir>` freezes a turn
+ *  from that spread at exactly raw progress t — pixel-reproducible mid-turn
+ *  frames with zero timing noise. Compiled out of production builds. */
+type PoseOverride = { spread: number; t: number | null; dir: TurnDir }
+
+function readPoseOverride(): PoseOverride | null {
+  if (process.env.NODE_ENV === 'production') return null
+  if (typeof window === 'undefined') return null
+  const raw = new URLSearchParams(window.location.search).get('sbpose')
+  if (!raw) return null
+  const [spreadPart, tPart, dirPart] = raw.split(':')
+  const spread = Number(spreadPart)
+  if (!Number.isInteger(spread) || spread < 0 || spread >= SPREAD_COUNT) return null
+  if (tPart === undefined) return { spread, t: null, dir: 'next' }
+  const t = Number(tPart)
+  if (!Number.isFinite(t)) return null
+  return {
+    spread,
+    t: Math.min(1, Math.max(0, t)),
+    dir: dirPart === 'prev' ? 'prev' : 'next',
+  }
+}
 
 /** True when `dir` would flip the front cover itself (spread 0<->1) rather
  *  than turning an interior page — shared with book.tsx so it can gate the
@@ -59,7 +85,24 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
   const firedCreak = useRef(false)
   const firedFlip = useRef(false)
 
+  const pose = useMemo(readPoseOverride, [])
+  useEffect(() => {
+    if (!pose) return
+    useStorybookStore.setState({
+      spread: pose.spread,
+      turning: pose.t !== null ? pose.dir : null,
+      queued: null,
+    })
+  }, [pose])
+
   useFrame((_, delta) => {
+    if (pose && pose.t !== null) {
+      // Frozen benchmark pose: hold the frame forever, no clock, no
+      // completion, no sound cues.
+      frame.current = { t: pose.t, dir: pose.dir, isCover: isCoverTurn(pose.spread, pose.dir) }
+      return
+    }
+
     const { turning, spread } = useStorybookStore.getState()
 
     if (!turning) {
