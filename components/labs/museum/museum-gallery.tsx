@@ -15,6 +15,8 @@ import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
 import { LoadSignal } from './load-signal'
+import { FocusCard } from './focus-card'
+import { VisitorGuide } from './visitor-guide'
 
 /**
  * The /labs museum: a first-person classical gallery.
@@ -30,10 +32,22 @@ export default function MuseumGallery({
   const placements = useMemo(() => paintingPlacements(hallLabs), [])
   const targets = useRef(new Map<string, THREE.Object3D>())
   const [focused, setFocused] = useState<string | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
   const moveRef = useRef<MoveVec>({ x: 0, y: 0 })
   const [coarse, setCoarse] = useState(false)
   useEffect(() => setCoarse(window.matchMedia('(pointer: coarse)').matches), [])
+
+  useEffect(() => {
+    if (!guideOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setGuideOpen(false)
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [guideOpen])
 
   const register = useCallback((slug: string, obj: THREE.Object3D | null) => {
     if (obj) targets.current.set(slug, obj)
@@ -77,12 +91,8 @@ export default function MuseumGallery({
       {/* Crosshair */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70" />
 
-      {/* Focused painting hint */}
-      {focusedLab && (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 font-mono text-xs uppercase tracking-widest text-white">
-          Click to enter — {focusedLab.title}
-        </div>
-      )}
+      {/* Lean-in preview of the focused painting */}
+      {focusedLab && <FocusCard lab={focusedLab} />}
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">
@@ -96,6 +106,24 @@ export default function MuseumGallery({
       >
         List view
       </Link>
+
+      <button
+        type="button"
+        onClick={() => setGuideOpen(true)}
+        aria-label="Show controls guide"
+        className="absolute top-4 right-28 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
+      >
+        ?
+      </button>
+
+      {guideOpen && (
+        <div
+          className="absolute inset-0 z-10 grid place-items-center bg-black/60"
+          onClick={() => setGuideOpen(false)}
+        >
+          <VisitorGuide />
+        </div>
+      )}
     </div>
   )
 }
