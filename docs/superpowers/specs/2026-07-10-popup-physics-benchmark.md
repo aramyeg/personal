@@ -131,3 +131,24 @@ B13. **Depth-ordered rise.** At a partial-open frame, layer rise progress
 4. Record verdict + failures in `.superpowers/sdd/progress.md`; fix; repeat.
 5. Benchmark passes when Part A is green and a full capture set has zero
    Part B violations.
+
+## Verdict — 2026-07-10
+
+**PASS after two iterations.**
+
+- Part A: 71/71 invariant assertions green over every shipped layer
+  (`__tests__/labs/storybook/popup-mechanics.test.ts`).
+- Part B: 15 deterministic pose captures (sheet angles 5°–175°, both
+  directions, both roles) + 5 live-motion captures (real turn, chained
+  double turn, cover open) reviewed frame by frame — zero violations on
+  the Chapter IV spread. Bench frames: `.superpowers/sdd/bench/out/`.
+- Iteration 1 → 2 findings, all fixed: pop-ups anchored above the true
+  page plane (floated at rest, pierced the sheet mid-turn — fixed by the
+  shared hinge plane), backdrop art carried transparent padding (pipeline
+  now trims backdrops), sheet lift inverted past vertical, shade slab too
+  hard, missing-art 404s dirtied the console.
+- Remaining visual roughness is placeholder art only (neighbor chapters'
+  procedural cutouts, procedural page prints) — replaced by the user's
+  Batch-2 / page-print generation, not physics.
+- Full stack at verdict: 311/311 unit, lint, production build, e2e CI mode
+  122 passed / 0 failed.
