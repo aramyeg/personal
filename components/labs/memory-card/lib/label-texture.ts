@@ -15,7 +15,7 @@
  */
 
 import * as THREE from 'three'
-import { MC } from '../tokens'
+import { MC, STICKER_PAPER, inkAlpha } from '../tokens'
 import { monoFamily } from '../fonts'
 
 const STICKER_W = 768
@@ -77,13 +77,13 @@ function paintBase(
 ): number {
   // Paper field with a subtle printed gradient (top slightly brighter).
   const grad = g.createLinearGradient(0, 0, 0, STICKER_H)
-  grad.addColorStop(0, '#f2f0ea')
+  grad.addColorStop(0, STICKER_PAPER.top)
   grad.addColorStop(1, MC.paper)
   g.fillStyle = grad
   g.fillRect(0, 0, STICKER_W, STICKER_H)
 
   // Printed hairline keyline just inside the edge.
-  g.strokeStyle = 'rgba(16,16,20,0.16)'
+  g.strokeStyle = inkAlpha(0.16)
   g.lineWidth = 2
   roundRect(g, 12, 12, STICKER_W - 24, STICKER_H - 24, 12)
   g.stroke()
@@ -94,14 +94,14 @@ function paintBase(
   g.fillStyle = accent
   roundRect(g, PAD, PAD, chipW, chipH, 8)
   g.fill()
-  g.fillStyle = '#f6f5f1'
+  g.fillStyle = STICKER_PAPER.field
   g.font = `600 34px ${monoFamily}`
   g.textAlign = 'center'
   g.textBaseline = 'middle'
   g.fillText(slot, PAD + chipW / 2, PAD + chipH / 2 + 1)
 
   // Right-hand mono tag.
-  g.fillStyle = 'rgba(16,16,20,0.42)'
+  g.fillStyle = inkAlpha(0.42)
   g.font = `500 22px ${monoFamily}`
   g.textAlign = 'right'
   g.textBaseline = 'middle'
@@ -143,7 +143,7 @@ export function makeFrontSticker(
   }
 
   // Saved-date line — the printed metadata a real save label carries.
-  g.fillStyle = 'rgba(16,16,20,0.5)'
+  g.fillStyle = inkAlpha(0.5)
   g.font = `500 25px ${monoFamily}`
   g.fillText(`SAVED · ${year.toUpperCase()}`, PAD, ty + 8)
 
@@ -179,7 +179,7 @@ export function makeBackSticker({
     const [line] = wrapCaps(g, metric, STICKER_W - PAD * 2 - 34, 1)
     g.fillStyle = accent
     g.fillText('›', PAD, my)
-    g.fillStyle = 'rgba(16,16,20,0.82)'
+    g.fillStyle = inkAlpha(0.82)
     g.fillText(line, PAD + 34, my)
     my += 58
   }

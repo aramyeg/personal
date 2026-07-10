@@ -69,6 +69,31 @@ const FRONT_Z = -0.1094 // model −Z face (−0.1054) floated 0.004 outward
 const BACK_Z = 0.1311 // model +Z face (0.1271) floated 0.004 outward
 
 /**
+ * Soft radial pool for the per-card floor shadow — same gradient the stage's
+ * ContactShadow draws. Per-card quads ride each card's outer position group
+ * (T8 review: the stage-level pool is fixed at world origin, so cards visibly
+ * detached from their shadows mid-transit; the stage pool is now near-zero for
+ * this section and each card carries its own).
+ */
+function makeShadowTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128)
+  grad.addColorStop(0, 'rgba(0,0,0,0.35)')
+  grad.addColorStop(0.55, 'rgba(0,0,0,0.18)')
+  grad.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 256, 256)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+/** Card footprint is ~1.4 world units wide at FIT_HEIGHT — pool sized to it. */
+const CARD_SHADOW_RADIUS = 0.95
+
+/**
  * World-space bounds of the loaded scene. `updateMatrixWorld(true)` up front so
  * every mesh reports settled world matrices before we union their bounds — the
  * same guard the single-model vignette relies on.
@@ -99,6 +124,7 @@ type CardProps = {
   tiltRef: RefObject<{ x: number; y: number }>
   flipped: boolean
   reduced: boolean
+  shadowTex: THREE.CanvasTexture
 }
 
 /** One card: the clone plus its two floated save-label stickers. */
@@ -111,6 +137,7 @@ function Card({
   tiltRef,
   flipped,
   reduced,
+  shadowTex,
 }: CardProps) {
   const pivot = useRef<THREE.Group>(null)
   const [fontsReady, setFontsReady] = useState(false)
@@ -171,6 +198,11 @@ function Card({
 
   return (
     <group position={[index * RAIL_GAP, 0, 0]}>
+      {/* Floor pool OUTSIDE the pivot: rides the card's x, never tilts/flips. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+        <circleGeometry args={[CARD_SHADOW_RADIUS, 48]} />
+        <meshBasicMaterial map={shadowTex} transparent depthWrite={false} opacity={0.9} />
+      </mesh>
       <group ref={pivot}>
         <group scale={fit.scale} position={fit.offset}>
           <primitive object={clone} />
@@ -225,6 +257,11 @@ function CardRailInner({ projects, railX, tiltRef, flipped, reduced }: CardRailP
     [gltf.scene, projects]
   )
 
+  // One shared floor-pool texture for every card's shadow quad (rail-owned, so
+  // it IS disposed — same memo+paired-dispose idiom as the sticker textures).
+  const shadowTex = useMemo(() => makeShadowTexture(), [])
+  useEffect(() => () => shadowTex.dispose(), [shadowTex])
+
   // No disposal here: the clones share the loader-cached geometry/materials, and
   // the stage's canvas unmount (IO gating) owns GPU cleanup — the StrictMode
   // precedent. Only the per-card CanvasTextures are disposed, inside Card.
@@ -254,6 +291,7 @@ function CardRailInner({ projects, railX, tiltRef, flipped, reduced }: CardRailP
           tiltRef={tiltRef}
           flipped={flipped}
           reduced={reduced}
+          shadowTex={shadowTex}
         />
       ))}
     </group>

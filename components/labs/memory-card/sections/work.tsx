@@ -150,7 +150,10 @@ export function WorkSection({ reduced: reducedProp, onCardFlip }: WorkSectionPro
               reduced={reduced}
               camera={CAMERA}
               target={TARGET}
-              shadowRadius={1.4}
+              // Near-zero: each rail card carries its own floor pool riding its
+              // x — the stage pool sat fixed at origin and cards detached from
+              // it mid-transit (T8 review, gate-2 polish).
+              shadowRadius={0.001}
               envIntensity={0.35}
               fallbackGlyph={SECTION_ACCENT.work}
             >

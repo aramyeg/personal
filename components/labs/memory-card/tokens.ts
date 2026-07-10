@@ -80,3 +80,10 @@ export const TYPE = {
   label: '0.75rem', // mono, letter-spacing 0.2em, uppercase
   body: '1.0625rem', // Space Grotesk, line-height 1.6
 } as const
+
+/** Rail save-label sticker paper — brighter than MC.paper so the printed
+ *  sticker reads as fresh label stock against the grey shell. */
+export const STICKER_PAPER = {
+  top: '#f2f0ea', // gradient top of the sticker field
+  field: '#f6f5f1', // flat label area
+} as const
