@@ -12,7 +12,7 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { getSkillsByCategory, skillCategories } from '@/data/skills'
 import type { Skill } from '@/types'
-import { HP_BAR, MC, TYPE, accentFor } from '../tokens'
+import { HP_BAR, MC, TYPE, accentFor, inkAlpha } from '../tokens'
 import { anton, grotesk, monoFamily } from '../fonts'
 
 /**
@@ -103,7 +103,7 @@ function SkillRow({ skill, accent, reduced }: SkillRowProps) {
       role="group"
       aria-label={`${skill.name}: ${skill.level}, ${skill.years} yrs`}
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b py-3"
-      style={{ borderColor: 'rgba(16,16,20,0.12)' }}
+      style={{ borderColor: HP_BAR.emptyColor }}
     >
       <span style={{ fontFamily: grotesk.style.fontFamily, fontWeight: 600, color: MC.ink }}>
         {skill.name}
@@ -111,7 +111,7 @@ function SkillRow({ skill, accent, reduced }: SkillRowProps) {
       <div className="flex items-center gap-4">
         <HpBar skill={skill} accent={accent} reduced={reduced} />
         <span
-          style={{ fontFamily: monoFamily, fontSize: TYPE.label, color: 'rgba(16,16,20,0.55)' }}
+          style={{ fontFamily: monoFamily, fontSize: TYPE.label, color: inkAlpha(0.55) }}
           className="w-14 shrink-0 text-right tabular-nums lowercase"
         >
           {skill.years} yrs
@@ -145,7 +145,7 @@ export function SkillsSection({ reduced: reducedProp }: SkillsSectionProps) {
       <div
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-px"
-        style={{ background: 'rgba(16,16,20,0.16)' }}
+        style={{ background: inkAlpha(0.16) }}
       />
       <span
         aria-hidden="true"
@@ -153,7 +153,7 @@ export function SkillsSection({ reduced: reducedProp }: SkillsSectionProps) {
           fontFamily: monoFamily,
           fontSize: TYPE.label,
           letterSpacing: '0.24em',
-          color: 'rgba(16,16,20,0.45)',
+          color: inkAlpha(0.45),
         }}
         className="absolute left-6 top-6 lowercase sm:left-12"
       >

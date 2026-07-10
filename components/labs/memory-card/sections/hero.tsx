@@ -13,7 +13,7 @@
 
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { siteConfig } from '@/lib/constants'
-import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT } from '../tokens'
+import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, paperAlpha } from '../tokens'
 import { anton, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { GltfVignette } from '../three/gltf-vignette'
@@ -27,8 +27,8 @@ const CHARACTER_IDLE_CLIP = 'Armature.F|bashful'
 // Camera + target are panned in +x (vs the head-on look-dev framing) so the
 // figure sits toward the left of its canvas and breaks into the headline's
 // right edge instead of standing in a separate column.
-const HERO_CAMERA = { position: [1.4, 1.75, 6.3] as [number, number, number], fov: 30 }
-const HERO_TARGET: [number, number, number] = [1.0, 1.4, 0]
+const HERO_CAMERA = { position: [1.25, 1.75, 6.3] as [number, number, number], fov: 30 }
+const HERO_TARGET: [number, number, number] = [0.85, 1.4, 0]
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
@@ -104,7 +104,7 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
       <div
         data-testid="hero-vignette"
         aria-hidden="true"
-        className="pointer-events-none relative z-20 order-last mx-auto mt-6 h-[42svh] w-full max-w-[420px] lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:h-full lg:w-[56vw] lg:max-w-none"
+        className="pointer-events-none relative z-20 order-last mx-auto mt-6 h-[42svh] w-full max-w-[420px] translate-x-[22%] [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:h-full lg:w-[56vw] lg:max-w-none lg:translate-x-0"
       >
         <VignetteCanvas
           height="100%"
@@ -164,7 +164,7 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
             fontSize: TYPE.h2,
             letterSpacing: '0.02em',
             textTransform: 'uppercase',
-            color: 'rgba(233,231,224,0.82)',
+            color: paperAlpha(0.82),
           }}
           className="mt-5"
         >
@@ -190,7 +190,7 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
               fontFamily: monoFamily,
               fontSize: '0.6875rem',
               letterSpacing: '0.3em',
-              color: 'rgba(233,231,224,0.55)',
+              color: paperAlpha(0.55),
             }}
             className="lowercase"
           >

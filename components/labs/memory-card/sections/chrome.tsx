@@ -11,7 +11,7 @@
  * rendered disabled here and wired for real in a later task via `onToggleSound`.
  */
 
-import { MC, SECTION_ACCENT } from '../tokens'
+import { MC, SECTION_ACCENT, paperAlpha } from '../tokens'
 import { monoFamily } from '../fonts'
 
 const NAV_LINKS: ReadonlyArray<{ label: string; href: string }> = [
@@ -45,9 +45,9 @@ export function MemoryCardChrome({
       style={{
         ['--mc-ring' as string]: MC.glyphs[SECTION_ACCENT.hero],
         background: MC.ink,
-        borderBottom: '1px solid rgba(233,231,224,0.14)',
+        borderBottom: `1px solid ${paperAlpha(0.14)}`,
       }}
-      className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between pl-4 pr-4 sm:pl-[7.5rem] sm:pr-6"
+      className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-end pl-4 pr-4 sm:justify-between sm:pl-[7.5rem] sm:pr-6"
     >
       <a
         href="#work"
@@ -62,7 +62,7 @@ export function MemoryCardChrome({
         className="hidden select-none items-baseline gap-1 sm:flex"
       >
         AY-01
-        <span style={{ color: 'rgba(233,231,224,0.55)' }}>· memory card</span>
+        <span style={{ color: paperAlpha(0.55) }}>· memory card</span>
       </span>
 
       <nav
@@ -73,8 +73,8 @@ export function MemoryCardChrome({
           <a
             key={href}
             href={href}
-            style={{ ...monoLabel, color: 'rgba(233,231,224,0.7)' }}
-            className={`inline-flex min-h-[44px] items-center px-2 transition-colors hover:text-[#e9e7e0] ${FOCUS_RING}`}
+            style={{ ...monoLabel, color: paperAlpha(0.7) }}
+            className={`hidden min-h-[44px] items-center px-2 transition-colors hover:text-[#e9e7e0] sm:inline-flex ${FOCUS_RING}`}
           >
             {label}
           </a>
@@ -85,8 +85,8 @@ export function MemoryCardChrome({
           aria-disabled="true"
           aria-label={`sound: ${soundOn ? 'on' : 'off'}`}
           onClick={onToggleSound}
-          style={{ ...monoLabel, color: 'rgba(233,231,224,0.4)' }}
-          className={`ml-1 inline-flex min-h-[44px] cursor-not-allowed items-center px-2 ${FOCUS_RING}`}
+          style={{ ...monoLabel, color: paperAlpha(0.4) }}
+          className={`ml-1 inline-flex min-h-[44px] cursor-not-allowed items-center whitespace-nowrap px-2 ${FOCUS_RING}`}
         >
           sound: {soundOn ? 'on' : 'off'}
         </button>

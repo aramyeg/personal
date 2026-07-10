@@ -38,6 +38,23 @@ export function accentFor(i: number): string {
   return MC.glyphs[GLYPH_ORDER[i % GLYPH_ORDER.length]]
 }
 
+const hexToRgb = (hex: string): string =>
+  hex
+    .replace('#', '')
+    .match(/\w\w/g)!
+    .map((h) => parseInt(h, 16))
+    .join(',')
+
+/** Paper at reduced opacity — the sanctioned way to dim light-on-ink text/rules. */
+export function paperAlpha(a: number): string {
+  return `rgba(${hexToRgb(MC.paper)},${a})`
+}
+
+/** Ink at reduced opacity — the sanctioned way to dim dark-on-paper text/rules. */
+export function inkAlpha(a: number): string {
+  return `rgba(${hexToRgb(MC.ink)},${a})`
+}
+
 /** Section → accent (hero triangle, work circle, skills cross, about square, contact triangle). */
 export const SECTION_ACCENT: Record<'hero' | 'work' | 'skills' | 'about' | 'contact', GlyphName> =
   {
@@ -70,5 +87,5 @@ export const HP_BAR = {
   segmentWidth: 18,
   segmentHeight: 8,
   gap: 3,
-  emptyColor: 'rgba(16,16,20,0.12)',
+  emptyColor: inkAlpha(0.12),
 } as const
