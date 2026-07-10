@@ -8,10 +8,7 @@ import {
 } from 'lucide-react'
 import OverviewModule from './modules/overview'
 import { useEscCapture } from './use-esc-capture'
-
-export type CuratorModule =
-  | 'overview' | 'rooms' | 'personnel' | 'pipeline'
-  | 'tickets' | 'engineering' | 'settings'
+import { type CuratorModule } from './store'
 
 export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
