@@ -1,30 +1,33 @@
 'use client'
 
 /**
- * MemoryCardChrome — the fixed top bar for the Memory Card lab.
+ * MemoryCardChrome — the fixed frame around the Save Select screen: a quiet ink
+ * bar across the top and a hairline credits strip across the bottom.
  *
- * A quiet, solid ink strip: wordmark on the left, section anchors and a live
- * sound toggle on the right, and a keyboard skip link ahead of everything. It
- * sits alongside GalleryChrome's floating "← Gallery" pill, so the left group
- * is inset far enough to clear it. Section anchors and the toggle carry 44px
- * hit areas and an accent focus ring.
+ * The top bar carries a keyboard skip link, the wordmark, and a live sound
+ * toggle. The Save Select rework retired the old section-scroll anchors (there
+ * are no sections to jump to any more), so the skip link now lands on the save
+ * strips themselves. The bottom strip keeps the two CC-BY asset attributions
+ * always on screen (license law), alongside the copyright line and a way back
+ * to the gallery.
  *
- * `soundOn`/`onToggleSound` remain explicit prop overrides (used by tests
- * that render this in isolation); when omitted, both fall back to the shared
- * `MemoryCardAudioProvider` context so chrome and the sections stay in sync
- * without prop-drilling. Anchors carry `data-cursor="triangle"` for the glyph
- * cursor and a menu-move `blip()` on click.
+ * `soundOn`/`onToggleSound` stay explicit prop overrides for isolated tests;
+ * when omitted they fall back to the shared `MemoryCardAudioProvider` context so
+ * chrome and the screen stay in sync without prop-drilling.
  */
 
-import { MC, SECTION_ACCENT, paperAlpha } from '../tokens'
+import Link from 'next/link'
+import { MC, paperAlpha } from '../tokens'
 import { monoFamily } from '../fonts'
 import { useMemoryCardAudioContext } from '../audio-context'
 
-const NAV_LINKS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: 'work', href: '#work' },
-  { label: 'skills', href: '#skills' },
-  { label: 'about', href: '#about' },
-  { label: 'contact', href: '#contact' },
+const RING = MC.glyphs.triangle
+
+/** CC-BY attributions for the lab's 3D assets — both lines are required to
+ *  render (license law); lowercase per lab copy law. */
+const ATTRIBUTIONS = [
+  'crt model by meipal (cc by 4.0)',
+  'character by humans of the world (cc by 4.0)',
 ]
 
 const monoLabel: React.CSSProperties = {
@@ -49,48 +52,34 @@ export function MemoryCardChrome({
   const audio = useMemoryCardAudioContext()
   const soundOn = soundOnProp ?? audio.soundOn
   const onToggleSound = onToggleSoundProp ?? audio.toggleSound
+  const year = new Date().getFullYear()
 
   return (
-    <header
-      style={{
-        ['--mc-ring' as string]: MC.glyphs[SECTION_ACCENT.hero],
-        background: MC.ink,
-        borderBottom: `1px solid ${paperAlpha(0.14)}`,
-      }}
-      className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-end pl-4 pr-4 sm:justify-between sm:pl-[7.5rem] sm:pr-6"
-    >
-      <a
-        href="#work"
-        style={monoLabel}
-        className={`sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-14 focus:z-50 focus:inline-flex focus:items-center focus:bg-[color:var(--mc-ring)] focus:px-3 focus:py-2 focus:text-[#101014] ${FOCUS_RING}`}
+    <>
+      <header
+        style={{
+          ['--mc-ring' as string]: RING,
+          ['--mc-ink' as string]: MC.ink,
+          background: MC.ink,
+          borderBottom: `1px solid ${paperAlpha(0.14)}`,
+        }}
+        className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between pl-4 pr-4 sm:pl-[7.5rem] sm:pr-6"
       >
-        skip to the content
-      </a>
+        <a
+          href="#save-strips"
+          style={monoLabel}
+          className={`sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-14 focus:z-50 focus:inline-flex focus:items-center focus:bg-[color:var(--mc-ring)] focus:px-3 focus:py-2 focus:text-[color:var(--mc-ink)] ${FOCUS_RING}`}
+        >
+          skip to the content
+        </a>
 
-      <span
-        style={{ ...monoLabel, color: MC.paper }}
-        className="hidden select-none items-baseline gap-1 sm:flex"
-      >
-        AY-01
-        <span style={{ color: paperAlpha(0.55) }}>· memory card</span>
-      </span>
-
-      <nav
-        aria-label="Sections"
-        className="flex items-center gap-1 sm:gap-2"
-      >
-        {NAV_LINKS.map(({ label, href }) => (
-          <a
-            key={href}
-            href={href}
-            data-cursor="triangle"
-            onClick={() => audio.blip()}
-            style={{ ...monoLabel, color: paperAlpha(0.7) }}
-            className={`hidden min-h-[44px] items-center px-2 transition-colors hover:text-[#e9e7e0] sm:inline-flex ${FOCUS_RING}`}
-          >
-            {label}
-          </a>
-        ))}
+        <span
+          style={{ ...monoLabel, color: MC.paper }}
+          className="hidden select-none items-baseline gap-1 sm:flex"
+        >
+          AY-01
+          <span style={{ color: paperAlpha(0.55) }}>· memory card</span>
+        </span>
 
         <button
           type="button"
@@ -99,12 +88,50 @@ export function MemoryCardChrome({
           data-cursor="triangle"
           onClick={onToggleSound}
           style={{ ...monoLabel, color: paperAlpha(0.7) }}
-          className={`ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap px-2 transition-colors hover:text-[#e9e7e0] ${FOCUS_RING}`}
+          className={`ml-auto inline-flex min-h-[44px] items-center whitespace-nowrap px-2 transition-colors hover:text-[color:var(--mc-ring)] ${FOCUS_RING}`}
         >
           sound: {soundOn ? 'on' : 'off'}
         </button>
-      </nav>
-    </header>
+      </header>
+
+      <footer
+        aria-label="Credits"
+        style={{
+          ['--mc-ring' as string]: RING,
+          background: MC.ink,
+          borderTop: `1px solid ${paperAlpha(0.12)}`,
+          fontFamily: monoFamily,
+          fontSize: '0.625rem',
+          letterSpacing: '0.06em',
+          color: paperAlpha(0.42),
+        }}
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-x-5 gap-y-1 px-4 py-2 lowercase sm:px-6"
+      >
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          {ATTRIBUTIONS.map((line, i) => (
+            <span key={line} className="whitespace-nowrap">
+              {i > 0 && (
+                <span aria-hidden="true" className="mr-2" style={{ color: paperAlpha(0.22) }}>
+                  ·
+                </span>
+              )}
+              {line}
+            </span>
+          ))}
+        </span>
+
+        <span className="flex items-center gap-x-4">
+          <span className="whitespace-nowrap">© {year} aram yeghiazaryan</span>
+          <Link
+            href="/labs"
+            data-cursor="triangle"
+            className={`whitespace-nowrap transition-colors hover:text-[color:var(--mc-ring)] ${FOCUS_RING}`}
+          >
+            gallery
+          </Link>
+        </span>
+      </footer>
+    </>
   )
 }
 

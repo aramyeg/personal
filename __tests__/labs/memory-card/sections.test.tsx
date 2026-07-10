@@ -73,24 +73,26 @@ beforeEach(() => {
 })
 
 describe('MemoryCardChrome', () => {
-  it('renders the four section anchors with correct hrefs', () => {
+  it('no longer renders the retired section anchors', () => {
     render(<MemoryCardChrome />)
-    const anchors: Record<string, string> = {
-      work: '#work',
-      skills: '#skills',
-      about: '#about',
-      contact: '#contact',
-    }
-    for (const [label, href] of Object.entries(anchors)) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href)
+    for (const label of ['work', 'skills', 'about', 'contact']) {
+      expect(screen.queryByRole('link', { name: label })).toBeNull()
     }
   })
 
-  it('renders a skip link that jumps to the content', () => {
+  it('renders a skip link that jumps to the save strips', () => {
     render(<MemoryCardChrome />)
     expect(
       screen.getByRole('link', { name: /skip to the content/i })
-    ).toHaveAttribute('href', '#work')
+    ).toHaveAttribute('href', '#save-strips')
+  })
+
+  it('keeps both CC-BY attribution lines in the credits footer (license law)', () => {
+    render(<MemoryCardChrome />)
+    expect(screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/character by humans of the world \(cc by 4\.0\)/i)
+    ).toBeInTheDocument()
   })
 
   // T6 review N2 (routed to Task 10): the toggle used to render aria-disabled
@@ -114,12 +116,13 @@ describe('MemoryCardChrome', () => {
     expect(sound).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('marks nav anchors and the sound toggle for the glyph cursor', () => {
+  it('marks the sound toggle and the gallery link for the glyph cursor', () => {
     render(<MemoryCardChrome />)
-    for (const label of ['work', 'skills', 'about', 'contact']) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute('data-cursor', 'triangle')
-    }
     expect(screen.getByRole('button', { name: /sound/i })).toHaveAttribute(
+      'data-cursor',
+      'triangle'
+    )
+    expect(screen.getByRole('link', { name: /gallery/i })).toHaveAttribute(
       'data-cursor',
       'triangle'
     )

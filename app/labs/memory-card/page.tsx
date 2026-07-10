@@ -1,14 +1,10 @@
 import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
-import { HeroSection } from '@/components/labs/memory-card/sections/hero'
-import { WorkSection } from '@/components/labs/memory-card/sections/work'
-import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
-import { AboutSection } from '@/components/labs/memory-card/sections/about'
-import { ContactSection } from '@/components/labs/memory-card/sections/contact'
+import { SaveSelectScreen } from '@/components/labs/memory-card/save-select/screen'
 import { MemoryCardAudioProvider } from '@/components/labs/memory-card/audio-context'
 import { GlyphCursor } from '@/components/labs/memory-card/cursor'
-import { MC } from '@/components/labs/memory-card/tokens'
+import { siteConfig } from '@/lib/constants'
 
 export const metadata: Metadata = {
   title: 'Memory Card — Style Lab | Aram Yeghiazaryan',
@@ -28,13 +24,21 @@ export default function MemoryCardLabPage() {
       <MemoryCardAudioProvider>
         <GlyphCursor />
         <MemoryCardChrome />
-        <main className="min-h-screen" style={{ background: MC.ink, color: MC.paper }}>
-          <HeroSection />
-          <WorkSection />
-          <SkillsSection />
-          <AboutSection />
-          <ContactSection />
-        </main>
+        <SaveSelectScreen />
+
+        {/* Plain-HTML fallback so the save data stays crawlable with JS off.
+            Non-heading so it never competes with the screen's own <h1>. */}
+        <noscript>
+          <div>
+            <p>
+              <strong>{siteConfig.name}</strong> — Senior Frontend Engineer
+            </p>
+            <p>{siteConfig.description}</p>
+            <p>
+              <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>
+            </p>
+          </div>
+        </noscript>
       </MemoryCardAudioProvider>
     </GalleryChrome>
   )
