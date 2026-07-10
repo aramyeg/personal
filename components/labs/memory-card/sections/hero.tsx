@@ -13,7 +13,7 @@
 
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { siteConfig } from '@/lib/constants'
-import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, paperAlpha } from '../tokens'
+import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, inkAlpha, paperAlpha } from '../tokens'
 import { anton, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { GltfVignette } from '../three/gltf-vignette'
@@ -24,11 +24,12 @@ const HERO_ACCENT = MC.glyphs[SECTION_ACCENT.hero]
 // never its identity — the asset is swapped later and nothing here assumes one.
 const CHARACTER_SRC = '/labs/memory-card/models/character.glb'
 const CHARACTER_IDLE_CLIP = 'Armature.F|bashful'
-// Camera + target are panned in +x (vs the head-on look-dev framing) so the
-// figure sits toward the left of its canvas and breaks into the headline's
-// right edge instead of standing in a separate column.
-const HERO_CAMERA = { position: [1.25, 1.75, 6.3] as [number, number, number], fov: 30 }
-const HERO_TARGET: [number, number, number] = [0.85, 1.4, 0]
+// Head-on look-dev framing: the figure is centered inside the capsule now, so
+// the old +x breakout pan is dropped and camera/target sit back on the axis
+// with headroom and floor room. The capsule (not the raw figure) is what
+// overlaps the headline — that layering is done in layout, not the camera.
+const HERO_CAMERA = { position: [0.4, 1.75, 6.3] as [number, number, number], fov: 30 }
+const HERO_TARGET: [number, number, number] = [0, 1.4, 0]
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
@@ -98,31 +99,53 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
         />
       </motion.svg>
 
-      {/* Character vignette: a reserved, aria-hidden box so the canvas mount
-          never shifts layout. Below the type on mobile, breaking out to the
-          right and overlapping the headline on desktop. */}
+      {/* Character capsule: a select-screen pod drawn in the lab's hairline
+          language — a tall pill that crops the canvas (this overflow-hidden
+          replaces the old edge-fade mask). Reserved + aria-hidden so the canvas
+          mount never shifts layout. Centered below the type on mobile; on
+          desktop it sits right-of-center and its frame overlaps the headline's
+          right edge, keeping the layered feel while the type still dominates. */}
       <div
         data-testid="hero-vignette"
         aria-hidden="true"
-        className="pointer-events-none relative z-20 order-last mx-auto mt-6 h-[42svh] w-full max-w-[420px] translate-x-[22%] [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:h-full lg:w-[56vw] lg:max-w-none lg:translate-x-0"
+        className="pointer-events-none relative z-20 order-last mx-auto mt-8 h-[50vh] w-[64vw] max-w-[300px] overflow-hidden rounded-full lg:absolute lg:inset-y-0 lg:right-[18vw] lg:my-auto lg:mt-0 lg:h-[76vh] lg:w-[32vw] lg:max-w-[460px]"
+        style={{ border: `1px solid ${paperAlpha(0.2)}`, background: paperAlpha(0.03) }}
       >
         <VignetteCanvas
           height="100%"
           reduced={reduced}
           camera={HERO_CAMERA}
           target={HERO_TARGET}
-          shadowRadius={2.3}
+          shadowRadius={1.5}
           envIntensity={1.15}
           fallbackGlyph={SECTION_ACCENT.hero}
         >
           <GltfVignette
             src={CHARACTER_SRC}
-            fitHeight={2.6}
+            fitHeight={2.4}
             yaw={0.7}
             spin={false}
             animation={CHARACTER_IDLE_CLIP}
           />
         </VignetteCanvas>
+
+        {/* Rim nameplate — one small mono chip, character-select energy. */}
+        <div
+          className="absolute bottom-[6%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-3 py-1"
+          style={{ border: `1px solid ${paperAlpha(0.18)}`, background: inkAlpha(0.5) }}
+        >
+          <span
+            style={{
+              fontFamily: monoFamily,
+              fontSize: '0.625rem',
+              letterSpacing: '0.24em',
+              color: paperAlpha(0.7),
+            }}
+            className="lowercase"
+          >
+            file 01 · idle
+          </span>
+        </div>
       </div>
 
       {/* Type block */}
