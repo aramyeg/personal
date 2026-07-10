@@ -7,6 +7,7 @@ export const CONTROLS: Array<[string, string]> = [
   ['Shift', 'run'],
   ['Space', 'jump'],
   ['Click a painting', 'enter the work'],
+  ['F11', 'fullscreen experience'],
   ['Esc', 'release the cursor'],
 ]
 
