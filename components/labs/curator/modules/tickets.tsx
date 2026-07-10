@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent } from 'react'
 import { siteConfig } from '@/lib/constants'
 import { useCuratorStore } from '../store'
+import { SpecChip } from '../ui/spec-chip'
 import {
   CATEGORY_LABELS,
   detailsSchema,
@@ -128,9 +129,12 @@ export default function TicketsModule() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-[18px] font-semibold">Tickets</h1>
-        <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Support requests route directly to the operator.</p>
+      <header className="flex items-center gap-2">
+        <div>
+          <h1 className="text-[18px] font-semibold">Tickets</h1>
+          <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Support requests route directly to the operator.</p>
+        </div>
+        <div className="ml-auto"><SpecChip briefId="EB-006" /></div>
       </header>
 
       <div className="max-w-[560px] rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-6">

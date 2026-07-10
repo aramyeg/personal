@@ -1,0 +1,54 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
+import { getBrief } from '../annotations'
+import { useEscCapture } from '../use-esc-capture'
+import { BriefFields, BriefHeader } from './brief-fields'
+
+export function SpecChip({ briefId }: { briefId: string }) {
+  const brief = getBrief(briefId)
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // flushSync: Escape is captured by a raw window listener (useEscCapture), outside
+  // React's event system, so the close must commit synchronously — callers that
+  // dispatch the keydown directly (bypassing RTL's act-wrapped fireEvent) still see
+  // the popover gone by the time dispatchEvent() returns.
+  const close = () => flushSync(() => setOpen(false))
+  useEscCapture(open, close)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) close()
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={`Spec ${brief.id}`}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center rounded-[4px] border px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[10px] font-medium uppercase tracking-[0.06em] transition-colors duration-150 ${
+          open
+            ? 'border-[var(--c-blue)] text-[var(--c-blue)]'
+            : 'border-[var(--c-border)] text-[var(--c-text-soft)] hover:border-[var(--c-blue)] hover:text-[var(--c-blue)]'
+        }`}
+      >
+        SPEC
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-40 mt-2 w-[340px] rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-4 text-left">
+          <BriefHeader brief={brief} />
+          <BriefFields brief={brief} />
+        </div>
+      )}
+    </div>
+  )
+}

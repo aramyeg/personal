@@ -2,6 +2,7 @@
 
 import { getRoomRows } from '../adapters'
 import { Badge } from '../ui/badge'
+import { SpecChip } from '../ui/spec-chip'
 import { useCuratorStore } from '../store'
 
 export default function RoomsModule() {
@@ -22,6 +23,7 @@ export default function RoomsModule() {
         <Badge>{rows.length} total</Badge>
         <Badge tone="ok">{live} live</Badge>
         <Badge>{rows.length - live} attic</Badge>
+        <SpecChip briefId="EB-003" />
       </header>
       <div className="overflow-x-auto rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)]">
         <table className="w-full text-left">

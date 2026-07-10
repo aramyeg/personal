@@ -23,6 +23,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { getDealCards, type DealCard, type PipelineColumn } from '../adapters'
 import { PIPELINE_COLUMNS, useCuratorStore } from '../store'
 import { DealCardView } from '../ui/deal-card'
+import { SpecChip } from '../ui/spec-chip'
 
 function SortableDealCard({ id, deal }: { id: string; deal: DealCard }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -112,9 +113,12 @@ export default function PipelineModule() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-[18px] font-semibold">Pipeline</h1>
-        <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Opportunity management — win rate {winRate}</p>
+      <header className="flex items-center gap-2">
+        <div>
+          <h1 className="text-[18px] font-semibold">Pipeline</h1>
+          <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Opportunity management — win rate {winRate}</p>
+        </div>
+        <div className="ml-auto"><SpecChip briefId="EB-005" /></div>
       </header>
       <DndContext
         sensors={sensors}

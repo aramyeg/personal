@@ -5,6 +5,7 @@ import { ChevronDown, Download } from 'lucide-react'
 import { getPersonnelRows, type PersonnelRow } from '../adapters'
 import { filterRows, paginate, sortRows, toCsv, type SortDir } from '../ui/table-core'
 import { Badge } from '../ui/badge'
+import { SpecChip } from '../ui/spec-chip'
 import { useCuratorStore } from '../store'
 
 const PAGE_SIZE = 3
@@ -100,6 +101,7 @@ export default function PersonnelModule() {
             Workforce records — {activeCount} active resource{activeCount === 1 ? '' : 's'}
           </p>
         </div>
+        <SpecChip briefId="EB-007" />
         <input
           type="text"
           placeholder="Filter records…"

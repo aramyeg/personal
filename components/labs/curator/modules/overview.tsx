@@ -8,6 +8,7 @@ import { KpiCard } from '../ui/kpi-card'
 import { Badge } from '../ui/badge'
 import { LineChart } from '../ui/charts/line-chart'
 import { BarChart } from '../ui/charts/bar-chart'
+import { SpecChip } from '../ui/spec-chip'
 
 const nf = new Intl.NumberFormat('en-US')
 
@@ -20,9 +21,12 @@ export default function OverviewModule() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-[18px] font-semibold">Overview</h1>
-        <p className="text-[12px] text-[var(--c-text-soft)]">Portfolio performance and asset status</p>
+      <header className="flex items-center gap-2">
+        <div>
+          <h1 className="text-[18px] font-semibold">Overview</h1>
+          <p className="text-[12px] text-[var(--c-text-soft)]">Portfolio performance and asset status</p>
+        </div>
+        <div className="ml-auto"><SpecChip briefId="EB-008" /></div>
       </header>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard label="Museum Rooms" value={nf.format(kpis.rooms)} />
@@ -36,6 +40,7 @@ export default function OverviewModule() {
           annotations={labs.map((l) => ({ date: l.date, label: l.title }))}
           title="Visitor Traffic — 90 days"
           caption="Sample data"
+          action={<SpecChip briefId="EB-004" />}
         />
         <div className="space-y-4">
           <BarChart title="Capability Utilization" unit=" yr" data={topSkills.map((s) => ({ label: s.name, value: s.years }))} />

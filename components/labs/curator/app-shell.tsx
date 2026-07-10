@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { ModuleHost } from './module-host'
 import { ToastViewport } from './ui/toast'
+import { SpecChip } from './ui/spec-chip'
 import { useEscCapture } from './use-esc-capture'
 import { useCuratorStore, type CuratorModule } from './store'
 
@@ -71,6 +72,10 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">
             Portfolio Operations Platform
           </span>
+          <div className="ml-auto flex items-center gap-2">
+            <SpecChip briefId="EB-002" />
+            <SpecChip briefId="EB-009" />
+          </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <ModuleHost />}</main>
         <ToastViewport />
