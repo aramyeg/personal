@@ -1545,16 +1545,21 @@ export function ModuleHost() {
   const module = useCuratorStore((s) => s.module)
   const setModule = useCuratorStore((s) => s.setModule)
 
+  // Single effect: adopt a valid ?m= on the first pass (skipping the write so the
+  // pre-adoption module never clobbers the URL), then mirror every change back.
+  const adopted = useRef(false)
   useEffect(() => {
-    const m = new URLSearchParams(window.location.search).get('m')
-    if (isModule(m)) setModule(m)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- adopt URL once on mount
-  }, [])
-
-  useEffect(() => {
-    const url = module === 'overview' ? window.location.pathname : `?m=${module}`
+    if (!adopted.current) {
+      adopted.current = true
+      const m = new URLSearchParams(window.location.search).get('m')
+      if (isModule(m) && m !== activeModule) {
+        setModule(m)
+        return
+      }
+    }
+    const url = activeModule === 'overview' ? window.location.pathname : `?m=${activeModule}`
     window.history.replaceState(null, '', url)
-  }, [module])
+  }, [activeModule, setModule])
 
   const Active = MODULES[module]
   return (
