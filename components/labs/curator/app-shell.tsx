@@ -84,7 +84,11 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
         </div>
       )}
       <div className="flex min-w-0 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6">
+        {/* mt-14 clears GalleryChrome's fixed "← Gallery" pill (top-4 left-4 z-50) on
+            mobile, where this header starts flush with the viewport's top-left corner
+            (same collision the sidebar nav below handles the same way); the desktop
+            aside already sits clear of the pill horizontally, so lg:mt-0 undoes it. */}
+        <header className="mt-14 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6 lg:mt-0">
           <button
             ref={hamburgerRef}
             type="button"
