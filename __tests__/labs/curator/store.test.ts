@@ -71,6 +71,22 @@ describe('curator store', () => {
     expect(useCuratorStore.getState().npsDone).toBe(true)
   })
 
+  it('marks the tour done', () => {
+    useCuratorStore.getState().markTourDone()
+    expect(useCuratorStore.getState().tourDone).toBe(true)
+  })
+
+  it('sets tourOpen without persisting it, but persists tourDone', () => {
+    const s = useCuratorStore.getState
+    s().markTourDone()
+    s().setTourOpen(true)
+    expect(s().tourOpen).toBe(true)
+    const raw = window.localStorage.getItem('labs-curator')
+    const persisted = JSON.parse(raw as string).state
+    expect(persisted.tourOpen).toBeUndefined()
+    expect(persisted.tourDone).toBe(true)
+  })
+
   it('flips a preference', () => {
     const s = useCuratorStore.getState
     expect(s().preferences.showSpecChips).toBe(true)
@@ -93,5 +109,34 @@ describe('migratePersisted', () => {
     expect(migrated.density).toBe('compact')
     expect(migrated.npsDone).toBe(true)
     expect(migrated.pipeline).toEqual(legacy.pipeline)
+  })
+
+  it('defaults tourDone to false for a v1 state that predates the tour', () => {
+    const legacy = { density: 'compact', pipeline: { ...defaultPipeline() }, npsDone: true }
+    const migrated = migratePersisted(legacy, 1)
+    expect(migrated.tourDone).toBe(false)
+  })
+
+  it('carries tourDone forward for an existing v2 state', () => {
+    const existing = {
+      density: 'compact',
+      preferences: { showSpecChips: true, reduceMotion: false, showSampleData: true },
+      pipeline: { ...defaultPipeline() },
+      npsDone: true,
+      tourDone: true,
+    }
+    const migrated = migratePersisted(existing, 2)
+    expect(migrated.tourDone).toBe(true)
+  })
+
+  it('defaults tourDone to false for an existing v2 state that predates the tour key', () => {
+    const existing = {
+      density: 'compact',
+      preferences: { showSpecChips: true, reduceMotion: false, showSampleData: true },
+      pipeline: { ...defaultPipeline() },
+      npsDone: false,
+    }
+    const migrated = migratePersisted(existing, 2)
+    expect(migrated.tourDone).toBe(false)
   })
 })

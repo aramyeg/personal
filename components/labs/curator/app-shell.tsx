@@ -10,6 +10,7 @@ import { ModuleHost } from './module-host'
 import { ToastViewport } from './ui/toast'
 import { useEscCapture } from './use-esc-capture'
 import { NpsSurvey } from './nps-survey'
+import { CuratorTour } from './tour'
 import { useCuratorStore, type CuratorModule } from './store'
 
 export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[] = [
@@ -108,6 +109,7 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
         <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <ModuleHost />}</main>
         <ToastViewport />
         <NpsSurvey />
+        <CuratorTour />
       </div>
     </div>
   )
@@ -119,7 +121,7 @@ function SidebarContent({
   return (
     <>
       {/* mt-14 clears GalleryChrome's fixed "← Gallery" pill (top-4 left-4, z-50) */}
-      <nav className="mt-14 flex-1 px-2" aria-label="Modules">
+      <nav className="mt-14 flex-1 px-2" aria-label="Modules" data-tour="workspace-nav">
         <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-white/40">
           Workspace
         </p>
@@ -132,6 +134,7 @@ function SidebarContent({
                 type="button"
                 onClick={() => onSelect(item.id)}
                 aria-current={active ? 'page' : undefined}
+                data-tour={`nav-${item.id}`}
                 className={`flex w-full touch-manipulation items-center gap-2.5 rounded-[6px] px-3 py-2 text-left text-[13px] transition-colors duration-150 ${
                   active
                     ? 'bg-white font-medium text-[var(--c-navy)]'

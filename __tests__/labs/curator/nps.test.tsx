@@ -52,4 +52,28 @@ describe('NpsSurvey', () => {
     act(() => vi.advanceTimersByTime(120_000))
     expect(screen.queryByText(question)).not.toBeInTheDocument()
   })
+
+  it('defers the visit-threshold trigger while the tour is on screen, then opens once it closes', () => {
+    act(() => useCuratorStore.getState().setTourOpen(true))
+    render(<NpsSurvey />)
+    act(() => {
+      const s = useCuratorStore.getState()
+      s.setModule('rooms'); s.setModule('pipeline'); s.setModule('tickets')
+    })
+    expect(screen.queryByText(question)).not.toBeInTheDocument()
+
+    act(() => useCuratorStore.getState().setTourOpen(false))
+    expect(screen.getByText(question)).toBeInTheDocument()
+  })
+
+  it('defers the 90s timer while the tour is on screen, then restarts once it closes', () => {
+    act(() => useCuratorStore.getState().setTourOpen(true))
+    render(<NpsSurvey />)
+    act(() => vi.advanceTimersByTime(90_000))
+    expect(screen.queryByText(question)).not.toBeInTheDocument()
+
+    act(() => useCuratorStore.getState().setTourOpen(false))
+    act(() => vi.advanceTimersByTime(90_000))
+    expect(screen.getByText(question)).toBeInTheDocument()
+  })
 })

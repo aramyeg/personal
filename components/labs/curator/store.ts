@@ -42,6 +42,8 @@ type CuratorState = {
   preferences: Preferences
   pipeline: PipelineState
   npsDone: boolean
+  tourDone: boolean
+  tourOpen: boolean
   setModule(m: CuratorModule): void
   pushToast(t: Omit<Toast, 'id'>): void
   dismissToast(id: number): void
@@ -50,6 +52,8 @@ type CuratorState = {
   setPreference(key: keyof Preferences, value: boolean): void
   movePipelineCard(cardId: string, to: PipelineColumn, toIndex: number): void
   markNpsDone(): void
+  markTourDone(): void
+  setTourOpen(open: boolean): void
 }
 
 export type PersistedCuratorState = {
@@ -57,6 +61,7 @@ export type PersistedCuratorState = {
   preferences: Preferences
   pipeline: PipelineState
   npsDone: boolean
+  tourDone: boolean
 }
 
 /**
@@ -75,6 +80,7 @@ export function migratePersisted(state: unknown, version: number): PersistedCura
       preferences: defaultPreferences(),
       pipeline: s.pipeline ?? defaultPipeline(),
       npsDone: Boolean(s.npsDone),
+      tourDone: Boolean(s.tourDone),
     }
   }
   return {
@@ -82,6 +88,7 @@ export function migratePersisted(state: unknown, version: number): PersistedCura
     preferences: s.preferences ?? defaultPreferences(),
     pipeline: s.pipeline ?? defaultPipeline(),
     npsDone: Boolean(s.npsDone),
+    tourDone: Boolean(s.tourDone),
   }
 }
 
@@ -97,6 +104,8 @@ export const useCuratorStore = create<CuratorState>()(
         preferences: defaultPreferences(),
         pipeline: defaultPipeline(),
         npsDone: false,
+        tourDone: false,
+        tourOpen: false,
 
         setModule: (m) => set((s) => {
           if (s.module !== m) { s.module = m; s.moduleVisits += 1 }
@@ -120,12 +129,15 @@ export const useCuratorStore = create<CuratorState>()(
           target.splice(Math.min(Math.max(toIndex, 0), target.length), 0, cardId)
         }),
         markNpsDone: () => set((s) => { s.npsDone = true }),
+        markTourDone: () => set((s) => { s.tourDone = true }),
+        setTourOpen: (open) => set((s) => { s.tourOpen = open }),
       })),
       {
         name: 'labs-curator',
         version: 2,
         partialize: (s) => ({
           density: s.density, preferences: s.preferences, pipeline: s.pipeline, npsDone: s.npsDone,
+          tourDone: s.tourDone,
         }),
         migrate: migratePersisted,
       }

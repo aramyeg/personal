@@ -73,3 +73,27 @@
 .root[data-reduce-motion] .toastEnter {
   animation: none;
 }
+
+@keyframes curator-tour-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+.tourPulse {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--c-blue);
+  animation: curator-tour-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tourPulse { animation: none; }
+}
+
+.root[data-reduce-motion] .tourPulse {
+  animation: none;
+}

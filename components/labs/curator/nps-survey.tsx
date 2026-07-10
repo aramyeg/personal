@@ -10,18 +10,19 @@ export function NpsSurvey() {
   const [open, setOpen] = useState(false)
   const npsDone = useCuratorStore((s) => s.npsDone)
   const visits = useCuratorStore((s) => s.moduleVisits)
+  const tourOpen = useCuratorStore((s) => s.tourOpen)
   const markNpsDone = useCuratorStore((s) => s.markNpsDone)
   const pushToast = useCuratorStore((s) => s.pushToast)
 
   useEffect(() => {
-    if (npsDone) return
+    if (npsDone || tourOpen) return
     const timer = setTimeout(() => setOpen(true), 90_000)
     return () => clearTimeout(timer)
-  }, [npsDone])
+  }, [npsDone, tourOpen])
 
   useEffect(() => {
-    if (visits >= 3 && !npsDone) setOpen(true)
-  }, [visits, npsDone])
+    if (visits >= 3 && !npsDone && !tourOpen) setOpen(true)
+  }, [visits, npsDone, tourOpen])
 
   function resolve(scored: boolean): void {
     setOpen(false)

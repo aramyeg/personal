@@ -1,10 +1,26 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// Pre-seeds tourDone so the first-run tour overlay doesn't block clicks in
+// tests that aren't specifically exercising it. Persist merge fills the rest
+// of the state with defaults. addInitScript re-runs on every navigation in
+// this page's lifetime, including page.reload() — guard on an empty key so a
+// later reload doesn't clobber state the app itself has since persisted
+// (e.g. a pipeline drag).
+const seedTourDone = (page: Page) =>
+  page.addInitScript(() => {
+    if (window.localStorage.getItem('labs-curator')) return
+    window.localStorage.setItem(
+      'labs-curator',
+      JSON.stringify({ state: { tourDone: true }, version: 2 }),
+    )
+  })
+
 // A generous timeout on the post-sign-in assertion: fullyParallel workers all
 // hit the same on-demand dev server, and a cold Turbopack compile of a route
 // under contention can exceed the default 5s expect timeout (dev-server
 // compile latency — see the settle-wait guard on the Esc-ordering test below).
 const signIn = async (page: Page) => {
+  await seedTourDone(page)
   await page.goto('/labs/curator')
   await page.getByRole('button', { name: /^sign in$/i }).click()
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible({ timeout: 15_000 })
@@ -67,6 +83,7 @@ test.describe('curator lab', () => {
   test('login gate: unauthenticated visit shows the login card; signing in sets an httpOnly session cookie', async ({
     page,
   }) => {
+    await seedTourDone(page)
     await page.goto('/labs/curator')
     await expect(page.getByLabel('Work email')).toBeVisible()
 
@@ -182,6 +199,39 @@ test.describe('curator lab', () => {
     await selectModule(page, 'Personnel')
     await selectModule(page, 'Pipeline')
     await expect(survey).toBeHidden()
+  })
+
+  test('first-run tour walks a new visitor through four coach marks, then never reappears', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'the tour is desktop-only by design')
+
+    await page.goto('/labs/curator')
+    await page.getByRole('button', { name: /^sign in$/i }).click()
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible({ timeout: 15_000 })
+
+    const tour = page.getByRole('dialog', { name: 'Product tour' })
+    await expect(tour).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Step 1 of 4')).toBeVisible()
+
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('Step 3 of 4')).toBeVisible()
+
+    await tour.getByRole('button', { name: 'Back' }).click()
+    await expect(page.getByText('Step 2 of 4')).toBeVisible()
+
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await tour.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('Step 4 of 4')).toBeVisible()
+
+    await tour.getByRole('button', { name: 'Get started' }).click()
+    await expect(tour).toBeHidden()
+    await expect(page.getByRole('dialog', { name: 'Feedback survey' })).not.toBeVisible()
+
+    await page.reload()
+    await expect(tour).toBeHidden()
   })
 
   test('escape closes an open SPEC popover before it navigates to the gallery', async ({ page }) => {

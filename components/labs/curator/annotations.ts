@@ -98,6 +98,16 @@ export const briefs: EngineeringBrief[] = [
     rationale:
       'Scoping tokens to the lab root lets Curator commit to its own enterprise palette without leaking into, or being leaked into by, the main portfolio identity or the other labs. Hairlines over shadows is a deliberate constraint — it is the visual signature of the dense, flat enterprise-console aesthetic the lab imitates.',
   },
+  {
+    id: 'EB-010',
+    area: 'Interaction',
+    title: 'Guided Onboarding',
+    stack: 'React, getBoundingClientRect, CSS custom properties',
+    pattern:
+      'The four-step first-run tour resolves each anchor via a data-tour attribute at step entry, not at mount, so the DOM only needs to match the current step. Spotlight and card position are computed by a pure, viewport-clamped function, and single-fire persistence rides the same versioned store slice as the rest of the app’s preferences.',
+    rationale:
+      'Resolving anchors lazily and skipping any step whose target is missing means a user preference — SPEC chips toggled off, say — can never strand the tour on a step with nothing to point at. The tour also defers the NPS survey prompt while it is on screen, so the two overlays never stack. The hand-rolled ~100-line positioning function replaces a tour-library dependency, consistent with the lab’s no-charting-library stance.',
+  },
 ]
 
 export function getBrief(id: string): EngineeringBrief {

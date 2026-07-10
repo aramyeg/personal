@@ -33,6 +33,7 @@ export function SpecChip({ briefId }: { briefId: string }) {
         aria-label={`Spec ${brief.id}`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
+        data-tour="spec-chip"
         className={`inline-flex items-center whitespace-nowrap rounded-[4px] border px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[10px] font-medium uppercase tracking-[0.06em] transition-colors duration-150 ${
           open
             ? 'border-[var(--c-blue)] text-[var(--c-blue)]'
