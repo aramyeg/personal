@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { siteConfig } from '@/lib/constants'
 
 // The lab fonts pull in `next/font/google`, whose call sites are compiled away
@@ -22,11 +22,19 @@ vi.mock('@/components/labs/memory-card/three/stage', () => ({
 vi.mock('@/components/labs/memory-card/three/gltf-vignette', () => ({
   GltfVignette: () => <div data-testid="gltf-vignette" />,
 }))
+// The card rail loads a GLB and runs a WebGL frameloop — neither exists under
+// vitest. Swap it for an inert node so WorkSection renders its real HTML.
+vi.mock('@/components/labs/memory-card/three/card-rail', () => ({
+  CardRail: () => <div data-testid="card-rail" />,
+  RAIL_GAP: 3.1,
+}))
 
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
 import { HeroSection } from '@/components/labs/memory-card/sections/hero'
 import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
+import { WorkSection } from '@/components/labs/memory-card/sections/work'
 import { WRITTEN_WITH } from '@/components/labs/memory-card/lib/written-with'
+import { projects } from '@/data/projects'
 
 describe('MemoryCardChrome', () => {
   it('renders the four section anchors with correct hrefs', () => {
@@ -104,5 +112,49 @@ describe('SkillsSection', () => {
     expect(
       screen.getByRole('link', { name: /full save data lives in the main site/i })
     ).toHaveAttribute('href', '/#skills')
+  })
+})
+
+describe('WorkSection', () => {
+  it('has id="work" on the section root', () => {
+    const { container } = render(<WorkSection />)
+    expect(container.querySelector('section#work')).toBeInTheDocument()
+  })
+
+  it('renders every project as an article in the crawlable list', () => {
+    render(<WorkSection />)
+    const list = screen.getByTestId('work-crawl')
+    for (const project of projects) {
+      expect(within(list).getByText(project.title)).toBeInTheDocument()
+    }
+  })
+
+  it('renders all metrics for every project', () => {
+    render(<WorkSection />)
+    const list = screen.getByTestId('work-crawl')
+    for (const project of projects) {
+      for (const metric of project.metrics ?? []) {
+        expect(within(list).getByText(metric)).toBeInTheDocument()
+      }
+    }
+  })
+
+  it('zero-pads the slot number of each project in the list', () => {
+    render(<WorkSection />)
+    const list = screen.getByTestId('work-crawl')
+    projects.forEach((_, idx) => {
+      const slot = String(idx + 1).padStart(2, '0')
+      expect(within(list).getByText(`slot ${slot}`)).toBeInTheDocument()
+    })
+  })
+
+  it('renders "company · year" verbatim for every project (year is a string)', () => {
+    render(<WorkSection />)
+    const list = screen.getByTestId('work-crawl')
+    for (const project of projects) {
+      expect(
+        within(list).getByText(`${project.company} · ${project.year}`)
+      ).toBeInTheDocument()
+    }
   })
 })

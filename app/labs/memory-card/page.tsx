@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
 import { HeroSection } from '@/components/labs/memory-card/sections/hero'
+import { WorkSection } from '@/components/labs/memory-card/sections/work'
 import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
 import { MC } from '@/components/labs/memory-card/tokens'
 
@@ -23,6 +24,7 @@ export default function MemoryCardLabPage() {
       <MemoryCardChrome />
       <main className="min-h-screen" style={{ background: MC.ink, color: MC.paper }}>
         <HeroSection />
+        <WorkSection />
         <SkillsSection />
       </main>
     </GalleryChrome>
