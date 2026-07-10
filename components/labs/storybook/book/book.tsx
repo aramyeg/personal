@@ -60,7 +60,7 @@ const CREASE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift + 0.001
 // when closed centers it under the CTA without touching any local layout.
 const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
 
-function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
+export function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4

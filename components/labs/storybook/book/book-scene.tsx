@@ -10,7 +10,7 @@
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Book } from './book'
+import { Book, makeCanvasTexture } from './book'
 import { Dust } from './dust'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 
@@ -36,11 +36,7 @@ const PARALLAX_EASE_RATE = 4
  * sits on instead of blending into the background void. */
 function Desk() {
   const deskCanvas = useMemo(() => makeDeskCanvas(), [])
-  const deskTexture = useMemo(() => {
-    const texture = new THREE.CanvasTexture(deskCanvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    return texture
-  }, [deskCanvas])
+  const deskTexture = useMemo(() => makeCanvasTexture(deskCanvas), [deskCanvas])
 
   useEffect(() => () => deskTexture.dispose(), [deskTexture])
 
