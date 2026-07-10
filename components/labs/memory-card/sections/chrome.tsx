@@ -3,16 +3,22 @@
 /**
  * MemoryCardChrome — the fixed top bar for the Memory Card lab.
  *
- * A quiet, solid ink strip: wordmark on the left, section anchors and a
- * (still-inert) sound toggle on the right, and a keyboard skip link ahead of
- * everything. It sits alongside GalleryChrome's floating "← Gallery" pill, so
- * the left group is inset far enough to clear it. Section anchors and the
- * toggle carry 44px hit areas and an accent focus ring; the sound button is
- * rendered disabled here and wired for real in a later task via `onToggleSound`.
+ * A quiet, solid ink strip: wordmark on the left, section anchors and a live
+ * sound toggle on the right, and a keyboard skip link ahead of everything. It
+ * sits alongside GalleryChrome's floating "← Gallery" pill, so the left group
+ * is inset far enough to clear it. Section anchors and the toggle carry 44px
+ * hit areas and an accent focus ring.
+ *
+ * `soundOn`/`onToggleSound` remain explicit prop overrides (used by tests
+ * that render this in isolation); when omitted, both fall back to the shared
+ * `MemoryCardAudioProvider` context so chrome and the sections stay in sync
+ * without prop-drilling. Anchors carry `data-cursor="triangle"` for the glyph
+ * cursor and a menu-move `blip()` on click.
  */
 
 import { MC, SECTION_ACCENT, paperAlpha } from '../tokens'
 import { monoFamily } from '../fonts'
+import { useMemoryCardAudioContext } from '../audio-context'
 
 const NAV_LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: 'work', href: '#work' },
@@ -37,9 +43,13 @@ export type MemoryCardChromeProps = {
 }
 
 export function MemoryCardChrome({
-  soundOn = false,
-  onToggleSound,
+  soundOn: soundOnProp,
+  onToggleSound: onToggleSoundProp,
 }: MemoryCardChromeProps) {
+  const audio = useMemoryCardAudioContext()
+  const soundOn = soundOnProp ?? audio.soundOn
+  const onToggleSound = onToggleSoundProp ?? audio.toggleSound
+
   return (
     <header
       style={{
@@ -73,6 +83,8 @@ export function MemoryCardChrome({
           <a
             key={href}
             href={href}
+            data-cursor="triangle"
+            onClick={() => audio.blip()}
             style={{ ...monoLabel, color: paperAlpha(0.7) }}
             className={`hidden min-h-[44px] items-center px-2 transition-colors hover:text-[#e9e7e0] sm:inline-flex ${FOCUS_RING}`}
           >
@@ -82,11 +94,12 @@ export function MemoryCardChrome({
 
         <button
           type="button"
-          aria-disabled="true"
+          aria-pressed={soundOn}
           aria-label={`sound: ${soundOn ? 'on' : 'off'}`}
+          data-cursor="triangle"
           onClick={onToggleSound}
-          style={{ ...monoLabel, color: paperAlpha(0.4) }}
-          className={`ml-1 inline-flex min-h-[44px] cursor-not-allowed items-center whitespace-nowrap px-2 ${FOCUS_RING}`}
+          style={{ ...monoLabel, color: paperAlpha(0.7) }}
+          className={`ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap px-2 transition-colors hover:text-[#e9e7e0] ${FOCUS_RING}`}
         >
           sound: {soundOn ? 'on' : 'off'}
         </button>

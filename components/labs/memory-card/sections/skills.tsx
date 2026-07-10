@@ -143,6 +143,7 @@ export function SkillsSection({ reduced: reducedProp }: SkillsSectionProps) {
         <div className="mt-6 flex justify-end pl-16 sm:pl-0">
           <Link
             href="/#skills"
+            data-cursor="cross"
             style={{
               fontFamily: monoFamily,
               fontSize: TYPE.label,

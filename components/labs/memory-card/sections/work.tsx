@@ -15,6 +15,11 @@
  * no-WebGL browser reads, and it's identical in both motion modes. Under reduced
  * motion the wrapper collapses to a single static stage (first card centered at
  * a still three-quarter pose; no scroll math, tilt, or flip).
+ *
+ * Sound: hovering the stage plays `blip()` (menu-move); flipping a card
+ * forward plays `select()`, flipping it back plays `back()` — both through
+ * the shared `MemoryCardAudioProvider` context, with the flip direction also
+ * surfaced on `onCardFlip` for callers/tests that need the raw seam.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -32,6 +37,7 @@ import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, accentFor, paperAlpha } from '..
 import { grotesk, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { CardRail, RAIL_GAP } from '../three/card-rail'
+import { useMemoryCardAudioContext } from '../audio-context'
 
 const WORK_ACCENT = MC.glyphs[SECTION_ACCENT.work]
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
@@ -46,12 +52,13 @@ const pad = (i: number) => String(i + 1).padStart(2, '0')
 export type WorkSectionProps = {
   /** Override the media query (client islands otherwise read it themselves). */
   reduced?: boolean
-  /** Fired when the centered card is flipped (Task 10 wires the select sound). */
-  onCardFlip?: () => void
+  /** Fired when the centered card flips, with the direction it flipped in. */
+  onCardFlip?: (direction: 'reveal' | 'return') => void
 }
 
 export function WorkSection({ reduced: reducedProp, onCardFlip }: WorkSectionProps) {
   const systemReduced = useReducedMotion()
+  const audio = useMemoryCardAudioContext()
 
   // This section branches its SSR-visible markup (wrapper height, cursor, hint)
   // on `reduced`, so the media-query value can't be read until after mount or
@@ -96,10 +103,21 @@ export function WorkSection({ reduced: reducedProp, onCardFlip }: WorkSectionPro
   const handleLeave = () => {
     tiltRef.current = { x: 0, y: 0 }
   }
+  const handleEnter = () => {
+    if (reduced) return
+    audio.blip()
+  }
   const handleFlip = () => {
     if (reduced) return
-    setFlipped((f) => !f)
-    onCardFlip?.()
+    // Reads `flipped` from the render closure rather than an updater
+    // function: React (Strict Mode, dev-only) double-invokes updater
+    // functions to catch impure ones, which would double-fire select()/back().
+    const next = !flipped
+    const direction = next ? 'reveal' : 'return'
+    setFlipped(next)
+    if (next) audio.select()
+    else audio.back()
+    onCardFlip?.(direction)
   }
 
   // Reduced motion parks on the first card; otherwise track the scroll.
@@ -116,6 +134,9 @@ export function WorkSection({ reduced: reducedProp, onCardFlip }: WorkSectionPro
           motion it collapses to a single static viewport so nothing pins. */}
       <div ref={wrapperRef} style={{ height: reduced ? '100svh' : `${N * 90}vh` }}>
         <div
+          data-testid="work-stage"
+          data-cursor="circle"
+          onPointerEnter={handleEnter}
           onPointerMove={handleMove}
           onPointerLeave={handleLeave}
           onClick={handleFlip}

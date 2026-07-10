@@ -1,8 +1,29 @@
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { hallLabs } from '@/lib/labs-manifest'
+
+// A stateful audio double — real enough that toggling actually flips
+// `enabled()`, so the provider's optimistic label update can be asserted
+// against a real setEnabled(true) call, not just a fixed mock return.
+let mockAudioEnabled = false
+const mockAudio = {
+  resume: vi.fn(),
+  blip: vi.fn(),
+  select: vi.fn(),
+  back: vi.fn(),
+  boot: vi.fn(),
+  setRoomTone: vi.fn(),
+  setEnabled: vi.fn((on: boolean) => {
+    mockAudioEnabled = on
+  }),
+  enabled: vi.fn(() => mockAudioEnabled),
+  dispose: vi.fn(),
+}
+vi.mock('@/components/labs/memory-card/audio', () => ({
+  useMemoryCardAudio: () => mockAudio,
+}))
 
 // The lab fonts pull in `next/font/google`, whose call sites are compiled away
 // by Next's loader — not available under vitest. These section tests are about
@@ -41,8 +62,14 @@ import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
 import { WorkSection } from '@/components/labs/memory-card/sections/work'
 import { AboutSection } from '@/components/labs/memory-card/sections/about'
 import { ContactSection } from '@/components/labs/memory-card/sections/contact'
+import { MemoryCardAudioProvider } from '@/components/labs/memory-card/audio-context'
+import { GlyphCursor } from '@/components/labs/memory-card/cursor'
 import { WRITTEN_WITH } from '@/components/labs/memory-card/lib/written-with'
 import { projects } from '@/data/projects'
+
+beforeEach(() => {
+  mockAudioEnabled = false
+})
 
 describe('MemoryCardChrome', () => {
   it('renders the four section anchors with correct hrefs', () => {
@@ -65,16 +92,50 @@ describe('MemoryCardChrome', () => {
     ).toHaveAttribute('href', '#work')
   })
 
-  it('renders the wordmark and a sound toggle disabled until wired', () => {
+  // T6 review N2 (routed to Task 10): the toggle used to render aria-disabled
+  // + cursor-not-allowed while onClick was already wired but inert. Sound is
+  // live now, so the disabled affordance is gone — this test is deliberately
+  // updated to assert the real thing (no aria-disabled, aria-pressed reflects
+  // state) instead of the placeholder it replaced.
+  it('renders the wordmark and a live, enabled sound toggle', () => {
     render(<MemoryCardChrome />)
     expect(screen.getByText(/memory card/i)).toBeInTheDocument()
     const sound = screen.getByRole('button', { name: /sound/i })
     expect(sound).toHaveTextContent('sound: off')
-    expect(sound).toHaveAttribute('aria-disabled', 'true')
+    expect(sound).not.toHaveAttribute('aria-disabled')
+    expect(sound).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('reflects the soundOn prop in the toggle label', () => {
     render(<MemoryCardChrome soundOn />)
+    const sound = screen.getByRole('button', { name: /sound/i })
+    expect(sound).toHaveTextContent('sound: on')
+    expect(sound).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('marks nav anchors and the sound toggle for the glyph cursor', () => {
+    render(<MemoryCardChrome />)
+    for (const label of ['work', 'skills', 'about', 'contact']) {
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute('data-cursor', 'triangle')
+    }
+    expect(screen.getByRole('button', { name: /sound/i })).toHaveAttribute(
+      'data-cursor',
+      'triangle'
+    )
+  })
+
+  it('toggling the sound button calls setEnabled(true) and flips the label live', () => {
+    render(
+      <MemoryCardAudioProvider>
+        <MemoryCardChrome />
+      </MemoryCardAudioProvider>
+    )
+    const sound = screen.getByRole('button', { name: /sound/i })
+    expect(sound).toHaveTextContent('sound: off')
+
+    fireEvent.click(sound)
+
+    expect(mockAudio.setEnabled).toHaveBeenCalledWith(true)
     expect(screen.getByRole('button', { name: /sound/i })).toHaveTextContent('sound: on')
   })
 })
@@ -117,9 +178,9 @@ describe('SkillsSection', () => {
 
   it('links out to the full stack on the main site', () => {
     render(<SkillsSection />)
-    expect(
-      screen.getByRole('link', { name: /full save data lives in the main site/i })
-    ).toHaveAttribute('href', '/#skills')
+    const link = screen.getByRole('link', { name: /full save data lives in the main site/i })
+    expect(link).toHaveAttribute('href', '/#skills')
+    expect(link).toHaveAttribute('data-cursor', 'cross')
   })
 })
 
@@ -164,6 +225,25 @@ describe('WorkSection', () => {
         within(list).getByText(`${project.company} · ${project.year}`)
       ).toBeInTheDocument()
     }
+  })
+
+  // T8 review N1 (routed to Task 10): the seam grew a direction argument so
+  // callers can tell a reveal from a return instead of a bare fire-and-forget.
+  it('reports the flip direction through onCardFlip: reveal then return', () => {
+    const onCardFlip = vi.fn()
+    render(<WorkSection onCardFlip={onCardFlip} />)
+    const stage = screen.getByTestId('work-stage')
+
+    fireEvent.click(stage)
+    expect(onCardFlip).toHaveBeenLastCalledWith('reveal')
+
+    fireEvent.click(stage)
+    expect(onCardFlip).toHaveBeenLastCalledWith('return')
+  })
+
+  it('marks the stage for the circle glyph cursor', () => {
+    render(<WorkSection />)
+    expect(screen.getByTestId('work-stage')).toHaveAttribute('data-cursor', 'circle')
   })
 })
 
@@ -250,5 +330,68 @@ describe('ContactSection', () => {
     expect(
       screen.getByText(/character by humans of the world \(cc by 4\.0\)/i)
     ).toBeInTheDocument()
+  })
+
+  it('marks copy buttons and footer links for the triangle glyph cursor', () => {
+    render(<ContactSection />)
+    for (const button of screen.getAllByRole('button', { name: /copy/i })) {
+      expect(button).toHaveAttribute('data-cursor', 'triangle')
+    }
+    const footer = screen.getByTestId('contact-footer')
+    expect(within(footer).getByRole('link', { name: /gallery/i })).toHaveAttribute(
+      'data-cursor',
+      'triangle'
+    )
+  })
+})
+
+describe('GlyphCursor', () => {
+  it('renders nothing on first paint', () => {
+    const { container } = render(<GlyphCursor />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders the dot once a real pointermove event arrives', () => {
+    const { container } = render(<GlyphCursor />)
+    expect(container).toBeEmptyDOMElement()
+
+    fireEvent(window, new PointerEvent('pointermove', { clientX: 120, clientY: 80 }))
+
+    expect(screen.getByTestId('glyph-cursor')).toBeInTheDocument()
+  })
+
+  // Same matcher shape vitest.setup.ts installs globally, but with `matches`
+  // driven by the query string so a single override can stand in for either
+  // `(prefers-reduced-motion: reduce)` or `(pointer: coarse)`.
+  function mockMatchMedia(matchesFor: (query: string) => boolean) {
+    return vi.fn((query: string) => ({
+      matches: matchesFor(query),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia
+  }
+
+  // Reduced-motion hiding is gated by framer-motion's `useReducedMotion()`
+  // (the same hook every other section in this lab already relies on for its
+  // own reduced-motion branch) rather than a matchMedia check this file owns,
+  // and that hook memoizes its query result process-wide — a per-test
+  // matchMedia override here would just prove the mock, not the component.
+  // Reduced-motion hiding is exercised live instead (self-check).
+
+  it('stays hidden under a coarse pointer, even after a pointermove', () => {
+    const original = window.matchMedia
+    window.matchMedia = mockMatchMedia((q) => q.includes('coarse'))
+    try {
+      const { container } = render(<GlyphCursor />)
+      fireEvent(window, new PointerEvent('pointermove', { clientX: 120, clientY: 80 }))
+      expect(container).toBeEmptyDOMElement()
+    } finally {
+      window.matchMedia = original
+    }
   })
 })

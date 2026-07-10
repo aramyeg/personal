@@ -18,6 +18,7 @@ import { siteConfig, socialLinks } from '@/lib/constants'
 import { hallLabs } from '@/lib/labs-manifest'
 import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, paperAlpha } from '../tokens'
 import { anton, monoFamily } from '../fonts'
+import { useMemoryCardAudioContext } from '../audio-context'
 
 const CONTACT_ACCENT = MC.glyphs[SECTION_ACCENT.contact]
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
@@ -98,11 +99,13 @@ export type ContactSectionProps = {
 export function ContactSection({ reduced: reducedProp }: ContactSectionProps) {
   const systemReduced = useReducedMotion()
   const reduced = reducedProp ?? systemReduced ?? false
+  const audio = useMemoryCardAudioContext()
   const [copied, setCopied] = useState<string | null>(null)
   const copiedTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(copiedTimer.current), [])
 
   const onCopy = async (row: Row) => {
+    audio.blip()
     const ok = await copyText(row.value)
     if (!ok) return
     setCopied(row.key)
@@ -180,6 +183,7 @@ export function ContactSection({ reduced: reducedProp }: ContactSectionProps) {
               </div>
               <button
                 type="button"
+                data-cursor="triangle"
                 onClick={() => onCopy(row)}
                 aria-label={`copy ${row.label}`}
                 style={{
@@ -206,6 +210,7 @@ export function ContactSection({ reduced: reducedProp }: ContactSectionProps) {
           <nav aria-label="Labs" className="flex flex-wrap items-center gap-x-6 gap-y-1">
             <Link
               href="/labs"
+              data-cursor="triangle"
               style={{ fontFamily: monoFamily, fontSize: TYPE.label, letterSpacing: '0.06em', color: paperAlpha(0.7) }}
               className={`${footLink} lowercase`}
             >
@@ -218,6 +223,7 @@ export function ContactSection({ reduced: reducedProp }: ContactSectionProps) {
               <Link
                 key={lab.href}
                 href={lab.href}
+                data-cursor="triangle"
                 style={{ fontFamily: monoFamily, fontSize: TYPE.label, letterSpacing: '0.06em', color: paperAlpha(0.5) }}
                 className={`${footLink} lowercase`}
               >

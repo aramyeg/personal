@@ -6,6 +6,8 @@ import { WorkSection } from '@/components/labs/memory-card/sections/work'
 import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
 import { AboutSection } from '@/components/labs/memory-card/sections/about'
 import { ContactSection } from '@/components/labs/memory-card/sections/contact'
+import { MemoryCardAudioProvider } from '@/components/labs/memory-card/audio-context'
+import { GlyphCursor } from '@/components/labs/memory-card/cursor'
 import { MC } from '@/components/labs/memory-card/tokens'
 
 export const metadata: Metadata = {
@@ -23,14 +25,17 @@ export const metadata: Metadata = {
 export default function MemoryCardLabPage() {
   return (
     <GalleryChrome>
-      <MemoryCardChrome />
-      <main className="min-h-screen" style={{ background: MC.ink, color: MC.paper }}>
-        <HeroSection />
-        <WorkSection />
-        <SkillsSection />
-        <AboutSection />
-        <ContactSection />
-      </main>
+      <MemoryCardAudioProvider>
+        <GlyphCursor />
+        <MemoryCardChrome />
+        <main className="min-h-screen" style={{ background: MC.ink, color: MC.paper }}>
+          <HeroSection />
+          <WorkSection />
+          <SkillsSection />
+          <AboutSection />
+          <ContactSection />
+        </main>
+      </MemoryCardAudioProvider>
     </GalleryChrome>
   )
 }

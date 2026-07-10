@@ -1,10 +1,18 @@
 /**
  * Synth-only WebAudio layer for the PS1 lab — no asset files. Everything is
  * generated on the fly and stays silent until `resume()` runs on the first
- * user gesture (the browser autoplay law). A pure factory: no React, no
- * three.js. `ctxFactory` is injectable so tests build the node graph against
- * a mock AudioContext and never touch a real one in jsdom.
+ * user gesture (the browser autoplay law). The factory itself is pure: no
+ * React, no three.js. `ctxFactory` is injectable so tests build the node
+ * graph against a mock AudioContext and never touch a real one in jsdom.
+ *
+ * `useMemoryCardAudio` (bottom of file) is the one React seam: it lazily
+ * builds a single module-level `PS1Audio` instance the first time any
+ * component mounts, and only inside an effect — never during render, so
+ * nothing SSR-visible depends on it and no AudioContext is ever touched at
+ * module-import time.
  */
+
+import { useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'memory-card-sound'
 
@@ -233,4 +241,42 @@ export function createPS1Audio(
   }
 
   return { resume, blip, select, back, boot, setRoomTone, setEnabled, enabled, dispose }
+}
+
+/** Inert stand-in returned before the real instance exists (SSR + the first
+ *  client render, both of which must agree — hydration-safe). Every call is
+ *  a no-op; `enabled()` reports muted, matching the factory's own default. */
+const NOOP_AUDIO: PS1Audio = {
+  resume() {},
+  blip() {},
+  select() {},
+  back() {},
+  boot() {},
+  setRoomTone() {},
+  setEnabled() {},
+  enabled: () => false,
+  dispose() {},
+}
+
+/** The one memory-card audio instance, shared by every consumer of the hook
+ *  below. Stays null until the first component mounts and its effect builds
+ *  it — never at module load, never during render. */
+let sharedAudio: PS1Audio | null = null
+
+/**
+ * One lazily-created `PS1Audio` instance, shared module-wide. The instance is
+ * built inside an effect on first mount (never during render/SSR, per the
+ * browser autoplay law and to keep server/first-client-paint output
+ * identical); every consumer thereafter reads the same shared object, so a
+ * toggle flipped from the chrome is immediately visible to every call site.
+ */
+export function useMemoryCardAudio(): PS1Audio {
+  const [instance, setInstance] = useState<PS1Audio | null>(sharedAudio)
+
+  useEffect(() => {
+    if (!sharedAudio) sharedAudio = createPS1Audio()
+    setInstance(sharedAudio)
+  }, [])
+
+  return instance ?? NOOP_AUDIO
 }
