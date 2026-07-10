@@ -98,7 +98,12 @@ export function TurningPage({
     mesh.geometry.computeVertexNormals()
 
     shade.material.opacity = 0.25 * Math.sin(Math.PI * f.t)
-    shade.position.x = Math.cos(Math.PI * easeTurn(f.t)) * (PAGE_W / 2)
+    // Sweeps from the spine (x=0) out toward the free edge on the side the
+    // page is departing toward: +X for 'next' (trailing shadow falls to the
+    // right, under the still-flat right stack), mirrored to -X for 'prev'
+    // (the page is curling back down onto the left stack instead).
+    const sweep = Math.cos(Math.PI * easeTurn(f.t)) * (PAGE_W / 2)
+    shade.position.x = f.dir === 'next' ? sweep : -sweep
   })
 
   return (

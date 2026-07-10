@@ -18,7 +18,11 @@ export const COVER_MS = 1400
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
 
-const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
+/** True when `dir` would flip the front cover itself (spread 0<->1) rather
+ *  than turning an interior page — shared with book.tsx so it can gate the
+ *  left static page/block's visibility using the same rule this driver uses
+ *  to pick the cover animation branch. */
+export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
   (spread === 0 && dir === 'next') || (spread === 1 && dir === 'prev')
 
 /**

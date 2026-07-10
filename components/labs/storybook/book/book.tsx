@@ -21,7 +21,7 @@ import { useStorybookStore } from '../store'
 import { SPREAD_COUNT } from '../content'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
-import { useTurnDriver } from './use-turn-driver'
+import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
 
 export const BOOK = {
@@ -163,6 +163,15 @@ export function Book() {
   // the lifting cover reveals them, rather than popping in only once the
   // turn commits).
   const isOpen = spreadOpen || turning !== null
+  // True for the entire duration of a cover turn (spread/turning are both
+  // committed store state, so this is stable across the whole animation,
+  // not a per-frame value). The front cover doubles as the left stack's
+  // support board only at its fully-open rest pose (see FRONT_LOCAL_Y
+  // above) — mid-rotation it is neither under the left pages (closing) nor
+  // yet under them (opening), so the left static page/block must stay
+  // hidden for the whole turn and only reappear once `completeTurn()`
+  // lands the cover on its new rest pose.
+  const isCoverTurning = turning !== null && isCoverTurn(spread, turning)
   const rightHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
   const leftHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
   const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
@@ -221,8 +230,11 @@ export function Book() {
       {/* Left page block: nonexistent at spread 0 or mid-cover-turn (a
           zero-height box still renders coincident top/bottom faces, so it's
           skipped entirely rather than shrunk to zero), grows once a page has
-          actually turned. */}
-      {isOpen && leftHeight > 0 && (
+          actually turned. Also hidden for the whole duration of a cover
+          turn — see isCoverTurning above — since a 'prev' cover turn starts
+          with leftHeight > 0 (spread is still 1 until commit) and would
+          otherwise float once the cover lifts out from under it. */}
+      {isOpen && leftHeight > 0 && !isCoverTurning && (
         <mesh
           position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + leftHeight / 2, 0]}
           material={edgeMaterial}
@@ -235,22 +247,25 @@ export function Book() {
           left page's footprint (x in [-PAGE_W, 0]) sits outside the front
           cover entirely and would otherwise poke out past the spine. */}
       {isOpen && (
-        <>
-          {/* Static right page (no curl) resting on the right block. */}
-          <mesh
-            position={[0, BACK_COVER_TOP + rightHeight + BOOK.pageLift, 0]}
-            geometry={pageGeometry}
-            material={paperMaterial}
-          />
+        <mesh
+          position={[0, BACK_COVER_TOP + rightHeight + BOOK.pageLift, 0]}
+          geometry={pageGeometry}
+          material={paperMaterial}
+        />
+      )}
 
-          {/* Static left page, mirrored across the spine. */}
-          <mesh
-            position={[0, BACK_COVER_TOP + leftHeight + BOOK.pageLift, 0]}
-            scale={[-1, 1, 1]}
-            geometry={pageGeometry}
-            material={paperMaterial}
-          />
-        </>
+      {/* Static left page, mirrored across the spine. Hidden for the whole
+          duration of a cover turn (see isCoverTurning above) — the front
+          cover is its support board only at rest, so revealing it any
+          earlier than the turn's commit makes it appear to float past the
+          book's edge, unsupported. */}
+      {isOpen && !isCoverTurning && (
+        <mesh
+          position={[0, BACK_COVER_TOP + leftHeight + BOOK.pageLift, 0]}
+          scale={[-1, 1, 1]}
+          geometry={pageGeometry}
+          material={paperMaterial}
+        />
       )}
 
       {/* The page currently mid-turn; hidden except during a non-cover turn. */}
