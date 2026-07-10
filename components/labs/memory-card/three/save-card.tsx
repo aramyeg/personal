@@ -289,6 +289,11 @@ function SaveCardInner({ save, flipped, reduced, onTap }: SaveCardProps) {
     invalidate()
   }
   const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    // Stop at the frontmost hit: the card is several meshes deep (GLB shells +
+    // sticker planes), and without this the group handler fires once per pierced
+    // mesh — an even number of onTap()s that cancel the flip out. Mirrors the
+    // stopPropagation the press already does (canonical R3F capture pattern).
+    e.stopPropagation()
     const d = drag.current
     const el = e.target as unknown as { releasePointerCapture?: (id: number) => void }
     el.releasePointerCapture?.(e.pointerId)
