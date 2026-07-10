@@ -114,7 +114,7 @@ function UserMenu({ email }: { email: string }) {
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-4 right-4 mb-2 rounded-[8px] border border-[var(--c-border)] bg-[var(--c-surface)] p-1 text-[var(--c-text)] shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
+        <div className="absolute bottom-full left-4 right-4 mb-2 rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-1 text-[var(--c-text)]">
           <p className="truncate px-2 py-1.5 font-[family-name:var(--font-data)] text-[11px] text-[var(--c-text-soft)]">
             {email}
           </p>
@@ -122,7 +122,7 @@ function UserMenu({ email }: { email: string }) {
           <button
             type="button"
             onClick={() => void signOut()}
-            className="w-full rounded-[4px] px-2 py-1.5 text-left text-[13px] text-[var(--c-text)] transition-colors duration-150 hover:bg-[#fafbfd]"
+            className="w-full rounded-[4px] px-2 py-1.5 text-left text-[13px] text-[var(--c-text)] transition-colors duration-150 hover:bg-[var(--c-hover)]"
           >
             Sign out
           </button>

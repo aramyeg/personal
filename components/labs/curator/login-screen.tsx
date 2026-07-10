@@ -67,7 +67,7 @@ export function LoginScreen() {
 
   return (
     <div className="flex h-full w-full items-center justify-center bg-[var(--c-canvas)]">
-      <div className="w-full max-w-[360px] rounded-[10px] border border-[var(--c-border)] bg-[var(--c-surface)] p-8 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+      <div className="w-full max-w-[360px] rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-8">
         <div className="mb-6 flex items-center gap-2">
           <span aria-hidden className="h-4 w-4 rounded-[3px] bg-[var(--c-blue)]" />
           <span className="text-[14px] font-semibold tracking-tight">Curator</span>
