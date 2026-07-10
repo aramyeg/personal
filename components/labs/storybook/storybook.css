@@ -91,6 +91,22 @@
 }
 .sb-plaque strong { font-weight: 700; letter-spacing: 0.06em; }
 
+/* Pasted-label parchment backing (Task 12 review, finding 1): a plainer
+   sibling to `.sb-plaque` — text glued onto the page rather than framed as
+   a fact-card. Used by the title-page hero block and each chapter's
+   narration column so narration never renders raw over the standing
+   pop-up cutouts. Deliberately lighter than the plaque (no outline ring,
+   thinner border, softer background) so the two treatments read as related
+   but distinct: plaque = fact card, plate = narration label. */
+.sb-text-plate {
+  background: color-mix(in srgb, var(--sb-paper) 86%, transparent);
+  border: 1px solid var(--sb-gold-deep);
+  border-radius: 3px;
+  padding: 0.9rem 1.2rem;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
 /* ---------------------------------------------------------------------
    Spread overlay (Task 12) — the book's real text layer, positioned over
    the WebGL spread via inline left/top/width/height from `pageRect`.
@@ -127,6 +143,13 @@
   gap: 0.6rem;
   padding-bottom: 8%;
 }
+.sb-text-plate--title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 34em;
+}
 .sb-title-hero {
   font-size: clamp(2.1rem, 5.2vw, 3.75rem);
 }
@@ -138,6 +161,11 @@
 }
 .sb-byline {
   margin-top: 0.3rem;
+  /* Legibility fix (Task 12 review, finding 2): gold-deep on paper is only
+     ~3.25:1, below AA for text this small — ink reads comfortably at ~9.5:1
+     against the text plate's parchment backing. */
+  color: var(--sb-ink);
+  font-size: 0.82rem;
 }
 .sb-opening-line {
   margin-top: 1rem;
@@ -162,8 +190,15 @@
   align-self: end;
   padding-bottom: 4%;
 }
+.sb-chapter-col--narration .sb-text-plate {
+  padding: 0.65rem 0.85rem;
+}
 .sb-chapter-col--narration .sb-chapter-kicker {
   margin: 0;
+  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline` — same
+     gold-deep-on-paper contrast shortfall, same ink-on-plate fix. */
+  color: var(--sb-ink);
+  font-size: 0.82rem;
 }
 .sb-chapter-col--narration .sb-chapter-title {
   font-size: clamp(1.3rem, 2.5vw, 1.85rem);
@@ -238,6 +273,11 @@
 .sb-satchel-tag {
   min-width: 0;
 }
+.sb-satchel-tag .sb-chapter-kicker {
+  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline`. */
+  color: var(--sb-ink);
+  font-size: 0.82rem;
+}
 .sb-satchel-name {
   font-family: var(--font-sb-display);
   font-size: 0.8rem;
@@ -252,6 +292,9 @@
 }
 .sb-satchel-more {
   line-height: 1.6;
+  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline`. */
+  color: var(--sb-ink);
+  font-size: 0.82rem;
 }
 
 /* The End (spread 9). */
@@ -378,7 +421,11 @@
     position: static;
     height: auto;
     min-height: 100%;
-    padding: 7% 8% 6rem;
+    padding: 7% 8% 0;
+    /* Clears the fixed BookNav pill (finding 4): its own footprint is
+       ~4rem (bottom-6 offset + pill height), plus the device's home-
+       indicator/notch inset so content never scrolls in behind it. */
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
   .sb-overlay-content--chapter {
     display: flex;
@@ -392,6 +439,9 @@
   }
   /* The panel scrolls, so the desktop compaction (needed to fit the flat
      page's shallow on-screen quad) is unnecessary here — read comfortably. */
+  .sb-chapter-col--narration .sb-text-plate {
+    padding: 0.9rem 1.1rem;
+  }
   .sb-chapter-col--narration .sb-chapter-title {
     font-size: clamp(1.5rem, 6vw, 2rem);
   }

@@ -121,7 +121,7 @@ export const CHAPTERS: readonly Chapter[] = [
 // derive them from.
 export const TITLE_LAYERS: readonly SceneLayer[] = [
   { id: 'title-border', kind: 'backdrop', hingeZ: -0.3, height: 0.5, width: 1.6, standAngle: 85 },
-  { id: 'title-hero', kind: 'hero', hingeZ: 0.2, height: 0.45, width: 0.7, standAngle: 88 },
+  { id: 'title-hero', kind: 'hero', hingeZ: 0.2, height: 0.45, width: 0.7, standAngle: 88, offsetX: 0.55 },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 

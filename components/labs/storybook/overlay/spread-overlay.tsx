@@ -34,11 +34,13 @@ const REMAINING_SKILLS = skills.filter((skill) => !FEATURED_SKILL_NAMES.has(skil
 function TitleContent() {
   return (
     <div className="sb-overlay-content sb-overlay-content--title">
-      <h1 className="sb-chapter-title sb-title-hero">{BOOK_TITLE}</h1>
-      <p className="sb-book-subtitle">{BOOK_SUBTITLE}</p>
-      <p className="sb-chapter-kicker sb-byline">
-        written &amp; illustrated in paper · {siteConfig.name}
-      </p>
+      <div className="sb-text-plate sb-text-plate--title">
+        <h1 className="sb-chapter-title sb-title-hero">{BOOK_TITLE}</h1>
+        <p className="sb-book-subtitle">{BOOK_SUBTITLE}</p>
+        <p className="sb-chapter-kicker sb-byline">
+          written &amp; illustrated in paper · {siteConfig.name}
+        </p>
+      </div>
       <p className="sb-narration sb-no-dropcap sb-opening-line">{TITLE_OPENING_LINE}</p>
     </div>
   )
@@ -49,11 +51,13 @@ function ChapterContent({ chapter }: { chapter: Chapter }) {
   return (
     <div className="sb-overlay-content sb-overlay-content--chapter">
       <div className="sb-chapter-col sb-chapter-col--narration">
-        <p className="sb-chapter-kicker">{chapter.kicker}</p>
-        <h2 className="sb-chapter-title">
-          {chapter.numeral}. {chapter.title}
-        </h2>
-        <p className="sb-narration">{chapter.narration}</p>
+        <div className="sb-text-plate">
+          <p className="sb-chapter-kicker">{chapter.kicker}</p>
+          <h2 className="sb-chapter-title">
+            {chapter.numeral}. {chapter.title}
+          </h2>
+          <p className="sb-narration">{chapter.narration}</p>
+        </div>
       </div>
       <div className="sb-chapter-col sb-chapter-col--plaque">
         <div className="sb-plaque">
