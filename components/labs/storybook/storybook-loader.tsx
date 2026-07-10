@@ -1,12 +1,16 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import './storybook.css'
 import './storybook-responsive.css'
 import '@fontsource-variable/grenze-gotisch'
 import '@fontsource-variable/alegreya'
 import '@fontsource/alegreya-sc/400.css'
 import '@fontsource/alegreya-sc/700.css'
+import { PlainTale } from './plain-tale'
+import { resolveSbView, type SbView } from './resolve-view'
 import { useStorybookStore } from './store'
 import { useBookInput } from './use-book-input'
 import { BookNav } from './overlay/nav'
@@ -28,14 +32,33 @@ const BookScene = dynamic(() => import('./book/book-scene'), {
   ),
 })
 
-/** Client entry for the lab: the WebGL stage plus the chrome that sits above it. */
-export function StorybookLoader() {
+function detectWebGL(): boolean {
+  try {
+    const c = document.createElement('canvas')
+    return Boolean(c.getContext('webgl2') ?? c.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
+
+/** First-client-paint state, before the view (book vs. plain) resolves —
+ *  same desk backdrop as the book so there's no flash of unstyled content. */
+function VellumLoading() {
+  return (
+    <div className="sb-root fixed inset-0 grid place-items-center">
+      <p className="sb-chapter-kicker" style={{ color: 'var(--sb-paper)' }}>
+        Unrolling the vellum…
+      </p>
+    </div>
+  )
+}
+
+/** The WebGL book: canvas, pop-up overlay text, nav, cursor and sound chrome. */
+function BookTale() {
   const spread = useStorybookStore((s) => s.spread)
   const turning = useStorybookStore((s) => s.turning)
   const requestTurn = useStorybookStore((s) => s.requestTurn)
 
-  // Book view is the only view this loader ever mounts (there's no plain-
-  // view branch here yet), so input is always on.
   useBookInput(true)
 
   return (
@@ -60,4 +83,28 @@ export function StorybookLoader() {
       <SoundToggle />
     </div>
   )
+}
+
+/** Client entry for the lab: resolves book vs. plain (Task 4's `resolveSbView`)
+ *  from the `?view` param, WebGL support, and `prefers-reduced-motion`, then
+ *  mounts the matching experience. Mirrors `labs-view-switch.tsx`'s pattern. */
+export function StorybookLoader() {
+  const params = useSearchParams()
+  const [view, setView] = useState<SbView | null>(null)
+
+  useEffect(() => {
+    setView(
+      resolveSbView({
+        param: params.get('view'),
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        webglSupported: detectWebGL(),
+      })
+    )
+  }, [params])
+
+  // Server render + first client paint: a themed loading state (fast, no
+  // flash of the wrong view) until capabilities are known.
+  if (view === null) return <VellumLoading />
+  if (view === 'plain') return <PlainTale />
+  return <BookTale />
 }

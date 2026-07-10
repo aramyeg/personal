@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
+import { CrawlableTale } from '@/components/labs/storybook/crawlable-tale'
 import { StorybookLoader } from '@/components/labs/storybook/storybook-loader'
 
 export const metadata: Metadata = {
@@ -20,8 +22,13 @@ export default function StorybookLabPage() {
       {/* StorybookLoader's own `.sb-root` already covers the viewport
           (fixed inset-0 overflow-hidden); no need to duplicate it here. */}
       <main>
-        <StorybookLoader />
+        {/* useSearchParams (view resolution) requires a Suspense boundary. */}
+        <Suspense fallback={null}>
+          <StorybookLoader />
+        </Suspense>
       </main>
+      {/* Server-rendered full tale for crawlers; removes itself on hydration. */}
+      <CrawlableTale />
     </GalleryChrome>
   )
 }
