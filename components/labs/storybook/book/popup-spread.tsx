@@ -145,13 +145,19 @@ function PopupLayer({
 
   return (
     <>
+      {/* renderOrder=0 (the three.js default, pinned explicitly here) keeps
+          this cutout drawing after the gutter crease's renderOrder=-1 (see
+          book.tsx) regardless of where three's distance-based transparent
+          sort would otherwise place it — so a standing layer always
+          composites on top of the crease instead of being painted over. */}
       <group ref={groupRef} position={[layer.offsetX ?? 0, 0, layer.hingeZ]}>
-        <mesh geometry={geometry} material={material} />
+        <mesh geometry={geometry} material={material} renderOrder={0} />
       </group>
       <mesh
         position={[layer.offsetX ?? 0, SHADOW_Y_LIFT, layer.hingeZ + SHADOW_Z_OFFSET]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={shadowMaterial}
+        renderOrder={0}
       >
         <planeGeometry args={[layer.width, SHADOW_HEIGHT]} />
       </mesh>

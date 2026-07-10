@@ -225,9 +225,25 @@ export function Book() {
         <boxGeometry args={[0.05, spineHeight, BOOK.coverH]} />
       </mesh>
 
-      {/* Gutter crease: soft dark shadow where the open pages meet the spine. */}
+      {/* Gutter crease: soft dark shadow where the open pages meet the spine.
+          renderOrder=-1 forces it into the transparent pass *before* every
+          default-renderOrder transparent object (the pop-up layers and their
+          shadows below) instead of relying on three's distance-based sort.
+          That sort keys off each mesh's geometry bounding-sphere center,
+          which for a wide, medium-depth strip like this one can end up
+          judged "nearer" than a tall standing pop-up layer hinged deep on
+          the page — flipping draw order so the crease (depthWrite: false,
+          so it never occupies the depth buffer) painted over the layer
+          instead of under it. Pinning the order guarantees the layers'
+          alpha-tested cutouts always composite on top, wherever they cover
+          the strip, while bare page still shows the crease beneath them. */}
       {isOpen && (
-        <mesh position={[0, CREASE_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} material={creaseMaterial}>
+        <mesh
+          position={[0, CREASE_Y, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          material={creaseMaterial}
+          renderOrder={-1}
+        >
           <planeGeometry args={[CREASE_WIDTH, BOOK.coverH]} />
         </mesh>
       )}
