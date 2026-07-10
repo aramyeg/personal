@@ -24,7 +24,7 @@ export const briefs: EngineeringBrief[] = [
     title: 'Client State Architecture',
     stack: 'Zustand, Immer, zustand/middleware persist',
     pattern:
-      'A single Zustand store, wrapped in an Immer producer, holds every module’s UI and domain state. Components read module-scoped slices through selectors (e.g. useCuratorStore((s) => s.pipeline)) rather than the whole tree, and a persist middleware partializes only density, notification preferences, pipeline placement, and NPS completion to storage.',
+      'A single Zustand store, wrapped in an Immer producer, holds every module’s UI and domain state. Components read module-scoped slices through selectors (e.g. useCuratorStore((s) => s.pipeline)) rather than the whole tree, and a versioned persist middleware partializes only density, interface preferences, pipeline placement, and NPS completion to storage.',
     rationale:
       'One store lets seven independently code-split modules share state without prop drilling or nested providers, and partializing keeps session-scoped noise — the active module, the toast queue, sidebar state — out of localStorage so a reload restores preferences, not transient UI.',
   },
