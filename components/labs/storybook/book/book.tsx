@@ -25,6 +25,7 @@ import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
 import { CoverDecals } from './cover-decals'
+import { useSpreadPrints } from './use-page-print'
 
 export const BOOK = {
   coverW: 1.22,
@@ -143,6 +144,18 @@ export function Book() {
     () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
     [paper]
   )
+  // v2 printed page faces: each static page shows its half of the current
+  // spread's full-bleed print (user art `page-<n>.webp`, else the procedural
+  // print). During a turn the exposed side pre-swaps to the incoming
+  // spread's print — the page the lifting sheet reveals underneath.
+  const leftPageMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
+    [paper]
+  )
+  const rightPageMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
+    [paper]
+  )
   const creaseMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: crease, transparent: true, depthWrite: false }),
     [crease]
@@ -153,9 +166,11 @@ export function Book() {
       leatherMaterial.dispose()
       edgeMaterial.dispose()
       paperMaterial.dispose()
+      leftPageMaterial.dispose()
+      rightPageMaterial.dispose()
       creaseMaterial.dispose()
     },
-    [leatherMaterial, edgeMaterial, paperMaterial, creaseMaterial]
+    [leatherMaterial, edgeMaterial, paperMaterial, leftPageMaterial, rightPageMaterial, creaseMaterial]
   )
 
   // Committed open/closed state — drives the cover's *rest* pose and the
@@ -204,6 +219,40 @@ export function Book() {
   // computing this here doesn't touch the "no zustand in the frame loop"
   // contract the turn driver documents.
   const incomingSpreadIndex = turning ? spread + (turning === 'next' ? 1 : -1) : null
+
+  // Printed page faces for the current spread ± 1 (indices 1..SPREAD_MAX —
+  // spread 0 is the closed cover, no pages visible).
+  const printIndices = useMemo(
+    () => [spread - 1, spread, spread + 1].filter((i) => i >= 1 && i <= SPREAD_MAX),
+    [spread]
+  )
+  const prints = useSpreadPrints(printIndices)
+  // The half each static page shows: at rest, the current spread's own
+  // halves; during a turn, the side the lifting sheet exposes pre-swaps to
+  // the incoming spread (the turning sheet's own faces cover the seam — its
+  // landing face is the same image the static page switches to at commit).
+  const leftPrintIndex = turning === 'prev' ? spread - 1 : spread
+  const rightPrintIndex = turning === 'next' ? spread + 1 : spread
+  useEffect(() => {
+    const left = prints[leftPrintIndex]?.left ?? paper
+    if (leftPageMaterial.map !== left) {
+      leftPageMaterial.map = left
+      leftPageMaterial.needsUpdate = true
+    }
+    const right = prints[rightPrintIndex]?.right ?? paper
+    if (rightPageMaterial.map !== right) {
+      rightPageMaterial.map = right
+      rightPageMaterial.needsUpdate = true
+    }
+  }, [prints, leftPrintIndex, rightPrintIndex, leftPageMaterial, rightPageMaterial, paper])
+  // The mid-turn sheet's two faces: what it was showing when it lifted, and
+  // what it lands as (see turning-page.tsx for the uv orientations).
+  const turnFrontMap = turning
+    ? (turning === 'next' ? prints[spread]?.right : prints[spread - 1]?.right) ?? null
+    : null
+  const turnBackMap = turning
+    ? (turning === 'next' ? prints[spread + 1]?.left : prints[spread]?.left) ?? null
+    : null
 
   useFrame(() => {
     const f = frame.current
@@ -291,7 +340,7 @@ export function Book() {
         <mesh
           position={[0, BACK_COVER_TOP + rightHeight + BOOK.pageLift, 0]}
           geometry={pageGeometry}
-          material={paperMaterial}
+          material={rightPageMaterial}
         />
       )}
 
@@ -305,12 +354,12 @@ export function Book() {
           position={[0, BACK_COVER_TOP + leftHeight + BOOK.pageLift, 0]}
           scale={[-1, 1, 1]}
           geometry={pageGeometry}
-          material={paperMaterial}
+          material={leftPageMaterial}
         />
       )}
 
       {/* The page currently mid-turn; hidden except during a non-cover turn. */}
-      <TurningPage frame={frame} originY={turnOriginY} />
+      <TurningPage frame={frame} originY={turnOriginY} frontMap={turnFrontMap} backMap={turnBackMap} />
 
       {/* Pop-up layers for the open spread: folded paper cutouts that spring
           up from the page. Mounted for spread ± 1 (see popupSpreadIndices

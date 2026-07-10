@@ -106,8 +106,12 @@ export default function BookScene() {
       onCreated={(state) => state.camera.lookAt(...CAMERA_LOOKAT)}
     >
       <color attach="background" args={[DESK_COLOR]} />
-      <ambientLight color="#ffe8c8" intensity={0.32} />
-      <directionalLight position={[2, 4, 2]} color="#fff1d6" intensity={0.7} />
+      {/* v2 pivot: the book reads like a bright printed object — childhood
+          pop-up books live in daylight, not murk. The candle keeps its warm
+          flicker as seasoning; the vignette/desk keep the dark theatre
+          around the book. */}
+      <ambientLight color="#fff3e0" intensity={0.85} />
+      <directionalLight position={[2, 4, 2]} color="#fff6e4" intensity={0.95} />
       <CandleLight />
       <Desk />
       <Dust />

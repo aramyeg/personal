@@ -39,11 +39,20 @@ const BACK_TINT = '#4a3a2c'
 export function TurningPage({
   frame,
   originY,
+  frontMap = null,
+  backMap = null,
 }: {
   frame: RefObject<TurnFrame | null>
   /** World-space Y of the stack this page is currently departing from
    *  (matches the static page it was, per book.tsx's own height formula). */
   originY: number
+  /** v2 printed faces (book.tsx picks the right print halves per turn
+   *  direction): the face this sheet was showing when it lifted, and the
+   *  face it lands as. Falls back to plain paper when a print hasn't
+   *  resolved. The back map arrives pre-mirrored (a `left` half from
+   *  use-page-print.ts), matching the landed pose's spine-out uv run. */
+  frontMap?: THREE.Texture | null
+  backMap?: THREE.Texture | null
 }) {
   const meshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
   const backMeshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
@@ -95,6 +104,19 @@ export function TurningPage({
     },
     [paperTexture, material, backMaterial, shadeMaterial]
   )
+
+  // Swap the printed faces in as book.tsx resolves them (between turns, not
+  // mid-flight — the maps only change when `turning` flips). With a printed
+  // back the underside tint relaxes to a mild shade: at landing that face
+  // *is* the next left page, and a heavy tint would visibly pop when the
+  // untinted static page takes over at commit.
+  useEffect(() => {
+    material.map = frontMap ?? paperTexture
+    material.needsUpdate = true
+    backMaterial.map = backMap ?? paperTexture
+    backMaterial.color.set(backMap ? '#b9ad99' : BACK_TINT)
+    backMaterial.needsUpdate = true
+  }, [material, backMaterial, frontMap, backMap, paperTexture])
 
   // Builds a private geometry (never shared with the static pages' geometry
   // — its position attribute is rewritten every frame) before first paint,

@@ -38,7 +38,7 @@ function hashLayerId(id: string): number {
  * function so the caller's effect cleanup can suppress a load that resolves
  * after unmount without needing its own loader instance.
  */
-function loadArtTexture(
+export function loadArtTexture(
   id: string,
   onLoad: (texture: THREE.Texture) => void,
   onError: () => void

@@ -40,6 +40,73 @@ function magentaDistance(r, g, b) {
 }
 
 const isBackdropId = (id) => id.endsWith('-backdrop')
+// Cover decals sit on leather as gold foil, not as paper cutouts on a page —
+// a raw-paper rim would read as a sticker there. Page prints are full-bleed
+// page faces, not cutouts, so they get no rim either.
+const skipsRim = (id) => id.startsWith('cover-') || id.startsWith('page-')
+
+// Die-cut edge: real pop-up pieces show a sliver of raw paper where the
+// blade cut through the printed sheet. Approximated by dilating the alpha
+// mask (separable Chebyshev max-filter) and compositing the art over a
+// cream rim of that dilated silhouette.
+const RIM_RADIUS = 6
+const RIM_COLOR = [242, 231, 201] // raw paper cream, a touch lighter than the page
+
+function dilateAlpha(alpha, width, height, radius) {
+  const horizontal = new Uint8Array(alpha.length)
+  for (let y = 0; y < height; y++) {
+    const row = y * width
+    for (let x = 0; x < width; x++) {
+      let max = 0
+      const lo = Math.max(0, x - radius)
+      const hi = Math.min(width - 1, x + radius)
+      for (let k = lo; k <= hi; k++) {
+        const v = alpha[row + k]
+        if (v > max) max = v
+      }
+      horizontal[row + x] = max
+    }
+  }
+  const dilated = new Uint8Array(alpha.length)
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let max = 0
+      const lo = Math.max(0, y - radius)
+      const hi = Math.min(height - 1, y + radius)
+      for (let k = lo; k <= hi; k++) {
+        const v = horizontal[k * width + x]
+        if (v > max) max = v
+      }
+      dilated[y * width + x] = max
+    }
+  }
+  return dilated
+}
+
+/** Composites the art over its own dilated-silhouette cream rim ("over"
+ *  operator per pixel; returns a new buffer). */
+function addPaperRim(raw, width, height) {
+  const pixelCount = width * height
+  const alpha = new Uint8Array(pixelCount)
+  for (let i = 0; i < pixelCount; i++) alpha[i] = raw[i * 4 + 3]
+  const rim = dilateAlpha(alpha, width, height, RIM_RADIUS)
+
+  const out = Buffer.from(raw)
+  for (let i = 0; i < pixelCount; i++) {
+    const rimA = rim[i] / 255
+    if (rimA <= 0) continue
+    const topA = raw[i * 4 + 3] / 255
+    const outA = topA + rimA * (1 - topA)
+    if (outA <= 0) continue
+    for (let c = 0; c < 3; c++) {
+      const top = raw[i * 4 + c] * topA
+      const under = RIM_COLOR[c] * rimA * (1 - topA)
+      out[i * 4 + c] = Math.round((top + under) / outA)
+    }
+    out[i * 4 + 3] = Math.round(outA * 255)
+  }
+  return out
+}
 
 async function readSourceFiles() {
   try {
@@ -124,8 +191,19 @@ async function processOne(fileName) {
   }
   pipeline = pipeline.resize({ width: MAX_DIM, height: MAX_DIM, fit: 'inside', withoutEnlargement: true })
 
+  // The rim pass needs raw pixels at final size, so the pipeline is
+  // materialized once here and re-wrapped for encoding.
+  const sized = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const finalPixels = skipsRim(id)
+    ? sized.data
+    : addPaperRim(sized.data, sized.info.width, sized.info.height)
+
   const outPath = path.join(OUT_DIR, `${id}.webp`)
-  const outInfo = await pipeline.webp({ quality: 82 }).toFile(outPath)
+  const outInfo = await sharp(finalPixels, {
+    raw: { width: sized.info.width, height: sized.info.height, channels: 4 },
+  })
+    .webp({ quality: 82 })
+    .toFile(outPath)
   return { id, width: outInfo.width, height: outInfo.height, bytes: outInfo.size }
 }
 

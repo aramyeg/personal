@@ -3,6 +3,17 @@ import type { Experience } from '@/types'
 
 export type LayerKind = 'backdrop' | 'midground' | 'hero' | 'foreground'
 
+/** Paper-engineering structure of a pop-up piece (v2 pivot — real pop-up
+ *  books are folded mechanisms, not flat billboards on hinges):
+ *  - 'vfold': two half-panels joined at a vertical center crease that opens
+ *    into a V as the piece stands — the classic centerpiece mechanism, the
+ *    fold line running visibly through the printed art.
+ *  - 'crease': a horizontal fold partway up; the upper segment leans back,
+ *    giving the piece paper relief instead of a flat face.
+ *  - 'flat': a single plane (backdrops planted at the horizon, low fringes).
+ */
+export type LayerFold = 'vfold' | 'crease' | 'flat'
+
 export type SceneLayer = {
   id: string
   kind: LayerKind
@@ -11,7 +22,14 @@ export type SceneLayer = {
   width: number
   standAngle: number
   offsetX?: number
+  /** Defaults per kind when omitted: hero → 'vfold', midground → 'crease',
+   *  backdrop/foreground → 'flat'. */
+  fold?: LayerFold
 }
+
+/** Resolves a layer's fold structure, applying the per-kind defaults above. */
+export const layerFold = (layer: SceneLayer): LayerFold =>
+  layer.fold ?? (layer.kind === 'hero' ? 'vfold' : layer.kind === 'midground' ? 'crease' : 'flat')
 
 export type Chapter = {
   spread: number
@@ -65,10 +83,15 @@ const layerDefaults = (ch: number): SceneLayer[] => [
 // see book-scene.tsx) so every plane displays its art undistorted; hingeZ/
 // standAngle are untouched. See task-19-report.md for the before/after gate
 // screenshots.
+// v2 pivot re-plant: backdrop pushed to the page's far edge and leaned back
+// (a stage flat planted at the printed horizon, no air gap to the midground),
+// midground pulled back to give the v-fold hero the center of the spread,
+// hero hinge just past the gutter — v-fold centerpieces live at the middle
+// of a real pop-up spread, their crease continuing the gutter's line.
 const CH4_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch4-backdrop', kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 1.575, standAngle: 90 },
-  { id: 'ch4-midground', kind: 'midground', hingeZ: -0.18, height: 0.7, width: 2.825, standAngle: 78 },
-  { id: 'ch4-hero', kind: 'hero', hingeZ: 0.12, height: 0.62, width: 0.794, standAngle: 85 },
+  { id: 'ch4-backdrop', kind: 'backdrop', hingeZ: -0.58, height: 1.05, width: 1.575, standAngle: 83 },
+  { id: 'ch4-midground', kind: 'midground', hingeZ: -0.3, height: 0.7, width: 2.825, standAngle: 78 },
+  { id: 'ch4-hero', kind: 'hero', hingeZ: 0.04, height: 0.62, width: 0.794, standAngle: 85 },
   { id: 'ch4-foreground', kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 1.524, standAngle: 84 },
 ]
 

@@ -232,3 +232,103 @@ export function makePlaceholderLayer(kind: LayerKind, accents: readonly string[]
 
   return canvas
 }
+
+// ---------------------------------------------------------------------------
+// v2 pivot: printed page faces. Real pop-up books print the world onto the
+// page itself — the cutouts rise out of a fully illustrated spread, never
+// out of blank paper. Until the user's full-bleed page art lands (asset ids
+// `page-<spread>`), this procedural print keeps the composition honest: a
+// warm sky wash, a printed ground that meets the pop-ups' fold lines, and a
+// hairline frame per page half.
+
+const PRINT_W = 1536
+const PRINT_H = 1002
+
+/** Full-spread printed page face (both pages side by side; the book splits
+ *  it into halves via texture offsets). Deterministic per seed. */
+export function makePlaceholderPagePrint(
+  accents: readonly string[],
+  seed: number
+): HTMLCanvasElement {
+  assertBrowser('makePlaceholderPagePrint')
+  const { canvas, ctx } = createCanvas(PRINT_W, PRINT_H)
+  const rand = mulberry32(seed)
+
+  // Aged paper base with a soft warm sky wash toward the top.
+  ctx.fillStyle = '#e7d5a8'
+  ctx.fillRect(0, 0, PRINT_W, PRINT_H)
+  const sky = ctx.createLinearGradient(0, 0, 0, PRINT_H * 0.55)
+  sky.addColorStop(0, withAlpha(pickAccent(accents, 2), 0.35, 60))
+  sky.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, PRINT_W, PRINT_H * 0.55)
+
+  // Distant printed band (a painted horizon behind the standing backdrop).
+  paintPrintedBand(ctx, rand, PRINT_H * 0.44, PRINT_H * 0.1, withAlpha(pickAccent(accents, 1), 0.32))
+  // Main printed ground: the floor the cutouts stand on, covering the lower
+  // spread down to (and past) the foreground fold line.
+  paintPrintedBand(ctx, rand, PRINT_H * 0.52, PRINT_H * 0.48, withAlpha(pickAccent(accents, 0), 0.5))
+
+  // Sparse printed motifs drifting on the ground — pebbles/tufts at print
+  // strength, not cutout strength.
+  ctx.fillStyle = withAlpha(pickAccent(accents, 1), 0.3)
+  for (let i = 0; i < 40; i++) {
+    const x = rand() * PRINT_W
+    const y = PRINT_H * (0.58 + rand() * 0.36)
+    const r = 3 + rand() * 8
+    ctx.beginPath()
+    ctx.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Paper grain (subtle, print never kills the paper).
+  const grain = ctx.getImageData(0, 0, PRINT_W, PRINT_H)
+  for (let i = 0; i < grain.data.length; i += 4) {
+    const n = (rand() - 0.5) * 10
+    grain.data[i] = clampByte(grain.data[i] + n)
+    grain.data[i + 1] = clampByte(grain.data[i + 1] + n)
+    grain.data[i + 2] = clampByte(grain.data[i + 2] + n)
+  }
+  ctx.putImageData(grain, 0, 0)
+
+  // Hairline gold frame per page half, echoing a printed plate border.
+  ctx.strokeStyle = 'rgba(143, 111, 26, 0.5)'
+  ctx.lineWidth = 2
+  const inset = PRINT_W * 0.02
+  ctx.strokeRect(inset, inset, PRINT_W / 2 - inset * 1.6, PRINT_H - inset * 2)
+  ctx.strokeRect(PRINT_W / 2 + inset * 0.6, inset, PRINT_W / 2 - inset * 1.6, PRINT_H - inset * 2)
+
+  return canvas
+}
+
+/** A printed band with a gently waving top edge, running the full width. */
+function paintPrintedBand(
+  ctx: CanvasRenderingContext2D,
+  rand: () => number,
+  topY: number,
+  height: number,
+  fillStyle: string
+): void {
+  ctx.fillStyle = fillStyle
+  ctx.beginPath()
+  ctx.moveTo(0, topY + height)
+  ctx.lineTo(0, topY)
+  const waves = 5 + Math.floor(rand() * 3)
+  for (let i = 0; i < waves; i++) {
+    const x0 = (PRINT_W / waves) * i
+    const x1 = (PRINT_W / waves) * (i + 1)
+    const dip = (rand() - 0.5) * height * 0.5
+    ctx.quadraticCurveTo((x0 + x1) / 2, topY + dip, x1, topY)
+  }
+  ctx.lineTo(PRINT_W, topY + height)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/** `#rrggbb` → `rgba(r,g,b,a)`, optionally lifting each channel first. */
+function withAlpha(hex: string, alpha: number, lift = 0): string {
+  const r = clampByte(parseInt(hex.slice(1, 3), 16) + lift)
+  const g = clampByte(parseInt(hex.slice(3, 5), 16) + lift)
+  const b = clampByte(parseInt(hex.slice(5, 7), 16) + lift)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}

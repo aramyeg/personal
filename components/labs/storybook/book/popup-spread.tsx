@@ -38,7 +38,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { SceneLayer } from '../content'
+import { layerFold, type SceneLayer } from '../content'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { incomingRiseStand, outgoingFoldStand } from './popup-kinematics'
@@ -69,6 +69,18 @@ const PHASE_STEP_MS = 12
 // than exactly 0 so float noise in the spring/kinematic math can't flicker
 // the mesh.
 const STAND_EPSILON = 0.002
+// v2 paper engineering (see content.ts's LayerFold):
+// - v-fold: half-panels yaw around the vertical center crease as the piece
+//   stands, forming the classic V (crease toward the reader). Fully flat at
+//   stand=0 — yaw and pitch collapse together, like real glued paper.
+const VFOLD_YAW_RAD = (24 * Math.PI) / 180
+// - crease: the upper segment leans back from the horizontal fold line.
+const CREASE_SPLIT = 0.6 // lower segment's share of the piece's height
+const CREASE_TILT_RAD = (16 * Math.PI) / 180
+// Fold shading, baked as material tints (the print itself carries the
+// light — materials are unlit): the half/segment turned away from the key
+// side reads a step darker, which is what sells the crease as a real fold.
+const FOLD_SHADE_TINT = '#d9cdb4'
 
 /** A pop-up spread's relationship to any turn currently in flight — see the
  *  file header for how each drives `stand`. */
@@ -110,7 +122,7 @@ function PopupLayer({
   // has already folded flat, or a current/hidden layer sitting flat before
   // its own rise starts — rather than resolving the conflict by
   // depth-buffer luck or leaving flat paper visibly painted on the page.
-  const cutoutRef = useRef<THREE.Mesh>(null)
+  const cutoutRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   // Spring state (stand progress 0..1) and its velocity, integrated by hand
   // every frame rather than via a library — see SPRING_K/SPRING_C above.
@@ -126,28 +138,90 @@ function PopupLayer({
   const foldStart = useRef(0)
   const prevRole = useRef<PopupRole>(role)
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(layer.width, layer.height)
-    // Bottom edge (local y = -height/2) moves to y = 0: the hinge.
-    geo.translate(0, layer.height / 2, 0)
-    return geo
-  }, [layer.width, layer.height])
+  const fold = layerFold(layer)
+  // Sub-pivot refs for the fold mechanics (v-fold half-panels / crease's
+  // upper segment) — posed every frame alongside the main pitch group.
+  const leftPivotRef = useRef<THREE.Group>(null)
+  const rightPivotRef = useRef<THREE.Group>(null)
+  const upperPivotRef = useRef<THREE.Group>(null)
 
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
+  // Piece geometries per fold structure. Every piece is bottom-anchored at
+  // its fold line (local y=0 = the glue line on the page).
+  const geometries = useMemo(() => {
+    const { width, height } = layer
+    if (fold === 'vfold') {
+      const half = new THREE.PlaneGeometry(width / 2, height)
+      const left = half.clone()
+      left.translate(-width / 4, height / 2, 0)
+      const right = half
+      right.translate(width / 4, height / 2, 0)
+      return { a: left, b: right }
+    }
+    if (fold === 'crease') {
+      const lowerH = height * CREASE_SPLIT
+      const upperH = height - lowerH
+      const lower = new THREE.PlaneGeometry(width, lowerH)
+      lower.translate(0, lowerH / 2, 0)
+      const upper = new THREE.PlaneGeometry(width, upperH)
+      upper.translate(0, upperH / 2, 0)
+      return { a: lower, b: upper }
+    }
+    const flat = new THREE.PlaneGeometry(width, height)
+    flat.translate(0, height / 2, 0)
+    return { a: flat, b: null }
+  }, [layer, fold])
+
+  // Unlit print materials — the artwork carries its own light, like ink on
+  // paper; scene lights set the mood around the book, not on the print. The
+  // second piece (v-fold's far panel / crease's leaning top) gets a baked
+  // shade tint, which is what visually sells the fold.
+  const materials = useMemo(() => {
+    const make = (tint: string) =>
+      new THREE.MeshBasicMaterial({
         transparent: true,
         alphaTest: 0.1,
         side: THREE.DoubleSide,
-        roughness: 0.85,
-      }),
-    []
-  )
+        color: tint,
+      })
+    return { a: make('#ffffff'), b: fold === 'flat' ? null : make(FOLD_SHADE_TINT) }
+  }, [fold])
 
+  // Texture halves per fold: v-fold splits the art at the center crease
+  // (left|right), crease splits it at the fold line (lower|upper), flat
+  // shows it whole. Clones share the GPU upload; only uv transforms differ.
   useEffect(() => {
-    material.map = texture
-    material.needsUpdate = true
-  }, [material, texture])
+    if (!texture) return
+    texture.wrapS = THREE.ClampToEdgeWrapping
+    texture.wrapT = THREE.ClampToEdgeWrapping
+    const clones: THREE.Texture[] = []
+    const assign = (material: THREE.Material | null, map: THREE.Texture) => {
+      if (!(material instanceof THREE.MeshBasicMaterial)) return
+      material.map = map
+      material.needsUpdate = true
+    }
+    if (fold === 'vfold') {
+      const left = texture.clone()
+      left.repeat.set(0.5, 1)
+      const right = texture.clone()
+      right.repeat.set(0.5, 1)
+      right.offset.x = 0.5
+      clones.push(left, right)
+      assign(materials.a, left)
+      assign(materials.b, right)
+    } else if (fold === 'crease') {
+      const lower = texture.clone()
+      lower.repeat.set(1, CREASE_SPLIT)
+      const upper = texture.clone()
+      upper.repeat.set(1, 1 - CREASE_SPLIT)
+      upper.offset.y = CREASE_SPLIT
+      clones.push(lower, upper)
+      assign(materials.a, lower)
+      assign(materials.b, upper)
+    } else {
+      assign(materials.a, texture)
+    }
+    return () => clones.forEach((clone) => clone.dispose())
+  }, [texture, fold, materials])
 
   const shadowCanvas = useMemo(() => makeShadowCanvas(), [])
   const shadowTexture = useMemo(() => makeCanvasTexture(shadowCanvas), [shadowCanvas])
@@ -164,12 +238,14 @@ function PopupLayer({
 
   useEffect(
     () => () => {
-      geometry.dispose()
-      material.dispose()
+      geometries.a.dispose()
+      geometries.b?.dispose()
+      materials.a.dispose()
+      materials.b?.dispose()
       shadowTexture.dispose()
       shadowMaterial.dispose()
     },
-    [geometry, material, shadowTexture, shadowMaterial]
+    [geometries, materials, shadowTexture, shadowMaterial]
   )
 
   useFrame((state, delta) => {
@@ -253,11 +329,26 @@ function PopupLayer({
 
     shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.max(0, Math.min(1, stand.current))
 
+    // Fold mechanics, driven by the same stand value as the pitch — the
+    // whole mechanism collapses flat together and opens together, the way
+    // one glued sheet of paper must.
+    if (fold === 'vfold') {
+      // Mountain fold: the center crease points at the reader, panel outer
+      // edges sweep back — the classic pop-up centerpiece pose.
+      if (leftPivotRef.current) leftPivotRef.current.rotation.y = -VFOLD_YAW_RAD * stand.current
+      if (rightPivotRef.current) rightPivotRef.current.rotation.y = VFOLD_YAW_RAD * stand.current
+    } else if (fold === 'crease' && upperPivotRef.current) {
+      // Upper segment leans back from the fold line as the piece stands.
+      upperPivotRef.current.rotation.x = -CREASE_TILT_RAD * stand.current
+    }
+
     // See cutoutRef's declaration: paper is only worth drawing once it has
     // actually started rising off the page, whatever role got it there —
     // incoming-waiting, outgoing-folded-flat, and a current/hidden layer
-    // still flat pre-rise all read the same way here.
-    const paperVisible = stand.current > STAND_EPSILON
+    // still flat pre-rise all read the same way here. Also gated on the
+    // texture having resolved — an unmapped basic material would flash as
+    // a solid white card.
+    const paperVisible = stand.current > STAND_EPSILON && texture !== null
     if (cutoutRef.current) {
       cutoutRef.current.visible = paperVisible
     }
@@ -274,7 +365,32 @@ function PopupLayer({
           sort would otherwise place it — so a standing layer always
           composites on top of the crease instead of being painted over. */}
       <group ref={groupRef} position={[layer.offsetX ?? 0, 0, layer.hingeZ]}>
-        <mesh ref={cutoutRef} geometry={geometry} material={material} renderOrder={0} />
+        <group ref={cutoutRef}>
+          {fold === 'vfold' && (
+            <>
+              {/* Half-panels pivot around the vertical center crease (local
+                  x=0); their geometries already carry the ±width/4 offset. */}
+              <group ref={leftPivotRef}>
+                <mesh geometry={geometries.a} material={materials.a} renderOrder={0} />
+              </group>
+              <group ref={rightPivotRef}>
+                <mesh geometry={geometries.b!} material={materials.b!} renderOrder={0} />
+              </group>
+            </>
+          )}
+          {fold === 'crease' && (
+            <>
+              <mesh geometry={geometries.a} material={materials.a} renderOrder={0} />
+              {/* Upper segment pivots at the horizontal fold line. */}
+              <group ref={upperPivotRef} position={[0, layer.height * CREASE_SPLIT, 0]}>
+                <mesh geometry={geometries.b!} material={materials.b!} renderOrder={0} />
+              </group>
+            </>
+          )}
+          {fold === 'flat' && (
+            <mesh geometry={geometries.a} material={materials.a} renderOrder={0} />
+          )}
+        </group>
       </group>
       <mesh
         ref={shadowRef}
