@@ -1974,7 +1974,7 @@ describe('PipelineModule', () => {
 `ui/deal-card.tsx` — presentation only:
 
 ```tsx
-import type { DealCard } from '../adapters'
+import { OPEN_DEAL_ID, type DealCard } from '../adapters'
 import { Badge } from './badge'
 
 export function DealCardView({ deal, dragging = false }: { deal: DealCard; dragging?: boolean }) {
@@ -1985,7 +1985,7 @@ export function DealCardView({ deal, dragging = false }: { deal: DealCard; dragg
     >
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-[13px] font-medium">{deal.company}</p>
-        {deal.id === 'your-company'
+        {deal.id === OPEN_DEAL_ID
           ? <Badge tone="warn">open</Badge>
           : <Badge tone="ok">won</Badge>}
       </div>
@@ -2007,7 +2007,7 @@ export function DealCardView({ deal, dragging = false }: { deal: DealCard; dragg
 - `onDragEnd({ active, over })`: if no `over`, return. Resolve target column: `over.id` startsWith `col-` → that column at index = column length; otherwise find the column containing `String(over.id)` and use its index there. Call `movePipelineCard(String(active.id), targetColumn, targetIndex)`.
 - `DragOverlay` renders `DealCardView dragging` for the active id (null-safe).
 - Column shell: `data-testid={\`column-${col.id}\`}`, header = 11px tracked label + mono count, body = `space-y-2 min-h-[80px]`. Grid `lg:grid-cols-4`, below `lg`: `grid-flow-col auto-cols-[260px] overflow-x-auto` horizontal scroll.
-- Header: `h1` "Pipeline" + subtitle "Opportunity management — win rate 100%" (that is a real number computed as `won/(won+0 lost)`, not a gag).
+- Header: `h1` "Pipeline" + subtitle "Opportunity management — win rate 100%" (a real number computed as `won/(won+0 lost)`, not a gag; when `won + lost === 0` render "win rate —" so dragging every card out never shows NaN). SortableContext `items` must be the same filtered card list that renders.
 
 - [ ] **Step 3: Run tests, verify PASS. Browser check: drag the open deal Sourced → Offer with mouse; reload — placement persists (store persist); keyboard: tab to card, space to lift, arrows to move, space to drop.**
 
