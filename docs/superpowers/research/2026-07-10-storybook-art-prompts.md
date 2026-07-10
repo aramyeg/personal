@@ -11,11 +11,13 @@ above" shortcuts — so any asset can be regenerated independently.
    section below is one complete, self-contained prompt (style preamble + subject
    + transparency ask + magenta fallback + reject criteria) — copy the full fenced
    block, nothing more needed.
-2. **Generate all layers of one scene in a single ChatGPT conversation.** For a
-   4-layer chapter spread, do backdrop → midground → hero → foreground back to
-   back in the same thread so paper grain, light, and palette stay consistent
-   across the set. If a later layer starts drifting, remind the model: "same
-   paper, same light, same palette as the previous image."
+2. **Batch by what must stay consistent — see "Generation order" below.** The
+   two consistency axes: the HERO must be the same person in every chapter
+   (generate all hero-bearing pieces in ONE conversation, anchored on the
+   approved `ch4-hero` as a reference image), and each chapter's scenery +
+   its riders must share paper grain, light, and palette (one short
+   conversation per chapter). If a later image starts drifting, remind the
+   model: "same paper, same light, same palette as the previous image."
 3. **If a result comes back with a filled (non-transparent) background** instead
    of a transparent PNG, re-run the *same* prompt but explicitly repeat/emphasize
    the magenta fallback line at the end of your message — e.g. "place the subject
@@ -26,9 +28,53 @@ above" shortcuts — so any asset can be regenerated independently.
    headings below one-to-one).
 5. **Run the prep script**: `node scripts/storybook/prepare-art.mjs`. It
    chroma-keys any magenta fallback backgrounds, de-fringes the magenta cast off
-   semi-transparent edges, trims dead space (backdrops keep full canvas width),
-   resizes to fit within 1536px, and emits `public/labs/storybook/art/<id>.webp`
-   — a stdout table lists what it produced.
+   semi-transparent edges, trims dead space (EVERY cutout trims now, backdrops
+   included — the fold physics glues each texture edge-to-edge onto its panel),
+   resizes to fit within 1536px, emits `public/labs/storybook/art/<id>.webp`,
+   and rebuilds `art/manifest.json` (the runtime only requests art listed
+   there — skip this step and new art stays invisible).
+
+## Generation order — consistency sessions (v3)
+
+Batch 1 (cover crest/corner + the four ch4 pieces) is approved and
+benchmark-verified — do NOT regenerate it. Better: `ch4-hero` is now the
+canonical CHARACTER REFERENCE for every other hero appearance.
+
+Each bullet below = one ChatGPT conversation window. Within a session,
+generate in the listed order; re-anchor with the reference image whenever a
+result drifts.
+
+1. **`page-5` alone, first.** One asset, zero dependencies, validates the
+   whole page-print system against the ch4 art already in the app.
+2. **Hero session A** — open with the approved `ch4-hero` image uploaded:
+   "This is the canonical hero figurine from this book; keep his face,
+   hair, green tunic, satchel and golden quill identical in everything
+   that follows." Then: `title-hero` → `ch1-inn` → `ch1-sign` →
+   `ch2-hero` → `ch3-counter`. (The sign rides the inn's fold — making it
+   right after the inn keeps its wood/brass language matched.)
+3. **Hero session B** — new window, re-upload `ch4-hero` AND the fresh
+   `title-hero` as anchors: `ch5-arch` → `ch5-lantern` → `ch6-treasury` →
+   `ch6-banner` → `ch4-coins` (show `ch4-hero` again for the coin gold).
+   Splitting the hero work into two windows keeps threads short enough
+   that the character doesn't drift by the tenth image.
+4. **One short scenery window per chapter** — parent pieces and their
+   riders together so a raven matches its tower and a bee its ridge:
+   - ch1: `ch1-backdrop` → `ch1-wall`
+   - ch2: `ch2-backdrop` → `ch2-bee-a` → `ch2-bee-b`
+   - ch3: `ch3-towers` → `ch3-raven-a` → `ch3-rank` → `ch3-raven-b`
+   - ch5: `ch5-city` → `ch5-awning`
+   - ch6: `ch6-pines` → `ch6-fringe`
+5. **Endpapers window** — upload `cover-crest` as the gold-foil reference:
+   `title-border` → `end-letter` → `end-raven` → `back-crest`.
+6. **Satchel window** — upload `ch4-hero` so the bag matches the one he
+   wears: `satchel-bag` → the six `item-*` prompts.
+7. **Remaining page prints** — one window for `page-1..4, 6..9` (the
+   quiet printed-parchment register must stay uniform across all pages;
+   palettes shift per chapter, treatment must not).
+
+After each session: drop PNGs in `art-src/`, run the prep script, look at
+the live spread, and only then move on — catching a drift after one
+session is cheap, after five it's a redo.
 
 ## Locked style preamble (spec §8.3 — verbatim, prepended to every prompt below)
 
@@ -487,13 +533,9 @@ page, `page-<spread>.png` → 9 assets. These are **opaque full rectangles,
 1536×1024, NO transparency** — the pipeline detects `page-` ids and skips
 trimming/rims.
 
-**Also, when generating the remaining Batch-2 CUTOUTS from the prompts
-above, append one sentence:**
-- to every `chX-hero` prompt: *"Composed to stay readable with a vertical
-  center fold — balance the main mass evenly across the middle."* (heroes
-  are v-fold centerpieces; the crease runs through the art)
-- to every `chX-midground` prompt: *"Keep a clean horizontal band at about
-  60% of the piece's height — a paper fold line will cross there."*
+*(Superseded by v3: the Batch-2 cutout prompts above now carry their fold
+guidance inline — each heading states the fold/ridge position and the
+prompt text places a natural seam there. Nothing extra to append.)*
 
 Every page print below shares the same structure: printed FLAT on aged
 parchment (paper grain showing through), ground plane covering the lower
