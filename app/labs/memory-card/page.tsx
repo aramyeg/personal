@@ -4,6 +4,8 @@ import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
 import { HeroSection } from '@/components/labs/memory-card/sections/hero'
 import { WorkSection } from '@/components/labs/memory-card/sections/work'
 import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
+import { AboutSection } from '@/components/labs/memory-card/sections/about'
+import { ContactSection } from '@/components/labs/memory-card/sections/contact'
 import { MC } from '@/components/labs/memory-card/tokens'
 
 export const metadata: Metadata = {
@@ -26,6 +28,8 @@ export default function MemoryCardLabPage() {
         <HeroSection />
         <WorkSection />
         <SkillsSection />
+        <AboutSection />
+        <ContactSection />
       </main>
     </GalleryChrome>
   )

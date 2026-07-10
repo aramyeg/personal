@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import { siteConfig } from '@/lib/constants'
+import { siteConfig, socialLinks } from '@/lib/constants'
+import { hallLabs } from '@/lib/labs-manifest'
 
 // The lab fonts pull in `next/font/google`, whose call sites are compiled away
 // by Next's loader — not available under vitest. These section tests are about
@@ -28,11 +29,18 @@ vi.mock('@/components/labs/memory-card/three/card-rail', () => ({
   CardRail: () => <div data-testid="card-rail" />,
   RAIL_GAP: 3.1,
 }))
+// The CRT vignette loads a GLB and swaps an emissive canvas texture — neither
+// works under vitest. Swap it for an inert node so AboutSection renders its HTML.
+vi.mock('@/components/labs/memory-card/three/crt-vignette', () => ({
+  CrtVignette: () => <div data-testid="crt-vignette" />,
+}))
 
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
 import { HeroSection } from '@/components/labs/memory-card/sections/hero'
 import { SkillsSection } from '@/components/labs/memory-card/sections/skills'
 import { WorkSection } from '@/components/labs/memory-card/sections/work'
+import { AboutSection } from '@/components/labs/memory-card/sections/about'
+import { ContactSection } from '@/components/labs/memory-card/sections/contact'
 import { WRITTEN_WITH } from '@/components/labs/memory-card/lib/written-with'
 import { projects } from '@/data/projects'
 
@@ -156,5 +164,91 @@ describe('WorkSection', () => {
         within(list).getByText(`${project.company} · ${project.year}`)
       ).toBeInTheDocument()
     }
+  })
+})
+
+describe('AboutSection', () => {
+  it('has id="about" on the section root', () => {
+    const { container } = render(<AboutSection />)
+    expect(container.querySelector('section#about')).toBeInTheDocument()
+  })
+
+  it('renders a verbatim bio sentence as real DOM text (claims law)', () => {
+    render(<AboutSection />)
+    expect(
+      screen.getByText(
+        "Currently at xDataGroup, I build the frontend of AMIO Bank's retail banking platform while collaborating directly with founders on an early-stage PropTech startup."
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('never renders a lead title', () => {
+    render(<AboutSection />)
+    expect(screen.queryByText(/lead/i)).toBeNull()
+  })
+
+  it('renders the oversized mono ornament line', () => {
+    render(<AboutSection />)
+    expect(
+      screen.getByText('8 yrs · fintech systems · yerevan → worldwide')
+    ).toBeInTheDocument()
+  })
+
+  it('mounts the CRT vignette inside an aria-hidden container', () => {
+    render(<AboutSection />)
+    const box = screen.getByTestId('about-vignette')
+    expect(box).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByTestId('crt-vignette')).toBeInTheDocument()
+  })
+})
+
+describe('ContactSection', () => {
+  it('has id="contact" on the section root', () => {
+    const { container } = render(<ContactSection />)
+    expect(container.querySelector('section#contact')).toBeInTheDocument()
+  })
+
+  it('renders the save-prompt heading', () => {
+    render(<ContactSection />)
+    expect(
+      screen.getByRole('heading', { name: /save your progress/i })
+    ).toBeInTheDocument()
+  })
+
+  it('renders all three contact values, each with a copy button', () => {
+    render(<ContactSection />)
+    const values = [
+      siteConfig.email,
+      ...socialLinks.map((s) => s.url.replace(/^https?:\/\//, '')),
+    ]
+    for (const value of values) {
+      expect(screen.getByText(value)).toBeInTheDocument()
+    }
+    expect(screen.getAllByRole('button', { name: /copy/i })).toHaveLength(3)
+  })
+
+  it('links to the gallery and cross-links every hall lab except this one', () => {
+    render(<ContactSection />)
+    const footer = screen.getByTestId('contact-footer')
+    expect(
+      within(footer).getByRole('link', { name: /gallery/i })
+    ).toHaveAttribute('href', '/labs')
+    for (const lab of hallLabs) {
+      if (lab.slug === 'memory-card') {
+        expect(within(footer).queryByText(lab.title)).toBeNull()
+      } else {
+        expect(within(footer).getByText(lab.title)).toBeInTheDocument()
+      }
+    }
+  })
+
+  it('renders both CC-BY attribution lines (license law)', () => {
+    render(<ContactSection />)
+    expect(
+      screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/character by humans of the world \(cc by 4\.0\)/i)
+    ).toBeInTheDocument()
   })
 })
