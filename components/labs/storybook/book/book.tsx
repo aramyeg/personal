@@ -24,6 +24,7 @@ import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedu
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
+import { CoverDecals } from './cover-decals'
 
 export const BOOK = {
   coverW: 1.22,
@@ -351,6 +352,10 @@ export function Book() {
         <mesh position={[BOOK.coverW / 2, FRONT_LOCAL_Y, 0]} material={leatherMaterial}>
           <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
         </mesh>
+        {/* Crest/corners/title — moves with the cover through the whole
+            turn since it's mounted in the same pivot group as the box
+            above (task 19). */}
+        <CoverDecals coverTopY={FRONT_LOCAL_Y + BOOK.coverT / 2} />
       </group>
     </group>
   )

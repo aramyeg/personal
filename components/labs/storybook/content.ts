@@ -52,6 +52,26 @@ const layerDefaults = (ch: number): SceneLayer[] => [
   { id: `ch${ch}-foreground`, kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 2.1, standAngle: 84 },
 ]
 
+// task 19 (Batch-1 art look-dev): chapter IV's real baked art trims to a
+// noticeably different aspect ratio per layer than the 1024×512 placeholder
+// canvas every `layerDefaults` width/height pair above was tuned against —
+// backdrop 1536×1024 (1.5), midground 1465×363 (a much wider/shorter strip,
+// 4.04), hero 949×741 (1.28), foreground 1422×280 (an even wider strip,
+// 5.08). Reusing layerDefaults(4) stretched every layer non-uniformly to
+// fill its old width×height box, squashing the dragon coil and smearing the
+// dune-city skyline. These widths are each layer's old height re-derived
+// through its art's real aspect ratio instead (height held constant — the
+// standing scale that was already verified clear of the camera frustum,
+// see book-scene.tsx) so every plane displays its art undistorted; hingeZ/
+// standAngle are untouched. See task-19-report.md for the before/after gate
+// screenshots.
+const CH4_LAYERS: readonly SceneLayer[] = [
+  { id: 'ch4-backdrop', kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 1.575, standAngle: 90 },
+  { id: 'ch4-midground', kind: 'midground', hingeZ: -0.18, height: 0.7, width: 2.825, standAngle: 78 },
+  { id: 'ch4-hero', kind: 'hero', hingeZ: 0.12, height: 0.62, width: 0.794, standAngle: 85 },
+  { id: 'ch4-foreground', kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 1.524, standAngle: 84 },
+]
+
 export const CHAPTERS: readonly Chapter[] = [
   {
     spread: 2,
@@ -95,7 +115,7 @@ export const CHAPTERS: readonly Chapter[] = [
     narration:
       "Then came a summons from the golden dunes, where a great bank kept a dragon of renown coiled about its treasure. None doubted the beast’s strength; the trouble was teaching it manners. The hero built passages of glass through which the people could reach their gold — safely, swiftly, and without waking so much as one scale — and he even taught the dragon to lease out carriages.",
     accents: ['#d9a24a', '#d96f4a', '#4f8f85', '#e6c65a'],
-    layers: layerDefaults(4),
+    layers: CH4_LAYERS,
   },
   {
     spread: 6,

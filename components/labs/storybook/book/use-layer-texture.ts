@@ -6,6 +6,12 @@
  * doesn't exist — which, until real art lands, is every layer, every time.
  * The fallback is therefore the expected path today, not a real error, so
  * it stays silent (no console noise) rather than logging.
+ *
+ * `loadArtTexture` below is the one place that actually talks to
+ * `THREE.TextureLoader`; both `useLayerTexture` (placeholder fallback) and
+ * `useArtTexture` (task 19's cover decals — no placeholder, missing art
+ * just means no decal) build on it instead of duplicating the loader
+ * boilerplate.
  */
 
 import { useEffect, useState } from 'react'
@@ -26,6 +32,42 @@ function hashLayerId(id: string): number {
 }
 
 /**
+ * Fires a `THREE.TextureLoader` request for `/labs/storybook/art/<id>.webp`,
+ * routing success to `onLoad` and any failure (404, decode error, ...) to
+ * `onError` — both silently, per the file header. Returns a `cancel`
+ * function so the caller's effect cleanup can suppress a load that resolves
+ * after unmount without needing its own loader instance.
+ */
+function loadArtTexture(
+  id: string,
+  onLoad: (texture: THREE.Texture) => void,
+  onError: () => void
+): { cancel: () => void } {
+  let cancelled = false
+  const loader = new THREE.TextureLoader()
+  loader.load(
+    `/labs/storybook/art/${id}.webp`,
+    (loaded) => {
+      if (cancelled) {
+        loaded.dispose()
+        return
+      }
+      loaded.colorSpace = THREE.SRGBColorSpace
+      onLoad(loaded)
+    },
+    undefined,
+    () => {
+      if (!cancelled) onError()
+    }
+  )
+  return {
+    cancel: () => {
+      cancelled = true
+    },
+  }
+}
+
+/**
  * Resolves one layer's texture: real baked art if it exists at
  * `/labs/storybook/art/<id>.webp`, otherwise a seeded placeholder cutout
  * built from `kind`/`accents`. Both paths set `colorSpace = SRGBColorSpace`
@@ -40,26 +82,14 @@ export function useLayerTexture(
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
 
   useEffect(() => {
-    let cancelled = false
     let owned: THREE.Texture | null = null
-
-    const loader = new THREE.TextureLoader()
-    loader.load(
-      `/labs/storybook/art/${layerId}.webp`,
+    const { cancel } = loadArtTexture(
+      layerId,
       (loaded) => {
-        if (cancelled) {
-          loaded.dispose()
-          return
-        }
-        loaded.colorSpace = THREE.SRGBColorSpace
         owned = loaded
         setTexture(loaded)
       },
-      undefined,
       () => {
-        // Expected path today (see file header) — no art/ directory exists
-        // yet, so this fires for every layer. Deliberately silent.
-        if (cancelled) return
         const canvas = makePlaceholderLayer(kind, accents, hashLayerId(layerId))
         const fallback = makeCanvasTexture(canvas)
         owned = fallback
@@ -68,11 +98,42 @@ export function useLayerTexture(
     )
 
     return () => {
-      cancelled = true
+      cancel()
       owned?.dispose()
       setTexture(null)
     }
   }, [layerId, kind, accents])
+
+  return texture
+}
+
+/**
+ * Loads `/labs/storybook/art/<id>.webp` with no placeholder fallback:
+ * resolves `null` while loading and whenever the file doesn't exist yet.
+ * Used by the cover decals (task 19) — a crest/corner/etc. with no baked
+ * art simply isn't drawn, rather than substituting a placeholder shape that
+ * was never designed for a flat leather cover.
+ */
+export function useArtTexture(id: string): THREE.Texture | null {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null)
+
+  useEffect(() => {
+    let owned: THREE.Texture | null = null
+    const { cancel } = loadArtTexture(
+      id,
+      (loaded) => {
+        owned = loaded
+        setTexture(loaded)
+      },
+      () => setTexture(null)
+    )
+
+    return () => {
+      cancel()
+      owned?.dispose()
+      setTexture(null)
+    }
+  }, [id])
 
   return texture
 }
