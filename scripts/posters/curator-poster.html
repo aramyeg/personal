@@ -1,0 +1,292 @@
+<!-- scripts/posters/curator-poster.html -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    --navy: #0C2340;
+    --blue: #1F5EDC;
+    --canvas: #F6F8FB;
+    --surface: #FFFFFF;
+    --border: #E2E8F0;
+    --text: #111C2E;
+    --text-soft: #5A6B82;
+    --ok: #0E7A4B;
+    --ok-bg: #E6F4EC;
+    --warn: #B45309;
+    --warn-bg: #FDF0E3;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    width: 900px;
+    height: 1200px;
+    overflow: hidden;
+    position: relative;
+    background: var(--canvas);
+    font-family: var(--font-ui);
+    color: var(--text);
+  }
+
+  /* ---- top wordmark row (subtle, not the hero) ---- */
+  .topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 28px;
+  }
+  .topbar .glyph { width: 16px; height: 16px; border-radius: 4px; background: var(--blue); }
+  .topbar .word { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .topbar .ver { font-family: var(--font-mono); font-size: 13px; color: var(--text-soft); }
+  .topbar .sep { width: 1px; height: 18px; background: var(--border); }
+  .topbar .tag {
+    font-size: 12px; font-weight: 600; color: var(--text-soft);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  /* ---- left strip: navy sidebar ---- */
+  .sidebar {
+    position: absolute;
+    top: 64px; left: 0;
+    width: 200px; height: 1136px;
+    background: var(--navy);
+    padding: 28px 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-glyph {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--blue);
+    margin-bottom: 26px;
+    position: relative;
+  }
+  .sidebar-glyph::after {
+    content: "";
+    position: absolute;
+    left: 12px; top: 12px;
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.85);
+  }
+  .nav { display: flex; flex-direction: column; gap: 10px; }
+  .nav-item {
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    background: rgba(255,255,255,0.12);
+  }
+  .nav-item.active {
+    background: #FFFFFF;
+    color: var(--navy);
+    font-size: 19px;
+    font-weight: 700;
+  }
+  .operator {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .operator .avatar {
+    width: 36px; height: 36px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .operator .name { color: #fff; font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .operator .role { color: rgba(255,255,255,0.5); font-size: 12px; line-height: 1.3; }
+
+  /* ---- right area: canvas with dashboard cards ---- */
+  .canvas-area {
+    position: absolute;
+    top: 64px; left: 200px;
+    width: 700px; height: 1136px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .kpi-row { display: flex; gap: 22px; height: 236px; }
+  .kpi-card { flex: 1; padding: 24px; display: flex; flex-direction: column; }
+  .kpi-card .label {
+    font-size: 21px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-soft);
+  }
+  .kpi-card .value-row {
+    margin-top: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .kpi-card .value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+  }
+  .kpi-card.rooms .value { font-size: 156px; }
+  .kpi-card.visitors .value { font-size: 92px; }
+  .kpi-card .delta { font-family: var(--font-mono); font-size: 46px; font-weight: 700; color: var(--ok); }
+
+  .chart-card { flex: 1; min-height: 0; padding: 26px 28px; display: flex; flex-direction: column; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .chart-head .title {
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-soft);
+  }
+  .chart-head .caption { font-size: 15px; color: var(--text-soft); font-style: italic; }
+  .chart-svg-wrap { flex: 1; min-height: 0; margin-top: 14px; }
+  .chart-foot {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--text-soft);
+    margin-top: 8px;
+  }
+
+  .kanban-row { display: flex; gap: 18px; height: 128px; }
+  .kanban-card { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+  .kanban-badge {
+    align-self: flex-start;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .kanban-badge.won { background: var(--ok-bg); color: var(--ok); }
+  .kanban-badge.open { background: var(--warn-bg); color: var(--warn); }
+  .kanban-bar { height: 9px; border-radius: 4px; background: #DCE3EC; }
+  .kanban-bar.short { width: 55%; background: #E9EDF3; }
+  .kanban-meta { margin-top: auto; font-family: var(--font-mono); font-size: 13px; color: var(--text-soft); }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="glyph"></div>
+    <span class="word">Curator</span>
+    <span class="ver">v4.2.1</span>
+    <div class="sep"></div>
+    <span class="tag">Portfolio Operations Platform</span>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-glyph"></div>
+    <div class="nav">
+      <div class="nav-item active">Overview</div>
+      <div class="nav-item" style="background: rgba(255,255,255,0.14);"></div>
+      <div class="nav-item" style="background: rgba(255,255,255,0.10);"></div>
+      <div class="nav-item" style="background: rgba(255,255,255,0.22);"></div>
+      <div class="nav-item" style="background: rgba(255,255,255,0.12);"></div>
+      <div class="nav-item" style="background: rgba(255,255,255,0.16);"></div>
+    </div>
+    <div class="operator">
+      <div class="avatar">AY</div>
+      <div>
+        <div class="name">Aram Yeghiazaryan</div>
+        <div class="role">Workspace Owner</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area">
+    <div class="kpi-row">
+      <div class="card kpi-card rooms">
+        <div class="label">Museum Rooms</div>
+        <div class="value-row">
+          <span class="value">4</span>
+        </div>
+      </div>
+      <div class="card kpi-card visitors">
+        <div class="label">Weekly Visitors</div>
+        <div class="value-row">
+          <span class="value">1,467</span>
+          <span class="delta">&#9650;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-head">
+        <span class="title">Visitor Traffic &mdash; 90 days</span>
+        <span class="caption">Sample data</span>
+      </div>
+      <div class="chart-svg-wrap">
+        <svg viewBox="0 0 580 300" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+          <line x1="248" y1="14" x2="248" y2="286" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6" />
+          <line x1="503" y1="14" x2="503" y2="286" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6" />
+          <path
+            d="M0,286 L0,236 L39,224 L77,230 L116,206 L155,214 L193,190 L232,198 L271,168 L309,176 L348,148 L387,156 L425,124 L464,134 L503,88 L541,40 L580,10 L580,286 Z"
+            fill="#1F5EDC" opacity="0.09" stroke="none"
+          />
+          <path
+            d="M0,236 L39,224 L77,230 L116,206 L155,214 L193,190 L232,198 L271,168 L309,176 L348,148 L387,156 L425,124 L464,134 L503,88 L541,40 L580,10"
+            fill="none" stroke="#1F5EDC" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"
+          />
+          <circle cx="580" cy="10" r="6" fill="#1F5EDC" />
+        </svg>
+      </div>
+      <div class="chart-foot">
+        <span>Apr 12</span>
+        <span>Jul 10</span>
+      </div>
+    </div>
+
+    <div class="kanban-row">
+      <div class="card kanban-card">
+        <span class="kanban-badge won">Won</span>
+        <div class="kanban-bar"></div>
+        <div class="kanban-bar short"></div>
+        <span class="kanban-meta">26 mo</span>
+      </div>
+      <div class="card kanban-card">
+        <span class="kanban-badge won">Won</span>
+        <div class="kanban-bar"></div>
+        <div class="kanban-bar short"></div>
+        <span class="kanban-meta">18 mo</span>
+      </div>
+      <div class="card kanban-card">
+        <span class="kanban-badge open">Sourced</span>
+        <div class="kanban-bar"></div>
+        <div class="kanban-bar short"></div>
+        <span class="kanban-meta">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

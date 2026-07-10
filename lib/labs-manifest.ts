@@ -63,6 +63,14 @@ export const labs: LabEntry[] = [
       'The portfolio as a Windows XP desktop — Luna chrome, the real boot chime, a helpful paperclip. The most beloved OS ever shipped, rebuilt as a design system.',
     status: 'live',
   },
+  {
+    slug: 'curator',
+    title: 'Curator',
+    date: '2026-07-10',
+    thesis:
+      'The portfolio as enterprise SaaS — a navy-and-white operations console where the museum itself is the managed asset. Every ritual played straight; the pagination paginates six rows.',
+    status: 'live',
+  },
 ]
 
 /** What hangs in the main hall — everything not retired to the attic. */
