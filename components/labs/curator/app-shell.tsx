@@ -10,6 +10,7 @@ import { ModuleHost } from './module-host'
 import { ToastViewport } from './ui/toast'
 import { SpecChip } from './ui/spec-chip'
 import { useEscCapture } from './use-esc-capture'
+import { NpsSurvey } from './nps-survey'
 import { useCuratorStore, type CuratorModule } from './store'
 
 export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[] = [
@@ -79,6 +80,7 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <ModuleHost />}</main>
         <ToastViewport />
+        <NpsSurvey />
       </div>
     </div>
   )
