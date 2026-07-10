@@ -16,6 +16,17 @@ const SWIPE_MAX_MS = 600
 
 type PointerStart = { x: number; y: number; t: number }
 
+/** Portrait layout turns `.sb-overlay` into a real scrollable parchment
+ *  panel (storybook-responsive.css) sitting beside the canvas rather than
+ *  pageRect-tracking on top of it. A wheel or drag gesture that starts (or,
+ *  for wheel, bubbles from) inside that panel is the user scrolling the
+ *  narration, not swiping/spinning to turn the page — both gesture paths
+ *  route through this same check so neither eats the panel's scroll.
+ *  Canvas gestures and the corner hotspots (outside the panel) are
+ *  unaffected. */
+const targetsOverlayPanel = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest('.sb-overlay') !== null
+
 export function useBookInput(enabled: boolean): void {
   const wheelAcc = useRef<WheelAcc>({ value: 0, lastMs: 0 })
   const pointerStart = useRef<PointerStart | null>(null)
@@ -26,6 +37,7 @@ export function useBookInput(enabled: boolean): void {
     const requestTurn = (dir: TurnDir) => useStorybookStore.getState().requestTurn(dir)
 
     const onWheel = (e: WheelEvent) => {
+      if (targetsOverlayPanel(e.target)) return
       const { acc, fire } = accumulateWheel(wheelAcc.current, e.deltaY, performance.now())
       wheelAcc.current = acc
       if (fire) requestTurn(fire)
@@ -54,6 +66,7 @@ export function useBookInput(enabled: boolean): void {
     }
 
     const onPointerDown = (e: PointerEvent) => {
+      if (targetsOverlayPanel(e.target)) return
       pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     }
 

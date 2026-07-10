@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import './storybook.css'
+import './storybook-responsive.css'
 import '@fontsource-variable/grenze-gotisch'
 import '@fontsource-variable/alegreya'
 import '@fontsource/alegreya-sc/400.css'

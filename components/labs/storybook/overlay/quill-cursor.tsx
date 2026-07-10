@@ -5,13 +5,21 @@
  * catching gold light over anything tagged `data-sb-hover` (nav arrows, the
  * wax-seal button, sigil links, the cover CTA). Fine-pointer only — coarse
  * (touch) pointers never see it, and `.sb-root` keeps its native cursor
- * there (see the `(pointer: fine)` guard in storybook.css). Position is
- * written on every `pointermove`; a rAF loop reads the latest values and
- * writes the transform once per frame, so a burst of pointer events never
- * forces more than one style write per frame.
+ * there (see the `(pointer: fine)` guard in storybook-responsive.css).
+ * Also stays off in the portrait/narrow layout (same breakpoint as
+ * storybook-responsive.css's `.sb-quill-cursor { display: none }`) — the
+ * element is hidden there but the rAF loop doesn't know that on its own, so
+ * it's gated on the same query and torn down rather than spinning forever
+ * writing a transform nobody sees. Both queries are watched for `change` so
+ * resizing/rotating across the breakpoint starts or stops the loop live.
+ * Position is written on every `pointermove`; the rAF loop reads the latest
+ * values and writes the transform once per frame, so a burst of pointer
+ * events never forces more than one style write per frame.
  */
 
 import { useEffect, useRef } from 'react'
+
+const NARROW_QUERY = '(max-width: 820px), (orientation: portrait)'
 
 export function QuillCursor() {
   const elRef = useRef<HTMLDivElement>(null)
@@ -20,10 +28,15 @@ export function QuillCursor() {
   const rafId = useRef<number | null>(null)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia('(pointer: fine)').matches) return
+    if (typeof window === 'undefined') return
 
     const el = elRef.current
     if (!el) return
+
+    const fineMql = window.matchMedia('(pointer: fine)')
+    const narrowMql = window.matchMedia(NARROW_QUERY)
+
+    let running = false
 
     const onMove = (e: PointerEvent) => {
       pos.current = { x: e.clientX, y: e.clientY }
@@ -39,12 +52,36 @@ export function QuillCursor() {
       rafId.current = requestAnimationFrame(tick)
     }
 
-    window.addEventListener('pointermove', onMove)
-    rafId.current = requestAnimationFrame(tick)
+    const start = () => {
+      if (running) return
+      running = true
+      window.addEventListener('pointermove', onMove)
+      rafId.current = requestAnimationFrame(tick)
+    }
+
+    const stop = () => {
+      if (!running) return
+      running = false
+      window.removeEventListener('pointermove', onMove)
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current)
+        rafId.current = null
+      }
+    }
+
+    const sync = () => {
+      if (fineMql.matches && !narrowMql.matches) start()
+      else stop()
+    }
+
+    sync()
+    fineMql.addEventListener('change', sync)
+    narrowMql.addEventListener('change', sync)
 
     return () => {
-      window.removeEventListener('pointermove', onMove)
-      if (rafId.current !== null) cancelAnimationFrame(rafId.current)
+      fineMql.removeEventListener('change', sync)
+      narrowMql.removeEventListener('change', sync)
+      stop()
     }
   }, [])
 
