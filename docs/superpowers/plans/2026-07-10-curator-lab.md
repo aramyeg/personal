@@ -1681,8 +1681,8 @@ export default function RoomsModule() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[var(--c-border)]">
-              {['Room', 'Status', 'Shipped', 'Thesis', ''].map((h, i) => (
-                <th key={i} className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{h}</th>
+              {['Room', 'Status', 'Shipped', 'Thesis', 'Actions'].map((h) => (
+                <th key={h} scope="col" className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{h}</th>
               ))}
             </tr>
           </thead>
@@ -1697,7 +1697,13 @@ export default function RoomsModule() {
                 <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{r.date}</td>
                 <td className={`px-4 ${pad} max-w-[420px] truncate text-[12px] text-[var(--c-text-soft)]`} title={r.thesis}>{r.thesis}</td>
                 <td className={`px-4 ${pad} text-right`}>
-                  <a href={r.href} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
+                  <a
+                    href={r.href}
+                    aria-label={`Open ${r.title}`}
+                    className="text-[12px] font-medium text-[var(--c-blue)] hover:underline"
+                  >
+                    Open
+                  </a>
                 </td>
               </tr>
             ))}
@@ -1899,7 +1905,7 @@ Client, default export. Local state: `{ sortKey: 'startDate' as keyof PersonnelR
 Layout:
 - Header: `h1` "Personnel" + subtitle "Workforce records — 1 active resource" + right-aligned controls: filter `<input placeholder="Filter records…">` (card-chrome input, 240px), `Export CSV` secondary button.
 - Table columns: Company (sortable), Role, Location, Start (sortable, mono), Tenure (sortable numeric, mono `${tenureMonths} mo`), Status (`Badge tone={endDate === null ? 'ok' : 'neutral'}` → `active`/`archived`), expand chevron button (`aria-label="Expand record"`).
-- Sortable headers are `<button aria-label={\`Sort by ${label}\`}>` with ▲/▼ affix when active; click toggles direction, sets key.
+- Sortable headers are `<button aria-label={\`Sort by ${label}\`}>` with ▲/▼ affix when active; click toggles direction, sets key. All `<th>` carry `scope="col"`. Per-row action buttons carry row-distinct accessible names (e.g. `aria-label={\`Expand record — ${row.company}\`}`) — never N identical "Expand record" names. Include one test asserting compact density switches cell padding (mock/set store density to 'compact', assert a `py-1.5` cell).
 - Expanded row (`expandedId`): a full-width `<tr>` under the record — description 12px, highlights as bullet list, technologies as neutral Badges. Row has `data-testid="personnel-row"` on record rows only (not the expansion row).
 - Footer bar: mono 11px `Page {page+1} of {pageCount}` + `Previous page` / `Next page` buttons (hairline, disabled at bounds).
 - `Export CSV`: `toCsv(allFilteredSortedRows, [{key:'company',header:'Company'},{key:'role',header:'Role'},{key:'location',header:'Location'},{key:'period',header:'Period'},{key:'tenureMonths',header:'Tenure (months)'},{key:'description',header:'Description'}])` → `new Blob([csv], { type: 'text/csv' })` → temp `<a download="personnel-records.csv">` click → `URL.revokeObjectURL`.
