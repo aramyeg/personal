@@ -25,8 +25,11 @@ export type PS1Audio = {
   select(): void
   /** Close: square 330Hz, 60ms. */
   back(): void
-  /** Boot: soft fifth — triangle 220Hz + 330Hz, 700ms fade. */
-  boot(): void
+  /** Boot: soft fifth — triangle 220Hz + 330Hz, 700ms fade. Returns whether
+   *  it actually sounded (false while muted or before the first `resume()`)
+   *  — callers that latch a "played once" flag must key it off this, not
+   *  off having merely called the function. */
+  boot(): boolean
   /** Filtered brown-noise loop at -40dB, 400Hz lowpass. */
   setRoomTone(on: boolean): void
   /** Master gate — also persists the preference to localStorage. */
@@ -168,8 +171,8 @@ export function createPS1Audio(
     tone('square', 330, 0.06, SFX_GAIN)
   }
 
-  function boot(): void {
-    if (!isEnabled || !ctx) return
+  function boot(): boolean {
+    if (!isEnabled || !ctx) return false
     const now = ctx.currentTime
     const duration = 0.7
     const gain = ctx.createGain()
@@ -191,6 +194,7 @@ export function createPS1Audio(
       oscs.forEach((osc) => osc.disconnect())
       gain.disconnect()
     }
+    return true
   }
 
   function setRoomTone(on: boolean): void {
@@ -251,7 +255,7 @@ const NOOP_AUDIO: PS1Audio = {
   blip() {},
   select() {},
   back() {},
-  boot() {},
+  boot: () => false,
   setRoomTone() {},
   setEnabled() {},
   enabled: () => false,

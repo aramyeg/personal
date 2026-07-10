@@ -69,6 +69,7 @@ import { projects } from '@/data/projects'
 
 beforeEach(() => {
   mockAudioEnabled = false
+  mockAudio.boot.mockReset()
 })
 
 describe('MemoryCardChrome', () => {
@@ -140,6 +141,50 @@ describe('MemoryCardChrome', () => {
   })
 })
 
+describe('MemoryCardAudioProvider — returning-visitor gesture arming', () => {
+  it('arms resume() on the first user gesture when sound is already persisted on', () => {
+    mockAudioEnabled = true // simulates a fresh page load with 'memory-card-sound' = 'on'
+
+    render(
+      <MemoryCardAudioProvider>
+        <div>content</div>
+      </MemoryCardAudioProvider>
+    )
+    expect(mockAudio.resume).not.toHaveBeenCalled()
+
+    fireEvent.click(window)
+
+    expect(mockAudio.resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not eagerly arm resume() when sound was never enabled', () => {
+    mockAudioEnabled = false
+
+    render(
+      <MemoryCardAudioProvider>
+        <div>content</div>
+      </MemoryCardAudioProvider>
+    )
+    fireEvent.click(window)
+
+    expect(mockAudio.resume).not.toHaveBeenCalled()
+  })
+
+  it('only arms once — a second gesture does not call resume() again', () => {
+    mockAudioEnabled = true
+
+    render(
+      <MemoryCardAudioProvider>
+        <div>content</div>
+      </MemoryCardAudioProvider>
+    )
+    fireEvent.click(window)
+    fireEvent.keyDown(window, { key: 'a' })
+
+    expect(mockAudio.resume).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('HeroSection', () => {
   it('renders the name from siteConfig, split across display lines', () => {
     render(<HeroSection />)
@@ -159,6 +204,65 @@ describe('HeroSection', () => {
     const box = screen.getByTestId('hero-vignette')
     expect(box).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByTestId('gltf-vignette')).toBeInTheDocument()
+  })
+
+  // Controllable IntersectionObserver double — the global mock in
+  // vitest.setup.ts never invokes its callback, so the boot-chime effect's
+  // outcome-aware latch (only spend `fired` on an actual play) needs a
+  // fake that lets the test drive intersection transitions directly.
+  class ControllableIO {
+    static instances: ControllableIO[] = []
+    callback: IntersectionObserverCallback
+    observe = vi.fn()
+    unobserve = vi.fn()
+    disconnect = vi.fn()
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      ControllableIO.instances.push(this)
+    }
+    trigger(isIntersecting: boolean) {
+      this.callback(
+        [{ isIntersecting } as IntersectionObserverEntry],
+        this as unknown as IntersectionObserver
+      )
+    }
+  }
+
+  it('latches the boot chime only once it actually plays, surviving a muted scroll-out', () => {
+    const OriginalIO = window.IntersectionObserver
+    window.IntersectionObserver = ControllableIO as unknown as typeof IntersectionObserver
+    ControllableIO.instances = []
+
+    let bootPlays = false
+    mockAudio.boot.mockImplementation(() => bootPlays)
+
+    render(
+      <MemoryCardAudioProvider>
+        <HeroSection />
+      </MemoryCardAudioProvider>
+    )
+    const io = ControllableIO.instances.at(-1)!
+
+    // Visible on mount, then scrolls out while muted — boot() is attempted
+    // (and would report it via the mock) but returns false, so the shot
+    // must NOT be spent.
+    io.trigger(true)
+    io.trigger(false)
+    expect(mockAudio.boot).toHaveBeenCalledTimes(1)
+
+    // Scrolls back into view, sound goes live, scrolls out again — this
+    // attempt actually plays and spends the shot.
+    bootPlays = true
+    io.trigger(true)
+    io.trigger(false)
+    expect(mockAudio.boot).toHaveBeenCalledTimes(2)
+
+    // A third scroll-out must not fire again — the shot is spent.
+    io.trigger(true)
+    io.trigger(false)
+    expect(mockAudio.boot).toHaveBeenCalledTimes(2)
+
+    window.IntersectionObserver = OriginalIO
   })
 })
 

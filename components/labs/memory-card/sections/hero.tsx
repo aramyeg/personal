@@ -10,10 +10,13 @@
  * under a second, played once. Everything collapses to a still, well-posed
  * frame under reduced motion.
  *
- * Sound: the boot chime plays exactly once, the first time this section
- * scrolls out of view (IntersectionObserver — never on initial mount, since
- * the hero starts on-screen). `boot()` is already a no-op while muted, so no
- * extra enabled-check is needed here.
+ * Sound: the boot chime plays the first time this section scrolls out of
+ * view (IntersectionObserver — never on initial mount, since the hero starts
+ * on-screen) AND actually produces sound — `boot()` reports whether it did,
+ * and only a `true` spends the one-shot latch. A scroll-out while muted (a
+ * returning visitor whose audio hasn't been armed yet, or sound genuinely
+ * off) leaves the shot unspent, so a later scroll-out once audio goes live
+ * can still fire it.
  */
 
 import { useEffect, useRef } from 'react'
@@ -23,7 +26,7 @@ import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, inkAlpha, paperAlpha } from '../
 import { anton, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { GltfVignette } from '../three/gltf-vignette'
-import { useMemoryCardAudioContext } from '../audio-context'
+import { useMemoryCardAudioActions } from '../audio-context'
 
 const HERO_ACCENT = MC.glyphs[SECTION_ACCENT.hero]
 
@@ -67,17 +70,11 @@ export type HeroSectionProps = {
 export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
   const systemReduced = useReducedMotion()
   const reduced = reducedProp ?? systemReduced ?? false
-  const audio = useMemoryCardAudioContext()
-  // The provider's context value gets a new identity on every soundOn change
-  // (toggling sound re-renders it), which would otherwise tear down and
-  // rebuild the observer below — losing its "has this been visible yet"
-  // tracking mid-session. A ref decouples the observer's lifecycle from that
-  // churn: the effect below reads the ref, always the latest `boot`, without
-  // needing to restart every time the toggle flips.
-  const audioRef = useRef(audio)
-  useEffect(() => {
-    audioRef.current = audio
-  }, [audio])
+  // The actions-only context (no `soundOn`) stays referentially stable across
+  // a sound toggle, so the observer effect below can depend on it directly
+  // without tearing down and losing its "has this been visible yet" tracking
+  // mid-session — no ref indirection needed.
+  const actions = useMemoryCardAudioActions()
   const sectionRef = useRef<HTMLElement>(null)
 
   const [firstName, ...restName] = siteConfig.name.split(' ')
@@ -91,9 +88,13 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
   })
 
   // The chime is a "you've moved on" cue — it fires the first time the hero
-  // leaves the viewport, never on mount (the hero starts fully visible, so
-  // the observer's first callback is always an intersecting entry). Set up
-  // once (empty deps) so a mid-session sound toggle can't reset its tracking.
+  // leaves the viewport AND boot() actually sounds, never on mount (the hero
+  // starts fully visible, so the observer's first callback is always an
+  // intersecting entry). `fired` only latches on a genuine play: a scroll-out
+  // that lands muted (sound off, or a returning visitor's audio not yet
+  // armed by a user gesture) leaves the shot unspent for a later attempt.
+  // Depends on `actions` — stable across a sound toggle, so this doesn't
+  // reset mid-session.
   useEffect(() => {
     const el = sectionRef.current
     if (!el) return
@@ -105,13 +106,12 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
         return
       }
       if (hasBeenVisible && !fired) {
-        fired = true
-        audioRef.current.boot()
+        fired = actions.boot()
       }
     })
     io.observe(el)
     return () => io.disconnect()
-  }, [])
+  }, [actions])
 
   return (
     <section

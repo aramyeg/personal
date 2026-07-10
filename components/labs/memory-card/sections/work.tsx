@@ -37,7 +37,7 @@ import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, accentFor, paperAlpha } from '..
 import { grotesk, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { CardRail, RAIL_GAP } from '../three/card-rail'
-import { useMemoryCardAudioContext } from '../audio-context'
+import { useMemoryCardAudioActions } from '../audio-context'
 
 const WORK_ACCENT = MC.glyphs[SECTION_ACCENT.work]
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
@@ -58,7 +58,7 @@ export type WorkSectionProps = {
 
 export function WorkSection({ reduced: reducedProp, onCardFlip }: WorkSectionProps) {
   const systemReduced = useReducedMotion()
-  const audio = useMemoryCardAudioContext()
+  const audio = useMemoryCardAudioActions()
 
   // This section branches its SSR-visible markup (wrapper height, cursor, hint)
   // on `reduced`, so the media-query value can't be read until after mount or

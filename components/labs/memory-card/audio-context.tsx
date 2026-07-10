@@ -14,6 +14,17 @@
  * between server and first client paint: `soundOn` starts `false` on both,
  * matching the muted default `useMemoryCardAudio` reports before its effect
  * runs.
+ *
+ * Two contexts, not one, split on churn: `soundOn` flips on every toggle
+ * click, but the call sites (`blip`/`select`/`back`/`boot`/`toggleSound`)
+ * don't need to change identity when it does — `audio` is stable once built,
+ * and `toggleSound` is a `useCallback` keyed only on `audio`. Consumers that
+ * only fire sounds (hero's boot-chime observer, work's hover/flip handlers,
+ * contact's copy button) read `useMemoryCardAudioActions()`, a context whose
+ * value is memoized on `[audio, toggleSound]` — no `soundOn` — so it never
+ * tears down anything built around it on a toggle. Only chrome, which also
+ * renders the on/off label, needs `useMemoryCardAudioContext()`'s merged
+ * shape.
  */
 
 import {
@@ -27,29 +38,32 @@ import {
 } from 'react'
 import { useMemoryCardAudio } from './audio'
 
-export type MemoryCardAudioContextValue = {
-  soundOn: boolean
+export type MemoryCardAudioActions = {
   toggleSound: () => void
   blip: () => void
   select: () => void
   back: () => void
-  boot: () => void
+  boot: () => boolean
+}
+
+export type MemoryCardAudioContextValue = MemoryCardAudioActions & {
+  soundOn: boolean
 }
 
 const noop = () => {}
 
 /** Standalone default — components render fine without a provider (unit
  *  tests mount sections in isolation); every call is simply a no-op. */
-const DEFAULT_VALUE: MemoryCardAudioContextValue = {
-  soundOn: false,
+const DEFAULT_ACTIONS: MemoryCardAudioActions = {
   toggleSound: noop,
   blip: noop,
   select: noop,
   back: noop,
-  boot: noop,
+  boot: () => false,
 }
 
-const MemoryCardAudioContext = createContext<MemoryCardAudioContextValue>(DEFAULT_VALUE)
+const MemoryCardAudioActionsContext = createContext<MemoryCardAudioActions>(DEFAULT_ACTIONS)
+const MemoryCardSoundOnContext = createContext<boolean>(false)
 
 export function MemoryCardAudioProvider({ children }: { children: ReactNode }) {
   const audio = useMemoryCardAudio()
@@ -66,25 +80,69 @@ export function MemoryCardAudioProvider({ children }: { children: ReactNode }) {
     setSoundOn(next)
   }, [audio])
 
-  const value = useMemo<MemoryCardAudioContextValue>(
+  // A returning visitor whose preference is already "on" gets a page load
+  // where the toggle correctly reads "sound: on" from localStorage, but the
+  // real AudioContext has never been created — resume() only ever ran inside
+  // a click on the toggle itself, which this visitor has no reason to press.
+  // Every call site would silently no-op until they happened to double-click
+  // it. Arm the actual resume() on the page's first qualifying user gesture
+  // instead: click/keydown/touchend are valid WebAudio user-activation
+  // events, scroll is not, so scroll is deliberately not listened for here.
+  // Capture phase + a shared AbortController so whichever of the three fires
+  // first tears down all three — one resume() call, not up to three. If the
+  // toggle itself is that first gesture, its own onClick already calls
+  // resume() too; the factory's resume() is idempotent (`if (!ctx) ctx =
+  // ctxFactory()`), so the harmless double call never double-creates a
+  // context.
+  useEffect(() => {
+    if (!audio.enabled()) return
+    const controller = new AbortController()
+    const arm = () => {
+      audio.resume()
+      controller.abort()
+    }
+    const opts = { capture: true, once: true, signal: controller.signal }
+    window.addEventListener('click', arm, opts)
+    window.addEventListener('keydown', arm, opts)
+    window.addEventListener('touchend', arm, opts)
+    return () => controller.abort()
+  }, [audio])
+
+  const actions = useMemo<MemoryCardAudioActions>(
     () => ({
-      soundOn,
       toggleSound,
       blip: audio.blip,
       select: audio.select,
       back: audio.back,
       boot: audio.boot,
     }),
-    [soundOn, toggleSound, audio]
+    [audio, toggleSound]
   )
 
   return (
-    <MemoryCardAudioContext.Provider value={value}>{children}</MemoryCardAudioContext.Provider>
+    <MemoryCardAudioActionsContext.Provider value={actions}>
+      <MemoryCardSoundOnContext.Provider value={soundOn}>
+        {children}
+      </MemoryCardSoundOnContext.Provider>
+    </MemoryCardAudioActionsContext.Provider>
   )
 }
 
+/** Stable across `soundOn` toggles — the hook to reach for when a consumer
+ *  only ever fires sounds and never renders the on/off label (hero, work,
+ *  contact). Safe to depend on directly in an effect's dependency array. */
+export function useMemoryCardAudioActions(): MemoryCardAudioActions {
+  return useContext(MemoryCardAudioActionsContext)
+}
+
+/** Merged shape for consumers that also need `soundOn` (chrome's label +
+ *  aria-pressed). Re-renders on every toggle by design; do not depend on
+ *  this in an effect that must survive a toggle — use the actions-only hook
+ *  above instead. */
 export function useMemoryCardAudioContext(): MemoryCardAudioContextValue {
-  return useContext(MemoryCardAudioContext)
+  const actions = useContext(MemoryCardAudioActionsContext)
+  const soundOn = useContext(MemoryCardSoundOnContext)
+  return useMemo(() => ({ ...actions, soundOn }), [actions, soundOn])
 }
 
 export default MemoryCardAudioProvider
