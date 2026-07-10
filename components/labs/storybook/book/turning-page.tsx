@@ -29,17 +29,24 @@ import * as THREE from 'three'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurnWeighted } from './page-geometry'
 import { sheetAngle } from './popup-mechanics'
 import { makeCanvasTexture } from './book'
-import { makePaperCanvas } from '../procedural/paper-texture'
+import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import type { TurnFrame } from './use-turn-driver'
 
 const SHADE_WIDTH = PAGE_W * 0.7
 const SHADE_LIFT = 0.003
-const SHADE_MAX_OPACITY = 0.34
+// Peak material opacity; the radial gradient map (center alpha 0.55)
+// multiplies in, so the effective peak is ~0.28 fading to nothing at the
+// edges — light passing through paper, not a hard cast slab (benchmark B11).
+const SHADE_MAX_OPACITY = 0.5
 // Shapes the shade's opacity so it peaks a little past mid-turn (t≈0.59):
 // the page exposes more of its underside to the stack on the way down.
 const SHADE_PEAK_EXPONENT = 1.3
 // Tiny lift keeping the sheet from z-fighting the static page it rests on
-// at the ends of the turn.
+// at the ends of the turn. Applied to the PIVOT's world y (not the mesh's
+// local y): a local offset would rotate with the sheet and push it BELOW
+// the page plane once past vertical, clipping into the landing page. The
+// raised pivot keeps the sheet a paper-thickness above the pop-up wedge it
+// bounds through the whole sweep.
 const SHEET_LIFT = 0.004
 const BACK_TINT = '#4a3a2c'
 
@@ -89,15 +96,20 @@ export function TurningPage({
       }),
     [paperTexture]
   )
+  // Soft radial-gradient shade (not a flat slab): light reads as passing
+  // through the paper with a diffuse penumbra (benchmark B11).
+  const shadeCanvas = useMemo(() => makeShadowCanvas(), [])
+  const shadeTexture = useMemo(() => makeCanvasTexture(shadeCanvas), [shadeCanvas])
   const shadeMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
+        map: shadeTexture,
         color: '#0d0805',
         transparent: true,
         opacity: 0,
         depthWrite: false,
       }),
-    []
+    [shadeTexture]
   )
 
   useEffect(
@@ -105,9 +117,10 @@ export function TurningPage({
       paperTexture.dispose()
       material.dispose()
       backMaterial.dispose()
+      shadeTexture.dispose()
       shadeMaterial.dispose()
     },
-    [paperTexture, material, backMaterial, shadeMaterial]
+    [paperTexture, material, backMaterial, shadeTexture, shadeMaterial]
   )
 
   // Swap the printed faces in as book.tsx resolves them (between turns, not
@@ -165,9 +178,9 @@ export function TurningPage({
 
   return (
     <>
-      <group ref={pivotRef} position={[0, originY, 0]}>
-        <mesh ref={meshRef} position={[0, SHEET_LIFT, 0]} material={material} visible={false} />
-        <mesh ref={backMeshRef} position={[0, SHEET_LIFT, 0]} material={backMaterial} visible={false} />
+      <group ref={pivotRef} position={[0, originY + SHEET_LIFT, 0]}>
+        <mesh ref={meshRef} material={material} visible={false} />
+        <mesh ref={backMeshRef} material={backMaterial} visible={false} />
       </group>
       <mesh
         ref={shadeRef}

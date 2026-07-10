@@ -56,16 +56,21 @@ const SPINE_HEIGHT = BOOK.coverT * 2 + BOOK.blockMaxH
 // BOOK.coverH depth still exceeds the page block's BLOCK_DEPTH, so it
 // peeks out beyond the pages at the near/far (top/bottom) edges only.
 const SPINE_FLAT_HEIGHT = BOOK.coverT
+// The ONE hinge plane everything paper shares: both static page surfaces,
+// the turning sheet's pivot, and the pop-up mechanisms' wedge floor. The
+// pop-up physics demands this (see popup-mechanics.ts): the sheet and the
+// paper glued to it hinge on the same line, so an outgoing scene folds
+// EXACTLY into the closing wedge under the sheet — pieces can never poke
+// through the page that is pressing them flat. (Previously pages sat at
+// per-stack heights while pop-ups anchored at the block top: pieces
+// floated ~0.05 above their pages at rest and pierced the sheet mid-turn.)
+const PAGE_SURFACE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift
 // Gutter crease: a narrow dark-transparent-gradient strip laid flat over
-// the seam where the open pages meet, sitting just above the taller of
-// the two page blocks so it never z-fights with either page.
+// the seam where the open pages meet, just above the page surfaces.
 const CREASE_WIDTH = 0.1
-const CREASE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift + 0.001
-// Pop-up layers sit just above the crease, at the height of the taller
-// stack — always the very top of the open block regardless of `spread`
-// (rightHeight + leftHeight is constant), so the illustration never steps
-// down to match whichever page is momentarily shorter.
-const POPUP_Y = CREASE_Y + 0.004
+const CREASE_Y = PAGE_SURFACE_Y + 0.001
+// Pop-up layers: a hair above the crease strip, effectively ON the page.
+const POPUP_Y = PAGE_SURFACE_Y + 0.0015
 // Closed book extends only toward +X from the spine (x=0), so it sits
 // right of the HTML CTA's centerline; open, the two blocks/pages already
 // straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
@@ -194,13 +199,7 @@ export function Book() {
   // hidden for the whole turn and only reappear once `completeTurn()`
   // lands the cover on its new rest pose.
   const isCoverTurning = turning !== null && isCoverTurn(spread, turning)
-  const rightHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
-  const leftHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
   const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
-  // The turning page's resting height: wherever it's departing from (the
-  // right stack for a 'next' turn, the left stack for 'prev'), matching the
-  // static pages' own height formula below exactly.
-  const turnOriginY = BACK_COVER_TOP + (turning === 'prev' ? leftHeight : rightHeight) + BOOK.pageLift
 
   // Current spread ± 1 with actual pop-up content, so neighboring layer
   // textures are already warm by the time you turn to them (see
@@ -309,39 +308,36 @@ export function Book() {
         <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
       </mesh>
 
-      {/* Right page block: full at spread 0, shrinks toward the spine as pages "turn". */}
+      {/* Page blocks: constant full-height stacks under the shared page
+          surface plane (PAGE_SURFACE_Y). Real stacks would trade thickness
+          side to side as you read, but the paper physics needs every sheet
+          hinging on ONE line — the thick-tome look keeps the fore-edges
+          filled at all times. */}
       <mesh
-        position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + rightHeight / 2, 0]}
+        position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
         material={edgeMaterial}
       >
-        <boxGeometry args={[BLOCK_WIDTH, rightHeight, BLOCK_DEPTH]} />
+        <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
       </mesh>
 
-      {/* Left page block: nonexistent at spread 0 or mid-cover-turn (a
-          zero-height box still renders coincident top/bottom faces, so it's
-          skipped entirely rather than shrunk to zero), grows once a page has
-          actually turned. Also hidden for the whole duration of a cover
-          turn — see isCoverTurning above — since a 'prev' cover turn starts
-          with leftHeight > 0 (spread is still 1 until commit) and would
-          otherwise float once the cover lifts out from under it. */}
-      {isOpen && leftHeight > 0 && !isCoverTurning && (
+      {/* Left page block. Hidden for the whole duration of a cover turn —
+          see isCoverTurning above — since a 'prev' cover turn would leave
+          it floating once the cover lifts out from under it. */}
+      {isOpen && !isCoverTurning && (
         <mesh
-          position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + leftHeight / 2, 0]}
+          position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
           material={edgeMaterial}
         >
-          <boxGeometry args={[BLOCK_WIDTH, leftHeight, BLOCK_DEPTH]} />
+          <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
         </mesh>
       )}
 
       {/* Static pages only exist once the book is open: closed, the mirrored
           left page's footprint (x in [-PAGE_W, 0]) sits outside the front
-          cover entirely and would otherwise poke out past the spine. */}
+          cover entirely and would otherwise poke out past the spine. Both
+          lie in the shared hinge plane (see PAGE_SURFACE_Y). */}
       {isOpen && (
-        <mesh
-          position={[0, BACK_COVER_TOP + rightHeight + BOOK.pageLift, 0]}
-          geometry={pageGeometry}
-          material={rightPageMaterial}
-        />
+        <mesh position={[0, PAGE_SURFACE_Y, 0]} geometry={pageGeometry} material={rightPageMaterial} />
       )}
 
       {/* Static left page, mirrored across the spine. Hidden for the whole
@@ -351,7 +347,7 @@ export function Book() {
           book's edge, unsupported. */}
       {isOpen && !isCoverTurning && (
         <mesh
-          position={[0, BACK_COVER_TOP + leftHeight + BOOK.pageLift, 0]}
+          position={[0, PAGE_SURFACE_Y, 0]}
           scale={[-1, 1, 1]}
           geometry={pageGeometry}
           material={leftPageMaterial}
@@ -359,7 +355,7 @@ export function Book() {
       )}
 
       {/* The page currently mid-turn; hidden except during a non-cover turn. */}
-      <TurningPage frame={frame} originY={turnOriginY} frontMap={turnFrontMap} backMap={turnBackMap} />
+      <TurningPage frame={frame} originY={PAGE_SURFACE_Y} frontMap={turnFrontMap} backMap={turnBackMap} />
 
       {/* Pop-up layers for the open spread: folded paper cutouts that spring
           up from the page. Mounted for spread ± 1 (see popupSpreadIndices

@@ -39,7 +39,6 @@ function magentaDistance(r, g, b) {
   return Math.max(Math.abs(r - 255), g, Math.abs(b - 255))
 }
 
-const isBackdropId = (id) => id.endsWith('-backdrop')
 // Cover decals sit on leather as gold foil, not as paper cutouts on a page —
 // a raw-paper rim would read as a sticker there. Page prints are full-bleed
 // page faces, not cutouts, so they get no rim either.
@@ -183,12 +182,11 @@ async function processOne(fileName) {
   let pipeline = sharp(pixels, {
     raw: { width: info.width, height: info.height, channels: info.channels },
   })
-  if (!isBackdropId(id)) {
-    // Backdrops keep their full canvas width (spec §8.5: they're only
-    // transparent above the skyline, not on the sides); everything else
-    // trims dead transparent margin from a die-cut subject.
-    pipeline = pipeline.trim()
-  }
+  // Every cutout trims its dead transparent margin — including backdrops.
+  // The v-fold physics maps each texture edge-to-edge onto a rigid panel
+  // whose bottom edge is glued to the page (popup-mechanics.ts), so any
+  // leftover padding reads as the piece floating above the paper.
+  pipeline = pipeline.trim()
   pipeline = pipeline.resize({ width: MAX_DIM, height: MAX_DIM, fit: 'inside', withoutEnlargement: true })
 
   // The rim pass needs raw pixels at final size, so the pipeline is

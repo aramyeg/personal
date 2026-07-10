@@ -74,12 +74,13 @@ const layerDefaults = (ch: number): SceneLayer[] => [
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
 // sizes re-derived from the trimmed art's true aspect ratios — backdrop
-// 1536x1024 (1.5), midground 1465x363 (4.04), hero 949x741 (1.28),
-// foreground 1422x280 (5.08) — so every panel displays its print
+// 1499x584 (2.57, after trimming the transparent padding the original
+// pipeline left on backdrops), midground 1465x363 (4.04), hero 949x741
+// (1.28), foreground 1422x280 (5.08) — so every panel displays its print
 // undistorted. Widths chosen so the folded pieces pass the closed-book
 // containment test (see popup-mechanics.test.ts).
 const CH4_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch4-backdrop', kind: 'backdrop', apexZ: -0.4, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 1.0 },
+  { id: 'ch4-backdrop', kind: 'backdrop', apexZ: -0.4, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.9, height: 0.74 },
   { id: 'ch4-midground', kind: 'midground', apexZ: -0.05, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 2.0, height: 0.495 },
   { id: 'ch4-hero', kind: 'hero', apexZ: 0.06, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.794, height: 0.62 },
   { id: 'ch4-foreground', kind: 'foreground', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },

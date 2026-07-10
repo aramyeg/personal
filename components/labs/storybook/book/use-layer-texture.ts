@@ -32,11 +32,16 @@ function hashLayerId(id: string): number {
 }
 
 /**
- * Fires a `THREE.TextureLoader` request for `/labs/storybook/art/<id>.webp`,
- * routing success to `onLoad` and any failure (404, decode error, ...) to
- * `onError` — both silently, per the file header. Returns a `cancel`
- * function so the caller's effect cleanup can suppress a load that resolves
- * after unmount without needing its own loader instance.
+ * Loads `/labs/storybook/art/<id>.webp`, routing success to `onLoad` and
+ * any failure (404, decode error, ...) to `onError` — both silently, per
+ * the file header. Probes with `fetch` FIRST and only hands the bytes to
+ * `THREE.TextureLoader` (via an object URL) when they exist: a missing
+ * file resolves as a plain 404 response instead of a failed <img>
+ * subresource, which the browser would log as a console error no matter
+ * how quietly we handle it (art is optional by design — most of it hasn't
+ * been generated yet, and the console must stay clean). Returns a `cancel`
+ * function so the caller's effect cleanup can suppress a load that
+ * resolves after unmount.
  */
 export function loadArtTexture(
   id: string,
@@ -44,22 +49,38 @@ export function loadArtTexture(
   onError: () => void
 ): { cancel: () => void } {
   let cancelled = false
-  const loader = new THREE.TextureLoader()
-  loader.load(
-    `/labs/storybook/art/${id}.webp`,
-    (loaded) => {
-      if (cancelled) {
-        loaded.dispose()
-        return
+  fetch(`/labs/storybook/art/${id}.webp`)
+    .then((res) => {
+      if (cancelled) return undefined
+      if (!res.ok) {
+        onError()
+        return undefined
       }
-      loaded.colorSpace = THREE.SRGBColorSpace
-      onLoad(loaded)
-    },
-    undefined,
-    () => {
+      return res.blob().then((blob) => {
+        if (cancelled) return
+        const objectUrl = URL.createObjectURL(blob)
+        new THREE.TextureLoader().load(
+          objectUrl,
+          (loaded) => {
+            URL.revokeObjectURL(objectUrl)
+            if (cancelled) {
+              loaded.dispose()
+              return
+            }
+            loaded.colorSpace = THREE.SRGBColorSpace
+            onLoad(loaded)
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(objectUrl)
+            if (!cancelled) onError()
+          }
+        )
+      })
+    })
+    .catch(() => {
       if (!cancelled) onError()
-    }
-  )
+    })
   return {
     cancel: () => {
       cancelled = true
