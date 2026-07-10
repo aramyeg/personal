@@ -60,8 +60,8 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
   }
 
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-[232px_1fr]">
-      <aside className="hidden flex-col bg-[var(--c-navy)] text-white/85 lg:flex">
+    <div className="grid h-full grid-rows-[minmax(0,1fr)] grid-cols-1 lg:grid-cols-[232px_1fr]">
+      <aside className="hidden min-h-0 flex-col overflow-y-auto bg-[var(--c-navy)] text-white/85 lg:flex">
         <SidebarContent email={email} activeModule={activeModule} onSelect={setModule} />
       </aside>
       {sidebarOpen && (
@@ -83,7 +83,7 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
           </div>
         </div>
       )}
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-col">
         {/* mt-14 clears GalleryChrome's fixed "← Gallery" pill (top-4 left-4 z-50) on
             mobile, where this header starts flush with the viewport's top-left corner
             (same collision the sidebar nav below handles the same way); the desktop

@@ -200,6 +200,18 @@ test.describe('curator lab', () => {
     await expect(page).toHaveURL(/\/labs$/, { timeout: 10_000 })
   })
 
+  test('main content area scrolls when a module is taller than the viewport', async ({ page }) => {
+    await signIn(page)
+    await selectModule(page, 'Engineering')
+    await expect(page.getByRole('heading', { name: 'Engineering', level: 1 })).toBeVisible({ timeout: 15_000 })
+
+    const scrolled = await page.locator('main').evaluate((el) => {
+      el.scrollTop = 400
+      return el.scrollTop
+    })
+    expect(scrolled).toBeGreaterThan(0)
+  })
+
   test('curator is crawlable for logged-out visitors/crawlers', async ({ page }) => {
     const res = await page.request.get('/labs/curator')
     expect(res.ok()).toBe(true)
