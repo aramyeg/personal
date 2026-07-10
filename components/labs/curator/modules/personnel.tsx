@@ -127,8 +127,8 @@ export default function PersonnelModule() {
                 <SortButton label="Company" active={state.sortKey === 'company'} dir={state.sortDir} onClick={() => toggleSort('company')} />
               </th>
               <th scope="col" className={TH_CLS}>Role</th>
-              <th scope="col" className={TH_CLS}>Location</th>
-              <th scope="col" className={TH_CLS}>
+              <th scope="col" className={`hidden md:table-cell ${TH_CLS}`}>Location</th>
+              <th scope="col" className={`hidden md:table-cell ${TH_CLS}`}>
                 <SortButton label="Start" active={state.sortKey === 'startDate'} dir={state.sortDir} onClick={() => toggleSort('startDate')} />
               </th>
               <th scope="col" className={TH_CLS}>
@@ -149,8 +149,8 @@ export default function PersonnelModule() {
                   >
                     <td className={`px-4 ${pad} text-[13px] font-medium`}>{row.company}</td>
                     <td className={`px-4 ${pad} text-[12px] text-[var(--c-text-soft)]`}>{row.role}</td>
-                    <td className={`px-4 ${pad} text-[12px] text-[var(--c-text-soft)]`}>{row.location}</td>
-                    <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{row.startDate}</td>
+                    <td className={`hidden px-4 ${pad} text-[12px] text-[var(--c-text-soft)] md:table-cell`}>{row.location}</td>
+                    <td className={`hidden px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums md:table-cell`}>{row.startDate}</td>
                     <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{row.tenureMonths} mo</td>
                     <td className={`px-4 ${pad}`}>
                       <Badge tone={row.endDate === null ? 'ok' : 'neutral'}>{row.endDate === null ? 'active' : 'archived'}</Badge>

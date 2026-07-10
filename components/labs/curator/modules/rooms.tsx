@@ -5,6 +5,14 @@ import { Badge } from '../ui/badge'
 import { SpecChip } from '../ui/spec-chip'
 import { useCuratorStore } from '../store'
 
+const HEADERS: { label: string; className?: string }[] = [
+  { label: 'Room' },
+  { label: 'Status' },
+  { label: 'Shipped' },
+  { label: 'Thesis', className: 'hidden md:table-cell' },
+  { label: 'Actions' },
+]
+
 export default function RoomsModule() {
   const rows = getRoomRows()
   const density = useCuratorStore((s) => s.density)
@@ -29,8 +37,14 @@ export default function RoomsModule() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-[var(--c-border)]">
-              {['Room', 'Status', 'Shipped', 'Thesis', 'Actions'].map((h) => (
-                <th key={h} scope="col" className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">{h}</th>
+              {HEADERS.map((h) => (
+                <th
+                  key={h.label}
+                  scope="col"
+                  className={`px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)] ${h.className ?? ''}`}
+                >
+                  {h.label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -43,7 +57,7 @@ export default function RoomsModule() {
                 </td>
                 <td className={`px-4 ${pad}`}><Badge tone={r.status === 'live' ? 'ok' : 'neutral'}>{r.status}</Badge></td>
                 <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{r.date}</td>
-                <td className={`px-4 ${pad} max-w-[420px] truncate text-[12px] text-[var(--c-text-soft)]`} title={r.thesis}>{r.thesis}</td>
+                <td className={`hidden px-4 ${pad} max-w-[420px] truncate text-[12px] text-[var(--c-text-soft)] md:table-cell`} title={r.thesis}>{r.thesis}</td>
                 <td className={`px-4 ${pad} text-right`}>
                   <a href={r.href} aria-label={`Open ${r.title}`} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
                 </td>

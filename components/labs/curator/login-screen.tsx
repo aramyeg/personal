@@ -67,7 +67,7 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[var(--c-canvas)]">
+    <div className="flex h-full w-full items-center justify-center bg-[var(--c-canvas)] px-4">
       <div className="flex w-full max-w-[360px] flex-col items-center gap-4">
         <div className="w-full rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-8">
           <div className="mb-6 flex items-center gap-2">
