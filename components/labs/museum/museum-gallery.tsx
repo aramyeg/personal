@@ -80,7 +80,7 @@ export default function MuseumGallery() {
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">
-        {coarse ? 'Joystick to walk · drag to look · center art, tap to enter' : 'Click to walk · WASD + mouse · Esc to release'}
+        {coarse ? 'Joystick to walk · drag to look · center art, tap to enter' : 'Click to walk · WASD + mouse · Shift to run · Space to jump · Esc to release'}
       </div>
 
       {/* Escape hatch to the list */}

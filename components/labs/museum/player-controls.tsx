@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLAYER, clampToRegions, floorY } from './layout'
+import { GROUNDED, fovTarget, speedFor, stepJump, tryJump, type JumpState } from './movement'
 
 export type MoveVec = { x: number; y: number }
 
@@ -41,6 +42,8 @@ export function PlayerControls({
   const pitch = useRef(0)
   const keys = useRef<MoveVec>({ x: 0, y: 0 })
   const pressed = useRef(new Set<string>())
+  const sprint = useRef(false)
+  const jump = useRef<JumpState>(GROUNDED)
 
   useEffect(() => {
     const el = gl.domElement
@@ -54,9 +57,12 @@ export function PlayerControls({
       keys.current = { x: Math.sign(v.x), y: Math.sign(v.y) }
     }
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sprint.current = true; return }
+      if (e.code === 'Space') { jump.current = tryJump(jump.current); e.preventDefault(); return }
       if (KEYMAP[e.code]) { pressed.current.add(e.code); recomputeKeys(); e.preventDefault() }
     }
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sprint.current = false; return }
       pressed.current.delete(e.code); recomputeKeys()
     }
 
@@ -119,11 +125,24 @@ export function PlayerControls({
   useFrame((_, delta) => {
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ')
 
+    const dt = Math.min(delta, 0.05)
+    jump.current = stepJump(jump.current, dt)
+
     const joy = moveRef.current ?? { x: 0, y: 0 }
     const mx = keys.current.x + joy.x
     const my = keys.current.y + joy.y
-    if (mx === 0 && my === 0) {
-      camera.position.y = floorY(camera.position.z, length) + PLAYER.eyeHeight
+    const moving = mx !== 0 || my !== 0
+
+    // Sprint FOV: widen while running, settle back when not.
+    const cam = camera as THREE.PerspectiveCamera
+    const fov = THREE.MathUtils.lerp(cam.fov, fovTarget(sprint.current, moving), Math.min(1, delta * 8))
+    if (Math.abs(fov - cam.fov) > 0.01) {
+      cam.fov = fov
+      cam.updateProjectionMatrix()
+    }
+
+    if (!moving) {
+      camera.position.y = floorY(camera.position.z, length) + PLAYER.eyeHeight + jump.current.offset
       return
     }
 
@@ -138,7 +157,7 @@ export function PlayerControls({
     dir.normalize()
     const right = new THREE.Vector3(dir.z, 0, -dir.x).negate()
 
-    const step = PLAYER.speed * Math.min(delta, 0.05)
+    const step = speedFor(PLAYER.speed, sprint.current) * dt
     const nx = camera.position.x + (dir.x * ny2 + right.x * nx2) * step
     const nz = camera.position.z + (dir.z * ny2 + right.z * nx2) * step
     const clamped = clampToRegions(
@@ -146,7 +165,11 @@ export function PlayerControls({
       { x: nx, z: nz },
       length
     )
-    camera.position.set(clamped.x, floorY(clamped.z, length) + PLAYER.eyeHeight, clamped.z)
+    camera.position.set(
+      clamped.x,
+      floorY(clamped.z, length) + PLAYER.eyeHeight + jump.current.offset,
+      clamped.z
+    )
   })
 
   return null
