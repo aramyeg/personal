@@ -49,13 +49,13 @@ const CORNER_ASPECT = 856 / 814
 // safely), and a top-level `const X = BOOK.coverW * f` would evaluate
 // before book.tsx's own `export const BOOK` initializer has run, throwing
 // "Cannot access 'BOOK' before initialization".
-const CREST_WIDTH_FRAC = 0.72 // fraction of BOOK.coverDepth (the cover's short side)
-const CORNER_WIDTH_FRAC = 0.34 // fraction of BOOK.coverDepth
-const CORNER_MARGIN_X_FRAC = 0.04 // fraction of BOOK.coverSpan
-const CORNER_MARGIN_Z_FRAC = 0.12 // fraction of BOOK.coverDepth
-// v3 landscape cover: z runs 0 (gutter, top of screen) -> coverDepth (near
-// edge). Crest center-low, clear of the title band near the gutter.
-const CREST_Z_FRAC = 0.62 // fraction of BOOK.coverDepth
+const CREST_WIDTH_FRAC = 0.46 // fraction of BOOK.coverW
+const CORNER_WIDTH_FRAC = 0.22
+const CORNER_MARGIN_X_FRAC = 0.075 // fraction of BOOK.coverW
+const CORNER_MARGIN_Z_FRAC = 0.07 // fraction of BOOK.coverH
+// Center-low per the poster reference (scripts/posters/storybook-poster.html):
+// the crest sits a little below true vertical center, clear of the title.
+const CREST_Z_FRAC = 0.16 // fraction of BOOK.coverH
 const DECAL_LIFT = 0.0016
 const DECAL_ROTATION: readonly [number, number, number] = [-Math.PI / 2, 0, 0]
 
@@ -79,14 +79,14 @@ function cornerTransform(
   width: number,
   height: number
 ): { x: number; z: number; scale: readonly [number, number, number] } {
-  const marginX = BOOK.coverSpan * CORNER_MARGIN_X_FRAC
-  const marginZ = BOOK.coverDepth * CORNER_MARGIN_Z_FRAC
+  const marginX = BOOK.coverW * CORNER_MARGIN_X_FRAC
+  const marginZ = BOOK.coverH * CORNER_MARGIN_Z_FRAC
   const mirrorX = corner === 'tr' || corner === 'br'
   const mirrorY = corner === 'tl' || corner === 'tr'
-  const x = mirrorX
-    ? BOOK.coverSpan / 2 - marginX - width / 2
-    : -BOOK.coverSpan / 2 + marginX + width / 2
-  const z = mirrorY ? marginZ + height / 2 : BOOK.coverDepth - marginZ - height / 2
+  const x = mirrorX ? BOOK.coverW - marginX - width / 2 : marginX + width / 2
+  const z = mirrorY
+    ? -BOOK.coverH / 2 + marginZ + height / 2
+    : BOOK.coverH / 2 - marginZ - height / 2
   return { x, z, scale: [mirrorX ? -1 : 1, mirrorY ? -1 : 1, 1] }
 }
 
@@ -107,9 +107,9 @@ function CrestAndCorners({ coverTopY }: { coverTopY: number }) {
   const crestTexture = useArtTexture('cover-crest')
   const cornerTexture = useArtTexture('cover-corner')
 
-  const crestWidth = BOOK.coverDepth * CREST_WIDTH_FRAC
+  const crestWidth = BOOK.coverW * CREST_WIDTH_FRAC
   const crestHeight = crestWidth / CREST_ASPECT
-  const cornerWidth = BOOK.coverDepth * CORNER_WIDTH_FRAC
+  const cornerWidth = BOOK.coverW * CORNER_WIDTH_FRAC
   const cornerHeight = cornerWidth / CORNER_ASPECT
 
   const crestGeometry = useMemo(
@@ -144,7 +144,7 @@ function CrestAndCorners({ coverTopY }: { coverTopY: number }) {
   )
 
   const decalY = coverTopY + DECAL_LIFT
-  const crestZ = BOOK.coverDepth * CREST_Z_FRAC
+  const crestZ = BOOK.coverH * CREST_Z_FRAC
 
   return (
     <>
@@ -152,7 +152,7 @@ function CrestAndCorners({ coverTopY }: { coverTopY: number }) {
         <mesh
           geometry={crestGeometry}
           material={crestMaterial}
-          position={[0, decalY, crestZ]}
+          position={[BOOK.coverW / 2, decalY, crestZ]}
           rotation={DECAL_ROTATION}
         />
       )}
@@ -176,12 +176,13 @@ function CrestAndCorners({ coverTopY }: { coverTopY: number }) {
 
 // ----------------------------------------------------------------- title --
 
-const TITLE_CANVAS_W = 1600
-const TITLE_CANVAS_H = 360
+const TITLE_CANVAS_W = 1024
+const TITLE_CANVAS_H = 620
 const TITLE_ASPECT = TITLE_CANVAS_W / TITLE_CANVAS_H
-const TITLE_WIDTH_FRAC = 0.6 // fraction of BOOK.coverSpan
-// Band between the gutter edge and the crest (z from 0 at the gutter).
-const TITLE_Z_FRAC = 0.21 // fraction of BOOK.coverDepth
+const TITLE_WIDTH_FRAC = 0.62 // fraction of BOOK.coverW
+// Upper third of the cover (z spans [-coverH/2, coverH/2]; -coverH/2 is the
+// far/top edge as the camera sees it — see book.tsx's file header).
+const TITLE_Z_FRAC = 0.29 // fraction of BOOK.coverH, negated at point of use
 
 // Mirrors storybook.css's --sb-gold-bright/--sb-gold-deep/--sb-paper.
 // Canvas 2D can't read CSS custom properties without an extra DOM
@@ -212,6 +213,15 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return lines
 }
 
+/** Splits BOOK_TITLE into two roughly-even lines by word count — for the
+ *  current title this reproduces the poster reference's manual "A Tale
+ *  of" / "Six Kingdoms" break without hardcoding the split point. */
+function titleLines(): string[] {
+  const words = BOOK_TITLE.split(' ')
+  const mid = Math.ceil(words.length / 2)
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')]
+}
+
 /** Draws the title (two-line, gold gradient over a darker gold shadow copy
  *  for an embossed/stamped feel) and the italic subtitle beneath it. */
 function drawTitleCanvas(ctx: CanvasRenderingContext2D): void {
@@ -219,10 +229,10 @@ function drawTitleCanvas(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
-  const lines = [BOOK_TITLE]
-  const titleSize = 150
+  const lines = titleLines()
+  const titleSize = 118
   const lineHeight = titleSize * 1.02
-  const titleTop = TITLE_CANVAS_H * 0.42
+  const titleTop = TITLE_CANVAS_H * 0.3
   const cx = TITLE_CANVAS_W / 2
 
   ctx.font = `700 ${titleSize}px "Grenze Gotisch Variable", serif`
@@ -242,12 +252,12 @@ function drawTitleCanvas(ctx: CanvasRenderingContext2D): void {
     ctx.fillText(line, cx, y)
   })
 
-  ctx.font = `italic 500 44px "Alegreya Variable", georgia, serif`
+  ctx.font = `italic 500 36px "Alegreya Variable", georgia, serif`
   ctx.fillStyle = PAPER
   ctx.shadowColor = 'rgba(0, 0, 0, 0.65)'
   ctx.shadowBlur = 5
-  const subtitleTop = titleTop + lines.length * lineHeight - 40
-  const subtitleLineHeight = 52
+  const subtitleTop = titleTop + lines.length * lineHeight + 44
+  const subtitleLineHeight = 44
   wrapLines(ctx, BOOK_SUBTITLE, TITLE_CANVAS_W * 0.88).forEach((line, i) => {
     ctx.fillText(line, cx, subtitleTop + i * subtitleLineHeight)
   })
@@ -268,8 +278,8 @@ function TitleBanner({ coverTopY }: { coverTopY: number }) {
     const draw = async () => {
       try {
         await Promise.all([
-          document.fonts.load('700 150px "Grenze Gotisch Variable"'),
-          document.fonts.load('italic 500 44px "Alegreya Variable"'),
+          document.fonts.load('700 118px "Grenze Gotisch Variable"'),
+          document.fonts.load('italic 500 36px "Alegreya Variable"'),
         ])
         await document.fonts.ready
       } catch {
@@ -294,7 +304,7 @@ function TitleBanner({ coverTopY }: { coverTopY: number }) {
     }
   }, [])
 
-  const width = BOOK.coverSpan * TITLE_WIDTH_FRAC
+  const width = BOOK.coverW * TITLE_WIDTH_FRAC
   const height = width / TITLE_ASPECT
   const geometry = useMemo(() => new THREE.PlaneGeometry(width, height), [width, height])
   const material = useMemo(() => makeDecalMaterial(), [])
@@ -308,13 +318,13 @@ function TitleBanner({ coverTopY }: { coverTopY: number }) {
 
   if (!texture) return null
 
-  const titleZ = BOOK.coverDepth * TITLE_Z_FRAC
+  const titleZ = -BOOK.coverH * TITLE_Z_FRAC
 
   return (
     <mesh
       geometry={geometry}
       material={material}
-      position={[0, coverTopY + DECAL_LIFT, titleZ]}
+      position={[BOOK.coverW / 2, coverTopY + DECAL_LIFT, titleZ]}
       rotation={DECAL_ROTATION}
     />
   )

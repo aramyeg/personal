@@ -7,9 +7,9 @@
  * else the procedural print from placeholder-art.ts), split into left/right
  * page halves via texture transforms:
  *
- * - `near`: repeat (1, -0.5), offset (0, 0.5) — the print's right half in
+ * - `right`: repeat (0.5, 1), offset (0.5, 0) — the print's right half in
  *   right-page orientation (geometry u=0 at the spine).
- * - `far`: repeat (1, 0.5), offset (0, 0.5) — the print's left half,
+ * - `left`: repeat (-0.5, 1), offset (0.5, 0) — the print's left half,
  *   pre-mirrored so the left static page's `scale.x = -1` mesh (and the
  *   turning page's BackSide face at its landed pose, which shares the same
  *   spine-out uv direction) displays it upright.
@@ -27,34 +27,28 @@ import { loadArtTexture } from './use-layer-texture'
 
 export type SpreadPrint = {
   full: THREE.Texture
-  near: THREE.Texture
-  far: THREE.Texture
+  left: THREE.Texture
+  right: THREE.Texture
 }
 
 const FALLBACK_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
 function deriveHalves(full: THREE.Texture): SpreadPrint {
   full.wrapS = THREE.ClampToEdgeWrapping
-  full.wrapT = THREE.ClampToEdgeWrapping
-  // v3 orientation: the spread print splits along its VERTICAL axis — the
-  // image bottom half is the NEAR page (ground toward the reader), the top
-  // half the FAR page (sky beyond the gutter). Page geometry v runs 0 at
-  // the gutter -> 1 at the free edge (both pages; the far mesh is mirrored
-  // in z), so: near samples v_img = 0.5 - 0.5*v, far samples 0.5 + 0.5*v.
-  const near = full.clone()
-  near.repeat.set(1, -0.5)
-  near.offset.set(0, 0.5)
-  const far = full.clone()
-  far.repeat.set(1, 0.5)
-  far.offset.set(0, 0.5)
-  return { full, near, far }
+  const right = full.clone()
+  right.repeat.set(0.5, 1)
+  right.offset.set(0.5, 0)
+  const left = full.clone()
+  left.repeat.set(-0.5, 1)
+  left.offset.set(0.5, 0)
+  return { full, left, right }
 }
 
 function disposePrint(print: SpreadPrint): void {
   // Clones share the full texture's GPU image but own their uniforms; the
   // full texture owns the upload.
-  print.near.dispose()
-  print.far.dispose()
+  print.left.dispose()
+  print.right.dispose()
   print.full.dispose()
 }
 

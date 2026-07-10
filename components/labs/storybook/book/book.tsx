@@ -2,12 +2,10 @@
 
 /**
  * The book assembly: spine, back cover, two page blocks, two static flat
- * pages, and the front cover pivot. v3 world conventions (must match
- * page-geometry.ts): spine/gutter along X at z=0 — horizontal on screen —
- * with the NEAR (unread) stack toward the camera (+Z) and the FAR (read)
- * stack beyond the gutter (-Z), +Y up. Turns rotate about the gutter: the
- * authentic pop-up orientation, so the pop-up pieces' fold lines (parallel
- * to X) are parallel to the hinge every page rotates on.
+ * pages, and the front cover pivot. World conventions (must match
+ * page-geometry.ts): spine along Z at x=0, pages/covers extend toward +X
+ * (the "right"/unread stack) with the mirrored twin toward -X (the
+ * "left"/read stack), +Y up.
  *
  * Vertical stack when closed, bottom to top: desk -> back cover -> page
  * block -> front cover. The front cover pivots at the spine; its
@@ -21,7 +19,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStorybookStore } from '../store'
 import { SPREAD_COUNT, popupContentForSpread } from '../content'
-import { PAGE_DEPTH, PAGE_SPAN, buildPageTemplate, easeTurn } from './page-geometry'
+import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
@@ -30,8 +28,8 @@ import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
 
 export const BOOK = {
-  coverSpan: 2.36,
-  coverDepth: 0.79,
+  coverW: 1.22,
+  coverH: 1.58,
   coverT: 0.035,
   blockMaxH: 0.11,
   pageLift: 0.005,
@@ -39,8 +37,8 @@ export const BOOK = {
 
 const SPREAD_MAX = SPREAD_COUNT - 1
 const EDGE_COLOR = '#d8c491'
-const BLOCK_SPAN = PAGE_SPAN * 0.98
-const BLOCK_DEPTH = PAGE_DEPTH * 0.98
+const BLOCK_WIDTH = PAGE_W * 0.98
+const BLOCK_DEPTH = PAGE_H * 0.98
 
 const BACK_COVER_Y = BOOK.coverT / 2
 const BACK_COVER_TOP = BOOK.coverT
@@ -68,10 +66,11 @@ const CREASE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift + 0.001
 // (rightHeight + leftHeight is constant), so the illustration never steps
 // down to match whichever page is momentarily shorter.
 const POPUP_Y = CREASE_Y + 0.004
-// Closed book extends only toward +Z (near) from the gutter (z=0); open,
-// the two stacks straddle z=0 symmetrically. Shifting the whole assembly
-// by -PAGE_DEPTH/2 when closed keeps it centered in frame.
-const CLOSED_CENTER_OFFSET_Z = -PAGE_DEPTH / 2
+// Closed book extends only toward +X from the spine (x=0), so it sits
+// right of the HTML CTA's centerline; open, the two blocks/pages already
+// straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
+// when closed centers it under the CTA without touching any local layout.
+const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
 
 export function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
@@ -149,11 +148,11 @@ export function Book() {
   // spread's full-bleed print (user art `page-<n>.webp`, else the procedural
   // print). During a turn the exposed side pre-swaps to the incoming
   // spread's print — the page the lifting sheet reveals underneath.
-  const farPageMaterial = useMemo(
+  const leftPageMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
     [paper]
   )
-  const nearPageMaterial = useMemo(
+  const rightPageMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
     [paper]
   )
@@ -167,11 +166,11 @@ export function Book() {
       leatherMaterial.dispose()
       edgeMaterial.dispose()
       paperMaterial.dispose()
-      farPageMaterial.dispose()
-      nearPageMaterial.dispose()
+      leftPageMaterial.dispose()
+      rightPageMaterial.dispose()
       creaseMaterial.dispose()
     },
-    [leatherMaterial, edgeMaterial, paperMaterial, farPageMaterial, nearPageMaterial, creaseMaterial]
+    [leatherMaterial, edgeMaterial, paperMaterial, leftPageMaterial, rightPageMaterial, creaseMaterial]
   )
 
   // Committed open/closed state — drives the cover's *rest* pose and the
@@ -195,13 +194,13 @@ export function Book() {
   // hidden for the whole turn and only reappear once `completeTurn()`
   // lands the cover on its new rest pose.
   const isCoverTurning = turning !== null && isCoverTurn(spread, turning)
-  const nearHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
-  const farHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
+  const rightHeight = BOOK.blockMaxH * (1 - spread / SPREAD_MAX)
+  const leftHeight = BOOK.blockMaxH * (spread / SPREAD_MAX)
   const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
   // The turning page's resting height: wherever it's departing from (the
   // right stack for a 'next' turn, the left stack for 'prev'), matching the
   // static pages' own height formula below exactly.
-  const turnOriginY = BACK_COVER_TOP + (turning === 'prev' ? farHeight : nearHeight) + BOOK.pageLift
+  const turnOriginY = BACK_COVER_TOP + (turning === 'prev' ? leftHeight : rightHeight) + BOOK.pageLift
 
   // Current spread ± 1 with actual pop-up content, so neighboring layer
   // textures are already warm by the time you turn to them (see
@@ -232,27 +231,27 @@ export function Book() {
   // halves; during a turn, the side the lifting sheet exposes pre-swaps to
   // the incoming spread (the turning sheet's own faces cover the seam — its
   // landing face is the same image the static page switches to at commit).
-  const farPrintIndex = turning === 'prev' ? spread - 1 : spread
-  const nearPrintIndex = turning === 'next' ? spread + 1 : spread
+  const leftPrintIndex = turning === 'prev' ? spread - 1 : spread
+  const rightPrintIndex = turning === 'next' ? spread + 1 : spread
   useEffect(() => {
-    const far = prints[farPrintIndex]?.far ?? paper
-    if (farPageMaterial.map !== far) {
-      farPageMaterial.map = far
-      farPageMaterial.needsUpdate = true
+    const left = prints[leftPrintIndex]?.left ?? paper
+    if (leftPageMaterial.map !== left) {
+      leftPageMaterial.map = left
+      leftPageMaterial.needsUpdate = true
     }
-    const near = prints[nearPrintIndex]?.near ?? paper
-    if (nearPageMaterial.map !== near) {
-      nearPageMaterial.map = near
-      nearPageMaterial.needsUpdate = true
+    const right = prints[rightPrintIndex]?.right ?? paper
+    if (rightPageMaterial.map !== right) {
+      rightPageMaterial.map = right
+      rightPageMaterial.needsUpdate = true
     }
-  }, [prints, farPrintIndex, nearPrintIndex, farPageMaterial, nearPageMaterial, paper])
+  }, [prints, leftPrintIndex, rightPrintIndex, leftPageMaterial, rightPageMaterial, paper])
   // The mid-turn sheet's two faces: what it was showing when it lifted, and
   // what it lands as (see turning-page.tsx for the uv orientations).
   const turnFrontMap = turning
-    ? ((turning === 'next' ? prints[spread]?.near : prints[spread - 1]?.near) ?? null)
+    ? (turning === 'next' ? prints[spread]?.right : prints[spread - 1]?.right) ?? null
     : null
   const turnBackMap = turning
-    ? ((turning === 'next' ? prints[spread + 1]?.far : prints[spread]?.far) ?? null)
+    ? (turning === 'next' ? prints[spread + 1]?.left : prints[spread]?.left) ?? null
     : null
 
   useFrame(() => {
@@ -269,17 +268,17 @@ export function Book() {
     // over the spine like a real hinge. The opposite sign sends it straight
     // through the desk (verified: worldY dips to ~-0.52 at the midpoint,
     // well below the y=0 desk plane — invisible, not lifting).
-    cover.rotation.x = f.dir === 'next' ? -Math.PI * eased : -Math.PI * (1 - eased)
-    outer.position.z = CLOSED_CENTER_OFFSET_Z * (1 - openAmount)
+    cover.rotation.z = f.dir === 'next' ? Math.PI * eased : Math.PI * (1 - eased)
+    outer.position.x = CLOSED_CENTER_OFFSET_X * (1 - openAmount)
   })
 
   return (
-    <group ref={outerGroupRef} position={[0, 0, spread === 0 ? CLOSED_CENTER_OFFSET_Z : 0]}>
+    <group ref={outerGroupRef} position={[spread === 0 ? CLOSED_CENTER_OFFSET_X : 0, 0, 0]}>
       {/* Spine: a standing ridge along the hinge edge when closed; lies flat
           under the spread once open (real open books have no wall down the
           middle) — same footprint, just collapsed to cover thickness. */}
-      <mesh position={[0, spineHeight / 2, -0.02]} material={leatherMaterial}>
-        <boxGeometry args={[BOOK.coverSpan, spineHeight, 0.05]} />
+      <mesh position={[-0.02, spineHeight / 2, 0]} material={leatherMaterial}>
+        <boxGeometry args={[0.05, spineHeight, BOOK.coverH]} />
       </mesh>
 
       {/* Gutter crease: soft dark shadow where the open pages meet the spine.
@@ -301,21 +300,21 @@ export function Book() {
           material={creaseMaterial}
           renderOrder={-1}
         >
-          <planeGeometry args={[PAGE_SPAN, CREASE_WIDTH]} />
+          <planeGeometry args={[CREASE_WIDTH, BOOK.coverH]} />
         </mesh>
       )}
 
       {/* Back cover: fixed support board, always under the right-hand stack. */}
-      <mesh position={[0, BACK_COVER_Y, BOOK.coverDepth / 2]} material={leatherMaterial}>
-        <boxGeometry args={[BOOK.coverSpan, BOOK.coverT, BOOK.coverDepth]} />
+      <mesh position={[BOOK.coverW / 2, BACK_COVER_Y, 0]} material={leatherMaterial}>
+        <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
       </mesh>
 
       {/* Right page block: full at spread 0, shrinks toward the spine as pages "turn". */}
       <mesh
-        position={[0, BACK_COVER_TOP + nearHeight / 2, BLOCK_DEPTH / 2]}
+        position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + rightHeight / 2, 0]}
         material={edgeMaterial}
       >
-        <boxGeometry args={[BLOCK_SPAN, nearHeight, BLOCK_DEPTH]} />
+        <boxGeometry args={[BLOCK_WIDTH, rightHeight, BLOCK_DEPTH]} />
       </mesh>
 
       {/* Left page block: nonexistent at spread 0 or mid-cover-turn (a
@@ -325,37 +324,37 @@ export function Book() {
           turn — see isCoverTurning above — since a 'prev' cover turn starts
           with leftHeight > 0 (spread is still 1 until commit) and would
           otherwise float once the cover lifts out from under it. */}
-      {isOpen && farHeight > 0 && !isCoverTurning && (
+      {isOpen && leftHeight > 0 && !isCoverTurning && (
         <mesh
-          position={[0, BACK_COVER_TOP + farHeight / 2, -BLOCK_DEPTH / 2]}
+          position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + leftHeight / 2, 0]}
           material={edgeMaterial}
         >
-          <boxGeometry args={[BLOCK_SPAN, farHeight, BLOCK_DEPTH]} />
+          <boxGeometry args={[BLOCK_WIDTH, leftHeight, BLOCK_DEPTH]} />
         </mesh>
       )}
 
       {/* Static pages only exist once the book is open: closed, the mirrored
-          far page's footprint (z in [-PAGE_DEPTH, 0]) sits outside the front
+          left page's footprint (x in [-PAGE_W, 0]) sits outside the front
           cover entirely and would otherwise poke out past the spine. */}
       {isOpen && (
         <mesh
-          position={[0, BACK_COVER_TOP + nearHeight + BOOK.pageLift, 0]}
+          position={[0, BACK_COVER_TOP + rightHeight + BOOK.pageLift, 0]}
           geometry={pageGeometry}
-          material={nearPageMaterial}
+          material={rightPageMaterial}
         />
       )}
 
-      {/* Static far page, mirrored across the gutter. Hidden for the whole
+      {/* Static left page, mirrored across the spine. Hidden for the whole
           duration of a cover turn (see isCoverTurning above) — the front
           cover is its support board only at rest, so revealing it any
           earlier than the turn's commit makes it appear to float past the
           book's edge, unsupported. */}
       {isOpen && !isCoverTurning && (
         <mesh
-          position={[0, BACK_COVER_TOP + farHeight + BOOK.pageLift, 0]}
-          scale={[1, 1, -1]}
+          position={[0, BACK_COVER_TOP + leftHeight + BOOK.pageLift, 0]}
+          scale={[-1, 1, 1]}
           geometry={pageGeometry}
-          material={farPageMaterial}
+          material={leftPageMaterial}
         />
       )}
 
@@ -398,9 +397,9 @@ export function Book() {
       {/* Front cover pivot: rotation.z rests at 0 (closed, on top) / PI
           (open, flat left); the turn driver takes over continuously
           in-between whenever a cover turn is in flight. */}
-      <group ref={frontCoverRef} position={[0, FRONT_PIVOT_Y, 0]} rotation={[spreadOpen ? -Math.PI : 0, 0, 0]}>
-        <mesh position={[0, FRONT_LOCAL_Y, BOOK.coverDepth / 2]} material={leatherMaterial}>
-          <boxGeometry args={[BOOK.coverSpan, BOOK.coverT, BOOK.coverDepth]} />
+      <group ref={frontCoverRef} position={[0, FRONT_PIVOT_Y, 0]} rotation={[0, 0, spreadOpen ? Math.PI : 0]}>
+        <mesh position={[BOOK.coverW / 2, FRONT_LOCAL_Y, 0]} material={leatherMaterial}>
+          <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
         </mesh>
         {/* Crest/corners/title — moves with the cover through the whole
             turn since it's mounted in the same pivot group as the box

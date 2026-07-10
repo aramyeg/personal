@@ -22,12 +22,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PAGE_DEPTH, PAGE_SPAN, buildPageTemplate, curlPositionsPhased, easeTurnWeighted } from './page-geometry'
+import { PAGE_H, PAGE_W, buildPageTemplate, curlPositionsPhased, easeTurnWeighted } from './page-geometry'
 import { makeCanvasTexture } from './book'
 import { makePaperCanvas } from '../procedural/paper-texture'
 import type { TurnFrame } from './use-turn-driver'
 
-const SHADE_DEPTH = PAGE_DEPTH * 0.7
+const SHADE_WIDTH = PAGE_W * 0.7
 const SHADE_LIFT = 0.003
 const SHADE_MAX_OPACITY = 0.34
 // Shapes the shade's opacity so it peaks a little past mid-turn (t≈0.59)
@@ -160,8 +160,8 @@ export function TurningPage({
     // page is departing toward: +X for 'next' (trailing shadow falls to the
     // right, under the still-flat right stack), mirrored to -X for 'prev'
     // (the page is curling back down onto the left stack instead).
-    const sweep = Math.cos(Math.PI * easeTurnWeighted(f.t)) * (PAGE_DEPTH / 2)
-    shade.position.z = f.dir === 'next' ? sweep : -sweep
+    const sweep = Math.cos(Math.PI * easeTurnWeighted(f.t)) * (PAGE_W / 2)
+    shade.position.x = f.dir === 'next' ? sweep : -sweep
   })
 
   return (
@@ -175,7 +175,7 @@ export function TurningPage({
         material={shadeMaterial}
         visible={false}
       >
-        <planeGeometry args={[PAGE_SPAN, SHADE_DEPTH]} />
+        <planeGeometry args={[SHADE_WIDTH, PAGE_H]} />
       </mesh>
     </>
   )
