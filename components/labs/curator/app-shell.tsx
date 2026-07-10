@@ -6,9 +6,10 @@ import {
   LayoutDashboard, Landmark, Users, SquareKanban, Ticket, BookOpen, Settings, ChevronsUpDown,
   type LucideIcon,
 } from 'lucide-react'
-import OverviewModule from './modules/overview'
+import { ModuleHost } from './module-host'
+import { ToastViewport } from './ui/toast'
 import { useEscCapture } from './use-esc-capture'
-import { type CuratorModule } from './store'
+import { useCuratorStore, type CuratorModule } from './store'
 
 export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -21,8 +22,14 @@ export const NAV_ITEMS: { id: CuratorModule; label: string; icon: LucideIcon }[]
 ]
 
 export function AppShell({ email, children }: { email: string; children?: ReactNode }) {
-  // Static until Task 8 wires module switching through the store.
-  const activeModule: CuratorModule = 'overview'
+  const activeModule: CuratorModule = useCuratorStore((s) => s.module)
+  const setModule = useCuratorStore((s) => s.setModule)
+
+  useEffect(() => {
+    const label = NAV_ITEMS.find((item) => item.id === activeModule)?.label ?? ''
+    document.title = `${label} · Curator`
+  }, [activeModule])
+
   return (
     <div className="grid h-full grid-cols-[232px_1fr]">
       <aside className="flex flex-col bg-[var(--c-navy)] text-white/85">
@@ -38,6 +45,7 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
                 <button
                   key={item.id}
                   type="button"
+                  onClick={() => setModule(item.id)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex w-full items-center gap-2.5 rounded-[6px] px-3 py-2 text-left text-[13px] transition-colors duration-150 ${
                     active
@@ -64,7 +72,8 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
             Portfolio Operations Platform
           </span>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <OverviewModule />}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">{children ?? <ModuleHost />}</main>
+        <ToastViewport />
       </div>
     </div>
   )
