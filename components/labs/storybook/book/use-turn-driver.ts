@@ -11,10 +11,14 @@
 
 import { useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { sbSound } from '../sound'
 import { useStorybookStore, type TurnDir } from '../store'
 
 export const TURN_MS = 1100
 export const COVER_MS = 1400
+// Fraction of the turn at which the paper "flip" whoosh fires — roughly the
+// moment the page is mid-air, past the initial lift.
+const FLIP_AT_T = 0.15
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
 
@@ -31,6 +35,13 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
  * calls `completeTurn()` exactly once and resets its clock — if that commit
  * chain-promotes a queued turn, `turning` is still truthy on the very next
  * frame, so this hook re-arms automatically without any extra bookkeeping.
+ *
+ * Also the single owner of the turn's procedural sound cues (task 13): a
+ * `creak()` the instant a cover turn arms, a `flip()` once `t` first passes
+ * `FLIP_AT_T`, and a `thump()` on landing — each latched with its own
+ * "fired" ref so a sustained condition (t past the threshold, isCover true)
+ * plays exactly once per turn instead of once per frame. sbSound itself
+ * no-ops unless sound is on, so these calls are unconditional here.
  */
 export function useTurnDriver(): RefObject<TurnFrame | null> {
   const frame = useRef<TurnFrame | null>(null)
@@ -40,6 +51,8 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
   // the promoted queued turn shares the same direction as the one that
   // just finished.
   const armedFor = useRef<TurnDir | null>(null)
+  const firedCreak = useRef(false)
+  const firedFlip = useRef(false)
 
   useFrame((_, delta) => {
     const { turning, spread } = useStorybookStore.getState()
@@ -48,12 +61,16 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
       frame.current = null
       elapsedMs.current = 0
       armedFor.current = null
+      firedCreak.current = false
+      firedFlip.current = false
       return
     }
 
     if (armedFor.current !== turning) {
       armedFor.current = turning
       elapsedMs.current = 0
+      firedCreak.current = false
+      firedFlip.current = false
     }
 
     const isCover = isCoverTurn(spread, turning)
@@ -63,10 +80,29 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
     const t = Math.min(1, elapsedMs.current / duration)
     frame.current = { t, dir: turning, isCover }
 
+    if (isCover && !firedCreak.current) {
+      firedCreak.current = true
+      sbSound.creak()
+    }
+    if (!firedFlip.current && t >= FLIP_AT_T) {
+      firedFlip.current = true
+      sbSound.flip()
+    }
+
     if (t >= 1) {
+      // A large frame delta (e.g. a backgrounded tab resuming) can jump t
+      // straight from < FLIP_AT_T to >= 1 in one frame — flip still plays
+      // once, just back-to-back with thump, rather than being skipped.
+      if (!firedFlip.current) {
+        firedFlip.current = true
+        sbSound.flip()
+      }
+      sbSound.thump()
       useStorybookStore.getState().completeTurn()
       elapsedMs.current = 0
       armedFor.current = null
+      firedCreak.current = false
+      firedFlip.current = false
     }
   })
 

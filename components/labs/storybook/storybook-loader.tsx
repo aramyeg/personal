@@ -11,6 +11,7 @@ import { useStorybookStore } from './store'
 import { useBookInput } from './use-book-input'
 import { BookNav } from './overlay/nav'
 import { QuillCursor } from './overlay/quill-cursor'
+import { SoundToggle } from './overlay/sound-toggle'
 import { SpreadOverlay } from './overlay/spread-overlay'
 
 // three.js only ever reaches the browser: ssr is off and nothing outside
@@ -56,6 +57,7 @@ export function StorybookLoader() {
       <SpreadOverlay />
       <BookNav />
       <QuillCursor />
+      <SoundToggle />
     </div>
   )
 }
