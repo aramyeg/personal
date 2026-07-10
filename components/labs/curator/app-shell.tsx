@@ -28,11 +28,28 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
   const setModule = useCuratorStore((s) => s.setModule)
   const sidebarOpen = useCuratorStore((s) => s.sidebarOpen)
   const setSidebarOpen = useCuratorStore((s) => s.setSidebarOpen)
+  const drawerPanelRef = useRef<HTMLDivElement>(null)
+  const hamburgerRef = useRef<HTMLButtonElement>(null)
+  const drawerWasOpenRef = useRef(false)
 
   useEffect(() => {
     const label = NAV_ITEMS.find((item) => item.id === activeModule)?.label ?? ''
     document.title = `${label} · Curator`
   }, [activeModule])
+
+  // The drawer dialog sits before the hamburger in DOM order, so without this
+  // a keyboard user tabbing from the hamburger would land in <main> behind the
+  // "modal". Focus the panel on open; restore focus to the trigger on every
+  // close path (nav select, backdrop pointerdown, Escape) — all of which
+  // funnel through sidebarOpen.
+  useEffect(() => {
+    if (sidebarOpen) {
+      drawerPanelRef.current?.focus()
+    } else if (drawerWasOpenRef.current) {
+      hamburgerRef.current?.focus()
+    }
+    drawerWasOpenRef.current = sidebarOpen
+  }, [sidebarOpen])
 
   const closeSidebar = () => setSidebarOpen(false)
   useEscCapture(sidebarOpen, closeSidebar)
@@ -57,7 +74,11 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
             if (e.target === e.currentTarget) closeSidebar()
           }}
         >
-          <div className="flex h-full w-[264px] max-w-[80vw] flex-col bg-[var(--c-navy)] text-white/85">
+          <div
+            ref={drawerPanelRef}
+            tabIndex={-1}
+            className="flex h-full w-[264px] max-w-[80vw] flex-col bg-[var(--c-navy)] text-white/85 outline-none"
+          >
             <SidebarContent email={email} activeModule={activeModule} onSelect={selectMobileModule} />
           </div>
         </div>
@@ -65,6 +86,7 @@ export function AppShell({ email, children }: { email: string; children?: ReactN
       <div className="flex min-w-0 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6">
           <button
+            ref={hamburgerRef}
             type="button"
             aria-label="Open navigation"
             onClick={() => setSidebarOpen(true)}

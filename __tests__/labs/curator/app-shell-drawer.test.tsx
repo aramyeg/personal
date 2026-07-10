@@ -81,4 +81,25 @@ describe('AppShell mobile drawer', () => {
     act(() => useCuratorStore.getState().setSidebarOpen(true))
     expect(screen.getByRole('dialog', { name: 'Navigation' })).toBeInTheDocument()
   })
+
+  it('moves focus into the dialog on open', () => {
+    renderShell()
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Navigation' })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+  })
+
+  it('returns focus to the hamburger button after Escape closes the drawer', () => {
+    renderShell()
+    const hamburger = screen.getByRole('button', { name: 'Open navigation' })
+    fireEvent.click(hamburger)
+    expect(screen.getByRole('dialog', { name: 'Navigation' })).toBeInTheDocument()
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    fireEvent(document.body, escape)
+
+    expect(screen.queryByRole('dialog', { name: 'Navigation' })).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(hamburger)
+  })
 })

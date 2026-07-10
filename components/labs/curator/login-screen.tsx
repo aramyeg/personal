@@ -67,8 +67,10 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[var(--c-canvas)] px-4">
-      <div className="flex w-full max-w-[360px] flex-col items-center gap-4">
+    <div className="flex h-full w-full items-center justify-center overflow-y-auto bg-[var(--c-canvas)] px-4">
+      {/* my-auto keeps the card centered when it fits, but collapses when the
+          viewport is shorter than the card so the top stays scroll-reachable */}
+      <div className="my-auto flex w-full max-w-[360px] flex-col items-center gap-4 py-6">
         <div className="w-full rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-8">
           <div className="mb-6 flex items-center gap-2">
             <span aria-hidden className="h-4 w-4 rounded-[3px] bg-[var(--c-blue)]" />
