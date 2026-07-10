@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
 import { CuratorRoot } from '@/components/labs/curator/curator-root'
+import { CuratorCrawlableCv } from '@/components/labs/curator/crawlable-cv'
 import { SESSION_COOKIE, verifySession } from '@/components/labs/curator/server/session'
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default async function CuratorLabPage() {
   const session = await verifySession(jar.get(SESSION_COOKIE)?.value)
   return (
     <GalleryChrome>
+      <CuratorCrawlableCv />
       <CuratorRoot session={session} />
     </GalleryChrome>
   )
