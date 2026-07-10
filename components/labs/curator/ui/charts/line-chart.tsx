@@ -26,11 +26,11 @@ export function LineChart({ data, annotations = [], title, caption }: {
   }, [])
 
   return (
-    <figure className="rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+    <figure className="flex h-full flex-col rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
       <figcaption className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]">
         {title}
       </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-[180px] w-full" preserveAspectRatio="none" role="img" aria-label={title}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 min-h-[180px] w-full flex-1" preserveAspectRatio="none" role="img" aria-label={title}>
         <path d={areaPath(pts, H)} fill="var(--c-blue)" opacity={0.08} />
         {uniqueAnnotations.map((a) => {
           const x = xByDate.get(a.date)

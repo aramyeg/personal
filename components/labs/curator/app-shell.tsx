@@ -21,7 +21,8 @@ export function AppShell({ children }: { children?: ReactNode }) {
   return (
     <div className="grid h-full grid-cols-[232px_1fr]">
       <aside className="flex flex-col bg-[var(--c-navy)] text-white/85">
-        <nav className="mt-4 flex-1 px-2" aria-label="Modules">
+        {/* mt-14 clears GalleryChrome's fixed "← Gallery" pill (top-4 left-4, z-50) */}
+        <nav className="mt-14 flex-1 px-2" aria-label="Modules">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
