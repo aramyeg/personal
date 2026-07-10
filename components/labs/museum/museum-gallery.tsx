@@ -111,7 +111,7 @@ export default function MuseumGallery({
         type="button"
         onClick={() => setGuideOpen(true)}
         aria-label="Show controls guide"
-        className="absolute top-4 right-28 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
+        className="absolute top-4 right-32 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
       >
         ?
       </button>
@@ -121,7 +121,9 @@ export default function MuseumGallery({
           className="absolute inset-0 z-10 grid place-items-center bg-black/60"
           onClick={() => setGuideOpen(false)}
         >
-          <VisitorGuide />
+          <div onClick={(e) => e.stopPropagation()}>
+            <VisitorGuide />
+          </div>
         </div>
       )}
     </div>
