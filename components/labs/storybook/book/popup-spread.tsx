@@ -57,9 +57,12 @@ const PARALLAX_SWAY = 0.015
 // same ms budget buys a smaller t fraction there — the stagger still reads
 // like ~12ms/layer either way, not a fraction that grows with duration).
 const PHASE_STEP_MS = 12
-// Below this, an incoming layer's stand is treated as "still flat" for
-// visibility purposes (see cutoutRef) — a hair above 0 rather than exactly
-// 0 so float noise in the spring/kinematic math can't flicker the mesh.
+// Below this, a layer's stand is treated as "still flat" for visibility
+// purposes (see cutoutRef/shadowRef) regardless of role — incoming-waiting,
+// outgoing-folded, or a current/hidden layer that hasn't started its rise
+// yet all read as flat paper with nothing to show. A hair above 0 rather
+// than exactly 0 so float noise in the spring/kinematic math can't flicker
+// the mesh.
 const STAND_EPSILON = 0.002
 
 /** A pop-up spread's relationship to any turn currently in flight — see the
@@ -93,13 +96,17 @@ function PopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   // Every chapter's four layers share identical hingeZ/width per kind (see
   // content.ts's layerDefaults) — with the outgoing AND incoming spreads
-  // both mounted and visible during a turn (see PopupSpread below), their
-  // flat (stand≈0) cutouts are geometrically coincident and would z-fight,
-  // the incoming chapter's colors flickering through before it's revealed.
-  // This ref lets the incoming layer's own cutout mesh stay fully
-  // invisible until it actually has something to show (stand above this
-  // epsilon) rather than resolving the conflict by depth-buffer luck.
+  // both mounted during a turn (see PopupSpread below), their flat
+  // (stand≈0) cutouts are geometrically coincident and would z-fight, one
+  // chapter's colors flickering through another's. These refs let each
+  // layer's cutout mesh and contact shadow stay fully invisible whenever
+  // they have nothing to show (stand at or below this epsilon) — whether
+  // that's an incoming layer still waiting to rise, an outgoing layer that
+  // has already folded flat, or a current/hidden layer sitting flat before
+  // its own rise starts — rather than resolving the conflict by
+  // depth-buffer luck or leaving flat paper visibly painted on the page.
   const cutoutRef = useRef<THREE.Mesh>(null)
+  const shadowRef = useRef<THREE.Mesh>(null)
   // Spring state (stand progress 0..1) and its velocity, integrated by hand
   // every frame rather than via a library — see SPRING_K/SPRING_C above.
   const stand = useRef(0)
@@ -213,12 +220,16 @@ function PopupLayer({
 
     shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.max(0, Math.min(1, stand.current))
 
-    // See cutoutRef's declaration: only the incoming layer needs this —
-    // 'outgoing'/'current'/'hidden' cutouts either belong to a group
-    // that's already hidden wholesale, or are the one flat pose that's
-    // *meant* to keep showing as it settles onto the page.
+    // See cutoutRef's declaration: paper is only worth drawing once it has
+    // actually started rising off the page, whatever role got it there —
+    // incoming-waiting, outgoing-folded-flat, and a current/hidden layer
+    // still flat pre-rise all read the same way here.
+    const paperVisible = stand.current > STAND_EPSILON
     if (cutoutRef.current) {
-      cutoutRef.current.visible = role !== 'incoming' || stand.current > STAND_EPSILON
+      cutoutRef.current.visible = paperVisible
+    }
+    if (shadowRef.current) {
+      shadowRef.current.visible = paperVisible
     }
   })
 
@@ -233,6 +244,7 @@ function PopupLayer({
         <mesh ref={cutoutRef} geometry={geometry} material={material} renderOrder={0} />
       </group>
       <mesh
+        ref={shadowRef}
         position={[layer.offsetX ?? 0, SHADOW_Y_LIFT, layer.hingeZ + SHADOW_Z_OFFSET]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={shadowMaterial}
