@@ -92,9 +92,9 @@ export const briefs: EngineeringBrief[] = [
     id: 'EB-009',
     area: 'Platform',
     title: 'Design Tokens',
-    stack: 'CSS custom properties, CSS Modules, next/font/google + Fontsource',
+    stack: 'CSS custom properties, CSS Modules, Fontsource',
     pattern:
-      'Color, typography, and structural tokens are declared as CSS custom properties on a single scoped .root class in curator.module.css — --c-navy, --c-blue, --c-border, --font-ui, --font-data — instead of the site’s shared Tailwind theme. Every surface uses a 1px --c-border hairline for structure; the module renders no box-shadow.',
+      'Color, typography, and structural tokens are declared as CSS custom properties on a single scoped .root class in curator.module.css — --c-navy, --c-blue, --c-border, --font-ui, --font-data — instead of the site’s shared Tailwind theme. Inter Variable loads site-wide via Fontsource; the lab additionally loads IBM Plex Mono the same way for its data typeface. Every surface uses a 1px --c-border hairline for structure; the module renders no box-shadow.',
     rationale:
       'Scoping tokens to the lab root lets Curator commit to its own enterprise palette without leaking into, or being leaked into by, the main portfolio identity or the other labs. Hairlines over shadows is a deliberate constraint — it is the visual signature of the dense, flat enterprise-console aesthetic the lab imitates.',
   },
