@@ -20,7 +20,10 @@ import { MC } from '../tokens'
 
 const W = 512
 const H = 384
-const PAD = 40
+// 15% side margin: the screen mesh is convex glass viewed obliquely (BASE_YAW),
+// so the bezel's inner lip occludes the outer ~8% of the texture worst at the
+// vertical middle — 40px clipped leading glyphs ('8 YRS' read '3 YRS').
+const PAD = 76
 
 // Phosphor palette, derived from the lab's triangle accent (MC.glyphs.triangle,
 // a teal-green) so the screen glows in a color the token system already owns —

@@ -35,7 +35,7 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { fitToStage } from '../lib/fit-model'
-import { createCrtScreen } from '../lib/crt-screen'
+import { createCrtScreen, type CrtScreen } from '../lib/crt-screen'
 
 const SRC = '/labs/memory-card/models/crt.glb'
 
@@ -117,19 +117,16 @@ function CrtModel({ lines, reduced }: CrtVignetteProps) {
 
   const screen = useMemo(() => findScreenMaterial(gltf.scene), [gltf.scene])
 
-  // The terminal texture: inherit the GLB's UV orientation from the original
-  // map (calibrated against a screenshot, not assumed). Rebuilt if the lines or
-  // target material change; disposed by the swap effect below.
-  const crt = useMemo(
-    () => createCrtScreen(lines, screen?.emissiveMap?.flipY ?? false),
-    [lines, screen]
-  )
-
-  // Point the screen material at our terminal; restore the original map + its
-  // emissive state on unmount, disposing only what we created. The original map
-  // is never disposed — it belongs to the shared loader cache.
+  // The terminal texture is created, swapped in, and disposed inside ONE paired
+  // effect: StrictMode re-runs effects (not memos), so a memoized texture
+  // disposed by an effect cleanup would be re-assigned already-disposed on the
+  // synthetic remount. Creating it here means every effect run owns a fresh
+  // texture. The original map is never disposed — it belongs to the shared
+  // loader cache. `useFrame` reaches the live instance through a ref.
+  const crtRef = useRef<CrtScreen | null>(null)
   useEffect(() => {
     if (!screen) return
+    const crt = createCrtScreen(lines, screen.emissiveMap?.flipY ?? false)
     const original = {
       map: screen.emissiveMap,
       emissive: screen.emissive.clone(),
@@ -140,22 +137,25 @@ function CrtModel({ lines, reduced }: CrtVignetteProps) {
     screen.emissiveIntensity = SCREEN_EMISSIVE_INTENSITY
     screen.needsUpdate = true
     crt.draw(reduced ? -1 : 0)
+    crtRef.current = crt
     invalidate()
     return () => {
+      crtRef.current = null
       screen.emissiveMap = original.map
       screen.emissive.copy(original.emissive)
       screen.emissiveIntensity = original.intensity
       screen.needsUpdate = true
       crt.dispose()
     }
-  }, [screen, crt, reduced, invalidate])
+  }, [screen, lines, reduced, invalidate])
 
   // Slow line-cycle. Idle under reduced motion (useFrame never advances on the
   // demand loop) — the static paint above stands.
   const acc = useRef(0)
   const active = useRef(0)
   useFrame((_, dt) => {
-    if (reduced || lines.length === 0) return
+    const crt = crtRef.current
+    if (!crt || reduced || lines.length === 0) return
     acc.current += dt
     if (acc.current >= CYCLE_SECONDS) {
       acc.current = 0

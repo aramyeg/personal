@@ -158,6 +158,14 @@ export function VignetteCanvas({
   const wrapRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [webgl, setWebgl] = useState(true)
+  // Bumped when the GL context is lost so the whole Canvas subtree remounts on
+  // a fresh context. The browser LRU-evicts WebGL contexts under pressure
+  // (several vignettes + fast scrolling reproduces it) and never restores them
+  // on its own; a full remount is the robust recovery — in-place restore is
+  // fragile against effects that mutate loader-cached materials (the CRT's
+  // screen swap). The small delay lets the eviction storm settle so the new
+  // context isn't immediately reclaimed.
+  const [glEpoch, setGlEpoch] = useState(0)
 
   useEffect(() => {
     setWebgl(hasWebGL())
@@ -184,6 +192,7 @@ export function VignetteCanvas({
     >
       {mountCanvas ? (
         <Canvas
+          key={glEpoch}
           dpr={[1, 2]}
           frameloop={reduced ? 'demand' : 'always'}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
@@ -193,6 +202,10 @@ export function VignetteCanvas({
             gl.toneMapping = THREE.ACESFilmicToneMapping
             gl.toneMappingExposure = 1.05
             gl.outputColorSpace = THREE.SRGBColorSpace
+            gl.domElement.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault()
+              window.setTimeout(() => setGlEpoch((n) => n + 1), 250)
+            })
           }}
         >
           <LookAt target={target} />

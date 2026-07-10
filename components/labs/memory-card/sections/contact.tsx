@@ -11,7 +11,7 @@
  * (a license LAW, not decoration), and the copyright line.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { siteConfig, socialLinks } from '@/lib/constants'
@@ -99,12 +99,18 @@ export function ContactSection({ reduced: reducedProp }: ContactSectionProps) {
   const systemReduced = useReducedMotion()
   const reduced = reducedProp ?? systemReduced ?? false
   const [copied, setCopied] = useState<string | null>(null)
+  const copiedTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), [])
 
   const onCopy = async (row: Row) => {
     const ok = await copyText(row.value)
     if (!ok) return
     setCopied(row.key)
-    window.setTimeout(() => setCopied((k) => (k === row.key ? null : k)), COPIED_MS)
+    window.clearTimeout(copiedTimer.current)
+    copiedTimer.current = window.setTimeout(
+      () => setCopied((k) => (k === row.key ? null : k)),
+      COPIED_MS
+    )
   }
 
   return (
