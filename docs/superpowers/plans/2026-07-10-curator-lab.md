@@ -2229,7 +2229,7 @@ export function SpecChip({ briefId }: { briefId: string }): JSX.Element
 | EB-003 | Data | Single Source of Truth | rooms/personnel/pipeline derive from `data/*` + labs manifest through one adapter layer |
 | EB-004 | Data | Analytics Abstraction | `AnalyticsSource` interface; seeded deterministic simulation; GA implementation slots in behind the same contract |
 | EB-005 | Interaction | Drag-and-Drop | dnd-kit sensors (pointer distance 4px, touch delay 150ms, keyboard); per-column sortable contexts; store-persisted placement |
-| EB-006 | Forms | Validation Strategy | per-step zod schemas shared shape with the API route; inline field errors; no validation library beyond zod |
+| EB-006 | Forms | Validation Strategy | per-step zod schemas; inline field errors; no form library beyond zod; delivery via prefilled mailto (no ticket API route exists — do not claim one) |
 | EB-007 | Data | Table Logic | pure sort/filter/paginate functions, unit-tested independent of React |
 | EB-008 | Performance | Module Code-Splitting | each module behind `next/dynamic` with skeleton fallback; charts hand-rolled SVG, zero chart-library bytes |
 | EB-009 | Platform | Design Tokens | CSS custom properties scoped to the lab root; hairline-not-shadow structure; Inter/IBM Plex Mono split |
@@ -2254,7 +2254,7 @@ Example entry (write the rest in the same voice):
 `__tests__/labs/curator/annotations.test.tsx`:
 
 ```tsx
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { briefs, getBrief } from '@/components/labs/curator/annotations'
 import { SpecChip } from '@/components/labs/curator/ui/spec-chip'
 
@@ -2275,7 +2275,9 @@ describe('SpecChip', () => {
     fireEvent.click(screen.getByRole('button', { name: /spec/i }))
     expect(screen.getByText(/ENGINEERING BRIEF · EB-001/)).toBeInTheDocument()
     const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-    document.body.dispatchEvent(escape)
+    act(() => {
+      document.body.dispatchEvent(escape)
+    })
     expect(escape.defaultPrevented).toBe(true)
     expect(screen.queryByText(/ENGINEERING BRIEF/)).not.toBeInTheDocument()
   })
