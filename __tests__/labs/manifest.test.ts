@@ -25,4 +25,12 @@ describe('labs manifest attic split', () => {
     expect(xp!.title).toBe('Bliss')
     expect(xp!.status).toBe('live')
   })
+
+  it('demotes the main site to a hall painting at /classic-claude', () => {
+    const main = hallLabs.find((l) => l.slug === 'main')
+    expect(main).toBeDefined()
+    expect(main!.title).toBe('Classic Claude')
+    expect(main!.href).toBe('/classic-claude')
+    expect(main!.status).toBe('live')
+  })
 })
