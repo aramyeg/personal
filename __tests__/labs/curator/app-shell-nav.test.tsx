@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AppShell } from '@/components/labs/curator/app-shell'
 import { useCuratorStore } from '@/components/labs/curator/store'

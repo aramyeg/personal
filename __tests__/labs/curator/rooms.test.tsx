@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import RoomsModule from '@/components/labs/curator/modules/rooms'
 import { useCuratorStore } from '@/components/labs/curator/store'

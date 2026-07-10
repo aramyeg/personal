@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useCuratorStore } from '@/components/labs/curator/store'
 import { OPEN_DEAL_ID } from '@/components/labs/curator/adapters'
 

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { briefs, getBrief } from '@/components/labs/curator/annotations'
 import { SpecChip } from '@/components/labs/curator/ui/spec-chip'

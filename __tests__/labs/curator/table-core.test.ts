@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { sortRows, filterRows, paginate, toCsv } from '@/components/labs/curator/ui/table-core'
 
 type Row = { name: string; years: number; end: string | null }

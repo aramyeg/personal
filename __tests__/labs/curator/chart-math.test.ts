@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { scalePoints, linePath, areaPath } from '@/components/labs/curator/ui/charts/chart-math'
 
 describe('chart math', () => {

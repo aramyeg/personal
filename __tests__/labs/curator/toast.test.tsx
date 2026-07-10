@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ToastViewport } from '@/components/labs/curator/ui/toast'
 import { useCuratorStore } from '@/components/labs/curator/store'

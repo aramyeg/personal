@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { SimulatedAnalyticsSource, mulberry32 } from '@/components/labs/curator/analytics-source'
 
 const END = new Date('2026-07-10T12:00:00Z')

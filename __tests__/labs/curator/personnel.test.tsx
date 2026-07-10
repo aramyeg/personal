@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PersonnelModule from '@/components/labs/curator/modules/personnel'
 import { experiences } from '@/data/experience'

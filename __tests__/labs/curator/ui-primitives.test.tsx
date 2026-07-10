@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Badge } from '@/components/labs/curator/ui/badge'
 import { KpiCard } from '@/components/labs/curator/ui/kpi-card'

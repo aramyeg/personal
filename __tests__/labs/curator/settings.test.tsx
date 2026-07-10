@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import SettingsModule from '@/components/labs/curator/modules/settings'
 import { useCuratorStore } from '@/components/labs/curator/store'

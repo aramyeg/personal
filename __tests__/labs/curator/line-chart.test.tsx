@@ -1,5 +1,5 @@
+import { describe, expect, it, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
 import { LineChart } from '@/components/labs/curator/ui/charts/line-chart'
 import type { TrafficPoint } from '@/components/labs/curator/analytics-source'
 

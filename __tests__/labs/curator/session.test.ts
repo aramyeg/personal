@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { describe, expect, it } from 'vitest'
 import { signSession, verifySession } from '@/components/labs/curator/server/session'
 
 describe('curator session', () => {

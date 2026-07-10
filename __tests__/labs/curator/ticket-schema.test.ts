@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { requesterSchema, detailsSchema, ticketId, ticketMailto } from '@/components/labs/curator/ticket-schema'
 
 describe('ticket schemas', () => {

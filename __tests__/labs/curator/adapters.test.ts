@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import {
   tenureMonths, getRoomRows, getPersonnelRows, getDealCards, getActivity, getRealKpis, OPEN_DEAL_ID,
 } from '@/components/labs/curator/adapters'
