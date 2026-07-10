@@ -68,3 +68,55 @@ export function incomingRiseStand(p: number, phaseOffset: number): number {
   // page passes vertical, decisive through the middle, easing into flat.
   return RISE_LANDING_STAND * (0.5 - 0.5 * Math.cos(Math.PI * u))
 }
+
+// ---------------------------------------------------------------------------
+// v3 attachment mechanics: which sheet a piece is glued to, and how it rides.
+//
+// The moving sheet on a 'next' turn is the near stack's top page; on 'prev',
+// the far stack's. Physically, that sheet CARRIES paper on both faces:
+//  - the outgoing spread's pieces hinged on the sheet's side of the gutter
+//    fold flat against its top face and ride it up;
+//  - the incoming spread's pieces hinged on the sheet's LANDING side are
+//    glued to its back face and ride it down, unfolding as it lays flat.
+// Pieces hinged on the stationary page unfold/fold in place. Riding is what
+// makes "the cutouts unfold from the page itself" literal — and it makes
+// sheet/paper intersection geometrically impossible, because the paper is
+// attached to the thing that would otherwise sweep through it.
+
+/** The moving sheet's angle over the NEAR side, in radians 0..π — matches
+ *  the curl math's theta exactly (see page-geometry.ts). */
+export function sheetTheta(dir: 'next' | 'prev', easedP: number): number {
+  const p = clamp01(easedP)
+  return dir === 'next' ? Math.PI * p : Math.PI * (1 - p)
+}
+
+const HALF_PI = Math.PI / 2
+
+/**
+ * Extra rotation (radians, about the gutter axis) a piece's assembly picks
+ * up from the sheet it is glued to during a turn — 0 for pieces glued to
+ * stationary paper. `hingeZ` < 0 is the far side of the gutter.
+ *
+ * Angles are capped at ±π/2: past vertical the riding piece is fully folded
+ * (stand 0, hidden by the ε-visibility rule), so the cap only spares the
+ * pose math from chasing an invisible piece under the landed sheet.
+ */
+export function rideAngle(
+  role: 'outgoing' | 'incoming',
+  dir: 'next' | 'prev',
+  hingeZ: number,
+  theta: number
+): number {
+  const nearHinged = hingeZ >= 0
+  if (dir === 'next') {
+    // Moving sheet: the near page, sweeping theta 0 -> π.
+    if (role === 'outgoing' && nearHinged) return -Math.min(theta, HALF_PI)
+    if (role === 'incoming' && !nearHinged) return Math.max(0, Math.min(Math.PI - theta, HALF_PI))
+    return 0
+  }
+  // 'prev': the far page's sheet, sweeping theta π -> 0 (still measured from
+  // the near side, so its own lift off the far stack is π - theta).
+  if (role === 'outgoing' && !nearHinged) return Math.max(0, Math.min(Math.PI - theta, HALF_PI))
+  if (role === 'incoming' && nearHinged) return -Math.min(theta, HALF_PI)
+  return 0
+}

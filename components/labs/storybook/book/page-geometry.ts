@@ -1,59 +1,61 @@
 /**
- * Pure math module for the WebGL book's page-turn geometry. No three.js
- * imports here — this feeds raw Float32Arrays to a mesh later, and staying
- * three-free lets it run in jsdom tests.
+ * Pure page-curl math for the pop-up book — no three.js imports, so it runs
+ * in jsdom tests as-is.
  *
- * Geometry conventions: the page is a horizontal grid, x runs from the
- * spine (0) to the free edge (PAGE_W), z runs across the page height
- * (±PAGE_H/2), y is up. The turn rotates around the spine (the z axis).
+ * v3 orientation (the authentic pop-up orientation, user-approved): the
+ * spine/gutter runs along X at z=0 — horizontal on screen. The NEAR page
+ * (unread stack) extends toward the camera, z ∈ [0, PAGE_DEPTH]; the FAR
+ * page (read stack) mirrors it, z ∈ [-PAGE_DEPTH, 0]. +Y is up. A page turn
+ * rotates about the gutter (the X axis): 'next' lifts the near page up and
+ * over, away from the reader; 'prev' brings the far stack's top sheet back
+ * over toward them. This is what makes the pop-up mechanics honest: the
+ * pieces' fold lines (parallel to X — see popup-spread.tsx) are parallel to
+ * the gutter, so the turning page and the paper it drives rotate on
+ * parallel hinges, exactly like glued paper in a real book.
  */
 
-export const PAGE_W = 1.15
-export const PAGE_H = 1.5
+export const PAGE_SPAN = 2.3 // across the spread, along the spine/gutter (x)
+export const PAGE_DEPTH = 0.75 // one page, gutter -> free edge (z)
 export const PAGE_SEGMENTS = 32
-export const CURL_MAX = 0.55 // radians of trailing-edge lag
+export const CURL_MAX = 0.55
 
-const ROW_VERTS = PAGE_SEGMENTS + 1
+const COLS = 2
 
 /**
- * Flat page template vertices: x∈[0,PAGE_W] from spine, z∈[-PAGE_H/2,PAGE_H/2], y=0.
- * Returns [positions, uvs, indices] arrays for a (PAGE_SEGMENTS+1)×2 vertex grid.
- *
- * Vertex layout: two rows of (PAGE_SEGMENTS+1) vertices — row 0 at
- * z=-PAGE_H/2 (vertices 0..PAGE_SEGMENTS), row 1 at z=+PAGE_H/2 (vertices
- * PAGE_SEGMENTS+1..2*PAGE_SEGMENTS+1). uvs are u=x/PAGE_W, v=row.
+ * Flat page template vertices: two columns at x = ∓PAGE_SPAN/2, and
+ * PAGE_SEGMENTS+1 rows at z = d ∈ [0, PAGE_DEPTH] from the gutter, y = 0.
+ * Vertex order: row r holds vertices r·2 (x = -PAGE_SPAN/2) and r·2+1
+ * (x = +PAGE_SPAN/2). uvs are u = column, v = d/PAGE_DEPTH (v = 0 at the
+ * gutter). Triangles wound CCW for a +y normal when flat.
  */
 export function buildPageTemplate(): {
   positions: Float32Array
   uvs: Float32Array
   indices: Uint16Array
 } {
-  const vertexCount = ROW_VERTS * 2
-  const positions = new Float32Array(vertexCount * 3)
-  const uvs = new Float32Array(vertexCount * 2)
+  const rows = PAGE_SEGMENTS + 1
+  const positions = new Float32Array(rows * COLS * 3)
+  const uvs = new Float32Array(rows * COLS * 2)
+  const indices = new Uint16Array(PAGE_SEGMENTS * 6)
 
-  for (let row = 0; row < 2; row++) {
-    const z = row === 0 ? -PAGE_H / 2 : PAGE_H / 2
-    for (let col = 0; col <= PAGE_SEGMENTS; col++) {
-      const vertex = row * ROW_VERTS + col
-      const x = (col / PAGE_SEGMENTS) * PAGE_W
-
-      positions[vertex * 3] = x
+  for (let row = 0; row < rows; row++) {
+    const d = (row / PAGE_SEGMENTS) * PAGE_DEPTH
+    for (let col = 0; col < COLS; col++) {
+      const vertex = row * COLS + col
+      positions[vertex * 3] = col === 0 ? -PAGE_SPAN / 2 : PAGE_SPAN / 2
       positions[vertex * 3 + 1] = 0
-      positions[vertex * 3 + 2] = z
-
-      uvs[vertex * 2] = x / PAGE_W
-      uvs[vertex * 2 + 1] = row
+      positions[vertex * 3 + 2] = d
+      uvs[vertex * 2] = col
+      uvs[vertex * 2 + 1] = d / PAGE_DEPTH
     }
   }
 
-  const indices = new Uint16Array(PAGE_SEGMENTS * 6)
   let cursor = 0
-  for (let col = 0; col < PAGE_SEGMENTS; col++) {
-    const a = col // row 0, col
-    const b = col + 1 // row 0, col + 1
-    const c = ROW_VERTS + col // row 1, col
-    const d = ROW_VERTS + col + 1 // row 1, col + 1
+  for (let seg = 0; seg < PAGE_SEGMENTS; seg++) {
+    const a = seg * COLS // row seg, -x
+    const b = a + 1 // row seg, +x
+    const c = a + COLS // row seg+1, -x
+    const d = c + 1 // row seg+1, +x
 
     // Two CCW triangles per segment quad (normal +y when flat).
     indices[cursor++] = a
@@ -75,14 +77,15 @@ export const easeTurn = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
 /**
- * Curl deformation around the spine (z axis). dir 'next': theta 0→π.
+ * Curl deformation around the gutter (the x axis). dir 'next': theta 0→π,
+ * the near page sweeping up and over to the far side.
  *
- * For each vertex: d = template.x;
+ * For each vertex: d = template.z (distance from the gutter);
  * theta = dir === 'next' ? π·ease(t) : π·(1−ease(t));
  * sign = dir === 'next' ? 1 : −1;
- * alpha = theta − sign·CURL_MAX·sin(π·t)·(d/PAGE_W)^1.3;
- * out.x = d·cos(alpha), out.y = d·sin(alpha) + 0.005 (lift to avoid
- * z-fighting with static pages), out.z = template.z.
+ * alpha = theta − sign·CURL_MAX·sin(π·t)·(d/PAGE_DEPTH)^1.3;
+ * out.z = d·cos(alpha), out.y = d·sin(alpha) + 0.005 (lift to avoid
+ * z-fighting with static pages), out.x = template.x.
  */
 export function curlPositions(
   template: Float32Array,
@@ -99,14 +102,14 @@ export function curlPositions(
   const vertexCount = template.length / 3
   for (let vertex = 0; vertex < vertexCount; vertex++) {
     const base = vertex * 3
-    const d = template[base]
-    const z = template[base + 2]
+    const x = template[base]
+    const d = template[base + 2]
 
-    const alpha = theta - sign * CURL_MAX * sinPiT * Math.pow(d / PAGE_W, 1.3)
+    const alpha = theta - sign * CURL_MAX * sinPiT * Math.pow(d / PAGE_DEPTH, 1.3)
 
-    out[base] = d * Math.cos(alpha)
+    out[base] = x
     out[base + 1] = d * Math.sin(alpha) + 0.005
-    out[base + 2] = z
+    out[base + 2] = d * Math.cos(alpha)
   }
 }
 
@@ -116,23 +119,23 @@ export function curlPositions(
  * middle, so a full turn reads as a weightier hardback page instead of a
  * uniform glide (task 18). Kept as a separate export rather than changing
  * `easeTurn` in place: `easeTurn`'s cubic shape is asserted by the tests
- * above and consumed elsewhere (book.tsx's cover pivot) unchanged.
+ * and consumed elsewhere (book.tsx's cover pivot) unchanged.
  */
 export const easeTurnWeighted = (t: number): number =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
 
-/** Max fraction of `t` the +z/-z long edges of the page lead/lag each other
+/** Max fraction of `t` the +x/-x side edges of the page lead/lag each other
  *  by in curlPositionsPhased — see that function. */
-export const CURL_Z_LEAD = 0.05
+export const CURL_X_LEAD = 0.05
 
 /**
  * Same deformation as curlPositions, but with the free corner leading: the
- * +z edge reaches a given point in the curl slightly before global `t`, the
- * -z edge slightly after, each clamped back into the page's own [0,1] time
+ * +x edge reaches a given point in the curl slightly before global `t`, the
+ * -x edge slightly after, each clamped back into the page's own [0,1] time
  * so the curl never runs backward or restarts partway through. Reads as the
- * page being pinched and lifted from one corner rather than hinging evenly
- * across its whole height — a small, standard paper-turn tell that a
- * uniform curl (curlPositions) can't produce on its own.
+ * sheet being pinched and lifted from one corner rather than hinging evenly
+ * across its whole span — a small, standard paper-turn tell that a uniform
+ * curl (curlPositions) can't produce on its own.
  *
  * Also drives the trailing-edge droop's envelope off the *eased* fraction
  * rather than raw t (curlPositions uses raw t — see its own comment).
@@ -144,10 +147,9 @@ export const CURL_Z_LEAD = 0.05
  * fraction guarantees theta − droop ≥ 0.45·theta ≥ 0 for every t, so that
  * can't happen, whichever easing function is passed in.
  *
- * A new export rather than a change to curlPositions, so that function's
- * existing tests — and its simpler, uniform mid-turn shape — stay exactly
- * as they are (per this task's constraint that page-geometry.ts's existing
- * exports must remain intact).
+ * A separate export rather than a change to curlPositions, so that
+ * function's existing tests — and its simpler, uniform mid-turn shape —
+ * stay exactly as they are.
  */
 export function curlPositionsPhased(
   template: Float32Array,
@@ -161,19 +163,19 @@ export function curlPositionsPhased(
 
   for (let vertex = 0; vertex < vertexCount; vertex++) {
     const base = vertex * 3
-    const d = template[base]
-    const z = template[base + 2]
+    const x = template[base]
+    const d = template[base + 2]
 
-    const zPhase = CURL_Z_LEAD * (z / (PAGE_H / 2))
-    const tLocal = Math.min(1, Math.max(0, t + zPhase))
+    const xPhase = CURL_X_LEAD * (x / (PAGE_SPAN / 2))
+    const tLocal = Math.min(1, Math.max(0, t + xPhase))
     const eased = ease(tLocal)
     const theta = dir === 'next' ? Math.PI * eased : Math.PI * (1 - eased)
     const droopEnvelope = Math.sin(Math.PI * eased)
 
-    const alpha = theta - sign * CURL_MAX * droopEnvelope * Math.pow(d / PAGE_W, 1.3)
+    const alpha = theta - sign * CURL_MAX * droopEnvelope * Math.pow(d / PAGE_DEPTH, 1.3)
 
-    out[base] = d * Math.cos(alpha)
+    out[base] = x
     out[base + 1] = d * Math.sin(alpha) + 0.005
-    out[base + 2] = z
+    out[base + 2] = d * Math.cos(alpha)
   }
 }

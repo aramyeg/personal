@@ -41,7 +41,7 @@ import * as THREE from 'three'
 import { layerFold, type SceneLayer } from '../content'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
-import { incomingRiseStand, outgoingFoldStand } from './popup-kinematics'
+import { incomingRiseStand, outgoingFoldStand, rideAngle, sheetTheta } from './popup-kinematics'
 import { COVER_MS, TURN_MS, type TurnFrame } from './use-turn-driver'
 import { easeTurnWeighted } from './page-geometry'
 import { useLayerTexture } from './use-layer-texture'
@@ -125,6 +125,9 @@ function PopupLayer({
   // depth-buffer luck or leaving flat paper visibly painted on the page.
   const cutoutRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
+  // v3 attachment: extra rotation about the gutter picked up from the moving
+  // sheet this piece is glued to during a turn (see popup-kinematics.ts).
+  const rideRef = useRef<THREE.Group>(null)
   // Spring state (stand progress 0..1) and its velocity, integrated by hand
   // every frame rather than via a library — see SPRING_K/SPRING_C above.
   const stand = useRef(0)
@@ -284,6 +287,9 @@ function PopupLayer({
       const p = easeTurnWeighted(f.t)
       const phaseOffset = ((layerCount - 1 - index) * PHASE_STEP_MS) / duration
       stand.current = outgoingFoldStand(p, foldStart.current, phaseOffset)
+      if (rideRef.current) {
+        rideRef.current.rotation.x = rideAngle('outgoing', f.dir, layer.hingeZ, sheetTheta(f.dir, p))
+      }
       velocity.current = 0
       risingClock.current = null
     } else if (role === 'incoming' && f) {
@@ -293,6 +299,9 @@ function PopupLayer({
       const p = easeTurnWeighted(f.t)
       const phaseOffset = (index * PHASE_STEP_MS) / duration
       stand.current = incomingRiseStand(p, phaseOffset)
+      if (rideRef.current) {
+        rideRef.current.rotation.x = rideAngle('incoming', f.dir, layer.hingeZ, sheetTheta(f.dir, p))
+      }
       velocity.current = 0
       risingClock.current = null
     } else {
@@ -310,6 +319,7 @@ function PopupLayer({
       if (prevRole.current === 'incoming' && role === 'current') {
         risingClock.current = index * STAGGER_S
       }
+      if (rideRef.current) rideRef.current.rotation.x = 0
 
       const rising = role === 'current'
       risingClock.current = rising ? (risingClock.current ?? 0) + dt : null
@@ -370,6 +380,7 @@ function PopupLayer({
           book.tsx) regardless of where three's distance-based transparent
           sort would otherwise place it — so a standing layer always
           composites on top of the crease instead of being painted over. */}
+      <group ref={rideRef}>
       <group ref={groupRef} position={[layer.offsetX ?? 0, 0, layer.hingeZ]}>
         <group ref={cutoutRef}>
           {fold === 'vfold' && (
@@ -397,6 +408,7 @@ function PopupLayer({
             <mesh geometry={geometries.a} material={materials.a} renderOrder={0} />
           )}
         </group>
+      </group>
       </group>
       <mesh
         ref={shadowRef}
