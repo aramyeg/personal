@@ -1,0 +1,339 @@
+/* Storybook lab — the WebGL book's HTML overlay (desktop/landscape layout +
+   illuminated-manuscript ornaments). Split out of storybook.css so the
+   shared base (tokens + typography, reused by the untouched plain view)
+   stays lean. Imported after storybook.css, before storybook-responsive.css
+   in storybook-loader.tsx — the portrait media query there overrides the
+   grid layout below into a bottom drawer using the same class names. */
+
+/* `#sb-drawer-panel` (spread-overlay.tsx) is a pure grouping node so its
+   children — `.sb-col-left` / `.sb-col-right` / `.sb-title-panel` — land as
+   direct children of `.sb-overlay` in both layouts (a grid here, a flex
+   column in the portrait drawer) without two separate component trees. */
+#sb-drawer-panel {
+  display: contents;
+}
+
+/* The book is always screen-centered (camera + book both sit on the x=0
+   axis — book-scene.tsx), so text simply flanks it: a fixed 3-column grid,
+   the book showing through the empty middle track. No pageRect, no resize
+   listeners. */
+.sb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+  display: grid;
+  grid-template-columns: minmax(0, 24rem) 1fr minmax(0, 20rem);
+  align-items: center;
+  column-gap: clamp(1rem, 3vw, 3rem);
+  padding: 0 clamp(1.5rem, 4vw, 4rem);
+}
+.sb-overlay a,
+.sb-overlay button {
+  pointer-events: auto;
+}
+
+.sb-col-left,
+.sb-col-right {
+  min-width: 0;
+  color: color-mix(in srgb, var(--sb-paper) 92%, transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 159, 77, 0.12);
+}
+.sb-col-left { grid-column: 1; }
+.sb-col-right { grid-column: 3; }
+.sb-col-left .sb-chapter-kicker,
+.sb-col-right .sb-chapter-kicker,
+.sb-title-panel .sb-chapter-kicker {
+  color: var(--sb-gold-bright);
+}
+
+/* Kicker → title flourish + closing fleuron + the gold-tinted em-dash/quote
+   spans (ornaments.tsx). */
+.sb-flourish {
+  display: block;
+  margin: 0.3rem 0 0.5rem;
+}
+.sb-fleuron {
+  display: block;
+  align-self: stretch; /* same shrink-to-fit fix as .sb-hairline above —
+    without it text-align:center has no width to center within. */
+  width: 100%;
+  margin-top: 0.7rem;
+  text-align: center;
+  font-size: 1.15rem;
+  color: var(--sb-gold-bright);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--sb-gold) 55%, transparent);
+}
+.sb-ornament-glyph {
+  color: var(--sb-gold-bright);
+  text-shadow: 0 0 5px color-mix(in srgb, var(--sb-gold) 50%, transparent);
+}
+.sb-narration--illuminated::first-line {
+  font-variant: small-caps;
+  font-family: var(--font-sb-caps);
+  letter-spacing: 0.02em;
+}
+
+/* Thin double gold hairline with a single diamond finial — frames the top
+   and bottom of each side column / panel. */
+.sb-hairline {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 6px;
+  margin: 0.2rem 0;
+  align-self: stretch; /* both header/body flex parents use align-items:
+    flex-start (or :center for the title panel), which would otherwise
+    shrink this — an empty-content flex row — to the width of its lone
+    finial span instead of the full column. */
+  width: 100%;
+}
+.sb-hairline::before,
+.sb-hairline::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px solid var(--sb-gold);
+  border-bottom: 1px solid color-mix(in srgb, var(--sb-gold-deep) 70%, transparent);
+}
+.sb-hairline-finial {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  background: var(--sb-gold-bright);
+  transform: rotate(45deg);
+  box-shadow: 0 0 3px var(--sb-gold);
+}
+
+.sb-drawer-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+.sb-drawer-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+.sb-col-right.sb-drawer-body {
+  margin-top: 0;
+}
+
+/* Title (spread 1): a floating panel, no paper plate, hovering above the
+   book's standing title layers rather than bottom-anchored on the page. */
+.sb-title-panel {
+  grid-column: 1 / -1;
+  max-width: 34rem;
+  margin: 0 auto;
+  align-self: start;
+  margin-top: clamp(2.5rem, 8vh, 5.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem clamp(1.5rem, 4vw, 2.5rem);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sb-desk) 76%, transparent);
+  color: color-mix(in srgb, var(--sb-paper) 92%, transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 159, 77, 0.12);
+}
+.sb-title-panel .sb-drawer-header,
+.sb-title-panel .sb-drawer-body {
+  align-items: center;
+}
+.sb-title-hero {
+  font-size: clamp(2rem, 4.6vw, 3.25rem);
+}
+.sb-book-subtitle {
+  font-style: italic;
+  font-size: clamp(0.95rem, 1.3vw, 1.1rem);
+  opacity: 0.85;
+  max-width: 30em;
+}
+.sb-byline {
+  font-size: 0.82rem;
+}
+.sb-opening-line {
+  max-width: 28em;
+}
+
+/* Chapters (2–7): plaque keeps its gold-framed fact-card treatment, now on
+   a translucent dark-leather fill instead of parchment. A small crest dot
+   marks its top center. */
+.sb-plaque-facts {
+  margin: 0 0 0.4rem;
+}
+.sb-plaque-highlights {
+  margin: 0;
+  padding-left: 1.1em;
+  list-style: disc;
+  font-family: var(--font-sb-body);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.sb-plaque-highlights li {
+  margin-bottom: 0.24em;
+}
+.sb-plaque-highlights li::marker {
+  color: var(--sb-gold-deep);
+}
+.sb-plaque--dark {
+  position: relative;
+  background: color-mix(in srgb, var(--sb-leather) 55%, var(--sb-desk) 45%);
+  border-color: var(--sb-gold);
+  color: color-mix(in srgb, var(--sb-paper) 94%, transparent);
+  width: 100%;
+}
+.sb-plaque--dark strong {
+  color: var(--sb-gold-bright);
+}
+.sb-plaque--dark::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--sb-gold-bright);
+  box-shadow: 0 0 4px var(--sb-gold);
+}
+
+/* The Hero's Satchel (spread 8): 2×3 grid of dark tag cards. */
+.sb-satchel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.sb-satchel-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--sb-gold) 45%, transparent);
+  background: color-mix(in srgb, var(--sb-leather) 45%, var(--sb-desk) 55%);
+  border-radius: 2px;
+  padding: 0.5rem 0.4rem;
+}
+.sb-satchel-img {
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: contain;
+}
+.sb-satchel-tag {
+  min-width: 0;
+}
+.sb-satchel-tag .sb-chapter-kicker {
+  font-size: 0.68rem;
+}
+.sb-satchel-name {
+  font-family: var(--font-sb-display);
+  font-size: 0.78rem;
+  line-height: 1.1;
+  margin: 0;
+}
+.sb-satchel-blurb {
+  font-size: 0.66rem;
+  line-height: 1.3;
+  margin: 0;
+  opacity: 0.85;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sb-satchel-more {
+  line-height: 1.55;
+}
+
+/* The End (spread 9): wax seal + sigils stay in the left column; the right
+   column carries a short small-caps colophon. */
+.sb-end-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.sb-wax-seal {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sb-display);
+  font-size: 1.5rem;
+  color: var(--sb-gold-bright);
+  background: radial-gradient(circle at 35% 30%, var(--sb-leather-worn), var(--sb-seal) 55%, var(--sb-leather-shadow) 100%);
+  border: 1px solid color-mix(in srgb, var(--sb-gold) 55%, transparent);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 -1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 2px 3px rgba(255, 255, 255, 0.15),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.4);
+  transition: transform 150ms ease;
+}
+.sb-wax-seal:hover {
+  transform: scale(1.06);
+}
+.sb-sigil-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sb-sigil-link {
+  display: inline-block;
+  font-family: var(--font-sb-caps);
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  border: 1px solid var(--sb-gold);
+  border-radius: 999px;
+  padding: 0.4rem 1.1rem;
+  color: var(--sb-gold-bright);
+  transition: background-color 150ms ease;
+}
+.sb-sigil-link:hover {
+  background: color-mix(in srgb, var(--sb-gold) 15%, transparent);
+}
+.sb-colophon {
+  font-family: var(--font-sb-caps);
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--sb-gold-bright);
+  text-align: right;
+}
+
+/* Portrait drawer toggle — hidden here, shown full-width in
+   storybook-responsive.css. Kept in the base file (not the media query) so
+   its resting/hover states are defined once. */
+.sb-drawer-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-sb-caps);
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: var(--sb-gold-bright);
+  background: none;
+  border: none;
+}
+.sb-drawer-toggle-glyph {
+  font-size: 0.9rem;
+  transition: transform 150ms ease;
+}

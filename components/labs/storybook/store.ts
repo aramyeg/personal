@@ -4,7 +4,6 @@ import { immer } from 'zustand/middleware/immer'
 import { SPREAD_COUNT } from './content'
 
 export type TurnDir = 'next' | 'prev'
-export type PageRect = { left: number; top: number; width: number; height: number }
 
 const inBounds = (spread: number, dir: TurnDir) =>
   dir === 'next' ? spread < SPREAD_COUNT - 1 : spread > 0
@@ -14,11 +13,9 @@ type SbState = {
   turning: TurnDir | null
   queued: TurnDir | null
   soundOn: boolean
-  pageRect: PageRect | null
   requestTurn: (dir: TurnDir) => void
   completeTurn: () => void
   toggleSound: () => void
-  setPageRect: (r: PageRect | null) => void
 }
 
 export const useStorybookStore = create<SbState>()(
@@ -28,7 +25,6 @@ export const useStorybookStore = create<SbState>()(
       turning: null,
       queued: null,
       soundOn: false,
-      pageRect: null,
       requestTurn: (dir) =>
         set((st) => {
           if (st.turning) {
@@ -45,7 +41,6 @@ export const useStorybookStore = create<SbState>()(
           st.queued = null
         }),
       toggleSound: () => set((st) => void (st.soundOn = !st.soundOn)),
-      setPageRect: (r) => set((st) => void (st.pageRect = r)),
     })),
     { name: 'storybook-lab' }
   )

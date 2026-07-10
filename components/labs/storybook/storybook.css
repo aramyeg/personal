@@ -1,4 +1,11 @@
-/* Storybook lab tokens — spec §3.1. The lab owns its full-viewport world. */
+/* Storybook lab tokens — spec §3.1. The lab owns its full-viewport world.
+   Base typography here is shared by three surfaces: the plain/crawlable
+   tale (plain-tale.tsx, untouched by the overlay rework), the WebGL book's
+   HTML overlay (overlay/spread-overlay.tsx — desktop side columns + the
+   portrait drawer), and the loading states below. Overlay-only layout
+   (side columns, the title panel, ornaments, the drawer) lives in
+   storybook-overlay.css; portrait/narrow overrides + the quill cursor live
+   in storybook-responsive.css — both imported after this file. */
 .sb-root {
   --sb-leather: #641e26;
   --sb-leather-shadow: #4a151c;
@@ -23,9 +30,11 @@
   font-family: var(--font-sb-body);
 }
 
-/* Canvas wrapper: full-bleed on desktop, shrinks to the top 52dvh in the
-   portrait layout below. The vignette and cover CTA live inside it so both
-   stay scoped to the WebGL stage rather than the whole viewport. */
+/* Canvas wrapper: always full-bleed — the book is the whole screen in both
+   landscape and portrait now (the portrait split into a top canvas/bottom
+   scroll panel is gone; see storybook-responsive.css). The vignette and
+   cover CTA live inside it so both stay scoped to the WebGL stage rather
+   than the whole viewport. */
 .sb-canvas-wrap {
   position: relative;
   width: 100%;
@@ -39,7 +48,8 @@
   background: radial-gradient(ellipse 70% 60% at 50% 42%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
 }
 
-/* Narration typography — used by overlay (Task 12) and plain view (Task 5). */
+/* Narration typography — used by the overlay (both layouts) and the plain
+   view alike. */
 .sb-narration {
   font-size: clamp(1rem, 1.6vw, 1.1875rem);
   line-height: 1.62;
@@ -90,275 +100,3 @@
   background: color-mix(in srgb, var(--sb-paper-aged) 30%, transparent);
 }
 .sb-plaque strong { font-weight: 700; letter-spacing: 0.06em; }
-
-/* Pasted-label parchment backing (Task 12 review, finding 1): a plainer
-   sibling to `.sb-plaque` — text glued onto the page rather than framed as
-   a fact-card. Used by the title-page hero block and each chapter's
-   narration column so narration never renders raw over the standing
-   pop-up cutouts. Deliberately lighter than the plaque (no outline ring,
-   thinner border, softer background) so the two treatments read as related
-   but distinct: plaque = fact card, plate = narration label. */
-.sb-text-plate {
-  background: color-mix(in srgb, var(--sb-paper) 86%, transparent);
-  border: 1px solid var(--sb-gold-deep);
-  border-radius: 3px;
-  padding: 0.9rem 1.2rem;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-
-/* ---------------------------------------------------------------------
-   Spread overlay (Task 12) — the book's real text layer, positioned over
-   the WebGL spread via inline left/top/width/height from `pageRect`.
-   Pointer events are off on the wrapper/content shells and back on for the
-   handful of interactive children (wax seal, sigils, CTA, nav — those set
-   their own pointer-events through normal button/link defaults once inside
-   an `auto`-scoped ancestor). --------------------------------------- */
-.sb-overlay {
-  position: fixed;
-  pointer-events: none;
-  transition: opacity 180ms ease;
-  overflow: hidden;
-}
-.sb-overlay-content {
-  position: absolute;
-  inset: 0;
-  padding: 4% 7%;
-  color: var(--sb-ink);
-}
-.sb-overlay-content a,
-.sb-overlay-content button {
-  pointer-events: auto;
-}
-
-/* Title (spread 1): centered block, bottom-anchored so the standing scene
-   above keeps the top of the spread. */
-.sb-overlay-content--title {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  text-align: center;
-  gap: 0.6rem;
-  padding-bottom: 8%;
-}
-.sb-text-plate--title {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 34em;
-}
-.sb-title-hero {
-  font-size: clamp(2.1rem, 5.2vw, 3.75rem);
-}
-.sb-book-subtitle {
-  font-style: italic;
-  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
-  opacity: 0.85;
-  max-width: 30em;
-}
-.sb-byline {
-  margin-top: 0.3rem;
-  /* Legibility fix (Task 12 review, finding 2): gold-deep on paper is only
-     ~3.25:1, below AA for text this small — ink reads comfortably at ~9.5:1
-     against the text plate's parchment backing. */
-  color: var(--sb-ink);
-  font-size: 0.82rem;
-}
-.sb-opening-line {
-  margin-top: 1rem;
-  max-width: 28em;
-}
-
-/* Chapters (2–7): two columns, both bottom-aligned to the near half of the
-   spread so the pop-up scenery keeps the top. The whole spread's HTML rect
-   (`pageRect`) is only the flat page's own screen-space quad — foreshortened
-   by the camera's downward angle, it's shallower than the book's full
-   visual footprint (which also includes the standing pop-up art rising
-   above it), so this typography is deliberately compact: it has to live
-   fully inside that quad, no more forgiving a budget than roughly 300px of
-   height on a common desktop viewport. */
-.sb-overlay-content--chapter {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  column-gap: 4%;
-  height: 100%;
-}
-.sb-chapter-col {
-  align-self: end;
-  padding-bottom: 4%;
-}
-.sb-chapter-col--narration .sb-text-plate {
-  padding: 0.65rem 0.85rem;
-}
-.sb-chapter-col--narration .sb-chapter-kicker {
-  margin: 0;
-  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline` — same
-     gold-deep-on-paper contrast shortfall, same ink-on-plate fix. */
-  color: var(--sb-ink);
-  font-size: 0.82rem;
-}
-.sb-chapter-col--narration .sb-chapter-title {
-  font-size: clamp(1.3rem, 2.5vw, 1.85rem);
-  margin: 0.2rem 0 0.4rem;
-}
-.sb-chapter-col--narration .sb-narration {
-  font-size: clamp(0.85rem, 1.05vw, 0.98rem);
-  line-height: 1.42;
-  max-width: none;
-}
-.sb-chapter-col--narration .sb-narration::first-letter {
-  font-size: 2.6em;
-}
-.sb-chapter-col--plaque .sb-plaque {
-  padding: 0.65rem 0.85rem;
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-.sb-plaque-facts {
-  margin: 0 0 0.4rem;
-}
-.sb-plaque-highlights {
-  margin: 0;
-  padding-left: 1.1em;
-  list-style: disc;
-  font-family: var(--font-sb-body);
-  font-size: 0.74rem;
-  line-height: 1.32;
-}
-.sb-plaque-highlights li {
-  margin-bottom: 0.22em;
-}
-.sb-plaque-highlights li::marker {
-  color: var(--sb-gold-deep);
-}
-
-/* The Hero's Satchel (spread 8). */
-.sb-overlay-content--satchel {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
-  gap: 0.75rem;
-  padding-bottom: 5%;
-}
-.sb-satchel-head .sb-narration {
-  margin-top: 0.35rem;
-  max-width: 32em;
-}
-.sb-satchel-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sb-satchel-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid color-mix(in srgb, var(--sb-gold) 45%, transparent);
-  background: color-mix(in srgb, var(--sb-paper-aged) 25%, transparent);
-  padding: 0.4rem;
-}
-.sb-satchel-img {
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: none;
-  object-fit: contain;
-}
-.sb-satchel-tag {
-  min-width: 0;
-}
-.sb-satchel-tag .sb-chapter-kicker {
-  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline`. */
-  color: var(--sb-ink);
-  font-size: 0.82rem;
-}
-.sb-satchel-name {
-  font-family: var(--font-sb-display);
-  font-size: 0.8rem;
-  line-height: 1.1;
-  margin: 0 0 0.15rem;
-}
-.sb-satchel-blurb {
-  font-size: 0.7rem;
-  line-height: 1.3;
-  margin: 0.1rem 0 0;
-  opacity: 0.85;
-}
-.sb-satchel-more {
-  line-height: 1.6;
-  /* Legibility fix (Task 12 review, finding 2): see `.sb-byline`. */
-  color: var(--sb-ink);
-  font-size: 0.82rem;
-}
-
-/* The End (spread 9). */
-.sb-overlay-content--end {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
-  gap: 1.1rem;
-  padding-bottom: 8%;
-}
-.sb-end-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.1rem;
-  flex-wrap: wrap;
-}
-.sb-wax-seal {
-  width: 3.75rem;
-  height: 3.75rem;
-  flex: none;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-sb-display);
-  font-size: 1.6rem;
-  color: var(--sb-gold-bright);
-  background: radial-gradient(circle at 35% 30%, var(--sb-leather-worn), var(--sb-seal) 55%, var(--sb-leather-shadow) 100%);
-  border: 1px solid color-mix(in srgb, var(--sb-gold) 55%, transparent);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 -1px 0 rgba(255, 255, 255, 0.15);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    inset 0 2px 3px rgba(255, 255, 255, 0.15),
-    inset 0 -3px 5px rgba(0, 0, 0, 0.4);
-  transition: transform 150ms ease;
-}
-.sb-wax-seal:hover {
-  transform: scale(1.06);
-}
-.sb-sigil-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sb-sigil-link {
-  display: inline-block;
-  font-family: var(--font-sb-caps);
-  font-variant: small-caps;
-  letter-spacing: 0.08em;
-  font-size: 0.85rem;
-  border: 1px solid var(--sb-gold);
-  border-radius: 999px;
-  padding: 0.4rem 1.1rem;
-  color: var(--sb-gold-bright);
-  transition: background-color 150ms ease;
-}
-.sb-sigil-link:hover {
-  background: color-mix(in srgb, var(--sb-gold) 15%, transparent);
-}
-
-/* Quill cursor styles and the portrait/narrow responsive layout live in
-   storybook-responsive.css (Task 12 follow-up review, finding 3) — split
-   out to keep both files under the 400-line cap. It's imported immediately
-   after this file in storybook-loader.tsx so cascade order is preserved. */

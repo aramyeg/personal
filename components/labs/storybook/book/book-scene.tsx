@@ -12,12 +12,19 @@ import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Book, makeCanvasTexture } from './book'
 import { Dust } from './dust'
-import { PageRectReporter } from './page-rect-reporter'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 
+// task-17: the book is the whole-screen hero now (side-column narration
+// replaces the old on-page text plates), so the camera sits noticeably
+// closer than the original framing — same elevation angle (the offset from
+// lookAt is just scaled down ~0.73x), just tighter, so the open spread
+// reads at roughly 55-65% of viewport width on a 16:9-ish desktop instead
+// of ~44%. Standing pop-up layers (up to ~1.05 world units tall) still
+// clear the frustum at rest and mid-turn — verified via screenshot, not
+// just math, since the perspective is a foreshortened top-down angle.
 const CAMERA_POSITION: [number, number, number] = [0, 2.6, 2.9]
-const CAMERA_LOOKAT: [number, number, number] = [0, 0, 0.15]
-const CAMERA_FOV = 40
+const CAMERA_LOOKAT: [number, number, number] = [0, 0.32, 0.15]
+const CAMERA_FOV = 34
 const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
 const CANDLE_POSITION: [number, number, number] = [1.6, 1.1, 1.4]
@@ -104,7 +111,6 @@ export default function BookScene() {
       <CandleLight />
       <Desk />
       <Dust />
-      <PageRectReporter />
       <ParallaxRig>
         <Book />
       </ParallaxRig>
