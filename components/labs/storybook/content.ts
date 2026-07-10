@@ -104,6 +104,54 @@ export const CHAPTERS: readonly Chapter[] = [
   },
 ]
 
+// Pop-up layers for the three spreads that aren't a career chapter: the
+// title page (spread 1) and the closing satchel/end pages (8, 9). Chapters
+// get their four-layer set from `layerDefaults` above; these are hand-tuned
+// one-off decorative sets instead, since there's no career experience to
+// derive them from.
+export const TITLE_LAYERS: readonly SceneLayer[] = [
+  { id: 'title-border', kind: 'backdrop', hingeZ: -0.3, height: 0.5, width: 1.6, standAngle: 85 },
+  { id: 'title-hero', kind: 'hero', hingeZ: 0.2, height: 0.45, width: 0.7, standAngle: 88 },
+]
+const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
+
+const SATCHEL_LAYERS: readonly SceneLayer[] = [
+  { id: 'satchel-bag', kind: 'hero', hingeZ: -0.25, height: 0.6, width: 0.9, standAngle: 85 },
+]
+const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
+
+const END_LAYERS: readonly SceneLayer[] = [
+  { id: 'end-letter', kind: 'hero', hingeZ: -0.2, height: 0.5, width: 0.75, standAngle: 85 },
+  { id: 'end-raven', kind: 'midground', hingeZ: -0.45, height: 0.55, width: 0.8, standAngle: 80 },
+]
+const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
+
+export const EXTRA_SPREAD_LAYERS: Record<number, readonly SceneLayer[]> = {
+  1: TITLE_LAYERS,
+  8: SATCHEL_LAYERS,
+  9: END_LAYERS,
+}
+
+const EXTRA_SPREAD_ACCENTS: Record<number, readonly string[]> = {
+  1: TITLE_ACCENTS,
+  8: SATCHEL_ACCENTS,
+  9: END_ACCENTS,
+}
+
+export type PopupContent = { layers: readonly SceneLayer[]; accents: readonly string[] }
+
+/** Resolves whatever pop-up content (if any) belongs to a spread: a career
+ *  chapter's four layers, one of the decorative extra sets above, or
+ *  `undefined` for the closed cover (spread 0). */
+export const popupContentForSpread = (spread: number): PopupContent | undefined => {
+  const chapter = chapterForSpread(spread)
+  if (chapter) return { layers: chapter.layers, accents: chapter.accents }
+  const layers = EXTRA_SPREAD_LAYERS[spread]
+  const accents = EXTRA_SPREAD_ACCENTS[spread]
+  if (!layers || !accents) return undefined
+  return { layers, accents }
+}
+
 export const chapterForSpread = (spread: number): Chapter | undefined =>
   CHAPTERS.find((c) => c.spread === spread)
 

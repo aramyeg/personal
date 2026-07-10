@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { experiences } from '@/data'
 import {
   CHAPTERS,
+  EXTRA_SPREAD_LAYERS,
   SPREAD_COUNT,
+  TITLE_LAYERS,
   chapterForSpread,
   experienceFor,
+  popupContentForSpread,
 } from '@/components/labs/storybook/content'
 
 describe('storybook content', () => {
@@ -55,5 +58,19 @@ describe('storybook content', () => {
     const ch6 = CHAPTERS[5]
     expect(ch6.narration.toLowerCase()).not.toMatch(/\blead(s|ing|er)?\b/)
     expect(ch6.narration).toMatch(/apprentices/)
+  })
+
+  it('gives every non-chapter spread with pop-up content its own layers', () => {
+    expect(EXTRA_SPREAD_LAYERS[1]).toBe(TITLE_LAYERS)
+    for (const spread of [1, 8, 9]) {
+      const content = popupContentForSpread(spread)
+      expect(content?.layers.length).toBeGreaterThan(0)
+      expect(content?.accents.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('resolves pop-up content for chapters too, and nothing for the closed cover', () => {
+    expect(popupContentForSpread(4)?.layers).toBe(chapterForSpread(4)?.layers)
+    expect(popupContentForSpread(0)).toBeUndefined()
   })
 })

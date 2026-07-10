@@ -18,11 +18,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStorybookStore } from '../store'
-import { SPREAD_COUNT } from '../content'
+import { SPREAD_COUNT, popupContentForSpread } from '../content'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
+import { PopupSpread } from './popup-spread'
 
 export const BOOK = {
   coverW: 1.22,
@@ -58,6 +59,11 @@ const SPINE_FLAT_HEIGHT = BOOK.coverT
 // the two page blocks so it never z-fights with either page.
 const CREASE_WIDTH = 0.1
 const CREASE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift + 0.001
+// Pop-up layers sit just above the crease, at the height of the taller
+// stack — always the very top of the open block regardless of `spread`
+// (rightHeight + leftHeight is constant), so the illustration never steps
+// down to match whichever page is momentarily shorter.
+const POPUP_Y = CREASE_Y + 0.004
 // Closed book extends only toward +X from the spine (x=0), so it sits
 // right of the HTML CTA's centerline; open, the two blocks/pages already
 // straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
@@ -180,6 +186,18 @@ export function Book() {
   // static pages' own height formula below exactly.
   const turnOriginY = BACK_COVER_TOP + (turning === 'prev' ? leftHeight : rightHeight) + BOOK.pageLift
 
+  // Current spread ± 1 with actual pop-up content, so neighboring layer
+  // textures are already warm by the time you turn to them (see
+  // popup-spread.tsx's file header) — only `spread` itself ever renders
+  // visibly, the neighbors stay hidden until it's their turn.
+  const popupSpreadIndices = useMemo(
+    () =>
+      [spread - 1, spread, spread + 1].filter(
+        (i) => i >= 1 && i <= SPREAD_MAX && popupContentForSpread(i) !== undefined
+      ),
+    [spread]
+  )
+
   useFrame(() => {
     const f = frame.current
     const cover = frontCoverRef.current
@@ -270,6 +288,28 @@ export function Book() {
 
       {/* The page currently mid-turn; hidden except during a non-cover turn. */}
       <TurningPage frame={frame} originY={turnOriginY} />
+
+      {/* Pop-up layers for the open spread: folded paper cutouts that spring
+          up from the page. Mounted for spread ± 1 (see popupSpreadIndices
+          above) to keep neighboring textures warm, but each PopupSpread
+          only renders visibly while it's the current spread. */}
+      {isOpen && (
+        <group position={[0, POPUP_Y, 0]}>
+          {popupSpreadIndices.map((i) => {
+            const content = popupContentForSpread(i)
+            if (!content) return null
+            return (
+              <PopupSpread
+                key={i}
+                layers={content.layers}
+                accents={content.accents}
+                spreadIndex={i}
+                active={i === spread}
+              />
+            )
+          })}
+        </group>
+      )}
 
       {/* Front cover pivot: rotation.z rests at 0 (closed, on top) / PI
           (open, flat left); the turn driver takes over continuously
