@@ -20,10 +20,11 @@ describe('ModuleHost', () => {
     await waitFor(() => expect(window.location.search).toBe('?m=pipeline'))
   })
 
-  it('adopts a valid ?m= on mount', async () => {
+  it('adopts a valid ?m= on mount and the URL param survives adoption', async () => {
     window.history.replaceState(null, '', '/labs/curator?m=settings')
     render(<ModuleHost />)
     await waitFor(() => expect(useCuratorStore.getState().module).toBe('settings'))
+    await waitFor(() => expect(window.location.search).toBe('?m=settings'))
   })
 
   it('ignores an invalid ?m=', async () => {
