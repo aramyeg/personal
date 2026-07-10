@@ -104,9 +104,9 @@ export const briefs: EngineeringBrief[] = [
     title: 'Guided Onboarding',
     stack: 'React, getBoundingClientRect, CSS custom properties',
     pattern:
-      'The four-step first-run tour resolves each anchor via a data-tour attribute at step entry, not at mount, so the DOM only needs to match the current step. Spotlight and card position are computed by a pure, viewport-clamped function, and single-fire persistence rides the same versioned store slice as the rest of the app’s preferences.',
+      'The four-step first-run tour resolves each anchor via a data-tour attribute at step entry, not at mount, so the DOM only needs to match the current step. The spotlight ring tracks the anchor’s measured rect directly, the card is placed by a pure, viewport-clamped function, and single-fire persistence rides the same versioned store slice as the rest of the app’s preferences.',
     rationale:
-      'Resolving anchors lazily and skipping any step whose target is missing means a user preference — SPEC chips toggled off, say — can never strand the tour on a step with nothing to point at. The tour also defers the NPS survey prompt while it is on screen, so the two overlays never stack. The hand-rolled ~100-line positioning function replaces a tour-library dependency, consistent with the lab’s no-charting-library stance.',
+      'Resolving anchors lazily and skipping any step whose target is missing means a user preference — SPEC chips toggled off, say — can never strand the tour on a step with nothing to point at. The tour also defers the NPS survey prompt while it is on screen, so the two overlays never stack. The hand-rolled positioning — a pure function of a few dozen lines — replaces a tour-library dependency, consistent with the lab’s no-charting-library stance.',
   },
 ]
 

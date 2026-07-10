@@ -28,6 +28,17 @@ function resolveFrom(fromIndex: number): { index: number; el: Element } | null {
   return null
 }
 
+/** Mirrors resolveFrom, walking backward. Back() uses this instead of
+ *  resolveFrom so a skipped step's missing anchor doesn't re-resolve forward
+ *  onto the step Back was just called from (a visible no-op). */
+function resolveBackwardFrom(fromIndex: number): { index: number; el: Element } | null {
+  for (let i = fromIndex; i >= 0; i--) {
+    const el = document.querySelector(TOUR_STEPS[i].target)
+    if (el) return { index: i, el }
+  }
+  return null
+}
+
 export function CuratorTour() {
   const tourDone = useCuratorStore((s) => s.tourDone)
   const tourOpen = useCuratorStore((s) => s.tourOpen)
@@ -96,7 +107,10 @@ export function CuratorTour() {
 
   function back(): void {
     if (stepIndex <= 0) return
-    goTo(stepIndex - 1)
+    const resolved = resolveBackwardFrom(stepIndex - 1)
+    if (!resolved) return
+    setStepIndex(resolved.index)
+    setTargetRect(rectFromElement(resolved.el))
   }
 
   if (tourDone || !tourOpen || !targetRect) return null

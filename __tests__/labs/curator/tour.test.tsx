@@ -107,6 +107,18 @@ describe('CuratorTour', () => {
     expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
   })
 
+  it('Back from a skipped-step landing walks past the missing anchor instead of no-oping', () => {
+    stubDesktopMatchMedia()
+    const div = renderAnchors()
+    div.querySelector('[data-tour="spec-chip"]')?.remove()
+    render(<CuratorTour />)
+    act(() => vi.advanceTimersByTime(600))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' })) // step 1 -> step 3 (step 2's anchor is missing)
+    expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument()
+  })
+
   it('"Get started" on the last step finishes the tour', () => {
     stubDesktopMatchMedia()
     renderAnchors()
