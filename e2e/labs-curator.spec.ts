@@ -188,10 +188,12 @@ test.describe('curator lab', () => {
     await page.goto('/labs/curator')
 
     await page.getByRole('button', { name: /spec/i }).click()
-    await expect(page.getByText('Session Management')).toBeVisible({ timeout: 15_000 })
+    // exact: the chip's own visible text is now "SPEC · Session Management",
+    // which would otherwise substring-match this locator too.
+    await expect(page.getByText('Session Management', { exact: true })).toBeVisible({ timeout: 15_000 })
 
     await page.keyboard.press('Escape')
-    await expect(page.getByText('Session Management')).toBeHidden()
+    await expect(page.getByText('Session Management', { exact: true })).toBeHidden()
     // settle-wait guard: dev-server route compilation can lag a wrong navigation
     await page.waitForTimeout(700)
     await expect(page).toHaveURL(/\/labs\/curator/)

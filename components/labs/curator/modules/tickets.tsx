@@ -128,7 +128,7 @@ export default function TicketsModule() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-[640px] space-y-4">
       <header className="flex items-center gap-2">
         <div>
           <h1 className="text-[18px] font-semibold">Tickets</h1>
@@ -137,7 +137,7 @@ export default function TicketsModule() {
         <div className="ml-auto"><SpecChip briefId="EB-006" /></div>
       </header>
 
-      <div className="max-w-[560px] rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-6">
+      <div className="rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-6">
         <ProgressIndicator step={state.step} />
 
         {state.step === 0 && (

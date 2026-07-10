@@ -42,6 +42,10 @@
   .skeleton { animation: none; }
 }
 
+.root[data-reduce-motion] .skeleton {
+  animation: none;
+}
+
 @keyframes curator-enter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
@@ -63,4 +67,9 @@
 @media (prefers-reduced-motion: reduce) {
   .moduleEnter { animation: none; }
   .toastEnter { animation: none; }
+}
+
+.root[data-reduce-motion] .moduleEnter,
+.root[data-reduce-motion] .toastEnter {
+  animation: none;
 }

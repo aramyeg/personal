@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useCuratorStore } from '@/components/labs/curator/store'
+import { defaultPipeline, migratePersisted, useCuratorStore } from '@/components/labs/curator/store'
 import { OPEN_DEAL_ID } from '@/components/labs/curator/adapters'
 
 const initial = useCuratorStore.getState()
@@ -61,6 +61,7 @@ describe('curator store', () => {
     expect(raw).toBeTruthy()
     const persisted = JSON.parse(raw as string).state
     expect(persisted.density).toBe('compact')
+    expect(persisted.preferences).toEqual(s().preferences)
     expect(persisted.module).toBeUndefined()
     expect(persisted.toasts).toBeUndefined()
   })
@@ -68,5 +69,29 @@ describe('curator store', () => {
   it('marks NPS done', () => {
     useCuratorStore.getState().markNpsDone()
     expect(useCuratorStore.getState().npsDone).toBe(true)
+  })
+
+  it('flips a preference', () => {
+    const s = useCuratorStore.getState
+    expect(s().preferences.showSpecChips).toBe(true)
+    s().setPreference('showSpecChips', false)
+    expect(s().preferences.showSpecChips).toBe(false)
+  })
+})
+
+describe('migratePersisted', () => {
+  it('upgrades a v1 state by dropping notifications and injecting default preferences', () => {
+    const legacy = {
+      density: 'compact',
+      notifications: { productUpdates: true },
+      pipeline: { ...defaultPipeline() },
+      npsDone: true,
+    }
+    const migrated = migratePersisted(legacy, 1)
+    expect(migrated.preferences).toEqual({ showSpecChips: true, reduceMotion: false, showSampleData: true })
+    expect(migrated).not.toHaveProperty('notifications')
+    expect(migrated.density).toBe('compact')
+    expect(migrated.npsDone).toBe(true)
+    expect(migrated.pipeline).toEqual(legacy.pipeline)
   })
 })

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { getBrief } from '../annotations'
+import { useCuratorStore } from '../store'
 import { useEscCapture } from '../use-esc-capture'
 import { BriefFields, BriefHeader } from './brief-fields'
 
 export function SpecChip({ briefId }: { briefId: string }) {
   const brief = getBrief(briefId)
+  const showSpecChips = useCuratorStore((s) => s.preferences.showSpecChips)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -22,6 +24,8 @@ export function SpecChip({ briefId }: { briefId: string }) {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
+  if (!showSpecChips) return null
+
   return (
     <div ref={rootRef} className="relative inline-flex">
       <button
@@ -29,13 +33,13 @@ export function SpecChip({ briefId }: { briefId: string }) {
         aria-label={`Spec ${brief.id}`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center rounded-[4px] border px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[10px] font-medium uppercase tracking-[0.06em] transition-colors duration-150 ${
+        className={`inline-flex items-center whitespace-nowrap rounded-[4px] border px-1.5 py-0.5 font-[family-name:var(--font-data)] text-[10px] font-medium uppercase tracking-[0.06em] transition-colors duration-150 ${
           open
             ? 'border-[var(--c-blue)] text-[var(--c-blue)]'
             : 'border-[var(--c-border)] text-[var(--c-text-soft)] hover:border-[var(--c-blue)] hover:text-[var(--c-blue)]'
         }`}
       >
-        SPEC
+        SPEC · {brief.title}
       </button>
 
       {open && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { TrafficPoint } from '../../analytics-source'
+import { useCuratorStore } from '../../store'
 import { scalePoints, linePath, areaPath } from './chart-math'
 
 const W = 640
@@ -10,6 +11,7 @@ const H = 180
 export function LineChart({ data, annotations = [], title, caption, action }: {
   data: TrafficPoint[]; annotations?: { date: string; label: string }[]; title: string; caption?: string; action?: ReactNode
 }) {
+  const reduceMotionPref = useCuratorStore((s) => s.preferences.reduceMotion)
   const pts = scalePoints(data.map((p) => p.visitors), W, H, 8)
   const xByDate = new Map(data.map((p, i) => [p.date, pts[i]?.x ?? 0]))
   // One line per date — several labs can ship the same day.
@@ -17,13 +19,13 @@ export function LineChart({ data, annotations = [], title, caption, action }: {
   const [anim, setAnim] = useState<'pending' | 'draw' | 'off'>('pending')
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (reduceMotionPref || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setAnim('off')
       return
     }
     const id = requestAnimationFrame(() => setAnim('draw'))
     return () => cancelAnimationFrame(id)
-  }, [])
+  }, [reduceMotionPref])
 
   return (
     <figure className="flex h-full flex-col rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-4">

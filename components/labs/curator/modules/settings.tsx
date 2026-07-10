@@ -1,11 +1,10 @@
 'use client'
 
 import { siteConfig } from '@/lib/constants'
-import { useCuratorStore, type Density } from '../store'
+import { useCuratorStore, type Density, type Preferences } from '../store'
 import { Toggle } from '../ui/toggle'
 
 type ProfileField = { id: string; label: string; value: string }
-type NotificationKey = 'productUpdates' | 'weeklyDigest' | 'incidentAlerts'
 
 const PROFILE_FIELDS: ProfileField[] = [
   { id: 'profile-name', label: 'Display name', value: siteConfig.name },
@@ -19,14 +18,20 @@ const DENSITIES: { id: Density; label: string }[] = [
   { id: 'compact', label: 'Compact' },
 ]
 
-const NOTIFICATIONS: { key: NotificationKey; label: string; description: string }[] = [
-  { key: 'productUpdates', label: 'Product updates', description: 'Release notes for new rooms and modules.' },
-  { key: 'weeklyDigest', label: 'Weekly digest', description: 'A summary of portfolio activity, every Monday.' },
+const PREFERENCES: { key: keyof Preferences; label: string; description: string }[] = [
+  { key: 'showSpecChips', label: 'Engineering annotations', description: 'Show SPEC chips on module headers.' },
+  { key: 'reduceMotion', label: 'Reduce motion', description: 'Disable chart draw-ins and interface transitions.' },
   {
-    key: 'incidentAlerts',
-    label: 'Incident alerts',
-    description: 'Immediate notification when anything breaks in production.',
+    key: 'showSampleData',
+    label: 'Sample data',
+    description: 'Display simulated analytics where a data source is not connected.',
   },
+]
+
+const PREVIEW_ROWS: { record: string; status: string }[] = [
+  { record: 'Design tokens', status: 'applied' },
+  { record: 'Table density', status: 'previewing' },
+  { record: 'Motion grammar', status: '150ms' },
 ]
 
 const CARD_CLS = 'rounded-[6px] border border-[var(--c-border)] bg-[var(--c-surface)] p-6'
@@ -35,15 +40,40 @@ const FIELD_LABEL_CLS = 'mb-1.5 block text-[12px] font-medium text-[var(--c-text
 const FIELD_CLS =
   'w-full rounded-[6px] border border-[var(--c-border)] bg-[var(--c-hover)] px-3 py-2 text-[13px] text-[var(--c-text-soft)] outline-none disabled:cursor-not-allowed'
 const CAPTION_CLS = 'mt-4 text-[11px] text-[var(--c-text-soft)]'
+const PREVIEW_TH_CLS = 'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--c-text-soft)]'
+
+function DensityPreview({ density }: { density: Density }) {
+  const pad = density === 'compact' ? 'py-1.5' : 'py-3'
+  return (
+    <table aria-hidden className="mt-4 w-full overflow-hidden rounded-[6px] border border-[var(--c-border)] text-left">
+      <thead>
+        <tr className="border-b border-[var(--c-border)]">
+          <th scope="col" className={PREVIEW_TH_CLS}>Record</th>
+          <th scope="col" className={PREVIEW_TH_CLS}>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {PREVIEW_ROWS.map((row) => (
+          <tr key={row.record} className="border-b border-[var(--c-border)] last:border-0">
+            <td className={`px-4 ${pad} text-[13px] font-medium transition-[padding] duration-150`}>{row.record}</td>
+            <td className={`px-4 ${pad} text-[12px] text-[var(--c-text-soft)] transition-[padding] duration-150`}>
+              {row.status}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
 export default function SettingsModule() {
   const density = useCuratorStore((s) => s.density)
   const setDensity = useCuratorStore((s) => s.setDensity)
-  const notifications = useCuratorStore((s) => s.notifications)
-  const setNotification = useCuratorStore((s) => s.setNotification)
+  const preferences = useCuratorStore((s) => s.preferences)
+  const setPreference = useCuratorStore((s) => s.setPreference)
 
   return (
-    <div className="max-w-[640px] space-y-4">
+    <div className="mx-auto max-w-[640px] space-y-4">
       <header>
         <h1 className="text-[18px] font-semibold">Settings</h1>
         <p className="mt-1 text-[12px] text-[var(--c-text-soft)]">Workspace preferences</p>
@@ -88,19 +118,20 @@ export default function SettingsModule() {
             })}
           </div>
         </div>
+        <DensityPreview density={density} />
         <p className={CAPTION_CLS}>Density applies to all data tables.</p>
       </section>
 
       <section className={CARD_CLS}>
-        <p className={SECTION_LABEL_CLS}>Notifications</p>
+        <p className={SECTION_LABEL_CLS}>Preferences</p>
         <div className="mt-4 divide-y divide-[var(--c-border)]">
-          {NOTIFICATIONS.map((n) => (
-            <div key={n.key} className="py-3 first:pt-0 last:pb-0">
+          {PREFERENCES.map((p) => (
+            <div key={p.key} className="py-3 first:pt-0 last:pb-0">
               <Toggle
-                checked={notifications[n.key]}
-                onChange={(value) => setNotification(n.key, value)}
-                label={n.label}
-                description={n.description}
+                checked={preferences[p.key]}
+                onChange={(value) => setPreference(p.key, value)}
+                label={p.label}
+                description={p.description}
               />
             </div>
           ))}
