@@ -38,11 +38,18 @@ export const SATCHEL_INTRO =
 export const END_CLOSING_LINE =
   'Here ends — for now — the Tale of Six Kingdoms. Should you have need of the hero — a kingdom to raise, a dragon to gentle — send a raven.'
 
+// task 18: the foreground layer's standAngle was 65 — with book-scene.tsx's
+// current tighter/steeper camera (fov 34, raised lookAt), a layer that far
+// from vertical sits at a viewing angle so oblique to the camera it reads
+// as a near-edge-on dark bar instead of a scalloped strip with a visible
+// face (see task-17-chapter.png). Bumped to 84°, close to `hero`'s already-
+// readable 85 — still the shortest/widest layer of the four (the fringe
+// silhouette), just no longer nearly perpendicular to the camera's sightline.
 const layerDefaults = (ch: number): SceneLayer[] => [
   { id: `ch${ch}-backdrop`, kind: 'backdrop', hingeZ: -0.52, height: 1.05, width: 2.0, standAngle: 90 },
   { id: `ch${ch}-midground`, kind: 'midground', hingeZ: -0.18, height: 0.7, width: 1.9, standAngle: 78 },
   { id: `ch${ch}-hero`, kind: 'hero', hingeZ: 0.12, height: 0.62, width: 1.0, standAngle: 85 },
-  { id: `ch${ch}-foreground`, kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 2.1, standAngle: 65 },
+  { id: `ch${ch}-foreground`, kind: 'foreground', hingeZ: 0.48, height: 0.3, width: 2.1, standAngle: 84 },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [

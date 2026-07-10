@@ -15,16 +15,33 @@
  * Position is written on every `pointermove`; the rAF loop reads the latest
  * values and writes the transform once per frame, so a burst of pointer
  * events never forces more than one style write per frame.
+ *
+ * Task 18 polish: still a single rAF loop writing one `transform` per
+ * frame (translate + rotate + scale only) —
+ *  - Rotation lags the pointer's horizontal velocity (eased toward a
+ *    target tilt, not applied instantly), so the nib trails a beat behind
+ *    fast swipes instead of feeling rigidly glued to the cursor.
+ *  - A brief "ink-dip" squish plays on `pointerdown`, decaying back to
+ *    rest over PRESS_DURATION_MS — pure JS easing, not a CSS transition
+ *    (one would fight the per-frame transform writes).
  */
 
 import { useEffect, useRef } from 'react'
 
 const NARROW_QUERY = '(max-width: 820px), (orientation: portrait)'
+const ROT_MAX_DEG = 9
+const ROT_SENSITIVITY = 0.7
+const ROT_LAG = 0.18
+const PRESS_DURATION_MS = 220
+const PRESS_DIP = 0.22
 
 export function QuillCursor() {
   const elRef = useRef<HTMLDivElement>(null)
   const pos = useRef({ x: -100, y: -100 })
+  const prevPos = useRef({ x: -100, y: -100 })
+  const rotation = useRef(0)
   const hovering = useRef(false)
+  const pressedAt = useRef<number | null>(null)
   const rafId = useRef<number | null>(null)
 
   useEffect(() => {
@@ -44,10 +61,33 @@ export function QuillCursor() {
       hovering.current = target instanceof Element && target.closest('[data-sb-hover]') !== null
     }
 
+    const onDown = () => {
+      pressedAt.current = performance.now()
+    }
+
     const tick = () => {
       const { x, y } = pos.current
-      const scale = hovering.current ? 1.15 : 1
-      el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`
+
+      // Horizontal velocity since the last frame drives a small trailing
+      // tilt — a real held pen lags a beat behind a fast sideways stroke
+      // instead of snapping to point along it.
+      const dx = x - prevPos.current.x
+      prevPos.current = { x, y }
+      const targetRot = Math.max(-ROT_MAX_DEG, Math.min(ROT_MAX_DEG, dx * ROT_SENSITIVITY))
+      rotation.current += (targetRot - rotation.current) * ROT_LAG
+
+      let pressDip = 0
+      if (pressedAt.current !== null) {
+        const pressT = Math.min(1, (performance.now() - pressedAt.current) / PRESS_DURATION_MS)
+        const settle = 1 - pressT
+        pressDip = PRESS_DIP * settle * settle
+        if (pressT >= 1) pressedAt.current = null
+      }
+
+      const hoverScale = hovering.current ? 1.15 : 1
+      const scale = hoverScale * (1 - pressDip)
+
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rotation.current.toFixed(2)}deg) scale(${scale.toFixed(3)})`
       el.classList.toggle('sb-quill-cursor--hover', hovering.current)
       rafId.current = requestAnimationFrame(tick)
     }
@@ -56,6 +96,7 @@ export function QuillCursor() {
       if (running) return
       running = true
       window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerdown', onDown)
       rafId.current = requestAnimationFrame(tick)
     }
 
@@ -63,6 +104,7 @@ export function QuillCursor() {
       if (!running) return
       running = false
       window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerdown', onDown)
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current)
         rafId.current = null
@@ -88,19 +130,31 @@ export function QuillCursor() {
   return (
     <div ref={elRef} className="sb-quill-cursor" aria-hidden="true">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        {/* shaft: a gentle S-curve from plume to nib, rather than a near-straight line */}
         <path
-          d="M20.5 2c-6.5 1-11.5 4.5-15 15.5"
+          d="M20.8 2.4C15.6 4.1 10.6 7.6 7.6 12.4 6 14.9 5 17 4.4 18.6"
           stroke="var(--sb-ink)"
-          strokeWidth="1.3"
+          strokeWidth="1.1"
           strokeLinecap="round"
         />
+        {/* feather plume/vane */}
         <path
-          d="M20.5 2c-4.6.9-8 3-10.4 6.3 2-.7 4-1.1 5.9-1 -1.4 1.8-2.6 3.9-2.9 6.6 2.3-1.3 4-3.1 5-5.6.9-2.1 1.7-4.1 2.4-6.3z"
+          d="M20.8 2.4c-3.9 1-7.1 2.8-9.6 5.4 1.9-.3 3.7-.2 5.4.4-1.6 1.1-2.9 2.5-3.8 4.3 2.1-.6 3.9-1.8 5.3-3.7 1.2-1.6 2-3.6 2.7-6.4z"
           fill="var(--sb-gold-bright)"
           stroke="var(--sb-gold-deep)"
-          strokeWidth="0.5"
+          strokeWidth="0.45"
         />
-        <circle cx="5.3" cy="17.8" r="1.15" fill="var(--sb-ink)" />
+        {/* barb texture strokes along the shaft, suggesting feather grain */}
+        <path
+          d="M15.7 6.6 13.4 8.4M13.1 9.9 10.8 11.5M10.6 13.1 8.5 14.6"
+          stroke="var(--sb-gold-deep)"
+          strokeWidth="0.55"
+          strokeLinecap="round"
+          opacity="0.75"
+        />
+        {/* nib tip + ink highlight */}
+        <path d="M6.2 16.2 4.2 19 7 17.3z" fill="var(--sb-ink)" />
+        <circle cx="4.6" cy="18.7" r="1" fill="var(--sb-ink)" />
       </svg>
     </div>
   )

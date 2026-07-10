@@ -109,3 +109,71 @@ export function curlPositions(
     out[base + 2] = z
   }
 }
+
+/**
+ * easeInOutQuint — flatter grip at both ends than easeTurn's cubic (a
+ * gentler initial lift, a softer landing) with a snappier sweep through the
+ * middle, so a full turn reads as a weightier hardback page instead of a
+ * uniform glide (task 18). Kept as a separate export rather than changing
+ * `easeTurn` in place: `easeTurn`'s cubic shape is asserted by the tests
+ * above and consumed elsewhere (book.tsx's cover pivot) unchanged.
+ */
+export const easeTurnWeighted = (t: number): number =>
+  t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
+
+/** Max fraction of `t` the +z/-z long edges of the page lead/lag each other
+ *  by in curlPositionsPhased — see that function. */
+export const CURL_Z_LEAD = 0.05
+
+/**
+ * Same deformation as curlPositions, but with the free corner leading: the
+ * +z edge reaches a given point in the curl slightly before global `t`, the
+ * -z edge slightly after, each clamped back into the page's own [0,1] time
+ * so the curl never runs backward or restarts partway through. Reads as the
+ * page being pinched and lifted from one corner rather than hinging evenly
+ * across its whole height — a small, standard paper-turn tell that a
+ * uniform curl (curlPositions) can't produce on its own.
+ *
+ * Also drives the trailing-edge droop's envelope off the *eased* fraction
+ * rather than raw t (curlPositions uses raw t — see its own comment).
+ * Feeding a heavily front/back-loaded ease (easeTurnWeighted's gentle grip
+ * and soft landing) through a droop envelope keyed to raw t lets the droop
+ * outrun theta at small t and briefly swings the free edge's y negative —
+ * through the desk and the static page below it. Since sin(u) ≤ u for
+ * u ≥ 0, keying both theta and the droop envelope to the same eased
+ * fraction guarantees theta − droop ≥ 0.45·theta ≥ 0 for every t, so that
+ * can't happen, whichever easing function is passed in.
+ *
+ * A new export rather than a change to curlPositions, so that function's
+ * existing tests — and its simpler, uniform mid-turn shape — stay exactly
+ * as they are (per this task's constraint that page-geometry.ts's existing
+ * exports must remain intact).
+ */
+export function curlPositionsPhased(
+  template: Float32Array,
+  out: Float32Array,
+  t: number,
+  dir: 'next' | 'prev',
+  ease: (t: number) => number
+): void {
+  const sign = dir === 'next' ? 1 : -1
+  const vertexCount = template.length / 3
+
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
+    const base = vertex * 3
+    const d = template[base]
+    const z = template[base + 2]
+
+    const zPhase = CURL_Z_LEAD * (z / (PAGE_H / 2))
+    const tLocal = Math.min(1, Math.max(0, t + zPhase))
+    const eased = ease(tLocal)
+    const theta = dir === 'next' ? Math.PI * eased : Math.PI * (1 - eased)
+    const droopEnvelope = Math.sin(Math.PI * eased)
+
+    const alpha = theta - sign * CURL_MAX * droopEnvelope * Math.pow(d / PAGE_W, 1.3)
+
+    out[base] = d * Math.cos(alpha)
+    out[base + 1] = d * Math.sin(alpha) + 0.005
+    out[base + 2] = z
+  }
+}

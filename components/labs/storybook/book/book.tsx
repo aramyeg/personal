@@ -23,7 +23,7 @@ import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
-import { PopupSpread } from './popup-spread'
+import { PopupSpread, type PopupRole } from './popup-spread'
 
 export const BOOK = {
   coverW: 1.22,
@@ -197,6 +197,12 @@ export function Book() {
       ),
     [spread]
   )
+  // The spread a turn (if any) is headed toward — `spread` itself is always
+  // the one being left (see popup-spread.tsx's file header). Both are plain
+  // re-render-on-commit values (turning/spread), not per-frame reads, so
+  // computing this here doesn't touch the "no zustand in the frame loop"
+  // contract the turn driver documents.
+  const incomingSpreadIndex = turning ? spread + (turning === 'next' ? 1 : -1) : null
 
   useFrame(() => {
     const f = frame.current
@@ -314,13 +320,24 @@ export function Book() {
           {popupSpreadIndices.map((i) => {
             const content = popupContentForSpread(i)
             if (!content) return null
+            const role: PopupRole =
+              turning === null
+                ? i === spread
+                  ? 'current'
+                  : 'hidden'
+                : i === spread
+                  ? 'outgoing'
+                  : i === incomingSpreadIndex
+                    ? 'incoming'
+                    : 'hidden'
             return (
               <PopupSpread
                 key={i}
                 layers={content.layers}
                 accents={content.accents}
                 spreadIndex={i}
-                active={i === spread}
+                role={role}
+                frame={frame}
               />
             )
           })}

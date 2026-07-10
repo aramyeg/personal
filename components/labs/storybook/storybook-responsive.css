@@ -20,6 +20,10 @@
   width: 24px;
   height: 24px;
   margin: -20px 0 0 -2px; /* nib rests at the pointer's hotspot */
+  /* Pivot rotation/scale near the nib (see the SVG's ~(4.6,18.7) tip)
+     rather than the box center, so the velocity-lag tilt reads as the pen
+     swinging from a held point instead of drifting off the cursor. */
+  transform-origin: 19% 79%;
   pointer-events: none;
   z-index: 60;
   display: none;
@@ -31,7 +35,7 @@
   }
 }
 .sb-quill-cursor--hover {
-  filter: drop-shadow(0 0 5px var(--sb-gold-bright));
+  filter: drop-shadow(0 0 4px var(--sb-gold-bright)) drop-shadow(0 0 9px var(--sb-gold-deep));
 }
 
 /* ---------------------------------------------------------------------

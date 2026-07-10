@@ -2,12 +2,27 @@
 
 /**
  * A pop-up book spread: one folded paper-cutout layer per `SceneLayer`,
- * each hinged along its `hingeZ` line and sprung between lying flat on the
+ * each hinged along its `hingeZ` line and posed between lying flat on the
  * page (rotation.x = π/2) and standing up toward the reader (rotation.x =
  * π/2 − standAngle). Mounted by book.tsx for the current spread ± 1 so
  * neighboring textures are warm before you turn to them (see
- * use-layer-texture.ts) — but only the spread matching the store's current
- * `spread` is ever visible; the others stay hidden until it's their turn.
+ * use-layer-texture.ts) — but only spreads with a `role` other than
+ * 'hidden' are ever visible.
+ *
+ * Task 18 rework: a layer's stand progress is driven two different ways
+ * depending on `role`:
+ *  - 'current' / 'hidden' (no turn in flight, or a warm-but-inactive
+ *    neighbor): the original manual spring, unchanged — mouse parallax sway
+ *    and the staggered mount/reveal rise live here.
+ *  - 'outgoing' / 'incoming' (this spread is the one being left, or the one
+ *    about to become current, for the duration of a turn): stand progress
+ *    is a direct, deterministic function of the turn's own t (see
+ *    popup-kinematics.ts) instead of an independent spring, so the paper
+ *    can never be caught still standing while the turning page sweeps
+ *    overhead. The spring resumes automatically the instant the layer's
+ *    role flips back to 'current' at commit, continuing from wherever the
+ *    kinematic function left `stand` (~0.92) for a small natural overshoot
+ *    settle — no special-cased handoff needed.
  *
  * Convention (matches page-geometry.ts): the enclosing group already sits
  * at the open page's surface height, so a layer's local y=0 is the page.
@@ -15,13 +30,14 @@
  * across the page); standing, it rises straight up in local y (world up).
  */
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { useStorybookStore } from '../store'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
+import { incomingRiseStand, outgoingFoldStand } from './popup-kinematics'
+import { COVER_MS, TURN_MS, type TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
 
 // Manual spring integrator constants (semi-implicit Euler): k is stiffness,
@@ -36,31 +52,54 @@ const SHADOW_Z_OFFSET = 0.05
 const SHADOW_Y_LIFT = 0.001
 const SHADOW_MAX_OPACITY = 0.35
 const PARALLAX_SWAY = 0.015
+// Per-layer kinematic stagger, converted from a fixed ms budget into a t
+// fraction using the turn's actual duration (cover turns run slower, so the
+// same ms budget buys a smaller t fraction there — the stagger still reads
+// like ~12ms/layer either way, not a fraction that grows with duration).
+const PHASE_STEP_MS = 12
+// Below this, an incoming layer's stand is treated as "still flat" for
+// visibility purposes (see cutoutRef) — a hair above 0 rather than exactly
+// 0 so float noise in the spring/kinematic math can't flicker the mesh.
+const STAND_EPSILON = 0.002
+
+/** A pop-up spread's relationship to any turn currently in flight — see the
+ *  file header for how each drives `stand`. */
+export type PopupRole = 'current' | 'outgoing' | 'incoming' | 'hidden'
 
 type PopupSpreadProps = {
   layers: readonly SceneLayer[]
   accents: readonly string[]
   spreadIndex: number
-  /** True only for the spread matching the store's current `spread` — the
-   *  one whose layers are visible at all (standing or mid-collapse). */
-  active: boolean
+  role: PopupRole
+  frame: RefObject<TurnFrame | null>
 }
 
 function PopupLayer({
   layer,
   accents,
   index,
-  rising,
+  layerCount,
+  role,
+  frame,
 }: {
   layer: SceneLayer
   accents: readonly string[]
   index: number
-  /** True while this layer should be springing toward "standing"; false
-   *  collapses it to flat immediately (leaving the spread, or a turn started). */
-  rising: boolean
+  layerCount: number
+  role: PopupRole
+  frame: RefObject<TurnFrame | null>
 }) {
   const texture = useLayerTexture(layer.id, layer.kind, accents)
   const groupRef = useRef<THREE.Group>(null)
+  // Every chapter's four layers share identical hingeZ/width per kind (see
+  // content.ts's layerDefaults) — with the outgoing AND incoming spreads
+  // both mounted and visible during a turn (see PopupSpread below), their
+  // flat (stand≈0) cutouts are geometrically coincident and would z-fight,
+  // the incoming chapter's colors flickering through before it's revealed.
+  // This ref lets the incoming layer's own cutout mesh stay fully
+  // invisible until it actually has something to show (stand above this
+  // epsilon) rather than resolving the conflict by depth-buffer luck.
+  const cutoutRef = useRef<THREE.Mesh>(null)
   // Spring state (stand progress 0..1) and its velocity, integrated by hand
   // every frame rather than via a library — see SPRING_K/SPRING_C above.
   const stand = useRef(0)
@@ -69,6 +108,11 @@ function PopupLayer({
   // this layer's staggered entrance (target flips to 1 once it passes
   // index * STAGGER_S).
   const risingClock = useRef<number | null>(null)
+  // `stand` captured the instant this layer's role last became 'outgoing' —
+  // the fold starts from wherever it actually was (spring overshoot, a
+  // chained turn cutting a prior rise short), never snapped to 1 first.
+  const foldStart = useRef(0)
+  const prevRole = useRef<PopupRole>(role)
 
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(layer.width, layer.height)
@@ -125,28 +169,57 @@ function PopupLayer({
     // blow up the spring integrator (and the stagger clock below) for one
     // frame and flash the pose/opacity.
     const dt = Math.min(delta, 1 / 30)
+    const f = frame.current
 
-    if (rising) {
-      risingClock.current = (risingClock.current ?? 0) + dt
-    } else {
+    if (role === 'outgoing' && f) {
+      if (prevRole.current !== 'outgoing') foldStart.current = stand.current
+      const duration = f.isCover ? COVER_MS : TURN_MS
+      // Foreground-most layers (highest index) lead the fold — they're the
+      // first thing the lifting page would otherwise sweep through.
+      const phaseOffset = ((layerCount - 1 - index) * PHASE_STEP_MS) / duration
+      stand.current = outgoingFoldStand(f.t, foldStart.current, phaseOffset)
+      velocity.current = 0
       risingClock.current = null
+    } else if (role === 'incoming' && f) {
+      const duration = f.isCover ? COVER_MS : TURN_MS
+      // Backdrop-most layers (lowest index) lead the rise, same order the
+      // idle stagger below uses — foreground trails in last.
+      const phaseOffset = (index * PHASE_STEP_MS) / duration
+      stand.current = incomingRiseStand(f.t, phaseOffset)
+      velocity.current = 0
+      risingClock.current = null
+    } else {
+      const rising = role === 'current'
+      risingClock.current = rising ? (risingClock.current ?? 0) + dt : null
+
+      const staggerDelay = index * STAGGER_S
+      const target = risingClock.current !== null && risingClock.current >= staggerDelay ? 1 : 0
+
+      const accel = SPRING_K * (target - stand.current) - SPRING_C * velocity.current
+      velocity.current += accel * dt
+      stand.current += velocity.current * dt
     }
-
-    const staggerDelay = index * STAGGER_S
-    const target = risingClock.current !== null && risingClock.current >= staggerDelay ? 1 : 0
-
-    const accel = SPRING_K * (target - stand.current) - SPRING_C * velocity.current
-    velocity.current += accel * dt
-    stand.current += velocity.current * dt
+    prevRole.current = role
 
     const standRad = (layer.standAngle * Math.PI) / 180
     // Extra per-layer parallax sway on top of the spring pose — deeper
     // layers (higher index) sway a touch more, cheap parallax depth cue.
+    // Idle-only (per task 18): a turn in flight drives `stand` kinematically
+    // off the page's own motion, and mouse sway has no business perturbing
+    // that — it would desync the paper from the page sweeping above it.
     const depthFactor = index / 3
-    const sway = state.pointer.y * PARALLAX_SWAY * depthFactor
+    const sway = role === 'current' ? state.pointer.y * PARALLAX_SWAY * depthFactor : 0
     group.rotation.x = Math.PI / 2 - standRad * stand.current + sway
 
-    shadowMaterial.opacity = SHADOW_MAX_OPACITY * stand.current
+    shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.max(0, Math.min(1, stand.current))
+
+    // See cutoutRef's declaration: only the incoming layer needs this —
+    // 'outgoing'/'current'/'hidden' cutouts either belong to a group
+    // that's already hidden wholesale, or are the one flat pose that's
+    // *meant* to keep showing as it settles onto the page.
+    if (cutoutRef.current) {
+      cutoutRef.current.visible = role !== 'incoming' || stand.current > STAND_EPSILON
+    }
   })
 
   return (
@@ -157,7 +230,7 @@ function PopupLayer({
           sort would otherwise place it — so a standing layer always
           composites on top of the crease instead of being painted over. */}
       <group ref={groupRef} position={[layer.offsetX ?? 0, 0, layer.hingeZ]}>
-        <mesh geometry={geometry} material={material} renderOrder={0} />
+        <mesh ref={cutoutRef} geometry={geometry} material={material} renderOrder={0} />
       </group>
       <mesh
         position={[layer.offsetX ?? 0, SHADOW_Y_LIFT, layer.hingeZ + SHADOW_Z_OFFSET]}
@@ -172,15 +245,21 @@ function PopupLayer({
 }
 
 /** One spread's worth of pop-up layers. Always mounted (for the current
- *  spread ± 1) but only visible while `active` — see the file header. */
-export function PopupSpread({ layers, accents, spreadIndex, active }: PopupSpreadProps) {
-  const turning = useStorybookStore((s) => s.turning)
-  const rising = active && !turning
-
+ *  spread ± 1) but only visible while `role !== 'hidden'` — see the file
+ *  header for what each role does. */
+export function PopupSpread({ layers, accents, spreadIndex, role, frame }: PopupSpreadProps) {
   return (
-    <group visible={active} name={`popup-spread-${spreadIndex}`}>
+    <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
       {layers.map((layer, index) => (
-        <PopupLayer key={layer.id} layer={layer} accents={accents} index={index} rising={rising} />
+        <PopupLayer
+          key={layer.id}
+          layer={layer}
+          accents={accents}
+          index={index}
+          layerCount={layers.length}
+          role={role}
+          frame={frame}
+        />
       ))}
     </group>
   )

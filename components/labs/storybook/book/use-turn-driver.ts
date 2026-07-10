@@ -14,8 +14,13 @@ import { useFrame } from '@react-three/fiber'
 import { sbSound } from '../sound'
 import { useStorybookStore, type TurnDir } from '../store'
 
-export const TURN_MS = 1100
-export const COVER_MS = 1400
+// task 18: nudged up from 1100/1400 — paired with page-geometry's
+// easeTurnWeighted (a gentler grip at the start, a softer landing) this is
+// what reads as a real hardback page rather than a quick, weightless swipe.
+// COVER_MS keeps roughly the same ~1.27x ratio over TURN_MS a cover always
+// had (there's more leather/board mass to swing).
+export const TURN_MS = 1250
+export const COVER_MS = 1600
 // Fraction of the turn at which the paper "flip" whoosh fires — roughly the
 // moment the page is mid-air, past the initial lift.
 const FLIP_AT_T = 0.15
