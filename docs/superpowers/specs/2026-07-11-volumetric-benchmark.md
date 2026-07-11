@@ -10,6 +10,14 @@ counter/awning/stable tents "do not translate the idea"; riders must sit
 "at distances and angles that they match the scene"; "more depth in the
 overall book"; fold variety beyond the V ("a rectangle shaped fold").
 
+**Escalation (user, 2026-07-11, second round):** "make sure the whole
+aesthetics improves and the experience truly leads to a 3d illusion
+created with papers territory, just a flat piece of paper should[n't] be
+on our agenda, only some backdrops or scene settings maybe." This
+upgrades the goal from "at least one volumetric piece per chapter" to
+**volumetric by default**: a flat single-fold sheet is now the exception
+that needs a reason (backdrop, scenery, figure standee), not the norm.
+
 Research foundation: docs/superpowers/research/2026-07-11-popup-box-mechanisms.md
 (Ruiz 11-patch box-fold, Li type-1 45-degree diamond box, Li four-vector
 closed-form pose framework, Winder step-fold equations).
@@ -35,6 +43,40 @@ Implementation path: the Li four-vector decomposition (lit doc section
 3.2 + research doc section 5) — decompose each patch vertex once at the
 open pose, re-evaluate per frame; rigidity is guaranteed by construction,
 so patch shapes FOLLOW from the framework instead of being guessed.
+
+## Composition covenant — volumetric by default
+
+Every layer in content.ts declares a **role**:
+
+- `backdrop` — the big scenic sheet near the spine. Flat allowed.
+- `scenery` — mid-page scene-setting planes (walls, tree lines, fringes).
+  Flat allowed, sparingly.
+- `figure` — character/creature standees (heroes, bees, ravens). Flat
+  cutouts are AUTHENTIC pop-up vocabulary for figures — but they must be
+  separate cutouts at scene depth (the treasury-split standard), never
+  painted onto a structure.
+- `story` — buildings, furniture, props that carry the scene's physical
+  world (inn, stable, treasury, counter, arch, stalls, market row).
+  **Must be volumetric**: box, step, or a multi-patch compound. A bare
+  v-fold or gutter tent in a story role is a covenant violation.
+
+Enforced by a unit test over CHAPTERS (roles are data, the rule is CI).
+
+## Renderer physicality — "made of paper" cues
+
+The aesthetic half of the escalation. The illusion is sold not just by
+geometry but by how the paper renders:
+
+- **Cut edges**: die rims show the white paper edge (real cutouts always
+  reveal the sheet's core at the cut).
+- **Contact shadows**: standing pieces ground themselves with soft
+  shadows onto the page; floating = illusion broken.
+- **Raw-paper interiors**: hollow boxes' inner faces read as unpainted
+  stock, not mirrored art.
+- **Fold seams**: creases visible as slight tone breaks at grazing light.
+
+These are engine work (three.js material/geometry passes), independent of
+his art generation, and land as their own iteration.
 
 ## Part A — geometric invariants (extends the existing 100+ suite)
 
@@ -77,13 +119,47 @@ B19. **Depth under tilt.** The doubled pointer tilt shows clean parallax
      between at least three depth planes per chapter spread, with no
      frustum clipping at the tilt extremes.
 
+## Part C — the illusion gates (goal-level benchmark)
+
+Part A proves the math; Part B proves each mechanism reads; Part C is
+the benchmark for the GOAL — the whole book lands in "3D illusion
+created with papers" territory. Scored per spread, all six required:
+
+C1. **Volumetric census.** The spread contains at least one enclosed
+    volume (box or step assembly), and every story-role piece is
+    volumetric. Flat sheets appear only in backdrop/scenery/figure
+    roles. (Automated: the covenant unit test.)
+C2. **Three-face readability.** Each volumetric piece shows >= 3
+    distinct faces (front + side + top) with meaningful projected area
+    from the reading camera across the tilt range. (Automated geometric
+    check in the derive/bench script + capture confirmation.)
+C3. **Depth occupancy.** Pieces occupy >= 4 distinct depth bands between
+    spine and page edge, and max-tilt parallax between nearest and
+    farthest band is clearly visible in captures. (Semi-automated:
+    z-centroid histogram + capture.)
+C4. **Fold vocabulary.** >= 3 mechanism families visible per spread
+    (v-fold / box / step / parallel / child) with distinct silhouettes.
+    (Automated census.)
+C5. **Paper physicality.** Cut edges, contact shadows, raw-paper
+    interiors, fold seams present in renders (see renderer section).
+    (Capture review.)
+C6. **The blind illusion test — the human gate.** A screenshot at an
+    arbitrary tilt angle should be mistakable for a PHOTOGRAPH of a
+    handmade paper diorama. The user's verdict, per spread, is the
+    final gate; no automated proxy substitutes for it.
+
+**Definition of done for the phase:** A12-A15 numerically green, all six
+Part C gates pass on every chapter spread, and the physics benchmark
+(A1-A11, B1-B13) shows zero regression.
+
 ## Loop protocol
 
 Same as the physics benchmark: derive numerically first (scripts in
 .superpowers/sdd/bench/), Part A green before any capture, capture review
-against Part B every iteration, verdicts in .superpowers/sdd/progress.md.
-The physics benchmark's PASS remains a hard floor — no regression of
-A1-A11 or B1-B13 is acceptable while adding volume.
+against Part B and Part C every iteration, verdicts in
+.superpowers/sdd/progress.md. The physics benchmark's PASS remains a hard
+floor — no regression of A1-A11 or B1-B13 is acceptable while adding
+volume.
 
 ## First composition targets (from the user's review)
 
@@ -94,3 +170,7 @@ A1-A11 or B1-B13 is acceptable while adding volume.
 - ch6 treasury + ch1 inn -> candidates for box buildings with painted
   side walls once he regenerates face art (call sheet v5 will spec
   multi-face strips: front / sides / top in one image with marked splits).
+- Renderer physicality pass (cut edges, contact shadows, raw-paper
+  interiors, fold seams) as its own iteration once the first box ships.
+- Role field + covenant test over CHAPTERS lands with the first
+  recomposition (roles assigned to all 45 existing pieces).
