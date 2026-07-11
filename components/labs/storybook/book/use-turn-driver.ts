@@ -74,8 +74,15 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
  * plays exactly once per turn instead of once per frame. sbSound itself
  * no-ops unless sound is on, so these calls are unconditional here.
  */
-export function useTurnDriver(): RefObject<TurnFrame | null> {
+export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committedSpread: RefObject<number> } {
   const frame = useRef<TurnFrame | null>(null)
+  // The committed `spread`, mirrored off the store every frame so consumers
+  // reading it inside the frame loop (book.tsx's static-page prints) share the
+  // sheet's own clock. `spread` on React's render clock lands a frame or two
+  // late at a turn's commit — long enough for the sheet to have hidden (driver
+  // ref) while the static page still showed the outgoing print: the turn
+  // flash. This ref moves in lockstep with the sheet.
+  const committedSpread = useRef(0)
   const elapsedMs = useRef(0)
   // Which direction the clock is currently timing. Reset to null right
   // after a completion so the very next frame always re-arms — even when
@@ -96,6 +103,9 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
   }, [pose])
 
   useFrame((_, delta) => {
+    const state = useStorybookStore.getState()
+    committedSpread.current = state.spread
+
     if (pose && pose.t !== null) {
       // Frozen benchmark pose: hold the frame forever, no clock, no
       // completion, no sound cues.
@@ -103,7 +113,7 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
       return
     }
 
-    const { turning, spread } = useStorybookStore.getState()
+    const { turning, spread } = state
 
     if (!turning) {
       frame.current = null
@@ -154,5 +164,5 @@ export function useTurnDriver(): RefObject<TurnFrame | null> {
     }
   })
 
-  return frame
+  return { frame, committedSpread }
 }

@@ -133,7 +133,7 @@ export function Book() {
   const turning = useStorybookStore((s) => s.turning)
   const { paper, leather, crease } = useBookTextures()
   const pageGeometry = usePageGeometry()
-  const frame = useTurnDriver()
+  const { frame, committedSpread } = useTurnDriver()
   const outerGroupRef = useRef<THREE.Group>(null)
   const frontCoverRef = useRef<THREE.Group>(null)
 
@@ -226,24 +226,17 @@ export function Book() {
     [spread]
   )
   const prints = useSpreadPrints(printIndices)
-  // The half each static page shows: at rest, the current spread's own
-  // halves; during a turn, the side the lifting sheet exposes pre-swaps to
-  // the incoming spread (the turning sheet's own faces cover the seam — its
-  // landing face is the same image the static page switches to at commit).
-  const leftPrintIndex = turning === 'prev' ? spread - 1 : spread
-  const rightPrintIndex = turning === 'next' ? spread + 1 : spread
-  useEffect(() => {
-    const left = prints[leftPrintIndex]?.left ?? paper
-    if (leftPageMaterial.map !== left) {
-      leftPageMaterial.map = left
-      leftPageMaterial.needsUpdate = true
-    }
-    const right = prints[rightPrintIndex]?.right ?? paper
-    if (rightPageMaterial.map !== right) {
-      rightPageMaterial.map = right
-      rightPageMaterial.needsUpdate = true
-    }
-  }, [prints, leftPrintIndex, rightPrintIndex, leftPageMaterial, rightPageMaterial, paper])
+  // The half each static page shows — at rest the current spread's own halves,
+  // during a turn the exposed side pre-swapped to the incoming spread — is set
+  // in the useFrame below, NOT here. It has to run on the SAME per-frame clock
+  // as the turning sheet's visibility (the driver refs), or it desyncs: read on
+  // React's render clock, `turning` arms a frame or two AFTER the driver at a
+  // turn's start, and `spread` commits a frame or two AFTER the sheet hides at
+  // its end. Either gap paints a print onto the bare static page while the
+  // sheet isn't covering it — the right-page turn flash. Driving both the
+  // direction and the spread off the driver refs keeps every swap atomic with
+  // the sheet. The mid-turn sheet's own two faces stay on the render clock
+  // below: they're only ever seen ON the sheet, never on the bare page.
   // The mid-turn sheet's two faces: what it was showing when it lifted, and
   // what it lands as (see turning-page.tsx for the uv orientations).
   const turnFrontMap = turning
@@ -255,6 +248,35 @@ export function Book() {
 
   useFrame(() => {
     const f = frame.current
+    // Static page prints, swapped here (frame loop) rather than in a React
+    // effect — see the printIndices note above for the flash this prevents.
+    // Both the turn's direction (f.dir) and the committed spread come off the
+    // driver's refs, the SAME clock the turning sheet's visibility runs on, so
+    // every swap — the incoming half revealed as the sheet lifts at the start,
+    // and the landing half committed as the sheet hides at the end — lands on
+    // the exact frame the sheet covers it. (A React-clock `turning`/`spread`
+    // ran a frame or two out of step with the sheet, baring the wrong print.)
+    // The lifting cover does its own reveal, so cover turns read the same f.dir.
+    const sp = committedSpread.current
+    const revealDir = f ? f.dir : null
+    // Prefer the incoming half while a turn reveals it, else the current
+    // spread's half. Never fall back to blank `paper` mid-book: at a chained
+    // turn's hand-off the incoming print can still be a frame from warm (the
+    // spread ± 1 window, keyed off React's slower `spread`, hasn't caught up to
+    // the driver's committed one), and swapping to `paper` blanks the page for
+    // that frame. Skipping the swap when nothing is resolved holds the last
+    // real print, riding the gap invisibly until the incoming half warms in.
+    const rightWanted = (revealDir === 'next' ? prints[sp + 1]?.right : undefined) ?? prints[sp]?.right
+    if (rightWanted && rightPageMaterial.map !== rightWanted) {
+      rightPageMaterial.map = rightWanted
+      rightPageMaterial.needsUpdate = true
+    }
+    const leftWanted = (revealDir === 'prev' ? prints[sp - 1]?.left : undefined) ?? prints[sp]?.left
+    if (leftWanted && leftPageMaterial.map !== leftWanted) {
+      leftPageMaterial.map = leftWanted
+      leftPageMaterial.needsUpdate = true
+    }
+
     const cover = frontCoverRef.current
     const outer = outerGroupRef.current
     if (!f || !f.isCover || !cover || !outer) return
