@@ -1,9 +1,11 @@
 /**
- * Synth-only WebAudio layer for the PS1 lab — no asset files. Everything is
- * generated on the fly and stays silent until `resume()` runs on the first
- * user gesture (the browser autoplay law). The factory itself is pure: no
- * React, no three.js. `ctxFactory` is injectable so tests build the node
- * graph against a mock AudioContext and never touch a real one in jsdom.
+ * WebAudio synth layer for the PS1 lab, plus one real recording. `blip` /
+ * `select` / `back` / room tone are generated on the fly and stay silent
+ * until `resume()` runs on the first user gesture (the browser autoplay
+ * law); `bootMusic` is the one asset file the lab ships, an HTMLAudio
+ * element gated the same way. The factory itself is pure: no React, no
+ * three.js. `ctxFactory` is injectable so tests build the node graph
+ * against a mock AudioContext and never touch a real one in jsdom.
  *
  * `useMemoryCardAudio` (bottom of file) is the one React seam: it lazily
  * builds a single module-level `PS1Audio` instance the first time any
@@ -25,11 +27,17 @@ export type PS1Audio = {
   select(): void
   /** Close: square 330Hz, 60ms. */
   back(): void
-  /** Boot: soft fifth — triangle 220Hz + 330Hz, 700ms fade. Returns whether
-   *  it actually sounded (false while muted or before the first `resume()`)
-   *  — callers that latch a "played once" flag must key it off this, not
-   *  off having merely called the function. */
-  boot(): boolean
+  /** Boot: plays the original PS1 BIOS boot recording once, from the start.
+   *  Muted the same way every other sound is, plus gated on the browser's own
+   *  sticky user-activation flag (not `resume()` — this is HTMLAudio, not
+   *  WebAudio) and a sticky failure latch if the asset ever errors. Returns
+   *  whether playback actually started; callers that latch a "played once"
+   *  flag must key it off this, not off having merely called the function. */
+  bootMusic(): boolean
+  /** Pauses the boot recording and resets it to the start — the one way to
+   *  cut it short, used both when the boot beat's own timer ends and when a
+   *  visitor skips it. No-ops if it was never started. */
+  stopBoot(): void
   /** Filtered brown-noise loop at -40dB, 400Hz lowpass. */
   setRoomTone(on: boolean): void
   /** Master gate — also persists the preference to localStorage. */
@@ -38,14 +46,34 @@ export type PS1Audio = {
   dispose(): void
 }
 
-/** The perfect fifth (220Hz, 330Hz) the boot chime plays as a shared triangle pair. */
-const BOOT_FIFTH_HZ = [220, 330] as const
+/** The original PS1 BIOS boot recording — a 17s capture; only its opening
+ *  swell is ever heard since `stopBoot()` cuts it when the boot beat ends
+ *  (see `boot.tsx`). */
+const BOOT_MUSIC_SRC = '/labs/memory-card/sounds/ps1-boot.mp3'
+const BOOT_MUSIC_VOLUME = 0.6
 const ROOM_TONE_LOWPASS_HZ = 400
 const ROOM_TONE_LOOP_SECONDS = 2
 
 /** -dB (0 or negative) → linear gain multiplier. */
 function fromDb(db: number): number {
   return Math.pow(10, db / 20)
+}
+
+/**
+ * The browser's own sticky user-activation flag — true from the moment the
+ * current *document* first receives any gesture (click/key/tap), and stays
+ * true for the rest of that document's life. Unlike `resume()`'s AudioContext
+ * (armed only by a listener THIS app attaches, which can't retroactively
+ * catch a gesture that already finished dispatching before it was attached),
+ * this is exactly what a same-document SPA soft-nav needs: the click that
+ * carries a visitor from the gallery into this lab already sets it, so it
+ * reads `true` the instant the lab's first component mounts — no listener
+ * required, no race with effect timing. A hard load/direct URL starts a
+ * fresh document with no gesture yet, so this reads `false` until the
+ * visitor's first interaction. Undefined in jsdom and any browser without
+ * the User Activation API — treated as "not armed", the safe default. */
+function hasStickyUserActivation(): boolean {
+  return typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true
 }
 
 const SFX_GAIN = fromDb(-18)
@@ -106,6 +134,10 @@ export function createPS1Audio(
   let ctx: AudioContext | null = null
   let isEnabled = readPersistedEnabled()
   let roomTone: RoomTone | null = null
+  let bootAudio: HTMLAudioElement | null = null
+  /** Sticky — set by the element's `onerror`, so a failed asset never keeps
+   *  retrying a doomed `play()` on every subsequent boot. */
+  let bootAudioFailed = false
 
   function resume(): void {
     if (!ctx) ctx = ctxFactory()
@@ -171,30 +203,38 @@ export function createPS1Audio(
     tone('square', 330, 0.06, SFX_GAIN)
   }
 
-  function boot(): boolean {
-    if (!isEnabled || !ctx) return false
-    const now = ctx.currentTime
-    const duration = 0.7
-    const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(SFX_GAIN, now + 0.1)
-    gain.gain.linearRampToValueAtTime(0, now + duration)
-    gain.connect(ctx.destination)
-
-    const oscs = BOOT_FIFTH_HZ.map((freqHz) => {
-      const osc = ctx!.createOscillator()
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(freqHz, now)
-      osc.connect(gain)
-      osc.start(now)
-      osc.stop(now + duration)
-      return osc
-    })
-    oscs[oscs.length - 1].onended = () => {
-      oscs.forEach((osc) => osc.disconnect())
-      gain.disconnect()
+  /**
+   * HTMLAudio, not WebAudio — a real recording, not a synth, so it doesn't
+   * gate on `ctx`/`resume()` (that pair is WebAudio-specific — see `tone()`).
+   * "Armed" here means `hasStickyUserActivation()`: the browser's own
+   * document-level gesture flag, which is what actually determines whether
+   * `play()` will be allowed to make sound, and — unlike this app's own
+   * resume()-on-first-gesture listener — is already `true` the instant this
+   * mounts after a same-document soft-nav (the click that navigated here
+   * set it), not just after a fresh gesture on this page.
+   */
+  function bootMusic(): boolean {
+    if (!isEnabled || bootAudioFailed || !hasStickyUserActivation()) return false
+    if (!bootAudio) {
+      bootAudio = new Audio(BOOT_MUSIC_SRC)
+      bootAudio.volume = BOOT_MUSIC_VOLUME
+      bootAudio.onerror = () => {
+        bootAudioFailed = true
+      }
     }
+    bootAudio.currentTime = 0
+    void bootAudio.play().catch(() => {
+      // Autoplay block or a mid-flight decode error — the gate above already
+      // reported `true` to the caller; a silent boot beat is fine, a thrown
+      // rejection is not.
+    })
     return true
+  }
+
+  function stopBoot(): void {
+    if (!bootAudio) return
+    bootAudio.pause()
+    bootAudio.currentTime = 0
   }
 
   function setRoomTone(on: boolean): void {
@@ -238,13 +278,25 @@ export function createPS1Audio(
 
   function dispose(): void {
     stopRoomTone()
+    stopBoot()
     if (ctx) {
       void ctx.close()
       ctx = null
     }
   }
 
-  return { resume, blip, select, back, boot, setRoomTone, setEnabled, enabled, dispose }
+  return {
+    resume,
+    blip,
+    select,
+    back,
+    bootMusic,
+    stopBoot,
+    setRoomTone,
+    setEnabled,
+    enabled,
+    dispose,
+  }
 }
 
 /** Inert stand-in returned before the real instance exists (SSR + the first
@@ -255,7 +307,8 @@ const NOOP_AUDIO: PS1Audio = {
   blip() {},
   select() {},
   back() {},
-  boot: () => false,
+  bootMusic: () => false,
+  stopBoot() {},
   setRoomTone() {},
   setEnabled() {},
   enabled: () => false,

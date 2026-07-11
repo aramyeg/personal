@@ -17,14 +17,19 @@ vi.mock('@/components/labs/memory-card/fonts', () => ({
   monoFamily: 'monospace',
 }))
 
-// A fake audio instance so audio-context builds without WebAudio.
+// A fake audio instance so audio-context builds without WebAudio. Screen is
+// rendered without a MemoryCardAudioProvider below (isolating the screen's
+// own DOM from audio wiring, which sections.test.tsx covers separately), so
+// this mock is inert today — kept in the real PS1Audio shape anyway so it
+// doesn't silently drift if a future test wraps the screen in the provider.
 vi.mock('@/components/labs/memory-card/audio', () => ({
   useMemoryCardAudio: () => ({
     resume: vi.fn(),
     blip: vi.fn(),
     select: vi.fn(),
     back: vi.fn(),
-    boot: vi.fn(() => false),
+    bootMusic: vi.fn(() => false),
+    stopBoot: vi.fn(),
     setRoomTone: vi.fn(),
     setEnabled: vi.fn(),
     enabled: vi.fn(() => false),

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPS1Audio } from '@/components/labs/memory-card/audio'
 
 /**
@@ -228,29 +228,166 @@ describe('createPS1Audio', () => {
     })
   })
 
-  describe('boot()', () => {
-    it('only sounds when enabled', () => {
-      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
-      audio.resume()
-      audio.boot()
-      expect(mock.oscillators).toHaveLength(0)
+  describe('bootMusic()', () => {
+    let play: ReturnType<typeof vi.fn>
+    let pause: ReturnType<typeof vi.fn>
+    let audioCtor: ReturnType<typeof vi.fn>
+
+    /** A minimal HTMLAudioElement stand-in — jsdom has no real media pipeline,
+     *  so every `bootMusic()` test stubs the global `Audio` constructor and
+     *  asserts against this mock instead (same pattern as the xp lab's
+     *  `sounds.test.ts`). */
+    beforeEach(() => {
+      play = vi.fn().mockResolvedValue(undefined)
+      pause = vi.fn()
+      audioCtor = vi.fn(function (this: { src: string }, src: string) {
+        this.src = src
+      })
+      audioCtor.prototype.play = play
+      audioCtor.prototype.pause = pause
+      audioCtor.prototype.volume = 1
+      audioCtor.prototype.currentTime = 0
+      vi.stubGlobal('Audio', audioCtor)
+      // jsdom has no User Activation API — `navigator.userActivation` reads
+      // undefined by default, which the gate already treats as "not armed".
+      // Individual tests below define it to simulate a document that has
+      // (or hasn't) ever seen a real user gesture.
     })
 
-    it('plays a soft triangle fifth (220Hz + 330Hz) fading over 700ms', () => {
+    afterEach(() => {
+      Reflect.deleteProperty(window.navigator, 'userActivation')
+    })
+
+    /** A soft-nav from the gallery: same document, and it already saw the
+     *  click that navigated here — the browser's sticky flag is `true`
+     *  before this component's own first render, not just after a fresh
+     *  gesture on this page. */
+    function armStickyActivation() {
+      Object.defineProperty(window.navigator, 'userActivation', {
+        value: { hasBeenActive: true, isActive: true },
+        configurable: true,
+      })
+    }
+
+    it('does not play and returns false while disabled, even with sticky activation', () => {
+      armStickyActivation()
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      expect(audio.bootMusic()).toBe(false)
+      expect(audioCtor).not.toHaveBeenCalled()
+      expect(play).not.toHaveBeenCalled()
+    })
+
+    it('a hard load / direct URL (no gesture on this fresh document) returns false while enabled', () => {
       const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
       audio.setEnabled(true)
-      audio.resume()
-      audio.boot()
+      expect(audio.bootMusic()).toBe(false)
+      expect(audioCtor).not.toHaveBeenCalled()
+      expect(play).not.toHaveBeenCalled()
+    })
 
-      expect(mock.oscillators).toHaveLength(2)
-      expect(mock.oscillators.map((o) => o.type)).toEqual(['triangle', 'triangle'])
-      const freqs = mock.oscillators
-        .map((o) => o.frequency.setValueAtTime.mock.calls[0][0] as number)
-        .sort((a, b) => a - b)
-      expect(freqs).toEqual([220, 330])
-      for (const osc of mock.oscillators) {
-        expect(osc.stop).toHaveBeenCalledWith(expect.closeTo(0.7, 5))
-      }
+    it('a soft-nav from the gallery (sticky activation already set) plays on first visit', () => {
+      armStickyActivation()
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+
+      expect(audio.bootMusic()).toBe(true)
+      expect(audioCtor).toHaveBeenCalledWith('/labs/memory-card/sounds/ps1-boot.mp3')
+      expect(audioCtor).toHaveBeenCalledTimes(1)
+      expect(play).toHaveBeenCalledTimes(1)
+    })
+
+    it('sets volume to 0.6', () => {
+      armStickyActivation()
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+      audio.bootMusic()
+
+      const instance = audioCtor.mock.instances[0] as unknown as { volume: number }
+      expect(instance.volume).toBe(0.6)
+    })
+
+    it('reuses the same element across repeated calls instead of constructing a new one', () => {
+      armStickyActivation()
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+
+      audio.bootMusic()
+      audio.bootMusic()
+
+      expect(audioCtor).toHaveBeenCalledTimes(1)
+      expect(play).toHaveBeenCalledTimes(2)
+    })
+
+    it('latches false after the element errors, without retrying play()', () => {
+      armStickyActivation()
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+
+      audio.bootMusic()
+      const instance = audioCtor.mock.instances[0] as unknown as { onerror: () => void }
+      instance.onerror()
+
+      expect(audio.bootMusic()).toBe(false)
+      expect(audioCtor).toHaveBeenCalledTimes(1)
+      expect(play).toHaveBeenCalledTimes(1)
+    })
+
+    it('swallows a play() promise rejection (autoplay block) without throwing', async () => {
+      armStickyActivation()
+      play.mockRejectedValueOnce(new Error('NotAllowedError'))
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+
+      expect(() => audio.bootMusic()).not.toThrow()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  })
+
+  describe('stopBoot()', () => {
+    let play: ReturnType<typeof vi.fn>
+    let pause: ReturnType<typeof vi.fn>
+    let audioCtor: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      play = vi.fn().mockResolvedValue(undefined)
+      pause = vi.fn()
+      audioCtor = vi.fn(function (this: { src: string }, src: string) {
+        this.src = src
+      })
+      audioCtor.prototype.play = play
+      audioCtor.prototype.pause = pause
+      audioCtor.prototype.volume = 1
+      audioCtor.prototype.currentTime = 0
+      vi.stubGlobal('Audio', audioCtor)
+      Object.defineProperty(window.navigator, 'userActivation', {
+        value: { hasBeenActive: true, isActive: true },
+        configurable: true,
+      })
+    })
+
+    afterEach(() => {
+      Reflect.deleteProperty(window.navigator, 'userActivation')
+    })
+
+    it('is a no-op when bootMusic() was never called', () => {
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      expect(() => audio.stopBoot()).not.toThrow()
+      expect(pause).not.toHaveBeenCalled()
+    })
+
+    it('pauses and resets the element to the start', () => {
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+      audio.bootMusic()
+
+      const instance = audioCtor.mock.instances[0] as unknown as { currentTime: number }
+      instance.currentTime = 12.4
+
+      audio.stopBoot()
+
+      expect(pause).toHaveBeenCalledTimes(1)
+      expect(instance.currentTime).toBe(0)
     })
   })
 
@@ -333,6 +470,32 @@ describe('createPS1Audio', () => {
       audio.setRoomTone(true)
       audio.dispose()
       expect(mock.sources[0].stop).toHaveBeenCalled()
+    })
+
+    it('pauses the boot recording if it was playing', () => {
+      const play = vi.fn().mockResolvedValue(undefined)
+      const pause = vi.fn()
+      const audioCtor = vi.fn(function (this: { src: string }, src: string) {
+        this.src = src
+      })
+      audioCtor.prototype.play = play
+      audioCtor.prototype.pause = pause
+      audioCtor.prototype.volume = 1
+      audioCtor.prototype.currentTime = 0
+      vi.stubGlobal('Audio', audioCtor)
+      Object.defineProperty(window.navigator, 'userActivation', {
+        value: { hasBeenActive: true, isActive: true },
+        configurable: true,
+      })
+
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+      audio.resume()
+      audio.bootMusic()
+      audio.dispose()
+
+      expect(pause).toHaveBeenCalledTimes(1)
+      Reflect.deleteProperty(window.navigator, 'userActivation')
     })
   })
 })

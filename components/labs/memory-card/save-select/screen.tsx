@@ -24,6 +24,7 @@ import { motion } from 'framer-motion'
 import { MC, GLYPH_ORDER, inkAlpha, voidBackdrop, paperAlpha, type GlyphName } from '../tokens'
 import { monoFamily } from '../fonts'
 import { useMemoryCardAudioActions } from '../audio-context'
+import { BootBeat } from '../boot'
 import { VignetteCanvas } from '../three/stage'
 import { FigureSceneContents } from '../three/figure-stage'
 import { CardArc } from '../three/card-arc'
@@ -244,6 +245,8 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
       style={{ ['--mc-ring' as string]: CURSOR, background: voidBackdrop(activeSave.accent), color: MC.paper }}
       className="relative h-[100svh] overflow-hidden"
     >
+      <BootBeat />
+
       <div className="relative z-10 flex h-full flex-col gap-y-6 overflow-y-auto px-5 pb-[7rem] pt-[4.5rem] sm:px-8 lg:grid lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-y-4 lg:overflow-hidden lg:px-12 lg:pb-14">
         {/* Stage — figure · index · cards. */}
         <div

@@ -10,23 +10,18 @@
  * under a second, played once. Everything collapses to a still, well-posed
  * frame under reduced motion.
  *
- * Sound: the boot chime plays the first time this section scrolls out of
- * view (IntersectionObserver — never on initial mount, since the hero starts
- * on-screen) AND actually produces sound — `boot()` reports whether it did,
- * and only a `true` spends the one-shot latch. A scroll-out while muted (a
- * returning visitor whose audio hasn't been armed yet, or sound genuinely
- * off) leaves the shot unspent, so a later scroll-out once audio goes live
- * can still fire it.
+ * Sound: none owned here any more — the boot beat (`boot.tsx`) now owns the
+ * session's one boot sound, fired on first entry to the Save Select screen
+ * rather than misread off a scroll (the old scroll-triggered chime here was
+ * the "Windows shutdown music" bug — ledger verdict, deleted for good).
  */
 
-import { useEffect, useRef } from 'react'
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { siteConfig } from '@/lib/constants'
 import { MC, TYPE, GLYPH_PATHS, SECTION_ACCENT, inkAlpha, paperAlpha } from '../tokens'
 import { anton, monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { GltfVignette } from '../three/gltf-vignette'
-import { useMemoryCardAudioActions } from '../audio-context'
 
 const HERO_ACCENT = MC.glyphs[SECTION_ACCENT.hero]
 
@@ -70,12 +65,6 @@ export type HeroSectionProps = {
 export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
   const systemReduced = useReducedMotion()
   const reduced = reducedProp ?? systemReduced ?? false
-  // The actions-only context (no `soundOn`) stays referentially stable across
-  // a sound toggle, so the observer effect below can depend on it directly
-  // without tearing down and losing its "has this been visible yet" tracking
-  // mid-session — no ref indirection needed.
-  const actions = useMemoryCardAudioActions()
-  const sectionRef = useRef<HTMLElement>(null)
 
   const [firstName, ...restName] = siteConfig.name.split(' ')
   const lastName = restName.join(' ')
@@ -87,35 +76,8 @@ export function HeroSection({ reduced: reducedProp }: HeroSectionProps) {
     animate: 'show' as const,
   })
 
-  // The chime is a "you've moved on" cue — it fires the first time the hero
-  // leaves the viewport AND boot() actually sounds, never on mount (the hero
-  // starts fully visible, so the observer's first callback is always an
-  // intersecting entry). `fired` only latches on a genuine play: a scroll-out
-  // that lands muted (sound off, or a returning visitor's audio not yet
-  // armed by a user gesture) leaves the shot unspent for a later attempt.
-  // Depends on `actions` — stable across a sound toggle, so this doesn't
-  // reset mid-session.
-  useEffect(() => {
-    const el = sectionRef.current
-    if (!el) return
-    let hasBeenVisible = false
-    let fired = false
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        hasBeenVisible = true
-        return
-      }
-      if (hasBeenVisible && !fired) {
-        fired = actions.boot()
-      }
-    })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [actions])
-
   return (
     <section
-      ref={sectionRef}
       id="hero"
       style={{ ['--mc-ring' as string]: HERO_ACCENT, background: MC.ink, color: MC.paper }}
       className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden px-6 pt-16 pb-24 sm:px-12 lg:pb-16"

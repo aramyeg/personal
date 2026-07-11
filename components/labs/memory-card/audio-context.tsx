@@ -16,15 +16,15 @@
  * runs.
  *
  * Two contexts, not one, split on churn: `soundOn` flips on every toggle
- * click, but the call sites (`blip`/`select`/`back`/`boot`/`toggleSound`)
- * don't need to change identity when it does — `audio` is stable once built,
- * and `toggleSound` is a `useCallback` keyed only on `audio`. Consumers that
- * only fire sounds (hero's boot-chime observer, work's hover/flip handlers,
- * contact's copy button) read `useMemoryCardAudioActions()`, a context whose
- * value is memoized on `[audio, toggleSound]` — no `soundOn` — so it never
- * tears down anything built around it on a toggle. Only chrome, which also
- * renders the on/off label, needs `useMemoryCardAudioContext()`'s merged
- * shape.
+ * click, but the call sites (`blip`/`select`/`back`/`boot`/`stopBoot`/
+ * `toggleSound`) don't need to change identity when it does — `audio` is
+ * stable once built, and `toggleSound` is a `useCallback` keyed only on
+ * `audio`. Consumers that only fire sounds (`BootBeat`'s one-shot boot on
+ * mount, work's hover/flip handlers, contact's copy button) read
+ * `useMemoryCardAudioActions()`, a context whose value is memoized on
+ * `[audio, toggleSound]` — no `soundOn` — so it never tears down anything
+ * built around it on a toggle. Only chrome, which also renders the on/off
+ * label, needs `useMemoryCardAudioContext()`'s merged shape.
  */
 
 import {
@@ -43,7 +43,11 @@ export type MemoryCardAudioActions = {
   blip: () => void
   select: () => void
   back: () => void
+  /** Plays the PS1 boot recording — outcome-aware, see `audio.ts#bootMusic`. */
   boot: () => boolean
+  /** Cuts the boot recording short — `BootBeat`'s own timer end and its skip
+   *  handler both call this so the beat's audio and visual always end together. */
+  stopBoot: () => void
 }
 
 export type MemoryCardAudioContextValue = MemoryCardAudioActions & {
@@ -60,6 +64,7 @@ const DEFAULT_ACTIONS: MemoryCardAudioActions = {
   select: noop,
   back: noop,
   boot: () => false,
+  stopBoot: noop,
 }
 
 const MemoryCardAudioActionsContext = createContext<MemoryCardAudioActions>(DEFAULT_ACTIONS)
@@ -114,7 +119,8 @@ export function MemoryCardAudioProvider({ children }: { children: ReactNode }) {
       blip: audio.blip,
       select: audio.select,
       back: audio.back,
-      boot: audio.boot,
+      boot: audio.bootMusic,
+      stopBoot: audio.stopBoot,
     }),
     [audio, toggleSound]
   )
