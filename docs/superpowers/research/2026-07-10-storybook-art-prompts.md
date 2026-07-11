@@ -720,7 +720,7 @@ SUPERSEDED — do not regenerate those.
 
 **Chapter I — the stable, now a gabled box barn at the innyard gate**
 
-## ch1-stable-front — 1536×1024 · box front (gable face)
+## ch1-stable-front — ON HOLD (C6 round-1: the barn is now an OPEN-FRONT room — no front face to print; an interior back-wall prompt replaces this once interior art faces land)
 
 ```
 {STYLE PREAMBLE + accents: chalet timber #8a5a3b, terracotta roofs #b0603f, spring green #6a8f5f} full-bleed printed panel for the front face of a small paper barn box, edge to edge with NO margin: a timber stable front — plank walls, a wide barn door standing slightly ajar with warm lantern light inside, a dozing dapple pony looking over the half-door on the right side, a hanging horseshoe above the door frame, small tufts of straw at the sill. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
@@ -774,7 +774,7 @@ SUPERSEDED — do not regenerate those.
 
 **Chapter V — the awning, now a gabled market-stall box**
 
-## ch5-stall-front — 1536×1024 · box front
+## ch5-stall-front — ON HOLD (C6 round-1: the stall is now an OPEN-FRONT room — no front face to print; an interior back-wall prompt replaces this once interior art faces land)
 
 ```
 {STYLE PREAMBLE + accents: rose stone #c4766a, deep terracotta #a63d2f, sand parchment #e7d5a8} full-bleed printed panel for the front face of a paper market-stall box, edge to edge with NO margin: a rose-stone stall front with a wooden counter board, woven baskets of oranges and pomegranates, hanging bundles of dried herbs, a folded carpet leaning at one side. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.

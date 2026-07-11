@@ -161,6 +161,24 @@ against Part B and Part C every iteration, verdicts in
 floor — no regression of A1-A11 or B1-B13 is acceptable while adding
 volume.
 
+## C6 round-1 verdict (user, 2026-07-11, on the six-frame kraft deck)
+
+"I don't get what I am looking at, also feels like most of these would
+be impossible inside a pop up book, usually I saw a structure in such
+books like left wall, right wall and a ceiling."
+
+Rulings adopted: (1) fully enclosed cap-fronted boxes read as alien —
+the CANONICAL volumetric form is the OPEN-FRONT ROOM: left wall, right
+wall, ceiling/roof, hollow middle, back wall as the brace, opening
+toward the reader (this is also the original ask verbatim: "hollow in
+the middle and the top would again be a painting"). Barn and stall
+converted (capFront: false); closed boxes remain legal for small props
+(chest, hive, strongbox, counter) pending his next verdict. (2) B15's
+tilt lever resolved: DRAG-TO-TILT shipped — hover keeps subtle parallax,
+holding and dragging swings the desk (0.26/0.5 rad caps), released tilt
+drains back. (3) Raw kraft among painted pieces suppresses the read —
+final C6 verdicts wait for face art.
+
 ## First composition targets (from the user's review)
 
 - ch3 dispatch counter -> step fold or lidded box (desk front + top).
