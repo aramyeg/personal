@@ -122,9 +122,13 @@ const flatTol = (layer: SceneLayer): number => {
   if (layer.mech === 'child') return 1e-5
   if (layer.mech === 'vfold' && (layer.skewDeg ?? 0) !== 0) return 1e-5
   if (layer.mech === 'parallel') return 1e-6
-  // Platform decks and riders inherit parallelRidge's float summation order
-  // (~1e-8 y at the closed tangency — same sqrt-of-roundoff class).
-  if (layer.mech === 'platform' || layer.mech === 'rider' || layer.mech === 'fan') return 1e-6
+  // Platform decks — and riders SEATED on them — inherit parallelRidge's
+  // float summation order (~1e-8 y at the closed tangency, sqrt-of-roundoff
+  // class). boxLid riders and unskewed fan members are analytically exact;
+  // skewed fan members go through the two-cone tangency like skewed v-folds.
+  if (layer.mech === 'platform') return 1e-6
+  if (layer.mech === 'rider') return layer.seat === 'deckCrease' ? 1e-6 : 1e-9
+  if (layer.mech === 'fan') return layer.members.some((m) => (m.skewDeg ?? 0) !== 0) ? 1e-5 : 1e-9
   // A dress patch is a SECOND sheet glued atop its link: it flattens to its
   // parent's plane plus the glue-layer lift (DRESS_LIFT 0.003 — well inside
   // paper thickness 0.02).
