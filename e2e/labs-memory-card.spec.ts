@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
+/*
+ * LOCAL RUNS NEED --workers=1 for this spec. Each journey boots a WebGL-heavy
+ * page (PMREM bake + six-fit GLTF pipeline); parallel workers contend for the
+ * dev machine's GPU/main thread and time out spuriously (measured: 4/8 flaky
+ * at default workers, 8/8 green serial). CI already runs workers:1.
+ *   npx playwright test e2e/labs-memory-card.spec.ts --workers=1
+ */
+
 const BOOT_SESSION_KEY = 'memory-card-booted'
 
 /**
