@@ -42,7 +42,7 @@ export const labs: LabEntry[] = [
     title: 'Memory Card',
     date: '2026-07-10',
     thesis:
-      'The PS1 memory-card manager as an editorial site — crisp retro-3D product shots, save-slot typography, four button-glyph accents. No pixelation, all nostalgia.',
+      'The PS1 memory-card manager rebuilt as a character-select screen — load a save and a figure re-dresses into its fit as its card eases forward from a spinning fan, the room re-lighting in one of four button-glyph accents. No pixelation, all nostalgia.',
     status: 'live',
   },
   {
