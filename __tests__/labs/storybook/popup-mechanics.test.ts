@@ -112,6 +112,12 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         expect(rest.apex[1]).toBeGreaterThan(0.05)
         return
       }
+      if (layer.mech === 'platform' || layer.mech === 'fan' || layer.mech === 'rider' || layer.mech === 'dress') {
+        // Anatomy-phase mechs carry their spec-validity gates in
+        // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
+        // rider mount rule, dress seat existence).
+        return
+      }
       const skew = layer.mech === 'vfold' ? (layer.skewDeg ?? 0) : 0
       const phiR = rad(layer.phiDeg)
       const rhoR = rad(layer.rhoDeg)

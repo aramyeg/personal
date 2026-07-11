@@ -55,7 +55,19 @@ describe('storybook content', () => {
       // construction (mechanism sequence + sizes)
       signatures.add(
         ch.layers
-          .map((l) => `${l.mech}:${l.mech === 'parallel' ? l.glueL + l.glueR : l.width}`)
+          .map((l) => {
+            const size =
+              l.mech === 'parallel'
+                ? l.glueL + l.glueR
+                : l.mech === 'box'
+                  ? l.a
+                  : l.mech === 'platform'
+                    ? l.qA + l.qB
+                    : l.mech === 'fan'
+                      ? l.members.length
+                      : l.width
+            return `${l.mech}:${size}`
+          })
           .join('|')
       )
     }

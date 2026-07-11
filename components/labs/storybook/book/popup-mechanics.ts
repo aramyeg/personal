@@ -180,7 +180,126 @@ export type BoxGeom = {
   capBack?: boolean
 }
 
-export type LayerGeom = VFoldGeom | ParallelGeom | ChildGeom | BoxGeom
+export type PlatformStrut = {
+  /** Glue-line distances from the spine on the left / right page. */
+  glueL: number
+  glueR: number
+  /** Stand-proud slack, exactly as ParallelGeom: panel widths are
+   *  glueR + rise (left panel) and glueL + rise (right panel), so every
+   *  strut folds flat by construction. */
+  rise: number
+  /** Strut bays along the spine: disjoint [z0, z1] spans. All bays of a
+   *  rank share one cross-section, so they share one ridge line — that is
+   *  what lets a single deck ride them all (Eni Oken: "the secret is to
+   *  create all pedestals the same size"). */
+  spans: readonly (readonly [number, number])[]
+}
+
+/**
+ * FLOATING PLATFORM (anatomy research rec #1; derive-platform.mjs): a
+ * two-panel DECK hinged along the ridge lines of two tent-strut ranks,
+ * meeting at a center crease solved by circle-circle intersection —
+ * 0-DOF, closed form, h-only. The crease is authentic anatomy: a rigid
+ * uncreased plate spanning the gutter cannot flat-fold. Flat-fold rules
+ * (asserted by the content covenant, discovered in the derive):
+ * BRIDGE (rank B mirrors rank A, same closed reach) needs qA = qB;
+ * TERRACE (different closed reaches) needs qA + qB = the closed gap.
+ */
+export type PlatformGeom = {
+  mech: 'platform'
+  strutA: PlatformStrut
+  strutB: PlatformStrut
+  /** Deck panel widths, ridge A / ridge B to the shared crease. */
+  qA: number
+  qB: number
+  /** Deck span along the spine — bridging the strut bays IS the floating
+   *  look (one art piece spanning the gaps between supports). */
+  deckZ0: number
+  deckZ1: number
+}
+
+/** One fan member — a v-fold sharing the fan's common apex. Same angle
+ *  conventions as VFoldGeom; the built-in skew keeps flat-fold true.
+ *  Feasibility (derive-fan.mjs): the member must bridge its glue lines at
+ *  full open — rhoL + rhoR >= phiL + phiR — asserted by the covenant. */
+export type FanMember = {
+  phiDeg: number
+  rhoDeg: number
+  skewDeg?: number
+  creaseU?: number
+  width: number
+  height: number
+}
+
+/**
+ * ANGLE-FOLD FAN (research §4; derive-fan.mjs): k independent v-folds
+ * sharing ONE spine apex with distinct angles — Birmingham's M-fold is
+ * 3 members: 6 planes / 9 gullies from one sheet. Members must never
+ * cross mid-fold (3D arc gate in the derive + covenant test).
+ */
+export type FanGeom = {
+  mech: 'fan'
+  apexZ: number
+  vDir: 1 | -1
+  members: readonly FanMember[]
+}
+
+/**
+ * RIDER (mechanism-on-mechanism recursion, derive-recursion.mjs): a
+ * symmetric v-fold whose "pages" are a parent mechanism's hinged patch
+ * pair. Valid seats fold parallel at book-closed (the mount rule):
+ * 'boxLid' — valley child standing on a flat-roofed box (local half-angle
+ * = the page half-angle exactly); 'deckCrease' — rooftop child straddling
+ * a BRIDGE platform's deck peak (half-angle PI at closed, easing down as
+ * the book opens — a rider, not a tower).
+ */
+export type RiderGeom = {
+  mech: 'rider'
+  /** id of the box (roof 'flat') or bridge platform this rider sits on. */
+  parentId: string
+  seat: 'boxLid' | 'deckCrease'
+  /** Mount position along the seat crease (world z). */
+  mountZ: number
+  vDir: 1 | -1
+  phiDeg: number
+  rhoDeg: number
+  creaseU?: number
+  width: number
+  height: number
+}
+
+/**
+ * DRESS PATCH (the Sabuda recipe's engine form): a decoratively-shaped
+ * NON-KINEMATIC patch glued flat onto one parent panel, rigidly riding
+ * its link — "links may be curved, partially cut away, extended beyond
+ * their joints". Dress patches carry die-cut silhouette art and may
+ * overhang the panel edges; they add zero DOF and zero solver work.
+ */
+export type DressGeom = {
+  mech: 'dress'
+  parentId: string
+  /** Which parent surface carries the patch: 'left' | 'right' for
+   *  two-panel mechs, a BoxFace for boxes, a PlatformFace for platforms. */
+  seat: string
+  /** Placement from the seat panel's bottom-left corner, along its edges
+   *  (world units). May run past the panel — overhang is the point. */
+  u: number
+  v: number
+  /** Rotation in the panel plane, degrees. */
+  angleDeg?: number
+  width: number
+  height: number
+}
+
+export type LayerGeom =
+  | VFoldGeom
+  | ParallelGeom
+  | ChildGeom
+  | BoxGeom
+  | PlatformGeom
+  | FanGeom
+  | RiderGeom
+  | DressGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -221,8 +340,9 @@ const normalize = (a: Vec3): Vec3 => {
 
 /** Parallelogram panel from an apex and two spanning directions — the shape
  *  a real die-cut v-fold panel is: base along the glue line, sides along
- *  the central crease. Corner order matches PanelQuad. */
-const parallelogram = (apex: Vec3, g: Vec3, glueLen: number, c: Vec3, height: number): PanelQuad => [
+ *  the central crease. Corner order matches PanelQuad. Exported for the
+ *  anatomy solvers (popup-anatomy.ts); not an authoring API. */
+export const parallelogram = (apex: Vec3, g: Vec3, glueLen: number, c: Vec3, height: number): PanelQuad => [
   apex,
   combine(1, apex, glueLen, g),
   [
@@ -340,15 +460,13 @@ export function solveVFoldPose(geom: VFoldGeom, thetaL: number, thetaR: number):
 // ---------------------------------------------------------------------------
 // Parallel fold (planar four-bar in the cross-section, lit doc §4).
 
-export function solveParallelPose(geom: ParallelGeom, thetaL: number, thetaR: number): MechPose {
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const m = (thetaL + thetaR) / 2
-  const h = beta / 2
-  const { glueL: dL, glueR: dR, rise, z0, z1 } = geom
+/** Cross-section ridge of a parallel-fold strip in the bisector frame
+ *  (pages at +-h from X): glue at dL/dR from the spine, panel widths
+ *  glueR + rise / glueL + rise. Exported for the platform solver, whose
+ *  strut ranks are exactly these tents (popup-anatomy.ts). */
+export function parallelRidge(dL: number, dR: number, rise: number, h: number): readonly [number, number] {
   const wA = dR + rise
   const wC = dL + rise
-
-  // Cross-section in the bisector frame: X "up", pages at +-h from X.
   const ax = dL * Math.cos(h)
   const ay = dL * Math.sin(h)
   const cx = dR * Math.cos(h)
@@ -357,26 +475,36 @@ export function solveParallelPose(geom: ParallelGeom, thetaL: number, thetaR: nu
   const dy = cy - ay
   const dist = Math.hypot(dx, dy)
 
-  let bx: number
-  let by: number
   if (dist < 1e-9) {
     // Symmetric strip at exactly closed: the glue points coincide and the
     // equal-radius circles are concentric — the strip folds flat up the
     // collapsed page, reaching dL + wA from the spine.
-    bx = ax + wA
-    by = ay
-  } else {
-    const ex = dx / dist
-    const ey = dy / dist
-    const along = (dist * dist + wA * wA - wC * wC) / (2 * dist)
-    const h2 = Math.max(0, wA * wA - along * along)
-    const lift = Math.sqrt(h2)
-    // Two branches along the AC normal; the ridge stands on the reader
-    // side (larger bisector-frame x). n = (-ey, ex) has nx = -ey >= 0 for
-    // beta in [0, PI] (ey <= 0), so the + branch is always the standing one.
-    bx = ax + along * ex - lift * ey
-    by = ay + along * ey + lift * ex
+    return [ax + wA, ay]
   }
+  const ex = dx / dist
+  const ey = dy / dist
+  const along = (dist * dist + wA * wA - wC * wC) / (2 * dist)
+  const h2 = Math.max(0, wA * wA - along * along)
+  const lift = Math.sqrt(h2)
+  // Two branches along the AC normal; the ridge stands on the reader
+  // side (larger bisector-frame x). n = (-ey, ex) has nx = -ey >= 0 for
+  // beta in [0, PI] (ey <= 0), so the + branch is always the standing one.
+  return [ax + along * ex - lift * ey, ay + along * ey + lift * ex]
+}
+
+export function solveParallelPose(geom: ParallelGeom, thetaL: number, thetaR: number): MechPose {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const m = (thetaL + thetaR) / 2
+  const h = beta / 2
+  const { glueL: dL, glueR: dR, rise, z0, z1 } = geom
+  const wA = dR + rise
+  const wC = dL + rise
+
+  const ax = dL * Math.cos(h)
+  const ay = dL * Math.sin(h)
+  const cx = dR * Math.cos(h)
+  const cy = -dR * Math.sin(h)
+  const [bx, by] = parallelRidge(dL, dR, rise, h)
 
   const cm = Math.cos(m)
   const sm = Math.sin(m)
@@ -547,6 +675,14 @@ export function solveLayerPose(
     }
     case 'box':
       throw new Error('storybook: box layers are multi-patch — use solveBoxPose')
+    case 'platform':
+      throw new Error('storybook: platform layers are multi-patch — use solvePlatformPose (popup-anatomy)')
+    case 'fan':
+      throw new Error('storybook: fan layers are multi-pose — use solveFanPose (popup-anatomy)')
+    case 'rider':
+      throw new Error('storybook: rider layers need their parent geometry — use solveRiderPose (popup-anatomy)')
+    case 'dress':
+      throw new Error('storybook: dress patches ride a solved parent surface — use solveDressPose (popup-anatomy)')
   }
 }
 

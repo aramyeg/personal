@@ -77,6 +77,9 @@ const foldSplit = (layer: SceneLayer): number => {
     return (layer.glueR + layer.rise) / (layer.glueL + layer.glueR + 2 * layer.rise)
   }
   if (layer.mech === 'box') return 0.5
+  if (layer.mech === 'platform') return layer.qA / (layer.qA + layer.qB) // deck crease
+  if (layer.mech === 'fan') return 0.5 // per-member creaseU applies at render
+  if (layer.mech === 'dress') return 0.5 // single quad, no fold
   return layer.creaseU ?? 0.5
 }
 
@@ -105,6 +108,12 @@ const SCREEN_UP: readonly [number, number, number] = [0, 0.77, -0.638]
 export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): boolean {
   if (layer.mech === 'parallel') return false // handled in panelUvs' own mapping
   if (layer.mech === 'box') return false // per-face uvs live in popup-box-layer.tsx
+  if (layer.mech === 'platform') return false // per-face uvs live in the platform layer
+  if (layer.mech === 'fan' || layer.mech === 'rider' || layer.mech === 'dress') {
+    // Anatomy mechs route through their own renderers (fan members and
+    // riders re-enter here as synthesized v-fold poses when they land).
+    return false
+  }
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
