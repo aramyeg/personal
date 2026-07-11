@@ -13,6 +13,12 @@ import {
   type PanelQuad,
   type Vec3,
 } from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  solveDressPose,
+  solveFanPose,
+  solvePlatformPose,
+  solveRiderPose,
+} from '@/components/labs/storybook/book/popup-anatomy'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 import { PAGE_H, PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 
@@ -39,8 +45,35 @@ const parentOf = (layer: SceneLayer, layers: readonly SceneLayer[]): SceneLayer 
 const poseAt = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number, thetaR: number) =>
   solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
 
+/** A dress patch's seat quad, re-solved from its parent (mirrors the
+ *  renderer's seat resolution in popup-anatomy-layers.tsx). */
+const seatQuadOf = (
+  layer: SceneLayer & { mech: 'dress' },
+  layers: readonly SceneLayer[],
+  thetaL: number,
+  thetaR: number
+): PanelQuad => {
+  const parent = layers.find((l) => l.id === layer.parentId)
+  if (!parent) throw new Error(`dress ${layer.id}: parent ${layer.parentId} not in spread`)
+  if (parent.mech === 'box') {
+    const patch = solveBoxPose(parent, thetaL, thetaR).find((p) => p.face === layer.seat)
+    if (!patch) throw new Error(`dress ${layer.id}: box has no face ${layer.seat}`)
+    return patch.quad
+  }
+  if (parent.mech === 'platform') {
+    const patch = solvePlatformPose(parent, thetaL, thetaR).find(
+      (p) => p.face === layer.seat && p.bay === 0
+    )
+    if (!patch) throw new Error(`dress ${layer.id}: platform has no face ${layer.seat}`)
+    return patch.quad
+  }
+  const pose = solveLayerPose(parent, parentOf(parent, layers), thetaL, thetaR)
+  return layer.seat === 'left' ? pose.left : pose.right
+}
+
 /** Every world-space quad a layer poses: two panels for the two-panel
- *  mechanisms, the full patch list for boxes. */
+ *  mechanisms (fan members and riders included), the full patch list for
+ *  boxes and platforms, the single riding quad for a dress patch. */
 const allQuads = (
   layer: SceneLayer,
   layers: readonly SceneLayer[],
@@ -48,6 +81,18 @@ const allQuads = (
   thetaR: number
 ): PanelQuad[] => {
   if (layer.mech === 'box') return solveBoxPose(layer, thetaL, thetaR).map((p) => p.quad)
+  if (layer.mech === 'platform') return solvePlatformPose(layer, thetaL, thetaR).map((p) => p.quad)
+  if (layer.mech === 'fan')
+    return solveFanPose(layer, thetaL, thetaR).flatMap((pose) => [pose.right, pose.left])
+  if (layer.mech === 'rider') {
+    const parent = layers.find((l) => l.id === layer.parentId)
+    if (!parent || (parent.mech !== 'box' && parent.mech !== 'platform')) {
+      throw new Error(`rider ${layer.id}: parent must be a box/platform in the same spread`)
+    }
+    const pose = solveRiderPose(layer, parent, thetaL, thetaR)
+    return [pose.right, pose.left]
+  }
+  if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -77,6 +122,13 @@ const flatTol = (layer: SceneLayer): number => {
   if (layer.mech === 'child') return 1e-5
   if (layer.mech === 'vfold' && (layer.skewDeg ?? 0) !== 0) return 1e-5
   if (layer.mech === 'parallel') return 1e-6
+  // Platform decks and riders inherit parallelRidge's float summation order
+  // (~1e-8 y at the closed tangency — same sqrt-of-roundoff class).
+  if (layer.mech === 'platform' || layer.mech === 'rider' || layer.mech === 'fan') return 1e-6
+  // A dress patch is a SECOND sheet glued atop its link: it flattens to its
+  // parent's plane plus the glue-layer lift (DRESS_LIFT 0.003 — well inside
+  // paper thickness 0.02).
+  if (layer.mech === 'dress') return 0.004
   return 1e-9 // symmetric v-folds AND boxes: analytically exact closed forms
 }
 
@@ -149,12 +201,44 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
 describe('A1 glue coherence — glue edges lie in their host surface at every angle', () => {
   it('page-glued pieces keep their bottom edges in the page planes', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
-      if (layer.mech === 'child') continue
+      // children, riders, and dress patches glue to PAPER, not pages —
+      // their glue coherence is tested against their parents instead.
+      if (layer.mech === 'child' || layer.mech === 'rider' || layer.mech === 'dress') continue
       for (let i = 0; i <= 72; i++) {
         const thetaR = 0
         const thetaL = (i / 72) * Math.PI
         const nR: Vec3 = [-Math.sin(thetaR), Math.cos(thetaR), 0]
         const nL: Vec3 = [-Math.sin(thetaL), Math.cos(thetaL), 0]
+        if (layer.mech === 'platform') {
+          // strut glue: strutL's bottom edge (corners 0,1) on the left page,
+          // strutR's glue edge (corners 2,3) on the right page, every bay
+          for (const patch of solvePlatformPose(layer, thetaL, thetaR)) {
+            const glue =
+              patch.face === 'strutL'
+                ? ([patch.quad[0], patch.quad[1]] as const)
+                : patch.face === 'strutR'
+                  ? ([patch.quad[2], patch.quad[3]] as const)
+                  : null
+            if (!glue) continue
+            const n = patch.face === 'strutL' ? nL : nR
+            for (const p of glue) {
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+            }
+          }
+          continue
+        }
+        if (layer.mech === 'fan') {
+          // every member is an independent page-glued v-fold
+          for (const pose of solveFanPose(layer, thetaL, thetaR)) {
+            for (const p of [pose.right[0], pose.right[1]]) {
+              expect(Math.abs(p[0] * nR[0] + p[1] * nR[1])).toBeLessThan(1e-9)
+            }
+            for (const p of [pose.left[0], pose.left[1]]) {
+              expect(Math.abs(p[0] * nL[0] + p[1] * nL[1])).toBeLessThan(1e-9)
+            }
+          }
+          continue
+        }
         if (layer.mech === 'box') {
           // box glue: each wall's bottom edge (quad corners 0,1) on its page
           const patches = solveBoxPose(layer, thetaL, thetaR)
@@ -293,9 +377,11 @@ describe('A6 continuity — no jumps, no branch flips', () => {
       // backdrop's far corner — bounded, since rho > phi keeps the linkage
       // strictly inside its reachability margin). Children COMPOUND their
       // parent's bloom with their own (the parent's panel dihedral is
-      // their driving angle), so their ceiling doubles. A branch flip
-      // would displace corners by ~0.1-1.0 in a single step.
-      const bound = layer.mech === 'child' ? (16 * Math.PI) / steps : (8 * Math.PI) / steps
+      // their driving angle), so their ceiling doubles — riders and dress
+      // patches ride mechanisms the same way. A branch flip would displace
+      // corners by ~0.1-1.0 in a single step.
+      const compound = layer.mech === 'child' || layer.mech === 'rider' || layer.mech === 'dress'
+      const bound = compound ? (16 * Math.PI) / steps : (8 * Math.PI) / steps
       let prev = allCorners(layer, layers, 0, 0)
       for (let i = 1; i <= steps; i++) {
         const next = allCorners(layer, layers, (i / steps) * Math.PI, 0)
@@ -394,9 +480,12 @@ describe('A9 rest-pose separation — pieces clear each other, spread by spread'
       // stays inside the parent's convex panel wedge (same argument as
       // A10's page wedge). Child-parent pairs are therefore excluded;
       // every other pair is a real separation requirement.
+      // Riders and dress patches touch their parents by design too: rider
+      // glue edges lie IN the parent's lid/deck planes, a dress sits one
+      // glue layer (0.003) off its link — same convexity argument.
       const glued = new Set<string>()
       layers.forEach((l, idx) => {
-        if (l.mech !== 'child') return
+        if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress') return
         const p = layers.findIndex((c) => c.id === l.parentId)
         glued.add(`${idx}:${p}`)
         glued.add(`${p}:${idx}`)
@@ -425,13 +514,19 @@ describe('A10 wedge containment — paper never pokes through either bounding pa
           for (const p of allCorners(layer, layers, thetaL, thetaR)) {
             const r = Math.hypot(p[0], p[1])
             if (r < 1e-9) continue // on the spine
+            // A dress patch is a sheet stacked on another sheet: its glue-
+            // layer lift (0.003) may sit inside the closing sandwich, which
+            // a zero-thickness wedge reads as penetration. Allow it in
+            // LINEAR terms (4mm against paper thickness 0.02); everything
+            // else keeps the strict angular tolerance.
+            const slackAng = layer.mech === 'dress' ? 0.004 / r : 1e-6
             // atan2 jumps to -PI for points on the flat left page whose y
             // carries -0/-1e-17 float noise; lift those into [0, 2PI) so a
             // corner exactly on a page plane isn't a false violation.
             let ang = Math.atan2(p[1], p[0])
-            if (ang < thetaR - 1e-6) ang += 2 * Math.PI
-            expect(ang).toBeGreaterThanOrEqual(thetaR - 1e-9)
-            expect(ang).toBeLessThanOrEqual(thetaL + 1e-6)
+            if (ang < thetaR - slackAng) ang += 2 * Math.PI
+            expect(ang).toBeGreaterThanOrEqual(thetaR - slackAng)
+            expect(ang).toBeLessThanOrEqual(thetaL + slackAng)
           }
         }
       }

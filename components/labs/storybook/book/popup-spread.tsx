@@ -16,15 +16,10 @@
  *    (a geometric property of the mechanism, not an animation curve).
  *  - 'hidden': a warm-texture neighbor; never visible.
  *
- * No springs, no timers, no per-layer easing: one shared driving angle,
- * like real glued paper (benchmark B9) — a child piece moves because its
- * parent's fold opens it, second-hand from the same page. Mounted by
- * book.tsx for the current spread ± 1 so neighboring textures are warm
- * before you turn to them.
- *
- * Convention (matches page-geometry.ts): the enclosing group sits at the
- * open page's surface height, so a layer's local y=0 is the page plane;
- * the spine runs along z at x=0.
+ * No springs or timers: one shared driving angle, like real glued paper
+ * (benchmark B9). Mounted by book.tsx for the current spread ± 1. The
+ * enclosing group sits at the open page's surface height (page-geometry.ts),
+ * so a layer's local y=0 is the page plane and the spine runs along z at x=0.
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
@@ -36,11 +31,15 @@ import { makeCanvasTexture } from './book'
 import {
   solveLayerPose,
   spreadPageAngles,
+  type MechPose,
   type PanelQuad,
   type SpreadRole,
 } from './popup-mechanics'
+import { solveRiderPose } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
 import { BoxPopupLayer } from './popup-box-layer'
+import { PlatformPopupLayer } from './popup-platform-layer'
+import { DressPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
 
@@ -204,12 +203,16 @@ function PopupLayer({
   accents,
   role,
   frame,
+  solvePose,
 }: {
   layer: SceneLayer
   parent: SceneLayer | undefined
   accents: readonly string[]
   role: PopupRole
   frame: RefObject<TurnFrame | null>
+  /** Overrides the internal `solveLayerPose` for mechs whose pose is not a
+   *  pure function of the layer alone (riders re-solve their parent). */
+  solvePose?: (thetaL: number, thetaR: number) => MechPose | null
 }) {
   const texture = useLayerTexture(layer.id, layer.kind, accents)
   const cutoutRef = useRef<THREE.Group>(null)
@@ -292,12 +295,17 @@ function PopupLayer({
     )
     const beta = thetaL - thetaR
 
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
+    const pose =
+      role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
+        ? solvePose
+          ? solvePose(thetaL, thetaR)
+          : solveLayerPose(layer, parent, thetaL, thetaR)
+        : null
+    const visible = pose !== null
     cutout.visible = visible
     if (shadowRef.current) shadowRef.current.visible = visible && shadow !== null
-    if (!visible) return
+    if (!pose) return
 
-    const pose = solveLayerPose(layer, parent, thetaL, thetaR)
     if (rightMeshRef.current) writeQuad(geometries.right, pose.right)
     if (leftMeshRef.current) writeQuad(geometries.left, pose.left)
 
@@ -337,22 +345,55 @@ function PopupLayer({
 export function PopupSpread({ layers, accents, spreadIndex, role, frame }: PopupSpreadProps) {
   return (
     <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
-      {layers.map((layer) =>
-        layer.mech === 'box' ? (
-          <BoxPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
-        ) : (
+      {layers.map((layer) => {
+        if (layer.mech === 'box') {
+          return <BoxPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
+        }
+        if (layer.mech === 'platform') {
+          return <PlatformPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
+        }
+        // A fan is k independent v-folds sharing one apex — each member renders
+        // as an ordinary two-panel layer (identical geometry to solveFanPose).
+        if (layer.mech === 'fan') {
+          return (
+            <group key={layer.id}>
+              {fanMemberLayers(layer).map((member) => (
+                <PopupLayer key={member.id} layer={member} parent={undefined} accents={accents} role={role} frame={frame} />
+              ))}
+            </group>
+          )
+        }
+        // A rider's "pages" are a box/platform patch pair; solveRiderPose
+        // re-solves that parent's geometry each frame from the layer alone.
+        if (layer.mech === 'rider') {
+          const seat = layers.find((l) => l.id === layer.parentId)
+          if (!seat || (seat.mech !== 'box' && seat.mech !== 'platform')) return null
+          return (
+            <PopupLayer
+              key={layer.id}
+              layer={layer}
+              parent={undefined}
+              accents={accents}
+              role={role}
+              frame={frame}
+              solvePose={(thetaL, thetaR) => solveRiderPose(layer, seat, thetaL, thetaR)}
+            />
+          )
+        }
+        if (layer.mech === 'dress') {
+          return <DressPopupLayer key={layer.id} layer={layer} layers={layers} role={role} frame={frame} />
+        }
+        return (
           <PopupLayer
             key={layer.id}
             layer={layer}
-            parent={
-              layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
-            }
+            parent={layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined}
             accents={accents}
             role={role}
             frame={frame}
           />
         )
-      )}
+      })}
     </group>
   )
 }
