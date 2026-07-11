@@ -65,9 +65,12 @@ const SPINE_FLAT_HEIGHT = BOOK.coverT
 // per-stack heights while pop-ups anchored at the block top: pieces
 // floated ~0.05 above their pages at rest and pierced the sheet mid-turn.)
 const PAGE_SURFACE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift
-// Gutter crease: a narrow dark-transparent-gradient strip laid flat over
-// the seam where the open pages meet, just above the page surfaces.
-const CREASE_WIDTH = 0.1
+// Gutter crease: the valley strip laid flat over the seam where the open
+// pages meet, just above the page surfaces. Widened with the round-4
+// gutter valley (paper-texture.ts makeCreaseCanvas): the concave falloff,
+// curl highlights, and folded-edge hairlines need the span to read as a
+// fold holding paper rather than a printed stripe.
+const CREASE_WIDTH = 0.16
 const CREASE_Y = PAGE_SURFACE_Y + 0.001
 // Pop-up layers: a hair above the crease strip, effectively ON the page.
 const POPUP_Y = PAGE_SURFACE_Y + 0.0015
