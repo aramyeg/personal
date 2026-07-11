@@ -119,6 +119,13 @@ function toTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 
 export type FrontSticker = { slot: string; title: string; year: string; accent: string }
 export type BackSticker = { slot: string; metrics: string[]; accent: string }
+export type SystemSticker = {
+  slot: string
+  label: string
+  sub: string
+  tag: string
+  accent: string
+}
 
 /** Front label: slot chip + project title in grotesk caps, a mono saved-date. */
 export function makeFrontSticker(
@@ -148,6 +155,56 @@ export function makeFrontSticker(
   g.fillText(`SAVED · ${year.toUpperCase()}`, PAD, ty + 8)
 
   // Accent underline tick — a printed rule under the label body.
+  g.strokeStyle = accent
+  g.lineWidth = 5
+  g.lineCap = 'round'
+  g.beginPath()
+  g.moveTo(PAD, STICKER_H - PAD)
+  g.lineTo(PAD + 96, STICKER_H - PAD)
+  g.stroke()
+
+  return toTexture(canvas)
+}
+
+/**
+ * System-slot front label: the same printed-sticker language as a project's
+ * front (slot chip · caps title · accent tick), but carrying a system save's
+ * label + a mono sub-note instead of a project title + saved-date. Lets every
+ * card on the select arc wear a real printed label, system cards included.
+ */
+export function makeSystemSticker(
+  { slot, label, sub, tag, accent }: SystemSticker,
+  titleFont: string
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = STICKER_W
+  canvas.height = STICKER_H
+  const g = canvas.getContext('2d')!
+  const bodyTop = paintBase(g, slot, accent, tag)
+
+  g.fillStyle = MC.ink
+  g.textAlign = 'left'
+  g.textBaseline = 'alphabetic'
+  g.font = `700 60px ${titleFont}`
+  const lines = wrapCaps(g, label, STICKER_W - PAD * 2, 2)
+  let ty = bodyTop + 48
+  for (const line of lines) {
+    g.fillText(line, PAD, ty)
+    ty += 70
+  }
+
+  // Mono sub-note — the quiet detail line the system card carries. Drawn
+  // lowercase (lab copy law) and clipped to the label width so it never bleeds.
+  g.fillStyle = inkAlpha(0.5)
+  g.font = `500 24px ${monoFamily}`
+  let subLine = sub.toLowerCase()
+  const maxSubW = STICKER_W - PAD * 2
+  while (subLine.length > 1 && g.measureText(subLine).width > maxSubW) {
+    subLine = `${subLine.slice(0, -2)}…`
+  }
+  g.fillText(subLine, PAD, ty + 6)
+
+  // Accent underline tick — the printed rule under the label body.
   g.strokeStyle = accent
   g.lineWidth = 5
   g.lineCap = 'round'

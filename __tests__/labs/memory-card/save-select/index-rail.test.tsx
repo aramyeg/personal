@@ -1,16 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
-// next/font/google is compiled away by Next's loader — not available under
-// vitest. The strips only need font-family strings, so stub the module.
+// next/font/google is compiled away by Next's loader — stub the family strings.
 vi.mock('@/components/labs/memory-card/fonts', () => ({
   anton: { className: 'anton', style: { fontFamily: 'Anton' } },
   grotesk: { className: 'grotesk', style: { fontFamily: 'Space Grotesk' } },
   monoFamily: 'monospace',
 }))
 
-// Direct action spies — no provider needed; the strips fire sounds inside
-// their own event handlers.
+// Direct action spies — the rail fires sounds inside its own handlers.
 const blip = vi.fn()
 const select = vi.fn()
 vi.mock('@/components/labs/memory-card/audio-context', () => ({
@@ -23,17 +21,19 @@ vi.mock('@/components/labs/memory-card/audio-context', () => ({
   }),
 }))
 
-import { SaveStrips } from '@/components/labs/memory-card/save-select/save-strips'
+import { IndexRail } from '@/components/labs/memory-card/save-select/index-rail'
 import { buildSaves } from '@/components/labs/memory-card/save-select/saves'
 import { projects } from '@/data/projects'
 
 const saves = buildSaves(projects)
 
 function setup(activeIndex = 0) {
+  blip.mockClear()
+  select.mockClear()
   const onHighlight = vi.fn()
   const onActivate = vi.fn()
   const utils = render(
-    <SaveStrips
+    <IndexRail
       saves={saves}
       activeIndex={activeIndex}
       onHighlight={onHighlight}
@@ -44,25 +44,22 @@ function setup(activeIndex = 0) {
   return { ...utils, onHighlight, onActivate, buttons }
 }
 
-describe('SaveStrips', () => {
-  it('renders one row per save with slot numerals 01–06 and the labels', () => {
+describe('IndexRail', () => {
+  it('renders one focusable row per save with slot numerals 01–06', () => {
     setup()
     for (const save of saves) {
-      expect(screen.getByText(save.slot)).toBeInTheDocument()
-      expect(screen.getByText(save.label)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: new RegExp(`slot ${save.slot}`, 'i') })).toBeInTheDocument()
     }
   })
 
-  it('renders exactly one focusable strip — the active one — with the rest at tabIndex -1', () => {
+  it('makes exactly the active row focusable, the rest tabIndex -1', () => {
     const { buttons } = setup(2)
     expect(buttons).toHaveLength(saves.length)
-    buttons.forEach((button, i) => {
-      expect(button.tabIndex).toBe(i === 2 ? 0 : -1)
-    })
+    buttons.forEach((button, i) => expect(button.tabIndex).toBe(i === 2 ? 0 : -1))
     expect(buttons[2]).toHaveAttribute('aria-current', 'true')
   })
 
-  it('ArrowDown highlights and focuses the next strip', () => {
+  it('ArrowDown highlights and focuses the next row', () => {
     const { buttons, onHighlight } = setup(0)
     buttons[0].focus()
     fireEvent.keyDown(buttons[0], { key: 'ArrowDown' })
@@ -70,7 +67,7 @@ describe('SaveStrips', () => {
     expect(document.activeElement).toBe(buttons[1])
   })
 
-  it('ArrowDown wraps from the last strip back to the first', () => {
+  it('ArrowDown wraps from the last row back to the first', () => {
     const { buttons, onHighlight } = setup(saves.length - 1)
     buttons[saves.length - 1].focus()
     fireEvent.keyDown(buttons[saves.length - 1], { key: 'ArrowDown' })
@@ -78,7 +75,7 @@ describe('SaveStrips', () => {
     expect(document.activeElement).toBe(buttons[0])
   })
 
-  it('ArrowUp wraps from the first strip to the last', () => {
+  it('ArrowUp wraps from the first row to the last', () => {
     const { buttons, onHighlight } = setup(0)
     buttons[0].focus()
     fireEvent.keyDown(buttons[0], { key: 'ArrowUp' })
@@ -90,25 +87,27 @@ describe('SaveStrips', () => {
     const { buttons, onActivate } = setup(1)
     fireEvent.keyDown(buttons[1], { key: 'Enter' })
     expect(onActivate).toHaveBeenCalledWith(saves[1])
+    expect(select).toHaveBeenCalledTimes(1)
   })
 
-  it('a click on a non-active strip highlights it (never activates)', () => {
+  it('a click on a non-active row highlights it, never activates', () => {
     const { buttons, onHighlight, onActivate } = setup(0)
     fireEvent.click(buttons[3])
     expect(onHighlight).toHaveBeenCalledWith(3)
     expect(onActivate).not.toHaveBeenCalled()
   })
 
-  it('a second click — on the already-active strip — activates it', () => {
+  it('a second click — on the already-active row — activates it', () => {
     const { buttons, onActivate } = setup(2)
     fireEvent.click(buttons[2])
     expect(onActivate).toHaveBeenCalledWith(saves[2])
   })
 
-  it('blips on every highlight change but not when re-clicking the active strip', () => {
+  it('blips on a highlight change but not when clicking the already-active row', () => {
     const { buttons } = setup(0)
-    fireEvent.keyDown(buttons[0], { key: 'ArrowDown' })
-    fireEvent.click(buttons[4])
+    fireEvent.keyDown(buttons[0], { key: 'ArrowDown' }) // move → blip
+    fireEvent.click(buttons[0]) // active row → activates, no blip
+    fireEvent.click(buttons[4]) // non-active row → blip
     expect(blip).toHaveBeenCalledTimes(2)
   })
 })

@@ -13,8 +13,16 @@
 // ---- Primitive: raw palette ---------------------------------------------
 // Gates tune ONLY these values — every consumer reads through the
 // semantic/component layers below, never a hardcoded hex.
+//
+// The surface is a three-stop cool near-black — the PS2 browser "void". `ink`
+// is the base plane every section sits on and the dark text on printed label
+// stock; `abyss` is the deepest stop (screen edges, the far floor); `haze` is
+// the faintly-lifted upper atmosphere the void grades up into. All three read
+// as one continuous void behind the transparent 3D canvases.
 export const MC = {
-  ink: '#101014',
+  ink: '#0d0e14',
+  abyss: '#060609',
+  haze: '#181924',
   paper: '#e9e7e0',
   shell: '#b7b9bd',
   warmGrey: '#8f8c84',
@@ -45,14 +53,38 @@ const hexToRgb = (hex: string): string =>
     .map((h) => parseInt(h, 16))
     .join(',')
 
+/** Any token hex at reduced opacity — the one sanctioned way to build an rgba
+ *  from a palette colour (accent atmosphere, glow pools, hairlines). Never
+ *  hand-write an rgba() outside this module. */
+export function withAlpha(hex: string, a: number): string {
+  return `rgba(${hexToRgb(hex)},${a})`
+}
+
 /** Paper at reduced opacity — the sanctioned way to dim light-on-ink text/rules. */
 export function paperAlpha(a: number): string {
-  return `rgba(${hexToRgb(MC.paper)},${a})`
+  return withAlpha(MC.paper, a)
 }
 
 /** Ink at reduced opacity — the sanctioned way to dim dark-on-paper text/rules. */
 export function inkAlpha(a: number): string {
-  return `rgba(${hexToRgb(MC.ink)},${a})`
+  return withAlpha(MC.ink, a)
+}
+
+/**
+ * The character-select void: a layered CSS background string for the whole
+ * stage, tinted by the active save's accent. A soft accent atmosphere pools
+ * high-centre (behind the objects), a cool radial lifts the mid-stage out of
+ * the abyss, and a reflective floor band warms the lower third so the 3D
+ * objects read as standing on a lit plane. Pure token colours — the only
+ * variable is `accent`, so every save re-lights the same room in its colour.
+ */
+export function voidBackdrop(accent: string): string {
+  return [
+    `radial-gradient(120% 88% at 50% -12%, ${withAlpha(accent, 0.16)} 0%, transparent 46%)`,
+    `radial-gradient(78% 62% at 50% 30%, ${MC.haze} 0%, transparent 70%)`,
+    `radial-gradient(140% 70% at 50% 118%, ${withAlpha(accent, 0.1)} 0%, transparent 55%)`,
+    `linear-gradient(180deg, ${MC.abyss} 0%, ${MC.ink} 42%, ${MC.ink} 70%, ${MC.abyss} 100%)`,
+  ].join(', ')
 }
 
 /** Section → accent (hero triangle, work circle, skills cross, about square, contact triangle). */
