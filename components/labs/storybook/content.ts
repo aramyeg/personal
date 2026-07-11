@@ -220,13 +220,16 @@ const CH4_LAYERS: readonly SceneLayer[] = [
 const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-city', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.44, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.2, creaseU: 0.58, width: 1.7, height: 0.72 },
   { id: 'ch5-stalls', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: -0.24, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.2, creaseU: 0.62, width: 1.15, height: 0.3 },
-  // ANGLE-FOLD FAN (C4v2): the bazaar's stacked canopies — three v-folds
-  // sharing one spine apex at nested angles (the proven green trio), a
-  // cluster of tent silhouettes fanning up from a single crease. Kept
-  // compact and tucked in the lane between the stall row and the archway
-  // so it owns a depth band without fouling the packed forward scene.
-  { id: 'ch5-canopies', kind: 'midground', role: 'story', mech: 'fan', apexZ: -0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.12, height: 0.1 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.1, height: 0.09 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.08, height: 0.08 }] },
-  { id: 'ch5-arch', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
+  // (C6 round 4: the canopy fan that briefly lived here was shrunk to a
+  // nubbin by the packed bazaar lanes and read as nothing — the fan
+  // showcase moved to the TITLE spread at full size, where it has room to
+  // be six planes. The bazaar keeps its four families without it:
+  // vfold / child / box / platform.)
+  // Arch pulled a step deeper (C6 round 4 band audit): its panel centroid
+  // sat within the goods table's band and the two merged once the canopy
+  // fan left — a real depth gap between archway and market table restores
+  // the fifth band the eye reads.
+  { id: 'ch5-arch', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.16, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
   // Dress on the arch: a garland swagged high across the right panel, a keystone medallion high-center on the left.
   { id: 'ch5-arch-garland', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'right', u: 0.05, v: 0.72, width: 0.3, height: 0.1 },
   { id: 'ch5-arch-keystone', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'left', u: 0.15, v: 0.68, width: 0.1, height: 0.1 },
@@ -359,8 +362,17 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
+// THE FAN SHOWCASE (C6 round 4): the canopy fan died as a nubbin in the
+// packed bazaar, and the title page's center hides under the HTML title
+// card — the satchel spread is the stage with actual room. Narrative fit:
+// "the satchel, unpacked" — a golden fan of treasures bursting out of the
+// opened bag toward the reader. Widths bloom OUTWARD (inner ray short,
+// outer rays long): a low-phi member's glue lines run nearly parallel to
+// the spine, so the inner ray is what would reach the bag — kept short —
+// while the outer rays angle away from the spine and carry the span.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
+  { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
