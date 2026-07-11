@@ -4,10 +4,13 @@
  * FigureStage — the character half of the select screen. The figure stands on
  * one side of the shared void, posed by its baked idle, and re-lights itself in
  * the highlighted save's accent: an accent rim light rakes the silhouette edge
- * so choosing a save visibly "equips" the figure in that save's colour. For one
- * designated save a small accent charm is clipped to a hand bone as proof of the
- * real equipment swap (gear assets land next task); for every other save it is
- * simply hidden.
+ * and a short-range accent fill washes the lower body, so choosing a save
+ * visibly "equips" the figure in that save's colour — legible even in a still.
+ * The fill's falloff distance is capped to the figure canvas's own contact-
+ * shadow radius so the glow never reads past the ground shadow it stands in.
+ * For one designated save a small accent charm is clipped to a hand bone as
+ * proof of the real equipment swap (gear assets land next task); for every
+ * other save it is simply hidden.
  *
  * It reuses the shared `VignetteCanvas` rig (IO gating, RoomEnvironment,
  * context-loss recovery) and adds the accent rim + the character as children.
@@ -82,36 +85,58 @@ function findHandBone(scene: THREE.Object3D): THREE.Bone | null {
 
 type AccentRimProps = { accent: string; reduced: boolean }
 
+/** Contact-shadow radius on the figure's `VignetteCanvas` — the fill light's
+ *  `distance` is capped to this so its glow never spreads past the shadow. */
+const FILL_MAX_DISTANCE = 1.3
+
 /**
- * A coloured rim from behind the figure's shoulder that eases to the active
- * accent. Under the live loop it lerps; under reduced motion's demand loop it
- * snaps to the new colour and forces one repaint so the change is never frozen.
+ * A coloured rim from behind the figure's shoulder plus a short-range fill low
+ * at its front, both easing to the active accent. Under the live loop they
+ * lerp; under reduced motion's demand loop they snap to the new colour and
+ * force one repaint so the change is never frozen.
  */
 function AccentRim({ accent, reduced }: AccentRimProps) {
-  const lightRef = useRef<THREE.DirectionalLight>(null)
+  const rimRef = useRef<THREE.DirectionalLight>(null)
+  const fillRef = useRef<THREE.PointLight>(null)
   const invalidate = useThree((s) => s.invalidate)
   const target = useMemo(() => new THREE.Color(accent), [accent])
 
   useEffect(() => {
-    if (reduced && lightRef.current) {
-      lightRef.current.color.copy(target)
+    if (reduced) {
+      rimRef.current?.color.copy(target)
+      fillRef.current?.color.copy(target)
       invalidate()
     }
   }, [target, reduced, invalidate])
 
   useFrame((_, dt) => {
-    const light = lightRef.current
-    if (!light || reduced) return
-    light.color.lerp(target, Math.min(1, dt * 3))
+    if (reduced) return
+    const k = Math.min(1, dt * 3)
+    rimRef.current?.color.lerp(target, k)
+    fillRef.current?.color.lerp(target, k)
   })
 
   return (
-    <directionalLight
-      ref={lightRef}
-      color={accent}
-      intensity={2.1}
-      position={[-3.4, 3.6, -2.6]}
-    />
+    <>
+      <directionalLight
+        ref={rimRef}
+        color={accent}
+        intensity={4.6}
+        position={[-3.4, 3.6, -2.6]}
+      />
+      {/* Low accent bounce so the equipped colour reads across the figure's
+          front — torso height, close enough to camera-facing surfaces (tank
+          top, waist) that the tint is legible in a still, not just grazing
+          the silhouette edge. Short range keeps it a tint, not a wash. */}
+      <pointLight
+        ref={fillRef}
+        color={accent}
+        intensity={2.6}
+        distance={FILL_MAX_DISTANCE}
+        decay={2}
+        position={[0.5, 0.95, 1.0]}
+      />
+    </>
   )
 }
 

@@ -39,8 +39,8 @@ vi.mock('@/components/labs/memory-card/three/figure-stage', () => ({
   ),
 }))
 vi.mock('@/components/labs/memory-card/three/card-arc', () => ({
-  CardArc: ({ focusIndex, variant }: { focusIndex: number; variant: string }) => (
-    <div data-testid="card-arc" data-focus={String(focusIndex)} data-variant={variant} />
+  CardArc: ({ focusIndex }: { focusIndex: number }) => (
+    <div data-testid="card-arc" data-focus={String(focusIndex)} />
   ),
 }))
 
@@ -81,11 +81,6 @@ describe('SaveSelectScreen', () => {
     const figure = screen.getByTestId('figure')
     expect(figure).toHaveAttribute('data-equip', 'true')
     expect(figure).toHaveAttribute('data-accent', saves[0].accent)
-  })
-
-  it('forwards the composition variant to the card arc', () => {
-    render(<SaveSelectScreen variant="b" />)
-    expect(screen.getByTestId('card-arc')).toHaveAttribute('data-variant', 'b')
   })
 
   it('never renders a lead title anywhere on the screen (claims law)', () => {

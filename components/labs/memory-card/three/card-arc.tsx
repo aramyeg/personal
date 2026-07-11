@@ -14,9 +14,11 @@
  * system saves get a matching system label. Scene fog the colour of the void
  * melts the far cards into the backdrop for depth.
  *
- * Two composition variants change only the arc geometry: `a` fans the cards
- * left-to-right, `b` stacks them on a vertical arc. Motion runs only under the
- * live frameloop; reduced motion snaps to a static, readable pose and repaints
+ * The arc fans the cards left-to-right, receding and cascading down as they
+ * fall away from the focused card; x and z both ease toward a saturating
+ * bound so the tail of the fan never runs past the frame, no matter how far
+ * the focus sits from either end of the list. Motion runs only under the live
+ * frameloop; reduced motion snaps to a static, readable pose and repaints
  * once (the shared canvas's demand loop).
  */
 
@@ -41,8 +43,6 @@ import type { SaveSlot } from '../save-select/saves'
 
 const SRC = '/labs/memory-card/models/memory-card.glb'
 
-export type ArcVariant = 'a' | 'b'
-
 /** Base card height before per-card focus scaling. */
 const FIT_HEIGHT = 1.62
 /** World-height the focused card centres on; every card rests on floor y=0. */
@@ -55,6 +55,17 @@ const SPIN_SPEED = 0.5 // rad/s idle turntable
 const FOCUS_SCALE = 1.5
 const BASE_SCALE = 0.64
 const FALLOFF = 1.3 // how quickly scale falls off with distance from focus
+/** World-units the fan can occupy horizontally before it saturates. */
+const X_SPREAD = 4.3
+/** World-units of recession (−z) the fan can fall back before it saturates. */
+const Z_SPREAD = 3.4
+/** How quickly x, z and the y cascade approach their bound — shared so x only
+ *  reaches for the frustum's edge in step with z earning it more room (a
+ *  perspective camera's cross-section widens with distance, so x and z must
+ *  saturate together or the fan overruns the frame — see arcPose). */
+const ARC_FALLOFF = 2.0
+/** World-units the cascade can drop in y before it saturates. */
+const Y_DROP = 0.85
 
 /** Card-face recess geometry (verbatim from card-rail: front is the −Z face). */
 const RECESS_CX = 0.0132
@@ -79,24 +90,23 @@ function easeAngle(current: number, target: number, k: number): number {
 
 type ArcPose = { x: number; y: number; z: number }
 
-/** Where a card sits given its signed distance `rel` from the focused card. */
-function arcPose(rel: number, variant: ArcVariant): ArcPose {
-  const depth = Math.min(Math.abs(rel), 3)
-  const pop = (1 - clamp01(Math.abs(rel))) * 0.5 // focused card leans toward camera
-  if (variant === 'a') {
-    // Horizontal fan: cards spread left↔right, receding and cascading down.
-    return {
-      x: rel * 1.74,
-      y: BASE_Y - depth * 0.26,
-      z: -depth * 0.95 + pop,
-    }
-  }
-  // Vertical stack-arc: the focused card leads, the rest cascade down and back
-  // on a diagonal — a distinct silhouette from the horizontal fan.
+/**
+ * Where a card sits given its signed distance `rel` from the focused card.
+ * Horizontal fan: cards spread left↔right, receding and cascading down. x, y
+ * and z all ease off the same saturating curve (1 − e^−dist/falloff) so every
+ * index — however far from focus — lands at a distinct position that never
+ * runs past the frame; a hard cap on `depth` alone let far cards pile up on
+ * identical coordinates while x kept growing unbounded (the idle-slot thin
+ * spread and the right-edge sliver both traced back to that mismatch).
+ */
+function arcPose(rel: number): ArcPose {
+  const dist = Math.abs(rel)
+  const t = 1 - Math.exp(-dist / ARC_FALLOFF)
+  const pop = (1 - clamp01(dist)) * 0.5 // focused card leans toward camera
   return {
-    x: 0.28 + depth * 0.52,
-    y: BASE_Y - rel * 0.82,
-    z: -depth * 0.9 + pop,
+    x: Math.sign(rel) * X_SPREAD * t,
+    y: BASE_Y - Y_DROP * t,
+    z: -Z_SPREAD * t + pop,
   }
 }
 
@@ -171,13 +181,12 @@ type CardProps = {
   clone: THREE.Object3D
   fit: { scale: number; offset: [number, number, number] }
   focusRef: React.RefObject<number>
-  variant: ArcVariant
   reduced: boolean
   shadowTex: THREE.CanvasTexture
 }
 
 /** One card: clone + printed sticker, driven each frame from the shared focus. */
-function Card({ save, index, clone, fit, focusRef, variant, reduced, shadowTex }: CardProps) {
+function Card({ save, index, clone, fit, focusRef, reduced, shadowTex }: CardProps) {
   const outer = useRef<THREE.Group>(null)
   const scaler = useRef<THREE.Group>(null)
   const pivot = useRef<THREE.Group>(null)
@@ -207,7 +216,7 @@ function Card({ save, index, clone, fit, focusRef, variant, reduced, shadowTex }
     const p = pivot.current
     if (!o || !s || !p) return
     const rel = index - focus
-    const pose = arcPose(rel, variant)
+    const pose = arcPose(rel)
     o.position.set(pose.x, pose.y, pose.z)
     const focused = Math.abs(rel) < 0.5
     const scale = BASE_SCALE + (FOCUS_SCALE - BASE_SCALE) * clamp01(1 - Math.abs(rel) / FALLOFF)
@@ -219,7 +228,7 @@ function Card({ save, index, clone, fit, focusRef, variant, reduced, shadowTex }
   useLayoutEffect(() => {
     applyStatic(focusRef.current ?? index)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variant])
+  }, [])
 
   useFrame((_, dt) => {
     if (reduced) return
@@ -229,7 +238,7 @@ function Card({ save, index, clone, fit, focusRef, variant, reduced, shadowTex }
     if (!o || !s || !p) return
     const focus = focusRef.current ?? index
     const rel = index - focus
-    const pose = arcPose(rel, variant)
+    const pose = arcPose(rel)
     const k = Math.min(1, dt * 6)
     o.position.x += (pose.x - o.position.x) * k
     o.position.y += (pose.y - o.position.y) * k
@@ -269,12 +278,11 @@ function Card({ save, index, clone, fit, focusRef, variant, reduced, shadowTex }
 export type CardArcProps = {
   saves: SaveSlot[]
   focusIndex: number
-  variant: ArcVariant
   reduced: boolean
 }
 
 /** Loads + fits the GLB once, then eases the shared focus and renders the cards. */
-function CardArcInner({ saves, focusIndex, variant, reduced }: CardArcProps) {
+function CardArcInner({ saves, focusIndex, reduced }: CardArcProps) {
   const gltf = useLoader(GLTFLoader, SRC)
   const invalidate = useThree((s) => s.invalidate)
   const focusRef = useRef<number>(focusIndex)
@@ -302,7 +310,7 @@ function CardArcInner({ saves, focusIndex, variant, reduced }: CardArcProps) {
       focusRef.current = focusIndex
       invalidate()
     }
-  }, [reduced, focusIndex, variant, fit, clones, invalidate])
+  }, [reduced, focusIndex, fit, clones, invalidate])
 
   useFrame((_, dt) => {
     if (reduced) return
@@ -321,7 +329,6 @@ function CardArcInner({ saves, focusIndex, variant, reduced }: CardArcProps) {
           clone={clones[index]}
           fit={fit}
           focusRef={focusRef}
-          variant={variant}
           reduced={reduced}
           shadowTex={shadowTex}
         />

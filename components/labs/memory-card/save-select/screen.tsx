@@ -13,12 +13,9 @@
  * At lg+ the screen is one non-scrolling viewport (figure · index · cards, story
  * beneath); below lg it relaxes into a gently scrolling column.
  *
- * Two composition variants gate the look: `a` puts the figure left with a
- * horizontal card fan, `b` puts it right with a vertical card stack-arc. The
- * variant is a server-provided prop (from `?variant=`), so first paint is always
- * correct — no client flip. Reduced motion is read via effect-set state so SSR
- * and the first client paint are byte-identical before reconciling to the real
- * preference.
+ * The figure stands left with a horizontal card fan filling the rest of the
+ * stage. Reduced motion is read via effect-set state so SSR and the first
+ * client paint are byte-identical before reconciling to the real preference.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -26,7 +23,7 @@ import { MC, GLYPH_ORDER, voidBackdrop, paperAlpha, type GlyphName } from '../to
 import { monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
 import { FigureSceneContents } from '../three/figure-stage'
-import { CardArc, type ArcVariant } from '../three/card-arc'
+import { CardArc } from '../three/card-arc'
 import { IndexRail } from './index-rail'
 import { StoryBand } from './story-band'
 import { buildSaves, type SaveSlot } from './saves'
@@ -42,17 +39,11 @@ function glyphForAccent(accent: string): GlyphName {
 export type SaveSelectScreenProps = {
   /** R4 wires this to router.push / dialog state; default no-op ships this alone. */
   onLoad?: (save: SaveSlot) => void
-  /** Composition variant, from the page's `?variant=` search param. */
-  variant?: ArcVariant
   /** Test/SSR override; otherwise detected via effect after mount. */
   reduced?: boolean
 }
 
-export function SaveSelectScreen({
-  onLoad,
-  variant = 'a',
-  reduced: reducedProp,
-}: SaveSelectScreenProps) {
+export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScreenProps) {
   const saves = useMemo(() => buildSaves(projects), [])
 
   const [activeIndex, setActiveIndex] = useState(0)
@@ -69,9 +60,8 @@ export function SaveSelectScreen({
   const handleHighlight = (index: number) => setActiveIndex(index)
   const handleActivate = (save: SaveSlot) => onLoad?.(save)
 
-  const figureLeft = variant === 'a'
   // Face the figure toward the cards (inward) so it addresses the arc.
-  const figureYaw = figureLeft ? 0.55 : -0.55
+  const figureYaw = 0.55
 
   const figureCol = (
     <div key="figure" className="relative order-1 min-h-0 lg:order-none lg:h-full">
@@ -118,7 +108,7 @@ export function SaveSelectScreen({
           target={[0, 0.8, 0]}
           fallbackGlyph={fallbackGlyph}
         >
-          <CardArc saves={saves} focusIndex={activeIndex} variant={variant} reduced={reduced} />
+          <CardArc saves={saves} focusIndex={activeIndex} reduced={reduced} />
         </VignetteCanvas>
       </div>
       <p
@@ -138,14 +128,11 @@ export function SaveSelectScreen({
     </div>
   )
 
-  // Left→right stage order per variant; the columns rearrange, the DOM index
-  // stays a single ordered list either way.
-  const stageChildren = figureLeft
-    ? [figureCol, railCol, cardsCol]
-    : [cardsCol, railCol, figureCol]
-  const stageCols = figureLeft
-    ? 'lg:[grid-template-columns:minmax(0,32%)_minmax(9rem,auto)_minmax(0,1fr)]'
-    : 'lg:[grid-template-columns:minmax(0,1fr)_minmax(9rem,auto)_minmax(0,32%)]'
+  // Left→right stage order — figure, index, cards. The DOM index stays a
+  // single ordered list; only the visual columns are arranged here.
+  const stageChildren = [figureCol, railCol, cardsCol]
+  const stageCols =
+    'lg:[grid-template-columns:minmax(0,32%)_minmax(9rem,auto)_minmax(0,1fr)]'
 
   return (
     <main

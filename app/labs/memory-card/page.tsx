@@ -18,22 +18,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function MemoryCardLabPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ variant?: string }>
-}) {
-  // Composition variant chosen server-side so the first paint is already correct
-  // (no client flip): `b` selects the alternate layout, anything else falls to `a`.
-  const { variant } = await searchParams
-  const composition = variant === 'b' ? 'b' : 'a'
-
+export default function MemoryCardLabPage() {
   return (
     <GalleryChrome>
       <MemoryCardAudioProvider>
         <GlyphCursor />
         <MemoryCardChrome />
-        <SaveSelectScreen variant={composition} />
+        <SaveSelectScreen />
 
         {/* Plain-HTML fallback so the save data stays crawlable with JS off.
             Non-heading so it never competes with the screen's own <h1>. */}
