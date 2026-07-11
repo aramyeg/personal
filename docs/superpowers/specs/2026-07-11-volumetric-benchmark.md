@@ -179,6 +179,34 @@ holding and dragging swings the desk (0.26/0.5 rad caps), released tilt
 drains back. (3) Raw kraft among painted pieces suppresses the read —
 final C6 verdicts wait for face art.
 
+## C6 rounds 2-3 + course correction (user, 2026-07-11, later)
+
+Round 2: drag-to-tilt VETOED on first touch ("I hate the new drag
+thing") — it collided with the existing swipe-to-turn gesture; REVERTED,
+and the follow-up ruling is final: **NO DEEP TILT, hover parallax only**.
+Round 3 on the open-front rooms: "they aren't open, there is clearly a
+wall right behind it" (unlit interiors rendered as bright as exteriors —
+interior shadow tint shipped in reply) and, decisively: "Nothing changed
+that much, the shapes are still mostly closed from all positions...
+we are starting to drift away from the original pop up book idea. Most
+of the items in a popup book are not just a piece of paper, they have
+dimensions — research what dimensions they usually have."
+
+COURSE CORRECTION ADOPTED: stop iterating box variants; ground the
+vocabulary in the real thing. Research commissioned into the dimensional
+anatomy of commercial pop-up pieces (Carter/Diaz Elements of Pop-Up
+taxonomy, Sabuda/Reinhart multi-piece assembly anatomy, FLOATING LAYERS /
+multi-tier platforms, angle-fold multi-plane assemblies, pull-tab
+mechanics) → its report defines the next mechanism set and revises Part
+B/C acceptance upward ("we need to increase the level of acceptance").
+
+FUTURE PHASE (user-declared, not yet scheduled): INTERACTIVE PAPER —
+pieces the reader DRAGS through cut slits (pull-tabs/sliders), pieces
+that slide into/out of a page, inventory-like takeaway parts. Input must
+be disambiguated against the swipe-to-turn grammar (the drag-tilt
+lesson). RESOURCES UNLOCKED: "we can use all the needed resources",
+including Blender (MCP available) for 3D models of artwork if needed.
+
 ## First composition targets (from the user's review)
 
 - ch3 dispatch counter -> step fold or lidded box (desk front + top).

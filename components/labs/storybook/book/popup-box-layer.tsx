@@ -47,6 +47,12 @@ const CAP_TINT = '#f2ebdc'
 // blob against the painted pieces (capture review 2026-07-11).
 const PAPER_TINT = '#d8c8a4'
 const PAPER_SHADE_TINT = '#c0af88'
+// Interior surfaces sit in deep shadow. The materials are unlit, so
+// without this an open-front room's back wall renders as bright as an
+// exterior face and the opening reads as a solid wall (user, C6 round 2:
+// "they aren't open, there is clearly a wall right behind it") — the
+// darkness IS the hollow.
+const INTERIOR_SHADOW_TINT = '#5f5138'
 // C5 paper physicality: every patch border draws a hairline in the
 // sheet's pale core color — cut edges and scored fold lines both read as
 // lighter lines on a real paper model, and they are what makes a box
@@ -134,7 +140,7 @@ export function BoxPopupLayer({
     const interior = new THREE.MeshBasicMaterial({
       side: THREE.BackSide,
       map: paperTexture,
-      color: PAPER_TINT,
+      color: INTERIOR_SHADOW_TINT,
     })
     return { exterior, interior }
   }, [faces, paperTexture])
