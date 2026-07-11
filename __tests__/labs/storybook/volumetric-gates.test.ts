@@ -2,14 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
 import {
   solveBoxPose,
-  solveLayerPose,
+  solveVFoldPose,
+  solveChildPose,
   type PanelQuad,
   type Vec3,
 } from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  solvePlatformPose,
+  solveFanPose,
+  solveRiderPose,
+  solveDressPose,
+  type PlatformPatch,
+} from '@/components/labs/storybook/book/popup-anatomy'
 
-// Volumetric benchmark gates C2 + C3 (spec 2026-07-11) as numeric floors.
-// Capture review remains the other half of both gates — these assertions
-// keep the geometry from regressing between reviews.
+// Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
+// as numeric floors. Capture review remains the other half of both gates —
+// these assertions keep the geometry from regressing between reviews now
+// that platforms, fans, riders and dress patches share the stage.
 
 // Reading camera (book-scene.tsx): position (0, 2.6, 2.9) looking at
 // (0, 0.32, 0.15); pointer parallax tilts the whole book group by up to
@@ -48,8 +57,62 @@ function tilt(v: Vec3, rx: number, ry: number): Vec3 {
 /** How squarely a face looks at the camera under a given tilt (0 = edge-on). */
 const visibility = (q: PanelQuad, rx = 0, ry = 0): number => -dot(tilt(quadNormal(q), rx, ry), VIEW)
 
+// Every layer's world quads at a given pose — one entry point across all six
+// mechanism families, so the depth histogram sees the whole assembly.
+const seatQuad = (l: SceneLayer & { mech: 'dress' }, layers: readonly SceneLayer[], tL: number, tR: number): PanelQuad => {
+  const parent = layers.find((p) => p.id === l.parentId)!
+  if (parent.mech === 'vfold') {
+    const pose = solveVFoldPose(parent, tL, tR)
+    return l.seat === 'left' ? pose.left : pose.right
+  }
+  if (parent.mech === 'box') return solveBoxPose(parent, tL, tR).find((p) => p.face === l.seat)!.quad
+  if (parent.mech === 'platform') {
+    return solvePlatformPose(parent, tL, tR).find((p: PlatformPatch) => p.face === l.seat)!.quad
+  }
+  throw new Error(`dress ${l.id}: unsupported parent ${parent.mech}`)
+}
+const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR: number): PanelQuad[] => {
+  switch (l.mech) {
+    case 'box':
+      return solveBoxPose(l, tL, tR).map((p) => p.quad)
+    case 'platform':
+      return solvePlatformPose(l, tL, tR).map((p) => p.quad)
+    case 'fan':
+      return solveFanPose(l, tL, tR).flatMap((p) => [p.right, p.left])
+    case 'rider': {
+      const parent = layers.find((p) => p.id === l.parentId) as SceneLayer & { mech: 'box' | 'platform' }
+      const pose = solveRiderPose(l, parent, tL, tR)
+      return [pose.right, pose.left]
+    }
+    case 'dress':
+      return [solveDressPose(l, seatQuad(l, layers, tL, tR))]
+    case 'child': {
+      const parent = layers.find((p) => p.id === l.parentId) as SceneLayer & { mech: 'vfold' }
+      const pose = solveChildPose(l, solveVFoldPose(parent, tL, tR))
+      return [pose.right, pose.left]
+    }
+    case 'vfold': {
+      const pose = solveVFoldPose(l, tL, tR)
+      return [pose.right, pose.left]
+    }
+    default:
+      throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
+  }
+}
+
+// A dependent piece rides another's paper: children ride their parent v-fold,
+// riders their host box/platform, dress patches their seat panel. They may
+// JOIN a plane or form their own, but never BRIDGE two.
+const isDependent = (l: SceneLayer): boolean =>
+  l.mech === 'child' || l.mech === 'rider' || l.mech === 'dress'
+
 const boxes = CHAPTERS.flatMap((c) =>
   c.layers.filter((l): l is SceneLayer & { mech: 'box' } => l.mech === 'box').map(
+    (layer) => [layer.id, layer] as const
+  )
+)
+const platforms = CHAPTERS.flatMap((c) =>
+  c.layers.filter((l): l is SceneLayer & { mech: 'platform' } => l.mech === 'platform').map(
     (layer) => [layer.id, layer] as const
   )
 )
@@ -91,23 +154,25 @@ describe('C2 three-face readability — boxes present real faces to the camera',
           side = Math.max(side, visibility(wall.quad, rx, ry))
     expect(side, 'side face under tilt').toBeGreaterThan(0.02)
   })
+
+  it.each(platforms)('%s: the floating deck presents an upward face to the reader', (_id, layer) => {
+    // The deck's readable top (bisector X at open ~ +Y) must clear the same
+    // front/top cosine floor as a box lid. A BRIDGE deck reads on both
+    // panels; a TERRACE deck's riser faces sideways by design, so its
+    // up-facing tread — the greater-visibility panel — carries the read.
+    const deck = solvePlatformPose(layer, Math.PI, 0).filter(
+      (p) => p.face === 'deckA' || p.face === 'deckB'
+    )
+    const topVis = Math.max(...deck.map((p) => visibility(p.quad)))
+    expect(topVis, 'deck top face').toBeGreaterThan(0.25)
+  })
 })
 
-describe('C3 depth occupancy — pieces spread across distinct depth bands', () => {
+describe('C3v2 depth occupancy — pieces spread across >= 5 depth bands', () => {
   const SEPARATION = 0.12
 
   const centroidOf = (layer: SceneLayer, chapter: (typeof CHAPTERS)[number]): number => {
-    const quads =
-      layer.mech === 'box'
-        ? solveBoxPose(layer, Math.PI, 0).map((p) => p.quad)
-        : (() => {
-            const parent =
-              layer.mech === 'child'
-                ? chapter.layers.find((l) => l.id === layer.parentId)
-                : undefined
-            const pose = solveLayerPose(layer, parent, Math.PI, 0)
-            return [pose.right, pose.left]
-          })()
+    const quads = poseQuads(layer, chapter.layers, Math.PI, 0)
     let zSum = 0
     let aSum = 0
     for (const q of quads) {
@@ -120,13 +185,13 @@ describe('C3 depth occupancy — pieces spread across distinct depth bands', () 
 
   const bandsOf = (chapter: (typeof CHAPTERS)[number]): number => {
     // Independent (page-glued) pieces define the parallax planes via
-    // single-linkage clustering. Children ride their parent's paper, so
-    // they may JOIN a plane or — when they jut clear of everything, like
-    // the ch3 balcony — form their own, but they can never BRIDGE two
-    // planes into one (the ch6 banner sat between the treasury and the
-    // strongbox and chain-merged the whole middle of the spread).
+    // single-linkage clustering. A platform occupies its floating deck as
+    // ONE independent piece; a fan occupies its spine apex like a v-fold.
+    // Dependent pieces (children, riders, dress) ride another's paper — they
+    // may JOIN a plane or, when they jut clear of everything, form their own,
+    // but they can never BRIDGE two planes into one.
     const indep = chapter.layers
-      .filter((l) => l.mech !== 'child')
+      .filter((l) => !isDependent(l))
       .map((l) => centroidOf(l, chapter))
       .sort((a, b) => a - b)
     const bands: Array<{ min: number; max: number }> = []
@@ -137,7 +202,7 @@ describe('C3 depth occupancy — pieces spread across distinct depth bands', () 
     }
     let extra = 0
     for (const layer of chapter.layers) {
-      if (layer.mech !== 'child') continue
+      if (!isDependent(layer)) continue
       const z = centroidOf(layer, chapter)
       const clear = bands.every((b) => z < b.min - SEPARATION || z > b.max + SEPARATION)
       if (clear) extra++
@@ -145,12 +210,11 @@ describe('C3 depth occupancy — pieces spread across distinct depth bands', () 
     return bands.length + extra
   }
 
-  it('every chapter spread meets its depth-band ratchet (target: 4 everywhere)', () => {
-    // Measured 2026-07-11 (box-fold iterations 1-3): 2:4, 3:3, 4:5, 5:4,
-    // 6:4, 7:4. Spread 3 (Chapter II, airy by design) sits at 3 — it
-    // ratchets UP to 4 when the painted ch2-fringe lands (call sheet
-    // v5); every other spread holds its measured floor.
-    const RATCHET: Record<number, number> = { 2: 4, 3: 3, 4: 5, 5: 4, 6: 4, 7: 4 }
+  it('every chapter spread meets its raised depth-band ratchet (target: 5 everywhere)', () => {
+    // Part C v2 raises the floor to 5 for every spread; where a spread
+    // measures higher it ratchets at the measured value. Measured
+    // 2026-07-11 (anatomy recomposition): 2:5, 3:5, 4:7, 5:5, 6:5, 7:5.
+    const RATCHET: Record<number, number> = { 2: 5, 3: 5, 4: 7, 5: 5, 6: 5, 7: 5 }
     for (const chapter of CHAPTERS) {
       expect(bandsOf(chapter), `spread ${chapter.spread} depth bands`).toBeGreaterThanOrEqual(
         RATCHET[chapter.spread]

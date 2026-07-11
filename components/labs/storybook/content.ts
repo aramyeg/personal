@@ -20,7 +20,7 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
 /** Every pop-up piece is a real paper mechanism glued to BOTH pages of its
  *  spread and posed purely by the spread's dihedral angle (see
  *  book/popup-mechanics.ts and the physics benchmark spec). A layer's
- *  geometry fields ARE its die-cut. Four mechanism families give each
+ *  geometry fields ARE its die-cut. Eight mechanism families give each
  *  spread its own construction:
  *   - 'vfold': the spherical four-bar wall/centerpiece; optionally skewed
  *     (asymmetric glue angles — the piece leans) and with an off-center
@@ -36,6 +36,18 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *     the gutter with camera-facing caps, painted side walls, and a flat
  *     lid, gabled roof, or open hollow top. Counters, barns, stalls,
  *     chests. Per-face art: `<id>-front/-back/-side/-top`.
+ *  The anatomy-phase families (Part C v2 — dressed assemblies; solvers in
+ *  book/popup-anatomy.ts):
+ *   - 'platform': a floating deck hinged on two tent-strut ranks — the
+ *     BRIDGE (mirror ranks, one flat tier) or the TERRACE (stepped ranks).
+ *     Art held above the page plane: the single biggest depth win.
+ *   - 'fan': k v-folds sharing one spine apex at nested angles (Birmingham
+ *     M-fold) — many planes from one crease.
+ *   - 'rider': a v-fold whose "pages" are a parent's hinged patch pair —
+ *     a prop standing ON a flat-roofed box or a bridge deck (recursion).
+ *   - 'dress': a non-kinematic die-cut silhouette patch glued flat onto one
+ *     parent panel, riding its link and free to overhang the panel edges
+ *     (the Sabuda recipe) — zero DOF, pure decoration.
  *  Constraints enforced by tests: pieces stand when open, fold exactly
  *  flat when closed, stay inside the closed page ("nothing sticks out"),
  *  never tear or jam, and children keep their glue on the parent's paper.
@@ -96,6 +108,11 @@ export const END_CLOSING_LINE =
 const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
   { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
+  // DRESSED ASSEMBLY (C1v2): the inn is now a v-fold core wearing shaped
+  // silhouette patches — the eaves overhang its roofline off the left
+  // panel, a hanging lamp bracket off the right.
+  { id: 'ch1-inn-eaves', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch1-inn', seat: 'left', u: 0.06, v: 0.62, width: 0.3, height: 0.12 },
+  { id: 'ch1-inn-lamp', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch1-inn', seat: 'right', u: 0.13, v: 0.28, width: 0.08, height: 0.14 },
   { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn', mount: 0.62, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.15 },
   { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: 0.2, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.2, height: 0.26 },
   // VOLUMETRIC: the stable is a gabled OPEN-FRONT barn at the gate — the
@@ -104,6 +121,14 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // reader, hollow interior, back wall as the brace. Sized down and kept
   // forward so the inn's painted story and the signpost stay clear.
   { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.16, z0: 0.42, z1: 0.58, roof: 'gable', gableRise: 0.08, capFront: false },
+  // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
+  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.07, height: 0.12 },
+  { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
+  // FLOATING TIER (C3v2): the inn's coaching-yard deck — a BRIDGE platform,
+  // two mirror strut ranks (equal closed reach, qA===qB) carrying one deck
+  // across the gap between them. Sunk into the back lane between the
+  // backdrop and the inn so it owns a depth band and clears the signpost.
+  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.2, glueR: 0.14, rise: 0.16, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.2, rise: 0.16, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, qA: 0.12, qB: 0.12, deckZ0: -0.3, deckZ1: -0.12 },
   { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.6, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
 ]
 
@@ -121,6 +146,16 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // beehives ARE stacked boxes); keeps the chapter airy but gives it its
   // enclosed volume and a third fold family.
   { id: 'ch2-hive', kind: 'backdrop', role: 'story', mech: 'box', a: 0.09, height: 0.14, z0: 0.34, z1: 0.46, roof: 'flat' },
+  // Dress on the hive: a bee swarm hanging off the lid, flowers at the base.
+  { id: 'ch2-hive-swarm', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-hive', seat: 'lidR', u: 0, v: 0.01, width: 0.16, height: 0.1 },
+  { id: 'ch2-hive-flowers', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-hive', seat: 'wallL', u: 0, v: 0, width: 0.14, height: 0.07 },
+  // FLOATING TIER (C3v2): an alpine meadow shelf — a TERRACE platform (two
+  // strut ranks of DIFFERENT closed reach, qA+qB spanning the gap) so the
+  // deck steps down toward the reader.
+  { id: 'ch2-meadow', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.12, glueR: 0.12, rise: 0.14, spans: [[-0.3, -0.22]] }, strutB: { glueL: 0.1, glueR: 0.1, rise: 0.06, spans: [[-0.1, -0.02]] }, qA: 0.06, qB: 0.06, deckZ0: -0.3, deckZ1: -0.02 },
+  // The long-planned painted meadow fringe up front (call sheet v5): a low
+  // wide reader-edge wall that ratchets the chapter's depth bands.
+  { id: 'ch2-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.56, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.2, height: 0.22 },
 ]
 
 // Chapter III — the rookery: the great tower now carries a dispatch
@@ -138,6 +173,15 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // VOLUMETRIC: the dispatch counter is a lidded flat-top box — a real
   // desk with a painted writing top and a camera-facing front.
   { id: 'ch3-counter', kind: 'backdrop', role: 'story', mech: 'box', a: 0.16, height: 0.2, z0: 0.26, z1: 0.58, roof: 'flat' },
+  // RECURSION (C4v2): a raven standing ON the dispatch counter's lid — a
+  // rider v-fold whose "pages" are the box's lid patch pair.
+  { id: 'ch3-perch-raven', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch3-counter', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.1, height: 0.09 },
+  // Dress on the counter: stacked ledgers overhanging the lid edge, a weigh-scale on the front cap.
+  { id: 'ch3-counter-ledgers', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch3-counter', seat: 'lidR', u: 0.1, v: 0.11, width: 0.12, height: 0.1 },
+  { id: 'ch3-counter-scale', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch3-counter', seat: 'capFrontL', u: 0.04, v: 0.05, width: 0.09, height: 0.1 },
+  // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
+  // the coaching yard but tucked in toward the spine.
+  { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.02, 0.08], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.02, 0.08], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.02, deckZ1: 0.2 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
@@ -155,6 +199,15 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // book's HOLLOW box (open top, no backbone): the reading camera looks
   // straight down into a raw-paper interior (benchmark B16).
   { id: 'ch4-chest', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.12, z0: 0.3, z1: 0.42, roof: 'open' },
+  // Dress on the chest: the propped-open lid silhouette rising off the side
+  // wall, gold heaped across the front cap (patches ride at/above the panel
+  // base — paper cannot overhang below a page-glued edge).
+  { id: 'ch4-chest-lid', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'wallL', u: 0, v: 0.02, width: 0.13, height: 0.14 },
+  { id: 'ch4-chest-spill', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'capFrontR', u: 0, v: 0, width: 0.12, height: 0.09 },
+  // FLOATING TIER (C3v2): the gold-hoard shelf — a BRIDGE platform sunk
+  // into the deep lane behind the dragon (the back of its lair), where the
+  // coin is heaped; owns a depth band and clears the hero's fold.
+  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.13, glueR: 0.09, rise: 0.1, spans: [[-0.39, -0.35], [-0.33, -0.29]] }, strutB: { glueL: 0.09, glueR: 0.13, rise: 0.1, spans: [[-0.39, -0.35], [-0.33, -0.29]] }, qA: 0.08, qB: 0.08, deckZ0: -0.39, deckZ1: -0.29 },
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
@@ -167,7 +220,16 @@ const CH4_LAYERS: readonly SceneLayer[] = [
 const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-city', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.44, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.2, creaseU: 0.58, width: 1.7, height: 0.72 },
   { id: 'ch5-stalls', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: -0.24, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.2, creaseU: 0.62, width: 1.15, height: 0.3 },
+  // ANGLE-FOLD FAN (C4v2): the bazaar's stacked canopies — three v-folds
+  // sharing one spine apex at nested angles (the proven green trio), a
+  // cluster of tent silhouettes fanning up from a single crease. Kept
+  // compact and tucked in the lane between the stall row and the archway
+  // so it owns a depth band without fouling the packed forward scene.
+  { id: 'ch5-canopies', kind: 'midground', role: 'story', mech: 'fan', apexZ: -0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.12, height: 0.1 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.1, height: 0.09 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.08, height: 0.08 }] },
   { id: 'ch5-arch', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
+  // Dress on the arch: a garland swagged high across the right panel, a keystone medallion high-center on the left.
+  { id: 'ch5-arch-garland', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'right', u: 0.05, v: 0.72, width: 0.3, height: 0.1 },
+  { id: 'ch5-arch-keystone', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'left', u: 0.15, v: 0.68, width: 0.1, height: 0.1 },
   { id: 'ch5-lantern', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.54, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.15, height: 0.26 },
   { id: 'ch5-lantern-b', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.66, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.09, height: 0.252 },
   // VOLUMETRIC: the awning tent is reimagined as an OPEN-FRONT market
@@ -176,6 +238,12 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // read). Back wall braces. Sized so the arch's painted opening and the
   // hero walking through it stay clear above it.
   { id: 'ch5-stall', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.15, z0: 0.36, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
+  // Dress on the stall: a scalloped valance hanging off the canopy edge, stacked crates low against the side wall.
+  { id: 'ch5-stall-valance', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch5-stall', seat: 'roofL', u: 0, v: 0.07, width: 0.2, height: 0.07 },
+  { id: 'ch5-stall-crates', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch5-stall', seat: 'wallL', u: 0.04, v: 0, width: 0.12, height: 0.09 },
+  // FLOATING TIER (C3v2): the goods table — a BRIDGE platform spanning the
+  // stall row, its deck the laid-out wares.
+  { id: 'ch5-goods', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, qA: 0.09, qB: 0.09, deckZ0: 0.08, deckZ1: 0.3 },
 ]
 
 // Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —
@@ -185,12 +253,28 @@ const CH5_LAYERS: readonly SceneLayer[] = [
 const CH6_LAYERS: readonly SceneLayer[] = [
   { id: 'ch6-pines', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.4, creaseU: 0.44, width: 1.7, height: 0.69 },
   { id: 'ch6-treasury', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 54, rhoDeg: 80, skewDeg: -2, creaseU: 0.47, width: 0.86, height: 0.91 },
+  // Dress on the treasury: a glass spire overhanging the roofline off the
+  // left panel, climbing vines low across the right — the dressed hero.
+  { id: 'ch6-treasury-spire', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch6-treasury', seat: 'left', u: 0.14, v: 0.75, width: 0.14, height: 0.2 },
+  { id: 'ch6-treasury-vines', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch6-treasury', seat: 'right', u: 0.13, v: 0.02, width: 0.2, height: 0.12 },
   { id: 'ch6-door', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.18, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
   { id: 'ch6-banner', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.66, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.18, height: 0.36 },
   // VOLUMETRIC: a banker's strongbox on the path to the vaults — the
   // chapter's enclosed volume until the treasury itself becomes a box
   // (waiting on the art split). Completes the census: 6/6 chapters.
   { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.1, height: 0.11, z0: 0.38, z1: 0.5, roof: 'flat' },
+  // RECURSION (C4v2): the bank's griffin crest standing ON the strongbox lid.
+  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.44, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08 },
+  // Dress on the strongbox: a wax seal on the front cap, minted coins heaped
+  // at the side-wall base (v=0 — no overhang below the page-glued edge).
+  { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
+  { id: 'ch6-strongbox-coins', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'wallL', u: 0, v: 0, width: 0.12, height: 0.06 },
+  // FLOATING TIER (C3v2): the treasury's glass steps — a TERRACE platform,
+  // strut ranks of different reach so the deck stairs down (qA + qB = the
+  // closed gap: reachA 0.44, reachB 0.26, gap 0.18 = 0.115 + 0.065). Set in
+  // the approach lane behind the treasury so it owns a depth band and
+  // clears the hero's fold.
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.14, glueR: 0.14, rise: 0.16, spans: [[-0.32, -0.24]] }, strutB: { glueL: 0.08, glueR: 0.08, rise: 0.1, spans: [[-0.2, -0.12]] }, qA: 0.115, qB: 0.065, deckZ0: -0.32, deckZ1: -0.12 },
   { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.54, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 
