@@ -190,7 +190,11 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   { id: 'ch6-treasury', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 54, rhoDeg: 80, skewDeg: -2, creaseU: 0.47, width: 0.86, height: 0.91 },
   { id: 'ch6-door', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.18, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
   { id: 'ch6-banner', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.66, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.18, height: 0.36 },
-  { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.5, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
+  // VOLUMETRIC: a banker's strongbox on the path to the vaults — the
+  // chapter's enclosed volume until the treasury itself becomes a box
+  // (waiting on the art split). Completes the census: 6/6 chapters.
+  { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.1, height: 0.11, z0: 0.38, z1: 0.5, roof: 'flat' },
+  { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.54, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [

@@ -791,3 +791,33 @@ SUPERSEDED — do not regenerate those.
 ```
 {STYLE PREAMBLE + same accents} full-bleed printed strip for the pitched canvas roof of a paper market-stall box, edge to edge with NO margin: striped market-awning canvas in terracotta and cream, the stripes running away from a straight ridge line down the exact vertical center of the image, gently scalloped shadow bands suggesting draped fabric. The two halves read as the two slopes of one canopy. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
+
+**Chapter VI — NEW: the banker's strongbox on the path to the vaults (lidded box)**
+
+## ch6-strongbox-front — 1536×1024 · box front
+
+```
+{STYLE PREAMBLE + accents: deep pine #2e5244, glass teal #4fd6b8, twilight violet #8a6fd6, midnight navy #1d2a45} full-bleed printed panel for the front face of a small paper strongbox, edge to edge with NO margin: dark iron-bound northern wood with teal-enameled strap hinges, a round vault-dial ornament placed right of center, faint frost crystals creeping in from the corners. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch6-strongbox-side — 1024×1024 · box side wall
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the side wall of a small paper strongbox, edge to edge with NO margin: iron-bound dark wood with a heavy riveted corner plate, a hanging brass key on a cord, a dusting of snow along the bottom edge. Square composition. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch6-strongbox-top — 1024×1024 · lid seen from above
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the top lid of a small paper strongbox seen straight from above, edge to edge with NO margin: dark wood planks crossed by two teal-enameled iron straps, a fine dusting of snow settled along the strap edges, one small aurora-green reflection — arranged so nothing sits exactly on the vertical centerline. Square composition. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+**Chapter II — NEW cutout (not a box face): a low alpine meadow fringe. This is
+the spread's missing fourth depth plane (C3) — it enters content.ts only when
+this art lands, so the airy chapter never shows a placeholder blob.**
+
+## ch2-fringe — 1536×1024 · standard cutout, center fold, transparent background
+
+```
+{STYLE PREAMBLE + accents: alpine slate blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441} a long LOW paper-cut fringe strip of alpine meadow grass for the front edge of a pop-up scene: tufts of mountain grass and tiny wildflowers in honey gold and slate blue, two or three small stones, one tiny paper bee resting on a flower near the right end; wide and shallow silhouette with a gently varied top edge, solid along the bottom; the composition reads correctly when the strip is later folded along the vertical line at its center. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```

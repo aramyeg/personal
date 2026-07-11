@@ -89,45 +89,61 @@ describe('C2 three-face readability — boxes present real faces to the camera',
 describe('C3 depth occupancy — pieces spread across distinct depth bands', () => {
   const SEPARATION = 0.12
 
-  const bandsOf = (chapter: (typeof CHAPTERS)[number]): number => {
-    const centroids = chapter.layers
-      .map((layer) => {
-        const quads =
-          layer.mech === 'box'
-            ? solveBoxPose(layer, Math.PI, 0).map((p) => p.quad)
-            : (() => {
-                const parent =
-                  layer.mech === 'child'
-                    ? chapter.layers.find((l) => l.id === layer.parentId)
-                    : undefined
-                const pose = solveLayerPose(layer, parent, Math.PI, 0)
-                return [pose.right, pose.left]
-              })()
-        let zSum = 0
-        let aSum = 0
-        for (const q of quads) {
-          const a = quadArea(q)
-          zSum += ((q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4) * a
-          aSum += a
-        }
-        return zSum / aSum
-      })
-      .sort((a, b) => a - b)
-    let bands = 0
-    let lastMax = -Infinity
-    for (const z of centroids) {
-      if (z - lastMax > SEPARATION) bands++
-      lastMax = Math.max(lastMax, z)
+  const centroidOf = (layer: SceneLayer, chapter: (typeof CHAPTERS)[number]): number => {
+    const quads =
+      layer.mech === 'box'
+        ? solveBoxPose(layer, Math.PI, 0).map((p) => p.quad)
+        : (() => {
+            const parent =
+              layer.mech === 'child'
+                ? chapter.layers.find((l) => l.id === layer.parentId)
+                : undefined
+            const pose = solveLayerPose(layer, parent, Math.PI, 0)
+            return [pose.right, pose.left]
+          })()
+    let zSum = 0
+    let aSum = 0
+    for (const q of quads) {
+      const a = quadArea(q)
+      zSum += ((q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4) * a
+      aSum += a
     }
-    return bands
+    return zSum / aSum
+  }
+
+  const bandsOf = (chapter: (typeof CHAPTERS)[number]): number => {
+    // Independent (page-glued) pieces define the parallax planes via
+    // single-linkage clustering. Children ride their parent's paper, so
+    // they may JOIN a plane or — when they jut clear of everything, like
+    // the ch3 balcony — form their own, but they can never BRIDGE two
+    // planes into one (the ch6 banner sat between the treasury and the
+    // strongbox and chain-merged the whole middle of the spread).
+    const indep = chapter.layers
+      .filter((l) => l.mech !== 'child')
+      .map((l) => centroidOf(l, chapter))
+      .sort((a, b) => a - b)
+    const bands: Array<{ min: number; max: number }> = []
+    for (const z of indep) {
+      const last = bands[bands.length - 1]
+      if (!last || z - last.max > SEPARATION) bands.push({ min: z, max: z })
+      else last.max = z
+    }
+    let extra = 0
+    for (const layer of chapter.layers) {
+      if (layer.mech !== 'child') continue
+      const z = centroidOf(layer, chapter)
+      const clear = bands.every((b) => z < b.min - SEPARATION || z > b.max + SEPARATION)
+      if (clear) extra++
+    }
+    return bands.length + extra
   }
 
   it('every chapter spread meets its depth-band ratchet (target: 4 everywhere)', () => {
-    // Measured 2026-07-11 (box-fold iteration 1). Spreads 3 (Chapter II,
-    // airy by design) and 7 (Chapter VI, waits on the treasury box +
-    // founders standee) sit at 3 — they ratchet UP to 4 as those
-    // compositions land; every other spread must never drop below 4.
-    const RATCHET: Record<number, number> = { 2: 4, 3: 3, 4: 4, 5: 4, 6: 4, 7: 3 }
+    // Measured 2026-07-11 (box-fold iterations 1-3): 2:4, 3:3, 4:5, 5:4,
+    // 6:4, 7:4. Spread 3 (Chapter II, airy by design) sits at 3 — it
+    // ratchets UP to 4 when the painted ch2-fringe lands (call sheet
+    // v5); every other spread holds its measured floor.
+    const RATCHET: Record<number, number> = { 2: 4, 3: 3, 4: 5, 5: 4, 6: 4, 7: 4 }
     for (const chapter of CHAPTERS) {
       expect(bandsOf(chapter), `spread ${chapter.spread} depth bands`).toBeGreaterThanOrEqual(
         RATCHET[chapter.spread]

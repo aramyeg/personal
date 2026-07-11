@@ -47,6 +47,11 @@ const CAP_TINT = '#f2ebdc'
 // blob against the painted pieces (capture review 2026-07-11).
 const PAPER_TINT = '#d8c8a4'
 const PAPER_SHADE_TINT = '#c0af88'
+// C5 paper physicality: every patch border draws a hairline in the
+// sheet's pale core color — cut edges and scored fold lines both read as
+// lighter lines on a real paper model, and they are what makes a box
+// read as CONSTRUCTED from sheets rather than extruded.
+const CUT_EDGE_COLOR = '#f6eedb'
 
 /** Which art asset a face prints, and which horizontal half of it. */
 const FACE_ART: Record<BoxFace, { asset: 'front' | 'back' | 'side' | 'top' | null; u0: number; u1: number }> = {
@@ -81,6 +86,16 @@ function makeFaceGeometry(face: BoxFace): THREE.BufferGeometry {
   return geometry
 }
 
+/** Hairline loop around a patch's border (positions shared per frame with
+ *  the face quad) — the cut-edge/scored-crease line of the C5 gate. */
+function makeEdgeGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry()
+  const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
+  positions.setUsage(THREE.DynamicDrawUsage)
+  geometry.setAttribute('position', positions)
+  return geometry
+}
+
 export function BoxPopupLayer({
   layer,
   role,
@@ -101,6 +116,11 @@ export function BoxPopupLayer({
   // The face list is constant per geometry — only the corners move.
   const faces = useMemo(() => solveBoxPose(layer, Math.PI, 0).map((p) => p.face), [layer])
   const geometries = useMemo(() => faces.map((face) => makeFaceGeometry(face)), [faces])
+  const edgeGeometries = useMemo(() => faces.map(() => makeEdgeGeometry()), [faces])
+  const edgeMaterial = useMemo(
+    () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
+    []
+  )
 
   const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
   const materials = useMemo(() => {
@@ -145,13 +165,15 @@ export function BoxPopupLayer({
   useEffect(
     () => () => {
       geometries.forEach((g) => g.dispose())
+      edgeGeometries.forEach((g) => g.dispose())
+      edgeMaterial.dispose()
       materials.exterior.forEach((m) => m.dispose())
       materials.interior.dispose()
       paperTexture.dispose()
       shadowTexture.dispose()
       shadowMaterial.dispose()
     },
-    [geometries, materials, paperTexture, shadowTexture, shadowMaterial]
+    [geometries, edgeGeometries, edgeMaterial, materials, paperTexture, shadowTexture, shadowMaterial]
   )
 
   useFrame(() => {
@@ -169,15 +191,17 @@ export function BoxPopupLayer({
 
     const patches = solveBoxPose(layer, thetaL, thetaR)
     patches.forEach((patch, i) => {
-      const attr = geometries[i].getAttribute('position') as THREE.BufferAttribute
-      const arr = attr.array as Float32Array
-      for (let c = 0; c < 4; c++) {
-        arr[c * 3] = patch.quad[c][0]
-        arr[c * 3 + 1] = patch.quad[c][1]
-        arr[c * 3 + 2] = patch.quad[c][2]
+      for (const geometry of [geometries[i], edgeGeometries[i]]) {
+        const attr = geometry.getAttribute('position') as THREE.BufferAttribute
+        const arr = attr.array as Float32Array
+        for (let c = 0; c < 4; c++) {
+          arr[c * 3] = patch.quad[c][0]
+          arr[c * 3 + 1] = patch.quad[c][1]
+          arr[c * 3 + 2] = patch.quad[c][2]
+        }
+        attr.needsUpdate = true
+        geometry.computeBoundingSphere()
       }
-      attr.needsUpdate = true
-      geometries[i].computeBoundingSphere()
     })
 
     shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.sin(beta / 2) ** 2
@@ -190,6 +214,7 @@ export function BoxPopupLayer({
           <group key={face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
             <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
+            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterial} renderOrder={1} />
           </group>
         ))}
       </group>
