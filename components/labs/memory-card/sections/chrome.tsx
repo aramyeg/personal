@@ -124,7 +124,7 @@ export function MemoryCardChrome({
         <span className="flex items-center gap-x-4">
           <span className="whitespace-nowrap">© {year} aram yeghiazaryan</span>
           <Link
-            href="/labs"
+            href="/"
             data-cursor="triangle"
             className={`whitespace-nowrap transition-colors hover:text-[color:var(--mc-ring)] ${FOCUS_RING}`}
           >

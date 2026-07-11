@@ -28,7 +28,7 @@ test.describe('Style Lab gallery', () => {
 
   test('lab page has a back-to-gallery button', async ({ page }) => {
     await page.goto('/labs/memory-card')
-    const back = page.getByRole('link', { name: /gallery/i })
+    const back = page.getByRole('link', { name: /gallery/i }).first()
     await expect(back).toBeVisible()
     await back.click()
     await expect(page).toHaveURL(/\/$/)
