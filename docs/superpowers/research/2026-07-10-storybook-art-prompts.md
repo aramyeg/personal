@@ -863,8 +863,11 @@ ch3-perch-raven (10:9, a raven perched wings-half-open — it stands ON
 the dispatch counter), ch6-crest (9:8, gilded griffin crest plaque —
 stands on the strongbox).
 
-**FAN MEMBERS**: ch5-canopies-m0 (12:10), -m1 (10:9), -m2 (8:8) —
-striped bazaar awning Vs, each a center-crease sheet, nested trio.
+**FAN MEMBERS** (v6.1 — the showcase moved to the satchel spread; the
+ch5-canopies-m* prompts are DEAD): satchel-burst-m0 (26:26),
+-m1 (40:34), -m2 (50:36) — a golden fan of treasures bursting out of
+the hero's opened satchel: gilded rays, tool silhouettes, coin glints;
+each member a center-crease sheet, nested trio, richest ray outermost.
 
 **FLAT SHEET**: ch2-fringe (120:22) — long meadow-edge fringe strip,
 scalloped top silhouette like ch6-fringe.
