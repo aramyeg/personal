@@ -9,10 +9,15 @@
  *
  * The card is the shipped GLB (`memory-card.glb`, branded front decal baked in),
  * loaded ONCE and `clone(true)`'d per save — clones share geometry + materials,
- * so six of them stay cheap. Each clone wears its save's printed sticker over
- * the blank recess (`lib/label-texture.ts`): projects get the front save-label,
- * system saves get a matching system label. Scene fog the colour of the void
- * melts the far cards into the backdrop for depth.
+ * so six of them stay cheap. On top of that shared base each card is made a
+ * distinct *owned object*: the shell material is cloned and tinted toward the
+ * save's accent (desaturated, era third-party-shell energy — the loader-cache
+ * original is never touched, and the per-card clone is disposed with the card);
+ * deterministic wear (`lib/card-wear.ts`, seeded per save) floats scuffs + a
+ * sticker-residue ghost over the plastic; and the printed sticker picks a
+ * per-save layout variant (`lib/label-texture.ts` `makeSaveSticker` — bank-form,
+ * chat, app-badge for projects; quieter system-form layouts for the rest). Scene
+ * fog the colour of the void melts the far cards into the backdrop for depth.
  *
  * The arc fans the cards left-to-right, receding and cascading down as they
  * fall away from the focused card; x and z both ease toward a saturating
@@ -38,7 +43,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MC } from '../tokens'
 import { grotesk } from '../fonts'
 import { fitToStage } from '../lib/fit-model'
-import { makeFrontSticker, makeSystemSticker } from '../lib/label-texture'
+import { makeSaveSticker } from '../lib/label-texture'
+import { makeShellWearTexture } from '../lib/card-wear'
+import { labelVariantFor, wearSeedFor, wearProfile } from '../lib/save-visuals'
 import type { SaveSlot } from '../save-select/saves'
 
 const SRC = '/labs/memory-card/models/memory-card.glb'
@@ -75,8 +82,54 @@ const RECESS_H = 0.703
 const FRONT_Z = -0.1094
 const CARD_SHADOW_RADIUS = 0.95
 
+/** Wear overlay quad: a hair proud of the shell face (−0.1054) but behind the
+ *  label (−0.1094), sized a touch larger than the recess so scuffs + the
+ *  residue-ghost peek around the sticker onto the bare plastic — and centred on
+ *  the recess so it never rides up over the baked PlayStation wordmark. */
+const WEAR_Z = -0.1076
+const WEAR_W = 1.24
+const WEAR_H = 0.94
+
 /** Short tag printed on each system card's label chip row. */
 const SYSTEM_TAG: Record<string, string> = { bio: 'system', stack: 'log', contact: 'save' }
+
+/**
+ * Tint a card's shell toward its save's accent. The clones share the loader's
+ * `memcard-shell` material, so we clone it per card and recolour the copy — the
+ * original is never mutated. The accent is first pulled 30% toward the shell grey
+ * (desaturated third-party-shell plastic, not toy-bright), then mixed in lightly;
+ * system saves stay greyer (smaller mix) to keep the project trio prominent.
+ * Roughness rides the save's grime so a more-handled card reads a touch more
+ * matte. Returns the cloned material for paired disposal (never the original).
+ */
+function tintShell(
+  clone: THREE.Object3D,
+  accent: string,
+  kind: SaveSlot['kind'],
+  grime: number
+): THREE.MeshStandardMaterial | null {
+  const target = new THREE.Color(accent).lerp(new THREE.Color(MC.shell), 0.3)
+  const mix = kind === 'project' ? 0.16 : 0.07
+  let cloned: THREE.MeshStandardMaterial | null = null
+  clone.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    const mat = mesh.material as THREE.MeshStandardMaterial
+    if (!mat || mat.name !== 'memcard-shell') return
+    if (!cloned) {
+      cloned = mat.clone()
+      cloned.color.lerp(target, mix)
+      cloned.roughness = THREE.MathUtils.clamp(
+        (mat.roughness ?? 0.5) + (grime - 0.55) * 0.4,
+        0.36,
+        0.64
+      )
+      cloned.needsUpdate = true
+    }
+    mesh.material = cloned
+  })
+  return cloned
+}
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
@@ -155,21 +208,18 @@ function SceneFog() {
   return null
 }
 
-/** Build a save's printed front sticker — project label or system label. */
-function stickerFor(save: SaveSlot, titleFont: string): THREE.CanvasTexture {
-  if (save.kind === 'project') {
-    return makeFrontSticker(
-      { slot: save.slot, title: save.label, year: save.project?.year ?? '', accent: save.accent },
-      titleFont
-    )
-  }
-  return makeSystemSticker(
+/** Build a save's printed sticker with its per-save layout variant + wear. */
+function stickerFor(save: SaveSlot, index: number, titleFont: string): THREE.CanvasTexture {
+  const isProject = save.kind === 'project'
+  return makeSaveSticker(
     {
       slot: save.slot,
-      label: save.label,
-      sub: save.sub,
-      tag: SYSTEM_TAG[save.kind] ?? 'data',
+      title: save.label,
+      meta: isProject ? save.project?.year ?? '' : save.sub,
+      tag: isProject ? 'save' : SYSTEM_TAG[save.kind] ?? 'data',
       accent: save.accent,
+      variant: labelVariantFor(save.kind, index),
+      seed: wearSeedFor(save.slot),
     },
     titleFont
   )
@@ -202,13 +252,36 @@ function Card({ save, index, clone, fit, focusRef, reduced, shadowTex }: CardPro
     }
   }, [])
 
+  const invalidate = useThree((s) => s.invalidate)
+
   const titleFont = grotesk.style.fontFamily
   const tex = useMemo(
-    () => stickerFor(save, titleFont),
+    () => stickerFor(save, index, titleFont),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [save.slot, save.kind, save.label, save.sub, save.accent, titleFont, fontsReady]
+    [save.slot, save.kind, save.label, save.sub, save.accent, index, titleFont, fontsReady]
   )
   useEffect(() => () => tex.dispose(), [tex])
+
+  // Per-save wear profile drives the shell roughness, the shell-wear quad, and
+  // (inside the sticker) the paper wear — one deterministic seed, one identity.
+  const profile = useMemo(() => wearProfile(wearSeedFor(save.slot)), [save.slot])
+
+  // Tint the shell toward the accent on a cloned material we own + dispose.
+  const shellMat = useMemo(
+    () => tintShell(clone, save.accent, save.kind, profile.grime),
+    [clone, save.accent, save.kind, profile.grime]
+  )
+  useEffect(() => () => shellMat?.dispose(), [shellMat])
+
+  // Shell-wear overlay: scuffs + residue-ghost floated over the bare plastic.
+  const wearTex = useMemo(() => makeShellWearTexture(profile), [profile])
+  useEffect(() => () => wearTex.dispose(), [wearTex])
+
+  // Demand-loop discipline: a new sticker/tint/wear only shows if we ask for a
+  // repaint (under reduced motion the frameloop is idle until invalidated).
+  useEffect(() => {
+    invalidate()
+  }, [tex, shellMat, wearTex, invalidate])
 
   const applyStatic = (focus: number) => {
     const o = outer.current
@@ -264,6 +337,18 @@ function Card({ save, index, clone, fit, focusRef, reduced, shadowTex }: CardPro
         <group ref={pivot}>
           <group scale={fit.scale} position={fit.offset}>
             <primitive object={clone} />
+            {/* Shell wear sits behind the label so scuffs + residue show on the
+                bare plastic around it; depthWrite off so it never occludes. */}
+            <mesh position={[RECESS_CX, RECESS_CY, WEAR_Z]} rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[WEAR_W, WEAR_H]} />
+              <meshStandardMaterial
+                map={wearTex}
+                roughness={0.72}
+                metalness={0}
+                transparent
+                depthWrite={false}
+              />
+            </mesh>
             <mesh position={[RECESS_CX, RECESS_CY, FRONT_Z]} rotation={[0, Math.PI, 0]}>
               <planeGeometry args={[RECESS_W, RECESS_H]} />
               <meshStandardMaterial map={tex} roughness={0.6} metalness={0} transparent />
