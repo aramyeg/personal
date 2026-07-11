@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
+
+// The screen routes loads through the App Router; mock it so useRouter resolves
+// under vitest and the load URL is observable.
+const push = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, back: vi.fn() }),
+}))
 
 // next/font/google is unavailable under vitest — stub with inert style objects.
 vi.mock('@/components/labs/memory-card/fonts', () => ({
@@ -52,6 +59,31 @@ import { projects } from '@/data/projects'
 const saves = buildSaves(projects)
 
 describe('SaveSelectScreen', () => {
+  beforeEach(() => push.mockClear())
+
+  it('routes to the save panel when the story-band LOAD button fires', () => {
+    render(<SaveSelectScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /load slot 01/i }))
+    expect(push).toHaveBeenCalledWith('/labs/memory-card/save/amio-bank')
+  })
+
+  it('routes to the save panel when the rail activates a project save (Enter)', () => {
+    render(<SaveSelectScreen />)
+    fireEvent.keyDown(screen.getByRole('list', { name: /save files/i }), { key: 'Enter' })
+    expect(push).toHaveBeenCalledWith('/labs/memory-card/save/amio-bank')
+  })
+
+  it('does not route when a system save is activated (no project to load)', () => {
+    render(<SaveSelectScreen />)
+    // Slot 04 is the first system save (system data / bio). Anchor to the rail
+    // row so the story-band's "load slot 04" button doesn't also match. First
+    // click highlights it, second activates it.
+    const railRow = () => screen.getByRole('button', { name: /^slot 04/i })
+    fireEvent.click(railRow())
+    fireEvent.click(railRow())
+    expect(push).not.toHaveBeenCalled()
+  })
+
   it('renders the six saves as a keyboard-navigable index listbox', () => {
     render(<SaveSelectScreen />)
     const list = screen.getByRole('list', { name: /save files/i })

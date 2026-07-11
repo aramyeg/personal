@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MC, GLYPH_ORDER, voidBackdrop, paperAlpha, type GlyphName } from '../tokens'
 import { monoFamily } from '../fonts'
 import { VignetteCanvas } from '../three/stage'
@@ -37,13 +38,14 @@ function glyphForAccent(accent: string): GlyphName {
 }
 
 export type SaveSelectScreenProps = {
-  /** R4 wires this to router.push / dialog state; default no-op ships this alone. */
+  /** Test override for the load action; defaults to routing to the save panel. */
   onLoad?: (save: SaveSlot) => void
   /** Test/SSR override; otherwise detected via effect after mount. */
   reduced?: boolean
 }
 
 export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScreenProps) {
+  const router = useRouter()
   const saves = useMemo(() => buildSaves(projects), [])
 
   const [activeIndex, setActiveIndex] = useState(0)
@@ -58,7 +60,20 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
   const fallbackGlyph = glyphForAccent(activeSave.accent)
 
   const handleHighlight = (index: number) => setActiveIndex(index)
-  const handleActivate = (save: SaveSlot) => onLoad?.(save)
+
+  // Loading a save opens it as a paper panel over this screen. Project saves
+  // route to their intercepting overlay (`/save/[id]`); the three system saves
+  // already tell their whole story in the band below, so activating one is a
+  // no-op. A test-injected `onLoad` overrides the routing to observe the call.
+  const handleActivate = (save: SaveSlot) => {
+    if (onLoad) {
+      onLoad(save)
+      return
+    }
+    if (save.kind === 'project' && save.project) {
+      router.push(`/labs/memory-card/save/${save.project.id}`)
+    }
+  }
 
   // Face the figure toward the cards (inward) so it addresses the arc.
   const figureYaw = 0.55
