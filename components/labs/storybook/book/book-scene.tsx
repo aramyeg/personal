@@ -42,14 +42,11 @@ const CANDLE_DISTANCE = 3.6
 const PARALLAX_TILT_X = 0.07
 const PARALLAX_TILT_Y = 0.11
 const PARALLAX_EASE_RATE = 4
-// DRAG-TO-TILT (user-approved 2026-07-11): hover keeps the subtle
-// parallax; holding the pointer down and dragging tilts the whole desk
-// far enough to peer at the boxes' side walls and into the open-front
-// rooms. Released, the extra tilt eases back to the hover baseline.
-const DRAG_TILT_X = 0.26
-const DRAG_TILT_Y = 0.5
-const DRAG_SENSITIVITY = 1.1 // radians of tilt per full canvas drag
-const DRAG_EASE_RATE = 7
+// DRAG-TO-TILT v1 REVERTED (2026-07-11): a canvas-wide left-drag tilt
+// collided with the existing swipe-to-turn gesture (use-book-input.ts:
+// 60px within 600ms turns the page) — the user vetoed it on first touch.
+// The deep-tilt gesture returns once its input is disambiguated (hold-
+// then-drag, right-button drag, or another pick of his).
 
 /** Desk surface: a baked warm light-pool texture (see makeDeskCanvas) rather
  * than a flat fill, so the near-black desk reads as a lit surface the tome
@@ -90,63 +87,16 @@ function CandleLight() {
   )
 }
 
-/** Eases the wrapped group's tilt toward the pointer position (subtle
- *  hover parallax) plus a drag-accumulated tilt (hold and drag to swing
- *  the desk and look at the paper's sides and into open-front rooms). */
+/** Eases the wrapped group's tilt toward the pointer position, giving the desk a parallax feel. */
 function ParallaxRig({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null)
-  const drag = useRef({ active: false, x: 0, y: 0, lastX: 0, lastY: 0 })
-
-  useEffect(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('canvas')
-    if (!canvas) return
-    canvas.style.cursor = 'grab'
-    const down = (e: PointerEvent) => {
-      if (e.target !== canvas || !e.isPrimary) return
-      drag.current.active = true
-      drag.current.lastX = e.clientX
-      drag.current.lastY = e.clientY
-      canvas.style.cursor = 'grabbing'
-    }
-    const move = (e: PointerEvent) => {
-      const d = drag.current
-      if (!d.active || !e.isPrimary) return
-      d.x += ((e.clientY - d.lastY) / window.innerHeight) * DRAG_SENSITIVITY
-      d.y += ((e.clientX - d.lastX) / window.innerWidth) * DRAG_SENSITIVITY
-      d.x = Math.max(-DRAG_TILT_X, Math.min(DRAG_TILT_X, d.x))
-      d.y = Math.max(-DRAG_TILT_Y, Math.min(DRAG_TILT_Y, d.y))
-      d.lastX = e.clientX
-      d.lastY = e.clientY
-    }
-    const up = () => {
-      drag.current.active = false
-      canvas.style.cursor = 'grab'
-    }
-    canvas.addEventListener('pointerdown', down)
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
-    return () => {
-      canvas.removeEventListener('pointerdown', down)
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
-    }
-  }, [])
 
   useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
-    const d = drag.current
-    // Released drag tilt drains back to the hover baseline.
-    if (!d.active) {
-      const drain = Math.min(1, delta * DRAG_EASE_RATE)
-      d.x -= d.x * drain
-      d.y -= d.y * drain
-    }
-    const ease = Math.min(1, delta * (d.active ? DRAG_EASE_RATE : PARALLAX_EASE_RATE))
-    const targetX = -state.pointer.y * PARALLAX_TILT_X + d.x
-    const targetY = state.pointer.x * PARALLAX_TILT_Y + d.y
+    const ease = Math.min(1, delta * PARALLAX_EASE_RATE)
+    const targetX = -state.pointer.y * PARALLAX_TILT_X
+    const targetY = state.pointer.x * PARALLAX_TILT_Y
     group.rotation.x += (targetX - group.rotation.x) * ease
     group.rotation.y += (targetY - group.rotation.y) * ease
   })
