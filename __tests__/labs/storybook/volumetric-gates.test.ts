@@ -59,10 +59,17 @@ describe('C2 three-face readability — boxes present real faces to the camera',
     const patches = solveBoxPose(layer, Math.PI, 0)
     const face = (name: string) => patches.find((p) => p.face === name)
 
-    // Front face looks at the reading camera (the tent failure mode this
-    // gate exists to prevent: faces that only ever look left/right).
-    const front = face('capFrontL')!
-    expect(visibility(front.quad), 'front face').toBeGreaterThan(0.25)
+    // Front read toward the camera (the tent failure mode this gate
+    // exists to prevent: faces that only ever look left/right). A closed
+    // box presents its painted front cap; an OPEN-FRONT room (the user's
+    // canonical "left wall, right wall and a ceiling") presents its
+    // opening — normal +Z, straight at the reader.
+    const front = face('capFrontL')
+    if (front) {
+      expect(visibility(front.quad), 'front face').toBeGreaterThan(0.25)
+    } else {
+      expect(-dot([0, 0, 1], VIEW), 'open front').toBeGreaterThan(0.25)
+    }
 
     // Top: painted lid / roof slopes read from the high camera; a hollow
     // box instead shows its open interior (opening normal is +Y).

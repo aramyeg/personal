@@ -98,15 +98,12 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
   { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn', mount: 0.62, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.15 },
   { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: 0.2, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.2, height: 0.26 },
-  // VOLUMETRIC: the stable is a gabled box barn in the yard — pitched roof
-  // pair on a floating ridge, camera-facing gable front, painted sides.
-  // Boxes straddle the spine by construction, so it is sized DOWN and kept
-  // forward: dead center in front of the inn, it must not swallow the
-  // inn's painted ground story (capture review 2026-07-11).
-  // ...and pushed forward to the gate (z 0.42-0.58): the camera looks down
-  // the spine, so screen separation between spine-stacked pieces comes
-  // from z-depth — at the wall the barn clears the signpost's sight-line.
-  { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.16, z0: 0.42, z1: 0.58, roof: 'gable', gableRise: 0.08 },
+  // VOLUMETRIC: the stable is a gabled OPEN-FRONT barn at the gate — the
+  // user's canonical pop-up structure ("left wall, right wall and a
+  // ceiling", C6 round-1 verdict 2026-07-11): open front toward the
+  // reader, hollow interior, back wall as the brace. Sized down and kept
+  // forward so the inn's painted story and the signpost stay clear.
+  { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.16, z0: 0.42, z1: 0.58, roof: 'gable', gableRise: 0.08, capFront: false },
   { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.6, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
 ]
 
@@ -173,12 +170,12 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-arch', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
   { id: 'ch5-lantern', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.54, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.15, height: 0.26 },
   { id: 'ch5-lantern-b', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.66, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.09, height: 0.252 },
-  // VOLUMETRIC: the awning tent is reimagined as a gabled market stall —
-  // a boxed stall with a pitched canopy roof and a camera-facing front
-  // (the tent "did not translate the idea"; this is the reply). Sized so
-  // the arch's painted opening and the hero walking through it stay clear
-  // above it (capture review 2026-07-11).
-  { id: 'ch5-stall', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.15, z0: 0.36, z1: 0.58, roof: 'gable', gableRise: 0.075 },
+  // VOLUMETRIC: the awning tent is reimagined as an OPEN-FRONT market
+  // stall — left wall, right wall, canvas canopy, open toward the shopper
+  // (market stalls ARE open-fronted; C6 round-1 made this the canonical
+  // read). Back wall braces. Sized so the arch's painted opening and the
+  // hero walking through it stay clear above it.
+  { id: 'ch5-stall', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.15, z0: 0.36, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
 ]
 
 // Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —
