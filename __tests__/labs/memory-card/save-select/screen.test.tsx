@@ -46,21 +46,8 @@ vi.mock('@/components/labs/memory-card/three/stage', () => ({
   ),
 }))
 vi.mock('@/components/labs/memory-card/three/figure-stage', () => ({
-  FigureSceneContents: ({
-    accent,
-    equip,
-    fit,
-  }: {
-    accent: string
-    equip: boolean
-    fit: number
-  }) => (
-    <div
-      data-testid="figure"
-      data-accent={accent}
-      data-equip={String(equip)}
-      data-fit={String(fit)}
-    />
+  FigureSceneContents: ({ accent, fit }: { accent: string; fit: number }) => (
+    <div data-testid="figure" data-accent={accent} data-fit={String(fit)} />
   ),
 }))
 vi.mock('@/components/labs/memory-card/three/card-arc', () => ({
@@ -150,11 +137,9 @@ describe('SaveSelectScreen', () => {
     )
   })
 
-  it('equips the figure only on the first save and passes its accent', () => {
+  it('passes the active save accent to the figure', () => {
     render(<SaveSelectScreen />)
-    const figure = screen.getByTestId('figure')
-    expect(figure).toHaveAttribute('data-equip', 'true')
-    expect(figure).toHaveAttribute('data-accent', saves[0].accent)
+    expect(screen.getByTestId('figure')).toHaveAttribute('data-accent', saves[0].accent)
   })
 
   it('dresses the figure in the active save fit and re-dresses it on highlight', () => {

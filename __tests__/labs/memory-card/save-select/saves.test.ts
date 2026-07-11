@@ -35,6 +35,20 @@ describe('buildSaves', () => {
     saves.forEach((save) => expect(save.fit).toBe(Number(save.slot)))
   })
 
+  it('cycles fit past FIT_COUNT so a 7th slot wraps back to fit 1', () => {
+    // Four projects + three system slots = seven saves; the 7th must wrap to a
+    // fit that exists on disk (a bare position would ask for a missing char-fit7).
+    const fakeProjects = Array.from({ length: 4 }, (_, i) => ({
+      title: `P${i}`,
+      technologies: ['x', 'y'],
+      year: '2020',
+      metrics: [],
+    })) as unknown as typeof projects
+    const many = buildSaves(fakeProjects)
+    expect(many).toHaveLength(7)
+    expect(many[6].fit).toBe(1)
+  })
+
   it('assigns accentFor(index) to every slot', () => {
     saves.forEach((save, i) => expect(save.accent).toBe(accentFor(i)))
   })

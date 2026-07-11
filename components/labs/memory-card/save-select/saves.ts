@@ -7,6 +7,7 @@
  * without importing each other.
  */
 import { accentFor } from '../tokens'
+import { FIT_COUNT } from '../three/character'
 import type { ExtendedProject } from '@/data/projects'
 
 export type SaveKind = 'project' | 'bio' | 'stack' | 'contact'
@@ -42,6 +43,13 @@ function projectSub(project: ExtendedProject): string {
   return `${project.year} · ${first} · ${second}`.toLowerCase()
 }
 
+/** 1-based fit number for a 0-based slot position, cycling within the fits that
+ *  actually exist on disk — mirrors the accent cycle so an extra save never asks
+ *  for a missing char-fit GLB (which would throw the figure loader sticky). */
+function fitFor(position: number): number {
+  return (position % FIT_COUNT) + 1
+}
+
 /** Projects (data order) as slots 01..N, then the three fixed system slots. */
 export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
   const projectSlots: SaveSlot[] = projects.map((project, i) => ({
@@ -51,7 +59,7 @@ export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
     sub: projectSub(project),
     blocks: project.metrics?.length ?? 0,
     accent: accentFor(i),
-    fit: i + 1,
+    fit: fitFor(i),
     project,
   }))
 
@@ -62,7 +70,7 @@ export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
     sub: system.sub,
     blocks: 0,
     accent: accentFor(projects.length + i),
-    fit: projects.length + i + 1,
+    fit: fitFor(projects.length + i),
   }))
 
   return [...projectSlots, ...systemSlots]

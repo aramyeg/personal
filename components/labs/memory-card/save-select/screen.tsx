@@ -183,7 +183,6 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
             yaw={figureYaw}
             reduced={reduced}
             accent={activeSave.accent}
-            equip={activeIndex === 0}
           />
         </VignetteCanvas>
       </div>

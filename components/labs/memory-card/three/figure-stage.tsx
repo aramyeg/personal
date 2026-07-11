@@ -47,9 +47,6 @@ import { CHARACTER_IDLE_CLIP, FIT_COUNT, fitSrc } from './character'
 /** A second into the idle lands on a natural mid-pose, not the frame-0 A-pose. */
 const REDUCED_POSE_TIME = 0.6
 
-/** Bones a hand-held charm can ride, most-specific first — matched case-insensitively. */
-const HAND_BONE_HINTS = ['righthand', 'hand_r', 'r_hand', 'wrist_r', 'hand', 'wrist']
-
 /** Equip pop: how far the figure squashes at the start of a re-dress, and how
  *  long (seconds) the pop takes to settle back to full scale. */
 const SWAP_DIP = 0.82
@@ -88,19 +85,6 @@ function measureScene(scene: THREE.Object3D): THREE.Box3 {
     }
   })
   return box
-}
-
-/** First bone whose name matches a hand hint, or null if the rig has none. */
-function findHandBone(scene: THREE.Object3D): THREE.Bone | null {
-  let found: THREE.Bone | null = null
-  scene.traverse((o) => {
-    if (found) return
-    const bone = o as THREE.Bone
-    if (!bone.isBone) return
-    const name = bone.name.toLowerCase()
-    if (HAND_BONE_HINTS.some((hint) => name.includes(hint))) found = bone
-  })
-  return found
 }
 
 type AccentRimProps = { accent: string; reduced: boolean }
@@ -232,15 +216,12 @@ type FigureModelProps = {
   fitHeight: number
   yaw: number
   reduced: boolean
-  accent: string
-  equip: boolean
 }
 
-/** Loads + fits the active fit, plays its idle, and clips the accent charm on. */
-function FigureModel({ fit, fitHeight, yaw, reduced, accent, equip }: FigureModelProps): JSX.Element {
+/** Loads + fits the active fit and plays its idle. */
+function FigureModel({ fit, fitHeight, yaw, reduced }: FigureModelProps): JSX.Element {
   const gltf = useLoader(GLTFLoader, fitSrc(fit))
   const invalidate = useThree((s) => s.invalidate)
-  const charmRef = useRef<THREE.Mesh | null>(null)
 
   const mixer = useMemo(
     () => (gltf.animations.length > 0 ? new THREE.AnimationMixer(gltf.scene) : null),
@@ -271,45 +252,6 @@ function FigureModel({ fit, fitHeight, yaw, reduced, accent, equip }: FigureMode
       0
     )
   }, [gltf.scene, fitHeight])
-
-  // Charm: a small accent icosahedron clipped to a hand bone, created once and
-  // reused. Its visibility + colour track the active save; only the designated
-  // save shows it, a selected-accent token in the figure's hand. Recreated when
-  // the fit swaps (new scene, new bone); disposed and unparented on unmount so
-  // the cached GLB is left clean.
-  useEffect(() => {
-    const bone = findHandBone(gltf.scene)
-    if (!bone) return
-    if (!charmRef.current) {
-      const geometry = new THREE.IcosahedronGeometry(0.06, 0)
-      const material = new THREE.MeshStandardMaterial({
-        color: accent,
-        emissive: accent,
-        emissiveIntensity: 0.9,
-        roughness: 0.35,
-        metalness: 0.1,
-      })
-      const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set(0.04, 0.02, 0)
-      charmRef.current = mesh
-      bone.add(mesh)
-    }
-    const charm = charmRef.current
-    charm.visible = equip
-    const mat = charm.material as THREE.MeshStandardMaterial
-    mat.color.set(accent)
-    mat.emissive.set(accent)
-    if (reduced) invalidate()
-    return () => {
-      const held = charmRef.current
-      if (held) {
-        held.parent?.remove(held)
-        held.geometry.dispose()
-        ;(held.material as THREE.Material).dispose()
-        charmRef.current = null
-      }
-    }
-  }, [gltf.scene, accent, equip, reduced, invalidate])
 
   useFrame((_, dt) => {
     if (mixer && !reduced) mixer.update(dt)
@@ -343,7 +285,6 @@ export type FigureStageChildrenProps = {
   yaw: number
   reduced: boolean
   accent: string
-  equip: boolean
   fitHeight?: number
 }
 
@@ -357,7 +298,6 @@ export function FigureSceneContents({
   yaw,
   reduced,
   accent,
-  equip,
   fitHeight = 2.35,
 }: FigureStageChildrenProps): JSX.Element {
   return (
@@ -367,14 +307,7 @@ export function FigureSceneContents({
       <FigureBoundary>
         <SwapPop fit={fit} reduced={reduced}>
           <Suspense fallback={null}>
-            <FigureModel
-              fit={fit}
-              fitHeight={fitHeight}
-              yaw={yaw}
-              reduced={reduced}
-              accent={accent}
-              equip={equip}
-            />
+            <FigureModel fit={fit} fitHeight={fitHeight} yaw={yaw} reduced={reduced} />
           </Suspense>
         </SwapPop>
       </FigureBoundary>
