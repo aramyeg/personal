@@ -7,15 +7,19 @@
  * The arc IS the index (the old strip list is gone); a DOM listbox beside it
  * carries the same saves for keyboard + assistive tech.
  *
- * The card is the shipped GLB (`memory-card.glb`, branded front decal baked in),
- * loaded ONCE and `clone(true)`'d per save — clones share geometry + materials,
- * so six of them stay cheap. Each clone wears its save's printed sticker over the
- * blank recess, and the sticker picks a per-save layout variant
- * (`lib/label-texture.ts` `makeSaveSticker` — bank-form, chat, app-badge for the
- * projects; quieter system-form layouts for the rest) so the fan reads as a
- * collection of distinct owned objects. (Shell tint + physical wear are baked
- * into the Blender asset, not applied at runtime.) Scene fog the colour of the
- * void melts the far cards into the backdrop for depth.
+ * The card is the UV-unwrapped GLB (`memory-card-uv.glb`, branded front decal
+ * baked in, geometry bit-identical to the original `memory-card.glb`), loaded
+ * ONCE and `clone(true)`'d per save — clones share geometry + materials, so six
+ * of them stay cheap. On top of that shared base each card gets its own baked
+ * shell skin: a Blender-baked tint+wear texture pair (color + roughness, one of
+ * per save, `public/labs/memory-card/textures/`) loaded and assigned to a
+ * cloned copy of the shell material — the loader-cache original is never
+ * touched, and the per-card clone is disposed with the card. Each clone also
+ * wears its save's printed sticker over the blank recess, and the sticker picks
+ * a per-save layout variant (`lib/label-texture.ts` `makeSaveSticker` —
+ * bank-form, chat, app-badge for the projects; quieter system-form layouts for
+ * the rest) so the fan reads as a collection of distinct owned objects. Scene
+ * fog the colour of the void melts the far cards into the backdrop for depth.
  *
  * The arc fans the cards left-to-right, receding and cascading down as they
  * fall away from the focused card; x and z both ease toward a saturating
@@ -45,7 +49,8 @@ import { makeSaveSticker } from '../lib/label-texture'
 import { labelVariantFor } from '../lib/save-visuals'
 import type { SaveSlot } from '../save-select/saves'
 
-const SRC = '/labs/memory-card/models/memory-card.glb'
+const SRC = '/labs/memory-card/models/memory-card-uv.glb'
+const TEXTURE_DIR = '/labs/memory-card/textures'
 
 /** Base card height before per-card focus scaling. */
 const FIT_HEIGHT = 1.62
@@ -159,6 +164,47 @@ function SceneFog() {
   return null
 }
 
+/** Baked shell texture pair for a save, in slot order (01..06 on disk). */
+function shellTexturePaths(index: number): { color: string; rough: string } {
+  const n = String(index + 1).padStart(2, '0')
+  return {
+    color: `${TEXTURE_DIR}/shell-${n}-color.webp`,
+    rough: `${TEXTURE_DIR}/shell-${n}-rough.webp`,
+  }
+}
+
+/**
+ * Assign a save's baked shell textures to a cloned copy of the shell material.
+ * The shell mesh's material is identified by the ABSENCE of a base color
+ * map — the decal quad's material carries the branded texture and must never
+ * be touched. The clone starts from the shipped grey `baseColorFactor`
+ * (`memcard-shell`), which would multiply-darken the baked color map, so the
+ * clone's `.color` is reset to white before the map is assigned. Returns the
+ * cloned material for paired disposal (never the shared loader-cache original).
+ */
+function applyShellTextures(
+  clone: THREE.Object3D,
+  colorMap: THREE.Texture,
+  roughMap: THREE.Texture
+): THREE.MeshStandardMaterial | null {
+  let cloned: THREE.MeshStandardMaterial | null = null
+  clone.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    const mat = mesh.material as THREE.MeshStandardMaterial
+    if (!mat || mat.map) return // has a map => the decal material; skip it
+    if (!cloned) {
+      cloned = mat.clone()
+      cloned.color.setHex(0xffffff)
+      cloned.map = colorMap
+      cloned.roughnessMap = roughMap
+      cloned.needsUpdate = true
+    }
+    mesh.material = cloned
+  })
+  return cloned
+}
+
 /** Build a save's printed sticker with its per-save layout variant. */
 function stickerFor(save: SaveSlot, index: number, titleFont: string): THREE.CanvasTexture {
   const isProject = save.kind === 'project'
@@ -209,6 +255,23 @@ function Card({ save, index, clone, fit, focusRef, reduced, shadowTex }: CardPro
     [save.slot, save.kind, save.label, save.sub, save.accent, index, titleFont, fontsReady]
   )
   useEffect(() => () => tex.dispose(), [tex])
+
+  // Baked per-save shell skin. useLoader caches by URL, so each save's pair is
+  // loaded once and shared across StrictMode's double-invoke — only the
+  // material clone below is card-owned and needs disposal.
+  const { color: colorUrl, rough: roughUrl } = shellTexturePaths(index)
+  const [colorMap, roughMap] = useLoader(THREE.TextureLoader, [colorUrl, roughUrl])
+
+  // We own the material clone; the loader-cached textures are never disposed.
+  const shellMat = useMemo(() => {
+    colorMap.colorSpace = THREE.SRGBColorSpace
+    colorMap.flipY = false // glTF UV convention, not the image-space default
+    colorMap.needsUpdate = true
+    roughMap.flipY = false
+    roughMap.needsUpdate = true
+    return applyShellTextures(clone, colorMap, roughMap)
+  }, [clone, colorMap, roughMap])
+  useEffect(() => () => shellMat?.dispose(), [shellMat])
 
   const applyStatic = (focus: number) => {
     const o = outer.current
