@@ -90,12 +90,12 @@ describe('IndexRail', () => {
     expect(select).toHaveBeenCalledTimes(1)
   })
 
-  it('does not play the load sound when activating a system save (nothing loads)', () => {
+  it('plays the load sound when activating a system save (it opens the dialog)', () => {
     const systemIndex = saves.findIndex((s) => s.kind !== 'project')
     const { buttons, onActivate } = setup(systemIndex)
     fireEvent.keyDown(buttons[systemIndex], { key: 'Enter' })
     expect(onActivate).toHaveBeenCalledWith(saves[systemIndex])
-    expect(select).not.toHaveBeenCalled()
+    expect(select).toHaveBeenCalledTimes(1)
   })
 
   it('a click on a non-active row highlights it, never activates', () => {

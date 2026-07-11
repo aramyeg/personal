@@ -409,9 +409,10 @@ export function StoryBand({ save, reduced = false, onLoad }: StoryBandProps) {
   }, [save.slot, reduced, animate])
 
   const onLoadClick = () => {
-    // Only project saves open a panel; system saves already show their story
-    // here, so their LOAD button is a silent no-op.
-    if (save.kind === 'project') audio.select()
+    // Every save now loads something on activation — project saves open their
+    // panel, system saves open their dialog — so the select() sound fires for
+    // all kinds.
+    audio.select()
     onLoad?.(save)
   }
 
@@ -442,7 +443,7 @@ export function StoryBand({ save, reduced = false, onLoad }: StoryBandProps) {
         {save.kind === 'contact' && <ContactStory save={save} />}
       </div>
 
-      {/* LOAD seam — visible affordance, wired to the no-op onLoad until routing lands. */}
+      {/* LOAD seam — project saves route to their panel, system saves open their dialog. */}
       <div className="relative z-10 mt-6 flex items-center gap-4">
         <button
           type="button"

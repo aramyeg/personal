@@ -80,11 +80,11 @@ describe('StoryBand', () => {
     expect(select).toHaveBeenCalledTimes(1)
   })
 
-  it('does not play the load sound when the LOAD button fires on a system save', () => {
+  it('plays the load sound when the LOAD button fires on a system save (it opens a dialog)', () => {
     select.mockClear()
     render(<StoryBand save={bioSave} onLoad={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /load slot/i }))
-    expect(select).not.toHaveBeenCalled()
+    expect(select).toHaveBeenCalledTimes(1)
   })
 
   it('never renders a lead title (claims law)', () => {

@@ -139,10 +139,10 @@ export function IndexRail({ saves, activeIndex, onHighlight, onActivate }: Index
 
   const activate = () => {
     const save = saves[activeIndex]
-    // The load blip is confirmation that something opened — only project saves
-    // load a panel; the system saves already tell their story on highlight, so
-    // activating one is a silent no-op.
-    if (save.kind === 'project') audio.select()
+    // The load blip is confirmation that something opened. Every save now loads
+    // something on activation — project saves route to their panel, system saves
+    // open their dialog — so the select() sound fires for all kinds.
+    audio.select()
     onActivate(save)
   }
 

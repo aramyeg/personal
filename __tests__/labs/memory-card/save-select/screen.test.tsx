@@ -73,15 +73,39 @@ describe('SaveSelectScreen', () => {
     expect(push).toHaveBeenCalledWith('/labs/memory-card/save/amio-bank')
   })
 
-  it('does not route when a system save is activated (no project to load)', () => {
+  it('opens a system dialog (never routes) when a system save is activated', () => {
     render(<SaveSelectScreen />)
     // Slot 04 is the first system save (system data / bio). Anchor to the rail
     // row so the story-band's "load slot 04" button doesn't also match. First
-    // click highlights it, second activates it.
+    // click highlights it, second activates it → the dialog opens over the
+    // still-mounted screen; nothing routes (system saves have no project).
     const railRow = () => screen.getByRole('button', { name: /^slot 04/i })
     fireEvent.click(railRow())
     fireEvent.click(railRow())
     expect(push).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: /system data/i })).toBeInTheDocument()
+  })
+
+  it('closes the system dialog when its close control fires', () => {
+    render(<SaveSelectScreen />)
+    const railRow = () => screen.getByRole('button', { name: /^slot 04/i })
+    fireEvent.click(railRow())
+    fireEvent.click(railRow())
+    expect(screen.getByRole('dialog', { name: /system data/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /close/i }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the three system dialogs in the server markup for crawlers (hidden when closed)', () => {
+    const html = renderToStaticMarkup(<SaveSelectScreen />)
+    // Bio, written-with, and contact content is present but inside hidden
+    // wrappers on first paint, so it ships in the SSR HTML.
+    expect(html).toContain('hidden')
+    // Raw SSR markup escapes apostrophes (I&#x27;ve), so assert an apostrophe-free
+    // slice of the verbatim bio.
+    expect(html).toContain('For the last eight years')
+    expect(html).toContain('the component tree behind every section')
+    expect(html).toContain('save your progress')
   })
 
   it('renders the six saves as a keyboard-navigable index listbox', () => {

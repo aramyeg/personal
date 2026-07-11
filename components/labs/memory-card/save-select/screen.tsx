@@ -18,17 +18,93 @@
  * client paint are byte-identical before reconciling to the real preference.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MC, GLYPH_ORDER, voidBackdrop, paperAlpha, type GlyphName } from '../tokens'
+import { motion } from 'framer-motion'
+import { MC, GLYPH_ORDER, inkAlpha, voidBackdrop, paperAlpha, type GlyphName } from '../tokens'
 import { monoFamily } from '../fonts'
+import { useMemoryCardAudioActions } from '../audio-context'
 import { VignetteCanvas } from '../three/stage'
 import { FigureSceneContents } from '../three/figure-stage'
 import { CardArc } from '../three/card-arc'
+import { PanelShell } from '../panels/panel-shell'
+import { BioPanel } from '../panels/bio-panel'
+import { StackPanel } from '../panels/stack-panel'
+import { ContactPanel } from '../panels/contact-panel'
 import { IndexRail } from './index-rail'
 import { StoryBand } from './story-band'
-import { buildSaves, type SaveSlot } from './saves'
+import { buildSaves, type SaveKind, type SaveSlot } from './saves'
 import { projects } from '@/data/projects'
+
+/** The three system saves that open a dialog rather than routing to a panel. */
+type SystemKind = Exclude<SaveKind, 'project'>
+
+/** Dialog accessible name per system kind (PanelShell's `title`). */
+const DIALOG_TITLE: Record<SystemKind, string> = {
+  bio: 'system data',
+  stack: 'written with',
+  contact: 'save your progress',
+}
+
+/** The content component for a system save, rendered inside PanelShell (or bare
+ *  inside the hidden crawler wrapper when the dialog is closed). */
+function systemDialogContent(save: SaveSlot, onClose: () => void) {
+  switch (save.kind) {
+    case 'bio':
+      return <BioPanel save={save} />
+    case 'stack':
+      return <StackPanel save={save} />
+    case 'contact':
+      return <ContactPanel save={save} onClose={onClose} />
+    default:
+      return null
+  }
+}
+
+/**
+ * One system dialog. Its content stays in the DOM in both states so crawlers
+ * always see it: closed, it renders bare inside a `hidden` wrapper (present in
+ * the server HTML); open, the wrapper shows and the content lifts into a
+ * paper `PanelShell` over an ink scrim — the same overlay language as the
+ * project save panels. PanelShell owns Esc / focus-trap / return-focus while
+ * mounted, so it is mounted only while open (never three at once).
+ */
+function SystemDialogHost({
+  save,
+  open,
+  reduced,
+  onClose,
+}: {
+  save: SaveSlot
+  open: boolean
+  reduced: boolean
+  onClose: () => void
+}) {
+  const content = systemDialogContent(save, onClose)
+  return (
+    <div hidden={!open}>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex lg:items-center lg:justify-center lg:p-6"
+          style={{ background: inkAlpha(0.6), ['--mc-ring' as string]: save.accent }}
+          onClick={onClose}
+          // Panels fade only — no slide/scale — and instant under reduced motion.
+          initial={reduced ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
+        >
+          <div className="w-full lg:max-w-[46rem]">
+            <PanelShell title={DIALOG_TITLE[save.kind as SystemKind]} onClose={onClose}>
+              {content}
+            </PanelShell>
+          </div>
+        </motion.div>
+      ) : (
+        content
+      )}
+    </div>
+  )
+}
 
 const CURSOR = MC.glyphs.triangle
 
@@ -46,9 +122,11 @@ export type SaveSelectScreenProps = {
 
 export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScreenProps) {
   const router = useRouter()
+  const audio = useMemoryCardAudioActions()
   const saves = useMemo(() => buildSaves(projects), [])
 
   const [activeIndex, setActiveIndex] = useState(0)
+  const [openDialog, setOpenDialog] = useState<SystemKind | null>(null)
   const [detectedReduced, setDetectedReduced] = useState(false)
 
   useEffect(() => {
@@ -61,10 +139,18 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
 
   const handleHighlight = (index: number) => setActiveIndex(index)
 
+  // Closing any system dialog fires the back() blip and drops the overlay — the
+  // one place the close sound lives, mirroring the project panel's `close()`.
+  const closeDialog = useCallback(() => {
+    audio.back()
+    setOpenDialog(null)
+  }, [audio])
+
   // Loading a save opens it as a paper panel over this screen. Project saves
   // route to their intercepting overlay (`/save/[id]`); the three system saves
-  // already tell their whole story in the band below, so activating one is a
-  // no-op. A test-injected `onLoad` overrides the routing to observe the call.
+  // open their dialog in place (content already in the DOM for crawlers). The
+  // select() blip is fired by the rail/story-band handlers. A test-injected
+  // `onLoad` overrides both to observe the call.
   const handleActivate = (save: SaveSlot) => {
     if (onLoad) {
       onLoad(save)
@@ -72,8 +158,12 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
     }
     if (save.kind === 'project' && save.project) {
       router.push(`/labs/memory-card/save/${save.project.id}`)
+      return
     }
+    setOpenDialog(save.kind as SystemKind)
   }
+
+  const systemSaves = useMemo(() => saves.filter((save) => save.kind !== 'project'), [saves])
 
   // Face the figure toward the cards (inward) so it addresses the arc.
   const figureYaw = 0.55
@@ -167,6 +257,19 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
           <StoryBand save={activeSave} reduced={reduced} onLoad={handleActivate} />
         </div>
       </div>
+
+      {/* System dialogs — bio / written-with / contact. Content is always in the
+          DOM (hidden when closed) so it ships in the server HTML; activating a
+          system save lifts it into a paper panel over this screen. */}
+      {systemSaves.map((save) => (
+        <SystemDialogHost
+          key={save.kind}
+          save={save}
+          open={openDialog === save.kind}
+          reduced={reduced}
+          onClose={closeDialog}
+        />
+      ))}
     </main>
   )
 }
