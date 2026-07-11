@@ -23,11 +23,12 @@ import { useMemoryCardAudioContext } from '../audio-context'
 
 const RING = MC.glyphs.triangle
 
-/** CC-BY attributions for the lab's 3D assets — both lines are required to
- *  render (license law); lowercase per lab copy law. */
+/** Attributions for the lab's 3D assets — both lines are required to render
+ *  (license law); lowercase per lab copy law. The CRT ships under CC BY 4.0;
+ *  the figure is dressed on a quaternius CC0 character base (courtesy credit). */
 const ATTRIBUTIONS = [
   'crt model by meipal (cc by 4.0)',
-  'character by humans of the world (cc by 4.0)',
+  'character base by quaternius (cc0)',
 ]
 
 const monoLabel: React.CSSProperties = {

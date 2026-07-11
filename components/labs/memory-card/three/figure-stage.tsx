@@ -1,16 +1,22 @@
 'use client'
 
 /**
- * FigureStage — the character half of the select screen. The figure stands on
- * one side of the shared void, posed by its baked idle, and re-lights itself in
- * the highlighted save's accent: an accent rim light rakes the silhouette edge
- * and a short-range accent fill washes the lower body, so choosing a save
- * visibly "equips" the figure in that save's colour — legible even in a still.
- * The fill's falloff distance is capped to the figure canvas's own contact-
- * shadow radius so the glow never reads past the ground shadow it stands in.
- * For one designated save a small accent charm is clipped to a hand bone as
- * proof of the real equipment swap (gear assets land next task); for every
- * other save it is simply hidden.
+ * FigureStage — the character half of the select screen, and the payoff of the
+ * whole lab: choosing a save re-dresses the figure into that save's fit. Each
+ * save owns a fit GLB (a distinct outfit on a shared skeleton, saves.ts maps
+ * slot→fit); the active fit loads, plays its baked idle, and swaps for the next
+ * one when the highlighted save changes. The figure also re-lights itself in the
+ * highlighted save's accent — an accent rim rakes the silhouette edge and a
+ * short-range accent fill washes the lower body — so a choice visibly "equips"
+ * the figure in that save's outfit AND colour, legible even in a still.
+ *
+ * Swap grammar (web-motion-design): a quick "equip pop" — the figure squashes to
+ * a dip and eases back with a slight overshoot (easeOutBack) as the new fit
+ * lands. The accent atmosphere (void backdrop + rim) is the secondary action,
+ * shifting in step. Under reduced motion the swap is instant with no squash and
+ * the idle is sampled to a static mid-pose. The other fits are warmed into the
+ * loader cache once the stage is idle, so a re-dress hits cache (near-instant); a
+ * cold swap degrades to the stage's Suspense fallback.
  *
  * It reuses the shared `VignetteCanvas` rig (IO gating, RoomEnvironment,
  * context-loss recovery) and adds the accent rim + the character as children.
@@ -26,6 +32,7 @@ import {
   Component,
   Suspense,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type JSX,
@@ -35,13 +42,26 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { fitToStage } from '../lib/fit-model'
-import { CHARACTER_SRC, CHARACTER_IDLE_CLIP } from './character'
+import { CHARACTER_IDLE_CLIP, FIT_COUNT, fitSrc } from './character'
 
 /** A second into the idle lands on a natural mid-pose, not the frame-0 A-pose. */
 const REDUCED_POSE_TIME = 0.6
 
 /** Bones a hand-held charm can ride, most-specific first — matched case-insensitively. */
 const HAND_BONE_HINTS = ['righthand', 'hand_r', 'r_hand', 'wrist_r', 'hand', 'wrist']
+
+/** Equip pop: how far the figure squashes at the start of a re-dress, and how
+ *  long (seconds) the pop takes to settle back to full scale. */
+const SWAP_DIP = 0.82
+const SWAP_DURATION = 0.38
+
+/** easeOutBack — settles at exactly 1 after a small overshoot; gives the equip
+ *  pop its snap. Constants are the CSS `back` curve's defaults. */
+const BACK_C1 = 1.70158
+const BACK_C3 = BACK_C1 + 1
+function easeOutBack(x: number): number {
+  return 1 + BACK_C3 * (x - 1) ** 3 + BACK_C1 * (x - 1) ** 2
+}
 
 /** World-space bounds, skinned-mesh-aware (bone matrices settled up front). */
 function measureScene(scene: THREE.Object3D): THREE.Box3 {
@@ -140,7 +160,75 @@ function AccentRim({ accent, reduced }: AccentRimProps) {
   )
 }
 
+/**
+ * Warms the loader cache for every fit shortly after first paint, so a re-dress
+ * hits cache (near-instant). Preloading a fit that is already loaded is a cache
+ * no-op, so the active fit is included and no per-swap bookkeeping is needed.
+ * ~3.5MB total on a lazy timer is acceptable.
+ *
+ * The warm prefers `requestIdleCallback` but MUST carry a `timeout`: the stage's
+ * live frameloop renders every rAF and starves idle callbacks (observed live —
+ * the other fits never warmed and swaps stayed cold), so the timeout guarantees
+ * the warm runs. A plain `setTimeout` is the fallback where rIC is absent.
+ */
+function FitPreloader() {
+  useEffect(() => {
+    const warm = () => {
+      for (let n = 1; n <= FIT_COUNT; n++) useLoader.preload(GLTFLoader, fitSrc(n))
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 1200 })
+      return () => window.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(warm, 1200)
+    return () => window.clearTimeout(t)
+  }, [])
+  return null
+}
+
+/**
+ * The equip pop. On every fit change after the first, the wrapped figure
+ * squashes to `SWAP_DIP` and eases back to full scale with a small overshoot
+ * under the live loop. Under reduced motion it is inert (no squash, instant
+ * swap) — the demand loop wouldn't advance the ease and would freeze it mid-pop.
+ * Sits OUTSIDE the model's Suspense boundary so its frame loop keeps running
+ * through a cold swap's fallback gap.
+ */
+function SwapPop({
+  fit,
+  reduced,
+  children,
+}: {
+  fit: number
+  reduced: boolean
+  children: ReactNode
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const progress = useRef(1) // 1 = settled at full scale
+  const prevFit = useRef(fit)
+
+  // Kick synchronously at commit (before paint) so the new fit never flashes at
+  // full scale for a frame before dipping.
+  useLayoutEffect(() => {
+    if (prevFit.current === fit) return
+    prevFit.current = fit
+    if (reduced) return
+    progress.current = 0
+    groupRef.current?.scale.setScalar(SWAP_DIP)
+  }, [fit, reduced])
+
+  useFrame((_, dt) => {
+    if (reduced || progress.current >= 1) return
+    progress.current = Math.min(1, progress.current + dt / SWAP_DURATION)
+    const s = SWAP_DIP + (1 - SWAP_DIP) * easeOutBack(progress.current)
+    groupRef.current?.scale.setScalar(s)
+  })
+
+  return <group ref={groupRef}>{children}</group>
+}
+
 type FigureModelProps = {
+  fit: number
   fitHeight: number
   yaw: number
   reduced: boolean
@@ -148,9 +236,9 @@ type FigureModelProps = {
   equip: boolean
 }
 
-/** Loads + fits the character, plays its idle, and clips the accent charm on. */
-function FigureModel({ fitHeight, yaw, reduced, accent, equip }: FigureModelProps): JSX.Element {
-  const gltf = useLoader(GLTFLoader, CHARACTER_SRC)
+/** Loads + fits the active fit, plays its idle, and clips the accent charm on. */
+function FigureModel({ fit, fitHeight, yaw, reduced, accent, equip }: FigureModelProps): JSX.Element {
+  const gltf = useLoader(GLTFLoader, fitSrc(fit))
   const invalidate = useThree((s) => s.invalidate)
   const charmRef = useRef<THREE.Mesh | null>(null)
 
@@ -173,7 +261,7 @@ function FigureModel({ fitHeight, yaw, reduced, accent, equip }: FigureModelProp
     }
   }, [mixer, gltf.animations, reduced, invalidate])
 
-  const fit = useMemo(() => {
+  const fitTransform = useMemo(() => {
     const box = measureScene(gltf.scene)
     if (box.isEmpty()) return { scale: 1, offset: [0, 0, 0] as [number, number, number] }
     return fitToStage(
@@ -186,8 +274,9 @@ function FigureModel({ fitHeight, yaw, reduced, accent, equip }: FigureModelProp
 
   // Charm: a small accent icosahedron clipped to a hand bone, created once and
   // reused. Its visibility + colour track the active save; only the designated
-  // save shows it, proving the equipment swap without any gear asset. Disposed
-  // and unparented on unmount so the cached GLB is left clean.
+  // save shows it, a selected-accent token in the figure's hand. Recreated when
+  // the fit swaps (new scene, new bone); disposed and unparented on unmount so
+  // the cached GLB is left clean.
   useEffect(() => {
     const bone = findHandBone(gltf.scene)
     if (!bone) return
@@ -228,7 +317,7 @@ function FigureModel({ fitHeight, yaw, reduced, accent, equip }: FigureModelProp
 
   return (
     <group rotation-y={yaw}>
-      <group scale={fit.scale} position={fit.offset}>
+      <group scale={fitTransform.scale} position={fitTransform.offset}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -250,6 +339,7 @@ class FigureBoundary extends Component<BoundaryProps, BoundaryState> {
 }
 
 export type FigureStageChildrenProps = {
+  fit: number
   yaw: number
   reduced: boolean
   accent: string
@@ -258,10 +348,12 @@ export type FigureStageChildrenProps = {
 }
 
 /**
- * The scene contents for the figure — the accent rim plus the character. Mounted
- * as `VignetteCanvas` children by the screen so the figure shares the stage rig.
+ * The scene contents for the figure — the accent rim plus the character, warmed
+ * by the idle fit preloader. Mounted as `VignetteCanvas` children by the screen
+ * so the figure shares the stage rig.
  */
 export function FigureSceneContents({
+  fit,
   yaw,
   reduced,
   accent,
@@ -271,16 +363,20 @@ export function FigureSceneContents({
   return (
     <>
       <AccentRim accent={accent} reduced={reduced} />
+      <FitPreloader />
       <FigureBoundary>
-        <Suspense fallback={null}>
-          <FigureModel
-            fitHeight={fitHeight}
-            yaw={yaw}
-            reduced={reduced}
-            accent={accent}
-            equip={equip}
-          />
-        </Suspense>
+        <SwapPop fit={fit} reduced={reduced}>
+          <Suspense fallback={null}>
+            <FigureModel
+              fit={fit}
+              fitHeight={fitHeight}
+              yaw={yaw}
+              reduced={reduced}
+              accent={accent}
+              equip={equip}
+            />
+          </Suspense>
+        </SwapPop>
       </FigureBoundary>
     </>
   )

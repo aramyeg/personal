@@ -52,12 +52,17 @@ describe('MemoryCardChrome', () => {
     ).toHaveAttribute('href', '#save-strips')
   })
 
-  it('keeps both CC-BY attribution lines in the credits footer (license law)', () => {
+  it('keeps both asset attribution lines in the credits footer (license law)', () => {
     render(<MemoryCardChrome />)
     expect(screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/character by humans of the world \(cc by 4\.0\)/i)
+      screen.getByText(/character base by quaternius \(cc0\)/i)
     ).toBeInTheDocument()
+  })
+
+  it('no longer credits the retired character asset', () => {
+    render(<MemoryCardChrome />)
+    expect(screen.queryByText(/humans of the world/i)).toBeNull()
   })
 
   // T6 review N2 (routed to Task 10): the toggle used to render aria-disabled

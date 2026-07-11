@@ -46,8 +46,21 @@ vi.mock('@/components/labs/memory-card/three/stage', () => ({
   ),
 }))
 vi.mock('@/components/labs/memory-card/three/figure-stage', () => ({
-  FigureSceneContents: ({ accent, equip }: { accent: string; equip: boolean }) => (
-    <div data-testid="figure" data-accent={accent} data-equip={String(equip)} />
+  FigureSceneContents: ({
+    accent,
+    equip,
+    fit,
+  }: {
+    accent: string
+    equip: boolean
+    fit: number
+  }) => (
+    <div
+      data-testid="figure"
+      data-accent={accent}
+      data-equip={String(equip)}
+      data-fit={String(fit)}
+    />
   ),
 }))
 vi.mock('@/components/labs/memory-card/three/card-arc', () => ({
@@ -144,6 +157,15 @@ describe('SaveSelectScreen', () => {
     expect(figure).toHaveAttribute('data-accent', saves[0].accent)
   })
 
+  it('dresses the figure in the active save fit and re-dresses it on highlight', () => {
+    render(<SaveSelectScreen />)
+    expect(screen.getByTestId('figure')).toHaveAttribute('data-fit', String(saves[0].fit))
+    // One click on a non-active row highlights it — the figure re-dresses into
+    // that save's fit without loading anything.
+    fireEvent.click(screen.getByRole('button', { name: /^slot 03/i }))
+    expect(screen.getByTestId('figure')).toHaveAttribute('data-fit', String(saves[2].fit))
+  })
+
   it('never renders a lead title anywhere on the screen (claims law)', () => {
     const { container } = render(<SaveSelectScreen />)
     expect(container.textContent).not.toMatch(/lead/i)
@@ -157,11 +179,11 @@ describe('SaveSelectScreen', () => {
 })
 
 describe('MemoryCardChrome footer (license law)', () => {
-  it('keeps both CC-BY attribution lines always visible', () => {
+  it('keeps both asset attribution lines always visible', () => {
     render(<MemoryCardChrome />)
     expect(screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/character by humans of the world \(cc by 4\.0\)/i)
+      screen.getByText(/character base by quaternius \(cc0\)/i)
     ).toBeInTheDocument()
   })
 })

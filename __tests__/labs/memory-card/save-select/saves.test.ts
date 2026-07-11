@@ -27,6 +27,14 @@ describe('buildSaves', () => {
     expect(saves.map((s) => s.slot)).toEqual(['01', '02', '03', '04', '05', '06'])
   })
 
+  it('dresses each slot in its positional fit (slot 01→fit 1 … 06→fit 6)', () => {
+    expect(saves.map((s) => s.fit)).toEqual([1, 2, 3, 4, 5, 6])
+  })
+
+  it('keeps every fit in lockstep with its slot number', () => {
+    saves.forEach((save) => expect(save.fit).toBe(Number(save.slot)))
+  })
+
   it('assigns accentFor(index) to every slot', () => {
     saves.forEach((save, i) => expect(save.accent).toBe(accentFor(i)))
   })

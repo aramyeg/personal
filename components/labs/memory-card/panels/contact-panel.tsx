@@ -35,12 +35,13 @@ const ROWS: Row[] = [
   })),
 ]
 
-/** CC-BY attributions for the lab's 3D assets. Both lines are required to render
- *  (license law); lowercase per lab copy law. Plain text — the Sketchfab source
- *  pages aren't linked rather than risk a wrong URL. */
+/** Attributions for the lab's 3D assets. Both lines are required to render
+ *  (license law); lowercase per lab copy law. Plain text — the source pages
+ *  aren't linked rather than risk a wrong URL. The CRT ships under CC BY 4.0;
+ *  the figure is dressed on a quaternius CC0 character base (courtesy credit). */
 const ATTRIBUTIONS = [
   'crt model by meipal (cc by 4.0)',
-  'character by humans of the world (cc by 4.0)',
+  'character base by quaternius (cc0)',
 ]
 
 /**

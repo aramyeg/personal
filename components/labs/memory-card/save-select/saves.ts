@@ -18,6 +18,9 @@ export type SaveSlot = {
   sub: string
   blocks: number
   accent: string
+  /** 1-based fit number (matches the slot position) — the character GLB this
+   *  save re-dresses the figure into on select. See three/character.ts#fitSrc. */
+  fit: number
   project?: ExtendedProject
 }
 
@@ -48,6 +51,7 @@ export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
     sub: projectSub(project),
     blocks: project.metrics?.length ?? 0,
     accent: accentFor(i),
+    fit: i + 1,
     project,
   }))
 
@@ -58,6 +62,7 @@ export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
     sub: system.sub,
     blocks: 0,
     accent: accentFor(projects.length + i),
+    fit: projects.length + i + 1,
   }))
 
   return [...projectSlots, ...systemSlots]

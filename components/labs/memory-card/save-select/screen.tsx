@@ -179,6 +179,7 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
           fallbackGlyph={fallbackGlyph}
         >
           <FigureSceneContents
+            fit={activeSave.fit}
             yaw={figureYaw}
             reduced={reduced}
             accent={activeSave.accent}

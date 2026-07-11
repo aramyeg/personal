@@ -25,10 +25,11 @@ export async function generateMetadata({
   }
 }
 
-/** Both CC-BY asset attributions — required on every standalone save page too. */
+/** Both asset attributions — required on every standalone save page too. The
+ *  CRT ships under CC BY 4.0; the figure rides a quaternius CC0 character base. */
 const ATTRIBUTIONS = [
   'crt model by meipal (cc by 4.0)',
-  'character by humans of the world (cc by 4.0)',
+  'character base by quaternius (cc0)',
 ]
 
 export default async function StandaloneSavePage({
