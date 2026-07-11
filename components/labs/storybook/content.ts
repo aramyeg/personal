@@ -95,7 +95,7 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-backdrop', kind: 'backdrop', mech: 'vfold', apexZ: -0.45, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: 1.5, creaseU: 0.6, width: 1.65, height: 0.94 },
   { id: 'ch2-bee-a', kind: 'hero', mech: 'child', parentId: 'ch2-backdrop', mount: 0.48, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117 },
   { id: 'ch2-bee-b', kind: 'hero', mech: 'child', parentId: 'ch2-backdrop', mount: 0.22, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
-  { id: 'ch2-hero', kind: 'hero', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 78, skewDeg: -4, creaseU: 0.45, width: 0.51, height: 0.89 },
+  { id: 'ch2-hero', kind: 'hero', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
   { id: 'ch2-bee-c', kind: 'hero', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069 },
 ]
 
@@ -138,8 +138,8 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-city', kind: 'backdrop', mech: 'vfold', apexZ: -0.44, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.2, creaseU: 0.58, width: 1.7, height: 0.72 },
   { id: 'ch5-stalls', kind: 'midground', mech: 'vfold', apexZ: -0.24, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.2, creaseU: 0.62, width: 1.15, height: 0.3 },
   { id: 'ch5-arch', kind: 'hero', mech: 'vfold', apexZ: -0.06, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
-  { id: 'ch5-lantern', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.15, height: 0.26 },
-  { id: 'ch5-lantern-b', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.09, height: 0.252 },
+  { id: 'ch5-lantern', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.54, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.15, height: 0.26 },
+  { id: 'ch5-lantern-b', kind: 'hero', mech: 'child', parentId: 'ch5-arch', mount: 0.66, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.09, height: 0.252 },
   { id: 'ch5-awning', kind: 'backdrop', mech: 'parallel', glueL: 0.175, glueR: 0.27, rise: 0.11, z0: 0.28, z1: 0.6 },
 ]
 
@@ -149,9 +149,9 @@ const CH5_LAYERS: readonly SceneLayer[] = [
 // piece leaning with real skew. Low pine fringe up front.
 const CH6_LAYERS: readonly SceneLayer[] = [
   { id: 'ch6-pines', kind: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.4, creaseU: 0.44, width: 1.7, height: 0.69 },
-  { id: 'ch6-treasury', kind: 'hero', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 48, rhoDeg: 76, skewDeg: -3, creaseU: 0.47, width: 0.86, height: 0.91 },
+  { id: 'ch6-treasury', kind: 'hero', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 54, rhoDeg: 80, skewDeg: -2, creaseU: 0.47, width: 0.86, height: 0.91 },
   { id: 'ch6-door', kind: 'midground', mech: 'child', parentId: 'ch6-treasury', mount: 0.18, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
-  { id: 'ch6-banner', kind: 'hero', mech: 'child', parentId: 'ch6-treasury', mount: 0.5, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.18, height: 0.36 },
+  { id: 'ch6-banner', kind: 'hero', mech: 'child', parentId: 'ch6-treasury', mount: 0.66, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.18, height: 0.36 },
   { id: 'ch6-fringe', kind: 'foreground', mech: 'vfold', apexZ: 0.5, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 

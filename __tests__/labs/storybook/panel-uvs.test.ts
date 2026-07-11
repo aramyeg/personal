@@ -1,73 +1,116 @@
 import { describe, expect, it } from 'vitest'
-import { panelUvs } from '@/components/labs/storybook/book/popup-spread'
-import type { SceneLayer } from '@/components/labs/storybook/content'
+import { dieFlipped, panelUvs } from '@/components/labs/storybook/book/popup-spread'
+import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
 
 // Art orientation is this project's recurring bug class (the page prints
-// rendered upside down, then the hanging children did). These tests pin the
-// texture-v convention per mechanism: under three's default flipY, v=1 is
-// the image's TOP row, and the image top must always render at the
-// physically HIGHEST edge of the piece.
-//
-// PanelQuad corner order: [base-inner, base-outer, free-outer, free-inner],
-// where "base" is the glue edge and "free" the die-cut's far edge. For
-// standing pieces the free edge is up; for a HANGING child (vDir -1, glued
-// under its parent's crease) the free edge is the LOWEST — its die is
-// printed rotated 180 degrees, like a fabricator would rotate it before
-// gluing.
+// rendered upside down, then the tents, then whole families of children).
+// The rule under test: a die is printed rotated 180 degrees exactly when
+// its REST-pose v-axis points down-screen from the fixed reading camera —
+// no static vDir/mechanism rule covers all cases (a child of a deep-V
+// parent tips past vertical while the same geometry on a wall stands up).
 
-const vfold: SceneLayer = {
-  id: 't-vfold', kind: 'hero', mech: 'vfold',
-  apexZ: 0, vDir: 1, phiDeg: 52, rhoDeg: 80, creaseU: 0.4, width: 1, height: 1,
+const layersOf = (spread: number) => CHAPTERS.find((c) => c.spread === spread)!.layers
+const byId = (layers: readonly SceneLayer[], id: string) => {
+  const layer = layers.find((l) => l.id === id)!
+  const parent = layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
+  return { layer, parent }
 }
-const standingChild: SceneLayer = {
-  id: 't-up', kind: 'hero', mech: 'child', parentId: 't-vfold',
-  mount: 0.3, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.2, height: 0.2,
-}
-const hangingChild: SceneLayer = { ...standingChild, id: 't-down', vDir: -1 }
 
 const vAt = (uvs: Float32Array, corner: number) => uvs[corner * 2 + 1]
 const uAt = (uvs: Float32Array, corner: number) => uvs[corner * 2]
 
+describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified pieces', () => {
+  it('children of deep-V parents tip past vertical and need the flip', () => {
+    // User-reported upside down 2026-07-11: sign, dormer, lantern (inn and
+    // arch are deep-V parents — child fold elevation lambda > 90deg).
+    for (const [spread, id] of [
+      [2, 'ch1-sign'],
+      [2, 'ch1-dormer'],
+      [6, 'ch5-lantern'],
+      [7, 'ch6-banner'],
+    ] as const) {
+      const { layer, parent } = byId(layersOf(spread), id)
+      expect(dieFlipped(layer, parent), id).toBe(true)
+    }
+  })
+
+  it('hanging children (coins, vault door) need the flip', () => {
+    for (const [spread, id] of [
+      [5, 'ch4-coins'],
+      [7, 'ch6-door'],
+    ] as const) {
+      const { layer, parent } = byId(layersOf(spread), id)
+      expect(dieFlipped(layer, parent), id).toBe(true)
+    }
+  })
+
+  it('children of near-flat wall parents stand upright — no flip', () => {
+    // User-verified upright: bees on the alpine ridge, ravens and the
+    // balcony on the citadel walls.
+    for (const [spread, id] of [
+      [3, 'ch2-bee-a'],
+      [3, 'ch2-bee-b'],
+      [4, 'ch3-balcony'],
+      [4, 'ch3-raven-a'],
+      [4, 'ch3-raven-b'],
+    ] as const) {
+      const { layer, parent } = byId(layersOf(spread), id)
+      expect(dieFlipped(layer, parent), id).toBe(false)
+    }
+  })
+
+  it('page-glued v-folds never flip (standing validity keeps their crease up)', () => {
+    for (const chapter of CHAPTERS) {
+      for (const layer of chapter.layers) {
+        if (layer.mech !== 'vfold') continue
+        expect(dieFlipped(layer, undefined), layer.id).toBe(false)
+      }
+    }
+  })
+})
+
 describe('panelUvs orientation', () => {
+  const { layer: upChild, parent: upParent } = byId(layersOf(3), 'ch2-bee-a')
+
   it('standing pieces put the image top (v=1) on the free edge', () => {
-    for (const layer of [vfold, standingChild]) {
-      for (const side of ['right', 'left'] as const) {
-        const uvs = panelUvs(layer, side)
-        expect(vAt(uvs, 0)).toBe(0) // base corners sample the image bottom
-        expect(vAt(uvs, 1)).toBe(0)
-        expect(vAt(uvs, 2)).toBe(1) // free corners sample the image top
-        expect(vAt(uvs, 3)).toBe(1)
+    for (const side of ['right', 'left'] as const) {
+      const uvs = panelUvs(upChild, side, dieFlipped(upChild, upParent))
+      expect(vAt(uvs, 0)).toBe(0) // base corners sample the image bottom
+      expect(vAt(uvs, 1)).toBe(0)
+      expect(vAt(uvs, 2)).toBe(1) // free corners sample the image top
+      expect(vAt(uvs, 3)).toBe(1)
+    }
+  })
+
+  it('flipped dies rotate 180deg — a true rotation, not a mirror', () => {
+    for (const side of ['right', 'left'] as const) {
+      const up = panelUvs(upChild, side, false)
+      const down = panelUvs(upChild, side, true)
+      for (let corner = 0; corner < 4; corner++) {
+        expect(uAt(down, corner)).toBeCloseTo(1 - uAt(up, corner), 12)
+        expect(vAt(down, corner)).toBeCloseTo(1 - vAt(up, corner), 12)
       }
     }
   })
 
-  it('hanging children (vDir -1) print rotated 180deg: image top at the glue edge', () => {
+  it('parallel strips put the image top (v=1) at z0 — the far, up-screen edge', () => {
+    const { layer: tent } = byId(layersOf(4), 'ch3-counter')
     for (const side of ['right', 'left'] as const) {
-      const uvs = panelUvs(hangingChild, side)
-      expect(vAt(uvs, 0)).toBe(1) // base (mount, physically highest) = image top
-      expect(vAt(uvs, 1)).toBe(1)
-      expect(vAt(uvs, 2)).toBe(0) // free edge (hanging low) = image bottom
-      expect(vAt(uvs, 3)).toBe(0)
+      const uvs = panelUvs(tent, side)
+      // corner order: [...@z0, ...@z1, ...@z1, ...@z0]
+      expect(vAt(uvs, 0)).toBe(1) // z0 corners sample the image top
+      expect(vAt(uvs, 3)).toBe(1)
+      expect(vAt(uvs, 1)).toBe(0) // z1 corners (near the reader) the bottom
+      expect(vAt(uvs, 2)).toBe(0)
     }
   })
 
-  it('the rotation is a true rotation, not a mirror: u flips with v', () => {
-    // Rotating (u,v) -> (1-u, 1-v) must land each panel's crease corners on
-    // the art's fold line and swap the outer edges across it.
-    const up = panelUvs(standingChild, 'right')
-    const down = panelUvs(hangingChild, 'right')
-    for (let corner = 0; corner < 4; corner++) {
-      expect(uAt(down, corner)).toBeCloseTo(1 - uAt(up, corner), 12)
-      expect(vAt(down, corner)).toBeCloseTo(1 - vAt(up, corner), 12)
-    }
-  })
-
-  it('the fold seam stays on the crease corners in both orientations (center-fold children)', () => {
-    for (const layer of [standingChild, hangingChild]) {
+  it('the fold seam stays on the crease/ridge corners in both orientations', () => {
+    for (const flipped of [false, true]) {
       for (const side of ['right', 'left'] as const) {
-        const uvs = panelUvs(layer, side)
-        expect(uAt(uvs, 0)).toBeCloseTo(0.5, 12) // base-inner rides the crease
-        expect(uAt(uvs, 3)).toBeCloseTo(0.5, 12) // free-inner rides the crease
+        const uvs = panelUvs(upChild, side, flipped)
+        expect(uAt(uvs, 0)).toBeCloseTo(0.5, 12) // center-fold child
+        expect(uAt(uvs, 3)).toBeCloseTo(0.5, 12)
       }
     }
   })

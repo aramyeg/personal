@@ -75,29 +75,59 @@ const foldSplit = (layer: SceneLayer): number =>
     ? (layer.glueR + layer.rise) / (layer.glueL + layer.glueR + 2 * layer.rise)
     : (layer.creaseU ?? 0.5)
 
+/** Screen-up direction on the book, derived from the fixed reading camera
+ *  (book-scene.tsx: position (0, 2.6, 2.9) looking at (0, 0.32, 0.15)):
+ *  world up minus its component along the view direction, normalized.
+ *  Re-derive if the camera framing ever changes materially. */
+const SCREEN_UP: readonly [number, number, number] = [0, 0.77, -0.638]
+
+/**
+ * Whether a piece's die must be printed rotated 180 degrees so its art
+ * reads upright from the reading camera. Decided from the REST pose (a
+ * pure function of the layer's geometry): if the piece's v-axis — apex
+ * toward top corners — points DOWN-SCREEN, its art would render on its
+ * head. This is the book's recurring bug class, and no static rule covers
+ * it: children of deep-V parents tip past the vertical (fold elevation
+ * lambda > 90 deg puts sign/lantern/banner v-axes at dot ~ -0.99) while
+ * the same child geometry on a near-flat wall parent stands upright
+ * (bees/ravens/balcony at dot ~ +0.2..0.5); hanging children (coins,
+ * vault door) point at the camera and land at dot ~ -0.3. Rotating is a
+ * real fabricator move — the die turns 180 before gluing; paper cannot be
+ * mirror-printed. Flipped pieces are center-fold only (all shipped ones
+ * are): an off-center creaseU would land the art's painted seam at 1-s
+ * after the rotation.
+ */
+export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): boolean {
+  if (layer.mech === 'parallel') return false // handled in panelUvs' own mapping
+  const rest = solveLayerPose(layer, parent, Math.PI, 0)
+  const v: [number, number, number] = [
+    rest.right[3][0] - rest.right[0][0],
+    rest.right[3][1] - rest.right[0][1],
+    rest.right[3][2] - rest.right[0][2],
+  ]
+  return v[0] * SCREEN_UP[0] + v[1] * SCREEN_UP[1] + v[2] * SCREEN_UP[2] < 0
+}
+
 /** Per-corner uvs (matching PanelQuad order) selecting one panel's share of
  *  the layer's art, split at the fold line so the print continues
  *  seamlessly across it (benchmark B6). V-folds read u across the width
  *  and v up the standing panel; parallel strips read u across the fold and
- *  v along their span. */
-export function panelUvs(layer: SceneLayer, side: 'right' | 'left'): Float32Array {
+ *  v along their span. Under three's default flipY, v=1 is the image TOP —
+ *  and the image top must always land on the piece's up-screen edge. */
+export function panelUvs(layer: SceneLayer, side: 'right' | 'left', flipped = false): Float32Array {
   const s = foldSplit(layer)
   if (layer.mech === 'parallel') {
     // corners: [glue@z0, glue@z1, ridge@z1, ridge@z0] (left) and
-    // [ridge@z0, ridge@z1, glue@z1, glue@z0] (right)
+    // [ridge@z0, ridge@z1, glue@z1, glue@z0] (right). v runs along the
+    // spine span, and the image top (v=1) must sit at z0 — the FAR edge,
+    // up-screen from the reading camera. v=z-order rendered every tent
+    // print upside down (the page-print v-flip bug, third appearance).
     return side === 'left'
-      ? new Float32Array([0, 0, 0, 1, s, 1, s, 0])
-      : new Float32Array([s, 0, s, 1, 1, 1, 1, 0])
+      ? new Float32Array([0, 1, 0, 0, s, 0, s, 1])
+      : new Float32Array([s, 1, s, 0, 1, 0, 1, 1])
   }
-  // corners: [apex, bottom-outer, top-outer, top-inner]. A HANGING child
-  // (vDir -1) extends DOWN its parent's crease — its "top" corners are
-  // physically the lowest — so its die is printed rotated 180 degrees
-  // ((u,v) -> (1-u, 1-v), a rotation, not a mirror: paper can't be
-  // mirror-printed) to read upright, exactly like a real fabricator would
-  // rotate the die before gluing. Hanging children are center-fold only
-  // (all shipped ones are): an off-center creaseU would land the art's
-  // painted seam at 1-s instead of s after the rotation.
-  if (layer.mech === 'child' && layer.vDir === -1) {
+  // corners: [apex, bottom-outer, top-outer, top-inner]
+  if (flipped) {
     return side === 'left'
       ? new Float32Array([1 - s, 1, 1, 1, 1, 0, 1 - s, 0])
       : new Float32Array([1 - s, 1, 0, 1, 0, 0, 1 - s, 0])
@@ -172,13 +202,13 @@ function PopupLayer({
   const rightMeshRef = useRef<THREE.Mesh>(null)
   const leftMeshRef = useRef<THREE.Mesh>(null)
 
-  const geometries = useMemo(
-    () => ({
-      right: makePanelGeometry(panelUvs(layer, 'right')),
-      left: makePanelGeometry(panelUvs(layer, 'left')),
-    }),
-    [layer]
-  )
+  const geometries = useMemo(() => {
+    const flipped = dieFlipped(layer, parent)
+    return {
+      right: makePanelGeometry(panelUvs(layer, 'right', flipped)),
+      left: makePanelGeometry(panelUvs(layer, 'left', flipped)),
+    }
+  }, [layer, parent])
 
   // Unlit print materials — the artwork carries its own light, like ink on
   // paper; scene lights set the mood around the book, not on the print. One
