@@ -138,8 +138,12 @@ export function IndexRail({ saves, activeIndex, onHighlight, onActivate }: Index
   }
 
   const activate = () => {
-    audio.select()
-    onActivate(saves[activeIndex])
+    const save = saves[activeIndex]
+    // The load blip is confirmation that something opened — only project saves
+    // load a panel; the system saves already tell their story on highlight, so
+    // activating one is a silent no-op.
+    if (save.kind === 'project') audio.select()
+    onActivate(save)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLOListElement>) => {

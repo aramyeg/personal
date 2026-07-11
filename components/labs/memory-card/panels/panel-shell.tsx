@@ -42,6 +42,12 @@ export function PanelShell({ title, onClose, children }: PanelShellProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
+  // Latest onClose, read by the mount-once window listener below.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
   // Focus the close button on mount; return focus to the launching control
   // (the rail item / LOAD button that was focused when navigation fired) on
   // unmount.
@@ -53,15 +59,31 @@ export function PanelShell({ title, onClose, children }: PanelShellProps) {
     }
   }, [])
 
+  // Own Escape at the window level for as long as the overlay is mounted. The
+  // dialog's onKeyDown below only sees keys while focus is INSIDE it, but a
+  // click on non-interactive panel content (a paragraph, a metric, the CRT)
+  // blurs focus to <body> — Escape from there must still close the panel, never
+  // fall through to GalleryChrome's window listener (which would leave the whole
+  // lab). Capture phase + stopPropagation so that listener never runs;
+  // preventDefault as a belt-and-suspenders for its `defaultPrevented` bail.
+  useEffect(() => {
+    const controller = new AbortController()
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        e.stopPropagation()
+        onCloseRef.current()
+      },
+      { capture: true, signal: controller.signal }
+    )
+    return () => controller.abort()
+  }, [])
+
   const onKeyDown = (e: React.KeyboardEvent) => {
-    // The overlay owns Esc while open — close and stop the event so the
-    // GalleryChrome window listener beneath it never navigates to /labs.
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      e.stopPropagation()
-      onClose()
-      return
-    }
+    // Tab-trap only — Escape is owned by the window listener above so it works
+    // regardless of where focus currently sits.
     if (e.key !== 'Tab') return
 
     const items = focusables(dialogRef.current)

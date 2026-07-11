@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('@/components/labs/memory-card/fonts', () => ({
   anton: { className: 'anton', style: { fontFamily: 'Anton' } },
@@ -7,10 +7,13 @@ vi.mock('@/components/labs/memory-card/fonts', () => ({
   monoFamily: 'monospace',
 }))
 
+// The LOAD button fires the select() blip from its own handler — capture it so
+// we can assert it only sounds for saves that actually load.
+const select = vi.fn()
 vi.mock('@/components/labs/memory-card/audio-context', () => ({
   useMemoryCardAudioActions: () => ({
     blip: vi.fn(),
-    select: vi.fn(),
+    select,
     back: vi.fn(),
     toggleSound: vi.fn(),
     boot: () => false,
@@ -68,6 +71,20 @@ describe('StoryBand', () => {
     const email = screen.getByRole('link', { name: /aramyeg96@gmail.com/i })
     expect(email).toHaveAttribute('href', 'mailto:aramyeg96@gmail.com')
     expect(screen.getByRole('link', { name: /github\.com/i })).toBeInTheDocument()
+  })
+
+  it('plays the load sound when the LOAD button fires on a project save', () => {
+    select.mockClear()
+    render(<StoryBand save={projectSave} onLoad={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /load slot 01/i }))
+    expect(select).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not play the load sound when the LOAD button fires on a system save', () => {
+    select.mockClear()
+    render(<StoryBand save={bioSave} onLoad={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /load slot/i }))
+    expect(select).not.toHaveBeenCalled()
   })
 
   it('never renders a lead title (claims law)', () => {

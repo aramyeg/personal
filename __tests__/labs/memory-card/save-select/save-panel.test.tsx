@@ -95,9 +95,12 @@ describe('SavePanel', () => {
     expect(lines).toContain(linked.technologies[0].toUpperCase())
   })
 
-  it('never renders a lead title (claims law)', () => {
-    const { container } = render(<SavePanel project={linked} />)
-    expect(container.textContent).not.toMatch(/lead/i)
+  it('never renders a lead title for any project (claims law)', () => {
+    for (const project of projects) {
+      const { container, unmount } = render(<SavePanel project={project} />)
+      expect(container.textContent).not.toMatch(/lead/i)
+      unmount()
+    }
   })
 
   it('promotes the title to an h1 in standalone mode', () => {
@@ -151,6 +154,29 @@ describe('PanelShell', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(parentKeyDown).not.toHaveBeenCalled()
+  })
+
+  it('owns Escape even after focus leaves the dialog to <body> (no leak to a window listener)', () => {
+    const onClose = vi.fn()
+    // Mirrors GalleryChrome's window-level Escape→/labs listener (bubble phase).
+    const galleryLikeWindowListener = vi.fn()
+    window.addEventListener('keydown', galleryLikeWindowListener)
+    try {
+      render(
+        <PanelShell title="t" onClose={onClose}>
+          <button type="button">x</button>
+        </PanelShell>
+      )
+      // A click on non-interactive panel content blurs focus to <body>; Escape
+      // from there must still close the panel and never reach the window listener.
+      const evt = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      document.body.dispatchEvent(evt)
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(galleryLikeWindowListener).not.toHaveBeenCalled()
+      expect(evt.defaultPrevented).toBe(true)
+    } finally {
+      window.removeEventListener('keydown', galleryLikeWindowListener)
+    }
   })
 
   it('the close button calls onClose', () => {

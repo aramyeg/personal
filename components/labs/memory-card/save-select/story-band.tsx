@@ -409,7 +409,9 @@ export function StoryBand({ save, reduced = false, onLoad }: StoryBandProps) {
   }, [save.slot, reduced, animate])
 
   const onLoadClick = () => {
-    audio.select()
+    // Only project saves open a panel; system saves already show their story
+    // here, so their LOAD button is a silent no-op.
+    if (save.kind === 'project') audio.select()
     onLoad?.(save)
   }
 
