@@ -261,6 +261,48 @@ verdict from the user per spread. The physics benchmark (A1-A11,
 B1-B13) remains a hard floor. The box-era composition targets below
 are SUPERSEDED by this section.
 
+## C6 round 4 (user, 2026-07-12, on the anatomy-phase deck)
+
+"Overall I can see the improvements, but we still have a lot that should
+be done" — direction holds, bar rises. Verbatim asks, mapped to
+workstreams:
+
+A. CRISP TURN (defects first): "there is still some flashing on the
+   right page when a page is turned"; "no visual fold, or dimension
+   between the pages, suggesting there was something folded between the
+   page" — gutter must read as a real valley holding folded paper
+   (fold seam, gutter shadow, slight gape/bulge implying content).
+B. PAPER REALISM: "papers should behave very realistic, the creases,
+   folds, animation of it folding and unfolding, the rougher paper
+   feel" — crease/scored-fold rendering on every piece, rougher stock
+   feel, fold/unfold nuance (visual cues only — the pure-f(theta)
+   covenant stands; realism comes through shading and print, never
+   springs).
+C. PAGE DIE-CUTS: "some cut places on the pages which reveal box type
+   cutouts which would have to be made from cutting" — pages show the
+   VOIDS their pop-ups were cut from: die-cut windows in the page print
+   at piece footprints, darkened reveal beneath.
+D. COMPOSITION SPREAD: "some chapters have too many items in front of
+   one another, instead of being spread throughout the book" — pieces
+   cluster in the spine column (every mechanism is gutter-anchored);
+   redistribute across the page area: leans/off-center creases pushed
+   harder, children mounted toward panel outer edges, mechanisms on
+   mechanism creases as off-spine rails, the 3 occluded platforms and
+   the miniature ch5 fan re-placed (fan showcase belongs where there is
+   room — CH2 or the title spread).
+E. INTERACTIVE PAPER (now scheduled, was "future"): "the idea with
+   moving pieces and some 2 dimensional pieces that will slide in and
+   out of the book are also not made" — pull-tabs/sliders (independent
+   scalar input s, orthogonal to theta per the anatomy research),
+   pieces sliding out of page slits, inventory takeaways. HARD
+   CONSTRAINT: input must be disambiguated from swipe-to-turn (the
+   drag-tilt lesson) — explicit grab handles on visible tabs, never a
+   canvas-wide gesture.
+
+Execution order: A (defects) -> D (composition) -> B/C (realism passes)
+-> E (new input channel). Each lands with derive/tests where mechanisms
+are involved, captures for his verdict every round.
+
 ## First composition targets (from the user's review)
 
 - ch3 dispatch counter -> step fold or lidded box (desk front + top).
