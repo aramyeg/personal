@@ -207,6 +207,60 @@ be disambiguated against the swipe-to-turn grammar (the drag-tilt
 lesson). RESOURCES UNLOCKED: "we can use all the needed resources",
 including Blender (MCP available) for 3D models of artwork if needed.
 
+## Part C v2 — raised acceptance (2026-07-11, post-anatomy research)
+
+Research basis: docs/superpowers/research/2026-07-11-popup-anatomy.md.
+Its core finding inverts the box-era premise: real pop-up "dimensions"
+do NOT come from enclosed volumes. They come from ASSEMBLY ANATOMY —
+a few kinematic primitives combined in parallel/series, carrying MANY
+decoratively-shaped non-kinematic patches ("links may be curved,
+partially cut away, extended beyond their joints" — Winder on Sabuda),
+stacked in floating tiers, silhouettes staggered in depth with
+inter-tier shadows. A closed box is rare in real books; a dressed open
+assembly is the norm.
+
+Vocabulary to add (build order):
+
+1. FLOATING PLATFORM — identical struts sharing one closed form, a
+   rigid plate spanning the strut tops, ONE art piece spanning the gap
+   between tiers; tiers stack (2-3 typical). The single biggest visual
+   win per the research.
+2. ANGLE-FOLD FAN — k >= 2 v-folds sharing one spine apex with
+   distinct angles (Birmingham M-fold: 6 planes / 9 gullies from one
+   sheet).
+3. RECURSION — a local-dihedral utility phi_child(theta) between any
+   parent patch pair, so existing solvers mount ON mechanisms (Ruiz
+   placement rules + non-intersection guards).
+4. DRESSED ASSEMBLIES — kinematic core + decorative die-cut silhouette
+   patches riding the links; the actual Sabuda recipe; every hero
+   recomposed this way (call sheet v6 follows the geometry).
+
+Raised gates (supersede C1-C4; C5 gains a cue; C6 unchanged):
+
+C1v2. ANATOMY CENSUS — every story-role piece is a dressed assembly
+      (kinematic core + >= 2 shaped dress patches riding its links) or
+      a multi-tier platform. A bare primitive — v-fold, tent, OR BOX —
+      in a story role fails CI. Boxes are demoted exactly as tents were.
+C2v2. SILHOUETTE READABILITY — story pieces read by shaped outline
+      (concave die-cuts, not rectangles) and tier-stagger from the
+      reading camera; the three-face box check remains only for
+      surviving boxes.
+C3v2. DEPTH OCCUPANCY RAISED — >= 5 depth bands per spread AND >= 1
+      floating tier (art held above the page plane by struts).
+C4v2. FOLD VOCABULARY RAISED — >= 4 mechanism families per spread from
+      {v-fold family, box family, platform, fan, recursive child}.
+C5v2. C5 + INTER-TIER SHADOWS — tiers cast soft shadow on the tier
+      below (the research's top visual cue for stacked paper).
+C6.   Unchanged — the user's blind "photo of a real paper diorama?"
+      verdict per spread, judged against this raised bar.
+
+Definition of done for the phase: platform + fan + recursion prove
+A12-A15 in their derive scripts before any capture, every hero
+recomposed as a dressed assembly, C1v2-C5v2 green in CI/captures, C6
+verdict from the user per spread. The physics benchmark (A1-A11,
+B1-B13) remains a hard floor. The box-era composition targets below
+are SUPERSEDED by this section.
+
 ## First composition targets (from the user's review)
 
 - ch3 dispatch counter -> step fold or lidded box (desk front + top).
