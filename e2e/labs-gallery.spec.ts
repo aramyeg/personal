@@ -2,16 +2,16 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Style Lab gallery', () => {
   test('list view shows every lab with a working link', async ({ page }) => {
-    await page.goto('/labs?view=list')
+    await page.goto('/?view=list')
     const memoryCard = page.getByRole('link', { name: /Memory Card/ })
     await expect(memoryCard).toBeVisible()
     await memoryCard.click()
     await expect(page).toHaveURL(/\/labs\/memory-card/)
   })
 
-  test('desktop /labs mounts the 3D museum canvas', async ({ page, isMobile }) => {
+  test('desktop / mounts the 3D museum canvas', async ({ page, isMobile }) => {
     test.skip(isMobile, '3D is desktop-default only')
-    await page.goto('/labs')
+    await page.goto('/')
     const hasWebGL = await page.evaluate(
       () => !!document.createElement('canvas').getContext('webgl2')
     )
@@ -20,10 +20,10 @@ test.describe('Style Lab gallery', () => {
     await expect(page.getByRole('link', { name: /list view/i })).toBeVisible()
   })
 
-  test('Escape inside a lab returns to the gallery', async ({ page }) => {
+  test('Escape inside a lab returns to the museum', async ({ page }) => {
     await page.goto('/labs/memory-card')
     await page.keyboard.press('Escape')
-    await expect(page).toHaveURL(/\/labs$/, { timeout: 10000 })
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
   })
 
   test('lab page has a back-to-gallery button', async ({ page }) => {
@@ -31,6 +31,6 @@ test.describe('Style Lab gallery', () => {
     const back = page.getByRole('link', { name: /gallery/i })
     await expect(back).toBeVisible()
     await back.click()
-    await expect(page).toHaveURL(/\/labs$/)
+    await expect(page).toHaveURL(/\/$/)
   })
 })

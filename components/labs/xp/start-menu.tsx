@@ -31,7 +31,7 @@ export function StartMenu() {
 
   const turnOff = () => {
     playSound('shutdown')
-    router.push('/labs')
+    router.push('/')
   }
   const restart = () => {
     window.sessionStorage.removeItem('xp-booted')

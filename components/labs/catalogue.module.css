@@ -1,0 +1,233 @@
+/* The museum's printed program. Palette translated from the WebGL hall:
+   wine fabric #5a2028 (darkened for page use), brass #b08d3f → #d6b968,
+   cream #efe8da, aged paper #d8cdb4 with ink #3a2d16 for the attic. */
+
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(214, 185, 104, 0.08), transparent),
+    linear-gradient(180deg, #2a1016, #1e0b10 40%, #180a0d);
+  color: #efe8da;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.inner {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 6rem;
+}
+
+/* --- masthead ------------------------------------------------------------ */
+
+.masthead {
+  text-align: center;
+  padding-bottom: 2.75rem;
+  margin-bottom: 3rem;
+  border-bottom: 1px solid rgba(176, 141, 63, 0.4);
+}
+
+.eyebrow {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #d6b968;
+}
+
+.name {
+  margin-top: 1rem;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #f5eede;
+}
+
+.role {
+  margin-top: 0.4rem;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: #cfc5b2;
+}
+
+.intro {
+  margin: 1.25rem auto 0;
+  max-width: 34rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: rgba(239, 232, 218, 0.75);
+}
+
+.mastheadLinks {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+}
+
+.mastheadLinks a {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #d6b968;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(214, 185, 104, 0.35);
+  padding-bottom: 2px;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.mastheadLinks a:hover {
+  color: #f0d998;
+  border-color: #f0d998;
+}
+
+.enterSlot {
+  margin-top: 1.75rem;
+}
+
+.enterSlot button {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #1e0b10;
+  background: linear-gradient(180deg, #d6b968, #b08d3f);
+  border: 1px solid #8a6a24;
+  border-radius: 999px;
+  padding: 0.7rem 1.6rem;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+
+.enterSlot button:hover {
+  filter: brightness(1.1);
+}
+
+/* --- catalogue grid ------------------------------------------------------ */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem 2rem;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.frame {
+  display: block;
+  padding: 10px;
+  background: linear-gradient(160deg, #b08d3f, #8a6a24 55%, #d6b968);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 200, 0.35),
+    0 14px 30px rgba(0, 0, 0, 0.45);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+}
+
+.card:hover .frame {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 200, 0.5),
+    0 20px 40px rgba(0, 0, 0, 0.55);
+}
+
+.placard {
+  display: block;
+  margin: 1rem auto 0;
+  max-width: 26rem;
+  padding: 0.8rem 1.1rem 0.9rem;
+  text-align: center;
+  background: linear-gradient(135deg, #b08d3f, #d6b968 50%, #a5813a);
+  border: 1px solid rgba(60, 40, 0, 0.55);
+  border-radius: 2px;
+  color: #2c1f08;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.placardTitle {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.placardDate {
+  display: block;
+  margin-top: 0.15rem;
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.placardWip {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: 1px solid rgba(60, 40, 0, 0.45);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+.placardThesis {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* --- attic --------------------------------------------------------------- */
+
+.attic {
+  margin-top: 4.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px dashed rgba(185, 179, 166, 0.35);
+}
+
+.atticHeading {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: #b9b3a6;
+}
+
+.atticSub {
+  margin: 0.5rem 0 2rem;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: rgba(185, 179, 166, 0.8);
+}
+
+.retrospective {
+  display: block;
+  margin: 0.9rem auto 0;
+  max-width: 26rem;
+  padding: 0.8rem 1rem;
+  background: #d8cdb4;
+  border: 1px solid rgba(58, 45, 22, 0.4);
+  color: #3a2d16;
+  font-style: italic;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}

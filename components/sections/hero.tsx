@@ -6,7 +6,7 @@ import { siteConfig } from '@/lib/constants'
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6">
+    <section id="hero" className="relative min-h-screen flex flex-col items-center justify-center px-6">
       {/* Avatar renders immediately; idle motion lives inside PixelAvatar */}
       <div className="relative mb-8">
         <PixelAvatar />

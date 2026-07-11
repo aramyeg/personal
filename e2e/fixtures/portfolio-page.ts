@@ -30,7 +30,7 @@ export class PortfolioPage {
   }
 
   async goto() {
-    await this.page.goto('/');
+    await this.page.goto('/classic-claude');
     await this.page.waitForLoadState('networkidle');
   }
 
