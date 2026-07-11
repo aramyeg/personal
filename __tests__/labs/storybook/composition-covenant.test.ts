@@ -60,6 +60,15 @@ const BOX_FACES: ReadonlySet<string> = new Set([
 ])
 const PLATFORM_FACES: ReadonlySet<string> = new Set(['deckA', 'deckB', 'strutL', 'strutR'])
 
+// Seats whose bottom (v=0) edge is glued or hinged to a PAGE — v-fold glue
+// lines, box wall bases, and box cap hinges. A dress patch overhanging BELOW
+// such an edge (v < 0) swings outside the dihedral wedge as the book closes
+// (A10 wedge containment) — impossible paper. Overhang is legal only past a
+// FREE edge (a top or side away from the pages), so on these seats v >= 0.
+const PAGE_GLUED_BOTTOM_SEATS: ReadonlySet<string> = new Set([
+  'left', 'right', 'wallL', 'wallR', 'capFrontL', 'capFrontR', 'capBackL', 'capBackR',
+])
+
 describe('composition covenant v2 — dressed assemblies by default (gate C1v2)', () => {
   it('C1v2 ANATOMY CENSUS: every story piece is a platform, a fan, or a dressed core', () => {
     for (const [name, layers] of ALL_SETS) {
@@ -216,6 +225,13 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
           legal.has(l.seat),
           `${name} ${l.id} seat '${l.seat}' is not legal for a ${parent.mech} parent`
         ).toBe(true)
+        // no overhang below a page-glued edge (would exit the wedge on close)
+        if (PAGE_GLUED_BOTTOM_SEATS.has(l.seat)) {
+          expect(
+            l.v,
+            `${name} ${l.id} overhangs below a page-glued edge (A10 wedge)`
+          ).toBeGreaterThanOrEqual(0)
+        }
         // dress is decorative scenery, never a story piece on its own
         expect(l.role).toBe('scenery')
         // each patch stays within the die-cut bound (overhang allowed, sprawl not)
