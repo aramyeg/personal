@@ -38,11 +38,22 @@
  * outputs are byte-identical before React has any chance to disagree with
  * itself, in both reduced modes.
  *
- * The boot recording (`bootMusic()` / `stopBoot()` in `audio.ts`) is a 17s
- * file; only its opening SCE swell is ever heard because `stopBoot()` pauses
- * the shared element the instant the beat ends, whether that's the timer
- * firing or a skip — no manual gain ramp, the recording's own decay in those
- * opening seconds already reads as a fade once it's cut.
+ * The boot recording (`audio.ts`) is a 17s file; only its opening SCE swell
+ * is ever heard. The two ways the beat ends have deliberately different
+ * audio behavior: the timer firing naturally calls `fadeOutBoot()` (a short
+ * ~400ms ramp down, then pause) so the recording doesn't cut off mid-swell;
+ * a skip (keydown/pointerdown) calls `stopBoot()` instead — an instant
+ * pause, matching "any skip cuts both visual and audio instantly." The
+ * visual overlay itself is removed immediately in both cases — only the
+ * audio tail differs.
+ *
+ * Escape is special-cased on the skip path: the overlay owns Escape while
+ * it's showing (`preventDefault` + `stopPropagation`, capture phase — the
+ * same "dialog owns Esc while open" contract `PanelShell` uses), so
+ * `GalleryChrome`'s bubble-phase Escape-to-`/labs` listener never sees it.
+ * Without this, pressing the single most natural "skip this" key ejects the
+ * visitor straight out of the lab instead of revealing the screen — and
+ * silently spends the session's one boot beat on the way out.
  */
 
 import { useEffect, useState } from 'react'
@@ -93,16 +104,29 @@ export function BootBeat() {
     actions.boot()
 
     const controller = new AbortController()
-    const finish = () => {
-      actions.stopBoot()
+    // Shared teardown for both end paths — only the audio call differs.
+    const endBeat = (endAudio: () => void) => {
+      endAudio()
       writeSessionBooted()
       setVisible(false)
       clearTimeout(timer)
       controller.abort()
     }
-    const timer = setTimeout(finish, BEAT_DURATION_MS)
-    window.addEventListener('keydown', finish, { capture: true, signal: controller.signal })
-    window.addEventListener('pointerdown', finish, { capture: true, signal: controller.signal })
+    // Natural end: the timer ran out, nobody skipped — fade the recording out.
+    const onTimerEnd = () => endBeat(actions.fadeOutBoot)
+    // Skip: any keydown or pointerdown — instant cut, both visual and audio.
+    // Escape additionally owns the event (dialog-owns-Esc contract) so
+    // GalleryChrome's bubble-phase Escape-to-/labs listener never fires.
+    const onSkip = (e: KeyboardEvent | PointerEvent) => {
+      if (e instanceof KeyboardEvent && e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      endBeat(actions.stopBoot)
+    }
+    const timer = setTimeout(onTimerEnd, BEAT_DURATION_MS)
+    window.addEventListener('keydown', onSkip, { capture: true, signal: controller.signal })
+    window.addEventListener('pointerdown', onSkip, { capture: true, signal: controller.signal })
 
     return () => {
       clearTimeout(timer)

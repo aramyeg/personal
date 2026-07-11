@@ -391,6 +391,90 @@ describe('createPS1Audio', () => {
     })
   })
 
+  describe('fadeOutBoot()', () => {
+    let play: ReturnType<typeof vi.fn>
+    let pause: ReturnType<typeof vi.fn>
+    let audioCtor: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      play = vi.fn().mockResolvedValue(undefined)
+      pause = vi.fn()
+      audioCtor = vi.fn(function (this: { src: string }, src: string) {
+        this.src = src
+      })
+      audioCtor.prototype.play = play
+      audioCtor.prototype.pause = pause
+      audioCtor.prototype.volume = 1
+      audioCtor.prototype.currentTime = 0
+      vi.stubGlobal('Audio', audioCtor)
+      Object.defineProperty(window.navigator, 'userActivation', {
+        value: { hasBeenActive: true, isActive: true },
+        configurable: true,
+      })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      Reflect.deleteProperty(window.navigator, 'userActivation')
+    })
+
+    it('is a no-op when bootMusic() was never called', () => {
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      expect(() => audio.fadeOutBoot()).not.toThrow()
+      expect(pause).not.toHaveBeenCalled()
+    })
+
+    it('ramps volume down below 0.1 before the ~400ms mark, then pauses and resets position + volume', () => {
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+      audio.bootMusic()
+      const instance = audioCtor.mock.instances[0] as unknown as {
+        volume: number
+        currentTime: number
+      }
+      instance.currentTime = 5
+
+      audio.fadeOutBoot()
+      expect(instance.volume).toBe(0.6) // unchanged synchronously — the ramp is timer-driven
+
+      // Listen check: partway through the ramp, volume has audibly dropped
+      // near silence but playback hasn't been cut yet.
+      vi.advanceTimersByTime(350)
+      expect(instance.volume).toBeLessThan(0.1)
+      expect(pause).not.toHaveBeenCalled()
+
+      // The ramp's final tick pauses and resets — ready for the next boot.
+      vi.advanceTimersByTime(50)
+      expect(pause).toHaveBeenCalledTimes(1)
+      expect(instance.currentTime).toBe(0)
+      expect(instance.volume).toBe(0.6)
+    })
+
+    it('a skip mid-fade (stopBoot) cancels the ramp and cuts immediately instead of riding it out', () => {
+      const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)
+      audio.setEnabled(true)
+      audio.bootMusic()
+      const instance = audioCtor.mock.instances[0] as unknown as {
+        volume: number
+        currentTime: number
+      }
+
+      audio.fadeOutBoot()
+      vi.advanceTimersByTime(150) // partway through — a few steps in, not done
+      expect(pause).not.toHaveBeenCalled()
+
+      audio.stopBoot()
+      expect(pause).toHaveBeenCalledTimes(1)
+      expect(instance.volume).toBe(0.6)
+      expect(instance.currentTime).toBe(0)
+
+      // The cancelled ramp's remaining ticks must never fire a second pause.
+      vi.advanceTimersByTime(1000)
+      expect(pause).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('setRoomTone()', () => {
     it('does nothing while disabled, even after resume()', () => {
       const audio = createPS1Audio(ctxFactory as unknown as () => AudioContext)

@@ -34,10 +34,17 @@ export type PS1Audio = {
    *  whether playback actually started; callers that latch a "played once"
    *  flag must key it off this, not off having merely called the function. */
   bootMusic(): boolean
-  /** Pauses the boot recording and resets it to the start — the one way to
-   *  cut it short, used both when the boot beat's own timer ends and when a
-   *  visitor skips it. No-ops if it was never started. */
+  /** Pauses the boot recording and resets it to the start — an instant cut,
+   *  used when a visitor skips the boot beat. Also cancels an in-flight
+   *  `fadeOutBoot()` ramp, resetting volume back to its normal level, so a
+   *  skip landing mid-fade still cuts immediately rather than finishing the
+   *  ramp. No-ops if it was never started. */
   stopBoot(): void
+  /** Ramps the boot recording's volume down to silence over ~400ms, then
+   *  pauses and resets it (start position, normal volume) — the boot beat's
+   *  own timer end, never its skip path (that's `stopBoot()`, instant).
+   *  No-ops if it was never started or is already paused. */
+  fadeOutBoot(): void
   /** Filtered brown-noise loop at -40dB, 400Hz lowpass. */
   setRoomTone(on: boolean): void
   /** Master gate — also persists the preference to localStorage. */
@@ -47,10 +54,13 @@ export type PS1Audio = {
 }
 
 /** The original PS1 BIOS boot recording — a 17s capture; only its opening
- *  swell is ever heard since `stopBoot()` cuts it when the boot beat ends
- *  (see `boot.tsx`). */
+ *  swell is ever heard since `fadeOutBoot()`/`stopBoot()` cut it when the
+ *  boot beat ends (see `boot.tsx`). */
 const BOOT_MUSIC_SRC = '/labs/memory-card/sounds/ps1-boot.mp3'
 const BOOT_MUSIC_VOLUME = 0.6
+/** `fadeOutBoot()`'s ramp — ~400ms in even steps, timer-end only. */
+const BOOT_FADE_MS = 400
+const BOOT_FADE_STEPS = 8
 const ROOM_TONE_LOWPASS_HZ = 400
 const ROOM_TONE_LOOP_SECONDS = 2
 
@@ -138,6 +148,10 @@ export function createPS1Audio(
   /** Sticky — set by the element's `onerror`, so a failed asset never keeps
    *  retrying a doomed `play()` on every subsequent boot. */
   let bootAudioFailed = false
+  /** The in-flight `fadeOutBoot()` ramp's interval id, if one is running —
+   *  `stopBoot()` cancels it so a skip landing mid-fade still cuts instantly
+   *  instead of riding the ramp out. */
+  let bootFadeHandle: ReturnType<typeof setInterval> | null = null
 
   function resume(): void {
     if (!ctx) ctx = ctxFactory()
@@ -215,13 +229,14 @@ export function createPS1Audio(
    */
   function bootMusic(): boolean {
     if (!isEnabled || bootAudioFailed || !hasStickyUserActivation()) return false
+    cancelBootFade()
     if (!bootAudio) {
       bootAudio = new Audio(BOOT_MUSIC_SRC)
-      bootAudio.volume = BOOT_MUSIC_VOLUME
       bootAudio.onerror = () => {
         bootAudioFailed = true
       }
     }
+    bootAudio.volume = BOOT_MUSIC_VOLUME
     bootAudio.currentTime = 0
     void bootAudio.play().catch(() => {
       // Autoplay block or a mid-flight decode error — the gate above already
@@ -231,10 +246,39 @@ export function createPS1Audio(
     return true
   }
 
+  function cancelBootFade(): void {
+    if (bootFadeHandle === null) return
+    clearInterval(bootFadeHandle)
+    bootFadeHandle = null
+  }
+
   function stopBoot(): void {
+    cancelBootFade()
     if (!bootAudio) return
     bootAudio.pause()
     bootAudio.currentTime = 0
+    bootAudio.volume = BOOT_MUSIC_VOLUME
+  }
+
+  function fadeOutBoot(): void {
+    if (!bootAudio || bootAudio.paused || bootFadeHandle !== null) return
+    const startVolume = bootAudio.volume
+    let step = 0
+    bootFadeHandle = setInterval(() => {
+      step += 1
+      if (!bootAudio) {
+        cancelBootFade()
+        return
+      }
+      if (step >= BOOT_FADE_STEPS) {
+        cancelBootFade()
+        bootAudio.pause()
+        bootAudio.currentTime = 0
+        bootAudio.volume = BOOT_MUSIC_VOLUME
+        return
+      }
+      bootAudio.volume = Math.max(0, startVolume * (1 - step / BOOT_FADE_STEPS))
+    }, BOOT_FADE_MS / BOOT_FADE_STEPS)
   }
 
   function setRoomTone(on: boolean): void {
@@ -292,6 +336,7 @@ export function createPS1Audio(
     back,
     bootMusic,
     stopBoot,
+    fadeOutBoot,
     setRoomTone,
     setEnabled,
     enabled,
@@ -309,6 +354,7 @@ const NOOP_AUDIO: PS1Audio = {
   back() {},
   bootMusic: () => false,
   stopBoot() {},
+  fadeOutBoot() {},
   setRoomTone() {},
   setEnabled() {},
   enabled: () => false,

@@ -17,7 +17,7 @@
  *
  * Two contexts, not one, split on churn: `soundOn` flips on every toggle
  * click, but the call sites (`blip`/`select`/`back`/`boot`/`stopBoot`/
- * `toggleSound`) don't need to change identity when it does — `audio` is
+ * `fadeOutBoot`/`toggleSound`) don't need to change identity when it does — `audio` is
  * stable once built, and `toggleSound` is a `useCallback` keyed only on
  * `audio`. Consumers that only fire sounds (`BootBeat`'s one-shot boot on
  * mount, work's hover/flip handlers, contact's copy button) read
@@ -45,9 +45,11 @@ export type MemoryCardAudioActions = {
   back: () => void
   /** Plays the PS1 boot recording — outcome-aware, see `audio.ts#bootMusic`. */
   boot: () => boolean
-  /** Cuts the boot recording short — `BootBeat`'s own timer end and its skip
-   *  handler both call this so the beat's audio and visual always end together. */
+  /** Cuts the boot recording instantly — `BootBeat`'s skip path (keydown/pointerdown). */
   stopBoot: () => void
+  /** Ramps the boot recording out over ~400ms then pauses it — `BootBeat`'s own
+   *  timer-end path only; skip stays instant via `stopBoot`. */
+  fadeOutBoot: () => void
 }
 
 export type MemoryCardAudioContextValue = MemoryCardAudioActions & {
@@ -65,6 +67,7 @@ const DEFAULT_ACTIONS: MemoryCardAudioActions = {
   back: noop,
   boot: () => false,
   stopBoot: noop,
+  fadeOutBoot: noop,
 }
 
 const MemoryCardAudioActionsContext = createContext<MemoryCardAudioActions>(DEFAULT_ACTIONS)
@@ -121,6 +124,7 @@ export function MemoryCardAudioProvider({ children }: { children: ReactNode }) {
       back: audio.back,
       boot: audio.bootMusic,
       stopBoot: audio.stopBoot,
+      fadeOutBoot: audio.fadeOutBoot,
     }),
     [audio, toggleSound]
   )
