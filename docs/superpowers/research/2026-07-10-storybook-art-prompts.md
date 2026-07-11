@@ -821,3 +821,56 @@ this art lands, so the airy chapter never shows a placeholder blob.**
 ```
 {STYLE PREAMBLE + accents: alpine slate blue #7d9bb5, chalet timber #8a5a3b, honey gold #d9a441} a long LOW paper-cut fringe strip of alpine meadow grass for the front edge of a pop-up scene: tufts of mountain grass and tiny wildflowers in honey gold and slate blue, two or three small stones, one tiny paper bee resting on a flower near the right end; wide and shallow silhouette with a gently varied top edge, solid along the bottom; the composition reads correctly when the strip is later folded along the vertical line at its center. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
+
+---
+
+## v6 addendum — anatomy phase (platforms, fan, riders, dress patches)
+
+House style unchanged (storybook gouache, warm paper, no text in art).
+All assets manifest-gated as before. Two NEW asset shapes:
+
+**DECK paintings** (`<id>-deck`): ONE image spanning the whole deck,
+crease running VERTICALLY at the u-split given below (paint continuous
+across it — it's a fold, not a border). Image TOP = the far edge (away
+from the reader). These are viewed from above at an angle — paint
+top-down scenes.
+
+| asset | aspect (w:h) | crease u | scene |
+|---|---|---|---|
+| ch1-yard-deck | 24:18 | 0.50 | cobbled coaching-yard: well, barrels, hens |
+| ch2-meadow-deck | 12:28 | 0.50 | alpine flower shelf: gentians, clover drifts |
+| ch3-sorting-deck | 20:18 | 0.50 | dispatch sorting table: letters, twine, wax |
+| ch4-hoard-deck | 16:10 | 0.50 | coin drifts and a spilled goblet |
+| ch5-goods-deck | 18:22 | 0.50 | market wares: bolts of cloth, spice bowls |
+| ch6-steps-deck | 18:20 | 0.64 | glass treasury steps, aurora reflections |
+
+**DIE-CUT DRESS PATCHES** (transparent PNG, alpha IS the die-cut — the
+silhouette edge is the artwork; nothing rectangular): ch1-inn-eaves
+(carved eave board 30:12), ch1-inn-lamp (hanging lantern 8:14),
+ch1-stable-vane (weathervane cockerel 7:12), ch1-stable-hay (hay pile
+14:8), ch2-hive-swarm (bee swarm arc 16:10), ch2-hive-flowers (clover
+clump 14:7), ch3-counter-ledgers (leaning ledger stack 12:10),
+ch3-counter-scale (brass balance 9:10), ch4-chest-lid (propped-open lid
+13:14), ch4-chest-spill (coin spill 12:9), ch5-arch-garland (pennant
+garland 30:10), ch5-arch-keystone (carved keystone 10:10),
+ch5-stall-valance (scalloped valance 20:7), ch5-stall-crates (fruit
+crates 12:9), ch6-treasury-spire (glass spire finial 14:20),
+ch6-treasury-vines (frosted vine base 20:12), ch6-strongbox-seal (wax
+bank seal 7:7), ch6-strongbox-coins (coin scatter 12:6).
+
+**RIDERS** (standard center-crease standee sheets like figures):
+ch3-perch-raven (10:9, a raven perched wings-half-open — it stands ON
+the dispatch counter), ch6-crest (9:8, gilded griffin crest plaque —
+stands on the strongbox).
+
+**FAN MEMBERS**: ch5-canopies-m0 (12:10), -m1 (10:9), -m2 (8:8) —
+striped bazaar awning Vs, each a center-crease sheet, nested trio.
+
+**FLAT SHEET**: ch2-fringe (120:22) — long meadow-edge fringe strip,
+scalloped top silhouette like ch6-fringe.
+
+Still open from v5 (unchanged): box face sets for stable (-side/-top),
+hive/counter/strongbox (-front/-back/-side/-top), chest (-front/-back/
+-side), stall (-side/-top). The v5 'treasury/inn/arch box conversion'
+line is DEAD: under the v2 anatomy bar they stay dressed v-fold heroes —
+their existing paintings stand, no regen needed.
