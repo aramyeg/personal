@@ -12,8 +12,8 @@
  *    picks a per-save *layout variant* (bank-form / chat / app-badge for the
  *    three projects; quieter system-form layouts for the system saves) so the
  *    fan reads as a collection of distinct owned objects. Every variant speaks
- *    the same paper/ink/token language — only the composition changes — and each
- *    carries deterministic paper wear (see `card-wear.ts`) so no two feel new.
+ *    the same paper/ink/token language — only the composition changes. (Shell
+ *    tint + physical wear are owned by the Blender asset pipeline, not here.)
  *
  * The drawing space matches the recess aspect (measured 1.117 × 0.703 world =
  * 1.589:1) so the sticker maps 1:1 onto its float quad without distortion. All
@@ -22,9 +22,9 @@
  */
 
 import * as THREE from 'three'
-import { MC, STICKER_PAPER, inkAlpha, paperAlpha, withAlpha } from '../tokens'
+import { MC, STICKER_PAPER, inkAlpha, withAlpha } from '../tokens'
 import { monoFamily } from '../fonts'
-import { wearProfile, type WearProfile, type SaveLabelVariant } from './save-visuals'
+import type { SaveLabelVariant } from './save-visuals'
 
 const STICKER_W = 768
 const STICKER_H = 483
@@ -275,8 +275,6 @@ export type SaveLabelSpec = {
   tag: string
   accent: string
   variant: SaveLabelVariant
-  /** Deterministic wear seed (from the slot id). */
-  seed: number
 }
 
 /** Title in grotesk caps; returns the y baseline after the last line. */
@@ -501,69 +499,9 @@ const PAINTERS: Record<
 }
 
 /**
- * Deterministic paper wear painted over the finished label: an inset grime
- * vignette, a lifted-corner curl (shadow + highlight sliver), and — where the
- * profile marks it — a faint light scuff streak. Kept low-alpha so the label
- * stays fully readable at fan scale; it reads as handling, not damage.
- */
-function applyPaperWear(g: CanvasRenderingContext2D, profile: WearProfile) {
-  const { grime, scuffCorner, scratchAngle, hasScratch } = profile
-  const W = STICKER_W
-  const H = STICKER_H
-
-  const vign = g.createRadialGradient(
-    W / 2,
-    H / 2,
-    Math.min(W, H) * 0.34,
-    W / 2,
-    H / 2,
-    Math.max(W, H) * 0.62
-  )
-  vign.addColorStop(0, inkAlpha(0))
-  vign.addColorStop(1, inkAlpha(0.06 * grime))
-  g.fillStyle = vign
-  g.fillRect(0, 0, W, H)
-
-  // Lifted-corner curl at the worn corner.
-  const corners: ReadonlyArray<readonly [number, number, number, number]> = [
-    [12, 12, 1, 1],
-    [W - 12, 12, -1, 1],
-    [W - 12, H - 12, -1, -1],
-    [12, H - 12, 1, -1],
-  ]
-  const [cx, cy, sx, sy] = corners[scuffCorner]
-  const curl = g.createRadialGradient(cx, cy, 0, cx, cy, 96)
-  curl.addColorStop(0, inkAlpha(0.11 * grime))
-  curl.addColorStop(1, inkAlpha(0))
-  g.fillStyle = curl
-  g.fillRect(0, 0, W, H)
-  g.strokeStyle = paperAlpha(0.4)
-  g.lineWidth = 3
-  g.lineCap = 'round'
-  g.beginPath()
-  g.moveTo(cx, cy + sy * 52)
-  g.lineTo(cx + sx * 52, cy)
-  g.stroke()
-
-  if (hasScratch) {
-    g.save()
-    g.translate(W / 2, H / 2)
-    g.rotate(scratchAngle)
-    g.strokeStyle = paperAlpha(0.22)
-    g.lineWidth = 2
-    g.lineCap = 'round'
-    g.beginPath()
-    g.moveTo(-W * 0.32, 18)
-    g.lineTo(W * 0.3, -14)
-    g.stroke()
-    g.restore()
-  }
-}
-
-/**
- * A save's printed sticker: its per-save layout variant over shared paper, aged
- * with deterministic wear. This is what every card on the character-select arc
- * wears — the fan reads as a collection because no two labels compose alike.
+ * A save's printed sticker: its per-save layout variant over shared paper. This
+ * is what every card on the character-select arc wears — the fan reads as a
+ * collection because no two labels compose alike.
  */
 export function makeSaveSticker(spec: SaveLabelSpec, titleFont: string): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
@@ -572,6 +510,5 @@ export function makeSaveSticker(spec: SaveLabelSpec, titleFont: string): THREE.C
   const g = canvas.getContext('2d')!
   paintPaper(g)
   PAINTERS[spec.variant](g, spec, titleFont)
-  applyPaperWear(g, wearProfile(spec.seed))
   return toTexture(canvas)
 }

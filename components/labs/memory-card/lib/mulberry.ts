@@ -7,14 +7,3 @@ export function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
-
-/** Deterministic string → uint32 seed (FNV-1a) — pairs a save's slot id with a
- *  stable mulberry32 stream so its wear/variant never shifts between paints. */
-export function hashSeed(s: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
-}
