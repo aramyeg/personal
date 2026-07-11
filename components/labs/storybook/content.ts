@@ -78,8 +78,8 @@ export const END_CLOSING_LINE =
 const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-backdrop', kind: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
   { id: 'ch1-inn', kind: 'hero', mech: 'vfold', apexZ: -0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
-  { id: 'ch1-sign', kind: 'hero', mech: 'child', parentId: 'ch1-inn', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.26 },
-  { id: 'ch1-dormer', kind: 'midground', mech: 'child', parentId: 'ch1-inn', mount: 0.52, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.2, height: 0.19 },
+  { id: 'ch1-dormer', kind: 'midground', mech: 'child', parentId: 'ch1-inn', mount: 0.62, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.15 },
+  { id: 'ch1-sign', kind: 'hero', mech: 'vfold', apexZ: 0.2, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.2, height: 0.26 },
   // kind 'backdrop' picks the solid placeholder painter — a tent's faces
   // are full printed paper, not a fringe silhouette (same for every
   // parallel strip below)

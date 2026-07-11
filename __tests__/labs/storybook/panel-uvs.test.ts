@@ -22,9 +22,10 @@ const uAt = (uvs: Float32Array, corner: number) => uvs[corner * 2]
 describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified pieces', () => {
   it('children of deep-V parents tip past vertical and need the flip', () => {
     // User-reported upside down 2026-07-11: sign, dormer, lantern (inn and
-    // arch are deep-V parents — child fold elevation lambda > 90deg).
+    // arch are deep-V parents — child fold elevation lambda > 90deg). The
+    // sign has since become a freestanding v-fold; the dormer still pins
+    // the inn's deep-V case.
     for (const [spread, id] of [
-      [2, 'ch1-sign'],
       [2, 'ch1-dormer'],
       [6, 'ch5-lantern'],
       [7, 'ch6-banner'],
