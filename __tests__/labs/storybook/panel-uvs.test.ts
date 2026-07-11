@@ -95,7 +95,20 @@ describe('panelUvs orientation', () => {
   })
 
   it('parallel strips put the image top (v=1) at z0 — the far, up-screen edge', () => {
-    const { layer: tent } = byId(layersOf(4), 'ch3-counter')
+    // No shipped piece is a parallel tent anymore (all demoted to boxes by
+    // the volumetric covenant), so the mapping is pinned on a synthetic
+    // strip — the mechanism stays available.
+    const tent: SceneLayer = {
+      id: 'synthetic-tent',
+      kind: 'backdrop',
+      role: 'scenery',
+      mech: 'parallel',
+      glueL: 0.25,
+      glueR: 0.41,
+      rise: 0.1,
+      z0: 0.26,
+      z1: 0.66,
+    }
     for (const side of ['right', 'left'] as const) {
       const uvs = panelUvs(tent, side)
       // corner order: [...@z0, ...@z1, ...@z1, ...@z0]

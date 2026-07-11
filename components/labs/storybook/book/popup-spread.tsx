@@ -40,6 +40,7 @@ import {
   type SpreadRole,
 } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
+import { BoxPopupLayer } from './popup-box-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
 
@@ -69,11 +70,15 @@ type PopupSpreadProps = {
 
 /** Fold-line position in texture u, fixed per die-cut: where the art's
  *  crease falls for v-folds/children, where the ridge splits a parallel
- *  strip's two slopes. */
-const foldSplit = (layer: SceneLayer): number =>
-  layer.mech === 'parallel'
-    ? (layer.glueR + layer.rise) / (layer.glueL + layer.glueR + 2 * layer.rise)
-    : (layer.creaseU ?? 0.5)
+ *  strip's two slopes. Boxes never reach here (their faces carry their own
+ *  uv mapping in popup-box-layer.tsx). */
+const foldSplit = (layer: SceneLayer): number => {
+  if (layer.mech === 'parallel') {
+    return (layer.glueR + layer.rise) / (layer.glueL + layer.glueR + 2 * layer.rise)
+  }
+  if (layer.mech === 'box') return 0.5
+  return layer.creaseU ?? 0.5
+}
 
 /** Screen-up direction on the book, derived from the fixed reading camera
  *  (book-scene.tsx: position (0, 2.6, 2.9) looking at (0, 0.32, 0.15)):
@@ -99,6 +104,7 @@ const SCREEN_UP: readonly [number, number, number] = [0, 0.77, -0.638]
  */
 export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): boolean {
   if (layer.mech === 'parallel') return false // handled in panelUvs' own mapping
+  if (layer.mech === 'box') return false // per-face uvs live in popup-box-layer.tsx
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -322,18 +328,22 @@ function PopupLayer({
 export function PopupSpread({ layers, accents, spreadIndex, role, frame }: PopupSpreadProps) {
   return (
     <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
-      {layers.map((layer) => (
-        <PopupLayer
-          key={layer.id}
-          layer={layer}
-          parent={
-            layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
-          }
-          accents={accents}
-          role={role}
-          frame={frame}
-        />
-      ))}
+      {layers.map((layer) =>
+        layer.mech === 'box' ? (
+          <BoxPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
+        ) : (
+          <PopupLayer
+            key={layer.id}
+            layer={layer}
+            parent={
+              layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
+            }
+            accents={accents}
+            role={role}
+            frame={frame}
+          />
+        )
+      )}
     </group>
   )
 }

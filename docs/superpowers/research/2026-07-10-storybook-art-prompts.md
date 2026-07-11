@@ -263,7 +263,7 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: spring green #6a8f5f, terracotta roofs #b0603f, dawn peach #e8a978. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. long low dry-stone field wall strip with tufts of spring grass and apple-blossom sprigs along its top, a wooden gate exactly at the center of the strip (a clean vertical seam there), the wall base resting on the flat bottom edge; isolated strip, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch1-stable — 1536×1024 · TENT strip, ridge at 41% from left
+## ch1-stable — SUPERSEDED by v5 box faces (ch1-stable-front/-side/-top below) — do not regenerate
 
 *Chapter I — the innyard stable*
 
@@ -365,7 +365,7 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: raven black #2b2d33, window amber #d98e3f. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one small paper raven perched upright seen head-on, wings tucked, head tilted curiously, a sealed letter at its feet, bold simple silhouette readable at very small size, vertical centerline down the body, feet resting on the flat bottom edge; isolated figure, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch3-counter — 1536×1024 · TENT strip, ridge at 59% from left
+## ch3-counter — SUPERSEDED by v5 box faces (ch3-counter-front/-side/-top below) — do not regenerate
 
 *Chapter III — dispatch counter (the hero works here)*
 
@@ -432,7 +432,7 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is cut from matte construction paper and cardstock: visible paper grain, crisp die-cut edges, layered flat shapes with subtle soft shadows between paper layers. Whimsical storybook fairy-tale shapes, charming and warm, like a children's book made by a master paper artist. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: window amber #d98e3f, awning red #a63d2f, antique gold #c9a227. Flat matte lighting as if photographed on a copy stand under soft warm light. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. one small paper market lantern glowing warm amber with a short red ribbon, hanging from a simple hook — plainer and smaller than its sibling lantern, bold simple silhouette readable at very small size, symmetrical about its vertical centerline, the hook base resting on the flat bottom edge; isolated object, transparent background. Isolated on a fully transparent background (transparent PNG, no background fill). If transparency is not possible: place the isolated subject on a solid uniform pure magenta #FF00FF background that touches nothing else. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```
 
-## ch5-awning — 1536×1024 · TENT strip, ridge at 57% from left
+## ch5-awning — SUPERSEDED by v5 box faces (ch5-stall-front/-side/-top below) — do not regenerate
 
 *Chapter V — market awning canopy*
 
@@ -686,4 +686,108 @@ Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everythi
 
 ```
 Handmade paper-craft illustration for an artisanal fantasy pop-up book. Everything is printed flat on aged parchment paper with visible paper grain showing through the print. Whimsical storybook fairy-tale shapes, charming and warm. Muted earthy palette anchored on aged parchment cream #E7D5A8, warm sepia #3B2A1A, and antique gold #C9A227, plus these scene accents: seal burgundy #7a1f2b, slate #5a6470. Flat matte lighting. No text or letters anywhere. No photorealism, no 3D-render look, no glossy digital gradients, no airbrush. Subject: one continuous full-bleed two-page book spread printed flat: a scholar's writing desk seen from above covering the whole spread, printed dark wood grain, faint printed ink rings from an inkwell, a few printed drips of burgundy sealing wax, one printed black feather lying across the center gutter, the soft printed glow of an unseen candle warming one corner; printed saturation a step quieter than a paper cutout; no letter, no raven, no figures; no border. Opaque full rectangle, landscape orientation, NO transparency.
+```
+
+---
+
+# v5 addendum — box faces (the volumetric phase)
+
+The counter, stable, and awning tents are gone: they are now BOX FOLDS —
+enclosed paper prisms with a camera-facing front, painted side walls, and
+a lid or pitched roof (plus a new treasure chest in Chapter IV). Their old
+tent-strip prompts above (ch1-stable, ch3-counter, ch5-awning) are
+SUPERSEDED — do not regenerate those.
+
+**Box face conventions (every prompt below):**
+
+- Each face is its OWN image, full bleed edge to edge, NO transparent
+  margin (like the page prints — the whole rectangle is glued to a face).
+  The transparency/magenta lines are dropped for these on purpose.
+- The engine maps: `<id>-front` onto the front face, `<id>-side` onto both
+  side walls (mirrored placement left/right — authentic same-die
+  printing), `<id>-top` onto the lid or both roof slopes, `<id>-back`
+  (optional, skippable) onto the back face. A face with no art renders as
+  raw kraft stock, which also reads fine — fronts first if you batch.
+- A real vertical seam runs down the exact center of every front face
+  when the box folds (the classic pop-up box seam), so keep any single
+  focal motif — a face, an emblem, a keyhole — OFF the exact centerline.
+- Top/roof images: the image's top edge lands at the BACK of the box (the
+  far edge from the reader). Roof strips split at the vertical center
+  into the two slopes — paint the ridge line vertically down the middle.
+- Every prompt starts with the locked style preamble (spec §8.3, verbatim
+  as everywhere else) with that chapter's accents — abbreviated below as
+  `{STYLE PREAMBLE + accents}`.
+
+**Chapter I — the stable, now a gabled box barn at the innyard gate**
+
+## ch1-stable-front — 1536×1024 · box front (gable face)
+
+```
+{STYLE PREAMBLE + accents: chalet timber #8a5a3b, terracotta roofs #b0603f, spring green #6a8f5f} full-bleed printed panel for the front face of a small paper barn box, edge to edge with NO margin: a timber stable front — plank walls, a wide barn door standing slightly ajar with warm lantern light inside, a dozing dapple pony looking over the half-door on the right side, a hanging horseshoe above the door frame, small tufts of straw at the sill. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch1-stable-side — 1024×1024 · box side wall (used mirrored on both sides)
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the side wall of a small paper barn box, edge to edge with NO margin: weathered plank siding with a single square hay-window, a coiled rope on a peg, a wooden bucket at the base, a chicken pecking near the corner. Square composition. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch1-stable-top — 1536×1024 · roof strip, ridge vertically down the exact center
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed strip for the pitched roof of a small paper barn box, edge to edge with NO margin: terracotta shingle rows on both halves, a straight ridge line running vertically down the exact center of the image, a few patches of moss and one tiny sparrow perched on the ridge. The two halves read as the two slopes of one roof. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+**Chapter III — the dispatch counter, now a lidded flat-top box desk**
+
+## ch3-counter-front — 1536×1024 · box front
+
+```
+{STYLE PREAMBLE + accents: slate blues #5a6470, charcoal #2b2d33, muted violet #6f5a7d, ember orange #d98e3f} full-bleed printed panel for the front face of a paper dispatch-counter box, edge to edge with NO margin: a carved dark-wood counter front with two rows of small pigeonhole compartments stuffed with rolled messages, brass fittings, a raven feather quill resting in a holder, wax seals in ember orange. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch3-counter-side — 1536×1024 · box side wall
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the side wall of a paper dispatch-counter box, edge to edge with NO margin: the counter's dark-wood side panel with a shelf of stacked ledgers, a hanging brass lantern, and a small perch with message capsules. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch3-counter-top — 1024×1024 · lid seen from above
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the top writing surface of a paper dispatch-counter box seen straight from above, edge to edge with NO margin: an open ledger book, an ink pot, a burning stub of sealing wax, two sealed letters, scattered raven feathers on dark wood — arranged so no single object sits exactly on the vertical centerline. Square composition. No text or letters anywhere (the ledger shows only faint ruled lines, no writing). Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+**Chapter IV — NEW: the treasure chest (hollow box, open top — the interior stays raw paper on purpose)**
+
+## ch4-chest-front — 1536×1024 · box front
+
+```
+{STYLE PREAMBLE + accents: dune gold #d9a24a, burnt sienna #d96f4a, oasis teal #4f8f85, treasure glint #e6c65a} full-bleed printed panel for the front face of a small paper treasure-chest box, edge to edge with NO margin: dark banded wood with riveted gold straps, an ornate keyhole plate placed left of center, a few gold coins spilling over the front lip at the top edge. Composition reads correctly when displayed twice as wide as tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch4-chest-side — 1024×1024 · box side wall
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the side wall of a small paper treasure-chest box, edge to edge with NO margin: banded dark wood with a gold strap corner, a heavy iron carrying handle, one small scratch mark as if from a dragon claw. Square composition. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+**Chapter V — the awning, now a gabled market-stall box**
+
+## ch5-stall-front — 1536×1024 · box front
+
+```
+{STYLE PREAMBLE + accents: rose stone #c4766a, deep terracotta #a63d2f, sand parchment #e7d5a8} full-bleed printed panel for the front face of a paper market-stall box, edge to edge with NO margin: a rose-stone stall front with a wooden counter board, woven baskets of oranges and pomegranates, hanging bundles of dried herbs, a folded carpet leaning at one side. Composition reads correctly when displayed a little wider than tall. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch5-stall-side — 1536×1024 · box side wall
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed panel for the side wall of a paper market-stall box, edge to edge with NO margin: hanging patterned rugs in rose and terracotta, a stack of clay pots, a string of dried peppers down one edge. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
+```
+
+## ch5-stall-top — 1536×1024 · roof strip, ridge vertically down the exact center
+
+```
+{STYLE PREAMBLE + same accents} full-bleed printed strip for the pitched canvas roof of a paper market-stall box, edge to edge with NO margin: striped market-awning canvas in terracotta and cream, the stripes running away from a straight ridge line down the exact vertical center of the image, gently scalloped shadow bands suggesting draped fabric. The two halves read as the two slopes of one canopy. No text or letters anywhere. Reject if: glossy 3D render look, airbrushed gradients, photoreal texture, or any text/letters appear anywhere in the image.
 ```

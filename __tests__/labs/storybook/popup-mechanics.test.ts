@@ -3,6 +3,7 @@ import {
   creaseElevation,
   openElevation,
   sheetAngle,
+  solveBoxPose,
   solveLayerPose,
   solveParallelPose,
   solveVFoldPose,
@@ -38,15 +39,25 @@ const parentOf = (layer: SceneLayer, layers: readonly SceneLayer[]): SceneLayer 
 const poseAt = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number, thetaR: number) =>
   solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
 
+/** Every world-space quad a layer poses: two panels for the two-panel
+ *  mechanisms, the full patch list for boxes. */
+const allQuads = (
+  layer: SceneLayer,
+  layers: readonly SceneLayer[],
+  thetaL: number,
+  thetaR: number
+): PanelQuad[] => {
+  if (layer.mech === 'box') return solveBoxPose(layer, thetaL, thetaR).map((p) => p.quad)
+  const pose = poseAt(layer, layers, thetaL, thetaR)
+  return [pose.right, pose.left]
+}
+
 const allCorners = (
   layer: SceneLayer,
   layers: readonly SceneLayer[],
   thetaL: number,
   thetaR: number
-): Vec3[] => {
-  const pose = poseAt(layer, layers, thetaL, thetaR)
-  return [...pose.right, ...pose.left]
-}
+): Vec3[] => allQuads(layer, layers, thetaL, thetaR).flat()
 
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -66,13 +77,29 @@ const flatTol = (layer: SceneLayer): number => {
   if (layer.mech === 'child') return 1e-5
   if (layer.mech === 'vfold' && (layer.skewDeg ?? 0) !== 0) return 1e-5
   if (layer.mech === 'parallel') return 1e-6
-  return 1e-9
+  return 1e-9 // symmetric v-folds AND boxes: analytically exact closed forms
 }
 
 describe('layer spec validity (design constraints, every shipped layer)', () => {
   it.each(ALL_LAYERS.map(([id, l, ls]) => [id, l, ls] as const))(
     '%s satisfies its mechanism laws',
     (_id, layer, layers) => {
+      if (layer.mech === 'box') {
+        expect(layer.a).toBeGreaterThan(0)
+        expect(layer.height).toBeGreaterThan(0)
+        expect(layer.z0).toBeLessThan(layer.z1)
+        // at least one cap pair braces the walls (module header §4)
+        expect((layer.capFront ?? true) || (layer.capBack ?? true)).toBe(true)
+        if (layer.roof === 'gable') expect(layer.gableRise ?? 0).toBeGreaterThan(0)
+        // closed reach along the page: wall tip a + H, plus a gable's
+        // ridge panel folding past it
+        const roofReach = layer.roof === 'gable' ? Math.hypot(layer.a, layer.gableRise ?? 0) : 0
+        expect(layer.a + layer.height + roofReach).toBeLessThanOrEqual(PAGE_W)
+        // caps fold OUT along the spine to z1 + a / z0 - a at closed
+        if (layer.capFront ?? true) expect(layer.z1 + layer.a).toBeLessThanOrEqual(PAGE_H / 2)
+        if (layer.capBack ?? true) expect(layer.z0 - layer.a).toBeGreaterThanOrEqual(-PAGE_H / 2)
+        return
+      }
       if (layer.mech === 'parallel') {
         expect(layer.rise).toBeGreaterThan(0)
         // closed it reaches glueL + glueR + rise from the spine
@@ -120,9 +147,21 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
       for (let i = 0; i <= 72; i++) {
         const thetaR = 0
         const thetaL = (i / 72) * Math.PI
-        const pose = poseAt(layer, layers, thetaL, thetaR)
         const nR: Vec3 = [-Math.sin(thetaR), Math.cos(thetaR), 0]
         const nL: Vec3 = [-Math.sin(thetaL), Math.cos(thetaL), 0]
+        if (layer.mech === 'box') {
+          // box glue: each wall's bottom edge (quad corners 0,1) on its page
+          const patches = solveBoxPose(layer, thetaL, thetaR)
+          for (const { face, quad } of patches) {
+            const n = face === 'wallL' ? nL : face === 'wallR' ? nR : null
+            if (!n) continue
+            for (const p of [quad[0], quad[1]]) {
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+            }
+          }
+          continue
+        }
+        const pose = poseAt(layer, layers, thetaL, thetaR)
         // v-fold right glue: [apex, bottom-outer] (corners 0,1); parallel
         // right glue: [glue@z1, glue@z0] (corners 2,3). Left glue is
         // corners 0,1 for both mechanisms.
@@ -183,26 +222,24 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
   })
 })
 
-describe('A2 rigidity — the paper does not stretch', () => {
-  it('every quad edge and diagonal is constant across the sweep, all layers', () => {
+describe('A2/A12 rigidity — the paper does not stretch (multi-patch included)', () => {
+  it('every patch keeps all pairwise corner distances across the sweep, all layers', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
-      const ref = poseAt(layer, layers, Math.PI, 0)
-      const refLens = {
-        rGlue: dist(ref.right[0], ref.right[1]),
-        rSide: dist(ref.right[1], ref.right[2]),
-        rDiag: dist(ref.right[0], ref.right[2]),
-        lGlue: dist(ref.left[0], ref.left[1]),
-        lDiag: dist(ref.left[0], ref.left[2]),
-        crease: dist(ref.right[0], ref.right[3]),
-      }
+      const refQuads = allQuads(layer, layers, Math.PI, 0)
+      const refDists = refQuads.map((q) => {
+        const ds: number[] = []
+        for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) ds.push(dist(q[a], q[b]))
+        return ds
+      })
       for (let i = 0; i <= 36; i++) {
-        const pose = poseAt(layer, layers, (i / 36) * Math.PI, 0)
-        expect(dist(pose.right[0], pose.right[1])).toBeCloseTo(refLens.rGlue, 9)
-        expect(dist(pose.right[1], pose.right[2])).toBeCloseTo(refLens.rSide, 9)
-        expect(dist(pose.right[0], pose.right[2])).toBeCloseTo(refLens.rDiag, 9)
-        expect(dist(pose.left[0], pose.left[1])).toBeCloseTo(refLens.lGlue, 9)
-        expect(dist(pose.left[0], pose.left[2])).toBeCloseTo(refLens.lDiag, 9)
-        expect(dist(pose.right[0], pose.right[3])).toBeCloseTo(refLens.crease, 9)
+        const quads = allQuads(layer, layers, (i / 36) * Math.PI, 0)
+        quads.forEach((q, qi) => {
+          let k = 0
+          for (let a = 0; a < 4; a++)
+            for (let b = a + 1; b < 4; b++) {
+              expect(dist(q[a], q[b])).toBeCloseTo(refDists[qi][k++], 9)
+            }
+        })
       }
     }
   })
@@ -339,13 +376,9 @@ describe('A9 rest-pose separation — pieces clear each other, spread by spread'
   it.each(SPREAD_SETS.map(([name, layers]) => [name, layers] as const))(
     '%s: no two quads intersect at full open',
     (_name, layers) => {
-      const quads = layers.flatMap((l, idx) => {
-        const pose = poseAt(l, layers, Math.PI, 0)
-        return [
-          { q: pose.right, piece: idx, id: l.id },
-          { q: pose.left, piece: idx, id: l.id },
-        ]
-      })
+      const quads = layers.flatMap((l, idx) =>
+        allQuads(l, layers, Math.PI, 0).map((q) => ({ q, piece: idx, id: l.id }))
+      )
       // A child touches its parent BY DESIGN: its apex vertex sits on the
       // parent's crease edge and its glue edges lie in the panel planes —
       // vertex/edge contact the segment-triangle test reads as a hit. It
@@ -395,6 +428,81 @@ describe('A10 wedge containment — paper never pokes through either bounding pa
             expect(ang).toBeLessThanOrEqual(thetaL + 1e-6)
           }
         }
+      }
+    }
+  })
+})
+
+describe('A13 assembly closure — box hinges stay coincident at every angle', () => {
+  // Volumetric benchmark spec 2026-07-11: shared hinges between patches
+  // remain coincident (<= 1e-6) — lids stay on walls, caps stay on the
+  // walls' edges, cap creases meet, nothing tears. (A14 bracing is a
+  // derive-time gate: .superpowers/sdd/bench/derive-boxfold.mjs.)
+  const boxes = ALL_LAYERS.filter(([, l]) => l.mech === 'box')
+
+  it('ships at least one box (the volumetric mechanism exists in content)', () => {
+    expect(boxes.length).toBeGreaterThan(0)
+  })
+
+  it.each(boxes.map(([id, l]) => [id, l] as const))('%s hinges never tear', (_id, layer) => {
+    if (layer.mech !== 'box') throw new Error('filtered to boxes')
+    for (let i = 0; i <= 72; i++) {
+      const patches = new Map(
+        solveBoxPose(layer, (i / 72) * Math.PI, 0).map((p) => [p.face, p.quad] as const)
+      )
+      const expectCoincident = (p: Vec3 | undefined, q: Vec3 | undefined) => {
+        if (!p || !q) return
+        expect(dist(p, q)).toBeLessThan(1e-6)
+      }
+      const wallL = patches.get('wallL')!
+      const wallR = patches.get('wallR')!
+      const lidL = patches.get('lidL')
+      const lidR = patches.get('lidR')
+      const roofL = patches.get('roofL')
+      const roofR = patches.get('roofR')
+      const backbone = patches.get('backbone')
+      // lid outer edges on the wall tops, seam on the backbone's top edge
+      if (lidL && backbone) {
+        expectCoincident(lidL[0], wallL[2])
+        expectCoincident(lidL[3], wallL[3])
+        expectCoincident(lidL[1], backbone[2])
+        expectCoincident(lidL[2], backbone[3])
+      }
+      if (lidR && backbone) {
+        expectCoincident(lidR[1], wallR[3])
+        expectCoincident(lidR[2], wallR[2])
+        expectCoincident(lidR[0], backbone[2])
+        expectCoincident(lidR[3], backbone[3])
+      }
+      // gable roof: hinged on the wall tops, sharing one floating ridge
+      if (roofL && roofR) {
+        expectCoincident(roofL[0], wallL[2])
+        expectCoincident(roofL[3], wallL[3])
+        expectCoincident(roofR[1], wallR[3])
+        expectCoincident(roofR[2], wallR[2])
+        expectCoincident(roofL[1], roofR[0])
+        expectCoincident(roofL[2], roofR[3])
+      }
+      // caps: hinged on the walls' vertical edges, sharing their crease
+      const capFrontL = patches.get('capFrontL')
+      const capFrontR = patches.get('capFrontR')
+      if (capFrontL && capFrontR) {
+        expectCoincident(capFrontL[0], wallL[1])
+        expectCoincident(capFrontL[3], wallL[2])
+        expectCoincident(capFrontR[1], wallR[0])
+        expectCoincident(capFrontR[2], wallR[3])
+        expectCoincident(capFrontL[1], capFrontR[0])
+        expectCoincident(capFrontL[2], capFrontR[3])
+      }
+      const capBackL = patches.get('capBackL')
+      const capBackR = patches.get('capBackR')
+      if (capBackL && capBackR) {
+        expectCoincident(capBackL[1], wallL[0])
+        expectCoincident(capBackL[2], wallL[3])
+        expectCoincident(capBackR[0], wallR[1])
+        expectCoincident(capBackR[3], wallR[2])
+        expectCoincident(capBackR[1], capBackL[0])
+        expectCoincident(capBackR[2], capBackL[3])
       }
     }
   })

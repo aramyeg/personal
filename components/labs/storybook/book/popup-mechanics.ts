@@ -48,6 +48,33 @@
  *    the parent's panel dihedral). One page turn drives parent AND child —
  *    a raven rides the rookery fold because the fold itself opens it.
  *
+ * 4. BOX FOLD (Ruiz et al. CGF 2014, research doc 2026-07-11; derived and
+ *    gate-checked in .superpowers/sdd/bench/derive-boxfold.mjs) — the
+ *    volumetric mechanism: an enclosed prism straddling the gutter. Side
+ *    walls glued at distance `a` from the spine on BOTH pages stay exactly
+ *    PARALLEL TO THE DIHEDRAL BISECTOR at every beta (the lid strut from
+ *    wall top to backbone top has length |a*(cos h, sin h)| = a
+ *    identically — a zero-residual four-bar branch), so in the bisector
+ *    frame the whole box is closed-form:
+ *      wall glue at a*(cos h, +-sin h), walls extruded along the bisector;
+ *      backbone C = the STATIC rectangle on the bisector plane over the
+ *      spine (Ruiz's rigidizer — its seam is visible on real boxes);
+ *      flat lid = two width-a panels hinged wall-top <-> C-top (flat
+ *      painted top at open, seam over the spine);
+ *      gable roof = two width-w panels meeting at a floating ridge at
+ *      X = a cos h + H + sqrt(w^2 - a^2 sin^2 h) (pitched barn roof);
+ *      caps (front/back faces) = width-a panel pairs hinged on the walls'
+ *      front edges, crease on the bisector plane at z1 + a cos h — flat
+ *      camera-facing faces at open that bulge outward as the book closes.
+ *    The caps are the BRACE: a rigid rectangular cap's crease stays
+ *    parallel to its hinge, and coincident lines must be parallel, so
+ *    crease coincidence pins both walls to the bisector (Ruiz: the front/
+ *    back patches keep L and R from shearing). At least one cap pair is
+ *    mandatory; the backbone exists iff roof === 'flat' (the lid braces
+ *    it — under a gable or open top it would be an unbraced sway DOF).
+ *    Symmetric only: asymmetric glue distances raise the two cap hinges
+ *    to different heights and no rigid rectangle can crease them together.
+ *
  * World convention (v2 orientation): spine along Z at x = 0, +Y up, +Z
  * toward the camera. A page at angle theta occupies direction
  * (cos theta, sin theta, 0): right page flat = 0, left page flat = PI.
@@ -129,7 +156,31 @@ export type ChildGeom = {
   height: number
 }
 
-export type LayerGeom = VFoldGeom | ParallelGeom | ChildGeom
+export type BoxGeom = {
+  mech: 'box'
+  /** Glue-line distance from the spine on BOTH pages (the box half-width).
+   *  Symmetric by construction — see the module header. */
+  a: number
+  /** Wall height along the dihedral bisector. */
+  height: number
+  /** Span along the spine (world z), z0 < z1; the front face is at z1,
+   *  toward the camera. Caps fold OUT to z1 + a / z0 - a at closed — keep
+   *  that inside the page. */
+  z0: number
+  z1: number
+  /** 'flat' = painted lid on a backbone (counter, chest with a top);
+   *  'gable' = pitched roof pair on a floating ridge (barn, stall);
+   *  'open' = hollow, interior visible from the high reading camera. */
+  roof: 'flat' | 'gable' | 'open'
+  /** Ridge height above the walls at full open (gable roofs only). */
+  gableRise?: number
+  /** Cap pairs (the box's front/back faces). At least one pair must stay
+   *  on: the caps are what brace the walls (default both true). */
+  capFront?: boolean
+  capBack?: boolean
+}
+
+export type LayerGeom = VFoldGeom | ParallelGeom | ChildGeom | BoxGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -391,14 +442,91 @@ export function solveChildPose(geom: ChildGeom, parent: MechPose): MechPose {
 }
 
 // ---------------------------------------------------------------------------
+// Box fold (Ruiz-style enclosed prism, closed form — module header §4).
+
+/** A box patch's name doubles as its art-face role: caps carry the front/
+ *  back paintings, walls the sides, lid/roof the top, backbone raw paper. */
+export type BoxFace =
+  | 'wallL'
+  | 'wallR'
+  | 'lidL'
+  | 'lidR'
+  | 'roofL'
+  | 'roofR'
+  | 'capFrontL'
+  | 'capFrontR'
+  | 'capBackL'
+  | 'capBackR'
+  | 'backbone'
+
+export type BoxPatch = { readonly face: BoxFace; readonly quad: PanelQuad }
+
+/**
+ * Solves a box fold's world pose. Every quad is ordered [bottom-left,
+ * bottom-right, top-right, top-left] AS SEEN FROM OUTSIDE the box at rest,
+ * so uvs (0,0)(1,0)(1,1)(0,1) print each face's art upright and the
+ * [0,1,2, 0,2,3] winding faces outward. The patch LIST (faces present,
+ * their order) is constant for a given geometry — only corners move.
+ */
+export function solveBoxPose(geom: BoxGeom, thetaL: number, thetaR: number): readonly BoxPatch[] {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const m = (thetaL + thetaR) / 2
+  const h = beta / 2
+  const ch = Math.cos(h)
+  const sh = Math.sin(h)
+  const cm = Math.cos(m)
+  const sm = Math.sin(m)
+  const { a, height: H, z0, z1 } = geom
+  const capFront = geom.capFront ?? true
+  const capBack = geom.capBack ?? true
+  // Bisector frame -> world: X along the bisector, rotated by m about Z.
+  const W = (x: number, y: number, z: number): Vec3 => [x * cm - y * sm, x * sm + y * cm, z]
+
+  const patches: BoxPatch[] = [
+    { face: 'wallL', quad: [W(a * ch, a * sh, z0), W(a * ch, a * sh, z1), W(a * ch + H, a * sh, z1), W(a * ch + H, a * sh, z0)] },
+    { face: 'wallR', quad: [W(a * ch, -a * sh, z1), W(a * ch, -a * sh, z0), W(a * ch + H, -a * sh, z0), W(a * ch + H, -a * sh, z1)] },
+  ]
+  if (geom.roof === 'flat') {
+    patches.push(
+      { face: 'backbone', quad: [W(0, 0, z0), W(0, 0, z1), W(H, 0, z1), W(H, 0, z0)] },
+      { face: 'lidL', quad: [W(a * ch + H, a * sh, z1), W(H, 0, z1), W(H, 0, z0), W(a * ch + H, a * sh, z0)] },
+      { face: 'lidR', quad: [W(H, 0, z1), W(a * ch + H, -a * sh, z1), W(a * ch + H, -a * sh, z0), W(H, 0, z0)] }
+    )
+  } else if (geom.roof === 'gable') {
+    const w = Math.hypot(a, geom.gableRise ?? 0)
+    const rx = a * ch + H + Math.sqrt(Math.max(0, w * w - a * a * sh * sh))
+    patches.push(
+      { face: 'roofL', quad: [W(a * ch + H, a * sh, z1), W(rx, 0, z1), W(rx, 0, z0), W(a * ch + H, a * sh, z0)] },
+      { face: 'roofR', quad: [W(rx, 0, z1), W(a * ch + H, -a * sh, z1), W(a * ch + H, -a * sh, z0), W(rx, 0, z0)] }
+    )
+  }
+  if (capFront) {
+    const zc = z1 + a * ch
+    patches.push(
+      { face: 'capFrontL', quad: [W(a * ch, a * sh, z1), W(a * ch, 0, zc), W(a * ch + H, 0, zc), W(a * ch + H, a * sh, z1)] },
+      { face: 'capFrontR', quad: [W(a * ch, 0, zc), W(a * ch, -a * sh, z1), W(a * ch + H, -a * sh, z1), W(a * ch + H, 0, zc)] }
+    )
+  }
+  if (capBack) {
+    const zc = z0 - a * ch
+    patches.push(
+      { face: 'capBackR', quad: [W(a * ch, -a * sh, z0), W(a * ch, 0, zc), W(a * ch + H, 0, zc), W(a * ch + H, -a * sh, z0)] },
+      { face: 'capBackL', quad: [W(a * ch, 0, zc), W(a * ch, a * sh, z0), W(a * ch + H, a * sh, z0), W(a * ch + H, 0, zc)] }
+    )
+  }
+  return patches
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch: one entry point for any layer geometry.
 
 /**
- * Solves any layer's pose. Child layers need their parent's geometry —
- * the caller resolves `parentId` (content keeps children after parents in
- * each spread's layer list). Children may only mount on v-folds: a parallel
- * fold's ridge is a translating crease, not a fixed-apex fold, so a
- * spherical child cannot ride it.
+ * Solves any two-panel layer's pose. Child layers need their parent's
+ * geometry — the caller resolves `parentId` (content keeps children after
+ * parents in each spread's layer list). Children may only mount on
+ * v-folds: a parallel fold's ridge is a translating crease, not a
+ * fixed-apex fold, so a spherical child cannot ride it. Box layers are
+ * multi-patch and take `solveBoxPose` instead.
  */
 export function solveLayerPose(
   geom: LayerGeom,
@@ -417,6 +545,8 @@ export function solveLayerPose(
       }
       return solveChildPose(geom, solveVFoldPose(parentGeom, thetaL, thetaR))
     }
+    case 'box':
+      throw new Error('storybook: box layers are multi-patch — use solveBoxPose')
   }
 }
 
