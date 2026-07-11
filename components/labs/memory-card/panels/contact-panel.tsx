@@ -217,6 +217,9 @@ export function ContactPanel({ save, onClose }: ContactPanelProps) {
               </span>
               <a
                 href={row.href}
+                {...(row.href.startsWith('http')
+                  ? { target: '_blank', rel: 'noreferrer' }
+                  : {})}
                 className="truncate rounded-sm transition-colors hover:text-[color:var(--mc-ring)] focus-visible:outline-none focus-visible:[outline:2px_solid_var(--mc-ring)] focus-visible:[outline-offset:4px]"
                 style={{
                   fontFamily: monoFamily,
