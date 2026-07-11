@@ -30,12 +30,12 @@ export type LabEntry = {
 export const labs: LabEntry[] = [
   {
     slug: 'main',
-    title: 'Terracotta',
+    title: 'Classic Claude',
     date: '2026-07-08',
     thesis:
-      'The daily driver — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
+      'Standard AI with a twist — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
     status: 'live',
-    href: '/',
+    href: '/classic-claude',
   },
   {
     slug: 'ps1',

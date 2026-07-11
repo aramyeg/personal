@@ -14,12 +14,20 @@ import { AtticRoom } from './attic-room'
 import { FocusProbe } from './use-painting-focus'
 import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
+import { LoadSignal } from './load-signal'
+import { FocusCard } from './focus-card'
+import { VisitorGuide } from './visitor-guide'
+import { usePause } from './use-pause'
 
 /**
  * The /labs museum: a first-person classical gallery.
  * Everything inside <Canvas> is three.js; overlay UI is plain DOM.
  */
-export default function MuseumGallery() {
+export default function MuseumGallery({
+  onLoadChange,
+}: {
+  onLoadChange?: (progress: number, ready: boolean) => void
+}) {
   const router = useRouter()
   const length = useMemo(() => hallLength(hallLabs.length), [])
   const placements = useMemo(() => paintingPlacements(hallLabs), [])
@@ -30,6 +38,9 @@ export default function MuseumGallery() {
   const [coarse, setCoarse] = useState(false)
   useEffect(() => setCoarse(window.matchMedia('(pointer: coarse)').matches), [])
 
+  const navigatingRef = useRef(false)
+  const { paused, open: openPause, close: closePause } = usePause(navigatingRef)
+
   const register = useCallback((slug: string, obj: THREE.Object3D | null) => {
     if (obj) targets.current.set(slug, obj)
     else targets.current.delete(slug)
@@ -37,6 +48,7 @@ export default function MuseumGallery() {
 
   const enterFocused = useCallback(() => {
     if (!focused) return
+    navigatingRef.current = true
     const lab = labs.find((l) => l.slug === focused)
     router.push(lab?.href ?? `/labs/${focused}`)
   }, [focused, router])
@@ -63,7 +75,8 @@ export default function MuseumGallery() {
         <DrapedFrame labCount={hallLabs.length} />
         <AtticRoom hallLen={length} register={register} focused={focused} />
         <FocusProbe targets={targets} onChange={setFocused} />
-        <PlayerControls length={length} moveRef={moveRef} />
+        <PlayerControls length={length} moveRef={moveRef} paused={paused} />
+        {onLoadChange && <LoadSignal onChange={onLoadChange} />}
       </Canvas>
 
       {coarse && <MobileJoystick moveRef={moveRef} />}
@@ -71,25 +84,47 @@ export default function MuseumGallery() {
       {/* Crosshair */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70" />
 
-      {/* Focused painting hint */}
-      {focusedLab && (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 font-mono text-xs uppercase tracking-widest text-white">
-          Click to enter — {focusedLab.title}
-        </div>
-      )}
+      {/* Lean-in preview of the focused painting */}
+      {focusedLab && <FocusCard lab={focusedLab} />}
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">
-        {coarse ? 'Joystick to walk · drag to look · center art, tap to enter' : 'Click to walk · WASD + mouse · Esc to release'}
+        {coarse ? 'Joystick to walk · drag to look · center art, tap to enter' : 'Click to walk · WASD + mouse · Shift to run · Space to jump · Esc to release'}
       </div>
 
       {/* Escape hatch to the list */}
       <Link
-        href="/labs?view=list"
+        href="/?view=list"
         className="absolute top-4 right-4 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
       >
         List view
       </Link>
+
+      <button
+        type="button"
+        onClick={openPause}
+        aria-label="Show controls guide"
+        className="absolute top-4 right-32 rounded-full bg-black/50 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-white/80 backdrop-blur-sm hover:bg-black/70 hover:text-white"
+      >
+        ?
+      </button>
+
+      {paused && (
+        <div
+          className="absolute inset-0 z-10 grid place-items-center bg-black/60"
+          onClick={closePause}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-md border border-[#d6b968]/45 bg-[#16090d]/95 px-10 py-8 shadow-2xl backdrop-blur-sm"
+          >
+            <VisitorGuide />
+            <p className="mt-6 border-t border-[#d6b968]/30 pt-4 text-center font-mono text-sm font-bold uppercase tracking-[0.25em] text-[#f0d998]">
+              Right-click or Esc to resume &middot; then click to walk
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -29,7 +29,7 @@ test.describe('xp lab', () => {
     await page.waitForTimeout(700)
     await expect(page).toHaveURL(/\/labs\/xp/)
     await page.keyboard.press('Escape')
-    await expect(page).toHaveURL(/\/labs(\?.*)?$/)
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
   })
 
   test('turn off computer exits to the gallery', async ({ page }) => {
@@ -39,7 +39,7 @@ test.describe('xp lab', () => {
     await page.getByRole('button', { name: 'start' }).click()
     await page.getByText('Turn Off Computer').click()
     await page.getByRole('button', { name: 'Turn Off' }).click()
-    await expect(page).toHaveURL(/\/labs(\?.*)?$/)
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
   })
 
   test('reduced motion skips boot entirely', async ({ page }) => {
