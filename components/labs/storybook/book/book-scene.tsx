@@ -35,8 +35,12 @@ const CANDLE_COLOR = '#ff9f4d'
 // instead of an even wash clear out to its edges.
 const CANDLE_BASE_INTENSITY = 1.3
 const CANDLE_DISTANCE = 3.6
-const PARALLAX_TILT_X = 0.03
-const PARALLAX_TILT_Y = 0.05
+// Doubled 2026-07-11 (user: "more depth... maybe by allowing tilting it
+// more") — the pointer now swings the desk noticeably, letting the standing
+// paper parallax against the page prints. Still well inside the frustum
+// margin verified for ~1.05-tall pieces.
+const PARALLAX_TILT_X = 0.07
+const PARALLAX_TILT_Y = 0.11
 const PARALLAX_EASE_RATE = 4
 
 /** Desk surface: a baked warm light-pool texture (see makeDeskCanvas) rather
