@@ -46,14 +46,14 @@ describe('composition covenant — volumetric by default (gate C1)', () => {
   })
 
   it('volumetric census: box-bearing chapter spreads only ever grow', () => {
-    // Ratchet: chapters I (stable barn), III (dispatch counter), IV
-    // (treasure chest), V (market stall) ship volumes today. Chapters II
-    // and VI join as their compositions gain boxes (ch6 waits on the
-    // treasury art split). Shrinking this set is a regression.
+    // Ratchet: chapters I (stable barn), II (hive), III (dispatch
+    // counter), IV (treasure chest), V (market stall) ship volumes today.
+    // Chapter VI joins when the treasury art split lands (its building
+    // becomes a box). Shrinking this set is a regression.
     const withBoxes = CHAPTERS.filter((c) => c.layers.some((l) => l.mech === 'box')).map(
       (c) => c.spread
     )
-    for (const spread of [2, 4, 5, 6]) {
+    for (const spread of [2, 3, 4, 5, 6]) {
       expect(withBoxes, `spread ${spread} lost its volumetric piece`).toContain(spread)
     }
   })

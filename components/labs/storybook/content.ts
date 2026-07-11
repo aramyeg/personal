@@ -120,6 +120,10 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.22, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
   { id: 'ch2-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
   { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069 },
+  // VOLUMETRIC: the guild's hive — a small lidded box in the meadow (real
+  // beehives ARE stacked boxes); keeps the chapter airy but gives it its
+  // enclosed volume and a third fold family.
+  { id: 'ch2-hive', kind: 'backdrop', role: 'story', mech: 'box', a: 0.09, height: 0.14, z0: 0.34, z1: 0.46, roof: 'flat' },
 ]
 
 // Chapter III — the rookery: the great tower now carries a dispatch
