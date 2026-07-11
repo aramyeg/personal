@@ -87,16 +87,6 @@ export function voidBackdrop(accent: string): string {
   ].join(', ')
 }
 
-/** Section → accent (hero triangle, work circle, skills cross, about square, contact triangle). */
-export const SECTION_ACCENT: Record<'hero' | 'work' | 'skills' | 'about' | 'contact', GlyphName> =
-  {
-    hero: 'triangle',
-    work: 'circle',
-    skills: 'cross',
-    about: 'square',
-    contact: 'triangle',
-  }
-
 /** SVG path data for the four glyph shapes in a 24x24 viewBox, stroke-style. */
 export const GLYPH_PATHS: Record<GlyphName, string> = {
   triangle: 'M12 4 L21 19 L3 19 Z',
