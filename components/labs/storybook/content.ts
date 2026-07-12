@@ -107,7 +107,7 @@ export const END_CLOSING_LINE =
 // cascade — the densest chapter open.
 const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
-  { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.02, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
+  { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.06, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
   // DRESSED ASSEMBLY (C1v2): the inn is now a v-fold core wearing shaped
   // silhouette patches — the eaves overhang its roofline off the left
   // panel, a hanging lamp bracket off the right.
@@ -126,9 +126,13 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
   // FLOATING TIER (C3v2): the inn's coaching-yard deck — a BRIDGE platform,
   // two mirror strut ranks (equal closed reach, qA===qB) carrying one deck
-  // across the gap between them. Sunk into the back lane between the
-  // backdrop and the inn so it owns a depth band and clears the signpost.
-  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.2, glueR: 0.14, rise: 0.16, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.2, rise: 0.16, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, qA: 0.12, qB: 0.12, deckZ0: -0.3, deckZ1: -0.12 },
+  // across the gap between them. COMPOSITION SPREAD-D: raised on tall struts
+  // (rise 0.26) and widened by a lopsided glue split (0.30/0.14, qA 0.30) so
+  // the deck crest clears the inn's roofline and its struts show past the
+  // building on both sides — a rampart-terrace behind the inn instead of a
+  // flap the hero fully masks. Still sunk in the back lane so it owns its
+  // depth band (the inn nudged to apexZ 0.06 to drop its screen-top clear).
+  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.3, glueR: 0.14, rise: 0.26, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.3, rise: 0.26, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, qA: 0.3, qB: 0.3, deckZ0: -0.3, deckZ1: -0.12 },
   { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.6, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
 ]
 
@@ -204,10 +208,15 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // base — paper cannot overhang below a page-glued edge).
   { id: 'ch4-chest-lid', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'wallL', u: 0, v: 0.02, width: 0.13, height: 0.14 },
   { id: 'ch4-chest-spill', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'capFrontR', u: 0, v: 0, width: 0.12, height: 0.09 },
-  // FLOATING TIER (C3v2): the gold-hoard shelf — a BRIDGE platform sunk
-  // into the deep lane behind the dragon (the back of its lair), where the
-  // coin is heaped; owns a depth band and clears the hero's fold.
-  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.13, glueR: 0.09, rise: 0.1, spans: [[-0.39, -0.35], [-0.33, -0.29]] }, strutB: { glueL: 0.09, glueR: 0.13, rise: 0.1, spans: [[-0.39, -0.35], [-0.33, -0.29]] }, qA: 0.08, qB: 0.08, deckZ0: -0.39, deckZ1: -0.29 },
+  // FLOATING TIER (C3v2): the gold-hoard shelf — a BRIDGE platform in the
+  // deep lane behind the dragon (the back of its lair), where the coin is
+  // heaped. COMPOSITION SPREAD-D: this deck was buried behind BOTH the city
+  // skyline (a full-width standing wall) and the dragon. Kept DEEP (its own
+  // depth band) but grown onto tall struts (rise 0.40, qA 0.21) and a
+  // lopsided glue split so the gold heap crests ABOVE the skyline and shows
+  // through the torn-paper sky — deep AND tall, since a deeper piece sits
+  // HIGHER on this top-down camera.
+  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.22, glueR: 0.14, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, strutB: { glueL: 0.14, glueR: 0.22, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, qA: 0.21, qB: 0.21, deckZ0: -0.39, deckZ1: -0.26 },
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
@@ -272,12 +281,15 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // at the side-wall base (v=0 — no overhang below the page-glued edge).
   { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
   { id: 'ch6-strongbox-coins', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'wallL', u: 0, v: 0, width: 0.12, height: 0.06 },
-  // FLOATING TIER (C3v2): the treasury's glass steps — a TERRACE platform,
-  // strut ranks of different reach so the deck stairs down (qA + qB = the
-  // closed gap: reachA 0.44, reachB 0.26, gap 0.18 = 0.115 + 0.065). Set in
-  // the approach lane behind the treasury so it owns a depth band and
-  // clears the hero's fold.
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.14, glueR: 0.14, rise: 0.16, spans: [[-0.32, -0.24]] }, strutB: { glueL: 0.08, glueR: 0.08, rise: 0.1, spans: [[-0.2, -0.12]] }, qA: 0.115, qB: 0.065, deckZ0: -0.32, deckZ1: -0.12 },
+  // FLOATING TIER (C3v2): the treasury's glass gallery — a BRIDGE platform in
+  // the approach lane behind the vault. COMPOSITION SPREAD-D: the treasury is
+  // the book's TALLEST hero (0.91) and it LEANS RIGHT (skew -2), so a wide
+  // deck raised on tall struts (rise 0.40, qA 0.28) crests near its shoulder
+  // while its LEFT wing — deck and struts — swings toward the open left of
+  // the leaning tower. Was a narrow one-sided TERRACE the treasury fully hid;
+  // the wide bridge and the lean together give it a real reveal. Deep back
+  // lane, so it keeps its own depth band.
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.26, glueR: 0.14, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, strutB: { glueL: 0.14, glueR: 0.26, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, qA: 0.28, qB: 0.28, deckZ0: -0.32, deckZ1: -0.14 },
   { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.54, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 
