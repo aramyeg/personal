@@ -88,12 +88,15 @@ const SPINE_FLAT_HEIGHT = BOOK.coverT
 // (restAngles): the open book dips at the gutter and the stacks fan up to
 // the fore-edges, trading thickness side to side as you read.
 const PAGE_SURFACE_Y = BACK_COVER_TOP + STACK_PEDESTAL + BOOK.pageLift
-// Gutter crease: the valley strip laid flat over the seam where the open
-// pages meet, just above the page surfaces. Widened with the round-4
-// gutter valley (paper-texture.ts makeCreaseCanvas): the concave falloff,
-// curl highlights, and folded-edge hairlines need the span to read as a
-// fold holding paper rather than a printed stripe.
-const CREASE_WIDTH = 0.16
+// Gutter seam core: a narrow strip over the fold LINE only — the near-black
+// gap between the page edges and the collapsed pop-ups' folded edges
+// peeking out of it (paper-texture.ts makeCreaseCanvas). The wide concave
+// valley shadow that used to live here moved INTO the page surfaces as the
+// template's vertex-color AO ramp (page-geometry.ts gutterShade): a flat
+// floating shadow can't follow pages that tilt up from the hinge, and it
+// stayed behind when the sheet lifted — the round-5 "seam disappears from
+// the turning page, clicks into place at landing".
+const CREASE_WIDTH = 0.05
 const CREASE_Y = PAGE_SURFACE_Y + 0.001
 // Pop-up layers: a hair above the crease strip, effectively ON the page.
 const POPUP_Y = PAGE_SURFACE_Y + 0.0015
@@ -161,13 +164,16 @@ function useWedgeGeometry(): THREE.BufferGeometry {
   return geometry
 }
 
-/** Flat page BufferGeometry shared by both static pages (built once, disposed on unmount). */
+/** Flat page BufferGeometry shared by both static pages (built once, disposed on unmount).
+ *  Carries the template's gutter-shade vertex colors — the page materials
+ *  render with vertexColors so the fold's AO rides the page surface. */
 function usePageGeometry(): THREE.BufferGeometry {
   const geometry = useMemo(() => {
-    const { positions, uvs, indices } = buildPageTemplate()
+    const { positions, uvs, colors, indices } = buildPageTemplate()
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     geo.setIndex(new THREE.BufferAttribute(indices, 1))
     geo.computeVertexNormals()
     return geo
@@ -212,12 +218,27 @@ export function Book() {
   // spread's full-bleed print (user art `page-<n>.webp`, else the procedural
   // print). During a turn the exposed side pre-swaps to the incoming
   // spread's print — the page the lifting sheet reveals underneath.
+  // vertexColors: the shared page template bakes the gutter fold's AO ramp
+  // into its `color` attribute (page-geometry.ts gutterShade) — it must
+  // multiply every print these pages ever wear, art and placeholder alike.
   const leftPageMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: paper,
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+        vertexColors: true,
+      }),
     [paper]
   )
   const rightPageMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: paper,
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+        vertexColors: true,
+      }),
     [paper]
   )
   const creaseMaterial = useMemo(
@@ -322,12 +343,29 @@ export function Book() {
   // below, on the driver-ref clock — a React effect in the sheet component
   // raced the driver at both ends of a turn and painted a blank-paper
   // frame whenever its flush landed while the sheet was still visible.
+  // vertexColors: the sheet builds from the SAME page template, so its faces
+  // carry the same baked gutter-shade ramp as the static pages — the crease
+  // rides the flying sheet instead of staying behind on the desk, and the
+  // lift-off/landing hand-off against the identically-shaded static page is
+  // pixel-identical by construction.
   const sheetFrontMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.FrontSide }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: paper,
+        roughness: 0.9,
+        side: THREE.FrontSide,
+        vertexColors: true,
+      }),
     [paper]
   )
   const sheetBackMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.97, side: THREE.BackSide }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: paper,
+        roughness: 0.97,
+        side: THREE.BackSide,
+        vertexColors: true,
+      }),
     [paper]
   )
 

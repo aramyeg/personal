@@ -125,11 +125,16 @@ export function TurningPage({
   // Flat page geometry shared by both printed faces, built once before
   // first paint. Rigid: never rewritten — the pivot group's rotation does
   // all the motion, and each face mesh carries its ±PAPER_T/2 offset.
+  // The template's gutter-shade vertex colors ride along (the face
+  // materials render with vertexColors), so the fold's shadow stays ON the
+  // sheet through the whole sweep — matching the static pages exactly at
+  // both flat poses.
   useLayoutEffect(() => {
-    const { positions, uvs, indices } = buildPageTemplate()
+    const { positions, uvs, colors, indices } = buildPageTemplate()
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     geometry.setIndex(new THREE.BufferAttribute(indices, 1))
     geometry.computeVertexNormals()
     if (meshRef.current) meshRef.current.geometry = geometry

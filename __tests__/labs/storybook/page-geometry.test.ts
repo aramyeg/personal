@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  GUTTER_SHADE_U,
   INTERIOR_SHEETS,
   PAGE_H,
   PAGE_SEGMENTS,
@@ -11,6 +12,7 @@ import {
   buildStackWedge,
   easeTurn,
   easeTurnWeighted,
+  gutterShade,
   restAngles,
 } from '@/components/labs/storybook/book/page-geometry'
 import { SPREAD_COUNT } from '@/components/labs/storybook/content'
@@ -20,7 +22,7 @@ import { SPREAD_COUNT } from '@/components/labs/storybook/content'
 // What lives here is the flat template geometry and the easing curves.
 
 describe('buildPageTemplate', () => {
-  const { positions, uvs, indices } = buildPageTemplate()
+  const { positions, uvs, colors, indices } = buildPageTemplate()
 
   it('spans the page from the spine to the free edge, flat at y=0', () => {
     expect(positions[0]).toBeCloseTo(0, 5) // first vertex at the spine
@@ -50,6 +52,49 @@ describe('buildPageTemplate', () => {
 
   it('emits two CCW triangles per segment', () => {
     expect(indices.length).toBe(PAGE_SEGMENTS * 6)
+  })
+
+  it('packs grid columns toward the spine (the gutter-shade ramp needs the resolution there)', () => {
+    const firstSegment = positions[3] - positions[0] // col 1 x - col 0 x
+    const uniform = PAGE_W / PAGE_SEGMENTS
+    expect(firstSegment).toBeGreaterThan(0)
+    expect(firstSegment).toBeLessThan(uniform / 2)
+    // uv must stay u = x/PAGE_W under the warp.
+    for (let col = 0; col <= PAGE_SEGMENTS; col++) {
+      expect(uvs[col * 2]).toBeCloseTo(positions[col * 3] / PAGE_W, 5)
+    }
+  })
+
+  it('bakes the gutter-shade AO ramp: dark at the spine, clean past the falloff, monotonic', () => {
+    expect(colors.length).toBe(positions.length)
+    // Spine vertex wears the dark stop; every channel below clean paper.
+    for (let ch = 0; ch < 3; ch++) {
+      expect(colors[ch]).toBeLessThan(0.5)
+      expect(colors[ch]).toBeGreaterThan(0)
+    }
+    for (let col = 0; col <= PAGE_SEGMENTS; col++) {
+      const u = uvs[col * 2]
+      for (let ch = 0; ch < 3; ch++) {
+        const value = colors[col * 3 + ch]
+        // Clean paper (exactly 1) everywhere past the falloff — the print
+        // must be untouched outside the fold shadow.
+        if (u >= GUTTER_SHADE_U) expect(value).toBe(1)
+        // Monotonic non-decreasing out from the spine.
+        if (col > 0) expect(value).toBeGreaterThanOrEqual(colors[(col - 1) * 3 + ch])
+        // Both rows carry the identical ramp (shade depends only on u).
+        expect(colors[(PAGE_SEGMENTS + 1 + col) * 3 + ch]).toBe(value)
+      }
+    }
+  })
+
+  it('gutterShade is warm (r >= g >= b) so the fold shadow reads brown, not gray', () => {
+    for (const u of [0, 0.02, 0.05]) {
+      const [r, g, b] = gutterShade(u)
+      expect(r).toBeGreaterThanOrEqual(g)
+      expect(g).toBeGreaterThanOrEqual(b)
+    }
+    expect(gutterShade(GUTTER_SHADE_U)).toEqual([1, 1, 1])
+    expect(gutterShade(1)).toEqual([1, 1, 1])
   })
 })
 

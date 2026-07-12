@@ -148,70 +148,58 @@ export function makeLeatherCanvas(): HTMLCanvasElement {
 }
 
 /**
- * Gutter valley strip (C6 round 4: "no visual fold, or dimension between
- * the pages, suggesting there was something folded between the page").
- * Four painted layers turn the old flat gradient into a fold that HOLDS
- * something:
- *  1. a valley shadow with a concave falloff (steepening toward center
- *     reads as the paper curving down into the binding, not a vignette),
- *  2. two faint warm bands just outside the dark core — the page curl
- *     catching light on its way down,
- *  3. a near-black seam at the exact centerline (the gap between the two
+ * Gutter SEAM CORE (round-4 fold contents, re-scoped for the bulge model):
+ * only what physically lives IN the fold line between the two page edges —
+ * the wide concave valley shadow moved onto the page surfaces themselves
+ * as the template's vertex-color AO ramp (page-geometry.ts gutterShade),
+ * because a flat floating shadow can't follow tilted pages or a lifting
+ * sheet. Three painted layers remain:
+ *  1. a slim fold-core shadow where the two page AO ramps meet,
+ *  2. a near-black seam at the exact centerline (the gap between the two
  *     page edges),
- *  4. broken cream/kraft hairlines hugging the seam — the folded edges of
- *     the collapsed pop-ups peeking out of the gutter shadow. Dashed and
- *     jittered so they read as stacked sheets, not printed rules.
- * Maps onto the narrow plane over the open spread's gutter (x≈0).
+ *  3. broken cream/kraft hairlines hugging the seam — the folded edges of
+ *     the collapsed pop-ups peeking out of the fold. Dashed and jittered
+ *     so they read as stacked sheets, not printed rules.
+ * Maps onto the narrow (CREASE_WIDTH ≈ 0.05) plane over the open spread's
+ * gutter — feature sizes below keep the WORLD dimensions the old wide
+ * strip established (seam ~2.5mm, hairlines ~2mm at offsets up to ±15mm).
  */
 export function makeCreaseCanvas(w = 128, h = 512): HTMLCanvasElement {
   assertBrowser('makeCreaseCanvas')
   const { canvas, ctx } = createCanvas(w, h)
   const cx = w / 2
 
-  // 1. Valley shadow — concave falloff via stacked stops.
+  // 1. Fold-core shadow: the last, deepest step of the valley — the page
+  // AO ramps hand off to it at the strip edges.
   const gradient = ctx.createLinearGradient(0, 0, w, 0)
   gradient.addColorStop(0, INK_TRANSPARENT)
-  gradient.addColorStop(0.18, '#3b2a1a14')
-  gradient.addColorStop(0.34, '#3b2a1a38')
-  gradient.addColorStop(0.44, '#33220f73')
-  gradient.addColorStop(0.5, '#2a1a0aa6')
-  gradient.addColorStop(0.56, '#33220f73')
-  gradient.addColorStop(0.66, '#3b2a1a38')
-  gradient.addColorStop(0.82, '#3b2a1a14')
+  gradient.addColorStop(0.3, '#33220f4d')
+  gradient.addColorStop(0.5, '#2a1a0a99')
+  gradient.addColorStop(0.7, '#33220f4d')
   gradient.addColorStop(1, INK_TRANSPARENT)
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, w, h)
 
-  // 2. Page-curl light bands, one per side, just outside the dark core.
-  for (const bandX of [w * 0.27, w * 0.73]) {
-    const band = ctx.createLinearGradient(bandX - w * 0.05, 0, bandX + w * 0.05, 0)
-    band.addColorStop(0, '#f2e4c800')
-    band.addColorStop(0.5, '#f2e4c815')
-    band.addColorStop(1, '#f2e4c800')
-    ctx.fillStyle = band
-    ctx.fillRect(bandX - w * 0.05, 0, w * 0.1, h)
-  }
-
-  // 3. The seam between the page edges.
+  // 2. The seam between the page edges.
   ctx.fillStyle = '#1c1006bf'
-  ctx.fillRect(cx - 1, 0, 2, h)
+  ctx.fillRect(cx - 3, 0, 6, h)
 
-  // 4. Folded pop-up edges stacked in the shadow: broken hairlines at
-  // small offsets either side of the seam, brighter nearest the seam.
+  // 3. Folded pop-up edges stacked in the fold: broken hairlines at small
+  // offsets either side of the seam, brighter nearest the seam.
   const edges: ReadonlyArray<readonly [number, string]> = [
-    [-11, '#cdbb9226'],
-    [-7, '#e8d9b833'],
-    [-3, '#f2e6c73d'],
-    [4, '#e8d9b836'],
-    [8, '#cdbb922b'],
-    [12, '#cdbb9220'],
+    [-35, '#cdbb9226'],
+    [-22, '#e8d9b833'],
+    [-10, '#f2e6c73d'],
+    [13, '#e8d9b836'],
+    [26, '#cdbb922b'],
+    [38, '#cdbb9220'],
   ]
   for (const [offset, color] of edges) {
     ctx.fillStyle = color
     let y = Math.random() * 24
     while (y < h) {
       const run = 22 + Math.random() * 46
-      ctx.fillRect(cx + offset, y, 1.5, run)
+      ctx.fillRect(cx + offset, y, 4.5, run)
       y += run + 10 + Math.random() * 26
     }
   }

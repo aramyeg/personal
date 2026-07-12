@@ -18,39 +18,91 @@ export const PAGE_SEGMENTS = 32
 
 const ROW_VERTS = PAGE_SEGMENTS + 1
 
+// ---------------------------------------------------------------------------
+// Gutter shade: the fold's ambient occlusion, baked into the page template
+// as vertex colors. The shadow where a page dives into the binding is a
+// property of the PAGE SURFACE, not of the air above the gutter — a flat
+// shadow strip floating at the valley floor breaks twice under the bulge
+// model: the tilted page planes rise above and occlude it (the shadow all
+// but vanished at the steep-tilt chapters), and it stays behind when the
+// sheet lifts, so the seam popped off the flying page at lift-off and
+// snapped back at landing ("click into place", C6 round 5). Baking it into
+// the ONE template that both static pages and the turning sheet build from
+// makes the crease ride the page through the whole sweep, and makes the
+// lift-off/landing hand-off pixel-identical by construction.
+
+/** Column-density warp exponent: x = PAGE_W * (col/N)^GRID_WARP packs grid
+ *  columns toward the spine, where the gutter-shade ramp needs resolution
+ *  (~7 columns inside the falloff instead of 2 — a uniform grid banded).
+ *  The page is rigid and flat, so the fore-edge's coarser columns cost
+ *  nothing: endpoints are preserved and uv stays u = x/PAGE_W. */
+const GRID_WARP = 1.6
+/** Where the fold shadow fades to clean paper, as a fraction of page width
+ *  (~0.08 world units — the half-span the old floating strip covered). */
+export const GUTTER_SHADE_U = 0.07
+/** Multiply factors at the fold line (u = 0): warm brown, not gray — the
+ *  same composite the approved round-4 strip produced over aged paper. */
+const GUTTER_DARK: readonly [number, number, number] = [0.45, 0.4, 0.34]
+
+/** Per-channel multiply factor of the fold shadow at page coordinate u.
+ *  (1 - t)^1.7 keeps the dark hugging the spine and eases into clean paper
+ *  — the concave "paper curving down into the binding" falloff. */
+export function gutterShade(u: number): [number, number, number] {
+  const t = Math.min(1, Math.max(0, u / GUTTER_SHADE_U))
+  const rise = 1 - Math.pow(1 - t, 1.7)
+  return [
+    GUTTER_DARK[0] + (1 - GUTTER_DARK[0]) * rise,
+    GUTTER_DARK[1] + (1 - GUTTER_DARK[1]) * rise,
+    GUTTER_DARK[2] + (1 - GUTTER_DARK[2]) * rise,
+  ]
+}
+
 /**
  * Flat page template vertices: x∈[0,PAGE_W] from spine, z∈[-PAGE_H/2,PAGE_H/2], y=0.
  * Returns [positions, uvs, indices] arrays for a (PAGE_SEGMENTS+1)×2 vertex grid.
  *
  * Vertex layout: two rows of (PAGE_SEGMENTS+1) vertices — row 0 at
  * z=-PAGE_H/2 (vertices 0..PAGE_SEGMENTS), row 1 at z=+PAGE_H/2 (vertices
- * PAGE_SEGMENTS+1..2*PAGE_SEGMENTS+1). uvs are u=x/PAGE_W, v=1-row: the
- * camera views the desk from +Z (book-scene.tsx), so the image's top row
- * (v=1 under three's default flipY) must land on the FAR page edge at
- * z=-PAGE_H/2 — v=row put the printed sky at the reader's edge, rendering
- * every page print upside down.
+ * PAGE_SEGMENTS+1..2*PAGE_SEGMENTS+1). Columns are spine-dense (GRID_WARP
+ * above). uvs are u=x/PAGE_W, v=1-row: the camera views the desk from +Z
+ * (book-scene.tsx), so the image's top row (v=1 under three's default
+ * flipY) must land on the FAR page edge at z=-PAGE_H/2 — v=row put the
+ * printed sky at the reader's edge, rendering every page print upside down.
+ *
+ * `colors` carries the gutter-shade AO ramp (gutterShade above); consumers
+ * attach it as the geometry's `color` attribute and render with
+ * `vertexColors: true` so the fold shadow multiplies whatever print the
+ * page currently wears.
  */
 export function buildPageTemplate(): {
   positions: Float32Array
   uvs: Float32Array
+  colors: Float32Array
   indices: Uint16Array
 } {
   const vertexCount = ROW_VERTS * 2
   const positions = new Float32Array(vertexCount * 3)
   const uvs = new Float32Array(vertexCount * 2)
+  const colors = new Float32Array(vertexCount * 3)
 
   for (let row = 0; row < 2; row++) {
     const z = row === 0 ? -PAGE_H / 2 : PAGE_H / 2
     for (let col = 0; col <= PAGE_SEGMENTS; col++) {
       const vertex = row * ROW_VERTS + col
-      const x = (col / PAGE_SEGMENTS) * PAGE_W
+      const u = Math.pow(col / PAGE_SEGMENTS, GRID_WARP)
+      const x = u * PAGE_W
 
       positions[vertex * 3] = x
       positions[vertex * 3 + 1] = 0
       positions[vertex * 3 + 2] = z
 
-      uvs[vertex * 2] = x / PAGE_W
+      uvs[vertex * 2] = u
       uvs[vertex * 2 + 1] = 1 - row
+
+      const [r, g, b] = gutterShade(u)
+      colors[vertex * 3] = r
+      colors[vertex * 3 + 1] = g
+      colors[vertex * 3 + 2] = b
     }
   }
 
@@ -72,7 +124,7 @@ export function buildPageTemplate(): {
     indices[cursor++] = d
   }
 
-  return { positions, uvs, indices }
+  return { positions, uvs, colors, indices }
 }
 
 /**
