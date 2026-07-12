@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  coverSpreadAngles,
   creaseElevation,
+  isCoverPair,
   liveSpreadRole,
   openElevation,
   sheetAngle,
@@ -24,7 +26,7 @@ import {
   solveRiderPose,
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
-import { PAGE_H, PAGE_W } from '@/components/labs/storybook/book/page-geometry'
+import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
 // Benchmark Part A (docs/superpowers/specs/2026-07-10-popup-physics-benchmark.md):
 // geometric invariants of the dihedral-driven engine, tested against every
@@ -772,3 +774,71 @@ describe('tilted gearing (bulge, derive-bulge.mjs A16/A17) — sheet sweep and p
     }
   })
 })
+
+describe('cover-turn gearing (coverSpreadAngles) — the board IS the left plane', () => {
+  it('isCoverPair matches the driver rule: spread 0 next / spread 1 prev, nothing else', () => {
+    expect(isCoverPair(0, 'next')).toBe(true)
+    expect(isCoverPair(1, 'prev')).toBe(true)
+    expect(isCoverPair(0, 'prev')).toBe(false)
+    expect(isCoverPair(1, 'next')).toBe(false)
+    expect(isCoverPair(2, 'prev')).toBe(false)
+    expect(isCoverPair(0, null)).toBe(false)
+  })
+
+  it('opening: flat-folded shut at e=0, EXACTLY spread 1 rest pose at e=1', () => {
+    const shut = coverSpreadAngles('next', 0)
+    expect(shut.thetaL).toBe(0)
+    expect(shut.thetaR).toBe(0) // dihedral 0: everything folded flat under the board
+    const open = coverSpreadAngles('next', 1)
+    const rest = restAngles(1)
+    expect(open.thetaL).toBeCloseTo(Math.PI - rest.aL, 12) // aL(1) = 0
+    expect(open.thetaR).toBeCloseTo(rest.aR, 12) // the asin coincidence
+  })
+
+  it('closing mirrors opening exactly', () => {
+    for (const e of [0, 0.25, 0.5, 0.75, 1]) {
+      const closing = coverSpreadAngles('prev', e)
+      const opening = coverSpreadAngles('next', 1 - e)
+      expect(closing.thetaL).toBeCloseTo(opening.thetaL, 12)
+      expect(closing.thetaR).toBeCloseTo(opening.thetaR, 12)
+    }
+  })
+
+  it('the bloom is monotone and always a valid dihedral', () => {
+    let prev = -1
+    for (let i = 0; i <= 100; i++) {
+      const { thetaL, thetaR } = coverSpreadAngles('next', i / 100)
+      const beta = thetaL - thetaR
+      expect(beta).toBeGreaterThanOrEqual(0)
+      expect(beta).toBeLessThanOrEqual(Math.PI)
+      expect(beta).toBeGreaterThanOrEqual(prev)
+      prev = beta
+    }
+  })
+
+  it('spreadPageAnglesTilted routes spread 1 through the cover gearing and parks everyone else at rest', () => {
+    for (const e of [0, 0.3, 0.7, 1]) {
+      expect(spreadPageAnglesTilted(1, 0, 'next', e)).toEqual(coverSpreadAngles('next', e))
+      expect(spreadPageAnglesTilted(1, 1, 'prev', e)).toEqual(coverSpreadAngles('prev', e))
+    }
+    // A warm-window neighbor mid-cover-turn holds its rest pose (hidden).
+    const parked = spreadPageAnglesTilted(2, 0, 'next', 0.5)
+    const rest2 = spreadPageAnglesTilted(2, 2, null, 0)
+    expect(parked).toEqual(rest2)
+  })
+
+  it('every spread-1 layer solves finitely across the whole cover bloom', () => {
+    const layers = EXTRA_SPREAD_LAYERS[1] ?? []
+    expect(layers.length).toBeGreaterThan(0) // the title spread ships pop-ups
+    for (let i = 0; i <= 20; i++) {
+      const { thetaL, thetaR } = coverSpreadAngles('next', i / 20)
+      if (thetaL - thetaR <= 0.02) continue // under FLAT_EPSILON the engine hides pieces
+      for (const layer of layers) {
+        for (const q of allQuads(layer, layers, thetaL, thetaR)) {
+          for (const p of q.flat()) expect(Number.isFinite(p)).toBe(true)
+        }
+      }
+    }
+  })
+})
+

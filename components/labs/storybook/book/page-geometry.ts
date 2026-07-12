@@ -137,9 +137,10 @@ export const easeTurn = (t: number): number =>
  * easeInOutQuint — flatter grip at both ends than easeTurn's cubic (a
  * gentler initial lift, a softer landing) with a snappier sweep through the
  * middle, so a full turn reads as a weightier hardback page instead of a
- * uniform glide. Kept as a separate export rather than changing `easeTurn`
- * in place: `easeTurn`'s cubic shape is asserted by the tests and consumed
- * elsewhere (book.tsx's cover pivot) unchanged.
+ * uniform glide. Since the cover-mechanics rework this is the ONE easing
+ * every turn consumer shares — sheet, cover board, block relaxation and
+ * pop-up gearing — so nothing glued together can shear apart mid-flight
+ * (`easeTurn` above remains as the tests' reference cubic).
  */
 export const easeTurnWeighted = (t: number): number =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
@@ -208,59 +209,106 @@ export function restAngles(spread: number): RestPose {
 }
 
 /**
- * Unit stack wedge: the OPEN book's per-side page stack. A rigid tilted
- * page can't drape over a full-height box (the plane would cut through
- * it); a real open stack is exactly this wedge — sheet edges climbing
- * from the gutter valley to the fore-edge. Cross-section: y=0 at the
- * spine (x=0) rising linearly to y=1 at x=width; the caller scales y to
- * `sheets * SHEET_STACK_T` per frame, so one static geometry serves every
- * spread. Flat-shaded (duplicated verts).
+ * Morphing stack block: the per-side page stack in EVERY book state, one
+ * geometry with two driven heights.
+ *
+ *   spineH = foreH        -> the SHUT slab (closed book / cover-turn start)
+ *   spineH = 0            -> the OPEN wedge (sheet edges climbing from the
+ *                            gutter valley to the fore-edge — a rigid
+ *                            tilted page can't drape over a full box)
+ *   spineH in between     -> the binding RELAXING while the cover opens:
+ *                            the spine side sinks into the valley while
+ *                            the fore-edge stays put, which is exactly what
+ *                            a real block does as the board comes over
+ *
+ * The old closed box / open wedge pair swapped shapes in one React commit
+ * at the cover turn's end — the round-5 "morph pop". This block is updated
+ * per frame on the driver clock instead (updateStackBlock below), so the
+ * silhouette never jumps.
  *
  * UVs carry the per-sheet edge stripes (book.tsx's stack-edge canvases):
- * v runs 0 at the valley floor to 1 at the stack top on every visible
- * face, so a horizontal stripe = one sheet's cut edge. On the triangular
- * z-end faces the spine vertex sits at v=0 while the fore corners span
- * the full 0..1 — linear interpolation makes the stripes CONVERGE at the
- * binding, exactly how a real fanned stack reads from the side.
+ * v = height / foreH, so on the fore face a horizontal stripe = one
+ * sheet's cut edge, and on the z-end faces the spine-top corner sits at
+ * v = spineH/foreH — stripes squeeze toward the binding as the spine side
+ * relaxes, converging exactly like real fanned sheets (at spineH = 0 they
+ * meet AT the binding, the old wedge's look; at spineH = foreH they run
+ * level, the shut block's).
  */
-export function buildStackWedge(
+export function buildStackBlock(
   width: number,
   depth: number
 ): { positions: Float32Array; uvs: Float32Array; indices: Uint16Array } {
   const d = depth / 2
+  // Flat-shaded (duplicated verts), 24 vertices / 6 faces. Top-edge y and
+  // side-face v values here are placeholders — updateStackBlock writes
+  // them before first render.
   // prettier-ignore
   const positions = new Float32Array([
     // bottom (-y): CCW from below
     0, 0, -d,  width, 0, -d,  width, 0, d,  0, 0, d,
-    // slope (top): outward up-left
-    0, 0, -d,  0, 0, d,  width, 1, d,  width, 1, -d,
+    // top slope: spine edge (y=spineH) to fore edge (y=foreH)
+    0, 1, -d,  0, 1, d,  width, 1, d,  width, 1, -d,
     // fore face (+x)
     width, 0, d,  width, 0, -d,  width, 1, -d,  width, 1, d,
-    // near end (+z)
-    0, 0, d,  width, 0, d,  width, 1, d,
-    // far end (-z)
-    0, 0, -d,  width, 1, -d,  width, 0, -d,
+    // spine face (-x), zero-height when fully open
+    0, 0, -d,  0, 0, d,  0, 1, d,  0, 1, -d,
+    // near end (+z): trapezoid spine-bottom, fore-bottom, fore-top, spine-top
+    0, 0, d,  width, 0, d,  width, 1, d,  0, 1, d,
+    // far end (-z), mirrored u so the print reads outward
+    0, 0, -d,  0, 1, -d,  width, 1, -d,  width, 0, -d,
   ])
   // prettier-ignore
   const uvs = new Float32Array([
-    // bottom: unseen, park at the paper base of the stripe map
+    // bottom: unseen, park at the stripe map's base
     0, 0,  1, 0,  1, 0,  0, 0,
-    // slope: top sheet's surface — sample just under the top stripe's line
+    // top slope: the top sheet's surface — sample the top stripe row
     0, 1,  1, 1,  1, 1,  0, 1,
     // fore face: full stripe run, v = height
     0, 0,  1, 0,  1, 1,  0, 1,
-    // +z end triangle: spine vertex at v=0, fore corners span the run
-    0, 0,  1, 0,  1, 1,
-    // -z end triangle (mirrored u so the print reads outward)
-    1, 0,  0, 1,  0, 0,
+    // spine face: hidden behind the spine board; v tracks spineH
+    0, 0,  1, 0,  1, 1,  0, 1,
+    // +z end trapezoid: fore corners span 0..1, spine-top at v=spineV
+    0, 0,  1, 0,  1, 1,  0, 1,
+    // -z end trapezoid (mirrored u)
+    1, 0,  1, 1,  0, 1,  0, 0,
   ])
   // prettier-ignore
   const indices = new Uint16Array([
     0, 3, 2, 0, 2, 1,       // bottom (wound for -y)
-    4, 5, 6, 4, 6, 7,       // slope
+    4, 5, 6, 4, 6, 7,       // top slope
     8, 9, 10, 8, 10, 11,    // fore
-    12, 13, 14,             // +z end
-    15, 16, 17,             // -z end
+    12, 13, 14, 12, 14, 15, // spine (wound for -x)
+    16, 17, 18, 16, 18, 19, // +z end
+    20, 21, 22, 20, 22, 23, // -z end
   ])
-  return { positions, uvs, indices }
+  const template = { positions, uvs, indices }
+  updateStackBlock(positions, uvs, 1, 1)
+  return template
+}
+
+// Vertex indices of buildStackBlock's spine-top corners (y = spineH) and
+// fore-top corners (y = foreH), per the layout above.
+const BLOCK_SPINE_TOP = [4, 5, 14, 15, 19, 21] as const
+const BLOCK_FORE_TOP = [6, 7, 10, 11, 18, 22] as const
+// Of those, the ones whose uv v tracks spineH/foreH (the z-end trapezoids'
+// spine-top corners and the spine face's top edge).
+const BLOCK_SPINE_V = [14, 15, 19, 21] as const
+
+/**
+ * Writes the block's two driven heights (world units) into a
+ * buildStackBlock geometry's attribute arrays. Pure array-in/array-out so
+ * the morph invariants are testable in jsdom; the caller flags
+ * needsUpdate / recomputes normals. foreH must be > 0 (clamp a hidden
+ * stack to epsilon, exactly like the old wedge's minimum y scale).
+ */
+export function updateStackBlock(
+  positions: Float32Array,
+  uvs: Float32Array,
+  spineH: number,
+  foreH: number
+): void {
+  const spineV = Math.min(1, spineH / foreH)
+  for (const i of BLOCK_SPINE_TOP) positions[i * 3 + 1] = spineH
+  for (const i of BLOCK_FORE_TOP) positions[i * 3 + 1] = foreH
+  for (const i of BLOCK_SPINE_V) uvs[i * 2 + 1] = spineV
 }

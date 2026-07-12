@@ -83,7 +83,7 @@
  * m = (thetaL + thetaR) / 2 about Z.
  */
 
-import { restAngles } from './page-geometry'
+import { INTERIOR_SHEETS, PAGE_W, SHEET_STACK_T, restAngles } from './page-geometry'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -800,6 +800,13 @@ export function spreadPageAnglesTilted(
 ): { thetaL: number; thetaR: number } {
   const role = liveSpreadRole(spreadIndex, committedSpread, dir)
   const rest = restAngles(spreadIndex)
+  if (dir !== null && isCoverPair(committedSpread, dir)) {
+    // Cover turn: only spread 1 has skin in it — its pop-ups gear to the
+    // cover board and the relaxing title page, not to a flying sheet.
+    return spreadIndex === 1
+      ? coverSpreadAngles(dir, easedT)
+      : { thetaL: Math.PI - rest.aL, thetaR: rest.aR }
+  }
   if (dir === null || role === 'current' || role === 'hidden') {
     return { thetaL: Math.PI - rest.aL, thetaR: rest.aR }
   }
@@ -814,4 +821,35 @@ export function spreadPageAnglesTilted(
   return role === 'outgoing'
     ? { thetaL: theta, thetaR: rest.aR }
     : { thetaL: Math.PI - rest.aL, thetaR: theta }
+}
+
+// ---------------------------------------------------------------------------
+// Cover-turn gearing. A cover turn is NOT a sheet turn: the board itself is
+// the moving left plane, and the right plane is the TITLE PAGE riding the
+// top of the page block while the block's spine side relaxes from the shut
+// slab down into the gutter valley (book.tsx's block morph — a real book's
+// binding relaxes as the cover opens). Everything is geared to the single
+// eased open fraction the cover board itself rotates by.
+
+/** True when the frame-loop pair describes a cover turn (spread 0 <-> 1) —
+ *  the pure-math twin of use-turn-driver's isCoverTurn, keyed off the same
+ *  committed spread the driver mirrors. */
+export const isCoverPair = (committedSpread: number, dir: TurnDir | null): boolean =>
+  (committedSpread === 0 && dir === 'next') || (committedSpread === 1 && dir === 'prev')
+
+/**
+ * Spread 1's page angles during a cover turn, from the eased progress:
+ * thetaL is the cover board's own rotation (its inner face carries the
+ * endpaper — spread 1's left page), thetaR the title page lying on the
+ * relaxing block: asin(sheetStack * open / PAGE_W), which at open = 1 is
+ * EXACTLY restAngles(1).aR — the hand-off to the rest pose is coincident
+ * by construction, the cover-turn twin of the A16 sweep invariant.
+ */
+export function coverSpreadAngles(dir: TurnDir, easedT: number): { thetaL: number; thetaR: number } {
+  const e = clamp(easedT, 0, 1)
+  const open = dir === 'next' ? e : 1 - e
+  return {
+    thetaL: Math.PI * open,
+    thetaR: Math.asin((INTERIOR_SHEETS * SHEET_STACK_T * open) / PAGE_W),
+  }
 }

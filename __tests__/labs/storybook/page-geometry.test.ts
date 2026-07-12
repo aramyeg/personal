@@ -9,11 +9,12 @@ import {
   STACK_PEDESTAL,
   STACK_TOTAL_H,
   buildPageTemplate,
-  buildStackWedge,
+  buildStackBlock,
   easeTurn,
   easeTurnWeighted,
   gutterShade,
   restAngles,
+  updateStackBlock,
 } from '@/components/labs/storybook/book/page-geometry'
 import { SPREAD_COUNT } from '@/components/labs/storybook/content'
 
@@ -180,17 +181,64 @@ describe('bulge rest poses (derive-bulge.mjs theorems A16-A20)', () => {
   })
 })
 
-describe('buildStackWedge', () => {
-  it('is a unit-height wedge: y=0 at the spine, y=1 only at the fore-edge', () => {
-    const { positions, uvs, indices } = buildStackWedge(1.2, 1.5)
-    expect(positions.length).toBe(18 * 3)
-    expect(uvs.length).toBe(18 * 2)
-    expect(indices.length).toBe(24)
+describe('buildStackBlock / updateStackBlock (the closed-slab <-> open-wedge morph)', () => {
+  const W = 1.2
+  const build = () => buildStackBlock(W, 1.5)
+
+  it('is a 6-face flat-shaded prism born as the unit shut slab', () => {
+    const { positions, uvs, indices } = build()
+    expect(positions.length).toBe(24 * 3)
+    expect(uvs.length).toBe(24 * 2)
+    expect(indices.length).toBe(36)
     for (let i = 0; i < positions.length; i += 3) {
-      const [x, y] = [positions[i], positions[i + 1]]
-      expect(y === 0 || y === 1).toBe(true)
-      if (y === 1) expect(x).toBeCloseTo(1.2, 6) // height only at the fore-edge (float32)
-      if (x === 0) expect(y).toBe(0) // spine edge sits on the valley floor
+      expect(positions[i + 1] === 0 || positions[i + 1] === 1).toBe(true)
     }
+  })
+
+  it('spineH = 0 reproduces the open wedge: valley floor at the spine, height only at the fore-edge', () => {
+    const { positions, uvs } = build()
+    updateStackBlock(positions, uvs, 0, 0.126)
+    for (let i = 0; i < positions.length / 3; i++) {
+      const [x, y] = [positions[i * 3], positions[i * 3 + 1]]
+      if (x === 0) expect(y).toBe(0)
+      if (y !== 0) {
+        expect(x).toBeCloseTo(W, 6)
+        expect(y).toBeCloseTo(0.126, 6)
+        expect(uvs[i * 2 + 1]).toBe(1) // stack top samples the stripe run's top
+      }
+    }
+  })
+
+  it('spineH = foreH reproduces the shut slab with level, uncompressed stripes', () => {
+    const { positions, uvs } = build()
+    updateStackBlock(positions, uvs, 0.126, 0.126)
+    const tops: number[] = []
+    for (let i = 0; i < positions.length / 3; i++) {
+      const y = positions[i * 3 + 1]
+      expect(y === 0 || Math.abs(y - 0.126) < 1e-7).toBe(true)
+      if (y !== 0) tops.push(uvs[i * 2 + 1])
+    }
+    // Every top corner (spine and fore alike) sits at v = 1: stripes run
+    // level across the whole shut block.
+    for (const v of tops) expect(v).toBe(1)
+  })
+
+  it('mid-relaxation: spine side sinks while the fore-edge holds, stripes converging toward the binding', () => {
+    const { positions, uvs } = build()
+    updateStackBlock(positions, uvs, 0.063, 0.126)
+    const spineTopVs: number[] = []
+    for (let i = 0; i < positions.length / 3; i++) {
+      const [x, y] = [positions[i * 3], positions[i * 3 + 1]]
+      if (x === 0 && y !== 0) {
+        expect(y).toBeCloseTo(0.063, 6) // spine-top corners at spineH
+        spineTopVs.push(uvs[i * 2 + 1])
+      }
+      if (Math.abs(x - W) < 1e-7 && y !== 0) expect(y).toBeCloseTo(0.126, 6)
+    }
+    // The side faces' spine-top corners carry v = spineH/foreH — half the
+    // stripe run left at the binding (the top-slope face's corners stay
+    // pinned to the top stripe row, v = 1, by design).
+    expect(spineTopVs.filter((v) => Math.abs(v - 0.5) < 1e-7).length).toBe(4)
+    for (const v of spineTopVs) expect(v === 1 || Math.abs(v - 0.5) < 1e-7).toBe(true)
   })
 })

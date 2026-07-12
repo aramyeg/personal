@@ -27,10 +27,10 @@ import {
   STACK_PEDESTAL,
   STACK_TOTAL_H,
   buildPageTemplate,
-  buildStackWedge,
-  easeTurn,
+  buildStackBlock,
   easeTurnWeighted,
   restAngles,
+  updateStackBlock,
 } from './page-geometry'
 import {
   makeCreaseCanvas,
@@ -38,7 +38,7 @@ import {
   makePaperCanvas,
   makeStackEdgeCanvas,
 } from '../procedural/paper-texture'
-import { isCoverTurn, useTurnDriver } from './use-turn-driver'
+import { useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
 import { CoverDecals } from './cover-decals'
@@ -63,7 +63,18 @@ const BLOCK_DEPTH = PAGE_H * 0.985
 
 const BACK_COVER_Y = BOOK.coverT / 2
 const BACK_COVER_TOP = BOOK.coverT
-const CLOSED_FRONT_COVER_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.coverT / 2
+// The sheet band of the block (above the pedestal) — the part whose spine
+// side relaxes into the valley during a cover turn (see the block morph in
+// the useFrame below).
+const BLOCK_SHEETS_H = INTERIOR_SHEETS * SHEET_STACK_T
+// Front endpaper pad: the binding margin GLUED to the front cover's inside,
+// carrying spread 1's left page (its verso is "sheet 0"). It rides the
+// cover through a cover turn — that's what an endpaper is — and lands
+// exactly on the open book's left pedestal pose, so the left side fills in
+// DURING the turn instead of popping at commit (round 5). Closed, it sits
+// between the cover and the block, so the shut book is one pad taller.
+const FRONT_PAD = STACK_PEDESTAL
+const CLOSED_FRONT_COVER_Y = BACK_COVER_TOP + BOOK.blockMaxH + FRONT_PAD + BOOK.coverT / 2
 const OPEN_FRONT_COVER_Y = BOOK.coverT / 2
 // A single Z pivot flips both local axes at PI, so it can only land on both
 // the "closed, stacked on top" height and the "open, flat on the desk"
@@ -71,7 +82,14 @@ const OPEN_FRONT_COVER_Y = BOOK.coverT / 2
 // the gap between them. See task-9-brief.md for the two target poses.
 const FRONT_PIVOT_Y = (CLOSED_FRONT_COVER_Y + OPEN_FRONT_COVER_Y) / 2
 const FRONT_LOCAL_Y = (CLOSED_FRONT_COVER_Y - OPEN_FRONT_COVER_Y) / 2
-const SPINE_HEIGHT = BOOK.coverT * 2 + BOOK.blockMaxH
+// Traveling endpaper assembly, local to the front-cover pivot group: pad
+// slab hanging under the board, page card under the pad. The pivot's PI
+// rotation maps local y to FRONT_PIVOT_Y - y, so the page surface lands at
+// exactly PAGE_SURFACE_Y and the pad at the static left pedestal's pose —
+// the commit swap to the static left assembly is pixel-identical.
+const PAD_LOCAL_Y = FRONT_LOCAL_Y - BOOK.coverT / 2 - FRONT_PAD / 2
+const COVER_PAGE_LOCAL_Y = FRONT_LOCAL_Y - BOOK.coverT / 2 - FRONT_PAD - BOOK.pageLift
+const SPINE_HEIGHT = BOOK.coverT * 2 + BOOK.blockMaxH + FRONT_PAD
 // Open state: the spine board lies flat under the spread (real open books
 // have no standing wall down the middle) — same thickness as a cover, its
 // BOOK.coverH depth still exceeds the page block's BLOCK_DEPTH, so it
@@ -148,11 +166,14 @@ function useBookTextures(): {
   return { paper, leather, crease }
 }
 
-/** Unit stack-wedge BufferGeometry shared by both open-book stacks (its y
- *  scale is driven per frame to `sheets * SHEET_STACK_T`). */
-function useWedgeGeometry(): THREE.BufferGeometry {
+/** One morphing stack-block BufferGeometry (page-geometry's
+ *  buildStackBlock). Each side owns its own instance — the two heights are
+ *  driven independently per frame via updateStackBlock in the useFrame
+ *  below (closed slab, open wedge, and the cover-turn relaxation between
+ *  are all poses of this one mesh; no shape swaps at commit). */
+function useBlockGeometry(): THREE.BufferGeometry {
   const geometry = useMemo(() => {
-    const { positions, uvs, indices } = buildStackWedge(BLOCK_WIDTH, BLOCK_DEPTH)
+    const { positions, uvs, indices } = buildStackBlock(BLOCK_WIDTH, BLOCK_DEPTH)
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
@@ -162,6 +183,24 @@ function useWedgeGeometry(): THREE.BufferGeometry {
   }, [])
   useEffect(() => () => geometry.dispose(), [geometry])
   return geometry
+}
+
+/** Applies the block morph to one side's geometry, skipping the work when
+ *  the pair hasn't moved since the last frame. */
+function applyBlockHeights(
+  geometry: THREE.BufferGeometry,
+  cache: { current: { spineH: number; foreH: number } },
+  spineH: number,
+  foreH: number
+): void {
+  if (cache.current.spineH === spineH && cache.current.foreH === foreH) return
+  cache.current = { spineH, foreH }
+  const position = geometry.getAttribute('position') as THREE.BufferAttribute
+  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute
+  updateStackBlock(position.array as Float32Array, uv.array as Float32Array, spineH, foreH)
+  position.needsUpdate = true
+  uv.needsUpdate = true
+  geometry.computeVertexNormals()
 }
 
 /** Flat page BufferGeometry shared by both static pages (built once, disposed on unmount).
@@ -191,17 +230,25 @@ export function Book() {
   const turning = useStorybookStore((s) => s.turning)
   const { paper, leather, crease } = useBookTextures()
   const pageGeometry = usePageGeometry()
-  const wedgeGeometry = useWedgeGeometry()
+  const rightBlockGeometry = useBlockGeometry()
+  const leftBlockGeometry = useBlockGeometry()
   const { frame, committedSpread } = useTurnDriver()
   const outerGroupRef = useRef<THREE.Group>(null)
   const frontCoverRef = useRef<THREE.Group>(null)
-  // Tilt/stack consumers driven per frame (see the rest-pose block in the
-  // useFrame below): the two static page CARDS (print + rim ribbons, so
-  // the whole card tilts as one) and the two stack wedges.
+  // Tilt/stack consumers driven per frame (see the rest-pose and cover-
+  // mechanics blocks in the useFrame below): the two static page CARDS
+  // (print + rim ribbons, so the whole card tilts as one), the two
+  // morphing stack blocks, the spine wall, the pop-up container, the
+  // traveling endpaper assembly, and the left statics' visibility.
   const rightPageRef = useRef<THREE.Group>(null)
   const leftPageRef = useRef<THREE.Group>(null)
-  const rightWedgeRef = useRef<THREE.Mesh>(null)
-  const leftWedgeRef = useRef<THREE.Mesh>(null)
+  const leftPedestalRef = useRef<THREE.Mesh>(null)
+  const leftBlockRef = useRef<THREE.Mesh>(null)
+  const rightBlockCache = useRef({ spineH: -1, foreH: -1 })
+  const leftBlockCache = useRef({ spineH: -1, foreH: -1 })
+  const spineRef = useRef<THREE.Mesh>(null)
+  const popupsRef = useRef<THREE.Group>(null)
+  const coverPadRef = useRef<THREE.Group>(null)
   // Boot sentinel counters (see the markBooted block in the useFrame below).
   const bootFrames = useRef(0)
   const bootElapsedMs = useRef(0)
@@ -305,16 +352,24 @@ export function Book() {
     () => new THREE.MeshStandardMaterial({ color: '#c9b078', roughness: 0.9 }),
     []
   )
-  // Closed book (spread 0): the shut block shows the SAME nine striped
-  // sheet edges on its fore and z faces (box face order: +x, -x, +y, -y,
-  // +z, -z — spine/top/bottom stay plain, they sit against spine board,
-  // cover, and back cover).
-  const closedBoxMaterials = useMemo(() => {
-    const plain = () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.85 })
-    const striped = () =>
-      new THREE.MeshStandardMaterial({ map: stackEdgeTextures.right[0], roughness: 0.85 })
-    return [striped(), plain(), plain(), plain(), striped(), striped()]
-  }, [stackEdgeTextures])
+  // Traveling endpaper page: spread 1's left print, glued to the cover's
+  // inside for cover turns (and the shut book, where it tucks between the
+  // cover and the block). Its map/rim tint swap in the useFrame below on
+  // the driver clock, like every other print the eye can catch mid-turn.
+  const coverPageMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: paper,
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+        vertexColors: true,
+      }),
+    [paper]
+  )
+  const coverRimMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.92, side: THREE.DoubleSide }),
+    []
+  )
   useEffect(
     () => () => {
       for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) t.dispose()
@@ -324,7 +379,8 @@ export function Book() {
       leftRimMaterial.dispose()
       sheetRimMaterial.dispose()
       pedestalMaterial.dispose()
-      for (const m of closedBoxMaterials) m.dispose()
+      coverPageMaterial.dispose()
+      coverRimMaterial.dispose()
     },
     [
       stackEdgeTextures,
@@ -334,7 +390,8 @@ export function Book() {
       leftRimMaterial,
       sheetRimMaterial,
       pedestalMaterial,
-      closedBoxMaterials,
+      coverPageMaterial,
+      coverRimMaterial,
     ]
   )
 
@@ -402,16 +459,11 @@ export function Book() {
   // the lifting cover reveals them, rather than popping in only once the
   // turn commits).
   const isOpen = spreadOpen || turning !== null
-  // True for the entire duration of a cover turn (spread/turning are both
-  // committed store state, so this is stable across the whole animation,
-  // not a per-frame value). The front cover doubles as the left stack's
-  // support board only at its fully-open rest pose (see FRONT_LOCAL_Y
-  // above) — mid-rotation it is neither under the left pages (closing) nor
-  // yet under them (opening), so the left static page/block must stay
-  // hidden for the whole turn and only reappear once `completeTurn()`
-  // lands the cover on its new rest pose.
-  const isCoverTurning = turning !== null && isCoverTurn(spread, turning)
-  const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
+  // NOTE: cover-turn hiding/revealing of the left statics, the traveling
+  // endpaper, the spine wall's height, and the block morph are ALL driven
+  // per frame in the useFrame below off the driver refs — a React-clock
+  // `isCoverTurning` prop here swapped whole assemblies one commit late at
+  // the turn's endpoints (the round-5 left-side pop-in).
 
   // Current spread ± 2 with actual pop-up content, so neighboring layer
   // textures are already warm by the time you turn to them (see
@@ -528,27 +580,85 @@ export function Book() {
       sheetBackMaterial.color.lerpColors(SHEET_WHITE, SHEET_BACK_SHADE, shade)
     }
 
-    // Bulge rest poses, on this same clock and with the SAME side-index
-    // rule as the print swaps above: the side that LOSES the flying sheet
-    // re-tilts (and its stack wedge shrinks) at lift-off, hidden under the
-    // barely-lifted sheet; the side that GAINS it re-tilts at commit,
-    // hidden under the just-landed sheet (derive-bulge.mjs A16/A17 — the
-    // sheet's tilted sweep starts and ends exactly in these planes).
+    // Bulge rest poses + cover mechanics, on this same clock and with the
+    // SAME side-index rule as the print swaps above: the side that LOSES
+    // the flying sheet re-tilts (and its stack block shrinks) at lift-off,
+    // hidden under the barely-lifted sheet; the side that GAINS it re-tilts
+    // at commit, hidden under the just-landed sheet (derive-bulge.mjs
+    // A16/A17 — the sheet's tilted sweep starts and ends in these planes).
     const rightIdx = revealDir === 'next' ? sp + 1 : sp
     const leftIdx = revealDir === 'prev' ? sp - 1 : sp
-    if (rightPageRef.current) rightPageRef.current.rotation.z = restAngles(rightIdx).aR
-    if (leftPageRef.current) leftPageRef.current.rotation.z = -restAngles(leftIdx).aL
-    if (rightWedgeRef.current) {
-      // +1: the current right page's own sheet stays IN the right stack
-      // until it flies (see restAngles' count note).
-      rightWedgeRef.current.scale.y = Math.max(
-        (INTERIOR_SHEETS + 1 - Math.max(1, rightIdx)) * SHEET_STACK_T,
-        1e-4
-      )
+    // The ONE open fraction every cover-turn consumer gears to: the board's
+    // eased rotation, the block's binding relaxation, the title page riding
+    // the block top, the pop-up hinge height, and the spine wall. 1 for the
+    // whole open book (interior turns included), 0 shut, eased mid-cover.
+    const coverFlight = f !== null && f.isCover
+    const openA = coverFlight
+      ? f.dir === 'next'
+        ? easeTurnWeighted(f.t)
+        : 1 - easeTurnWeighted(f.t)
+      : sp > 0
+        ? 1
+        : 0
+    // Block morph (page-geometry's updateStackBlock): the sheet band's
+    // spine side relaxes into the valley as the cover opens; the fore edge
+    // holds the stack silhouette. +1 in the right count: the current right
+    // page's own sheet stays IN the right stack until it flies.
+    applyBlockHeights(
+      rightBlockGeometry,
+      rightBlockCache,
+      BLOCK_SHEETS_H * (1 - openA),
+      Math.max((INTERIOR_SHEETS + 1 - Math.max(1, rightIdx)) * SHEET_STACK_T, 1e-4)
+    )
+    applyBlockHeights(
+      leftBlockGeometry,
+      leftBlockCache,
+      0,
+      Math.max((leftIdx - 1) * SHEET_STACK_T, 1e-4)
+    )
+    // The title page lies ON the relaxing block: its hinge rides the
+    // block's spine-top corner and its tilt opens to exactly restAngles'
+    // aR at openA = 1 (same asin — the cover-turn hand-off coincidence).
+    const pageHingeY = BACK_COVER_TOP + STACK_PEDESTAL + BLOCK_SHEETS_H * (1 - openA) + BOOK.pageLift
+    if (rightPageRef.current) {
+      rightPageRef.current.position.y = pageHingeY
+      rightPageRef.current.rotation.z = coverFlight
+        ? Math.asin((BLOCK_SHEETS_H * openA) / PAGE_W)
+        : restAngles(rightIdx).aR
+      // Driver-clock visibility: after a cover CLOSE commits, React keeps
+      // this group mounted for a frame or two while spread is already 0 —
+      // and its rest tilt (aR) would poke the fore edge up through the shut
+      // cover for exactly those frames (caught by flash-hunt cover-close).
+      rightPageRef.current.visible = coverFlight || sp >= 1
     }
-    if (leftWedgeRef.current) {
-      leftWedgeRef.current.scale.y = Math.max((leftIdx - 1) * SHEET_STACK_T, 1e-4)
+    if (popupsRef.current) popupsRef.current.position.y = pageHingeY + 0.0015
+    // Left statics: hidden for the whole cover flight (the traveling
+    // endpaper below plays their part), shown the instant the commit lands
+    // — same rAF as the driver's completeTurn, so there is no React-clock
+    // gap at either endpoint.
+    const leftShown = !coverFlight && sp >= 1
+    if (leftPageRef.current) {
+      leftPageRef.current.rotation.z = -restAngles(leftIdx).aL
+      leftPageRef.current.visible = leftShown
     }
+    if (leftPedestalRef.current) leftPedestalRef.current.visible = leftShown
+    if (leftBlockRef.current) leftBlockRef.current.visible = leftShown
+    // Spine wall: a standing ridge exactly as tall as the shut sandwich,
+    // collapsing to cover thickness as the book opens flat.
+    if (spineRef.current) {
+      const wallH = SPINE_FLAT_HEIGHT + (SPINE_HEIGHT - SPINE_FLAT_HEIGHT) * (1 - openA)
+      spineRef.current.scale.y = wallH
+      spineRef.current.position.y = wallH / 2
+    }
+    // Traveling endpaper (pad + spread 1's left page card, glued inside the
+    // front cover): visible whenever the book is shut or the cover flies.
+    if (coverPadRef.current) coverPadRef.current.visible = coverFlight || sp === 0
+    const coverLeftWanted = prints[1]?.left
+    if (coverLeftWanted && coverPageMaterial.map !== coverLeftWanted) {
+      coverPageMaterial.map = coverLeftWanted
+      coverPageMaterial.needsUpdate = true
+    }
+    coverRimMaterial.color.copy(pageEdgeTints[1])
     // Matching stripe maps for the stacks (same clock, same indices).
     const rightStripes = stackEdgeTextures.right[Math.min(Math.max(rightIdx, 0), SPREAD_MAX)]
     if (rightStripes && rightStackMaterial.map !== rightStripes) {
@@ -570,27 +680,32 @@ export function Book() {
 
     const cover = frontCoverRef.current
     const outer = outerGroupRef.current
-    if (!f || !f.isCover || !cover || !outer) return
+    if (!coverFlight || !cover || !outer) return
 
-    const eased = easeTurn(f.t)
-    const openAmount = f.dir === 'next' ? eased : 1 - eased
     // Positive theta (not the naive -pi*eased mirror of the sheet angle):
     // FRONT_LOCAL_Y is positive (the cover mesh sits above its pivot at
     // rest), so a positive rotation swings it up through +Y first, arcing
     // over the spine like a real hinge. The opposite sign sends it straight
     // through the desk (verified: worldY dips to ~-0.52 at the midpoint,
     // well below the y=0 desk plane — invisible, not lifting).
-    cover.rotation.z = f.dir === 'next' ? Math.PI * eased : Math.PI * (1 - eased)
-    outer.position.x = CLOSED_CENTER_OFFSET_X * (1 - openAmount)
+    // easeTurnWeighted (not the old cubic): the board must share the exact
+    // eased number the pop-ups, block morph and riding page use — one
+    // clock, one easing, or the endpaper visibly shears off the paper
+    // glued to it mid-flight.
+    cover.rotation.z = Math.PI * openA
+    outer.position.x = CLOSED_CENTER_OFFSET_X * (1 - openA)
   })
 
   return (
     <group ref={outerGroupRef} position={[spread === 0 ? CLOSED_CENTER_OFFSET_X : 0, 0, 0]}>
       {/* Spine: a standing ridge along the hinge edge when closed; lies flat
           under the spread once open (real open books have no wall down the
-          middle) — same footprint, just collapsed to cover thickness. */}
-      <mesh position={[-0.02, spineHeight / 2, 0]} material={leatherMaterial}>
-        <boxGeometry args={[0.05, spineHeight, BOOK.coverH]} />
+          middle) — same footprint, just collapsed to cover thickness. Unit
+          height: scale.y/position.y are driven per frame in the useFrame
+          above so the wall sinks WITH the cover turn instead of snapping
+          at commit. */}
+      <mesh ref={spineRef} position={[-0.02, SPINE_HEIGHT / 2, 0]} scale={[1, SPINE_HEIGHT, 1]} material={leatherMaterial}>
+        <boxGeometry args={[0.05, 1, BOOK.coverH]} />
       </mesh>
 
       {/* Gutter crease: soft dark shadow where the open pages meet the spine.
@@ -621,55 +736,44 @@ export function Book() {
         <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
       </mesh>
 
-      {/* Page stacks. CLOSED, all sheets lie flat on the right: one
-          full-height box carrying the shut-book silhouette (the front
-          cover's rest heights are keyed to it). OPEN, each side becomes a
-          pedestal (endpapers/margins) plus a stack WEDGE climbing from the
-          gutter valley to the fore-edge — a rigid tilted page cannot drape
-          over a full box, and a real open stack IS this wedge. The wedges'
-          y scale (sheets * SHEET_STACK_T) trades side to side per frame in
-          the useFrame above, on the driver clock with the page tilts. */}
-      {!spreadOpen ? (
-        <mesh
-          position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
-          material={closedBoxMaterials}
-        >
-          <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
-        </mesh>
-      ) : (
-        <>
-          <mesh
-            position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
-            material={pedestalMaterial}
-          >
-            <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
-          </mesh>
-          <mesh
-            ref={rightWedgeRef}
-            position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
-            scale={[1, 1e-4, 1]}
-            geometry={wedgeGeometry}
-            material={rightStackMaterial}
-          />
-        </>
-      )}
+      {/* Right page stack: pedestal (endpapers/margins) + the morphing
+          block (page-geometry's buildStackBlock). One mesh serves every
+          state — the shut slab, the open wedge climbing from the gutter
+          valley to the fore-edge, and the cover-turn relaxation between —
+          its two heights driven per frame in the useFrame above, on the
+          driver clock with the page tilts. */}
+      <mesh
+        position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
+        material={pedestalMaterial}
+      >
+        <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
+      </mesh>
+      <mesh
+        position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
+        geometry={rightBlockGeometry}
+        material={rightStackMaterial}
+      />
 
-      {/* Left pedestal + wedge. Hidden for the whole duration of a cover
-          turn — see isCoverTurning above — since a 'prev' cover turn would
-          leave them floating once the cover lifts out from under them. */}
-      {isOpen && !isCoverTurning && (
+      {/* Left pedestal + block. Mounted with the open book but VISIBILITY-
+          driven per frame (the useFrame above): hidden for the whole cover
+          flight — the traveling endpaper under the cover plays their part
+          — and shown in the same rAF the commit lands. */}
+      {isOpen && (
         <>
           <mesh
+            ref={leftPedestalRef}
+            visible={false}
             position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
             material={pedestalMaterial}
           >
             <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
           </mesh>
           <mesh
-            ref={leftWedgeRef}
+            ref={leftBlockRef}
+            visible={false}
             position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
-            scale={[-1, 1e-4, 1]}
-            geometry={wedgeGeometry}
+            scale={[-1, 1, 1]}
+            geometry={leftBlockGeometry}
             material={leftStackMaterial}
           />
         </>
@@ -702,13 +806,12 @@ export function Book() {
 
       {/* Static left page card, mirrored across the spine (the group's
           x-mirror flips the print mesh AND the rims together; rims are
-          DoubleSide so the flipped winding can't cull them). Hidden for
-          the whole duration of a cover turn (see isCoverTurning above) —
-          the front cover is its support board only at rest, so revealing
-          it any earlier than the turn's commit makes it appear to float
-          past the book's edge, unsupported. */}
-      {isOpen && !isCoverTurning && (
-        <group ref={leftPageRef} position={[0, PAGE_SURFACE_Y, 0]} scale={[-1, 1, 1]}>
+          DoubleSide so the flipped winding can't cull them). Visibility is
+          driven per frame with the other left statics (see the useFrame
+          above): hidden through a cover flight, shown the rAF the commit
+          lands — exactly where the traveling endpaper card stops. */}
+      {isOpen && (
+        <group ref={leftPageRef} visible={false} position={[0, PAGE_SURFACE_Y, 0]} scale={[-1, 1, 1]}>
           <mesh geometry={pageGeometry} material={leftPageMaterial} />
           <mesh material={leftRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
             <planeGeometry args={[PAGE_H, RIM_T]} />
@@ -739,7 +842,7 @@ export function Book() {
           above) to keep neighboring textures warm, but each PopupSpread
           only renders visibly while it's the current spread. */}
       {isOpen && (
-        <group position={[0, POPUP_Y, 0]}>
+        <group ref={popupsRef} position={[0, POPUP_Y, 0]}>
           {popupSpreadIndices.map((i) => {
             const content = popupContentForSpread(i)
             if (!content) return null
@@ -775,6 +878,31 @@ export function Book() {
         <mesh position={[BOOK.coverW / 2, FRONT_LOCAL_Y, 0]} material={leatherMaterial}>
           <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
         </mesh>
+        {/* Traveling endpaper: the binding-margin pad and spread 1's left
+            page card GLUED to the cover's inside, riding it through cover
+            turns (visibility per frame, useFrame above). Shut, the pad
+            fills the sandwich gap between cover and block; open, the whole
+            assembly lands exactly on the static left pedestal + page pose
+            (see PAD_LOCAL_Y/COVER_PAGE_LOCAL_Y), so the commit swap to the
+            statics is invisible. */}
+        <group ref={coverPadRef} visible={false}>
+          <mesh position={[BLOCK_WIDTH / 2, PAD_LOCAL_Y, 0]} material={pedestalMaterial}>
+            <boxGeometry args={[BLOCK_WIDTH, FRONT_PAD, BLOCK_DEPTH]} />
+          </mesh>
+          <mesh geometry={pageGeometry} material={coverPageMaterial} position={[0, COVER_PAGE_LOCAL_Y, 0]} />
+          {/* Card rims, +RIM_T/2 in local y: the pivot's PI rotation lands
+              them a half-rim UNDER the page surface, matching the static
+              left card's layout. */}
+          <mesh material={coverRimMaterial} position={[PAGE_W, COVER_PAGE_LOCAL_Y + RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[PAGE_H, RIM_T]} />
+          </mesh>
+          <mesh material={coverRimMaterial} position={[PAGE_W / 2, COVER_PAGE_LOCAL_Y + RIM_T / 2, PAGE_H / 2]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+          <mesh material={coverRimMaterial} position={[PAGE_W / 2, COVER_PAGE_LOCAL_Y + RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+        </group>
         {/* Crest/corners/title — moves with the cover through the whole
             turn since it's mounted in the same pivot group as the box
             above (task 19). */}
