@@ -40,7 +40,7 @@ vi.mock('@/components/labs/memory-card/audio', () => ({
 
 // The 3D layer needs a WebGL context jsdom can't provide. Swap the shared canvas
 // and the two scene components for inert nodes so these tests exercise the
-// screen's own DOM (index + story band), not GL behaviour.
+// screen's own DOM (the slot index + its expanded active card), not GL behaviour.
 vi.mock('@/components/labs/memory-card/three/stage', () => ({
   VignetteCanvas: ({ children }: { children: ReactNode }) => (
     <div data-testid="vignette-canvas">{children}</div>
@@ -62,7 +62,7 @@ const saves = buildSaves(projects)
 describe('SaveSelectScreen', () => {
   beforeEach(() => push.mockClear())
 
-  it('routes to the save panel when the story-band LOAD button fires', () => {
+  it('routes to the save panel when the active card LOAD button fires', () => {
     render(<SaveSelectScreen />)
     fireEvent.click(screen.getByRole('button', { name: /load slot 01/i }))
     expect(push).toHaveBeenCalledWith('/labs/memory-card/save/amio-bank')
@@ -77,7 +77,7 @@ describe('SaveSelectScreen', () => {
   it('opens a system dialog (never routes) when a system save is activated', () => {
     render(<SaveSelectScreen />)
     // Slot 04 is the first system save (system data / bio). Anchor to the rail
-    // row so the story-band's "load slot 04" button doesn't also match. First
+    // row so the expanded card's "load slot 04" button doesn't also match. First
     // click highlights it, second activates it → the dialog opens over the
     // still-mounted screen; nothing routes (system saves have no project).
     const railRow = () => screen.getByRole('button', { name: /^slot 04/i })

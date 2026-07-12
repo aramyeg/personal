@@ -82,9 +82,11 @@ import { useMemoryCardAudioActions } from './audio-context'
 const SESSION_KEY = 'memory-card-booted'
 const BEAT_DURATION_MS = 3000
 /** How long before the hard end the surface begins fading out to reveal the
- *  select screen. Kept shorter than the fade duration below so it reaches ~0
- *  right as the overlay unmounts (no flash on the cut). Timer-end only — a skip
- *  removes the overlay instantly, no fade. */
+ *  select screen. This same value also drives the fade's own duration (see the
+ *  motion transition below), so the fade's lead-in EQUALS the fade duration: it
+ *  begins EXIT_MS before the end and lasts EXIT_MS, reaching ~0 right as the
+ *  overlay unmounts (no flash on the cut). Timer-end only — a skip removes the
+ *  overlay instantly, no fade. */
 const EXIT_MS = 460
 
 /** PS controller face-button layout, clockwise from the top; each glyph reveals
@@ -240,7 +242,7 @@ export function BootBeat({ onActiveChange }: BootBeatProps) {
         style={{ width: 'clamp(200px, 40vmin, 360px)', height: 'clamp(200px, 40vmin, 360px)' }}
         // A slow shared breath after the reveal settles — confident, not a flicker.
         animate={{ scale: [1, 1.025, 1] }}
-        transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut', delay: 0.9 }}
+        transition={{ duration: 2.6, repeat: Infinity, ease: MOTION.easeLoop, delay: 0.9 }}
       >
         {DIAMOND.map(({ glyph, position }, i) => (
           <div

@@ -70,23 +70,6 @@ export function inkAlpha(a: number): string {
   return withAlpha(MC.ink, a)
 }
 
-/**
- * The character-select void: a layered CSS background string for the whole
- * stage, tinted by the active save's accent. A soft accent atmosphere pools
- * high-centre (behind the objects), a cool radial lifts the mid-stage out of
- * the abyss, and a reflective floor band warms the lower third so the 3D
- * objects read as standing on a lit plane. Pure token colours — the only
- * variable is `accent`, so every save re-lights the same room in its colour.
- */
-export function voidBackdrop(accent: string): string {
-  return [
-    `radial-gradient(120% 88% at 50% -12%, ${withAlpha(accent, 0.16)} 0%, transparent 46%)`,
-    `radial-gradient(78% 62% at 50% 30%, ${MC.haze} 0%, transparent 70%)`,
-    `radial-gradient(140% 70% at 50% 118%, ${withAlpha(accent, 0.1)} 0%, transparent 55%)`,
-    `linear-gradient(180deg, ${MC.abyss} 0%, ${MC.ink} 42%, ${MC.ink} 70%, ${MC.abyss} 100%)`,
-  ].join(', ')
-}
-
 // ---- Ink ramp (spec §3): cool-cast ladder, #08090C → #262A33 -------------
 /**
  * Depth on the select screen is built from lightness LAYERS, not shadows. Every
@@ -118,6 +101,10 @@ export const MOTION = {
   easeMove: 'cubic-bezier(0.86, 0, 0.07, 1)',
   easeEntranceArr: [0.19, 1, 0.22, 1] as [number, number, number, number],
   easeMoveArr: [0.86, 0, 0.07, 1] as [number, number, number, number],
+  /** Symmetric ambient loop ease for in-place breaths/pulses (e.g. the boot
+   *  diamond's breath) — the two asymmetric signature curves above don't fit a
+   *  looping in-and-out motion. */
+  easeLoop: 'easeInOut',
   /** Signature select transition — one shared timing, seconds. */
   select: 0.28,
   /** Entrance reveal duration + inter-item stagger, seconds. */
@@ -180,18 +167,3 @@ export const GLYPH_PATHS: Record<GlyphName, string> = {
   cross: 'M5 5 L19 19 M19 5 L5 19',
   square: 'M5 5 H19 V19 H5 Z',
 }
-
-// ---- Component: per-role type scale --------------------------------------
-export const TYPE = {
-  display: 'clamp(3.5rem, 11vw, 8.5rem)', // Anton, uppercase, line-height 0.92
-  h2: 'clamp(2rem, 5vw, 3.5rem)',
-  label: '0.75rem', // mono, letter-spacing 0.2em, uppercase
-  body: '1.0625rem', // Space Grotesk, line-height 1.6
-} as const
-
-/** Rail save-label sticker paper — brighter than MC.paper so the printed
- *  sticker reads as fresh label stock against the grey shell. */
-export const STICKER_PAPER = {
-  top: '#f2f0ea', // gradient top of the sticker field
-  field: '#f6f5f1', // flat label area
-} as const
