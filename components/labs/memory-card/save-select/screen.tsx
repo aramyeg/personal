@@ -314,8 +314,9 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
           </h1>
         </div>
 
-        {/* SLOT SELECT — the spec-sheet index, right half. */}
-        <div className="relative z-[5] mt-8 lg:absolute lg:bottom-[22vh] lg:right-0 lg:top-0 lg:mt-0 lg:w-[46%] lg:overflow-y-auto lg:pl-6 lg:pr-10">
+        {/* SLOT SELECT — the spec-sheet index, right half. Bottom clears the
+            display title's text band (which is bottom-anchored in the 20vh row). */}
+        <div className="relative z-[5] mt-8 lg:absolute lg:bottom-[16vh] lg:right-0 lg:top-0 lg:mt-0 lg:w-[46%] lg:overflow-y-auto lg:pl-6 lg:pr-10">
           <SlotSelect
             saves={saves}
             activeIndex={activeIndex}

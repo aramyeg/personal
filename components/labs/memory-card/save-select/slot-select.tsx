@@ -176,8 +176,8 @@ function Story({ children }: { children: ReactNode }) {
       data-reveal
       style={{
         fontFamily: grotesk.style.fontFamily,
-        fontSize: '0.875rem',
-        lineHeight: 1.55,
+        fontSize: '0.8125rem',
+        lineHeight: 1.5,
         color: paperAlpha(0.74),
         maxWidth: '54ch',
       }}
@@ -239,7 +239,7 @@ function ProjectDetail({ save }: { save: SaveSlot }) {
     <>
       <Story>{project.longDescription}</Story>
       <Chips items={project.technologies.map((t) => t.toLowerCase())} />
-      <div data-reveal className="grid grid-cols-3 gap-x-5 gap-y-3">
+      <div data-reveal className="grid grid-cols-3 gap-x-5 gap-y-2">
         {metrics.map((metric) => (
           <StatTile key={metric} metric={metric} accent={save.accent} />
         ))}
@@ -309,7 +309,7 @@ function ContactDetail() {
 
 function ActiveDetail({ save, onLoad }: { save: SaveSlot; onLoad: () => void }) {
   return (
-    <div className="flex flex-col gap-4" style={{ paddingLeft: 52, paddingTop: 12, paddingBottom: 14 }}>
+    <div className="flex flex-col gap-3" style={{ paddingLeft: 52, paddingTop: 10, paddingBottom: 12 }}>
       {save.kind === 'project' && <ProjectDetail save={save} />}
       {save.kind === 'bio' && <BioDetail save={save} />}
       {save.kind === 'stack' && <StackDetail save={save} />}
@@ -355,8 +355,8 @@ function Row({ save, active, first, buttonRef, onClick, onLoad }: RowProps) {
         className={`grid w-full items-center gap-4 text-left ${FOCUS_RING}`}
         style={{
           gridTemplateColumns: '36px 1fr auto',
-          minHeight: 46,
-          padding: active ? '13px 8px 8px 12px' : '11px 8px 11px 12px',
+          minHeight: 44,
+          padding: active ? '12px 8px 6px 12px' : '9px 8px 9px 12px',
         }}
       >
         {/* slot numeral + accent tick (the row's own owned colour) */}
