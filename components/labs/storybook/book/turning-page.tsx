@@ -39,7 +39,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'rea
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurnWeighted } from './page-geometry'
-import { sheetAngle } from './popup-mechanics'
+import { sheetAngleTilted } from './popup-mechanics'
 import { makeCanvasTexture } from './book'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import type { TurnFrame } from './use-turn-driver'
@@ -71,13 +71,18 @@ const PAPER_EDGE_COLOR = '#d8c491'
 
 export function TurningPage({
   frame,
+  committedSpread,
   originY,
   frontMaterial,
   backMaterial,
 }: {
   frame: RefObject<TurnFrame | null>
-  /** World-space Y of the stack this page is currently departing from
-   *  (matches the static page it was, per book.tsx's own height formula). */
+  /** Driver ref (same clock as `frame`): the tilted sweep's endpoints are
+   *  the rest planes of the spread being left and the one being landed
+   *  (sheetAngleTilted / derive-bulge A16). */
+  committedSpread: RefObject<number>
+  /** World-space Y of the shared hinge line the sheet pivots on
+   *  (book.tsx's PAGE_SURFACE_Y — the gutter valley floor). */
   originY: number
   /** The sheet's two printed faces, owned and frame-loop-updated by
    *  book.tsx (see its sheetFront/sheetBackMaterial). Front shows the face
@@ -156,7 +161,7 @@ export function TurningPage({
     if (!active || !f) return
 
     const eased = easeTurnWeighted(f.t)
-    pivot.rotation.z = sheetAngle(f.dir, eased)
+    pivot.rotation.z = sheetAngleTilted(f.dir, eased, committedSpread.current)
 
     const tClamped = Math.min(1, Math.max(0, f.t))
     shade.material.opacity = SHADE_MAX_OPACITY * Math.sin(Math.PI * Math.pow(tClamped, SHADE_PEAK_EXPONENT))

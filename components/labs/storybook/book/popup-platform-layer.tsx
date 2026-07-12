@@ -28,7 +28,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
-import { liveSpreadRole, spreadPageAngles, type PlatformGeom, type SpreadRole } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type PlatformGeom } from './popup-mechanics'
 import { solvePlatformPose, type PlatformFace } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -224,8 +224,12 @@ export function PlatformPopupLayer({
     const f = frame.current
     // Role from the driver refs, never a React prop (see liveSpreadRole).
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
-    const { thetaL, thetaR } = spreadPageAngles(solveRole, f?.dir ?? null, f ? easeTurnWeighted(f.t) : 0)
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
+      f?.dir ?? null,
+      f ? easeTurnWeighted(f.t) : 0
+    )
     const beta = thetaL - thetaR
 
     const visible = role !== 'hidden' && beta > FLAT_EPSILON

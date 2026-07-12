@@ -7,6 +7,7 @@ import {
   SHEET_STACK_T,
   STACK_PEDESTAL,
   buildPageTemplate,
+  buildStackWedge,
   easeTurn,
   easeTurnWeighted,
   restAngles,
@@ -129,6 +130,20 @@ describe('bulge rest poses (derive-bulge.mjs theorems A16-A20)', () => {
         expect(r).toBeGreaterThan(0)
         expect(r).toBeLessThan(FLAT_EPSILON)
       }
+    }
+  })
+})
+
+describe('buildStackWedge', () => {
+  it('is a unit-height wedge: y=0 at the spine, y=1 only at the fore-edge', () => {
+    const { positions, indices } = buildStackWedge(1.2, 1.5)
+    expect(positions.length).toBe(18 * 3)
+    expect(indices.length).toBe(24)
+    for (let i = 0; i < positions.length; i += 3) {
+      const [x, y] = [positions[i], positions[i + 1]]
+      expect(y === 0 || y === 1).toBe(true)
+      if (y === 1) expect(x).toBeCloseTo(1.2, 6) // height only at the fore-edge (float32)
+      if (x === 0) expect(y).toBe(0) // spine edge sits on the valley floor
     }
   })
 })

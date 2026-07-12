@@ -146,3 +146,41 @@ export function restAngles(spread: number): RestPose {
     hR,
   }
 }
+
+/**
+ * Unit stack wedge: the OPEN book's per-side page stack. A rigid tilted
+ * page can't drape over a full-height box (the plane would cut through
+ * it); a real open stack is exactly this wedge — sheet edges climbing
+ * from the gutter valley to the fore-edge. Cross-section: y=0 at the
+ * spine (x=0) rising linearly to y=1 at x=width; the caller scales y to
+ * `sheets * SHEET_STACK_T` per frame, so one static geometry serves every
+ * spread. Flat-shaded (duplicated verts), no uvs (solid edge material).
+ */
+export function buildStackWedge(
+  width: number,
+  depth: number
+): { positions: Float32Array; indices: Uint16Array } {
+  const d = depth / 2
+  // prettier-ignore
+  const positions = new Float32Array([
+    // bottom (-y): CCW from below
+    0, 0, -d,  width, 0, -d,  width, 0, d,  0, 0, d,
+    // slope (top): outward up-left
+    0, 0, -d,  0, 0, d,  width, 1, d,  width, 1, -d,
+    // fore face (+x)
+    width, 0, d,  width, 0, -d,  width, 1, -d,  width, 1, d,
+    // near end (+z)
+    0, 0, d,  width, 0, d,  width, 1, d,
+    // far end (-z)
+    0, 0, -d,  width, 1, -d,  width, 0, -d,
+  ])
+  // prettier-ignore
+  const indices = new Uint16Array([
+    0, 3, 2, 0, 2, 1,       // bottom (wound for -y)
+    4, 5, 6, 4, 6, 7,       // slope
+    8, 9, 10, 8, 10, 11,    // fore
+    12, 13, 14,             // +z end
+    15, 16, 17,             // -z end
+  ])
+  return { positions, indices }
+}

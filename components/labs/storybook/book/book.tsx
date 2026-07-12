@@ -19,7 +19,18 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStorybookStore } from '../store'
 import { SPREAD_COUNT, popupContentForSpread } from '../content'
-import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn, easeTurnWeighted } from './page-geometry'
+import {
+  INTERIOR_SHEETS,
+  PAGE_H,
+  PAGE_W,
+  SHEET_STACK_T,
+  STACK_PEDESTAL,
+  buildPageTemplate,
+  buildStackWedge,
+  easeTurn,
+  easeTurnWeighted,
+  restAngles,
+} from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
@@ -56,15 +67,17 @@ const SPINE_HEIGHT = BOOK.coverT * 2 + BOOK.blockMaxH
 // BOOK.coverH depth still exceeds the page block's BLOCK_DEPTH, so it
 // peeks out beyond the pages at the near/far (top/bottom) edges only.
 const SPINE_FLAT_HEIGHT = BOOK.coverT
-// The ONE hinge plane everything paper shares: both static page surfaces,
-// the turning sheet's pivot, and the pop-up mechanisms' wedge floor. The
-// pop-up physics demands this (see popup-mechanics.ts): the sheet and the
-// paper glued to it hinge on the same line, so an outgoing scene folds
-// EXACTLY into the closing wedge under the sheet — pieces can never poke
-// through the page that is pressing them flat. (Previously pages sat at
-// per-stack heights while pop-ups anchored at the block top: pieces
-// floated ~0.05 above their pages at rest and pierced the sheet mid-turn.)
-const PAGE_SURFACE_Y = BACK_COVER_TOP + BOOK.blockMaxH + BOOK.pageLift
+// The ONE hinge LINE everything paper shares: both static page planes,
+// the turning sheet's pivot, and the pop-up mechanisms' wedge floor all
+// pass through it. The pop-up physics demands this (see popup-mechanics.ts):
+// the sheet and the paper glued to it hinge on the same line, so an
+// outgoing scene folds EXACTLY into the closing wedge under the sheet.
+// Since the bulge model (derive-bulge.mjs, HINGE_KAPPA = 0) the line sits
+// at the gutter VALLEY floor — pedestal height, constant for every spread
+// — and the page PLANES tilt up from it by their per-spread rest angles
+// (restAngles): the open book dips at the gutter and the stacks fan up to
+// the fore-edges, trading thickness side to side as you read.
+const PAGE_SURFACE_Y = BACK_COVER_TOP + STACK_PEDESTAL + BOOK.pageLift
 // Gutter crease: the valley strip laid flat over the seam where the open
 // pages meet, just above the page surfaces. Widened with the round-4
 // gutter valley (paper-texture.ts makeCreaseCanvas): the concave falloff,
@@ -118,6 +131,21 @@ function useBookTextures(): {
   return { paper, leather, crease }
 }
 
+/** Unit stack-wedge BufferGeometry shared by both open-book stacks (its y
+ *  scale is driven per frame to `sheets * SHEET_STACK_T`). */
+function useWedgeGeometry(): THREE.BufferGeometry {
+  const geometry = useMemo(() => {
+    const { positions, indices } = buildStackWedge(BLOCK_WIDTH, BLOCK_DEPTH)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geo.setIndex(new THREE.BufferAttribute(indices, 1))
+    geo.computeVertexNormals()
+    return geo
+  }, [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  return geometry
+}
+
 /** Flat page BufferGeometry shared by both static pages (built once, disposed on unmount). */
 function usePageGeometry(): THREE.BufferGeometry {
   const geometry = useMemo(() => {
@@ -142,9 +170,16 @@ export function Book() {
   const turning = useStorybookStore((s) => s.turning)
   const { paper, leather, crease } = useBookTextures()
   const pageGeometry = usePageGeometry()
+  const wedgeGeometry = useWedgeGeometry()
   const { frame, committedSpread } = useTurnDriver()
   const outerGroupRef = useRef<THREE.Group>(null)
   const frontCoverRef = useRef<THREE.Group>(null)
+  // Tilt/stack consumers driven per frame (see the rest-pose block in the
+  // useFrame below): the two static page meshes and the two stack wedges.
+  const rightPageRef = useRef<THREE.Mesh>(null)
+  const leftPageRef = useRef<THREE.Mesh>(null)
+  const rightWedgeRef = useRef<THREE.Mesh>(null)
+  const leftWedgeRef = useRef<THREE.Mesh>(null)
   // Boot sentinel counters (see the markBooted block in the useFrame below).
   const bootFrames = useRef(0)
   const bootElapsedMs = useRef(0)
@@ -349,6 +384,23 @@ export function Book() {
       sheetBackMaterial.color.lerpColors(SHEET_WHITE, SHEET_BACK_SHADE, shade)
     }
 
+    // Bulge rest poses, on this same clock and with the SAME side-index
+    // rule as the print swaps above: the side that LOSES the flying sheet
+    // re-tilts (and its stack wedge shrinks) at lift-off, hidden under the
+    // barely-lifted sheet; the side that GAINS it re-tilts at commit,
+    // hidden under the just-landed sheet (derive-bulge.mjs A16/A17 — the
+    // sheet's tilted sweep starts and ends exactly in these planes).
+    const rightIdx = revealDir === 'next' ? sp + 1 : sp
+    const leftIdx = revealDir === 'prev' ? sp - 1 : sp
+    if (rightPageRef.current) rightPageRef.current.rotation.z = restAngles(rightIdx).aR
+    if (leftPageRef.current) leftPageRef.current.rotation.z = -restAngles(leftIdx).aL
+    if (rightWedgeRef.current) {
+      rightWedgeRef.current.scale.y = Math.max((INTERIOR_SHEETS - Math.max(1, rightIdx)) * SHEET_STACK_T, 1e-4)
+    }
+    if (leftWedgeRef.current) {
+      leftWedgeRef.current.scale.y = Math.max((leftIdx - 1) * SHEET_STACK_T, 1e-4)
+    }
+
     const cover = frontCoverRef.current
     const outer = outerGroupRef.current
     if (!f || !f.isCover || !cover || !outer) return
@@ -402,36 +454,74 @@ export function Book() {
         <boxGeometry args={[BOOK.coverW, BOOK.coverT, BOOK.coverH]} />
       </mesh>
 
-      {/* Page blocks: constant full-height stacks under the shared page
-          surface plane (PAGE_SURFACE_Y). Real stacks would trade thickness
-          side to side as you read, but the paper physics needs every sheet
-          hinging on ONE line — the thick-tome look keeps the fore-edges
-          filled at all times. */}
-      <mesh
-        position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
-        material={edgeMaterial}
-      >
-        <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
-      </mesh>
-
-      {/* Left page block. Hidden for the whole duration of a cover turn —
-          see isCoverTurning above — since a 'prev' cover turn would leave
-          it floating once the cover lifts out from under it. */}
-      {isOpen && !isCoverTurning && (
+      {/* Page stacks. CLOSED, all sheets lie flat on the right: one
+          full-height box carrying the shut-book silhouette (the front
+          cover's rest heights are keyed to it). OPEN, each side becomes a
+          pedestal (endpapers/margins) plus a stack WEDGE climbing from the
+          gutter valley to the fore-edge — a rigid tilted page cannot drape
+          over a full box, and a real open stack IS this wedge. The wedges'
+          y scale (sheets * SHEET_STACK_T) trades side to side per frame in
+          the useFrame above, on the driver clock with the page tilts. */}
+      {!spreadOpen ? (
         <mesh
-          position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
+          position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
           material={edgeMaterial}
         >
           <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
         </mesh>
+      ) : (
+        <>
+          <mesh
+            position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
+            material={edgeMaterial}
+          >
+            <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
+          </mesh>
+          <mesh
+            ref={rightWedgeRef}
+            position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
+            scale={[1, 1e-4, 1]}
+            geometry={wedgeGeometry}
+            material={edgeMaterial}
+          />
+        </>
+      )}
+
+      {/* Left pedestal + wedge. Hidden for the whole duration of a cover
+          turn — see isCoverTurning above — since a 'prev' cover turn would
+          leave them floating once the cover lifts out from under them. */}
+      {isOpen && !isCoverTurning && (
+        <>
+          <mesh
+            position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
+            material={edgeMaterial}
+          >
+            <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
+          </mesh>
+          <mesh
+            ref={leftWedgeRef}
+            position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
+            scale={[-1, 1e-4, 1]}
+            geometry={wedgeGeometry}
+            material={edgeMaterial}
+          />
+        </>
       )}
 
       {/* Static pages only exist once the book is open: closed, the mirrored
           left page's footprint (x in [-PAGE_W, 0]) sits outside the front
           cover entirely and would otherwise poke out past the spine. Both
-          lie in the shared hinge plane (see PAGE_SURFACE_Y). */}
+          PLANES pass through the shared hinge line (PAGE_SURFACE_Y) and
+          tilt up from it by their rest angles, set per frame in the
+          useFrame above (rotation about the spine z axis; the mirrored
+          left mesh takes -aL so its fore-edge rises on the -X side). */}
       {isOpen && (
-        <mesh position={[0, PAGE_SURFACE_Y, 0]} geometry={pageGeometry} material={rightPageMaterial} />
+        <mesh
+          ref={rightPageRef}
+          position={[0, PAGE_SURFACE_Y, 0]}
+          geometry={pageGeometry}
+          material={rightPageMaterial}
+        />
       )}
 
       {/* Static left page, mirrored across the spine. Hidden for the whole
@@ -441,6 +531,7 @@ export function Book() {
           book's edge, unsupported. */}
       {isOpen && !isCoverTurning && (
         <mesh
+          ref={leftPageRef}
           position={[0, PAGE_SURFACE_Y, 0]}
           scale={[-1, 1, 1]}
           geometry={pageGeometry}
@@ -453,6 +544,7 @@ export function Book() {
           sheetBackMaterial above) so their maps swap on the driver clock. */}
       <TurningPage
         frame={frame}
+        committedSpread={committedSpread}
         originY={PAGE_SURFACE_Y}
         frontMaterial={sheetFrontMaterial}
         backMaterial={sheetBackMaterial}

@@ -28,11 +28,10 @@ import {
   liveSpreadRole,
   solveBoxPose,
   solveLayerPose,
-  spreadPageAngles,
+  spreadPageAnglesTilted,
   type FanGeom,
   type DressGeom,
   type PanelQuad,
-  type SpreadRole,
 } from './popup-mechanics'
 import { solveDressPose, solvePlatformPose } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
@@ -165,8 +164,12 @@ export function DressPopupLayer({
     const f = frame.current
     // Role from the driver refs, never a React prop (see liveSpreadRole).
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
-    const { thetaL, thetaR } = spreadPageAngles(solveRole, f?.dir ?? null, f ? easeTurnWeighted(f.t) : 0)
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
+      f?.dir ?? null,
+      f ? easeTurnWeighted(f.t) : 0
+    )
     const beta = thetaL - thetaR
 
     const seat =

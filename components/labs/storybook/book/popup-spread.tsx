@@ -31,10 +31,9 @@ import { makeCanvasTexture } from './book'
 import {
   liveSpreadRole,
   solveLayerPose,
-  spreadPageAngles,
+  spreadPageAnglesTilted,
   type MechPose,
   type PanelQuad,
-  type SpreadRole,
 } from './popup-mechanics'
 import { solveRiderPose } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
@@ -293,13 +292,13 @@ function PopupLayer({
 
     const f = frame.current
     // Role derived HERE, from the driver refs — never from a React prop.
-    // At eased t=0 both turn roles coincide with their rest/flat pose for
-    // either direction, so a transition frame where the driver ref hasn't
-    // populated yet can never snap (see popup-mechanics.test.ts, A7).
+    // At eased t=0 both turn roles coincide with their rest pose for either
+    // direction (tilted A16 hand-off coincidence), so a transition frame
+    // where the driver ref hasn't populated yet can never snap.
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
-    const { thetaL, thetaR } = spreadPageAngles(
-      solveRole,
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
       f?.dir ?? null,
       f ? easeTurnWeighted(f.t) : 0
     )
