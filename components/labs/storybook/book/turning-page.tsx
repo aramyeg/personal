@@ -66,8 +66,6 @@ const SHEET_LIFT = 0.004
 // nothing z-fights at the flat poses. At 0.004 the edge-on silhouette is a
 // few pixels — a visible paper edge, exactly what a real page shows.
 const PAPER_T = 0.004
-// Cut-paper edge color, matching the page block's fore-edge stack.
-const PAPER_EDGE_COLOR = '#d8c491'
 
 export function TurningPage({
   frame,
@@ -75,6 +73,7 @@ export function TurningPage({
   originY,
   frontMaterial,
   backMaterial,
+  rimMaterial,
 }: {
   frame: RefObject<TurnFrame | null>
   /** Driver ref (same clock as `frame`): the tilted sweep's endpoints are
@@ -90,24 +89,15 @@ export function TurningPage({
    *  (BackSide, pre-mirrored `left` half — see use-page-print.ts). */
   frontMaterial: THREE.MeshStandardMaterial
   backMaterial: THREE.MeshStandardMaterial
+  /** Rim ribbon material, owned and per-frame-tinted by book.tsx: the cut
+   *  edges wear the identity color of the sheet currently flying. */
+  rimMaterial: THREE.MeshStandardMaterial
 }) {
   const pivotRef = useRef<THREE.Group>(null)
   const cardRef = useRef<THREE.Group>(null)
   const meshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
   const backMeshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
   const shadeRef = useRef<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>>(null)
-
-  // Paper-edge ribbons: DoubleSide because each rim faces the camera on one
-  // half of the sweep and away on the other.
-  const edgeMaterial = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: PAPER_EDGE_COLOR,
-        roughness: 0.92,
-        side: THREE.DoubleSide,
-      }),
-    []
-  )
   // Soft radial-gradient shade (not a flat slab): light reads as passing
   // through the paper with a diffuse penumbra (benchmark B11).
   const shadeCanvas = useMemo(() => makeShadowCanvas(), [])
@@ -126,11 +116,10 @@ export function TurningPage({
 
   useEffect(
     () => () => {
-      edgeMaterial.dispose()
       shadeTexture.dispose()
       shadeMaterial.dispose()
     },
-    [edgeMaterial, shadeTexture, shadeMaterial]
+    [shadeTexture, shadeMaterial]
   )
 
   // Flat page geometry shared by both printed faces, built once before
@@ -179,15 +168,15 @@ export function TurningPage({
           <mesh ref={meshRef} material={frontMaterial} position={[0, PAPER_T / 2, 0]} />
           <mesh ref={backMeshRef} material={backMaterial} position={[0, -PAPER_T / 2, 0]} />
           {/* Fore edge: the cut rim opposite the spine. */}
-          <mesh material={edgeMaterial} position={[PAGE_W, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <mesh material={rimMaterial} position={[PAGE_W, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
             <planeGeometry args={[PAGE_H, PAPER_T]} />
           </mesh>
           {/* Near and far rims (±z). The spine edge stays bare: it lives
               inside the gutter shadow for the whole sweep. */}
-          <mesh material={edgeMaterial} position={[PAGE_W / 2, 0, PAGE_H / 2]}>
+          <mesh material={rimMaterial} position={[PAGE_W / 2, 0, PAGE_H / 2]}>
             <planeGeometry args={[PAGE_W, PAPER_T]} />
           </mesh>
-          <mesh material={edgeMaterial} position={[PAGE_W / 2, 0, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+          <mesh material={rimMaterial} position={[PAGE_W / 2, 0, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
             <planeGeometry args={[PAGE_W, PAPER_T]} />
           </mesh>
         </group>

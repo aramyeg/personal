@@ -97,6 +97,10 @@ const CREASE_WIDTH = 0.16
 const CREASE_Y = PAGE_SURFACE_Y + 0.001
 // Pop-up layers: a hair above the crease strip, effectively ON the page.
 const POPUP_Y = PAGE_SURFACE_Y + 0.0015
+// Open-page card thickness (~1mm at book scale, matching the turning
+// sheet's PAPER_T): the rim ribbons hang this far under the print surface,
+// inside the pageLift gap above the stack wedge — no z-fighting room lost.
+const RIM_T = 0.004
 // Closed book extends only toward +X from the spine (x=0), so it sits
 // right of the HTML CTA's centerline; open, the two blocks/pages already
 // straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
@@ -186,9 +190,10 @@ export function Book() {
   const outerGroupRef = useRef<THREE.Group>(null)
   const frontCoverRef = useRef<THREE.Group>(null)
   // Tilt/stack consumers driven per frame (see the rest-pose block in the
-  // useFrame below): the two static page meshes and the two stack wedges.
-  const rightPageRef = useRef<THREE.Mesh>(null)
-  const leftPageRef = useRef<THREE.Mesh>(null)
+  // useFrame below): the two static page CARDS (print + rim ribbons, so
+  // the whole card tilts as one) and the two stack wedges.
+  const rightPageRef = useRef<THREE.Group>(null)
+  const leftPageRef = useRef<THREE.Group>(null)
   const rightWedgeRef = useRef<THREE.Mesh>(null)
   const leftWedgeRef = useRef<THREE.Mesh>(null)
   // Boot sentinel counters (see the markBooted block in the useFrame below).
@@ -198,10 +203,6 @@ export function Book() {
   const leatherMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: leather, roughness: 0.55 }),
     [leather]
-  )
-  const edgeMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.85 }),
-    []
   )
   const paperMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.DoubleSide }),
@@ -254,13 +255,66 @@ export function Book() {
     () => new THREE.MeshStandardMaterial({ roughness: 0.9 }),
     []
   )
+  // Per-spread page-edge identity tints (round 6b): the chapter's lead
+  // accent pulled toward aged paper — what that page's ink looks like at
+  // its cut edge. Drives the open pages' rim ribbons and the flying
+  // sheet's rims, recolored per frame on the driver clock.
+  const pageEdgeTints = useMemo(() => {
+    const paper = new THREE.Color(EDGE_COLOR)
+    return Array.from({ length: SPREAD_MAX + 1 }, (_, i) => {
+      const accent = popupContentForSpread(i)?.accents[0]
+      return accent ? new THREE.Color(accent).lerp(paper, 0.3) : paper.clone()
+    })
+  }, [])
+  const rightRimMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.92, side: THREE.DoubleSide }),
+    []
+  )
+  const leftRimMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.92, side: THREE.DoubleSide }),
+    []
+  )
+  const sheetRimMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.92, side: THREE.DoubleSide }),
+    []
+  )
+  // Endpaper band under the fanned sheets: aged deeper than the sheets so
+  // the anonymous beige never reads as "a page".
+  const pedestalMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#c9b078', roughness: 0.9 }),
+    []
+  )
+  // Closed book (spread 0): the shut block shows the SAME nine striped
+  // sheet edges on its fore and z faces (box face order: +x, -x, +y, -y,
+  // +z, -z — spine/top/bottom stay plain, they sit against spine board,
+  // cover, and back cover).
+  const closedBoxMaterials = useMemo(() => {
+    const plain = () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.85 })
+    const striped = () =>
+      new THREE.MeshStandardMaterial({ map: stackEdgeTextures.right[0], roughness: 0.85 })
+    return [striped(), plain(), plain(), plain(), striped(), striped()]
+  }, [stackEdgeTextures])
   useEffect(
     () => () => {
       for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) t.dispose()
       leftStackMaterial.dispose()
       rightStackMaterial.dispose()
+      rightRimMaterial.dispose()
+      leftRimMaterial.dispose()
+      sheetRimMaterial.dispose()
+      pedestalMaterial.dispose()
+      for (const m of closedBoxMaterials) m.dispose()
     },
-    [stackEdgeTextures, leftStackMaterial, rightStackMaterial]
+    [
+      stackEdgeTextures,
+      leftStackMaterial,
+      rightStackMaterial,
+      rightRimMaterial,
+      leftRimMaterial,
+      sheetRimMaterial,
+      pedestalMaterial,
+      closedBoxMaterials,
+    ]
   )
 
   // The turning sheet's two printed faces. Owned HERE (not in
@@ -280,7 +334,6 @@ export function Book() {
   useEffect(
     () => () => {
       leatherMaterial.dispose()
-      edgeMaterial.dispose()
       paperMaterial.dispose()
       leftPageMaterial.dispose()
       rightPageMaterial.dispose()
@@ -290,7 +343,6 @@ export function Book() {
     },
     [
       leatherMaterial,
-      edgeMaterial,
       paperMaterial,
       leftPageMaterial,
       rightPageMaterial,
@@ -470,6 +522,13 @@ export function Book() {
       leftStackMaterial.map = leftStripes
       leftStackMaterial.needsUpdate = true
     }
+    // Page rim identity colors (round 6b): each open page's card edges wear
+    // ITS page's tint; the flying sheet's rims wear the sheet it lifted as.
+    rightRimMaterial.color.copy(pageEdgeTints[Math.min(Math.max(rightIdx, 0), SPREAD_MAX)])
+    leftRimMaterial.color.copy(pageEdgeTints[Math.min(Math.max(leftIdx, 0), SPREAD_MAX)])
+    if (f && !f.isCover) {
+      sheetRimMaterial.color.copy(pageEdgeTints[f.dir === 'next' ? sp : Math.max(sp - 1, 0)])
+    }
 
     const cover = frontCoverRef.current
     const outer = outerGroupRef.current
@@ -535,7 +594,7 @@ export function Book() {
       {!spreadOpen ? (
         <mesh
           position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + BOOK.blockMaxH / 2, 0]}
-          material={edgeMaterial}
+          material={closedBoxMaterials}
         >
           <boxGeometry args={[BLOCK_WIDTH, BOOK.blockMaxH, BLOCK_DEPTH]} />
         </mesh>
@@ -543,7 +602,7 @@ export function Book() {
         <>
           <mesh
             position={[BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
-            material={edgeMaterial}
+            material={pedestalMaterial}
           >
             <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
           </mesh>
@@ -564,7 +623,7 @@ export function Book() {
         <>
           <mesh
             position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
-            material={edgeMaterial}
+            material={pedestalMaterial}
           >
             <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
           </mesh>
@@ -586,27 +645,43 @@ export function Book() {
           useFrame above (rotation about the spine z axis; the mirrored
           left mesh takes -aL so its fore-edge rises on the -X side). */}
       {isOpen && (
-        <mesh
-          ref={rightPageRef}
-          position={[0, PAGE_SURFACE_Y, 0]}
-          geometry={pageGeometry}
-          material={rightPageMaterial}
-        />
+        <group ref={rightPageRef} position={[0, PAGE_SURFACE_Y, 0]}>
+          <mesh geometry={pageGeometry} material={rightPageMaterial} />
+          {/* 1mm card body: rim ribbons hanging under the print surface
+              (they fit inside the pageLift gap over the wedge), tinted per
+              the page this card currently is (rim materials above). */}
+          <mesh material={rightRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[PAGE_H, RIM_T]} />
+          </mesh>
+          <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+          <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+        </group>
       )}
 
-      {/* Static left page, mirrored across the spine. Hidden for the whole
-          duration of a cover turn (see isCoverTurning above) — the front
-          cover is its support board only at rest, so revealing it any
-          earlier than the turn's commit makes it appear to float past the
-          book's edge, unsupported. */}
+      {/* Static left page card, mirrored across the spine (the group's
+          x-mirror flips the print mesh AND the rims together; rims are
+          DoubleSide so the flipped winding can't cull them). Hidden for
+          the whole duration of a cover turn (see isCoverTurning above) —
+          the front cover is its support board only at rest, so revealing
+          it any earlier than the turn's commit makes it appear to float
+          past the book's edge, unsupported. */}
       {isOpen && !isCoverTurning && (
-        <mesh
-          ref={leftPageRef}
-          position={[0, PAGE_SURFACE_Y, 0]}
-          scale={[-1, 1, 1]}
-          geometry={pageGeometry}
-          material={leftPageMaterial}
-        />
+        <group ref={leftPageRef} position={[0, PAGE_SURFACE_Y, 0]} scale={[-1, 1, 1]}>
+          <mesh geometry={pageGeometry} material={leftPageMaterial} />
+          <mesh material={leftRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[PAGE_H, RIM_T]} />
+          </mesh>
+          <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+          <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[PAGE_W, RIM_T]} />
+          </mesh>
+        </group>
       )}
 
       {/* The page currently mid-turn; hidden except during a non-cover turn.
@@ -618,6 +693,7 @@ export function Book() {
         originY={PAGE_SURFACE_Y}
         frontMaterial={sheetFrontMaterial}
         backMaterial={sheetBackMaterial}
+        rimMaterial={sheetRimMaterial}
       />
 
       {/* Pop-up layers for the open spread: folded paper cutouts that spring

@@ -286,21 +286,30 @@ export function makeStackEdgeCanvas(tints: readonly string[], w = 64, h = 256): 
     // stripe i sits i-th from the BOTTOM: canvas y runs downward.
     const y0 = h - (i + 1) * stripeH
     if (tints[i]) {
-      ctx.globalAlpha = 0.42
+      // The page's identity color, full-strength in the stripe's core: a
+      // painted page's ink genuinely reaches its cut edge (round 6b — the
+      // earlier 0.42 wash still read as beige from the front).
+      ctx.globalAlpha = 0.82
       ctx.fillStyle = tints[i]
       ctx.fillRect(0, y0, w, stripeH)
+      // paper fibers breaking through at the stripe's top and bottom rims
+      ctx.globalAlpha = 0.35
+      ctx.fillStyle = '#d8c491'
+      const rim = Math.max(1, stripeH * 0.12)
+      ctx.fillRect(0, y0, w, rim)
+      ctx.fillRect(0, y0 + stripeH - rim, w, rim)
       ctx.globalAlpha = 1
     }
-    // cut-paper unevenness: a few short darker dashes per sheet
-    ctx.fillStyle = 'rgba(90, 66, 38, 0.25)'
-    for (let dash = 0; dash < 3; dash++) {
+    // cut-paper unevenness: short lighter and darker fiber dashes
+    for (let dash = 0; dash < 5; dash++) {
+      ctx.fillStyle = dash % 2 ? 'rgba(90, 66, 38, 0.3)' : 'rgba(240, 226, 190, 0.28)'
       const dx = Math.random() * w
-      const dw = 4 + Math.random() * 10
-      ctx.fillRect(dx, y0 + stripeH * (0.25 + Math.random() * 0.5), dw, 1)
+      const dw = 4 + Math.random() * 12
+      ctx.fillRect(dx, y0 + stripeH * (0.15 + Math.random() * 0.7), dw, 1)
     }
     // hairline shadow at each INTERNAL sheet boundary (not the stack top)
     if (i < n - 1) {
-      ctx.fillStyle = 'rgba(58, 40, 20, 0.55)'
+      ctx.fillStyle = 'rgba(58, 40, 20, 0.6)'
       ctx.fillRect(0, y0, w, 1)
     }
   }
