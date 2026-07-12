@@ -122,8 +122,10 @@ export function SavePanel({ project, standalone = false }: SavePanelProps) {
           </span>
         </div>
 
+        {/* Casing law: the loaded title renders in its true casing — no
+            `uppercase` transform — so a product name like "iBank" survives
+            intact here exactly as it does on the select screen. */}
         <TitleTag
-          className="uppercase"
           style={{
             fontFamily: grotesk.style.fontFamily,
             fontWeight: 700,

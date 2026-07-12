@@ -109,6 +109,23 @@ describe('SavePanel', () => {
       screen.getByRole('heading', { level: 1, name: new RegExp(linked.title, 'i') })
     ).toBeInTheDocument()
   })
+
+  it('renders the loaded title in true casing — iBank, never IBANK (casing law)', () => {
+    // The AMIO save is the cheap-tell case: a CSS `uppercase` transform would
+    // mangle "AMIO Bank iBank" → "AMIO BANK IBANK" the moment the save loads.
+    // The transform-free title keeps the product name intact in the DOM text,
+    // mirroring how the select screen renders it.
+    render(<SavePanel project={linked} />)
+    const heading = screen.getByRole('heading', { name: /amio bank ibank/i })
+    expect(heading).toHaveTextContent('AMIO Bank iBank')
+    expect(heading.textContent).toContain('iBank')
+  })
+
+  it('renders the standalone-page title in true casing too (casing law)', () => {
+    render(<SavePanel project={linked} standalone />)
+    const heading = screen.getByRole('heading', { level: 1, name: /amio bank ibank/i })
+    expect(heading.textContent).toContain('iBank')
+  })
 })
 
 describe('PanelShell', () => {
