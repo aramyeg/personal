@@ -22,9 +22,9 @@ export const TURNTABLE_SECONDS = 28
 /** Constant angular velocity of the turntable, radians per second. */
 export const SPIN_RATE = (Math.PI * 2) / TURNTABLE_SECONDS
 
-/** Reduced-motion resting pose: a static three-quarter turn (~28°) — off
- *  dead-front so the silhouette still reads dimensional, with no spin. */
-export const REDUCED_YAW = 0.5
+/** Reduced-motion resting pose: a static three-quarter turn (~45°, π/4) — a true
+ *  3/4 view that shows the fit's form on the no-spin path, no dead-front flatness. */
+export const REDUCED_YAW = Math.PI / 4
 
 /** Clamp on a single frame's delta so a resume after a pause (tab hidden,
  *  dialog open) advances animation by at most this, never a jarring jump. */

@@ -147,12 +147,29 @@ function makeGroundGlow(): THREE.CanvasTexture {
 function AccentGround({ accent, reduced }: { accent: string; reduced: boolean }) {
   const matRef = useRef<THREE.MeshBasicMaterial>(null)
   const invalidate = useThree((s) => s.invalidate)
-  const texture = useMemo(() => makeGroundGlow(), [])
-  useEffect(() => () => texture.dispose(), [texture])
 
   const target = useMemo(() => new THREE.Color(accent), [accent])
   const from = useRef(new THREE.Color(accent))
   const progress = useRef(1)
+
+  // Paired create + dispose in ONE effect (StrictMode texture law, per
+  // crt-vignette): a memo runs once but an effect cleanup re-runs on the dev
+  // double-mount, so a memoized-then-cleanup-disposed texture would leave the
+  // material pointing at an already-disposed texture. Creating it here means
+  // every effect run owns a fresh glow texture and disposes exactly that one.
+  useLayoutEffect(() => {
+    const mat = matRef.current
+    if (!mat) return
+    const tex = makeGroundGlow()
+    mat.map = tex
+    mat.needsUpdate = true
+    invalidate()
+    return () => {
+      mat.map = null
+      mat.needsUpdate = true
+      tex.dispose()
+    }
+  }, [invalidate])
 
   useLayoutEffect(() => {
     const mat = matRef.current
@@ -177,7 +194,6 @@ function AccentGround({ accent, reduced }: { accent: string; reduced: boolean })
       <circleGeometry args={[GROUND_RADIUS, 48]} />
       <meshBasicMaterial
         ref={matRef}
-        map={texture}
         color={accent}
         transparent
         depthWrite={false}
@@ -322,9 +338,11 @@ function FigureModel({ fit, fitHeight, reduced }: FigureModelProps): JSX.Element
   const gltf = useLoader(GLTFLoader, fitSrc(fit))
   const invalidate = useThree((s) => s.invalidate)
 
-  // Era renderer pass — unlit, point-sampled, no PBR. Mutates the loader-cached
-  // scene in place and restores + disposes-only-ours on cleanup (StrictMode law).
-  useEffect(() => {
+  // Era renderer pass — unlit, point-sampled, no PBR. Runs in a layout effect so
+  // the conversion lands before the first paint of a newly-loaded/swapped scene,
+  // never a frame of lit PBR before it. Mutates the loader-cached scene in place
+  // and restores + disposes-only-ours on cleanup (StrictMode law).
+  useLayoutEffect(() => {
     const restore = applyEraRenderer(gltf.scene)
     invalidate()
     return restore
