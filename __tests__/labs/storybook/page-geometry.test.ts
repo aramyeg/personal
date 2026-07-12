@@ -137,8 +137,9 @@ describe('bulge rest poses (derive-bulge.mjs theorems A16-A20)', () => {
 
 describe('buildStackWedge', () => {
   it('is a unit-height wedge: y=0 at the spine, y=1 only at the fore-edge', () => {
-    const { positions, indices } = buildStackWedge(1.2, 1.5)
+    const { positions, uvs, indices } = buildStackWedge(1.2, 1.5)
     expect(positions.length).toBe(18 * 3)
+    expect(uvs.length).toBe(18 * 2)
     expect(indices.length).toBe(24)
     for (let i = 0; i < positions.length; i += 3) {
       const [x, y] = [positions[i], positions[i + 1]]

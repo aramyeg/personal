@@ -162,12 +162,19 @@ export function restAngles(spread: number): RestPose {
  * from the gutter valley to the fore-edge. Cross-section: y=0 at the
  * spine (x=0) rising linearly to y=1 at x=width; the caller scales y to
  * `sheets * SHEET_STACK_T` per frame, so one static geometry serves every
- * spread. Flat-shaded (duplicated verts), no uvs (solid edge material).
+ * spread. Flat-shaded (duplicated verts).
+ *
+ * UVs carry the per-sheet edge stripes (book.tsx's stack-edge canvases):
+ * v runs 0 at the valley floor to 1 at the stack top on every visible
+ * face, so a horizontal stripe = one sheet's cut edge. On the triangular
+ * z-end faces the spine vertex sits at v=0 while the fore corners span
+ * the full 0..1 — linear interpolation makes the stripes CONVERGE at the
+ * binding, exactly how a real fanned stack reads from the side.
  */
 export function buildStackWedge(
   width: number,
   depth: number
-): { positions: Float32Array; indices: Uint16Array } {
+): { positions: Float32Array; uvs: Float32Array; indices: Uint16Array } {
   const d = depth / 2
   // prettier-ignore
   const positions = new Float32Array([
@@ -183,6 +190,19 @@ export function buildStackWedge(
     0, 0, -d,  width, 1, -d,  width, 0, -d,
   ])
   // prettier-ignore
+  const uvs = new Float32Array([
+    // bottom: unseen, park at the paper base of the stripe map
+    0, 0,  1, 0,  1, 0,  0, 0,
+    // slope: top sheet's surface — sample just under the top stripe's line
+    0, 1,  1, 1,  1, 1,  0, 1,
+    // fore face: full stripe run, v = height
+    0, 0,  1, 0,  1, 1,  0, 1,
+    // +z end triangle: spine vertex at v=0, fore corners span the run
+    0, 0,  1, 0,  1, 1,
+    // -z end triangle (mirrored u so the print reads outward)
+    1, 0,  0, 1,  0, 0,
+  ])
+  // prettier-ignore
   const indices = new Uint16Array([
     0, 3, 2, 0, 2, 1,       // bottom (wound for -y)
     4, 5, 6, 4, 6, 7,       // slope
@@ -190,5 +210,5 @@ export function buildStackWedge(
     12, 13, 14,             // +z end
     15, 16, 17,             // -z end
   ])
-  return { positions, indices }
+  return { positions, uvs, indices }
 }

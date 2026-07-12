@@ -32,7 +32,12 @@ import {
   easeTurnWeighted,
   restAngles,
 } from './page-geometry'
-import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
+import {
+  makeCreaseCanvas,
+  makeLeatherCanvas,
+  makePaperCanvas,
+  makeStackEdgeCanvas,
+} from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
@@ -140,9 +145,10 @@ function useBookTextures(): {
  *  scale is driven per frame to `sheets * SHEET_STACK_T`). */
 function useWedgeGeometry(): THREE.BufferGeometry {
   const geometry = useMemo(() => {
-    const { positions, indices } = buildStackWedge(BLOCK_WIDTH, BLOCK_DEPTH)
+    const { positions, uvs, indices } = buildStackWedge(BLOCK_WIDTH, BLOCK_DEPTH)
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
     geo.setIndex(new THREE.BufferAttribute(indices, 1))
     geo.computeVertexNormals()
     return geo
@@ -217,6 +223,46 @@ export function Book() {
     () => new THREE.MeshBasicMaterial({ map: crease, transparent: true, depthWrite: false }),
     [crease]
   )
+  // Stack-edge stripe maps (round 6): one canvas per (side, spread), each
+  // stripe a sheet's cut edge washed with ITS chapter's lead accent —
+  // membership per spread is a contiguous range, so all 20 exist up front
+  // and the useFrame below swaps them on the driver clock like the prints.
+  // Left stack bottom-up = sheets 1..s-1 (first-turned lowest); right
+  // bottom-up = sheets 9..s (the current top sheet stays in the stack
+  // until it flies — see restAngles' count note).
+  const stackEdgeTextures = useMemo(() => {
+    const tint = (k: number): string => popupContentForSpread(k)?.accents[0] ?? ''
+    const left: THREE.CanvasTexture[] = []
+    const right: THREE.CanvasTexture[] = []
+    for (let s = 0; s <= SPREAD_MAX; s++) {
+      const sc = Math.max(1, s)
+      const leftTints =
+        sc - 1 > 0 ? Array.from({ length: sc - 1 }, (_, i) => tint(1 + i)) : ['']
+      const rightTints = Array.from({ length: INTERIOR_SHEETS + 1 - sc }, (_, i) =>
+        tint(INTERIOR_SHEETS - i)
+      )
+      left.push(makeCanvasTexture(makeStackEdgeCanvas(leftTints)))
+      right.push(makeCanvasTexture(makeStackEdgeCanvas(rightTints)))
+    }
+    return { left, right }
+  }, [])
+  const leftStackMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+    []
+  )
+  const rightStackMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+    []
+  )
+  useEffect(
+    () => () => {
+      for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) t.dispose()
+      leftStackMaterial.dispose()
+      rightStackMaterial.dispose()
+    },
+    [stackEdgeTextures, leftStackMaterial, rightStackMaterial]
+  )
+
   // The turning sheet's two printed faces. Owned HERE (not in
   // turning-page.tsx) because their maps must swap inside the useFrame
   // below, on the driver-ref clock — a React effect in the sheet component
@@ -321,6 +367,9 @@ export function Book() {
       gl.initTexture(print.right)
     }
   }, [gl, prints])
+  useEffect(() => {
+    for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) gl.initTexture(t)
+  }, [gl, stackEdgeTextures])
 
   useFrame((_, delta) => {
     // Boot detection, on the same clock as everything else the eye sees:
@@ -410,6 +459,17 @@ export function Book() {
     if (leftWedgeRef.current) {
       leftWedgeRef.current.scale.y = Math.max((leftIdx - 1) * SHEET_STACK_T, 1e-4)
     }
+    // Matching stripe maps for the stacks (same clock, same indices).
+    const rightStripes = stackEdgeTextures.right[Math.min(Math.max(rightIdx, 0), SPREAD_MAX)]
+    if (rightStripes && rightStackMaterial.map !== rightStripes) {
+      rightStackMaterial.map = rightStripes
+      rightStackMaterial.needsUpdate = true
+    }
+    const leftStripes = stackEdgeTextures.left[Math.min(Math.max(leftIdx, 0), SPREAD_MAX)]
+    if (leftStripes && leftStackMaterial.map !== leftStripes) {
+      leftStackMaterial.map = leftStripes
+      leftStackMaterial.needsUpdate = true
+    }
 
     const cover = frontCoverRef.current
     const outer = outerGroupRef.current
@@ -492,7 +552,7 @@ export function Book() {
             position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
             scale={[1, 1e-4, 1]}
             geometry={wedgeGeometry}
-            material={edgeMaterial}
+            material={rightStackMaterial}
           />
         </>
       )}
@@ -513,7 +573,7 @@ export function Book() {
             position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
             scale={[-1, 1e-4, 1]}
             geometry={wedgeGeometry}
-            material={edgeMaterial}
+            material={leftStackMaterial}
           />
         </>
       )}

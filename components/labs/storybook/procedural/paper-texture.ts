@@ -262,3 +262,47 @@ export function makeShadowCanvas(): HTMLCanvasElement {
 
   return canvas
 }
+
+/**
+ * Stack-edge stripe canvas: the cut edges of a fanned page stack, one
+ * horizontal stripe per sheet from the BOTTOM of the canvas up (v=0 is the
+ * valley floor under three's flipY). Each stripe is aged paper washed with
+ * its chapter's palette tint — the ink bleed a painted page shows at its
+ * cut edge — separated by hairline shadows, with short darker dashes for
+ * cut-paper unevenness. Used by book.tsx's stack wedges (round 6: "page
+ * edges should carry their artwork's coloring, and each page distinct").
+ */
+export function makeStackEdgeCanvas(tints: readonly string[], w = 64, h = 256): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#d8c491'
+  ctx.fillRect(0, 0, w, h)
+
+  const n = Math.max(tints.length, 1)
+  const stripeH = h / n
+  for (let i = 0; i < n; i++) {
+    // stripe i sits i-th from the BOTTOM: canvas y runs downward.
+    const y0 = h - (i + 1) * stripeH
+    if (tints[i]) {
+      ctx.globalAlpha = 0.42
+      ctx.fillStyle = tints[i]
+      ctx.fillRect(0, y0, w, stripeH)
+      ctx.globalAlpha = 1
+    }
+    // cut-paper unevenness: a few short darker dashes per sheet
+    ctx.fillStyle = 'rgba(90, 66, 38, 0.25)'
+    for (let dash = 0; dash < 3; dash++) {
+      const dx = Math.random() * w
+      const dw = 4 + Math.random() * 10
+      ctx.fillRect(dx, y0 + stripeH * (0.25 + Math.random() * 0.5), dw, 1)
+    }
+    // hairline shadow at each INTERNAL sheet boundary (not the stack top)
+    if (i < n - 1) {
+      ctx.fillStyle = 'rgba(58, 40, 20, 0.55)'
+      ctx.fillRect(0, y0, w, 1)
+    }
+  }
+  return canvas
+}
