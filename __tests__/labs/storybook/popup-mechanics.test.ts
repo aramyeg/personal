@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   creaseElevation,
+  liveSpreadRole,
   openElevation,
   sheetAngle,
   solveBoxPose,
@@ -666,5 +667,41 @@ describe('closed-form endpoints (literature checks)', () => {
     for (const p of [...pose.right, ...pose.left]) {
       expect(Math.abs(p[1])).toBeLessThan(1e-6)
     }
+  })
+})
+
+describe('liveSpreadRole — turn roles on the driver clock (the commit-flash rule)', () => {
+  it('at rest only the committed spread is current; every neighbor is hidden', () => {
+    expect(liveSpreadRole(3, 3, null)).toBe('current')
+    expect(liveSpreadRole(2, 3, null)).toBe('hidden')
+    expect(liveSpreadRole(4, 3, null)).toBe('hidden')
+  })
+
+  it('next turn: committed spread is outgoing, spread+1 incoming, others hidden', () => {
+    expect(liveSpreadRole(3, 3, 'next')).toBe('outgoing')
+    expect(liveSpreadRole(4, 3, 'next')).toBe('incoming')
+    expect(liveSpreadRole(2, 3, 'next')).toBe('hidden')
+    expect(liveSpreadRole(5, 3, 'next')).toBe('hidden')
+  })
+
+  it('prev turn mirrors: committed outgoing, spread-1 incoming', () => {
+    expect(liveSpreadRole(3, 3, 'prev')).toBe('outgoing')
+    expect(liveSpreadRole(2, 3, 'prev')).toBe('incoming')
+    expect(liveSpreadRole(4, 3, 'prev')).toBe('hidden')
+  })
+
+  it('commit atomicity: the instant the driver advances committedSpread and nulls the frame, the outgoing spread must land hidden and the incoming one current — no dihedral-PI pop-open', () => {
+    // Before commit (mid next-turn from 3): 3 outgoing, 4 incoming.
+    expect(liveSpreadRole(3, 3, 'next')).toBe('outgoing')
+    expect(liveSpreadRole(4, 3, 'next')).toBe('incoming')
+    // After commit (committedSpread=4, frame null) in the SAME rAF:
+    expect(liveSpreadRole(3, 4, null)).toBe('hidden')
+    expect(liveSpreadRole(4, 4, null)).toBe('current')
+    // The React-clock failure this replaces: a stale 'outgoing' prop meeting
+    // a null frame solves at dihedral PI (fully open). Prove the dihedral
+    // that pairing produces is the rest pose — i.e. only a stale role could
+    // ever pop the folded scene open, never the live one.
+    expect(spreadDihedral('outgoing', null, 0)).toBeCloseTo(Math.PI, 12)
+    expect(spreadDihedral(liveSpreadRole(4, 4, null) as 'current', null, 0)).toBeCloseTo(Math.PI, 12)
   })
 })

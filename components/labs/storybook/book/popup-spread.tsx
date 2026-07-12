@@ -29,6 +29,7 @@ import type { SceneLayer } from '../content'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import {
+  liveSpreadRole,
   solveLayerPose,
   spreadPageAngles,
   type MechPose,
@@ -56,7 +57,11 @@ const FLAT_EPSILON = 0.02
 // step darker, which is what sells the center crease as a real fold.
 const FOLD_SHADE_TINT = '#d9cdb4'
 
-/** A pop-up spread's relationship to any turn currently in flight. */
+/** A pop-up spread's relationship to any turn currently in flight. The
+ *  React-clock value (book.tsx's `role` prop) only coarse-gates mounting
+ *  visibility; every POSE consumer re-derives its live role per frame via
+ *  `liveSpreadRole` so role and dihedral tick on the driver clock (see
+ *  popup-mechanics.ts — the commit-frame pop-open flash). */
 export type PopupRole = 'current' | 'outgoing' | 'incoming' | 'hidden'
 
 type PopupSpreadProps = {
@@ -65,6 +70,7 @@ type PopupSpreadProps = {
   spreadIndex: number
   role: PopupRole
   frame: RefObject<TurnFrame | null>
+  committedSpread: RefObject<number>
 }
 
 /** Fold-line position in texture u, fixed per die-cut: where the art's
@@ -201,15 +207,17 @@ function PopupLayer({
   layer,
   parent,
   accents,
-  role,
+  spreadIndex,
   frame,
+  committedSpread,
   solvePose,
 }: {
   layer: SceneLayer
   parent: SceneLayer | undefined
   accents: readonly string[]
-  role: PopupRole
+  spreadIndex: number
   frame: RefObject<TurnFrame | null>
+  committedSpread: RefObject<number>
   /** Overrides the internal `solveLayerPose` for mechs whose pose is not a
    *  pure function of the layer alone (riders re-solve their parent). */
   solvePose?: (thetaL: number, thetaR: number) => MechPose | null
@@ -284,9 +292,11 @@ function PopupLayer({
     if (!cutout) return
 
     const f = frame.current
+    // Role derived HERE, from the driver refs — never from a React prop.
     // At eased t=0 both turn roles coincide with their rest/flat pose for
     // either direction, so a transition frame where the driver ref hasn't
     // populated yet can never snap (see popup-mechanics.test.ts, A7).
+    const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
     const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
     const { thetaL, thetaR } = spreadPageAngles(
       solveRole,
@@ -342,15 +352,31 @@ function PopupLayer({
 /** One spread's worth of pop-up layers. Always mounted (for the current
  *  spread ± 1) but only visible while `role !== 'hidden'`. Children find
  *  their parent in the same spread's layer list. */
-export function PopupSpread({ layers, accents, spreadIndex, role, frame }: PopupSpreadProps) {
+export function PopupSpread({ layers, accents, spreadIndex, role, frame, committedSpread }: PopupSpreadProps) {
   return (
     <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
       {layers.map((layer) => {
         if (layer.mech === 'box') {
-          return <BoxPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
+          return (
+            <BoxPopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
         }
         if (layer.mech === 'platform') {
-          return <PlatformPopupLayer key={layer.id} layer={layer} role={role} frame={frame} />
+          return (
+            <PlatformPopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
         }
         // A fan is k independent v-folds sharing one apex — each member renders
         // as an ordinary two-panel layer (identical geometry to solveFanPose).
@@ -358,7 +384,15 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame }: Popup
           return (
             <group key={layer.id}>
               {fanMemberLayers(layer).map((member) => (
-                <PopupLayer key={member.id} layer={member} parent={undefined} accents={accents} role={role} frame={frame} />
+                <PopupLayer
+                  key={member.id}
+                  layer={member}
+                  parent={undefined}
+                  accents={accents}
+                  spreadIndex={spreadIndex}
+                  frame={frame}
+                  committedSpread={committedSpread}
+                />
               ))}
             </group>
           )
@@ -374,14 +408,24 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame }: Popup
               layer={layer}
               parent={undefined}
               accents={accents}
-              role={role}
+              spreadIndex={spreadIndex}
               frame={frame}
+              committedSpread={committedSpread}
               solvePose={(thetaL, thetaR) => solveRiderPose(layer, seat, thetaL, thetaR)}
             />
           )
         }
         if (layer.mech === 'dress') {
-          return <DressPopupLayer key={layer.id} layer={layer} layers={layers} role={role} frame={frame} />
+          return (
+            <DressPopupLayer
+              key={layer.id}
+              layer={layer}
+              layers={layers}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
         }
         return (
           <PopupLayer
@@ -389,8 +433,9 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame }: Popup
             layer={layer}
             parent={layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined}
             accents={accents}
-            role={role}
+            spreadIndex={spreadIndex}
             frame={frame}
+            committedSpread={committedSpread}
           />
         )
       })}

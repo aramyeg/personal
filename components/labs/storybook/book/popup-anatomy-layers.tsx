@@ -25,6 +25,7 @@ import type { SceneLayer } from '../content'
 import { makePaperCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import {
+  liveSpreadRole,
   solveBoxPose,
   solveLayerPose,
   spreadPageAngles,
@@ -37,7 +38,6 @@ import { solveDressPose, solvePlatformPose } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
-import type { PopupRole } from './popup-spread'
 
 const FLAT_EPSILON = 0.02
 const PAPER_TINT = '#d8c8a4'
@@ -95,13 +95,15 @@ function solveSeatQuad(
 export function DressPopupLayer({
   layer,
   layers,
-  role,
+  spreadIndex,
   frame,
+  committedSpread,
 }: {
   layer: SceneLayer & DressGeom
   layers: readonly SceneLayer[]
-  role: PopupRole
+  spreadIndex: number
   frame: RefObject<TurnFrame | null>
+  committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const art = useArtTexture(layer.id)
@@ -161,6 +163,8 @@ export function DressPopupLayer({
     const group = groupRef.current
     if (!group) return
     const f = frame.current
+    // Role from the driver refs, never a React prop (see liveSpreadRole).
+    const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
     const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
     const { thetaL, thetaR } = spreadPageAngles(solveRole, f?.dir ?? null, f ? easeTurnWeighted(f.t) : 0)
     const beta = thetaL - thetaR

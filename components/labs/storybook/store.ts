@@ -46,6 +46,13 @@ export const useStorybookStore = create<SbState>()(
   )
 )
 
+// Dev-only escape hatch for the bench probes (.superpowers/sdd/bench): lets
+// a Playwright page subscribe to store transitions and time them against the
+// frame loop. Compiled out of production builds, like ?sbpose.
+if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+  ;(window as unknown as { __sbStore?: typeof useStorybookStore }).__sbStore = useStorybookStore
+}
+
 export type WheelAcc = { value: number; lastMs: number }
 export const WHEEL_THRESHOLD = 160
 

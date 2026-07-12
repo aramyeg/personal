@@ -10,16 +10,28 @@
  * dihedrals — the sheet and the paper glued to it are geared to one
  * number, so they can never desynchronize.
  *
- * Mounted once and left in the scene permanently; only the meshes'
- * `visible` flags toggle per frame, driven by the turn driver ref. Cover
- * turns are animated by book.tsx's front-cover pivot, so this page stays
- * hidden whenever `frame.isCover`.
+ * The card has THICKNESS: printed faces at ±PAPER_T/2 around the pivot
+ * plane plus three paper-edge ribbons (fore edge and both z rims; the
+ * spine edge hides in the gutter). Two zero-thickness planes vanished
+ * entirely for the frames where the sheet passed vertical — the reading
+ * camera sits at x=0, so θ=90° is EXACTLY edge-on — baring the whole
+ * incoming spread mid-turn (the "cutouts through the page" flash). Real
+ * card stock edge-on is a lit paper edge, never nothing.
  *
- * Two meshes share one flat geometry — a FrontSide mesh showing the face
- * the sheet lifted with, and a BackSide mesh for the face it lands as. As
- * the page passes vertical the camera stops seeing front-facing triangles
- * and starts seeing back-facing ones, so the swap point is geometric, not
- * timed. A cheap traveling shade plane stands in for the shadow the
+ * The two face materials are OWNED BY book.tsx and passed in: their maps
+ * (and the underside shade ramp) swap inside book.tsx's useFrame on the
+ * driver-ref clock, atomically with this sheet's visibility. A React
+ * effect here raced the driver at the turn's endpoints and painted a
+ * blank-paper face whenever its flush landed while the sheet was visible.
+ *
+ * Mounted once and left in the scene permanently; only a group `visible`
+ * flag toggles per frame, driven by the turn driver ref. Cover turns are
+ * animated by book.tsx's front-cover pivot, so this page stays hidden
+ * whenever `frame.isCover`.
+ *
+ * As the page passes vertical the camera stops seeing the FrontSide face
+ * and starts seeing the BackSide one, so the face swap point is geometric,
+ * not timed. A cheap traveling shade plane stands in for the shadow the
  * lifting page casts on the stack beneath it.
  */
 
@@ -29,7 +41,7 @@ import * as THREE from 'three'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurnWeighted } from './page-geometry'
 import { sheetAngle } from './popup-mechanics'
 import { makeCanvasTexture } from './book'
-import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
+import { makeShadowCanvas } from '../procedural/paper-texture'
 import type { TurnFrame } from './use-turn-driver'
 
 const SHADE_WIDTH = PAGE_W * 0.7
@@ -48,53 +60,48 @@ const SHADE_PEAK_EXPONENT = 1.3
 // raised pivot keeps the sheet a paper-thickness above the pop-up wedge it
 // bounds through the whole sweep.
 const SHEET_LIFT = 0.004
-const BACK_TINT = '#4a3a2c'
+// Card-stock thickness, split ±t/2 around the pivot plane. Bounded above
+// by SHEET_LIFT: the underside face (at lift − t/2) must stay clear of the
+// page surface AND above the flattened pop-up pieces (page + 0.0015) so
+// nothing z-fights at the flat poses. At 0.004 the edge-on silhouette is a
+// few pixels — a visible paper edge, exactly what a real page shows.
+const PAPER_T = 0.004
+// Cut-paper edge color, matching the page block's fore-edge stack.
+const PAPER_EDGE_COLOR = '#d8c491'
 
 export function TurningPage({
   frame,
   originY,
-  frontMap = null,
-  backMap = null,
+  frontMaterial,
+  backMaterial,
 }: {
   frame: RefObject<TurnFrame | null>
   /** World-space Y of the stack this page is currently departing from
    *  (matches the static page it was, per book.tsx's own height formula). */
   originY: number
-  /** Printed faces (book.tsx picks the right print halves per turn
-   *  direction): the face this sheet was showing when it lifted, and the
-   *  face it lands as. Falls back to plain paper when a print hasn't
-   *  resolved. The back map arrives pre-mirrored (a `left` half from
-   *  use-page-print.ts), matching the landed pose's spine-out uv run. */
-  frontMap?: THREE.Texture | null
-  backMap?: THREE.Texture | null
+  /** The sheet's two printed faces, owned and frame-loop-updated by
+   *  book.tsx (see its sheetFront/sheetBackMaterial). Front shows the face
+   *  the sheet lifted with (FrontSide), back the face it lands as
+   *  (BackSide, pre-mirrored `left` half — see use-page-print.ts). */
+  frontMaterial: THREE.MeshStandardMaterial
+  backMaterial: THREE.MeshStandardMaterial
 }) {
   const pivotRef = useRef<THREE.Group>(null)
+  const cardRef = useRef<THREE.Group>(null)
   const meshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
   const backMeshRef = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null)
   const shadeRef = useRef<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>>(null)
 
-  const paperCanvas = useMemo(() => makePaperCanvas(), [])
-  const paperTexture = useMemo(() => makeCanvasTexture(paperCanvas), [paperCanvas])
-  const material = useMemo(
+  // Paper-edge ribbons: DoubleSide because each rim faces the camera on one
+  // half of the sweep and away on the other.
+  const edgeMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        map: paperTexture,
-        roughness: 0.9,
-        side: THREE.FrontSide,
+        color: PAPER_EDGE_COLOR,
+        roughness: 0.92,
+        side: THREE.DoubleSide,
       }),
-    [paperTexture]
-  )
-  // The page's underside: same paper grain, tinted darker so the sheet
-  // reads as card with real thickness rather than a lit, glowing film.
-  const backMaterial = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: paperTexture,
-        color: BACK_TINT,
-        roughness: 0.97,
-        side: THREE.BackSide,
-      }),
-    [paperTexture]
+    []
   )
   // Soft radial-gradient shade (not a flat slab): light reads as passing
   // through the paper with a diffuse penumbra (benchmark B11).
@@ -114,30 +121,16 @@ export function TurningPage({
 
   useEffect(
     () => () => {
-      paperTexture.dispose()
-      material.dispose()
-      backMaterial.dispose()
+      edgeMaterial.dispose()
       shadeTexture.dispose()
       shadeMaterial.dispose()
     },
-    [paperTexture, material, backMaterial, shadeTexture, shadeMaterial]
+    [edgeMaterial, shadeTexture, shadeMaterial]
   )
 
-  // Swap the printed faces in as book.tsx resolves them (between turns, not
-  // mid-flight — the maps only change when `turning` flips). With a printed
-  // back the underside tint relaxes to a mild shade: at landing that face
-  // *is* the next left page, and a heavy tint would visibly pop when the
-  // untinted static page takes over at commit.
-  useEffect(() => {
-    material.map = frontMap ?? paperTexture
-    material.needsUpdate = true
-    backMaterial.map = backMap ?? paperTexture
-    backMaterial.color.set(backMap ? '#b9ad99' : BACK_TINT)
-    backMaterial.needsUpdate = true
-  }, [material, backMaterial, frontMap, backMap, paperTexture])
-
-  // Flat page geometry, built once before first paint. Rigid: never
-  // rewritten — the pivot group's rotation does all the motion.
+  // Flat page geometry shared by both printed faces, built once before
+  // first paint. Rigid: never rewritten — the pivot group's rotation does
+  // all the motion, and each face mesh carries its ±PAPER_T/2 offset.
   useLayoutEffect(() => {
     const { positions, uvs, indices } = buildPageTemplate()
     const geometry = new THREE.BufferGeometry()
@@ -152,15 +145,13 @@ export function TurningPage({
 
   useFrame(() => {
     const pivot = pivotRef.current
-    const mesh = meshRef.current
-    const backMesh = backMeshRef.current
+    const card = cardRef.current
     const shade = shadeRef.current
-    if (!pivot || !mesh || !backMesh || !shade) return
+    if (!pivot || !card || !shade) return
 
     const f = frame.current
     const active = f !== null && !f.isCover
-    mesh.visible = active
-    backMesh.visible = active
+    card.visible = active
     shade.visible = active
     if (!active || !f) return
 
@@ -179,8 +170,22 @@ export function TurningPage({
   return (
     <>
       <group ref={pivotRef} position={[0, originY + SHEET_LIFT, 0]}>
-        <mesh ref={meshRef} material={material} visible={false} />
-        <mesh ref={backMeshRef} material={backMaterial} visible={false} />
+        <group ref={cardRef} visible={false}>
+          <mesh ref={meshRef} material={frontMaterial} position={[0, PAPER_T / 2, 0]} />
+          <mesh ref={backMeshRef} material={backMaterial} position={[0, -PAPER_T / 2, 0]} />
+          {/* Fore edge: the cut rim opposite the spine. */}
+          <mesh material={edgeMaterial} position={[PAGE_W, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[PAGE_H, PAPER_T]} />
+          </mesh>
+          {/* Near and far rims (±z). The spine edge stays bare: it lives
+              inside the gutter shadow for the whole sweep. */}
+          <mesh material={edgeMaterial} position={[PAGE_W / 2, 0, PAGE_H / 2]}>
+            <planeGeometry args={[PAGE_W, PAPER_T]} />
+          </mesh>
+          <mesh material={edgeMaterial} position={[PAGE_W / 2, 0, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[PAGE_W, PAPER_T]} />
+          </mesh>
+        </group>
       </group>
       <mesh
         ref={shadeRef}

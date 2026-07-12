@@ -157,6 +157,18 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       }
       sbSound.thump()
       useStorybookStore.getState().completeTurn()
+      // Land the whole commit inside THIS rAF: consumers registered after
+      // this hook (book.tsx's page prints, the sheet, every popup layer)
+      // read these refs later in the same frame, so nulling the frame and
+      // advancing the committed spread here swaps the static pages, hides
+      // the sheet, and re-roles the popups in one atomic paint. Leaving
+      // frame.current at {t:1} until the next rAF let React's commit race
+      // the driver — a landed-but-still-visible sheet whose materials a
+      // passive effect had already reset painted one blank-paper frame.
+      // (At t=1 the sheet's pose is exactly the static landed page, so
+      // hiding it a frame "early" is pixel-identical.)
+      committedSpread.current = useStorybookStore.getState().spread
+      frame.current = null
       elapsedMs.current = 0
       armedFor.current = null
       firedCreak.current = false

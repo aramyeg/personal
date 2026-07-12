@@ -22,6 +22,7 @@ import type { SceneLayer } from '../content'
 import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import {
+  liveSpreadRole,
   solveBoxPose,
   spreadPageAngles,
   type BoxFace,
@@ -31,7 +32,6 @@ import {
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
-import type { PopupRole } from './popup-spread'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -104,12 +104,14 @@ function makeEdgeGeometry(): THREE.BufferGeometry {
 
 export function BoxPopupLayer({
   layer,
-  role,
+  spreadIndex,
   frame,
+  committedSpread,
 }: {
   layer: SceneLayer & BoxGeom
-  role: PopupRole
+  spreadIndex: number
   frame: RefObject<TurnFrame | null>
+  committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
@@ -186,6 +188,8 @@ export function BoxPopupLayer({
     const group = groupRef.current
     if (!group) return
     const f = frame.current
+    // Role from the driver refs, never a React prop (see liveSpreadRole).
+    const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
     const solveRole: SpreadRole = role === 'hidden' ? 'current' : role
     const { thetaL, thetaR } = spreadPageAngles(solveRole, f?.dir ?? null, f ? easeTurnWeighted(f.t) : 0)
     const beta = thetaL - thetaR

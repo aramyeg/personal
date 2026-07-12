@@ -15,11 +15,11 @@
  */
 
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStorybookStore } from '../store'
 import { SPREAD_COUNT, popupContentForSpread } from '../content'
-import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn } from './page-geometry'
+import { PAGE_H, PAGE_W, buildPageTemplate, easeTurn, easeTurnWeighted } from './page-geometry'
 import { makeCreaseCanvas, makeLeatherCanvas, makePaperCanvas } from '../procedural/paper-texture'
 import { isCoverTurn, useTurnDriver } from './use-turn-driver'
 import { TurningPage } from './turning-page'
@@ -79,6 +79,12 @@ const POPUP_Y = PAGE_SURFACE_Y + 0.0015
 // straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
 // when closed centers it under the CTA without touching any local layout.
 const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
+// Turning sheet underside shade, ramped in mid-air and back to exact white
+// at both flat poses (see the useFrame below): the landed face and the
+// static page that replaces it must be pixel-identical at hand-off, or the
+// brightness step reads as a flash on the landing page.
+const SHEET_WHITE = new THREE.Color('#ffffff')
+const SHEET_BACK_SHADE = new THREE.Color('#b9ad99')
 
 export function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
@@ -168,6 +174,19 @@ export function Book() {
     () => new THREE.MeshBasicMaterial({ map: crease, transparent: true, depthWrite: false }),
     [crease]
   )
+  // The turning sheet's two printed faces. Owned HERE (not in
+  // turning-page.tsx) because their maps must swap inside the useFrame
+  // below, on the driver-ref clock — a React effect in the sheet component
+  // raced the driver at both ends of a turn and painted a blank-paper
+  // frame whenever its flush landed while the sheet was still visible.
+  const sheetFrontMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.9, side: THREE.FrontSide }),
+    [paper]
+  )
+  const sheetBackMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: paper, roughness: 0.97, side: THREE.BackSide }),
+    [paper]
+  )
 
   useEffect(
     () => () => {
@@ -177,8 +196,19 @@ export function Book() {
       leftPageMaterial.dispose()
       rightPageMaterial.dispose()
       creaseMaterial.dispose()
+      sheetFrontMaterial.dispose()
+      sheetBackMaterial.dispose()
     },
-    [leatherMaterial, edgeMaterial, paperMaterial, leftPageMaterial, rightPageMaterial, creaseMaterial]
+    [
+      leatherMaterial,
+      edgeMaterial,
+      paperMaterial,
+      leftPageMaterial,
+      rightPageMaterial,
+      creaseMaterial,
+      sheetFrontMaterial,
+      sheetBackMaterial,
+    ]
   )
 
   // Committed open/closed state — drives the cover's *rest* pose and the
@@ -204,13 +234,17 @@ export function Book() {
   const isCoverTurning = turning !== null && isCoverTurn(spread, turning)
   const spineHeight = spreadOpen ? SPINE_FLAT_HEIGHT : SPINE_HEIGHT
 
-  // Current spread ± 1 with actual pop-up content, so neighboring layer
+  // Current spread ± 2 with actual pop-up content, so neighboring layer
   // textures are already warm by the time you turn to them (see
   // popup-spread.tsx's file header) — only `spread` itself ever renders
-  // visibly, the neighbors stay hidden until it's their turn.
+  // visibly, the neighbors stay hidden until it's their turn. ± 2 (not 1)
+  // because a QUEUED turn promotes the instant the first one commits: its
+  // destination is spread ± 2 from where the chain started, and a ± 1
+  // window only begins loading it at the hand-off — pieces then popped in
+  // a few frames into the second turn.
   const popupSpreadIndices = useMemo(
     () =>
-      [spread - 1, spread, spread + 1].filter(
+      [spread - 2, spread - 1, spread, spread + 1, spread + 2].filter(
         (i) => i >= 1 && i <= SPREAD_MAX && popupContentForSpread(i) !== undefined
       ),
     [spread]
@@ -222,43 +256,38 @@ export function Book() {
   // contract the turn driver documents.
   const incomingSpreadIndex = turning ? spread + (turning === 'next' ? 1 : -1) : null
 
-  // Printed page faces for the current spread ± 1 (indices 1..SPREAD_MAX —
-  // spread 0 is the closed cover, no pages visible).
+  // Printed page faces for the current spread ± 2 (indices 1..SPREAD_MAX —
+  // spread 0 is the closed cover, no pages visible). ± 2 for the same
+  // chained-turn reason as popupSpreadIndices above: the reveal-side print
+  // must already be resolved when a queued turn promotes, or the exposed
+  // page holds the outgoing print and swaps it mid-flight.
   const printIndices = useMemo(
-    () => [spread - 1, spread, spread + 1].filter((i) => i >= 1 && i <= SPREAD_MAX),
+    () => [spread - 2, spread - 1, spread, spread + 1, spread + 2].filter((i) => i >= 1 && i <= SPREAD_MAX),
     [spread]
   )
   const prints = useSpreadPrints(printIndices)
-  // The half each static page shows — at rest the current spread's own halves,
-  // during a turn the exposed side pre-swapped to the incoming spread — is set
-  // in the useFrame below, NOT here. It has to run on the SAME per-frame clock
-  // as the turning sheet's visibility (the driver refs), or it desyncs: read on
-  // React's render clock, `turning` arms a frame or two AFTER the driver at a
-  // turn's start, and `spread` commits a frame or two AFTER the sheet hides at
-  // its end. Either gap paints a print onto the bare static page while the
-  // sheet isn't covering it — the right-page turn flash. Driving both the
-  // direction and the spread off the driver refs keeps every swap atomic with
-  // the sheet. The mid-turn sheet's own two faces stay on the render clock
-  // below: they're only ever seen ON the sheet, never on the bare page.
-  // The mid-turn sheet's two faces: what it was showing when it lifted, and
-  // what it lands as (see turning-page.tsx for the uv orientations).
-  const turnFrontMap = turning
-    ? (turning === 'next' ? prints[spread]?.right : prints[spread - 1]?.right) ?? null
-    : null
-  const turnBackMap = turning
-    ? (turning === 'next' ? prints[spread + 1]?.left : prints[spread]?.left) ?? null
-    : null
+  // Upload every resolved print to the GPU as soon as it lands in the warm
+  // window. Three.js otherwise uploads a texture on its first *rendered*
+  // use — and every print's first rendered use is the first frame of a
+  // turn, so the upload stall (tens of ms for a full-page canvas) hit
+  // exactly when the eye was tracking the sheet's lift-off.
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    for (const print of Object.values(prints)) {
+      gl.initTexture(print.left)
+      gl.initTexture(print.right)
+    }
+  }, [gl, prints])
 
   useFrame(() => {
     const f = frame.current
-    // Static page prints, swapped here (frame loop) rather than in a React
-    // effect — see the printIndices note above for the flash this prevents.
-    // Both the turn's direction (f.dir) and the committed spread come off the
-    // driver's refs, the SAME clock the turning sheet's visibility runs on, so
-    // every swap — the incoming half revealed as the sheet lifts at the start,
-    // and the landing half committed as the sheet hides at the end — lands on
-    // the exact frame the sheet covers it. (A React-clock `turning`/`spread`
-    // ran a frame or two out of step with the sheet, baring the wrong print.)
+    // EVERY print the eye can see during a turn is swapped here, in the
+    // frame loop, off the driver's refs — the ONE clock the sheet's
+    // visibility also runs on. Anything print-shaped left on React's
+    // render/effect clock desyncs by a frame or two at a turn's endpoints
+    // (React arms after the driver at lift-off and commits after it at
+    // landing) and paints a wrong or blank face exactly when the sheet
+    // stops covering it — the turn flash, in all its variants.
     // The lifting cover does its own reveal, so cover turns read the same f.dir.
     const sp = committedSpread.current
     const revealDir = f ? f.dir : null
@@ -278,6 +307,27 @@ export function Book() {
     if (leftWanted && leftPageMaterial.map !== leftWanted) {
       leftPageMaterial.map = leftWanted
       leftPageMaterial.needsUpdate = true
+    }
+
+    // The mid-turn sheet's two faces: the print it lifted with and the one
+    // it lands as (same hold-last rule as the static pages — never blank).
+    if (f && !f.isCover) {
+      const frontWanted = f.dir === 'next' ? prints[sp]?.right : prints[sp - 1]?.right
+      if (frontWanted && sheetFrontMaterial.map !== frontWanted) {
+        sheetFrontMaterial.map = frontWanted
+        sheetFrontMaterial.needsUpdate = true
+      }
+      const backWanted = f.dir === 'next' ? prints[sp + 1]?.left : prints[sp]?.left
+      if (backWanted && sheetBackMaterial.map !== backWanted) {
+        sheetBackMaterial.map = backWanted
+        sheetBackMaterial.needsUpdate = true
+      }
+      // Underside shade: full card-stock tint only in mid-air, exact white
+      // at both flat poses — at t=0/1 this face and the static page showing
+      // the SAME print must hand off pixel-identically, and any constant
+      // tint popped ~30% brightness on the landing page at commit.
+      const shade = Math.sin(Math.PI * easeTurnWeighted(f.t))
+      sheetBackMaterial.color.lerpColors(SHEET_WHITE, SHEET_BACK_SHADE, shade)
     }
 
     const cover = frontCoverRef.current
@@ -379,8 +429,15 @@ export function Book() {
         />
       )}
 
-      {/* The page currently mid-turn; hidden except during a non-cover turn. */}
-      <TurningPage frame={frame} originY={PAGE_SURFACE_Y} frontMap={turnFrontMap} backMap={turnBackMap} />
+      {/* The page currently mid-turn; hidden except during a non-cover turn.
+          Its two face materials live in this component (see sheetFront/
+          sheetBackMaterial above) so their maps swap on the driver clock. */}
+      <TurningPage
+        frame={frame}
+        originY={PAGE_SURFACE_Y}
+        frontMaterial={sheetFrontMaterial}
+        backMaterial={sheetBackMaterial}
+      />
 
       {/* Pop-up layers for the open spread: folded paper cutouts that spring
           up from the page. Mounted for spread ± 1 (see popupSpreadIndices
@@ -409,6 +466,7 @@ export function Book() {
                 spreadIndex={i}
                 role={role}
                 frame={frame}
+                committedSpread={committedSpread}
               />
             )
           })}

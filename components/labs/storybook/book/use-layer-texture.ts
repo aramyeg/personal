@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { artManifest } from '../art-manifest'
 import type { LayerKind } from '../content'
@@ -90,6 +91,7 @@ export function useLayerTexture(
   accents: readonly string[]
 ): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
+  const gl = useThree((s) => s.gl)
 
   useEffect(() => {
     let owned: THREE.Texture | null = null
@@ -114,6 +116,13 @@ export function useLayerTexture(
     }
   }, [layerId, kind, accents])
 
+  // Upload as soon as resolved: warm-window neighbors mount hidden, and a
+  // hidden mesh never renders, so without this the GPU upload stalled the
+  // first frames of the turn that revealed the piece.
+  useEffect(() => {
+    if (texture) gl.initTexture(texture)
+  }, [gl, texture])
+
   return texture
 }
 
@@ -126,6 +135,7 @@ export function useLayerTexture(
  */
 export function useArtTexture(id: string): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
+  const gl = useThree((s) => s.gl)
 
   useEffect(() => {
     let owned: THREE.Texture | null = null
@@ -144,6 +154,11 @@ export function useArtTexture(id: string): THREE.Texture | null {
       setTexture(null)
     }
   }, [id])
+
+  // Same pre-warm rationale as useLayerTexture above.
+  useEffect(() => {
+    if (texture) gl.initTexture(texture)
+  }, [gl, texture])
 
   return texture
 }

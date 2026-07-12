@@ -725,3 +725,25 @@ export function spreadDihedral(role: SpreadRole, dir: TurnDir | null, easedT: nu
   const { thetaL, thetaR } = spreadPageAngles(role, dir, easedT)
   return clamp(thetaL - thetaR, 0, Math.PI)
 }
+
+/**
+ * A spread's turn role derived from the FRAME-LOOP clock (the driver's
+ * committedSpread ref + the in-flight dir), never from React render state.
+ * The React-prop version of this value arrives one commit late at a turn's
+ * completion: the driver nulls its frame ref inside the same rAF that calls
+ * completeTurn(), but a prop still saying 'outgoing' meets that null frame
+ * as spreadPageAngles(role, null, 0) = dihedral PI — the whole outgoing
+ * scene popping fully open for however many frames React needs to catch up
+ * (the commit-time page flash). Every pose consumer derives its role from
+ * this function inside useFrame so role and dihedral tick on one clock.
+ */
+export function liveSpreadRole(
+  spreadIndex: number,
+  committedSpread: number,
+  dir: TurnDir | null
+): SpreadRole | 'hidden' {
+  if (dir === null) return spreadIndex === committedSpread ? 'current' : 'hidden'
+  if (spreadIndex === committedSpread) return 'outgoing'
+  const incoming = committedSpread + (dir === 'next' ? 1 : -1)
+  return spreadIndex === incoming ? 'incoming' : 'hidden'
+}
