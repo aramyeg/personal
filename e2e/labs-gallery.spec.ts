@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test'
 test.describe('Style Lab gallery', () => {
   test('list view shows every lab with a working link', async ({ page }) => {
     await page.goto('/?view=list')
-    const ps1 = page.getByRole('link', { name: /PS1 \/ Y2K/ })
-    await expect(ps1).toBeVisible()
-    await ps1.click()
-    await expect(page).toHaveURL(/\/labs\/ps1/)
+    const memoryCard = page.getByRole('link', { name: /Memory Card/ })
+    await expect(memoryCard).toBeVisible()
+    await memoryCard.click()
+    await expect(page).toHaveURL(/\/labs\/memory-card/)
   })
 
   test('desktop / mounts the 3D museum canvas', async ({ page, isMobile }) => {
@@ -21,14 +21,14 @@ test.describe('Style Lab gallery', () => {
   })
 
   test('Escape inside a lab returns to the museum', async ({ page }) => {
-    await page.goto('/labs/ps1')
+    await page.goto('/labs/memory-card')
     await page.keyboard.press('Escape')
     await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
   })
 
   test('lab page has a back-to-gallery button', async ({ page }) => {
-    await page.goto('/labs/ps1')
-    const back = page.getByRole('link', { name: /gallery/i })
+    await page.goto('/labs/memory-card')
+    const back = page.getByRole('link', { name: /gallery/i }).first()
     await expect(back).toBeVisible()
     await back.click()
     await expect(page).toHaveURL(/\/$/)
