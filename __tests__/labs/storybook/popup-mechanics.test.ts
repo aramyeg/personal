@@ -4,12 +4,15 @@ import {
   liveSpreadRole,
   openElevation,
   sheetAngle,
+  sheetAngleTilted,
+  sheetSweepTilted,
   solveBoxPose,
   solveLayerPose,
   solveParallelPose,
   solveVFoldPose,
   spreadDihedral,
   spreadPageAngles,
+  spreadPageAnglesTilted,
   type LayerGeom,
   type PanelQuad,
   type Vec3,
@@ -703,5 +706,69 @@ describe('liveSpreadRole — turn roles on the driver clock (the commit-flash ru
     // ever pop the folded scene open, never the live one.
     expect(spreadDihedral('outgoing', null, 0)).toBeCloseTo(Math.PI, 12)
     expect(spreadDihedral(liveSpreadRole(4, 4, null) as 'current', null, 0)).toBeCloseTo(Math.PI, 12)
+  })
+})
+
+describe('tilted gearing (bulge, derive-bulge.mjs A16/A17) — sheet sweep and page angles', () => {
+  const FLAT_EPSILON = 0.02
+  const N = 9 // INTERIOR_SHEETS
+
+  it('A16: the sweep starts exactly in the lifted plane and ends exactly in the landing plane', () => {
+    for (let s = 1; s <= N - 1; s++) {
+      const next = sheetSweepTilted('next', s)
+      expect(sheetAngleTilted('next', 0, s)).toBeCloseTo(next.from, 12)
+      expect(sheetAngleTilted('next', 1, s)).toBeCloseTo(next.to, 12)
+      // outgoing dihedral at e=0 equals the spread's rest dihedral exactly
+      const out0 = spreadPageAnglesTilted(s, s, 'next', 0)
+      const rest = spreadPageAnglesTilted(s, s, null, 0)
+      expect(out0.thetaL - out0.thetaR).toBeCloseTo(rest.thetaL - rest.thetaR, 12)
+      // incoming dihedral at e=1 equals the NEXT spread's rest dihedral exactly
+      const in1 = spreadPageAnglesTilted(s + 1, s, 'next', 1)
+      const restNext = spreadPageAnglesTilted(s + 1, s + 1, null, 0)
+      expect(in1.thetaL - in1.thetaR).toBeCloseTo(restNext.thetaL - restNext.thetaR, 12)
+    }
+  })
+
+  it('A17: hand-off residual dihedrals sit strictly inside (0, FLAT_EPSILON)', () => {
+    for (let s = 1; s <= N - 1; s++) {
+      const in0 = spreadPageAnglesTilted(s + 1, s, 'next', 0)
+      const out1 = spreadPageAnglesTilted(s, s, 'next', 1)
+      for (const beta of [in0.thetaL - in0.thetaR, out1.thetaL - out1.thetaR]) {
+        expect(beta).toBeGreaterThan(0)
+        expect(beta).toBeLessThan(FLAT_EPSILON)
+      }
+    }
+  })
+
+  it('prev turns mirror next turns exactly', () => {
+    for (let s = 2; s <= N; s++) {
+      // prev from s lands on s-1; its sweep reverses s-1's next sweep
+      const prev = sheetSweepTilted('prev', s)
+      const nextOfPrior = sheetSweepTilted('next', s - 1)
+      expect(prev.from).toBeCloseTo(nextOfPrior.to, 12)
+      expect(prev.to).toBeCloseTo(nextOfPrior.from, 12)
+      // incoming (s-1) at e=1 lands on its rest dihedral
+      const in1 = spreadPageAnglesTilted(s - 1, s, 'prev', 1)
+      const rest = spreadPageAnglesTilted(s - 1, s - 1, null, 0)
+      expect(in1.thetaL - in1.thetaR).toBeCloseTo(rest.thetaL - rest.thetaR, 12)
+    }
+  })
+
+  it('rest pose never opens flat and every shipped layer solves finitely at it', () => {
+    for (const [name, layers] of SPREAD_SETS) {
+      void name
+      for (const layer of layers) {
+        // spread indices 1..9; SPREAD_SETS names don't carry them, so solve
+        // at the most-tilted rest poses (spreads 1 and 9) for every layer.
+        for (const s of [1, 9]) {
+          const { thetaL, thetaR } = spreadPageAnglesTilted(s, s, null, 0)
+          expect(thetaL - thetaR).toBeLessThan(Math.PI)
+          expect(thetaL - thetaR).toBeGreaterThan(2.9)
+          for (const q of allQuads(layer, layers, thetaL, thetaR)) {
+            for (const p of q.flat()) expect(Number.isFinite(p)).toBe(true)
+          }
+        }
+      }
+    }
   })
 })

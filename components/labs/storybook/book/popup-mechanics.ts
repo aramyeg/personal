@@ -83,6 +83,8 @@
  * m = (thetaL + thetaR) / 2 about Z.
  */
 
+import { restAngles } from './page-geometry'
+
 export type Vec3 = readonly [number, number, number]
 
 /** One panel's world-space quad corners, ordered for uv mapping:
@@ -746,4 +748,70 @@ export function liveSpreadRole(
   if (spreadIndex === committedSpread) return 'outgoing'
   const incoming = committedSpread + (dir === 'next' ? 1 : -1)
   return spreadIndex === incoming ? 'incoming' : 'hidden'
+}
+
+// ---------------------------------------------------------------------------
+// Tilted (bulge) gearing — derive-bulge.mjs theorems A16-A20. The book never
+// opens dead flat: each spread rests at (PI - aL, aR) from its per-side
+// stack heights (page-geometry's restAngles), and the sheet sweeps between
+// the exact planes it lifts out of and lands as (A16 hand-off coincidence —
+// the invariant that keeps turn endpoints flicker-free under tilt).
+
+/** The moving sheet's tilted sweep for the turn leaving `committedSpread`
+ *  in `dir`: from the plane it lifts out of to the plane it lands as. */
+export function sheetSweepTilted(
+  dir: TurnDir,
+  committedSpread: number
+): { from: number; to: number } {
+  if (dir === 'next') {
+    return {
+      from: restAngles(committedSpread).aR,
+      to: Math.PI - restAngles(committedSpread + 1).aL,
+    }
+  }
+  return {
+    from: Math.PI - restAngles(committedSpread).aL,
+    to: restAngles(committedSpread - 1).aR,
+  }
+}
+
+/** Tilted replacement for `sheetAngle`: same eased clock, endpoint planes
+ *  from the rest poses instead of hard 0/PI. */
+export function sheetAngleTilted(dir: TurnDir, easedT: number, committedSpread: number): number {
+  const { from, to } = sheetSweepTilted(dir, committedSpread)
+  return from + (to - from) * clamp(easedT, 0, 1)
+}
+
+/**
+ * Tilted replacement for `spreadPageAngles`, role derived internally from
+ * the frame-loop pair (one clock). Static planes wear their OWN spread's
+ * rest tilt, which encodes the two re-tilt moments exactly: the side that
+ * LOSES the flying sheet re-tilts at lift-off (its stack is already one
+ * sheet shorter — the outgoing spread's static side keeps the OLD tilt,
+ * the incoming spread's shows the NEW one), and the side that GAINS it
+ * re-tilts at commit, hidden under the just-landed sheet. Hidden/current
+ * spreads sit at their rest pose (A18: still blooming, dihedral ~176 deg).
+ */
+export function spreadPageAnglesTilted(
+  spreadIndex: number,
+  committedSpread: number,
+  dir: TurnDir | null,
+  easedT: number
+): { thetaL: number; thetaR: number } {
+  const role = liveSpreadRole(spreadIndex, committedSpread, dir)
+  const rest = restAngles(spreadIndex)
+  if (dir === null || role === 'current' || role === 'hidden') {
+    return { thetaL: Math.PI - rest.aL, thetaR: rest.aR }
+  }
+  const theta = sheetAngleTilted(dir, easedT, committedSpread)
+  if (dir === 'next') {
+    // Sheet lifts off the right stack, lands as the incoming left page.
+    return role === 'outgoing'
+      ? { thetaL: Math.PI - rest.aL, thetaR: theta }
+      : { thetaL: theta, thetaR: rest.aR }
+  }
+  // 'prev': sheet lifts off the left stack, lands as the incoming right page.
+  return role === 'outgoing'
+    ? { thetaL: theta, thetaR: rest.aR }
+    : { thetaL: Math.PI - rest.aL, thetaR: theta }
 }
