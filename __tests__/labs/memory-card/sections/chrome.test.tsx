@@ -45,11 +45,11 @@ describe('MemoryCardChrome', () => {
     }
   })
 
-  it('renders a skip link that jumps to the save strips', () => {
+  it('renders a skip link that jumps to the save index list', () => {
     render(<MemoryCardChrome />)
     expect(
       screen.getByRole('link', { name: /skip to the content/i })
-    ).toHaveAttribute('href', '#save-strips')
+    ).toHaveAttribute('href', '#save-index')
   })
 
   it('keeps both asset attribution lines in the credits footer (license law)', () => {

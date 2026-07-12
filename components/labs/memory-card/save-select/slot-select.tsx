@@ -520,7 +520,17 @@ export function SlotSelect({
       </div>
       <div style={{ height: 1, background: HAIRLINE, marginBottom: 2 }} />
 
-      <ol id="save-index" aria-label="Save files" className="flex flex-col" onKeyDown={onKeyDown}>
+      {/* tabindex="-1" makes the list a programmatic focus target for the
+          chrome skip link (`#save-index`); the container outline is suppressed
+          because the active row is already visually raised and the roving
+          cursor lands real focus on a row the moment an arrow key is pressed. */}
+      <ol
+        id="save-index"
+        aria-label="Save files"
+        tabIndex={-1}
+        className="flex flex-col focus:outline-none"
+        onKeyDown={onKeyDown}
+      >
         {saves.map((save, index) => (
           <Fragment key={save.slot}>
             {index === firstSystemIndex && (

@@ -4,8 +4,9 @@
  * MemoryCardChrome — the top bar of the Save Select screen: a quiet fixed ink
  * bar carrying a keyboard skip link, the wordmark, and a live sound toggle. The
  * Save Select rework retired the old section-scroll anchors (there are no
- * sections to jump to any more), so the skip link now lands on the save strips
- * themselves. Rendered BEFORE the screen so the skip link stays first in tab
+ * sections to jump to any more), so the skip link now lands on the save index
+ * list itself (`#save-index`, made focusable with tabindex="-1" for the focus
+ * handoff). Rendered BEFORE the screen so the skip link stays first in tab
  * order.
  *
  * The credits strip is a SEPARATE `MemoryCardFooter` (below), rendered AFTER the
@@ -69,7 +70,7 @@ export function MemoryCardChrome({
         className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between pl-4 pr-4 sm:pl-[7.5rem] sm:pr-6"
       >
         <a
-          href="#save-strips"
+          href="#save-index"
           style={monoLabel}
           className={`sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-14 focus:z-50 focus:inline-flex focus:items-center focus:bg-[color:var(--mc-ring)] focus:px-3 focus:py-2 focus:text-[color:var(--mc-ink)] ${FOCUS_RING}`}
         >

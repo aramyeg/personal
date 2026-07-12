@@ -67,6 +67,14 @@ describe('SlotSelect', () => {
     expect(container.querySelectorAll('#save-index button[tabindex="0"]')).toHaveLength(1)
   })
 
+  it('exposes the list itself as a focus target for the chrome skip link (tabindex -1)', () => {
+    setup()
+    // The `#save-index` list is what `href="#save-index"` in the chrome resolves
+    // to; it must be programmatically focusable to receive the skip-link handoff
+    // without joining the tab order.
+    expect(screen.getByRole('list', { name: /save files/i })).toHaveAttribute('tabindex', '-1')
+  })
+
   it('ArrowDown highlights and focuses the next row', () => {
     const { rows, onHighlight } = setup(0)
     rows[0].focus()
