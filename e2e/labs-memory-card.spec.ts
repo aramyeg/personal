@@ -25,10 +25,10 @@ test.describe('memory card lab — boot', () => {
   test('the boot beat auto-advances to the screen once its timer ends', async ({ page }) => {
     await page.goto('/labs/memory-card')
     await expect(page.getByTestId('boot-beat')).toBeVisible()
-    // BEAT_DURATION_MS is a 3s timer, but the figure/card-arc scenes mount
-    // concurrently and do real synchronous WebGL setup (PMREM env bake, GLTF
-    // loads) that can delay the timer firing — generous margin for that,
-    // heavier still on emulated mobile devices.
+    // BEAT_DURATION_MS is a 3s timer, but the single figure-hero scene mounts
+    // and does real synchronous WebGL setup (PMREM env bake, GLB load) that can
+    // delay the timer firing — generous margin for that, heavier still on
+    // emulated mobile devices.
     await expect(page.getByTestId('boot-beat')).toBeHidden({ timeout: 15000 })
     await expect(page.getByRole('list', { name: /save files/i })).toBeVisible()
   })
@@ -60,14 +60,25 @@ test.describe('memory card lab — save select', () => {
     await page.goto('/labs/memory-card')
     await expect(page.getByRole('list', { name: /save files/i })).toBeVisible()
 
+    // Split-hero surface: the giant display title mirrors the active save. It
+    // opens on slot 01 (amio-bank) and is the only <h1> on the loaded screen.
+    await expect(
+      page.getByRole('heading', { level: 1, name: /amio bank ibank/i })
+    ).toBeVisible()
+
     const slot01 = page.getByRole('button', { name: /^slot 01/i })
     const slot02 = page.getByRole('button', { name: /^slot 02/i })
 
     // .focus() sets DOM focus directly (no click), so it doesn't fire the
-    // rail's click-to-activate handler on the already-active first row.
+    // list's click-to-activate handler on the already-active first row.
     await slot01.focus()
     await page.keyboard.press('ArrowDown') // slot 01 (already active) -> slot 02 (360dialog)
     await expect(slot02).toBeFocused()
+
+    // The signature payoff: highlighting a save swaps the display title in place.
+    await expect(
+      page.getByRole('heading', { level: 1, name: /360dialog platform/i })
+    ).toBeVisible()
 
     await page.keyboard.press('Enter')
     const overlay = page.getByRole('dialog', { name: /360dialog platform/i })
@@ -93,7 +104,7 @@ test.describe('memory card lab — save select', () => {
     await expect(page.getByText(/character base by quaternius \(cc0\)/i)).toBeVisible()
   })
 
-  test('mobile viewport: two taps on a rail row load its save as a full sheet', async ({
+  test('mobile viewport: two taps on a slot row load its save as a full sheet', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -101,8 +112,8 @@ test.describe('memory card lab — save select', () => {
     const slot03 = page.getByRole('button', { name: /^slot 03/i })
     await expect(slot03).toBeVisible()
 
-    // The rail's click handler is shared by touch and mouse (no separate touch
-    // listener), so .click() exercises the same "first tap highlights, second
+    // The slot row's click handler is shared by touch and mouse (no separate
+    // touch listener), so .click() exercises the same "first tap highlights, second
     // activates" path a real tap would — and keeps this journey runnable on
     // every configured browser project, not just the two with hasTouch.
     await slot03.click()
@@ -137,7 +148,7 @@ test.describe('memory card lab — save select', () => {
       page.getByLabel('Credits').getByText(/crt model by meipal \(cc by 4\.0\)/i)
     ).toBeVisible()
 
-    // Exactly one rail row carries the roving tabindex before anything opens.
+    // Exactly one slot row carries the roving tabindex before anything opens.
     await expect(page.locator('#save-index button[tabindex="0"]')).toHaveCount(1)
 
     // Slot 04 is the first system save (system data) — two taps opens its dialog.
