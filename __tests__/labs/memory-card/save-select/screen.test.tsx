@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const push = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, back: vi.fn() }),
+  usePathname: () => '/labs/memory-card',
 }))
 
 // next/font/google is unavailable under vitest — stub with inert style objects.

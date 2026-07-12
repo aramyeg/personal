@@ -1,31 +1,39 @@
 'use client'
 
 /**
- * FigureStage — the character half of the select screen, and the payoff of the
- * whole lab: choosing a save re-dresses the figure into that save's fit. Each
- * save owns a fit GLB (a distinct outfit on a shared skeleton, saves.ts maps
+ * FigureStage — the hero half of the select screen, and the payoff of the whole
+ * lab: the character stands large on a lit ground, slowly turning on a
+ * turntable, and choosing a save re-dresses it into that save's fit. Each save
+ * owns a fit GLB (a distinct outfit on a shared skeleton, saves.ts maps
  * slot→fit); the active fit loads, plays its baked idle, and swaps for the next
- * one when the highlighted save changes. The figure also re-lights itself in the
- * highlighted save's accent — an accent rim rakes the silhouette edge and a
- * short-range accent fill washes the lower body — so a choice visibly "equips"
- * the figure in that save's outfit AND colour, legible even in a still.
+ * when the highlighted save changes.
  *
- * Swap grammar (web-motion-design): a quick "equip pop" — the figure squashes to
- * a dip and eases back with a slight overshoot (easeOutBack) as the new fit
- * lands. The accent atmosphere (void backdrop + rim) is the secondary action,
- * shifting in step. Under reduced motion the swap is instant with no squash and
- * the idle is sampled to a static mid-pose. The other fits are warmed into the
- * loader cache once the stage is idle, so a re-dress hits cache (near-instant); a
- * cold swap degrades to the stage's Suspense fallback.
+ * Renderer law (spec §2). Fits render as PS-era unlit polygons: on load every
+ * material is converted to an unlit `MeshBasicMaterial` (map only) and every
+ * texture is point-sampled with no mip chain. "Lighting lives in the texture" —
+ * AO, folds and seams are baked into each fit's atlas — so the material must be
+ * unlit or that baked light would be double-shaded; PBR/normal contributions are
+ * dropped and tone-mapping disabled so the paint renders 1:1. The per-save accent
+ * is therefore delivered as ATMOSPHERE, never as material lights (which unlit
+ * materials ignore anyway): a canvas-side accent ground glow here, meeting the
+ * DOM-side accent backdrop the screen composites behind this transparent canvas.
+ * The renderer pass is written over the loaded scene, not per file, so the E2
+ * repainted GLBs inherit it through the same loader path.
  *
- * It reuses the shared `VignetteCanvas` rig (IO gating, RoomEnvironment,
- * context-loss recovery) and adds the accent rim + the character as children.
- * The figure owns the loader-cached GLB directly (never cloned — plain clone
- * breaks skinned-mesh binding), so it is the single renderer of that scene.
+ * Turntable. One slow revolution (~28s, constant rate) driven by a rAF loop that
+ * calls `invalidate()` on the canvas's demand frameloop, so the spin PAUSES for
+ * free when the tab is hidden, the canvas unmounts off-viewport (the shared rig's
+ * IntersectionObserver), or an overlay dialog/route covers the hero (`paused`,
+ * the signal the screen already owns). Under reduced motion there is no spin: the
+ * figure holds a static three-quarter pose and the idle is sampled to one frame.
  *
- * Motion discipline: the rim lerps under the live frameloop and snaps + one
- * `invalidate()` under reduced motion's demand loop; the idle mixer samples a
- * natural pose and repaints once when motion is suppressed.
+ * Swap choreography (~280ms, the shared select clock). On a fit change the figure
+ * dips and springs back (equip pop, easeOutBack) while the accent ground glow
+ * crossfades to the new accent — in step with the screen's atmosphere crossfade
+ * and title swap. The other fits are warmed into the loader cache once idle, so a
+ * re-dress hits cache; a cold swap degrades to the Suspense fallback while the
+ * turntable keeps turning. StrictMode law: anything created here is disposed in a
+ * paired cleanup; loader-cache-owned scenes/materials/textures are never disposed.
  */
 
 import {
@@ -42,15 +50,22 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { fitToStage } from '../lib/fit-model'
+import {
+  MAX_FRAME_DELTA,
+  REDUCED_YAW,
+  SPIN_RATE,
+  applyEraRenderer,
+  turntableRunning,
+} from '../lib/figure-era'
+import { MC, MOTION } from '../tokens'
 import { CHARACTER_IDLE_CLIP, FIT_COUNT, fitSrc } from './character'
 
 /** A second into the idle lands on a natural mid-pose, not the frame-0 A-pose. */
 const REDUCED_POSE_TIME = 0.6
 
-/** Equip pop: how far the figure squashes at the start of a re-dress, and how
- *  long (seconds) the pop takes to settle back to full scale. */
+/** Equip pop: how far the figure squashes at the start of a re-dress. It settles
+ *  back over the shared select clock (MOTION.select). */
 const SWAP_DIP = 0.82
-const SWAP_DURATION = 0.38
 
 /** easeOutBack — settles at exactly 1 after a small overshoot; gives the equip
  *  pop its snap. Constants are the CSS `back` curve's defaults. */
@@ -59,6 +74,10 @@ const BACK_C3 = BACK_C1 + 1
 function easeOutBack(x: number): number {
   return 1 + BACK_C3 * (x - 1) ** 3 + BACK_C1 * (x - 1) ** 2
 }
+
+/** Accent ground glow radius (world units) and its resting opacity. */
+const GROUND_RADIUS = 1.5
+const GROUND_OPACITY = 0.5
 
 /** World-space bounds, skinned-mesh-aware (bone matrices settled up front). */
 function measureScene(scene: THREE.Object3D): THREE.Box3 {
@@ -87,60 +106,85 @@ function measureScene(scene: THREE.Object3D): THREE.Box3 {
   return box
 }
 
-type AccentRimProps = { accent: string; reduced: boolean }
+/**
+ * Seam law: clear the figure canvas to the ink token behind it (imported, never
+ * a hex literal), fully transparent so the DOM accent atmosphere composites
+ * through. The shared rig clears to transparent black; this re-points the colour
+ * channel at the exact ink token for an honest seam.
+ */
+function SeamClear(): null {
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    gl.setClearColor(new THREE.Color(MC.ink), 0)
+  }, [gl])
+  return null
+}
 
-/** Contact-shadow radius on the figure's `VignetteCanvas` — the fill light's
- *  `distance` is capped to this so its glow never spreads past the shadow. */
-const FILL_MAX_DISTANCE = 1.3
+/** Soft white radial disc — tinted by the material colour into an accent pool. */
+function makeGroundGlow(): THREE.CanvasTexture {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.32)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
 
 /**
- * A coloured rim from behind the figure's shoulder plus a short-range fill low
- * at its front, both easing to the active accent. Under the live loop they
- * lerp; under reduced motion's demand loop they snap to the new colour and
- * force one repaint so the change is never frozen.
+ * The canvas-side accent ground: a soft glow disc on the floor, unlit and
+ * era-flat (no PBR), tinted to the active accent — the character-visible ground
+ * contact that meets the DOM atmosphere. It stays fixed while the figure turns.
+ * On a save change its colour crossfades to the new accent over the shared select
+ * clock; under reduced motion it snaps and forces one repaint (the demand loop
+ * won't advance a lerp on its own).
  */
-function AccentRim({ accent, reduced }: AccentRimProps) {
-  const rimRef = useRef<THREE.DirectionalLight>(null)
-  const fillRef = useRef<THREE.PointLight>(null)
+function AccentGround({ accent, reduced }: { accent: string; reduced: boolean }) {
+  const matRef = useRef<THREE.MeshBasicMaterial>(null)
   const invalidate = useThree((s) => s.invalidate)
-  const target = useMemo(() => new THREE.Color(accent), [accent])
+  const texture = useMemo(() => makeGroundGlow(), [])
+  useEffect(() => () => texture.dispose(), [texture])
 
-  useEffect(() => {
+  const target = useMemo(() => new THREE.Color(accent), [accent])
+  const from = useRef(new THREE.Color(accent))
+  const progress = useRef(1)
+
+  useLayoutEffect(() => {
+    const mat = matRef.current
+    if (!mat) return
     if (reduced) {
-      rimRef.current?.color.copy(target)
-      fillRef.current?.color.copy(target)
+      mat.color.copy(target)
       invalidate()
+      return
     }
+    from.current.copy(mat.color)
+    progress.current = 0
   }, [target, reduced, invalidate])
 
   useFrame((_, dt) => {
-    if (reduced) return
-    const k = Math.min(1, dt * 3)
-    rimRef.current?.color.lerp(target, k)
-    fillRef.current?.color.lerp(target, k)
+    if (reduced || progress.current >= 1) return
+    progress.current = Math.min(1, progress.current + dt / MOTION.select)
+    matRef.current?.color.lerpColors(from.current, target, progress.current)
   })
 
   return (
-    <>
-      <directionalLight
-        ref={rimRef}
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+      <circleGeometry args={[GROUND_RADIUS, 48]} />
+      <meshBasicMaterial
+        ref={matRef}
+        map={texture}
         color={accent}
-        intensity={4.6}
-        position={[-3.4, 3.6, -2.6]}
+        transparent
+        depthWrite={false}
+        opacity={GROUND_OPACITY}
+        toneMapped={false}
       />
-      {/* Low accent bounce so the equipped colour reads across the figure's
-          front — torso height, close enough to camera-facing surfaces (tank
-          top, waist) that the tint is legible in a still, not just grazing
-          the silhouette edge. Short range keeps it a tint, not a wash. */}
-      <pointLight
-        ref={fillRef}
-        color={accent}
-        intensity={2.6}
-        distance={FILL_MAX_DISTANCE}
-        decay={2}
-        position={[0.5, 0.95, 1.0]}
-      />
-    </>
+    </mesh>
   )
 }
 
@@ -148,14 +192,12 @@ function AccentRim({ accent, reduced }: AccentRimProps) {
  * Warms the loader cache for every fit shortly after first paint, so a re-dress
  * hits cache (near-instant). Preloading a fit that is already loaded is a cache
  * no-op, so the active fit is included and no per-swap bookkeeping is needed.
- * ~3.5MB total on a lazy timer is acceptable.
  *
- * The warm prefers `requestIdleCallback` but MUST carry a `timeout`: the stage's
- * live frameloop renders every rAF and starves idle callbacks (observed live —
- * the other fits never warmed and swaps stayed cold), so the timeout guarantees
- * the warm runs. A plain `setTimeout` is the fallback where rIC is absent.
+ * The warm prefers `requestIdleCallback` but MUST carry a `timeout`: a busy rAF
+ * loop can starve idle callbacks, so the timeout guarantees the warm runs. A
+ * plain `setTimeout` is the fallback where rIC is absent.
  */
-function FitPreloader() {
+function FitPreloader(): null {
   useEffect(() => {
     const warm = () => {
       for (let n = 1; n <= FIT_COUNT; n++) useLoader.preload(GLTFLoader, fitSrc(n))
@@ -171,12 +213,71 @@ function FitPreloader() {
 }
 
 /**
+ * The turntable. Owns the yaw group (so the spin survives fit swaps and cold
+ * Suspense gaps) and drives it from a single rAF loop that advances the angle at
+ * a constant rate and calls `invalidate()` on the canvas's demand frameloop. The
+ * loop is torn down while `paused` (an overlay covers the hero) and skips work
+ * while the tab is hidden — the angle is held in a ref so it resumes seamlessly.
+ * Under reduced motion the group is parked at the static three-quarter pose and
+ * the loop never runs.
+ */
+function Turntable({
+  reduced,
+  paused,
+  children,
+}: {
+  reduced: boolean
+  paused: boolean
+  children: ReactNode
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const angle = useRef(0)
+  const invalidate = useThree((s) => s.invalidate)
+
+  useEffect(() => {
+    const group = groupRef.current
+    if (!group) return
+
+    if (reduced) {
+      group.rotation.y = REDUCED_YAW
+      invalidate()
+      return
+    }
+    if (paused) return // frozen at the held angle; re-runs when paused clears
+
+    let raf = 0
+    let last = performance.now()
+    const tick = (now: number) => {
+      if (turntableRunning({ reduced, paused, hidden: document.hidden })) {
+        const dt = Math.min((now - last) / 1000, MAX_FRAME_DELTA)
+        angle.current = (angle.current + dt * SPIN_RATE) % (Math.PI * 2)
+        group.rotation.y = angle.current
+        invalidate()
+      }
+      last = now
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    // Becoming visible resets the clock so hidden time never lands as one jump.
+    const onVisible = () => {
+      if (!document.hidden) last = performance.now()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [reduced, paused, invalidate])
+
+  return <group ref={groupRef}>{children}</group>
+}
+
+/**
  * The equip pop. On every fit change after the first, the wrapped figure
- * squashes to `SWAP_DIP` and eases back to full scale with a small overshoot
- * under the live loop. Under reduced motion it is inert (no squash, instant
- * swap) — the demand loop wouldn't advance the ease and would freeze it mid-pop.
- * Sits OUTSIDE the model's Suspense boundary so its frame loop keeps running
- * through a cold swap's fallback gap.
+ * squashes to `SWAP_DIP` and springs back to full scale with a small overshoot,
+ * settling over the shared select clock. Under reduced motion it is inert (no
+ * squash, instant swap) — the demand loop wouldn't advance the ease. Sits OUTSIDE
+ * the model's Suspense boundary so its frame loop survives a cold swap's gap.
  */
 function SwapPop({
   fit,
@@ -191,8 +292,6 @@ function SwapPop({
   const progress = useRef(1) // 1 = settled at full scale
   const prevFit = useRef(fit)
 
-  // Kick synchronously at commit (before paint) so the new fit never flashes at
-  // full scale for a frame before dipping.
   useLayoutEffect(() => {
     if (prevFit.current === fit) return
     prevFit.current = fit
@@ -203,7 +302,7 @@ function SwapPop({
 
   useFrame((_, dt) => {
     if (reduced || progress.current >= 1) return
-    progress.current = Math.min(1, progress.current + dt / SWAP_DURATION)
+    progress.current = Math.min(1, progress.current + dt / MOTION.select)
     const s = SWAP_DIP + (1 - SWAP_DIP) * easeOutBack(progress.current)
     groupRef.current?.scale.setScalar(s)
   })
@@ -214,14 +313,22 @@ function SwapPop({
 type FigureModelProps = {
   fit: number
   fitHeight: number
-  yaw: number
   reduced: boolean
 }
 
-/** Loads + fits the active fit and plays its idle. */
-function FigureModel({ fit, fitHeight, yaw, reduced }: FigureModelProps): JSX.Element {
+/** Loads + fits the active fit, converts it to the era renderer, and plays its
+ *  idle. The turntable above owns the yaw. */
+function FigureModel({ fit, fitHeight, reduced }: FigureModelProps): JSX.Element {
   const gltf = useLoader(GLTFLoader, fitSrc(fit))
   const invalidate = useThree((s) => s.invalidate)
+
+  // Era renderer pass — unlit, point-sampled, no PBR. Mutates the loader-cached
+  // scene in place and restores + disposes-only-ours on cleanup (StrictMode law).
+  useEffect(() => {
+    const restore = applyEraRenderer(gltf.scene)
+    invalidate()
+    return restore
+  }, [gltf.scene, invalidate])
 
   const mixer = useMemo(
     () => (gltf.animations.length > 0 ? new THREE.AnimationMixer(gltf.scene) : null),
@@ -253,15 +360,14 @@ function FigureModel({ fit, fitHeight, yaw, reduced }: FigureModelProps): JSX.El
     )
   }, [gltf.scene, fitHeight])
 
+  // Clamp the idle delta so a resume after a pause never fast-forwards the clip.
   useFrame((_, dt) => {
-    if (mixer && !reduced) mixer.update(dt)
+    if (mixer && !reduced) mixer.update(Math.min(dt, MAX_FRAME_DELTA))
   })
 
   return (
-    <group rotation-y={yaw}>
-      <group scale={fitTransform.scale} position={fitTransform.offset}>
-        <primitive object={gltf.scene} />
-      </group>
+    <group scale={fitTransform.scale} position={fitTransform.offset}>
+      <primitive object={gltf.scene} />
     </group>
   )
 }
@@ -282,34 +388,38 @@ class FigureBoundary extends Component<BoundaryProps, BoundaryState> {
 
 export type FigureStageChildrenProps = {
   fit: number
-  yaw: number
   reduced: boolean
   accent: string
+  /** True while an overlay dialog/route covers the hero — the turntable freezes. */
+  paused: boolean
   fitHeight?: number
 }
 
 /**
- * The scene contents for the figure — the accent rim plus the character, warmed
- * by the idle fit preloader. Mounted as `VignetteCanvas` children by the screen
- * so the figure shares the stage rig.
+ * The scene contents for the figure — seam clear, accent ground, and the
+ * turntable-mounted character, warmed by the idle fit preloader. Mounted as
+ * `VignetteCanvas` children by the screen so the figure shares the stage rig.
  */
 export function FigureSceneContents({
   fit,
-  yaw,
   reduced,
   accent,
+  paused,
   fitHeight = 2.35,
 }: FigureStageChildrenProps): JSX.Element {
   return (
     <>
-      <AccentRim accent={accent} reduced={reduced} />
+      <SeamClear />
+      <AccentGround accent={accent} reduced={reduced} />
       <FitPreloader />
       <FigureBoundary>
-        <SwapPop fit={fit} reduced={reduced}>
-          <Suspense fallback={null}>
-            <FigureModel fit={fit} fitHeight={fitHeight} yaw={yaw} reduced={reduced} />
-          </Suspense>
-        </SwapPop>
+        <Turntable reduced={reduced} paused={paused}>
+          <SwapPop fit={fit} reduced={reduced}>
+            <Suspense fallback={null}>
+              <FigureModel fit={fit} fitHeight={fitHeight} reduced={reduced} />
+            </Suspense>
+          </SwapPop>
+        </Turntable>
       </FigureBoundary>
     </>
   )

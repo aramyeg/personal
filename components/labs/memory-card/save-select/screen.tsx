@@ -23,7 +23,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { motion, useAnimate, stagger } from 'framer-motion'
 import {
   MC,
@@ -135,6 +135,44 @@ function eyebrowText(save: SaveSlot): string {
   return `save ${save.slot} · ${save.label}`
 }
 
+/** Project saves route to an intercepting overlay under this path; while one is
+ *  up it covers the hero, so the turntable pauses (a route-level overlay signal,
+ *  the sibling of the in-place `openDialog`). */
+const SAVE_ROUTE_PREFIX = '/labs/memory-card/save'
+
+/**
+ * The per-save accent atmosphere for the hero half: an accent wash over the left
+ * column plus a fog glow and turntable disc at the figure's feet. Rendered twice
+ * during a save change — the live accent under an outgoing one that crossfades
+ * out — so the accent never hard-swaps (spec §1/§3 signature transition). Carries
+ * no z of its own; the region wrapper places the whole composite behind the
+ * title and figure.
+ */
+function HeroAtmosphere({ accent }: { accent: string }) {
+  return (
+    <>
+      <div
+        className="absolute inset-0 lg:bottom-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[54%]"
+        style={{ background: heroAtmosphere(accent) }}
+      />
+      <div
+        className="absolute bottom-[8%] left-1/2 h-[26%] w-[78%] -translate-x-1/2 lg:bottom-[15%] lg:left-[27%] lg:w-[42%]"
+        style={{
+          background: `radial-gradient(60% 100% at 50% 100%, ${withAlpha(accent, 0.1)}, transparent 70%)`,
+          filter: 'blur(24px)',
+        }}
+      />
+      <div
+        className="absolute bottom-[9%] left-1/2 h-[52px] w-[62%] -translate-x-1/2 rounded-[50%] lg:bottom-[16%] lg:left-[27%] lg:w-[34%]"
+        style={{
+          border: `1px solid ${withAlpha(accent, 0.22)}`,
+          background: `radial-gradient(ellipse at center, ${withAlpha(accent, 0.05)}, transparent 70%)`,
+        }}
+      />
+    </>
+  )
+}
+
 export type SaveSelectScreenProps = {
   /** Test override for the load action; defaults to routing to the save panel. */
   onLoad?: (save: SaveSlot) => void
@@ -144,14 +182,19 @@ export type SaveSelectScreenProps = {
 
 export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScreenProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const saves = useMemo(() => buildSaves(projects), [])
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [openDialog, setOpenDialog] = useState<SystemKind | null>(null)
   const [detectedReduced, setDetectedReduced] = useState(false)
+  // The outgoing accent mid-crossfade — null when the atmosphere is settled.
+  const [fadeAccent, setFadeAccent] = useState<string | null>(null)
 
   const [heroScope, animateHero] = useAnimate()
   const firstReveal = useRef(true)
+  const firstAtmos = useRef(true)
+  const prevAccent = useRef<string | null>(null)
 
   const audio = useMemoryCardAudioActions()
 
@@ -177,6 +220,27 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
       { duration: MOTION.select, delay: stagger(MOTION.stagger), ease: MOTION.easeEntranceArr }
     )
   }, [activeIndex, reduced, animateHero])
+
+  // Atmosphere crossfade — replaces E4's hard accent swap. On a save change the
+  // outgoing accent is lifted into a fading overlay above the instantly-updated
+  // live atmosphere, on the shared select clock. Client-only (skips first paint,
+  // so SSR/hydration is byte-identical) and skipped under reduced motion or when
+  // the accent is unchanged (adjacent same-colour slots).
+  useEffect(() => {
+    const prev = prevAccent.current
+    prevAccent.current = activeSave.accent
+    if (firstAtmos.current) {
+      firstAtmos.current = false
+      return
+    }
+    if (reduced || prev === null || prev === activeSave.accent) return
+    setFadeAccent(prev)
+  }, [activeSave.accent, reduced])
+
+  // The hero turntable pauses while an overlay covers it: an in-place system
+  // dialog (openDialog) or a project save's intercepting route (pathname). Tab
+  // visibility and off-viewport gating are handled inside the stage itself.
+  const heroPaused = openDialog !== null || pathname.startsWith(SAVE_ROUTE_PREFIX)
 
   const handleHighlight = (index: number) => setActiveIndex(index)
 
@@ -206,10 +270,6 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
 
   const systemSaves = useMemo(() => saves.filter((save) => save.kind !== 'project'), [saves])
 
-  // Face the figure toward the camera (front three-quarter) now that it stands
-  // alone over its own name — no card fan to address. The turntable spin is E5's.
-  const figureYaw = 0
-
   return (
     <main
       style={{
@@ -227,42 +287,39 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
       >
         {/* HERO — atmosphere + ground + figure + eyebrow (one WebGL scene). */}
         <div className="relative h-[48svh] w-full lg:contents">
-          {/* per-save accent atmosphere (behind everything) */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 z-0 lg:bottom-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[54%]"
-            style={{ background: heroAtmosphere(activeSave.accent) }}
-          />
-          {/* fog glow + turntable disc at the figure's feet */}
-          <div
-            aria-hidden="true"
-            className="absolute bottom-[8%] left-1/2 z-[1] h-[26%] w-[78%] -translate-x-1/2 lg:bottom-[15%] lg:left-[27%] lg:w-[42%]"
-            style={{
-              background: `radial-gradient(60% 100% at 50% 100%, ${withAlpha(activeSave.accent, 0.1)}, transparent 70%)`,
-              filter: 'blur(24px)',
-            }}
-          />
-          <div
-            aria-hidden="true"
-            className="absolute bottom-[9%] left-1/2 z-[1] h-[52px] w-[62%] -translate-x-1/2 rounded-[50%] lg:bottom-[16%] lg:left-[27%] lg:w-[34%]"
-            style={{
-              border: `1px solid ${withAlpha(activeSave.accent, 0.22)}`,
-              background: `radial-gradient(ellipse at center, ${withAlpha(activeSave.accent, 0.05)}, transparent 70%)`,
-            }}
-          />
+          {/* per-save accent atmosphere — crossfades on save change (behind all) */}
+          <div aria-hidden="true" className="absolute inset-0 z-0">
+            <div className="absolute inset-0">
+              <HeroAtmosphere accent={activeSave.accent} />
+            </div>
+            {fadeAccent && (
+              <motion.div
+                key={fadeAccent}
+                data-atmos-fade
+                className="absolute inset-0"
+                initial={{ opacity: 1 }}
+                animate={{ opacity: 0 }}
+                transition={{ duration: MOTION.select, ease: MOTION.easeMoveArr }}
+                onAnimationComplete={() => setFadeAccent(null)}
+              >
+                <HeroAtmosphere accent={fadeAccent} />
+              </motion.div>
+            )}
+          </div>
           {/* the figure — transparent canvas, stands over the title (poster depth) */}
           <div className="absolute inset-0 z-[3] lg:bottom-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[54%]">
             <VignetteCanvas
               reduced={reduced}
+              frameloop="demand"
               envIntensity={1.05}
               shadowRadius={1.35}
               fallbackGlyph={fallbackGlyph}
             >
               <FigureSceneContents
                 fit={activeSave.fit}
-                yaw={figureYaw}
                 reduced={reduced}
                 accent={activeSave.accent}
+                paused={heroPaused}
               />
             </VignetteCanvas>
           </div>
