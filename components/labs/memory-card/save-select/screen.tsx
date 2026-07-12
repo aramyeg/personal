@@ -187,6 +187,7 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [openDialog, setOpenDialog] = useState<SystemKind | null>(null)
+  const [bootActive, setBootActive] = useState(false)
   const [detectedReduced, setDetectedReduced] = useState(false)
   // The outgoing accent mid-crossfade — null when the atmosphere is settled.
   const [fadeAccent, setFadeAccent] = useState<string | null>(null)
@@ -237,10 +238,12 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
     setFadeAccent(prev)
   }, [activeSave.accent, reduced])
 
-  // The hero turntable pauses while an overlay covers it: an in-place system
-  // dialog (openDialog) or a project save's intercepting route (pathname). Tab
-  // visibility and off-viewport gating are handled inside the stage itself.
-  const heroPaused = openDialog !== null || pathname.startsWith(SAVE_ROUTE_PREFIX)
+  // The hero turntable pauses while an overlay covers it: the one-per-session
+  // boot beat (bootActive), an in-place system dialog (openDialog), or a project
+  // save's intercepting route (pathname). Tab visibility and off-viewport gating
+  // are handled inside the stage itself.
+  const heroPaused =
+    bootActive || openDialog !== null || pathname.startsWith(SAVE_ROUTE_PREFIX)
 
   const handleHighlight = (index: number) => setActiveIndex(index)
 
@@ -279,7 +282,7 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
       }}
       className="relative min-h-[100svh] overflow-x-hidden lg:h-[100svh] lg:overflow-hidden"
     >
-      <BootBeat />
+      <BootBeat onActiveChange={setBootActive} />
 
       <div
         ref={heroScope}
