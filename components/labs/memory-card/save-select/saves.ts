@@ -80,3 +80,21 @@ export function buildSaves(projects: ExtendedProject[]): SaveSlot[] {
 export function blocksUsed(saves: SaveSlot[]): number {
   return saves.reduce((total, save) => total + save.blocks, 0)
 }
+
+/**
+ * System slots carry lowercase copy in `label` (lab mono voice); this is their
+ * display TITLE in true casing for the big screen title and the slot rows.
+ * Casing law: titles never render CSS-uppercased, so the correct human casing
+ * lives in the data, not a transform. Projects render their title verbatim so
+ * product names ("iBank") survive intact.
+ */
+const SYSTEM_TITLE: Record<Exclude<SaveKind, 'project'>, string> = {
+  bio: 'System Data',
+  stack: 'Written With',
+  contact: 'Save?',
+}
+
+/** The active save's on-screen title, in its true casing. */
+export function saveTitle(save: SaveSlot): string {
+  return save.kind === 'project' ? save.label : SYSTEM_TITLE[save.kind]
+}

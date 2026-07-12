@@ -1,40 +1,53 @@
 'use client'
 
 /**
- * SaveSelectScreen — the whole lab is one character-select screen. A figure
- * stands on one side of a deep reflective void; an arc of slowly-spinning save
- * cards fills the other; a compact DOM index sits between them; and a full-width
- * story band under the stage tells the highlighted save's story. Choosing a save
- * re-lights the whole room in that save's PlayStation-button accent — the void
- * atmosphere, the figure's rim light, and the story band all shift together.
+ * SaveSelectScreen — the whole lab is one character-select screen, now composed
+ * as a split hero. On the LEFT half the character stands large on a lit ground —
+ * a CSS atmosphere (accent wash, cool mid lift, ground glow, fog + turntable
+ * disc) pooled around the ONE live WebGL scene (the FigureStage canvas), the
+ * per-save accent finally owning real estate. A giant Anton display title runs
+ * across the bottom, bridging the seam, with the figure standing over its own
+ * name (poster depth). On the RIGHT half a flat spec-sheet of six save files
+ * (`SlotSelect`) is the index; its active row lifts into a raised card that
+ * expands to the save's story, chips, stats, and LOAD control. The card fan and
+ * its second 3D scene are gone.
  *
- * The cards are the visual index but live inside aria-hidden canvases, so the
- * real control is `IndexRail`, a roving-tabindex listbox of the same six saves.
- * At lg+ the screen is one non-scrolling viewport (figure · index · cards, story
- * beneath); below lg it relaxes into a gently scrolling column.
- *
- * The figure stands left with a horizontal card fan filling the rest of the
- * stage. Reduced motion is read via effect-set state so SSR and the first
- * client paint are byte-identical before reconciling to the real preference.
+ * Choosing a save re-lights the hero atmosphere in that save's accent, re-dresses
+ * the figure into its fit, and swaps the display title — the payoff of the lab.
+ * The real control is `SlotSelect` (roving-tabindex listbox); the figure canvas
+ * is aria-hidden. Desktop (lg+) is one non-scrolling poster; below lg it relaxes
+ * into a scrolling column (hero, title, slots) with the footer flowing clear of
+ * the last rows. Reduced motion is read via effect-set state so SSR and the
+ * first client paint are byte-identical before reconciling to the real
+ * preference.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { MC, GLYPH_ORDER, inkAlpha, voidBackdrop, paperAlpha, type GlyphName } from '../tokens'
-import { monoFamily } from '../fonts'
+import { motion, useAnimate, stagger } from 'framer-motion'
+import {
+  MC,
+  GLYPH_ORDER,
+  MOTION,
+  inkAlpha,
+  paperAlpha,
+  withAlpha,
+  heroAtmosphere,
+  pageBackdrop,
+  type GlyphName,
+} from '../tokens'
+import { anton, monoFamily } from '../fonts'
 import { useMemoryCardAudioActions } from '../audio-context'
 import { BootBeat } from '../boot'
+import { Grain } from '../grain'
 import { VignetteCanvas } from '../three/stage'
 import { FigureSceneContents } from '../three/figure-stage'
-import { CardArc } from '../three/card-arc'
 import { PanelShell } from '../panels/panel-shell'
 import { BioPanel } from '../panels/bio-panel'
 import { StackPanel } from '../panels/stack-panel'
 import { ContactPanel } from '../panels/contact-panel'
-import { IndexRail } from './index-rail'
-import { StoryBand } from './story-band'
-import { buildSaves, type SaveKind, type SaveSlot } from './saves'
+import { SlotSelect } from './slot-select'
+import { buildSaves, saveTitle, type SaveKind, type SaveSlot } from './saves'
 import { projects } from '@/data/projects'
 
 /** The three system saves that open a dialog rather than routing to a panel. */
@@ -114,6 +127,14 @@ function glyphForAccent(accent: string): GlyphName {
   return GLYPH_ORDER.find((g) => MC.glyphs[g] === accent) ?? 'triangle'
 }
 
+/** The hero eyebrow — a mono spec tag in the active save's accent. */
+function eyebrowText(save: SaveSlot): string {
+  if (save.kind === 'project' && save.project) {
+    return `save ${save.slot} · loaded · ${save.project.category}`
+  }
+  return `save ${save.slot} · ${save.label}`
+}
+
 export type SaveSelectScreenProps = {
   /** Test override for the load action; defaults to routing to the save panel. */
   onLoad?: (save: SaveSlot) => void
@@ -123,12 +144,16 @@ export type SaveSelectScreenProps = {
 
 export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScreenProps) {
   const router = useRouter()
-  const audio = useMemoryCardAudioActions()
   const saves = useMemo(() => buildSaves(projects), [])
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [openDialog, setOpenDialog] = useState<SystemKind | null>(null)
   const [detectedReduced, setDetectedReduced] = useState(false)
+
+  const [heroScope, animateHero] = useAnimate()
+  const firstReveal = useRef(true)
+
+  const audio = useMemoryCardAudioActions()
 
   useEffect(() => {
     setDetectedReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -137,6 +162,21 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
   const reduced = reducedProp ?? detectedReduced
   const activeSave = saves[activeIndex]
   const fallbackGlyph = glyphForAccent(activeSave.accent)
+
+  // Title swap + eyebrow crossfade — the hero half of the signature select
+  // transition. Client-only (skips first paint for hydration) and reduced-safe.
+  useEffect(() => {
+    if (firstReveal.current) {
+      firstReveal.current = false
+      return
+    }
+    if (reduced) return
+    animateHero(
+      '[data-hero-reveal]',
+      { opacity: [0, 1], y: [MOTION.rise, 0] },
+      { duration: MOTION.select, delay: stagger(MOTION.stagger), ease: MOTION.easeEntranceArr }
+    )
+  }, [activeIndex, reduced, animateHero])
 
   const handleHighlight = (index: number) => setActiveIndex(index)
 
@@ -150,8 +190,8 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
   // Loading a save opens it as a paper panel over this screen. Project saves
   // route to their intercepting overlay (`/save/[id]`); the three system saves
   // open their dialog in place (content already in the DOM for crawlers). The
-  // select() blip is fired by the rail/story-band handlers. A test-injected
-  // `onLoad` overrides both to observe the call.
+  // select() blip is fired by the slot-select handlers. A test-injected `onLoad`
+  // overrides both to observe the call.
   const handleActivate = (save: SaveSlot) => {
     if (onLoad) {
       onLoad(save)
@@ -166,100 +206,127 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
 
   const systemSaves = useMemo(() => saves.filter((save) => save.kind !== 'project'), [saves])
 
-  // Face the figure toward the cards (inward) so it addresses the arc.
-  const figureYaw = 0.55
-
-  const figureCol = (
-    <div key="figure" className="relative order-1 min-h-0 lg:order-none lg:h-full">
-      <div className="h-[30svh] w-full lg:h-full">
-        <VignetteCanvas
-          reduced={reduced}
-          envIntensity={1.05}
-          shadowRadius={1.35}
-          fallbackGlyph={fallbackGlyph}
-        >
-          <FigureSceneContents
-            fit={activeSave.fit}
-            yaw={figureYaw}
-            reduced={reduced}
-            accent={activeSave.accent}
-          />
-        </VignetteCanvas>
-      </div>
-    </div>
-  )
-
-  const railCol = (
-    <div
-      key="rail"
-      className="order-3 flex min-h-0 flex-col justify-center lg:order-none lg:h-full"
-    >
-      <IndexRail
-        saves={saves}
-        activeIndex={activeIndex}
-        onHighlight={handleHighlight}
-        onActivate={handleActivate}
-      />
-    </div>
-  )
-
-  const cardsCol = (
-    <div key="cards" className="relative order-2 flex min-h-0 flex-col lg:order-none lg:h-full">
-      <div className="relative h-[34svh] min-h-0 w-full flex-1 lg:h-full">
-        <VignetteCanvas
-          reduced={reduced}
-          envIntensity={0.6}
-          shadowRadius={0.001}
-          camera={{ position: [0, 1.05, 6.1], fov: 34 }}
-          target={[0, 0.8, 0]}
-          fallbackGlyph={fallbackGlyph}
-        >
-          <CardArc saves={saves} focusIndex={activeIndex} reduced={reduced} />
-        </VignetteCanvas>
-      </div>
-      <p
-        className="mt-2 shrink-0 text-center lowercase lg:text-left"
-        style={{
-          fontFamily: monoFamily,
-          fontSize: '0.625rem',
-          letterSpacing: '0.16em',
-          color: paperAlpha(0.42),
-        }}
-      >
-        <span aria-hidden="true" style={{ color: activeSave.accent }}>
-          ◄ ►
-        </span>{' '}
-        browse saves · enter to load · slot {activeSave.slot}
-      </p>
-    </div>
-  )
-
-  // Left→right stage order — figure, index, cards. The DOM index stays a
-  // single ordered list; only the visual columns are arranged here.
-  const stageChildren = [figureCol, railCol, cardsCol]
-  const stageCols =
-    'lg:[grid-template-columns:minmax(0,32%)_minmax(9rem,auto)_minmax(0,1fr)]'
+  // Face the figure toward the camera (front three-quarter) now that it stands
+  // alone over its own name — no card fan to address. The turntable spin is E5's.
+  const figureYaw = 0
 
   return (
     <main
-      style={{ ['--mc-ring' as string]: CURSOR, background: voidBackdrop(activeSave.accent), color: MC.paper }}
-      className="relative h-[100svh] overflow-hidden"
+      style={{
+        ['--mc-ring' as string]: CURSOR,
+        background: pageBackdrop(),
+        color: MC.paper,
+      }}
+      className="relative min-h-[100svh] overflow-x-hidden lg:h-[100svh] lg:overflow-hidden"
     >
       <BootBeat />
 
-      <div className="relative z-10 flex h-full flex-col gap-y-6 overflow-y-auto px-5 pb-[7rem] pt-[4.5rem] sm:px-8 lg:grid lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-y-4 lg:overflow-hidden lg:px-12 lg:pb-14">
-        {/* Stage — figure · index · cards. */}
-        <div
-          className={`flex min-h-0 shrink-0 flex-col gap-6 lg:grid lg:min-h-0 lg:items-stretch lg:gap-x-8 ${stageCols}`}
-        >
-          {stageChildren}
+      <div
+        ref={heroScope}
+        className="relative flex min-h-[100svh] flex-col px-5 pb-[6rem] pt-[4rem] sm:px-8 lg:absolute lg:inset-x-0 lg:bottom-9 lg:top-12 lg:block lg:min-h-0 lg:p-0"
+      >
+        {/* HERO — atmosphere + ground + figure + eyebrow (one WebGL scene). */}
+        <div className="relative h-[48svh] w-full lg:contents">
+          {/* per-save accent atmosphere (behind everything) */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 z-0 lg:bottom-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[54%]"
+            style={{ background: heroAtmosphere(activeSave.accent) }}
+          />
+          {/* fog glow + turntable disc at the figure's feet */}
+          <div
+            aria-hidden="true"
+            className="absolute bottom-[8%] left-1/2 z-[1] h-[26%] w-[78%] -translate-x-1/2 lg:bottom-[15%] lg:left-[27%] lg:w-[42%]"
+            style={{
+              background: `radial-gradient(60% 100% at 50% 100%, ${withAlpha(activeSave.accent, 0.1)}, transparent 70%)`,
+              filter: 'blur(24px)',
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute bottom-[9%] left-1/2 z-[1] h-[52px] w-[62%] -translate-x-1/2 rounded-[50%] lg:bottom-[16%] lg:left-[27%] lg:w-[34%]"
+            style={{
+              border: `1px solid ${withAlpha(activeSave.accent, 0.22)}`,
+              background: `radial-gradient(ellipse at center, ${withAlpha(activeSave.accent, 0.05)}, transparent 70%)`,
+            }}
+          />
+          {/* the figure — transparent canvas, stands over the title (poster depth) */}
+          <div className="absolute inset-0 z-[3] lg:bottom-0 lg:left-0 lg:right-auto lg:top-0 lg:w-[54%]">
+            <VignetteCanvas
+              reduced={reduced}
+              envIntensity={1.05}
+              shadowRadius={1.35}
+              fallbackGlyph={fallbackGlyph}
+            >
+              <FigureSceneContents
+                fit={activeSave.fit}
+                yaw={figureYaw}
+                reduced={reduced}
+                accent={activeSave.accent}
+              />
+            </VignetteCanvas>
+          </div>
+          {/* eyebrow */}
+          <p
+            data-hero-reveal
+            className="absolute left-1 top-1 z-[4] uppercase lg:left-[6%] lg:top-[8%]"
+            style={{
+              fontFamily: monoFamily,
+              fontSize: '0.6875rem',
+              letterSpacing: '0.2em',
+              color: activeSave.accent,
+            }}
+          >
+            {eyebrowText(activeSave)}
+          </p>
+          {/* vertical editorial spine (desktop) */}
+          <span
+            aria-hidden="true"
+            className="z-[4] hidden select-none uppercase lg:absolute lg:left-1 lg:top-1/2 lg:block lg:-translate-y-1/2"
+            style={{
+              writingMode: 'vertical-rl',
+              transform: 'rotate(180deg)',
+              fontFamily: monoFamily,
+              fontSize: '0.625rem',
+              letterSpacing: '0.42em',
+              color: paperAlpha(0.32),
+            }}
+          >
+            save select · character re-dress
+          </span>
         </div>
 
-        {/* Story band — the selected save's story, full width beneath the stage. */}
-        <div className="shrink-0">
-          <StoryBand save={activeSave} reduced={reduced} onLoad={handleActivate} />
+        {/* BIG DISPLAY TITLE — bridges the seam, behind the figure. */}
+        <div className="relative z-[2] mt-6 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:mt-0 lg:flex lg:h-[20vh] lg:items-end lg:px-[3.5vw]">
+          <h1
+            data-hero-reveal
+            className="whitespace-normal lg:whitespace-nowrap"
+            style={{
+              fontFamily: anton.style.fontFamily,
+              fontWeight: 400,
+              fontSize: 'clamp(3rem, 13vw, 12rem)',
+              lineHeight: 0.86,
+              letterSpacing: '-0.03em',
+              color: MC.paper,
+            }}
+          >
+            {saveTitle(activeSave)}
+          </h1>
+        </div>
+
+        {/* SLOT SELECT — the spec-sheet index, right half. */}
+        <div className="relative z-[5] mt-8 lg:absolute lg:bottom-[22vh] lg:right-0 lg:top-0 lg:mt-0 lg:w-[46%] lg:overflow-y-auto lg:pl-6 lg:pr-10">
+          <SlotSelect
+            saves={saves}
+            activeIndex={activeIndex}
+            reduced={reduced}
+            onHighlight={handleHighlight}
+            onActivate={handleActivate}
+          />
         </div>
       </div>
+
+      <Grain />
 
       {/* System dialogs — bio / written-with / contact. Content is always in the
           DOM (hidden when closed) so it ships in the server HTML; activating a
