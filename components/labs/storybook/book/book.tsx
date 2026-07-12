@@ -25,6 +25,7 @@ import {
   PAGE_W,
   SHEET_STACK_T,
   STACK_PEDESTAL,
+  STACK_TOTAL_H,
   buildPageTemplate,
   buildStackWedge,
   easeTurn,
@@ -42,14 +43,18 @@ export const BOOK = {
   coverW: 1.22,
   coverH: 1.58,
   coverT: 0.035,
-  blockMaxH: 0.11,
+  // Closed-book page-block height: bound to the bulge model's stack total
+  // (pedestal + 9 sheets) so the cover always rests exactly on the sheets.
+  blockMaxH: STACK_TOTAL_H,
   pageLift: 0.005,
 } as const
 
 const SPREAD_MAX = SPREAD_COUNT - 1
 const EDGE_COLOR = '#d8c491'
-const BLOCK_WIDTH = PAGE_W * 0.98
-const BLOCK_DEPTH = PAGE_H * 0.98
+// Stacks sit almost flush with the open page's fore-edge (round 6: the
+// open page read visibly LONGER than the closed stack beneath it).
+const BLOCK_WIDTH = PAGE_W * 0.995
+const BLOCK_DEPTH = PAGE_H * 0.985
 
 const BACK_COVER_Y = BOOK.coverT / 2
 const BACK_COVER_TOP = BOOK.coverT
@@ -395,7 +400,12 @@ export function Book() {
     if (rightPageRef.current) rightPageRef.current.rotation.z = restAngles(rightIdx).aR
     if (leftPageRef.current) leftPageRef.current.rotation.z = -restAngles(leftIdx).aL
     if (rightWedgeRef.current) {
-      rightWedgeRef.current.scale.y = Math.max((INTERIOR_SHEETS - Math.max(1, rightIdx)) * SHEET_STACK_T, 1e-4)
+      // +1: the current right page's own sheet stays IN the right stack
+      // until it flies (see restAngles' count note).
+      rightWedgeRef.current.scale.y = Math.max(
+        (INTERIOR_SHEETS + 1 - Math.max(1, rightIdx)) * SHEET_STACK_T,
+        1e-4
+      )
     }
     if (leftWedgeRef.current) {
       leftWedgeRef.current.scale.y = Math.max((leftIdx - 1) * SHEET_STACK_T, 1e-4)

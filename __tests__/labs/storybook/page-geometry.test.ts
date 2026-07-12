@@ -6,6 +6,7 @@ import {
   PAGE_W,
   SHEET_STACK_T,
   STACK_PEDESTAL,
+  STACK_TOTAL_H,
   buildPageTemplate,
   buildStackWedge,
   easeTurn,
@@ -95,7 +96,7 @@ describe('bulge rest poses (derive-bulge.mjs theorems A16-A20)', () => {
       expect(r.aR).toBeGreaterThanOrEqual(0)
       expect(r.hinge).toBeLessThanOrEqual(Math.max(r.hL, r.hR) + 1e-12)
     }
-    expect(STACK_PEDESTAL + INTERIOR_SHEETS * SHEET_STACK_T).toBeCloseTo(0.11, 10)
+    expect(STACK_PEDESTAL + INTERIOR_SHEETS * SHEET_STACK_T).toBeCloseTo(STACK_TOTAL_H, 10)
   })
 
   it('A18: every open spread still blooms fully at rest', () => {

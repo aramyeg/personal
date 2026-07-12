@@ -102,13 +102,17 @@ export const easeTurnWeighted = (t: number): number =>
 // epsilon hand-off residuals (~0.0087 rad) ARE the visible air held around
 // the folded content between pages.
 
-/** Visual thickness of one interior sheet in the fore-edge fan. Chosen at
- *  the top of the derived feasible region (fan 0.09 tall, max tilt ~4deg,
- *  rest dihedral ~176deg): the user's bar is pages with VISIBLE width. */
-export const SHEET_STACK_T = 0.01
-/** Static block body under the fanned sheets (keeps the closed-book
- *  silhouette at the old blockMaxH 0.11 = pedestal + 9 sheets). */
+/** Visual thickness of one interior sheet in the fore-edge fan. Round-6
+ *  chunkiness bump (0.01 -> 0.014, re-derived with the corrected stack
+ *  count): max tilt ~6.3deg, rest bloom ~173.7deg, hand-off residual
+ *  0.0122 rad — 61% of FLAT_EPSILON, comfortable margin. The user's bar
+ *  is pages with clearly VISIBLE width, each one distinct. */
+export const SHEET_STACK_T = 0.014
+/** Static block body under the fanned sheets (endpapers/binding margin). */
 export const STACK_PEDESTAL = 0.02
+/** Full stack height when every sheet lies on one side — the closed-book
+ *  block silhouette. book.tsx keys the cover rest heights off this. */
+export const STACK_TOTAL_H = STACK_PEDESTAL + 9 * SHEET_STACK_T
 /** Hinge-valley depth factor: 0 = the gutter fold dips all the way to the
  *  pedestal between the stacks (deepest legal valley — kappa=1 was proven
  *  infeasible: it zeroes the landing residual, i.e. no bulge at all). */
@@ -129,12 +133,16 @@ export type RestPose = {
 }
 
 /** Rest pose for an OPEN spread (1..INTERIOR_SHEETS): page tilts and hinge
- *  height from how many sheets lie on each side. Spread 0 (closed cover)
- *  clamps to the spread-1 stacks — nothing open renders with it, but every
- *  caller gets finite numbers. */
+ *  height from how many sheets of PAPER lie under each visible surface.
+ *  The left surface is the BACK of sheet spread-1, so spread-1 sheets lie
+ *  under it; the right surface is the FRONT of sheet `spread`, which stays
+ *  IN the right stack until it flies — sheets spread..9 lie under it (at
+ *  chapter I all NINE sheets are on the right). Spread 0 (closed cover)
+ *  clamps to the spread-1 stacks — nothing open renders with it, but
+ *  every caller gets finite numbers. */
 export function restAngles(spread: number): RestPose {
   const left = Math.max(0, spread - 1)
-  const right = Math.max(0, INTERIOR_SHEETS - Math.max(1, spread))
+  const right = INTERIOR_SHEETS + 1 - Math.max(1, spread)
   const hL = STACK_PEDESTAL + left * SHEET_STACK_T
   const hR = STACK_PEDESTAL + right * SHEET_STACK_T
   const hinge = STACK_PEDESTAL + HINGE_KAPPA * Math.min(left, right) * SHEET_STACK_T
