@@ -141,6 +141,13 @@ export type VignetteCanvasProps = {
   shadowRadius?: number
   /** Scene-wide multiplier on the studio environment light. Default 1. */
   envIntensity?: number
+  /**
+   * Frameloop override. Defaults to the live loop under full motion and demand
+   * under reduced motion. A scene that drives its own render cadence (the figure
+   * hero's rAF-invalidate turntable) passes `'demand'` so it can pause cleanly;
+   * scenes that animate straight off `useFrame` (the CRT ticker) keep the default.
+   */
+  frameloop?: 'always' | 'demand' | 'never'
   fallbackGlyph?: GlyphName
   children: ReactNode
 }
@@ -152,6 +159,7 @@ export function VignetteCanvas({
   target = DEFAULT_TARGET,
   shadowRadius,
   envIntensity = 1,
+  frameloop,
   fallbackGlyph = 'triangle',
   children,
 }: VignetteCanvasProps) {
@@ -194,7 +202,7 @@ export function VignetteCanvas({
         <Canvas
           key={glEpoch}
           dpr={[1, 2]}
-          frameloop={reduced ? 'demand' : 'always'}
+          frameloop={frameloop ?? (reduced ? 'demand' : 'always')}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           camera={{ position: camera.position, fov: camera.fov, near: 0.1, far: 100 }}
           onCreated={({ gl }) => {
