@@ -91,3 +91,58 @@ export const easeTurn = (t: number): number =>
  */
 export const easeTurnWeighted = (t: number): number =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
+
+// ---------------------------------------------------------------------------
+// Bulge model: tilted rest poses from per-side stack thickness.
+// Derived in .superpowers/sdd/bench/derive-bulge.mjs (theorems A16-A20,
+// grid-scanned): the engine is dihedral-driven end to end, so "the left
+// stack grows while the right thins" is NOT new mechanics — it is a rest
+// pose of (PI - aL(spread), aR(spread)) instead of (PI, 0), already inside
+// the solved space. A real pop-up book never opens dead flat; the sub-
+// epsilon hand-off residuals (~0.0087 rad) ARE the visible air held around
+// the folded content between pages.
+
+/** Visual thickness of one interior sheet in the fore-edge fan. Chosen at
+ *  the top of the derived feasible region (fan 0.09 tall, max tilt ~4deg,
+ *  rest dihedral ~176deg): the user's bar is pages with VISIBLE width. */
+export const SHEET_STACK_T = 0.01
+/** Static block body under the fanned sheets (keeps the closed-book
+ *  silhouette at the old blockMaxH 0.11 = pedestal + 9 sheets). */
+export const STACK_PEDESTAL = 0.02
+/** Hinge-valley depth factor: 0 = the gutter fold dips all the way to the
+ *  pedestal between the stacks (deepest legal valley — kappa=1 was proven
+ *  infeasible: it zeroes the landing residual, i.e. no bulge at all). */
+export const HINGE_KAPPA = 0
+/** Interior sheets in the book = SPREAD_COUNT - 1 (asserted by tests to
+ *  stay bound to content.ts without importing it into this pure module). */
+export const INTERIOR_SHEETS = 9
+
+export type RestPose = {
+  /** Left/right page tilt UP from the hinge plane, radians (>= 0). */
+  aL: number
+  aR: number
+  /** Hinge-line height above the block base (world units). */
+  hinge: number
+  /** Stack-top heights above the block base. */
+  hL: number
+  hR: number
+}
+
+/** Rest pose for an OPEN spread (1..INTERIOR_SHEETS): page tilts and hinge
+ *  height from how many sheets lie on each side. Spread 0 (closed cover)
+ *  clamps to the spread-1 stacks — nothing open renders with it, but every
+ *  caller gets finite numbers. */
+export function restAngles(spread: number): RestPose {
+  const left = Math.max(0, spread - 1)
+  const right = Math.max(0, INTERIOR_SHEETS - Math.max(1, spread))
+  const hL = STACK_PEDESTAL + left * SHEET_STACK_T
+  const hR = STACK_PEDESTAL + right * SHEET_STACK_T
+  const hinge = STACK_PEDESTAL + HINGE_KAPPA * Math.min(left, right) * SHEET_STACK_T
+  return {
+    aL: Math.asin((hL - hinge) / PAGE_W),
+    aR: Math.asin((hR - hinge) / PAGE_W),
+    hinge,
+    hL,
+    hR,
+  }
+}

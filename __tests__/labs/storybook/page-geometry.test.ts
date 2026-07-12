@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  INTERIOR_SHEETS,
   PAGE_H,
   PAGE_SEGMENTS,
   PAGE_W,
+  SHEET_STACK_T,
+  STACK_PEDESTAL,
   buildPageTemplate,
   easeTurn,
   easeTurnWeighted,
+  restAngles,
 } from '@/components/labs/storybook/book/page-geometry'
+import { SPREAD_COUNT } from '@/components/labs/storybook/content'
 
 // The page is rigid card stock — its mid-turn motion is a pure rotation
 // about the spine driven by popup-mechanics' sheetAngle (tested there).
@@ -69,6 +74,60 @@ describe('easing curves', () => {
         const next = ease(Math.min(1, t))
         expect(next).toBeGreaterThanOrEqual(prev)
         prev = next
+      }
+    }
+  })
+})
+
+describe('bulge rest poses (derive-bulge.mjs theorems A16-A20)', () => {
+  const FLAT_EPSILON = 0.02
+  const BLOOM_MIN = 2.9
+
+  it('INTERIOR_SHEETS stays bound to the book length', () => {
+    expect(INTERIOR_SHEETS).toBe(SPREAD_COUNT - 1)
+  })
+
+  it('A20: tilts are non-negative and the fan fits the old block silhouette', () => {
+    for (let s = 0; s <= INTERIOR_SHEETS; s++) {
+      const r = restAngles(s)
+      expect(r.aL).toBeGreaterThanOrEqual(0)
+      expect(r.aR).toBeGreaterThanOrEqual(0)
+      expect(r.hinge).toBeLessThanOrEqual(Math.max(r.hL, r.hR) + 1e-12)
+    }
+    expect(STACK_PEDESTAL + INTERIOR_SHEETS * SHEET_STACK_T).toBeCloseTo(0.11, 10)
+  })
+
+  it('A18: every open spread still blooms fully at rest', () => {
+    for (let s = 1; s <= INTERIOR_SHEETS; s++) {
+      const r = restAngles(s)
+      expect(Math.PI - r.aL - r.aR).toBeGreaterThanOrEqual(BLOOM_MIN)
+    }
+  })
+
+  it('A16/A19: every next-turn sweep is forward and stays inside both wedges', () => {
+    for (let s = 1; s <= INTERIOR_SHEETS - 1; s++) {
+      const cur = restAngles(s)
+      const nxt = restAngles(s + 1)
+      const theta0 = cur.aR
+      const theta1 = Math.PI - nxt.aL
+      expect(theta1).toBeGreaterThan(theta0)
+      for (let i = 0; i <= 100; i++) {
+        const theta = theta0 + ((theta1 - theta0) * i) / 100
+        expect(Math.PI - cur.aL - theta).toBeGreaterThanOrEqual(-1e-12) // outgoing wedge
+        expect(theta - nxt.aR).toBeGreaterThanOrEqual(-1e-12) // incoming wedge
+      }
+    }
+  })
+
+  it('A17: hand-off residuals sit strictly between 0 and FLAT_EPSILON (the bulge exists AND hides)', () => {
+    for (let s = 1; s <= INTERIOR_SHEETS - 1; s++) {
+      const cur = restAngles(s)
+      const nxt = restAngles(s + 1)
+      const lift = cur.aR - nxt.aR
+      const land = nxt.aL - cur.aL
+      for (const r of [lift, land]) {
+        expect(r).toBeGreaterThan(0)
+        expect(r).toBeLessThan(FLAT_EPSILON)
       }
     }
   })
