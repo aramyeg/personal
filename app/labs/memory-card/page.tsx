@@ -9,7 +9,7 @@ import { siteConfig } from '@/lib/constants'
 export const metadata: Metadata = {
   title: 'Memory Card — Style Lab | Aram Yeghiazaryan',
   description:
-    'Style Lab experiment: the PS1 memory-card manager rebuilt as a character-select screen — load a save, watch the figure re-dress into its fit and the card fan ease into focus.',
+    'Style Lab experiment: the PS1 memory-card manager rebuilt as a split-hero character-select screen — pick a save from the spec-sheet index and watch the figure re-dress into that slot’s era-authentic fit as the screen re-lights in its accent.',
   openGraph: {
     title: 'Memory Card — Style Lab',
     description:
