@@ -28,6 +28,17 @@ const FLIP_AT_T = 0.15
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
 
+// The driver's useFrame subscribes at this negative priority. r3f sorts
+// subscribers ascending by priority (and only priorities > 0 switch the
+// canvas to manual rendering), so this guarantees the driver ticks BEFORE
+// every default-priority consumer in the same rAF regardless of mount
+// order. Without it the ordering was a mount-order accident — TurningPage
+// mounts with Book, so its child layout effect subscribed AHEAD of this
+// hook's and read the refs one frame stale: at lift-off the reveal-side
+// page had already pre-swapped to the incoming print while the sheet was
+// still a frame from appearing over it — a one-frame bare-print flash.
+const DRIVER_PRIORITY = -1
+
 /** Dev-only deterministic pose override for the physics benchmark harness
  *  (see .superpowers/sdd/bench/capture.mjs): `?sbpose=<spread>` opens the
  *  book at rest on that spread; `?sbpose=<spread>:<t>:<dir>` freezes a turn
@@ -157,9 +168,10 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       }
       sbSound.thump()
       useStorybookStore.getState().completeTurn()
-      // Land the whole commit inside THIS rAF: consumers registered after
-      // this hook (book.tsx's page prints, the sheet, every popup layer)
-      // read these refs later in the same frame, so nulling the frame and
+      // Land the whole commit inside THIS rAF: every default-priority
+      // consumer (book.tsx's page prints, the sheet, every popup layer)
+      // runs after this hook in the same frame — enforced by
+      // DRIVER_PRIORITY, not mount order — so nulling the frame and
       // advancing the committed spread here swaps the static pages, hides
       // the sheet, and re-roles the popups in one atomic paint. Leaving
       // frame.current at {t:1} until the next rAF let React's commit race
@@ -174,7 +186,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       firedCreak.current = false
       firedFlip.current = false
     }
-  })
+  }, DRIVER_PRIORITY)
 
   return { frame, committedSpread }
 }
