@@ -42,8 +42,10 @@ export const labs: LabEntry[] = [
     title: 'Memory Card',
     date: '2026-07-10',
     thesis:
-      'The PS1 memory-card manager rebuilt as a character-select screen — load a save and a figure re-dresses into its fit as its card eases forward from a spinning fan, the room re-lighting in one of four button-glyph accents. No pixelation, all nostalgia.',
-    status: 'live',
+      'The PS1 memory-card manager rebuilt as a character-select screen — pick a save from the spec-sheet index and the figure re-dresses into that slot’s fit as the room re-lights in its accent. No pixelation, all nostalgia.',
+    status: 'attic',
+    retrospective:
+      'Two builds, one lesson. v1: conventional sections around a spinning card fan — "generic sloppy layout." v2: a split-hero character select — six outfits painted straight onto the body the way PS1 games did it, a real boot moment, ink and grain. The screen learned to read designed; the characters never did — "the models look really bad… the geometry is weak." You can script a render pipeline; you can’t script a character artist. Retired here, still playable, as evidence.',
   },
   {
     slug: 'snowpark',
