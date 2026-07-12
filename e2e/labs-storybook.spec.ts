@@ -23,6 +23,15 @@ test.describe('storybook book', () => {
     await page.goto('/labs/storybook')
     await expect(page.getByRole('button', { name: /open the book/i })).toBeVisible()
     await page.keyboard.press('ArrowRight')
+    // Commit signal: spread 1's overlay content only mounts once the cover
+    // turn lands.
+    await expect(page.getByText(/the tale begins/i)).toBeVisible({ timeout: 10_000 })
+    // Portrait layouts collapse the story body into the bottom drawer
+    // (visibility: hidden until opened) — unfold it exactly like a reader
+    // would. The handle is part of every layout, so this also exercises
+    // the drawer toggle on desktop.
+    const unfold = page.getByRole('button', { name: /unfold the tale/i })
+    if (await unfold.isVisible()) await unfold.click()
     await expect(page.getByText(/Once upon a time — which is to say/)).toBeVisible({ timeout: 10_000 })
     await page.keyboard.press('ArrowRight')
     await expect(page.getByText(/Inn of a Hundred Keys/).first()).toBeVisible({ timeout: 10_000 })
