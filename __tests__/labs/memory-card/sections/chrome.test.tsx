@@ -34,7 +34,7 @@ vi.mock('@/components/labs/memory-card/fonts', () => ({
   monoFamily: 'monospace',
 }))
 
-import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
+import { MemoryCardChrome, MemoryCardFooter } from '@/components/labs/memory-card/sections/chrome'
 import { MemoryCardAudioProvider } from '@/components/labs/memory-card/audio-context'
 
 describe('MemoryCardChrome', () => {
@@ -53,15 +53,24 @@ describe('MemoryCardChrome', () => {
   })
 
   it('keeps both asset attribution lines in the credits footer (license law)', () => {
-    render(<MemoryCardChrome />)
+    render(<MemoryCardFooter />)
     expect(screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)).toBeInTheDocument()
     expect(
       screen.getByText(/character base by quaternius \(cc0\)/i)
     ).toBeInTheDocument()
   })
 
+  it('the footer flows in document order (not fixed) on mobile — static, fixed only at lg', () => {
+    const { container } = render(<MemoryCardFooter />)
+    const footer = container.querySelector('footer')!
+    // Base position is static (flows after the list on mobile); desktop pins it.
+    expect(footer.className).toContain('static')
+    expect(footer.className).toContain('lg:fixed')
+    expect(footer.className).not.toMatch(/(^|\s)fixed(\s|$)/)
+  })
+
   it('no longer credits the retired character asset', () => {
-    render(<MemoryCardChrome />)
+    render(<MemoryCardFooter />)
     expect(screen.queryByText(/humans of the world/i)).toBeNull()
   })
 
@@ -86,12 +95,14 @@ describe('MemoryCardChrome', () => {
     expect(sound).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('marks the sound toggle and the gallery link for the glyph cursor', () => {
-    render(<MemoryCardChrome />)
+  it('marks the sound toggle (header) and the gallery link (footer) for the glyph cursor', () => {
+    const { unmount } = render(<MemoryCardChrome />)
     expect(screen.getByRole('button', { name: /sound/i })).toHaveAttribute(
       'data-cursor',
       'triangle'
     )
+    unmount()
+    render(<MemoryCardFooter />)
     expect(screen.getByRole('link', { name: /gallery/i })).toHaveAttribute(
       'data-cursor',
       'triangle'

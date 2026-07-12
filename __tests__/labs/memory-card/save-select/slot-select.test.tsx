@@ -146,7 +146,7 @@ describe('SlotSelect', () => {
     setup(0)
     // The one-line story (folded from the old story band) plus a metric stat
     // (phrase unique to the stat grid — not echoed in the description).
-    expect(screen.getByText(/internet banking platform/i)).toBeInTheDocument()
+    expect(screen.getByText(/financial services in armenia/i)).toBeInTheDocument()
     expect(screen.getByText(/ongoing development/i)).toBeInTheDocument()
   })
 

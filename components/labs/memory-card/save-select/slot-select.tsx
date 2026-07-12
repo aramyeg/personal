@@ -195,7 +195,7 @@ function LoadRow({ save, onLoad }: { save: SaveSlot; onLoad: () => void }) {
     <div
       data-reveal
       className="flex flex-wrap items-center gap-4"
-      style={{ paddingTop: 14, borderTop: `1px solid ${HAIRLINE_DIM}` }}
+      style={{ paddingTop: 10, borderTop: `1px solid ${HAIRLINE_DIM}` }}
     >
       <button
         type="button"
@@ -237,7 +237,7 @@ function ProjectDetail({ save }: { save: SaveSlot }) {
   const metrics = (project.metrics ?? []).slice(0, 3)
   return (
     <>
-      <Story>{project.longDescription}</Story>
+      <Story>{project.description}</Story>
       <Chips items={project.technologies.map((t) => t.toLowerCase())} />
       <div data-reveal className="grid grid-cols-3 gap-x-5 gap-y-2">
         {metrics.map((metric) => (
@@ -309,7 +309,7 @@ function ContactDetail() {
 
 function ActiveDetail({ save, onLoad }: { save: SaveSlot; onLoad: () => void }) {
   return (
-    <div className="flex flex-col gap-3" style={{ paddingLeft: 52, paddingTop: 10, paddingBottom: 12 }}>
+    <div className="flex flex-col gap-2" style={{ paddingLeft: 52, paddingTop: 8, paddingBottom: 8 }}>
       {save.kind === 'project' && <ProjectDetail save={save} />}
       {save.kind === 'bio' && <BioDetail save={save} />}
       {save.kind === 'stack' && <StackDetail save={save} />}
@@ -356,7 +356,7 @@ function Row({ save, active, first, buttonRef, onClick, onLoad }: RowProps) {
         style={{
           gridTemplateColumns: '36px 1fr auto',
           minHeight: 44,
-          padding: active ? '12px 8px 6px 12px' : '9px 8px 9px 12px',
+          padding: active ? '9px 8px 5px 12px' : '5px 8px 5px 12px',
         }}
       >
         {/* slot numeral + accent tick (the row's own owned colour) */}
@@ -510,7 +510,7 @@ export function SlotSelect({
           fontSize: '0.6875rem',
           letterSpacing: '0.2em',
           color: paperAlpha(0.6),
-          marginBottom: 6,
+          marginBottom: 4,
         }}
       >
         <span>select save</span>

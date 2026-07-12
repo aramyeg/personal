@@ -52,7 +52,7 @@ vi.mock('@/components/labs/memory-card/three/figure-stage', () => ({
 }))
 
 import { SaveSelectScreen } from '@/components/labs/memory-card/save-select/screen'
-import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
+import { MemoryCardFooter } from '@/components/labs/memory-card/sections/chrome'
 import { buildSaves } from '@/components/labs/memory-card/save-select/saves'
 import { projects } from '@/data/projects'
 
@@ -169,9 +169,9 @@ describe('SaveSelectScreen', () => {
   })
 })
 
-describe('MemoryCardChrome footer (license law)', () => {
+describe('MemoryCardFooter (license law)', () => {
   it('keeps both asset attribution lines always visible', () => {
-    render(<MemoryCardChrome />)
+    render(<MemoryCardFooter />)
     expect(screen.getByText(/crt model by meipal \(cc by 4\.0\)/i)).toBeInTheDocument()
     expect(
       screen.getByText(/character base by quaternius \(cc0\)/i)

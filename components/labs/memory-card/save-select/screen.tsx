@@ -223,7 +223,7 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
 
       <div
         ref={heroScope}
-        className="relative flex min-h-[100svh] flex-col px-5 pb-[6rem] pt-[4rem] sm:px-8 lg:absolute lg:inset-x-0 lg:bottom-9 lg:top-12 lg:block lg:min-h-0 lg:p-0"
+        className="relative flex min-h-[100svh] flex-col px-5 pb-10 pt-[4rem] sm:px-8 lg:absolute lg:inset-x-0 lg:bottom-9 lg:top-12 lg:block lg:min-h-0 lg:p-0"
       >
         {/* HERO — atmosphere + ground + figure + eyebrow (one WebGL scene). */}
         <div className="relative h-[48svh] w-full lg:contents">
@@ -296,15 +296,17 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
           </span>
         </div>
 
-        {/* BIG DISPLAY TITLE — bridges the seam, behind the figure. */}
-        <div className="relative z-[2] mt-6 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:mt-0 lg:flex lg:h-[20vh] lg:items-end lg:px-[3.5vw]">
+        {/* BIG DISPLAY TITLE — bridges the seam, behind the figure. Capped at
+            15vh so the character stays the dominant vertical mass; the figure
+            (not the list) is the only thing licensed to overlap it. */}
+        <div className="relative z-[2] mt-6 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:mt-0 lg:flex lg:h-[15vh] lg:items-end lg:px-[3.5vw]">
           <h1
             data-hero-reveal
             className="whitespace-normal lg:whitespace-nowrap"
             style={{
               fontFamily: anton.style.fontFamily,
               fontWeight: 400,
-              fontSize: 'clamp(3rem, 13vw, 12rem)',
+              fontSize: 'clamp(2.5rem, 9vw, 7.5rem)',
               lineHeight: 0.86,
               letterSpacing: '-0.03em',
               color: MC.paper,
@@ -314,9 +316,11 @@ export function SaveSelectScreen({ onLoad, reduced: reducedProp }: SaveSelectScr
           </h1>
         </div>
 
-        {/* SLOT SELECT — the spec-sheet index, right half. Bottom clears the
-            display title's text band (which is bottom-anchored in the 20vh row). */}
-        <div className="relative z-[5] mt-8 lg:absolute lg:bottom-[16vh] lg:right-0 lg:top-0 lg:mt-0 lg:w-[46%] lg:overflow-y-auto lg:pl-6 lg:pr-10">
+        {/* SLOT SELECT — the spec-sheet index, right half. Its bottom sits above
+            the display-title text (interactive UI fully clears the type — only
+            the figure is licensed to overlap it), scrolling internally if a
+            viewport can't show all six rows. */}
+        <div className="relative z-[5] mt-8 lg:absolute lg:bottom-[15vh] lg:right-0 lg:top-0 lg:mt-0 lg:w-[46%] lg:overflow-y-auto lg:pl-6 lg:pr-10">
           <SlotSelect
             saves={saves}
             activeIndex={activeIndex}

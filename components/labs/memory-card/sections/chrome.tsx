@@ -1,15 +1,18 @@
 'use client'
 
 /**
- * MemoryCardChrome — the fixed frame around the Save Select screen: a quiet ink
- * bar across the top and a hairline credits strip across the bottom.
+ * MemoryCardChrome — the top bar of the Save Select screen: a quiet fixed ink
+ * bar carrying a keyboard skip link, the wordmark, and a live sound toggle. The
+ * Save Select rework retired the old section-scroll anchors (there are no
+ * sections to jump to any more), so the skip link now lands on the save strips
+ * themselves. Rendered BEFORE the screen so the skip link stays first in tab
+ * order.
  *
- * The top bar carries a keyboard skip link, the wordmark, and a live sound
- * toggle. The Save Select rework retired the old section-scroll anchors (there
- * are no sections to jump to any more), so the skip link now lands on the save
- * strips themselves. The bottom strip keeps the two CC-BY asset attributions
- * always on screen (license law), alongside the copyright line and a way back
- * to the gallery.
+ * The credits strip is a SEPARATE `MemoryCardFooter` (below), rendered AFTER the
+ * screen: on desktop it is a fixed hairline strip; on mobile it FLOWS in
+ * document order after the slot list (spec §1) instead of floating fixed over
+ * the scrolling content. It keeps the two CC-BY asset attributions always on
+ * screen (license law), the copyright line, and a way back to the gallery.
  *
  * `soundOn`/`onToggleSound` stay explicit prop overrides for isolated tests;
  * when omitted they fall back to the shared `MemoryCardAudioProvider` context so
@@ -53,7 +56,6 @@ export function MemoryCardChrome({
   const audio = useMemoryCardAudioContext()
   const soundOn = soundOnProp ?? audio.soundOn
   const onToggleSound = onToggleSoundProp ?? audio.toggleSound
-  const year = new Date().getFullYear()
 
   return (
     <>
@@ -94,45 +96,58 @@ export function MemoryCardChrome({
           sound: {soundOn ? 'on' : 'off'}
         </button>
       </header>
-
-      <footer
-        aria-label="Credits"
-        style={{
-          ['--mc-ring' as string]: RING,
-          background: MC.ink,
-          borderTop: `1px solid ${paperAlpha(0.16)}`,
-          fontFamily: monoFamily,
-          fontSize: '0.625rem',
-          letterSpacing: '0.06em',
-          color: paperAlpha(0.42),
-        }}
-        className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-x-5 gap-y-1 px-4 py-2 lowercase sm:px-6"
-      >
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          {ATTRIBUTIONS.map((line, i) => (
-            <span key={line} className="whitespace-nowrap">
-              {i > 0 && (
-                <span aria-hidden="true" className="mr-2" style={{ color: paperAlpha(0.22) }}>
-                  ·
-                </span>
-              )}
-              {line}
-            </span>
-          ))}
-        </span>
-
-        <span className="flex items-center gap-x-4">
-          <span className="whitespace-nowrap">© {year} aram yeghiazaryan</span>
-          <Link
-            href="/"
-            data-cursor="triangle"
-            className={`whitespace-nowrap transition-colors hover:text-[color:var(--mc-ring)] ${FOCUS_RING}`}
-          >
-            gallery
-          </Link>
-        </span>
-      </footer>
     </>
+  )
+}
+
+/**
+ * MemoryCardFooter — the credits strip, rendered AFTER the screen so it flows in
+ * document order. On desktop (lg+, a 100vh no-scroll screen) it is fixed to the
+ * viewport bottom; on mobile it is `static`, flowing after the slot list instead
+ * of floating fixed over the scrolling content (spec §1 mobile). Keeps both
+ * CC-BY attributions on screen (license law), the copyright line, and the
+ * gallery link.
+ */
+export function MemoryCardFooter() {
+  const year = new Date().getFullYear()
+  return (
+    <footer
+      aria-label="Credits"
+      style={{
+        ['--mc-ring' as string]: RING,
+        background: MC.ink,
+        borderTop: `1px solid ${paperAlpha(0.16)}`,
+        fontFamily: monoFamily,
+        fontSize: '0.625rem',
+        letterSpacing: '0.06em',
+        color: paperAlpha(0.42),
+      }}
+      className="static z-40 flex flex-wrap items-center justify-between gap-x-5 gap-y-1 px-4 py-2 lowercase sm:px-6 lg:fixed lg:inset-x-0 lg:bottom-0"
+    >
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        {ATTRIBUTIONS.map((line, i) => (
+          <span key={line} className="whitespace-nowrap">
+            {i > 0 && (
+              <span aria-hidden="true" className="mr-2" style={{ color: paperAlpha(0.22) }}>
+                ·
+              </span>
+            )}
+            {line}
+          </span>
+        ))}
+      </span>
+
+      <span className="flex items-center gap-x-4">
+        <span className="whitespace-nowrap">© {year} aram yeghiazaryan</span>
+        <Link
+          href="/"
+          data-cursor="triangle"
+          className={`whitespace-nowrap transition-colors hover:text-[color:var(--mc-ring)] ${FOCUS_RING}`}
+        >
+          gallery
+        </Link>
+      </span>
+    </footer>
   )
 }
 

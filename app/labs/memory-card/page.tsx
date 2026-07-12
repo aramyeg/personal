@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { GalleryChrome } from '@/components/labs/gallery-chrome'
-import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
+import { MemoryCardChrome, MemoryCardFooter } from '@/components/labs/memory-card/sections/chrome'
 import { SaveSelectScreen } from '@/components/labs/memory-card/save-select/screen'
 import { MemoryCardAudioProvider } from '@/components/labs/memory-card/audio-context'
 import { GlyphCursor } from '@/components/labs/memory-card/cursor'
@@ -25,6 +25,9 @@ export default function MemoryCardLabPage() {
         <GlyphCursor />
         <MemoryCardChrome />
         <SaveSelectScreen />
+        {/* Footer flows AFTER the screen (document order): static on mobile so it
+            trails the slot list, fixed at the viewport bottom on desktop. */}
+        <MemoryCardFooter />
 
         {/* Plain-HTML fallback so the save data stays crawlable with JS off.
             Non-heading so it never competes with the screen's own <h1>. */}
