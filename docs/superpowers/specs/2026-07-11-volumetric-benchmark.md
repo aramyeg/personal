@@ -350,3 +350,21 @@ New items, mapped:
 
 Directive: "apart from these issues, we can move on" → resume order stands:
 D pt 2 (composition spread) → bulge → B → C → E.
+
+## C6 round 6 (2026-07-12) — bulge verdicts + stack anatomy asks
+
+Bulge: direction approved. Items, verbatim mapped:
+- DONE: "a bit more chunkiness to each page" -> SHEET_STACK_T 0.014.
+- STACK ANATOMY (next step): "the view of the pages from the edge (the
+  ones that are closed) would also carry their artwork towards the
+  edges... not the yellowish beige color"; "it would be cool if each
+  page could be distinct, since we only have 8 pages, even when they
+  are closed". Design: replace pedestal+wedge stacks with N individual
+  sheet SLABS (thin boxes hinged at the spine, each tilted to its own
+  layer plane asin(j*t/W)) so every page reads distinct; each slab's
+  fore/side edge faces tinted from ITS chapter's palette (content.ts
+  accents — art-derived once real art lands); slab width = PAGE_W so
+  closed pages align with the open page exactly. Side membership per
+  frame on the driver clock (same index rule as tilts/prints).
+- DONE: "opened page looks a bit longer than the closed pages" ->
+  stacks widened to 99.5% PAGE_W (full alignment lands with the slabs).
