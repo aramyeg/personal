@@ -50,11 +50,6 @@ vi.mock('@/components/labs/memory-card/three/figure-stage', () => ({
     <div data-testid="figure" data-accent={accent} data-fit={String(fit)} />
   ),
 }))
-vi.mock('@/components/labs/memory-card/three/card-arc', () => ({
-  CardArc: ({ focusIndex }: { focusIndex: number }) => (
-    <div data-testid="card-arc" data-focus={String(focusIndex)} />
-  ),
-}))
 
 import { SaveSelectScreen } from '@/components/labs/memory-card/save-select/screen'
 import { MemoryCardChrome } from '@/components/labs/memory-card/sections/chrome'
@@ -117,24 +112,35 @@ describe('SaveSelectScreen', () => {
     render(<SaveSelectScreen />)
     const list = screen.getByRole('list', { name: /save files/i })
     for (const save of saves) {
+      // Anchored so the active card's "load slot 01" button doesn't also match.
       expect(
-        within(list).getByRole('button', { name: new RegExp(`slot ${save.slot}`, 'i') })
+        within(list).getByRole('button', { name: new RegExp(`^slot ${save.slot}`, 'i') })
       ).toBeInTheDocument()
     }
   })
 
-  it('mounts the figure and card-arc canvases', () => {
+  it('mounts the single figure canvas (the card fan and its scene are gone)', () => {
     render(<SaveSelectScreen />)
     expect(screen.getByTestId('figure')).toBeInTheDocument()
-    expect(screen.getByTestId('card-arc')).toBeInTheDocument()
+    expect(screen.queryByTestId('card-arc')).toBeNull()
   })
 
-  it('tells the default active save story (slot 01) with a LOAD control naming it', () => {
+  it('tells the default active save story (slot 01): a display title + a LOAD control naming it', () => {
     render(<SaveSelectScreen />)
-    expect(screen.getByRole('heading', { name: /amio bank ibank/i })).toBeInTheDocument()
+    // The big Anton display title is the screen's <h1>.
+    expect(
+      screen.getByRole('heading', { level: 1, name: /amio bank ibank/i })
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /load slot 01/i })).toHaveAccessibleName(
       /amio bank ibank/i
     )
+  })
+
+  it('renders the AMIO product name in true casing — iBank, never IBANK (casing law)', () => {
+    render(<SaveSelectScreen />)
+    // The transform-free title keeps the product name intact in the DOM text.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('AMIO Bank iBank')
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('iBank')
   })
 
   it('passes the active save accent to the figure', () => {
