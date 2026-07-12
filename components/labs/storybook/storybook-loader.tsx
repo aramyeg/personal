@@ -54,19 +54,51 @@ function VellumLoading() {
   )
 }
 
+/** Opaque desk-colored veil covering the canvas while the WebGL scene
+ *  boots (shader compile + texture uploads happen in full view otherwise —
+ *  the first-load choppiness). Fades once book.tsx marks the store booted,
+ *  then unmounts after the fade so it stops intercepting pointer events. */
+function BootVeil() {
+  const booted = useStorybookStore((s) => s.booted)
+  const [gone, setGone] = useState(false)
+
+  useEffect(() => {
+    if (!booted) return
+    const timer = setTimeout(() => setGone(true), 750)
+    return () => clearTimeout(timer)
+  }, [booted])
+
+  if (gone) return null
+  return (
+    <div
+      aria-hidden
+      className={`absolute inset-0 z-10 grid place-items-center bg-[var(--sb-desk)] transition-opacity duration-700 ${
+        booted ? 'opacity-0' : 'opacity-100'
+      }`}
+    >
+      <p className="sb-chapter-kicker" style={{ color: 'var(--sb-paper)' }}>
+        Binding the pages…
+      </p>
+    </div>
+  )
+}
+
 /** The WebGL book: canvas, pop-up overlay text, nav, cursor and sound chrome. */
 function BookTale() {
   const spread = useStorybookStore((s) => s.spread)
   const turning = useStorybookStore((s) => s.turning)
+  const booted = useStorybookStore((s) => s.booted)
   const requestTurn = useStorybookStore((s) => s.requestTurn)
 
-  useBookInput(true)
+  // Turn input stays dead until the scene has booted: a swipe or arrow key
+  // during warm-up would start the cover turn against half-loaded pages.
+  useBookInput(booted)
 
   return (
     <div className="sb-root fixed inset-0 overflow-hidden">
       <div className="sb-canvas-wrap">
         <BookScene />
-        {spread === 0 && !turning && (
+        {booted && spread === 0 && !turning && (
           <button
             type="button"
             onClick={() => requestTurn('next')}
@@ -76,6 +108,7 @@ function BookTale() {
             Open the book
           </button>
         )}
+        <BootVeil />
         <div className="sb-vignette" />
       </div>
       <SpreadOverlay />

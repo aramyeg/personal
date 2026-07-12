@@ -316,3 +316,37 @@ are involved, captures for his verdict every round.
   interiors, fold seams) as its own iteration once the first box ships.
 - Role field + covenant test over CHAPTERS lands with the first
   recomposition (roles assigned to all 45 existing pieces).
+
+## C6 round 5 (2026-07-12) — verdicts on the flicker fix + new items
+
+Turn flicker: ACCEPTED ("acceptable at this moment"). Residual noted: "still
+some repositioning before the start and end of the turn" — the sheet-lift
+parallax pop; polish target for workstream B.
+
+New items, mapped:
+
+- **B (paper realism)** — "The middle seam disappears from the turning page
+  when the turn starts, and appears only when the turn ends and there is a
+  click in place type of motion." The gutter-crease strip lives only on the
+  static pages, so the sheet's faces carry no seam mid-air and the landed
+  sheet hides the strip until commit. The sheet's printed faces need
+  spine-side crease continuity (shading on the face prints themselves).
+- **B/bulge (cover path)** — "the very first turn of the book doesn't
+  properly work, first we see the inside of the seam and the page appears
+  filled on the left part once the turn is made." The cover turn hides the
+  left page/block for its whole duration (the cover is the left support
+  board only at rest) — reveal needs a real support treatment instead of a
+  commit-time pop-in.
+- **DONE (this round)** — "we should add some sort of loading state when
+  first loading the book" → boot gate shipped: store `booted` flag flipped
+  from the frame loop (≥12 real frames + ≥600ms + all warm-window prints
+  resolved), desk-colored veil fades over the canvas, "Open the book" CTA
+  and ALL turn input gated on it.
+- **bulge (now a requirement, not optional)** — "the pages having some width
+  between them, also the pages should stack and grow thicker on the left
+  side and thinner on the right side during the turning towards the end."
+  Supersedes the constant-full-height block design; needs the PAGE_SURFACE_Y
+  shared-hinge contract re-derived (the A3 relaxation work).
+
+Directive: "apart from these issues, we can move on" → resume order stands:
+D pt 2 (composition spread) → bulge → B → C → E.

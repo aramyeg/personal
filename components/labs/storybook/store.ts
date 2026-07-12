@@ -13,9 +13,16 @@ type SbState = {
   turning: TurnDir | null
   queued: TurnDir | null
   soundOn: boolean
+  /** True once the WebGL book has actually warmed up: a run of real frames
+   *  rendered and every warm-window print resolved (book.tsx flips it from
+   *  the frame loop). Gates the boot veil, the "Open the book" CTA and all
+   *  turn input, so the first turn can never start against a half-loaded
+   *  scene. */
+  booted: boolean
   requestTurn: (dir: TurnDir) => void
   completeTurn: () => void
   toggleSound: () => void
+  markBooted: () => void
 }
 
 export const useStorybookStore = create<SbState>()(
@@ -25,6 +32,7 @@ export const useStorybookStore = create<SbState>()(
       turning: null,
       queued: null,
       soundOn: false,
+      booted: false,
       requestTurn: (dir) =>
         set((st) => {
           if (st.turning) {
@@ -41,6 +49,7 @@ export const useStorybookStore = create<SbState>()(
           st.queued = null
         }),
       toggleSound: () => set((st) => void (st.soundOn = !st.soundOn)),
+      markBooted: () => set((st) => void (st.booted = true)),
     })),
     { name: 'storybook-lab' }
   )

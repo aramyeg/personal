@@ -145,6 +145,9 @@ export function Book() {
   const { frame, committedSpread } = useTurnDriver()
   const outerGroupRef = useRef<THREE.Group>(null)
   const frontCoverRef = useRef<THREE.Group>(null)
+  // Boot sentinel counters (see the markBooted block in the useFrame below).
+  const bootFrames = useRef(0)
+  const bootElapsedMs = useRef(0)
 
   const leatherMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: leather, roughness: 0.55 }),
@@ -279,7 +282,23 @@ export function Book() {
     }
   }, [gl, prints])
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    // Boot detection, on the same clock as everything else the eye sees:
+    // the book counts as ready only after a run of REAL rendered frames
+    // (shaders compiled, initTexture uploads flushed), a minimum dwell,
+    // and every print in the warm window resolved. storybook-loader.tsx
+    // holds its veil, the "Open the book" CTA and all turn input on this
+    // flag — the first-load choppiness was the canvas booting in full
+    // view with the cover already clickable.
+    if (!useStorybookStore.getState().booted) {
+      bootFrames.current += 1
+      bootElapsedMs.current += delta * 1000
+      const printsResolved = printIndices.every((i) => prints[i] !== undefined)
+      if (bootFrames.current >= 12 && bootElapsedMs.current >= 600 && printsResolved) {
+        useStorybookStore.getState().markBooted()
+      }
+    }
+
     const f = frame.current
     // EVERY print the eye can see during a turn is swapped here, in the
     // frame loop, off the driver's refs — the ONE clock the sheet's

@@ -65,3 +65,18 @@ describe('accumulateWheel', () => {
     expect(r.fire).toBeNull()
   })
 })
+
+describe('boot gate', () => {
+  beforeEach(() => useStorybookStore.setState({ booted: false }))
+
+  it('starts un-booted so the veil covers the warming canvas', () => {
+    expect(s().booted).toBe(false)
+  })
+
+  it('markBooted flips the flag and is idempotent', () => {
+    s().markBooted()
+    expect(s().booted).toBe(true)
+    s().markBooted()
+    expect(s().booted).toBe(true)
+  })
+})
