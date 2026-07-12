@@ -368,3 +368,41 @@ Bulge: direction approved. Items, verbatim mapped:
   frame on the driver clock (same index rule as tilts/prints).
 - DONE: "opened page looks a bit longer than the closed pages" ->
   stacks widened to 99.5% PAGE_W (full alignment lands with the slabs).
+
+## C6 round 7 (2026-07-12) — cutout collisions + THE DE-CENTERING PRINCIPLE
+
+Filed after the seam/cover-mechanics review. Verbatim, mapped:
+
+1. "the cutouts still go through eachother, also some are not correctly
+   placed and some are covered and messed up, and we didn't address
+   their placement, if we can displace them from the center? I just
+   want to make sure we have these fixes scheduled."
+   -> SCHEDULED as the next major phase (supersedes old C/E ordering):
+   a. Piece-piece interpenetration: the A9 rest-separation theorems
+      pass yet overlaps are VISIBLE -> the theorem is too weak (rest
+      pose only / pairwise gaps only). Needs a real audit: per-spread
+      visual sweep + theorems extended to mid-bloom sweep and to
+      DRAW-ORDER/occlusion ("some are covered and messed up" = z-order
+      and alpha-cutout layering, not just geometry).
+   b. Placement corrections per spread against the page art.
+   c. LATERAL DISPLACEMENT off the spine — the off-spine mechanism
+      family (the D pt 2 wall, now explicitly requested): per-piece
+      anchor points on the page plane, derive-first.
+
+2. THE PRINCIPLE (his words): "Right now there is a central point in
+   our book canvas and I feel like you try to bend everything towards
+   that point. This shouldn't be our goal. We should treat almost each
+   cutout as their central place, not bend it towards the overall book
+   center. The person looking at the book will be able to see the whole
+   plane and the 3d paper objects, so we shouldn't bend everything so
+   much towards the center." Most apparent on spread 8 (hero's
+   satchel). This is a STANDING DESIGN LAW for all composition work:
+   each cutout owns its local frame; the spine is a mechanism detail,
+   not a gravitational center.
+
+3. Fold-shape preference: "v-folds ... lose the artwork recognisability
+   when they bend too much and it's unnatural, I love the table or
+   chair type folds more" -> prefer parallel/platform ("table/chair")
+   mechanisms for most pieces; flatten remaining v-folds (rho-phi
+   small, panels near-coplanar so the art reads frontal); reserve deep
+   V only where the fold itself is the show.
