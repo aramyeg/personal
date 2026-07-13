@@ -82,7 +82,13 @@ export function Painting({
       {/* Brass placard below */}
       <mesh position={[0, -(ART_H / 2 + FRAME_T + 0.35), 0.03]}>
         <planeGeometry args={[0.9, 0.45]} />
-        <meshStandardMaterial map={placard} roughness={0.4} metalness={0.3} />
+        <meshStandardMaterial
+          map={placard}
+          roughness={0.4}
+          metalness={0.3}
+          emissive="#8a6a24"
+          emissiveIntensity={focused ? 0.55 : 0}
+        />
       </mesh>
 
       {/* Picture light: warm glow onto the art */}

@@ -22,12 +22,12 @@ describe('GalleryChrome', () => {
   it('renders a back-to-gallery link', () => {
     render(<GalleryChrome>x</GalleryChrome>)
     const link = screen.getByRole('link', { name: /gallery/i })
-    expect(link).toHaveAttribute('href', '/labs')
+    expect(link).toHaveAttribute('href', '/')
   })
 
-  it('navigates to /labs on Escape', () => {
+  it('navigates to the museum on Escape', () => {
     render(<GalleryChrome>x</GalleryChrome>)
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(push).toHaveBeenCalledWith('/labs')
+    expect(push).toHaveBeenCalledWith('/')
   })
 })

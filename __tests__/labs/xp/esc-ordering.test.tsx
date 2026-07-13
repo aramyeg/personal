@@ -44,6 +44,6 @@ describe('esc ordering with GalleryChrome', () => {
   it('esc on a quiet desktop falls through to GalleryChrome and navigates', () => {
     render(<GalleryChrome><XpDesktop /></GalleryChrome>)
     pressEscOnBody()
-    expect(push).toHaveBeenCalledWith('/labs')
+    expect(push).toHaveBeenCalledWith('/')
   })
 })
