@@ -406,3 +406,28 @@ Filed after the seam/cover-mechanics review. Verbatim, mapped:
    mechanisms for most pieces; flatten remaining v-folds (rho-phi
    small, panels near-coplanar so the art reads frontal); reserve deep
    V only where the fold itself is the show.
+
+## C6 round 7b (2026-07-13) — playback confirmed, amendments
+
+Reply to the played-back principle. Verbatim, mapped:
+
+1. "v folds like backdrops and bigger items are ok to stay, but can be
+   reworked in the future if we decide so" -> AMENDS round-7 item 3: do
+   NOT mass-flatten. Backdrop/large-scenery v-folds keep their fold.
+   Conversion targets are the smaller character/prop pieces whose art
+   loses recognisability when creased. Future rework = his call, parked.
+
+2. "as for the spine being the gravitational center, yes this needs to
+   be changed into the plane where different objects can exist" ->
+   de-centering CONFIRMED. The page plane is a stage; objects stand at
+   their own places on it. This is the go for the off-spine derivation.
+
+3. "the stretching of the paper allows other pieces to be erected at
+   different off center places, especially when we implement pull strip
+   mechanism for the pop up. Pull tabs, flap flips" -> the PHYSICAL
+   ROUTE he expects: off-center pieces erected by paper stretched by
+   other paper (generations — mechanisms mounted on mechanisms), and
+   later by pull strips. Workstream E now explicitly includes pull
+   strips, pull tabs, and flap flips; the off-spine anchor model must
+   be the SAME model a pull strip will later actuate (one anchor
+   family, two drivers: page dihedral now, pull strip in E).
