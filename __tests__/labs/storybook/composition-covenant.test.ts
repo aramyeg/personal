@@ -88,10 +88,33 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     }
   })
 
-  it('no piece anywhere uses the demoted parallel (gutter tent) fold', () => {
+  it('parallel folds appear only as GROUND SWELLS carrying tentRidge riders (off-spine anchors)', () => {
+    // The 2026-07-11 demotion stands for the tent's OLD role (artwork
+    // carrier: its faces only ever look left/right). C6 round 7 gave it a
+    // NEW role — a low terrain mound whose ridge is an off-spine anchor
+    // (derive-offspine.mjs). Legal iff it carries at least one rider, sits
+    // low (rise is slack: open height ~ sqrt(rise * reach)), stays scenery,
+    // and folds flat inside the page.
     for (const [name, layers] of ALL_SETS) {
       for (const layer of layers) {
-        expect(layer.mech, `${name} ${layer.id} is a demoted gutter tent`).not.toBe('parallel')
+        if (layer.mech !== 'parallel') continue
+        const riders = layers.filter(
+          (l) => l.mech === 'rider' && l.seat === 'tentRidge' && l.parentId === layer.id
+        )
+        expect(
+          riders.length,
+          `${name} ${layer.id}: a tent carrying no rider is the demoted billboard`
+        ).toBeGreaterThanOrEqual(1)
+        expect(layer.role, `${name} ${layer.id}: ground swells are scenery`).toBe('scenery')
+        expect(layer.rise, `${name} ${layer.id}: ground swells stay low`).toBeLessThanOrEqual(0.08)
+        // closed containment: the strip folds flat to glueL+glueR+rise up the page
+        expect(
+          layer.glueL + layer.glueR + layer.rise,
+          `${name} ${layer.id}: closed reach exceeds the page`
+        ).toBeLessThanOrEqual(PAGE_W)
+        expect(layer.z0).toBeLessThan(layer.z1)
+        expect(Math.abs(layer.z0)).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(layer.z1)).toBeLessThanOrEqual(PAGE_H / 2)
       }
     }
   })
@@ -173,7 +196,7 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
     }
   })
 
-  it('rider mount rule: boxLid on a flat box, deckCrease on a bridge platform; mountZ in range', () => {
+  it('rider mount rule: boxLid on a flat box, deckCrease on a bridge, tentRidge on a swell', () => {
     for (const [name, layers] of ALL_SETS) {
       for (const l of layers) {
         if (l.mech !== 'rider') continue
@@ -187,9 +210,14 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
             expect(l.mountZ).toBeGreaterThanOrEqual(parent.z0)
             expect(l.mountZ).toBeLessThanOrEqual(parent.z1)
           }
-        } else {
+          // rooftop props stay small — they rise only partway (design rules)
+          expect(l.width).toBeLessThanOrEqual(0.12)
+          expect(l.height).toBeLessThanOrEqual(0.1)
+        } else if (l.seat === 'deckCrease') {
           expect(parent.mech, `${name} ${l.id} deckCrease needs a platform`).toBe('platform')
           if (parent.mech === 'platform') {
+            // EQUAL CLOSED REACH is the whole bridge rule — mirrored ranks
+            // are a special case, not a requirement (derive-offspine).
             expect(
               Math.abs(strutClosedReach(parent.strutA) - strutClosedReach(parent.strutB)),
               `${name} ${l.id} deckCrease needs a BRIDGE platform`
@@ -197,10 +225,23 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
             expect(l.mountZ).toBeGreaterThanOrEqual(parent.deckZ0)
             expect(l.mountZ).toBeLessThanOrEqual(parent.deckZ1)
           }
+          expect(l.width).toBeLessThanOrEqual(0.12)
+          expect(l.height).toBeLessThanOrEqual(0.1)
+        } else {
+          // tentRidge STANDEES (the off-spine family): bigger than rooftop
+          // props — they are the scene pieces the de-centering law exists
+          // for — but bounded by their mound: at book-closed the rider
+          // wraps the ridge spine-ward, so its height must stay inside the
+          // tent's own folded reach.
+          expect(parent.mech, `${name} ${l.id} tentRidge needs a parallel ground swell`).toBe('parallel')
+          if (parent.mech === 'parallel') {
+            expect(l.mountZ).toBeGreaterThanOrEqual(parent.z0)
+            expect(l.mountZ).toBeLessThanOrEqual(parent.z1)
+            expect(l.height).toBeLessThanOrEqual(parent.glueL + parent.glueR + parent.rise)
+          }
+          expect(l.width).toBeLessThanOrEqual(0.5)
+          expect(l.height).toBeLessThanOrEqual(0.42)
         }
-        // riders stay small — a rooftop prop rises only partway (design rules)
-        expect(l.width).toBeLessThanOrEqual(0.12)
-        expect(l.height).toBeLessThanOrEqual(0.1)
         expect(l.rhoDeg).toBeGreaterThan(l.phiDeg)
       }
     }

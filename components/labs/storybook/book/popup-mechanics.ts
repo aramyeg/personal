@@ -247,19 +247,28 @@ export type FanGeom = {
 }
 
 /**
- * RIDER (mechanism-on-mechanism recursion, derive-recursion.mjs): a
- * symmetric v-fold whose "pages" are a parent mechanism's hinged patch
- * pair. Valid seats fold parallel at book-closed (the mount rule):
+ * RIDER (mechanism-on-mechanism recursion, derive-recursion.mjs; extended
+ * by the OFF-SPINE family, derive-offspine.mjs — C6 round 7): a symmetric
+ * v-fold whose "pages" are a parent mechanism's hinged patch pair. Valid
+ * seats fold parallel at book-closed (the mount rule):
  * 'boxLid' — valley child standing on a flat-roofed box (local half-angle
  * = the page half-angle exactly); 'deckCrease' — rooftop child straddling
- * a BRIDGE platform's deck peak (half-angle PI at closed, easing down as
- * the book opens — a rider, not a tower).
+ * a bridge platform's deck peak (half-angle PI at closed, easing down as
+ * the book opens — a rider, not a tower). The bridge may be NON-MIRRORED
+ * (equal closed reach is the whole rule), so the deck — and the rider —
+ * can stand at any lateral station; 'tentRidge' — rooftop child astride a
+ * parallel-fold ground swell's ridge, which sits at lateral station
+ * ~ (glueL - glueR): the full-range off-spine anchor. Tent seats are
+ * always mount-valid (the tent's panels fold together with the page
+ * sandwich); the rider leans by half the tent's cross-section asymmetry —
+ * zero when glueL === glueR, growing with offset (composition budgets it).
  */
 export type RiderGeom = {
   mech: 'rider'
-  /** id of the box (roof 'flat') or bridge platform this rider sits on. */
+  /** id of the box (roof 'flat'), bridge platform, or parallel-fold ground
+   *  swell this rider sits on. */
   parentId: string
-  seat: 'boxLid' | 'deckCrease'
+  seat: 'boxLid' | 'deckCrease' | 'tentRidge'
   /** Mount position along the seat crease (world z). */
   mountZ: number
   vDir: 1 | -1

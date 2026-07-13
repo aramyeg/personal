@@ -23,10 +23,12 @@ import {
 import {
   parallelRidge,
   solveBoxPose,
+  solveParallelPose,
   type BoxGeom,
   type DressGeom,
   type FanGeom,
   type PanelQuad,
+  type ParallelGeom,
   type PlatformGeom,
   type RiderGeom,
   type Vec3,
@@ -398,6 +400,118 @@ describe('rider — mount rule has teeth (invalid seats throw)', () => {
   it('a boxLid rider on a GABLE-roofed box is rejected', () => {
     const gable: BoxGeom = { mech: 'box', a: 0.1, height: 0.11, z0: 0.38, z1: 0.5, roof: 'gable', gableRise: 0.06 }
     expect(() => solveRiderPose(RIDER_ON_LID, gable, Math.PI, 0)).toThrow()
+  })
+  it('a tentRidge rider on a non-parallel parent is rejected', () => {
+    const tentSeat: RiderGeom = { ...RIDER_ON_DECK, seat: 'tentRidge' }
+    expect(() => solveRiderPose(tentSeat, BRIDGE, Math.PI, 0)).toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// OFF-SPINE FAMILY — derive-offspine.mjs (C6 round 7, the de-centering
+// principle): tent-ridge riders at lateral stations, non-mirrored bridges,
+// and the upright theorem.
+// ---------------------------------------------------------------------------
+const SWELL: ParallelGeom = { mech: 'parallel', glueL: 0.4, glueR: 0.2, rise: 0.12, z0: 0.1, z1: 0.3 }
+const RIDER_ON_SWELL: RiderGeom = {
+  mech: 'rider',
+  parentId: 'swell',
+  seat: 'tentRidge',
+  mountZ: 0.2,
+  vDir: 1,
+  phiDeg: deg(0.5),
+  rhoDeg: deg(0.75),
+  width: 0.08,
+  height: 0.07,
+}
+// The reading rest pose (~176 deg bloom): stations and leans are judged
+// where the eye judges them.
+const REST: readonly [number, number] = [Math.PI / 2 + (88 / 180) * Math.PI, Math.PI / 2 - (88 / 180) * Math.PI]
+
+/** Lean of a pose's standing crease off world vertical, degrees, at a pose
+ *  whose bisector m = PI/2 (world vertical IS the bisector X). */
+const leanDeg = (crease: Vec3): number => {
+  const planar = Math.hypot(crease[0], crease[1])
+  return deg(Math.atan2(Math.abs(crease[0]), Math.abs(crease[1]))) * (planar < 1e-12 ? 0 : 1)
+}
+
+describe('off-spine — rooftop rider astride a ground-swell tent ridge', () => {
+  it('glue edges ride in the tent panel planes across the sweep; apex on the ridge', () => {
+    for (const [tL, tR] of SWEEP) {
+      const pose = solveRiderPose(RIDER_ON_SWELL, SWELL, tL, tR)
+      const tent = solveParallelPose(SWELL, tL, tR)
+      const panels = [planeOf(tent.left), planeOf(tent.right)]
+      for (const p of [pose.left[0], pose.left[1], pose.right[0], pose.right[1]]) {
+        expect(offNearest(p, panels)).toBeLessThan(1e-9)
+      }
+      // the ridge line is the tent quads' shared edge: left[3] -> left[2]
+      expect(offLine(pose.apex, tent.left[3], tent.left[2])).toBeLessThan(1e-9)
+    }
+  })
+
+  it('folds flat into the page at book-closed', () => {
+    for (const m of CLOSED) {
+      const pose = solveRiderPose(RIDER_ON_SWELL, SWELL, m, m)
+      for (const p of [...pose.right, ...pose.left]) expect(offPage(p, m)).toBeLessThan(FLAT_TOL_PARALLEL)
+    }
+  })
+
+  it('stands at the tent station off the spine, leaning the derived ~13 deg', () => {
+    const pose = solveRiderPose(RIDER_ON_SWELL, SWELL, REST[0], REST[1])
+    // station ~ +0.24 bisector-lateral = world -x (left page side)
+    expect(pose.apex[0]).toBeLessThan(-0.15)
+    // the tent-asymmetry lean budget (derive-offspine: 13.2 deg at rest)
+    const lean = leanDeg(pose.crease)
+    expect(lean).toBeGreaterThan(10)
+    expect(lean).toBeLessThan(16)
+  })
+})
+
+// Non-mirrored equal-reach bridge: both ridges LEFT of the spine at equal
+// height (rise solved in derive-offspine.mjs), deck crease at station
+// ~ +0.36 — the off-center table.
+const TABLE_REACH = 0.7
+const TABLE_RISE_B = 0.0353
+const TABLE: PlatformGeom = {
+  mech: 'platform',
+  strutA: { glueL: 0.55, glueR: 0.05, rise: 0.1, spans: [[0.1, 0.3]] },
+  strutB: { glueL: 0.4, glueR: TABLE_REACH - 0.4 - TABLE_RISE_B, rise: TABLE_RISE_B, spans: [[0.1, 0.3]] },
+  qA: 0.24,
+  qB: 0.24,
+  deckZ0: 0.1,
+  deckZ1: 0.3,
+}
+const RIDER_ON_TABLE: RiderGeom = { ...RIDER_ON_DECK, parentId: 'table' }
+
+describe('off-spine — upright rider on a NON-MIRRORED equal-reach bridge', () => {
+  it('equal closed reach admits the mount (the bridge rule, not the mirror)', () => {
+    expect(Math.abs(strutClosedReach(TABLE.strutA) - strutClosedReach(TABLE.strutB))).toBeLessThan(1e-9)
+    expect(() => solveRiderPose(RIDER_ON_TABLE, TABLE, Math.PI, 0)).not.toThrow()
+  })
+
+  it('glue edges ride in the deck panel planes across the sweep', () => {
+    for (const [tL, tR] of SWEEP) {
+      const pose = solveRiderPose(RIDER_ON_TABLE, TABLE, tL, tR)
+      const plat = solvePlatformPose(TABLE, tL, tR)
+      const decks = [planeOf(faceQuad(plat, 'deckA')), planeOf(faceQuad(plat, 'deckB'))]
+      for (const p of [pose.left[0], pose.left[1], pose.right[0], pose.right[1]]) {
+        expect(offNearest(p, decks)).toBeLessThan(1e-9)
+      }
+    }
+  })
+
+  it('folds flat into the page at book-closed', () => {
+    for (const m of CLOSED) {
+      const pose = solveRiderPose(RIDER_ON_TABLE, TABLE, m, m)
+      for (const p of [...pose.right, ...pose.left]) expect(offPage(p, m)).toBeLessThan(FLAT_TOL_PARALLEL)
+    }
+  })
+
+  it('UPRIGHT THEOREM: equal ridge heights stand the rider vertical at an off-spine station', () => {
+    const pose = solveRiderPose(RIDER_ON_TABLE, TABLE, REST[0], REST[1])
+    // station ~ +0.36 bisector-lateral = world -x (left page side)
+    expect(pose.apex[0]).toBeLessThan(-0.25)
+    expect(leanDeg(pose.crease)).toBeLessThan(1)
   })
 })
 

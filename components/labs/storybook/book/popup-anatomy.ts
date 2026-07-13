@@ -17,22 +17,28 @@
  *    spine apex; each member is the shipped spherical four-bar, so the fan
  *    is pure composition. Member rules live with the covenant tests.
  *
- * 3. RIDER (derive-recursion.mjs) — a symmetric v-fold whose "pages" are a
- *    parent's hinged patch pair. Both valid seats reduce to the SAME solve
- *    with an overridden half-angle and an apex offset in the bisector
- *    frame:
- *      boxLid     — local frame IS the bisector frame lifted to the seam
- *                   (H, 0): hEff = h exactly (|wallTop - seam| = a).
- *      deckCrease — bridge platforms only: crease sits ON the bisector
- *                   plane, so the local frame is the bisector frame at
- *                   (Cx, 0); hEff = atan2(|ridgeY|, ridgeX - Cx), running
- *                   PI (book closed, flat) down as the book opens. The
- *                   shipped creaseElevation closed form is exact in that
- *                   regime (checked analytically at hEff = PI and swept
- *                   numerically in the derive).
+ * 3. RIDER (derive-recursion.mjs; generalized by derive-offspine.mjs for
+ *    the C6 round-7 OFF-SPINE family) — a symmetric v-fold whose "pages"
+ *    are a parent's hinged patch pair. Every seat solves through ONE
+ *    local-frame path: the seat pair's pop-side bisector is the rider's
+ *    local X (a z-rotation of the bisector frame by delta), the common
+ *    half-angle its hEff, and the v-fold closes in that frame exactly as
+ *    on a page gutter. Seats:
+ *      boxLid     — the frame reduces to delta = 0, hEff = h exactly
+ *                   (|wallTop - seam| = a identically).
+ *      deckCrease — bridge platforms (EQUAL CLOSED REACH — mirrored ranks
+ *                   are a special case, not the rule): a non-mirrored
+ *                   bridge parks its deck crease at any lateral station,
+ *                   and the rider stands UPRIGHT there iff the two ridges
+ *                   share a height (the upright theorem, derive-offspine).
+ *      tentRidge  — a parallel-fold ground swell's ridge at station
+ *                   ~ (glueL - glueR): the full-range off-spine anchor.
+ *                   The rider leans by half the tent's cross-section
+ *                   asymmetry (0 when symmetric; composition budgets it).
  *    MOUNT RULE: seats must stack parallel at book-closed — the terrace
  *    crease (straight at closed) is rejected, riders there would stand
- *    erect inside the closed book.
+ *    erect inside the closed book. Tent ridges always qualify: the tent's
+ *    panels fold together with the page sandwich.
  *
  * 4. DRESS PATCH — zero kinematics: a rigid decorative quad riding one
  *    parent panel's frame, allowed to overhang (the Sabuda silhouette
@@ -49,6 +55,7 @@ import {
   type FanGeom,
   type MechPose,
   type PanelQuad,
+  type ParallelGeom,
   type PlatformGeom,
   type RiderGeom,
   type Vec3,
@@ -196,44 +203,114 @@ export function solveFanPose(geom: FanGeom, thetaL: number, thetaR: number): rea
 // ---------------------------------------------------------------------------
 // Rider: recursion via local page pairs.
 
-/**
- * Solves a rider's world pose off its parent geometry. Throws on invalid
- * seats — the mount rule is a covenant, not a soft warning: a rider on a
- * terrace crease or a non-flat roof would stand erect inside the closed
- * book.
- */
-export function solveRiderPose(
-  geom: RiderGeom,
-  parent: BoxGeom | PlatformGeom,
-  thetaL: number,
-  thetaR: number
-): MechPose {
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const m = (thetaL + thetaR) / 2
-  const h = beta / 2
+/** A rider seat's cross-section pair in the bisector frame: crease point
+ *  (ox, oy) plus unit in-panel perpendiculars toward each seat panel. The
+ *  crease itself always runs along z for every seat we mount on. */
+type SeatPair = {
+  readonly ox: number
+  readonly oy: number
+  readonly eL: readonly [number, number]
+  readonly eR: readonly [number, number]
+}
 
-  let apexX: number
-  let hEff: number
+/** Resolves a rider's seat pair from its parent geometry at half-angle h.
+ *  Throws on invalid seats — the mount rule is a covenant, not a soft
+ *  warning: a rider on a terrace crease or a non-flat roof would stand
+ *  erect inside the closed book. */
+function riderSeatPair(geom: RiderGeom, parent: BoxGeom | PlatformGeom | ParallelGeom, h: number): SeatPair {
   if (geom.seat === 'boxLid') {
     if (parent.mech !== 'box' || parent.roof !== 'flat') {
       throw new Error('storybook: boxLid riders need a flat-roofed box parent')
     }
-    apexX = parent.height
-    hEff = h
-  } else {
+    // Local frame IS the bisector frame lifted to the seam: eL/eR run from
+    // the backbone top to the wall tops.
+    return { ox: parent.height, oy: 0, eL: [Math.cos(h), Math.sin(h)], eR: [Math.cos(h), -Math.sin(h)] }
+  }
+  if (geom.seat === 'deckCrease') {
     if (parent.mech !== 'platform') {
       throw new Error('storybook: deckCrease riders need a platform parent')
     }
     if (Math.abs(strutClosedReach(parent.strutA) - strutClosedReach(parent.strutB)) > 1e-9) {
       throw new Error('storybook: deckCrease riders need a BRIDGE platform (terrace creases fail the mount rule)')
     }
+    // The true two-rank circle-circle solve — NO mirror assumption, so a
+    // non-mirrored bridge seats its rider at any lateral station
+    // (derive-offspine.mjs upright-table-off-center).
     const ra = parallelRidge(parent.strutA.glueL, parent.strutA.glueR, parent.strutA.rise, h)
-    const c = deckCreasePoint(ra, parent.qA, [ra[0], -ra[1]], parent.qB)
-    apexX = c[0]
-    // Local half-angle of the deck pair about the crease: PI at book-closed
-    // (panels folded together), easing down as the deck peaks.
-    hEff = Math.atan2(Math.abs(ra[1]), ra[0] - c[0])
+    const rb = parallelRidge(parent.strutB.glueL, parent.strutB.glueR, parent.strutB.rise, h)
+    const c = deckCreasePoint(ra, parent.qA, rb, parent.qB)
+    return {
+      ox: c[0],
+      oy: c[1],
+      eL: unit2(ra[0] - c[0], ra[1] - c[1]),
+      eR: unit2(rb[0] - c[0], rb[1] - c[1]),
+    }
   }
+  // tentRidge: a parallel-fold ground swell's ridge. Always mount-valid —
+  // the tent's panels fold together with the page sandwich at closed
+  // (derive-offspine.mjs, all tent configs).
+  if (parent.mech !== 'parallel') {
+    throw new Error('storybook: tentRidge riders need a parallel-fold parent')
+  }
+  const r = parallelRidge(parent.glueL, parent.glueR, parent.rise, h)
+  return {
+    ox: r[0],
+    oy: r[1],
+    eL: unit2(parent.glueL * Math.cos(h) - r[0], parent.glueL * Math.sin(h) - r[1]),
+    eR: unit2(parent.glueR * Math.cos(h) - r[0], -parent.glueR * Math.sin(h) - r[1]),
+  }
+}
+
+const unit2 = (x: number, y: number): readonly [number, number] => {
+  const l = Math.hypot(x, y)
+  return [x / l, y / l]
+}
+
+/**
+ * Solves a rider's world pose off its parent geometry — every seat through
+ * ONE local-frame path (derive-offspine.mjs): the seat pair's pop-side
+ * bisector is the rider's local X (a z-rotation of the bisector frame by
+ * delta), the common half-angle its hEff, and the symmetric v-fold solves
+ * in that frame exactly as on a page gutter. For the shipped mirrored
+ * seats the frame reduces to delta = 0 and the previous closed forms
+ * bit-for-bit (boxLid: hEff = h; mirrored deck: atan2(|ra.y|, ra.x - Cx)).
+ */
+export function solveRiderPose(
+  geom: RiderGeom,
+  parent: BoxGeom | PlatformGeom | ParallelGeom,
+  thetaL: number,
+  thetaR: number
+): MechPose {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const m = (thetaL + thetaR) / 2
+  const h = beta / 2
+  const pair = riderSeatPair(geom, parent, h)
+
+  // Pop-side bisector of the seat pair. Antiparallel panels (local
+  // dihedral exactly PI — the book fully flat under a symmetric seat) fall
+  // back to the crease-normal perpendicular; both branches flip to +x, the
+  // away-from-the-pages side of the bisector frame.
+  let xx = pair.eL[0] + pair.eR[0]
+  let xy = pair.eL[1] + pair.eR[1]
+  const sumLen = Math.hypot(xx, xy)
+  if (sumLen > 1e-9) {
+    xx /= sumLen
+    xy /= sumLen
+  } else {
+    const dx = pair.eR[0] - pair.eL[0]
+    const dy = pair.eR[1] - pair.eL[1]
+    const dl = Math.hypot(dx, dy)
+    xx = -dy / dl
+    xy = dx / dl
+  }
+  if (xx < 0) {
+    xx = -xx
+    xy = -xy
+  }
+  const delta = Math.atan2(xy, xx)
+  // Local half-angle: |signed angle from local X to eL|. atan2 keeps the
+  // mountain regime (negative x-component -> hEff in (PI/2, PI]) exact.
+  const hEff = Math.atan2(Math.abs(pair.eL[1] * xx - pair.eL[0] * xy), pair.eL[0] * xx + pair.eL[1] * xy)
 
   const phi = rad(geom.phiDeg)
   const rho = rad(geom.rhoDeg)
@@ -243,24 +320,28 @@ export function solveRiderPose(
   const lambda = creaseElevation(phi, rho, 2 * hEff)
   const c: Vec3 = [Math.sin(lambda), 0, vDir * Math.cos(lambda)]
 
-  const cm = Math.cos(m)
-  const sm = Math.sin(m)
-  const toWorld = (v: Vec3): Vec3 => [v[0] * cm - v[1] * sm, v[0] * sm + v[1] * cm, v[2]]
+  // Directions live in the LOCAL frame: world = rotate by m + delta about
+  // Z. The apex is a bisector-frame POINT: world = rotate by m alone.
+  const cw = Math.cos(m + delta)
+  const sw = Math.sin(m + delta)
+  const toWorld = (v: Vec3): Vec3 => [v[0] * cw - v[1] * sw, v[0] * sw + v[1] * cw, v[2]]
   const gRw = toWorld(gR)
   const gLw = toWorld(gL)
-  const cw = toWorld(c)
-  const apex: Vec3 = [apexX * cm, apexX * sm, geom.mountZ]
+  const cwv = toWorld(c)
+  const cm = Math.cos(m)
+  const sm = Math.sin(m)
+  const apex: Vec3 = [pair.ox * cm - pair.oy * sm, pair.ox * sm + pair.oy * cm, geom.mountZ]
 
   const split = geom.creaseU ?? 0.5
   const glueLenR = (geom.width * (1 - split)) / Math.sin(rho)
   const glueLenL = (geom.width * split) / Math.sin(rho)
 
   return {
-    right: parallelogram(apex, gRw, glueLenR, cw, geom.height),
-    left: parallelogram(apex, gLw, glueLenL, cw, geom.height),
+    right: parallelogram(apex, gRw, glueLenR, cwv, geom.height),
+    left: parallelogram(apex, gLw, glueLenL, cwv, geom.height),
     split,
     apex,
-    crease: cw,
+    crease: cwv,
     glueR: gRw,
     glueL: gLw,
   }

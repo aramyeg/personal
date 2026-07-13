@@ -26,8 +26,11 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *     (asymmetric glue angles — the piece leans) and with an off-center
  *     crease (creaseU — the peak sits off-middle).
  *   - 'parallel': a strip creased parallel to the spine (planar four-bar).
- *     DEMOTED by the volumetric benchmark: its faces only ever look
- *     left/right, so nothing that needs a camera-facing face may use it.
+ *     DEMOTED as an artwork carrier (its faces only ever look left/right)
+ *     but re-derived by C6 round 7 as the GROUND SWELL: a low terrain
+ *     mound whose ridge sits at lateral station ~ (glueL - glueR) — the
+ *     full-range off-spine anchor a tentRidge rider stands on. Covenant:
+ *     must carry >= 1 rider, rise <= 0.08, scenery role.
  *   - 'child': a small v-fold riding a parent's central crease (Glassner
  *     "generations") — ravens on rookery folds, coins spilling off a
  *     dragon. Driven by the parent's own panel dihedral, so one page turn
@@ -382,9 +385,33 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // outer rays long): a low-phi member's glue lines run nearly parallel to
 // the spine, so the inner ray is what would reach the bag — kept short —
 // while the outer rays angle away from the spine and carry the span.
+// DE-CENTERED (C6 round 7/7b acid test — THE spread where "everything
+// bends toward the center" hurt most): the unpacking now scatters across
+// the whole plane, each piece owning its local frame (the de-centering
+// law). The bag keeps the spine (bigger items may stay) and the golden
+// burst keeps its apex (the fan showcase); the new pieces stand at their
+// own stations:
+//  - the Wayfarer's Compass sits UPRIGHT on a map table standing entirely
+//    on the RIGHT page — a NON-MIRRORED equal-reach bridge whose two
+//    ridges share a height (the upright theorem, derive-offspine.mjs;
+//    strutB's rise is the solved root 0.0353).
+//  - the Ever-Sharp Sword stands planted in a ground-swell mound near the
+//    front LEFT edge — a tentRidge rider that leans with its mound the
+//    way a sword stuck in earth leans.
+// OFF-SPINE DISCIPLINE: every anchor's paper still runs to the gutter
+// under the hood (tent panels and strut ramps cross the spine), so pieces
+// whose GLUE FOOTPRINTS overlap laterally must take disjoint z-bands.
+// Footprints here: table -0.62..-0.36 | mound -0.34..-0.18 | bag -0.10..
+// ~0.47 | burst glue 0.24..0.47 (bag/burst share air, A9-verified clear;
+// the fan's PANELS reach z ~0.73 — nothing else may live under that
+// shadow, which is what evicted the mound from the front band).
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
   { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
+  { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.1, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.2647, glueR: 0.4, rise: 0.0353, spans: [[-0.62, -0.36]] }, qA: 0.24, qB: 0.24, deckZ0: -0.62, deckZ1: -0.36 },
+  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'satchel-table', seat: 'deckCrease', mountZ: -0.49, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.1, height: 0.08 },
+  { id: 'satchel-mound', kind: 'midground', role: 'scenery', mech: 'parallel', glueL: 0.4, glueR: 0.2, rise: 0.03, z0: -0.34, z1: -0.18 },
+  { id: 'satchel-sword', kind: 'hero', role: 'scenery', mech: 'rider', parentId: 'satchel-mound', seat: 'tentRidge', mountZ: -0.26, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.16, height: 0.3 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 

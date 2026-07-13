@@ -396,11 +396,13 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
             </group>
           )
         }
-        // A rider's "pages" are a box/platform patch pair; solveRiderPose
-        // re-solves that parent's geometry each frame from the layer alone.
+        // A rider's "pages" are a box/platform/ground-swell patch pair;
+        // solveRiderPose re-solves that parent's geometry each frame from
+        // the layer alone.
         if (layer.mech === 'rider') {
           const seat = layers.find((l) => l.id === layer.parentId)
-          if (!seat || (seat.mech !== 'box' && seat.mech !== 'platform')) return null
+          if (!seat || (seat.mech !== 'box' && seat.mech !== 'platform' && seat.mech !== 'parallel'))
+            return null
           return (
             <PopupLayer
               key={layer.id}

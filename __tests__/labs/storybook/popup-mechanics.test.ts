@@ -92,8 +92,8 @@ const allQuads = (
     return solveFanPose(layer, thetaL, thetaR).flatMap((pose) => [pose.right, pose.left])
   if (layer.mech === 'rider') {
     const parent = layers.find((l) => l.id === layer.parentId)
-    if (!parent || (parent.mech !== 'box' && parent.mech !== 'platform')) {
-      throw new Error(`rider ${layer.id}: parent must be a box/platform in the same spread`)
+    if (!parent || (parent.mech !== 'box' && parent.mech !== 'platform' && parent.mech !== 'parallel')) {
+      throw new Error(`rider ${layer.id}: parent must be a box/platform/tent in the same spread`)
     }
     const pose = solveRiderPose(layer, parent, thetaL, thetaR)
     return [pose.right, pose.left]
@@ -133,7 +133,7 @@ const flatTol = (layer: SceneLayer): number => {
   // class). boxLid riders and unskewed fan members are analytically exact;
   // skewed fan members go through the two-cone tangency like skewed v-folds.
   if (layer.mech === 'platform') return 1e-6
-  if (layer.mech === 'rider') return layer.seat === 'deckCrease' ? 1e-6 : 1e-9
+  if (layer.mech === 'rider') return layer.seat === 'boxLid' ? 1e-9 : 1e-6
   if (layer.mech === 'fan') return layer.members.some((m) => (m.skewDeg ?? 0) !== 0) ? 1e-5 : 1e-9
   // A dress patch is a SECOND sheet glued atop its link: it flattens to its
   // parent's plane plus the glue-layer lift (DRESS_LIFT 0.003 — well inside

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
 import {
   solveBoxPose,
+  solveParallelPose,
   solveVFoldPose,
   solveChildPose,
   type PanelQuad,
@@ -80,7 +81,9 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     case 'fan':
       return solveFanPose(l, tL, tR).flatMap((p) => [p.right, p.left])
     case 'rider': {
-      const parent = layers.find((p) => p.id === l.parentId) as SceneLayer & { mech: 'box' | 'platform' }
+      const parent = layers.find((p) => p.id === l.parentId) as SceneLayer & {
+        mech: 'box' | 'platform' | 'parallel'
+      }
       const pose = solveRiderPose(l, parent, tL, tR)
       return [pose.right, pose.left]
     }
@@ -93,6 +96,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     }
     case 'vfold': {
       const pose = solveVFoldPose(l, tL, tR)
+      return [pose.right, pose.left]
+    }
+    case 'parallel': {
+      const pose = solveParallelPose(l, tL, tR)
       return [pose.right, pose.left]
     }
     default:
