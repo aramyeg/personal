@@ -74,3 +74,6 @@ IMPROVEMENT_PLAN.md
 # Storybook lab: user-generated source art (raw ChatGPT PNGs); only the
 # processed public/labs/storybook/art/*.webp output is committed.
 public/labs/storybook/art-src/
+
+# scanned reference books (copyrighted - never commit)
+docs/knowledge/

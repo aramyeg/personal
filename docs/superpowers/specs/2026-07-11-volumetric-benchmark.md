@@ -536,3 +536,52 @@ erect or fold.
 Composition rule of thumb going forward: a spread mixes >= 2-3 families
 at varied stations, scales, and drives; no spread (and no roll-out)
 converges on a single mechanism.
+
+## Book distillation + engine map (2026-07-13)
+
+Both source books distilled into the persistent skill
+`~/.claude/skills/paper-engineering/` (SKILL.md = taxonomy + 10
+cross-cutting laws; references/ = full Birmingham 120-mechanism catalog
++ Hiebert notes). Consult the skill for geometry; this section only maps
+book vocabulary onto THIS engine.
+
+Cross-validation of our derived laws (book page/mech citations):
+- Our off-spine anchor family = Birmingham 18-20 "V-fold glued away
+  from the spine" — a named canonical family, not an invention.
+- Our equal-closed-reach bridge rule = the asymmetry balance law
+  (mech 30-31: A = D + x, B = C + x pairwise compensation).
+- Our L5 (actuation under the floor; flat-fold forces panel length)
+  aligns with the spine-crossing law (mech 70): pieces crossing the
+  spine need a fold above the spine — long crossing connectors are
+  Birmingham-legal only as parallelogram-principle builds (38).
+- Our "rest pose is solved, not authored" solver stance = the book's
+  close-the-base gluing law (114-117; also Hiebert's tent/pyramid/coil
+  steps). The physical craft does what our solvers do.
+- Our stripflap = the flap family lifted by strips (94-96) driven
+  automatically (116). Birmingham states the drive law we measured:
+  automatic-strip stroke = 2 x slit offset D; G = H flips a flap fully
+  over, G > H parks it at an angle (our erectAtDeg analogue).
+
+Engine status by book family:
+- SHIPPED: v-folds 1-8 (vfold), sculpted/asymmetric V 13-17/30-33
+  (rider seats, art cutouts), V away from spine 18-20 (off-spine
+  riders), stacked V 21-27 (child), M-fold 28-29 (parallel/ground
+  swell), parallelograms 34-40 (platform), zig-zag 45-48 (fan),
+  quadrilaterals 54-58 (platform qA/qB pitch), boxes 67-69 (box),
+  stage set 118 (our layered backdrop stack), strip-lifted flaps
+  94-96 + automatic strip 116 (stripflap).
+- NEXT (tabpiece): mech 84 pull-strip grammar (strip/tab/slit/sleeve
+  + tolerance canon) + 116-117 automatic drive; Hiebert's pull-tab
+  rib cage (strap through base slits tensioned by the spread) is the
+  physical prototype of the page-internal strip with a visible tab.
+  Mech 90 "knee" (strip buckles a pre-creased peak up out of the
+  page; equal lengths F make the buckle form) is the closest thing
+  to our planned mound-form slider - adopt its name.
+- FUTURE CANDIDATES (unbuilt vocabulary, palette L6 expansion):
+  45-degree folds / moving arms 73-83 (kinetic figures, turning disc
+  rotation = 2xE), hubs/pivots/articulated chains 103-113 (paper
+  rivets - dancing figures), spirals/twists 114-115 (smoke, magic),
+  slot joints 59-66, dissolves 92-93 + shutter scene 119 (scene
+  transitions), delayed double-action 101 (staged reveals), swoop
+  113. Explicitly rejected for this lab: none - all are palette
+  candidates at the right station/scale.
