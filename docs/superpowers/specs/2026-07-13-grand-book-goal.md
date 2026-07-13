@@ -86,23 +86,26 @@ D2 PAPER TRUTH PASS: full-sweep collision gates, draw-order audit,
 D3 LIGHT TRUTH PASS: shadow system v2, key-light consistency,
    translucency/edge treatment; look-dev captures are the gate. (P3)
 D4 KINETIC THEATRE: hub/pivot family — turning discs, moving arms,
-   articulated figures; the knob-twist tower erection. (P1, P5)
+   articulated figures as page-driven scenery. (P1)
 D5 STORY ROLL-OUT: beat sheet per kingdom, palette placement pass
    across all spreads (variety audit against P1 quotas), art call
    sheet + integration of user-generated artwork, overlap-complement
    pass, one wow moment per spread. (P4)
-D6 THE HAND: interactive strip pull/push, knob interaction, removable
-   keepsake, polish (die-cut voids, endpapers), optional paper-sound
-   moments. (P5)
+D6 THE HAND: interactive strip pull/push, knob-twist tower erection,
+   removable keepsake, polish (die-cut voids, endpapers), optional
+   paper-sound moments. (P5)
+
+PARKED (user verdict 2026-07-13): keepsake and knob-twist stay D6
+concepts — no derivation time spent on them before D6 opens.
 
 ## Known walls to derive through (not around)
 
 - Removable pieces break fold-flat while removed: needs a "keepsake
   seat" rule (piece detaches to a desk plane in front of the book;
   the book only closes when its pieces are home, or the piece
-  auto-returns on page turn). Derivation owed in D6.
+  auto-returns on page turn). Derivation owed in D6, not earlier.
 - Knob rotation gesture vs existing pointer laws: rotation handle
-  law owed in D4.
+  law owed in D6, not earlier.
 - True sheet thickness may conflict with current solved-plane
   geometry (SHEET_STACK_T is cosmetic today): derive bench owed in
   D2 before any renderer change.
