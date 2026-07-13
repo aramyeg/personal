@@ -470,3 +470,39 @@ L4 TABLETOP PITCH: deck slack (qA+qB - ridge gap) is roof pitch. 0.48
    slack over a 0.435 gap reads as a barn; 0.272 over 0.262 (slopes
    ~9 deg) reads as a table. Keep >= ~0.005 intersection margin at
    h = 90 deg (the gap is largest at full open).
+
+## C6 round 7c (2026-07-13) — connectors REJECTED, pull strips promoted
+
+Verdict on the phase-1 off-spine look. Verbatim: "I actually don't like
+these long connectors that still try to perceive the gravity center, I
+feel like we should focus more on pull tab variants, which can
+automatically get pulled and erect the buildings or figurines"
+
+1. LAW L5 — LOCAL PAPER ONLY: visible paper must belong to the piece.
+   Long gutter-reaching connectors (tent panels, strut ramps) re-draw
+   the spine's gravity even when the piece stands off-center — REJECTED
+   vocabulary for standees/furniture. And they are IRREDUCIBLE in the
+   page-driven family: flat-fold forces panel length ~ the glue span
+   (checked before filing — a shorter ramp cannot exist). Therefore
+   off-center erection moves UNDER THE FLOOR.
+
+2. PULL-STRIP PROMOTION: workstream E's pull strips are promoted to
+   NOW as the off-center erection method. Anatomy (real automata
+   books): a strip anchored on the OPPOSITE page at distance a crosses
+   the gutter valley as a taut chord and threads a slot; opening the
+   book lengthens the chord by
+     delta(beta) = sqrt(a^2 + b^2 - 2ab cos beta + dz^2)
+                   - sqrt((a-b)^2 + dz^2)
+   (monotone, zero at closed, late-blooming). The slot redirects the
+   strip under the floor to a hinged flap's tab at radius r:
+     theta(beta) = acos(1 - delta/r),  r = delta(beta_rest) => exactly
+   90 deg at the reading pose, flat at closed. The under-floor run is
+   constant-length, so the figure stands at ANY station with ANY
+   facing (hinge orientation free — frontal camera-facing billboards
+   anywhere: dissolves L3's standee limitation). Driver is still the
+   ONE dihedral (benchmark B9): "automatically get pulled" = the
+   book's own opening is the puller. Finger-drag tab variants stay E.
+
+3. Composition consequence: spread-8 mound+sword and the table's ramp
+   look are to be reworked onto strip-erected pieces; rolling the
+   tent/table connector look across chapters 2-7 is CANCELLED.
