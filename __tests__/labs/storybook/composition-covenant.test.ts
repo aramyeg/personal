@@ -6,6 +6,7 @@ import {
 } from '@/components/labs/storybook/content'
 import { strutClosedReach } from '@/components/labs/storybook/book/popup-anatomy'
 import { tabPieceFlatSpan } from '@/components/labs/storybook/book/popup-tabpiece'
+import { solveKineticArmPose, kineticArmFlatReach } from '@/components/labs/storybook/book/popup-kinetic'
 import { PAGE_W, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
 
 // The volumetric composition covenant, RAISED to Part C v2 (benchmark spec
@@ -50,6 +51,8 @@ const familyOf = (l: SceneLayer): string | null => {
       return 'stripflap'
     case 'tabpiece':
       return 'tabpiece'
+    case 'kinetic':
+      return 'kinetic'
     case 'dress':
       return null
   }
@@ -333,6 +336,44 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         expect(Math.abs(l.z1), label).toBeLessThanOrEqual(PAGE_H / 2)
         // the visible tab fits the piece's spine extent
         expect(l.tabW ?? 0.1, label).toBeLessThanOrEqual(l.z1 - l.z0)
+      }
+    }
+  })
+
+  it('kinetic arm validity: 45 fold, flap+arm fold flat inside the page, arm sweeps up', () => {
+    // The moving arm (Birmingham 73) is a two-panel MechPose whose ARM panel
+    // extends up a 45-deg v-fold ridge. Its tip is the fastest point in the
+    // book, but the v-fold late-bloom parks that speed near flat-open where
+    // the eased turn clock is slowest — so the arm passes the D-G5 GLOBAL_CAP
+    // (0.0497) with ~85% margin at armLen up to ~0.48 (bench K7). This gate
+    // guards the design constraints; the cap itself is enforced in
+    // motion-character.test.ts across every shipped layer.
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'kinetic') continue
+        const label = `${name} ${l.id}`
+        const phi = l.phiDeg ?? 45
+        expect(l.armLen, label).toBeGreaterThan(0)
+        expect(l.armW, label).toBeGreaterThan(0)
+        expect(l.flapW, label).toBeGreaterThan(0)
+        expect(l.flapLen, label).toBeGreaterThan(0)
+        // 45 fold, muscle stands and stays reachable
+        expect(phi, label).toBeGreaterThan(0)
+        expect(l.rhoDeg, label).toBeGreaterThan(phi)
+        expect(phi + l.rhoDeg, label).toBeLessThan(180)
+        // flap + arm fold flat entirely inside the page rectangle at closed
+        const closed = solveKineticArmPose(l, 0, 0)
+        for (const p of [...closed.right, ...closed.left]) {
+          expect(Math.abs(p[1]), `${label} flat`).toBeLessThan(1e-9)
+          expect(p[0], `${label} spine`).toBeGreaterThanOrEqual(-1e-9)
+          expect(p[0], `${label} fore edge`).toBeLessThanOrEqual(PAGE_W + 1e-9)
+          expect(Math.abs(p[2]), `${label} depth`).toBeLessThanOrEqual(PAGE_H / 2 + 1e-9)
+        }
+        // the flat reach fits the page even before the fold-flat fan
+        expect(kineticArmFlatReach(l), label).toBeLessThanOrEqual(PAGE_W)
+        // the arm stands nearly vertical at rest (its ridge points up)
+        const rest = solveKineticArmPose(l, Math.PI, 0)
+        expect(rest.crease[1], `${label} stands`).toBeGreaterThan(0.7)
       }
     }
   })

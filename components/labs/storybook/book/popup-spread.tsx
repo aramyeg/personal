@@ -88,6 +88,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'dress') return 0.5 // single quad, no fold
   if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
   if (layer.mech === 'tabpiece') return 0.5 // per-face uvs live in the tabpiece layer
+  if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   return layer.creaseU ?? 0.5
 }
 
@@ -208,6 +209,15 @@ function shadowPlacement(
     return {
       position: [layer.side === 'left' ? -layer.hingeX : layer.hingeX, SHADOW_Y_LIFT, layer.hingeZ],
       size: [layer.width * 0.9, SHADOW_HEIGHT * 0.8],
+    }
+  }
+  if (layer.mech === 'kinetic') {
+    // The arm stands nearly vertical over the spine at rest — its contact
+    // patch is a small footprint at the muscle's base, offset toward the
+    // fold direction like a v-fold.
+    return {
+      position: [0, SHADOW_Y_LIFT, layer.apexZ + layer.vDir * 0.04],
+      size: [(layer.armW + layer.flapW) * 1.6, SHADOW_HEIGHT * 0.7],
     }
   }
   return null

@@ -218,6 +218,22 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         expect(top).toBeGreaterThan(0.05)
         return
       }
+      if (layer.mech === 'kinetic') {
+        const phi = layer.phiDeg ?? 45
+        expect(layer.armLen).toBeGreaterThan(0)
+        expect(layer.armW).toBeGreaterThan(0)
+        expect(layer.flapW).toBeGreaterThan(0)
+        expect(layer.flapLen).toBeGreaterThan(0)
+        // muscle stands and stays reachable: rho > phi, phi + rho < 180
+        expect(layer.rhoDeg).toBeGreaterThan(phi)
+        expect(phi + layer.rhoDeg).toBeLessThan(180)
+        // the arm sweeps up to a near-vertical ridge at rest (the wow moment)
+        const rest = solveLayerPose(layer, undefined, Math.PI, 0)
+        expect(rest.crease[1]).toBeGreaterThan(0.7)
+        // spine extent stays inside the page depth
+        expect(Math.abs(layer.apexZ)).toBeLessThanOrEqual(PAGE_H / 2)
+        return
+      }
       const skew = layer.mech === 'vfold' ? (layer.skewDeg ?? 0) : 0
       const phiR = rad(layer.phiDeg)
       const rhoR = rad(layer.rhoDeg)

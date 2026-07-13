@@ -84,6 +84,11 @@
  */
 
 import { INTERIOR_SHEETS, PAGE_W, SHEET_STACK_T, restAngles } from './page-geometry'
+// Kinetic arms are a two-panel MechPose whose math lives in its own module
+// (this file is at its size cap). popup-kinetic imports only creaseElevation
+// + parallelogram back — both defined below and used only at call time, so
+// the cycle is inert at module-eval (ESM live bindings).
+import { solveKineticArmPose } from './popup-kinetic'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -362,6 +367,40 @@ export type TabPieceGeom = {
   tabW?: number
 }
 
+/**
+ * KINETIC MOVING ARM (Part D4; Birmingham mech 73) — the book's first
+ * image-ANIMATING fold. A 45deg double-triangle muscle astride the spine
+ * carries a rigid ARM extended up its ridge crease; the arm sweeps a clean
+ * quarter-turn from lying in the page (book closed) to standing vertical
+ * (book open). Pose math lives in book/popup-kinetic.ts (this module is at
+ * its size cap); it is an ordinary two-panel MechPose (ARM + FLAP), so it
+ * routes through the standard PopupLayer renderer. Derived + gate-checked in
+ * .superpowers/sdd/bench/derive-kinetic.mjs.
+ */
+export type KineticArmGeom = {
+  mech: 'kinetic'
+  /** Apex on the spine (world z). */
+  apexZ: number
+  /** Fold direction along the spine: +1 the arm folds flat toward +z as the
+   *  book closes, -1 toward -z. */
+  vDir: 1 | -1
+  /** Glue-crease angle from the spine, degrees. Birmingham's 45 fold — 45
+   *  makes the arm sweep a clean quarter-turn (default 45). */
+  phiDeg?: number
+  /** Muscle corner angle, degrees. rho = 90 stands the arm EXACTLY vertical
+   *  at full open (the 45 rule); a hair under leans it toward the reader.
+   *  Must exceed phi, and phi + rho < 180. */
+  rhoDeg: number
+  /** Arm length up the ridge crease — the sweeping lever. */
+  armLen: number
+  /** Arm base width along its glue line (narrow = a lever, not a wall). */
+  armW: number
+  /** Muscle flap on the opposite page: glue-line width and rise up the ridge
+   *  (the short mount triangle). */
+  flapW: number
+  flapLen: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -373,6 +412,7 @@ export type LayerGeom =
   | DressGeom
   | StripFlapGeom
   | TabPieceGeom
+  | KineticArmGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -820,6 +860,9 @@ export function solveLayerPose(
     }
     case 'stripflap':
       return solveStripFlapPose(geom, thetaL, thetaR)
+    case 'kinetic':
+      // Two-panel moving arm — MechPose (ARM + FLAP), math in popup-kinetic.
+      return solveKineticArmPose(geom, thetaL, thetaR)
     case 'box':
       throw new Error('storybook: box layers are multi-patch — use solveBoxPose')
     case 'platform':

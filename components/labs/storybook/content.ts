@@ -172,6 +172,14 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // The long-planned painted meadow fringe up front (call sheet v5): a low
   // wide reader-edge wall that ratchets the chapter's depth bands.
   { id: 'ch2-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.56, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.2, height: 0.22 },
+  // KINETIC (D4): a WINDMILL SAIL on the alpine courier station — Birmingham
+  // mech 73, a 45-deg arm that sweeps a quarter-turn up to vertical as the
+  // book opens (the sail catching the wind). NOTE (D4 placement wall): the
+  // book is at zero D-G2 collision headroom and densely composed at the
+  // spine, so the only A9-clean + gate-passing home for a spine-straddling
+  // sweep is the deep upstage lane behind the backdrop; a VISIBLE placement
+  // needs a re-composition pass (orchestrator call — see the D4 report).
+  { id: 'ch2-windmill', kind: 'backdrop', role: 'scenery', mech: 'kinetic', apexZ: -0.62, vDir: -1, phiDeg: 45, rhoDeg: 88, armW: 0.11, armLen: 0.26, flapW: 0.13, flapLen: 0.15 },
 ]
 
 // Chapter III — the rookery: the great tower now carries a dispatch
@@ -198,6 +206,15 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
   // the coaching yard but tucked in toward the spine.
   { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.05, deckZ1: 0.2 },
+  // KINETIC (D4): the dispatch tower's SEMAPHORE ARM — Birmingham mech 73,
+  // a 45-deg double-triangle astride the spine whose signal arm sweeps a
+  // quarter-turn from horizontal to vertical as the book opens (the tower
+  // "raising the signal" for the raven post). PARKED in the deep upstage lane
+  // (see the ch2-windmill note + the D4 report): this densely-composed rookery
+  // is at zero D-G2 collision headroom, so the arm's spine-straddling sweep
+  // has no A9-clean, gate-passing home in the visible near-spine region;
+  // giving it a downstage stage needs a composition pass (orchestrator call).
+  { id: 'ch3-semaphore', kind: 'backdrop', role: 'scenery', mech: 'kinetic', apexZ: -0.55, vDir: -1, phiDeg: 45, rhoDeg: 89, armW: 0.1, armLen: 0.24, flapW: 0.12, flapLen: 0.14 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):

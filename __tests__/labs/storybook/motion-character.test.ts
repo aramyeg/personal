@@ -230,6 +230,14 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   child: 15.5,
   fan: 4.5,
   stripflap: 5.0,
+  // KINETIC arm (D4): its ARM panel rides a 45-deg v-fold ridge, so it
+  // inherits the v-fold's late-bloom — the tip's per-station step grows
+  // toward flat-open — while its apex corner is STATIC (on the spine, step
+  // 0), which lowers the per-corner mean and raises the ratio. Measured
+  // worst 3.47x (both shipped arms, D-G5 measurement 2026-07-13) + 10%.
+  // Smooth and branch-free (A6 continuity passes); the real-time GLOBAL_CAP
+  // still holds it ~85% clear (the late bloom parks near the slow eased tail).
+  kinetic: 3.9,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {
