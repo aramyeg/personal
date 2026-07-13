@@ -342,13 +342,16 @@ function PopupLayer({
         <mesh ref={rightMeshRef} geometry={geometries.right} material={materials.right} renderOrder={0} />
         <mesh ref={leftMeshRef} geometry={geometries.left} material={materials.left} renderOrder={0} />
       </group>
+      {/* Shadows take renderOrder=-1 with the gutter crease (D-G3 audit):
+          every ground-shading plane draws before every piece of paper, so
+          a shadow can never blend on top of a cutout mid-turn. */}
       {shadow && (
         <mesh
           ref={shadowRef}
           position={shadow.position}
           rotation={[-Math.PI / 2, 0, 0]}
           material={shadowMaterial}
-          renderOrder={0}
+          renderOrder={-1}
           visible={false}
         >
           <planeGeometry args={shadow.size} />

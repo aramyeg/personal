@@ -231,12 +231,14 @@ export function BoxPopupLayer({
           </group>
         ))}
       </group>
+      {/* renderOrder=-1: ground shading joins the gutter crease's early
+          transparent tier (D-G3 audit; book.tsx precedent). */}
       <mesh
         ref={shadowRef}
         position={[0, SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={shadowMaterial}
-        renderOrder={0}
+        renderOrder={-1}
         visible={false}
       >
         <planeGeometry args={[layer.a * 2 * 1.05, (layer.z1 - layer.z0) * 1.05]} />

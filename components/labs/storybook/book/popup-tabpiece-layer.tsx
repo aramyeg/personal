@@ -222,11 +222,14 @@ export function TabPiecePopupLayer({
         ))}
       </group>
       <group ref={shadowGroupRef} visible={false}>
+        {/* renderOrder=-1: all ground shading joins the gutter crease's
+            early transparent tier (D-G3 audit; book.tsx precedent) so no
+            shadow can ever draw over paper. */}
         <mesh
           position={shadowSpec.position}
           rotation={[-Math.PI / 2, 0, 0]}
           material={shadowMaterial}
-          renderOrder={0}
+          renderOrder={-1}
         >
           <planeGeometry args={shadowSpec.size} />
         </mesh>

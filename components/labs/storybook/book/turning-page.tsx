@@ -186,11 +186,14 @@ export function TurningPage({
           </mesh>
         </group>
       </group>
+      {/* renderOrder=-1: the traveling shade joins the ground-shading tier
+          (D-G3 audit) — it must never blend over the sheet or a pop-up. */}
       <mesh
         ref={shadeRef}
         position={[0, originY - SHADE_LIFT, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         material={shadeMaterial}
+        renderOrder={-1}
         visible={false}
       >
         <planeGeometry args={[SHADE_WIDTH, PAGE_H]} />

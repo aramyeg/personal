@@ -268,6 +268,8 @@ export function PlatformPopupLayer({
           </group>
         ))}
       </group>
+      {/* renderOrder=-1: both shadow tiers join the gutter crease's early
+          transparent tier (D-G3 audit; book.tsx precedent). */}
       <group ref={shadowGroupRef} visible={false}>
         {strutSpecs.map((spec, i) => (
           <mesh
@@ -275,7 +277,7 @@ export function PlatformPopupLayer({
             position={spec.position}
             rotation={[-Math.PI / 2, 0, 0]}
             material={strutShadowMaterial}
-            renderOrder={0}
+            renderOrder={-1}
           >
             <planeGeometry args={spec.size} />
           </mesh>
@@ -284,7 +286,7 @@ export function PlatformPopupLayer({
           position={deckSpec.position}
           rotation={[-Math.PI / 2, 0, 0]}
           material={deckShadowMaterial}
-          renderOrder={0}
+          renderOrder={-1}
         >
           <planeGeometry args={deckSpec.size} />
         </mesh>
