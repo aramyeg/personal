@@ -74,7 +74,9 @@ P5 THE HAND IN THE BOOK (interaction)
      handle law when the knob family lands.
 
 ## Phase roadmap (each phase = derive bench → engine → covenant/tests
-→ captures → user eye-test; thresholds only rise)
+→ captures → async eye-test; thresholds only rise. Per user verdict
+2026-07-13: no pauses between phases — contact sheets post async and
+the loop continues; subagents implement, the main session advises)
 
 D1 STRIP WORKS (in flight): tabpiece with visible fore-edge tab —
    "knee" (mound) + table forms, page-internal strip, geared to book

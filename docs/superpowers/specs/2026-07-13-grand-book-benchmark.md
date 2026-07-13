@@ -82,8 +82,15 @@ user's eye-test; captures happen twice (warm compile, then settled).
 
 Per roadmap item: derive bench → engine + tests → gates green
 (ratchet where measured above floor) → captures of touched spreads →
-commit → ledger entry → next item. PAUSE only (a) at phase
-boundaries, presenting the capture contact sheet for eye-test, or
-(b) when a wall demands re-derivation — present the divergence and
-the re-derived design, per standing doctrine. Keepsake/knob stay
-parked until D6. Report outcomes, not mechanism math.
+commit → ledger entry → next item. AMENDED by user verdict
+2026-07-13: do NOT pause at phase boundaries — post the capture
+contact sheet for asynchronous eye-test and continue immediately
+into the next phase; corrections arrive async and are folded in.
+The only hard stop remains a wall demanding re-derivation whose
+resolution genuinely needs the user's verdict — present the
+divergence and the re-derived options, per standing doctrine.
+Implementation is DELEGATED to subagents (opus for geometry/design
+judgment, sonnet for well-scoped mechanical work, never haiku); the
+main session orchestrates, reviews every diff, advises confused
+agents, and owns commits. Keepsake/knob stay parked until D6.
+Report outcomes, not mechanism math.
