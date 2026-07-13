@@ -65,7 +65,9 @@ describe('storybook content', () => {
                     ? l.qA + l.qB
                     : l.mech === 'fan'
                       ? l.members.length
-                      : l.width
+                      : l.mech === 'tabpiece'
+                        ? l.legW
+                        : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

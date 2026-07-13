@@ -55,6 +55,11 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *     under the floor — the book's own opening pulls it upright at any
  *     station with any facing, with no visible connector (law L5). The
  *     off-center standee/building vocabulary.
+ *   - 'tabpiece' (Part D1): a one-page slider — mound (Birmingham 90
+ *     "knee") or table — erected by a page-internal strip whose end is a
+ *     VISIBLE tab at the fore edge; the tab slides out by exactly the
+ *     strip draw as the book opens (solver in book/popup-tabpiece.ts).
+ *     The future interactive pull/push handle (D6).
  *  Constraints enforced by tests: pieces stand when open, fold exactly
  *  flat when closed, stay inside the closed page ("nothing sticks out"),
  *  never tear or jam, and children keep their glue on the parent's paper.
@@ -224,6 +229,13 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // through the torn-paper sky — deep AND tall, since a deeper piece sits
   // HIGHER on this top-down camera.
   { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.22, glueR: 0.14, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, strutB: { glueL: 0.14, glueR: 0.22, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, qA: 0.21, qB: 0.21, deckZ0: -0.39, deckZ1: -0.26 },
+  // D1 TAB PIECE: the hoard's loose gold rises as a MOUND on the right
+  // page, its tab creeping out of the fore edge as the spread blooms —
+  // the treasure literally grows when the book opens. Strip-driven family
+  // beyond the satchel (palette law), opposite side from ch5's table.
+  // Sited z 0.08+ so the midground wall's glue path (crosses z ~0.04 at
+  // this x range) stays clear, x >= 0.38 so the chest (x <= ~0.24) does.
+  { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.08, z1: 0.36, legW: 0.26, liftDeg: 55 },
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
@@ -263,6 +275,12 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // FLOATING TIER (C3v2): the goods table — a BRIDGE platform spanning the
   // stall row, its deck the laid-out wares.
   { id: 'ch5-goods', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, qA: 0.09, qB: 0.09, deckZ0: 0.08, deckZ1: 0.3 },
+  // D1 TAB PIECE: a market TABLE erected by its own fore-edge tab on the
+  // left page, downstage of the stall row — legs + level deck. Inner
+  // hinge at 0.34 clears the stall box's left-wall reach (~0.27); the
+  // z band sits past the goods platform (z <= 0.3) and the stalls fold
+  // (z ~ -0.2). Mirrors ch4's mound on the other side of the book.
+  { id: 'ch5-market-table', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60 },
 ]
 
 // Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —

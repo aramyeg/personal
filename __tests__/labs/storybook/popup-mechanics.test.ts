@@ -26,6 +26,13 @@ import {
   solvePlatformPose,
   solveRiderPose,
 } from '@/components/labs/storybook/book/popup-anatomy'
+import {
+  solveTabPiecePose,
+  tabPieceFlatSpan,
+  tabPieceLift,
+  tabPieceTabOut,
+  TAB_LIP,
+} from '@/components/labs/storybook/book/popup-tabpiece'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
@@ -100,6 +107,7 @@ const allQuads = (
     return [pose.right, pose.left]
   }
   if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
+  if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -140,7 +148,8 @@ const flatTol = (layer: SceneLayer): number => {
   // parent's plane plus the glue-layer lift (DRESS_LIFT 0.003 — well inside
   // paper thickness 0.02).
   if (layer.mech === 'dress') return 0.004
-  return 1e-9 // symmetric v-folds AND boxes: analytically exact closed forms
+  // Tab pieces close through an exact cam zero (a = 0 at beta = 0).
+  return 1e-9 // symmetric v-folds, boxes, tab pieces: analytically exact
 }
 
 describe('layer spec validity (design constraints, every shipped layer)', () => {
@@ -187,6 +196,26 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         expect(layer.slot).toBeGreaterThan(0)
         const rest = solveStripFlapPose(layer, Math.PI, 0)
         expect(rest.crease[1]).toBeGreaterThan(0.9)
+        return
+      }
+      if (layer.mech === 'tabpiece') {
+        expect(layer.legW).toBeGreaterThan(0)
+        if (layer.form === 'table') expect(layer.deckD ?? 0).toBeGreaterThan(0)
+        const lift = layer.liftDeg ?? 55
+        expect(lift).toBeGreaterThan(0)
+        expect(lift).toBeLessThanOrEqual(85) // legs never cross (bench T8)
+        // ONE-PAGE footprint: flat span fits between a gutter margin and
+        // the fore edge (the fixed hinge stays inside the page)
+        expect(layer.hingeX).toBeLessThanOrEqual(PAGE_W - 0.02)
+        expect(layer.hingeX - tabPieceFlatSpan(layer)).toBeGreaterThanOrEqual(0.06)
+        expect(layer.z0).toBeLessThan(layer.z1)
+        expect(Math.abs(layer.z0)).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(layer.z1)).toBeLessThanOrEqual(PAGE_H / 2)
+        // stands proud at rest
+        const top = Math.max(
+          ...solveTabPiecePose(layer, Math.PI, 0).flatMap((p) => p.quad.map((c) => c[1]))
+        )
+        expect(top).toBeGreaterThan(0.05)
         return
       }
       const skew = layer.mech === 'vfold' ? (layer.skewDeg ?? 0) : 0
@@ -252,6 +281,25 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
           const n = layer.side === 'left' ? nL : nR
           for (const p of [pose.right[0], pose.right[1], pose.left[0], pose.left[1]]) {
             expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+          }
+          continue
+        }
+        if (layer.mech === 'tabpiece') {
+          // one-page slider: both hinges AND the whole tab lie in its page
+          const n = layer.side === 'left' ? nL : nR
+          for (const patch of solveTabPiecePose(layer, thetaL, thetaR)) {
+            const onPage =
+              patch.face === 'slopeIn' || patch.face === 'legIn'
+                ? [0, 1]
+                : patch.face === 'slopeOut' || patch.face === 'legOut'
+                  ? [2, 3]
+                  : patch.face === 'tab'
+                    ? [0, 1, 2, 3]
+                    : []
+            for (const i of onPage) {
+              const p = patch.quad[i]
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+            }
           }
           continue
         }
@@ -344,6 +392,10 @@ describe('A2/A12 rigidity — the paper does not stretch (multi-patch included)'
   it('every patch keeps all pairwise corner distances across the sweep, all layers', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
       const refQuads = allQuads(layer, layers, Math.PI, 0)
+      // A tab piece's TAB quad is exempt: it is the clipped VIEW of a longer
+      // rigid strip emerging through the fore-edge slit — its visible extent
+      // legitimately grows with the draw. The structure panels stay rigid.
+      const tabIndex = layer.mech === 'tabpiece' ? refQuads.length - 1 : -1
       const refDists = refQuads.map((q) => {
         const ds: number[] = []
         for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) ds.push(dist(q[a], q[b]))
@@ -352,6 +404,7 @@ describe('A2/A12 rigidity — the paper does not stretch (multi-patch included)'
       for (let i = 0; i <= 36; i++) {
         const quads = allQuads(layer, layers, (i / 36) * Math.PI, 0)
         quads.forEach((q, qi) => {
+          if (qi === tabIndex) return
           let k = 0
           for (let a = 0; a < 4; a++)
             for (let b = a + 1; b < 4; b++) {
@@ -941,6 +994,123 @@ describe('stripflap — hidden-strip erection (P1/P2/P3/P6 gates)', () => {
           ((p[0] - o[0]) * pn[0] + (p[1] - o[1]) * pn[1] + (p[2] - o[2]) * pn[2]) / pl
         expect(Math.abs(d)).toBeLessThan(1e-12)
       }
+    }
+  })
+})
+
+describe('tabpiece — fore-edge tab slider (D1 gates, bench derive-tabpiece.mjs)', () => {
+  const TAB_LAYERS = ALL_LAYERS.filter(
+    (entry): entry is readonly [string, SceneLayer & { mech: 'tabpiece' }, readonly SceneLayer[]] =>
+      entry[1].mech === 'tabpiece'
+  )
+  const REST = rad(176)
+  /** Symmetric bloom angles for a dihedral beta. */
+  const bloom = (beta: number): [number, number] => [Math.PI / 2 + beta / 2, Math.PI / 2 - beta / 2]
+
+  it('both shipped forms exist (mound and table — the palette mixes drives)', () => {
+    const forms = new Set(TAB_LAYERS.map(([, l]) => l.form))
+    expect(forms.has('mound')).toBe(true)
+    expect(forms.has('table')).toBe(true)
+  })
+
+  it.each(TAB_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: tab protrusion equals the inner-hinge slide exactly (inextensible strip)',
+    (_id, layer) => {
+      const innerFlat = layer.hingeX - tabPieceFlatSpan(layer)
+      for (let i = 0; i <= 40; i++) {
+        const [tL, tR] = bloom((REST * i) / 40)
+        const patches = solveTabPiecePose(layer, tL, tR)
+        const u: Vec3 = [Math.cos(layer.side === 'left' ? tL : tR), Math.sin(layer.side === 'left' ? tL : tR), 0]
+        // inner hinge = first corner of the first (inner) panel
+        const inner = patches[0].quad[0]
+        const innerD = inner[0] * u[0] + inner[1] * u[1]
+        // tab tip = corner 2/3 of the tab quad
+        const tab = patches[patches.length - 1]
+        const tipD = tab.quad[2][0] * u[0] + tab.quad[2][1] * u[1]
+        const tabOut = tipD - PAGE_W
+        expect(Math.abs(innerD - innerFlat - tabOut)).toBeLessThan(1e-9)
+        expect(Math.abs(tabOut - tabPieceTabOut(layer, tL - tR))).toBeLessThan(1e-9)
+      }
+    }
+  )
+
+  it.each(TAB_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: flush at closed, erect at rest, monotone rise',
+    (_id, layer) => {
+      // closed: dead flat, tab fully home (only the lip inside the edge) —
+      // evaluated with both pages flat right, the A3 convention
+      for (const closed of solveTabPiecePose(layer, 0, 0)) {
+        for (const p of closed.quad) expect(Math.abs(p[1])).toBeLessThan(1e-12)
+      }
+      expect(tabPieceTabOut(layer, 0)).toBe(0)
+      // rest: full designed lift
+      const [tL, tR] = bloom(REST)
+      const lift = tabPieceLift(layer, tL - tR)
+      expect(lift).toBeCloseTo(rad(layer.liftDeg ?? 55), 6)
+      const top = Math.max(...solveTabPiecePose(layer, tL, tR).flatMap((p) => p.quad.map((c) => c[1])))
+      // ridge/deck height in page-normal terms reaches legW * sin(lift)
+      // (world y is a hair less under the page's own ~2-degree rest tilt)
+      expect(top).toBeGreaterThan(layer.legW * Math.sin(lift) * 0.93)
+      // monotone
+      let prev = -1
+      for (let i = 0; i <= 40; i++) {
+        const a = tabPieceLift(layer, (REST * i) / 40)
+        expect(a).toBeGreaterThanOrEqual(prev - 1e-12)
+        prev = a
+      }
+    }
+  )
+
+  it.each(TAB_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: early-rise character — well ahead of the v-fold late bloom (D-G5)',
+    (_id, layer) => {
+      // Strip family: >= 50% of rest lift at quarter-rest (bench T7: 56%)
+      const frac = tabPieceLift(layer, REST / 4) / tabPieceLift(layer, REST)
+      expect(frac).toBeGreaterThanOrEqual(0.5)
+      // Family CONTRAST, in each mechanism's OWN terms (how far its fold
+      // has opened relative to rest — corner heights are corrupted by the
+      // page steepness at small beta): a canonical v-fold hero's panel
+      // pair opens only ~33% by quarter-rest (measured 2026-07-13); the
+      // strip family must stay >= 1.5x ahead of that late bloom.
+      const vconf = { mech: 'vfold', apexZ: 0, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.5, height: 0.5 } as const
+      const panelOpen = (beta: number): number => {
+        const [tL, tR] = bloom(beta)
+        const pose = solveVFoldPose(vconf, tL, tR)
+        const nOf = (q: PanelQuad): Vec3 => {
+          const n = cross(sub(q[1], q[0]), sub(q[3], q[0]))
+          const l = Math.hypot(n[0], n[1], n[2])
+          return [n[0] / l, n[1] / l, n[2] / l]
+        }
+        const c = dot(nOf(pose.right), nOf(pose.left))
+        return Math.acos(Math.max(-1, Math.min(1, c)))
+      }
+      const vfrac = panelOpen(REST / 4) / panelOpen(REST)
+      expect(frac).toBeGreaterThanOrEqual(1.5 * vfrac)
+    }
+  )
+
+  it('table decks stay dead level through the whole sweep', () => {
+    for (const [, layer] of TAB_LAYERS) {
+      if (layer.form !== 'table') continue
+      for (let i = 0; i <= 40; i++) {
+        const [tL, tR] = bloom((REST * i) / 40)
+        const deck = solveTabPiecePose(layer, tL, tR).find((p) => p.face === 'deck')!
+        const t = layer.side === 'left' ? tL : tR
+        const n: Vec3 =
+          layer.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
+        const lifts = deck.quad.map((p) => p[0] * n[0] + p[1] * n[1])
+        for (const l of lifts) expect(l).toBeCloseTo(lifts[0], 9)
+      }
+    }
+  })
+
+  it('the tab never retreats inside the page and the lip stays put', () => {
+    for (const [, layer] of TAB_LAYERS) {
+      for (let i = 0; i <= 40; i++) {
+        const beta = (REST * i) / 40
+        expect(tabPieceTabOut(layer, beta)).toBeGreaterThanOrEqual(0)
+      }
+      expect(TAB_LIP).toBeGreaterThan(0)
     }
   })
 })

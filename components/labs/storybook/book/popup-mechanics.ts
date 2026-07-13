@@ -339,6 +339,29 @@ export type StripFlapGeom = {
   erectAtDeg?: number
 }
 
+export type TabPieceGeom = {
+  mech: 'tabpiece'
+  /** The page the piece stands on (and whose fore edge shows the tab). */
+  side: 'left' | 'right'
+  form: 'mound' | 'table'
+  /** Fixed fore-side hinge: distance from the gutter along the page. */
+  hingeX: number
+  /** Piece extent along the spine (ridge runs parallel to the spine). */
+  z0: number
+  z1: number
+  /** Panel / leg width. */
+  legW: number
+  /** Table only: deck length between the leg tops. */
+  deckD?: number
+  /** Rest lift angle, degrees (default 55; must stay below 90). */
+  liftDeg?: number
+  /** Dihedral (deg) the cam normalizes to — the book's rest bloom.
+   *  Default 176. */
+  restAtDeg?: number
+  /** Visible tab width along the spine (default 0.1). */
+  tabW?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -349,6 +372,7 @@ export type LayerGeom =
   | RiderGeom
   | DressGeom
   | StripFlapGeom
+  | TabPieceGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -806,6 +830,8 @@ export function solveLayerPose(
       throw new Error('storybook: rider layers need their parent geometry — use solveRiderPose (popup-anatomy)')
     case 'dress':
       throw new Error('storybook: dress patches ride a solved parent surface — use solveDressPose (popup-anatomy)')
+    case 'tabpiece':
+      throw new Error('storybook: tab pieces are multi-patch — use solveTabPiecePose (popup-tabpiece)')
   }
 }
 

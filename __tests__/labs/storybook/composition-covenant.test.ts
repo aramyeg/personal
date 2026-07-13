@@ -5,6 +5,7 @@ import {
   type SceneLayer,
 } from '@/components/labs/storybook/content'
 import { strutClosedReach } from '@/components/labs/storybook/book/popup-anatomy'
+import { tabPieceFlatSpan } from '@/components/labs/storybook/book/popup-tabpiece'
 import { PAGE_W, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
 
 // The volumetric composition covenant, RAISED to Part C v2 (benchmark spec
@@ -47,6 +48,8 @@ const familyOf = (l: SceneLayer): string | null => {
       return 'parallel'
     case 'stripflap':
       return 'stripflap'
+    case 'tabpiece':
+      return 'tabpiece'
     case 'dress':
       return null
   }
@@ -307,6 +310,29 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         expect(Math.abs(l.hingeZ) + (l.width / 2) * sz + l.height * cx, label).toBeLessThanOrEqual(
           PAGE_H / 2
         )
+      }
+    }
+  })
+
+  it('tabpiece validity: one-page footprint, workable lift, tab room at the fore edge', () => {
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'tabpiece') continue
+        const label = `${name} ${l.id}`
+        expect(l.legW, label).toBeGreaterThan(0)
+        if (l.form === 'table') expect(l.deckD ?? 0, label).toBeGreaterThan(0)
+        const lift = l.liftDeg ?? 55
+        expect(lift, label).toBeGreaterThan(0)
+        expect(lift, label).toBeLessThanOrEqual(85)
+        // the flat structure fits its ONE page: fixed hinge inside the fore
+        // edge, sliding hinge clear of the gutter by a margin
+        expect(l.hingeX, label).toBeLessThanOrEqual(PAGE_W - 0.02)
+        expect(l.hingeX - tabPieceFlatSpan(l), label).toBeGreaterThanOrEqual(0.06)
+        expect(l.z0, label).toBeLessThan(l.z1)
+        expect(Math.abs(l.z0), label).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(l.z1), label).toBeLessThanOrEqual(PAGE_H / 2)
+        // the visible tab fits the piece's spine extent
+        expect(l.tabW ?? 0.1, label).toBeLessThanOrEqual(l.z1 - l.z0)
       }
     }
   })

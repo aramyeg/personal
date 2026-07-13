@@ -39,6 +39,7 @@ import { solveRiderPose } from './popup-anatomy'
 import { easeTurnWeighted } from './page-geometry'
 import { BoxPopupLayer } from './popup-box-layer'
 import { PlatformPopupLayer } from './popup-platform-layer'
+import { TabPiecePopupLayer } from './popup-tabpiece-layer'
 import { DressPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
@@ -85,6 +86,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'fan') return 0.5 // per-member creaseU applies at render
   if (layer.mech === 'dress') return 0.5 // single quad, no fold
   if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
+  if (layer.mech === 'tabpiece') return 0.5 // per-face uvs live in the tabpiece layer
   return layer.creaseU ?? 0.5
 }
 
@@ -119,6 +121,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
     // riders re-enter here as synthesized v-fold poses when they land).
     return false
   }
+  if (layer.mech === 'tabpiece') return false // per-face uvs live in the tabpiece layer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -376,6 +379,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'platform') {
           return (
             <PlatformPopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'tabpiece') {
+          return (
+            <TabPiecePopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}

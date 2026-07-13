@@ -16,6 +16,7 @@ import {
   solveDressPose,
   type PlatformPatch,
 } from '@/components/labs/storybook/book/popup-anatomy'
+import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpiece'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -107,6 +108,8 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       const pose = solveStripFlapPose(l, tL, tR)
       return [pose.right, pose.left]
     }
+    case 'tabpiece':
+      return solveTabPiecePose(l, tL, tR).map((p) => p.quad)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }
