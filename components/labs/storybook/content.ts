@@ -432,6 +432,12 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // all). Variety and asymmetry ARE the aesthetic.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
+  // KINETIC (D4 wave 2): the Wayfinder's ASTROLABE, its star-dial spinning
+  // open on the satchel flap — a die-cut disc riveted flat on the bag's right
+  // panel (mech 76) that turns 130deg as the book opens. Rides the panel
+  // coplanar, so it never collides; distinct drive from the standing compass
+  // stripflap below (the palette law — no monoculture per spread).
+  { id: 'satchel-astrolabe', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'satchel-bag', seat: 'right', u: 0.23, v: 0.3, radius: 0.13, spinDeg: 130 },
   { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
   // The map table: gutter-bound, standing well out on the right page
   // (equal-height ridges keep its top level), the Router's Scroll
@@ -448,6 +454,12 @@ const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leat
 const END_LAYERS: readonly SceneLayer[] = [
   { id: 'end-letter', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.75, height: 0.5 },
   { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'child', parentId: 'end-letter', mount: 0.28, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.15 },
+  // KINETIC (D4 wave 2): the hero's SIGNET SEAL, its heraldic rosette turning
+  // 110deg as the letter is unfolded — a die-cut disc hub-riveted flat on the
+  // letter's left panel (Birmingham mech 76). The end spread carries no
+  // backdrop, so the rotor's coplanar disc adds ZERO collision footprint here
+  // (the rotor's virtue: on a clean parent it costs nothing).
+  { id: 'end-seal', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'end-letter', seat: 'left', u: 0.19, v: 0.25, radius: 0.13, spinDeg: 110 },
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 

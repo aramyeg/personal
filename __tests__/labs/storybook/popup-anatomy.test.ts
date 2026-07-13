@@ -24,6 +24,7 @@ import {
   parallelRidge,
   solveBoxPose,
   solveParallelPose,
+  solveVFoldPose,
   type BoxGeom,
   type DressGeom,
   type FanGeom,
@@ -31,8 +32,17 @@ import {
   type ParallelGeom,
   type PlatformGeom,
   type RiderGeom,
+  type RotorGeom,
   type Vec3,
+  type VFoldGeom,
 } from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  ROTOR_LIFT,
+  ROTOR_SPIN_CAP,
+  rotorSpin,
+  rotorSweptRadius,
+  solveRotorPose,
+} from '@/components/labs/storybook/book/popup-rotor'
 import { PAGE_H, PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 
 // --- vector helpers (kept local; the modules under test stay three-free) ---
@@ -546,5 +556,162 @@ describe('dress — rigid decorative patch on a moving seat', () => {
       const seatPlane = planeOf(seat)
       for (const p of patch) expect(Math.abs(offPlane(p, seatPlane) - DRESS_LIFT)).toBeLessThan(1e-9)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ROTOR — a die-cut disc riveted flat onto a moving parent panel that SPINS in
+// the panel plane by a designed cam of the dihedral (Birmingham mech 76/103;
+// derive-rotor.mjs). The KINETIC sibling of the dress patch: same seat frame,
+// same 0.003 rivet lift, but a rotating rigid square. Two seat kinds cover the
+// solver's two frame shapes: a SHEARED v-fold panel (the orthonormal-frame
+// fix, bench W6) and a RECTANGULAR box wall.
+// ---------------------------------------------------------------------------
+const ROTOR_GLOBAL_CAP = 0.0497 // motion-character Gate 2
+const ROTOR_REST = (176 * Math.PI) / 180
+const rbloom = (beta: number): readonly [number, number] => [Math.PI / 2 + beta / 2, Math.PI / 2 - beta / 2]
+const easeW = (t: number): number => (t < 0.5 ? 16 * t ** 5 : 1 - Math.pow(-2 * t + 2, 5) / 2)
+
+const ROTOR_VFOLD_SEAT: VFoldGeom = {
+  mech: 'vfold',
+  apexZ: 0.04,
+  vDir: 1,
+  phiDeg: 54,
+  rhoDeg: 80,
+  width: 0.86,
+  height: 0.91,
+}
+const ROTOR_BOX_SEAT: BoxGeom = { mech: 'box', a: 0.16, height: 0.2, z0: 0.26, z1: 0.58, roof: 'flat' }
+
+type RotorCase = {
+  readonly name: string
+  readonly geom: RotorGeom
+  readonly seat: (tL: number, tR: number) => PanelQuad
+  readonly panelU: number // seat panel edge lengths at rest (for the fit check)
+  readonly panelV: number
+}
+const vfoldSeatQuad = (side: 'left' | 'right') => (tL: number, tR: number): PanelQuad => {
+  const pose = solveVFoldPose(ROTOR_VFOLD_SEAT, tL, tR)
+  return side === 'left' ? pose.left : pose.right
+}
+const ROTOR_CASES: readonly RotorCase[] = [
+  {
+    name: 'dial on a sheared v-fold panel',
+    geom: { mech: 'rotor', parentId: 'seat', seat: 'left', u: 0.2, v: 0.34, radius: 0.14, spinDeg: 120 },
+    seat: vfoldSeatQuad('left'),
+    panelU: edgeLens(solveVFoldPose(ROTOR_VFOLD_SEAT, Math.PI, 0).left)[0],
+    panelV: edgeLens(solveVFoldPose(ROTOR_VFOLD_SEAT, Math.PI, 0).left)[3],
+  },
+  {
+    // The box wall's u-edge runs along the spine (z-span 0.32), its v-edge up
+    // the short wall height (0.2) — the disc is centered so its swept circle
+    // fits the shorter dimension.
+    name: 'dial on a rectangular box wall',
+    geom: { mech: 'rotor', parentId: 'seat', seat: 'wallL', u: 0.16, v: 0.1, radius: 0.055, spinDeg: 110 },
+    seat: (tL, tR) => faceQuad(solveBoxPose(ROTOR_BOX_SEAT, tL, tR), 'wallL'),
+    panelU: edgeLens(faceQuad(solveBoxPose(ROTOR_BOX_SEAT, Math.PI, 0), 'wallL'))[0],
+    panelV: edgeLens(faceQuad(solveBoxPose(ROTOR_BOX_SEAT, Math.PI, 0), 'wallL'))[3],
+  },
+]
+
+describe('rotor — die-cut disc spinning in a moving panel plane (derive-rotor covenant)', () => {
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))('%s: zero spin at closed, exact spinDeg at rest', (_n, c) => {
+    expect(rotorSpin(c.geom, 0)).toBe(0) // the print aligns flat with the seat
+    expect(rotorSpin(c.geom, ROTOR_REST)).toBeCloseTo((c.geom.spinDeg * Math.PI) / 180, 12)
+  })
+
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))('%s: spin is monotone over the sweep', (_n, c) => {
+    let prev = -Infinity
+    for (let i = 0; i <= 200; i++) {
+      const s = rotorSpin(c.geom, (ROTOR_REST * i) / 200)
+      expect(s).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = s
+    }
+  })
+
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))(
+    '%s: stays COPLANAR with the parent panel (<= the 0.003 rivet lift) and RIGID across the sweep',
+    (_n, c) => {
+      const ref = edgeLens(solveRotorPose(c.geom, c.seat(Math.PI, 0), Math.PI))
+      for (const [tL, tR] of SWEEP) {
+        const seat = c.seat(tL, tR)
+        const quad = solveRotorPose(c.geom, seat, tL - tR)
+        // coplanar: every corner sits exactly the rivet lift off the seat plane
+        const seatPlane = planeOf(seat)
+        for (const p of quad) expect(offPlane(p, seatPlane)).toBeLessThan(ROTOR_LIFT + 1e-9)
+        // rigid: the disc square keeps its edge lengths as it spins (the
+        // orthonormal-frame fix — a sheared seat must not stretch it)
+        edgeLens(quad).forEach((len, i) => expect(Math.abs(len - ref[i])).toBeLessThan(1e-9))
+      }
+    }
+  )
+
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))('%s: folds flat inside the page at book-closed', (_n, c) => {
+    for (const m of CLOSED) {
+      const quad = solveRotorPose(c.geom, c.seat(m, m), 0)
+      for (const p of quad) {
+        expect(offPage(p, m)).toBeLessThan(ROTOR_LIFT + 1e-9)
+        expect(Math.hypot(p[0], p[1])).toBeLessThanOrEqual(PAGE_W)
+        expect(Math.abs(p[2])).toBeLessThanOrEqual(PAGE_H / 2)
+      }
+    }
+  })
+
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))(
+    '%s: the spin-swept circumcircle fits inside the parent panel at the anchor',
+    (_n, c) => {
+      // The rotating square's corners reach radius*sqrt(2) from the hub, so
+      // the anchor +- that must stay within the seat panel's own edges.
+      const reach = rotorSweptRadius(c.geom)
+      expect(c.geom.u - reach).toBeGreaterThanOrEqual(0)
+      expect(c.geom.u + reach).toBeLessThanOrEqual(c.panelU)
+      expect(c.geom.v - reach).toBeGreaterThanOrEqual(0)
+      expect(c.geom.v + reach).toBeLessThanOrEqual(c.panelV)
+    }
+  )
+
+  it.each(ROTOR_CASES.map((c) => [c.name, c] as const))(
+    '%s: no-snap in the beta domain (< 3x mean step) and under the real-time speed cap',
+    (_n, c) => {
+      // beta domain, 200 uniform stations
+      let prev: PanelQuad | null = null
+      let maxStep = 0
+      let sum = 0
+      let cnt = 0
+      for (let i = 0; i <= 200; i++) {
+        const beta = (ROTOR_REST * i) / 200
+        const [tL, tR] = rbloom(beta)
+        const quad = solveRotorPose(c.geom, c.seat(tL, tR), beta)
+        if (prev) {
+          let step = 0
+          for (let k = 0; k < 4; k++) step = Math.max(step, dist3(prev[k], quad[k]))
+          maxStep = Math.max(maxStep, step)
+          sum += step
+          cnt++
+        }
+        prev = quad
+      }
+      expect(maxStep).toBeLessThan(3 * (sum / cnt))
+
+      // real-time eased clock, 240 stations — the disc corner (radius*sqrt(2)
+      // from the hub) is the fastest point; must clear the GLOBAL_CAP.
+      prev = null
+      let capMax = 0
+      for (let i = 0; i <= 240; i++) {
+        const beta = Math.PI * easeW(i / 240)
+        const [tL, tR] = rbloom(beta)
+        const quad = solveRotorPose(c.geom, c.seat(tL, tR), beta)
+        if (prev) for (let k = 0; k < 4; k++) capMax = Math.max(capMax, dist3(prev[k], quad[k]))
+        prev = quad
+      }
+      expect(capMax).toBeLessThan(ROTOR_GLOBAL_CAP)
+    }
+  )
+
+  it('honors the mech-76 spin cap: |spinDeg| beyond 150 is clamped', () => {
+    const over: RotorGeom = { mech: 'rotor', parentId: 'seat', seat: 'left', u: 0.2, v: 0.34, radius: 0.1, spinDeg: 220 }
+    expect(rotorSpin(over, ROTOR_REST)).toBeCloseTo((ROTOR_SPIN_CAP * Math.PI) / 180, 12)
+    const under: RotorGeom = { ...over, spinDeg: -220 }
+    expect(rotorSpin(under, ROTOR_REST)).toBeCloseTo((-ROTOR_SPIN_CAP * Math.PI) / 180, 12)
   })
 })

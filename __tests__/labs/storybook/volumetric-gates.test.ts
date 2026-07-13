@@ -18,6 +18,7 @@ import {
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveKineticArmPose } from '@/components/labs/storybook/book/popup-kinetic'
+import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -63,7 +64,12 @@ const visibility = (q: PanelQuad, rx = 0, ry = 0): number => -dot(tilt(quadNorma
 
 // Every layer's world quads at a given pose — one entry point across all six
 // mechanism families, so the depth histogram sees the whole assembly.
-const seatQuad = (l: SceneLayer & { mech: 'dress' }, layers: readonly SceneLayer[], tL: number, tR: number): PanelQuad => {
+const seatQuad = (
+  l: SceneLayer & { parentId: string; seat: string },
+  layers: readonly SceneLayer[],
+  tL: number,
+  tR: number
+): PanelQuad => {
   const parent = layers.find((p) => p.id === l.parentId)!
   if (parent.mech === 'vfold') {
     const pose = solveVFoldPose(parent, tL, tR)
@@ -73,7 +79,7 @@ const seatQuad = (l: SceneLayer & { mech: 'dress' }, layers: readonly SceneLayer
   if (parent.mech === 'platform') {
     return solvePlatformPose(parent, tL, tR).find((p: PlatformPatch) => p.face === l.seat)!.quad
   }
-  throw new Error(`dress ${l.id}: unsupported parent ${parent.mech}`)
+  throw new Error(`${l.mech} ${l.id}: unsupported parent ${parent.mech}`)
 }
 const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR: number): PanelQuad[] => {
   switch (l.mech) {
@@ -92,6 +98,8 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     }
     case 'dress':
       return [solveDressPose(l, seatQuad(l, layers, tL, tR))]
+    case 'rotor':
+      return [solveRotorPose(l, seatQuad(l, layers, tL, tR), tL - tR)]
     case 'child': {
       const parent = layers.find((p) => p.id === l.parentId) as SceneLayer & { mech: 'vfold' }
       const pose = solveChildPose(l, solveVFoldPose(parent, tL, tR))
@@ -121,10 +129,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
 }
 
 // A dependent piece rides another's paper: children ride their parent v-fold,
-// riders their host box/platform, dress patches their seat panel. They may
-// JOIN a plane or form their own, but never BRIDGE two.
+// riders their host box/platform, dress patches and rotors their seat panel.
+// They may JOIN a plane or form their own, but never BRIDGE two.
 const isDependent = (l: SceneLayer): boolean =>
-  l.mech === 'child' || l.mech === 'rider' || l.mech === 'dress'
+  l.mech === 'child' || l.mech === 'rider' || l.mech === 'dress' || l.mech === 'rotor'
 
 const boxes = CHAPTERS.flatMap((c) =>
   c.layers.filter((l): l is SceneLayer & { mech: 'box' } => l.mech === 'box').map(

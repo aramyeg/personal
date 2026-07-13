@@ -14,6 +14,7 @@ import {
   solveRiderPose,
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/book/popup-tabpiece'
+import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 
@@ -73,7 +74,7 @@ const poseAt = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number
  *  renderer's seat resolution in popup-anatomy-layers.tsx and the A-suite's
  *  seatQuadOf in popup-mechanics.test.ts). */
 const seatQuadOf = (
-  layer: SceneLayer & { mech: 'dress' },
+  layer: SceneLayer & { parentId: string; seat: string },
   layers: readonly SceneLayer[],
   thetaL: number,
   thetaR: number
@@ -117,6 +118,8 @@ const allQuads = (
     return [pose.right, pose.left]
   }
   if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
+  if (layer.mech === 'rotor')
+    return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
@@ -238,6 +241,14 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // Smooth and branch-free (A6 continuity passes); the real-time GLOBAL_CAP
   // still holds it ~85% clear (the late bloom parks near the slow eased tail).
   kinetic: 3.9,
+  // ROTOR (D4 wave 2): a disc spinning on a moving v-fold panel. Its
+  // designed cam is early-rise (steep at closed) while its v-fold SEAT is
+  // late-bloom (steep at open), so the two peaks sit at opposite ends and the
+  // combined per-station step is quite even — measured worst 1.74x (end-seal,
+  // D-G5 measurement 2026-07-13) + ~15%. Smooth and branch-free; the real-time
+  // GLOBAL_CAP holds it ~77% clear (satchel-astrolabe's real-time step 0.0114,
+  // the early-rise cam parking the fast spin at the slow eased ease-in).
+  rotor: 2.0,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

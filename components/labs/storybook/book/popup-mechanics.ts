@@ -401,6 +401,40 @@ export type KineticArmGeom = {
   flapLen: number
 }
 
+/**
+ * PANEL ROTOR (Part D4 wave 2; Birmingham mech 76 "A TURNING DISC" + mech 103
+ * "THE HUB") — the KINETIC sibling of the dress patch. A die-cut disc riveted
+ * flat onto ONE parent panel, one glue layer proud, that ROTATES in the plane
+ * of that panel as the book opens (windmill sails, a compass rose, a clock
+ * dial). It resolves its seat exactly like a dress patch (the same seat
+ * vocabulary), but its square quad SPINS about its center by a designed cam of
+ * the dihedral. Because it lies ON its parent panel (coplanar within the glue
+ * lift at every angle), it adds NO collision footprint — the reason this
+ * variant exists. Pose math lives in book/popup-rotor.ts (this module is at
+ * its size cap). Derived + gate-checked in .superpowers/sdd/bench/derive-rotor.mjs.
+ */
+export type RotorGeom = {
+  mech: 'rotor'
+  /** id of the panel this disc rivets onto (a v-fold, box, or platform). */
+  parentId: string
+  /** Which parent surface carries the disc — the dress seat vocabulary:
+   *  'left' | 'right' for two-panel mechs, a BoxFace, a PlatformFace. */
+  seat: string
+  /** Hub position from the seat panel's bottom-left corner, along its edges
+   *  (world units) — the disc's center of rotation. */
+  u: number
+  v: number
+  /** Disc radius; rendered as a square quad of side 2*radius carrying circular
+   *  die-cut art (the alpha cutout makes it a disc). The rotating square's
+   *  corners reach radius*sqrt(2) from the hub. */
+  radius: number
+  /** Total spin from closed to rest, degrees. Capped at |150| (mech 76:
+   *  rotation = 2xE, practical E <= 75). Sign sets the turn direction. */
+  spinDeg: number
+  /** Dihedral (deg) the cam normalizes to — the book's rest bloom. Default 176. */
+  restAtDeg?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -413,6 +447,7 @@ export type LayerGeom =
   | StripFlapGeom
   | TabPieceGeom
   | KineticArmGeom
+  | RotorGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -875,6 +910,8 @@ export function solveLayerPose(
       throw new Error('storybook: dress patches ride a solved parent surface — use solveDressPose (popup-anatomy)')
     case 'tabpiece':
       throw new Error('storybook: tab pieces are multi-patch — use solveTabPiecePose (popup-tabpiece)')
+    case 'rotor':
+      throw new Error('storybook: rotors ride a solved parent surface — use solveRotorPose (popup-rotor)')
   }
 }
 

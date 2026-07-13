@@ -16,13 +16,19 @@
  *    front prints the die-cut alpha art; the back is the raw kraft underside
  *    of the same cut sheet (the art's alpha, tinted kraft, so an overhang
  *    reads as cut paper rather than a rectangular slab).
+ *
+ *  - ROTOR (`RotorPopupLayer`): the KINETIC sibling of the dress patch — the
+ *    SAME seat resolution and riding lift, but the disc quad SPINS about its
+ *    hub by a designed cam of the dihedral (popup-rotor.ts). Rides its parent
+ *    coplanar, so it casts no page-contact shadow either. Its placeholder is a
+ *    spoked disc so the rotation reads even in kraft.
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas } from '../procedural/paper-texture'
+import { makePaperCanvas, makeRotorCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import {
@@ -32,9 +38,11 @@ import {
   spreadPageAnglesTilted,
   type FanGeom,
   type DressGeom,
+  type RotorGeom,
   type PanelQuad,
 } from './popup-mechanics'
 import { solveDressPose, solvePlatformPose } from './popup-anatomy'
+import { solveRotorPose } from './popup-rotor'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
@@ -181,6 +189,114 @@ export function DressPopupLayer({
     if (!seat) return
 
     const quad = solveDressPose(layer, seat)
+    const attr = geometry.getAttribute('position') as THREE.BufferAttribute
+    const arr = attr.array as Float32Array
+    for (let i = 0; i < 4; i++) {
+      arr[i * 3] = quad[i][0]
+      arr[i * 3 + 1] = quad[i][1]
+      arr[i * 3 + 2] = quad[i][2]
+    }
+    attr.needsUpdate = true
+    geometry.computeBoundingSphere()
+  })
+
+  return (
+    <group ref={groupRef} visible={false}>
+      <mesh geometry={geometry} material={materials.front} renderOrder={0} />
+      <mesh geometry={geometry} material={materials.back} renderOrder={0} />
+    </group>
+  )
+}
+
+export function RotorPopupLayer({
+  layer,
+  layers,
+  spreadIndex,
+  frame,
+  committedSpread,
+}: {
+  layer: SceneLayer & RotorGeom
+  layers: readonly SceneLayer[]
+  spreadIndex: number
+  frame: RefObject<TurnFrame | null>
+  committedSpread: RefObject<number>
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const art = useArtTexture(layer.id)
+  const tint = useMemo(() => kraftTints(layer.id), [layer.id])
+
+  const { parent, grandParent } = useMemo(() => {
+    const p = layers.find((l) => l.id === layer.parentId)
+    const gp = p?.mech === 'child' ? layers.find((l) => l.id === p.parentId) : undefined
+    return { parent: p, grandParent: gp }
+  }, [layers, layer.parentId])
+
+  const geometry = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
+    positions.setUsage(THREE.DynamicDrawUsage)
+    g.setAttribute('position', positions)
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
+    g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
+    return g
+  }, [])
+
+  // Placeholder is a spoked DISC (not a paper square) so the spin reads before
+  // real art lands; its transparent corners keep the die-cut circular.
+  const discTexture = useMemo(() => makeCanvasTexture(makeRotorCanvas(256, 256)), [])
+  const materials = useMemo(
+    () => ({
+      front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
+      back: new THREE.MeshBasicMaterial({ side: THREE.BackSide, transparent: true, alphaTest: 0.1, color: tint.shade }),
+    }),
+    [tint]
+  )
+
+  useEffect(() => {
+    const texture = art ?? discTexture
+    if (art) {
+      art.wrapS = THREE.ClampToEdgeWrapping
+      art.wrapT = THREE.ClampToEdgeWrapping
+    }
+    materials.front.map = texture
+    materials.front.color.set(art ? '#ffffff' : tint.lit)
+    materials.back.map = texture
+    materials.back.color.set(tint.shade)
+    materials.front.needsUpdate = true
+    materials.back.needsUpdate = true
+  }, [art, discTexture, materials, tint])
+
+  useEffect(
+    () => () => {
+      geometry.dispose()
+      materials.front.dispose()
+      materials.back.dispose()
+      discTexture.dispose()
+    },
+    [geometry, materials, discTexture]
+  )
+
+  useFrame(() => {
+    const group = groupRef.current
+    if (!group) return
+    const f = frame.current
+    const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
+      f?.dir ?? null,
+      f ? easeTurnWeighted(f.t) : 0
+    )
+    const beta = thetaL - thetaR
+
+    const seat =
+      parent && role !== 'hidden' && beta > FLAT_EPSILON
+        ? solveSeatQuad(parent, grandParent, layer.seat, thetaL, thetaR)
+        : null
+    group.visible = seat !== null
+    if (!seat) return
+
+    const quad = solveRotorPose(layer, seat, beta)
     const attr = geometry.getAttribute('position') as THREE.BufferAttribute
     const arr = attr.array as Float32Array
     for (let i = 0; i < 4; i++) {

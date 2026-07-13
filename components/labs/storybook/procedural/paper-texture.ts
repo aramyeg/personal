@@ -286,6 +286,58 @@ export function makeTabGripCanvas(w = 64, h = 160): HTMLCanvasElement {
 }
 
 /**
+ * Panel-rotor placeholder disc (D4 wave 2): a circular die-cut on a
+ * TRANSPARENT square so the rotor reads as a spinning disc, not a rotating
+ * square, even before real art lands. The rotor renderer spins the whole
+ * quad, so a disc with radial spokes + a hub makes the rotation legible
+ * (windmill sails / compass rose / clock face). Drawn only inside the circle,
+ * so the corners stay transparent under the material's alphaTest. Tinted with
+ * the piece's own kraft stock by the renderer (base white here).
+ */
+export function makeRotorCanvas(w = 256, h = 256): HTMLCanvasElement {
+  assertBrowser('makeRotorCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+  const cx = w / 2
+  const cy = h / 2
+  const R = Math.min(w, h) * 0.46
+
+  // The disc face.
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.arc(cx, cy, R, 0, Math.PI * 2)
+  ctx.fill()
+
+  // A darker rim ring so the disc edge reads as a cut circle.
+  ctx.strokeStyle = 'rgba(58, 40, 20, 0.5)'
+  ctx.lineWidth = Math.max(2, R * 0.05)
+  ctx.beginPath()
+  ctx.arc(cx, cy, R * 0.94, 0, Math.PI * 2)
+  ctx.stroke()
+
+  // Radial spokes — the thing that makes the spin visible. Eight arms with a
+  // single longer "pointer" (a compass north / a clock hand) so the rotation
+  // has an unambiguous heading.
+  ctx.strokeStyle = 'rgba(58, 40, 20, 0.42)'
+  ctx.lineWidth = Math.max(1.5, R * 0.035)
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 - Math.PI / 2
+    const reach = i === 0 ? 0.86 : 0.7
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(cx + Math.cos(ang) * R * reach, cy + Math.sin(ang) * R * reach)
+    ctx.stroke()
+  }
+
+  // The hub (mech 103's rivet).
+  ctx.fillStyle = 'rgba(58, 40, 20, 0.6)'
+  ctx.beginPath()
+  ctx.arc(cx, cy, R * 0.12, 0, Math.PI * 2)
+  ctx.fill()
+
+  return canvas
+}
+
+/**
  * Stack-edge stripe canvas: the cut edges of a fanned page stack, one
  * horizontal stripe per sheet from the BOTTOM of the canvas up (v=0 is the
  * valley floor under three's flipY). Each stripe is aged paper washed with

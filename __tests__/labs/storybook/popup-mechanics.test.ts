@@ -33,6 +33,7 @@ import {
   tabPieceTabOut,
   TAB_LIP,
 } from '@/components/labs/storybook/book/popup-tabpiece'
+import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
@@ -59,10 +60,11 @@ const parentOf = (layer: SceneLayer, layers: readonly SceneLayer[]): SceneLayer 
 const poseAt = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number, thetaR: number) =>
   solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
 
-/** A dress patch's seat quad, re-solved from its parent (mirrors the
- *  renderer's seat resolution in popup-anatomy-layers.tsx). */
+/** A dress patch's or rotor's seat quad, re-solved from its parent (mirrors
+ *  the renderer's seat resolution in popup-anatomy-layers.tsx). Both mechs
+ *  carry the same `parentId` + `seat` vocabulary. */
 const seatQuadOf = (
-  layer: SceneLayer & { mech: 'dress' },
+  layer: SceneLayer & { parentId: string; seat: string },
   layers: readonly SceneLayer[],
   thetaL: number,
   thetaR: number
@@ -107,6 +109,8 @@ const allQuads = (
     return [pose.right, pose.left]
   }
   if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
+  if (layer.mech === 'rotor')
+    return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
@@ -146,8 +150,9 @@ const flatTol = (layer: SceneLayer): number => {
   if (layer.mech === 'fan') return layer.members.some((m) => (m.skewDeg ?? 0) !== 0) ? 1e-5 : 1e-9
   // A dress patch is a SECOND sheet glued atop its link: it flattens to its
   // parent's plane plus the glue-layer lift (DRESS_LIFT 0.003 — well inside
-  // paper thickness 0.02).
-  if (layer.mech === 'dress') return 0.004
+  // paper thickness 0.02). A rotor rivets on the same way (ROTOR_LIFT 0.003),
+  // and its spin is exactly 0 at closed, so it flattens to the same tolerance.
+  if (layer.mech === 'dress' || layer.mech === 'rotor') return 0.004
   // Tab pieces close through an exact cam zero (a = 0 at beta = 0).
   return 1e-9 // symmetric v-folds, boxes, tab pieces: analytically exact
 }
@@ -184,10 +189,17 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         expect(rest.apex[1]).toBeGreaterThan(0.05)
         return
       }
-      if (layer.mech === 'platform' || layer.mech === 'fan' || layer.mech === 'rider' || layer.mech === 'dress') {
+      if (
+        layer.mech === 'platform' ||
+        layer.mech === 'fan' ||
+        layer.mech === 'rider' ||
+        layer.mech === 'dress' ||
+        layer.mech === 'rotor'
+      ) {
         // Anatomy-phase mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
-        // rider mount rule, dress seat existence).
+        // rider mount rule, dress seat existence, rotor cam + fit) and the
+        // composition covenant (rotor spin cap / seat legality).
         return
       }
       if (layer.mech === 'stripflap') {
@@ -265,9 +277,15 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
 describe('A1 glue coherence — glue edges lie in their host surface at every angle', () => {
   it('page-glued pieces keep their bottom edges in the page planes', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
-      // children, riders, and dress patches glue to PAPER, not pages —
+      // children, riders, dress patches, and rotors glue to PAPER, not pages —
       // their glue coherence is tested against their parents instead.
-      if (layer.mech === 'child' || layer.mech === 'rider' || layer.mech === 'dress') continue
+      if (
+        layer.mech === 'child' ||
+        layer.mech === 'rider' ||
+        layer.mech === 'dress' ||
+        layer.mech === 'rotor'
+      )
+        continue
       for (let i = 0; i <= 72; i++) {
         const thetaR = 0
         const thetaL = (i / 72) * Math.PI
@@ -474,10 +492,15 @@ describe('A6 continuity — no jumps, no branch flips', () => {
       // backdrop's far corner — bounded, since rho > phi keeps the linkage
       // strictly inside its reachability margin). Children COMPOUND their
       // parent's bloom with their own (the parent's panel dihedral is
-      // their driving angle), so their ceiling doubles — riders and dress
-      // patches ride mechanisms the same way. A branch flip would displace
+      // their driving angle), so their ceiling doubles — riders, dress
+      // patches, and rotors ride mechanisms the same way (a rotor adds its
+      // own spin on top of the seat's motion). A branch flip would displace
       // corners by ~0.1-1.0 in a single step.
-      const compound = layer.mech === 'child' || layer.mech === 'rider' || layer.mech === 'dress'
+      const compound =
+        layer.mech === 'child' ||
+        layer.mech === 'rider' ||
+        layer.mech === 'dress' ||
+        layer.mech === 'rotor'
       const bound = compound ? (16 * Math.PI) / steps : (8 * Math.PI) / steps
       let prev = allCorners(layer, layers, 0, 0)
       for (let i = 1; i <= steps; i++) {
@@ -681,12 +704,13 @@ describe('A9 rest-pose separation — pieces clear each other, spread by spread'
       // stays inside the parent's convex panel wedge (same argument as
       // A10's page wedge). Child-parent pairs are therefore excluded;
       // every other pair is a real separation requirement.
-      // Riders and dress patches touch their parents by design too: rider
-      // glue edges lie IN the parent's lid/deck planes, a dress sits one
-      // glue layer (0.003) off its link — same convexity argument.
+      // Riders, dress patches, and rotors touch their parents by design too:
+      // rider glue edges lie IN the parent's lid/deck planes, a dress sits one
+      // glue layer (0.003) off its link, a rotor rivets coplanar one lift off
+      // its panel — same convexity argument.
       const glued = new Set<string>()
       layers.forEach((l, idx) => {
-        if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress') return
+        if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress' && l.mech !== 'rotor') return
         const p = layers.findIndex((c) => c.id === l.parentId)
         glued.add(`${idx}:${p}`)
         glued.add(`${p}:${idx}`)
@@ -769,7 +793,7 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
   const gluedOf = (layers: readonly SceneLayer[]): Set<string> => {
     const glued = new Set<string>()
     layers.forEach((l, idx) => {
-      if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress') return
+      if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress' && l.mech !== 'rotor') return
       const p = layers.findIndex((c) => c.id === l.parentId)
       glued.add(`${idx}:${p}`)
       glued.add(`${p}:${idx}`)
@@ -874,12 +898,12 @@ describe('A10 wedge containment — paper never pokes through either bounding pa
           for (const p of allCorners(layer, layers, thetaL, thetaR)) {
             const r = Math.hypot(p[0], p[1])
             if (r < 1e-9) continue // on the spine
-            // A dress patch is a sheet stacked on another sheet: its glue-
-            // layer lift (0.003) may sit inside the closing sandwich, which
-            // a zero-thickness wedge reads as penetration. Allow it in
+            // A dress patch or rotor is a sheet stacked on another sheet: its
+            // glue-layer lift (0.003) may sit inside the closing sandwich,
+            // which a zero-thickness wedge reads as penetration. Allow it in
             // LINEAR terms (4mm against paper thickness 0.02); everything
             // else keeps the strict angular tolerance.
-            const slackAng = layer.mech === 'dress' ? 0.004 / r : 1e-6
+            const slackAng = layer.mech === 'dress' || layer.mech === 'rotor' ? 0.004 / r : 1e-6
             // atan2 jumps to -PI for points on the flat left page whose y
             // carries -0/-1e-17 float noise; lift those into [0, 2PI) so a
             // corner exactly on a page plane isn't a false violation.

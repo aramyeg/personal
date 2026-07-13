@@ -4,10 +4,41 @@ import {
   EXTRA_SPREAD_LAYERS,
   type SceneLayer,
 } from '@/components/labs/storybook/content'
-import { strutClosedReach } from '@/components/labs/storybook/book/popup-anatomy'
+import { solvePlatformPose, strutClosedReach } from '@/components/labs/storybook/book/popup-anatomy'
 import { tabPieceFlatSpan } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveKineticArmPose, kineticArmFlatReach } from '@/components/labs/storybook/book/popup-kinetic'
+import { rotorSweptRadius } from '@/components/labs/storybook/book/popup-rotor'
+import {
+  solveBoxPose,
+  solveVFoldPose,
+  type PanelQuad,
+} from '@/components/labs/storybook/book/popup-mechanics'
 import { PAGE_W, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
+
+/** The [u-edge, v-edge] lengths of a rotor/dress seat panel at full open —
+ *  the bounds a spin-swept disc must fit within at its anchor. */
+const seatPanelDims = (
+  parent: SceneLayer,
+  seat: string
+): readonly [number, number] | null => {
+  const edges = (q: PanelQuad): readonly [number, number] => [
+    Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1], q[1][2] - q[0][2]),
+    Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1], q[3][2] - q[0][2]),
+  ]
+  if (parent.mech === 'vfold') {
+    const pose = solveVFoldPose(parent, Math.PI, 0)
+    return edges(seat === 'left' ? pose.left : pose.right)
+  }
+  if (parent.mech === 'box') {
+    const patch = solveBoxPose(parent, Math.PI, 0).find((p) => p.face === seat)
+    return patch ? edges(patch.quad) : null
+  }
+  if (parent.mech === 'platform') {
+    const patch = solvePlatformPose(parent, Math.PI, 0).find((p) => p.face === seat && p.bay === 0)
+    return patch ? edges(patch.quad) : null
+  }
+  return null
+}
 
 // The volumetric composition covenant, RAISED to Part C v2 (benchmark spec
 // 2026-07-11, "raised acceptance"). The box-era premise is inverted: real
@@ -52,6 +83,9 @@ const familyOf = (l: SceneLayer): string | null => {
     case 'tabpiece':
       return 'tabpiece'
     case 'kinetic':
+    case 'rotor':
+      // The rotor is the kinetic family's SECOND form (a spinning disc rather
+      // than a sweeping arm) — both are page-driven image-animating folds.
       return 'kinetic'
     case 'dress':
       return null
@@ -286,6 +320,47 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         // each patch stays within the die-cut bound (overhang allowed, sprawl not)
         expect(l.width).toBeLessThanOrEqual(0.35)
         expect(l.height).toBeLessThanOrEqual(0.35)
+      }
+    }
+  })
+
+  it('rotor validity: parent resolves in-spread, seat legal, spin capped at 150, decorative role', () => {
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'rotor') continue
+        const label = `${name} ${l.id}`
+        const parent = layers.find((p) => p.id === l.parentId)
+        expect(parent, `${label} rotor parent ${l.parentId} not in spread`).toBeDefined()
+        if (!parent) continue
+        const legal =
+          parent.mech === 'vfold'
+            ? VFOLD_SEATS
+            : parent.mech === 'box'
+              ? BOX_FACES
+              : parent.mech === 'platform'
+                ? PLATFORM_FACES
+                : new Set<string>()
+        expect(legal.has(l.seat), `${label} seat '${l.seat}' is not legal for a ${parent.mech} parent`).toBe(true)
+        // mechanism 76 caps the turn at 2xE with E <= 75 -> |spin| <= 150.
+        expect(Math.abs(l.spinDeg), `${label} spin exceeds the mech-76 cap`).toBeLessThanOrEqual(150)
+        // a real, visible disc (radius > 0) that isn't a sprawling slab
+        expect(l.radius, label).toBeGreaterThan(0)
+        expect(l.radius, label).toBeLessThanOrEqual(0.25)
+        // the spin-swept circumcircle (radius*sqrt(2) from the hub) fits
+        // inside the parent panel at the anchor — the disc never spins its
+        // corners off its own seat.
+        const dims = seatPanelDims(parent, l.seat)
+        expect(dims, `${label} could not resolve its seat panel`).not.toBeNull()
+        if (dims) {
+          const reach = rotorSweptRadius(l)
+          expect(l.u - reach, `${label} spins off the panel's spine edge`).toBeGreaterThanOrEqual(0)
+          expect(l.u + reach, `${label} spins off the panel's fore edge`).toBeLessThanOrEqual(dims[0])
+          expect(l.v - reach, `${label} spins off the panel's bottom edge`).toBeGreaterThanOrEqual(0)
+          expect(l.v + reach, `${label} spins off the panel's top edge`).toBeLessThanOrEqual(dims[1])
+        }
+        // a spinning disc is decorative kinetic scenery, never a story piece
+        // on its own (the C1v2 census forbids non-assembly story mechs).
+        expect(l.role === 'scenery' || l.role === 'figure', `${label} rotor role must be scenery/figure`).toBe(true)
       }
     }
   })
