@@ -20,7 +20,9 @@ describe('adapters', () => {
   it('maps every manifest lab to a room row with resolved href', () => {
     const rows = getRoomRows()
     expect(rows).toHaveLength(labs.length)
-    expect(rows.find((r) => r.slug === 'main')?.href).toBe('/')
+    // museum-at-root: the Classic Claude room links to /classic-claude — a
+    // room row pointing at / would circularly link back to the museum itself
+    expect(rows.find((r) => r.slug === 'main')?.href).toBe('/classic-claude')
     expect(rows.find((r) => r.slug === 'xp')?.href).toBe('/labs/xp')
   })
   it('maps every experience to a personnel row', () => {

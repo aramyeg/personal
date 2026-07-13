@@ -21,7 +21,7 @@ describe('RoomsModule', () => {
     render(<RoomsModule />)
     const links = screen.getAllByRole('link', { name: /open/i })
     expect(links).toHaveLength(labs.length)
-    expect(links.map((l) => l.getAttribute('href'))).toContain('/')
+    expect(links.map((l) => l.getAttribute('href'))).toContain('/classic-claude')
   })
   it('gives every row action a distinct accessible name', () => {
     render(<RoomsModule />)
