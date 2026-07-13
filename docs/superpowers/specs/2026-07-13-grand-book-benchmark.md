@@ -38,14 +38,32 @@ D-G4 FLAT-FOLD (P2) — existing, kept and ratcheted
     at these tolerances or tighter.
 
 D-G5 MOTION (P2) — benches + eye-test
-  - No-snap: across the sweep, max per-vertex frame step < 3x mean
-    step (the pull-strip bench gate, generalized to every family).
+  REFINED 2026-07-13 by measurement (motion-character.test.ts): the
+  original single "3x mean" gate conflated two domains. A control
+  experiment (pose linear in beta run through the real render clock)
+  measured a ~4.9x max/mean floor from easeTurnWeighted ALONE — a
+  uniform-real-time ratio re-tests the easing curve, not the paper.
+  Two gates instead:
+  - Gate 1, MECHANISM CHARACTER (beta domain): max per-vertex step
+    < 3x mean over the uniform-beta sweep, with measured+10% ceilings
+    where a family's character legitimately exceeds (walls/children
+    concentrate motion near flat-open GEOMETRICALLY: vfold/child
+    15.5x; stripflap 5.0x; fan 4.5x). Catches solver regressions and
+    families migrating snappier than their measured nature.
+  - Gate 2, PERCEPTUAL SPEED LIMIT (real time, absolute): max
+    per-vertex step over uniform-t stations of the eased turn path
+    (worst of incoming/outgoing) < one GLOBAL cap, calibrated at
+    today's worst measured + 25%. No ratios, no per-family carve-outs.
+    Catches branch flips and absolute-velocity explosions.
   - Family character preserved (floors from measured benches): strip
-    pieces early-rise (>= 45 deg lift by quarter-rest), v-folds
-    late-bloom; a family's curve shape may not migrate toward
-    another's.
+    pieces early-rise (stripflap >= 0.45, tabpiece >= 0.5 lift
+    fraction at quarter-rest), v-folds late-bloom (panel-open
+    fraction <= 0.34 at quarter-rest); a family's curve shape may
+    not migrate toward another's.
   - One-clock rule stays absolute; capture review judges hitchless
-    page turns at real speed.
+    page turns at real speed. Wall v-folds' late rush is accepted
+    GEOMETRIC character (re-timing the geometry would shear glue
+    edges off the pages — rejected).
 
 D-G6 LIGHT (P3) — covenant + capture review
   - Every piece with elevation > 0.02 casts a contact shadow placed

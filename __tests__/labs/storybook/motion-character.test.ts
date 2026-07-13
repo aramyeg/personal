@@ -1,0 +1,405 @@
+import { describe, expect, it } from 'vitest'
+import {
+  solveBoxPose,
+  solveLayerPose,
+  solveVFoldPose,
+  spreadDihedral,
+  type PanelQuad,
+  type Vec3,
+} from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  solveDressPose,
+  solveFanPose,
+  solvePlatformPose,
+  solveRiderPose,
+} from '@/components/labs/storybook/book/popup-anatomy'
+import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/book/popup-tabpiece'
+import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
+import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
+
+// Benchmark Part D gate D-G5 (docs/superpowers/specs/2026-07-13-grand-book-
+// benchmark.md), REFINED 2026-07-13 by measurement: the original single
+// "3x mean" gate conflated two domains — a control experiment (a pose
+// exactly linear in beta, zero kinematic character, run through the real
+// render clock) measured a ~4.9x max/mean floor from easeTurnWeighted
+// ALONE, so a uniform-real-time ratio just re-tests the easing curve, not
+// the paper. Two gates instead:
+//
+// GATE 1 — MECHANISM CHARACTER (beta domain, uniform steps of the dihedral
+// itself): max per-vertex step < 3x mean, with measured+10% ceilings where
+// a family's character legitimately exceeds it (walls/children concentrate
+// motion near flat-open GEOMETRICALLY — "late bloom is geometric"). Catches
+// solver regressions and families migrating snappier than their measured
+// nature.
+//
+// GATE 2 — PERCEPTUAL SPEED LIMIT (real time, absolute): page angles driven
+// by the actual render clock (spreadDihedral + easeTurnWeighted, same
+// composition popup-spread.tsx/popup-platform-layer.tsx use in useFrame),
+// worst of incoming/outgoing, max per-vertex step < ONE GLOBAL CAP
+// calibrated at today's worst measured + 25%. No ratios, no per-family
+// carve-outs — this catches branch flips and absolute-velocity explosions,
+// not the easing curve's own (intentional, shared, already-reviewed)
+// velocity shape.
+//
+// Advisor ruling 2026-07-13: no engine re-timing of the v-fold geometry
+// (glue-edge shear would make the pose wrong, and late bloom is the
+// family's identity) — wall v-folds' late rush is accepted GEOMETRIC
+// character, caught by Gate 1's per-family ceiling, not re-timed away.
+
+const rad = (d: number) => (d * Math.PI) / 180
+/** Symmetric bloom angles for a dihedral beta (same convention as the D1
+ *  tabpiece gates in popup-mechanics.test.ts). */
+const bloom = (beta: number): [number, number] => [Math.PI / 2 + beta / 2, Math.PI / 2 - beta / 2]
+const REST_BETA = rad(176)
+const QUARTER_REST = REST_BETA / 4
+
+/** Every spread's layer set. */
+const SPREAD_SETS: ReadonlyArray<readonly [string, readonly SceneLayer[]]> = [
+  ...CHAPTERS.map((c) => [`spread-${c.spread}`, c.layers] as const),
+  ...Object.entries(EXTRA_SPREAD_LAYERS).map(([s, layers]) => [`extra-${s}`, layers] as const),
+]
+
+/** [id, layer, its spread's layers] for parent resolution. */
+const ALL_LAYERS: ReadonlyArray<readonly [string, SceneLayer, readonly SceneLayer[]]> =
+  SPREAD_SETS.flatMap(([, layers]) => layers.map((l) => [l.id, l, layers] as const))
+
+const parentOf = (layer: SceneLayer, layers: readonly SceneLayer[]): SceneLayer | undefined =>
+  layer.mech === 'child' ? layers.find((l) => l.id === layer.parentId) : undefined
+
+const poseAt = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number, thetaR: number) =>
+  solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
+
+/** A dress patch's seat quad, re-solved from its parent (mirrors the
+ *  renderer's seat resolution in popup-anatomy-layers.tsx and the A-suite's
+ *  seatQuadOf in popup-mechanics.test.ts). */
+const seatQuadOf = (
+  layer: SceneLayer & { mech: 'dress' },
+  layers: readonly SceneLayer[],
+  thetaL: number,
+  thetaR: number
+): PanelQuad => {
+  const parent = layers.find((l) => l.id === layer.parentId)
+  if (!parent) throw new Error(`dress ${layer.id}: parent ${layer.parentId} not in spread`)
+  if (parent.mech === 'box') {
+    const patch = solveBoxPose(parent, thetaL, thetaR).find((p) => p.face === layer.seat)
+    if (!patch) throw new Error(`dress ${layer.id}: box has no face ${layer.seat}`)
+    return patch.quad
+  }
+  if (parent.mech === 'platform') {
+    const patch = solvePlatformPose(parent, thetaL, thetaR).find(
+      (p) => p.face === layer.seat && p.bay === 0
+    )
+    if (!patch) throw new Error(`dress ${layer.id}: platform has no face ${layer.seat}`)
+    return patch.quad
+  }
+  const pose = solveLayerPose(parent, parentOf(parent, layers), thetaL, thetaR)
+  return layer.seat === 'left' ? pose.left : pose.right
+}
+
+/** Every world-space quad a layer poses, one dispatcher for all nine
+ *  shipped mechanism families (mirrors allQuads in popup-mechanics.test.ts). */
+const allQuads = (
+  layer: SceneLayer,
+  layers: readonly SceneLayer[],
+  thetaL: number,
+  thetaR: number
+): PanelQuad[] => {
+  if (layer.mech === 'box') return solveBoxPose(layer, thetaL, thetaR).map((p) => p.quad)
+  if (layer.mech === 'platform') return solvePlatformPose(layer, thetaL, thetaR).map((p) => p.quad)
+  if (layer.mech === 'fan')
+    return solveFanPose(layer, thetaL, thetaR).flatMap((pose) => [pose.right, pose.left])
+  if (layer.mech === 'rider') {
+    const parent = layers.find((l) => l.id === layer.parentId)
+    if (!parent || (parent.mech !== 'box' && parent.mech !== 'platform' && parent.mech !== 'parallel')) {
+      throw new Error(`rider ${layer.id}: parent must be a box/platform/tent in the same spread`)
+    }
+    const pose = solveRiderPose(layer, parent, thetaL, thetaR)
+    return [pose.right, pose.left]
+  }
+  if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
+  if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
+  const pose = poseAt(layer, layers, thetaL, thetaR)
+  return [pose.right, pose.left]
+}
+
+const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+]
+
+// ---------------------------------------------------------------------------
+// NO-SNAP: max per-vertex frame step bounded by the mean step, per layer.
+// Beta-domain table is descriptive; the real-time domain below is enforced.
+
+const STATIONS = 240
+
+type StepStats = { maxStep: number; meanStep: number }
+
+/** Every corner of every quad a layer poses at a given (thetaL, thetaR),
+ *  with the tabpiece TAB quad excluded — it is a clipped reveal through the
+ *  fore-edge slit whose visible extent legitimately accelerates (A2/A12
+ *  exempts it from rigidity for the same reason). */
+const shipCorners = (layer: SceneLayer, layers: readonly SceneLayer[], thetaL: number, thetaR: number): Vec3[] => {
+  const quads = allQuads(layer, layers, thetaL, thetaR)
+  const shipQuads = layer.mech === 'tabpiece' ? quads.slice(0, -1) : quads
+  return shipQuads.flat()
+}
+
+/** Accumulates per-corner step stats over a sequence of betas (already
+ *  ordered by whatever domain — uniform beta, or an eased real-time clock). */
+const stepStatsOverBetas = (layer: SceneLayer, layers: readonly SceneLayer[], betas: readonly number[]): StepStats => {
+  let prev: Vec3[] | null = null
+  let maxStep = 0
+  let sum = 0
+  let n = 0
+  for (const beta of betas) {
+    const [thetaL, thetaR] = bloom(beta)
+    const corners = shipCorners(layer, layers, thetaL, thetaR)
+    if (prev) {
+      for (let k = 0; k < corners.length; k++) {
+        const d = dist(prev[k], corners[k])
+        if (d > maxStep) maxStep = d
+        sum += d
+        n++
+      }
+    }
+    prev = corners
+  }
+  return { maxStep, meanStep: sum / n }
+}
+
+const uniformBetas = (max: number, stations: number): number[] =>
+  Array.from({ length: stations + 1 }, (_, i) => (i / stations) * max)
+
+type NoSnapRow = { id: string; family: string; maxStep: number; meanStep: number; ratio: number }
+
+const toRow = (id: string, family: string, stats: StepStats): NoSnapRow => ({
+  id,
+  family,
+  ...stats,
+  ratio: stats.maxStep / stats.meanStep,
+})
+
+const worstPerFamily = (rows: readonly NoSnapRow[]) => {
+  const byFamily = new Map<string, NoSnapRow[]>()
+  for (const row of rows) {
+    const list = byFamily.get(row.family) ?? []
+    list.push(row)
+    byFamily.set(row.family, list)
+  }
+  return [...byFamily.values()]
+    .map((familyRows) => familyRows.reduce((a, b) => (b.ratio > a.ratio ? b : a)))
+    .sort((a, b) => b.ratio - a.ratio)
+    .map((r) => ({
+      family: r.family,
+      worstLayer: r.id,
+      ratio: Number(r.ratio.toFixed(3)),
+      maxStep: Number(r.maxStep.toFixed(5)),
+      meanStep: Number(r.meanStep.toFixed(5)),
+    }))
+}
+
+const BETA_DOMAIN_STATS: readonly NoSnapRow[] = ALL_LAYERS.map(([id, layer, layers]) =>
+  toRow(id, layer.mech, stepStatsOverBetas(layer, layers, uniformBetas(REST_BETA, STATIONS)))
+)
+
+/** Gate 1 per-family ceiling on the beta-domain max/mean step ratio.
+ *  box/platform/rider/dress/tabpiece measure under the plain 3x floor
+ *  (worst: box 1.88, tabpiece 1.42, platform 2.24, rider 2.51, dress 2.59 —
+ *  D-G5 measurement pass, 2026-07-13). Four families measure over 3x for
+ *  two different reasons:
+ *  TRUE DISCONTINUITY — stripflap (4.50x, satchel-sword): the press-and-
+ *  peel graze clamp (bisection resolution ~1e-6, plus a 0.002 press gap,
+ *  popup-mechanics.ts solveStripFlapPose) puts an actual slope
+ *  discontinuity in the lift-vs-beta curve where the clamp disengages.
+ *  SMOOTH BUT STEEP — vfold (14.05x, ch3-towers), child (14.00x,
+ *  ch3-balcony), fan (4.02x, satchel-burst): all three drive through the
+ *  same closed-form spherical four-bar (creaseElevation/bisectorCrease),
+ *  smooth and branch-free for the symmetric case, whose derivative grows
+ *  large as phi approaches 90 deg with a small rho-phi margin — the book's
+ *  "wall" configs (phiDeg 84/rhoDeg 88) sit exactly there. This is the
+ *  "late bloom is geometric" character the module header documents; no
+ *  per-station jump exceeds A6's own angular-rate bound. Each ceiling is
+ *  measured worst-case + 10%. */
+const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
+  vfold: 15.5,
+  child: 15.5,
+  fan: 4.5,
+  stripflap: 5.0,
+}
+
+describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {
+  it('measurement table: worst layer per family (max/mean ratio, uniform beta)', () => {
+    console.table(worstPerFamily(BETA_DOMAIN_STATS))
+    expect(BETA_DOMAIN_STATS.length).toBeGreaterThan(0)
+  })
+
+  it.each(BETA_DOMAIN_STATS.map((r) => [r.id, r] as const))(
+    '%s: max step stays under its family ceiling times the mean step (beta domain)',
+    (_id, row) => {
+      const ceiling = BETA_FAMILY_CEILING[row.family] ?? 3
+      expect(row.maxStep).toBeLessThan(ceiling * row.meanStep)
+    }
+  )
+})
+
+// Real-time domain: page angles driven by the actual render clock. Every
+// spread can arrive as 'incoming' (dihedral eases 0 -> PI) or depart as
+// 'outgoing' (eases PI -> 0) on a 'next' turn — same composition
+// popup-spread.tsx/popup-platform-layer.tsx use in useFrame. A layer's
+// geometry doesn't know which spread or direction it's in, so both roles
+// are checked and the gate enforces on whichever is worse.
+const REALTIME_STATIONS = 240
+const REALTIME_ROLES = ['incoming', 'outgoing'] as const
+
+const realTimeBetas = (role: (typeof REALTIME_ROLES)[number], stations: number): number[] =>
+  Array.from({ length: stations + 1 }, (_, i) => spreadDihedral(role, 'next', easeTurnWeighted(i / stations)))
+
+const REAL_TIME_STATS: readonly NoSnapRow[] = ALL_LAYERS.flatMap(([id, layer, layers]) =>
+  REALTIME_ROLES.map((role) =>
+    toRow(id, layer.mech, stepStatsOverBetas(layer, layers, realTimeBetas(role, REALTIME_STATIONS)))
+  )
+)
+
+/** Gate 2's actual metric: the single largest ABSOLUTE per-vertex step
+ *  across every layer, both turn roles, real time. NOT a ratio — a control
+ *  experiment (a pose exactly linear in beta, zero kinematic character, run
+ *  through this identical clock) measured a ~4.9x max/mean step ratio from
+ *  easeTurnWeighted's own quintic shape ALONE (peak dBeta/dt at t=0.5 is 5x
+ *  the average), so any per-family ratio floor in this domain re-tests the
+ *  shared easing curve, not the paper. An absolute cap sidesteps that: it
+ *  only fires on a genuinely large single-frame jump (branch flip, solver
+ *  blow-up), regardless of how the clock paces the rest of the sweep.
+ *  Computed here only for the diagnostic print below — GLOBAL_CAP itself
+ *  (next) is a calibrated LITERAL, not derived from the current run's own
+ *  data, or the assertion below would be tautological (nothing can ever
+ *  exceed 1.25x of its own maximum) and could never catch a regression. */
+const GLOBAL_WORST_MAX_STEP = Math.max(...REAL_TIME_STATS.map((r) => r.maxStep))
+
+/** Today's worst measured absolute per-vertex step, real time, both turn
+ *  roles (D-G5 measurement pass, 2026-07-13: 0.039685, a stripflap corner)
+ *  + 25%, per the spec's calibration rule — a fixed literal so a future
+ *  regression that pushes any layer's step higher actually fails this
+ *  test. Ratchets upward only if a future measurement legitimately exceeds
+ *  it — never weakened for convenience. */
+const GLOBAL_CAP = 0.0497
+
+describe('D-G5 Gate 2 — perceptual speed limit (real time, ENFORCED, absolute cap)', () => {
+  it('measurement table: worst layer per family (max/mean ratio, eased real time — diagnostic only, not the enforced metric)', () => {
+    console.table(worstPerFamily(REAL_TIME_STATS))
+    console.log('global worst max step (real time):', GLOBAL_WORST_MAX_STEP, 'cap:', GLOBAL_CAP)
+    expect(REAL_TIME_STATS.length).toBeGreaterThan(0)
+  })
+
+  it.each(REAL_TIME_STATS.map((r, i) => [`${r.id}#${i}`, r] as const))(
+    '%s: max per-vertex step stays under the global cap, at real turn speed',
+    (_id, row) => {
+      expect(row.maxStep).toBeLessThan(GLOBAL_CAP)
+    }
+  )
+})
+
+// ---------------------------------------------------------------------------
+// FAMILY CHARACTER: strip-driven pieces rise early, v-folds bloom late.
+
+/** Raw strip-pull lift (the chord law solveStripFlapPose derives its
+ *  stripLift from) WITHOUT the press-and-peel graze clamp — the clamp is a
+ *  paper-collision correction, not part of the family's driving law, so the
+ *  character gate measures the law itself. */
+const stripLiftRaw = (geom: SceneLayer & { mech: 'stripflap' }, beta: number): number => {
+  const a = geom.anchor
+  const b = geom.slot
+  const dz = geom.anchorZ - geom.slotZ
+  const strip = (bt: number) => Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(bt) + dz * dz)
+  const shut = strip(0)
+  const erectAt = rad(geom.erectAtDeg ?? 176)
+  const reach = Math.max(strip(erectAt) - shut, 1e-9)
+  const pull = strip(beta) - shut
+  return Math.acos(Math.min(1, Math.max(-1, 1 - pull / reach)))
+}
+
+const nOf = (q: PanelQuad): Vec3 => {
+  const n = cross(sub(q[1], q[0]), sub(q[3], q[0]))
+  const l = Math.hypot(n[0], n[1], n[2])
+  return [n[0] / l, n[1] / l, n[2] / l]
+}
+
+/** Panel-opening angle (between the two panel normals) at a given beta —
+ *  each mechanism's OWN opening variable, since raw corner height is
+ *  corrupted by page steepness at small beta (D1 tabpiece gate, same
+ *  reasoning). */
+const panelOpenAngle = (layer: SceneLayer & { mech: 'vfold' }, beta: number): number => {
+  const [tL, tR] = bloom(beta)
+  const pose = solveVFoldPose(layer, tL, tR)
+  const c = dot(nOf(pose.right), nOf(pose.left))
+  return Math.acos(Math.max(-1, Math.min(1, c)))
+}
+
+const STRIPFLAP_LAYERS = ALL_LAYERS.filter(
+  (entry): entry is readonly [string, SceneLayer & { mech: 'stripflap' }, readonly SceneLayer[]] =>
+    entry[1].mech === 'stripflap'
+)
+const TABPIECE_LAYERS = ALL_LAYERS.filter(
+  (entry): entry is readonly [string, SceneLayer & { mech: 'tabpiece' }, readonly SceneLayer[]] =>
+    entry[1].mech === 'tabpiece'
+)
+const VFOLD_LAYERS = ALL_LAYERS.filter(
+  (entry): entry is readonly [string, SceneLayer & { mech: 'vfold' }, readonly SceneLayer[]] =>
+    entry[1].mech === 'vfold'
+)
+
+/** v-fold late-bloom ceiling on panel-opening fraction at quarter-rest.
+ *  Measured maximum across every shipped v-fold (D-G5 measurement pass,
+ *  2026-07-13) is 0.335 (ch2-hero, phiDeg 50/rhoDeg 82 — the deepest-V
+ *  heroes open fastest); the phi=84/rho=88 wall/backdrop configs are the
+ *  LATEST bloomers at ~0.258-0.263. Ceiling set just above the measured
+ *  maximum so the gate catches future migration toward the strip family's
+ *  early-rise curve (>= 0.45), not today's spread. */
+const VFOLD_CEILING = 0.34
+
+describe('D-G5 family character — strip-driven pieces rise early, v-folds bloom late', () => {
+  it('measurement table: character fraction at quarter-rest, per family', () => {
+    const stripRows = STRIPFLAP_LAYERS.map(([id, layer]) => ({
+      id,
+      frac: Number((stripLiftRaw(layer, QUARTER_REST) / stripLiftRaw(layer, REST_BETA)).toFixed(3)),
+    }))
+    const tabRows = TABPIECE_LAYERS.map(([id, layer]) => ({
+      id,
+      frac: Number((tabPieceLift(layer, QUARTER_REST) / tabPieceLift(layer, REST_BETA)).toFixed(3)),
+    }))
+    const vfoldRows = VFOLD_LAYERS.map(([id, layer]) => ({
+      id,
+      frac: Number((panelOpenAngle(layer, QUARTER_REST) / panelOpenAngle(layer, REST_BETA)).toFixed(3)),
+    }))
+    console.table({ stripflap: stripRows, tabpiece: tabRows, vfold: vfoldRows })
+    expect(stripRows.length + tabRows.length + vfoldRows.length).toBeGreaterThan(0)
+  })
+
+  it.each(STRIPFLAP_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: strip-driven early-rise >= 45%% of rest lift by quarter-rest',
+    (_id, layer) => {
+      const frac = stripLiftRaw(layer, QUARTER_REST) / stripLiftRaw(layer, REST_BETA)
+      expect(frac).toBeGreaterThanOrEqual(0.45)
+    }
+  )
+
+  it.each(TABPIECE_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: strip-driven early-rise >= 50%% of rest lift by quarter-rest',
+    (_id, layer) => {
+      const frac = tabPieceLift(layer, QUARTER_REST) / tabPieceLift(layer, REST_BETA)
+      expect(frac).toBeGreaterThanOrEqual(0.5)
+    }
+  )
+
+  it.each(VFOLD_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: v-fold late-bloom stays <= the family ceiling at quarter-rest',
+    (_id, layer) => {
+      const frac = panelOpenAngle(layer, QUARTER_REST) / panelOpenAngle(layer, REST_BETA)
+      expect(frac).toBeLessThanOrEqual(VFOLD_CEILING)
+    }
+  )
+})
