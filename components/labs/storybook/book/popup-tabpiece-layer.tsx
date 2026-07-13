@@ -23,10 +23,11 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
+import { makePaperCanvas, makeShadowCanvas, makeTabGripCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
+import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom } from './popup-mechanics'
-import { solveTabPiecePose, tabPieceFlatSpan, type TabPieceFace } from './popup-tabpiece'
+import { solveTabPiecePose, tabPieceFlatSpan, tabPieceSlit, type TabPieceFace } from './popup-tabpiece'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -36,8 +37,6 @@ const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
 const STRUCT_SHADOW_MAX = 0.28
 const FOLD_SHADE_TINT = '#d9cdb4'
-const PAPER_TINT = '#d8c8a4'
-const PAPER_SHADE_TINT = '#c0af88'
 const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 
@@ -83,6 +82,17 @@ function makeEdgeGeometry(): THREE.BufferGeometry {
   return geometry
 }
 
+/** Two-point line geometry for the fore-edge SLIT the tab emerges through
+ *  (D3 tab-legibility package) — one segment, positions rewritten every
+ *  frame from `tabPieceSlit`. */
+function makeSlitGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry()
+  const positions = new THREE.BufferAttribute(new Float32Array(6), 3)
+  positions.setUsage(THREE.DynamicDrawUsage)
+  geometry.setAttribute('position', positions)
+  return geometry
+}
+
 export function TabPiecePopupLayer({
   layer,
   spreadIndex,
@@ -98,6 +108,10 @@ export function TabPiecePopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
 
   const faceArt = useArtTexture(`${layer.id}-face`)
+  // This piece's own stock (D3 kraft-legibility package): replaces the
+  // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
+  // artless tab pieces separates by tone instead of reading as one mass.
+  const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   const patches = useMemo(() => solveTabPiecePose(layer, Math.PI, 0), [layer])
   const geometries = useMemo(
@@ -105,12 +119,16 @@ export function TabPiecePopupLayer({
     [patches, layer]
   )
   const edgeGeometries = useMemo(() => patches.map(() => makeEdgeGeometry()), [patches])
-  const edgeMaterial = useMemo(
-    () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
-    []
+  // One hairline material per patch (not shared): artless faces get this
+  // piece's own darker `tint.edge` for contrast against same-family
+  // neighbors mid-turn; painted faces keep the standard pale cut-edge core.
+  const edgeMaterials = useMemo(
+    () => patches.map(() => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 })),
+    [patches]
   )
 
   const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const tabGripTexture = useMemo(() => makeCanvasTexture(makeTabGripCanvas()), [])
   const materials = useMemo(() => {
     const exterior = patches.map(
       (p) =>
@@ -131,17 +149,29 @@ export function TabPiecePopupLayer({
     patches.forEach((p, i) => {
       const material = materials.exterior[i]
       const art = p.face === 'tab' ? null : faceArt
-      material.map = art ?? paperTexture
+      // The tab never prints art (file header) — its raw-kraft map carries
+      // the grip-notch texture instead of the generic paper grain.
+      material.map = art ?? (p.face === 'tab' ? tabGripTexture : paperTexture)
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
         material.color.set(isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff')
       } else {
-        material.color.set(isShaded(p.face) ? PAPER_SHADE_TINT : PAPER_TINT)
+        material.color.set(isShaded(p.face) ? tint.shade : tint.lit)
       }
       material.needsUpdate = true
+      edgeMaterials[i].color.set(art ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [patches, materials, paperTexture, faceArt])
+  }, [patches, materials, edgeMaterials, paperTexture, tabGripTexture, faceArt, tint])
+
+  // The fore-edge SLIT the tab emerges through (D3 tab-legibility package):
+  // a short hairline riding the page rigidly at d = PAGE_W, tinted this
+  // piece's own darker `edge` sibling so it reads as a cut, not a stray line.
+  const slitGeometry = useMemo(() => makeSlitGeometry(), [])
+  const slitMaterial = useMemo(
+    () => new THREE.LineBasicMaterial({ color: tint.edge, transparent: true, opacity: 0.9 }),
+    [tint]
+  )
 
   const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
   const shadowMaterial = useMemo(
@@ -170,14 +200,28 @@ export function TabPiecePopupLayer({
     () => () => {
       geometries.forEach((g) => g.dispose())
       edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterial.dispose()
+      edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
       materials.interior.dispose()
       paperTexture.dispose()
+      tabGripTexture.dispose()
+      slitGeometry.dispose()
+      slitMaterial.dispose()
       shadowTexture.dispose()
       shadowMaterial.dispose()
     },
-    [geometries, edgeGeometries, edgeMaterial, materials, paperTexture, shadowTexture, shadowMaterial]
+    [
+      geometries,
+      edgeGeometries,
+      edgeMaterials,
+      materials,
+      paperTexture,
+      tabGripTexture,
+      slitGeometry,
+      slitMaterial,
+      shadowTexture,
+      shadowMaterial,
+    ]
   )
 
   useFrame(() => {
@@ -213,6 +257,18 @@ export function TabPiecePopupLayer({
       }
     })
 
+    const [slitA, slitB] = tabPieceSlit(layer, thetaL, thetaR)
+    const slitAttr = slitGeometry.getAttribute('position') as THREE.BufferAttribute
+    const slitArr = slitAttr.array as Float32Array
+    slitArr[0] = slitA[0]
+    slitArr[1] = slitA[1]
+    slitArr[2] = slitA[2]
+    slitArr[3] = slitB[0]
+    slitArr[4] = slitB[1]
+    slitArr[5] = slitB[2]
+    slitAttr.needsUpdate = true
+    slitGeometry.computeBoundingSphere()
+
     shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2
   })
 
@@ -223,9 +279,10 @@ export function TabPiecePopupLayer({
           <group key={p.face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
             <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
-            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterial} renderOrder={1} />
+            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}
+        <lineSegments geometry={slitGeometry} material={slitMaterial} renderOrder={1} />
       </group>
       <group ref={shadowGroupRef} visible={false}>
         {/* renderOrder=-1: all ground shading joins the gutter crease's

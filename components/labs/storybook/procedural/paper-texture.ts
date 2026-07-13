@@ -258,6 +258,34 @@ export function makeShadowCanvas(): HTMLCanvasElement {
 }
 
 /**
+ * Small canvas for a tab-piece's pull tab (D3 tab-legibility package): a
+ * plain white base (so the renderer's own kraft tint multiplies through
+ * unchanged) plus a darker semicircular NOTCH bitten into the outer edge —
+ * v=1, the canvas top under three's flipY, which is the tab's free end
+ * under the tabpiece layer's identity uv map (root at v=0, tip at v=1). A
+ * flat kraft rectangle reads as a disconnected floating quad; the notch is
+ * what tells the eye "grab here." The renderer tints this with the piece's
+ * own kraft shade, so it stays in that piece's stock family rather than
+ * introducing a new fixed color.
+ */
+export function makeTabGripCanvas(w = 64, h = 160): HTMLCanvasElement {
+  assertBrowser('makeTabGripCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, w, h)
+
+  // Circle centered ON the top edge (canvas y=0): only its lower half falls
+  // inside the canvas, reading as a half-moon bitten into the tip.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
+  ctx.beginPath()
+  ctx.arc(w / 2, 0, w * 0.46, 0, Math.PI * 2)
+  ctx.fill()
+
+  return canvas
+}
+
+/**
  * Stack-edge stripe canvas: the cut edges of a fanned page stack, one
  * horizontal stripe per sheet from the BOTTOM of the canvas up (v=0 is the
  * valley floor under three's flipY). Each stripe is aged paper washed with

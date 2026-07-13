@@ -28,6 +28,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
+import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type PlatformGeom } from './popup-mechanics'
 import { solvePlatformPose, type PlatformFace } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
@@ -44,9 +45,6 @@ const DECK_SHADOW_MAX = 0.34
 // Same fold-shading rule as the box: the sibling left of a seam reads a step
 // darker than its lit partner, which is what sells the crease.
 const FOLD_SHADE_TINT = '#d9cdb4'
-// Artless faces read as warm kraft stock, lit/shaded like the printed ones.
-const PAPER_TINT = '#d8c8a4'
-const PAPER_SHADE_TINT = '#c0af88'
 // Interior surfaces sit in deep shadow (materials are unlit, so without this
 // the underside would render as bright as the top and the float would read
 // flat).
@@ -135,6 +133,10 @@ export function PlatformPopupLayer({
 
   const deckArt = useArtTexture(`${layer.id}-deck`)
   const split = layer.qA / (layer.qA + layer.qB)
+  // This piece's own stock (D3 kraft-legibility package): replaces the
+  // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
+  // artless platforms separates by tone instead of reading as one mass.
+  const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   // The patch LIST (faces, ranks, bays, order) is constant per geometry —
   // only the corners move. Solve once at rest to build it.
@@ -144,9 +146,12 @@ export function PlatformPopupLayer({
     [patches, split]
   )
   const edgeGeometries = useMemo(() => patches.map(() => makeEdgeGeometry()), [patches])
-  const edgeMaterial = useMemo(
-    () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
-    []
+  // One hairline material per patch (not shared): artless faces get this
+  // piece's own darker `tint.edge` for contrast against same-family
+  // neighbors mid-turn; painted faces keep the standard pale cut-edge core.
+  const edgeMaterials = useMemo(
+    () => patches.map(() => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 })),
+    [patches]
   )
 
   const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
@@ -177,11 +182,12 @@ export function PlatformPopupLayer({
         art.wrapT = THREE.ClampToEdgeWrapping
         material.color.set(isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff')
       } else {
-        material.color.set(isShaded(p.face) ? PAPER_SHADE_TINT : PAPER_TINT)
+        material.color.set(isShaded(p.face) ? tint.shade : tint.lit)
       }
       material.needsUpdate = true
+      edgeMaterials[i].color.set(art ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [patches, materials, paperTexture, deckArt])
+  }, [patches, materials, edgeMaterials, paperTexture, deckArt, tint])
 
   const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
   const strutShadowMaterial = useMemo(
@@ -218,7 +224,7 @@ export function PlatformPopupLayer({
     () => () => {
       geometries.forEach((g) => g.dispose())
       edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterial.dispose()
+      edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
       materials.interior.dispose()
       paperTexture.dispose()
@@ -229,7 +235,7 @@ export function PlatformPopupLayer({
     [
       geometries,
       edgeGeometries,
-      edgeMaterial,
+      edgeMaterials,
       materials,
       paperTexture,
       shadowTexture,
@@ -284,7 +290,7 @@ export function PlatformPopupLayer({
           <group key={`${p.face}-${p.rank}-${p.bay}`}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
             <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
-            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterial} renderOrder={1} />
+            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}
       </group>

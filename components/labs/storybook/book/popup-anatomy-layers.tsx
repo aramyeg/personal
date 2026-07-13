@@ -24,6 +24,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { makePaperCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
+import { kraftTints } from './paper-stock'
 import {
   liveSpreadRole,
   solveBoxPose,
@@ -39,10 +40,6 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
 const FLAT_EPSILON = 0.02
-const PAPER_TINT = '#d8c8a4'
-// The underside of a die-cut patch: unprinted kraft, a step darker as it
-// sits against/near its parent panel.
-const PAPER_SHADE_TINT = '#c0af88'
 
 /** Synthesizes one v-fold SceneLayer per fan member — identical geometry to
  *  solveFanPose (which is itself member -> solveVFoldPose), so the members
@@ -106,6 +103,10 @@ export function DressPopupLayer({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const art = useArtTexture(layer.id)
+  // This piece's own stock (D3 kraft-legibility package): replaces the
+  // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
+  // artless dress patches separates by tone instead of reading as one mass.
+  const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   // The seat surface, and (if that parent is itself a cascaded child) its own
   // parent — both needed to re-solve the seat quad every frame.
@@ -129,9 +130,9 @@ export function DressPopupLayer({
   const materials = useMemo(
     () => ({
       front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
-      back: new THREE.MeshBasicMaterial({ side: THREE.BackSide, transparent: true, alphaTest: 0.1, color: PAPER_SHADE_TINT }),
+      back: new THREE.MeshBasicMaterial({ side: THREE.BackSide, transparent: true, alphaTest: 0.1, color: tint.shade }),
     }),
-    []
+    [tint]
   )
 
   useEffect(() => {
@@ -141,12 +142,12 @@ export function DressPopupLayer({
       art.wrapT = THREE.ClampToEdgeWrapping
     }
     materials.front.map = texture
-    materials.front.color.set(art ? '#ffffff' : PAPER_TINT)
+    materials.front.color.set(art ? '#ffffff' : tint.lit)
     materials.back.map = texture
-    materials.back.color.set(PAPER_SHADE_TINT)
+    materials.back.color.set(tint.shade)
     materials.front.needsUpdate = true
     materials.back.needsUpdate = true
-  }, [art, paperTexture, materials])
+  }, [art, paperTexture, materials, tint])
 
   useEffect(
     () => () => {

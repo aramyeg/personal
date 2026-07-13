@@ -21,6 +21,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
+import { kraftTints } from './paper-stock'
 import {
   liveSpreadRole,
   solveBoxPose,
@@ -42,11 +43,6 @@ const FOLD_SHADE_TINT = '#d9cdb4'
 // Caps face the reader straight-on and catch less of the key light than
 // the top — a half-step tint keeps front/top from reading as one surface.
 const CAP_TINT = '#f2ebdc'
-// Artless faces read as warm kraft stock, with the same lit/shaded split
-// the printed faces get — without it a raw box renders as one white-hot
-// blob against the painted pieces (capture review 2026-07-11).
-const PAPER_TINT = '#d8c8a4'
-const PAPER_SHADE_TINT = '#c0af88'
 // Interior surfaces sit in deep shadow. The materials are unlit, so
 // without this an open-front room's back wall renders as bright as an
 // exterior face and the opening reads as a solid wall (user, C6 round 2:
@@ -120,14 +116,21 @@ export function BoxPopupLayer({
   const backArt = useArtTexture(`${layer.id}-back`)
   const sideArt = useArtTexture(`${layer.id}-side`)
   const topArt = useArtTexture(`${layer.id}-top`)
+  // This piece's own stock (D3 kraft-legibility package): replaces the
+  // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
+  // artless boxes separates by tone instead of reading as one mass.
+  const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   // The face list is constant per geometry — only the corners move.
   const faces = useMemo(() => solveBoxPose(layer, Math.PI, 0).map((p) => p.face), [layer])
   const geometries = useMemo(() => faces.map((face) => makeFaceGeometry(face)), [faces])
   const edgeGeometries = useMemo(() => faces.map(() => makeEdgeGeometry()), [faces])
-  const edgeMaterial = useMemo(
-    () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
-    []
+  // One hairline material per face (not shared): artless faces get this
+  // piece's own darker `tint.edge` for contrast against same-family
+  // neighbors mid-turn; painted faces keep the standard pale cut-edge core.
+  const edgeMaterials = useMemo(
+    () => faces.map(() => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 })),
+    [faces]
   )
 
   const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
@@ -155,14 +158,15 @@ export function BoxPopupLayer({
       const texture = asset ? art[asset] : null
       const material = materials.exterior[i]
       material.map = texture ?? paperTexture
-      if (!texture) material.color.set(SHADED_FACES.has(face) ? PAPER_SHADE_TINT : PAPER_TINT)
+      if (!texture) material.color.set(SHADED_FACES.has(face) ? tint.shade : tint.lit)
       if (texture) {
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
       }
       material.needsUpdate = true
+      edgeMaterials[i].color.set(texture ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [faces, materials, paperTexture, frontArt, backArt, sideArt, topArt])
+  }, [faces, materials, edgeMaterials, paperTexture, frontArt, backArt, sideArt, topArt, tint])
 
   const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
   const shadowMaterial = useMemo(
@@ -186,14 +190,14 @@ export function BoxPopupLayer({
     () => () => {
       geometries.forEach((g) => g.dispose())
       edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterial.dispose()
+      edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
       materials.interior.dispose()
       paperTexture.dispose()
       shadowTexture.dispose()
       shadowMaterial.dispose()
     },
-    [geometries, edgeGeometries, edgeMaterial, materials, paperTexture, shadowTexture, shadowMaterial]
+    [geometries, edgeGeometries, edgeMaterials, materials, paperTexture, shadowTexture, shadowMaterial]
   )
 
   useFrame(() => {
@@ -240,7 +244,7 @@ export function BoxPopupLayer({
           <group key={face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
             <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
-            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterial} renderOrder={1} />
+            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}
       </group>
