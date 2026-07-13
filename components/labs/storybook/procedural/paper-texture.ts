@@ -234,7 +234,11 @@ export function makeDeskCanvas(w = 512, h = 512): HTMLCanvasElement {
 
 /**
  * 128×64 radial gradient (black → transparent) used as a soft contact
- * shadow beneath standing pop-up layers.
+ * shadow beneath standing pop-up layers. The falloff holds a fuller UMBRA
+ * core, then feathers through a wide PENUMBRA to nothing — a soft-edged
+ * pool reads as a real key light's shadow quality rather than a hard decal
+ * (D-G6). Center alpha stays 0.55: the pop-up renderers and the turning
+ * page's traveling shade multiply their own opacity in against that peak.
  */
 export function makeShadowCanvas(): HTMLCanvasElement {
   assertBrowser('makeShadowCanvas')
@@ -244,6 +248,8 @@ export function makeShadowCanvas(): HTMLCanvasElement {
 
   const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2)
   gradient.addColorStop(0, 'rgba(0,0,0,0.55)')
+  gradient.addColorStop(0.35, 'rgba(0,0,0,0.44)')
+  gradient.addColorStop(0.7, 'rgba(0,0,0,0.17)')
   gradient.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, w, h)

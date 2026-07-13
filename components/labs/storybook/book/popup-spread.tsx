@@ -36,6 +36,7 @@ import {
   type PanelQuad,
 } from './popup-mechanics'
 import { solveRiderPose } from './popup-anatomy'
+import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import { BoxPopupLayer } from './popup-box-layer'
 import { PlatformPopupLayer } from './popup-platform-layer'
@@ -270,7 +271,25 @@ function PopupLayer({
     materials.left.needsUpdate = true
   }, [texture, materials])
 
-  const shadow = useMemo(() => shadowPlacement(layer), [layer])
+  // Contact shadow, placed and weighted by the book's single key light
+  // (shadow-light.ts): the base footprint offset DOWN-SCREEN-RIGHT and
+  // deepened/spread by how high the piece stands at rest. Peak height comes
+  // from one flat-open solve — pure math, computed once per piece.
+  const shadow = useMemo(() => {
+    const placement = shadowPlacement(layer)
+    if (!placement) return null
+    const rest = solveLayerPose(layer, parent, Math.PI, 0)
+    const lift = shadowLift(peakHeight([rest.left, rest.right]))
+    return {
+      position: [
+        placement.position[0] + lift.dx,
+        placement.position[1],
+        placement.position[2] + lift.dz,
+      ] as [number, number, number],
+      size: [placement.size[0] * lift.spread, placement.size[1] * lift.spread] as [number, number],
+      maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
+    }
+  }, [layer, parent])
   const shadowCanvas = useMemo(() => makeShadowCanvas(), [])
   const shadowTexture = useMemo(() => makeCanvasTexture(shadowCanvas), [shadowCanvas])
   const shadowMaterial = useMemo(
@@ -329,8 +348,9 @@ function PopupLayer({
     if (leftMeshRef.current) writeQuad(geometries.left, pose.left)
 
     // Contact shadow deepens as the piece stands — driven by the same
-    // dihedral as the paper (one shared angle, benchmark B9/B11).
-    shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.sin(beta / 2) ** 2
+    // dihedral as the paper (one shared angle, benchmark B9/B11); its
+    // elevation-weighted ceiling is baked into `shadow.maxOpacity`.
+    shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
   })
 
   return (

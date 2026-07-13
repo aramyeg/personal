@@ -30,6 +30,7 @@ import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { liveSpreadRole, spreadPageAnglesTilted, type PlatformGeom } from './popup-mechanics'
 import { solvePlatformPose, type PlatformFace } from './popup-anatomy'
+import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
@@ -191,8 +192,27 @@ export function PlatformPopupLayer({
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
   )
-  const strutSpecs = useMemo(() => strutShadowSpecs(layer), [layer])
-  const deckSpec = useMemo(() => deckShadowSpec(layer), [layer])
+  // Key-light placement (shadow-light.ts). The DECK floats high, so its
+  // inter-tier pool throws far down-screen-right, deep and spread — the
+  // strongest stacked-paper cue. The struts SIT on the page: they keep a
+  // tight, near-base footprint (a small fraction of the deck's throw) so the
+  // light direction stays consistent without lifting them off their contact.
+  const shadowTiers = useMemo(() => {
+    const rest = solvePlatformPose(layer, Math.PI, 0)
+    const deckPeak = peakHeight(rest.filter((p) => isDeck(p.face)).map((p) => p.quad))
+    const deckLift = shadowLift(deckPeak)
+    const strutLift = shadowLift(deckPeak * 0.28)
+    const applyLift = (spec: ShadowSpec, lift: { dx: number; dz: number; spread: number }): ShadowSpec => ({
+      position: [spec.position[0] + lift.dx, spec.position[1], spec.position[2] + lift.dz],
+      size: [spec.size[0] * lift.spread, spec.size[1] * lift.spread],
+    })
+    return {
+      strut: strutShadowSpecs(layer).map((s) => applyLift(s, strutLift)),
+      strutMax: STRUT_SHADOW_MAX * strutLift.depth,
+      deck: applyLift(deckShadowSpec(layer), deckLift),
+      deckMax: DECK_SHADOW_MAX * deckLift.depth,
+    }
+  }, [layer])
 
   useEffect(
     () => () => {
@@ -253,8 +273,8 @@ export function PlatformPopupLayer({
     })
 
     const contact = Math.sin(beta / 2) ** 2
-    strutShadowMaterial.opacity = STRUT_SHADOW_MAX * contact
-    deckShadowMaterial.opacity = DECK_SHADOW_MAX * contact
+    strutShadowMaterial.opacity = shadowTiers.strutMax * contact
+    deckShadowMaterial.opacity = shadowTiers.deckMax * contact
   })
 
   return (
@@ -271,7 +291,7 @@ export function PlatformPopupLayer({
       {/* renderOrder=-1: both shadow tiers join the gutter crease's early
           transparent tier (D-G3 audit; book.tsx precedent). */}
       <group ref={shadowGroupRef} visible={false}>
-        {strutSpecs.map((spec, i) => (
+        {shadowTiers.strut.map((spec, i) => (
           <mesh
             key={`strut-shadow-${i}`}
             position={spec.position}
@@ -283,12 +303,12 @@ export function PlatformPopupLayer({
           </mesh>
         ))}
         <mesh
-          position={deckSpec.position}
+          position={shadowTiers.deck.position}
           rotation={[-Math.PI / 2, 0, 0]}
           material={deckShadowMaterial}
           renderOrder={-1}
         >
-          <planeGeometry args={deckSpec.size} />
+          <planeGeometry args={shadowTiers.deck.size} />
         </mesh>
       </group>
     </>

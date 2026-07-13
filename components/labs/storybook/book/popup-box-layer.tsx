@@ -29,6 +29,7 @@ import {
   type BoxGeom,
 } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
+import { peakHeight, shadowLift } from './shadow-light'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
@@ -168,6 +169,18 @@ export function BoxPopupLayer({
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
   )
+  // Contact pool placed and weighted by the book's key light (shadow-light.ts):
+  // a box stands tall, so it throws a deep pool offset down-screen-right. Peak
+  // height comes from one flat-open solve — pure math, computed once.
+  const shadowSpec = useMemo(() => {
+    const rest = solveBoxPose(layer, Math.PI, 0)
+    const lift = shadowLift(peakHeight(rest.map((p) => p.quad)))
+    return {
+      position: [lift.dx, SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2 + lift.dz] as [number, number, number],
+      size: [layer.a * 2 * 1.05 * lift.spread, (layer.z1 - layer.z0) * 1.05 * lift.spread] as [number, number],
+      maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
+    }
+  }, [layer])
 
   useEffect(
     () => () => {
@@ -217,7 +230,7 @@ export function BoxPopupLayer({
       }
     })
 
-    shadowMaterial.opacity = SHADOW_MAX_OPACITY * Math.sin(beta / 2) ** 2
+    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2
   })
 
   return (
@@ -235,13 +248,13 @@ export function BoxPopupLayer({
           transparent tier (D-G3 audit; book.tsx precedent). */}
       <mesh
         ref={shadowRef}
-        position={[0, SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2]}
+        position={shadowSpec.position}
         rotation={[-Math.PI / 2, 0, 0]}
         material={shadowMaterial}
         renderOrder={-1}
         visible={false}
       >
-        <planeGeometry args={[layer.a * 2 * 1.05, (layer.z1 - layer.z0) * 1.05]} />
+        <planeGeometry args={shadowSpec.size} />
       </mesh>
     </>
   )

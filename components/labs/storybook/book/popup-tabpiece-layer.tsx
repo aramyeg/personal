@@ -27,6 +27,7 @@ import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom } from './popup-mechanics'
 import { solveTabPiecePose, tabPieceFlatSpan, type TabPieceFace } from './popup-tabpiece'
+import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
@@ -147,16 +148,21 @@ export function TabPiecePopupLayer({
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
   )
+  // Key-light placement (shadow-light.ts): the erected mound/table stands, so
+  // its pool offsets down-screen-right and deepens/spreads with its rest peak.
   const shadowSpec = useMemo(() => {
     const span = tabPieceFlatSpan(layer)
     const sign = layer.side === 'left' ? -1 : 1
+    const rest = solveTabPiecePose(layer, Math.PI, 0)
+    const lift = shadowLift(peakHeight(rest.map((p) => p.quad)))
     return {
-      position: [sign * (layer.hingeX - span / 2), SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2] as [
-        number,
-        number,
-        number,
-      ],
-      size: [span * 0.95, (layer.z1 - layer.z0) * 1.05] as [number, number],
+      position: [
+        sign * (layer.hingeX - span / 2) + lift.dx,
+        SHADOW_Y_LIFT,
+        (layer.z0 + layer.z1) / 2 + lift.dz,
+      ] as [number, number, number],
+      size: [span * 0.95 * lift.spread, (layer.z1 - layer.z0) * 1.05 * lift.spread] as [number, number],
+      maxOpacity: STRUCT_SHADOW_MAX * lift.depth,
     }
   }, [layer])
 
@@ -207,7 +213,7 @@ export function TabPiecePopupLayer({
       }
     })
 
-    shadowMaterial.opacity = STRUCT_SHADOW_MAX * Math.sin(beta / 2) ** 2
+    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2
   })
 
   return (
