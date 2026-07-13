@@ -431,3 +431,42 @@ Reply to the played-back principle. Verbatim, mapped:
    strips, pull tabs, and flap flips; the off-spine anchor model must
    be the SAME model a pull strip will later actuate (one anchor
    family, two drivers: page dihedral now, pull strip in E).
+
+## Off-spine anchor family — SHIPPED (2026-07-13) + laws discovered
+
+Derive: .superpowers/sdd/bench/derive-offspine.mjs (all gates green).
+Engine: solveRiderPose generalized to one local-frame path (seat pair's
+pop-side bisector = local X); new seat 'tentRidge' (parallel-fold ground
+swell, station ~ glueL-glueR, ALWAYS mount-valid); deckCrease dropped
+its mirror assumption (equal closed reach IS the bridge rule) so decks
+stand at any station; parallel fold un-demoted into the GROUND SWELL
+role (covenant: carries >= 1 rider, rise <= 0.08, scenery). Spread 8
+recomposed as the acid test. Laws discovered while composing it:
+
+L1 Z-BAND DISCIPLINE: every off-spine anchor's paper still runs to the
+   gutter (tent panels / strut ramps cross the spine), so pieces whose
+   glue footprints overlap laterally MUST take disjoint z-bands. Also
+   count the airborne shadow: a fan's panels advance in z by
+   glueLen*cos(phi) + height*cos(lambda) — the satchel burst owns z
+   0.24..0.73, which evicted the first mound placement (A9 caught it).
+
+L2 RECLINE LAW: on a mountain seat the local book only opens to the
+   tent/deck dihedral; past beta = pi, creaseElevation's bigPhi term
+   swings negative ~ (beta-pi)/2 * tan(phi). Standees on tent ridges /
+   deck creases take LOW phi (25-35 deg): the sword at phi 30 reclines
+   the family's ~23 deg; at phi 58 it lay back 48 deg. Encoded in the
+   content comments; candidate covenant rule when the family spreads.
+
+L3 FACING LAW: a rider's v opens ALONG its ridge, so the reading camera
+   sees its EDGE. Riders are for PROFILE silhouettes (sword blade,
+   perch raven). Flat objects lie on deck tops as dress patches (the
+   high camera reads decks face-on). Camera-facing billboard art keeps
+   to v-folds/walls near the spine or on parent panels. De-centering's
+   camera-facing vocabulary is therefore FURNITURE (platform tops, box
+   caps/lids) + lay-ons + profile standees — which matches his own
+   "table or chair type folds" preference exactly.
+
+L4 TABLETOP PITCH: deck slack (qA+qB - ridge gap) is roof pitch. 0.48
+   slack over a 0.435 gap reads as a barn; 0.272 over 0.262 (slopes
+   ~9 deg) reads as a table. Keep >= ~0.005 intersection margin at
+   h = 90 deg (the gap is largest at full open).
