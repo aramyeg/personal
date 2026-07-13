@@ -75,6 +75,13 @@ export type Chapter = {
   narration: string
   accents: readonly string[]
   layers: readonly SceneLayer[]
+  /** D-G1/D-G8: the layer id whose motion is this spread's signature moment.
+   *  Must exist in `layers`, its FAMILY must differ from the previous and next
+   *  spread's hero (rotation), and its measured sweep displacement must clear
+   *  0.35 x page height (0.525 world units) unless it is strip-driven
+   *  (tabpiece/stripflap — the future-interactive vocabulary). Enforced by
+   *  __tests__/labs/storybook/hero-wow.test.ts. */
+  hero: string
 }
 
 export const SPREAD_COUNT = 10
@@ -360,6 +367,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Once upon a time, in a stone-built city beneath a sleeping mountain, a young clerk of the merchant’s guild grew tired of selling things and resolved instead to make them. He apprenticed himself to the code-wrights of BlueNet, and his first great labor was an enchanted ledger for the Inn of a Hundred Keys — a book that knew every guest, every room, and every candle lit therein. And the innkeepers marveled, for nothing was ever lost again.",
     accents: ['#6a8f5f', '#b0603f', '#e8a978'],
     layers: CH1_LAYERS,
+    hero: 'ch1-inn', // vfold, sweep 0.85
   },
   {
     spread: 3,
@@ -371,6 +379,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Word of the apprentice’s craft crossed the mountains to the alpine city of Zürich, where the Guild of the Bee kept a thousand couriers aloft. ‘Build us a looking-glass,’ said the beekeepers, ‘that we may see every wing at once.’ So he built it from nothing at all — his first work made to be carried in a pocket — and from that day no parcel, however small, ever wandered from its path.",
     accents: ['#7d9bb5', '#8a5a3b', '#d9a441'],
     layers: CH2_LAYERS,
+    hero: 'ch2-bee-a', // recursion (child), sweep 0.82 — the carrier bee
   },
   {
     spread: 4,
@@ -382,6 +391,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "In the grey citadel of Berlin stood a rookery of unusual size. Four billion ravens passed through its towers, each bearing a message, and fifty thousand merchant houses trusted them with their words. The hero — for so we may now call him — was set over the great dispatch boards, and he wrought them so well that the sky itself seemed orderly.",
     accents: ['#5a6470', '#2b2d33', '#6f5a7d', '#d98e3f'],
     layers: CH3_LAYERS,
+    hero: 'ch3-towers', // vfold, sweep 1.64 — the great rookery towers
   },
   {
     spread: 5,
@@ -393,6 +403,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Then came a summons from the golden dunes, where a great bank kept a dragon of renown coiled about its treasure. None doubted the beast’s strength; the trouble was teaching it manners. The hero built passages of glass through which the people could reach their gold — safely, swiftly, and without waking so much as one scale — and he even taught the dragon to lease out carriages.",
     accents: ['#d9a24a', '#d96f4a', '#4f8f85', '#e6c65a'],
     layers: CH4_LAYERS,
+    hero: 'ch4-goldpile', // tabpiece (strip-driven, exempt), sweep 1.27 — the hoard growing
   },
   {
     spread: 6,
@@ -404,6 +415,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Homeward then, to the rose-stone city, where a bazaar of a thousand stalls was to be raised. The hero did not build the stalls. He did something cleverer: he carved master patterns from which any stall could be raised in a day, true and identical, by any pair of willing hands. Masons came from far away just to study the stones.",
     accents: ['#c4766a', '#a63d2f', '#e7d5a8'],
     layers: CH5_LAYERS,
+    hero: 'ch5-lantern-b', // recursion (child), sweep 0.67 — a bazaar lantern
   },
   {
     spread: 7,
@@ -415,6 +427,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "And so at last the road bent north, to a kingdom of pine and long light, where a new treasury was rising — AMIO by name — with walls of glass, so the people might always see their gold. There the hero works to this day: raising vaults, drawing plans with the founders themselves, and teaching young apprentices the old craft. Whether he lives happily ever after is not yet written — the best chronicles never quite end.",
     accents: ['#2e5244', '#4fd6b8', '#8a6fd6', '#1d2a45'],
     layers: CH6_LAYERS,
+    hero: 'ch6-treasury', // vfold, sweep 0.97 — the northern treasury (the crescendo)
   },
 ]
 
@@ -427,6 +440,20 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.25, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.5 },
   { id: 'title-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.38, height: 0.63 },
   { id: 'title-crest', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'title-hero', mount: 0.24, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.13 },
+  // D5 MASSING (silhouette review: the title was "a lone small cutout"). The
+  // HERO is now the writer's QUILL erected by a hidden pull strip — the tale
+  // being written as the book opens (stripflap, the spread's hero FAMILY: no
+  // other extra can field it, and it's the future-interactive vocabulary so
+  // it's exempt from the D-G8 sweep floor). Stood in profile at the fore edge,
+  // downstage of the emblem in its own z-band (z >= 0.44) so, since spine
+  // rotation preserves z, it never crosses the center cluster (extra-1 ceiling).
+  { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.22, height: 0.24 },
+  // The second supporting piece (massing): a low GROUND SWELL (parallel fold,
+  // covenant: scenery, rise <= 0.08, carries a rider) far upstage behind the
+  // border — a distant berm with a wax-seal tuft, filling the empty top of
+  // frame. Own z-band (z <= -0.36) so it never crosses the center cluster.
+  { id: 'title-swell', kind: 'backdrop', role: 'scenery', mech: 'parallel', glueL: 0.3, glueR: 0.3, rise: 0.06, z0: -0.52, z1: -0.36 },
+  { id: 'title-swell-seal', kind: 'backdrop', role: 'scenery', mech: 'rider', parentId: 'title-swell', seat: 'tentRidge', mountZ: -0.44, vDir: -1, phiDeg: 32, rhoDeg: 52, width: 0.18, height: 0.14 },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
@@ -445,7 +472,10 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // strip-erected frontal figures (hidden pull strips — no connectors at
 // all). Variety and asymmetry ARE the aesthetic.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
-  { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
+  // D5 MASSING (silhouette review: "inventory not scene — needs an anchor"):
+  // the bag is GROWN into the clear anchor mass so the items read as spilling
+  // FROM it rather than as a row of equals — hierarchy, not more pieces.
+  { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 1.0, height: 0.6 },
   // KINETIC (D4 wave 2): the Wayfinder's ASTROLABE, its star-dial spinning
   // open on the satchel flap — a die-cut disc riveted flat on the bag's right
   // panel (mech 76) that turns 130deg as the book opens. Rides the panel
@@ -466,8 +496,22 @@ const SATCHEL_LAYERS: readonly SceneLayer[] = [
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
 const END_LAYERS: readonly SceneLayer[] = [
+  // D5 MASSING (silhouette review: the end was "a lone small cutout"). The
+  // HERO is now the far country the road bent through — a FAN of distant
+  // hills fanning open behind the letter (Birmingham M-fold, k=3 nested
+  // ridges from one deep spine apex). Sited in its own z-band far upstage
+  // (z <= -0.46) so, since spine rotation preserves z, it can never cross
+  // the mid-page letter at any angle (extra-9's zero collision ceiling).
+  // Wide members read as receding downs AND carry the D-G8 sweep (fan is
+  // the spread's hero family — no other extra can field it).
+  { id: 'end-hills', kind: 'backdrop', role: 'scenery', mech: 'fan', apexZ: -0.46, vDir: -1, members: [{ phiDeg: 58, rhoDeg: 74, width: 0.72, height: 0.18 }, { phiDeg: 66, rhoDeg: 80, width: 0.96, height: 0.21 }, { phiDeg: 74, rhoDeg: 84, width: 1.2, height: 0.24 }] },
   { id: 'end-letter', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.75, height: 0.5 },
   { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'child', parentId: 'end-letter', mount: 0.28, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.15 },
+  // The low mound the letter rests against (massing): a GROUND SWELL (parallel
+  // fold, covenant: scenery, rise <= 0.08, carries a rider) at the fore edge
+  // in its own z-band (z >= 0.42) — grounds the letter without crowding it.
+  { id: 'end-mound', kind: 'foreground', role: 'scenery', mech: 'parallel', glueL: 0.22, glueR: 0.22, rise: 0.06, z0: 0.42, z1: 0.64 },
+  { id: 'end-mound-tuft', kind: 'foreground', role: 'scenery', mech: 'rider', parentId: 'end-mound', seat: 'tentRidge', mountZ: 0.53, vDir: 1, phiDeg: 32, rhoDeg: 52, width: 0.16, height: 0.14 },
   // KINETIC (D4 wave 2): the hero's SIGNET SEAL, its heraldic rosette turning
   // 110deg as the letter is unfolded — a die-cut disc hub-riveted flat on the
   // letter's left panel (Birmingham mech 76). The end spread carries no
@@ -482,6 +526,22 @@ export const EXTRA_SPREAD_LAYERS: Readonly<Record<number, readonly SceneLayer[]>
   8: SATCHEL_LAYERS,
   9: END_LAYERS,
 }
+
+/** D-G1/D-G8 hero declaration for the non-chapter spreads (same contract as
+ *  Chapter.hero). Title fields the stripflap family (the erected quill,
+ *  strip-driven so exempt from the sweep floor), satchel the platform (the
+ *  map table, sweep 0.78), end the fan (the distant hills, sweep 0.82) — the
+ *  three families no career chapter can host. */
+export const EXTRA_SPREAD_HERO: Readonly<Record<number, string>> = {
+  1: 'title-quill',
+  8: 'satchel-table',
+  9: 'end-hills',
+}
+
+/** The declared hero layer id for any spread (chapter or extra), or undefined
+ *  for the coverless spread 0. */
+export const heroForSpread = (spread: number): string | undefined =>
+  chapterForSpread(spread)?.hero ?? EXTRA_SPREAD_HERO[spread]
 
 const EXTRA_SPREAD_ACCENTS: Record<number, readonly string[]> = {
   1: TITLE_ACCENTS,

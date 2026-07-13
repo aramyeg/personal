@@ -265,6 +265,9 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `title-border` | `title-border` | Illuminated vine border framing the title page | ≈2.6:1 landscape | STAND | placeholder |
 | `title-hero` | `title-hero` | Small hero figurine waving, opening line ink | ≈0.60:1 portrait | STAND | **art** |
 | `title-crest` | `title-crest` | Small crest riding the hero's own fold | ≈1.39:1 landscape | STAND — **ROTATED 180** | placeholder |
+| `title-quill` | `title-quill` | The writer's quill, strip-erected at the fore edge — the tale being written as the book opens (the spread's D-G8 hero; strip-driven, no visible connector) | ≈0.92:1 near-square | STAND | placeholder |
+| `title-swell` | `title-swell` | A low distant berm behind the border — ground-swell massing that fills the top of frame | ≈2.2:1 wide low | FLAT | placeholder |
+| `title-swell-seal` | `title-swell-seal` | A wax-seal tuft standing on the berm's ridge | ≈1.29:1 landscape | STAND | placeholder |
 
 ## 9. The Hero's Satchel (spread 8) — the fan showcase
 
@@ -274,7 +277,7 @@ monoculture.*
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `satchel-bag` | `satchel-bag` | The satchel itself, bursting open toward the reader | ≈1.5:1 landscape | STAND | placeholder |
+| `satchel-bag` | `satchel-bag` | The satchel itself, bursting open toward the reader — grown into the spread's anchor mass so the items read as spilling FROM it | ≈1.67:1 landscape | STAND | placeholder |
 | `satchel-astrolabe` | `satchel-astrolabe` | Wayfinder's Astrolabe, star-dial spinning on the bag's flap (rotor, riveted flat, coplanar) | 1:1 square (disc, radius 0.13 → canvas 0.26×0.26) | DISC | placeholder |
 | `satchel-burst` | `satchel-burst-m0`, `satchel-burst-m1`, `satchel-burst-m2` | Golden fan of treasures bursting from the bag — 3 independent v-folds, one shared apex, blooming outward (inner ray short, outer rays long) | m0 ≈1.0:1 · m1 ≈1.18:1 · m2 ≈1.39:1 | STAND — **m0 and m1 ROTATED 180; m2 upright** | placeholder |
 | `satchel-table` | `satchel-table-deck` | The map table: off-center, non-mirrored BRIDGE deck, standing on the right page | ≈1.05:1 near-square | TOPDOWN | placeholder |
@@ -286,8 +289,11 @@ monoculture.*
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
+| `end-hills` | `end-hills-m0`, `end-hills-m1`, `end-hills-m2` | The far country the road bent through — a fan of 3 nested distant-hill ridges from one deep apex, receding front-to-back (the spread's D-G8 hero). Deep upstage z-band so it never crosses the letter | m0 ≈4.0:1 · m1 ≈4.6:1 · m2 ≈5.0:1 wide low | STAND — **m2 upright; m0/m1 per fold** | placeholder |
 | `end-letter` | `end-letter` | Folded letter with a burgundy wax seal, closing the tale | ≈1.5:1 landscape | STAND | placeholder |
 | `end-raven` | `end-raven` | Raven riding the letter's own fold — the raven the closing line asks the reader to send | ≈1.33:1 landscape | STAND — **ROTATED 180** | placeholder |
+| `end-mound` | `end-mound` | The low mound the letter rests against — a fore-edge ground swell (parallel fold) grounding the scene | ≈2.4:1 wide low | FLAT | placeholder |
+| `end-mound-tuft` | `end-mound-tuft` | A grass tuft standing on the mound's ridge | ≈1.14:1 landscape | STAND | placeholder |
 | `end-seal` | `end-seal` | Hero's signet seal, heraldic rosette turning as the letter unfolds (rotor, coplanar, zero collision cost) | 1:1 square (disc, radius 0.13 → canvas 0.26×0.26) | DISC | placeholder |
 
 ## 11. Covers (spread 0, closed book — `book/cover-decals.tsx`)
