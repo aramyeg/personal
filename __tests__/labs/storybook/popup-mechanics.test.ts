@@ -784,7 +784,13 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
     'spread-6': 10, 'spread-7': 8, 'extra-1': 0, 'extra-8': 0, 'extra-9': 0,
   }
   const MID_CEIL: Record<string, number> = {
-    'spread-2': 123, 'spread-3': 134, 'spread-4': 185, 'spread-5': 218,
+    // D5 arm-lane pass (2026-07-13): spreads 3 and 4 recomposed to give the
+    // parked kinetic arms visible downstage homes (ch2 windmill in the meadow,
+    // ch3 semaphore mast at the fore edge). Both ratcheted DOWN from the parked
+    // values (134 -> 122, 185 -> 179): the meadow-shelf tightening (s3) and the
+    // lower rank + compact counter (s4) return more mid-turn budget than the
+    // now-visible sweeps spend.
+    'spread-2': 123, 'spread-3': 122, 'spread-4': 179, 'spread-5': 218,
     'spread-6': 77, 'spread-7': 122, 'extra-1': 21, 'extra-8': 36, 'extra-9': 0,
   }
   /** Spread number from the set name ('spread-4' -> 4, 'extra-8' -> 8). */

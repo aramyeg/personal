@@ -167,19 +167,24 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-hive-flowers', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-hive', seat: 'wallL', u: 0, v: 0, width: 0.14, height: 0.07 },
   // FLOATING TIER (C3v2): an alpine meadow shelf — a TERRACE platform (two
   // strut ranks of DIFFERENT closed reach, qA+qB spanning the gap) so the
-  // deck steps down toward the reader.
-  { id: 'ch2-meadow', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.12, glueR: 0.12, rise: 0.14, spans: [[-0.3, -0.22]] }, strutB: { glueL: 0.1, glueR: 0.1, rise: 0.06, spans: [[-0.1, -0.02]] }, qA: 0.06, qB: 0.06, deckZ0: -0.3, deckZ1: -0.02 },
+  // deck steps down toward the reader. D5 arm-lane pass: its depth footprint
+  // was tightened (deckZ -0.28..-0.10, was -0.30..-0.02) — pulling the shelf's
+  // reader edge back opens clean air at the spine for the windmill downstage
+  // of it and drops the meadow's mid-turn crossings with the backdrop/hero/
+  // bees by ~30, the budget the visible sail spends against the backdrop.
+  { id: 'ch2-meadow', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.12, glueR: 0.12, rise: 0.14, spans: [[-0.28, -0.22]] }, strutB: { glueL: 0.1, glueR: 0.1, rise: 0.06, spans: [[-0.16, -0.1]] }, qA: 0.06, qB: 0.06, deckZ0: -0.28, deckZ1: -0.1 },
   // The long-planned painted meadow fringe up front (call sheet v5): a low
   // wide reader-edge wall that ratchets the chapter's depth bands.
   { id: 'ch2-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.56, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.2, height: 0.22 },
-  // KINETIC (D4): a WINDMILL SAIL on the alpine courier station — Birmingham
-  // mech 73, a 45-deg arm that sweeps a quarter-turn up to vertical as the
-  // book opens (the sail catching the wind). NOTE (D4 placement wall): the
-  // book is at zero D-G2 collision headroom and densely composed at the
-  // spine, so the only A9-clean + gate-passing home for a spine-straddling
-  // sweep is the deep upstage lane behind the backdrop; a VISIBLE placement
-  // needs a re-composition pass (orchestrator call — see the D4 report).
-  { id: 'ch2-windmill', kind: 'backdrop', role: 'scenery', mech: 'kinetic', apexZ: -0.62, vDir: -1, phiDeg: 45, rhoDeg: 88, armW: 0.11, armLen: 0.26, flapW: 0.13, flapLen: 0.15 },
+  // KINETIC (D4/D5): a WINDMILL SAIL standing in the meadow — Birmingham mech
+  // 73, a 45-deg arm that sweeps a quarter-turn up to vertical as the book
+  // opens (the sail catching the wind). D5 arm-lane pass moved it from the deep
+  // upstage park (apexZ -0.62) to a VISIBLE mid-page downstage lane (apexZ 0.20,
+  // vDir +1): it stands at the meadow's front edge, just downstage of the
+  // courier hero, rising a hair over the fringe. Its quarter-turn sweep costs
+  // ~18 mid-turn brushes against the big backdrop wall; the meadow-shelf
+  // tightening above returns that budget (net mid-turn count DROPS vs the park).
+  { id: 'ch2-windmill', kind: 'midground', role: 'scenery', mech: 'kinetic', apexZ: 0.2, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.12, armLen: 0.3, flapW: 0.14, flapLen: 0.18 },
 ]
 
 // Chapter III — the rookery: the great tower now carries a dispatch
@@ -192,11 +197,18 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // 'foreground' painter reads as its railing until real art lands
   { id: 'ch3-balcony', kind: 'foreground', role: 'scenery', mech: 'child', parentId: 'ch3-towers', mount: 0.44, vDir: 1, phiDeg: 52, rhoDeg: 78, width: 0.3, height: 0.36 },
   { id: 'ch3-raven-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-towers', mount: 0.76, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.113 },
-  { id: 'ch3-rank', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 82, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.67 },
+  // D5 arm-lane pass: the second tower rank was lowered (height 0.67 -> 0.52) so
+  // the tower rows step down front-to-back — and, load-bearing for the gate, a
+  // shorter rank sweeps a smaller arc, dropping its mid-turn crossings with the
+  // counter/sorting AND clearing the fore-edge signal mast's backward sweep.
+  { id: 'ch3-rank', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 82, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.52 },
   { id: 'ch3-raven-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-rank', mount: 0.34, vDir: 1, phiDeg: 66, rhoDeg: 86, width: 0.11, height: 0.245 },
   // VOLUMETRIC: the dispatch counter is a lidded flat-top box — a real
-  // desk with a painted writing top and a camera-facing front.
-  { id: 'ch3-counter', kind: 'backdrop', role: 'story', mech: 'box', a: 0.16, height: 0.2, z0: 0.26, z1: 0.58, roof: 'flat' },
+  // desk with a painted writing top and a camera-facing front. D5 arm-lane
+  // pass: shrunk to a more compact desk (z 0.36..0.52, was 0.26..0.58; height
+  // 0.17, was 0.2) so it sweeps less over the rank/sorting and so the fore-edge
+  // signal mast standing just downstage of it clears it, rest and mid-turn.
+  { id: 'ch3-counter', kind: 'backdrop', role: 'story', mech: 'box', a: 0.16, height: 0.16, z0: 0.38, z1: 0.52, roof: 'flat' },
   // RECURSION (C4v2): a raven standing ON the dispatch counter's lid — a
   // rider v-fold whose "pages" are the box's lid patch pair.
   { id: 'ch3-perch-raven', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch3-counter', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.1, height: 0.09 },
@@ -206,15 +218,17 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
   // the coaching yard but tucked in toward the spine.
   { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.05, deckZ1: 0.2 },
-  // KINETIC (D4): the dispatch tower's SEMAPHORE ARM — Birmingham mech 73,
+  // KINETIC (D4/D5): the dispatch tower's SEMAPHORE ARM — Birmingham mech 73,
   // a 45-deg double-triangle astride the spine whose signal arm sweeps a
   // quarter-turn from horizontal to vertical as the book opens (the tower
-  // "raising the signal" for the raven post). PARKED in the deep upstage lane
-  // (see the ch2-windmill note + the D4 report): this densely-composed rookery
-  // is at zero D-G2 collision headroom, so the arm's spine-straddling sweep
-  // has no A9-clean, gate-passing home in the visible near-spine region;
-  // giving it a downstage stage needs a composition pass (orchestrator call).
-  { id: 'ch3-semaphore', kind: 'backdrop', role: 'scenery', mech: 'kinetic', apexZ: -0.55, vDir: -1, phiDeg: 45, rhoDeg: 89, armW: 0.1, armLen: 0.24, flapW: 0.12, flapLen: 0.14 },
+  // "raising the signal" for the raven post). D5 arm-lane pass moved it from the
+  // deep upstage park to the one clear lane the rookery has: the FORE EDGE
+  // (apexZ 0.64, vDir +1), where it stands as a tall signal mast at the front
+  // of the dispatch yard, unoccluded, rising well over the (now compact)
+  // counter — the spread's wow moment. As the page opens it sweeps up from
+  // lying back over the yard to vertical. The lower rank + shrunk counter above
+  // return the mid-turn budget its backward sweep spends (net count DROPS).
+  { id: 'ch3-semaphore', kind: 'foreground', role: 'scenery', mech: 'kinetic', apexZ: 0.64, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.11, armLen: 0.3, flapW: 0.13, flapLen: 0.16 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
