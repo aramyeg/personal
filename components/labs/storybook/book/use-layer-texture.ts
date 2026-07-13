@@ -14,7 +14,7 @@
  * boilerplate.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { artManifest } from '../art-manifest'
@@ -32,6 +32,26 @@ function hashLayerId(id: string): number {
   }
   return hash
 }
+
+/** Dev-only silhouette gate for the capture-review benchmark (D-G6, see
+ *  .superpowers/sdd/bench/capture-silhouette.mjs): `?sbsilhouette=1` strips
+ *  every pop-up piece's art down to plain warm stock, so a capture with art
+ *  disabled still has to read as a compelling paper scene on silhouette and
+ *  shadow alone. Read once per hook instance, same pattern as use-turn-driver's
+ *  `?sbpose`. Compiled out of production builds. */
+function readSilhouetteMode(): boolean {
+  if (process.env.NODE_ENV === 'production') return false
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('sbsilhouette') === '1'
+}
+
+// A couple of warm kraft/aged-paper tones (mirrors PAPER/PAPER_AGED in
+// ../procedural/paper-texture.ts — kept in sync by eye, like that file's own
+// duplicated palette) standing in for a chapter's real accent colors while
+// the silhouette gate is on. Two tones (not one) so placeholder shapes that
+// alternate accents by index (drawBackdrop's humps, drawHero's mound/body/
+// head, ...) still separate by value, not just outline.
+const KRAFT_TINTS: readonly string[] = ['#e7d5a8', '#c9b078']
 
 /**
  * Loads `/labs/storybook/art/<id>.webp`, routing success to `onLoad` and
@@ -92,29 +112,40 @@ export function useLayerTexture(
 ): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const gl = useThree((s) => s.gl)
+  const silhouette = useMemo(readSilhouetteMode, [])
 
   useEffect(() => {
     let owned: THREE.Texture | null = null
-    const { cancel } = loadArtTexture(
-      layerId,
-      (loaded) => {
-        owned = loaded
-        setTexture(loaded)
-      },
-      () => {
-        const canvas = makePlaceholderLayer(kind, accents, hashLayerId(layerId))
-        const fallback = makeCanvasTexture(canvas)
-        owned = fallback
-        setTexture(fallback)
-      }
-    )
+    const installPlaceholder = (palette: readonly string[]) => {
+      const canvas = makePlaceholderLayer(kind, palette, hashLayerId(layerId))
+      const fallback = makeCanvasTexture(canvas)
+      owned = fallback
+      setTexture(fallback)
+    }
+
+    let cancel = () => {}
+    if (silhouette) {
+      // Silhouette gate: never attempt the real-art fetch, always land on
+      // the placeholder cutout painted in kraft tones instead of the
+      // chapter's real accents.
+      installPlaceholder(KRAFT_TINTS)
+    } else {
+      ;({ cancel } = loadArtTexture(
+        layerId,
+        (loaded) => {
+          owned = loaded
+          setTexture(loaded)
+        },
+        () => installPlaceholder(accents)
+      ))
+    }
 
     return () => {
       cancel()
       owned?.dispose()
       setTexture(null)
     }
-  }, [layerId, kind, accents])
+  }, [layerId, kind, accents, silhouette])
 
   // Upload as soon as resolved: warm-window neighbors mount hidden, and a
   // hidden mesh never renders, so without this the GPU upload stalled the
@@ -136,8 +167,17 @@ export function useLayerTexture(
 export function useArtTexture(id: string): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const gl = useThree((s) => s.gl)
+  const silhouette = useMemo(readSilhouetteMode, [])
 
   useEffect(() => {
+    if (silhouette) {
+      // Silhouette gate: no placeholder exists for this hook (see the file
+      // header), so behave exactly as if the art never resolved — the
+      // renderer's own missing-art fallback takes over, unchanged.
+      setTexture(null)
+      return
+    }
+
     let owned: THREE.Texture | null = null
     const { cancel } = loadArtTexture(
       id,
@@ -153,7 +193,7 @@ export function useArtTexture(id: string): THREE.Texture | null {
       owned?.dispose()
       setTexture(null)
     }
-  }, [id])
+  }, [id, silhouette])
 
   // Same pre-warm rationale as useLayerTexture above.
   useEffect(() => {
