@@ -11,6 +11,7 @@ import {
   solveBoxPose,
   solveLayerPose,
   solveParallelPose,
+  solveStripFlapPose,
   solveVFoldPose,
   spreadDihedral,
   spreadPageAngles,
@@ -180,6 +181,14 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         // rider mount rule, dress seat existence).
         return
       }
+      if (layer.mech === 'stripflap') {
+        // strip pull budget exists and the figure stands upright at rest
+        expect(layer.anchor).toBeGreaterThan(0)
+        expect(layer.slot).toBeGreaterThan(0)
+        const rest = solveStripFlapPose(layer, Math.PI, 0)
+        expect(rest.crease[1]).toBeGreaterThan(0.9)
+        return
+      }
       const skew = layer.mech === 'vfold' ? (layer.skewDeg ?? 0) : 0
       const phiR = rad(layer.phiDeg)
       const rhoR = rad(layer.rhoDeg)
@@ -234,6 +243,15 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
             for (const p of glue) {
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
+          }
+          continue
+        }
+        if (layer.mech === 'stripflap') {
+          // one-page mechanism: BOTH panels hinge on the figure's page
+          const pose = poseAt(layer, layers, thetaL, thetaR)
+          const n = layer.side === 'left' ? nL : nR
+          for (const p of [pose.right[0], pose.right[1], pose.left[0], pose.left[1]]) {
+            expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
           }
           continue
         }
@@ -842,3 +860,87 @@ describe('cover-turn gearing (coverSpreadAngles) — the board IS the left plane
   })
 })
 
+
+// ---------------------------------------------------------------------------
+// PULL-STRIP ERECTED FLAP — derive-pullstrip.mjs gates ported in-engine
+// (C6 round 7c: off-center figures with no visible connector, law L5).
+// ---------------------------------------------------------------------------
+describe('stripflap — hidden-strip erection (P1/P2/P3/P6 gates)', () => {
+  const FLAP: LayerGeom = {
+    mech: 'stripflap',
+    side: 'left',
+    anchor: 0.22,
+    anchorZ: -0.26,
+    slot: 0.3,
+    slotZ: -0.26,
+    hingeX: 0.35,
+    hingeZ: -0.26,
+    width: 0.3,
+    height: 0.28,
+  }
+  const REST_BETA = rad(176)
+
+  it('P2: lies exactly flat at book-closed, at every bisector angle', () => {
+    for (const m of [0, Math.PI / 6, Math.PI / 2, Math.PI]) {
+      const pose = solveStripFlapPose(FLAP, m, m)
+      for (const p of [...pose.right, ...pose.left]) {
+        expect(Math.abs(p[0] * Math.sin(m) - p[1] * Math.cos(m))).toBeLessThan(1e-12)
+      }
+    }
+  })
+
+  it('P2: stands within a press-gap of upright at the erectAt dihedral, monotone rise', () => {
+    // the 0.995 press-gap caps theta a hair under beta everywhere, so at
+    // the rest dihedral the flap reads upright to within half a degree.
+    const rest = solveStripFlapPose(FLAP, Math.PI / 2 + REST_BETA / 2, Math.PI / 2 - REST_BETA / 2)
+    const up = Math.atan2(Math.hypot(rest.crease[0], rest.crease[2]), rest.crease[1])
+    // upright relative to its page; the page itself rests ~2 deg shy of flat
+    expect(Math.abs(up)).toBeLessThan(rad(3))
+    let prev = -1
+    for (let i = 0; i <= 60; i++) {
+      const beta = (i / 60) * REST_BETA
+      const pose = solveStripFlapPose(FLAP, Math.PI / 2 + beta / 2, Math.PI / 2 - beta / 2)
+      const lift = Math.asin(Math.min(1, Math.max(-1, pose.crease[1])))
+      expect(lift).toBeGreaterThanOrEqual(prev - 1e-6) // graze bisection resolution
+      prev = lift
+    }
+  })
+
+  it('P6: press-and-peel — the flap never leaves the closing wedge (theta <= beta)', () => {
+    for (let i = 1; i <= 90; i++) {
+      const beta = (i / 90) * Math.PI
+      const pose = solveStripFlapPose(FLAP, beta, 0)
+      // every corner inside the dihedral wedge: above the right page and
+      // below the left page plane
+      for (const p of [...pose.right, ...pose.left]) {
+        expect(p[1]).toBeGreaterThanOrEqual(-1e-9)
+        expect(p[0] * Math.sin(beta) - p[1] * Math.cos(beta)).toBeGreaterThanOrEqual(-1e-9)
+      }
+    }
+  })
+
+  it('P3: frontal facing at rest, at any station — and the halves stay coplanar', () => {
+    for (const hingeX of [0.2, 0.35, 0.6]) {
+      const geom: LayerGeom = { ...FLAP, hingeX }
+      const pose = solveStripFlapPose(geom, Math.PI / 2 + REST_BETA / 2, Math.PI / 2 - REST_BETA / 2)
+      // face normal = hinge x crease; frontal hinge (0 deg) faces +-z
+      const nx = pose.glueR[1] * pose.crease[2] - pose.glueR[2] * pose.crease[1]
+      const ny = pose.glueR[2] * pose.crease[0] - pose.glueR[0] * pose.crease[2]
+      const nz = pose.glueR[0] * pose.crease[1] - pose.glueR[1] * pose.crease[0]
+      const len = Math.hypot(nx, ny, nz)
+      expect(Math.abs(nz / len)).toBeGreaterThan(0.95)
+      // coplanar halves: the left panel's outer corners lie in the right
+      // panel's plane (single sheet, invisible center seam)
+      const [o, r1, r2] = [pose.right[0], pose.right[1], pose.right[3]]
+      const u: [number, number, number] = [r1[0] - o[0], r1[1] - o[1], r1[2] - o[2]]
+      const v: [number, number, number] = [r2[0] - o[0], r2[1] - o[1], r2[2] - o[2]]
+      const pn = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+      const pl = Math.hypot(pn[0], pn[1], pn[2])
+      for (const p of [pose.left[1], pose.left[2]]) {
+        const d =
+          ((p[0] - o[0]) * pn[0] + (p[1] - o[1]) * pn[1] + (p[2] - o[2]) * pn[2]) / pl
+        expect(Math.abs(d)).toBeLessThan(1e-12)
+      }
+    }
+  })
+})

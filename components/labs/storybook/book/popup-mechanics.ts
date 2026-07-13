@@ -302,6 +302,43 @@ export type DressGeom = {
   height: number
 }
 
+/**
+ * PULL-STRIP ERECTED FLAP (C6 round 7c; derive-pullstrip.mjs): the
+ * off-center figure with NO visible connector (law L5). A hidden strip
+ * anchored on the OPPOSITE page crosses the gutter valley as a taut
+ * chord, threads a slot in the floor, and pulls a flap erect about a
+ * hinge glued flat on the figure's page — the book's own opening is the
+ * puller (one dihedral, benchmark B9). The under-floor run cancels out
+ * of the kinematics, so the figure stands at ANY station with ANY
+ * facing; only the flap itself is visible paper. Geared to stand at
+ * exactly 90 deg at `erectAtDeg`; the opposite page presses it flat
+ * early in a turn until it peels up (theta = min(strip curve, beta)).
+ */
+export type StripFlapGeom = {
+  mech: 'stripflap'
+  /** The page the figure stands on (the strip anchors on the other). */
+  side: 'left' | 'right'
+  /** Strip anchor: distance from the gutter on the opposite page, and z. */
+  anchor: number
+  anchorZ: number
+  /** Floor slot: distance from the gutter on the figure's page, and z. */
+  slot: number
+  slotZ: number
+  /** Hinge center on the figure's page: distance from the gutter along
+   *  the page, and z. */
+  hingeX: number
+  hingeZ: number
+  /** Hinge orientation in the page plane, degrees: 0 = across the page
+   *  (frontal figure, face to the reader), 90 = along the spine
+   *  (profile). 180 flips which way the flap lies when flat. */
+  hingeDeg?: number
+  width: number
+  height: number
+  /** Dihedral (deg) at which the figure stands exactly upright.
+   *  Default 176 — the book's rest bloom. */
+  erectAtDeg?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -311,6 +348,7 @@ export type LayerGeom =
   | FanGeom
   | RiderGeom
   | DressGeom
+  | StripFlapGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -657,6 +695,78 @@ export function solveBoxPose(geom: BoxGeom, thetaL: number, thetaR: number): rea
 }
 
 // ---------------------------------------------------------------------------
+// Pull-strip erected flap (derive-pullstrip.mjs — see StripFlapGeom).
+
+export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const a = geom.anchor
+  const b = geom.slot
+  const dz = geom.anchorZ - geom.slotZ
+  const strip = (bt: number): number => Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(bt) + dz * dz)
+  const shut = strip(0)
+  const reach = Math.max(strip(rad(geom.erectAtDeg ?? 176)) - shut, 1e-9)
+  const pull = strip(beta) - shut
+  const stripLift = Math.acos(clamp(1 - pull / reach, -1, 1))
+
+  // The figure page's own frame: u along the page (gutter -> fore edge),
+  // n into the wedge, hinge axis turned by hingeDeg in the page plane.
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const u: Vec3 = [Math.cos(t), Math.sin(t), 0]
+  const n: Vec3 = geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
+  const hd = rad(geom.hingeDeg ?? 0)
+  const hinge: Vec3 = [Math.cos(hd) * u[0], Math.cos(hd) * u[1], Math.sin(hd)]
+  const flat = cross(hinge, n) // the flap's lie direction when flat
+  const center: Vec3 = [geom.hingeX * u[0], geom.hingeX * u[1], geom.hingeZ]
+  const h0 = combine(1, center, -geom.width / 2, hinge)
+  const h1 = combine(1, center, geom.width / 2, hinge)
+
+  // Press-and-peel: early in a turn the strip curve would carry the flap
+  // tip through the OTHER page — in paper the tip rests against that page
+  // and slides until it peels free. Cap the lift at the graze pose (the
+  // largest angle keeping every tip corner inside the dihedral wedge),
+  // less a paper-thickness press gap.
+  const nuR: Vec3 = [-Math.sin(thetaR), Math.cos(thetaR), 0]
+  const nuL: Vec3 = [Math.sin(thetaL), -Math.cos(thetaL), 0]
+  const erectAt = (th: number): Vec3 => [
+    flat[0] * Math.cos(th) + n[0] * Math.sin(th),
+    flat[1] * Math.cos(th) + n[1] * Math.sin(th),
+    flat[2] * Math.cos(th) + n[2] * Math.sin(th),
+  ]
+  const insideWedge = (th: number): boolean => {
+    const e = erectAt(th)
+    for (const base of [h0, h1]) {
+      const tip = combine(1, base, geom.height, e)
+      if (dot(tip, nuR) < -1e-12 || dot(tip, nuL) < -1e-12) return false
+    }
+    return true
+  }
+  let lift = stripLift
+  if (!insideWedge(lift)) {
+    let lo = 0
+    let hi = lift
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2
+      if (insideWedge(mid)) lo = mid
+      else hi = mid
+    }
+    lift = Math.max(0, lo - 0.002)
+  }
+  const erect = erectAt(lift)
+
+  // Two coplanar half-quads split at the center so the standard two-panel
+  // renderer draws it with a seamless (invisible) center line.
+  return {
+    right: parallelogram(center, [h1[0] - center[0], h1[1] - center[1], h1[2] - center[2]], 1, erect, geom.height),
+    left: parallelogram(center, [h0[0] - center[0], h0[1] - center[1], h0[2] - center[2]], 1, erect, geom.height),
+    split: 0.5,
+    apex: center,
+    crease: erect,
+    glueR: hinge,
+    glueL: [-hinge[0], -hinge[1], -hinge[2]],
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch: one entry point for any layer geometry.
 
 /**
@@ -684,6 +794,8 @@ export function solveLayerPose(
       }
       return solveChildPose(geom, solveVFoldPose(parentGeom, thetaL, thetaR))
     }
+    case 'stripflap':
+      return solveStripFlapPose(geom, thetaL, thetaR)
     case 'box':
       throw new Error('storybook: box layers are multi-patch — use solveBoxPose')
     case 'platform':

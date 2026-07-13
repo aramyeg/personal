@@ -45,6 +45,8 @@ const familyOf = (l: SceneLayer): string | null => {
       return 'recursion'
     case 'parallel':
       return 'parallel'
+    case 'stripflap':
+      return 'stripflap'
     case 'dress':
       return null
   }
@@ -278,6 +280,33 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         // each patch stays within the die-cut bound (overhang allowed, sprawl not)
         expect(l.width).toBeLessThanOrEqual(0.35)
         expect(l.height).toBeLessThanOrEqual(0.35)
+      }
+    }
+  })
+
+  it('stripflap validity: the strip can pull, and the whole die stays inside the page', () => {
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'stripflap') continue
+        const label = `${name} ${l.id}`
+        // a working strip needs a real anchor and slot on their pages
+        expect(l.anchor, label).toBeGreaterThan(0)
+        expect(l.slot, label).toBeGreaterThan(0)
+        expect(l.anchor, label).toBeLessThanOrEqual(PAGE_W)
+        expect(l.slot, label).toBeLessThanOrEqual(PAGE_W)
+        expect(Math.abs(l.anchorZ), label).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(l.slotZ), label).toBeLessThanOrEqual(PAGE_H / 2)
+        // hinge plus the flat-lying flap stays inside the page (the die
+        // lies flat at book-closed): width runs along the hinge, height
+        // perpendicular to it in the page plane
+        const hd = ((l.hingeDeg ?? 0) * Math.PI) / 180
+        const cx = Math.abs(Math.cos(hd))
+        const sz = Math.abs(Math.sin(hd))
+        expect(l.hingeX + (l.width / 2) * cx + l.height * sz, label).toBeLessThanOrEqual(PAGE_W)
+        expect(l.hingeX - (l.width / 2) * cx - l.height * sz, label).toBeGreaterThanOrEqual(0)
+        expect(Math.abs(l.hingeZ) + (l.width / 2) * sz + l.height * cx, label).toBeLessThanOrEqual(
+          PAGE_H / 2
+        )
       }
     }
   })

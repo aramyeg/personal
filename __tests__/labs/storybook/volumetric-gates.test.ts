@@ -3,6 +3,7 @@ import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
 import {
   solveBoxPose,
   solveParallelPose,
+  solveStripFlapPose,
   solveVFoldPose,
   solveChildPose,
   type PanelQuad,
@@ -100,6 +101,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     }
     case 'parallel': {
       const pose = solveParallelPose(l, tL, tR)
+      return [pose.right, pose.left]
+    }
+    case 'stripflap': {
+      const pose = solveStripFlapPose(l, tL, tR)
       return [pose.right, pose.left]
     }
     default:

@@ -51,6 +51,10 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *   - 'dress': a non-kinematic die-cut silhouette patch glued flat onto one
  *     parent panel, riding its link and free to overhang the panel edges
  *     (the Sabuda recipe) — zero DOF, pure decoration.
+ *   - 'stripflap' (C6 round 7c): a figure erected by a HIDDEN pull strip
+ *     under the floor — the book's own opening pulls it upright at any
+ *     station with any facing, with no visible connector (law L5). The
+ *     off-center standee/building vocabulary.
  *  Constraints enforced by tests: pieces stand when open, fold exactly
  *  flat when closed, stay inside the closed page ("nothing sticks out"),
  *  never tear or jam, and children keep their glue on the parent's paper.
@@ -385,47 +389,20 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // outer rays long): a low-phi member's glue lines run nearly parallel to
 // the spine, so the inner ray is what would reach the bag — kept short —
 // while the outer rays angle away from the spine and carry the span.
-// DE-CENTERED (C6 round 7/7b acid test — THE spread where "everything
-// bends toward the center" hurt most): the unpacking now scatters across
-// the whole plane, each piece owning its local frame (the de-centering
-// law). The bag keeps the spine (bigger items may stay) and the golden
-// burst keeps its apex (the fan showcase); the new pieces stand at their
-// own stations:
-//  - the Wayfarer's Compass sits UPRIGHT on a map table standing entirely
-//    on the RIGHT page — a NON-MIRRORED equal-reach bridge whose two
-//    ridges share a height (the upright theorem, derive-offspine.mjs;
-//    strutB's rise is the solved root 0.0353).
-//  - the Ever-Sharp Sword stands planted in a ground-swell mound near the
-//    front LEFT edge — a tentRidge rider that leans with its mound the
-//    way a sword stuck in earth leans.
-// OFF-SPINE DISCIPLINE: every anchor's paper still runs to the gutter
-// under the hood (tent panels and strut ramps cross the spine), so pieces
-// whose GLUE FOOTPRINTS overlap laterally must take disjoint z-bands.
-// Footprints here: table -0.62..-0.36 | mound -0.34..-0.18 | bag -0.10..
-// ~0.47 | burst glue 0.24..0.47 (bag/burst share air, A9-verified clear;
-// the fan's PANELS reach z ~0.73 — nothing else may live under that
-// shadow, which is what evicted the mound from the front band).
+// DE-CENTERED, round 7c: the ramped table/mound experiment is out — its
+// long connectors re-drew the spine's gravity. The scattered items are
+// now PULL-STRIP ERECTED FLAPS (hidden strip under the floor, the book's
+// own opening pulls them upright): only the figure itself is visible
+// paper, standing frontal at its own station. The bag keeps the spine
+// (bigger-item amnesty) and the golden burst keeps its apex (the fan
+// showcase). Flat-lie footprints and stations avoid the bag/burst bands.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
   { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
-  // Table: a low camp table standing WELL out on the right page (deck at
-  // stations -0.28..-0.54; strutB's rise 0.018 is the equal-height root at
-  // the rest pose — ridges 0.118 each, so the top is level: the upright
-  // theorem in shipped form). qA/qB 0.136 over the 0.262 ridge gap keeps
-  // the deck slopes ~9 deg — a TABLETOP, not a pitched roof (the first
-  // build's 0.48 slack read as a barn). The compass LIES ON the tabletop
-  // as a dress patch: the high reading camera sees deck tops face-on, so
-  // flat objects read from above — a rider's v opens ALONG the ridge and
-  // shows the camera its edge (right for profile silhouettes like the
-  // sword blade or the perch raven, wrong for a dial).
-  { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.05, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.18, glueR: 0.452, rise: 0.018, spans: [[-0.62, -0.36]] }, qA: 0.136, qB: 0.136, deckZ0: -0.62, deckZ1: -0.36 },
-  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'dress', parentId: 'satchel-table', seat: 'deckB', u: 0.025, v: 0.08, width: 0.09, height: 0.09 },
-  // Standee angle law (discovered here): mountain seats swing the crease-
-  // elevation term by ~tan(phi) past beta = pi, so tent/deck riders take
-  // LOW phi — the sword at phi 30 reclines the family's ~23 deg where phi
-  // 58 lay back 48 deg. Its art is a BLADE IN PROFILE (see facing note).
-  { id: 'satchel-mound', kind: 'midground', role: 'scenery', mech: 'parallel', glueL: 0.4, glueR: 0.2, rise: 0.02, z0: -0.34, z1: -0.18 },
-  { id: 'satchel-sword', kind: 'hero', role: 'scenery', mech: 'rider', parentId: 'satchel-mound', seat: 'tentRidge', mountZ: -0.27, vDir: 1, phiDeg: 30, rhoDeg: 80, width: 0.16, height: 0.3 },
+  // The Ever-Sharp Sword: frontal figure standing mid-left.
+  { id: 'satchel-sword', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.22, anchorZ: -0.3, slot: 0.3, slotZ: -0.3, hingeX: 0.38, hingeZ: -0.3, width: 0.34, height: 0.4 },
+  // The Wayfarer's Compass: frontal dial standing on the right page.
+  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: -0.5, slot: 0.26, slotZ: -0.5, hingeX: 0.36, hingeZ: -0.5, width: 0.22, height: 0.24 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 

@@ -84,6 +84,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'platform') return layer.qA / (layer.qA + layer.qB) // deck crease
   if (layer.mech === 'fan') return 0.5 // per-member creaseU applies at render
   if (layer.mech === 'dress') return 0.5 // single quad, no fold
+  if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
   return layer.creaseU ?? 0.5
 }
 
@@ -197,6 +198,12 @@ function shadowPlacement(
     return {
       position: [(layer.glueR - layer.glueL) / 2, SHADOW_Y_LIFT, (layer.z0 + layer.z1) / 2],
       size: [(layer.glueL + layer.glueR) * 0.85, (layer.z1 - layer.z0) * 0.95],
+    }
+  }
+  if (layer.mech === 'stripflap') {
+    return {
+      position: [layer.side === 'left' ? -layer.hingeX : layer.hingeX, SHADOW_Y_LIFT, layer.hingeZ],
+      size: [layer.width * 0.9, SHADOW_HEIGHT * 0.8],
     }
   }
   return null
