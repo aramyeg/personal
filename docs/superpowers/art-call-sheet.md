@@ -179,7 +179,7 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 |---|---|---|---|---|---|
 | `ch2-backdrop` | `ch2-backdrop` | Alpine ridge panorama, chalets stepped down the slope | ≈1.76:1 landscape | STAND | **art** |
 | `ch2-bee-a` | `ch2-bee-a` | Courier bee riding the ridge's fold, wings spread, parcel underneath | ≈1.88:1 landscape | STAND | **art** |
-| `ch2-bee-b` | `ch2-bee-b` | Smaller courier bee, letter in its legs | ≈1.80:1 landscape | STAND | **art** |
+| `ch2-bee-b` | `ch2-bee-b` | Smaller courier bee, letter in its legs (re-homed to the balloon's fold in D5 — was invisible behind it) | ≈1.80:1 landscape | STAND — **ROTATED 180** | **art** |
 | `ch2-hero` | `ch2-hero` | The hero's courier hot-air balloon, looking-glass in hand | ≈0.57:1 portrait | STAND | **art** |
 | `ch2-bee-c` | `ch2-bee-c` | Smallest scout bee, riding the balloon's own fold | ≈2.17:1 wide | STAND — **ROTATED 180** | **art** |
 | `ch2-hive` | `ch2-hive-front`, `ch2-hive-back`, `ch2-hive-side`, `ch2-hive-top` | Lidded beehive box in the meadow — real hives ARE stacked boxes | side ≈0.86:1 · front/back ≈1.29:1 · top ≈1.5:1 | FACE / TOPDOWN | placeholder |

@@ -27,6 +27,9 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
     // the inn's deep-V case.
     for (const [spread, id] of [
       [2, 'ch1-dormer'],
+      // bee-b re-homed to the deep-V hero in D5 (it was 100% swallowed as a
+      // backdrop child) — it now tips past vertical like its sibling bee-c.
+      [3, 'ch2-bee-b'],
       [6, 'ch5-lantern'],
       [7, 'ch6-banner'],
     ] as const) {
@@ -50,7 +53,6 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
     // balcony on the citadel walls.
     for (const [spread, id] of [
       [3, 'ch2-bee-a'],
-      [3, 'ch2-bee-b'],
       [4, 'ch3-balcony'],
       [4, 'ch3-raven-a'],
       [4, 'ch3-raven-b'],

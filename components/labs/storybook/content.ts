@@ -139,7 +139,7 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // ceiling", C6 round-1 verdict 2026-07-11): open front toward the
   // reader, hollow interior, back wall as the brace. Sized down and kept
   // forward so the inn's painted story and the signpost stay clear.
-  { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.16, z0: 0.42, z1: 0.58, roof: 'gable', gableRise: 0.08, capFront: false },
+  { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.15, z0: 0.43, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
   // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
   { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.07, height: 0.12 },
   { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
@@ -162,8 +162,8 @@ const CH1_LAYERS: readonly SceneLayer[] = [
 const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.45, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: 1.5, creaseU: 0.6, width: 1.65, height: 0.94 },
   { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.48, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117 },
-  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.22, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
   { id: 'ch2-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
+  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.62, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
   { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069 },
   // VOLUMETRIC: the guild's hive — a small lidded box in the meadow (real
   // beehives ARE stacked boxes); keeps the chapter airy but gives it its
@@ -337,7 +337,7 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // VOLUMETRIC: a banker's strongbox on the path to the vaults — the
   // chapter's enclosed volume until the treasury itself becomes a box
   // (waiting on the art split). Completes the census: 6/6 chapters.
-  { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.1, height: 0.11, z0: 0.38, z1: 0.5, roof: 'flat' },
+  { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.095, height: 0.1, z0: 0.38, z1: 0.5, roof: 'flat' },
   // RECURSION (C4v2): the bank's griffin crest standing ON the strongbox lid.
   { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08 },
   // Dress on the strongbox: a wax seal on the front cap, minted coins heaped
