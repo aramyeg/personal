@@ -408,10 +408,24 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
   { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
-  { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.1, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.2647, glueR: 0.4, rise: 0.0353, spans: [[-0.62, -0.36]] }, qA: 0.24, qB: 0.24, deckZ0: -0.62, deckZ1: -0.36 },
-  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'satchel-table', seat: 'deckCrease', mountZ: -0.49, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.1, height: 0.08 },
-  { id: 'satchel-mound', kind: 'midground', role: 'scenery', mech: 'parallel', glueL: 0.4, glueR: 0.2, rise: 0.03, z0: -0.34, z1: -0.18 },
-  { id: 'satchel-sword', kind: 'hero', role: 'scenery', mech: 'rider', parentId: 'satchel-mound', seat: 'tentRidge', mountZ: -0.26, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.16, height: 0.3 },
+  // Table: a low camp table standing WELL out on the right page (deck at
+  // stations -0.28..-0.54; strutB's rise 0.018 is the equal-height root at
+  // the rest pose — ridges 0.118 each, so the top is level: the upright
+  // theorem in shipped form). qA/qB 0.136 over the 0.262 ridge gap keeps
+  // the deck slopes ~9 deg — a TABLETOP, not a pitched roof (the first
+  // build's 0.48 slack read as a barn). The compass LIES ON the tabletop
+  // as a dress patch: the high reading camera sees deck tops face-on, so
+  // flat objects read from above — a rider's v opens ALONG the ridge and
+  // shows the camera its edge (right for profile silhouettes like the
+  // sword blade or the perch raven, wrong for a dial).
+  { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.05, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.18, glueR: 0.452, rise: 0.018, spans: [[-0.62, -0.36]] }, qA: 0.136, qB: 0.136, deckZ0: -0.62, deckZ1: -0.36 },
+  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'dress', parentId: 'satchel-table', seat: 'deckB', u: 0.025, v: 0.08, width: 0.09, height: 0.09 },
+  // Standee angle law (discovered here): mountain seats swing the crease-
+  // elevation term by ~tan(phi) past beta = pi, so tent/deck riders take
+  // LOW phi — the sword at phi 30 reclines the family's ~23 deg where phi
+  // 58 lay back 48 deg. Its art is a BLADE IN PROFILE (see facing note).
+  { id: 'satchel-mound', kind: 'midground', role: 'scenery', mech: 'parallel', glueL: 0.4, glueR: 0.2, rise: 0.02, z0: -0.34, z1: -0.18 },
+  { id: 'satchel-sword', kind: 'hero', role: 'scenery', mech: 'rider', parentId: 'satchel-mound', seat: 'tentRidge', mountZ: -0.27, vDir: 1, phiDeg: 30, rhoDeg: 80, width: 0.16, height: 0.3 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
