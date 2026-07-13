@@ -249,7 +249,8 @@ test.describe('curator lab', () => {
     await expect(page).toHaveURL(/\/labs\/curator/)
 
     await page.keyboard.press('Escape')
-    await expect(page).toHaveURL(/\/labs$/, { timeout: 10_000 })
+    // museum-at-root: GalleryChrome's Esc exit targets / (matches labs-gallery.spec)
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 })
   })
 
   test('main content area scrolls when a module is taller than the viewport', async ({ page }) => {
