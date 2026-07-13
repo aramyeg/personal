@@ -506,3 +506,33 @@ automatically get pulled and erect the buildings or figurines"
 3. Composition consequence: spread-8 mound+sword and the table's ramp
    look are to be reworked onto strip-erected pieces; rolling the
    tent/table connector look across chapters 2-7 is CANCELLED.
+
+## C6 round 7d (2026-07-13) — THE PALETTE LAW: variety and asymmetry
+
+Correction after I removed the table/mound wholesale. Verbatim: "not
+each one, some can be bound to the gutter, the ones that stay in the
+middle, some will be bound to the gutter but be off center, some can be
+v-folds, like the backdrops that we have, and some can be table,
+cutouts, wall and ceiling structures which can be either again bound to
+the gutter creating some variety, or have strips inside the page. You
+always focus only on 1 aspect, but actually what makes the aesthetics
+is having variety and asymmetrism"
+
+L6 — THE PALETTE LAW (supersedes any monoculture reading of rounds
+7a-7c): every earlier verdict pruned an EXCESS, not a family. The full
+vocabulary COEXISTS, mixed asymmetrically per scene:
+  a. gutter-bound center pieces (spine v-folds, boxes, fans) — the
+     middle of the stage;
+  b. gutter-bound OFF-CENTER pieces (non-mirrored bridges, skewed
+     folds, off-center creases) — connectors are fine when modest;
+     7c rejected the DOMINANT-ramp look, not the family;
+  c. v-fold backdrops as they are;
+  d. tables / cutouts / wall-and-ceiling structures in BOTH drives:
+     gutter-bound for some, page-internal strips (tab visible at the
+     book's side, future user pull/push) for others.
+Also: strip tabs remain the interactive future (E) — pull OR push to
+erect or fold.
+
+Composition rule of thumb going forward: a spread mixes >= 2-3 families
+at varied stations, scales, and drives; no spread (and no roll-out)
+converges on a single mechanism.

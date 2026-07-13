@@ -389,20 +389,24 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // outer rays long): a low-phi member's glue lines run nearly parallel to
 // the spine, so the inner ray is what would reach the bag — kept short —
 // while the outer rays angle away from the spine and carry the span.
-// DE-CENTERED, round 7c: the ramped table/mound experiment is out — its
-// long connectors re-drew the spine's gravity. The scattered items are
-// now PULL-STRIP ERECTED FLAPS (hidden strip under the floor, the book's
-// own opening pulls them upright): only the figure itself is visible
-// paper, standing frontal at its own station. The bag keeps the spine
-// (bigger-item amnesty) and the golden burst keeps its apex (the fan
-// showcase). Flat-lie footprints and stations avoid the bag/burst bands.
+// ROUND 7d — THE PALETTE LAW: the scene mixes drives and stations, no
+// monoculture. Spine pieces (bag v-fold, fan burst), a gutter-bound
+// OFF-CENTER table (non-mirrored bridge — modest ramps are part of the
+// paper's honesty; 7c rejected dominant ramps, not the family), and
+// strip-erected frontal figures (hidden pull strips — no connectors at
+// all). Variety and asymmetry ARE the aesthetic.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-bag', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.1, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.9, height: 0.6 },
   { id: 'satchel-burst', kind: 'midground', role: 'scenery', mech: 'fan', apexZ: 0.24, vDir: 1, members: [{ phiDeg: 17.2, rhoDeg: 31.5, width: 0.26, height: 0.26 }, { phiDeg: 31.5, rhoDeg: 48.7, width: 0.4, height: 0.34 }, { phiDeg: 45.8, rhoDeg: 65.9, width: 0.5, height: 0.36 }] },
-  // The Ever-Sharp Sword: frontal figure standing mid-left.
+  // The map table: gutter-bound, standing well out on the right page
+  // (equal-height ridges keep its top level), the Router's Scroll
+  // unrolled across it.
+  { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.05, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.18, glueR: 0.452, rise: 0.018, spans: [[-0.62, -0.36]] }, qA: 0.136, qB: 0.136, deckZ0: -0.62, deckZ1: -0.36 },
+  { id: 'satchel-scroll', kind: 'midground', role: 'scenery', mech: 'dress', parentId: 'satchel-table', seat: 'deckB', u: 0.02, v: 0.05, width: 0.09, height: 0.16 },
+  // The Ever-Sharp Sword: strip-erected frontal figure, mid-left.
   { id: 'satchel-sword', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.22, anchorZ: -0.3, slot: 0.3, slotZ: -0.3, hingeX: 0.38, hingeZ: -0.3, width: 0.34, height: 0.4 },
-  // The Wayfarer's Compass: frontal dial standing on the right page.
-  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: -0.5, slot: 0.26, slotZ: -0.5, hingeX: 0.36, hingeZ: -0.5, width: 0.22, height: 0.24 },
+  // The Wayfarer's Compass: strip-erected frontal dial, front-right.
+  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.35, slot: 0.26, slotZ: 0.35, hingeX: 0.36, hingeZ: 0.35, width: 0.22, height: 0.24 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
