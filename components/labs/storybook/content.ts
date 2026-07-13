@@ -118,7 +118,7 @@ export const END_CLOSING_LINE =
 // low field wall pushed to the very front edge. Four depth planes plus a
 // cascade — the densest chapter open.
 const CH1_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch1-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
+  { id: 'ch1-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 82, rhoDeg: 88.8, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
   { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.06, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
   // DRESSED ASSEMBLY (C1v2): the inn is now a v-fold core wearing shaped
   // silhouette patches — the eaves overhang its roofline off the left
@@ -144,8 +144,8 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // building on both sides — a rampart-terrace behind the inn instead of a
   // flap the hero fully masks. Still sunk in the back lane so it owns its
   // depth band (the inn nudged to apexZ 0.06 to drop its screen-top clear).
-  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.3, glueR: 0.14, rise: 0.26, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.3, rise: 0.26, spans: [[-0.3, -0.24], [-0.18, -0.12]] }, qA: 0.3, qB: 0.3, deckZ0: -0.3, deckZ1: -0.12 },
-  { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.6, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
+  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.3, glueR: 0.14, rise: 0.26, spans: [[-0.24, -0.19], [-0.17, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.3, rise: 0.26, spans: [[-0.24, -0.19], [-0.17, -0.12]] }, qA: 0.28, qB: 0.28, deckZ0: -0.24, deckZ1: -0.12 },
+  { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
 ]
 
 // Chapter II — airy alpine spread, no foreground fringe: one big leaning
@@ -184,7 +184,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // 'foreground' painter reads as its railing until real art lands
   { id: 'ch3-balcony', kind: 'foreground', role: 'scenery', mech: 'child', parentId: 'ch3-towers', mount: 0.44, vDir: 1, phiDeg: 52, rhoDeg: 78, width: 0.3, height: 0.36 },
   { id: 'ch3-raven-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-towers', mount: 0.76, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.113 },
-  { id: 'ch3-rank', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.67 },
+  { id: 'ch3-rank', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 82, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.67 },
   { id: 'ch3-raven-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-rank', mount: 0.34, vDir: 1, phiDeg: 66, rhoDeg: 86, width: 0.11, height: 0.245 },
   // VOLUMETRIC: the dispatch counter is a lidded flat-top box — a real
   // desk with a painted writing top and a camera-facing front.
@@ -197,7 +197,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   { id: 'ch3-counter-scale', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch3-counter', seat: 'capFrontL', u: 0.04, v: 0.05, width: 0.09, height: 0.1 },
   // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
   // the coaching yard but tucked in toward the spine.
-  { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.02, 0.08], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.02, 0.08], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.02, deckZ1: 0.2 },
+  { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.05, deckZ1: 0.2 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
@@ -207,14 +207,14 @@ const CH3_LAYERS: readonly SceneLayer[] = [
 // displays its print undistorted. One storytelling child joins them:
 // coins spilling off the dragon's own fold (placeholder art until Batch-2).
 const CH4_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch4-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.4, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.9, height: 0.74 },
+  { id: 'ch4-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.4, vDir: -1, phiDeg: 80, rhoDeg: 88, width: 1.9, height: 0.74 },
   { id: 'ch4-midground', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.05, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 2.0, height: 0.495 },
   { id: 'ch4-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.06, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.794, height: 0.62 },
   { id: 'ch4-coins', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch4-hero', mount: 0.22, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
   // VOLUMETRIC: an open treasure chest in front of the dragon — the
   // book's HOLLOW box (open top, no backbone): the reading camera looks
   // straight down into a raw-paper interior (benchmark B16).
-  { id: 'ch4-chest', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.12, z0: 0.3, z1: 0.42, roof: 'open' },
+  { id: 'ch4-chest', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.12, z0: 0.34, z1: 0.46, roof: 'open' },
   // Dress on the chest: the propped-open lid silhouette rising off the side
   // wall, gold heaped across the front cap (patches ride at/above the panel
   // base — paper cannot overhang below a page-glued edge).
@@ -228,7 +228,7 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // lopsided glue split so the gold heap crests ABOVE the skyline and shows
   // through the torn-paper sky — deep AND tall, since a deeper piece sits
   // HIGHER on this top-down camera.
-  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.22, glueR: 0.14, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, strutB: { glueL: 0.14, glueR: 0.22, rise: 0.4, spans: [[-0.39, -0.34], [-0.32, -0.26]] }, qA: 0.21, qB: 0.21, deckZ0: -0.39, deckZ1: -0.26 },
+  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.22, glueR: 0.14, rise: 0.4, spans: [[-0.3, -0.26], [-0.24, -0.2]] }, strutB: { glueL: 0.14, glueR: 0.22, rise: 0.4, spans: [[-0.3, -0.26], [-0.24, -0.2]] }, qA: 0.21, qB: 0.21, deckZ0: -0.3, deckZ1: -0.2 },
   // D1 TAB PIECE: the hoard's loose gold rises as a MOUND on the right
   // page, its tab creeping out of the fore edge as the spread blooms —
   // the treasure literally grows when the book opens. Strip-driven family
@@ -236,7 +236,7 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // Sited z 0.08+ so the midground wall's glue path (crosses z ~0.04 at
   // this x range) stays clear, x >= 0.38 so the chest (x <= ~0.24) does.
   { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.08, z1: 0.36, legW: 0.26, liftDeg: 55 },
-  { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.44, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
+  { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
 // Chapter V — the bazaar: rose-stone skyline, then a ROW of identical
@@ -301,7 +301,7 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // (waiting on the art split). Completes the census: 6/6 chapters.
   { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.1, height: 0.11, z0: 0.38, z1: 0.5, roof: 'flat' },
   // RECURSION (C4v2): the bank's griffin crest standing ON the strongbox lid.
-  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.44, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08 },
+  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08 },
   // Dress on the strongbox: a wax seal on the front cap, minted coins heaped
   // at the side-wall base (v=0 — no overhang below the page-glued edge).
   { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
@@ -315,7 +315,7 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // the wide bridge and the lean together give it a real reveal. Deep back
   // lane, so it keeps its own depth band.
   { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.26, glueR: 0.14, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, strutB: { glueL: 0.14, glueR: 0.26, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, qA: 0.28, qB: 0.28, deckZ0: -0.32, deckZ1: -0.14 },
-  { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.54, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
+  { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [

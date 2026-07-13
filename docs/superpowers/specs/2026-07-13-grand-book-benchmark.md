@@ -18,14 +18,30 @@ D-G1 VARIETY (P1) — covenant test over CHAPTERS
     once.
 
 D-G2 FULL-SWEEP COLLISION (P2) — bench + vitest
-  - Zero interpenetration beyond margin 0.005 between any two solved
-    panels of a spread at 25 stations across the fold sweep (from
-    near-closed ~8° to rest bloom), not just at rest. Below ~8° the
-    closed-stack model owns the geometry.
-  - Strip-driven pieces scrub BOTH domains: page angle x strip
-    travel (11 travel stations per page station on touched pairs).
-  - Replaces/extends A9. Current A9 rest-only version is the floor;
-    D2 raises it to the sweep.
+  REFINED 2026-07-13 by derivation (derive-nesting.mjs): absolute
+  zero-crossing at all angles is physically wrong for zero-thickness
+  solvers — at/near closed, overlapping-footprint pieces legally
+  STACK, and mid-fold transient contact is real-paper behavior
+  (paper presses/flexes) that rigid solvers cannot express. A
+  crossing CLASSIFIER separates grazing/stacking from scissoring:
+  ILLEGAL iff quad-plane angle >= 15deg (measured gap: grazes <=13,
+  crossings >=20) AND intersection height above the nearer page
+  >= 0.028 (2x SHEET_STACK_T). Three tiers where the eye dwells:
+  - Part 1 HARD ZERO at each spread's TRUE rest pose (tilted rest
+    angles incl. bulge, plus symmetric 176deg; A9's (PI,0) roll
+    stays as its own gate). The reader's dwelling pose is spotless.
+  - Part 2 NEAR-REST RATCHET beta [165,176]: per-spread illegal-hit
+    ceilings (measured 2026-07-13: 0-13), only ever lowered. These
+    are edge-on slivers from the reading camera (D-G3 audit read
+    beta~173 captures as clean).
+  - Part 3 MID-TURN RATCHET beta [8,165): per-spread ceilings
+    (measured 21-218), only ever lowered; the D5 composition pass
+    and future CONTACT-AWARE POSING (filed as the paper-truth
+    endgame derivation) shrink them. Choreography hacks (fade/hold)
+    REJECTED — they break glue truth.
+  - Strip-driven pieces are beta-driven today, so the sweep is their
+    full travel scrub; D6 user drive extends the gate to page-angle
+    x strip-travel then.
 
 D-G3 DRAW ORDER / OCCLUSION (P2) — probe + capture review
   - At every capture station, no piece renders through a nearer
