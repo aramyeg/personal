@@ -34,7 +34,8 @@ matter which handler releases the grab first.
   this collapses the owed D-G2 user-domain extension from a 2D
   beta-times-s scrub to a 1D scrub at the true tilted rest pose).
 - On grab: pointer capture on the canvas element; store records
-  `{ id, kind }` (kind: 'tab' | 'knob' | 'keepsake'); cursor
+  `{ id, kind }` (kind: 'tab' | 'flap' | 'knob' | 'keepsake' — the
+  flap kind is the stripflap's flap-as-handle channel, H3); cursor
   `grabbing` (hover over any handle shows `grab`).
 - High-frequency scrub values (s, theta) NEVER flow through React
   state — they live in a mutable module-level channel read by the

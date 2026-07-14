@@ -9,10 +9,11 @@
 
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Book, makeCanvasTexture } from './book'
 import { Dust } from './dust'
 import { makeDeskCanvas } from '../procedural/paper-texture'
+import { useStorybookStore } from '../store'
 
 // task-17: the book is the whole-screen hero now (side-column narration
 // replaces the old on-page text plates), so the camera sits noticeably
@@ -87,21 +88,48 @@ function CandleLight() {
   )
 }
 
-/** Eases the wrapped group's tilt toward the pointer position, giving the desk a parallax feel. */
+/** Eases the wrapped group's tilt toward the pointer position, giving the desk a parallax feel.
+ *  Law H5: while a handle grab is active, the ease target holds at the group's CURRENT rotation
+ *  instead of the pointer — a freeze, not a snap, so the rig simply stops chasing the pointer
+ *  rather than jumping anywhere. A wobbling stage under the finger would corrupt the H3/H4
+ *  handle-plane projections and read as the book squirming away mid-grab. */
 function ParallaxRig({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null)
 
   useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
+    const grabbed = useStorybookStore.getState().grab !== null
     const ease = Math.min(1, delta * PARALLAX_EASE_RATE)
-    const targetX = -state.pointer.y * PARALLAX_TILT_X
-    const targetY = state.pointer.x * PARALLAX_TILT_Y
+    const targetX = grabbed ? group.rotation.x : -state.pointer.y * PARALLAX_TILT_X
+    const targetY = grabbed ? group.rotation.y : state.pointer.x * PARALLAX_TILT_Y
     group.rotation.x += (targetX - group.rotation.x) * ease
     group.rotation.y += (targetY - group.rotation.y) * ease
   })
 
   return <group ref={groupRef}>{children}</group>
+}
+
+/** Cursor contract for law H2: while any grab is active the canvas shows 'grabbing'; it
+ *  reverts to the default on release/unmount. Hover 'grab' cursors are per-handle and
+ *  arrive with the handle wave — this only ever shows the active-grab state. */
+function GrabCursor() {
+  const gl = useThree((s) => s.gl)
+
+  useEffect(() => {
+    const el = gl.domElement
+    const applyCursor = (grab: ReturnType<typeof useStorybookStore.getState>['grab']) => {
+      el.style.cursor = grab !== null ? 'grabbing' : ''
+    }
+    applyCursor(useStorybookStore.getState().grab)
+    const unsubscribe = useStorybookStore.subscribe((state) => applyCursor(state.grab))
+    return () => {
+      unsubscribe()
+      el.style.cursor = ''
+    }
+  }, [gl])
+
+  return null
 }
 
 /** Default export for `next/dynamic` — renders the full Canvas; nothing outside this
@@ -124,6 +152,7 @@ export default function BookScene() {
       <CandleLight />
       <Desk />
       <Dust />
+      <GrabCursor />
       <ParallaxRig>
         <Book />
       </ParallaxRig>

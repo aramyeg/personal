@@ -80,3 +80,67 @@ describe('boot gate', () => {
     expect(s().booted).toBe(true)
   })
 })
+
+describe('grab lifecycle', () => {
+  beforeEach(() =>
+    useStorybookStore.setState({ spread: 3, turning: null, queued: null, booted: true, grab: null })
+  )
+
+  it('beginGrab records the id/kind when booted and settled', () => {
+    s().beginGrab('tab-1', 'tab')
+    expect(s().grab).toEqual({ id: 'tab-1', kind: 'tab' })
+  })
+
+  it('beginGrab no-ops when not booted', () => {
+    useStorybookStore.setState({ booted: false })
+    s().beginGrab('tab-1', 'tab')
+    expect(s().grab).toBeNull()
+  })
+
+  it('beginGrab no-ops mid-turn', () => {
+    useStorybookStore.setState({ turning: 'next' })
+    s().beginGrab('knob-1', 'knob')
+    expect(s().grab).toBeNull()
+  })
+
+  it('endGrab clears an active grab', () => {
+    s().beginGrab('flap-1', 'flap')
+    s().endGrab()
+    expect(s().grab).toBeNull()
+  })
+
+  it('endGrab is a no-op when nothing is grabbed', () => {
+    s().endGrab()
+    expect(s().grab).toBeNull()
+  })
+
+  it('requestTurn force-releases an active grab and still turns normally', () => {
+    s().beginGrab('keepsake-1', 'keepsake')
+    s().requestTurn('next')
+    expect(s().grab).toBeNull()
+    expect(s().turning).toBe('next')
+    s().completeTurn()
+    expect(s().spread).toBe(4)
+  })
+
+  it('a grab can never coexist with an in-flight turn, and queuing semantics are unchanged', () => {
+    s().beginGrab('tab-2', 'tab')
+    s().requestTurn('next') // releases the grab and starts turning, per the test above
+    s().beginGrab('tab-3', 'tab') // illegal while turning !== null — stays null
+    expect(s().grab).toBeNull()
+    s().requestTurn('prev') // queues, exactly like the grab-free case (store.test.ts's turn machine)
+    expect(s().grab).toBeNull()
+    expect(s().queued).toBe('prev')
+    s().completeTurn()
+    expect(s().spread).toBe(4)
+    expect(s().turning).toBe('prev')
+    expect(s().queued).toBeNull()
+  })
+
+  it('requestTurn still clamps at the covers with a grab active', () => {
+    useStorybookStore.setState({ spread: 9, grab: { id: 'tab-3', kind: 'tab' } })
+    s().requestTurn('next')
+    expect(s().grab).toBeNull()
+    expect(s().turning).toBeNull()
+  })
+})

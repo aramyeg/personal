@@ -6,6 +6,15 @@
  * store.ts). Lives outside the r3f canvas (the loader mounts it alongside
  * `<BookScene/>`), uses window listeners with no capture phase, and never
  * touches Escape — that key belongs exclusively to `<GalleryChrome>`.
+ *
+ * Hit-target disambiguation (hand-interaction-laws.md law H1): a handle
+ * grab starts on the r3f canvas's own pointerdown, which runs first on the
+ * bubble path — the canvas listener attaches directly to the element,
+ * while this file listens on `window` without capture. `onPointerDown`
+ * below checks `store.grab` and, if a grab is already active, records no
+ * swipe start at all. `onPointerUp` needs no matching check: with no start
+ * recorded, the swipe is already inert no matter which handler releases
+ * the grab first (suppress at start, not at end).
  */
 
 import { useEffect, useRef } from 'react'
@@ -68,6 +77,7 @@ export function useBookInput(enabled: boolean): void {
 
     const onPointerDown = (e: PointerEvent) => {
       if (targetsOverlayPanel(e.target)) return
+      if (useStorybookStore.getState().grab !== null) return
       pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     }
 
