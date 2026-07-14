@@ -318,6 +318,21 @@
   text-align: right;
 }
 
+/* Bottom nav pill (overlay/nav.tsx — the folio label between the prev/next
+   arrows): a FIXED width, not the shrink-to-fit `.sb-chapter-kicker` default,
+   so the two arrows sit at pixel-identical positions on every spread instead
+   of sliding with each chapter's title length. Sized to the longest label
+   the book ever shows — "IV · The Vault-Dragon of the Golden Dunes" —
+   measured at this exact font/padding (~311px at a 1440px/16px-root
+   desktop), with headroom for cross-browser font-metric variance. `truncate`
+   (nav.tsx) stays on as the overflow guard for any future title that runs
+   longer still; shorter labels just center inside the fixed pill. Narrow/
+   portrait viewports don't have this width budget to spend, so
+   storybook-responsive.css reverts to the old hug-and-cap behavior there. */
+.sb-nav-pill {
+  width: 21rem;
+}
+
 /* Portrait drawer toggle — hidden here, shown full-width in
    storybook-responsive.css. Kept in the base file (not the media query) so
    its resting/hover states are defined once. */

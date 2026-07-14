@@ -53,7 +53,7 @@ export function BookNav() {
           <span aria-hidden="true">‹</span>
         </button>
 
-        <p className="sb-chapter-kicker max-w-[60vw] truncate rounded-full border border-[var(--sb-gold)]/40 bg-black/30 px-4 py-1.5 text-center backdrop-blur-sm">
+        <p className="sb-chapter-kicker sb-nav-pill truncate rounded-full border border-[var(--sb-gold)]/40 bg-black/30 px-4 py-1.5 text-center backdrop-blur-sm">
           {label}
         </p>
 

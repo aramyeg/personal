@@ -28,6 +28,26 @@
   background: var(--sb-desk);
   color: var(--sb-ink);
   font-family: var(--font-sb-body);
+
+  /* The lab reads as an app, not a page (user: "I don't like that the
+     text, icons, etc is selectable") — scoped to `.sb-root` (this lab's one
+     shared root, both the WebGL book and the plain/reduced-motion tale) so
+     it never leaks to the rest of the portfolio. `user-select` inherits, so
+     one declaration here covers every descendant — nav, arrows, titles,
+     plaques, narration, the drawer, the loader CTA — without disabling
+     clicks, scrolling, or focus on any of them. */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Long-press-to-select-and-copy on iOS Safari isn't gated by user-select
+     alone. */
+  -webkit-touch-callout: none;
+}
+
+/* Drag-ghost guard for chrome images (the satchel item art, spread-
+   overlay.tsx) — a stray native image drag reads as broken interaction in
+   an otherwise app-like surface. */
+.sb-root img {
+  -webkit-user-drag: none;
 }
 
 /* Canvas wrapper: always full-bleed — the book is the whole screen in both

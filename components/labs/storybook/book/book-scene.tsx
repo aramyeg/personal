@@ -10,8 +10,9 @@
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Book, makeCanvasTexture } from './book'
+import { BOOK, Book, makeCanvasTexture } from './book'
 import { Dust } from './dust'
+import { parallaxLift } from './parallax-lift'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 import { useStorybookStore } from '../store'
 
@@ -48,6 +49,19 @@ const PARALLAX_EASE_RATE = 4
 // 60px within 600ms turns the page) — the user vetoed it on first touch.
 // The deep-tilt gesture returns once its input is disambiguated (hold-
 // then-drag, right-button drag, or another pick of his).
+// COVER-DIP FIX (2026-07-14, user: "the book cover shrinks from the
+// bottom... like the cover disappears for 1/8th of its length" while
+// tilting): ParallaxRig rotates the whole book about its own origin, which
+// sits at the spine on the desk (y=0). At the open spread the front cover
+// (rotation.z=PI) and the fixed back cover together span the book's full
+// horizontal footprint symmetrically about that origin — from -BOOK.coverW
+// to +BOOK.coverW (book.tsx: the open front cover's board spans local x in
+// [-coverW, 0], the back cover [0, coverW]) — and BOOK.coverH is the
+// deepest z-extent of either (it overhangs the page block). That's the
+// largest slab in the assembly, so it's the footprint parallaxLift guards:
+// half-extents (coverW, coverH/2) centered on the rotation origin.
+const COVER_FOOTPRINT_HALF_W = BOOK.coverW
+const COVER_FOOTPRINT_HALF_D = BOOK.coverH / 2
 
 /** Desk surface: a baked warm light-pool texture (see makeDeskCanvas) rather
  * than a flat fill, so the near-black desk reads as a lit surface the tome
@@ -92,7 +106,15 @@ function CandleLight() {
  *  Law H5: while a handle grab is active, the ease target holds at the group's CURRENT rotation
  *  instead of the pointer — a freeze, not a snap, so the rig simply stops chasing the pointer
  *  rather than jumping anywhere. A wobbling stage under the finger would corrupt the H3/H4
- *  handle-plane projections and read as the book squirming away mid-grab. */
+ *  handle-plane projections and read as the book squirming away mid-grab.
+ *
+ *  COVER-DIP FIX: after easing, `parallaxLift` reads the group's just-updated
+ *  rotation (whatever it is — chasing the pointer, or frozen under a grab)
+ *  and lifts the whole rig by exactly enough that the cover footprint clears
+ *  the desk plane. Deriving the lift from the CURRENT rotation rather than
+ *  the pointer directly means it composes with the H5 freeze for free: a
+ *  frozen rotation keeps producing the same lift, so there's nothing to jump
+ *  when a grab starts or ends. */
 function ParallaxRig({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null)
 
@@ -105,6 +127,12 @@ function ParallaxRig({ children }: { children: ReactNode }) {
     const targetY = grabbed ? group.rotation.y : state.pointer.x * PARALLAX_TILT_Y
     group.rotation.x += (targetX - group.rotation.x) * ease
     group.rotation.y += (targetY - group.rotation.y) * ease
+    group.position.y = parallaxLift(
+      group.rotation.x,
+      group.rotation.y,
+      COVER_FOOTPRINT_HALF_W,
+      COVER_FOOTPRINT_HALF_D
+    )
   })
 
   return <group ref={groupRef}>{children}</group>

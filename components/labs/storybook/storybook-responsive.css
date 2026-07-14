@@ -167,6 +167,15 @@
   .sb-chapter-title {
     font-size: clamp(1.4rem, 6.5vw, 2rem);
   }
+
+  /* The desktop nav pill's fixed 21rem (storybook-overlay.css) assumes
+     desktop-width headroom to spend on identical arrow positions; a narrow
+     viewport doesn't have it (21rem alone can exceed the screen), so the
+     pill goes back to hugging its label, capped like it always was. */
+  .sb-nav-pill {
+    width: auto;
+    max-width: 60vw;
+  }
   .sb-plaque--dark {
     margin-top: 0.4rem;
   }
