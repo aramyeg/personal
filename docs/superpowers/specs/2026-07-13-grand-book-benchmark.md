@@ -105,6 +105,32 @@ D-G8 WOW (P4) — content check + eye-test
     (or the piece is interactive, D6+). Eye-test confirms the moment
     actually lands.
 
+D-G9 THE HAND (P5) — vitest + eye-test (added at D6 close,
+  2026-07-14; laws in 2026-07-14-hand-interaction-laws.md H1-H8)
+  - USER-DOMAIN COLLISION: every user-drivable piece scrubs its full
+    drive domain (~200 stations: tab s in [0, s_stop], flap lift in
+    [0, 90deg], knob theta in [0, THETA_MAX], keepsake p in
+    [0, p_exit]) at TRUE tilted rest against every other spread
+    piece under the D-G2 classifier — HARD ZERO, no ratchet (the
+    reader dwells anywhere in the domain). Grab legality is
+    rest-only, which is what keeps this gate 1D.
+  - AUTONOMOUS MOTION CAPS: release returns are output-clamped at
+    STEP_CAP = 0.8 x GLOBAL_CAP and YIELD budget to a concurrent
+    turn (composed step < GLOBAL_CAP by construction); keepsake
+    auto-return worst step measured under cap; the knob never moves
+    autonomously (theta held; fold-flat via the openness envelope,
+    exact at closed for any frozen twist).
+  - SHIPPED POSES UNTOUCHED: with no user input, every interactive
+    piece's pose is bit-identical to its page cam (ceilings are
+    cam-dominated) — pinned.
+  - SEAT RULE: H8 state machine tested — no path turns/closes the
+    book with a keepsake out; deferred turns fire bounds-checked
+    after auto-return; every mount starts HOME.
+  - AFFORDANCE (eye-test half): handles read before touching (tab
+    lip, flap silhouette, knob thumb-notch + arrow, keepsake pocket
+    corner); the stage freezes under a grab; cursor grammar
+    grab/grabbing; no gesture ever misfires a page turn.
+
 ## Capture set (the review half, produced at every phase boundary)
 
 Per spread: rest bloom, three mid-turn stations, closed stack, one
