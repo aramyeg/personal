@@ -225,6 +225,28 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
   // the coaching yard but tucked in toward the spine.
   { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.05, deckZ1: 0.2 },
+  // KNOB-TWIST TOWER (D6 "THE HAND", the book's first user-driven crank; solver
+  // in book/popup-knobtower.ts, derived in bench/derive-knobtower.mjs): the
+  // citadel's TOWER-HOIST — a die-cut winch knob riveted flat into the LEFT
+  // page (the coplanar rotor grammar) that the reader TWISTS to wind a hidden
+  // paper crank, erecting a staggered rank of siege-tower tiers in the dispatch
+  // yard ("raising the towers" — the rookery's own theme). The disc "remembers"
+  // the twist through page turns; every tier folds dead flat at book-close.
+  //   PLACEMENT (probed against the D-G2 station sweeps + A9/user-scrub, NOT
+  // trial-and-error): spread 4 is the book's densest, and the RECOMMENDED
+  // 3-tier footprint (run 0.856) has no clean home here — its lowest tier and
+  // its wider fore hinge are swept by ch3-rank (the second tower rank) across
+  // the left-page mid-z lane through the turn (a hand-tuned counter-cleared
+  // 3-tier still measured 5 mid-turn scissors). So it ships as the bench's
+  // 2-TIER FALLBACK in the one clean pocket the rookery has: the LEFT page,
+  // high-z lane (tier z-bands 0.37..0.49 and 0.51..0.63 — above the backdrops'
+  // reach), with the disc pulled out to hubD 0.38 so its coplanar footprint
+  // clears the spine-hugging counter/sorting/semaphore (all x in ~[-0.16,0.16]).
+  // Contributes ZERO illegal crossings at every station (rest / near-rest /
+  // mid-turn / the whole user twist scrub / A9), keeps the spread at 7 depth
+  // bands, folds flat and stays inside the page. crankR = discR = 0.15 (the pin
+  // rides the disc rim); THETA_MAX 140deg — one comfortable winding drag.
+  { id: 'ch3-towerworks', kind: 'foreground', role: 'scenery', mech: 'knobtower', side: 'left', hubD: 0.38, hubZ: 0.5, discR: 0.15, crankR: 0.15, foreHingeD: 0.85, tiers: [{ w: 0.1, aRestDeg: 72, zc: 0.43, ridgeLen: 0.12 }, { w: 0.12, aRestDeg: 78, zc: 0.57, ridgeLen: 0.12 }] },
   // KINETIC (D4/D5): the dispatch tower's SEMAPHORE ARM — Birmingham mech 73,
   // a 45-deg double-triangle astride the spine whose signal arm sweeps a
   // quarter-turn from horizontal to vertical as the book opens (the tower

@@ -100,6 +100,7 @@ the SUBJECT's own proportions need to match the "Aspect" column below, not the c
 | `rider` | `<id>` | **ALPHA**; same convention, posed on a parent surface (box lid / bridge deck) |
 | `dress` | `<id>` | **ALPHA**; front print + kraft-tinted back of the SAME cutout; may overhang its seat panel |
 | `rotor` | `<id>` (no suffix — same as dress, not box) | **ALPHA**; circular die-cut in a square canvas |
+| `knobtower` | `<id>-disc` (the twist knob) + `<id>-tier<k>`, one per tier (0-based) | disc is **ALPHA** circular die-cut in a square canvas (side = 2×`discR`), like a rotor; each `-tier<k>` is one **ALPHA** unfolded mound painting (both slopes share it, ridge across the middle) — see UNFOLD/MOUND in §1.6 |
 | `stripflap` | `<id>` | **ALPHA**; standing frontal/profile figure, no visible connector |
 | `kinetic` | `<id>` | **ALPHA**; two panels (arm + flap) share one painting |
 | `fan` | `<id>-m<index>`, one per member (0-based) | **ALPHA**; each member is its own painting |
@@ -129,9 +130,16 @@ the SUBJECT's own proportions need to match the "Aspect" column below, not the c
   erected structure. v runs from the INNER hinge (v=0, hidden low in the fold) to the
   TAB at the fore edge (v=1); band fractions are given per row. u runs across the
   piece's width, parallel to the spine.
-- **DISC** (rotor): circular die-cut art in a square canvas, side = 2×radius.
-  Rotationally near-symmetric designs (compass rose, sundial, astrolabe face) read
-  best — the disc physically spins in place.
+- **DISC** (rotor, knob-tower `-disc`): circular die-cut art in a square canvas,
+  side = 2×radius. Rotationally near-symmetric designs (compass rose, sundial,
+  astrolabe face, a spoked winch/capstan knob) read best — the disc physically spins
+  in place; give it a clear thumb-notch / grip cue so the reader reads it as twistable.
+- **MOUND** (knob-tower `-tier<k>`): one continuous unfolded print per tier, painted
+  like a tabpiece MOUND — v runs from the INNER hinge (v=0, hidden low in the fold)
+  over the RIDGE/peak (v=0.5, across the middle of the canvas) to the FORE hinge
+  (v=1, back down on the page); u runs across the tier's width, parallel to the spine
+  (= `ridgeLen`). Both slope faces share the one painting, mirror-continuous across the
+  ridge, so draw the peak detail centered. Canvas aspect W:H = `ridgeLen` : 2×`w`.
 - **FLAT** (dress patches, cover decals): a rigid flat cutout riding one parent
   surface, may overhang its edges (the Sabuda recipe) — standard v=1-top orientation,
   no fold.
@@ -204,6 +212,7 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `ch3-counter-scale` | `ch3-counter-scale` | Dressed weigh-scale on the counter's front cap | ≈0.9:1 near-square | FLAT | placeholder |
 | `ch3-sorting` | `ch3-sorting-deck` | Parcel-sorting BRIDGE deck, tucked in toward the spine | ≈1.33:1 landscape | TOPDOWN | placeholder |
 | `ch3-semaphore` | `ch3-semaphore` | Dispatch tower's semaphore arm, sweeps to vertical "raising the signal" | combined ≈0.92:1 near-square (see §1.6 caveat) | STAND (kinetic) | placeholder — **parked deep upstage, currently near-invisible; low priority until re-composed (see §5)** |
+| `ch3-towerworks` | `ch3-towerworks-disc`, `ch3-towerworks-tier0`, `ch3-towerworks-tier1` | The citadel's TOWER-HOIST (D6 user knob): a spoked winch knob on the left page that the reader twists to erect a staggered rank of two siege-tower tiers in the dispatch yard. Disc = the crank/capstan knob (thumb-notch, arrow arc); tiers = ascending grey stone tower segments (tier1 taller). Paint each tier's ridge/battlements centered (peak at v=0.5) | disc 1:1 square (radius 0.15 → canvas 0.30×0.30) · tier0 ≈0.6:1 · tier1 ≈0.5:1 (both portrait mounds) | DISC / MOUND | placeholder |
 
 ## 5. Chapter IV — The Vault-Dragon of the Golden Dunes (spread 5)
 

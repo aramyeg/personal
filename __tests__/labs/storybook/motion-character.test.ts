@@ -15,6 +15,7 @@ import {
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
@@ -122,6 +123,11 @@ const allQuads = (
   if (layer.mech === 'rotor')
     return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
+  // The knob-tower's autonomous (page-driven) motion is the envelope collapse
+  // at a FROZEN twist; the twist itself is user-paced (cap-exempt). Pose at full
+  // erect (THETA_MAX) — the tallest tower, the worst envelope amplitude.
+  if (layer.mech === 'knobtower')
+    return solveKnobTowerPose(layer, knobTowerThetaMax(layer), thetaL, thetaR).map((p) => p.quad)
   // The keepsake's only page-driven pose is HOME (p=0), coplanar in its sleeve;
   // the pull/settle/return are the hand's own domain, not this dihedral gate.
   if (layer.mech === 'keepsake') return [keepsakeCardInPlane(layer, 0, thetaL, thetaR)]

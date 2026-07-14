@@ -37,6 +37,8 @@ function allLayers(): readonly SceneLayer[] {
  *  - popup-platform-layer.tsx: `<id>-deck`.
  *  - popup-tabpiece-layer.tsx: `<id>-face`.
  *  - popup-anatomy-layers.tsx's fanMemberLayers: `<id>-m<index>`, 0-based.
+ *  - popup-knobtower-layer.tsx: `<id>-disc` (the knob) + `<id>-tier<k>` per
+ *    tier, 0-based (KnobDisc/KnobTier request them directly).
  *  - Every other mech (vfold/child/rider/dress/rotor/stripflap/kinetic)
  *    requests its OWN layer id with no suffix (useLayerTexture/useArtTexture
  *    called with `layer.id` directly).
@@ -55,6 +57,10 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'tabpiece') ids.add(`${layer.id}-face`)
     if (layer.mech === 'fan') {
       layer.members.forEach((_, i) => ids.add(`${layer.id}-m${i}`))
+    }
+    if (layer.mech === 'knobtower') {
+      ids.add(`${layer.id}-disc`)
+      layer.tiers.forEach((_, i) => ids.add(`${layer.id}-tier${i}`))
     }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
@@ -132,6 +138,10 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
       if (layer.mech === 'platform') constructed.push(`${layer.id}-deck`)
       if (layer.mech === 'tabpiece') constructed.push(`${layer.id}-face`)
       if (layer.mech === 'fan') layer.members.forEach((_, i) => constructed.push(`${layer.id}-m${i}`))
+      if (layer.mech === 'knobtower') {
+        constructed.push(`${layer.id}-disc`)
+        layer.tiers.forEach((_, i) => constructed.push(`${layer.id}-tier${i}`))
+      }
     }
     const missing = constructed.filter((key) => !doc.includes(`\`${key}\``))
     expect(missing, `constructed asset keys missing from the call sheet: ${missing.join(', ')}`).toEqual([])
