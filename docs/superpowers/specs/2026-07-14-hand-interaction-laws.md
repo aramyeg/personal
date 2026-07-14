@@ -66,10 +66,15 @@ ray with the knob's seat plane, measure the angle about the hub
 center, accumulate per-frame deltas wrapped to (-pi, pi]. Stability
 guard: deltas measured from hit points inside 0.25·r of the hub are
 discarded (angle is numerically unstable at the center; the last
-stable angle holds). theta clamps to the working range [0,
-theta_max] [bench]. Same lifecycle as H2; release holds theta (the
-knob has detents/friction in paper truth) unless the fold-flat
-composition law demands homing on page events [bench].
+stable angle holds). theta clamps to the working range
+[0, THETA_MAX], THETA_MAX = acos(1 - s_full/crankR) per piece with a
+270-degree ergonomic covenant ceiling (derive-knobtower K7: the
+recommended config wants 141.2deg — one comfortable drag). Release
+holds theta PERMANENTLY: the coplanar disc holds the twist through
+page turns and even book close/reopen, because the fold-flat
+composition law a_shown = a(theta) * E(beta) collapses every tier
+exactly at close for ANY frozen theta (derive K1, exact). The book
+remembers the knob; nothing ever homes autonomously.
 
 ## Law H5 — the stage holds still under the hand
 
