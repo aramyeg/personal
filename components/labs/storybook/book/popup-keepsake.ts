@@ -141,22 +141,40 @@ export function keepsakeSeatCorners(geom: KeepsakeGeom): PanelQuad {
   ]
 }
 
-// ---- printed sleeve (a pocket read on the page, bench containment) ----------
+// ---- the printed EX-LIBRIS POCKET (law H7) ----------------------------------
 
-/** The two decorative sleeve hairlines riding the page rigidly: the fore-edge
- *  SLIT the card exits through (at d = PAGE_W) and the pocket mouth at the
- *  trailing-home station, each spanning the card's z-band. Both follow the
- *  tabPieceSlit precedent so the card reads as pulled from a real cut pocket. */
-export function keepsakeSleeveLines(
-  geom: KeepsakeGeom,
-  thetaL: number,
-  thetaR: number
-): { slit: readonly [Vec3, Vec3]; mouth: readonly [Vec3, Vec3] } {
+/** Page-normal lift of the pocket panel, a hair PROUD of the coplanar (h = 0)
+ *  card so the opaque panel occludes the tucked-in card body while leaving the
+ *  peeking corner clear. Tiny (~0.26 mm at this scale): it only breaks the
+ *  z-tie, never reads as a float. The card itself stays at h = 0 (invariant
+ *  I1); the pocket is a SECOND sheet glued on top, like a dress patch's lift. */
+export const KEEPSAKE_POCKET_LIFT = 0.002
+/** How far spine-ward of the trailing-home station the pocket's closed end
+ *  sits (it tucks the card's trailing edge fully under). */
+export const KEEPSAKE_POCKET_BACK = 0.03
+/** Card length left proud of the pocket MOUTH at home — exactly the dog-eared
+ *  leading corner (the H7 grab affordance: proud, dog-eared, visibly loose). */
+export const KEEPSAKE_POCKET_PEEK = 0.08
+/** Pocket overhang past the card's z-band each side, so the card's side
+ *  cut-edges are tucked under too. */
+export const KEEPSAKE_POCKET_ZMARGIN = 0.012
+
+/** The printed pocket as an OPAQUE page-stock panel glued over the card's home
+ *  span (law H7 — "the SLEEVE read as a printed pocket"): its fore edge is the
+ *  MOUTH the card is drawn through, its closed end sits spine-ward of the
+ *  trailing edge. Rides the page rigidly (the tabPieceSlit precedent), lifted
+ *  KEEPSAKE_POCKET_LIFT proud of the coplanar card so it occludes the tucked
+ *  body while the dog-eared leading corner peeks past the mouth. Corner order
+ *  [back@z0, back@z1, mouth@z1, mouth@z0]; drawn DoubleSide, so winding is
+ *  free. */
+export function keepsakePocketPanel(geom: KeepsakeGeom, thetaL: number, thetaR: number): PanelQuad {
   const P = keepsakePageFrame(geom, thetaL, thetaR)
-  return {
-    slit: [P(PAGE_W, 0, geom.z0), P(PAGE_W, 0, geom.z1)],
-    mouth: [P(keepsakeTrailHome(geom), 0, geom.z0), P(keepsakeTrailHome(geom), 0, geom.z1)],
-  }
+  const h = KEEPSAKE_POCKET_LIFT
+  const back = keepsakeTrailHome(geom) - KEEPSAKE_POCKET_BACK
+  const mouth = keepsakeForeLead(geom) - KEEPSAKE_POCKET_PEEK
+  const zLo = geom.z0 - KEEPSAKE_POCKET_ZMARGIN
+  const zHi = geom.z1 + KEEPSAKE_POCKET_ZMARGIN
+  return [P(back, h, zLo), P(back, h, zHi), P(mouth, h, zHi), P(mouth, h, zLo)]
 }
 
 // ---- auto-return / settle trajectory (bench returnPathStats) ----------------

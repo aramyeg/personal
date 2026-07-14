@@ -106,7 +106,7 @@ describe('removable keepsake — D6 gates (bench derive-keepsake.mjs, shipped ca
     const stats = keepsakeReturnStats(KEEP, thetaL, thetaR)
     expect(stats.monotone).toBe(true)
     expect(stats.worstStep).toBeLessThan(GLOBAL_CAP)
-    expect(stats.worstStep).toBeCloseTo(0.0328, 3) // the bench-measured worst step
+    expect(stats.worstStep).toBeCloseTo(0.0286, 3) // re-sited seat (D6 polish); shorter path than the 0.0328 bench seat
   })
 
   it('the settle (exit -> seat) also holds under the cap and is C0 at the seat', () => {
@@ -144,9 +144,10 @@ describe('removable keepsake — D6 gates (bench derive-keepsake.mjs, shipped ca
     const cx = seat.reduce((s, c) => s + c[0], 0) / 4
     const cy = seat.reduce((s, c) => s + c[1], 0) / 4
     const cz = seat.reduce((s, c) => s + c[2], 0) / 4
-    expect(cx).toBeCloseTo(0.33, 6)
-    expect(cy).toBeCloseTo(0.055, 6)
-    expect(cz).toBeCloseTo(1.06, 6)
+    // Re-sited (D6 polish): downstage-RIGHT on the desk, clear of the nav pill.
+    expect(cx).toBeCloseTo(0.5, 6)
+    expect(cy).toBeCloseTo(0.03, 6)
+    expect(cz).toBeCloseTo(0.95, 6)
     // tilted far-edge-up: the far (-z) edge stands higher than the near (+z) one
     const farY = (seat[0][1] + seat[3][1]) / 2 // corners at -W/2 (far edge)
     const nearY = (seat[1][1] + seat[2][1]) / 2 // corners at +W/2 (near edge)

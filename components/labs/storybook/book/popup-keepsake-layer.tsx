@@ -33,12 +33,11 @@ import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type KeepsakeGeom, type Vec3 } from './popup-mechanics'
 import {
-  KEEPSAKE_POPUP_WORLD_Y,
   KEEPSAKE_RETURN_MS,
   keepsakeCardInPlane,
   keepsakePExit,
+  keepsakePocketPanel,
   keepsakeSeatCorners,
-  keepsakeSleeveLines,
   keepsakeTwoLegPose,
 } from './popup-keepsake'
 import { shadowLift } from './shadow-light'
@@ -69,6 +68,8 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 const _plane = new THREE.Plane()
 const _u = new THREE.Vector3()
 const _hit = new THREE.Vector3()
+// Scratch for the world <-> layer-local seat transform (law H8 desk-fix).
+const _xf = new THREE.Vector3()
 
 /** Dev-only keepsake override for the D6 capture deck: `?sbkeepsake=<p|seated>`
  *  freezes the card at pull `p` (in the sleeve) or fully `seated` on the desk,
@@ -113,18 +114,6 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: readonly Vec3[]): void 
   geometry.computeBoundingSphere()
 }
 
-function writeSegments(geometry: THREE.BufferGeometry, points: readonly Vec3[]): void {
-  const attr = geometry.getAttribute('position') as THREE.BufferAttribute
-  const arr = attr.array as Float32Array
-  points.forEach((p, i) => {
-    arr[i * 3] = p[0]
-    arr[i * 3 + 1] = p[1]
-    arr[i * 3 + 2] = p[2]
-  })
-  attr.needsUpdate = true
-  geometry.computeBoundingSphere()
-}
-
 function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
   const c: number[] = [0, 0, 0]
   for (const p of quad) for (let i = 0; i < 3; i++) c[i] += p[i] / 4
@@ -136,13 +125,6 @@ const centroid = (quad: readonly Vec3[]): Vec3 => {
   for (const p of quad) for (let i = 0; i < 3; i++) c[i] += p[i] / 4
   return [c[0], c[1], c[2]]
 }
-
-/** The seat pose mapped into the popup group's LOCAL frame (world minus the
- *  container lift) — the card is authored on the desk in WORLD, but rendered as
- *  a child of the popup group like every other page piece (see the constant's
- *  note on the rest-pose approximation). */
-const seatLocalCorners = (geom: KeepsakeGeom): Vec3[] =>
-  keepsakeSeatCorners(geom).map((c) => [c[0], c[1] - KEEPSAKE_POPUP_WORLD_Y, c[2]] as Vec3)
 
 export function KeepsakePopupLayer({
   layer,
@@ -170,23 +152,32 @@ export function KeepsakePopupLayer({
   const edgeGeometry = useMemo(() => makeEdgeGeometry(4), [])
   const handleGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const slopGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
-  // The printed pocket: the fore-edge slit + the sleeve mouth, two hairlines
-  // riding the page rigidly (the tabPieceSlit precedent) so the card reads as
-  // drawn from a real cut pocket even while it is out on the desk.
-  const sleeveGeometry = useMemo(() => makeEdgeGeometry(4), []) // two segments
+  // The printed EX-LIBRIS POCKET (law H7): an OPAQUE page-stock panel glued over
+  // the card's home span, plus its cut-edge outline — both riding the page
+  // rigidly. The card renders UNDER the panel (lifted a hair proud, so it
+  // occludes the tucked body via the depth buffer) and emerges from the panel's
+  // fore-edge mouth as the pull grows.
+  const pocketGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
+  const pocketEdgeGeometry = useMemo(() => makeEdgeGeometry(4), [])
 
   const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
   const edgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.85 }),
     []
   )
-  const sleeveMaterial = useMemo(
+  const pocketEdgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: tint.edge, transparent: true, opacity: 0.9 }),
     [tint]
   )
 
   const keepsakeTexture = useMemo(() => makeCanvasTexture(makeKeepsakeCanvas()), [])
   const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  // Opaque so it occludes the tucked card by writing depth; page-stock kraft so
+  // it reads as a printed pocket on the endpaper. DoubleSide — winding-free.
+  const pocketMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: paperTexture, color: tint.lit }),
+    [paperTexture, tint]
+  )
   const materials = useMemo(
     () => ({
       front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
@@ -235,10 +226,12 @@ export function KeepsakePopupLayer({
       edgeGeometry.dispose()
       handleGeometry.dispose()
       slopGeometry.dispose()
-      sleeveGeometry.dispose()
+      pocketGeometry.dispose()
+      pocketEdgeGeometry.dispose()
       handleMaterial.dispose()
       edgeMaterial.dispose()
-      sleeveMaterial.dispose()
+      pocketEdgeMaterial.dispose()
+      pocketMaterial.dispose()
       keepsakeTexture.dispose()
       paperTexture.dispose()
       materials.front.dispose()
@@ -247,8 +240,9 @@ export function KeepsakePopupLayer({
       shadowMaterial.dispose()
     },
     [
-      cardGeometry, edgeGeometry, handleGeometry, slopGeometry, sleeveGeometry, handleMaterial,
-      edgeMaterial, sleeveMaterial, keepsakeTexture, paperTexture, materials, shadowTexture, shadowMaterial,
+      cardGeometry, edgeGeometry, handleGeometry, slopGeometry, pocketGeometry, pocketEdgeGeometry,
+      handleMaterial, edgeMaterial, pocketEdgeMaterial, pocketMaterial, keepsakeTexture, paperTexture,
+      materials, shadowTexture, shadowMaterial,
     ]
   )
 
@@ -256,10 +250,13 @@ export function KeepsakePopupLayer({
   // module scrub channel; only the low-frequency grab identity + H8 macro state
   // touch zustand.
   const grabRef = useRef<{ pGrabStart: number; dGrab: number } | null>(null)
-  // The card's live LOCAL pose, captured so an auto-return starts from wherever
-  // the card actually is (a seated card, or an interrupted mid-settle one).
-  const poseRef = useRef<readonly Vec3[]>(seatLocalCorners(layer))
-  // The local phase of the out/returning animations, on the frame clock.
+  // The card's live WORLD pose, captured so an auto-return starts from wherever
+  // the card actually is (a seated card, or an interrupted mid-settle one). Held
+  // in world (not local) because the settle/return polylines interpolate in
+  // world space, then transform into the layer frame for rendering (law H8).
+  const poseWorldRef = useRef<readonly Vec3[]>(keepsakeSeatCorners(layer))
+  // The phase of the out/returning animations, on the frame clock. `start` is a
+  // WORLD pose (settle: the exit card; return: the card's live world pose).
   const animRef = useRef<{ kind: 'settle' | 'seated' | 'return'; startT: number; start: readonly Vec3[] } | null>(null)
 
   const anglesNow = (): { thetaL: number; thetaR: number } =>
@@ -374,23 +371,47 @@ export function KeepsakePopupLayer({
     if (shadowRef.current) shadowRef.current.visible = visible
     if (!visible) return
 
+    // The seat is authored in TRUE WORLD (desk-fixed). Transform world <-> this
+    // layer's local frame through the popup group's LIVE world matrix so the
+    // seated card ignores the group's parallax tilt + container Y offset and
+    // lies genuinely flat on the static desk (law H8 fix). updateWorldMatrix
+    // pulls the parallax rig + lift down from the ancestors first.
+    group.updateWorldMatrix(true, false)
+    const toLocal = (w: Vec3): Vec3 => {
+      _xf.set(w[0], w[1], w[2])
+      group.worldToLocal(_xf)
+      return [_xf.x, _xf.y, _xf.z]
+    }
+    const toWorld = (l: Vec3): Vec3 => {
+      _xf.set(l[0], l[1], l[2])
+      group.localToWorld(_xf)
+      return [_xf.x, _xf.y, _xf.z]
+    }
+
     const now = state.clock.elapsedTime
     const store = useStorybookStore.getState()
     const macro = store.keepsakes[layer.id] ?? 'home'
     const grabbed = store.grab?.id === layer.id
     const override = readKeepsakeOverride()
 
+    // Page-fixed poses live in the local (parallax page) frame; the desk seat
+    // lives in world. The settle/return polylines interpolate in WORLD, then
+    // each frame's result transforms into local for rendering.
     const exitLocal = keepsakeCardInPlane(layer, pExit, thetaL, thetaR)
     const homeLocal = keepsakeCardInPlane(layer, 0, thetaL, thetaR)
-    const seatLocal = seatLocalCorners(layer)
+    const seatWorld = keepsakeSeatCorners(layer)
 
     let card: readonly Vec3[]
+    let cardWorld: readonly Vec3[]
     let seatedShadow = false
 
     if (override) {
       // Capture deck: freeze at a pull or fully seated.
-      card = 'seated' in override ? seatLocal : keepsakeCardInPlane(layer, clamp(override.p, 0, pExit), thetaL, thetaR)
+      card = 'seated' in override
+        ? seatWorld.map(toLocal)
+        : keepsakeCardInPlane(layer, clamp(override.p, 0, pExit), thetaL, thetaR)
       seatedShadow = 'seated' in override
+      cardWorld = card.map(toWorld)
     } else if (macro === 'home') {
       animRef.current = null
       // In-sleeve: the pull p from the grab channel, easing home on release.
@@ -413,29 +434,33 @@ export function KeepsakePopupLayer({
         p = 0
       }
       card = keepsakeCardInPlane(layer, p, thetaL, thetaR)
+      cardWorld = card.map(toWorld)
     } else if (macro === 'out') {
-      // Detached: settle exit -> seat, then hold at the seat.
+      // Detached: settle exit -> seat in WORLD (the card leaves the parallax
+      // page for the static desk), then hold at the world seat.
       if (!animRef.current || animRef.current.kind === 'return') {
-        animRef.current = { kind: 'settle', startT: now, start: exitLocal }
+        animRef.current = { kind: 'settle', startT: now, start: exitLocal.map(toWorld) }
       }
       const anim = animRef.current
       if (anim.kind === 'settle') {
         const eased = easeTurnWeighted(clamp((now - anim.startT) / returnMs, 0, 1))
         // Degenerate second leg (seat -> seat) collapses to the exit -> seat lerp.
-        card = keepsakeTwoLegPose(anim.start, seatLocal, seatLocal, eased)
-        if (now - anim.startT >= returnMs) animRef.current = { kind: 'seated', startT: now, start: seatLocal }
+        cardWorld = keepsakeTwoLegPose(anim.start, seatWorld, seatWorld, eased)
+        if (now - anim.startT >= returnMs) animRef.current = { kind: 'seated', startT: now, start: seatWorld }
       } else {
-        card = seatLocal
+        cardWorld = seatWorld
       }
+      card = cardWorld.map(toLocal)
       seatedShadow = true
     } else {
-      // Returning: reverse polyline start -> exit -> home, then report home.
+      // Returning: reverse polyline start -> exit -> home in WORLD, then home.
       if (!animRef.current || animRef.current.kind !== 'return') {
-        animRef.current = { kind: 'return', startT: now, start: poseRef.current }
+        animRef.current = { kind: 'return', startT: now, start: poseWorldRef.current }
       }
       const anim = animRef.current
       const eased = easeTurnWeighted(clamp((now - anim.startT) / returnMs, 0, 1))
-      card = keepsakeTwoLegPose(anim.start, exitLocal, homeLocal, eased)
+      cardWorld = keepsakeTwoLegPose(anim.start, exitLocal.map(toWorld), homeLocal.map(toWorld), eased)
+      card = cardWorld.map(toLocal)
       seatedShadow = now - anim.startT < returnMs * 0.5
       if (now - anim.startT >= returnMs) {
         animRef.current = null
@@ -443,34 +468,50 @@ export function KeepsakePopupLayer({
       }
     }
 
-    poseRef.current = card
+    poseWorldRef.current = cardWorld
     writeQuad(cardGeometry, card)
     writeQuad(edgeGeometry, card)
     writeQuad(handleGeometry, card)
     writeQuad(slopGeometry, enlargeQuad(card, TOUCH_SLOP))
 
-    const { slit, mouth } = keepsakeSleeveLines(layer, thetaL, thetaR)
-    writeSegments(sleeveGeometry, [slit[0], slit[1], mouth[0], mouth[1]])
+    // The printed pocket rides the page rigidly (local, like the resting card).
+    const pocket = keepsakePocketPanel(layer, thetaL, thetaR)
+    writeQuad(pocketGeometry, pocket)
+    writeQuad(pocketEdgeGeometry, pocket)
 
     // Contact / drop shadow: negligible while the card lies coplanar in the
-    // sleeve, a real desk drop shadow once it stands tilted on the desk.
+    // pocket, a real desk drop shadow once it stands tilted on the desk. The
+    // seated pool is placed in WORLD on the desk plane (then into local), so it
+    // never rides the parallax up off the desk with the card.
     const shadow = shadowRef.current
     if (shadow) {
-      const c = centroid(card)
-      shadow.position.set(c[0] + (seatedShadow ? seatLift.dx : 0), SHADOW_Y_LIFT - KEEPSAKE_POPUP_WORLD_Y * (seatedShadow ? 1 : 0), c[2] + (seatedShadow ? seatLift.dz : 0))
-      const s = seatedShadow ? seatLift.spread : 0.7
-      shadow.scale.set(layer.cardL * s, (layer.z1 - layer.z0) * s, 1)
-      shadowMaterial.opacity = CARD_SHADOW_MAX * (seatedShadow ? seatLift.depth : 0.15 * Math.sin(beta / 2) ** 2)
+      if (seatedShadow) {
+        const c = centroid(cardWorld)
+        const local = toLocal([c[0] + seatLift.dx, SHADOW_Y_LIFT, c[2] + seatLift.dz])
+        shadow.position.set(local[0], local[1], local[2])
+        shadow.scale.set(layer.cardL * seatLift.spread, (layer.z1 - layer.z0) * seatLift.spread, 1)
+        shadowMaterial.opacity = CARD_SHADOW_MAX * seatLift.depth
+      } else {
+        const c = centroid(card)
+        shadow.position.set(c[0], SHADOW_Y_LIFT, c[2])
+        shadow.scale.set(layer.cardL * 0.7, (layer.z1 - layer.z0) * 0.7, 1)
+        shadowMaterial.opacity = CARD_SHADOW_MAX * 0.15 * Math.sin(beta / 2) ** 2
+      }
     }
   })
 
   return (
     <>
       <group ref={groupRef} visible={false}>
+        {/* The printed pocket: OPAQUE panel (occludes the tucked card via the
+            depth buffer) + its cut-edge outline. The card renders after (it is
+            transparent), so its body behind the panel is depth-culled while the
+            dog-eared corner peeking past the mouth shows (law H7). */}
+        <mesh geometry={pocketGeometry} material={pocketMaterial} renderOrder={0} />
         <mesh geometry={cardGeometry} material={materials.front} renderOrder={0} />
         <mesh geometry={cardGeometry} material={materials.back} renderOrder={0} />
         <lineLoop geometry={edgeGeometry} material={edgeMaterial} renderOrder={1} />
-        <lineSegments geometry={sleeveGeometry} material={sleeveMaterial} renderOrder={1} />
+        <lineLoop geometry={pocketEdgeGeometry} material={pocketEdgeMaterial} renderOrder={1} />
         {/* Invisible removal handle (raycast targets, never rendered): the card
             quad exact for mouse/pen, 1.5x for touch (laws H6/H7). */}
         <group

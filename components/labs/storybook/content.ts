@@ -293,9 +293,17 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // page, its tab creeping out of the fore edge as the spread blooms —
   // the treasure literally grows when the book opens. Strip-driven family
   // beyond the satchel (palette law), opposite side from ch5's table.
-  // Sited z 0.08+ so the midground wall's glue path (crosses z ~0.04 at
-  // this x range) stays clear, x >= 0.38 so the chest (x <= ~0.24) does.
-  { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.08, z1: 0.36, legW: 0.26, liftDeg: 55 },
+  // D6 THE HAND re-site: the old z-band (0.08..0.36) put the fore-edge tab
+  // exactly behind the right-column HTML plaque (tab screen box inside the
+  // card's box), so the pull handle was hidden at grab time. The band moved
+  // DOWNSTAGE to 0.26..0.54 (tab centre 0.40) so the tab projects clear
+  // BELOW the plaque's bottom edge at the resting/grab-hover view (probe:
+  // +41px neutral, +10px at grab-hover; the mound's parallax swing still
+  // grazes the plaque only at the mouse-far-corner extreme — inherent to the
+  // book's tilt, not a grab-time state). Still clear of the midground wall's
+  // glue (z ~0.04) and the spine-hugging chest (x <= ~0.24; z overlap is at a
+  // disjoint x, no crossing). Ships at the same 218/13 spread-5 ceilings.
+  { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.26, z1: 0.54, legW: 0.26, liftDeg: 55 },
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
@@ -542,14 +550,19 @@ const END_LAYERS: readonly SceneLayer[] = [
   { id: 'end-seal', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'end-letter', seat: 'left', u: 0.19, v: 0.25, radius: 0.13, spinDeg: 110 },
   // D6 REMOVABLE KEEPSAKE (the book's first removable piece; law H7/H8): the
   // reader's own EX-LIBRIS — a wax-sealed card of the six kingdoms — tucked in
-  // a sleeve on the right endpaper. Pull its dog-eared fore corner and it draws
-  // out coplanar with the page, detaches past the fore-edge slit, and settles
-  // tilted on the desk downstage-center (the clear band between the HTML
-  // columns); grab it, or turn the page, and it auto-returns home. The bench
-  // proved this placement: the card reaches x~1.13, the sleeve lives in the
-  // fore zone (x>=0.79) clear of the letter (x~0.78), and the seat sits below
-  // the book silhouette (derive-keepsake S1-S6).
-  { id: 'end-keepsake', kind: 'foreground', role: 'scenery', mech: 'keepsake', side: 'right', z0: 0.245, z1: 0.395, cardL: 0.34, seat: { x: 0.33, y: 0.055, z: 1.06, tiltDeg: 22 } },
+  // a printed pocket on the right endpaper. Pull its dog-eared fore corner and
+  // it draws out coplanar with the page, detaches past the fore-edge slit, and
+  // settles tilted on the desk; grab it, or turn the page, and it auto-returns
+  // home. The seat is authored in TRUE WORLD coordinates (desk-fixed) — the
+  // renderer transforms it into the popup group's live frame each frame, so the
+  // card lies genuinely flat on the static desk (no parallax tilt / group Y
+  // offset). RE-SITED (D6 polish) to { x .5, y .03, z .95 }: the bench seat
+  // { x .33, z 1.06 } projected onto the bottom-centre nav pill; this sits it
+  // downstage-RIGHT on the lit desk between the book's fore corner and the
+  // right column — clear of both HTML columns, the book silhouette, AND the nav
+  // pill (probe: screen px[893,1058] py[759,829], all zones clear). y .03 rests
+  // the card's near edge on the desk (tilt 22deg toward the camera, law H8).
+  { id: 'end-keepsake', kind: 'foreground', role: 'scenery', mech: 'keepsake', side: 'right', z0: 0.245, z1: 0.395, cardL: 0.34, seat: { x: 0.5, y: 0.03, z: 0.95, tiltDeg: 22 } },
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 
