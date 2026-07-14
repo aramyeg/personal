@@ -20,6 +20,7 @@ import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpie
 import { solveKineticArmPose } from '@/components/labs/storybook/book/popup-kinetic'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
+import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -124,6 +125,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       // No theta channel in the depth/readability gates — pose at full erect
       // (THETA_MAX), the worst-case footprint, conservative for occupancy.
       return solveKnobTowerPose(l, knobTowerThetaMax(l), tL, tR).map((p) => p.quad)
+    case 'keepsake':
+      // No pull channel in the depth gates — pose the card HOME (p=0), coplanar
+      // in its sleeve, its resting depth footprint.
+      return [keepsakeCardInPlane(l, 0, tL, tR)]
     case 'kinetic': {
       const pose = solveKineticArmPose(l, tL, tR)
       return [pose.right, pose.left]

@@ -144,3 +144,82 @@ describe('grab lifecycle', () => {
     expect(s().turning).toBeNull()
   })
 })
+
+describe('keepsake seat rule (law H8)', () => {
+  beforeEach(() =>
+    useStorybookStore.setState({
+      spread: 3,
+      turning: null,
+      queued: null,
+      booted: true,
+      grab: null,
+      keepsakes: {},
+      pendingTurn: null,
+    })
+  )
+
+  it('a turn requested with a card OUT does not turn — it defers and starts the return', () => {
+    s().keepsakeOut('kp')
+    s().requestTurn('next')
+    expect(s().turning).toBeNull() // the book NEVER turns with a card out
+    expect(s().keepsakes.kp).toBe('returning') // the card is sent home first
+    expect(s().pendingTurn).toBe('next') // the turn is parked
+  })
+
+  it('the deferred turn fires only once the card reports home, bounds-checked at fire time', () => {
+    s().keepsakeOut('kp')
+    s().requestTurn('next')
+    expect(s().turning).toBeNull()
+    s().keepsakeHomed('kp')
+    expect(s().keepsakes.kp).toBe('home')
+    expect(s().pendingTurn).toBeNull()
+    expect(s().turning).toBe('next') // now it turns
+  })
+
+  it('a deferred turn that would run out of bounds is dropped at fire time', () => {
+    useStorybookStore.setState({ spread: 9 })
+    s().keepsakeOut('kp')
+    s().requestTurn('next') // next from 9 is out of bounds
+    s().keepsakeHomed('kp')
+    expect(s().pendingTurn).toBeNull()
+    expect(s().turning).toBeNull() // clamped, no turn
+  })
+
+  it('turns requested while RETURNING just replace the parked turn (last wins)', () => {
+    s().keepsakeOut('kp')
+    s().requestTurn('next')
+    expect(s().pendingTurn).toBe('next')
+    s().requestTurn('prev') // already returning — replace, do not turn
+    expect(s().turning).toBeNull()
+    expect(s().pendingTurn).toBe('prev')
+    s().keepsakeHomed('kp')
+    expect(s().turning).toBe('prev')
+  })
+
+  it('grabbing the seated card sends it returning with no parked turn', () => {
+    s().keepsakeOut('kp')
+    s().keepsakeReturn('kp')
+    expect(s().keepsakes.kp).toBe('returning')
+    expect(s().pendingTurn).toBeNull()
+    s().keepsakeHomed('kp')
+    expect(s().keepsakes.kp).toBe('home')
+    expect(s().turning).toBeNull() // a plain dismiss, no turn follows
+  })
+
+  it('keepsakeReset forces a card home and clears any parked turn (mount reset)', () => {
+    s().keepsakeOut('kp')
+    s().requestTurn('next')
+    s().keepsakeReset('kp')
+    expect(s().keepsakes.kp).toBe('home')
+    expect(s().pendingTurn).toBeNull()
+    expect(s().turning).toBeNull()
+  })
+
+  it('the no-keepsake turn path is bit-identical: an empty keepsake map turns immediately', () => {
+    expect(s().keepsakes).toEqual({})
+    expect(s().pendingTurn).toBeNull()
+    s().requestTurn('next')
+    expect(s().turning).toBe('next') // exactly the pre-keepsake behaviour
+    expect(s().pendingTurn).toBeNull()
+  })
+})

@@ -418,6 +418,89 @@ export function makeKnobCanvas(w = 256, h = 256): HTMLCanvasElement {
 }
 
 /**
+ * Removable-keepsake placeholder (D6 "THE HAND", law H7): the card must read as
+ * a LOOSE card wedged in a pocket, NOT the tab piece's flush grip-notch tab. So
+ * the die-cut carries the keepsake grammar — a rounded/notched card CORNER, a
+ * scored DOGEAR crease across it, and a small wax-seal / ex-libris motif — on
+ * warm kraft stock, before real art lands. Landscape (cardL x cardW ~ 2.27:1).
+ * The renderer tints it with the card's own kraft stock (base white here).
+ */
+export function makeKeepsakeCanvas(w = 320, h = 141): HTMLCanvasElement {
+  assertBrowser('makeKeepsakeCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+  const ink = 'rgba(58, 40, 20, '
+  const inset = Math.round(Math.min(w, h) * 0.05)
+  const round = Math.round(Math.min(w, h) * 0.14)
+  const dog = Math.round(Math.min(w, h) * 0.34) // dog-eared fore corner size
+
+  // Transparent ground so the card's die-cut silhouette reads (alphaTest cuts
+  // the corners) — the loose-card outline, not a full rectangle.
+  ctx.clearRect(0, 0, w, h)
+
+  // The card body: a rounded rectangle with the fore (right) top corner DOG-
+  // EARED off — the proud, peel-me corner the reader pinches.
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.moveTo(inset + round, inset)
+  ctx.lineTo(w - inset - dog, inset)
+  ctx.lineTo(w - inset, inset + dog) // the folded-back dogear diagonal
+  ctx.lineTo(w - inset, h - inset - round)
+  ctx.arcTo(w - inset, h - inset, w - inset - round, h - inset, round)
+  ctx.lineTo(inset + round, h - inset)
+  ctx.arcTo(inset, h - inset, inset, h - inset - round, round)
+  ctx.lineTo(inset, inset + round)
+  ctx.arcTo(inset, inset, inset + round, inset, round)
+  ctx.closePath()
+  ctx.fill()
+
+  // The card's own cut-edge line, so it reads as a separate sheet with a drop
+  // shadow (the renderer adds the desk shadow; this is the edge).
+  ctx.strokeStyle = `${ink}0.5)`
+  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.02)
+  ctx.stroke()
+
+  // The DOGEAR score: the crease of the turned-down fore corner, plus the
+  // little triangle it folds against — the H7 "scored dogear".
+  ctx.strokeStyle = `${ink}0.42)`
+  ctx.lineWidth = Math.max(1.5, Math.min(w, h) * 0.015)
+  ctx.beginPath()
+  ctx.moveTo(w - inset - dog, inset)
+  ctx.lineTo(w - inset, inset + dog)
+  ctx.stroke()
+
+  // Ex-libris rules — two ruled lines suggesting "the reader's keepsake".
+  ctx.strokeStyle = `${ink}0.3)`
+  ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.01)
+  for (const fy of [0.42, 0.58]) {
+    ctx.beginPath()
+    ctx.moveTo(inset + round, h * fy)
+    ctx.lineTo(w * 0.62, h * fy)
+    ctx.stroke()
+  }
+
+  // The WAX SEAL / ex-libris rosette, low-left — a stamped medallion, the
+  // keepsake of the six kingdoms.
+  const sx = w * 0.26
+  const sy = h * 0.72
+  const sr = Math.min(w, h) * 0.14
+  ctx.fillStyle = `${ink}0.5)`
+  ctx.beginPath()
+  ctx.arc(sx, sy, sr, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = `${ink}0.7)`
+  ctx.lineWidth = Math.max(1, sr * 0.12)
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(sx + Math.cos(a) * sr * 0.4, sy + Math.sin(a) * sr * 0.4)
+    ctx.lineTo(sx + Math.cos(a) * sr * 0.92, sy + Math.sin(a) * sr * 0.92)
+    ctx.stroke()
+  }
+
+  return canvas
+}
+
+/**
  * Stack-edge stripe canvas: the cut edges of a fanned page stack, one
  * horizontal stripe per sheet from the BOTTOM of the canvas up (v=0 is the
  * valley floor under three's flipY). Each stripe is aged paper washed with

@@ -295,6 +295,7 @@ monoculture.*
 | `end-mound` | `end-mound` | The low mound the letter rests against — a fore-edge ground swell (parallel fold) grounding the scene | ≈2.4:1 wide low | FLAT | placeholder |
 | `end-mound-tuft` | `end-mound-tuft` | A grass tuft standing on the mound's ridge | ≈1.14:1 landscape | STAND | placeholder |
 | `end-seal` | `end-seal` | Hero's signet seal, heraldic rosette turning as the letter unfolds (rotor, coplanar, zero collision cost) | 1:1 square (disc, radius 0.13 → canvas 0.26×0.26) | DISC | placeholder |
+| `end-keepsake` | `end-keepsake` | The reader's REMOVABLE keepsake — a wax-sealed ex-libris card of the six kingdoms, tucked in a right-endpaper sleeve; pull its dog-eared fore corner to draw it out and seat it on the desk (law H7/H8). Paint the whole die-cut card face; the loose-card grammar (rounded/notched corner, scored dogear, own drop shadow) must read against the flush tab pieces | ≈2.27:1 landscape (cardL 0.34 × cardW 0.15) | CARD — die-cut, ALPHA corners | placeholder |
 
 ## 11. Covers (spread 0, closed book — `book/cover-decals.tsx`)
 

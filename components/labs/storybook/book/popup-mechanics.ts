@@ -484,6 +484,36 @@ export type KnobTowerGeom = {
   restAtDeg?: number
 }
 
+/**
+ * REMOVABLE KEEPSAKE (Part D6 "THE HAND") — the book's first REMOVABLE piece: a
+ * flat die-cut card in a page-internal SLEEVE that the reader pulls clear of the
+ * book. PAGE-ROOTED like the tab piece (side + page coordinates); the card
+ * slides coplanar with the page (invariant I1) until its trailing edge clears
+ * the fore-edge slit, then detaches and settles onto a WORLD-fixed desk seat.
+ * The seat rule (law H8, store.ts) guarantees the book only ever turns or
+ * closes with the card home. Pose + trajectory math lives in
+ * book/popup-keepsake.ts (this module is at its size cap). Derived + gate-
+ * checked in .superpowers/sdd/bench/derive-keepsake.mjs.
+ */
+export type KeepsakeGeom = {
+  mech: 'keepsake'
+  /** The page the sleeve lives on (and whose fore edge the card exits). */
+  side: 'left' | 'right'
+  /** Sleeve span along the spine (world z), z0 < z1 — the card's width band. */
+  z0: number
+  z1: number
+  /** Card length along the page run (spine -> fore direction). */
+  cardL: number
+  /** Grip lip inside the fore edge (default TAB_LIP 0.02). */
+  tabLip?: number
+  /** The desk seat (WORLD): downstage-center in the clear band between the HTML
+   *  columns, tilted toward the camera. `y` defaults to the desk (0); `yawDeg`
+   *  swivels the card in the desk plane (default 0). */
+  seat: { x: number; y?: number; z: number; tiltDeg: number; yawDeg?: number }
+  /** Auto-return duration, ms (default TURN_MS 1250). */
+  returnMs?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -498,6 +528,7 @@ export type LayerGeom =
   | KineticArmGeom
   | RotorGeom
   | KnobTowerGeom
+  | KeepsakeGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -999,6 +1030,8 @@ export function solveLayerPose(
       throw new Error('storybook: rotors ride a solved parent surface — use solveRotorPose (popup-rotor)')
     case 'knobtower':
       throw new Error('storybook: knob-tower layers are multi-patch + user-driven — use solveKnobTowerPose (popup-knobtower)')
+    case 'keepsake':
+      throw new Error('storybook: keepsake layers are removable + trajectory-driven — use keepsakeCardInPlane (popup-keepsake)')
   }
 }
 

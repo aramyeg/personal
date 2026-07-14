@@ -17,8 +17,46 @@ import {
   solveBoxPose,
   solveVFoldPose,
   type PanelQuad,
+  type Vec3,
 } from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  KEEPSAKE_SLIT_TOL,
+  KEEPSAKE_SLEEVE_TOL,
+  keepsakeCardW,
+  keepsakeForeLead,
+  keepsakePExit,
+  keepsakeSeatCorners,
+  keepsakeTrailHome,
+} from '@/components/labs/storybook/book/popup-keepsake'
 import { PAGE_W, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
+
+// Reading camera (book-scene.tsx), for the keepsake seat's clear-band gate —
+// same constants derive-keepsake.mjs S4 projects the desk seat through.
+const CAM_POS: Vec3 = [0, 2.6, 2.9]
+const CAM_LOOK: Vec3 = [0, 0.32, 0.15]
+const CAM_FOV = 34
+const CAM_ASPECT = 16 / 9
+// HTML side columns leave this central screen-NDC-x band clear for the seat.
+const CLEAR_BAND_X: readonly [number, number] = [-0.37, 0.45]
+const vsub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const vcross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+]
+const vdot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const vnorm = (a: Vec3): Vec3 => {
+  const l = Math.hypot(a[0], a[1], a[2])
+  return [a[0] / l, a[1] / l, a[2] / l]
+}
+const projectX = (p: Vec3): number => {
+  const f = vnorm(vsub(CAM_LOOK, CAM_POS))
+  const r = vnorm(vcross(f, [0, 1, 0]))
+  const v = vsub(p, CAM_POS)
+  const depth = vdot(v, f)
+  const th = Math.tan((CAM_FOV * Math.PI) / 360)
+  return vdot(v, r) / depth / (th * CAM_ASPECT)
+}
 
 /** The [u-edge, v-edge] lengths of a rotor/dress seat panel at full open —
  *  the bounds a spin-swept disc must fit within at its anchor. */
@@ -87,6 +125,11 @@ const familyOf = (l: SceneLayer): string | null => {
       return 'stripflap'
     case 'tabpiece':
       return 'tabpiece'
+    case 'keepsake':
+      // The removable card is its own hand-driven family (the only piece that
+      // leaves the book) — page-rooted like the tab piece, but pull-to-REMOVE
+      // rather than pull-to-erect (law H7).
+      return 'keepsake'
     case 'kinetic':
     case 'rotor':
     case 'knobtower':
@@ -471,6 +514,45 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         expect(Math.abs(l.z1), label).toBeLessThanOrEqual(PAGE_H / 2)
         // the visible tab fits the piece's spine extent
         expect(l.tabW ?? 0.1, label).toBeLessThanOrEqual(l.z1 - l.z0)
+      }
+    }
+  })
+
+  it('keepsake validity: sleeve/slit containment + a seat in the clear band below the book', () => {
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'keepsake') continue
+        const label = `${name} ${l.id}`
+        const cardW = keepsakeCardW(l)
+        // real card, real sleeve span (bench S1 sizeOK)
+        expect(cardW, label).toBeGreaterThan(0)
+        expect(l.cardL, label).toBeGreaterThan(0)
+        expect(l.z0, label).toBeLessThan(l.z1)
+        expect(Math.abs(l.z0), label).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(l.z1), label).toBeLessThanOrEqual(PAGE_H / 2)
+        // the through-slit (card width + 4 mm canon) fits the page depth, and
+        // its z-edge stays inside the bench's 0.75 containment bound (S1)
+        const zc = (l.z0 + l.z1) / 2
+        const zEdge = Math.abs(zc) + (cardW + KEEPSAKE_SLIT_TOL) / 2
+        expect(zEdge, `${label} slit z-edge`).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(zEdge, `${label} slit z-edge`).toBeLessThanOrEqual(0.75)
+        // the sleeve fits one page: leading edge inside the fore edge, trailing
+        // (sleeve mouth) clear of the gutter by the tab-piece T6 margin
+        expect(keepsakeForeLead(l), `${label} fore lead`).toBeLessThanOrEqual(PAGE_W - 0.02)
+        expect(keepsakeTrailHome(l), `${label} trail home`).toBeGreaterThanOrEqual(0.06)
+        // Birmingham law 9 slit:sleeve ratio (4 mm : 3 mm) preserved
+        expect(Math.abs(KEEPSAKE_SLIT_TOL / KEEPSAKE_SLEEVE_TOL - 4 / 3), label).toBeLessThan(0.05)
+        // the pull that detaches the card equals cardL + tabLip (p_exit)
+        expect(keepsakePExit(l), label).toBeCloseTo(l.cardL + (l.tabLip ?? 0.02), 12)
+        // SEAT legality (bench S4): a real flat card tilted up toward the
+        // camera, seated downstage of the book (z beyond the fore edge), its
+        // whole screen-x footprint inside the clear band between the HTML columns
+        expect(l.seat.tiltDeg, `${label} seat tilt`).toBeGreaterThan(0)
+        expect(l.seat.tiltDeg, `${label} seat tilt`).toBeLessThan(90)
+        expect(l.seat.z, `${label} seat downstage`).toBeGreaterThan(PAGE_H / 2)
+        const xs = keepsakeSeatCorners(l).map(projectX)
+        expect(Math.min(...xs), `${label} seat left of clear band`).toBeGreaterThanOrEqual(CLEAR_BAND_X[0])
+        expect(Math.max(...xs), `${label} seat right of clear band`).toBeLessThanOrEqual(CLEAR_BAND_X[1])
       }
     }
   })

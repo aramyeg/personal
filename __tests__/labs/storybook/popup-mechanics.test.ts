@@ -41,6 +41,10 @@ import {
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
+import {
+  keepsakeCardInPlane,
+  keepsakePExit,
+} from '@/components/labs/storybook/book/popup-keepsake'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
@@ -124,6 +128,11 @@ const allQuads = (
   // footprint. D-G2-style scrubs that need theta call the solver directly.
   if (layer.mech === 'knobtower')
     return solveKnobTowerPose(layer, knobTowerThetaMax(layer), thetaL, thetaR).map((p) => p.quad)
+  // A keepsake has no dihedral pose but HOME (p=0): coplanar in its sleeve. The
+  // pull/settle/return live in the hand's domain (the D-G2 user scrub below and
+  // popup-keepsake.test.ts), so the dihedral-only A-suite sees only the resting
+  // in-sleeve card.
+  if (layer.mech === 'keepsake') return [keepsakeCardInPlane(layer, 0, thetaL, thetaR)]
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -211,13 +220,15 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'rider' ||
         layer.mech === 'dress' ||
         layer.mech === 'rotor' ||
-        layer.mech === 'knobtower'
+        layer.mech === 'knobtower' ||
+        layer.mech === 'keepsake'
       ) {
-        // Anatomy-phase mechs carry their spec-validity gates in
+        // Anatomy-phase and hand-driven mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
         // rider mount rule, dress seat existence, rotor cam + fit), the
         // composition covenant (rotor spin cap / seat legality; knob-tower
-        // stroke + run-band + z-band rules), and popup-knobtower.test.ts.
+        // stroke + run-band + z-band rules; keepsake sleeve/slit/seat rules), and
+        // popup-knobtower.test.ts / popup-keepsake.test.ts.
         return
       }
       if (layer.mech === 'stripflap') {
@@ -366,6 +377,15 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
               const p = patch.quad[idx]
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
+          }
+          continue
+        }
+        if (layer.mech === 'keepsake') {
+          // COPLANAR SLIDE (invariant I1): the in-sleeve card lies flat IN its
+          // page plane — every corner has zero page-normal height at every pull.
+          const n = layer.side === 'left' ? nL : nR
+          for (const p of keepsakeCardInPlane(layer, keepsakePExit(layer) / 2, thetaL, thetaR)) {
+            expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
           }
           continue
         }
@@ -974,15 +994,20 @@ describe('D-G2 user domain — zero illegal crossings across the whole drive scr
       return [pose.right, pose.left]
     }
     if (piece.mech === 'knobtower') return solveKnobTowerPose(piece, v, thetaL, thetaR).map((p) => p.quad)
+    // The keepsake's drive is the pull p; while in the sleeve its card is a
+    // single COPLANAR quad (invariant I1 — hard zero crossing height in-engine).
+    if (piece.mech === 'keepsake') return [keepsakeCardInPlane(piece, v, thetaL, thetaR)]
     throw new Error(`piece ${piece.id} is not user-drivable`)
   }
 
   /** The scrub ceiling in the piece's own domain (law H3: strip s to s_stop,
-   *  flap lift to the 90-degree anti-flip stop, knob to THETA_MAX). */
+   *  flap lift to the 90-degree anti-flip stop, knob to THETA_MAX, keepsake pull
+   *  to p_exit — its in-sleeve travel before it detaches). */
   const scrubHi = (piece: SceneLayer): number => {
     if (piece.mech === 'tabpiece') return tabPieceStopSlide(piece)
     if (piece.mech === 'stripflap') return Math.PI / 2
     if (piece.mech === 'knobtower') return knobTowerThetaMax(piece)
+    if (piece.mech === 'keepsake') return keepsakePExit(piece)
     throw new Error(`piece ${piece.id} is not user-drivable`)
   }
 
@@ -992,16 +1017,18 @@ describe('D-G2 user domain — zero illegal crossings across the whole drive scr
     if (piece.mech === 'tabpiece') return tabPieceSlideFromLift(piece, tabPieceLift(piece, beta))
     if (piece.mech === 'stripflap') return stripFlapCamLift(piece, beta)
     if (piece.mech === 'knobtower') return 0 // rests untwisted (law H4)
+    if (piece.mech === 'keepsake') return 0 // rests home in its sleeve (law H8)
     throw new Error(`piece ${piece.id} is not user-drivable`)
   }
 
   // Every user-drivable piece shipped today; a knob-tower joins automatically
   // if ever shipped (vacuous now — none in content).
   const USER_IDS = ALL_LAYERS.filter(
-    ([, l]) => l.mech === 'tabpiece' || l.mech === 'stripflap' || l.mech === 'knobtower'
+    ([, l]) =>
+      l.mech === 'tabpiece' || l.mech === 'stripflap' || l.mech === 'knobtower' || l.mech === 'keepsake'
   ).map(([id]) => id)
 
-  it('covers the shipped user-drivable pieces (2 tab pieces + 3 strip flaps)', () => {
+  it('covers the shipped user-drivable pieces (2 tab pieces + 3 strip flaps + 1 keepsake)', () => {
     expect(USER_IDS).toEqual(
       expect.arrayContaining([
         'ch4-goldpile',
@@ -1009,6 +1036,7 @@ describe('D-G2 user domain — zero illegal crossings across the whole drive scr
         'title-quill',
         'satchel-sword',
         'satchel-compass',
+        'end-keepsake',
       ])
     )
   })

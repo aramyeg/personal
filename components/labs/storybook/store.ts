@@ -6,6 +6,11 @@ import { SPREAD_COUNT } from './content'
 export type TurnDir = 'next' | 'prev'
 export type GrabKind = 'tab' | 'flap' | 'knob' | 'keepsake'
 export type Grab = { id: string; kind: GrabKind } | null
+/** A removable keepsake's macro state (hand-interaction-laws.md law H8; derived
+ *  in derive-keepsake.mjs). HOME (in its sleeve) -> pull past p_exit -> OUT
+ *  (seated on the desk) -> RETURNING (auto-return in flight) -> HOME. There is
+ *  NO path to a turned/closed book with a card OUT. */
+export type KeepsakeState = 'home' | 'out' | 'returning'
 
 const inBounds = (spread: number, dir: TurnDir) =>
   dir === 'next' ? spread < SPREAD_COUNT - 1 : spread > 0
@@ -26,12 +31,47 @@ type SbState = {
    *  value it drives lives outside React entirely (see user-drive.ts); this
    *  field exists only so cursor/affordance UI can react to grab start/end. */
   grab: Grab
+  /** Per-card keepsake macro state (law H8). A card absent from the map is
+   *  HOME; the layer resets its card HOME on every mount (lab exit / unmount is
+   *  a state reset — a card can never persist OUT across a lab re-entry). */
+  keepsakes: Record<string, KeepsakeState>
+  /** The single deferred turn slot (last wins). A turn requested while any card
+   *  is OUT/RETURNING is parked here and fired — bounds-checked at fire time —
+   *  once every card has auto-returned HOME. */
+  pendingTurn: TurnDir | null
   requestTurn: (dir: TurnDir) => void
   completeTurn: () => void
   toggleSound: () => void
   markBooted: () => void
   beginGrab: (id: string, kind: GrabKind) => void
   endGrab: () => void
+  /** HOME -> OUT: the card has detached past p_exit and is settling/seated. */
+  keepsakeOut: (id: string) => void
+  /** OUT -> RETURNING: the reader grabbed the seated card to send it home. */
+  keepsakeReturn: (id: string) => void
+  /** * -> HOME: the auto-return finished. Fires any deferred turn once every
+   *  card is home again. */
+  keepsakeHomed: (id: string) => void
+  /** Force a card HOME with no side effects — the mount-time state reset. */
+  keepsakeReset: (id: string) => void
+}
+
+/** True while any card is out of its sleeve (settling, seated, or returning) —
+ *  the window in which a turn defers behind the seat rule (law H8). */
+const anyKeepsakeActive = (keepsakes: Record<string, KeepsakeState>): boolean =>
+  Object.values(keepsakes).some((s) => s !== 'home')
+
+/** The normal turn transition — force-release any grab, then queue or start the
+ *  turn (bounds-checked). Shared verbatim by requestTurn's no-keepsake path and
+ *  the deferred-turn fire, so the turn semantics stay bit-identical whether a
+ *  keepsake was ever involved or not. */
+const applyTurn = (st: { grab: Grab; turning: TurnDir | null; queued: TurnDir | null; spread: number }, dir: TurnDir): void => {
+  st.grab = null
+  if (st.turning) {
+    st.queued = dir
+    return
+  }
+  if (inBounds(st.spread, dir)) st.turning = dir
 }
 
 export const useStorybookStore = create<SbState>()(
@@ -43,17 +83,25 @@ export const useStorybookStore = create<SbState>()(
       soundOn: false,
       booted: false,
       grab: null,
+      keepsakes: {},
+      pendingTurn: null,
       requestTurn: (dir) =>
         set((st) => {
-          // Law H2: a turn request is never blocked by a grab — it force-
-          // releases the grab first, then proceeds exactly as if no grab
-          // had been active.
-          st.grab = null
-          if (st.turning) {
-            st.queued = dir
+          // Law H8: a turn requested with a card OUT is never refused and never
+          // leaves the spread with a card out — it SEQUENCES behind the card's
+          // auto-return. Send every out card home-ward and park the turn (last
+          // wins); keepsakeHomed fires it once the spread is clear again. A turn
+          // requested while already RETURNING just replaces the parked turn.
+          if (anyKeepsakeActive(st.keepsakes)) {
+            for (const id of Object.keys(st.keepsakes)) {
+              if (st.keepsakes[id] === 'out') st.keepsakes[id] = 'returning'
+            }
+            st.pendingTurn = dir
             return
           }
-          if (inBounds(st.spread, dir)) st.turning = dir
+          // No keepsake involved — bit-identical to the pre-keepsake path
+          // (law H2: a turn is never blocked by a grab; it force-releases first).
+          applyTurn(st, dir)
         }),
       completeTurn: () =>
         set((st) => {
@@ -73,6 +121,25 @@ export const useStorybookStore = create<SbState>()(
           st.grab = { id, kind }
         }),
       endGrab: () => set((st) => void (st.grab = null)),
+      keepsakeOut: (id) => set((st) => void (st.keepsakes[id] = 'out')),
+      keepsakeReturn: (id) => set((st) => void (st.keepsakes[id] = 'returning')),
+      keepsakeHomed: (id) =>
+        set((st) => {
+          st.keepsakes[id] = 'home'
+          // Fire a deferred turn only once EVERY card is home again — never
+          // leave the spread with a card out (law H8).
+          if (st.pendingTurn === null || anyKeepsakeActive(st.keepsakes)) return
+          const dir = st.pendingTurn
+          st.pendingTurn = null
+          applyTurn(st, dir) // bounds-checked here, at fire time
+        }),
+      keepsakeReset: (id) =>
+        set((st) => {
+          // Mount-time reset: a fresh lab session starts every card home with
+          // no parked turn, whatever a prior abnormal exit left behind.
+          st.keepsakes[id] = 'home'
+          if (!anyKeepsakeActive(st.keepsakes)) st.pendingTurn = null
+        }),
     })),
     { name: 'storybook-lab' }
   )

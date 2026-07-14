@@ -518,6 +518,16 @@ const END_LAYERS: readonly SceneLayer[] = [
   // backdrop, so the rotor's coplanar disc adds ZERO collision footprint here
   // (the rotor's virtue: on a clean parent it costs nothing).
   { id: 'end-seal', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'end-letter', seat: 'left', u: 0.19, v: 0.25, radius: 0.13, spinDeg: 110 },
+  // D6 REMOVABLE KEEPSAKE (the book's first removable piece; law H7/H8): the
+  // reader's own EX-LIBRIS — a wax-sealed card of the six kingdoms — tucked in
+  // a sleeve on the right endpaper. Pull its dog-eared fore corner and it draws
+  // out coplanar with the page, detaches past the fore-edge slit, and settles
+  // tilted on the desk downstage-center (the clear band between the HTML
+  // columns); grab it, or turn the page, and it auto-returns home. The bench
+  // proved this placement: the card reaches x~1.13, the sleeve lives in the
+  // fore zone (x>=0.79) clear of the letter (x~0.78), and the seat sits below
+  // the book silhouette (derive-keepsake S1-S6).
+  { id: 'end-keepsake', kind: 'foreground', role: 'scenery', mech: 'keepsake', side: 'right', z0: 0.245, z1: 0.395, cardL: 0.34, seat: { x: 0.33, y: 0.055, z: 1.06, tiltDeg: 22 } },
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 

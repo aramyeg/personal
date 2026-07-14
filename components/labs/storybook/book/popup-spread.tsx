@@ -43,6 +43,7 @@ import { PlatformPopupLayer } from './popup-platform-layer'
 import { TabPiecePopupLayer } from './popup-tabpiece-layer'
 import { StripFlapPopupLayer } from './popup-stripflap-layer'
 import { KnobTowerPopupLayer } from './popup-knobtower-layer'
+import { KeepsakePopupLayer } from './popup-keepsake-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
@@ -92,6 +93,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
   if (layer.mech === 'tabpiece') return 0.5 // per-face uvs live in the tabpiece layer
   if (layer.mech === 'knobtower') return 0.5 // per-face uvs live in the knobtower layer
+  if (layer.mech === 'keepsake') return 0.5 // single card quad, no fold
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   return layer.creaseU ?? 0.5
 }
@@ -130,6 +132,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
   if (layer.mech === 'rotor') return false // spun in-plane by its own renderer; disc art is symmetric
   if (layer.mech === 'knobtower') return false // per-face uvs live in the knobtower layer
   if (layer.mech === 'tabpiece') return false // per-face uvs live in the tabpiece layer
+  if (layer.mech === 'keepsake') return false // single card quad, its own renderer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -440,6 +443,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'knobtower') {
           return (
             <KnobTowerPopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'keepsake') {
+          return (
+            <KeepsakePopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}
