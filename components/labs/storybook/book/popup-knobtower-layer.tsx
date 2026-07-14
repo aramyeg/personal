@@ -6,25 +6,23 @@
  * the crank erects as the knob is twisted. PAGE-ROOTED like the tab piece —
  * one page carries the whole assembly.
  *
+ * D6 "THE HAND": the knob disc is a real ROTATION handle (law H4). While
+ * grabbed, the twist tracks the pointer's angle about the hub (per-frame
+ * deltas, discarded near the numerically-unstable centre); release holds theta
+ * PERMANENTLY — the coplanar disc remembers the twist through page turns and
+ * book close/reopen (the fold-flat composition a_shown = a(theta)*E(beta)
+ * collapses every tier at close for any frozen theta), so there is no return
+ * law here. The high-frequency twist lives in the module scrub channel; the
+ * dev override `?sbknob=<deg>` still freezes it for the capture deck.
+ *
  * Follows the tab-piece / rotor layer conventions: unlit print, per-piece
  * kraft fallback tints, a BackSide interior mesh in deep shadow, cut-edge
  * hairlines, DynamicDrawUsage positions rewritten per frame, contact shadows
  * scaled by each tier's own lift.
- *
- * Art: the DISC prints `<id>-disc` as a circular die-cut (its placeholder is a
- * spoked knob carrying the H4 thumb notch + arrow arc so the twist reads
- * before it is touched); each tier prints `<id>-tier<k>` as its unfolded mound
- * (u along the spine, v the unrolled slide — 0 at the inner hinge, 1 at the
- * fore hinge, the ridge break at v=0.5). Each tier owns its own art texture, so
- * a subcomponent per tier keeps the hooks at the top level.
- *
- * For NOW the knob angle is a frozen dev override (`?sbknob=<deg>`); the
- * interactive gesture (hand-interaction-laws H1-H4) is a later wave. In normal
- * viewing the knob rests untwisted (theta 0), so the towers lie flat.
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { makeKnobCanvas, makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
@@ -32,10 +30,14 @@ import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type KnobTowerGeom } from './popup-mechanics'
 import { knobTowerThetaMax, knobTowerTierLift, solveKnobTowerPose } from './popup-knobtower'
+import { ROTOR_LIFT } from './popup-rotor'
 import { shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import type { TurnFrame } from './use-turn-driver'
+import { type TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
+import { useStorybookStore } from '../store'
+import { beginGrabChannel, endGrabChannel, readUserDrive, writeUserDrive } from '../user-drive'
+import { pointerLocalRay } from './user-drive-pointer'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -43,14 +45,27 @@ const STRUCT_SHADOW_MAX = 0.28
 const FOLD_SHADE_TINT = '#d9cdb4'
 const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
+/** Deltas from hit points inside this fraction of the disc radius are
+ *  discarded — angle is numerically unstable at the hub (law H4). */
+const HUB_DEADZONE = 0.25
+const TOUCH_SLOP = 1.5
 const rad = (d: number): number => (d * Math.PI) / 180
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
+const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
-/** Dev-only knob-angle override for the D6 look-dev harness: `?sbknob=<deg>`
- *  freezes the twist at that angle (the parent clamps it to [0, THETA_MAX]);
- *  absent, the knob rests untwisted (theta 0). The interactive gesture wiring
- *  (hand-interaction-laws H1-H4) is a later wave — this reads a static value,
- *  no pointer handling. Same pattern as use-turn-driver's `?sbpose`; compiled
- *  out of production builds. */
+// Scratch for the H4 angle-about-hub projection (one grab at a time).
+const _plane = new THREE.Plane()
+const _hit = new THREE.Vector3()
+const _center = new THREE.Vector3()
+const _n = new THREE.Vector3()
+const _u = new THREE.Vector3()
+const _rel = new THREE.Vector3()
+const _ez = new THREE.Vector3(0, 0, 1)
+
+/** Dev-only knob-angle override for the D6 capture deck: `?sbknob=<deg>`
+ *  freezes the twist at that angle (clamped to [0, THETA_MAX]); absent, the
+ *  live scrub channel drives it, resting untwisted (theta 0) with no grab.
+ *  Same pattern as ?sbpose; compiled out of production builds. */
 function readKnobOverrideDeg(): number | null {
   if (process.env.NODE_ENV === 'production') return null
   if (typeof window === 'undefined') return null
@@ -58,6 +73,17 @@ function readKnobOverrideDeg(): number | null {
   if (raw === null) return null
   const deg = Number(raw)
   return Number.isFinite(deg) ? deg : null
+}
+
+/** The live twist for this frame: the dev override wins, else the scrub
+ *  channel (the reader's held twist), else untwisted — always clamped to the
+ *  piece's working range. */
+function readKnobTheta(layer: SceneLayer & KnobTowerGeom): number {
+  const max = knobTowerThetaMax(layer)
+  const override = readKnobOverrideDeg()
+  if (override !== null) return clamp(rad(override), 0, max)
+  const channel = readUserDrive(layer.id)
+  return channel !== undefined ? clamp(channel, 0, max) : 0
 }
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
@@ -90,6 +116,16 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: readonly (readonly [num
   geometry.computeBoundingSphere()
 }
 
+function enlargeQuad(
+  quad: readonly (readonly [number, number, number])[],
+  k: number
+): [number, number, number][] {
+  const cx = (quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4
+  const cy = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
+  const cz = (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4
+  return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k])
+}
+
 /** The turn-clock page angles + live role for this spread, shared by the disc
  *  and every tier so they tick on one driver clock (never a React prop). */
 function usePageAngles(
@@ -111,27 +147,31 @@ function usePageAngles(
 }
 
 /** The coplanar knob disc — a circular die-cut riveted flat into the page,
- *  spun by the frozen knob angle. Rides its page coplanar, so it casts no
- *  contact shadow (the rotor rule). */
+ *  spun by the reader's twist (law H4). Rides its page coplanar, so it casts
+ *  no contact shadow (the rotor rule). It is the ROTATION handle: pointer
+ *  handlers accumulate the twist into the scrub channel. */
 function KnobDisc({
   layer,
-  knobTheta,
   spreadIndex,
   frame,
   committedSpread,
 }: {
   layer: SceneLayer & KnobTowerGeom
-  knobTheta: number
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
+  const slopRef = useRef<THREE.Mesh>(null)
+  const gl = useThree((s) => s.gl)
   const art = useArtTexture(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const thetaMax = useMemo(() => knobTowerThetaMax(layer), [layer])
 
   const geometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
+  const slopGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
+  const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
   // Placeholder is a spoked knob (thumb notch + arrow arc, H4) so the twist
   // reads before real art lands; its transparent corners keep the die-cut
   // circular under the material's alphaTest.
@@ -161,12 +201,101 @@ function KnobDisc({
   useEffect(
     () => () => {
       geometry.dispose()
+      slopGeometry.dispose()
+      handleMaterial.dispose()
       materials.front.dispose()
       materials.back.dispose()
       knobTexture.dispose()
     },
-    [geometry, materials, knobTexture]
+    [geometry, slopGeometry, handleMaterial, materials, knobTexture]
   )
+
+  // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the
+  // hub; the last stable angle holds through the unstable centre.
+  const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+
+  /** The pointer's angle about the hub in the disc's seat plane, plus whether
+   *  the hit fell inside the unstable centre deadzone. */
+  const angleAboutHub = (
+    e: ThreeEvent<PointerEvent>,
+    thetaL: number,
+    thetaR: number
+  ): { angle: number; stable: boolean } | null => {
+    const t = layer.side === 'left' ? thetaL : thetaR
+    _u.set(Math.cos(t), Math.sin(t), 0)
+    _n.set(layer.side === 'left' ? Math.sin(t) : -Math.sin(t), layer.side === 'left' ? -Math.cos(t) : Math.cos(t), 0)
+    // Hub centre P(hubD, ROTOR_LIFT, hubZ) in the page's own frame.
+    _center.set(
+      layer.hubD * _u.x + ROTOR_LIFT * _n.x,
+      layer.hubD * _u.y + ROTOR_LIFT * _n.y,
+      layer.hubZ
+    )
+    _plane.setFromNormalAndCoplanarPoint(_n, _center)
+    const ray = pointerLocalRay(e)
+    if (!ray.intersectPlane(_plane, _hit)) return null
+    _rel.copy(_hit).sub(_center)
+    const along = _rel.dot(_u)
+    const spin = _rel.dot(_ez)
+    const r = Math.hypot(along, spin)
+    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.discR }
+  }
+
+  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+    if (!grabRef.current) return
+    grabRef.current = null
+    endGrabChannel(layer.id)
+    useStorybookStore.getState().endGrab() // theta HELD in the channel (law H4)
+    try {
+      ;(e.target as Element).releasePointerCapture(e.pointerId)
+    } catch {
+      // capture already gone
+    }
+  }
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    const isSlop = e.object === slopRef.current
+    if ((e.pointerType === 'touch') !== isSlop) return
+    const st = useStorybookStore.getState()
+    if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
+    const { thetaL, thetaR } = readAngles()
+    const hub = angleAboutHub(e, thetaL, thetaR)
+    st.beginGrab(layer.id, 'knob')
+    if (useStorybookStore.getState().grab?.id !== layer.id) return
+    // Seed the channel with the current held twist so accumulation is relative.
+    writeUserDrive(layer.id, clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax), [0, thetaMax])
+    grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
+    beginGrabChannel(layer.id)
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    e.stopPropagation()
+  }
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    const grab = grabRef.current
+    if (!grab) return
+    if (useStorybookStore.getState().grab?.id !== layer.id) {
+      releaseGrab(e)
+      return
+    }
+    const { thetaL, thetaR } = readAngles()
+    const hub = angleAboutHub(e, thetaL, thetaR)
+    if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
+    if (grab.lastAngle !== null) {
+      const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+      writeUserDrive(layer.id, clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax), [0, thetaMax])
+    }
+    grab.lastAngle = hub.angle
+    e.stopPropagation()
+  }
+
+  const onPointerOver = (): void => {
+    const st = useStorybookStore.getState()
+    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
+      gl.domElement.style.cursor = 'grab'
+    }
+  }
+  const onPointerOut = (): void => {
+    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+  }
 
   useFrame(() => {
     const group = groupRef.current
@@ -175,32 +304,44 @@ function KnobDisc({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON
     group.visible = visible
     if (!visible) return
-    const patches = solveKnobTowerPose(layer, knobTheta, thetaL, thetaR)
-    writeQuad(geometry, patches[0].quad) // 'disc' is always the first patch
+    const patches = solveKnobTowerPose(layer, readKnobTheta(layer), thetaL, thetaR)
+    const disc = patches[0].quad // 'disc' is always the first patch
+    writeQuad(geometry, disc)
+    writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
   })
 
   return (
-    <group ref={groupRef} visible={false}>
+    <group
+      ref={groupRef}
+      visible={false}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={releaseGrab}
+      onPointerCancel={releaseGrab}
+      onLostPointerCapture={releaseGrab}
+      onPointerOver={onPointerOver}
+      onPointerOut={onPointerOut}
+    >
       <mesh geometry={geometry} material={materials.front} renderOrder={0} />
       <mesh geometry={geometry} material={materials.back} renderOrder={0} />
+      {/* Coarse-pointer slop (law H6): 1.5x the disc, touch only. */}
+      <mesh ref={slopRef} geometry={slopGeometry} material={handleMaterial} renderOrder={2} />
     </group>
   )
 }
 
 /** One knee tier — a mound of two slope panels over a ridge band, standing IN
  *  the page. Owns its own art texture (`<id>-tier<k>`) and a contact shadow
- *  scaled by its own current lift. */
+ *  scaled by its own current lift. Reads the live twist each frame. */
 function KnobTier({
   layer,
   k,
-  knobTheta,
   spreadIndex,
   frame,
   committedSpread,
 }: {
   layer: SceneLayer & KnobTowerGeom
   k: number
-  knobTheta: number
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
@@ -308,6 +449,7 @@ function KnobTier({
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
 
+    const knobTheta = readKnobTheta(layer)
     const patches = solveKnobTowerPose(layer, knobTheta, thetaL, thetaR)
     const inPatch = patches.find((p) => p.face === inFace)
     const outPatch = patches.find((p) => p.face === outFace)
@@ -358,29 +500,14 @@ export function KnobTowerPopupLayer({
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
 }) {
-  // The frozen knob angle for this view: the dev override clamped to the
-  // piece's own working range, or untwisted flat in normal viewing.
-  const knobTheta = useMemo(() => {
-    const override = readKnobOverrideDeg()
-    if (override === null) return 0
-    return Math.min(knobTowerThetaMax(layer), Math.max(0, rad(override)))
-  }, [layer])
-
   return (
     <group name={`knobtower-${layer.id}`}>
-      <KnobDisc
-        layer={layer}
-        knobTheta={knobTheta}
-        spreadIndex={spreadIndex}
-        frame={frame}
-        committedSpread={committedSpread}
-      />
+      <KnobDisc layer={layer} spreadIndex={spreadIndex} frame={frame} committedSpread={committedSpread} />
       {layer.tiers.map((_, k) => (
         <KnobTier
           key={k}
           layer={layer}
           k={k}
-          knobTheta={knobTheta}
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}

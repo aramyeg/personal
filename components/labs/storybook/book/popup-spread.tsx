@@ -41,6 +41,7 @@ import { easeTurnWeighted } from './page-geometry'
 import { BoxPopupLayer } from './popup-box-layer'
 import { PlatformPopupLayer } from './popup-platform-layer'
 import { TabPiecePopupLayer } from './popup-tabpiece-layer'
+import { StripFlapPopupLayer } from './popup-stripflap-layer'
 import { KnobTowerPopupLayer } from './popup-knobtower-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import type { TurnFrame } from './use-turn-driver'
@@ -441,6 +442,21 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
             <KnobTowerPopupLayer
               key={layer.id}
               layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        // Strip flaps render through their own layer (D6): the flap is a grab
+        // handle, so it owns pointer wiring + the release return. With no drive
+        // the pose it draws is bit-identical to the generic two-panel layer's.
+        if (layer.mech === 'stripflap') {
+          return (
+            <StripFlapPopupLayer
+              key={layer.id}
+              layer={layer}
+              accents={accents}
               spreadIndex={spreadIndex}
               frame={frame}
               committedSpread={committedSpread}

@@ -66,6 +66,55 @@ export function tabPieceTabOut(geom: TabPieceGeom, beta: number): number {
   return 2 * geom.legW * (1 - Math.cos(tabPieceLift(geom, beta)))
 }
 
+// ---------------------------------------------------------------------------
+// User drive (D6 "THE HAND"; derived + proven in derive-userdrive.mjs). The
+// reader pulls the tab directly: a SECOND input channel — the strip draw s,
+// orthogonal to the page dihedral — carried internally as the lift angle a
+// (every vertex is a bounded-slope function of a; s <-> a inverts only for
+// the input reading). The whole channel lives between a flat fold and a
+// mechanical stop a hair below the form's singular attitude.
+
+/** Paper thickness used as the mound's sliding-hinge clearance at the stop
+ *  (derive-userdrive T_PAPER): the sliding hinge halts one of these short of
+ *  colliding with the fixed hinge, so gap = 2w cos(a_stop) = T_PAPER at
+ *  a_stop = acos(T_PAPER / 2w). */
+const STOP_HINGE_T = 0.02
+/** Table stop: a 2-degree guard below the 90-degree over-center singularity
+ *  (past it the legs pass vertical and the deck collapses inward). */
+const TABLE_STOP = rad(88)
+
+/** Slide law inverse — lift angle for a strip draw s: a = acos(1 - s / 2w). */
+export const tabPieceLiftFromSlide = (geom: TabPieceGeom, s: number): number =>
+  Math.acos(clamp(1 - s / (2 * geom.legW), -1, 1))
+
+/** Slide law — strip draw for a lift: s = 2w(1 - cos a). */
+export const tabPieceSlideFromLift = (geom: TabPieceGeom, a: number): number =>
+  2 * geom.legW * (1 - Math.cos(a))
+
+/** The user-drive mechanical stop lift (radians): the largest lift the reader
+ *  may pull the piece to. Mound halts a paper thickness short of the fixed
+ *  hinge (acos(T/2w) ~ 87.8deg for the goldpile); table guards 2 degrees
+ *  below its over-center attitude. */
+export function tabPieceStopLift(geom: TabPieceGeom): number {
+  return geom.form === 'mound' ? Math.acos(clamp(STOP_HINGE_T / (2 * geom.legW), -1, 1)) : TABLE_STOP
+}
+
+/** The user-drive strip-draw ceiling s_stop = 2w(1 - cos a_stop). */
+export const tabPieceStopSlide = (geom: TabPieceGeom): number =>
+  tabPieceSlideFromLift(geom, tabPieceStopLift(geom))
+
+/** Always-on flat-fold safety ceiling on the rendered lift: the SAME cam
+ *  shape as tabPieceLift but scaled to the mechanical stop, so it DOMINATES
+ *  the shipped page cam at every beta (never alters the non-interactive pose —
+ *  a_stop > liftDeg for every shipped piece) yet collapses to 0 at book-closed
+ *  for any frozen user value. The interactive layer renders
+ *  min(a_eff, tabPieceCeiling(beta)). */
+export function tabPieceCeiling(geom: TabPieceGeom, beta: number): number {
+  const rest = rad(geom.restAtDeg ?? 176)
+  const u = clamp(Math.sin(beta / 2) / Math.sin(rest / 2), 0, 1)
+  return tabPieceStopLift(geom) * Math.sin((u * Math.PI) / 2)
+}
+
 /** The page's own moving frame at the current dihedral — u along the page
  *  surface toward the fore edge, n the page normal into the wedge — packaged
  *  as the point-in-page-plane function P(d, lift, z). Shared by the pose
@@ -97,11 +146,11 @@ export function tabPieceSlit(geom: TabPieceGeom, thetaL: number, thetaR: number)
 }
 
 /**
- * Solves the world pose. Corner order per quad matches the platform
- * convention — [bl, br, tr, tl] as seen from outside at rest — so identity
- * uvs print upright. The piece rides its page's own frame (like the strip
- * flap): u along the page toward the fore edge, n the page normal into
- * the wedge; the tab lies IN the page plane beyond the fore edge.
+ * Solves the world pose at the shipped page cam lift. Corner order per quad
+ * matches the platform convention — [bl, br, tr, tl] as seen from outside at
+ * rest — so identity uvs print upright. The piece rides its page's own frame
+ * (like the strip flap): u along the page toward the fore edge, n the page
+ * normal into the wedge; the tab lies IN the page plane beyond the fore edge.
  */
 export function solveTabPiecePose(
   geom: TabPieceGeom,
@@ -109,7 +158,22 @@ export function solveTabPiecePose(
   thetaR: number
 ): readonly TabPiecePatch[] {
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const a = tabPieceLift(geom, beta)
+  return solveTabPiecePoseAt(geom, tabPieceLift(geom, beta), thetaL, thetaR)
+}
+
+/**
+ * Solves the world pose at an EXPLICIT lift angle `a` — the D6 user-drive
+ * override path. solveTabPiecePose delegates here with the page cam lift, so
+ * the non-interactive pose is bit-identical; the interactive layer passes
+ * min(a_eff, tabPieceCeiling(beta)) with a_eff the reader's pulled or
+ * returning lift.
+ */
+export function solveTabPiecePoseAt(
+  geom: TabPieceGeom,
+  a: number,
+  thetaL: number,
+  thetaR: number
+): readonly TabPiecePatch[] {
   const w = geom.legW
   const s = 2 * w * (1 - Math.cos(a))
   const h = w * Math.sin(a)

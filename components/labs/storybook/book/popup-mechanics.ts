@@ -846,19 +846,16 @@ export function solveBoxPose(geom: BoxGeom, thetaL: number, thetaR: number): rea
 // ---------------------------------------------------------------------------
 // Pull-strip erected flap (derive-pullstrip.mjs — see StripFlapGeom).
 
-export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const a = geom.anchor
-  const b = geom.slot
-  const dz = geom.anchorZ - geom.slotZ
-  const strip = (bt: number): number => Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(bt) + dz * dz)
-  const shut = strip(0)
-  const reach = Math.max(strip(rad(geom.erectAtDeg ?? 176)) - shut, 1e-9)
-  const pull = strip(beta) - shut
-  const stripLift = Math.acos(clamp(1 - pull / reach, -1, 1))
-
-  // The figure page's own frame: u along the page (gutter -> fore edge),
-  // n into the wedge, hinge axis turned by hingeDeg in the page plane.
+/** A strip flap's hinge frame on its figure page: u along the page (gutter ->
+ *  fore edge), n into the wedge, the hinge axis turned by hingeDeg in the page
+ *  plane, `flat` the flap's lie direction when down, and the two hinge ends
+ *  h0/h1 about the hinge centre. Shared by the pose solver and the D6 handle
+ *  layer (which measures the pointer's angle about this hinge). */
+export function stripFlapFrame(
+  geom: StripFlapGeom,
+  thetaL: number,
+  thetaR: number
+): { u: Vec3; n: Vec3; hinge: Vec3; flat: Vec3; center: Vec3; h0: Vec3; h1: Vec3 } {
   const t = geom.side === 'left' ? thetaL : thetaR
   const u: Vec3 = [Math.cos(t), Math.sin(t), 0]
   const n: Vec3 = geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
@@ -868,6 +865,44 @@ export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: 
   const center: Vec3 = [geom.hingeX * u[0], geom.hingeX * u[1], geom.hingeZ]
   const h0 = combine(1, center, -geom.width / 2, hinge)
   const h1 = combine(1, center, geom.width / 2, hinge)
+  return { u, n, hinge, flat, center, h0, h1 }
+}
+
+/** The strip cam lift (chord law) for dihedral beta, BEFORE the press-and-peel
+ *  graze clamp — the flap's page-driven target. The D6 layer eases the reader-
+ *  released flap back to this. */
+export function stripFlapCamLift(geom: StripFlapGeom, beta: number): number {
+  const a = geom.anchor
+  const b = geom.slot
+  const dz = geom.anchorZ - geom.slotZ
+  const strip = (bt: number): number => Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(bt) + dz * dz)
+  const shut = strip(0)
+  const reach = Math.max(strip(rad(geom.erectAtDeg ?? 176)) - shut, 1e-9)
+  const pull = strip(clamp(beta, 0, Math.PI)) - shut
+  return Math.acos(clamp(1 - pull / reach, -1, 1))
+}
+
+export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  return solveStripFlapPoseAt(geom, stripFlapCamLift(geom, beta), thetaL, thetaR)
+}
+
+/**
+ * Solves the flap pose at an EXPLICIT requested lift — the D6 user-drive
+ * override path (the flap IS the handle, law H3). solveStripFlapPose delegates
+ * here with the chord-law cam lift, so the non-interactive pose is bit-
+ * identical; the layer passes the reader's pulled or returning lift, clamped
+ * to [0, 90deg] (the anti-flip stop). The press-and-peel graze clamp still
+ * applies to `liftReq` exactly as before, so nothing ever passes through the
+ * facing page.
+ */
+export function solveStripFlapPoseAt(
+  geom: StripFlapGeom,
+  liftReq: number,
+  thetaL: number,
+  thetaR: number
+): MechPose {
+  const { n, flat, hinge, center, h0, h1 } = stripFlapFrame(geom, thetaL, thetaR)
 
   // Press-and-peel: early in a turn the strip curve would carry the flap
   // tip through the OTHER page — in paper the tip rests against that page
@@ -889,7 +924,7 @@ export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: 
     }
     return true
   }
-  let lift = stripLift
+  let lift = liftReq
   if (!insideWedge(lift)) {
     let lo = 0
     let hi = lift

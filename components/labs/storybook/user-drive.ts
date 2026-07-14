@@ -43,6 +43,21 @@ export function listUserDriveIds(): readonly string[] {
   return Array.from(drive.keys())
 }
 
+/** Dev-only static drive override for the D6 capture deck: `?sbdrive=<id>:<v>`
+ *  freezes the handle of layer `id` at raw value `v` in the piece's OWN domain
+ *  (strip draw s for tabs, degrees for flaps). Read where each layer computes
+ *  its lift, analogous to ?sbknob / ?sbpose; compiled out of production. */
+export function readDriveOverride(id: string): number | null {
+  if (process.env.NODE_ENV === 'production') return null
+  if (typeof window === 'undefined') return null
+  const raw = new URLSearchParams(window.location.search).get('sbdrive')
+  if (!raw) return null
+  const sep = raw.lastIndexOf(':')
+  if (sep < 0 || raw.slice(0, sep) !== id) return null
+  const v = Number(raw.slice(sep + 1))
+  return Number.isFinite(v) ? v : null
+}
+
 /** Grab bookkeeping the frame loop needs synchronously, alongside the drive
  *  values themselves — kept in this module (not store.ts) so a per-frame
  *  read never touches zustand. */

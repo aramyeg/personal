@@ -12,8 +12,10 @@ import {
   solveLayerPose,
   solveParallelPose,
   solveStripFlapPose,
+  solveStripFlapPoseAt,
   solveVFoldPose,
   spreadDihedral,
+  stripFlapCamLift,
   spreadPageAngles,
   spreadPageAnglesTilted,
   type LayerGeom,
@@ -28,8 +30,12 @@ import {
 } from '@/components/labs/storybook/book/popup-anatomy'
 import {
   solveTabPiecePose,
+  solveTabPiecePoseAt,
   tabPieceFlatSpan,
   tabPieceLift,
+  tabPieceLiftFromSlide,
+  tabPieceSlideFromLift,
+  tabPieceStopSlide,
   tabPieceTabOut,
   TAB_LIP,
 } from '@/components/labs/storybook/book/popup-tabpiece'
@@ -920,6 +926,119 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
   )
 })
 
+// ---------------------------------------------------------------------------
+// D-G2 USER-DOMAIN GATE (D6 "THE HAND"; law derived + proven in
+// .superpowers/sdd/bench/derive-userdrive.mjs, gates U5/U7). The user drive is
+// a SECOND input channel, orthogonal to the page dihedral beta: the reader
+// pulls a tab / swings a flap / twists a knob. Grabs are legal ONLY at the
+// spread's settled rest (law H2), which collapses the owed 2D beta×drive
+// collision extension to a 1D scrub at the TRUE tilted rest pose. The reader
+// can freeze the drive at ANY value there and dwell, so the whole scrub must be
+// as clean as the rest pose itself: HARD ZERO illegal standing crossings, no
+// ratchet, against every other shipped piece in the spread — each posed via the
+// interactive solver override path (solveTabPiecePoseAt / solveStripFlapPoseAt /
+// solveKnobTowerPose). A self-check station reproduces the A9 rest zero through
+// the override, proving the override path is faithful.
+describe('D-G2 user domain — zero illegal crossings across the whole drive scrub', () => {
+  const A_TOL = rad(15) // unchanged from D-G2 v2
+  const H_TOL = 0.028
+  const SCRUB = 200
+
+  const piecesIllegallyCross = (qa: PanelQuad[], qb: PanelQuad[], thetaL: number, thetaR: number): boolean => {
+    for (const A of qa) {
+      if (quadArea(A) < 1e-9) continue
+      for (const B of qb) {
+        if (quadArea(B) < 1e-9) continue
+        if (quadPlaneAngle(A, B) < A_TOL) continue
+        if (crossingHeight(A, B, thetaL, thetaR) >= H_TOL) return true
+      }
+    }
+    return false
+  }
+
+  /** The spread number and full layer set holding a user piece. */
+  const locate = (id: string): { spread: number; layers: readonly SceneLayer[] } => {
+    const set = SPREAD_SETS.find(([, layers]) => layers.some((l) => l.id === id))
+    if (!set) throw new Error(`user piece ${id} is not shipped`)
+    return { spread: Number(set[0].split('-')[1]), layers: set[1] }
+  }
+
+  /** The DRIVEN piece's world quads at an explicit drive value, through the
+   *  interactive override — strip draw s for tabs, lift a_flap for flaps, twist
+   *  theta for the knob. */
+  const userQuadsAt = (piece: SceneLayer, v: number, thetaL: number, thetaR: number): PanelQuad[] => {
+    if (piece.mech === 'tabpiece')
+      return solveTabPiecePoseAt(piece, tabPieceLiftFromSlide(piece, v), thetaL, thetaR).map((p) => p.quad)
+    if (piece.mech === 'stripflap') {
+      const pose = solveStripFlapPoseAt(piece, v, thetaL, thetaR)
+      return [pose.right, pose.left]
+    }
+    if (piece.mech === 'knobtower') return solveKnobTowerPose(piece, v, thetaL, thetaR).map((p) => p.quad)
+    throw new Error(`piece ${piece.id} is not user-drivable`)
+  }
+
+  /** The scrub ceiling in the piece's own domain (law H3: strip s to s_stop,
+   *  flap lift to the 90-degree anti-flip stop, knob to THETA_MAX). */
+  const scrubHi = (piece: SceneLayer): number => {
+    if (piece.mech === 'tabpiece') return tabPieceStopSlide(piece)
+    if (piece.mech === 'stripflap') return Math.PI / 2
+    if (piece.mech === 'knobtower') return knobTowerThetaMax(piece)
+    throw new Error(`piece ${piece.id} is not user-drivable`)
+  }
+
+  /** The rest drive value (the shipped cam pose reproduced through the override
+   *  — the A9 self-check station). */
+  const restValue = (piece: SceneLayer, beta: number): number => {
+    if (piece.mech === 'tabpiece') return tabPieceSlideFromLift(piece, tabPieceLift(piece, beta))
+    if (piece.mech === 'stripflap') return stripFlapCamLift(piece, beta)
+    if (piece.mech === 'knobtower') return 0 // rests untwisted (law H4)
+    throw new Error(`piece ${piece.id} is not user-drivable`)
+  }
+
+  // Every user-drivable piece shipped today; a knob-tower joins automatically
+  // if ever shipped (vacuous now — none in content).
+  const USER_IDS = ALL_LAYERS.filter(
+    ([, l]) => l.mech === 'tabpiece' || l.mech === 'stripflap' || l.mech === 'knobtower'
+  ).map(([id]) => id)
+
+  it('covers the shipped user-drivable pieces (2 tab pieces + 3 strip flaps)', () => {
+    expect(USER_IDS).toEqual(
+      expect.arrayContaining([
+        'ch4-goldpile',
+        'ch5-market-table',
+        'title-quill',
+        'satchel-sword',
+        'satchel-compass',
+      ])
+    )
+  })
+
+  it.each(USER_IDS.map((id) => [id] as const))(
+    '%s: zero illegal standing crossings across the whole user scrub at true rest',
+    (id) => {
+      const { spread, layers } = locate(id)
+      const piece = layers.find((l) => l.id === id)!
+      const { thetaL, thetaR } = spreadPageAnglesTilted(spread, spread, null, 0)
+      const others = layers.filter((l) => l.id !== id).map((l) => allQuads(l, layers, thetaL, thetaR))
+      const hi = scrubHi(piece)
+
+      let illegal = 0
+      for (let i = 0; i <= SCRUB; i++) {
+        const uq = userQuadsAt(piece, (hi * i) / SCRUB, thetaL, thetaR)
+        for (const oq of others) if (piecesIllegallyCross(uq, oq, thetaL, thetaR)) illegal += 1
+      }
+      expect(illegal).toBe(0)
+
+      // Self-check: the rest override reproduces the A9 rest zero.
+      const restQuads = userQuadsAt(piece, restValue(piece, thetaL - thetaR), thetaL, thetaR)
+      let restIllegal = 0
+      for (const oq of others) if (piecesIllegallyCross(restQuads, oq, thetaL, thetaR)) restIllegal += 1
+      expect(restIllegal).toBe(0)
+    },
+    60_000
+  )
+})
+
 describe('A10 wedge containment — paper never pokes through either bounding page', () => {
   it('every corner stays inside its spread dihedral wedge through both turn roles', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
@@ -1448,4 +1567,50 @@ describe('tabpiece — fore-edge tab slider (D1 gates, bench derive-tabpiece.mjs
       expect(TAB_LIP).toBeGreaterThan(0)
     }
   })
+
+  // The D6 override path (solveTabPiecePoseAt) at the page cam lift must be
+  // BIT-IDENTICAL to the non-interactive solveTabPiecePose — the cam-dominated
+  // invariant. If this drifts, the shipped non-interactive pose changed and
+  // every A-suite gate would move; pin it here directly.
+  it.each(TAB_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: override at the cam lift reproduces the shipped pose exactly',
+    (_id, layer) => {
+      for (let i = 0; i <= 40; i++) {
+        const [tL, tR] = bloom((REST * i) / 40)
+        const cam = solveTabPiecePose(layer, tL, tR)
+        const over = solveTabPiecePoseAt(layer, tabPieceLift(layer, tL - tR), tL, tR)
+        expect(over.length).toBe(cam.length)
+        for (let p = 0; p < cam.length; p++) {
+          expect(over[p].face).toBe(cam[p].face)
+          for (let c = 0; c < 4; c++) for (let k = 0; k < 3; k++) {
+            expect(over[p].quad[c][k]).toBe(cam[p].quad[c][k])
+          }
+        }
+      }
+    }
+  )
+})
+
+describe('stripflap user-drive override faithfulness (D6, cam-dominated invariant)', () => {
+  const STRIP_LAYERS = ALL_LAYERS.filter(
+    (entry): entry is readonly [string, SceneLayer & { mech: 'stripflap' }, readonly SceneLayer[]] =>
+      entry[1].mech === 'stripflap'
+  )
+  const REST = rad(176)
+  const bloom = (beta: number): [number, number] => [Math.PI / 2 + beta / 2, Math.PI / 2 - beta / 2]
+
+  it.each(STRIP_LAYERS.map(([id, l]) => [id, l] as const))(
+    '%s: override at the cam lift reproduces solveStripFlapPose exactly',
+    (_id, layer) => {
+      for (let i = 0; i <= 40; i++) {
+        const [tL, tR] = bloom((REST * i) / 40)
+        const cam = solveStripFlapPose(layer, tL, tR)
+        const over = solveStripFlapPoseAt(layer, stripFlapCamLift(layer, tL - tR), tL, tR)
+        for (const side of ['right', 'left'] as const)
+          for (let c = 0; c < 4; c++) for (let k = 0; k < 3; k++) {
+            expect(over[side][c][k]).toBe(cam[side][c][k])
+          }
+      }
+    }
+  )
 })
