@@ -338,6 +338,86 @@ export function makeRotorCanvas(w = 256, h = 256): HTMLCanvasElement {
 }
 
 /**
+ * Knob-tower knob placeholder (D6 "THE HAND"): the rotor disc's die-cut, plus
+ * the two affordances interaction law H4 requires so the twist reads before
+ * a finger touches it — a THUMB NOTCH bitten into the rim and a short ARROW
+ * ARC hugging the rim to show the turn direction. Drawn only inside the
+ * circle on a TRANSPARENT square (alphaTest keeps the corners cut away); the
+ * renderer tints it with the piece's own kraft stock (base white here).
+ */
+export function makeKnobCanvas(w = 256, h = 256): HTMLCanvasElement {
+  assertBrowser('makeKnobCanvas')
+  const { canvas, ctx } = createCanvas(w, h)
+  const cx = w / 2
+  const cy = h / 2
+  const R = Math.min(w, h) * 0.46
+  const ink = 'rgba(58, 40, 20, '
+
+  // The disc face.
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.arc(cx, cy, R, 0, Math.PI * 2)
+  ctx.fill()
+
+  // A darker rim ring so the disc edge reads as a cut circle.
+  ctx.strokeStyle = `${ink}0.5)`
+  ctx.lineWidth = Math.max(2, R * 0.05)
+  ctx.beginPath()
+  ctx.arc(cx, cy, R * 0.94, 0, Math.PI * 2)
+  ctx.stroke()
+
+  // THUMB NOTCH (H4): a shaded crescent bitten into the rim at the top, the
+  // grab affordance — the twist handle read from shape alone (touch parity,
+  // H6). A ridged thumb rest sits just inside it.
+  const notchAng = -Math.PI / 2
+  const nx = cx + Math.cos(notchAng) * R * 0.82
+  const ny = cy + Math.sin(notchAng) * R * 0.82
+  ctx.fillStyle = `${ink}0.4)`
+  ctx.beginPath()
+  ctx.arc(nx, ny, R * 0.2, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = `${ink}0.55)`
+  ctx.lineWidth = Math.max(1.5, R * 0.03)
+  for (let i = -1; i <= 1; i++) {
+    const a = notchAng + i * 0.28
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * R * 0.58, cy + Math.sin(a) * R * 0.58)
+    ctx.lineTo(cx + Math.cos(a) * R * 0.74, cy + Math.sin(a) * R * 0.74)
+    ctx.stroke()
+  }
+
+  // ARROW ARC (H4): a short curved arrow hugging the rim, showing the twist
+  // heading. Arc from lower-left up toward the notch, capped by an arrowhead.
+  ctx.strokeStyle = `${ink}0.6)`
+  ctx.lineWidth = Math.max(2, R * 0.045)
+  const arcR = R * 0.66
+  const a0 = Math.PI * 0.7
+  const a1 = Math.PI * 1.35
+  ctx.beginPath()
+  ctx.arc(cx, cy, arcR, a0, a1)
+  ctx.stroke()
+  const tipX = cx + Math.cos(a1) * arcR
+  const tipY = cy + Math.sin(a1) * arcR
+  const tang = a1 + Math.PI / 2 // arrowhead points along the arc's travel
+  const head = R * 0.14
+  ctx.fillStyle = `${ink}0.6)`
+  ctx.beginPath()
+  ctx.moveTo(tipX, tipY)
+  ctx.lineTo(tipX + Math.cos(tang + 2.4) * head, tipY + Math.sin(tang + 2.4) * head)
+  ctx.lineTo(tipX + Math.cos(tang - 2.4) * head, tipY + Math.sin(tang - 2.4) * head)
+  ctx.closePath()
+  ctx.fill()
+
+  // The hub (mech 103's rivet).
+  ctx.fillStyle = `${ink}0.6)`
+  ctx.beginPath()
+  ctx.arc(cx, cy, R * 0.12, 0, Math.PI * 2)
+  ctx.fill()
+
+  return canvas
+}
+
+/**
  * Stack-edge stripe canvas: the cut edges of a fanned page stack, one
  * horizontal stripe per sheet from the BOTTOM of the canvas up (v=0 is the
  * valley floor under three's flipY). Each stripe is aged paper washed with

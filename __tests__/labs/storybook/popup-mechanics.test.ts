@@ -34,6 +34,7 @@ import {
   TAB_LIP,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
@@ -112,6 +113,11 @@ const allQuads = (
   if (layer.mech === 'rotor')
     return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
+  // A knob-tower has no theta channel in these dihedral-only gates (collision,
+  // containment, rigidity) — pose at full erect (THETA_MAX), the worst-case
+  // footprint. D-G2-style scrubs that need theta call the solver directly.
+  if (layer.mech === 'knobtower')
+    return solveKnobTowerPose(layer, knobTowerThetaMax(layer), thetaL, thetaR).map((p) => p.quad)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -153,6 +159,10 @@ const flatTol = (layer: SceneLayer): number => {
   // paper thickness 0.02). A rotor rivets on the same way (ROTOR_LIFT 0.003),
   // and its spin is exactly 0 at closed, so it flattens to the same tolerance.
   if (layer.mech === 'dress' || layer.mech === 'rotor') return 0.004
+  // A knob-tower's tiers close through an exact cam zero (a = 0 at beta = 0),
+  // but its riveted disc sits one glue layer (ROTOR_LIFT 0.003) proud like a
+  // rotor, so it flattens to that tolerance.
+  if (layer.mech === 'knobtower') return 0.004
   // Tab pieces close through an exact cam zero (a = 0 at beta = 0).
   return 1e-9 // symmetric v-folds, boxes, tab pieces: analytically exact
 }
@@ -194,12 +204,14 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'fan' ||
         layer.mech === 'rider' ||
         layer.mech === 'dress' ||
-        layer.mech === 'rotor'
+        layer.mech === 'rotor' ||
+        layer.mech === 'knobtower'
       ) {
         // Anatomy-phase mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
-        // rider mount rule, dress seat existence, rotor cam + fit) and the
-        // composition covenant (rotor spin cap / seat legality).
+        // rider mount rule, dress seat existence, rotor cam + fit), the
+        // composition covenant (rotor spin cap / seat legality; knob-tower
+        // stroke + run-band + z-band rules), and popup-knobtower.test.ts.
         return
       }
       if (layer.mech === 'stripflap') {
@@ -332,6 +344,20 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
                     : []
             for (const i of onPage) {
               const p = patch.quad[i]
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+            }
+          }
+          continue
+        }
+        if (layer.mech === 'knobtower') {
+          // one-page slider: each tier's base hinge corners lie in its page;
+          // the disc rivets one glue layer proud (skip it, like a rotor).
+          const n = layer.side === 'left' ? nL : nR
+          for (const patch of solveKnobTowerPose(layer, knobTowerThetaMax(layer), thetaL, thetaR)) {
+            if (patch.face === 'disc') continue
+            const base = patch.face.endsWith('In') ? [0, 1] : [2, 3]
+            for (const idx of base) {
+              const p = patch.quad[idx]
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
           }

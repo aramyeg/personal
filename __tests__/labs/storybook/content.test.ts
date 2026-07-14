@@ -71,7 +71,9 @@ describe('storybook content', () => {
                           ? l.armLen
                           : l.mech === 'rotor'
                             ? l.radius
-                            : l.width
+                            : l.mech === 'knobtower'
+                              ? l.crankR
+                              : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

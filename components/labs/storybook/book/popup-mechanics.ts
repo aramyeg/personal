@@ -435,6 +435,55 @@ export type RotorGeom = {
   restAtDeg?: number
 }
 
+/**
+ * KNOB-TWIST TOWER (Part D6 "THE HAND"; Birmingham mech 103 "THE HUB" volvelle
+ * + mech 59/105 Scotch yoke + mech 90 "the knee") — the book's first
+ * USER-DRIVEN fold. A die-cut disc riveted flat INTO the page (the rotor
+ * vocabulary: coplanar, one glue layer proud) that the reader TWISTS by angle
+ * theta; a hidden paper crank converts the twist into a strip pull that erects
+ * a row of N staggered knee towers standing IN the page. PAGE-ROOTED like the
+ * tab piece (side + page coordinates), NOT seated on a parent panel. The
+ * fold-flat composition a_shown = a(theta) * E(beta) collapses every tier
+ * exactly at book-closed for ANY frozen theta, so the coplanar disc holds the
+ * user's twist through page turns (the book "remembers" the knob). Pose math
+ * lives in book/popup-knobtower.ts (this module is at its size cap). Derived +
+ * gate-checked in .superpowers/sdd/bench/derive-knobtower.mjs.
+ */
+export type KnobTowerGeom = {
+  mech: 'knobtower'
+  /** The page the assembly stands on (and whose surface carries the disc). */
+  side: 'left' | 'right'
+  /** Hub (disc centre) distance from the spine along the page run. */
+  hubD: number
+  /** Hub position along the spine (world z). */
+  hubZ: number
+  /** Visible disc radius; rendered as a square quad of side 2*discR carrying
+   *  circular die-cut art (the alpha cutout makes it a disc). Its spin-swept
+   *  corners reach discR*sqrt(2) from the hub. */
+  discR: number
+  /** Crank pin radius — the strip pull is crankR * (1 - cos theta). Full
+   *  erection needs s_full <= 2*crankR (the Scotch-yoke stroke ceiling). */
+  crankR: number
+  /** Common fore-side hinge for every tier: distance from the spine along the
+   *  page. Each tier's mound spans [foreHingeD - 2w, foreHingeD]. */
+  foreHingeD: number
+  /** The knee tiers, ascending. Each is a mound of leg width `w` at rest lift
+   *  `aRestDeg` (below 90), occupying a disjoint z-band
+   *  [zc - ridgeLen/2, zc + ridgeLen/2] along the spine. */
+  tiers: ReadonlyArray<{
+    w: number
+    aRestDeg: number
+    zc: number
+    ridgeLen: number
+  }>
+  /** Engagement fraction: tier k+1 wakes at this fraction of tier k's rest
+   *  lift (default 0.75). Smaller overlaps the cascade and shortens the wind. */
+  phiE?: number
+  /** Dihedral (deg) the fold-flat envelope normalizes to — the book's rest
+   *  bloom. Default 176. */
+  restAtDeg?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -448,6 +497,7 @@ export type LayerGeom =
   | TabPieceGeom
   | KineticArmGeom
   | RotorGeom
+  | KnobTowerGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -912,6 +962,8 @@ export function solveLayerPose(
       throw new Error('storybook: tab pieces are multi-patch — use solveTabPiecePose (popup-tabpiece)')
     case 'rotor':
       throw new Error('storybook: rotors ride a solved parent surface — use solveRotorPose (popup-rotor)')
+    case 'knobtower':
+      throw new Error('storybook: knob-tower layers are multi-patch + user-driven — use solveKnobTowerPose (popup-knobtower)')
   }
 }
 

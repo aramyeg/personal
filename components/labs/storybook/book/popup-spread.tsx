@@ -41,6 +41,7 @@ import { easeTurnWeighted } from './page-geometry'
 import { BoxPopupLayer } from './popup-box-layer'
 import { PlatformPopupLayer } from './popup-platform-layer'
 import { TabPiecePopupLayer } from './popup-tabpiece-layer'
+import { KnobTowerPopupLayer } from './popup-knobtower-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
@@ -89,6 +90,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'rotor') return 0.5 // single spinning quad, no fold
   if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
   if (layer.mech === 'tabpiece') return 0.5 // per-face uvs live in the tabpiece layer
+  if (layer.mech === 'knobtower') return 0.5 // per-face uvs live in the knobtower layer
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   return layer.creaseU ?? 0.5
 }
@@ -125,6 +127,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
     return false
   }
   if (layer.mech === 'rotor') return false // spun in-plane by its own renderer; disc art is symmetric
+  if (layer.mech === 'knobtower') return false // per-face uvs live in the knobtower layer
   if (layer.mech === 'tabpiece') return false // per-face uvs live in the tabpiece layer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
@@ -425,6 +428,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'tabpiece') {
           return (
             <TabPiecePopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'knobtower') {
+          return (
+            <KnobTowerPopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}

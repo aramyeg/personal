@@ -9,6 +9,11 @@ import { tabPieceFlatSpan } from '@/components/labs/storybook/book/popup-tabpiec
 import { solveKineticArmPose, kineticArmFlatReach } from '@/components/labs/storybook/book/popup-kinetic'
 import { rotorSweptRadius } from '@/components/labs/storybook/book/popup-rotor'
 import {
+  knobTowerRunGap,
+  knobTowerStrokeFull,
+  knobTowerThetaMax,
+} from '@/components/labs/storybook/book/popup-knobtower'
+import {
   solveBoxPose,
   solveVFoldPose,
   type PanelQuad,
@@ -84,8 +89,10 @@ const familyOf = (l: SceneLayer): string | null => {
       return 'tabpiece'
     case 'kinetic':
     case 'rotor':
+    case 'knobtower':
       // The rotor is the kinetic family's SECOND form (a spinning disc rather
-      // than a sweeping arm) — both are page-driven image-animating folds.
+      // than a sweeping arm); the knob-tower is its USER-DRIVEN third form (a
+      // hand-twisted crank) — all page/hand-driven image-animating folds.
       return 'kinetic'
     case 'dress':
       return null
@@ -361,6 +368,59 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
         // a spinning disc is decorative kinetic scenery, never a story piece
         // on its own (the C1v2 census forbids non-assembly story mechs).
         expect(l.role === 'scenery' || l.role === 'figure', `${label} rotor role must be scenery/figure`).toBe(true)
+      }
+    }
+  })
+
+  it('knobtower belongs to the kinetic family (its user-driven third form)', () => {
+    const knob: SceneLayer = {
+      id: 'probe-knob',
+      kind: 'hero',
+      role: 'figure',
+      mech: 'knobtower',
+      side: 'right',
+      hubD: 0.3,
+      hubZ: 0,
+      discR: 0.16,
+      crankR: 0.2,
+      foreHingeD: 0.82,
+      tiers: [
+        { w: 0.09, aRestDeg: 70, zc: -0.12, ridgeLen: 0.12 },
+        { w: 0.11, aRestDeg: 74, zc: 0, ridgeLen: 0.12 },
+        { w: 0.13, aRestDeg: 78, zc: 0.12, ridgeLen: 0.12 },
+      ],
+    }
+    expect(familyOf(knob)).toBe('kinetic')
+  })
+
+  it('knobtower validity: crank stroke, disjoint disc/tower run-bands, aRest < 90, wind + z-bands', () => {
+    // Shipped-content-dependent: vacuous until a knob-tower lands in content.
+    for (const [name, layers] of ALL_SETS) {
+      for (const l of layers) {
+        if (l.mech !== 'knobtower') continue
+        const label = `${name} ${l.id}`
+        // the crank stroke can actually reach full erection (s_full <= 2*crankR)
+        expect(knobTowerStrokeFull(l), `${label} crank stroke too short`).toBeLessThanOrEqual(
+          2 * l.crankR + 1e-9
+        )
+        // the disc's spin-swept circle and the towers occupy disjoint run-bands
+        expect(knobTowerRunGap(l), `${label} disc/tower run-bands overlap`).toBeGreaterThanOrEqual(0)
+        // every tier is a real knee that folds flat (0 < aRest < 90)
+        for (const t of l.tiers) {
+          expect(t.aRestDeg, label).toBeGreaterThan(0)
+          expect(t.aRestDeg, `${label} aRest must stay below 90`).toBeLessThan(90)
+          expect(t.w, label).toBeGreaterThan(0)
+          expect(t.ridgeLen, label).toBeGreaterThan(0)
+        }
+        // one comfortable drag: the 270-degree ergonomic covenant ceiling
+        expect((knobTowerThetaMax(l) * 180) / Math.PI, `${label} wind exceeds 270deg`).toBeLessThanOrEqual(270)
+        // disjoint tier z-bands (each tier stands in its own lane)
+        const bands = l.tiers
+          .map((t) => [t.zc - t.ridgeLen / 2, t.zc + t.ridgeLen / 2] as const)
+          .sort((a, b) => a[0] - b[0])
+        for (let i = 1; i < bands.length; i++) {
+          expect(bands[i][0], `${label} tier z-bands overlap`).toBeGreaterThanOrEqual(bands[i - 1][1])
+        }
       }
     }
   })
