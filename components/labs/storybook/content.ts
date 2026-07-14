@@ -477,7 +477,7 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // it's exempt from the D-G8 sweep floor). Stood in profile at the fore edge,
   // downstage of the emblem in its own z-band (z >= 0.44) so, since spine
   // rotation preserves z, it never crosses the center cluster (extra-1 ceiling).
-  { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.22, height: 0.24 },
+  { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.0887, height: 0.24 },
   // The second supporting piece (massing): a low GROUND SWELL (parallel fold,
   // covenant: scenery, rise <= 0.08, carries a rider) far upstage behind the
   // border — a distant berm with a wax-seal tuft, filling the empty top of
@@ -519,9 +519,9 @@ const SATCHEL_LAYERS: readonly SceneLayer[] = [
   { id: 'satchel-table', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.05, glueR: 0.55, rise: 0.05, spans: [[-0.62, -0.36]] }, strutB: { glueL: 0.18, glueR: 0.452, rise: 0.018, spans: [[-0.62, -0.36]] }, qA: 0.136, qB: 0.136, deckZ0: -0.62, deckZ1: -0.36 },
   { id: 'satchel-scroll', kind: 'midground', role: 'scenery', mech: 'dress', parentId: 'satchel-table', seat: 'deckB', u: 0.02, v: 0.05, width: 0.09, height: 0.16 },
   // The Ever-Sharp Sword: strip-erected frontal figure, mid-left.
-  { id: 'satchel-sword', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.22, anchorZ: -0.3, slot: 0.3, slotZ: -0.3, hingeX: 0.38, hingeZ: -0.3, width: 0.34, height: 0.4 },
+  { id: 'satchel-sword', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.22, anchorZ: -0.3, slot: 0.3, slotZ: -0.3, hingeX: 0.38, hingeZ: -0.3, width: 0.1392, height: 0.4 },
   // The Wayfarer's Compass: strip-erected frontal dial, front-right.
-  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.35, slot: 0.26, slotZ: 0.35, hingeX: 0.36, hingeZ: 0.35, width: 0.22, height: 0.24 },
+  { id: 'satchel-compass', kind: 'midground', role: 'scenery', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.35, slot: 0.26, slotZ: 0.35, hingeX: 0.36, hingeZ: 0.35, width: 0.1679, height: 0.24 },
 ]
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
@@ -562,7 +562,7 @@ const END_LAYERS: readonly SceneLayer[] = [
   // right column — clear of both HTML columns, the book silhouette, AND the nav
   // pill (probe: screen px[893,1058] py[759,829], all zones clear). y .03 rests
   // the card's near edge on the desk (tilt 22deg toward the camera, law H8).
-  { id: 'end-keepsake', kind: 'foreground', role: 'scenery', mech: 'keepsake', side: 'right', z0: 0.245, z1: 0.395, cardL: 0.34, seat: { x: 0.5, y: 0.03, z: 0.95, tiltDeg: 22 } },
+  { id: 'end-keepsake', kind: 'foreground', role: 'scenery', mech: 'keepsake', side: 'right', z0: 0.245, z1: 0.395, cardL: 0.312, seat: { x: 0.5, y: 0.03, z: 0.95, tiltDeg: 22 } },
 ]
 const END_ACCENTS: readonly string[] = ['#641e26', '#5a6470'] // seal burgundy + slate
 

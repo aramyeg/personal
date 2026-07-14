@@ -52,12 +52,14 @@ describe('removable keepsake — D6 gates (bench derive-keepsake.mjs, shipped ca
     expect(KEEP.side).toBe('right')
     expect(KEEP.z0).toBe(0.245)
     expect(KEEP.z1).toBe(0.395)
-    expect(KEEP.cardL).toBe(0.34)
+    expect(KEEP.cardL).toBe(0.312)
     expect(keepsakeCardW(KEEP)).toBeCloseTo(0.15, 12)
-    // p_exit = cardL + tabLip; foreLead / trailHome the bench values
-    expect(P_EXIT).toBeCloseTo(0.36, 12)
+    // p_exit = cardL + tabLip; foreLead / trailHome the bench values. cardL
+    // re-derived to the shipped card art's 2.08:1 aspect (D6 feel batch), so
+    // p_exit / trailHome move with it; foreLead is spine-anchored, unchanged.
+    expect(P_EXIT).toBeCloseTo(0.332, 12)
     expect(keepsakeForeLead(KEEP)).toBeCloseTo(1.13, 12)
-    expect(keepsakeTrailHome(KEEP)).toBeCloseTo(0.79, 12)
+    expect(keepsakeTrailHome(KEEP)).toBeCloseTo(0.818, 12)
   })
 
   it('S1 sleeve containment: through-slit + sleeve fit the page, gutter margin, 4:3 canon', () => {
@@ -108,7 +110,7 @@ describe('removable keepsake — D6 gates (bench derive-keepsake.mjs, shipped ca
     const stats = keepsakeReturnStats(KEEP, thetaL, thetaR)
     expect(stats.monotone).toBe(true)
     expect(stats.worstStep).toBeLessThan(GLOBAL_CAP)
-    expect(stats.worstStep).toBeCloseTo(0.0286, 3) // re-sited seat (D6 polish); shorter path than the 0.0328 bench seat
+    expect(stats.worstStep).toBeCloseTo(0.0278, 3) // shorter card (0.312 cardL, D6 feel batch) => shorter return path than the 0.0286 pre-batch seat
   })
 
   it('the settle (exit -> seat) also holds under the cap and is C0 at the seat', () => {
