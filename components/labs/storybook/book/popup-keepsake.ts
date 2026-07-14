@@ -225,6 +225,27 @@ const easeTurnWeighted = (t: number): number =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
 
 /**
+ * Progress of a settle / auto-return animation on the frame clock, UNIT-SAFE.
+ * `elapsedSec` is seconds since the phase began (three's clock.elapsedTime is
+ * SECONDS); `durationMs` the phase length in MILLISECONDS (KEEPSAKE_RETURN_MS /
+ * layer.returnMs, the same ms unit as TURN_MS). Returns the linear [0,1]
+ * fraction, its eased image, and whether the phase has COMPLETED.
+ *
+ * This is the single source of truth for WHEN a settle seats and WHEN a return
+ * fires keepsakeHomed: a card that is 'returning' MUST reach `done` within
+ * durationMs so the store's parked page turn always fires (law H8 completeness —
+ * mixing the two units here is what deadlocks the book, since done never trips).
+ */
+export function keepsakeAnimProgress(
+  elapsedSec: number,
+  durationMs: number
+): { linear: number; eased: number; done: boolean } {
+  const durationSec = durationMs / 1000
+  const linear = durationSec > 0 ? clamp(elapsedSec / durationSec, 0, 1) : 1
+  return { linear, eased: easeTurnWeighted(linear), done: elapsedSec >= durationSec }
+}
+
+/**
  * The auto-return metrics (bench S5): worst per-station per-vertex world step
  * and the longest per-vertex path, over the eased 240-station clock of the
  * canonical return seat -> exit -> home. worstStep < GLOBAL_CAP is the cap

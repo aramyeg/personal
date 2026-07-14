@@ -34,6 +34,7 @@ import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type KeepsakeGeom, type Vec3 } from './popup-mechanics'
 import {
   KEEPSAKE_RETURN_MS,
+  keepsakeAnimProgress,
   keepsakeCardInPlane,
   keepsakePExit,
   keepsakePocketPanel,
@@ -443,10 +444,10 @@ export function KeepsakePopupLayer({
       }
       const anim = animRef.current
       if (anim.kind === 'settle') {
-        const eased = easeTurnWeighted(clamp((now - anim.startT) / returnMs, 0, 1))
+        const { eased, done } = keepsakeAnimProgress(now - anim.startT, returnMs)
         // Degenerate second leg (seat -> seat) collapses to the exit -> seat lerp.
         cardWorld = keepsakeTwoLegPose(anim.start, seatWorld, seatWorld, eased)
-        if (now - anim.startT >= returnMs) animRef.current = { kind: 'seated', startT: now, start: seatWorld }
+        if (done) animRef.current = { kind: 'seated', startT: now, start: seatWorld }
       } else {
         cardWorld = seatWorld
       }
@@ -458,11 +459,11 @@ export function KeepsakePopupLayer({
         animRef.current = { kind: 'return', startT: now, start: poseWorldRef.current }
       }
       const anim = animRef.current
-      const eased = easeTurnWeighted(clamp((now - anim.startT) / returnMs, 0, 1))
+      const { linear, eased, done } = keepsakeAnimProgress(now - anim.startT, returnMs)
       cardWorld = keepsakeTwoLegPose(anim.start, exitLocal.map(toWorld), homeLocal.map(toWorld), eased)
       card = cardWorld.map(toLocal)
-      seatedShadow = now - anim.startT < returnMs * 0.5
-      if (now - anim.startT >= returnMs) {
+      seatedShadow = linear < 0.5
+      if (done) {
         animRef.current = null
         useStorybookStore.getState().keepsakeHomed(layer.id)
       }

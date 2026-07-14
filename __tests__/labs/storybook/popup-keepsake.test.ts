@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  KEEPSAKE_RETURN_MS,
   KEEPSAKE_SLIT_TOL,
   KEEPSAKE_SLEEVE_TOL,
+  keepsakeAnimProgress,
   keepsakeCardInPlane,
   keepsakeCardW,
   keepsakeForeLead,
@@ -152,6 +154,57 @@ describe('removable keepsake — D6 gates (bench derive-keepsake.mjs, shipped ca
     const farY = (seat[0][1] + seat[3][1]) / 2 // corners at -W/2 (far edge)
     const nearY = (seat[1][1] + seat[2][1]) / 2 // corners at +W/2 (near edge)
     expect(farY).toBeGreaterThan(nearY)
+  })
+
+  // REGRESSION (deadlock, D6): the settle / auto-return completion clock. The
+  // renderer times these off three's clock.elapsedTime, which is SECONDS, but
+  // the duration (KEEPSAKE_RETURN_MS / layer.returnMs) is MILLISECONDS. Comparing
+  // seconds-elapsed against the raw ms number needs ~1250 SECONDS to finish, so:
+  // the card never seats, the auto-return never completes, keepsakeHomed never
+  // fires, and any page turn parked behind it (law H8) hangs the whole book. The
+  // renderer now routes both phases through keepsakeAnimProgress, whose `done`
+  // must trip within the duration for the store's pending turn to ever fire.
+  describe('keepsakeAnimProgress — unit-safe settle/return clock (deadlock regression)', () => {
+    it('starts un-done and eases up from zero', () => {
+      const r = keepsakeAnimProgress(0, KEEPSAKE_RETURN_MS)
+      expect(r.linear).toBe(0)
+      expect(r.eased).toBe(0)
+      expect(r.done).toBe(false)
+    })
+
+    it('COMPLETES within its duration — returnMs is MS, elapsed is SECONDS', () => {
+      // At exactly returnMs/1000 seconds the phase MUST be done. The old inline
+      // code did `elapsedSec >= returnMs`; at 1.25s that is `1.25 >= 1250` — the
+      // predicate the deadlock rode on.
+      expect(KEEPSAKE_RETURN_MS / 1000 >= KEEPSAKE_RETURN_MS).toBe(false) // the buggy comparison
+      const atEnd = keepsakeAnimProgress(KEEPSAKE_RETURN_MS / 1000, KEEPSAKE_RETURN_MS)
+      expect(atEnd.linear).toBe(1)
+      expect(atEnd.eased).toBe(1)
+      expect(atEnd.done).toBe(true)
+      // still in flight a hair before the end
+      const nearEnd = keepsakeAnimProgress(KEEPSAKE_RETURN_MS / 1000 - 0.05, KEEPSAKE_RETURN_MS)
+      expect(nearEnd.linear).toBeLessThan(1)
+      expect(nearEnd.done).toBe(false)
+    })
+
+    it('clamps past the end and stays done (monotone, never backtracks)', () => {
+      const past = keepsakeAnimProgress(999, KEEPSAKE_RETURN_MS)
+      expect(past.linear).toBe(1)
+      expect(past.eased).toBe(1)
+      expect(past.done).toBe(true)
+    })
+
+    it('linear crosses 0.5 at half the duration (the seated -> contact shadow switch)', () => {
+      const halfSec = KEEPSAKE_RETURN_MS / 1000 / 2
+      expect(keepsakeAnimProgress(halfSec, KEEPSAKE_RETURN_MS).linear).toBeCloseTo(0.5, 12)
+      expect(keepsakeAnimProgress(halfSec - 0.01, KEEPSAKE_RETURN_MS).linear < 0.5).toBe(true)
+      expect(keepsakeAnimProgress(halfSec + 0.01, KEEPSAKE_RETURN_MS).linear < 0.5).toBe(false)
+    })
+
+    it('honours a custom shorter returnMs the same way (the ~830ms cap)', () => {
+      expect(keepsakeAnimProgress(0.83, 830).done).toBe(true)
+      expect(keepsakeAnimProgress(0.4, 830).done).toBe(false)
+    })
   })
 
   it('S6 flat-fold: the card home folds EXACTLY flat inside the closed page', () => {
