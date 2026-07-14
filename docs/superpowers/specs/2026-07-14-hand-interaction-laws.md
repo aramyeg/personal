@@ -51,8 +51,9 @@ matter which handler releases the grab first.
   <= max(0, STEP_CAP - pageStep), so the composed step stays under
   GLOBAL_CAP by construction, not by timing (derive gate UT: worst
   composed 58% of cap from an adversarial mechanical-stop release).
-  Turns are never blocked by a grab (hostile UX), with the one
-  keepsake exception ruled by the seat law ([bench]).
+  Turns are never blocked by a grab (hostile UX); a keepsake that is
+  OUT sequences the turn behind its auto-return (law H8) — sequenced,
+  never refused.
 
 ## Law H3 — linear handle (pull/push tabs)
 
@@ -127,7 +128,29 @@ quad by ~1.5x for hit purposes only).
 ## Law H7 — keepsake grammar distinction
 
 Pull-to-erect (tabpiece) and pull-to-REMOVE (keepsake) must not share
-a visual grammar: the keepsake reads as a loose card in a pocket
-(corner peeking, different tab silhouette) per the keepsake derive's
-affordance section. One gesture, two verbs, disambiguated by what
-the paper visibly is — never by hidden state.
+a visual grammar. A tabpiece tab is flush and slot-like — it belongs
+to the page. The keepsake reads as a separate card wedged in a
+pocket: a rounded/notched card CORNER peeking proud of the fore
+edge, a scored dogear, its own edge visible and casting its own
+drop shadow onto the desk — visibly loose, not hinged. One gesture,
+two verbs, disambiguated by what the paper visibly is — never by
+hidden state.
+
+## Law H8 — the keepsake seat rule
+
+A removable card belongs to ONE spread's page (its sleeve is on that
+page) and cannot outlive that page being turned away. The book
+reaches CLOSED only when every keepsake is HOME. Any book-state
+change with a card OUT (page turn, book close, lab exit) routes
+through AUTO-RETURN first: the card reverse-slides home while the
+spread is still at rest (inheriting the rest-pose collision regime,
+derive-keepsake S3/S5), then the change proceeds. State machine:
+HOME -> pull past p_exit -> OUT -> RETURNING -> HOME; there is no
+path to close-with-card-out. No persistence across spreads — a
+re-entered spread always starts HOME. Auto-return duration defaults
+to one turn (1250 ms; the cap allows down to ~830 ms if the pre-roll
+feels slow in the eye-test). The seat is the DESK — world-fixed,
+downstage-center in the clear band between the HTML columns, tilted
+~22 degrees toward the camera: the desk holds the card up, not a
+fold. That is the resolved wall: a removed piece has no spread
+dihedral to drive it erect, so only FLAT cards may leave the book.
