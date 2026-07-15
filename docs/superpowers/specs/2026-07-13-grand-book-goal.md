@@ -1,4 +1,14 @@
-# The Grand Book — goal charter (Part D)
+# The Grand Book — goal charter (Part D) — CLOSED 2026-07-14
+
+STATUS: COMPLETED AND SUPERSEDED. All phases D1–D6 were delivered,
+gated (eight D-benchmark gates + D-G9 THE HAND, floors ratcheted),
+committed, and ledgered across 2026-07-13/14 — the loop ran to its
+end, keepsake + knob included. The umbrella goal is now Part E
+(docs/superpowers/specs/2026-07-14-showpiece-reset-goal.md, pinned
+2026-07-14 after the user's quality verdict). All D laws and gates
+remain in force as FLOORS under Part E; this loop text must not be
+re-entered. Next session runs the E0 loop text in the Part E
+charter.
 
 2026-07-13. Supersedes the C-series benchmark as the umbrella goal; all
 C laws (L1–L6) and gates remain in force and only ratchet upward. Book
