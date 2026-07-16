@@ -9,6 +9,14 @@ import { CHAPTER_COUNT } from './chapters'
  *   [PANEL_END, 1]           release, next chapter's travel resumes rotation
  */
 export const ROTATION_TOTAL = Math.PI * 2
+/** Rotation each chapter owns. The spec's parked >360° question changes THIS
+ * constant (and chapterStartRotation) only — nothing else may hardcode the slice. */
+export const CHAPTER_SLICE = ROTATION_TOTAL / CHAPTER_COUNT
+
+export function chapterStartRotation(chapter: number): number {
+  return chapter * CHAPTER_SLICE
+}
+
 export const TRAVEL_END = 0.55
 export const BURST_END = 0.65
 export const PANEL_END = 0.95
@@ -32,21 +40,30 @@ export const smoothstep = (t: number): number => {
   return x * x * (3 - 2 * x)
 }
 
-export function journeyStateAt(rawProgress: number): JourneyState {
+/** Springy overshoot easing for prop growth (easeOutBack, c = 1.70158). */
+export function easeOutBack(t: number): number {
+  const x = clamp01(t)
+  const c = 1.70158
+  const p = x - 1
+  return 1 + (c + 1) * p * p * p + c * p * p
+}
+
+export function journeyStateAt(rawProgress: number, morphOut?: number[]): JourneyState {
   const progress = clamp01(rawProgress)
   const segLen = 1 / CHAPTER_COUNT
   const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(progress / segLen))
   const local = (progress - chapter * segLen) / segLen
 
-  const slice = ROTATION_TOTAL / CHAPTER_COUNT
-  const rotation = chapter * slice + clamp01(local / TRAVEL_END) * slice
+  const rotation = chapterStartRotation(chapter) + clamp01(local / TRAVEL_END) * CHAPTER_SLICE
 
-  const morph = Array.from({ length: CHAPTER_COUNT }, (_, i) => {
-    const grow = chapter === 0 ? 1 : smoothstep(local / MORPH_WINDOW)
-    if (i === chapter) return i === 0 ? 1 : grow
-    if (i === chapter - 1) return 1 - smoothstep(local / MORPH_WINDOW)
-    return 0
-  })
+  const morph =
+    morphOut && morphOut.length === CHAPTER_COUNT ? morphOut : new Array<number>(CHAPTER_COUNT)
+  const growT = smoothstep(local / MORPH_WINDOW)
+  for (let i = 0; i < CHAPTER_COUNT; i++) {
+    if (i === chapter) morph[i] = chapter === 0 ? 1 : growT
+    else if (i === chapter - 1) morph[i] = 1 - growT
+    else morph[i] = 0
+  }
 
   const burst =
     local >= TRAVEL_END && local < BURST_END

@@ -20,11 +20,15 @@ const DAMP_LAMBDA = 4
  */
 export function useDampedJourney(progressRef: MutableRefObject<number>): JourneyRef {
   const damped = useRef(progressRef.current)
+  const morphScratch = useRef<number[]>([])
   const journeyRef = useRef<JourneyState>(journeyStateAt(progressRef.current))
+  if (morphScratch.current.length === 0) {
+    morphScratch.current = journeyRef.current.morph
+  }
 
   useFrame((_, delta) => {
     damped.current = THREE.MathUtils.damp(damped.current, progressRef.current, DAMP_LAMBDA, delta)
-    journeyRef.current = journeyStateAt(damped.current)
+    journeyRef.current = journeyStateAt(damped.current, morphScratch.current)
   }, -1)
 
   return journeyRef
