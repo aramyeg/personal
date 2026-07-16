@@ -12,6 +12,10 @@ import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
 import { BluenetSet } from './props/set-bluenet'
 import { FlyerbeeSet } from './props/set-flyerbee'
+import { Dialog360Set } from './props/set-360dialog'
+import { AccentureSet } from './props/set-accenture'
+import { AknaSet } from './props/set-akna'
+import { XdatagroupSet } from './props/set-xdatagroup'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
 
@@ -56,6 +60,18 @@ function SceneContents({ progressRef }: SceneProps) {
         </ChapterSet>
         <ChapterSet index={1} journeyRef={journeyRef}>
           <FlyerbeeSet />
+        </ChapterSet>
+        <ChapterSet index={2} journeyRef={journeyRef}>
+          <Dialog360Set />
+        </ChapterSet>
+        <ChapterSet index={3} journeyRef={journeyRef}>
+          <AccentureSet />
+        </ChapterSet>
+        <ChapterSet index={4} journeyRef={journeyRef}>
+          <AknaSet />
+        </ChapterSet>
+        <ChapterSet index={5} journeyRef={journeyRef}>
+          <XdatagroupSet />
         </ChapterSet>
       </Planet>
       {hasArt('girl') ? (
