@@ -9,30 +9,29 @@ const INK_BORDER = `4px solid ${PALETTE.ink}`
 const HALFTONE = `radial-gradient(circle, ${PALETTE.ink}18 1px, transparent 1.5px)`
 
 /**
- * Below 900px there's no room for side-flanking cards, so both stack in a
- * column above the planet. `--sw-enter` (set once on the root, inherited by
- * both cards) drives the bounce/rotate/scale here too, via calc()/var() —
- * `!important` is required to beat the desktop inline transform.
+ * Below 900px there's no room for side-flanking cards: the data card takes
+ * the top alone and the art card hides — its placeholder (chapter number +
+ * theme) earns no phone pixels, and when real manga art lands the mobile
+ * treatment gets its own pass. `--sw-enter` (set once on the root, inherited)
+ * drives the bounce/rotate/scale via calc()/var() — `!important` is required
+ * to beat the desktop inline transform.
  */
 const MOBILE_STYLES = `
   @media (max-width: 900px) {
-    .sw-panel-art, .sw-panel-data {
+    .sw-panel-art {
+      display: none !important;
+    }
+    .sw-panel-data {
       left: 50% !important;
       right: auto !important;
+      top: 6vh !important;
+      width: min(84vw, 340px) !important;
       transform:
         translateX(-50%)
         translateY(calc((1 - var(--sw-enter)) * -24px))
         rotate(calc(var(--sw-rotate) * var(--sw-enter)))
         scale(calc(0.85 + 0.15 * var(--sw-enter)))
         !important;
-    }
-    .sw-panel-art {
-      top: 3vh !important;
-      width: min(28vw, 150px) !important;
-    }
-    .sw-panel-data {
-      top: 26vh !important;
-      width: min(78vw, 320px) !important;
     }
   }
 `
