@@ -98,19 +98,27 @@ re-derivation; only collapse paths changed):
   0.10·sin(deploy) → 0 at close (rides a folding wall — the
   knee/lid idiom). MORE on-concept than the old floating ring:
   the shutters ARE the roost mouths' shutters.
-- counterweight → LOW SWING-OUT PANEL (re-derived TWICE; final
-  2026-07-16 after the A10 mid-turn dip): hall wallR (KEEP[0] q1),
-  VERTICAL hinge at z-station sHinge 0.5, r-band [0.15, 0.5]
-  (low flank), CW_PANEL 0.14, deploy range rad(78), free edge
-  cos·e1 + sin·n (in-wall → outward, the shutter idiom). Every
-  point stays at the hinge's bisector-x band → CANNOT dip below
-  the page at any partial deploy (by construction; measured
-  counterweight-only min wedge −0.0000). The drop reading comes
-  from the low seat + swing-out + weight art. Off-wall reach
-  0.14·sin(deploy) → 0 at close. FORBIDDEN: the down-swing
-  (−cos·e2 + sin·n) variant — its tip goes below the swinging
-  page plane at mid-turn (worst +0.278 at outgoing t 0.75); no
-  hinge height fixes it (probes: r 0.75 still 0.13).
+- counterweight → IN-PLANE SASH-WEIGHT (FINAL, third derivation
+  2026-07-16): a rigid block descending WITHIN the hall flank-wall
+  plane (KEEP[0] wallR q1) as the winch winds. CW_R_TOP 0.60,
+  CW_DROP_R 0.40 (≈0.10 world descent down the flank), CW_LIFT
+  0.003 (z-fight seat off the wall face), block half-size CW_BW
+  0.045 (z) × CW_BH 0.04 (up), extent within r [0.05, 0.85].
+  Cam: drop = outCam(s(theta), L 0.11, sMax 0.07) · E(beta) — a
+  FRACTION of CW_DROP_R, not an angle. Off-wall reach ZERO by
+  construction → N8 wedge containment inherits the wall's own
+  proof (measured counterweight-only min wedge −0.003 = the seat
+  lift, over an 80×80×60 grid). At close E→0 returns it to the
+  top and it rides the folded wall flat. A literal weight
+  descending the flank. If a longer visible drop is ever wanted:
+  the same block on the GALLERY flank is a zero-wedge-risk
+  re-station (derive on demand).
+  FORBIDDEN VARIANTS (both bench-recorded): the down-swing
+  (−cos·e2 + sin·n; tip through the swinging page, worst +0.278
+  at outgoing t 0.75; no hinge height fixes it — probes r 0.75
+  still 0.13) and the vertical-hinge swing-out (lateral +n reach
+  survives at partial deploy). Any counterweight with off-wall
+  reach is the rejected class.
 Bench corrections (derive-keep-winch.mjs, all 7 gates green):
 - N4 = BODY CONTAINMENT at book-closed (tL=tR=PI): max off-page
   world-Y <= FLAT_TOL 0.02; measured 0.0150 (semaphore spine
