@@ -29,6 +29,16 @@ const CAMERA_LOOKAT: [number, number, number] = [0, 0.32, 0.15]
 const CAMERA_FOV = 34
 const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
+// E-G5 floor (b) rebalance: removing the ACES tone-map lifted every rendered
+// surface, but the desk is the one that must NOT — it is the dark theatre the
+// candlelit book sits in (measured: the flat-fill desk luma more than doubled,
+// ~10->28, washing the murk toward a lit floor). The book itself (unlit pop-up
+// prints + lit cover/pages) KEEPS the lift — that is the fidelity fix. So the
+// desk plane alone gets an albedo multiplier that pulls it back near its
+// blessed darkness, its warm candle pool intact (the pool is still the brightest
+// part of the desk, just no longer washing the frame). sRGB-encoded: #a9a9a9
+// ~= a 0.42x linear albedo scale (tuned against the s0 desk probe vs blessed).
+const DESK_ALBEDO = '#a9a9a9'
 const CANDLE_POSITION: [number, number, number] = [1.6, 1.1, 1.4]
 const CANDLE_COLOR = '#ff9f4d'
 // Lowered from the original 2.2/6 pairing (task-9 concern: candle falloff
@@ -75,7 +85,7 @@ function Desk() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]}>
       <planeGeometry args={DESK_SIZE} />
-      <meshStandardMaterial map={deskTexture} roughness={0.95} />
+      <meshStandardMaterial map={deskTexture} color={DESK_ALBEDO} roughness={0.95} />
     </mesh>
   )
 }
@@ -166,7 +176,17 @@ export default function BookScene() {
   return (
     <Canvas
       dpr={[1, 2]}
-      gl={{ antialias: true, alpha: false }}
+      // E-G5 floor (b): r3f v9 defaults gl.toneMapping to ACESFilmic, which
+      // film-compresses every unlit painted print — a flat aspect-true backdrop
+      // measured a ~17% luminance + saturation loss before any other degrader.
+      // The pieces are MeshBasicMaterial (their painting already carries its own
+      // light), so a filmic response curve has nothing legitimate to do here; it
+      // only pulls the art away from its source file. NoToneMapping renders the
+      // paintings at true value. The candlelit MOOD is not carried by the tone
+      // map — it lives in the lit desk/candle pool and the unlit contact
+      // shadows, which are rebalanced (ambient/directional/candle) to hold the
+      // dark-theatre look now that the film curve no longer dims the whole frame.
+      gl={{ antialias: true, alpha: false, toneMapping: THREE.NoToneMapping }}
       camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
       onCreated={(state) => state.camera.lookAt(...CAMERA_LOOKAT)}
     >

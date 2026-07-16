@@ -44,7 +44,11 @@ const STRUT_SHADOW_MAX = 0.26
 const DECK_SHADOW_MAX = 0.34
 // Same fold-shading rule as the box: the sibling left of a seam reads a step
 // darker than its lit partner, which is what sells the crease.
-const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
+// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
+// across half of a folded piece; the warm seam stays reserved for raw kraft
+// placeholder stock (per-piece kraftTints), never painted art.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 // Interior surfaces sit in deep shadow (materials are unlit, so without this
 // the underside would render as bright as the top and the float would read
 // flat).
@@ -160,7 +164,7 @@ export function PlatformPopupLayer({
       (p) =>
         new THREE.MeshBasicMaterial({
           side: THREE.FrontSide,
-          color: isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff',
+          color: isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff',
         })
     )
     return { exterior }
@@ -183,7 +187,7 @@ export function PlatformPopupLayer({
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
-        material.color.set(isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff')
+        material.color.set(isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff')
       } else {
         material.color.set(isShaded(p.face) ? tint.shade : tint.lit)
       }

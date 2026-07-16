@@ -62,6 +62,11 @@ const FLAT_EPSILON = 0.02
 // materials are unlit): the panel facing away from the key light reads a
 // step darker, which is what sells the center crease as a real fold.
 const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED v-folds get this gentle NEUTRAL step on the shaded
+// panel; the warm FOLD_SHADE_TINT (~x0.85/0.80/0.71) is reserved for kraft
+// placeholder v-folds (no texture) so painted art is not dimmed + warm-cast
+// across the whole left leaf of a crease.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 
 /** A pop-up spread's relationship to any turn currently in flight. The
  *  React-clock value (book.tsx's `role` prop) only coarse-gates mounting
@@ -293,6 +298,10 @@ function PopupLayer({
     materials.right.map = texture
     materials.right.needsUpdate = true
     materials.left.map = texture
+    // Painted leaf: swap the warm kraft seam for the neutral painted step
+    // (floor f). A kraft v-fold has no texture, so it keeps FOLD_SHADE_TINT
+    // from material creation and never reaches here.
+    materials.left.color.set(PAINTED_FOLD_SHADE)
     materials.left.needsUpdate = true
   }, [texture, materials])
 

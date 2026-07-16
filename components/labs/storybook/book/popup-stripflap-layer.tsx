@@ -58,6 +58,10 @@ const SHADOW_HEIGHT = 0.16
 const SHADOW_Y_LIFT = 0.001
 const SHADOW_MAX_OPACITY = 0.32
 const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): a PAINTED stripflap gets this gentle NEUTRAL step on its
+// shaded leaf; the warm FOLD_SHADE_TINT (~x0.85/0.80/0.71) is reserved for a
+// kraft placeholder flap (no texture) so painted art is not dimmed + warm-cast.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 const ANTI_FLIP = Math.PI / 2 // the user ceiling (law H3): past vertical the figure flips
 const TOUCH_SLOP = 1.5
 
@@ -162,6 +166,10 @@ export function StripFlapPopupLayer({
     materials.right.map = texture
     materials.right.needsUpdate = true
     materials.left.map = texture
+    // Painted leaf: swap the warm kraft seam for the neutral painted step
+    // (floor f). A kraft flap has no texture, so it keeps FOLD_SHADE_TINT from
+    // material creation and never reaches here.
+    materials.left.color.set(PAINTED_FOLD_SHADE)
     materials.left.needsUpdate = true
   }, [texture, materials])
 

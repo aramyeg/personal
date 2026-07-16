@@ -25,7 +25,11 @@ import { useArtTexture } from './use-layer-texture'
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
 const STRUCT_SHADOW_MAX = 0.28
-const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
+// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
+// across half of a folded piece; the warm seam stays reserved for raw kraft
+// placeholder stock (per-piece kraftTints), never painted art.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 const rad = (d: number): number => (d * Math.PI) / 180
@@ -117,7 +121,7 @@ function SkylineMound({
   const materials = useMemo(
     () => ({
       in: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff' }),
-      out: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: FOLD_SHADE_TINT }),
+      out: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: PAINTED_FOLD_SHADE }),
     }),
     []
   )
@@ -133,7 +137,7 @@ function SkylineMound({
       if (faceArt) {
         faceArt.wrapS = THREE.ClampToEdgeWrapping
         faceArt.wrapT = THREE.ClampToEdgeWrapping
-        mat.color.set(shaded ? FOLD_SHADE_TINT : '#ffffff')
+        mat.color.set(shaded ? PAINTED_FOLD_SHADE : '#ffffff')
       } else {
         mat.color.set(shaded ? tint.shade : tint.lit)
       }

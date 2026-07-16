@@ -32,7 +32,11 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
 const FLAT_EPSILON = 0.02
-const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
+// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
+// across half of a folded piece; the warm seam stays reserved for raw kraft
+// placeholder stock (per-piece kraftTints), never painted art.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 
@@ -116,7 +120,7 @@ function TwoQuadRide({
   )
   const paperTexture = sharedPaperTexture()
   const materials = useMemo(
-    () => geometries.map((_, i) => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: i === 0 ? '#ffffff' : FOLD_SHADE_TINT })),
+    () => geometries.map((_, i) => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: i === 0 ? '#ffffff' : PAINTED_FOLD_SHADE })),
     [geometries]
   )
   const interiorMaterial = useMemo(
@@ -132,7 +136,7 @@ function TwoQuadRide({
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
-        mat.color.set(shaded ? FOLD_SHADE_TINT : '#ffffff')
+        mat.color.set(shaded ? PAINTED_FOLD_SHADE : '#ffffff')
       } else {
         mat.color.set(shaded ? tint.shade : tint.lit)
       }

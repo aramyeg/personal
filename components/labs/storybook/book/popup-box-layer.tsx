@@ -37,9 +37,13 @@ import { useArtTexture } from './use-layer-texture'
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
 const SHADOW_MAX_OPACITY = 0.32
-// Same fold-shading rule as the v-folds: the half left of a seam reads a
-// step darker than its lit sibling, which is what sells the crease.
-const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED shaded faces read a step darker than their lit
+// sibling to sell the crease, but with a gentle NEUTRAL dim. The old warm fold
+// seam (#d9cdb4, ~x0.85/0.80/0.71) both dimmed AND warm-cast the artwork, so
+// half of every folded piece read as a different print; a painting carries its
+// own light, so its crease only needs a faint neutral hint. The warm seam is
+// reserved for raw placeholder stock (per-piece kraftTints), never painted art.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 // Caps face the reader straight-on and catch less of the key light than
 // the top — a half-step tint keeps front/top from reading as one surface.
 const CAP_TINT = '#f2ebdc'
@@ -139,7 +143,7 @@ export function BoxPopupLayer({
       (face) =>
         new THREE.MeshBasicMaterial({
           side: THREE.FrontSide,
-          color: SHADED_FACES.has(face) ? FOLD_SHADE_TINT : face.startsWith('capFront') ? CAP_TINT : '#ffffff',
+          color: SHADED_FACES.has(face) ? PAINTED_FOLD_SHADE : face.startsWith('capFront') ? CAP_TINT : '#ffffff',
         })
     )
     return { exterior }

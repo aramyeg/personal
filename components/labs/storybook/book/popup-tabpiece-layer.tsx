@@ -66,7 +66,11 @@ import { pointerLocalRay } from './user-drive-pointer'
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
 const STRUCT_SHADOW_MAX = 0.28
-const FOLD_SHADE_TINT = '#d9cdb4'
+// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
+// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
+// across half of a folded piece; the warm seam stays reserved for raw kraft
+// placeholder stock (per-piece kraftTints), never painted art.
+const PAINTED_FOLD_SHADE = '#e4e4e4'
 const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 /** Coarse-pointer hit widening (law H6): the invisible slop mesh is 1.5x the
@@ -215,7 +219,7 @@ export function TabPiecePopupLayer({
       (p) =>
         new THREE.MeshBasicMaterial({
           side: THREE.FrontSide,
-          color: isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff',
+          color: isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff',
         })
     )
     return { exterior }
@@ -247,7 +251,7 @@ export function TabPiecePopupLayer({
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
-        material.color.set(isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff')
+        material.color.set(isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff')
       } else {
         material.color.set(isShaded(p.face) ? tint.shade : tint.lit)
       }
