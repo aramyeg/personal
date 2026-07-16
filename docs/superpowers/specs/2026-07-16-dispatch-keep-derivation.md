@@ -212,3 +212,42 @@ winch (rides crown/loft) → wings art → per-face art briefs.
 Every integration step diffs against golden blessed v1 (E-G1);
 spread-4 boards will intentionally change wholesale — bless flows
 through the orchestrator only.
+
+## E1 ART-INTEGRATION AMENDMENTS (2026-07-16, commits 07e8706 / a94f33b / ba6bd13)
+
+Locked-in changes discovered while integrating the 26-piece art batch —
+these supersede the corresponding constants/mechanisms above.
+
+1. RAVEN = IN-PLANE FINIAL (3rd use of the in-plane idiom after the
+   sash-weight and dress). Two coplanar half-quads extending the crown
+   capFrontL/capFrontR planes past the cap top edge, creased at y=0, art
+   split at the crease (art-u 0.5 fanning outward). 0.18 x 0.174, top
+   world-Y ~0.94. Folds flat with the cap; A10 inherits the cap proof.
+   LAW: a z-spanning decorative quad (normal along bisector-y) is
+   INVISIBLE from the reading camera; a y-spanning rigid quad is the
+   forbidden off-plane-reach class. Reader-facing riders on box stories
+   must be in-plane extensions of a +z-facing cap.
+2. COUNTERWEIGHT seat = LOFT FRONT CAP (not the hall flank wall). Same
+   in-plane sash-weight law; host loft; two half-quads straddling the cap
+   crease; CW_R_TOP 0.75, CW_DROP_R 0.4, CW_BW 0.0253, CW_BH 0.04. The
+   hall-flank seat measured 0% visible at every station and theta (the
+   reading camera is LID-DOMINANT: story walls are near-edge-on slivers
+   even at tilt extremes). The weight now descends the belfry mouth,
+   crossing the amber arch glow. N7 margin rose to 84%.
+3. SEMAPHORE: armHalfW 0.0195 (the N4/N8 fold-flat ceiling at tol 0.02),
+   armLen 0.1287 (L:S 3.30 = art), SEMAPHORE_BASE_Z -0.08 (mast behind
+   the ridge; clears the raven cap plane by 0.062).
+4. SKYLINE UV: reader-facing in-slope samples the FULL art v0..1
+   (die-cut roofline at the ridge, alphaTest); out-slope is paper
+   backing, no art. Mound w = ridgeLen / artAspect (per-mound).
+5. BALCONY: halfW 0.1707; one art split across the crease (art-u 0.5 at
+   the seam), DoubleSide + unshaded. LAW (winding, 3rd instance):
+   mirrored half-panel pairs have OPPOSITE winding — any split rider
+   printing art must be DoubleSide or per-half winding-corrected.
+6. VISIBILITY BENCH (check-keep-visibility.mjs): per-art-slot visible
+   fraction from the reading camera (rest + tilt extremes + winch theta
+   sweep). Findings law: the 4 capBack faces NEVER render (drop their
+   art asks); sides show ~45-50% (one flank per yaw). Run it before
+   authoring any new art call sheet.
+7. PIPELINE: per-id padToAspect (disc -> 1.0), CROP_TO_ASPECT (4 tops),
+   ROTATE (semaphore 270deg). Aspect bench reads LIVE processed dims.
