@@ -22,7 +22,6 @@
   inset: 0;
   z-index: 20;
   pointer-events: none;
-  transition: opacity 220ms ease;
   display: grid;
   grid-template-columns: minmax(0, 24rem) 1fr minmax(0, 20rem);
   align-items: center;
@@ -32,6 +31,138 @@
 .sb-overlay a,
 .sb-overlay button {
   pointer-events: auto;
+}
+
+/* -------------------------------------------------------------------------
+   Page-turn text choreography (E-G4 item 5 / spec E-P3). The overlay no
+   longer flat-fades the whole block in after the turn commits — it joins the
+   turn's motion. Two states driven by spread-overlay.tsx off the frame-loop
+   turn clock (turn-events.ts, discrete — never per frame):
+
+     - default ('resting'): a fresh panel mounts (React re-keys #sb-drawer-
+       panel on landing) and its text rises + fades UP into place, STAGGERED
+       kicker → flourish → title → narration → plaque, so the page turn reads
+       as delivering the words.
+     - [data-sb-phase='exiting']: the outgoing text lifts + fades away
+       together as the page begins to turn.
+
+   Transform + opacity only (GPU compositor, no layout thrash). The stagger
+   uses per-element animation-delay longhands (declared AFTER the block below
+   so the shorthand can't reset them). ----------------------------------- */
+@keyframes sb-text-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sb-text-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.45rem);
+  }
+}
+
+.sb-overlay .sb-hairline,
+.sb-overlay .sb-chapter-kicker,
+.sb-overlay .sb-flourish,
+.sb-overlay .sb-chapter-title,
+.sb-overlay .sb-book-subtitle,
+.sb-overlay .sb-byline,
+.sb-overlay .sb-narration,
+.sb-overlay .sb-fleuron,
+.sb-overlay .sb-plaque,
+.sb-overlay .sb-satchel-grid,
+.sb-overlay .sb-satchel-more,
+.sb-overlay .sb-end-actions,
+.sb-overlay .sb-colophon {
+  animation-name: sb-text-enter;
+  animation-duration: 400ms;
+  /* decelerate — the words settle IN (skill: enter easing) */
+  animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+/* Stagger: kicker leads, the plaque/right-column lands last. Longhands only,
+   after the block above, so they override just the delay sub-property. */
+.sb-overlay .sb-hairline {
+  animation-delay: 20ms;
+}
+.sb-overlay .sb-chapter-kicker {
+  animation-delay: 55ms;
+}
+.sb-overlay .sb-flourish {
+  animation-delay: 100ms;
+}
+.sb-overlay .sb-chapter-title {
+  animation-delay: 145ms;
+}
+.sb-overlay .sb-book-subtitle,
+.sb-overlay .sb-byline {
+  animation-delay: 200ms;
+}
+.sb-overlay .sb-narration {
+  animation-delay: 235ms;
+}
+.sb-overlay .sb-fleuron {
+  animation-delay: 320ms;
+}
+.sb-overlay .sb-plaque,
+.sb-overlay .sb-satchel-grid,
+.sb-overlay .sb-satchel-more,
+.sb-overlay .sb-end-actions,
+.sb-overlay .sb-colophon {
+  animation-delay: 285ms;
+}
+
+/* Exit: the outgoing text leaves together, quickly, as the page lifts —
+   overrides the entrance name/curve/timing on the still-mounted panel. */
+.sb-overlay[data-sb-phase='exiting'] .sb-hairline,
+.sb-overlay[data-sb-phase='exiting'] .sb-chapter-kicker,
+.sb-overlay[data-sb-phase='exiting'] .sb-flourish,
+.sb-overlay[data-sb-phase='exiting'] .sb-chapter-title,
+.sb-overlay[data-sb-phase='exiting'] .sb-book-subtitle,
+.sb-overlay[data-sb-phase='exiting'] .sb-byline,
+.sb-overlay[data-sb-phase='exiting'] .sb-narration,
+.sb-overlay[data-sb-phase='exiting'] .sb-fleuron,
+.sb-overlay[data-sb-phase='exiting'] .sb-plaque,
+.sb-overlay[data-sb-phase='exiting'] .sb-satchel-grid,
+.sb-overlay[data-sb-phase='exiting'] .sb-satchel-more,
+.sb-overlay[data-sb-phase='exiting'] .sb-end-actions,
+.sb-overlay[data-sb-phase='exiting'] .sb-colophon {
+  animation-name: sb-text-exit;
+  animation-duration: 200ms;
+  /* accelerate — the words leave (skill: exit easing) */
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  animation-fill-mode: forwards;
+  animation-delay: 0ms;
+}
+
+/* Reduced motion: instant swap, no entrance/exit. spread-overlay.tsx also
+   skips the bridge subscription so content changes only at commit. */
+@media (prefers-reduced-motion: reduce) {
+  .sb-overlay .sb-hairline,
+  .sb-overlay .sb-chapter-kicker,
+  .sb-overlay .sb-flourish,
+  .sb-overlay .sb-chapter-title,
+  .sb-overlay .sb-book-subtitle,
+  .sb-overlay .sb-byline,
+  .sb-overlay .sb-narration,
+  .sb-overlay .sb-fleuron,
+  .sb-overlay .sb-plaque,
+  .sb-overlay .sb-satchel-grid,
+  .sb-overlay .sb-satchel-more,
+  .sb-overlay .sb-end-actions,
+  .sb-overlay .sb-colophon {
+    animation: none !important;
+  }
 }
 
 .sb-col-left,

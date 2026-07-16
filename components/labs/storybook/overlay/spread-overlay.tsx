@@ -16,7 +16,10 @@
  * always visible) and one or more `.sb-drawer-body` blocks (narration,
  * plaque, satchel grid, colophon — collapsed to nothing in the portrait
  * drawer until `.sb-drawer-toggle` expands it; always visible on desktop).
- * Faded out while a turn is in flight or on the closed cover. All copy is
+ * The overlay joins the page turn's choreography (see the SpreadOverlay
+ * component + turn-events.ts): the outgoing text exits as the turn begins and
+ * the incoming text staggers in a beat before the page settles, rather than
+ * flat-fading in after the motion stops. All copy is
  * real facts pulled from `content.ts` / `satchel-items.ts` /
  * `lib/constants.ts` — nothing hardcoded here beyond structural glue
  * (kickers, the colophon line) and decorative punctuation spans
@@ -28,7 +31,7 @@ import { useEffect, useState } from 'react'
 import { skills } from '@/data'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { useArtIds } from '../art-manifest'
-import { useStorybookStore } from '../store'
+import { useSpreadChoreography } from './use-spread-choreography'
 import {
   BOOK_SUBTITLE,
   BOOK_TITLE,
@@ -225,21 +228,44 @@ function contentForSpread(spread: number) {
   return null
 }
 
+/**
+ * The overlay JOINS the page turn's choreography instead of appending its
+ * text after it (E-G4 item 5). The shared choreography hook
+ * (use-spread-choreography.ts) tracks `displaySpread` — the spread the text
+ * should show, synced to the turn's land cue (decoupled from the store's
+ * `spread`, which only commits at t=1) — plus the `exiting` phase:
+ *
+ *   - a turn arms → `exiting`: the visible (outgoing) spread's text lifts +
+ *     fades away as the page begins to turn.
+ *   - the land cue fires → `displaySpread` swaps to the incoming spread: the
+ *     panel remounts (keyed by `displaySpread`) so its CSS entrance replays,
+ *     staggering kicker → flourish → title → narration → plaque up into place
+ *     a beat before the page settles — the turn DELIVERS the words.
+ */
 export function SpreadOverlay() {
-  const spread = useStorybookStore((s) => s.spread)
-  const turning = useStorybookStore((s) => s.turning)
+  // Shared with the nav label (use-spread-choreography.ts) so both text
+  // surfaces swap on the same land cue rather than the overlay leading.
+  const { displaySpread, exiting, frozenTurn } = useSpreadChoreography()
   const [expanded, setExpanded] = useState(false)
 
   // A fresh spread always starts collapsed (portrait drawer) — otherwise the
   // previous page's fully-open drawer would keep covering the newly turned
   // scene the instant it lands.
-  useEffect(() => setExpanded(false), [spread])
+  useEffect(() => setExpanded(false), [displaySpread])
 
-  const faded = turning !== null || spread === 0
-  const content = contentForSpread(spread)
+  const content = contentForSpread(displaySpread)
+  // Hidden on the closed cover (spread 0 has no text, and the portrait
+  // "unfold the tale" toggle must not dangle over the shut book) and over a
+  // frozen benchmark pose. Everything else is choreographed, never flat-faded.
+  const hidden = frozenTurn || displaySpread === 0
 
   return (
-    <div className="sb-overlay" style={{ opacity: faded ? 0 : 1 }} data-expanded={expanded}>
+    <div
+      className="sb-overlay"
+      data-expanded={expanded}
+      data-sb-phase={exiting ? 'exiting' : 'resting'}
+      style={hidden ? { opacity: 0 } : undefined}
+    >
       <button
         type="button"
         className="sb-drawer-toggle"
@@ -253,7 +279,12 @@ export function SpreadOverlay() {
           {expanded ? '⌃' : '⌄'}
         </span>
       </button>
-      <div id="sb-drawer-panel">{content}</div>
+      {/* Keyed by the shown spread so a landing REMOUNTS the panel, replaying
+          the staggered CSS entrance (storybook-overlay.css) exactly once per
+          arrival — a plain re-render (e.g. the drawer toggle) never replays it. */}
+      <div id="sb-drawer-panel" key={displaySpread}>
+        {content}
+      </div>
     </div>
   )
 }

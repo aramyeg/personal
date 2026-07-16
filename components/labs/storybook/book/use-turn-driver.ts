@@ -14,6 +14,7 @@ import { useFrame } from '@react-three/fiber'
 import { sbSound } from '../sound'
 import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
+import { emitTurnLand, emitTurnStart } from '../turn-events'
 
 // task 18: nudged up from 1100/1400 — paired with page-geometry's
 // easeTurnWeighted (a gentler grip at the start, a softer landing) this is
@@ -25,6 +26,14 @@ export const COVER_MS = 1600
 // Fraction of the turn at which the paper "flip" whoosh fires — roughly the
 // moment the page is mid-air, past the initial lift.
 const FLIP_AT_T = 0.15
+// Fraction of the turn at which the overlay's "text landed" cue fires (E-G4
+// item 5, spec E-P3). Deliberately BEFORE t=1: the incoming spread's text
+// begins its staggered entrance a beat before the page geometrically settles
+// (the v-fold family's late-rush is the final ~15%), so the page turn reads
+// as DELIVERING the words rather than the words being appended after the
+// motion stops. Bridged to the DOM overlay via turn-events (no per-frame
+// React — fired once per turn, like the sound cues below).
+const TEXT_LAND_AT_T = 0.72
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
 
@@ -102,6 +111,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
   const armedFor = useRef<TurnDir | null>(null)
   const firedCreak = useRef(false)
   const firedFlip = useRef(false)
+  const firedLand = useRef(false)
 
   const pose = useMemo(readPoseOverride, [])
   useEffect(() => {
@@ -132,6 +142,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       armedFor.current = null
       firedCreak.current = false
       firedFlip.current = false
+      firedLand.current = false
       return
     }
 
@@ -140,6 +151,10 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       elapsedMs.current = 0
       firedCreak.current = false
       firedFlip.current = false
+      firedLand.current = false
+      // Overlay choreography: the outgoing text exits now (turn-events →
+      // spread-overlay.tsx). `spread` is the committed spread being left.
+      emitTurnStart({ dir: turning, from: spread })
     }
 
     const isCover = isCoverTurn(spread, turning)
@@ -156,6 +171,12 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
     if (!firedFlip.current && t >= FLIP_AT_T) {
       firedFlip.current = true
       sbSound.flip()
+    }
+    // The "deliver the text" cue — fired once, a beat before landing, so the
+    // incoming overlay text staggers in as the page settles rather than after.
+    if (!firedLand.current && t >= TEXT_LAND_AT_T) {
+      firedLand.current = true
+      emitTurnLand({ dir: turning, to: spread + (turning === 'next' ? 1 : -1) })
     }
 
     if (t >= 1) {
@@ -185,6 +206,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       armedFor.current = null
       firedCreak.current = false
       firedFlip.current = false
+      firedLand.current = false
     }
   }, DRIVER_PRIORITY)
 

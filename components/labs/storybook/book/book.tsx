@@ -133,6 +133,16 @@ const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
 // brightness step reads as a flash on the landing page.
 const SHEET_WHITE = new THREE.Color('#ffffff')
 const SHEET_BACK_SHADE = new THREE.Color('#b9ad99')
+// Turning sheet underside ROUGHNESS, eased on the SAME shade weight as the
+// color above (E-G4 item 4): the lifting card stock scatters light in mid-air
+// (rougher than a flat page), but at both flat poses it must read as the same
+// surface as the static page it hands off to — the page roughness, 0.9. A
+// constant 0.97 left a one-frame specular/brightness STEP on the left-page
+// ground at the commit frame (the sheet back handed off to the 0.9 static page
+// with a 0.07 roughness jump); converging to 0.9 at the endpoints — exactly as
+// the color converges to white — completes the pixel-identical hand-off.
+const SHEET_BACK_ROUGH_FLAT = 0.9
+const SHEET_BACK_ROUGH_AIR = 0.97
 
 export function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
@@ -419,7 +429,9 @@ export function Book() {
     () =>
       new THREE.MeshStandardMaterial({
         map: paper,
-        roughness: 0.97,
+        // Base = the flat/landed page roughness; the useFrame below eases it up
+        // to SHEET_BACK_ROUGH_AIR in mid-air and back to this at the endpoints.
+        roughness: SHEET_BACK_ROUGH_FLAT,
         side: THREE.BackSide,
         vertexColors: true,
       }),
@@ -612,6 +624,11 @@ export function Book() {
       // tint popped ~30% brightness on the landing page at commit.
       const shade = Math.sin(Math.PI * easeTurnWeighted(f.t))
       sheetBackMaterial.color.lerpColors(SHEET_WHITE, SHEET_BACK_SHADE, shade)
+      // Same weight as the color: roughness converges to the static page's 0.9
+      // at both flat poses so the landing hand-off has no specular/brightness
+      // step, and holds the rougher mid-air underside where shade peaks.
+      sheetBackMaterial.roughness =
+        SHEET_BACK_ROUGH_FLAT + (SHEET_BACK_ROUGH_AIR - SHEET_BACK_ROUGH_FLAT) * shade
     }
 
     // Bulge rest poses + cover mechanics, on this same clock and with the

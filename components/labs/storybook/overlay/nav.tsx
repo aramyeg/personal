@@ -11,6 +11,7 @@
 
 import { chapterForSpread, SPREAD_COUNT } from '../content'
 import { useStorybookStore } from '../store'
+import { useSpreadChoreography } from './use-spread-choreography'
 
 const HOTSPOT_STYLE = {
   width: '18vw',
@@ -31,10 +32,15 @@ const spreadLabel = (spread: number): string => {
 export function BookNav() {
   const spread = useStorybookStore((s) => s.spread)
   const requestTurn = useStorybookStore((s) => s.requestTurn)
+  // The label reads the choreography's displaySpread so it swaps with the
+  // overlay text on the same land cue (a beat before the store commit), not
+  // ~280ms after it. The arrows/hotspots stay on the COMMITTED `spread` — turn
+  // bounds and requests must track the real position, not the previewed label.
+  const { displaySpread } = useSpreadChoreography()
 
   const atStart = spread <= 0
   const atEnd = spread >= SPREAD_COUNT - 1
-  const label = spreadLabel(spread)
+  const label = spreadLabel(displaySpread)
 
   return (
     <>
