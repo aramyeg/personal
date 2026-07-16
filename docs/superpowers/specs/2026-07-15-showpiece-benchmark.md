@@ -173,11 +173,17 @@ E-G5 ART FIDELITY (in-scene == generated) — RESOLVED by E0a audit
         per-face briefs absorb this list (many are also E-G2
         occlusion debt: ch2-meadow, ch6-strongbox, ch4-chest —
         double-hidden).
-  - OPEN BUG (fix wave, highest severity): knob-tier art loads
-    (manifest + disk + 200 fetch, wiring reads correct) but the
-    tier renders the kraft branch — runtime trace needed
-    (timing/dispose/strict-mode suspect). Orchestrator-verified
-    via edge-color branch test (gold tint.edge, not #f6eedb).
+  - RESOLVED FALSE POSITIVE (2026-07-16): the "knob-tier art never
+    renders" bug does NOT exist — the E0a montage crop box framed
+    the neighboring ch3-counter (a legitimately kraft piece) and
+    called it the tier; the tier renders its stone art correctly
+    (runtime-traced 5+ fresh navigations). The orchestrator's own
+    edge-color verification also read the wrong piece inside the
+    same crop. SECOND occurrence of the misidentification class —
+    piece identity must be established by decomposition BEFORE any
+    property of the image is used as evidence. Lifecycle
+    regression tests added (use-layer-texture.test.ts) so a real
+    future regression fails a test, not a live trace.
 
 E-G6 COMPOSED INTERACTION (no lone planes)
   - Every interactive moment moves >= 2 linked parts or produces
