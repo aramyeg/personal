@@ -7,6 +7,7 @@ import { Sky } from './sky'
 import { Planet } from './planet'
 import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
+import { DiscoveryBurst } from './discovery-burst'
 import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
@@ -81,6 +82,7 @@ function SceneContents({ progressRef }: SceneProps) {
       ) : (
         <GirlProxy journeyRef={journeyRef} />
       )}
+      <DiscoveryBurst journeyRef={journeyRef} />
     </>
   )
 }

@@ -29,7 +29,7 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
   const activity = useRef(0)
 
   useFrame(({ clock }, delta) => {
-    const { rotation } = journeyRef.current
+    const { rotation, burst } = journeyRef.current
     const dt = Math.max(delta, 1e-6)
     const prev = lastRotation.current ?? rotation
     lastRotation.current = rotation
@@ -50,20 +50,25 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
     // Idle: a soft breathing bounce so she never goes statue-still.
     const idle = (1 - activity.current) * 0.012 * Math.sin(clock.elapsedTime * 2.4)
     const squashTravel = 1 - 0.12 * Math.cos(hopPhase * 2) // squash at contact, stretch mid-air
-    const squash = 1 + (squashTravel - 1) * activity.current + idle
+    // Discovery celebration: two excited bounces while the "!" is up — rotation
+    // is frozen here so travel hop is zero; this is her reaction beat.
+    const celebrate = burst === null ? 0 : Math.abs(Math.sin(burst * Math.PI * 3)) * (1 - 0.35 * burst)
+    const lift = Math.max(hop, celebrate * 0.2)
+    const squashCelebrate = 1 + 0.1 * Math.sin(burst === null ? 0 : burst * Math.PI * 6)
+    const squash = (1 + (squashTravel - 1) * activity.current + idle) * squashCelebrate
     const groundY = surfaceYAt(STANCE_Z, rotation)
     if (group.current) {
-      group.current.position.y = groundY + hop
+      group.current.position.y = groundY + lift
       group.current.scale.set(1 / squash, squash, 1 / squash)
     }
     if (shadow.current) {
       // Shadow hugs the ground and shrinks/fades as she leaves it.
-      const lift = hop / HOP_HEIGHT
+      const liftT = Math.min(1, lift / HOP_HEIGHT)
       shadow.current.position.y = groundY + 0.015
-      const s = 1 - 0.35 * lift
+      const s = 1 - 0.35 * liftT
       shadow.current.scale.set(s, s, s)
       const mat = shadow.current.material as THREE.MeshBasicMaterial
-      mat.opacity = 0.22 * (1 - 0.55 * lift)
+      mat.opacity = 0.22 * (1 - 0.55 * liftT)
     }
   })
 
