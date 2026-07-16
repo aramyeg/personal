@@ -19,25 +19,18 @@ import type { BoxGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   keepStackBalconyDeck,
-  keepStackRavenQuad,
+  keepStackRavenDeck,
   keepStackStoryGeoms,
   type KeepStackGeom,
 } from './popup-keepstack'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
-import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture } from './shared-procedural-textures'
 import { BoxPopupLayer } from './popup-box-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
 const FLAT_EPSILON = 0.02
-// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
-// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
-// across half of a folded piece; the warm seam stays reserved for raw kraft
-// placeholder stock (per-piece kraftTints), never painted art.
-const PAINTED_FOLD_SHADE = '#e4e4e4'
-const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
@@ -89,17 +82,48 @@ function usePageAngles(
   }
 }
 
+// Balcony deck UVs — the art (a single gold desk, arch frame at image-top, front
+// rail at image-bottom) is ONE painting split across the spine crease, not printed
+// twice. Each half-deck's quad is [seam-z0, seam-z1, outer-z1, outer-z0]
+// (keepStackBalconyDeck). art-u (image WIDTH) fans ACROSS the crease: 0.5 at both
+// seam corners (t=0) -> 0 on deckL / 1 on deckR at the outer edge, so the desk runs
+// continuously left-to-right (deckL rides +y = world -x = reader LEFT, verified by
+// corner math). art-v (image HEIGHT) runs along z; with the default flipY, v=1 is
+// image-top (the arch), mapped to z0 (the facade-attachment edge toward the tower),
+// v=0 (the rail) to z1 (the reader-facing jut). Corner->uv table (deckL): seam-z0
+// (0.5,1), seam-z1 (0.5,0), outer-z1 (0,0), outer-z0 (0,1).
+const BALCONY_DECK_UVS: [Float32Array, Float32Array] = [
+  new Float32Array([0.5, 1, 0.5, 0, 0, 0, 0, 1]), // deckL (solved.a): seam art-u 0.5 -> outer 0; arch(v1)@z0
+  new Float32Array([0.5, 1, 0.5, 0, 1, 0, 1, 1]), // deckR (solved.b): seam art-u 0.5 -> outer 1; arch(v1)@z0
+]
+
+// Raven finial UVs — the raven art split across the crown crease, same idiom as
+// the balcony. The finial half-quads are [crease-bottom, crease-top, outer-top,
+// outer-bottom] (keepStackRavenDeck). art-u fans 0.5 at the crease -> 0 (crestL,
+// +y = reader LEFT) / 1 (crestR) at the outer edge; art-v runs bottom (cap top
+// edge, v=0) -> top (finial top, v=1) so the bird stands upright (head at v=1).
+const RAVEN_FINIAL_UVS: [Float32Array, Float32Array] = [
+  new Float32Array([0.5, 0, 0.5, 1, 0, 1, 0, 0]), // crestL: crease 0.5 -> outer 0
+  new Float32Array([0.5, 0, 0.5, 1, 1, 1, 1, 0]), // crestR: crease 0.5 -> outer 1
+]
+
 /** A small two-quad print riding a solved-per-frame pair of quads (the balcony
- *  deck's two half-decks), following the box lid's look. */
+ *  deck's two half-decks), following the box lid's look. `uvs` gives each quad's
+ *  texture coords; pass a split pair to print ONE painting across the crease. */
 function TwoQuadRide({
   artId,
   solve,
+  uvs,
+  alpha = false,
   spreadIndex,
   frame,
   committedSpread,
 }: {
   artId: string
   solve: (thetaL: number, thetaR: number) => { a: PanelQuad; b: PanelQuad } | null
+  uvs: readonly [Float32Array, Float32Array]
+  /** die-cut silhouette (raven finial): alpha-tested, no rectangular cut-edge loop. */
+  alpha?: boolean
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
@@ -110,8 +134,8 @@ function TwoQuadRide({
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
 
   const geometries = useMemo(
-    () => [makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]))],
-    []
+    () => [makeQuadGeometry(new Float32Array(uvs[0])), makeQuadGeometry(new Float32Array(uvs[1]))],
+    [uvs]
   )
   const edgeGeometries = useMemo(() => [makeEdgeGeometry(), makeEdgeGeometry()], [])
   const edgeMaterials = useMemo(
@@ -119,28 +143,34 @@ function TwoQuadRide({
     [geometries]
   )
   const paperTexture = sharedPaperTexture()
+  // ONE continuous painting split across the crease — both halves print the art
+  // UNSHADED (a fold-shade seam would break the continuity), DoubleSide so the ride
+  // reads from the reader side regardless of each half-quad's winding (the two
+  // half-decks/finials have OPPOSITE front-face normals, so a FrontSide material
+  // shows one half's raw-paper back — the old "flat olive band" balcony bug).
   const materials = useMemo(
-    () => geometries.map((_, i) => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: i === 0 ? '#ffffff' : PAINTED_FOLD_SHADE })),
-    [geometries]
+    () =>
+      geometries.map(
+        () =>
+          new THREE.MeshBasicMaterial({
+            side: THREE.DoubleSide,
+            color: '#ffffff',
+            transparent: alpha,
+            alphaTest: alpha ? 0.1 : 0,
+          })
+      ),
+    [geometries, alpha]
   )
-  const interiorMaterial = useMemo(
-    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
-    [paperTexture]
-  )
-  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   useEffect(() => {
     materials.forEach((mat, i) => {
-      const shaded = i !== 0
       mat.map = art ?? paperTexture
+      mat.color.set(art ? '#ffffff' : tint.lit)
+      mat.needsUpdate = true
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
-        mat.color.set(shaded ? PAINTED_FOLD_SHADE : '#ffffff')
-      } else {
-        mat.color.set(shaded ? tint.shade : tint.lit)
       }
-      mat.needsUpdate = true
       edgeMaterials[i].color.set(art ? CUT_EDGE_COLOR : tint.edge)
     })
   }, [art, paperTexture, materials, edgeMaterials, tint])
@@ -173,63 +203,13 @@ function TwoQuadRide({
       {geometries.map((g, i) => (
         <group key={i}>
           <mesh geometry={g} material={materials[i]} renderOrder={0} />
-          <mesh geometry={g} material={interiorMaterial} renderOrder={0} />
-          <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
+          {/* die-cut silhouettes (alpha) skip the rectangular cut-edge loop — it
+              would draw a box around the cutout. */}
+          {!alpha && <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />}
         </group>
       ))}
     </group>
   )
-}
-
-/** The hero raven silhouette perched on the crown — a single DoubleSide alpha
- *  print riding a solved-per-frame quad. */
-function RavenSilhouette({
-  layer,
-  spreadIndex,
-  frame,
-  committedSpread,
-}: {
-  layer: SceneLayer & KeepStackGeom
-  spreadIndex: number
-  frame: RefObject<TurnFrame | null>
-  committedSpread: RefObject<number>
-}) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const art = useArtTexture(`${layer.id}-raven`)
-  const tint = useMemo(() => kraftTints(`${layer.id}-raven`), [layer.id])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
-  const geometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
-  const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
-    []
-  )
-  const paperTexture = sharedPaperTexture()
-
-  useEffect(() => {
-    material.map = art ?? paperTexture
-    material.color.set(art ? '#ffffff' : tint.lit)
-    material.needsUpdate = true
-    if (art) {
-      art.wrapS = THREE.ClampToEdgeWrapping
-      art.wrapT = THREE.ClampToEdgeWrapping
-    }
-  }, [art, paperTexture, material, tint])
-
-  useEffect(() => () => {
-    geometry.dispose()
-    material.dispose()
-  }, [geometry, material])
-
-  useFrame(() => {
-    const mesh = meshRef.current
-    if (!mesh) return
-    const { role, thetaL, thetaR, beta } = readAngles()
-    const quad = role !== 'hidden' && beta > FLAT_EPSILON ? keepStackRavenQuad(layer, thetaL, thetaR) : null
-    mesh.visible = quad !== null
-    if (quad) writeQuad(geometry, quad)
-  })
-
-  return <mesh ref={meshRef} geometry={geometry} material={material} renderOrder={0} visible={false} />
 }
 
 export function KeepStackPopupLayer({
@@ -270,13 +250,25 @@ export function KeepStackPopupLayer({
             const deck = keepStackBalconyDeck(layer, tL, tR)
             return deck ? { a: deck.deckL, b: deck.deckR } : null
           }}
+          uvs={BALCONY_DECK_UVS}
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}
         />
       )}
       {layer.raven && (
-        <RavenSilhouette layer={layer} spreadIndex={spreadIndex} frame={frame} committedSpread={committedSpread} />
+        <TwoQuadRide
+          artId={`${layer.id}-raven`}
+          solve={(tL, tR) => {
+            const finial = keepStackRavenDeck(layer, tL, tR)
+            return finial ? { a: finial.crestL, b: finial.crestR } : null
+          }}
+          uvs={RAVEN_FINIAL_UVS}
+          alpha
+          spreadIndex={spreadIndex}
+          frame={frame}
+          committedSpread={committedSpread}
+        />
       )}
     </group>
   )

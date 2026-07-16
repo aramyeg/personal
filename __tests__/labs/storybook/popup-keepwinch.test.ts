@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   KEEP_WINCH_IRIS_SHUTTERS,
-  keepWinchCounterweightQuad,
+  keepWinchCounterweightDeck,
   keepWinchCrank,
   keepWinchDiscQuad,
   keepWinchEngageTheta,
@@ -103,13 +103,15 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
     }
   })
 
-  it('the winch hosts match the keep’s loft + hall stories (no drift)', () => {
+  it('the winch hosts match the keep’s loft story (iris + re-stationed counterweight)', () => {
     const stories = keepStackStoryGeoms(KEEP)
     const loft = stories.find((s) => s.key === 'loft')!
-    const hall = stories.find((s) => s.key === 'hall')!
+    // Both the iris (loft walls) and the re-stationed counterweight (loft FRONT CAP)
+    // now ride the loft story — the counterweight moved off the hall flank (dead
+    // sightline) onto the belfry mouth face.
     for (const key of ['a', 'height', 'z0', 'z1', 'baseH'] as const) {
       expect(WINCH.iris.host[key], `iris host ${key}`).toBe(loft[key])
-      expect(WINCH.counterweight.host[key], `cw host ${key}`).toBe(hall[key])
+      expect(WINCH.counterweight.host[key], `cw host ${key}`).toBe(loft[key])
     }
     expect(keepWinchIrisQuads(WINCH, THETA_MAX, REST, ...bloom(REST)).length).toBe(KEEP_WINCH_IRIS_SHUTTERS)
   })
@@ -267,7 +269,9 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
   it('N6 collision: the whole knob-twist scrub is D-G2-clean vs the keep + among outputs, excluding each body’s glued host wall (the legal hinge)', () => {
     const stories = keepStackStoryGeoms(KEEP)
     const isIrisHost = (s: string, f: string): boolean => s === 'loft' && (f === 'wallL' || f === 'wallR')
-    const isCwHost = (s: string, f: string): boolean => s === 'hall' && f === 'wallR'
+    // cw host = loft FRONT CAP; caps are excluded from COLLIDE_FACES below (as the
+    // bench excludes them), so this never fires — kept for parity with the bench.
+    const isCwHost = (s: string, f: string): boolean => s === 'loft' && (f === 'capFrontL' || f === 'capFrontR')
     let illegalCount = 0
     let worst = ''
     // The bench models the keep's collision surfaces as the reader-facing
@@ -286,7 +290,7 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
         const bodies: ReadonlyArray<{ name: string; quads: PanelQuad[]; isHost: (s: string, f: string) => boolean }> = [
           { name: 'semaphore', quads: [keepWinchSemaphoreQuad(WINCH, theta, beta, tL, tR)], isHost: () => false },
           { name: 'iris', quads: keepWinchIrisQuads(WINCH, theta, beta, tL, tR), isHost: isIrisHost },
-          { name: 'counterweight', quads: [keepWinchCounterweightQuad(WINCH, theta, beta, tL, tR)], isHost: isCwHost },
+          { name: 'counterweight', quads: (() => { const cw = keepWinchCounterweightDeck(WINCH, theta, beta, tL, tR); return [cw.crestL, cw.crestR] })(), isHost: isCwHost },
         ]
         for (const body of bodies)
           for (const A of body.quads)

@@ -102,10 +102,15 @@ function SkylineMound({
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const mound = layer.mounds[k]
 
+  // The reader-facing IN-slope carries the FULL roofline art (v 0..1: hinge at the
+  // art's bottom, die-cut slate roofline silhouette at the ridge). The OUT-slope
+  // (the far side of the mound) drops the art and becomes a shaded paper backing
+  // card — the old split-across-both-slopes mapping showed the reader the art's
+  // pale bottom half and pointed the roofline crest away.
   const geometries = useMemo(
     () => ({
-      in: makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 0.5, 0, 0.5])),
-      out: makeQuadGeometry(new Float32Array([0, 0.5, 1, 0.5, 1, 1, 0, 1])),
+      in: makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])),
+      out: makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])),
     }),
     []
   )
@@ -120,7 +125,9 @@ function SkylineMound({
   const paperTexture = sharedPaperTexture()
   const materials = useMemo(
     () => ({
-      in: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff' }),
+      // in-slope: die-cut roofline print, so it needs alpha (transparent above the
+      // silhouette shows the backdrop through the cut).
+      in: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff', transparent: true, alphaTest: 0.1 }),
       out: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: PAINTED_FOLD_SHADE }),
     }),
     []
@@ -132,20 +139,24 @@ function SkylineMound({
   useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   useEffect(() => {
-    const set = (mat: THREE.MeshBasicMaterial, edge: THREE.LineBasicMaterial, shaded: boolean) => {
-      mat.map = faceArt ?? paperTexture
-      if (faceArt) {
-        faceArt.wrapS = THREE.ClampToEdgeWrapping
-        faceArt.wrapT = THREE.ClampToEdgeWrapping
-        mat.color.set(shaded ? PAINTED_FOLD_SHADE : '#ffffff')
-      } else {
-        mat.color.set(shaded ? tint.shade : tint.lit)
-      }
-      mat.needsUpdate = true
-      edge.color.set(faceArt ? CUT_EDGE_COLOR : tint.edge)
+    // in-slope: the full roofline art (or kraft stock when unpainted).
+    materials.in.map = faceArt ?? paperTexture
+    materials.in.transparent = !!faceArt
+    materials.in.alphaTest = faceArt ? 0.1 : 0
+    if (faceArt) {
+      faceArt.wrapS = THREE.ClampToEdgeWrapping
+      faceArt.wrapT = THREE.ClampToEdgeWrapping
+      materials.in.color.set('#ffffff')
+    } else {
+      materials.in.color.set(tint.lit)
     }
-    set(materials.in, edgeMaterials.in, false)
-    set(materials.out, edgeMaterials.out, true)
+    materials.in.needsUpdate = true
+    edgeMaterials.in.color.set(faceArt ? CUT_EDGE_COLOR : tint.edge)
+    // out-slope: shaded paper backing card, never the art (the mound's far side).
+    materials.out.map = paperTexture
+    materials.out.color.set(tint.shade)
+    materials.out.needsUpdate = true
+    edgeMaterials.out.color.set(tint.edge)
   }, [faceArt, paperTexture, materials, edgeMaterials, tint])
 
   const shadowTexture = sharedShadowTexture()

@@ -244,34 +244,40 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // Signal-Spire crown — a small gabled spire; top world-Y ~0.84.
       { key: 'crown', a: 0.11, height: 0.1, z0: -0.11, z1: 0.11, roof: 'gable', gableRise: 0.08, capFront: true, capBack: true },
     ],
-    // Balcony deck halfW retuned 0.17 -> 0.117 so each half-deck's printed aspect
-    // (z-span 0.20 / halfW) matches the delivered balcony art (1.707 w/h); the
-    // renderer prints the FULL art per half-deck (mirrored), so the match is
-    // per-half. Narrowing (not deepening the jut) keeps B3/B4/B5 gate margins.
-    balcony: { halfW: 0.117, z0: 0.24, z1: 0.44 },
-    // Raven retuned 0.18x0.12 -> 0.102x0.099 so its aspect matches the delivered
-    // raven art (1.033 w/h) AND its crown-perched top world-Y (0.76 + height =
-    // 0.859) stays <= ~0.86 (the old 0.12 height crested 0.88, above the budget).
-    // Width 0.102 keeps its z-extent [-0.051, 0.051] inside the crown z-span.
-    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.102, height: 0.099 },
+    // Balcony halfW 0.1707: the renderer now SPLITS the art across the spine crease
+    // (deckL samples art-u 0.5->0, deckR 0.5->1) so the gold desk reads as ONE
+    // continuous painting, not printed twice. The art then spans the FULL deck:
+    // width -> lateral 2*halfW, height -> depth z-span 0.20, so 2*halfW/0.20 =
+    // 1.707 (the delivered balcony art). ~0.17 == the original bench-proven halfW.
+    balcony: { halfW: 0.1707, z0: 0.24, z1: 0.44 },
+    // Raven = an IN-PLANE FINIAL extending the crown's FRONT CAP past its top edge
+    // (keepStackRavenDeck): TWO coplanar half-quads creased at y=0, split art like
+    // the balcony. width 0.18 (total, both halves) x height 0.174 (art 1.033 w/h);
+    // bottom at the cap top edge (world-Y 0.76), top ~0.94 — a hero spire finial
+    // above the 0.844 structural crown. Coplanar with a folding cap => zero off-plane
+    // reach: folds dead flat for free, wedge containment inherits the cap's proof.
+    // Faces the reader (+z) face-on, unlike the old y-spanning quad (edge-on sliver).
+    // The semaphore mast is moved behind the ridge (SEMAPHORE_BASE_Z -0.08) to clear it.
+    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.18, height: 0.174 },
   },
   // THE SKYLINE — 3 low mounds per outer page (derive-keep-skyline.mjs), a
   // jagged rooftop line stepping in Z, page-driven by the fold-flat envelope
   // (no knob). Fore-hinge band F in [0.64, 0.75] clears the keep's mid-fold
   // sweep and holds the swinging-page vertex-speed cap. The flanking citadel.
-  // Per-mound leg width w retuned so each mound's slope-pair art aspect
-  // (ridgeLen / 2w) matches its OWN delivered art file (left/right differ). w is
-  // reduced only (flatter, lower rooftops), which raises the inner edge F-2w and
-  // slows the swing — every skyline gate moves in the safe direction.
+  // Per-mound leg width w = ridgeLen / artAspect: the renderer now maps the FULL
+  // art onto the READER-FACING in-slope only (die-cut roofline at the ridge), with
+  // the out-slope a shaded paper backing card. So the matched aspect is ridgeLen/w
+  // (one slope), not ridgeLen/2w — hence w is ~doubled vs the split-texture version.
+  // F unchanged; inner edge F-2w stays >= 0.44 and F in [0.64,0.75].
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
-    { F: 0.64, w: 0.0343, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.0386, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.0231, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.64, w: 0.0687, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.0772, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.0462, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
-    { F: 0.64, w: 0.0317, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.0332, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.0171, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.64, w: 0.0634, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.0663, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.0341, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
@@ -290,15 +296,19 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   {
     id: 'ch3-keep-winch', kind: 'hero', role: 'scenery', mech: 'keepwinch', side: 'left',
     hubD: 0.34, hubZ: 0.3, discR: 0.13, crankR: 0.13,
-    // armLen retuned 0.16 -> 0.099 so the arm's mesh elongation (armLen / 2*armHalfW)
-    // matches the delivered semaphore art's long:short (3.304); armHalfW is HELD at
-    // 0.015 because it sets the at-close off-page residual (0.015) the winch N4/N8
-    // fold-flat gates ride on. NOTE (art pass): the mesh maps the LONG axis to the
-    // art's HEIGHT (v=armLen), so the semaphore art must be authored/rotated PORTRAIT
-    // (tall, ~0.303 w/h) — the delivered 3.304-wide file prints rotated 90deg.
-    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.099, armHalfW: 0.015 },
+    // Semaphore paddle THICKENED for legibility (was a 0.03-wide hairline at the
+    // spire): armHalfW 0.0195, armLen 0.1287 holds L:S = armLen/2*armHalfW = 3.30 =
+    // 1/0.303, matching the delivered PORTRAIT semaphore art (444x1467, 0.303 w/h —
+    // no rotation needed, the tall art maps straight onto the arm). armHalfW is the
+    // at-close off-page residual the N4/N8 fold-flat gates ride on; 0.0195 leaves a
+    // 2.5% margin under the 0.02 paper-thickness tol (0.02 itself fails on float eps).
+    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.1287, armHalfW: 0.0195 },
     iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
-    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.3, height: 0.26, z0: -0.26, z1: 0.26, roof: 'flat', capFront: false, capBack: true, baseH: 0 } },
+    // Counterweight RE-STATIONED to the LOFT FRONT CAP (belfry mouth face) — the
+    // hall flank-wall seat was invisible from the reading camera (check-keep-
+    // visibility.mjs: 0% at rest). host is now the LOFT box (shares the iris host),
+    // so its capFrontL/capFrontR are the seats; it descends dead-center in sightline.
+    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
   },
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
   // v-fold at the fore edge — the spread's nearest plane, its scalloped painter

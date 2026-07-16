@@ -160,18 +160,24 @@ export function keepStackBalconyDeck(
   return { deckL: half(1), deckR: half(-1) }
 }
 
-/** The hero raven silhouette perched on its seat story's roof/lid. A flat
- *  rigid quad standing up along the seat's outward normal — decorative, zero
- *  DOF, folds flat with the seat. Returns null when the keep carries no raven.
- */
-export function keepStackRavenQuad(
+/** The hero raven finial — an IN-PLANE extension of the crown's FRONT CAP, past
+ *  its top edge, as TWO coplanar half-quads (one in each capFront plane), creased
+ *  at y=0 exactly like the cap. Being coplanar with a folding cap face means ZERO
+ *  off-plane reach: it folds dead flat with the cap for free (at close sh->0 so
+ *  every lateral y-> 0), and its mid-turn wedge containment inherits the cap's own
+ *  proof. At open the cap faces the reader (+z), so the finial faces the reader
+ *  face-on — unlike a y-spanning quad, whose normal is lateral and reads edge-on.
+ *  The raven art is split across the crease (like the balcony deck). Returns null
+ *  when the keep carries no raven. `width` is the TOTAL finial width across both
+ *  halves (each half is width/2 crease->outer, along the cap top edge); `height`
+ *  is the run UP the cap plane from the cap top edge. */
+export function keepStackRavenDeck(
   geom: KeepStackGeom,
   thetaL: number,
   thetaR: number
-): PanelQuad | null {
+): { crestL: PanelQuad; crestR: PanelQuad } | null {
   if (!geom.raven) return null
-  const geoms = keepStackStoryGeoms(geom)
-  const seat = geoms.find((g) => g.key === geom.raven!.storyKey)
+  const seat = keepStackStoryGeoms(geom).find((g) => g.key === geom.raven!.storyKey)
   if (!seat) return null
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
   const m = (thetaL + thetaR) / 2
@@ -185,18 +191,23 @@ export function keepStackRavenQuad(
     const X = x + baseH
     return [X * cm - y * sm, X * sm + y * cm, z]
   }
-  const { u, z, width, height } = geom.raven
-  // Perch on the +y half of the seat's flat lid / roof top, standing up along
-  // the seat's lid plane toward the crown (bisector-x = H + u*ch).
-  const footX = seat.height + u * ch
-  const footY = u * sh
-  const top = footX + height
-  return [
-    W(footX, footY, z - width / 2),
-    W(footX, footY, z + width / 2),
-    W(top, footY, z + width / 2),
-    W(top, footY, z - width / 2),
+  const { width, height } = geom.raven
+  const a = seat.a
+  // The front cap's top edge (bisector-x = a*ch + seat.height) is the finial's
+  // BOTTOM; its crease-to-outer direction in the cap plane is (y,z) = (sh, -ch)
+  // from the spine peak (y=0, z = z1 + a*ch) toward the outer front corner.
+  const X0 = a * ch + seat.height
+  const zc = seat.z1 + a * ch
+  const wh = width / 2
+  const crease0 = W(X0, 0, zc)
+  const creaseTop = W(X0 + height, 0, zc)
+  const half = (sign: number): PanelQuad => [
+    crease0,
+    creaseTop,
+    W(X0 + height, sign * wh * sh, zc - wh * ch),
+    W(X0, sign * wh * sh, zc - wh * ch),
   ]
+  return { crestL: half(1), crestR: half(-1) }
 }
 
 /** Every world-space quad the keep poses at a given dihedral — the four story
@@ -213,8 +224,8 @@ export function keepStackQuads(
   }
   const deck = keepStackBalconyDeck(geom, thetaL, thetaR)
   if (deck) quads.push(deck.deckL, deck.deckR)
-  const raven = keepStackRavenQuad(geom, thetaL, thetaR)
-  if (raven) quads.push(raven)
+  const raven = keepStackRavenDeck(geom, thetaL, thetaR)
+  if (raven) quads.push(raven.crestL, raven.crestR)
   return quads
 }
 

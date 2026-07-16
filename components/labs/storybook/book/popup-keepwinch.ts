@@ -72,11 +72,15 @@ export type KeepWinchGeom = {
    *  loft walls (the knee/lid idiom). `host` is the loft story box (wallL/wallR
    *  are the seats). */
   iris: KeepWinchOutput & { bladeLen: number; host: BoxGeom }
-  /** IN-PLANE SASH-WEIGHT counterweight (FINAL, 2026-07-16): a rigid block that
-   *  descends within the hall flank-wall plane. `range` is the deploy FRACTION
-   *  (1 = full CW_DROP_R descent — the block position/size constants live in the
-   *  solver). `host` is the hall story box (wallR is the seat). Off-wall reach is
-   *  zero by construction, so it is winding-insensitive and always wedge-contained. */
+  /** IN-PLANE SASH-WEIGHT counterweight (re-stationed 2026-07-16 round 4): a rigid
+   *  dark-iron block that descends WITHIN THE LOFT FRONT-CAP plane — down the belfry
+   *  mouth face, dead-center in the reading sightline (the hall flank-wall seat was a
+   *  dead sightline: invisible at rest, per check-keep-visibility.mjs). Two coplanar
+   *  half-quads straddling the y=0 cap crease (split art like the raven finial).
+   *  `range` is the deploy FRACTION (1 = full CW_DROP_R descent); the block
+   *  position/size constants live in the solver. `host` is the LOFT story box
+   *  (capFrontL/capFrontR are the seats). Off-plane reach is zero by construction
+   *  (only CW_LIFT z-fight seat), so fold-flat + N8 wedge inherit the cap's proof. */
   counterweight: KeepWinchOutput & { host: BoxGeom }
   /** Dihedral (deg) the fold-flat envelope normalizes to. Default 176. */
   restAtDeg?: number
@@ -186,6 +190,12 @@ export function keepWinchDiscQuad(
 
 /** The semaphore arm — a thin quad at the crown mast top, swinging from lying
  *  over the yard (+z, horizontal) to vertical (+bisector-x = up). */
+// The signal mast sits BEHIND the crown ridge (negative z) so its swing arc clears
+// the raven finial's front-cap plane (z ~ 0.11) by >= 0.06; at rest it still lies
+// above the crest (baseX 0.9 > 0.844) so it reads, and winds up vertical behind
+// the raven.
+const SEMAPHORE_BASE_Z = -0.08
+
 export function keepWinchSemaphoreQuad(
   geom: KeepWinchGeom,
   theta: number,
@@ -197,7 +207,7 @@ export function keepWinchSemaphoreQuad(
   const s = geom.semaphore
   const psi = keepWinchOutputValue(geom, 'semaphore', theta, beta)
   const baseX = s.baseX
-  const baseZ = 0.02
+  const baseZ = SEMAPHORE_BASE_Z
   const tipX = baseX + Math.sin(psi) * s.armLen
   const tipZ = baseZ + Math.cos(psi) * s.armLen
   const w = s.armHalfW
@@ -284,49 +294,63 @@ export function keepWinchIrisQuads(
   return blades
 }
 
-// IN-PLANE SASH-WEIGHT constants (the FINAL counterweight, bench derive-keep-
-// winch.mjs). A rigid block that DESCENDS within the hall flank-wall plane as
-// the winch winds — it never leaves the wall plane (only a negligible seat lift
-// off the face), so its wedge containment inherits the wall's own proof and it
-// is WINDING-INSENSITIVE (symmetric in e1; the wall's up-axis e2 is identical
-// in either winding) — no render-vs-bench winding reconciliation needed.
-const CW_R_TOP = 0.6 // top r-station (undeployed weight) — clear of the hall lid at r=1
-const CW_DROP_R = 0.4 // r-units of descent (world 0.4 * H_hall 0.26 = 0.10 down the flank)
-const CW_LIFT = 0.003 // ROTOR_LIFT-scale seat off the wall face (z-fight only)
-// CW_BW retuned 0.045 -> 0.0253 so the block's mesh aspect (CW_BW / CW_BH) matches
-// the delivered counterweight art (0.632 w/h — a tall narrow sash weight). Only the
-// in-plane z-width changes (along the wall's e1/spine axis), so off-wall reach stays
-// zero and the N8 wedge / N4 fold-flat proofs are untouched (they depend on x,y, and
-// CW_BH — unchanged).
-const CW_BW = 0.0253 // weight half-width along the wall (z)
-const CW_BH = 0.04 // weight half-height up the wall (block stays within r in [0.05, 0.85])
+// IN-PLANE SASH-WEIGHT constants (re-stationed to the LOFT FRONT CAP, round 4).
+// A rigid block DESCENDING within the loft capFront planes as the winch winds —
+// it never leaves the cap plane (only a negligible CW_LIFT seat off the face), so
+// wedge containment inherits the cap's own proof. Two half-quads straddle the y=0
+// cap crease; the seat r/s stations come from the RENDER solveBoxPose corner order
+// (below), so they are winding-correct against what the layer draws.
+const CW_R_TOP = 0.75 // top r-station (undeployed) — block top r+CW_BH/H stays under the cap top (r=1)
+const CW_DROP_R = 0.4 // r-units of descent (world 0.4 * H_loft 0.18 = 0.072 down the belfry face)
+const CW_LIFT = 0.003 // ROTOR_LIFT-scale seat off the cap face (z-fight only)
+// CW_BW/CW_BH give the block's mesh aspect (2*CW_BW / 2*CW_BH = CW_BW/CW_BH = 0.632),
+// matching the delivered counterweight art (a tall narrow iron weight). Off-plane
+// reach is zero (only CW_LIFT), so N8/N4 inherit the cap's proof.
+const CW_BW = 0.0253 // block half-width across the crease (per half, e1/z direction)
+const CW_BH = 0.04 // block half-height down the cap (e2/up direction)
 
-/** The counterweight — an IN-PLANE SASH-WEIGHT (FINAL). A rigid block seated at
- *  the hall flank (wallR) z-centre that slides DOWN the wall's up-axis by
- *  CW_DROP_R * drop as the crank winds, drop = outCam(s) * E(beta) (a FRACTION,
- *  not an angle). Off-wall reach is ZERO by construction — only CW_LIFT off the
- *  face — so it can never dip below the swinging page (bench N8, counterweight-
- *  only min wedge -0.003 = the seat lift), and at close E->0 returns it to the
- *  top and it rides the folded wall flat. A literal weight descending the flank. */
-export function keepWinchCounterweightQuad(
+/** The counterweight — an IN-PLANE SASH-WEIGHT re-stationed to the LOFT FRONT CAP.
+ *  TWO coplanar half-quads straddling the y=0 cap crease, descending the belfry
+ *  mouth face by CW_DROP_R * drop as the crank winds (drop = outCam(s)*E(beta), a
+ *  FRACTION). SEAT STATIONS from the render solveBoxPose corner order:
+ *   capFrontL = [base+y·z1, base·crease·zc, top·crease·zc, top+y·z1] -> seatFrame e1
+ *     runs OUTER(s0)->CREASE(s1), e2 runs BASE(r0)->TOP(r1); crease is s=1.
+ *   capFrontR = [base·crease·zc, base−y·z1, top−y·z1, top·crease·zc] -> e1 runs
+ *     CREASE(s0)->OUTER(s1), e2 BASE->TOP; crease is s=0.
+ *  Each half hugs the crease (width CW_BW inward) so the two meet at the shared
+ *  crease line. Off-plane reach zero (CW_LIFT only) -> folds flat with the cap. */
+export function keepWinchCounterweightDeck(
   geom: KeepWinchGeom,
   theta: number,
   beta: number,
   thetaL: number,
   thetaR: number
-): PanelQuad {
+): { crestL: PanelQuad; crestR: PanelQuad } {
   const drop = keepWinchOutputValue(geom, 'counterweight', theta, beta) // fraction 0..1
-  const wall = solveBoxPose(geom.counterweight.host, thetaL, thetaR).find((p) => p.face === 'wallR')!.quad
-  const F = seatFrame(wall)
+  const patches = solveBoxPose(geom.counterweight.host, thetaL, thetaR)
+  const capL = patches.find((p) => p.face === 'capFrontL')!.quad
+  const capR = patches.find((p) => p.face === 'capFrontR')!.quad
+  const FL = seatFrame(capL)
+  const FR = seatFrame(capR)
   const r = CW_R_TOP - CW_DROP_R * drop
-  const dw = CW_BW / vnorm(F.e1v) // half-width in e1 fraction
-  const dh = CW_BH / vnorm(F.e2v) // half-height in e2 fraction
-  return [
-    seatPt(F, 0.5 - dw, r - dh, CW_LIFT),
-    seatPt(F, 0.5 + dw, r - dh, CW_LIFT),
-    seatPt(F, 0.5 + dw, r + dh, CW_LIFT),
-    seatPt(F, 0.5 - dw, r + dh, CW_LIFT),
+  const dhL = CW_BH / vnorm(FL.e2v)
+  const dhR = CW_BH / vnorm(FR.e2v)
+  const swL = CW_BW / vnorm(FL.e1v)
+  const swR = CW_BW / vnorm(FR.e1v)
+  // order [crease-bottom, crease-top, outer-top, outer-bottom] (matches the split art).
+  const crestL: PanelQuad = [
+    seatPt(FL, 1, r - dhL, CW_LIFT),
+    seatPt(FL, 1, r + dhL, CW_LIFT),
+    seatPt(FL, 1 - swL, r + dhL, CW_LIFT),
+    seatPt(FL, 1 - swL, r - dhL, CW_LIFT),
   ]
+  const crestR: PanelQuad = [
+    seatPt(FR, 0, r - dhR, CW_LIFT),
+    seatPt(FR, 0, r + dhR, CW_LIFT),
+    seatPt(FR, swR, r + dhR, CW_LIFT),
+    seatPt(FR, swR, r - dhR, CW_LIFT),
+  ]
+  return { crestL, crestR }
 }
 
 /** Every world-space output quad the winch poses at a frozen twist — semaphore
@@ -340,9 +364,11 @@ export function keepWinchOutputQuads(
   thetaR: number
 ): PanelQuad[] {
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const cw = keepWinchCounterweightDeck(geom, theta, beta, thetaL, thetaR)
   return [
     keepWinchSemaphoreQuad(geom, theta, beta, thetaL, thetaR),
     ...keepWinchIrisQuads(geom, theta, beta, thetaL, thetaR),
-    keepWinchCounterweightQuad(geom, theta, beta, thetaL, thetaR),
+    cw.crestL,
+    cw.crestR,
   ]
 }

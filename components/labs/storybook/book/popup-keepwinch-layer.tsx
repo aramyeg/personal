@@ -27,7 +27,7 @@ import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   KEEP_WINCH_IRIS_SHUTTERS,
-  keepWinchCounterweightQuad,
+  keepWinchCounterweightDeck,
   keepWinchDiscQuad,
   keepWinchIrisQuads,
   keepWinchSemaphoreQuad,
@@ -45,6 +45,15 @@ import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, wri
 import { pointerLocalRay } from './user-drive-pointer'
 
 const FLAT_EPSILON = 0.02
+// Counterweight deck UVs — the iron-weight art split across the loft cap crease
+// (same idiom as the raven finial): crestL (capFrontL, reader LEFT) fans art-u 0.5
+// at the crease -> 0 outward; crestR (capFrontR) 0.5 -> 1. art-v bottom(0)->top(1)
+// so the weight prints upright. Corner order [crease-bottom, crease-top, outer-top,
+// outer-bottom] from keepWinchCounterweightDeck.
+const COUNTERWEIGHT_DECK_UVS: readonly Float32Array[] = [
+  new Float32Array([0.5, 0, 0.5, 1, 0, 1, 0, 0]), // crestL
+  new Float32Array([0.5, 0, 0.5, 1, 1, 1, 1, 0]), // crestR
+]
 const HUB_DEADZONE = 0.25
 const TOUCH_SLOP = 1.5
 const rad = (d: number): number => (d * Math.PI) / 180
@@ -299,6 +308,7 @@ function WinchOutput({
   artId,
   count,
   solve,
+  uvs,
   spreadIndex,
   frame,
   committedSpread,
@@ -307,6 +317,9 @@ function WinchOutput({
   artId: string
   count: number
   solve: (theta: number, beta: number, thetaL: number, thetaR: number) => PanelQuad[]
+  /** per-quad UVs (default: identity each) — pass a split pair to print ONE art
+   *  across a crease (the counterweight straddling the loft cap crease). */
+  uvs?: readonly Float32Array[]
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
@@ -316,8 +329,8 @@ function WinchOutput({
   const tint = useMemo(() => kraftTints(artId), [artId])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const geometries = useMemo(
-    () => Array.from({ length: count }, () => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]))),
-    [count]
+    () => Array.from({ length: count }, (_, i) => makeQuadGeometry(new Float32Array(uvs?.[i] ?? [0, 0, 1, 0, 1, 1, 0, 1]))),
+    [count, uvs]
   )
   const material = useMemo(
     () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
@@ -400,8 +413,12 @@ export function KeepWinchPopupLayer({
       <WinchOutput
         layer={layer}
         artId={`${layer.id}-counterweight`}
-        count={1}
-        solve={(theta, beta, tL, tR) => [keepWinchCounterweightQuad(layer, theta, beta, tL, tR)]}
+        count={2}
+        solve={(theta, beta, tL, tR) => {
+          const cw = keepWinchCounterweightDeck(layer, theta, beta, tL, tR)
+          return [cw.crestL, cw.crestR]
+        }}
+        uvs={COUNTERWEIGHT_DECK_UVS}
         spreadIndex={spreadIndex}
         frame={frame}
         committedSpread={committedSpread}
