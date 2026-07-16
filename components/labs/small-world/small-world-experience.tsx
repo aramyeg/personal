@@ -26,8 +26,11 @@ export function SmallWorldExperience() {
   const trackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!reduced && detectWebGL()) setActive(true)
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setActive(!mq.matches && detectWebGL())
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
   }, [])
 
   useEffect(() => {

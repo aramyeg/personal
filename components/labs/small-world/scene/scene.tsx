@@ -8,6 +8,7 @@ import { Planet } from './planet'
 import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
 import { useDampedJourney } from './use-journey'
+import { ToonRampProvider } from './toon-ramp'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
 
@@ -61,8 +62,12 @@ function SceneContents({ progressRef }: SceneProps) {
 /** Side-view stage: planet is a wheel spinning about z; girl pinned on top. */
 export function SmallWorldScene({ progressRef }: SceneProps) {
   return (
-    <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
-      <SceneContents progressRef={progressRef} />
-    </Canvas>
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
+      <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
+        <ToonRampProvider>
+          <SceneContents progressRef={progressRef} />
+        </ToonRampProvider>
+      </Canvas>
+    </div>
   )
 }

@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import type { JourneyRef } from './use-journey'
+import { useClayRamp } from './toon-ramp'
 
 export const PLANET_RADIUS = 2.2
 
@@ -41,20 +42,6 @@ export function surfaceYAt(worldZ: number, rotation: number): number {
   return Math.sqrt(Math.max(0, r * r - worldZ * worldZ))
 }
 
-/** 3-step toon ramp — hard clay banding. */
-function useToonRamp(): THREE.DataTexture {
-  return useMemo(() => {
-    const steps = new Uint8Array([140, 200, 255])
-    const data = new Uint8Array(steps.length * 4)
-    steps.forEach((v, i) => data.set([v, v, v, 255], i * 4))
-    const tex = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat)
-    tex.needsUpdate = true
-    tex.minFilter = THREE.NearestFilter
-    tex.magFilter = THREE.NearestFilter
-    return tex
-  }, [])
-}
-
 /**
  * Chunky vertex-displaced sphere with height-tinted vertex colors: valleys
  * sink toward deep leaf green, crests lift toward pale sprout — the
@@ -89,7 +76,7 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
 
 export function Planet({ journeyRef }: { journeyRef: JourneyRef }) {
   const group = useRef<THREE.Group>(null)
-  const ramp = useToonRamp()
+  const ramp = useClayRamp()
   const geometry = useHillGeometry()
 
   useFrame(() => {
