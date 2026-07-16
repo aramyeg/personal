@@ -45,13 +45,17 @@ const CANYON_BANK = 0.05
 /** The ocean owns the +x side: a hemisphere-ish basin at the right pole,
  *  present every rotation. */
 export const OCEAN: WaterBody = { dir: norm3([0.94, -0.12, 0.16]), radius: 0.95, feather: 0.34, depth: 0.09 }
-/** A secondary sea a third of the way round — catches the middle river so the
- *  water isn't clustered on the ocean's hemisphere. */
-export const SEA: WaterBody = { dir: norm3([0.62, 0.16, -0.78]), radius: 0.4, feather: 0.26, depth: 0.06 }
-/** A cool highland lake near the top longitude — catches the last river. */
-export const LAKE: WaterBody = { dir: norm3([0.5, 0.82, -0.18]), radius: 0.34, feather: 0.22, depth: 0.055 }
-/** Every water body, ordered biggest-first. Rivers route to the nearest one. */
-export const WATER_BODIES: readonly WaterBody[] = [OCEAN, SEA, LAKE]
+/** A cold sea on the OPPOSITE (-x, left) side, a whole hemisphere from the
+ *  ocean, so water shows on the left of the lap too. Catches the middle river. */
+export const SEA: WaterBody = { dir: norm3([-0.6, -0.13, -0.79]), radius: 0.4, feather: 0.26, depth: 0.06 }
+/** A highland lake near the top longitude — catches the last river. */
+export const LAKE: WaterBody = { dir: norm3([0.5, 0.8, -0.23]), radius: 0.32, feather: 0.22, depth: 0.055 }
+/** A little pond nestled in the front meadow — breaks up the central face. */
+export const POND: WaterBody = { dir: norm3([0.4, 0.36, 0.84]), radius: 0.14, feather: 0.11, depth: 0.045 }
+/** Every water body (basins, masks, beaches). */
+export const WATER_BODIES: readonly WaterBody[] = [OCEAN, SEA, LAKE, POND]
+/** Bodies rivers may drain to (the pond is decorative — no river feeds it). */
+const RIVER_BODIES: readonly WaterBody[] = [OCEAN, SEA, LAKE]
 
 /** A few little islands poking out of the ocean — small delight peaks that ride
  *  above the basin's waterline, ringed by deep water. */
@@ -71,11 +75,11 @@ export const FOREST: Cap = { dir: norm3([-0.46, 0.5, 0.73]), radius: 0.44, feath
 
 /** ONE distinct mountain range: a tight snowy arc across the cold left-front. */
 export const RANGE: Peak[] = [
-  { dir: norm3([-0.62, 0.52, 0.52]), h: 0.17, r: 0.13 },
-  { dir: norm3([-0.68, 0.3, 0.64]), h: 0.2, r: 0.12 },
-  { dir: norm3([-0.71, 0.06, 0.69]), h: 0.18, r: 0.12 },
-  { dir: norm3([-0.7, -0.2, 0.66]), h: 0.16, r: 0.13 },
-  { dir: norm3([-0.64, -0.42, 0.62]), h: 0.14, r: 0.14 },
+  { dir: norm3([-0.62, 0.52, 0.52]), h: 0.19, r: 0.11 },
+  { dir: norm3([-0.68, 0.3, 0.64]), h: 0.28, r: 0.09 }, // sharp snowy spire
+  { dir: norm3([-0.71, 0.06, 0.69]), h: 0.26, r: 0.088 }, // sharp snowy spire
+  { dir: norm3([-0.7, -0.2, 0.66]), h: 0.17, r: 0.11 },
+  { dir: norm3([-0.64, -0.42, 0.62]), h: 0.14, r: 0.13 },
 ]
 
 /**
@@ -139,16 +143,16 @@ const RIVER_RAMP = 0.05 // carve feather beyond the half-width
 function crossPoint(theta: number): [number, number, number] {
   return [0, Math.cos(theta), Math.sin(theta)]
 }
-/** Nearest water body to a unit direction (by angular distance to its centre). */
+/** Nearest river-fed water body to a unit direction (angular distance to centre). */
 function nearestBody(dx: number, dy: number, dz: number): WaterBody {
-  let best = WATER_BODIES[0]
+  let best = RIVER_BODIES[0]
   let bestDot = -Infinity
-  for (let i = 0; i < WATER_BODIES.length; i++) {
-    const d = WATER_BODIES[i].dir
+  for (let i = 0; i < RIVER_BODIES.length; i++) {
+    const d = RIVER_BODIES[i].dir
     const dot = dx * d[0] + dy * d[1] + dz * d[2]
     if (dot > bestDot) {
       bestDot = dot
-      best = WATER_BODIES[i]
+      best = RIVER_BODIES[i]
     }
   }
   return best

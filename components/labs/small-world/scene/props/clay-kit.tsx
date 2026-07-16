@@ -190,30 +190,44 @@ export function ClayBlock({ w = 0.2, h = 0.2, d = 0.2, color, ...x }: Xform & { 
  */
 export function ClayBridge({ rise = 0.13, ...x }: Xform & { rise?: number }) {
   const ramp = useClayRamp()
-  const planksZ = [-0.2, -0.1, 0, 0.1, 0.2]
-  const arch = (z: number) => rise + 0.03 * (1 - (z / 0.24) ** 2)
-  const posts: Array<[number, number]> = [
-    [-0.2, -0.22], [0.2, -0.22], [-0.2, 0.22], [0.2, 0.22],
+  // flat deck (so the girl's feet land at DECK_RISE); the arched read comes from
+  // tall pylons + raised handrails that carry a clear bridge silhouette at range.
+  const planksZ = [-0.18, -0.09, 0, 0.09, 0.18]
+  const corners: Array<[number, number]> = [
+    [-0.24, -0.19], [0.24, -0.19], [-0.24, 0.19], [0.24, 0.19],
   ]
+  const rows = [-0.16, 0, 0.16]
   return (
     <group {...x}>
+      {/* solid deck planks */}
       {planksZ.map((z) => (
-        <mesh key={z} position={[0, arch(z), z]}>
-          <boxGeometry args={[0.44, 0.04, 0.085]} />
+        <mesh key={z} position={[0, rise, z]}>
+          <boxGeometry args={[0.46, 0.055, 0.11]} />
           <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
         </mesh>
       ))}
-      {[-0.2, 0.2].map((px) => (
-        <mesh key={px} position={[px, rise + 0.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.013, 0.013, 0.5, 8]} />
-          <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
-        </mesh>
-      ))}
-      {posts.map(([px, pz], i) => (
-        <mesh key={i} position={[px, rise * 0.5, pz]}>
-          <cylinderGeometry args={[0.02, 0.026, rise + 0.1, 8]} />
+      {/* thick end pylons standing well above the deck */}
+      {corners.map(([px, pz], i) => (
+        <mesh key={i} position={[px, rise * 0.5 + 0.08, pz]}>
+          <cylinderGeometry args={[0.035, 0.045, rise + 0.3, 8]} />
           <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
         </mesh>
+      ))}
+      {/* handrails: a thick clayPath top bar each side + balusters — the light
+          rail against the dark deck is what reads the bridge from the camera */}
+      {[-0.24, 0.24].map((px) => (
+        <group key={px}>
+          <mesh position={[px, rise + 0.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.022, 0.022, 0.44, 8]} />
+            <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
+          </mesh>
+          {rows.map((z) => (
+            <mesh key={z} position={[px, rise + 0.12, z]}>
+              <cylinderGeometry args={[0.016, 0.016, 0.16, 6]} />
+              <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
+            </mesh>
+          ))}
+        </group>
       ))}
     </group>
   )

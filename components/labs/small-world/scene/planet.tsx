@@ -79,6 +79,7 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
     const earth = new THREE.Color(PALETTE.earth)
     const pine = new THREE.Color(PALETTE.pine)
     const dune = new THREE.Color(PALETTE.dune)
+    const blossom = new THREE.Color(PALETTE.blossom)
     const c = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
@@ -127,6 +128,13 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
           // subtle warm longitude drift, never stripes
           const t2 = 0.5 + 0.5 * Math.sin(1.2 * Math.atan2(nz, ny) + 0.7)
           c.lerp(honey, 0.06 * t2)
+          // wildflower speckle — deterministic pink/gold dots break the uniform
+          // green so no meadow face reads as flat green (dense, high-frequency)
+          const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
+          if (spk > 0.68) c.lerp(blossom, 0.55)
+          else if (spk < -0.72) c.lerp(honey, 0.5)
+          const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
+          if (spk2 > 0.74) c.lerp(sprout, 0.5)
         }
       }
       colors.set([c.r, c.g, c.b], i * 3)
@@ -152,9 +160,11 @@ function useWaterGeometry(): THREE.SphereGeometry {
     const pos = geo.attributes.position
     const colors = new Float32Array(pos.count * 3)
     const v = new THREE.Vector3()
+    const ink = new THREE.Color(PALETTE.ink)
     const river = new THREE.Color(PALETTE.river)
-    const deep = new THREE.Color(PALETTE.riverDeep)
-    const abyss = deep.clone().lerp(new THREE.Color(PALETTE.ink), 0.4)
+    // deep clay blue DOMINATES: riverDeep pushed darker for the body of the water
+    const deepBase = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.22)
+    const abyss = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.5)
     const c = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
@@ -162,15 +172,16 @@ function useWaterGeometry(): THREE.SphereGeometry {
       const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
       const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
       // deep-blue dominant, darkening into the abyss where the floor sinks far
-      c.copy(deep).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.35, 1))
-      // lighter shallow rim only near the shoreline
-      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.28)
-      c.lerp(river, 0.55 * rim)
+      c.copy(deepBase).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.3, 1))
+      // lighter river blue only as a NARROW shallow rim right at the shoreline
+      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.15)
+      c.lerp(river, 0.5 * rim)
       colors.set([c.r, c.g, c.b], i * 3)
-      // gentle clay lumps, inward-only (radius never exceeds WATER_LEVEL → no
-      // shoreline poke-through); faceted normals catch the ramp as clay.
-      const w = Math.sin(5.1 * dir.x + 1.3) * Math.sin(4.7 * dir.y - 0.7) * Math.sin(5.3 * dir.z + 2.1)
-      v.multiplyScalar(1 - 0.006 * (0.5 + 0.5 * w))
+      // clay lumps, inward-only (radius never exceeds WATER_LEVEL → no shoreline
+      // poke-through); two octaves + recomputed normals catch the ramp as clay.
+      const w1 = Math.sin(5.1 * dir.x + 1.3) * Math.sin(4.7 * dir.y - 0.7) * Math.sin(5.3 * dir.z + 2.1)
+      const w2 = Math.sin(9.4 * dir.y + 0.5) * Math.sin(8.7 * dir.z - 1.1) * Math.sin(9.1 * dir.x + 2.6)
+      v.multiplyScalar(1 - 0.009 * (0.5 + 0.5 * w1) - 0.004 * (0.5 + 0.5 * w2))
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))

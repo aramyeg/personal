@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL } from '../planet'
-import { ISLANDS, LAKE } from '../biomes'
+import { ISLANDS, SEA } from '../biomes'
 import { PropAnchor } from './prop-anchor'
 import { ClayBlossom, ClayDisc, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
@@ -15,11 +15,11 @@ function anchorFor(dir: readonly [number, number, number]): { theta: number; x: 
   return { theta: Math.atan2(dir[2], dir[1]), x: dir[0] * PLANET_RADIUS }
 }
 
-/** Flat ice floes floating on the highland lake's surface (at the waterline). */
+/** Flat ice floes floating on the cold sea's surface (at the waterline). */
 function IceFloes() {
   const ramp = useClayRamp()
   const floes = useMemo(() => {
-    const c = new THREE.Vector3(LAKE.dir[0], LAKE.dir[1], LAKE.dir[2])
+    const c = new THREE.Vector3(SEA.dir[0], SEA.dir[1], SEA.dir[2])
     const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
     const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
     // [tangent a, tangent b, radius] offsets inside the lake
@@ -52,17 +52,19 @@ function IceFloes() {
  * dry, feature-clear ground so every stretch of the lap has something new.
  */
 export function Delights() {
-  // authored dry-meadow flower patch
+  // authored dry-meadow flower patches at two longitudes
   const flowers: Array<[number, number]> = [
     [2.0, 0.8], [2.1, 0.9], [2.2, 0.78], [2.05, 0.72], [2.15, 0.85],
+    [0.45, 0.85], [0.55, 1.0], [0.65, 0.8], [0.5, 0.7],
   ]
   // winding dirt path segment
   const path: Array<[number, number]> = [
     [5.24, 0.72], [5.35, 0.82], [5.46, 0.72], [5.57, 0.85], [5.68, 0.75],
   ]
-  // little rock formation
+  // rock formations at two longitudes
   const rocks: Array<[number, number, number]> = [
     [3.9, 0.95, 0.11], [4.0, 1.1, 0.08], [3.95, 0.8, 0.09],
+    [4.85, 0.95, 0.1], [4.95, 1.1, 0.075], [5.05, 0.85, 0.09],
   ]
   const island = ISLANDS.map((p) => anchorFor(p.dir))
 
