@@ -1,9 +1,11 @@
 'use client'
-import { useLayoutEffect } from 'react'
+import { Suspense, useLayoutEffect } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
+import { hasArt } from '../art-manifest'
 import { Sky } from './sky'
 import { Planet } from './planet'
+import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
 import { useDampedJourney } from './use-journey'
 
@@ -45,7 +47,13 @@ function SceneContents({ progressRef }: SceneProps) {
       {/* Warm raking key from upper-left — makes the toon ramp bands read as clay facets. */}
       <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
       <Planet journeyRef={journeyRef} />
-      <GirlProxy journeyRef={journeyRef} />
+      {hasArt('girl') ? (
+        <Suspense fallback={<GirlProxy journeyRef={journeyRef} />}>
+          <Girl journeyRef={journeyRef} />
+        </Suspense>
+      ) : (
+        <GirlProxy journeyRef={journeyRef} />
+      )}
     </>
   )
 }
