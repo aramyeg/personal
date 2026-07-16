@@ -41,8 +41,9 @@ function SceneContents({ progressRef }: SceneProps) {
     <>
       <CameraRig />
       <Sky />
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[4, 6, 5]} intensity={1.2} />
+      <ambientLight intensity={0.7} />
+      {/* Warm raking key from upper-left — makes the toon ramp bands read as clay facets. */}
+      <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
       <Planet journeyRef={journeyRef} />
       <GirlProxy journeyRef={journeyRef} />
     </>
