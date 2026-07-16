@@ -98,10 +98,19 @@ re-derivation; only collapse paths changed):
   0.10·sin(deploy) → 0 at close (rides a folding wall — the
   knee/lid idiom). MORE on-concept than the old floating ring:
   the shutters ARE the roost mouths' shutters.
-- counterweight → KNEE PANEL (re-derived rigid): rigid panel on
-  the HALL flank (KEEP[0] wallR), panel len CW_PANEL 0.14,
-  deploy range rad(78), hinged low (r 0.35), swings down-and-out
-  (−cos·e2 + sin·n). Off-wall reach 0.14·sin(deploy) → 0 at close.
+- counterweight → LOW SWING-OUT PANEL (re-derived TWICE; final
+  2026-07-16 after the A10 mid-turn dip): hall wallR (KEEP[0] q1),
+  VERTICAL hinge at z-station sHinge 0.5, r-band [0.15, 0.5]
+  (low flank), CW_PANEL 0.14, deploy range rad(78), free edge
+  cos·e1 + sin·n (in-wall → outward, the shutter idiom). Every
+  point stays at the hinge's bisector-x band → CANNOT dip below
+  the page at any partial deploy (by construction; measured
+  counterweight-only min wedge −0.0000). The drop reading comes
+  from the low seat + swing-out + weight art. Off-wall reach
+  0.14·sin(deploy) → 0 at close. FORBIDDEN: the down-swing
+  (−cos·e2 + sin·n) variant — its tip goes below the swinging
+  page plane at mid-turn (worst +0.278 at outgoing t 0.75); no
+  hinge height fixes it (probes: r 0.75 still 0.13).
 Bench corrections (derive-keep-winch.mjs, all 7 gates green):
 - N4 = BODY CONTAINMENT at book-closed (tL=tR=PI): max off-page
   world-Y <= FLAT_TOL 0.02; measured 0.0150 (semaphore spine
@@ -111,6 +120,14 @@ Bench corrections (derive-keep-winch.mjs, all 7 gates green):
   hinge = legal joint, same rule as adjacent-story seams);
   0 illegal over full theta sweep + tilts. N7 real-time 81%
   margin; cams monotone C1 (cw slope 3.93).
+- N8 (added after the A10 mid-turn dip) = MID-TURN WEDGE
+  CONTAINMENT: every body point stays in the page wedge
+  (dot(p,nL) >= −tol AND dot(p,nR) >= −tol, tol = paper 0.02)
+  across the full beta × theta grid on BOTH turn paths. Measured
+  min −0.0150 (the semaphore's at-close spine residual, inside
+  paper thickness). Close-only containment (N4) is NEVER
+  sufficient for bodies that deploy laterally — N8 is mandatory
+  for every future user-drivable rider.
 The old fixed-lateral-offset iris ring (R 0.24 perp plane) and
 counterweight block (bisector-y 0.31) are FORBIDDEN geometry —
 they sit ~0.3 proud at close (root cause: fixed lateral offsets
