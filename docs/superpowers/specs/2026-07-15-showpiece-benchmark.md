@@ -105,6 +105,21 @@ E-G4 FRAME-TIME + ARTIFACT (crisp motion, his pinned bar) —
     triplets: satchel-sword full-piece vanish (frame 47/175),
     satchel-compass pose jump (80/181), end-keepsake edge-mark
     dropout (96/140).
+  - USER-REPORTED (2026-07-16, fix wave): (4) TURN-END CLICK —
+    the page "clicks into place" at landing. Easing is quint
+    (zero end-velocity), so suspects are: frame drops clustering
+    late in the turn (the measured 8–9%), the v-fold family's
+    geometric late-rush concentrating panel motion in the final
+    degrees, and a possible one-frame pose mismatch when the turn
+    frame nulls to the committed rest pose (verify t=1 pose ==
+    rest pose bit-exactly, incl. parallax unfreeze timing).
+    (5) POST-TURN TEXT POP — the HTML overlay swaps content and
+    fades in (flat 220ms, spread-overlay.tsx style + .sb-overlay
+    transition) only AFTER completeTurn: text reads as appended,
+    not choreographed. Fix direction: overlay participates in the
+    turn's motion design (staggered fade/rise beginning before the
+    page settles), per E-P3 "page-turn + erection choreo reviewed
+    as motion design."
 
 E-G5 ART FIDELITY (in-scene == generated) — RESOLVED by E0a audit
   2026-07-16 (full ranked-degrader report:
