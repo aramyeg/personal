@@ -8,10 +8,16 @@ import { STANCE_Z } from './stage'
 import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'
+/** Only clip in the delivered GLB — no idle/discovery/wave clips shipped. */
+const CLIP_NAME = 'Armature|Skip_Forward|baselayer'
+/** Mesh is 1.7 units tall; scene is built around a ~0.9-unit character. */
+const GIRL_SCALE = 0.53
 /** Surface distance one skip-cycle covers at timeScale 1 — tune to the clip. */
-const CLIP_STRIDE = 0.55
+const CLIP_STRIDE = 1.0
 /** Damping rate for mixer.timeScale so cadence eases rather than snaps to speed changes. */
 const DAMP_LAMBDA = 6
+/** Floor for the timeScale damp target — keeps a slow skip-in-place during dwell/panel windows instead of freezing mid-pose. */
+const MIN_TIMESCALE = 0.12
 
 /**
  * Real GLB girl — rendered only behind `hasArt('girl')` (see scene.tsx), so
@@ -28,7 +34,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const timeScale = useRef(0)
 
   useEffect(() => {
-    actions.skip?.reset().play()
+    actions[CLIP_NAME]?.reset().play()
   }, [actions])
 
   useFrame((_, delta) => {
@@ -37,7 +43,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     const prev = lastRotation.current ?? rotation
     lastRotation.current = rotation
     const surfaceSpeed = (Math.abs(rotation - prev) * PLANET_RADIUS) / dt
-    const targetScale = THREE.MathUtils.clamp(surfaceSpeed / CLIP_STRIDE, 0, 2.5)
+    const targetScale = THREE.MathUtils.clamp(surfaceSpeed / CLIP_STRIDE, MIN_TIMESCALE, 2.5)
     timeScale.current = THREE.MathUtils.damp(timeScale.current, targetScale, DAMP_LAMBDA, dt)
     mixer.timeScale = timeScale.current
     if (group.current) {
@@ -47,7 +53,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
 
   return (
     <group ref={group} position={[0, PLANET_RADIUS, STANCE_Z]}>
-      <primitive object={scene} />
+      <primitive object={scene} scale={GIRL_SCALE} />
     </group>
   )
 }
