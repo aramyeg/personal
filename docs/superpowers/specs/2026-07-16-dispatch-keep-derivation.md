@@ -84,15 +84,37 @@ occlusion), world-Y 0.26.
 
 WINCH: disc side 'left', hubD 0.34, hubZ 0.30, discR 0.13,
 crankR 0.13 (pin on rim), THETA_MAX 112.6deg. Outputs
-(stagger L / sMax / range):
+(stagger L / sMax preserved through the 2026-07-16 rigid-fold
+re-derivation; only collapse paths changed):
 - semaphore: L 0, sMax 0.09, range 90deg; pivot bisector-x 0.90
-  (above crown ridge 0.84), arm len 0.16
-- iris: L 0.055, sMax 0.075, range 58deg; rim bisector-x 0.66,
-  ring R 0.24 (outside loft walls), N=6 blades
-- counterweight: L 0.11, sMax 0.07, drop 0.24; lateral 0.31
-  (outside gallery wall), xTop 0.62
-All outputs: out_shown = out(theta) · E(beta); E(0)=0 → exact
-collapse at close; the disc holds theta (H4).
+  (above crown ridge 0.84), arm len 0.16. UNCHANGED — at close it
+  lies along the fold-invariant spine axis (0.015 residual =
+  paper thickness).
+- iris → ROOST-MOUTH SHUTTERS (re-derived rigid): 4 flaps hinged
+  on the VERTICAL edges of the loft walls (KEEP[2] wallL+wallR,
+  2 per wall), blade len IRIS_BLADE 0.10, deploy range rad(68),
+  free edge swings +z (closed, in-wall) → +n (open, outward);
+  z-stations 0.25/0.75, height band r 0.25..0.85. Off-wall reach
+  0.10·sin(deploy) → 0 at close (rides a folding wall — the
+  knee/lid idiom). MORE on-concept than the old floating ring:
+  the shutters ARE the roost mouths' shutters.
+- counterweight → KNEE PANEL (re-derived rigid): rigid panel on
+  the HALL flank (KEEP[0] wallR), panel len CW_PANEL 0.14,
+  deploy range rad(78), hinged low (r 0.35), swings down-and-out
+  (−cos·e2 + sin·n). Off-wall reach 0.14·sin(deploy) → 0 at close.
+Bench corrections (derive-keep-winch.mjs, all 7 gates green):
+- N4 = BODY CONTAINMENT at book-closed (tL=tR=PI): max off-page
+  world-Y <= FLAT_TOL 0.02; measured 0.0150 (semaphore spine
+  residual is worst; shutters + panel fold flat). Never
+  deployment-angle-only again.
+- N6 excludes each body's GLUED host surface from D-G2 (shared
+  hinge = legal joint, same rule as adjacent-story seams);
+  0 illegal over full theta sweep + tilts. N7 real-time 81%
+  margin; cams monotone C1 (cw slope 3.93).
+The old fixed-lateral-offset iris ring (R 0.24 perp plane) and
+counterweight block (bisector-y 0.31) are FORBIDDEN geometry —
+they sit ~0.3 proud at close (root cause: fixed lateral offsets
+don't scale with sin(beta/2) the way box panels do).
 
 WINGS: paint-on-keep back walls. The tested off-spine flat config
 (front hingeX 0.64 / z 0.12 / w 0.36 / h 0.28; rear 0.86 / −0.16 /
