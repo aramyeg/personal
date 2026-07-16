@@ -98,6 +98,17 @@ WINGS: paint-on-keep back walls. The tested off-spine flat config
 (front hingeX 0.64 / z 0.12 / w 0.36 / h 0.28; rear 0.86 / −0.16 /
 0.46 / 0.32) FAILS real-time — never ship as erecting flats.
 
+SKYLINE (validated GO, derive-keep-skyline.mjs — the conditional
+low mound cleared all gates): fold-flat 7.5e-10, zero D-G2 vs keep
+(turns + 4 tilts), zero mound-vs-mound, real-time 3% margin.
+FEASIBLE BAND (hard): mound fore-hinge F in [0.64, 0.75] — inner
+edge F−2w >= 0.44 clears the keep's mid-fold sweep; further out
+busts the swinging-page vertex speed cap. Shippable config
+(mound family, page-driven envelope, no knob): 3 mounds per outer
+page stepping in Z (depth, not X) — F 0.64/0.72/0.75,
+w 0.08/0.08/0.07, aRest 58/60/52 deg, zc −0.30/−0.02/0.26,
+ridgeLen ~0.16. A low rooftop line flanking the keep.
+
 ## Layer plan
 
 NEW:
@@ -112,7 +123,17 @@ NEW:
 - book/popup-keepwinch.ts — extends popup-knobtower: one disc
   (H4 'knob' grab kind, existing use-book-input channel) driving
   3 cammed output bodies. Release holds theta.
+- skyline mounds — reuse the existing mound poser (tabpiece mound
+  path / knobtower tierQuads), page-driven by the envelope, no
+  knob: a small 'skyline' layer or fold into the tabpiece family.
+  No new solver.
 - Loft die-cut arch walls = ART (per-face briefs), no mechanism.
+
+ART-BRIEF CORRECTION: the board's wing-rank ×3/side STAND entries
+are REMOVED. Replaced by (a) painted aerial-recession bands within
+the keep's upper back-wall faces (stepped rooflines, dusk-violet
+recession), and (b) skyline-mound ×3/side (STAND, low slate
+rooftops with amber windows, dusk-violet on the deepest).
 
 FATE LIST (mechanism-grounded):
 - ABSORB ch3-towers + ch3-rank → painted recession on keep back
