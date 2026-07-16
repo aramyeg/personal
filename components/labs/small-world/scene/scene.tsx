@@ -9,6 +9,8 @@ import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
 import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
+import { ChapterSet } from './props/chapter-set'
+import { BluenetSet } from './props/set-bluenet'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
 
@@ -47,7 +49,11 @@ function SceneContents({ progressRef }: SceneProps) {
       <ambientLight intensity={0.7} />
       {/* Warm raking key from upper-left — makes the toon ramp bands read as clay facets. */}
       <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
-      <Planet journeyRef={journeyRef} />
+      <Planet journeyRef={journeyRef}>
+        <ChapterSet index={0} journeyRef={journeyRef}>
+          <BluenetSet />
+        </ChapterSet>
+      </Planet>
       {hasArt('girl') ? (
         <Suspense fallback={<GirlProxy journeyRef={journeyRef} />}>
           <Girl journeyRef={journeyRef} />
