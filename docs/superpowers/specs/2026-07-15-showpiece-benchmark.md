@@ -30,15 +30,33 @@ E-G1 GOLDEN-BOARD DIFF (the anti-degradation gate)
   - Blessed set lineage: user-approved at phase boundaries; between
     boundaries the orchestrator blesses only strict improvements.
 
-E-G2 SIGHTLINE (the "book completes 3D space" law)
-  - From the reading camera at rest AND both parallax extremes:
-    no story-role piece FULLY or MOSTLY (>50%) hidden behind a
-    backdrop or another piece. HARD ZERO, no whitelist for the
-    fully-hidden class.
-  - Partial overlaps remain governed by the D-G7 whitelist.
-  - Automated check: [TBD-E0c: per-piece visibility technique the
-    sightline audit proves out — pixel-diff toggle or analytic
-    projection] wired as a bench script; runs per spread change.
+E-G2 SIGHTLINE (the "book completes 3D space" law) — RESOLVED by
+  E0c audit 2026-07-16
+  - Technique (proven, capture-verified): run the real pose solvers
+    in Node for true world-space geometry, sample each layer's own
+    surface on a fine screen grid, ray-cast from the reading camera
+    (book-scene EYE/LOOKAT) against all nearer layer quads. Measure
+    at rest + all 4 parallax-tilt extremes (±0.07/±0.11 rad).
+  - Classification (adopted from E0c): FULLY_HIDDEN >= 95%,
+    MOSTLY_HIDDEN > 50%, PARTIAL > 8% (D-G7 overlap floor), else
+    CLEAR.
+  - Gate: no STORY-role piece FULLY or MOSTLY hidden at rest —
+    HARD ZERO, no whitelist. Tilt-extreme-only crossings (> 50%
+    only at a parallax corner) are reviewed, not auto-failed.
+  - Partial overlaps remain governed by the D-G7 whitelist; stale
+    whitelist entries invalidated by measurement are removed (the
+    "ch2-hero x ch2-meadow depth-echo" entry is measured FALSE —
+    meadow is 100% hidden at rest).
+  - E0c measured debt (fix during E1/E2 rebuilds, worst first):
+    ch2-meadow 100% (story platform, invisible); ch6-strongbox
+    assembly 73–100% (box/crest/seal/coins behind ch6-fringe);
+    ch4-chest assembly 70–100% (behind ch4-foreground); plus
+    lower-priority scenery cases in the E0c table.
+  - CORRECTION to the charter: ch3-balcony is only 2.4% occluded —
+    its invisibility is CAMOUFLAGE (matching placeholder tint), an
+    E-G5 art-legibility case, not a sightline case.
+  - Full data: .superpowers/sdd/bench/out/e0/sightline/
+    (occlusion-raw.json, occlusion-table.tsv, annotated captures).
 
 E-G3 SCALE FLOORS (anti-debris)
   - Each spread's HERO/centerpiece: height >= [TBD-E1: fraction of
@@ -87,8 +105,12 @@ E-G6 COMPOSED INTERACTION (no lone planes)
 
 ## TBD ledger (fill before pinning)
 
-- [ ] E-G1 diff threshold (from E0d flake measurement)
-- [ ] E-G2 automated visibility technique (from E0c)
+- [ ] E-G1 diff threshold (from E0d flake measurement; interim
+      data: noise floor 0.039% on identical rest captures — dust
+      motes — vs 0.73% on a real piece move; awaiting per-station
+      worst-case across all spreads)
+- [x] E-G2 automated visibility technique (E0c: solver + screen-
+      grid ray-cast; thresholds 95/50/8; resolved 2026-07-16)
 - [ ] E-G3 hero fraction + min on-screen px (from E1 boards + E0a)
 - [ ] E-G4 frame-time numbers + artifact capture technique (E0b)
 - [ ] E-G5 pipeline floors per degrader (E0a)
