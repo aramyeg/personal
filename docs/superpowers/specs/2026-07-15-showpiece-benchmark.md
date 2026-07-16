@@ -62,9 +62,11 @@ E-G3 SCALE FLOORS (anti-debris)
   - Each spread's HERO/centerpiece: height >= [TBD-E1: fraction of
     backdrop height the approved boards establish; charter target
     "approaching backdrop height"] and footprint >= [TBD].
-  - Story-role pieces: minimum on-screen size at rest >= [TBD-E0a:
-    from the texel-density audit — the size below which painterly
-    art cannot read] px at reference viewport.
+  - Story-role pieces: minimum on-screen size at rest — E0a data
+    brackets the legibility floor: 115–215px long edge all fail,
+    >= 620px reads (1600px reference viewport). Proposed floor
+    ~300–400px CSS long edge; CONFIRM against the E1 boards before
+    pinning.
   - Dressing pieces exempt but counted: max [TBD] small pieces per
     spread (prune law).
 
@@ -80,13 +82,35 @@ E-G4 FRAME-TIME + ARTIFACT (crisp motion, his pinned bar)
     sequences [TBD-E0b: technique from the artifact profile] —
     any single anomalous frame is a failure.
 
-E-G5 ART FIDELITY (in-scene == generated)
+E-G5 ART FIDELITY (in-scene == generated) — RESOLVED by E0a audit
+  2026-07-16 (full ranked-degrader report:
+  .superpowers/sdd/bench/out/e0/art-fidelity/findings.md)
   - Side-by-side law: every painted piece's in-scene render must
     read as the same artwork as its source file — audited with the
     E0a side-by-side method at art integration time.
-  - Pipeline floors: [TBD-E0a: per-degrader — e.g. minimum texture
-    px per on-screen px, tone/material rules, no mirror-squeeze,
-    art aspect == mesh aspect within tolerance].
+  - Pipeline floors (from the measured degraders):
+    (a) art aspect == mesh aspect — hard rule (v-folds already
+        honor it and read well; failures were the squeezed family);
+    (b) tone rule: no ACES film tone-map on flat painted prints
+        (measured 17% luminance loss + desat on a full-res
+        aspect-true backdrop before any other degrader);
+    (c) no single-texture fold across a knee — every face of a
+        folded structure gets its own per-face art brief;
+    (d) art textures get max anisotropy (today: 1 vs 4 for
+        procedural — the most foreshortened pieces are least
+        filtered);
+    (e) texel floor: >= ~0.5 texture px per screen px (pieces at
+        7–11x minify all fail; <= 4x pass);
+    (f) FOLD_SHADE_TINT reserved for placeholder stock — painted
+        art never multiplied by the shade tint;
+    (g) camouflage check: no piece tinted within legibility range
+        of the neighbor it sits against (the ch3-balcony class —
+        geometrically visible, visually absent).
+  - OPEN BUG (fix wave, highest severity): knob-tier art loads
+    (manifest + disk + 200 fetch, wiring reads correct) but the
+    tier renders the kraft branch — runtime trace needed
+    (timing/dispose/strict-mode suspect). Orchestrator-verified
+    via edge-color branch test (gold tint.edge, not #f6eedb).
 
 E-G6 COMPOSED INTERACTION (no lone planes)
   - Every interactive moment moves >= 2 linked parts or produces
@@ -111,6 +135,9 @@ E-G6 COMPOSED INTERACTION (no lone planes)
       worst-case across all spreads)
 - [x] E-G2 automated visibility technique (E0c: solver + screen-
       grid ray-cast; thresholds 95/50/8; resolved 2026-07-16)
-- [ ] E-G3 hero fraction + min on-screen px (from E1 boards + E0a)
+- [~] E-G3 min on-screen px (E0a: bracketed 115–215 fail / 620
+      pass; proposed 300–400px — confirm vs E1 boards); hero
+      fraction still TBD-E1
 - [ ] E-G4 frame-time numbers + artifact capture technique (E0b)
-- [ ] E-G5 pipeline floors per degrader (E0a)
+- [x] E-G5 pipeline floors per degrader (E0a: resolved 2026-07-16;
+      knob-tier wiring bug filed for the fix wave)
