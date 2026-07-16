@@ -75,7 +75,13 @@ describe('storybook content', () => {
                               ? l.crankR
                               : l.mech === 'keepsake'
                                 ? l.cardL
-                                : l.width
+                                : l.mech === 'keepstack'
+                                  ? l.stories.length
+                                  : l.mech === 'keepwinch'
+                                    ? l.crankR
+                                    : l.mech === 'skyline'
+                                      ? l.mounds.length
+                                      : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

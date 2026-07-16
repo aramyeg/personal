@@ -14,6 +14,9 @@ import {
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
+import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
+import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { easeTurnWeighted, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
 import {
   heroForSpread,
@@ -37,7 +40,12 @@ import {
 // use (spreadDihedral incoming + easeTurnWeighted, symmetric bloom).
 
 const WOW_FLOOR = 0.35 * PAGE_H // 0.525 world units
-const STRIP_DRIVEN: ReadonlySet<string> = new Set(['tabpiece', 'stripflap'])
+// The interactive vocabulary exempt from the page-turn sweep floor (D-G8 "or
+// the piece is interactive"): tabpiece/stripflap were the FUTURE-interactive
+// pieces; keepwinch is the REALIZED hand-driven crank (the E-G6 composed
+// machine) — its signature moment is the twist-driven interaction, not a big
+// page-turn corner sweep, exactly the exemption's rationale.
+const STRIP_DRIVEN: ReadonlySet<string> = new Set(['tabpiece', 'stripflap', 'keepwinch'])
 
 /** Hero-family taxonomy — mirrors familyOf in composition-covenant.test.ts.
  *  The rotation and >= 6-families gates are stated over these families. */
@@ -106,6 +114,9 @@ const allQuads = (
   if (layer.mech === 'rotor')
     return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
+  if (layer.mech === 'keepstack') return keepStackQuads(layer, thetaL, thetaR)
+  if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
+  if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
   const pose = solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
   return [pose.right, pose.left]
 }

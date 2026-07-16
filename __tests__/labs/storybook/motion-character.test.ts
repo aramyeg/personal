@@ -17,6 +17,9 @@ import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/boo
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
+import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
+import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
+import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 
@@ -131,6 +134,13 @@ const allQuads = (
   // The keepsake's only page-driven pose is HOME (p=0), coplanar in its sleeve;
   // the pull/settle/return are the hand's own domain, not this dihedral gate.
   if (layer.mech === 'keepsake') return [keepsakeCardInPlane(layer, 0, thetaL, thetaR)]
+  // The keep (stacked box chain + balcony + raven) is fully page-driven.
+  if (layer.mech === 'keepstack') return keepStackQuads(layer, thetaL, thetaR)
+  // The winch's autonomous (page-driven) motion is the envelope collapse at a
+  // FROZEN twist; the twist is user-paced (cap-exempt). Pose at full erect
+  // (THETA_MAX) — the worst envelope amplitude. Disc excluded (coplanar handle).
+  if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
+  if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -259,6 +269,15 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // GLOBAL_CAP holds it ~77% clear (satchel-astrolabe's real-time step 0.0114,
   // the early-rise cam parking the fast spin at the slow eased ease-in).
   rotor: 2.0,
+  // KEEP-WINCH (E1 showpiece): one crank driving three staggered outputs. Its
+  // per-corner MEAN is low — the iris blades and counterweight barely travel —
+  // while the TALL semaphore arm (baseX 0.9, armLen 0.16, tip ~1.06 from the
+  // spine) swings through the envelope's late-rise, so the max/mean ratio runs
+  // high (measured 8.86x, ch3-keep-winch) the same way the kinetic arm's static
+  // apex raises its ratio. Smooth, monotone, C1 — the bench (derive-keep-winch
+  // N2) proves every output cam has bounded slope (no snap); its real bound is
+  // Gate 2's absolute cap, which N7 holds ~88% clear. Measured 8.86x + ~10%.
+  keepwinch: 9.8,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

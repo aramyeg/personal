@@ -49,14 +49,10 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
   })
 
   it('children of near-flat wall parents stand upright — no flip', () => {
-    // User-verified upright: bees on the alpine ridge, ravens and the
-    // balcony on the citadel walls.
-    for (const [spread, id] of [
-      [3, 'ch2-bee-a'],
-      [4, 'ch3-balcony'],
-      [4, 'ch3-raven-a'],
-      [4, 'ch3-raven-b'],
-    ] as const) {
+    // User-verified upright: bees on the alpine ridge. (The ch3 rookery
+    // children — the balcony and its ravens — retired in the E1 keep rebuild;
+    // the near-flat-wall upright case is now carried by the alpine bee.)
+    for (const [spread, id] of [[3, 'ch2-bee-a']] as const) {
       const { layer, parent } = byId(layersOf(spread), id)
       expect(dieFlipped(layer, parent), id).toBe(false)
     }

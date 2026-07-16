@@ -62,6 +62,31 @@ function knownGoodIds(): ReadonlySet<string> {
       ids.add(`${layer.id}-disc`)
       layer.tiers.forEach((_, i) => ids.add(`${layer.id}-tier${i}`))
     }
+    // The dispatch keep (popup-keepstack-layer.tsx): each story renders through
+    // a box instance as `<id>-<key>-side/-front/-back/-top` (same box FACE_ART
+    // gating), plus the balcony deck and the crown raven.
+    if (layer.mech === 'keepstack') {
+      for (const s of layer.stories) {
+        ids.add(`${layer.id}-${s.key}-side`)
+        if (s.capFront ?? true) ids.add(`${layer.id}-${s.key}-front`)
+        if (s.capBack ?? true) ids.add(`${layer.id}-${s.key}-back`)
+        if (s.roof !== 'open') ids.add(`${layer.id}-${s.key}-top`)
+      }
+      if (layer.balcony) ids.add(`${layer.id}-balcony`)
+      if (layer.raven) ids.add(`${layer.id}-raven`)
+    }
+    // The tower-hoist winch (popup-keepwinch-layer.tsx): the disc handle plus
+    // the three output bodies.
+    if (layer.mech === 'keepwinch') {
+      ids.add(`${layer.id}-disc`)
+      ids.add(`${layer.id}-semaphore`)
+      ids.add(`${layer.id}-iris`)
+      ids.add(`${layer.id}-counterweight`)
+    }
+    // The skyline (popup-skyline-layer.tsx): one art per rooftop mound.
+    if (layer.mech === 'skyline') {
+      layer.mounds.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
+    }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
   // use-page-print.ts, satchel-items.ts's HTML-overlay icons).
@@ -141,6 +166,22 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
       if (layer.mech === 'knobtower') {
         constructed.push(`${layer.id}-disc`)
         layer.tiers.forEach((_, i) => constructed.push(`${layer.id}-tier${i}`))
+      }
+      if (layer.mech === 'keepstack') {
+        for (const s of layer.stories) {
+          constructed.push(`${layer.id}-${s.key}-side`)
+          if (s.capFront ?? true) constructed.push(`${layer.id}-${s.key}-front`)
+          if (s.capBack ?? true) constructed.push(`${layer.id}-${s.key}-back`)
+          if (s.roof !== 'open') constructed.push(`${layer.id}-${s.key}-top`)
+        }
+        if (layer.balcony) constructed.push(`${layer.id}-balcony`)
+        if (layer.raven) constructed.push(`${layer.id}-raven`)
+      }
+      if (layer.mech === 'keepwinch') {
+        constructed.push(`${layer.id}-disc`, `${layer.id}-semaphore`, `${layer.id}-iris`, `${layer.id}-counterweight`)
+      }
+      if (layer.mech === 'skyline') {
+        layer.mounds.forEach((_, i) => constructed.push(`${layer.id}-mound${i}`))
       }
     }
     const missing = constructed.filter((key) => !doc.includes(`\`${key}\``))

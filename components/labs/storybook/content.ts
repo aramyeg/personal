@@ -82,6 +82,17 @@ export type Chapter = {
    *  (tabpiece/stripflap — the future-interactive vocabulary). Enforced by
    *  __tests__/labs/storybook/hero-wow.test.ts. */
   hero: string
+  /** SHOWPIECE (Part E, charter 2026-07-14 pillar E-P2 "prune the crowds:
+   *  fewer, larger, distinct structures... variety survives at the BOOK level,
+   *  not by piling mechanisms per spread"): a grand-architecture spread built as
+   *  ONE near-backdrop structure rather than the D-series per-chapter template.
+   *  A declared marker (not a spread-index literal) so the covenant tests exempt
+   *  it from the crowd-template gates — the platform-per-chapter, the depth-band
+   *  ratchet, the art-overlap coverage floor — while every physics/quality gate
+   *  (D-G2 collision, real-time, sightline, golden) stays hard everywhere. Set on
+   *  the E1 pilot (the Dispatch Keep) and extends to the E2 grand chapter by
+   *  setting this flag, no test edit. */
+  showpiece?: boolean
 }
 
 export const SPREAD_COUNT = 10
@@ -194,70 +205,87 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-windmill', kind: 'midground', role: 'scenery', mech: 'kinetic', apexZ: 0.2, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.12, armLen: 0.3, flapW: 0.14, flapLen: 0.18 },
 ]
 
-// Chapter III — the rookery: the great tower now carries a dispatch
-// BALCONY jutting off its fold at mid-height with a raven perched above it
-// (one compound multi-story piece), a second rank of towers with its own
-// raven, and the dispatch counter tented off-center toward the right page.
+// Chapter III — THE DISPATCH KEEP (E1 pilot showpiece; derivation
+// docs/superpowers/specs/2026-07-16-dispatch-keep-derivation.md, five bench
+// proofs derive-keep-{stack,gallery,winch,skyline,wings}.mjs). The old rookery
+// crowd (ch3-towers/rank/balcony/counter+dress/sorting/towerworks/semaphore/
+// perch-raven/raven-b) is retired PER THE FATE LIST into ONE grand structure:
+// a hollow grey-stone keep rising four stacked box-fold stories out of the
+// spine to backdrop height (~0.84) — Dispatch Hall (hollow, open front) ->
+// Balcony Gallery (open arcade, gold balcony cantilevering toward the reader)
+// -> Rookery Loft (open belfry) -> Signal-Spire crown — with an interactive
+// tower-hoist winch driving semaphore/iris/counterweight, a low mound skyline
+// flanking it, and the kept fore wall. The reset's E-P2 "prune the crowds":
+// fewer, larger, distinct structures; variety lives at the BOOK level. The old
+// wing-rank v-folds become PAINTED aerial recession on the keep's own back
+// walls (art, not mechanism — see the art call sheet). ch3-raven-a is kept as
+// the hero raven, folded onto the crown (its child-v-fold parent retired, and
+// nothing external can parent onto the one-entry keep).
 const CH3_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch3-towers', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.38, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.5, creaseU: 0.34, width: 1.5, height: 0.84 },
-  // deeper V than the ravens so it juts clear of the facade; the scalloped
-  // 'foreground' painter reads as its railing until real art lands
-  { id: 'ch3-balcony', kind: 'foreground', role: 'scenery', mech: 'child', parentId: 'ch3-towers', mount: 0.44, vDir: 1, phiDeg: 52, rhoDeg: 78, width: 0.3, height: 0.36 },
-  { id: 'ch3-raven-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-towers', mount: 0.76, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.113 },
-  // D5 arm-lane pass: the second tower rank was lowered (height 0.67 -> 0.52) so
-  // the tower rows step down front-to-back — and, load-bearing for the gate, a
-  // shorter rank sweeps a smaller arc, dropping its mid-turn crossings with the
-  // counter/sorting AND clearing the fore-edge signal mast's backward sweep.
-  { id: 'ch3-rank', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.06, vDir: -1, phiDeg: 82, rhoDeg: 88.5, skewDeg: -1.5, creaseU: 0.64, width: 1.3, height: 0.52 },
-  { id: 'ch3-raven-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch3-rank', mount: 0.34, vDir: 1, phiDeg: 66, rhoDeg: 86, width: 0.11, height: 0.245 },
-  // VOLUMETRIC: the dispatch counter is a lidded flat-top box — a real
-  // desk with a painted writing top and a camera-facing front. D5 arm-lane
-  // pass: shrunk to a more compact desk (z 0.36..0.52, was 0.26..0.58; height
-  // 0.17, was 0.2) so it sweeps less over the rank/sorting and so the fore-edge
-  // signal mast standing just downstage of it clears it, rest and mid-turn.
-  { id: 'ch3-counter', kind: 'backdrop', role: 'story', mech: 'box', a: 0.16, height: 0.16, z0: 0.38, z1: 0.52, roof: 'flat' },
-  // RECURSION (C4v2): a raven standing ON the dispatch counter's lid — a
-  // rider v-fold whose "pages" are the box's lid patch pair.
-  { id: 'ch3-perch-raven', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch3-counter', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.1, height: 0.09 },
-  // Dress on the counter: stacked ledgers overhanging the lid edge, a weigh-scale on the front cap.
-  { id: 'ch3-counter-ledgers', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch3-counter', seat: 'lidR', u: 0.1, v: 0.11, width: 0.12, height: 0.1 },
-  { id: 'ch3-counter-scale', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch3-counter', seat: 'capFrontL', u: 0.04, v: 0.05, width: 0.09, height: 0.1 },
-  // FLOATING TIER (C3v2): the parcel-sorting deck — a BRIDGE platform like
-  // the coaching yard but tucked in toward the spine.
-  { id: 'ch3-sorting', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.16, glueR: 0.11, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, strutB: { glueL: 0.11, glueR: 0.16, rise: 0.13, spans: [[0.05, 0.11], [0.14, 0.2]] }, qA: 0.1, qB: 0.1, deckZ0: 0.05, deckZ1: 0.2 },
-  // KNOB-TWIST TOWER (D6 "THE HAND", the book's first user-driven crank; solver
-  // in book/popup-knobtower.ts, derived in bench/derive-knobtower.mjs): the
-  // citadel's TOWER-HOIST — a die-cut winch knob riveted flat into the LEFT
-  // page (the coplanar rotor grammar) that the reader TWISTS to wind a hidden
-  // paper crank, erecting a staggered rank of siege-tower tiers in the dispatch
-  // yard ("raising the towers" — the rookery's own theme). The disc "remembers"
-  // the twist through page turns; every tier folds dead flat at book-close.
-  //   PLACEMENT (probed against the D-G2 station sweeps + A9/user-scrub, NOT
-  // trial-and-error): spread 4 is the book's densest, and the RECOMMENDED
-  // 3-tier footprint (run 0.856) has no clean home here — its lowest tier and
-  // its wider fore hinge are swept by ch3-rank (the second tower rank) across
-  // the left-page mid-z lane through the turn (a hand-tuned counter-cleared
-  // 3-tier still measured 5 mid-turn scissors). So it ships as the bench's
-  // 2-TIER FALLBACK in the one clean pocket the rookery has: the LEFT page,
-  // high-z lane (tier z-bands 0.37..0.49 and 0.51..0.63 — above the backdrops'
-  // reach), with the disc pulled out to hubD 0.38 so its coplanar footprint
-  // clears the spine-hugging counter/sorting/semaphore (all x in ~[-0.16,0.16]).
-  // Contributes ZERO illegal crossings at every station (rest / near-rest /
-  // mid-turn / the whole user twist scrub / A9), keeps the spread at 7 depth
-  // bands, folds flat and stays inside the page. crankR = discR = 0.15 (the pin
-  // rides the disc rim); THETA_MAX 140deg — one comfortable winding drag.
-  { id: 'ch3-towerworks', kind: 'foreground', role: 'scenery', mech: 'knobtower', side: 'left', hubD: 0.38, hubZ: 0.5, discR: 0.15, crankR: 0.15, foreHingeD: 0.85, tiers: [{ w: 0.1, aRestDeg: 72, zc: 0.43, ridgeLen: 0.12 }, { w: 0.12, aRestDeg: 78, zc: 0.57, ridgeLen: 0.12 }] },
-  // KINETIC (D4/D5): the dispatch tower's SEMAPHORE ARM — Birmingham mech 73,
-  // a 45-deg double-triangle astride the spine whose signal arm sweeps a
-  // quarter-turn from horizontal to vertical as the book opens (the tower
-  // "raising the signal" for the raven post). D5 arm-lane pass moved it from the
-  // deep upstage park to the one clear lane the rookery has: the FORE EDGE
-  // (apexZ 0.64, vDir +1), where it stands as a tall signal mast at the front
-  // of the dispatch yard, unoccluded, rising well over the (now compact)
-  // counter — the spread's wow moment. As the page opens it sweeps up from
-  // lying back over the yard to vertical. The lower rank + shrunk counter above
-  // return the mid-turn budget its backward sweep spends (net count DROPS).
-  { id: 'ch3-semaphore', kind: 'foreground', role: 'scenery', mech: 'kinetic', apexZ: 0.64, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.11, armLen: 0.3, flapW: 0.13, flapLen: 0.16 },
+  // THE KEEP — one content entry expanding to four stacked box poses
+  // (popup-keepstack.ts), each rendered through the existing box renderer. The
+  // stories telescope inward (a_k <= a_{k-1}) and nest in z, so the whole stack
+  // is one rigid chain geared to the single page dihedral and folds dead flat
+  // at close. The balcony deck rides the hall's flat lid overhanging +z (the
+  // board's jutting gold gallery, derive-keep-gallery.mjs), and the hero raven
+  // perches on the crown.
+  {
+    id: 'ch3-keep', kind: 'backdrop', role: 'story', mech: 'keepstack',
+    stories: [
+      // Dispatch Hall — hollow, open arched mouth (capFront:false) the reading
+      // camera looks into; back cap braces, flat lid seats the gallery.
+      { key: 'hall', a: 0.3, height: 0.26, z0: -0.26, z1: 0.26, roof: 'flat', capFront: false, capBack: true },
+      // Balcony Gallery — open arcaded loggia (capFront:false); flat lid seats
+      // the loft.
+      { key: 'gallery', a: 0.26, height: 0.22, z0: -0.22, z1: 0.22, roof: 'flat', capFront: false, capBack: true },
+      // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
+      // see-through belfry); flat cap slab seats the crown.
+      { key: 'loft', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true },
+      // Signal-Spire crown — a small gabled spire; top world-Y ~0.84.
+      { key: 'crown', a: 0.11, height: 0.1, z0: -0.11, z1: 0.11, roof: 'gable', gableRise: 0.08, capFront: true, capBack: true },
+    ],
+    balcony: { halfW: 0.17, z0: 0.24, z1: 0.44 },
+    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.18, height: 0.12 },
+  },
+  // THE SKYLINE — 3 low mounds per outer page (derive-keep-skyline.mjs), a
+  // jagged rooftop line stepping in Z, page-driven by the fold-flat envelope
+  // (no knob). Fore-hinge band F in [0.64, 0.75] clears the keep's mid-fold
+  // sweep and holds the swinging-page vertex-speed cap. The flanking citadel.
+  { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
+    { F: 0.64, w: 0.08, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.08, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.07, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+  ] },
+  { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
+    { F: 0.64, w: 0.08, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.08, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.07, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+  ] },
+  // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
+  // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
+  // discR = crankR = 0.13, pin on the rim) that the reader TWISTS; a Scotch-yoke
+  // crank drives THREE staggered outputs in sequence off one drag — the
+  // semaphore paddle up (engages 0deg), the roost-mouth shutters ajar around the
+  // loft (55deg), the counterweight sash-weight descending the hall flank (81deg).
+  // THETA_MAX 112.6deg, one comfortable winding drag; release HOLDS the twist
+  // (H4, the disc remembers). RIGID-FOLD re-derivation (2026-07-16): the iris is
+  // 4 shutters hinged on the loft walls (off-wall reach 0.10*sin(deploy)*E ->0 at
+  // close, riding the folding wall), and the counterweight is an IN-PLANE
+  // SASH-WEIGHT that descends WITHIN the hall flank-wall plane (zero off-wall
+  // reach — winding-insensitive and always wedge-contained; bench N8). Both fold
+  // flat with the folding keep walls. The two `host` boxes MUST match the keep's
+  // loft + hall stories (asserted by the winch test).
+  {
+    id: 'ch3-keep-winch', kind: 'hero', role: 'scenery', mech: 'keepwinch', side: 'left',
+    hubD: 0.34, hubZ: 0.3, discR: 0.13, crankR: 0.13,
+    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.16, armHalfW: 0.015 },
+    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
+    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.3, height: 0.26, z0: -0.26, z1: 0.26, roof: 'flat', capFront: false, capBack: true, baseH: 0 } },
+  },
+  // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
+  // v-fold at the fore edge — the spread's nearest plane, its scalloped painter
+  // reading as the yard's front wall until real art lands.
+  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):
@@ -421,7 +449,15 @@ export const CHAPTERS: readonly Chapter[] = [
       "In the grey citadel of Berlin stood a rookery of unusual size. Four billion ravens passed through its towers, each bearing a message, and fifty thousand merchant houses trusted them with their words. The hero — for so we may now call him — was set over the great dispatch boards, and he wrought them so well that the sky itself seemed orderly.",
     accents: ['#5a6470', '#2b2d33', '#6f5a7d', '#d98e3f'],
     layers: CH3_LAYERS,
-    hero: 'ch3-towers', // vfold, sweep 1.64 — the great rookery towers
+    showpiece: true, // E1 pilot — the Dispatch Keep (one grand structure)
+    // D-G1/D-G8 signature MOTION moment = the interactive tower-hoist winch (the
+    // E-G6 composed-machine, the board's "launch moment"): one twist drives three
+    // staggered outputs. The keep is the E-G3 near-backdrop CENTERPIECE (a
+    // separate visual gate), but a spine-centered structure rises rigidly rather
+    // than swinging out, so the winch's interactive drive is the declared hero —
+    // exempt from the page-turn sweep floor like the rest of the hand-driven
+    // vocabulary (D-G8 "or the piece is interactive").
+    hero: 'ch3-keep-winch',
   },
   {
     spread: 5,

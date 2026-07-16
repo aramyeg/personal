@@ -89,6 +89,14 @@ import { INTERIOR_SHEETS, PAGE_W, SHEET_STACK_T, restAngles } from './page-geome
 // + parallelogram back — both defined below and used only at call time, so
 // the cycle is inert at module-eval (ESM live bindings).
 import { solveKineticArmPose } from './popup-kinetic'
+// The E1 showpiece mechs (dispatch keep) define their geoms in their own
+// solver modules; imported TYPE-ONLY here for the LayerGeom union, so there is
+// no runtime cycle (popup-keepstack requires solveBoxPose from this file, not
+// the reverse). Their solvers are multi-patch / user-driven and route through
+// their own layer renderers, exactly like box/knobtower.
+import type { KeepStackGeom } from './popup-keepstack'
+import type { KeepWinchGeom } from './popup-keepwinch'
+import type { KeepSkylineGeom } from './popup-skyline'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -185,6 +193,13 @@ export type BoxGeom = {
    *  on: the caps are what brace the walls (default both true). */
   capFront?: boolean
   capBack?: boolean
+  /** Cumulative height of the stories BENEATH this box when it is one story
+   *  of a stacked keep (popup-keepstack.ts): the whole bisector-x is offset
+   *  by baseH so the box's wall glue seats ON the lower story's flat lid at
+   *  lid-distance a (telescoping a_k <= a_{k-1}). Default 0 = a ground box.
+   *  Folds dead flat at book-closed regardless (the offset is along bisector-x,
+   *  which collapses to the page plane as beta -> 0). */
+  baseH?: number
 }
 
 export type PlatformStrut = {
@@ -529,6 +544,9 @@ export type LayerGeom =
   | RotorGeom
   | KnobTowerGeom
   | KeepsakeGeom
+  | KeepStackGeom
+  | KeepWinchGeom
+  | KeepSkylineGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -836,8 +854,13 @@ export function solveBoxPose(geom: BoxGeom, thetaL: number, thetaR: number): rea
   const { a, height: H, z0, z1 } = geom
   const capFront = geom.capFront ?? true
   const capBack = geom.capBack ?? true
-  // Bisector frame -> world: X along the bisector, rotated by m about Z.
-  const W = (x: number, y: number, z: number): Vec3 => [x * cm - y * sm, x * sm + y * cm, z]
+  const baseH = geom.baseH ?? 0
+  // Bisector frame -> world: X along the bisector (offset by baseH so a
+  // stacked story seats on the lower lid), rotated by m about Z.
+  const W = (x: number, y: number, z: number): Vec3 => {
+    const X = x + baseH
+    return [X * cm - y * sm, X * sm + y * cm, z]
+  }
 
   const patches: BoxPatch[] = [
     { face: 'wallL', quad: [W(a * ch, a * sh, z0), W(a * ch, a * sh, z1), W(a * ch + H, a * sh, z1), W(a * ch + H, a * sh, z0)] },
@@ -1032,6 +1055,12 @@ export function solveLayerPose(
       throw new Error('storybook: knob-tower layers are multi-patch + user-driven — use solveKnobTowerPose (popup-knobtower)')
     case 'keepsake':
       throw new Error('storybook: keepsake layers are removable + trajectory-driven — use keepsakeCardInPlane (popup-keepsake)')
+    case 'keepstack':
+      throw new Error('storybook: keepstack layers expand to N stacked box poses — use solveKeepStackPose (popup-keepstack)')
+    case 'keepwinch':
+      throw new Error('storybook: keepwinch layers are multi-output + user-driven — use solveKeepWinchPose (popup-keepwinch)')
+    case 'skyline':
+      throw new Error('storybook: skyline layers are multi-mound — use solveKeepSkylinePose (popup-skyline)')
   }
 }
 

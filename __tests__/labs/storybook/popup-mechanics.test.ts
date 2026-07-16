@@ -41,6 +41,9 @@ import {
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
+import { keepStackQuads, keepStackStoryGeoms } from '@/components/labs/storybook/book/popup-keepstack'
+import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
+import { keepSkylineQuads, solveKeepSkylinePose } from '@/components/labs/storybook/book/popup-skyline'
 import {
   keepsakeCardInPlane,
   keepsakePExit,
@@ -133,6 +136,12 @@ const allQuads = (
   // popup-keepsake.test.ts), so the dihedral-only A-suite sees only the resting
   // in-sleeve card.
   if (layer.mech === 'keepsake') return [keepsakeCardInPlane(layer, 0, thetaL, thetaR)]
+  // The keep expands to four stacked box poses + balcony + raven; the winch's
+  // dihedral-only footprint is its outputs at full erect (disc excluded); the
+  // skyline is its mound rows.
+  if (layer.mech === 'keepstack') return keepStackQuads(layer, thetaL, thetaR)
+  if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
+  if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -178,6 +187,11 @@ const flatTol = (layer: SceneLayer): number => {
   // but its riveted disc sits one glue layer (ROTOR_LIFT 0.003) proud like a
   // rotor, so it flattens to that tolerance.
   if (layer.mech === 'knobtower') return 0.004
+  // The winch's outputs fold flat riding folding keep walls (off-wall reach ~
+  // sin(deploy)*E(beta) -> 0), but the semaphore lies along the fold-invariant
+  // spine axis leaving a paper-thickness residual (0.015) — the bench's N4
+  // FLAT_TOL exactly (derive-keep-winch.mjs), same rationale as the knob disc.
+  if (layer.mech === 'keepwinch') return 0.02
   // Tab pieces close through an exact cam zero (a = 0 at beta = 0).
   return 1e-9 // symmetric v-folds, boxes, tab pieces: analytically exact
 }
@@ -221,14 +235,18 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'dress' ||
         layer.mech === 'rotor' ||
         layer.mech === 'knobtower' ||
-        layer.mech === 'keepsake'
+        layer.mech === 'keepsake' ||
+        layer.mech === 'keepstack' ||
+        layer.mech === 'keepwinch' ||
+        layer.mech === 'skyline'
       ) {
         // Anatomy-phase and hand-driven mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
         // rider mount rule, dress seat existence, rotor cam + fit), the
         // composition covenant (rotor spin cap / seat legality; knob-tower
         // stroke + run-band + z-band rules; keepsake sleeve/slit/seat rules), and
-        // popup-knobtower.test.ts / popup-keepsake.test.ts.
+        // the E1 showpiece test files (popup-keepstack/-keepwinch/-skyline.test.ts:
+        // telescoping + glue chain, crank + stagger + D-G2 scrub, mound band).
         return
       }
       if (layer.mech === 'stripflap') {
@@ -411,6 +429,42 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
           }
+          continue
+        }
+        if (layer.mech === 'keepstack') {
+          // Only the GROUND story straddles the pages; the upper stories glue to
+          // the lower story's LID (the hoist chain), not the pages — so A1's
+          // page-glue check applies to the ground story alone. The lid-chain
+          // coherence is the stronger gate, proven in popup-keepstack.test.ts
+          // (S3: every upper wall stays glued on the lower lid, gap ~ 1e-9).
+          const ground = keepStackStoryGeoms(layer).find((g) => (g.baseH ?? 0) === 0)
+          if (ground) {
+            for (const { face, quad } of solveBoxPose(ground, thetaL, thetaR)) {
+              const n = face === 'wallL' ? nL : face === 'wallR' ? nR : null
+              if (!n) continue
+              for (const p of [quad[0], quad[1]]) {
+                expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+              }
+            }
+          }
+          continue
+        }
+        if (layer.mech === 'skyline') {
+          // one-page mound rows: each mound's inner/fore hinge sits on its page
+          // (the tab-piece/knob-tier base pattern).
+          const n = layer.side === 'left' ? nL : nR
+          for (const patch of solveKeepSkylinePose(layer, thetaL, thetaR)) {
+            for (const p of [patch.slopeIn[0], patch.slopeIn[1], patch.slopeOut[2], patch.slopeOut[3]]) {
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+            }
+          }
+          continue
+        }
+        if (layer.mech === 'keepwinch') {
+          // The winch outputs ride the KEEP's bisector frame (a mounted machine),
+          // and the disc rivets one glue layer proud of the page — neither is a
+          // page-glued fold panel, so A1's page-glue coherence does not apply
+          // (its fold-flat is checked in A3 / popup-keepwinch.test.ts).
           continue
         }
         const pose = poseAt(layer, layers, thetaL, thetaR)
@@ -851,6 +905,20 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
   const gluedOf = (layers: readonly SceneLayer[]): Set<string> => {
     const glued = new Set<string>()
     layers.forEach((l, idx) => {
+      if (l.mech === 'keepwinch') {
+        // The tower-hoist winch's roost-mouth shutters hinge on the keep's loft
+        // walls and its counterweight panel on the hall flank — GLUED joints
+        // (the same rule as a rider on a box), so the keep/winch pair is a
+        // composed assembly, not a scissor. Its winch-vs-keep collision is the
+        // bench's domain (derive-keep-winch.mjs N6, which excludes each body's
+        // host surface exactly like this).
+        const k = layers.findIndex((c) => c.mech === 'keepstack')
+        if (k >= 0) {
+          glued.add(`${idx}:${k}`)
+          glued.add(`${k}:${idx}`)
+        }
+        return
+      }
       if (l.mech !== 'child' && l.mech !== 'rider' && l.mech !== 'dress' && l.mech !== 'rotor') return
       const p = layers.findIndex((c) => c.id === l.parentId)
       glued.add(`${idx}:${p}`)
@@ -1068,6 +1136,13 @@ describe('D-G2 user domain — zero illegal crossings across the whole drive scr
 })
 
 describe('A10 wedge containment — paper never pokes through either bounding page', () => {
+  // This IS the book-wide, REUSABLE mid-turn wedge-containment gate (the app
+  // side of the winch bench's N8): it sweeps EVERY layer's corners across both
+  // turn roles, posing each user-drivable rider at its worst drive (allQuads
+  // poses knobtower/keepwinch at THETA_MAX). Any future keep-mounted or page-
+  // rooted rider that deploys laterally is caught here automatically — the E1
+  // winch's mid-turn dip (the counterweight's forbidden down-swing/swing-out)
+  // was found by exactly this gate. Not winch-specific by construction.
   it('every corner stays inside its spread dihedral wedge through both turn roles', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
       for (const role of ['outgoing', 'incoming'] as const) {

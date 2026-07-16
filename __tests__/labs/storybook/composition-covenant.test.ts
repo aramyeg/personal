@@ -133,10 +133,21 @@ const familyOf = (l: SceneLayer): string | null => {
     case 'kinetic':
     case 'rotor':
     case 'knobtower':
+    case 'keepwinch':
       // The rotor is the kinetic family's SECOND form (a spinning disc rather
       // than a sweeping arm); the knob-tower is its USER-DRIVEN third form (a
-      // hand-twisted crank) — all page/hand-driven image-animating folds.
+      // hand-twisted crank); the keep-winch is its composed fourth form (one
+      // crank driving three staggered outputs) — all page/hand-driven
+      // image-animating folds.
       return 'kinetic'
+    case 'keepstack':
+      // The dispatch keep — four stacked box-fold stories rising as one rigid
+      // chain: an inherent multi-story assembly, its own showpiece family.
+      return 'keepstack'
+    case 'skyline':
+      // A row of page-driven rooftop mounds (the tab-piece/knob-tier cross-
+      // section without a knob) — its own low-scenery family.
+      return 'skyline'
     case 'dress':
       return null
   }
@@ -166,7 +177,7 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     for (const [name, layers] of ALL_SETS) {
       for (const layer of layers) {
         if (layer.role !== 'story') continue
-        if (layer.mech === 'platform' || layer.mech === 'fan') continue // inherent assemblies
+        if (layer.mech === 'platform' || layer.mech === 'fan' || layer.mech === 'keepstack') continue // inherent assemblies
         if (layer.mech === 'vfold' || layer.mech === 'box') {
           const dresses = dressTargeting(layer.id, layers)
           expect(
@@ -223,8 +234,22 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     }
   })
 
-  it('the floating-tier gate: every chapter spread ships >= 1 platform (C3v2 structural half)', () => {
+  it('the floating-tier gate: every non-showpiece chapter spread ships >= 1 platform (C3v2 structural half)', () => {
+    // SHOWPIECE EXEMPTION (E1 reset, charter 2026-07-14 pillar E-P2 "prune the
+    // crowds: fewer, larger, distinct structures beat many small pieces;
+    // variety survives at the BOOK level, not by piling mechanisms per
+    // spread"): the pilot showpiece spread (4, the dispatch keep) is ONE grand
+    // multi-story structure, not a per-chapter template of {box, platform,
+    // fan, ...}. Its floating-tier depth is carried inside the keep (the
+    // cantilevered balcony deck riding the hall lid) and judged by the E-gates
+    // (E-G2 sightline, E-G3 scale, golden boards), not by a separate platform
+    // piece. Every OTHER chapter still ships its platform. This exemption
+    // relaxes a D-series template covenant per the fate list; it does NOT
+    // weaken any physics/quality gate (D-G2 collision, real-time, sightline
+    // stay hard). Keyed to the declared `showpiece` marker (not a spread index)
+    // so it extends to the E2 grand chapter with no test edit.
     for (const chapter of CHAPTERS) {
+      if (chapter.showpiece) continue
       expect(
         chapter.layers.some((l) => l.mech === 'platform'),
         `spread ${chapter.spread} has no floating platform`

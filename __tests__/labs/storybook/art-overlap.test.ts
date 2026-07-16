@@ -20,6 +20,9 @@ import {
 import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveKineticArmPose } from '@/components/labs/storybook/book/popup-kinetic'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
+import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
+import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 
 // D-G7 ART & OVERLAP whitelist gate, second half (benchmark spec
 // docs/superpowers/specs/2026-07-13-grand-book-benchmark.md): "Screen-space
@@ -132,6 +135,12 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       const pose = solveKineticArmPose(l, tL, tR)
       return [pose.right, pose.left]
     }
+    case 'keepstack':
+      return keepStackQuads(l, tL, tR)
+    case 'keepwinch':
+      return keepWinchOutputQuads(l, keepWinchThetaMax(l), tL, tR)
+    case 'skyline':
+      return keepSkylineQuads(l, tL, tR)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }
@@ -367,9 +376,18 @@ describe('D-G7 art overlap whitelist — story/figure pieces at their chapter re
     console.table(OVERLAP_ROWS)
     // Sanity floor on the gate's own coverage: every chapter must contribute
     // at least one checked pair, or the role/glue filters have gone stale
-    // and are silently checking nothing.
+    // and are silently checking nothing. SHOWPIECE EXEMPTION (E1 reset, charter
+    // E-P2 "prune the crowds"): spread 4 is ONE grand story piece (the dispatch
+    // keep) — there is no second art-carrying story/figure piece to pair it
+    // with, so it contributes no overlap pair by design. Its internal
+    // composition is judged by E-G2 sightline, not this inter-piece whitelist.
+    // Keyed to the declared `showpiece` marker (not a spread index) so it
+    // extends to the E2 grand chapter with no test edit.
     const spreadsCovered = new Set(OVERLAP_ROWS.map((r) => r.spread))
-    expect(spreadsCovered.size, 'chapters with >= 1 checked pair').toBe(CHAPTERS.length)
+    for (const c of CHAPTERS) {
+      if (c.showpiece) continue
+      expect(spreadsCovered.has(c.spread), `chapter ${c.spread} has no checked pair`).toBe(true)
+    }
   })
 
   it.each(OVERLAP_ROWS.map((r) => [`spread ${r.spread}: ${r.pair}`, r] as const))(

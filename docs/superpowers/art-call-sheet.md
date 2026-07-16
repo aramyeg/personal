@@ -197,22 +197,46 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `ch2-fringe` | `ch2-fringe` | Painted meadow fringe at the very front edge | ≈5.45:1 very wide | STAND | placeholder |
 | `ch2-windmill` | `ch2-windmill` | Windmill sail standing in the meadow, just downstage of the courier hero, sweeps to vertical as the book opens | combined ≈0.80:1 portrait-ish (arm dominates; see §1.6 caveat below) | STAND (kinetic) | placeholder — **moved from the deep-upstage park to a visible downstage lane (2026-07-13, in-flight composition pass); geometry above is current as of verification but may still be tuning — recheck `armLen`/`apexZ` before painting if this row looks stale** |
 
-## 4. Chapter III — The Rookery of Four Billion Ravens (spread 4)
+## 4. Chapter III — The Rookery of Four Billion Ravens · THE DISPATCH KEEP (spread 4)
 
-| Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
+The E1 PILOT SHOWPIECE (derivation `docs/superpowers/specs/2026-07-16-dispatch-keep-derivation.md`).
+ONE grand structure replaces the old rookery crowd (`ch3-towers`/`ch3-rank`/`ch3-balcony`/
+`ch3-counter`+dress/`ch3-sorting`/`ch3-towerworks`/`ch3-semaphore`/`ch3-perch-raven`/`ch3-raven-b`
+all retired per the fate list): a four-story keep (`ch3-keep`, expanding to four stacked box
+poses through the box renderer), a jutting gold balcony, the kept hero raven folded onto the
+crown, an interactive tower-hoist winch (`ch3-keep-winch`), a flanking mound skyline
+(`ch3-skyline-l` / `ch3-skyline-r`), and the kept fore wall (`ch3-fringe`). The old wing-rank
+stage-set flats are GONE: the citadel canyon is PAINTED aerial recession — stepped rooflines,
+dusk-violet on the deepest — INTO the keep's own upper **back-wall faces** (`-back`), no separate
+mechanism. Palette §1.1 Ch III (slate `#5a6470`, raven `#2b2d33`, dusk violet `#6f5a7d`, window
+amber `#d98e3f`). The silhouette must read on kraft placeholders + shadow alone (the Sabuda
+principle) before any of these land.
+
+| Layer id | Asset key(s) | Piece & face | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `ch3-towers` | `ch3-towers` | Tall grey citadel rank, rookery tower, spire, scattered amber windows | ≈1.79:1 landscape | STAND | **art** |
-| `ch3-balcony` | `ch3-balcony` | Dispatch balcony jutting off the towers' fold, mid-height (the building's second story) | ≈0.83:1 near-square | STAND | **art** |
-| `ch3-raven-a` | `ch3-raven-a` | Raven, wings spread, high on the towers' fold | ≈1.77:1 landscape | STAND | **art** |
-| `ch3-rank` | `ch3-rank` | Second, lower tower rank — rooftops, chimneys, a gate-tower | ≈1.94:1 landscape | STAND | **art** |
-| `ch3-raven-b` | `ch3-raven-b` | Small raven, folded wings, on the second rank's fold | ≈0.45:1 portrait | STAND | **art** |
-| `ch3-counter` | `ch3-counter-front`, `ch3-counter-back`, `ch3-counter-side`, `ch3-counter-top` | Dispatch counter — lidded flat-top box, painted writing surface | side/front/back ≈1.6:1 · top ≈1.0:1 | FACE / TOPDOWN | placeholder — **legacy `ch3-counter.webp` (old single-strip design) is orphaned** |
-| `ch3-perch-raven` | `ch3-perch-raven` | Raven standing ON the counter's lid (rider recursion) | ≈1.11:1 near-square | STAND | placeholder |
-| `ch3-counter-ledgers` | `ch3-counter-ledgers` | Dressed stacked ledgers overhanging the counter lid | ≈1.2:1 near-square | FLAT | placeholder |
-| `ch3-counter-scale` | `ch3-counter-scale` | Dressed weigh-scale on the counter's front cap | ≈0.9:1 near-square | FLAT | placeholder |
-| `ch3-sorting` | `ch3-sorting-deck` | Parcel-sorting BRIDGE deck, tucked in toward the spine | ≈1.33:1 landscape | TOPDOWN | placeholder |
-| `ch3-semaphore` | `ch3-semaphore` | Dispatch tower's semaphore arm, sweeps to vertical "raising the signal" | combined ≈0.92:1 near-square (see §1.6 caveat) | STAND (kinetic) | placeholder — **parked deep upstage, currently near-invisible; low priority until re-composed (see §5)** |
-| `ch3-towerworks` | `ch3-towerworks-disc`, `ch3-towerworks-tier0`, `ch3-towerworks-tier1` | The citadel's TOWER-HOIST (D6 user knob): a spoked winch knob on the left page that the reader twists to erect a staggered rank of two siege-tower tiers in the dispatch yard. Disc = the crank/capstan knob (thumb-notch, arrow arc); tiers = ascending grey stone tower segments (tier1 taller). Paint each tier's ridge/battlements centered (peak at v=0.5) | disc 1:1 square (radius 0.15 → canvas 0.30×0.30) · tier0 ≈0.6:1 · tier1 ≈0.5:1 (both portrait mounds) | DISC / MOUND | placeholder |
+| `ch3-keep` | `ch3-keep-hall-side` | Dispatch Hall side curtain wall — slate ashlar, three amber-lit lancet windows, raven-weathering (repeats both walls) | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-hall-back` | Hall back wall — the LOWEST painted aerial-recession band (near citadel rooftops) seen through the open mouth | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-hall-top` | Hall flat lid (the gallery floor) — slate flags from the high camera | ≈2.3:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-gallery-side` | Balcony Gallery side — dusk-violet shadowed stone, corbels (both walls) | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-gallery-back` | Gallery back wall — MID aerial-recession band (dusk-violet receding rooftops) | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-gallery-top` | Gallery flat lid (the loft floor) | ≈2.3:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-loft-side` | Rookery Loft side — open belfry post-frame with die-cut arched roost-mouths, one amber-lit (genuinely see-through) | ≈1.06:1 | FACE (die-cut) | placeholder |
+| `ch3-keep` | `ch3-keep-loft-front` | Loft front — arched roost belfry face, die-cut arch void | ≈1.06:1 | FACE (die-cut) | placeholder |
+| `ch3-keep` | `ch3-keep-loft-back` | Loft back wall — DEEPEST aerial-recession band (dusk-violet, faintest rooftops) | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-loft-top` | Loft flat cap slab (seats the crown) | ≈2.3:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-crown-side` | Signal-Spire crown side — slate lead spire (both walls) | ≈0.7:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-crown-front` | Crown front — spire face, gold weathervane seam down the ridge | ≈0.7:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-crown-back` | Crown back — spire back | ≈0.7:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-crown-top` | Crown gable roof — slate lead pitch | ≈1.0:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-balcony` | The jutting gold dispatch-desk balcony deck from above — ink-pots, an open ledger, scattered quills, a wax-seal | ≈1.7:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-raven` | The kept hero raven perched at the crown — wings spread, black silhouette (the retired ch3-raven-a, folded onto the keep) | ≈1.5:1 | STAND (die-cut) | placeholder |
+| `ch3-keep-winch` | `ch3-keep-winch-disc` | Spoked gold capstan crank knob — thumb-notch grip, engraved arrow-arc reading "HOIST" | 1:1 square | DISC | placeholder |
+| `ch3-keep-winch` | `ch3-keep-winch-semaphore` | Gold signal paddle arm — the semaphore sweeping up to vertical | wide strip | STAND | placeholder |
+| `ch3-keep-winch` | `ch3-keep-winch-iris` | One raven-shutter blade (repeats around the loft rim) — slate shutter, amber roost-glow behind | ≈0.5:1 | STAND | placeholder |
+| `ch3-keep-winch` | `ch3-keep-winch-counterweight` | Slate counterweight block on a cable, dropping down the keep flank | ≈1:1 | STAND | placeholder |
+| `ch3-skyline-l` | `ch3-skyline-l-mound0`, `ch3-skyline-l-mound1`, `ch3-skyline-l-mound2` | Left-page flanking citadel rooftops — low slate rooflines, chimneys, amber windows; dusk-violet on the deepest (stepping back in Z) | ≈2:1 each | STAND (mound) | placeholder |
+| `ch3-skyline-r` | `ch3-skyline-r-mound0`, `ch3-skyline-r-mound1`, `ch3-skyline-r-mound2` | Right-page flanking citadel rooftops (mirror rank) | ≈2:1 each | STAND (mound) | placeholder |
+| `ch3-fringe` | `ch3-fringe` | Fore-edge dispatch-yard wall — slate, iron straps, pinned amber dispatch-notices | ≈5.2:1 low strip | FACE | placeholder |
 
 ## 5. Chapter IV — The Vault-Dragon of the Golden Dunes (spread 5)
 
@@ -371,14 +395,11 @@ flat drawer icons, never as a paper mechanism.
    painting with strong asymmetric detail (a door on only one wall) will look wrong
    repeated on the opposite wall. Worth flagging to whoever paints `-side` assets: keep
    them generic enough to read correctly on either side.
-3. **One of the two kinetic pieces is still parked off-stage.** `ch3-semaphore` sits
-   in the deep upstage lane per content.ts's own comment ("zero D-G2 collision
-   headroom... no gate-passing home in the visible near-spine region") — essentially
-   invisible at the current composition, pending a re-composition pass. Low priority
-   for art generation until that lands. `ch2-windmill` was moved to a visible
-   downstage lane by a concurrent composition pass while this call sheet was being
-   written (see its row in §3) — its geometry is current as of verification but this
-   spread is actively being tuned; recheck before painting.
+3. **The ch3 semaphore is now a winch output.** The old `ch3-semaphore` kinetic arm was
+   ABSORBED into the tower-hoist winch (E1 showpiece) — it is one of the three staggered
+   outputs the crank drives, painted as `ch3-keep-winch-semaphore` (§4). `ch2-windmill`
+   remains the book's standalone kinetic arm in its visible downstage lane (see §3) — its
+   geometry is current as of verification; recheck before painting.
 4. **`ch5-arch` is flagged low-res** in the source research doc even though it already
    has real art in the manifest (trims to ~456px vs. 1000+px peers) — worth a re-export
    pass rather than treating it as "done."
