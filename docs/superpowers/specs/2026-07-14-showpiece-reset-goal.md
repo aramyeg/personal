@@ -132,10 +132,17 @@ E4 AWWWARDS POLISH: light/shadow refinement, endpapers, die-cut
 
 ## Pinned decisions (2026-07-14, his answers)
 
-1. Pilot chapter: UNDECIDED in the abstract ("unique things in
-   both"; ch4 not the worst chapter — the tab-table design is the
-   worst element). Resolution: E1 concept-board bake-off, he picks
-   from visuals.
+1. Pilot chapter: PICKED 2026-07-16 from the bake-off boards —
+   THE DISPATCH KEEP (ch3 citadel). The Vault-Palace stays the
+   natural E2 second-grand-chapter candidate (dome derivation
+   attempted then, with pilot learnings). The tab-table family
+   still dies in E2 regardless.
+   AUTONOMY AMENDMENT (his words at pick time): "do not ask me
+   such trivial questions when working on a goal, we have a lot
+   to do until my involvement" — intermediate decisions, including
+   design picks, are the orchestrator's: decide with recorded
+   reasoning and proceed; his gates are the phase-boundary visual
+   reviews only.
 2. Grand-architecture scope: NOT per chapter. One pilot spread,
    then decide; ceiling ~2 grand chapters book-wide.
 3. Crisp-motion bar: super-high fps AND zero visual artifacts —
