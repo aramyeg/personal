@@ -25,8 +25,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makeShadowCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
+import { sharedHandleMaterial, sharedShadowTexture } from './shared-procedural-textures'
 import {
   liveSpreadRole,
   solveStripFlapPose,
@@ -152,7 +151,9 @@ export function StripFlapPopupLayer({
       new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, color: tint })
     return { right: make('#ffffff'), left: make(FOLD_SHADE_TINT) }
   }, [])
-  const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
+  // Shared singleton (every grabbable layer used its own copy of this
+  // identical invisible material — E-G4 fix wave).
+  const handleMaterial = sharedHandleMaterial()
 
   useEffect(() => {
     if (!texture) return
@@ -174,7 +175,7 @@ export function StripFlapPopupLayer({
       maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
     }
   }, [layer])
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -187,11 +188,11 @@ export function StripFlapPopupLayer({
       slopGeometry.dispose()
       materials.right.dispose()
       materials.left.dispose()
-      handleMaterial.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
+      // handleMaterial/shadowTexture are shared singletons — never disposed
+      // per-instance.
     },
-    [geometries, slopGeometry, materials, handleMaterial, shadowTexture, shadowMaterial]
+    [geometries, slopGeometry, materials, shadowMaterial]
   )
 
   // --- Grab lifecycle (laws H1-H3). Offset-captured hinge angle for continuity.

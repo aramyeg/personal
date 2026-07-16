@@ -26,8 +26,6 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makeShadowCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import {
   liveSpreadRole,
   solveLayerPose,
@@ -38,6 +36,7 @@ import {
 import { solveRiderPose } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
+import { sharedShadowTexture } from './shared-procedural-textures'
 import { BoxPopupLayer } from './popup-box-layer'
 import { PlatformPopupLayer } from './popup-platform-layer'
 import { TabPiecePopupLayer } from './popup-tabpiece-layer'
@@ -309,8 +308,7 @@ function PopupLayer({
       maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
     }
   }, [layer, parent])
-  const shadowCanvas = useMemo(() => makeShadowCanvas(), [])
-  const shadowTexture = useMemo(() => makeCanvasTexture(shadowCanvas), [shadowCanvas])
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
@@ -328,10 +326,10 @@ function PopupLayer({
       geometries.left.dispose()
       materials.right.dispose()
       materials.left.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
+      // shadowTexture is a shared singleton — never disposed per-instance.
     },
-    [geometries, materials, shadowTexture, shadowMaterial]
+    [geometries, materials, shadowMaterial]
   )
 
   useFrame(() => {

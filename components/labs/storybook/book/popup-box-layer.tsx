@@ -19,8 +19,6 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import {
   liveSpreadRole,
@@ -31,6 +29,8 @@ import {
 } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
 import { peakHeight, shadowLift } from './shadow-light'
+import { acquireMaterial, releaseMaterial } from './material-pool'
+import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
@@ -133,7 +133,7 @@ export function BoxPopupLayer({
     [faces]
   )
 
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const paperTexture = sharedPaperTexture()
   const materials = useMemo(() => {
     const exterior = faces.map(
       (face) =>
@@ -142,13 +142,16 @@ export function BoxPopupLayer({
           color: SHADED_FACES.has(face) ? FOLD_SHADE_TINT : face.startsWith('capFront') ? CAP_TINT : '#ffffff',
         })
     )
-    const interior = new THREE.MeshBasicMaterial({
-      side: THREE.BackSide,
-      map: paperTexture,
-      color: INTERIOR_SHADOW_TINT,
-    })
-    return { exterior, interior }
-  }, [faces, paperTexture])
+    return { exterior }
+  }, [faces])
+  // Every box's interior is the same raw-paper-stock BackSide wall, pooled
+  // (E-G4 fix wave): shared map + fixed color + fixed side, never mutated
+  // after acquisition, so every box in the book shares this ONE material.
+  const interiorMaterial = useMemo(
+    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
+    [paperTexture]
+  )
+  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   // Wire each face's art (or raw paper) into its exterior material.
   useEffect(() => {
@@ -168,7 +171,11 @@ export function BoxPopupLayer({
     })
   }, [faces, materials, edgeMaterials, paperTexture, frontArt, backArt, sideArt, topArt, tint])
 
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  // Contact-shadow map is a parameter-free radial blob (shared-procedural-
+  // textures.ts) — the material itself stays owned (opacity is rewritten
+  // every frame below from this box's own live lift, so it can never share
+  // identity with another box's shadow material).
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -192,12 +199,12 @@ export function BoxPopupLayer({
       edgeGeometries.forEach((g) => g.dispose())
       edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
-      materials.interior.dispose()
-      paperTexture.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
+      // paperTexture/shadowTexture are shared singletons (shared-procedural-
+      // textures.ts) — never disposed per-instance; interiorMaterial is
+      // pooled — released above, not disposed here.
     },
-    [geometries, edgeGeometries, edgeMaterials, materials, paperTexture, shadowTexture, shadowMaterial]
+    [geometries, edgeGeometries, edgeMaterials, materials, shadowMaterial]
   )
 
   useFrame(() => {
@@ -243,7 +250,7 @@ export function BoxPopupLayer({
         {faces.map((face, i) => (
           <group key={face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
-            <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
+            <mesh geometry={geometries[i]} material={interiorMaterial} renderOrder={0} />
             <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}

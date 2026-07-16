@@ -58,11 +58,21 @@ const KRAFT_TINTS: readonly string[] = ['#e7d5a8', '#c9b078']
  * any failure (not in the manifest, decode error, ...) to `onError` — both
  * silently, per the file header. Returns a `cancel` function so the
  * caller's effect cleanup can suppress a load that resolves after unmount.
+ *
+ * `maxAnisotropy` (E-G5 floor d): painted art is the LEAST-filtered yet
+ * MOST-foreshortened texture family in the scene — procedural/page textures
+ * already get `anisotropy = 4` (book.tsx's `makeCanvasTexture`), art
+ * textures got only the THREE default of 1. This function is plain (no
+ * hook), so the caller threads the device's real ceiling in from its own
+ * `useThree((s) => s.gl)` rather than this module reaching for a GL context
+ * itself; defaults to 1 (THREE's own default) so callers that don't care
+ * (or tests with no WebGL context at all) don't have to pass it.
  */
 export function loadArtTexture(
   id: string,
   onLoad: (texture: THREE.Texture) => void,
-  onError: () => void
+  onError: () => void,
+  maxAnisotropy = 1
 ): { cancel: () => void } {
   let cancelled = false
   artManifest()
@@ -80,6 +90,7 @@ export function loadArtTexture(
             return
           }
           loaded.colorSpace = THREE.SRGBColorSpace
+          loaded.anisotropy = maxAnisotropy
           onLoad(loaded)
         },
         undefined,
@@ -113,6 +124,12 @@ export function useLayerTexture(
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const gl = useThree((s) => s.gl)
   const silhouette = useMemo(readSilhouetteMode, [])
+  // Stable per-renderer ceiling (E-G5 floor d) — a plain useMemo (not read
+  // inline in the effect below) so the effect's own dep list stays exactly
+  // what it was before threading this through: `gl` itself never changes
+  // identity for the Canvas's lifetime, so re-deriving this from `gl` would
+  // otherwise trip exhaustive-deps for a value that can't actually change.
+  const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl])
 
   useEffect(() => {
     let owned: THREE.Texture | null = null
@@ -136,7 +153,8 @@ export function useLayerTexture(
           owned = loaded
           setTexture(loaded)
         },
-        () => installPlaceholder(accents)
+        () => installPlaceholder(accents),
+        maxAnisotropy
       ))
     }
 
@@ -145,7 +163,7 @@ export function useLayerTexture(
       owned?.dispose()
       setTexture(null)
     }
-  }, [layerId, kind, accents, silhouette])
+  }, [layerId, kind, accents, silhouette, maxAnisotropy])
 
   // Upload as soon as resolved: warm-window neighbors mount hidden, and a
   // hidden mesh never renders, so without this the GPU upload stalled the
@@ -168,6 +186,8 @@ export function useArtTexture(id: string): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const gl = useThree((s) => s.gl)
   const silhouette = useMemo(readSilhouetteMode, [])
+  // See useLayerTexture's identical comment above.
+  const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl])
 
   useEffect(() => {
     if (silhouette) {
@@ -185,7 +205,8 @@ export function useArtTexture(id: string): THREE.Texture | null {
         owned = loaded
         setTexture(loaded)
       },
-      () => setTexture(null)
+      () => setTexture(null),
+      maxAnisotropy
     )
 
     return () => {
@@ -193,7 +214,7 @@ export function useArtTexture(id: string): THREE.Texture | null {
       owned?.dispose()
       setTexture(null)
     }
-  }, [id, silhouette])
+  }, [id, silhouette, maxAnisotropy])
 
   // Same pre-warm rationale as useLayerTexture above.
   useEffect(() => {

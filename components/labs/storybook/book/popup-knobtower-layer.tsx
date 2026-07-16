@@ -25,14 +25,14 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makeKnobCanvas, makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type KnobTowerGeom } from './popup-mechanics'
 import { knobTowerThetaMax, knobTowerTierLift, solveKnobTowerPose } from './popup-knobtower'
 import { ROTOR_LIFT } from './popup-rotor'
 import { shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
+import { acquireMaterial, releaseMaterial } from './material-pool'
+import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import { type TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
@@ -171,11 +171,13 @@ function KnobDisc({
 
   const geometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const slopGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
-  const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
+  // Shared singleton (every grabbable layer used its own copy of this
+  // identical invisible material — E-G4 fix wave).
+  const handleMaterial = sharedHandleMaterial()
   // Placeholder is a spoked knob (thumb notch + arrow arc, H4) so the twist
   // reads before real art lands; its transparent corners keep the die-cut
-  // circular under the material's alphaTest.
-  const knobTexture = useMemo(() => makeCanvasTexture(makeKnobCanvas(256, 256)), [])
+  // circular under the material's alphaTest. Parameter-free canvas, shared.
+  const knobTexture = sharedKnobTexture()
   const materials = useMemo(
     () => ({
       front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
@@ -202,12 +204,12 @@ function KnobDisc({
     () => () => {
       geometry.dispose()
       slopGeometry.dispose()
-      handleMaterial.dispose()
       materials.front.dispose()
       materials.back.dispose()
-      knobTexture.dispose()
+      // handleMaterial/knobTexture are shared singletons — never disposed
+      // per-instance.
     },
-    [geometry, slopGeometry, handleMaterial, materials, knobTexture]
+    [geometry, slopGeometry, materials]
   )
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the
@@ -373,15 +375,21 @@ function KnobTier({
     []
   )
 
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const paperTexture = sharedPaperTexture()
   const materials = useMemo(
     () => ({
       in: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff' }),
       out: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: FOLD_SHADE_TINT }),
-      interior: new THREE.MeshBasicMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
     }),
+    []
+  )
+  // Every knob-tier's underside is the same raw-paper-stock BackSide wall,
+  // pooled (E-G4 fix wave) — shared with box/platform/tabpiece's interior.
+  const interiorMaterial = useMemo(
+    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
     [paperTexture]
   )
+  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   useEffect(() => {
     // slopeOut is the darker sibling (turned away from the fore-edge light).
@@ -401,7 +409,7 @@ function KnobTier({
     set(materials.out, edgeMaterials.out, true)
   }, [faceArt, paperTexture, materials, edgeMaterials, tint])
 
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -432,12 +440,11 @@ function KnobTier({
       edgeMaterials.out.dispose()
       materials.in.dispose()
       materials.out.dispose()
-      materials.interior.dispose()
-      paperTexture.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
+      // paperTexture/shadowTexture are shared singletons — never disposed
+      // per-instance; interiorMaterial is pooled — released above.
     },
-    [geometries, edgeGeometries, edgeMaterials, materials, paperTexture, shadowTexture, shadowMaterial]
+    [geometries, edgeGeometries, edgeMaterials, materials, shadowMaterial]
   )
 
   useFrame(() => {
@@ -467,10 +474,10 @@ function KnobTier({
     <>
       <group ref={groupRef} visible={false}>
         <mesh geometry={geometries.in} material={materials.in} renderOrder={0} />
-        <mesh geometry={geometries.in} material={materials.interior} renderOrder={0} />
+        <mesh geometry={geometries.in} material={interiorMaterial} renderOrder={0} />
         <lineLoop geometry={edgeGeometries.in} material={edgeMaterials.in} renderOrder={1} />
         <mesh geometry={geometries.out} material={materials.out} renderOrder={0} />
-        <mesh geometry={geometries.out} material={materials.interior} renderOrder={0} />
+        <mesh geometry={geometries.out} material={interiorMaterial} renderOrder={0} />
         <lineLoop geometry={edgeGeometries.out} material={edgeMaterials.out} renderOrder={1} />
       </group>
       <group ref={shadowGroupRef} visible={false}>

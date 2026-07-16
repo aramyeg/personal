@@ -30,9 +30,9 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas, makeShadowCanvas, makeTabGripCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
+import { acquireMaterial, releaseMaterial } from './material-pool'
+import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 import {
   solveTabPiecePose,
@@ -208,8 +208,8 @@ export function TabPiecePopupLayer({
     [patches]
   )
 
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
-  const tabGripTexture = useMemo(() => makeCanvasTexture(makeTabGripCanvas()), [])
+  const paperTexture = sharedPaperTexture()
+  const tabGripTexture = sharedTabGripTexture()
   const materials = useMemo(() => {
     const exterior = patches.map(
       (p) =>
@@ -218,21 +218,24 @@ export function TabPiecePopupLayer({
           color: isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff',
         })
     )
-    const interior = new THREE.MeshBasicMaterial({
-      side: THREE.BackSide,
-      map: paperTexture,
-      color: INTERIOR_SHADOW_TINT,
-    })
-    return { exterior, interior }
-  }, [patches, paperTexture])
+    return { exterior }
+  }, [patches])
+  // Every tab piece's underside is the same raw-paper-stock BackSide wall,
+  // pooled (E-G4 fix wave) — shared with box/platform's interior material.
+  const interiorMaterial = useMemo(
+    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
+    [paperTexture]
+  )
+  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   // The invisible grab handles (law H3/H6): an exact-tab mesh for mouse/pen
   // precision and a 1.5x slop mesh for touch. Both raycast (object visible)
   // but never render (material.visible = false). Positions track the tab
-  // quad every frame.
+  // quad every frame. Shared singleton (every grabbable layer used its own
+  // copy of this identical invisible material — E-G4 fix wave).
   const handleGeometry = useMemo(() => makeFaceGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const slopGeometry = useMemo(() => makeFaceGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
-  const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
+  const handleMaterial = sharedHandleMaterial()
 
   useEffect(() => {
     patches.forEach((p, i) => {
@@ -262,7 +265,7 @@ export function TabPiecePopupLayer({
     [tint]
   )
 
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -295,15 +298,13 @@ export function TabPiecePopupLayer({
       edgeGeometries.forEach((g) => g.dispose())
       edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
-      materials.interior.dispose()
-      paperTexture.dispose()
-      tabGripTexture.dispose()
+      // paperTexture/tabGripTexture/shadowTexture/handleMaterial are shared
+      // singletons — never disposed per-instance; interiorMaterial is
+      // pooled — released above.
       handleGeometry.dispose()
       slopGeometry.dispose()
-      handleMaterial.dispose()
       slitGeometry.dispose()
       slitMaterial.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
     },
     [
@@ -311,14 +312,10 @@ export function TabPiecePopupLayer({
       edgeGeometries,
       edgeMaterials,
       materials,
-      paperTexture,
-      tabGripTexture,
       handleGeometry,
       slopGeometry,
-      handleMaterial,
       slitGeometry,
       slitMaterial,
-      shadowTexture,
       shadowMaterial,
     ]
   )
@@ -499,7 +496,7 @@ export function TabPiecePopupLayer({
         {patches.map((p, i) => (
           <group key={p.face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
-            <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
+            <mesh geometry={geometries[i]} material={interiorMaterial} renderOrder={0} />
             <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}

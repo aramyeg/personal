@@ -26,13 +26,13 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type PlatformGeom } from './popup-mechanics'
 import { solvePlatformPose, type PlatformFace } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
+import { acquireMaterial, releaseMaterial } from './material-pool'
+import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
@@ -154,7 +154,7 @@ export function PlatformPopupLayer({
     [patches]
   )
 
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const paperTexture = sharedPaperTexture()
   const materials = useMemo(() => {
     const exterior = patches.map(
       (p) =>
@@ -163,13 +163,16 @@ export function PlatformPopupLayer({
           color: isShaded(p.face) ? FOLD_SHADE_TINT : '#ffffff',
         })
     )
-    const interior = new THREE.MeshBasicMaterial({
-      side: THREE.BackSide,
-      map: paperTexture,
-      color: INTERIOR_SHADOW_TINT,
-    })
-    return { exterior, interior }
-  }, [patches, paperTexture])
+    return { exterior }
+  }, [patches])
+  // Every platform's underside is the same raw-paper-stock BackSide wall,
+  // pooled (E-G4 fix wave): shared map + fixed color + fixed side, never
+  // mutated after acquisition — shared with popup-box-layer's interior too.
+  const interiorMaterial = useMemo(
+    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
+    [paperTexture]
+  )
+  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   // Wire the deck painting (or raw kraft) into each exterior material.
   useEffect(() => {
@@ -189,7 +192,7 @@ export function PlatformPopupLayer({
     })
   }, [patches, materials, edgeMaterials, paperTexture, deckArt, tint])
 
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  const shadowTexture = sharedShadowTexture()
   const strutShadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -226,22 +229,12 @@ export function PlatformPopupLayer({
       edgeGeometries.forEach((g) => g.dispose())
       edgeMaterials.forEach((m) => m.dispose())
       materials.exterior.forEach((m) => m.dispose())
-      materials.interior.dispose()
-      paperTexture.dispose()
-      shadowTexture.dispose()
       strutShadowMaterial.dispose()
       deckShadowMaterial.dispose()
+      // paperTexture/shadowTexture are shared singletons — never disposed
+      // per-instance; interiorMaterial is pooled — released above.
     },
-    [
-      geometries,
-      edgeGeometries,
-      edgeMaterials,
-      materials,
-      paperTexture,
-      shadowTexture,
-      strutShadowMaterial,
-      deckShadowMaterial,
-    ]
+    [geometries, edgeGeometries, edgeMaterials, materials, strutShadowMaterial, deckShadowMaterial]
   )
 
   useFrame(() => {
@@ -289,7 +282,7 @@ export function PlatformPopupLayer({
         {patches.map((p, i) => (
           <group key={`${p.face}-${p.rank}-${p.bay}`}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
-            <mesh geometry={geometries[i]} material={materials.interior} renderOrder={0} />
+            <mesh geometry={geometries[i]} material={interiorMaterial} renderOrder={0} />
             <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
           </group>
         ))}

@@ -28,9 +28,10 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makeKeepsakeCanvas, makePaperCanvas, makeShadowCanvas } from '../procedural/paper-texture'
+import { makeKeepsakeCanvas } from '../procedural/paper-texture'
 import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
+import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import { liveSpreadRole, spreadPageAnglesTilted, type KeepsakeGeom, type Vec3 } from './popup-mechanics'
 import {
   KEEPSAKE_RETURN_MS,
@@ -161,7 +162,9 @@ export function KeepsakePopupLayer({
   const pocketGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const pocketEdgeGeometry = useMemo(() => makeEdgeGeometry(4), [])
 
-  const handleMaterial = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])
+  // Shared singleton (every grabbable layer used its own copy of this
+  // identical invisible material — E-G4 fix wave).
+  const handleMaterial = sharedHandleMaterial()
   const edgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.85 }),
     []
@@ -172,7 +175,7 @@ export function KeepsakePopupLayer({
   )
 
   const keepsakeTexture = useMemo(() => makeCanvasTexture(makeKeepsakeCanvas()), [])
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const paperTexture = sharedPaperTexture()
   // Opaque so it occludes the tucked card by writing depth; page-stock kraft so
   // it reads as a printed pocket on the endpaper. DoubleSide — winding-free.
   const pocketMaterial = useMemo(
@@ -198,7 +201,7 @@ export function KeepsakePopupLayer({
     materials.front.needsUpdate = true
   }, [cardArt, keepsakeTexture, materials, tint])
 
-  const shadowTexture = useMemo(() => makeCanvasTexture(makeShadowCanvas()), [])
+  const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
     [shadowTexture]
@@ -229,21 +232,20 @@ export function KeepsakePopupLayer({
       slopGeometry.dispose()
       pocketGeometry.dispose()
       pocketEdgeGeometry.dispose()
-      handleMaterial.dispose()
       edgeMaterial.dispose()
       pocketEdgeMaterial.dispose()
       pocketMaterial.dispose()
       keepsakeTexture.dispose()
-      paperTexture.dispose()
       materials.front.dispose()
       materials.back.dispose()
-      shadowTexture.dispose()
       shadowMaterial.dispose()
+      // handleMaterial/paperTexture/shadowTexture are shared singletons —
+      // never disposed per-instance.
     },
     [
       cardGeometry, edgeGeometry, handleGeometry, slopGeometry, pocketGeometry, pocketEdgeGeometry,
-      handleMaterial, edgeMaterial, pocketEdgeMaterial, pocketMaterial, keepsakeTexture, paperTexture,
-      materials, shadowTexture, shadowMaterial,
+      edgeMaterial, pocketEdgeMaterial, pocketMaterial, keepsakeTexture,
+      materials, shadowMaterial,
     ]
   )
 

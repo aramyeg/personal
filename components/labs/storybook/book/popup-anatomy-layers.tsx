@@ -28,9 +28,8 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { makePaperCanvas, makeRotorCanvas } from '../procedural/paper-texture'
-import { makeCanvasTexture } from './book'
 import { kraftTints } from './paper-stock'
+import { sharedPaperTexture, sharedRotorTexture } from './shared-procedural-textures'
 import {
   liveSpreadRole,
   solveBoxPose,
@@ -134,7 +133,7 @@ export function DressPopupLayer({
     return g
   }, [])
 
-  const paperTexture = useMemo(() => makeCanvasTexture(makePaperCanvas(256, 256)), [])
+  const paperTexture = sharedPaperTexture()
   const materials = useMemo(
     () => ({
       front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
@@ -162,9 +161,9 @@ export function DressPopupLayer({
       geometry.dispose()
       materials.front.dispose()
       materials.back.dispose()
-      paperTexture.dispose()
+      // paperTexture is a shared singleton — never disposed per-instance.
     },
-    [geometry, materials, paperTexture]
+    [geometry, materials]
   )
 
   useFrame(() => {
@@ -243,7 +242,7 @@ export function RotorPopupLayer({
 
   // Placeholder is a spoked DISC (not a paper square) so the spin reads before
   // real art lands; its transparent corners keep the die-cut circular.
-  const discTexture = useMemo(() => makeCanvasTexture(makeRotorCanvas(256, 256)), [])
+  const discTexture = sharedRotorTexture()
   const materials = useMemo(
     () => ({
       front: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
@@ -271,9 +270,9 @@ export function RotorPopupLayer({
       geometry.dispose()
       materials.front.dispose()
       materials.back.dispose()
-      discTexture.dispose()
+      // discTexture is a shared singleton — never disposed per-instance.
     },
-    [geometry, materials, discTexture]
+    [geometry, materials]
   )
 
   useFrame(() => {

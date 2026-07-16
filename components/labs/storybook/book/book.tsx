@@ -503,6 +503,8 @@ export function Book() {
   // turn, so the upload stall (tens of ms for a full-page canvas) hit
   // exactly when the eye was tracking the sheet's lift-off.
   const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
   useEffect(() => {
     for (const print of Object.values(prints)) {
       gl.initTexture(print.left)
@@ -512,6 +514,38 @@ export function Book() {
   useEffect(() => {
     for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) gl.initTexture(t)
   }, [gl, stackEdgeTextures])
+  // SHADER PRECOMPILE (E-G4 fix wave, root cause #2): first-visit-to-a-
+  // spread stalled up to 966ms, dominated by first-use shader program
+  // compilation (measured, .superpowers/sdd/bench/out/e0/perf/) — not
+  // texture decode, which initTexture above already warms. `gl.compile`
+  // walks the WHOLE scene graph via `.traverse` (not `.traverseVisible`), so
+  // it reaches the hidden ±2 popup-spread window the same as a visible one,
+  // paying the compile cost while the piece is still off-screen instead of
+  // on the first frame a turn reveals it. Plain `compile()`, not
+  // `compileAsync()`: the async variant's readiness poll
+  // (`materialProperties.currentProgram.isReady()`) throws on some of this
+  // scene's materials (verified against the live app — a DoubleSide
+  // transparent MeshBasicMaterial takes compile()'s two-pass BackSide/
+  // FrontSide branch and its `currentProgram` bookkeeping doesn't survive
+  // that cleanly), which crashes as an uncaught exception in a `setTimeout`
+  // callback outside any promise chain a `.catch` could intercept. Plain
+  // `compile()` runs the same underlying `getProgram` warm-up synchronously
+  // and returns, without ever touching that broken poll path.
+  //
+  // Fired twice per window change: an immediate pass catches anything
+  // already resolved (a warm manifest cache), and a second pass after
+  // DELAY_MS catches layers whose own texture-resolution effect (real art
+  // or the kraft placeholder — both async, gated on the shared manifest
+  // fetch) hadn't attached a map yet on the immediate pass. A material's
+  // mesh only ever renders once its texture resolves (`visible` is gated on
+  // `texture !== null` in every popup layer), so an EARLY-only compile
+  // would just cache the map=null variant that never actually gets drawn.
+  useEffect(() => {
+    const DELAY_MS = 350
+    gl.compile(scene, camera)
+    const settle = setTimeout(() => gl.compile(scene, camera), DELAY_MS)
+    return () => clearTimeout(settle)
+  }, [gl, scene, camera, popupSpreadIndices])
 
   useFrame((_, delta) => {
     // Boot detection, on the same clock as everything else the eye sees:
