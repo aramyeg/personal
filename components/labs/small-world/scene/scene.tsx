@@ -11,6 +11,7 @@ import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
 import { BluenetSet } from './props/set-bluenet'
+import { FlyerbeeSet } from './props/set-flyerbee'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
 
@@ -52,6 +53,9 @@ function SceneContents({ progressRef }: SceneProps) {
       <Planet journeyRef={journeyRef}>
         <ChapterSet index={0} journeyRef={journeyRef}>
           <BluenetSet />
+        </ChapterSet>
+        <ChapterSet index={1} journeyRef={journeyRef}>
+          <FlyerbeeSet />
         </ChapterSet>
       </Planet>
       {hasArt('girl') ? (
