@@ -58,6 +58,20 @@ const PAD_TO_ASPECT = {
   'ch3-keep-winch-disc': 1.0, // hub disc is a square 2*discR quad -> the circle must stay round
 }
 
+// CROP-TO-ASPECT (per id, target width/height): centered cover-crop applied
+// after the trim, for FULL-BLEED texture-like faces (pavement, deck boards,
+// roof pitch) delivered wider/taller than their mesh. Cropping a texture
+// surface loses only more-of-the-same at the margins — unlike composed faces
+// (walls with windows, skyline scenes), which must be redrawn to the mesh
+// aspect instead. Sources in art-src keep the full frame, so crops are
+// reversible. See the keep art-aspect bench.
+const CROP_TO_ASPECT = {
+  'ch3-keep-hall-top': 0.6 / 0.52, // slate flagstone paving
+  'ch3-keep-gallery-top': 0.52 / 0.44, // weathered deck boards
+  'ch3-keep-loft-top': 0.44 / 0.3, // plain cap slab
+  'ch3-keep-crown-top': 0.272 / 0.22, // gable pitch (both planes over the ridge)
+}
+
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
 // for deliveries authored transposed relative to their mesh's texture axes.
 // The semaphore quad maps the arm's LONG axis to texture V with the pivot at
@@ -310,6 +324,27 @@ async function processOne(fileName) {
   // whose bottom edge is glued to the page (popup-mechanics.ts), so any
   // leftover padding reads as the piece floating above the paper.
   pipeline = pipeline.trim()
+
+  // Cover-crop to the mesh aspect (centered) for full-bleed texture faces
+  // delivered at the wrong aspect, computed from the true post-trim size.
+  const cropAspect = CROP_TO_ASPECT[id]
+  if (cropAspect) {
+    const trimmed = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const { width: tw, height: th, channels } = trimmed.info
+    let cw = tw
+    let chh = th
+    if (tw / th > cropAspect) cw = Math.round(th * cropAspect)
+    else if (tw / th < cropAspect) chh = Math.round(tw / cropAspect)
+    pipeline = sharp(trimmed.data, { raw: { width: tw, height: th, channels } })
+    if (cw < tw || chh < th) {
+      pipeline = pipeline.extract({
+        left: Math.floor((tw - cw) / 2),
+        top: Math.floor((th - chh) / 2),
+        width: cw,
+        height: chh,
+      })
+    }
+  }
 
   // Pad to the mesh aspect (centered transparent) for the handful of round/
   // fixed-aspect cutouts, computed from the true post-trim dimensions.
