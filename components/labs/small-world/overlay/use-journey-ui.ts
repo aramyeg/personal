@@ -44,13 +44,24 @@ export function useJourneyUi(progressRef: MutableRefObject<number>): JourneyUi {
   const [ui, setUi] = useState<JourneyUi>(() => uiAt(progressRef.current))
 
   useEffect(() => {
+    let raf = 0
     const compute = () => {
       const next = uiAt(progressRef.current)
       setUi((prev) => (same(prev, next) ? prev : next))
     }
+    // Defer to rAF so this always reads progressRef AFTER every scroll
+    // listener for the event has run (child effects mount before parent
+    // effects, so reading synchronously here can see a stale ref).
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(compute)
+    }
     compute()
-    window.addEventListener('scroll', compute, { passive: true })
-    return () => window.removeEventListener('scroll', compute)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+    }
   }, [progressRef])
 
   return ui

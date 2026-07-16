@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useJourneyUi } from '@/components/labs/small-world/overlay/use-journey-ui'
 
@@ -6,9 +6,24 @@ function refOf(value: number) {
   return { current: value }
 }
 
-const fireScroll = () => act(() => { window.dispatchEvent(new Event('scroll')) })
+// compute() is deferred to a rAF (mocked as setTimeout(fn, 0) in
+// vitest.setup.ts) so it always reads progressRef after every scroll
+// listener for the event has run. Flush it with fake timers.
+const fireScroll = () =>
+  act(() => {
+    window.dispatchEvent(new Event('scroll'))
+    vi.advanceTimersByTime(16)
+  })
 
 describe('useJourneyUi', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('starts in chapter 0 with no panel', () => {
     const { result } = renderHook(() => useJourneyUi(refOf(0)))
     expect(result.current).toEqual({ chapter: 0, burst: false, panel: null, ended: false })
