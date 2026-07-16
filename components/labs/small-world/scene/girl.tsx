@@ -11,8 +11,9 @@ import type { JourneyRef } from './use-journey'
 const GIRL_URL = '/labs/small-world/girl.glb'
 /** Only clip in the delivered GLB — no idle/discovery/wave clips shipped. */
 const CLIP_NAME = 'Armature|Skip_Forward|baselayer'
-/** Mesh is 1.7 units tall; scene is built around a ~0.9-unit character. */
-const GIRL_SCALE = 0.53
+/** Mesh is 1.7 units tall. 0.53 matched the old ~0.9u proxy; raised per
+ * Aram's Gate-2 note — she should command the planet, not decorate it. */
+const GIRL_SCALE = 0.7
 /** Surface distance one skip-cycle covers at timeScale 1 — tune to the clip. */
 const CLIP_STRIDE = 1.0
 /** Damping rate for mixer.timeScale so cadence eases rather than snaps to speed changes. */
@@ -63,7 +64,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
         <primitive object={scene} scale={GIRL_SCALE} />
       </group>
       <mesh ref={shadow} position={[0, PLANET_RADIUS, STANCE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.24, 24]} />
+        <circleGeometry args={[0.3, 24]} />
         <meshBasicMaterial color={PALETTE.ink} transparent opacity={0.22} depthWrite={false} />
       </mesh>
     </>

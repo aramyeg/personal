@@ -26,7 +26,7 @@ export function DiscoveryBurst({ journeyRef }: { journeyRef: JourneyRef }) {
     const pop = easeOutBack(Math.min(1, burst / 0.35))
     const fade = 1 - THREE.MathUtils.smoothstep(burst, 0.75, 1)
     g.scale.setScalar(Math.max(0.4 * pop * fade, 0.0001))
-    g.position.y = surfaceYAt(STANCE_Z, rotation) + 1.0 + 0.08 * burst
+    g.position.y = surfaceYAt(STANCE_Z, rotation) + 1.32 + 0.08 * burst
     g.rotation.z = 0.18 * Math.sin(burst * Math.PI * 4)
   })
 

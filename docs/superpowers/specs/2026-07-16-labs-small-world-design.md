@@ -186,6 +186,19 @@ Gate-0 verdict (2026-07-16): palette approved for now; facing-the-viewer
 orientation confirmed and shipped. Future dressing he named (not now):
 earthy textures, blue water on the globe, bridges, animals along the sides.
 
+Gate-2 direction (Aram, 2026-07-16, after Phase 2 shipped):
+- Girl scale raised 0.53 → 0.7 at his immediate ask ("bigger") — she should
+  command the planet. Badge and shadow retuned with it.
+- THE PLANET IS THE NEXT BIG WORKSTREAM — "it doesn't look good right now."
+  Two directions he's weighing, undecided: (a) richer SMALL planet — clay
+  water, mountains, valleys, more trees, overall variety (procedural or
+  generated); (b) BIGGER planet cropped to its top half, which would also
+  absorb the >360° rotation question. His lean: "I'd rather keep the planet
+  small." Resolve with a look-dev comparison before committing either way.
+- Per-chapter weather/time-of-day: confirmed as a real future direction
+  ("would also be cool, we will work towards it later") — upgrades the
+  spec's sky/light-shift promise from parked to planned.
+
 ## Risks
 
 - **Meshy character quality below the bar** — mitigated by Gate 0 ordering;
