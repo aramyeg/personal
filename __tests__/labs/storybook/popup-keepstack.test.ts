@@ -98,12 +98,14 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
     expect(maxGap).toBeLessThanOrEqual(1e-9)
   })
 
-  it('S5 height: the crown reaches near-backdrop scale (~0.84 world-Y at rest)', () => {
-    expect(keepStackCrownHeight(KEEP)).toBeCloseTo(0.84, 2)
-    // measured world-Y at the tilted rest bloom clears 0.8 (E-G3 near-backdrop).
+  it('S5 height: the crown reaches near-backdrop scale (~0.90 world-Y at rest, E1.5 re-mass)', () => {
+    // E1.5 re-mass grew the keep to its S4 fold-flat maximum (crown ~0.90; the
+    // fold-flat footprint reach 1.13 <= PAGE_W 1.15 caps it there).
+    expect(keepStackCrownHeight(KEEP)).toBeCloseTo(0.9, 2)
+    // measured world-Y at the tilted rest bloom clears 0.85 (E-G3 near-backdrop).
     let topY = -Infinity
     for (const q of keepStackQuads(KEEP, ...bloom(REST))) for (const p of q) topY = Math.max(topY, p[1])
-    expect(topY).toBeGreaterThan(0.8)
+    expect(topY).toBeGreaterThan(0.85)
   })
 
   it('S4 containment: the flat-fold footprint fits the page (reach <= PAGE_W, z in +-PAGE_H/2)', () => {

@@ -15,7 +15,7 @@
  * the paired faces (caps, lid, roof), whose shared crease sits at u = 0.5.
  */
 
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
@@ -157,8 +157,11 @@ export function BoxPopupLayer({
   )
   useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
-  // Wire each face's art (or raw paper) into its exterior material.
-  useEffect(() => {
+  // Wire each face's art (or raw paper) into its exterior material. LAYOUT
+  // effect (not passive): the map binds BEFORE paint, so any future material-
+  // identity churn can never commit an unmapped pure-white frame (the E-G4 turn
+  // flash; the keepstack's inline-layer churn was the trigger, now also memoized).
+  useLayoutEffect(() => {
     const art = { front: frontArt, back: backArt, side: sideArt, top: topArt }
     faces.forEach((face, i) => {
       const asset = FACE_ART[face].asset

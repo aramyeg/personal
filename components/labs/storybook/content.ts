@@ -231,53 +231,69 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // perches on the crown.
   {
     id: 'ch3-keep', kind: 'backdrop', role: 'story', mech: 'keepstack',
+    // E1.5 RE-MASS (composition FAIL -> "design the picture, then engineer").
+    // The keep is re-massed as a READER-FACING TIERED FACADE composed for the
+    // pinned composition camera, not a lid-stack: the Dispatch HALL is now a
+    // SOLID capFront base (the master painting's big lower facade), the GALLERY
+    // stays an OPEN loggia (capFront:false) so the jutting gold balcony reads as
+    // a cantilevered gallery, the LOFT belfry + CROWN spire cap the tiers. The
+    // stack is sized to the S4 FOLD-FLAT MAXIMUM: at book-close it folds flat
+    // ALONG the page, so its footprint reach (top-story roof peak up the page,
+    // = sum(H) + a + H + sqrt(a^2+gable^2)) must stay <= PAGE_W 1.15 — this, not
+    // z-containment, caps the keep HEIGHT at ~0.90 world (reach 1.13). Wider
+    // stories (a up to the z1+a<=0.75 front-cap-fold ceiling) widen the facade.
     stories: [
-      // Dispatch Hall — hollow, open arched mouth (capFront:false) the reading
-      // camera looks into; back cap braces, flat lid seats the gallery.
-      { key: 'hall', a: 0.3, height: 0.26, z0: -0.26, z1: 0.26, roof: 'flat', capFront: false, capBack: true },
-      // Balcony Gallery — open arcaded loggia (capFront:false); flat lid seats
-      // the loft.
-      { key: 'gallery', a: 0.26, height: 0.22, z0: -0.22, z1: 0.22, roof: 'flat', capFront: false, capBack: true },
+      // Dispatch Hall — SOLID capFront base facade (was an open hollow mouth
+      // that read as a wall/lid from the lid-dominant camera; the E1.5 fix
+      // closes it into the picture's lower facade). Back cap braces, flat lid
+      // seats the gallery + carries the balcony.
+      { key: 'hall', a: 0.4, height: 0.25, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true },
+      // Balcony Gallery — OPEN arcaded loggia (capFront:false) so the jutting
+      // gold balcony deck cantilevers out of it toward the reader (closing this
+      // front would collide with the balcony riding the hall lid); flat lid
+      // seats the loft.
+      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: false, capBack: true },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
-      // see-through belfry); flat cap slab seats the crown.
-      { key: 'loft', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true },
-      // Signal-Spire crown — a small gabled spire; top world-Y ~0.84.
-      { key: 'crown', a: 0.11, height: 0.1, z0: -0.11, z1: 0.11, roof: 'gable', gableRise: 0.08, capFront: true, capBack: true },
+      // see-through belfry) and host the winch iris + counterweight; flat cap
+      // slab seats the crown.
+      { key: 'loft', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true },
+      // Signal-Spire crown — a small gabled spire; structural top world-Y ~0.90.
+      { key: 'crown', a: 0.15, height: 0.15, z0: -0.14, z1: 0.14, roof: 'gable', gableRise: 0.1, capFront: true, capBack: true },
     ],
-    // Balcony halfW 0.1707: the renderer now SPLITS the art across the spine crease
-    // (deckL samples art-u 0.5->0, deckR 0.5->1) so the gold desk reads as ONE
-    // continuous painting, not printed twice. The art then spans the FULL deck:
-    // width -> lateral 2*halfW, height -> depth z-span 0.20, so 2*halfW/0.20 =
-    // 1.707 (the delivered balcony art). ~0.17 == the original bench-proven halfW.
-    balcony: { halfW: 0.1707, z0: 0.24, z1: 0.44 },
-    // Raven = an IN-PLANE FINIAL extending the crown's FRONT CAP past its top edge
-    // (keepStackRavenDeck): TWO coplanar half-quads creased at y=0, split art like
-    // the balcony. width 0.18 (total, both halves) x height 0.174 (art 1.033 w/h);
-    // bottom at the cap top edge (world-Y 0.76), top ~0.94 — a hero spire finial
-    // above the 0.844 structural crown. Coplanar with a folding cap => zero off-plane
-    // reach: folds dead flat for free, wedge containment inherits the cap's proof.
-    // Faces the reader (+z) face-on, unlike the old y-spanning quad (edge-on sliver).
-    // The semaphore mast is moved behind the ridge (SEMAPHORE_BASE_Z -0.08) to clear it.
-    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.18, height: 0.174 },
+    // The jutting gold gallery deck, GROWN (halfW 0.26, z 0.30..0.58) into a
+    // hero cantilever off the hall lid, starting just in front of the gallery
+    // wall (z1 0.28) so nothing occludes it. Art splits across the spine crease
+    // (deckL art-u 0.5->0, deckR 0.5->1) — one continuous painting.
+    balcony: { halfW: 0.26, z0: 0.3, z1: 0.58 },
+    // Raven = an IN-PLANE FINIAL extending the crown's FRONT CAP past its top
+    // edge (keepStackRavenDeck): TWO coplanar half-quads creased at y=0, split
+    // art like the balcony. GROWN to width 0.30 x height 0.20; bottom at the cap
+    // top edge, top above the ~0.90 structural crown — a hero spire finial.
+    // Coplanar with a folding cap => zero off-plane reach: folds dead flat for
+    // free, wedge containment inherits the cap's proof. Faces the reader (+z)
+    // face-on. Semaphore mast sits behind the ridge (SEMAPHORE_BASE_Z) to clear it.
+    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.3, height: 0.2 },
   },
-  // THE SKYLINE — 3 low mounds per outer page (derive-keep-skyline.mjs), a
-  // jagged rooftop line stepping in Z, page-driven by the fold-flat envelope
-  // (no knob). Fore-hinge band F in [0.64, 0.75] clears the keep's mid-fold
-  // sweep and holds the swinging-page vertex-speed cap. The flanking citadel.
-  // Per-mound leg width w = ridgeLen / artAspect: the renderer now maps the FULL
-  // art onto the READER-FACING in-slope only (die-cut roofline at the ridge), with
-  // the out-slope a shaded paper backing card. So the matched aspect is ridgeLen/w
-  // (one slope), not ridgeLen/2w — hence w is ~doubled vs the split-texture version.
-  // F unchanged; inner edge F-2w stays >= 0.44 and F in [0.64,0.75].
+  // THE CITADEL RANK — a CONNECTED rooftop rank replacing the 6 isolated skyline
+  // mounds (E1.5: "reading as ONE mass flanking the keep"). Per side, 3 UNIFORM
+  // strips (same F/w/aRest) stepping only in zc across TOUCHING z-spans (ridgeLen
+  // 0.40, zc -0.40/0/0.40) — so adjacent strips tile into ONE continuous ridge
+  // sharing clean edges (no mound-vs-mound scissor; the staggered-rooftop look
+  // comes from the die-cut ROOFLINE ART, not the geometry). Pushed OUT to F 0.71/
+  // 0.73 so the inner edge F-2w (0.50/0.53) clears the RE-MASSED WIDER keep's
+  // mid-fold sweep (hall a 0.40; the old 0.44 floor was for the a-0.30 keep) —
+  // bench-reverified zero D-G2 vs keep + zero mound-vs-mound (derive-keep-skyline).
+  // L/R differ slightly (asymmetry). The full-art in-slope faces the reader
+  // (die-cut roofline at the ridge); the out-slope is a shaded paper backing card.
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
-    { F: 0.64, w: 0.0687, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.0772, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.0462, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.73, w: 0.115, aRestDeg: 63, zc: -0.4, ridgeLen: 0.34 },
+    { F: 0.73, w: 0.115, aRestDeg: 63, zc: 0.0, ridgeLen: 0.34 },
+    { F: 0.73, w: 0.115, aRestDeg: 63, zc: 0.4, ridgeLen: 0.34 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
-    { F: 0.64, w: 0.0634, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.0663, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.0341, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.71, w: 0.115, aRestDeg: 61, zc: -0.4, ridgeLen: 0.34 },
+    { F: 0.71, w: 0.115, aRestDeg: 61, zc: 0.0, ridgeLen: 0.34 },
+    { F: 0.71, w: 0.115, aRestDeg: 61, zc: 0.4, ridgeLen: 0.34 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
@@ -295,25 +311,28 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // loft + hall stories (asserted by the winch test).
   {
     id: 'ch3-keep-winch', kind: 'hero', role: 'scenery', mech: 'keepwinch', side: 'left',
-    hubD: 0.34, hubZ: 0.3, discR: 0.13, crankR: 0.13,
-    // Semaphore paddle THICKENED for legibility (was a 0.03-wide hairline at the
-    // spire): armHalfW 0.0195, armLen 0.1287 holds L:S = armLen/2*armHalfW = 3.30 =
-    // 1/0.303, matching the delivered PORTRAIT semaphore art (444x1467, 0.303 w/h —
-    // no rotation needed, the tall art maps straight onto the arm). armHalfW is the
-    // at-close off-page residual the N4/N8 fold-flat gates ride on; 0.0195 leaves a
-    // 2.5% margin under the 0.02 paper-thickness tol (0.02 itself fails on float eps).
-    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.1287, armHalfW: 0.0195 },
-    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
-    // Counterweight RE-STATIONED to the LOFT FRONT CAP (belfry mouth face) — the
-    // hall flank-wall seat was invisible from the reading camera (check-keep-
-    // visibility.mjs: 0% at rest). host is now the LOFT box (shares the iris host),
-    // so its capFrontL/capFrontR are the seats; it descends dead-center in sightline.
-    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
+    // Disc moved OUT to hubD 0.50 so it clears the re-massed hall flank (a 0.40)
+    // and reads on the open left page beside the keep; discR/crankR 0.13 hold the
+    // proven THETA_MAX 112.6deg and cam behaviour. (At the low composition camera
+    // a page-flat handle foreshortens; it reads full at the interaction camera.)
+    hubD: 0.5, hubZ: 0.3, discR: 0.13, crankR: 0.13,
+    // Semaphore mast lifted to baseX 0.96 to sit just above the re-massed
+    // structural crown (~0.90) so the paddle reads over the crest. armHalfW is
+    // the at-close off-page residual the N4/N8 fold-flat gates ride on; 0.0195
+    // leaves a 2.5% margin under the 0.02 paper-thickness tol.
+    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.96, armLen: 0.1287, armHalfW: 0.0195 },
+    // Iris + counterweight hosts RE-STATIONED to the re-massed LOFT story
+    // (a 0.27, height 0.18, z +-0.20, baseH 0.47 = hall.H 0.25 + gallery.H 0.22).
+    // Both must equal the keep's loft story (asserted by popup-keepwinch.test).
+    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.47 } },
+    // Counterweight on the LOFT FRONT CAP (belfry mouth), dead-center in the
+    // reading sightline; descends within the cap plane (zero off-plane reach).
+    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.47 } },
   },
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
-  // v-fold at the fore edge — the spread's nearest plane, its scalloped painter
-  // reading as the yard's front wall until real art lands.
-  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
+  // v-fold at the fore edge — the spread's nearest plane framing the keep, its
+  // scalloped painter reading as the yard's front wall until real art lands.
+  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.25 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):

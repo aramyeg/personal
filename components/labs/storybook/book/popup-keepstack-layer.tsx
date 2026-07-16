@@ -11,7 +11,7 @@
  * hairlines, DynamicDrawUsage positions rewritten per frame).
  */
 
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
@@ -162,7 +162,9 @@ function TwoQuadRide({
     [geometries, alpha]
   )
 
-  useEffect(() => {
+  // useLayoutEffect (not passive): bind the map BEFORE paint so an identity
+  // churn can never commit an unmapped pure-white frame (the E-G4 turn flash).
+  useLayoutEffect(() => {
     materials.forEach((mat, i) => {
       mat.map = art ?? paperTexture
       mat.color.set(art ? '#ffffff' : tint.lit)
@@ -224,25 +226,33 @@ export function KeepStackPopupLayer({
   committedSpread: RefObject<number>
 }) {
   const stories = useMemo(() => keepStackStoryGeoms(layer), [layer])
+  // STABLE per-story box layer identities. Building these inline every render
+  // churned BoxPopupLayer's [layer]-memoized materials back to unmapped white,
+  // and the map only rebinds in a passive effect AFTER paint — the landing's two
+  // commits then painted the whole stack pure white for ~2 frames (the reported
+  // turn "flash"/click). Memoized on the stable story geoms + the keep's own
+  // kind/role, so a landing re-render reuses the same box layer objects.
+  const boxLayers = useMemo<(SceneLayer & BoxGeom)[]>(
+    () =>
+      stories.map((storyGeom) => ({
+        ...storyGeom,
+        id: `${layer.id}-${storyGeom.key}`,
+        kind: layer.kind,
+        role: layer.role,
+      })),
+    [stories, layer.id, layer.kind, layer.role]
+  )
   return (
     <group name={`keepstack-${layer.id}`}>
-      {stories.map((storyGeom) => {
-        const boxLayer: SceneLayer & BoxGeom = {
-          ...storyGeom,
-          id: `${layer.id}-${storyGeom.key}`,
-          kind: layer.kind,
-          role: layer.role,
-        }
-        return (
-          <BoxPopupLayer
-            key={storyGeom.key}
-            layer={boxLayer}
-            spreadIndex={spreadIndex}
-            frame={frame}
-            committedSpread={committedSpread}
-          />
-        )
-      })}
+      {boxLayers.map((boxLayer) => (
+        <BoxPopupLayer
+          key={boxLayer.id}
+          layer={boxLayer}
+          spreadIndex={spreadIndex}
+          frame={frame}
+          committedSpread={committedSpread}
+        />
+      ))}
       {layer.balcony && (
         <TwoQuadRide
           artId={`${layer.id}-balcony`}

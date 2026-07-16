@@ -214,8 +214,9 @@ principle) before any of these land.
 
 | Layer id | Asset key(s) | Piece & face | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
+| `ch3-keep` | `ch3-keep-hall-front` | Dispatch Hall FRONT — the keep's SOLID base facade (E1.5 re-mass; the master painting's big lower curtain wall): slate ashlar, the great arched dispatch gate, flanking amber lancets | ≈1.0:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-hall-side` | Dispatch Hall side curtain wall — slate ashlar, three amber-lit lancet windows, raven-weathering (repeats both walls) | ≈1.0:1 | FACE | placeholder |
-| `ch3-keep` | `ch3-keep-hall-back` | Hall back wall — the LOWEST painted aerial-recession band (near citadel rooftops) seen through the open mouth | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-hall-back` | Hall back wall — the LOWEST painted aerial-recession band (near citadel rooftops), now braced (capBack) | ≈1.0:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-hall-top` | Hall flat lid (the gallery floor) — slate flags from the high camera | ≈2.3:1 | TOPDOWN | placeholder |
 | `ch3-keep` | `ch3-keep-gallery-side` | Balcony Gallery side — dusk-violet shadowed stone, corbels (both walls) | ≈1.0:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-gallery-back` | Gallery back wall — MID aerial-recession band (dusk-violet receding rooftops) | ≈1.0:1 | FACE | placeholder |
