@@ -63,9 +63,12 @@ resculpts itself under her feet."
   → planet rotation angle, active chapter index, per-chapter morph states,
   panel visibility windows. All scene components read from it; no scattered
   scroll math.
-- Girl pinned lower-third, slightly left of center; planet rotates beneath
-  her. Skip cadence distance-locked to surface rotation (foot-contact sync —
-  no moonwalking). Idle bounce when scroll rests.
+- Girl pinned near the planet's front-top, FACING THE VIEWER and skipping
+  toward the camera (Aram's direction, 2026-07-16): the planet rotates about
+  the screen-horizontal axis so the surface moves away beneath her while each
+  chapter's scenery rises over the front horizon below her — the viewer sees
+  discoveries coming. Skip cadence distance-locked to surface rotation
+  (foot-contact sync — no moonwalking). Idle bounce when scroll rests.
 - Fixed camera with gentle mouse/gyro parallax. Sky gradient and light
   temperature shift subtly per chapter (each era gets its own hour of day).
 

@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { PLANET_RADIUS, surfaceYAt } from './planet'
-import { STANCE_X } from './girl-proxy'
+import { STANCE_Z } from './girl-proxy'
 import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'
@@ -17,7 +17,7 @@ const DAMP_LAMBDA = 6
  * Real GLB girl — rendered only behind `hasArt('girl')` (see scene.tsx), so
  * this module's useGLTF call never fires while the asset is absent. Ground
  * contact ONLY: the clip carries the hop, this just follows surfaceYAt at
- * STANCE_X (same fixed-character contract as GirlProxy — group never moves
+ * STANCE_Z (same fixed-character contract as GirlProxy — group never moves
  * in x/z, only the planet spins beneath it).
  */
 export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
@@ -41,12 +41,12 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     timeScale.current = THREE.MathUtils.damp(timeScale.current, targetScale, DAMP_LAMBDA, dt)
     mixer.timeScale = timeScale.current
     if (group.current) {
-      group.current.position.y = surfaceYAt(STANCE_X, rotation)
+      group.current.position.y = surfaceYAt(STANCE_Z, rotation)
     }
   })
 
   return (
-    <group ref={group} position={[STANCE_X, PLANET_RADIUS, 0]}>
+    <group ref={group} position={[0, PLANET_RADIUS, STANCE_Z]}>
       <primitive object={scene} />
     </group>
   )

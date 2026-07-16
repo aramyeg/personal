@@ -22,21 +22,23 @@ export function terrainBump(x: number, y: number, z: number): number {
 }
 
 /**
- * World-space surface point directly under a stance at world x (z=0, upper
- * hemisphere), for a planet rotated by `rotation` about z. Returns the y of
- * the displaced surface at that x.
+ * World-space surface point directly under a stance at world z (x=0, upper
+ * hemisphere), for a planet rotated by `rotation` about the x-axis (the
+ * toward-camera travel direction: the girl faces the viewer and the surface
+ * under her feet moves away over the back while new terrain rises over the
+ * front horizon). Returns the y of the displaced surface at that z.
  */
-export function surfaceYAt(worldX: number, rotation: number): number {
-  const baseY = Math.sqrt(PLANET_RADIUS * PLANET_RADIUS - worldX * worldX)
-  // World stance direction rotated INTO planet-local space (planet spins by
-  // -rotation, so local = R_z(-(-rotation)) · world = R_z(rotation) · world).
+export function surfaceYAt(worldZ: number, rotation: number): number {
+  const baseY = Math.sqrt(PLANET_RADIUS * PLANET_RADIUS - worldZ * worldZ)
+  // World stance direction rotated INTO planet-local space (the mesh spins
+  // by -rotation about x, so local = R_x(rotation) · world).
   const cos = Math.cos(rotation)
   const sin = Math.sin(rotation)
-  const lx = worldX * cos - baseY * sin
-  const ly = worldX * sin + baseY * cos
-  const bump = terrainBump(lx, ly, 0)
+  const ly = baseY * cos - worldZ * sin
+  const lz = baseY * sin + worldZ * cos
+  const bump = terrainBump(0, ly, lz)
   const r = PLANET_RADIUS * (1 + bump)
-  return Math.sqrt(Math.max(0, r * r - worldX * worldX))
+  return Math.sqrt(Math.max(0, r * r - worldZ * worldZ))
 }
 
 /** 3-step toon ramp — hard clay banding. */
@@ -91,7 +93,10 @@ export function Planet({ journeyRef }: { journeyRef: JourneyRef }) {
   const geometry = useHillGeometry()
 
   useFrame(() => {
-    if (group.current) group.current.rotation.z = -journeyRef.current.rotation
+    // -rotation about x: the top surface moves away from the camera, so the
+    // viewer-facing girl advances toward the viewer; incoming terrain rises
+    // over the front horizon where the camera can see it coming.
+    if (group.current) group.current.rotation.x = -journeyRef.current.rotation
   })
 
   return (

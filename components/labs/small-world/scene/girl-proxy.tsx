@@ -6,8 +6,12 @@ import { PALETTE } from '../palette'
 import { PLANET_RADIUS, surfaceYAt } from './planet'
 import type { JourneyRef } from './use-journey'
 
-/** Where the girl stands, in world x (slightly left of the planet's apex). */
-export const STANCE_X = -0.6
+/**
+ * Where the girl stands, in world z: slightly toward the viewer from the
+ * apex, so she faces the camera and skips in its direction while incoming
+ * terrain rises over the front horizon beneath her.
+ */
+export const STANCE_Z = 0.75
 /** Surface distance covered by one skip — ties hop cadence to rotation. */
 const STRIDE = 0.55
 const HOP_HEIGHT = 0.16
@@ -16,7 +20,7 @@ const HOP_HEIGHT = 0.16
  * Capsule stand-in for the girl. Its ONLY job: prove that hop cadence
  * locks to surface speed (no moonwalking) before the real GLB lands.
  * Contract for the real Girl (Task 7): same group transform — feet planted
- * on surfaceYAt(STANCE_X, rotation), hop offset ADDED to that surface y,
+ * on surfaceYAt(STANCE_Z, rotation), hop offset ADDED to that surface y,
  * never replacing it. The group never moves in x/z; only the planet spins
  * beneath it (fixed-character pattern).
  */
@@ -52,7 +56,7 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
     const idle = (1 - activity.current) * 0.012 * Math.sin(clock.elapsedTime * 2.4)
     const squashTravel = 1 - 0.12 * Math.cos(hopPhase * 2) // squash at contact, stretch mid-air
     const squash = 1 + (squashTravel - 1) * activity.current + idle
-    const groundY = surfaceYAt(STANCE_X, rotation)
+    const groundY = surfaceYAt(STANCE_Z, rotation)
     if (group.current) {
       group.current.position.y = groundY + hop
       group.current.scale.set(1 / squash, squash, 1 / squash)
@@ -72,7 +76,7 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
     <>
       {/* Feet-at-origin rig: meshes are lifted inside the group so the group's
           y IS the ground contact point. */}
-      <group ref={group} position={[STANCE_X, PLANET_RADIUS, 0]}>
+      <group ref={group} position={[0, PLANET_RADIUS, STANCE_Z]}>
         <mesh position={[0, 0.42, 0]}>
           <capsuleGeometry args={[0.14, 0.28, 8, 16]} />
           <meshToonMaterial color={PALETTE.blossomDeep} />
@@ -82,7 +86,7 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
           <meshToonMaterial color={PALETTE.blossom} />
         </mesh>
       </group>
-      <mesh ref={shadow} position={[STANCE_X, PLANET_RADIUS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={shadow} position={[0, PLANET_RADIUS, STANCE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.24, 24]} />
         <meshBasicMaterial color={PALETTE.ink} transparent opacity={0.22} depthWrite={false} />
       </mesh>
