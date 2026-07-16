@@ -11,6 +11,7 @@ import { DiscoveryBurst } from './discovery-burst'
 import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
+import { GlobalDressing } from './props/global-dressing'
 import { BluenetSet } from './props/set-bluenet'
 import { FlyerbeeSet } from './props/set-flyerbee'
 import { Dialog360Set } from './props/set-360dialog'
@@ -56,6 +57,7 @@ function SceneContents({ progressRef }: SceneProps) {
       {/* Warm raking key from upper-left — makes the toon ramp bands read as clay facets. */}
       <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
       <Planet journeyRef={journeyRef}>
+        <GlobalDressing />
         <ChapterSet index={0} journeyRef={journeyRef}>
           <BluenetSet />
         </ChapterSet>
