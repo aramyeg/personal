@@ -1,4 +1,5 @@
 import { chapters } from './chapters'
+import { FALLBACK_CLASS } from './fallback-class'
 
 /**
  * Server-rendered career timeline — the crawler / no-WebGL / reduced-motion
@@ -6,7 +7,7 @@ import { chapters } from './chapters'
  */
 export function FallbackTimeline() {
   return (
-    <section data-testid="small-world-fallback" aria-label="Career journey">
+    <section data-testid="small-world-fallback" className={FALLBACK_CLASS} aria-label="Career journey">
       <h1>Small World — a career in one lap of a tiny planet</h1>
       <ol>
         {chapters.map((c) => (

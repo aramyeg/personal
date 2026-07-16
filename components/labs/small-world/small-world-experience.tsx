@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { CHAPTER_COUNT } from './chapters'
+import { FALLBACK_CLASS } from './fallback-class'
 import { SmallWorldScene } from './scene/scene'
 
 function detectWebGL(): boolean {
@@ -49,7 +50,7 @@ export function SmallWorldExperience() {
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} />
       </div>
-      <style>{`[data-testid="small-world-fallback"]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}`}</style>
+      <style>{`.${FALLBACK_CLASS}{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}`}</style>
     </div>
   )
 }
