@@ -182,6 +182,43 @@ export function ClayBlock({ w = 0.2, h = 0.2, d = 0.2, color, ...x }: Xform & { 
   )
 }
 
+/**
+ * A little arched wooden footbridge in rich clay-brown, spanning a river
+ * crossing. Anchored at the carved river floor; the plank deck rides `rise`
+ * above it (matched to stage's DECK_RISE) so the girl's feet land on the
+ * planks. Planks + posts in `earth`, rail tops in the lighter `clayPath`.
+ */
+export function ClayBridge({ rise = 0.13, ...x }: Xform & { rise?: number }) {
+  const ramp = useClayRamp()
+  const planksZ = [-0.2, -0.1, 0, 0.1, 0.2]
+  const arch = (z: number) => rise + 0.03 * (1 - (z / 0.24) ** 2)
+  const posts: Array<[number, number]> = [
+    [-0.2, -0.22], [0.2, -0.22], [-0.2, 0.22], [0.2, 0.22],
+  ]
+  return (
+    <group {...x}>
+      {planksZ.map((z) => (
+        <mesh key={z} position={[0, arch(z), z]}>
+          <boxGeometry args={[0.44, 0.04, 0.085]} />
+          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
+        </mesh>
+      ))}
+      {[-0.2, 0.2].map((px) => (
+        <mesh key={px} position={[px, rise + 0.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.013, 0.013, 0.5, 8]} />
+          <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
+        </mesh>
+      ))}
+      {posts.map(([px, pz], i) => (
+        <mesh key={i} position={[px, rise * 0.5, pz]}>
+          <cylinderGeometry args={[0.02, 0.026, rise + 0.1, 8]} />
+          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x }: Xform & { r?: number; color?: string; squash?: number }) {
   const ramp = useClayRamp()
   return (

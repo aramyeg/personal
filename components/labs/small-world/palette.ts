@@ -15,4 +15,8 @@ export const PALETTE = {
   honey: '#F7C948',
   dune: '#E8C58A',
   tuff: '#DE8E9E',
+  // authored-biome tones (Task 15)
+  snow: '#F5F2EA',
+  earth: '#7E4E2E',
+  pine: '#3B7A46',
 } as const

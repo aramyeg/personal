@@ -5,8 +5,10 @@ import {
   chapterTheta,
   STANCE_ALPHA,
   STANCE_Z,
+  walkYAt,
 } from '@/components/labs/small-world/scene/stage'
 import { PLANET_RADIUS, surfaceYAt, terrainBump } from '@/components/labs/small-world/scene/planet'
+import { RIVER_CROSSINGS } from '@/components/labs/small-world/scene/biomes'
 import { chapterStartRotation, CHAPTER_SLICE } from '@/components/labs/small-world/journey-timeline'
 
 describe('stage math', () => {
@@ -46,5 +48,39 @@ describe('stage math', () => {
     const { position, quaternion } = anchorTransform(2.0, 0.5)
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion)
     expect(up.dot(position.clone().normalize())).toBeCloseTo(1, 6)
+  })
+})
+
+describe('walkYAt (bridge decks)', () => {
+  /** rotation that puts local theta under the girl's stance. */
+  const rotationFor = (theta: number): number => theta - STANCE_ALPHA
+
+  it('equals surfaceYAt away from every crossing', () => {
+    // the pinned rhos sit clear of all crossings, so no deck applies
+    for (const rho of [0, 0.7, 2.1, 5.5]) {
+      expect(walkYAt(STANCE_Z, rho)).toBeCloseTo(surfaceYAt(STANCE_Z, rho), 10)
+    }
+  })
+
+  it('lifts above the carved river at each crossing centre', () => {
+    for (const tc of RIVER_CROSSINGS) {
+      const rot = rotationFor(tc)
+      const deck = walkYAt(STANCE_Z, rot)
+      const terrain = surfaceYAt(STANCE_Z, rot)
+      expect(deck).toBeGreaterThan(terrain)
+    }
+  })
+
+  it('is continuous across a ramp — no step in the deck profile', () => {
+    const tc = RIVER_CROSSINGS[0]
+    let prev = walkYAt(STANCE_Z, rotationFor(tc) - 0.2)
+    let maxDelta = 0
+    for (let k = 1; k <= 20; k++) {
+      const theta = tc - 0.2 + (0.4 * k) / 20
+      const y = walkYAt(STANCE_Z, rotationFor(theta))
+      maxDelta = Math.max(maxDelta, Math.abs(y - prev))
+      prev = y
+    }
+    expect(maxDelta).toBeLessThan(0.05)
   })
 })

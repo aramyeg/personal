@@ -4,8 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import { easeOutBack } from '../journey-timeline'
-import { surfaceYAt } from './planet'
-import { STANCE_Z } from './stage'
+import { STANCE_Z, walkYAt } from './stage'
 import { useClayRamp } from './toon-ramp'
 import type { JourneyRef } from './use-journey'
 
@@ -26,7 +25,7 @@ export function DiscoveryBurst({ journeyRef }: { journeyRef: JourneyRef }) {
     const pop = easeOutBack(Math.min(1, burst / 0.35))
     const fade = 1 - THREE.MathUtils.smoothstep(burst, 0.75, 1)
     g.scale.setScalar(Math.max(0.4 * pop * fade, 0.0001))
-    g.position.y = surfaceYAt(STANCE_Z, rotation) + 1.32 + 0.08 * burst
+    g.position.y = walkYAt(STANCE_Z, rotation) + 1.32 + 0.08 * burst
     g.rotation.z = 0.18 * Math.sin(burst * Math.PI * 4)
   })
 

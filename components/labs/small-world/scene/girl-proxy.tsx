@@ -3,8 +3,8 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
-import { PLANET_RADIUS, surfaceYAt } from './planet'
-import { STANCE_Z } from './stage'
+import { PLANET_RADIUS } from './planet'
+import { STANCE_Z, walkYAt } from './stage'
 import type { JourneyRef } from './use-journey'
 
 /** Surface distance covered by one skip — ties hop cadence to rotation. */
@@ -56,7 +56,7 @@ export function GirlProxy({ journeyRef }: { journeyRef: JourneyRef }) {
     const lift = Math.max(hop, celebrate * 0.2)
     const squashCelebrate = 1 + 0.1 * Math.sin(burst === null ? 0 : burst * Math.PI * 6)
     const squash = (1 + (squashTravel - 1) * activity.current + idle) * squashCelebrate
-    const groundY = surfaceYAt(STANCE_Z, rotation)
+    const groundY = walkYAt(STANCE_Z, rotation)
     if (group.current) {
       group.current.position.y = groundY + lift
       group.current.scale.set(1 / squash, squash, 1 / squash)

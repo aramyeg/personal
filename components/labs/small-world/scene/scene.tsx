@@ -12,6 +12,8 @@ import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
 import { GlobalDressing } from './props/global-dressing'
+import { Forest } from './props/forest'
+import { Bridges } from './props/bridges'
 import { BluenetSet } from './props/set-bluenet'
 import { FlyerbeeSet } from './props/set-flyerbee'
 import { Dialog360Set } from './props/set-360dialog'
@@ -58,6 +60,8 @@ function SceneContents({ progressRef }: SceneProps) {
       <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
       <Planet journeyRef={journeyRef}>
         <GlobalDressing />
+        <Forest />
+        <Bridges />
         <ChapterSet index={0} journeyRef={journeyRef}>
           <BluenetSet />
         </ChapterSet>

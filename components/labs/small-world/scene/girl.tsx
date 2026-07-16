@@ -4,8 +4,8 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
-import { PLANET_RADIUS, surfaceYAt } from './planet'
-import { STANCE_Z } from './stage'
+import { PLANET_RADIUS } from './planet'
+import { STANCE_Z, walkYAt } from './stage'
 import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'
@@ -49,7 +49,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     const targetScale = THREE.MathUtils.clamp(surfaceSpeed / CLIP_STRIDE, MIN_TIMESCALE, 2.5)
     timeScale.current = THREE.MathUtils.damp(timeScale.current, targetScale, DAMP_LAMBDA, dt)
     mixer.timeScale = timeScale.current
-    const groundY = surfaceYAt(STANCE_Z, rotation)
+    const groundY = walkYAt(STANCE_Z, rotation)
     if (group.current) {
       group.current.position.y = groundY
     }

@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump } from '../planet'
+import { FOREST, SNOW, capMask, canyonDist } from '../biomes'
 import { PropAnchor } from './prop-anchor'
 import { ClayBlossom, ClayRock, ClaySprout, ClayTree } from './clay-kit'
 
@@ -14,15 +15,11 @@ const seeded = (i: number): number => fract(Math.sin(i * 127.1 + 311.7) * 43758.
 
 type Anchor = { i: number; theta: number; x: number; scale: number }
 
-/**
- * The direction an anchor plants on, matching anchorTransform's construction,
- * so we can skip any anchor that would land in a lake.
- */
-function anchorDirBump(theta: number, x: number): number {
+/** The unit direction an anchor plants on, matching anchorTransform. */
+function anchorDir(theta: number, x: number): THREE.Vector3 {
   const xN = THREE.MathUtils.clamp(x / PLANET_RADIUS, -0.95, 0.95)
   const ring = Math.sqrt(1 - xN * xN)
-  const dir = new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
-  return terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
+  return new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
 }
 
 /**
@@ -41,8 +38,13 @@ export function GlobalDressing() {
       const theta = seeded(i) * Math.PI * 2
       const sign = i % 2 === 0 ? 1 : -1
       const x = sign * (0.5 + seeded(i + 100) * 0.55)
-      // no trees in the lakes
-      if (1 + anchorDirBump(theta, x) < WATER_LEVEL) continue
+      const dir = anchorDir(theta, x)
+      const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
+      // authored regions own their own dressing — stay out of them
+      if (1 + bump < WATER_LEVEL) continue // water
+      if (capMask(dir.x, dir.y, dir.z, FOREST) > 0.3) continue // forest.tsx owns it
+      if (capMask(dir.x, dir.y, dir.z, SNOW) > 0.5) continue // snow boulders below
+      if (canyonDist(dir.x, dir.y, dir.z) < 0.14) continue // canyon rocks below
       const scale = 0.75 + seeded(i + 200) * 0.35
       list.push({ i, theta, x, scale })
     }
@@ -54,6 +56,18 @@ export function GlobalDressing() {
       {anchors.map(({ i, theta, x, scale }) => (
         <PropAnchor key={i} theta={theta} x={x}>
           {renderProp(i, scale)}
+        </PropAnchor>
+      ))}
+      {/* snow boulders on the cold pole (replacing the skipped snow scatter) */}
+      {[0.5, 2.1, 4.4].map((theta, k) => (
+        <PropAnchor key={`snow-${k}`} theta={theta} x={-1.95}>
+          <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
+        </PropAnchor>
+      ))}
+      {/* earth rocks on the canyon rim, reinforcing the brown clay read */}
+      {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55]] as const).map(([theta, x], k) => (
+        <PropAnchor key={`canyon-${k}`} theta={theta} x={x}>
+          <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
         </PropAnchor>
       ))}
     </>
