@@ -244,22 +244,34 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // Signal-Spire crown — a small gabled spire; top world-Y ~0.84.
       { key: 'crown', a: 0.11, height: 0.1, z0: -0.11, z1: 0.11, roof: 'gable', gableRise: 0.08, capFront: true, capBack: true },
     ],
-    balcony: { halfW: 0.17, z0: 0.24, z1: 0.44 },
-    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.18, height: 0.12 },
+    // Balcony deck halfW retuned 0.17 -> 0.117 so each half-deck's printed aspect
+    // (z-span 0.20 / halfW) matches the delivered balcony art (1.707 w/h); the
+    // renderer prints the FULL art per half-deck (mirrored), so the match is
+    // per-half. Narrowing (not deepening the jut) keeps B3/B4/B5 gate margins.
+    balcony: { halfW: 0.117, z0: 0.24, z1: 0.44 },
+    // Raven retuned 0.18x0.12 -> 0.102x0.099 so its aspect matches the delivered
+    // raven art (1.033 w/h) AND its crown-perched top world-Y (0.76 + height =
+    // 0.859) stays <= ~0.86 (the old 0.12 height crested 0.88, above the budget).
+    // Width 0.102 keeps its z-extent [-0.051, 0.051] inside the crown z-span.
+    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.102, height: 0.099 },
   },
   // THE SKYLINE — 3 low mounds per outer page (derive-keep-skyline.mjs), a
   // jagged rooftop line stepping in Z, page-driven by the fold-flat envelope
   // (no knob). Fore-hinge band F in [0.64, 0.75] clears the keep's mid-fold
   // sweep and holds the swinging-page vertex-speed cap. The flanking citadel.
+  // Per-mound leg width w retuned so each mound's slope-pair art aspect
+  // (ridgeLen / 2w) matches its OWN delivered art file (left/right differ). w is
+  // reduced only (flatter, lower rooftops), which raises the inner edge F-2w and
+  // slows the swing — every skyline gate moves in the safe direction.
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
-    { F: 0.64, w: 0.08, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.08, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.07, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.64, w: 0.0343, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.0386, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.0231, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
-    { F: 0.64, w: 0.08, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
-    { F: 0.72, w: 0.08, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
-    { F: 0.75, w: 0.07, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
+    { F: 0.64, w: 0.0317, aRestDeg: 58, zc: -0.3, ridgeLen: 0.16 },
+    { F: 0.72, w: 0.0332, aRestDeg: 60, zc: -0.02, ridgeLen: 0.18 },
+    { F: 0.75, w: 0.0171, aRestDeg: 52, zc: 0.26, ridgeLen: 0.15 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
@@ -278,7 +290,13 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   {
     id: 'ch3-keep-winch', kind: 'hero', role: 'scenery', mech: 'keepwinch', side: 'left',
     hubD: 0.34, hubZ: 0.3, discR: 0.13, crankR: 0.13,
-    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.16, armHalfW: 0.015 },
+    // armLen retuned 0.16 -> 0.099 so the arm's mesh elongation (armLen / 2*armHalfW)
+    // matches the delivered semaphore art's long:short (3.304); armHalfW is HELD at
+    // 0.015 because it sets the at-close off-page residual (0.015) the winch N4/N8
+    // fold-flat gates ride on. NOTE (art pass): the mesh maps the LONG axis to the
+    // art's HEIGHT (v=armLen), so the semaphore art must be authored/rotated PORTRAIT
+    // (tall, ~0.303 w/h) — the delivered 3.304-wide file prints rotated 90deg.
+    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.9, armLen: 0.099, armHalfW: 0.015 },
     iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.22, height: 0.18, z0: -0.15, z1: 0.15, roof: 'flat', capFront: true, capBack: true, baseH: 0.48 } },
     counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.3, height: 0.26, z0: -0.26, z1: 0.26, roof: 'flat', capFront: false, capBack: true, baseH: 0 } },
   },

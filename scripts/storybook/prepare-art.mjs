@@ -44,6 +44,30 @@ function magentaDistance(r, g, b) {
 // page faces, not cutouts, so they get no rim either.
 const skipsRim = (id) => id.startsWith('cover-') || id.startsWith('page-')
 
+// PAD-TO-ASPECT (per id, target width/height): after the alpha trim, pad the
+// SHORTER axis with centered transparent pixels so the piece renders at the
+// mesh aspect its quad demands — for radial/round cutouts whose trim landed a
+// hair off-square (a 2% off-square disc renders as a visible ellipse). Padding
+// is transparent and centered, so it never touches the artwork or its die-cut
+// rim (the rim follows the alpha silhouette, which padding leaves untouched).
+// ONLY for pieces whose mesh aspect is fixed AND whose art should stay centered
+// in a larger transparent field — never for full-bleed faces (which must be
+// redrawn to the mesh aspect, not letterboxed). See the keep art-aspect bench
+// (.superpowers/sdd/bench/check-keep-art-aspects.mjs).
+const PAD_TO_ASPECT = {
+  'ch3-keep-winch-disc': 1.0, // hub disc is a square 2*discR quad -> the circle must stay round
+}
+
+// ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
+// for deliveries authored transposed relative to their mesh's texture axes.
+// The semaphore quad maps the arm's LONG axis to texture V with the pivot at
+// the base (v=0 = image bottom under three's flipY), so its landscape source
+// (pivot at the left) turns 90deg CCW into a portrait with the pivot at the
+// bottom edge.
+const ROTATE = {
+  'ch3-keep-winch-semaphore': 270,
+}
+
 // Die-cut edge: real pop-up pieces show a sliver of raw paper where the
 // blade cut through the printed sheet. Approximated by dilating the alpha
 // mask (separable Chebyshev max-filter) and compositing the art over a
@@ -267,7 +291,9 @@ async function processOne(fileName) {
   const id = fileName.replace(/\.png$/i, '')
   const srcPath = path.join(SRC_DIR, fileName)
 
-  const { data, info } = await sharp(srcPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  let source = sharp(srcPath)
+  if (ROTATE[id]) source = source.rotate(ROTATE[id])
+  const { data, info } = await source.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   let pixels = hasMagentaCorners(data, info) ? chromaKey(data, info) : data
   // Page prints are full-bleed page faces by design — never background-key
   // them even if a sky corner happens to read uniform.
@@ -284,6 +310,29 @@ async function processOne(fileName) {
   // whose bottom edge is glued to the page (popup-mechanics.ts), so any
   // leftover padding reads as the piece floating above the paper.
   pipeline = pipeline.trim()
+
+  // Pad to the mesh aspect (centered transparent) for the handful of round/
+  // fixed-aspect cutouts, computed from the true post-trim dimensions.
+  const targetAspect = PAD_TO_ASPECT[id]
+  if (targetAspect) {
+    const trimmed = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const { width: tw, height: th, channels } = trimmed.info
+    let addW = 0
+    let addH = 0
+    if (tw / th < targetAspect) addW = Math.round(th * targetAspect) - tw
+    else if (tw / th > targetAspect) addH = Math.round(tw / targetAspect) - th
+    pipeline = sharp(trimmed.data, { raw: { width: tw, height: th, channels } })
+    if (addW > 0 || addH > 0) {
+      pipeline = pipeline.extend({
+        left: Math.floor(addW / 2),
+        right: addW - Math.floor(addW / 2),
+        top: Math.floor(addH / 2),
+        bottom: addH - Math.floor(addH / 2),
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+    }
+  }
+
   pipeline = pipeline.resize({ width: MAX_DIM, height: MAX_DIM, fit: 'inside', withoutEnlargement: true })
 
   // The rim pass needs raw pixels at final size, so the pipeline is

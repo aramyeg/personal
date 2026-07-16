@@ -237,6 +237,15 @@ const seatPt = (F: SeatFrame, s: number, r: number, lift: number): Vec3 => [
 /** Number of roost-mouth shutters the iris renders (2 per loft wall x 2 walls). */
 export const KEEP_WINCH_IRIS_SHUTTERS = 4
 
+// Shutter hinge height band up the wall (fractions r of the loft wall). Narrowed
+// 0.25..0.85 -> 0.461..0.639 so each shutter's mesh aspect (hinge-span world /
+// bladeLen) matches the delivered iris art (0.319 w/h — a tall narrow shutter).
+// bladeLen is HELD at 0.10, so the off-wall reach (bladeLen*sin deploy) and thus
+// the winch N8 wedge / N4 fold-flat proofs are unchanged; only the in-wall hinge
+// span (along e2, up the folding wall) shrinks.
+const IRIS_R_LO = 0.461
+const IRIS_R_HI = 0.639
+
 /** The roost-mouth shutters — 2 rigid flaps hinged on the VERTICAL edges of
  *  each loft wall (wallL, wallR), covering the mouths when closed and swinging
  *  AJAR outward by the deploy angle when the crank winds. The flap's off-wall
@@ -261,8 +270,8 @@ export function keepWinchIrisQuads(
     const F = seatFrame(wall) // e1 = along z (spine), e2 = up the wall, n = outward
     for (let k = 0; k < 2; k++) {
       const sHinge = 0.25 + 0.5 * k // two shutters along the wall
-      const h0 = seatPt(F, sHinge, 0.25, 0)
-      const h1 = seatPt(F, sHinge, 0.85, 0)
+      const h0 = seatPt(F, sHinge, IRIS_R_LO, 0)
+      const h1 = seatPt(F, sHinge, IRIS_R_HI, 0)
       // free edge swings from along +z (in the wall, closed) to +n (outward, open)
       const free = (base: Vec3): Vec3 => [
         base[0] + bl * (co * F.e1[0] + si * F.n[0]),
@@ -284,7 +293,12 @@ export function keepWinchIrisQuads(
 const CW_R_TOP = 0.6 // top r-station (undeployed weight) — clear of the hall lid at r=1
 const CW_DROP_R = 0.4 // r-units of descent (world 0.4 * H_hall 0.26 = 0.10 down the flank)
 const CW_LIFT = 0.003 // ROTOR_LIFT-scale seat off the wall face (z-fight only)
-const CW_BW = 0.045 // weight half-width along the wall (z)
+// CW_BW retuned 0.045 -> 0.0253 so the block's mesh aspect (CW_BW / CW_BH) matches
+// the delivered counterweight art (0.632 w/h — a tall narrow sash weight). Only the
+// in-plane z-width changes (along the wall's e1/spine axis), so off-wall reach stays
+// zero and the N8 wedge / N4 fold-flat proofs are untouched (they depend on x,y, and
+// CW_BH — unchanged).
+const CW_BW = 0.0253 // weight half-width along the wall (z)
 const CW_BH = 0.04 // weight half-height up the wall (block stays within r in [0.05, 0.85])
 
 /** The counterweight — an IN-PLANE SASH-WEIGHT (FINAL). A rigid block seated at
