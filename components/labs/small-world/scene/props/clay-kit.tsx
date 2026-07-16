@@ -1,5 +1,4 @@
 'use client'
-import * as React from 'react'
 import { PALETTE } from '../../palette'
 import { useClayRamp } from '../toon-ramp'
 

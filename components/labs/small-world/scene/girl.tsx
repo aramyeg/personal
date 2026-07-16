@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
+import { PALETTE } from '../palette'
 import { PLANET_RADIUS, surfaceYAt } from './planet'
 import { STANCE_Z } from './stage'
 import type { JourneyRef } from './use-journey'
@@ -28,10 +29,11 @@ const MIN_TIMESCALE = 0.12
  */
 export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const group = useRef<THREE.Group>(null)
+  const shadow = useRef<THREE.Mesh>(null)
   const { scene, animations } = useGLTF(GIRL_URL)
   const { actions, mixer } = useAnimations(animations, group)
   const lastRotation = useRef<number | null>(null)
-  const timeScale = useRef(0)
+  const timeScale = useRef(MIN_TIMESCALE)
 
   useEffect(() => {
     actions[CLIP_NAME]?.reset().play()
@@ -46,14 +48,24 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     const targetScale = THREE.MathUtils.clamp(surfaceSpeed / CLIP_STRIDE, MIN_TIMESCALE, 2.5)
     timeScale.current = THREE.MathUtils.damp(timeScale.current, targetScale, DAMP_LAMBDA, dt)
     mixer.timeScale = timeScale.current
+    const groundY = surfaceYAt(STANCE_Z, rotation)
     if (group.current) {
-      group.current.position.y = surfaceYAt(STANCE_Z, rotation)
+      group.current.position.y = groundY
+    }
+    if (shadow.current) {
+      shadow.current.position.y = groundY + 0.015
     }
   })
 
   return (
-    <group ref={group} position={[0, PLANET_RADIUS, STANCE_Z]}>
-      <primitive object={scene} scale={GIRL_SCALE} />
-    </group>
+    <>
+      <group ref={group} position={[0, PLANET_RADIUS, STANCE_Z]}>
+        <primitive object={scene} scale={GIRL_SCALE} />
+      </group>
+      <mesh ref={shadow} position={[0, PLANET_RADIUS, STANCE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.24, 24]} />
+        <meshBasicMaterial color={PALETTE.ink} transparent opacity={0.22} depthWrite={false} />
+      </mesh>
+    </>
   )
 }
