@@ -138,9 +138,13 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
 }
 
 /**
- * The clay-glaze water sphere at WATER_LEVEL. Ocean basin, river channels and
- * the canyon floor dip below it, so it shows through as sea, veins and pools;
- * vertex colors deepen river → riverDeep where the floor sinks farthest.
+ * The clay water sphere at WATER_LEVEL. Every basin, river channel and canyon
+ * floor dips below it, so it shows through as sea, veins and pools. Deep river
+ * blue DOMINATES the surface (darkening toward an ink-blue abyss in the deeps);
+ * the lighter river blue survives only as a shallow rim near shores. The sphere
+ * carries its own gentle inward-only clay displacement so it reads as
+ * hand-pushed clay under the toon ramp, never flat glass — and never pokes
+ * above the shoreline.
  */
 function useWaterGeometry(): THREE.SphereGeometry {
   return useMemo(() => {
@@ -150,16 +154,27 @@ function useWaterGeometry(): THREE.SphereGeometry {
     const v = new THREE.Vector3()
     const river = new THREE.Color(PALETTE.river)
     const deep = new THREE.Color(PALETTE.riverDeep)
+    const abyss = deep.clone().lerp(new THREE.Color(PALETTE.ink), 0.4)
     const c = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
       const dir = v.clone().normalize()
       const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
-      const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.06, 0, 1)
-      c.lerpColors(river, deep, depth)
+      const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
+      // deep-blue dominant, darkening into the abyss where the floor sinks far
+      c.copy(deep).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.35, 1))
+      // lighter shallow rim only near the shoreline
+      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.28)
+      c.lerp(river, 0.55 * rim)
       colors.set([c.r, c.g, c.b], i * 3)
+      // gentle clay lumps, inward-only (radius never exceeds WATER_LEVEL → no
+      // shoreline poke-through); faceted normals catch the ramp as clay.
+      const w = Math.sin(5.1 * dir.x + 1.3) * Math.sin(4.7 * dir.y - 0.7) * Math.sin(5.3 * dir.z + 2.1)
+      v.multiplyScalar(1 - 0.006 * (0.5 + 0.5 * w))
+      pos.setXYZ(i, v.x, v.y, v.z)
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    geo.computeVertexNormals()
     return geo
   }, [])
 }

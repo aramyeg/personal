@@ -14,6 +14,7 @@ import { ChapterSet } from './props/chapter-set'
 import { GlobalDressing } from './props/global-dressing'
 import { Forest } from './props/forest'
 import { Bridges } from './props/bridges'
+import { Delights } from './props/delights'
 import { BluenetSet } from './props/set-bluenet'
 import { FlyerbeeSet } from './props/set-flyerbee'
 import { Dialog360Set } from './props/set-360dialog'
@@ -62,6 +63,7 @@ function SceneContents({ progressRef }: SceneProps) {
         <GlobalDressing />
         <Forest />
         <Bridges />
+        <Delights />
         <ChapterSet index={0} journeyRef={journeyRef}>
           <BluenetSet />
         </ChapterSet>

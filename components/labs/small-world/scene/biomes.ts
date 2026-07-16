@@ -18,6 +18,8 @@
 
 export type Cap = { dir: readonly [number, number, number]; radius: number; feather: number }
 export type Peak = { dir: readonly [number, number, number]; h: number; r: number }
+/** A basin of water: a cap that carves the terrain down to a floor. */
+export type WaterBody = Cap & { depth: number }
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
 const smoothstep01 = (t: number): number => {
@@ -33,16 +35,31 @@ function norm3(v: readonly [number, number, number]): [number, number, number] {
 
 /** Water glaze radius as a fraction of PLANET_RADIUS (Aram's "a lot more water"). */
 export const WATER_LEVEL = 0.972
-/** River channel floor + ocean floor depth targets (bump units, radius = R·(1+bump)). */
+/** River channel floor depth target (bump units, radius = R·(1+bump)). */
 const RIVER_DEPTH = 0.05 // floor ~0.95R — below waterline, above ocean floor
-const OCEAN_DEPTH = 0.09 // floor ~0.91R — a genuine basin
 const CANYON_DEPTH = 0.055
 const CANYON_BANK = 0.05
 
-// --- Authored regions ------------------------------------------------------
+// --- Water bodies ----------------------------------------------------------
 
-/** The ocean owns the +x side: a hemisphere-ish basin at the right pole. */
-export const OCEAN: Cap = { dir: norm3([0.94, -0.12, 0.16]), radius: 0.95, feather: 0.34 }
+/** The ocean owns the +x side: a hemisphere-ish basin at the right pole,
+ *  present every rotation. */
+export const OCEAN: WaterBody = { dir: norm3([0.94, -0.12, 0.16]), radius: 0.95, feather: 0.34, depth: 0.09 }
+/** A secondary sea a third of the way round — catches the middle river so the
+ *  water isn't clustered on the ocean's hemisphere. */
+export const SEA: WaterBody = { dir: norm3([0.62, 0.16, -0.78]), radius: 0.4, feather: 0.26, depth: 0.06 }
+/** A cool highland lake near the top longitude — catches the last river. */
+export const LAKE: WaterBody = { dir: norm3([0.5, 0.82, -0.18]), radius: 0.34, feather: 0.22, depth: 0.055 }
+/** Every water body, ordered biggest-first. Rivers route to the nearest one. */
+export const WATER_BODIES: readonly WaterBody[] = [OCEAN, SEA, LAKE]
+
+/** A few little islands poking out of the ocean — small delight peaks that ride
+ *  above the basin's waterline, ringed by deep water. */
+export const ISLANDS: Peak[] = [
+  { dir: norm3([0.8, 0.12, 0.34]), h: 0.13, r: 0.055 },
+  { dir: norm3([0.87, -0.26, 0.18]), h: 0.11, r: 0.05 },
+  { dir: norm3([0.72, 0.28, 0.28]), h: 0.12, r: 0.05 },
+]
 
 /** The cold region on the near-left flank — pulled off the pure -x pole so its
  * snowy ground + range actually face the camera (a pole cap foreshortens to an
@@ -122,15 +139,29 @@ const RIVER_RAMP = 0.05 // carve feather beyond the half-width
 function crossPoint(theta: number): [number, number, number] {
   return [0, Math.cos(theta), Math.sin(theta)]
 }
-/** Each river arc runs from its spine crossing out toward the ocean edge. */
+/** Nearest water body to a unit direction (by angular distance to its centre). */
+function nearestBody(dx: number, dy: number, dz: number): WaterBody {
+  let best = WATER_BODIES[0]
+  let bestDot = -Infinity
+  for (let i = 0; i < WATER_BODIES.length; i++) {
+    const d = WATER_BODIES[i].dir
+    const dot = dx * d[0] + dy * d[1] + dz * d[2]
+    if (dot > bestDot) {
+      bestDot = dot
+      best = WATER_BODIES[i]
+    }
+  }
+  return best
+}
+/** Each river runs from its spine crossing out to its NEAREST water body, so the
+ *  three crossings drain to three different bodies and water veins the whole lap. */
 const RIVER_ARCS: Arc[] = RIVER_CROSSINGS.map((theta) => {
   const c = crossPoint(theta)
-  // aim at a point ~80% of the way toward the ocean centre so the mouth lands
-  // in the ocean shallows, bending off the spine toward +x.
-  const o = OCEAN.dir
-  const mx = c[0] * 0.2 + o[0] * 0.8
-  const my = c[1] * 0.2 + o[1] * 0.8
-  const mz = c[2] * 0.2 + o[2] * 0.8
+  const o = nearestBody(c[0], c[1], c[2]).dir
+  // aim ~82% of the way toward the body centre so the mouth lands in its shallows.
+  const mx = c[0] * 0.18 + o[0] * 0.82
+  const my = c[1] * 0.18 + o[1] * 0.82
+  const mz = c[2] * 0.18 + o[2] * 0.82
   return makeArc(c, [mx, my, mz])
 })
 
@@ -158,6 +189,16 @@ export function canyonDist(nx: number, ny: number, nz: number): number {
   return arcDist(nx, ny, nz, CANYON_ARC)
 }
 
+/** Strongest water-body membership at a point (0..1) — for beach + skip tests. */
+export function waterMask(nx: number, ny: number, nz: number): number {
+  let m = 0
+  for (let i = 0; i < WATER_BODIES.length; i++) {
+    const v = capMask(nx, ny, nz, WATER_BODIES[i])
+    if (v > m) m = v
+  }
+  return m
+}
+
 /**
  * Authored feature displacement, added on top of the base meadow in
  * terrainBump. Pure; scalar-only.
@@ -165,8 +206,20 @@ export function canyonDist(nx: number, ny: number, nz: number): number {
 export function biomeBump(nx: number, ny: number, nz: number): number {
   let bump = 0
 
-  // Ocean basin — dips well below the waterline into a real sea.
-  bump -= OCEAN_DEPTH * capMask(nx, ny, nz, OCEAN)
+  // Water basins — each dips below the waterline into a real body of water.
+  for (let i = 0; i < WATER_BODIES.length; i++) {
+    const b = WATER_BODIES[i]
+    bump -= b.depth * capMask(nx, ny, nz, b)
+  }
+
+  // Islands riding above the ocean basin — small delight peaks.
+  for (let i = 0; i < ISLANDS.length; i++) {
+    const p = ISLANDS[i]
+    const dot = clampU(nx * p.dir[0] + ny * p.dir[1] + nz * p.dir[2])
+    const d = Math.acos(dot)
+    const g = d / p.r
+    bump += p.h * Math.exp(-g * g)
+  }
 
   // The mountain range — gaussian peaks in a tight arc.
   for (let i = 0; i < RANGE.length; i++) {
@@ -215,10 +268,9 @@ export function biomeTint(
     return { kind: 'underwater', t: clamp01((WATER_LEVEL - radius) / 0.06) }
   }
 
-  const oceanM = capMask(nx, ny, nz, OCEAN)
   const rd = riverDist(nx, ny, nz)
-  const nearWater = oceanM > 0.02 || rd < RIVER_HALF + 0.05
-  // Beach: a thin sand band just above any waterline.
+  const nearWater = waterMask(nx, ny, nz) > 0.02 || rd < RIVER_HALF + 0.05
+  // Beach: a thin sand band just above any waterline (every body + river mouth).
   if (nearWater && radius < 0.986) {
     return { kind: 'beach', t: clamp01((0.986 - radius) / 0.014) }
   }
