@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { PLANET_RADIUS, surfaceYAt } from './planet'
-import { STANCE_Z } from './girl-proxy'
+import { STANCE_Z } from './stage'
 import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'

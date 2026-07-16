@@ -4,14 +4,9 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import { PLANET_RADIUS, surfaceYAt } from './planet'
+import { STANCE_Z } from './stage'
 import type { JourneyRef } from './use-journey'
 
-/**
- * Where the girl stands, in world z: slightly toward the viewer from the
- * apex, so she faces the camera and skips in its direction while incoming
- * terrain rises over the front horizon beneath her.
- */
-export const STANCE_Z = 0.75
 /** Surface distance covered by one skip — ties hop cadence to rotation. */
 const STRIDE = 0.55
 const HOP_HEIGHT = 0.16

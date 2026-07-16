@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
@@ -74,7 +75,13 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
   }, [])
 }
 
-export function Planet({ journeyRef }: { journeyRef: JourneyRef }) {
+export function Planet({
+  journeyRef,
+  children,
+}: {
+  journeyRef: JourneyRef
+  children?: ReactNode
+}) {
   const group = useRef<THREE.Group>(null)
   const ramp = useClayRamp()
   const geometry = useHillGeometry()
@@ -91,6 +98,7 @@ export function Planet({ journeyRef }: { journeyRef: JourneyRef }) {
       <mesh geometry={geometry}>
         <meshToonMaterial vertexColors gradientMap={ramp} />
       </mesh>
+      {children}
     </group>
   )
 }
