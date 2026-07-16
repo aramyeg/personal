@@ -18,17 +18,28 @@ judge what the D-gates cannot: how it LOOKS and how it FEELS.
 
 ## Gates
 
-E-G1 GOLDEN-BOARD DIFF (the anti-degradation gate)
-  - Harness: .superpowers/sdd/bench/golden/ (built in E0d).
+E-G1 GOLDEN-BOARD DIFF (the anti-degradation gate) — RESOLVED
+  2026-07-16 (harness live: .superpowers/sdd/bench/golden/, three
+  commands documented in its README; first full blessed set = 64
+  stations across all 10 spreads)
   - Stations per spread: rest, mid-turn 25/50/75%, two parallax
-    tilt extremes, each drivable piece at ~60% travel.
+    tilt extremes, each drivable piece at ~60% travel. Every
+    station double-captured (throwaway + keeper).
+  - THRESHOLD (measured): pixel-threshold 24/255, image threshold
+    0.5% diff pixels. Noise floor measured per station across all
+    spreads: 0.033–0.060% (worst: s9 rest — dust-mote layer is
+    irreducibly nondeterministic; freeze param filed as future
+    app-code improvement). Real-move signal: 0.72% = 12x worst
+    noise. Never tighten below ~0.1% while dust is unfrozen.
   - Every change touching visuals runs diff-boards against the
-    blessed set. Any image over threshold [TBD-E0d: measured
-    flake-floor + margin] requires either a bless (intentional,
-    improvement — orchestrator judgment, user at phase boundary)
-    or a revert. Degradation never ships.
+    blessed set; any failing image requires either a bless
+    (intentional improvement — orchestrator judgment, user at
+    phase boundary) or a revert. Degradation never ships. Exit
+    code enforces it (verified: intentional-change demo fails at
+    0.72% with heatmap outlining exactly the moved piece).
   - Blessed set lineage: user-approved at phase boundaries; between
     boundaries the orchestrator blesses only strict improvements.
+    Blessing overwrites (no history) — bless only reviewed boards.
 
 E-G2 SIGHTLINE (the "book completes 3D space" law) — RESOLVED by
   E0c audit 2026-07-16
@@ -185,10 +196,9 @@ E-G6 COMPOSED INTERACTION (no lone planes)
 
 ## TBD ledger (fill before pinning)
 
-- [ ] E-G1 diff threshold (from E0d flake measurement; interim
-      data: noise floor 0.039% on identical rest captures — dust
-      motes — vs 0.73% on a real piece move; awaiting per-station
-      worst-case across all spreads)
+- [x] E-G1 diff threshold (E0d: resolved 2026-07-16 — 0.5% gate,
+      noise floor 0.033–0.060% all spreads, signal 12x worst
+      noise; blessed set v1 = 64 stations live)
 - [x] E-G2 automated visibility technique (E0c: solver + screen-
       grid ray-cast; thresholds 95/50/8; resolved 2026-07-16)
 - [~] E-G3 min on-screen px (E0a: bracketed 115–215 fail / 620
