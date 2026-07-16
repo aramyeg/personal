@@ -20,16 +20,23 @@ consistency matters more than any single panel's beauty.
 
 > Production character reference sheet, four views in a clean grid: front,
 > three-quarter, side profile, back. The SAME character in every panel: a
-> cheerful cartoon girl in the chunky rounded style of Pixar's Turning Red —
-> big round head, large expressive eyes, short stocky limbs, bold simple
-> shapes, soft clay-like surfaces. Dark bob haircut with a small pink flower
-> clip. Outfit, identical in all four views: meadow-green spring dress
-> (hex #7BC47F) with a small pink blossom print (hex #F7A8C4), white
-> sneakers, blush-pink socks. Neutral A-pose: arms slightly out from the
-> body, relaxed open hands, straight posture, feet together at hip width.
-> Flat even studio lighting, no cast shadows, plain light-grey background,
-> no props, full body fully visible in every panel, consistent proportions
-> and outfit across all views. Clean 3D-render-style cel shading.
+> cheerful, confident cartoon girl in the chunky rounded style of Pixar's
+> Turning Red — big round head, big happy smile, short stocky limbs, bold
+> simple shapes, soft clay-like surfaces. Hair: dirty-blonde wavy hair to
+> the shoulders, loose face-framing front strands, and exactly ONE thin
+> small braid hanging with the front strands on one side of her face.
+> Chunky chrome mirrored wraparound sunglasses worn over her eyes, sporty
+> Oakley-like shape with rounded ladybug-shell lenses. Outfit, identical
+> in all four views: black tank top; over it an OPEN unbuttoned
+> short-sleeve pink shirt (hex #F7A8C4) with green (hex #4E9A51) and black
+> (hex #2B2B33) accent trim and a visible button placket, worn loose so
+> the tank top shows; vivid hot-pink galife-style trousers (hex #E86FA4) —
+> wide and flared at the thighs, tapering snug below the knee; white
+> sneakers. Neutral A-pose: arms slightly out from the body, relaxed open
+> hands, straight posture, feet together at hip width. Flat even studio
+> lighting, no cast shadows, plain light-grey background, no props, full
+> body fully visible in every panel, consistent proportions and outfit
+> across all views. Clean 3D-render-style cel shading.
 
 - Size: 1536×1024 (landscape grid) or one 1024×1536 per view — whichever
   ChatGPT keeps most consistent for you.
@@ -37,6 +44,18 @@ consistency matters more than any single panel's beauty.
   (Meshy inherits and worsens hand errors), and the silhouette reads
   "chunky-cute" — Meshy tends to flatten exaggeration, so the sheet should
   overshoot the chunkiness slightly.
+- Outfit-specific drift to watch across the four views: the sunglasses must
+  sit identically in every panel (generators love swapping them to the
+  forehead or dropping them in the back view); the open shirt must hang the
+  same way with the tank top visible; the single braid must stay on the
+  SAME side and stay singular (drift usually doubles it into symmetric
+  braids); the galife silhouette (wide thigh → tapered calf) must survive
+  the side view — that taper is what sells the trousers in 3D.
+- For Meshy: chunky wraparound frames are good news — thin wire glasses fuse
+  into the face or shatter during image-to-3D, but a sporty one-piece chrome
+  visor shape survives as clean geometry. If the mirrored-chrome read gets
+  lost after generation, that's recoverable on our side (a metallic material
+  override on the lens submesh), so don't burn regenerations chasing it.
 
 ## 2. The girl — Meshy pipeline (~48 credits)
 
@@ -89,10 +108,13 @@ art moment. Shared style block — paste this before each subject line:
 > shading, flat cel colors from a fixed palette: meadow green #7BC47F,
 > blossom pink #F7A8C4, river blue #6FB7D9, butter-cream #FFF3D6, clay
 > terracotta #D98E6A, ink #2B2B33. The recurring heroine: a cheerful chunky
-> cartoon girl (Turning Red style), dark bob with pink flower clip,
-> meadow-green spring dress with pink blossom print. Joyful discovery
-> energy, radial speed lines where noted, generous margins safe to crop,
-> no text or lettering anywhere in the image.
+> cartoon girl (Turning Red style), dirty-blonde wavy hair with loose
+> face-framing strands and one thin small braid on one side, chrome
+> mirrored wraparound sunglasses with rounded ladybug-shell lenses, open
+> unbuttoned pink shirt with green-black trim over a black tank top,
+> vivid hot-pink galife trousers tapered below the knee, white sneakers.
+> Joyful discovery energy, radial speed lines where noted, generous
+> margins safe to crop, no text or lettering anywhere in the image.
 
 Per-chapter subject lines:
 
