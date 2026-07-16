@@ -169,6 +169,23 @@ Between gates: orchestrator runs strict visual reviews solo (autonomy
 directive); implementation delegated to subagents (opus/sonnet, never
 haiku), orchestrator reviews and commits.
 
+## Open question (Aram, 2026-07-16, parked at his call)
+
+Per-chapter turn may grow from 60° to 90–120° (total 540–720° — more than
+one lap), which requires "re-rendering an unexisting part of the planet":
+longitudes get revisited, so the landscape must change on the way around.
+Keep 60° until we have a real answer. Analysis so far: chapters live in PROP
+SETS that grow/sink (not baked terrain), so longitude reuse is already
+mostly safe — the outgoing set is gone before a longitude comes back; the
+remaining work is (a) ROTATION_TOTAL becoming a per-chapter slice constant,
+(b) anchor overlap bookkeeping, (c) optionally morphing `terrainBump` per
+chapter ("changing the landshaft") for true terrain change. Revisit at
+Phase 2 planning.
+
+Gate-0 verdict (2026-07-16): palette approved for now; facing-the-viewer
+orientation confirmed and shipped. Future dressing he named (not now):
+earthy textures, blue water on the globe, bridges, animals along the sides.
+
 ## Risks
 
 - **Meshy character quality below the bar** — mitigated by Gate 0 ordering;
