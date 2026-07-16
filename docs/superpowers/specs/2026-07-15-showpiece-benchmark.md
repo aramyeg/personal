@@ -70,17 +70,41 @@ E-G3 SCALE FLOORS (anti-debris)
   - Dressing pieces exempt but counted: max [TBD] small pieces per
     spread (prune law).
 
-E-G4 FRAME-TIME + ARTIFACT (crisp motion, his pinned bar)
-  - Frame-time half: during page turns and interactive drags,
-    p95 frame <= 16.7ms and worst frame <= [TBD-E0b: measured
-    now + ratchet plan] at reference viewport (dev-mode numbers
-    recorded separately; the gate binds on production build
-    measurements at phase boundaries).
-  - Artifact half, ZERO TOLERANCE: no flashing, no flickering, no
-    unintended dimming, no z-fighting shimmer, no texture pop-in
-    during any turn/drag/spread change. Verified by burst-capture
-    sequences [TBD-E0b: technique from the artifact profile] —
-    any single anomalous frame is a failure.
+E-G4 FRAME-TIME + ARTIFACT (crisp motion, his pinned bar) —
+  RESOLVED by E0b profile 2026-07-16 (data:
+  .superpowers/sdd/bench/out/e0/perf/)
+  - Measurement law: HEADED Chromium only — headless falls back to
+    SwiftShader software WebGL and inflates frames 10–20x (measured
+    ~150ms idle frames that are renderer artifacts). Never gate on
+    headless numbers.
+  - Baseline measured (warm, headed, dev): page turns 8–9% of
+    frames > 33ms (worst 100–367ms); handle drags 1–2% > 33ms;
+    first-ever visit to a spread: 12 frames in a 2.3s window
+    (mean 190ms, worst 966ms) — dominated by first-use SHADER
+    PROGRAM COMPILATION, not texture decode.
+  - Gate targets (the fix wave must reach, then ratchet): during
+    warm turns and drags, ZERO frames > 33ms and p95 <= 16.7ms;
+    first-visit stall eliminated via shader warm-up/precompile.
+    Gate binds on production-build measurements at phase
+    boundaries; dev numbers tracked separately.
+  - Root causes filed for the fix wave: (1) per-layer
+    MeshBasicMaterial instances (every popup layer allocates its
+    own; three re-validates each material's program cache key per
+    frame — getParameters/getProgram dominate every CPU profile)
+    => pool materials by (color, transparent, alphaTest, side);
+    (2) shader compile on first spread visit => precompile/warm-up.
+    Input architecture confirmed GOOD (module-level drive channel,
+    no React state per pointermove) — do not rework it.
+  - Artifact half, ZERO TOLERANCE: no flashing, flickering,
+    unintended dimming, z-fighting shimmer, or texture pop-in.
+    Technique (proven): screencast + luminance/pixel transient
+    scoring, whole-canvas AND per-handle ROI; any single anomalous
+    frame is a failure. Measured today: zero whole-canvas events
+    (candle flicker + shadow curves are clean); THREE local
+    one-frame bugs filed for the fix wave with before/FLAG/after
+    triplets: satchel-sword full-piece vanish (frame 47/175),
+    satchel-compass pose jump (80/181), end-keepsake edge-mark
+    dropout (96/140).
 
 E-G5 ART FIDELITY (in-scene == generated) — RESOLVED by E0a audit
   2026-07-16 (full ranked-degrader report:
@@ -103,9 +127,26 @@ E-G5 ART FIDELITY (in-scene == generated) — RESOLVED by E0a audit
         7–11x minify all fail; <= 4x pass);
     (f) FOLD_SHADE_TINT reserved for placeholder stock — painted
         art never multiplied by the shade tint;
-    (g) camouflage check: no piece tinted within legibility range
-        of the neighbor it sits against (the ch3-balcony class —
-        geometrically visible, visually absent).
+    (g) FIGURE/GROUND CONTRAST FLOOR (the camouflage gate,
+        refined by the E0a addendum): from the reading camera,
+        every story piece must clear ~25 mean-luma delta OR a hue
+        break against the layer directly behind it — measurable
+        with the E-G2 solver+raycast rig (sample piece texels +
+        nearest layer behind each). Orthogonal to E-G2: a piece
+        can be visible yet camouflaged. Measured case: ch3-balcony
+        IS painted (content.ts comment stale) but sits at |dLum| 9
+        against the dark rank tower — merge; it separates fine
+        (dLum 72+) from the lit half. Craft levers: contact/drop
+        shadow onto the backdrop, darken-blur band behind story
+        pieces, palette nudges — the thin cream cut-rim cannot
+        separate grey-on-grey.
+    (h) LATENT KRAFT DEBT: 48 of 88 pieces are unpainted placeholder
+        stock (the box/platform/dress/kinetic/fan family) — a
+        book-wide camouflage bomb against warm backdrops. They
+        cannot pass legibility judgment until painted; the E1/E2
+        per-face briefs absorb this list (many are also E-G2
+        occlusion debt: ch2-meadow, ch6-strongbox, ch4-chest —
+        double-hidden).
   - OPEN BUG (fix wave, highest severity): knob-tier art loads
     (manifest + disk + 200 fetch, wiring reads correct) but the
     tier renders the kraft branch — runtime trace needed
@@ -138,6 +179,8 @@ E-G6 COMPOSED INTERACTION (no lone planes)
 - [~] E-G3 min on-screen px (E0a: bracketed 115–215 fail / 620
       pass; proposed 300–400px — confirm vs E1 boards); hero
       fraction still TBD-E1
-- [ ] E-G4 frame-time numbers + artifact capture technique (E0b)
+- [x] E-G4 frame-time numbers + artifact technique (E0b: resolved
+      2026-07-16; material-pooling + shader-warmup + 3 local
+      artifact bugs filed for the fix wave)
 - [x] E-G5 pipeline floors per degrader (E0a: resolved 2026-07-16;
       knob-tier wiring bug filed for the fix wave)
