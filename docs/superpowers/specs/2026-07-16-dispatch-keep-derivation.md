@@ -119,6 +119,19 @@ re-derivation; only collapse paths changed):
   still 0.13) and the vertical-hinge swing-out (lateral +n reach
   survives at partial deploy). Any counterweight with off-wall
   reach is the rejected class.
+
+  WINDING LAW (integration find, 2026-07-16): the bench's
+  storyPatches winds wallR z0-first (INWARD seat normal); the
+  render's solveBoxPose winds z1-first (OUTWARD, FrontSide). Any
+  HINGED rider on a keep wall therefore swings in OPPOSITE
+  directions in bench vs a naive render port (measured: same
+  constants, −0.015 contained vs −0.080 through-page). Every
+  future wallR/wallL rider must reconcile winding explicitly
+  (reorder the render quad to the bench's proven frame, as the
+  shutter port does) — or better, prefer riders that TRANSLATE in
+  the wall plane (the sash-weight idiom), which are winding-
+  insensitive by construction. This hazard is a second,
+  independent reason the in-plane counterweight is final.
 Bench corrections (derive-keep-winch.mjs, all 7 gates green):
 - N4 = BODY CONTAINMENT at book-closed (tL=tR=PI): max off-page
   world-Y <= FLAT_TOL 0.02; measured 0.0150 (semaphore spine
