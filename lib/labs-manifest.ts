@@ -73,6 +73,14 @@ export const labs: LabEntry[] = [
       'The portfolio as enterprise SaaS — a navy-and-white operations console where the museum itself is the managed asset. Every ritual played straight; the pagination paginates six rows.',
     status: 'live',
   },
+  {
+    slug: 'small-world',
+    title: 'Small World',
+    date: '2026-07-16',
+    thesis:
+      'A clay planet small enough to walk in an afternoon — every lap of it is a career. A cartoon girl skips through six chapters as the world resculpts itself under her feet.',
+    status: 'wip',
+  },
 ]
 
 /** What hangs in the main hall — everything not retired to the attic. */

@@ -1,0 +1,63 @@
+<!-- scripts/posters/small-world-poster.html -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Bangers&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { width: 768px; height: 1024px; overflow: hidden; position: relative;
+    background: linear-gradient(180deg, #FFF3D6 0%, #FFF3D6 46%, #FFE3EC 78%, #F7A8C4 100%); }
+  .planet { position: absolute; left: 50%; bottom: -620px; transform: translateX(-50%);
+    width: 1100px; height: 1100px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 18%, #A8DCA0 0%, #7BC47F 42%, #4E9A51 100%);
+    box-shadow: 0 -14px 0 #4E9A51 inset; }
+  .hill { position: absolute; border-radius: 50%; background: #A8DCA0; }
+  .hill.a { width: 300px; height: 120px; left: 60px; bottom: 400px; }
+  .hill.b { width: 380px; height: 150px; right: 30px; bottom: 360px; background: #7BC47F; }
+  .river { position: absolute; width: 200px; height: 70px; border-radius: 50%;
+    background: #6FB7D9; left: 300px; bottom: 330px; box-shadow: 0 6px 0 #4E9EC7 inset; }
+  .blossom { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #F7A8C4;
+    box-shadow: 0 4px 0 #E86FA4 inset; }
+  .girl { position: absolute; left: 50%; bottom: 470px; transform: translateX(-50%); width: 120px; }
+  .girl .head { width: 74px; height: 68px; border-radius: 50%; background: #F3C6A5; margin: 0 auto; position: relative; }
+  .girl .hair { position: absolute; top: -12px; left: -8px; width: 90px; height: 52px;
+    border-radius: 50% 50% 40% 40%; background: #C9A86A; }
+  .girl .shades { position: absolute; top: 24px; left: 8px; width: 58px; height: 18px; border-radius: 10px;
+    background: linear-gradient(120deg, #e8e8f2, #9aa0b4 60%, #dfe3ee); border: 3px solid #2B2B33; }
+  .girl .torso { width: 60px; height: 54px; margin: -4px auto 0; background: #2B2B33; border-radius: 12px; position: relative; }
+  .girl .shirt-l, .girl .shirt-r { position: absolute; top: 0; width: 22px; height: 54px; background: #F7A8C4;
+    border: 3px solid #2B2B33; }
+  .girl .shirt-l { left: -14px; border-radius: 10px 4px 4px 10px; }
+  .girl .shirt-r { right: -14px; border-radius: 4px 10px 10px 4px; }
+  .girl .pants { width: 74px; height: 46px; margin: -2px auto 0; background: #E86FA4;
+    border-radius: 26px 26px 10px 10px; }
+  .girl .shoe-l, .girl .shoe-r { width: 24px; height: 12px; background: #fff; border: 3px solid #2B2B33;
+    border-radius: 8px; display: inline-block; margin: -2px 4px 0; }
+  .shoes { text-align: center; }
+  h1 { position: absolute; top: 84px; width: 100%; text-align: center;
+    font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 92px; color: #2B2B33; letter-spacing: 1px; }
+  .sub { position: absolute; top: 196px; width: 100%; text-align: center;
+    font-family: 'Bangers', cursive; font-size: 30px; color: #E86FA4; letter-spacing: 3px; }
+</style>
+</head>
+<body>
+  <h1>Small World</h1>
+  <div class="sub">ONE LAP OF IT IS A CAREER</div>
+  <div class="planet"></div>
+  <div class="hill a"></div>
+  <div class="hill b"></div>
+  <div class="river"></div>
+  <div class="blossom" style="left:130px; bottom:430px"></div>
+  <div class="blossom" style="left:210px; bottom:390px; width:20px; height:20px"></div>
+  <div class="blossom" style="right:150px; bottom:440px"></div>
+  <div class="blossom" style="right:240px; bottom:395px; width:18px; height:18px"></div>
+  <div class="girl">
+    <div class="head"><div class="hair"></div><div class="shades"></div></div>
+    <div class="torso"><div class="shirt-l"></div><div class="shirt-r"></div></div>
+    <div class="pants"></div>
+    <div class="shoes"><span class="shoe-l"></span><span class="shoe-r"></span></div>
+  </div>
+</body>
+</html>

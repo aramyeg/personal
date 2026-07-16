@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Small World — Style Lab',
     description: 'A clay planet small enough to walk in an afternoon — every lap of it is a career.',
-    // images: poster.jpg ships with the Phase 2 poster task — a reference now would 404 on shares.
+    images: [{ url: '/labs/small-world/poster.jpg', width: 768, height: 1024 }],
   },
 }
 
