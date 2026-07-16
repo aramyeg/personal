@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DELIVERED_ART, hasArt } from '@/components/labs/small-world/art-manifest'
+import { DELIVERED_ART, hasArt, panelArtSrc } from '@/components/labs/small-world/art-manifest'
 
 describe('small-world art manifest', () => {
   it('has delivered the girl and nothing else yet', () => {
@@ -11,5 +11,11 @@ describe('small-world art manifest', () => {
     expect(hasArt('girl')).toBe(true)
     expect(hasArt('')).toBe(false)
     expect(hasArt('panel-bluenet-1')).toBe(false)
+  })
+})
+
+describe('panelArtSrc', () => {
+  it('returns null while panel art is undelivered', () => {
+    expect(panelArtSrc('bluenet')).toBeNull()
   })
 })

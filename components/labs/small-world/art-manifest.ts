@@ -9,3 +9,11 @@ export const DELIVERED_ART: ReadonlySet<string> = new Set<string>([
 ])
 
 export const hasArt = (id: string): boolean => DELIVERED_ART.has(id)
+
+/** Panel art ships as public/labs/small-world/panels/<chapterId>-1.png,
+ * gated by a `panel-<chapterId>` entry in DELIVERED_ART. */
+export function panelArtSrc(chapterId: string): string | null {
+  return DELIVERED_ART.has(`panel-${chapterId}`)
+    ? `/labs/small-world/panels/${chapterId}-1.png`
+    : null
+}

@@ -1,10 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import type { MutableRefObject } from 'react'
 import { CHAPTER_COUNT } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
-import { SpeedLines } from './overlay/speed-lines'
-import { useJourneyUi } from './overlay/use-journey-ui'
+import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
 
 function detectWebGL(): boolean {
@@ -49,25 +47,23 @@ export function SmallWorldExperience() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [active])
 
+  const advanceTo = (p: number) => {
+    const el = trackRef.current
+    if (!el) return
+    const total = el.scrollHeight - window.innerHeight
+    const top = el.getBoundingClientRect().top + window.scrollY
+    window.scrollTo({ top: top + p * total, behavior: 'smooth' })
+  }
+
   if (!active) return null
 
   return (
     <div ref={trackRef} style={{ height: `${CHAPTER_COUNT * TRACK_VH_PER_CHAPTER}vh` }}>
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} />
-        <OverlayLayer progressRef={progressRef} />
+        <JourneyOverlay progressRef={progressRef} onAdvance={advanceTo} />
       </div>
       <style>{`.${FALLBACK_CLASS}{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}`}</style>
-    </div>
-  )
-}
-
-// Temporary scaffolding — Task 9 replaces this with a JourneyOverlay component.
-function OverlayLayer({ progressRef }: { progressRef: MutableRefObject<number> }) {
-  const ui = useJourneyUi(progressRef)
-  return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      <SpeedLines active={ui.burst} />
     </div>
   )
 }
