@@ -23,9 +23,16 @@ import { useStorybookStore } from '../store'
 // reads at roughly 55-65% of viewport width on a 16:9-ish desktop instead
 // of ~44%. Standing pop-up layers (up to ~1.05 world units tall) still
 // clear the frustum at rest and mid-turn — verified via screenshot, not
-// just math, since the perspective is a foreshortened top-down angle.
-const CAMERA_POSITION: [number, number, number] = [0, 2.6, 2.9]
-const CAMERA_LOOKAT: [number, number, number] = [0, 0.32, 0.15]
+// just math.
+// E1.5 PINNED COMPOSITION CAMERA (2026-07-17): lowered from the original
+// ~40deg lid-dominant view to a ~27deg reading angle — vertical faces
+// (facades, the surfaces that carry the scene) gain ~2x screen presence
+// while the painted page still reads as ground/sky. Every art and scale
+// decision from E1.5 on is composed for THIS frame; probed against all
+// 10 spreads (standing scenes gain, flat-lay spreads stay legible)
+// before pinning. Goldens re-blessed book-wide at this camera.
+const CAMERA_POSITION: [number, number, number] = [0, 1.85, 3.05]
+const CAMERA_LOOKAT: [number, number, number] = [0, 0.38, 0.05]
 const CAMERA_FOV = 34
 const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
