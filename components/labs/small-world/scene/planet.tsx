@@ -191,12 +191,14 @@ function accentMeadow(
       if (hi) dot(pal.honey, 0.5)
       else if (lo) dot(pal.dune, 0.55)
     } else if (band === 1) {
-      // B1 AKNA canyon: deep earth brown badlands, tuff-pink + terracotta speckle
-      dot(pal.earth, 0.8)
-      dot(pal.rust, 0.22)
-      if (hi) dot(pal.rust, 0.5)
-      else if (lo) dot(pal.tuff, 0.45) // tuff pink echo of the Yerevan street
-      if (hi2) dot(pal.earthDeep, 0.45)
+      // B1 AKNA: warm tuff-pink meadow SURROUND, so the rich-brown canyon (painted
+      // by the biomeTint 'canyon' kind) reads as clay ADDED onto pink-warm ground —
+      // a brown gorge winding through pink countryside. Tuff echoes the Yerevan set.
+      dot(pal.meadow, 0.18)
+      dot(pal.tuff, 0.62)
+      if (hi) dot(pal.blossom, 0.45)
+      else if (lo) dot(pal.petal, 0.45)
+      if (hi2) dot(pal.tuff, 0.45)
     } else {
       // B2 winter-meets-blossom: pink on white (snow kind covers the core)
       dot(pal.ice, 0.6)
@@ -243,10 +245,12 @@ function paintVertex(
       break
     }
     case 'canyon': {
-      // rich brown layered earth walls, darker in the channel floor
+      // rich brown layered earth: floor darkens to deep earth, banks/rims lighten
+      // to warm terracotta clay — authored contrast so the gorge reads as carved.
       c.copy(pal.earth)
-      c.lerp(pal.earthDeep, 0.4 * kt)
-      c.lerp(pal.rust, 0.18 * (1 - kt)) // terracotta on the upper banks
+      c.lerp(pal.earthDeep, 0.6 * kt) // creek floor / deep gorge = darkest
+      c.lerp(pal.clay, 0.4 * (1 - kt)) // upper banks + rims = lightened terracotta
+      c.lerp(pal.rust, 0.12) // overall terracotta warmth
       break
     }
     case 'snow': {

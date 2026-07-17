@@ -91,16 +91,24 @@ export function meridianDist(thetaC: number): number {
   return best
 }
 
-const MERIDIAN_HALF = 0.12
-const MERIDIAN_RAMP = 0.1
+// Neutral connective bands (Task 20 R2): tightened from 0.12 → 0.075 half-width
+// (same 0.833 feather ratio) so the green meridian seams read as brief countryside
+// breaths between scenes, not hard borders. Still EXACTLY 0 on each meridian
+// (meridianDist=0), so the A/B identity + m0 wrap-identity strip are untouched.
+const MERIDIAN_HALF = 0.075
+const MERIDIAN_RAMP = 0.0625
 /** 0 within MERIDIAN_HALF of a meridian, ramping to 1 in the band interior. */
 export function meridianGate(thetaC: number): number {
   return smoothstep01((meridianDist(thetaC) - MERIDIAN_HALF) / MERIDIAN_RAMP)
 }
 
-/** 1 near the spine, fading to 0 by |nx| = 0.75 (protects the polar caps/beach). */
+/** 1 near the spine, fading to 0 by |nx| = 0.75 (protects the polar caps/beach).
+ *  R2: holds full to |nx|=0.68 then drops sharply to 0 at 0.75, so wedge water
+ *  (the grand delta's arms) reaches closer to the polar-ocean shore before the
+ *  structural gate takes over — the blue-limb → channel → blue-limb read joins up
+ *  instead of leaving a dry shallow gap. Still EXACTLY 0 for |nx| ≥ 0.75. */
 export function polarLatGate(nx: number): number {
-  return 1 - smoothstep01((Math.abs(nx) - 0.63) / 0.12)
+  return 1 - smoothstep01((Math.abs(nx) - 0.68) / 0.07)
 }
 
 /** Master mask for every wedge delta — zero on the meridians AND at the poles. */
@@ -125,9 +133,12 @@ export function colorGate(thetaC: number, nx: number): number {
 /** Water glaze radius as a fraction of PLANET_RADIUS. */
 export const WATER_LEVEL = 0.972
 
-/** The two permanent polar oceans (variant-INVARIANT, the blue limbs). */
-export const POLAR_R: WaterBody = { dir: [1, 0, 0], radius: 0.72, feather: 0.36, depth: 0.11 }
-export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 0.72, feather: 0.36, depth: 0.11 }
+/** The two permanent polar oceans (variant-INVARIANT, the blue limbs). R2: radius
+ *  0.72 → 0.80 so the blue reads BIG on both limbs and its shore meets the wedge
+ *  water (the delta arms fade by |nx|=0.75; the ocean now reads blue from ~0.74)
+ *  — no dry sandy ring between the grand-delta artery and the limb it drains into. */
+export const POLAR_R: WaterBody = { dir: [1, 0, 0], radius: 0.8, feather: 0.34, depth: 0.11 }
+export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 0.8, feather: 0.34, depth: 0.11 }
 export const POLAR_OCEANS: readonly WaterBody[] = [POLAR_R, POLAR_L]
 
 /** Smooth 0..1 membership of a cap, feathered at its rim. */
@@ -200,17 +211,28 @@ export const RIVER_CROSSINGS = CROSSINGS_A
 
 // --- Channels: streams, the grand delta, the canyon creek ------------------
 
-type Channel = { arcs: Arc[]; half: number; ramp: number; depth: number }
+/** A carved water channel. `widen` (optional) grows the half-width + depth with
+ *  |nx| so a channel can stay a narrow bridge-span at the girl's lane (nx≈0) yet
+ *  open into a broad, deep artery off the lane — used by the grand delta so the
+ *  water is the protagonist across the face without flooding the near-spine props
+ *  or the walkable lane. */
+type Channel = {
+  arcs: Arc[]
+  half: number
+  ramp: number
+  depth: number
+  widen?: { half: number; depth: number; lo: number; hi: number }
+}
 
 const STREAM_HALF = 0.04
 const STREAM_RAMP = 0.05
 const STREAM_DEPTH = 0.055
 const DELTA_HALF = 0.1
 const DELTA_RAMP = 0.08
-const DELTA_DEPTH = 0.06
-const CREEK_HALF = 0.045
+const DELTA_DEPTH = 0.07
+const CREEK_HALF = 0.055
 const CREEK_RAMP = 0.05
-const CREEK_DEPTH = 0.055
+const CREEK_DEPTH = 0.08
 
 /** A single stream from a spine crossing out to a polar ocean (pole at ±x). */
 function streamChannel(theta: number, sign: 1 | -1, depth = STREAM_DEPTH): Channel {
@@ -219,42 +241,57 @@ function streamChannel(theta: number, sign: 1 | -1, depth = STREAM_DEPTH): Chann
   return { arcs: [makeArc(c, mouth)], half: STREAM_HALF, ramp: STREAM_RAMP, depth }
 }
 
-/** The grand delta: braided arcs from the RIGHT ocean through the spine crossing
- *  into the LEFT ocean, so blue enters both limbs of one frame. */
+/** The grand delta: ONE continuous wide artery from the RIGHT ocean through the
+ *  spine crossing into the LEFT ocean (blue enters both limbs of one frame), with
+ *  braided side-channels feeding it. `widen` keeps the crossing a modest bridge
+ *  span at the lane but opens the artery into a broad, deep channel off the lane
+ *  so the water — not the sand — is the protagonist. Sand islets (A_PEAKS[2]) and
+ *  the stepping-stone discs poke out of it as sandbars. */
 function deltaChannel(theta: number): Channel {
   const c = crossPoint(theta)
   const rMouth: [number, number, number] = [0.82, c[1] * 0.18, c[2] * 0.18]
   const lMouth: [number, number, number] = [-0.82, c[1] * 0.18, c[2] * 0.18]
-  // side braids: start OFF the girl's lane at shifted longitudes and diverge to
-  // the poles, so only the main channel crosses nx=0 but the face reads as a wide
-  // braided delta (lots of water + sand islets between the arms).
-  const braidR1 = place(0.28, theta + 0.16)
-  const braidL1 = place(-0.28, theta - 0.16)
-  const braidR2 = place(0.4, theta - 0.12)
-  const braidL2 = place(-0.4, theta + 0.12)
+  // braids: start near the main artery off the lane and fan toward the poles, so
+  // the face reads as one wide braided delta feeding the central thread (not
+  // disconnected pools). They diverge in longitude so sand islets sit between them.
+  const braidR1 = place(0.3, theta + 0.14)
+  const braidL1 = place(-0.3, theta - 0.14)
+  const braidR2 = place(0.46, theta - 0.1)
+  const braidL2 = place(-0.46, theta + 0.1)
+  const widen = { half: 0.2, depth: 0.05, lo: 0.1, hi: 0.44 }
   return {
     arcs: [
       makeArc(c, rMouth),
       makeArc(c, lMouth),
-      makeArc(braidR1, [0.72, braidR1[1] * 0.28, braidR1[2] * 0.28]),
-      makeArc(braidL1, [-0.72, braidL1[1] * 0.28, braidL1[2] * 0.28]),
-      makeArc(braidR2, [0.78, braidR2[1] * 0.2, braidR2[2] * 0.2]),
-      makeArc(braidL2, [-0.78, braidL2[1] * 0.2, braidL2[2] * 0.2]),
+      makeArc(braidR1, [0.74, braidR1[1] * 0.24, braidR1[2] * 0.24]),
+      makeArc(braidL1, [-0.74, braidL1[1] * 0.24, braidL1[2] * 0.24]),
+      makeArc(braidR2, [0.8, braidR2[1] * 0.18, braidR2[2] * 0.18]),
+      makeArc(braidL2, [-0.8, braidL2[1] * 0.18, braidL2[2] * 0.18]),
     ],
     half: DELTA_HALF,
     ramp: DELTA_RAMP,
     depth: DELTA_DEPTH,
+    widen,
   }
 }
 
-/** The canyon creek: a slightly meandering channel from the spine crossing to a
- *  polar ocean; its earth walls (banks) are added separately in sceneRaw. */
+/** The canyon creek: a meandering channel from the spine crossing to a polar
+ *  ocean, snaking down the canyon floor (its earth walls are added separately in
+ *  sceneRaw). Three segments give it a clear S-bend so it reads as a river in a
+ *  gorge, not a straight ditch. */
 function creekChannel(theta: number, sign: 1 | -1): Channel {
   const c = crossPoint(theta)
-  const bend = crossPoint(theta + 0.1)
-  const mid: [number, number, number] = [sign * 0.42, bend[1] * 0.58, bend[2] * 0.58]
+  const bend1 = crossPoint(theta + 0.14)
+  const bend2 = crossPoint(theta - 0.06)
+  const midA: [number, number, number] = [sign * 0.3, bend1[1] * 0.72, bend1[2] * 0.72]
+  const midB: [number, number, number] = [sign * 0.55, bend2[1] * 0.42, bend2[2] * 0.42]
   const mouth: [number, number, number] = [sign * 0.82, c[1] * 0.18, c[2] * 0.18]
-  return { arcs: [makeArc(c, mid), makeArc(mid, mouth)], half: CREEK_HALF, ramp: CREEK_RAMP, depth: CREEK_DEPTH }
+  return {
+    arcs: [makeArc(c, midA), makeArc(midA, midB), makeArc(midB, mouth)],
+    half: CREEK_HALF,
+    ramp: CREEK_RAMP,
+    depth: CREEK_DEPTH,
+  }
 }
 
 /** Variant channels indexed by band (band 0,1,2). */
@@ -276,8 +313,15 @@ function channelCarve(nx: number, ny: number, nz: number, ch: Channel): number {
     const x = arcDist(nx, ny, nz, ch.arcs[i])
     if (x < d) d = x
   }
-  if (d >= ch.half + ch.ramp) return 0
-  return -ch.depth * (1 - smoothstep01((d - ch.half) / ch.ramp))
+  let half = ch.half
+  let depth = ch.depth
+  if (ch.widen) {
+    const f = smoothstep01((Math.abs(nx) - ch.widen.lo) / (ch.widen.hi - ch.widen.lo))
+    half += ch.widen.half * f
+    depth += ch.widen.depth * f
+  }
+  if (d >= half + ch.ramp) return 0
+  return -depth * (1 - smoothstep01((d - half) / ch.ramp))
 }
 
 /** Distance (rad) to the nearest channel centre-line of a variant (beach tint). */
@@ -324,14 +368,17 @@ const A_PEAKS: readonly (readonly Peak[])[] = [
     { dir: norm3(place(-0.46, 3.5)), h: 0.05, r: 0.3 },
     { dir: norm3(place(0.48, 3.95)), h: 0.045, r: 0.28 },
   ],
-  // A2 delta: low braided sandbanks + islets between the channels
+  // A2 delta: low braided sandbanks + islets between the wide channel arms; each
+  // near-spine / off-lane stepping-stone disc sits on its own islet so it pokes
+  // out of the widened water as a sandbar (dry anchor) rather than drowning.
   [
     { dir: norm3(place(0.34, 5.5)), h: 0.03, r: 0.2 },
     { dir: norm3(place(-0.34, 5.95)), h: 0.03, r: 0.2 },
-    { dir: norm3(place(-0.26, 5.54)), h: 0.055, r: 0.15 }, // sandbar under the -x delta discs
-    { dir: norm3(place(0.28, 5.63)), h: 0.055, r: 0.15 }, // sandbar under the +x delta discs
+    { dir: norm3(place(-0.26, 5.54)), h: 0.1, r: 0.15 }, // sandbar holding the -x delta discs above the widened artery
+    { dir: norm3(place(0.28, 5.63)), h: 0.08, r: 0.15 }, // sandbar holding the +x delta discs above the widened artery
     { dir: norm3(place(0.52, 5.62)), h: 0.06, r: 0.06 }, // islet
     { dir: norm3(place(-0.5, 5.9)), h: 0.05, r: 0.055 }, // islet
+    { dir: norm3(place(0.318, 5.668)), h: 0.08, r: 0.06 }, // stepping-stone islet (ch2 disc t0.54 x0.7 → nx0.318)
   ],
 ]
 const B_PEAKS: readonly (readonly Peak[])[] = [
@@ -466,11 +513,18 @@ export function biomeTint(
   }
   const thetaC = canonicalTheta(Math.atan2(nz, ny))
   const band = bandOf(thetaC)
-  // B1 canyon walls read as rich brown clay.
-  if (variant === 1 && band === 1) {
+  // B1 canyon: the rich-brown gorge (near the creek) + standalone badland buttes
+  // read as clay added onto the pink-warm surround. `t` runs 1 in the creek floor
+  // (deepest brown) to 0 on the upper banks/rims (lightened terracotta) so the
+  // gorge has authored floor-dark / rim-light contrast, not a flat brown wash.
+  if (variant === 1 && band === 1 && meridianGate(thetaC) > 0.1 && polarLatGate(nx) > 0.1) {
     const cd = canyonCreekDist(nx, ny, nz)
-    if (cd < CREEK_HALF + 0.2 && meridianGate(thetaC) > 0.1 && polarLatGate(nx) > 0.1) {
-      return { kind: 'canyon', t: clamp01((CREEK_HALF + 0.2 - cd) / (CREEK_HALF + 0.2)) }
+    const CANYON_REACH = CREEK_HALF + 0.22
+    const nearCreek = cd < CANYON_REACH
+    const butte = currentBump > 0.045 // a raised mesa/butte of clay
+    if (nearCreek || butte) {
+      const t = nearCreek ? clamp01((CANYON_REACH - cd) / CANYON_REACH) : 0.35
+      return { kind: 'canyon', t }
     }
   }
   // B2 winter summit reads as snow (colour-gated so it seams at the meridians but
