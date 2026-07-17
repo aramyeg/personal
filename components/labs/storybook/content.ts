@@ -272,7 +272,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // Coplanar with a folding cap => zero off-plane reach: folds dead flat for
     // free, wedge containment inherits the cap's proof. Faces the reader (+z)
     // face-on. Semaphore mast sits behind the ridge (SEMAPHORE_BASE_Z) to clear it.
-    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.3, height: 0.2 },
+    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.36, height: 0.1942 },
   },
   // THE CITADEL RANK — a CONNECTED rooftop rank replacing the 6 isolated skyline
   // mounds (E1.5: "reading as ONE mass flanking the keep"). Per side, 3 UNIFORM
@@ -286,14 +286,14 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // L/R differ slightly (asymmetry). The full-art in-slope faces the reader
   // (die-cut roofline at the ridge); the out-slope is a shaded paper backing card.
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
-    { F: 0.73, w: 0.115, aRestDeg: 63, zc: -0.4, ridgeLen: 0.34 },
-    { F: 0.73, w: 0.115, aRestDeg: 63, zc: 0.0, ridgeLen: 0.34 },
-    { F: 0.73, w: 0.115, aRestDeg: 63, zc: 0.4, ridgeLen: 0.34 },
+    { F: 0.73, w: 0.0976, aRestDeg: 63, zc: -0.4, ridgeLen: 0.34 },
+    { F: 0.73, w: 0.0976, aRestDeg: 63, zc: 0.0, ridgeLen: 0.34 },
+    { F: 0.73, w: 0.1068, aRestDeg: 63, zc: 0.4, ridgeLen: 0.34 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
-    { F: 0.71, w: 0.115, aRestDeg: 61, zc: -0.4, ridgeLen: 0.34 },
-    { F: 0.71, w: 0.115, aRestDeg: 61, zc: 0.0, ridgeLen: 0.34 },
-    { F: 0.71, w: 0.115, aRestDeg: 61, zc: 0.4, ridgeLen: 0.34 },
+    { F: 0.71, w: 0.1068, aRestDeg: 61, zc: -0.4, ridgeLen: 0.34 },
+    { F: 0.71, w: 0.1068, aRestDeg: 61, zc: 0.0, ridgeLen: 0.34 },
+    { F: 0.71, w: 0.0976, aRestDeg: 61, zc: 0.4, ridgeLen: 0.34 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
@@ -332,7 +332,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its
   // scalloped painter reading as the yard's front wall until real art lands.
-  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.25 },
+  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.2113 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):

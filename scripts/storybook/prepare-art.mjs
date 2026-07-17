@@ -65,6 +65,9 @@ const PAD_TO_ASPECT = {
 // (walls with windows, skyline scenes), which must be redrawn to the mesh
 // aspect instead. Sources in art-src keep the full frame, so crops are
 // reversible. See the keep art-aspect bench.
+// Values: a number (centered crop) or { aspect, anchor: 'bottom' } to keep
+// the LOWER content when cropping height (tier faces whose deliveries added
+// roofs/spires above the architectural band the mesh actually shows).
 const CROP_TO_ASPECT = {
   // E1.5 re-massed story dims (content.ts ch3-keep: hall a .40 H .25 z .68,
   // gallery a .34 H .22 z .56, loft a .27 H .18 z .40, crown a .15 gable .10
@@ -73,6 +76,10 @@ const CROP_TO_ASPECT = {
   'ch3-keep-gallery-top': 0.68 / 0.56, // weathered deck boards
   'ch3-keep-loft-top': 0.54 / 0.4, // plain cap slab
   'ch3-keep-crown-top': (2 * Math.hypot(0.15, 0.1)) / 0.28, // gable pitch
+  // v2 tier faces (delivered beyond their bands):
+  'ch3-keep-hall-front': 0.8 / 0.25, // centered: keeps the gate, trims outer width
+  'ch3-keep-loft-front': { aspect: 0.54 / 0.18, anchor: 'bottom' }, // keeps arch+ledge, trims the painted roof
+  'ch3-keep-crown-front': { aspect: 0.3 / 0.15, anchor: 'bottom' }, // keeps the lamp band, trims the painted cone
 }
 
 // FAN-OUT (per source id, dest ids): one processed panel saved under several
@@ -80,9 +87,12 @@ const CROP_TO_ASPECT = {
 // strip paintings (a/b/c) each serve one slot per side, at separated
 // positions so the reuse never reads as a repeat.
 const FAN_OUT = {
-  'ch3-citadel-a': ['ch3-skyline-l-mound0', 'ch3-skyline-r-mound1'],
-  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2'],
-  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0'],
+  // INTERIM: the delivered ch3-citadel-a.png was a mis-saved balcony
+  // duplicate, so strips b/c cover its two slots until a real citadel-a
+  // lands (then restore: a -> [l-mound0, r-mound1]).
+  'ch3-citadel-a': [],
+  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2', 'ch3-skyline-l-mound0'],
+  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0', 'ch3-skyline-r-mound1'],
 }
 
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
@@ -338,10 +348,13 @@ async function processOne(fileName) {
   // leftover padding reads as the piece floating above the paper.
   pipeline = pipeline.trim()
 
-  // Cover-crop to the mesh aspect (centered) for full-bleed texture faces
-  // delivered at the wrong aspect, computed from the true post-trim size.
-  const cropAspect = CROP_TO_ASPECT[id]
-  if (cropAspect) {
+  // Cover-crop to the mesh aspect for full-bleed texture faces delivered at
+  // the wrong aspect, computed from the true post-trim size. Centered by
+  // default; 'bottom' anchor keeps the lower content when trimming height.
+  const cropSpec = CROP_TO_ASPECT[id]
+  if (cropSpec) {
+    const cropAspect = typeof cropSpec === 'number' ? cropSpec : cropSpec.aspect
+    const anchor = typeof cropSpec === 'number' ? 'center' : (cropSpec.anchor ?? 'center')
     const trimmed = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
     const { width: tw, height: th, channels } = trimmed.info
     let cw = tw
@@ -352,7 +365,7 @@ async function processOne(fileName) {
     if (cw < tw || chh < th) {
       pipeline = pipeline.extract({
         left: Math.floor((tw - cw) / 2),
-        top: Math.floor((th - chh) / 2),
+        top: anchor === 'bottom' ? th - chh : Math.floor((th - chh) / 2),
         width: cw,
         height: chh,
       })
