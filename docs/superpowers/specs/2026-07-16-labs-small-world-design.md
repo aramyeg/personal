@@ -169,18 +169,35 @@ Between gates: orchestrator runs strict visual reviews solo (autonomy
 directive); implementation delegated to subagents (opus/sonnet, never
 haiku), orchestrator reviews and commits.
 
-## Open question (Aram, 2026-07-16, parked at his call)
+## Resolved: 120° per chapter (Aram called it, 2026-07-17)
 
-Per-chapter turn may grow from 60° to 90–120° (total 540–720° — more than
-one lap), which requires "re-rendering an unexisting part of the planet":
-longitudes get revisited, so the landscape must change on the way around.
-Keep 60° until we have a real answer. Analysis so far: chapters live in PROP
-SETS that grow/sink (not baked terrain), so longitude reuse is already
-mostly safe — the outgoing set is gone before a longitude comes back; the
-remaining work is (a) ROTATION_TOTAL becoming a per-chapter slice constant,
-(b) anchor overlap bookkeeping, (c) optionally morphing `terrainBump` per
-chapter ("changing the landshaft") for true terrain change. Revisit at
-Phase 2 planning.
+The parked question is decided: per-chapter turn goes 60° → 120°, total
+720° = TWO full laps; "the planet will need to generate new content" for
+the revisited longitudes. Design:
+
+1. **Mechanical switch (Phase 3a):** `ROTATION_TOTAL = 4π`; CHAPTER_SLICE
+   derives (120°). Chapter sets already anchor via `chapterTheta` — sets
+   4–6 land on lap-1 longitudes mod 2π, which is SAFE by the morph
+   adjacency rule (only chapters i and i−1 are ever visible; the set that
+   used a longitude one lap ago is fully sunk). Girl crosses each bridge
+   twice — a real planet, fine. Pacing: track lengthens
+   (TRACK_VH_PER_CHAPTER 150 → ~240) so degrees-per-scroll stays cozy;
+   timeline tests that pin 2π-derived rotations update deliberately (the
+   ONE sanctioned test change). Burst/panel windows are segment-fractions —
+   unchanged.
+2. **New content on lap 2 (Phase 3b — "changing the landshaft"):** the lap
+   boundary (rotation = 2π) falls exactly at the chapter 3→4 transition,
+   whose PANEL DWELL freezes rotation — the world morph plays there,
+   behind the comic panel, and finishes by the release. Mechanism: bake
+   TWO land variants (bumpA/bumpB + colorsA/colorsB); CPU-lerp the
+   geometry's position+color attributes over the dwell window;
+   `terrainBump`/`surfaceYAt`/`walkYAt`/`anchorTransform` gain a lap-blend
+   parameter so ground math follows the morph. CONSTRAINT: water geography
+   (ocean/sea/lake/rivers/crossings) stays IDENTICAL across laps — bridges
+   and dryness contracts must hold on both — only LAND changes: autumn
+   color story (meadow→honey, blossoms→amber), mountains grow, canyon
+   deepens, snow region spreads; dressing/delights get lap-gated variants
+   (grow/sink like ChapterSets). One dryness scan per variant.
 
 Gate-0 verdict (2026-07-16): palette approved for now; facing-the-viewer
 orientation confirmed and shipped. Future dressing he named (not now):
