@@ -1,206 +1,95 @@
 'use client'
-import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { PLANET_RADIUS, WATER_LEVEL } from '../planet'
-import { ISLANDS, SEA } from '../biomes'
-import { activeVariantAt, canonicalTheta } from '../renewal'
+import { POLAR_R, POLAR_L, WATER_LEVEL } from '../biomes'
+import { PLANET_RADIUS } from '../planet'
 import { PropAnchor } from './prop-anchor'
 import { GatedProp } from './gated-prop'
-import { ClayBlossom, ClayDisc, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
+import { ClayBlossom, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
 const Y_UP = new THREE.Vector3(0, 1, 0)
 
-/** PropAnchor params reproducing a unit direction (island tops sit on terrain). */
-function anchorFor(dir: readonly [number, number, number]): { theta: number; x: number } {
-  return { theta: Math.atan2(dir[2], dir[1]), x: dir[0] * PLANET_RADIUS }
-}
-
-/** A frozen pond inside the snow cap: a flat snow-tinted ice disc ringed by a
- *  slightly wider river-blue rim, flat-shaded under the ramp so it reads as ice. */
-function FrozenPond({ theta, x }: { theta: number; x: number }) {
+/** Flat ice floes sitting on a polar ocean's surface (variant-INVARIANT — the
+ *  polar oceans never morph, so these never pop). Tangent offsets around the
+ *  pole centre; each floe rides at the waterline. */
+function PolarFloes({ cap, spec }: { cap: { dir: readonly [number, number, number] }; spec: Array<[number, number, number]> }) {
   const ramp = useClayRamp()
-  return (
-    <PropAnchor theta={theta} x={x}>
-      <mesh position={[0, 0.012, 0]}>
-        <cylinderGeometry args={[0.19, 0.2, 0.024, 16]} />
-        <meshToonMaterial color={PALETTE.river} gradientMap={ramp} />
-      </mesh>
-      <mesh position={[0, 0.03, 0]}>
-        <cylinderGeometry args={[0.15, 0.155, 0.02, 14]} />
-        <meshToonMaterial color={PALETTE.snow} gradientMap={ramp} />
-      </mesh>
-    </PropAnchor>
-  )
-}
-
-/** A bare dead winter tree — a dark earth trunk with a couple of leafless
- *  branches, no crown. Sits on the snowy ground for the cold-region read. */
-function WinterTree({ theta, x, scale = 1 }: { theta: number; x: number; scale?: number }) {
-  const ramp = useClayRamp()
-  return (
-    <PropAnchor theta={theta} x={x}>
-      <group scale={scale}>
-        <mesh position={[0, 0.16, 0]}>
-          <cylinderGeometry args={[0.018, 0.03, 0.32, 6]} />
-          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
-        </mesh>
-        <mesh position={[0.05, 0.26, 0]} rotation={[0, 0, -0.8]}>
-          <cylinderGeometry args={[0.01, 0.014, 0.16, 5]} />
-          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
-        </mesh>
-        <mesh position={[-0.045, 0.3, 0.02]} rotation={[0.3, 0, 0.9]}>
-          <cylinderGeometry args={[0.008, 0.012, 0.13, 5]} />
-          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
-        </mesh>
-      </group>
-    </PropAnchor>
-  )
-}
-
-/** Snow-cap delights: a frozen pond and bare winter trees inside the cold cap. */
-function SnowRegion() {
-  const pond = anchorFor([-0.6, 0.05, 0.62])
-  const trees: Array<[number, number, number]> = [
-    ...([[-0.7, 0.2, 0.45], [-0.62, -0.06, 0.62], [-0.68, 0.3, 0.5]] as const).map(
-      (d) => anchorForTuple(d)
-    ),
-  ]
+  const c = new THREE.Vector3(cap.dir[0], cap.dir[1], cap.dir[2]).normalize()
+  const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
+  const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
   return (
     <>
-      <FrozenPond theta={pond.theta} x={pond.x} />
-      {trees.map(([theta, x, s], i) => (
-        <WinterTree key={i} theta={theta} x={x} scale={s} />
-      ))}
+      {spec.map(([a, b, r], i) => {
+        const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
+        const pos = dir.clone().multiplyScalar(PLANET_RADIUS * WATER_LEVEL + 0.012)
+        const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
+        return (
+          <mesh key={i} position={pos} quaternion={quat}>
+            <cylinderGeometry args={[r, r * 0.86, 0.03, 7]} />
+            <meshToonMaterial color={PALETTE.ice} gradientMap={ramp} />
+          </mesh>
+        )
+      })}
     </>
   )
 }
 
-/** anchorFor packed with a scale for the winter-tree list. */
-function anchorForTuple(dir: readonly [number, number, number]): [number, number, number] {
-  const a = anchorFor(dir)
-  return [a.theta, a.x, 0.9 + 0.25 * Math.abs(dir[1])]
-}
-
-/** Flat ice floes floating on the cold sea's surface (at the waterline). The
- *  lap-2 winter adds 2 more floes (passed via `spec`), gated in as variant B —
- *  each floe toggles by the renewal gate at its OWN longitude (never a whole-group
- *  pop). The base floes are variant-independent (always visible). */
-function IceFloes({
-  spec,
-  gate,
-}: {
-  spec: Array<[number, number, number]>
-  gate?: { journeyRef: JourneyRef; variant: 0 | 1 }
-}) {
-  const ramp = useClayRamp()
-  const refs = useRef<Array<THREE.Mesh | null>>([])
-  const floes = useMemo(() => {
-    const c = new THREE.Vector3(SEA.dir[0], SEA.dir[1], SEA.dir[2])
-    const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
-    const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
-    return spec.map(([a, b, r]) => {
-      const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
-      const pos = dir.clone().multiplyScalar(PLANET_RADIUS * WATER_LEVEL + 0.012)
-      const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
-      const tc = canonicalTheta(Math.atan2(dir.z, dir.y))
-      return { pos, quat, r, tc }
-    })
-  }, [spec])
-
-  useFrame(() => {
-    if (!gate) return
-    const rot = gate.journeyRef.current.rotation
-    for (let i = 0; i < floes.length; i++) {
-      const m = refs.current[i]
-      if (!m) continue
-      m.visible = gate.variant === activeVariantAt(floes[i].tc, rot)
-    }
-  })
-
-  return (
-    <>
-      {floes.map(({ pos, quat, r }, i) => (
-        <mesh key={i} ref={(m) => { refs.current[i] = m }} position={pos} quaternion={quat}>
-          <cylinderGeometry args={[r, r * 0.88, 0.03, 7]} />
-          <meshToonMaterial color={PALETTE.snow} gradientMap={ramp} />
-        </mesh>
-      ))}
-    </>
-  )
-}
-
-/** [tangent a, tangent b, radius] offsets inside the sea for the ice floes. */
-const FLOES_BASE: Array<[number, number, number]> = [
-  [0.06, 0.08, 0.09], [-0.11, 0.03, 0.07], [0.05, -0.1, 0.08], [-0.04, -0.13, 0.055],
+const FLOES_R: Array<[number, number, number]> = [
+  [0.12, 0.16, 0.1], [-0.2, 0.06, 0.08], [0.08, -0.22, 0.09],
 ]
-/** Two extra floes the spreading lap-2 winter grows on the sea. */
-const FLOES_LAP2: Array<[number, number, number]> = [
-  [0.13, -0.03, 0.075], [-0.02, 0.14, 0.06],
+const FLOES_L: Array<[number, number, number]> = [
+  [0.14, -0.1, 0.09], [-0.06, 0.2, 0.08], [0.2, 0.1, 0.075],
 ]
 
 /**
- * Curated delights beyond the core biome list (per Aram's creative-license
- * note): islands in the ocean, ice floes on the highland lake, a flower-meadow
- * patch, a winding dirt path, and a little rock formation — placed on verified
- * dry, feature-clear ground so every stretch of the lap has something new.
+ * Curated water-side delights the flank scatter leaves out: lilies on the A0
+ * spring pond, palms on the A2 delta islets, oasis palms in B0, ice floes on the
+ * winter B2 pond, and floes on the two permanent polar oceans. Wedge items are
+ * variant-gated (swap behind the horizon); the polar floes are invariant.
  */
 export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
-  // authored dry-meadow flower patches at two longitudes
-  const flowers: Array<[number, number]> = [
-    [2.0, 0.8], [2.1, 0.9], [2.2, 0.78], [2.05, 0.72], [2.15, 0.85],
-    [0.45, 0.85], [0.55, 1.0], [0.65, 0.8], [0.5, 0.7],
-  ]
-  // winding dirt path segment
-  const path: Array<[number, number]> = [
-    [5.24, 0.72], [5.35, 0.82], [5.46, 0.72], [5.57, 0.85], [5.68, 0.75],
-  ]
-  // rock formations at two longitudes
-  const rocks: Array<[number, number, number]> = [
-    [3.9, 0.95, 0.11], [4.0, 1.1, 0.08], [3.95, 0.8, 0.09],
-    [4.85, 0.95, 0.1], [4.95, 1.1, 0.075], [5.05, 0.85, 0.09],
-  ]
-  const island = ISLANDS.map((p) => anchorFor(p.dir))
-
+  const ramp = useClayRamp()
   return (
     <>
-      {/* islands */}
-      <PropAnchor theta={island[0].theta} x={island[0].x}><ClayPalm /></PropAnchor>
-      <PropAnchor theta={island[1].theta} x={island[1].x}><ClayRock color={PALETTE.dune} r={0.09} /></PropAnchor>
-      <PropAnchor theta={island[2].theta} x={island[2].x}><ClaySprout scale={1.2} /></PropAnchor>
+      {/* permanent ice on the polar oceans (both limbs) */}
+      <PolarFloes cap={POLAR_R} spec={FLOES_R} />
+      <PolarFloes cap={POLAR_L} spec={FLOES_L} />
 
-      <IceFloes spec={FLOES_BASE} />
-      {/* 2 extra ice floes arrive with the lap-2 winter (gated per floe) */}
-      <IceFloes spec={FLOES_LAP2} gate={{ journeyRef, variant: 1 }} />
-      <SnowRegion />
-
-      {/* spring flower patch — swaps to an autumn (amber/deep) cast on lap 2,
-          each blossom flipping behind the horizon at its own longitude */}
-      {flowers.map(([theta, x], i) => (
-        <GatedProp key={`fl-${i}`} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
-          <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.blossomDeep} scale={1.1} />
-        </GatedProp>
-      ))}
-      {flowers.map(([theta, x], i) => (
-        <GatedProp key={`fl2-${i}`} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
-          <ClayBlossom color={i % 2 === 0 ? PALETTE.honey : PALETTE.dune} scale={1.1} />
+      {/* A0 spring pond: lily blossoms on the near bank */}
+      {([[1.22, 0.62], [1.34, 0.9], [1.28, 0.72]] as const).map(([t, x], i) => (
+        <GatedProp key={`a0-${i}`} theta={t} x={x} variant={0} journeyRef={journeyRef}>
+          <ClayBlossom color={i % 2 === 0 ? PALETTE.petal : PALETTE.blossom} scale={1.1} />
         </GatedProp>
       ))}
 
-      {path.map(([theta, x], i) => (
-        <PropAnchor key={`pa-${i}`} theta={theta} x={x}>
-          <ClayDisc color={PALETTE.clayPath} r={0.11} h={0.025} />
-        </PropAnchor>
+      {/* A2 delta: reeds + a palm on the sand islets */}
+      {([[5.5, 0.66], [5.66, 1.05], [5.58, -0.8]] as const).map(([t, x], i) => (
+        <GatedProp key={`a2-${i}`} theta={t} x={x} variant={0} journeyRef={journeyRef}>
+          {i === 1 ? <ClayPalm scale={0.85} /> : <ClaySprout scale={1.5} />}
+        </GatedProp>
       ))}
 
-      {rocks.map(([theta, x, r], i) => (
-        <PropAnchor key={`rk-${i}`} theta={theta} x={x}>
-          <ClayRock color={i === 1 ? PALETTE.earth : PALETTE.dune} r={r} />
-        </PropAnchor>
+      {/* B0 oasis: a small palm grove by the pool */}
+      {([[1.1, 0.6], [1.18, 0.78], [1.06, 0.86]] as const).map(([t, x], i) => (
+        <GatedProp key={`b0-${i}`} theta={t} x={x} variant={1} journeyRef={journeyRef}>
+          {i === 1 ? <ClayRock color={PALETTE.goldSand} r={0.09} /> : <ClayPalm scale={0.9} />}
+        </GatedProp>
       ))}
+
+      {/* B2 frozen pond: ice floes + a snowy boulder on its bank */}
+      {([[5.5, 0.62], [5.6, 0.86]] as const).map(([t, x], i) => (
+        <GatedProp key={`b2-${i}`} theta={t} x={x} variant={1} journeyRef={journeyRef}>
+          <mesh position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.11, 0.1, 0.03, 8]} />
+            <meshToonMaterial color={PALETTE.ice} gradientMap={ramp} />
+          </mesh>
+        </GatedProp>
+      ))}
+      <GatedProp theta={5.66} x={0.72} variant={1} journeyRef={journeyRef}>
+        <ClayRock color={PALETTE.snow} r={0.1} />
+      </GatedProp>
     </>
   )
 }

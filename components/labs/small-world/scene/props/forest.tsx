@@ -3,166 +3,154 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { PLANET_RADIUS, WATER_LEVEL, terrainBump } from '../planet'
-import { FOREST, SNOW, SNOW_B, capMask } from '../biomes'
+import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet'
+import { channelDist, type Cap } from '../biomes'
 import { activeVariantAt, canonicalTheta } from '../renewal'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
-/** ~100 trees inside the FOREST cap. Oversample so rejections still land ~100. */
-const CANDIDATES = 150
-const MAX_TREES = 108
 /** Keep the girl's lane clear — no forest inside the spine band. */
 const MIN_NX = 0.3
+const CANDIDATES = 96
+const MAX_PER_CLUSTER = 54
 
 const fract = (v: number): number => v - Math.floor(v)
 const seeded = (i: number, s: number): number => fract(Math.sin(i * 127.1 + s) * 43758.5453)
-
 const Y_UP = new THREE.Vector3(0, 1, 0)
+
+/** Green woods over the A0/A1 spring flank (variant A). */
+const GREEN_CAP: Cap = { dir: [0.5, Math.cos(1.9) * 0.866, Math.sin(1.9) * 0.866], radius: 0.6, feather: 0.16 }
+/** Snowy conifers over the B2 winter-summit flank (variant B). */
+const SNOW_CAP: Cap = { dir: [0.5, Math.cos(5.55) * 0.866, Math.sin(5.55) * 0.866], radius: 0.55, feather: 0.16 }
+
+type Tree = { pos: THREE.Vector3; quat: THREE.Quaternion; s: number; crown: THREE.Color; tc: number; variant: 0 | 1 }
+
+/** Scatter accepted trees inside a cap, grounded on the cluster's variant terrain. */
+function scatterCluster(cap: Cap, variant: 0 | 1, crown: THREE.Color, seedOff: number): Tree[] {
+  const bumpFn = variant === 0 ? terrainBump : terrainBumpB
+  const c = new THREE.Vector3(cap.dir[0], cap.dir[1], cap.dir[2]).normalize()
+  const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
+  const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
+  const cosR = Math.cos(cap.radius)
+  const dir = new THREE.Vector3()
+  const out: Tree[] = []
+  for (let i = 0; i < CANDIDATES && out.length < MAX_PER_CLUSTER; i++) {
+    const cosT = 1 - (1 - cosR) * seeded(i, seedOff)
+    const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT))
+    const phi = seeded(i, seedOff + 40) * Math.PI * 2
+    dir.copy(c).multiplyScalar(cosT).addScaledVector(t1, sinT * Math.cos(phi)).addScaledVector(t2, sinT * Math.sin(phi)).normalize()
+    if (Math.abs(dir.x) < MIN_NX) continue
+    const bump = bumpFn(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
+    if (1 + bump < WATER_LEVEL) continue // no trees in water
+    if (bump > 0.1) continue // bare the steep spires
+    if (channelDist(dir.x, dir.y, dir.z, variant) < 0.09) continue // clear the channels
+    const pos = dir.clone().multiplyScalar(PLANET_RADIUS * (1 + bump))
+    const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
+    const s = 0.5 + seeded(i, seedOff + 80) * 0.5
+    const tc = canonicalTheta(Math.atan2(dir.z, dir.y))
+    out.push({ pos, quat, s, crown: crown.clone(), tc, variant })
+  }
+  return out
+}
 
 type Built = {
   trunk: THREE.InstancedMesh
   crown: THREE.InstancedMesh
-  /** Per-instance crown colors for lap 1 (spring) and lap 2 (autumn). */
-  crownA: Float32Array
-  crownB: Float32Array
-  /** Per-instance canonical thetaC — each tree flips its own crown colour. */
+  real: THREE.Matrix4[]
+  variant: Uint8Array
   thetaC: Float32Array
 }
 
 /**
- * A dense woods on the near-left flank, drawn as exactly TWO InstancedMesh
- * (trunk + crown) — deterministic seeded scatter inside the FOREST cap,
- * per-instance crown color. Two draw calls total. Each crown flips its own color
- * from the spring cast (pine/leaf/sprout, snow where cold) to the autumn cast
- * (honey/dune/earth, WIDER snowy share) as its longitude passes behind the horizon
- * — the renewal front, per-instance, never a global lerp.
+ * Two dense woods — a green spring cluster over A0/A1 and a snowy conifer cluster
+ * over B2 — drawn as exactly TWO InstancedMesh (trunk + crown). Per-instance
+ * positions differ per variant; each instance scale-zeros itself when its variant
+ * is not the active one at its longitude (the renewal front, per-instance, never a
+ * global lerp). Two draw calls total.
  */
 export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
-
   const built = useMemo<Built>(() => {
-    // tangent basis around the cap centre for in-cap sampling
-    const c = new THREE.Vector3(FOREST.dir[0], FOREST.dir[1], FOREST.dir[2])
-    const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
-    const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
-    const cosR = Math.cos(FOREST.radius)
-
-    const dir = new THREE.Vector3()
-    const pos = new THREE.Vector3()
-    const quat = new THREE.Quaternion()
-    const scl = new THREE.Vector3()
-    const m = new THREE.Matrix4()
-    const lift = new THREE.Matrix4()
-    const col = new THREE.Color()
+    const green = scatterCluster(GREEN_CAP, 0, new THREE.Color(PALETTE.pine), 311.7)
+    const snowy = scatterCluster(SNOW_CAP, 1, new THREE.Color(PALETTE.snow), 733.1)
+    const trees = [...green, ...snowy]
+    const n = trees.length
 
     const trunkGeo = new THREE.CylinderGeometry(0.028, 0.04, 0.16, 6)
-    // fewer crown segments -> chunkier hand-rolled conifers under the hard ramp
     const crownGeo = new THREE.SphereGeometry(0.15, 8, 8)
-    const mat = (): THREE.MeshToonMaterial =>
-      new THREE.MeshToonMaterial({ gradientMap: ramp, vertexColors: false })
-
-    // first pass: collect accepted trees with BOTH lap crown colors
-    type Tree = { pos: THREE.Vector3; quat: THREE.Quaternion; s: number; crownA: THREE.Color; crownB: THREE.Color; tc: number }
-    const trees: Tree[] = []
-    const pine = new THREE.Color(PALETTE.pine)
-    const leaf = new THREE.Color(PALETTE.leaf)
-    const sprout = new THREE.Color(PALETTE.sprout)
-    const snow = new THREE.Color(PALETTE.snow)
-    const honey = new THREE.Color(PALETTE.honey)
-    const dune = new THREE.Color(PALETTE.dune)
-    const earth = new THREE.Color(PALETTE.earth)
-
-    for (let i = 0; i < CANDIDATES && trees.length < MAX_TREES; i++) {
-      const cosT = 1 - (1 - cosR) * seeded(i, 311.7)
-      const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT))
-      const phi = seeded(i, 74.7) * Math.PI * 2
-      dir
-        .copy(c)
-        .multiplyScalar(cosT)
-        .addScaledVector(t1, sinT * Math.cos(phi))
-        .addScaledVector(t2, sinT * Math.sin(phi))
-        .normalize()
-      if (Math.abs(dir.x) < MIN_NX) continue
-      const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
-      if (1 + bump < WATER_LEVEL) continue // no trees in the water
-      if (bump > 0.06) continue // bare the snowy peaks above the treeline
-      pos.copy(dir).multiplyScalar(PLANET_RADIUS * (1 + bump))
-      quat.setFromUnitVectors(Y_UP, dir)
-      const s = 0.5 + seeded(i, 512.3) * 0.5
-      const pick = seeded(i, 901.1)
-      // lap 1: snowy conifer inside the cold cap, else pine/leaf/sprout
-      const snowyA = capMask(dir.x, dir.y, dir.z, SNOW) > 0.3
-      const crownA = snowyA ? snow : pick < 0.6 ? pine : pick < 0.85 ? leaf : sprout
-      // lap 2: winter has spread (WIDER SNOW_B share); the rest turn autumn
-      const snowyB = capMask(dir.x, dir.y, dir.z, SNOW_B) > 0.3
-      const crownB = snowyB ? snow : pick < 0.5 ? honey : pick < 0.8 ? dune : earth
-      const tc = canonicalTheta(Math.atan2(dir.z, dir.y))
-      trees.push({ pos: pos.clone(), quat: quat.clone(), s, crownA: crownA.clone(), crownB: crownB.clone(), tc })
-    }
-
-    const n = trees.length
-    const trunkMat = mat()
+    const mk = () => new THREE.MeshToonMaterial({ gradientMap: ramp, vertexColors: false })
+    const trunkMat = mk()
     trunkMat.color = new THREE.Color(PALETTE.clayPath)
-    const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, n)
-    const crownMat = mat()
+    const crownMat = mk()
     crownMat.color = new THREE.Color(0xffffff)
+    const trunk = new THREE.InstancedMesh(trunkGeo, trunkMat, n)
     const crown = new THREE.InstancedMesh(crownGeo, crownMat, n)
     trunk.frustumCulled = false
     crown.frustumCulled = false
 
-    const crownA = new Float32Array(n * 3)
-    const crownB = new Float32Array(n * 3)
+    const real: THREE.Matrix4[] = []
+    const variant = new Uint8Array(n)
     const thetaC = new Float32Array(n)
+    const scl = new THREE.Vector3()
+    const m = new THREE.Matrix4()
+    const lift = new THREE.Matrix4()
+    const crownM = new THREE.Matrix4()
+    const col = new THREE.Color()
     for (let i = 0; i < n; i++) {
       const tr = trees[i]
       scl.setScalar(tr.s)
       m.compose(tr.pos, tr.quat, scl)
-      // trunk: lift half its height along local up
+      real.push(m.clone())
+      variant[i] = tr.variant
+      thetaC[i] = tr.tc
       lift.makeTranslation(0, 0.08, 0)
       trunk.setMatrixAt(i, m.clone().multiply(lift))
-      // crown: sit atop the trunk
       lift.makeTranslation(0, 0.24, 0)
-      crown.setMatrixAt(i, m.clone().multiply(lift))
-      crown.setColorAt(i, col.copy(tr.crownA))
-      crownA[i * 3] = tr.crownA.r; crownA[i * 3 + 1] = tr.crownA.g; crownA[i * 3 + 2] = tr.crownA.b
-      crownB[i * 3] = tr.crownB.r; crownB[i * 3 + 1] = tr.crownB.g; crownB[i * 3 + 2] = tr.crownB.b
-      thetaC[i] = tr.tc
+      crownM.copy(m).multiply(lift)
+      crown.setMatrixAt(i, crownM)
+      crown.setColorAt(i, col.copy(tr.crown))
     }
     trunk.instanceMatrix.needsUpdate = true
     crown.instanceMatrix.needsUpdate = true
     if (crown.instanceColor) crown.instanceColor.needsUpdate = true
-
-    return { trunk, crown, crownA, crownB, thetaC }
+    return { trunk, crown, real, variant, thetaC }
   }, [ramp])
 
-  // Each tree flips its own crown colour A→B as its longitude passes behind the
-  // horizon — never a global lerp. Only trees whose gate CHANGED this frame write
-  // their 3 floats (flips are rare + occluded), and the whole pass is skipped when
-  // the rotation is unchanged, so the common case costs nothing.
+  // Each instance shows only when its variant is active at its longitude; the flip
+  // always happens behind the horizon (renewal-scan), so it never pops on camera.
   const lastRot = useRef(Number.NaN)
-  const flipped = useRef<Uint8Array | null>(null)
+  const state = useRef<Int8Array | null>(null)
+  const ZERO = useMemo(() => new THREE.Matrix4().makeScale(0, 0, 0), [])
   useFrame(() => {
     const rot = journeyRef.current.rotation
     if (rot === lastRot.current) return
     lastRot.current = rot
-    const buf = built.crown.instanceColor
-    if (!buf) return
-    const arr = buf.array as Float32Array
-    const { crownA, crownB, thetaC } = built
+    const { trunk, crown, real, variant, thetaC } = built
     const n = thetaC.length
-    if (!flipped.current || flipped.current.length !== n) flipped.current = new Uint8Array(n).fill(2)
-    const state = flipped.current
+    if (!state.current || state.current.length !== n) state.current = new Int8Array(n).fill(-1)
+    const st = state.current
+    const lift = new THREE.Matrix4()
+    const tmp = new THREE.Matrix4()
     let changed = false
     for (let i = 0; i < n; i++) {
-      const b = activeVariantAt(thetaC[i], rot)
-      if (state[i] === b) continue
-      state[i] = b
-      const src = b === 1 ? crownB : crownA
-      arr[i * 3] = src[i * 3]; arr[i * 3 + 1] = src[i * 3 + 1]; arr[i * 3 + 2] = src[i * 3 + 2]
+      const on = activeVariantAt(thetaC[i], rot) === variant[i] ? 1 : 0
+      if (st[i] === on) continue
+      st[i] = on
+      if (on) {
+        lift.makeTranslation(0, 0.08, 0)
+        trunk.setMatrixAt(i, tmp.copy(real[i]).multiply(lift))
+        lift.makeTranslation(0, 0.24, 0)
+        crown.setMatrixAt(i, tmp.copy(real[i]).multiply(lift))
+      } else {
+        trunk.setMatrixAt(i, ZERO)
+        crown.setMatrixAt(i, ZERO)
+      }
       changed = true
     }
-    if (changed) buf.needsUpdate = true
+    if (changed) {
+      trunk.instanceMatrix.needsUpdate = true
+      crown.instanceMatrix.needsUpdate = true
+    }
   })
 
   return (

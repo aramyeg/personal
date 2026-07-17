@@ -8,7 +8,7 @@ import {
   walkYAt,
 } from '@/components/labs/small-world/scene/stage'
 import { PLANET_RADIUS, surfaceYAt, terrainBump } from '@/components/labs/small-world/scene/planet'
-import { RIVER_CROSSINGS } from '@/components/labs/small-world/scene/biomes'
+import { RIVER_CROSSINGS, CROSSINGS_A, CROSSINGS_B } from '@/components/labs/small-world/scene/biomes'
 import { chapterStartRotation, CHAPTER_SLICE } from '@/components/labs/small-world/journey-timeline'
 
 describe('stage math', () => {
@@ -56,8 +56,9 @@ describe('walkYAt (bridge decks)', () => {
   const rotationFor = (theta: number): number => theta - STANCE_ALPHA
 
   it('equals surfaceYAt away from every crossing', () => {
-    // the pinned rhos sit clear of all crossings, so no deck applies
-    for (const rho of [0, 0.7, 2.1, 5.5]) {
+    // the pinned rhos sit clear of all crossings, so no deck applies (updated for
+    // Task 20's crossings 1.70 / 3.52 / 5.80 — 5.5 now grazes the A2 deck)
+    for (const rho of [0, 0.7, 2.1, 4.9]) {
       expect(walkYAt(STANCE_Z, rho)).toBeCloseTo(surfaceYAt(STANCE_Z, rho), 10)
     }
   })
@@ -84,31 +85,32 @@ describe('walkYAt (bridge decks)', () => {
     expect(maxDelta).toBeLessThan(0.05)
   })
 
-  it('lap 2: the deck is present again a full rotation later at every crossing', () => {
-    // Two full planet laps (ROTATION_TOTAL = 4π) mean the girl passes each
-    // crossing twice. bridgeDeckYAt must wrap the query theta so the second
-    // pass still lands on the plank, not the carved river floor beneath it.
-    // NOTE (Task 19): this passes TODAY because the spine is lap-invariant
-    // (CROSSINGS_A === CROSSINGS_B, terrainBumpB === terrainBump on nx=0), so the
-    // lap-2 deck matches lap-1 exactly. Task 20 makes the crossings per-lap and
-    // will rewrite this pin deliberately.
+  it('lap 2: the girl rides the B-variant deck at each B crossing (spine per-lap)', () => {
+    // Task 20: the crossings diverge per lap (CROSSINGS_A on lap 1, CROSSINGS_B on
+    // lap 2). Over each B crossing longitude on lap 2 she must land on the plank —
+    // a real lift over the B-terrain-carved creek floor beneath it.
     const TWO_PI = Math.PI * 2
-    for (const tc of RIVER_CROSSINGS) {
-      const rot = rotationFor(tc)
-      const lap1 = walkYAt(STANCE_Z, rot)
-      const lap2 = walkYAt(STANCE_Z, rot + TWO_PI)
-      expect(lap2).toBeCloseTo(lap1, 10)
-      // and it's genuinely the deck, not a coincidental terrain match
-      expect(lap2).toBeGreaterThan(surfaceYAt(STANCE_Z, rot + TWO_PI))
+    for (const tc of CROSSINGS_B) {
+      const rot = tc - STANCE_ALPHA + TWO_PI // girl over this longitude on lap 2
+      const deck = walkYAt(STANCE_Z, rot)
+      const terrain = surfaceYAt(STANCE_Z, rot)
+      expect(deck).toBeGreaterThan(terrain)
+      expect(deck - terrain).toBeGreaterThan(0.02) // genuinely on the deck, not a graze
     }
   })
 
-  it('lap 2: dry ground away from crossings is unchanged a full rotation later', () => {
-    // Passes TODAY because the girl's lane is spine (A === B); Task 20 makes the
-    // spine per-lap and will rewrite this deliberately.
+  it('lap 2: the A-crossing longitudes are DRY (their decks retired to B) + dry lane follows B terrain', () => {
+    // The complement pin: the lap-1 (A) crossings carry no deck on lap 2 — proof
+    // the spine truly changed — and plain lane longitudes follow the B surface with
+    // no deck lift.
     const TWO_PI = Math.PI * 2
-    for (const rho of [0, 0.7, 2.1, 5.5]) {
-      expect(walkYAt(STANCE_Z, rho + TWO_PI)).toBeCloseTo(walkYAt(STANCE_Z, rho), 10)
+    for (const tc of CROSSINGS_A) {
+      const rot = tc - STANCE_ALPHA + TWO_PI
+      expect(walkYAt(STANCE_Z, rot)).toBeCloseTo(surfaceYAt(STANCE_Z, rot), 10)
+    }
+    for (const tc of [1.0, 2.9, 5.0]) {
+      const rot = tc - STANCE_ALPHA + TWO_PI
+      expect(walkYAt(STANCE_Z, rot)).toBeCloseTo(surfaceYAt(STANCE_Z, rot), 10)
     }
   })
 })

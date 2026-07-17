@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import type { JourneyRef } from './use-journey'
 import { useClayRamp } from './toon-ramp'
-import { WATER_LEVEL, SNOW, SNOW_B, biomeBump, biomeBumpB, biomeTint } from './biomes'
+import { WATER_LEVEL, biomeBump, biomeBumpB, biomeTint, bandOf, colorGate } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
 
@@ -134,83 +134,136 @@ function clayDimple(nx: number, ny: number, nz: number): number {
   )
 }
 
+type Pal = {
+  leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
+  deep: THREE.Color; honey: THREE.Color; snow: THREE.Color; earth: THREE.Color
+  pine: THREE.Color; dune: THREE.Color; blossom: THREE.Color; blossomDeep: THREE.Color
+  springGreen: THREE.Color; petal: THREE.Color; sand: THREE.Color; goldSand: THREE.Color
+  earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
+}
+
 /**
- * Paints one vertex from the biome map into `c`. `isB` selects the lap-2
- * autumn-into-winter palette (meadow greens shift to honey/dune amber, forest
- * floor warms toward earth, canyon walls saturate, wildflower confetti re-tints,
- * snow reads across the wider SNOW_B cap). Water/beach are lap-invariant.
+ * Applies the per-wedge scene accent to open ground (the six scenes each own a
+ * saturated identity). `g` is wedgeGate at this point, so every accent fades to
+ * neutral meadow on the meridians (all four abutting scenes seam through one
+ * shared meadow — no hard colour lines) and at the poles (into beach/ocean).
+ */
+function accentMeadow(
+  c: THREE.Color,
+  pal: Pal,
+  band: 0 | 1 | 2,
+  variant: 0 | 1,
+  nx: number,
+  ny: number,
+  nz: number,
+  g: number
+): void {
+  if (g <= 0) return
+  const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
+  const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
+  const hi = spk > 0.68
+  const lo = spk < -0.72
+  const hi2 = spk2 > 0.74
+  const dot = (col: THREE.Color, amt: number) => c.lerp(col, amt * g)
+  if (variant === 0) {
+    if (band === 0) {
+      // A0 BlueNet spring: vivid spring green, white-pink blossom speckle
+      dot(pal.springGreen, 0.55)
+      if (hi) dot(pal.snow, 0.5)
+      else if (lo) dot(pal.petal, 0.6)
+      if (hi2) dot(pal.blossom, 0.5)
+    } else if (band === 1) {
+      // A1 FLYERBEE flower field: lush green rioting with pink/honey flowers
+      dot(pal.meadow, 0.25)
+      if (hi) dot(pal.petal, 0.72)
+      else if (lo) dot(pal.honey, 0.62)
+      if (hi2) dot(pal.blossomDeep, 0.55)
+    } else {
+      // A2 delta: sandy braided banks (mostly water + sand)
+      dot(pal.sand, 0.78)
+      if (hi) dot(pal.dune, 0.5)
+      else if (lo) dot(pal.goldSand, 0.4)
+    }
+  } else {
+    if (band === 0) {
+      // B0 Accenture golden dunes: rich saturated gold
+      dot(pal.goldSand, 0.82)
+      if (hi) dot(pal.honey, 0.5)
+      else if (lo) dot(pal.dune, 0.55)
+    } else if (band === 1) {
+      // B1 AKNA canyon: deep earth brown badlands, tuff-pink + terracotta speckle
+      dot(pal.earth, 0.8)
+      dot(pal.rust, 0.22)
+      if (hi) dot(pal.rust, 0.5)
+      else if (lo) dot(pal.tuff, 0.45) // tuff pink echo of the Yerevan street
+      if (hi2) dot(pal.earthDeep, 0.45)
+    } else {
+      // B2 winter-meets-blossom: pink on white (snow kind covers the core)
+      dot(pal.ice, 0.6)
+      if (hi) dot(pal.blossom, 0.6)
+      else if (lo) dot(pal.petal, 0.55)
+    }
+  }
+}
+
+/**
+ * Paints one vertex from the biome map into `c`. `isB` selects the lap-2 (variant
+ * B) scenes. The base meadow read is the fallback; biomeTint classifies water /
+ * beach / canyon / snow, and accentMeadow lays each wedge's saturated identity on
+ * the open ground (spring green, flower pink, delta sand, dune gold, canyon
+ * brown, winter white-pink). Polar oceans + their beach ring are lap-invariant.
  */
 function paintVertex(
   c: THREE.Color,
-  pal: {
-    leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
-    deep: THREE.Color; honey: THREE.Color; snow: THREE.Color; earth: THREE.Color
-    pine: THREE.Color; dune: THREE.Color; blossom: THREE.Color; blossomDeep: THREE.Color
-    amber: THREE.Color
-  },
+  pal: Pal,
   nx: number,
   ny: number,
   nz: number,
   bump: number,
   isB: boolean
 ): void {
-  const snowCap = isB ? SNOW_B : SNOW
+  const variant: 0 | 1 = isB ? 1 : 0
   // open-meadow height read is the fallback everywhere
-  const t = THREE.MathUtils.clamp(bump / 0.05 / 2 + 0.5, 0, 1)
+  const t = THREE.MathUtils.clamp(bump / 0.1 + 0.5, 0, 1)
   if (t < 0.5) c.lerpColors(pal.leaf, pal.meadow, t * 2)
   else c.lerpColors(pal.meadow, pal.sprout, (t - 0.5) * 2)
 
-  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, snowCap)
+  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, variant)
   switch (kind) {
     case 'underwater':
       c.lerp(pal.deep, 0.55 + 0.35 * kt)
       break
-    case 'beach':
-      c.lerp(pal.dune, 0.85 * kt)
+    case 'beach': {
+      c.lerp(pal.sand, 0.85 * kt)
+      // shore takes a hint of its wedge (icy by the winter pond, earthy by the
+      // canyon) so the beach ring isn't a uniform sand stripe
+      const band = bandOf(canonicalTheta(Math.atan2(nz, ny)))
+      if (variant === 1 && band === 2) c.lerp(pal.ice, 0.4 * kt)
+      else if (variant === 1 && band === 1) c.lerp(pal.rust, 0.3 * kt)
       break
+    }
     case 'canyon': {
+      // rich brown layered earth walls, darker in the channel floor
       c.copy(pal.earth)
-      // darken the channel floor, keep the banks a touch lighter
-      c.lerp(pal.deep.clone().lerp(pal.earth, 0.7), 0.25 * kt)
-      // lap 2: richer, more saturated earth walls
-      if (isB) c.lerp(pal.earth, 0.35)
+      c.lerp(pal.earthDeep, 0.4 * kt)
+      c.lerp(pal.rust, 0.18 * (1 - kt)) // terracotta on the upper banks
       break
     }
     case 'snow': {
       c.lerp(pal.snow, kt)
-      // snowline pulled DOWN: earth rock shows only on the steep upper
-      // spires, so the enlarged cap + range read as ONE white cold region.
-      const rock =
-        THREE.MathUtils.smoothstep(bump, 0.09, 0.14) *
-        (1 - THREE.MathUtils.smoothstep(bump, 0.2, 0.26))
-      if (rock > 0) c.lerp(pal.earth, 0.5 * rock * kt)
+      // faint blossom-pink cast dusting the winter summit
+      const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
+      if (spk > 0.72) c.lerp(pal.blossom, 0.35 * kt)
       break
     }
-    case 'forest':
-      c.lerp(pal.pine, 0.4 * kt)
-      // lap 2: warm the pine floor toward earth (autumn leaf litter)
-      if (isB) c.lerp(pal.earth, 0.2 * kt)
-      break
     default: {
-      // lap 2: the open meadow turns autumn — greens lerp toward honey/dune amber
-      if (isB) c.lerp(pal.amber, 0.52)
-      // terracotta breaking through the odd high meadow crest
-      const peak = THREE.MathUtils.clamp((bump - 0.07) / 0.04, 0, 1)
-      if (peak > 0) c.lerp(pal.clay, 0.4 * peak)
-      // subtle warm longitude drift, never stripes (richer on lap 2)
-      const t2 = 0.5 + 0.5 * Math.sin(1.2 * Math.atan2(nz, ny) + 0.7)
-      c.lerp(pal.honey, (isB ? 0.12 : 0.06) * t2)
-      // wildflower speckle — deterministic dots break the uniform ground; the
-      // lap-2 confetti re-tints to amber/blossomDeep/dune (autumn seed heads).
-      const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
-      if (spk > 0.68) c.lerp(isB ? pal.honey : pal.blossom, 0.55)
-      else if (spk < -0.72) c.lerp(isB ? pal.blossomDeep : pal.honey, 0.5)
-      const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
-      if (spk2 > 0.74) c.lerp(isB ? pal.dune : pal.sprout, 0.5)
+      const thetaC = canonicalTheta(Math.atan2(nz, ny))
+      const g = colorGate(thetaC, nx)
+      accentMeadow(c, pal, bandOf(thetaC), variant, nx, ny, nz, g)
     }
   }
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
-  // matching lap's slope so the deeper lap-2 canyon / taller peaks crease right.
+  // matching lap's slope so the deeper canyon / taller spires crease right.
   const crease = THREE.MathUtils.smoothstep(
     terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
     0.12,
@@ -270,8 +323,15 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       dune: new THREE.Color(PALETTE.dune),
       blossom: new THREE.Color(PALETTE.blossom),
       blossomDeep: new THREE.Color(PALETTE.blossomDeep),
-      amber: new THREE.Color(PALETTE.honey).lerp(new THREE.Color(PALETTE.dune), 0.5),
-    }
+      springGreen: new THREE.Color(PALETTE.springGreen),
+      petal: new THREE.Color(PALETTE.petal),
+      sand: new THREE.Color(PALETTE.sand),
+      goldSand: new THREE.Color(PALETTE.goldSand),
+      earthDeep: new THREE.Color(PALETTE.earthDeep),
+      rust: new THREE.Color(PALETTE.rust),
+      ice: new THREE.Color(PALETTE.ice),
+      tuff: new THREE.Color(PALETTE.tuff),
+    } satisfies Pal
     const c = new THREE.Color()
     for (let i = 0; i < count; i++) {
       v.fromBufferAttribute(src, i)

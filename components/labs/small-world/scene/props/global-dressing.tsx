@@ -3,18 +3,18 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet'
-import { FOREST, SNOW, SNOW_B, capMask, canyonDist } from '../biomes'
+import { bandOf, canonicalTheta, channelDist } from '../biomes'
 import { GatedProp } from './gated-prop'
 import type { JourneyRef } from '../use-journey'
-import { ClayBlossom, ClayMound, ClayRock, ClaySprout, ClayTree } from './clay-kit'
+import { ClayBlossom, ClayMound, ClayPalm, ClayRock, ClaySprout, ClayTree } from './clay-kit'
 
-const DRESSING_COUNT = 36
+const DRESSING_COUNT = 46
 
 /** Deterministic 0→1 hash of an integer — no Math.random, stable per index. */
 const fract = (v: number): number => v - Math.floor(v)
 const seeded = (i: number): number => fract(Math.sin(i * 127.1 + 311.7) * 43758.5453)
 
-type Anchor = { i: number; theta: number; x: number; scale: number }
+type Anchor = { i: number; theta: number; x: number; scale: number; band: 0 | 1 | 2 }
 
 /** The unit direction an anchor plants on, matching anchorTransform. */
 function anchorDir(theta: number, x: number): THREE.Vector3 {
@@ -24,151 +24,98 @@ function anchorDir(theta: number, x: number): THREE.Vector3 {
 }
 
 /**
- * Always-visible flank scatter that keeps the planet from reading bare between
- * chapter arcs. Deterministic, not chapter-gated, not morphing — it lives on
- * the flanks (|x| ≥ 0.5) and leaves the spine band to the chapter sets, which
- * stay the visibly larger, denser stars.
- *
- * Perf: ~36 props ≈ 80–100 draw calls. Phase-3 optimization is instancing if
- * mobile complains.
- *
- * Renewal: each item is a variant-A GatedProp — visible only while its own
- * longitude has not flipped to autumn (gate < 0.5). Its autumn counterpart lives
- * in GlobalDressingAutumn; the two swap behind the horizon, one item at a time.
+ * Builds the always-on flank scatter for one variant. Each item sits on the
+ * flanks (|x| ≥ 0.55) so the spine stays the chapter sets' stage, avoids water
+ * and channels, and is planted on ITS variant's terrain. The renderer chooses a
+ * prop that belongs to the wedge (band + variant) it lands in — so the scatter
+ * sells each of the six scenes. Deterministic seeded scatter (no Math.random).
  */
+function buildAnchors(variant: 0 | 1, seedBase: number): Anchor[] {
+  const bumpFn = variant === 0 ? terrainBump : terrainBumpB
+  const list: Anchor[] = []
+  for (let i = 0; i < DRESSING_COUNT; i++) {
+    const theta = seeded(i + seedBase) * Math.PI * 2
+    const sign = i % 2 === 0 ? 1 : -1
+    const x = sign * (0.55 + seeded(i + seedBase + 100) * 0.5)
+    const dir = anchorDir(theta, x)
+    const bump = bumpFn(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
+    if (1 + bump < WATER_LEVEL) continue // in water
+    if (channelDist(dir.x, dir.y, dir.z, variant) < 0.09) continue // in a channel
+    const scale = 0.75 + seeded(i + seedBase + 200) * 0.35
+    const band = bandOf(canonicalTheta(Math.atan2(dir.z, dir.y)))
+    list.push({ i, theta, x, scale, band })
+  }
+  return list
+}
+
+/** Lap-1 (variant A) flank scatter: spring sprouts (A0), flower drifts (A1),
+ *  delta reeds/palms (A2). Each item swaps out behind the horizon as its
+ *  longitude flips to the lap-2 world. */
 export function GlobalDressing({ journeyRef }: { journeyRef: JourneyRef }) {
-  const anchors = useMemo<Anchor[]>(() => {
-    const list: Anchor[] = []
-    for (let i = 0; i < DRESSING_COUNT; i++) {
-      const theta = seeded(i) * Math.PI * 2
-      const sign = i % 2 === 0 ? 1 : -1
-      const x = sign * (0.5 + seeded(i + 100) * 0.55)
-      const dir = anchorDir(theta, x)
-      const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
-      // authored regions own their own dressing — stay out of them
-      if (1 + bump < WATER_LEVEL) continue // water
-      if (capMask(dir.x, dir.y, dir.z, FOREST) > 0.3) continue // forest.tsx owns it
-      if (capMask(dir.x, dir.y, dir.z, SNOW) > 0.5) continue // snow boulders below
-      if (canyonDist(dir.x, dir.y, dir.z) < 0.14) continue // canyon rocks below
-      const scale = 0.75 + seeded(i + 200) * 0.35
-      list.push({ i, theta, x, scale })
-    }
-    return list
-  }, [])
-
+  const anchors = useMemo(() => buildAnchors(0, 0), [])
   return (
     <>
-      {anchors.map(({ i, theta, x, scale }) => (
+      {anchors.map(({ i, theta, x, scale, band }) => (
         <GatedProp key={i} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
-          {renderProp(i, scale)}
-        </GatedProp>
-      ))}
-      {/* snow boulders on the cold pole (replacing the skipped snow scatter) */}
-      {[0.5, 2.1, 4.4].map((theta, k) => (
-        <GatedProp key={`snow-${k}`} theta={theta} x={-1.95} variant={0} journeyRef={journeyRef}>
-          <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
-        </GatedProp>
-      ))}
-      {/* earth rocks on the canyon rim, reinforcing the brown clay read */}
-      {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55]] as const).map(([theta, x], k) => (
-        <GatedProp key={`canyon-${k}`} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
-          <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
+          {renderA(i, scale, band)}
         </GatedProp>
       ))}
     </>
   )
 }
 
-function renderProp(i: number, scale: number) {
-  switch (i % 5) {
-    case 0:
-      return (
-        <ClayTree
-          height={0.28 + seeded(i + 300) * 0.12}
-          crown={i % 2 === 0 ? PALETTE.leaf : PALETTE.sprout}
-          scale={scale}
-        />
-      )
-    case 1:
-      return <ClayRock r={0.06 + seeded(i + 300) * 0.03} scale={scale} />
-    case 2:
-      return <ClayBlossom scale={scale} />
-    case 3:
-      return <ClaySprout scale={scale} />
-    default:
-      return <ClayTree height={0.4 + seeded(i + 300) * 0.1} crown={PALETTE.blossom} scale={scale} />
+function renderA(i: number, scale: number, band: 0 | 1 | 2) {
+  const s = seeded(i + 300)
+  if (band === 0) {
+    // A0 spring origin: fresh sprouts, blossoms, spring-green trees
+    if (s < 0.34) return <ClaySprout scale={scale * 1.2} />
+    if (s < 0.67) return <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.petal} scale={scale} />
+    return <ClayTree height={0.3 + s * 0.14} crown={i % 2 === 0 ? PALETTE.springGreen : PALETTE.leaf} scale={scale} />
   }
+  if (band === 1) {
+    // A1 flower field: dense pink/honey blossom drifts + a hive-ish mound
+    if (s < 0.55) return <ClayBlossom color={i % 2 === 0 ? PALETTE.petal : PALETTE.blossomDeep} scale={scale * 1.1} />
+    if (s < 0.78) return <ClayMound r={0.12 + s * 0.05} color={PALETTE.honey} squash={0.55} scale={scale} />
+    return <ClaySprout scale={scale} />
+  }
+  // A2 grand delta: reeds (tall thin sprouts), the odd palm on a bank, sand rocks
+  if (s < 0.5) return <ClaySprout scale={scale * 1.4} />
+  if (s < 0.75) return <ClayRock color={PALETTE.sand} r={0.07 + s * 0.03} scale={scale} />
+  return <ClayPalm scale={scale * 0.8} />
 }
 
-/**
- * Lap-2 flank scatter: the same always-on role as GlobalDressing but an autumn
- * cast — amber/deep-blossom crowns, bare earth-trunk trees, more earth rocks and
- * pumpkin-ish honey mounds. A DIFFERENT seed offset scatters it to new spots, and
- * it grounds on the lap-2 terrain (terrainBumpB / SNOW_B, variant-B GatedProp).
- * Lives on the flanks; the spine band stays the chapter sets' stage. Each item is
- * visible only once its own longitude has flipped to autumn (gate ≥ 0.5).
- */
+/** Lap-2 (variant B) flank scatter: dune rocks + palms (B0), canyon boulders &
+ *  dead trees (B1), winter conifers + bare trunks (B2). Grounds on the lap-2
+ *  terrain; each item arrives as its longitude flips behind the horizon. */
 export function GlobalDressingAutumn({ journeyRef }: { journeyRef: JourneyRef }) {
-  const anchors = useMemo<Anchor[]>(() => {
-    const list: Anchor[] = []
-    for (let i = 0; i < DRESSING_COUNT; i++) {
-      const theta = seeded(i + 500) * Math.PI * 2
-      const sign = i % 2 === 0 ? -1 : 1
-      const x = sign * (0.5 + seeded(i + 600) * 0.55)
-      const dir = anchorDir(theta, x)
-      const bump = terrainBumpB(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
-      if (1 + bump < WATER_LEVEL) continue // water
-      if (capMask(dir.x, dir.y, dir.z, FOREST) > 0.3) continue // forest.tsx owns it
-      if (capMask(dir.x, dir.y, dir.z, SNOW_B) > 0.5) continue // (wider) snow core
-      if (canyonDist(dir.x, dir.y, dir.z) < 0.14) continue // canyon rocks below
-      const scale = 0.75 + seeded(i + 700) * 0.35
-      list.push({ i, theta, x, scale })
-    }
-    return list
-  }, [])
-
+  const anchors = useMemo(() => buildAnchors(1, 500), [])
   return (
     <>
-      {anchors.map(({ i, theta, x, scale }) => (
+      {anchors.map(({ i, theta, x, scale, band }) => (
         <GatedProp key={i} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
-          {renderPropAutumn(i, scale)}
-        </GatedProp>
-      ))}
-      {/* snow boulders across the (wider) cold pole */}
-      {[0.5, 2.1, 3.3, 4.4].map((theta, k) => (
-        <GatedProp key={`snow-${k}`} theta={theta} x={-1.95} variant={1} journeyRef={journeyRef}>
-          <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
-        </GatedProp>
-      ))}
-      {/* extra earth rocks on the canyon rim (richer autumn walls) */}
-      {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55], [1.15, 1.9]] as const).map(([theta, x], k) => (
-        <GatedProp key={`canyon-${k}`} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
-          <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
+          {renderB(i, scale, band)}
         </GatedProp>
       ))}
     </>
   )
 }
 
-function renderPropAutumn(i: number, scale: number) {
-  switch (i % 5) {
-    case 0:
-      return (
-        <ClayTree
-          height={0.3 + seeded(i + 800) * 0.12}
-          crown={i % 2 === 0 ? PALETTE.honey : PALETTE.dune}
-          scale={scale}
-        />
-      )
-    case 1:
-      return <ClayRock color={PALETTE.earth} r={0.07 + seeded(i + 800) * 0.03} scale={scale} />
-    case 2:
-      // pumpkin-ish honey mound
-      return <ClayMound r={0.13 + seeded(i + 800) * 0.06} color={PALETTE.honey} squash={0.6} scale={scale} />
-    case 3:
-      // bare earth-trunk tree (leafless autumn)
-      return <ClayTree height={0.34 + seeded(i + 800) * 0.1} crown={PALETTE.earth} scale={scale * 0.9} />
-    default:
-      return <ClayRock color={PALETTE.earth} r={0.09 + seeded(i + 800) * 0.03} scale={scale} />
+function renderB(i: number, scale: number, band: 0 | 1 | 2) {
+  const s = seeded(i + 800)
+  if (band === 0) {
+    // B0 golden dunes: dune rocks, low gold mounds, the occasional oasis palm
+    if (s < 0.5) return <ClayRock color={i % 2 === 0 ? PALETTE.dune : PALETTE.goldSand} r={0.08 + s * 0.04} scale={scale} />
+    if (s < 0.78) return <ClayMound r={0.13 + s * 0.05} color={PALETTE.goldSand} squash={0.35} scale={scale} />
+    return <ClayPalm scale={scale * 0.85} />
   }
+  if (band === 1) {
+    // B1 brown canyon: earth/rust boulders + bare dead trees on the rim
+    if (s < 0.5) return <ClayRock color={i % 2 === 0 ? PALETTE.earth : PALETTE.rust} r={0.08 + s * 0.04} scale={scale} />
+    if (s < 0.8) return <ClayTree height={0.32 + s * 0.12} crown={PALETTE.earth} scale={scale * 0.9} />
+    return <ClayRock color={PALETTE.earthDeep} r={0.1 + s * 0.03} scale={scale} />
+  }
+  // B2 winter summit: snowy conifers, bare trunks, snow boulders
+  if (s < 0.5) return <ClayTree height={0.34 + s * 0.14} crown={PALETTE.snow} scale={scale} />
+  if (s < 0.78) return <ClayTree height={0.3 + s * 0.1} crown={PALETTE.earth} scale={scale * 0.85} />
+  return <ClayRock color={PALETTE.snow} r={0.08 + s * 0.03} scale={scale} />
 }

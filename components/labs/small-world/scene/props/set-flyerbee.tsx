@@ -6,10 +6,12 @@ import { ClayBee, ClayBlossom, ClayDisc, ClayMound, ClayTree } from './clay-kit'
 
 const T = (t: number) => chapterTheta(1, t)
 
-/** The winding path: clay stepping discs alternating around the girl's line. */
+/** The winding path: clay stepping discs alternating around the girl's line. The
+ *  0.44/0.60 pair opens a gap where the FLYERBEE stream + its bridge cross the
+ *  lane (Task 20 authored crossing at theta ≈ 3.52). */
 const PATH: Array<[number, number]> = [
   [0.08, 0.1], [0.16, -0.12], [0.24, 0.18], [0.32, -0.2], [0.4, 0.12],
-  [0.48, -0.08], [0.56, 0.2], [0.64, -0.16], [0.72, 0.1],
+  [0.44, -0.08], [0.6, 0.2], [0.64, -0.16], [0.72, 0.1],
 ]
 
 function Beehive(props: { position?: [number, number, number] }) {

@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   biomeBump,
   biomeBumpB,
-  spineGate,
-  SNOW,
-  SNOW_B,
+  wedgeGate,
+  meridianGate,
+  polarLatGate,
+  bandOf,
+  canonicalTheta,
+  MERIDIANS,
 } from '@/components/labs/small-world/scene/biomes'
 import {
   terrainBump,
@@ -12,66 +15,92 @@ import {
   PLANET_RADIUS,
 } from '@/components/labs/small-world/scene/planet'
 
-/** A dense grid over the spine band (|nx| < 0.45) × full azimuth. Chapter props
- *  and the girl's lane all live here, so this is the region that must be
- *  bit-identical across laps. */
-function spineGrid(): Array<[number, number, number]> {
+const TWO_PI = Math.PI * 2
+
+/** Every latitude along a meridian — the seam where the four abutting scenes
+ *  (band j−1 / band j, in either variant) must collapse to one shared world. */
+function meridianSweep(m: number): Array<[number, number, number]> {
   const pts: Array<[number, number, number]> = []
-  for (let a = 0; a < 40; a++) {
-    const theta = (a / 40) * Math.PI * 2
-    // nx from -0.44 to 0.44 (strictly inside the 0.45 gate)
-    for (let b = 0; b <= 22; b++) {
-      const nx = -0.44 + (0.88 * b) / 22
-      const ring = Math.sqrt(1 - nx * nx)
-      pts.push([nx, ring * Math.cos(theta), ring * Math.sin(theta)])
-    }
+  for (let b = -98; b <= 98; b++) {
+    const nx = b / 100
+    const ring = Math.sqrt(1 - nx * nx)
+    pts.push([nx, ring * Math.cos(m), ring * Math.sin(m)])
   }
   return pts
 }
 
-describe('spine-identity gate (the world never morphs on the lane)', () => {
-  it('spineGate is exactly 0 for |nx| <= 0.45 and positive beyond', () => {
-    for (const nx of [-0.45, -0.3, 0, 0.2, 0.44, 0.45]) {
-      expect(spineGate(nx)).toBe(0)
-    }
-    expect(spineGate(0.5)).toBeGreaterThan(0)
-    expect(spineGate(0.55)).toBeCloseTo(1, 10)
-    expect(spineGate(0.9)).toBe(1)
-  })
-
-  it('biomeBumpB === biomeBump EXACTLY across the spine band', () => {
-    for (const [nx, ny, nz] of spineGrid()) {
-      expect(biomeBumpB(nx, ny, nz)).toBe(biomeBump(nx, ny, nz))
+describe('meridian seam identity (all four abutting wedges share one base)', () => {
+  it('wedgeGate is EXACTLY 0 on every meridian (full latitude sweep)', () => {
+    for (const m of MERIDIANS) {
+      for (const [nx, ny, nz] of meridianSweep(m)) {
+        expect(wedgeGate(canonicalTheta(Math.atan2(nz, ny)), nx)).toBe(0)
+      }
     }
   })
 
-  it('terrainBumpB === terrainBump EXACTLY across the spine band', () => {
-    for (const [nx, ny, nz] of spineGrid()) {
-      const x = nx * PLANET_RADIUS
-      const y = ny * PLANET_RADIUS
-      const z = nz * PLANET_RADIUS
-      expect(terrainBumpB(x, y, z)).toBe(terrainBump(x, y, z))
+  it('biomeBumpB === biomeBump EXACTLY on every meridian', () => {
+    for (const m of MERIDIANS) {
+      for (const [nx, ny, nz] of meridianSweep(m)) {
+        expect(biomeBumpB(nx, ny, nz)).toBe(biomeBump(nx, ny, nz))
+      }
     }
   })
 
-  it('DOES morph the flanks (proves the delta is real, not a no-op)', () => {
-    // sample the mountain range longitude on the flank (|nx| well past the gate)
-    let anyDifferent = false
-    for (let a = 0; a < 60; a++) {
-      const theta = (a / 60) * Math.PI * 2
-      const nx = -0.68
-      const ring = Math.sqrt(1 - nx * nx)
-      const ny = ring * Math.cos(theta)
-      const nz = ring * Math.sin(theta)
-      if (biomeBumpB(nx, ny, nz) !== biomeBump(nx, ny, nz)) anyDifferent = true
+  it('terrainBumpB === terrainBump EXACTLY on every meridian (props + girl seam)', () => {
+    for (const m of MERIDIANS) {
+      for (const [nx, ny, nz] of meridianSweep(m)) {
+        const x = nx * PLANET_RADIUS, y = ny * PLANET_RADIUS, z = nz * PLANET_RADIUS
+        expect(terrainBumpB(x, y, z)).toBe(terrainBump(x, y, z))
+      }
     }
-    expect(anyDifferent).toBe(true)
   })
 })
 
-describe('lap-2 snow cap', () => {
-  it('SNOW_B is the SNOW cap grown ~0.15 rad, same centre', () => {
-    expect(SNOW_B.dir).toBe(SNOW.dir)
-    expect(SNOW_B.radius).toBeCloseTo(SNOW.radius + 0.15, 10)
+describe('polar oceans are variant-invariant (the blue limbs never pop)', () => {
+  it('biomeBumpB === biomeBump EXACTLY over the polar caps (|nx| >= 0.8)', () => {
+    for (let a = 0; a < 200; a++) {
+      const th = (a / 200) * TWO_PI
+      for (const nx of [0.82, 0.9, 0.97, -0.82, -0.9, -0.97]) {
+        const ring = Math.sqrt(1 - nx * nx)
+        const p: [number, number, number] = [nx, ring * Math.cos(th), ring * Math.sin(th)]
+        expect(biomeBumpB(...p)).toBe(biomeBump(...p))
+      }
+    }
+  })
+
+  it('polarLatGate fades wedge deltas to 0 by |nx| = 0.75', () => {
+    for (const nx of [-0.75, -0.63, 0, 0.63, 0.75]) {
+      if (Math.abs(nx) >= 0.75) expect(polarLatGate(nx)).toBe(0)
+      else expect(polarLatGate(nx)).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('the six wedges genuinely differ (renewal is not a no-op)', () => {
+  it('each band interior morphs A -> B somewhere off the lane', () => {
+    for (let band = 0 as 0 | 1 | 2; band <= 2; band = (band + 1) as 0 | 1 | 2) {
+      let anyDifferent = false
+      const center = MERIDIANS[band] + Math.PI / 3 // band interior
+      for (let k = 0; k < 40; k++) {
+        const nx = -0.55 + (1.1 * k) / 40
+        const ring = Math.sqrt(1 - nx * nx)
+        const ny = ring * Math.cos(center), nz = ring * Math.sin(center)
+        if (biomeBumpB(nx, ny, nz) !== biomeBump(nx, ny, nz)) anyDifferent = true
+      }
+      expect(anyDifferent).toBe(true)
+    }
+  })
+
+  it('meridianGate reaches 1 in every band interior', () => {
+    for (const m of MERIDIANS) {
+      expect(meridianGate(m + Math.PI / 3)).toBeCloseTo(1, 10)
+      expect(meridianGate(m)).toBe(0)
+    }
+  })
+
+  it('bandOf partitions the circle into 3 contiguous bands', () => {
+    expect(bandOf(MERIDIANS[0] + 0.5)).toBe(0)
+    expect(bandOf(MERIDIANS[1] + 0.5)).toBe(1)
+    expect(bandOf(MERIDIANS[2] + 0.5)).toBe(2)
   })
 })

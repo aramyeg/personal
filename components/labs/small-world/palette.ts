@@ -19,4 +19,12 @@ export const PALETTE = {
   snow: '#F5F2EA',
   earth: '#7E4E2E',
   pine: '#3B7A46',
+  // per-wedge scene accents (Task 20)
+  springGreen: '#59C56A', // A0 vivid spring
+  petal: '#FF9DC2', // A1 flower-drift pink
+  sand: '#E9D4A0', // A2 delta / B0 dune light sand
+  goldSand: '#E6B24C', // B0 rich golden dune body
+  earthDeep: '#5A3216', // B1 canyon channel floor / deep walls
+  rust: '#A85A32', // B1 canyon terracotta bank
+  ice: '#DCEAF2', // B2 frozen water rim
 } as const
