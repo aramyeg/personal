@@ -38,6 +38,15 @@ import { solveBoxPose } from './popup-mechanics'
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
+// Seat-lift the balcony deck off the hall lid plane (ROTOR_LIFT/CW_LIFT scale):
+// the deck rides IN the lid plane and its inner strip (z 0.30..0.34) overlaps the
+// lid coplanarly -> z-fight flicker ("part of it is under a rectangle"). Lifting
+// it a hair along the lid normal breaks the shared plane. The lift is SCALED by
+// the openness (sh = sin(beta/2)) so it is EXACTLY 0 at book-closed (the deck
+// still folds dead flat — B1 stays at 1e-9) and ~this value at the reading pose;
+// it only nudges world X/Y (never z), so B3 fore-edge containment is untouched.
+const BALCONY_LIFT = 0.004
+
 /** One story of the keep — a box fold seated on the story below. `key` names
  *  the story (hall/gallery/loft/crown) so its per-face art ids resolve as
  *  `<keepId>-<key>-front/-back/-side/-top` (the box-family suffix scheme). */
@@ -52,6 +61,18 @@ export type KeepStorySpec = {
   gableRise?: number
   capFront?: boolean
   capBack?: boolean
+  /** DIE-CUT FACADE PLATE dims (the raven-finial idiom generalized to a tier
+   *  front). When set, the tier's `-front` art prints as TWO coplanar half-quads
+   *  in the capFront planes — creased at y=0, split art u at 0.5 — anchored at
+   *  the cap BASE edge and sized to the art's TRUE (uncropped) aspect, so the
+   *  silhouette (curtain wall / belfry roof / spire) shows past the cap's top and
+   *  side edges. In-plane extension = ZERO off-plane reach: folds flat with the
+   *  cap, wedge containment inherits the cap's proof. The box cap itself renders
+   *  as plain bracing paper behind the plate (capFrontArt:false). `width` is the
+   *  TOTAL plate width across both halves (crease->outer per half = width/2, along
+   *  the cap plane's lateral); `height` is the run UP the cap plane from the base
+   *  edge. mesh aspect width/height MUST equal the delivered art aspect. */
+  plate?: { width: number; height: number }
 }
 
 /** The jutting gold dispatch balcony — a deck riding the ground story's flat
@@ -92,9 +113,9 @@ export type KeepStackGeom = {
  *  This is the whole "expansion" — one keepstack entry -> N box poses. */
 export function keepStackStoryGeoms(
   geom: KeepStackGeom
-): ReadonlyArray<BoxGeom & { key: string }> {
+): ReadonlyArray<BoxGeom & { key: string; plate?: KeepStorySpec['plate'] }> {
   let base = 0
-  const out: Array<BoxGeom & { key: string }> = []
+  const out: Array<BoxGeom & { key: string; plate?: KeepStorySpec['plate'] }> = []
   for (const s of geom.stories) {
     out.push({
       mech: 'box',
@@ -106,8 +127,12 @@ export function keepStackStoryGeoms(
       gableRise: s.gableRise,
       capFront: s.capFront,
       capBack: s.capBack,
+      // A tier with a facade plate suppresses its own cap-front art (the plate
+      // prints the front; the cap stays raw bracing paper behind it).
+      capFrontArt: s.plate ? false : undefined,
       baseH: base,
       key: s.key,
+      plate: s.plate,
     })
     base += s.height
   }
@@ -150,7 +175,11 @@ export function keepStackBalconyDeck(
   const sm = Math.sin(m)
   // The ground story sits at baseH 0, so its lid rides bisector-x = H + t*ch.
   const W = (x: number, y: number, z: number): Vec3 => [x * cm - y * sm, x * sm + y * cm, z]
-  const lidPt = (t: number, sign: number, z: number): Vec3 => W(hall.height + t * ch, sign * t * sh, z)
+  // Each half-deck lifts along its own lid-half normal (bisector (sh, -sign*ch),
+  // a unit vector), magnitude BALCONY_LIFT*sh -> 0 at close, ~BALCONY_LIFT at open.
+  const lift = BALCONY_LIFT * sh
+  const lidPt = (t: number, sign: number, z: number): Vec3 =>
+    W(hall.height + t * ch + lift * sh, sign * (t * sh - lift * ch), z)
   const half = (sign: number): PanelQuad => [
     lidPt(0, sign, bal.z0),
     lidPt(0, sign, bal.z1),
@@ -210,9 +239,61 @@ export function keepStackRavenDeck(
   return { crestL: half(1), crestR: half(-1) }
 }
 
+/** A tier's DIE-CUT FACADE PLATE — the raven-finial idiom (keepStackRavenDeck)
+ *  generalized, anchored at the cap BASE edge instead of its top. TWO coplanar
+ *  half-quads in the story's capFront planes (one per side of the y=0 crease),
+ *  each running BASE->TOP along the cap plane (X from a*ch up by plate.height,
+ *  free to exceed the cap height H) and CREASE->OUTER in the cap's own lateral
+ *  direction (wh from 0 to plate.width/2, free to exceed the wall half-width a =
+ *  the bailey-wall lateral overhang). Being coplanar with the folding cap means
+ *  ZERO off-plane reach: it folds dead flat with the cap for free, and its wedge
+ *  containment inherits the cap's proof (the raven precedent). Returns null when
+ *  the story carries no plate. Corner order [crease-bottom, crease-top,
+ *  outer-top, outer-bottom] — identical to the raven, so it reuses the raven UVs
+ *  (art-u 0.5 at the crease -> 0/1 at the outer edge, art-v 0 base -> 1 top). */
+export function keepStackFacadePlate(
+  geom: KeepStackGeom,
+  storyKey: string,
+  thetaL: number,
+  thetaR: number
+): { plateL: PanelQuad; plateR: PanelQuad } | null {
+  const seat = keepStackStoryGeoms(geom).find((g) => g.key === storyKey)
+  if (!seat || !seat.plate) return null
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const m = (thetaL + thetaR) / 2
+  const h = beta / 2
+  const ch = Math.cos(h)
+  const sh = Math.sin(h)
+  const cm = Math.cos(m)
+  const sm = Math.sin(m)
+  const baseH = seat.baseH ?? 0
+  const W = (x: number, y: number, z: number): Vec3 => {
+    const X = x + baseH
+    return [X * cm - y * sm, X * sm + y * cm, z]
+  }
+  const { width, height } = seat.plate
+  const a = seat.a
+  // The cap's BASE edge (bisector-x = a*ch, the tier floor / wall-top seam) is the
+  // plate's BOTTOM; the crease is at (y=0, z = z1 + a*ch) and the crease->outer
+  // direction in the cap plane is (y,z) = (sh, -ch) per unit wh (toward the front
+  // wall corner, hitting it exactly at wh = a).
+  const X0 = a * ch
+  const zc = seat.z1 + a * ch
+  const wh = width / 2
+  const creaseBottom = W(X0, 0, zc)
+  const creaseTop = W(X0 + height, 0, zc)
+  const half = (sign: number): PanelQuad => [
+    creaseBottom,
+    creaseTop,
+    W(X0 + height, sign * wh * sh, zc - wh * ch),
+    W(X0, sign * wh * sh, zc - wh * ch),
+  ]
+  return { plateL: half(1), plateR: half(-1) }
+}
+
 /** Every world-space quad the keep poses at a given dihedral — the four story
- *  box faces plus the balcony half-decks and the raven — for the collision /
- *  sightline / motion / depth dispatchers. */
+ *  box faces plus any facade plates, the balcony half-decks and the raven — for
+ *  the collision / sightline / motion / depth dispatchers. */
 export function keepStackQuads(
   geom: KeepStackGeom,
   thetaL: number,
@@ -221,6 +302,8 @@ export function keepStackQuads(
   const quads: PanelQuad[] = []
   for (const g of keepStackStoryGeoms(geom)) {
     for (const patch of solveBoxPose(g, thetaL, thetaR)) quads.push(patch.quad)
+    const plate = keepStackFacadePlate(geom, g.key, thetaL, thetaR)
+    if (plate) quads.push(plate.plateL, plate.plateR)
   }
   const deck = keepStackBalconyDeck(geom, thetaL, thetaR)
   if (deck) quads.push(deck.deckL, deck.deckR)

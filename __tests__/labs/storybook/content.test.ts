@@ -80,7 +80,7 @@ describe('storybook content', () => {
                                   : l.mech === 'keepwinch'
                                     ? l.crankR
                                     : l.mech === 'skyline'
-                                      ? l.mounds.length
+                                      ? l.rows.length
                                       : l.width
             return `${l.mech}:${size}`
           })

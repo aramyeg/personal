@@ -165,10 +165,20 @@ export function BoxPopupLayer({
     const art = { front: frontArt, back: backArt, side: sideArt, top: topArt }
     faces.forEach((face, i) => {
       const asset = FACE_ART[face].asset
-      const texture = asset ? art[asset] : null
+      // A tier with a die-cut facade plate (keepstack) suppresses its own cap-
+      // front art: the plate prints the front, and the cap stays raw bracing
+      // paper hidden behind it (never the uncropped plate art stretched to the
+      // cap aspect).
+      const suppressed = asset === 'front' && layer.capFrontArt === false
+      const texture = asset && !suppressed ? art[asset] : null
       const material = materials.exterior[i]
       material.map = texture ?? paperTexture
-      if (!texture) material.color.set(SHADED_FACES.has(face) ? tint.shade : tint.lit)
+      // A plate-suppressed cap renders in INTERIOR shadow, not raw kraft: the cap
+      // sits behind (and mostly under) the die-cut plate, so any exposed strip
+      // above a shorter plate must read as recession/depth behind the silhouette
+      // (the fallback hall plate leaves a cap strip above it), never a bright
+      // paper block.
+      if (!texture) material.color.set(suppressed ? INTERIOR_SHADOW_TINT : SHADED_FACES.has(face) ? tint.shade : tint.lit)
       if (texture) {
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
@@ -176,7 +186,7 @@ export function BoxPopupLayer({
       material.needsUpdate = true
       edgeMaterials[i].color.set(texture ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [faces, materials, edgeMaterials, paperTexture, frontArt, backArt, sideArt, topArt, tint])
+  }, [faces, materials, edgeMaterials, paperTexture, frontArt, backArt, sideArt, topArt, tint, layer.capFrontArt])
 
   // Contact-shadow map is a parameter-free radial blob (shared-procedural-
   // textures.ts) — the material itself stays owned (opacity is rewritten

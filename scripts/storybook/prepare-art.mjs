@@ -76,10 +76,12 @@ const CROP_TO_ASPECT = {
   'ch3-keep-gallery-top': 0.68 / 0.56, // weathered deck boards
   'ch3-keep-loft-top': 0.54 / 0.4, // plain cap slab
   'ch3-keep-crown-top': (2 * Math.hypot(0.15, 0.1)) / 0.28, // gable pitch
-  // v2 tier faces (delivered beyond their bands):
-  'ch3-keep-hall-front': 0.8 / 0.25, // centered: keeps the gate, trims outer width
-  'ch3-keep-loft-front': { aspect: 0.54 / 0.18, anchor: 'bottom' }, // keeps arch+ledge, trims the painted roof
-  'ch3-keep-crown-front': { aspect: 0.3 / 0.15, anchor: 'bottom' }, // keeps the lamp band, trims the painted cone
+  // NOTE: the hall/loft/crown `-front` faces are NO LONGER cropped to the cap
+  // aspect. E1.5.1 renders each tier front as a DIE-CUT FACADE PLATE
+  // (keepStackFacadePlate) sized to the art's TRUE (uncropped) aspect, so the
+  // silhouette (curtain wall, belfry roof + bell, spire cone) shows past the cap
+  // edges — cropping to the rectangular cap would defeat the whole point. The
+  // plate dims in content.ts (ch3-keep stories) carry the uncropped aspect.
 }
 
 // FAN-OUT (per source id, dest ids): one processed panel saved under several

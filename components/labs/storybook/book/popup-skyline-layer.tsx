@@ -1,38 +1,38 @@
 'use client'
 
 /**
- * Renders the SKYLINE (popup-skyline.ts): a row of low rooftop mounds per outer
- * page, each two slope panels over a ridge band, page-driven by the fold-flat
- * envelope (no knob). Follows the knob-tier renderer's conventions verbatim —
- * unlit print, kraft fallback, interior BackSide in deep shadow, cut-edge
- * hairlines, a contact shadow scaled by the mound's own lift.
+ * Renders the CITADEL RANK (popup-skyline.ts): per outer page, a few low
+ * +z-facing city-skyline ROWS — single-page cammed flaps hinged on a radial
+ * line, standing up as the book opens (page-driven envelope, no knob). Each row
+ * is ONE die-cut flap carrying the full roofline art (alpha-tested silhouette,
+ * DoubleSide so the reader reads it from the front while the back rides the
+ * distance), kraft fallback when unpainted, plus a contact shadow scaled by the
+ * flap's own stand. The old prism mound (two slopes over a spine-running ridge)
+ * read END-ON; this reorientation faces the reader.
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
-import { solveKeepSkylinePose, keepSkylineEnvelope, type KeepSkylineGeom } from './popup-skyline'
+import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
+import { solveSkylineRow, keepSkylineEnvelope, type KeepSkylineGeom } from './popup-skyline'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
 import { shadowLift } from './shadow-light'
-import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
-const STRUCT_SHADOW_MAX = 0.28
-// E-G5 floor (f): PAINTED shaded faces use this gentle NEUTRAL step. The old
-// warm fold seam (#d9cdb4, ~x0.85/0.80/0.71) dimmed + warm-cast painted art
-// across half of a folded piece; the warm seam stays reserved for raw kraft
-// placeholder stock (per-piece kraftTints), never painted art.
-const PAINTED_FOLD_SHADE = '#e4e4e4'
-const INTERIOR_SHADOW_TINT = '#5f5138'
-const CUT_EDGE_COLOR = '#f6eedb'
+const STRUCT_SHADOW_MAX = 0.22
 const rad = (d: number): number => (d * Math.PI) / 180
+
+// Roofline flap uvs: u along the radial base (0 inner -> 1 outer), v up the flap
+// (0 hinge -> 1 roofline crest), matching solveSkylineRow's corner order
+// [base-inner, base-outer, top-outer, top-inner].
+const ROW_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
@@ -44,15 +44,7 @@ function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
   return geometry
 }
 
-function makeEdgeGeometry(): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry()
-  const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
-  positions.setUsage(THREE.DynamicDrawUsage)
-  geometry.setAttribute('position', positions)
-  return geometry
-}
-
-function writeQuad(geometry: THREE.BufferGeometry, quad: readonly (readonly [number, number, number])[]): void {
+function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
   const attr = geometry.getAttribute('position') as THREE.BufferAttribute
   const arr = attr.array as Float32Array
   for (let c = 0; c < 4; c++) {
@@ -82,7 +74,7 @@ function usePageAngles(
   }
 }
 
-function SkylineMound({
+function SkylineRow({
   layer,
   k,
   spreadIndex,
@@ -100,64 +92,29 @@ function SkylineMound({
   const faceArt = useArtTexture(`${layer.id}-mound${k}`)
   const tint = useMemo(() => kraftTints(`${layer.id}-mound${k}`), [layer.id, k])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
-  const mound = layer.mounds[k]
+  const row = layer.rows[k]
 
-  // The reader-facing IN-slope carries the FULL roofline art (v 0..1: hinge at the
-  // art's bottom, die-cut slate roofline silhouette at the ridge). The OUT-slope
-  // (the far side of the mound) drops the art and becomes a shaded paper backing
-  // card — the old split-across-both-slopes mapping showed the reader the art's
-  // pale bottom half and pointed the roofline crest away.
-  const geometries = useMemo(
-    () => ({
-      in: makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])),
-      out: makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])),
-    }),
-    []
-  )
-  const edgeGeometries = useMemo(() => ({ in: makeEdgeGeometry(), out: makeEdgeGeometry() }), [])
-  const edgeMaterials = useMemo(
-    () => ({
-      in: new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
-      out: new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }),
-    }),
-    []
-  )
+  const geometry = useMemo(() => makeQuadGeometry(new Float32Array(ROW_UVS)), [])
   const paperTexture = sharedPaperTexture()
-  const materials = useMemo(
-    () => ({
-      // in-slope: die-cut roofline print, so it needs alpha (transparent above the
-      // silhouette shows the backdrop through the cut).
-      in: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff', transparent: true, alphaTest: 0.1 }),
-      out: new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: PAINTED_FOLD_SHADE }),
-    }),
+  // ONE die-cut flap: the full roofline art (alpha-tested silhouette), DoubleSide
+  // so the reader reads the front face regardless of the flap's winding as it
+  // leans, and the transparent sky above the roofline shows through the cut.
+  const material = useMemo(
+    () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: '#ffffff', transparent: true, alphaTest: 0.1 }),
     []
   )
-  const interiorMaterial = useMemo(
-    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
-    [paperTexture]
-  )
-  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
 
   useEffect(() => {
-    // in-slope: the full roofline art (or kraft stock when unpainted).
-    materials.in.map = faceArt ?? paperTexture
-    materials.in.transparent = !!faceArt
-    materials.in.alphaTest = faceArt ? 0.1 : 0
+    material.map = faceArt ?? paperTexture
+    material.transparent = !!faceArt
+    material.alphaTest = faceArt ? 0.1 : 0
+    material.color.set(faceArt ? '#ffffff' : tint.lit)
     if (faceArt) {
       faceArt.wrapS = THREE.ClampToEdgeWrapping
       faceArt.wrapT = THREE.ClampToEdgeWrapping
-      materials.in.color.set('#ffffff')
-    } else {
-      materials.in.color.set(tint.lit)
     }
-    materials.in.needsUpdate = true
-    edgeMaterials.in.color.set(faceArt ? CUT_EDGE_COLOR : tint.edge)
-    // out-slope: shaded paper backing card, never the art (the mound's far side).
-    materials.out.map = paperTexture
-    materials.out.color.set(tint.shade)
-    materials.out.needsUpdate = true
-    edgeMaterials.out.color.set(tint.edge)
-  }, [faceArt, paperTexture, materials, edgeMaterials, tint])
+    material.needsUpdate = true
+  }, [faceArt, paperTexture, material, tint])
 
   const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
@@ -166,29 +123,23 @@ function SkylineMound({
   )
   const shadowSpec = useMemo(() => {
     const sign = layer.side === 'left' ? -1 : 1
-    const peak = mound.w * Math.sin(rad(mound.aRestDeg))
+    const peak = row.height * Math.sin(rad(row.standDeg))
     const lift = shadowLift(peak)
-    const centerD = mound.F - mound.w
+    const centerD = row.F + row.width / 2
     return {
-      position: [sign * centerD + lift.dx, SHADOW_Y_LIFT, mound.zc + lift.dz] as [number, number, number],
-      size: [mound.w * 2 * 0.95 * lift.spread, mound.ridgeLen * 1.05 * lift.spread] as [number, number],
+      position: [sign * centerD + lift.dx, SHADOW_Y_LIFT, row.zc + lift.dz] as [number, number, number],
+      size: [row.width * 1.05 * lift.spread, Math.max(0.08, row.height) * 1.2 * lift.spread] as [number, number],
       maxOpacity: STRUCT_SHADOW_MAX * lift.depth,
     }
-  }, [layer, mound])
+  }, [layer, row])
 
   useEffect(
     () => () => {
-      geometries.in.dispose()
-      geometries.out.dispose()
-      edgeGeometries.in.dispose()
-      edgeGeometries.out.dispose()
-      edgeMaterials.in.dispose()
-      edgeMaterials.out.dispose()
-      materials.in.dispose()
-      materials.out.dispose()
+      geometry.dispose()
+      material.dispose()
       shadowMaterial.dispose()
     },
-    [geometries, edgeGeometries, edgeMaterials, materials, shadowMaterial]
+    [geometry, material, shadowMaterial]
   )
 
   useFrame(() => {
@@ -199,23 +150,16 @@ function SkylineMound({
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
-    const patch = solveKeepSkylinePose(layer, thetaL, thetaR)[k]
-    writeQuad(geometries.in, patch.slopeIn)
-    writeQuad(edgeGeometries.in, patch.slopeIn)
-    writeQuad(geometries.out, patch.slopeOut)
-    writeQuad(edgeGeometries.out, patch.slopeOut)
+    writeQuad(geometry, solveSkylineRow(layer, row, thetaL, thetaR))
     shadowMaterial.opacity = shadowSpec.maxOpacity * keepSkylineEnvelope(layer, beta)
   })
 
   return (
     <>
       <group ref={groupRef} visible={false}>
-        <mesh geometry={geometries.in} material={materials.in} renderOrder={0} />
-        <mesh geometry={geometries.in} material={interiorMaterial} renderOrder={0} />
-        <lineLoop geometry={edgeGeometries.in} material={edgeMaterials.in} renderOrder={1} />
-        <mesh geometry={geometries.out} material={materials.out} renderOrder={0} />
-        <mesh geometry={geometries.out} material={interiorMaterial} renderOrder={0} />
-        <lineLoop geometry={edgeGeometries.out} material={edgeMaterials.out} renderOrder={1} />
+        {/* die-cut silhouette (alpha): no rectangular cut-edge loop — it would
+            draw a box around the roofline cutout. */}
+        <mesh geometry={geometry} material={material} renderOrder={0} />
       </group>
       <group ref={shadowGroupRef} visible={false}>
         <mesh
@@ -244,8 +188,8 @@ export function KeepSkylinePopupLayer({
 }) {
   return (
     <group name={`skyline-${layer.id}`}>
-      {layer.mounds.map((_, k) => (
-        <SkylineMound
+      {layer.rows.map((_, k) => (
+        <SkylineRow
           key={k}
           layer={layer}
           k={k}

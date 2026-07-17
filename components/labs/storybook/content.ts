@@ -243,22 +243,35 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // z-containment, caps the keep HEIGHT at ~0.90 world (reach 1.13). Wider
     // stories (a up to the z1+a<=0.75 front-cap-fold ceiling) widen the facade.
     stories: [
-      // Dispatch Hall — SOLID capFront base facade (was an open hollow mouth
-      // that read as a wall/lid from the lid-dominant camera; the E1.5 fix
-      // closes it into the picture's lower facade). Back cap braces, flat lid
-      // seats the gallery + carries the balcony.
-      { key: 'hall', a: 0.4, height: 0.25, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true },
-      // Balcony Gallery — OPEN arcaded loggia (capFront:false) so the jutting
-      // gold balcony deck cantilevers out of it toward the reader (closing this
-      // front would collide with the balcony riding the hall lid); flat lid
-      // seats the loft.
+      // Dispatch Hall — SOLID capFront base facade. E1.5.1 FACADE-PLATE fix: the
+      // front no longer prints as art CROPPED to the rectangular cap face (which
+      // read as a square block); instead a DIE-CUT PLATE (keepStackFacadePlate)
+      // prints the UNCROPPED curtain-wall art (delivered 4.448 w/h). The wide
+      // bailey-wing variant (height 0.25 -> width 1.112, overhanging the tower)
+      // was REJECTED: at 4.448 its wings reach lateral 0.556 and collide with the
+      // grown citadel rank (skyline-r inner edge 0.537, A9) and graze the page
+      // wedge (A10). FALLBACK adopted: width = cap width 0.80 (wh = a, flush with
+      // the walls, no lateral overhang) -> height 0.1799. The plate covers the cap
+      // base band; the exposed cap strip above it (0.18..0.25) renders as interior
+      // shadow (capFrontArt:false darkens the cap), reading as recession behind the
+      // die-cut battlement, not raw kraft. Back cap braces, flat lid seats the
+      // gallery + carries the balcony.
+      { key: 'hall', a: 0.4, height: 0.25, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.8, height: 0.1799 } },
+      // Balcony Gallery — solid capFront tier below the jutting gold balcony. Its
+      // die-cut arcade plate (3.1:1) is PENDING (user generating); until it lands
+      // the cap renders as plain kraft paper (no plate, no `-front` art yet).
       { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
       // see-through belfry) and host the winch iris + counterweight; flat cap
-      // slab seats the crown.
-      { key: 'loft', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true },
+      // slab seats the crown. Facade plate: painted roof + bell (delivered 2.427)
+      // sized plate width = cap width 0.54 -> height 0.2225, so the roofline + bell
+      // rise ABOVE the cap top edge as silhouette.
+      { key: 'loft', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.54, height: 0.2225 } },
       // Signal-Spire crown — a small gabled spire; structural top world-Y ~0.90.
-      { key: 'crown', a: 0.15, height: 0.15, z0: -0.14, z1: 0.14, roof: 'gable', gableRise: 0.1, capFront: true, capBack: true },
+      // Facade plate: painted spire cone (delivered 1.601) sized plate width = cap
+      // width 0.30 -> height 0.1874, rising above the cap as the spire silhouette
+      // (REPLACES the doubled-cone read of a painted cone on a flat cap).
+      { key: 'crown', a: 0.15, height: 0.15, z0: -0.14, z1: 0.14, roof: 'gable', gableRise: 0.1, capFront: true, capBack: true, plate: { width: 0.3, height: 0.1874 } },
     ],
     // The jutting gold gallery deck, GROWN (halfW 0.26, z 0.30..0.58) into a
     // hero cantilever off the hall lid, starting just in front of the gallery
@@ -274,26 +287,34 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // face-on. Semaphore mast sits behind the ridge (SEMAPHORE_BASE_Z) to clear it.
     raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.36, height: 0.1942 },
   },
-  // THE CITADEL RANK — a CONNECTED rooftop rank replacing the 6 isolated skyline
-  // mounds (E1.5: "reading as ONE mass flanking the keep"). Per side, 3 UNIFORM
-  // strips (same F/w/aRest) stepping only in zc across TOUCHING z-spans (ridgeLen
-  // 0.40, zc -0.40/0/0.40) — so adjacent strips tile into ONE continuous ridge
-  // sharing clean edges (no mound-vs-mound scissor; the staggered-rooftop look
-  // comes from the die-cut ROOFLINE ART, not the geometry). Pushed OUT to F 0.71/
-  // 0.73 so the inner edge F-2w (0.50/0.53) clears the RE-MASSED WIDER keep's
-  // mid-fold sweep (hall a 0.40; the old 0.44 floor was for the a-0.30 keep) —
-  // bench-reverified zero D-G2 vs keep + zero mound-vs-mound (derive-keep-skyline).
-  // L/R differ slightly (asymmetry). The full-art in-slope faces the reader
-  // (die-cut roofline at the ridge); the out-slope is a shaded paper backing card.
-  { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', mounds: [
-    { F: 0.73, w: 0.0976, aRestDeg: 63, zc: -0.4, ridgeLen: 0.34 },
-    { F: 0.73, w: 0.0976, aRestDeg: 63, zc: 0.0, ridgeLen: 0.34 },
-    { F: 0.73, w: 0.1068, aRestDeg: 63, zc: 0.4, ridgeLen: 0.34 },
+  // THE CITADEL RANK — E1.5.2 RE-DERIVED as +z-FACING CITY ROWS
+  // (derive-keep-cityrows.mjs). The v1 fore-hinge PRISM read END-ON: its ridge
+  // ran ALONG the spine, so the along-spine composition camera saw leaning shards
+  // (current) / kraft backs (flip) — the orchestrator eye-test killed both. Root
+  // cause is orientation class: every piece that READS in this book faces +z.
+  // Now each row is a single-page cammed FLAP hinged on a RADIAL line, standing
+  // up (leaning back toward -z, standDeg 68) as the book opens — the SAME
+  // page-driven envelope class as the retired mound, REORIENTED so the die-cut
+  // roofline faces the reader (face spans radial x up at a fixed depth, normal
+  // along z). Rows sit BEHIND the keep (zc < the -0.34 back wall) at the FLANKS
+  // (F ~0.44), stepped in depth (-0.56/-0.46/-0.37) so rooftops peek on both
+  // sides of the tower and layer into distance. Placement is DOUBLY BOUNDED: F
+  // must clear the keep's back-cap sweep, F+width must stay under the real-time
+  // radius cap (~0.74) — which forces the low height ~0.08 (the wide 3.2-3.5:1
+  // delivered strip art binds width = height*artAspect, so a taller row would
+  // overrun the radius cap). Bench Y1-Y6 all green (fold-flat, keep D-G2,
+  // row/fringe/winch-disc D-G2, real-time 5% margin, fits-page, pinned-camera
+  // sightline 51% visible). Slot->strip aspect per the prepare-art FAN_OUT
+  // (b-strips 3.484 -> l0/l1/r2, c-strips 3.185 -> l2/r0/r1).
+  { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
+    { F: 0.44, zc: -0.56, height: 0.08, width: 0.2787, standDeg: 68 },
+    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2857, standDeg: 68 },
+    { F: 0.45, zc: -0.37, height: 0.078, width: 0.2484, standDeg: 68 },
   ] },
-  { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', mounds: [
-    { F: 0.71, w: 0.1068, aRestDeg: 61, zc: -0.4, ridgeLen: 0.34 },
-    { F: 0.71, w: 0.1068, aRestDeg: 61, zc: 0.0, ridgeLen: 0.34 },
-    { F: 0.71, w: 0.0976, aRestDeg: 61, zc: 0.4, ridgeLen: 0.34 },
+  { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
+    { F: 0.44, zc: -0.56, height: 0.084, width: 0.2675, standDeg: 68 },
+    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2612, standDeg: 68 },
+    { F: 0.45, zc: -0.37, height: 0.075, width: 0.2613, standDeg: 68 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,

@@ -19,6 +19,7 @@ import type { BoxGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   keepStackBalconyDeck,
+  keepStackFacadePlate,
   keepStackRavenDeck,
   keepStackStoryGeoms,
   type KeepStackGeom,
@@ -106,6 +107,13 @@ const RAVEN_FINIAL_UVS: [Float32Array, Float32Array] = [
   new Float32Array([0.5, 0, 0.5, 1, 0, 1, 0, 0]), // crestL: crease 0.5 -> outer 0
   new Float32Array([0.5, 0, 0.5, 1, 1, 1, 1, 0]), // crestR: crease 0.5 -> outer 1
 ]
+
+// Facade plate UVs — the tier front art split across the capFront crease, same
+// idiom and corner order as the raven finial (keepStackFacadePlate returns
+// [crease-bottom, crease-top, outer-top, outer-bottom]), so it reuses the raven
+// UV table verbatim: art-u 0.5 at the crease -> 0 (plateL, reader LEFT) / 1
+// (plateR) at the outer edge; art-v 0 at the cap base edge -> 1 at the plate top.
+const FACADE_PLATE_UVS = RAVEN_FINIAL_UVS
 
 /** A small two-quad print riding a solved-per-frame pair of quads (the balcony
  *  deck's two half-decks), following the box lid's look. `uvs` gives each quad's
@@ -253,6 +261,26 @@ export function KeepStackPopupLayer({
           committedSpread={committedSpread}
         />
       ))}
+      {/* DIE-CUT FACADE PLATES — the tier front art as a coplanar cap-plane plate
+          (raven-finial idiom), one per plated story. The box cap behind it is raw
+          bracing paper (capFrontArt:false). */}
+      {stories
+        .filter((s) => s.plate)
+        .map((s) => (
+          <TwoQuadRide
+            key={`plate-${s.key}`}
+            artId={`${layer.id}-${s.key}-front`}
+            solve={(tL, tR) => {
+              const plate = keepStackFacadePlate(layer, s.key, tL, tR)
+              return plate ? { a: plate.plateL, b: plate.plateR } : null
+            }}
+            uvs={FACADE_PLATE_UVS}
+            alpha
+            spreadIndex={spreadIndex}
+            frame={frame}
+            committedSpread={committedSpread}
+          />
+        ))}
       {layer.balcony && (
         <TwoQuadRide
           artId={`${layer.id}-balcony`}

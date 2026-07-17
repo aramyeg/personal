@@ -450,11 +450,11 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
           continue
         }
         if (layer.mech === 'skyline') {
-          // one-page mound rows: each mound's inner/fore hinge sits on its page
-          // (the tab-piece/knob-tier base pattern).
+          // one-page city rows: each flap's radial BASE hinge (q[0], q[1]) sits
+          // on its page; the top edge stands off it.
           const n = layer.side === 'left' ? nL : nR
-          for (const patch of solveKeepSkylinePose(layer, thetaL, thetaR)) {
-            for (const p of [patch.slopeIn[0], patch.slopeIn[1], patch.slopeOut[2], patch.slopeOut[3]]) {
+          for (const flap of solveKeepSkylinePose(layer, thetaL, thetaR)) {
+            for (const p of [flap[0], flap[1]]) {
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
           }

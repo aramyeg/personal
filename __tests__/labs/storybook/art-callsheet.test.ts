@@ -85,7 +85,7 @@ function knownGoodIds(): ReadonlySet<string> {
     }
     // The skyline (popup-skyline-layer.tsx): one art per rooftop mound.
     if (layer.mech === 'skyline') {
-      layer.mounds.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
+      layer.rows.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
     }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
@@ -181,7 +181,7 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
         constructed.push(`${layer.id}-disc`, `${layer.id}-semaphore`, `${layer.id}-iris`, `${layer.id}-counterweight`)
       }
       if (layer.mech === 'skyline') {
-        layer.mounds.forEach((_, i) => constructed.push(`${layer.id}-mound${i}`))
+        layer.rows.forEach((_, i) => constructed.push(`${layer.id}-mound${i}`))
       }
     }
     const missing = constructed.filter((key) => !doc.includes(`\`${key}\``))

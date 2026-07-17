@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   keepStackBalconyDeck,
   keepStackCrownHeight,
+  keepStackFacadePlate,
   keepStackQuads,
   keepStackStoryGeoms,
   keepStackTelescopes,
@@ -183,6 +184,69 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
         for (let k = 0; k < 4; k++) if (ref[k] > 1e-9) expect(Math.abs(l[k] - ref[k]) / ref[k]).toBeLessThanOrEqual(1e-9)
       }
     })
+  })
+
+  describe('die-cut facade plates (the raven-finial idiom generalized to tier fronts)', () => {
+    const PLATED = ['hall', 'loft', 'crown'] as const
+
+    it('every plated tier suppresses its cap-front art (capFrontArt:false) so the cap stays raw bracing paper', () => {
+      const geoms = keepStackStoryGeoms(KEEP)
+      for (const g of geoms) {
+        const plated = PLATED.includes(g.key as (typeof PLATED)[number])
+        expect(g.plate !== undefined).toBe(plated)
+        // plated -> capFrontArt false (cap hidden behind the plate); else default (art on).
+        if (plated) expect(g.capFrontArt).toBe(false)
+        else expect(g.capFrontArt).toBeUndefined()
+      }
+      // the gallery front is PENDING (no art) -> no plate yet.
+      expect(keepStackFacadePlate(KEEP, 'gallery', ...bloom(REST))).toBeNull()
+    })
+
+    it('each plate mesh aspect (width/height) equals the delivered UNCROPPED art aspect', () => {
+      // hall 4.448 (curtain wall), loft 2.427 (belfry roof+bell), crown 1.601 (spire).
+      const want: Record<string, number> = { hall: 4.448, loft: 2.427, crown: 1.601 }
+      for (const key of PLATED) {
+        const plate = KEEP.stories.find((s) => s.key === key)!.plate!
+        expect(plate.width / plate.height).toBeCloseTo(want[key], 2)
+      }
+    })
+
+    it('plates fold dead flat at book-closed (inherited from the coplanar cap — S1 covers, asserted directly)', () => {
+      for (const key of PLATED) {
+        const plate = keepStackFacadePlate(KEEP, key, 0, 0)!
+        for (const q of [plate.plateL, plate.plateR]) for (const p of q) expect(Math.abs(p[1])).toBeLessThanOrEqual(1e-9)
+      }
+    })
+
+    it('plates are rigid across the sweep (coplanar cap-plane extension, zero off-plane DOF)', () => {
+      const refLen = (q: PanelQuad): number[] => [dist(q[0], q[1]), dist(q[1], q[2]), dist(q[2], q[3]), dist(q[3], q[0])]
+      for (const key of PLATED) {
+        const ref = refLen(keepStackFacadePlate(KEEP, key, ...bloom(REST))!.plateL)
+        for (let i = 0; i <= 120; i++) {
+          const l = refLen(keepStackFacadePlate(KEEP, key, ...bloom((Math.PI * i) / 120))!.plateL)
+          for (let k = 0; k < 4; k++) if (ref[k] > 1e-9) expect(Math.abs(l[k] - ref[k]) / ref[k]).toBeLessThanOrEqual(1e-9)
+        }
+      }
+    })
+  })
+
+  it('the balcony deck is seat-lifted off the hall lid (no coplanar z-fight) yet folds flat at close', () => {
+    // At rest the deck must NOT lie in the hall lid plane (that coplanarity is the
+    // reported flicker). Measure the deck's signed distance from the lid plane.
+    const [tL, tR] = bloom(REST)
+    const lidL = solveBoxPose(keepStackStoryGeoms(KEEP)[0], tL, tR).find((p) => p.face === 'lidL')!.quad
+    const e1: Vec3 = [lidL[1][0] - lidL[0][0], lidL[1][1] - lidL[0][1], lidL[1][2] - lidL[0][2]]
+    const e2: Vec3 = [lidL[3][0] - lidL[0][0], lidL[3][1] - lidL[0][1], lidL[3][2] - lidL[0][2]]
+    const n: Vec3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+    const nl = Math.hypot(...n)
+    const deck = keepStackBalconyDeck(KEEP, tL, tR)!
+    const off = Math.abs(
+      ((deck.deckL[0][0] - lidL[0][0]) * n[0] + (deck.deckL[0][1] - lidL[0][1]) * n[1] + (deck.deckL[0][2] - lidL[0][2]) * n[2]) / nl
+    )
+    expect(off).toBeGreaterThan(0.002) // cleared the lid plane (z-fight broken)
+    // still folds dead flat at close (B1, re-asserted with the lift in place).
+    const shut = keepStackBalconyDeck(KEEP, 0, 0)!
+    for (const q of [shut.deckL, shut.deckR]) for (const p of q) expect(Math.abs(p[1])).toBeLessThanOrEqual(1e-9)
   })
 
   it('the per-story renderer expansion tags every story and reuses solveBoxPose', () => {

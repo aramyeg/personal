@@ -193,6 +193,12 @@ export type BoxGeom = {
    *  on: the caps are what brace the walls (default both true). */
   capFront?: boolean
   capBack?: boolean
+  /** When false, the capFront faces render as raw supporting paper (no `-front`
+   *  art), because a DIE-CUT FACADE PLATE (popup-keepstack.ts facade plate,
+   *  the raven-finial idiom generalized) prints the tier's front art in front of
+   *  the cap instead — the cap stays as plain bracing paper hidden behind it.
+   *  Default true (the cap prints its own `-front` art). */
+  capFrontArt?: boolean
   /** Cumulative height of the stories BENEATH this box when it is one story
    *  of a stacked keep (popup-keepstack.ts): the whole bisector-x is offset
    *  by baseH so the box's wall glue seats ON the lower story's flat lid at
