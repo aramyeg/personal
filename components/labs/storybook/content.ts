@@ -252,7 +252,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // gold balcony deck cantilevers out of it toward the reader (closing this
       // front would collide with the balcony riding the hall lid); flat lid
       // seats the loft.
-      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: false, capBack: true },
+      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
       // see-through belfry) and host the winch iris + counterweight; flat cap
       // slab seats the crown.
@@ -332,7 +332,7 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its
   // scalloped painter reading as the yard's front wall until real art lands.
-  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.2113 },
+  { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.1, height: 0.155 },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):

@@ -219,6 +219,7 @@ principle) before any of these land.
 | `ch3-keep` | `ch3-keep-hall-back` | Hall back wall — the LOWEST painted aerial-recession band (near citadel rooftops), now braced (capBack) | ≈1.0:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-hall-top` | Hall flat lid (the gallery floor) — slate flags from the high camera | ≈2.3:1 | TOPDOWN | placeholder |
 | `ch3-keep` | `ch3-keep-gallery-side` | Balcony Gallery side — dusk-violet shadowed stone, corbels (both walls) | ≈1.0:1 | FACE | placeholder |
+| `ch3-keep` | `ch3-keep-gallery-front` | Gallery front — painted arcaded loggia band (arched openings in deep warm shadow, amber glints; the E1.5 closed front that replaced the dead open-interior read) | ≈3.1:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-gallery-back` | Gallery back wall — MID aerial-recession band (dusk-violet receding rooftops) | ≈1.0:1 | FACE | placeholder |
 | `ch3-keep` | `ch3-keep-gallery-top` | Gallery flat lid (the loft floor) | ≈2.3:1 | TOPDOWN | placeholder |
 | `ch3-keep` | `ch3-keep-loft-side` | Rookery Loft side — open belfry post-frame with die-cut arched roost-mouths, one amber-lit (genuinely see-through) | ≈1.06:1 | FACE (die-cut) | placeholder |
