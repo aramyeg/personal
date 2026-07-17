@@ -88,6 +88,10 @@ describe('walkYAt (bridge decks)', () => {
     // Two full planet laps (ROTATION_TOTAL = 4π) mean the girl passes each
     // crossing twice. bridgeDeckYAt must wrap the query theta so the second
     // pass still lands on the plank, not the carved river floor beneath it.
+    // NOTE (Task 19): this passes TODAY because the spine is lap-invariant
+    // (CROSSINGS_A === CROSSINGS_B, terrainBumpB === terrainBump on nx=0), so the
+    // lap-2 deck matches lap-1 exactly. Task 20 makes the crossings per-lap and
+    // will rewrite this pin deliberately.
     const TWO_PI = Math.PI * 2
     for (const tc of RIVER_CROSSINGS) {
       const rot = rotationFor(tc)
@@ -100,6 +104,8 @@ describe('walkYAt (bridge decks)', () => {
   })
 
   it('lap 2: dry ground away from crossings is unchanged a full rotation later', () => {
+    // Passes TODAY because the girl's lane is spine (A === B); Task 20 makes the
+    // spine per-lap and will rewrite this deliberately.
     const TWO_PI = Math.PI * 2
     for (const rho of [0, 0.7, 2.1, 5.5]) {
       expect(walkYAt(STANCE_Z, rho + TWO_PI)).toBeCloseTo(walkYAt(STANCE_Z, rho), 10)

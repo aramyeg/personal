@@ -1,18 +1,21 @@
 import * as THREE from 'three'
 import { CHAPTER_SLICE, chapterStartRotation } from '../journey-timeline'
 import { PLANET_RADIUS, surfaceYAt, terrainBump, terrainBumpB } from './planet'
-import { RIVER_CROSSINGS } from './biomes'
+import { CROSSINGS_A, CROSSINGS_B } from './biomes'
+import { STANCE_ALPHA, activeVariantAt, canonicalTheta } from './renewal'
 
-/**
- * Where the girl stands, in world z: slightly toward the viewer from the
- * apex, so she faces the camera while incoming terrain rises over the front
- * horizon beneath her. (Moved here from girl-proxy so pure prop math can
- * import it without touching a component file.)
- */
-export const STANCE_Z = 0.75
-
-/** The girl's angular offset from the planet apex, about the x axis. */
-export const STANCE_ALPHA = Math.asin(STANCE_Z / PLANET_RADIUS)
+// The renewal gate is the single source of the A/B flip. It lives in the leaf
+// renewal.ts (planet.ts needs it too, and stage.ts imports planet — a cycle if it
+// lived here); re-exported so `from './stage'` stays the public entry.
+export {
+  STANCE_Z,
+  STANCE_ALPHA,
+  FLIP_START,
+  FLIP_WIDTH,
+  canonicalTheta,
+  renewalGate,
+  activeVariantAt,
+} from './renewal'
 
 /**
  * Planet-LOCAL angle (about x, measured from +y toward +z) of the surface
@@ -52,13 +55,18 @@ function angularGap(a: number, b: number): number {
  */
 export function bridgeDeckYAt(worldZ: number, rotation: number): number {
   const theta = rotation + STANCE_ALPHA
-  for (let i = 0; i < RIVER_CROSSINGS.length; i++) {
-    const tc = RIVER_CROSSINGS[i]
+  for (let i = 0; i < CROSSINGS_A.length; i++) {
+    // The deck present at a crossing is the one whose variant is active there:
+    // renewalGate > 0.5 ⇒ B list live, else A. (Both lists are identical today;
+    // Task 20 diverges them.) Carve depth samples the matching variant's terrain.
+    const variant = activeVariantAt(canonicalTheta(CROSSINGS_A[i]), rotation)
+    const tc = variant === 1 ? CROSSINGS_B[i] : CROSSINGS_A[i]
     const gap = angularGap(theta, tc)
     if (gap > DECK_HALF + DECK_RAMP) continue
     const cy = PLANET_RADIUS * Math.cos(tc)
     const cz = PLANET_RADIUS * Math.sin(tc)
-    const carvedR = PLANET_RADIUS * (1 + terrainBump(0, cy, cz))
+    const bumpFn = variant === 1 ? terrainBumpB : terrainBump
+    const carvedR = PLANET_RADIUS * (1 + bumpFn(0, cy, cz))
     const deckR = carvedR + DECK_RISE
     const deckY = Math.sqrt(Math.max(0, deckR * deckR - worldZ * worldZ))
     if (gap <= DECK_HALF) return deckY
@@ -85,36 +93,25 @@ const Y_UP = new THREE.Vector3(0, 1, 0)
  * Transform for a prop standing ON the displaced terrain at local angle
  * `theta` with lateral offset `x` world units along the planet's x axis.
  * Children of the returned frame author with +Y up, ground at y=0.
+ *
+ * Variant selection (folds in the old anchorTransformB): chapters 3–5 pass an
+ * UNWRAPPED chapterTheta ≥ 2π, so they seat on the lap-2 terrain (B); chapters
+ * 0–2 (< 2π) seat on A. A caller may force a variant (the lap-2 flank dressing
+ * passes 1). On the spine band terrainBumpB === terrainBump, so chapters 0–2 seat
+ * byte-identically to today regardless of which branch is taken.
  */
 export function anchorTransform(
   theta: number,
-  x: number
+  x: number,
+  variant?: 0 | 1
 ): { position: THREE.Vector3; quaternion: THREE.Quaternion } {
+  const isB = variant !== undefined ? variant === 1 : theta >= Math.PI * 2
+  const bumpFn = isB ? terrainBumpB : terrainBump
   const xN = THREE.MathUtils.clamp(x / PLANET_RADIUS, -0.95, 0.95)
   const ring = Math.sqrt(1 - xN * xN)
   const dir = new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
   const pre = dir.clone().multiplyScalar(PLANET_RADIUS)
-  const bump = terrainBump(pre.x, pre.y, pre.z)
-  const position = dir.clone().multiplyScalar(PLANET_RADIUS * (1 + bump))
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
-  return { position, quaternion }
-}
-
-/**
- * Parallel to anchorTransform but seats the prop on the LAP-2 terrain
- * (terrainBumpB) — used only by the lap-2 flank dressing. anchorTransform (the
- * chapter-set / bridge contract) is intentionally left untouched; the two agree
- * exactly on the spine band where terrainBumpB === terrainBump.
- */
-export function anchorTransformB(
-  theta: number,
-  x: number
-): { position: THREE.Vector3; quaternion: THREE.Quaternion } {
-  const xN = THREE.MathUtils.clamp(x / PLANET_RADIUS, -0.95, 0.95)
-  const ring = Math.sqrt(1 - xN * xN)
-  const dir = new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
-  const pre = dir.clone().multiplyScalar(PLANET_RADIUS)
-  const bump = terrainBumpB(pre.x, pre.y, pre.z)
+  const bump = bumpFn(pre.x, pre.y, pre.z)
   const position = dir.clone().multiplyScalar(PLANET_RADIUS * (1 + bump))
   const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
   return { position, quaternion }

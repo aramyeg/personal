@@ -1,11 +1,13 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL } from '../planet'
 import { ISLANDS, SEA } from '../biomes'
+import { canonicalTheta, renewalGate } from '../renewal'
 import { PropAnchor } from './prop-anchor'
-import { LapSet } from './lap-set'
+import { GatedProp } from './gated-prop'
 import { ClayBlossom, ClayDisc, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
@@ -84,9 +86,18 @@ function anchorForTuple(dir: readonly [number, number, number]): [number, number
 }
 
 /** Flat ice floes floating on the cold sea's surface (at the waterline). The
- *  lap-2 winter adds 2 more floes (passed via `spec`). */
-function IceFloes({ spec }: { spec: Array<[number, number, number]> }) {
+ *  lap-2 winter adds 2 more floes (passed via `spec`), gated in as variant B —
+ *  each floe toggles by the renewal gate at its OWN longitude (never a whole-group
+ *  pop). The base floes are variant-independent (always visible). */
+function IceFloes({
+  spec,
+  gate,
+}: {
+  spec: Array<[number, number, number]>
+  gate?: { journeyRef: JourneyRef; variant: 0 | 1 }
+}) {
   const ramp = useClayRamp()
+  const refs = useRef<Array<THREE.Mesh | null>>([])
   const floes = useMemo(() => {
     const c = new THREE.Vector3(SEA.dir[0], SEA.dir[1], SEA.dir[2])
     const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
@@ -95,13 +106,26 @@ function IceFloes({ spec }: { spec: Array<[number, number, number]> }) {
       const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
       const pos = dir.clone().multiplyScalar(PLANET_RADIUS * WATER_LEVEL + 0.012)
       const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
-      return { pos, quat, r }
+      const tc = canonicalTheta(Math.atan2(dir.z, dir.y))
+      return { pos, quat, r, tc }
     })
   }, [spec])
+
+  useFrame(() => {
+    if (!gate) return
+    const rot = gate.journeyRef.current.rotation
+    for (let i = 0; i < floes.length; i++) {
+      const m = refs.current[i]
+      if (!m) continue
+      const g = renewalGate(floes[i].tc, rot)
+      m.visible = gate.variant === 1 ? g >= 0.5 : g < 0.5
+    }
+  })
+
   return (
     <>
       {floes.map(({ pos, quat, r }, i) => (
-        <mesh key={i} position={pos} quaternion={quat}>
+        <mesh key={i} ref={(m) => { refs.current[i] = m }} position={pos} quaternion={quat}>
           <cylinderGeometry args={[r, r * 0.88, 0.03, 7]} />
           <meshToonMaterial color={PALETTE.snow} gradientMap={ramp} />
         </mesh>
@@ -150,27 +174,22 @@ export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
       <PropAnchor theta={island[2].theta} x={island[2].x}><ClaySprout scale={1.2} /></PropAnchor>
 
       <IceFloes spec={FLOES_BASE} />
-      {/* 2 extra ice floes grow with the lap-2 winter */}
-      <LapSet lap={2} journeyRef={journeyRef}>
-        <IceFloes spec={FLOES_LAP2} />
-      </LapSet>
+      {/* 2 extra ice floes arrive with the lap-2 winter (gated per floe) */}
+      <IceFloes spec={FLOES_LAP2} gate={{ journeyRef, variant: 1 }} />
       <SnowRegion />
 
-      {/* spring flower patch — swaps to an autumn (amber/deep) cast on lap 2 */}
-      <LapSet lap={1} journeyRef={journeyRef}>
-        {flowers.map(([theta, x], i) => (
-          <PropAnchor key={`fl-${i}`} theta={theta} x={x}>
-            <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.blossomDeep} scale={1.1} />
-          </PropAnchor>
-        ))}
-      </LapSet>
-      <LapSet lap={2} journeyRef={journeyRef}>
-        {flowers.map(([theta, x], i) => (
-          <PropAnchor key={`fl2-${i}`} theta={theta} x={x} lapB>
-            <ClayBlossom color={i % 2 === 0 ? PALETTE.honey : PALETTE.dune} scale={1.1} />
-          </PropAnchor>
-        ))}
-      </LapSet>
+      {/* spring flower patch — swaps to an autumn (amber/deep) cast on lap 2,
+          each blossom flipping behind the horizon at its own longitude */}
+      {flowers.map(([theta, x], i) => (
+        <GatedProp key={`fl-${i}`} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
+          <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.blossomDeep} scale={1.1} />
+        </GatedProp>
+      ))}
+      {flowers.map(([theta, x], i) => (
+        <GatedProp key={`fl2-${i}`} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
+          <ClayBlossom color={i % 2 === 0 ? PALETTE.honey : PALETTE.dune} scale={1.1} />
+        </GatedProp>
+      ))}
 
       {path.map(([theta, x], i) => (
         <PropAnchor key={`pa-${i}`} theta={theta} x={x}>

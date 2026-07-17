@@ -184,6 +184,12 @@ const CANYON_HALF = 0.06 // channel half-width (rad)
  * clusters; these are the relocated, verified crossings.)
  */
 export const RIVER_CROSSINGS = [2.65, 4.55, 6.03] as const
+/** Per-variant crossing lists for the renewal machine. Both equal RIVER_CROSSINGS
+ *  today (the spine is lap-invariant); Task 20 diverges them so the six wedge
+ *  scenes can re-route their own water. `RIVER_CROSSINGS` stays exported as the
+ *  A alias until then. */
+export const CROSSINGS_A = RIVER_CROSSINGS
+export const CROSSINGS_B = RIVER_CROSSINGS
 const RIVER_HALF = 0.045 // channel half-width (rad)
 const RIVER_RAMP = 0.05 // carve feather beyond the half-width
 

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { anchorTransform, anchorTransformB } from '../stage'
+import { anchorTransform } from '../stage'
 
 /** Plants children on the terrain at local angle theta / lateral x. Pass
  *  `lapB` to seat on the lap-2 terrain (terrainBumpB) — the lap-2 flank dressing
@@ -18,7 +18,7 @@ export function PropAnchor({
   children: ReactNode
 }) {
   const { position, quaternion } = useMemo(
-    () => (lapB ? anchorTransformB : anchorTransform)(theta, x),
+    () => anchorTransform(theta, x, lapB ? 1 : undefined),
     [theta, x, lapB]
   )
   return (

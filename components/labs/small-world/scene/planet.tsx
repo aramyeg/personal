@@ -7,6 +7,8 @@ import { PALETTE } from '../palette'
 import type { JourneyRef } from './use-journey'
 import { useClayRamp } from './toon-ramp'
 import { WATER_LEVEL, SNOW, SNOW_B, biomeBump, biomeBumpB, biomeTint } from './biomes'
+import { canonicalTheta, renewalGate } from './renewal'
+import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
 
 export const PLANET_RADIUS = 2.2
 
@@ -86,10 +88,27 @@ export function terrainSlope(
 }
 
 /**
+ * Variant-aware terrain bump at a point, for the CURRENT rotation: A (lap-1) and
+ * B (lap-2) blended by the renewal gate at that point's longitude. Because a
+ * walker/prop only samples ground where the gate is exactly 0 or 1 (visible ⇒
+ * flipped or not — proven by renewal-scan.mjs), heights read exact, never
+ * mid-lerp; on the spine terrainBumpB === terrainBump so it is a no-op there. */
+export function terrainBumpAt(x: number, y: number, z: number, rotation: number): number {
+  const len = Math.sqrt(x * x + y * y + z * z) || 1
+  const gate = renewalGate(canonicalTheta(Math.atan2(z / len, y / len)), rotation)
+  if (gate <= 0) return terrainBump(x, y, z)
+  if (gate >= 1) return terrainBumpB(x, y, z)
+  const a = terrainBump(x, y, z)
+  return a + (terrainBumpB(x, y, z) - a) * gate
+}
+
+/**
  * World-space surface point directly under a stance at world z (x=0, upper
  * hemisphere), for a planet rotated by `rotation` about x. Returns the y of the
- * displaced terrain surface at that z. PURE TERRAIN — prop anchors and the
- * pinned tests depend on this; the girl's on-bridge height lives in walkYAt.
+ * displaced terrain surface at that z. Samples the variant-aware terrain, so the
+ * girl and prop anchors ride the active variant; the girl's lane is spine
+ * (A === B), so this is lap-invariant there. The girl's on-bridge height is in
+ * walkYAt.
  */
 export function surfaceYAt(worldZ: number, rotation: number): number {
   const baseY = Math.sqrt(PLANET_RADIUS * PLANET_RADIUS - worldZ * worldZ)
@@ -97,7 +116,7 @@ export function surfaceYAt(worldZ: number, rotation: number): number {
   const sin = Math.sin(rotation)
   const ly = baseY * cos - worldZ * sin
   const lz = baseY * sin + worldZ * cos
-  const bump = terrainBump(0, ly, lz)
+  const bump = terrainBumpAt(0, ly, lz, rotation)
   const r = PLANET_RADIUS * (1 + bump)
   return Math.sqrt(Math.max(0, r * r - worldZ * worldZ))
 }
@@ -210,19 +229,22 @@ function flatNormals(positions: Float32Array): Float32Array {
   return n
 }
 
-/** The two baked worlds + live attributes the per-frame morph lerps between. */
+/** The two baked worlds + per-vertex thetaC buckets the per-frame traveling front
+ *  lerps between. */
 type MorphBake = {
   positionsA: Float32Array; positionsB: Float32Array
   colorsA: Float32Array; colorsB: Float32Array
   normalsA: Float32Array; normalsB: Float32Array
+  thetaC: Float32Array; buckets: Buckets
 }
 
 /**
  * Chunky vertex-displaced sphere, dual-baked: variant A (lap-1 spring) and
  * variant B (lap-2 autumn→winter) over the SAME pre-displacement icosahedron.
- * The returned geometry starts on A; `applyWorldBlend` lerps position/color/
- * normal toward B per frame during the lap-boundary panel. Because the spine
- * band never morphs, A and B coincide there and the lerp is a no-op on the lane.
+ * The returned geometry starts on A; the bucketed renewal front lerps position/
+ * color/normal toward B per vertex as each longitude passes behind the horizon.
+ * Because the spine band never morphs, A and B coincide there and the lerp is a
+ * no-op on the lane.
  */
 function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
@@ -233,6 +255,7 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
     const positionsB = new Float32Array(count * 3)
     const colorsA = new Float32Array(count * 3)
     const colorsB = new Float32Array(count * 3)
+    const thetaC = new Float32Array(count)
     const v = new THREE.Vector3()
     const pal = {
       leaf: new THREE.Color(PALETTE.leaf),
@@ -255,6 +278,7 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       const nx = v.x / PLANET_RADIUS
       const ny = v.y / PLANET_RADIUS
       const nz = v.z / PLANET_RADIUS
+      thetaC[i] = canonicalTheta(Math.atan2(nz, ny))
       const dimple = clayDimple(nx, ny, nz)
       const bumpA = terrainBump(v.x, v.y, v.z)
       const bumpB = terrainBumpB(v.x, v.y, v.z)
@@ -285,37 +309,19 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
 
     return {
       geometry: geo,
-      bake: { positionsA, positionsB, colorsA, colorsB, normalsA, normalsB },
+      bake: {
+        positionsA, positionsB, colorsA, colorsB, normalsA, normalsB,
+        thetaC, buckets: buildBuckets(thetaC),
+      },
     }
   }, [])
 }
 
-/**
- * Lerp the live planet geometry between the two bakes at `blend`. Skipped by the
- * caller when the blend is unchanged, so the flanks only recompute during the
- * lap-boundary panel; the spine rows are identical in A and B so they never move.
- */
-function applyWorldBlend(geo: THREE.BufferGeometry, bake: MorphBake, blend: number): void {
-  const pos = geo.attributes.position.array as Float32Array
-  const col = geo.attributes.color.array as Float32Array
-  const nor = geo.attributes.normal.array as Float32Array
-  const { positionsA, positionsB, colorsA, colorsB, normalsA, normalsB } = bake
-  const n = pos.length
-  for (let i = 0; i < n; i++) {
-    pos[i] = positionsA[i] + (positionsB[i] - positionsA[i]) * blend
-    col[i] = colorsA[i] + (colorsB[i] - colorsA[i]) * blend
-    nor[i] = normalsA[i] + (normalsB[i] - normalsA[i]) * blend
-  }
-  // Re-normalize the lerped face normals (each facet's 3 verts share a normal,
-  // so the facets stay flat — the ramp still reads pinched clay planes).
-  for (let i = 0; i < n; i += 3) {
-    const x = nor[i], y = nor[i + 1], z = nor[i + 2]
-    const l = Math.hypot(x, y, z) || 1
-    nor[i] = x / l; nor[i + 1] = y / l; nor[i + 2] = z / l
-  }
-  geo.attributes.position.needsUpdate = true
-  geo.attributes.color.needsUpdate = true
-  geo.attributes.normal.needsUpdate = true
+/** The dual-baked water sphere: variant-independent geometry, two colour bakes. */
+type WaterBake = {
+  geometry: THREE.BufferGeometry
+  colorsA: Float32Array; colorsB: Float32Array
+  thetaC: Float32Array; buckets: Buckets
 }
 
 /**
@@ -326,14 +332,21 @@ function applyWorldBlend(geo: THREE.BufferGeometry, bake: MorphBake, blend: numb
  * carries its own gentle inward-only clay displacement so it reads as
  * hand-pushed clay under the toon ramp, never flat glass — and never pokes
  * above the shoreline.
+ *
+ * Positions/lumps are variant-INDEPENDENT (water geography is just terrain dipping
+ * under the sphere), but the depth-tinted COLOURS read terrainBump — so they are
+ * dual-baked (depth vs bumpA and bumpB) and lerped by the SAME bucketed renewal
+ * gate as the land. On the spine bumpB === bumpA, so the colour is lap-invariant
+ * there; only flank shallows re-tint.
  */
-function useWaterGeometry(): THREE.BufferGeometry {
+function useWaterGeometry(): WaterBake {
   return useMemo(() => {
     // Fewer segments = larger facets; the SphereGeometry is indexed, so
     // toNonIndexed + flat normals below turns it into visible lumpy clay water.
     const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_LEVEL, 48, 48)
     const pos = geo.attributes.position
-    const colors = new Float32Array(pos.count * 3)
+    const colorsIdxA = new Float32Array(pos.count * 3)
+    const colorsIdxB = new Float32Array(pos.count * 3)
     const v = new THREE.Vector3()
     const ink = new THREE.Color(PALETTE.ink)
     const river = new THREE.Color(PALETTE.river)
@@ -341,17 +354,19 @@ function useWaterGeometry(): THREE.BufferGeometry {
     const deepBase = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.22)
     const abyss = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.5)
     const c = new THREE.Color()
+    const paintDepth = (out: Float32Array, i: number, bump: number): void => {
+      const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
+      c.copy(deepBase).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.3, 1))
+      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.15)
+      c.lerp(river, 0.5 * rim)
+      out[i * 3] = c.r; out[i * 3 + 1] = c.g; out[i * 3 + 2] = c.b
+    }
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
       const dir = v.clone().normalize()
-      const bump = terrainBump(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
-      const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
-      // deep-blue dominant, darkening into the abyss where the floor sinks far
-      c.copy(deepBase).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.3, 1))
-      // lighter river blue only as a NARROW shallow rim right at the shoreline
-      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.15)
-      c.lerp(river, 0.5 * rim)
-      colors.set([c.r, c.g, c.b], i * 3)
+      const px = dir.x * PLANET_RADIUS, py = dir.y * PLANET_RADIUS, pz = dir.z * PLANET_RADIUS
+      paintDepth(colorsIdxA, i, terrainBump(px, py, pz))
+      paintDepth(colorsIdxB, i, terrainBumpB(px, py, pz))
       // clay lumps, inward-only (radius never exceeds WATER_LEVEL → no shoreline
       // poke-through); two octaves + recomputed normals catch the ramp as clay.
       const w1 = Math.sin(5.1 * dir.x + 1.3) * Math.sin(4.7 * dir.y - 0.7) * Math.sin(5.3 * dir.z + 2.1)
@@ -359,14 +374,27 @@ function useWaterGeometry(): THREE.BufferGeometry {
       v.multiplyScalar(1 - 0.009 * (0.5 + 0.5 * w1) - 0.004 * (0.5 + 0.5 * w2))
       pos.setXYZ(i, v.x, v.y, v.z)
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     // Flat-shade: expand to non-indexed then per-face normals so the water shows
-    // hand-pinched clay facets under the ramp, not a smooth glass blob. Colors
-    // (set above) are expanded with the positions, so they stay facet-crisp too.
+    // hand-pinched clay facets under the ramp, not a smooth glass blob. Both colour
+    // bakes are expanded with the positions, so they stay facet-crisp too.
+    geo.setAttribute('color', new THREE.BufferAttribute(colorsIdxA.slice(), 3))
+    geo.setAttribute('colorB', new THREE.BufferAttribute(colorsIdxB, 3))
     const flat = geo.toNonIndexed()
     geo.dispose()
     flat.computeVertexNormals()
-    return flat
+
+    // Per-vertex thetaC of the non-indexed water verts, for the same bucketed gate.
+    const fpos = flat.attributes.position
+    const colorsA = (flat.attributes.color.array as Float32Array).slice()
+    const colorsB = (flat.attributes.colorB.array as Float32Array).slice()
+    flat.deleteAttribute('colorB')
+    // live colour buffer starts on A; the bucketed morph writes toward B per frame
+    flat.setAttribute('color', new THREE.BufferAttribute(colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage))
+    const thetaC = new Float32Array(fpos.count)
+    for (let i = 0; i < fpos.count; i++) {
+      thetaC[i] = canonicalTheta(Math.atan2(fpos.getZ(i), fpos.getY(i)))
+    }
+    return { geometry: flat, colorsA, colorsB, thetaC, buckets: buildBuckets(thetaC) }
   }, [])
 }
 
@@ -381,23 +409,38 @@ export function Planet({
   const ramp = useClayRamp()
   const { geometry, bake } = useHillGeometry()
   const water = useWaterGeometry()
-  // -1 forces the first frame to apply (settling the live geometry onto lap-1);
-  // afterwards the morph is skipped whenever worldBlend is unchanged — so the
-  // 34k-vertex lerp only runs during the lap-boundary panel dwell.
-  const lastBlend = useRef(-1)
+  // The traveling front: each updater re-lerps only the thetaC buckets swept since
+  // the last rotation (a full re-apply on the first frame / any big jump). The
+  // spine buckets never change, so the girl's lane costs nothing.
+  const planetMorph = useMemo(
+    () =>
+      makeRenewalMorph({
+        geo: geometry, thetaC: bake.thetaC, buckets: bake.buckets,
+        colorsA: bake.colorsA, colorsB: bake.colorsB,
+        positionsA: bake.positionsA, positionsB: bake.positionsB,
+        normalsA: bake.normalsA, normalsB: bake.normalsB,
+      }),
+    [geometry, bake]
+  )
+  const waterMorph = useMemo(
+    () =>
+      makeRenewalMorph({
+        geo: water.geometry, thetaC: water.thetaC, buckets: water.buckets,
+        colorsA: water.colorsA, colorsB: water.colorsB,
+      }),
+    [water]
+  )
 
   useFrame(() => {
     const j = journeyRef.current
     if (group.current) group.current.rotation.x = -j.rotation
-    if (j.worldBlend !== lastBlend.current) {
-      applyWorldBlend(geometry, bake, j.worldBlend)
-      lastBlend.current = j.worldBlend
-    }
+    planetMorph.update(j.rotation)
+    waterMorph.update(j.rotation)
   })
 
   return (
     <group ref={group}>
-      <mesh geometry={water}>
+      <mesh geometry={water.geometry}>
         <meshToonMaterial vertexColors gradientMap={ramp} />
       </mesh>
       <mesh geometry={geometry}>

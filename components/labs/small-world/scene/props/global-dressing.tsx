@@ -4,7 +4,8 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet'
 import { FOREST, SNOW, SNOW_B, capMask, canyonDist } from '../biomes'
-import { PropAnchor } from './prop-anchor'
+import { GatedProp } from './gated-prop'
+import type { JourneyRef } from '../use-journey'
 import { ClayBlossom, ClayMound, ClayRock, ClaySprout, ClayTree } from './clay-kit'
 
 const DRESSING_COUNT = 36
@@ -30,8 +31,12 @@ function anchorDir(theta: number, x: number): THREE.Vector3 {
  *
  * Perf: ~36 props ≈ 80–100 draw calls. Phase-3 optimization is instancing if
  * mobile complains.
+ *
+ * Renewal: each item is a variant-A GatedProp — visible only while its own
+ * longitude has not flipped to autumn (gate < 0.5). Its autumn counterpart lives
+ * in GlobalDressingAutumn; the two swap behind the horizon, one item at a time.
  */
-export function GlobalDressing() {
+export function GlobalDressing({ journeyRef }: { journeyRef: JourneyRef }) {
   const anchors = useMemo<Anchor[]>(() => {
     const list: Anchor[] = []
     for (let i = 0; i < DRESSING_COUNT; i++) {
@@ -54,21 +59,21 @@ export function GlobalDressing() {
   return (
     <>
       {anchors.map(({ i, theta, x, scale }) => (
-        <PropAnchor key={i} theta={theta} x={x}>
+        <GatedProp key={i} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
           {renderProp(i, scale)}
-        </PropAnchor>
+        </GatedProp>
       ))}
       {/* snow boulders on the cold pole (replacing the skipped snow scatter) */}
       {[0.5, 2.1, 4.4].map((theta, k) => (
-        <PropAnchor key={`snow-${k}`} theta={theta} x={-1.95}>
+        <GatedProp key={`snow-${k}`} theta={theta} x={-1.95} variant={0} journeyRef={journeyRef}>
           <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
-        </PropAnchor>
+        </GatedProp>
       ))}
       {/* earth rocks on the canyon rim, reinforcing the brown clay read */}
       {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55]] as const).map(([theta, x], k) => (
-        <PropAnchor key={`canyon-${k}`} theta={theta} x={x}>
+        <GatedProp key={`canyon-${k}`} theta={theta} x={x} variant={0} journeyRef={journeyRef}>
           <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
-        </PropAnchor>
+        </GatedProp>
       ))}
     </>
   )
@@ -99,10 +104,11 @@ function renderProp(i: number, scale: number) {
  * Lap-2 flank scatter: the same always-on role as GlobalDressing but an autumn
  * cast — amber/deep-blossom crowns, bare earth-trunk trees, more earth rocks and
  * pumpkin-ish honey mounds. A DIFFERENT seed offset scatters it to new spots, and
- * it grounds on the lap-2 terrain (terrainBumpB / SNOW_B, via PropAnchor lapB).
- * Lives on the flanks; the spine band stays the chapter sets' stage.
+ * it grounds on the lap-2 terrain (terrainBumpB / SNOW_B, variant-B GatedProp).
+ * Lives on the flanks; the spine band stays the chapter sets' stage. Each item is
+ * visible only once its own longitude has flipped to autumn (gate ≥ 0.5).
  */
-export function GlobalDressingAutumn() {
+export function GlobalDressingAutumn({ journeyRef }: { journeyRef: JourneyRef }) {
   const anchors = useMemo<Anchor[]>(() => {
     const list: Anchor[] = []
     for (let i = 0; i < DRESSING_COUNT; i++) {
@@ -124,21 +130,21 @@ export function GlobalDressingAutumn() {
   return (
     <>
       {anchors.map(({ i, theta, x, scale }) => (
-        <PropAnchor key={i} theta={theta} x={x} lapB>
+        <GatedProp key={i} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
           {renderPropAutumn(i, scale)}
-        </PropAnchor>
+        </GatedProp>
       ))}
       {/* snow boulders across the (wider) cold pole */}
       {[0.5, 2.1, 3.3, 4.4].map((theta, k) => (
-        <PropAnchor key={`snow-${k}`} theta={theta} x={-1.95} lapB>
+        <GatedProp key={`snow-${k}`} theta={theta} x={-1.95} variant={1} journeyRef={journeyRef}>
           <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
-        </PropAnchor>
+        </GatedProp>
       ))}
       {/* extra earth rocks on the canyon rim (richer autumn walls) */}
       {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55], [1.15, 1.9]] as const).map(([theta, x], k) => (
-        <PropAnchor key={`canyon-${k}`} theta={theta} x={x} lapB>
+        <GatedProp key={`canyon-${k}`} theta={theta} x={x} variant={1} journeyRef={journeyRef}>
           <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
-        </PropAnchor>
+        </GatedProp>
       ))}
     </>
   )

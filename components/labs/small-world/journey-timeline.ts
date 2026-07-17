@@ -24,15 +24,6 @@ export const PANEL_END = 0.95
 /** Fraction of a segment over which the incoming prop set grows (and the outgoing sinks). */
 export const MORPH_WINDOW = 0.35
 
-/**
- * The chapter whose panel dwell straddles the lap boundary (rotation = 2π). The
- * girl laps the planet twice, so the boundary falls at the END of the chapter
- * whose travel completes the first full turn: (i+1)·CHAPTER_SLICE = 2π ⟹
- * i = 2π/CHAPTER_SLICE − 1. With CHAPTER_SLICE = ROTATION_TOTAL/CHAPTER_COUNT
- * and ROTATION_TOTAL = 4π this is index 2. The world morphs across this panel.
- */
-export const LAP_BOUNDARY_CHAPTER = Math.round((Math.PI * 2) / CHAPTER_SLICE) - 1
-
 export type PanelState = { chapter: number; t: number }
 export type JourneyState = {
   progress: number
@@ -41,10 +32,6 @@ export type JourneyState = {
   morph: number[]
   burst: number | null
   panel: PanelState | null
-  /** 0 = lap-1 (spring) world, 1 = lap-2 (autumn→winter) world. Ramps
-   *  smoothstep across the lap-boundary chapter's panel dwell; a pure function
-   *  of progress, so scrolling back un-morphs the world. */
-  worldBlend: number
 }
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
@@ -89,15 +76,8 @@ export function journeyStateAt(rawProgress: number, morphOut?: number[]): Journe
       ? { chapter, t: (local - BURST_END) / (PANEL_END - BURST_END) }
       : null
 
-  // The world is lap-1 before the boundary chapter, lap-2 after it, and ramps
-  // across that chapter's panel window. smoothstep clamps the local fraction,
-  // so this is 0 through the boundary chapter's travel+burst and 1 past its panel.
-  const worldBlend =
-    chapter < LAP_BOUNDARY_CHAPTER
-      ? 0
-      : chapter > LAP_BOUNDARY_CHAPTER
-        ? 1
-        : smoothstep((local - BURST_END) / (PANEL_END - BURST_END))
-
-  return { progress, rotation, chapter, morph, burst, panel, worldBlend }
+  // Round 5: the world no longer morphs on a lap-boundary panel. Each surface
+  // point restages itself per-vertex behind the horizon (renewal.ts / planet.tsx),
+  // so there is no global worldBlend — the render reads rotation directly.
+  return { progress, rotation, chapter, morph, burst, panel }
 }

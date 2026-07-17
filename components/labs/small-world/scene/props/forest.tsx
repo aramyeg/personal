@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump } from '../planet'
 import { FOREST, SNOW, SNOW_B, capMask } from '../biomes'
+import { canonicalTheta, renewalGate } from '../renewal'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
@@ -25,14 +26,17 @@ type Built = {
   /** Per-instance crown colors for lap 1 (spring) and lap 2 (autumn). */
   crownA: Float32Array
   crownB: Float32Array
+  /** Per-instance canonical thetaC — each tree flips its own crown colour. */
+  thetaC: Float32Array
 }
 
 /**
  * A dense woods on the near-left flank, drawn as exactly TWO InstancedMesh
  * (trunk + crown) — deterministic seeded scatter inside the FOREST cap,
- * per-instance crown color. Two draw calls total. The crown instanceColor buffer
- * lerps from the spring cast (pine/leaf/sprout, snow where cold) to the autumn
- * cast (honey/dune/earth, with a WIDER snowy share) across the lap boundary.
+ * per-instance crown color. Two draw calls total. Each crown flips its own color
+ * from the spring cast (pine/leaf/sprout, snow where cold) to the autumn cast
+ * (honey/dune/earth, WIDER snowy share) as its longitude passes behind the horizon
+ * — the renewal front, per-instance, never a global lerp.
  */
 export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
@@ -59,7 +63,7 @@ export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
       new THREE.MeshToonMaterial({ gradientMap: ramp, vertexColors: false })
 
     // first pass: collect accepted trees with BOTH lap crown colors
-    type Tree = { pos: THREE.Vector3; quat: THREE.Quaternion; s: number; crownA: THREE.Color; crownB: THREE.Color }
+    type Tree = { pos: THREE.Vector3; quat: THREE.Quaternion; s: number; crownA: THREE.Color; crownB: THREE.Color; tc: number }
     const trees: Tree[] = []
     const pine = new THREE.Color(PALETTE.pine)
     const leaf = new THREE.Color(PALETTE.leaf)
@@ -93,7 +97,8 @@ export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
       // lap 2: winter has spread (WIDER SNOW_B share); the rest turn autumn
       const snowyB = capMask(dir.x, dir.y, dir.z, SNOW_B) > 0.3
       const crownB = snowyB ? snow : pick < 0.5 ? honey : pick < 0.8 ? dune : earth
-      trees.push({ pos: pos.clone(), quat: quat.clone(), s, crownA: crownA.clone(), crownB: crownB.clone() })
+      const tc = canonicalTheta(Math.atan2(dir.z, dir.y))
+      trees.push({ pos: pos.clone(), quat: quat.clone(), s, crownA: crownA.clone(), crownB: crownB.clone(), tc })
     }
 
     const n = trees.length
@@ -108,6 +113,7 @@ export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
 
     const crownA = new Float32Array(n * 3)
     const crownB = new Float32Array(n * 3)
+    const thetaC = new Float32Array(n)
     for (let i = 0; i < n; i++) {
       const tr = trees[i]
       scl.setScalar(tr.s)
@@ -121,28 +127,42 @@ export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
       crown.setColorAt(i, col.copy(tr.crownA))
       crownA[i * 3] = tr.crownA.r; crownA[i * 3 + 1] = tr.crownA.g; crownA[i * 3 + 2] = tr.crownA.b
       crownB[i * 3] = tr.crownB.r; crownB[i * 3 + 1] = tr.crownB.g; crownB[i * 3 + 2] = tr.crownB.b
+      thetaC[i] = tr.tc
     }
     trunk.instanceMatrix.needsUpdate = true
     crown.instanceMatrix.needsUpdate = true
     if (crown.instanceColor) crown.instanceColor.needsUpdate = true
 
-    return { trunk, crown, crownA, crownB }
+    return { trunk, crown, crownA, crownB, thetaC }
   }, [ramp])
 
-  // Lerp the crown instanceColor A→B across the lap boundary; skipped whenever
-  // worldBlend is unchanged so the common case costs nothing.
-  const lastBlend = useRef(-1)
+  // Each tree flips its own crown colour A→B as its longitude passes behind the
+  // horizon — never a global lerp. Only trees whose gate CHANGED this frame write
+  // their 3 floats (flips are rare + occluded), and the whole pass is skipped when
+  // the rotation is unchanged, so the common case costs nothing.
+  const lastRot = useRef(Number.NaN)
+  const flipped = useRef<Uint8Array | null>(null)
   useFrame(() => {
-    const blend = journeyRef.current.worldBlend
-    if (blend === lastBlend.current) return
+    const rot = journeyRef.current.rotation
+    if (rot === lastRot.current) return
+    lastRot.current = rot
     const buf = built.crown.instanceColor
-    if (buf) {
-      const arr = buf.array as Float32Array
-      const { crownA, crownB } = built
-      for (let i = 0; i < arr.length; i++) arr[i] = crownA[i] + (crownB[i] - crownA[i]) * blend
-      buf.needsUpdate = true
+    if (!buf) return
+    const arr = buf.array as Float32Array
+    const { crownA, crownB, thetaC } = built
+    const n = thetaC.length
+    if (!flipped.current || flipped.current.length !== n) flipped.current = new Uint8Array(n).fill(2)
+    const state = flipped.current
+    let changed = false
+    for (let i = 0; i < n; i++) {
+      const b = renewalGate(thetaC[i], rot) >= 0.5 ? 1 : 0
+      if (state[i] === b) continue
+      state[i] = b
+      const src = b === 1 ? crownB : crownA
+      arr[i * 3] = src[i * 3]; arr[i * 3 + 1] = src[i * 3 + 1]; arr[i * 3 + 2] = src[i * 3 + 2]
+      changed = true
     }
-    lastBlend.current = blend
+    if (changed) buf.needsUpdate = true
   })
 
   return (
