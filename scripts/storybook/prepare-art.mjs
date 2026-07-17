@@ -66,10 +66,23 @@ const PAD_TO_ASPECT = {
 // aspect instead. Sources in art-src keep the full frame, so crops are
 // reversible. See the keep art-aspect bench.
 const CROP_TO_ASPECT = {
-  'ch3-keep-hall-top': 0.6 / 0.52, // slate flagstone paving
-  'ch3-keep-gallery-top': 0.52 / 0.44, // weathered deck boards
-  'ch3-keep-loft-top': 0.44 / 0.3, // plain cap slab
-  'ch3-keep-crown-top': 0.272 / 0.22, // gable pitch (both planes over the ridge)
+  // E1.5 re-massed story dims (content.ts ch3-keep: hall a .40 H .25 z .68,
+  // gallery a .34 H .22 z .56, loft a .27 H .18 z .40, crown a .15 gable .10
+  // z .28): top aspect = 2a / z-span (gable: 2*hypot(a, rise) / z-span).
+  'ch3-keep-hall-top': 0.8 / 0.68, // slate flagstone paving
+  'ch3-keep-gallery-top': 0.68 / 0.56, // weathered deck boards
+  'ch3-keep-loft-top': 0.54 / 0.4, // plain cap slab
+  'ch3-keep-crown-top': (2 * Math.hypot(0.15, 0.1)) / 0.28, // gable pitch
+}
+
+// FAN-OUT (per source id, dest ids): one processed panel saved under several
+// art ids. The E1.5 citadel rank uses six uniform strip slots; three unique
+// strip paintings (a/b/c) each serve one slot per side, at separated
+// positions so the reuse never reads as a repeat.
+const FAN_OUT = {
+  'ch3-citadel-a': ['ch3-skyline-l-mound0', 'ch3-skyline-r-mound1'],
+  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2'],
+  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0'],
 }
 
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
@@ -377,13 +390,18 @@ async function processOne(fileName) {
     ? sized.data
     : addPaperRim(sized.data, sized.info.width, sized.info.height)
 
-  const outPath = path.join(OUT_DIR, `${id}.webp`)
-  const outInfo = await sharp(finalPixels, {
-    raw: { width: sized.info.width, height: sized.info.height, channels: 4 },
-  })
-    .webp({ quality: 82 })
-    .toFile(outPath)
-  return { id, width: outInfo.width, height: outInfo.height, bytes: outInfo.size }
+  const destIds = FAN_OUT[id] ?? [id]
+  const rows = []
+  for (const destId of destIds) {
+    const outPath = path.join(OUT_DIR, `${destId}.webp`)
+    const outInfo = await sharp(finalPixels, {
+      raw: { width: sized.info.width, height: sized.info.height, channels: 4 },
+    })
+      .webp({ quality: 82 })
+      .toFile(outPath)
+    rows.push({ id: destId, width: outInfo.width, height: outInfo.height, bytes: outInfo.size })
+  }
+  return rows
 }
 
 function printTable(rows) {
@@ -431,7 +449,7 @@ async function main() {
   await mkdir(OUT_DIR, { recursive: true })
   const rows = []
   for (const file of files) {
-    rows.push(await processOne(file))
+    rows.push(...(await processOne(file)))
   }
   printTable(rows)
   await writeManifest()
