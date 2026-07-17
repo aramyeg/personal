@@ -1,14 +1,15 @@
 import { CHAPTER_COUNT } from './chapters'
 
 /**
- * Pure scroll→scene math. One scroll lap = one planet lap = the career.
- * Each chapter owns an equal progress segment, subdivided:
+ * Pure scroll→scene math. One scroll lap = TWO planet laps (720°, 120° per
+ * chapter) — the career circles the little world twice. Each chapter owns an
+ * equal progress segment, subdivided:
  *   [0, TRAVEL_END)          girl skips, planet rotates its slice
  *   [TRAVEL_END, BURST_END)  discovery animation ("!"), rotation frozen
  *   [BURST_END, PANEL_END)   comic panel dwell, rotation frozen
  *   [PANEL_END, 1]           release, next chapter's travel resumes rotation
  */
-export const ROTATION_TOTAL = Math.PI * 2
+export const ROTATION_TOTAL = Math.PI * 4
 /** Rotation each chapter owns. The spec's parked >360° question changes THIS
  * constant (and chapterStartRotation) only — nothing else may hardcode the slice. */
 export const CHAPTER_SLICE = ROTATION_TOTAL / CHAPTER_COUNT

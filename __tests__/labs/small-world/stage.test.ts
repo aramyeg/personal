@@ -83,4 +83,26 @@ describe('walkYAt (bridge decks)', () => {
     }
     expect(maxDelta).toBeLessThan(0.05)
   })
+
+  it('lap 2: the deck is present again a full rotation later at every crossing', () => {
+    // Two full planet laps (ROTATION_TOTAL = 4π) mean the girl passes each
+    // crossing twice. bridgeDeckYAt must wrap the query theta so the second
+    // pass still lands on the plank, not the carved river floor beneath it.
+    const TWO_PI = Math.PI * 2
+    for (const tc of RIVER_CROSSINGS) {
+      const rot = rotationFor(tc)
+      const lap1 = walkYAt(STANCE_Z, rot)
+      const lap2 = walkYAt(STANCE_Z, rot + TWO_PI)
+      expect(lap2).toBeCloseTo(lap1, 10)
+      // and it's genuinely the deck, not a coincidental terrain match
+      expect(lap2).toBeGreaterThan(surfaceYAt(STANCE_Z, rot + TWO_PI))
+    }
+  })
+
+  it('lap 2: dry ground away from crossings is unchanged a full rotation later', () => {
+    const TWO_PI = Math.PI * 2
+    for (const rho of [0, 0.7, 2.1, 5.5]) {
+      expect(walkYAt(STANCE_Z, rho + TWO_PI)).toBeCloseTo(walkYAt(STANCE_Z, rho), 10)
+    }
+  })
 })

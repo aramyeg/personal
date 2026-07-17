@@ -14,7 +14,7 @@ function detectWebGL(): boolean {
   }
 }
 
-const TRACK_VH_PER_CHAPTER = 150
+const TRACK_VH_PER_CHAPTER = 240
 
 /**
  * Owns the tall scroll track and turns document scroll into a 0..1 progress
