@@ -96,6 +96,40 @@ export const RANGE: Peak[] = [
   { dir: norm3([-0.64, -0.42, 0.62]), h: 0.14, r: 0.13 },
 ]
 
+// --- Lap-2 (variant B) land: autumn-into-winter --------------------------------
+// Every variant-B delta below is multiplied by SPINE_GATE (exactly 0 for
+// |nx| < 0.45), so `terrainBumpB === terrainBump` on the spine BY CONSTRUCTION —
+// the girl's lane, water geography, crossings and every spine-anchored prop are
+// bit-identical on both laps. Only the flank LAND changes.
+
+/** Structural spine-identity gate: 0 for |nx| ≤ 0.45, ramping to 1 by |nx| = 0.55. */
+export function spineGate(nx: number): number {
+  return smoothstep01((Math.abs(nx) - 0.45) / 0.1)
+}
+
+/** Winter is spreading on lap 2 — the snow cap grows ~0.15 rad (drives the wider
+ *  white in the lap-2 color pass; the terrain lift lives in biomeBumpB). */
+export const SNOW_B: Cap = { dir: SNOW.dir, radius: SNOW.radius + 0.15, feather: SNOW.feather }
+
+/** Existing range peaks grow this fraction taller on lap 2. */
+const RANGE_B_GROWTH = 0.35
+/** One NEW snowy spire appears in the range on lap 2, between the two sharp ones. */
+export const RANGE_B_NEW: Peak = { dir: norm3([-0.64, 0.42, 0.62]), h: 0.26, r: 0.088 }
+/** Lap-2 canyon: deeper channel + higher banks (richer earth walls). */
+const CANYON_DEPTH_B = 0.022
+const CANYON_BANK_B = 0.03
+/** Lap-2 snow accumulation: a gentle lift across the NEW snow ring (SNOW_B − SNOW). */
+const SNOW_ACCUM_B = 0.025
+
+/** 3 new autumn hill mounds on previously-plain flank longitudes — positive
+ *  swells (so they can never wet the surface), amber-tinted in the lap-2 color
+ *  pass. Off-spine, clear of the water bodies + authored features. */
+export const AUTUMN_MOUNDS_B: Peak[] = [
+  { dir: norm3([0.62, -0.5, -0.6]), h: 0.1, r: 0.16 },
+  { dir: norm3([-0.58, 0.6, -0.54]), h: 0.09, r: 0.15 },
+  { dir: norm3([0.66, 0.48, -0.55]), h: 0.085, r: 0.14 },
+]
+
 /**
  * A great-circle arc field: precomputed plane normal + endpoint angle so the
  * per-point distance is pure scalar trig.
@@ -329,6 +363,58 @@ export function biomeBump(nx: number, ny: number, nz: number): number {
   return bump
 }
 
+/** A gaussian swell's contribution at a unit point (shared peak evaluator). */
+function peakBump(nx: number, ny: number, nz: number, p: Peak): number {
+  const dot = clampU(nx * p.dir[0] + ny * p.dir[1] + nz * p.dir[2])
+  const g = Math.acos(dot) / p.r
+  return p.h * Math.exp(-g * g)
+}
+
+/**
+ * Lap-2 flank land deltas (BEFORE the spine gate): grown range + new spire,
+ * deeper canyon with higher banks, spreading snow, and new autumn mounds. Pure;
+ * scalar-only. Kept separate so the gate multiply in `biomeBumpB` guarantees the
+ * spine identity structurally.
+ */
+function flankDeltaB(nx: number, ny: number, nz: number): number {
+  let d = 0
+
+  // Range grows taller + one new spire.
+  for (let i = 0; i < RANGE.length; i++) d += RANGE_B_GROWTH * peakBump(nx, ny, nz, RANGE[i])
+  d += peakBump(nx, ny, nz, RANGE_B_NEW)
+
+  // Canyon deepens and its earth banks raise.
+  const cd = canyonDist(nx, ny, nz)
+  if (cd < CANYON_HALF + 0.12) {
+    const channel = -CANYON_DEPTH_B * smoothstep01((CANYON_HALF - cd) / 0.045)
+    const bank =
+      CANYON_BANK_B *
+      (smoothstep01((cd - CANYON_HALF) / 0.03) - smoothstep01((cd - CANYON_HALF - 0.055) / 0.04))
+    d += channel + bank
+  }
+
+  // Winter accumulation lifts the newly-snowed ring (SNOW_B beyond SNOW).
+  const snowSpread = capMask(nx, ny, nz, SNOW_B) - capMask(nx, ny, nz, SNOW)
+  if (snowSpread > 0) d += SNOW_ACCUM_B * snowSpread
+
+  // New autumn hill mounds on previously-plain flanks.
+  for (let i = 0; i < AUTUMN_MOUNDS_B.length; i++) d += peakBump(nx, ny, nz, AUTUMN_MOUNDS_B[i])
+
+  return d
+}
+
+/**
+ * Lap-2 authored feature displacement: `biomeBump` PLUS the flank deltas, each
+ * multiplied by the spine gate. For |nx| ≤ 0.45 the gate is exactly 0, so this
+ * returns `biomeBump(nx,ny,nz)` bit-for-bit — the spine band NEVER morphs.
+ */
+export function biomeBumpB(nx: number, ny: number, nz: number): number {
+  const base = biomeBump(nx, ny, nz)
+  const gate = spineGate(nx)
+  if (gate <= 0) return base
+  return base + gate * flankDeltaB(nx, ny, nz)
+}
+
 export type BiomeKind = 'snow' | 'forest' | 'canyon' | 'beach' | 'meadow' | 'underwater'
 
 /**
@@ -339,7 +425,8 @@ export function biomeTint(
   nx: number,
   ny: number,
   nz: number,
-  currentBump: number
+  currentBump: number,
+  snowCap: Cap = SNOW
 ): { kind: BiomeKind; t: number } {
   const radius = 1 + currentBump
 
@@ -365,7 +452,7 @@ export function biomeTint(
   }
 
   // Cold pole: snow ground, with earth showing on the range's lower flanks.
-  const snowM = capMask(nx, ny, nz, SNOW)
+  const snowM = capMask(nx, ny, nz, snowCap)
   if (snowM > 0.02) {
     return { kind: 'snow', t: snowM }
   }

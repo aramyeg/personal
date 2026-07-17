@@ -2,10 +2,10 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { PLANET_RADIUS, WATER_LEVEL, terrainBump } from '../planet'
-import { FOREST, SNOW, capMask, canyonDist } from '../biomes'
+import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet'
+import { FOREST, SNOW, SNOW_B, capMask, canyonDist } from '../biomes'
 import { PropAnchor } from './prop-anchor'
-import { ClayBlossom, ClayRock, ClaySprout, ClayTree } from './clay-kit'
+import { ClayBlossom, ClayMound, ClayRock, ClaySprout, ClayTree } from './clay-kit'
 
 const DRESSING_COUNT = 36
 
@@ -92,5 +92,77 @@ function renderProp(i: number, scale: number) {
       return <ClaySprout scale={scale} />
     default:
       return <ClayTree height={0.4 + seeded(i + 300) * 0.1} crown={PALETTE.blossom} scale={scale} />
+  }
+}
+
+/**
+ * Lap-2 flank scatter: the same always-on role as GlobalDressing but an autumn
+ * cast — amber/deep-blossom crowns, bare earth-trunk trees, more earth rocks and
+ * pumpkin-ish honey mounds. A DIFFERENT seed offset scatters it to new spots, and
+ * it grounds on the lap-2 terrain (terrainBumpB / SNOW_B, via PropAnchor lapB).
+ * Lives on the flanks; the spine band stays the chapter sets' stage.
+ */
+export function GlobalDressingAutumn() {
+  const anchors = useMemo<Anchor[]>(() => {
+    const list: Anchor[] = []
+    for (let i = 0; i < DRESSING_COUNT; i++) {
+      const theta = seeded(i + 500) * Math.PI * 2
+      const sign = i % 2 === 0 ? -1 : 1
+      const x = sign * (0.5 + seeded(i + 600) * 0.55)
+      const dir = anchorDir(theta, x)
+      const bump = terrainBumpB(dir.x * PLANET_RADIUS, dir.y * PLANET_RADIUS, dir.z * PLANET_RADIUS)
+      if (1 + bump < WATER_LEVEL) continue // water
+      if (capMask(dir.x, dir.y, dir.z, FOREST) > 0.3) continue // forest.tsx owns it
+      if (capMask(dir.x, dir.y, dir.z, SNOW_B) > 0.5) continue // (wider) snow core
+      if (canyonDist(dir.x, dir.y, dir.z) < 0.14) continue // canyon rocks below
+      const scale = 0.75 + seeded(i + 700) * 0.35
+      list.push({ i, theta, x, scale })
+    }
+    return list
+  }, [])
+
+  return (
+    <>
+      {anchors.map(({ i, theta, x, scale }) => (
+        <PropAnchor key={i} theta={theta} x={x} lapB>
+          {renderPropAutumn(i, scale)}
+        </PropAnchor>
+      ))}
+      {/* snow boulders across the (wider) cold pole */}
+      {[0.5, 2.1, 3.3, 4.4].map((theta, k) => (
+        <PropAnchor key={`snow-${k}`} theta={theta} x={-1.95} lapB>
+          <ClayRock color={PALETTE.snow} r={0.09 + k * 0.015} />
+        </PropAnchor>
+      ))}
+      {/* extra earth rocks on the canyon rim (richer autumn walls) */}
+      {([[1.05, 1.5], [1.2, 1.72], [1.36, 1.55], [1.15, 1.9]] as const).map(([theta, x], k) => (
+        <PropAnchor key={`canyon-${k}`} theta={theta} x={x} lapB>
+          <ClayRock color={PALETTE.earth} r={0.08 + k * 0.01} />
+        </PropAnchor>
+      ))}
+    </>
+  )
+}
+
+function renderPropAutumn(i: number, scale: number) {
+  switch (i % 5) {
+    case 0:
+      return (
+        <ClayTree
+          height={0.3 + seeded(i + 800) * 0.12}
+          crown={i % 2 === 0 ? PALETTE.honey : PALETTE.dune}
+          scale={scale}
+        />
+      )
+    case 1:
+      return <ClayRock color={PALETTE.earth} r={0.07 + seeded(i + 800) * 0.03} scale={scale} />
+    case 2:
+      // pumpkin-ish honey mound
+      return <ClayMound r={0.13 + seeded(i + 800) * 0.06} color={PALETTE.honey} squash={0.6} scale={scale} />
+    case 3:
+      // bare earth-trunk tree (leafless autumn)
+      return <ClayTree height={0.34 + seeded(i + 800) * 0.1} crown={PALETTE.earth} scale={scale * 0.9} />
+    default:
+      return <ClayRock color={PALETTE.earth} r={0.09 + seeded(i + 800) * 0.03} scale={scale} />
   }
 }

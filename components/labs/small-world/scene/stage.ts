@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CHAPTER_SLICE, chapterStartRotation } from '../journey-timeline'
-import { PLANET_RADIUS, surfaceYAt, terrainBump } from './planet'
+import { PLANET_RADIUS, surfaceYAt, terrainBump, terrainBumpB } from './planet'
 import { RIVER_CROSSINGS } from './biomes'
 
 /**
@@ -95,6 +95,26 @@ export function anchorTransform(
   const dir = new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
   const pre = dir.clone().multiplyScalar(PLANET_RADIUS)
   const bump = terrainBump(pre.x, pre.y, pre.z)
+  const position = dir.clone().multiplyScalar(PLANET_RADIUS * (1 + bump))
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
+  return { position, quaternion }
+}
+
+/**
+ * Parallel to anchorTransform but seats the prop on the LAP-2 terrain
+ * (terrainBumpB) — used only by the lap-2 flank dressing. anchorTransform (the
+ * chapter-set / bridge contract) is intentionally left untouched; the two agree
+ * exactly on the spine band where terrainBumpB === terrainBump.
+ */
+export function anchorTransformB(
+  theta: number,
+  x: number
+): { position: THREE.Vector3; quaternion: THREE.Quaternion } {
+  const xN = THREE.MathUtils.clamp(x / PLANET_RADIUS, -0.95, 0.95)
+  const ring = Math.sqrt(1 - xN * xN)
+  const dir = new THREE.Vector3(xN, ring * Math.cos(theta), ring * Math.sin(theta))
+  const pre = dir.clone().multiplyScalar(PLANET_RADIUS)
+  const bump = terrainBumpB(pre.x, pre.y, pre.z)
   const position = dir.clone().multiplyScalar(PLANET_RADIUS * (1 + bump))
   const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
   return { position, quaternion }

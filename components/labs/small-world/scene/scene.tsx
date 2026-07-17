@@ -11,7 +11,8 @@ import { DiscoveryBurst } from './discovery-burst'
 import { useDampedJourney } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
-import { GlobalDressing } from './props/global-dressing'
+import { LapSet } from './props/lap-set'
+import { GlobalDressing, GlobalDressingAutumn } from './props/global-dressing'
 import { Forest } from './props/forest'
 import { Bridges } from './props/bridges'
 import { Delights } from './props/delights'
@@ -64,10 +65,15 @@ function SceneContents({ progressRef }: SceneProps) {
           toon bands as pinched facets. */}
       <directionalLight position={[-6, 2, 3.2]} intensity={1.55} color="#fff2e0" />
       <Planet journeyRef={journeyRef}>
-        <GlobalDressing />
-        <Forest />
+        <LapSet lap={1} journeyRef={journeyRef}>
+          <GlobalDressing />
+        </LapSet>
+        <LapSet lap={2} journeyRef={journeyRef}>
+          <GlobalDressingAutumn />
+        </LapSet>
+        <Forest journeyRef={journeyRef} />
         <Bridges />
-        <Delights />
+        <Delights journeyRef={journeyRef} />
         <ChapterSet index={0} journeyRef={journeyRef}>
           <BluenetSet />
         </ChapterSet>

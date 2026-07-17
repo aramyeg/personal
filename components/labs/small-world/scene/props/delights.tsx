@@ -5,8 +5,10 @@ import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL } from '../planet'
 import { ISLANDS, SEA } from '../biomes'
 import { PropAnchor } from './prop-anchor'
+import { LapSet } from './lap-set'
 import { ClayBlossom, ClayDisc, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
+import type { JourneyRef } from '../use-journey'
 
 const Y_UP = new THREE.Vector3(0, 1, 0)
 
@@ -81,24 +83,21 @@ function anchorForTuple(dir: readonly [number, number, number]): [number, number
   return [a.theta, a.x, 0.9 + 0.25 * Math.abs(dir[1])]
 }
 
-/** Flat ice floes floating on the cold sea's surface (at the waterline). */
-function IceFloes() {
+/** Flat ice floes floating on the cold sea's surface (at the waterline). The
+ *  lap-2 winter adds 2 more floes (passed via `spec`). */
+function IceFloes({ spec }: { spec: Array<[number, number, number]> }) {
   const ramp = useClayRamp()
   const floes = useMemo(() => {
     const c = new THREE.Vector3(SEA.dir[0], SEA.dir[1], SEA.dir[2])
     const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
     const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
-    // [tangent a, tangent b, radius] offsets inside the lake
-    const spec: Array<[number, number, number]> = [
-      [0.06, 0.08, 0.09], [-0.11, 0.03, 0.07], [0.05, -0.1, 0.08], [-0.04, -0.13, 0.055],
-    ]
     return spec.map(([a, b, r]) => {
       const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
       const pos = dir.clone().multiplyScalar(PLANET_RADIUS * WATER_LEVEL + 0.012)
       const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
       return { pos, quat, r }
     })
-  }, [])
+  }, [spec])
   return (
     <>
       {floes.map(({ pos, quat, r }, i) => (
@@ -111,13 +110,22 @@ function IceFloes() {
   )
 }
 
+/** [tangent a, tangent b, radius] offsets inside the sea for the ice floes. */
+const FLOES_BASE: Array<[number, number, number]> = [
+  [0.06, 0.08, 0.09], [-0.11, 0.03, 0.07], [0.05, -0.1, 0.08], [-0.04, -0.13, 0.055],
+]
+/** Two extra floes the spreading lap-2 winter grows on the sea. */
+const FLOES_LAP2: Array<[number, number, number]> = [
+  [0.13, -0.03, 0.075], [-0.02, 0.14, 0.06],
+]
+
 /**
  * Curated delights beyond the core biome list (per Aram's creative-license
  * note): islands in the ocean, ice floes on the highland lake, a flower-meadow
  * patch, a winding dirt path, and a little rock formation — placed on verified
  * dry, feature-clear ground so every stretch of the lap has something new.
  */
-export function Delights() {
+export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
   // authored dry-meadow flower patches at two longitudes
   const flowers: Array<[number, number]> = [
     [2.0, 0.8], [2.1, 0.9], [2.2, 0.78], [2.05, 0.72], [2.15, 0.85],
@@ -141,14 +149,28 @@ export function Delights() {
       <PropAnchor theta={island[1].theta} x={island[1].x}><ClayRock color={PALETTE.dune} r={0.09} /></PropAnchor>
       <PropAnchor theta={island[2].theta} x={island[2].x}><ClaySprout scale={1.2} /></PropAnchor>
 
-      <IceFloes />
+      <IceFloes spec={FLOES_BASE} />
+      {/* 2 extra ice floes grow with the lap-2 winter */}
+      <LapSet lap={2} journeyRef={journeyRef}>
+        <IceFloes spec={FLOES_LAP2} />
+      </LapSet>
       <SnowRegion />
 
-      {flowers.map(([theta, x], i) => (
-        <PropAnchor key={`fl-${i}`} theta={theta} x={x}>
-          <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.blossomDeep} scale={1.1} />
-        </PropAnchor>
-      ))}
+      {/* spring flower patch — swaps to an autumn (amber/deep) cast on lap 2 */}
+      <LapSet lap={1} journeyRef={journeyRef}>
+        {flowers.map(([theta, x], i) => (
+          <PropAnchor key={`fl-${i}`} theta={theta} x={x}>
+            <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.blossomDeep} scale={1.1} />
+          </PropAnchor>
+        ))}
+      </LapSet>
+      <LapSet lap={2} journeyRef={journeyRef}>
+        {flowers.map(([theta, x], i) => (
+          <PropAnchor key={`fl2-${i}`} theta={theta} x={x} lapB>
+            <ClayBlossom color={i % 2 === 0 ? PALETTE.honey : PALETTE.dune} scale={1.1} />
+          </PropAnchor>
+        ))}
+      </LapSet>
 
       {path.map(([theta, x], i) => (
         <PropAnchor key={`pa-${i}`} theta={theta} x={x}>

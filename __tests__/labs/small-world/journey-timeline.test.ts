@@ -6,6 +6,7 @@ import {
   BURST_END,
   PANEL_END,
   CHAPTER_SLICE,
+  LAP_BOUNDARY_CHAPTER,
   chapterStartRotation,
   easeOutBack,
 } from '@/components/labs/small-world/journey-timeline'
@@ -103,6 +104,50 @@ describe('easeOutBack', () => {
   it('clamps input outside [0,1]', () => {
     expect(easeOutBack(-1)).toBeCloseTo(0, 10)
     expect(easeOutBack(2)).toBeCloseTo(1, 10)
+  })
+})
+
+describe('worldBlend (lap-2 world morph)', () => {
+  const B = LAP_BOUNDARY_CHAPTER
+
+  it('places the lap boundary at the chapter whose travel completes 2π', () => {
+    // rotation at the END of chapter B's travel is exactly one full turn
+    expect(chapterStartRotation(B) + CHAPTER_SLICE).toBeCloseTo(Math.PI * 2, 10)
+    expect(B).toBe(2)
+  })
+
+  it('is 0 through lap 1 (before the boundary panel)', () => {
+    expect(journeyStateAt(0.3).worldBlend).toBe(0) // chapter 1 travel
+    expect(journeyStateAt(at(B, 0.3)).worldBlend).toBe(0) // boundary chapter travel
+    // during the boundary chapter's discovery burst — still spring
+    expect(journeyStateAt(at(B, (TRAVEL_END + BURST_END) / 2)).worldBlend).toBe(0)
+  })
+
+  it('ramps ~0.5 mid-panel of the boundary chapter', () => {
+    const mid = journeyStateAt(at(B, (BURST_END + PANEL_END) / 2)).worldBlend
+    expect(mid).toBeCloseTo(0.5, 5)
+  })
+
+  it('is 1 once past the boundary panel (all of lap 2)', () => {
+    expect(journeyStateAt(at(B, PANEL_END + 0.01)).worldBlend).toBe(1)
+    expect(journeyStateAt(at(B + 1, 0.3)).worldBlend).toBe(1) // lap-2 travel
+    expect(journeyStateAt(1.0).worldBlend).toBe(1)
+  })
+
+  it('is monotonically non-decreasing across the whole journey', () => {
+    let prev = -1
+    for (let p = 0; p <= 1.0001; p += 0.001) {
+      const w = journeyStateAt(p).worldBlend
+      expect(w).toBeGreaterThanOrEqual(prev)
+      prev = w
+    }
+  })
+
+  it('un-morphs when scrolling back (pure function of progress)', () => {
+    const forward = journeyStateAt(at(B, (BURST_END + PANEL_END) / 2)).worldBlend
+    const back = journeyStateAt(at(B, BURST_END - 0.01)).worldBlend
+    expect(forward).toBeGreaterThan(0)
+    expect(back).toBe(0)
   })
 })
 

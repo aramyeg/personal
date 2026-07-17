@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import type { JourneyRef } from './use-journey'
 import { useClayRamp } from './toon-ramp'
-import { WATER_LEVEL, biomeBump, biomeTint } from './biomes'
+import { WATER_LEVEL, SNOW, SNOW_B, biomeBump, biomeBumpB, biomeTint } from './biomes'
 
 export const PLANET_RADIUS = 2.2
 
@@ -41,12 +41,31 @@ export function terrainBump(x: number, y: number, z: number): number {
 }
 
 /**
+ * Lap-2 terrain: the same base meadow plus the variant-B biome displacement.
+ * Because `biomeBumpB` gates every flank delta to zero on the spine band,
+ * `terrainBumpB === terrainBump` exactly for |nx| < 0.45 — so surfaceYAt/walkYAt
+ * and every spine-anchored prop stay lap-invariant. Pure; build-time only
+ * (the render geometry lerps between the two bakes per frame). */
+export function terrainBumpB(x: number, y: number, z: number): number {
+  const len = Math.sqrt(x * x + y * y + z * z) || 1
+  const nx = x / len
+  const ny = y / len
+  const nz = z / len
+  return baseMeadowBump(x, y, z) + biomeBumpB(nx, ny, nz)
+}
+
+/**
  * Finite-difference gradient magnitude of terrainBump along the surface at a
  * unit direction — how steeply the clay is pinched here. Used to darken creases
  * (hand-pushed clay shows dirt in its folds). Pure; two centered samples per
  * tangent, four terrainBump calls (build-time only).
  */
-export function terrainSlope(nx: number, ny: number, nz: number): number {
+export function terrainSlope(
+  nx: number,
+  ny: number,
+  nz: number,
+  bumpFn: (x: number, y: number, z: number) => number = terrainBump
+): number {
   const eps = 0.02
   // tangent 1 = normalize(n × up); at the poles fall back to the x axis
   let t1x = -nz
@@ -60,7 +79,7 @@ export function terrainSlope(nx: number, ny: number, nz: number): number {
   const t2z = nx * t1y - ny * t1x
   const R = PLANET_RADIUS
   const s = (ox: number, oy: number, oz: number): number =>
-    terrainBump((nx + ox) * R, (ny + oy) * R, (nz + oz) * R)
+    bumpFn((nx + ox) * R, (ny + oy) * R, (nz + oz) * R)
   const dA = (s(eps * t1x, eps * t1y, eps * t1z) - s(-eps * t1x, -eps * t1y, -eps * t1z)) / (2 * eps)
   const dB = (s(eps * t2x, eps * t2y, eps * t2z) - s(-eps * t2x, -eps * t2y, -eps * t2z)) / (2 * eps)
   return Math.hypot(dA, dB)
@@ -83,109 +102,220 @@ export function surfaceYAt(worldZ: number, rotation: number): number {
   return Math.sqrt(Math.max(0, r * r - worldZ * worldZ))
 }
 
+/** Clay thumb-dents: a small two-octave surface irregularity applied to the
+ * RENDER geometry only (never to terrainBump, so dryness/props/tests are
+ * untouched). It tilts the flat facet normals so the hard ramp breaks into
+ * pressed-clay patches instead of a smooth soft gradient. A pure function of the
+ * unit direction, so it is IDENTICAL on both laps and cancels out of the morph
+ * on the spine (where the two bakes already coincide). */
+function clayDimple(nx: number, ny: number, nz: number): number {
+  return (
+    0.005 * Math.sin(15.3 * nx + 1.1) * Math.sin(14.7 * ny - 0.4) * Math.sin(15.1 * nz + 2.3) +
+    0.003 * Math.sin(26.1 * ny + 0.7) * Math.sin(25.4 * nz - 1.3) * Math.sin(26.9 * nx + 0.5)
+  )
+}
+
 /**
- * Chunky vertex-displaced sphere, vertex-colored straight from the biome map:
- * snow at the cold pole, rich-brown canyon clay, pine forest floor, sand
- * shorelines edging every water body, deep glaze underwater, and the gentle
- * leaf→meadow→sprout height read on the open meadow — no textures.
+ * Paints one vertex from the biome map into `c`. `isB` selects the lap-2
+ * autumn-into-winter palette (meadow greens shift to honey/dune amber, forest
+ * floor warms toward earth, canyon walls saturate, wildflower confetti re-tints,
+ * snow reads across the wider SNOW_B cap). Water/beach are lap-invariant.
  */
-function useHillGeometry(): THREE.IcosahedronGeometry {
+function paintVertex(
+  c: THREE.Color,
+  pal: {
+    leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
+    deep: THREE.Color; honey: THREE.Color; snow: THREE.Color; earth: THREE.Color
+    pine: THREE.Color; dune: THREE.Color; blossom: THREE.Color; blossomDeep: THREE.Color
+    amber: THREE.Color
+  },
+  nx: number,
+  ny: number,
+  nz: number,
+  bump: number,
+  isB: boolean
+): void {
+  const snowCap = isB ? SNOW_B : SNOW
+  // open-meadow height read is the fallback everywhere
+  const t = THREE.MathUtils.clamp(bump / 0.05 / 2 + 0.5, 0, 1)
+  if (t < 0.5) c.lerpColors(pal.leaf, pal.meadow, t * 2)
+  else c.lerpColors(pal.meadow, pal.sprout, (t - 0.5) * 2)
+
+  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, snowCap)
+  switch (kind) {
+    case 'underwater':
+      c.lerp(pal.deep, 0.55 + 0.35 * kt)
+      break
+    case 'beach':
+      c.lerp(pal.dune, 0.85 * kt)
+      break
+    case 'canyon': {
+      c.copy(pal.earth)
+      // darken the channel floor, keep the banks a touch lighter
+      c.lerp(pal.deep.clone().lerp(pal.earth, 0.7), 0.25 * kt)
+      // lap 2: richer, more saturated earth walls
+      if (isB) c.lerp(pal.earth, 0.35)
+      break
+    }
+    case 'snow': {
+      c.lerp(pal.snow, kt)
+      // snowline pulled DOWN: earth rock shows only on the steep upper
+      // spires, so the enlarged cap + range read as ONE white cold region.
+      const rock =
+        THREE.MathUtils.smoothstep(bump, 0.09, 0.14) *
+        (1 - THREE.MathUtils.smoothstep(bump, 0.2, 0.26))
+      if (rock > 0) c.lerp(pal.earth, 0.5 * rock * kt)
+      break
+    }
+    case 'forest':
+      c.lerp(pal.pine, 0.4 * kt)
+      // lap 2: warm the pine floor toward earth (autumn leaf litter)
+      if (isB) c.lerp(pal.earth, 0.2 * kt)
+      break
+    default: {
+      // lap 2: the open meadow turns autumn — greens lerp toward honey/dune amber
+      if (isB) c.lerp(pal.amber, 0.52)
+      // terracotta breaking through the odd high meadow crest
+      const peak = THREE.MathUtils.clamp((bump - 0.07) / 0.04, 0, 1)
+      if (peak > 0) c.lerp(pal.clay, 0.4 * peak)
+      // subtle warm longitude drift, never stripes (richer on lap 2)
+      const t2 = 0.5 + 0.5 * Math.sin(1.2 * Math.atan2(nz, ny) + 0.7)
+      c.lerp(pal.honey, (isB ? 0.12 : 0.06) * t2)
+      // wildflower speckle — deterministic dots break the uniform ground; the
+      // lap-2 confetti re-tints to amber/blossomDeep/dune (autumn seed heads).
+      const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
+      if (spk > 0.68) c.lerp(isB ? pal.honey : pal.blossom, 0.55)
+      else if (spk < -0.72) c.lerp(isB ? pal.blossomDeep : pal.honey, 0.5)
+      const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
+      if (spk2 > 0.74) c.lerp(isB ? pal.dune : pal.sprout, 0.5)
+    }
+  }
+  // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
+  // matching lap's slope so the deeper lap-2 canyon / taller peaks crease right.
+  const crease = THREE.MathUtils.smoothstep(
+    terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
+    0.12,
+    0.6
+  )
+  if (crease > 0) c.multiplyScalar(1 - 0.14 * crease)
+}
+
+/** Flat per-face normals for a non-indexed positions buffer. */
+function flatNormals(positions: Float32Array): Float32Array {
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  g.computeVertexNormals()
+  const n = (g.attributes.normal.array as Float32Array).slice()
+  g.dispose()
+  return n
+}
+
+/** The two baked worlds + live attributes the per-frame morph lerps between. */
+type MorphBake = {
+  positionsA: Float32Array; positionsB: Float32Array
+  colorsA: Float32Array; colorsB: Float32Array
+  normalsA: Float32Array; normalsB: Float32Array
+}
+
+/**
+ * Chunky vertex-displaced sphere, dual-baked: variant A (lap-1 spring) and
+ * variant B (lap-2 autumn→winter) over the SAME pre-displacement icosahedron.
+ * The returned geometry starts on A; `applyWorldBlend` lerps position/color/
+ * normal toward B per frame during the lap-boundary panel. Because the spine
+ * band never morphs, A and B coincide there and the lerp is a no-op on the lane.
+ */
+function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
     const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, 24)
-    const pos = geo.attributes.position
-    const colors = new Float32Array(pos.count * 3)
+    const src = geo.attributes.position
+    const count = src.count
+    const positionsA = new Float32Array(count * 3)
+    const positionsB = new Float32Array(count * 3)
+    const colorsA = new Float32Array(count * 3)
+    const colorsB = new Float32Array(count * 3)
     const v = new THREE.Vector3()
-    const leaf = new THREE.Color(PALETTE.leaf)
-    const meadow = new THREE.Color(PALETTE.meadow)
-    const sprout = new THREE.Color(PALETTE.sprout)
-    const clay = new THREE.Color(PALETTE.clayPath)
-    const deep = new THREE.Color(PALETTE.riverDeep)
-    const honey = new THREE.Color(PALETTE.honey)
-    const snow = new THREE.Color(PALETTE.snow)
-    const earth = new THREE.Color(PALETTE.earth)
-    const pine = new THREE.Color(PALETTE.pine)
-    const dune = new THREE.Color(PALETTE.dune)
-    const blossom = new THREE.Color(PALETTE.blossom)
+    const pal = {
+      leaf: new THREE.Color(PALETTE.leaf),
+      meadow: new THREE.Color(PALETTE.meadow),
+      sprout: new THREE.Color(PALETTE.sprout),
+      clay: new THREE.Color(PALETTE.clayPath),
+      deep: new THREE.Color(PALETTE.riverDeep),
+      honey: new THREE.Color(PALETTE.honey),
+      snow: new THREE.Color(PALETTE.snow),
+      earth: new THREE.Color(PALETTE.earth),
+      pine: new THREE.Color(PALETTE.pine),
+      dune: new THREE.Color(PALETTE.dune),
+      blossom: new THREE.Color(PALETTE.blossom),
+      blossomDeep: new THREE.Color(PALETTE.blossomDeep),
+      amber: new THREE.Color(PALETTE.honey).lerp(new THREE.Color(PALETTE.dune), 0.5),
+    }
     const c = new THREE.Color()
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i)
+    for (let i = 0; i < count; i++) {
+      v.fromBufferAttribute(src, i)
       const nx = v.x / PLANET_RADIUS
       const ny = v.y / PLANET_RADIUS
       const nz = v.z / PLANET_RADIUS
-      const bump = terrainBump(v.x, v.y, v.z)
-      // Clay thumb-dents: a small two-octave surface irregularity applied to the
-      // RENDER geometry only (never to terrainBump, so dryness/props/tests are
-      // untouched). It tilts the flat facet normals so the hard ramp breaks into
-      // pressed-clay patches instead of a smooth soft gradient. Amplitude is tiny
-      // enough that the spine stays above the waterline (verified in bench scan).
-      const dimple =
-        0.005 * Math.sin(15.3 * nx + 1.1) * Math.sin(14.7 * ny - 0.4) * Math.sin(15.1 * nz + 2.3) +
-        0.003 * Math.sin(26.1 * ny + 0.7) * Math.sin(25.4 * nz - 1.3) * Math.sin(26.9 * nx + 0.5)
-      v.multiplyScalar(1 + bump + dimple)
-      pos.setXYZ(i, v.x, v.y, v.z)
+      const dimple = clayDimple(nx, ny, nz)
+      const bumpA = terrainBump(v.x, v.y, v.z)
+      const bumpB = terrainBumpB(v.x, v.y, v.z)
+      const rA = 1 + bumpA + dimple
+      const rB = 1 + bumpB + dimple
+      positionsA[i * 3] = nx * PLANET_RADIUS * rA
+      positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
+      positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
+      positionsB[i * 3] = nx * PLANET_RADIUS * rB
+      positionsB[i * 3 + 1] = ny * PLANET_RADIUS * rB
+      positionsB[i * 3 + 2] = nz * PLANET_RADIUS * rB
 
-      // open-meadow height read is the fallback everywhere
-      const t = THREE.MathUtils.clamp(bump / 0.05 / 2 + 0.5, 0, 1)
-      if (t < 0.5) c.lerpColors(leaf, meadow, t * 2)
-      else c.lerpColors(meadow, sprout, (t - 0.5) * 2)
-
-      const { kind, t: kt } = biomeTint(nx, ny, nz, bump)
-      switch (kind) {
-        case 'underwater':
-          c.lerp(deep, 0.55 + 0.35 * kt)
-          break
-        case 'beach':
-          c.lerp(dune, 0.85 * kt)
-          break
-        case 'canyon': {
-          c.copy(earth)
-          // darken the channel floor, keep the banks a touch lighter
-          c.lerp(deep.clone().lerp(earth, 0.7), 0.25 * kt)
-          break
-        }
-        case 'snow': {
-          c.lerp(snow, kt)
-          // snowline pulled DOWN: earth rock shows only on the steep upper
-          // spires, so the enlarged cap + range read as ONE white cold region.
-          const rock =
-            THREE.MathUtils.smoothstep(bump, 0.09, 0.14) *
-            (1 - THREE.MathUtils.smoothstep(bump, 0.2, 0.26))
-          if (rock > 0) c.lerp(earth, 0.5 * rock * kt)
-          break
-        }
-        case 'forest':
-          c.lerp(pine, 0.4 * kt)
-          break
-        default: {
-          // terracotta breaking through the odd high meadow crest
-          const peak = THREE.MathUtils.clamp((bump - 0.07) / 0.04, 0, 1)
-          if (peak > 0) c.lerp(clay, 0.4 * peak)
-          // subtle warm longitude drift, never stripes
-          const t2 = 0.5 + 0.5 * Math.sin(1.2 * Math.atan2(nz, ny) + 0.7)
-          c.lerp(honey, 0.06 * t2)
-          // wildflower speckle — deterministic pink/gold dots break the uniform
-          // green so no meadow face reads as flat green (dense, high-frequency)
-          const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
-          if (spk > 0.68) c.lerp(blossom, 0.55)
-          else if (spk < -0.72) c.lerp(honey, 0.5)
-          const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
-          if (spk2 > 0.74) c.lerp(sprout, 0.5)
-        }
-      }
-      // Crease darkening: hand-pushed clay carries dirt in its steep folds. The
-      // per-face flat normals already band under the ramp; this deepens the
-      // color where the terrain is pinched (biome flanks, channel + canyon
-      // banks) so the facets read as pressed clay, not shaded haze.
-      const crease = THREE.MathUtils.smoothstep(terrainSlope(nx, ny, nz), 0.12, 0.6)
-      if (crease > 0) c.multiplyScalar(1 - 0.14 * crease)
-      colors.set([c.r, c.g, c.b], i * 3)
+      paintVertex(c, pal, nx, ny, nz, bumpA, false)
+      colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
+      paintVertex(c, pal, nx, ny, nz, bumpB, true)
+      colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    // IcosahedronGeometry is already non-indexed, so per-face normals here give
-    // flat facets straight away — the ramp turns them into pinched clay planes.
-    geo.computeVertexNormals()
-    return geo
+    const normalsA = flatNormals(positionsA)
+    const normalsB = flatNormals(positionsB)
+
+    // Live attributes start on lap-1 (A); the frame lerp writes toward B.
+    const posAttr = new THREE.BufferAttribute(positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    const colAttr = new THREE.BufferAttribute(colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    const norAttr = new THREE.BufferAttribute(normalsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    geo.setAttribute('position', posAttr)
+    geo.setAttribute('color', colAttr)
+    geo.setAttribute('normal', norAttr)
+
+    return {
+      geometry: geo,
+      bake: { positionsA, positionsB, colorsA, colorsB, normalsA, normalsB },
+    }
   }, [])
+}
+
+/**
+ * Lerp the live planet geometry between the two bakes at `blend`. Skipped by the
+ * caller when the blend is unchanged, so the flanks only recompute during the
+ * lap-boundary panel; the spine rows are identical in A and B so they never move.
+ */
+function applyWorldBlend(geo: THREE.BufferGeometry, bake: MorphBake, blend: number): void {
+  const pos = geo.attributes.position.array as Float32Array
+  const col = geo.attributes.color.array as Float32Array
+  const nor = geo.attributes.normal.array as Float32Array
+  const { positionsA, positionsB, colorsA, colorsB, normalsA, normalsB } = bake
+  const n = pos.length
+  for (let i = 0; i < n; i++) {
+    pos[i] = positionsA[i] + (positionsB[i] - positionsA[i]) * blend
+    col[i] = colorsA[i] + (colorsB[i] - colorsA[i]) * blend
+    nor[i] = normalsA[i] + (normalsB[i] - normalsA[i]) * blend
+  }
+  // Re-normalize the lerped face normals (each facet's 3 verts share a normal,
+  // so the facets stay flat — the ramp still reads pinched clay planes).
+  for (let i = 0; i < n; i += 3) {
+    const x = nor[i], y = nor[i + 1], z = nor[i + 2]
+    const l = Math.hypot(x, y, z) || 1
+    nor[i] = x / l; nor[i + 1] = y / l; nor[i + 2] = z / l
+  }
+  geo.attributes.position.needsUpdate = true
+  geo.attributes.color.needsUpdate = true
+  geo.attributes.normal.needsUpdate = true
 }
 
 /**
@@ -249,11 +379,20 @@ export function Planet({
 }) {
   const group = useRef<THREE.Group>(null)
   const ramp = useClayRamp()
-  const geometry = useHillGeometry()
+  const { geometry, bake } = useHillGeometry()
   const water = useWaterGeometry()
+  // -1 forces the first frame to apply (settling the live geometry onto lap-1);
+  // afterwards the morph is skipped whenever worldBlend is unchanged — so the
+  // 34k-vertex lerp only runs during the lap-boundary panel dwell.
+  const lastBlend = useRef(-1)
 
   useFrame(() => {
-    if (group.current) group.current.rotation.x = -journeyRef.current.rotation
+    const j = journeyRef.current
+    if (group.current) group.current.rotation.x = -j.rotation
+    if (j.worldBlend !== lastBlend.current) {
+      applyWorldBlend(geometry, bake, j.worldBlend)
+      lastBlend.current = j.worldBlend
+    }
   })
 
   return (
