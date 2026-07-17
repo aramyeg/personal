@@ -15,6 +15,72 @@ function anchorFor(dir: readonly [number, number, number]): { theta: number; x: 
   return { theta: Math.atan2(dir[2], dir[1]), x: dir[0] * PLANET_RADIUS }
 }
 
+/** A frozen pond inside the snow cap: a flat snow-tinted ice disc ringed by a
+ *  slightly wider river-blue rim, flat-shaded under the ramp so it reads as ice. */
+function FrozenPond({ theta, x }: { theta: number; x: number }) {
+  const ramp = useClayRamp()
+  return (
+    <PropAnchor theta={theta} x={x}>
+      <mesh position={[0, 0.012, 0]}>
+        <cylinderGeometry args={[0.19, 0.2, 0.024, 16]} />
+        <meshToonMaterial color={PALETTE.river} gradientMap={ramp} />
+      </mesh>
+      <mesh position={[0, 0.03, 0]}>
+        <cylinderGeometry args={[0.15, 0.155, 0.02, 14]} />
+        <meshToonMaterial color={PALETTE.snow} gradientMap={ramp} />
+      </mesh>
+    </PropAnchor>
+  )
+}
+
+/** A bare dead winter tree — a dark earth trunk with a couple of leafless
+ *  branches, no crown. Sits on the snowy ground for the cold-region read. */
+function WinterTree({ theta, x, scale = 1 }: { theta: number; x: number; scale?: number }) {
+  const ramp = useClayRamp()
+  return (
+    <PropAnchor theta={theta} x={x}>
+      <group scale={scale}>
+        <mesh position={[0, 0.16, 0]}>
+          <cylinderGeometry args={[0.018, 0.03, 0.32, 6]} />
+          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
+        </mesh>
+        <mesh position={[0.05, 0.26, 0]} rotation={[0, 0, -0.8]}>
+          <cylinderGeometry args={[0.01, 0.014, 0.16, 5]} />
+          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
+        </mesh>
+        <mesh position={[-0.045, 0.3, 0.02]} rotation={[0.3, 0, 0.9]}>
+          <cylinderGeometry args={[0.008, 0.012, 0.13, 5]} />
+          <meshToonMaterial color={PALETTE.earth} gradientMap={ramp} />
+        </mesh>
+      </group>
+    </PropAnchor>
+  )
+}
+
+/** Snow-cap delights: a frozen pond and bare winter trees inside the cold cap. */
+function SnowRegion() {
+  const pond = anchorFor([-0.6, 0.05, 0.62])
+  const trees: Array<[number, number, number]> = [
+    ...([[-0.7, 0.2, 0.45], [-0.62, -0.06, 0.62], [-0.68, 0.3, 0.5]] as const).map(
+      (d) => anchorForTuple(d)
+    ),
+  ]
+  return (
+    <>
+      <FrozenPond theta={pond.theta} x={pond.x} />
+      {trees.map(([theta, x, s], i) => (
+        <WinterTree key={i} theta={theta} x={x} scale={s} />
+      ))}
+    </>
+  )
+}
+
+/** anchorFor packed with a scale for the winter-tree list. */
+function anchorForTuple(dir: readonly [number, number, number]): [number, number, number] {
+  const a = anchorFor(dir)
+  return [a.theta, a.x, 0.9 + 0.25 * Math.abs(dir[1])]
+}
+
 /** Flat ice floes floating on the cold sea's surface (at the waterline). */
 function IceFloes() {
   const ramp = useClayRamp()
@@ -76,6 +142,7 @@ export function Delights() {
       <PropAnchor theta={island[2].theta} x={island[2].x}><ClaySprout scale={1.2} /></PropAnchor>
 
       <IceFloes />
+      <SnowRegion />
 
       {flowers.map(([theta, x], i) => (
         <PropAnchor key={`fl-${i}`} theta={theta} x={x}>

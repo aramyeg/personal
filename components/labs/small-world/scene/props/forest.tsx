@@ -44,7 +44,8 @@ export function Forest() {
     const col = new THREE.Color()
 
     const trunkGeo = new THREE.CylinderGeometry(0.028, 0.04, 0.16, 6)
-    const crownGeo = new THREE.SphereGeometry(0.15, 12, 12)
+    // fewer crown segments -> chunkier hand-rolled conifers under the hard ramp
+    const crownGeo = new THREE.SphereGeometry(0.15, 8, 8)
     const mat = (): THREE.MeshToonMaterial =>
       new THREE.MeshToonMaterial({ gradientMap: ramp, vertexColors: false })
 
@@ -73,7 +74,9 @@ export function Forest() {
       pos.copy(dir).multiplyScalar(PLANET_RADIUS * (1 + bump))
       quat.setFromUnitVectors(Y_UP, dir)
       const s = 0.5 + seeded(i, 512.3) * 0.5
-      const snowy = capMask(dir.x, dir.y, dir.z, SNOW) > 0.4
+      // thicker snowy sub-cluster: any tree well inside the cold cap is a
+      // snow-crowned conifer, so the forest edge blends into the snow region
+      const snowy = capMask(dir.x, dir.y, dir.z, SNOW) > 0.3
       const pick = seeded(i, 901.1)
       const crown = snowy ? snow : pick < 0.6 ? pine : pick < 0.85 ? leaf : sprout
       trees.push({ pos: pos.clone(), quat: quat.clone(), s, crown: crown.clone() })

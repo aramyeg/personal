@@ -56,9 +56,13 @@ function SceneContents({ progressRef }: SceneProps) {
     <>
       <CameraRig />
       <Sky />
-      <ambientLight intensity={0.7} />
-      {/* Warm raking key from upper-left — makes the toon ramp bands read as clay facets. */}
-      <directionalLight position={[-5, 3.5, 4]} intensity={1.35} color="#fff2e0" />
+      {/* Lower ambient so the 4-step ramp actually bands across the form — high
+          fill washed the clay creases into a soft haze. */}
+      <ambientLight intensity={0.42} />
+      {/* Warm key raking from the upper-left, low enough that the terminator
+          crosses the visible face — shadow pools in the clay dents and reads the
+          toon bands as pinched facets. */}
+      <directionalLight position={[-6, 2, 3.2]} intensity={1.55} color="#fff2e0" />
       <Planet journeyRef={journeyRef}>
         <GlobalDressing />
         <Forest />

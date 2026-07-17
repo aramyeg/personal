@@ -67,8 +67,22 @@ export const ISLANDS: Peak[] = [
 
 /** The cold region on the near-left flank — pulled off the pure -x pole so its
  * snowy ground + range actually face the camera (a pole cap foreshortens to an
- * invisible edge sliver). Opposite the ocean, clear of the girl's lane. */
-export const SNOW: Cap = { dir: norm3([-0.66, 0.22, 0.42]), radius: 0.5, feather: 0.26 }
+ * invisible edge sliver). Opposite the ocean, clear of the girl's lane. Grown to
+ * a proper white EXPANSE (radius 0.7) with a HARD core: the small feather leaves
+ * a solid all-white interior (mask=1 for d < radius−feather ≈ 0.48 rad) and only
+ * dusts into meadow at the rim. Centred toward the RANGE so cap + spires read as
+ * ONE cold region. Still clears the girl's nx=0 lane (nearest spine point ≈ 0.72
+ * rad from centre > core radius). */
+export const SNOW: Cap = { dir: norm3([-0.66, 0.14, 0.52]), radius: 0.7, feather: 0.22 }
+
+/** White drift mounds inside the snow cap — gentle gaussian swells that give the
+ * expanse hand-pushed clay relief (they sit within the cap so they colour snow
+ * automatically, and off the spine so the calm lane is untouched). */
+export const SNOW_DRIFTS: Peak[] = [
+  { dir: norm3([-0.6, 0.28, 0.6]), h: 0.06, r: 0.16 },
+  { dir: norm3([-0.72, 0.02, 0.5]), h: 0.05, r: 0.14 },
+  { dir: norm3([-0.66, -0.16, 0.56]), h: 0.055, r: 0.15 },
+]
 
 /** A dense forest patch on the near-left flank, clear of ocean + snow cores. */
 export const FOREST: Cap = { dir: norm3([-0.46, 0.5, 0.73]), radius: 0.44, feather: 0.16 }
@@ -139,6 +153,14 @@ export const RIVER_CROSSINGS = [2.65, 4.55, 6.03] as const
 const RIVER_HALF = 0.045 // channel half-width (rad)
 const RIVER_RAMP = 0.05 // carve feather beyond the half-width
 
+/** The middle crossing is a STRAIT, not a plain river: the ocean (right, +x)
+ *  narrows into a wide channel, snakes under the girl's bridge at this theta and
+ *  opens into the cold SEA on the left — one continuous body of water read in a
+ *  single frame. The other two crossings stay narrow rivers. */
+const STRAIT_CROSSING = 4.55
+/** Which crossings are ordinary rivers (drain to their nearest body). */
+const RIVER_ONLY_CROSSINGS = RIVER_CROSSINGS.filter((t) => t !== STRAIT_CROSSING)
+
 /** Point on the girl's ring (nx=0) at a crossing theta. */
 function crossPoint(theta: number): [number, number, number] {
   return [0, Math.cos(theta), Math.sin(theta)]
@@ -157,9 +179,9 @@ function nearestBody(dx: number, dy: number, dz: number): WaterBody {
   }
   return best
 }
-/** Each river runs from its spine crossing out to its NEAREST water body, so the
- *  three crossings drain to three different bodies and water veins the whole lap. */
-const RIVER_ARCS: Arc[] = RIVER_CROSSINGS.map((theta) => {
+/** Each ordinary river runs from its spine crossing out to its NEAREST water
+ *  body, so the crossings drain to different bodies and water veins the lap. */
+const RIVER_ARCS: Arc[] = RIVER_ONLY_CROSSINGS.map((theta) => {
   const c = crossPoint(theta)
   const o = nearestBody(c[0], c[1], c[2]).dir
   // aim ~82% of the way toward the body centre so the mouth lands in its shallows.
@@ -168,6 +190,40 @@ const RIVER_ARCS: Arc[] = RIVER_CROSSINGS.map((theta) => {
   const mz = c[2] * 0.18 + o[2] * 0.82
   return makeArc(c, [mx, my, mz])
 })
+
+// --- The strait: ocean → spine crossing → left sea ---------------------------
+
+const STRAIT_C = crossPoint(STRAIT_CROSSING)
+/** A mouth aimed 85% of the way toward a body's centre so the channel clearly
+ *  merges with that body's shallows. */
+function straitMouth(body: WaterBody): [number, number, number] {
+  return [
+    STRAIT_C[0] * 0.15 + body.dir[0] * 0.85,
+    STRAIT_C[1] * 0.15 + body.dir[1] * 0.85,
+    STRAIT_C[2] * 0.15 + body.dir[2] * 0.85,
+  ]
+}
+/** Two arcs sharing the spine crossing: one reaching into the OCEAN (right), one
+ *  into the SEA (left). Their union is the strait's centre-line. */
+const STRAIT_ARCS: Arc[] = [makeArc(STRAIT_C, straitMouth(OCEAN)), makeArc(STRAIT_C, straitMouth(SEA))]
+/** Wide away from the crossing (strait-grade); tapered back to river-width right
+ *  at the spine so it never wets the calm lane wider than the bridge deck spans
+ *  and keeps the near-spine chapter props dry. */
+const STRAIT_HALF = 0.1 // ~2.2x a river's half-width at the mouths
+const STRAIT_RAMP = 0.05
+
+/** Distance (rad) to the strait centre-line (nearest of its two arcs). */
+export function straitDist(nx: number, ny: number, nz: number): number {
+  const a = arcDist(nx, ny, nz, STRAIT_ARCS[0])
+  const b = arcDist(nx, ny, nz, STRAIT_ARCS[1])
+  return a < b ? a : b
+}
+/** Strait half-width at a point: tapers from river-width near the spine crossing
+ *  out to full strait-width toward the mouths. */
+function straitHalfAt(nx: number, ny: number, nz: number): number {
+  const dc = Math.acos(clampU(nx * STRAIT_C[0] + ny * STRAIT_C[1] + nz * STRAIT_C[2]))
+  return RIVER_HALF + (STRAIT_HALF - RIVER_HALF) * smoothstep01((dc - 0.24) / 0.34)
+}
 
 // --- Field evaluators ------------------------------------------------------
 
@@ -178,9 +234,10 @@ export function capMask(nx: number, ny: number, nz: number, cap: Cap): number {
   return smoothstep01((cap.radius - d) / cap.feather)
 }
 
-/** Distance (rad) to the nearest river channel centre-arc. */
+/** Distance (rad) to the nearest channel centre-arc — rivers AND the strait, so
+ *  beaches and skip-tests edge every waterway. */
 export function riverDist(nx: number, ny: number, nz: number): number {
-  let m = Infinity
+  let m = straitDist(nx, ny, nz)
   for (let i = 0; i < RIVER_ARCS.length; i++) {
     const d = arcDist(nx, ny, nz, RIVER_ARCS[i])
     if (d < m) m = d
@@ -225,9 +282,16 @@ export function biomeBump(nx: number, ny: number, nz: number): number {
     bump += p.h * Math.exp(-g * g)
   }
 
-  // The mountain range — gaussian peaks in a tight arc.
+  // The mountain range + the snow-cap drift mounds — gaussian swells.
   for (let i = 0; i < RANGE.length; i++) {
     const p = RANGE[i]
+    const dot = clampU(nx * p.dir[0] + ny * p.dir[1] + nz * p.dir[2])
+    const d = Math.acos(dot)
+    const g = d / p.r
+    bump += p.h * Math.exp(-g * g)
+  }
+  for (let i = 0; i < SNOW_DRIFTS.length; i++) {
+    const p = SNOW_DRIFTS[i]
     const dot = clampU(nx * p.dir[0] + ny * p.dir[1] + nz * p.dir[2])
     const d = Math.acos(dot)
     const g = d / p.r
@@ -244,10 +308,22 @@ export function biomeBump(nx: number, ny: number, nz: number): number {
     bump += channel + bank
   }
 
-  // River channels — narrow dips to the river floor (below the waterline).
-  const rd = riverDist(nx, ny, nz)
+  // Ordinary river channels — narrow dips to the river floor (below waterline).
+  let rd = Infinity
+  for (let i = 0; i < RIVER_ARCS.length; i++) {
+    const d = arcDist(nx, ny, nz, RIVER_ARCS[i])
+    if (d < rd) rd = d
+  }
   if (rd < RIVER_HALF + RIVER_RAMP) {
     bump -= RIVER_DEPTH * (1 - smoothstep01((rd - RIVER_HALF) / RIVER_RAMP))
+  }
+
+  // The strait — a wide channel (variable half-width, tapered near the spine)
+  // carved to the same floor so ocean and sea read as one continuous water.
+  const sd = straitDist(nx, ny, nz)
+  const sh = straitHalfAt(nx, ny, nz)
+  if (sd < sh + STRAIT_RAMP) {
+    bump -= RIVER_DEPTH * (1 - smoothstep01((sd - sh) / STRAIT_RAMP))
   }
 
   return bump
@@ -273,8 +349,11 @@ export function biomeTint(
   }
 
   const rd = riverDist(nx, ny, nz)
-  const nearWater = waterMask(nx, ny, nz) > 0.02 || rd < RIVER_HALF + 0.05
-  // Beach: a thin sand band just above any waterline (every body + river mouth).
+  const nearWater =
+    waterMask(nx, ny, nz) > 0.02 ||
+    rd < RIVER_HALF + 0.05 ||
+    straitDist(nx, ny, nz) < straitHalfAt(nx, ny, nz) + 0.05
+  // Beach: a thin sand band just above any waterline (every body + channel bank).
   if (nearWater && radius < 0.986) {
     return { kind: 'beach', t: clamp01((0.986 - radius) / 0.014) }
   }

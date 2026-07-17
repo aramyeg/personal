@@ -41,6 +41,32 @@ export function terrainBump(x: number, y: number, z: number): number {
 }
 
 /**
+ * Finite-difference gradient magnitude of terrainBump along the surface at a
+ * unit direction — how steeply the clay is pinched here. Used to darken creases
+ * (hand-pushed clay shows dirt in its folds). Pure; two centered samples per
+ * tangent, four terrainBump calls (build-time only).
+ */
+export function terrainSlope(nx: number, ny: number, nz: number): number {
+  const eps = 0.02
+  // tangent 1 = normalize(n × up); at the poles fall back to the x axis
+  let t1x = -nz
+  let t1z = nx
+  const l = Math.hypot(t1x, t1z)
+  const t1y = 0
+  if (l < 1e-4) { t1x = 1; t1z = 0 } else { t1x /= l; t1z /= l }
+  // tangent 2 = n × t1 (already unit for orthonormal n, t1)
+  const t2x = ny * t1z - nz * t1y
+  const t2y = nz * t1x - nx * t1z
+  const t2z = nx * t1y - ny * t1x
+  const R = PLANET_RADIUS
+  const s = (ox: number, oy: number, oz: number): number =>
+    terrainBump((nx + ox) * R, (ny + oy) * R, (nz + oz) * R)
+  const dA = (s(eps * t1x, eps * t1y, eps * t1z) - s(-eps * t1x, -eps * t1y, -eps * t1z)) / (2 * eps)
+  const dB = (s(eps * t2x, eps * t2y, eps * t2z) - s(-eps * t2x, -eps * t2y, -eps * t2z)) / (2 * eps)
+  return Math.hypot(dA, dB)
+}
+
+/**
  * World-space surface point directly under a stance at world z (x=0, upper
  * hemisphere), for a planet rotated by `rotation` about x. Returns the y of the
  * displaced terrain surface at that z. PURE TERRAIN — prop anchors and the
@@ -87,7 +113,15 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
       const ny = v.y / PLANET_RADIUS
       const nz = v.z / PLANET_RADIUS
       const bump = terrainBump(v.x, v.y, v.z)
-      v.multiplyScalar(1 + bump)
+      // Clay thumb-dents: a small two-octave surface irregularity applied to the
+      // RENDER geometry only (never to terrainBump, so dryness/props/tests are
+      // untouched). It tilts the flat facet normals so the hard ramp breaks into
+      // pressed-clay patches instead of a smooth soft gradient. Amplitude is tiny
+      // enough that the spine stays above the waterline (verified in bench scan).
+      const dimple =
+        0.005 * Math.sin(15.3 * nx + 1.1) * Math.sin(14.7 * ny - 0.4) * Math.sin(15.1 * nz + 2.3) +
+        0.003 * Math.sin(26.1 * ny + 0.7) * Math.sin(25.4 * nz - 1.3) * Math.sin(26.9 * nx + 0.5)
+      v.multiplyScalar(1 + bump + dimple)
       pos.setXYZ(i, v.x, v.y, v.z)
 
       // open-meadow height read is the fallback everywhere
@@ -111,11 +145,12 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
         }
         case 'snow': {
           c.lerp(snow, kt)
-          // earth rock on the range's mid flanks, snow left on the crests
+          // snowline pulled DOWN: earth rock shows only on the steep upper
+          // spires, so the enlarged cap + range read as ONE white cold region.
           const rock =
-            THREE.MathUtils.smoothstep(bump, 0.02, 0.06) *
-            (1 - THREE.MathUtils.smoothstep(bump, 0.1, 0.14))
-          if (rock > 0) c.lerp(earth, 0.6 * rock * kt)
+            THREE.MathUtils.smoothstep(bump, 0.09, 0.14) *
+            (1 - THREE.MathUtils.smoothstep(bump, 0.2, 0.26))
+          if (rock > 0) c.lerp(earth, 0.5 * rock * kt)
           break
         }
         case 'forest':
@@ -137,9 +172,17 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
           if (spk2 > 0.74) c.lerp(sprout, 0.5)
         }
       }
+      // Crease darkening: hand-pushed clay carries dirt in its steep folds. The
+      // per-face flat normals already band under the ramp; this deepens the
+      // color where the terrain is pinched (biome flanks, channel + canyon
+      // banks) so the facets read as pressed clay, not shaded haze.
+      const crease = THREE.MathUtils.smoothstep(terrainSlope(nx, ny, nz), 0.12, 0.6)
+      if (crease > 0) c.multiplyScalar(1 - 0.14 * crease)
       colors.set([c.r, c.g, c.b], i * 3)
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    // IcosahedronGeometry is already non-indexed, so per-face normals here give
+    // flat facets straight away — the ramp turns them into pinched clay planes.
     geo.computeVertexNormals()
     return geo
   }, [])
@@ -154,9 +197,11 @@ function useHillGeometry(): THREE.IcosahedronGeometry {
  * hand-pushed clay under the toon ramp, never flat glass — and never pokes
  * above the shoreline.
  */
-function useWaterGeometry(): THREE.SphereGeometry {
+function useWaterGeometry(): THREE.BufferGeometry {
   return useMemo(() => {
-    const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_LEVEL, 96, 96)
+    // Fewer segments = larger facets; the SphereGeometry is indexed, so
+    // toNonIndexed + flat normals below turns it into visible lumpy clay water.
+    const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_LEVEL, 48, 48)
     const pos = geo.attributes.position
     const colors = new Float32Array(pos.count * 3)
     const v = new THREE.Vector3()
@@ -185,8 +230,13 @@ function useWaterGeometry(): THREE.SphereGeometry {
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    geo.computeVertexNormals()
-    return geo
+    // Flat-shade: expand to non-indexed then per-face normals so the water shows
+    // hand-pinched clay facets under the ramp, not a smooth glass blob. Colors
+    // (set above) are expanded with the positions, so they stay facet-crisp too.
+    const flat = geo.toNonIndexed()
+    geo.dispose()
+    flat.computeVertexNormals()
+    return flat
   }, [])
 }
 

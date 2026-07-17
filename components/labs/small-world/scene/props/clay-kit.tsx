@@ -13,11 +13,11 @@ export function ClayTree({ crown = PALETTE.leaf, height = 0.45, ...x }: Xform & 
   return (
     <group {...x}>
       <mesh position={[0, height * 0.25, 0]}>
-        <cylinderGeometry args={[0.035, 0.05, height * 0.5, 8]} />
+        <cylinderGeometry args={[0.035, 0.05, height * 0.5, 7]} />
         <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
       </mesh>
       <mesh position={[0, height * 0.72, 0]}>
-        <sphereGeometry args={[height * 0.38, 20, 20]} />
+        <sphereGeometry args={[height * 0.38, 10, 10]} />
         <meshToonMaterial color={crown} gradientMap={ramp} />
       </mesh>
       <mesh position={[height * 0.18, height * 0.95, 0]}>
@@ -154,7 +154,7 @@ export function ClayPalm(x: Xform) {
   return (
     <group {...x}>
       <mesh position={[0.03, 0.24, 0]} rotation={[0, 0, -0.12]}>
-        <cylinderGeometry args={[0.03, 0.05, 0.5, 8]} />
+        <cylinderGeometry args={[0.03, 0.05, 0.5, 7]} />
         <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
       </mesh>
       {fronds.map((a) => (
@@ -237,7 +237,7 @@ export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x
   const ramp = useClayRamp()
   return (
     <mesh {...x} scale={[1, squash, 1].map((s) => s * (x.scale ?? 1)) as [number, number, number]}>
-      <sphereGeometry args={[r, 24, 24]} />
+      <sphereGeometry args={[r, 12, 12]} />
       <meshToonMaterial color={color} gradientMap={ramp} />
     </mesh>
   )
