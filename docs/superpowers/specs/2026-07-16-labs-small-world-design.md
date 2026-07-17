@@ -199,6 +199,58 @@ the revisited longitudes. Design:
    deepens, snow region spreads; dressing/delights get lap-gated variants
    (grow/sink like ChapterSets). One dryness scan per variant.
 
+## Round 5 (2026-07-17): backstage restaging — the planet as a rolling stage
+
+Aram's call, confirmed in his own words: the hidden side of the planet must
+"render new stuff" while out of view, so each chapter's arrival brings a
+genuinely fresh scene — this SUPERSEDES the one-shot lap-boundary panel morph
+(Task 18), which is absorbed as content. Confirmed scope: terrain + water +
+bridges + dressing all restage per chapter wedge. Also confirmed: (a) the
+ocean-through-river read failed and gets redone properly (ocean-scale blue on
+BOTH sides, visibly threaded by a river), (b) MORE clay definition, (c) NEW —
+a deep-brown canyon-like plasticine CREEK as one stage's centerpiece,
+(d) stronger per-scene color accents.
+
+**Architecture — the renewal front:**
+
+1. **Six wedge-scenes.** With 120°/chapter × 6 = two laps, the planet has 3
+   longitude bands (banded by `chapterTheta` arcs, meridians at
+   j·2π/3 + STANCE_ALPHA); each band carries TWO authored variants — variant
+   A themes chapters 1–3, variant B themes chapters 4–6. 3 bands × 2 = six
+   distinct scenes, one per chapter.
+2. **The traveling flip.** Each vertex (canonical theta θc, wrap aligned to
+   the band-0 meridian) blends A→B once, while provably occluded:
+   `renewalGate(θc, rotation)` ramps over rotation−θc ∈ [FLIP_START,
+   FLIP_START+FLIP_WIDTH] (≈[1.4, 2.4]), the window diametrically opposite
+   the view axis (camera fov 38, pitch 20°, 5.5R) — hidden at EVERY latitude
+   including relief tips ≤0.35R peeking over the limb (numeric bench proof).
+   Whenever a point is visible its gate is exactly 0 or 1: nothing ever
+   morphs on camera; the reveal is scenery rising over the front horizon
+   already final.
+3. **Ground truth follows.** surfaceYAt/walkYAt/anchors lerp bumpA/bumpB by
+   the same gate — the spine may now DIFFER per lap (the old spine-identity
+   gate retires); the girl always stands on an exactly-flipped surface.
+   Crossings/bridges become per-variant lists; bridge props gate like
+   terrain. Water geography is variant terrain dipping under the global
+   water sphere — only the water sphere's depth COLORS dual-bake.
+4. **Structural seams.** (a) Polar caps |nx| ≳ 0.75 are variant-INVARIANT
+   permanent oceans (right AND left limb always deep blue — silhouette-pop
+   safe, and Aram's "ocean on both sides" holds every frame); (b) neutral
+   connective meadow bands (~0.12 rad) at the three band meridians, where
+   every variant converges to the shared base — covers the canonical-wrap
+   discontinuity and lets consecutive scenes abut cleanly.
+5. **Wedge themes** (creative license per his vibe law): A0 BlueNet spring
+   meadow; A1 FLYERBEE flower riot; A2 360dialog GRAND DELTA — right polar
+   ocean → wide channel under her bridge → left polar ocean, the redone
+   item-(a) read; B0 Accenture golden dunes + oasis; B1 AKNA deep-brown
+   plasticine canyon creek (his item c); B2 xDataGroup winter-meets-blossom
+   summit. Every wedge threads water to a polar ocean and owns ≥1 bridge;
+   every wedge gets a saturated accent identity (item d).
+6. **Clay push (item b):** hand-pinched vertex irregularity (tangential
+   jitter breaking the geodesic grid), bigger thumb dents, stronger crease
+   dirt, chunkier water lumps — render-only, pastel calibration guardrails
+   from Task 16 stand.
+
 Gate-0 verdict (2026-07-16): palette approved for now; facing-the-viewer
 orientation confirmed and shipped. Future dressing he named (not now):
 earthy textures, blue water on the globe, bridges, animals along the sides.
