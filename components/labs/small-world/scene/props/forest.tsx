@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump } from '../planet'
 import { FOREST, SNOW, SNOW_B, capMask } from '../biomes'
-import { canonicalTheta, renewalGate } from '../renewal'
+import { activeVariantAt, canonicalTheta } from '../renewal'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
@@ -155,7 +155,7 @@ export function Forest({ journeyRef }: { journeyRef: JourneyRef }) {
     const state = flipped.current
     let changed = false
     for (let i = 0; i < n; i++) {
-      const b = renewalGate(thetaC[i], rot) >= 0.5 ? 1 : 0
+      const b = activeVariantAt(thetaC[i], rot)
       if (state[i] === b) continue
       state[i] = b
       const src = b === 1 ? crownB : crownA

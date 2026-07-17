@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { PLANET_RADIUS, WATER_LEVEL } from '../planet'
 import { ISLANDS, SEA } from '../biomes'
-import { canonicalTheta, renewalGate } from '../renewal'
+import { activeVariantAt, canonicalTheta } from '../renewal'
 import { PropAnchor } from './prop-anchor'
 import { GatedProp } from './gated-prop'
 import { ClayBlossom, ClayDisc, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
@@ -117,8 +117,7 @@ function IceFloes({
     for (let i = 0; i < floes.length; i++) {
       const m = refs.current[i]
       if (!m) continue
-      const g = renewalGate(floes[i].tc, rot)
-      m.visible = gate.variant === 1 ? g >= 0.5 : g < 0.5
+      m.visible = gate.variant === activeVariantAt(floes[i].tc, rot)
     }
   })
 

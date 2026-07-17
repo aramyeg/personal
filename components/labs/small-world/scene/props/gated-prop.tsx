@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { anchorTransform } from '../stage'
-import { canonicalTheta, renewalGate } from '../renewal'
+import { activeVariantAt, canonicalTheta } from '../renewal'
 import type { JourneyRef } from '../use-journey'
 
 /**
@@ -40,8 +40,7 @@ export function GatedProp({
   useFrame(() => {
     const g = ref.current
     if (!g) return
-    const gate = renewalGate(tc, journeyRef.current.rotation)
-    g.visible = variant === 1 ? gate >= 0.5 : gate < 0.5
+    g.visible = variant === activeVariantAt(tc, journeyRef.current.rotation)
   })
 
   return (
