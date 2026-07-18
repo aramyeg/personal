@@ -12,8 +12,9 @@ import * as THREE from 'three'
  * the flat facets of the planet + water snap to one of four hard bands, so the
  * surface reads as hand-pushed claymation instead of a smooth soft blob, while
  * the pastel vertex colors still carry the hue (facets + bands, never gloom).
- * Shared by planet, water, every clay prop and the burst badge (the girl GLB
- * keeps its own materials).
+ * Shared by planet, water, every clay prop, the burst badge AND the girl GLB
+ * (Task 24 converts her materials to this same ramp — one shadow-band family
+ * across the whole scene).
  */
 export function useToonRamp(): THREE.DataTexture {
   const ramp = useMemo(() => {
