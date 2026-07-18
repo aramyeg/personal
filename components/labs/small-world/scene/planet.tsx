@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -23,6 +23,8 @@ import {
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
+import { fieldDents, FIELD_DENT_DEPTH, applyFieldMottle, type Pal } from './field-clay'
+import { makeBoilMaterial, boilAmplitude, BOIL_FPS } from './boil-material'
 
 export const PLANET_RADIUS = 2.2
 
@@ -287,14 +289,11 @@ const JITTER_TAN = 0.44
  * lumpiness. Kept small so the combined render-vs-analytic offset the girl/shadow
  * must forgive stays well inside the dimple-dominated budget. Peak = this value. */
 const JITTER_RAD = 0.0013
-
-type Pal = {
-  leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
-  deep: THREE.Color; honey: THREE.Color; snow: THREE.Color; earth: THREE.Color
-  pine: THREE.Color; dune: THREE.Color; blossom: THREE.Color; blossomDeep: THREE.Color
-  springGreen: THREE.Color; petal: THREE.Color; sand: THREE.Color; goldSand: THREE.Color
-  earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
-}
+/** Task 29 lever 4 — static facet-normal dither amplitude on OPEN field facets
+ *  (unit-normal units ≈ radians of tilt). Small enough to only re-band a facet that
+ *  already grazes a ramp threshold (the terminator), so the lit face never speckles.
+ *  Normals only — positions/contact/ceiling are untouched. 0 = off. */
+const NORMAL_DITHER = 0.02
 
 /**
  * Applies the per-wedge scene accent to open ground (the six scenes each own a
@@ -420,6 +419,12 @@ function paintVertex(
       accentMeadow(c, pal, bandOf(thetaC), variant, nx, ny, nz, g)
     }
   }
+  // Task 29 lever 1 (headline) — multi-scale field colour mottling. Variance WITHIN
+  // the biome colour (deeper-hue pockets, drier smudges, sparse veins/grime) so the
+  // open ground reads as pressed clay with character, not one flat CG-plastic field.
+  // The 4-step ramp quantizes LIGHT then multiplies albedo, so this colour variance
+  // survives at any frequency — the cheapest, most reliable clay cue we have.
+  applyFieldMottle(c, pal, kind, nx, ny, nz)
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
   // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
@@ -434,14 +439,19 @@ function paintVertex(
     0.6
   )
   if (crease > 0) c.multiplyScalar(1 - 0.24 * crease)
-  // Cheap AO for the thumb presses: pressed-in dimple hollows hold a little shadow.
-  // Pure function of the (jittered) direction, so it is identical on both bakes and
-  // is a no-op in the morph on the spine.
+  // Task 29 lever 3 — dent AO baked into albedo by DEPTH, not slope. Every pressed
+  // hollow (the global dimple octaves AND the new off-lane field dents) darkens by its
+  // own depth, independent of surface slope, so FLAT fields get "imperfections cast
+  // shadow" — the crease gate above is slope-gated and misses them. Pure function of
+  // the (jittered) direction, so it is identical on both bakes and a no-op on the spine
+  // (dimple is symmetric there and the field dents are gated to exactly 0 on the lane).
   const dip = clayDimple(nx, ny, nz)
-  if (dip < 0) {
-    const hollow = THREE.MathUtils.clamp(-dip / CLAY_DIMPLE_MAX, 0, 1)
-    c.multiplyScalar(1 - 0.06 * hollow)
-  }
+  const dent = fieldDents(nx, ny, nz, bump)
+  let hollow = 0
+  if (dip < 0) hollow += -dip / CLAY_DIMPLE_MAX
+  if (dent < 0) hollow += -dent / FIELD_DENT_DEPTH
+  hollow = THREE.MathUtils.clamp(hollow, 0, 1)
+  if (hollow > 0) c.multiplyScalar(1 - 0.09 * hollow)
   // Signature AO + edge definition (Task 23 lever 4): the molded grooves — ridge
   // troughs, canyon strata steps, dune ripple valleys — hold dirt, so each figure's
   // own carve darkens into it. This is the crease-dirt logic pushed to the feature's
@@ -500,6 +510,13 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
     // Round 7 tide targets: the flooded state of the right grazing limb + its verts.
     const floodedPositions = new Float32Array(count * 3)
     const floodedColors = new Float32Array(count * 3)
+    // Task 29 lever 4 — per-FACE static normal dither (one vector per triangle, seeded
+    // by its first vertex, gated to OPEN field facets). Applied to the flat normals
+    // after they are computed so field facets straddle the ramp bands at the terminator
+    // (grazing-light speckle) while feature facets + the lit mid-band stay clean. The
+    // geometry is non-indexed with contiguous face triplets, so one vector per face
+    // keeps every facet flat.
+    const faceDither = new Float32Array(count) // [f*3 .. f*3+2] per face f = i/3
     const capIdx: number[] = []
     const capNxL: number[] = []
     const capNyL: number[] = []
@@ -527,6 +544,9 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       rust: new THREE.Color(PALETTE.rust),
       ice: new THREE.Color(PALETTE.ice),
       tuff: new THREE.Color(PALETTE.tuff),
+      foliageDeep: new THREE.Color(PALETTE.foliageDeep),
+      pineDeep: new THREE.Color(PALETTE.pineDeep),
+      meadowDry: new THREE.Color(PALETTE.meadowDry),
     } satisfies Pal
     const c = new THREE.Color()
     for (let i = 0; i < count; i++) {
@@ -553,8 +573,23 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
       const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
       // per-figure molded signature (inward-only, off-lane): each variant bakes its own.
-      const rA = 1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0)
-      const rB = 1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1)
+      // Task 29 lever 2 — off-lane field press-dents (inward-only, EXACTLY 0 on the lane
+      // band, so no new spine-band render term — the contact budget is unmoved).
+      const rA =
+        1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0) + fieldDents(nx, ny, nz, bumpA)
+      const rB =
+        1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1) + fieldDents(nx, ny, nz, bumpB)
+      // Task 29 lever 4 — one dither vector per face (on the first face-vertex), gated to
+      // low-relief open ground. A ~1° tilt only re-bands a facet within ~0.02 of a ramp
+      // threshold (i.e. at the terminator), never mid-face — so the lit face stays clean.
+      if (i % 3 === 0) {
+        const fieldG = 1 - THREE.MathUtils.smoothstep(bumpA, 0.05, 0.12)
+        const ds = NORMAL_DITHER * fieldG
+        const f3 = i // i is already the face base (i%3===0) → store at [i..i+2]
+        faceDither[f3] = ds * (2 * hash01(nx, ny, nz, 71.3) - 1)
+        faceDither[f3 + 1] = ds * (2 * hash01(nx, ny, nz, 91.7) - 1)
+        faceDither[f3 + 2] = ds * (2 * hash01(nx, ny, nz, 113.1) - 1)
+      }
       positionsA[i * 3] = nx * PLANET_RADIUS * rA
       positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
       positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
@@ -593,6 +628,26 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
     const normalsA = flatNormals(positionsA)
     const normalsB = flatNormals(positionsB)
     const floodedNormals = flatNormals(floodedPositions)
+    // Task 29 lever 4 — add the per-face field dither to the flat normals and
+    // renormalize. Same vector on all 3 verts of a face keeps the facet flat; the
+    // dither is a pure function of direction, so A/B/flooded share it and the morph
+    // (which lerps normals) stays seamless.
+    const faces = count / 3
+    const applyFaceDither = (nor: Float32Array): void => {
+      for (let f = 0; f < faces; f++) {
+        const dx = faceDither[f * 3], dy = faceDither[f * 3 + 1], dz = faceDither[f * 3 + 2]
+        if (dx === 0 && dy === 0 && dz === 0) continue
+        for (let vtx = 0; vtx < 3; vtx++) {
+          const k = (f * 3 + vtx) * 3
+          const x = nor[k] + dx, y = nor[k + 1] + dy, z = nor[k + 2] + dz
+          const l = Math.hypot(x, y, z) || 1
+          nor[k] = x / l; nor[k + 1] = y / l; nor[k + 2] = z / l
+        }
+      }
+    }
+    applyFaceDither(normalsA)
+    applyFaceDither(normalsB)
+    applyFaceDither(floodedNormals)
 
     // Live attributes start on lap-1 (A); the frame lerp writes toward B.
     const posAttr = new THREE.BufferAttribute(positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
@@ -878,14 +933,28 @@ export function Planet({
   // the water sphere's deep-ocean deepening over the flooded limb).
   const tideMorph = useMemo(() => makeTideMorph({ geo: geometry, bake }), [geometry, bake])
   const waterTideMorph = useMemo(() => makeWaterTideMorph(water), [water])
+  // Task 29 lever 5 — the land material carries the boil term (a stepped normal tilt
+  // driven by one uniform). Water keeps the stock ramp material (it has its own molded
+  // depth voice). Disposed on unmount like the other clay resources.
+  const boil = useMemo(() => makeBoilMaterial(ramp), [ramp])
+  useEffect(() => () => boil.material.dispose(), [boil])
+  const boilStep = useRef(-1)
 
-  useFrame(() => {
+  useFrame((state) => {
     const j = journeyRef.current
     if (group.current) group.current.rotation.x = -j.rotation
     planetMorph.update(j.rotation)
     waterMorph.update(j.rotation)
     tideMorph.update(j.rotation)
     waterTideMorph.update(j.rotation)
+    // Boil: hold the phase for ~1/10 s then jump (stepped, never smoothly interpolated).
+    // One float write when the step advances; the amplitude honours the runtime dial.
+    boil.uniforms.uBoilAmp.value = boilAmplitude()
+    const step = Math.floor(state.clock.elapsedTime * BOIL_FPS)
+    if (step !== boilStep.current) {
+      boilStep.current = step
+      boil.uniforms.uBoilPhase.value = step * 1.618033988
+    }
   })
 
   return (
@@ -893,9 +962,7 @@ export function Planet({
       <mesh geometry={water.geometry}>
         <meshToonMaterial vertexColors gradientMap={ramp} />
       </mesh>
-      <mesh geometry={geometry}>
-        <meshToonMaterial vertexColors gradientMap={ramp} />
-      </mesh>
+      <mesh geometry={geometry} material={boil.material} />
       {children}
     </group>
   )

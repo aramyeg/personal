@@ -1,0 +1,121 @@
+/**
+ * Task 29 — "thumbiness": field imperfections that make the open ground read as
+ * pressed clay, not smooth CG plastic. Two channels, per the clay research
+ * (docs/superpowers/research/2026-07-18-clay-look-research.md):
+ *
+ *  - COLOUR mottling (the unquantized channel — the 4-step ramp quantizes LIGHT
+ *    then multiplies albedo, so vertex-colour variance survives at any frequency):
+ *    multi-scale value drift + deeper-hue pockets + drier "high-touch" smudges +
+ *    sparse marbling veins + rare grime specks. All palette-derived lerps.
+ *  - Field press-DENTS (render-only displacement): shallow inward oval hollows on
+ *    OPEN off-lane ground, gated EXACTLY 0 on the girl's lane band (same discipline
+ *    as claySignature) so the spine contact budget never moves.
+ *
+ * Every function is a pure hash/sine of the UNIT direction, so both renewal bakes
+ * (A and B) agree byte-for-byte and the front lerp stays seamless.
+ */
+import * as THREE from 'three'
+
+/** The planet colour palette the bake feeds in (built once in planet.tsx). */
+export type Pal = {
+  leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
+  deep: THREE.Color; honey: THREE.Color; snow: THREE.Color; earth: THREE.Color
+  pine: THREE.Color; dune: THREE.Color; blossom: THREE.Color; blossomDeep: THREE.Color
+  springGreen: THREE.Color; petal: THREE.Color; sand: THREE.Color; goldSand: THREE.Color
+  earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
+  foliageDeep: THREE.Color; pineDeep: THREE.Color; meadowDry: THREE.Color
+}
+
+const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
+const smooth = (x: number, lo: number, hi: number): number => {
+  const t = clamp01((x - lo) / (hi - lo))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * Shallow oval press-dents on OPEN off-lane fields (inward-only). Two anisotropic
+ * product-noise pocket sets (~3–5% of the planet diameter across) give the "thumb
+ * pressed into a ping-pong ball" read where no authored feature owns the ground.
+ *  - `lat` is EXACTLY 0 for |nx| < 0.14 (identical gate to claySignature), so this
+ *    adds NO spine-band render term — the contact budget (0.01247R vs 0.0128R) is
+ *    unchanged and the analytic bound survives.
+ *  - `open` fades the dents out as relief rises (a feature already carries its own
+ *    signature there), so dents live only on the quiet fields Aram flagged.
+ * Depth is capped at FIELD_DENT_DEPTH, and it only ever REMOVES radius, so the
+ * 1.35R ceiling can only drop. Pure function of direction + the variant's bump.
+ */
+export const FIELD_DENT_DEPTH = 0.012
+export function fieldDents(nx: number, ny: number, nz: number, bump: number): number {
+  const lat = smooth(Math.abs(nx), 0.14, 0.24)
+  if (lat <= 0) return 0
+  const open = 1 - smooth(bump, 0.05, 0.12)
+  if (open <= 0) return 0
+  const p = Math.sin(11.3 * nx + 0.4) * Math.sin(14.9 * ny - 1.1) * Math.sin(12.1 * nz + 2.0)
+  const dentA = smooth(p, 0.45, 0.85)
+  const q = Math.sin(7.1 * ny + 2.3) * Math.sin(6.7 * nz - 0.6) * Math.sin(7.7 * nx + 1.4)
+  const dentB = smooth(q, 0.6, 0.95)
+  const dent = clamp01(dentA + 0.6 * dentB)
+  return -FIELD_DENT_DEPTH * dent * open * lat
+}
+
+const _deep = new THREE.Color()
+const _dry = new THREE.Color()
+
+/**
+ * Multi-scale colour mottling for one already-painted field vertex. `kind` is the
+ * biomeTint class; `bump` the local relief. Mutates `c` in place (bake-loop hot
+ * path, matches the existing scratch-colour convention).
+ *
+ * The pocket/smudge targets are chosen from the CURRENT colour's own character so
+ * a green field deepens to green, a gold dune deepens to gold — "variance within a
+ * colour", never a foreign hue. Greenish meadow (the motivating ch-1 field) also
+ * gets the richer deep-foliage pockets, drier sage smudges, sparse veins + grime.
+ * Canyon strata already carry their variance, so it takes only the value drift.
+ */
+export function applyFieldMottle(
+  c: THREE.Color,
+  pal: Pal,
+  kind: 'underwater' | 'beach' | 'canyon' | 'snow' | 'meadow',
+  nx: number,
+  ny: number,
+  nz: number
+): void {
+  if (kind === 'underwater') return
+  const coarse =
+    Math.sin(4.7 * nx + 1.3) * Math.sin(5.1 * ny - 0.7) * Math.sin(4.3 * nz + 2.1)
+  const fine =
+    Math.sin(11.9 * ny + 0.4) * Math.sin(12.7 * nz - 1.9) * Math.sin(10.3 * nx + 0.8)
+  const m = 0.7 * coarse + 0.3 * fine
+  // gentle value drift within the colour (pastel: canyon quieter, it is already tinted)
+  c.multiplyScalar(1 + (kind === 'canyon' ? 0.03 : 0.05) * m)
+  if (kind === 'canyon') return
+
+  const greenish = c.g > c.r * 1.02 && c.g > c.b * 1.02
+  // deeper-hue pockets (Aram's "some parts deeper green")
+  const pocket = smooth(-coarse, 0.25, 0.75)
+  if (pocket > 0) {
+    if (greenish) c.lerp(pal.foliageDeep, 0.2 * pocket)
+    else {
+      _deep.copy(c).multiplyScalar(0.8)
+      c.lerp(_deep, 0.6 * pocket)
+    }
+  }
+  // drier "high-touch" smudges
+  const smudge = smooth(fine, 0.5, 0.92)
+  if (smudge > 0) {
+    if (greenish) c.lerp(pal.meadowDry, 0.14 * smudge)
+    else {
+      _dry.copy(c).multiplyScalar(1.07)
+      c.lerp(_dry, 0.5 * smudge)
+    }
+  }
+  if (!greenish) return
+  // sparse marbling veins (thin adjacent-hue streaks, only in some regions)
+  const region = Math.sin(2.1 * nx + 0.5) * Math.sin(1.9 * nz - 1.0)
+  const streak = 1 - smooth(Math.abs(Math.sin(9.0 * ny - 6.0 * nz + 3.0 * nx)), 0.0, 0.06)
+  const vein = streak * smooth(region, 0.35, 0.85)
+  if (vein > 0) c.lerp(pal.pineDeep, 0.12 * vein)
+  // rare grime specks (tiny darkening)
+  const gr = Math.sin(53.1 * nx + 9.0) * Math.sin(61.7 * ny - 3.0) * Math.sin(57.3 * nz + 5.0)
+  if (gr > 0.9) c.multiplyScalar(1 - 0.1 * smooth(gr, 0.9, 0.99))
+}

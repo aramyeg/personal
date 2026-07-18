@@ -27,6 +27,9 @@ export const PALETTE = {
   earthDeep: '#5A3216', // B1 canyon channel floor / deep walls
   rust: '#A85A32', // B1 canyon terracotta bank
   ice: '#DCEAF2', // B2 frozen water rim
+  // field mottling (Task 29) — a drier, desaturated sage for the meadow's
+  // "high-touch" smudges (variance WITHIN the green, still pastel, never muddy)
+  meadowDry: '#A3BE96',
   // per-FIGURE identity (Task 23) — deeper SATURATION, still pastel daylight
   blossomRose: '#E8659B', // A1 deep-rose petal blob (the flower riot's richest bloom)
   bluebell: '#A79BE8', // periwinkle bell flower (A0/A1 — a cool note among the pinks)
