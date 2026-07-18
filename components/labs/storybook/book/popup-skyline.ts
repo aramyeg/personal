@@ -21,8 +21,15 @@
  * clearing), only REORIENTED: the flap face spans RADIAL x UP at a fixed depth,
  * so its normal points along z and the die-cut roofline faces the reader. The
  * flap leans slightly BACK (top toward -z) so the elevated composition camera
- * reads its front face. Rows step in depth (zc) and radius (F) per side, so the
- * rooftop silhouettes peek on both flanks of the tower and layer into distance.
+ * reads its front face. Rows step in depth (zc) and radius (F) per side; the
+ * grown+forward pass MARCHES the tiers toward the reader and outboard together
+ * (deep/tall back tier at F 0.43 zc -0.52 -> a front tier jutting to zc ~ -0.16
+ * out at F 0.52) so the rooftops read as a PRESENT flanking city that layers into
+ * distance. The hard ceiling is the real-time cap: the per-vertex page-turn step
+ * is pure page-sweep (rfar * dtheta, independent of standDeg/envelope), so
+ * F+width must stay <= ~0.752 — which caps row height near ~0.11. A literal 2x is
+ * infeasible: the wide strip art binds width = height*artAspect, so a 2x row would
+ * reach INTO the keep, not toward the sides (frontier gain ~+29% apparent size).
  *
  * FOLD-FLAT. lift = rho * sin(a), a = standDeg * E(beta), E(0) = 0 -> a = 0 at
  * book-closed: every flap point collapses to lift 0 (flat in the page plane).

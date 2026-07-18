@@ -30,8 +30,11 @@ describe('citadel rank — +z-facing city rows (bench derive-keep-cityrows.mjs)'
     for (const sky of SKYLINES) {
       expect(sky.rows.length).toBeGreaterThanOrEqual(2)
       for (const r of sky.rows) {
-        // rows sit BEHIND the keep's -0.34 back wall (no lateral keep sweep there).
-        expect(r.zc).toBeLessThan(-0.34)
+        // rows march from the deep flanks toward the reader (grown+forward pass):
+        // the nearest tier juts to zc ~ -0.16, still behind the keep's +z front-cap
+        // crown and laterally clear of the tower (bench Y2 keeps D-G2 at zero).
+        expect(r.zc).toBeLessThan(0)
+        expect(r.zc).toBeGreaterThan(-0.6)
         // width is aspect-bound and the far edge stays under the real-time radius cap.
         expect(r.F + r.width).toBeLessThanOrEqual(0.76 + 1e-9)
         expect(r.standDeg).toBeGreaterThan(0)

@@ -321,28 +321,34 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // (current) / kraft backs (flip) — the orchestrator eye-test killed both. Root
   // cause is orientation class: every piece that READS in this book faces +z.
   // Now each row is a single-page cammed FLAP hinged on a RADIAL line, standing
-  // up (leaning back toward -z, standDeg 68) as the book opens — the SAME
+  // up (leaning back toward -z, standDeg 64) as the book opens — the SAME
   // page-driven envelope class as the retired mound, REORIENTED so the die-cut
   // roofline faces the reader (face spans radial x up at a fixed depth, normal
-  // along z). Rows sit BEHIND the keep (zc < the -0.34 back wall) at the FLANKS
-  // (F ~0.44), stepped in depth (-0.56/-0.46/-0.37) so rooftops peek on both
-  // sides of the tower and layer into distance. Placement is DOUBLY BOUNDED: F
-  // must clear the keep's back-cap sweep, F+width must stay under the real-time
-  // radius cap (~0.74) — which forces the low height ~0.08 (the wide 3.2-3.5:1
-  // delivered strip art binds width = height*artAspect, so a taller row would
-  // overrun the radius cap). Bench Y1-Y6 all green (fold-flat, keep D-G2,
-  // row/fringe/winch-disc D-G2, real-time 5% margin, fits-page, pinned-camera
-  // sightline 51% visible). Slot->strip aspect per the prepare-art FAN_OUT
+  // along z). GROWN + MARCHED-FORWARD pass (user order "bigger, nearer, wider"):
+  // the three tiers now STEP toward the reader and outboard together — deep back
+  // tier (F 0.43, zc -0.52) tallest at ~0.10-0.11, mid tier (F 0.46, zc -0.38),
+  // front tier jutting to zc -0.16 out at F 0.52 (0.21 world nearer than the old
+  // -0.37 front; a real forward+lateral depth march that reads as a PRESENT
+  // flanking city, verified 0% occlusion of the hall facade + winch disc). The
+  // HARD WALL is the real-time radius cap: F+width must stay <= ~0.752 (the
+  // per-vertex page-turn step is PURE page-sweep = rfar * dtheta, independent of
+  // standDeg/envelope), and the wide 3.2-3.5:1 delivered strip art binds
+  // width = height*artAspect — so a literal 2x height (~0.16) would need width
+  // ~0.55, forcing the inner edge to radius ~0.20 (INTO the keep, the opposite of
+  // "toward the sides"). Infeasible; the frontier gain is ~+29% apparent size at
+  // rfar 0.752, not 2x. Bench Y1-Y6 all green (fold-flat, keep D-G2,
+  // row/fringe/winch-disc D-G2, real-time 3% margin, fits-page, pinned-camera
+  // sightline 63% visible). Slot->strip aspect per the prepare-art FAN_OUT
   // (a-strips 2.956 -> l0/r1, b-strips 3.484 -> l1/r2, c-strips 3.185 -> l2/r0).
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
-    { F: 0.44, zc: -0.56, height: 0.08, width: 0.2365, standDeg: 68 },
-    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2857, standDeg: 68 },
-    { F: 0.45, zc: -0.37, height: 0.078, width: 0.2484, standDeg: 68 },
+    { F: 0.43, zc: -0.52, height: 0.1089, width: 0.3219, standDeg: 64 },
+    { F: 0.46, zc: -0.38, height: 0.0838, width: 0.292, standDeg: 64 },
+    { F: 0.52, zc: -0.16, height: 0.0728, width: 0.2319, standDeg: 64 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
-    { F: 0.44, zc: -0.56, height: 0.084, width: 0.2675, standDeg: 68 },
-    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2424, standDeg: 68 },
-    { F: 0.45, zc: -0.37, height: 0.075, width: 0.2613, standDeg: 68 },
+    { F: 0.43, zc: -0.52, height: 0.1011, width: 0.322, standDeg: 64 },
+    { F: 0.46, zc: -0.38, height: 0.0988, width: 0.2921, standDeg: 64 },
+    { F: 0.52, zc: -0.16, height: 0.0666, width: 0.232, standDeg: 64 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
