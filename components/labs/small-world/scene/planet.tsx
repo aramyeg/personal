@@ -151,11 +151,18 @@ export function surfaceYAt(worldZ: number, rotation: number): number {
  * presses (amp 0.005→0.009 at roughly half the frequency 15→8, ~1.8× deeper over
  * ~2× wider patches) so the surface reads as broad pressed hollows under the toon
  * bands; the fine octave stays subtle grain (0.003→0.0025). Peak |dimple| ≈
- * 0.0115·R. */
+ * 0.0115·R.
+ *
+ * Task-27 rougher clay v3: both octaves dropped a notch in frequency (low 7.9→6.0,
+ * fine 27→22) so the presses read as BIGGER, coarser pinches — the same amplitude
+ * budget (contact-proof unchanged) spread over wider patches. Paired with the
+ * raised tangential jitter (JITTER_TAN 0.34→0.44) this coarsens the facet grain
+ * without eating the contact budget (tangential jitter re-samples terrain at the
+ * moved vertex, so it never contributes to the render-vs-analytic spine offset). */
 function clayDimple(nx: number, ny: number, nz: number): number {
   return (
-    0.009 * Math.sin(7.9 * nx + 1.1) * Math.sin(7.4 * ny - 0.4) * Math.sin(7.7 * nz + 2.3) +
-    0.0025 * Math.sin(27.3 * ny + 0.7) * Math.sin(26.4 * nz - 1.3) * Math.sin(28.1 * nx + 0.5)
+    0.009 * Math.sin(6.0 * nx + 1.1) * Math.sin(5.6 * ny - 0.4) * Math.sin(5.9 * nz + 2.3) +
+    0.0025 * Math.sin(21.7 * ny + 0.7) * Math.sin(20.9 * nz - 1.3) * Math.sin(22.4 * nx + 0.5)
   )
 }
 
@@ -216,6 +223,19 @@ function claySignature(nx: number, ny: number, nz: number, bump: number, variant
       carve -= 0.012 * duneMask * ripple
     }
   }
+  // Task-27 lever 4 — broad terrace steps on QUIET open meadow (both variants). The
+  // gentle base swells are the "soft overflowing" background: quantize their low
+  // relief into discrete steps so even the calm zones read molded, not melted. Only
+  // on low-relief ground (faded out by bump 0.09, so features keep their own
+  // signature) and only where the surface rises above the base (bump > 0), so water/
+  // beach are untouched. Inward-only (carve toward the step below), off-lane gated by
+  // `lat` — the girl's lane never terraces, so the contact budget is unchanged.
+  const quiet = 1 - THREE.MathUtils.smoothstep(bump, 0.05, 0.09)
+  if (quiet > 0 && bump > 0.008) {
+    const STEP = 0.024
+    const frac = bump / STEP - Math.floor(bump / STEP) // 0 at each step base → 1 below the next
+    carve -= 0.016 * quiet * frac
+  }
   return carve * lat
 }
 
@@ -257,8 +277,12 @@ function jitterDir(
   return [px / l, py / l, pz / l]
 }
 
-/** Tangential jitter budget as a fraction of the local sub-triangle edge. */
-const JITTER_TAN = 0.34
+/** Tangential jitter budget as a fraction of the local sub-triangle edge. Task-27:
+ * raised 0.34→0.44 for coarser, rougher facet planes (bigger hand-pinched facets).
+ * Contact-neutral by construction — the vertex re-samples terrain where it lands, so
+ * the tangential nudge never widens the render-vs-analytic spine offset. Held below
+ * ~0.5 to stay clear of the "low-poly game asset" guardrail (Task 21). */
+const JITTER_TAN = 0.44
 /** Tiny radial jitter (fraction of R) layered on the dimple for extra hand-made
  * lumpiness. Kept small so the combined render-vs-analytic offset the girl/shadow
  * must forgive stays well inside the dimple-dominated budget. Peak = this value. */
@@ -399,12 +423,17 @@ function paintVertex(
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
   // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
+  // Task-27 (lever 5): the hardened feature skirts (pressed-edge peakBump) raise the
+  // rim slope, so this same slope gate now auto-lays a shadow line along every pressed
+  // edge; the multiplier is nudged 0.20→0.24 and the low threshold pulled in (0.12→
+  // 0.10) so the new edges carry a crisp crease dark. Edge-gated (slope), not global,
+  // so flat pastel meadow stays bright — rough, not gloomy.
   const crease = THREE.MathUtils.smoothstep(
     terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
-    0.12,
+    0.1,
     0.6
   )
-  if (crease > 0) c.multiplyScalar(1 - 0.2 * crease)
+  if (crease > 0) c.multiplyScalar(1 - 0.24 * crease)
   // Cheap AO for the thumb presses: pressed-in dimple hollows hold a little shadow.
   // Pure function of the (jittered) direction, so it is identical on both bakes and
   // is a no-op in the morph on the spine.

@@ -159,7 +159,7 @@ export const WATER_LEVEL = 0.972
  *  right limb has NO ocean (POLAR_R deleted): it is continental coast. Base radius
  *  1.05 with warp amp 0.15 keeps the invariant core |nx|>0.75 solidly ocean while
  *  the shore swings between nx≈−0.42 (headland) and nx≈−0.67 (bay). */
-export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 1.05, feather: 0.34, depth: 0.13 }
+export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 1.05, feather: 0.22, depth: 0.13 }
 /** Back-compat: the ocean list (a single body now). */
 export const POLAR_OCEANS: readonly WaterBody[] = [POLAR_L]
 
@@ -230,11 +230,25 @@ export function capMask(nx: number, ny: number, nz: number, cap: Cap): number {
   return smoothstep01((cap.radius - d) / cap.feather)
 }
 
-/** A gaussian swell's contribution at a unit point (shared peak evaluator). */
+// Task-27 lever 1 — pressed feature edges. A pure gaussian never ends: its tail
+// bleeds outward forever, which is the "soft overflowing" read. We multiply the
+// gaussian by a finite skirt WINDOW so every feature ENDS with a crisp pressed edge
+// instead of melting into meadow: full inside PEAK_EDGE_IN·r, ramped hard to 0 by
+// PEAK_EDGE_OUT·r. Because it only ever REMOVES skirt height (never adds), the 1.35R
+// ceiling can only drop, and the steeper rim it creates feeds the crease-dark gate
+// (lever 5) so each edge carries a shadow line. The cutoff sits past the gaussian's
+// own near-zero tail region, so a feature's core + its dry-anchor support are intact.
+const PEAK_EDGE_IN = 1.2
+const PEAK_EDGE_OUT = 1.75
+/** A gaussian swell with a finite pressed skirt (shared peak evaluator). */
 function peakBump(nx: number, ny: number, nz: number, p: Peak): number {
   const dot = clampU(nx * p.dir[0] + ny * p.dir[1] + nz * p.dir[2])
-  const g = Math.acos(dot) / p.r
-  return p.h * Math.exp(-g * g)
+  const ang = Math.acos(dot)
+  const g = ang / p.r
+  const core = p.h * Math.exp(-g * g)
+  if (ang <= p.r * PEAK_EDGE_IN) return core
+  const w = 1 - smoothstep01((ang - p.r * PEAK_EDGE_IN) / (p.r * (PEAK_EDGE_OUT - PEAK_EDGE_IN)))
+  return core * w
 }
 
 // --- The overflow tide (Round 7, Mechanism B — RIGHT limb ring only) --------
@@ -748,10 +762,16 @@ export function biomeTint(
   if (radius < WATER_LEVEL) {
     return { kind: 'underwater', t: clamp01((WATER_LEVEL - radius) / 0.08) }
   }
+  // Task-27 lever 2 — cut shores. The beach reach + tint band are narrowed (channel
+  // skirt 0.06→0.04, meadow-side band 0.987→0.982 over 0.015→0.010) so the sand reads
+  // as a thin pressed rim where land meets water, not a wide fade that melts the coast
+  // into meadow. Paired with the tightened ocean feather (POLAR_L) the whole coastline
+  // now reads cut. (Untouched: the A0 strait near-deck blue fix, the B0 breach read,
+  // and the tide feather — those are proven and own their own edges.)
   const nearWater =
-    waterMask(nx, ny, nz, variant) > 0.02 || channelDist(nx, ny, nz, variant) < STREAM_HALF + 0.06
-  if (nearWater && radius < 0.987) {
-    return { kind: 'beach', t: clamp01((0.987 - radius) / 0.015) }
+    waterMask(nx, ny, nz, variant) > 0.02 || channelDist(nx, ny, nz, variant) < STREAM_HALF + 0.04
+  if (nearWater && radius < 0.982) {
+    return { kind: 'beach', t: clamp01((0.982 - radius) / 0.01) }
   }
   const thetaC = canonicalTheta(Math.atan2(nz, ny))
   const band = bandOf(thetaC)
