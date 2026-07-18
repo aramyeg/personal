@@ -346,6 +346,52 @@ Architecture:
    A === B holds, so Task 25 diverges caps without a rewrite; its
    invariance tests are pinned as "current regime, Task 25 rewrites".
 
+## Round 7 (2026-07-18): the overflowing ocean, rougher clay, a living girl
+
+Aram's direction: (1) "we still have the ocean stone set as a pole, I don't
+want this to happen, we should at some point have it overflow to the other
+side" — the ocean must not read as anchored to the left limb forever; at
+some stage of the journey water must visibly claim the other side. (2) Clay
+definition "worked on more, rougher shapes, not soft overflowing with the
+whole scene" — features still melt together; he wants discrete, rough-edged
+molded forms. (3) More girl animations (moving back, stopping) — he'll
+generate clips in Meshy (model already rigged); we wire the state machine.
+
+Architecture:
+
+1. **The flood arc (ground truth).** The journey tells a water story with a
+   beginning, middle, and end: lap 1 = the left ocean dominant, right side
+   dry coast (as shipped). Across the B variants the water advances wedge
+   by wedge — B0's oasis chain reaches further, B1's creek fattens, and the
+   climax is staged at the continent-break strait wedge: its B variant
+   breaches — the strait widens massively and the right inlet swells into
+   a true sea JOINED to the left ocean. By journey's end water reads on
+   both sides: the ocean has overflowed. Discrete wedge restaging carries
+   all of this (proven machinery) EXCEPT the right limb core itself.
+2. **The right limb wets continuously (Mechanism B, scoped small).** The
+   grazing right limb (|nx| ≥ 0.80) cannot flip discretely (Task 25's
+   proof). For the limb ring ONLY, the coast's wetness becomes a
+   CONTINUOUS monotone function of unwrapped rotation — a slow tide, every
+   frame a valid coastline, imperceptible per-frame, unmistakable across
+   laps. Ground truth gains the rotation term in the cap zone; the render
+   evaluates cap-ring vertices per frame (small static bucket, budget
+   reported next to the 0.24–0.28ms front). Girl/props never stand there;
+   scans re-run across sampled rotations.
+3. **Rougher clay v3.** The softness is boundary feathering: biome edges,
+   water shores, and feature skirts all smoothstep over wide bands, so
+   forms bleed into each other. Harden: tighter feature feathers (features
+   END, with a visible pressed edge), coarser/stronger facet jitter, deeper
+   crease darks at boundaries, chunkier silhouettes on hills. Pastel
+   daylight stays; rough ≠ gloom, rough = discrete.
+4. **Girl animation state machine.** Clips from Meshy (same rigged asset —
+   never re-upload the mesh or track names drift): Idle, Walk_Backward,
+   Wave/Celebrate (+ optional Look_Around). Journey-state driver:
+   |speed|→0 crossfades skip→idle (replaces the MIN_TIMESCALE keep-alive),
+   reverse scrub plays Walk_Backward (fallback: reversed skip), discovery
+   burst one-shots Wave then returns. Crossfades 0.2–0.3s, deterministic.
+   Built to degrade gracefully: until his clips land, idle = settled skip
+   pose, backward = reversed skip — the machine ships now, clips drop in.
+
 ## Risks
 
 - **Meshy character quality below the bar** — mitigated by Gate 0 ordering;
