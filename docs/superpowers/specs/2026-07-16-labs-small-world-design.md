@@ -268,6 +268,70 @@ Gate-2 direction (Aram, 2026-07-16, after Phase 2 shipped):
   ("would also be cool, we will work towards it later") — upgrades the
   spec's sky/light-shift promise from parked to planned.
 
+## Round 6 (2026-07-18): asymmetric continents, per-element clay identity, girl blend
+
+Aram's direction (sent mid-Task-21, verbatim intent): (1) he dislikes the
+symmetric always-both-limbs oceans — his initial vision is ONE big ocean on
+the left, connected/filled by flow from the land; the planet should read as
+CONTINENTS — land masses connected, narrowed into isthmuses, taking
+interesting continent shapes, some cut off by water so the girl crosses on
+bridges. Variety means asymmetry. (2) The clay push means each clay FIGURE
+has its own molded structure so it doesn't blend smoothly into the planet —
+mountains, canyon ridges, and water (tougher, deeper-blue, molded at
+places); flowers, trees, all small details get descriptive shapes and a
+deeper palette. (3) Open question he wants answered: techniques to blend
+the generated girl GLB with the generated world (shadows, palette). (4)
+Process: a visual verify loop per step — back to planning or green-light.
+
+Architecture:
+
+1. **Asymmetric water plan (ground truth, bench-gated).** The ±x rotation
+   poles are the only screen-stable points — whatever sits there is on the
+   limbs forever. So: POLAR_L (−x) grows into THE ocean — radius up,
+   coastline noise-warped (deterministic, low-frequency) so the left limb
+   reads as an irregular sea with bays and headlands, not a circle cap.
+   POLAR_R (+x) is DELETED as an ocean; the right limb becomes continental
+   coast — land with warped shoreline where a narrower shelf sea laps in
+   only at some longitudes (wedge-varying is allowed off the invariant
+   core). Invariant rule stays structural but asymmetric: A === B wherever
+   |nx| beyond the silhouette-safe latitude, on BOTH limbs — the left limb
+   is invariantly ocean, the right limb invariantly coast.
+2. **Continents.** Wedge interiors reshape from "meadow with features" to
+   continent reads: connected land masses, at least one narrow isthmus
+   moment (land pinched between waters), at least one wedge where the
+   lane's land is cut off and ONLY a bridge continues the journey. The
+   grand delta redesigns: with no right ocean, the artery rises inland
+   (highland spring/lake chain) and drains INTO the left ocean — "the
+   river fills the ocean on the left", Aram's original round-5 sentence,
+   now literally the geography.
+3. **Non-negotiable benches BEFORE look-dev:** renewal-scan 0 violations
+   (new asymmetric relief on limbs must respect per-latitude occlusion
+   tips), lane dryness both variants except authored crossings, all seated
+   prop anchors dry on their own variant, tips ≤ 1.35R, meridian identity
+   (bumpA === bumpB on meridians), delta-continuity scan rewritten for the
+   new inland-source artery.
+4. **Per-element clay identity (materiality, look-dev-gated).** Per-biome
+   displacement signatures instead of one global noise voice: ridged sharp
+   noise on mountain groups, stratified terrace layers on canyon walls,
+   deep molded troughs vs shallow rims on water (structural depth + darker
+   abyss tint — beyond Task 21's lump-scale chunking), distinct silhouette
+   pushes on props (flowers/trees get shape variants + deeper per-scene
+   palette entries). Rule: identity per FIGURE, smooth blending is the
+   failure mode being fixed.
+5. **Girl GLB blend (answer + implementation).** In payoff order: share
+   the world's meshToonMaterial 4-step gradientMap on her materials (one
+   ramp family = "she belongs"); palette-grade her texture toward the
+   pastel set (compress saturation/contrast); keep/retune the contact
+   blob to the ramp floor; slight flat-normal clay treatment so her
+   surface family matches the faceted world; same crease/AO logic; cast
+   shadow only if the rig allows without new lights. Binding guardrail:
+   NO fill light — if the shared ramp costs shadow-side readability,
+   STOP and report.
+6. **Verify loop (process, now formalized).** Every task ends in a
+   capture gate reviewed by the orchestrator against the task's named
+   levers: green-light, or a punch list back to planning/implementation.
+   Ground-truth tasks additionally gate on benches BEFORE any look-dev.
+
 ## Risks
 
 - **Meshy character quality below the bar** — mitigated by Gate 0 ordering;
