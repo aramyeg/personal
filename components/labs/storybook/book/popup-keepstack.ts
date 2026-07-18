@@ -33,8 +33,13 @@
  * swings out on its jutting hinge."
  */
 
-import type { BoxFace, BoxGeom, BoxPatch, PanelQuad, Vec3 } from './popup-mechanics'
-import { solveBoxPose } from './popup-mechanics'
+import type { BoxFace, BoxGeom, BoxPatch, FanMember, PanelQuad, Vec3 } from './popup-mechanics'
+import { openElevation, solveBoxPose } from './popup-mechanics'
+import { solveFanPose } from './popup-anatomy'
+
+const rad = (d: number): number => (d * Math.PI) / 180
+const add3 = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+const scale3 = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s]
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -96,27 +101,49 @@ export type KeepBalconySpec = {
   z1: number
 }
 
-/** The kept hero raven, folded into the keep as a flat die-cut silhouette
- *  perched on a story's roof/lid (the child-v-fold it used to ride retired with
- *  ch3-towers; nothing external can parent onto the one-entry keep). `storyKey`
- *  picks the seat story; `u` is the run out along the seat lid/roof from the
- *  spine seam, `z` the perch position along the spine, and width/height the
- *  silhouette size (stands up along the seat's outward normal). */
-export type KeepRavenSpec = {
-  storyKey: string
-  u: number
-  z: number
-  width: number
-  height: number
+/** The hero raven finial riding the FAN SPIRE'S PEAK member (Concept A). A
+ *  coplanar extension of the steepest member's two panels, PAST its ridge tip
+ *  along the member crease — the raven-finial idiom (was: keepStackRavenDeck on
+ *  the retired crown's front cap) transplanted from the cap to the spire peak.
+ *  Coplanar with a folding member => zero off-plane reach: folds dead flat with
+ *  the spire for free, wedge containment inherits the member's proof. Stays the
+ *  topmost hero silhouette, reader-visible at the pinned camera. `finialH` is
+ *  the run UP the crease past the ridge tip; the finial spreads to the member's
+ *  own half-width (so it reads at the peak's scale). */
+export type KeepSpireRavenSpec = {
+  finialH: number
+}
+
+/** THE FAN SPIRE CROWN (Concept A "Silhouette-Break Keep"; bench derive-keep-
+ *  spire.mjs). Birmingham mech 21-29 M-fold: k INDEPENDENT v-fold members
+ *  sharing ONE apex, SEATED ON THE TOP STORY'S FLAT LID. The apex sits on the
+ *  lid's backbone-top seam (bisector-x = sum of story heights, y=0, over the
+ *  spine) and every member's glue lines run down the two lid panels — the
+ *  boxLid rider seat (delta=0, hEff=h) generalized from one v-fold to a fan. So
+ *  a page fan and the lid-seated fan are the SAME solveFanPose, translated by
+ *  the seat height along the bisector X. The translation collapses into the
+ *  page plane as beta->0 and a v-fold folds flat on its own, so the spire folds
+ *  DEAD FLAT for free. Members run laid-back-flank -> steep-narrow-peak (the
+ *  LAST member is the peak and the raven's seat), narrowing so the silhouette
+ *  reads as a pierced peak, not a fan of sails. */
+export type KeepSpireSpec = {
+  apexZ: number
+  vDir: 1 | -1
+  members: readonly FanMember[]
+  raven?: KeepSpireRavenSpec
 }
 
 export type KeepStackGeom = {
   mech: 'keepstack'
   /** Stories ground -> top. Telescoping (a_k <= a_{k-1}) and nested z-spans are
-   *  REQUIRED (asserted by the content covenant + keepStackTelescopes below). */
+   *  REQUIRED (asserted by the content covenant + keepStackTelescopes below).
+   *  Every story is FLAT-lidded: its lid is the seat for the story (or spire)
+   *  above — the box-on-lid hoist chain. */
   stories: readonly KeepStorySpec[]
   balcony?: KeepBalconySpec
-  raven?: KeepRavenSpec
+  /** The fan spire crown seated on the TOP story's flat lid (replaces the old
+   *  gabled crown box). Carries the hero raven finial. */
+  spire?: KeepSpireSpec
 }
 
 /** Each story as a BoxGeom with its cumulative baseH filled in (the offset that
@@ -150,13 +177,26 @@ export function keepStackStoryGeoms(
   return out
 }
 
-/** The keep's structural crown height above the pages at full open — the sum of
- *  story heights plus the crown's gable rise. Bench S5: ~0.84, 107% of the
- *  backdrop crest reference. */
+/** The bisector-x the spire apex seats on: the sum of the story heights (the
+ *  top story's flat-lid backbone-top seam). */
+export function keepStackSeatHeight(geom: KeepStackGeom): number {
+  return geom.stories.reduce((h, s) => h + s.height, 0)
+}
+
+/** The keep's structural crown reach up the bisector at full open (beta=PI) —
+ *  now the FAN SPIRE peak: the seat height plus the peak member's crease run
+ *  (height * sin(open crease elevation)). Bench derive-keep-spire T7: ~1.0
+ *  world, clearly above the retired gabled crown's ~0.90. Falls back to the
+ *  top-story roof for a spire-less keep. */
 export function keepStackCrownHeight(geom: KeepStackGeom): number {
-  const total = geom.stories.reduce((h, s) => h + s.height, 0)
+  const seat = keepStackSeatHeight(geom)
+  if (geom.spire && geom.spire.members.length > 0) {
+    const peak = geom.spire.members[geom.spire.members.length - 1]
+    const lambda = openElevation(rad(peak.phiDeg), rad(peak.rhoDeg))
+    return seat + peak.height * Math.sin(lambda)
+  }
   const top = geom.stories[geom.stories.length - 1]
-  return total + (top.roof === 'gable' ? (top.gableRise ?? 0) : 0)
+  return seat + (top.roof === 'gable' ? (top.gableRise ?? 0) : 0)
 }
 
 /** True iff every story telescopes inward (a_k <= a_{k-1}) — the fold-flat
@@ -200,54 +240,73 @@ export function keepStackBalconyDeck(
   return { deckL: half(1), deckR: half(-1) }
 }
 
-/** The hero raven finial — an IN-PLANE extension of the crown's FRONT CAP, past
- *  its top edge, as TWO coplanar half-quads (one in each capFront plane), creased
- *  at y=0 exactly like the cap. Being coplanar with a folding cap face means ZERO
- *  off-plane reach: it folds dead flat with the cap for free (at close sh->0 so
- *  every lateral y-> 0), and its mid-turn wedge containment inherits the cap's own
- *  proof. At open the cap faces the reader (+z), so the finial faces the reader
- *  face-on — unlike a y-spanning quad, whose normal is lateral and reads edge-on.
- *  The raven art is split across the crease (like the balcony deck). Returns null
- *  when the keep carries no raven. `width` is the TOTAL finial width across both
- *  halves (each half is width/2 crease->outer, along the cap top edge); `height`
- *  is the run UP the cap plane from the cap top edge. */
-export function keepStackRavenDeck(
+/** One solved spire member seated on the top story's flat lid. The fan is
+ *  solved on the spine (solveFanPose, apex [0,0,apexZ]) then RIGIDLY translated
+ *  by the seat height along the bisector X — [seat*cm, seat*sm, 0] — so the apex
+ *  lands on the lid seam and every glue line runs down the lid panels (the
+ *  boxLid seat, delta=0). Translation leaves the crease/glue DIRECTIONS
+ *  unchanged, so this is bit-identical physics to a page fan, just lifted onto
+ *  the lid. Corner order per panel: [apex, glue-out, glue-out+crease, crease-top]
+ *  (parallelogram convention). */
+export type KeepSpireMemberPose = {
+  left: PanelQuad
+  right: PanelQuad
+  /** Unit crease (ridge) direction in world; the raven extends along it. */
+  crease: Vec3
+  /** Ridge tip (apex + height*crease) — shared by both panels. */
+  tip: Vec3
+}
+
+export function keepStackSpirePoses(
+  geom: KeepStackGeom,
+  thetaL: number,
+  thetaR: number
+): KeepSpireMemberPose[] | null {
+  if (!geom.spire || geom.spire.members.length === 0) return null
+  const m = (thetaL + thetaR) / 2
+  const cm = Math.cos(m)
+  const sm = Math.sin(m)
+  const seat = keepStackSeatHeight(geom)
+  // seat translation: bisector-x offset (seat, 0, 0) rotated to world by m.
+  const delta: Vec3 = [seat * cm, seat * sm, 0]
+  const tr = (q: PanelQuad): PanelQuad => [add3(q[0], delta), add3(q[1], delta), add3(q[2], delta), add3(q[3], delta)]
+  return solveFanPose(
+    { mech: 'fan', apexZ: geom.spire.apexZ, vDir: geom.spire.vDir, members: geom.spire.members },
+    thetaL,
+    thetaR
+  ).map((pose) => {
+    const left = tr(pose.left)
+    return { left, right: tr(pose.right), crease: pose.crease, tip: left[3] }
+  })
+}
+
+/** The hero raven finial riding the spire's PEAK (last) member — a coplanar
+ *  extension of both peak panels PAST the ridge tip along the member crease,
+ *  spreading to the member's own half-width. Being coplanar with each folding
+ *  member panel means ZERO off-plane reach: folds dead flat with the spire for
+ *  free, wedge containment inherits the member's proof. Corner order per half:
+ *  [crease-bottom, crease-top, outer-top, outer-bottom] — the raven-finial idiom
+ *  (reuses RAVEN_FINIAL_UVS). Returns null when the keep carries no spire raven. */
+export function keepStackSpireRaven(
   geom: KeepStackGeom,
   thetaL: number,
   thetaR: number
 ): { crestL: PanelQuad; crestR: PanelQuad } | null {
-  if (!geom.raven) return null
-  const seat = keepStackStoryGeoms(geom).find((g) => g.key === geom.raven!.storyKey)
-  if (!seat) return null
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const m = (thetaL + thetaR) / 2
-  const h = beta / 2
-  const ch = Math.cos(h)
-  const sh = Math.sin(h)
-  const cm = Math.cos(m)
-  const sm = Math.sin(m)
-  const baseH = seat.baseH ?? 0
-  const W = (x: number, y: number, z: number): Vec3 => {
-    const X = x + baseH
-    return [X * cm - y * sm, X * sm + y * cm, z]
+  const poses = keepStackSpirePoses(geom, thetaL, thetaR)
+  if (!poses || !geom.spire?.raven) return null
+  const peak = poses[poses.length - 1]
+  const { finialH } = geom.spire.raven
+  const base = peak.tip // crease-bottom (ridge tip, shared by both panels)
+  const up = scale3(peak.crease, finialH)
+  const creaseTop = add3(base, up)
+  // outer-bottom of each half = the panel's glue-out-top corner (left[2]/right[2]);
+  // outer-top = that corner lifted by the same finial run along the crease.
+  const outL = peak.left[2]
+  const outR = peak.right[2]
+  return {
+    crestL: [base, creaseTop, add3(outL, up), outL],
+    crestR: [base, creaseTop, add3(outR, up), outR],
   }
-  const { width, height } = geom.raven
-  const a = seat.a
-  // The front cap's top edge (bisector-x = a*ch + seat.height) is the finial's
-  // BOTTOM; its crease-to-outer direction in the cap plane is (y,z) = (sh, -ch)
-  // from the spine peak (y=0, z = z1 + a*ch) toward the outer front corner.
-  const X0 = a * ch + seat.height
-  const zc = seat.z1 + a * ch
-  const wh = width / 2
-  const crease0 = W(X0, 0, zc)
-  const creaseTop = W(X0 + height, 0, zc)
-  const half = (sign: number): PanelQuad => [
-    crease0,
-    creaseTop,
-    W(X0 + height, sign * wh * sh, zc - wh * ch),
-    W(X0, sign * wh * sh, zc - wh * ch),
-  ]
-  return { crestL: half(1), crestR: half(-1) }
 }
 
 /** A tier's DIE-CUT FACADE PLATE — the raven-finial idiom (keepStackRavenDeck)
@@ -307,9 +366,10 @@ export function keepStackFacadePlate(
   return { plateL: half(1), plateR: half(-1) }
 }
 
-/** Every world-space quad the keep poses at a given dihedral — the four story
- *  box faces plus any facade plates, the balcony half-decks and the raven — for
- *  the collision / sightline / motion / depth dispatchers. */
+/** Every world-space quad the keep poses at a given dihedral — the story box
+ *  faces plus any facade plates, the balcony half-decks, the fan spire members
+ *  and the raven finial — for the collision / sightline / motion / depth
+ *  dispatchers. */
 export function keepStackQuads(
   geom: KeepStackGeom,
   thetaL: number,
@@ -323,7 +383,9 @@ export function keepStackQuads(
   }
   const deck = keepStackBalconyDeck(geom, thetaL, thetaR)
   if (deck) quads.push(deck.deckL, deck.deckR)
-  const raven = keepStackRavenDeck(geom, thetaL, thetaR)
+  const spire = keepStackSpirePoses(geom, thetaL, thetaR)
+  if (spire) for (const p of spire) quads.push(p.left, p.right)
+  const raven = keepStackSpireRaven(geom, thetaL, thetaR)
   if (raven) quads.push(raven.crestL, raven.crestR)
   return quads
 }

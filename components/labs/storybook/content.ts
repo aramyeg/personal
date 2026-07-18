@@ -264,30 +264,53 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // as the recess under the balcony cantilever.
       { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.1849 } },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
-      // see-through belfry) and host the winch iris + counterweight; flat cap
-      // slab seats the crown. Facade plate: painted roof + bell (delivered 2.427)
-      // sized plate width = cap width 0.54 -> height 0.2225, so the roofline + bell
-      // rise ABOVE the cap top edge as silhouette.
+      // see-through belfry) and host the winch iris + counterweight; its flat cap
+      // slab is now the FAN SPIRE'S SEAT (the apex sits on this lid's seam).
+      // Facade plate: painted roof + bell (delivered 2.427) sized plate width =
+      // cap width 0.54 -> height 0.2225, so the roofline + bell rise ABOVE the cap
+      // top edge as silhouette. (A1 Concept A: the gabled crown box is RETIRED —
+      // see `spire` below. ROOF DIFFERENTIATION note: the three box tiers all keep
+      // FLAT lids because each tier's lid IS the seat that hoists the tier/spire
+      // above — the box-on-lid chain. gable/open remove the lid, so they are
+      // walled for a seating tier; the middle-tier roofline variety is carried by
+      // the die-cut facade PLATES, and the top silhouette break is the fan spire.)
       { key: 'loft', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.54, height: 0.2225 } },
-      // Signal-Spire crown — a small gabled spire; structural top world-Y ~0.90.
-      // Facade plate: painted spire cone (delivered 1.601) sized plate width = cap
-      // width 0.30 -> height 0.1874, rising above the cap as the spire silhouette
-      // (REPLACES the doubled-cone read of a painted cone on a flat cap).
-      { key: 'crown', a: 0.15, height: 0.15, z0: -0.14, z1: 0.14, roof: 'gable', gableRise: 0.1, capFront: true, capBack: true, plate: { width: 0.3, height: 0.1874 } },
     ],
     // The jutting gold gallery deck, GROWN (halfW 0.26, z 0.30..0.58) into a
     // hero cantilever off the hall lid, starting just in front of the gallery
     // wall (z1 0.28) so nothing occludes it. Art splits across the spine crease
     // (deckL art-u 0.5->0, deckR 0.5->1) — one continuous painting.
     balcony: { halfW: 0.26, z0: 0.3, z1: 0.58 },
-    // Raven = an IN-PLANE FINIAL extending the crown's FRONT CAP past its top
-    // edge (keepStackRavenDeck): TWO coplanar half-quads creased at y=0, split
-    // art like the balcony. GROWN to width 0.30 x height 0.20; bottom at the cap
-    // top edge, top above the ~0.90 structural crown — a hero spire finial.
-    // Coplanar with a folding cap => zero off-plane reach: folds dead flat for
-    // free, wedge containment inherits the cap's proof. Faces the reader (+z)
-    // face-on. Semaphore mast sits behind the ridge (SEMAPHORE_BASE_Z) to clear it.
-    raven: { storyKey: 'crown', u: 0.0, z: 0.0, width: 0.36, height: 0.1942 },
+    // THE FAN SPIRE CROWN (Concept A "Silhouette-Break Keep"; bench derive-keep-
+    // spire.mjs, T1-T8 green). Birmingham mech 21-29 M-fold: 3 nested v-fold
+    // members sharing ONE apex, SEATED ON THE LOFT'S FLAT LID (apex on the lid
+    // seam at bisector-x = sum(H) = 0.65, glue lines running down the two lid
+    // panels — the boxLid rider seat generalized from one v-fold to a fan). Solved
+    // as solveFanPose translated by the seat height along the bisector, so it is
+    // bit-identical physics to a page fan and folds DEAD FLAT for free. Members
+    // run laid-back-flank -> steep-narrow-peak (widths narrowing), so the
+    // silhouette reads as a PIERCED PEAK, not a lid: the peak member's ridge
+    // reaches ~1.00 world-Y at rest (raven finial ~1.12), clearly above the
+    // retired gabled crown's ~0.90. The steepest (last) member carries the raven.
+    spire: {
+      apexZ: 0.0,
+      vDir: 1,
+      members: [
+        // flank: broadest/shortest sail — kept STEEP so it rises, not flops
+        // forward over the keep's front caps (T5 keep clearance).
+        { phiDeg: 35.5, rhoDeg: 52.7, width: 0.26, height: 0.28 },
+        // mid
+        { phiDeg: 42.4, rhoDeg: 63.0, width: 0.2, height: 0.34 },
+        // peak: steepest + narrowest, pierces above the old crown; carries the raven.
+        { phiDeg: 49.3, rhoDeg: 74.5, width: 0.15, height: 0.38 },
+      ],
+      // Raven = the hero finial, a coplanar extension of the PEAK member past its
+      // ridge tip (was: keepStackRavenDeck on the crown cap). Coplanar with a
+      // folding member => zero off-plane reach: folds dead flat for free, wedge
+      // containment inherits the member's proof. Stays the topmost hero
+      // silhouette, reader-visible at the pinned camera (T8 sightline 100%).
+      raven: { finialH: 0.12 },
+    },
   },
   // THE CITADEL RANK — E1.5.2 RE-DERIVED as +z-FACING CITY ROWS
   // (derive-keep-cityrows.mjs). The v1 fore-hinge PRISM read END-ON: its ridge

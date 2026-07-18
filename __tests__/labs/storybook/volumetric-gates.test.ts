@@ -133,8 +133,9 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       // in its sleeve, its resting depth footprint.
       return [keepsakeCardInPlane(l, 0, tL, tR)]
     case 'keepstack':
-      // The keep expands to four stacked box poses plus the balcony deck + the
-      // crown raven — its whole depth footprint (popup-keepstack.ts).
+      // The keep expands to three stacked box poses plus the balcony deck, the
+      // fan spire members + the raven finial — its whole depth footprint
+      // (popup-keepstack.ts).
       return keepStackQuads(l, tL, tR)
     case 'keepwinch':
       // No theta channel in the depth gates — pose the outputs at full erect

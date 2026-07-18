@@ -225,13 +225,12 @@ principle) before any of these land.
 | `ch3-keep` | `ch3-keep-loft-side` | Rookery Loft side — open belfry post-frame with die-cut arched roost-mouths, one amber-lit (genuinely see-through) | ≈1.06:1 | FACE (die-cut) | placeholder |
 | `ch3-keep` | `ch3-keep-loft-front` | Loft front — arched roost belfry face, die-cut arch void | ≈1.06:1 | FACE (die-cut) | placeholder |
 | `ch3-keep` | `ch3-keep-loft-back` | Loft back wall — DEEPEST aerial-recession band (dusk-violet, faintest rooftops) | ≈1.0:1 | FACE | placeholder |
-| `ch3-keep` | `ch3-keep-loft-top` | Loft flat cap slab (seats the crown) | ≈2.3:1 | TOPDOWN | placeholder |
-| `ch3-keep` | `ch3-keep-crown-side` | Signal-Spire crown side — slate lead spire (both walls) | ≈0.7:1 | FACE | placeholder |
-| `ch3-keep` | `ch3-keep-crown-front` | Crown front — spire face, gold weathervane seam down the ridge | ≈0.7:1 | FACE | placeholder |
-| `ch3-keep` | `ch3-keep-crown-back` | Crown back — spire back | ≈0.7:1 | FACE | placeholder |
-| `ch3-keep` | `ch3-keep-crown-top` | Crown gable roof — slate lead pitch | ≈1.0:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-loft-top` | Loft flat cap slab (seats the fan spire) | ≈2.3:1 | TOPDOWN | placeholder |
+| `ch3-keep` | `ch3-keep-spire-m0` | Fan-spire flank member (Concept A M-fold, seated on the loft lid) — broad laid-back slate sail, split down the ridge crease | ≈0.9:1 | STAND (split) | placeholder |
+| `ch3-keep` | `ch3-keep-spire-m1` | Fan-spire mid member — steeper slate sail, split down the ridge crease | ≈0.6:1 | STAND (split) | placeholder |
+| `ch3-keep` | `ch3-keep-spire-m2` | Fan-spire PEAK member — steep narrow lead signal-spire, gold weathervane seam down the ridge; pierces above the old crown | ≈0.4:1 | STAND (split) | placeholder |
 | `ch3-keep` | `ch3-keep-balcony` | The jutting gold dispatch-desk balcony deck from above — ink-pots, an open ledger, scattered quills, a wax-seal | ≈1.7:1 | TOPDOWN | placeholder |
-| `ch3-keep` | `ch3-keep-raven` | The kept hero raven perched at the crown — wings spread, black silhouette (the retired ch3-raven-a, folded onto the keep) | ≈1.5:1 | STAND (die-cut) | placeholder |
+| `ch3-keep` | `ch3-keep-raven` | The kept hero raven finial at the spire PEAK — wings spread, black die-cut silhouette (the retired ch3-raven-a, folded onto the spire's steepest member) | ≈1.5:1 | STAND (die-cut) | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-disc` | Spoked gold capstan crank knob — thumb-notch grip, engraved arrow-arc reading "HOIST" | 1:1 square | DISC | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-semaphore` | Gold signal paddle arm — the semaphore sweeping up to vertical | wide strip | STAND | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-iris` | One raven-shutter blade (repeats around the loft rim) — slate shutter, amber roost-glow behind | ≈0.5:1 | STAND | placeholder |

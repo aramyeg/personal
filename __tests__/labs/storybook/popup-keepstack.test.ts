@@ -4,6 +4,9 @@ import {
   keepStackCrownHeight,
   keepStackFacadePlate,
   keepStackQuads,
+  keepStackSeatHeight,
+  keepStackSpirePoses,
+  keepStackSpireRaven,
   keepStackStoryGeoms,
   keepStackTelescopes,
   solveKeepStackPose,
@@ -36,8 +39,9 @@ const pairwise = (q: PanelQuad): number[] => {
 }
 
 describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery.mjs)', () => {
-  it('the shipped keep has four stories that telescope inward with nested z-spans', () => {
-    expect(KEEP.stories.length).toBe(4)
+  it('the shipped keep has three box stories that telescope inward with nested z-spans (crown retired for the fan spire)', () => {
+    expect(KEEP.stories.length).toBe(3)
+    expect(KEEP.stories.map((s) => s.key)).toEqual(['hall', 'gallery', 'loft'])
     expect(keepStackTelescopes(KEEP)).toBe(true)
     // nested z-spans: each story sits within the one below (bench S6b honesty).
     for (let k = 1; k < KEEP.stories.length; k++) {
@@ -99,14 +103,16 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
     expect(maxGap).toBeLessThanOrEqual(1e-9)
   })
 
-  it('S5 height: the crown reaches near-backdrop scale (~0.90 world-Y at rest, E1.5 re-mass)', () => {
-    // E1.5 re-mass grew the keep to its S4 fold-flat maximum (crown ~0.90; the
-    // fold-flat footprint reach 1.13 <= PAGE_W 1.15 caps it there).
-    expect(keepStackCrownHeight(KEEP)).toBeCloseTo(0.9, 2)
-    // measured world-Y at the tilted rest bloom clears 0.85 (E-G3 near-backdrop).
+  it('S5/T7 height: the FAN SPIRE peak pierces above the retired crown (~1.0 world, was ~0.90)', () => {
+    // Concept A: the gabled crown box is replaced by a fan spire seated on the
+    // loft lid. Its structural peak (seat height + peak-member crease run) reaches
+    // ~1.0 at full open — clearly above the old crown's ~0.90 (bench T7).
+    expect(keepStackCrownHeight(KEEP)).toBeGreaterThan(0.95)
+    expect(keepStackSeatHeight(KEEP)).toBeCloseTo(0.65, 6) // hall+gallery+loft
+    // measured world-Y at the tilted rest bloom pierces above the old crown top.
     let topY = -Infinity
     for (const q of keepStackQuads(KEEP, ...bloom(REST))) for (const p of q) topY = Math.max(topY, p[1])
-    expect(topY).toBeGreaterThan(0.85)
+    expect(topY).toBeGreaterThan(0.93)
   })
 
   it('S4 containment: the flat-fold footprint fits the page (reach <= PAGE_W, z in +-PAGE_H/2)', () => {
@@ -187,7 +193,7 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
   })
 
   describe('die-cut facade plates (the raven-finial idiom generalized to tier fronts)', () => {
-    const PLATED = ['hall', 'gallery', 'loft', 'crown'] as const
+    const PLATED = ['hall', 'gallery', 'loft'] as const
 
     it('every plated tier suppresses its cap-front art (capFrontArt:false) so the cap stays raw bracing paper', () => {
       const geoms = keepStackStoryGeoms(KEEP)
@@ -202,8 +208,8 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
 
     it('each plate mesh aspect (width/height) equals the delivered UNCROPPED art aspect', () => {
       // hall 4.448 (curtain wall), gallery 3.677 (arcade loggia), loft 2.427
-      // (belfry roof+bell), crown 1.601 (spire).
-      const want: Record<string, number> = { hall: 4.448, gallery: 3.677, loft: 2.427, crown: 1.601 }
+      // (belfry roof+bell). The crown plate is retired with the crown box.
+      const want: Record<string, number> = { hall: 4.448, gallery: 3.677, loft: 2.427 }
       for (const key of PLATED) {
         const plate = KEEP.stories.find((s) => s.key === key)!.plate!
         expect(plate.width / plate.height).toBeCloseTo(want[key], 2)
@@ -250,12 +256,88 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
 
   it('the per-story renderer expansion tags every story and reuses solveBoxPose', () => {
     const solved = solveKeepStackPose(KEEP, ...bloom(REST))
-    expect(solved.map((s) => s.key)).toEqual(['hall', 'gallery', 'loft', 'crown'])
+    expect(solved.map((s) => s.key)).toEqual(['hall', 'gallery', 'loft'])
     // each story’s patches match a direct solveBoxPose on its box geom (the
     // renderer draws exactly this through popup-box-layer).
     for (const s of solved) {
       const direct = solveBoxPose(s.geom, ...bloom(REST))
       expect(s.patches.length).toBe(direct.length)
     }
+  })
+
+  // THE FAN SPIRE CROWN (bench derive-keep-spire.mjs T1-T8), run against the
+  // shipped keep so the covenant catches any drift of the spire constants.
+  describe('the fan spire crown (bench derive-keep-spire.mjs)', () => {
+    const spireQuads = (tL: number, tR: number): PanelQuad[] => {
+      const q: PanelQuad[] = []
+      for (const p of keepStackSpirePoses(KEEP, tL, tR)!) q.push(p.left, p.right)
+      const rv = keepStackSpireRaven(KEEP, tL, tR)!
+      q.push(rv.crestL, rv.crestR)
+      return q
+    }
+
+    it('T1 folds exactly flat at book-closed (spire members + raven in the page plane)', () => {
+      for (const q of spireQuads(0, 0)) for (const p of q) expect(Math.abs(p[1])).toBeLessThanOrEqual(1e-9)
+    })
+
+    it('T2 every spire member + raven is rigid across the sweep', () => {
+      const ref = spireQuads(...bloom(REST)).map(pairwise)
+      for (const betaDeg of [10, 60, 120, 176]) {
+        spireQuads(...bloom(rad(betaDeg))).forEach((q, qi) => {
+          pairwise(q).forEach((d, k) => {
+            if (ref[qi][k] > 1e-9) expect(Math.abs(d - ref[qi][k]) / ref[qi][k]).toBeLessThanOrEqual(1e-9)
+          })
+        })
+      }
+    })
+
+    it('T3 body containment: no spire/raven vertex pierces a page over the sweep', () => {
+      let minWedge = Infinity
+      for (let i = 1; i <= 120; i++) {
+        const [tL, tR] = bloom((Math.PI * i) / 120)
+        const nL: Vec3 = [Math.sin(tL), -Math.cos(tL), 0]
+        const nR: Vec3 = [-Math.sin(tR), Math.cos(tR), 0]
+        for (const q of spireQuads(tL, tR))
+          for (const p of q) minWedge = Math.min(minWedge, p[0] * nL[0] + p[1] * nL[1], p[0] * nR[0] + p[1] * nR[1])
+      }
+      expect(minWedge).toBeGreaterThanOrEqual(-1e-9)
+    })
+
+    it('T5b seat-slack: every spire vertex sits on/above the loft lid (bisector-x >= seat height)', () => {
+      const seat = keepStackSeatHeight(KEEP)
+      let minSlack = Infinity
+      for (let i = 1; i <= 120; i++) {
+        const [tL, tR] = bloom((Math.PI * i) / 120)
+        const m = (tL + tR) / 2
+        const cm = Math.cos(m)
+        const sm = Math.sin(m)
+        for (const q of spireQuads(tL, tR)) for (const p of q) minSlack = Math.min(minSlack, p[0] * cm + p[1] * sm - seat)
+      }
+      expect(minSlack).toBeGreaterThanOrEqual(-1e-9)
+    })
+
+    it('T7 the peak member + raven pierce above the old crown top (~0.90 world)', () => {
+      let peakY = -Infinity
+      for (const q of spireQuads(...bloom(REST))) for (const p of q) peakY = Math.max(peakY, p[1])
+      expect(peakY).toBeGreaterThan(0.93)
+    })
+
+    it('the raven finial is coplanar with the peak member (folds flat + rides it rigidly)', () => {
+      // the raven crease-bottom is the peak member ridge tip; each half lies in
+      // the same plane as the peak panel it extends (zero off-plane reach).
+      const [tL, tR] = bloom(REST)
+      const poses = keepStackSpirePoses(KEEP, tL, tR)!
+      const peak = poses[poses.length - 1]
+      const rv = keepStackSpireRaven(KEEP, tL, tR)!
+      // plane of the peak LEFT panel
+      const e1: Vec3 = [peak.left[1][0] - peak.left[0][0], peak.left[1][1] - peak.left[0][1], peak.left[1][2] - peak.left[0][2]]
+      const e2: Vec3 = [peak.left[3][0] - peak.left[0][0], peak.left[3][1] - peak.left[0][1], peak.left[3][2] - peak.left[0][2]]
+      const n: Vec3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+      const nl = Math.hypot(...n)
+      for (const p of rv.crestL) {
+        const off = Math.abs(((p[0] - peak.left[0][0]) * n[0] + (p[1] - peak.left[0][1]) * n[1] + (p[2] - peak.left[0][2]) * n[2]) / nl)
+        expect(off).toBeLessThanOrEqual(1e-9)
+      }
+    })
   })
 })

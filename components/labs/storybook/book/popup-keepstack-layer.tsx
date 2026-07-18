@@ -20,7 +20,8 @@ import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   keepStackBalconyDeck,
   keepStackFacadePlate,
-  keepStackRavenDeck,
+  keepStackSpirePoses,
+  keepStackSpireRaven,
   keepStackStoryGeoms,
   type KeepStackGeom,
 } from './popup-keepstack'
@@ -114,6 +115,17 @@ const RAVEN_FINIAL_UVS: [Float32Array, Float32Array] = [
 // UV table verbatim: art-u 0.5 at the crease -> 0 (plateL, reader LEFT) / 1
 // (plateR) at the outer edge; art-v 0 at the cap base edge -> 1 at the plate top.
 const FACADE_PLATE_UVS = RAVEN_FINIAL_UVS
+
+// Fan spire member UVs — each member's art split across the SHARED CREASE (apex
+// -> ridge tip), the two panels having OPPOSITE front-face normals like the
+// balcony/raven, so DoubleSide + one painting reads continuous. Panel corner
+// order is the parallelogram [apex(=crease-bottom), glue-out-bottom, glue-out-
+// top, crease-top] (keepStackSpirePoses), so art-u fans 0.5 at the crease -> 0
+// (left) / 1 (right) at the outer glue edge; art-v 0 at the apex -> 1 at the tip.
+const SPIRE_MEMBER_UVS: [Float32Array, Float32Array] = [
+  new Float32Array([0.5, 0, 0, 0, 0, 1, 0.5, 1]), // left: crease 0.5 -> outer 0
+  new Float32Array([0.5, 0, 1, 0, 1, 1, 0.5, 1]), // right: crease 0.5 -> outer 1
+]
 
 /** A small two-quad print riding a solved-per-frame pair of quads (the balcony
  *  deck's two half-decks), following the box lid's look. `uvs` gives each quad's
@@ -294,11 +306,28 @@ export function KeepStackPopupLayer({
           committedSpread={committedSpread}
         />
       )}
-      {layer.raven && (
+      {/* THE FAN SPIRE — each M-fold member (two panels meeting at the shared
+          ridge crease) rides as one split painting, drawn like the box lids
+          (solid paper, cut-edge hairlines). Seated on the loft's flat lid. */}
+      {layer.spire?.members.map((_, i) => (
+        <TwoQuadRide
+          key={`spire-m${i}`}
+          artId={`${layer.id}-spire-m${i}`}
+          solve={(tL, tR) => {
+            const poses = keepStackSpirePoses(layer, tL, tR)
+            return poses ? { a: poses[i].left, b: poses[i].right } : null
+          }}
+          uvs={SPIRE_MEMBER_UVS}
+          spreadIndex={spreadIndex}
+          frame={frame}
+          committedSpread={committedSpread}
+        />
+      ))}
+      {layer.spire?.raven && (
         <TwoQuadRide
           artId={`${layer.id}-raven`}
           solve={(tL, tR) => {
-            const finial = keepStackRavenDeck(layer, tL, tR)
+            const finial = keepStackSpireRaven(layer, tL, tR)
             return finial ? { a: finial.crestL, b: finial.crestR } : null
           }}
           uvs={RAVEN_FINIAL_UVS}

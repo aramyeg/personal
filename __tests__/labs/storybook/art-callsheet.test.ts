@@ -64,7 +64,7 @@ function knownGoodIds(): ReadonlySet<string> {
     }
     // The dispatch keep (popup-keepstack-layer.tsx): each story renders through
     // a box instance as `<id>-<key>-side/-front/-back/-top` (same box FACE_ART
-    // gating), plus the balcony deck and the crown raven.
+    // gating), plus the balcony deck, the fan spire members and the raven finial.
     if (layer.mech === 'keepstack') {
       for (const s of layer.stories) {
         ids.add(`${layer.id}-${s.key}-side`)
@@ -73,7 +73,10 @@ function knownGoodIds(): ReadonlySet<string> {
         if (s.roof !== 'open') ids.add(`${layer.id}-${s.key}-top`)
       }
       if (layer.balcony) ids.add(`${layer.id}-balcony`)
-      if (layer.raven) ids.add(`${layer.id}-raven`)
+      if (layer.spire) {
+        layer.spire.members.forEach((_, i) => ids.add(`${layer.id}-spire-m${i}`))
+        if (layer.spire.raven) ids.add(`${layer.id}-raven`)
+      }
     }
     // The tower-hoist winch (popup-keepwinch-layer.tsx): the disc handle plus
     // the three output bodies.
@@ -175,7 +178,10 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
           if (s.roof !== 'open') constructed.push(`${layer.id}-${s.key}-top`)
         }
         if (layer.balcony) constructed.push(`${layer.id}-balcony`)
-        if (layer.raven) constructed.push(`${layer.id}-raven`)
+        if (layer.spire) {
+          layer.spire.members.forEach((_, i) => constructed.push(`${layer.id}-spire-m${i}`))
+          if (layer.spire.raven) constructed.push(`${layer.id}-raven`)
+        }
       }
       if (layer.mech === 'keepwinch') {
         constructed.push(`${layer.id}-disc`, `${layer.id}-semaphore`, `${layer.id}-iris`, `${layer.id}-counterweight`)
