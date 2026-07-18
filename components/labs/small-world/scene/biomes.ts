@@ -17,7 +17,7 @@
  *    diverges per lap — a different sea comes around on lap 2 (bays where headlands
  *    were) — but the change is tapered back to bit-identical ocean at the grazing
  *    limb (|nx| ≥ 0.8, the screen-stable silhouette) so the flip is never caught on
- *    camera (capDivGate, proven by renewal-scan-caps.mjs). The RIGHT limb (+x) is
+ *    camera (capDivGate, occlusion-sweep proven). The RIGHT limb (+x) is
  *    NO LONGER an ocean — it is continental coast (land), whose shelf seas are
  *    authored per-wedge, so its shoreline likewise changes lap to lap.
  *  - Wedge gate: every wedge delta is multiplied by wedgeGate = meridianGate ·
@@ -171,10 +171,13 @@ const OCEAN_WARP: readonly (readonly [number, number, number, number, number, nu
  *  just like the wedge interiors. So the lap-2 coastline (OCEAN_WARP[1]) is blended
  *  back toward lap-1 (OCEAN_WARP[0]) as |nx| approaches the limb: FULL divergence
  *  below CAP_DIV_LO, tapering to ZERO (A === B, bit-identical ocean) by CAP_DIV_HI.
- *  CAP_DIV_HI = the proven latitude L: renewal-scan-caps.mjs finds 0 mid-flip
- *  visibility violations (dry-tip pass AND a conservative limb-water pass) for any L
- *  up to 0.92; 0.80 is chosen so the grazing limb |nx| ≥ 0.82 stays EXACTLY
- *  invariant (preserving the polar-identity pin) with margin to spare. The gate is
+ *  CAP_DIV_HI = the proven latitude L: the occlusion sweep (workspace bench, not
+ *  tracked in-repo) finds 0 mid-flip visibility violations (dry-tip pass AND a
+ *  conservative limb-water pass) for any L up to 0.92; 0.80 is chosen so the grazing
+ *  limb |nx| ≥ 0.80 stays EXACTLY invariant by construction — smoothstep clamps to 1
+ *  there, so lat = 0 exactly (preserving the polar-identity pin) with margin to
+ *  spare. Wet-reach tops out at |nx| ≈ 0.784; tiny DRY land deltas (~6e-4R) extend
+ *  to just below 0.80 — the hard divergence ceiling is 0.80, not 0.784. The gate is
  *  ALSO multiplied by meridianGate, so the coastline is invariant on the meridians
  *  too — the meridian seam identity is untouched. */
 const CAP_DIV_LO = 0.7
