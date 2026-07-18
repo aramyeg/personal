@@ -1,11 +1,13 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import { PLANET_RADIUS } from './planet'
 import { STANCE_Z, walkYAt } from './stage'
+import { useClayRamp } from './toon-ramp'
+import { toonifyGirl } from './girl-clay'
 import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'
@@ -20,6 +22,14 @@ const CLIP_STRIDE = 1.0
 const DAMP_LAMBDA = 6
 /** Floor for the timeScale damp target — keeps a slow skip-in-place during dwell/panel windows instead of freezing mid-pose. */
 const MIN_TIMESCALE = 0.12
+/** Facet her toon surface to match the faceted clay world (lever 4). Off by
+ *  default — capture-gated against face/hair readability; kept as a one-line
+ *  dial. See task-24-report for the tried-and-rejected finding. */
+const GIRL_FLAT_SHADING = false
+/** Contact-shadow blob, retuned to the ramp floor: a warm-ink pool (not pure
+ *  ink) at the darkest-band feel, sized so she sits grounded like the props. */
+const SHADOW_RADIUS = 0.32
+const SHADOW_OPACITY = 0.26
 
 /**
  * Real GLB girl — rendered only behind `hasArt('girl')` (see scene.tsx), so
@@ -31,10 +41,15 @@ const MIN_TIMESCALE = 0.12
 export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const group = useRef<THREE.Group>(null)
   const shadow = useRef<THREE.Mesh>(null)
+  const ramp = useClayRamp()
   const { scene, animations } = useGLTF(GIRL_URL)
   const { actions, mixer } = useAnimations(animations, group)
   const lastRotation = useRef<number | null>(null)
   const timeScale = useRef(MIN_TIMESCALE)
+
+  // Blend her into the clay world once, before first paint: shared toon ramp +
+  // pastel texture grade, dropping the GLB's fullbright emissive. Idempotent.
+  useMemo(() => toonifyGirl(scene, ramp, GIRL_FLAT_SHADING), [scene, ramp])
 
   useEffect(() => {
     actions[CLIP_NAME]?.reset().play()
@@ -64,8 +79,8 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
         <primitive object={scene} scale={GIRL_SCALE} />
       </group>
       <mesh ref={shadow} position={[0, PLANET_RADIUS, STANCE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.3, 24]} />
-        <meshBasicMaterial color={PALETTE.ink} transparent opacity={0.22} depthWrite={false} />
+        <circleGeometry args={[SHADOW_RADIUS, 24]} />
+        <meshBasicMaterial color={PALETTE.shadowClay} transparent opacity={SHADOW_OPACITY} depthWrite={false} />
       </mesh>
     </>
   )

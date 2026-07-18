@@ -34,4 +34,7 @@ export const PALETTE = {
   foliageDeep: '#3F9A55', // deeper broadleaf crown (spring woods, lobed silhouette)
   pineDeep: '#357E48', // deep conifer green for pinched-cone crowns
   stone: '#94745C', // canyon boulder clay-stone (faceted pinch)
+  // girl blend (Task 24) — contact-shadow pool at the ramp floor, warm ink so
+  // she grounds into the clay rather than casting a cool neutral disc
+  shadowClay: '#3A2F30',
 } as const
