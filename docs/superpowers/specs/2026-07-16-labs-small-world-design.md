@@ -331,6 +331,20 @@ Architecture:
    capture gate reviewed by the orchestrator against the task's named
    levers: green-light, or a punch list back to planning/implementation.
    Ground-truth tasks additionally gate on benches BEFORE any look-dev.
+7. **Amendment (Aram, 2026-07-18 08:22): the polar caps must NOT be
+   stone-set.** He rejects screen-stable oceans as a permanent structure —
+   the planet is non-canonical; rotation generates new landmasses, and
+   the ±x caps should evolve too. Accepted as a separate task (Task 25)
+   on top of the asymmetric-continents base: Mechanism A first — extend
+   the discrete renewal flip to the caps and let the occlusion bench
+   decide empirically (cap relief is low; near-pole points at |nx|≈0.8
+   may already own a hidden window); fall back to Mechanism B —
+   continuous phase-driven coastline evolution where EVERY frame is a
+   valid coastline (no invalid half-state to hide), the only mechanism
+   fully valid at the limb itself. Task 22 therefore implements its cap
+   coastline as a parameterized per-variant-capable function even while
+   A === B holds, so Task 25 diverges caps without a rewrite; its
+   invariance tests are pinned as "current regime, Task 25 rewrites".
 
 ## Risks
 
