@@ -56,8 +56,12 @@ describe('meridian seam identity (all four abutting wedges share one base)', () 
   })
 })
 
-describe('polar oceans are variant-invariant (the blue limbs never pop)', () => {
-  it('biomeBumpB === biomeBump EXACTLY over the polar caps (|nx| >= 0.8)', () => {
+// Round 6: the limbs are now ASYMMETRIC — the LEFT limb (−x) is the one great
+// ocean, the RIGHT limb (+x) is continental coast. Both are still variant-INVARIANT
+// (bumpA === bumpB), so neither pops across the A/B flip; the scan asserts the
+// wet-left / dry-right geography, this pin guards the no-pop invariance.
+describe('the limbs are variant-invariant (left ocean, right coast — never pop)', () => {
+  it('biomeBumpB === biomeBump EXACTLY over both limbs (|nx| >= 0.8)', () => {
     for (let a = 0; a < 200; a++) {
       const th = (a / 200) * TWO_PI
       for (const nx of [0.82, 0.9, 0.97, -0.82, -0.9, -0.97]) {

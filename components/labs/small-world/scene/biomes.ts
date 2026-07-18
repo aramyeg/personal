@@ -10,17 +10,21 @@
  *   band 2  A2 360dialog grand delta  · B2 xDataGroup winter summit
  *
  * TWO structural invariants keep the renewal seamless (they replace the retired
- * Task-15/16 spineGate + strait):
- *  - Polar oceans: two permanent deep-water caps at the rotation poles
- *    (dirs ±x). They are variant-INVARIANT, so the left AND right limbs read
- *    deep blue in every frame forever, and never pop across the A/B flip.
+ * Task-15/16 spineGate + strait). Round 6 makes the limbs ASYMMETRIC:
+ *  - The one ocean (left, −x): a single permanent deep-water cap grown big and
+ *    given a deterministic azimuthal coastline warp (bays + headlands, an offshore
+ *    island or two). Variant-INVARIANT, so the left limb reads as one irregular
+ *    sea in every frame forever and never pops across the A/B flip. The RIGHT
+ *    limb (+x) is NO LONGER an ocean — it is continental coast (land), with a
+ *    warped shore where a shelf sea laps in only at some longitudes.
  *  - Wedge gate: every wedge delta is multiplied by wedgeGate = meridianGate ·
- *    polarLatGate, which is EXACTLY 0 within 0.12 rad of any meridian and fades
+ *    polarLatGate, which is EXACTLY 0 within 0.075 rad of any meridian and fades
  *    to 0 by |nx| = 0.75. So (a) on every meridian bumpA === bumpB === base +
- *    polar carve (all four abutting scenes seam through one shared meadow), and
- *    (b) the polar caps + their shared beach ring are bit-identical across
- *    variants. Wedge water threads fade into sand at |nx|≈0.7 where the polar
- *    ocean takes over — the delta's braided sandbanks are exactly this zone.
+ *    ocean carve (all four abutting scenes seam through one shared meadow), and
+ *    (b) the limbs are bit-identical across variants: the left limb invariantly
+ *    ocean, the right limb invariantly coast. Every wedge routes its water to the
+ *    LEFT ocean or an authored local sea; the grand delta drains inland-source →
+ *    braid → the left ocean, filling it at the limb.
  *
  * Coordinate frame: planet-LOCAL unit directions. The girl walks the great
  * circle at nx=0; the planet spins about x, so nx=±1 are the permanent poles.
@@ -133,13 +137,35 @@ export function colorGate(thetaC: number, nx: number): number {
 /** Water glaze radius as a fraction of PLANET_RADIUS. */
 export const WATER_LEVEL = 0.972
 
-/** The two permanent polar oceans (variant-INVARIANT, the blue limbs). R2: radius
- *  0.72 → 0.80 so the blue reads BIG on both limbs and its shore meets the wedge
- *  water (the delta arms fade by |nx|=0.75; the ocean now reads blue from ~0.74)
- *  — no dry sandy ring between the grand-delta artery and the limb it drains into. */
-export const POLAR_R: WaterBody = { dir: [1, 0, 0], radius: 0.8, feather: 0.34, depth: 0.11 }
-export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 0.8, feather: 0.34, depth: 0.11 }
-export const POLAR_OCEANS: readonly WaterBody[] = [POLAR_R, POLAR_L]
+/** The one great ocean, on the LEFT limb (−x) — variant-INVARIANT (Round 6). Grown
+ *  from the old radius-0.8 cap; `POLAR_L.radius` is its BASE angular radius, warped
+ *  per-azimuth by `oceanWarp` into an irregular coastline (bays + headlands). The
+ *  right limb has NO ocean (POLAR_R deleted): it is continental coast. Base radius
+ *  1.05 with warp amp 0.15 keeps the invariant core |nx|>0.75 solidly ocean while
+ *  the shore swings between nx≈−0.42 (headland) and nx≈−0.67 (bay). */
+export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 1.05, feather: 0.34, depth: 0.13 }
+/** Back-compat: the ocean list (a single body now). */
+export const POLAR_OCEANS: readonly WaterBody[] = [POLAR_L]
+
+const OCEAN_WARP_AMP = 0.15
+/** Deterministic low-frequency coastline warp: the azimuth φ around the −x pole
+ *  (which equals a point's longitude θ) → a bounded ~[-1,1] offset added to the
+ *  ocean's angular radius, carving bays and headlands. The 3φ octave (period 2π/3,
+ *  phased to peak at the three band centres) lets the sea reach inland where each
+ *  wedge drains into it; the 5φ + 2φ octaves break the 3-fold symmetry so no two
+ *  headlands/bays match (the irregular coast Aram asked for). Pure sines (NO
+ *  Math.random); shared by both variants, so the warped left limb is bit-identical
+ *  A vs B (the structural invariant). */
+function oceanWarp(ny: number, nz: number): number {
+  const phi = Math.atan2(nz, ny)
+  return 0.45 * Math.sin(3 * phi - 2.618) + 0.35 * Math.sin(5 * phi - 1.9) + 0.2 * Math.sin(2 * phi + 2.4)
+}
+/** Feathered 0..1 membership of the warped left ocean at a unit point. */
+export function oceanMask(nx: number, ny: number, nz: number): number {
+  const d = Math.acos(clampU(-nx)) // angular distance to the −x pole
+  const eff = POLAR_L.radius + OCEAN_WARP_AMP * oceanWarp(ny, nz)
+  return smoothstep01((eff - d) / POLAR_L.feather)
+}
 
 /** Smooth 0..1 membership of a cap, feathered at its rim. */
 export function capMask(nx: number, ny: number, nz: number, cap: Cap): number {
@@ -221,7 +247,10 @@ type Channel = {
   half: number
   ramp: number
   depth: number
-  widen?: { half: number; depth: number; lo: number; hi: number }
+  /** Grows half-width + depth off the lane. Metric is |nx| by default, or −nx when
+   *  `neg` is set (the grand delta widens ONLY toward the left ocean, so the inland
+   *  source stays a narrow thread while the mouth opens into a broad braided fan). */
+  widen?: { half: number; depth: number; lo: number; hi: number; neg?: boolean }
 }
 
 const STREAM_HALF = 0.04
@@ -234,39 +263,53 @@ const CREEK_HALF = 0.055
 const CREEK_RAMP = 0.05
 const CREEK_DEPTH = 0.08
 
-/** A single stream from a spine crossing out to a polar ocean (pole at ±x). */
+/** A single stream from a spine crossing out to the LEFT ocean (pole at −x, so
+ *  sign is −1 for every wedge now the right ocean is gone). `sign` is retained for
+ *  clarity/back-compat but the mouth always lands in the one ocean. */
 function streamChannel(theta: number, sign: 1 | -1, depth = STREAM_DEPTH): Channel {
   const c = crossPoint(theta)
   const mouth: [number, number, number] = [sign * 0.82, c[1] * 0.18, c[2] * 0.18]
   return { arcs: [makeArc(c, mouth)], half: STREAM_HALF, ramp: STREAM_RAMP, depth }
 }
 
-/** The grand delta: ONE continuous wide artery from the RIGHT ocean through the
- *  spine crossing into the LEFT ocean (blue enters both limbs of one frame), with
- *  braided side-channels feeding it. `widen` keeps the crossing a modest bridge
- *  span at the lane but opens the artery into a broad, deep channel off the lane
- *  so the water — not the sand — is the protagonist. Sand islets (A_PEAKS[2]) and
- *  the stepping-stone discs poke out of it as sandbars. */
+/** The continent-break strait (A0): a wide water gap that cuts the spring continent
+ *  in two — the LEFT ocean on one side, a right-limb inlet sea (A0_INLET) on the
+ *  other, the girl's ONLY continuation the bridge across the lane. `widen` opens the
+ *  gap off-lane toward BOTH shores (metric |nx|) yet stays a bridge-span at the lane
+ *  (lo 0.16), so the deck provably covers the wet lane. */
+function straitChannel(theta: number): Channel {
+  const c = crossPoint(theta)
+  const lMouth: [number, number, number] = [-0.82, c[1] * 0.18, c[2] * 0.18]
+  const rInlet = place(0.58, theta + 0.3) // right inlet sea, angled off the near-lane props
+  // Width (not depth) carries the "wide strait" read at the lane, so the on-bridge
+  // ramp stays gentle for the girl; the flanks deepen off-lane into the two seas.
+  const widen = { half: 0.12, depth: 0.04, lo: 0.16, hi: 0.5 }
+  return { arcs: [makeArc(c, lMouth), makeArc(c, rInlet)], half: 0.09, ramp: 0.08, depth: 0.055, widen }
+}
+
+/** The grand delta (A2, Round 6 redesign): the artery rises INLAND at a highland
+ *  tarn (A2_SOURCE, off-lane at +nx), steps down through the spine crossing and
+ *  broadens into a braided fan that drains INTO the LEFT ocean — one-glance read
+ *  inland thread → widening braid → open blue at the left limb. `widen` is signed
+ *  (`neg`), growing ONLY toward −x, so the source stays a narrow thread while the
+ *  mouth opens wide; the under-bridge crossing stays a modest wet span. Sand islets
+ *  (A_PEAKS[2]) and the stepping-stone discs poke out of the braid as sandbars. */
 function deltaChannel(theta: number): Channel {
   const c = crossPoint(theta)
-  const rMouth: [number, number, number] = [0.82, c[1] * 0.18, c[2] * 0.18]
   const lMouth: [number, number, number] = [-0.82, c[1] * 0.18, c[2] * 0.18]
-  // braids: start near the main artery off the lane and fan toward the poles, so
-  // the face reads as one wide braided delta feeding the central thread (not
-  // disconnected pools). They diverge in longitude so sand islets sit between them.
-  const braidR1 = place(0.3, theta + 0.14)
-  const braidL1 = place(-0.3, theta - 0.14)
-  const braidR2 = place(0.46, theta - 0.1)
-  const braidL2 = place(-0.46, theta + 0.1)
-  const widen = { half: 0.2, depth: 0.05, lo: 0.1, hi: 0.44 }
+  const source = place(0.5, 6.0) // highland tarn (matches A2_SOURCE)
+  const feeder = place(0.32, theta + 0.08) // steps down toward the lane
+  // braids fan into the left-ocean approach so the mouth reads as one wide delta.
+  const braidA = place(-0.3, theta + 0.14)
+  const braidB = place(-0.4, theta - 0.1)
+  const widen = { half: 0.22, depth: 0.05, lo: 0.04, hi: 0.52, neg: true }
   return {
     arcs: [
-      makeArc(c, rMouth),
+      makeArc(source, feeder),
+      makeArc(feeder, c),
       makeArc(c, lMouth),
-      makeArc(braidR1, [0.74, braidR1[1] * 0.24, braidR1[2] * 0.24]),
-      makeArc(braidL1, [-0.74, braidL1[1] * 0.24, braidL1[2] * 0.24]),
-      makeArc(braidR2, [0.8, braidR2[1] * 0.18, braidR2[2] * 0.18]),
-      makeArc(braidL2, [-0.8, braidL2[1] * 0.18, braidL2[2] * 0.18]),
+      makeArc(braidA, [-0.76, braidA[1] * 0.22, braidA[2] * 0.22]),
+      makeArc(braidB, [-0.8, braidB[1] * 0.18, braidB[2] * 0.18]),
     ],
     half: DELTA_HALF,
     ramp: DELTA_RAMP,
@@ -294,16 +337,18 @@ function creekChannel(theta: number, sign: 1 | -1): Channel {
   }
 }
 
-/** Variant channels indexed by band (band 0,1,2). */
+/** Variant channels indexed by band (band 0,1,2). Every wedge routes to the ONE
+ *  left ocean now (Round 6); A0 is the continent-break strait, A2 the inland-source
+ *  grand delta. */
 const A_CHANNELS: readonly Channel[] = [
-  streamChannel(CROSSINGS_A[0], 1), // A0 → right ocean
-  streamChannel(CROSSINGS_A[1], -1), // A1 → left ocean
-  deltaChannel(CROSSINGS_A[2]), // A2 grand delta → both
+  straitChannel(CROSSINGS_A[0]), // A0 continent-break strait: left ocean ↔ right inlet
+  streamChannel(CROSSINGS_A[1], -1), // A1 isthmus stream → left ocean
+  deltaChannel(CROSSINGS_A[2]), // A2 grand delta: inland source → left ocean
 ]
 const B_CHANNELS: readonly Channel[] = [
-  streamChannel(CROSSINGS_B[0], 1), // B0 oasis stream → right ocean
+  streamChannel(CROSSINGS_B[0], -1), // B0 oasis stream → left ocean
   creekChannel(CROSSINGS_B[1], -1), // B1 canyon creek → left ocean
-  streamChannel(CROSSINGS_B[2], 1), // B2 frozen creek → right ocean
+  streamChannel(CROSSINGS_B[2], -1), // B2 frozen creek → left ocean
 ]
 const CHANNELS = [A_CHANNELS, B_CHANNELS] as const
 
@@ -316,7 +361,8 @@ function channelCarve(nx: number, ny: number, nz: number, ch: Channel): number {
   let half = ch.half
   let depth = ch.depth
   if (ch.widen) {
-    const f = smoothstep01((Math.abs(nx) - ch.widen.lo) / (ch.widen.hi - ch.widen.lo))
+    const metric = ch.widen.neg ? -nx : Math.abs(nx)
+    const f = smoothstep01((metric - ch.widen.lo) / (ch.widen.hi - ch.widen.lo))
     half += ch.widen.half * f
     depth += ch.widen.depth * f
   }
@@ -342,16 +388,38 @@ export function channelDist(nx: number, ny: number, nz: number, variant: 0 | 1):
 type LocalBody = { band: 0 | 1 | 2; body: WaterBody }
 /** A0 glassy spring pond. */
 const A0_POND: WaterBody = { dir: norm3(place(0.36, 1.3)), radius: 0.15, feather: 0.1, depth: 0.05 }
+/** A0 continent-break: the right-limb inlet sea — the far shore of the strait that
+ *  cuts the spring continent, so the bridge crosses open water with coast both sides. */
+const A0_INLET: WaterBody = { dir: norm3(place(0.55, 1.7)), radius: 0.26, feather: 0.12, depth: 0.06 }
+/** A1 isthmus: a right-limb shelf sea that laps in opposite an ocean headland,
+ *  pinching the flower land into a narrow neck (the girl still crosses on dry lane). */
+const A1_SHELF: WaterBody = { dir: norm3(place(0.55, 3.25)), radius: 0.26, feather: 0.14, depth: 0.09 }
+/** A2 grand-delta inland source: a highland tarn feeding the braided delta down to
+ *  the left ocean. */
+const A2_SOURCE: WaterBody = { dir: norm3(place(0.5, 6.0)), radius: 0.14, feather: 0.09, depth: 0.09 }
 /** B0 desert oasis pool. */
 const B0_OASIS: WaterBody = { dir: norm3(place(0.3, 1.12)), radius: 0.11, feather: 0.08, depth: 0.05 }
 /** B2 frozen pond. */
 const B2_FROZEN: WaterBody = { dir: norm3(place(0.34, 5.55)), radius: 0.14, feather: 0.1, depth: 0.045 }
-const A_PONDS: readonly LocalBody[] = [{ band: 0, body: A0_POND }]
+const A_PONDS: readonly LocalBody[] = [
+  { band: 0, body: A0_POND },
+  { band: 0, body: A0_INLET },
+  { band: 1, body: A1_SHELF },
+  { band: 2, body: A2_SOURCE },
+]
 const B_PONDS: readonly LocalBody[] = [
   { band: 0, body: B0_OASIS },
   { band: 2, body: B2_FROZEN },
 ]
 const PONDS = [A_PONDS, B_PONDS] as const
+
+/** One or two LOW offshore islands poking above the left ocean (invariant relief).
+ *  Kept low so the renewal-scan occlusion budget and the 1.35R ceiling hold —
+ *  coastal cliffs read via colour, not height. */
+const OCEAN_ISLANDS: readonly Peak[] = [
+  { dir: norm3(place(-0.58, 2.1)), h: 0.1, r: 0.08 },
+  { dir: norm3(place(-0.55, 4.35)), h: 0.09, r: 0.075 },
+]
 
 // --- Scene relief (positive swells), per variant per band -------------------
 
@@ -368,10 +436,13 @@ const A_PEAKS: readonly (readonly Peak[])[] = [
     { dir: norm3(place(-0.46, 3.5)), h: 0.05, r: 0.3 },
     { dir: norm3(place(0.48, 3.95)), h: 0.045, r: 0.28 },
   ],
-  // A2 delta: low braided sandbanks + islets between the wide channel arms; each
-  // near-spine / off-lane stepping-stone disc sits on its own islet so it pokes
-  // out of the widened water as a sandbar (dry anchor) rather than drowning.
+  // A2 delta: inland HIGHLAND (source of the artery) + low braided sandbanks/islets
+  // between the wide channel arms; each near-spine / off-lane stepping-stone disc
+  // sits on its own islet so it pokes out of the widened water as a sandbar (dry
+  // anchor) rather than drowning.
   [
+    { dir: norm3(place(0.7, 6.15)), h: 0.12, r: 0.15 }, // highland ridge cradling the tarn source
+    { dir: norm3(place(0.62, 5.8)), h: 0.09, r: 0.15 }, // highland shoulder stepping down to the lane
     { dir: norm3(place(0.34, 5.5)), h: 0.03, r: 0.2 },
     { dir: norm3(place(-0.34, 5.95)), h: 0.03, r: 0.2 },
     { dir: norm3(place(-0.26, 5.54)), h: 0.1, r: 0.15 }, // sandbar holding the -x delta discs above the widened artery
@@ -433,9 +504,12 @@ function canyonWalls(nx: number, ny: number, nz: number): number {
 
 // --- Assembled displacement -------------------------------------------------
 
-/** The two polar oceans carved below the waterline (variant-INVARIANT). */
-function polarCarve(nx: number, ny: number, nz: number): number {
-  return -POLAR_R.depth * capMask(nx, ny, nz, POLAR_R) - POLAR_L.depth * capMask(nx, ny, nz, POLAR_L)
+/** The one left ocean carved below the waterline (variant-INVARIANT): the warped
+ *  coastline cap plus a couple of low offshore island swells. */
+function oceanCarve(nx: number, ny: number, nz: number): number {
+  let c = -POLAR_L.depth * oceanMask(nx, ny, nz)
+  for (let i = 0; i < OCEAN_ISLANDS.length; i++) c += peakBump(nx, ny, nz, OCEAN_ISLANDS[i])
+  return c
 }
 
 /** Raw wedge relief for a band+variant, BEFORE the wedge gate. */
@@ -463,19 +537,19 @@ export function wedgeDelta(nx: number, ny: number, nz: number, variant: 0 | 1): 
 
 /** Variant-A authored displacement (lap 1). */
 export function biomeBump(nx: number, ny: number, nz: number): number {
-  return polarCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 0)
+  return oceanCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 0)
 }
 /** Variant-B authored displacement (lap 2). Equals biomeBump on every meridian
- *  and at the poles by construction (wedgeGate = 0 there). */
+ *  and at the limbs by construction (wedgeGate = 0 there, oceanCarve is invariant). */
 export function biomeBumpB(nx: number, ny: number, nz: number): number {
-  return polarCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 1)
+  return oceanCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 1)
 }
 
 // --- Classification for the colour pass -------------------------------------
 
-/** Strongest polar-ocean + active-wedge pond membership (0..1) at a point. */
+/** Strongest ocean + active-wedge local-water membership (0..1) at a point. */
 export function waterMask(nx: number, ny: number, nz: number, variant: 0 | 1): number {
-  let m = Math.max(capMask(nx, ny, nz, POLAR_R), capMask(nx, ny, nz, POLAR_L))
+  let m = oceanMask(nx, ny, nz)
   const band = bandOf(canonicalTheta(Math.atan2(nz, ny)))
   const ponds = PONDS[variant]
   for (let i = 0; i < ponds.length; i++) {

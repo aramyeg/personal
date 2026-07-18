@@ -1,7 +1,7 @@
 'use client'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { POLAR_R, POLAR_L, WATER_LEVEL } from '../biomes'
+import { POLAR_L, WATER_LEVEL } from '../biomes'
 import { PLANET_RADIUS } from '../planet'
 import { GatedProp } from './gated-prop'
 import { ClayBlossom, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
@@ -35,9 +35,6 @@ function PolarFloes({ cap, spec }: { cap: { dir: readonly [number, number, numbe
   )
 }
 
-const FLOES_R: Array<[number, number, number]> = [
-  [0.12, 0.16, 0.1], [-0.2, 0.06, 0.08], [0.08, -0.22, 0.09],
-]
 const FLOES_L: Array<[number, number, number]> = [
   [0.14, -0.1, 0.09], [-0.06, 0.2, 0.08], [0.2, 0.1, 0.075],
 ]
@@ -45,15 +42,15 @@ const FLOES_L: Array<[number, number, number]> = [
 /**
  * Curated water-side delights the flank scatter leaves out: lilies on the A0
  * spring pond, palms on the A2 delta islets, oasis palms in B0, ice floes on the
- * winter B2 pond, and floes on the two permanent polar oceans. Wedge items are
- * variant-gated (swap behind the horizon); the polar floes are invariant.
+ * winter B2 pond, and floes on the one great left ocean (Round 6: the right limb
+ * is coast now, so its floes are gone). Wedge items are variant-gated (swap behind
+ * the horizon); the ocean floes are invariant.
  */
 export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   return (
     <>
-      {/* permanent ice on the polar oceans (both limbs) */}
-      <PolarFloes cap={POLAR_R} spec={FLOES_R} />
+      {/* permanent ice on the one great left ocean */}
       <PolarFloes cap={POLAR_L} spec={FLOES_L} />
 
       {/* A0 spring pond: lily blossoms on the near bank */}
