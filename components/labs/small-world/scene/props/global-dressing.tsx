@@ -6,7 +6,7 @@ import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet
 import { bandOf, canonicalTheta, channelDist } from '../biomes'
 import { GatedProp } from './gated-prop'
 import type { JourneyRef } from '../use-journey'
-import { ClayBlossom, ClayMound, ClayPalm, ClayRock, ClaySprout, ClayTree } from './clay-kit'
+import { ClayBell, ClayBlossom, ClayBoulder, ClayMound, ClayPalm, ClayRock, ClaySpike, ClaySprout, ClayTree } from './clay-kit'
 
 const DRESSING_COUNT = 46
 
@@ -67,18 +67,22 @@ export function GlobalDressing({ journeyRef }: { journeyRef: JourneyRef }) {
 function renderA(i: number, scale: number, band: 0 | 1 | 2) {
   const s = seeded(i + 300)
   if (band === 0) {
-    // A0 spring origin: fresh sprouts, blossoms, spring-green trees
-    if (s < 0.34) return <ClaySprout scale={scale * 1.2} />
-    if (s < 0.67) return <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.petal} scale={scale} />
-    return <ClayTree height={0.3 + s * 0.14} crown={i % 2 === 0 ? PALETTE.springGreen : PALETTE.leaf} scale={scale} />
+    // A0 spring origin: fresh sprouts, blossoms + bells, lobed spring-green trees
+    if (s < 0.3) return <ClaySprout scale={scale * 1.2} />
+    if (s < 0.5) return <ClayBlossom color={i % 2 === 0 ? PALETTE.blossom : PALETTE.petal} scale={scale} />
+    if (s < 0.66) return <ClayBell color={PALETTE.bluebell} scale={scale} />
+    return <ClayTree height={0.3 + s * 0.14} shape="lobes" crown={i % 2 === 0 ? PALETTE.foliageDeep : PALETTE.springGreen} scale={scale} />
   }
   if (band === 1) {
-    // A1 flower field: dense pink/honey blossom drifts + a hive-ish mound
-    if (s < 0.55) return <ClayBlossom color={i % 2 === 0 ? PALETTE.petal : PALETTE.blossomDeep} scale={scale * 1.1} />
-    if (s < 0.78) return <ClayMound r={0.12 + s * 0.05} color={PALETTE.honey} squash={0.55} scale={scale} />
+    // A1 flower riot: three flower silhouettes (rose blob, periwinkle bell, lupine
+    // spike) drifting through a honey-mound meadow — descriptive, not one recolour
+    if (s < 0.34) return <ClayBlossom color={i % 2 === 0 ? PALETTE.blossomRose : PALETTE.petal} scale={scale * 1.1} />
+    if (s < 0.56) return <ClaySpike color={i % 2 === 0 ? PALETTE.lupine : PALETTE.blossomDeep} scale={scale * 1.1} />
+    if (s < 0.74) return <ClayBell color={i % 2 === 0 ? PALETTE.bluebell : PALETTE.blossom} scale={scale * 1.1} />
+    if (s < 0.88) return <ClayMound r={0.12 + s * 0.05} color={PALETTE.honey} squash={0.55} scale={scale} />
     return <ClaySprout scale={scale} />
   }
-  // A2 grand delta: reeds (tall thin sprouts), the odd palm on a bank, sand rocks
+  // A2 grand delta: reeds (tall thin sprouts), a parasol palm on a bank, sand rocks
   if (s < 0.5) return <ClaySprout scale={scale * 1.4} />
   if (s < 0.75) return <ClayRock color={PALETTE.sand} r={0.07 + s * 0.03} scale={scale} />
   return <ClayPalm scale={scale * 0.8} />
@@ -109,13 +113,13 @@ function renderB(i: number, scale: number, band: 0 | 1 | 2) {
     return <ClayPalm scale={scale * 0.85} />
   }
   if (band === 1) {
-    // B1 brown canyon: earth/rust boulders + bare dead trees on the rim
-    if (s < 0.5) return <ClayRock color={i % 2 === 0 ? PALETTE.earth : PALETTE.rust} r={0.08 + s * 0.04} scale={scale} />
-    if (s < 0.8) return <ClayTree height={0.32 + s * 0.12} crown={PALETTE.earth} scale={scale * 0.9} />
-    return <ClayRock color={PALETTE.earthDeep} r={0.1 + s * 0.03} scale={scale} />
+    // B1 brown canyon: angular earth/stone boulders + bare parasol trees on the rim
+    if (s < 0.5) return <ClayBoulder color={i % 2 === 0 ? PALETTE.stone : PALETTE.rust} r={0.09 + s * 0.05} scale={scale} />
+    if (s < 0.8) return <ClayTree height={0.32 + s * 0.12} shape="parasol" crown={PALETTE.earth} scale={scale * 0.9} />
+    return <ClayBoulder color={PALETTE.earthDeep} r={0.1 + s * 0.04} scale={scale} />
   }
-  // B2 winter summit: snowy conifers, bare trunks, snow boulders
-  if (s < 0.5) return <ClayTree height={0.34 + s * 0.14} crown={PALETTE.snow} scale={scale} />
-  if (s < 0.78) return <ClayTree height={0.3 + s * 0.1} crown={PALETTE.earth} scale={scale * 0.85} />
-  return <ClayRock color={PALETTE.snow} r={0.08 + s * 0.03} scale={scale} />
+  // B2 winter summit: pinched-cone snowy conifers, bare trunks, angular snow boulders
+  if (s < 0.5) return <ClayTree height={0.34 + s * 0.14} shape="cone" crown={PALETTE.snow} scale={scale} />
+  if (s < 0.78) return <ClayTree height={0.3 + s * 0.1} shape="cone" crown={PALETTE.pineDeep} scale={scale * 0.85} />
+  return <ClayBoulder color={PALETTE.snow} r={0.08 + s * 0.04} scale={scale} />
 }

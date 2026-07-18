@@ -27,4 +27,11 @@ export const PALETTE = {
   earthDeep: '#5A3216', // B1 canyon channel floor / deep walls
   rust: '#A85A32', // B1 canyon terracotta bank
   ice: '#DCEAF2', // B2 frozen water rim
+  // per-FIGURE identity (Task 23) — deeper SATURATION, still pastel daylight
+  blossomRose: '#E8659B', // A1 deep-rose petal blob (the flower riot's richest bloom)
+  bluebell: '#A79BE8', // periwinkle bell flower (A0/A1 — a cool note among the pinks)
+  lupine: '#CE79CE', // spike flower (violet-magenta lupine/foxglove)
+  foliageDeep: '#3F9A55', // deeper broadleaf crown (spring woods, lobed silhouette)
+  pineDeep: '#357E48', // deep conifer green for pinched-cone crowns
+  stone: '#94745C', // canyon boulder clay-stone (faceted pinch)
 } as const

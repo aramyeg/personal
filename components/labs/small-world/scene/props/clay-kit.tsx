@@ -8,7 +8,18 @@ type Xform = {
   scale?: number
 }
 
-export function ClayTree({ crown = PALETTE.leaf, height = 0.45, ...x }: Xform & { crown?: string; height?: number }) {
+/** Crown silhouette family (Task 23): each tree family owns a distinct shape so the
+ *  forest is not one blobby crown recoloured. 'lobes' = broadleaf stacked spheres
+ *  (spring woods); 'cone' = pinched conifer (winter/evergreen); 'parasol' = flat wide
+ *  umbrella crown (delta/dry-land). */
+export type CrownShape = 'lobes' | 'cone' | 'parasol'
+
+export function ClayTree({
+  crown = PALETTE.leaf,
+  height = 0.45,
+  shape = 'lobes',
+  ...x
+}: Xform & { crown?: string; height?: number; shape?: CrownShape }) {
   const ramp = useClayRamp()
   return (
     <group {...x}>
@@ -16,14 +27,34 @@ export function ClayTree({ crown = PALETTE.leaf, height = 0.45, ...x }: Xform & 
         <cylinderGeometry args={[0.035, 0.05, height * 0.5, 7]} />
         <meshToonMaterial color={PALETTE.clayPath} gradientMap={ramp} />
       </mesh>
-      <mesh position={[0, height * 0.72, 0]}>
-        <sphereGeometry args={[height * 0.38, 10, 10]} />
-        <meshToonMaterial color={crown} gradientMap={ramp} />
-      </mesh>
-      <mesh position={[height * 0.18, height * 0.95, 0]}>
-        <sphereGeometry args={[height * 0.22, 16, 16]} />
-        <meshToonMaterial color={crown} gradientMap={ramp} />
-      </mesh>
+      {shape === 'cone' ? (
+        <>
+          <mesh position={[0, height * 0.78, 0]}>
+            <coneGeometry args={[height * 0.34, height * 0.72, 7]} />
+            <meshToonMaterial color={crown} gradientMap={ramp} />
+          </mesh>
+          <mesh position={[0, height * 1.06, 0]}>
+            <coneGeometry args={[height * 0.2, height * 0.4, 7]} />
+            <meshToonMaterial color={crown} gradientMap={ramp} />
+          </mesh>
+        </>
+      ) : shape === 'parasol' ? (
+        <mesh position={[0, height * 0.68, 0]} scale={[1, 0.42, 1]}>
+          <sphereGeometry args={[height * 0.5, 12, 8]} />
+          <meshToonMaterial color={crown} gradientMap={ramp} />
+        </mesh>
+      ) : (
+        <>
+          <mesh position={[0, height * 0.72, 0]}>
+            <sphereGeometry args={[height * 0.38, 10, 10]} />
+            <meshToonMaterial color={crown} gradientMap={ramp} />
+          </mesh>
+          <mesh position={[height * 0.18, height * 0.95, 0]}>
+            <sphereGeometry args={[height * 0.22, 16, 16]} />
+            <meshToonMaterial color={crown} gradientMap={ramp} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }
@@ -65,6 +96,61 @@ export function ClayBlossom({ color = PALETTE.blossom, ...x }: Xform & { color?:
         <meshToonMaterial color={PALETTE.honey} gradientMap={ramp} />
       </mesh>
     </group>
+  )
+}
+
+/** A bell / tulip flower — a molded cup nodding on its stem (Task 23 silhouette
+ *  variant, distinct from the blossom blob). The cup is a cone hung wide-end-down. */
+export function ClayBell({ color = PALETTE.bluebell, ...x }: Xform & { color?: string }) {
+  const ramp = useClayRamp()
+  return (
+    <group {...x}>
+      <mesh position={[0, 0.06, 0]}>
+        <cylinderGeometry args={[0.008, 0.012, 0.12, 6]} />
+        <meshToonMaterial color={PALETTE.leaf} gradientMap={ramp} />
+      </mesh>
+      <mesh position={[0, 0.145, 0]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[0.038, 0.07, 8, 1, true]} />
+        <meshToonMaterial color={color} gradientMap={ramp} side={2} />
+      </mesh>
+      <mesh position={[0, 0.185, 0]}>
+        <sphereGeometry args={[0.02, 8, 8]} />
+        <meshToonMaterial color={color} gradientMap={ramp} />
+      </mesh>
+    </group>
+  )
+}
+
+/** A spike flower — a lupine/foxglove tower of small molded florets up a stalk
+ *  (Task 23 silhouette variant). Reads tall and narrow against the round blossoms. */
+export function ClaySpike({ color = PALETTE.lupine, ...x }: Xform & { color?: string }) {
+  const ramp = useClayRamp()
+  const florets = [0.11, 0.14, 0.17, 0.2, 0.225]
+  return (
+    <group {...x}>
+      <mesh position={[0, 0.08, 0]}>
+        <cylinderGeometry args={[0.009, 0.013, 0.16, 6]} />
+        <meshToonMaterial color={PALETTE.leaf} gradientMap={ramp} />
+      </mesh>
+      {florets.map((y, i) => (
+        <mesh key={y} position={[0, y, 0]}>
+          <sphereGeometry args={[0.036 - i * 0.005, 8, 8]} />
+          <meshToonMaterial color={color} gradientMap={ramp} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** An angular faceted boulder — a low-poly icosahedron pinched flat, so it reads as a
+ *  chipped clay rock, not a smooth pebble (Task 23: canyon/winter boulders). */
+export function ClayBoulder({ color = PALETTE.stone, r = 0.1, ...x }: Xform & { color?: string; r?: number }) {
+  const ramp = useClayRamp()
+  return (
+    <mesh {...x} scale={[1, 0.72, 0.9].map((s) => s * (x.scale ?? 1)) as [number, number, number]}>
+      <icosahedronGeometry args={[r, 0]} />
+      <meshToonMaterial color={color} gradientMap={ramp} />
+    </mesh>
   )
 }
 

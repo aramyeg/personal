@@ -4,7 +4,7 @@ import { PALETTE } from '../../palette'
 import { POLAR_L, WATER_LEVEL } from '../biomes'
 import { PLANET_RADIUS } from '../planet'
 import { GatedProp } from './gated-prop'
-import { ClayBlossom, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
+import { ClayBlossom, ClayBoulder, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
@@ -84,7 +84,7 @@ export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
         </GatedProp>
       ))}
       <GatedProp theta={5.66} x={0.72} variant={1} journeyRef={journeyRef}>
-        <ClayRock color={PALETTE.snow} r={0.1} />
+        <ClayBoulder color={PALETTE.snow} r={0.11} />
       </GatedProp>
     </>
   )

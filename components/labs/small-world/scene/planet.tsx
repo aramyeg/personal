@@ -6,7 +6,16 @@ import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import type { JourneyRef } from './use-journey'
 import { useClayRamp } from './toon-ramp'
-import { WATER_LEVEL, biomeBump, biomeBumpB, biomeTint, bandOf, colorGate } from './biomes'
+import {
+  WATER_LEVEL,
+  biomeBump,
+  biomeBumpB,
+  biomeTint,
+  bandOf,
+  colorGate,
+  channelDist,
+  canyonCreekDist,
+} from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
 
@@ -143,6 +152,62 @@ function clayDimple(nx: number, ny: number, nz: number): number {
 /** Amplitude ceiling of clayDimple (sum of the two octave amplitudes), so the
  * contact-proof scan and any ceiling math have one source of truth. */
 export const CLAY_DIMPLE_MAX = 0.009 + 0.0025
+
+/**
+ * Task 23 — per-FIGURE clay signature (render-only, INWARD-only). Task 21's dimple
+ * is one global surface voice; this gives each element FAMILY its own molded texture
+ * so a mountain reads as a pinched clay piece, a canyon as stratified earth, a dune
+ * as raked ripples — not one smooth swell of the same noise. Three signatures, each
+ * carving grooves DOWN from the feature (never adding relief, so the 1.35R ceiling
+ * only ever drops), by band + local relief:
+ *  - RIDGED CRESTS on high relief (mountains + winter spires): abs-noise ridge lines
+ *    stay at the peak while the troughs between them carve in → pinched, not blobby.
+ *  - STRATIFIED TERRACES on the B1 canyon (near the creek): a sawtooth on local
+ *    height steps the walls into molded earth strata.
+ *  - DIRECTIONAL DUNE RIPPLES on the B0 golden dunes: raked parallel ridges.
+ *  - SNOW (B2 drifts) gets NONE — smooth heavy lobes are the deliberate contrast.
+ *
+ * GATED to zero on the girl's lane (|nx| < ~0.14), so the spine contact budget is
+ * exactly Task 21's (dimple+radial) — the girl/props never stand on a signature.
+ * A pure function of direction + the variant's own bump, so A and B each bake their
+ * own and the renewal front lerps them behind the horizon like the rest of the flank.
+ */
+export const CLAY_SIGNATURE_MAX = 0.03
+const CREEK_HALF_LOCAL = 0.055 // mirrors biomes CREEK_HALF (zero-import there)
+function claySignature(nx: number, ny: number, nz: number, bump: number, variant: 0 | 1): number {
+  const lat = THREE.MathUtils.smoothstep(Math.abs(nx), 0.14, 0.24)
+  if (lat <= 0) return 0
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  const band = bandOf(thetaC)
+  let carve = 0
+  // ridged crests — the taller the relief, the sharper the pinch (both variants)
+  const high = THREE.MathUtils.smoothstep(bump, 0.08, 0.18)
+  if (high > 0) {
+    const ridge = Math.abs(
+      Math.sin(18.0 * nx + 0.3) * Math.sin(17.0 * ny - 0.8) * Math.sin(19.0 * nz + 1.5)
+    ) // 0 on the ridge lines, →1 between them
+    carve -= 0.03 * high * ridge
+  }
+  // stratified terraces on the B1 canyon walls
+  if (variant === 1 && band === 1) {
+    const cd = canyonCreekDist(nx, ny, nz)
+    const canyonMask = 1 - THREE.MathUtils.smoothstep(cd, CREEK_HALF_LOCAL, CREEK_HALF_LOCAL + 0.22)
+    if (canyonMask > 0) {
+      const LEVELS = 5
+      const step = bump * LEVELS - Math.floor(bump * LEVELS) // 0 at each band base → 1 at its top
+      carve -= 0.02 * canyonMask * step
+    }
+  }
+  // directional raked ripples on the B0 golden dunes
+  if (variant === 1 && band === 0) {
+    const duneMask = THREE.MathUtils.smoothstep(bump, 0.02, 0.08)
+    if (duneMask > 0) {
+      const ripple = 0.5 + 0.5 * Math.sin(34.0 * nz + 12.0 * ny)
+      carve -= 0.012 * duneMask * ripple
+    }
+  }
+  return carve * lat
+}
 
 /** Deterministic hash of a source-vertex direction → [0,1). Pure sin-fract with a
  * per-call seed; NO Math.random, so both bakes and the bench agree byte-for-byte. */
@@ -338,6 +403,15 @@ function paintVertex(
     const hollow = THREE.MathUtils.clamp(-dip / CLAY_DIMPLE_MAX, 0, 1)
     c.multiplyScalar(1 - 0.06 * hollow)
   }
+  // Signature AO + edge definition (Task 23 lever 4): the molded grooves — ridge
+  // troughs, canyon strata steps, dune ripple valleys — hold dirt, so each figure's
+  // own carve darkens into it. This is the crease-dirt logic pushed to the feature's
+  // own structure, so a mountain/canyon/dune reads pressed, not blended into meadow.
+  const sig = claySignature(nx, ny, nz, bump, variant)
+  if (sig < 0) {
+    const groove = THREE.MathUtils.clamp(-sig / CLAY_SIGNATURE_MAX, 0, 1)
+    c.multiplyScalar(1 - 0.12 * groove)
+  }
 }
 
 /** Flat per-face normals for a non-indexed positions buffer. */
@@ -428,8 +502,9 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       const rjit = JITTER_RAD * (2 * hash01(sx, sy, sz, 5.1) - 1)
       const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
       const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-      const rA = 1 + bumpA + dimple + rjit
-      const rB = 1 + bumpB + dimple + rjit
+      // per-figure molded signature (inward-only, off-lane): each variant bakes its own.
+      const rA = 1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0)
+      const rB = 1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1)
       positionsA[i * 3] = nx * PLANET_RADIUS * rA
       positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
       positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
@@ -500,28 +575,60 @@ function useWaterGeometry(): WaterBake {
     const deepBase = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.22)
     const abyss = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.5)
     const c = new THREE.Color()
-    const paintDepth = (out: Float32Array, i: number, bump: number): void => {
-      const depth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
-      c.copy(deepBase).lerp(abyss, THREE.MathUtils.smoothstep(depth, 0.3, 1))
-      const rim = 1 - THREE.MathUtils.smoothstep(depth, 0.0, 0.15)
+    // Task 23 — molded water: the deep-blue reads TOUGHER and hand-pressed. Colour
+    // now answers THREE depths, not just the terrain basin: (1) terrain depth (deep
+    // basins → abyss); (2) the sphere's own molded TROUGH depth (a pressed hollow in
+    // the clay sheet darkens toward abyss even over a flat floor, so the water is not
+    // one even blue); (3) a near-DECK deepening along the lane channels (the A0 strait
+    // read pale at mid-face because the shallow-rim brightening dominated its
+    // width-carried carve — this pushes its near-deck tint back to deep blue). Rims
+    // (high, shallow crests of the clay sheet) keep the lighter river blue.
+    const paintDepth = (
+      out: Float32Array, i: number, bump: number, trough: number, deck: number
+    ): void => {
+      const terrainDepth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
+      const deep = Math.max(terrainDepth, 0.85 * trough, 0.7 * deck)
+      c.copy(deepBase).lerp(abyss, THREE.MathUtils.smoothstep(deep, 0.3, 1))
+      // river-blue rim survives only on the shallow crests: killed in troughs and by
+      // the near-deck deepening, so molded hollows + the strait deck stay deep blue.
+      const rim = (1 - THREE.MathUtils.smoothstep(terrainDepth, 0.0, 0.15)) *
+        (1 - 0.6 * trough) * (1 - 0.7 * deck)
       c.lerp(river, 0.5 * rim)
       out[i * 3] = c.r; out[i * 3 + 1] = c.g; out[i * 3 + 2] = c.b
     }
+    // Peak inward push of the molded clay sheet (trough-biased low octave + fine
+    // grain). Floor = WATER_LEVEL·(1−WATER_MOLD_MAX) ≈ 0.969·WATER_LEVEL, still well
+    // above every basin floor and below the shoreline (proven in scan-task23).
+    const WATER_MOLD_MAX = 0.024 + 0.007
+    // How near a lane channel the deep near-deck tint reaches (rad); kept tight to the
+    // girl's lane (|nx|) so the wide off-lane delta fan / beach shallows are NOT
+    // over-darkened — only the deck approaches deepen.
+    const DECK_REACH = 0.14
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i)
       const dir = v.clone().normalize()
       const px = dir.x * PLANET_RADIUS, py = dir.y * PLANET_RADIUS, pz = dir.z * PLANET_RADIUS
-      paintDepth(colorsIdxA, i, terrainBump(px, py, pz))
-      paintDepth(colorsIdxB, i, terrainBumpB(px, py, pz))
       // clay lumps, inward-only (radius never exceeds WATER_LEVEL → no shoreline
       // poke-through); two octaves + recomputed normals catch the ramp as clay.
-      // Task-21: chunked up — bigger pressed sheets (freq 5→3.3, amp 0.009→0.016)
-      // so water reads as a hand-pressed clay sheet, not ripple noise; the fine
-      // octave follows (9→7, 0.004→0.006). Max inward 0.022 keeps water floor at
-      // 0.978·WATER_LEVEL, still above the basin floors, still below the shoreline.
+      // Task-23: trough-biased so most of the sheet sits at the shallow rim while
+      // occasional pressed hollows dig DEEP (a power curve on the low octave), giving
+      // the molded deep-trough / shallow-rim contrast — beyond Task 21's even scale.
       const w1 = Math.sin(3.3 * dir.x + 1.3) * Math.sin(3.0 * dir.y - 0.7) * Math.sin(3.5 * dir.z + 2.1)
       const w2 = Math.sin(7.1 * dir.y + 0.5) * Math.sin(6.6 * dir.z - 1.1) * Math.sin(6.9 * dir.x + 2.6)
-      v.multiplyScalar(1 - 0.016 * (0.5 + 0.5 * w1) - 0.006 * (0.5 + 0.5 * w2))
+      const t1 = Math.pow(0.5 + 0.5 * w1, 1.7)
+      const t2 = 0.5 + 0.5 * w2
+      const inward = 0.024 * t1 + 0.007 * t2
+      const trough = THREE.MathUtils.clamp(inward / WATER_MOLD_MAX, 0, 1)
+      // near-deck deepening, per variant (the strait is A0; every lane channel gets a
+      // deep deck approach). Gated tight to the lane so the delta/beach stay untouched.
+      const nearLane = 1 - THREE.MathUtils.smoothstep(Math.abs(dir.x), 0.12, 0.36)
+      const deckA = nearLane * THREE.MathUtils.clamp(
+        (DECK_REACH - channelDist(dir.x, dir.y, dir.z, 0)) / DECK_REACH, 0, 1)
+      const deckB = nearLane * THREE.MathUtils.clamp(
+        (DECK_REACH - channelDist(dir.x, dir.y, dir.z, 1)) / DECK_REACH, 0, 1)
+      paintDepth(colorsIdxA, i, terrainBump(px, py, pz), trough, deckA)
+      paintDepth(colorsIdxB, i, terrainBumpB(px, py, pz), trough, deckB)
+      v.multiplyScalar(1 - inward)
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     // Flat-shade: expand to non-indexed then per-face normals so the water shows
