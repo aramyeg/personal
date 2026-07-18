@@ -121,18 +121,73 @@ export function surfaceYAt(worldZ: number, rotation: number): number {
   return Math.sqrt(Math.max(0, r * r - worldZ * worldZ))
 }
 
-/** Clay thumb-dents: a small two-octave surface irregularity applied to the
- * RENDER geometry only (never to terrainBump, so dryness/props/tests are
- * untouched). It tilts the flat facet normals so the hard ramp breaks into
- * pressed-clay patches instead of a smooth soft gradient. A pure function of the
- * unit direction, so it is IDENTICAL on both laps and cancels out of the morph
- * on the spine (where the two bakes already coincide). */
+/** Clay thumb-dents: a two-octave surface irregularity applied to the RENDER
+ * geometry only (never to terrainBump, so dryness/props/tests are untouched). It
+ * tilts the flat facet normals so the hard ramp breaks into pressed-clay patches
+ * instead of a smooth soft gradient. A pure function of the unit direction, so it
+ * is IDENTICAL on both laps and cancels out of the morph on the spine (where the
+ * two bakes already coincide).
+ *
+ * Task-21 clay push: energy moved into the LOW octave — bigger, deeper thumb
+ * presses (amp 0.005→0.009 at roughly half the frequency 15→8, ~1.8× deeper over
+ * ~2× wider patches) so the surface reads as broad pressed hollows under the toon
+ * bands; the fine octave stays subtle grain (0.003→0.0025). Peak |dimple| ≈
+ * 0.0115·R. */
 function clayDimple(nx: number, ny: number, nz: number): number {
   return (
-    0.005 * Math.sin(15.3 * nx + 1.1) * Math.sin(14.7 * ny - 0.4) * Math.sin(15.1 * nz + 2.3) +
-    0.003 * Math.sin(26.1 * ny + 0.7) * Math.sin(25.4 * nz - 1.3) * Math.sin(26.9 * nx + 0.5)
+    0.009 * Math.sin(7.9 * nx + 1.1) * Math.sin(7.4 * ny - 0.4) * Math.sin(7.7 * nz + 2.3) +
+    0.0025 * Math.sin(27.3 * ny + 0.7) * Math.sin(26.4 * nz - 1.3) * Math.sin(28.1 * nx + 0.5)
   )
 }
+
+/** Amplitude ceiling of clayDimple (sum of the two octave amplitudes), so the
+ * contact-proof scan and any ceiling math have one source of truth. */
+export const CLAY_DIMPLE_MAX = 0.009 + 0.0025
+
+/** Deterministic hash of a source-vertex direction → [0,1). Pure sin-fract with a
+ * per-call seed; NO Math.random, so both bakes and the bench agree byte-for-byte. */
+function hash01(x: number, y: number, z: number, seed: number): number {
+  const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + seed) * 43758.5453
+  return s - Math.floor(s)
+}
+
+/**
+ * Task-21 grid-break (headline lever). The icosahedron's regular triangle lattice
+ * reads "3D asset"; jitter each SOURCE vertex TANGENTIALLY (within its own tangent
+ * plane) by up to JITTER_TAN·edge before displacement, so the flat facets become
+ * irregular hand-pinched planes. Deterministic hash of the source direction ⇒
+ * identical on both bakes, so the renewal A→B lerp stays seamless. Terrain/dimple
+ * are re-evaluated at the JITTERED direction (that is where the vertex physically
+ * sits), so the render surface still equals analytic terrain at every vertex — the
+ * only render-vs-analytic offset is dimple + the tiny radial jitter below.
+ *
+ * `edge` is the local sub-triangle edge length (world units); `t1`,`t2` are an
+ * orthonormal tangent basis at the source direction. Returns the new UNIT
+ * direction. */
+function jitterDir(
+  nx: number, ny: number, nz: number,
+  t1x: number, t1y: number, t1z: number,
+  t2x: number, t2y: number, t2z: number,
+  edge: number
+): [number, number, number] {
+  const rho = JITTER_TAN * edge * hash01(nx, ny, nz, 0.0)
+  const phi = 2 * Math.PI * hash01(nx, ny, nz, 17.3)
+  const a = rho * Math.cos(phi)
+  const b = rho * Math.sin(phi)
+  // P = n·R displaced sideways by (a·t1 + b·t2), then re-projected to a unit dir.
+  const px = nx * PLANET_RADIUS + a * t1x + b * t2x
+  const py = ny * PLANET_RADIUS + a * t1y + b * t2y
+  const pz = nz * PLANET_RADIUS + a * t1z + b * t2z
+  const l = Math.hypot(px, py, pz) || 1
+  return [px / l, py / l, pz / l]
+}
+
+/** Tangential jitter budget as a fraction of the local sub-triangle edge. */
+const JITTER_TAN = 0.34
+/** Tiny radial jitter (fraction of R) layered on the dimple for extra hand-made
+ * lumpiness. Kept small so the combined render-vs-analytic offset the girl/shadow
+ * must forgive stays well inside the dimple-dominated budget. Peak = this value. */
+const JITTER_RAD = 0.0013
 
 type Pal = {
   leaf: THREE.Color; meadow: THREE.Color; sprout: THREE.Color; clay: THREE.Color
@@ -268,12 +323,21 @@ function paintVertex(
   }
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
+  // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
   const crease = THREE.MathUtils.smoothstep(
     terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
     0.12,
     0.6
   )
-  if (crease > 0) c.multiplyScalar(1 - 0.14 * crease)
+  if (crease > 0) c.multiplyScalar(1 - 0.2 * crease)
+  // Cheap AO for the thumb presses: pressed-in dimple hollows hold a little shadow.
+  // Pure function of the (jittered) direction, so it is identical on both bakes and
+  // is a no-op in the morph on the spine.
+  const dip = clayDimple(nx, ny, nz)
+  if (dip < 0) {
+    const hollow = THREE.MathUtils.clamp(-dip / CLAY_DIMPLE_MAX, 0, 1)
+    c.multiplyScalar(1 - 0.06 * hollow)
+  }
 }
 
 /** Flat per-face normals for a non-indexed positions buffer. */
@@ -305,9 +369,13 @@ type MorphBake = {
  */
 function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, 24)
+    const ICO_DETAIL = 24
+    const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, ICO_DETAIL)
     const src = geo.attributes.position
     const count = src.count
+    // Local sub-triangle edge length: icosahedron edge (circumradius·1.0515)
+    // split into ICO_DETAIL segments. The tangential jitter is a fraction of this.
+    const EDGE = (PLANET_RADIUS * 1.0515) / ICO_DETAIL
     const positionsA = new Float32Array(count * 3)
     const positionsB = new Float32Array(count * 3)
     const colorsA = new Float32Array(count * 3)
@@ -339,15 +407,29 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
     const c = new THREE.Color()
     for (let i = 0; i < count; i++) {
       v.fromBufferAttribute(src, i)
-      const nx = v.x / PLANET_RADIUS
-      const ny = v.y / PLANET_RADIUS
-      const nz = v.z / PLANET_RADIUS
+      const sx = v.x / PLANET_RADIUS
+      const sy = v.y / PLANET_RADIUS
+      const sz = v.z / PLANET_RADIUS
+      // Orthonormal tangent basis at the SOURCE direction (same convention as
+      // terrainSlope): t1 = normalize(n × up) with an x-axis fallback at the poles.
+      let t1x = -sz
+      let t1z = sx
+      const tl = Math.hypot(t1x, t1z)
+      const t1y = 0
+      if (tl < 1e-4) { t1x = 1; t1z = 0 } else { t1x /= tl; t1z /= tl }
+      const t2x = sy * t1z - sz * t1y
+      const t2y = sz * t1x - sx * t1z
+      const t2z = sx * t1y - sy * t1x
+      // Break the geodesic grid: jitter the source vertex tangentially, then work
+      // from the jittered direction for everything the vertex renders.
+      const [nx, ny, nz] = jitterDir(sx, sy, sz, t1x, t1y, t1z, t2x, t2y, t2z, EDGE)
       thetaC[i] = canonicalTheta(Math.atan2(nz, ny))
       const dimple = clayDimple(nx, ny, nz)
-      const bumpA = terrainBump(v.x, v.y, v.z)
-      const bumpB = terrainBumpB(v.x, v.y, v.z)
-      const rA = 1 + bumpA + dimple
-      const rB = 1 + bumpB + dimple
+      const rjit = JITTER_RAD * (2 * hash01(sx, sy, sz, 5.1) - 1)
+      const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+      const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+      const rA = 1 + bumpA + dimple + rjit
+      const rB = 1 + bumpB + dimple + rjit
       positionsA[i * 3] = nx * PLANET_RADIUS * rA
       positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
       positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
@@ -433,9 +515,13 @@ function useWaterGeometry(): WaterBake {
       paintDepth(colorsIdxB, i, terrainBumpB(px, py, pz))
       // clay lumps, inward-only (radius never exceeds WATER_LEVEL → no shoreline
       // poke-through); two octaves + recomputed normals catch the ramp as clay.
-      const w1 = Math.sin(5.1 * dir.x + 1.3) * Math.sin(4.7 * dir.y - 0.7) * Math.sin(5.3 * dir.z + 2.1)
-      const w2 = Math.sin(9.4 * dir.y + 0.5) * Math.sin(8.7 * dir.z - 1.1) * Math.sin(9.1 * dir.x + 2.6)
-      v.multiplyScalar(1 - 0.009 * (0.5 + 0.5 * w1) - 0.004 * (0.5 + 0.5 * w2))
+      // Task-21: chunked up — bigger pressed sheets (freq 5→3.3, amp 0.009→0.016)
+      // so water reads as a hand-pressed clay sheet, not ripple noise; the fine
+      // octave follows (9→7, 0.004→0.006). Max inward 0.022 keeps water floor at
+      // 0.978·WATER_LEVEL, still above the basin floors, still below the shoreline.
+      const w1 = Math.sin(3.3 * dir.x + 1.3) * Math.sin(3.0 * dir.y - 0.7) * Math.sin(3.5 * dir.z + 2.1)
+      const w2 = Math.sin(7.1 * dir.y + 0.5) * Math.sin(6.6 * dir.z - 1.1) * Math.sin(6.9 * dir.x + 2.6)
+      v.multiplyScalar(1 - 0.016 * (0.5 + 0.5 * w1) - 0.006 * (0.5 + 0.5 * w2))
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     // Flat-shade: expand to non-indexed then per-face normals so the water shows
