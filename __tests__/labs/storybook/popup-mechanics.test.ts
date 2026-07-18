@@ -1156,8 +1156,16 @@ describe('A10 wedge containment — paper never pokes through either bounding pa
             // glue-layer lift (0.003) may sit inside the closing sandwich,
             // which a zero-thickness wedge reads as penetration. Allow it in
             // LINEAR terms (4mm against paper thickness 0.02); everything
-            // else keeps the strict angular tolerance.
-            const slackAng = layer.mech === 'dress' || layer.mech === 'rotor' ? 0.004 / r : 1e-6
+            // else keeps the strict angular tolerance. The keepstack joins the
+            // class: its anti-z-fight riders (facade PLATE_LIFT / BALCONY_LIFT
+            // 0.004, sh-scaled) ride a hair off their host planes, and near the
+            // page-touch pose that hair can exit the zero-thickness wedge by up
+            // to the lift — paper thickness, not penetration (bench-side S4
+            // tolerates the same via PLATE_WEDGE_TOL).
+            const slackAng =
+              layer.mech === 'dress' || layer.mech === 'rotor' || layer.mech === 'keepstack'
+                ? 0.004 / r
+                : 1e-6
             // atan2 jumps to -PI for points on the flat left page whose y
             // carries -0/-1e-17 float noise; lift those into [0, 2PI) so a
             // corner exactly on a page plane isn't a false violation.

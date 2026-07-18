@@ -257,10 +257,12 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // die-cut battlement, not raw kraft. Back cap braces, flat lid seats the
       // gallery + carries the balcony.
       { key: 'hall', a: 0.4, height: 0.25, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.8, height: 0.1799 } },
-      // Balcony Gallery — solid capFront tier below the jutting gold balcony. Its
-      // die-cut arcade plate (3.1:1) is PENDING (user generating); until it lands
-      // the cap renders as plain kraft paper (no plate, no `-front` art yet).
-      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true },
+      // Balcony Gallery — solid capFront tier below the jutting gold balcony.
+      // Facade plate: painted arcade loggia (delivered 3.677) sized plate width =
+      // cap width 0.68 (flush, like the hall fallback) -> height 0.1849; the
+      // exposed cap strip above (0.185..0.22) renders as interior shadow, reading
+      // as the recess under the balcony cantilever.
+      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.1849 } },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
       // see-through belfry) and host the winch iris + counterweight; flat cap
       // slab seats the crown. Facade plate: painted roof + bell (delivered 2.427)
@@ -305,15 +307,15 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // overrun the radius cap). Bench Y1-Y6 all green (fold-flat, keep D-G2,
   // row/fringe/winch-disc D-G2, real-time 5% margin, fits-page, pinned-camera
   // sightline 51% visible). Slot->strip aspect per the prepare-art FAN_OUT
-  // (b-strips 3.484 -> l0/l1/r2, c-strips 3.185 -> l2/r0/r1).
+  // (a-strips 2.956 -> l0/r1, b-strips 3.484 -> l1/r2, c-strips 3.185 -> l2/r0).
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
-    { F: 0.44, zc: -0.56, height: 0.08, width: 0.2787, standDeg: 68 },
+    { F: 0.44, zc: -0.56, height: 0.08, width: 0.2365, standDeg: 68 },
     { F: 0.45, zc: -0.46, height: 0.082, width: 0.2857, standDeg: 68 },
     { F: 0.45, zc: -0.37, height: 0.078, width: 0.2484, standDeg: 68 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
     { F: 0.44, zc: -0.56, height: 0.084, width: 0.2675, standDeg: 68 },
-    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2612, standDeg: 68 },
+    { F: 0.45, zc: -0.46, height: 0.082, width: 0.2424, standDeg: 68 },
     { F: 0.45, zc: -0.37, height: 0.075, width: 0.2613, standDeg: 68 },
   ] },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine

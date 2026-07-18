@@ -89,12 +89,9 @@ const CROP_TO_ASPECT = {
 // strip paintings (a/b/c) each serve one slot per side, at separated
 // positions so the reuse never reads as a repeat.
 const FAN_OUT = {
-  // INTERIM: the delivered ch3-citadel-a.png was a mis-saved balcony
-  // duplicate, so strips b/c cover its two slots until a real citadel-a
-  // lands (then restore: a -> [l-mound0, r-mound1]).
-  'ch3-citadel-a': [],
-  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2', 'ch3-skyline-l-mound0'],
-  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0', 'ch3-skyline-r-mound1'],
+  'ch3-citadel-a': ['ch3-skyline-l-mound0', 'ch3-skyline-r-mound1'],
+  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2'],
+  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0'],
 }
 
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,

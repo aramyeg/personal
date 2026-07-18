@@ -187,7 +187,7 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
   })
 
   describe('die-cut facade plates (the raven-finial idiom generalized to tier fronts)', () => {
-    const PLATED = ['hall', 'loft', 'crown'] as const
+    const PLATED = ['hall', 'gallery', 'loft', 'crown'] as const
 
     it('every plated tier suppresses its cap-front art (capFrontArt:false) so the cap stays raw bracing paper', () => {
       const geoms = keepStackStoryGeoms(KEEP)
@@ -198,13 +198,12 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
         if (plated) expect(g.capFrontArt).toBe(false)
         else expect(g.capFrontArt).toBeUndefined()
       }
-      // the gallery front is PENDING (no art) -> no plate yet.
-      expect(keepStackFacadePlate(KEEP, 'gallery', ...bloom(REST))).toBeNull()
     })
 
     it('each plate mesh aspect (width/height) equals the delivered UNCROPPED art aspect', () => {
-      // hall 4.448 (curtain wall), loft 2.427 (belfry roof+bell), crown 1.601 (spire).
-      const want: Record<string, number> = { hall: 4.448, loft: 2.427, crown: 1.601 }
+      // hall 4.448 (curtain wall), gallery 3.677 (arcade loggia), loft 2.427
+      // (belfry roof+bell), crown 1.601 (spire).
+      const want: Record<string, number> = { hall: 4.448, gallery: 3.677, loft: 2.427, crown: 1.601 }
       for (const key of PLATED) {
         const plate = KEEP.stories.find((s) => s.key === key)!.plate!
         expect(plate.width / plate.height).toBeCloseTo(want[key], 2)
