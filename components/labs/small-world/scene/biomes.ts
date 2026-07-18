@@ -147,23 +147,33 @@ export const POLAR_L: WaterBody = { dir: [-1, 0, 0], radius: 1.05, feather: 0.34
 /** Back-compat: the ocean list (a single body now). */
 export const POLAR_OCEANS: readonly WaterBody[] = [POLAR_L]
 
-const OCEAN_WARP_AMP = 0.15
-/** Deterministic low-frequency coastline warp: the azimuth φ around the −x pole
- *  (which equals a point's longitude θ) → a bounded ~[-1,1] offset added to the
- *  ocean's angular radius, carving bays and headlands. The 3φ octave (period 2π/3,
- *  phased to peak at the three band centres) lets the sea reach inland where each
- *  wedge drains into it; the 5φ + 2φ octaves break the 3-fold symmetry so no two
- *  headlands/bays match (the irregular coast Aram asked for). Pure sines (NO
- *  Math.random); shared by both variants, so the warped left limb is bit-identical
- *  A vs B (the structural invariant). */
-function oceanWarp(ny: number, nz: number): number {
+/** Ocean coastline warp parameters, PER VARIANT: [amp, a3, p3, a5, p5, a2, p2] for
+ *  amp·(a3·sin3φ+p3 + a5·sin5φ+p5 + a2·sin2φ+p2). Task 22 ships A and B byte-
+ *  IDENTICAL, so the warped left limb stays bit-identical A vs B (the current-regime
+ *  invariant, |nx|>0.75). This is a per-variant TABLE — not baked constants — on
+ *  purpose: Task 25 will make the ±x caps themselves evolve (discrete flip if the
+ *  occlusion bench allows, else continuous phase-driven coastline evolution) by
+ *  diverging these two rows. Keep them equal until that task deliberately does not. */
+const OCEAN_WARP: readonly (readonly [number, number, number, number, number, number, number])[] = [
+  [0.15, 0.45, -2.618, 0.35, -1.9, 0.2, 2.4], // A (lap 1)
+  [0.15, 0.45, -2.618, 0.35, -1.9, 0.2, 2.4], // B (lap 2) — === A until Task 25 diverges caps
+]
+/** Deterministic low-frequency coastline warp for a variant: the azimuth φ around
+ *  the −x pole (which equals a point's longitude θ) → a bounded ~[-1,1] offset added
+ *  to the ocean's angular radius, carving bays and headlands. The 3φ octave (period
+ *  2π/3, phased to peak at the three band centres) lets the sea reach inland where
+ *  each wedge drains into it; the 5φ + 2φ octaves break the 3-fold symmetry so no
+ *  two headlands/bays match (the irregular coast Aram asked for). Pure sines (NO
+ *  Math.random). */
+function oceanWarp(ny: number, nz: number, variant: 0 | 1): number {
+  const w = OCEAN_WARP[variant]
   const phi = Math.atan2(nz, ny)
-  return 0.45 * Math.sin(3 * phi - 2.618) + 0.35 * Math.sin(5 * phi - 1.9) + 0.2 * Math.sin(2 * phi + 2.4)
+  return w[1] * Math.sin(3 * phi + w[2]) + w[3] * Math.sin(5 * phi + w[4]) + w[5] * Math.sin(2 * phi + w[6])
 }
-/** Feathered 0..1 membership of the warped left ocean at a unit point. */
-export function oceanMask(nx: number, ny: number, nz: number): number {
+/** Feathered 0..1 membership of the warped left ocean at a unit point, for a variant. */
+export function oceanMask(nx: number, ny: number, nz: number, variant: 0 | 1): number {
   const d = Math.acos(clampU(-nx)) // angular distance to the −x pole
-  const eff = POLAR_L.radius + OCEAN_WARP_AMP * oceanWarp(ny, nz)
+  const eff = POLAR_L.radius + OCEAN_WARP[variant][0] * oceanWarp(ny, nz, variant)
   return smoothstep01((eff - d) / POLAR_L.feather)
 }
 
@@ -504,10 +514,12 @@ function canyonWalls(nx: number, ny: number, nz: number): number {
 
 // --- Assembled displacement -------------------------------------------------
 
-/** The one left ocean carved below the waterline (variant-INVARIANT): the warped
- *  coastline cap plus a couple of low offshore island swells. */
-function oceanCarve(nx: number, ny: number, nz: number): number {
-  let c = -POLAR_L.depth * oceanMask(nx, ny, nz)
+/** The one left ocean carved below the waterline, for a variant: the warped
+ *  coastline cap plus a couple of low offshore island swells. Variant-threaded so
+ *  Task 25 can diverge the caps; A and B carve identically today (OCEAN_WARP rows
+ *  are equal), so A === B beyond |nx| > 0.75 still holds exactly. */
+function oceanCarve(nx: number, ny: number, nz: number, variant: 0 | 1): number {
+  let c = -POLAR_L.depth * oceanMask(nx, ny, nz, variant)
   for (let i = 0; i < OCEAN_ISLANDS.length; i++) c += peakBump(nx, ny, nz, OCEAN_ISLANDS[i])
   return c
 }
@@ -537,19 +549,20 @@ export function wedgeDelta(nx: number, ny: number, nz: number, variant: 0 | 1): 
 
 /** Variant-A authored displacement (lap 1). */
 export function biomeBump(nx: number, ny: number, nz: number): number {
-  return oceanCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 0)
+  return oceanCarve(nx, ny, nz, 0) + wedgeDelta(nx, ny, nz, 0)
 }
-/** Variant-B authored displacement (lap 2). Equals biomeBump on every meridian
- *  and at the limbs by construction (wedgeGate = 0 there, oceanCarve is invariant). */
+/** Variant-B authored displacement (lap 2). Equals biomeBump on every meridian and
+ *  at the limbs by construction (wedgeGate = 0 there; the per-variant oceanCarve
+ *  rows are identical today, so the caps match too — Task 25 diverges them). */
 export function biomeBumpB(nx: number, ny: number, nz: number): number {
-  return oceanCarve(nx, ny, nz) + wedgeDelta(nx, ny, nz, 1)
+  return oceanCarve(nx, ny, nz, 1) + wedgeDelta(nx, ny, nz, 1)
 }
 
 // --- Classification for the colour pass -------------------------------------
 
 /** Strongest ocean + active-wedge local-water membership (0..1) at a point. */
 export function waterMask(nx: number, ny: number, nz: number, variant: 0 | 1): number {
-  let m = oceanMask(nx, ny, nz)
+  let m = oceanMask(nx, ny, nz, variant)
   const band = bandOf(canonicalTheta(Math.atan2(nz, ny)))
   const ponds = PONDS[variant]
   for (let i = 0; i < ponds.length; i++) {
