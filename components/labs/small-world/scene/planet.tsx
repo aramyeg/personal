@@ -15,6 +15,11 @@ import {
   colorGate,
   channelDist,
   canyonCreekDist,
+  tideCarve,
+  tideWetnessFast,
+  tideFrontOffset,
+  TIDE_LAT_LO,
+  TIDE_DEPTH,
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
@@ -104,11 +109,16 @@ export function terrainSlope(
  * mid-lerp; on the spine terrainBumpB === terrainBump so it is a no-op there. */
 export function terrainBumpAt(x: number, y: number, z: number, rotation: number): number {
   const len = Math.sqrt(x * x + y * y + z * z) || 1
-  const gate = renewalGate(canonicalTheta(Math.atan2(z / len, y / len)), rotation)
-  if (gate <= 0) return terrainBump(x, y, z)
-  if (gate >= 1) return terrainBumpB(x, y, z)
+  const nx = x / len, ny = y / len, nz = z / len
+  const gate = renewalGate(canonicalTheta(Math.atan2(nz, ny)), rotation)
+  // Round 7: the continuous overflow tide wets the +x grazing limb (|nx| ≥ 0.80) as a
+  // monotone function of rotation. It is added on TOP of the A/B blend and is 0 for the
+  // whole lane/anchor region (nx ≤ 0.80), so surfaceYAt/walkYAt are unchanged there.
+  const tide = tideCarve(nx, ny, nz, rotation)
+  if (gate <= 0) return terrainBump(x, y, z) + tide
+  if (gate >= 1) return terrainBumpB(x, y, z) + tide
   const a = terrainBump(x, y, z)
-  return a + (terrainBumpB(x, y, z) - a) * gate
+  return a + (terrainBumpB(x, y, z) - a) * gate + tide
 }
 
 /**
@@ -431,6 +441,10 @@ type MorphBake = {
   colorsA: Float32Array; colorsB: Float32Array
   normalsA: Float32Array; normalsB: Float32Array
   thetaC: Float32Array; buckets: Buckets
+  // Round 7 tide: the flooded-limb target + the static right-cap vertex bucket the
+  // per-frame tide re-evaluates (base A === B on the grazing limb, so A is the base).
+  floodedPositions: Float32Array; floodedColors: Float32Array; floodedNormals: Float32Array
+  capIdx: Int32Array; capNx: Float32Array; capNy: Float32Array; capNz: Float32Array
 }
 
 /**
@@ -454,6 +468,13 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
     const positionsB = new Float32Array(count * 3)
     const colorsA = new Float32Array(count * 3)
     const colorsB = new Float32Array(count * 3)
+    // Round 7 tide targets: the flooded state of the right grazing limb + its verts.
+    const floodedPositions = new Float32Array(count * 3)
+    const floodedColors = new Float32Array(count * 3)
+    const capIdx: number[] = []
+    const capNxL: number[] = []
+    const capNyL: number[] = []
+    const capNzL: number[] = []
     const thetaC = new Float32Array(count)
     const v = new THREE.Vector3()
     const pal = {
@@ -516,9 +537,33 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
       paintVertex(c, pal, nx, ny, nz, bumpB, true)
       colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
+
+      // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA
+      // === rB there (grazing-limb invariant), so A is the base; the flooded radius
+      // drops TIDE_DEPTH below it (clearly under the waterline) and the colour goes to
+      // deep water. Elsewhere the flooded target === the A bake (a no-op the tide never
+      // touches). The per-frame tide lerps A → flooded by tideWetness on the cap bucket.
+      if (nx > TIDE_LAT_LO) {
+        const floodedR = rA - TIDE_DEPTH
+        floodedPositions[i * 3] = nx * PLANET_RADIUS * floodedR
+        floodedPositions[i * 3 + 1] = ny * PLANET_RADIUS * floodedR
+        floodedPositions[i * 3 + 2] = nz * PLANET_RADIUS * floodedR
+        floodedColors[i * 3] = pal.deep.r
+        floodedColors[i * 3 + 1] = pal.deep.g
+        floodedColors[i * 3 + 2] = pal.deep.b
+        capIdx.push(i); capNxL.push(nx); capNyL.push(ny); capNzL.push(nz)
+      } else {
+        floodedPositions[i * 3] = positionsA[i * 3]
+        floodedPositions[i * 3 + 1] = positionsA[i * 3 + 1]
+        floodedPositions[i * 3 + 2] = positionsA[i * 3 + 2]
+        floodedColors[i * 3] = colorsA[i * 3]
+        floodedColors[i * 3 + 1] = colorsA[i * 3 + 1]
+        floodedColors[i * 3 + 2] = colorsA[i * 3 + 2]
+      }
     }
     const normalsA = flatNormals(positionsA)
     const normalsB = flatNormals(positionsB)
+    const floodedNormals = flatNormals(floodedPositions)
 
     // Live attributes start on lap-1 (A); the frame lerp writes toward B.
     const posAttr = new THREE.BufferAttribute(positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
@@ -533,6 +578,11 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       bake: {
         positionsA, positionsB, colorsA, colorsB, normalsA, normalsB,
         thetaC, buckets: buildBuckets(thetaC),
+        floodedPositions, floodedColors, floodedNormals,
+        capIdx: Int32Array.from(capIdx),
+        capNx: Float32Array.from(capNxL),
+        capNy: Float32Array.from(capNyL),
+        capNz: Float32Array.from(capNzL),
       },
     }
   }, [])
@@ -655,6 +705,59 @@ function useWaterGeometry(): WaterBake {
   }, [])
 }
 
+/**
+ * The Round 7 overflow tide (Mechanism B). Re-evaluates ONLY the static right-cap
+ * vertex bucket (|nx| > TIDE_LAT_LO — a fixed set, since the poles sit at ±x and the
+ * planet spins about x) each frame, lerping the base (A, which equals B on the grazing
+ * limb) toward the flooded target by tideWetness(nx, rotation). Continuous + monotone
+ * in rotation, so the right limb goes dry → wet exactly once across the journey. Runs
+ * AFTER the renewal front each frame so it owns the final cap value. Cost is reported
+ * next to the front in renewal-cost.mjs (cap bucket ≈ 10% of the buffer).
+ */
+function makeTideMorph(args: {
+  geo: THREE.BufferGeometry
+  bake: MorphBake
+}): { update: (rotation: number) => void } {
+  const { geo, bake } = args
+  const posArr = geo.attributes.position.array as Float32Array
+  const colArr = geo.attributes.color.array as Float32Array
+  const norArr = geo.attributes.normal.array as Float32Array
+  const { capIdx, capNx, capNy, capNz } = bake
+  const basePos = bake.positionsA
+  const baseCol = bake.colorsA
+  const baseNor = bake.normalsA
+  const { floodedPositions: fPos, floodedColors: fCol, floodedNormals: fNor } = bake
+  // Bake the azimuthal shoreline offset per cap vertex ONCE, so the per-frame lerp
+  // avoids atan2 (keeps front + tide under the ~0.5 ms budget — see renewal-cost.mjs).
+  const capWob = new Float32Array(capIdx.length)
+  for (let k = 0; k < capIdx.length; k++) capWob[k] = tideFrontOffset(capNy[k], capNz[k])
+  let last = Number.NaN
+  const update = (rotation: number): void => {
+    if (rotation === last) return
+    last = rotation
+    for (let k = 0; k < capIdx.length; k++) {
+      const i = capIdx[k]
+      const g = tideWetnessFast(capNx[k], capWob[k], rotation)
+      const j = i * 3
+      posArr[j] = basePos[j] + (fPos[j] - basePos[j]) * g
+      posArr[j + 1] = basePos[j + 1] + (fPos[j + 1] - basePos[j + 1]) * g
+      posArr[j + 2] = basePos[j + 2] + (fPos[j + 2] - basePos[j + 2]) * g
+      colArr[j] = baseCol[j] + (fCol[j] - baseCol[j]) * g
+      colArr[j + 1] = baseCol[j + 1] + (fCol[j + 1] - baseCol[j + 1]) * g
+      colArr[j + 2] = baseCol[j + 2] + (fCol[j + 2] - baseCol[j + 2]) * g
+      const nx = baseNor[j] + (fNor[j] - baseNor[j]) * g
+      const ny = baseNor[j + 1] + (fNor[j + 1] - baseNor[j + 1]) * g
+      const nz = baseNor[j + 2] + (fNor[j + 2] - baseNor[j + 2]) * g
+      const l = Math.hypot(nx, ny, nz) || 1
+      norArr[j] = nx / l; norArr[j + 1] = ny / l; norArr[j + 2] = nz / l
+    }
+    geo.attributes.position.needsUpdate = true
+    geo.attributes.color.needsUpdate = true
+    geo.attributes.normal.needsUpdate = true
+  }
+  return { update }
+}
+
 export function Planet({
   journeyRef,
   children,
@@ -687,12 +790,16 @@ export function Planet({
       }),
     [water]
   )
+  // Round 7 overflow tide — the right-cap bucket, re-evaluated per frame AFTER the
+  // renewal front so it owns the final grazing-limb value.
+  const tideMorph = useMemo(() => makeTideMorph({ geo: geometry, bake }), [geometry, bake])
 
   useFrame(() => {
     const j = journeyRef.current
     if (group.current) group.current.rotation.x = -j.rotation
     planetMorph.update(j.rotation)
     waterMorph.update(j.rotation)
+    tideMorph.update(j.rotation)
   })
 
   return (

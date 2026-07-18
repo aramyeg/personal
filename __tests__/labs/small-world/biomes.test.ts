@@ -8,6 +8,10 @@ import {
   bandOf,
   canonicalTheta,
   MERIDIANS,
+  tideWetness,
+  tideCarve,
+  TIDE_LAT_LO,
+  WATER_LEVEL,
 } from '@/components/labs/small-world/scene/biomes'
 import {
   terrainBump,
@@ -103,6 +107,54 @@ describe('the left-ocean coastline evolves per lap (Task 25 — caps not stone-s
     expect(anyDiff).toBe(true)
     // a real moved coastline (headland↔bay), not float noise
     expect(maxDiff).toBeGreaterThan(0.02)
+  })
+})
+
+// Round 7 (the flood arc): the grazing right limb (|nx| ≥ TIDE_LAT_LO) is wetted by a
+// CONTINUOUS tide — a monotone function of unwrapped rotation ∈ [0, 4π]. It is a
+// separate render/sample-time term (NOT in the A/B bakes), so the discrete-bake
+// invariants above are untouched; here we pin the tide's own contract.
+describe('the overflow tide (Round 7 — right limb wets continuously)', () => {
+  const ROTATION_TOTAL = Math.PI * 4
+  const rightCap = (nx: number, az: number): [number, number, number] => {
+    const ring = Math.sqrt(1 - nx * nx)
+    return [nx, ring * Math.cos(az), ring * Math.sin(az)]
+  }
+
+  it('is 0 across the whole left hemisphere and the lane (nx ≤ TIDE_LAT_LO), every rotation', () => {
+    for (let ri = 0; ri <= 40; ri++) {
+      const rot = (ri / 40) * ROTATION_TOTAL
+      for (const nx of [-0.95, -0.85, -0.5, 0, 0.5, 0.79, TIDE_LAT_LO]) {
+        for (const az of [0.3, 1.7, 3.1, 4.9]) {
+          expect(tideWetness(...rightCap(nx, az), rot)).toBe(0)
+          expect(Math.abs(tideCarve(...rightCap(nx, az), rot))).toBe(0)
+        }
+      }
+    }
+  })
+
+  it('is monotone non-decreasing in rotation at every right-cap point (dry → wet once)', () => {
+    for (const nx of [0.82, 0.88, 0.94]) {
+      for (const az of [0.4, 2.2, 4.5]) {
+        let prev = -1
+        for (let ri = 0; ri <= 400; ri++) {
+          const w = tideWetness(...rightCap(nx, az), (ri / 400) * ROTATION_TOTAL)
+          expect(w).toBeGreaterThanOrEqual(prev - 1e-12)
+          prev = w
+        }
+      }
+    }
+  })
+
+  it('leaves the right limb dry at journey start and wet at journey end', () => {
+    for (const nx of [0.82, 0.88, 0.94]) {
+      for (const az of [0.4, 2.2, 4.5]) {
+        expect(tideWetness(...rightCap(nx, az), 0)).toBe(0)
+        // by journey's end the shoreline has swept past → carve submerges the coast
+        expect(tideWetness(...rightCap(nx, az), ROTATION_TOTAL)).toBeGreaterThan(0.5)
+        expect(tideCarve(...rightCap(nx, az), ROTATION_TOTAL)).toBeLessThan(-(1 - WATER_LEVEL))
+      }
+    }
   })
 })
 

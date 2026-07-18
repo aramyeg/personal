@@ -5,9 +5,15 @@
  * carries a variant-A scene (lap 1) and a variant-B scene (lap 2), so six
  * distinct wedges tile the two-lap journey:
  *
- *   band 0  A0 BlueNet spring pond    · B0 Accenture golden dunes
- *   band 1  A1 FLYERBEE flower field  · B1 AKNA brown canyon creek
- *   band 2  A2 360dialog grand delta  · B2 xDataGroup winter summit
+ *   band 0  A0 BlueNet spring + strait · B0 Accenture dunes + STRAIT BREACH
+ *   band 1  A1 FLYERBEE flower field   · B1 AKNA canyon creek + shelf sea
+ *   band 2  A2 360dialog grand delta   · B2 xDataGroup winter + shelf sea
+ *
+ * Round 7 (the flood arc): lap 1 (A) is the dry "before" — left ocean dominant,
+ * right side continental coast. Across the B variants the water advances wedge by
+ * wedge (B0 breach → B1 shelf → B2 shelf, each reaching further right), and the
+ * grazing right limb (|nx| ≥ 0.80) wets CONTINUOUSLY via the tide (see tideCarve),
+ * so by journey's end the ocean has overflowed to the other side.
  *
  * TWO structural invariants keep the renewal seamless (they replace the retired
  * Task-15/16 spineGate + strait). Round 6 makes the limbs ASYMMETRIC:
@@ -19,7 +25,12 @@
  *    limb (|nx| ≥ 0.8, the screen-stable silhouette) so the flip is never caught on
  *    camera (capDivGate, occlusion-sweep proven). The RIGHT limb (+x) is
  *    NO LONGER an ocean — it is continental coast (land), whose shelf seas are
- *    authored per-wedge, so its shoreline likewise changes lap to lap.
+ *    authored per-wedge, so its shoreline likewise changes lap to lap. Round 7: on
+ *    lap 2 those shelf seas advance further right wedge by wedge, and the grazing
+ *    limb itself (|nx| ≥ 0.80) is wetted by the CONTINUOUS tide (tideCarve, a
+ *    rotation-driven term layered by terrainBumpAt / the render, NOT part of the
+ *    A/B bakes) — so the discrete bakes below still read the right limb as invariant
+ *    coast, while the sampled/rendered world floods it monotonically across the journey.
  *  - Wedge gate: every wedge delta is multiplied by wedgeGate = meridianGate ·
  *    polarLatGate, which is EXACTLY 0 within 0.075 rad of any meridian and fades
  *    to 0 by |nx| = 0.75. So (a) on every meridian bumpA === bumpB === base +
@@ -226,6 +237,75 @@ function peakBump(nx: number, ny: number, nz: number, p: Peak): number {
   return p.h * Math.exp(-g * g)
 }
 
+// --- The overflow tide (Round 7, Mechanism B — RIGHT limb ring only) --------
+//
+// Aram: "we still have the ocean stone set as a pole … at some point have it
+// overflow to the other side." The discrete wedge restaging floods the right
+// side out to |nx| ≈ 0.74 (wedgeGate zeros deltas by 0.75); the grazing right
+// limb (|nx| ≥ TIDE_LAT_LO) cannot flip discretely (Task 25's proof stands, the
+// ±x poles sit on the screen limb forever). So the limb's wetness is a CONTINUOUS
+// monotone function of the UNWRAPPED rotation ∈ [0, ROTATION_TOTAL]: a slow tide
+// whose shoreline advances from the shelf edge toward the +x pole across the two
+// laps. Every frame is a valid coastline (no invalid half-state to hide, so no
+// occlusion proof is needed — unlike the discrete A→B flip), it is deterministic
+// (rotation is the ONLY time-like input — NO Date.now), and it is slow enough not
+// to read as sliding ground (max d(coast)/d(rotation) reported in scan-task26).
+//
+// Scope: +x hemisphere only (the LEFT limb is the permanent ocean, already wet).
+// terrainBumpAt adds `tideCarve` here as ground truth; the render re-evaluates the
+// static right-cap vertex bucket per frame (planet.tsx). The girl/props never stand
+// at |nx| ≥ TIDE_LAT_LO (delta-arm anchors top out near |nx| ≈ 0.42), so the lane,
+// walkYAt and every seated anchor are untouched — tideWetness is 0 for nx ≤ LO.
+
+/** Duplicated from journey-timeline.ROTATION_TOTAL (kept a zero-import leaf). */
+const TIDE_ROTATION_TOTAL = Math.PI * 4
+/** Tide is confined to the +x grazing limb; 0.80 is exactly where the wedge gate
+ *  (polarLatGate → 0 by 0.75) and the left-ocean cap divergence (capDivGate → 0 by
+ *  0.80) have both ended, so the tide owns a band no other water term touches. */
+export const TIDE_LAT_LO = 0.8
+/** Shoreline latitude (nx) at journey start (nothing wet) and end (limb reads wet).
+ *  The pole tip past END stays a last dry islet. */
+const TIDE_FRONT_START = TIDE_LAT_LO
+const TIDE_FRONT_END = 1.05
+/** Shoreline softness in nx (a gentle wetting, not a hard step). */
+const TIDE_FEATHER = 0.06
+/** Carve below the coast at full wetness — sized so the ~[0.978,1.022]R right-cap
+ *  coast (base meadow only past the wedge gate) drops clearly under WATER_LEVEL. */
+export const TIDE_DEPTH = 0.06
+
+/** The tide's per-point azimuthal shoreline offset (bays + headlands in the tide
+ *  line). Deterministic. The render bakes this ONCE per cap vertex so the per-frame
+ *  hot path (tideWetnessFast) avoids atan2 — see planet.tsx makeTideMorph. */
+export function tideFrontOffset(ny: number, nz: number): number {
+  return 0.015 * Math.sin(3 * Math.atan2(nz, ny) + 0.7)
+}
+
+/** 0..1 tide wetness from a PRECOMPUTED front offset (render hot path). 0 for
+ *  nx ≤ TIDE_LAT_LO; rises to 1 once the advancing shoreline (front) has swept past
+ *  this latitude. Monotone-increasing in rotation (front only grows). */
+export function tideWetnessFast(nx: number, wob: number, rotation: number): number {
+  if (nx <= TIDE_LAT_LO) return 0
+  const p = clamp01(rotation / TIDE_ROTATION_TOTAL)
+  const front = TIDE_FRONT_START + (TIDE_FRONT_END - TIDE_FRONT_START) * p + wob
+  return smoothstep01((front - nx) / TIDE_FEATHER)
+}
+
+/** 0..1 tide wetness at a right-cap point under the current rotation: 0 across the
+ *  whole left hemisphere and for nx ≤ TIDE_LAT_LO; rises to 1 once the advancing
+ *  shoreline has swept past this latitude. Continuous, and monotone-increasing in
+ *  rotation, so the limb goes dry→wet exactly once. (Ground-truth entry; the render
+ *  uses tideWetnessFast with a baked offset for the same result without atan2.) */
+export function tideWetness(nx: number, ny: number, nz: number, rotation: number): number {
+  if (nx <= TIDE_LAT_LO) return 0
+  return tideWetnessFast(nx, tideFrontOffset(ny, nz), rotation)
+}
+
+/** Rotation-dependent tide carve (ground truth): lowers the right-limb coast under
+ *  the waterline as the tide advances. Zero everywhere except the wetting +x cap. */
+export function tideCarve(nx: number, ny: number, nz: number, rotation: number): number {
+  return -TIDE_DEPTH * tideWetness(nx, ny, nz, rotation)
+}
+
 // --- Great-circle arcs (channel centre-lines) ------------------------------
 
 type Arc = {
@@ -332,6 +412,27 @@ function straitChannel(theta: number): Channel {
   return { arcs: [makeArc(c, lMouth), makeArc(c, rInlet)], half: 0.09, ramp: 0.08, depth: 0.055, widen }
 }
 
+/** The breach strait (B0, Round 7 climax): the continent-break wedge's B variant is
+ *  the overflow moment. On lap 1 (A0) the strait is a modest continent break the girl
+ *  bridges; when band 0 comes around again on lap 2 the ocean has POURED THROUGH — the
+ *  strait has widened massively and the right inlet has swollen into a true sea
+ *  (B0_SEA) visibly JOINED to the left ocean across the lane. Like `straitChannel` the
+ *  width (not depth) carries the wide read at the lane so the on-bridge ramp stays
+ *  gentle and the deck provably spans (lo 0.16); the flanks open far off-lane into the
+ *  two joined waters. One-glance read: a broad blue band from the left limb, through
+ *  the strait under the girl's bridge, into the swollen right sea. */
+function breachStraitChannel(theta: number): Channel {
+  const c = crossPoint(theta)
+  const lMouth: [number, number, number] = [-0.82, c[1] * 0.18, c[2] * 0.18]
+  const rMouth = place(0.5, theta + 0.2) // steep climb into the swollen right sea (B0_SEA)
+  // `neg` widen: the strait opens MASSIVELY toward the left ocean (the "ocean poured
+  // through" read) while the right approach stays a narrow thread that climbs steeply
+  // to B0_SEA — so the wide flank never reaches the low-nx dune props, and the lane
+  // (nx≈0, widen f=0) stays a spannable bridge crossing.
+  const widen = { half: 0.24, depth: 0.05, lo: 0.16, hi: 0.55, neg: true }
+  return { arcs: [makeArc(c, lMouth), makeArc(c, rMouth)], half: 0.1, ramp: 0.08, depth: 0.06, widen }
+}
+
 /** The grand delta (A2, Round 6 redesign): the artery rises INLAND at a highland
  *  tarn (A2_SOURCE, off-lane at +nx), steps down through the spine crossing and
  *  broadens into a braided fan that drains INTO the LEFT ocean — one-glance read
@@ -367,7 +468,7 @@ function deltaChannel(theta: number): Channel {
  *  ocean, snaking down the canyon floor (its earth walls are added separately in
  *  sceneRaw). Three segments give it a clear S-bend so it reads as a river in a
  *  gorge, not a straight ditch. */
-function creekChannel(theta: number, sign: 1 | -1): Channel {
+function creekChannel(theta: number, sign: 1 | -1, half = CREEK_HALF, depth = CREEK_DEPTH): Channel {
   const c = crossPoint(theta)
   const bend1 = crossPoint(theta + 0.14)
   const bend2 = crossPoint(theta - 0.06)
@@ -376,9 +477,9 @@ function creekChannel(theta: number, sign: 1 | -1): Channel {
   const mouth: [number, number, number] = [sign * 0.82, c[1] * 0.18, c[2] * 0.18]
   return {
     arcs: [makeArc(c, midA), makeArc(midA, midB), makeArc(midB, mouth)],
-    half: CREEK_HALF,
+    half,
     ramp: CREEK_RAMP,
-    depth: CREEK_DEPTH,
+    depth,
   }
 }
 
@@ -391,8 +492,8 @@ const A_CHANNELS: readonly Channel[] = [
   deltaChannel(CROSSINGS_A[2]), // A2 grand delta: inland source → left ocean
 ]
 const B_CHANNELS: readonly Channel[] = [
-  streamChannel(CROSSINGS_B[0], -1), // B0 oasis stream → left ocean
-  creekChannel(CROSSINGS_B[1], -1), // B1 canyon creek → left ocean
+  breachStraitChannel(CROSSINGS_B[0]), // B0 continent-break BREACH: left ocean ↔ swollen right sea
+  creekChannel(CROSSINGS_B[1], -1, CREEK_HALF, 0.1), // B1 canyon creek → left ocean, fattened (deeper)
   streamChannel(CROSSINGS_B[2], -1), // B2 frozen creek → left ocean
 ]
 const CHANNELS = [A_CHANNELS, B_CHANNELS] as const
@@ -442,10 +543,23 @@ const A1_SHELF: WaterBody = { dir: norm3(place(0.55, 3.25)), radius: 0.26, feath
 /** A2 grand-delta inland source: a highland tarn feeding the braided delta down to
  *  the left ocean. */
 const A2_SOURCE: WaterBody = { dir: norm3(place(0.5, 6.0)), radius: 0.14, feather: 0.09, depth: 0.09 }
-/** B0 desert oasis pool. */
-const B0_OASIS: WaterBody = { dir: norm3(place(0.3, 1.12)), radius: 0.11, feather: 0.08, depth: 0.05 }
+/** B0 desert oasis pool — the last dune tarn, kept small beside the breached sea. */
+const B0_OASIS: WaterBody = { dir: norm3(place(0.3, 1.12)), radius: 0.09, feather: 0.07, depth: 0.05 }
+/** B0 BREACH sea (Round 7 climax): the swollen right-limb sea the ocean poured into
+ *  through the widened strait — a broad, deep body joined to the left ocean. First
+ *  wedge of the flood arc: its poleward reach is the SHORTEST of the three B seas
+ *  (the drama is the JOINING + width, not the reach), leaving B1/B2 to advance
+ *  further right as the journey goes on. */
+const B0_SEA: WaterBody = { dir: norm3(place(0.5, 1.4)), radius: 0.18, feather: 0.1, depth: 0.09 }
+/** B1 canyon shelf sea (Round 7 flood arc, step 2): a right-limb sea lapping the
+ *  fattened canyon, reaching FURTHER right than the B0 breach. */
+const B1_SHELF: WaterBody = { dir: norm3(place(0.54, 3.5)), radius: 0.22, feather: 0.12, depth: 0.09 }
 /** B2 frozen pond. */
 const B2_FROZEN: WaterBody = { dir: norm3(place(0.34, 5.55)), radius: 0.14, feather: 0.1, depth: 0.045 }
+/** B2 winter shelf sea (Round 7 flood arc, step 3 — journey's end): the frozen sea
+ *  reaches FURTHEST right, so by journey's end the coast is drowned right up to where
+ *  the continuous tide (tideCarve) takes over on the grazing limb. */
+const B2_SHELF: WaterBody = { dir: norm3(place(0.6, 5.72)), radius: 0.28, feather: 0.13, depth: 0.09 }
 const A_PONDS: readonly LocalBody[] = [
   { band: 0, body: A0_POND },
   { band: 0, body: A0_INLET },
@@ -454,7 +568,10 @@ const A_PONDS: readonly LocalBody[] = [
 ]
 const B_PONDS: readonly LocalBody[] = [
   { band: 0, body: B0_OASIS },
+  { band: 0, body: B0_SEA },
+  { band: 1, body: B1_SHELF },
   { band: 2, body: B2_FROZEN },
+  { band: 2, body: B2_SHELF },
 ]
 const PONDS = [A_PONDS, B_PONDS] as const
 
