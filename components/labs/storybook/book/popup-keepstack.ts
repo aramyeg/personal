@@ -47,6 +47,17 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // it only nudges world X/Y (never z), so B3 fore-edge containment is untouched.
 const BALCONY_LIFT = 0.004
 
+// Same idiom for the facade plates: a plate rides IN its cap plane, and from the
+// cap base up to the cap top it coplanarly overlaps the still-rendered cap face
+// (the interior-shadow recess behind the die-cut) -> z-fight flicker on every
+// camera/parallax move. Each half lifts along ITS OWN cap-half outward normal
+// (local (0, sign*ch, sh), a unit vector), magnitude PLATE_LIFT*sh: exactly 0 at
+// book-closed (fold-flat + S1 stay at 1e-9) and ~PLATE_LIFT toward the reader at
+// the open pose. A per-half rigid translation, so plate rigidity is untouched;
+// the crease halves part by ±PLATE_LIFT*ch laterally at mid-turn (sub-3mm at
+// book scale, unreadable at the sliver angles where ch is large).
+const PLATE_LIFT = 0.004
+
 /** One story of the keep — a box fold seated on the story below. `key` names
  *  the story (hall/gallery/loft/crown) so its per-face art ids resolve as
  *  `<keepId>-<key>-front/-back/-side/-top` (the box-family suffix scheme). */
@@ -280,14 +291,19 @@ export function keepStackFacadePlate(
   const X0 = a * ch
   const zc = seat.z1 + a * ch
   const wh = width / 2
-  const creaseBottom = W(X0, 0, zc)
-  const creaseTop = W(X0 + height, 0, zc)
-  const half = (sign: number): PanelQuad => [
-    creaseBottom,
-    creaseTop,
-    W(X0 + height, sign * wh * sh, zc - wh * ch),
-    W(X0, sign * wh * sh, zc - wh * ch),
-  ]
+  // PLATE_LIFT: rigid per-half translation along the cap-half outward normal
+  // (see the constant) so the plate never shares the rendered cap's plane.
+  const lift = PLATE_LIFT * sh
+  const half = (sign: number): PanelQuad => {
+    const dy = sign * lift * ch
+    const dz = lift * sh
+    return [
+      W(X0, dy, zc + dz),
+      W(X0 + height, dy, zc + dz),
+      W(X0 + height, sign * wh * sh + dy, zc - wh * ch + dz),
+      W(X0, sign * wh * sh + dy, zc - wh * ch + dz),
+    ]
+  }
   return { plateL: half(1), plateR: half(-1) }
 }
 
