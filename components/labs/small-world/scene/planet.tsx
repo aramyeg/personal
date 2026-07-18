@@ -593,6 +593,12 @@ type WaterBake = {
   geometry: THREE.BufferGeometry
   colorsA: Float32Array; colorsB: Float32Array
   thetaC: Float32Array; buckets: Buckets
+  // Round 7 tide: the right-cap water ring + the committed deep-ocean target it
+  // deepens toward as the tide floods (so the flooded limb reads open ocean, not a
+  // shallow teal fringe). Colour-only, tied to tideWetness — no geometry change.
+  waterCapIdx: Int32Array; waterCapNx: Float32Array
+  waterCapNy: Float32Array; waterCapNz: Float32Array
+  deepOcean: readonly [number, number, number]
 }
 
 /**
@@ -698,10 +704,27 @@ function useWaterGeometry(): WaterBake {
     // live colour buffer starts on A; the bucketed morph writes toward B per frame
     flat.setAttribute('color', new THREE.BufferAttribute(colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage))
     const thetaC = new Float32Array(fpos.count)
+    // Round 7: collect the right-cap water ring (local nx > TIDE_LAT_LO). The tide
+    // deepens these verts toward `deepOcean` — the left ocean's own committed deep
+    // blue — as the flood advances, so the overflowed limb reads as open sea.
+    const wCapIdx: number[] = []
+    const wCapNx: number[] = [], wCapNy: number[] = [], wCapNz: number[] = []
     for (let i = 0; i < fpos.count; i++) {
-      thetaC[i] = canonicalTheta(Math.atan2(fpos.getZ(i), fpos.getY(i)))
+      const px = fpos.getX(i), py = fpos.getY(i), pz = fpos.getZ(i)
+      const l = Math.hypot(px, py, pz) || 1
+      const nx = px / l, ny = py / l, nz = pz / l
+      thetaC[i] = canonicalTheta(Math.atan2(nz, ny))
+      if (nx > TIDE_LAT_LO) { wCapIdx.push(i); wCapNx.push(nx); wCapNy.push(ny); wCapNz.push(nz) }
     }
-    return { geometry: flat, colorsA, colorsB, thetaC, buckets: buildBuckets(thetaC) }
+    const deepOcean = new THREE.Color(PALETTE.riverDeep).lerp(new THREE.Color(PALETTE.ink), 0.5)
+    return {
+      geometry: flat, colorsA, colorsB, thetaC, buckets: buildBuckets(thetaC),
+      waterCapIdx: Int32Array.from(wCapIdx),
+      waterCapNx: Float32Array.from(wCapNx),
+      waterCapNy: Float32Array.from(wCapNy),
+      waterCapNz: Float32Array.from(wCapNz),
+      deepOcean: [deepOcean.r, deepOcean.g, deepOcean.b],
+    }
   }, [])
 }
 
@@ -758,6 +781,37 @@ function makeTideMorph(args: {
   return { update }
 }
 
+/**
+ * The tide's WATER-sphere companion (Round 7 punch item): as the flood advances, the
+ * right-cap water — revealed where the land sank under the waterline — deepens from
+ * its baked shallow-rim blue toward `deepOcean` (the left ocean's committed deep blue),
+ * so the overflowed limb reads as open ocean rather than a shallow teal fringe. The
+ * depth tint is tied to the SAME tideWetness as the land, so the colour deepens exactly
+ * as the water does. Colour-only, one deepening lerp over the static water-cap ring.
+ */
+function makeWaterTideMorph(water: WaterBake): { update: (rotation: number) => void } {
+  const colArr = water.geometry.attributes.color.array as Float32Array
+  const { waterCapIdx: idx, waterCapNx: nxA, waterCapNy: nyA, waterCapNz: nzA } = water
+  const baseCol = water.colorsA // A === B on the grazing limb, so A is the base
+  const [dr, dg, db] = water.deepOcean
+  const capWob = new Float32Array(idx.length)
+  for (let k = 0; k < idx.length; k++) capWob[k] = tideFrontOffset(nyA[k], nzA[k])
+  let last = Number.NaN
+  const update = (rotation: number): void => {
+    if (rotation === last) return
+    last = rotation
+    for (let k = 0; k < idx.length; k++) {
+      const g = tideWetnessFast(nxA[k], capWob[k], rotation)
+      const j = idx[k] * 3
+      colArr[j] = baseCol[j] + (dr - baseCol[j]) * g
+      colArr[j + 1] = baseCol[j + 1] + (dg - baseCol[j + 1]) * g
+      colArr[j + 2] = baseCol[j + 2] + (db - baseCol[j + 2]) * g
+    }
+    water.geometry.attributes.color.needsUpdate = true
+  }
+  return { update }
+}
+
 export function Planet({
   journeyRef,
   children,
@@ -790,9 +844,11 @@ export function Planet({
       }),
     [water]
   )
-  // Round 7 overflow tide — the right-cap bucket, re-evaluated per frame AFTER the
-  // renewal front so it owns the final grazing-limb value.
+  // Round 7 overflow tide — the right-cap buckets, re-evaluated per frame AFTER the
+  // renewal front so they own the final grazing-limb value (land geometry + colour, and
+  // the water sphere's deep-ocean deepening over the flooded limb).
   const tideMorph = useMemo(() => makeTideMorph({ geo: geometry, bake }), [geometry, bake])
+  const waterTideMorph = useMemo(() => makeWaterTideMorph(water), [water])
 
   useFrame(() => {
     const j = journeyRef.current
@@ -800,6 +856,7 @@ export function Planet({
     planetMorph.update(j.rotation)
     waterMorph.update(j.rotation)
     tideMorph.update(j.rotation)
+    waterTideMorph.update(j.rotation)
   })
 
   return (
