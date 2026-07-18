@@ -103,13 +103,17 @@ describe('dispatch keep — story cascade (bench derive-keep-stack.mjs / gallery
     expect(maxGap).toBeLessThanOrEqual(1e-9)
   })
 
-  it('S5/T7 height: the FAN SPIRE peak pierces above the retired crown (~1.0 world, was ~0.90)', () => {
-    // Concept A: the gabled crown box is replaced by a fan spire seated on the
-    // loft lid. Its structural peak (seat height + peak-member crease run) reaches
-    // ~1.0 at full open — clearly above the old crown's ~0.90 (bench T7).
-    expect(keepStackCrownHeight(KEEP)).toBeGreaterThan(0.95)
-    expect(keepStackSeatHeight(KEEP)).toBeCloseTo(0.65, 6) // hall+gallery+loft
-    // measured world-Y at the tilted rest bloom pierces above the old crown top.
+  it('S5/T7 height: the FAN SPIRE peak clears its loft-lid seat (structural ~0.89, raven crest ~1.01 world)', () => {
+    // Concept A: the gabled crown box is replaced by a fan spire seated on the loft
+    // lid. PHASE 1 height refit pulled the hall+gallery caps down to their plate
+    // heights, dropping the seat 0.65 -> 0.5448 and the whole spire ~0.105. The
+    // spire members are UNCHANGED, so the structural peak (seat + peak-member crease
+    // run) is ~0.891 and the raven crest tops out ~1.011 at the tilted rest bloom —
+    // a pierced peak clearing its seat by ~0.35, not a lid (bench T7).
+    expect(keepStackSeatHeight(KEEP)).toBeCloseTo(0.5448, 6) // hall+gallery+loft
+    expect(keepStackCrownHeight(KEEP)).toBeCloseTo(0.8914, 3)
+    expect(keepStackCrownHeight(KEEP) - keepStackSeatHeight(KEEP)).toBeGreaterThan(0.3)
+    // measured world-Y at the tilted rest bloom: the raven crest pierces well above.
     let topY = -Infinity
     for (const q of keepStackQuads(KEEP, ...bloom(REST))) for (const p of q) topY = Math.max(topY, p[1])
     expect(topY).toBeGreaterThan(0.93)

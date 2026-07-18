@@ -251,18 +251,21 @@ const CH3_LAYERS: readonly SceneLayer[] = [
       // was REJECTED: at 4.448 its wings reach lateral 0.556 and collide with the
       // grown citadel rank (skyline-r inner edge 0.537, A9) and graze the page
       // wedge (A10). FALLBACK adopted: width = cap width 0.80 (wh = a, flush with
-      // the walls, no lateral overhang) -> height 0.1799. The plate covers the cap
-      // base band; the exposed cap strip above it (0.18..0.25) renders as interior
-      // shadow (capFrontArt:false darkens the cap), reading as recession behind the
-      // die-cut battlement, not raw kraft. Back cap braces, flat lid seats the
-      // gallery + carries the balcony.
-      { key: 'hall', a: 0.4, height: 0.25, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.8, height: 0.1799 } },
+      // the walls, no lateral overhang) -> plate height 0.1799. PHASE 1 "STRUCTURE
+      // FITS INSIDE ART": the structural cap height is pulled DOWN to equal the
+      // plate height (0.25 -> 0.1799) so the die-cut curtain-wall plate covers the
+      // cap edge-to-edge — no raw tan/kraft cap strip is exposed above the art from
+      // the pinned camera (the old 0.070 strip dies). capFrontArt:false interior
+      // shadow now simply never shows (zero exposed strip). Back cap braces, flat
+      // lid seats the gallery + carries the balcony.
+      { key: 'hall', a: 0.4, height: 0.1799, z0: -0.34, z1: 0.34, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.8, height: 0.1799 } },
       // Balcony Gallery — solid capFront tier below the jutting gold balcony.
       // Facade plate: painted arcade loggia (delivered 3.677) sized plate width =
-      // cap width 0.68 (flush, like the hall fallback) -> height 0.1849; the
-      // exposed cap strip above (0.185..0.22) renders as interior shadow, reading
-      // as the recess under the balcony cantilever.
-      { key: 'gallery', a: 0.34, height: 0.22, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.1849 } },
+      // cap width 0.68 (flush, like the hall fallback) -> plate height 0.1849. PHASE
+      // 1: the structural cap height is pulled DOWN to the plate height (0.22 ->
+      // 0.1849) so the loggia plate covers the cap edge-to-edge — the old 0.035
+      // exposed strip under the balcony cantilever dies.
+      { key: 'gallery', a: 0.34, height: 0.1849, z0: -0.28, z1: 0.28, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.1849 } },
       // Rookery Loft — box shell whose walls carry die-cut arch voids (art: a
       // see-through belfry) and host the winch iris + counterweight; its flat cap
       // slab is now the FAN SPIRE'S SEAT (the apex sits on this lid's seam).
@@ -368,12 +371,12 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // leaves a 2.5% margin under the 0.02 paper-thickness tol.
     semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.96, armLen: 0.1287, armHalfW: 0.0195 },
     // Iris + counterweight hosts RE-STATIONED to the re-massed LOFT story
-    // (a 0.27, height 0.18, z +-0.20, baseH 0.47 = hall.H 0.25 + gallery.H 0.22).
+    // (a 0.27, height 0.18, z +-0.20, baseH 0.3648 = hall.H 0.1799 + gallery.H 0.1849).
     // Both must equal the keep's loft story (asserted by popup-keepwinch.test).
-    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.47 } },
+    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
     // Counterweight on the LOFT FRONT CAP (belfry mouth), dead-center in the
     // reading sightline; descends within the cap plane (zero off-plane reach).
-    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.47 } },
+    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
   },
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its
