@@ -53,26 +53,42 @@ export const DIALS = {
   mottleSaturation: dial({ default: 0.2, min: 0, max: 0.6, step: 0.005, label: 'saturation drift', group: 'fields', cls: 'rebake' }),
   veinDensity: dial({ default: 0.12, min: 0, max: 0.5, step: 0.005, label: 'vein density', group: 'fields', cls: 'rebake' }),
   grimeDensity: dial({ default: 0.1, min: 0, max: 0.4, step: 0.005, label: 'grime density', group: 'fields', cls: 'rebake' }),
-  terminatorDither: dial({ default: 0.02, min: 0, max: 0.1, step: 0.001, label: 'terminator dither', group: 'fields', cls: 'rebake' }),
+  // Round-9 verdict: terminator dither reads as flickering shadows (same family as the
+  // boil) — DEFAULT 0 (off). The dial stays so it remains explorable.
+  terminatorDither: dial({ default: 0, min: 0, max: 0.1, step: 0.001, label: 'terminator dither', group: 'fields', cls: 'rebake' }),
 
-  // dents (rebake) — the off-lane press-hollows + their baked AO.
-  dentDepth: dial({ default: 0.012, min: 0, max: 0.05, step: 0.001, label: 'press-dent depth', group: 'dents', cls: 'rebake' }),
-  dentAO: dial({ default: 0.09, min: 0, max: 0.4, step: 0.005, label: 'dent AO strength', group: 'dents', cls: 'rebake' }),
+  // dents (rebake) — the off-lane press-hollows + their baked AO. Round-9 verdict: Aram
+  // likes the HIGHER settings — defaults baked to ~75% of the prior max and the maxes
+  // ~doubled for headroom. Capture-gated so the fields read pressed, not gloomy; the
+  // off-lane gate lives in fieldDents (0 on the spine band at ANY depth, so the contact
+  // budget never moves — proven at the new max in scan-task23).
+  dentDepth: dial({ default: 0.0375, min: 0, max: 0.1, step: 0.001, label: 'press-dent depth', group: 'dents', cls: 'rebake' }),
+  dentAO: dial({ default: 0.3, min: 0, max: 0.8, step: 0.005, label: 'dent AO strength', group: 'dents', cls: 'rebake' }),
 
   // water (rebake) — Task 31 clay-water genart (clay-noise.ts / water-clay.ts). Every
   // param bakes into the water geometry/colour/normals, so all are rebake-class; the
   // debounced path re-runs the water bake and re-inits its morphs. Defaults === the
   // WATER_DEFAULTS literal in water-clay.ts (pinned by the tunables test). Kept literal
   // so this stays a zero-import leaf (no TDZ risk in the stage↔planet cycle).
-  waterPathWarp: dial({ default: 0.9, min: 0, max: 2, step: 0.02, label: 'path warp', group: 'water', cls: 'rebake' }),
-  waterPathStretch: dial({ default: 2.5, min: 1, max: 6, step: 0.1, label: 'path stretch', group: 'water', cls: 'rebake' }),
-  waterPathDepth: dial({ default: 0.014, min: 0, max: 0.03, step: 0.001, label: 'path depth', group: 'water', cls: 'rebake' }),
-  waterPocketTint: dial({ default: 0.5, min: 0, max: 1, step: 0.01, label: 'pocket tint', group: 'water', cls: 'rebake' }),
-  waterReliefInward: dial({ default: 0.03, min: 0, max: 0.05, step: 0.001, label: 'relief inward', group: 'water', cls: 'rebake' }),
-  waterReliefOutward: dial({ default: 0.01, min: 0, max: 0.02, step: 0.0005, label: 'relief outward', group: 'water', cls: 'rebake' }),
-  waterRidgeSharp: dial({ default: 1.4, min: 0.3, max: 3, step: 0.05, label: 'ridge sharpness', group: 'water', cls: 'rebake' }),
+  // Round-9 verdict: water dials were hard to judge (visible change too small, ranges too
+  // narrow). Maxes ~doubled where plausible so slider moves are VISIBLE; every extended
+  // max is re-proven safe (shoreline + all six deck clearances) in scan-task31, whose
+  // MAXP mirrors these maxes BY CONSTRUCTION (it imports DIALS). pocketTint default 0.8
+  // is Aram's kept value.
+  waterPathWarp: dial({ default: 0.9, min: 0, max: 3.5, step: 0.02, label: 'path warp', group: 'water', cls: 'rebake' }),
+  waterPathStretch: dial({ default: 2.5, min: 1, max: 10, step: 0.1, label: 'path stretch', group: 'water', cls: 'rebake' }),
+  waterPathDepth: dial({ default: 0.014, min: 0, max: 0.06, step: 0.001, label: 'path depth', group: 'water', cls: 'rebake' }),
+  waterPocketTint: dial({ default: 0.8, min: 0, max: 1, step: 0.01, label: 'pocket tint', group: 'water', cls: 'rebake' }),
+  waterReliefInward: dial({ default: 0.04, min: 0, max: 0.1, step: 0.001, label: 'relief inward', group: 'water', cls: 'rebake' }),
+  waterReliefOutward: dial({ default: 0.01, min: 0, max: 0.04, step: 0.0005, label: 'relief outward', group: 'water', cls: 'rebake' }),
+  waterRidgeSharp: dial({ default: 1.4, min: 0.3, max: 5, step: 0.05, label: 'ridge sharpness', group: 'water', cls: 'rebake' }),
   waterOctaves: dial({ default: 4, min: 1, max: 6, step: 1, label: 'relief octaves', group: 'water', cls: 'rebake' }),
-  waterNormalRough: dial({ default: 0.32, min: 0, max: 0.5, step: 0.01, label: 'normal roughness', group: 'water', cls: 'rebake' }),
+  waterNormalRough: dial({ default: 0.42, min: 0, max: 1, step: 0.01, label: 'normal roughness', group: 'water', cls: 'rebake' }),
+  // Flow-aligned streak COLOUR (Task 32): the streak daubs run along an authored drainage
+  // flow field so they read as tool-dragged flowing runs. `flow strength` = around-sphere
+  // swirl; `flow alignment` = how strongly the streaks follow the flow (0 = isotropic).
+  waterFlowStrength: dial({ default: 0.4, min: 0, max: 1.5, step: 0.05, label: 'flow strength', group: 'water', cls: 'rebake' }),
+  waterFlowAlign: dial({ default: 0.85, min: 0, max: 1, step: 0.02, label: 'flow alignment', group: 'water', cls: 'rebake' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS

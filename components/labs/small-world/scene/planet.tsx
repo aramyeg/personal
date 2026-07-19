@@ -20,6 +20,8 @@ import {
   tideFrontOffset,
   TIDE_LAT_LO,
   TIDE_DEPTH,
+  CROSSINGS_A,
+  CROSSINGS_B,
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
@@ -29,13 +31,17 @@ import { DIALS, subscribe, bakeVersion } from './tunables'
 import {
   type WaterParams,
   waterDeepGate,
-  waterLaneClear,
+  waterFootprintClear,
   waterStreak,
   waterRelief,
   waterNormalTilt,
 } from './water-clay'
 
 export const PLANET_RADIUS = 2.2
+
+/** Union of BOTH variants' bridge crossings — the water geometry is shared across laps,
+ *  so relief is zeroed under every deck of either lap (see waterFootprintClear). */
+const ALL_CROSSINGS = [...CROSSINGS_A, ...CROSSINGS_B] as const
 
 /** Re-exported so prop/dressing modules keep importing the waterline from here. */
 export { WATER_LEVEL }
@@ -728,6 +734,8 @@ function useWaterGeometry(version: number): WaterBake {
       ridgeSharp: DIALS.waterRidgeSharp.value,
       octaves: DIALS.waterOctaves.value,
       normalRough: DIALS.waterNormalRough.value,
+      flowStrength: DIALS.waterFlowStrength.value,
+      flowAlign: DIALS.waterFlowAlign.value,
     }
     // Fewer segments = larger facets; the SphereGeometry is indexed, so
     // toNonIndexed + flat normals below turns it into visible lumpy clay water.
@@ -806,12 +814,15 @@ function useWaterGeometry(version: number): WaterBake {
       const bA = terrainBump(px, py, pz)
       const bB = terrainBumpB(px, py, pz)
       // Task 31 genart: the streak-path field (variant-independent) drives colour +
-      // an extra groove carve; the ridged relief bulges/carves the sheet, gated to DEEP
-      // water away from the lane (waterDeepGate reads the min depth across BOTH bakes,
-      // so the single shared geometry honours the shoreline contract on both laps and
-      // the bridge decks keep their clearance — relief is 0 on the lane).
+      // an extra groove carve; the ridged relief bulges/carves the sheet. Task 32 gates it
+      // by waterDeepGate (the shoreline feather — 0 at any shore, min depth across BOTH
+      // bakes, so the shared geometry honours the shoreline contract on both laps) × the
+      // deck-FOOTPRINT gate (0 only under a bridge deck of EITHER lap, so mid-face seas /
+      // inter-crossing channels / the delta now take the full clay relief while every deck
+      // keeps its proven v1-water clearance).
+      const theta = Math.atan2(dir.z, dir.y)
       const streak = waterStreak(dir.x, dir.y, dir.z, wp)
-      const gate = waterDeepGate(bA, bB) * waterLaneClear(dir.x)
+      const gate = waterDeepGate(bA, bB) * waterFootprintClear(dir.x, theta, ALL_CROSSINGS)
       const relief = waterRelief(dir.x, dir.y, dir.z, gate, streak, wp)
       paintDepth(colorsIdxA, i, bA, trough, deckA, streak)
       paintDepth(colorsIdxB, i, bB, trough, deckB, streak)

@@ -30,12 +30,14 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.boilFps.default).toBe(BOIL_FPS)
   })
 
-  it('press-dent depth equals field-clay FIELD_DENT_DEPTH', () => {
-    expect(DIALS.dentDepth.default).toBe(0.012)
+  it('press-dent depth equals field-clay FIELD_DENT_DEPTH (Round-9 baked up)', () => {
+    expect(DIALS.dentDepth.default).toBe(0.0375)
     expect(DIALS.dentDepth.default).toBe(FIELD_DENT_DEPTH)
+    // extended headroom past the higher default (Round-9 range widening).
+    expect(DIALS.dentDepth.max).toBe(0.1)
   })
 
-  it('field + dent dial defaults equal their legacy literals', () => {
+  it('field + dent dial defaults reflect the Round-9 verdicts', () => {
     expect(DIALS.mottleMacro.default).toBe(0.035)
     expect(DIALS.mottleMicro.default).toBe(0.015)
     // macro·coarse + micro·fine reproduces the legacy 0.05·(0.7·coarse + 0.3·fine)
@@ -44,8 +46,12 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.mottleSaturation.default).toBe(0.2)
     expect(DIALS.veinDensity.default).toBe(0.12)
     expect(DIALS.grimeDensity.default).toBe(0.1)
-    expect(DIALS.terminatorDither.default).toBe(0.02)
-    expect(DIALS.dentAO.default).toBe(0.09)
+    // terminator dither disliked (flickering shadows) → default OFF; dial kept.
+    expect(DIALS.terminatorDither.default).toBe(0)
+    expect(DIALS.terminatorDither.max).toBe(0.1)
+    // dent AO baked up (Aram likes the higher settings) with doubled headroom.
+    expect(DIALS.dentAO.default).toBe(0.3)
+    expect(DIALS.dentAO.max).toBe(0.8)
   })
 
   it('every dial starts at its default with a valid range and class', () => {
@@ -69,7 +75,10 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.waterRidgeSharp.default).toBe(WATER_DEFAULTS.ridgeSharp)
     expect(DIALS.waterOctaves.default).toBe(WATER_DEFAULTS.octaves)
     expect(DIALS.waterNormalRough.default).toBe(WATER_DEFAULTS.normalRough)
-    // the outward crest default is under its own ≤0.4× inward cap
+    expect(DIALS.waterFlowStrength.default).toBe(WATER_DEFAULTS.flowStrength)
+    expect(DIALS.waterFlowAlign.default).toBe(WATER_DEFAULTS.flowAlign)
+    // pocketTint is Aram's kept 0.8; the outward crest default is under its ≤0.4× cap.
+    expect(DIALS.waterPocketTint.default).toBe(0.8)
     expect(DIALS.waterReliefOutward.default).toBeLessThanOrEqual(0.4 * DIALS.waterReliefInward.default)
   })
 
@@ -94,6 +103,8 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'waterRidgeSharp',
       'waterOctaves',
       'waterNormalRough',
+      'waterFlowStrength',
+      'waterFlowAlign',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')

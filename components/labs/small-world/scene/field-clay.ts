@@ -45,8 +45,10 @@ const smooth = (x: number, lo: number, hi: number): number => {
  * Depth is DIALS.dentDepth (default FIELD_DENT_DEPTH), and it only ever REMOVES radius,
  * so the 1.35R ceiling can only drop. Pure function of direction + the variant's bump.
  */
-/** Pinned default of the press-dent depth dial (DIALS.dentDepth) — the shipped cap. */
-export const FIELD_DENT_DEPTH = 0.012
+/** Pinned default of the press-dent depth dial (DIALS.dentDepth). Round-9: Aram likes the
+ *  higher settings, so the shipped default is baked up from 0.012. The value here is only
+ *  the cross-pin for the tunables test; fieldDents reads the LIVE DIALS.dentDepth.value. */
+export const FIELD_DENT_DEPTH = 0.0375
 export function fieldDents(nx: number, ny: number, nz: number, bump: number): number {
   const lat = smooth(Math.abs(nx), 0.14, 0.24)
   if (lat <= 0) return 0
