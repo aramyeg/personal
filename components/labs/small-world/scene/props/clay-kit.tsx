@@ -1,6 +1,7 @@
 'use client'
 import { PALETTE } from '../../palette'
 import { useClayRamp } from '../toon-ramp'
+import { DECK_RISE } from '../stage'
 
 type Xform = {
   position?: [number, number, number]
@@ -274,7 +275,7 @@ export function ClayBlock({ w = 0.2, h = 0.2, d = 0.2, color, ...x }: Xform & { 
  * above it (matched to stage's DECK_RISE) so the girl's feet land on the
  * planks. Planks + posts in `earth`, rail tops in the lighter `clayPath`.
  */
-export function ClayBridge({ rise = 0.13, ...x }: Xform & { rise?: number }) {
+export function ClayBridge({ rise = DECK_RISE, ...x }: Xform & { rise?: number }) {
   const ramp = useClayRamp()
   // flat deck (so the girl's feet land at DECK_RISE); the arched read comes from
   // tall pylons + raised handrails that carry a clear bridge silhouette at range.

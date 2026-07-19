@@ -43,7 +43,7 @@ const DECK_RAMP = 0.09
  * with it. Re-derived so the tightest deck (B1) keeps a healthy clearance over the
  * risen + max-roughness water (scan-task33 / scan-task31). This is a deliberate
  * ground-truth change to walkYAt's deck heights (the girl rides ~0.03 world higher
- * on every bridge); the stage.test deck pins are rewritten for it.
+ * on every bridge); the stage.test deck pins are relational (Task 20) and hold unchanged.
  */
 export const DECK_RISE = 0.16
 

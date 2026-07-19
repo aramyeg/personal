@@ -106,7 +106,7 @@ export const DIALS = {
   // lane dryness / crossings-wet / anchors-dry are unchanged; the rise is render-only). At
   // dial 0 the water sits at WATER_LEVEL (today's recessed look); the MAX (0.008 of R) lifts
   // it flush-to-slightly-proud of the beach shore. The max is CLAMPED by the girl's own dry
-  // lane: her lowest lane point sits at 0.9831R (longitude ≈1.7, lap 2), so 0.972+0.008=0.980R
+  // lane: her exact-foot (nx=0) min is 0.9831R (lon ≈1.7, lap 2); the wider lane BAND min is 0.9825R (lon 1.87, lap 1 — the bench binder), so 0.972+0.008=0.980R
   // leaves her ~0.003R of dry path; the six bridge decks buy their headroom from the raised
   // DECK_RISE (0.13→0.16). Re-proven at MAX in scan-task33 / scan-task31. Rebake-class (the
   // water bake reads it once), default 0 keeps ?tune-absent byte-identical.
