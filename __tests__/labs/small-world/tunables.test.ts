@@ -12,6 +12,7 @@ import {
 } from '@/components/labs/small-world/scene/tunables'
 import { BOIL_AMPLITUDE, BOIL_FPS } from '@/components/labs/small-world/scene/boil-material'
 import { FIELD_DENT_DEPTH } from '@/components/labs/small-world/scene/field-clay'
+import { WATER_DEFAULTS } from '@/components/labs/small-world/scene/water-clay'
 
 // The store is module-global mutable state; restore defaults between every test.
 beforeEach(() => resetDials())
@@ -58,7 +59,21 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     }
   })
 
-  it('declares exactly the Round-9 initial dial set, grouped boil/fields/dents', () => {
+  it('water dial defaults equal the WATER_DEFAULTS literals in water-clay', () => {
+    expect(DIALS.waterPathWarp.default).toBe(WATER_DEFAULTS.pathWarp)
+    expect(DIALS.waterPathStretch.default).toBe(WATER_DEFAULTS.pathStretch)
+    expect(DIALS.waterPathDepth.default).toBe(WATER_DEFAULTS.pathDepth)
+    expect(DIALS.waterPocketTint.default).toBe(WATER_DEFAULTS.pocketTint)
+    expect(DIALS.waterReliefInward.default).toBe(WATER_DEFAULTS.reliefInward)
+    expect(DIALS.waterReliefOutward.default).toBe(WATER_DEFAULTS.reliefOutward)
+    expect(DIALS.waterRidgeSharp.default).toBe(WATER_DEFAULTS.ridgeSharp)
+    expect(DIALS.waterOctaves.default).toBe(WATER_DEFAULTS.octaves)
+    expect(DIALS.waterNormalRough.default).toBe(WATER_DEFAULTS.normalRough)
+    // the outward crest default is under its own ≤0.4× inward cap
+    expect(DIALS.waterReliefOutward.default).toBeLessThanOrEqual(0.4 * DIALS.waterReliefInward.default)
+  })
+
+  it('declares exactly the Round-9 dial set, grouped boil/fields/dents/water', () => {
     expect(DIAL_KEYS).toEqual([
       'boilAmp',
       'boilFps',
@@ -70,10 +85,20 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'terminatorDither',
       'dentDepth',
       'dentAO',
+      'waterPathWarp',
+      'waterPathStretch',
+      'waterPathDepth',
+      'waterPocketTint',
+      'waterReliefInward',
+      'waterReliefOutward',
+      'waterRidgeSharp',
+      'waterOctaves',
+      'waterNormalRough',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')
     expect(DIALS.dentDepth.group).toBe('dents')
+    expect(DIALS.waterPathWarp.group).toBe('water')
   })
 })
 

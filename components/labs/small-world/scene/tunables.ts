@@ -58,6 +58,21 @@ export const DIALS = {
   // dents (rebake) — the off-lane press-hollows + their baked AO.
   dentDepth: dial({ default: 0.012, min: 0, max: 0.05, step: 0.001, label: 'press-dent depth', group: 'dents', cls: 'rebake' }),
   dentAO: dial({ default: 0.09, min: 0, max: 0.4, step: 0.005, label: 'dent AO strength', group: 'dents', cls: 'rebake' }),
+
+  // water (rebake) — Task 31 clay-water genart (clay-noise.ts / water-clay.ts). Every
+  // param bakes into the water geometry/colour/normals, so all are rebake-class; the
+  // debounced path re-runs the water bake and re-inits its morphs. Defaults === the
+  // WATER_DEFAULTS literal in water-clay.ts (pinned by the tunables test). Kept literal
+  // so this stays a zero-import leaf (no TDZ risk in the stage↔planet cycle).
+  waterPathWarp: dial({ default: 0.9, min: 0, max: 2, step: 0.02, label: 'path warp', group: 'water', cls: 'rebake' }),
+  waterPathStretch: dial({ default: 2.5, min: 1, max: 6, step: 0.1, label: 'path stretch', group: 'water', cls: 'rebake' }),
+  waterPathDepth: dial({ default: 0.014, min: 0, max: 0.03, step: 0.001, label: 'path depth', group: 'water', cls: 'rebake' }),
+  waterPocketTint: dial({ default: 0.5, min: 0, max: 1, step: 0.01, label: 'pocket tint', group: 'water', cls: 'rebake' }),
+  waterReliefInward: dial({ default: 0.03, min: 0, max: 0.05, step: 0.001, label: 'relief inward', group: 'water', cls: 'rebake' }),
+  waterReliefOutward: dial({ default: 0.01, min: 0, max: 0.02, step: 0.0005, label: 'relief outward', group: 'water', cls: 'rebake' }),
+  waterRidgeSharp: dial({ default: 1.4, min: 0.3, max: 3, step: 0.05, label: 'ridge sharpness', group: 'water', cls: 'rebake' }),
+  waterOctaves: dial({ default: 4, min: 1, max: 6, step: 1, label: 'relief octaves', group: 'water', cls: 'rebake' }),
+  waterNormalRough: dial({ default: 0.32, min: 0, max: 0.5, step: 0.01, label: 'normal roughness', group: 'water', cls: 'rebake' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS

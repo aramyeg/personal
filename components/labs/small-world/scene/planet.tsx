@@ -26,6 +26,14 @@ import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
 import { fieldDents, applyFieldMottle, type Pal } from './field-clay'
 import { makeBoilMaterial, boilAmplitude } from './boil-material'
 import { DIALS, subscribe, bakeVersion } from './tunables'
+import {
+  type WaterParams,
+  waterDeepGate,
+  waterLaneClear,
+  waterStreak,
+  waterRelief,
+  waterNormalTilt,
+} from './water-clay'
 
 export const PLANET_RADIUS = 2.2
 
@@ -706,8 +714,21 @@ type WaterBake = {
  * gate as the land. On the spine bumpB === bumpA, so the colour is lap-invariant
  * there; only flank shallows re-tint.
  */
-function useWaterGeometry(): WaterBake {
+function useWaterGeometry(version: number): WaterBake {
   return useMemo(() => {
+    // The live water dial state (Task 31). Read once per bake; a rebake-class edit
+    // debounces then bumps `version`, re-running this memo with the new values.
+    const wp: WaterParams = {
+      pathWarp: DIALS.waterPathWarp.value,
+      pathStretch: DIALS.waterPathStretch.value,
+      pathDepth: DIALS.waterPathDepth.value,
+      pocketTint: DIALS.waterPocketTint.value,
+      reliefInward: DIALS.waterReliefInward.value,
+      reliefOutward: DIALS.waterReliefOutward.value,
+      ridgeSharp: DIALS.waterRidgeSharp.value,
+      octaves: DIALS.waterOctaves.value,
+      normalRough: DIALS.waterNormalRough.value,
+    }
     // Fewer segments = larger facets; the SphereGeometry is indexed, so
     // toNonIndexed + flat normals below turns it into visible lumpy clay water.
     const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_LEVEL, 48, 48)
@@ -729,8 +750,14 @@ function useWaterGeometry(): WaterBake {
     // read pale at mid-face because the shallow-rim brightening dominated its
     // width-carried carve — this pushes its near-deck tint back to deep blue). Rims
     // (high, shallow crests of the clay sheet) keep the lighter river blue.
+    //
+    // Task 31 adds a fourth term: the genart STREAK field pushes patchy pockets + the
+    // tool-dragged grooves toward the abyss blue ("deeper colors"), layered OVER the
+    // three above (they still win — the Task-26 flooded-limb deepening is re-applied
+    // per frame by the water-tide morph AFTER this bake, so it always dominates at the
+    // cap). Colour-only; palette-derived (riverDeep→ink).
     const paintDepth = (
-      out: Float32Array, i: number, bump: number, trough: number, deck: number
+      out: Float32Array, i: number, bump: number, trough: number, deck: number, streak: number
     ): void => {
       const terrainDepth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
       const deep = Math.max(terrainDepth, 0.85 * trough, 0.7 * deck)
@@ -740,6 +767,10 @@ function useWaterGeometry(): WaterBake {
       const rim = (1 - THREE.MathUtils.smoothstep(terrainDepth, 0.0, 0.15)) *
         (1 - 0.6 * trough) * (1 - 0.7 * deck)
       c.lerp(river, 0.5 * rim)
+      // genart pockets + streak grooves deepen toward the abyss blue (path troughs
+      // read darkest). Applied everywhere over water (no contact constraint) so the
+      // "rougher paths / deeper colours" read reaches the near-shore water too.
+      if (streak > 0 && wp.pocketTint > 0) c.lerp(abyss, wp.pocketTint * streak)
       out[i * 3] = c.r; out[i * 3 + 1] = c.g; out[i * 3 + 2] = c.b
     }
     // Peak inward push of the molded clay sheet (trough-biased low octave + fine
@@ -772,9 +803,22 @@ function useWaterGeometry(): WaterBake {
         (DECK_REACH - channelDist(dir.x, dir.y, dir.z, 0)) / DECK_REACH, 0, 1)
       const deckB = nearLane * THREE.MathUtils.clamp(
         (DECK_REACH - channelDist(dir.x, dir.y, dir.z, 1)) / DECK_REACH, 0, 1)
-      paintDepth(colorsIdxA, i, terrainBump(px, py, pz), trough, deckA)
-      paintDepth(colorsIdxB, i, terrainBumpB(px, py, pz), trough, deckB)
-      v.multiplyScalar(1 - inward)
+      const bA = terrainBump(px, py, pz)
+      const bB = terrainBumpB(px, py, pz)
+      // Task 31 genart: the streak-path field (variant-independent) drives colour +
+      // an extra groove carve; the ridged relief bulges/carves the sheet, gated to DEEP
+      // water away from the lane (waterDeepGate reads the min depth across BOTH bakes,
+      // so the single shared geometry honours the shoreline contract on both laps and
+      // the bridge decks keep their clearance — relief is 0 on the lane).
+      const streak = waterStreak(dir.x, dir.y, dir.z, wp)
+      const gate = waterDeepGate(bA, bB) * waterLaneClear(dir.x)
+      const relief = waterRelief(dir.x, dir.y, dir.z, gate, streak, wp)
+      paintDepth(colorsIdxA, i, bA, trough, deckA, streak)
+      paintDepth(colorsIdxB, i, bB, trough, deckB, streak)
+      // net radius = WATER_LEVEL·(1 − molded inward + genart relief). Relief is signed
+      // (outward crests ≤ 0.4× the inward budget, inward troughs deeper), and 0 near any
+      // shore/lane so this never exceeds WATER_LEVEL where water meets land.
+      v.multiplyScalar(1 - inward + relief)
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     // Flat-shade: expand to non-indexed then per-face normals so the water shows
@@ -785,6 +829,30 @@ function useWaterGeometry(): WaterBake {
     const flat = geo.toNonIndexed()
     geo.dispose()
     flat.computeVertexNormals()
+    // Task 31 non-smoothness: tilt each flat face normal by a coherent per-face amount
+    // (one vector per triangle → the facet stays flat) so the toon ramp band-splits
+    // across the water like tool-worked clay. Normals only — positions/contact untouched.
+    if (wp.normalRough > 0) {
+      const fnor = flat.attributes.normal.array as Float32Array
+      const fp = flat.attributes.position
+      const faceCount = fp.count / 3
+      for (let f = 0; f < faceCount; f++) {
+        const j0 = f * 3
+        // face centroid direction (average of the three verts, normalized)
+        let cx = 0, cy = 0, cz = 0
+        for (let t = 0; t < 3; t++) {
+          cx += fp.getX(j0 + t); cy += fp.getY(j0 + t); cz += fp.getZ(j0 + t)
+        }
+        const cl = Math.hypot(cx, cy, cz) || 1
+        const [dx, dy, dz] = waterNormalTilt(cx / cl, cy / cl, cz / cl, wp.normalRough)
+        for (let t = 0; t < 3; t++) {
+          const k = (j0 + t) * 3
+          const x = fnor[k] + dx, y = fnor[k + 1] + dy, z = fnor[k + 2] + dz
+          const l = Math.hypot(x, y, z) || 1
+          fnor[k] = x / l; fnor[k + 1] = y / l; fnor[k + 2] = z / l
+        }
+      }
+    }
 
     // Per-vertex thetaC of the non-indexed water verts, for the same bucketed gate.
     const fpos = flat.attributes.position
@@ -815,7 +883,11 @@ function useWaterGeometry(): WaterBake {
       waterCapNz: Float32Array.from(wCapNz),
       deepOcean: [deepOcean.r, deepOcean.g, deepOcean.b],
     }
-  }, [])
+    // `version` bumps when a rebake-class dial settles (Round 9). Water dials are all
+    // rebake-class, so this re-bakes the water geometry/colour/normals; the caller
+    // disposes the previous water geometry and the water/water-tide morphs re-init.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version])
 }
 
 /**
@@ -915,10 +987,12 @@ export function Planet({
   // dial settles; on ?tune-absent it is a constant 0, so the bake runs exactly once.
   const version = useSyncExternalStore(subscribe, bakeVersion, bakeVersion)
   const { geometry, bake } = useHillGeometry(version)
-  const water = useWaterGeometry()
-  // Dispose the previous land geometry (and its GPU buffers) when a rebake swaps it in,
-  // so live re-tuning never leaks attributes. Water is variant/dial-independent today.
+  const water = useWaterGeometry(version)
+  // Dispose the previous land + water geometry (and their GPU buffers) when a rebake
+  // swaps them in, so live re-tuning never leaks attributes. Task 31 makes the water
+  // bake dial-driven too, so it disposes on the same rebake path as the land.
   useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => water.geometry.dispose(), [water.geometry])
   // The traveling front: each updater re-lerps only the thetaC buckets swept since
   // the last rotation (a full re-apply on the first frame / any big jump). The
   // spine buckets never change, so the girl's lane costs nothing.
