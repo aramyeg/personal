@@ -15,6 +15,7 @@
  * (A and B) agree byte-for-byte and the front lerp stays seamless.
  */
 import * as THREE from 'three'
+import { DIALS } from './tunables'
 
 /** The planet colour palette the bake feeds in (built once in planet.tsx). */
 export type Pal = {
@@ -41,9 +42,10 @@ const smooth = (x: number, lo: number, hi: number): number => {
  *    unchanged and the analytic bound survives.
  *  - `open` fades the dents out as relief rises (a feature already carries its own
  *    signature there), so dents live only on the quiet fields Aram flagged.
- * Depth is capped at FIELD_DENT_DEPTH, and it only ever REMOVES radius, so the
- * 1.35R ceiling can only drop. Pure function of direction + the variant's bump.
+ * Depth is DIALS.dentDepth (default FIELD_DENT_DEPTH), and it only ever REMOVES radius,
+ * so the 1.35R ceiling can only drop. Pure function of direction + the variant's bump.
  */
+/** Pinned default of the press-dent depth dial (DIALS.dentDepth) — the shipped cap. */
 export const FIELD_DENT_DEPTH = 0.012
 export function fieldDents(nx: number, ny: number, nz: number, bump: number): number {
   const lat = smooth(Math.abs(nx), 0.14, 0.24)
@@ -55,7 +57,7 @@ export function fieldDents(nx: number, ny: number, nz: number, bump: number): nu
   const q = Math.sin(7.1 * ny + 2.3) * Math.sin(6.7 * nz - 0.6) * Math.sin(7.7 * nx + 1.4)
   const dentB = smooth(q, 0.6, 0.95)
   const dent = clamp01(dentA + 0.6 * dentB)
-  return -FIELD_DENT_DEPTH * dent * open * lat
+  return -DIALS.dentDepth.value * dent * open * lat
 }
 
 const _deep = new THREE.Color()
@@ -85,16 +87,19 @@ export function applyFieldMottle(
     Math.sin(4.7 * nx + 1.3) * Math.sin(5.1 * ny - 0.7) * Math.sin(4.3 * nz + 2.1)
   const fine =
     Math.sin(11.9 * ny + 0.4) * Math.sin(12.7 * nz - 1.9) * Math.sin(10.3 * nx + 0.8)
-  const m = 0.7 * coarse + 0.3 * fine
-  // gentle value drift within the colour (pastel: canyon quieter, it is already tinted)
-  c.multiplyScalar(1 + (kind === 'canyon' ? 0.03 : 0.05) * m)
+  // gentle value drift within the colour (pastel: canyon quieter, it is already tinted).
+  // Two independent amplitudes (macro = coarse scale, micro = fine); the default pair
+  // 0.035/0.015 reproduces the legacy 0.05·(0.7·coarse + 0.3·fine). Canyon keeps its
+  // 0.6 ratio (0.03 vs 0.05) so it stays the quieter, already-tinted read.
+  const canyonK = kind === 'canyon' ? 0.6 : 1
+  c.multiplyScalar(1 + canyonK * (DIALS.mottleMacro.value * coarse + DIALS.mottleMicro.value * fine))
   if (kind === 'canyon') return
 
   const greenish = c.g > c.r * 1.02 && c.g > c.b * 1.02
   // deeper-hue pockets (Aram's "some parts deeper green")
   const pocket = smooth(-coarse, 0.25, 0.75)
   if (pocket > 0) {
-    if (greenish) c.lerp(pal.foliageDeep, 0.2 * pocket)
+    if (greenish) c.lerp(pal.foliageDeep, DIALS.mottleSaturation.value * pocket)
     else {
       _deep.copy(c).multiplyScalar(0.8)
       c.lerp(_deep, 0.6 * pocket)
@@ -114,8 +119,8 @@ export function applyFieldMottle(
   const region = Math.sin(2.1 * nx + 0.5) * Math.sin(1.9 * nz - 1.0)
   const streak = 1 - smooth(Math.abs(Math.sin(9.0 * ny - 6.0 * nz + 3.0 * nx)), 0.0, 0.06)
   const vein = streak * smooth(region, 0.35, 0.85)
-  if (vein > 0) c.lerp(pal.pineDeep, 0.12 * vein)
+  if (vein > 0) c.lerp(pal.pineDeep, DIALS.veinDensity.value * vein)
   // rare grime specks (tiny darkening)
   const gr = Math.sin(53.1 * nx + 9.0) * Math.sin(61.7 * ny - 3.0) * Math.sin(57.3 * nz + 5.0)
-  if (gr > 0.9) c.multiplyScalar(1 - 0.1 * smooth(gr, 0.9, 0.99))
+  if (gr > 0.9) c.multiplyScalar(1 - DIALS.grimeDensity.value * smooth(gr, 0.9, 0.99))
 }

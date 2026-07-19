@@ -1,9 +1,17 @@
 'use client'
+import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
 import { CHAPTER_COUNT } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
+import { isTuneEnabled } from './scene/tunables'
+
+/** The ?tune=1 roughness panel is code-split behind the flag: absent → this chunk is
+ *  never requested, so normal visitors (and LinkedIn unfurls) pay zero bundle/runtime. */
+const TunePanel = dynamic(() => import('./overlay/tune-panel').then((m) => m.TunePanel), {
+  ssr: false,
+})
 
 function detectWebGL(): boolean {
   try {
@@ -23,6 +31,7 @@ const TRACK_VH_PER_CHAPTER = 240
  */
 export function SmallWorldExperience() {
   const [active, setActive] = useState(false)
+  const [tune, setTune] = useState(false)
   const progressRef = useRef(0)
   const trackRef = useRef<HTMLDivElement>(null)
 
@@ -32,6 +41,13 @@ export function SmallWorldExperience() {
     update()
     mq.addEventListener('change', update)
     return () => mq.removeEventListener('change', update)
+  }, [])
+
+  // Client-only read of ?tune=1 (this whole component is dynamic ssr:false, so
+  // window.location is safe and needs no Suspense boundary). Absent → TunePanel is
+  // never rendered, so its dynamic import never fires.
+  useEffect(() => {
+    setTune(isTuneEnabled(window.location.search))
   }, [])
 
   useEffect(() => {
@@ -62,6 +78,7 @@ export function SmallWorldExperience() {
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} />
         <JourneyOverlay progressRef={progressRef} onAdvance={advanceTo} />
+        {tune && <TunePanel />}
       </div>
       <style>{`.${FALLBACK_CLASS}{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}`}</style>
     </div>

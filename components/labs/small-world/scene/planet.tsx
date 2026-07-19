@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -23,8 +23,9 @@ import {
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
-import { fieldDents, FIELD_DENT_DEPTH, applyFieldMottle, type Pal } from './field-clay'
-import { makeBoilMaterial, boilAmplitude, BOIL_FPS } from './boil-material'
+import { fieldDents, applyFieldMottle, type Pal } from './field-clay'
+import { makeBoilMaterial, boilAmplitude } from './boil-material'
+import { DIALS, subscribe, bakeVersion } from './tunables'
 
 export const PLANET_RADIUS = 2.2
 
@@ -289,11 +290,10 @@ const JITTER_TAN = 0.44
  * lumpiness. Kept small so the combined render-vs-analytic offset the girl/shadow
  * must forgive stays well inside the dimple-dominated budget. Peak = this value. */
 const JITTER_RAD = 0.0013
-/** Task 29 lever 4 — static facet-normal dither amplitude on OPEN field facets
- *  (unit-normal units ≈ radians of tilt). Small enough to only re-band a facet that
- *  already grazes a ramp threshold (the terminator), so the lit face never speckles.
- *  Normals only — positions/contact/ceiling are untouched. 0 = off. */
-const NORMAL_DITHER = 0.02
+/** Task 29 lever 4 — static facet-normal dither amplitude on OPEN field facets lives in
+ *  DIALS.terminatorDither (default 0.02, unit-normal units ≈ radians of tilt). Small
+ *  enough to only re-band a facet that already grazes a ramp threshold (the terminator),
+ *  so the lit face never speckles. Normals only — positions/contact/ceiling untouched. */
 
 /**
  * Applies the per-wedge scene accent to open ground (the six scenes each own a
@@ -449,9 +449,11 @@ function paintVertex(
   const dent = fieldDents(nx, ny, nz, bump)
   let hollow = 0
   if (dip < 0) hollow += -dip / CLAY_DIMPLE_MAX
-  if (dent < 0) hollow += -dent / FIELD_DENT_DEPTH
+  // normalize by the LIVE dent depth (the dial) so the AO tracks the hollow, not a stale
+  // constant; dent < 0 already implies dentDepth > 0.
+  if (dent < 0) hollow += -dent / DIALS.dentDepth.value
   hollow = THREE.MathUtils.clamp(hollow, 0, 1)
-  if (hollow > 0) c.multiplyScalar(1 - 0.09 * hollow)
+  if (hollow > 0) c.multiplyScalar(1 - DIALS.dentAO.value * hollow)
   // Signature AO + edge definition (Task 23 lever 4): the molded grooves — ridge
   // troughs, canyon strata steps, dune ripple valleys — hold dirt, so each figure's
   // own carve darkens into it. This is the crease-dirt logic pushed to the feature's
@@ -494,7 +496,7 @@ type MorphBake = {
  * Because the spine band never morphs, A and B coincide there and the lerp is a
  * no-op on the lane.
  */
-function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } {
+function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
     const ICO_DETAIL = 24
     const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, ICO_DETAIL)
@@ -584,7 +586,7 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
       // threshold (i.e. at the terminator), never mid-face — so the lit face stays clean.
       if (i % 3 === 0) {
         const fieldG = 1 - THREE.MathUtils.smoothstep(bumpA, 0.05, 0.12)
-        const ds = NORMAL_DITHER * fieldG
+        const ds = DIALS.terminatorDither.value * fieldG
         const f3 = i // i is already the face base (i%3===0) → store at [i..i+2]
         faceDither[f3] = ds * (2 * hash01(nx, ny, nz, 71.3) - 1)
         faceDither[f3 + 1] = ds * (2 * hash01(nx, ny, nz, 91.7) - 1)
@@ -669,7 +671,11 @@ function useHillGeometry(): { geometry: THREE.BufferGeometry; bake: MorphBake } 
         capNz: Float32Array.from(capNzL),
       },
     }
-  }, [])
+    // `version` bumps when a rebake-class dial settles (Round 9 tuning panel); it is a
+    // deliberate cache-buster (not read in the body), so the bake re-runs, the caller
+    // disposes the previous geometry and the morphs re-init.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version])
 }
 
 /** The dual-baked water sphere: variant-independent geometry, two colour bakes. */
@@ -905,8 +911,14 @@ export function Planet({
 }) {
   const group = useRef<THREE.Group>(null)
   const ramp = useClayRamp()
-  const { geometry, bake } = useHillGeometry()
+  // Rebake generation from the tuning panel (Round 9). Bumps only when a rebake-class
+  // dial settles; on ?tune-absent it is a constant 0, so the bake runs exactly once.
+  const version = useSyncExternalStore(subscribe, bakeVersion, bakeVersion)
+  const { geometry, bake } = useHillGeometry(version)
   const water = useWaterGeometry()
+  // Dispose the previous land geometry (and its GPU buffers) when a rebake swaps it in,
+  // so live re-tuning never leaks attributes. Water is variant/dial-independent today.
+  useEffect(() => () => geometry.dispose(), [geometry])
   // The traveling front: each updater re-lerps only the thetaC buckets swept since
   // the last rotation (a full re-apply on the first frame / any big jump). The
   // spine buckets never change, so the girl's lane costs nothing.
@@ -950,7 +962,7 @@ export function Planet({
     // Boil: hold the phase for ~1/10 s then jump (stepped, never smoothly interpolated).
     // One float write when the step advances; the amplitude honours the runtime dial.
     boil.uniforms.uBoilAmp.value = boilAmplitude()
-    const step = Math.floor(state.clock.elapsedTime * BOIL_FPS)
+    const step = Math.floor(state.clock.elapsedTime * DIALS.boilFps.value)
     if (step !== boilStep.current) {
       boilStep.current = step
       boil.uniforms.uBoilPhase.value = step * 1.618033988

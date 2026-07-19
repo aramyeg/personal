@@ -15,15 +15,17 @@
  * is numerically identical to a stock MeshToonMaterial (the dial's off state).
  */
 import * as THREE from 'three'
+import { DIALS } from './tunables'
 
 /** Default normal-tilt amplitude (unit-normal units ≈ radians of tilt). Subtle by
- *  design — Aram feel-tests on preview; 0 = off. Overridable at runtime via
- *  window.SMALL_WORLD_BOIL for the capture A/B/off proof. */
+ *  design — Aram feel-tests on preview; 0 = off. The live value is DIALS.boilAmp
+ *  (Round 9 tuning panel); this constant is the pinned default that seeds it. */
 // Aram's verdict 2026-07-19: the boil reads as flickering/moving shadows — OFF
 // by default. The mechanism stays (dial via the tuning panel / window override).
 export const BOIL_AMPLITUDE = 0
 /** Held-frame rate — the step counter is floor(elapsed·BOIL_FPS), so the phase
- *  holds for ~1/10 s then jumps (stepped, never smoothly interpolated). */
+ *  holds for ~1/10 s then jumps (stepped, never smoothly interpolated). This is the
+ *  pinned default that seeds DIALS.boilFps (the live value the frame loop reads). */
 export const BOIL_FPS = 10
 
 export type BoilUniforms = {
@@ -63,11 +65,13 @@ export function makeBoilMaterial(ramp: THREE.DataTexture): {
   return { material, uniforms }
 }
 
-/** The current boil amplitude, honouring the runtime override used by captures. */
+/** The current boil amplitude. The window.SMALL_WORLD_BOIL override (the capture A/B/off
+ *  proof) still wins when set; otherwise the tuning-panel dial DIALS.boilAmp drives it —
+ *  panel and global both feed this one uniform. Default DIALS.boilAmp.value = 0. */
 export function boilAmplitude(): number {
   if (typeof window !== 'undefined') {
     const o = (window as unknown as { SMALL_WORLD_BOIL?: number }).SMALL_WORLD_BOIL
     if (o != null && !Number.isNaN(Number(o))) return Number(o)
   }
-  return BOIL_AMPLITUDE
+  return DIALS.boilAmp.value
 }
