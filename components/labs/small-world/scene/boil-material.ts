@@ -19,7 +19,9 @@ import * as THREE from 'three'
 /** Default normal-tilt amplitude (unit-normal units ≈ radians of tilt). Subtle by
  *  design — Aram feel-tests on preview; 0 = off. Overridable at runtime via
  *  window.SMALL_WORLD_BOIL for the capture A/B/off proof. */
-export const BOIL_AMPLITUDE = 0.035
+// Aram's verdict 2026-07-19: the boil reads as flickering/moving shadows — OFF
+// by default. The mechanism stays (dial via the tuning panel / window override).
+export const BOIL_AMPLITUDE = 0
 /** Held-frame rate — the step counter is floor(elapsed·BOIL_FPS), so the phase
  *  holds for ~1/10 s then jumps (stepped, never smoothly interpolated). */
 export const BOIL_FPS = 10
