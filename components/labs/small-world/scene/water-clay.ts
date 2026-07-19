@@ -68,7 +68,7 @@ export type WaterParams = {
 }
 
 /** Capture-gated shipped defaults (planet.tsx / tunables read these; the panel tunes
- *  live). `reliefOutward` 0.007 < 0.4×0.02 = 0.008, so it is under the hard cap. */
+ *  live). `reliefOutward` 0.01 < 0.4×0.03 = 0.012, so it is under the hard cap. */
 export const WATER_DEFAULTS: WaterParams = {
   pathWarp: 0.9,
   pathStretch: 2.5,
