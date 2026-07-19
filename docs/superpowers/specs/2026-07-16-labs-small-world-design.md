@@ -392,6 +392,50 @@ Architecture:
    Built to degrade gracefully: until his clips land, idle = settled skip
    pose, backward = reversed skip — the machine ships now, clips drop in.
 
+## Round 9 (2026-07-19): live dials, genart clay water, boil verdict
+
+Aram's direction: (1) the boil VERDICT — it reads as moving/flickering
+shadows, "looks pretty bad"; killed by default (9025f23), the mechanism
+stays dial-only. (2) The thumbiness ANALYSIS is right (he confirmed the
+Aardman doctrine matches his intent — imperfections in color AND surface)
+but the implementation under-delivers — "not properly implemented at all".
+(3) He wants DIALS ON THE WEBSITE ITSELF to tune roughness live. (4) The
+worked example is WATER: "some random rougher paths, deeper colors,
+elevation of the material and non smootheness" — and he explicitly points
+at genart techniques, e.g. Perlin noise.
+
+Architecture:
+
+1. **Tuning panel (Task 30).** An on-page dev panel gated by `?tune=1`
+   (absent = zero UI, zero cost for LinkedIn visitors): sliders bound to
+   the live clay dials — water clay params (Task 31's, wired when they
+   land), field mottle amplitudes (macro/micro value, saturation, vein
+   density), press-dent depth + AO, terminator dither, boil amp + fps
+   (default 0 stays). Values apply per-frame where cheap (uniforms,
+   colors) and re-bake debounced where not (geometry) — a "rebake" badge
+   while it churns is fine. A "copy settings" button exports the current
+   values as JSON so Aram can paste them into chat; defaults live in ONE
+   tunables module the panel reads/writes.
+2. **Clay water v2 (Task 31) — the genart pass.** Perlin-family coherent
+   noise (simplex/fBm — the existing hash noise is white/value noise;
+   coherent gradients are what give organic paths):
+   - **Rougher paths:** domain-WARPED fBm (the classic genart marbling
+     move: p' = p + k·noise(p)) drawn as directional streak fields in
+     the water surface — tool-dragged smear paths, not ripple dots.
+   - **Deeper colors:** the same warped field drives depth-tint pockets
+     (deeper blues toward ink in patches + along path troughs), layered
+     over the existing depth/abyss tint.
+   - **Elevation + non-smoothness:** multi-octave ridged fBm relief on
+     the water sphere — inward-dominant, with a SMALL outward allowance
+     (cap ~0.4 of the inward budget) away from shorelines, feathered to
+     zero within the beach band so the shoreline contract (never above
+     WATER_LEVEL at the coast) and deck clearances hold; facet-scale
+     normal roughness so the toon bands break across the surface.
+   - All parameters flow through the tunables module → panel sliders.
+3. **Fields follow the water verdict.** Once Aram tunes water to taste,
+   the same warped-fBm vocabulary replaces/augments the field mottle
+   octaves (Task 32, on his numbers) — water is the proving ground.
+
 ## Risks
 
 - **Meshy character quality below the bar** — mitigated by Gate 0 ordering;
