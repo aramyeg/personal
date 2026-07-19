@@ -56,6 +56,17 @@ export const DIALS = {
   // Round-9 verdict: terminator dither reads as flickering shadows (same family as the
   // boil) — DEFAULT 0 (off). The dial stays so it remains explorable.
   terminatorDither: dial({ default: 0, min: 0, max: 0.1, step: 0.001, label: 'terminator dither', group: 'fields', cls: 'rebake' }),
+  // Round-9 continued (Task 33) — TERRAIN flow field. The flow-aligned streak colour
+  // (Task 32's water lever) extended onto the LAND so Aram can judge the flow effect at
+  // scale. `terrainFlowStrength` = how much poleward/around-sphere swirl blends into the
+  // downslope drainage direction; `terrainFlowAlign` = how strongly the field streak
+  // colour follows that flow (0 = isotropic — the legacy mottle, so it can be dialled
+  // back to today's look). Magnitude reuses the existing mottle amps, so turning mottle
+  // down shrinks the flow streak too. Colour-only — no displacement (the spine contact
+  // analytic bound is untouched); feathered to 0 on the girl's lane so her path never
+  // stripes.
+  terrainFlowStrength: dial({ default: 0.5, min: 0, max: 1.5, step: 0.05, label: 'terrain flow strength', group: 'fields', cls: 'rebake' }),
+  terrainFlowAlign: dial({ default: 0.6, min: 0, max: 1, step: 0.02, label: 'terrain flow align', group: 'fields', cls: 'rebake' }),
 
   // dents (rebake) — the off-lane press-hollows + their baked AO. Round-9 verdict: Aram
   // likes the HIGHER settings — defaults baked to ~75% of the prior max and the maxes
@@ -89,6 +100,17 @@ export const DIALS = {
   // swirl; `flow alignment` = how strongly the streaks follow the flow (0 = isotropic).
   waterFlowStrength: dial({ default: 0.4, min: 0, max: 1.5, step: 0.05, label: 'flow strength', group: 'water', cls: 'rebake' }),
   waterFlowAlign: dial({ default: 0.85, min: 0, max: 1, step: 0.02, label: 'flow alignment', group: 'water', cls: 'rebake' }),
+  // Round-9 continued (Task 33) — WATER ALTITUDE. Claymation water is a proud slab flush
+  // with the land, not a sunken pool. This raises the RENDER water-sphere radius above the
+  // geography waterline (WATER_LEVEL, the wetness classifier in biomes.ts, is UNTOUCHED —
+  // lane dryness / crossings-wet / anchors-dry are unchanged; the rise is render-only). At
+  // dial 0 the water sits at WATER_LEVEL (today's recessed look); the MAX (0.008 of R) lifts
+  // it flush-to-slightly-proud of the beach shore. The max is CLAMPED by the girl's own dry
+  // lane: her lowest lane point sits at 0.9831R (longitude ≈1.7, lap 2), so 0.972+0.008=0.980R
+  // leaves her ~0.003R of dry path; the six bridge decks buy their headroom from the raised
+  // DECK_RISE (0.13→0.16). Re-proven at MAX in scan-task33 / scan-task31. Rebake-class (the
+  // water bake reads it once), default 0 keeps ?tune-absent byte-identical.
+  waterRise: dial({ default: 0, min: 0, max: 0.008, step: 0.0005, label: 'water altitude', group: 'water', cls: 'rebake' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS

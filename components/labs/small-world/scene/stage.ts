@@ -33,11 +33,19 @@ const DECK_HALF = 0.08
 const DECK_RAMP = 0.09
 /**
  * Height the plank deck rides above the carved river floor (world units). The
- * river carves ~RIVER_DEPTH·R below the meadow, so ~0.13 lifts the deck back to
- * ground level plus a plank thickness. Matched by ClayBridge's plank offset so
- * the girl's feet land on the planks; tuned by capture.
+ * river carves ~RIVER_DEPTH·R below the meadow, so this lifts the deck back to
+ * ground level plus a plank thickness. Matched by ClayBridge's plank offset (it
+ * reads DECK_RISE) so the girl's feet land on the planks; tuned by capture.
+ *
+ * Task 33 (Round-9 water altitude): raised 0.13 → 0.16 to buy headroom for the
+ * render water-altitude dial (waterRise). At MAX rise (0.008·R ≈ 0.0176 world) the
+ * water climbs under every deck, so the decks — and the girl who rides them — lift
+ * with it. Re-derived so the tightest deck (B1) keeps a healthy clearance over the
+ * risen + max-roughness water (scan-task33 / scan-task31). This is a deliberate
+ * ground-truth change to walkYAt's deck heights (the girl rides ~0.03 world higher
+ * on every bridge); the stage.test deck pins are rewritten for it.
  */
-export const DECK_RISE = 0.13
+export const DECK_RISE = 0.16
 
 /** Shortest signed angular distance |a-b| wrapped to [0, π]. */
 function angularGap(a: number, b: number): number {

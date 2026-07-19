@@ -49,6 +49,14 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     // terminator dither disliked (flickering shadows) → default OFF; dial kept.
     expect(DIALS.terminatorDither.default).toBe(0)
     expect(DIALS.terminatorDither.max).toBe(0.1)
+    // Task 33 — terrain flow field (extends the water flow streak onto the land). Ships ON
+    // at a modest default so Aram can judge the flow at scale; both dial back to 0.
+    expect(DIALS.terrainFlowStrength.default).toBe(0.5)
+    expect(DIALS.terrainFlowStrength.max).toBe(1.5)
+    expect(DIALS.terrainFlowAlign.default).toBe(0.6)
+    expect(DIALS.terrainFlowAlign.max).toBe(1)
+    expect(DIALS.terrainFlowStrength.group).toBe('fields')
+    expect(DIALS.terrainFlowAlign.group).toBe('fields')
     // dent AO baked up (Aram likes the higher settings) with doubled headroom.
     expect(DIALS.dentAO.default).toBe(0.3)
     expect(DIALS.dentAO.max).toBe(0.8)
@@ -77,6 +85,11 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.waterNormalRough.default).toBe(WATER_DEFAULTS.normalRough)
     expect(DIALS.waterFlowStrength.default).toBe(WATER_DEFAULTS.flowStrength)
     expect(DIALS.waterFlowAlign.default).toBe(WATER_DEFAULTS.flowAlign)
+    // Task 33 water altitude: default 0 (today's recessed look), max clamped by the girl's
+    // dry lane to a modest flush-with-shore rise.
+    expect(DIALS.waterRise.default).toBe(WATER_DEFAULTS.waterRise)
+    expect(DIALS.waterRise.default).toBe(0)
+    expect(DIALS.waterRise.max).toBe(0.008)
     // pocketTint is Aram's kept 0.8; the outward crest default is under its ≤0.4× cap.
     expect(DIALS.waterPocketTint.default).toBe(0.8)
     expect(DIALS.waterReliefOutward.default).toBeLessThanOrEqual(0.4 * DIALS.waterReliefInward.default)
@@ -92,6 +105,8 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'veinDensity',
       'grimeDensity',
       'terminatorDither',
+      'terrainFlowStrength',
+      'terrainFlowAlign',
       'dentDepth',
       'dentAO',
       'waterPathWarp',
@@ -105,6 +120,7 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'waterNormalRough',
       'waterFlowStrength',
       'waterFlowAlign',
+      'waterRise',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')

@@ -1,8 +1,10 @@
 'use client'
+import { useSyncExternalStore } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { POLAR_L, WATER_LEVEL } from '../biomes'
 import { PLANET_RADIUS } from '../planet'
+import { DIALS, subscribe, revisionSnapshot } from '../tunables'
 import { GatedProp } from './gated-prop'
 import { ClayBlossom, ClayBoulder, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
@@ -12,9 +14,14 @@ const Y_UP = new THREE.Vector3(0, 1, 0)
 
 /** Flat ice floes sitting on a polar ocean's surface (variant-INVARIANT — the
  *  polar oceans never morph, so these never pop). Tangent offsets around the
- *  pole centre; each floe rides at the waterline. */
+ *  pole centre; each floe rides at the waterline. Task 33: they FLOAT on the risen
+ *  water — the seat radius tracks the waterRise dial so the altitude rise never
+ *  swallows them (subscribes to the tunables store so live tuning moves them). */
 function PolarFloes({ cap, spec }: { cap: { dir: readonly [number, number, number] }; spec: Array<[number, number, number]> }) {
   const ramp = useClayRamp()
+  // re-render on any dial change so the floes ride the current water altitude.
+  useSyncExternalStore(subscribe, revisionSnapshot, revisionSnapshot)
+  const waterR = PLANET_RADIUS * (WATER_LEVEL + DIALS.waterRise.value)
   const c = new THREE.Vector3(cap.dir[0], cap.dir[1], cap.dir[2]).normalize()
   const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
   const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
@@ -22,7 +29,7 @@ function PolarFloes({ cap, spec }: { cap: { dir: readonly [number, number, numbe
     <>
       {spec.map(([a, b, r], i) => {
         const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
-        const pos = dir.clone().multiplyScalar(PLANET_RADIUS * WATER_LEVEL + 0.012)
+        const pos = dir.clone().multiplyScalar(waterR + 0.012)
         const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir)
         return (
           <mesh key={i} position={pos} quaternion={quat}>

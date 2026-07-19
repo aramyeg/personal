@@ -310,6 +310,52 @@ const JITTER_RAD = 0.0013
  *  so the lit face never speckles. Normals only — positions/contact/ceiling untouched. */
 
 /**
+ * Task 33 — the authored LAND flow tangent at a unit direction: the terrain's steepest
+ * DESCENT (downslope of the biome bump, from a finite-difference gradient of `bumpFn`)
+ * BLENDED with the same poleward-drainage + around-sphere swirl the water flow uses
+ * (`flowStrength` scales the blend). Returns a unit tangent, or [0,0,0] at the poles /
+ * where the field degenerates (no preferred flow) — so the flow-aligned field streak runs
+ * downhill toward the drainage, exactly like tool-dragged clay. Pure; bake-time only (four
+ * bumpFn samples), and colour-only downstream — no displacement term.
+ */
+function terrainFlowDir(
+  nx: number,
+  ny: number,
+  nz: number,
+  bumpFn: (x: number, y: number, z: number) => number,
+  flowStrength: number
+): [number, number, number] {
+  // tangent basis (same convention as terrainSlope); at the poles there is no flow.
+  let t1x = -nz
+  let t1z = nx
+  const l = Math.hypot(t1x, t1z)
+  if (l < 1e-4) return [0, 0, 0]
+  const t1y = 0
+  t1x /= l; t1z /= l
+  const t2x = ny * t1z - nz * t1y
+  const t2y = nz * t1x - nx * t1z
+  const t2z = nx * t1y - ny * t1x
+  const R = PLANET_RADIUS
+  const eps = 0.02
+  const s = (ox: number, oy: number, oz: number): number =>
+    bumpFn((nx + ox) * R, (ny + oy) * R, (nz + oz) * R)
+  const dA = (s(eps * t1x, eps * t1y, eps * t1z) - s(-eps * t1x, -eps * t1y, -eps * t1z)) / (2 * eps)
+  const dB = (s(eps * t2x, eps * t2y, eps * t2z) - s(-eps * t2x, -eps * t2y, -eps * t2z)) / (2 * eps)
+  // steepest descent (downhill) tangent = −∇bump projected onto the surface
+  let fx = -(dA * t1x + dB * t2x)
+  let fy = -(dA * t1y + dB * t2y)
+  let fz = -(dA * t1z + dB * t2z)
+  // blend the water drainage field: poleward projection of −x̂ + azimuthal swirl about x.
+  const px = -1 + nx * nx, py = nx * ny, pz = nx * nz
+  fx += flowStrength * px
+  fy += flowStrength * (py - nz)
+  fz += flowStrength * (pz + ny)
+  const fl = Math.hypot(fx, fy, fz)
+  if (fl < 1e-6) return [0, 0, 0]
+  return [fx / fl, fy / fl, fz / fl]
+}
+
+/**
  * Applies the per-wedge scene accent to open ground (the six scenes each own a
  * saturated identity). `g` is wedgeGate at this point, so every accent fades to
  * neutral meadow on the meridians (all four abutting scenes seam through one
@@ -438,7 +484,14 @@ function paintVertex(
   // open ground reads as pressed clay with character, not one flat CG-plastic field.
   // The 4-step ramp quantizes LIGHT then multiplies albedo, so this colour variance
   // survives at any frequency — the cheapest, most reliable clay cue we have.
-  applyFieldMottle(c, pal, kind, nx, ny, nz)
+  // Task 33: pass the LAND flow tangent so the mottle carries a flow-aligned streak
+  // deepening (only computed when the flow field is enabled — align 0 skips the gradient).
+  const flowAlign = DIALS.terrainFlowAlign.value
+  const flow =
+    flowAlign > 0
+      ? terrainFlowDir(nx, ny, nz, isB ? terrainBumpB : terrainBump, DIALS.terrainFlowStrength.value)
+      : ([0, 0, 0] as [number, number, number])
+  applyFieldMottle(c, pal, kind, nx, ny, nz, flow)
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
   // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
@@ -703,6 +756,9 @@ type WaterBake = {
   waterCapIdx: Int32Array; waterCapNx: Float32Array
   waterCapNy: Float32Array; waterCapNz: Float32Array
   deepOcean: readonly [number, number, number]
+  // Task 33: true when the altitude rise is non-zero, so the render enables a small
+  // depth polygonOffset to kill the shallow-angle shore-seam shimmer (see the mesh).
+  raised: boolean
 }
 
 /**
@@ -736,10 +792,18 @@ function useWaterGeometry(version: number): WaterBake {
       normalRough: DIALS.waterNormalRough.value,
       flowStrength: DIALS.waterFlowStrength.value,
       flowAlign: DIALS.waterFlowAlign.value,
+      waterRise: DIALS.waterRise.value,
     }
+    // Task 33 — water-altitude rise: the RENDER sphere sits at WATER_LEVEL + waterRise (a
+    // proud slab flush with the shore at MAX, today's recessed level at dial 0). The
+    // geography classifier WATER_LEVEL is untouched (paintDepth's terrainDepth still reads
+    // the constant), and every unit-direction field (streak/relief/flow/normals) is
+    // altitude-independent — only the base radius the lumps ride on moves. The rise is
+    // clamped (tunables) so the girl's dry lane + every seated anchor stay above it.
+    const WATER_R = WATER_LEVEL + wp.waterRise
     // Fewer segments = larger facets; the SphereGeometry is indexed, so
     // toNonIndexed + flat normals below turns it into visible lumpy clay water.
-    const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_LEVEL, 48, 48)
+    const geo = new THREE.SphereGeometry(PLANET_RADIUS * WATER_R, 48, 48)
     const pos = geo.attributes.position
     const colorsIdxA = new Float32Array(pos.count * 3)
     const colorsIdxB = new Float32Array(pos.count * 3)
@@ -893,6 +957,7 @@ function useWaterGeometry(version: number): WaterBake {
       waterCapNy: Float32Array.from(wCapNy),
       waterCapNz: Float32Array.from(wCapNz),
       deepOcean: [deepOcean.r, deepOcean.g, deepOcean.b],
+      raised: wp.waterRise > 0,
     }
     // `version` bumps when a rebake-class dial settles (Round 9). Water dials are all
     // rebake-class, so this re-bakes the water geometry/colour/normals; the caller
@@ -1057,7 +1122,18 @@ export function Planet({
   return (
     <group ref={group}>
       <mesh geometry={water.geometry}>
-        <meshToonMaterial vertexColors gradientMap={ramp} />
+        {/* Task 33 shore seam: when the water is raised flush with the shore the two
+            meshes cross at a shallow angle, so a coplanar depth fight can shimmer along the
+            new intersection. A small positive polygonOffset pushes the water fragments
+            slightly deeper so the land wins at the coincident depth (terrain occludes at the
+            shore) — enabled ONLY when raised, so dial 0 stays byte-identical (no offset). */}
+        <meshToonMaterial
+          vertexColors
+          gradientMap={ramp}
+          polygonOffset={water.raised}
+          polygonOffsetFactor={water.raised ? 1 : 0}
+          polygonOffsetUnits={water.raised ? 1 : 0}
+        />
       </mesh>
       <mesh geometry={geometry} material={boil.material} />
       {children}

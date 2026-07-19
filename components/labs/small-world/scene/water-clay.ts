@@ -73,6 +73,12 @@ export type WaterParams = {
    *  daubs, 1 = fully flow-aligned smears). Round-9 (Task 32): the streak COLOUR runs
    *  along the flow so the daubs read as tool-dragged flowing runs. */
   flowAlign: number
+  /** Round-9 (Task 33) render-only water-altitude rise as a fraction of PLANET_RADIUS,
+   *  added to the RENDER sphere radius on top of WATER_LEVEL (0 = today's recessed look;
+   *  MAX lifts the slab flush-to-proud of the shore). NOT part of the pure unit-direction
+   *  fields (streak/relief/flow are all altitude-independent) — the water bake reads it to
+   *  size the base sphere. The geography classifier WATER_LEVEL is untouched. */
+  waterRise: number
 }
 
 /** Capture-gated shipped defaults (planet.tsx / tunables read these; the panel tunes
@@ -91,6 +97,7 @@ export const WATER_DEFAULTS: WaterParams = {
   normalRough: 0.42,
   flowStrength: 0.4,
   flowAlign: 0.85,
+  waterRise: 0,
 }
 
 // Field frequencies over the UNIT sphere (tuned so relief reads as ~10–20 broad

@@ -16,6 +16,7 @@
  */
 import * as THREE from 'three'
 import { DIALS } from './tunables'
+import { makePermutation, ridged3, domainWarp3 } from './clay-noise'
 
 /** The planet colour palette the bake feeds in (built once in planet.tsx). */
 export type Pal = {
@@ -26,6 +27,9 @@ export type Pal = {
   earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
   foliageDeep: THREE.Color; pineDeep: THREE.Color; meadowDry: THREE.Color
 }
+
+/** Degenerate flow (a pole, or the flow field disabled) — no directional streak. */
+const ZERO_FLOW: readonly [number, number, number] = [0, 0, 0]
 
 const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t)
 const smooth = (x: number, lo: number, hi: number): number => {
@@ -64,6 +68,50 @@ export function fieldDents(nx: number, ny: number, nz: number, bump: number): nu
 
 const _deep = new THREE.Color()
 const _dry = new THREE.Color()
+const _flow = new THREE.Color()
+
+// Task 33 — TERRAIN flow streak. Reuses the water clay-noise vocabulary (clay-noise.ts):
+// a domain-warped ridged field sampled in a domain COMPRESSED along the terrain flow, so
+// the deepened streaks elongate into tool-dragged flowing runs down the slope/drainage.
+// One fixed seed (distinct from the water's 1337) so both renewal bakes + the bench agree.
+const FPERM = makePermutation(7919)
+const F_FREQ = 3.0
+const F_STRETCH = 4.0 // how long the streaks run along the flow (matches the water feel)
+const F_WARP = 0.7
+const F_OCT = 4
+const F_LAC = 2.0
+const F_GAIN = 0.5
+const F_SHARP = 1.3
+
+/**
+ * The flow-aligned streak field [0,1] at a unit direction, given the authored terrain
+ * flow unit tangent `flow` (downslope blended with the poleward/swirl drainage — computed
+ * by the caller, which has the terrain gradient) and `flowAlign` [0,1]. The base grid is
+ * compressed by (1−1/F_STRETCH)·flowAlign along `flow` so ridges run LONG along the flow,
+ * then domain-warped into marbled smears. flowAlign 0 (or a degenerate [0,0,0] flow at a
+ * pole) ⇒ isotropic (no directional bias). Pure, variant-independent.
+ */
+export function terrainStreak(
+  nx: number,
+  ny: number,
+  nz: number,
+  flow: readonly [number, number, number],
+  flowAlign: number
+): number {
+  let sx = nx * F_FREQ
+  let sy = ny * F_FREQ
+  let sz = nz * F_FREQ
+  const comp = (1 - 1 / F_STRETCH) * clamp01(flowAlign)
+  const [fx, fy, fz] = flow
+  if (comp > 0 && (fx !== 0 || fy !== 0 || fz !== 0)) {
+    const dot = sx * fx + sy * fy + sz * fz
+    sx -= comp * dot * fx
+    sy -= comp * dot * fy
+    sz -= comp * dot * fz
+  }
+  const [wx, wy, wz] = domainWarp3(FPERM, sx, sy, sz, F_WARP)
+  return ridged3(FPERM, wx, wy, wz, F_OCT, F_LAC, F_GAIN, F_SHARP)
+}
 
 /**
  * Multi-scale colour mottling for one already-painted field vertex. `kind` is the
@@ -82,9 +130,30 @@ export function applyFieldMottle(
   kind: 'underwater' | 'beach' | 'canyon' | 'snow' | 'meadow',
   nx: number,
   ny: number,
-  nz: number
+  nz: number,
+  flow: readonly [number, number, number] = ZERO_FLOW
 ): void {
   if (kind === 'underwater') return
+  // Task 33 — flow-aligned streak deepening (extended from the water's Task-32 lever onto
+  // the land). Sample the flow-stretched ridged field and darken toward a deeper shade of
+  // the CURRENT colour along the flow, so the ground reads as clay dragged downslope. Its
+  // magnitude REUSES the mottle saturation amp (turning mottle down shrinks the streak);
+  // its anisotropy is DIALS.terrainFlowAlign. Feathered to EXACTLY 0 on the girl's lane
+  // (|nx| < 0.14) so her path never stripes; colour-only, no displacement.
+  const flowAlign = DIALS.terrainFlowAlign.value
+  if (flowAlign > 0 && (flow[0] !== 0 || flow[1] !== 0 || flow[2] !== 0)) {
+    const laneG = smooth(Math.abs(nx), 0.14, 0.24)
+    if (laneG > 0) {
+      const streak = terrainStreak(nx, ny, nz, flow, flowAlign)
+      // deepen where the streak is strong (ridge crest = 1); ease it in so faint field
+      // stays clean. Amount = mottle saturation × alignment × lane feather × streak.
+      const amt = DIALS.mottleSaturation.value * flowAlign * laneG * smooth(streak, 0.35, 0.9)
+      if (amt > 0) {
+        _flow.copy(c).multiplyScalar(0.78)
+        c.lerp(_flow, amt)
+      }
+    }
+  }
   const coarse =
     Math.sin(4.7 * nx + 1.3) * Math.sin(5.1 * ny - 0.7) * Math.sin(4.3 * nz + 2.1)
   const fine =
