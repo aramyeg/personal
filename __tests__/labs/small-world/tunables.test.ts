@@ -85,11 +85,13 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.waterNormalRough.default).toBe(WATER_DEFAULTS.normalRough)
     expect(DIALS.waterFlowStrength.default).toBe(WATER_DEFAULTS.flowStrength)
     expect(DIALS.waterFlowAlign.default).toBe(WATER_DEFAULTS.flowAlign)
-    // Task 33 water altitude: default 0 (today's recessed look), max clamped by the girl's
-    // dry lane to a modest flush-with-shore rise.
+    // Task 33/34 water altitude: default 0 (today's recessed look). TWO-TIER range —
+    // the shipped-default-safe region is ≤0.008·R (proven clear of the girl's lane +
+    // props in scan-task33); the slider max is raised to 0.03·R for pure visual
+    // exploration (Task 34 — Aram wants to play), where the slab may lap her path.
     expect(DIALS.waterRise.default).toBe(WATER_DEFAULTS.waterRise)
     expect(DIALS.waterRise.default).toBe(0)
-    expect(DIALS.waterRise.max).toBe(0.008)
+    expect(DIALS.waterRise.max).toBe(0.03)
     // pocketTint is Aram's kept 0.8; the outward crest default is under its ≤0.4× cap.
     expect(DIALS.waterPocketTint.default).toBe(0.8)
     expect(DIALS.waterReliefOutward.default).toBeLessThanOrEqual(0.4 * DIALS.waterReliefInward.default)

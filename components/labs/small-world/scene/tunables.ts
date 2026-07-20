@@ -100,17 +100,23 @@ export const DIALS = {
   // swirl; `flow alignment` = how strongly the streaks follow the flow (0 = isotropic).
   waterFlowStrength: dial({ default: 0.4, min: 0, max: 1.5, step: 0.05, label: 'flow strength', group: 'water', cls: 'rebake' }),
   waterFlowAlign: dial({ default: 0.85, min: 0, max: 1, step: 0.02, label: 'flow alignment', group: 'water', cls: 'rebake' }),
-  // Round-9 continued (Task 33) — WATER ALTITUDE. Claymation water is a proud slab flush
+  // Round-9 continued (Task 33/34) — WATER ALTITUDE. Claymation water is a proud slab flush
   // with the land, not a sunken pool. This raises the RENDER water-sphere radius above the
   // geography waterline (WATER_LEVEL, the wetness classifier in biomes.ts, is UNTOUCHED —
   // lane dryness / crossings-wet / anchors-dry are unchanged; the rise is render-only). At
-  // dial 0 the water sits at WATER_LEVEL (today's recessed look); the MAX (0.008 of R) lifts
-  // it flush-to-slightly-proud of the beach shore. The max is CLAMPED by the girl's own dry
-  // lane: her exact-foot (nx=0) min is 0.9831R (lon ≈1.7, lap 2); the wider lane BAND min is 0.9825R (lon 1.87, lap 1 — the bench binder), so 0.972+0.008=0.980R
-  // leaves her ~0.003R of dry path; the six bridge decks buy their headroom from the raised
-  // DECK_RISE (0.13→0.16). Re-proven at MAX in scan-task33 / scan-task31. Rebake-class (the
-  // water bake reads it once), default 0 keeps ?tune-absent byte-identical.
-  waterRise: dial({ default: 0, min: 0, max: 0.008, step: 0.0005, label: 'water altitude', group: 'water', cls: 'rebake' }),
+  // dial 0 the water sits at WATER_LEVEL (today's recessed look).
+  //
+  // TWO-TIER RANGE (Task 34 — Aram wants to PLAY with this one):
+  //  • SAFE ≤ 0.008·R — flush-to-slightly-proud of the beach shore, PROVEN clear of the girl's
+  //    dry lane (her band min ≈0.9825R, so 0.972+0.008=0.980R leaves ~0.003R of dry path) and
+  //    every dry-bank anchor + all six bridge decks (raised DECK_RISE 0.13→0.16). This is the
+  //    shippable-default region; scan-task33 asserts clearance at 0.008 (WATER_RISE_SAFE_MAX).
+  //  • 0.008 → 0.03·R (this slider max) — VISUAL EXPLORATION only. Past ~0.008 the risen slab
+  //    visibly laps the girl's path and can swallow shore props; that is EXPECTED and accepted
+  //    for a tuning dial (never the shipped default — default stays 0). Not proof territory:
+  //    the bench captures what it looks like, it does not assert it stays clear.
+  // Rebake-class (the water bake reads it once), default 0 keeps ?tune-absent byte-identical.
+  waterRise: dial({ default: 0, min: 0, max: 0.03, step: 0.0005, label: 'water altitude (safe ≤0.008)', group: 'water', cls: 'rebake' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS
