@@ -1,10 +1,11 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CHAPTER_COUNT } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
+import { beginManualScrollRestoration, pinScrollToTop } from './scroll-reset'
 import { isTuneEnabled } from './scene/tunables'
 
 /** The ?tune=1 roughness panel is code-split behind the flag: absent → this chunk is
@@ -34,6 +35,23 @@ export function SmallWorldExperience() {
   const [tune, setTune] = useState(false)
   const progressRef = useRef(0)
   const trackRef = useRef<HTMLDivElement>(null)
+
+  // BUG-fix: own scroll restoration for the lab's lifetime so a reload-while-deep
+  // never lets the browser re-apply a stale scroll during load (which made the
+  // journey sample a near-end progress — the "loads at the end then resets" flash).
+  // Layout effect + manual mode from first mount; the prior mode is restored on
+  // unmount so every other route keeps normal restoration.
+  useLayoutEffect(() => {
+    const restore = beginManualScrollRestoration()
+    pinScrollToTop()
+    return restore
+  }, [])
+
+  // The tall track only exists once `active` flips true; pin to top again in the
+  // same commit (before paint) so the just-grown page can't show a restored depth.
+  useLayoutEffect(() => {
+    if (active) pinScrollToTop()
+  }, [active])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -80,7 +98,10 @@ export function SmallWorldExperience() {
         <JourneyOverlay progressRef={progressRef} onAdvance={advanceTo} />
         {tune && <TunePanel />}
       </div>
-      <style>{`.${FALLBACK_CLASS}{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}`}</style>
+      {/* Collapse the now-pastel-styled fallback once the scene is live. Neutralises
+          the fallback's own min-height/padding/background so it fully visually hides
+          (this rule renders after the fallback's style block, so it wins on tie). */}
+      <style>{`.${FALLBACK_CLASS}{position:absolute!important;width:1px;height:1px;min-height:0;padding:0;margin:0;overflow:hidden;clip-path:inset(50%)}`}</style>
     </div>
   )
 }
