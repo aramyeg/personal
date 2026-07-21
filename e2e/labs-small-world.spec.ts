@@ -24,6 +24,10 @@ async function scrollToProgress(page: import('@playwright/test').Page, progress:
 // wait for the canvas (a proxy for the track having mounted) before scrolling.
 async function waitForSceneReady(page: import('@playwright/test').Page) {
   await page.waitForSelector('canvas', { timeout: 10_000 })
+  // The themed planet loader overlays the scene through its min-hold + reveal;
+  // wait for it to finish and unmount so scroll-driven panels aren't covered
+  // when assertions run. `detached` resolves immediately if it is already gone.
+  await page.waitForSelector('[data-sw-loader]', { state: 'detached', timeout: 12_000 })
 }
 
 test.describe('Small World lab', () => {

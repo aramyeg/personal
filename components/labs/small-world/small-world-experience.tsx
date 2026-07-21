@@ -30,7 +30,11 @@ const TRACK_VH_PER_CHAPTER = 240
  * ref for the scene. Falls back to the server timeline when WebGL is missing
  * or the visitor prefers reduced motion.
  */
-export function SmallWorldExperience() {
+export function SmallWorldExperience({
+  onLoadChange,
+}: {
+  onLoadChange?: (progress: number, ready: boolean) => void
+} = {}) {
   const [active, setActive] = useState(false)
   const [tune, setTune] = useState(false)
   const progressRef = useRef(0)
@@ -94,7 +98,7 @@ export function SmallWorldExperience() {
   return (
     <div ref={trackRef} style={{ height: `${CHAPTER_COUNT * TRACK_VH_PER_CHAPTER}vh` }}>
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
-        <SmallWorldScene progressRef={progressRef} />
+        <SmallWorldScene progressRef={progressRef} onLoadChange={onLoadChange} />
         <JourneyOverlay progressRef={progressRef} onAdvance={advanceTo} />
         {tune && <TunePanel />}
       </div>

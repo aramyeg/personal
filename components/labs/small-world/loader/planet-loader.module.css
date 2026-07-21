@@ -1,0 +1,204 @@
+/* Small World themed loader. Palette arrives as --swl-* custom properties from
+   planet-loader.tsx (palette.ts is the single source of truth); everything here
+   is procedural (radial/conic gradients + box-shadows) — no images. */
+
+/* Registered so the clay ring's fill can ease between progress values instead of
+   snapping. Unsupported engines simply jump — still correct, just less smooth. */
+@property --swl-progress {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  /* Matches the scene's Sky shader: cream up top, pink glow low, so the reveal
+     is seamless (Sky mixes horizon→sky around vUv.y 0.42–0.66). */
+  background: linear-gradient(180deg, var(--swl-sky) 0%, var(--swl-sky) 42%, var(--swl-horizon) 100%);
+  opacity: 1;
+  /* The overlay fades whole (gradient included) so the backdrop ends transparent
+     over the live scene; the ring fill eases via the registered property. */
+  transition: opacity 0.4s ease, --swl-progress 0.45s ease-out;
+}
+
+.revealing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.system {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  transition: transform 0.4s ease;
+}
+
+.revealing .system {
+  transform: translateY(-10px) scale(1.04);
+}
+
+/* Clay progress ring — a conic wedge of clay path "rolls up" around the planet
+   as progress climbs; the untravelled arc is a faint clay track. */
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 168px;
+  height: 168px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--swl-clay) calc(var(--swl-progress) * 1%),
+    color-mix(in srgb, var(--swl-clay) 26%, transparent) 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+}
+
+/* Tiny clay world: a lit green sphere with blobby mottling and clay dents. */
+.planet {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 128px;
+  height: 128px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    /* terminator pooling lower-right */
+    radial-gradient(circle at 64% 72%, rgba(43, 43, 51, 0.16), transparent 48%),
+    /* clay dents / patches of growth */
+    radial-gradient(10px 10px at 39% 41%, var(--swl-sprout), transparent 62%),
+    radial-gradient(12px 12px at 66% 57%, var(--swl-foliage), transparent 64%),
+    radial-gradient(8px 8px at 52% 29%, var(--swl-meadow-dry), transparent 62%),
+    /* a pink blossom patch + a small pond */
+    radial-gradient(5px 5px at 31% 63%, var(--swl-blossom-deep), transparent 62%),
+    radial-gradient(6px 6px at 44% 74%, color-mix(in srgb, var(--swl-blossom) 80%, white), transparent 64%),
+    /* base sphere: light green highlight → deep green shade */
+    radial-gradient(circle at 34% 30%, var(--swl-sprout) 0%, var(--swl-meadow) 40%, var(--swl-leaf) 76%, var(--swl-pine) 100%);
+  box-shadow:
+    inset -10px -12px 22px rgba(43, 43, 51, 0.26),
+    inset 8px 10px 18px rgba(255, 255, 255, 0.32),
+    0 14px 26px -8px rgba(43, 43, 51, 0.32);
+}
+
+/* Orbit ring rotates the skipper all the way around the little world; at the
+   bottom of the lap she reads inverted — the tiny-planet gravity that sells it. */
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150px;
+  height: 150px;
+  transform: translate(-50%, -50%);
+  animation: swl-orbit 5.2s linear infinite;
+}
+
+/* Anchor pinned at 12 o'clock on the orbit circle (75px above centre). */
+.skipper {
+  position: absolute;
+  top: 0;
+  left: 50%;
+}
+
+/* The girl: a warm-ink silhouette with a blossom hair bow, feet toward the
+   surface, growing outward. Hops with squash/stretch — the skip rhythm. */
+.figure {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  margin-left: -7.5px;
+  width: 15px;
+  height: 21px;
+  transform-origin: 50% 100%;
+  animation: swl-hop 0.52s cubic-bezier(0.33, 0, 0.4, 1) infinite;
+}
+
+.head {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  width: 8.5px;
+  height: 8.5px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--swl-ink);
+}
+
+.bow {
+  position: absolute;
+  bottom: 15px;
+  left: 10.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--swl-blossom-deep);
+}
+
+.dress {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 15px;
+  height: 13px;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 42% 42% / 72% 72% 30% 30%;
+  background: var(--swl-ink);
+}
+
+.caption {
+  margin: 0.4rem 0 0;
+  font-family: var(--sw-font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  letter-spacing: 0.01em;
+  color: var(--swl-leaf);
+  text-align: center;
+}
+
+@keyframes swl-orbit {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes swl-hop {
+  0% {
+    transform: translateY(0) scale(1.08, 0.86);
+  }
+  18% {
+    transform: translateY(-9px) scale(0.96, 1.06);
+  }
+  50% {
+    transform: translateY(-12px) scale(1, 1);
+  }
+  82% {
+    transform: translateY(-9px) scale(0.97, 1.04);
+  }
+  100% {
+    transform: translateY(0) scale(1.08, 0.86);
+  }
+}
+
+/* Reduced motion: a static frame — no orbit, no hop — that still reveals. */
+@media (prefers-reduced-motion: reduce) {
+  .orbit,
+  .figure {
+    animation: none;
+  }
+  .loader {
+    transition: opacity 0.2s ease;
+  }
+}

@@ -21,6 +21,7 @@ import { Dialog360Set } from './props/set-360dialog'
 import { AccentureSet } from './props/set-accenture'
 import { AknaSet } from './props/set-akna'
 import { XdatagroupSet } from './props/set-xdatagroup'
+import { LoadSignal } from '../loader/load-signal'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
 
@@ -101,13 +102,18 @@ function SceneContents({ progressRef }: SceneProps) {
 }
 
 /** Side-view stage: planet is a wheel spinning about z; girl pinned on top. */
-export function SmallWorldScene({ progressRef }: SceneProps) {
+export function SmallWorldScene({
+  progressRef,
+  onLoadChange,
+}: SceneProps & { onLoadChange?: (progress: number, ready: boolean) => void }) {
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
       <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
         <ToonRampProvider>
           <SceneContents progressRef={progressRef} />
         </ToonRampProvider>
+        {/* Reports the girl-GLB load to the DOM planet loader (drei useProgress). */}
+        {onLoadChange && <LoadSignal onChange={onLoadChange} />}
       </Canvas>
     </div>
   )
