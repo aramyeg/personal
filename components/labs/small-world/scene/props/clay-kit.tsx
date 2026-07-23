@@ -382,3 +382,152 @@ export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x
     </mesh>
   )
 }
+
+// --- Lurking jungle animals (Task 42) ---------------------------------------
+//
+// Aram: "some animals lurking around." Small clay figures HIDING in the jungle —
+// the charm is mostly-occluded placement (a snake at a trunk, cat eyes behind a
+// canopy mound, a parrot on a branch, a frog by the water). Each is a few clay
+// primitives with a strong silhouette and one accent colour, in the clay-kit idiom
+// (like ClayBee). Jungle accents are LOCAL hex defaults here (not palette.ts entries)
+// so the figures ship independent of the concurrent palette edits — overridable per prop.
+
+/** A coiled snake resting at a trunk base: a flattened body coil + a raised head with
+ *  two ink eyes and a forked-flick tongue. Accent = emerald body. */
+export function ClaySnake({ color = PALETTE.snakeBody, belly = PALETTE.snakeBelly, ...x }: Xform & { color?: string; belly?: string }) {
+  const ramp = useClayRamp()
+  return (
+    <group {...x}>
+      {/* the flat coil lying on the ground */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.55]}>
+        <torusGeometry args={[0.075, 0.026, 10, 20]} />
+        <meshToonMaterial color={color} gradientMap={ramp} />
+      </mesh>
+      {/* a smaller inner coil so the body reads as a spiral, not a ring */}
+      <mesh position={[0.02, 0.02, 0.01]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.55]}>
+        <torusGeometry args={[0.04, 0.024, 10, 18]} />
+        <meshToonMaterial color={color} gradientMap={ramp} />
+      </mesh>
+      {/* head reared up off the coil */}
+      <mesh position={[0.08, 0.05, 0.05]} rotation={[0, 0, -0.5]} scale={[1.5, 1, 1]}>
+        <sphereGeometry args={[0.03, 12, 12]} />
+        <meshToonMaterial color={color} gradientMap={ramp} />
+      </mesh>
+      <mesh position={[0.11, 0.062, 0.058]} scale={[1, 0.3, 1]}>
+        <sphereGeometry args={[0.014, 8, 8]} />
+        <meshToonMaterial color={PALETTE.honey} gradientMap={ramp} />
+      </mesh>
+      {[0.045, 0.065].map((z) => (
+        <mesh key={z} position={[0.1, 0.075, z]}>
+          <sphereGeometry args={[0.006, 6, 6]} />
+          <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** A big cat peeking from cover — only the crown of the head, two ears and two glowing
+ *  eyes show (the body stays hidden behind a canopy mound). Accent = amber eyes. */
+export function ClayJaguar({ fur = PALETTE.jaguarFur, eye = PALETTE.jaguarEye, ...x }: Xform & { fur?: string; eye?: string }) {
+  const ramp = useClayRamp()
+  return (
+    <group {...x}>
+      {/* the brow / crown of the head — most of it sinks behind cover */}
+      <mesh position={[0, 0, 0]} scale={[1.25, 0.85, 1]}>
+        <sphereGeometry args={[0.09, 14, 14]} />
+        <meshToonMaterial color={fur} gradientMap={ramp} />
+      </mesh>
+      {/* rounded ears */}
+      {[-0.06, 0.06].map((ex) => (
+        <mesh key={ex} position={[ex, 0.075, 0]}>
+          <coneGeometry args={[0.035, 0.06, 10]} />
+          <meshToonMaterial color={fur} gradientMap={ramp} />
+        </mesh>
+      ))}
+      {/* the glowing eyes that give it away in the gloom */}
+      {[-0.04, 0.04].map((ex) => (
+        <mesh key={ex} position={[ex, 0.01, 0.075]}>
+          <sphereGeometry args={[0.018, 10, 10]} />
+          <meshToonMaterial color={eye} gradientMap={ramp} />
+        </mesh>
+      ))}
+      {[-0.04, 0.04].map((ex) => (
+        <mesh key={`p${ex}`} position={[ex, 0.005, 0.09]} scale={[0.5, 1, 0.5]}>
+          <sphereGeometry args={[0.012, 8, 8]} />
+          <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** A parrot perched on a branch: a plump body, a hooked beak, a long tail and a wing
+ *  patch of a second colour. Accent = scarlet body with a teal wing. */
+export function ClayParrot({ body = PALETTE.parrotBody, wing = PALETTE.parrotWing, ...x }: Xform & { body?: string; wing?: string }) {
+  const ramp = useClayRamp()
+  return (
+    <group {...x}>
+      <mesh scale={[1, 1.25, 1]}>
+        <sphereGeometry args={[0.06, 14, 14]} />
+        <meshToonMaterial color={body} gradientMap={ramp} />
+      </mesh>
+      {/* head */}
+      <mesh position={[0.01, 0.09, 0.02]}>
+        <sphereGeometry args={[0.042, 12, 12]} />
+        <meshToonMaterial color={body} gradientMap={ramp} />
+      </mesh>
+      {/* hooked beak */}
+      <mesh position={[0.05, 0.085, 0.03]} rotation={[0, 0, -1.1]}>
+        <coneGeometry args={[0.02, 0.05, 8]} />
+        <meshToonMaterial color={PALETTE.honey} gradientMap={ramp} />
+      </mesh>
+      {/* folded wing patch */}
+      <mesh position={[-0.03, 0.0, 0.03]} rotation={[0.3, 0.2, 0.4]} scale={[0.55, 1.4, 0.9]}>
+        <sphereGeometry args={[0.045, 10, 10]} />
+        <meshToonMaterial color={wing} gradientMap={ramp} />
+      </mesh>
+      {/* long tail sweeping down */}
+      <mesh position={[-0.05, -0.09, 0]} rotation={[0, 0, 0.6]} scale={[0.5, 2.4, 0.7]}>
+        <sphereGeometry args={[0.03, 10, 10]} />
+        <meshToonMaterial color={wing} gradientMap={ramp} />
+      </mesh>
+      <mesh position={[0.035, 0.1, 0.05]}>
+        <sphereGeometry args={[0.008, 6, 6]} />
+        <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
+      </mesh>
+    </group>
+  )
+}
+
+/** A little frog crouched by the water: a wide squat body with two bulging eyes on
+ *  top and a pale throat. Accent = bright leaf green. */
+export function ClayFrog({ color = PALETTE.frogBody, throat = PALETTE.frogThroat, ...x }: Xform & { color?: string; throat?: string }) {
+  const ramp = useClayRamp()
+  return (
+    <group {...x}>
+      <mesh scale={[1.3, 0.8, 1.15]}>
+        <sphereGeometry args={[0.055, 14, 12]} />
+        <meshToonMaterial color={color} gradientMap={ramp} />
+      </mesh>
+      {/* pale throat */}
+      <mesh position={[0.045, -0.005, 0]} scale={[0.7, 0.55, 0.9]}>
+        <sphereGeometry args={[0.04, 10, 10]} />
+        <meshToonMaterial color={throat} gradientMap={ramp} />
+      </mesh>
+      {/* bulging eyes on top */}
+      {[-0.028, 0.028].map((ez) => (
+        <group key={ez} position={[0.02, 0.045, ez]}>
+          <mesh>
+            <sphereGeometry args={[0.02, 10, 10]} />
+            <meshToonMaterial color={color} gradientMap={ramp} />
+          </mesh>
+          <mesh position={[0.012, 0.006, 0]}>
+            <sphereGeometry args={[0.009, 8, 8]} />
+            <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}

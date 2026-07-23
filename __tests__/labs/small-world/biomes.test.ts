@@ -15,6 +15,8 @@ import {
   BOUNDARY_WANDER,
   duneField,
   DUNE_GATE,
+  canopyMounds,
+  CANOPY_GATE,
   MERIDIANS,
   tideWetness,
   tideCarve,
@@ -228,6 +230,88 @@ describe('Task 41 — B0 desert dune field (crescent dunes, no ridge/passage)', 
 
   it('vanishes on the band-0 meridians (biomeBumpB === biomeBump there — seam intact)', () => {
     for (const m of [MERIDIANS[0], MERIDIANS[1]]) {
+      for (let b = -70; b <= 70; b += 5) {
+        const nx = b / 100
+        const d = dirAt(nx, m)
+        expect(biomeBumpB(...d)).toBe(biomeBump(...d))
+      }
+    }
+  })
+})
+
+// Task 42 (Round 12): the A1 flower-field wedge (band 1, variant A) becomes a jungle —
+// canopyMounds authors bulbous overlapping-dome canopy relief in biomeBump. It must be
+// EXACTLY 0 on the girl's lane band (contact budget + lane walkability) and past the limb,
+// add only (never carve, so no accidental water), be deterministic, and vanish on the
+// band-1 meridians (so bumpA === bumpB there — the seam is intact).
+describe('Task 42 — A1 jungle canopy mounds', () => {
+  const A1_LONGITUDES = [2.7, 3.1, 3.52, 3.9, 4.3] // band-1 interior + the FLYERBEE crossing
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('is EXACTLY 0 across the girl lane band (|nx| < laneLo), at every band-1 longitude', () => {
+    for (const th of A1_LONGITUDES) {
+      for (let ni = 0; ni <= 30; ni++) {
+        const nx = -(CANOPY_GATE.laneLo - 1e-4) + (2 * (CANOPY_GATE.laneLo - 1e-4) * ni) / 30
+        expect(canopyMounds(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('is EXACTLY 0 at and past the limb fade (|nx| >= limbHi)', () => {
+    for (const th of A1_LONGITUDES) {
+      for (const nx of [CANOPY_GATE.limbHi, 0.8, 0.9, -CANOPY_GATE.limbHi, -0.85]) {
+        expect(canopyMounds(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('only ever ADDS relief (>= 0) — never carves, so no accidental water forms', () => {
+    for (let ai = 0; ai < 60; ai++) {
+      const th = (ai / 60) * TWO_PI
+      for (let ni = 0; ni <= 40; ni++) {
+        const nx = -0.7 + (1.4 * ni) / 40
+        expect(canopyMounds(...dirAt(nx, th))).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('actually builds canopy mounds off-lane in the jungle (positive relief at reading latitudes)', () => {
+    let peak = 0
+    for (const th of A1_LONGITUDES) {
+      for (let ni = 0; ni <= 60; ni++) {
+        const nx = 0.16 + (0.4 * ni) / 60
+        peak = Math.max(peak, canopyMounds(...dirAt(nx, th)))
+      }
+    }
+    expect(peak).toBeGreaterThan(0.03) // real canopy relief (fraction of R), not a flat sheet
+  })
+
+  it('is deterministic (both renewal bakes agree byte-for-byte)', () => {
+    for (const th of A1_LONGITUDES) {
+      for (const nx of [0.25, 0.4, 0.55, -0.35]) {
+        const d = dirAt(nx, th)
+        expect(canopyMounds(...d)).toBe(canopyMounds(...d))
+      }
+    }
+  })
+
+  it('stays well under the 1.35R ceiling across the whole jungle wedge', () => {
+    let maxR = 0
+    for (const th of A1_LONGITUDES) {
+      for (let ni = 0; ni <= 80; ni++) {
+        const nx = -0.72 + (1.44 * ni) / 80
+        const [x, y, z] = dirAt(nx, th)
+        maxR = Math.max(maxR, 1 + biomeBump(x, y, z))
+      }
+    }
+    expect(maxR).toBeLessThan(1.35)
+  })
+
+  it('vanishes on the band-1 meridians (biomeBumpB === biomeBump there — seam intact)', () => {
+    for (const m of [MERIDIANS[1], MERIDIANS[2]]) {
       for (let b = -70; b <= 70; b += 5) {
         const nx = b / 100
         const d = dirAt(nx, m)

@@ -13,6 +13,7 @@ import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
 import { GlobalDressing, GlobalDressingAutumn } from './props/global-dressing'
 import { Forest } from './props/forest'
+import { Jungle } from './props/jungle'
 import { Bridges } from './props/bridges'
 import { Delights } from './props/delights'
 import { BluenetSet } from './props/set-bluenet'
@@ -68,6 +69,7 @@ function SceneContents({ progressRef }: SceneProps) {
         <GlobalDressing journeyRef={journeyRef} />
         <GlobalDressingAutumn journeyRef={journeyRef} />
         <Forest journeyRef={journeyRef} />
+        <Jungle journeyRef={journeyRef} />
         <Bridges journeyRef={journeyRef} />
         <Delights journeyRef={journeyRef} />
         <ChapterSet index={0} journeyRef={journeyRef}>

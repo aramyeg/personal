@@ -41,4 +41,25 @@ export const PALETTE = {
   // girl blend (Task 24) — contact-shadow pool at the ramp floor, warm ink so
   // she grounds into the clay rather than casting a cool neutral disc
   shadowClay: '#3A2F30',
+  // Task 42 — jungle (A1, the 2nd green wedge): deep saturated jungle greens for the
+  // ground AND the dense flora, so the wedge reads "very green". The ground base is
+  // jungleFloor; the accent deepens to jungleDeep in the shadow pockets and lifts to
+  // jungleMoss on the fern-lit highlights (the shared green field-mottle then layers its
+  // foliageDeep pockets + pineDeep veins on top for a lush, mottled floor).
+  jungleFloor: '#3C9450', // rich jungle ground green (A1 accent base)
+  jungleCanopy: '#2E7D46', // broad-leaf canopy crowns
+  jungleDeep: '#1F6236', // deep understory shadow-green (crowns + ground pockets)
+  jungleMoss: '#4FA85C', // bright fern/moss highlight (ground + ferns)
+  jungleVine: '#37703F', // hanging vine loops
+  jungleLeaf: '#245E36', // dark understory big leaves
+  jungleBark: '#6E4A32', // broad-leaf trunks
+  // lurking jungle animals (Task 42) — one accent colour each
+  snakeBody: '#3FA65A', // emerald snake coil
+  snakeBelly: '#B7D98A', // pale snake underside
+  jaguarFur: '#D9A24A', // golden cat fur
+  jaguarEye: '#F2D65C', // amber glowing eyes
+  parrotBody: '#E24B3A', // scarlet parrot
+  parrotWing: '#3FA6C4', // teal wing + tail
+  frogBody: '#5FBE4A', // bright green frog
+  frogThroat: '#D7E7A0', // pale frog throat
 } as const

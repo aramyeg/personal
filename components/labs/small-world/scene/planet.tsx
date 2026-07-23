@@ -460,11 +460,15 @@ function accentMeadow(
       else if (lo) dot(pal.petal, 0.6)
       if (hi2) dot(pal.blossom, 0.5)
     } else if (band === 1) {
-      // A1 FLYERBEE flower field: lush green rioting with pink/honey flowers
-      dot(pal.meadow, 0.25)
-      if (hi) dot(pal.petal, 0.72)
-      else if (lo) dot(pal.honey, 0.62)
-      if (hi2) dot(pal.blossomDeep, 0.55)
+      // A1 JUNGLE (Task 42): deep saturated jungle green floor — the fern-lit highlights
+      // lift to moss, the shadow pockets sink to deep understory green, with the occasional
+      // surviving flower (it was the flower field). The shared green field-mottle then layers
+      // foliageDeep pockets + pineDeep veins on top for a lush, thumbed jungle floor; the
+      // dense instanced flora (jungle.tsx) rides on the canopy mounds above it.
+      dot(pal.jungleFloor, 0.74)
+      if (hi) dot(pal.jungleMoss, 0.5)
+      else if (lo) dot(pal.jungleDeep, 0.62)
+      if (hi2) dot(pal.blossom, 0.3)
     } else {
       // A2 delta: sandy braided banks (mostly water + sand)
       dot(pal.sand, 0.78)
@@ -690,6 +694,9 @@ export function buildPal(): Pal {
     foliageDeep: new THREE.Color(PALETTE.foliageDeep),
     pineDeep: new THREE.Color(PALETTE.pineDeep),
     meadowDry: new THREE.Color(PALETTE.meadowDry),
+    jungleFloor: new THREE.Color(PALETTE.jungleFloor),
+    jungleDeep: new THREE.Color(PALETTE.jungleDeep),
+    jungleMoss: new THREE.Color(PALETTE.jungleMoss),
   } satisfies Pal
 }
 

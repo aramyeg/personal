@@ -127,6 +127,8 @@ const buildPal = (): Pal => ({
   ice: new THREE.Color(PALETTE.ice), tuff: new THREE.Color(PALETTE.tuff),
   foliageDeep: new THREE.Color(PALETTE.foliageDeep), pineDeep: new THREE.Color(PALETTE.pineDeep),
   meadowDry: new THREE.Color(PALETTE.meadowDry),
+  jungleFloor: new THREE.Color(PALETTE.jungleFloor), jungleDeep: new THREE.Color(PALETTE.jungleDeep),
+  jungleMoss: new THREE.Color(PALETTE.jungleMoss),
 })
 
 describe('applyFieldMottle flow streak — lane feathering + disable', () => {

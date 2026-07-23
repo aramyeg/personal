@@ -851,6 +851,85 @@ export function duneField(nx: number, ny: number, nz: number): number {
   return DUNE_AMP * h * envelope * lane * limb * oasisFlat
 }
 
+// --- Jungle canopy mounds (A1, Task 42) -------------------------------------
+//
+// Aram (Round 12): the second green wedge (band 1, variant A — the FLYERBEE flower
+// field) becomes a "very green jungle terrain." The FORM of a jungle read from the
+// reading camera is a lumpy, bulbous CANOPY — overlapping rounded domes, not the
+// smooth terraced swells of a meadow. Authored HERE as displacement (like duneField)
+// so both renewal bakes agree byte-for-byte and the bench reads the real relief; the
+// dense instanced flora (jungle.tsx) sits ON these mounds so the wedge reads as a
+// packed canopy of green crowns riding a hummocky floor.
+//
+// Same hard gating contract as duneField: EXACTLY 0 on the girl's lane band
+// (|nx| < CANOPY_LANE_LO, an early return) so it adds NO spine-band term — the contact
+// budget (0.01247R) is untouched and the lane stays gentle + walkable; faded to 0
+// before the limb so it never fights the polar ocean/beach; and wedge-gated to 0 on the
+// meridians via wedgeDelta (so bumpA === bumpB there). Adds only (never carves), so no
+// accidental water forms and the 1.35R ceiling only rises a little.
+const CANOPY_LANE_LO = 0.16
+const CANOPY_LANE_HI = 0.3
+const CANOPY_LIMB_LO = 0.56
+const CANOPY_LIMB_HI = 0.72
+/** Dome cells marching across a full 2π of longitude (≈4–5 canopy clusters across the wedge). */
+const CANOPY_FREQ_LON = 13
+/** Dome cells across latitude (≈2–3 rows of canopy up each flank). */
+const CANOPY_FREQ_LAT = 4.5
+/** Peak canopy-mound height (fraction of R). */
+const CANOPY_AMP = 0.085
+
+/** A single rounded dome from a cell's fractional coordinates: 1 at the cell centre,
+ *  smoothly 0 at the cell-radius rim (0.5). Bulbous (smoothstep of a radial parabola),
+ *  so summed/maxed offset grids read as overlapping cauliflower canopy, not corrugation. */
+function domeCell(u: number, v: number): number {
+  const fu = u - Math.floor(u) - 0.5
+  const fv = v - Math.floor(v) - 0.5
+  const d2 = (fu * fu + fv * fv) / 0.25 // 0 at centre → 1 at the 0.5 cell radius
+  if (d2 >= 1) return 0
+  return smoothstep01(1 - d2)
+}
+
+/** Lane/limb gate bounds for the canopy field, exported so the unit test pins the gating
+ *  contract (0 on the girl's lane band, 0 past the limb) against the shipped constants. */
+export const CANOPY_GATE = { laneLo: CANOPY_LANE_LO, laneHi: CANOPY_LANE_HI, limbLo: CANOPY_LIMB_LO, limbHi: CANOPY_LIMB_HI } as const
+
+/** Bulbous overlapping-dome canopy field for the A1 jungle (variant A, added in sceneRaw).
+ *  Pure function of the unit direction; adds only (never carves), 0 on the lane + past the
+ *  limb fade. Exported for the unit test (gating + determinism); the render consumes it via
+ *  biomeBump. Three offset/rotated dome grids are MAXed (not summed) so the canopy is a floor
+ *  of overlapping rounded humps with shaded valleys between, and a low-frequency clump term
+ *  gives dense thickets and thinner clearings (the "gaps" where the understory shows). */
+export function canopyMounds(nx: number, ny: number, nz: number): number {
+  const ax = Math.abs(nx)
+  const lane = smoothstep01((ax - CANOPY_LANE_LO) / (CANOPY_LANE_HI - CANOPY_LANE_LO))
+  if (lane <= 0) return 0
+  const limb = 1 - smoothstep01((ax - CANOPY_LIMB_LO) / (CANOPY_LIMB_HI - CANOPY_LIMB_LO))
+  if (limb <= 0) return 0
+  // Never build canopy ON the water — flatten to 0 inside the A1 shelf sea (so it stays a wet
+  // lagoon) and along the stream channel (so the bridged crossing stays wet). Same idea as
+  // duneField's oasisFlat.
+  const shelfD = Math.acos(clampU(nx * A1_SHELF.dir[0] + ny * A1_SHELF.dir[1] + nz * A1_SHELF.dir[2]))
+  const shelfAvoid = smoothstep01((shelfD - (A1_SHELF.radius + 0.05)) / 0.06)
+  if (shelfAvoid <= 0) return 0
+  const chAvoid = smoothstep01((channelDist(nx, ny, nz, 0) - (STREAM_HALF + 0.05)) / 0.05)
+  if (chAvoid <= 0) return 0
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  // Keep the canopy OUT of the seam "breath" zone: full only in the wedge interior, tapering
+  // to 0 well before the meridians (a wider taper than the wedgeGate ramp) so the two abutting
+  // scenes still meet through a clean low meadow and no steep near-seam height gradient forms.
+  const seam = smoothstep01((meridianDist(thetaC) - 0.16) / 0.14)
+  if (seam <= 0) return 0
+  const u = (CANOPY_FREQ_LON * thetaC) / TWO_PI
+  const v = CANOPY_FREQ_LAT * nx
+  // three overlapping dome grids (offset + yawed) → a lumpy cauliflower canopy silhouette
+  let h = domeCell(u, v)
+  h = Math.max(h, 0.85 * domeCell(u + 0.5, v + 0.5))
+  h = Math.max(h, 0.7 * domeCell(1.7 * u + 0.3, 1.3 * v - 0.2))
+  // large-scale clumping: dense thickets vs thinner clearings (understory gaps)
+  const clump = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(2.1 * thetaC + 2.7 * nx + 0.6))
+  return CANOPY_AMP * h * clump * lane * limb * seam * shelfAvoid * chAvoid
+}
+
 // --- Assembled displacement -------------------------------------------------
 
 /** The one left ocean carved below the waterline, for a variant: the warped
@@ -877,6 +956,7 @@ function sceneRaw(band: 0 | 1 | 2, nx: number, ny: number, nz: number, variant: 
   }
   if (variant === 1 && band === 1) bump += canyonWalls(nx, ny, nz)
   if (variant === 1 && band === 0) bump += duneField(nx, ny, nz) // B0 crescent dune field (Task 41)
+  if (variant === 0 && band === 1) bump += canopyMounds(nx, ny, nz) // A1 jungle canopy mounds (Task 42)
   return bump
 }
 
