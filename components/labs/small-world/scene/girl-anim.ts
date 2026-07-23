@@ -7,11 +7,14 @@
  * in girl.tsx.
  *
  * Design contract — the mixer must NEVER be left without an active action (that
- * shows a T-pose). So every journey state resolves to a real clip: the fallback
- * selection below degrades a missing Idle/Walk_Backward/Wave onto the one clip
- * that always ships (the forward skip), driven differently (parked at a settled
- * frame / reversed timeScale / badge-only). When Aram's Meshy clips land under
- * the expected names, resolveClipPlan picks them up with ZERO code changes.
+ * shows a T-pose). So every journey state resolves to a real clip. When a named
+ * Idle/Walk_Backward is ABSENT, the state degrades onto the one clip that always
+ * ships (the forward skip), driven the pre-T28 way: the forward skip plays for
+ * ALL locomotion, its cadence mapped from |speed| with a slow keep-alive floor
+ * during dwell (no reversed playback, no parked frame — those were rejected).
+ * Missing Wave = badge-only celebrate. When Aram's Meshy clips land under the
+ * expected names, resolveClipPlan picks them up with ZERO code changes and the
+ * full state machine (real Idle loop, Walk_Backward, one-shot Wave) activates.
  */
 
 /** The forward locomotion clip that ships in girl.glb today (its only clip). */
@@ -51,17 +54,16 @@ export function shouldTriggerCelebrate(
   return hasCelebrateClip && prevBurst === null && burst !== null
 }
 
-/** How a resolved slot's action is driven on the mixer. */
-export type PlaybackMode = 'play' | 'pause-settled'
-
+/**
+ * A resolved locomotion slot: which animation to bind this state's action to,
+ * and whether it is a fallback (the dedicated named clip was absent, so the
+ * forward skip is standing in). girl.tsx drives a fallback idle as a slow
+ * keep-alive skip-in-place; a real Idle clip (fallback:false) loops naturally.
+ */
 export type SlotPlan = {
   /** the animation name to bind this state's action to */
   readonly clip: string
-  /** play the clip in reverse (negative timeScale) — the backward fallback */
-  readonly reversed: boolean
-  /** 'pause-settled' parks the clip at a grounded frame instead of advancing */
-  readonly mode: PlaybackMode
-  /** true when the dedicated named clip was absent and a fallback was chosen */
+  /** true when the dedicated named clip was absent and the skip is standing in */
   readonly fallback: boolean
 }
 
@@ -80,22 +82,22 @@ const has = (available: readonly string[], name: string): boolean => available.i
 /**
  * Choose an action for each journey state from the animation names the GLB
  * carries, degrading gracefully so the mixer always has a clip to play:
- *   Idle          → the forward clip parked at a settled (grounded) frame
- *   Walk_Backward → the forward clip played in reverse
+ *   Idle          → the forward skip (slow keep-alive skip-in-place during dwell)
+ *   Walk_Backward → the forward skip (played forward, cadence from |speed|)
  *   Wave/Celebrate → badge-only celebrate (no clip)
  * The forward slot is the skip clip when present, else the first animation.
  */
 export function resolveClipPlan(available: readonly string[]): ClipPlan {
   const forwardClip = has(available, SKIP_CLIP) ? SKIP_CLIP : (available[0] ?? SKIP_CLIP)
-  const forward: SlotPlan = { clip: forwardClip, reversed: false, mode: 'play', fallback: false }
+  const forward: SlotPlan = { clip: forwardClip, fallback: false }
 
   const idle: SlotPlan = has(available, IDLE_SLOT)
-    ? { clip: IDLE_SLOT, reversed: false, mode: 'play', fallback: false }
-    : { clip: forwardClip, reversed: false, mode: 'pause-settled', fallback: true }
+    ? { clip: IDLE_SLOT, fallback: false }
+    : { clip: forwardClip, fallback: true }
 
   const backward: SlotPlan = has(available, BACKWARD_SLOT)
-    ? { clip: BACKWARD_SLOT, reversed: false, mode: 'play', fallback: false }
-    : { clip: forwardClip, reversed: true, mode: 'play', fallback: true }
+    ? { clip: BACKWARD_SLOT, fallback: false }
+    : { clip: forwardClip, fallback: true }
 
   const celebrateClip = CELEBRATE_SLOTS.find((n) => has(available, n)) ?? null
   const celebrate: CelebratePlan = celebrateClip ? { clip: celebrateClip } : null
@@ -104,9 +106,10 @@ export function resolveClipPlan(available: readonly string[]): ClipPlan {
 }
 
 /**
- * Surface-speed magnitude → forward/backward cadence timeScale, clamped to a
- * lively band. Replaces the old MIN_TIMESCALE keep-alive: idle is now its own
- * state (parked), so this only runs while she is actually travelling.
+ * Surface-speed magnitude → skip cadence timeScale, clamped to a lively band.
+ * The `min` floor is the pre-T28 keep-alive: a dwell (|speed|→0) still skips
+ * slowly in place rather than freezing, and a fast fling never runs away past
+ * `max`. A real Idle clip supersedes this by looping at its natural rate.
  */
 export function speedToTimeScale(
   speedMag: number,

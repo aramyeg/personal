@@ -25,26 +25,20 @@ const GIRL_URL = '/labs/small-world/girl.glb'
 const GIRL_SCALE = 0.7
 /** Surface distance one skip-cycle covers at timeScale 1 — tune to the clip. */
 const CLIP_STRIDE = 1.0
-/** Damping rate for the forward/backward cadence timeScale so it eases rather
- * than snaps to speed changes. */
+/** Damping rate for the skip cadence timeScale so it eases rather than snaps to
+ * speed changes. */
 const DAMP_LAMBDA = 6
-/** Cadence band while travelling. Floor keeps a slow skip legible; ceiling stops
- * a fast fling running away. Idle is its own parked state, not a floor here. */
-const FORWARD_MIN_TIMESCALE = 0.2
-const FORWARD_MAX_TIMESCALE = 2.5
+/** Skip cadence band. The floor is the pre-T28 keep-alive: during dwell she
+ * skips slowly in place (never freezes, never T-poses); the ceiling stops a fast
+ * fling running away. A real Idle clip loops at its own rate, ignoring this. */
+const MIN_TIMESCALE = 0.12
+const MAX_TIMESCALE = 2.5
 /** Signed surface speed (world u/s) below which she is at rest → idle. Panel
  * windows freeze rotation, so their speed collapses well under this. */
 const IDLE_EPS = 0.04
 /** AnimationMixer crossfade between distinct clips (real Idle/Walk_Backward/Wave
  * once Aram's Meshy exports land). Same-clip transitions just re-drive params. */
 const CROSSFADE = 0.25
-/** Fraction of the skip clip's duration at which both feet sit near the ground —
- * the parked pose for the idle fallback. Capture-tuned against the shipped clip
- * (skip contact); a real Idle clip supersedes this entirely. */
-const IDLE_SETTLED_FRACTION = 0.0
-/** Below this cadence magnitude the idle fallback eases its pose toward the
- * settled frame so she comes to rest grounded, not frozen mid-hop. */
-const IDLE_SETTLE_CADENCE = 0.3
 /** Facet her toon surface to match the faceted clay world (lever 4). Off by
  *  default — capture-gated against face/hair readability; kept as a one-line
  *  dial. See task-24-report for the tried-and-rejected finding. */
@@ -54,42 +48,37 @@ const GIRL_FLAT_SHADING = false
 const SHADOW_RADIUS = 0.32
 const SHADOW_OPACITY = 0.26
 
-/** Drive the active slot's action for a travelling state (forward/backward). */
-function driveTravel(
-  action: THREE.AnimationAction,
-  slot: SlotPlan,
-  tsMag: number
-): void {
-  action.paused = false
-  action.timeScale = slot.reversed ? -tsMag : tsMag
-}
-
 /**
- * Drive the idle slot. A real Idle clip loops normally; the skip-clip fallback
- * eases its cadence to a stop and settles the pose onto a grounded frame so she
- * rests planted rather than freezing mid-hop. The action never stops → the mixer
- * always has an active clip (no T-pose).
+ * Drive the active locomotion action. A real Idle clip (a resolved, non-fallback
+ * idle slot) loops at its natural rate. Everything else — forward/backward
+ * travel AND the idle fallback — is the shipped forward skip, its cadence eased
+ * from |speed| toward the clamped band; the MIN_TIMESCALE floor keeps a dwell
+ * skipping slowly in place instead of freezing. The action never stops → the
+ * mixer always has an active clip (no T-pose). No reversed playback: a backward
+ * scrub just plays the forward skip while the planet spins the other way.
  */
-function driveIdle(
+function driveLocomotion(
   action: THREE.AnimationAction,
+  loco: Locomotion,
   slot: SlotPlan,
+  signedSpeed: number,
   tsMagRef: { current: number },
   delta: number
 ): void {
   action.paused = false
-  if (slot.mode !== 'pause-settled') {
+  if (loco === 'idle' && !slot.fallback) {
     action.timeScale = 1
     tsMagRef.current = 1
     return
   }
-  tsMagRef.current = THREE.MathUtils.damp(tsMagRef.current, 0, DAMP_LAMBDA, delta)
+  const target = speedToTimeScale(
+    Math.abs(signedSpeed),
+    CLIP_STRIDE,
+    MIN_TIMESCALE,
+    MAX_TIMESCALE
+  )
+  tsMagRef.current = THREE.MathUtils.damp(tsMagRef.current, target, DAMP_LAMBDA, delta)
   action.timeScale = tsMagRef.current
-  const duration = action.getClip().duration
-  const settled = THREE.MathUtils.clamp(IDLE_SETTLED_FRACTION, 0, 1) * duration
-  // As the skip slows, bias the sampled frame toward the grounded pose. Near a
-  // standstill mixer.update barely advances .time, so this lerp owns it.
-  const settleBlend = 1 - THREE.MathUtils.clamp(tsMagRef.current / IDLE_SETTLE_CADENCE, 0, 1)
-  action.time = THREE.MathUtils.lerp(action.time, settled, settleBlend * 0.15)
 }
 
 /**
@@ -111,7 +100,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const { scene, animations } = useGLTF(GIRL_URL)
   const { actions, mixer } = useAnimations(animations, group)
   const lastRotation = useRef<number | null>(null)
-  const tsMag = useRef(FORWARD_MIN_TIMESCALE)
+  const tsMag = useRef(MIN_TIMESCALE)
   const prevBurst = useRef<number | null>(null)
   const activeClip = useRef<string | null>(null)
   const celebrating = useRef(false)
@@ -191,22 +180,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       const slot = plan[loco]
       const action = fadeTo(slot.clip)
       if (action) {
-        if (loco === 'idle') {
-          driveIdle(action, slot, tsMag, dt)
-        } else {
-          tsMag.current = THREE.MathUtils.damp(
-            tsMag.current,
-            speedToTimeScale(
-              Math.abs(signedSpeed),
-              CLIP_STRIDE,
-              FORWARD_MIN_TIMESCALE,
-              FORWARD_MAX_TIMESCALE
-            ),
-            DAMP_LAMBDA,
-            dt
-          )
-          driveTravel(action, slot, tsMag.current)
-        }
+        driveLocomotion(action, loco, slot, signedSpeed, tsMag, dt)
       }
     }
 

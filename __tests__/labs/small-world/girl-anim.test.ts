@@ -56,21 +56,16 @@ describe('shouldTriggerCelebrate', () => {
 describe('resolveClipPlan — current GLB (skip clip only)', () => {
   const plan = resolveClipPlan([SKIP_CLIP])
 
-  it('forward is the skip clip, played normally', () => {
-    expect(plan.forward).toEqual({ clip: SKIP_CLIP, reversed: false, mode: 'play', fallback: false })
+  it('forward is the skip clip, driven directly', () => {
+    expect(plan.forward).toEqual({ clip: SKIP_CLIP, fallback: false })
   })
 
-  it('idle falls back to the skip clip parked at a settled frame', () => {
-    expect(plan.idle).toEqual({
-      clip: SKIP_CLIP,
-      reversed: false,
-      mode: 'pause-settled',
-      fallback: true,
-    })
+  it('idle falls back to the forward skip (slow keep-alive, never parked)', () => {
+    expect(plan.idle).toEqual({ clip: SKIP_CLIP, fallback: true })
   })
 
-  it('backward falls back to the skip clip reversed', () => {
-    expect(plan.backward).toEqual({ clip: SKIP_CLIP, reversed: true, mode: 'play', fallback: true })
+  it('backward falls back to the forward skip, played forward (never reversed)', () => {
+    expect(plan.backward).toEqual({ clip: SKIP_CLIP, fallback: true })
   })
 
   it('celebrate is badge-only (null) with no dedicated clip', () => {
@@ -87,17 +82,12 @@ describe('resolveClipPlan — current GLB (skip clip only)', () => {
 describe('resolveClipPlan — full Meshy delivery (all named clips)', () => {
   const plan = resolveClipPlan([SKIP_CLIP, IDLE_SLOT, BACKWARD_SLOT, 'Wave'])
 
-  it('idle uses the dedicated Idle clip, played (not parked)', () => {
-    expect(plan.idle).toEqual({ clip: IDLE_SLOT, reversed: false, mode: 'play', fallback: false })
+  it('idle uses the dedicated Idle clip (real clip, not a fallback)', () => {
+    expect(plan.idle).toEqual({ clip: IDLE_SLOT, fallback: false })
   })
 
-  it('backward uses the dedicated Walk_Backward clip, forward-played', () => {
-    expect(plan.backward).toEqual({
-      clip: BACKWARD_SLOT,
-      reversed: false,
-      mode: 'play',
-      fallback: false,
-    })
+  it('backward uses the dedicated Walk_Backward clip', () => {
+    expect(plan.backward).toEqual({ clip: BACKWARD_SLOT, fallback: false })
   })
 
   it('celebrate uses the Wave clip', () => {
@@ -137,7 +127,7 @@ describe('resolveClipPlan — clip-name variants and partial delivery', () => {
     const plan = resolveClipPlan([])
     expect(plan.forward.clip).toBe(SKIP_CLIP)
     expect(plan.backward.clip).toBe(SKIP_CLIP)
-    expect(plan.idle.mode).toBe('pause-settled')
+    expect(plan.idle.fallback).toBe(true)
     expect(plan.celebrate).toBeNull()
   })
 })
