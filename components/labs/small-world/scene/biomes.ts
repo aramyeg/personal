@@ -137,28 +137,19 @@ export function wedgeGate(thetaC: number, nx: number): number {
 }
 
 /**
- * Gate for the COLOUR accent only (decoupled from the terrain gate): a thinner
- * meridian seam and a latitude fade that holds almost to the ocean shore, so
- * each wedge's saturated identity reaches the limbs instead of dissolving into a
- * green crescent. Terrain identity (biomeBump) is unaffected — this shapes paint.
+ * Latitude-only gate for the COLOUR accent (Task 38). Each wedge's saturated identity
+ * paints at FULL strength right across its band — up to the HARD torn boundary curve
+ * (see paintBand) — and fades ONLY toward the limbs (|nx| ≳ 0.74) into the beach/ocean.
+ * The old meridian "seam" fade is GONE: abutting scenes now meet at a hard pressed-clay
+ * boundary, not through a green connective band (Aram's Round-12 verdict). Terrain
+ * identity (biomeBump) is unaffected — this shapes paint only.
  */
-export function colorGate(thetaC: number, nx: number): number {
-  const seam = smoothstep01((meridianDist(thetaC) - 0.05) / 0.08)
-  const lat = 1 - smoothstep01((Math.abs(nx) - 0.74) / 0.12)
-  return seam * lat
-}
-
-/** Task 36 — the seam de-green weight: 1 EXACTLY on a meridian, ramping to 0 by the
- *  band interior, reusing colorGate's seam sub-shape EXACTLY (half 0.05, ramp 0.08). So
- *  the seam tint fills PRECISELY where the wedge accent fades out — without widening the
- *  band. Longitude-only ⇒ a pure function of position, so the seam colour it drives is
- *  variant-invariant (the inviolable renewal identity: the seam must be identical A vs B). */
-export function seamTintWeight(thetaC: number): number {
-  return 1 - smoothstep01((meridianDist(thetaC) - 0.05) / 0.08)
+export function accentLatGate(nx: number): number {
+  return 1 - smoothstep01((Math.abs(nx) - 0.74) / 0.12)
 }
 
 /** Index (0..2) of the meridian nearest a canonical longitude — selects which
- *  per-meridian seam tint a de-greened seam point uses (Task 36). Pure. */
+ *  meridian's torn boundary curve a near-seam point is classified against. Pure. */
 export function nearestMeridianIndex(thetaC: number): 0 | 1 | 2 {
   let best = Infinity
   let bestI: 0 | 1 | 2 = 0
@@ -171,6 +162,109 @@ export function nearestMeridianIndex(thetaC: number): 0 | 1 | 2 {
     }
   }
   return bestI
+}
+
+// --- Torn biome boundaries (Task 38) ----------------------------------------
+//
+// Aram (Round 12): the green connective seams are REJECTED — "there should be a hard
+// rough terrain change, without a seam." So two abutting wedges now meet like two slabs
+// of clay pressed together: each paints its FULL accent right up to a shared boundary
+// CURVE, which is not the straight meridian but an irregular hand-cut line.
+//
+// The boundary between band i−1 (low-longitude side) and band i is the curve
+// longitude = m_i + boundaryWander(nx, i): a small deterministic multi-octave-sine fBm
+// along latitude (fixed per-meridian phases), so the seam is torn, not ruled. It is a
+// PURE function of position (no variant, no rotation) ⇒ variant-INVARIANT: the boundary
+// sits in the same place on both laps, so it never flips. |offset| ≤ amp ≪ BAND_SPAN/2,
+// so a point is always unambiguously on one side of its single nearest meridian.
+//
+// The RENEWAL identity moves from "paint A===B on the meridian" (retired with the seam)
+// to the wedge-interior rule: near-meridian paint is now variant-dependent (full spring
+// vs full winter), and that is safe because every such vertex flips A→B only inside the
+// occlusion-proven-hidden renewalGate window — proven by the paint-delta pass in
+// bench/renewal-scan.mjs (the geometry seam bumpA===bumpB on the meridian is UNTOUCHED,
+// only paint goes hard). The boundary ridge below is invariant, so it never flips.
+
+/** Shipped default of the torn-boundary wander amplitude (rad). Pinned equal to
+ *  DIALS.boundaryWander.default in the tunables test; the benches import this so the
+ *  proof uses the shipped curve. */
+export const BOUNDARY_WANDER = 0.035
+/** Shipped default of the pressed-lip height (fraction of R). Pinned equal to
+ *  DIALS.boundaryRidge.default; the render + benches scale the ridge profile by it. */
+export const BOUNDARY_RIDGE = 0.018
+
+/** Unit torn-boundary offset shape for meridian i at latitude nx: a 3-octave sine fBm
+ *  (amplitudes summing to 1, so |shape| ≤ 1) with golden-angle phases per meridian so
+ *  the three seams are all differently torn. Deterministic, pure. */
+function boundaryWanderShape(nx: number, i: number): number {
+  const ph = i * 2.399963
+  return (
+    0.55 * Math.sin(3.1 * nx + 1.7 + ph) +
+    0.3 * Math.sin(6.7 * nx - 0.9 + 2 * ph) +
+    0.15 * Math.sin(12.3 * nx + 0.4 + 3 * ph)
+  )
+}
+/** The torn-boundary longitude offset (rad) for meridian i at latitude nx, scaled by
+ *  `amp` (the boundaryWander dial). |result| ≤ amp. Variant-invariant. */
+export function boundaryWander(nx: number, i: number, amp: number): number {
+  return amp * boundaryWanderShape(nx, i)
+}
+
+/** Signed longitude offset (rad, wrapped to (−π,π]) of a canonical longitude from its
+ *  nearest meridian. Shared by paintBand + boundaryDist. */
+function signedMeridianDelta(thetaC: number, i: number): number {
+  let delta = thetaC - MERIDIANS[i]
+  if (delta > Math.PI) delta -= TWO_PI
+  else if (delta < -Math.PI) delta += TWO_PI
+  return delta
+}
+
+/** Which wedge band's accent paints this point — HARD-switched at the torn boundary
+ *  curve (Task 38). A point is in band i−1 if it lies on the low-longitude side of its
+ *  nearest meridian's warped boundary, else band i. With amp = 0 this reproduces bandOf
+ *  exactly (a straight meridian). Pure + variant-invariant, so both laps switch at the
+ *  same curve. */
+export function paintBand(thetaC: number, nx: number, amp: number = BOUNDARY_WANDER): 0 | 1 | 2 {
+  const i = nearestMeridianIndex(thetaC)
+  const delta = signedMeridianDelta(thetaC, i)
+  return delta < boundaryWander(nx, i, amp) ? (((i + 2) % 3) as 0 | 1 | 2) : (i as 0 | 1 | 2)
+}
+
+/** Surface angular distance (rad) from a point to its nearest torn boundary curve —
+ *  drives the pressed-lip + crease profile. Scaled by the ring radius so the crease
+ *  keeps a constant surface width and narrows to 0 at the poles (where it is faded out
+ *  anyway). Pure + variant-invariant. */
+export function boundaryDist(thetaC: number, nx: number, amp: number = BOUNDARY_WANDER): number {
+  const i = nearestMeridianIndex(thetaC)
+  const delta = signedMeridianDelta(thetaC, i)
+  const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+  return Math.abs(delta - boundaryWander(nx, i, amp)) * ring
+}
+
+// Pressed-lip profile geometry (surface radians): full lip within HALF of the curve,
+// ramping to 0 by HALF+RAMP.
+const RIDGE_HALF = 0.012
+const RIDGE_RAMP = 0.03
+/**
+ * Pressed-clay lip profile [0,1] centred on the torn boundary curve (Task 38 — "two
+ * slabs of clay pressed together"). Returns a UNIT profile the caller scales by the
+ * ridge-height dial. Gated:
+ *  - EXACTLY 0 on the girl's lane band (|nx| < 0.14, hard early-return like fieldDents),
+ *    so it adds NO spine-band displacement term — the analytic contact bound (0.01247R)
+ *    is untouched, and the deck footprints (all on the lane) carry no lip.
+ *  - faded to 0 before the limbs (|nx| ≥ 0.72), so it never touches the grazing
+ *    silhouette / the invariant polar caps.
+ * Variant-invariant (pure position fn), so it is identical in both bakes and the renewal
+ * front lerps it as a no-op (it never flips). */
+export function boundaryRidgeShape(nx: number, ny: number, nz: number, amp: number = BOUNDARY_WANDER): number {
+  const ax = Math.abs(nx)
+  if (ax < 0.14) return 0
+  const lat = smoothstep01((ax - 0.14) / 0.08) * (1 - smoothstep01((ax - 0.6) / 0.12))
+  if (lat <= 0) return 0
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  const d = boundaryDist(thetaC, nx, amp)
+  if (d >= RIDGE_HALF + RIDGE_RAMP) return 0
+  return (1 - smoothstep01((d - RIDGE_HALF) / RIDGE_RAMP)) * lat
 }
 
 // --- Water ------------------------------------------------------------------
@@ -781,7 +875,8 @@ export function biomeTint(
   ny: number,
   nz: number,
   currentBump: number,
-  variant: 0 | 1
+  variant: 0 | 1,
+  wanderAmp: number = BOUNDARY_WANDER
 ): { kind: BiomeKind; t: number } {
   const radius = 1 + currentBump
   if (radius < WATER_LEVEL) {
@@ -799,12 +894,15 @@ export function biomeTint(
     return { kind: 'beach', t: clamp01((0.982 - radius) / 0.01) }
   }
   const thetaC = canonicalTheta(Math.atan2(nz, ny))
-  const band = bandOf(thetaC)
+  // Task 38: band membership follows the HARD torn boundary, not the straight meridian,
+  // so the canyon/snow scenes abut their neighbours at the same pressed-clay curve the
+  // accents do — no soft meridian fade.
+  const pband = paintBand(thetaC, nx, wanderAmp)
   // B1 canyon: the rich-brown gorge (near the creek) + standalone badland buttes
   // read as clay added onto the pink-warm surround. `t` runs 1 in the creek floor
   // (deepest brown) to 0 on the upper banks/rims (lightened terracotta) so the
   // gorge has authored floor-dark / rim-light contrast, not a flat brown wash.
-  if (variant === 1 && band === 1 && meridianGate(thetaC) > 0.1 && polarLatGate(nx) > 0.1) {
+  if (variant === 1 && pband === 1 && polarLatGate(nx) > 0.1) {
     const cd = canyonCreekDist(nx, ny, nz)
     const CANYON_REACH = CREEK_HALF + 0.22
     const nearCreek = cd < CANYON_REACH
@@ -814,10 +912,10 @@ export function biomeTint(
       return { kind: 'canyon', t }
     }
   }
-  // B2 winter summit reads as snow (colour-gated so it seams at the meridians but
-  // reaches the shore before the polar ocean, no green crescent on the limb).
-  if (variant === 1 && band === 2) {
-    const w = colorGate(thetaC, nx)
+  // B2 winter summit reads as snow at FULL coverage right up to the hard boundary,
+  // fading only toward the limb (accentLatGate) — no green meridian crescent.
+  if (variant === 1 && pband === 2) {
+    const w = accentLatGate(nx)
     if (w > 0.05) return { kind: 'snow', t: w }
   }
   return { kind: 'meadow', t: 0 }

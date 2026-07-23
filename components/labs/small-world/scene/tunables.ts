@@ -67,14 +67,17 @@ export const DIALS = {
   // stripes.
   terrainFlowStrength: dial({ default: 0.5, min: 0, max: 1.5, step: 0.05, label: 'terrain flow strength', group: 'fields', cls: 'rebake' }),
   terrainFlowAlign: dial({ default: 0.6, min: 0, max: 1, step: 0.02, label: 'terrain flow align', group: 'fields', cls: 'rebake' }),
-  // De-green the biome seams (Task 36 — Aram rejected the green strips between scenes). The
-  // meridian seam tint blends between a warm pressed-clay SUBSTRATE (mix 0 — uniform terracotta
-  // ground between set-pieces, the claymation "pieces on a clay ball" read) and a per-meridian
-  // BRIDGE blend of the four abutting wedge accents (mix 1 — a colour that belongs to both
-  // neighbours, cross-fading e.g. desert→winter). Rebake-class (baked into vertex colour); the
-  // seam tint is a pure function of position, so variant-invariance (the renewal identity)
-  // holds at EVERY mix. Default = the shipped look chosen from the Task-36 captures.
-  seamBridgeMix: dial({ default: 0.4, min: 0, max: 1, step: 0.02, label: 'seam bridge mix', group: 'fields', cls: 'rebake' }),
+  // Hard torn biome boundaries (Task 38 — Aram rejected the green connective seams: "there
+  // should be a hard rough terrain change, without a seam"). Two abutting wedges now meet like
+  // two slabs of clay pressed together, each painting its full accent up to a shared boundary
+  // CURVE. `boundaryWander` is how torn that curve is (rad of longitude the seam wanders along
+  // latitude — 0 = a straight ruled meridian); `boundaryRidge` is the height (fraction of R) of
+  // the pressed-clay lip welded onto the seam (0 = a truly hard colour switch with no
+  // physicality, the brief's fallback; the crease-dark line rides the same profile). Both are
+  // rebake-class (baked into geometry/colour) and variant-INVARIANT by construction — the seam
+  // sits in the same place on both laps, so it never flips. Defaults = the shipped Task-38 look.
+  boundaryWander: dial({ default: 0.035, min: 0, max: 0.09, step: 0.001, label: 'boundary wander', group: 'fields', cls: 'rebake' }),
+  boundaryRidge: dial({ default: 0.018, min: 0, max: 0.05, step: 0.001, label: 'boundary ridge', group: 'fields', cls: 'rebake' }),
 
   // dents (rebake) — the off-lane press-hollows + their baked AO. Round-9 verdict: Aram
   // likes the HIGHER settings — defaults baked to ~75% of the prior max and the maxes

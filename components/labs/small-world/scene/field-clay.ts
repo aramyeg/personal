@@ -26,42 +26,6 @@ export type Pal = {
   springGreen: THREE.Color; petal: THREE.Color; sand: THREE.Color; goldSand: THREE.Color
   earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
   foliageDeep: THREE.Color; pineDeep: THREE.Color; meadowDry: THREE.Color
-  seamClay: THREE.Color
-}
-
-/** Representative accent colour per (variant, band) — each wedge-scene's dominant
- *  identity read (A: spring green / flower pink / delta sand · B: dune gold / canyon
- *  tuff / winter ice). Used to blend the per-meridian seam bridge (Task 36). Returns a
- *  shared palette reference; callers only READ it (via Color.add), never mutate. */
-function bandAccent(pal: Pal, variant: 0 | 1, band: 0 | 1 | 2): THREE.Color {
-  if (variant === 0) return band === 0 ? pal.springGreen : band === 1 ? pal.petal : pal.sand
-  return band === 0 ? pal.goldSand : band === 1 ? pal.tuff : pal.ice
-}
-
-/**
- * The three per-meridian seam tints (Task 36 — de-green the biome seams). Meridian j
- * abuts band (j−1) below and band j above; the BRIDGE is the average of those two bands'
- * accents across BOTH variants (four accents — a colour that belongs to every neighbour),
- * and the shipped seam tint lerps from a warm pressed-clay SUBSTRATE toward that bridge by
- * `mix` (0 = uniform terracotta ground between set-pieces, 1 = full per-meridian bridge).
- * Built once per bake from the palette + the live mix dial; consumed downstream as a pure
- * function of position, so the seam colour stays EXACTLY variant-invariant at every mix.
- */
-export function buildSeamTints(pal: Pal, mix: number): [THREE.Color, THREE.Color, THREE.Color] {
-  const tints: THREE.Color[] = []
-  const m = clamp01(mix)
-  for (let j = 0; j < 3; j++) {
-    const below = ((((j - 1) % 3) + 3) % 3) as 0 | 1 | 2
-    const above = j as 0 | 1 | 2
-    const bridge = new THREE.Color(0, 0, 0)
-      .add(bandAccent(pal, 0, below))
-      .add(bandAccent(pal, 0, above))
-      .add(bandAccent(pal, 1, below))
-      .add(bandAccent(pal, 1, above))
-      .multiplyScalar(0.25)
-    tints.push(pal.seamClay.clone().lerp(bridge, m))
-  }
-  return tints as [THREE.Color, THREE.Color, THREE.Color]
 }
 
 /** Degenerate flow (a pole, or the flow field disabled) — no directional streak. */
@@ -167,8 +131,7 @@ export function applyFieldMottle(
   nx: number,
   ny: number,
   nz: number,
-  flow: readonly [number, number, number] = ZERO_FLOW,
-  seamW = 0
+  flow: readonly [number, number, number] = ZERO_FLOW
 ): void {
   if (kind === 'underwater') return
   // Task 33 — flow-aligned streak deepening (extended from the water's Task-32 lever onto
@@ -203,11 +166,10 @@ export function applyFieldMottle(
   c.multiplyScalar(1 + canyonK * (DIALS.mottleMacro.value * coarse + DIALS.mottleMicro.value * fine))
   if (kind === 'canyon') return
 
-  // Task 36 — inside a de-greened meridian seam (seamW high) the field colour is a warm
-  // seam tint; suppress the green-specific marbling (deep-foliage pockets, sage smudges,
-  // pine veins, grime) so a nominally warm seam never punches green through at the fully
-  // bridged extreme. Away from seams (seamW 0) this is exactly the legacy behaviour.
-  const greenish = seamW < 0.5 && c.g > c.r * 1.02 && c.g > c.b * 1.02
+  // Green-field marbling (deep-foliage pockets, sage smudges, pine veins, grime) applies
+  // only where the current colour actually reads green (each side of a hard boundary
+  // marbles per its own accent — a gold dune never gets green veins).
+  const greenish = c.g > c.r * 1.02 && c.g > c.b * 1.02
   // deeper-hue pockets (Aram's "some parts deeper green")
   const pocket = smooth(-coarse, 0.25, 0.75)
   if (pocket > 0) {

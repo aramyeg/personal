@@ -8,8 +8,11 @@ import {
   polarLatGate,
   bandOf,
   canonicalTheta,
-  meridianDist,
-  seamTintWeight,
+  paintBand,
+  accentLatGate,
+  boundaryWander,
+  boundaryRidgeShape,
+  BOUNDARY_WANDER,
   MERIDIANS,
   tideWetness,
   tideCarve,
@@ -23,8 +26,6 @@ import {
   paintVertex,
   PLANET_RADIUS,
 } from '@/components/labs/small-world/scene/planet'
-import { buildSeamTints } from '@/components/labs/small-world/scene/field-clay'
-import { DIALS } from '@/components/labs/small-world/scene/tunables'
 
 const TWO_PI = Math.PI * 2
 
@@ -194,102 +195,150 @@ describe('the six wedges genuinely differ (renewal is not a no-op)', () => {
   })
 })
 
-// Task 36 — the de-greened seam tint replaces the base countryside green that showed
-// through where the wedge accent collapses at a meridian. The INVIOLABLE constraint is
-// the renewal identity: on each meridian the A and B variants' PAINT must be EXACTLY
-// identical (the m0 wrap-identity strip flips variant while the near-side seam is on
-// camera). The seam tint is a pure function of position (per-meridian fixed colour,
-// never variant), so this must hold at every mix — including the fully-bridged extreme.
-describe('Task 36 — seam de-green paint is EXACTLY variant-invariant', () => {
-  const pal = buildPal()
-  const paint = (
-    nx: number, ny: number, nz: number, bump: number, isB: boolean, seams: readonly THREE.Color[]
-  ): THREE.Color => {
+// Task 38 — the green connective seams are RETIRED. Two abutting wedges now meet at a
+// HARD, irregular torn-clay boundary curve, each painting its FULL accent up to that
+// curve. The renewal identity moves from "paint A===B on the meridian" (gone with the
+// seam) to the wedge-interior rule: the boundary is a pure position curve (variant-
+// invariant, never flips), and near-meridian paint IS now variant-dependent — safe only
+// because every such vertex flips A→B inside the occlusion-proven-hidden window (proven
+// by bench/renewal-scan.mjs, not a unit test). The unit contracts below pin: the geometry
+// meridian seam is untouched, the boundary/ridge are variant-invariant, the switch is
+// HARD (no green band), and the lip is EXACTLY 0 on the lane.
+describe('Task 38 — torn boundary curve is variant-invariant + hard-switched', () => {
+  const paint = (nx: number, ny: number, nz: number, bump: number, isB: boolean): THREE.Color => {
+    const pal = buildPal()
     const c = new THREE.Color()
-    paintVertex(c, pal, nx, ny, nz, bump, isB, seams)
+    paintVertex(c, pal, nx, ny, nz, bump, isB)
     return c
   }
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
 
-  it('paintVertex is BIT-EXACT identical for variant A and B ON every meridian (the wrap-identity strip), at all mixes', () => {
-    // The inviolable pin: on the meridian itself (meridianDist = 0) the near-side seam is
-    // on camera when the girl flips variant at rotation = 2π, so paint MUST be exactly
-    // equal. The substrate (0), shipped default (0.4) and full bridge (1) — all exact,
-    // because the seam tint (and the now seam-faded beach wedge tint) never depend on the
-    // variant, and biomeBump/base green coincide on the meridian.
-    for (const mix of [0, 0.4, 1]) {
-      const seams = buildSeamTints(pal, mix)
-      for (const m of MERIDIANS) {
-        for (let bi = -90; bi <= 90; bi += 2) {
-          const nx = bi / 100
-          const ring = Math.sqrt(1 - nx * nx)
-          const ny = ring * Math.cos(m)
-          const nz = ring * Math.sin(m)
-          const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-          const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-          const a = paint(nx, ny, nz, bumpA, false, seams)
-          const b = paint(nx, ny, nz, bumpB, true, seams)
-          expect(b.r).toBe(a.r)
-          expect(b.g).toBe(a.g)
-          expect(b.b).toBe(a.b)
+  it('the boundary curve is a pure position function (no variant arg) and wanders within its amp', () => {
+    // boundaryWander depends only on (nx, meridian, amp) — trivially identical on both
+    // laps. Assert it is bounded by amp and genuinely torn (varies with latitude).
+    for (const amp of [0.02, 0.035, 0.09]) {
+      for (let i = 0 as 0 | 1 | 2; i <= 2; i = (i + 1) as 0 | 1 | 2) {
+        let mn = Infinity
+        let mx = -Infinity
+        for (let b = -90; b <= 90; b += 3) {
+          const w = boundaryWander(b / 100, i, amp)
+          expect(Math.abs(w)).toBeLessThanOrEqual(amp + 1e-12)
+          if (w < mn) mn = w
+          if (w > mx) mx = w
+        }
+        expect(mx - mn).toBeGreaterThan(0.5 * amp) // actually torn, not flat
+      }
+    }
+  })
+
+  it('paintBand reproduces bandOf exactly when the wander amp is 0 (a straight meridian)', () => {
+    for (let a = 0; a < 400; a++) {
+      const th = canonicalTheta((a / 400) * TWO_PI + 0.013)
+      for (const nx of [-0.5, -0.2, 0, 0.2, 0.5]) {
+        expect(paintBand(th, nx, 0)).toBe(bandOf(th))
+      }
+    }
+  })
+
+  it('paintBand switches HARD across the torn boundary (band i-1 ↔ band i), not through a third band', () => {
+    // Straddle each meridian's warped boundary at a mid-latitude: just inside either side
+    // must be the two ADJACENT bands, and they must differ (a hard edge, no green filler).
+    for (let mi = 0; mi < MERIDIANS.length; mi++) {
+      const m = MERIDIANS[mi]
+      for (const nx of [-0.5, -0.25, 0.25, 0.5]) {
+        const w = boundaryWander(nx, mi, BOUNDARY_WANDER)
+        const [lx, ly, lz] = dirAt(nx, m + w - 0.03)
+        const [hx, hy, hz] = dirAt(nx, m + w + 0.03)
+        const below = paintBand(canonicalTheta(Math.atan2(lz, ly)), lx, BOUNDARY_WANDER)
+        const above = paintBand(canonicalTheta(Math.atan2(hz, hy)), hx, BOUNDARY_WANDER)
+        expect(above).toBe(mi as 0 | 1 | 2)
+        expect(below).toBe((((mi + 2) % 3) as 0 | 1 | 2))
+        expect(above).not.toBe(below)
+      }
+    }
+  })
+
+  it('the painted accent JUMPS across the boundary (hard switch) — no gradient band', () => {
+    // At a mid-latitude, colour change across the boundary is far larger than within a
+    // band over the same tiny longitude step: the switch is a hard edge, not a fade.
+    const nx = 0.4
+    for (let mi = 0; mi < MERIDIANS.length; mi++) {
+      const m = MERIDIANS[mi]
+      const w = boundaryWander(nx, mi, BOUNDARY_WANDER)
+      const at = (th: number, isB: boolean): THREE.Color => {
+        const [x, y, z] = dirAt(nx, th)
+        const bump = (isB ? terrainBumpB : terrainBump)(x * PLANET_RADIUS, y * PLANET_RADIUS, z * PLANET_RADIUS)
+        return paint(x, y, z, bump, isB)
+      }
+      const d = (p: THREE.Color, q: THREE.Color): number =>
+        Math.abs(p.r - q.r) + Math.abs(p.g - q.g) + Math.abs(p.b - q.b)
+      for (const isB of [false, true]) {
+        const acrossLo = at(m + w - 0.02, isB)
+        const acrossHi = at(m + w + 0.02, isB)
+        const withinA = at(m + w + 0.06, isB)
+        const withinB = at(m + w + 0.1, isB)
+        expect(d(acrossLo, acrossHi)).toBeGreaterThan(d(withinA, withinB) + 0.02)
+      }
+    }
+  })
+
+  it('the accent is full-strength across the band interior (no meridian fade), fading only at the limbs', () => {
+    // accentLatGate is ~1 across all reading latitudes and only drops toward the limb.
+    for (const nx of [-0.4, 0, 0.4]) expect(accentLatGate(nx)).toBeGreaterThan(0.99)
+    expect(accentLatGate(0.86)).toBeLessThan(0.05)
+    expect(accentLatGate(-0.86)).toBeLessThan(0.05)
+  })
+})
+
+describe('Task 38 — the pressed-clay boundary lip is invariant + EXACTLY 0 on the lane', () => {
+  it('boundaryRidgeShape is EXACTLY 0 across the whole girl lane band (|nx| < 0.14), at any wander', () => {
+    for (const amp of [0, 0.035, 0.09]) {
+      for (let ni = 0; ni <= 40; ni++) {
+        const nx = -0.139 + (0.278 * ni) / 40 // ⊂ (-0.14, 0.14)
+        const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+        for (let ai = 0; ai < 96; ai++) {
+          const th = (ai / 96) * TWO_PI
+          expect(boundaryRidgeShape(nx, ring * Math.cos(th), ring * Math.sin(th), amp)).toBe(0)
         }
       }
     }
   })
 
-  it('paintVertex is variant-invariant to floating point across the whole seam band (meridianDist < 0.05), at all mixes', () => {
-    // Across the wider seam band the only residual A/B difference is the pre-existing
-    // finite-difference crease/signature stencil grazing the wedge buffer. Its true
-    // band-edge supremum is ≈1.46e-5 (off≈-0.049, |nx|≈0.69 — outside this grid), not
-    // the ≈8.5e-7 of the sampled corners, so EPS bounds the MEASURED worst case with
-    // ~3× headroom rather than promising a false 1e-6 guarantee. Still ~0.4% of one
-    // 8-bit colour quantum, mix-independent (proven: identical at mixes 0/0.4/1, so
-    // the seam tint contributes ZERO variant dependence), and it flips inside the
-    // occlusion-proven hidden window regardless. On-meridian identity is exactly 0
-    // (bit-exact test above).
-    const EPS = 5e-5
-    for (const mix of [0, 0.4, 1]) {
-      const seams = buildSeamTints(pal, mix)
-      for (const m of MERIDIANS) {
-        for (const off of [-0.048, -0.02, 0.02, 0.048]) {
-          const th = m + off
-          for (let bi = -70; bi <= 70; bi += 5) {
-            const nx = bi / 100
-            const ring = Math.sqrt(1 - nx * nx)
-            const ny = ring * Math.cos(th)
-            const nz = ring * Math.sin(th)
-            expect(meridianDist(canonicalTheta(Math.atan2(nz, ny)))).toBeLessThan(0.05)
-            const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-            const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-            const a = paint(nx, ny, nz, bumpA, false, seams)
-            const b = paint(nx, ny, nz, bumpB, true, seams)
-            expect(Math.abs(b.r - a.r)).toBeLessThan(EPS)
-            expect(Math.abs(b.g - a.g)).toBeLessThan(EPS)
-            expect(Math.abs(b.b - a.b)).toBeLessThan(EPS)
-          }
-        }
+  it('the lip is 0 at the grazing limbs (never touches the silhouette) and rises in the mid-latitudes', () => {
+    // 0 by |nx| >= 0.72 everywhere; and there EXISTS a mid-latitude point on a boundary
+    // where the lip is positive (it is actually built).
+    for (const nx of [0.75, 0.85, -0.8, -0.95]) {
+      const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+      for (let ai = 0; ai < 96; ai++) {
+        const th = (ai / 96) * TWO_PI
+        expect(boundaryRidgeShape(nx, ring * Math.cos(th), ring * Math.sin(th), BOUNDARY_WANDER)).toBe(0)
       }
     }
-  })
-
-  it('seamTintWeight is full on the meridian and zero in the band interior (colorGate seam shape, band not widened)', () => {
-    for (const m of MERIDIANS) {
-      expect(seamTintWeight(m)).toBe(1)
-      expect(seamTintWeight(m + Math.PI / 3)).toBe(0)
+    let anyPositive = false
+    for (let mi = 0; mi < MERIDIANS.length && !anyPositive; mi++) {
+      const nx = 0.4
+      const w = boundaryWander(nx, mi, BOUNDARY_WANDER)
+      const ring = Math.sqrt(1 - nx * nx)
+      const th = MERIDIANS[mi] + w
+      if (boundaryRidgeShape(nx, ring * Math.cos(th), ring * Math.sin(th), BOUNDARY_WANDER) > 0) anyPositive = true
     }
+    expect(anyPositive).toBe(true)
   })
 
-  it('the shipped default de-greens the meridian lane seam to a warm clay read (green no longer dominant)', () => {
-    const seams = buildSeamTints(pal, DIALS.seamBridgeMix.default)
+  it('the lip does not change biomeBump (render-only) — meridian geometry seam stays bit-exact', () => {
+    // The lip lives in the render bake, NOT biomeBump, so biomeBumpB === biomeBump on the
+    // meridians is untouched (re-pinned here alongside the top-of-file geometry tests).
     for (const m of MERIDIANS) {
-      // nx = 0 lane point exactly on the meridian: dry meadow (crossings are >=0.25 rad
-      // away, ocean is at the limbs), so the default branch + seam tint own this pixel.
-      const ny = Math.cos(m)
-      const nz = Math.sin(m)
-      const bump = terrainBump(0, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-      const c = paint(0, ny, nz, bump, false, seams)
-      const greenDominant = c.g > c.r * 1.02 && c.g > c.b * 1.02
-      expect(greenDominant).toBe(false)
-      expect(c.r).toBeGreaterThan(c.g)
+      for (let bi = -90; bi <= 90; bi += 5) {
+        const nx = bi / 100
+        const ring = Math.sqrt(1 - nx * nx)
+        const ny = ring * Math.cos(m)
+        const nz = ring * Math.sin(m)
+        expect(biomeBumpB(nx, ny, nz)).toBe(biomeBump(nx, ny, nz))
+      }
     }
   })
 })

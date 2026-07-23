@@ -12,9 +12,10 @@ import {
   biomeBumpB,
   biomeTint,
   bandOf,
-  colorGate,
-  seamTintWeight,
-  nearestMeridianIndex,
+  paintBand,
+  accentLatGate,
+  boundaryRidgeShape,
+  polarLatGate,
   channelDist,
   canyonCreekDist,
   tideCarve,
@@ -27,7 +28,7 @@ import {
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
-import { fieldDents, applyFieldMottle, buildSeamTints, type Pal } from './field-clay'
+import { fieldDents, applyFieldMottle, type Pal } from './field-clay'
 import { makeBoilMaterial, boilAmplitude } from './boil-material'
 import { DIALS, subscribe, bakeVersion } from './tunables'
 import {
@@ -437,32 +438,33 @@ export function paintVertex(
   ny: number,
   nz: number,
   bump: number,
-  isB: boolean,
-  seamTints: readonly THREE.Color[]
+  isB: boolean
 ): void {
   const variant: 0 | 1 = isB ? 1 : 0
+  const wanderAmp = DIALS.boundaryWander.value
   // open-meadow height read is the fallback everywhere
   const t = THREE.MathUtils.clamp(bump / 0.1 + 0.5, 0, 1)
   if (t < 0.5) c.lerpColors(pal.leaf, pal.meadow, t * 2)
   else c.lerpColors(pal.meadow, pal.sprout, (t - 0.5) * 2)
 
-  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, variant)
+  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, variant, wanderAmp)
   switch (kind) {
     case 'underwater':
       c.lerp(pal.deep, 0.55 + 0.35 * kt)
       break
     case 'beach': {
       c.lerp(pal.sand, 0.85 * kt)
-      // shore takes a hint of its wedge (icy by the winter pond, earthy by the
-      // canyon) so the beach ring isn't a uniform sand stripe. Task 36: this wedge
-      // flourish is variant-specific, so fade it out at the meridian seam (× the seam
-      // gate, 0 on the meridian) — the shore is plain variant-invariant sand there,
-      // preserving the renewal wrap-identity strip.
+      // shore takes a hint of its wedge (icy by the winter pond, earthy by the canyon)
+      // so the beach ring isn't a uniform sand stripe. Task 38: the hint switches HARD
+      // at the torn boundary (paintBand), like the land accents — no soft meridian fade.
+      // It is faded to 0 before the grazing limb (polarLatGate → 0 by |nx|=0.75, well
+      // inside the 0.80 invariance line), so the variant-specific hint only ever exists
+      // in the proven-hidden mid-latitudes and never pops at the pole.
       const bthetaC = canonicalTheta(Math.atan2(nz, ny))
-      const band = bandOf(bthetaC)
-      const seamG = 1 - seamTintWeight(bthetaC)
-      if (variant === 1 && band === 2) c.lerp(pal.ice, 0.4 * kt * seamG)
-      else if (variant === 1 && band === 1) c.lerp(pal.rust, 0.3 * kt * seamG)
+      const pband = paintBand(bthetaC, nx, wanderAmp)
+      const latG = polarLatGate(nx)
+      if (variant === 1 && pband === 2) c.lerp(pal.ice, 0.4 * kt * latG)
+      else if (variant === 1 && pband === 1) c.lerp(pal.rust, 0.3 * kt * latG)
       break
     }
     case 'canyon': {
@@ -483,15 +485,15 @@ export function paintVertex(
     }
     default: {
       const thetaC = canonicalTheta(Math.atan2(nz, ny))
-      const g = colorGate(thetaC, nx)
-      accentMeadow(c, pal, bandOf(thetaC), variant, nx, ny, nz, g)
-      // Task 36 — de-green the seams. Where the wedge accent has faded toward a meridian
-      // (g → 0), blend the exposed base-meadow green toward this meridian's seam tint
-      // instead. seamTintWeight matches colorGate's seam sub-shape exactly (so the band is
-      // not widened) and is longitude-only, so the seam colour is a pure function of
-      // position — EXACTLY variant-invariant, the renewal identity's one hard constraint.
-      const sw = seamTintWeight(thetaC)
-      if (sw > 0) c.lerp(seamTints[nearestMeridianIndex(thetaC)], sw)
+      // Task 38 — HARD boundary: the wedge accent paints at FULL strength across the
+      // whole band (accentLatGate fades it ONLY toward the limbs), and the band identity
+      // switches at the torn boundary curve (paintBand), so two neighbouring scenes abut
+      // like two pressed clay slabs — no green connective seam. The near-meridian paint
+      // is now variant-dependent (spring vs winter at full strength); it is renewal-safe
+      // because every such vertex flips A→B only inside the occlusion-proven-hidden window
+      // (proven by the paint-delta pass in bench/renewal-scan.mjs).
+      const pband = paintBand(thetaC, nx, wanderAmp)
+      accentMeadow(c, pal, pband, variant, nx, ny, nz, accentLatGate(nx))
     }
   }
   // Task 29 lever 1 (headline) — multi-scale field colour mottling. Variance WITHIN
@@ -506,11 +508,7 @@ export function paintVertex(
     flowAlign > 0
       ? terrainFlowDir(nx, ny, nz, isB ? terrainBumpB : terrainBump, DIALS.terrainFlowStrength.value)
       : ([0, 0, 0] as [number, number, number])
-  // Task 36 — near a de-greened meridian seam the ground colour is now the warm seam
-  // tint, so tell the mottle to drop its green-specific marbling there (else the fully
-  // bridged extreme could punch faint green veins through a nominally warm seam).
-  const seamW = seamTintWeight(canonicalTheta(Math.atan2(nz, ny)))
-  applyFieldMottle(c, pal, kind, nx, ny, nz, flow, seamW)
+  applyFieldMottle(c, pal, kind, nx, ny, nz, flow)
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
   // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
@@ -548,6 +546,15 @@ export function paintVertex(
   if (sig < 0) {
     const groove = THREE.MathUtils.clamp(-sig / CLAY_SIGNATURE_MAX, 0, 1)
     c.multiplyScalar(1 - 0.12 * groove)
+  }
+  // Task 38 — the pressed-clay seam crease. Where two wedges meet at the torn boundary
+  // the raised lip (baked into geometry below) carries a dark crease line, like dirt in
+  // the fold where two clay slabs are pushed together. Colour-only here; gated to EXACTLY
+  // 0 on the lane + limbs by boundaryRidgeShape, and skipped entirely when the ridge dial
+  // is 0 (the "truly hard colour switch, no physicality" fallback).
+  if (DIALS.boundaryRidge.value > 0) {
+    const ridgeProf = boundaryRidgeShape(nx, ny, nz, wanderAmp)
+    if (ridgeProf > 0) c.multiplyScalar(1 - 0.16 * ridgeProf)
   }
 }
 
@@ -609,7 +616,6 @@ export function buildPal(): Pal {
     foliageDeep: new THREE.Color(PALETTE.foliageDeep),
     pineDeep: new THREE.Color(PALETTE.pineDeep),
     meadowDry: new THREE.Color(PALETTE.meadowDry),
-    seamClay: new THREE.Color(PALETTE.seamClay),
   } satisfies Pal
 }
 
@@ -643,9 +649,11 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
     const thetaC = new Float32Array(count)
     const v = new THREE.Vector3()
     const pal = buildPal()
-    // Task 36 — the three per-meridian seam tints, baked from the live seam-bridge mix
-    // (rebake-class dial). Variant-independent by construction, so both bakes seam identically.
-    const seamTints = buildSeamTints(pal, DIALS.seamBridgeMix.value)
+    // Task 38 — the torn-boundary dials (rebake-class). The wander warps WHERE two wedges
+    // switch accent; the ridge is the pressed-clay lip baked onto the boundary curve. Both
+    // are variant-INVARIANT, so both bakes carry the same lip and the seam never flips.
+    const wanderAmp = DIALS.boundaryWander.value
+    const ridgeH = DIALS.boundaryRidge.value
     const c = new THREE.Color()
     for (let i = 0; i < count; i++) {
       v.fromBufferAttribute(src, i)
@@ -673,10 +681,15 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
       // per-figure molded signature (inward-only, off-lane): each variant bakes its own.
       // Task 29 lever 2 — off-lane field press-dents (inward-only, EXACTLY 0 on the lane
       // band, so no new spine-band render term — the contact budget is unmoved).
+      // Task 38 — the pressed-clay boundary lip: a variant-INVARIANT raised welt on the
+      // torn seam curve, EXACTLY 0 on the lane band (boundaryRidgeShape early-returns), so
+      // it adds no spine-band displacement; identical in rA and rB, so the renewal front
+      // lerps it as a no-op (it never flips).
+      const ridge = ridgeH * boundaryRidgeShape(nx, ny, nz, wanderAmp)
       const rA =
-        1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0) + fieldDents(nx, ny, nz, bumpA)
+        1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0) + fieldDents(nx, ny, nz, bumpA) + ridge
       const rB =
-        1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1) + fieldDents(nx, ny, nz, bumpB)
+        1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1) + fieldDents(nx, ny, nz, bumpB) + ridge
       // Task 29 lever 4 — one dither vector per face (on the first face-vertex), gated to
       // low-relief open ground. A ~1° tilt only re-bands a facet within ~0.02 of a ramp
       // threshold (i.e. at the terminator), never mid-face — so the lit face stays clean.
@@ -695,9 +708,9 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
       positionsB[i * 3 + 1] = ny * PLANET_RADIUS * rB
       positionsB[i * 3 + 2] = nz * PLANET_RADIUS * rB
 
-      paintVertex(c, pal, nx, ny, nz, bumpA, false, seamTints)
+      paintVertex(c, pal, nx, ny, nz, bumpA, false)
       colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
-      paintVertex(c, pal, nx, ny, nz, bumpB, true, seamTints)
+      paintVertex(c, pal, nx, ny, nz, bumpB, true)
       colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
 
       // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA

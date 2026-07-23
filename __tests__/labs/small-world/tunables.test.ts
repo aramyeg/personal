@@ -13,6 +13,7 @@ import {
 import { BOIL_AMPLITUDE, BOIL_FPS } from '@/components/labs/small-world/scene/boil-material'
 import { FIELD_DENT_DEPTH } from '@/components/labs/small-world/scene/field-clay'
 import { WATER_DEFAULTS } from '@/components/labs/small-world/scene/water-clay'
+import { BOUNDARY_WANDER, BOUNDARY_RIDGE } from '@/components/labs/small-world/scene/biomes'
 
 // The store is module-global mutable state; restore defaults between every test.
 beforeEach(() => resetDials())
@@ -60,13 +61,21 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     // dent AO baked up (Aram likes the higher settings) with doubled headroom.
     expect(DIALS.dentAO.default).toBe(0.3)
     expect(DIALS.dentAO.max).toBe(0.8)
-    // Task 36 — seam de-green mix (0 = pure clay substrate .. 1 = full per-meridian bridge),
-    // rebake-class in the fields group. Default is the shipped Task-36 look.
-    expect(DIALS.seamBridgeMix.default).toBe(0.4)
-    expect(DIALS.seamBridgeMix.min).toBe(0)
-    expect(DIALS.seamBridgeMix.max).toBe(1)
-    expect(DIALS.seamBridgeMix.group).toBe('fields')
-    expect(DIALS.seamBridgeMix.cls).toBe('rebake')
+    // Task 38 — hard torn biome boundaries. The wander/ridge dials replace the retired
+    // seamBridgeMix; both rebake-class in the fields group. Defaults are the shipped look
+    // and are pinned equal to the biomes.ts constants the benches import.
+    expect(DIALS.boundaryWander.default).toBe(0.035)
+    expect(DIALS.boundaryWander.default).toBe(BOUNDARY_WANDER)
+    expect(DIALS.boundaryWander.min).toBe(0)
+    expect(DIALS.boundaryWander.max).toBe(0.09)
+    expect(DIALS.boundaryWander.group).toBe('fields')
+    expect(DIALS.boundaryWander.cls).toBe('rebake')
+    expect(DIALS.boundaryRidge.default).toBe(0.018)
+    expect(DIALS.boundaryRidge.default).toBe(BOUNDARY_RIDGE)
+    expect(DIALS.boundaryRidge.min).toBe(0)
+    expect(DIALS.boundaryRidge.max).toBe(0.05)
+    expect(DIALS.boundaryRidge.group).toBe('fields')
+    expect(DIALS.boundaryRidge.cls).toBe('rebake')
   })
 
   it('every dial starts at its default with a valid range and class', () => {
@@ -116,7 +125,8 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'terminatorDither',
       'terrainFlowStrength',
       'terrainFlowAlign',
-      'seamBridgeMix',
+      'boundaryWander',
+      'boundaryRidge',
       'dentDepth',
       'dentAO',
       'waterPathWarp',
