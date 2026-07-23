@@ -238,11 +238,15 @@ describe('Task 36 — seam de-green paint is EXACTLY variant-invariant', () => {
 
   it('paintVertex is variant-invariant to floating point across the whole seam band (meridianDist < 0.05), at all mixes', () => {
     // Across the wider seam band the only residual A/B difference is the pre-existing
-    // finite-difference crease/signature stencil grazing the wedge buffer at the extreme
-    // corner (≈8.5e-7 — over 4000× below 8-bit colour quantization, and it flips inside
-    // the occlusion-proven hidden window regardless). The seam tint itself is a pure
-    // function of position, so it adds ZERO new variant dependence.
-    const EPS = 1e-6
+    // finite-difference crease/signature stencil grazing the wedge buffer. Its true
+    // band-edge supremum is ≈1.46e-5 (off≈-0.049, |nx|≈0.69 — outside this grid), not
+    // the ≈8.5e-7 of the sampled corners, so EPS bounds the MEASURED worst case with
+    // ~3× headroom rather than promising a false 1e-6 guarantee. Still ~0.4% of one
+    // 8-bit colour quantum, mix-independent (proven: identical at mixes 0/0.4/1, so
+    // the seam tint contributes ZERO variant dependence), and it flips inside the
+    // occlusion-proven hidden window regardless. On-meridian identity is exactly 0
+    // (bit-exact test above).
+    const EPS = 5e-5
     for (const mix of [0, 0.4, 1]) {
       const seams = buildSeamTints(pal, mix)
       for (const m of MERIDIANS) {
