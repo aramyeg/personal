@@ -111,6 +111,13 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     // pocketTint is Aram's kept 0.8; the outward crest default is under its ≤0.4× cap.
     expect(DIALS.waterPocketTint.default).toBe(0.8)
     expect(DIALS.waterReliefOutward.default).toBeLessThanOrEqual(0.4 * DIALS.waterReliefInward.default)
+    // Task 40 — icy winter lake. Ships ON (default 1: the small B2 pond IS icy now);
+    // rebake-class in the water group, dial to 0 for the plain clay-water pond.
+    expect(DIALS.waterIceAmount.default).toBe(1)
+    expect(DIALS.waterIceAmount.min).toBe(0)
+    expect(DIALS.waterIceAmount.max).toBe(1)
+    expect(DIALS.waterIceAmount.group).toBe('water')
+    expect(DIALS.waterIceAmount.cls).toBe('rebake')
   })
 
   it('declares exactly the Round-9 dial set, grouped boil/fields/dents/water', () => {
@@ -141,6 +148,7 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'waterFlowStrength',
       'waterFlowAlign',
       'waterRise',
+      'waterIceAmount',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')

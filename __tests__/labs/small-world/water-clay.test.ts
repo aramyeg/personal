@@ -10,8 +10,11 @@ import {
   waterStreak,
   waterRelief,
   waterNormalTilt,
+  iceFootprint,
+  iceRim,
+  iceCrack,
 } from '@/components/labs/small-world/scene/water-clay'
-import { CROSSINGS_A, CROSSINGS_B } from '@/components/labs/small-world/scene/biomes'
+import { CROSSINGS_A, CROSSINGS_B, waterMask } from '@/components/labs/small-world/scene/biomes'
 
 const WATER_LEVEL = 0.972 // mirrors biomes.WATER_LEVEL (pinned in biomes.test)
 const P = WATER_DEFAULTS
@@ -239,5 +242,111 @@ describe('waterNormalTilt', () => {
     expect(Math.abs(dx)).toBeLessThanOrEqual(0.5)
     expect(Math.abs(dy)).toBeLessThanOrEqual(0.5)
     expect(Math.abs(dz)).toBeLessThanOrEqual(0.5)
+  })
+})
+
+// --- Task 40: icy winter lake ------------------------------------------------
+// The two B2 winter water caps the ice covers: B2_FROZEN place(0.34,5.55) and the
+// larger, visible B2_SHELF place(0.6,5.72) ("the frozen sea", floes on it).
+const place = (nx: number, theta: number): [number, number, number] => {
+  const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+  return [nx, ring * Math.cos(theta), ring * Math.sin(theta)]
+}
+const FROZEN = place(0.34, 5.55)
+const SHELF = place(0.6, 5.72)
+const ALL_X = [...CROSSINGS_A, ...CROSSINGS_B]
+const TIDE_LAT_LO = 0.8 // mirrors biomes.TIDE_LAT_LO — the ice must end before the flood limb
+
+describe('iceFootprint — the hard winter-pond mask (union of both B2 caps)', () => {
+  it('is high at BOTH B2 pond centres and pins to the live biomes B2 water', () => {
+    expect(iceFootprint(...FROZEN)).toBeGreaterThan(0.9)
+    expect(iceFootprint(...SHELF)).toBeGreaterThan(0.9)
+    // the biomes B2 (variant 1) water really is at both — so the footprint sits on the
+    // ponds, not hand-guessed spots (guards against the duplicated caps drifting).
+    expect(waterMask(FROZEN[0], FROZEN[1], FROZEN[2], 1)).toBeGreaterThan(0.9)
+    expect(waterMask(SHELF[0], SHELF[1], SHELF[2], 1)).toBeGreaterThan(0.9)
+  })
+
+  it('is EXACTLY 0 at every bridge deck (centre + the full deck footprint band)', () => {
+    for (const cx of ALL_X) {
+      for (let dth = -0.17; dth <= 0.17 + 1e-9; dth += 0.02) {
+        for (let nx = -0.12; nx <= 0.12 + 1e-9; nx += 0.03) {
+          const [px, py, pz] = place(nx, cx + dth)
+          expect(iceFootprint(px, py, pz)).toBe(0)
+        }
+      }
+    }
+  })
+
+  it('is EXACTLY 0 along the girl\'s lane (nx=0) all the way round', () => {
+    for (let i = 0; i < 360; i++) {
+      const [px, py, pz] = place(0, (i / 360) * 2 * Math.PI)
+      expect(iceFootprint(px, py, pz)).toBe(0)
+    }
+  })
+
+  it('is EXACTLY 0 at and past the tide limb (|nx| ≥ TIDE_LAT_LO — the flood ring never freezes)', () => {
+    for (let ni = 0; ni <= 40; ni++) {
+      const nx = TIDE_LAT_LO + (0.199 * ni) / 40 // [0.80, 0.999]
+      for (let ai = 0; ai < 180; ai++) {
+        const [px, py, pz] = place(nx, (ai / 180) * 2 * Math.PI)
+        expect(iceFootprint(px, py, pz)).toBe(0)
+      }
+    }
+  })
+
+  it('is EXACTLY 0 outside the winter ponds (left ocean + other-band water)', () => {
+    expect(iceFootprint(-1, 0, 0)).toBe(0) // left ocean pole
+    expect(iceFootprint(...place(-0.5, 5.6))).toBe(0) // winter longitude but the −x ocean side
+    expect(iceFootprint(...place(0.36, 1.3))).toBe(0) // A0 spring pond region
+    expect(iceFootprint(...place(0.54, 3.5))).toBe(0) // B1 shelf sea (different band)
+  })
+
+  it('is deterministic and bounded in [0,1]', () => {
+    for (let i = 0; i < 500; i++) {
+      const a = (i / 500) * 2 * Math.PI
+      const nx = Math.cos(a) * 0.5
+      const [px, py, pz] = place(nx, a * 1.7)
+      const v = iceFootprint(px, py, pz)
+      expect(v).toBe(iceFootprint(px, py, pz))
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('iceRim — the snow-dust bank ring', () => {
+  it('is 0 at a pond core and 0 outside the footprint, positive in the outer ring', () => {
+    expect(iceRim(...SHELF)).toBe(0) // dead centre of the shelf
+    expect(iceRim(...place(0.6 + 0.4, 5.72))).toBe(0) // outside the footprint
+    // somewhere in the shelf's feathered edge the rim is positive
+    let mx = 0
+    for (let i = 0; i <= 40; i++) {
+      const [px, py, pz] = place(0.6 - 0.02 - (0.26 * i) / 40, 5.72) // sweep out toward the rim
+      mx = Math.max(mx, iceRim(px, py, pz))
+    }
+    expect(mx).toBeGreaterThan(0.2)
+  })
+})
+
+describe('iceCrack — sparse pressed veins', () => {
+  it('is deterministic, bounded [0,1] and SPARSE (most of the ice is uncracked)', () => {
+    let sum = 0
+    let n = 0
+    let mx = 0
+    for (let i = 0; i < 4000; i++) {
+      const a = (i * 0.37) % (2 * Math.PI)
+      const nx = Math.cos(a) * 0.5
+      const [px, py, pz] = place(nx, a * 1.3)
+      const v = iceCrack(px, py, pz)
+      expect(v).toBe(iceCrack(px, py, pz))
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+      sum += v
+      if (v > mx) mx = v
+      n++
+    }
+    expect(mx).toBeGreaterThan(0) // cracks DO appear somewhere
+    expect(sum / n).toBeLessThan(0.15) // but they are sparse veins, not a wash
   })
 })

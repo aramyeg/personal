@@ -26,7 +26,8 @@ export const PALETTE = {
   goldSand: '#E6B24C', // B0 rich golden dune body
   earthDeep: '#5A3216', // B1 canyon channel floor / deep walls
   rust: '#A85A32', // B1 canyon terracotta bank
-  ice: '#DCEAF2', // B2 frozen water rim
+  ice: '#DCEAF2', // B2 frozen water rim / icy-lake sheet (Task 40)
+  iceDeep: '#6E97AE', // B2 icy-lake pressed crack veins (Task 40) — darker blue-grey in the pale ice
   // field mottling (Task 29) — a drier, desaturated sage for the meadow's
   // "high-touch" smudges (variance WITHIN the green, still pastel, never muddy)
   meadowDry: '#A3BE96',

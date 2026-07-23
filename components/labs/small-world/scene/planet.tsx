@@ -38,6 +38,10 @@ import {
   waterStreak,
   waterRelief,
   waterNormalTilt,
+  iceFootprint,
+  iceRim,
+  iceCrack,
+  ICE_FLATTEN,
 } from './water-clay'
 
 export const PLANET_RADIUS = 2.2
@@ -982,6 +986,13 @@ function useWaterGeometry(version: number): WaterBake {
     // deep clay blue DOMINATES: riverDeep pushed darker for the body of the water
     const deepBase = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.22)
     const abyss = new THREE.Color(PALETTE.riverDeep).lerp(ink, 0.5)
+    // Task 40 icy lake colours (applied to the variant-B bake only, inside iceFootprint):
+    // a pale frozen sheet, darker blue-grey pressed cracks, and a warm-white snow rim.
+    const iceSheet = new THREE.Color(PALETTE.ice)
+    const iceCrackCol = new THREE.Color(PALETTE.iceDeep)
+    const iceSnow = new THREE.Color(PALETTE.snow)
+    // Task 40 dial: how icy the B2 winter pond reads (0 = plain clay water, 1 = full ice).
+    const iceAmount = DIALS.waterIceAmount.value
     const c = new THREE.Color()
     // Task 23 — molded water: the deep-blue reads TOUGHER and hand-pressed. Colour
     // now answers THREE depths, not just the terrain basin: (1) terrain depth (deep
@@ -998,7 +1009,8 @@ function useWaterGeometry(version: number): WaterBake {
     // per frame by the water-tide morph AFTER this bake, so it always dominates at the
     // cap). Colour-only; palette-derived (riverDeep→ink).
     const paintDepth = (
-      out: Float32Array, i: number, bump: number, trough: number, deck: number, streak: number
+      out: Float32Array, i: number, bump: number, trough: number, deck: number, streak: number,
+      ice: number, crack: number, snow: number
     ): void => {
       const terrainDepth = THREE.MathUtils.clamp((WATER_LEVEL - (1 + bump)) / 0.08, 0, 1)
       const deep = Math.max(terrainDepth, 0.85 * trough, 0.7 * deck)
@@ -1012,6 +1024,15 @@ function useWaterGeometry(version: number): WaterBake {
       // read darkest). Applied everywhere over water (no contact constraint) so the
       // "rougher paths / deeper colours" read reaches the near-shore water too.
       if (streak > 0 && wp.pocketTint > 0) c.lerp(abyss, wp.pocketTint * streak)
+      // Task 40 — icy winter lake (variant-B bake only; `ice`=0 for the A buffer, so the
+      // A longitude keeps its clay-water look). Within the pond footprint the liquid blue
+      // is overpainted with a pale frozen sheet, sparse darker pressed crack veins, and a
+      // warm-white snow dusting at the bank rim. Colour only — palette-derived.
+      if (ice > 0) {
+        c.lerp(iceSheet, 0.9 * ice)
+        if (crack > 0) c.lerp(iceCrackCol, 0.55 * crack * ice)
+        if (snow > 0) c.lerp(iceSnow, 0.7 * snow * ice)
+      }
       out[i * 3] = c.r; out[i * 3 + 1] = c.g; out[i * 3 + 2] = c.b
     }
     // Peak inward push of the molded clay sheet (trough-biased low octave + fine
@@ -1057,12 +1078,24 @@ function useWaterGeometry(version: number): WaterBake {
       const streak = waterStreak(dir.x, dir.y, dir.z, wp)
       const gate = waterDeepGate(bA, bB) * waterFootprintClear(dir.x, theta, ALL_CROSSINGS)
       const relief = waterRelief(dir.x, dir.y, dir.z, gate, streak, wp)
-      paintDepth(colorsIdxA, i, bA, trough, deckA, streak)
-      paintDepth(colorsIdxB, i, bB, trough, deckB, streak)
+      // Task 40 — icy winter lake. Inside the B2 pond footprint (hard-masked, 0 elsewhere
+      // and at every deck) the ice reads as SOLID: the molded clay lumps are pressed
+      // flatter (a glassy sheet at ~waterline), and the variant-B colour is overpainted
+      // with the ice family. iceStrength is footprint × the dial; A gets no ice.
+      const iceMask = iceFootprint(dir.x, dir.y, dir.z)
+      const iceStrength = iceMask * iceAmount
+      const crack = iceStrength > 0 ? iceCrack(dir.x, dir.y, dir.z) : 0
+      const snow = iceStrength > 0 ? iceRim(dir.x, dir.y, dir.z) : 0
+      // flatten only ever RAISES the surface toward the waterline (inward ≥ 0), never
+      // above it — the shoreline contract holds; the genart relief here is already 0
+      // (waterDeepGate = 0: the pond is land on variant A, so min-depth closes the gate).
+      const inwardIced = inward * (1 - ICE_FLATTEN * iceStrength)
+      paintDepth(colorsIdxA, i, bA, trough, deckA, streak, 0, 0, 0)
+      paintDepth(colorsIdxB, i, bB, trough, deckB, streak, iceStrength, crack, snow)
       // net radius = WATER_LEVEL·(1 − molded inward + genart relief). Relief is signed
       // (outward crests ≤ 0.4× the inward budget, inward troughs deeper), and 0 near any
       // shore/lane so this never exceeds WATER_LEVEL where water meets land.
-      v.multiplyScalar(1 - inward + relief)
+      v.multiplyScalar(1 - inwardIced + relief)
       pos.setXYZ(i, v.x, v.y, v.z)
     }
     // Flat-shade: expand to non-indexed then per-face normals so the water shows

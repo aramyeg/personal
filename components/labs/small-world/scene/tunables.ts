@@ -128,6 +128,14 @@ export const DIALS = {
   //    the bench captures what it looks like, it does not assert it stays clear.
   // Rebake-class (the water bake reads it once), default 0 keeps ?tune-absent byte-identical.
   waterRise: dial({ default: 0, min: 0, max: 0.03, step: 0.0005, label: 'water altitude (safe ≤0.008)', group: 'water', cls: 'rebake' }),
+  // Task 40 — icy winter lake. How strongly the B2 winter pond (biomes.B2_FROZEN) reads
+  // as solid ice: the ice colour (pale sheet + snow rim + crack veins) and the sheet
+  // flattening are both scaled by this within the pond footprint mask (iceFootprint), so
+  // 0 = the plain clay-water pond and 1 = full ice. Default 1 (the shipped icy look — this
+  // IS the new intended state of the small lake). Rebake-class (the water bake reads it) and
+  // footprint-masked, so it only ever touches that one pond. Purely variant-B paint + a
+  // localized flatten of the shared sphere; nothing outside the footprint moves.
+  waterIceAmount: dial({ default: 1, min: 0, max: 1, step: 0.02, label: 'winter lake ice', group: 'water', cls: 'rebake' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS

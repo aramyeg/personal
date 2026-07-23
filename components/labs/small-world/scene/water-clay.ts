@@ -289,3 +289,96 @@ export function waterNormalTilt(cx: number, cy: number, cz: number, amp: number)
   const dz = amp * perlin3(PERM, cx * f - 3.7, cy * f + 1.1, cz * f + 6.4)
   return [dx, dy, dz]
 }
+
+// --- Icy winter lake (Task 40) ----------------------------------------------
+//
+// Aram: "let's make the small lake on the winter terrain be icy." The winter (B2)
+// wedge's pond reads as SOLID PALE ICE instead of liquid: a pale blue-white sheet,
+// FLATTENED relief (the molded clay lumps pressed out so it sits as a glassy sheet at
+// the waterline), sparse pressed CRACK veins and a SNOW-DUSTED rim where the ice meets
+// the bank.
+//
+// FOOTPRINT: the winter wedge has two water bodies besides the left ocean —
+// biomes.B2_FROZEN (a tiny shallow pond, dir place(0.34, 5.55) r0.14) and biomes.B2_SHELF
+// (the larger shelf sea, dir place(0.6, 5.72) r0.28, whose own biomes comment calls it
+// "the frozen sea" and on which the delights.tsx B2 ice-floe props actually sit). The
+// visible "winter lake" a viewer sees is B2_SHELF; B2_FROZEN is nearly hidden under the
+// snow relief. So the ice footprint is the UNION of both B2 caps — the whole winter
+// pond region — and EXACTLY 0 elsewhere: 0 outside those caps, 0 at every bridge deck
+// (both caps sit off the girl's lane), 0 on the left ocean (nx<0), and 0 at the tide
+// limb (both caps end by |nx|≈0.80 = TIDE_LAT_LO, so the rotation-driven flood ring is
+// never frozen). Pure + deterministic (seeded clay-noise); the geometry is variant-
+// INDEPENDENT (the shared sphere) and the render applies the ice COLOUR only to the
+// variant-B water bake, so the A-variant longitude keeps its look (the A/B flip is
+// hidden by the same renewal paint pass as all wedge paint — both ponds are already
+// water-morph cells there).
+
+const clampU = (t: number): number => (t < -1 ? -1 : t > 1 ? 1 : t)
+
+/** Unit direction at latitude nx and longitude theta (mirrors biomes.place — kept
+ *  local so water-clay stays a dependency-light leaf; biomes never imports this file). */
+function iceDir(nx: number, theta: number): [number, number, number] {
+  const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+  return [nx, ring * Math.cos(theta), ring * Math.sin(theta)]
+}
+
+type IceCap = { dir: readonly [number, number, number]; radius: number; feather: number }
+/** The two B2 winter water caps, DUPLICATED from biomes.B2_FROZEN / biomes.B2_SHELF.
+ *  biomes never imports this module, so they are kept literal here and pinned against
+ *  the live biomes ponds in the water-clay test (via waterMask at each centre). T41 does
+ *  not touch B2, so these stay in sync; if a pond ever moves, update both. */
+const ICE_CAPS: readonly IceCap[] = [
+  { dir: iceDir(0.34, 5.55), radius: 0.14, feather: 0.1 }, // B2_FROZEN — small shallow pond
+  { dir: iceDir(0.6, 5.72), radius: 0.28, feather: 0.13 }, // B2_SHELF  — the visible frozen sea
+]
+
+/** Feathered 0..1 membership of one cap: 1 in the core, EXACTLY 0 at/beyond its radius. */
+function iceCapMask(nx: number, ny: number, nz: number, cap: IceCap): number {
+  const dot = clampU(nx * cap.dir[0] + ny * cap.dir[1] + nz * cap.dir[2])
+  const d = Math.acos(dot)
+  return smoothstep01((cap.radius - d) / cap.feather)
+}
+
+/**
+ * Hard 0..1 membership of the winter pond region (the UNION of the two B2 caps): 1 in a
+ * pond core, ramping to EXACTLY 0 beyond both cap radii — so it is 0 everywhere outside
+ * the winter ponds and, because both caps sit off the girl's lane, off the left ocean and
+ * below the tide limb, 0 at every bridge deck / the flooded limb / the ocean. THE ice
+ * footprint mask: all ice treatment (colour + relief flatten) is multiplied by it, so the
+ * ice is exactly contained. Pure. */
+export function iceFootprint(nx: number, ny: number, nz: number): number {
+  let m = 0
+  for (let i = 0; i < ICE_CAPS.length; i++) {
+    const v = iceCapMask(nx, ny, nz, ICE_CAPS[i])
+    if (v > m) m = v
+  }
+  return m
+}
+
+/** 0..1 snow-dust weight for the pond RIM (where the ice meets the bank): derived from
+ *  the footprint mask itself so it works for either cap — 0 in a pond core, rising across
+ *  the feathered edge, 0 outside the footprint. Pure. */
+export function iceRim(nx: number, ny: number, nz: number): number {
+  const m = iceFootprint(nx, ny, nz)
+  if (m <= 0) return 0
+  return smoothstep01((m - 0.06) / 0.3) * (1 - smoothstep01((m - 0.5) / 0.4))
+}
+
+const ICE_CRACK_FREQ = 8.5
+const ICE_CRACK_SHARP = 3.2
+const ICE_CRACK_THRESH = 0.86
+/** 0..1 sparse pressed CRACK veins across the ice: a seeded ridged clay-noise whose
+ *  thin, sharp ridge crests (past ICE_CRACK_THRESH) become dark vein lines. Not
+ *  footprint-gated itself — the caller multiplies by iceFootprint so cracks live only
+ *  on the pond. Deterministic, variant-independent. */
+export function iceCrack(nx: number, ny: number, nz: number): number {
+  const r = ridged3(PERM, nx * ICE_CRACK_FREQ, ny * ICE_CRACK_FREQ, nz * ICE_CRACK_FREQ, 2, LACUNARITY, GAIN, ICE_CRACK_SHARP)
+  return smoothstep01((r - ICE_CRACK_THRESH) / (1 - ICE_CRACK_THRESH))
+}
+
+/** How strongly the ice sheet flattens the molded-clay water lumps within the footprint
+ *  (the render multiplies the molded inward push by (1 − ICE_FLATTEN·footprint·iceAmount)).
+ *  Just under 1 so a faint clay swell survives — claymation ice, not glass. Flattening
+ *  only ever RAISES the surface toward the waterline (never above it), so the shoreline
+ *  contract is untouched. */
+export const ICE_FLATTEN = 0.9
