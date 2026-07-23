@@ -358,6 +358,73 @@ function terrainFlowDir(
   return [fx / fl, fy / fl, fz / fl]
 }
 
+/** Per-vertex invariants the bake precomputes ONCE and threads into `paintVertex`, so the
+ *  paint pass reuses the clay signature, dimple, field dents, boundary-ridge shape, and the
+ *  terrain gradient (crease + flow) the radius pass already produced instead of recomputing
+ *  them. Omitted on the standalone/test path, where paintVertex recomputes each exactly as
+ *  before — byte-identical either way. */
+export type PaintPrecomp = {
+  sig: number
+  dip: number
+  dent: number
+  ridgeShape: number
+  crease: number
+  flow: readonly [number, number, number]
+}
+
+/**
+ * Task 43 (perf) — the SHARED terrain gradient for the bake. `terrainSlope` (crease) and
+ * `terrainFlowDir` (flow streak) each computed the SAME finite-difference ∇bump per vertex:
+ * identical tangent basis, identical `eps = 0.02`, the identical four `bumpFn` samples. This
+ * merges them so those four samples are taken ONCE and feed both the crease magnitude and the
+ * steepest-descent flow tangent — halving the biome-field evaluations in the hot bake path.
+ *
+ * BYTE-IDENTICAL to calling `terrainSlope` then `terrainFlowDir`: the basis + `dA`/`dB` math
+ * is copied verbatim from both, and the pole/degenerate handling matches each consumer — the
+ * crease uses the x-axis fallback basis exactly like terrainSlope, and the flow returns the
+ * zero tangent at a pole / vanishing field / when `flowAlign <= 0` exactly like the
+ * `flowAlign > 0 ? terrainFlowDir(...) : [0,0,0]` guard in paintVertex. Bake-time only; the
+ * standalone terrainSlope/terrainFlowDir stay for the paintVertex test path.
+ */
+export function terrainGradientField(
+  nx: number,
+  ny: number,
+  nz: number,
+  bumpFn: (x: number, y: number, z: number) => number,
+  flowStrength: number,
+  flowAlign: number
+): { crease: number; flow: [number, number, number] } {
+  let t1x = -nz
+  let t1z = nx
+  const l = Math.hypot(t1x, t1z)
+  const t1y = 0
+  const degenerate = l < 1e-4
+  if (degenerate) { t1x = 1; t1z = 0 } else { t1x /= l; t1z /= l }
+  const t2x = ny * t1z - nz * t1y
+  const t2y = nz * t1x - nx * t1z
+  const t2z = nx * t1y - ny * t1x
+  const R = PLANET_RADIUS
+  const eps = 0.02
+  const s = (ox: number, oy: number, oz: number): number =>
+    bumpFn((nx + ox) * R, (ny + oy) * R, (nz + oz) * R)
+  const dA = (s(eps * t1x, eps * t1y, eps * t1z) - s(-eps * t1x, -eps * t1y, -eps * t1z)) / (2 * eps)
+  const dB = (s(eps * t2x, eps * t2y, eps * t2z) - s(-eps * t2x, -eps * t2y, -eps * t2z)) / (2 * eps)
+  const crease = Math.hypot(dA, dB)
+  // flow: `flowAlign <= 0` reproduces paintVertex's guard (no flow ⇒ [0,0,0]); `degenerate`
+  // reproduces terrainFlowDir's pole early-return. Both leave the crease untouched above.
+  if (flowAlign <= 0 || degenerate) return { crease, flow: [0, 0, 0] }
+  let fx = -(dA * t1x + dB * t2x)
+  let fy = -(dA * t1y + dB * t2y)
+  let fz = -(dA * t1z + dB * t2z)
+  const px = -1 + nx * nx, py = nx * ny, pz = nx * nz
+  fx += flowStrength * px
+  fy += flowStrength * (py - nz)
+  fz += flowStrength * (pz + ny)
+  const fl = Math.hypot(fx, fy, fz)
+  if (fl < 1e-6) return { crease, flow: [0, 0, 0] }
+  return { crease, flow: [fx / fl, fy / fl, fz / fl] }
+}
+
 /**
  * Applies the per-wedge scene accent to open ground (the six scenes each own a
  * saturated identity). `g` is wedgeGate at this point, so every accent fades to
@@ -438,7 +505,8 @@ export function paintVertex(
   ny: number,
   nz: number,
   bump: number,
-  isB: boolean
+  isB: boolean,
+  pre?: PaintPrecomp
 ): void {
   const variant: 0 | 1 = isB ? 1 : 0
   const wanderAmp = DIALS.boundaryWander.value
@@ -503,9 +571,11 @@ export function paintVertex(
   // survives at any frequency — the cheapest, most reliable clay cue we have.
   // Task 33: pass the LAND flow tangent so the mottle carries a flow-aligned streak
   // deepening (only computed when the flow field is enabled — align 0 skips the gradient).
-  const flowAlign = DIALS.terrainFlowAlign.value
-  const flow =
-    flowAlign > 0
+  // Task 43: the bake threads the flow tangent (shared with the crease gradient) via `pre`;
+  // the standalone/test path recomputes it exactly as before.
+  const flow = pre
+    ? pre.flow
+    : DIALS.terrainFlowAlign.value > 0
       ? terrainFlowDir(nx, ny, nz, isB ? terrainBumpB : terrainBump, DIALS.terrainFlowStrength.value)
       : ([0, 0, 0] as [number, number, number])
   applyFieldMottle(c, pal, kind, nx, ny, nz, flow)
@@ -518,7 +588,7 @@ export function paintVertex(
   // 0.10) so the new edges carry a crisp crease dark. Edge-gated (slope), not global,
   // so flat pastel meadow stays bright — rough, not gloomy.
   const crease = THREE.MathUtils.smoothstep(
-    terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
+    pre ? pre.crease : terrainSlope(nx, ny, nz, isB ? terrainBumpB : terrainBump),
     0.1,
     0.6
   )
@@ -529,8 +599,8 @@ export function paintVertex(
   // shadow" — the crease gate above is slope-gated and misses them. Pure function of
   // the (jittered) direction, so it is identical on both bakes and a no-op on the spine
   // (dimple is symmetric there and the field dents are gated to exactly 0 on the lane).
-  const dip = clayDimple(nx, ny, nz)
-  const dent = fieldDents(nx, ny, nz, bump)
+  const dip = pre ? pre.dip : clayDimple(nx, ny, nz)
+  const dent = pre ? pre.dent : fieldDents(nx, ny, nz, bump)
   let hollow = 0
   if (dip < 0) hollow += -dip / CLAY_DIMPLE_MAX
   // normalize by the LIVE dent depth (the dial) so the AO tracks the hollow, not a stale
@@ -542,7 +612,7 @@ export function paintVertex(
   // troughs, canyon strata steps, dune ripple valleys — hold dirt, so each figure's
   // own carve darkens into it. This is the crease-dirt logic pushed to the feature's
   // own structure, so a mountain/canyon/dune reads pressed, not blended into meadow.
-  const sig = claySignature(nx, ny, nz, bump, variant)
+  const sig = pre ? pre.sig : claySignature(nx, ny, nz, bump, variant)
   if (sig < 0) {
     const groove = THREE.MathUtils.clamp(-sig / CLAY_SIGNATURE_MAX, 0, 1)
     c.multiplyScalar(1 - 0.12 * groove)
@@ -553,7 +623,7 @@ export function paintVertex(
   // 0 on the lane + limbs by boundaryRidgeShape, and skipped entirely when the ridge dial
   // is 0 (the "truly hard colour switch, no physicality" fallback).
   if (DIALS.boundaryRidge.value > 0) {
-    const ridgeProf = boundaryRidgeShape(nx, ny, nz, wanderAmp)
+    const ridgeProf = pre ? pre.ridgeShape : boundaryRidgeShape(nx, ny, nz, wanderAmp)
     if (ridgeProf > 0) c.multiplyScalar(1 - 0.16 * ridgeProf)
   }
 }
@@ -619,151 +689,209 @@ export function buildPal(): Pal {
   } satisfies Pal
 }
 
+/** The raw baked arrays for the land — everything `useHillGeometry` needs to assemble the
+ *  live geometry + MorphBake. Extracted (Task 43) so the bake is a pure function the perf
+ *  hash/timing harness can drive directly (the hook only wraps it in a useMemo and wires the
+ *  THREE attributes). */
+export type LandBake = {
+  positionsA: Float32Array; positionsB: Float32Array
+  colorsA: Float32Array; colorsB: Float32Array
+  normalsA: Float32Array; normalsB: Float32Array
+  floodedPositions: Float32Array; floodedColors: Float32Array; floodedNormals: Float32Array
+  thetaC: Float32Array
+  capIdx: Int32Array; capNx: Float32Array; capNy: Float32Array; capNz: Float32Array
+}
+
+/**
+ * Bakes both variant worlds over the pre-displacement icosahedron `src` (a position
+ * BufferAttribute of `count` verts; `EDGE` is the local sub-triangle edge length). Pure
+ * (reads the current DIALS + palette, allocates fresh arrays), so it is the single source of
+ * truth for the land bake shared by the runtime hook and the perf bench.
+ */
+export function bakeLandArrays(src: THREE.BufferAttribute, count: number, EDGE: number): LandBake {
+  const positionsA = new Float32Array(count * 3)
+  const positionsB = new Float32Array(count * 3)
+  const colorsA = new Float32Array(count * 3)
+  const colorsB = new Float32Array(count * 3)
+  // Round 7 tide targets: the flooded state of the right grazing limb + its verts.
+  const floodedPositions = new Float32Array(count * 3)
+  const floodedColors = new Float32Array(count * 3)
+  // Task 29 lever 4 — per-FACE static normal dither (one vector per triangle, seeded
+  // by its first vertex, gated to OPEN field facets). Applied to the flat normals
+  // after they are computed so field facets straddle the ramp bands at the terminator
+  // (grazing-light speckle) while feature facets + the lit mid-band stay clean. The
+  // geometry is non-indexed with contiguous face triplets, so one vector per face
+  // keeps every facet flat.
+  const faceDither = new Float32Array(count) // [f*3 .. f*3+2] per face f = i/3
+  const capIdx: number[] = []
+  const capNxL: number[] = []
+  const capNyL: number[] = []
+  const capNzL: number[] = []
+  const thetaC = new Float32Array(count)
+  const v = new THREE.Vector3()
+  const pal = buildPal()
+  // Task 38 — the torn-boundary dials (rebake-class). The wander warps WHERE two wedges
+  // switch accent; the ridge is the pressed-clay lip baked onto the boundary curve. Both
+  // are variant-INVARIANT, so both bakes carry the same lip and the seam never flips.
+  const wanderAmp = DIALS.boundaryWander.value
+  const ridgeH = DIALS.boundaryRidge.value
+  // Task 43: the flow dials are constant across the bake — read once so the merged gradient
+  // (Win A) can be threaded into paintVertex without a per-vertex DIALS read.
+  const flowAlign = DIALS.terrainFlowAlign.value
+  const flowStrength = DIALS.terrainFlowStrength.value
+  const c = new THREE.Color()
+  // Task 43: reused scratch carrying the per-vertex invariants into paintVertex (Win B/C:
+  // claySignature / dimple / field-dents / boundary-ridge shape; Win A: crease + flow).
+  // Reused (not reallocated) per vertex — the paint call reads each synchronously.
+  const preA: PaintPrecomp = { sig: 0, dip: 0, dent: 0, ridgeShape: 0, crease: 0, flow: [0, 0, 0] }
+  const preB: PaintPrecomp = { sig: 0, dip: 0, dent: 0, ridgeShape: 0, crease: 0, flow: [0, 0, 0] }
+  for (let i = 0; i < count; i++) {
+    v.fromBufferAttribute(src, i)
+    const sx = v.x / PLANET_RADIUS
+    const sy = v.y / PLANET_RADIUS
+    const sz = v.z / PLANET_RADIUS
+    // Orthonormal tangent basis at the SOURCE direction (same convention as
+    // terrainSlope): t1 = normalize(n × up) with an x-axis fallback at the poles.
+    let t1x = -sz
+    let t1z = sx
+    const tl = Math.hypot(t1x, t1z)
+    const t1y = 0
+    if (tl < 1e-4) { t1x = 1; t1z = 0 } else { t1x /= tl; t1z /= tl }
+    const t2x = sy * t1z - sz * t1y
+    const t2y = sz * t1x - sx * t1z
+    const t2z = sx * t1y - sy * t1x
+    // Break the geodesic grid: jitter the source vertex tangentially, then work
+    // from the jittered direction for everything the vertex renders.
+    const [nx, ny, nz] = jitterDir(sx, sy, sz, t1x, t1y, t1z, t2x, t2y, t2z, EDGE)
+    thetaC[i] = canonicalTheta(Math.atan2(nz, ny))
+    const dimple = clayDimple(nx, ny, nz)
+    const rjit = JITTER_RAD * (2 * hash01(sx, sy, sz, 5.1) - 1)
+    const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+    const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+    // per-figure molded signature (inward-only, off-lane): each variant bakes its own.
+    // Task 29 lever 2 — off-lane field press-dents (inward-only, EXACTLY 0 on the lane
+    // band, so no new spine-band render term — the contact budget is unmoved).
+    // Task 38 — the pressed-clay boundary lip: a variant-INVARIANT raised welt on the
+    // torn seam curve, EXACTLY 0 on the lane band (boundaryRidgeShape early-returns), so
+    // it adds no spine-band displacement; identical in rA and rB, so the renewal front
+    // lerps it as a no-op (it never flips).
+    // Task 43 (Win B/C): compute the per-figure signature + field dents ONCE per variant
+    // + the shared boundary-ridge shape here (the radius pass needs them), then thread them
+    // into paintVertex — removing the duplicate recompute that used to run inside each
+    // paintVertex call. The radius expressions are unchanged (same operands, same order).
+    const ridgeShape = boundaryRidgeShape(nx, ny, nz, wanderAmp)
+    const ridge = ridgeH * ridgeShape
+    const sigA = claySignature(nx, ny, nz, bumpA, 0)
+    const sigB = claySignature(nx, ny, nz, bumpB, 1)
+    const dentA = fieldDents(nx, ny, nz, bumpA)
+    const dentB = fieldDents(nx, ny, nz, bumpB)
+    const rA = 1 + bumpA + dimple + rjit + sigA + dentA + ridge
+    const rB = 1 + bumpB + dimple + rjit + sigB + dentB + ridge
+    // Task 29 lever 4 — one dither vector per face (on the first face-vertex), gated to
+    // low-relief open ground. A ~1° tilt only re-bands a facet within ~0.02 of a ramp
+    // threshold (i.e. at the terminator), never mid-face — so the lit face stays clean.
+    if (i % 3 === 0) {
+      const fieldG = 1 - THREE.MathUtils.smoothstep(bumpA, 0.05, 0.12)
+      const ds = DIALS.terminatorDither.value * fieldG
+      const f3 = i // i is already the face base (i%3===0) → store at [i..i+2]
+      faceDither[f3] = ds * (2 * hash01(nx, ny, nz, 71.3) - 1)
+      faceDither[f3 + 1] = ds * (2 * hash01(nx, ny, nz, 91.7) - 1)
+      faceDither[f3 + 2] = ds * (2 * hash01(nx, ny, nz, 113.1) - 1)
+    }
+    positionsA[i * 3] = nx * PLANET_RADIUS * rA
+    positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
+    positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
+    positionsB[i * 3] = nx * PLANET_RADIUS * rB
+    positionsB[i * 3 + 1] = ny * PLANET_RADIUS * rB
+    positionsB[i * 3 + 2] = nz * PLANET_RADIUS * rB
+
+    // Task 43 (Win A): the terrain gradient (crease magnitude + flow tangent) computed ONCE
+    // per variant here — it was computed TWICE inside each paintVertex call (terrainSlope +
+    // terrainFlowDir each did the same four terrainBump samples). Threaded through preA/preB
+    // along with the Win B/C invariants above.
+    const gradA = terrainGradientField(nx, ny, nz, terrainBump, flowStrength, flowAlign)
+    const gradB = terrainGradientField(nx, ny, nz, terrainBumpB, flowStrength, flowAlign)
+    preA.sig = sigA; preA.dip = dimple; preA.dent = dentA; preA.ridgeShape = ridgeShape
+    preA.crease = gradA.crease; preA.flow = gradA.flow
+    preB.sig = sigB; preB.dip = dimple; preB.dent = dentB; preB.ridgeShape = ridgeShape
+    preB.crease = gradB.crease; preB.flow = gradB.flow
+    paintVertex(c, pal, nx, ny, nz, bumpA, false, preA)
+    colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
+    paintVertex(c, pal, nx, ny, nz, bumpB, true, preB)
+    colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
+
+    // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA
+    // === rB there (grazing-limb invariant), so A is the base; the flooded radius
+    // drops TIDE_DEPTH below it (clearly under the waterline) and the colour goes to
+    // deep water. Elsewhere the flooded target === the A bake (a no-op the tide never
+    // touches). The per-frame tide lerps A → flooded by tideWetness on the cap bucket.
+    if (nx > TIDE_LAT_LO) {
+      const floodedR = rA - TIDE_DEPTH
+      floodedPositions[i * 3] = nx * PLANET_RADIUS * floodedR
+      floodedPositions[i * 3 + 1] = ny * PLANET_RADIUS * floodedR
+      floodedPositions[i * 3 + 2] = nz * PLANET_RADIUS * floodedR
+      floodedColors[i * 3] = pal.deep.r
+      floodedColors[i * 3 + 1] = pal.deep.g
+      floodedColors[i * 3 + 2] = pal.deep.b
+      capIdx.push(i); capNxL.push(nx); capNyL.push(ny); capNzL.push(nz)
+    } else {
+      floodedPositions[i * 3] = positionsA[i * 3]
+      floodedPositions[i * 3 + 1] = positionsA[i * 3 + 1]
+      floodedPositions[i * 3 + 2] = positionsA[i * 3 + 2]
+      floodedColors[i * 3] = colorsA[i * 3]
+      floodedColors[i * 3 + 1] = colorsA[i * 3 + 1]
+      floodedColors[i * 3 + 2] = colorsA[i * 3 + 2]
+    }
+  }
+  const normalsA = flatNormals(positionsA)
+  const normalsB = flatNormals(positionsB)
+  const floodedNormals = flatNormals(floodedPositions)
+  // Task 29 lever 4 — add the per-face field dither to the flat normals and
+  // renormalize. Same vector on all 3 verts of a face keeps the facet flat; the
+  // dither is a pure function of direction, so A/B/flooded share it and the morph
+  // (which lerps normals) stays seamless.
+  const faces = count / 3
+  const applyFaceDither = (nor: Float32Array): void => {
+    for (let f = 0; f < faces; f++) {
+      const dx = faceDither[f * 3], dy = faceDither[f * 3 + 1], dz = faceDither[f * 3 + 2]
+      if (dx === 0 && dy === 0 && dz === 0) continue
+      for (let vtx = 0; vtx < 3; vtx++) {
+        const k = (f * 3 + vtx) * 3
+        const x = nor[k] + dx, y = nor[k + 1] + dy, z = nor[k + 2] + dz
+        const l = Math.hypot(x, y, z) || 1
+        nor[k] = x / l; nor[k + 1] = y / l; nor[k + 2] = z / l
+      }
+    }
+  }
+  applyFaceDither(normalsA)
+  applyFaceDither(normalsB)
+  applyFaceDither(floodedNormals)
+
+  return {
+    positionsA, positionsB, colorsA, colorsB, normalsA, normalsB,
+    thetaC,
+    floodedPositions, floodedColors, floodedNormals,
+    capIdx: Int32Array.from(capIdx),
+    capNx: Float32Array.from(capNxL),
+    capNy: Float32Array.from(capNyL),
+    capNz: Float32Array.from(capNzL),
+  }
+}
+
 function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
     const ICO_DETAIL = 24
     const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, ICO_DETAIL)
-    const src = geo.attributes.position
+    const src = geo.attributes.position as THREE.BufferAttribute
     const count = src.count
     // Local sub-triangle edge length: icosahedron edge (circumradius·1.0515)
     // split into ICO_DETAIL segments. The tangential jitter is a fraction of this.
     const EDGE = (PLANET_RADIUS * 1.0515) / ICO_DETAIL
-    const positionsA = new Float32Array(count * 3)
-    const positionsB = new Float32Array(count * 3)
-    const colorsA = new Float32Array(count * 3)
-    const colorsB = new Float32Array(count * 3)
-    // Round 7 tide targets: the flooded state of the right grazing limb + its verts.
-    const floodedPositions = new Float32Array(count * 3)
-    const floodedColors = new Float32Array(count * 3)
-    // Task 29 lever 4 — per-FACE static normal dither (one vector per triangle, seeded
-    // by its first vertex, gated to OPEN field facets). Applied to the flat normals
-    // after they are computed so field facets straddle the ramp bands at the terminator
-    // (grazing-light speckle) while feature facets + the lit mid-band stay clean. The
-    // geometry is non-indexed with contiguous face triplets, so one vector per face
-    // keeps every facet flat.
-    const faceDither = new Float32Array(count) // [f*3 .. f*3+2] per face f = i/3
-    const capIdx: number[] = []
-    const capNxL: number[] = []
-    const capNyL: number[] = []
-    const capNzL: number[] = []
-    const thetaC = new Float32Array(count)
-    const v = new THREE.Vector3()
-    const pal = buildPal()
-    // Task 38 — the torn-boundary dials (rebake-class). The wander warps WHERE two wedges
-    // switch accent; the ridge is the pressed-clay lip baked onto the boundary curve. Both
-    // are variant-INVARIANT, so both bakes carry the same lip and the seam never flips.
-    const wanderAmp = DIALS.boundaryWander.value
-    const ridgeH = DIALS.boundaryRidge.value
-    const c = new THREE.Color()
-    for (let i = 0; i < count; i++) {
-      v.fromBufferAttribute(src, i)
-      const sx = v.x / PLANET_RADIUS
-      const sy = v.y / PLANET_RADIUS
-      const sz = v.z / PLANET_RADIUS
-      // Orthonormal tangent basis at the SOURCE direction (same convention as
-      // terrainSlope): t1 = normalize(n × up) with an x-axis fallback at the poles.
-      let t1x = -sz
-      let t1z = sx
-      const tl = Math.hypot(t1x, t1z)
-      const t1y = 0
-      if (tl < 1e-4) { t1x = 1; t1z = 0 } else { t1x /= tl; t1z /= tl }
-      const t2x = sy * t1z - sz * t1y
-      const t2y = sz * t1x - sx * t1z
-      const t2z = sx * t1y - sy * t1x
-      // Break the geodesic grid: jitter the source vertex tangentially, then work
-      // from the jittered direction for everything the vertex renders.
-      const [nx, ny, nz] = jitterDir(sx, sy, sz, t1x, t1y, t1z, t2x, t2y, t2z, EDGE)
-      thetaC[i] = canonicalTheta(Math.atan2(nz, ny))
-      const dimple = clayDimple(nx, ny, nz)
-      const rjit = JITTER_RAD * (2 * hash01(sx, sy, sz, 5.1) - 1)
-      const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-      const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
-      // per-figure molded signature (inward-only, off-lane): each variant bakes its own.
-      // Task 29 lever 2 — off-lane field press-dents (inward-only, EXACTLY 0 on the lane
-      // band, so no new spine-band render term — the contact budget is unmoved).
-      // Task 38 — the pressed-clay boundary lip: a variant-INVARIANT raised welt on the
-      // torn seam curve, EXACTLY 0 on the lane band (boundaryRidgeShape early-returns), so
-      // it adds no spine-band displacement; identical in rA and rB, so the renewal front
-      // lerps it as a no-op (it never flips).
-      const ridge = ridgeH * boundaryRidgeShape(nx, ny, nz, wanderAmp)
-      const rA =
-        1 + bumpA + dimple + rjit + claySignature(nx, ny, nz, bumpA, 0) + fieldDents(nx, ny, nz, bumpA) + ridge
-      const rB =
-        1 + bumpB + dimple + rjit + claySignature(nx, ny, nz, bumpB, 1) + fieldDents(nx, ny, nz, bumpB) + ridge
-      // Task 29 lever 4 — one dither vector per face (on the first face-vertex), gated to
-      // low-relief open ground. A ~1° tilt only re-bands a facet within ~0.02 of a ramp
-      // threshold (i.e. at the terminator), never mid-face — so the lit face stays clean.
-      if (i % 3 === 0) {
-        const fieldG = 1 - THREE.MathUtils.smoothstep(bumpA, 0.05, 0.12)
-        const ds = DIALS.terminatorDither.value * fieldG
-        const f3 = i // i is already the face base (i%3===0) → store at [i..i+2]
-        faceDither[f3] = ds * (2 * hash01(nx, ny, nz, 71.3) - 1)
-        faceDither[f3 + 1] = ds * (2 * hash01(nx, ny, nz, 91.7) - 1)
-        faceDither[f3 + 2] = ds * (2 * hash01(nx, ny, nz, 113.1) - 1)
-      }
-      positionsA[i * 3] = nx * PLANET_RADIUS * rA
-      positionsA[i * 3 + 1] = ny * PLANET_RADIUS * rA
-      positionsA[i * 3 + 2] = nz * PLANET_RADIUS * rA
-      positionsB[i * 3] = nx * PLANET_RADIUS * rB
-      positionsB[i * 3 + 1] = ny * PLANET_RADIUS * rB
-      positionsB[i * 3 + 2] = nz * PLANET_RADIUS * rB
-
-      paintVertex(c, pal, nx, ny, nz, bumpA, false)
-      colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
-      paintVertex(c, pal, nx, ny, nz, bumpB, true)
-      colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
-
-      // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA
-      // === rB there (grazing-limb invariant), so A is the base; the flooded radius
-      // drops TIDE_DEPTH below it (clearly under the waterline) and the colour goes to
-      // deep water. Elsewhere the flooded target === the A bake (a no-op the tide never
-      // touches). The per-frame tide lerps A → flooded by tideWetness on the cap bucket.
-      if (nx > TIDE_LAT_LO) {
-        const floodedR = rA - TIDE_DEPTH
-        floodedPositions[i * 3] = nx * PLANET_RADIUS * floodedR
-        floodedPositions[i * 3 + 1] = ny * PLANET_RADIUS * floodedR
-        floodedPositions[i * 3 + 2] = nz * PLANET_RADIUS * floodedR
-        floodedColors[i * 3] = pal.deep.r
-        floodedColors[i * 3 + 1] = pal.deep.g
-        floodedColors[i * 3 + 2] = pal.deep.b
-        capIdx.push(i); capNxL.push(nx); capNyL.push(ny); capNzL.push(nz)
-      } else {
-        floodedPositions[i * 3] = positionsA[i * 3]
-        floodedPositions[i * 3 + 1] = positionsA[i * 3 + 1]
-        floodedPositions[i * 3 + 2] = positionsA[i * 3 + 2]
-        floodedColors[i * 3] = colorsA[i * 3]
-        floodedColors[i * 3 + 1] = colorsA[i * 3 + 1]
-        floodedColors[i * 3 + 2] = colorsA[i * 3 + 2]
-      }
-    }
-    const normalsA = flatNormals(positionsA)
-    const normalsB = flatNormals(positionsB)
-    const floodedNormals = flatNormals(floodedPositions)
-    // Task 29 lever 4 — add the per-face field dither to the flat normals and
-    // renormalize. Same vector on all 3 verts of a face keeps the facet flat; the
-    // dither is a pure function of direction, so A/B/flooded share it and the morph
-    // (which lerps normals) stays seamless.
-    const faces = count / 3
-    const applyFaceDither = (nor: Float32Array): void => {
-      for (let f = 0; f < faces; f++) {
-        const dx = faceDither[f * 3], dy = faceDither[f * 3 + 1], dz = faceDither[f * 3 + 2]
-        if (dx === 0 && dy === 0 && dz === 0) continue
-        for (let vtx = 0; vtx < 3; vtx++) {
-          const k = (f * 3 + vtx) * 3
-          const x = nor[k] + dx, y = nor[k + 1] + dy, z = nor[k + 2] + dz
-          const l = Math.hypot(x, y, z) || 1
-          nor[k] = x / l; nor[k + 1] = y / l; nor[k + 2] = z / l
-        }
-      }
-    }
-    applyFaceDither(normalsA)
-    applyFaceDither(normalsB)
-    applyFaceDither(floodedNormals)
-
+    const b = bakeLandArrays(src, count, EDGE)
     // Live attributes start on lap-1 (A); the frame lerp writes toward B.
-    const posAttr = new THREE.BufferAttribute(positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
-    const colAttr = new THREE.BufferAttribute(colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
-    const norAttr = new THREE.BufferAttribute(normalsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    const posAttr = new THREE.BufferAttribute(b.positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    const colAttr = new THREE.BufferAttribute(b.colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
+    const norAttr = new THREE.BufferAttribute(b.normalsA.slice(), 3).setUsage(THREE.DynamicDrawUsage)
     geo.setAttribute('position', posAttr)
     geo.setAttribute('color', colAttr)
     geo.setAttribute('normal', norAttr)
@@ -771,13 +899,12 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
     return {
       geometry: geo,
       bake: {
-        positionsA, positionsB, colorsA, colorsB, normalsA, normalsB,
-        thetaC, buckets: buildBuckets(thetaC),
-        floodedPositions, floodedColors, floodedNormals,
-        capIdx: Int32Array.from(capIdx),
-        capNx: Float32Array.from(capNxL),
-        capNy: Float32Array.from(capNyL),
-        capNz: Float32Array.from(capNzL),
+        positionsA: b.positionsA, positionsB: b.positionsB,
+        colorsA: b.colorsA, colorsB: b.colorsB,
+        normalsA: b.normalsA, normalsB: b.normalsB,
+        thetaC: b.thetaC, buckets: buildBuckets(b.thetaC),
+        floodedPositions: b.floodedPositions, floodedColors: b.floodedColors, floodedNormals: b.floodedNormals,
+        capIdx: b.capIdx, capNx: b.capNx, capNy: b.capNy, capNz: b.capNz,
       },
     }
     // `version` bumps when a rebake-class dial settles (Round 9 tuning panel); it is a
