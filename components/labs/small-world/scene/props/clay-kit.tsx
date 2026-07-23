@@ -388,146 +388,132 @@ export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x
 // Aram: "some animals lurking around." Small clay figures HIDING in the jungle —
 // the charm is mostly-occluded placement (a snake at a trunk, cat eyes behind a
 // canopy mound, a parrot on a branch, a frog by the water). Each is a few clay
-// primitives with a strong silhouette and one accent colour, in the clay-kit idiom
-// (like ClayBee). Jungle accents are LOCAL hex defaults here (not palette.ts entries)
-// so the figures ship independent of the concurrent palette edits — overridable per prop.
+// primitives with a strong silhouette and one accent colour, in the clay-kit idiom.
+// All accents are named palette.ts entries.
+//
+// Each animal is built as ONE merged vertex-coloured geometry (its primitives baked to
+// a single BufferGeometry under the shared toon ramp), so a whole animal is a SINGLE
+// draw call instead of one per primitive — 4 animals cost 4 draws, not ~25 (the flora
+// is already instanced). The merge bakes each primitive's local transform + accent into
+// per-vertex colour; the silhouette + shading are identical to the per-mesh build.
 
-/** A coiled snake resting at a trunk base: a flattened body coil + a raised head with
- *  two ink eyes and a forked-flick tongue. Accent = emerald body. */
-export function ClaySnake({ color = PALETTE.snakeBody, belly = PALETTE.snakeBelly, ...x }: Xform & { color?: string; belly?: string }) {
-  const ramp = useClayRamp()
-  return (
-    <group {...x}>
-      {/* the flat coil lying on the ground */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.55]}>
-        <torusGeometry args={[0.075, 0.026, 10, 20]} />
-        <meshToonMaterial color={color} gradientMap={ramp} />
-      </mesh>
-      {/* a smaller inner coil so the body reads as a spiral, not a ring */}
-      <mesh position={[0.02, 0.02, 0.01]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.55]}>
-        <torusGeometry args={[0.04, 0.024, 10, 18]} />
-        <meshToonMaterial color={color} gradientMap={ramp} />
-      </mesh>
-      {/* head reared up off the coil */}
-      <mesh position={[0.08, 0.05, 0.05]} rotation={[0, 0, -0.5]} scale={[1.5, 1, 1]}>
-        <sphereGeometry args={[0.03, 12, 12]} />
-        <meshToonMaterial color={color} gradientMap={ramp} />
-      </mesh>
-      <mesh position={[0.11, 0.062, 0.058]} scale={[1, 0.3, 1]}>
-        <sphereGeometry args={[0.014, 8, 8]} />
-        <meshToonMaterial color={PALETTE.honey} gradientMap={ramp} />
-      </mesh>
-      {[0.045, 0.065].map((z) => (
-        <mesh key={z} position={[0.1, 0.075, z]}>
-          <sphereGeometry args={[0.006, 6, 6]} />
-          <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
-        </mesh>
-      ))}
-    </group>
+type ClayPart = { geo: THREE.BufferGeometry; color: string; pos?: [number, number, number]; rot?: [number, number, number]; scl?: [number, number, number] }
+
+/** Local transform matrix for a part (Euler order XYZ, matching r3f's `rotation` prop). */
+function partMatrix(p: ClayPart): THREE.Matrix4 {
+  const q = new THREE.Quaternion()
+  if (p.rot) q.setFromEuler(new THREE.Euler(p.rot[0], p.rot[1], p.rot[2]))
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(...(p.pos ?? [0, 0, 0])),
+    q,
+    new THREE.Vector3(...(p.scl ?? [1, 1, 1]))
   )
+}
+
+/** Bake a list of clay primitives into ONE vertex-coloured, non-indexed BufferGeometry:
+ *  each part's local transform is applied to its geometry (positions + normals) and its
+ *  accent colour is written per-vertex. Rendered with a single meshToonMaterial
+ *  (vertexColors) so the whole figure is one draw call. The source geometries are disposed. */
+function buildMergedClay(parts: ClayPart[]): THREE.BufferGeometry {
+  const positions: number[] = []
+  const normals: number[] = []
+  const colors: number[] = []
+  const col = new THREE.Color()
+  for (const part of parts) {
+    const src = part.geo
+    const g = src.index ? src.toNonIndexed() : src
+    g.applyMatrix4(partMatrix(part)) // transforms positions AND (normalised) normals
+    const pos = g.attributes.position.array as ArrayLike<number>
+    const nor = g.attributes.normal.array as ArrayLike<number>
+    for (let i = 0; i < pos.length; i++) {
+      positions.push(pos[i])
+      normals.push(nor[i])
+    }
+    col.set(part.color)
+    for (let i = 0; i < g.attributes.position.count; i++) colors.push(col.r, col.g, col.b)
+    if (g !== src) g.dispose()
+    src.dispose()
+  }
+  const out = new THREE.BufferGeometry()
+  out.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
+  out.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  return out
+}
+
+/** A coiled snake resting at a trunk base: a flattened spiral body + a raised head with
+ *  two ink eyes and a honey tongue. Accent = emerald body. */
+export function ClaySnake({ color = PALETTE.snakeBody, ...x }: Xform & { color?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.TorusGeometry(0.075, 0.026, 10, 20), color, rot: [Math.PI / 2, 0, 0], scl: [1, 1, 0.55] },
+        { geo: new THREE.TorusGeometry(0.04, 0.024, 10, 18), color, pos: [0.02, 0.02, 0.01], rot: [Math.PI / 2, 0, 0], scl: [1, 1, 0.55] },
+        { geo: new THREE.SphereGeometry(0.03, 12, 12), color, pos: [0.08, 0.05, 0.05], rot: [0, 0, -0.5], scl: [1.5, 1, 1] },
+        { geo: new THREE.SphereGeometry(0.014, 8, 8), color: PALETTE.honey, pos: [0.11, 0.062, 0.058], scl: [1, 0.3, 1] },
+        { geo: new THREE.SphereGeometry(0.006, 6, 6), color: PALETTE.ink, pos: [0.1, 0.075, 0.045] },
+        { geo: new THREE.SphereGeometry(0.006, 6, 6), color: PALETTE.ink, pos: [0.1, 0.075, 0.065] },
+      ]),
+    [color]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
 
 /** A big cat peeking from cover — only the crown of the head, two ears and two glowing
  *  eyes show (the body stays hidden behind a canopy mound). Accent = amber eyes. */
 export function ClayJaguar({ fur = PALETTE.jaguarFur, eye = PALETTE.jaguarEye, ...x }: Xform & { fur?: string; eye?: string }) {
   const ramp = useClayRamp()
-  return (
-    <group {...x}>
-      {/* the brow / crown of the head — most of it sinks behind cover */}
-      <mesh position={[0, 0, 0]} scale={[1.25, 0.85, 1]}>
-        <sphereGeometry args={[0.09, 14, 14]} />
-        <meshToonMaterial color={fur} gradientMap={ramp} />
-      </mesh>
-      {/* rounded ears */}
-      {[-0.06, 0.06].map((ex) => (
-        <mesh key={ex} position={[ex, 0.075, 0]}>
-          <coneGeometry args={[0.035, 0.06, 10]} />
-          <meshToonMaterial color={fur} gradientMap={ramp} />
-        </mesh>
-      ))}
-      {/* the glowing eyes that give it away in the gloom */}
-      {[-0.04, 0.04].map((ex) => (
-        <mesh key={ex} position={[ex, 0.01, 0.075]}>
-          <sphereGeometry args={[0.018, 10, 10]} />
-          <meshToonMaterial color={eye} gradientMap={ramp} />
-        </mesh>
-      ))}
-      {[-0.04, 0.04].map((ex) => (
-        <mesh key={`p${ex}`} position={[ex, 0.005, 0.09]} scale={[0.5, 1, 0.5]}>
-          <sphereGeometry args={[0.012, 8, 8]} />
-          <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
-        </mesh>
-      ))}
-    </group>
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.SphereGeometry(0.09, 14, 14), color: fur, scl: [1.25, 0.85, 1] },
+        { geo: new THREE.ConeGeometry(0.035, 0.06, 10), color: fur, pos: [-0.06, 0.075, 0] },
+        { geo: new THREE.ConeGeometry(0.035, 0.06, 10), color: fur, pos: [0.06, 0.075, 0] },
+        { geo: new THREE.SphereGeometry(0.018, 10, 10), color: eye, pos: [-0.04, 0.01, 0.075] },
+        { geo: new THREE.SphereGeometry(0.018, 10, 10), color: eye, pos: [0.04, 0.01, 0.075] },
+        { geo: new THREE.SphereGeometry(0.012, 8, 8), color: PALETTE.ink, pos: [-0.04, 0.005, 0.09], scl: [0.5, 1, 0.5] },
+        { geo: new THREE.SphereGeometry(0.012, 8, 8), color: PALETTE.ink, pos: [0.04, 0.005, 0.09], scl: [0.5, 1, 0.5] },
+      ]),
+    [fur, eye]
   )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
 
 /** A parrot perched on a branch: a plump body, a hooked beak, a long tail and a wing
  *  patch of a second colour. Accent = scarlet body with a teal wing. */
 export function ClayParrot({ body = PALETTE.parrotBody, wing = PALETTE.parrotWing, ...x }: Xform & { body?: string; wing?: string }) {
   const ramp = useClayRamp()
-  return (
-    <group {...x}>
-      <mesh scale={[1, 1.25, 1]}>
-        <sphereGeometry args={[0.06, 14, 14]} />
-        <meshToonMaterial color={body} gradientMap={ramp} />
-      </mesh>
-      {/* head */}
-      <mesh position={[0.01, 0.09, 0.02]}>
-        <sphereGeometry args={[0.042, 12, 12]} />
-        <meshToonMaterial color={body} gradientMap={ramp} />
-      </mesh>
-      {/* hooked beak */}
-      <mesh position={[0.05, 0.085, 0.03]} rotation={[0, 0, -1.1]}>
-        <coneGeometry args={[0.02, 0.05, 8]} />
-        <meshToonMaterial color={PALETTE.honey} gradientMap={ramp} />
-      </mesh>
-      {/* folded wing patch */}
-      <mesh position={[-0.03, 0.0, 0.03]} rotation={[0.3, 0.2, 0.4]} scale={[0.55, 1.4, 0.9]}>
-        <sphereGeometry args={[0.045, 10, 10]} />
-        <meshToonMaterial color={wing} gradientMap={ramp} />
-      </mesh>
-      {/* long tail sweeping down */}
-      <mesh position={[-0.05, -0.09, 0]} rotation={[0, 0, 0.6]} scale={[0.5, 2.4, 0.7]}>
-        <sphereGeometry args={[0.03, 10, 10]} />
-        <meshToonMaterial color={wing} gradientMap={ramp} />
-      </mesh>
-      <mesh position={[0.035, 0.1, 0.05]}>
-        <sphereGeometry args={[0.008, 6, 6]} />
-        <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
-      </mesh>
-    </group>
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.SphereGeometry(0.06, 14, 14), color: body, scl: [1, 1.25, 1] },
+        { geo: new THREE.SphereGeometry(0.042, 12, 12), color: body, pos: [0.01, 0.09, 0.02] },
+        { geo: new THREE.ConeGeometry(0.02, 0.05, 8), color: PALETTE.honey, pos: [0.05, 0.085, 0.03], rot: [0, 0, -1.1] },
+        { geo: new THREE.SphereGeometry(0.045, 10, 10), color: wing, pos: [-0.03, 0.0, 0.03], rot: [0.3, 0.2, 0.4], scl: [0.55, 1.4, 0.9] },
+        { geo: new THREE.SphereGeometry(0.03, 10, 10), color: wing, pos: [-0.05, -0.09, 0], rot: [0, 0, 0.6], scl: [0.5, 2.4, 0.7] },
+        { geo: new THREE.SphereGeometry(0.008, 6, 6), color: PALETTE.ink, pos: [0.035, 0.1, 0.05] },
+      ]),
+    [body, wing]
   )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
 
 /** A little frog crouched by the water: a wide squat body with two bulging eyes on
  *  top and a pale throat. Accent = bright leaf green. */
 export function ClayFrog({ color = PALETTE.frogBody, throat = PALETTE.frogThroat, ...x }: Xform & { color?: string; throat?: string }) {
   const ramp = useClayRamp()
-  return (
-    <group {...x}>
-      <mesh scale={[1.3, 0.8, 1.15]}>
-        <sphereGeometry args={[0.055, 14, 12]} />
-        <meshToonMaterial color={color} gradientMap={ramp} />
-      </mesh>
-      {/* pale throat */}
-      <mesh position={[0.045, -0.005, 0]} scale={[0.7, 0.55, 0.9]}>
-        <sphereGeometry args={[0.04, 10, 10]} />
-        <meshToonMaterial color={throat} gradientMap={ramp} />
-      </mesh>
-      {/* bulging eyes on top */}
-      {[-0.028, 0.028].map((ez) => (
-        <group key={ez} position={[0.02, 0.045, ez]}>
-          <mesh>
-            <sphereGeometry args={[0.02, 10, 10]} />
-            <meshToonMaterial color={color} gradientMap={ramp} />
-          </mesh>
-          <mesh position={[0.012, 0.006, 0]}>
-            <sphereGeometry args={[0.009, 8, 8]} />
-            <meshToonMaterial color={PALETTE.ink} gradientMap={ramp} />
-          </mesh>
-        </group>
-      ))}
-    </group>
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.SphereGeometry(0.055, 14, 12), color, scl: [1.3, 0.8, 1.15] },
+        { geo: new THREE.SphereGeometry(0.04, 10, 10), color: throat, pos: [0.045, -0.005, 0], scl: [0.7, 0.55, 0.9] },
+        { geo: new THREE.SphereGeometry(0.02, 10, 10), color, pos: [0.02, 0.045, -0.028] },
+        { geo: new THREE.SphereGeometry(0.02, 10, 10), color, pos: [0.02, 0.045, 0.028] },
+        { geo: new THREE.SphereGeometry(0.009, 8, 8), color: PALETTE.ink, pos: [0.032, 0.051, -0.028] },
+        { geo: new THREE.SphereGeometry(0.009, 8, 8), color: PALETTE.ink, pos: [0.032, 0.051, 0.028] },
+      ]),
+    [color, throat]
   )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
