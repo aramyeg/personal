@@ -13,6 +13,8 @@ import {
   biomeTint,
   bandOf,
   colorGate,
+  seamTintWeight,
+  nearestMeridianIndex,
   channelDist,
   canyonCreekDist,
   tideCarve,
@@ -25,7 +27,7 @@ import {
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
-import { fieldDents, applyFieldMottle, type Pal } from './field-clay'
+import { fieldDents, applyFieldMottle, buildSeamTints, type Pal } from './field-clay'
 import { makeBoilMaterial, boilAmplitude } from './boil-material'
 import { DIALS, subscribe, bakeVersion } from './tunables'
 import {
@@ -428,14 +430,15 @@ function accentMeadow(
  * the open ground (spring green, flower pink, delta sand, dune gold, canyon
  * brown, winter white-pink). Polar oceans + their beach ring are lap-invariant.
  */
-function paintVertex(
+export function paintVertex(
   c: THREE.Color,
   pal: Pal,
   nx: number,
   ny: number,
   nz: number,
   bump: number,
-  isB: boolean
+  isB: boolean,
+  seamTints: readonly THREE.Color[]
 ): void {
   const variant: 0 | 1 = isB ? 1 : 0
   // open-meadow height read is the fallback everywhere
@@ -451,10 +454,15 @@ function paintVertex(
     case 'beach': {
       c.lerp(pal.sand, 0.85 * kt)
       // shore takes a hint of its wedge (icy by the winter pond, earthy by the
-      // canyon) so the beach ring isn't a uniform sand stripe
-      const band = bandOf(canonicalTheta(Math.atan2(nz, ny)))
-      if (variant === 1 && band === 2) c.lerp(pal.ice, 0.4 * kt)
-      else if (variant === 1 && band === 1) c.lerp(pal.rust, 0.3 * kt)
+      // canyon) so the beach ring isn't a uniform sand stripe. Task 36: this wedge
+      // flourish is variant-specific, so fade it out at the meridian seam (× the seam
+      // gate, 0 on the meridian) — the shore is plain variant-invariant sand there,
+      // preserving the renewal wrap-identity strip.
+      const bthetaC = canonicalTheta(Math.atan2(nz, ny))
+      const band = bandOf(bthetaC)
+      const seamG = 1 - seamTintWeight(bthetaC)
+      if (variant === 1 && band === 2) c.lerp(pal.ice, 0.4 * kt * seamG)
+      else if (variant === 1 && band === 1) c.lerp(pal.rust, 0.3 * kt * seamG)
       break
     }
     case 'canyon': {
@@ -477,6 +485,13 @@ function paintVertex(
       const thetaC = canonicalTheta(Math.atan2(nz, ny))
       const g = colorGate(thetaC, nx)
       accentMeadow(c, pal, bandOf(thetaC), variant, nx, ny, nz, g)
+      // Task 36 — de-green the seams. Where the wedge accent has faded toward a meridian
+      // (g → 0), blend the exposed base-meadow green toward this meridian's seam tint
+      // instead. seamTintWeight matches colorGate's seam sub-shape exactly (so the band is
+      // not widened) and is longitude-only, so the seam colour is a pure function of
+      // position — EXACTLY variant-invariant, the renewal identity's one hard constraint.
+      const sw = seamTintWeight(thetaC)
+      if (sw > 0) c.lerp(seamTints[nearestMeridianIndex(thetaC)], sw)
     }
   }
   // Task 29 lever 1 (headline) — multi-scale field colour mottling. Variance WITHIN
@@ -491,7 +506,11 @@ function paintVertex(
     flowAlign > 0
       ? terrainFlowDir(nx, ny, nz, isB ? terrainBumpB : terrainBump, DIALS.terrainFlowStrength.value)
       : ([0, 0, 0] as [number, number, number])
-  applyFieldMottle(c, pal, kind, nx, ny, nz, flow)
+  // Task 36 — near a de-greened meridian seam the ground colour is now the warm seam
+  // tint, so tell the mottle to drop its green-specific marbling there (else the fully
+  // bridged extreme could punch faint green veins through a nominally warm seam).
+  const seamW = seamTintWeight(canonicalTheta(Math.atan2(nz, ny)))
+  applyFieldMottle(c, pal, kind, nx, ny, nz, flow, seamW)
   // Crease darkening: hand-pushed clay carries dirt in its steep folds. Uses the
   // matching lap's slope so the deeper canyon / taller spires crease right.
   // Task-21: strengthened a notch (0.14 → 0.20) so the pinched folds read harder.
@@ -563,6 +582,37 @@ type MorphBake = {
  * Because the spine band never morphs, A and B coincide there and the lerp is a
  * no-op on the lane.
  */
+/** The planet colour palette as THREE.Colors, built once per bake from the hex PALETTE.
+ *  Exported so the paint unit tests can reproduce the exact bake palette (single source). */
+export function buildPal(): Pal {
+  return {
+    leaf: new THREE.Color(PALETTE.leaf),
+    meadow: new THREE.Color(PALETTE.meadow),
+    sprout: new THREE.Color(PALETTE.sprout),
+    clay: new THREE.Color(PALETTE.clayPath),
+    deep: new THREE.Color(PALETTE.riverDeep),
+    honey: new THREE.Color(PALETTE.honey),
+    snow: new THREE.Color(PALETTE.snow),
+    earth: new THREE.Color(PALETTE.earth),
+    pine: new THREE.Color(PALETTE.pine),
+    dune: new THREE.Color(PALETTE.dune),
+    blossom: new THREE.Color(PALETTE.blossom),
+    blossomDeep: new THREE.Color(PALETTE.blossomDeep),
+    springGreen: new THREE.Color(PALETTE.springGreen),
+    petal: new THREE.Color(PALETTE.petal),
+    sand: new THREE.Color(PALETTE.sand),
+    goldSand: new THREE.Color(PALETTE.goldSand),
+    earthDeep: new THREE.Color(PALETTE.earthDeep),
+    rust: new THREE.Color(PALETTE.rust),
+    ice: new THREE.Color(PALETTE.ice),
+    tuff: new THREE.Color(PALETTE.tuff),
+    foliageDeep: new THREE.Color(PALETTE.foliageDeep),
+    pineDeep: new THREE.Color(PALETTE.pineDeep),
+    meadowDry: new THREE.Color(PALETTE.meadowDry),
+    seamClay: new THREE.Color(PALETTE.seamClay),
+  } satisfies Pal
+}
+
 function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bake: MorphBake } {
   return useMemo(() => {
     const ICO_DETAIL = 24
@@ -592,31 +642,10 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
     const capNzL: number[] = []
     const thetaC = new Float32Array(count)
     const v = new THREE.Vector3()
-    const pal = {
-      leaf: new THREE.Color(PALETTE.leaf),
-      meadow: new THREE.Color(PALETTE.meadow),
-      sprout: new THREE.Color(PALETTE.sprout),
-      clay: new THREE.Color(PALETTE.clayPath),
-      deep: new THREE.Color(PALETTE.riverDeep),
-      honey: new THREE.Color(PALETTE.honey),
-      snow: new THREE.Color(PALETTE.snow),
-      earth: new THREE.Color(PALETTE.earth),
-      pine: new THREE.Color(PALETTE.pine),
-      dune: new THREE.Color(PALETTE.dune),
-      blossom: new THREE.Color(PALETTE.blossom),
-      blossomDeep: new THREE.Color(PALETTE.blossomDeep),
-      springGreen: new THREE.Color(PALETTE.springGreen),
-      petal: new THREE.Color(PALETTE.petal),
-      sand: new THREE.Color(PALETTE.sand),
-      goldSand: new THREE.Color(PALETTE.goldSand),
-      earthDeep: new THREE.Color(PALETTE.earthDeep),
-      rust: new THREE.Color(PALETTE.rust),
-      ice: new THREE.Color(PALETTE.ice),
-      tuff: new THREE.Color(PALETTE.tuff),
-      foliageDeep: new THREE.Color(PALETTE.foliageDeep),
-      pineDeep: new THREE.Color(PALETTE.pineDeep),
-      meadowDry: new THREE.Color(PALETTE.meadowDry),
-    } satisfies Pal
+    const pal = buildPal()
+    // Task 36 — the three per-meridian seam tints, baked from the live seam-bridge mix
+    // (rebake-class dial). Variant-independent by construction, so both bakes seam identically.
+    const seamTints = buildSeamTints(pal, DIALS.seamBridgeMix.value)
     const c = new THREE.Color()
     for (let i = 0; i < count; i++) {
       v.fromBufferAttribute(src, i)
@@ -666,9 +695,9 @@ function useHillGeometry(version: number): { geometry: THREE.BufferGeometry; bak
       positionsB[i * 3 + 1] = ny * PLANET_RADIUS * rB
       positionsB[i * 3 + 2] = nz * PLANET_RADIUS * rB
 
-      paintVertex(c, pal, nx, ny, nz, bumpA, false)
+      paintVertex(c, pal, nx, ny, nz, bumpA, false, seamTints)
       colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
-      paintVertex(c, pal, nx, ny, nz, bumpB, true)
+      paintVertex(c, pal, nx, ny, nz, bumpB, true, seamTints)
       colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
 
       // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA

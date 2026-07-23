@@ -40,4 +40,9 @@ export const PALETTE = {
   // girl blend (Task 24) — contact-shadow pool at the ramp floor, warm ink so
   // she grounds into the clay rather than casting a cool neutral disc
   shadowClay: '#3A2F30',
+  // seam substrate (Task 36) — the pressed bare-clay body of the planet showing
+  // between set-pieces. A warm terracotta so the meridian seams read as clay ground,
+  // not the green countryside strip Aram rejected. Used (optionally tinted toward each
+  // meridian's abutting-accent bridge blend) to de-green every biome seam.
+  seamClay: '#BF8560',
 } as const

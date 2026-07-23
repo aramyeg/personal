@@ -60,6 +60,13 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     // dent AO baked up (Aram likes the higher settings) with doubled headroom.
     expect(DIALS.dentAO.default).toBe(0.3)
     expect(DIALS.dentAO.max).toBe(0.8)
+    // Task 36 — seam de-green mix (0 = pure clay substrate .. 1 = full per-meridian bridge),
+    // rebake-class in the fields group. Default is the shipped Task-36 look.
+    expect(DIALS.seamBridgeMix.default).toBe(0.4)
+    expect(DIALS.seamBridgeMix.min).toBe(0)
+    expect(DIALS.seamBridgeMix.max).toBe(1)
+    expect(DIALS.seamBridgeMix.group).toBe('fields')
+    expect(DIALS.seamBridgeMix.cls).toBe('rebake')
   })
 
   it('every dial starts at its default with a valid range and class', () => {
@@ -109,6 +116,7 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'terminatorDither',
       'terrainFlowStrength',
       'terrainFlowAlign',
+      'seamBridgeMix',
       'dentDepth',
       'dentAO',
       'waterPathWarp',

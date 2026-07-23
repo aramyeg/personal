@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
 import {
   biomeBump,
   biomeBumpB,
@@ -7,6 +8,8 @@ import {
   polarLatGate,
   bandOf,
   canonicalTheta,
+  meridianDist,
+  seamTintWeight,
   MERIDIANS,
   tideWetness,
   tideCarve,
@@ -16,8 +19,12 @@ import {
 import {
   terrainBump,
   terrainBumpB,
+  buildPal,
+  paintVertex,
   PLANET_RADIUS,
 } from '@/components/labs/small-world/scene/planet'
+import { buildSeamTints } from '@/components/labs/small-world/scene/field-clay'
+import { DIALS } from '@/components/labs/small-world/scene/tunables'
 
 const TWO_PI = Math.PI * 2
 
@@ -184,5 +191,101 @@ describe('the six wedges genuinely differ (renewal is not a no-op)', () => {
     expect(bandOf(MERIDIANS[0] + 0.5)).toBe(0)
     expect(bandOf(MERIDIANS[1] + 0.5)).toBe(1)
     expect(bandOf(MERIDIANS[2] + 0.5)).toBe(2)
+  })
+})
+
+// Task 36 — the de-greened seam tint replaces the base countryside green that showed
+// through where the wedge accent collapses at a meridian. The INVIOLABLE constraint is
+// the renewal identity: on each meridian the A and B variants' PAINT must be EXACTLY
+// identical (the m0 wrap-identity strip flips variant while the near-side seam is on
+// camera). The seam tint is a pure function of position (per-meridian fixed colour,
+// never variant), so this must hold at every mix — including the fully-bridged extreme.
+describe('Task 36 — seam de-green paint is EXACTLY variant-invariant', () => {
+  const pal = buildPal()
+  const paint = (
+    nx: number, ny: number, nz: number, bump: number, isB: boolean, seams: readonly THREE.Color[]
+  ): THREE.Color => {
+    const c = new THREE.Color()
+    paintVertex(c, pal, nx, ny, nz, bump, isB, seams)
+    return c
+  }
+
+  it('paintVertex is BIT-EXACT identical for variant A and B ON every meridian (the wrap-identity strip), at all mixes', () => {
+    // The inviolable pin: on the meridian itself (meridianDist = 0) the near-side seam is
+    // on camera when the girl flips variant at rotation = 2π, so paint MUST be exactly
+    // equal. The substrate (0), shipped default (0.4) and full bridge (1) — all exact,
+    // because the seam tint (and the now seam-faded beach wedge tint) never depend on the
+    // variant, and biomeBump/base green coincide on the meridian.
+    for (const mix of [0, 0.4, 1]) {
+      const seams = buildSeamTints(pal, mix)
+      for (const m of MERIDIANS) {
+        for (let bi = -90; bi <= 90; bi += 2) {
+          const nx = bi / 100
+          const ring = Math.sqrt(1 - nx * nx)
+          const ny = ring * Math.cos(m)
+          const nz = ring * Math.sin(m)
+          const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+          const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+          const a = paint(nx, ny, nz, bumpA, false, seams)
+          const b = paint(nx, ny, nz, bumpB, true, seams)
+          expect(b.r).toBe(a.r)
+          expect(b.g).toBe(a.g)
+          expect(b.b).toBe(a.b)
+        }
+      }
+    }
+  })
+
+  it('paintVertex is variant-invariant to floating point across the whole seam band (meridianDist < 0.05), at all mixes', () => {
+    // Across the wider seam band the only residual A/B difference is the pre-existing
+    // finite-difference crease/signature stencil grazing the wedge buffer at the extreme
+    // corner (≈8.5e-7 — over 4000× below 8-bit colour quantization, and it flips inside
+    // the occlusion-proven hidden window regardless). The seam tint itself is a pure
+    // function of position, so it adds ZERO new variant dependence.
+    const EPS = 1e-6
+    for (const mix of [0, 0.4, 1]) {
+      const seams = buildSeamTints(pal, mix)
+      for (const m of MERIDIANS) {
+        for (const off of [-0.048, -0.02, 0.02, 0.048]) {
+          const th = m + off
+          for (let bi = -70; bi <= 70; bi += 5) {
+            const nx = bi / 100
+            const ring = Math.sqrt(1 - nx * nx)
+            const ny = ring * Math.cos(th)
+            const nz = ring * Math.sin(th)
+            expect(meridianDist(canonicalTheta(Math.atan2(nz, ny)))).toBeLessThan(0.05)
+            const bumpA = terrainBump(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+            const bumpB = terrainBumpB(nx * PLANET_RADIUS, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+            const a = paint(nx, ny, nz, bumpA, false, seams)
+            const b = paint(nx, ny, nz, bumpB, true, seams)
+            expect(Math.abs(b.r - a.r)).toBeLessThan(EPS)
+            expect(Math.abs(b.g - a.g)).toBeLessThan(EPS)
+            expect(Math.abs(b.b - a.b)).toBeLessThan(EPS)
+          }
+        }
+      }
+    }
+  })
+
+  it('seamTintWeight is full on the meridian and zero in the band interior (colorGate seam shape, band not widened)', () => {
+    for (const m of MERIDIANS) {
+      expect(seamTintWeight(m)).toBe(1)
+      expect(seamTintWeight(m + Math.PI / 3)).toBe(0)
+    }
+  })
+
+  it('the shipped default de-greens the meridian lane seam to a warm clay read (green no longer dominant)', () => {
+    const seams = buildSeamTints(pal, DIALS.seamBridgeMix.default)
+    for (const m of MERIDIANS) {
+      // nx = 0 lane point exactly on the meridian: dry meadow (crossings are >=0.25 rad
+      // away, ocean is at the limbs), so the default branch + seam tint own this pixel.
+      const ny = Math.cos(m)
+      const nz = Math.sin(m)
+      const bump = terrainBump(0, ny * PLANET_RADIUS, nz * PLANET_RADIUS)
+      const c = paint(0, ny, nz, bump, false, seams)
+      const greenDominant = c.g > c.r * 1.02 && c.g > c.b * 1.02
+      expect(greenDominant).toBe(false)
+      expect(c.r).toBeGreaterThan(c.g)
+    }
   })
 })

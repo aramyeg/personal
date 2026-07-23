@@ -67,6 +67,14 @@ export const DIALS = {
   // stripes.
   terrainFlowStrength: dial({ default: 0.5, min: 0, max: 1.5, step: 0.05, label: 'terrain flow strength', group: 'fields', cls: 'rebake' }),
   terrainFlowAlign: dial({ default: 0.6, min: 0, max: 1, step: 0.02, label: 'terrain flow align', group: 'fields', cls: 'rebake' }),
+  // De-green the biome seams (Task 36 — Aram rejected the green strips between scenes). The
+  // meridian seam tint blends between a warm pressed-clay SUBSTRATE (mix 0 — uniform terracotta
+  // ground between set-pieces, the claymation "pieces on a clay ball" read) and a per-meridian
+  // BRIDGE blend of the four abutting wedge accents (mix 1 — a colour that belongs to both
+  // neighbours, cross-fading e.g. desert→winter). Rebake-class (baked into vertex colour); the
+  // seam tint is a pure function of position, so variant-invariance (the renewal identity)
+  // holds at EVERY mix. Default = the shipped look chosen from the Task-36 captures.
+  seamBridgeMix: dial({ default: 0.4, min: 0, max: 1, step: 0.02, label: 'seam bridge mix', group: 'fields', cls: 'rebake' }),
 
   // dents (rebake) — the off-lane press-hollows + their baked AO. Round-9 verdict: Aram
   // likes the HIGHER settings — defaults baked to ~75% of the prior max and the maxes

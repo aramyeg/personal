@@ -148,6 +148,31 @@ export function colorGate(thetaC: number, nx: number): number {
   return seam * lat
 }
 
+/** Task 36 — the seam de-green weight: 1 EXACTLY on a meridian, ramping to 0 by the
+ *  band interior, reusing colorGate's seam sub-shape EXACTLY (half 0.05, ramp 0.08). So
+ *  the seam tint fills PRECISELY where the wedge accent fades out — without widening the
+ *  band. Longitude-only ⇒ a pure function of position, so the seam colour it drives is
+ *  variant-invariant (the inviolable renewal identity: the seam must be identical A vs B). */
+export function seamTintWeight(thetaC: number): number {
+  return 1 - smoothstep01((meridianDist(thetaC) - 0.05) / 0.08)
+}
+
+/** Index (0..2) of the meridian nearest a canonical longitude — selects which
+ *  per-meridian seam tint a de-greened seam point uses (Task 36). Pure. */
+export function nearestMeridianIndex(thetaC: number): 0 | 1 | 2 {
+  let best = Infinity
+  let bestI: 0 | 1 | 2 = 0
+  for (let i = 0; i < MERIDIANS.length; i++) {
+    let d = Math.abs(thetaC - MERIDIANS[i]) % TWO_PI
+    if (d > Math.PI) d = TWO_PI - d
+    if (d < best) {
+      best = d
+      bestI = i as 0 | 1 | 2
+    }
+  }
+  return bestI
+}
+
 // --- Water ------------------------------------------------------------------
 
 /** Water glaze radius as a fraction of PLANET_RADIUS. */
