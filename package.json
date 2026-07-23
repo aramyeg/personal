@@ -48,6 +48,8 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^5.0.0",
     "@eslint/eslintrc": "^3.2.0",
+    "@gltf-transform/core": "^4.4.1",
+    "@gltf-transform/functions": "^4.4.1",
     "@playwright/test": "1.58.0",
     "@storybook/addon-a11y": "^10.2.1",
     "@storybook/addon-docs": "^10.2.1",
