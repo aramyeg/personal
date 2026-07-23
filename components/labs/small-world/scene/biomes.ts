@@ -5,15 +5,20 @@
  * carries a variant-A scene (lap 1) and a variant-B scene (lap 2), so six
  * distinct wedges tile the two-lap journey:
  *
- *   band 0  A0 BlueNet spring + strait · B0 Accenture dunes + STRAIT BREACH
+ *   band 0  A0 BlueNet spring + strait · B0 Accenture DUNES + PYRAMIDS (dry desert)
  *   band 1  A1 FLYERBEE flower field   · B1 AKNA canyon creek + shelf sea
  *   band 2  A2 360dialog grand delta   · B2 xDataGroup winter + shelf sea
  *
  * Round 7 (the flood arc): lap 1 (A) is the dry "before" — left ocean dominant,
  * right side continental coast. Across the B variants the water advances wedge by
- * wedge (B0 breach → B1 shelf → B2 shelf, each reaching further right), and the
- * grazing right limb (|nx| ≥ 0.80) wets CONTINUOUSLY via the tide (see tideCarve),
- * so by journey's end the ocean has overflowed to the other side.
+ * wedge and the grazing right limb (|nx| ≥ 0.80) wets CONTINUOUSLY via the tide
+ * (see tideCarve), so by journey's end the ocean has overflowed to the other side.
+ * Task 41 (Aram, Round 12): the B0 desert wedge is now a DRY dune-and-pyramid scene —
+ * its old right sea + breach strait (which cut a water passage across the desert face)
+ * are retired; the overflow read is carried by the B1/B2 shelf seas (which still advance
+ * FURTHER right wedge by wedge) plus the continuous limb tide (untouched). B0 keeps only
+ * its single bridged crossing stream (draining LEFT to the ocean, like every wedge) and a
+ * small classic oasis pool in an inter-dune hollow — no passage crosses the visible face.
  *
  * TWO structural invariants keep the renewal seamless (they replace the retired
  * Task-15/16 spineGate + strait). Round 6 makes the limbs ASYMMETRIC:
@@ -545,26 +550,13 @@ function straitChannel(theta: number): Channel {
   return { arcs: [makeArc(c, lMouth), makeArc(c, rInlet)], half: 0.09, ramp: 0.08, depth: 0.055, widen }
 }
 
-/** The breach strait (B0, Round 7 climax): the continent-break wedge's B variant is
- *  the overflow moment. On lap 1 (A0) the strait is a modest continent break the girl
- *  bridges; when band 0 comes around again on lap 2 the ocean has POURED THROUGH — the
- *  strait has widened massively and the right inlet has swollen into a true sea
- *  (B0_SEA) visibly JOINED to the left ocean across the lane. Like `straitChannel` the
- *  width (not depth) carries the wide read at the lane so the on-bridge ramp stays
- *  gentle and the deck provably spans (lo 0.16); the flanks open far off-lane into the
- *  two joined waters. One-glance read: a broad blue band from the left limb, through
- *  the strait under the girl's bridge, into the swollen right sea. */
-function breachStraitChannel(theta: number): Channel {
-  const c = crossPoint(theta)
-  const lMouth: [number, number, number] = [-0.82, c[1] * 0.18, c[2] * 0.18]
-  const rMouth = place(0.5, theta + 0.2) // steep climb into the swollen right sea (B0_SEA)
-  // `neg` widen: the strait opens MASSIVELY toward the left ocean (the "ocean poured
-  // through" read) while the right approach stays a narrow thread that climbs steeply
-  // to B0_SEA — so the wide flank never reaches the low-nx dune props, and the lane
-  // (nx≈0, widen f=0) stays a spannable bridge crossing.
-  const widen = { half: 0.24, depth: 0.05, lo: 0.16, hi: 0.55, neg: true }
-  return { arcs: [makeArc(c, lMouth), makeArc(c, rMouth)], half: 0.1, ramp: 0.08, depth: 0.06, widen }
-}
+// Task 41 (Round 12): the B0 breach strait is RETIRED. Aram — "in desert terrain there
+// should be no ridge and water passage." The old breachStraitChannel widened a massive
+// water passage across the desert face and joined a swollen right sea (B0_SEA) to the left
+// ocean. The desert is now dry dunes + pyramids; B0 keeps only a modest bridged crossing
+// stream draining LEFT to the ocean (streamChannel, like every other wedge — no wide flank,
+// no right sea), so no passage crosses the visible face. The overflow narrative continues
+// via the B1/B2 shelf seas (still advancing further right) + the continuous limb tide.
 
 /** The grand delta (A2, Round 6 redesign): the artery rises INLAND at a highland
  *  tarn (A2_SOURCE, off-lane at +nx), steps down through the spine crossing and
@@ -625,7 +617,7 @@ const A_CHANNELS: readonly Channel[] = [
   deltaChannel(CROSSINGS_A[2]), // A2 grand delta: inland source → left ocean
 ]
 const B_CHANNELS: readonly Channel[] = [
-  breachStraitChannel(CROSSINGS_B[0]), // B0 continent-break BREACH: left ocean ↔ swollen right sea
+  streamChannel(CROSSINGS_B[0], -1), // B0 desert: single bridged crossing stream → LEFT ocean (Task 41)
   creekChannel(CROSSINGS_B[1], -1, CREEK_HALF, 0.1), // B1 canyon creek → left ocean, fattened (deeper)
   streamChannel(CROSSINGS_B[2], -1), // B2 frozen creek → left ocean
 ]
@@ -676,14 +668,14 @@ const A1_SHELF: WaterBody = { dir: norm3(place(0.55, 3.25)), radius: 0.26, feath
 /** A2 grand-delta inland source: a highland tarn feeding the braided delta down to
  *  the left ocean. */
 const A2_SOURCE: WaterBody = { dir: norm3(place(0.5, 6.0)), radius: 0.14, feather: 0.09, depth: 0.09 }
-/** B0 desert oasis pool — the last dune tarn, kept small beside the breached sea. */
-const B0_OASIS: WaterBody = { dir: norm3(place(0.3, 1.12)), radius: 0.09, feather: 0.07, depth: 0.05 }
-/** B0 BREACH sea (Round 7 climax): the swollen right-limb sea the ocean poured into
- *  through the widened strait — a broad, deep body joined to the left ocean. First
- *  wedge of the flood arc: its poleward reach is the SHORTEST of the three B seas
- *  (the drama is the JOINING + width, not the reach), leaving B1/B2 to advance
- *  further right as the journey goes on. */
-const B0_SEA: WaterBody = { dir: norm3(place(0.5, 1.4)), radius: 0.18, feather: 0.1, depth: 0.09 }
+/** B0 desert oasis pool — a small classic tarn nestled in an inter-dune hollow (Task 41;
+ *  the dune field flattens to a basin around it, see duneField). The only water on the
+ *  desert face; NOT a passage. Depth carries a clear blue even after the surrounding dunes
+ *  rise, so it stays a wet pool. */
+const B0_OASIS: WaterBody = { dir: norm3(place(0.3, 1.12)), radius: 0.085, feather: 0.06, depth: 0.06 }
+// Task 41: B0_SEA (the swollen breach right-sea) is RETIRED with the breach strait — the
+// desert face carries no sea. The flood arc's advancing water lives in the B1/B2 shelf seas
+// + the continuous limb tide (see the header note + FLOOD ARC section of scan-task26).
 /** B1 canyon shelf sea (Round 7 flood arc, step 2): a right-limb sea lapping the
  *  fattened canyon, reaching FURTHER right than the B0 breach. */
 const B1_SHELF: WaterBody = { dir: norm3(place(0.54, 3.5)), radius: 0.22, feather: 0.12, depth: 0.09 }
@@ -701,7 +693,6 @@ const A_PONDS: readonly LocalBody[] = [
 ]
 const B_PONDS: readonly LocalBody[] = [
   { band: 0, body: B0_OASIS },
-  { band: 0, body: B0_SEA },
   { band: 1, body: B1_SHELF },
   { band: 2, body: B2_FROZEN },
   { band: 2, body: B2_SHELF },
@@ -748,13 +739,12 @@ const A_PEAKS: readonly (readonly Peak[])[] = [
   ],
 ]
 const B_PEAKS: readonly (readonly Peak[])[] = [
-  // B0 golden dunes: ripple ridge swells
+  // B0 golden desert (Task 41): only a couple of BROAD low swells for large-scale ground
+  // roll — the dune FORM is the wind-coherent crescent field (duneField, added in sceneRaw),
+  // not these. The old five symmetric "ripple ridge" swells (which read as a ridge) are gone.
   [
-    { dir: norm3(place(0.4, 0.95)), h: 0.1, r: 0.22 },
-    { dir: norm3(place(-0.44, 1.3)), h: 0.11, r: 0.2 },
-    { dir: norm3(place(0.5, 1.62)), h: 0.09, r: 0.22 },
-    { dir: norm3(place(-0.5, 1.92)), h: 0.1, r: 0.2 },
-    { dir: norm3(place(0.36, 2.02)), h: 0.08, r: 0.24 },
+    { dir: norm3(place(-0.46, 1.3)), h: 0.05, r: 0.32 },
+    { dir: norm3(place(0.48, 1.75)), h: 0.045, r: 0.34 },
   ],
   // B1 canyon: standalone mesas beside the creek (walls added in sceneRaw)
   [
@@ -797,6 +787,70 @@ function canyonWalls(nx: number, ny: number, nz: number): number {
   return CANYON_BANK_H * latG * wall
 }
 
+// --- Desert dunes (B0, Task 41) ---------------------------------------------
+//
+// Aram (Round 12): "In desert terrain there should be no ridge and water passage, let's
+// add dunes and pyramides." The B0 wedge now rolls with wind-coherent crescent dunes —
+// asymmetric waves with a gentle windward BACK and a steep leeward SLIP FACE, NOT noise
+// ripples. Authored HERE as displacement so both renewal bakes agree byte-for-byte and the
+// bench reads the real relief; the render's claySignature layers fine raked ripples on the
+// dune flanks (planet.tsx, bump∈[0.02,0.08]). This owns the FORM.
+//
+// Gated EXACTLY 0 on the girl's lane band (|nx| < DUNE_LANE_LO, a hard early-return like
+// fieldDents/claySignature) so it adds NO spine-band term — the contact budget (0.01247R) is
+// untouched and the lane stays gentle + dry. Faded to 0 before the limb so it never fights the
+// polar ocean/beach, and wedge-gated to 0 on the meridians via wedgeDelta (so bumpA===bumpB
+// there). The classic oasis pool sits in a flattened inter-dune hollow (oasisFlat below).
+const DUNE_LANE_LO = 0.16
+const DUNE_LANE_HI = 0.28
+const DUNE_LIMB_LO = 0.58
+const DUNE_LIMB_HI = 0.72
+/** Dune crest count marching across a full 2π of longitude (≈4 crescents across the wedge). */
+const DUNE_FREQ = 12
+/** How much the crest lines bow with latitude → crescent (barchan) horns, not straight ridges. */
+const DUNE_CURVE = 2.3
+/** Fraction of each dune period spent on the gentle windward back (the rest = steep slip face). */
+const DUNE_BACK = 0.72
+/** Peak dune height (fraction of R). */
+const DUNE_AMP = 0.075
+
+/** One asymmetric dune wave from a phase p∈[0,1): a gentle windward rise to the crest at
+ *  DUNE_BACK, then a steep leeward slip-face drop. The slip face is compressed into the
+ *  remaining (1−DUNE_BACK) of the period so it reads markedly steeper than the back. */
+function duneProfile(p: number): number {
+  if (p < DUNE_BACK) return smoothstep01(p / DUNE_BACK)
+  return 1 - smoothstep01((p - DUNE_BACK) / (1 - DUNE_BACK))
+}
+
+/** Lane/limb gate bounds for the dune field, exported so the unit test pins the gating
+ *  contract (0 on the girl's lane band, 0 past the limb) against the shipped constants. */
+export const DUNE_GATE = { laneLo: DUNE_LANE_LO, laneHi: DUNE_LANE_HI, limbLo: DUNE_LIMB_LO, limbHi: DUNE_LIMB_HI } as const
+
+/** Wind-coherent crescent dune field for the B0 desert (variant B, added in sceneRaw).
+ *  Pure function of the unit direction; adds only (never carves), so the 1.35R ceiling can
+ *  only rise a little and no accidental water forms. 0 on the lane + past the limb fade.
+ *  Exported for the unit test (gating + determinism); the render consumes it via biomeBumpB. */
+export function duneField(nx: number, ny: number, nz: number): number {
+  const ax = Math.abs(nx)
+  const lane = smoothstep01((ax - DUNE_LANE_LO) / (DUNE_LANE_HI - DUNE_LANE_LO))
+  if (lane <= 0) return 0
+  const limb = 1 - smoothstep01((ax - DUNE_LIMB_LO) / (DUNE_LIMB_HI - DUNE_LIMB_LO))
+  if (limb <= 0) return 0
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  // primary transverse dune train: crests march in longitude, bowed by latitude into crescents
+  const phase = (DUNE_FREQ * thetaC + DUNE_CURVE * nx) / TWO_PI
+  let h = duneProfile(phase - Math.floor(phase))
+  // a weaker second train at a slight yaw breaks the monotony while staying wind-coherent
+  const phase2 = (DUNE_FREQ * 0.55 * thetaC - 1.4 * nx + 1.3) / TWO_PI
+  h = 0.82 * h + 0.18 * duneProfile(phase2 - Math.floor(phase2))
+  // large-scale height modulation so the field has tall + low dunes (a field, not corrugation)
+  const envelope = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(2.3 * thetaC + 3.1 * nx + 0.7))
+  // flatten the dunes into a hollow around the oasis so the pool sits on a calm basin, not a hump
+  const od = Math.acos(clampU(nx * B0_OASIS.dir[0] + ny * B0_OASIS.dir[1] + nz * B0_OASIS.dir[2]))
+  const oasisFlat = smoothstep01((od - 0.14) / 0.06)
+  return DUNE_AMP * h * envelope * lane * limb * oasisFlat
+}
+
 // --- Assembled displacement -------------------------------------------------
 
 /** The one left ocean carved below the waterline, for a variant: the warped
@@ -822,6 +876,7 @@ function sceneRaw(band: 0 | 1 | 2, nx: number, ny: number, nz: number, variant: 
     if (ponds[i].band === band) bump -= ponds[i].body.depth * capMask(nx, ny, nz, ponds[i].body)
   }
   if (variant === 1 && band === 1) bump += canyonWalls(nx, ny, nz)
+  if (variant === 1 && band === 0) bump += duneField(nx, ny, nz) // B0 crescent dune field (Task 41)
   return bump
 }
 

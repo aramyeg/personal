@@ -13,6 +13,8 @@ import {
   boundaryWander,
   boundaryRidgeShape,
   BOUNDARY_WANDER,
+  duneField,
+  DUNE_GATE,
   MERIDIANS,
   tideWetness,
   tideCarve,
@@ -161,6 +163,75 @@ describe('the overflow tide (Round 7 — right limb wets continuously)', () => {
         // by journey's end the shoreline has swept past → carve submerges the coast
         expect(tideWetness(...rightCap(nx, az), ROTATION_TOTAL)).toBeGreaterThan(0.5)
         expect(tideCarve(...rightCap(nx, az), ROTATION_TOTAL)).toBeLessThan(-(1 - WATER_LEVEL))
+      }
+    }
+  })
+})
+
+// Task 41 (Round 12): the B0 desert wedge is now a wind-coherent crescent dune field
+// (duneField), authored as displacement in biomeBumpB. It must be EXACTLY 0 on the girl's
+// lane band (the contact budget + lane dryness depend on it) and past the limb, add only
+// (never carve, so no accidental water), and be deterministic (both bakes agree).
+describe('Task 41 — B0 desert dune field (crescent dunes, no ridge/passage)', () => {
+  const B0_LONGITUDES = [0.7, 0.95, 1.2, 1.5, 1.9] // band-0 interior + the crossing
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('is EXACTLY 0 across the girl lane band (|nx| < laneLo), at every band-0 longitude', () => {
+    for (const th of B0_LONGITUDES) {
+      for (let ni = 0; ni <= 30; ni++) {
+        const nx = -(DUNE_GATE.laneLo - 1e-4) + (2 * (DUNE_GATE.laneLo - 1e-4) * ni) / 30
+        expect(duneField(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('is EXACTLY 0 at and past the limb fade (|nx| >= limbHi)', () => {
+    for (const th of B0_LONGITUDES) {
+      for (const nx of [DUNE_GATE.limbHi, 0.8, 0.9, -DUNE_GATE.limbHi, -0.85]) {
+        expect(duneField(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('only ever ADDS relief (>= 0) — never carves, so no accidental water forms', () => {
+    for (let ai = 0; ai < 60; ai++) {
+      const th = (ai / 60) * TWO_PI
+      for (let ni = 0; ni <= 40; ni++) {
+        const nx = -0.7 + (1.4 * ni) / 40
+        expect(duneField(...dirAt(nx, th))).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('actually builds dunes off-lane in the desert (positive relief exists at reading latitudes)', () => {
+    let peak = 0
+    for (const th of B0_LONGITUDES) {
+      for (let ni = 0; ni <= 60; ni++) {
+        const nx = 0.16 + (0.4 * ni) / 60
+        peak = Math.max(peak, duneField(...dirAt(nx, th)))
+      }
+    }
+    expect(peak).toBeGreaterThan(0.03) // real dune relief (fraction of R), not a flat sheet
+  })
+
+  it('is deterministic (both renewal bakes agree byte-for-byte)', () => {
+    for (const th of B0_LONGITUDES) {
+      for (const nx of [0.25, 0.4, 0.55, -0.35]) {
+        const d = dirAt(nx, th)
+        expect(duneField(...d)).toBe(duneField(...d))
+      }
+    }
+  })
+
+  it('vanishes on the band-0 meridians (biomeBumpB === biomeBump there — seam intact)', () => {
+    for (const m of [MERIDIANS[0], MERIDIANS[1]]) {
+      for (let b = -70; b <= 70; b += 5) {
+        const nx = b / 100
+        const d = dirAt(nx, m)
+        expect(biomeBumpB(...d)).toBe(biomeBump(...d))
       }
     }
   })

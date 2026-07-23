@@ -1,4 +1,6 @@
 'use client'
+import { useMemo } from 'react'
+import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { useClayRamp } from '../toon-ramp'
 import { DECK_RISE } from '../stage'
@@ -316,6 +318,57 @@ export function ClayBridge({ rise = DECK_RISE, ...x }: Xform & { rise?: number }
           ))}
         </group>
       ))}
+    </group>
+  )
+}
+
+/**
+ * A clay pyramid — the desert's first "structure" (Task 41). A four-sided pressed-clay
+ * pyramid in the sand family. Flat FACE normals are baked into the geometry (toNonIndexed +
+ * computeVertexNormals) so each of the four faces takes its own crisp toon band — a lit face
+ * + a shaded face at a glance, without the material `flatShading` flag (which meshToonMaterial
+ * doesn't type). A darker pressed base grounds it in the dune. `tilt` leans it a touch and
+ * `sink` buries the base for hand-made claymation charm; `spin` turns which faces front the
+ * camera. `size` is the square base edge (world units).
+ */
+export function ClayPyramid({
+  color = PALETTE.sand,
+  base = PALETTE.dune,
+  size = 0.5,
+  height,
+  tilt = 0,
+  sink = 0,
+  spin = Math.PI / 4,
+  ...x
+}: Xform & {
+  color?: string
+  base?: string
+  size?: number
+  height?: number
+  tilt?: number
+  sink?: number
+  spin?: number
+}) {
+  const ramp = useClayRamp()
+  const h = height ?? size
+  const r = size / Math.SQRT2 // cone radius whose square base has edge = size
+  const geo = useMemo(() => {
+    const g = new THREE.ConeGeometry(r, h, 4).toNonIndexed()
+    g.computeVertexNormals() // per-face flat normals → crisp faceted sun/shade faces
+    return g
+  }, [r, h])
+  return (
+    <group {...x}>
+      {/* darker pressed base slab, grounding the pyramid in the sand */}
+      <mesh position={[0, 0.02, 0]}>
+        <boxGeometry args={[size * 0.98, 0.06, size * 0.98]} />
+        <meshToonMaterial color={base} gradientMap={ramp} />
+      </mesh>
+      <group rotation={[tilt, spin, 0]} position={[0, -sink, 0]}>
+        <mesh geometry={geo} position={[0, h / 2, 0]}>
+          <meshToonMaterial color={color} gradientMap={ramp} />
+        </mesh>
+      </group>
     </group>
   )
 }
