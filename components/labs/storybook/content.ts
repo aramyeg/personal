@@ -689,6 +689,20 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // strip-erected frontal figures (hidden pull strips — no connectors at
 // all). Variety and asymmetry ARE the aesthetic.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
+  // DEPTH VISTA (E2.2 Batch B; bench derive-depthvista.mjs, all gates GREEN): an
+  // ALL-WINGS graded tunnel-frame around the satchel hero — 3 page-rooted flap
+  // PAIRS (near/mid/rear), each a single +z-facing cammed flap (the ch3-skyline
+  // form; NO arches, NO raw-kraft risers), mirrored to both pages and graded in
+  // warmth + scale + depth: near = warmest/largest front-flank, rear = coolest/
+  // simplest innermost-visible (six-kingdoms horizon). Their shaped inner-top
+  // arcs imply one receding vaulted aperture wrapping over the satchel. Page-
+  // driven, folds dead flat at close. Frozen config VERBATIM from the bench.
+  { id: 'satchel-vista', kind: 'backdrop', role: 'scenery', mech: 'depthvista',
+    wings: [
+      { key: 'near', F: 0.5, width: 0.42, height: 0.26, zc: 0.34, standDeg: 58 }, // FOREGROUND: broad warm tents, short
+      { key: 'mid', F: 0.72, width: 0.3, height: 0.32, zc: 0.2, standDeg: 60 }, //   MIDGROUND: the road, taller (crest peeks)
+      { key: 'rear', F: 0.82, width: 0.2, height: 0.4, zc: -0.2, standDeg: 62 }, //  DISTANT: tall narrow six-kingdom spires
+    ] },
   // D5 MASSING (silhouette review: "inventory not scene — needs an anchor"):
   // the bag is GROWN into the clear anchor mass so the items read as spilling
   // FROM it rather than as a row of equals — hierarchy, not more pieces.

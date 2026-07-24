@@ -22,6 +22,7 @@ import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keep
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 
@@ -159,6 +160,11 @@ const allQuads = (
   // (THETA_MAX) — the worst envelope amplitude. Disc excluded (coplanar handle).
   if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
   if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
+  // The depth vista is fully page-driven: N wing configs mirrored to both pages,
+  // one single cammed flap each — every world quad it poses.
+  if (layer.mech === 'depthvista') {
+    return solveDepthVistaPose(layer, thetaL, thetaR).wings.map((w) => w.patch.flap)
+  }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }

@@ -157,6 +157,11 @@ const familyOf = (l: SceneLayer): string | null => {
       // reveal (lift to uncover a recess), distinct from the volvelle's rotating
       // window: its own hand-driven family.
       return 'liftflap'
+    case 'depthvista':
+      // The tunnel-mouth depth vista — 2 centred vaulted-arch planes + a flanking
+      // wing pair, all parallel-fold: an inherent multi-plane assembly, its own
+      // page-driven backdrop family.
+      return 'depthvista'
     case 'dress':
       return null
   }

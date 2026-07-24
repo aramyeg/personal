@@ -46,6 +46,7 @@ import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybo
 import { keepStackQuads, keepStackStoryGeoms } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads, solveKeepSkylinePose } from '@/components/labs/storybook/book/popup-skyline'
+import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import {
   keepsakeCardInPlane,
   keepsakePExit,
@@ -164,6 +165,11 @@ const allQuads = (
   if (layer.mech === 'keepstack') return keepStackQuads(layer, thetaL, thetaR)
   if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
   if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
+  // The depth vista is N wing configs mirrored to both pages — one single flap
+  // per (config, side); every world quad it poses, for the whole-scene sweeps.
+  if (layer.mech === 'depthvista') {
+    return solveDepthVistaPose(layer, thetaL, thetaR).wings.map((w) => w.patch.flap)
+  }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -174,6 +180,7 @@ const allCorners = (
   thetaL: number,
   thetaR: number
 ): Vec3[] => allQuads(layer, layers, thetaL, thetaR).flat()
+
 
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -270,7 +277,8 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'keepsake' ||
         layer.mech === 'keepstack' ||
         layer.mech === 'keepwinch' ||
-        layer.mech === 'skyline'
+        layer.mech === 'skyline' ||
+        layer.mech === 'depthvista'
       ) {
         // Anatomy-phase and hand-driven mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
@@ -498,8 +506,18 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
         if (layer.mech === 'keepwinch') {
           // The winch outputs ride the KEEP's bisector frame (a mounted machine),
           // and the disc rivets one glue layer proud of the page — neither is a
-          // page-glued fold panel, so A1's page-glue coherence does not apply
-          // (its fold-flat is checked in A3 / popup-keepwinch.test.ts).
+          // page-glued fold panel, so A1's fold-flat is checked in A3 / popup-keepwinch.test.ts.
+          continue
+        }
+        if (layer.mech === 'depthvista') {
+          // Each wing is a single page-rooted cammed flap: its HINGE edge (the
+          // inner base, corners 0,1) lies in the wing's own page; the tip stands
+          // off it. (No arches, no struts — a single flap has no other glue.)
+          for (const w of solveDepthVistaPose(layer, thetaL, thetaR).wings) {
+            const n = w.side === 'left' ? nL : nR
+            for (const idx of [0, 1])
+              expect(Math.abs(w.patch.flap[idx][0] * n[0] + w.patch.flap[idx][1] * n[1])).toBeLessThan(1e-9)
+          }
           continue
         }
         const pose = poseAt(layer, layers, thetaL, thetaR)
@@ -932,8 +950,14 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
     // values (134 -> 122, 185 -> 179): the meadow-shelf tightening (s3) and the
     // lower rank + compact counter (s4) return more mid-turn budget than the
     // now-visible sweeps spend.
+    // extra-8 raised 36 -> 38 for the depth vista (E2.2 Batch B): its beta-driven
+    // +z-facing wing masses add two transient mid-turn brushes BELOW the erected
+    // floor (the collapsing-sandwich zone the house tolerates — deep in the turn,
+    // well before the pieces stand). Rest + near-rest stay ZERO (Parts 1/2 —
+    // clean where the eye dwells), and the source-of-truth bench (derive-
+    // depthvista.mjs) proves the erected range (beta >= 0.9) fully clear.
     'spread-2': 123, 'spread-3': 122, 'spread-4': 179, 'spread-5': 218,
-    'spread-6': 77, 'spread-7': 122, 'extra-1': 21, 'extra-8': 36, 'extra-9': 0,
+    'spread-6': 77, 'spread-7': 122, 'extra-1': 21, 'extra-8': 38, 'extra-9': 0,
   }
   /** Spread number from the set name ('spread-4' -> 4, 'extra-8' -> 8). */
   const spreadNumOf = (name: string): number => Number(name.split('-')[1])

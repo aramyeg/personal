@@ -85,7 +85,9 @@ describe('storybook content', () => {
                                         ? l.radius
                                         : l.mech === 'liftflap'
                                           ? l.leafLen
-                                          : l.width
+                                          : l.mech === 'depthvista'
+                                            ? l.wings.length
+                                            : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

@@ -103,6 +103,11 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'skyline') {
       layer.rows.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
     }
+    // The depth vista (popup-depthvista-layer.tsx): one shaped flap art per wing
+    // config (`<id>-<key>`, e.g. -near/-mid/-rear), each mirrored to both flanks.
+    if (layer.mech === 'depthvista') {
+      for (const wing of layer.wings) ids.add(`${layer.id}-${wing.key}`)
+    }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
   // use-page-print.ts, satchel-items.ts's HTML-overlay icons).

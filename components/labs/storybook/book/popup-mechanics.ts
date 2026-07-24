@@ -643,6 +643,50 @@ export type LiftFlapGeom = {
   restAtDeg?: number
 }
 
+/**
+ * DEPTH VISTA (E2.2 Batch B) — an ALL-WINGS graded tunnel-frame on spread 8 (The
+ * Hero's Satchel): N page-rooted parallel-fold FLAP PAIRS, each mirrored to the
+ * left + right pages, graded in warmth + scale + depth (near -> mid -> rear) so
+ * they frame the satchel hero and their shaped inner-top arcs imply one receding
+ * vaulted aperture. Each wing is a SINGLE +z-facing cammed flap (the ch3-skyline
+ * form — a die-cut painted plane, DoubleSide alpha), NOT a two-slope prism: on
+ * the flat-page reading camera a mound's raw-kraft back reads as scaffolding
+ * (the bench's STRUT-SILHOUETTE gate proves it), so a single flap with no kraft
+ * riser is the proven form. Page-driven: every flap rises from beta and folds
+ * DEAD FLAT at close (rest-lift * envelope, E(0) = 0). Pose math lives in
+ * book/popup-depthvista.ts (this module is at its size cap), porting the source-
+ * of-truth bench (derive-depthvista.mjs) VERBATIM. Multi-flap + page-driven, so
+ * it routes through its own layer renderer (popup-depthvista-layer.tsx), like the
+ * skyline.
+ */
+export type DepthVistaWing = {
+  /** Art-id suffix + warmth-grade tag (e.g. 'near' | 'mid' | 'rear'). The flap's
+   *  painting is `<layerId>-<key>`, shared by both mirrored sides. */
+  key: string
+  /** Radial base-inner edge (the hinge) distance from the spine — the flap's
+   *  closest approach; F > ~0.42 clears the bag's swept column. */
+  F: number
+  /** Radial extent of the reader-facing mass (base spans [F, F+width]). */
+  width: number
+  /** Flap height (how tall it stands); the top leans toward -z so the broad
+   *  front face angles up toward the reading camera (a mass, not an edge-on
+   *  sliver). */
+  height: number
+  /** Base depth (world z) — the radial base line's z; the receding grade. */
+  zc: number
+  /** Rest stand/lean angle, degrees — scaled by the fold-flat envelope E(beta). */
+  standDeg: number
+}
+
+export type DepthVistaGeom = {
+  mech: 'depthvista'
+  /** The graded wing configs, front -> back (near first). Each is mirrored onto
+   *  both the left + right pages. */
+  wings: readonly DepthVistaWing[]
+  /** Dihedral (deg) the fold-flat envelope normalizes to. Default 176. */
+  restAtDeg?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -663,6 +707,7 @@ export type LayerGeom =
   | KeepStackGeom
   | KeepWinchGeom
   | KeepSkylineGeom
+  | DepthVistaGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1181,6 +1226,8 @@ export function solveLayerPose(
       throw new Error('storybook: keepwinch layers are multi-output + user-driven — use solveKeepWinchPose (popup-keepwinch)')
     case 'skyline':
       throw new Error('storybook: skyline layers are multi-mound — use solveKeepSkylinePose (popup-skyline)')
+    case 'depthvista':
+      throw new Error('storybook: depth-vista layers are multi-patch (arches + wings) — use solveDepthVistaPose (popup-depthvista)')
   }
 }
 

@@ -833,6 +833,129 @@ function rolledScroll(w, h, seed) {
   return svgPiece(w, h, s)
 }
 
+// ---- THE DEPTH VISTA WINGS (s8 satchel-vista-{near,mid,rear}). A SHAPED-MESH art
+// module (like the ch3 skyline): each grade emits BOTH an OUTLINE (normalized
+// [0,1]^2, v hinge=0 -> crest=1) that cuts the mesh silhouette AND a PAINT drawn
+// in the same space. The crest is a VAULT arc rising toward the INNER (u=1) end,
+// so after the renderer's per-side u-mirror the six arcs together imply one
+// receding vaulted aperture wrapping the satchel. Warmth/scale GRADED: near =
+// warmest, largest, keepsake TENTS + a waypost; mid = cooler, rolling with a
+// winding ROAD; rear = coolest dusk-violet, six KINGDOM spikes as one horizon.
+// Alpha die-cut (sky shows above the crest). Byte-deterministic. No text. ----
+// Atmospheric-perspective GRADE: FOREGROUND (near) = dark, saturated, high
+// contrast; DISTANT (rear) = pale, cool, low contrast, hazy. The near->rear
+// value+warmth+contrast recession is what makes the flat layers read as depth.
+const VISTA_PAL = {
+  near: { body: '#6b3d1c', lit: '#cf9e4c', dim: '#201106', accent: GOLD, accentLit: GOLD_LIT, archLo: 0.42, archHi: 0.9, detail: 'tents', haze: 0 },
+  mid: { body: '#9a6e33', lit: '#cc9d51', dim: '#4a3016', accent: '#e6c052', accentLit: '#f2d98a', archLo: 0.36, archHi: 0.8, detail: 'roads', haze: 0.14 },
+  rear: { body: '#9990ad', lit: '#b9b1c9', dim: '#7c7396', accent: '#d8c096', accentLit: '#ecdcb4', archLo: 0.32, archHi: 0.72, detail: 'kingdoms', haze: 0.34 },
+}
+
+/** The crest top profile (u ascending 0..1, normalized v) = a vault baseline
+ *  arcing UP toward the INNER end (u=0, spine-ward) so the mirrored pair's arcs
+ *  imply the receding aperture — plus per-grade silhouette peaks. */
+function vistaCrest(rand, cfg) {
+  const baseline = (u) => cfg.archHi - (cfg.archHi - cfg.archLo) * Math.pow(u, 0.9)
+  const peaks = []
+  if (cfg.detail === 'tents') {
+    for (const c of [0.28, 0.54, 0.8]) peaks.push({ c: c + rr(rand, -0.02, 0.02), hw: rr(rand, 0.11, 0.15), hg: rr(rand, 0.12, 0.18), shape: 'tent' })
+    peaks.push({ c: 0.14, hw: 0.06, hg: 0.14, shape: 'post' }) // the waypost, near the inner crest
+  } else if (cfg.detail === 'roads') {
+    for (const c of [0.26, 0.52, 0.78]) peaks.push({ c, hw: rr(rand, 0.13, 0.18), hg: rr(rand, 0.08, 0.12), shape: 'roll' })
+  } else {
+    for (let k = 0; k < 6; k++) peaks.push({ c: (k + 0.5) / 6, hw: 0.05, hg: rr(rand, 0.1, 0.18), shape: 'spike' }) // six kingdoms
+  }
+  const vAt = (u) => {
+    let v = baseline(u)
+    for (const p of peaks) {
+      const d = Math.abs(u - p.c)
+      if (d > p.hw) continue
+      const t = 1 - d / p.hw
+      let add = 0
+      if (p.shape === 'tent' || p.shape === 'spike') add = p.hg * t
+      else if (p.shape === 'post') add = d < p.hw * 0.42 ? p.hg : 0
+      else add = p.hg * (0.5 - 0.5 * Math.cos(Math.PI * t))
+      v = Math.max(v, baseline(u) + add)
+    }
+    return Math.min(0.97, v)
+  }
+  const S = 96
+  const pts = []
+  for (let i = 0; i <= S; i++) { const u = i / S; pts.push([u, vAt(u)]) }
+  return pts
+}
+
+function vistaWingArt({ seed, w, h, grade }) {
+  const rand = mulberry32(seed)
+  const cfg = VISTA_PAL[grade]
+  const crest = vistaCrest(rand, cfg)
+  // Closed silhouette ring: base-inner -> base-outer -> up the crest (u=1 -> 0).
+  const ring = simplifyOutline([[0, 0], [1, 0], ...crest.slice().reverse()])
+  const gid = `vistaBody_${grade}`
+  const px = ([u, v]) => `${fx(u * w)} ${fx((1 - v) * h)}`
+  const d = 'M ' + ring.map(px).join(' L ') + ' Z'
+  const YV = (v) => (1 - v) * h
+  let s = `<g>`
+  s += `<path d="${d}" fill="url(#${gid})"/>` // body: lit crest -> dark base (mass)
+  // a darker inner-base wedge grounds the mass; a bright crest rim catches light.
+  s += `<path d="M ${fx(0)} ${fx(h)} L ${fx(w * 0.34)} ${fx(h)} L 0 ${fx(YV(cfg.archHi * 0.55))} Z" fill="${cfg.dim}" opacity="0.4"/>`
+  // detail marks by grade (inside the silhouette)
+  if (cfg.detail === 'tents') {
+    s += stitch(w * 0.04, h * 0.92, w * 0.96, h * 0.92)
+    // a waypost + pennant near the inner crest (u ~ 0.14)
+    const pxp = w * 0.14
+    s += `<rect x="${fx(pxp - w * 0.01)}" y="${fx(YV(cfg.archHi - 0.02))}" width="${fx(w * 0.02)}" height="${fx(h * 0.42)}" fill="${cfg.dim}"/>`
+    s += `<path d="M ${fx(pxp + w * 0.01)} ${fx(YV(cfg.archHi + 0.06))} L ${fx(pxp + w * 0.11)} ${fx(YV(cfg.archHi))} L ${fx(pxp + w * 0.01)} ${fx(YV(cfg.archHi - 0.06))} Z" fill="${cfg.accent}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>`
+    // keepsake tent doorways + a lit gable edge each
+    for (const c of [0.28, 0.54, 0.8]) {
+      s += `<path d="M ${fx(c * w - w * 0.05)} ${fx(h * 0.78)} L ${fx(c * w)} ${fx(h * 0.44)} L ${fx(c * w + w * 0.05)} ${fx(h * 0.78)} Z" fill="${cfg.dim}" opacity="0.3"/>`
+      s += `<line x1="${fx(c * w)}" y1="${fx(h * 0.46)}" x2="${fx(c * w)}" y2="${fx(h * 0.92)}" stroke="${cfg.accentLit}" stroke-width="2.2" opacity="0.5"/>`
+    }
+  } else if (cfg.detail === 'roads') {
+    // a winding road climbing from the outer foot toward the inner crest
+    s += `<path d="M ${fx(w * 0.9)} ${fx(h * 0.9)} C ${fx(w * 0.55)} ${fx(h * 0.72)} ${fx(w * 0.4)} ${fx(h * 0.6)} ${fx(w * 0.1)} ${fx(h * 0.4)}" fill="none" stroke="${cfg.accentLit}" stroke-width="4" stroke-dasharray="12 9" opacity="0.6"/>`
+    s += `<path d="M ${fx(w * 0.9)} ${fx(h * 0.9)} C ${fx(w * 0.55)} ${fx(h * 0.72)} ${fx(w * 0.4)} ${fx(h * 0.6)} ${fx(w * 0.1)} ${fx(h * 0.4)}" fill="none" stroke="${cfg.dim}" stroke-width="1.6" opacity="0.5"/>`
+    for (const [cx, cy] of [[0.62, 0.68], [0.34, 0.54], [0.16, 0.44]]) {
+      s += `<circle cx="${fx(cx * w)}" cy="${fx(cy * h)}" r="${fx(w * 0.022)}" fill="${cfg.accent}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+    }
+  } else {
+    // amber window glints climbing the six kingdom spires (deep dusk, but readable)
+    for (let k = 0; k < 6; k++) {
+      const cx = ((k + 0.5) / 6) * w
+      for (const vy of [0.5, 0.62, 0.74]) s += `<rect x="${fx(cx - w * 0.01)}" y="${fx(vy * h)}" width="${fx(w * 0.02)}" height="${fx(h * 0.045)}" fill="${cfg.accent}" opacity="0.65"/>`
+      s += `<line x1="${fx(cx)}" y1="${fx(h * 0.44)}" x2="${fx(cx)}" y2="${fx(h * 0.9)}" stroke="${cfg.lit}" stroke-width="1.6" opacity="0.4"/>`
+    }
+  }
+  // ATMOSPHERIC HAZE: distant layers get a pale cool wash that lowers contrast
+  // (the further back, the hazier) — the depth cue that makes flat paper recede.
+  if (cfg.haze > 0) s += `<path d="${d}" fill="#cdd0e0" opacity="${cfg.haze.toFixed(2)}"/>`
+  s += rimPath(d, 4)
+  s += `</g>`
+  const defs = `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cfg.lit}"/><stop offset="0.5" stop-color="${cfg.body}"/><stop offset="1" stop-color="${cfg.dim}"/></linearGradient>`
+  return { outline: ring, svg: svgPiece(w, h, s, defs) }
+}
+
+/** Bakes one vista wing straight into the art dir as <id>.webp + <id>.outline.json
+ *  (the shaped-mesh contour), like the skyline slot bake. */
+async function bakeVistaWing(wing, outDir) {
+  const { outline, svg } = vistaWingArt({ seed: wing.seed, w: wing.w, h: wing.h, grade: wing.grade })
+  const flat = await sharp(Buffer.from(svg)).png().toBuffer()
+  const flatRaw = await sharp(flat).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const grainCut = await grainOverArt(flatRaw, wing.w, wing.h, wing.seed, 12)
+  const out = await sharp(flat).composite([{ input: grainCut, blend: 'over' }]).png().toBuffer()
+  const webp = await sharp(out).webp({ quality: 84 }).toBuffer()
+  await writeFile(path.join(outDir, `${wing.id}.webp`), webp)
+  await writeFile(path.join(outDir, `${wing.id}.outline.json`), JSON.stringify(outline))
+  return { id: wing.id, W: wing.w, H: wing.h, aspect: (wing.w / wing.h).toFixed(3), points: outline.length, bytes: webp.length }
+}
+
+// The three graded wing flaps. Pixel dims at the true flap aspect width : height.
+const VISTA_WINGS = [
+  { id: 'satchel-vista-near', grade: 'near', w: 896, h: 555, seed: 80140 }, // width 0.42 : height 0.26 (broad foreground)
+  { id: 'satchel-vista-mid', grade: 'mid', w: 640, h: 683, seed: 80141 }, //  width 0.30 : height 0.32
+  { id: 'satchel-vista-rear', grade: 'rear', w: 384, h: 768, seed: 80142 }, // width 0.20 : height 0.40 (tall narrow spires)
+]
+
 // ---- THE END LETTER (s9 end-letter, vfold w0.75/h0.5). The unfolded letter
 // the closing line asks the reader to answer: cream paper folded down the
 // centre, ruled hand, a red wax blob and ribbon at the fold. Crease centre. ----
@@ -2422,6 +2545,8 @@ const PIECES = [
   { id: 'satchel-burst-m2', seed: 80112, w: 760, h: 547, grain: 12, paint() { return treasureRay(this.w, this.h, this.seed, 2) } },
   { id: 'satchel-table-deck', seed: 80120, w: 1024, h: 445, grain: 16, paint() { return mapTableDeck(this.w, this.h, this.seed) } },
   { id: 'satchel-scroll', seed: 80130, w: 288, h: 512, grain: 12, paint() { return rolledScroll(this.w, this.h, this.seed) } },
+  // (the depth vista's 3 graded wing flaps are SHAPED-MESH bakes — they carry
+  //  outline sidecars, so they run through bakeVistaWing / VISTA_WINGS, not here.)
   // ---- Spread 9 — the End Letter ----
   { id: 'end-letter', seed: 90101, w: 1024, h: 683, grain: 14, paint() { return foldedLetter(this.w, this.h, this.seed) } },
   { id: 'end-hills-m0', seed: 90110, w: 1024, h: 256, grain: 12, paint() { return distantHills(this.w, this.h, this.seed, 0) } },
@@ -2550,6 +2675,7 @@ async function main() {
   await mkdir(ART_DIR, { recursive: true })
   const info = []
   for (const slot of SLOTS) info.push(await bakeSlot(slot, ART_DIR))
+  for (const wing of VISTA_WINGS) info.push(await bakeVistaWing(wing, ART_DIR))
   const pieceInfo = []
   for (const piece of PIECES) pieceInfo.push(await bakePieceTexture(piece, ART_DIR))
   const { artIds, outlineIds } = await writeManifests(ART_DIR)

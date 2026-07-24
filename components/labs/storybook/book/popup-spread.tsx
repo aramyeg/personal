@@ -46,6 +46,7 @@ import { KeepsakePopupLayer } from './popup-keepsake-layer'
 import { KeepStackPopupLayer } from './popup-keepstack-layer'
 import { KeepWinchPopupLayer } from './popup-keepwinch-layer'
 import { KeepSkylinePopupLayer } from './popup-skyline-layer'
+import { DepthVistaPopupLayer } from './popup-depthvista-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import { VolvellePopupLayer } from './popup-volvelle-layer'
 import { LiftFlapPopupLayer } from './popup-liftflap-layer'
@@ -107,6 +108,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'keepsake') return 0.5 // single card quad, no fold
   // The E1 showpiece mechs carry their per-face uvs in their own layers.
   if (layer.mech === 'keepstack' || layer.mech === 'keepwinch' || layer.mech === 'skyline') return 0.5
+  if (layer.mech === 'depthvista') return 0.5 // arch decks + wing quads, per-face uvs in the depthvista layer
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   return layer.creaseU ?? 0.5
 }
@@ -150,6 +152,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
   if (layer.mech === 'keepsake') return false // single card quad, its own renderer
   // The E1 showpiece mechs pose their own per-face uvs in their own renderers.
   if (layer.mech === 'keepstack' || layer.mech === 'keepwinch' || layer.mech === 'skyline') return false
+  if (layer.mech === 'depthvista') return false // per-face uvs live in the depthvista layer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -507,6 +510,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'skyline') {
           return (
             <KeepSkylinePopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'depthvista') {
+          return (
+            <DepthVistaPopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}
