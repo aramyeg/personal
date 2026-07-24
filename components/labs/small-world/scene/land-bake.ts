@@ -459,10 +459,14 @@ function accentMeadow(
       else if (lo) dot(pal.jungleDeep, 0.62)
       if (hi2) dot(pal.blossom, 0.3)
     } else {
-      // A2 delta: sandy braided banks (mostly water + sand)
-      dot(pal.sand, 0.78)
-      if (hi) dot(pal.dune, 0.5)
-      else if (lo) dot(pal.goldSand, 0.4)
+      // A2 delta (Task 48): a WET-sandy braided delta — damp olive-silt banks, pale wet
+      // sandbar crests and olive-green marsh hollows. Deliberately muddy/olive, NOT the
+      // desert's dry gold: the silt base reads distinct from both B0 dune-gold and the A1
+      // jungle green. The dense wetland flora + waders (delta.tsx) sit on the levee banks
+      // (deltaLevees) above it.
+      dot(pal.deltaSilt, 0.82)
+      if (hi) dot(pal.deltaSand, 0.45) // exposed sandbar / levee crest
+      else if (lo) dot(pal.deltaMoss, 0.55) // reed-grown marsh hollow
     }
   } else {
     if (band === 0) {
@@ -535,6 +539,10 @@ export function paintVertex(
       const latG = polarLatGate(nx)
       if (variant === 1 && pband === 2) c.lerp(pal.ice, 0.4 * kt * latG)
       else if (variant === 1 && pband === 1) c.lerp(pal.rust, 0.3 * kt * latG)
+      // Task 48 — the A2 delta's braided shallows are WET silt, not dry desert sand:
+      // pull the sandbar/shore toward the olive delta silt so the extensive delta beach
+      // reads as damp mudflat, keeping the whole wedge distinct from the B0 gold desert.
+      else if (variant === 0 && pband === 2) c.lerp(pal.deltaSilt, 0.72 * kt * latG)
       break
     }
     case 'canyon': {
@@ -670,6 +678,9 @@ export function buildPal(): Pal {
     jungleFloor: new THREE.Color(PALETTE.jungleFloor),
     jungleDeep: new THREE.Color(PALETTE.jungleDeep),
     jungleMoss: new THREE.Color(PALETTE.jungleMoss),
+    deltaSilt: new THREE.Color(PALETTE.deltaSilt),
+    deltaSand: new THREE.Color(PALETTE.deltaSand),
+    deltaMoss: new THREE.Color(PALETTE.deltaMoss),
   } satisfies Pal
 }
 

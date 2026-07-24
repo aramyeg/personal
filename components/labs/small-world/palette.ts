@@ -69,4 +69,21 @@ export const PALETTE = {
   camelHideDeep: '#B07E3F', // shaded camel underside / legs
   camelSaddle: '#B0563A', // terracotta saddle blanket accent
   reedGreen: '#8FB055', // dusty oasis reed/grass tuft (drier green than the jungle)
+  // Task 48 — the A2 grand delta gets its OWN wet-sandy vocabulary, distinct from BOTH the
+  // desert gold and the jungle deep-green: damp silt banks, pale wet sand bars and
+  // olive-green wetland pockets. The ground base is deltaSilt; the mottle lifts to
+  // deltaSand on the dry crests and sinks to deltaMoss in the reed-grown hollows.
+  deltaSilt: '#828B54', // DAMP olive-silt delta ground (A2 accent base) — dark wet mud, reads
+  // clearly wetter (lower value) than the bright DRY desert gold, so it never reads as desert
+  deltaSand: '#B3AA72', // damp sandbar crest (levee tops, exposed bars) — muted, not bright sand
+  deltaMoss: '#5E8140', // olive wetland green in the marshy hollows (distinct from jungle)
+  // delta wildlife (Task 48) — one accent each, wader/marsh family
+  heronBody: '#C9D2D8', // pale blue-grey heron plumage
+  heronWing: '#8A98A4', // slate wing/back
+  heronBill: '#E6B84C', // warm dagger bill + legs
+  turtleShell: '#6E7A45', // mossy olive carapace
+  turtleSkin: '#9AA86A', // pale olive turtle skin
+  // delta structures (Task 48) — the stilt fishing hut on the levee
+  stiltWall: '#C7A878', // sun-bleached reed-and-plank hut wall
+  stiltRoof: '#8A6A46', // thatched brown roof / posts
 } as const

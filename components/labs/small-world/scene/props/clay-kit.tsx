@@ -592,3 +592,129 @@ export function ClayReeds({ color = PALETTE.reedGreen, ...x }: Xform & { color?:
   }, [color])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
+
+// --- Delta wetland wildlife + structure (Task 48) ---------------------------
+//
+// Aram (Round 13): biome 2 (the A2 grand delta) "kind of lacks features" — bring it to the
+// jungle compass in the delta's OWN wet-sandy vocabulary. These are the lurking WADERS (a
+// heron standing in a shallow, a turtle basking on a sandbank), a fish-RIPPLE hint on the
+// water, and one STRUCTURE touch (a stilt fishing hut on a levee). Each is ONE merged
+// vertex-coloured geometry (buildMergedClay) so a whole figure is a SINGLE draw call — same
+// idiom as the jungle beasts + desert camels. All accents are named palette.ts entries.
+
+/** A heron/stork wading in the shallows: two long thin legs (feet at y=0), a plump body high
+ *  on the legs, an S-curved neck, a small head with a dagger bill and two ink eyes. Accent =
+ *  pale blue-grey plumage with a slate wing and a warm bill/legs. Reads tall + still. */
+export function ClayHeron({ body = PALETTE.heronBody, wing = PALETTE.heronWing, bill = PALETTE.heronBill, ...x }: Xform & { body?: string; wing?: string; bill?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // two long legs — feet at y=0
+        { geo: new THREE.CylinderGeometry(0.008, 0.01, 0.26, 6), color: bill, pos: [0.022, 0.13, 0.01] },
+        { geo: new THREE.CylinderGeometry(0.008, 0.01, 0.26, 6), color: bill, pos: [-0.022, 0.13, -0.01] },
+        // plump body riding high on the legs
+        { geo: new THREE.SphereGeometry(0.07, 14, 12), color: body, pos: [0, 0.31, 0], scl: [1.55, 0.92, 1] },
+        // folded slate wing patch on the flank
+        { geo: new THREE.SphereGeometry(0.055, 12, 10), color: wing, pos: [-0.02, 0.32, 0.04], rot: [0.2, 0, 0.3], scl: [1.5, 0.75, 0.5] },
+        // short tail sweeping back
+        { geo: new THREE.ConeGeometry(0.03, 0.11, 8), color: wing, pos: [-0.11, 0.32, 0], rot: [0, 0, 1.3] },
+        // S-neck: a lower forward-lean segment + an upright upper segment
+        { geo: new THREE.CylinderGeometry(0.016, 0.02, 0.12, 7), color: body, pos: [0.05, 0.4, 0], rot: [0, 0, -0.7] },
+        { geo: new THREE.CylinderGeometry(0.013, 0.016, 0.12, 7), color: body, pos: [0.08, 0.5, 0], rot: [0, 0, 0.35] },
+        // head + dagger bill
+        { geo: new THREE.SphereGeometry(0.028, 10, 10), color: body, pos: [0.1, 0.56, 0] },
+        { geo: new THREE.ConeGeometry(0.014, 0.09, 8), color: bill, pos: [0.17, 0.55, 0], rot: [0, 0, -1.35] },
+        // two ink eyes
+        { geo: new THREE.SphereGeometry(0.006, 6, 6), color: PALETTE.ink, pos: [0.11, 0.575, 0.022] },
+        { geo: new THREE.SphereGeometry(0.006, 6, 6), color: PALETTE.ink, pos: [0.11, 0.575, -0.022] },
+      ]),
+    [body, wing, bill]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A turtle basking on a sandbank: a low domed carapace, a head poking forward, four stubby
+ *  flippers and a little tail. Accent = mossy olive shell over pale-olive skin. Low + calm. */
+export function ClayTurtle({ shell = PALETTE.turtleShell, skin = PALETTE.turtleSkin, ...x }: Xform & { shell?: string; skin?: string }) {
+  const ramp = useClayRamp()
+  const flipper = (px: number, pz: number, yaw: number): ClayPart => ({
+    geo: new THREE.SphereGeometry(0.028, 10, 8),
+    color: skin,
+    pos: [px, 0.02, pz],
+    rot: [0, yaw, 0],
+    scl: [1.5, 0.45, 0.9],
+  })
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // domed carapace
+        { geo: new THREE.SphereGeometry(0.09, 16, 12), color: shell, pos: [0, 0.05, 0], scl: [1.3, 0.62, 1.05] },
+        // pale plastron rim just under the shell
+        { geo: new THREE.SphereGeometry(0.085, 14, 8), color: skin, pos: [0, 0.02, 0], scl: [1.32, 0.24, 1.08] },
+        // head poking forward
+        { geo: new THREE.SphereGeometry(0.032, 12, 12), color: skin, pos: [0.11, 0.05, 0], scl: [1.2, 0.9, 0.9] },
+        // four stubby flippers
+        flipper(0.07, 0.075, 0.7), flipper(0.07, -0.075, -0.7),
+        flipper(-0.075, 0.07, 2.3), flipper(-0.075, -0.07, -2.3),
+        // little tail
+        { geo: new THREE.ConeGeometry(0.014, 0.05, 6), color: skin, pos: [-0.12, 0.04, 0], rot: [0, 0, 1.4] },
+        // two ink eyes
+        { geo: new THREE.SphereGeometry(0.007, 6, 6), color: PALETTE.ink, pos: [0.128, 0.062, 0.018] },
+        { geo: new THREE.SphereGeometry(0.007, 6, 6), color: PALETTE.ink, pos: [0.128, 0.062, -0.018] },
+      ]),
+    [shell, skin]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A fish-ripple hint on the water surface — two flat concentric rings, as if something just
+ *  broke the surface. Merged single-draw; laid flat (lies in the horizontal plane at y≈0), so
+ *  it reads on the water, not standing. Accent = the river blues. */
+export function ClayRipple({ color = PALETTE.river, inner = PALETTE.riverDeep, ...x }: Xform & { color?: string; inner?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.TorusGeometry(0.075, 0.006, 6, 20), color, rot: [Math.PI / 2, 0, 0] },
+        { geo: new THREE.TorusGeometry(0.042, 0.005, 6, 18), color: inner, pos: [0, 0.002, 0], rot: [Math.PI / 2, 0, 0] },
+      ]),
+    [color, inner]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/**
+ * A stilt fishing hut — the delta's ONE structure touch (Task 48). A little reed-and-plank
+ * cabin raised on four posts over the shallows, with a plank deck, a pitched thatch roof, a
+ * dark doorway and a short jetty plank reaching out toward the water. Built as ONE merged
+ * vertex-coloured geometry (single draw), feet (post bases) at y=0 so it stands on the levee
+ * it is anchored to. Reads crisp at the reading camera (the structures bar).
+ */
+export function ClayStiltHut({ wall = PALETTE.stiltWall, roof = PALETTE.stiltRoof, ...x }: Xform & { wall?: string; roof?: string }) {
+  const ramp = useClayRamp()
+  const post = (px: number, pz: number): ClayPart => ({
+    geo: new THREE.CylinderGeometry(0.018, 0.022, 0.3, 6),
+    color: roof,
+    pos: [px, 0.15, pz],
+  })
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // four stilt posts standing in the shallows (bases at y=0)
+        post(0.15, 0.12), post(0.15, -0.12), post(-0.15, 0.12), post(-0.15, -0.12),
+        // plank deck platform on top of the posts
+        { geo: new THREE.BoxGeometry(0.4, 0.03, 0.34), color: PALETTE.clayPath, pos: [0, 0.31, 0] },
+        // a short jetty plank reaching out toward the water
+        { geo: new THREE.BoxGeometry(0.22, 0.025, 0.1), color: PALETTE.clayPath, pos: [0.28, 0.31, 0.08] },
+        // cabin walls
+        { geo: new THREE.BoxGeometry(0.32, 0.22, 0.28), color: wall, pos: [0, 0.44, 0] },
+        // dark doorway
+        { geo: new THREE.BoxGeometry(0.08, 0.15, 0.02), color: PALETTE.ink, pos: [0, 0.4, 0.141] },
+        // pitched thatch roof (4-sided cone, overhanging the walls)
+        { geo: new THREE.ConeGeometry(0.28, 0.18, 4), color: roof, pos: [0, 0.64, 0], rot: [0, Math.PI / 4, 0] },
+      ]),
+    [wall, roof]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}

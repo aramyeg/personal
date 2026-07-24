@@ -27,6 +27,7 @@ export type Pal = {
   earthDeep: THREE.Color; rust: THREE.Color; ice: THREE.Color; tuff: THREE.Color
   foliageDeep: THREE.Color; pineDeep: THREE.Color; meadowDry: THREE.Color
   jungleFloor: THREE.Color; jungleDeep: THREE.Color; jungleMoss: THREE.Color
+  deltaSilt: THREE.Color; deltaSand: THREE.Color; deltaMoss: THREE.Color
 }
 
 /** Degenerate flow (a pole, or the flow field disabled) — no directional streak. */

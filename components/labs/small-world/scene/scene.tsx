@@ -14,6 +14,7 @@ import { ChapterSet } from './props/chapter-set'
 import { GlobalDressing, GlobalDressingAutumn } from './props/global-dressing'
 import { Forest } from './props/forest'
 import { Jungle } from './props/jungle'
+import { DeltaLife } from './props/delta'
 import { Bridges } from './props/bridges'
 import { Delights } from './props/delights'
 import { BluenetSet } from './props/set-bluenet'
@@ -73,6 +74,7 @@ function SceneContents({
         <GlobalDressingAutumn journeyRef={journeyRef} />
         <Forest journeyRef={journeyRef} />
         <Jungle journeyRef={journeyRef} />
+        <DeltaLife journeyRef={journeyRef} />
         <DesertLife journeyRef={journeyRef} />
         <Bridges journeyRef={journeyRef} />
         <Delights journeyRef={journeyRef} />

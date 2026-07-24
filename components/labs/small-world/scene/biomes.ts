@@ -971,6 +971,90 @@ export function canopyMounds(nx: number, ny: number, nz: number): number {
   return CANOPY_AMP * h * clump * lane * limb * seam * shelfAvoid * chAvoid
 }
 
+// --- Delta braided levee banks (A2, Task 48) --------------------------------
+//
+// Aram (Round 13): biome 2 (the A2 grand delta) "kind of lacks features." Bring it to the
+// jungle compass in the delta's OWN wet-sandy vocabulary. The FORM of a river delta read
+// from the reading camera is BRAIDED — low sculpted LEVEE banks lining each water arm, with
+// sandbars between them — not a flat sand sheet. Authored HERE as displacement (like duneField
+// / canopyMounds) so both renewal bakes agree byte-for-byte and the bench reads the real relief;
+// the instanced wetland flora + waders (delta.tsx) sit ON these banks.
+//
+// Same hard gating contract as duneField/canopyMounds: EXACTLY 0 on the girl's lane band
+// (|nx| < DELTA_LANE_LO, an early return) so it adds NO spine-band term — the contact budget
+// (0.01247R) is untouched and the lane stays gentle + walkable; faded to 0 before the limb so
+// it never fights the polar ocean/beach; and wedge-gated to 0 on the meridians via wedgeDelta
+// (so bumpA === bumpB there). Adds only (never carves), so no accidental water forms and the
+// ceiling only rises a little. The levee seats on the DRY BANK just beyond the LOCAL wet
+// half-width of each arm (which widens toward the mouth), so it never lifts a braid arm out of
+// the water; oceanAvoid flattens it where the left ocean rises at the mouth.
+const DELTA_LANE_LO = 0.16
+const DELTA_LANE_HI = 0.3
+const DELTA_LIMB_LO = 0.46
+const DELTA_LIMB_HI = 0.6
+/** Peak levee-bank height (fraction of R). */
+const DELTA_LEVEE_AMP = 0.055
+/** Angular half-span of the raised bank flanking each arm (the ridge peaks one W off the
+ *  water's edge and fades to 0 by two W). */
+const DELTA_BANK_W = 0.055
+/** Clear margin between the wet channel edge and the foot of the levee (rad). */
+const DELTA_BANK_MARGIN = 0.015
+
+/** The A2 grand-delta channel (its braided arms). Levees flank THESE centre-lines. */
+const DELTA_CH = A_CHANNELS[2]
+
+/** Distance (rad) to the nearest A2 delta channel arm centre-line (for the levee banks). */
+export function deltaArmDist(nx: number, ny: number, nz: number): number {
+  let d = Infinity
+  for (let i = 0; i < DELTA_CH.arcs.length; i++) {
+    const x = arcDist(nx, ny, nz, DELTA_CH.arcs[i])
+    if (x < d) d = x
+  }
+  return d
+}
+
+/** Local wet half-width of the delta braid at latitude nx (mirrors channelCarve's widen so the
+ *  levee always seats on the DRY bank beyond the water, even where the mouth broadens). */
+function deltaWetHalf(nx: number): number {
+  const w = DELTA_CH.widen
+  if (!w) return DELTA_CH.half
+  const metric = w.neg ? -nx : Math.abs(nx)
+  const f = smoothstep01((metric - w.lo) / (w.hi - w.lo))
+  return DELTA_CH.half + w.half * f
+}
+
+/** Lane/limb gate bounds for the delta levees, exported so the unit test pins the gating
+ *  contract (0 on the girl's lane band, 0 past the limb) against the shipped constants. */
+export const DELTA_LEVEE_GATE = { laneLo: DELTA_LANE_LO, laneHi: DELTA_LANE_HI, limbLo: DELTA_LIMB_LO, limbHi: DELTA_LIMB_HI } as const
+
+/** Sculpted braided levee banks flanking the A2 delta arms (variant A, added in sceneRaw).
+ *  Pure function of the unit direction; adds only (never carves), 0 on the lane + past the limb
+ *  fade. Exported for the unit test (gating + determinism); the render consumes it via biomeBump.
+ *  A raised ridge sits one bank-width off each arm's wet edge and fades back into the fan, so the
+ *  water arms read as braided channels between sculpted banks; a longitude undulation keeps the
+ *  bank hand-thumbed, not a smooth wall. */
+export function deltaLevees(nx: number, ny: number, nz: number): number {
+  const ax = Math.abs(nx)
+  const lane = smoothstep01((ax - DELTA_LANE_LO) / (DELTA_LANE_HI - DELTA_LANE_LO))
+  if (lane <= 0) return 0
+  const limb = 1 - smoothstep01((ax - DELTA_LIMB_LO) / (DELTA_LIMB_HI - DELTA_LIMB_LO))
+  if (limb <= 0) return 0
+  const cd = deltaArmDist(nx, ny, nz)
+  const foot = deltaWetHalf(nx) + DELTA_BANK_MARGIN
+  const off = cd - foot
+  if (off <= 0 || off >= 2 * DELTA_BANK_W) return 0 // inside the water, or out past the bank
+  // ridge profile: rise from the water's edge to a crest one W out, then fade back into the fan
+  const bank = smoothstep01(off / DELTA_BANK_W) * (1 - smoothstep01((off - DELTA_BANK_W) / DELTA_BANK_W))
+  if (bank <= 0) return 0
+  // braided undulation along the arm so the bank reads hand-sculpted, not a smooth wall
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  const undulate = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(11 * thetaC + 6 * nx + 0.5))
+  // never lift the left ocean out of the water where the mouth broadens into the sea
+  const om = oceanMask(nx, ny, nz, 0)
+  const oceanAvoid = 1 - smoothstep01(om / 0.12)
+  return DELTA_LEVEE_AMP * bank * undulate * lane * limb * oceanAvoid
+}
+
 // --- Assembled displacement -------------------------------------------------
 
 /** The one left ocean carved below the waterline, for a variant: the warped
@@ -998,6 +1082,7 @@ function sceneRaw(band: 0 | 1 | 2, nx: number, ny: number, nz: number, variant: 
   if (variant === 1 && band === 1) bump += canyonWalls(nx, ny, nz)
   if (variant === 1 && band === 0) bump += duneField(nx, ny, nz) // B0 crescent dune field (Task 41)
   if (variant === 0 && band === 1) bump += canopyMounds(nx, ny, nz) // A1 jungle canopy mounds (Task 42)
+  if (variant === 0 && band === 2) bump += deltaLevees(nx, ny, nz) // A2 delta braided levee banks (Task 48)
   return bump
 }
 
