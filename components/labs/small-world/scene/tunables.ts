@@ -142,6 +142,54 @@ export type DialKey = keyof typeof DIALS
 /** Dial keys in declaration (panel render) order. */
 export const DIAL_KEYS = Object.keys(DIALS) as DialKey[]
 
+/**
+ * Task 47 (worker bake) — the by-value snapshot of every dial the LAND bake reads. The
+ * bake runs in a Web Worker, whose module graph gets its OWN `DIALS` instance (always at
+ * defaults — the panel writes only the main-thread store). So the bake must NOT read a live
+ * store; instead the main thread snapshots these twelve values with `readLandDials()` and
+ * passes the plain object into `bakeLandArrays` (threaded through paintVertex / fieldDents /
+ * applyFieldMottle). Determinism is by-value: same snapshot ⇒ byte-identical arrays, whether
+ * the bake runs on the worker or the synchronous fallback.
+ *
+ * These are exactly the dials the land bake consumes today: the boundary curve (wander/ridge),
+ * the field press-dents (depth/AO), the terrain flow field (strength/align), the terminator
+ * dither, and the field mottle channels (saturation/macro/micro/vein/grime). Water dials are
+ * NOT here — the water bake stays on the main thread.
+ */
+export type LandDials = {
+  dentDepth: number
+  dentAO: number
+  boundaryWander: number
+  boundaryRidge: number
+  terrainFlowAlign: number
+  terrainFlowStrength: number
+  terminatorDither: number
+  mottleSaturation: number
+  mottleMacro: number
+  mottleMicro: number
+  veinDensity: number
+  grimeDensity: number
+}
+
+/** Snapshot the live values of every land-bake dial into a plain object (main thread only).
+ *  Read once per bake dispatch so a rebake bakes the dials as they settled. */
+export function readLandDials(): LandDials {
+  return {
+    dentDepth: DIALS.dentDepth.value,
+    dentAO: DIALS.dentAO.value,
+    boundaryWander: DIALS.boundaryWander.value,
+    boundaryRidge: DIALS.boundaryRidge.value,
+    terrainFlowAlign: DIALS.terrainFlowAlign.value,
+    terrainFlowStrength: DIALS.terrainFlowStrength.value,
+    terminatorDither: DIALS.terminatorDither.value,
+    mottleSaturation: DIALS.mottleSaturation.value,
+    mottleMacro: DIALS.mottleMacro.value,
+    mottleMicro: DIALS.mottleMicro.value,
+    veinDensity: DIALS.veinDensity.value,
+    grimeDensity: DIALS.grimeDensity.value,
+  }
+}
+
 // ── store ──────────────────────────────────────────────────────────────────────
 const REBAKE_DEBOUNCE_MS = 400
 

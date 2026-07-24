@@ -15,7 +15,7 @@
  * (A and B) agree byte-for-byte and the front lerp stays seamless.
  */
 import * as THREE from 'three'
-import { DIALS } from './tunables'
+import { DIALS, type LandDials } from './tunables'
 import { makePermutation, ridged3, domainWarp3 } from './clay-noise'
 
 /** The planet colour palette the bake feeds in (built once in planet.tsx). */
@@ -54,7 +54,14 @@ const smooth = (x: number, lo: number, hi: number): number => {
  *  higher settings, so the shipped default is baked up from 0.012. The value here is only
  *  the cross-pin for the tunables test; fieldDents reads the LIVE DIALS.dentDepth.value. */
 export const FIELD_DENT_DEPTH = 0.0375
-export function fieldDents(nx: number, ny: number, nz: number, bump: number): number {
+/**
+ * `dentDepth` is the by-value snapshot of DIALS.dentDepth for the worker/coalesced bake
+ * (Task 47). When omitted (the standalone unit-test path) it reads the LIVE DIALS.dentDepth,
+ * exactly as before — byte-identical either way since the snapshot equals the live value.
+ */
+export function fieldDents(
+  nx: number, ny: number, nz: number, bump: number, dentDepth?: number
+): number {
   const lat = smooth(Math.abs(nx), 0.14, 0.24)
   if (lat <= 0) return 0
   const open = 1 - smooth(bump, 0.05, 0.12)
@@ -64,7 +71,7 @@ export function fieldDents(nx: number, ny: number, nz: number, bump: number): nu
   const q = Math.sin(7.1 * ny + 2.3) * Math.sin(6.7 * nz - 0.6) * Math.sin(7.7 * nx + 1.4)
   const dentB = smooth(q, 0.6, 0.95)
   const dent = clamp01(dentA + 0.6 * dentB)
-  return -DIALS.dentDepth.value * dent * open * lat
+  return -(dentDepth ?? DIALS.dentDepth.value) * dent * open * lat
 }
 
 const _deep = new THREE.Color()
@@ -132,23 +139,33 @@ export function applyFieldMottle(
   nx: number,
   ny: number,
   nz: number,
-  flow: readonly [number, number, number] = ZERO_FLOW
+  flow: readonly [number, number, number] = ZERO_FLOW,
+  dials?: LandDials
 ): void {
   if (kind === 'underwater') return
+  // Task 47 — by-value dial snapshot for the worker/coalesced bake. When omitted (the
+  // standalone unit-test path) each falls back to the LIVE DIALS, byte-identical to before
+  // (the snapshot equals the live value). Resolved once here; the getters are side-effect
+  // free, so reading them all upfront cannot change the output.
+  const mottleSaturation = dials ? dials.mottleSaturation : DIALS.mottleSaturation.value
+  const mottleMacro = dials ? dials.mottleMacro : DIALS.mottleMacro.value
+  const mottleMicro = dials ? dials.mottleMicro : DIALS.mottleMicro.value
+  const veinDensity = dials ? dials.veinDensity : DIALS.veinDensity.value
+  const grimeDensity = dials ? dials.grimeDensity : DIALS.grimeDensity.value
   // Task 33 — flow-aligned streak deepening (extended from the water's Task-32 lever onto
   // the land). Sample the flow-stretched ridged field and darken toward a deeper shade of
   // the CURRENT colour along the flow, so the ground reads as clay dragged downslope. Its
   // magnitude REUSES the mottle saturation amp (turning mottle down shrinks the streak);
   // its anisotropy is DIALS.terrainFlowAlign. Feathered to EXACTLY 0 on the girl's lane
   // (|nx| < 0.14) so her path never stripes; colour-only, no displacement.
-  const flowAlign = DIALS.terrainFlowAlign.value
+  const flowAlign = dials ? dials.terrainFlowAlign : DIALS.terrainFlowAlign.value
   if (flowAlign > 0 && (flow[0] !== 0 || flow[1] !== 0 || flow[2] !== 0)) {
     const laneG = smooth(Math.abs(nx), 0.14, 0.24)
     if (laneG > 0) {
       const streak = terrainStreak(nx, ny, nz, flow, flowAlign)
       // deepen where the streak is strong (ridge crest = 1); ease it in so faint field
       // stays clean. Amount = mottle saturation × alignment × lane feather × streak.
-      const amt = DIALS.mottleSaturation.value * flowAlign * laneG * smooth(streak, 0.35, 0.9)
+      const amt = mottleSaturation * flowAlign * laneG * smooth(streak, 0.35, 0.9)
       if (amt > 0) {
         _flow.copy(c).multiplyScalar(0.78)
         c.lerp(_flow, amt)
@@ -164,7 +181,7 @@ export function applyFieldMottle(
   // 0.035/0.015 reproduces the legacy 0.05·(0.7·coarse + 0.3·fine). Canyon keeps its
   // 0.6 ratio (0.03 vs 0.05) so it stays the quieter, already-tinted read.
   const canyonK = kind === 'canyon' ? 0.6 : 1
-  c.multiplyScalar(1 + canyonK * (DIALS.mottleMacro.value * coarse + DIALS.mottleMicro.value * fine))
+  c.multiplyScalar(1 + canyonK * (mottleMacro * coarse + mottleMicro * fine))
   if (kind === 'canyon') return
 
   // Green-field marbling (deep-foliage pockets, sage smudges, pine veins, grime) applies
@@ -174,7 +191,7 @@ export function applyFieldMottle(
   // deeper-hue pockets (Aram's "some parts deeper green")
   const pocket = smooth(-coarse, 0.25, 0.75)
   if (pocket > 0) {
-    if (greenish) c.lerp(pal.foliageDeep, DIALS.mottleSaturation.value * pocket)
+    if (greenish) c.lerp(pal.foliageDeep, mottleSaturation * pocket)
     else {
       _deep.copy(c).multiplyScalar(0.8)
       c.lerp(_deep, 0.6 * pocket)
@@ -194,8 +211,8 @@ export function applyFieldMottle(
   const region = Math.sin(2.1 * nx + 0.5) * Math.sin(1.9 * nz - 1.0)
   const streak = 1 - smooth(Math.abs(Math.sin(9.0 * ny - 6.0 * nz + 3.0 * nx)), 0.0, 0.06)
   const vein = streak * smooth(region, 0.35, 0.85)
-  if (vein > 0) c.lerp(pal.pineDeep, DIALS.veinDensity.value * vein)
+  if (vein > 0) c.lerp(pal.pineDeep, veinDensity * vein)
   // rare grime specks (tiny darkening)
   const gr = Math.sin(53.1 * nx + 9.0) * Math.sin(61.7 * ny - 3.0) * Math.sin(57.3 * nz + 5.0)
-  if (gr > 0.9) c.multiplyScalar(1 - DIALS.grimeDensity.value * smooth(gr, 0.9, 0.99))
+  if (gr > 0.9) c.multiplyScalar(1 - grimeDensity * smooth(gr, 0.9, 0.99))
 }

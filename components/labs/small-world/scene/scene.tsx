@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useLayoutEffect } from 'react'
+import { Suspense, useCallback, useLayoutEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { hasArt } from '../art-manifest'
@@ -52,7 +52,10 @@ function CameraRig() {
   return null
 }
 
-function SceneContents({ progressRef }: SceneProps) {
+function SceneContents({
+  progressRef,
+  onBakeReady,
+}: SceneProps & { onBakeReady?: () => void }) {
   const journeyRef = useDampedJourney(progressRef)
   return (
     <>
@@ -65,7 +68,7 @@ function SceneContents({ progressRef }: SceneProps) {
           crosses the visible face — shadow pools in the clay dents and reads the
           toon bands as pinched facets. */}
       <directionalLight position={[-6, 2, 3.2]} intensity={1.55} color="#fff2e0" />
-      <Planet journeyRef={journeyRef}>
+      <Planet journeyRef={journeyRef} onBakeReady={onBakeReady}>
         <GlobalDressing journeyRef={journeyRef} />
         <GlobalDressingAutumn journeyRef={journeyRef} />
         <Forest journeyRef={journeyRef} />
@@ -108,14 +111,20 @@ export function SmallWorldScene({
   progressRef,
   onLoadChange,
 }: SceneProps & { onLoadChange?: (progress: number, ready: boolean) => void }) {
+  // Task 47 — the land bake is async (Web Worker), so "ready" must also wait for the first bake
+  // to apply, not just the GLB manager. Planet fires onBakeReady on its first applied bake; this
+  // flag is ANDed into the loader ready condition (see LoadSignal) so the loader never reveals an
+  // empty planet. One-time false→true flip.
+  const [bakeReady, setBakeReady] = useState(false)
+  const onBakeReady = useCallback(() => setBakeReady(true), [])
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
       <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
         <ToonRampProvider>
-          <SceneContents progressRef={progressRef} />
+          <SceneContents progressRef={progressRef} onBakeReady={onBakeReady} />
         </ToonRampProvider>
-        {/* Reports the girl-GLB load to the DOM planet loader (drei useProgress). */}
-        {onLoadChange && <LoadSignal onChange={onLoadChange} />}
+        {/* Reports the girl-GLB load + the first land bake to the DOM planet loader. */}
+        {onLoadChange && <LoadSignal onChange={onLoadChange} bakeReady={bakeReady} />}
       </Canvas>
     </div>
   )
