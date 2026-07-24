@@ -52,6 +52,7 @@
 import { NodeIO } from '@gltf-transform/core'
 import { prune } from '@gltf-transform/functions'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -261,6 +262,69 @@ async function rootTravelSpan(path, clipName) {
   return 0
 }
 
+/**
+ * Open a GLB the way the app does — three.js GLTFLoader, real skeleton — and
+ * hand back a `measure(clip, timeFrac)` that returns the TRUE skinned world
+ * bounding box (bones × inverse-bind × bind matrix, exactly what the GPU draws).
+ *
+ * This is the invariant `worldBindExtent()` cannot see. That one rotates the
+ * POSITION accessor by the root quaternion — a proxy. It happens to match the
+ * render for this asset, but it would still read ~1.7u for an export whose
+ * skeleton was NOT carried by the rotated root (she would then render lying
+ * down / collapsed, the Round-13 eye-test failure). Measuring the actual skinned
+ * mesh — at rest AND across each shipped clip — is what closes that gap, so a
+ * Z-up or collapsed re-export fails the self-test instead of shipping silently.
+ *
+ * Textures are stripped in memory first: GLTFLoader's image path needs a DOM
+ * (`self`), absent in Node — geometry and skeleton do not, so dropping the
+ * images lets it parse headless. Loads once; poses are cheap re-evaluations.
+ */
+async function openSkinned(path) {
+  const doc = await new NodeIO().read(path)
+  for (const tex of doc.getRoot().listTextures()) tex.dispose()
+  const bin = await new NodeIO().writeBinary(doc)
+  const ab = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)
+  const gltf = await new Promise((res, rej) => new GLTFLoader().parse(ab, '', res, rej))
+  const scene = gltf.scene
+  const skinned = []
+  scene.traverse((o) => {
+    if (o.isSkinnedMesh) skinned.push(o)
+  })
+  const mixer = new THREE.AnimationMixer(scene)
+  const axes = ['X', 'Y', 'Z']
+  const v = new THREE.Vector3()
+  const size = new THREE.Vector3()
+  /** @param {string|null} clip  @param {number} timeFrac 0..1 of the clip */
+  const measure = (clip, timeFrac) => {
+    mixer.stopAllAction()
+    if (clip) {
+      const a = gltf.animations.find((c) => c.name === clip)
+      if (a) {
+        const action = mixer.clipAction(a)
+        action.reset().play()
+        action.time = a.duration * timeFrac
+        mixer.update(0)
+      }
+    }
+    scene.updateMatrixWorld(true)
+    const box = new THREE.Box3().makeEmpty()
+    for (const sm of skinned) {
+      sm.skeleton.update()
+      const pos = sm.geometry.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i)
+        sm.applyBoneTransform(i, v)
+        v.applyMatrix4(sm.matrixWorld)
+        box.expandByPoint(v)
+      }
+    }
+    box.getSize(size)
+    const tallest = axes[[size.x, size.y, size.z].indexOf(Math.max(size.x, size.y, size.z))]
+    return { y: size.y, minY: box.min.y, tallest }
+  }
+  return { measure, animations: gltf.animations.map((a) => a.name) }
+}
+
 /** Parse `--src`, `--out`, `--self-test` from argv. */
 function parseArgs(argv) {
   const opts = { src: DEFAULT_SRC, out: DEFAULT_OUT, selfTest: false }
@@ -312,6 +376,36 @@ async function selfTest() {
     `Walk_Backward root motion neutralized (${beforeSpan.toFixed(3)}u → ${afterSpan.toFixed(3)}u)`,
     beforeSpan > 0.5 && afterSpan < 1e-6
   )
+
+  // TRUE-SKINNED RENDER INVARIANT — the gap the accessor proxy leaves open.
+  // worldBindExtent() (above) rotates the POSITION accessor by the root
+  // quaternion; that matched the render here, but only the actual skinned mesh
+  // — bones × inverse-bind × bind matrix, exactly what the GPU draws — proves
+  // she stands. Measure it at rest and across every shipped clip so a Z-up or
+  // collapsed re-export fails HERE instead of at a human eye-test (Round 13).
+  const rig = await openSkinned(out)
+  const rest = rig.measure(null, 0)
+  assert(
+    `RENDER rest upright ~1.7u on +Y, feet grounded (${rest.y.toFixed(3)}u, tallest ${rest.tallest}, feet ${rest.minY.toFixed(3)})`,
+    rest.tallest === 'Y' && Math.abs(rest.y - 1.7) < 0.05 && Math.abs(rest.minY) < 0.02
+  )
+  for (const clip of SHIPPED_SLOTS) {
+    let uprightEveryFrame = true
+    let minH = Infinity
+    let maxH = -Infinity
+    for (const f of [0, 0.25, 0.5, 0.75]) {
+      const e = rig.measure(clip, f)
+      if (e.tallest !== 'Y') uprightEveryFrame = false
+      minH = Math.min(minH, e.y)
+      maxH = Math.max(maxH, e.y)
+    }
+    // Upright (tallest axis Y) every sampled frame, height never collapsing
+    // (<1.2u = lying/tiny) nor exploding (>2.4u); jump apex legitimately stretches.
+    assert(
+      `RENDER ${clip} upright every frame (tallest Y, height ${minH.toFixed(2)}–${maxH.toFixed(2)}u)`,
+      uprightEveryFrame && minH >= 1.2 && maxH <= 2.4
+    )
+  }
 
   // Idempotency: re-running over the canonical output changes nothing (slots
   // stable, no extra rotation — height stays ~1.7u, not re-tipped).
