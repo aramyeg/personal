@@ -68,6 +68,13 @@ function knownGoodIds(): ReadonlySet<string> {
       ids.add(`${layer.id}-dial`)
       ids.add(`${layer.id}-card`)
     }
+    // The lift-flap (popup-liftflap-layer.tsx): the key-board plaque plus one
+    // numbered door leaf per door (requested as `<id>-board` and
+    // `<id>-door<plate>` directly by the layer).
+    if (layer.mech === 'liftflap') {
+      ids.add(`${layer.id}-board`)
+      for (const d of layer.doors) ids.add(`${layer.id}-door${d.plate}`)
+    }
     // The dispatch keep (popup-keepstack-layer.tsx): each story renders through
     // a box instance as `<id>-<key>-side/-front/-back/-top` (same box FACE_ART
     // gating), plus the balcony deck, the fan spire members and the raven finial.

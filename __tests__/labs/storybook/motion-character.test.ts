@@ -16,6 +16,7 @@ import {
 import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { solveVolvellePose } from '@/components/labs/storybook/book/popup-volvelle'
+import { solveLiftFlapPose, liftFlapMax } from '@/components/labs/storybook/book/popup-liftflap'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
@@ -132,6 +133,15 @@ const allQuads = (
   if (layer.mech === 'volvelle') {
     const pose = solveVolvellePose(layer, thetaL, thetaR, 0)
     return [pose.dial, pose.card]
+  }
+  // A lift-flap's autonomous (page-driven) motion is the envelope collapse of a
+  // door held at a FROZEN reader angle (the lift itself is user-paced, cap-
+  // exempt). Pose every leaf FULLY OPEN (a_user = LIFT_MAX) — the tallest leaf,
+  // the worst envelope amplitude, the fastest-moving corner (bench L9).
+  if (layer.mech === 'liftflap') {
+    const open = layer.doors.map(() => liftFlapMax(layer))
+    const pose = solveLiftFlapPose(layer, open, thetaL, thetaR)
+    return [pose.board, ...pose.doors]
   }
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   // The knob-tower's autonomous (page-driven) motion is the envelope collapse

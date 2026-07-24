@@ -23,6 +23,7 @@ import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybo
 import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
+import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
@@ -147,6 +148,12 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     case 'kinetic': {
       const pose = solveKineticArmPose(l, tL, tR)
       return [pose.right, pose.left]
+    }
+    case 'liftflap': {
+      // No lift channel in the depth gates — pose every door SHUT (the resting
+      // coplanar footprint); the static board dominates the occupancy centroid.
+      const pose = solveLiftFlapPose(l, [], tL, tR)
+      return [pose.board, ...pose.doors]
     }
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)

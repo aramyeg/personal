@@ -2248,6 +2248,153 @@ function dispatchCard(w, h, seed) {
   return svgPiece(w, h, s + rim, defs)
 }
 
+// ============================================================================
+// E2.2 BATCH B — THE LIFT-THE-FLAP (s2 ch1-keyboard). The Inn of a Hundred
+// Keys' key-board: a timber tavern plaque of numbered door leaves the reader
+// lifts to find brass keys (one hides the innkeeper's cat).
+//
+// Painted in SCREEN SPACE (the layer's flatUvs map image-x -> the page-fore
+// axis d = screen-RIGHT, image-y -> the spine axis z = screen-DOWN, no
+// rotation). So: DOORS are LANDSCAPE — hinge straps at the LEFT (spine) edge, a
+// ring handle at the RIGHT (fore/lift) edge, the number upright and centred.
+// The BOARD is PORTRAIT — the door row runs top-to-bottom (image-y = z), one
+// recess niche per door stacked down the plaque, each key in the FORE (RIGHT)
+// half so a lifted leaf uncovers it first (bench L6). Warm oak/walnut timber,
+// iron straps as dark accents, brass plates + keys; recesses dark inn-wood. A
+// thin warm timber edge (no cold pale die-cut rim — it read steel-grey in
+// scene). Deterministic: mulberry32(seed).
+// ============================================================================
+
+const WOOD = '#6b4a26', WOOD_LIT = '#9a7038', WOOD_DK = '#3d2812', WOOD_EDGE = '#2c1c0c'
+const IRON = '#33302b', IRON_LIT = '#6b6156'
+
+/** A brass key lying in a niche, bow (ring) at the RIGHT/fore end, shaft + bit
+ *  reaching left — the bow sits in the fore half so a lifted leaf reveals it. */
+function brassKeyLying(x0, x1, cy, r) {
+  const len = x1 - x0
+  const bowR = (x1 - x0) * 0.17
+  const bowX = x1 - bowR
+  const shaftW = len * 0.1
+  let s = `<rect x="${fx(x0)}" y="${fx(cy - shaftW / 2)}" width="${fx(bowX - x0)}" height="${fx(shaftW)}" rx="${fx(shaftW * 0.4)}" fill="${GOLD}"/>` // shaft
+  s += `<rect x="${fx(x0)}" y="${fx(cy - shaftW / 2)}" width="${fx(bowX - x0)}" height="${fx(shaftW * 0.4)}" fill="${GOLD_LIT}" opacity="0.7"/>` // lit edge
+  // toothed bit at the left (spine) end — two prongs down
+  s += `<rect x="${fx(x0)}" y="${fx(cy)}" width="${fx(len * 0.11)}" height="${fx(len * 0.13)}" fill="${GOLD}"/>`
+  s += `<rect x="${fx(x0 + len * 0.14)}" y="${fx(cy)}" width="${fx(len * 0.07)}" height="${fx(len * 0.09)}" fill="${GOLD}"/>`
+  s += `<circle cx="${fx(bowX)}" cy="${fx(cy)}" r="${fx(bowR)}" fill="none" stroke="${GOLD}" stroke-width="${fx(shaftW * 1.25)}"/>` // bow
+  s += `<circle cx="${fx(bowX)}" cy="${fx(cy)}" r="${fx(bowR)}" fill="none" stroke="${GOLD_LIT}" stroke-width="1.4" opacity="0.85"/>`
+  s += `<circle cx="${fx(bowX - bowR * 0.3)}" cy="${fx(cy - bowR * 0.3)}" r="${fx(bowR * 0.22)}" fill="#fff" opacity="0.4"/>` // glint
+  void r
+  return s
+}
+
+/** A curled sleeping cat silhouette (the surprise behind one door). Faces LEFT,
+ *  tucked into the niche; nose toward the fore (right) so it reads on reveal. */
+function sleepingCat(cx, cy, size) {
+  const bodyR = size * 0.5
+  let s = `<ellipse cx="${fx(cx)}" cy="${fx(cy + size * 0.08)}" rx="${fx(bodyR)}" ry="${fx(bodyR * 0.6)}" fill="#2b2620"/>` // curled body
+  s += `<circle cx="${fx(cx + bodyR * 0.72)}" cy="${fx(cy - size * 0.04)}" r="${fx(size * 0.24)}" fill="#2b2620"/>` // head (toward fore/right)
+  s += `<path d="M ${fx(cx + bodyR * 0.62)} ${fx(cy - size * 0.2)} l ${fx(-size * 0.02)} ${fx(-size * 0.18)} l ${fx(size * 0.15)} ${fx(size * 0.06)} Z" fill="#2b2620"/>` // ear
+  s += `<path d="M ${fx(cx + bodyR * 0.95)} ${fx(cy - size * 0.17)} l ${fx(size * 0.1)} ${fx(-size * 0.16)} l ${fx(-size * 0.14)} ${fx(size * 0.04)} Z" fill="#2b2620"/>` // ear
+  s += `<path d="M ${fx(cx - bodyR * 0.72)} ${fx(cy + size * 0.16)} q ${fx(-size * 0.28)} ${fx(-size * 0.04)} ${fx(-size * 0.12)} ${fx(-size * 0.3)}" fill="none" stroke="#2b2620" stroke-width="${fx(size * 0.13)}" stroke-linecap="round"/>` // tail
+  s += `<path d="M ${fx(cx + bodyR * 0.62)} ${fx(cy - size * 0.02)} a ${fx(size * 0.14)} ${fx(size * 0.14)} 0 0 1 ${fx(size * 0.16)} 0" fill="none" stroke="${GOLD_LIT}" stroke-width="3" opacity="0.85"/>` // sleepy eye
+  s += `<circle cx="${fx(cx + bodyR * 0.96)}" cy="${fx(cy - size * 0.01)}" r="${fx(size * 0.05)}" fill="#c98b4a"/>` // nose
+  return s
+}
+
+/** THE KEY-BOARD PLAQUE (ch1-keyboard-board): PORTRAIT timber board, the door
+ *  row running top->bottom (image-y = z). One dark recess niche per door, each
+ *  with a brass key lying bow-to-the-fore (right) — save the cat niche. Opaque
+ *  (the doors cover it); painted in the OPEN (revealed) state. */
+function keyboardBoard(w, h, seed, doorCount, catIndex) {
+  const r = mulberry32(seed)
+  let s = `<g>`
+  s += `<rect x="0" y="0" width="${w}" height="${h}" fill="${WOOD}"/>`
+  // vertical plank seams (planks run down the row) + a lit fore (right) edge
+  const planks = 3
+  for (let i = 1; i < planks; i++) {
+    const x = (w * i) / planks
+    s += `<line x1="${fx(x)}" y1="0" x2="${fx(x)}" y2="${h}" stroke="${WOOD_DK}" stroke-width="2.4" opacity="0.5"/>`
+    s += `<line x1="${fx(x + 2)}" y1="0" x2="${fx(x + 2)}" y2="${h}" stroke="${WOOD_LIT}" stroke-width="1.2" opacity="0.35"/>`
+  }
+  for (let i = 0; i < 44; i++) {
+    const gx = rr(r, 0, w), gy = rr(r, 0, h)
+    s += `<line x1="${fx(gx)}" y1="${fx(gy)}" x2="${fx(gx)}" y2="${fx(gy + rr(r, 14, 44))}" stroke="${WOOD_DK}" stroke-width="1" opacity="${fx(rr(r, 0.12, 0.3))}"/>` // grain
+  }
+  s += `<rect x="${fx(w * 0.9)}" y="0" width="${fx(w * 0.1)}" height="${h}" fill="${WOOD_LIT}" opacity="0.28"/>` // lit fore edge
+  // one recess niche per door, stacked down the plaque
+  const gap = h * 0.028
+  const slotH = (h - gap * (doorCount + 1)) / doorCount
+  const nicheL = w * 0.12, nicheR = w * 0.9
+  const nicheW = nicheR - nicheL
+  for (let d = 0; d < doorCount; d++) {
+    const ny0 = gap + d * (slotH + gap)
+    const ncy = ny0 + slotH / 2
+    const nd = `M ${fx(nicheL)} ${fx(ny0)} L ${fx(nicheR)} ${fx(ny0)} L ${fx(nicheR)} ${fx(ny0 + slotH)} L ${fx(nicheL)} ${fx(ny0 + slotH)} Z`
+    s += `<rect x="${fx(nicheL)}" y="${fx(ny0)}" width="${fx(nicheW)}" height="${fx(slotH)}" fill="#22190f"/>` // dark inn-wood cavity
+    s += `<rect x="${fx(nicheL)}" y="${fx(ny0)}" width="${fx(nicheW * 0.4)}" height="${fx(slotH)}" fill="#000" opacity="0.32"/>` // depth shade toward spine (left)
+    s += `<rect x="${fx(nicheR - nicheW * 0.1)}" y="${fx(ny0)}" width="${fx(nicheW * 0.1)}" height="${fx(slotH)}" fill="${WOOD_LIT}" opacity="0.16"/>` // lit fore lip
+    s += `<path d="${nd}" fill="none" stroke="${WOOD_EDGE}" stroke-width="3.5" opacity="0.8"/>` // warm inset edge
+    if (d === catIndex) {
+      s += sleepingCat(nicheL + nicheW * 0.5, ncy, slotH * 0.62)
+    } else {
+      s += `<rect x="${fx(nicheL + nicheW * 0.62)}" y="${fx(ny0 + slotH * 0.08)}" width="3" height="${fx(slotH * 0.84)}" fill="${IRON_LIT}" opacity="0.6"/>` // hook rail (fore)
+      s += brassKeyLying(nicheL + nicheW * 0.24, nicheL + nicheW * 0.9, ncy, r)
+    }
+  }
+  // warm timber frame (two strokes, no cold pale rim)
+  const frame = `M 4 4 L ${fx(w - 4)} 4 L ${fx(w - 4)} ${fx(h - 4)} L 4 ${fx(h - 4)} Z`
+  s += `<path d="${frame}" fill="none" stroke="${WOOD_EDGE}" stroke-width="7" opacity="0.9" stroke-linejoin="round"/>`
+  s += `<path d="${frame}" fill="none" stroke="${WOOD_LIT}" stroke-width="1.6" opacity="0.5" stroke-linejoin="round"/>`
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+/** ONE NUMBERED DOOR LEAF (ch1-keyboard-door<N>): a LANDSCAPE timber plank door,
+ *  iron hinge straps at the LEFT (spine) edge, a ring handle at the RIGHT
+ *  (fore/lift) edge, a brass number plate centred and UPRIGHT. Opaque. */
+function keyboardDoor(w, h, seed, plate) {
+  const r = mulberry32(seed)
+  let s = `<g>`
+  const x0 = w * 0.03, x1 = w * 0.97, y0 = h * 0.05, y1 = h * 0.95
+  const doorD = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x0)} ${fx(y1)} Z`
+  s += `<path d="${doorD}" fill="${WOOD_LIT}"/>`
+  // plank seams run across (top-to-bottom lines at intervals along the width)
+  const planks = 3
+  for (let i = 1; i < planks; i++) {
+    const x = x0 + ((x1 - x0) * i) / planks
+    s += `<line x1="${fx(x)}" y1="${fx(y0)}" x2="${fx(x)}" y2="${fx(y1)}" stroke="${WOOD_DK}" stroke-width="2.4" opacity="0.55"/>`
+    s += `<line x1="${fx(x + 2)}" y1="${fx(y0)}" x2="${fx(x + 2)}" y2="${fx(y1)}" stroke="${WOOD}" stroke-width="1.2" opacity="0.4"/>`
+  }
+  for (let i = 0; i < 22; i++) {
+    const gx = rr(r, x0, x1)
+    s += `<line x1="${fx(gx)}" y1="${fx(rr(r, y0, y1))}" x2="${fx(gx)}" y2="${fx(rr(r, y0, y1) + rr(r, 6, 20))}" stroke="${WOOD_DK}" stroke-width="1" opacity="${fx(rr(r, 0.1, 0.25))}"/>` // grain
+  }
+  s += `<rect x="${fx(x1 - w * 0.08)}" y="${fx(y0)}" width="${fx(w * 0.08)}" height="${fx(y1 - y0)}" fill="#c6a066" opacity="0.35"/>` // lit fore (right) edge
+  // iron hinge straps at the LEFT (spine) edge, reaching in
+  for (const hy of [h * 0.28, h * 0.72]) {
+    s += `<rect x="${fx(x0)}" y="${fx(hy - h * 0.08)}" width="${fx(w * 0.13)}" height="${fx(h * 0.16)}" rx="2" fill="${IRON}"/>`
+    s += `<path d="M ${fx(x0 + w * 0.12)} ${fx(hy)} L ${fx(x0 + w * 0.28)} ${fx(hy)}" stroke="${IRON}" stroke-width="${fx(h * 0.07)}" stroke-linecap="round"/>` // strap across the plank
+    s += `<circle cx="${fx(x0 + w * 0.05)}" cy="${fx(hy)}" r="2.6" fill="${IRON_LIT}"/>` // nail
+  }
+  // brass number plate, centred + upright
+  const px = w * 0.52, py = h * 0.5, prx = w * 0.15, pry = h * 0.3
+  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 2)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.35)}" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="1.6" stroke-opacity="0.7"/>`
+  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 0.5)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.3)}" fill="${GOLD_LIT}" opacity="0.6"/>`
+  for (const [dx, dy] of [[-prx * 0.66, -pry * 0.82], [prx * 0.66, -pry * 0.82], [-prx * 0.66, pry * 0.82], [prx * 0.66, pry * 0.82]])
+    s += `<circle cx="${fx(px + dx)}" cy="${fx(py + dy)}" r="2.4" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.5"/>` // plate screws
+  s += `<text x="${fx(px)}" y="${fx(py + pry * 0.42)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(pry * 1.15)}" font-weight="bold" text-anchor="middle" fill="${WOOD_EDGE}">${plate}</text>`
+  // iron ring handle at the RIGHT (fore/lift) edge
+  const rcx = w * 0.85, rcy = h * 0.5, rrad = h * 0.2
+  s += `<circle cx="${fx(rcx)}" cy="${fx(rcy)}" r="${fx(rrad)}" fill="none" stroke="${IRON}" stroke-width="${fx(h * 0.06)}"/>`
+  s += `<circle cx="${fx(rcx)}" cy="${fx(rcy)}" r="${fx(rrad)}" fill="none" stroke="${IRON_LIT}" stroke-width="1.4" opacity="0.7"/>`
+  s += `<circle cx="${fx(rcx + rrad)}" cy="${fx(rcy)}" r="${fx(h * 0.05)}" fill="${IRON}"/>` // mount boss (toward the fore edge)
+  // warm timber edge (no cold pale rim)
+  s += `<path d="${doorD}" fill="none" stroke="${WOOD_EDGE}" stroke-width="6" opacity="0.92" stroke-linejoin="round"/>`
+  s += `<path d="${doorD}" fill="none" stroke="${WOOD_LIT}" stroke-width="1.4" opacity="0.5" stroke-linejoin="round"/>`
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -2324,6 +2471,15 @@ const PIECES = [
   { id: 'ch1-stable-vane', seed: 20220, w: 299, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'vane') } },
   { id: 'ch1-stable-hay', seed: 20221, w: 512, h: 293, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'hay') } },
   { id: 'ch1-yard-deck', seed: 20230, w: 1024, h: 219, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'yard') } },
+  // Lift-the-flap, painted in SCREEN SPACE (image-x = page-fore d, image-y =
+  // spine z): the BOARD is PORTRAIT (d-span 0.22 : z-span 0.45, row runs down)
+  // and the DOORS LANDSCAPE (d-span 0.16 : z-span 0.085, number upright). Cat
+  // behind door 3 (index 2). Odd seeds so grain differs per leaf.
+  { id: 'ch1-keyboard-board', seed: 20250, w: 500, h: 1024, grain: 12, paint() { return keyboardBoard(this.w, this.h, this.seed, 4, 2) } },
+  { id: 'ch1-keyboard-door1', seed: 20251, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 1) } },
+  { id: 'ch1-keyboard-door2', seed: 20253, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 2) } },
+  { id: 'ch1-keyboard-door3', seed: 20255, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 3) } },
+  { id: 'ch1-keyboard-door4', seed: 20257, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 4) } },
   // ---- Spread 4 — the Keep's fan spire ----
   { id: 'ch3-keep-spire-m0', seed: 40301, w: 595, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 0) } },
   { id: 'ch3-keep-spire-m1', seed: 40302, w: 376, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 1) } },

@@ -588,6 +588,61 @@ export type KeepsakeGeom = {
   returnMs?: number
 }
 
+/**
+ * LIFT-THE-FLAP (E2.2 Batch B; Birmingham mech 94/95 "the lifted flap" + the
+ * reader-direct variant) — the book's first numbered DOOR-FLAPS the reader
+ * lifts to find keys: the conceit of Chapter I, "The Inn of a Hundred Keys"
+ * (spread 2), and its playable (G4). PAGE-ROOTED like the knob tower / volvelle
+ * (side + page coordinates, riding the page's own moving frame, NOT seated on a
+ * parent panel). A KEY-BOARD plaque riveted coplanar into the page (one glue
+ * layer proud) carries a row of numbered door leaves; each leaf is hinged along
+ * its SPINE-WARD edge (the hinge axis runs along the spine), lying coplanar one
+ * paper thickness above the board at rest (shut) and lifting through a capped
+ * arc when the reader grabs its fore edge — uncovering a painted recess (a
+ * hanging brass key, or the innkeeper's cat behind one door, the surprise).
+ * Each door HOLDS its own reader angle (the book remembers which are open); the
+ * shown lift = a_user * E(beta), so E(0) = 0 folds every leaf flat at book
+ * close for any held angle (the winch/knobtower persistence law). Pose math
+ * lives in book/popup-liftflap.ts (this module is at its size cap). Derived +
+ * gate-checked in .superpowers/sdd/bench/derive-liftflap.mjs.
+ */
+export type LiftFlapDoor = {
+  /** Door band along the spine (world z), z0 < z1 — bands are disjoint so the
+   *  standing leaves never meet (bench L4). */
+  z0: number
+  z1: number
+  /** What the recess behind this door reveals — selects the -key/-cat art id
+   *  suffix. Most doors hide a brass key; one hides the innkeeper's cat. */
+  reveal: 'key' | 'cat'
+  /** The number stamped on the door's brass plate (1..N). */
+  plate: number
+}
+
+export type LiftFlapGeom = {
+  mech: 'liftflap'
+  /** The page the board rivets into (whose frame the leaves hinge on). */
+  side: 'left' | 'right'
+  /** Shared hinge line: distance from the spine along the page (the doors'
+   *  spine-ward edge). */
+  hingeD: number
+  /** Door leaf length hinge -> fore edge (the door's "height"). */
+  leafLen: number
+  /** Key-board plaque run band [boardD0, boardD1] (spine -> fore). */
+  boardD0: number
+  boardD1: number
+  /** Key-board plaque spine band [boardZ0, boardZ1] — holds the door row. */
+  boardZ0: number
+  boardZ1: number
+  /** The numbered door leaves, in disjoint z-bands. */
+  doors: readonly LiftFlapDoor[]
+  /** Max lift, degrees (default 95 — the anti-flip ceiling). */
+  liftMaxDeg?: number
+  /** The reveal threshold, degrees (default 70 — a door reads open past this). */
+  regOpenDeg?: number
+  /** Dihedral (deg) the fold-flat envelope normalizes to. Default 176. */
+  restAtDeg?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -603,6 +658,7 @@ export type LayerGeom =
   | RotorGeom
   | VolvelleGeom
   | KnobTowerGeom
+  | LiftFlapGeom
   | KeepsakeGeom
   | KeepStackGeom
   | KeepWinchGeom
@@ -1113,6 +1169,8 @@ export function solveLayerPose(
       throw new Error('storybook: rotors ride a solved parent surface — use solveRotorPose (popup-rotor)')
     case 'volvelle':
       throw new Error('storybook: volvelle layers are multi-patch + user-driven — use solveVolvellePose (popup-volvelle)')
+    case 'liftflap':
+      throw new Error('storybook: lift-flap layers are multi-patch + user-driven — use solveLiftFlapPose (popup-liftflap)')
     case 'knobtower':
       throw new Error('storybook: knob-tower layers are multi-patch + user-driven — use solveKnobTowerPose (popup-knobtower)')
     case 'keepsake':

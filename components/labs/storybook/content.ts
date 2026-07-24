@@ -145,6 +145,27 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   { id: 'ch1-inn-lamp', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch1-inn', seat: 'right', u: 0.13, v: 0.28, width: 0.08, height: 0.14 },
   { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn', mount: 0.62, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.15 },
   { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: 0.2, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.2, height: 0.26 },
+  // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
+  // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
+  // open mid-ground meadow (where loose brass keys are already printed) carries
+  // a row of four numbered inn doors; the reader lifts each to find a hanging
+  // brass key — behind door 3, the innkeeper's cat (the surprise). Page-rooted
+  // and page-flat (the winch/volvelle seat: lid-orientation reads best at the
+  // pinned camera; the inn hero is a single v-fold PAINTING, so its flaps live
+  // on a piece I fully control). Doors HOLD their open/shut state through page
+  // turns; the page-openness envelope eases them shut at book close. Numbers
+  // bench-verified in derive-liftflap.mjs (L1-L9). Clears the stable (z 0.43+)
+  // and the spine v-folds (it sits out at d 0.4+).
+  {
+    id: 'ch1-keyboard', kind: 'foreground', role: 'scenery', mech: 'liftflap', side: 'right',
+    hingeD: 0.44, leafLen: 0.16, boardD0: 0.4, boardD1: 0.62, boardZ0: -0.03, boardZ1: 0.42,
+    doors: [
+      { z0: -0.005, z1: 0.08, reveal: 'key', plate: 1 },
+      { z0: 0.1, z1: 0.185, reveal: 'key', plate: 2 },
+      { z0: 0.215, z1: 0.3, reveal: 'cat', plate: 3 },
+      { z0: 0.33, z1: 0.415, reveal: 'key', plate: 4 },
+    ],
+  },
   // VOLUMETRIC: the stable is a gabled OPEN-FRONT barn at the gate — the
   // user's canonical pop-up structure ("left wall, right wall and a
   // ceiling", C6 round-1 verdict 2026-07-11): open front toward the

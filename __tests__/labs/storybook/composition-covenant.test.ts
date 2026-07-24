@@ -152,6 +152,11 @@ const familyOf = (l: SceneLayer): string | null => {
       // The reader-spun windowed dial (Birmingham 103/104) — a rotating-window
       // reveal, distinct from the winch's crank/iris: its own hand-driven family.
       return 'volvelle'
+    case 'liftflap':
+      // The reader-lifted numbered door-flaps (Birmingham 94/95) — a hinged
+      // reveal (lift to uncover a recess), distinct from the volvelle's rotating
+      // window: its own hand-driven family.
+      return 'liftflap'
     case 'dress':
       return null
   }
