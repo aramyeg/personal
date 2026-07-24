@@ -19,7 +19,7 @@ import { Delights } from './props/delights'
 import { BluenetSet } from './props/set-bluenet'
 import { FlyerbeeSet } from './props/set-flyerbee'
 import { Dialog360Set } from './props/set-360dialog'
-import { AccentureSet } from './props/set-accenture'
+import { AccentureSet, DesertLife } from './props/set-accenture'
 import { AknaSet } from './props/set-akna'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { LoadSignal } from '../loader/load-signal'
@@ -73,6 +73,7 @@ function SceneContents({
         <GlobalDressingAutumn journeyRef={journeyRef} />
         <Forest journeyRef={journeyRef} />
         <Jungle journeyRef={journeyRef} />
+        <DesertLife journeyRef={journeyRef} />
         <Bridges journeyRef={journeyRef} />
         <Delights journeyRef={journeyRef} />
         <ChapterSet index={0} journeyRef={journeyRef}>
