@@ -8,6 +8,7 @@ import {
   CHAPTER_SLICE,
   chapterStartRotation,
   easeOutBack,
+  approachRevealGrow,
 } from '@/components/labs/small-world/journey-timeline'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 
@@ -103,6 +104,42 @@ describe('easeOutBack', () => {
   it('clamps input outside [0,1]', () => {
     expect(easeOutBack(-1)).toBeCloseTo(0, 10)
     expect(easeOutBack(2)).toBeCloseTo(1, 10)
+  })
+})
+
+// Task 46 — the desert camels + oasis "appear as the girl approaches": a deterministic,
+// rotation-driven grow (no wall-clock) so the reveal is bit-reproducible when scrubbing.
+describe('approachRevealGrow (Task 46 desert approach reveal)', () => {
+  const CH = 3 // desert chapter
+  const START = 0.45
+  const SPAN = 0.4
+  const grow = (rot: number) => approachRevealGrow(CH, rot, START, SPAN)
+  const chapterStop = chapterStartRotation(CH) + CHAPTER_SLICE // rotation at the desert stop
+
+  it('is deterministic — same rotation gives the exact same grow', () => {
+    for (const rot of [chapterStartRotation(CH), chapterStartRotation(CH) + 1.2, chapterStop]) {
+      expect(grow(rot)).toBe(grow(rot))
+    }
+  })
+
+  it('holds hidden (0) before the reveal begins (start of the desert travel)', () => {
+    expect(grow(chapterStartRotation(CH))).toBeCloseTo(0, 10)
+    // still 0 right up to the start fraction
+    expect(grow(chapterStartRotation(CH) + CHAPTER_SLICE * (START - 0.02))).toBeCloseTo(0, 10)
+  })
+
+  it('is fully grown (1) by the stop and stays full through the frozen dwell', () => {
+    expect(grow(chapterStop)).toBeCloseTo(1, 10)
+    // rotation freezes at the stop through burst + panel — grow must stay pinned at 1
+    expect(grow(chapterStop + 0.5)).toBeCloseTo(1, 10)
+  })
+
+  it('grows through the middle of the approach (a real before/mid/after reveal)', () => {
+    const mid = grow(chapterStartRotation(CH) + CHAPTER_SLICE * (START + SPAN * 0.5))
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThanOrEqual(easeOutBack(0.5) + 1e-9)
+    // strictly larger than the hidden start
+    expect(mid).toBeGreaterThan(grow(chapterStartRotation(CH)))
   })
 })
 

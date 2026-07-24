@@ -16,9 +16,10 @@
  * Task 41 (Aram, Round 12): the B0 desert wedge is now a DRY dune-and-pyramid scene —
  * its old right sea + breach strait (which cut a water passage across the desert face)
  * are retired; the overflow read is carried by the B1/B2 shelf seas (which still advance
- * FURTHER right wedge by wedge) plus the continuous limb tide (untouched). B0 keeps only
- * its single bridged crossing stream (draining LEFT to the ocean, like every wedge) and a
- * small classic oasis pool in an inter-dune hollow — no passage crosses the visible face.
+ * FURTHER right wedge by wedge) plus the continuous limb tide (untouched). Task 46 (Round 13)
+ * then removed the B0 crossing stream + its bridge as well — the desert lane is now CONTINUOUS
+ * DRY SAND (the girl walks the terrain, no deck); the only water on the desert face is a small
+ * classic oasis pool in an inter-dune hollow. No passage crosses the visible face.
  *
  * TWO structural invariants keep the renewal seamless (they replace the retired
  * Task-15/16 spineGate + strait). Round 6 makes the limbs ASYMMETRIC:
@@ -494,7 +495,22 @@ function crossPoint(theta: number): [number, number, number] {
  *  meridian and ≥ 0.12 rad from its own chapter's near-spine props. Variant A
  *  (chapters 0–2) on lap 1, variant B (chapters 3–5) on lap 2. */
 export const CROSSINGS_A = [1.7, 3.52, 5.8] as const
-export const CROSSINGS_B = [1.2, 3.22, 5.3] as const
+/**
+ * Per-band variant-B crossing longitude, or `null` where the band has NO bridged
+ * crossing. Task 46 (Round 13): Aram — "I don't think we need these water bridges on
+ * every biome." The B0 DESERT crossing + its bridge are REMOVED: the desert lane is now
+ * continuous dry sand (the girl walks the terrain — no deck spans it), so band 0 is null.
+ * Bands 1 (canyon creek) and 2 (winter creek) keep their crossings. Band-indexed (0,1,2)
+ * for the per-band consumers (bridgeDeckYAt, B_CHANNELS).
+ */
+export const B_CROSSING_BY_BAND = [null, 3.22, 5.3] as const
+/**
+ * The LIVE variant-B bridged crossings (the `null` bands dropped). The bridge renderer,
+ * the shared water-relief clear (planet's ALL_CROSSINGS) and the deck-clearance benches
+ * enumerate THESE. Task 46: band 0 (desert) removed, so this is the two remaining B
+ * crossings. MUST mirror the non-null entries of B_CROSSING_BY_BAND (pinned in biomes.test).
+ */
+export const CROSSINGS_B = [3.22, 5.3] as const
 /** Back-compat alias (old importers). */
 export const RIVER_CROSSINGS = CROSSINGS_A
 
@@ -526,6 +542,11 @@ const CREEK_HALF = 0.055
 const CREEK_RAMP = 0.05
 const CREEK_DEPTH = 0.08
 
+/** A channel that carves NOTHING — a band with no crossing/stream (Task 46: the B0 desert
+ *  lane is continuous dry sand). Empty arcs ⇒ channelCarve returns 0 and channelDist returns
+ *  Infinity everywhere, so no water forms and no beach tint is keyed off it. */
+const DRY_CHANNEL: Channel = { arcs: [], half: STREAM_HALF, ramp: STREAM_RAMP, depth: 0 }
+
 /** A single stream from a spine crossing out to the LEFT ocean (pole at −x, so
  *  sign is −1 for every wedge now the right ocean is gone). `sign` is retained for
  *  clarity/back-compat but the mouth always lands in the one ocean. */
@@ -553,9 +574,12 @@ function straitChannel(theta: number): Channel {
 // Task 41 (Round 12): the B0 breach strait is RETIRED. Aram — "in desert terrain there
 // should be no ridge and water passage." The old breachStraitChannel widened a massive
 // water passage across the desert face and joined a swollen right sea (B0_SEA) to the left
-// ocean. The desert is now dry dunes + pyramids; B0 keeps only a modest bridged crossing
-// stream draining LEFT to the ocean (streamChannel, like every other wedge — no wide flank,
-// no right sea), so no passage crosses the visible face. The overflow narrative continues
+// ocean. The desert is now dry dunes + pyramids.
+// Task 46 (Round 13): Aram — "I don't think we need these water bridges on every biome."
+// The B0 crossing stream + its bridge are now REMOVED TOO (B_CHANNELS[0] = DRY_CHANNEL,
+// B_CROSSING_BY_BAND[0] = null): the desert lane is CONTINUOUS DRY SAND — the girl walks the
+// terrain with no deck. The only water on the desert face is the small oasis pool. The
+// overflow narrative still lives in the B1/B2 shelf seas + the continuous limb tide. The overflow narrative continues
 // via the B1/B2 shelf seas (still advancing further right) + the continuous limb tide.
 
 /** The grand delta (A2, Round 6 redesign): the artery rises INLAND at a highland
@@ -617,9 +641,9 @@ const A_CHANNELS: readonly Channel[] = [
   deltaChannel(CROSSINGS_A[2]), // A2 grand delta: inland source → left ocean
 ]
 const B_CHANNELS: readonly Channel[] = [
-  streamChannel(CROSSINGS_B[0], -1), // B0 desert: single bridged crossing stream → LEFT ocean (Task 41)
-  creekChannel(CROSSINGS_B[1], -1, CREEK_HALF, 0.1), // B1 canyon creek → left ocean, fattened (deeper)
-  streamChannel(CROSSINGS_B[2], -1), // B2 frozen creek → left ocean
+  DRY_CHANNEL, // B0 desert (Task 46): NO crossing — continuous dry sand, no water carves the face
+  creekChannel(B_CROSSING_BY_BAND[1], -1, CREEK_HALF, 0.1), // B1 canyon creek → left ocean, fattened (deeper)
+  streamChannel(B_CROSSING_BY_BAND[2], -1), // B2 frozen creek → left ocean
 ]
 const CHANNELS = [A_CHANNELS, B_CHANNELS] as const
 
@@ -801,18 +825,29 @@ function canyonWalls(nx: number, ny: number, nz: number): number {
 // untouched and the lane stays gentle + dry. Faded to 0 before the limb so it never fights the
 // polar ocean/beach, and wedge-gated to 0 on the meridians via wedgeDelta (so bumpA===bumpB
 // there). The classic oasis pool sits in a flattened inter-dune hollow (oasisFlat below).
+//
+// Task 46 (Round 13): Aram — "reach more into the left part of the planet towards the ocean.
+// Also cover the right side more" + "make the dunes ... more of a stable structures." So the
+// field FOOTPRINT is widened toward BOTH limbs (limbLo/Hi pushed to the wedgeGate structural
+// limit ~0.75 — nothing crosses the invariant limb, wedgeDelta still zeros the delta by 0.75),
+// the crests are made LONGER (lower DUNE_FREQ) so the dunes read as landforms not texture, and
+// the peak height is raised toward its verified ~0.1R headroom for a stable, grounded mass. As
+// the dunes now run left toward the ocean, they are flattened at the shore (oceanAvoid) so the
+// desert MEETS the sea as a clean coast instead of floating sand on the water.
 const DUNE_LANE_LO = 0.16
 const DUNE_LANE_HI = 0.28
-const DUNE_LIMB_LO = 0.58
-const DUNE_LIMB_HI = 0.72
-/** Dune crest count marching across a full 2π of longitude (≈4 crescents across the wedge). */
-const DUNE_FREQ = 12
+const DUNE_LIMB_LO = 0.62 // Task 46: push coverage toward both limbs (was 0.58)
+const DUNE_LIMB_HI = 0.75 // Task 46: reach the wedgeGate structural limit (was 0.72)
+/** Dune crest count marching across a full 2π of longitude. Task 46: fewer, LONGER crests
+ *  (≈3 crescents across the wedge) so the dunes read as landforms, not corrugated texture. */
+const DUNE_FREQ = 9
 /** How much the crest lines bow with latitude → crescent (barchan) horns, not straight ridges. */
 const DUNE_CURVE = 2.3
 /** Fraction of each dune period spent on the gentle windward back (the rest = steep slip face). */
 const DUNE_BACK = 0.72
-/** Peak dune height (fraction of R). */
-const DUNE_AMP = 0.075
+/** Peak dune height (fraction of R). Task 46: raised toward the verified ~0.1R headroom (was
+ *  0.075) so the dunes carry a stable, grounded mass — still well under the 1.35R ceiling. */
+const DUNE_AMP = 0.095
 
 /** One asymmetric dune wave from a phase p∈[0,1): a gentle windward rise to the crest at
  *  DUNE_BACK, then a steep leeward slip-face drop. The slip face is compressed into the
@@ -848,7 +883,13 @@ export function duneField(nx: number, ny: number, nz: number): number {
   // flatten the dunes into a hollow around the oasis so the pool sits on a calm basin, not a hump
   const od = Math.acos(clampU(nx * B0_OASIS.dir[0] + ny * B0_OASIS.dir[1] + nz * B0_OASIS.dir[2]))
   const oasisFlat = smoothstep01((od - 0.14) / 0.06)
-  return DUNE_AMP * h * envelope * lane * limb * oasisFlat
+  // Task 46: the field now reaches toward the LEFT-ocean shore (−x). Flatten the dunes to 0
+  // wherever the ocean membership rises, so sand is never built on (or lifted out of) the
+  // water — the dunes descend into a dry beach and stop at the sea (oceanMask ≳ 0.22 is the
+  // wet coast; this fades the dunes out well before then, adds-only preserved since ∈[0,1]).
+  const om = oceanMask(nx, ny, nz, 1)
+  const oceanAvoid = 1 - smoothstep01(om / 0.12)
+  return DUNE_AMP * h * envelope * lane * limb * oasisFlat * oceanAvoid
 }
 
 // --- Jungle canopy mounds (A1, Task 42) -------------------------------------

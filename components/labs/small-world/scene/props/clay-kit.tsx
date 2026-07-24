@@ -323,12 +323,16 @@ export function ClayBridge({ rise = DECK_RISE, ...x }: Xform & { rise?: number }
 }
 
 /**
- * A clay pyramid — the desert's first "structure" (Task 41). A four-sided pressed-clay
- * pyramid in the sand family. Flat FACE normals are baked into the geometry (toNonIndexed +
- * computeVertexNormals) so each of the four faces takes its own crisp toon band — a lit face
- * + a shaded face at a glance, without the material `flatShading` flag (which meshToonMaterial
- * doesn't type). A darker pressed base grounds it in the dune. `tilt` leans it a touch and
- * `sink` buries the base for hand-made claymation charm; `spin` turns which faces front the
+ * A clay pyramid — the desert's "structure" (Task 41; grounded in Task 46). A four-sided
+ * pressed-clay pyramid in the sand family. Flat FACE normals are baked into the geometry
+ * (toNonIndexed + computeVertexNormals) so each of the four faces takes its own crisp toon
+ * band — a lit face + a shaded face at a glance, without the material `flatShading` flag (which
+ * meshToonMaterial doesn't type).
+ *
+ * Task 46 (Aram — "make the dunes and pyramids more of a stable structures"): the pyramid now
+ * sits on a STEPPED two-tier pressed-clay plinth (a wide grounding step + a narrower seat step)
+ * so it reads as a seated monument, not a cone dropped on the sand. `tilt` leans it a touch and
+ * `sink` buries the seat for hand-made claymation charm; `spin` turns which faces front the
  * camera. `size` is the square base edge (world units).
  */
 export function ClayPyramid({
@@ -352,6 +356,7 @@ export function ClayPyramid({
   const ramp = useClayRamp()
   const h = height ?? size
   const r = size / Math.SQRT2 // cone radius whose square base has edge = size
+  const plinthH = size * 0.1 // one plinth step height, scaled to the pyramid
   const geo = useMemo(() => {
     const g = new THREE.ConeGeometry(r, h, 4).toNonIndexed()
     g.computeVertexNormals() // per-face flat normals → crisp faceted sun/shade faces
@@ -359,12 +364,17 @@ export function ClayPyramid({
   }, [r, h])
   return (
     <group {...x}>
-      {/* darker pressed base slab, grounding the pyramid in the sand */}
-      <mesh position={[0, 0.02, 0]}>
-        <boxGeometry args={[size * 0.98, 0.06, size * 0.98]} />
+      {/* stepped pressed-clay plinth — a wide grounding step seated into the sand + a narrower
+          seat step, so the pyramid reads as a grounded STRUCTURE (Task 46 stability). */}
+      <mesh position={[0, plinthH * 0.5, 0]}>
+        <boxGeometry args={[size * 1.2, plinthH, size * 1.2]} />
         <meshToonMaterial color={base} gradientMap={ramp} />
       </mesh>
-      <group rotation={[tilt, spin, 0]} position={[0, -sink, 0]}>
+      <mesh position={[0, plinthH * 1.4, 0]}>
+        <boxGeometry args={[size * 1.0, plinthH * 0.8, size * 1.0]} />
+        <meshToonMaterial color={base} gradientMap={ramp} />
+      </mesh>
+      <group rotation={[tilt, spin, 0]} position={[0, plinthH * 1.8 - sink, 0]}>
         <mesh geometry={geo} position={[0, h / 2, 0]}>
           <meshToonMaterial color={color} gradientMap={ramp} />
         </mesh>
@@ -515,5 +525,70 @@ export function ClayFrog({ color = PALETTE.frogBody, throat = PALETTE.frogThroat
       ]),
     [color, throat]
   )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+// --- Desert life that appears on approach (Task 46) -------------------------
+//
+// Aram: "when the girl walks towards the desert biome camels, oasis can appear." The camels
+// are merged single-draw clay animals (buildMergedClay, same as the jungle beasts): a strong
+// dromedary silhouette — a long body on four legs, ONE high hump under a terracotta saddle
+// blanket, a raised neck + head with a heavy muzzle — in the golden-desert sand family with a
+// single warm saddle accent. Feet sit at y=0 so it stands on the dune it is anchored to. One
+// draw call each; revealed by the rotation-driven grow in set-accenture.tsx.
+export function ClayCamel({ hide = PALETTE.camelHide, saddle = PALETTE.camelSaddle, ...x }: Xform & { hide?: string; saddle?: string }) {
+  const ramp = useClayRamp()
+  const leg = (px: number, pz: number): ClayPart => ({
+    geo: new THREE.CylinderGeometry(0.017, 0.02, 0.16, 7),
+    color: PALETTE.camelHideDeep,
+    pos: [px, 0.08, pz],
+  })
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // four legs (feet at y=0)
+        leg(0.1, 0.055), leg(0.1, -0.055), leg(-0.1, 0.055), leg(-0.1, -0.055),
+        // long barrel body
+        { geo: new THREE.SphereGeometry(0.11, 16, 14), color: hide, pos: [0, 0.23, 0], scl: [1.55, 0.92, 0.9] },
+        // single high hump
+        { geo: new THREE.SphereGeometry(0.075, 14, 14), color: hide, pos: [-0.015, 0.31, 0], scl: [1.15, 1.05, 0.95] },
+        // terracotta saddle blanket draped over the hump (the one accent)
+        { geo: new THREE.SphereGeometry(0.06, 14, 12), color: saddle, pos: [-0.015, 0.34, 0], scl: [1.25, 0.5, 1.02] },
+        // neck rising toward the front
+        { geo: new THREE.CylinderGeometry(0.03, 0.042, 0.18, 8), color: hide, pos: [0.17, 0.31, 0], rot: [0, 0, -0.62] },
+        // head + heavy muzzle
+        { geo: new THREE.SphereGeometry(0.05, 12, 12), color: hide, pos: [0.24, 0.4, 0], scl: [1.25, 0.95, 0.9] },
+        { geo: new THREE.SphereGeometry(0.03, 10, 10), color: PALETTE.camelHideDeep, pos: [0.29, 0.37, 0], scl: [1.4, 0.85, 0.85] },
+        // two ink eyes + two little ears
+        { geo: new THREE.SphereGeometry(0.008, 6, 6), color: PALETTE.ink, pos: [0.265, 0.42, 0.032] },
+        { geo: new THREE.SphereGeometry(0.008, 6, 6), color: PALETTE.ink, pos: [0.265, 0.42, -0.032] },
+        { geo: new THREE.ConeGeometry(0.016, 0.03, 7), color: hide, pos: [0.22, 0.45, 0.03] },
+        { geo: new THREE.ConeGeometry(0.016, 0.03, 7), color: hide, pos: [0.22, 0.45, -0.03] },
+        // stubby tail
+        { geo: new THREE.CylinderGeometry(0.008, 0.012, 0.1, 6), color: PALETTE.camelHideDeep, pos: [-0.17, 0.24, 0], rot: [0, 0, 0.6] },
+      ]),
+    [hide, saddle]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A dusty tuft of oasis reeds — a few tapered blades fanning up from the base, merged into
+ *  ONE geometry (single draw). Reads as the marsh grass ringing the oasis pool. */
+export function ClayReeds({ color = PALETTE.reedGreen, ...x }: Xform & { color?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const blades: ClayPart[] = []
+    const lean = [-0.35, -0.12, 0.1, 0.32, 0.02]
+    const yaw = [0.2, 1.4, 2.7, 3.9, 5.2]
+    for (let i = 0; i < lean.length; i++) {
+      blades.push({
+        geo: new THREE.ConeGeometry(0.012, 0.2 + 0.05 * (i % 2), 5),
+        color,
+        pos: [0.03 * Math.cos(yaw[i]), 0.1, 0.03 * Math.sin(yaw[i])],
+        rot: [lean[i], yaw[i], lean[i] * 0.6],
+      })
+    }
+    return buildMergedClay(blades)
+  }, [color])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }

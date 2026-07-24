@@ -62,4 +62,11 @@ export const PALETTE = {
   parrotWing: '#3FA6C4', // teal wing + tail
   frogBody: '#5FBE4A', // bright green frog
   frogThroat: '#D7E7A0', // pale frog throat
+  // Task 46 — desert life that appears on approach: the camels (merged single-draw clay
+  // animals, sand-family body + a warm saddle accent) and the oasis palm cluster (reuses
+  // leaf/clayPath). One accent colour each, in the golden-desert family.
+  camelHide: '#D2A15E', // warm sandy-tan camel body (sits in the goldSand/dune family)
+  camelHideDeep: '#B07E3F', // shaded camel underside / legs
+  camelSaddle: '#B0563A', // terracotta saddle blanket accent
+  reedGreen: '#8FB055', // dusty oasis reed/grass tuft (drier green than the jungle)
 } as const

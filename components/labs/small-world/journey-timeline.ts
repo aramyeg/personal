@@ -49,6 +49,27 @@ export function easeOutBack(t: number): number {
   return 1 + (c + 1) * p * p * p + c * p * p
 }
 
+/**
+ * Deterministic APPROACH-REVEAL grow [0 … 1] for props that emerge as the girl nears a
+ * chapter's stop (Task 46 — the desert camels + oasis palms "appear as the girl approaches").
+ * Driven ONLY by the unwrapped journey `rotation` (no wall-clock, so scrubbing back and forth
+ * is bit-reproducible): it holds 0 until she is `startFrac` of the chapter's travel-slice in,
+ * then eases up (easeOutBack springy pop) to full by `startFrac + spanFrac`, and stays full
+ * through the stop + dwell (rotation freezes there). Distinct from ChapterSet's morph (which
+ * grows the whole set from the chapter's first frame): this reveals LATER, mid-approach, so the
+ * life pops in against the already-standing dunes + pyramids. `chapter` is the desert's chapter.
+ */
+export function approachRevealGrow(
+  chapter: number,
+  rotation: number,
+  startFrac: number,
+  spanFrac: number
+): number {
+  const start = chapterStartRotation(chapter) + CHAPTER_SLICE * startFrac
+  const p = clamp01((rotation - start) / (CHAPTER_SLICE * spanFrac))
+  return easeOutBack(p)
+}
+
 export function journeyStateAt(rawProgress: number, morphOut?: number[]): JourneyState {
   const progress = clamp01(rawProgress)
   const segLen = 1 / CHAPTER_COUNT

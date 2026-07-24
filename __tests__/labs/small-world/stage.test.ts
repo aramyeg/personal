@@ -103,6 +103,16 @@ describe('walkYAt (bridge decks)', () => {
     }
   })
 
+  it('lap 2: the DESERT (band 0) lane has NO bridge deck — continuous dry sand (Task 46)', () => {
+    // The B0 crossing + bridge are removed, so across the desert wedge (band 0 on lap 2) the
+    // girl follows the terrain with no deck lift — including the OLD crossing longitude (1.2).
+    const TWO_PI = Math.PI * 2
+    for (const tc of [0.9, 1.2, 1.5]) {
+      const rot = tc - STANCE_ALPHA + TWO_PI
+      expect(walkYAt(STANCE_Z, rot)).toBeCloseTo(surfaceYAt(STANCE_Z, rot), 10)
+    }
+  })
+
   it('lap 2: the A-crossing longitudes are DRY (their decks retired to B) + dry lane follows B terrain', () => {
     // The complement pin: the lap-1 (A) crossings carry no deck on lap 2 — proof
     // the spine truly changed — and plain lane longitudes follow the B surface with

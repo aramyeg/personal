@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { CHAPTER_SLICE, chapterStartRotation } from '../journey-timeline'
 import { PLANET_RADIUS, surfaceYAt, terrainBump, terrainBumpB } from './planet'
-import { CROSSINGS_A, CROSSINGS_B } from './biomes'
+import { CROSSINGS_A, B_CROSSING_BY_BAND } from './biomes'
 import { STANCE_ALPHA, activeVariantAt, canonicalTheta } from './renewal'
 
 // The renewal gate is the single source of the A/B flip. It lives in the leaf
@@ -65,10 +65,13 @@ export function bridgeDeckYAt(worldZ: number, rotation: number): number {
   const theta = rotation + STANCE_ALPHA
   for (let i = 0; i < CROSSINGS_A.length; i++) {
     // The deck present at a crossing is the one whose variant is active there:
-    // renewalGate > 0.5 ⇒ B list live, else A. (Both lists are identical today;
-    // Task 20 diverges them.) Carve depth samples the matching variant's terrain.
+    // renewalGate > 0.5 ⇒ B list live, else A. Carve depth samples the matching
+    // variant's terrain. Task 46: band 0's B variant (the desert) has NO crossing
+    // (B_CROSSING_BY_BAND[0] === null) — the girl walks continuous dry sand there, so
+    // skip it and let walkYAt fall through to the terrain (bridgeDeckYAt returns -Inf).
     const variant = activeVariantAt(canonicalTheta(CROSSINGS_A[i]), rotation)
-    const tc = variant === 1 ? CROSSINGS_B[i] : CROSSINGS_A[i]
+    const tc = variant === 1 ? B_CROSSING_BY_BAND[i] : CROSSINGS_A[i]
+    if (tc === null) continue
     const gap = angularGap(theta, tc)
     if (gap > DECK_HALF + DECK_RAMP) continue
     const cy = PLANET_RADIUS * Math.cos(tc)

@@ -22,6 +22,9 @@ import {
   tideCarve,
   TIDE_LAT_LO,
   WATER_LEVEL,
+  CROSSINGS_B,
+  B_CROSSING_BY_BAND,
+  channelDist,
 } from '@/components/labs/small-world/scene/biomes'
 import {
   terrainBump,
@@ -317,6 +320,56 @@ describe('Task 42 — A1 jungle canopy mounds', () => {
         const d = dirAt(nx, m)
         expect(biomeBumpB(...d)).toBe(biomeBump(...d))
       }
+    }
+  })
+})
+
+// Task 46 (Round 13): Aram — "I don't think we need these water bridges on every biome."
+// The B0 DESERT crossing + its bridge are removed (the lane is continuous dry sand), and the
+// dune footprint is widened toward both limbs / raised for stable mass, meeting the left ocean.
+describe('Task 46 — desert bridge removal + widened dune footprint', () => {
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('CROSSINGS_B mirrors the non-null B_CROSSING_BY_BAND entries (band-0 desert dropped)', () => {
+    expect(B_CROSSING_BY_BAND[0]).toBe(null) // desert: no crossing
+    expect([...CROSSINGS_B]).toEqual(B_CROSSING_BY_BAND.filter((v) => v !== null))
+    expect(CROSSINGS_B).toHaveLength(2)
+  })
+
+  it('the B0 desert lane carries NO channel water at the old crossing (θ=1.2) — dry sand', () => {
+    // the stream that used to carve the crossing is gone: no B channel is anywhere near the
+    // desert lane, and the lane bump is un-carved (was a ~-0.055R stream trough before).
+    const [x, y, z] = dirAt(0, 1.2)
+    expect(channelDist(x, y, z, 1)).toBeGreaterThan(1)
+    expect(biomeBumpB(x, y, z)).toBeGreaterThan(-0.01)
+  })
+
+  it('the dune footprint reaches past the old 0.72 limb (widened toward the coast)', () => {
+    expect(DUNE_GATE.limbHi).toBe(0.75)
+    let peak = 0
+    for (const th of [0.7, 0.95, 1.2, 1.5, 1.9]) {
+      for (const nx of [0.72, 0.73, 0.74]) peak = Math.max(peak, duneField(...dirAt(nx, th)))
+    }
+    expect(peak).toBeGreaterThan(0) // dunes now build relief past the old 0.72 limb
+  })
+
+  it('still vanishes at/past the wedgeGate structural limit (|nx| >= 0.75) and on the lane', () => {
+    for (const th of [0.7, 1.2, 1.9]) {
+      for (const nx of [0.75, 0.8, -0.75, -0.85]) expect(duneField(...dirAt(nx, th))).toBe(0)
+      for (const nx of [0, 0.1, -0.1]) expect(duneField(...dirAt(nx, th))).toBe(0)
+    }
+  })
+
+  it('the widened dunes MEET the left ocean — they never lift a deep sea point out of the water', () => {
+    // sample the −x ocean at a band-0 longitude: raising/reaching the dunes must not create dry
+    // land where the sea is (oceanAvoid flattens the dunes at the shore).
+    const seaTh = MERIDIANS[0] + Math.PI / 3 // band-0 interior
+    for (const nx of [-0.8, -0.85, -0.9]) {
+      const [x, y, z] = dirAt(nx, seaTh)
+      expect(1 + biomeBumpB(x, y, z)).toBeLessThan(WATER_LEVEL)
     }
   })
 })

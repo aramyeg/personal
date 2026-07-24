@@ -6,12 +6,13 @@ import { ClayBridge } from './clay-kit'
 import type { JourneyRef } from '../use-journey'
 
 /**
- * Always-present wooden footbridges, one per authored river crossing — but now a
- * variant-A copy AND a variant-B copy at each crossing, each gated at that
- * crossing's own longitude so exactly one is visible (A-visible XOR B-visible by
- * the shared 0.5 threshold). Today the two lists are identical, so the swap is
- * invisible; Task 20 diverges them and the mechanism already carries it. Lives
- * inside Planet (not chapter-gated) so the girl always has a deck to cross.
+ * Always-present wooden footbridges, one per authored river crossing — a variant-A copy
+ * at each A crossing and a variant-B copy at each B crossing, each gated at that crossing's
+ * own longitude so exactly one is visible (A-visible XOR B-visible by the shared 0.5
+ * threshold). Task 20 diverged the two lists; Task 46 dropped the B0 DESERT crossing
+ * entirely (CROSSINGS_B now holds only the canyon + winter B crossings), so lap 2 has NO
+ * bridge over the desert — the girl walks continuous dry sand there. Lives inside Planet
+ * (not chapter-gated) so the girl always has a deck wherever a crossing DOES exist.
  */
 export function Bridges({ journeyRef }: { journeyRef: JourneyRef }) {
   return (
