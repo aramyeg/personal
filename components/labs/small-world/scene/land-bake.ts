@@ -484,10 +484,13 @@ function accentMeadow(
       else if (lo) dot(pal.petal, 0.45)
       if (hi2) dot(pal.tuff, 0.45)
     } else {
-      // B2 winter-meets-blossom: pink on white (snow kind covers the core)
+      // B2 winter (Task 50): cold blue-white drift ground — a pale ice base, bright snow crests,
+      // frost-blue scoured hollows and sparse deep-spruce flecks. NO blossom pink (cold-palette
+      // discipline; the winter scene's one warm note is the fox, a prop, not the ground).
       dot(pal.ice, 0.6)
-      if (hi) dot(pal.blossom, 0.6)
-      else if (lo) dot(pal.petal, 0.55)
+      if (hi) dot(pal.snow, 0.5)
+      else if (lo) dot(pal.frostShadow, 0.5)
+      if (hi2) dot(pal.spruceDeep, 0.22)
     }
   }
 }
@@ -556,9 +559,14 @@ export function paintVertex(
     }
     case 'snow': {
       c.lerp(pal.snow, kt)
-      // faint blossom-pink cast dusting the winter summit
+      // Task 50 — cold mottling replaces the old blossom-pink cast (cold-palette discipline):
+      // wind-scoured frost-blue hollows, bright ice crest glints and sparse deep-spruce shadow
+      // flecks, so the snow reads as pressed cold clay with character, not flat warm white.
       const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
-      if (spk > 0.72) c.lerp(pal.blossom, 0.35 * kt)
+      const spk2 = Math.sin(29.1 * ny + 4.2) * Math.sin(31.7 * nz - 0.8) * Math.sin(27.3 * nx + 1.9)
+      if (spk < -0.5) c.lerp(pal.frostShadow, 0.4 * kt)
+      else if (spk > 0.6) c.lerp(pal.ice, 0.3 * kt)
+      if (spk2 > 0.7) c.lerp(pal.spruceDeep, 0.2 * kt)
       break
     }
     default: {
@@ -681,6 +689,8 @@ export function buildPal(): Pal {
     deltaSilt: new THREE.Color(PALETTE.deltaSilt),
     deltaSand: new THREE.Color(PALETTE.deltaSand),
     deltaMoss: new THREE.Color(PALETTE.deltaMoss),
+    frostShadow: new THREE.Color(PALETTE.frostShadow),
+    spruceDeep: new THREE.Color(PALETTE.spruceDeep),
   } satisfies Pal
 }
 

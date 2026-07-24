@@ -19,7 +19,10 @@
  * FURTHER right wedge by wedge) plus the continuous limb tide (untouched). Task 46 (Round 13)
  * then removed the B0 crossing stream + its bridge as well — the desert lane is now CONTINUOUS
  * DRY SAND (the girl walks the terrain, no deck); the only water on the desert face is a small
- * classic oasis pool in an inter-dune hollow. No passage crosses the visible face.
+ * classic oasis pool in an inter-dune hollow. No passage crosses the visible face. Task 50
+ * (Round 13) does the same to the B2 WINTER wedge: its frozen creek + bridge are removed, so the
+ * winter lane is CONTINUOUS SNOW too — the only winter water is the icy lake (B2_FROZEN + B2_SHELF
+ * ponds, kept sacred). Only the B1 canyon creek keeps a variant-B bridged crossing now.
  *
  * TWO structural invariants keep the renewal seamless (they replace the retired
  * Task-15/16 spineGate + strait). Round 6 makes the limbs ASYMMETRIC:
@@ -497,20 +500,22 @@ function crossPoint(theta: number): [number, number, number] {
 export const CROSSINGS_A = [1.7, 3.52, 5.8] as const
 /**
  * Per-band variant-B crossing longitude, or `null` where the band has NO bridged
- * crossing. Task 46 (Round 13): Aram — "I don't think we need these water bridges on
- * every biome." The B0 DESERT crossing + its bridge are REMOVED: the desert lane is now
- * continuous dry sand (the girl walks the terrain — no deck spans it), so band 0 is null.
- * Bands 1 (canyon creek) and 2 (winter creek) keep their crossings. Band-indexed (0,1,2)
- * for the per-band consumers (bridgeDeckYAt, B_CHANNELS).
+ * crossing. Aram — "I don't think we need these water bridges on every biome."
+ * Task 46 (Round 13) removed the B0 DESERT crossing + its bridge (band 0 → null); Task 50
+ * (Round 13) then removes the B2 WINTER crossing + its bridge too (band 2 → null): the
+ * winter lane is now continuous snow (the girl walks the terrain — no deck spans it). Only
+ * band 1 (the canyon creek) keeps a variant-B crossing. Band-indexed (0,1,2) for the
+ * per-band consumers (bridgeDeckYAt, B_CHANNELS).
  */
-export const B_CROSSING_BY_BAND = [null, 3.22, 5.3] as const
+export const B_CROSSING_BY_BAND = [null, 3.22, null] as const
 /**
  * The LIVE variant-B bridged crossings (the `null` bands dropped). The bridge renderer,
  * the shared water-relief clear (planet's ALL_CROSSINGS) and the deck-clearance benches
- * enumerate THESE. Task 46: band 0 (desert) removed, so this is the two remaining B
- * crossings. MUST mirror the non-null entries of B_CROSSING_BY_BAND (pinned in biomes.test).
+ * enumerate THESE. Task 46 dropped band 0 (desert); Task 50 dropped band 2 (winter), so
+ * this is the ONE remaining B crossing (the canyon creek). MUST mirror the non-null entries
+ * of B_CROSSING_BY_BAND (pinned in biomes.test).
  */
-export const CROSSINGS_B = [3.22, 5.3] as const
+export const CROSSINGS_B = [3.22] as const
 /** Back-compat alias (old importers). */
 export const RIVER_CROSSINGS = CROSSINGS_A
 
@@ -643,7 +648,7 @@ const A_CHANNELS: readonly Channel[] = [
 const B_CHANNELS: readonly Channel[] = [
   DRY_CHANNEL, // B0 desert (Task 46): NO crossing — continuous dry sand, no water carves the face
   creekChannel(B_CROSSING_BY_BAND[1], -1, CREEK_HALF, 0.1), // B1 canyon creek → left ocean, fattened (deeper)
-  streamChannel(B_CROSSING_BY_BAND[2], -1), // B2 frozen creek → left ocean
+  DRY_CHANNEL, // B2 winter (Task 50): NO crossing — continuous snow lane, no creek carves the winter face
 ]
 const CHANNELS = [A_CHANNELS, B_CHANNELS] as const
 
@@ -1126,6 +1131,79 @@ export function deltaLevees(nx: number, ny: number, nz: number): number {
   return DELTA_LEVEE_AMP * bank * undulate * lane * limb * oceanAvoid
 }
 
+// --- Winter drift banks (B2, Task 50) ---------------------------------------
+//
+// Aram (Round 13): he likes the winter lake + the right-side forest, but wants the winter
+// wedge's "overall feel" worked further. The FORM that says wind-blown winter from the reading
+// camera is DRIFTS — long, rounded, wind-carved snowbanks sweeping across the ground, softer
+// and more rounded than the desert's sharp barchan dunes. Authored HERE as displacement (like
+// duneField/canopyMounds/deltaLevees) so both renewal bakes agree byte-for-byte and the bench
+// reads the real relief; the winter wildlife + snow-laden flora (winter.tsx) sit ON the drifts.
+//
+// Same hard gating contract as duneField: EXACTLY 0 on the girl's lane band (|nx| < DRIFT_LANE_LO,
+// an early return) so it adds NO spine-band term — the contact budget (0.01247R) is untouched and
+// the lane stays a gentle, walkable snow corridor; faded to 0 before the limb so it never fights
+// the polar ocean/beach; and wedge-gated to 0 on the meridians via wedgeDelta (so bumpB === bumpA
+// there). Adds only (never carves), so no accidental water forms and the ceiling only rises a
+// little. The drifts flatten to 0 across the ICY LAKE (both B2 ponds) so the frozen sheet stays a
+// flush glassy plane — never lifted into a snow hump (the ICE_CAPS footprint mirrors those ponds;
+// Task 40's ice constants depend on the ponds staying put, so this only READS them, never moves them).
+const DRIFT_LANE_LO = 0.16
+const DRIFT_LANE_HI = 0.28
+const DRIFT_LIMB_LO = 0.6
+const DRIFT_LIMB_HI = 0.75
+/** Drift crest count across a full 2π of longitude — few, LONG rounded banks (not texture). */
+const DRIFT_FREQ = 8
+/** How much the crest lines bow with latitude → sweeping wind-scoured curves. */
+const DRIFT_CURVE = 1.8
+/** Peak drift height (fraction of R). Kept modest so the winter spires (B_PEAKS[2]) still crown
+ *  the wedge and the whole B tip stays clear of the 1.35R ceiling (scan-task23 / scan-task26). */
+const DRIFT_AMP = 0.05
+
+/** A single rounded wind-drift wave from a phase p∈[0,1): a raised cosine, so the bank is a
+ *  smooth swept mound with no hard slip face — snow reads soft + wind-packed, unlike the desert
+ *  dune's steep leeward scarp. Troughs are mildly flattened (a gentle power) so the scoured
+ *  hollows between drifts read wide + calm. */
+function driftProfile(p: number): number {
+  const c = 0.5 - 0.5 * Math.cos(TWO_PI * p)
+  return c * c * (3 - 2 * c) // smoothstep of the cosine — rounder crest, calmer hollow
+}
+
+/** Lane/limb gate bounds for the drift field, exported so the unit test pins the gating
+ *  contract (0 on the girl's lane band, 0 past the limb) against the shipped constants. */
+export const DRIFT_GATE = { laneLo: DRIFT_LANE_LO, laneHi: DRIFT_LANE_HI, limbLo: DRIFT_LIMB_LO, limbHi: DRIFT_LIMB_HI } as const
+
+/** Wind-carved snowdrift field for the B2 winter wedge (variant B, added in sceneRaw).
+ *  Pure function of the unit direction; adds only (never carves), so the 1.35R ceiling can only
+ *  rise a little and no accidental water forms. 0 on the lane + past the limb fade + across the
+ *  icy lake. Exported for the unit test (gating + determinism); the render consumes it via
+ *  biomeBumpB. Two rounded wind trains at a slight yaw + a large-scale envelope give a field of
+ *  tall + low drifts, not corrugation. */
+export function driftField(nx: number, ny: number, nz: number): number {
+  const ax = Math.abs(nx)
+  const lane = smoothstep01((ax - DRIFT_LANE_LO) / (DRIFT_LANE_HI - DRIFT_LANE_LO))
+  if (lane <= 0) return 0
+  const limb = 1 - smoothstep01((ax - DRIFT_LIMB_LO) / (DRIFT_LIMB_HI - DRIFT_LIMB_LO))
+  if (limb <= 0) return 0
+  const thetaC = canonicalTheta(Math.atan2(nz, ny))
+  // primary wind-drift train: rounded banks march in longitude, bowed by latitude
+  const phase = (DRIFT_FREQ * thetaC + DRIFT_CURVE * nx) / TWO_PI
+  let h = driftProfile(phase - Math.floor(phase))
+  // a weaker cross train at a slight yaw breaks the monotony while staying wind-coherent
+  const phase2 = (DRIFT_FREQ * 0.62 * thetaC - 1.1 * nx + 2.0) / TWO_PI
+  h = 0.8 * h + 0.2 * driftProfile(phase2 - Math.floor(phase2))
+  // large-scale height modulation so the field has tall + low drifts (a field, not corrugation)
+  const envelope = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(2.0 * thetaC + 2.6 * nx + 1.4))
+  // flatten the drifts to 0 across the ICY LAKE (both B2 ponds) so the frozen sheet stays a flush
+  // glassy plane; margins clear each cap radius + feather (the ICE footprint mirrors these caps).
+  const df = Math.acos(clampU(nx * B2_FROZEN.dir[0] + ny * B2_FROZEN.dir[1] + nz * B2_FROZEN.dir[2]))
+  const ds = Math.acos(clampU(nx * B2_SHELF.dir[0] + ny * B2_SHELF.dir[1] + nz * B2_SHELF.dir[2]))
+  const pondAvoid =
+    smoothstep01((df - (B2_FROZEN.radius + 0.04)) / 0.06) * smoothstep01((ds - (B2_SHELF.radius + 0.05)) / 0.07)
+  if (pondAvoid <= 0) return 0
+  return DRIFT_AMP * h * envelope * lane * limb * pondAvoid
+}
+
 // --- Assembled displacement -------------------------------------------------
 
 /** The one left ocean carved below the waterline, for a variant: the warped
@@ -1155,6 +1233,7 @@ function sceneRaw(band: 0 | 1 | 2, nx: number, ny: number, nz: number, variant: 
   if (variant === 1 && band === 0) bump += duneField(nx, ny, nz) // B0 crescent dune field (Task 41)
   if (variant === 0 && band === 1) bump += canopyMounds(nx, ny, nz) // A1 jungle canopy mounds (Task 42)
   if (variant === 0 && band === 2) bump += deltaLevees(nx, ny, nz) // A2 delta braided levee banks (Task 48)
+  if (variant === 1 && band === 2) bump += driftField(nx, ny, nz) // B2 winter wind-carved drift banks (Task 50)
   return bump
 }
 

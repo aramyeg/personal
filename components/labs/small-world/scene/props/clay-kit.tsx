@@ -810,3 +810,181 @@ export function ClayHoodoo({ rock = PALETTE.hoodooRock, cap = PALETTE.hoodooCap,
   }, [rock, cap])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
+
+// --- Winter feel: wildlife + frozen fall + snow-laden conifer (Task 50) ------
+//
+// Aram (Round 13): he likes the winter lake + right-side forest, "we can work a bit more on
+// overall feel." Bring the winter wedge to the jungle COMPASS in its own COLD vocabulary —
+// hidden wildlife lurking in the drifts, a frozen cascade, and snow-laden conifers. Each is ONE
+// merged vertex-coloured geometry (buildMergedClay) so a whole figure is a SINGLE draw call —
+// same idiom as the jungle beasts / desert camels / delta waders. COLD-PALETTE DISCIPLINE: the
+// only warm accent in the whole winter scene is the red FOX's coat; everything else is
+// blue-white / ice / cold-spruce (named palette.ts entries).
+
+/** A red fox curled asleep in a drift — a rounded coiled body loaf, a bushy tail swept around to
+ *  the nose with a cream tip, a resting head with a pointed snout, two ears and a closed-eye read.
+ *  Accent = rust fox coat (the ONE warm note in the cold winter scene). ONE merged draw; base y=0. */
+export function ClayFox({ fur = PALETTE.foxFur, belly = PALETTE.foxBelly, dark = PALETTE.foxDark, ...x }: Xform & { fur?: string; belly?: string; dark?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // curled body loaf
+        { geo: new THREE.SphereGeometry(0.1, 16, 14), color: fur, pos: [0, 0.06, 0], scl: [1.55, 0.7, 1.15] },
+        // rear haunch curl
+        { geo: new THREE.SphereGeometry(0.062, 12, 12), color: fur, pos: [-0.08, 0.065, 0.02], scl: [1.1, 0.95, 1.0] },
+        // pale belly / chest tuck at the front
+        { geo: new THREE.SphereGeometry(0.055, 12, 12), color: belly, pos: [0.075, 0.04, 0.02], scl: [1.1, 0.55, 1.0] },
+        // bushy tail sweeping around toward the nose, with a cream tip
+        { geo: new THREE.SphereGeometry(0.05, 12, 12), color: fur, pos: [0.03, 0.055, 0.1], rot: [0.2, -0.5, 0], scl: [2.6, 0.75, 0.95] },
+        { geo: new THREE.SphereGeometry(0.033, 10, 10), color: belly, pos: [0.14, 0.05, 0.07] },
+        // head resting on the paws
+        { geo: new THREE.SphereGeometry(0.05, 14, 14), color: fur, pos: [0.12, 0.06, -0.03], scl: [1.05, 0.95, 1.0] },
+        // pointed snout + cream muzzle
+        { geo: new THREE.ConeGeometry(0.026, 0.07, 10), color: fur, pos: [0.175, 0.045, -0.03], rot: [0, 0, -1.35] },
+        { geo: new THREE.SphereGeometry(0.02, 10, 10), color: belly, pos: [0.15, 0.035, -0.03], scl: [1.2, 0.7, 1.0] },
+        // two pointed ears (dark tips) laid on the crown
+        { geo: new THREE.ConeGeometry(0.022, 0.045, 8), color: dark, pos: [0.1, 0.11, -0.055], rot: [-0.3, 0, 0.2] },
+        { geo: new THREE.ConeGeometry(0.022, 0.045, 8), color: dark, pos: [0.1, 0.11, 0.0], rot: [0.3, 0, 0.2] },
+        // ink nose + a closed-eye dot (sleeping)
+        { geo: new THREE.SphereGeometry(0.01, 8, 8), color: PALETTE.ink, pos: [0.205, 0.045, -0.03] },
+        { geo: new THREE.SphereGeometry(0.007, 6, 6), color: PALETTE.ink, pos: [0.135, 0.075, -0.045], scl: [1.4, 0.4, 1] },
+      ]),
+    [fur, belly, dark]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** An owl perched on a dead SNAG — a plump upright body, a pale facial disc with two big amber
+ *  eyes and ear tufts, a small beak, folded wings, all riding a short bark snag (base at y=0).
+ *  Cold-neutral grey-brown plumage (no warm saturation but the tiny amber eyes). ONE merged draw. */
+export function ClayOwl({ body = PALETTE.owlBody, face = PALETTE.owlFace, ...x }: Xform & { body?: string; face?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // the dead snag the owl perches on (bark), base at y=0
+        { geo: new THREE.CylinderGeometry(0.03, 0.042, 0.24, 7), color: PALETTE.clayPath, pos: [0, 0.12, 0] },
+        { geo: new THREE.CylinderGeometry(0.012, 0.018, 0.09, 6), color: PALETTE.clayPath, pos: [0.05, 0.2, 0], rot: [0, 0, -0.9] }, // broken stub
+        // plump upright body
+        { geo: new THREE.SphereGeometry(0.075, 14, 14), color: body, pos: [0, 0.31, 0], scl: [1, 1.3, 0.95] },
+        // folded wings on the flanks
+        { geo: new THREE.SphereGeometry(0.05, 12, 10), color: body, pos: [-0.06, 0.31, 0], rot: [0, 0, 0.2], scl: [0.5, 1.5, 0.8] },
+        { geo: new THREE.SphereGeometry(0.05, 12, 10), color: body, pos: [0.06, 0.31, 0], rot: [0, 0, -0.2], scl: [0.5, 1.5, 0.8] },
+        // pale facial disc
+        { geo: new THREE.SphereGeometry(0.06, 14, 12), color: face, pos: [0, 0.37, 0.045], scl: [1.05, 1.05, 0.5] },
+        // two big eyes: pale ring + amber iris + ink pupil
+        { geo: new THREE.SphereGeometry(0.022, 10, 10), color: PALETTE.jaguarEye, pos: [-0.028, 0.38, 0.08], scl: [1, 1, 0.6] },
+        { geo: new THREE.SphereGeometry(0.022, 10, 10), color: PALETTE.jaguarEye, pos: [0.028, 0.38, 0.08], scl: [1, 1, 0.6] },
+        { geo: new THREE.SphereGeometry(0.01, 8, 8), color: PALETTE.ink, pos: [-0.028, 0.38, 0.095] },
+        { geo: new THREE.SphereGeometry(0.01, 8, 8), color: PALETTE.ink, pos: [0.028, 0.38, 0.095] },
+        // little beak
+        { geo: new THREE.ConeGeometry(0.012, 0.03, 7), color: PALETTE.honey, pos: [0, 0.35, 0.09], rot: [1.2, 0, 0] },
+        // two ear tufts
+        { geo: new THREE.ConeGeometry(0.018, 0.05, 7), color: body, pos: [-0.045, 0.44, 0], rot: [0, 0, 0.35] },
+        { geo: new THREE.ConeGeometry(0.018, 0.05, 7), color: body, pos: [0.045, 0.44, 0], rot: [0, 0, -0.35] },
+      ]),
+    [body, face]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A snow hare crouched beside its burrow — a low white-grey body, a small head, two long
+ *  laid-back ears, a puff tail, next to a little snow mound with a dark burrow mouth. Cold white
+ *  palette (no warm accent). ONE merged draw; base y=0. */
+export function ClaySnowHare({ fur = PALETTE.hareFur, shade = PALETTE.hareShade, ...x }: Xform & { fur?: string; shade?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // burrow mound + dark mouth, off to one side
+        { geo: new THREE.SphereGeometry(0.09, 14, 10), color: fur, pos: [-0.14, 0.03, 0.02], scl: [1.3, 0.6, 1.2] },
+        { geo: new THREE.SphereGeometry(0.035, 10, 10), color: PALETTE.ink, pos: [-0.11, 0.03, 0.06], scl: [1.2, 1, 0.5] },
+        // crouched hare body
+        { geo: new THREE.SphereGeometry(0.07, 14, 12), color: fur, pos: [0.05, 0.05, 0], scl: [1.35, 0.85, 1] },
+        // haunch
+        { geo: new THREE.SphereGeometry(0.05, 12, 12), color: fur, pos: [0.0, 0.05, 0.0], scl: [1, 1, 1] },
+        // head lifted at the front
+        { geo: new THREE.SphereGeometry(0.04, 12, 12), color: fur, pos: [0.13, 0.08, 0], scl: [1.05, 1, 0.95] },
+        // two long ears laid back (pale outer, shaded inner)
+        { geo: new THREE.SphereGeometry(0.028, 10, 8), color: fur, pos: [0.08, 0.13, -0.025], rot: [0, 0, -0.5], scl: [0.5, 2.4, 0.4] },
+        { geo: new THREE.SphereGeometry(0.028, 10, 8), color: fur, pos: [0.08, 0.13, 0.025], rot: [0, 0, -0.5], scl: [0.5, 2.4, 0.4] },
+        { geo: new THREE.SphereGeometry(0.02, 8, 8), color: shade, pos: [0.083, 0.135, -0.025], rot: [0, 0, -0.5], scl: [0.35, 2.0, 0.25] },
+        // puff tail
+        { geo: new THREE.SphereGeometry(0.028, 10, 10), color: fur, pos: [-0.02, 0.05, 0] },
+        // ink eye + nose
+        { geo: new THREE.SphereGeometry(0.008, 6, 6), color: PALETTE.ink, pos: [0.15, 0.09, 0.025] },
+        { geo: new THREE.SphereGeometry(0.008, 6, 6), color: PALETTE.ink, pos: [0.165, 0.075, 0] },
+      ]),
+    [fur, shade]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A frozen waterfall spilling off a ledge — a dark rock back-wall, a curtain of pale icicle
+ *  columns hanging down (wide at the ledge, tapering to points) over a frozen pool at the base.
+ *  ONE merged draw; base y=0 (the pool). Reads as the winter's "frozen fall" where terrain steps.
+ *  All cold (ice / iceDeep / stone) — no warm accent. */
+export function ClayFrozenFall({ iceCol = PALETTE.ice, iceShade = PALETTE.iceDeep, rock = PALETTE.stone, ...x }: Xform & { iceCol?: string; iceShade?: string; rock?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const parts: ClayPart[] = [
+      // the rock ledge / back wall the fall pours over
+      { geo: new THREE.BoxGeometry(0.34, 0.44, 0.1), color: rock, pos: [0, 0.24, -0.06], rot: [0.12, 0, 0] },
+      { geo: new THREE.BoxGeometry(0.4, 0.08, 0.16), color: rock, pos: [0, 0.44, -0.02] }, // the lip
+      // frozen pool at the base
+      { geo: new THREE.CylinderGeometry(0.18, 0.15, 0.03, 16), color: iceCol, pos: [0, 0.015, 0.03] },
+    ]
+    // a curtain of icicle columns hanging from the lip, varied lengths + shades
+    const cols: Array<{ px: number; len: number; r: number; shade: boolean }> = [
+      { px: -0.13, len: 0.34, r: 0.03, shade: false },
+      { px: -0.07, len: 0.42, r: 0.036, shade: true },
+      { px: -0.01, len: 0.3, r: 0.028, shade: false },
+      { px: 0.05, len: 0.4, r: 0.034, shade: true },
+      { px: 0.12, len: 0.32, r: 0.03, shade: false },
+    ]
+    for (const c of cols) {
+      // an icicle = a downward cone (wide at the ledge, point at the bottom); base of the cone
+      // sits at the lip (~y0.42), tip hangs toward the pool.
+      const topY = 0.42
+      parts.push({
+        geo: new THREE.ConeGeometry(c.r, c.len, 8),
+        color: c.shade ? iceShade : iceCol,
+        pos: [c.px, topY - c.len / 2, 0.01],
+        rot: [0, 0, Math.PI], // point downward
+      })
+    }
+    return buildMergedClay(parts)
+  }, [iceCol, iceShade, rock])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A snow-laden conifer — a short trunk under three tiers of drooping cone boughs (cold spruce),
+ *  each crowned with a settled layer of snow, plus a snow cap on the crown. Distinct from the
+ *  Forest's clean conifer cones (Task 23): the flattened, snow-topped tiers read as branches
+ *  bowed under snow. ONE merged draw; base y=0. Cold (spruce + snow) — no warm accent. */
+export function ClaySnowConifer({ needle = PALETTE.spruceDeep, snow = PALETTE.snow, height = 0.5, ...x }: Xform & { needle?: string; snow?: string; height?: number }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const h = height
+    const parts: ClayPart[] = [
+      // trunk
+      { geo: new THREE.CylinderGeometry(0.026, 0.036, h * 0.32, 6), color: PALETTE.clayPath, pos: [0, h * 0.14, 0] },
+    ]
+    // three drooping bough tiers (flattened cones), each with a snow layer riding its crown
+    const tiers = [
+      { y: h * 0.36, r: h * 0.4, coneH: h * 0.34 },
+      { y: h * 0.58, r: h * 0.3, coneH: h * 0.3 },
+      { y: h * 0.78, r: h * 0.2, coneH: h * 0.26 },
+    ]
+    for (const t of tiers) {
+      parts.push({ geo: new THREE.ConeGeometry(t.r, t.coneH, 8), color: needle, pos: [0, t.y, 0], scl: [1, 0.82, 1] })
+      // a settled snow layer capping the tier (a flatter, slightly smaller cone in snow)
+      parts.push({ geo: new THREE.ConeGeometry(t.r * 0.86, t.coneH * 0.42, 8), color: snow, pos: [0, t.y + t.coneH * 0.24, 0], scl: [1, 0.7, 1] })
+    }
+    // crown snow cap
+    parts.push({ geo: new THREE.ConeGeometry(h * 0.11, h * 0.18, 8), color: snow, pos: [0, h * 0.94, 0] })
+    return buildMergedClay(parts)
+  }, [needle, snow, height])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}

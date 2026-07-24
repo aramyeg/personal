@@ -96,4 +96,17 @@ export const PALETTE = {
   geyserPool: '#A9C6D0', // the deeper mineral pool bubbling at the vent
   hoodooRock: '#B0673B', // terracotta hoodoo spire body (canyon rust family)
   hoodooCap: '#C79A6A', // lighter caprock crowning each hoodoo
+  // Task 50 — winter feel (B2). Cold-palette discipline: blue-white / ice / cold-spruce
+  // dominate the winter ground + flora, with exactly ONE warm accent — the red fox curled in
+  // a drift. All reload-safe prop colours + a couple of ground accents (baked, verified fresh).
+  frostShadow: '#A9C2D4', // cool blue-white drift hollow (wind-scoured snow shadow)
+  spruceDeep: '#274C38', // deep cold spruce green — snow-laden conifer foliage + shadow flecks
+  // winter wildlife (one accent each; only the FOX is a warm note — the cold-scene punctuation)
+  foxFur: '#D9743A', // rust red fox coat (THE one warm winter accent)
+  foxBelly: '#F0E6DA', // cream fox underside / tail-tip / cheek
+  foxDark: '#A84E22', // shaded fox legs / ear tips / nose bridge
+  owlBody: '#8A7A64', // soft grey-brown owl plumage (cold neutral)
+  owlFace: '#CBBBA0', // pale owl facial disc
+  hareFur: '#DDE6EC', // cold white-grey snow hare
+  hareShade: '#B8C6D0', // hare shadow / burrow-mouth rim
 } as const

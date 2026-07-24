@@ -19,6 +19,8 @@ import {
   CANOPY_GATE,
   deltaLevees,
   DELTA_LEVEE_GATE,
+  driftField,
+  DRIFT_GATE,
   canyonMountains,
   CANYON_MTN_GATE,
   CANYON_MODE,
@@ -423,6 +425,94 @@ describe('Task 48 — A2 delta braided levee banks', () => {
   })
 })
 
+// Task 50 (Round 13): the B2 winter wedge (band 2, variant B) gets wind-carved snowdrift banks
+// (driftField), authored as displacement in biomeBumpB. Same hard contract as duneField/
+// canopyMounds/deltaLevees: EXACTLY 0 on the girl's lane band (contact budget + lane walkability)
+// and past the limb, add only (never carve, so no accidental water), deterministic (both bakes
+// agree), and flattened across the icy lake so the frozen sheet stays flush.
+describe('Task 50 — B2 winter drift banks (wind-carved snowdrifts)', () => {
+  const B2_LONGITUDES = [5.0, 5.3, 5.55, 5.8, 6.1] // band-2 interior + around the ponds
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('is EXACTLY 0 across the girl lane band (|nx| < laneLo), at every band-2 longitude', () => {
+    for (const th of B2_LONGITUDES) {
+      for (let ni = 0; ni <= 30; ni++) {
+        const nx = -(DRIFT_GATE.laneLo - 1e-4) + (2 * (DRIFT_GATE.laneLo - 1e-4) * ni) / 30
+        expect(driftField(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('is EXACTLY 0 at and past the limb fade (|nx| >= limbHi)', () => {
+    for (const th of B2_LONGITUDES) {
+      for (const nx of [DRIFT_GATE.limbHi, 0.8, 0.9, -DRIFT_GATE.limbHi, -0.85]) {
+        expect(driftField(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('only ever ADDS relief (>= 0) — never carves, so no accidental water forms', () => {
+    for (let ai = 0; ai < 60; ai++) {
+      const th = (ai / 60) * Math.PI * 2
+      for (let ni = 0; ni <= 40; ni++) {
+        const nx = -0.7 + (1.4 * ni) / 40
+        expect(driftField(...dirAt(nx, th))).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('actually builds drifts off-lane in the winter wedge (positive relief at reading latitudes)', () => {
+    let peak = 0
+    for (const th of [5.0, 5.4, 5.8, 6.2]) {
+      for (let ni = 0; ni <= 60; ni++) {
+        const nx = 0.16 + (0.4 * ni) / 60
+        peak = Math.max(peak, driftField(...dirAt(nx, th)))
+      }
+    }
+    expect(peak).toBeGreaterThan(0.02) // real drift relief (fraction of R), not a flat snow sheet
+  })
+
+  it('flattens to 0 across the icy lake so the frozen sheet stays flush (both B2 ponds)', () => {
+    // pond centres: B2_FROZEN place(0.34,5.55) and B2_SHELF place(0.6,5.72)
+    expect(driftField(...dirAt(0.34, 5.55))).toBe(0)
+    expect(driftField(...dirAt(0.6, 5.72))).toBe(0)
+  })
+
+  it('is deterministic (both renewal bakes agree byte-for-byte)', () => {
+    for (const th of B2_LONGITUDES) {
+      for (const nx of [0.25, 0.4, 0.55, -0.35]) {
+        const d = dirAt(nx, th)
+        expect(driftField(...d)).toBe(driftField(...d))
+      }
+    }
+  })
+
+  it('vanishes on the band-2 meridians (biomeBumpB === biomeBump there — seam intact)', () => {
+    for (const m of [MERIDIANS[2], MERIDIANS[0]]) {
+      for (let b = -70; b <= 70; b += 5) {
+        const nx = b / 100
+        const d = dirAt(nx, m)
+        expect(biomeBumpB(...d)).toBe(biomeBump(...d))
+      }
+    }
+  })
+
+  it('stays well under the 1.35R ceiling across the whole winter wedge', () => {
+    let maxR = 0
+    for (const th of B2_LONGITUDES) {
+      for (let ni = 0; ni <= 80; ni++) {
+        const nx = -0.72 + (1.44 * ni) / 80
+        const [x, y, z] = dirAt(nx, th)
+        maxR = Math.max(maxR, 1 + biomeBumpB(x, y, z))
+      }
+    }
+    expect(maxR).toBeLessThan(1.35)
+  })
+})
+
 // Task 49 (Round 13): the B1 AKNA canyon (band 1, variant B) gets a backdrop MOUNTAIN RANGE
 // for the "mountain canyon" look (canyonMountains), summed into biomeBumpB only when
 // CANYON_MODE === 1. Same displacement contract as duneField/canopyMounds/deltaLevees: EXACTLY 0
@@ -512,10 +602,11 @@ describe('Task 46 — desert bridge removal + widened dune footprint', () => {
     return [nx, ring * Math.cos(th), ring * Math.sin(th)]
   }
 
-  it('CROSSINGS_B mirrors the non-null B_CROSSING_BY_BAND entries (band-0 desert dropped)', () => {
-    expect(B_CROSSING_BY_BAND[0]).toBe(null) // desert: no crossing
+  it('CROSSINGS_B mirrors the non-null B_CROSSING_BY_BAND entries (desert + winter dropped)', () => {
+    expect(B_CROSSING_BY_BAND[0]).toBe(null) // desert: no crossing (Task 46)
+    expect(B_CROSSING_BY_BAND[2]).toBe(null) // winter: no crossing (Task 50)
     expect([...CROSSINGS_B]).toEqual(B_CROSSING_BY_BAND.filter((v) => v !== null))
-    expect(CROSSINGS_B).toHaveLength(2)
+    expect(CROSSINGS_B).toHaveLength(1)
   })
 
   it('the B0 desert lane carries NO channel water at the old crossing (θ=1.2) — dry sand', () => {
