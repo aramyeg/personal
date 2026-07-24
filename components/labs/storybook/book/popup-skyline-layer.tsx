@@ -23,6 +23,7 @@ import { shadowLift } from './shadow-light'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
+import { useLayerOutline, type Outline } from './use-layer-outline'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -51,6 +52,55 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
     arr[c * 3] = quad[c][0]
     arr[c * 3 + 1] = quad[c][1]
     arr[c * 3 + 2] = quad[c][2]
+  }
+  attr.needsUpdate = true
+  geometry.computeBoundingSphere()
+}
+
+// SHAPED-MESH path (E2.1). When a code-generated outline sidecar exists, the
+// flat renders as the art's TRUE silhouette instead of an alpha-tested
+// rectangle: triangulate the normalized [0,1]^2 outline once (THREE's own
+// earcut — the same triangulator ShapeGeometry uses), UV = the outline verbatim
+// (identity: u along the radial base, v up the flap, matching ROW_UVS), and each
+// frame place every vertex by BILINEARLY interpolating the SAME four solver
+// corners writeQuad uses. Zero solver change; and because a bilinear combination
+// with u,v in [0,1] is a convex combination of the four corners, every shaped
+// vertex stays inside the solver quad — fold-flat + wedge containment are
+// inherited (proven per-slot in .superpowers/sdd/bench/procart-outline-bench.mjs).
+export function makeShapedGeometry(outline: Outline): THREE.BufferGeometry {
+  const n = outline.length
+  const contour = outline.map(([u, v]) => new THREE.Vector2(u, v))
+  const faces = THREE.ShapeUtils.triangulateShape(contour, [])
+  const geometry = new THREE.BufferGeometry()
+  const positions = new THREE.BufferAttribute(new Float32Array(n * 3), 3)
+  positions.setUsage(THREE.DynamicDrawUsage)
+  const uv = new Float32Array(n * 2)
+  for (let i = 0; i < n; i++) {
+    uv[i * 2] = outline[i][0]
+    uv[i * 2 + 1] = outline[i][1]
+  }
+  geometry.setAttribute('position', positions)
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+  const index: number[] = []
+  for (const [a, b, c] of faces) index.push(a, b, c)
+  geometry.setIndex(index)
+  return geometry
+}
+
+export function writeShapedQuad(geometry: THREE.BufferGeometry, quad: PanelQuad, outline: Outline): void {
+  const attr = geometry.getAttribute('position') as THREE.BufferAttribute
+  const arr = attr.array as Float32Array
+  const [c0, c1, c2, c3] = quad // [base-inner (0,0), base-outer (1,0), top-outer (1,1), top-inner (0,1)]
+  for (let i = 0; i < outline.length; i++) {
+    const u = outline[i][0]
+    const v = outline[i][1]
+    const w0 = (1 - u) * (1 - v)
+    const w1 = u * (1 - v)
+    const w2 = u * v
+    const w3 = (1 - u) * v
+    arr[i * 3] = w0 * c0[0] + w1 * c1[0] + w2 * c2[0] + w3 * c3[0]
+    arr[i * 3 + 1] = w0 * c0[1] + w1 * c1[1] + w2 * c2[1] + w3 * c3[1]
+    arr[i * 3 + 2] = w0 * c0[2] + w1 * c1[2] + w2 * c2[2] + w3 * c3[2]
   }
   attr.needsUpdate = true
   geometry.computeBoundingSphere()
@@ -90,11 +140,17 @@ function SkylineRow({
   const groupRef = useRef<THREE.Group>(null)
   const shadowGroupRef = useRef<THREE.Group>(null)
   const faceArt = useArtTexture(`${layer.id}-mound${k}`)
+  // The code-generated shaped-mesh contour, or null until it loads / when no
+  // sidecar exists — in which case we keep the original rectangle quad.
+  const outline = useLayerOutline(`${layer.id}-mound${k}`)
   const tint = useMemo(() => kraftTints(`${layer.id}-mound${k}`), [layer.id, k])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const row = layer.rows[k]
 
-  const geometry = useMemo(() => makeQuadGeometry(new Float32Array(ROW_UVS)), [])
+  const geometry = useMemo(
+    () => (outline ? makeShapedGeometry(outline) : makeQuadGeometry(new Float32Array(ROW_UVS))),
+    [outline]
+  )
   const paperTexture = sharedPaperTexture()
   // ONE die-cut flap: the full roofline art (alpha-tested silhouette), DoubleSide
   // so the reader reads the front face regardless of the flap's winding as it
@@ -133,13 +189,16 @@ function SkylineRow({
     }
   }, [layer, row])
 
+  // Geometry disposal is keyed on geometry ALONE: the shaped path swaps the
+  // geometry when the outline loads, and this must dispose only the OLD
+  // geometry — not the still-live materials (which never change identity).
+  useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(
     () => () => {
-      geometry.dispose()
       material.dispose()
       shadowMaterial.dispose()
     },
-    [geometry, material, shadowMaterial]
+    [material, shadowMaterial]
   )
 
   useFrame(() => {
@@ -150,7 +209,9 @@ function SkylineRow({
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
-    writeQuad(geometry, solveSkylineRow(layer, row, thetaL, thetaR))
+    const quad = solveSkylineRow(layer, row, thetaL, thetaR)
+    if (outline) writeShapedQuad(geometry, quad, outline)
+    else writeQuad(geometry, quad)
     shadowMaterial.opacity = shadowSpec.maxOpacity * keepSkylineEnvelope(layer, beta)
   })
 

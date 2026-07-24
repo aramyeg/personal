@@ -85,14 +85,16 @@ const CROP_TO_ASPECT = {
 }
 
 // FAN-OUT (per source id, dest ids): one processed panel saved under several
-// art ids. The E1.5 citadel rank uses six uniform strip slots; three unique
-// strip paintings (a/b/c) each serve one slot per side, at separated
-// positions so the reuse never reads as a repeat.
-const FAN_OUT = {
-  'ch3-citadel-a': ['ch3-skyline-l-mound0', 'ch3-skyline-r-mound1'],
-  'ch3-citadel-b': ['ch3-skyline-l-mound1', 'ch3-skyline-r-mound2'],
-  'ch3-citadel-c': ['ch3-skyline-l-mound2', 'ch3-skyline-r-mound0'],
-}
+// art ids.
+//
+// E2.1: the citadel rank (ch3-skyline-{l,r}-mound{0,1,2}) is now CODE-GENERATED
+// per slot by scripts/storybook/generate-art.mjs — six unique strips, each at
+// its own mesh aspect + a shaped-outline sidecar. Its former FAN_OUT entries
+// (ch3-citadel-a/b/c -> the six mounds) were REMOVED so prepare-art no longer
+// overwrites those procedural bakes. The art-src citadel PNGs are left in place
+// (untouched); prepare-art now emits them under their own ids (harmless, unused
+// by content). FAN_OUT stays as a mechanism for any future reuse.
+const FAN_OUT = {}
 
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
 // for deliveries authored transposed relative to their mesh's texture axes.
