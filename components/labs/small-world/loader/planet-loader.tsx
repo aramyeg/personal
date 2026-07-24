@@ -29,8 +29,8 @@ const PALETTE_VARS: Record<string, string> = {
 
 /**
  * Themed loading screen for the Small World lab: a pastel sky over a tiny clay
- * planet with a girl skipping around its orbit, a clay progress ring that rolls
- * up to completion, and a Baloo 2 caption. Paints before the 3D chunk resolves
+ * planet with a cheerful pink bird circling its orbit, a clay progress ring that
+ * rolls up to completion, and a Baloo 2 caption. Paints before the 3D chunk resolves
  * (rendered by the non-lazy parent), then reveals into the live scene.
  *
  * Phase machine mirrors the museum curtain's hard-won lessons: a minimum hold so
@@ -83,12 +83,13 @@ export function PlanetLoader({ ready, progress }: { ready: boolean; progress: nu
           <div className={styles.ring} />
           <div className={styles.planet} />
           <div className={styles.orbit}>
-            <div className={styles.skipper}>
-              <div className={styles.figure}>
-                <span className={styles.head} />
-                <span className={styles.bow} />
-                <span className={styles.dress} />
-              </div>
+            <div className={styles.bird}>
+              <span className={styles.tail} />
+              <span className={styles.body} />
+              <span className={styles.wing} />
+              <span className={styles.head} />
+              <span className={styles.beak} />
+              <span className={styles.eye} />
             </div>
           </div>
         </div>
