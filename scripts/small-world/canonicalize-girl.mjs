@@ -11,17 +11,24 @@
  *       Skip_Forward        → Skip_Forward   (forward travel; already canonical)
  *       Happy_Sway_Standing → Idle           (his "idle happy sway")
  *       Walk_Backward       → Walk_Backward  (already canonical)
- *       019f93e1-…-d204da   → Jump_A         (small clean hop, apex +0.06u, lands home)
- *       019f93e2-…-9b734b   → Jump_B         (big leap, apex +0.16u, ends +0.07u up)
+ *       019f93e1-…-d204da   → Jump_A         (small clean hop, lands home)
+ *       019f93e2-…-9b734b   → Jump_B         (big leap, ends slightly elevated)
  *  2. STRIP every other clip (Running / Walking / Walking_Woman — payload hygiene).
  *  3. DE-DRIFT the locomotion clips flagged in DEDRIFT: freeze the root (Hips)
- *     translation to its bind value. Walk_Backward shipped with a broken 1.22u
- *     monotone vertical root drift (hips sink straight through the floor, hard
- *     non-looping seam) — zeroing the root translation makes it a clean in-place
- *     backward cycle for our fixed-in-place girl (the planet, not her feet,
- *     provides travel). Its step motion lives in the leg/spine rotations, which
- *     are untouched. Jump clips are NOT de-drifted: their vertical IS the hop.
- *  4. prune() the accessors orphaned by the stripped clips, then write girl.glb.
+ *     translation to its bind value. Walk_Backward is a TRAVELLING clip — its root
+ *     translates ~1.22u backward across the cycle (and snaps back at the loop
+ *     seam). Our girl is fixed in place (the planet spins beneath her, her feet
+ *     never travel), so that root motion would slide/snap her off her stance;
+ *     zeroing it makes a clean in-place backward step. Its stride lives in the
+ *     leg/spine rotations, untouched. Jump clips are NOT de-drifted: their
+ *     vertical IS the hop.
+ *  4. STAND UPRIGHT: v1's export was Y-up; the v2 Meshy export is Z-up, so with
+ *     the world's fixed camera the 1.7u character renders lying down and reads as
+ *     tiny collapsed fragments. When the tallest axis is Z, prepend a +90° X
+ *     rotation to the scene root so she stands ~1.7u tall on +Y like v1 (rotates
+ *     rig + skinned mesh together; the clips animate bones underneath and still
+ *     play). Auto-detected + idempotent.
+ *  5. prune() the accessors orphaned by the stripped clips, then write girl.glb.
  *
  * The mesh / material / skin / texture are the same restyled character and pass
  * straight through — toonifyGirl re-materials them at load, unchanged.
@@ -44,6 +51,7 @@
  */
 import { NodeIO } from '@gltf-transform/core'
 import { prune } from '@gltf-transform/functions'
+import * as THREE from 'three'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -109,11 +117,65 @@ function freezeRootTranslation(doc, anim, root) {
   }
 }
 
+/** The scene's top-level nodes (the rig lives under the first one). */
+function sceneRoots(doc) {
+  return doc.getRoot().listScenes().flatMap((s) => s.listChildren())
+}
+
+/** World-space bind-pose extent of the skinned mesh under the current root
+ *  rotation. glTF places bind vertices in scene space (the inverse-bind cancels
+ *  the joints' world matrices), so a vertex's rendered position is the accessor
+ *  value rotated by the root — apply that rotation to read the TRUE standing box. */
+function worldBindExtent(doc) {
+  const roots = sceneRoots(doc)
+  const q = new THREE.Quaternion(...(roots[0] ? roots[0].getRotation() : [0, 0, 0, 1]))
+  const min = [Infinity, Infinity, Infinity]
+  const max = [-Infinity, -Infinity, -Infinity]
+  const v = new THREE.Vector3()
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION')
+      if (!pos) continue
+      const a = pos.getArray()
+      for (let i = 0; i < a.length; i += 3) {
+        v.set(a[i], a[i + 1], a[i + 2]).applyQuaternion(q)
+        for (const [k, c] of [v.x, v.y, v.z].entries()) {
+          min[k] = Math.min(min[k], c)
+          max[k] = Math.max(max[k], c)
+        }
+      }
+    }
+  }
+  return { x: max[0] - min[0], y: max[1] - min[1], z: max[2] - min[2] }
+}
+
+/**
+ * Stand the character up along +Y. v1's export was Y-up (height on Y); the v2
+ * Meshy export is Z-up — its 1.7u height lies along Z, so with the world's
+ * fixed camera she renders lying down and reads as tiny collapsed fragments.
+ * When the tallest axis is Z (not Y), prepend a +90° X rotation to the scene
+ * root(s) — this rotates the rig AND the skinned mesh together (the clips animate
+ * bones underneath, so they still play correctly). Idempotent: once Y is the
+ * tallest axis the check skips. Returns whether it rotated + the standing box.
+ */
+function standUpright(doc) {
+  const before = worldBindExtent(doc)
+  if (before.y >= before.z && before.y >= before.x) return { applied: false, extent: before }
+  const q90 = new THREE.Quaternion(Math.SQRT1_2, 0, 0, Math.SQRT1_2) // +90° about X
+  for (const node of sceneRoots(doc)) {
+    const r = new THREE.Quaternion(...node.getRotation()).premultiply(q90)
+    const t = new THREE.Vector3(...node.getTranslation()).applyQuaternion(q90)
+    node.setRotation([r.x, r.y, r.z, r.w])
+    node.setTranslation([t.x, t.y, t.z])
+  }
+  return { applied: true, extent: worldBindExtent(doc) }
+}
+
 /**
  * @param {object} opts
  * @param {string} opts.src  raw multi-clip export (girl-v2.glb)
  * @param {string} opts.out  shipping girl.glb to write
- * @returns {Promise<{out:string, animations:string[], stripped:string[], dedrifted:string[], meshes:number}>}
+ * @returns {Promise<{out:string, animations:string[], stripped:string[], dedrifted:string[], oriented:boolean, height:number, meshes:number}>}
  */
 export async function canonicalizeGirl({ src, out }) {
   const io = new NodeIO()
@@ -138,6 +200,8 @@ export async function canonicalizeGirl({ src, out }) {
     }
   }
 
+  const orient = standUpright(doc)
+
   await doc.transform(prune())
   await io.write(out, doc)
 
@@ -148,14 +212,16 @@ export async function canonicalizeGirl({ src, out }) {
     animations: rRoot.listAnimations().map((a) => a.getName()),
     stripped,
     dedrifted,
+    oriented: orient.applied,
+    height: worldBindExtent(reloaded).y,
     meshes: rRoot.listMeshes().length,
   }
 }
 
-/** Peak-to-trough world-space vertical travel of the root joint over a clip —
- *  the metric that exposes the Walk_Backward drift (huge before, ~0 after). */
-async function rootVerticalSpan(path, clipName) {
-  const THREE = await import('three')
+/** Largest world-space travel of the root joint across a clip (max of the three
+ *  axis spans) — the orientation-independent metric that exposes the Walk_Backward
+ *  root motion (huge before, ~0 after the freeze). */
+async function rootTravelSpan(path, clipName) {
   const doc = await new NodeIO().read(path)
   const hips = rootJoint(doc)
   const anim = doc.getRoot().listAnimations().find((a) => a.getName() === clipName)
@@ -180,14 +246,17 @@ async function rootVerticalSpan(path, clipName) {
   for (const ch of anim.listChannels()) {
     if (ch.getTargetNode() !== hips || ch.getTargetPath() !== 'translation') continue
     const v = ch.getSampler().getOutput().getArray()
-    let min = Infinity
-    let max = -Infinity
+    const min = [Infinity, Infinity, Infinity]
+    const max = [-Infinity, -Infinity, -Infinity]
+    const p = new THREE.Vector3()
     for (let i = 0; i < v.length; i += 3) {
-      const y = new THREE.Vector3(v[i], v[i + 1], v[i + 2]).applyMatrix4(arm).y
-      min = Math.min(min, y)
-      max = Math.max(max, y)
+      p.set(v[i], v[i + 1], v[i + 2]).applyMatrix4(arm)
+      for (const [k, c] of [p.x, p.y, p.z].entries()) {
+        min[k] = Math.min(min[k], c)
+        max[k] = Math.max(max[k], c)
+      }
     }
-    return max - min
+    return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2])
   }
   return 0
 }
@@ -230,18 +299,29 @@ async function selfTest() {
   assert(`Walk_Backward de-drifted`, result.dedrifted.includes('Walk_Backward'))
   assert(`single mesh (not duplicated) — ${result.meshes}`, result.meshes === 1)
 
-  const beforeSpan = await rootVerticalSpan(DEFAULT_SRC, 'Walk_Backward')
-  const afterSpan = await rootVerticalSpan(out, 'Walk_Backward')
+  // Orientation: the v2 export is Z-up; output must stand ~1.7u tall on +Y.
+  assert(`stood upright (Z-up export corrected)`, result.oriented === true)
   assert(
-    `Walk_Backward root drift neutralized (${beforeSpan.toFixed(3)}u → ${afterSpan.toFixed(3)}u)`,
+    `standing height ~1.7u on +Y (${result.height.toFixed(3)}u)`,
+    Math.abs(result.height - 1.7) < 0.05
+  )
+
+  const beforeSpan = await rootTravelSpan(DEFAULT_SRC, 'Walk_Backward')
+  const afterSpan = await rootTravelSpan(out, 'Walk_Backward')
+  assert(
+    `Walk_Backward root motion neutralized (${beforeSpan.toFixed(3)}u → ${afterSpan.toFixed(3)}u)`,
     beforeSpan > 0.5 && afterSpan < 1e-6
   )
 
-  // Idempotency: re-running over the canonical output changes nothing.
+  // Idempotency: re-running over the canonical output changes nothing (slots
+  // stable, no extra rotation — height stays ~1.7u, not re-tipped).
   const rerun = await canonicalizeGirl({ src: out, out })
   assert(
-    `idempotent re-run keeps the slot set`,
-    set(rerun.animations) === set(SHIPPED_SLOTS) && rerun.stripped.length === 0
+    `idempotent re-run keeps slots + stays upright (${rerun.height.toFixed(3)}u, oriented=${rerun.oriented})`,
+    set(rerun.animations) === set(SHIPPED_SLOTS) &&
+      rerun.stripped.length === 0 &&
+      rerun.oriented === false &&
+      Math.abs(rerun.height - 1.7) < 0.05
   )
 
   for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.label}`)
@@ -260,5 +340,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`animations: [${result.animations.join(', ')}]  meshes: ${result.meshes}`)
     console.log(`stripped: [${result.stripped.join(', ')}]`)
     console.log(`de-drifted root translation: [${result.dedrifted.join(', ')}]`)
+    console.log(`stood upright: ${result.oriented}  standing height: ${result.height.toFixed(3)}u`)
   }
 }
