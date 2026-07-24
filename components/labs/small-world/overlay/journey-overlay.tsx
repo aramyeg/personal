@@ -3,8 +3,12 @@ import type { MutableRefObject } from 'react'
 import { CHAPTER_COUNT, chapters } from '../chapters'
 import { ChapterPanels } from './chapter-panels'
 import { EndPanel } from './end-panel'
+import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
 import { useJourneyUi } from './use-journey-ui'
+
+/** Set false to remove the bottom progress rail entirely (one-line revert). */
+const SHOW_PROGRESS_RAIL = true
 
 /** Everything DOM above the canvas: speed lines, chapter panels, ending. */
 export function JourneyOverlay({
@@ -27,6 +31,7 @@ export function JourneyOverlay({
         />
       )}
       {ui.ended && <EndPanel />}
+      {SHOW_PROGRESS_RAIL && <JourneyProgress progressRef={progressRef} />}
     </div>
   )
 }
