@@ -12,19 +12,35 @@
  * ships (the forward skip), driven the pre-T28 way: the forward skip plays for
  * ALL locomotion, its cadence mapped from |speed| with a slow keep-alive floor
  * during dwell (no reversed playback, no parked frame — those were rejected).
- * Missing Wave = badge-only celebrate. When Aram's Meshy clips land under the
- * expected names, resolveClipPlan picks them up with ZERO code changes and the
- * full state machine (real Idle loop, Walk_Backward, one-shot Wave) activates.
+ *
+ * With Aram's girl-v2 export the canonical clips are all present:
+ *   Skip_Forward   → forward travel (cadence-driven skip)
+ *   Idle           → real happy-sway loop (natural rate)
+ *   Walk_Backward  → real backward step (cadence-driven)
+ *   Jump_A / Jump_B → the celebrate one-shot, alternating on discovery parity
+ * resolveClipPlan picks them up by name with ZERO wiring changes; the fallback
+ * table below is kept purely so an older/partial GLB still degrades gracefully.
  */
 
-/** The forward locomotion clip that ships in girl.glb today (its only clip). */
-export const SKIP_CLIP = 'Armature|Skip_Forward|baselayer'
+/** Canonical forward clip name shipped in girl.glb (v2). */
+export const SKIP_CLIP = 'Skip_Forward'
+/** Pre-v2 forward clip name — kept in the fallback chain so an old GLB still works. */
+export const LEGACY_SKIP_CLIP = 'Armature|Skip_Forward|baselayer'
+/** Forward-slot lookup order: canonical first, then the legacy name. */
+export const FORWARD_SLOTS = [SKIP_CLIP, LEGACY_SKIP_CLIP] as const
 
-/** Named clip slots Aram's Meshy export should carry (see the task report). */
+/** Named clip slots the canonicalized girl.glb carries (see the task report). */
 export const IDLE_SLOT = 'Idle'
 export const BACKWARD_SLOT = 'Walk_Backward'
-/** Either name is accepted for the one-shot celebrate at a discovery burst. */
-export const CELEBRATE_SLOTS = ['Wave', 'Celebrate'] as const
+/** Aram's two jump exports, wired to the celebrate one-shot. */
+export const JUMP_A_SLOT = 'Jump_A'
+export const JUMP_B_SLOT = 'Jump_B'
+/**
+ * Celebrate one-shot cycle, in priority/rotation order. His jumps lead; the old
+ * Wave/Celebrate names trail so a pre-v2 GLB still finds a clip. selectCelebrateClip
+ * rotates through whichever of these the GLB actually carries.
+ */
+export const CELEBRATE_SLOTS = [JUMP_A_SLOT, JUMP_B_SLOT, 'Wave', 'Celebrate'] as const
 
 /** Locomotion state derived from signed surface speed. */
 export type Locomotion = 'forward' | 'backward' | 'idle'
@@ -32,12 +48,36 @@ export type Locomotion = 'forward' | 'backward' | 'idle'
 /**
  * Signed surface speed (world units/s; +forward travel, −scrubbing back) → the
  * locomotion state. A magnitude within `eps` is a rest/dwell (panel windows
- * freeze rotation, so their speed collapses to ~0 → idle).
+ * freeze rotation, so their speed collapses to ~0 → idle). This is the
+ * instantaneous, memoryless classifier; girl.tsx drives the hysteretic variant.
  */
 export function resolveLocomotion(signedSpeed: number, eps: number): Locomotion {
   if (signedSpeed > eps) return 'forward'
   if (signedSpeed < -eps) return 'backward'
   return 'idle'
+}
+
+/**
+ * Hysteretic locomotion resolver: a wider bar to START moving than to SETTLE
+ * back to idle, so a speed hovering near the rest threshold does not flicker the
+ * girl between her idle loop and a locomotion skip frame-to-frame (the T28 M3
+ * recommendation, dormant until real clips landed). `restEps < moveEps`:
+ *   - from idle  → stays idle until |speed| exceeds the high `moveEps` bar
+ *   - from moving → keeps moving until |speed| drops below the low `restEps` bar
+ *   - in between  → holds the previous state
+ * A fast sign reversal while moving flips direction directly.
+ */
+export function resolveLocomotionHysteretic(
+  signedSpeed: number,
+  prev: Locomotion,
+  restEps: number,
+  moveEps: number
+): Locomotion {
+  const mag = Math.abs(signedSpeed)
+  const dir: Locomotion = signedSpeed >= 0 ? 'forward' : 'backward'
+  if (prev === 'idle') return mag > moveEps ? dir : 'idle'
+  // Currently moving (forward|backward): settle to idle at or below the low bar.
+  return mag <= restEps ? 'idle' : dir
 }
 
 /**
@@ -67,8 +107,12 @@ export type SlotPlan = {
   readonly fallback: boolean
 }
 
-/** The celebrate slot: a one-shot clip, or null = badge-only (no clip). */
-export type CelebratePlan = { readonly clip: string } | null
+/**
+ * The celebrate slot: an ordered cycle of one-shot clips (his jumps), or null =
+ * badge-only (no clip). girl.tsx advances an index per discovery and reads the
+ * clip via selectCelebrateClip so two jumps alternate deterministically.
+ */
+export type CelebratePlan = { readonly clips: readonly string[] } | null
 
 export type ClipPlan = {
   readonly forward: SlotPlan
@@ -82,13 +126,13 @@ const has = (available: readonly string[], name: string): boolean => available.i
 /**
  * Choose an action for each journey state from the animation names the GLB
  * carries, degrading gracefully so the mixer always has a clip to play:
- *   Idle          → the forward skip (slow keep-alive skip-in-place during dwell)
- *   Walk_Backward → the forward skip (played forward, cadence from |speed|)
- *   Wave/Celebrate → badge-only celebrate (no clip)
- * The forward slot is the skip clip when present, else the first animation.
+ *   forward       → the first present FORWARD_SLOTS name, else the first animation
+ *   Idle          → the Idle clip, else the forward skip (slow keep-alive in-place)
+ *   Walk_Backward → the Walk_Backward clip, else the forward skip (cadence from |speed|)
+ *   celebrate     → the ordered subset of CELEBRATE_SLOTS present, else badge-only
  */
 export function resolveClipPlan(available: readonly string[]): ClipPlan {
-  const forwardClip = has(available, SKIP_CLIP) ? SKIP_CLIP : (available[0] ?? SKIP_CLIP)
+  const forwardClip = FORWARD_SLOTS.find((n) => has(available, n)) ?? available[0] ?? SKIP_CLIP
   const forward: SlotPlan = { clip: forwardClip, fallback: false }
 
   const idle: SlotPlan = has(available, IDLE_SLOT)
@@ -99,10 +143,22 @@ export function resolveClipPlan(available: readonly string[]): ClipPlan {
     ? { clip: BACKWARD_SLOT, fallback: false }
     : { clip: forwardClip, fallback: true }
 
-  const celebrateClip = CELEBRATE_SLOTS.find((n) => has(available, n)) ?? null
-  const celebrate: CelebratePlan = celebrateClip ? { clip: celebrateClip } : null
+  const celebrateClips = CELEBRATE_SLOTS.filter((n) => has(available, n))
+  const celebrate: CelebratePlan = celebrateClips.length ? { clips: celebrateClips } : null
 
   return { forward, idle, backward, celebrate }
+}
+
+/**
+ * Pick the celebrate clip for a given discovery index, rotating through the
+ * cycle so two jumps alternate on parity (0→Jump_A, 1→Jump_B, 2→Jump_A, …).
+ * A one-clip cycle returns that clip for every index; a null plan returns null.
+ * Deterministic — a function only of the ordered clip cycle and the index.
+ */
+export function selectCelebrateClip(plan: CelebratePlan, index: number): string | null {
+  if (!plan || plan.clips.length === 0) return null
+  const n = plan.clips.length
+  return plan.clips[((index % n) + n) % n]
 }
 
 /**

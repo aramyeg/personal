@@ -133,18 +133,21 @@ function parseArgs(argv) {
 }
 
 /**
- * Self-test: merge the current girl.glb with itself under "Idle" and assert the
- * result. Proves the pipeline end-to-end before real clips exist. Writes to a
- * temp file only — never commits a GLB.
+ * Self-test: merge the current girl.glb with itself under a fresh slot name and
+ * assert the result. Proves the retarget/dedup pipeline end-to-end. Uses a slot
+ * absent from the base (the canonical girl.glb now ships Idle/Skip_Forward/…) so
+ * the +1 assertion holds regardless of how many clips the base already carries.
+ * Writes to a temp file only — never commits a GLB.
  */
 async function selfTest() {
   const base = 'public/labs/small-world/girl.glb'
+  const SLOT = 'SelfTest_Merge'
   const before = await new NodeIO().read(base)
   const beforeAnims = before.getRoot().listAnimations().length
   const beforeMeshes = before.getRoot().listMeshes().length
 
   const out = join(tmpdir(), 'girl-merge-selftest.glb')
-  const result = await mergeClips({ base, out, clips: [{ name: 'Idle', path: base }] })
+  const result = await mergeClips({ base, out, clips: [{ name: SLOT, path: base }] })
 
   const checks = []
   const assert = (label, ok) => {
@@ -153,12 +156,12 @@ async function selfTest() {
   }
   assert(`clip count grew by exactly 1 (${beforeAnims} → ${result.animations.length})`,
     result.animations.length === beforeAnims + 1)
-  assert(`"Idle" slot present`, result.animations.includes('Idle'))
+  assert(`"${SLOT}" slot present`, result.animations.includes(SLOT))
   assert(`meshes NOT duplicated (${beforeMeshes} → ${result.meshes})`,
     result.meshes === beforeMeshes)
 
   // Idempotency: a second run over the SAME base+slot yields the same count.
-  const rerun = await mergeClips({ base: out, out, clips: [{ name: 'Idle', path: base }] })
+  const rerun = await mergeClips({ base: out, out, clips: [{ name: SLOT, path: base }] })
   assert(`idempotent re-run keeps clip count (${rerun.animations.length})`,
     rerun.animations.length === result.animations.length)
 

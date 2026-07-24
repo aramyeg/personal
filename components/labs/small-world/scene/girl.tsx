@@ -10,7 +10,8 @@ import { useClayRamp } from './toon-ramp'
 import { toonifyGirl } from './girl-clay'
 import {
   resolveClipPlan,
-  resolveLocomotion,
+  resolveLocomotionHysteretic,
+  selectCelebrateClip,
   shouldTriggerCelebrate,
   speedToTimeScale,
   type ClipPlan,
@@ -33,11 +34,16 @@ const DAMP_LAMBDA = 6
  * fling running away. A real Idle clip loops at its own rate, ignoring this. */
 const MIN_TIMESCALE = 0.12
 const MAX_TIMESCALE = 2.5
-/** Signed surface speed (world u/s) below which she is at rest → idle. Panel
- * windows freeze rotation, so their speed collapses well under this. */
-const IDLE_EPS = 0.04
-/** AnimationMixer crossfade between distinct clips (real Idle/Walk_Backward/Wave
- * once Aram's Meshy exports land). Same-clip transitions just re-drive params. */
+/** Idle↔moving hysteresis (signed surface speed, world u/s). She must exceed
+ * IDLE_MOVE_EPS to leave the idle loop, and drop to/under IDLE_REST_EPS to settle
+ * back — the gap keeps a speed hovering near rest from flickering her between the
+ * idle sway and a locomotion step frame-to-frame (the T28 M3 recommendation, now
+ * that real clips distinguish the states). Panel windows freeze rotation, so a
+ * dwell collapses well under IDLE_REST_EPS. */
+const IDLE_REST_EPS = 0.03
+const IDLE_MOVE_EPS = 0.06
+/** AnimationMixer crossfade between distinct clips (Idle ↔ Skip_Forward ↔
+ * Walk_Backward ↔ the jump celebrate). Same-clip transitions just re-drive params. */
 const CROSSFADE = 0.25
 /** Facet her toon surface to match the faceted clay world (lever 4). Off by
  *  default — capture-gated against face/hair readability; kept as a one-line
@@ -106,6 +112,10 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const celebrating = useRef(false)
   /** Locomotion clip to fall back to when a celebrate one-shot finishes. */
   const returnClip = useRef<string | null>(null)
+  /** Last resolved locomotion state — feeds the idle↔moving hysteresis band. */
+  const prevLoco = useRef<Locomotion>('idle')
+  /** Ordinal of discoveries seen — alternates Jump_A/Jump_B on the celebrate cycle. */
+  const celebrateIndex = useRef(0)
 
   const plan: ClipPlan = useMemo(
     () => resolveClipPlan(animations.map((a) => a.name)),
@@ -159,24 +169,35 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     const signedSpeed = ((rotation - prev) * PLANET_RADIUS) / dt
 
     // Celebrate one-shot: fire on the burst's rising edge when a clip exists.
+    // Each discovery advances the cycle so his two jumps alternate on parity.
     if (shouldTriggerCelebrate(prevBurst.current, burst, plan.celebrate !== null)) {
-      returnClip.current = activeClip.current
-      const clip = plan.celebrate!.clip
-      const action = fadeTo(clip)
-      if (action) {
-        action.setLoop(THREE.LoopOnce, 1)
-        action.clampWhenFinished = true
-        action.paused = false
-        action.timeScale = 1
-        celebrating.current = true
+      const clip = selectCelebrateClip(plan.celebrate, celebrateIndex.current)
+      celebrateIndex.current += 1
+      if (clip) {
+        returnClip.current = activeClip.current
+        const action = fadeTo(clip)
+        if (action) {
+          action.setLoop(THREE.LoopOnce, 1)
+          action.clampWhenFinished = true
+          action.paused = false
+          action.timeScale = 1
+          celebrating.current = true
+        }
       }
     }
     prevBurst.current = burst
 
     // While a celebrate clip plays out, leave the mixer to it (returns via the
-    // 'finished' listener). Otherwise drive the locomotion state machine.
+    // 'finished' listener) and freeze the locomotion state so it resumes from
+    // where it left off. Otherwise drive the hysteretic locomotion state machine.
     if (!celebrating.current) {
-      const loco: Locomotion = resolveLocomotion(signedSpeed, IDLE_EPS)
+      const loco: Locomotion = resolveLocomotionHysteretic(
+        signedSpeed,
+        prevLoco.current,
+        IDLE_REST_EPS,
+        IDLE_MOVE_EPS
+      )
+      prevLoco.current = loco
       const slot = plan[loco]
       const action = fadeTo(slot.clip)
       if (action) {
