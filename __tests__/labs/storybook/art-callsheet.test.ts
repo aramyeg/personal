@@ -62,6 +62,12 @@ function knownGoodIds(): ReadonlySet<string> {
       ids.add(`${layer.id}-disc`)
       layer.tiers.forEach((_, i) => ids.add(`${layer.id}-tier${i}`))
     }
+    // The dispatch dial (popup-volvelle-layer.tsx): the spun DIAL beneath the
+    // static WINDOW CARD, both hub-riveted coplanar into the page.
+    if (layer.mech === 'volvelle') {
+      ids.add(`${layer.id}-dial`)
+      ids.add(`${layer.id}-card`)
+    }
     // The dispatch keep (popup-keepstack-layer.tsx): each story renders through
     // a box instance as `<id>-<key>-side/-front/-back/-top` (same box FACE_ART
     // gating), plus the balcony deck, the fan spire members and the raven finial.

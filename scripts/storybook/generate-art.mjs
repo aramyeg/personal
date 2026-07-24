@@ -1904,6 +1904,350 @@ function windmillSail(w, h, seed) {
   return svgPiece(w, h, s)
 }
 
+// ============================================================================
+// THE DISPATCH VOLVELLE (Spread 4). A reader-spun raven "dispatch dial" riveted
+// flat into the Keep's right page: a spun DIAL disc beneath a static WINDOW
+// CARD faceplate. Both are 1:1 CIRCULAR die-cuts — transparent OUTSIDE the
+// inscribed circle (the runtime's alphaTest 0.1 rounds them) — and they SHARE
+// one geometry basis (centre 320,320, disc radius R = w*0.46875 = 300) so the
+// dial's eight sector motifs and the card's three apertures register on the
+// SAME math-angle convention (+y UP: pixelX = cx + r*cosθ, pixelY = cy - r*sinθ).
+// Theme: "four billion ravens routed by one wheel." Deterministic: all randomness
+// flows through mulberry32(seed); everything else is fixed constants.
+// ============================================================================
+
+const D2R = Math.PI / 180
+// math-angle (deg, +y UP, CCW from +x) -> pixel; SVG y grows DOWN so y = cy - r*sinθ
+const polX = (cx, ang, r) => cx + r * Math.cos(ang * D2R)
+const polY = (cy, ang, r) => cy - r * Math.sin(ang * D2R)
+
+/** A circle expressed as a closed path (two half-arcs) so it can join an
+ *  even-odd compound path as an outer boundary or a punched hole. */
+function circlePath(cx, cy, r) {
+  return (
+    `M ${fx(cx - r)} ${fx(cy)} A ${fx(r)} ${fx(r)} 0 1 0 ${fx(cx + r)} ${fx(cy)} ` +
+    `A ${fx(r)} ${fx(r)} 0 1 0 ${fx(cx - r)} ${fx(cy)} Z`
+  )
+}
+
+/** Sampled annular-sector path (arc drawn as a polyline — deterministic, no
+ *  SVG arc-flag ambiguity). Centred on math-angle psi, angular half-width halfW
+ *  deg, radial band [rIn,rOut]. Outer arc then inner arc back = one closed ring
+ *  slice. Used for the dial wedges' read band and the card's window apertures. */
+function annularSectorPath(cx, cy, psi, halfW, rIn, rOut, steps = 16) {
+  const pts = []
+  for (let i = 0; i <= steps; i++) {
+    const a = psi - halfW + (2 * halfW * i) / steps
+    pts.push([polX(cx, a, rOut), polY(cy, a, rOut)])
+  }
+  for (let i = 0; i <= steps; i++) {
+    const a = psi + halfW - (2 * halfW * i) / steps
+    pts.push([polX(cx, a, rIn), polY(cy, a, rIn)])
+  }
+  return 'M ' + pts.map((p) => `${fx(p[0])} ${fx(p[1])}`).join(' L ') + ' Z'
+}
+
+/** Sampled pie-wedge from the centre out to radius r, spanning [a0,a1] deg. */
+function wedgePath(cx, cy, a0, a1, r, steps = 10) {
+  let d = `M ${fx(cx)} ${fx(cy)} L ${fx(polX(cx, a0, r))} ${fx(polY(cy, a0, r))}`
+  for (let i = 1; i <= steps; i++) {
+    const a = a0 + ((a1 - a0) * i) / steps
+    d += ` L ${fx(polX(cx, a, r))} ${fx(polY(cy, a, r))}`
+  }
+  return d + ` L ${fx(cx)} ${fx(cy)} Z`
+}
+
+/** A compact banking raven silhouette — wings spread, wedge tail, nominal
+ *  heading local +y (UP), centred at the local origin, wingspan ~2*S. Slate
+ *  cut-paper with a wing sheen + fine ink cut-edge. Placed via a translate+rotate
+ *  group so each sector can bank it to a DIFFERENT heading. */
+function miniRaven(S, body, sheen) {
+  const P = (mx, my) => `${fx(S * mx)} ${fx(S * my)}`
+  const d =
+    `M ${P(0, -0.58)}` +
+    ` Q ${P(0.06, -0.5)} ${P(0.08, -0.36)}` +
+    ` Q ${P(0.3, -0.44)} ${P(0.58, -0.3)}` +
+    ` Q ${P(0.86, -0.2)} ${P(1.0, 0.04)}` +
+    ` Q ${P(0.7, 0.0)} ${P(0.5, 0.06)}` +
+    ` Q ${P(0.24, 0.12)} ${P(0.15, 0.22)}` +
+    ` L ${P(0.18, 0.58)} L ${P(0, 0.44)} L ${P(-0.18, 0.58)}` +
+    ` L ${P(-0.15, 0.22)}` +
+    ` Q ${P(-0.24, 0.12)} ${P(-0.5, 0.06)}` +
+    ` Q ${P(-0.7, 0.0)} ${P(-1.0, 0.04)}` +
+    ` Q ${P(-0.86, -0.2)} ${P(-0.58, -0.3)}` +
+    ` Q ${P(-0.3, -0.44)} ${P(-0.08, -0.36)}` +
+    ` Q ${P(-0.06, -0.5)} ${P(0, -0.58)} Z`
+  let s = `<path d="${d}" fill="${body}"/>`
+  s += `<path d="M ${P(0.2, -0.16)} Q ${P(0.55, -0.13)} ${P(0.92, 0.02)}" fill="none" stroke="${sheen}" stroke-width="2" opacity="0.55"/>`
+  s += `<path d="M ${P(-0.2, -0.16)} Q ${P(-0.55, -0.13)} ${P(-0.92, 0.02)}" fill="none" stroke="${sheen}" stroke-width="2" opacity="0.55"/>`
+  s += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55" stroke-linejoin="round"/>`
+  return s
+}
+
+/** A compass NEEDLE pointing radially outward along math-angle ang — brass tip
+ *  triangle + slate tail triangle about a shared cross-axis, an ink pivot, a
+ *  dashed heading ring and a gold tip pip. A "route glyph" sector. */
+function compassNeedle(mx, my, ang, len, wdt, tipC, tailC) {
+  const ux = Math.cos(ang * D2R), uy = -Math.sin(ang * D2R)
+  const vx = -uy, vy = ux
+  const tx = mx + ux * len * 0.5, ty = my + uy * len * 0.5
+  const bx = mx - ux * len * 0.5, by = my - uy * len * 0.5
+  const lx = mx + vx * wdt * 0.5, ly = my + vy * wdt * 0.5
+  const rx = mx - vx * wdt * 0.5, ry = my - vy * wdt * 0.5
+  let s = `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(len * 0.6)}" fill="none" stroke="${INK}" stroke-width="1.4" stroke-dasharray="4 4" opacity="0.5"/>`
+  s += `<path d="M ${fx(tx)} ${fx(ty)} L ${fx(lx)} ${fx(ly)} L ${fx(rx)} ${fx(ry)} Z" fill="${tipC}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
+  s += `<path d="M ${fx(bx)} ${fx(by)} L ${fx(lx)} ${fx(ly)} L ${fx(rx)} ${fx(ry)} Z" fill="${tailC}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
+  s += `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(wdt * 0.3)}" fill="${INK}"/>`
+  s += `<circle cx="${fx(tx)}" cy="${fx(ty)}" r="3.2" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1"/>`
+  return s
+}
+
+/** A compass ROSE / cardinal mark centred at (mx,my), its north arm along
+ *  math-angle ang. Four kite points (north brass, rest slate), intercardinal
+ *  ticks, a gold boss and a gold north pip. A "cardinal mark" sector. */
+function compassRose(mx, my, ang, arm, body, northC) {
+  let s = `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(arm * 0.92)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.5"/>`
+  for (const [off, fill] of [[0, northC], [90, body], [180, body], [270, body]]) {
+    const ta = ang + off
+    const tx = mx + Math.cos(ta * D2R) * arm, ty = my - Math.sin(ta * D2R) * arm
+    const b1x = mx + Math.cos((ta + 34) * D2R) * arm * 0.34, b1y = my - Math.sin((ta + 34) * D2R) * arm * 0.34
+    const b2x = mx + Math.cos((ta - 34) * D2R) * arm * 0.34, b2y = my - Math.sin((ta - 34) * D2R) * arm * 0.34
+    s += `<path d="M ${fx(tx)} ${fx(ty)} L ${fx(b1x)} ${fx(b1y)} L ${fx(b2x)} ${fx(b2y)} Z" fill="${fill}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.6"/>`
+  }
+  for (const off of [45, 135, 225, 315]) {
+    const ta = ang + off
+    s += `<line x1="${fx(mx)}" y1="${fx(my)}" x2="${fx(mx + Math.cos(ta * D2R) * arm * 0.5)}" y2="${fx(my - Math.sin(ta * D2R) * arm * 0.5)}" stroke="${INK}" stroke-width="1.4" opacity="0.45"/>`
+  }
+  s += `<circle cx="${fx(mx)}" cy="${fx(my)}" r="4.5" fill="${GOLD}" stroke="${INK}" stroke-width="1.2"/>`
+  s += `<circle cx="${fx(mx + Math.cos(ang * D2R) * arm)}" cy="${fx(my - Math.sin(ang * D2R) * arm)}" r="3.4" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1"/>`
+  return s
+}
+
+/** A TALLY band — `count` radial stroke-count marks fanned across a `span`-deg
+ *  arc centred on math-angle a, every fifth mark drawn as a diagonal slash over
+ *  the preceding four (the classic five-bar gate). A "tally band" sector. */
+function tallyMarks(cx, cy, a, count, rIn, rOut, span, color) {
+  let s = ''
+  const a0 = a - span / 2, a1 = a + span / 2
+  const at = (m) => a0 + (a1 - a0) * (count <= 1 ? 0.5 : m / (count - 1))
+  for (let m = 0; m < count; m++) {
+    if (m % 5 === 4) {
+      const ab = at(m - 4)
+      s += `<line x1="${fx(polX(cx, ab, rIn))}" y1="${fx(polY(cy, ab, rIn))}" x2="${fx(polX(cx, at(m), rOut))}" y2="${fx(polY(cy, at(m), rOut))}" stroke="${color}" stroke-width="3" stroke-linecap="round" opacity="0.9"/>`
+    } else {
+      const am = at(m)
+      s += `<line x1="${fx(polX(cx, am, rIn))}" y1="${fx(polY(cy, am, rIn))}" x2="${fx(polX(cx, am, rOut))}" y2="${fx(polY(cy, am, rOut))}" stroke="${color}" stroke-width="3" stroke-linecap="round" opacity="0.85"/>`
+    }
+  }
+  return s
+}
+
+// A minimal stroke-vector capital alphabet (unit cell, x right / y down, 0=top)
+// for the card's engraved "DISPATCH" — path-based so the label is font-free and
+// byte-identical across bakes (no librsvg font dependency). Only D I S P A T C H.
+const DISPATCH_GLYPHS = {
+  D: [[['M', 0, 0], ['L', 0, 1]], [['M', 0, 0], ['C', 0.95, 0.02, 0.95, 0.98, 0, 1]]],
+  I: [[['M', 0.5, 0], ['L', 0.5, 1]], [['M', 0.2, 0], ['L', 0.8, 0]], [['M', 0.2, 1], ['L', 0.8, 1]]],
+  S: [[['M', 0.92, 0.14], ['C', 0.55, -0.04, 0.06, 0.06, 0.09, 0.34], ['C', 0.11, 0.54, 0.9, 0.5, 0.88, 0.72], ['C', 0.86, 1.0, 0.34, 1.0, 0.06, 0.84]]],
+  P: [[['M', 0.06, 0], ['L', 0.06, 1]], [['M', 0.06, 0], ['L', 0.6, 0], ['C', 1.0, 0.04, 1.0, 0.5, 0.6, 0.54], ['L', 0.06, 0.54]]],
+  A: [[['M', 0, 1], ['L', 0.5, 0], ['L', 1, 1]], [['M', 0.22, 0.62], ['L', 0.78, 0.62]]],
+  T: [[['M', 0, 0], ['L', 1, 0]], [['M', 0.5, 0], ['L', 0.5, 1]]],
+  C: [[['M', 0.94, 0.16], ['C', 0.58, -0.05, 0.06, 0.1, 0.06, 0.5], ['C', 0.06, 0.9, 0.58, 1.05, 0.94, 0.84]]],
+  H: [[['M', 0, 0], ['L', 0, 1]], [['M', 1, 0], ['L', 1, 1]], [['M', 0, 0.5], ['L', 1, 0.5]]],
+}
+
+/** Engrave a word from DISPATCH_GLYPHS as stroke paths, left cell at (x0,y0),
+ *  each cell cw x ch with `gap` between cells. Deterministic, font-free. */
+function engraveWord(word, x0, y0, cw, ch, gap, stroke, sw, extra = '') {
+  let out = ''
+  let x = x0
+  for (const c of word) {
+    const g = DISPATCH_GLYPHS[c]
+    if (g) {
+      for (const sub of g) {
+        let d = ''
+        for (const cmd of sub) {
+          if (cmd[0] === 'C') {
+            d += `C ${fx(x + cmd[1] * cw)} ${fx(y0 + cmd[2] * ch)} ${fx(x + cmd[3] * cw)} ${fx(y0 + cmd[4] * ch)} ${fx(x + cmd[5] * cw)} ${fx(y0 + cmd[6] * ch)} `
+          } else {
+            d += `${cmd[0]} ${fx(x + cmd[1] * cw)} ${fx(y0 + cmd[2] * ch)} `
+          }
+        }
+        out += `<path d="${d.trim()}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${extra} stroke-linecap="round" stroke-linejoin="round"/>`
+      }
+    }
+    x += cw + gap
+  }
+  return out
+}
+
+// ---- 1) THE SPUN DIAL (ch3-dispatch-dial). A brass/amber die-cut disc: eight
+// 45deg wedge sectors around an engraved hub, each sector's distinguishing motif
+// kept in the read annulus 0.40-0.84R. Motifs: four ravens banking at DIFFERENT
+// headings (k=0,2,4,6), a compass route-needle (k=1), a cardinal rose (k=5) and
+// two tally bands of different counts (k=3:10, k=7:7). A thumb-tab grip lobe
+// protrudes past the rim so it reads as spinnable. ----
+function dispatchDial(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2, cy = h / 2
+  const R = w * 0.46875 // 300 @ 640 — shared disc-radius basis with the card
+  const hubR = R * 0.3
+  const bandIn = R * 0.4, bandOut = R * 0.84, bandMid = R * 0.62
+  const BR = GOLD, BR_LIT = '#e7b24d', BR_DIM = GOLD_DIM, BR_DEEP = '#7a5f16'
+  const SLATE = '#3f4a57', SHEEN = '#6b7580'
+
+  const defs =
+    `<clipPath id="dialCut"><circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}"/></clipPath>` +
+    `<radialGradient id="dialLite" cx="0.38" cy="0.30" r="0.78">` +
+    `<stop offset="0" stop-color="${BR_LIT}" stop-opacity="0.5"/>` +
+    `<stop offset="0.55" stop-color="${BR_LIT}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${BR_DEEP}" stop-opacity="0.5"/>` +
+    `</radialGradient>`
+
+  // thumb-tab grip lobe protruding past the rim (down-right, stays in-canvas)
+  const tabA = 300, tabHalf = 12, tabR = R * 1.12
+  const bx0 = polX(cx, tabA - tabHalf, R * 0.99), by0 = polY(cy, tabA - tabHalf, R * 0.99)
+  const bx1 = polX(cx, tabA + tabHalf, R * 0.99), by1 = polY(cy, tabA + tabHalf, R * 0.99)
+  const tabD = `M ${fx(bx0)} ${fx(by0)} Q ${fx(polX(cx, tabA, tabR * 1.06))} ${fx(polY(cy, tabA, tabR * 1.06))} ${fx(bx1)} ${fx(by1)} Z`
+  let tab = `<path d="${tabD}" fill="${BR_DIM}"/>`
+  tab += `<path d="${tabD}" fill="none" stroke="${RIM}" stroke-width="4.5" opacity="0.9" stroke-linejoin="round"/>`
+  tab += `<path d="${tabD}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.5" stroke-linejoin="round"/>`
+  for (let i = 0; i < 3; i++) {
+    const rad = R + (tabR - R) * (0.3 + i * 0.22)
+    tab += `<line x1="${fx(polX(cx, tabA - tabHalf * 0.55, rad))}" y1="${fx(polY(cy, tabA - tabHalf * 0.55, rad))}" x2="${fx(polX(cx, tabA + tabHalf * 0.55, rad))}" y2="${fx(polY(cy, tabA + tabHalf * 0.55, rad))}" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
+  }
+
+  let g = `<g clip-path="url(#dialCut)">`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${BR}"/>`
+  for (let k = 0; k < 8; k++) {
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${k % 2 ? BR_DIM : BR_LIT}" opacity="${k % 2 ? '0.30' : '0.22'}"/>`
+  }
+  // parchment READ-BAND (the annulus the card windows reveal) so the windowed
+  // sectors read as aged parchment — dark ravens/glyphs pop against it — rather
+  // than muddy amber; the aged-brass field stays for the rim + hub.
+  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${PARCH_MID}" opacity="0.66"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.4"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.35"/>`
+  for (let k = 0; k < 8; k++) {
+    const a = k * 45 + 22.5
+    g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${INK}" stroke-width="1.6" opacity="0.42"/>`
+  }
+  const ravenRot = { 0: -35, 2: 20, 4: 135, 6: -110 }
+  for (let k = 0; k < 8; k++) {
+    const a = k * 45
+    const mx = polX(cx, a, bandMid), my = polY(cy, a, bandMid)
+    if (k === 1) g += compassNeedle(mx, my, a, R * 0.4, R * 0.095, BR_LIT, SLATE)
+    else if (k === 5) g += compassRose(mx, my, a, R * 0.17, SLATE, GOLD_LIT)
+    else if (k === 3) g += tallyMarks(cx, cy, a, 10, R * 0.5, R * 0.72, 30, INK)
+    else if (k === 7) g += tallyMarks(cx, cy, a, 7, R * 0.5, R * 0.72, 26, INK)
+    else g += `<g transform="translate(${fx(mx)} ${fx(my)}) rotate(${ravenRot[k]})">${miniRaven(R * 0.153, SLATE, SHEEN)}</g>`
+  }
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#dialLite)"/>`
+  for (let i = 0; i < 14; i++) {
+    const a = rr(r, 0, 360), rad = rr(r, hubR * 1.15, R * 0.95)
+    g += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 1.8))}" fill="${INK}" opacity="${fx(rr(r, 0.1, 0.22))}"/>`
+  }
+  // engraved central hub — brass boss, knurled rim, a compass emblem, a rivet
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="${BR_DIM}"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.65"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.78)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.45"/>`
+  for (let i = 0; i < 48; i++) {
+    const a = i * 7.5
+    g += `<line x1="${fx(polX(cx, a, hubR * 0.87))}" y1="${fx(polY(cy, a, hubR * 0.87))}" x2="${fx(polX(cx, a, hubR))}" y2="${fx(polY(cy, a, hubR))}" stroke="${INK}" stroke-width="1.1" opacity="0.4"/>`
+  }
+  g += compassRose(cx, cy, 90, hubR * 0.5, SLATE, GOLD_LIT)
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.26)}" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
+  g += `<circle cx="${fx(cx - hubR * 0.08)}" cy="${fx(cy - hubR * 0.08)}" r="${fx(hubR * 0.1)}" fill="#ffffff" opacity="0.4"/>`
+  g += `</g>`
+
+  const rim =
+    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${RIM}" stroke-width="5" opacity="0.92"/>` +
+    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
+
+  return svgPiece(w, h, tab + g + rim, defs)
+}
+
+// ---- 2) THE WINDOW CARD (ch3-dispatch-card). A dark-brass die-cut faceplate
+// over the dial: opaque plate, transparent OUTSIDE the inscribed circle, with
+// THREE die-cut apertures (true alpha-0 holes) punched at math-angles 45/90/135,
+// each an annular sector of half-width 16deg over the read band 0.40-0.84R. Built
+// as a single even-odd compound path (outer disc + three window sub-paths + a
+// thumb-notch) so the holes are genuine cut-outs the dial shows through. Carries
+// engraved window bezels, a central rivet, rim rivets and a "DISPATCH" label. ----
+function dispatchCard(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2, cy = h / 2
+  const R = w * 0.46875
+  const bandIn = R * 0.4, bandOut = R * 0.84
+  const halfW = 16
+  const wins = [45, 90, 135]
+  // Aged-brass ground (warmer + a step brighter than the old muddy olive) with
+  // walnut engraving — reads as a distinct instrument beside the winch's bright
+  // yellow-gold (this is browner/bronze, not gold).
+  const PLATE = '#9c7b3c', PLATE_LIT = '#c2a05a', PLATE_DK = '#4a3316'
+
+  const defs =
+    `<radialGradient id="cardLite" cx="0.36" cy="0.30" r="0.82">` +
+    `<stop offset="0" stop-color="${PLATE_LIT}" stop-opacity="0.55"/>` +
+    `<stop offset="0.5" stop-color="${PLATE_LIT}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="#000000" stop-opacity="0.42"/>` +
+    `</radialGradient>`
+
+  // even-odd compound plate: outer disc + 3 window holes + thumb-notch hole.
+  // A point inside a window is enclosed by 2 sub-paths (disc + window) => even
+  // => UNFILLED => true alpha-0 aperture the dial reads through.
+  const notchX = polX(cx, 270, R), notchY = polY(cy, 270, R)
+  let plateD = circlePath(cx, cy, R)
+  for (const psi of wins) plateD += ' ' + annularSectorPath(cx, cy, psi, halfW, bandIn, bandOut)
+  plateD += ' ' + circlePath(notchX, notchY, R * 0.09)
+
+  let s = `<g>`
+  s += `<path fill-rule="evenodd" d="${plateD}" fill="${PLATE}"/>`
+  s += `<path fill-rule="evenodd" d="${plateD}" fill="url(#cardLite)"/>`
+  // concentric engraved rings — kept OUT of the 0.40-0.84 window band
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.93)}" fill="none" stroke="${PLATE_DK}" stroke-width="2" opacity="0.7"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.955)}" fill="none" stroke="${PLATE_LIT}" stroke-width="1.2" opacity="0.6"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.34)}" fill="none" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.6"/>`
+  // engraved bezel frames on the plate around each aperture (never enter the hole)
+  for (const psi of wins) {
+    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 2.4, bandIn - 9, bandOut + 9)}" fill="none" stroke="${PLATE_DK}" stroke-width="3" opacity="0.85"/>`
+    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 1.6, bandIn - 4, bandOut + 4)}" fill="none" stroke="${PLATE_LIT}" stroke-width="1.4" opacity="0.7"/>`
+  }
+  // patina flecks on the outer ring (radius > 0.84R, never inside a window)
+  for (let i = 0; i < 12; i++) {
+    const a = rr(r, 0, 360), rad = rr(r, R * 0.86, R * 0.96)
+    s += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 1.6))}" fill="#000000" opacity="${fx(rr(r, 0.08, 0.16))}"/>`
+  }
+  // rim rivets (avoid the windows in the upper half and the thumb-notch at 270)
+  for (const a of [0, 180, 225, 315]) {
+    const rx = polX(cx, a, R * 0.9), ry = polY(cy, a, R * 0.9)
+    s += `<circle cx="${fx(rx)}" cy="${fx(ry)}" r="6" fill="${PLATE_LIT}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
+    s += `<circle cx="${fx(rx - 1.6)}" cy="${fx(ry - 1.6)}" r="2" fill="#ffffff" opacity="0.35"/>`
+  }
+  // engraved DISPATCH label across the free bottom half
+  const word = 'DISPATCH', cw = R * 0.058, ch = R * 0.12, gap = R * 0.03
+  const totalW = word.length * cw + (word.length - 1) * gap
+  const lx = cx - totalW / 2, ly = cy + R * 0.5
+  s += engraveWord(word, lx, ly + 1.4, cw, ch, gap, PLATE_LIT, 2.4, 'opacity="0.55"')
+  s += engraveWord(word, lx, ly, cw, ch, gap, PLATE_DK, 2.6, 'opacity="0.95"')
+  s += `<line x1="${fx(lx)}" y1="${fx(ly + ch + 6)}" x2="${fx(lx + totalW)}" y2="${fx(ly + ch + 6)}" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.6"/>`
+  // central rivet at the hub — pins the plate flat over the dial
+  const rivR = R * 0.14
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR)}" fill="${PLATE_LIT}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.65"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.62)}" fill="${PLATE}" stroke="${PLATE_DK}" stroke-width="1.4"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.3)}" fill="${PLATE_DK}"/>`
+  s += `<circle cx="${fx(cx - rivR * 0.34)}" cy="${fx(cy - rivR * 0.34)}" r="${fx(rivR * 0.16)}" fill="#ffffff" opacity="0.4"/>`
+  // thumb-notch bezel on the plate side of the rim cut
+  s += `<circle cx="${fx(notchX)}" cy="${fx(notchY)}" r="${fx(R * 0.11)}" fill="none" stroke="${PLATE_DK}" stroke-width="2" opacity="0.7"/>`
+  s += `</g>`
+
+  const rim =
+    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${RIM}" stroke-width="5" opacity="0.92"/>` +
+    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
+
+  return svgPiece(w, h, s + rim, defs)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -1984,6 +2328,9 @@ const PIECES = [
   { id: 'ch3-keep-spire-m0', seed: 40301, w: 595, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 0) } },
   { id: 'ch3-keep-spire-m1', seed: 40302, w: 376, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 1) } },
   { id: 'ch3-keep-spire-m2', seed: 40303, w: 253, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 2) } },
+  // the dispatch volvelle — a spun raven dial beneath a punched window card
+  { id: 'ch3-dispatch-dial', seed: 40310, w: 640, h: 640, grain: 10, paint() { return dispatchDial(this.w, this.h, this.seed) } },
+  { id: 'ch3-dispatch-card', seed: 40320, w: 640, h: 640, grain: 10, paint() { return dispatchCard(this.w, this.h, this.seed) } },
   // ---- Spread 7 — the Northern Treasury (ch6, northern aurora/teal/gold) ----
   { id: 'ch6-strongbox-front', seed: 70201, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'strongbox') } },
   { id: 'ch6-strongbox-back', seed: 70202, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'strongbox') } },

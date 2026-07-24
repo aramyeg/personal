@@ -238,6 +238,8 @@ principle) before any of these land.
 | `ch3-skyline-l` | `ch3-skyline-l-mound0`, `ch3-skyline-l-mound1`, `ch3-skyline-l-mound2` | Left-page flanking citadel rooftops — low slate rooflines, chimneys, amber windows; dusk-violet on the deepest (stepping back in Z) | ≈2:1 each | STAND (mound) | placeholder |
 | `ch3-skyline-r` | `ch3-skyline-r-mound0`, `ch3-skyline-r-mound1`, `ch3-skyline-r-mound2` | Right-page flanking citadel rooftops (mirror rank) | ≈2:1 each | STAND (mound) | placeholder |
 | `ch3-fringe` | `ch3-fringe` | Fore-edge dispatch-yard wall — slate, iron straps, pinned amber dispatch-notices | ≈5.2:1 low strip | FACE | placeholder |
+| `ch3-dispatch` | `ch3-dispatch-dial` | The reader-spun DISPATCH DIAL (volvelle, riveted flat into the right-page yard, mirroring the winch) — a brass wheel of 8 sectors: ravens banking at staggered headings, route glyphs, a tally band; a thumb-tab on the rim | 1:1 square (disc, radius 0.11 → canvas 0.22×0.22) | DISC | placeholder |
+| `ch3-dispatch` | `ch3-dispatch-card` | The static WINDOW CARD over the dial — dark brass faceplate with 3 die-cut windows (top + two flanks at 45°) and a thumb-notch, engraved "DISPATCH"; the sectors show through the cut windows | 1:1 square (disc, matches the dial) | DISC (windowed) | placeholder |
 
 ## 5. Chapter IV — The Vault-Dragon of the Golden Dunes (spread 5)
 

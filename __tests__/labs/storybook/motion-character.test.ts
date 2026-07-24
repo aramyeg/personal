@@ -15,6 +15,7 @@ import {
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose, tabPieceLift } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { solveVolvellePose } from '@/components/labs/storybook/book/popup-volvelle'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keepsake'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
@@ -125,6 +126,13 @@ const allQuads = (
   if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
   if (layer.mech === 'rotor')
     return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
+  // The volvelle dial + card ride the page coplanar at a FROZEN twist (the twist
+  // is user-paced, cap-exempt); their only page-driven motion is the rigid page
+  // sweep. Pose at a detent (0) — rotation is a rigid square, footprint-neutral.
+  if (layer.mech === 'volvelle') {
+    const pose = solveVolvellePose(layer, thetaL, thetaR, 0)
+    return [pose.dial, pose.card]
+  }
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   // The knob-tower's autonomous (page-driven) motion is the envelope collapse
   // at a FROZEN twist; the twist itself is user-paced (cap-exempt). Pose at full
@@ -278,6 +286,13 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // N2) proves every output cam has bounded slope (no snap); its real bound is
   // Gate 2's absolute cap, which N7 holds ~88% clear. Measured 8.86x + ~10%.
   keepwinch: 9.8,
+  // VOLVELLE (E2.2 Batch B): at a FROZEN twist the dial + card ride the page as a
+  // rigid coplanar square, so their only page-driven motion is the pure rigid
+  // page sweep — every corner's step is proportional to its distance from the
+  // spine, giving a very even per-corner profile (max/mean ~ the ratio of the
+  // farthest to the mean corner distance). Measured worst ~1.2x + margin; smooth
+  // and branch-free (the twist itself is user-paced and cap-exempt).
+  volvelle: 1.6,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

@@ -388,6 +388,34 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its
   // scalloped painter reading as the yard's front wall until real art lands.
   { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.1, height: 0.155 },
+  // THE DISPATCH DIAL (E2.2 Batch B — the book's first VOLVELLE; Birmingham mech
+  // 103 THE HUB + 104 ROTATING WINDOW; bench derive-volvelle.mjs V1-V10). A
+  // reader-spun raven dial riveted flat into the RIGHT page (the dispatch yard),
+  // MIRRORING the winch's crank knob on the left — winch left, dispatch dial
+  // right. The reader twists the dial (the winch/knob H4 idiom: pointer angle
+  // about the hub, release HOLDS the twist) and raven silhouettes + route glyphs
+  // cycle through the three die-cut windows of the static card over it — "four
+  // billion ravens routed by one wheel." Release clicks the sectors into their
+  // windows (45deg detents, snap ease). A coplanar disc lies flat at ANY
+  // rotation, so the dial simply rides the folding page (no envelope) and folds
+  // dead flat at close — the book remembers the twist through page turns. Second
+  // user-driven piece on s4 beside the winch by DESIGN: a windowed dial is a new
+  // mechanism FAMILY (G1), reads distinct from the crank machine, and sits on the
+  // opposite page. hubD 0.60 seats the dial in the open lower-right yard: its
+  // spine-side swept corner (0.60 - 0.11*sqrt2 = 0.44) clears the keep's
+  // full-open hall wall (x=0.40) with margin, and it reads clear of the keep at
+  // the real rest (where the near-flat book collapses the keep to x~0.02). hubZ
+  // 0.36 sits downstage of the skyline, upstage of the fringe (z 0.60+). Art:
+  // ch3-dispatch-dial (8 sectors) + ch3-dispatch-card (3 windows + thumb-tab).
+  {
+    id: 'ch3-dispatch', kind: 'foreground', role: 'scenery', mech: 'volvelle',
+    side: 'right', hubD: 0.6, hubZ: 0.36, radius: 0.11, sectors: 8,
+    windows: [
+      { psiDeg: 45, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
+      { psiDeg: 90, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
+      { psiDeg: 135, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
+    ],
+  },
 ]
 
 // Chapter IV (the Batch-1 real-art spread, the physics-benchmark subject):

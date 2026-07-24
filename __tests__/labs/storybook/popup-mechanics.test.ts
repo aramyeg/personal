@@ -40,6 +40,7 @@ import {
   TAB_LIP,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
+import { solveVolvellePose } from '@/components/labs/storybook/book/popup-volvelle'
 import { solveKnobTowerPose, knobTowerThetaMax } from '@/components/labs/storybook/book/popup-knobtower'
 import { keepStackQuads, keepStackStoryGeoms } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
@@ -125,6 +126,13 @@ const allQuads = (
   if (layer.mech === 'dress') return [solveDressPose(layer, seatQuadOf(layer, layers, thetaL, thetaR))]
   if (layer.mech === 'rotor')
     return [solveRotorPose(layer, seatQuadOf(layer, layers, thetaL, thetaR), thetaL - thetaR)]
+  // A volvelle poses a spun dial + a static window card, both coplanar in the
+  // page. Rotation only spins a rigid square on its circumcircle, so the
+  // dihedral-only footprint gates take any theta — use a detent (0).
+  if (layer.mech === 'volvelle') {
+    const pose = solveVolvellePose(layer, thetaL, thetaR, 0)
+    return [pose.dial, pose.card]
+  }
   if (layer.mech === 'tabpiece') return solveTabPiecePose(layer, thetaL, thetaR).map((p) => p.quad)
   // A knob-tower has no theta channel in these dihedral-only gates (collision,
   // containment, rigidity) — pose at full erect (THETA_MAX), the worst-case
@@ -187,6 +195,10 @@ const flatTol = (layer: SceneLayer): number => {
   // but its riveted disc sits one glue layer (ROTOR_LIFT 0.003) proud like a
   // rotor, so it flattens to that tolerance.
   if (layer.mech === 'knobtower') return 0.004
+  // A volvelle's dial rivets one glue layer proud (ROTOR_LIFT 0.003) and its
+  // static card a second (2*ROTOR_LIFT 0.006); both spin/sit at exact coplanar
+  // rest, so the piece flattens to the card's lift class at closed.
+  if (layer.mech === 'volvelle') return 0.007
   // The winch's outputs fold flat riding folding keep walls (off-wall reach ~
   // sin(deploy)*E(beta) -> 0), but the semaphore lies along the fold-invariant
   // spine axis leaving a paper-thickness residual (0.015) — the bench's N4
@@ -234,6 +246,7 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'rider' ||
         layer.mech === 'dress' ||
         layer.mech === 'rotor' ||
+        layer.mech === 'volvelle' ||
         layer.mech === 'knobtower' ||
         layer.mech === 'keepsake' ||
         layer.mech === 'keepstack' ||
@@ -324,13 +337,14 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
 describe('A1 glue coherence — glue edges lie in their host surface at every angle', () => {
   it('page-glued pieces keep their bottom edges in the page planes', () => {
     for (const [, layer, layers] of ALL_LAYERS) {
-      // children, riders, dress patches, and rotors glue to PAPER, not pages —
-      // their glue coherence is tested against their parents instead.
+      // children, riders, dress patches, rotors, and volvelles glue to PAPER,
+      // not pages — their glue coherence is tested against their parents instead.
       if (
         layer.mech === 'child' ||
         layer.mech === 'rider' ||
         layer.mech === 'dress' ||
-        layer.mech === 'rotor'
+        layer.mech === 'rotor' ||
+        layer.mech === 'volvelle'
       )
         continue
       for (let i = 0; i <= 72; i++) {
@@ -606,7 +620,8 @@ describe('A6 continuity — no jumps, no branch flips', () => {
         layer.mech === 'child' ||
         layer.mech === 'rider' ||
         layer.mech === 'dress' ||
-        layer.mech === 'rotor'
+        layer.mech === 'rotor' ||
+        layer.mech === 'volvelle'
       const bound = compound ? (16 * Math.PI) / steps : (8 * Math.PI) / steps
       let prev = allCorners(layer, layers, 0, 0)
       for (let i = 1; i <= steps; i++) {

@@ -148,6 +148,10 @@ const familyOf = (l: SceneLayer): string | null => {
       // A row of page-driven rooftop mounds (the tab-piece/knob-tier cross-
       // section without a knob) — its own low-scenery family.
       return 'skyline'
+    case 'volvelle':
+      // The reader-spun windowed dial (Birmingham 103/104) — a rotating-window
+      // reveal, distinct from the winch's crank/iris: its own hand-driven family.
+      return 'volvelle'
     case 'dress':
       return null
   }

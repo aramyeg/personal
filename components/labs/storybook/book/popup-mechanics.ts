@@ -457,6 +457,59 @@ export type RotorGeom = {
 }
 
 /**
+ * VOLVELLE (E2.2 Batch B; Birmingham mech 103 "THE HUB" + mech 104 "THE
+ * ROTATING WINDOW") — the book's first reader-spun paper DIAL with windowed
+ * reveals: the raven DISPATCH DIAL on spread 4. PAGE-ROOTED like the knob tower
+ * (side + page coordinates, NOT seated on a parent panel), it mirrors the s4
+ * winch: the winch's crank knob on the LEFT page, the dispatch dial on the
+ * RIGHT. TWO die-cut discs are HUB-RIVETED coplanar into the page (the rotor
+ * vocabulary: ROTOR_LIFT proud, spun on the page's own frame):
+ *   DIAL — beneath, one glue layer proud, S sectors of dispatch art (ravens at
+ *     staggered headings, route glyphs, a tally band). Spun by the reader's
+ *     twist theta (the knobtower/winch H4 idiom: pointer angle about the hub,
+ *     wrapped-delta accumulation into the user-drive channel, release HOLDS theta
+ *     — persistence, "the book remembers the knob"). A coplanar disc lies flat at
+ *     ANY rotation, so — unlike the knob tower — the dial needs NO fold-flat
+ *     envelope: it simply rides the folding page, whose own flat-fold carries it
+ *     down at book close.
+ *   CARD — over, a second glue layer proud, STATIC, W die-cut WINDOWS + a rim
+ *     thumb-tab (the affordance). Each detent-worth of spin frames a fresh
+ *     sector through each window.
+ * On release theta snaps to the nearest detent (2pi/S — the sectors click into
+ * their windows). Pose + registration math lives in book/popup-volvelle.ts (this
+ * module is at its size cap). Derived + gate-checked in
+ * .superpowers/sdd/bench/derive-volvelle.mjs.
+ */
+export type VolvelleWindow = {
+  /** Window centre angle in the disc's page frame (0 = the fore-edge/along-page
+   *  direction), degrees. Congruent to a sector centre (mod 360/sectors) so
+   *  every detent locks all windows onto sector centres simultaneously. */
+  psiDeg: number
+  /** Angular half-width, degrees. 2*halfWidth must stay under one sector. */
+  halfWidthDeg: number
+  /** Radial band centre / half-height, as fractions of the dial radius. */
+  rMid: number
+  rHalf: number
+}
+
+export type VolvelleGeom = {
+  mech: 'volvelle'
+  /** The page the dial rivets into (and whose frame the hub spins on). */
+  side: 'left' | 'right'
+  /** Hub (disc centre) distance from the spine along the page run. */
+  hubD: number
+  /** Hub position along the spine (world z). */
+  hubZ: number
+  /** Dial radius; rendered as a square quad of side 2*radius carrying circular
+   *  die-cut art. The static window card shares the hub + radius. */
+  radius: number
+  /** Detent count S — the dial clicks into 360/S sectors; the sector art. */
+  sectors: number
+  /** The die-cut windows in the static card. */
+  windows: readonly VolvelleWindow[]
+}
+
+/**
  * KNOB-TWIST TOWER (Part D6 "THE HAND"; Birmingham mech 103 "THE HUB" volvelle
  * + mech 59/105 Scotch yoke + mech 90 "the knee") — the book's first
  * USER-DRIVEN fold. A die-cut disc riveted flat INTO the page (the rotor
@@ -548,6 +601,7 @@ export type LayerGeom =
   | TabPieceGeom
   | KineticArmGeom
   | RotorGeom
+  | VolvelleGeom
   | KnobTowerGeom
   | KeepsakeGeom
   | KeepStackGeom
@@ -1057,6 +1111,8 @@ export function solveLayerPose(
       throw new Error('storybook: tab pieces are multi-patch — use solveTabPiecePose (popup-tabpiece)')
     case 'rotor':
       throw new Error('storybook: rotors ride a solved parent surface — use solveRotorPose (popup-rotor)')
+    case 'volvelle':
+      throw new Error('storybook: volvelle layers are multi-patch + user-driven — use solveVolvellePose (popup-volvelle)')
     case 'knobtower':
       throw new Error('storybook: knob-tower layers are multi-patch + user-driven — use solveKnobTowerPose (popup-knobtower)')
     case 'keepsake':

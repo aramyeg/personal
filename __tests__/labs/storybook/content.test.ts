@@ -81,7 +81,9 @@ describe('storybook content', () => {
                                     ? l.crankR
                                     : l.mech === 'skyline'
                                       ? l.rows.length
-                                      : l.width
+                                      : l.mech === 'volvelle'
+                                        ? l.radius
+                                        : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

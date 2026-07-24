@@ -47,6 +47,7 @@ import { KeepStackPopupLayer } from './popup-keepstack-layer'
 import { KeepWinchPopupLayer } from './popup-keepwinch-layer'
 import { KeepSkylinePopupLayer } from './popup-skyline-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
+import { VolvellePopupLayer } from './popup-volvelle-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
 
@@ -97,6 +98,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'fan') return 0.5 // per-member creaseU applies at render
   if (layer.mech === 'dress') return 0.5 // single quad, no fold
   if (layer.mech === 'rotor') return 0.5 // single spinning quad, no fold
+  if (layer.mech === 'volvelle') return 0.5 // dial + card quads, per-face uvs in the volvelle layer
   if (layer.mech === 'stripflap') return 0.5 // coplanar halves, invisible seam
   if (layer.mech === 'tabpiece') return 0.5 // per-face uvs live in the tabpiece layer
   if (layer.mech === 'knobtower') return 0.5 // per-face uvs live in the knobtower layer
@@ -139,6 +141,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
     return false
   }
   if (layer.mech === 'rotor') return false // spun in-plane by its own renderer; disc art is symmetric
+  if (layer.mech === 'volvelle') return false // dial spun in-plane by its own renderer; disc art is symmetric
   if (layer.mech === 'knobtower') return false // per-face uvs live in the knobtower layer
   if (layer.mech === 'tabpiece') return false // per-face uvs live in the tabpiece layer
   if (layer.mech === 'keepsake') return false // single card quad, its own renderer
@@ -581,6 +584,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
               key={layer.id}
               layer={layer}
               layers={layers}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'volvelle') {
+          return (
+            <VolvellePopupLayer
+              key={layer.id}
+              layer={layer}
               spreadIndex={spreadIndex}
               frame={frame}
               committedSpread={committedSpread}
