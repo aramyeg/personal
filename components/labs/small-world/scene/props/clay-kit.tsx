@@ -718,3 +718,95 @@ export function ClayStiltHut({ wall = PALETTE.stiltWall, roof = PALETTE.stiltRoo
   )
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
+
+// --- Canyon geysers + hoodoos (Task 49) -------------------------------------
+//
+// Aram (Round 13): the canyon "still... can add a lot there to make the art more exciting.
+// maybe geysers." A geyser is TWO merged single-draw pieces: (1) ClayGeyser — a pale mineral
+// SINTER cone seated on a terraced clay platform with a bubbling pool at the vent, always
+// present; (2) ClayGeyserPlume — a sculpted column of opaque clay puffs that the canyon
+// component GROWS and SHRINKS on a slow rotation-driven cycle (geyser.ts), so the eruption
+// reads as a solid mineral jet, never a flicker/particle spray (his flicker-family veto). The
+// plume is built with its base at y=0 so a uniform scale about the vent grows it straight up.
+// Hoodoos add stratified-rock variety to the gorge (his "dirt ridge + cliffs" stay untouched).
+
+/** A geyser's mineral base: a pale sinter cone on a two-step terraced platform with a darker
+ *  bubbling pool disc at the vent. ONE merged draw; base at y=0 so it seats on the canyon floor.
+ *  The plume erupts from `ClayGeyserPlume` positioned at the cone's mouth. */
+export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep, pool = PALETTE.geyserPool, ...x }: Xform & { crust?: string; shade?: string; pool?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        // two-step terraced sinter platform (a wide grounding apron + a narrower seat)
+        { geo: new THREE.CylinderGeometry(0.2, 0.23, 0.04, 16), color: shade, pos: [0, 0.02, 0] },
+        { geo: new THREE.CylinderGeometry(0.15, 0.17, 0.04, 16), color: crust, pos: [0, 0.06, 0] },
+        // the sinter cone rising to the vent
+        { geo: new THREE.CylinderGeometry(0.055, 0.13, 0.16, 14), color: crust, pos: [0, 0.16, 0] },
+        // shaded upper collar just under the rim
+        { geo: new THREE.CylinderGeometry(0.058, 0.07, 0.04, 14), color: shade, pos: [0, 0.235, 0] },
+        // the bubbling mineral pool sitting in the vent mouth
+        { geo: new THREE.CylinderGeometry(0.05, 0.05, 0.02, 14), color: pool, pos: [0, 0.255, 0] },
+      ]),
+    [crust, shade, pool]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** The erupting plume: a sculpted column of opaque clay puffs, base at y=0. ONE merged draw.
+ *  The canyon component scales this uniformly by the rotation-driven plume height (geyser.ts),
+ *  so it rises straight up from the vent and settles — a solid mineral jet, no flicker. */
+export function ClayGeyserPlume({ steam = PALETTE.geyserPlume, base = PALETTE.geyserPool, ...x }: Xform & { steam?: string; base?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    // stacked blobby puffs, wider + wetter at the base, tapering to a steamy crown; a gentle
+    // lean and side-puffs read as billowing spray without any transparency or sparkle.
+    const puff = (y: number, r: number, color: string, dx = 0, dz = 0): ClayPart => ({
+      geo: new THREE.SphereGeometry(r, 12, 12),
+      color,
+      pos: [dx, y, dz],
+      scl: [1, 1.15, 1],
+    })
+    return buildMergedClay([
+      puff(0.05, 0.085, base),
+      puff(0.15, 0.078, base, 0.02),
+      puff(0.26, 0.072, steam, -0.015),
+      puff(0.34, 0.05, steam, 0.05, 0.02), // a side billow
+      puff(0.37, 0.066, steam, 0.015),
+      puff(0.47, 0.055, steam, -0.03),
+      puff(0.56, 0.042, steam, 0.02),
+    ])
+  }, [steam, base])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** A cluster of stratified hoodoo spires — tall tapered terracotta rocks with a lighter caprock,
+ *  in the canyon rust family. ONE merged draw; bases at y=0. Adds badland-spire variety to the
+ *  gorge floor without touching the sacred cliffs/ridge (the canyon's beloved relief). */
+export function ClayHoodoo({ rock = PALETTE.hoodooRock, cap = PALETTE.hoodooCap, ...x }: Xform & { rock?: string; cap?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    // three spires of different heights, each a stack of tapering drums (the strata) under a
+    // wider caprock — the classic hoodoo silhouette.
+    const spires: Array<{ px: number; pz: number; h: number; r: number }> = [
+      { px: 0, pz: 0, h: 0.42, r: 0.05 },
+      { px: 0.13, pz: 0.06, h: 0.28, r: 0.045 },
+      { px: -0.1, pz: -0.05, h: 0.34, r: 0.042 },
+    ]
+    const parts: ClayPart[] = []
+    for (const s of spires) {
+      const drums = 3
+      for (let d = 0; d < drums; d++) {
+        const y0 = (s.h * d) / drums
+        const seg = s.h / drums
+        const rLo = s.r * (1 - 0.12 * d)
+        const rHi = s.r * (1 - 0.12 * (d + 1))
+        parts.push({ geo: new THREE.CylinderGeometry(rHi, rLo, seg, 8), color: rock, pos: [s.px, y0 + seg / 2, s.pz] })
+      }
+      // caprock crown
+      parts.push({ geo: new THREE.SphereGeometry(s.r * 1.35, 10, 8), color: cap, pos: [s.px, s.h, s.pz], scl: [1.1, 0.6, 1.1] })
+    }
+    return buildMergedClay(parts)
+  }, [rock, cap])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}

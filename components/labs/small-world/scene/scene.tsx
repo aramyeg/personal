@@ -22,6 +22,7 @@ import { FlyerbeeSet } from './props/set-flyerbee'
 import { Dialog360Set } from './props/set-360dialog'
 import { AccentureSet, DesertLife } from './props/set-accenture'
 import { AknaSet } from './props/set-akna'
+import { CanyonGeysers } from './props/canyon'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { LoadSignal } from '../loader/load-signal'
 
@@ -76,6 +77,7 @@ function SceneContents({
         <Jungle journeyRef={journeyRef} />
         <DeltaLife journeyRef={journeyRef} />
         <DesertLife journeyRef={journeyRef} />
+        <CanyonGeysers journeyRef={journeyRef} />
         <Bridges journeyRef={journeyRef} />
         <Delights journeyRef={journeyRef} />
         <ChapterSet index={0} journeyRef={journeyRef}>

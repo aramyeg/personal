@@ -86,4 +86,14 @@ export const PALETTE = {
   // delta structures (Task 48) — the stilt fishing hut on the levee
   stiltWall: '#C7A878', // sun-bleached reed-and-plank hut wall
   stiltRoof: '#8A6A46', // thatched brown roof / posts
+  // Task 49 — canyon geysers + hoodoos (props on the B1 canyon floor). The geyser is a pale
+  // mineral SINTER cone (bone-cream crust over the rust gorge) ringed by a bubbling pool, with
+  // an erupting steamy-blue clay plume. Hoodoos are stacked terracotta rock spires. All prop
+  // colours (reload-safe under the worker bake); one accent family each, tuned to the canyon.
+  sinter: '#D8C7A2', // pale mineral sinter crust — the geyser cone / terrace rim
+  sinterDeep: '#A98F66', // wet shaded sinter (cone base, terrace steps)
+  geyserPlume: '#DCE7EB', // pale steamy mineral water — the erupting clay plume
+  geyserPool: '#A9C6D0', // the deeper mineral pool bubbling at the vent
+  hoodooRock: '#B0673B', // terracotta hoodoo spire body (canyon rust family)
+  hoodooCap: '#C79A6A', // lighter caprock crowning each hoodoo
 } as const

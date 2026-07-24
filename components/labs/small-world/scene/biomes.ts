@@ -811,6 +811,77 @@ function canyonWalls(nx: number, ny: number, nz: number): number {
   return CANYON_BANK_H * latG * wall
 }
 
+// --- Canyon backdrop mountain range (B1, Task 49 — LOOK B "mountain canyon") -
+//
+// Aram (Round 13): he LOVES the canyon's dirt ridge + cliffs (untouched here) and left an
+// OPEN design question — "some mountain ranges if we decide to make 4th biome the mountainous
+// area." So this is the Look-B dressing: a jagged range rising BEHIND the canyon rim, framing
+// the beloved gorge without touching it. It is gated behind CANYON_MODE (a capture-time look
+// flag): mode 0 = "deep canyon" (no range, the range term is never summed); mode 1 = "mountain
+// canyon". The orchestrator + Aram pick the shipped default; flipping the one constant switches
+// looks (a rebake). Everything else in the canyon wedge is identical between the two looks.
+//
+// The range is a row of gaussian peaks (peakBump, with its pressed skirt) at mid-latitude on
+// BOTH flanks (|nx| ≈ 0.58–0.64), across the canyon's interior longitudes (θ ≈ 3.0–4.2) — well
+// beyond the creek + cliffs, so it reads as a distant skyline, not a taller cliff. It is painted
+// by the SAME biomeTint 'canyon' classifier (butte branch, currentBump > 0.045), so the peaks
+// read as big canyon-earth mesas/buttes — cohesive with the gorge, and deliberately NOT the
+// grey/snow alpine palette (that would converge with the winter wedge). RELIEF only (no new
+// baked colour), so it hot-reloads cleanly under the worker bake.
+//
+// Silhouette safety: same envelope discipline as duneField/canopyMounds — EXACTLY 0 on the
+// girl's lane band (an early return) so it adds NO spine term (the contact budget is untouched),
+// and faded to 0 before the grazing limb (|nx| ≥ CANYON_MTN_LIMB_HI), inside the wedgeGate's own
+// 0.75 structural cut, so it never touches the invariant polar silhouette. Summed only inside
+// wedgeDelta (variant 1, band 1), so it is EXACTLY 0 on the band meridians (bumpA === bumpB
+// there — seam intact) and the discrete A→B flip that brings it over the horizon is proven
+// hidden by renewal-scan (the peaks sit inside the proven-hidden relief band). Peak heights are
+// capped so the whole rendered canyon wedge stays clear of the 1.35R ceiling (scan-task23 with
+// CANYON_MODE = 1).
+export const CANYON_MODE: 0 | 1 = 0
+
+const CANYON_MTN_LANE_LO = 0.2
+const CANYON_MTN_LANE_HI = 0.34
+const CANYON_MTN_LIMB_LO = 0.66
+const CANYON_MTN_LIMB_HI = 0.75
+/** Lane/limb gate bounds for the canyon range, exported so the unit test pins the gating
+ *  contract (0 on the girl's lane band, 0 past the limb) against the shipped constants. */
+export const CANYON_MTN_GATE = {
+  laneLo: CANYON_MTN_LANE_LO,
+  laneHi: CANYON_MTN_LANE_HI,
+  limbLo: CANYON_MTN_LIMB_LO,
+  limbHi: CANYON_MTN_LIMB_HI,
+} as const
+
+/** The backdrop skyline — a jagged row of peaks framing the gorge on both flanks. Heights are
+ *  capped ≤ 0.24R so the range clears the 1.35R ceiling once the base meadow + jitter are added
+ *  (peakBump's pressed skirt + the claySignature ridged carve only ever lower the rendered tip). */
+const CANYON_RANGE: readonly Peak[] = [
+  { dir: norm3(place(0.6, 3.02)), h: 0.21, r: 0.12 },
+  { dir: norm3(place(0.64, 3.34)), h: 0.24, r: 0.11 },
+  { dir: norm3(place(0.58, 3.62)), h: 0.19, r: 0.12 },
+  { dir: norm3(place(0.63, 3.9)), h: 0.23, r: 0.11 },
+  { dir: norm3(place(0.6, 4.18)), h: 0.18, r: 0.12 },
+  { dir: norm3(place(-0.6, 3.22)), h: 0.2, r: 0.12 }, // far-flank backdrop peaks
+  { dir: norm3(place(-0.63, 3.68)), h: 0.22, r: 0.11 },
+  { dir: norm3(place(-0.58, 4.08)), h: 0.18, r: 0.12 },
+]
+
+/** Backdrop mountain range for the B1 canyon (Look B; variant B, band 1, added in sceneRaw only
+ *  when CANYON_MODE === 1). Pure function of the unit direction; adds only (never carves), 0 on
+ *  the lane band + past the limb fade. Exported for the unit test (gating + determinism + ceiling
+ *  headroom); the render consumes it via biomeBumpB. */
+export function canyonMountains(nx: number, ny: number, nz: number): number {
+  const ax = Math.abs(nx)
+  const lane = smoothstep01((ax - CANYON_MTN_LANE_LO) / (CANYON_MTN_LANE_HI - CANYON_MTN_LANE_LO))
+  if (lane <= 0) return 0
+  const limb = 1 - smoothstep01((ax - CANYON_MTN_LIMB_LO) / (CANYON_MTN_LIMB_HI - CANYON_MTN_LIMB_LO))
+  if (limb <= 0) return 0
+  let h = 0
+  for (let i = 0; i < CANYON_RANGE.length; i++) h += peakBump(nx, ny, nz, CANYON_RANGE[i])
+  return h * lane * limb
+}
+
 // --- Desert dunes (B0, Task 41) ---------------------------------------------
 //
 // Aram (Round 12): "In desert terrain there should be no ridge and water passage, let's
@@ -1080,6 +1151,7 @@ function sceneRaw(band: 0 | 1 | 2, nx: number, ny: number, nz: number, variant: 
     if (ponds[i].band === band) bump -= ponds[i].body.depth * capMask(nx, ny, nz, ponds[i].body)
   }
   if (variant === 1 && band === 1) bump += canyonWalls(nx, ny, nz)
+  if (variant === 1 && band === 1 && CANYON_MODE === 1) bump += canyonMountains(nx, ny, nz) // B1 backdrop range (Task 49 Look B)
   if (variant === 1 && band === 0) bump += duneField(nx, ny, nz) // B0 crescent dune field (Task 41)
   if (variant === 0 && band === 1) bump += canopyMounds(nx, ny, nz) // A1 jungle canopy mounds (Task 42)
   if (variant === 0 && band === 2) bump += deltaLevees(nx, ny, nz) // A2 delta braided levee banks (Task 48)

@@ -19,6 +19,9 @@ import {
   CANOPY_GATE,
   deltaLevees,
   DELTA_LEVEE_GATE,
+  canyonMountains,
+  CANYON_MTN_GATE,
+  CANYON_MODE,
   MERIDIANS,
   tideWetness,
   tideCarve,
@@ -415,6 +418,86 @@ describe('Task 48 — A2 delta braided levee banks', () => {
         const nx = b / 100
         const d = dirAt(nx, m)
         expect(biomeBumpB(...d)).toBe(biomeBump(...d))
+      }
+    }
+  })
+})
+
+// Task 49 (Round 13): the B1 AKNA canyon (band 1, variant B) gets a backdrop MOUNTAIN RANGE
+// for the "mountain canyon" look (canyonMountains), summed into biomeBumpB only when
+// CANYON_MODE === 1. Same displacement contract as duneField/canopyMounds/deltaLevees: EXACTLY 0
+// on the girl's lane band and past the limb, add only (never carve), deterministic, and — being
+// summed inside wedgeDelta — it vanishes on the band meridians (seam intact) and clears the 1.35R
+// ceiling. Tested DIRECTLY here (independent of CANYON_MODE) so the range is proven either look.
+describe('Task 49 — B1 canyon backdrop mountain range', () => {
+  const CANYON_LONGITUDES = [3.0, 3.34, 3.62, 3.9, 4.18] // band-1 canyon interior (the range)
+  const dirAt = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('ships Look A by default (CANYON_MODE 0 — no range; the beloved gorge is untouched)', () => {
+    // A tripwire on the shipped look-dev default: flipping to the "mountain canyon" (1) is a
+    // deliberate rebake, so it updates this pin.
+    expect(CANYON_MODE).toBe(0)
+  })
+
+  it('is EXACTLY 0 across the girl lane band (|nx| < laneLo), at every canyon longitude', () => {
+    for (const th of CANYON_LONGITUDES) {
+      for (let ni = 0; ni <= 30; ni++) {
+        const nx = -(CANYON_MTN_GATE.laneLo - 1e-4) + (2 * (CANYON_MTN_GATE.laneLo - 1e-4) * ni) / 30
+        expect(canyonMountains(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('is EXACTLY 0 at and past the limb fade (|nx| >= limbHi)', () => {
+    for (const th of CANYON_LONGITUDES) {
+      for (const nx of [CANYON_MTN_GATE.limbHi, 0.8, 0.9, -CANYON_MTN_GATE.limbHi, -0.85]) {
+        expect(canyonMountains(...dirAt(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('only ever ADDS relief (>= 0) — never carves, so no accidental water forms', () => {
+    for (let ai = 0; ai < 60; ai++) {
+      const th = (ai / 60) * TWO_PI
+      for (let ni = 0; ni <= 40; ni++) {
+        const nx = -0.72 + (1.44 * ni) / 40
+        expect(canyonMountains(...dirAt(nx, th))).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('actually raises a mountain range off-lane in the canyon (real relief at reading latitudes)', () => {
+    let peak = 0
+    for (const th of CANYON_LONGITUDES) {
+      for (let ni = 0; ni <= 80; ni++) {
+        const nx = 0.34 + (0.32 * ni) / 80
+        peak = Math.max(peak, canyonMountains(...dirAt(nx, th)))
+      }
+    }
+    expect(peak).toBeGreaterThan(0.15) // genuine mountains (fraction of R), not a low swell
+  })
+
+  it('stays clear of the 1.35R ceiling (peak range height leaves headroom over the base terrain)', () => {
+    let maxH = 0
+    for (let ai = 0; ai < 120; ai++) {
+      const th = (ai / 120) * TWO_PI
+      for (let ni = 0; ni <= 60; ni++) {
+        const nx = -0.75 + (1.5 * ni) / 60
+        maxH = Math.max(maxH, canyonMountains(...dirAt(nx, th)))
+      }
+    }
+    // wedge tip ≈ 1 + base-meadow(≈0.022) + range; a 0.25 cap keeps that under ~1.28R
+    expect(maxH).toBeLessThan(0.25)
+  })
+
+  it('is deterministic (both renewal bakes agree byte-for-byte)', () => {
+    for (const th of CANYON_LONGITUDES) {
+      for (const nx of [0.4, 0.55, 0.62, -0.6]) {
+        const d = dirAt(nx, th)
+        expect(canyonMountains(...d)).toBe(canyonMountains(...d))
       }
     }
   })

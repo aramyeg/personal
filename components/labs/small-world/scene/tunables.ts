@@ -136,6 +136,16 @@ export const DIALS = {
   // footprint-masked, so it only ever touches that one pond. Purely variant-B paint + a
   // localized flatten of the shared sphere; nothing outside the footprint moves.
   waterIceAmount: dial({ default: 1, min: 0, max: 1, step: 0.02, label: 'winter lake ice', group: 'water', cls: 'rebake' }),
+
+  // Task 49 — the canyon geysers. Both are LIVE (read per frame by the plume render in
+  // canyon.tsx — the plume is a prop scaled by the rotation-driven eruption cycle, NOT baked
+  // geometry), so a slider drag applies instantly. `geyserAmp` multiplies the erupting plume's
+  // full height (0 = the geysers rest as bubbling pools with no jet); `geyserPeriod` is how many
+  // radians of scroll-rotation one eruption cycle spans (larger = slower, statelier eruptions).
+  // Defaults are the shipped look. The A/B look-dev (deep canyon vs mountain canyon) is a
+  // separate capture-time flag (biomes.CANYON_MODE), not a live dial — it rebakes geometry.
+  geyserAmp: dial({ default: 1, min: 0, max: 1.6, step: 0.02, label: 'geyser plume height', group: 'canyon', cls: 'live' }),
+  geyserPeriod: dial({ default: 0.7, min: 0.2, max: 2, step: 0.05, label: 'geyser eruption period', group: 'canyon', cls: 'live' }),
 } satisfies Record<string, Dial>
 
 export type DialKey = keyof typeof DIALS

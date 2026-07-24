@@ -149,11 +149,27 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'waterFlowAlign',
       'waterRise',
       'waterIceAmount',
+      'geyserAmp',
+      'geyserPeriod',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')
     expect(DIALS.dentDepth.group).toBe('dents')
     expect(DIALS.waterPathWarp.group).toBe('water')
+    expect(DIALS.geyserAmp.group).toBe('canyon')
+  })
+
+  it('Task 49 — the canyon geyser dials are LIVE (per-frame plume render, not baked)', () => {
+    // Both drive the rotation-scaled plume prop directly, so a drag applies instantly (no rebake).
+    expect(DIALS.geyserAmp.default).toBe(1)
+    expect(DIALS.geyserAmp.min).toBe(0)
+    expect(DIALS.geyserAmp.max).toBe(1.6)
+    expect(DIALS.geyserAmp.cls).toBe('live')
+    expect(DIALS.geyserPeriod.default).toBe(0.7)
+    expect(DIALS.geyserPeriod.min).toBe(0.2)
+    expect(DIALS.geyserPeriod.max).toBe(2)
+    expect(DIALS.geyserPeriod.cls).toBe('live')
+    expect(DIALS.geyserPeriod.group).toBe('canyon')
   })
 })
 
