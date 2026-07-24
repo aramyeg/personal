@@ -661,57 +661,67 @@ function stitch(x0, y0, x1, y1, color = '#e6c98a') {
   return `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${color}" stroke-width="2.2" stroke-dasharray="6 5" opacity="0.85"/>`
 }
 
-// ---- THE HERO'S SATCHEL (s8 satchel-bag, vfold w1.0/h0.6). A leather
-// courier's bag: rounded body, a tongued flap over the top third, two brass
-// buckle straps, saddle-stitched seams. Crease down the centre = the bag's own
-// fold. Symmetric about cx so the two folded panels read as one bag. ----
+// ---- THE HERO'S SATCHEL (s8 satchel-bag, vfold w1.0/h0.6). The wide V opens
+// TOWARD the reading camera, so we paint the INTERIOR VIEW: a dark leather-lined
+// bag whose stitched rim carries buckle straps draped over the edge, with the
+// hero's treasures glinting inside the mouth. Fully opaque, high-contrast values
+// so the mass reads solid (not a milky sheet). Symmetric about the crease. ----
 function leatherSatchel(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
-  const x0 = w * 0.09,
-    x1 = w * 0.91
-  const bodyTop = h * 0.36,
+  const x0 = w * 0.08,
+    x1 = w * 0.92
+  const rimTop = h * 0.12,
+    rimBot = h * 0.3,
     bot = h * 0.965,
-    rad = w * 0.055
-  const body = `M ${fx(x0)} ${fx(bodyTop)} L ${fx(x0)} ${fx(bot - rad)} Q ${fx(x0)} ${fx(bot)} ${fx(x0 + rad)} ${fx(bot)} L ${fx(x1 - rad)} ${fx(bot)} Q ${fx(x1)} ${fx(bot)} ${fx(x1)} ${fx(bot - rad)} L ${fx(x1)} ${fx(bodyTop)} Z`
-  // flap: rounded top hood dipping to a tongue in the centre
-  const fx0 = w * 0.12,
-    fx1 = w * 0.88,
-    flapTop = h * 0.1
-  const flap = `M ${fx(fx0)} ${fx(bodyTop)} Q ${fx(fx0)} ${fx(flapTop)} ${fx(cx)} ${fx(flapTop)} Q ${fx(fx1)} ${fx(flapTop)} ${fx(fx1)} ${fx(bodyTop)} Q ${fx(fx1)} ${fx(h * 0.62)} ${fx(cx)} ${fx(h * 0.66)} Q ${fx(fx0)} ${fx(h * 0.62)} ${fx(fx0)} ${fx(bodyTop)} Z`
-  const sil = `${body} ${flap}` // union drawn as two fills; rim traces the body
+    rad = w * 0.07
+  const body = `M ${fx(x0)} ${fx(rimTop)} L ${fx(x1)} ${fx(rimTop)} L ${fx(x1)} ${fx(bot - rad)} Q ${fx(x1)} ${fx(bot)} ${fx(x1 - rad)} ${fx(bot)} L ${fx(x0 + rad)} ${fx(bot)} Q ${fx(x0)} ${fx(bot)} ${fx(x0)} ${fx(bot - rad)} Z`
   let s = `<g>`
   // shoulder strap arc behind the bag
-  s += `<path d="M ${fx(x0 + w * 0.02)} ${fx(bodyTop)} C ${fx(w * 0.18)} ${fx(-h * 0.06)} ${fx(w * 0.82)} ${fx(-h * 0.06)} ${fx(x1 - w * 0.02)} ${fx(bodyTop)}" fill="none" stroke="${LEATHER_DIM}" stroke-width="${fx(w * 0.03)}" opacity="0.9"/>`
-  // body
-  s += `<path d="${body}" fill="${LEATHER}"/>`
-  s += `<path d="M ${fx(x0)} ${fx(bodyTop)} L ${fx(x0)} ${fx(bot - rad)} Q ${fx(x0)} ${fx(bot)} ${fx(x0 + rad)} ${fx(bot)} L ${fx(cx)} ${fx(bot)} L ${fx(cx)} ${fx(bodyTop)} Z" fill="${LEATHER_LIT}" opacity="0.22"/>`
-  // dark bag-mouth shadow just under the flap line — reads as a deep opening
-  s += `<rect x="${fx(x0)}" y="${fx(bodyTop)}" width="${fx(x1 - x0)}" height="${fx(h * 0.12)}" fill="${LEATHER_DIM}" opacity="0.85"/>`
-  s += `<rect x="${fx(x0)}" y="${fx(h * 0.72)}" width="${fx(x1 - x0)}" height="${fx(h * 0.24)}" fill="${LEATHER_DIM}" opacity="0.4"/>` // weight sag shade
-  // flap — mid-tone leather (not the pale highlight) so the mass reads solid
-  s += `<path d="${flap}" fill="${LEATHER}"/>`
-  s += `<path d="M ${fx(fx0)} ${fx(bodyTop)} Q ${fx(fx0)} ${fx(flapTop)} ${fx(cx)} ${fx(flapTop)} L ${fx(cx)} ${fx(h * 0.66)} Q ${fx(fx0)} ${fx(h * 0.62)} ${fx(fx0)} ${fx(bodyTop)} Z" fill="${LEATHER_LIT}" opacity="0.35"/>` // lit left flap half
-  s += `<path d="M ${fx(fx0)} ${fx(h * 0.5)} Q ${fx(cx)} ${fx(h * 0.62)} ${fx(fx1)} ${fx(h * 0.5)} L ${fx(fx1)} ${fx(bodyTop)} Q ${fx(cx)} ${fx(h * 0.66)} ${fx(fx0)} ${fx(bodyTop)} Z" fill="${LEATHER_DIM}" opacity="0.4"/>` // shade under the tongue
-  // saddle stitching along the flap edge
-  s += `<path d="M ${fx(fx0 + 8)} ${fx(bodyTop)} Q ${fx(fx0 + 8)} ${fx(flapTop + 10)} ${fx(cx)} ${fx(flapTop + 10)} Q ${fx(fx1 - 8)} ${fx(flapTop + 10)} ${fx(fx1 - 8)} ${fx(bodyTop)}" fill="none" stroke="#e6c98a" stroke-width="2.2" stroke-dasharray="7 6" opacity="0.8"/>`
-  // two buckle straps hanging off the flap tongue
-  for (const bxN of [0.34, 0.66]) {
-    const sx = w * bxN
-    s += `<rect x="${fx(sx - w * 0.022)}" y="${fx(h * 0.5)}" width="${fx(w * 0.044)}" height="${fx(h * 0.34)}" fill="${LEATHER_DIM}"/>`
-    s += `<rect x="${fx(sx - w * 0.022)}" y="${fx(h * 0.5)}" width="${fx(w * 0.044)}" height="${fx(h * 0.34)}" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.5"/>`
-    // brass buckle
-    s += `<rect x="${fx(sx - w * 0.03)}" y="${fx(h * 0.6)}" width="${fx(w * 0.06)}" height="${fx(h * 0.07)}" rx="3" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>`
-    s += `<rect x="${fx(sx - w * 0.03)}" y="${fx(h * 0.6)}" width="${fx(w * 0.06)}" height="${fx(h * 0.018)}" fill="${GOLD_LIT}"/>`
+  s += `<path d="M ${fx(x0 + w * 0.03)} ${fx(rimTop + 6)} C ${fx(w * 0.16)} ${fx(-h * 0.08)} ${fx(w * 0.84)} ${fx(-h * 0.08)} ${fx(x1 - w * 0.03)} ${fx(rimTop + 6)}" fill="none" stroke="${LEATHER_DIM}" stroke-width="${fx(w * 0.035)}" opacity="0.95"/>`
+  // INTERIOR — deep leather, dark at the bottom of the mouth (opaque gradient)
+  s += `<path d="${body}" fill="url(#bagInt)"/>`
+  // a lit inner-wall sheen on the left half so the cavity reads dimensional
+  s += `<path d="M ${fx(x0)} ${fx(rimBot)} L ${fx(cx)} ${fx(rimBot)} L ${fx(cx)} ${fx(bot)} L ${fx(x0 + rad)} ${fx(bot)} Q ${fx(x0)} ${fx(bot)} ${fx(x0)} ${fx(bot - rad)} Z" fill="${LEATHER_LIT}" opacity="0.14"/>`
+  // TREASURE glinting inside the mouth — a heap of coins + a goblet + gems
+  const heapY = h * 0.78
+  s += `<path d="M ${fx(w * 0.18)} ${fx(bot - 6)} Q ${fx(cx)} ${fx(heapY - h * 0.06)} ${fx(w * 0.82)} ${fx(bot - 6)} Z" fill="#8a6a24"/>`
+  for (let i = 0; i < 60; i++) {
+    const x = rr(r, w * 0.2, w * 0.8),
+      y = rr(r, heapY, bot - 8)
+    const cr = rr(r, 6, 11)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.7)}" fill="${r() < 0.5 ? GOLD : GOLD_LIT}" stroke="${GOLD_DIM}" stroke-width="1"/>`
   }
-  // seam down the belly + a couple of body creases
-  s += `<line x1="${fx(cx)}" y1="${fx(bodyTop)}" x2="${fx(cx)}" y2="${fx(bot)}" stroke="${INK}" stroke-width="1.6" opacity="0.28"/>`
-  for (const cyN of [0.78, 0.88]) s += `<path d="M ${fx(x0 + 10)} ${fx(h * cyN)} Q ${fx(cx)} ${fx(h * (cyN + 0.02))} ${fx(x1 - 10)} ${fx(h * cyN)}" fill="none" stroke="${LEATHER_DIM}" stroke-width="1.8" opacity="0.4"/>`
+  // a goblet standing in the hoard
+  s += `<path d="M ${fx(cx - w * 0.05)} ${fx(heapY)} Q ${fx(cx)} ${fx(heapY + h * 0.08)} ${fx(cx + w * 0.05)} ${fx(heapY)} L ${fx(cx + w * 0.03)} ${fx(heapY - h * 0.1)} L ${fx(cx - w * 0.03)} ${fx(heapY - h * 0.1)} Z" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
+  s += `<rect x="${fx(cx - w * 0.05)}" y="${fx(heapY + h * 0.06)}" width="${fx(w * 0.1)}" height="6" rx="3" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+  for (const gx of [0.32, 0.66]) s += `<path d="M ${fx(w * gx)} ${fx(heapY - 4)} l 7 7 l -7 7 l -7 -7 Z" fill="#c04a54" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.4"/>` // ruby gems
+  // the folded-over leather RIM across the top, catching the key light
+  s += `<rect x="${fx(x0)}" y="${fx(rimTop)}" width="${fx(x1 - x0)}" height="${fx(rimBot - rimTop)}" fill="${LEATHER}"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(rimTop)}" width="${fx((x1 - x0) * 0.5)}" height="${fx(rimBot - rimTop)}" fill="${LEATHER_LIT}" opacity="0.3"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(rimTop)}" width="${fx(x1 - x0)}" height="5" fill="${LEATHER_LIT}"/>` // lit lip
+  s += `<rect x="${fx(x0)}" y="${fx(rimBot - 4)}" width="${fx(x1 - x0)}" height="4" fill="${LEATHER_DIM}"/>` // inner shadow under rim
+  // saddle stitching along the rim
+  s += `<line x1="${fx(x0 + 10)}" y1="${fx(rimTop + 12)}" x2="${fx(x1 - 10)}" y2="${fx(rimTop + 12)}" stroke="#e6c98a" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"/>`
+  // three buckle straps draped over the rim
+  for (const bxN of [0.24, 0.5, 0.76]) {
+    const sx = w * bxN
+    s += `<rect x="${fx(sx - w * 0.022)}" y="${fx(rimTop - 4)}" width="${fx(w * 0.044)}" height="${fx(h * 0.28)}" fill="${LEATHER_DIM}"/>`
+    s += `<rect x="${fx(sx - w * 0.022)}" y="${fx(rimTop - 4)}" width="${fx(w * 0.014)}" height="${fx(h * 0.28)}" fill="${LEATHER_LIT}" opacity="0.5"/>`
+    s += `<rect x="${fx(sx - w * 0.03)}" y="${fx(rimBot - h * 0.02)}" width="${fx(w * 0.06)}" height="${fx(h * 0.075)}" rx="3" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>` // brass buckle
+    s += `<rect x="${fx(sx - w * 0.03)}" y="${fx(rimBot - h * 0.02)}" width="${fx(w * 0.06)}" height="4" fill="${GOLD_LIT}"/>`
+  }
+  // side seams + crease
+  s += `<line x1="${fx(cx)}" y1="${fx(rimBot)}" x2="${fx(cx)}" y2="${fx(bot)}" stroke="${INK}" stroke-width="1.6" opacity="0.22"/>`
   s += rimPath(body)
-  s += rimPath(flap, 4)
   s += `</g>`
-  void sil
-  return svgPiece(w, h, s)
+  void r
+  return svgPiece(
+    w,
+    h,
+    s,
+    `<linearGradient id="bagInt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5c3a1e"/><stop offset="0.45" stop-color="#3a2414"/><stop offset="1" stop-color="#20110a"/></linearGradient>`
+  )
 }
 
 // ---- THE FAN BURST (s8 satchel-burst-mK, fan members). Golden treasure rays
@@ -837,81 +847,107 @@ function foldedLetter(w, h, seed) {
   // silhouette with a turned-down top-right dog-ear
   const d = `M ${fx(x0)} ${fx(y0)} L ${fx(x1 - dogEar)} ${fx(y0)} L ${fx(x1)} ${fx(y0 + dogEar)} L ${fx(x1)} ${fx(y1)} L ${fx(x0)} ${fx(y1)} Z`
   let s = `<g>`
-  s += `<path d="${d}" fill="${PARCH}"/>`
-  // lit left leaf
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#fff6e2" opacity="0.35"/>`
-  // shaded right leaf edge near fold + horizontal fold crease implied by centre
-  s += `<line x1="${fx(cx)}" y1="${fx(y0)}" x2="${fx(cx)}" y2="${fx(y1)}" stroke="${INK}" stroke-width="1.6" opacity="0.22"/>`
+  // AGED parchment ground (not stark white) + foxing mottle
+  s += `<path d="${d}" fill="${PARCH_MID}"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#f0e2bc" opacity="0.28"/>` // lit left leaf
+  s += `<rect x="${fx(cx)}" y="${fx(y0)}" width="${fx(x1 - cx)}" height="${fx(y1 - y0)}" fill="${PARCH_DIM}" opacity="0.22"/>` // shaded right leaf
+  for (let i = 0; i < 18; i++) s += `<circle cx="${fx(rr(r, x0, x1))}" cy="${fx(rr(r, y0, y1))}" r="${fx(rr(r, 3, 8))}" fill="#b89a63" opacity="0.12"/>` // foxing
+  s += `<line x1="${fx(cx)}" y1="${fx(y0)}" x2="${fx(cx)}" y2="${fx(y1)}" stroke="${INK}" stroke-width="1.6" opacity="0.2"/>` // centre fold
   // dog-ear fold
-  s += `<path d="M ${fx(x1 - dogEar)} ${fx(y0)} L ${fx(x1)} ${fx(y0 + dogEar)} L ${fx(x1 - dogEar)} ${fx(y0 + dogEar)} Z" fill="${PARCH_DIM}" opacity="0.7" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.4"/>`
-  // a salutation + ruled hand (skip the fold gutter)
-  s += `<line x1="${fx(x0 + w * 0.08)}" y1="${fx(y0 + h * 0.14)}" x2="${fx(cx - w * 0.04)}" y2="${fx(y0 + h * 0.14)}" stroke="${SEAL_RED}" stroke-width="3" opacity="0.6"/>`
-  for (let i = 0; i < 7; i++) {
-    const y = lerp(y0 + h * 0.28, y1 - h * 0.14, i / 6)
-    // left column
-    s += `<line x1="${fx(x0 + w * 0.06)}" y1="${fx(y)}" x2="${fx(cx - w * 0.05)}" y2="${fx(y)}" stroke="${INK}" stroke-width="2" opacity="${(0.28 + rr(r, 0, 0.18)).toFixed(2)}"/>`
-    if (i < 5) s += `<line x1="${fx(cx + w * 0.05)}" y1="${fx(y)}" x2="${fx(x1 - w * 0.06 - (i === 4 ? w * 0.2 : 0))}" y2="${fx(y)}" stroke="${INK}" stroke-width="2" opacity="${(0.28 + rr(r, 0, 0.18)).toFixed(2)}"/>`
+  s += `<path d="M ${fx(x1 - dogEar)} ${fx(y0)} L ${fx(x1)} ${fx(y0 + dogEar)} L ${fx(x1 - dogEar)} ${fx(y0 + dogEar)} Z" fill="${PARCH_DIM}" opacity="0.8" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.4"/>`
+  // handwritten hand: connected cursive loops per line (skip the fold gutter)
+  const script = (lx0, lx1, y, seed2) => {
+    const r2 = mulberry32(seed2)
+    let d2 = `M ${fx(lx0)} ${fx(y)}`
+    let x = lx0
+    const step = (lx1 - lx0) / 22
+    let pen = true
+    while (x < lx1) {
+      if (r2() < 0.12) {
+        pen = false
+        x += step * 1.6
+        d2 += ` M ${fx(x)} ${fx(y)}`
+      } else {
+        const up = r2() < 0.5 ? -1 : 1
+        d2 += ` q ${fx(step * 0.5)} ${fx(up * h * 0.018 * (0.5 + r2()))} ${fx(step)} 0`
+        x += step
+      }
+    }
+    void pen
+    return `<path d="${d2}" fill="none" stroke="#4a3320" stroke-width="1.7" opacity="0.7"/>`
+  }
+  s += `<path d="M ${fx(x0 + w * 0.07)} ${fx(y0 + h * 0.15)} q ${fx(w * 0.05)} ${fx(-h * 0.03)} ${fx(w * 0.12)} 0" fill="none" stroke="${SEAL_RED}" stroke-width="3" opacity="0.65"/>` // salutation flourish
+  for (let i = 0; i < 8; i++) {
+    const y = lerp(y0 + h * 0.28, y1 - h * 0.16, i / 7)
+    s += script(x0 + w * 0.06, cx - w * 0.05, y, (seed * 31 + i * 17) | 0)
+    if (i < 6) s += script(cx + w * 0.05, x1 - w * 0.06 - (i === 5 ? w * 0.22 : 0), y, (seed * 47 + i * 23) | 0)
   }
   // a signature flourish bottom-right
-  s += `<path d="M ${fx(cx + w * 0.06)} ${fx(y1 - h * 0.08)} q ${fx(w * 0.1)} ${fx(-h * 0.06)} ${fx(w * 0.18)} 0 q ${fx(w * 0.06)} ${fx(h * 0.04)} ${fx(w * 0.1)} ${fx(-h * 0.03)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>`
-  // wax seal + ribbon tails at the fold centre-bottom
-  const sy = y1 - h * 0.02
-  s += `<path d="M ${fx(cx - w * 0.14)} ${fx(sy - h * 0.16)} l ${fx(-w * 0.05)} ${fx(h * 0.16)} l ${fx(w * 0.08)} ${fx(-h * 0.06)} Z" fill="${SEAL_RED}" opacity="0.9"/>`
-  s += `<path d="M ${fx(cx + w * 0.14)} ${fx(sy - h * 0.16)} l ${fx(w * 0.05)} ${fx(h * 0.16)} l ${fx(-w * 0.08)} ${fx(-h * 0.06)} Z" fill="${SEAL_RED}" opacity="0.9"/>`
-  const seR = w * 0.06
-  s += `<circle cx="${fx(cx)}" cy="${fx(y1 - h * 0.12)}" r="${fx(seR)}" fill="${SEAL_RED_LIT}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.5"/>`
-  s += `<path d="M ${fx(cx)} ${fx(y1 - h * 0.12 - seR * 0.55)} l ${fx(seR * 0.32)} ${fx(seR * 0.9)} l ${fx(-seR * 0.8)} ${fx(-seR * 0.55)} l ${fx(seR * 0.96)} 0 l ${fx(-seR * 0.8)} ${fx(seR * 0.55)} Z" fill="${SEAL_RED}" opacity="0.8"/>` // embossed star
+  s += `<path d="M ${fx(cx + w * 0.06)} ${fx(y1 - h * 0.09)} q ${fx(w * 0.1)} ${fx(-h * 0.07)} ${fx(w * 0.18)} 0 q ${fx(w * 0.06)} ${fx(h * 0.05)} ${fx(w * 0.1)} ${fx(-h * 0.03)}" fill="none" stroke="#4a3320" stroke-width="2.4" opacity="0.7"/>`
+  // ribbon tails + a rich crimson wax seal (raven emboss) at the fold centre-bottom
+  const scy = y1 - h * 0.13
+  const seR = w * 0.075
+  s += `<path d="M ${fx(cx - w * 0.16)} ${fx(scy - h * 0.14)} l ${fx(-w * 0.06)} ${fx(h * 0.2)} l ${fx(w * 0.1)} ${fx(-h * 0.08)} Z" fill="${SEAL_RED}"/>`
+  s += `<path d="M ${fx(cx + w * 0.16)} ${fx(scy - h * 0.14)} l ${fx(w * 0.06)} ${fx(h * 0.2)} l ${fx(-w * 0.1)} ${fx(-h * 0.08)} Z" fill="${SEAL_RED}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(scy)}" r="${fx(seR)}" fill="${SEAL_RED}" stroke="#4a141c" stroke-width="2.4"/>`
+  s += `<circle cx="${fx(cx - seR * 0.3)}" cy="${fx(scy - seR * 0.3)}" r="${fx(seR * 0.72)}" fill="${SEAL_RED_LIT}" opacity="0.45"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(scy)}" r="${fx(seR * 0.74)}" fill="none" stroke="#4a141c" stroke-width="1.6" opacity="0.7"/>`
+  // embossed raven silhouette in the wax
+  s += `<path d="M ${fx(cx - seR * 0.4)} ${fx(scy + seR * 0.25)} Q ${fx(cx - seR * 0.5)} ${fx(scy - seR * 0.1)} ${fx(cx - seR * 0.1)} ${fx(scy - seR * 0.2)} Q ${fx(cx + seR * 0.1)} ${fx(scy - seR * 0.5)} ${fx(cx + seR * 0.3)} ${fx(scy - seR * 0.35)} L ${fx(cx + seR * 0.55)} ${fx(scy - seR * 0.3)} L ${fx(cx + seR * 0.32)} ${fx(scy - seR * 0.15)} Q ${fx(cx + seR * 0.5)} ${fx(scy + seR * 0.35)} ${fx(cx)} ${fx(scy + seR * 0.4)} Q ${fx(cx - seR * 0.25)} ${fx(scy + seR * 0.45)} ${fx(cx - seR * 0.4)} ${fx(scy + seR * 0.25)} Z" fill="#4a141c" opacity="0.6"/>`
   s += rimPath(d)
   s += `</g>`
   return svgPiece(w, h, s)
 }
 
-// ---- THE DISTANT HILLS (s9 end-hills-mK, fan, very wide/short). A soft
-// rolling ridge receding behind the letter, cool green-blue, a few tiny
-// pines on the crest. Silhouette = the humped ridge; transparent sky above. ----
+// ---- THE DISTANT HILLS (s9 end-hills-mK, fan, very wide/short). Citadel
+// treatment: a forested down whose TOP EDGE is a serrated pine tree-line (the
+// silhouette itself), with a darker recession band behind it and walnut-ink
+// tips — real value depth per plane. Muted forest green, receding per idx. ----
 function distantHills(w, h, seed, idx) {
   const r = mulberry32(seed)
-  // receding value: further members (higher idx) sit lighter/cooler, but stay
-  // muted forest-green EARTH (not pale mint) so the fan reads as land, not cloth.
-  const fills = ['#41573f', '#4c6248', '#5c7157']
-  const lits = ['#5f7a58', '#6d8664', '#7e9673']
-  const fill = fills[idx % fills.length]
-  const lit = lits[idx % lits.length]
-  const crest = h * (0.42 - idx * 0.05)
-  const humps = 3 + (seed % 3)
-  let top = `M 0 ${fx(h)} L 0 ${fx(crest + h * 0.16)}`
-  const pts = []
-  for (let i = 0; i <= humps; i++) {
-    const x = (w * i) / humps
-    const y = crest + Math.sin(i * 1.7 + seed) * h * 0.1 + rr(r, -h * 0.04, h * 0.04)
-    pts.push([x, Math.max(h * 0.06, y)])
+  const fills = ['#3a4d37', '#455840', '#54694c']
+  const backs = ['#2e3f2c', '#374a33', '#455840']
+  const lits = ['#54684a', '#617657', '#728666']
+  const fill = fills[idx % 3],
+    back = backs[idx % 3],
+    lit = lits[idx % 3]
+  const crest = h * (0.5 - idx * 0.05)
+  // serrated pine tree-line as the cut silhouette (sawtooth of valleys/tips)
+  const teeth = Math.round(14 + idx * 4 + (seed % 3))
+  const tips = []
+  for (let i = 0; i <= teeth; i++) {
+    const bx = (w * i) / teeth
+    const valley = crest + Math.sin(i * 0.6 + seed) * h * 0.05
+    const th = rr(r, h * 0.16, h * 0.34)
+    tips.push({ bx, valley, tip: Math.max(h * 0.05, valley - th) })
   }
-  for (let i = 0; i < pts.length; i++) {
-    const [x, y] = pts[i]
-    if (i === 0) top += ` L ${fx(x)} ${fx(y)}`
-    else {
-      const [px, py] = pts[i - 1]
-      const mx = (px + x) / 2
-      top += ` Q ${fx(mx)} ${fx(Math.min(py, y) - h * 0.06)} ${fx(x)} ${fx(y)}`
-    }
+  let top = `M 0 ${fx(h)} L 0 ${fx(crest + h * 0.1)}`
+  for (let i = 0; i <= teeth; i++) {
+    const t = tips[i]
+    top += ` L ${fx(t.bx - w / teeth / 2)} ${fx(t.valley)} L ${fx(t.bx)} ${fx(t.tip)}`
   }
-  top += ` L ${fx(w)} ${fx(crest + h * 0.16)} L ${fx(w)} ${fx(h)} Z`
+  top += ` L ${fx(w)} ${fx(crest + h * 0.1)} L ${fx(w)} ${fx(h)} Z`
   let s = `<g>`
+  // recession band BEHIND the tree-line (a lower, darker line for depth)
+  let backLine = `M 0 ${fx(h)} L 0 ${fx(crest + h * 0.06)}`
+  for (let i = 0; i <= teeth; i++) backLine += ` L ${fx(tips[i].bx - w / teeth / 2)} ${fx(tips[i].valley - h * 0.02)} L ${fx(tips[i].bx)} ${fx((tips[i].tip + tips[i].valley) / 2 - h * 0.04)}`
+  backLine += ` L ${fx(w)} ${fx(crest + h * 0.06)} L ${fx(w)} ${fx(h)} Z`
+  s += `<path d="${backLine}" fill="${back}"/>`
+  // main tree-line
   s += `<path d="${top}" fill="${fill}"/>`
-  // lit crest band
-  s += `<path d="${top}" fill="${lit}" opacity="0.0"/>`
-  s += `<path d="M 0 ${fx(crest + h * 0.16)}${pts.map(([x, y]) => ` L ${fx(x)} ${fx(y)}`).join('')} L ${fx(w)} ${fx(crest + h * 0.16)}" fill="none" stroke="${lit}" stroke-width="4" opacity="0.6"/>`
-  s += `<rect x="0" y="${fx(h * 0.6)}" width="${w}" height="${fx(h * 0.4)}" fill="${INK}" opacity="0.18"/>` // valley shade
-  s += `<rect x="0" y="${fx(h * 0.86)}" width="${w}" height="${fx(h * 0.14)}" fill="#3a4a34" opacity="0.5"/>` // warm earth foot grounds the ridge
-  // pines dense enough to read as a forested down (not cloth)
-  const pines = 9 + idx * 3
-  for (let i = 0; i < pines; i++) {
-    const x = rr(r, w * 0.03, w * 0.97)
-    const baseY = crest + h * 0.03 + rr(r, 0, h * 0.08)
-    const ph = rr(r, h * 0.13, h * 0.22)
-    s += `<path d="M ${fx(x)} ${fx(baseY)} L ${fx(x - ph * 0.28)} ${fx(baseY)} L ${fx(x)} ${fx(baseY - ph)} L ${fx(x + ph * 0.28)} ${fx(baseY)} Z" fill="${fill}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.35"/>`
+  s += `<rect x="0" y="${fx(h * 0.62)}" width="${w}" height="${fx(h * 0.38)}" fill="${INK}" opacity="0.22"/>` // valley shade
+  // lit dusting on the sunward (left) flank of each tip
+  for (let i = 0; i <= teeth; i++) {
+    const t = tips[i]
+    s += `<path d="M ${fx(t.bx)} ${fx(t.tip)} L ${fx(t.bx - w / teeth * 0.34)} ${fx(t.valley)} L ${fx(t.bx)} ${fx(t.valley)} Z" fill="${lit}" opacity="0.4"/>`
   }
-  s += rimPath(`M 0 ${fx(crest + h * 0.16)}${pts.map(([x, y]) => ` L ${fx(x)} ${fx(y)}`).join('')} L ${fx(w)} ${fx(crest + h * 0.16)}`, 4)
+  s += `<rect x="0" y="${fx(h * 0.88)}" width="${w}" height="${fx(h * 0.12)}" fill="#2c3a28" opacity="0.6"/>` // earth foot
+  // walnut ink on the tree-line edge
+  let inkEdge = `M 0 ${fx(crest + h * 0.1)}`
+  for (let i = 0; i <= teeth; i++) inkEdge += ` L ${fx(tips[i].bx - w / teeth / 2)} ${fx(tips[i].valley)} L ${fx(tips[i].bx)} ${fx(tips[i].tip)}`
+  inkEdge += ` L ${fx(w)} ${fx(crest + h * 0.1)}`
+  s += `<path d="${inkEdge}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.5" stroke-linejoin="round"/>`
+  s += rimPath(inkEdge, 4)
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -920,18 +956,37 @@ function distantHills(w, h, seed, idx) {
 // raven in profile riding the letter's fold, wing lifted. ----
 function ravenFigure(w, h, seed) {
   const r = mulberry32(seed)
-  const BLACK = '#241d24',
-    SHEEN = '#4a4152'
-  // body + head + tail + beak, facing right
-  const d = `M ${fx(w * 0.2)} ${fx(h * 0.7)} Q ${fx(w * 0.1)} ${fx(h * 0.62)} ${fx(w * 0.16)} ${fx(h * 0.5)} Q ${fx(w * 0.24)} ${fx(h * 0.36)} ${fx(w * 0.5)} ${fx(h * 0.4)} Q ${fx(w * 0.62)} ${fx(h * 0.42)} ${fx(w * 0.66)} ${fx(h * 0.3)} Q ${fx(w * 0.7)} ${fx(h * 0.18)} ${fx(w * 0.78)} ${fx(h * 0.22)} Q ${fx(w * 0.82)} ${fx(h * 0.24)} ${fx(w * 0.8)} ${fx(h * 0.32)} L ${fx(w * 0.92)} ${fx(h * 0.34)} L ${fx(w * 0.8)} ${fx(h * 0.4)} Q ${fx(w * 0.82)} ${fx(h * 0.5)} ${fx(w * 0.72)} ${fx(h * 0.56)} Q ${fx(w * 0.95)} ${fx(h * 0.7)} ${fx(w * 0.86)} ${fx(h * 0.82)} L ${fx(w * 0.5)} ${fx(h * 0.72)} Q ${fx(w * 0.3)} ${fx(h * 0.8)} ${fx(w * 0.2)} ${fx(h * 0.7)} Z`
+  const BLACK = '#221b26',
+    BLACK_LIT = '#3a3040',
+    SHEEN = '#5a5165'
+  // a raven perched in profile, facing right: rounded breast, arched neck, a
+  // wedge tail, a stout beak. Cleaner cut-paper silhouette than the v1 blob.
+  const d =
+    `M ${fx(w * 0.22)} ${fx(h * 0.86)}` + // tail base
+    ` Q ${fx(w * 0.08)} ${fx(h * 0.8)} ${fx(w * 0.14)} ${fx(h * 0.66)}` + // rump
+    ` Q ${fx(w * 0.18)} ${fx(h * 0.46)} ${fx(w * 0.42)} ${fx(h * 0.44)}` + // back
+    ` Q ${fx(w * 0.52)} ${fx(h * 0.42)} ${fx(w * 0.56)} ${fx(h * 0.28)}` + // nape
+    ` Q ${fx(w * 0.6)} ${fx(h * 0.14)} ${fx(w * 0.74)} ${fx(h * 0.16)}` + // crown
+    ` Q ${fx(w * 0.84)} ${fx(h * 0.17)} ${fx(w * 0.82)} ${fx(h * 0.27)}` + // face
+    ` L ${fx(w * 0.98)} ${fx(h * 0.29)} L ${fx(w * 0.82)} ${fx(h * 0.36)}` + // beak
+    ` Q ${fx(w * 0.8)} ${fx(h * 0.5)} ${fx(w * 0.66)} ${fx(h * 0.56)}` + // throat
+    ` Q ${fx(w * 0.6)} ${fx(h * 0.74)} ${fx(w * 0.5)} ${fx(h * 0.8)}` + // breast
+    ` L ${fx(w * 0.62)} ${fx(h * 0.9)} L ${fx(w * 0.3)} ${fx(h * 0.9)}` + // tail wedge
+    ` Z`
   let s = `<g>`
   s += `<path d="${d}" fill="${BLACK}"/>`
-  // raised wing
-  s += `<path d="M ${fx(w * 0.32)} ${fx(h * 0.48)} Q ${fx(w * 0.5)} ${fx(h * 0.2)} ${fx(w * 0.66)} ${fx(h * 0.26)} Q ${fx(w * 0.52)} ${fx(h * 0.44)} ${fx(w * 0.5)} ${fx(h * 0.62)} Q ${fx(w * 0.4)} ${fx(h * 0.56)} ${fx(w * 0.32)} ${fx(h * 0.48)} Z" fill="${SHEEN}" opacity="0.55" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.4"/>`
-  // feather ticks + eye + beak split
-  for (const t of [0.4, 0.55, 0.68]) s += `<path d="M ${fx(w * 0.3)} ${fx(h * t)} q ${fx(w * 0.1)} ${fx(-h * 0.04)} ${fx(w * 0.2)} 0" fill="none" stroke="${SHEEN}" stroke-width="1.6" opacity="0.5"/>`
-  s += `<circle cx="${fx(w * 0.74)}" cy="${fx(h * 0.32)}" r="${fx(w * 0.02)}" fill="${GOLD_LIT}"/>`
-  s += `<line x1="${fx(w * 0.8)}" y1="${fx(h * 0.36)}" x2="${fx(w * 0.9)}" y2="${fx(h * 0.35)}" stroke="${INK}" stroke-width="1.4" opacity="0.6"/>`
+  // folded wing — layered flight feathers over the back/flank
+  s += `<path d="M ${fx(w * 0.3)} ${fx(h * 0.5)} Q ${fx(w * 0.5)} ${fx(h * 0.44)} ${fx(w * 0.6)} ${fx(h * 0.52)} Q ${fx(w * 0.5)} ${fx(h * 0.72)} ${fx(w * 0.34)} ${fx(h * 0.78)} Q ${fx(w * 0.26)} ${fx(h * 0.64)} ${fx(w * 0.3)} ${fx(h * 0.5)} Z" fill="${BLACK_LIT}"/>`
+  for (let i = 0; i < 4; i++) {
+    const t = i / 4
+    s += `<path d="M ${fx(w * (0.34 + t * 0.06))} ${fx(h * (0.52 + t * 0.05))} Q ${fx(w * (0.46 + t * 0.04))} ${fx(h * (0.56 + t * 0.06))} ${fx(w * (0.4 + t * 0.03))} ${fx(h * (0.76 - t * 0.02))}" fill="none" stroke="${SHEEN}" stroke-width="1.8" opacity="0.55"/>` // feather quills
+  }
+  // breast plumage ticks
+  for (const t of [0.58, 0.68]) s += `<path d="M ${fx(w * 0.56)} ${fx(h * t)} q ${fx(-w * 0.05)} ${fx(h * 0.03)} ${fx(-w * 0.1)} 0" fill="none" stroke="${SHEEN}" stroke-width="1.4" opacity="0.45"/>`
+  // gold eye + beak line
+  s += `<circle cx="${fx(w * 0.72)}" cy="${fx(h * 0.26)}" r="${fx(w * 0.028)}" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1" stroke-opacity="0.5"/>`
+  s += `<circle cx="${fx(w * 0.725)}" cy="${fx(h * 0.265)}" r="${fx(w * 0.011)}" fill="${INK}"/>`
+  s += `<line x1="${fx(w * 0.82)}" y1="${fx(h * 0.31)}" x2="${fx(w * 0.96)}" y2="${fx(h * 0.3)}" stroke="${INK}" stroke-width="1.4" opacity="0.6"/>` // beak gape
   s += rimPath(d, 4)
   s += `</g>`
   void r
@@ -1047,15 +1102,19 @@ function titleBanner(w, h, seed) {
   // banner with swallowtail bottom
   const d = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x1 - w * 0.06)} ${fx(y1 - notch)} L ${fx(cx)} ${fx(y1)} L ${fx(x0 + w * 0.06)} ${fx(y1 - notch)} L ${fx(x0)} ${fx(y1)} Z`
   let s = `<g>`
-  s += `<path d="${d}" fill="${PARCH}"/>`
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#fff6e2" opacity="0.3"/>`
-  // gold scrollwork inner frame
+  // AGED parchment ground (#E7D5A8 family — was near-white) + weathering
+  s += `<path d="${d}" fill="${PARCH_MID}"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#efe0b6" opacity="0.28"/>`
+  s += `<rect x="${fx(cx)}" y="${fx(y0)}" width="${fx(x1 - cx)}" height="${fx(y1 - y0)}" fill="${PARCH_DIM}" opacity="0.2"/>`
+  for (let i = 0; i < 16; i++) s += `<circle cx="${fx(rr(r, x0, x1))}" cy="${fx(rr(r, y0, y1))}" r="${fx(rr(r, 3, 7))}" fill="#c3a86f" opacity="0.14"/>`
+  // strong walnut scroll-frame + gold rule inside it
   const ix0 = x0 + w * 0.03,
     ix1 = x1 - w * 0.03,
     iy0 = y0 + h * 0.1,
     iy1 = y1 - h * 0.18
-  s += `<rect x="${fx(ix0)}" y="${fx(iy0)}" width="${fx(ix1 - ix0)}" height="${fx(iy1 - iy0)}" fill="none" stroke="${GOLD}" stroke-width="3.5" opacity="0.85"/>`
-  s += `<rect x="${fx(ix0 + 5)}" y="${fx(iy0 + 5)}" width="${fx(ix1 - ix0 - 10)}" height="${fx(iy1 - iy0 - 10)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.4"/>`
+  s += `<rect x="${fx(ix0)}" y="${fx(iy0)}" width="${fx(ix1 - ix0)}" height="${fx(iy1 - iy0)}" fill="none" stroke="${INK}" stroke-width="4" opacity="0.72"/>` // walnut frame
+  s += `<rect x="${fx(ix0 + 6)}" y="${fx(iy0 + 6)}" width="${fx(ix1 - ix0 - 12)}" height="${fx(iy1 - iy0 - 12)}" fill="none" stroke="${GOLD}" stroke-width="3" opacity="0.9"/>` // gold rule
+  s += `<rect x="${fx(ix0 + 10)}" y="${fx(iy0 + 10)}" width="${fx(ix1 - ix0 - 20)}" height="${fx(iy1 - iy0 - 20)}" fill="none" stroke="${INK}" stroke-width="1.2" opacity="0.4"/>`
   // corner flourishes
   for (const [ox, oy, sx, sy] of [
     [ix0, iy0, 1, 1],
@@ -1097,16 +1156,33 @@ function heraldCrest(w, h, seed) {
   const shoulder = h * 0.55
   const tip = h * 0.94
   const d = `M ${fx(x0)} ${fx(top)} L ${fx(x1)} ${fx(top)} L ${fx(x1)} ${fx(shoulder)} Q ${fx(x1)} ${fx(tip - h * 0.05)} ${fx(cx)} ${fx(tip)} Q ${fx(x0)} ${fx(tip - h * 0.05)} ${fx(x0)} ${fx(shoulder)} Z`
+  const FIELD = '#2f3f66', // heraldic azure
+    FIELD_LIT = '#3f5486'
   let s = `<g>`
-  s += `<path d="${d}" fill="${PARCH}"/>`
-  s += `<path d="M ${fx(x0)} ${fx(top)} L ${fx(cx)} ${fx(top)} L ${fx(cx)} ${fx(tip)} Q ${fx(x0)} ${fx(tip - h * 0.05)} ${fx(x0)} ${fx(shoulder)} Z" fill="#fff6e2" opacity="0.3"/>`
-  s += `<path d="${d}" fill="none" stroke="${GOLD}" stroke-width="4" opacity="0.85"/>`
-  // open book at the base
-  s += `<path d="M ${fx(cx)} ${fx(h * 0.6)} Q ${fx(w * 0.3)} ${fx(h * 0.5)} ${fx(w * 0.22)} ${fx(h * 0.56)} L ${fx(w * 0.22)} ${fx(h * 0.72)} Q ${fx(w * 0.34)} ${fx(h * 0.66)} ${fx(cx)} ${fx(h * 0.74)} Q ${fx(w * 0.66)} ${fx(h * 0.66)} ${fx(w * 0.78)} ${fx(h * 0.72)} L ${fx(w * 0.78)} ${fx(h * 0.56)} Q ${fx(w * 0.7)} ${fx(h * 0.5)} ${fx(cx)} ${fx(h * 0.6)} Z" fill="#f6efd8" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
-  s += `<line x1="${fx(cx)}" y1="${fx(h * 0.6)}" x2="${fx(cx)}" y2="${fx(h * 0.74)}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+  // coloured field so the shield reads even small (was a pale blob)
+  s += `<path d="${d}" fill="${FIELD}"/>`
+  s += `<path d="M ${fx(x0)} ${fx(top)} L ${fx(cx)} ${fx(top)} L ${fx(cx)} ${fx(tip)} Q ${fx(x0)} ${fx(tip - h * 0.05)} ${fx(x0)} ${fx(shoulder)} Z" fill="${FIELD_LIT}" opacity="0.5"/>`
+  // gold CHIEF band across the top third
+  s += `<path d="M ${fx(x0)} ${fx(top)} L ${fx(x1)} ${fx(top)} L ${fx(x1)} ${fx(h * 0.34)} L ${fx(x0)} ${fx(h * 0.34)} Z" fill="${GOLD}"/>`
+  s += `<line x1="${fx(x0)}" y1="${fx(h * 0.34)}" x2="${fx(x1)}" y2="${fx(h * 0.34)}" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
+  // three stars on the chief
+  for (const sx of [0.3, 0.5, 0.7]) {
+    const star = []
+    for (let j = 0; j < 10; j++) {
+      const a = (j * Math.PI) / 5 - Math.PI / 2
+      const rl = j % 2 ? w * 0.02 : w * 0.045
+      star.push(`${fx(w * sx + Math.cos(a) * rl)} ${fx(h * 0.22 + Math.sin(a) * rl)}`)
+    }
+    s += `<path d="M ${star.join(' L ')} Z" fill="${INK}" opacity="0.72"/>`
+  }
+  // open book on the field
+  s += `<path d="M ${fx(cx)} ${fx(h * 0.56)} Q ${fx(w * 0.3)} ${fx(h * 0.46)} ${fx(w * 0.22)} ${fx(h * 0.52)} L ${fx(w * 0.22)} ${fx(h * 0.7)} Q ${fx(w * 0.34)} ${fx(h * 0.64)} ${fx(cx)} ${fx(h * 0.72)} Q ${fx(w * 0.66)} ${fx(h * 0.64)} ${fx(w * 0.78)} ${fx(h * 0.7)} L ${fx(w * 0.78)} ${fx(h * 0.52)} Q ${fx(w * 0.7)} ${fx(h * 0.46)} ${fx(cx)} ${fx(h * 0.56)} Z" fill="#f2ead0" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.55"/>`
+  s += `<line x1="${fx(cx)}" y1="${fx(h * 0.56)}" x2="${fx(cx)}" y2="${fx(h * 0.72)}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
   // gold quill crossing above the book
-  s += `<path d="M ${fx(w * 0.34)} ${fx(h * 0.5)} Q ${fx(cx)} ${fx(h * 0.2)} ${fx(w * 0.66)} ${fx(h * 0.36)}" fill="none" stroke="${GOLD}" stroke-width="4" opacity="0.9"/>`
-  s += `<path d="M ${fx(w * 0.6)} ${fx(h * 0.34)} l ${fx(w * 0.09)} ${fx(-h * 0.02)} l ${fx(-w * 0.04)} ${fx(h * 0.06)} Z" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.4"/>`
+  s += `<path d="M ${fx(w * 0.32)} ${fx(h * 0.5)} Q ${fx(cx)} ${fx(h * 0.32)} ${fx(w * 0.7)} ${fx(h * 0.44)}" fill="none" stroke="${GOLD_LIT}" stroke-width="4.5" opacity="0.95"/>`
+  s += `<path d="M ${fx(w * 0.64)} ${fx(h * 0.42)} l ${fx(w * 0.1)} ${fx(-h * 0.03)} l ${fx(-w * 0.045)} ${fx(h * 0.07)} Z" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.4"/>`
+  // heavy gold border
+  s += `<path d="${d}" fill="none" stroke="${GOLD}" stroke-width="6" opacity="0.9"/>`
   s += rimPath(d, 4)
   s += `</g>`
   return svgPiece(w, h, s)
@@ -1191,6 +1267,36 @@ function boxFace(w, h, seed, face, kind) {
     s += border(WOOD)
     return svgPiece(w, h, s)
   }
+  if (kind === 'strongbox') {
+    // banker's strongbox — teal steel with brass/gold reinforced corners,
+    // rivets, a big gold lock (northern palette). Aurora sheen highlight.
+    const STEEL = '#2e5244',
+      SLIT = '#3f6b5a',
+      SDIM = '#1c352b',
+      AUR = '#4fd6b8'
+    let s = `<rect width="${w}" height="${h}" fill="${STEEL}"/>`
+    s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${SLIT}" opacity="0.35"/>`
+    s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.12)}" fill="${AUR}" opacity="0.16"/>` // aurora sheen
+    // gold reinforced corner brackets on every face
+    const corner = (cx2, cy2, sx, sy) =>
+      `<path d="M ${fx(cx2)} ${fx(cy2 + sy * h * 0.22)} L ${fx(cx2)} ${fx(cy2)} L ${fx(cx2 + sx * w * 0.14)} ${fx(cy2)}" fill="none" stroke="${GOLD}" stroke-width="6" opacity="0.9"/>`
+    s += corner(w * 0.04, h * 0.06, 1, 1) + corner(w * 0.96, h * 0.06, -1, 1) + corner(w * 0.04, h * 0.94, 1, -1) + corner(w * 0.96, h * 0.94, -1, -1)
+    if (face === 'front' || face === 'back') {
+      for (const sx of [0.5]) {
+        for (const ry of [0.18, 0.5, 0.82]) s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * ry)}" r="3.5" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1"/>`
+        void sx
+      }
+      if (face === 'front') {
+        s += `<rect x="${fx(w * 0.42)}" y="${fx(h * 0.34)}" width="${fx(w * 0.16)}" height="${fx(h * 0.34)}" rx="4" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.5"/>` // lock plate
+        s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.46)}" r="${fx(w * 0.02)}" fill="${SDIM}"/>` // keyhole
+        s += `<rect x="${fx(w * 0.48)}" y="${fx(h * 0.46)}" width="${fx(w * 0.04)}" height="${fx(h * 0.12)}" fill="${SDIM}"/>`
+      }
+    } else {
+      for (let i = 1; i < 4; i++) for (const ry of [0.3, 0.7]) s += `<circle cx="${fx((w * i) / 4)}" cy="${fx(h * ry)}" r="3" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="0.9"/>` // rivets
+    }
+    s += border(STEEL)
+    return svgPiece(w, h, s)
+  }
   if (kind === 'barn') {
     // stable/barn — timber-framed plank wood with a shingled gable
     const WOOD = '#a9773f',
@@ -1244,13 +1350,22 @@ function boxFace(w, h, seed, face, kind) {
     }
     s += plank(false, 5, '#b89b6a')
   } else {
-    // side wall: timber posts + a gable of striped canvas up top
-    s += `<rect width="${w}" height="${h}" fill="#e6d8b6"/>`
-    s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.34)}" fill="${STRIPE}" opacity="0.9"/>` // canvas eave band
-    for (let i = 1; i < 4; i++) if (i % 2) s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.34)}" fill="${STRIPE}"/>`
-    s += `<rect x="${fx(w * 0.08)}" y="${fx(h * 0.34)}" width="${fx(w * 0.08)}" height="${fx(h * 0.66)}" fill="${TIMBER}"/>`
-    s += `<rect x="${fx(w * 0.84)}" y="${fx(h * 0.34)}" width="${fx(w * 0.08)}" height="${fx(h * 0.66)}" fill="${TIMBER}"/>`
-    s += `<rect x="${fx(w * 0.08)}" y="${fx(h * 0.34)}" width="${fx(w * 0.84)}" height="6" fill="${TDIM}"/>` // beam
+    // side wall (camera-facing): a striped canvas awning wall over a timber
+    // post frame, with a cast shadow low — no longer a flat tan panel.
+    const stripes = 8
+    for (let i = 0; i < stripes; i++)
+      s += `<rect x="${fx((w * i) / stripes)}" y="0" width="${fx(w / stripes)}" height="${fx(h * 0.6)}" fill="${i % 2 ? STRIPE : CANVAS}"/>`
+    // scalloped canvas hem across the middle
+    let hem = `M 0 ${fx(h * 0.6)}`
+    for (let i = stripes; i >= 0; i--) hem += ` Q ${fx((w * (i - 0.5)) / stripes)} ${fx(h * 0.68)} ${fx((w * (i - 1)) / stripes)} ${fx(h * 0.6)}`
+    s += `<path d="${hem} L 0 ${fx(h * 0.6)} Z" fill="${STRIPE}" opacity="0.5"/>`
+    s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.6)}" fill="#ffffff" opacity="0.1"/>` // canvas sheen
+    // timber post frame below the awning + interior shadow
+    s += `<rect x="0" y="${fx(h * 0.6)}" width="${w}" height="${fx(h * 0.4)}" fill="#cdb488"/>`
+    s += `<rect x="0" y="${fx(h * 0.6)}" width="${w}" height="${fx(h * 0.4)}" fill="${INK}" opacity="0.22"/>` // stall interior shade
+    s += `<rect x="${fx(w * 0.06)}" y="${fx(h * 0.58)}" width="${fx(w * 0.07)}" height="${fx(h * 0.42)}" fill="${TIMBER}"/>`
+    s += `<rect x="${fx(w * 0.87)}" y="${fx(h * 0.58)}" width="${fx(w * 0.07)}" height="${fx(h * 0.42)}" fill="${TIMBER}"/>`
+    s += `<rect x="0" y="${fx(h * 0.58)}" width="${w}" height="5" fill="${TDIM}"/>` // beam
   }
   s += border(CANVAS)
   return svgPiece(w, h, s)
@@ -1307,6 +1422,26 @@ function deckSurface(w, h, seed, kind) {
     // wheel ruts
     for (const ry of [0.4, 0.6]) s += `<path d="M 0 ${fx(h * ry)} Q ${fx(w / 2)} ${fx(h * (ry + 0.04))} ${fx(w)} ${fx(h * ry)}" fill="none" stroke="${INK}" stroke-width="4" opacity="0.2"/>`
     for (let i = 0; i < 24; i++) s += `<line x1="${fx(rr(r, 0, w))}" y1="${fx(rr(r, 0, h))}" x2="${fx(rr(r, 0, w) + rr(r, -12, 12))}" y2="${fx(rr(r, 0, h) + rr(r, -4, 4))}" stroke="#c9b070" stroke-width="1.8" opacity="0.6"/>` // straw
+    return svgPiece(w, h, s)
+  }
+  if (kind === 'glass') {
+    // treasury's glass gallery deck — teal glass panels in a gold frame
+    // (northern palette), a bright aurora reflection streak.
+    let s = `<rect width="${w}" height="${h}" fill="#274a3f"/>`
+    const cols = 7,
+      rows = 3
+    for (let ci = 0; ci < cols; ci++)
+      for (let ri = 0; ri < rows; ri++) {
+        const x = (w * ci) / cols,
+          y = (h * ri) / rows
+        const tint = (ci + ri) % 2 ? '#356b5b' : '#2e5a4c'
+        s += `<rect x="${fx(x + 2)}" y="${fx(y + 2)}" width="${fx(w / cols - 4)}" height="${fx(h / rows - 4)}" fill="${tint}"/>`
+        s += `<path d="M ${fx(x + 4)} ${fx(y + h / rows - 6)} L ${fx(x + w / cols * 0.5)} ${fx(y + 6)}" stroke="#7fe6cf" stroke-width="2" opacity="0.45"/>` // glass glint
+      }
+    // gold mullion grid
+    for (let ci = 0; ci <= cols; ci++) s += `<line x1="${fx((w * ci) / cols)}" y1="0" x2="${fx((w * ci) / cols)}" y2="${h}" stroke="${GOLD}" stroke-width="3" opacity="0.85"/>`
+    for (let ri = 0; ri <= rows; ri++) s += `<line x1="0" y1="${fx((h * ri) / rows)}" x2="${w}" y2="${fx((h * ri) / rows)}" stroke="${GOLD}" stroke-width="3" opacity="0.85"/>`
+    s += `<rect x="0" y="${fx(h * 0.1)}" width="${w}" height="${fx(h * 0.12)}" fill="#7fe6cf" opacity="0.18"/>` // aurora reflection
     return svgPiece(w, h, s)
   }
   // goods — laid-out market wares (rolled carpets, crates, fruit)
@@ -1366,25 +1501,28 @@ function meadowFringe(w, h, seed) {
 // mound's crest at v-mid) so the folded prism reads as a gleaming pile. ----
 function goldHeap(w, h, seed) {
   const r = mulberry32(seed)
-  // warm gold base (not olive) so any gaps between coins still read as gold
-  let s = `<rect width="${w}" height="${h}" fill="#b58824"/>`
-  // ridge glow band down the middle (the fold crest)
-  s += `<rect x="0" y="${fx(h * 0.36)}" width="${w}" height="${fx(h * 0.28)}" fill="${GOLD_LIT}" opacity="0.4"/>`
-  for (let i = 0; i < 620; i++) {
+  // BRIGHT gold ground so the mound gleams even at small scale / on the shaded
+  // fold half (was reading muddy-olive). High-key values + white specular glints.
+  let s = `<rect width="${w}" height="${h}" fill="#d7a92c"/>`
+  s += `<rect x="0" y="${fx(h * 0.32)}" width="${w}" height="${fx(h * 0.36)}" fill="${GOLD_LIT}" opacity="0.5"/>` // crest sheen
+  // a crown + goblet as centrepiece treasure
+  s += `<path d="M ${fx(w * 0.4)} ${fx(h * 0.5)} L ${fx(w * 0.4)} ${fx(h * 0.4)} L ${fx(w * 0.45)} ${fx(h * 0.46)} L ${fx(w * 0.5)} ${fx(h * 0.38)} L ${fx(w * 0.55)} ${fx(h * 0.46)} L ${fx(w * 0.6)} ${fx(h * 0.4)} L ${fx(w * 0.6)} ${fx(h * 0.5)} Z" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="2" stroke-opacity="0.5"/>`
+  for (const jx of [0.45, 0.5, 0.55]) s += `<circle cx="${fx(w * jx)}" cy="${fx(h * 0.41)}" r="4" fill="#c04a54" stroke="${INK}" stroke-width="1" stroke-opacity="0.4"/>`
+  for (let i = 0; i < 520; i++) {
     const x = rr(r, 0, w),
       y = rr(r, 0, h)
-    const cr = rr(r, 6, 13)
-    const near = Math.abs(y - h * 0.5) < h * 0.2
-    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.72)}" fill="${near || r() < 0.4 ? GOLD_LIT : GOLD}" stroke="${GOLD_DIM}" stroke-width="1" opacity="${near ? 1 : 0.9}"/>`
-    if (r() < 0.3) s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr * 0.5)}" ry="${fx(cr * 0.36)}" fill="none" stroke="${GOLD_DIM}" stroke-width="0.9" opacity="0.5"/>` // coin rim
+    const cr = rr(r, 7, 15)
+    const bright = r() < 0.55
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.72)}" fill="${bright ? GOLD_LIT : GOLD}" stroke="#b8901e" stroke-width="1"/>`
+    if (r() < 0.4) s += `<ellipse cx="${fx(x - cr * 0.22)}" cy="${fx(y - cr * 0.2)}" rx="${fx(cr * 0.32)}" ry="${fx(cr * 0.22)}" fill="#fff4cf" opacity="0.85"/>` // specular glint
   }
-  // scattered gems
-  for (let i = 0; i < 10; i++) {
+  // scattered gems catching light
+  for (let i = 0; i < 12; i++) {
     const x = rr(r, w * 0.08, w * 0.92),
-      y = rr(r, h * 0.1, h * 0.9)
-    const g = ['#6aa0c0', '#c04a54', '#7fb08a', '#8a6fd6'][i % 4]
-    s += `<path d="M ${fx(x)} ${fx(y - 8)} l 8 8 l -8 8 l -8 -8 Z" fill="${g}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.45"/>`
-    s += `<path d="M ${fx(x)} ${fx(y - 8)} l 8 8 l -8 0 Z" fill="#ffffff" opacity="0.25"/>`
+      y = rr(r, h * 0.12, h * 0.92)
+    const g = ['#57a6cf', '#c8434e', '#5fb488', '#8a6fd6'][i % 4]
+    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="${g}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.45"/>`
+    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 0 Z" fill="#ffffff" opacity="0.35"/>`
   }
   return svgPiece(w, h, s)
 }
@@ -1628,6 +1766,95 @@ function dressPatch(w, h, seed, kind) {
     s += `</g>`
     return svgPiece(w, h, s)
   }
+  if (kind === 'glassSpire') {
+    // treasury glass spire — teal glass panes in gold mullions rising to a point
+    const cx = w / 2
+    const x0 = w * 0.2,
+      x1 = w * 0.8,
+      baseY = h * 0.96,
+      tipY = h * 0.04
+    const d = `M ${fx(x0)} ${fx(baseY)} L ${fx(cx)} ${fx(tipY)} L ${fx(x1)} ${fx(baseY)} Z`
+    let s = `<path d="${d}" fill="#2e5a4c"/>`
+    s += `<path d="M ${fx(x0)} ${fx(baseY)} L ${fx(cx)} ${fx(tipY)} L ${fx(cx)} ${fx(baseY)} Z" fill="#3f6b5a" opacity="0.6"/>`
+    for (let i = 1; i < 5; i++) {
+      const y = lerp(baseY, tipY, i / 5)
+      const hw = lerp((x1 - x0) / 2, 0, i / 5)
+      s += `<line x1="${fx(cx - hw)}" y1="${fx(y)}" x2="${fx(cx + hw)}" y2="${fx(y)}" stroke="${GOLD}" stroke-width="2.4" opacity="0.85"/>` // gold transom
+    }
+    s += `<line x1="${fx(cx)}" y1="${fx(tipY)}" x2="${fx(cx)}" y2="${fx(baseY)}" stroke="${GOLD}" stroke-width="2.4" opacity="0.85"/>`
+    s += `<path d="M ${fx(cx - w * 0.06)} ${fx(baseY - h * 0.4)} L ${fx(cx)} ${fx(tipY + h * 0.08)}" stroke="#7fe6cf" stroke-width="2" opacity="0.5"/>` // glint
+    s += `<circle cx="${fx(cx)}" cy="${fx(tipY)}" r="4" fill="${GOLD_LIT}"/>` // finial
+    s += rimPath(d, 4)
+    return svgPiece(w, h, s)
+  }
+  if (kind === 'vines') {
+    // climbing vines with teal leaves + small aurora flowers
+    let s = `<g>`
+    for (let v = 0; v < 3; v++) {
+      const x0 = rr(r, w * 0.15, w * 0.85)
+      let d = `M ${fx(x0)} ${fx(h)}`
+      let x = x0,
+        y = h
+      for (let i = 0; i < 6; i++) {
+        const nx = x + rr(r, -w * 0.12, w * 0.12),
+          ny = y - h * 0.16
+        d += ` Q ${fx(x + rr(r, -w * 0.1, w * 0.1))} ${fx((y + ny) / 2)} ${fx(nx)} ${fx(ny)}`
+        x = nx
+        y = ny
+        s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(w * 0.06)} ${fx(-h * 0.04)} ${fx(w * 0.02)} ${fx(-h * 0.1)} q ${fx(-w * 0.06)} ${fx(h * 0.02)} ${fx(-w * 0.02)} ${fx(h * 0.1)} Z" fill="#3f7d5f" stroke="${INK}" stroke-width="1" stroke-opacity="0.3"/>` // leaf
+        if (i % 2) s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="4" fill="#7f6fd6" stroke="${INK}" stroke-width="0.9" stroke-opacity="0.3"/>` // violet flower
+      }
+      s += `<path d="${d}" fill="none" stroke="#2e5244" stroke-width="3" opacity="0.9"/>`
+    }
+    s += `</g>`
+    return svgPiece(w, h, s)
+  }
+  if (kind === 'griffin') {
+    // the bank's griffin crest — a rampant griffin in gold on a teal shield
+    const cx = w / 2
+    const sh = `M ${fx(w * 0.16)} ${fx(h * 0.1)} L ${fx(w * 0.84)} ${fx(h * 0.1)} L ${fx(w * 0.84)} ${fx(h * 0.5)} Q ${fx(w * 0.84)} ${fx(h * 0.86)} ${fx(cx)} ${fx(h * 0.96)} Q ${fx(w * 0.16)} ${fx(h * 0.86)} ${fx(w * 0.16)} ${fx(h * 0.5)} Z`
+    let s = `<path d="${sh}" fill="#2e5244"/>`
+    s += `<path d="M ${fx(w * 0.16)} ${fx(h * 0.1)} L ${fx(cx)} ${fx(h * 0.1)} L ${fx(cx)} ${fx(h * 0.96)} Q ${fx(w * 0.16)} ${fx(h * 0.86)} ${fx(w * 0.16)} ${fx(h * 0.5)} Z" fill="#3f6b5a" opacity="0.5"/>`
+    // stylised rampant griffin (wing + beak + raised claw) in gold
+    s += `<path d="M ${fx(cx - w * 0.12)} ${fx(h * 0.78)} Q ${fx(cx - w * 0.2)} ${fx(h * 0.5)} ${fx(cx - w * 0.04)} ${fx(h * 0.42)} Q ${fx(cx - w * 0.02)} ${fx(h * 0.28)} ${fx(cx + w * 0.1)} ${fx(h * 0.26)} L ${fx(cx + w * 0.22)} ${fx(h * 0.22)} L ${fx(cx + w * 0.1)} ${fx(h * 0.32)} Q ${fx(cx + w * 0.14)} ${fx(h * 0.5)} ${fx(cx + w * 0.04)} ${fx(h * 0.6)} Q ${fx(cx + w * 0.16)} ${fx(h * 0.74)} ${fx(cx + w * 0.02)} ${fx(h * 0.8)} Z" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
+    s += `<path d="M ${fx(cx - w * 0.06)} ${fx(h * 0.4)} Q ${fx(cx + w * 0.06)} ${fx(h * 0.34)} ${fx(cx + w * 0.12)} ${fx(h * 0.46)}" fill="none" stroke="${GOLD_LIT}" stroke-width="2.4" opacity="0.8"/>` // wing sweep
+    s += `<circle cx="${fx(cx + w * 0.12)}" cy="${fx(h * 0.28)}" r="2.6" fill="${INK}"/>` // eye
+    s += `<path d="${sh}" fill="none" stroke="${GOLD}" stroke-width="4" opacity="0.85"/>`
+    s += rimPath(sh, 4)
+    return svgPiece(w, h, s)
+  }
+  if (kind === 'waxSealN') {
+    // a violet/teal wax seal for the strongbox (northern)
+    const cx = w / 2,
+      cy = h / 2,
+      R = Math.min(w, h) * 0.4
+    let s = `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="#5a3f8a" stroke="#2a1c45" stroke-width="2.4"/>`
+    s += `<circle cx="${fx(cx - R * 0.28)}" cy="${fx(cy - R * 0.28)}" r="${fx(R * 0.7)}" fill="#7256a8" opacity="0.4"/>`
+    s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.66)}" fill="none" stroke="#2a1c45" stroke-width="1.6" opacity="0.7"/>`
+    const star = []
+    for (let k = 0; k < 12; k++) {
+      const a = (k * Math.PI) / 6 - Math.PI / 2
+      const rl = k % 2 ? R * 0.22 : R * 0.5
+      star.push(`${fx(cx + Math.cos(a) * rl)} ${fx(cy + Math.sin(a) * rl)}`)
+    }
+    s += `<path d="M ${star.join(' L ')} Z" fill="#2a1c45" opacity="0.55"/>`
+    s += rimPath(`M ${fx(cx - R)} ${fx(cy)} a ${fx(R)} ${fx(R)} 0 1 0 ${fx(R * 2)} 0 a ${fx(R)} ${fx(R)} 0 1 0 ${fx(-R * 2)} 0 Z`, 4)
+    return svgPiece(w, h, s)
+  }
+  if (kind === 'mintedCoins') {
+    // a low heap of freshly minted gold coins at the strongbox base
+    const base = `M 0 ${fx(h)} Q ${fx(w * 0.3)} ${fx(h * 0.35)} ${fx(w * 0.55)} ${fx(h * 0.5)} Q ${fx(w * 0.8)} ${fx(h * 0.62)} ${fx(w)} ${fx(h * 0.45)} L ${fx(w)} ${fx(h)} Z`
+    let s = `<path d="${base}" fill="#c79a24"/>`
+    for (let i = 0; i < 70; i++) {
+      const x = rr(r, 0, w),
+        y = rr(r, h * 0.45, h)
+      const cr = rr(r, 6, 11)
+      s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.72)}" fill="${r() < 0.55 ? GOLD_LIT : GOLD}" stroke="#b8901e" stroke-width="1"/>`
+      if (r() < 0.4) s += `<ellipse cx="${fx(x - cr * 0.2)}" cy="${fx(y - cr * 0.2)}" rx="${fx(cr * 0.3)}" ry="${fx(cr * 0.2)}" fill="#fff4cf" opacity="0.8"/>`
+    }
+    s += rimPath(base, 4)
+    return svgPiece(w, h, s)
+  }
   // keystone — a carved medallion boss for the arch crown
   const cx = w / 2,
     cy = h / 2,
@@ -1757,6 +1984,17 @@ const PIECES = [
   { id: 'ch3-keep-spire-m0', seed: 40301, w: 595, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 0) } },
   { id: 'ch3-keep-spire-m1', seed: 40302, w: 376, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 1) } },
   { id: 'ch3-keep-spire-m2', seed: 40303, w: 253, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 2) } },
+  // ---- Spread 7 — the Northern Treasury (ch6, northern aurora/teal/gold) ----
+  { id: 'ch6-strongbox-front', seed: 70201, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'strongbox') } },
+  { id: 'ch6-strongbox-back', seed: 70202, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'strongbox') } },
+  { id: 'ch6-strongbox-side', seed: 70203, w: 512, h: 427, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'strongbox') } },
+  { id: 'ch6-strongbox-top', seed: 70204, w: 512, h: 323, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'strongbox') } },
+  { id: 'ch6-strongbox-seal', seed: 70210, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'waxSealN') } },
+  { id: 'ch6-strongbox-coins', seed: 70211, w: 512, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'mintedCoins') } },
+  { id: 'ch6-treasury-spire', seed: 70220, w: 358, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'glassSpire') } },
+  { id: 'ch6-treasury-vines', seed: 70221, w: 512, h: 307, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'vines') } },
+  { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
+  { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
 ]
 
 // The SIX skyline mound slots, one strip each (procedural kills the FAN_OUT
