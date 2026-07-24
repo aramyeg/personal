@@ -32,7 +32,7 @@ import { peakHeight, shadowLift } from './shadow-light'
 import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { SLIVER_TIER, useArtTexture } from './use-layer-texture'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -116,25 +116,47 @@ export function BoxPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
 
+  // Fix C tiering: the front cap faces the reader straight-on (full 1024
+  // art), but the top/back/side faces are edge-on slivers or hollow-interior
+  // faces at the reading camera — half-size, no mips.
   const frontArt = useArtTexture(`${layer.id}-front`)
-  const backArt = useArtTexture(`${layer.id}-back`)
-  const sideArt = useArtTexture(`${layer.id}-side`)
-  const topArt = useArtTexture(`${layer.id}-top`)
+  const backArt = useArtTexture(`${layer.id}-back`, SLIVER_TIER)
+  const sideArt = useArtTexture(`${layer.id}-side`, SLIVER_TIER)
+  const topArt = useArtTexture(`${layer.id}-top`, SLIVER_TIER)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless boxes separates by tone instead of reading as one mass.
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
+  // Fix D — cut-edge hairlines are gated to hero-kind pieces. A per-face
+  // lineLoop is ~50% extra draw calls on a dense box stack (the s4 keep), and
+  // at the reading distance the hairline is illegible on the non-hero story
+  // props and the keep's own backdrop-kind tiers. Heroes (the pieces the eye
+  // lands on) keep it; everything else drops it. The keep's legible reading-
+  // distance edges — its balcony deck and fan spire — are their own rides in
+  // popup-keepstack-layer and are unaffected by this box-face gate.
+  const showCutEdge = layer.kind === 'hero'
+  // Fix E — the interior BackSide walls only ever read through an OPENING: a
+  // hollow-top 'open' roof, or a suppressed front/back cap. A fully sealed box
+  // (flat/gable roof, both caps — every keep tier, the hive, the strongbox)
+  // occludes its own interior from every angle, so that second per-face draw
+  // is pure waste. Static from the geometry, so no mid-turn popping is possible
+  // (a sealed box never exposes an interior at any dihedral angle).
+  const needsInterior = layer.roof === 'open' || layer.capFront === false || layer.capBack === false
+
   // The face list is constant per geometry — only the corners move.
   const faces = useMemo(() => solveBoxPose(layer, Math.PI, 0).map((p) => p.face), [layer])
   const geometries = useMemo(() => faces.map((face) => makeFaceGeometry(face)), [faces])
-  const edgeGeometries = useMemo(() => faces.map(() => makeEdgeGeometry()), [faces])
+  const edgeGeometries = useMemo(() => (showCutEdge ? faces.map(() => makeEdgeGeometry()) : []), [faces, showCutEdge])
   // One hairline material per face (not shared): artless faces get this
   // piece's own darker `tint.edge` for contrast against same-family
   // neighbors mid-turn; painted faces keep the standard pale cut-edge core.
   const edgeMaterials = useMemo(
-    () => faces.map(() => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 })),
-    [faces]
+    () =>
+      showCutEdge
+        ? faces.map(() => new THREE.LineBasicMaterial({ color: CUT_EDGE_COLOR, transparent: true, opacity: 0.8 }))
+        : [],
+    [faces, showCutEdge]
   )
 
   const paperTexture = sharedPaperTexture()
@@ -184,7 +206,9 @@ export function BoxPopupLayer({
         texture.wrapT = THREE.ClampToEdgeWrapping
       }
       material.needsUpdate = true
-      edgeMaterials[i].color.set(texture ? CUT_EDGE_COLOR : tint.edge)
+      // Edge material only exists on hero-kind pieces (fix D); on everything
+      // else edgeMaterials is empty and there is no hairline to recolor.
+      edgeMaterials[i]?.color.set(texture ? CUT_EDGE_COLOR : tint.edge)
     })
   }, [faces, materials, edgeMaterials, paperTexture, frontArt, backArt, sideArt, topArt, tint, layer.capFrontArt])
 
@@ -245,7 +269,10 @@ export function BoxPopupLayer({
 
     const patches = solveBoxPose(layer, thetaL, thetaR)
     patches.forEach((patch, i) => {
-      for (const geometry of [geometries[i], edgeGeometries[i]]) {
+      // The edge geometry only exists on hero-kind pieces (fix D); skip its
+      // per-frame position rewrite entirely when there is no hairline.
+      const targets = showCutEdge ? [geometries[i], edgeGeometries[i]] : [geometries[i]]
+      for (const geometry of targets) {
         const attr = geometry.getAttribute('position') as THREE.BufferAttribute
         const arr = attr.array as Float32Array
         for (let c = 0; c < 4; c++) {
@@ -267,8 +294,10 @@ export function BoxPopupLayer({
         {faces.map((face, i) => (
           <group key={face}>
             <mesh geometry={geometries[i]} material={materials.exterior[i]} renderOrder={0} />
-            <mesh geometry={geometries[i]} material={interiorMaterial} renderOrder={0} />
-            <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />
+            {/* Interior BackSide only when the box has an opening (fix E). */}
+            {needsInterior && <mesh geometry={geometries[i]} material={interiorMaterial} renderOrder={0} />}
+            {/* Cut-edge hairline only on hero-kind pieces (fix D). */}
+            {showCutEdge && <lineLoop geometry={edgeGeometries[i]} material={edgeMaterials[i]} renderOrder={1} />}
           </group>
         ))}
       </group>

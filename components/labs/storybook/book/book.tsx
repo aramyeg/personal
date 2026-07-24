@@ -477,17 +477,19 @@ export function Book() {
   // `isCoverTurning` prop here swapped whole assemblies one commit late at
   // the turn's endpoints (the round-5 left-side pop-in).
 
-  // Current spread ± 2 with actual pop-up content, so neighboring layer
+  // Current spread ± 1 with actual pop-up content, so the neighboring layer
   // textures are already warm by the time you turn to them (see
   // popup-spread.tsx's file header) — only `spread` itself ever renders
-  // visibly, the neighbors stay hidden until it's their turn. ± 2 (not 1)
-  // because a QUEUED turn promotes the instant the first one commits: its
-  // destination is spread ± 2 from where the chain started, and a ± 1
-  // window only begins loading it at the hand-off — pieces then popped in
-  // a few frames into the second turn.
+  // visibly, the neighbors stay hidden until it's their turn. ± 1 (E2.0 perf
+  // fix A, was ± 2): the INCOMING spread is always exactly ± 1, so the visible
+  // turn is never affected. The only case ± 2 covered was a CHAINED double-turn
+  // whose far destination is ± 2 from where the chain started — with ± 1 that
+  // far neighbor begins warming one frame later, at the hand-off, an
+  // imperceptible warm-up lag traded for two fewer mounted spreads' worth of
+  // resident textures and memory (the mid-book ch3 keep alone is 38 tex).
   const popupSpreadIndices = useMemo(
     () =>
-      [spread - 2, spread - 1, spread, spread + 1, spread + 2].filter(
+      [spread - 1, spread, spread + 1].filter(
         (i) => i >= 1 && i <= SPREAD_MAX && popupContentForSpread(i) !== undefined
       ),
     [spread]
@@ -499,13 +501,13 @@ export function Book() {
   // contract the turn driver documents.
   const incomingSpreadIndex = turning ? spread + (turning === 'next' ? 1 : -1) : null
 
-  // Printed page faces for the current spread ± 2 (indices 1..SPREAD_MAX —
-  // spread 0 is the closed cover, no pages visible). ± 2 for the same
-  // chained-turn reason as popupSpreadIndices above: the reveal-side print
-  // must already be resolved when a queued turn promotes, or the exposed
-  // page holds the outgoing print and swaps it mid-flight.
+  // Printed page faces for the current spread ± 1 (indices 1..SPREAD_MAX —
+  // spread 0 is the closed cover, no pages visible). ± 1 for the same reason
+  // as popupSpreadIndices above (E2.0 perf fix A, was ± 2): the reveal-side
+  // print is resolved for the incoming ± 1 spread every turn; only a chained
+  // double-turn's far print resolves one frame later, at the hand-off.
   const printIndices = useMemo(
-    () => [spread - 2, spread - 1, spread, spread + 1, spread + 2].filter((i) => i >= 1 && i <= SPREAD_MAX),
+    () => [spread - 1, spread, spread + 1].filter((i) => i >= 1 && i <= SPREAD_MAX),
     [spread]
   )
   const prints = useSpreadPrints(printIndices)
