@@ -231,6 +231,12 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
           continue
         }
         if (layer.mech === 'vfold' || layer.mech === 'box') {
+          // A box whose lid SEATS a rider is an assembly by recursion (C4v2):
+          // the rider is a kinematic patch pair riding the lid — tread +
+          // crowd chain read as ONE terrace piece (E3 s6 T-LINKED-RANK), the
+          // recursion crown the dress census was a proxy for.
+          const riders = layers.filter((l) => l.mech === 'rider' && l.parentId === layer.id)
+          if (layer.mech === 'box' && riders.length >= 1) continue
           const dresses = dressTargeting(layer.id, layers)
           expect(
             dresses.length,
@@ -391,9 +397,17 @@ describe('mechanism validity — the flat-fold / mount / seat laws (every layer)
             expect(parent.roof, `${name} ${l.id} boxLid needs a flat roof`).toBe('flat')
             expect(l.mountZ).toBeGreaterThanOrEqual(parent.z0)
             expect(l.mountZ).toBeLessThanOrEqual(parent.z1)
+            // T-LINKED-RANK (E3 s6, bench e3s6-terrace.mjs T8): a lid rider's
+            // width is bounded by its STAGE, not a fixed prop cap — the linked
+            // crowd chain spans up to 0.8x the lid's gutter-straddling span
+            // (2a). The old flat 0.12 cap encoded the rooftop-prop era (a
+            // single crest on a strongbox); a terrace tread's whole lid IS the
+            // seat, and its rider folds with the same lid patch pair whatever
+            // its width (the rider invariant — width never enters the fold).
+            expect(l.width, `${name} ${l.id} chain wider than 0.8x its lid span`)
+              .toBeLessThanOrEqual(0.8 * 2 * parent.a)
           }
-          // rooftop props stay small — they rise only partway (design rules)
-          expect(l.width).toBeLessThanOrEqual(0.12)
+          // lid riders stay LOW — they rise only partway (design rules)
           expect(l.height).toBeLessThanOrEqual(0.1)
         } else if (l.seat === 'deckCrease') {
           expect(parent.mech, `${name} ${l.id} deckCrease needs a platform`).toBe('platform')

@@ -92,7 +92,12 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     expect(onLoad).toHaveBeenCalledWith(texture)
     expect(texture.colorSpace).toBe(THREE.SRGBColorSpace)
     expect(onError).not.toHaveBeenCalled()
-  })
+    // 15s, not the 5s default: this is the FILE'S FIRST test, so it pays the
+    // cold dynamic re-import of the whole use-layer-texture module (INFRA-1
+    // grew it ~3x), which under a fully parallel suite run intermittently
+    // blows the default budget (observed flaking at full-suite load only —
+    // standalone it runs in milliseconds).
+  }, 15_000)
 
   it('onError fires (not onLoad) when the id is missing from the manifest — no network request at all', async () => {
     mockManifestFetch(['some-other-id'])

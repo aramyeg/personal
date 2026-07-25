@@ -155,12 +155,14 @@ down on the press before the final die-cut), decided per-piece by the physics
 (`dieFlipped`), not a fixed rule from mount height or `vDir` alone — verified by
 actually running the solver, not eyeballed:
 
-**Rotated 180° (7 shipped pieces + 2 fan members):** `ch2-bee-c`,
-`ch4-coins`, `ch5-lantern`, `ch5-lantern-b`, `ch6-door`, `ch6-banner`, `title-crest`,
-`satchel-burst-m0`, `satchel-burst-m1`. (`end-raven` is now a kinetic arm — upright,
-like `ch2-windmill`; `ch1-dormer` moved to the phi-74 E3 inn ROW, no longer a
-deep-V parent, and prints upright again alongside its new siblings `ch1-sign`
-and `ch1-key`.)
+**Rotated 180° (3 shipped pieces + 2 fan members):** `ch2-bee-c`,
+`ch4-coins`, `title-crest`, `satchel-burst-m0`, `satchel-burst-m1`.
+(`end-raven` is now a kinetic arm — upright, like `ch2-windmill`;
+`ch1-dormer` moved to the phi-74 E3 inn ROW, no longer a deep-V parent, and
+prints upright alongside its new siblings `ch1-sign` and `ch1-key`; the ch5
+lantern pair retired in the E3 s6 rebuild — the lanterns are now die-cut
+strings on the stall-arc plates; `ch6-door` and `ch6-banner` retired with the
+treasury exterior in the E3 s7 nave rebuild.)
 
 Every other STAND piece prints upright, including `satchel-burst-m2` and **every
 page-glued `vfold` layer without exception** (standing validity keeps a page-glued
@@ -279,20 +281,46 @@ principle) before any of these land.
 
 ## 6. Chapter V — The Bazaar of a Thousand Stalls (spread 6)
 
+E3 s6 amphitheater rebuild (scenes/s6-scene-pack.md, register R4 GRAND-DENSE).
+Palette: rose stone `#c4766a`, deep terracotta `#a63d2f`, sand parchment
+`#e7d5a8` (+lit `#f0e2bd`), saffron `#e0a33c`, market teal `#3f7d74`, cream
+`#f2e8cf`, walnut ink `#3b2a1a` (all linework). One shared stripe cadence
+(`BAZ_STRIPES_PER_BAY`) registers every awning in the spread — plates, souk
+wings and the raise-stall deck — so the 0.10 plate/souk seam is bridged by
+MATCHED PAINT rather than by paper (pack risk 4).
+
+Shared-atlas discipline (G5), as SHIPPED: `bazaar-atlas-s6` (1024²) carries both
+arcs' full face sets — the merged keepstack mesh needs every one of its ids on a
+single page or it silently falls back to per-face draws — plus the four souk
+sprites; `figure-atlas-s6` (512²) carries the two stripflap figures. That is the
+whole atlas-eligible set: INFRA-1 shipped sprite consumption for the
+**keepstack, skyline and stripflap** families only, so the crowd-chain riders,
+the pigeon children, the city v-fold, the tabpiece face and the eight tread box
+faces are still fetched as their own webps (`useLayerTexture`/`useArtTexture`
+take no `uvRect`). Spread-6 texture uploads therefore land at **17** (2 atlas
+pages + 14 loose + the page print), not the pack §5 estimate of 4 — that figure
+assumed a manifest-wide `uvRect` affordance the pipeline never grew. The largest
+remaining win is teaching `popup-box-layer.tsx` to use `useArtSprite` +
+`applyUvRect` (its half-split face tables are already covered by an
+`art-atlas.test.ts` case): that would fold 8 of the 14 onto the existing page
+here and pay again on every other box in the book.
+
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `ch5-city` | `ch5-city` | Rose-stone skyline, sun-warmed pink-tuff domes and arches | ≈2.36:1 landscape | STAND | **art** |
-| `ch5-stalls` | `ch5-stalls` | Row of IDENTICAL master-pattern stall fronts — repetition made visible | ≈3.83:1 very wide | STAND | **art** |
-| `ch5-arch` | `ch5-arch` | The master-pattern archway, hero chiseling a glowing pattern-stone | ≈1.0:1 square | STAND | **art — flagged low-res in the source research doc (trims to ~456px vs. peers at 1000+px); re-export recommended** |
-| `ch5-arch-garland` | `ch5-arch-garland` | Dressed garland swagged high across the arch's right panel | ≈3.0:1 very wide | FLAT | placeholder |
-| `ch5-arch-keystone` | `ch5-arch-keystone` | Dressed keystone medallion, high-center on the arch's left panel | ≈1.0:1 square | FLAT | placeholder |
-| `ch5-lantern` | `ch5-lantern` | Hanging market lantern, glowing amber, riding the arch's fold | ≈0.58:1 portrait | STAND — **ROTATED 180** | **art** |
-| `ch5-lantern-b` | `ch5-lantern-b` | Smaller sister lantern, higher on the arch's fold | ≈0.36:1 tall portrait | STAND — **ROTATED 180** | **art** |
-| `ch5-stall` | `ch5-stall-back`, `ch5-stall-side`, `ch5-stall-top` (no `-front` — `capFront:false`, open toward the shopper) | Open-front market stall — left wall, right wall, canvas canopy | side ≈1.47:1 · back ≈1.6:1 · top ≈1.29:1 | FACE / TOPDOWN | placeholder — **legacy `ch5-awning.webp` (old parallel-tent design) is orphaned** |
-| `ch5-stall-valance` | `ch5-stall-valance` | Dressed scalloped valance hanging off the canopy edge | ≈2.86:1 wide | FLAT | placeholder |
-| `ch5-stall-crates` | `ch5-stall-crates` | Dressed stacked crates against the stall's side wall | ≈1.33:1 landscape | FLAT | placeholder |
-| `ch5-goods` | `ch5-goods-deck` | Goods-table BRIDGE deck spanning the stall row, laid-out wares | ≈0.82:1 near-square | TOPDOWN | placeholder |
-| `ch5-market-table` | `ch5-market-table-face` | TABLE tab piece: legs + level deck, erected by its own fore-edge tab | u:v ≈0.5:1 (portrait unfolded strip) — bands: `legIn` v∈[0,0.32], *deck* v∈[0.32,0.68], `legOut` v∈[0.68,1] | UNFOLD | placeholder |
+| `ch5-city` | `ch5-city` | Curved rose city wall closing the rear: concentric streets receding to the gate, die-cut dome/rooftop top edge, painted lantern strings, aerial-recession wash | ≈2.88:1 landscape | STAND | procedural |
+| `ch5-pigeon-a` | `ch5-pigeon-a` | Wheeling pigeon over the bazaar, riding the city crease | ≈2.0:1 landscape | STAND | procedural |
+| `ch5-pigeon-b` | `ch5-pigeon-b` | Second pigeon, lower on the crease, opposite bank | ≈2.0:1 landscape | STAND | procedural |
+| `ch5-arc-rear` | `ch5-arc-rear-arc-front` (die-cut FACADE PLATE: 7 linked stall gables + gate-minaret rising to 0.55, lantern-string swags die-cut between finials), `ch5-arc-rear-arc-side`, `ch5-arc-rear-arc-top` (awning tops from above), `ch5-arc-rear-arc-back` (brace, rose-stone courses — never in a sightline) | REAR STALL ARC — 1-story keepstack, the plate IS the arc | plate 0.8:0.55 ≈1.45:1 | FACE / TOPDOWN | procedural |
+| `ch5-arc-inner` | `ch5-arc-inner-arc-front` (plate: 5 larger stall fronts, scalloped awning row, hanging goods), `ch5-arc-inner-arc-side`, `ch5-arc-inner-arc-top`, `ch5-arc-inner-arc-back` (brace) | INNER STALL ARC — nearer/larger 5-stall row | plate 0.68:0.24 ≈2.83:1 | FACE / TOPDOWN | procedural |
+| `ch5-souk-l` | `ch5-souk-l-mound0`, `ch5-souk-l-mound1` | Souk rows continuing the arcs to the left page edge, stripe cadence matched to the plates (the 0.10 plate/souk seam is bridged in paint) | ≈2.4:1 / 2.5:1 strips | STAND | procedural |
+| `ch5-souk-r` | `ch5-souk-r-mound0`, `ch5-souk-r-mound1` | Mirror souk rows, right page edge | ≈2.4:1 / 2.5:1 strips | STAND | procedural |
+| `ch5-tread-mid` | `ch5-tread-mid-top` (market carpets, goods heaps, coin scatter), `ch5-tread-mid-front` (arcade riser stone + price tags), `ch5-tread-mid-side`, `ch5-tread-mid-back` | Upper terrace tread of the stepped box train | top ≈4.6:1 · front ≈7:1 | TOPDOWN / FACE | procedural |
+| `ch5-tread-low` | `ch5-tread-low-top`, `ch5-tread-low-front` (chalk marks, spice sacks), `ch5-tread-low-side`, `ch5-tread-low-back` | Lower terrace tread, narrowest — the apron step | top ≈4.3:1 · front ≈11.5:1 | TOPDOWN / FACE | procedural |
+| `ch5-crowd-mid` | `ch5-crowd-mid` | Linked 6-shopper chain (T-LINKED-RANK) standing on the mid tread's carpets — robes, baskets, a haggling pair | ≈4.9:1 very wide | STAND | procedural |
+| `ch5-crowd-low` | `ch5-crowd-low` | Linked 5-shopper chain on the low tread | ≈4.8:1 very wide | STAND | procedural |
+| `ch5-throng` | `ch5-throng` | THE HERO: 8-figure surge rank rising at the terrace foot — backs + raised arms, one child on shoulders | ≈3.85:1 very wide | STAND | procedural |
+| `ch5-tea` | `ch5-tea` | Tea-corner counterweight: tea master + brazier + die-cut steam curl, over a painted floor rug | ≈0.88:1 near-square | STAND | procedural |
+| `ch5-raise-stall` | `ch5-raise-stall-face` | The celebrated playable: retained TABLE tab piece re-themed — legs as stall posts, deck a striped awning mid-raise, fore-edge tab a woodcut RAISE-A-STALL cartouche | u:v ≈0.5:1 (portrait unfolded strip) — bands: `legIn` v∈[0,0.32], *deck* v∈[0.32,0.68], `legOut` v∈[0.68,1] | UNFOLD | procedural |
 
 ## 7. Chapter VI — The Northern Treasury (spread 7)
 
@@ -433,9 +461,10 @@ flat drawer icons, never as a paper mechanism.
    outputs the crank drives, painted as `ch3-keep-winch-semaphore` (§4). `ch2-windmill`
    remains the book's standalone kinetic arm in its visible downstage lane (see §3) — its
    geometry is current as of verification; recheck before painting.
-4. **`ch5-arch` is flagged low-res** in the source research doc even though it already
-   has real art in the manifest (trims to ~456px vs. 1000+px peers) — worth a re-export
-   pass rather than treating it as "done."
+4. **The ch5 archway retired.** The old low-res arch (and the whole D-series
+   bazaar crowd around it) was replaced wholesale by the E3 s6 amphitheater —
+   its stale webps in the manifest are pruned by the s6 bake; nothing requests
+   them.
 5. **Kinetic aspect guidance is approximate.** The arm and flap panels share the SAME
    v∈[0,1] range despite having different physical lengths (`armLen` ≠ `flapLen`), so
    there's no single "correct" combined aspect — §1.6/UNFOLD-style banding doesn't

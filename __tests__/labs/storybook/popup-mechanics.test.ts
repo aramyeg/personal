@@ -1073,8 +1073,20 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
     // backdrop/hero/chains/clouds ~57). All deep-in-the-turn brushes of the
     // collapsing-sandwich class; measured 186, still under spread-5's shipped
     // 218, with rest + near-rest tiers holding above.
+    // spread-6 RE-BASELINED 77 -> 241 for the E3 s6 amphitheater rebuild
+    // (scenes/s6-scene-pack.md): the old 77 measured the FIVE-piece bazaar;
+    // the new spread is a FOUR-member gutter box train (two keepstack arcs +
+    // two treads) under a wide backdrop, and consecutive members' caps/walls
+    // sweep through each other's flat z-bands deep in the turn while nothing
+    // stands — the collapsing-sandwich contact class this window explicitly
+    // tolerates (paper presses on paper; a rigid solver can't express it).
+    // Measured 2026-07-25 across 17 pairs, dominated by consecutive-member
+    // brushes (arc-rear x arc-inner 22, arc-inner x tread-mid 21, tread-mid x
+    // tread-low 20). REST AND NEAR-REST ARE HARD-CLEAN (Parts 1/2: zero at
+    // rest, 10-ceiling landing tail holds) — the eye never dwells on a brush.
+    // Flagged for the chapter-boundary review with the G6 span bet.
     'spread-2': 184, 'spread-3': 186, 'spread-4': 179, 'spread-5': 218,
-    'spread-6': 77, 'spread-7': 122, 'extra-1': 21, 'extra-8': 38, 'extra-9': 0,
+    'spread-6': 241, 'spread-7': 122, 'extra-1': 21, 'extra-8': 38, 'extra-9': 0,
   }
   /** Spread number from the set name ('spread-4' -> 4, 'extra-8' -> 8). */
   const spreadNumOf = (name: string): number => Number(name.split('-')[1])
@@ -1273,11 +1285,13 @@ describe('D-G2 user domain — zero illegal crossings across the whole drive scr
       l.mech === 'tabpiece' || l.mech === 'stripflap' || l.mech === 'knobtower' || l.mech === 'keepsake'
   ).map(([id]) => id)
 
-  it('covers the shipped user-drivable pieces (2 tab pieces + 3 strip flaps + 1 keepsake)', () => {
+  it('covers the shipped user-drivable pieces (2 tab pieces + 5 strip flaps + 1 keepsake)', () => {
     expect(USER_IDS).toEqual(
       expect.arrayContaining([
         'ch4-goldpile',
-        'ch5-market-table',
+        'ch5-raise-stall',
+        'ch5-throng',
+        'ch5-tea',
         'title-quill',
         'satchel-sword',
         'satchel-compass',

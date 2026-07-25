@@ -31,9 +31,10 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
       // bee-b re-homed to the deep-V hero in D5 (it was 100% swallowed as a
       // backdrop child) — it now tips past vertical like its sibling bee-c.
       [3, 'ch2-bee-b'],
-      [6, 'ch5-lantern'],
-      // ch6-banner retired with the treasury exterior (E3 s7 nave rebuild);
-      // the deep-V child case stays pinned by the dormer/bee/lantern trio.
+      // (ch5-lantern retired in the E3 s6 bazaar rebuild; ch6-banner retired
+      // with the treasury exterior in the E3 s7 nave rebuild — the deep-V
+      // child flip case stays pinned by bee-b here and the dormer's upright
+      // case in its own block.)
     ] as const) {
       const { layer, parent } = byId(layersOf(spread), id)
       expect(dieFlipped(layer, parent), id).toBe(true)

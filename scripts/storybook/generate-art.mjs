@@ -3519,6 +3519,9 @@ const ENGRAVE_GLYPHS = {
   U: [[['M', 0, 0], ['L', 0, 0.6], ['C', 0.02, 1.06, 0.98, 1.06, 1, 0.6], ['L', 1, 0]]],
   E: [[['M', 1, 0], ['L', 0, 0], ['L', 0, 1], ['L', 1, 1]], [['M', 0, 0.5], ['L', 0.76, 0.5]]],
   V: [[['M', 0, 0], ['L', 0.5, 1], ['L', 1, 0]]],
+  // L joined for the s6 RAISE A STALL cartouche (additive — no shipped word
+  // uses it, so every existing engraving is byte-identical).
+  L: [[['M', 0.06, 0], ['L', 0.06, 1], ['L', 0.94, 1]]],
   '—': [[['M', 0, 0.52], ['L', 1, 0.52]]],
   // E3 s2 additions — the inn's painted words ("WELCOME" on the doormat, "LIFT"
   // on the affordance banner, "100" on the number board). Font-free strokes, so
@@ -6064,6 +6067,1187 @@ function navePage(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
+// E3 s6 — THE BAZAAR OF A THOUSAND STALLS (scenes/s6-scene-pack.md §4f).
+// Late-morning rose gold: rose stone / deep terracotta / sand parchment, with
+// saffron lantern-and-spice accents and market-teal awning stripes against
+// cream. Walnut ink carries ALL linework and doodles (house law); the pale
+// core cut edge (T1, rimPath) rides the die-cut plates and figure chains
+// only. Deterministic: mulberry32(seed), no Math.random (golden-safe).
+// ============================================================================
+
+const BAZ = {
+  rose: '#c4766a',
+  roseLit: '#d99384',
+  roseDim: '#9a564b',
+  terra: '#a63d2f',
+  terraDim: '#7e2d22',
+  sand: '#e7d5a8',
+  sandLit: '#f0e2bd',
+  sandDim: '#cdb37e',
+  saffron: '#e0a33c',
+  saffronLit: '#f2c46a',
+  teal: '#3f7d74',
+  tealDim: '#2f5f59',
+  cream: '#f2e8cf',
+  skin: '#c9996b',
+}
+// One shared stripe cadence for EVERY awning in the spread (plates, souk
+// wings, raise-stall deck): stripes per bay — the painted registration that
+// bridges the plate/souk seam (pack risk 4).
+const BAZ_STRIPES_PER_BAY = 7
+
+/** A teal/cream awning band with a scalloped bottom edge. (x,y) is the band's
+ *  top-left in px; scallops hang below y+bh. */
+function bazAwning(x, y, bw, bh, r, phase = 0) {
+  let s = ''
+  const n = BAZ_STRIPES_PER_BAY
+  const sw = bw / n
+  for (let i = 0; i < n; i++) {
+    s += `<rect x="${fx(x + i * sw)}" y="${fx(y)}" width="${fx(sw + 0.5)}" height="${fx(bh)}" fill="${(i + phase) % 2 ? BAZ.cream : BAZ.teal}"/>`
+  }
+  // scallop hem: one half-disc per stripe, colour-matched
+  for (let i = 0; i < n; i++) {
+    const cx = x + (i + 0.5) * sw
+    s += `<path d="M ${fx(cx - sw / 2)} ${fx(y + bh)} A ${fx(sw / 2)} ${fx(sw * 0.42)} 0 0 0 ${fx(cx + sw / 2)} ${fx(y + bh)} Z" fill="${(i + phase) % 2 ? BAZ.cream : BAZ.teal}"/>`
+  }
+  s += `<line x1="${fx(x)}" y1="${fx(y)}" x2="${fx(x + bw)}" y2="${fx(y)}" stroke="${INK}" stroke-width="1.8" opacity="0.55"/>`
+  s += `<line x1="${fx(x)}" y1="${fx(y + bh)}" x2="${fx(x + bw)}" y2="${fx(y + bh)}" stroke="${INK}" stroke-width="1.2" opacity="0.3"/>`
+  void r
+  return s
+}
+
+/** A hanging saffron market lantern (diamond body, finial + tassel), sized s px. */
+function bazLantern(cx, cy, s) {
+  return (
+    `<path d="M ${fx(cx)} ${fx(cy - s * 0.55)} L ${fx(cx + s * 0.42)} ${fx(cy)} L ${fx(cx)} ${fx(cy + s * 0.55)} L ${fx(cx - s * 0.42)} ${fx(cy)} Z" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>` +
+    `<path d="M ${fx(cx)} ${fx(cy - s * 0.32)} L ${fx(cx + s * 0.22)} ${fx(cy)} L ${fx(cx)} ${fx(cy + s * 0.32)} L ${fx(cx - s * 0.22)} ${fx(cy)} Z" fill="${BAZ.saffronLit}"/>` +
+    `<line x1="${fx(cx)}" y1="${fx(cy + s * 0.55)}" x2="${fx(cx)}" y2="${fx(cy + s * 0.75)}" stroke="${INK}" stroke-width="1.3" opacity="0.6"/>`
+  )
+}
+
+/** Rose/sand ashlar coursing over a rect — the arc walls' sliver faces. */
+function bazCourses(w, h, seed, base, lit) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${base}"/>`
+  s += `<rect width="${w}" height="${fx(h * 0.16)}" fill="${lit}" opacity="0.5"/>`
+  const rows = Math.max(3, Math.round(h / 26))
+  for (let i = 1; i <= rows; i++) {
+    const cy = (i / rows) * h
+    s += `<line x1="0" y1="${fx(cy)}" x2="${w}" y2="${fx(cy)}" stroke="${INK}" stroke-width="1.5" opacity="${fx(rr(r, 0.18, 0.32))}"/>`
+    const cols = 9
+    for (let b = 0; b < cols; b++) {
+      const jx = ((b + (i % 2 ? 0.5 : 0)) / cols) * w
+      s += `<line x1="${fx(jx)}" y1="${fx(cy)}" x2="${fx(jx)}" y2="${fx(cy - h / rows)}" stroke="${INK}" stroke-width="1.2" opacity="0.2"/>`
+    }
+  }
+  s += `<rect width="${w}" height="${h}" fill="${INK}" opacity="0.06"/>`
+  return svgPiece(w, h, s)
+}
+
+/** Awning tops seen from above (the arc lids at the lid-dominant camera):
+ *  canvas stripes running along the roof with seam lines and sun bleach. */
+function bazAwningTopFace(w, h, seed) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${BAZ.cream}"/>`
+  const n = Math.max(10, Math.round(w / 36))
+  for (let i = 0; i < n; i++) {
+    if (i % 2) s += `<rect x="${fx((i / n) * w)}" y="0" width="${fx(w / n + 0.5)}" height="${h}" fill="${BAZ.teal}"/>`
+  }
+  // ridge seam + eave shadows across the stripes
+  s += `<line x1="0" y1="${fx(h * 0.5)}" x2="${w}" y2="${fx(h * 0.5)}" stroke="${INK}" stroke-width="2" opacity="0.35"/>`
+  s += `<rect width="${w}" height="${fx(h * 0.12)}" fill="${INK}" opacity="0.12"/>`
+  s += `<rect y="${fx(h * 0.88)}" width="${w}" height="${fx(h * 0.12)}" fill="${INK}" opacity="0.12"/>`
+  for (let i = 0; i < 14; i++) {
+    s += `<rect x="${fx(rr(r, 0, w))}" y="${fx(rr(r, 0.15, 0.8) * h)}" width="${fx(rr(r, 8, 26))}" height="${fx(rr(r, 2, 4))}" fill="${BAZ.sandLit}" opacity="0.5"/>`
+  }
+  return svgPiece(w, h, s)
+}
+
+/** One painted stall bay (door arch, awning, gable field) between x0..x1 with
+ *  eave at eaveY px — shared by the arc plates and the souk rows. */
+function bazStallBay(x0, x1, baseY, eaveY, r, phase) {
+  const bw = x1 - x0
+  let s = ''
+  // wall wash, alternating warmth
+  s += `<rect x="${fx(x0)}" y="${fx(eaveY)}" width="${fx(bw)}" height="${fx(baseY - eaveY)}" fill="${phase % 2 ? BAZ.rose : BAZ.roseLit}"/>`
+  // door arch, deep terracotta with a saffron glow inside
+  const dw = bw * rr(r, 0.3, 0.36)
+  const dx = x0 + bw / 2 - dw / 2
+  const dh = (baseY - eaveY) * rr(r, 0.5, 0.6)
+  s += `<path d="M ${fx(dx)} ${fx(baseY)} L ${fx(dx)} ${fx(baseY - dh * 0.6)} Q ${fx(dx + dw / 2)} ${fx(baseY - dh * 1.25)} ${fx(dx + dw)} ${fx(baseY - dh * 0.6)} L ${fx(dx + dw)} ${fx(baseY)} Z" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.55"/>`
+  s += `<path d="M ${fx(dx + dw * 0.2)} ${fx(baseY)} L ${fx(dx + dw * 0.2)} ${fx(baseY - dh * 0.5)} Q ${fx(dx + dw / 2)} ${fx(baseY - dh)} ${fx(dx + dw * 0.8)} ${fx(baseY - dh * 0.5)} L ${fx(dx + dw * 0.8)} ${fx(baseY)} Z" fill="${BAZ.saffron}" opacity="0.55"/>`
+  // the awning across the bay, hem hanging over the door
+  s += bazAwning(x0 + bw * 0.06, eaveY + (baseY - eaveY) * 0.06, bw * 0.88, (baseY - eaveY) * 0.2, r, phase)
+  // goods at the plinth: a basket and a spice cone
+  const gy = baseY - 2
+  const b1 = x0 + bw * rr(r, 0.12, 0.2)
+  s += `<path d="M ${fx(b1)} ${fx(gy)} L ${fx(b1 + bw * 0.14)} ${fx(gy)} L ${fx(b1 + bw * 0.115)} ${fx(gy - bw * 0.1)} L ${fx(b1 + bw * 0.025)} ${fx(gy - bw * 0.1)} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.55"/>`
+  const c1 = x0 + bw * rr(r, 0.68, 0.78)
+  s += `<path d="M ${fx(c1)} ${fx(gy)} L ${fx(c1 + bw * 0.11)} ${fx(gy)} L ${fx(c1 + bw * 0.055)} ${fx(gy - bw * 0.14)} Z" fill="${phase % 2 ? BAZ.saffron : BAZ.terra}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+  return s
+}
+
+/** THE REAR / INNER STALL-ARC FACADE PLATES (ch5-arc-{rear,inner}-arc-front).
+ *  Die-cut coplanar plates on the arc caps: the ALPHA is the silhouette (no
+ *  outline sidecar — the raven/plate idiom). u 0.5 sits ON the spine crease
+ *  (plate UVs run crease -> outer), so the composition is centred: the REAR
+ *  plate carries 7 linked stall gables around the gate-minaret (top of the
+ *  die-cut at the pack's 0.55 world = image top), with the old lantern pair
+ *  re-seated as DIE-CUT lantern strings swagged between the gable finials;
+ *  the INNER plate is 5 nearer, larger stall fronts under one scalloped
+ *  awning row. */
+function bazArcPlate(w, h, seed, kind) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+
+  const isRear = kind === 'rear'
+  // bay edges in u (v-up fractions); rear leaves the centre to the minaret
+  const bays = isRear
+    ? [
+        [0.0, 0.155], [0.155, 0.31], [0.31, 0.452],
+        [0.548, 0.665], [0.665, 0.78], [0.78, 0.892], [0.892, 1.0],
+      ]
+    : [[0.0, 0.2], [0.2, 0.4], [0.4, 0.6], [0.6, 0.8], [0.8, 1.0]]
+  const eaveV = isRear ? 0.42 : 0.52
+  const peakVs = bays.map(() => (isRear ? rr(r, 0.52, 0.62) : rr(r, 0.72, 0.8)))
+
+  // ---- the die-cut contour: plinth -> gables (or awning crowns) -> plinth,
+  // with the minaret rising between the rear bays.
+  const pts = [[0, 0], [0, eaveV]]
+  const gable = (b, i) => {
+    const [u0, u1] = b
+    const um = (u0 + u1) / 2
+    if (isRear) {
+      pts.push([u0 + (u1 - u0) * 0.06, eaveV], [um, peakVs[i]], [u1 - (u1 - u0) * 0.06, eaveV])
+    } else {
+      // the inner arc's crown is its awning slab: a shallow camber per bay
+      pts.push([u0 + 0.012, eaveV], [u0 + 0.02, peakVs[i] - 0.05], [um, peakVs[i]], [u1 - 0.02, peakVs[i] - 0.05], [u1 - 0.012, eaveV])
+    }
+  }
+  if (isRear) {
+    bays.slice(0, 3).forEach((b, i) => gable(b, i))
+    // THE GATE-MINARET (the one modest vertical, top y 0.55 world = v 1 here):
+    // shaft, corbelled balcony, onion dome, finial.
+    pts.push(
+      [0.452, eaveV], [0.462, 0.66], [0.472, 0.66], [0.472, 0.8],
+      [0.452, 0.8], [0.452, 0.855], [0.472, 0.855],
+      [0.478, 0.9], [0.487, 0.955], [0.5, 0.985],
+      [0.513, 0.955], [0.522, 0.9], [0.528, 0.855],
+      [0.548, 0.855], [0.548, 0.8], [0.528, 0.8], [0.528, 0.66], [0.538, 0.66], [0.548, eaveV]
+    )
+    bays.slice(3).forEach((b, i) => gable(b, i + 3))
+  } else {
+    bays.forEach((b, i) => gable(b, i))
+  }
+  pts.push([1, eaveV], [1, 0])
+  const outline = simplifyOutline(pts)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  let g = `<g clip-path="url(#bazPlateCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.rose}"/>`
+  // plinth
+  g += `<rect y="${fx(Y(0.07))}" width="${w}" height="${fx(h * 0.07)}" fill="${BAZ.sandDim}"/>`
+  g += `<line x1="0" y1="${fx(Y(0.07))}" x2="${w}" y2="${fx(Y(0.07))}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+  // bays
+  bays.forEach((b, i) => {
+    g += bazStallBay(X(b[0]), X(b[1]), Y(0.07), Y(eaveV * (isRear ? 1 : 0.98)), r, i)
+    // gable / awning-crown field above the eave
+    const um = (b[0] + b[1]) / 2
+    if (isRear) {
+      g += `<path d="M ${fx(X(b[0]))} ${fx(Y(eaveV))} L ${fx(X(um))} ${fx(Y(peakVs[i]))} L ${fx(X(b[1]))} ${fx(Y(eaveV))} Z" fill="${i % 2 ? BAZ.roseLit : BAZ.rose}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
+      g += `<circle cx="${fx(X(um))}" cy="${fx(Y(eaveV) - (Y(eaveV) - Y(peakVs[i])) * 0.45)}" r="${fx(w * 0.011)}" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.55"/>`
+    } else {
+      // the awning slab IS the crown: stripe it edge to edge
+      g += bazAwning(X(b[0] + 0.012), Y(peakVs[i]), X(b[1] - b[0] - 0.024), (Y(eaveV) - Y(peakVs[i])) * 0.92, r, i)
+    }
+  })
+  if (isRear) {
+    // minaret paint: sand shaft, slit windows, balcony, terracotta dome ribs
+    g += `<rect x="${fx(X(0.462))}" y="${fx(Y(0.8))}" width="${fx(X(0.066))}" height="${fx(Y(eaveV) - Y(0.8))}" fill="${BAZ.sand}"/>`
+    g += `<rect x="${fx(X(0.452))}" y="${fx(Y(0.855))}" width="${fx(X(0.096))}" height="${fx(Y(0.8) - Y(0.855))}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
+    for (const wv of [0.56, 0.68]) {
+      g += `<rect x="${fx(X(0.489))}" y="${fx(Y(wv + 0.055))}" width="${fx(X(0.022))}" height="${fx(Y(wv) - Y(wv + 0.055))}" rx="${fx(w * 0.008)}" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+    }
+    g += `<path d="M ${fx(X(0.478))} ${fx(Y(0.9))} Q ${fx(X(0.5))} ${fx(Y(1.02))} ${fx(X(0.522))} ${fx(Y(0.9))} Z" fill="${BAZ.terra}"/>`
+    for (const rv of [0.489, 0.5, 0.511]) g += `<line x1="${fx(X(rv))}" y1="${fx(Y(0.9))}" x2="${fx(X(0.5))}" y2="${fx(Y(0.985))}" stroke="${BAZ.cream}" stroke-width="1.4" opacity="0.6"/>`
+    // THE GATE at its base — the arch the hero walked home through
+    g += `<path d="M ${fx(X(0.462))} ${fx(Y(0.07))} L ${fx(X(0.462))} ${fx(Y(0.3))} Q ${fx(X(0.5))} ${fx(Y(0.44))} ${fx(X(0.538))} ${fx(Y(0.3))} L ${fx(X(0.538))} ${fx(Y(0.07))} Z" fill="${INK}" opacity="0.82"/>`
+    g += `<path d="M ${fx(X(0.472))} ${fx(Y(0.07))} L ${fx(X(0.472))} ${fx(Y(0.27))} Q ${fx(X(0.5))} ${fx(Y(0.39))} ${fx(X(0.528))} ${fx(Y(0.27))} L ${fx(X(0.528))} ${fx(Y(0.07))} Z" fill="url(#bazGateGlow)"/>`
+  } else {
+    // hanging goods dangling BELOW the bay awning hems, beside the doors:
+    // copper pots on cords and rolled rugs (the eye-test moved them down off
+    // the awning band where the first bake parked them).
+    bays.forEach((b, i) => {
+      const um = X((b[0] + b[1]) / 2)
+      const hangTop = Y(0.4)
+      if (i % 3 === 0) {
+        g += `<line x1="${fx(um - w * 0.055)}" y1="${fx(hangTop)}" x2="${fx(um - w * 0.055)}" y2="${fx(hangTop + h * 0.05)}" stroke="${INK}" stroke-width="1.4" opacity="0.65"/>`
+        g += `<ellipse cx="${fx(um - w * 0.055)}" cy="${fx(hangTop + h * 0.095)}" rx="${fx(w * 0.024)}" ry="${fx(h * 0.05)}" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.55"/>`
+        g += `<ellipse cx="${fx(um - w * 0.062)}" cy="${fx(hangTop + h * 0.08)}" rx="${fx(w * 0.008)}" ry="${fx(h * 0.018)}" fill="${BAZ.saffronLit}"/>`
+      }
+      if (i % 3 === 1) {
+        g += `<line x1="${fx(um + w * 0.05)}" y1="${fx(hangTop)}" x2="${fx(um + w * 0.05)}" y2="${fx(hangTop + h * 0.04)}" stroke="${INK}" stroke-width="1.4" opacity="0.65"/>`
+        g += `<rect x="${fx(um + w * 0.038)}" y="${fx(hangTop + h * 0.04)}" width="${fx(w * 0.024)}" height="${fx(h * 0.13)}" rx="${fx(w * 0.01)}" fill="${BAZ.terra}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+        g += `<rect x="${fx(um + w * 0.038)}" y="${fx(hangTop + h * 0.08)}" width="${fx(w * 0.024)}" height="${fx(h * 0.022)}" fill="${BAZ.cream}"/>`
+        g += `<rect x="${fx(um + w * 0.038)}" y="${fx(hangTop + h * 0.125)}" width="${fx(w * 0.024)}" height="${fx(h * 0.022)}" fill="${BAZ.cream}"/>`
+      }
+    })
+  }
+  // late-morning shade
+  g += `<rect width="${w}" height="${h}" fill="url(#bazShade)"/>`
+  g += `</g>`
+
+  // ---- DIE-CUT LANTERN STRINGS (rear only): swagged between the gable
+  // finials and converging on the minaret balcony — drawn OUTSIDE the clip so
+  // the strings + lanterns carry their own alpha above the roofline.
+  if (isRear) {
+    const anchors = bays.map((b, i) => [(b[0] + b[1]) / 2, peakVs[i]])
+    anchors.splice(3, 0, [0.5, 0.84]) // the minaret balcony joins the run
+    for (let i = 0; i + 1 < anchors.length; i++) {
+      const [ua, va] = anchors[i]
+      const [ub, vb] = anchors[i + 1]
+      const dipV = Math.min(va, vb) - rr(r, 0.07, 0.095)
+      g += `<path d="M ${fx(X(ua))} ${fx(Y(va))} Q ${fx(X((ua + ub) / 2))} ${fx(Y(dipV))} ${fx(X(ub))} ${fx(Y(vb))}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.85"/>`
+      const nL = 2 + (i % 2)
+      for (let k = 1; k <= nL; k++) {
+        const t = k / (nL + 1)
+        const uu = (1 - t) * (1 - t) * ua + 2 * (1 - t) * t * ((ua + ub) / 2) + t * t * ub
+        const vv = (1 - t) * (1 - t) * va + 2 * (1 - t) * t * dipV + t * t * vb
+        g += bazLantern(X(uu), Y(vv) + w * 0.012, w * 0.018)
+      }
+    }
+  }
+
+  const defs =
+    `<clipPath id="bazPlateCut"><path d="${d}"/></clipPath>` +
+    `<radialGradient id="bazGateGlow" cx="0.5" cy="0.85" r="0.9">` +
+    `<stop offset="0" stop-color="${BAZ.saffronLit}"/><stop offset="0.55" stop-color="${BAZ.saffron}"/>` +
+    `<stop offset="1" stop-color="${BAZ.terraDim}"/></radialGradient>` +
+    `<linearGradient id="bazShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.16"/>` +
+    `<stop offset="0.55" stop-color="#000000" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.3"/></linearGradient>`
+
+  return svgPiece(w, h, g + rimPath(d, 5), defs)
+}
+
+/** THE SOUK WINGS (ch5-souk-*): shaped-mesh strips (outline sidecar) carrying
+ *  the arcs out to the page edges — row 0 echoes the rear arc's gable rhythm,
+ *  row 1 the inner arc's awning crowns, stripe cadence matched to the plates. */
+function soukRow({ seed, w, h, row, mirror }) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+  const stalls = row === 0 ? 4 : 3
+  const eaveV = row === 0 ? 0.5 : 0.56
+  const bays = []
+  for (let i = 0; i < stalls; i++) bays.push([i / stalls, (i + 1) / stalls])
+  const peakVs = bays.map(() => (row === 0 ? rr(r, 0.72, 0.9) : rr(r, 0.76, 0.86)))
+
+  let pts = [[0, 0], [0, eaveV]]
+  bays.forEach((b, i) => {
+    const um = (b[0] + b[1]) / 2
+    if (row === 0) {
+      pts.push([b[0] + 0.015, eaveV], [um, peakVs[i]], [b[1] - 0.015, eaveV])
+    } else {
+      pts.push([b[0] + 0.01, eaveV], [b[0] + 0.02, peakVs[i] - 0.05], [um, peakVs[i]], [b[1] - 0.02, peakVs[i] - 0.05], [b[1] - 0.01, eaveV])
+    }
+  })
+  pts.push([1, eaveV], [1, 0])
+  if (mirror) pts = pts.map(([u, v]) => [1 - u, v]).reverse()
+  const outline = simplifyOutline(pts)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  let g = `<g clip-path="url(#soukCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.rose}"/>`
+  g += `<rect y="${fx(Y(0.08))}" width="${w}" height="${fx(h * 0.08)}" fill="${BAZ.sandDim}"/>`
+  const painted = mirror ? bays.map(([a, b]) => [1 - b, 1 - a]).reverse() : bays
+  painted.forEach((b, i) => {
+    g += bazStallBay(X(b[0]), X(b[1]), Y(0.08), Y(eaveV), r, i + row)
+    const um = (b[0] + b[1]) / 2
+    const pv = peakVs[mirror ? painted.length - 1 - i : i]
+    if (row === 0) {
+      g += `<path d="M ${fx(X(b[0]))} ${fx(Y(eaveV))} L ${fx(X(um))} ${fx(Y(pv))} L ${fx(X(b[1]))} ${fx(Y(eaveV))} Z" fill="${i % 2 ? BAZ.roseLit : BAZ.rose}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.5"/>`
+      g += `<circle cx="${fx(X(um))}" cy="${fx((Y(eaveV) + Y(pv)) / 2)}" r="${fx(w * 0.012)}" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+    } else {
+      g += bazAwning(X(b[0] + 0.012), Y(pv), X(b[1] - b[0] - 0.024), (Y(eaveV) - Y(pv)) * 0.9, r, i)
+    }
+  })
+  g += `<rect width="${w}" height="${h}" fill="url(#soukShade)"/>`
+  g += `</g>`
+
+  const defs =
+    `<clipPath id="soukCut"><path d="${d}"/></clipPath>` +
+    `<linearGradient id="soukShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.32"/></linearGradient>`
+
+  return { outline, svg: svgPiece(w, h, g + rimPath(d, 4), defs) }
+}
+
+/** THE CITY BACKDROP (ch5-city, retained v-fold repainted): the whole rose
+ *  city seen from the gate — concentric painted streets receding to the
+ *  spine, a die-cut dome/rooftop skyline, lantern strings, aerial recession.
+ *  creaseU 0.5, so the great gate dome sits on the crease. */
+function bazCity(w, h, seed) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+
+  // die-cut skyline: walls / dome clusters / two lesser minarets / the great
+  // central dome. Sampled arcs for every dome.
+  const dome = (uc, rad, vBase, squash = 1) => {
+    const out = []
+    for (let k = 8; k >= 0; k--) {
+      const a = (k / 8) * Math.PI
+      out.push([uc + rad * Math.cos(a), vBase + rad * (w / h) * squash * Math.sin(a)])
+    }
+    return out
+  }
+  const pts = [[0, 0], [0, 0.6]]
+  pts.push([0.06, 0.6], [0.06, 0.66], [0.1, 0.66])
+  pts.push(...dome(0.14, 0.028, 0.66, 0.9))
+  pts.push([0.18, 0.66], [0.2, 0.6])
+  pts.push([0.24, 0.6], [0.24, 0.72], [0.252, 0.72], [0.252, 0.88], [0.262, 0.9], [0.272, 0.88], [0.272, 0.72], [0.284, 0.72], [0.284, 0.6]) // lesser minaret
+  pts.push([0.34, 0.6], [0.34, 0.68])
+  pts.push(...dome(0.385, 0.032, 0.68, 0.85))
+  pts.push([0.43, 0.68], [0.43, 0.62])
+  // THE GREAT GATE DOME on the crease
+  pts.push([0.44, 0.62], [0.44, 0.7])
+  pts.push(...dome(0.5, 0.055, 0.7, 0.95))
+  pts.push([0.56, 0.7], [0.56, 0.62], [0.57, 0.62])
+  pts.push([0.62, 0.62], [0.62, 0.7])
+  pts.push(...dome(0.655, 0.03, 0.7, 0.85))
+  pts.push([0.69, 0.7], [0.69, 0.6])
+  pts.push([0.74, 0.6], [0.74, 0.74], [0.752, 0.74], [0.752, 0.9], [0.762, 0.93], [0.772, 0.9], [0.772, 0.74], [0.784, 0.74], [0.784, 0.6]) // second minaret
+  pts.push([0.84, 0.6], [0.84, 0.66])
+  pts.push(...dome(0.88, 0.026, 0.66, 0.9))
+  pts.push([0.92, 0.66], [0.92, 0.6], [1, 0.6], [1, 0])
+  const outline = simplifyOutline(pts)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  let g = `<g clip-path="url(#bazCityCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.roseLit}"/>`
+  // CONCENTRIC STREETS receding to the gate: nested ellipse arcs about the
+  // crease base — the amphitheater's own geometry painted into the city.
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4
+    const ry = h * lerp(0.16, 0.62, t)
+    const rx = w * lerp(0.1, 0.62, t)
+    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="${fx(0.32 - t * 0.2)}"/>`
+    // roofline band riding each street arc
+    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${t > 0.5 ? BAZ.rose : BAZ.roseDim}" stroke-width="${fx(h * lerp(0.1, 0.05, t))}" opacity="${fx(0.5 - t * 0.28)}"/>`
+  }
+  // windows + doors scattered on the street bands, a few saffron-lit
+  for (let i = 0; i < 130; i++) {
+    const u = rr(r, 0.02, 0.98)
+    const v = rr(r, 0.06, 0.58) * (1 - Math.abs(u - 0.5) * 0.5)
+    const lit = r() < 0.16
+    const s2 = rr(r, 2.2, 4.6)
+    g += `<rect x="${fx(X(u))}" y="${fx(Y(v))}" width="${fx(s2)}" height="${fx(s2 * 1.5)}" fill="${lit ? BAZ.saffron : INK}" opacity="${lit ? 0.85 : fx(rr(r, 0.25, 0.45))}"/>`
+  }
+  // dome + minaret paint above the wall line
+  g += `<rect y="0" width="${w}" height="${fx(Y(0.58))}" fill="${BAZ.sand}" opacity="0.24"/>`
+  g += `<path d="M ${fx(X(0.44))} ${fx(Y(0.7))} L ${fx(X(0.56))} ${fx(Y(0.7))} L ${fx(X(0.555))} ${fx(Y(0.62))} L ${fx(X(0.445))} ${fx(Y(0.62))} Z" fill="${BAZ.sand}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.45"/>`
+  for (const [uc, rad, vb] of [[0.14, 0.028, 0.66], [0.385, 0.032, 0.68], [0.5, 0.055, 0.7], [0.655, 0.03, 0.7], [0.88, 0.026, 0.66]]) {
+    g += `<path d="M ${fx(X(uc - rad))} ${fx(Y(vb))} A ${fx(X(rad))} ${fx(X(rad) * 0.95)} 0 0 1 ${fx(X(uc + rad))} ${fx(Y(vb))} Z" fill="${BAZ.terra}"/>`
+    g += `<line x1="${fx(X(uc))}" y1="${fx(Y(vb))}" x2="${fx(X(uc))}" y2="${fx(Y(vb) - X(rad) * 0.92)}" stroke="${BAZ.cream}" stroke-width="1.6" opacity="0.55"/>`
+  }
+  // lantern strings swagged across the mid city
+  for (const [ua, ub, va] of [[0.08, 0.34, 0.5], [0.36, 0.62, 0.54], [0.64, 0.9, 0.5]]) {
+    g += `<path d="M ${fx(X(ua))} ${fx(Y(va))} Q ${fx(X((ua + ub) / 2))} ${fx(Y(va - 0.08))} ${fx(X(ub))} ${fx(Y(va))}" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.55"/>`
+    for (const t of [0.3, 0.5, 0.7]) {
+      const uu = lerp(ua, ub, t)
+      g += `<circle cx="${fx(X(uu))}" cy="${fx(Y(va - 0.07))}" r="${fx(w * 0.004)}" fill="${BAZ.saffron}" opacity="0.9"/>`
+    }
+  }
+  // aerial recession wash: the far city pales toward the die-cut skyline
+  g += `<rect width="${w}" height="${h}" fill="url(#bazCityHaze)"/>`
+  g += `</g>`
+
+  const defs =
+    `<clipPath id="bazCityCut"><path d="${d}"/></clipPath>` +
+    `<linearGradient id="bazCityHaze" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.62"/>` +
+    `<stop offset="0.5" stop-color="${BAZ.sandLit}" stop-opacity="0.12"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.18"/></linearGradient>`
+
+  return svgPiece(w, h, g + rimPath(d, 5), defs)
+}
+
+/** TERRACE TREAD LIDS (ch5-tread-*-top): market carpets edge to edge, heaped
+ *  goods and coin scatter — the Emerald-II terrace gardens turned to wares. */
+function bazTreadTop(w, h, seed, dense) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${BAZ.sandDim}"/>`
+  const n = dense ? 7 : 6
+  const robe = [BAZ.terra, BAZ.teal, BAZ.saffron, BAZ.rose, BAZ.tealDim]
+  let x = 0
+  for (let i = 0; i < n; i++) {
+    const cw = (w / n) * rr(r, 0.82, 1.1)
+    const carpet = robe[i % robe.length]
+    const inset = h * rr(r, 0.04, 0.12)
+    s += `<rect x="${fx(x + 2)}" y="${fx(inset)}" width="${fx(cw - 4)}" height="${fx(h - inset * 2)}" fill="${carpet}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
+    s += `<rect x="${fx(x + cw * 0.12)}" y="${fx(inset + h * 0.14)}" width="${fx(cw * 0.76)}" height="${fx(h - inset * 2 - h * 0.28)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.6" opacity="0.75"/>`
+    // centre diamond motif + end fringe
+    s += `<path d="M ${fx(x + cw / 2)} ${fx(h * 0.32)} L ${fx(x + cw * 0.62)} ${fx(h * 0.5)} L ${fx(x + cw / 2)} ${fx(h * 0.68)} L ${fx(x + cw * 0.38)} ${fx(h * 0.5)} Z" fill="${BAZ.cream}" opacity="0.8"/>`
+    for (let f = 0; f < 6; f++) {
+      const fy2 = inset + ((h - 2 * inset) * (f + 0.5)) / 6
+      s += `<line x1="${fx(x + 2)}" y1="${fx(fy2)}" x2="${fx(x - 2)}" y2="${fx(fy2)}" stroke="${INK}" stroke-width="1.2" opacity="0.5"/>`
+    }
+    // goods heaped on the carpet: spice cones or a bowl of coin
+    if (i % 2 === 0) {
+      const gx = x + cw * rr(r, 0.3, 0.6)
+      s += `<path d="M ${fx(gx)} ${fx(h * 0.62)} L ${fx(gx + cw * 0.2)} ${fx(h * 0.62)} L ${fx(gx + cw * 0.1)} ${fx(h * 0.24)} Z" fill="${i % 4 ? BAZ.saffronLit : BAZ.terraDim}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.5"/>`
+    } else {
+      const gx = x + cw * rr(r, 0.35, 0.55)
+      s += `<ellipse cx="${fx(gx)}" cy="${fx(h * 0.5)}" rx="${fx(cw * 0.14)}" ry="${fx(h * 0.16)}" fill="${BAZ.sand}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.55"/>`
+      for (let c = 0; c < 5; c++) s += `<circle cx="${fx(gx + rr(r, -cw * 0.08, cw * 0.08))}" cy="${fx(h * 0.5 + rr(r, -h * 0.08, h * 0.08))}" r="${fx(Math.max(1.6, h * 0.03))}" fill="${BAZ.saffronLit}"/>`
+    }
+    x += cw
+    if (x > w) break
+  }
+  // loose coin scatter between carpets
+  for (let i = 0; i < (dense ? 26 : 18); i++) {
+    s += `<circle cx="${fx(rr(r, 0, w))}" cy="${fx(rr(r, 0, h))}" r="${fx(Math.max(1.4, h * 0.024))}" fill="${BAZ.saffron}" opacity="${fx(rr(r, 0.5, 0.9))}"/>`
+  }
+  return svgPiece(w, h, s)
+}
+
+/** TERRACE RISERS (ch5-tread-*-front): arcade stone with painted price tags
+ *  and chalk marks — what the reader sees of each step. */
+function bazTreadFront(w, h, seed, arches) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
+  s += `<rect width="${w}" height="${fx(h * 0.14)}" fill="${BAZ.sandLit}"/>`
+  // shallow blind arcade
+  for (let i = 0; i < arches; i++) {
+    const ax = ((i + 0.5) / arches) * w
+    const aw = (w / arches) * 0.62
+    s += `<path d="M ${fx(ax - aw / 2)} ${fx(h)} L ${fx(ax - aw / 2)} ${fx(h * 0.5)} Q ${fx(ax)} ${fx(h * 0.16)} ${fx(ax + aw / 2)} ${fx(h * 0.5)} L ${fx(ax + aw / 2)} ${fx(h)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.45"/>`
+  }
+  // stone joints
+  for (const fyv of [0.32, 0.62, 0.88]) {
+    s += `<line x1="0" y1="${fx(h * fyv)}" x2="${w}" y2="${fx(h * fyv)}" stroke="${INK}" stroke-width="1.2" opacity="0.22"/>`
+  }
+  // price tags + chalk marks
+  for (let i = 0; i < Math.max(3, Math.round(arches * 0.7)); i++) {
+    const tx = rr(r, w * 0.05, w * 0.9)
+    const ty = rr(r, h * 0.2, h * 0.55)
+    s += `<g transform="rotate(${fx(rr(r, -14, 14))} ${fx(tx)} ${fx(ty)})">` +
+      `<rect x="${fx(tx)}" y="${fx(ty)}" width="${fx(w * 0.045)}" height="${fx(h * 0.3)}" fill="${BAZ.cream}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.6"/>` +
+      `<line x1="${fx(tx + w * 0.008)}" y1="${fx(ty + h * 0.09)}" x2="${fx(tx + w * 0.037)}" y2="${fx(ty + h * 0.09)}" stroke="${INK}" stroke-width="1.2" opacity="0.7"/>` +
+      `<line x1="${fx(tx + w * 0.008)}" y1="${fx(ty + h * 0.18)}" x2="${fx(tx + w * 0.03)}" y2="${fx(ty + h * 0.18)}" stroke="${INK}" stroke-width="1.2" opacity="0.55"/>` +
+      `</g>`
+    // chalk tally beside the tag
+    for (let c = 0; c < 4; c++) {
+      s += `<line x1="${fx(tx + w * 0.06 + c * 3)}" y1="${fx(ty)}" x2="${fx(tx + w * 0.06 + c * 3)}" y2="${fx(ty + h * 0.12)}" stroke="${BAZ.cream}" stroke-width="1.6" opacity="0.8"/>`
+    }
+  }
+  s += `<rect y="${fx(h * 0.86)}" width="${w}" height="${fx(h * 0.14)}" fill="${INK}" opacity="0.1"/>`
+  return svgPiece(w, h, s)
+}
+
+/** FIGURE RANKS cut as ONE linked chain (T-LINKED-RANK): the crowd chains on
+ *  the tread lids, and the 8-shopper THRONG hero. The ALPHA carries the
+ *  die-cut; the cream core edge rides the contour (T1). */
+function bazFigureRank(w, h, seed, { count, view, raisedArms = false, childAt = -1, basketAt = -1 }) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+  const asp = w / h // u-radius -> v-radius conversion for round heads
+
+  const u0 = 0.015
+  const u1 = 0.985
+  const span = (u1 - u0) / count
+  const vLink = 0.34
+  const figs = []
+  for (let i = 0; i < count; i++) {
+    figs.push({
+      cx: u0 + span * (i + 0.5),
+      shHalf: span * rr(r, 0.37, 0.45),
+      headR: span * rr(r, 0.16, 0.2),
+      vSh: rr(r, 0.5, 0.58),
+      robe: i % 5,
+      wrap: r() < 0.6,
+      // an arm belongs to a FIGURE, never to the gap between two (see armPts)
+      arms: raisedArms && i % 2 === 0,
+    })
+  }
+
+  const pts = [[0, 0], [0.004, vLink * 0.85]]
+  const headArc = (cx, hr, vNeck, top) => {
+    const out = []
+    for (let k = 10; k >= 0; k--) {
+      const a = (k / 10) * Math.PI
+      out.push([cx + hr * Math.cos(a), Math.min(top, vNeck + hr * asp * Math.sin(a))])
+    }
+    return out
+  }
+  /**
+   * ONE RAISED ARM, rising from a figure's OWN shoulder. The first cut of this
+   * rank emitted a single spike at the boundary `ub` BETWEEN two figures, so it
+   * belonged to neither and read as a tent pole or a pennant on a stick — a
+   * surge of eight people carrying four flags. An arm has to start on a
+   * shoulder, inside its owner's cell, which also means the cell's robe rect
+   * fills it as a sleeve for free. Returned in left-to-right traversal order so
+   * it splices straight into the silhouette: up the near edge, across the fist
+   * plateau, down the far edge.
+   */
+  const armPts = (f, sgn) => {
+    const armW = f.shHalf * 0.34
+    const cxA = f.cx + sgn * f.shHalf * 0.66 // arm root, outboard of the head
+    const lean = sgn * f.shHalf * 0.28 // hands thrown outward, not straight up
+    const vTop = Math.min(0.96, f.vSh + 0.34) // fists clear every crown
+    const xL = cxA - armW / 2
+    const xR = cxA + armW / 2
+    const tL = cxA + lean - armW * 0.42
+    const tR = cxA + lean + armW * 0.42
+    return [
+      [xL, f.vSh + 0.05],
+      [tL, vTop - 0.06],
+      [tL + armW * 0.12, vTop],
+      [tR - armW * 0.12, vTop],
+      [tR, vTop - 0.06],
+      [xR, f.vSh + 0.05],
+    ]
+  }
+
+  figs.forEach((f, i) => {
+    pts.push([f.cx - f.shHalf, f.vSh])
+    if (f.arms) pts.push(...armPts(f, -1))
+    if (i === childAt) {
+      // the child on shoulders: parent head low, child body + head above
+      pts.push(...headArc(f.cx, f.headR, f.vSh + 0.08, 0.8))
+      pts.push([f.cx - f.headR * 0.75, 0.74], [f.cx - f.headR * 0.7, 0.8])
+      pts.push(...headArc(f.cx, f.headR * 0.72, 0.82, 0.995))
+      pts.push([f.cx + f.headR * 0.7, 0.8], [f.cx + f.headR * 0.75, 0.74])
+    } else if (i === basketAt) {
+      // basket carried on the head: a flat-topped crown
+      pts.push(...headArc(f.cx, f.headR, f.vSh + 0.06, 0.78).slice(0, 4))
+      pts.push([f.cx - f.headR * 1.4, 0.8], [f.cx - f.headR * 1.25, 0.97], [f.cx + f.headR * 1.25, 0.97], [f.cx + f.headR * 1.4, 0.8])
+      pts.push(...headArc(f.cx, f.headR, f.vSh + 0.06, 0.78).slice(-4))
+    } else {
+      const crown = view === 'back' ? rr(r, 0.86, 0.94) : rr(r, 0.88, 0.97)
+      pts.push(...headArc(f.cx, f.headR, f.vSh + 0.07, crown))
+    }
+    if (f.arms) pts.push(...armPts(f, 1))
+    pts.push([f.cx + f.shHalf, f.vSh])
+    // Between figures the contour ALWAYS dips to the shared link — that dip is
+    // what makes the rank one piece of cut paper (T-LINKED-RANK). The old
+    // boundary-arm branch skipped it wherever an arm went up, so those pairs
+    // were joined by a spike rather than linked at the hem.
+    if (i + 1 < count) pts.push([u0 + span * (i + 1), vLink])
+  })
+  pts.push([0.996, vLink * 0.85], [1, 0])
+  const outline = simplifyOutline(pts)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  const robes = [BAZ.terra, BAZ.teal, BAZ.saffron, BAZ.rose, BAZ.tealDim]
+  const wraps = [BAZ.cream, BAZ.saffron, BAZ.teal, BAZ.sand, BAZ.terra]
+  let g = `<g clip-path="url(#rankCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.sandDim}"/>`
+  figs.forEach((f, i) => {
+    const xb0 = X(f.cx - span / 2)
+    // robe band
+    g += `<rect x="${fx(xb0)}" y="0" width="${fx(X(span) + 1)}" height="${h}" fill="${robes[f.robe]}"/>`
+    // head above the shoulder line: skin + wrap/cap
+    const headTop = Y(Math.min(0.98, f.vSh + 0.07 + f.headR * asp))
+    g += `<rect x="${fx(X(f.cx - f.headR))}" y="${fx(headTop)}" width="${fx(X(f.headR * 2))}" height="${fx(Y(f.vSh) - headTop)}" fill="${BAZ.skin}"/>`
+    if (f.wrap) {
+      g += `<rect x="${fx(X(f.cx - f.headR))}" y="${fx(headTop)}" width="${fx(X(f.headR * 2))}" height="${fx((Y(f.vSh) - headTop) * 0.38)}" fill="${wraps[(i + 2) % wraps.length]}"/>`
+    }
+    // shoulders/collar
+    g += `<path d="M ${fx(X(f.cx - f.shHalf))} ${fx(Y(f.vSh))} Q ${fx(X(f.cx))} ${fx(Y(f.vSh + 0.1))} ${fx(X(f.cx + f.shHalf))} ${fx(Y(f.vSh))} L ${fx(X(f.cx + f.shHalf))} ${fx(Y(f.vSh - 0.06))} L ${fx(X(f.cx - f.shHalf))} ${fx(Y(f.vSh - 0.06))} Z" fill="${robes[f.robe]}"/>`
+    // sash + hem
+    g += `<line x1="${fx(xb0 + 2)}" y1="${fx(Y(0.26))}" x2="${fx(xb0 + X(span) - 2)}" y2="${fx(Y(0.24))}" stroke="${wraps[(i + 1) % wraps.length]}" stroke-width="${fx(Math.max(2, h * 0.045))}" opacity="0.9"/>`
+    g += `<line x1="${fx(xb0 + 2)}" y1="${fx(Y(0.06))}" x2="${fx(xb0 + X(span) - 2)}" y2="${fx(Y(0.06))}" stroke="${BAZ.cream}" stroke-width="${fx(Math.max(1.6, h * 0.03))}" opacity="0.8"/>`
+    if (view === 'back') {
+      // back seam
+      g += `<line x1="${fx(X(f.cx))}" y1="${fx(Y(f.vSh - 0.04))}" x2="${fx(X(f.cx))}" y2="${fx(Y(0.08))}" stroke="${INK}" stroke-width="1.4" opacity="0.35"/>`
+    } else {
+      // face: two ink eyes + a beard on every third
+      g += `<circle cx="${fx(X(f.cx - f.headR * 0.35))}" cy="${fx(Y(f.vSh + 0.12))}" r="1.6" fill="${INK}"/>`
+      g += `<circle cx="${fx(X(f.cx + f.headR * 0.35))}" cy="${fx(Y(f.vSh + 0.12))}" r="1.6" fill="${INK}"/>`
+      if (i % 3 === 2) g += `<path d="M ${fx(X(f.cx - f.headR * 0.5))} ${fx(Y(f.vSh + 0.06))} Q ${fx(X(f.cx))} ${fx(Y(f.vSh - 0.04))} ${fx(X(f.cx + f.headR * 0.5))} ${fx(Y(f.vSh + 0.06))}" fill="${INK}" opacity="0.75"/>`
+    }
+    if (i === childAt) {
+      // the child reads as its own small robe + skin above the parent
+      g += `<rect x="${fx(X(f.cx - f.headR * 0.75))}" y="${fx(Y(0.82))}" width="${fx(X(f.headR * 1.5))}" height="${fx(Y(0.7) - Y(0.82))}" fill="${robes[(f.robe + 2) % robes.length]}"/>`
+      g += `<rect x="${fx(X(f.cx - f.headR * 0.72))}" y="${fx(Y(0.99))}" width="${fx(X(f.headR * 1.44))}" height="${fx(Y(0.82) - Y(0.99))}" fill="${BAZ.skin}"/>`
+    }
+    if (i === basketAt) {
+      const bx = X(f.cx - f.headR * 1.3)
+      const by = Y(0.97)
+      g += `<rect x="${fx(bx)}" y="${fx(by)}" width="${fx(X(f.headR * 2.6))}" height="${fx(Y(0.8) - by)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.6"/>`
+      for (let wv = 1; wv < 4; wv++) g += `<line x1="${fx(bx)}" y1="${fx(by + wv * 4)}" x2="${fx(bx + X(f.headR * 2.6))}" y2="${fx(by + wv * 4)}" stroke="${INK}" stroke-width="1" opacity="0.4"/>`
+    }
+  })
+  g += `<rect width="${w}" height="${h}" fill="url(#rankShade)"/>`
+  g += `</g>`
+
+  const defs =
+    `<clipPath id="rankCut"><path d="${d}"/></clipPath>` +
+    `<linearGradient id="rankShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.12"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.28"/></linearGradient>`
+
+  return svgPiece(w, h, g + rimPath(d, 4), defs)
+}
+
+/** THE TEA CORNER (ch5-tea): the tea master kneeling at his brazier, one
+ *  die-cut steam curl rising — the intimate counterweight at the right apron. */
+function bazTeaCorner(w, h, seed) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+
+  // steam curl centreline (quad beziers), sampled with a tapering half-width
+  const curl = (t) => {
+    const uu = 0.68 + 0.14 * Math.sin(t * Math.PI * 2.2 + 0.4) * (1 - t * 0.4)
+    return [uu, 0.4 + t * 0.58]
+  }
+  const steamL = []
+  const steamR = []
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16
+    const [uu, vv] = curl(t)
+    const hw = lerp(0.055, 0.018, t)
+    steamL.push([uu - hw, vv])
+    steamR.push([uu + hw, vv])
+  }
+  const pts = [
+    [0, 0],
+    [0.02, 0.1], // rug edge
+    [0.06, 0.12], [0.09, 0.32], [0.14, 0.46], // kneeling back
+    // A SHOULDER LEDGE and a NECK. Without them the back ran in one unbroken
+    // diagonal from hem to cap and the whole master silhouetted as a cone with a
+    // spike on top — a chess bishop, or the minaret in miniature. A person reads
+    // as a person because the outline STEPS at the shoulder and pinches at the
+    // neck before the head; the cap is then a dome, never a point.
+    [0.19, 0.545], [0.265, 0.578], // the ledge
+    [0.285, 0.6], // neck
+    [0.288, 0.655], // left cheek
+    [0.272, 0.685], [0.285, 0.745], [0.345, 0.778], [0.405, 0.745], [0.418, 0.685], // turban dome
+    [0.402, 0.655], // right cheek
+    [0.405, 0.6], // neck, other side
+    [0.44, 0.56], [0.5, 0.46], // pouring arm down toward the pot
+    [0.56, 0.36], [0.58, 0.42], // kettle spout meets steam base
+  ]
+  // brazier + steam: walk up the right side of the curl, over the top, down the left
+  pts.push([0.6, 0.3], [0.86, 0.3], [0.84, 0.4], [0.74, 0.44]) // brazier bowl rim
+  for (const [a, b] of steamR) pts.push([a, b])
+  const tip = curl(1)
+  pts.push([tip[0], Math.min(0.995, tip[1] + 0.03)])
+  for (let i = steamL.length - 1; i >= 0; i--) pts.push(steamL[i])
+  pts.push([0.62, 0.42], [0.6, 0.44], [0.56, 0.3], [0.6, 0.28])
+  pts.push([0.9, 0.26], [0.94, 0.1], [0.98, 0.08], [1, 0])
+  const outline = simplifyOutline(pts)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  let g = `<g clip-path="url(#teaCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.teal}"/>`
+  // rug base band
+  g += `<rect y="${fx(Y(0.1))}" width="${w}" height="${fx(Y(0) - Y(0.1))}" fill="${BAZ.terra}"/>`
+  for (let i = 0; i < 7; i++) g += `<rect x="${fx((i / 7) * w)}" y="${fx(Y(0.1))}" width="${fx(w / 14)}" height="${fx(Y(0) - Y(0.1))}" fill="${BAZ.cream}" opacity="0.7"/>`
+  // the master: teal robe (ground), saffron sash, skin head + white cap —
+  // the skin fills the head bump itself (v 0.6..0.74), cap above it
+  // (eye-test fix: the first bake painted the skin at neck level).
+  // skin fills the FACE band between neck and turban brim; the turban is a
+  // cream dome sat on top of it (both keyed to the new head contour above)
+  g += `<rect x="${fx(X(0.283))}" y="${fx(Y(0.69))}" width="${fx(X(0.124))}" height="${fx(Y(0.6) - Y(0.69))}" fill="${BAZ.skin}"/>`
+  g += `<circle cx="${fx(X(0.325))}" cy="${fx(Y(0.645))}" r="1.8" fill="${INK}"/>`
+  g += `<path d="M ${fx(X(0.272))} ${fx(Y(0.685))} Q ${fx(X(0.345))} ${fx(Y(0.83))} ${fx(X(0.418))} ${fx(Y(0.685))} Z" fill="${BAZ.cream}"/>`
+  g += `<path d="M ${fx(X(0.272))} ${fx(Y(0.688))} Q ${fx(X(0.345))} ${fx(Y(0.72))} ${fx(X(0.418))} ${fx(Y(0.688))}" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.4"/>` // brim
+  // the shoulder the ledge just carved, given a collar so it reads as cloth
+  g += `<path d="M ${fx(X(0.14))} ${fx(Y(0.46))} Q ${fx(X(0.23))} ${fx(Y(0.6))} ${fx(X(0.285))} ${fx(Y(0.6))}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.32"/>`
+  g += `<path d="M ${fx(X(0.1))} ${fx(Y(0.2))} Q ${fx(X(0.3))} ${fx(Y(0.4))} ${fx(X(0.52))} ${fx(Y(0.42))}" fill="none" stroke="${BAZ.saffron}" stroke-width="${fx(Math.max(3, w * 0.03))}" opacity="0.9"/>`
+  // kettle in the pouring hand
+  g += `<ellipse cx="${fx(X(0.55))}" cy="${fx(Y(0.36))}" rx="${fx(w * 0.05)}" ry="${fx(h * 0.04)}" fill="${INK}" opacity="0.85"/>`
+  g += `<path d="M ${fx(X(0.58))} ${fx(Y(0.38))} L ${fx(X(0.62))} ${fx(Y(0.42))}" stroke="${INK}" stroke-width="2.4" opacity="0.85"/>`
+  // brazier: bowl + coals + tripod
+  g += `<path d="M ${fx(X(0.6))} ${fx(Y(0.3))} L ${fx(X(0.86))} ${fx(Y(0.3))} L ${fx(X(0.8))} ${fx(Y(0.16))} L ${fx(X(0.66))} ${fx(Y(0.16))} Z" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
+  for (const cu of [0.66, 0.72, 0.78]) g += `<circle cx="${fx(X(cu))}" cy="${fx(Y(0.3))}" r="${fx(w * 0.02)}" fill="${BAZ.saffronLit}"/>`
+  g += `<line x1="${fx(X(0.64))}" y1="${fx(Y(0.16))}" x2="${fx(X(0.6))}" y2="${fx(Y(0.06))}" stroke="${INK}" stroke-width="2.2" opacity="0.75"/>`
+  g += `<line x1="${fx(X(0.82))}" y1="${fx(Y(0.16))}" x2="${fx(X(0.86))}" y2="${fx(Y(0.06))}" stroke="${INK}" stroke-width="2.2" opacity="0.75"/>`
+  // steam: cream, translucent toward the tip
+  g += `<path d="${'M ' + steamL.map(([a, b]) => `${fx(X(a))} ${fx(Y(b))}`).join(' L ') + ' L ' + [...steamR].reverse().map(([a, b]) => `${fx(X(a))} ${fx(Y(b))}`).join(' L ')} Z" fill="${BAZ.cream}" opacity="0.9"/>`
+  g += `<rect width="${w}" height="${h}" fill="url(#teaShade)"/>`
+  g += `</g>`
+
+  const defs =
+    `<clipPath id="teaCut"><path d="${d}"/></clipPath>` +
+    `<linearGradient id="teaShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.24"/></linearGradient>`
+
+  return svgPiece(w, h, g + rimPath(d, 4), defs)
+}
+
+/** WHEELING PIGEONS (ch5-pigeon-a/b): a soaring cut-paper bird — raised near
+ *  wing, dropped far wing, fan tail — dove grey with a cream belly. `bank`
+ *  flips the facing so the pair wheels toward each other. */
+function bazPigeon(w, h, seed, bank) {
+  const r = mulberry32(seed)
+  const M = (u) => (bank > 0 ? u : 1 - u)
+  const X = (u) => M(u) * w
+  const Y = (v) => (1 - v) * h
+  const pts = [
+    // fan tail (left), body top, then the RAISED near wing
+    [0.02, 0.46], [0.04, 0.64], [0.14, 0.6], [0.26, 0.6],
+    [0.32, 0.64], [0.38, 0.86], [0.46, 0.98], [0.56, 0.96], [0.6, 0.86], // wing blade up
+    [0.52, 0.72], [0.48, 0.62], // trailing edge back to the shoulder
+    [0.62, 0.62], [0.7, 0.66], [0.78, 0.66], [0.84, 0.6], // neck + head crown
+    [0.97, 0.52], [0.85, 0.46], // beak
+    [0.78, 0.38], [0.64, 0.32], // throat -> belly
+    [0.56, 0.28], [0.5, 0.1], [0.42, 0.02], [0.36, 0.08], [0.42, 0.28], // dropped far wing
+    [0.28, 0.3], [0.12, 0.34], [0.02, 0.38],
+  ]
+  const mapped = pts.map(([u, v]) => [M(u), v])
+  if (bank < 0) mapped.reverse()
+  const outline = simplifyOutline(mapped)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(u * w)} ${fx(Y(v))}`).join(' ') + ' Z'
+  let g = `<g clip-path="url(#pigeonCut)">`
+  g += `<rect width="${w}" height="${h}" fill="#b3a49c"/>`
+  // cream belly + throat
+  g += `<path d="M ${fx(X(0.02))} ${fx(Y(0.38))} Q ${fx(X(0.45))} ${fx(Y(0.5))} ${fx(X(0.85))} ${fx(Y(0.46))} L ${fx(X(0.8))} ${fx(Y(0.3))} L ${fx(X(0.05))} ${fx(Y(0.24))} Z" fill="${BAZ.cream}" opacity="0.9"/>`
+  // raised wing: lighter blade + ink flight feathers
+  g += `<path d="M ${fx(X(0.32))} ${fx(Y(0.64))} L ${fx(X(0.46))} ${fx(Y(0.98))} L ${fx(X(0.56))} ${fx(Y(0.96))} L ${fx(X(0.48))} ${fx(Y(0.62))} Z" fill="#c7bab2" opacity="0.9"/>`
+  for (const [ua, va, ub, vb] of [[0.38, 0.84, 0.46, 0.66], [0.44, 0.92, 0.5, 0.68], [0.52, 0.92, 0.5, 0.66]]) {
+    g += `<line x1="${fx(X(ua))}" y1="${fx(Y(va))}" x2="${fx(X(ub))}" y2="${fx(Y(vb))}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+  }
+  // dropped wing shading + tail bars
+  g += `<path d="M ${fx(X(0.56))} ${fx(Y(0.28))} L ${fx(X(0.5))} ${fx(Y(0.1))} L ${fx(X(0.42))} ${fx(Y(0.02))} L ${fx(X(0.42))} ${fx(Y(0.28))} Z" fill="#8d7d76"/>`
+  g += `<line x1="${fx(X(0.04))}" y1="${fx(Y(0.56))}" x2="${fx(X(0.13))}" y2="${fx(Y(0.5))}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
+  g += `<line x1="${fx(X(0.04))}" y1="${fx(Y(0.48))}" x2="${fx(X(0.13))}" y2="${fx(Y(0.44))}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
+  // head: eye + saffron beak + a teal collar glint (city pigeon)
+  g += `<circle cx="${fx(X(0.79))}" cy="${fx(Y(0.56))}" r="${fx(Math.max(1.7, w * 0.013))}" fill="${INK}"/>`
+  g += `<path d="M ${fx(X(0.86))} ${fx(Y(0.54))} L ${fx(X(0.97))} ${fx(Y(0.52))} L ${fx(X(0.86))} ${fx(Y(0.47))} Z" fill="${BAZ.saffron}"/>`
+  g += `<path d="M ${fx(X(0.66))} ${fx(Y(0.58))} Q ${fx(X(0.7))} ${fx(Y(0.5))} ${fx(X(0.66))} ${fx(Y(0.42))}" fill="none" stroke="${BAZ.teal}" stroke-width="2.2" opacity="${fx(rr(r, 0.5, 0.7))}"/>`
+  g += `</g>`
+  const defs = `<clipPath id="pigeonCut"><path d="${d}"/></clipPath>`
+  return svgPiece(w, h, g + rimPath(d, 3))
+}
+
+/** THE RAISE-A-STALL FACE (ch5-raise-stall-face): the retained tabpiece
+ *  re-themed into the chapter's meaning. UNFOLD bands (v-up): legIn 0..0.32 =
+ *  carved stall posts + a leaning master-pattern stone, deck 0.32..0.68 = the
+ *  striped awning mid-raise carrying the woodcut ⟡ RAISE A STALL ⟡ cartouche,
+ *  legOut 0.68..1 = posts again with the pattern-glyph row toward the tab. */
+function bazRaiseStallFace(w, h, seed) {
+  const r = mulberry32(seed)
+  const Y = (v) => (1 - v) * h
+  const WOODB = '#6b4a26'
+  const WOODB_LIT = '#9a7038'
+  let s = `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
+
+  const legBand = (v0, v1, glyphRow) => {
+    let out = ''
+    const y0 = Y(v1)
+    const bh = Y(v0) - Y(v1)
+    // two carved posts + cross-brace
+    for (const ux of [0.18, 0.74]) {
+      out += `<rect x="${fx(ux * w)}" y="${fx(y0)}" width="${fx(w * 0.09)}" height="${fx(bh)}" fill="${WOODB}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>`
+      out += `<rect x="${fx(ux * w + 2)}" y="${fx(y0)}" width="${fx(w * 0.02)}" height="${fx(bh)}" fill="${WOODB_LIT}" opacity="0.7"/>`
+      for (let c = 0; c < 5; c++) {
+        const cy = y0 + bh * (0.14 + c * 0.18)
+        out += `<path d="M ${fx(ux * w + w * 0.02)} ${fx(cy)} L ${fx(ux * w + w * 0.045)} ${fx(cy - 6)} L ${fx(ux * w + w * 0.07)} ${fx(cy)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.6" opacity="0.75"/>`
+      }
+    }
+    out += `<line x1="${fx(w * 0.27)}" y1="${fx(y0 + bh * 0.85)}" x2="${fx(w * 0.74)}" y2="${fx(y0 + bh * 0.15)}" stroke="${WOODB}" stroke-width="7" opacity="0.9"/>`
+    out += `<line x1="${fx(w * 0.27)}" y1="${fx(y0 + bh * 0.15)}" x2="${fx(w * 0.74)}" y2="${fx(y0 + bh * 0.85)}" stroke="${WOODB}" stroke-width="7" opacity="0.9"/>`
+    // the leaning master-pattern stone between the posts
+    const sx = w * 0.38
+    const sy = y0 + bh * 0.42
+    out += `<g transform="rotate(-8 ${fx(sx)} ${fx(sy)})">` +
+      `<rect x="${fx(sx)}" y="${fx(sy)}" width="${fx(w * 0.24)}" height="${fx(bh * 0.42)}" rx="6" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.6"/>`
+    for (let gk = 0; gk < 3; gk++) {
+      const gx = sx + w * 0.045 + gk * w * 0.065
+      out += `<path d="M ${fx(gx)} ${fx(sy + bh * 0.21)} l 8 -8 l 8 8 l -8 8 Z" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.7"/>`
+    }
+    out += `</g>`
+    if (glyphRow) {
+      for (let gk = 0; gk < 5; gk++) {
+        const gx = w * (0.2 + gk * 0.14)
+        out += `<path d="M ${fx(gx)} ${fx(y0 + bh * 0.06)} l 7 -7 l 7 7 l -7 7 Z" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.55"/>`
+      }
+    }
+    return out
+  }
+
+  s += legBand(0, 0.32, false)
+  s += legBand(0.68, 1, true)
+
+  // THE DECK: striped awning mid-raise + the woodcut cartouche
+  const dy0 = Y(0.68)
+  const dh = Y(0.32) - Y(0.68)
+  const nst = 12
+  for (let i = 0; i < nst; i++) {
+    s += `<rect x="${fx((i / nst) * w)}" y="${fx(dy0)}" width="${fx(w / nst + 0.5)}" height="${fx(dh)}" fill="${i % 2 ? BAZ.cream : BAZ.teal}"/>`
+  }
+  // scallop rules at both band seams
+  for (const by of [dy0, dy0 + dh]) {
+    for (let i = 0; i < nst; i++) {
+      const cx = ((i + 0.5) / nst) * w
+      s += `<path d="M ${fx(cx - w / nst / 2)} ${fx(by)} A ${fx(w / nst / 2)} ${fx(w * 0.03)} 0 0 0 ${fx(cx + w / nst / 2)} ${fx(by)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.4"/>`
+    }
+  }
+  // the woodcut cartouche: walnut plate, cream field, engraved legend
+  const cw2 = w * 0.86
+  const chh = dh * 0.34
+  const cx0 = (w - cw2) / 2
+  const cy0 = dy0 + dh / 2 - chh / 2
+  s += `<rect x="${fx(cx0)}" y="${fx(cy0)}" width="${fx(cw2)}" height="${fx(chh)}" rx="10" fill="${INK}" opacity="0.92"/>`
+  s += `<rect x="${fx(cx0 + 5)}" y="${fx(cy0 + 5)}" width="${fx(cw2 - 10)}" height="${fx(chh - 10)}" rx="7" fill="${BAZ.cream}"/>`
+  s += `<rect x="${fx(cx0 + 11)}" y="${fx(cy0 + 11)}" width="${fx(cw2 - 22)}" height="${fx(chh - 22)}" rx="5" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
+  // ⟡ RAISE A STALL ⟡ — 12 glyph cells + flanking lozenges
+  const word = 'RAISE A STALL'
+  const cells = word.length
+  const gw = (cw2 - 96) / cells
+  const gh = chh * 0.34
+  const gy = cy0 + chh / 2 - gh / 2
+  s += engraveWord(word, cx0 + 48, gy, gw * 0.72, gh, gw * 0.28, INK, 3.4)
+  for (const lx of [cx0 + 24, cx0 + cw2 - 24]) {
+    s += `<path d="M ${fx(lx)} ${fx(cy0 + chh / 2 - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="none" stroke="${INK}" stroke-width="2.4"/>`
+    s += `<circle cx="${fx(lx)}" cy="${fx(cy0 + chh / 2)}" r="2.4" fill="${INK}"/>`
+  }
+  void r
+  return svgPiece(w, h, s)
+}
+
+/**
+ * THE DOODLED MARKET FLOOR (page-6, both pages in one image — same uv law as
+ * page-4): cart ruts leading in from the apron between the treads, spice spills,
+ * price tags, a cat's footprints sneaking to the fish stall, the tea rug under
+ * `ch5-tea` — walnut ink on parchment, Vegas-ref doodle density.
+ *
+ * THE BOLD PASS, and why the first one read as a whisper. Measured off the
+ * previous bake: mean luma 192, 0.45% of pixels below luma 150 and NOT ONE pixel
+ * below 110 — on a page whose ink is supposed to be walnut #3b2a1a (luma 46).
+ * Two compounding causes, both fixed here:
+ *   1. the wrong pigment — it drew in #5c4526, the s4 yard print's softer
+ *      walnut, which is a mid-tone on parchment before any alpha is applied;
+ *   2. then put it at opacity 0.22-0.5, so nothing landed within reach of the
+ *      one element that DID read, the tea rug's terracotta.
+ * So: house INK at 0.5-0.9, and a real VALUE STEP — a terracotta dust field over
+ * the sunken bowl — so the standing pieces have a floor to sit on instead of
+ * hovering over blank parchment. The tea rug is left exactly as it was and used
+ * as the calibration reference; everything else is brought up to meet it.
+ *
+ * Two READS were wrong too, not just the values, and no amount of contrast would
+ * have fixed them: twin lines with regular cross-ties are a RAILWAY, so the ruts
+ * are now tapered scuffed bands with chatter marks ALONG them and never across;
+ * and uniform hairline dashes marching the full width are a ruled timetable, so
+ * the market lanes are now painted bands carrying dense cobble courses.
+ */
+function bazaarFloorSpread(w, h, seed) {
+  const r = mulberry32(seed)
+  const PX = (f) => f * w
+  const PY = (f) => f * h
+  // House walnut (#3b2a1a) for ALL linework — the chapter law. DUST is the
+  // field wash under the bowl; SCUFF the softer walnut for secondary marks.
+  const SCUFF = '#5c4526'
+
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${ROOK.parch}"/>`
+  for (let i = 0; i < 170; i++) {
+    const y = rr(r, 0, h)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${SCUFF}" stroke-width="1" opacity="${fx(rr(r, 0.03, 0.07))}"/>`
+  }
+
+  // ---- THE VALUE STEP: trodden terracotta dust over the sunken market bowl,
+  // darkest along the lane the crowd walks. This is what makes the floor a
+  // FLOOR at the pinned camera; the doodles then sit on a field, not on blank
+  // paper. Kept off the far quarter so the recession still reads.
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.16)))}" rx="${fx(PX(0.52))}" ry="${fx(PY(0.3))}" fill="url(#bazDust6)"/>`
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.3)))}" rx="${fx(PX(0.36))}" ry="${fx(PY(0.14))}" fill="${BAZ.terraDim}" opacity="0.13"/>`
+  s += `<rect width="${w}" height="${fx(h * 0.26)}" fill="url(#bazHaze6)"/>`
+
+  // ---- THE MARKET LANES (was: hairline dashed arcs reading as a timetable).
+  // FOUR stations, not six — six horizontal bands striped the whole page. Each
+  // is a SOLID PAINTED BAND of trodden rose, and the ink inside it is a field of
+  // individual COBBLE STONES, never a stroke laid along the arc: anything drawn
+  // along the arc direction at this scale re-forms into a dashed line and the
+  // timetable read comes straight back (that is what the first bold attempt got
+  // wrong, louder than the faint one). Small jittered ellipses cannot line up.
+  const lanes = [
+    [-0.34, 0.034, 104, 0.48],
+    [-0.12, 0.042, 124, 0.56],
+    [0.1, 0.05, 148, 0.64],
+    [0.34, 0.058, 172, 0.72],
+  ]
+  for (const [z, band, stones, op] of lanes) {
+    const fy = pageFY(z)
+    const rise = 0.085 - (z + 0.75) * 0.04
+    const yAt = (t) => {
+      const mt = 1 - t
+      return mt * mt * (fy - rise * 0.5) + 2 * mt * t * (fy + rise) + t * t * (fy - rise * 0.5)
+    }
+    // the lane's own width breathes along its length, so the band reads as a
+    // trodden arc rather than a ruled stripe of constant gauge
+    const bandAt = (t) => band * (0.72 + 0.42 * Math.sin(t * 6.4 + z * 9))
+    let bandD = `M 0 ${fx(PY(yAt(0) - bandAt(0) * 0.5))}`
+    for (let i = 1; i <= 32; i++) bandD += ` L ${fx(PX(i / 32))} ${fx(PY(yAt(i / 32) - bandAt(i / 32) * 0.5))}`
+    for (let i = 32; i >= 0; i--) bandD += ` L ${fx(PX(i / 32))} ${fx(PY(yAt(i / 32) + bandAt(i / 32) * 0.5))}`
+    s += `<path d="${bandD} Z" fill="${BAZ.rose}" opacity="${fx(0.12 + op * 0.2)}"/>`
+    s += `<path d="${bandD} Z" fill="url(#bazLane6)"/>`
+    // The cobbles: SETTS, not circles. Rounded quads at scattered angles pack
+    // and interlock the way laid stone does; outlined ellipses of one size read
+    // as bubbles floating over the band, which is what the previous attempt
+    // did. Density is CLUMPED (paving survives in patches) and fades on the same
+    // profile as the band itself, so no stray stones litter the page edges.
+    for (let i = 0; i < stones; i++) {
+      const t = (i + rr(r, 0.1, 0.9)) / stones
+      const edge = Math.min(1, Math.min(t, 1 - t) / 0.2) // matches #bazLane6
+      if (edge <= 0.02) continue
+      // clumping: a slow wave gates the density, so the lane has bald patches
+      if (rr(r, 0, 1) > (0.5 + 0.5 * Math.abs(Math.sin(t * 9.3 + z * 5))) * edge) continue
+      const yo = rr(r, -0.44, 0.44) * bandAt(t)
+      const sx = rr(r, 6, 14)
+      const sy = sx * rr(r, 0.52, 0.8)
+      const cx = PX(t)
+      const cy = PY(yAt(t) + yo)
+      const o = op * edge
+      s += `<rect x="${fx(cx - sx / 2)}" y="${fx(cy - sy / 2)}" width="${fx(sx)}" height="${fx(sy)}" rx="${fx(sy * 0.34)}" transform="rotate(${fx(rr(r, -26, 26))} ${fx(cx)} ${fx(cy)})" fill="${INK}" fill-opacity="${fx(o * rr(r, 0.14, 0.34))}" stroke="${INK}" stroke-width="${fx(rr(r, 2, 2.9))}" stroke-opacity="${fx(o * rr(r, 0.62, 1))}"/>`
+    }
+  }
+  s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#bazGutter6)"/>`
+
+  // ---- CART RUTS (was: twin rails + regular cross-ties = a railway; then two
+  // continuous tapered bands = a tram line). What separates a rut from a rail is
+  // that a rut is BROKEN and WANDERS: it survives in patches where the ground is
+  // soft, the pair converges and parts as the axle tracks, and it never holds a
+  // constant gauge. So each rut ships as 5-7 arcs with gaps, its offset wandering
+  // on a sine, over a broad dust smear. TWO routes, not three — three pairs of
+  // long diagonals were reading as a junction. Bones kept: in from the apron,
+  // threading the tread gap (z ~0.30-0.34) toward the arc doors.
+  const tracks = [
+    [[0.9, 1.0], [0.74, 0.86], [0.6, 0.7], [0.55, 0.52]],
+    [[0.14, 1.0], [0.24, 0.84], [0.34, 0.66], [0.43, 0.47]],
+  ]
+  tracks.forEach((CTRL, ti) => {
+    const bez = (t) => {
+      const mt = 1 - t
+      return [0, 1].map((k) => mt * mt * mt * CTRL[0][k] + 3 * mt * mt * t * CTRL[1][k] + 3 * mt * t * t * CTRL[2][k] + t * t * t * CTRL[3][k])
+    }
+    // the dust the wheels threw, under everything
+    let smear = ''
+    for (let i = 0; i <= 26; i++) {
+      const [bx, by] = bez(i / 26)
+      smear += `${i ? 'L' : 'M'}${fx(PX(bx))} ${fx(PY(by))} `
+    }
+    s += `<path d="${smear.trim()}" fill="none" stroke="${BAZ.terraDim}" stroke-width="${fx(w * 0.032)}" opacity="0.15" stroke-linecap="round"/>`
+    for (const side of [-1, 1]) {
+      // gauge wanders: the pair converges and parts the way a real axle tracks
+      const off = (t) => side * (0.0062 + 0.0028 * Math.sin(t * 5.1 + ti * 2.2))
+      // 5-7 patches with gaps — the rut survives only where the ground is soft
+      const segs = 5 + ((ti + (side > 0 ? 1 : 0)) % 3)
+      for (let sg = 0; sg < segs; sg++) {
+        const t0 = sg / segs + rr(r, 0.01, 0.05)
+        const t1 = Math.min(1, (sg + 1) / segs - rr(r, 0.02, 0.07))
+        if (t1 <= t0) continue
+        const steps = 7
+        let up = ''
+        let dn = ''
+        for (let i = 0; i <= steps; i++) {
+          const t = lerp(t0, t1, i / steps)
+          const [bx, by] = bez(t)
+          const hw = lerp(0.0014, 0.0040, t) * rr(r, 0.85, 1.15)
+          up += `${i ? 'L' : 'M'}${fx(PX(bx + off(t) - hw))} ${fx(PY(by))} `
+          dn = `L${fx(PX(bx + off(t) + hw))} ${fx(PY(by))} ` + dn
+        }
+        s += `<path d="${(up + dn).trim()} Z" fill="${INK}" opacity="${fx(rr(r, 0.5, 0.68))}"/>`
+      }
+      // a few loose scuffs alongside, where a wheel skidded off the rut
+      for (let i = 0; i < 7; i++) {
+        const t = rr(r, 0.05, 0.95)
+        const [bx, by] = bez(t)
+        const [nx, ny] = bez(Math.min(1, t + rr(r, 0.03, 0.06)))
+        const j = rr(r, -0.008, 0.008)
+        s += `<line x1="${fx(PX(bx + off(t) + j))}" y1="${fx(PY(by))}" x2="${fx(PX(nx + off(t) + j))}" y2="${fx(PY(ny))}" stroke="${INK}" stroke-width="${fx(rr(r, 1.6, 2.4))}" opacity="${fx(rr(r, 0.28, 0.46))}" stroke-linecap="round"/>`
+      }
+    }
+  })
+
+  // ---- SPICE SPILLS: fewer, BIGGER, saturated — a drift with a dense speckle
+  // halo, plus one tipped sack outlined in ink so the spill has a culprit.
+  for (let i = 0; i < 10; i++) {
+    const cx = PX(rr(r, 0.08, 0.92))
+    const cy = PY(pageFY(rr(r, 0.05, 0.62)))
+    const col = i % 2 ? BAZ.saffron : BAZ.terra
+    const rx = rr(r, 22, 46)
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx)}" ry="${fx(rx * rr(r, 0.4, 0.56))}" fill="${col}" opacity="0.62"/>`
+    s += `<ellipse cx="${fx(cx - rx * 0.2)}" cy="${fx(cy - rx * 0.12)}" rx="${fx(rx * 0.5)}" ry="${fx(rx * 0.24)}" fill="${col}" opacity="0.5"/>`
+    for (let k = 0; k < 30; k++) {
+      const a = rr(r, 0, Math.PI * 2)
+      const rad = rx * rr(r, 1.02, 1.9)
+      s += `<circle cx="${fx(cx + Math.cos(a) * rad)}" cy="${fx(cy + Math.sin(a) * rad * 0.5)}" r="${fx(rr(r, 1.6, 4))}" fill="${col}" opacity="${fx(rr(r, 0.5, 0.85))}"/>`
+    }
+    s += `<path d="M ${fx(cx - rx * 0.7)} ${fx(cy + rx * 0.5)} Q ${fx(cx)} ${fx(cy + rx * 0.78)} ${fx(cx + rx * 0.7)} ${fx(cy + rx * 0.5)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.42"/>`
+  }
+  // the tipped sack the saffron came out of (left apron, beside the tab lane)
+  {
+    const sx = PX(pageFX(0.78, 'left'))
+    const sy = PY(pageFY(0.52))
+    s += `<path d="M ${fx(sx)} ${fx(sy)} q ${fx(-26)} ${fx(-8)} ${fx(-34)} ${fx(-30)} q ${fx(14)} ${fx(-12)} ${fx(34)} ${fx(-6)} q ${fx(12)} ${fx(16)} 0 ${fx(36)} Z" fill="${BAZ.sandDim}" opacity="0.75" stroke="${INK}" stroke-width="2.8" stroke-opacity="0.72"/>`
+    s += `<path d="M ${fx(sx - 34)} ${fx(sy - 30)} q ${fx(10)} ${fx(-9)} ${fx(20)} ${fx(-4)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.6"/>`
+    s += `<ellipse cx="${fx(sx + 16)}" cy="${fx(sy + 8)}" rx="34" ry="15" fill="${BAZ.saffron}" opacity="0.66"/>`
+  }
+
+  // ---- PRICE TAGS: FOUR, dropped where the stalls actually are (the apron and
+  // tread lanes, not sprinkled over the whole spread), at a legible ~1.8x with a
+  // punched hole, a string and bold chalk tallies. Cream at 0.8 rather than a
+  // hard white: at 6 tags in full contrast they stopped being litter on a floor
+  // and became labels pinned in front of it, competing with the standing pieces.
+  for (let i = 0; i < 4; i++) {
+    const tx = PX(rr(r, 0.1, 0.9))
+    const ty = PY(pageFY(rr(r, 0.3, 0.66)))
+    const tw = 26
+    const th = 38
+    s += `<g transform="rotate(${fx(rr(r, -38, 38))} ${fx(tx)} ${fx(ty)})">`
+    s += `<path d="M ${fx(tx)} ${fx(ty)} L ${fx(tx + tw)} ${fx(ty)} L ${fx(tx + tw)} ${fx(ty + th * 0.78)} L ${fx(tx + tw / 2)} ${fx(ty + th)} L ${fx(tx)} ${fx(ty + th * 0.78)} Z" fill="${BAZ.cream}" opacity="0.8" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.66"/>`
+    s += `<circle cx="${fx(tx + tw / 2)}" cy="${fx(ty + 6)}" r="2.6" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.6"/>`
+    s += `<path d="M ${fx(tx + tw / 2)} ${fx(ty + 6)} q ${fx(rr(r, -10, 10))} ${fx(-12)} ${fx(rr(r, -15, 15))} ${fx(-20)}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.42"/>`
+    const marks = 2 + (i % 3)
+    for (let m = 0; m < marks; m++) {
+      const mx = tx + tw * 0.26 + m * tw * 0.16
+      s += `<line x1="${fx(mx)}" y1="${fx(ty + th * 0.34)}" x2="${fx(mx + 2.4)}" y2="${fx(ty + th * 0.64)}" stroke="${INK}" stroke-width="2.4" opacity="0.68"/>`
+    }
+    s += `</g>`
+  }
+
+  // ---- THE CAT'S FOOTPRINTS: same trail, now at reading weight — a pad and
+  // three toes per print, alternating stride — ending at a FISH STALL that is
+  // actually a stall: a crate, two fish over it, and the bone left behind.
+  const catPath = (t) => {
+    const mt = 1 - t
+    const C = [[0.8, 0.95], [0.66, 0.8], [0.4, 0.72], [0.24, 0.47]]
+    return [0, 1].map((k) => mt * mt * mt * C[0][k] + 3 * mt * mt * t * C[1][k] + 3 * mt * t * t * C[2][k] + t * t * t * C[3][k])
+  }
+  for (let i = 0; i <= 18; i++) {
+    const [bx, by] = catPath(i / 18)
+    const sidep = i % 2 ? 0.007 : -0.007
+    const px2 = PX(bx + sidep)
+    const py2 = PY(by)
+    s += `<g opacity="0.82">`
+    s += `<ellipse cx="${fx(px2)}" cy="${fx(py2)}" rx="4.2" ry="3.4" fill="${INK}"/>`
+    for (let tt = 0; tt < 3; tt++) {
+      s += `<circle cx="${fx(px2 + (tt - 1) * 4.4)}" cy="${fx(py2 - 5.4)}" r="2.1" fill="${INK}"/>`
+    }
+    s += `</g>`
+  }
+  {
+    const fsx = PX(0.2)
+    const fsy = PY(0.44)
+    // the crate
+    s += `<rect x="${fx(fsx - 6)}" y="${fx(fsy + 4)}" width="64" height="30" fill="${BAZ.sandDim}" opacity="0.7" stroke="${INK}" stroke-width="2.8" stroke-opacity="0.78"/>`
+    s += `<line x1="${fx(fsx - 6)}" y1="${fx(fsy + 14)}" x2="${fx(fsx + 58)}" y2="${fx(fsy + 14)}" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
+    // two fish laid over it, and the bone the cat is really after
+    for (const [ox, oy, sc] of [[2, -8, 1], [26, -16, 0.82]]) {
+      const bx = fsx + ox
+      const by = fsy + oy
+      s += `<path d="M ${fx(bx)} ${fx(by)} Q ${fx(bx + 20 * sc)} ${fx(by - 13 * sc)} ${fx(bx + 40 * sc)} ${fx(by)} Q ${fx(bx + 20 * sc)} ${fx(by + 13 * sc)} ${fx(bx)} ${fx(by)} Z" fill="${BAZ.teal}" opacity="0.5" stroke="${INK}" stroke-width="2.6" stroke-opacity="0.8"/>`
+      s += `<path d="M ${fx(bx + 40 * sc)} ${fx(by)} l ${fx(11 * sc)} ${fx(-9 * sc)} l 0 ${fx(18 * sc)} Z" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.8"/>`
+      s += `<circle cx="${fx(bx + 9 * sc)}" cy="${fx(by - 2 * sc)}" r="2.2" fill="${INK}" opacity="0.9"/>`
+    }
+    const bnx = fsx + 12
+    const bny = fsy + 52
+    s += `<g opacity="0.7"><line x1="${fx(bnx - 20)}" y1="${fx(bny)}" x2="${fx(bnx + 20)}" y2="${fx(bny)}" stroke="${INK}" stroke-width="2.8"/>`
+    for (let k = -3; k <= 3; k++) {
+      s += `<line x1="${fx(bnx + k * 5.5)}" y1="${fx(bny - 6)}" x2="${fx(bnx + k * 5.5)}" y2="${fx(bny + 6)}" stroke="${INK}" stroke-width="2.2"/>`
+    }
+    s += `</g>`
+  }
+
+  // ---- THE TEA RUG under ch5-tea (right page, radial 0.50..0.62, z 0.10..0.24).
+  // UNCHANGED from the first pass: it was the one element that read at the
+  // pinned camera, so it is the value everything above was brought up to meet.
+  const rx0 = PX(pageFX(0.48, 'right'))
+  const rx1 = PX(pageFX(0.64, 'right'))
+  const ry0 = PY(pageFY(0.08))
+  const ry1 = PY(pageFY(0.26))
+  s += `<rect x="${fx(rx0)}" y="${fx(ry0)}" width="${fx(rx1 - rx0)}" height="${fx(ry1 - ry0)}" rx="6" fill="${BAZ.terra}" opacity="0.4"/>`
+  s += `<rect x="${fx(rx0 + 5)}" y="${fx(ry0 + 5)}" width="${fx(rx1 - rx0 - 10)}" height="${fx(ry1 - ry0 - 10)}" rx="4" fill="none" stroke="${BAZ.teal}" stroke-width="3" opacity="0.5"/>`
+  for (let f = 0; f <= 8; f++) {
+    const fxp = rx0 + ((rx1 - rx0) * f) / 8
+    s += `<line x1="${fx(fxp)}" y1="${fx(ry0)}" x2="${fx(fxp)}" y2="${fx(ry0 - 4)}" stroke="${INK}" stroke-width="1.8" opacity="0.6"/>`
+    s += `<line x1="${fx(fxp)}" y1="${fx(ry1)}" x2="${fx(fxp)}" y2="${fx(ry1 + 4)}" stroke="${INK}" stroke-width="1.8" opacity="0.6"/>`
+  }
+
+  // ---- THE FOOTFALL. The density the Vegas ref actually gets its richness from
+  // is not props, it is TRAFFIC: clusters of sandal prints tracking across the
+  // floor between the lanes. They also carry most of the page's dark weight,
+  // which is safe to spend here — a footprint cannot be misread as anything
+  // structural, unlike another long line.
+  for (let cl = 0; cl < 9; cl++) {
+    const side = cl % 2 ? 'left' : 'right'
+    const cx0 = PX(pageFX(rr(r, 0.18, 1.02), side))
+    const cy0 = PY(pageFY(rr(r, -0.24, 0.62)))
+    const ang = rr(r, -0.5, 0.5) + (cy0 > h * 0.6 ? -1.3 : -1.7)
+    const stride = rr(r, 15, 23)
+    for (let k = 0; k < 3 + Math.floor(rr(r, 0, 3)); k++) {
+      const fxp = cx0 + Math.cos(ang) * stride * k + (k % 2 ? 7 : -7)
+      const fyp = cy0 + Math.sin(ang) * stride * k * 0.55
+      const rot = (ang * 180) / Math.PI + 90 + rr(r, -14, 14)
+      s += `<g transform="rotate(${fx(rot)} ${fx(fxp)} ${fx(fyp)})" opacity="${fx(rr(r, 0.4, 0.62))}">`
+      s += `<ellipse cx="${fx(fxp)}" cy="${fx(fyp)}" rx="3.4" ry="6.2" fill="${INK}"/>`
+      s += `<ellipse cx="${fx(fxp)}" cy="${fx(fyp + 8)}" rx="2.4" ry="3" fill="${INK}"/>`
+      s += `</g>`
+    }
+  }
+  // baskets and crates set down on the stones — the ring a sack leaves, and a
+  // few corner-on crates so the far lanes have objects, not just texture
+  for (let i = 0; i < 12; i++) {
+    const bx = PX(rr(r, 0.04, 0.96))
+    const by = PY(pageFY(rr(r, -0.44, 0.12)))
+    const rad = rr(r, 10, 22)
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by)}" rx="${fx(rad)}" ry="${fx(rad * 0.42)}" fill="none" stroke="${INK}" stroke-width="2.6" opacity="${fx(rr(r, 0.36, 0.56))}"/>`
+    if (i % 3 === 0) {
+      s += `<ellipse cx="${fx(bx)}" cy="${fx(by)}" rx="${fx(rad * 0.55)}" ry="${fx(rad * 0.24)}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.38"/>`
+    } else if (i % 3 === 1) {
+      const cw2 = rad * 1.5
+      s += `<path d="M ${fx(bx - cw2 / 2)} ${fx(by)} L ${fx(bx + cw2 / 2)} ${fx(by)} L ${fx(bx + cw2 / 2)} ${fx(by - cw2 * 0.4)} L ${fx(bx - cw2 / 2)} ${fx(by - cw2 * 0.4)} Z" fill="${BAZ.sandDim}" fill-opacity="0.5" stroke="${INK}" stroke-width="2.4" opacity="0.5"/>`
+      s += `<line x1="${fx(bx - cw2 / 2)}" y1="${fx(by - cw2 * 0.2)}" x2="${fx(bx + cw2 / 2)}" y2="${fx(by - cw2 * 0.2)}" stroke="${INK}" stroke-width="1.8" opacity="0.4"/>`
+    }
+  }
+  // swept broom fans by the tabpiece station — the one clean patch in the whole
+  // bazaar, somebody's pride
+  for (let i = 0; i < 10; i++) {
+    const ax = PX(pageFX(rr(r, 0.58, 0.98), 'left'))
+    const ay = PY(pageFY(rr(r, 0.3, 0.62)))
+    s += `<path d="M ${fx(ax)} ${fx(ay)} q ${fx(20)} ${fx(rr(r, -12, -5))} ${fx(42)} 0" fill="none" stroke="${SCUFF}" stroke-width="2.4" opacity="${fx(rr(r, 0.38, 0.56))}"/>`
+  }
+
+  s += `<rect width="${w}" height="${h}" fill="url(#bazVig6)"/>`
+  s += `</g>`
+
+  const defs =
+    `<linearGradient id="bazHaze6" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.5"/>` +
+    `<stop offset="1" stop-color="${BAZ.sandLit}" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="bazDust6" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${BAZ.terra}" stop-opacity="0.26"/>` +
+    `<stop offset="0.62" stop-color="${BAZ.rose}" stop-opacity="0.17"/>` +
+    `<stop offset="1" stop-color="${BAZ.rose}" stop-opacity="0"/></radialGradient>` +
+    // the lane bands fade out at both page edges so they read as arcs of a bowl
+    // rather than as full-width rules ruled across the paper
+    `<linearGradient id="bazLane6" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${ROOK.parch}" stop-opacity="0.75"/>` +
+    `<stop offset="0.22" stop-color="${ROOK.parch}" stop-opacity="0"/>` +
+    `<stop offset="0.78" stop-color="${ROOK.parch}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${ROOK.parch}" stop-opacity="0.75"/></linearGradient>` +
+    `<linearGradient id="bazGutter6" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0"/>` +
+    `<stop offset="0.5" stop-color="${INK}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="bazVig6" cx="0.5" cy="0.55" r="0.75">` +
+    `<stop offset="0.5" stop-color="${SCUFF}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${SCUFF}" stop-opacity="0.28"/></radialGradient>`
+
+  return svgPiece(w, h, s, defs)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 // ============================================================================
@@ -6707,15 +7891,37 @@ const PIECES = [
   // (d1-d0):(z1-z0) = 0.52:0.40 ~ 1.30:1; sliced into 6 vertical slat strips.
   { id: 'ch4-dissolve-dunes', seed: 50240, w: 1024, h: 788, grain: 12, paint() { return dissolveDunes(this.w, this.h, this.seed) } },
   { id: 'ch4-dissolve-gold', seed: 50241, w: 1024, h: 788, grain: 12, paint() { return dissolveGold(this.w, this.h, this.seed) } },
-  // ---- Spread 6 — the Bazaar (ch5 stall box, goods, arch dress) ----
-  { id: 'ch5-stall-back', seed: 60201, w: 512, h: 320, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'stall') } },
-  { id: 'ch5-stall-side', seed: 60202, w: 512, h: 349, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'stall') } },
-  { id: 'ch5-stall-top', seed: 60203, w: 512, h: 470, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'stall') } },
-  { id: 'ch5-stall-valance', seed: 60210, w: 640, h: 224, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'valance') } },
-  { id: 'ch5-stall-crates', seed: 60211, w: 512, h: 384, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'crates') } },
-  { id: 'ch5-goods-deck', seed: 60220, w: 584, h: 512, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'goods') } },
-  { id: 'ch5-arch-garland', seed: 60230, w: 768, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'garland') } },
-  { id: 'ch5-arch-keystone', seed: 60231, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'keystone') } },
+  // ---- Spread 6 — THE BAZAAR (E3 s6 rebuild, scenes/s6-scene-pack.md §4f).
+  // The D-series stall/goods/arch painters retired with their pieces. Every
+  // aspect below equals its mesh face exactly (city 1.9/0.66; plates 0.8/0.55
+  // and 0.68/0.24; box faces 2a x depth/height; figures their layer w/h). The
+  // arc faces + souk strips ride bazaar-atlas-s6, throng + tea ride
+  // figure-atlas-s6 (the sprite-consuming families); the rest stay loose. ----
+  { id: 'ch5-city', seed: 60400, w: 1024, h: 356, grain: 14, paint() { return bazCity(this.w, this.h, this.seed) } },
+  { id: 'ch5-pigeon-a', seed: 60410, w: 256, h: 128, grain: 8, paint() { return bazPigeon(this.w, this.h, this.seed, 1) } },
+  { id: 'ch5-pigeon-b', seed: 60411, w: 232, h: 116, grain: 8, paint() { return bazPigeon(this.w, this.h, this.seed, -1) } },
+  { id: 'ch5-arc-rear-arc-front', seed: 60420, w: 1024, h: 704, grain: 14, paint() { return bazArcPlate(this.w, this.h, this.seed, 'rear') } },
+  { id: 'ch5-arc-rear-arc-side', seed: 60421, w: 256, h: 198, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.rose, BAZ.roseLit) } },
+  { id: 'ch5-arc-rear-arc-back', seed: 60422, w: 512, h: 109, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.roseDim, BAZ.rose) } },
+  { id: 'ch5-arc-rear-arc-top', seed: 60423, w: 512, h: 141, grain: 10, paint() { return bazAwningTopFace(this.w, this.h, this.seed) } },
+  { id: 'ch5-arc-inner-arc-front', seed: 60430, w: 1020, h: 360, grain: 14, paint() { return bazArcPlate(this.w, this.h, this.seed, 'inner') } },
+  { id: 'ch5-arc-inner-arc-side', seed: 60431, w: 256, h: 192, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.rose, BAZ.roseLit) } },
+  { id: 'ch5-arc-inner-arc-back', seed: 60432, w: 512, h: 90, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.roseDim, BAZ.rose) } },
+  { id: 'ch5-arc-inner-arc-top', seed: 60433, w: 512, h: 120, grain: 10, paint() { return bazAwningTopFace(this.w, this.h, this.seed) } },
+  { id: 'ch5-tread-mid-top', seed: 60440, w: 512, h: 111, grain: 12, paint() { return bazTreadTop(this.w, this.h, this.seed, true) } },
+  { id: 'ch5-tread-mid-front', seed: 60441, w: 512, h: 73, grain: 10, paint() { return bazTreadFront(this.w, this.h, this.seed, 9) } },
+  { id: 'ch5-tread-mid-side', seed: 60442, w: 192, h: 126, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.sand, BAZ.sandLit) } },
+  { id: 'ch5-tread-mid-back', seed: 60443, w: 512, h: 73, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.sandDim, BAZ.sand) } },
+  { id: 'ch5-tread-low-top', seed: 60444, w: 512, h: 118, grain: 12, paint() { return bazTreadTop(this.w, this.h, this.seed, false) } },
+  { id: 'ch5-tread-low-front', seed: 60445, w: 512, h: 44, grain: 10, paint() { return bazTreadFront(this.w, this.h, this.seed, 11) } },
+  { id: 'ch5-tread-low-side', seed: 60446, w: 192, h: 72, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.sand, BAZ.sandLit) } },
+  { id: 'ch5-tread-low-back', seed: 60447, w: 512, h: 44, grain: 10, paint() { return bazCourses(this.w, this.h, this.seed, BAZ.sandDim, BAZ.sand) } },
+  { id: 'ch5-crowd-mid', seed: 60450, w: 512, h: 105, grain: 10, paint() { return bazFigureRank(this.w, this.h, this.seed, { count: 6, view: 'front', basketAt: 2 }) } },
+  { id: 'ch5-crowd-low', seed: 60451, w: 512, h: 107, grain: 10, paint() { return bazFigureRank(this.w, this.h, this.seed, { count: 5, view: 'front', basketAt: 3 }) } },
+  { id: 'ch5-throng', seed: 60452, w: 512, h: 133, grain: 10, paint() { return bazFigureRank(this.w, this.h, this.seed, { count: 8, view: 'back', raisedArms: true, childAt: 4 }) } },
+  { id: 'ch5-tea', seed: 60453, w: 256, h: 293, grain: 10, paint() { return bazTeaCorner(this.w, this.h, this.seed) } },
+  { id: 'ch5-raise-stall-face', seed: 60460, w: 512, h: 1024, grain: 12, paint() { return bazRaiseStallFace(this.w, this.h, this.seed) } },
+  { id: 'page-6', seed: 60470, w: 1024, h: 683, grain: 10, paint() { return bazaarFloorSpread(this.w, this.h, this.seed) } },
   // ---- Spread 2 — the Inn (E3 stage set: three graded gutter-spanning
   // planes + crease children + the linked rank; kept stable box + keyboard).
   // Pixel dims at each piece's true mesh aspect: mountain 1.9x0.92, inn row
@@ -6824,6 +8030,18 @@ const RING_SLOTS = [
   // ring-front gate wall: mesh 0.19 x 0.10 = 1.9.
   { id: 'ch3-skyline-l-mound4', w: 0.19, h: 0.1, W: 972, H: 512, seed: 10020, variant: 'ringFront', blocks: 5 },
 ]
+
+// E3 s6 — the SOUK WINGS (ch5-souk-{l,r}-mound{0,1}): the bazaar's stall arcs
+// continued to both page edges. Shaped-mesh bakes like the s4 flank rows, but
+// painted by the bazaar's own soukRow painter (slot.art hook) so the awning
+// stripe cadence registers with the arc plates (pack risk 4: the plate/souk
+// seam is bridged by MATCHED paint, not by paper). Right wings mirror left.
+const S6_SOUK_SLOTS = [
+  { id: 'ch5-souk-l-mound0', w: 0.24, h: 0.1, seed: 60310, art(W, H) { return soukRow({ seed: this.seed, w: W, h: H, row: 0, mirror: false }) } },
+  { id: 'ch5-souk-l-mound1', w: 0.2, h: 0.08, seed: 60311, art(W, H) { return soukRow({ seed: this.seed, w: W, h: H, row: 1, mirror: false }) } },
+  { id: 'ch5-souk-r-mound0', w: 0.24, h: 0.1, seed: 60313, art(W, H) { return soukRow({ seed: this.seed, w: W, h: H, row: 0, mirror: true }) } },
+  { id: 'ch5-souk-r-mound1', w: 0.2, h: 0.08, seed: 60314, art(W, H) { return soukRow({ seed: this.seed, w: W, h: H, row: 1, mirror: true }) } },
+]
 const SLOT_LONG_EDGE = 1024 // gate-matrix G5 budget: art max dim <= 1024
 
 function slotDims(slot) {
@@ -6836,14 +8054,18 @@ function slotDims(slot) {
  *  (normalized [0,1]^2, v-up hinge->crest). */
 async function bakeSlot(slot, outDir) {
   const { W, H } = slotDims(slot)
-  const art = dovecoteFacade({
-    seed: slot.seed,
-    w: W,
-    h: H,
-    variant: slot.variant ?? 'flank',
-    blocks: slot.blocks ?? Math.max(3, Math.round((slot.towers ?? 7) / 1.6)),
-    mirror: slot.mirror ?? false,
-  })
+  // A slot may bring its own {outline, svg} painter (the s6 souk rows);
+  // the default stays the s4 dovecote facade, byte-identical.
+  const art = slot.art
+    ? slot.art(W, H)
+    : dovecoteFacade({
+        seed: slot.seed,
+        w: W,
+        h: H,
+        variant: slot.variant ?? 'flank',
+        blocks: slot.blocks ?? Math.max(3, Math.round((slot.towers ?? 7) / 1.6)),
+        mirror: slot.mirror ?? false,
+      })
   const { outline, out } = await bakeShaped(art, slot.seed, W, H, 22)
   const webp = await sharp(out).webp({ quality: 82 }).toBuffer()
   await writeFile(path.join(outDir, `${slot.id}.webp`), webp)
@@ -6939,6 +8161,41 @@ const ATLASES = [
       { id: 'ch6-nave-d-back', w: 80, opaque: false },
     ],
   },
+  {
+    // E3 s6 ATLAS-A — the bazaar's ARCHITECTURE (pack §4f). Both stall-arc
+    // keepstacks' full face sets (the merged keepstack mesh needs EVERY id of
+    // a keep on one page or it falls back to per-face draws) plus the four
+    // souk wing strips: two merged arc meshes + the skyline sprites, one
+    // texture upload for the whole built bazaar.
+    id: 'bazaar-atlas-s6',
+    regions: [
+      { id: 'ch5-arc-rear-arc-front', w: 880, opaque: false }, // die-cut plate
+      { id: 'ch5-arc-inner-arc-front', w: 820, opaque: false }, // die-cut plate
+      { id: 'ch5-arc-rear-arc-top', w: 256, opaque: true },
+      { id: 'ch5-arc-inner-arc-top', w: 256, opaque: true },
+      { id: 'ch5-arc-rear-arc-side', w: 96, opaque: true },
+      { id: 'ch5-arc-inner-arc-side', w: 96, opaque: true },
+      { id: 'ch5-arc-rear-arc-back', w: 64, opaque: true },
+      { id: 'ch5-arc-inner-arc-back', w: 64, opaque: true },
+      { id: 'ch5-souk-l-mound0', w: 400, opaque: false },
+      { id: 'ch5-souk-l-mound1', w: 400, opaque: false },
+      { id: 'ch5-souk-r-mound0', w: 400, opaque: false },
+      { id: 'ch5-souk-r-mound1', w: 400, opaque: false },
+    ],
+  },
+  {
+    // E3 s6 ATLAS-B — the bazaar's FIGURES on a 512 page (pack §4f). Only the
+    // sprite-consuming stripflap family rides it today (throng + tea share the
+    // upload with their spread); the rider/child/vfold figure pieces stay
+    // loose webps until those renderers grow sprite support (INFRA-1 shipped
+    // consumption for keepstack/skyline/stripflap only).
+    id: 'figure-atlas-s6',
+    page: 512,
+    regions: [
+      { id: 'ch5-throng', w: 400, opaque: false },
+      { id: 'ch5-tea', h: 240, opaque: false },
+    ],
+  },
 ]
 
 /** Shelf-pack (next-fit decreasing height), deterministic: sort by descending
@@ -6976,6 +8233,7 @@ async function packAtlas(atlas, dir) {
     const h = region.h ?? Math.round(region.w / ar)
     base.push({ id: region.id, w, h, opaque: !!region.opaque })
   }
+  const P = atlas.page ?? ATLAS_PAGE
   for (let attempt = 0; attempt < 60; attempt++) {
     const factor = Math.pow(0.97, attempt)
     const items = base.map((b) => ({
@@ -6983,10 +8241,10 @@ async function packAtlas(atlas, dir) {
       w: Math.max(8, Math.round(b.w * factor)),
       h: Math.max(8, Math.round(b.h * factor)),
     }))
-    const placed = shelfPack(items, ATLAS_PAGE, ATLAS_GUTTER)
+    const placed = shelfPack(items, P, ATLAS_GUTTER)
     if (placed) return { placed, factor }
   }
-  throw new Error(`atlas ${atlas.id}: no uniform scale fits ${base.length} regions on ${ATLAS_PAGE}px`)
+  throw new Error(`atlas ${atlas.id}: no uniform scale fits ${base.length} regions on ${P}px`)
 }
 
 /** Composites one atlas page and returns its sprite rects in TEXTURE uv space. */
@@ -6998,8 +8256,9 @@ async function writeAtlasPage(atlas, dir) {
     const buf = await (p.opaque ? src.flatten({ background: ROOK.ink }) : src).ensureAlpha().png().toBuffer()
     layers.push({ input: buf, left: p.x, top: p.y })
   }
+  const P = atlas.page ?? ATLAS_PAGE
   const page = await sharp({
-    create: { width: ATLAS_PAGE, height: ATLAS_PAGE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    create: { width: P, height: P, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
     .composite(layers)
     .png()
@@ -7008,7 +8267,6 @@ async function writeAtlasPage(atlas, dir) {
   await writeFile(path.join(dir, `${atlas.id}.webp`), webp)
 
   const sprites = {}
-  const P = ATLAS_PAGE
   for (const p of [...placed].sort((a, b) => (a.id < b.id ? -1 : 1))) {
     sprites[p.id] = {
       atlas: atlas.id,
@@ -7028,7 +8286,7 @@ async function writeAtlases(dir) {
   const report = []
   for (const atlas of ATLASES) {
     const res = await writeAtlasPage(atlas, dir)
-    pages[atlas.id] = ATLAS_PAGE
+    pages[atlas.id] = atlas.page ?? ATLAS_PAGE
     Object.assign(sprites, res.sprites)
     report.push({ id: atlas.id, ...res })
   }
@@ -7055,7 +8313,7 @@ async function writeManifests(dir) {
 async function main() {
   await mkdir(ART_DIR, { recursive: true })
   const info = []
-  for (const slot of [...SLOTS, ...RING_SLOTS]) info.push(await bakeSlot(slot, ART_DIR))
+  for (const slot of [...SLOTS, ...RING_SLOTS, ...S6_SOUK_SLOTS]) info.push(await bakeSlot(slot, ART_DIR))
   for (const wing of VISTA_WINGS) info.push(await bakeVistaWing(wing, ART_DIR))
   const pieceInfo = []
   for (const piece of PIECES) pieceInfo.push(await bakePieceTexture(piece, ART_DIR))
@@ -7070,8 +8328,9 @@ async function main() {
     process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  ${(r.bytes / 1024).toFixed(1)}kb\n`)
   }
   for (const a of atlasInfo) {
+    const P = ATLASES.find((x) => x.id === a.id)?.page ?? ATLAS_PAGE
     process.stdout.write(
-      `${a.id.padEnd(24)} ${ATLAS_PAGE}x${ATLAS_PAGE}  ${a.count} regions  scale=${a.factor.toFixed(3)}  ` +
+      `${a.id.padEnd(24)} ${P}x${P}  ${a.count} regions  scale=${a.factor.toFixed(3)}  ` +
         `occupancy=${(a.occupancy * 100).toFixed(1)}%  ${(a.bytes / 1024).toFixed(1)}kb\n`
     )
   }
