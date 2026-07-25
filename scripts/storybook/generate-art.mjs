@@ -1881,9 +1881,10 @@ function duneProfile(r, w, cfg) {
     v += wobble * Math.sin(u * 9.7 + phase) * Math.sin(u * 4.1 + phase * 1.7)
     if (notch) {
       // eased saddle down to the cap: the dip blends in over an ease band
-      // on each side of the window (a dune bowl, never a cliff)
-      const ease = 0.08
-      const wIn = smooth((u - (notch.u0 - ease)) / (2 * ease)) * (1 - smooth((u - (notch.u1 - ease)) / (2 * ease)))
+      // OUTSIDE the window on each side (a dune bowl, never a cliff) — the
+      // cap must already hold AT u0/u1, the bench-gated window edges
+      const ease = 0.07
+      const wIn = smooth((u - (notch.u0 - 2 * ease)) / (2 * ease)) * (1 - smooth((u - notch.u1) / (2 * ease)))
       const mid = (notch.u0 + notch.u1) / 2
       const sag = notch.capV * (0.9 + 0.1 * Math.cos(((u - mid) / (notch.u1 - notch.u0)) * Math.PI * 2))
       v = lerp(v, Math.min(v, sag), wIn)
@@ -1910,13 +1911,18 @@ function duneRankRow(r, pfx, w, y0, y1, cfg) {
   const clip = `${pfx}c`
   let defs =
     `<clipPath id="${clip}"><path d="${d}"/></clipPath>` +
+    // hard row clip: NOTHING (rim strokes included) may bleed into the
+    // neighboring atlas band — stray alpha there renders as floating specks
+    // on the adjacent rank's mesh
+    `<clipPath id="${pfx}row"><rect x="0" y="${fx(y0)}" width="${w}" height="${fx(y1 - y0)}"/></clipPath>` +
     `<linearGradient id="${pfx}sky" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${VAULT.nightDeep}"/><stop offset="1" stop-color="${VAULT.night}"/></linearGradient>` +
     `<linearGradient id="${pfx}lee" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${VAULT.duneDim}"/><stop offset="1" stop-color="${VAULT.duneDeep}"/></linearGradient>` +
     `<linearGradient id="${pfx}win" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${VAULT.duneLit}"/><stop offset="1" stop-color="${VAULT.dune}"/></linearGradient>`
-  let s = `<g clip-path="url(#${clip})">`
+  let s = `<g clip-path="url(#${pfx}row)">`
+  s += `<g clip-path="url(#${clip})">`
 
   if (cfg.style === 'night') {
     // the great dune's upper card IS the night: sky fill, stars, heat-shimmer
@@ -1987,28 +1993,35 @@ function duneRankRow(r, pfx, w, y0, y1, cfg) {
     s += `<path d="${lip}" fill="none" stroke="${cfg.style === 'shadow' ? VAULT.dune : VAULT.duneLit}" stroke-width="2.2" opacity="${cfg.style === 'shadow' ? 0.5 : 0.75}"/>`
     if (cfg.style === 'fore') {
       // the transmutation hint: half-buried coins glinting in the fore bank
+      // (ry pre-stretched ~1.11x for the r1 band's display aspect)
       for (let i = 0; i < 12; i++) {
         const x = rr(r, w * 0.05, w * 0.95)
         const y = y1 - rr(r, 0.08, 0.5) * H
         const cr = rr(r, 3, 6)
-        s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.55)}" fill="${r() < 0.5 ? VAULT.foil : VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="0.8"/>`
+        s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.61)}" fill="${r() < 0.5 ? VAULT.foil : VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="0.8"/>`
       }
     }
   }
 
   if (cfg.caravan) {
     // the SAME caravan again, tiny, printed on the lit face — farther along
-    // its journey, walking toward the PULL tab (image-left = the left page)
+    // its journey, walking toward the PULL tab (image-left = the left page).
+    // The r2 atlas band displays 1.434x flatter than world (row px aspect vs
+    // the rank's world aspect), so the glyphs pre-stretch vertically about
+    // the ground line to display with true camel proportions.
     const cy = topY(prof[Math.round(prof.length * 0.3)][1] * 0.55)
+    s += `<g transform="translate(0 ${fx(cy)}) scale(1 1.434) translate(0 ${fx(-cy)})">`
     for (let i = 0; i < 5; i++) {
       const x = w * (0.14 + i * 0.055)
       s += `<g transform="translate(${fx(x)} ${fx(cy)}) scale(-1 1) translate(${fx(-x)} ${fx(-cy)})">${camelGlyph(x, cy, H * 0.03, VAULT.nightDeep)}</g>`
       s += `<rect x="${fx(x - 1.6)}" y="${fx(cy - H * 0.045)}" width="3.2" height="2.6" fill="${VAULT.ember}"/>`
     }
+    s += `</g>`
   }
 
   s += `</g>`
   s += rimPath(d, 3.4)
+  s += `</g>` // row clip
   return { defs, body: s }
 }
 
@@ -2108,8 +2121,10 @@ function guillocheAureole(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
   const cy = h / 2
-  const R1 = w * 0.46
-  const R0 = w * 0.285
+  // radii off the SHORT axis: the canvas is cut at the dress mesh's true
+  // aspect, so a circle in canvas pixels displays as a circle
+  const R1 = h * 0.46
+  const R0 = h * 0.285
   const ring = (rad) => `M ${fx(cx - rad)} ${fx(cy)} a ${fx(rad)} ${fx(rad)} 0 1 0 ${fx(rad * 2)} 0 a ${fx(rad)} ${fx(rad)} 0 1 0 ${fx(-rad * 2)} 0`
   // annulus silhouette via fill-rule evenodd
   const annulus = `${ring(R1)} ${ring(R0)}`
@@ -2227,9 +2242,9 @@ function caravanFrieze(w, h, seed) {
       s += `<path d="M ${fx(xb)} ${fx(barTop - h * 0.28)} Q ${fx((xa + xb) / 2)} ${fx(barTop - h * 0.14)} ${fx(xa)} ${fx(barTop - h * 0.32)}" fill="none" stroke="${VAULT.ember}" stroke-width="1.6" opacity="0.85"/>`
     }
   }
-  // the caravan master on foot at the head of the chain (u ~0.22), staff
-  // forward — still right of the sightline window's edge (u 0.207)
-  const mx = w * 0.225
+  // the caravan master on foot at the head of the chain, staff forward —
+  // clear of the sightline window's edge (u 0.205) with real margin
+  const mx = w * 0.235
   s += `<circle cx="${fx(mx)}" cy="${fx(barTop - h * 0.34)}" r="${fx(h * 0.05)}" fill="${VAULT.duneDeep}"/>`
   s += `<path d="M ${fx(mx - h * 0.03)} ${fx(barTop + h * 0.04)} L ${fx(mx - h * 0.012)} ${fx(barTop - h * 0.3)} L ${fx(mx + h * 0.05)} ${fx(barTop - h * 0.26)} L ${fx(mx + h * 0.06)} ${fx(barTop + h * 0.04)} Z" fill="${VAULT.duneDeep}"/>`
   s += `<path d="M ${fx(mx - h * 0.02)} ${fx(barTop - h * 0.18)} l ${fx(-h * 0.06)} ${fx(h * 0.02)}" stroke="${VAULT.ember}" stroke-width="2.4"/>` // sash
@@ -2481,6 +2496,40 @@ function brassPullPlate(w, h) {
   return s
 }
 
+/** THE BRASS PULL TAB (ch4-dissolve-tab): the grab handle itself, engraved
+ *  brass with ember chevrons — the celebrated affordance in the reader's
+ *  hand. Texture axes (popup-dissolve-layer tab quad): image u runs along
+ *  the spine (z), image v along the page-fore axis d with v=1 = the OUTER
+ *  end — so chevrons point image-UP (the pull direction) and the word
+ *  rotates 90 deg to read screen-upright on the left page. */
+function dissolveTabPlate(w, h, seed) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" rx="${fx(w * 0.06)}" fill="${VAULT.foil}"/>`
+  s += `<rect width="${fx(w * 0.22)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.5"/>`
+  s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" rx="${fx(w * 0.05)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="3"/>`
+  s += `<rect x="10" y="10" width="${fx(w - 20)}" height="${fx(h - 20)}" rx="${fx(w * 0.04)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.4" opacity="0.7"/>`
+  // engraved hatching (brushed brass)
+  for (let i = 0; i < 12; i++) {
+    const y = h * (0.06 + i * 0.08) + rr(r, -3, 3)
+    s += `<line x1="14" y1="${fx(y)}" x2="${fx(w - 14)}" y2="${fx(y)}" stroke="${VAULT.foilDeep}" stroke-width="0.8" opacity="0.3"/>`
+  }
+  // ember chevrons pointing image-UP = outward, the pull direction
+  for (const t of [0.3, 0.19]) {
+    const cy = h * t
+    s += `<path d="M ${fx(w * 0.24)} ${fx(cy + h * 0.045)} L ${fx(w * 0.5)} ${fx(cy - h * 0.02)} L ${fx(w * 0.76)} ${fx(cy + h * 0.045)}" fill="none" stroke="${VAULT.ember}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
+  }
+  // PULL reading screen-upright (rotate 90: word-up -> image-right); the
+  // word is 4 glyphs x 13 grid units long, sized to sit inside the lower half
+  const gs = w * 0.014
+  const wx = w * 0.5
+  const wy = h * 0.62
+  s += `<g transform="rotate(90 ${fx(wx)} ${fx(wy)})">${strokeWord('PULL', wx - 24 * gs, wy - 7 * gs, gs, VAULT.ink, 2.6)}</g>`
+  s += `<g transform="rotate(90 ${fx(wx)} ${fx(wy)})">${strokeWord('PULL', wx - 24 * gs - 1, wy - 7 * gs - 1, gs, VAULT.foilHi, 1.1)}</g>`
+  // the slit shadow at the inner (v=0) edge, where the strip disappears
+  s += `<rect x="0" y="${fx(h - 8)}" width="${w}" height="8" fill="${VAULT.ink}" opacity="0.45"/>`
+  return svgPiece(w, h, s)
+}
+
 /** THE SPREAD-5 FLOOR PRINT (page-5, full-bleed page faces): rippled
  *  sand-to-gold fans leading from the apron (image bottom = near) to the
  *  dissolve placard (lower-left) and up into the ranks (upper field), with
@@ -2494,8 +2543,8 @@ function vaultFloorPrint(w, h, seed) {
     `<stop offset="0.42" stop-color="${VAULT.duneDeep}"/>` +
     `<stop offset="1" stop-color="#4c3a56"/></linearGradient>` +
     `<radialGradient id="p5pool" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${VAULT.foilLit}" stop-opacity="0.5"/>` +
-    `<stop offset="0.65" stop-color="${VAULT.foil}" stop-opacity="0.16"/>` +
+    `<stop offset="0" stop-color="${VAULT.foilLit}" stop-opacity="0.78"/>` +
+    `<stop offset="0.6" stop-color="${VAULT.foil}" stop-opacity="0.3"/>` +
     `<stop offset="1" stop-color="${VAULT.foil}" stop-opacity="0"/></radialGradient>` +
     `<linearGradient id="p5gutter" x1="0" y1="0" x2="1" y2="0">` +
     `<stop offset="0" stop-color="${VAULT.nightDeep}" stop-opacity="0"/>` +
@@ -2524,8 +2573,10 @@ function vaultFloorPrint(w, h, seed) {
     for (let i = 0; i < f.n; i++) {
       const t = i / (f.n - 1)
       const rad = (f.r0 + (f.r1 - f.r0) * t) * w * 0.5
-      const col = t < 0.45 ? VAULT.duneDim : t < 0.75 ? VAULT.dune : VAULT.foil
-      const sw = 2.6 - t * 1.2
+      // BOLD at the pinned camera (the s4 eye-test rejected a faint floor):
+      // heavier strokes, hotter grade as the ripples climb toward the gold
+      const col = t < 0.35 ? VAULT.duneDim : t < 0.62 ? VAULT.dune : t < 0.85 ? VAULT.duneLit : VAULT.foilLit
+      const sw = 4.6 - t * 2.2
       // sampled parametric ellipse arcs — the A command's radii-vs-endpoint
       // solver rescales impossible arcs into scalloped bulges (librsvg), so
       // the fans are drawn as polylines on the exact parametric curve
@@ -2537,15 +2588,27 @@ function vaultFloorPrint(w, h, seed) {
         const py = h * f.cy + Math.sin(a) * rad * 0.62
         d += `${k === 0 ? 'M' : ' L'} ${fx(px)} ${fx(py)}`
       }
-      s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${fx(sw)}" opacity="${(0.5 - t * 0.22).toFixed(2)}"/>`
+      s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${fx(sw)}" opacity="${(0.72 - t * 0.26).toFixed(2)}"/>`
     }
   }
+  // the APRON: bold moonlit sand lips across the near edge — the floor's
+  // loudest beat sits where the reader's eye enters the spread
+  for (let i = 0; i < 6; i++) {
+    const y = h * (0.86 + i * 0.026)
+    const amp = h * 0.014
+    let d = ''
+    for (let k = 0; k <= 24; k++) {
+      const x = (w * k) / 24
+      d += `${k === 0 ? 'M' : ' L'} ${fx(x)} ${fx(y - Math.sin(k * 0.9 + i * 1.3) * amp)}`
+    }
+    s += `<path d="${d}" fill="none" stroke="${i % 2 ? VAULT.dune : VAULT.duneLit}" stroke-width="${fx(3.4 - i * 0.3)}" opacity="${(0.62 - i * 0.06).toFixed(2)}"/>`
+  }
   // scattered glints where sand is becoming gold (denser toward the pools)
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     const p = pools[Math.floor(rr(r, 0, pools.length))]
     const x = w * p[0] + rr(r, -1, 1) * w * p[2] * 0.55
     const y = h * p[1] + rr(r, -1, 1) * h * p[3] * 0.6
-    s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(rr(r, 1, 2.6))}" fill="${r() < 0.4 ? VAULT.foilHi : VAULT.foilLit}" opacity="${rr(r, 0.3, 0.8).toFixed(2)}"/>`
+    s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(rr(r, 1.2, 3.4))}" fill="${r() < 0.4 ? VAULT.foilHi : VAULT.foilLit}" opacity="${rr(r, 0.4, 0.9).toFixed(2)}"/>`
   }
   // camel tracks: paired-dot trails — apron to placard, apron up into the
   // notch (the caravan's two appearances, stitched by the floor)
@@ -4304,10 +4367,19 @@ const PIECES = [
   { id: 'ch4-range', seed: 50250, w: 1024, h: 1024, grain: 12, paint() { return rangeAtlas(this.w, this.h, this.seed) } },
   // The precious object: gold-foil vault-dragon coiled on the round door.
   { id: 'ch4-hero', seed: 50252, w: 1024, h: 800, grain: 10, paint() { return vaultDragon(this.w, this.h, this.seed) } },
-  { id: 'ch4-aureole', seed: 50254, w: 512, h: 512, grain: 8, paint() { return guillocheAureole(this.w, this.h, this.seed) } },
-  { id: 'ch4-frieze', seed: 50256, w: 1024, h: 192, grain: 10, paint() { return caravanFrieze(this.w, this.h, this.seed) } },
+  // Dress mesh 0.34 x 0.30 world -> canvas at the true aspect (1.133) so the
+  // guilloché ring displays ROUND, not squashed to an ellipse.
+  { id: 'ch4-aureole', seed: 50254, w: 512, h: 452, grain: 8, paint() { return guillocheAureole(this.w, this.h, this.seed) } },
+  // Frieze mesh 1.5 x 0.16 world = 9.375 -> 1024x109 (the fringe convention:
+  // ch2 1024x188 = 5.45, ch3 1024x144 = 7.11; 192px displayed 1.76x squashed).
+  { id: 'ch4-frieze', seed: 50256, w: 1024, h: 109, grain: 10, paint() { return caravanFrieze(this.w, this.h, this.seed) } },
+  // The celebrated brass PULL tab itself (popup-dissolve-layer.tsx requests
+  // `<id>-tab`, falling back to the shared kraft grip when absent).
+  { id: 'ch4-dissolve-tab', seed: 50259, w: 284, h: 512, grain: 8, paint() { return dissolveTabPlate(this.w, this.h, this.seed) } },
   // The T-FLOOR page print: rippled sand->gold fans, apron -> placard -> notch.
-  { id: 'page-5', seed: 50258, w: 1536, h: 1024, grain: 6, quality: 92, paint() { return vaultFloorPrint(this.w, this.h, this.seed) } },
+  // 1024 long edge like page-4 (use-layer-texture downscales to 1024 anyway —
+  // larger only re-opens the G5 oversize violation this pack closes).
+  { id: 'page-5', seed: 50258, w: 1024, h: 683, grain: 6, quality: 92, paint() { return vaultFloorPrint(this.w, this.h, this.seed) } },
   { id: 'ch4-chest-front', seed: 50201, w: 512, h: 256, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'chest') } },
   { id: 'ch4-chest-back', seed: 50202, w: 512, h: 256, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'chest') } },
   { id: 'ch4-chest-side', seed: 50203, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'chest') } },

@@ -68,11 +68,11 @@ const TOUCH_SLOP = 1.5
  *  detent ease). A soft exponential so the picture "clicks" to dunes or gold. */
 const SNAP_EASE = 0.3
 const SNAP_EPS = 1e-4
-/** Warm desert-floor sand under the slats (ch4 dune palette) — leans gold-ochre
- *  so the one-pitch band the flipped rack vacates reads as warm floor, not a
- *  pale gap, and the gaps between tilted slats mid-flip read as desert. */
-const SAND_COLOR = '#caa049'
-const SAND_SHADE = '#a67d34'
+/** Desert-floor sand under the slats — VAULT_NIGHT register (E3 s5): violet
+ *  dune shadow, so the one-pitch band the flipped rack vacates reads as the
+ *  night floor and the gaps between tilted slats mid-flip read as dark sand. */
+const SAND_COLOR = '#5c4160'
+const SAND_SHADE = '#38294a'
 
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
@@ -169,6 +169,9 @@ export function DissolvePopupLayer({
 
   const dunesArt = useArtTexture(`${layer.id}-dunes`)
   const goldArt = useArtTexture(`${layer.id}-gold`)
+  // The celebrated affordance (T-AFFORDANCE): the tab wears its own engraved
+  // brass-plate art when painted, falling back to the shared kraft grip.
+  const tabArt = useArtTexture(`${layer.id}-tab`)
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
   const paperTexture = sharedPaperTexture()
   const tabGripTexture = sharedTabGripTexture()
@@ -217,9 +220,14 @@ export function DissolvePopupLayer({
       mat.color.set(art ? '#ffffff' : tint.lit)
       mat.needsUpdate = true
     }
-    tabMaterial.map = tabGripTexture
+    if (tabArt) {
+      tabArt.wrapS = THREE.ClampToEdgeWrapping
+      tabArt.wrapT = THREE.ClampToEdgeWrapping
+    }
+    tabMaterial.map = tabArt ?? tabGripTexture
+    tabMaterial.color.set(tabArt ? '#ffffff' : tint.shade)
     tabMaterial.needsUpdate = true
-  }, [dunesArt, goldArt, paperTexture, tabGripTexture, dunesMaterial, goldMaterial, tabMaterial, tint])
+  }, [dunesArt, goldArt, tabArt, paperTexture, tabGripTexture, dunesMaterial, goldMaterial, tabMaterial, tint])
 
   // Contact shadow scaled by the placard's rest peak (it lies nearly flat, so a
   // gentle pool; deepens a touch mid-flip when the slats stand — the venetian).

@@ -109,10 +109,12 @@ function knownGoodIds(): ReadonlySet<string> {
       for (const wing of layer.wings) ids.add(`${layer.id}-${wing.key}`)
     }
     // popup-dissolve-layer.tsx: the two crossfade paintings (dunes up-face,
-    // gold under-face) sliced across the venetian slats.
+    // gold under-face) sliced across the venetian slats, plus the tab's own
+    // brass-plate art (`<id>-tab`, kraft-grip fallback when unpainted).
     if (layer.mech === 'dissolve') {
       ids.add(`${layer.id}-dunes`)
       ids.add(`${layer.id}-gold`)
+      ids.add(`${layer.id}-tab`)
     }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
