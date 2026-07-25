@@ -172,81 +172,9 @@
     "ch3-skyline-l-mound0": {
       "atlas": "flank-atlas-s4",
       "rect": [
-        0.392578125,
-        0.5146484375,
-        0.783203125,
-        0.646484375
-      ]
-    },
-    "ch3-skyline-l-mound1": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0.392578125,
-        0.1923828125,
-        0.783203125,
-        0.3046875
-      ]
-    },
-    "ch3-skyline-l-mound2": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0,
-        0.1826171875,
-        0.390625,
-        0.3046875
-      ]
-    },
-    "ch3-skyline-l-mound3": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
         0.212890625,
-        0.759765625,
+        0.7939453125,
         0.603515625,
-        1
-      ]
-    },
-    "ch3-skyline-l-mound4": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0,
-        0.4404296875,
-        0.390625,
-        0.646484375
-      ]
-    },
-    "ch3-skyline-r-mound0": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0.392578125,
-        0.3154296875,
-        0.783203125,
-        0.4384765625
-      ]
-    },
-    "ch3-skyline-r-mound1": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0,
-        0.306640625,
-        0.390625,
-        0.4384765625
-      ]
-    },
-    "ch3-skyline-r-mound2": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0,
-        0.068359375,
-        0.390625,
-        0.1806640625
-      ]
-    },
-    "ch3-skyline-r-mound3": {
-      "atlas": "flank-atlas-s4",
-      "rect": [
-        0.60546875,
-        0.759765625,
-        0.99609375,
         1
       ]
     },
