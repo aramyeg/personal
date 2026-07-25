@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PLY, Z_GUARD, plyLift, rivetLift } from '@/components/labs/storybook/book/lift-ladder'
-import { RIM_T } from '@/components/labs/storybook/book/book'
+import { PAGE_SURFACE_Y, POPUP_Y, RIM_T } from '@/components/labs/storybook/book/book'
 import { LIFT_CLEARANCE } from '@/components/labs/storybook/book/parallax-lift'
 import { DECAL_LIFT } from '@/components/labs/storybook/book/cover-decals'
 import { KEEPSAKE_POCKET_LIFT } from '@/components/labs/storybook/book/popup-keepsake'
@@ -33,6 +33,7 @@ describe('lift ladder', () => {
     expect(LIFT_CLEARANCE).toBe(plyLift(1))
     expect(DECAL_LIFT).toBe(plyLift(1))
     expect(KEEPSAKE_POCKET_LIFT).toBe(plyLift(1))
+    expect(POPUP_Y).toBe(PAGE_SURFACE_Y + plyLift(1))
   })
 
   it('rivet class: every migrated moving-panel lift equals rivetLift(1)', () => {

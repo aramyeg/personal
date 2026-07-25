@@ -106,7 +106,7 @@ const SPINE_FLAT_HEIGHT = BOOK.coverT
 // — and the page PLANES tilt up from it by their per-spread rest angles
 // (restAngles): the open book dips at the gutter and the stacks fan up to
 // the fore-edges, trading thickness side to side as you read.
-const PAGE_SURFACE_Y = BACK_COVER_TOP + STACK_PEDESTAL + BOOK.pageLift
+export const PAGE_SURFACE_Y = BACK_COVER_TOP + STACK_PEDESTAL + BOOK.pageLift
 // Gutter seam core: a narrow strip over the fold LINE only — the near-black
 // gap between the page edges and the collapsed pop-ups' folded edges
 // peeking out of it (paper-texture.ts makeCreaseCanvas). The wide concave
@@ -118,7 +118,8 @@ const PAGE_SURFACE_Y = BACK_COVER_TOP + STACK_PEDESTAL + BOOK.pageLift
 const CREASE_WIDTH = 0.05
 const CREASE_Y = PAGE_SURFACE_Y + 0.001
 // Pop-up layers: a hair above the crease strip, effectively ON the page.
-const POPUP_Y = PAGE_SURFACE_Y + 0.0015
+// Glue-stack class: one ply (lift-ladder.ts).
+export const POPUP_Y = PAGE_SURFACE_Y + plyLift(1)
 // Open-page card thickness (~1mm at book scale, matching the turning
 // sheet's PAPER_T): the rim ribbons hang this far under the print surface,
 // inside the pageLift gap above the stack wedge — no z-fighting room lost.
@@ -686,7 +687,7 @@ export function Book() {
       // cover for exactly those frames (caught by flash-hunt cover-close).
       rightPageRef.current.visible = coverFlight || sp >= 1
     }
-    if (popupsRef.current) popupsRef.current.position.y = pageHingeY + 0.0015
+    if (popupsRef.current) popupsRef.current.position.y = pageHingeY + plyLift(1)
     // Left statics: hidden for the whole cover flight (the traveling
     // endpaper below plays their part), shown the instant the commit lands
     // — same rAF as the driver's completeTurn, so there is no React-clock
