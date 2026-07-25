@@ -45,6 +45,7 @@
  *    recipe). Solved from the seat quad alone.
  */
 
+import { rivetLift } from './lift-ladder'
 import {
   creaseElevation,
   parallelRidge,
@@ -350,8 +351,9 @@ export function solveRiderPose(
 // ---------------------------------------------------------------------------
 // Dress patch: a rigid quad riding one parent panel's frame.
 
-/** Lift off the seat plane so coplanar art never z-fights its link. */
-const DRESS_LIFT = 0.003
+/** Lift off the seat plane so coplanar art never z-fights its link. Rivet
+ *  class: one ply + z-guard (lift-ladder.ts). */
+export const DRESS_LIFT = rivetLift(1)
 
 /**
  * Solves a dress patch's quad from its seat quad. The seat frame is the

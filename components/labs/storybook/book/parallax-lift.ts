@@ -15,6 +15,8 @@
  * the desk.
  */
 
+import { plyLift } from './lift-ladder'
+
 /** The four footprint corners as unit-square multipliers of (halfW, halfD) —
  *  (x, z) = (sx * halfW, sz * halfD), y = 0. */
 const FOOTPRINT_SIGNS: readonly (readonly [sx: number, sz: number])[] = [
@@ -38,8 +40,9 @@ function rotatedCornerY(rx: number, ry: number, x: number, z: number): number {
 /** A hair of clearance above the desk beyond exactly canceling the deepest
  *  corner's dip, on the same order as the gutter crease's own y offset
  *  above the page surface (book.tsx's CREASE_Y). Only added once the book
- *  is actually dipping (see parallaxLift) — zero at zero tilt. */
-const LIFT_CLEARANCE = 0.0015
+ *  is actually dipping (see parallaxLift) — zero at zero tilt. Glue-stack
+ *  class: one ply (lift-ladder.ts). */
+export const LIFT_CLEARANCE = plyLift(1)
 
 /**
  * Vertical lift (world units, >= 0) the parallax rig must add so a

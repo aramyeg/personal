@@ -33,6 +33,7 @@
  * swings out on its jutting hinge."
  */
 
+import { plyLift } from './lift-ladder'
 import type { BoxFace, BoxGeom, BoxPatch, FanMember, PanelQuad, Vec3 } from './popup-mechanics'
 import { openElevation, solveBoxPose } from './popup-mechanics'
 import { solveFanPose } from './popup-anatomy'
@@ -50,7 +51,8 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // the openness (sh = sin(beta/2)) so it is EXACTLY 0 at book-closed (the deck
 // still folds dead flat — B1 stays at 1e-9) and ~this value at the reading pose;
 // it only nudges world X/Y (never z), so B3 fore-edge containment is untouched.
-const BALCONY_LIFT = 0.004
+// Plate class: two plies (lift-ladder.ts).
+export const BALCONY_LIFT = plyLift(2)
 
 // Same idiom for the facade plates: a plate rides IN its cap plane, and from the
 // cap base up to the cap top it coplanarly overlaps the still-rendered cap face
@@ -61,7 +63,8 @@ const BALCONY_LIFT = 0.004
 // the open pose. A per-half rigid translation, so plate rigidity is untouched;
 // the crease halves part by ±PLATE_LIFT*ch laterally at mid-turn (sub-3mm at
 // book scale, unreadable at the sliver angles where ch is large).
-const PLATE_LIFT = 0.004
+// Plate class: two plies (lift-ladder.ts).
+export const PLATE_LIFT = plyLift(2)
 
 /** One story of the keep — a box fold seated on the story below. `key` names
  *  the story (hall/gallery/loft/crown) so its per-face art ids resolve as

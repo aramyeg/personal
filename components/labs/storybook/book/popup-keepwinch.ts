@@ -32,6 +32,7 @@
  * stories), so the winch is self-contained given (thetaL, thetaR).
  */
 
+import { rivetLift } from './lift-ladder'
 import type { BoxGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { solveBoxPose } from './popup-mechanics'
 import { ROTOR_LIFT } from './popup-rotor'
@@ -302,7 +303,7 @@ export function keepWinchIrisQuads(
 // (below), so they are winding-correct against what the layer draws.
 const CW_R_TOP = 0.75 // top r-station (undeployed) — block top r+CW_BH/H stays under the cap top (r=1)
 const CW_DROP_R = 0.4 // r-units of descent (world 0.4 * H_loft 0.18 = 0.072 down the belfry face)
-const CW_LIFT = 0.003 // ROTOR_LIFT-scale seat off the cap face (z-fight only)
+export const CW_LIFT = rivetLift(1) // ROTOR_LIFT-scale seat off the cap face (z-fight only), rivet class
 // CW_BW/CW_BH give the block's mesh aspect (2*CW_BW / 2*CW_BH = CW_BW/CW_BH = 0.632),
 // matching the delivered counterweight art (a tall narrow iron weight). Off-plane
 // reach is zero (only CW_LIFT), so N8/N4 inherit the cap's proof.

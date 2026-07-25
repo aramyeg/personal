@@ -33,6 +33,7 @@
  * page's own moving frame P(d, h, z); the seat is WORLD-fixed on the desk.
  */
 
+import { plyLift } from './lift-ladder'
 import { PAGE_W, STACK_PEDESTAL } from './page-geometry'
 import { TAB_LIP } from './popup-tabpiece'
 import type { KeepsakeGeom, PanelQuad, Vec3 } from './popup-mechanics'
@@ -147,8 +148,9 @@ export function keepsakeSeatCorners(geom: KeepsakeGeom): PanelQuad {
  *  card so the opaque panel occludes the tucked-in card body while leaving the
  *  peeking corner clear. Tiny (~0.26 mm at this scale): it only breaks the
  *  z-tie, never reads as a float. The card itself stays at h = 0 (invariant
- *  I1); the pocket is a SECOND sheet glued on top, like a dress patch's lift. */
-export const KEEPSAKE_POCKET_LIFT = 0.002
+ *  I1); the pocket is a SECOND sheet glued on top, like a dress patch's lift.
+ *  Glue-stack class: one ply (lift-ladder.ts). */
+export const KEEPSAKE_POCKET_LIFT = plyLift(1)
 /** How far spine-ward of the trailing-home station the pocket's closed end
  *  sits (it tucks the card's trailing edge fully under). */
 export const KEEPSAKE_POCKET_BACK = 0.03

@@ -41,6 +41,7 @@ import * as THREE from 'three'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurnWeighted } from './page-geometry'
 import { sheetAngleTilted } from './popup-mechanics'
 import { makeCanvasTexture } from './book'
+import { plyLift } from './lift-ladder'
 import { makeShadowCanvas } from '../procedural/paper-texture'
 import type { TurnFrame } from './use-turn-driver'
 
@@ -58,14 +59,15 @@ const SHADE_PEAK_EXPONENT = 1.3
 // local y): a local offset would rotate with the sheet and push it BELOW
 // the page plane once past vertical, clipping into the landing page. The
 // raised pivot keeps the sheet a paper-thickness above the pop-up wedge it
-// bounds through the whole sweep.
-const SHEET_LIFT = 0.004
+// bounds through the whole sweep. Plate class: two plies (lift-ladder.ts).
+export const SHEET_LIFT = plyLift(2)
 // Card-stock thickness, split ±t/2 around the pivot plane. Bounded above
 // by SHEET_LIFT: the underside face (at lift − t/2) must stay clear of the
-// page surface AND above the flattened pop-up pieces (page + 0.0015) so
+// page surface AND above the flattened pop-up pieces (page + a glue ply) so
 // nothing z-fights at the flat poses. At 0.004 the edge-on silhouette is a
-// few pixels — a visible paper edge, exactly what a real page shows.
-const PAPER_T = 0.004
+// few pixels — a visible paper edge, exactly what a real page shows. Plate
+// class: two plies (lift-ladder.ts).
+export const PAPER_T = plyLift(2)
 
 export function TurningPage({
   frame,
@@ -157,8 +159,11 @@ export function TurningPage({
     const eased = easeTurnWeighted(f.t)
     pivot.rotation.z = sheetAngleTilted(f.dir, eased, committedSpread.current)
 
-    const tClamped = Math.min(1, Math.max(0, f.t))
-    shade.material.opacity = SHADE_MAX_OPACITY * Math.sin(Math.PI * Math.pow(tClamped, SHADE_PEAK_EXPONENT))
+    // Geared to the EASED progress, not raw t: the driver's landing settle
+    // warps raw t so it tops out around 0.905, and a raw-t shade would land
+    // at nonzero opacity — a shadow left under a page that has stopped.
+    // sin(PI * eased^n) still peaks mid-sweep and closes to zero on landing.
+    shade.material.opacity = SHADE_MAX_OPACITY * Math.sin(Math.PI * Math.pow(eased, SHADE_PEAK_EXPONENT))
     // Tracks the sheet's footprint: starts under the lifting page (+X for
     // 'next', the right stack), crosses the spine at mid-turn, and ends
     // under the landing side — cos(theta) of the sheet's own angle.

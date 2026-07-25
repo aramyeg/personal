@@ -39,14 +39,16 @@
  * the center are the fastest points, which the gates measure.
  */
 
+import { rivetLift } from './lift-ladder'
 import type { PanelQuad, RotorGeom, Vec3 } from './popup-mechanics'
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const rad = (d: number): number => (d * Math.PI) / 180
 
 /** Lift off the seat plane so the riveted disc never z-fights its panel —
- *  one glue layer, exactly a dress patch's (DRESS_LIFT). */
-export const ROTOR_LIFT = 0.003
+ *  one glue layer, exactly a dress patch's (DRESS_LIFT). Rivet class: one
+ *  ply + z-guard (lift-ladder.ts). */
+export const ROTOR_LIFT = rivetLift(1)
 
 /** Rotation ceiling: mechanism 76 turns the disc through 2xE, and a practical
  *  parallelogram angle E stays <= 75deg, so |spin| <= 150deg. */

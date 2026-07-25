@@ -32,6 +32,7 @@ import * as THREE from 'three'
 import { createCanvas } from '../procedural/canvas-utils'
 import { BOOK_SUBTITLE, BOOK_TITLE } from '../content'
 import { BOOK, makeCanvasTexture } from './book'
+import { plyLift } from './lift-ladder'
 import { useArtTexture } from './use-layer-texture'
 
 // Real baked-art aspect ratios (width/height) for the two Batch-1 cover
@@ -56,7 +57,8 @@ const CORNER_MARGIN_Z_FRAC = 0.07 // fraction of BOOK.coverH
 // Center-low per the poster reference (scripts/posters/storybook-poster.html):
 // the crest sits a little below true vertical center, clear of the title.
 const CREST_Z_FRAC = 0.16 // fraction of BOOK.coverH
-const DECAL_LIFT = 0.0016
+// Glue-stack class: one ply (lift-ladder.ts).
+export const DECAL_LIFT = plyLift(1)
 const DECAL_ROTATION: readonly [number, number, number] = [-Math.PI / 2, 0, 0]
 
 // --------------------------------------------------------------- corners --

@@ -43,6 +43,7 @@ import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
 import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
+import { plyLift } from './lift-ladder'
 
 export const BOOK = {
   coverW: 1.22,
@@ -121,7 +122,8 @@ const POPUP_Y = PAGE_SURFACE_Y + 0.0015
 // Open-page card thickness (~1mm at book scale, matching the turning
 // sheet's PAPER_T): the rim ribbons hang this far under the print surface,
 // inside the pageLift gap above the stack wedge — no z-fighting room lost.
-const RIM_T = 0.004
+// Plate class: two plies (lift-ladder.ts).
+export const RIM_T = plyLift(2)
 // Closed book extends only toward +X from the spine (x=0), so it sits
 // right of the HTML CTA's centerline; open, the two blocks/pages already
 // straddle x=0 symmetrically. Shifting the whole assembly by -PAGE_W/2
