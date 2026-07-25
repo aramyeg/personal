@@ -364,7 +364,8 @@ it left/right via a texture-offset transform. Book-level, spreads 1–9 (`SPREAD
 
 | Asset key(s) | Recommended aspect | Cutout | Status |
 |---|---|---|---|
-| `page-1`, `page-2`, `page-3`, `page-4`, `page-5`, `page-6`, `page-7`, `page-8`, `page-9` | ≈1536×1024, ≈1.5:1 landscape (matches the procedural fallback's own canvas ratio) | **OPAQUE** full-bleed | **all 9 have real art already** |
+| `page-2`, `page-4` | 1024×683, 1.5:1 landscape (at the G5 1024 long-edge cap) | **OPAQUE** full-bleed | **CODE-GENERATED** by `generate-art.mjs` (`innCourtyardSpread` / `postRoadSpread`) — the T-FLOOR prints |
+| `page-1`, `page-3`, `page-5`, `page-6`, `page-7`, `page-8`, `page-9` | ≈1536×1024, ≈1.5:1 landscape (matches the procedural fallback's own canvas ratio) | **OPAQUE** full-bleed | delivered art; still over the 1024 long-edge cap (the runtime downscales at load) |
 
 ## 13. Satchel-drawer icons (HTML overlay, non-WebGL — `satchel-items.ts` / `overlay/spread-overlay.tsx`)
 

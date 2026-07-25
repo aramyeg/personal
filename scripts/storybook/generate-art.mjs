@@ -4209,55 +4209,91 @@ function innCourtyardSpread(w, h, seed) {
   // the gutter valley
   s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#s2pgGutter)"/>`
 
-  // ---- WINDOW-LIGHT POOLS under plane B's facades (glue band z -0.2..-0.41)
+  // ---- THE COBBLE FAN, painted as MASS (the s4 floor-rejection law: fill
+  // the stones, never wireframe them). First the paved FIELD, a full value step
+  // below the parchment, then FILLED cobble courses converging on the great door.
+  //
+  // The courtyard REACHES BOTH PAGE EDGES and dissolves into the far page under
+  // a haze. A paved region that stops mid-page reads as a trapezoid island —
+  // or, with flared flanks, as a ramp on a hill — with bare parchment
+  // shoulders, which fails the pinned-camera read as surely as a wireframed
+  // floor did: the courtyard has to BE the page. Two consequences, both load-
+  // bearing: the far edge is a gentle WAVE (a ruled horizon prints as a seam),
+  // and every course spans the WHOLE width, because a floor recedes by row
+  // COMPRESSION (the quadratic fy below), never by narrowing — narrowing is
+  // what draws a road.
+  const FAN0 = { x: doorX, y: doorY + 0.02 }
+  const farY = FAN0.y - 0.055
+  const farEdge = []
+  for (let i = 0; i <= 30; i++) {
+    const ft = i / 30
+    const fyy = farY + 0.013 * Math.sin(ft * 6.7 + 0.9) + 0.007 * Math.sin(ft * 15.1)
+    farEdge.push(`${fx(PX(lerp(-0.04, 1.04, ft)))} ${fx(PY(fyy))}`)
+  }
+  const field = `M ${farEdge.join(' L ')} L ${fx(PX(1.04))} ${fx(PY(1.05))} L ${fx(PX(-0.04))} ${fx(PY(1.05))} Z`
+  s += `<path d="${field}" fill="#dcc697"/>`
+  s += `<path d="${field}" fill="url(#s2pgPave)"/>`
+  s += `<g clip-path="url(#s2pgField)">`
+  const STONE_FILLS = ['#cbb078', '#a98a5c', '#c3a76e', '#b6976a']
+  // Courses are true ARCS about the great door, walked outward in PIXEL space so
+  // they stay circular on the plate: this is what makes the painted perspective
+  // CONVERGE on plane B's door (T-FLOOR, scene pack 1). Straight full-width rows
+  // pave the page but throw the convergence away and read as a rug of pebbles.
+  // Stone size grows with radius (perspective) and each course carries as many
+  // stones as it takes to TILE its own arc, so the joint stays thin everywhere
+  // instead of opening into mortar rivers at the apron.
+  const OXp = PX(doorX)
+  const OYp = PY(FAN0.y)
+  const TH0 = -0.2
+  const TH1 = Math.PI + 0.2
+  const RMAX = Math.hypot(w, h) * 1.15
+  let R = h * 0.062
+  let course = 0
+  while (R < RMAX) {
+    const grow = Math.pow(Math.min(1, R / (h * 1.15)), 0.78)
+    const ry = lerp(h * 0.005, h * 0.026, grow)
+    const rx = ry * 1.6
+    const stride = 2 * rx + 3.4
+    const count = Math.max(6, Math.ceil(((TH1 - TH0) * R) / stride))
+    const dTh = (TH1 - TH0) / count
+    // how much of the door's lamplight reaches this course — the value gradient
+    // that makes the paving LEAD INWARD instead of reading as an even texture
+    const warm = Math.max(0, 1 - R / (h * 0.78))
+    for (let c2 = 0; c2 < count; c2++) {
+      const th = TH0 + (c2 + (course % 2 ? 0.5 : 0)) * dTh // running bond
+      const sx2 = OXp + Math.cos(th) * R
+      const sy2 = OYp + Math.sin(th) * R
+      if (sy2 < -ry * 2 || sy2 > h + ry * 2 || sx2 < -rx * 2 || sx2 > w + rx * 2) continue
+      const fill = STONE_FILLS[Math.floor(r() * STONE_FILLS.length)]
+      const spin = fx((th * 180) / Math.PI - 90 + rr(r, -7, 7))
+      const erx = fx(rx * rr(r, 0.8, 1))
+      const ery = fx(ry * rr(r, 0.86, 1.04))
+      s += `<ellipse cx="${fx(sx2 + rr(r, -2.6, 2.6))}" cy="${fx(sy2 + rr(r, -1.8, 1.8))}" rx="${erx}" ry="${ery}" fill="${fill}" stroke="${WALNUT}" stroke-width="2" stroke-opacity="0.62" transform="rotate(${spin} ${fx(sx2)} ${fx(sy2)})"/>`
+      if (warm > 0.03) s += `<ellipse cx="${fx(sx2)}" cy="${fx(sy2)}" rx="${erx}" ry="${ery}" fill="${INN.lamp}" opacity="${fx(warm * 0.26)}" transform="rotate(${spin} ${fx(sx2)} ${fx(sy2)})"/>`
+      if (r() < 0.12) s += `<ellipse cx="${fx(sx2)}" cy="${fx(sy2)}" rx="${fx(rx * 0.66)}" ry="${fx(ry * 0.7)}" fill="${WALNUT}" opacity="0.28"/>` // a darker set stone
+    }
+    R += 2 * ry + 3.4
+    course++
+  }
+  // the warm spill from the door running down the fan's throat
+  s += `<path d="M ${fx(PX(FAN0.x - 0.05))} ${fx(PY(FAN0.y))} L ${fx(PX(FAN0.x - 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.05))} ${fx(PY(FAN0.y))} Z" fill="${INN.lamp}" opacity="0.1"/>`
+  s += `</g>`
+  // the far courses dissolve rather than ending at a line (haze-carried recession)
+  s += `<rect width="${w}" height="${fx(PY(farY + 0.13))}" fill="url(#s2pgHaze)"/>`
+
+  // ---- WINDOW-LIGHT POOLS under plane B's facades (glue band z -0.2..-0.41).
+  // Painted AFTER the paving: lamplight falls ON the cobbles, and while the
+  // field ended below them it silently covered any pool that reached it.
   for (const side of ['left', 'right']) {
     for (let k = 0; k < 6; k++) {
       const radial = lerp(0.12, PAGE_W_U * 0.92, (k + rr(r, 0.2, 0.8)) / 6)
-      const fy = pageFY(lerp(-0.36, -0.22, rr(r, 0, 1)))
+      const fy = pageFY(lerp(-0.36, -0.2, rr(r, 0, 1)))
       const rad = rr(r, 0.07, 0.12)
       s += `<ellipse cx="${fx(PX(pageFX(radial, side)))}" cy="${fx(PY(fy))}" rx="${fx(PX(rad * 0.62))}" ry="${fx(PY(rad * 0.3))}" fill="url(#s2pgPool)"/>`
     }
   }
   // warm spill out of the great door itself
   s += `<ellipse cx="${fx(PX(doorX))}" cy="${fx(PY(doorY + 0.03))}" rx="${fx(PX(0.055))}" ry="${fx(PY(0.032))}" fill="url(#s2pgPool)" opacity="0.95"/>`
-
-  // ---- THE COBBLE FAN, painted as MASS (the s4 floor-rejection law: fill
-  // the stones, never wireframe them). First the paved FIELD — a fan-shaped
-  // courtyard polygon a full value step below the parchment, pinched at the
-  // gate span and opening to the whole apron — then FILLED cobble courses
-  // laid concentric on the great door, stones growing toward the reader.
-  const FAN0 = { x: doorX, y: doorY + 0.02 }
-  const field =
-    `M ${fx(PX(FAN0.x - 0.085))} ${fx(PY(FAN0.y + 0.02))} ` +
-    `Q ${fx(PX(0.36))} ${fx(PY(gateY - 0.02))} ${fx(PX(0.3))} ${fx(PY(gateY + 0.1))} ` +
-    `Q ${fx(PX(0.06))} ${fx(PY(0.86))} ${fx(PX(-0.04))} ${fx(PY(1.05))} ` +
-    `L ${fx(PX(1.04))} ${fx(PY(1.05))} ` +
-    `Q ${fx(PX(0.94))} ${fx(PY(0.86))} ${fx(PX(0.7))} ${fx(PY(gateY + 0.1))} ` +
-    `Q ${fx(PX(0.64))} ${fx(PY(gateY - 0.02))} ${fx(PX(FAN0.x + 0.085))} ${fx(PY(FAN0.y + 0.02))} Z`
-  s += `<path d="${field}" fill="#dcc697"/>`
-  s += `<path d="${field}" fill="url(#s2pgPave)"/>`
-  s += `<path d="${field}" fill="none" stroke="${WALNUT}" stroke-width="3" opacity="0.4"/>`
-  s += `<g clip-path="url(#s2pgField)">`
-  const COURSES = 12
-  const STONE_FILLS = ['#cbb078', '#a98a5c', '#c3a76e', '#b6976a']
-  for (let a = 0; a <= COURSES; a++) {
-    const t = a / COURSES
-    const fy = lerp(FAN0.y + 0.045, 1.06, t * t * 0.92 + t * 0.08)
-    const span = lerp(0.1, 0.66, t)
-    const sr = lerp(0.009, 0.024, t)
-    const stones = 5 + a * 2
-    for (let c2 = 0; c2 < stones; c2++) {
-      const ct = stones === 1 ? 0.5 : c2 / (stones - 1)
-      const sx2 = FAN0.x + (ct - 0.5) * 2 * span * 0.94
-      const sy2 = fy - Math.sin(ct * Math.PI) * lerp(0.012, 0.05, t)
-      const fill = STONE_FILLS[(c2 + a) % STONE_FILLS.length]
-      s += `<ellipse cx="${fx(PX(sx2 + rr(r, -0.004, 0.004)))}" cy="${fx(PY(sy2 + rr(r, -0.003, 0.003)))}" rx="${fx(PX(sr * rr(r, 0.82, 1)))}" ry="${fx(PY(sr * 0.62))}" fill="${fill}" stroke="${WALNUT}" stroke-width="1.7" stroke-opacity="0.55"/>`
-      if (r() < 0.12) s += `<ellipse cx="${fx(PX(sx2))}" cy="${fx(PY(sy2))}" rx="${fx(PX(sr * 0.7))}" ry="${fx(PY(sr * 0.44))}" fill="${WALNUT}" opacity="0.28"/>` // a darker set stone
-    }
-  }
-  // the warm spill from the door running down the fan's throat
-  s += `<path d="M ${fx(PX(FAN0.x - 0.05))} ${fx(PY(FAN0.y))} L ${fx(PX(FAN0.x - 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.05))} ${fx(PY(FAN0.y))} Z" fill="${INN.lamp}" opacity="0.16"/>`
-  s += `</g>`
 
   // ---- THE WELCOME DOORMAT, just downstage of the gate span
   const matY = pageFY(0.3)
@@ -4367,10 +4403,17 @@ function innCourtyardSpread(w, h, seed) {
   s += `</g>`
   const defs =
     `<clipPath id="s2pgField"><path d="${field}"/></clipPath>` +
-    `<linearGradient id="s2pgPave" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0.3"/>` +
-    `<stop offset="0.45" stop-color="${WALNUT}" stop-opacity="0.12"/>` +
-    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.05"/></linearGradient>` +
+    // RADIAL about the great door, not vertical: the courtyard is lit from the
+    // door, so the paving must brighten inward and fall off to the aprons. A
+    // vertical ramp darkened the very band the doorlight falls on.
+    `<radialGradient id="s2pgPave" cx="0.5" cy="${fx(pageFY(-0.18))}" r="0.78">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.16"/>` +
+    `<stop offset="0.42" stop-color="${WALNUT}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.4"/></radialGradient>` +
+    `<linearGradient id="s2pgHaze" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${ROOK.parch}" stop-opacity="0.72"/>` +
+    `<stop offset="0.66" stop-color="${ROOK.parch}" stop-opacity="0.22"/>` +
+    `<stop offset="1" stop-color="${ROOK.parch}" stop-opacity="0"/></linearGradient>` +
     `<linearGradient id="s2pgDusk" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${INN.skyDeep}" stop-opacity="0.26"/>` +
     `<stop offset="0.6" stop-color="${INN.skyDeep}" stop-opacity="0.1"/>` +
