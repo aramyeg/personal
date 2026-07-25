@@ -26,6 +26,7 @@ import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/story
 import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { oanavePatches } from '@/components/labs/storybook/book/popup-oanave'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -162,6 +163,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       const pose = solveDissolvePose(l, 0, tL, tR)
       return [pose.base, ...pose.slats, pose.tab]
     }
+    case 'oanave':
+      // Host wings + the die-cut relief strata — the rank's full depth
+      // footprint (popup-oanave.ts).
+      return oanavePatches(l, tL, tR).map((p) => p.quad)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }

@@ -97,6 +97,10 @@ import { solveKineticArmPose } from './popup-kinetic'
 import type { KeepStackGeom } from './popup-keepstack'
 import type { KeepWinchGeom } from './popup-keepwinch'
 import type { KeepSkylineGeom } from './popup-skyline'
+// The E3 s7 nave rank (origamic-architecture relief strata die-cut from a
+// v-fold wall host) — geom + relief math in its own module, TYPE-ONLY here
+// (popup-oanave requires solveVFoldPose from this file, not the reverse).
+import type { OanaveGeom } from './popup-oanave'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -749,6 +753,7 @@ export type LayerGeom =
   | KeepSkylineGeom
   | DepthVistaGeom
   | DissolveGeom
+  | OanaveGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1271,6 +1276,24 @@ export function solveLayerPose(
       throw new Error('storybook: depth-vista layers are multi-patch (arches + wings) — use solveDepthVistaPose (popup-depthvista)')
     case 'dissolve':
       throw new Error('storybook: dissolve layers are multi-patch + user-driven — use solveDissolvePose (popup-dissolve)')
+    case 'oanave':
+      // The nave rank's HOST is the shipped v-fold wall solver verbatim; the
+      // dihedral-slaved relief strata are extra patches (oanavePatches in
+      // popup-oanave.ts) that never leave the host silhouette — so the host
+      // pose IS the piece's two-panel pose for sweep/motion/mount purposes.
+      return solveVFoldPose(
+        {
+          mech: 'vfold',
+          apexZ: geom.apexZ,
+          vDir: geom.vDir,
+          phiDeg: geom.phiDeg,
+          rhoDeg: geom.rhoDeg,
+          width: geom.width,
+          height: geom.height,
+        },
+        thetaL,
+        thetaR
+      )
   }
 }
 

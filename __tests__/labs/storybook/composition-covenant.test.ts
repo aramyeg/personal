@@ -169,6 +169,13 @@ const familyOf = (l: SceneLayer): string | null => {
       // family, distinct from the volvelle's rotating window and the liftflap's
       // hinged reveal.
       return 'dissolve'
+    case 'oanave':
+      // The origamic-architecture nave rank (E3 s7) — a v-fold wall host
+      // carrying die-cut relief strata folded from its own sheet: the
+      // relief DOF class (internal parallelograms, cut-from construction)
+      // is the mechanism, not the host — its own family by the same house
+      // precedent that separates m-fold/child/rider from the v-fold.
+      return 'oanave'
     case 'dress':
       return null
   }
@@ -200,6 +207,17 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
         if (layer.role !== 'story') continue
         if (layer.mech === 'platform' || layer.mech === 'fan' || layer.mech === 'keepstack') continue // inherent assemblies
         if (layer.mech === 'dissolve') continue // inherent assembly: a rack of N slats + sand base + tab (the paper crossfade)
+        if (layer.mech === 'oanave') {
+          // Inherent assembly when it carries relief: each stratum is two
+          // more kinematic planes die-cut from the host sheet (each rank
+          // reads as ~7 elements — columns, moldings, keystone, rim, crown).
+          // A bare oanave (no strata) is the apse backdrop, not story.
+          expect(
+            layer.strata.length,
+            `${name} ${layer.id} is a bare oanave in a story role — needs >= 1 relief stratum`
+          ).toBeGreaterThanOrEqual(1)
+          continue
+        }
         if (layer.mech === 'vfold' || layer.mech === 'box') {
           const dresses = dressTargeting(layer.id, layers)
           expect(

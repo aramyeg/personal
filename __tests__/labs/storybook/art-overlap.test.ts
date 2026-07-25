@@ -24,6 +24,7 @@ import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { oanavePatches } from '@/components/labs/storybook/book/popup-oanave'
 
 // D-G7 ART & OVERLAP whitelist gate, second half (benchmark spec
 // docs/superpowers/specs/2026-07-13-grand-book-benchmark.md): "Screen-space
@@ -146,6 +147,11 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       return keepWinchOutputQuads(l, keepWinchThetaMax(l), tL, tR)
     case 'skyline':
       return keepSkylineQuads(l, tL, tR)
+    case 'oanave':
+      // Host wings + die-cut relief strata — the rank's whole painted
+      // footprint (popup-oanave.ts); the nested-portal overlaps ARE the
+      // composition, judged by the whitelist like any depth staging.
+      return oanavePatches(l, tL, tR).map((p) => p.quad)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }
@@ -344,13 +350,41 @@ const WHITELIST: readonly WhitelistEntry[] = [
       'tower rises clear), so it reads against the keep facade rather than against sky — flagged in the s4 ' +
       'build ledger for the chapter-boundary review.',
   },
+  // E3 s7 nave (scenes/s7-scene-pack.md): the spread IS a stack of nested
+  // portals — every rank deliberately overlaps the ranks behind it, and the
+  // sightline bench (e3s7-nave-sightline.mjs, ported into
+  // popup-oanave.test.ts OA-7/OA-8) proves each deeper rank still shows a
+  // crown band (15.3/8.6/7.4/7.6% frameH), exposed wings (>= 0.08/side) and
+  // gilt jamb rims (>= 1% frameW) past the rank in front. Recession, not
+  // masking, is the composition.
   {
-    pair: 'ch6-treasury x ch6-steps',
+    pair: 'ch6-nave-b x ch6-nave-c',
     reason: 'depth-echo',
+    note: 'nested nave ranks — rank C shows through and around B by the bench-gated crown band + jamb rim.',
+  },
+  {
+    pair: 'ch6-nave-b x ch6-nave-d',
+    reason: 'depth-echo',
+    note: 'nested nave ranks — B reads over D by its crown band; the mouth frames its column bases.',
+  },
+  {
+    pair: 'ch6-nave-c x ch6-nave-d',
+    reason: 'depth-echo',
+    note: 'nested nave ranks — C portal shows through D below y = 0.13 (column bases + path, by design).',
+  },
+  {
+    pair: 'ch6-nave-d x ch6-steps',
+    reason: 'framing',
     note:
-      "documented intent: the glass-gallery deck 'crests near its shoulder' and its left wing 'swings " +
-      "toward the open left of the leaning tower' — confirmed in the capture as a strong, deliberate " +
-      'reveal past both shoulders of the treasury, not a mask.',
+      "the entrance dais climbs INTO rank D's portal — the mouth frames the deck; the dais grazing ray " +
+      "lands at y ~ 0 exactly at D's sill (bench §A), so the overlap hides nothing inside the nave.",
+  },
+  {
+    pair: 'ch6-strongbox x ch6-steps',
+    reason: 'silhouette-dialogue',
+    note:
+      'documented intent: the strongbox is the waystation the gold processional path splits around before ' +
+      'climbing the dais — one path beat by construction; its shadow dies at z ~ 0.22, before the dais top.',
   },
 ]
 

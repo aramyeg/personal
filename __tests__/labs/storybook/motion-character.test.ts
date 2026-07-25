@@ -317,6 +317,14 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // farthest to the mean corner distance). Measured worst ~1.2x + margin; smooth
   // and branch-free (the twist itself is user-paced and cap-exempt).
   volvelle: 1.6,
+  // OANAVE (E3 s7): the host IS the v-fold wall solver verbatim, so it
+  // carries the same smooth-but-steep late-bloom character as the vfold
+  // walls (phi 72-84 with a small rho-phi margin), and its relief strata
+  // are dihedral-slaved to the host fold — no drive of their own to add a
+  // discontinuity. Measured worst 9.05x (ch6-nave-a, the phi-84 apse — the
+  // wall regime, exactly the vfold walls' geometry) + 10% per the house
+  // measured-ceiling law (pack §4a beta-ratio note).
+  oanave: 10.0,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

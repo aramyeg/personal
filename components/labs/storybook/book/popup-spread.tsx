@@ -48,6 +48,7 @@ import { KeepWinchPopupLayer } from './popup-keepwinch-layer'
 import { KeepSkylinePopupLayer } from './popup-skyline-layer'
 import { DepthVistaPopupLayer } from './popup-depthvista-layer'
 import { DissolvePopupLayer } from './popup-dissolve-layer'
+import { OanavePopupLayer } from './popup-oanave-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import { VolvellePopupLayer } from './popup-volvelle-layer'
 import { LiftFlapPopupLayer } from './popup-liftflap-layer'
@@ -112,6 +113,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'depthvista') return 0.5 // arch decks + wing quads, per-face uvs in the depthvista layer
   if (layer.mech === 'dissolve') return 0.5 // base + slat + tab quads, per-slat uvs in the dissolve layer
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
+  if (layer.mech === 'oanave') return 0.5 // host + relief uvs live in the oanave layer (fold at 0.5, symmetric)
   return layer.creaseU ?? 0.5
 }
 
@@ -513,6 +515,19 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'skyline') {
           return (
             <KeepSkylinePopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        // The nave rank renders through its own layer: host wings + die-cut
+        // OA relief strata merged into ONE mesh/draw (popup-oanave.ts).
+        if (layer.mech === 'oanave') {
+          return (
+            <OanavePopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}
