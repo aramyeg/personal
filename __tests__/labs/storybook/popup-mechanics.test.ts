@@ -47,6 +47,7 @@ import { keepStackQuads, keepStackStoryGeoms } from '@/components/labs/storybook
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads, solveKeepSkylinePose } from '@/components/labs/storybook/book/popup-skyline'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
+import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import {
   keepsakeCardInPlane,
   keepsakePExit,
@@ -170,6 +171,12 @@ const allQuads = (
   if (layer.mech === 'depthvista') {
     return solveDepthVistaPose(layer, thetaL, thetaR).wings.map((w) => w.patch.flap)
   }
+  // The dissolve rests flat (dunes, tau=0): its sand base, the N coplanar slats,
+  // and the flush tab — every rigid world quad it poses.
+  if (layer.mech === 'dissolve') {
+    const pose = solveDissolvePose(layer, 0, thetaL, thetaR)
+    return [pose.base, ...pose.slats, pose.tab]
+  }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -224,6 +231,10 @@ const flatTol = (layer: SceneLayer): number => {
   // second (0.006); the leaf's lift = a_user * E(0) = 0 at closed, so the piece
   // flattens to the leaf's lift class.
   if (layer.mech === 'liftflap') return 0.007
+  // The dissolve's sand base lies IN the page (lift 0) and its slat rack rivets
+  // one glue layer proud (BASE_LIFT = ROTOR_LIFT 0.003); both end states are
+  // coplanar (tau in {0,PI}), so the piece flattens to the rotor lift class.
+  if (layer.mech === 'dissolve') return 0.004
   // The winch's outputs fold flat riding folding keep walls (off-wall reach ~
   // sin(deploy)*E(beta) -> 0), but the semaphore lies along the fold-invariant
   // spine axis leaving a paper-thickness residual (0.015) — the bench's N4
@@ -278,7 +289,8 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         layer.mech === 'keepstack' ||
         layer.mech === 'keepwinch' ||
         layer.mech === 'skyline' ||
-        layer.mech === 'depthvista'
+        layer.mech === 'depthvista' ||
+        layer.mech === 'dissolve'
       ) {
         // Anatomy-phase and hand-driven mechs carry their spec-validity gates in
         // popup-anatomy.test.ts (deck flat-fold rules, fan member rules,
@@ -518,6 +530,13 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
             for (const idx of [0, 1])
               expect(Math.abs(w.patch.flap[idx][0] * n[0] + w.patch.flap[idx][1] * n[1])).toBeLessThan(1e-9)
           }
+          continue
+        }
+        if (layer.mech === 'dissolve') {
+          // A coplanar slat rack riveted one glue layer proud (the volvelle/
+          // liftflap-board class): no page-glued FOLD panel, so A1's glue-in-page
+          // check does not apply — its coplanarity + fold-flat live in
+          // derive-dissolve.mjs D6/D8 and popup-dissolve.test.ts.
           continue
         }
         const pose = poseAt(layer, layers, thetaL, thetaR)

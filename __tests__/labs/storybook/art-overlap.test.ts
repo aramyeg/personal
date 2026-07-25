@@ -18,6 +18,7 @@ import {
   type PlatformPatch,
 } from '@/components/labs/storybook/book/popup-anatomy'
 import { solveTabPiecePose } from '@/components/labs/storybook/book/popup-tabpiece'
+import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { solveKineticArmPose } from '@/components/labs/storybook/book/popup-kinetic'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
@@ -131,6 +132,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
     }
     case 'tabpiece':
       return solveTabPiecePose(l, tL, tR).map((p) => p.quad)
+    case 'dissolve':
+      // The dissolve's art footprint is its coplanar placard (the sand base the
+      // slats tile at rest); posed flat (dunes, tau=0).
+      return [solveDissolvePose(l, 0, tL, tR).base]
     case 'kinetic': {
       const pose = solveKineticArmPose(l, tL, tR)
       return [pose.right, pose.left]

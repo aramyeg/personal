@@ -108,6 +108,12 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'depthvista') {
       for (const wing of layer.wings) ids.add(`${layer.id}-${wing.key}`)
     }
+    // popup-dissolve-layer.tsx: the two crossfade paintings (dunes up-face,
+    // gold under-face) sliced across the venetian slats.
+    if (layer.mech === 'dissolve') {
+      ids.add(`${layer.id}-dunes`)
+      ids.add(`${layer.id}-gold`)
+    }
   }
   // Fixed, book-level ids not tied to any content.ts layer (cover-decals.tsx,
   // use-page-print.ts, satchel-items.ts's HTML-overlay icons).

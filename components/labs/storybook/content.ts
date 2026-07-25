@@ -483,6 +483,19 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // glue (z ~0.04) and the spine-hugging chest (x <= ~0.24; z overlap is at a
   // disjoint x, no crossing). Ships at the same 218/13 spread-5 ceilings.
   { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.26, z1: 0.54, legW: 0.26, liftDeg: 55 },
+  // E2.2 PULL-TAB DISSOLVE (Birmingham 92/93/119; bench derive-dissolve.mjs):
+  // the book's first paper CROSSFADE and a genuinely NEW mechanism family for
+  // G1. A page-flat rack of 6 venetian SLATS in the open sand field on the LEFT
+  // page — the mirror of the right-page goldpile tab (a second fore-edge tab,
+  // symmetric tab vocabulary). The reader pulls the tab and the shared flip
+  // angle tau carries rolling DUNES (a distant camel-train) through the edge-on
+  // "blinds close" over to the dragon's GOLD hoard — the transmutation. Both end
+  // states are coplanar (volvelle-class, no fold-flat envelope); the release
+  // snaps to a pure end {dunes, gold} the book remembers. Placed downstage-left
+  // clear of the spine-hugging chest (d<=0.24), the deep hoard shelf (z<=-0.18)
+  // and the hero dragon's base footprint (d<=~0.32) — it does NOT touch the
+  // ch4-hoard strut region behind the dragon.
+  { id: 'ch4-dissolve', kind: 'midground', role: 'story', mech: 'dissolve', side: 'left', d0: 0.46, d1: 0.98, z0: 0.2, z1: 0.6, slats: 6, stroke: 0.14 },
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 

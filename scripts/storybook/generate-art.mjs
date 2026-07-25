@@ -1693,6 +1693,185 @@ function spireMember(w, h, seed, idx) {
   return svgPiece(w, h, s)
 }
 
+// ---- THE DUNES -> GOLD DISSOLVE (s5 ch4-dissolve-dunes / -gold). TWO full-bleed
+// paintings that share ONE composition: the SAME layered dune ridgelines and the
+// SAME camel-train station, so when the venetian slats flip, rolling desert
+// TRANSMUTES into the dragon's gold hoard (matching big shapes are what sell the
+// magic). Screen-space (art call sheet §1.6, the liftflap law): image-x = the
+// page-fore axis d (the direction the 6 slats stack), image-y = the spine axis z
+// (SVG top = z1 = the far sky, SVG bottom = z0 = the near foreground). Fully
+// opaque full-bleed, no alpha, like a box face or a deck. ----
+
+/** Interpolated crest height y at x across a crest polyline (both images share
+ *  these, so the ridgelines register A<->B). */
+function crestYAt(pts, x) {
+  for (let i = 0; i + 1 < pts.length; i++) {
+    if (x >= pts[i][0] && x <= pts[i + 1][0]) {
+      const t = (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0] || 1)
+      return lerp(pts[i][1], pts[i + 1][1], t)
+    }
+  }
+  return pts[pts.length - 1][1]
+}
+
+/** The shared desert composition: 4 layered dune crests (back high -> front low)
+ *  as y-profiles, plus a camel-train station on the 2nd-back crest. Deterministic
+ *  from the seed so dunes + gold are painted from the IDENTICAL big shapes. */
+function dissolveScene(w, h, seed) {
+  const r = mulberry32(seed)
+  const layers = 4
+  const crests = []
+  for (let L = 0; L < layers; L++) {
+    // Back crest sits HIGH (slim sky band) so the golden dunes dominate the
+    // canvas at scene scale; front crest low. Bolder amplitude = a silhouette
+    // that reads at the pinned camera.
+    const baseY = h * (0.26 + L * 0.185)
+    const amp = h * (0.06 + L * 0.028)
+    const phase = r() * 6.28
+    const cols = 12
+    const pts = []
+    for (let i = 0; i <= cols; i++) {
+      const x = (w * i) / cols
+      const y = baseY - Math.sin(i * 0.8 + L * 1.9 + phase) * amp - amp * 0.4 * Math.sin(i * 1.7 + phase * 2) - amp * 0.3
+      pts.push([x, y])
+    }
+    crests.push({ baseY, pts })
+  }
+  // The low SUN — the scene's dominant shared LANDMARK: a sun over the dunes in
+  // A, a great gold medallion in B (the eye's "this became that" anchor).
+  const sun = { x: w * 0.7, y: h * 0.22, r: h * 0.15 }
+  // camel train walking the 2nd-from-back crest ridge (humped silhouettes)
+  const ridge = crests[1].pts
+  const camels = []
+  const cn = 4
+  for (let i = 0; i < cn; i++) {
+    const x = w * (0.18 + i * 0.09)
+    camels.push([x, crestYAt(ridge, x) - h * 0.008])
+  }
+  return { crests, camels, sun }
+}
+
+/** One camel silhouette (two humps + neck), scaled by s, in the given ink. */
+function camelGlyph(x, y, s, fill) {
+  return (
+    `<path d="M ${fx(x - 3.4 * s)} ${fx(y)} q ${fx(1.2 * s)} ${fx(-2.2 * s)} ${fx(2.4 * s)} 0 ` +
+    `q ${fx(1.1 * s)} ${fx(-2.4 * s)} ${fx(2.3 * s)} 0 l ${fx(1.4 * s)} ${fx(0.2 * s)} ` +
+    `q ${fx(0.3 * s)} ${fx(-1.9 * s)} ${fx(0.9 * s)} ${fx(-2.1 * s)} l ${fx(0.4 * s)} ${fx(2.3 * s)} Z" ` +
+    `fill="${fill}"/>` +
+    `<line x1="${fx(x - 2.6 * s)}" y1="${fx(y + 0.2 * s)}" x2="${fx(x - 2.9 * s)}" y2="${fx(y + 2.4 * s)}" stroke="${fill}" stroke-width="${fx(0.7 * s)}"/>` +
+    `<line x1="${fx(x + 2.2 * s)}" y1="${fx(y + 0.2 * s)}" x2="${fx(x + 2.5 * s)}" y2="${fx(y + 2.4 * s)}" stroke="${fill}" stroke-width="${fx(0.7 * s)}"/>`
+  )
+}
+
+function dissolveDunes(w, h, seed) {
+  const { crests, camels, sun } = dissolveScene(w, h, seed)
+  // "The Golden Dunes": warm GOLDEN sand (not red), high-contrast layer ramp so
+  // the ridgelines read as bold stripes at scene scale; a SLIM sunset sky band.
+  const SKY_TOP = '#d9612f', SKY_MID = '#e8934a', SKY_LOW = '#f2c069'
+  const SAND = ['#eaca74', '#dcab4c', '#c88e30', '#b0761f'] // golden back -> deep front, strong steps
+  const SAND_LIT = '#ffe9a0'
+  const defs =
+    `<linearGradient id="dvSky" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${SKY_TOP}"/><stop offset="0.55" stop-color="${SKY_MID}"/><stop offset="1" stop-color="${SKY_LOW}"/></linearGradient>`
+  let s = `<rect width="${w}" height="${h}" fill="url(#dvSky)"/>`
+  // the low sun — a bold glowing disc (the shared landmark)
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r)}" fill="#ffe6a8"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.66)}" fill="#fff2cf"/>`
+  // dune crests, back -> front (each fills from its ridge down to the canvas foot)
+  crests.forEach((c, L) => {
+    let d = `M 0 ${fx(c.pts[0][1])}`
+    for (const [x, y] of c.pts) d += ` L ${fx(x)} ${fx(y)}`
+    d += ` L ${w} ${h} L 0 ${h} Z`
+    s += `<path d="${d}" fill="${SAND[L]}"/>`
+    // a lit wind-lip along the ridge — bolder so the silhouette reads small
+    let lip = `M ${fx(c.pts[0][0])} ${fx(c.pts[0][1])}`
+    for (const [x, y] of c.pts) lip += ` L ${fx(x)} ${fx(y)}`
+    s += `<path d="${lip}" fill="none" stroke="${SAND_LIT}" stroke-width="${fx(h * 0.009)}" opacity="${0.6 - L * 0.09}"/>`
+  })
+  // the camel train on the ridge — bold dark silhouettes
+  for (const [x, y] of camels) s += camelGlyph(x, y, h * 0.03, '#3a2410')
+  // foreground ripples + a few pebbles
+  const r = mulberry32(seed ^ 0x1d)
+  for (let i = 0; i < 12; i++) {
+    const y = h * (0.78 + r() * 0.2)
+    s += `<path d="M 0 ${fx(y)} Q ${fx(w * 0.5)} ${fx(y - h * 0.02)} ${w} ${fx(y)}" fill="none" stroke="#a06a28" stroke-width="1.6" opacity="0.4"/>`
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = rr(r, w * 0.04, w * 0.96), y = rr(r, h * 0.82, h * 0.97)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, 5, 9))}" ry="3.4" fill="#7e5220" opacity="0.6"/>`
+  }
+  return svgPiece(w, h, s, defs)
+}
+
+function dissolveGold(w, h, seed) {
+  const { crests, camels, sun } = dissolveScene(w, h, seed) // SAME shapes as the dunes
+  const defs =
+    `<linearGradient id="dvGold" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#d99a1e"/><stop offset="0.5" stop-color="#f0c236"/><stop offset="1" stop-color="#ffe878"/></linearGradient>`
+  let s = `<rect width="${w}" height="${h}" fill="url(#dvGold)"/>`
+  // the sun TRANSMUTED: a great gold medallion where the sun was (the "this
+  // became that" anchor) — radiating glints, a gem at its heart
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.15)}" fill="#fff6d0" opacity="0.85"/>` // halo
+  for (let a = 0; a < 12; a++) {
+    const ang = (a / 12) * 6.283
+    s += `<line x1="${fx(sun.x + Math.cos(ang) * sun.r * 1.1)}" y1="${fx(sun.y + Math.sin(ang) * sun.r * 1.1)}" x2="${fx(sun.x + Math.cos(ang) * sun.r * 1.5)}" y2="${fx(sun.y + Math.sin(ang) * sun.r * 1.5)}" stroke="${GOLD_LIT}" stroke-width="2.4" opacity="0.7"/>`
+  }
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r)}" fill="${GOLD_LIT}" stroke="#b8901e" stroke-width="${fx(h * 0.008)}"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.62)}" fill="none" stroke="#b8901e" stroke-width="1.6" opacity="0.6"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.24)}" fill="#c8434e" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.4"/>` // ruby heart
+  const GOLD_HEAP = ['#e8c945', '#d9a828', '#c8901a', '#b47c12'] // back -> front, bright metallic ramp
+  const r = mulberry32(seed ^ 0x60)
+  // gold heaps on the SAME crest ridgelines
+  crests.forEach((c, L) => {
+    let d = `M 0 ${fx(c.pts[0][1])}`
+    for (const [x, y] of c.pts) d += ` L ${fx(x)} ${fx(y)}`
+    d += ` L ${w} ${h} L 0 ${h} Z`
+    s += `<path d="${d}" fill="${GOLD_HEAP[L]}"/>`
+    // bright crest sheen
+    let lip = `M ${fx(c.pts[0][0])} ${fx(c.pts[0][1])}`
+    for (const [x, y] of c.pts) lip += ` L ${fx(x)} ${fx(y)}`
+    s += `<path d="${lip}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(h * 0.01)}" opacity="${0.7 - L * 0.1}"/>`
+    // scattered coins hugging each ridge (dense, so it reads as solid gold)
+    const coins = 70 + L * 45
+    for (let i = 0; i < coins; i++) {
+      const x = rr(r, 0, w)
+      const ry = crestYAt(c.pts, x)
+      const y = ry + rr(r, 0, (h - ry) * 0.6)
+      const cr = rr(r, 6, 13)
+      const bright = r() < 0.5
+      s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.7)}" fill="${bright ? GOLD_LIT : GOLD}" stroke="#b8901e" stroke-width="0.9"/>`
+      if (r() < 0.35) s += `<ellipse cx="${fx(x - cr * 0.24)}" cy="${fx(y - cr * 0.22)}" rx="${fx(cr * 0.3)}" ry="${fx(cr * 0.2)}" fill="#fff6d6" opacity="0.85"/>`
+    }
+  })
+  // the camel train transmuted: a caravan of crowns + goblets on the ridge —
+  // rendered BOLD (solid fill + thick dark outline) so it reads at scene scale
+  // as clearly as the dunes' dark camel silhouettes (the visible A<->B anchor,
+  // since the sun/medallion is occluded by the scene goldpile at the camera).
+  const CW = fx(h * 0.006) // outline weight
+  camels.forEach(([x, y], i) => {
+    const g = h * 0.042
+    if (i % 2 === 0) {
+      // crown — solid gold, dark rim, jewelled band
+      s += `<path d="M ${fx(x - g)} ${fx(y)} L ${fx(x - g)} ${fx(y - g * 0.85)} L ${fx(x - g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x)} ${fx(y - g * 1.05)} L ${fx(x + g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x + g)} ${fx(y - g * 0.85)} L ${fx(x + g)} ${fx(y)} Z" fill="${GOLD_LIT}" stroke="#4a3208" stroke-width="${CW}" stroke-linejoin="round"/>`
+      s += `<rect x="${fx(x - g)}" y="${fx(y - g * 0.28)}" width="${fx(g * 2)}" height="${fx(g * 0.28)}" fill="${GOLD}" stroke="#4a3208" stroke-width="${CW}"/>`
+      for (const jx of [-0.5, 0, 0.5]) s += `<circle cx="${fx(x + jx * g)}" cy="${fx(y - g * 0.62)}" r="${fx(g * 0.16)}" fill="#c8434e" stroke="#4a3208" stroke-width="1"/>`
+    } else {
+      // goblet — solid gold cup on a stem, dark rim
+      s += `<path d="M ${fx(x - g * 0.72)} ${fx(y - g * 1.05)} L ${fx(x + g * 0.72)} ${fx(y - g * 1.05)} Q ${fx(x)} ${fx(y - g * 0.05)} ${fx(x - g * 0.72)} ${fx(y - g * 1.05)} Z" fill="${GOLD_LIT}" stroke="#4a3208" stroke-width="${CW}" stroke-linejoin="round"/>`
+      s += `<rect x="${fx(x - g * 0.12)}" y="${fx(y - g * 0.5)}" width="${fx(g * 0.24)}" height="${fx(g * 0.5)}" fill="${GOLD}" stroke="#4a3208" stroke-width="1"/>`
+      s += `<rect x="${fx(x - g * 0.5)}" y="${fx(y)}" width="${fx(g)}" height="${fx(g * 0.16)}" fill="${GOLD}" stroke="#4a3208" stroke-width="1"/>` // foot
+    }
+  })
+  // a few big gems catching light across the heap
+  for (let i = 0; i < 9; i++) {
+    const x = rr(r, w * 0.08, w * 0.92), y = rr(r, h * 0.4, h * 0.94)
+    const col = ['#57a6cf', '#c8434e', '#5fb488', '#8a6fd6'][i % 4]
+    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="${col}" stroke="${INK}" stroke-width="1.1" stroke-opacity="0.4"/>`
+    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 0 Z" fill="#ffffff" opacity="0.35"/>`
+  }
+  return svgPiece(w, h, s, defs)
+}
+
 // ---- DRESS PATCHES (alpha silhouette). Small storytelling cut-outs. ----
 function dressPatch(w, h, seed, kind) {
   const r = mulberry32(seed)
@@ -2578,6 +2757,11 @@ const PIECES = [
   { id: 'ch4-chest-spill', seed: 50211, w: 512, h: 384, grain: 12, paint() { return dressPatch(this.w, this.h, this.seed, 'goldSpill') } },
   { id: 'ch4-hoard-deck', seed: 50220, w: 1024, h: 244, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'hoard') } },
   { id: 'ch4-goldpile-face', seed: 50230, w: 900, h: 900, grain: 14, paint() { return goldHeap(this.w, this.h, this.seed) } },
+  // the pull-tab DISSOLVE: dunes (A) and gold (B) share one composition (matching
+  // ridgelines) so the venetian flip transmutes desert -> hoard. Aspect w:h =
+  // (d1-d0):(z1-z0) = 0.52:0.40 ~ 1.30:1; sliced into 6 vertical slat strips.
+  { id: 'ch4-dissolve-dunes', seed: 50240, w: 1024, h: 788, grain: 12, paint() { return dissolveDunes(this.w, this.h, this.seed) } },
+  { id: 'ch4-dissolve-gold', seed: 50241, w: 1024, h: 788, grain: 12, paint() { return dissolveGold(this.w, this.h, this.seed) } },
   // ---- Spread 6 — the Bazaar (ch5 stall box, goods, arch dress) ----
   { id: 'ch5-stall-back', seed: 60201, w: 512, h: 320, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'stall') } },
   { id: 'ch5-stall-side', seed: 60202, w: 512, h: 349, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'stall') } },

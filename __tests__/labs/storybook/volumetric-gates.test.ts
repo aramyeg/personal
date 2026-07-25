@@ -24,6 +24,7 @@ import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keep
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
+import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
@@ -154,6 +155,12 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       // coplanar footprint); the static board dominates the occupancy centroid.
       const pose = solveLiftFlapPose(l, [], tL, tR)
       return [pose.board, ...pose.doors]
+    }
+    case 'dissolve': {
+      // No flip channel in the depth gates — pose flat (dunes, tau=0): the sand
+      // base + the coplanar slats + the flush tab, the resting depth footprint.
+      const pose = solveDissolvePose(l, 0, tL, tR)
+      return [pose.base, ...pose.slats, pose.tab]
     }
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)

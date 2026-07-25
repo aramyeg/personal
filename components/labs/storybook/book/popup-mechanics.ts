@@ -687,6 +687,46 @@ export type DepthVistaGeom = {
   restAtDeg?: number
 }
 
+/**
+ * PULL-TAB DISSOLVE (E2.2 Batch B; Birmingham mech 92 WOVEN DISSOLVE / 93 PANEL
+ * DISSOLVE / 119 SHUTTER SCENE) — the book's first paper CROSSFADE: the reader
+ * pulls a tab and one picture transmutes into another across a rack of
+ * interleaved slats (s5 dunes -> the dragon's gold hoard). PAGE-ROOTED like the
+ * volvelle / tab piece (side + page coordinates, riding the page's own moving
+ * frame, NOT seated on a parent panel). A page-flat rack of N rigid SLATS, each
+ * a ribbon spanning the placard's full spine band, hinged along its spine-ward
+ * z-edge; a single reader flip angle tau in [0,PI], shared by every slat (a
+ * synchronised venetian), carries image-A up-faces (tau=0) through the edge-on
+ * "blinds close" collapse over to image-B up-faces (tau=PI). The pull-strip is
+ * the cord: tab draw delta in [0,stroke] maps tau = PI*delta/stroke. Both end
+ * states are COPLANAR, so — like the volvelle — it needs no fold-flat envelope;
+ * the release snaps tau to a pure end {0,PI}, held through page turns (H4). A
+ * pure in-plane translation of flat opaque layers CANNOT cross-fade two
+ * pictures (bench D0) — the slats FLIP. Pose + registration math lives in
+ * book/popup-dissolve.ts (this module is at its size cap). Derived + gate-
+ * checked in .superpowers/sdd/bench/derive-dissolve.mjs.
+ */
+export type DissolveGeom = {
+  mech: 'dissolve'
+  /** The page the rack rivets into (whose frame the slats hinge on). */
+  side: 'left' | 'right'
+  /** Placard band along the page run (spine -> fore), d0 < d1 — the slats stack
+   *  across it, one pitch p = (d1 - d0)/slats each. The strip runs on from d1 to
+   *  the fore-edge slit at PAGE_W, emerging as the tab. */
+  d0: number
+  d1: number
+  /** Placard band along the spine (world z), z0 < z1 — every slat spans it. */
+  z0: number
+  z1: number
+  /** Slat count N — derive from the camera's angular resolution so each band
+   *  still reads as a strip of art (bench D10). */
+  slats: number
+  /** Tab pull for a full A->B flip (world units; default 0.14). */
+  stroke?: number
+  /** Visible tab width along the spine (default 0.1). */
+  tabW?: number
+}
+
 export type LayerGeom =
   | VFoldGeom
   | ParallelGeom
@@ -708,6 +748,7 @@ export type LayerGeom =
   | KeepWinchGeom
   | KeepSkylineGeom
   | DepthVistaGeom
+  | DissolveGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1228,6 +1269,8 @@ export function solveLayerPose(
       throw new Error('storybook: skyline layers are multi-mound — use solveKeepSkylinePose (popup-skyline)')
     case 'depthvista':
       throw new Error('storybook: depth-vista layers are multi-patch (arches + wings) — use solveDepthVistaPose (popup-depthvista)')
+    case 'dissolve':
+      throw new Error('storybook: dissolve layers are multi-patch + user-driven — use solveDissolvePose (popup-dissolve)')
   }
 }
 

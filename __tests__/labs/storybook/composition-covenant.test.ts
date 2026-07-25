@@ -162,6 +162,13 @@ const familyOf = (l: SceneLayer): string | null => {
       // wing pair, all parallel-fold: an inherent multi-plane assembly, its own
       // page-driven backdrop family.
       return 'depthvista'
+    case 'dissolve':
+      // The pull-tab dissolve (Birmingham 92/93/119) — a page-flat rack of
+      // venetian slats the reader flips to crossfade one picture into another
+      // (dunes -> gold): the book's only paper crossfade, its own hand-driven
+      // family, distinct from the volvelle's rotating window and the liftflap's
+      // hinged reveal.
+      return 'dissolve'
     case 'dress':
       return null
   }
@@ -192,6 +199,7 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
       for (const layer of layers) {
         if (layer.role !== 'story') continue
         if (layer.mech === 'platform' || layer.mech === 'fan' || layer.mech === 'keepstack') continue // inherent assemblies
+        if (layer.mech === 'dissolve') continue // inherent assembly: a rack of N slats + sand base + tab (the paper crossfade)
         if (layer.mech === 'vfold' || layer.mech === 'box') {
           const dresses = dressTargeting(layer.id, layers)
           expect(

@@ -23,6 +23,7 @@ import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
+import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
 
@@ -164,6 +165,13 @@ const allQuads = (
   // one single cammed flap each — every world quad it poses.
   if (layer.mech === 'depthvista') {
     return solveDepthVistaPose(layer, thetaL, thetaR).wings.map((w) => w.patch.flap)
+  }
+  // The dissolve holds a flat end state (tau=0 dunes); no envelope (both ends are
+  // coplanar), so it is purely page-driven like the depth vista — its base, N
+  // coplanar slats, and flush tab all ride the folding page (bench D11).
+  if (layer.mech === 'dissolve') {
+    const pose = solveDissolvePose(layer, 0, thetaL, thetaR)
+    return [pose.base, ...pose.slats, pose.tab]
   }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
