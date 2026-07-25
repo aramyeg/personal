@@ -3593,16 +3593,19 @@ function naveApseFace(w, h, seed) {
     const y = h * (0.55 + k * 0.15)
     s += `<rect x="0" y="${fx(y)}" width="${w}" height="${fx(h * 0.05)}" fill="${NAVE_C.gold}" opacity="${fx(0.28 - k * 0.07)}"/>`
   }
-  // the aurora-rose window: radial mint -> amethyst -> gilt core ring, spoked.
-  const wy = h * 0.42
-  const wr = h * 0.3
+  // the aurora-rose window: radial mint -> amethyst -> gilt core ring,
+  // spoked — CENTRED ON the visible band (world y 0.43..0.62 of the 0.62
+  // face, bench §A); the rose is generous so the crown band glows, and
+  // whatever dips under the clip line only warms the dark below it.
+  const wy = h * 0.155
+  const wr = h * 0.23
   s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="url(#rose-grad)"/>`
   for (let i = 0; i < 8; i++) {
     const a = (Math.PI * i) / 4
     s += `<line x1="${fx(cx)}" y1="${fx(wy)}" x2="${fx(cx + wr * Math.cos(a))}" y2="${fx(wy + wr * Math.sin(a))}" stroke="${NAVE_C.midnight}" stroke-width="2.4" opacity="0.65"/>`
   }
-  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="4" opacity="0.95"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr * 0.32)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.4" opacity="0.9"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="4.5" opacity="0.95"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr * 0.32)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.2" opacity="0.9"/>`
   s += `</g>`
   // frost cut edge along the whole scalloped crown + dusting beneath it.
   s += `<path d="${sil}" fill="none" stroke="${NAVE_C.frost}" stroke-width="4" opacity="0.95" stroke-linejoin="round"/>`
@@ -3682,26 +3685,37 @@ function navePage(w, h, seed) {
   // pooled aurora-gold light through the portals (z -0.05 .. -0.32 on axis)
   s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(-0.185)))}" rx="${fx(PX(0.14))}" ry="${fx(PY(0.095))}" fill="url(#pool-grad)"/>`
   // the gold processional path: apron (bottom centre) -> splits around the
-  // strongbox (z 0.38..0.5) -> dais -> through the mouth to the pooled light.
-  const path = [
-    [0.5, 1.0],
-    [0.5, pageFY(0.56)],
-    [0.44, pageFY(0.5)],
-    [0.44, pageFY(0.38)],
-    [0.5, pageFY(0.33)],
-    [0.5, pageFY(-0.32)],
-  ]
-  const lobe = [
-    [0.56, pageFY(0.5)],
-    [0.56, pageFY(0.38)],
-  ]
-  const half = (t) => 0.075 * (1 - 0.62 * t) // taper into the nave
-  for (let i = 0; i < path.length - 1; i++) {
-    const t = i / (path.length - 1)
-    const hw = PX(half(t) * 0.16 * 6.5)
-    s += `<line x1="${fx(PX(path[i][0]))}" y1="${fx(PY(path[i][1]))}" x2="${fx(PX(path[i + 1][0]))}" y2="${fx(PY(path[i + 1][1]))}" stroke="${NAVE_C.gold}" stroke-width="${fx(hw)}" opacity="0.5" stroke-linecap="round"/>`
-  }
-  s += `<line x1="${fx(PX(0.56))}" y1="${fx(PY(lobe[0][1]))}" x2="${fx(PX(0.56))}" y2="${fx(PY(lobe[1][1]))}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.05))}" opacity="0.4" stroke-linecap="round"/>`
+  // strongbox (z 0.38..0.5, |x| <= 0.095 world) -> dais -> through the
+  // mouth to the pooled light. Two smooth ribbons (main left lobe + a
+  // fainter right lobe), each ONE bezier path with butt caps so the split
+  // reads as an inlay parting around the waystation, not lumped capsules;
+  // perspective narrowing in two width steps at the dais.
+  const yApron = PY(1.0)
+  const y56 = PY(pageFY(0.56))
+  const y50 = PY(pageFY(0.5))
+  const y38 = PY(pageFY(0.38))
+  const y32 = PY(pageFY(0.32))
+  const yEnd = PY(pageFY(-0.32))
+  const xC = PX(0.5)
+  const xL = PX(0.44)
+  const xR = PX(0.565)
+  const mainD =
+    `M ${fx(xC)} ${fx(y56)} ` +
+    `C ${fx(xC)} ${fx((y56 + y50) / 2)} ${fx(xL)} ${fx(y56)} ${fx(xL)} ${fx(y50)} ` +
+    `L ${fx(xL)} ${fx(y38)} ` +
+    `C ${fx(xL)} ${fx((y38 + y32) / 2)} ${fx(xC)} ${fx(y38)} ${fx(xC)} ${fx(y32)}`
+  const lobeD =
+    `M ${fx(xC)} ${fx(y56)} ` +
+    `C ${fx(xC)} ${fx((y56 + y50) / 2)} ${fx(xR)} ${fx(y56)} ${fx(xR)} ${fx(y50)} ` +
+    `L ${fx(xR)} ${fx(y38)} ` +
+    `C ${fx(xR)} ${fx((y38 + y32) / 2)} ${fx(xC)} ${fx(y38)} ${fx(xC)} ${fx(y32)}`
+  // the full-width trunk on the apron, HALVED into the two lobes at the
+  // fork (the inlay parts around the box, it does not double), rejoining
+  // into the narrowed nave run.
+  s += `<line x1="${fx(xC)}" y1="${fx(yApron)}" x2="${fx(xC)}" y2="${fx(y56)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.072))}" opacity="0.5"/>`
+  s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.5" stroke-linejoin="round"/>`
+  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.03))}" opacity="0.42" stroke-linejoin="round"/>`
+  s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.5"/>`
   // gold lozenge inlay down the path centreline (painted-perspective narrowing)
   for (let i = 0; i < 26; i++) {
     const t = i / 26
