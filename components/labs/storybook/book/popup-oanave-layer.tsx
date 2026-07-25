@@ -29,7 +29,8 @@ import { easeTurnWeighted } from './page-geometry'
 import { shadowLift } from './shadow-light'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { useArtSprite } from './use-layer-texture'
+import { applyUvRect } from '../art-atlas'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -48,7 +49,9 @@ export function OanavePopupLayer({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
-  const faceArt = useArtTexture(layer.id)
+  // Atlas-aware: the whole nave + clerk share ONE 1024 page (nave-atlas-s7);
+  // the sprite rect remaps this rank's unit-square uv table into its region.
+  const { texture: faceArt, rect } = useArtSprite(layer.id)
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   // ONE merged geometry: host pair + a relief pair per stratum. UVs and the
@@ -67,14 +70,14 @@ export function OanavePopupLayer({
       // Quad corner order [inner@v0, outer@v0, outer@v1, inner@v1].
       uvs.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8)
     })
-    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    g.setAttribute('uv', new THREE.BufferAttribute(applyUvRect(uvs, rect), 2))
     const index = new Uint16Array(quadCount * 6)
     for (let k = 0; k < quadCount; k++)
       index.set([k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3], k * 6)
     g.setIndex(new THREE.BufferAttribute(index, 1))
     return g
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- geometry is sized by the (static) content entry
-  }, [layer.id, quadCount])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geometry is sized by the (static) content entry + its atlas rect
+  }, [layer.id, quadCount, rect])
 
   const paperTexture = sharedPaperTexture()
   const material = useMemo(

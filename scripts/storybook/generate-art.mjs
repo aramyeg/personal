@@ -3401,6 +3401,314 @@ function postRoadSpread(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
+// ============================================================================
+// E3 s7 — THE NORTHERN TREASURY NAVE (scenes/s7-scene-pack.md §4e). The ice-
+// palace ref's crystalline grammar (140028) mapped to midnight/teal + gold +
+// frost; aurora mint/amethyst live ONLY in the apse window and the pooled
+// floor light (daisy-ref single-accent discipline). SCREEN-SPACE page-flat
+// authoring; the OA relief strata are cut FROM these painted sheets, so
+// relief paint continuity is automatic — the painter only needs the gilt
+// shelf/molding lines to CROSS the cut bands.
+// ============================================================================
+
+const NAVE_C = {
+  midnight: '#16223a',
+  teal: '#14454b',
+  tealLit: '#1d5a60',
+  floor: '#0b2530',
+  gold: '#d4a13c',
+  gilt: '#f0cd7a',
+  frost: '#eef4f6',
+  mint: '#4fd6b8',
+  amethyst: '#8a6fd6',
+}
+
+/** The pointed-arch aperture path (image space, y down, bottom = sheet base).
+ *  Jambs rise from the base to the spring line, then two quadratics meet at
+ *  the apex — the die line the runtime alpha-cuts. */
+function naveArchPath(w, h, hwFrac, apexFrac) {
+  const cx = w / 2
+  const aw = hwFrac * w
+  const yApex = h * (1 - apexFrac)
+  const ySpring = Math.min(h, yApex + aw * 1.1)
+  return (
+    `M ${fx(cx - aw)} ${fx(h)} L ${fx(cx - aw)} ${fx(ySpring)} ` +
+    `Q ${fx(cx - aw)} ${fx(yApex)} ${fx(cx)} ${fx(yApex)} ` +
+    `Q ${fx(cx + aw)} ${fx(yApex)} ${fx(cx + aw)} ${fx(ySpring)} ` +
+    `L ${fx(cx + aw)} ${fx(h)} Z`
+  )
+}
+
+/** Teal vault masonry + coin-shelf strata lines shared by every rank face.
+ *  `topBand` is the wing band (image y fraction) the camera actually sees
+ *  (bench §4b) — the gilt coin shelves concentrate there. */
+function naveMasonry(w, h, r, topBandFrac) {
+  let s = ''
+  const course = h / 7
+  for (let i = 1; i < 7; i++) {
+    const y = i * course + rr(r, -1.5, 1.5)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${NAVE_C.midnight}" stroke-width="2" opacity="0.5"/>`
+    const stagger = i % 2 ? course * 0.9 : course * 0.45
+    for (let x = stagger; x < w; x += course * 1.8) {
+      s += `<line x1="${fx(x)}" y1="${fx(y)}" x2="${fx(x)}" y2="${fx(y - course)}" stroke="${NAVE_C.midnight}" stroke-width="1.4" opacity="0.35"/>`
+    }
+  }
+  // coin shelves in the visible top band: gilt shelf lines with coin-stack
+  // dashes, brightest nearest the crown (the "quiet gold" of the treasury).
+  const shelfBand = h * topBandFrac
+  for (let k = 0; k < 3; k++) {
+    const y = shelfBand * (0.28 + k * 0.3)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${NAVE_C.gold}" stroke-width="2.2" opacity="${fx(0.55 - k * 0.12)}"/>`
+    for (let x = rr(r, 6, 26); x < w; x += rr(r, 26, 54)) {
+      s += `<rect x="${fx(x)}" y="${fx(y - 5)}" width="${fx(rr(r, 8, 15))}" height="5" rx="1.5" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.5, 0.85))}"/>`
+    }
+  }
+  return s
+}
+
+/** Frost dusting along a silhouette crown (the crystalline cut edge). */
+function naveFrostDust(r, w, yAt, n) {
+  let s = ''
+  for (let i = 0; i < n; i++) {
+    const x = rr(r, 0, w)
+    s += `<circle cx="${fx(x)}" cy="${fx(yAt(x) + rr(r, 2, 12))}" r="${fx(rr(r, 0.8, 2.2))}" fill="${NAVE_C.frost}" opacity="${fx(rr(r, 0.3, 0.8))}"/>`
+  }
+  return s
+}
+
+/** One nave rank face (b/c/d): teal masonry sheet, die-cut pointed-arch
+ *  aperture (alpha), gilt arch rim, molding band across the tympanum, and —
+ *  where the rank carries a columnPair stratum — the painted central column
+ *  strip the relief is cut from, standing INSIDE the aperture (the through-
+ *  portal read is column bases + path, pack §4b). `edge` picks the T1
+ *  variant: 'gilt' for the mouth rank D, 'frost' elsewhere. */
+function naveRankFace(w, h, seed, cfg) {
+  const r = mulberry32(seed)
+  const arch = naveArchPath(w, h, cfg.apHw, cfg.apApex)
+  const sheet = `M 0 0 L ${w} 0 L ${w} ${h} L 0 ${h} Z ${arch}`
+  let s = `<g clip-path="url(#rank-clip)">`
+  s += `<rect width="${w}" height="${h}" fill="url(#rank-grad)"/>`
+  s += naveMasonry(w, h, r, cfg.topBand)
+  // tympanum molding band — gilt + frost lines the archMolding stratum is cut
+  // through (paint continuity across the relief cuts).
+  const [m0, m1] = cfg.mold
+  s += `<rect x="0" y="${fx(h * (1 - m1))}" width="${w}" height="${fx(h * (m1 - m0))}" fill="${NAVE_C.midnight}" opacity="0.35"/>`
+  s += `<line x1="0" y1="${fx(h * (1 - m1))}" x2="${w}" y2="${fx(h * (1 - m1))}" stroke="${NAVE_C.gilt}" stroke-width="3" opacity="0.8"/>`
+  s += `<line x1="0" y1="${fx(h * (1 - m0))}" x2="${w}" y2="${fx(h * (1 - m0))}" stroke="${NAVE_C.gold}" stroke-width="2.4" opacity="0.7"/>`
+  s += `</g>`
+  // gilt arch rim ringing the aperture (drawn unclipped so the ring sits ON
+  // the die edge), then the keystone at the crown for the mouth rank.
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gold}" stroke-width="7" opacity="0.95"/>`
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.6" opacity="0.9"/>`
+  if (cfg.keystone) {
+    const cx = w / 2
+    const yA = h * (1 - cfg.apApex)
+    s += `<path d="M ${fx(cx - w * 0.035)} ${fx(yA + 4)} L ${fx(cx + w * 0.035)} ${fx(yA + 4)} L ${fx(cx + w * 0.022)} ${fx(yA - h * 0.16)} L ${fx(cx - w * 0.022)} ${fx(yA - h * 0.16)} Z" fill="${NAVE_C.gilt}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
+  }
+  // the painted column pair standing in the portal centre — the sheet strip
+  // the columnPair stratum folds back from (it must stay painted: the cut
+  // region IS the relief). Gilt shafts on a midnight backing strip.
+  if (cfg.colHalf) {
+    const cx = w / 2
+    const cw = cfg.colHalf * w
+    const yTop = h * (1 - cfg.colTop)
+    s += `<rect x="${fx(cx - cw)}" y="${fx(yTop)}" width="${fx(cw * 2)}" height="${fx(h - yTop)}" fill="${NAVE_C.floor}"/>`
+    for (const sgn of [-1, 1]) {
+      const x = cx + sgn * cw * 0.52
+      s += `<rect x="${fx(x - cw * 0.2)}" y="${fx(yTop + 6)}" width="${fx(cw * 0.4)}" height="${fx(h - yTop - 14)}" fill="${NAVE_C.gold}" opacity="0.9"/>`
+      s += `<line x1="${fx(x)}" y1="${fx(yTop + 6)}" x2="${fx(x)}" y2="${fx(h - 8)}" stroke="${NAVE_C.gilt}" stroke-width="2.2" opacity="0.9"/>`
+      s += `<rect x="${fx(x - cw * 0.3)}" y="${fx(h - 14)}" width="${fx(cw * 0.6)}" height="8" fill="${NAVE_C.gilt}"/>`
+      s += `<rect x="${fx(x - cw * 0.3)}" y="${fx(yTop + 2)}" width="${fx(cw * 0.6)}" height="7" fill="${NAVE_C.gilt}"/>`
+    }
+  }
+  // T1 edge variant: the treasury's pages have gilt fore-edges — rank D's rim
+  // is GOLD-edged; the deeper ranks carry the house frost edge.
+  const edgeCore = cfg.edge === 'gilt' ? NAVE_C.gilt : NAVE_C.frost
+  s += `<path d="M 1 ${h} L 1 1 L ${w - 1} 1 L ${w - 1} ${h}" fill="none" stroke="${edgeCore}" stroke-width="4" opacity="0.95"/>`
+  s += `<path d="M 1 ${h} L 1 1 L ${w - 1} 1 L ${w - 1} ${h}" fill="none" stroke="${NAVE_C.midnight}" stroke-width="1.4" opacity="0.5"/>`
+  s += naveFrostDust(r, w, () => 3, 26)
+  const defs =
+    `<linearGradient id="rank-grad" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${NAVE_C.midnight}"/>` +
+    `<stop offset="0.45" stop-color="${NAVE_C.teal}"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.tealLit}"/></linearGradient>` +
+    `<clipPath id="rank-clip"><path d="${sheet}" fill-rule="evenodd"/></clipPath>`
+  // the sheet itself is painted only inside the evenodd clip, so the arch
+  // aperture rasterizes TRANSPARENT — the runtime alphaTest die-cuts it.
+  return svgPiece(w, h, s, defs)
+}
+
+/** The apse face (rank A): scalloped dome crown silhouette (alpha above the
+ *  crown line), the aurora-rose window centred in the visible band, flat
+ *  painted treasure tiers below (mostly hidden — cheap fills), frost dusting
+ *  on the crown edge. The ONLY home of aurora mint/amethyst on the walls. */
+function naveApseFace(w, h, seed) {
+  const r = mulberry32(seed)
+  const yWing = h * (1 - 0.46 / 0.62) // crown wings at world 0.46 of 0.62
+  const domeHw = w * 0.19
+  const cx = w / 2
+  // scalloped dome: five arcs over the crown, wings flat at yWing.
+  let sil = `M 0 ${h} L 0 ${fx(yWing)} L ${fx(cx - domeHw)} ${fx(yWing)}`
+  const scallops = 5
+  for (let i = 0; i < scallops; i++) {
+    const x0 = cx - domeHw + (2 * domeHw * i) / scallops
+    const x1 = cx - domeHw + (2 * domeHw * (i + 1)) / scallops
+    const mid = (x0 + x1) / 2
+    const rise = h * (0.22 + 0.68 * Math.sin((Math.PI * (i + 0.5)) / scallops))
+    sil += ` Q ${fx(mid)} ${fx(Math.max(4, yWing - rise))} ${fx(x1)} ${fx(yWing)}`
+  }
+  sil += ` L ${w} ${fx(yWing)} L ${w} ${h} Z`
+  let s = `<g clip-path="url(#apse-clip)">`
+  s += `<rect width="${w}" height="${h}" fill="url(#rank-grad-a)"/>`
+  s += naveMasonry(w, h, r, 0.3)
+  // flat painted treasure tiers below the sightline (bench: the apse lower
+  // face is invisible through the portals — cheap fills, no vista wasted).
+  for (let k = 0; k < 3; k++) {
+    const y = h * (0.55 + k * 0.15)
+    s += `<rect x="0" y="${fx(y)}" width="${w}" height="${fx(h * 0.05)}" fill="${NAVE_C.gold}" opacity="${fx(0.28 - k * 0.07)}"/>`
+  }
+  // the aurora-rose window: radial mint -> amethyst -> gilt core ring, spoked.
+  const wy = h * 0.42
+  const wr = h * 0.3
+  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="url(#rose-grad)"/>`
+  for (let i = 0; i < 8; i++) {
+    const a = (Math.PI * i) / 4
+    s += `<line x1="${fx(cx)}" y1="${fx(wy)}" x2="${fx(cx + wr * Math.cos(a))}" y2="${fx(wy + wr * Math.sin(a))}" stroke="${NAVE_C.midnight}" stroke-width="2.4" opacity="0.65"/>`
+  }
+  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="4" opacity="0.95"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr * 0.32)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.4" opacity="0.9"/>`
+  s += `</g>`
+  // frost cut edge along the whole scalloped crown + dusting beneath it.
+  s += `<path d="${sil}" fill="none" stroke="${NAVE_C.frost}" stroke-width="4" opacity="0.95" stroke-linejoin="round"/>`
+  s += `<path d="${sil}" fill="none" stroke="${NAVE_C.midnight}" stroke-width="1.4" opacity="0.5" stroke-linejoin="round"/>`
+  s += naveFrostDust(r, w, (x) => (Math.abs(x - cx) < domeHw ? yWing - h * 0.4 : yWing), 40)
+  const defs =
+    `<linearGradient id="rank-grad-a" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${NAVE_C.midnight}"/>` +
+    `<stop offset="0.5" stop-color="${NAVE_C.teal}"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.floor}"/></linearGradient>` +
+    `<radialGradient id="rose-grad" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.gilt}"/>` +
+    `<stop offset="0.35" stop-color="${NAVE_C.mint}"/>` +
+    `<stop offset="0.8" stop-color="${NAVE_C.amethyst}"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.midnight}"/></radialGradient>` +
+    `<clipPath id="apse-clip"><path d="${sil}"/></clipPath>`
+  return svgPiece(w, h, s, defs)
+}
+
+/** The clerk (T-COUNTERWEIGHT): kneeling over an open ledger, one candle —
+ *  midnight coat, candle-gold face, 3/4 toward the coffer (image right).
+ *  Painted on transparent ground; the stripflap shows both faces. */
+function naveClerk(w, h, seed) {
+  const r = mulberry32(seed)
+  let s = `<g>`
+  // candle glow halo behind everything
+  s += `<circle cx="${fx(w * 0.72)}" cy="${fx(h * 0.52)}" r="${fx(w * 0.3)}" fill="url(#candle-glow)"/>`
+  // kneeling body: coat sweeping to the floor, leaning forward over the book
+  s += `<path d="M ${fx(w * 0.18)} ${fx(h * 0.97)} Q ${fx(w * 0.14)} ${fx(h * 0.6)} ${fx(w * 0.34)} ${fx(h * 0.42)} Q ${fx(w * 0.52)} ${fx(h * 0.28)} ${fx(w * 0.6)} ${fx(h * 0.46)} L ${fx(w * 0.56)} ${fx(h * 0.97)} Z" fill="${NAVE_C.midnight}" stroke="${NAVE_C.teal}" stroke-width="2"/>`
+  // hood + candle-gold face, turned 3/4 to the right (toward the coffer)
+  s += `<circle cx="${fx(w * 0.52)}" cy="${fx(h * 0.3)}" r="${fx(w * 0.13)}" fill="${NAVE_C.midnight}"/>`
+  s += `<circle cx="${fx(w * 0.565)}" cy="${fx(h * 0.315)}" r="${fx(w * 0.085)}" fill="${NAVE_C.gilt}"/>`
+  // reaching arm toward the ledger
+  s += `<path d="M ${fx(w * 0.5)} ${fx(h * 0.5)} Q ${fx(w * 0.66)} ${fx(h * 0.56)} ${fx(w * 0.7)} ${fx(h * 0.72)}" fill="none" stroke="${NAVE_C.midnight}" stroke-width="${fx(w * 0.07)}" stroke-linecap="round"/>`
+  // the open ledger on the floor
+  s += `<path d="M ${fx(w * 0.52)} ${fx(h * 0.86)} L ${fx(w * 0.72)} ${fx(h * 0.79)} L ${fx(w * 0.92)} ${fx(h * 0.86)} L ${fx(w * 0.72)} ${fx(h * 0.93)} Z" fill="${NAVE_C.frost}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
+  s += `<line x1="${fx(w * 0.72)}" y1="${fx(h * 0.79)}" x2="${fx(w * 0.72)}" y2="${fx(h * 0.93)}" stroke="${NAVE_C.midnight}" stroke-width="1.6" opacity="0.7"/>`
+  for (const k of [0.82, 0.855, 0.885]) {
+    s += `<line x1="${fx(w * 0.56)}" y1="${fx(h * k + 2)}" x2="${fx(w * 0.7)}" y2="${fx(h * (k - 0.02))}" stroke="${NAVE_C.teal}" stroke-width="1.2" opacity="0.8"/>`
+  }
+  // the candle: stick, flame, gold pool
+  s += `<rect x="${fx(w * 0.8)}" y="${fx(h * 0.6)}" width="${fx(w * 0.05)}" height="${fx(h * 0.18)}" fill="${NAVE_C.frost}"/>`
+  s += `<ellipse cx="${fx(w * 0.825)}" cy="${fx(h * 0.795)}" rx="${fx(w * 0.085)}" ry="${fx(h * 0.02)}" fill="${NAVE_C.gold}" opacity="0.8"/>`
+  s += `<path d="M ${fx(w * 0.825)} ${fx(h * 0.5)} Q ${fx(w * 0.86)} ${fx(h * 0.55)} ${fx(w * 0.825)} ${fx(h * 0.59)} Q ${fx(w * 0.79)} ${fx(h * 0.55)} ${fx(w * 0.825)} ${fx(h * 0.5)} Z" fill="${NAVE_C.gilt}"/>`
+  s += `<circle cx="${fx(w * 0.825)}" cy="${fx(h * 0.545)}" r="${fx(w * 0.02)}" fill="${NAVE_C.frost}"/>`
+  s += `</g>`
+  const defs =
+    `<radialGradient id="candle-glow" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.gold}" stop-opacity="0.5"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>`
+  s += `` // clerk figure stays inside its die — no rectangular rim (die-cut alpha)
+  return svgPiece(w, h, s, defs)
+}
+
+/** The s7 page print — T-FLOOR, the refs' loudest norm: the gold lozenge
+ *  processional path apron -> around the strongbox -> up the dais -> through
+ *  the portal; pooled aurora-gold light on the axis ("light from the unseen
+ *  window"); AO seat bands at every rank station; the gilt ribbon + key tag
+ *  at the coffer hasp (the celebrated affordance); frost margin scatter. */
+function navePage(w, h, seed) {
+  const r = mulberry32(seed)
+  const PX = (f) => f * w
+  const PY = (f) => f * h
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${NAVE_C.floor}"/>`
+  // laid-stone tooth: faint teal course lines
+  for (let i = 0; i < 150; i++) {
+    const y = rr(r, 0, h)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${NAVE_C.teal}" stroke-width="1" opacity="${fx(rr(r, 0.04, 0.1))}"/>`
+  }
+  // AO seat bands at every rank station (T3) — the nave's depth laid into
+  // the ground even where the paper is cut away.
+  for (const z of [-0.52, -0.3, -0.08, 0.157]) {
+    const fy = pageFY(z)
+    s += `<rect x="0" y="${fx(PY(fy) - 7)}" width="${w}" height="14" fill="#000000" opacity="0.28"/>`
+  }
+  // pooled aurora-gold light through the portals (z -0.05 .. -0.32 on axis)
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(-0.185)))}" rx="${fx(PX(0.14))}" ry="${fx(PY(0.095))}" fill="url(#pool-grad)"/>`
+  // the gold processional path: apron (bottom centre) -> splits around the
+  // strongbox (z 0.38..0.5) -> dais -> through the mouth to the pooled light.
+  const path = [
+    [0.5, 1.0],
+    [0.5, pageFY(0.56)],
+    [0.44, pageFY(0.5)],
+    [0.44, pageFY(0.38)],
+    [0.5, pageFY(0.33)],
+    [0.5, pageFY(-0.32)],
+  ]
+  const lobe = [
+    [0.56, pageFY(0.5)],
+    [0.56, pageFY(0.38)],
+  ]
+  const half = (t) => 0.075 * (1 - 0.62 * t) // taper into the nave
+  for (let i = 0; i < path.length - 1; i++) {
+    const t = i / (path.length - 1)
+    const hw = PX(half(t) * 0.16 * 6.5)
+    s += `<line x1="${fx(PX(path[i][0]))}" y1="${fx(PY(path[i][1]))}" x2="${fx(PX(path[i + 1][0]))}" y2="${fx(PY(path[i + 1][1]))}" stroke="${NAVE_C.gold}" stroke-width="${fx(hw)}" opacity="0.5" stroke-linecap="round"/>`
+  }
+  s += `<line x1="${fx(PX(0.56))}" y1="${fx(PY(lobe[0][1]))}" x2="${fx(PX(0.56))}" y2="${fx(PY(lobe[1][1]))}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.05))}" opacity="0.4" stroke-linecap="round"/>`
+  // gold lozenge inlay down the path centreline (painted-perspective narrowing)
+  for (let i = 0; i < 26; i++) {
+    const t = i / 26
+    const fy = 1 - t * (1 - pageFY(-0.3))
+    const size = PX(0.016) * (1 - 0.55 * t)
+    const cxx = PX(0.5) + (fy > pageFY(0.38) && fy < pageFY(0.52) ? -PX(0.06) : 0)
+    s += `<path d="M ${fx(cxx)} ${fx(PY(fy) - size)} L ${fx(cxx + size)} ${fx(PY(fy))} L ${fx(cxx)} ${fx(PY(fy) + size)} L ${fx(cxx - size)} ${fx(PY(fy))} Z" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.6, 0.9))}"/>`
+  }
+  // the gutter valley shadow
+  s += `<rect x="${fx(w * 0.47)}" y="0" width="${fx(w * 0.06)}" height="${h}" fill="#000000" opacity="0.14"/>`
+  // gilt ribbon + key tag at the coffer hasp (right page d~0.68, z~0.02):
+  // right page runs image x 0.5 -> 1.0 over d 0 -> 1.05.
+  const hx = PX(0.5 + 0.68 / 2.1)
+  const hy = PY(pageFY(0.02))
+  s += `<line x1="${fx(hx - PX(0.05))}" y1="${fx(hy + PY(0.03))}" x2="${fx(hx)}" y2="${fx(hy)}" stroke="${NAVE_C.gilt}" stroke-width="5" opacity="0.9"/>`
+  s += `<circle cx="${fx(hx)}" cy="${fx(hy)}" r="7" fill="none" stroke="${NAVE_C.gilt}" stroke-width="3.4"/>`
+  s += `<line x1="${fx(hx + 7)}" y1="${fx(hy)}" x2="${fx(hx + 17)}" y2="${fx(hy)}" stroke="${NAVE_C.gilt}" stroke-width="3.4"/>`
+  s += `<line x1="${fx(hx + 13)}" y1="${fx(hy)}" x2="${fx(hx + 13)}" y2="${fx(hy + 5)}" stroke="${NAVE_C.gilt}" stroke-width="3"/>`
+  // frost margin scatter
+  for (let i = 0; i < 90; i++) {
+    const edge = r() < 0.5
+    const x = edge ? rr(r, 0, w * 0.1) : rr(r, w * 0.9, w)
+    s += `<circle cx="${fx(x)}" cy="${fx(rr(r, 0, h))}" r="${fx(rr(r, 0.8, 2.4))}" fill="${NAVE_C.frost}" opacity="${fx(rr(r, 0.15, 0.5))}"/>`
+  }
+  s += `</g>`
+  const defs =
+    `<radialGradient id="pool-grad" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.gilt}" stop-opacity="0.55"/>` +
+    `<stop offset="0.55" stop-color="${NAVE_C.mint}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.amethyst}" stop-opacity="0"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -3523,8 +3831,16 @@ const PIECES = [
   { id: 'ch6-strongbox-top', seed: 70204, w: 512, h: 323, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'strongbox') } },
   { id: 'ch6-strongbox-seal', seed: 70210, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'waxSealN') } },
   { id: 'ch6-strongbox-coins', seed: 70211, w: 512, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'mintedCoins') } },
-  { id: 'ch6-treasury-spire', seed: 70220, w: 358, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'glassSpire') } },
-  { id: 'ch6-treasury-vines', seed: 70221, w: 512, h: 307, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'vines') } },
+  // ---- E3 s7 nave (the treasury interior; the exterior dress bakes are
+  // retired with their pieces). Pixel dims at each rank's true mesh aspect,
+  // ~500px/world (pack §4e atlas layout); band fractions derive from the
+  // content.ts rank numbers (aperture, strata bands, crown wings).
+  { id: 'ch6-nave-a', seed: 70300, w: 950, h: 310, grain: 11, paint() { return naveApseFace(this.w, this.h, this.seed) } },
+  { id: 'ch6-nave-b', seed: 70301, w: 760, h: 260, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.1316, apApex: 0.7308, topBand: 0.3846, mold: [0.769, 0.962], colHalf: 0.0592, colTop: 0.6923, edge: 'frost' }) } },
+  { id: 'ch6-nave-c', seed: 70302, w: 580, h: 220, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.2069, apApex: 0.7273, topBand: 0.4545, mold: [0.7727, 0.9545], colHalf: 0.0776, colTop: 0.6818, edge: 'frost' }) } },
+  { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], keystone: true, edge: 'gilt' }) } },
+  { id: 'ch6-clerk', seed: 70304, w: 200, h: 250, grain: 10, paint() { return naveClerk(this.w, this.h, this.seed) } },
+  { id: 'page-7', seed: 70310, w: 1024, h: 683, grain: 10, paint() { return navePage(this.w, this.h, this.seed) } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
   { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
   // s7 PLAYABLE (G4): the treasure coffer — interior board + one teal-steel lid.
@@ -3654,6 +3970,19 @@ const ATLASES = [
       { id: 'ch3-skyline-r-mound2', w: 400, opaque: false },
       { id: 'ch3-skyline-r-mound3', w: 400, opaque: false },
       { id: 'ch3-ring-tower', h: 360, opaque: false },
+    ],
+  },
+  {
+    id: 'nave-atlas-s7',
+    // ONE page for the whole nave + the clerk (pack §4e): the four rank
+    // faces at ~500px/world, the clerk beside rank B's shelf. Every region
+    // keeps alpha (die-cut apertures, the dome scallop, the figure).
+    regions: [
+      { id: 'ch6-nave-a', w: 950, opaque: false },
+      { id: 'ch6-nave-b', w: 760, opaque: false },
+      { id: 'ch6-nave-c', w: 580, opaque: false },
+      { id: 'ch6-nave-d', w: 400, opaque: false },
+      { id: 'ch6-clerk', w: 200, opaque: false },
     ],
   },
 ]
