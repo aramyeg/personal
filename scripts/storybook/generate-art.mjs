@@ -3477,15 +3477,18 @@ const PIECES = [
   { id: 'ch5-goods-deck', seed: 60220, w: 584, h: 512, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'goods') } },
   { id: 'ch5-arch-garland', seed: 60230, w: 768, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'garland') } },
   { id: 'ch5-arch-keystone', seed: 60231, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'keystone') } },
-  // ---- Spread 2 — the Inn (ch1 dress quads, stable box, coaching yard) ----
-  { id: 'ch1-inn-eaves', seed: 20201, w: 640, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'eaves') } },
-  { id: 'ch1-inn-lamp', seed: 20202, w: 292, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'lamp') } },
+  // ---- Spread 2 — the Inn (E3 stage set; kept stable box + keyboard) ----
+  // E3 s2 retirement: the eaves/lamp dress patches and the coaching-yard
+  // deck left content.ts with the old ch1-inn/ch1-yard (their content is
+  // absorbed into the stage planes' paint), so their painters are dropped;
+  // stage-plane painters (mountainTwilight / innRowStage / gateOpen /
+  // brassKey / welcomeRank / signKeys / dormerLit / friezeKeys) land with
+  // the s2 art pass (scene pack §4.4).
   { id: 'ch1-stable-side', seed: 20210, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'barn') } },
   { id: 'ch1-stable-back', seed: 20211, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'barn') } },
   { id: 'ch1-stable-top', seed: 20212, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'barn') } },
   { id: 'ch1-stable-vane', seed: 20220, w: 299, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'vane') } },
   { id: 'ch1-stable-hay', seed: 20221, w: 512, h: 293, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'hay') } },
-  { id: 'ch1-yard-deck', seed: 20230, w: 1024, h: 219, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'yard') } },
   // Lift-the-flap, painted in SCREEN SPACE (image-x = page-fore d, image-y =
   // spine z): the BOARD is PORTRAIT (d-span 0.22 : z-span 0.45, row runs down)
   // and the DOORS LANDSCAPE (d-span 0.16 : z-span 0.085, number upright). Cat
