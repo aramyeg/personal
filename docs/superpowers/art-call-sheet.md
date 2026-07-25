@@ -170,18 +170,18 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `ch1-backdrop` | `ch1-backdrop` | Stone-built village beneath snow-capped twin peaks (Ararat echo) | ≈1.88:1 landscape | STAND | **art** |
-| `ch1-inn` | `ch1-inn` | The chapter hero: a two-story coaching inn, many lit windows | ≈1.03:1 near-square | STAND | **art** |
-| `ch1-inn-eaves` | `ch1-inn-eaves` | Dressed roofline: eaves overhanging the inn's left panel | ≈2.5:1 wide | FLAT | placeholder |
-| `ch1-inn-lamp` | `ch1-inn-lamp` | Dressed hanging lamp bracket off the inn's right panel | ≈0.57:1 portrait | FLAT | placeholder |
-| `ch1-dormer` | `ch1-dormer` | Attic dormer — the inn's own upper story, riding its fold | ≈1.07:1 near-square | STAND — **ROTATED 180** | **art** |
-| `ch1-sign` | `ch1-sign` | Hanging key-sign: an oversized brass key on a shield board (now a freestanding v-fold, not a rider) | ≈0.77:1 portrait | STAND | **art** |
+| `ch1-mountain` | `ch1-mountain` | STAGE PLANE A (rear, widest): the sleeping mountain — peach twilight sky bands, slate mass + snow crown, tiny far rooftops at the base, star pricks; torn-paper crest outline | ≈2.07:1 landscape (1.9:0.92) | STAND | **art** (procedural) |
+| `ch1-inn-row` | `ch1-inn-row` | STAGE PLANE B (mid, THE HERO): full-span lamplit inn-row facades astride the gutter — central double-gable hall on the crease, timber wings, 9–11 gold windows, terracotta roofs, chimney + cut-paper smoke curl IN the outline, "100" shield over the door, painted lock escutcheon under the key rotor (right panel u 0.18, v 0.35) | ≈2.21:1 landscape (1.5:0.68) | STAND | **art** (procedural) |
+| `ch1-dormer` | `ch1-dormer` | Attic dormer riding the inn row's crease — gabled, one gold window, terracotta cap | ≈1.14:1 near-square | STAND — **ROTATED 180** | **art** (procedural) |
+| `ch1-sign` | `ch1-sign` | Hanging key-sign riding the inn row's crease low (a child again, not a standalone v-fold): swinging bracket shield, three brass keys on a ring, walnut + gold | ≈0.88:1 portrait | STAND | **art** (procedural) |
+| `ch1-key` | `ch1-key` | The great brass KEY rotor turning in the lock as the page opens — ornate key on a round walnut escutcheon disc, hub-riveted coplanar on the inn row's right panel (oriented disc art: side-aware UV flip) | 1:1 disc | FLAT (rotor disc) | **art** (procedural) |
+| `ch1-gate` | `ch1-gate` | STAGE PLANE C (front, narrowest): the open gate — stone gateposts with lit lanterns + moth-glow halos, low swung-open timber gates at the outer edges, key-bunting swag as the outline's central dip (span low ≈v 0.45 so B's windows show through) | ≈1.81:1 landscape (0.76:0.42) | STAND | **art** (procedural) |
+| `ch1-rank` | `ch1-rank` | The WELCOME RANK: innkeeper + lantern, spouse + enchanted ledger, waving child, dog — ONE die-cut linked chain (hands/bunting connect all silhouettes), strip-erected frontal in the courtyard | ≈1.62:1 (0.34:0.21) | STAND (stripflap) | **art** (procedural) |
 | `ch1-keyboard` | `ch1-keyboard-board`, `ch1-keyboard-door1`, `ch1-keyboard-door2`, `ch1-keyboard-door3`, `ch1-keyboard-door4` | LIFT-THE-FLAP (the chapter's playable, G4): the inn's KEY-BOARD — a timber tavern plaque riveted flat into the right-page meadow with four numbered door leaves the reader lifts to reveal a hanging brass key behind each, save door 3 which hides the innkeeper's cat. `-board` = the plaque painted in the OPEN state (four dark recess niches, keys hanging, the cat curled in niche 3); `-door<N>` = one numbered timber door leaf (iron hinge straps at the spine edge, a ring handle at the lift edge, a brass `N` plate) | painted in SCREEN space (image-x = page-fore d, image-y = spine z): board PORTRAIT ≈0.49:1 (d 0.22 : z 0.45, row runs down) · doors LANDSCAPE ≈1.88:1 (d 0.16 : z 0.085, number upright) | FLAT (page-flat, screen-space uvs) | **art** (procedural) |
 | `ch1-stable` | `ch1-stable-back`, `ch1-stable-side`, `ch1-stable-top` (no `-front` — `capFront:false`, open toward the reader) | Gabled open-front barn in the coaching yard: left wall, right wall, hollow interior, back wall as brace | side ≈1.0:1 · back ≈1.63:1 · top ≈1.91:1 | FACE / TOPDOWN | placeholder — **a legacy `ch1-stable.webp` (old single-strip design) sits on disk but is orphaned; the box renderer never requests it** |
 | `ch1-stable-vane` | `ch1-stable-vane` | Dressed weathervane overhanging the stable's roof ridge | ≈0.58:1 portrait | FLAT | placeholder |
 | `ch1-stable-hay` | `ch1-stable-hay` | Dressed hay bale against the stable's side wall | ≈1.75:1 wide | FLAT | placeholder |
-| `ch1-yard` | `ch1-yard-deck` | Coaching-yard BRIDGE deck floating behind the inn, a rampart-terrace | ≈4.67:1 very wide strip | TOPDOWN | placeholder |
-| `ch1-wall` | `ch1-wall` | Low dry-stone field wall at the very front edge, apple blossom + gate | ≈6.25:1 very wide fringe | STAND | **art** |
+| `ch1-wall` | `ch1-wall` | Fore-edge courtyard wall RE-CUT as the key-baluster frieze: key-shaped balusters as the die-cut top edge, painted villager-and-geese frieze band along the base | ≈6.25:1 very wide fringe | STAND | **art** (procedural) |
 
 ## 3. Chapter II — The Carrier Swarm (spread 3)
 
