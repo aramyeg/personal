@@ -35,7 +35,7 @@ import { easeTurnWeighted } from './page-geometry'
 import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtSprite } from './use-layer-texture'
+import { useArtSprite, useArtTexture } from './use-layer-texture'
 import { applyUvRect, type UvRect } from '../art-atlas'
 
 const FLAT_EPSILON = 0.02
