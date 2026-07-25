@@ -2470,6 +2470,15 @@ const ENGRAVE_GLYPHS = {
   E: [[['M', 1, 0], ['L', 0, 0], ['L', 0, 1], ['L', 1, 1]], [['M', 0, 0.5], ['L', 0.76, 0.5]]],
   V: [[['M', 0, 0], ['L', 0.5, 1], ['L', 1, 0]]],
   '—': [[['M', 0, 0.52], ['L', 1, 0.52]]],
+  // E3 s2 additions — the inn's painted words ("WELCOME" on the doormat, "LIFT"
+  // on the affordance banner, "100" on the number board). Font-free strokes, so
+  // the bake stays byte-stable on any host (no installed-typeface dependency).
+  W: [[['M', 0, 0], ['L', 0.22, 1], ['L', 0.5, 0.34], ['L', 0.78, 1], ['L', 1, 0]]],
+  L: [[['M', 0, 0], ['L', 0, 1], ['L', 0.9, 1]]],
+  F: [[['M', 1, 0], ['L', 0, 0], ['L', 0, 1]], [['M', 0, 0.5], ['L', 0.72, 0.5]]],
+  M: [[['M', 0, 1], ['L', 0, 0], ['L', 0.5, 0.62], ['L', 1, 0], ['L', 1, 1]]],
+  '0': [[['M', 0.5, 0], ['C', 0.06, 0.03, 0.06, 0.97, 0.5, 1], ['C', 0.94, 0.97, 0.94, 0.03, 0.5, 0]]],
+  '1': [[['M', 0.2, 0.22], ['L', 0.52, 0]], [['M', 0.52, 0], ['L', 0.52, 1]], [['M', 0.16, 1], ['L', 0.9, 1]]],
 }
 
 /** Engrave a word from ENGRAVE_GLYPHS as stroke paths, left cell at (x0,y0),
@@ -2895,6 +2904,14 @@ function keyboardBoard(w, h, seed, doorCount, catIndex) {
   const frame = `M 4 4 L ${fx(w - 4)} 4 L ${fx(w - 4)} ${fx(h - 4)} L 4 ${fx(h - 4)} Z`
   s += `<path d="${frame}" fill="none" stroke="${WOOD_EDGE}" stroke-width="7" opacity="0.9" stroke-linejoin="round"/>`
   s += `<path d="${frame}" fill="none" stroke="${WOOD_LIT}" stroke-width="1.6" opacity="0.5" stroke-linejoin="round"/>`
+  // E3 s2 celebration: a festive brick-red ribbon inner frame with brass
+  // corner rosettes — the board is the chapter's PLAYABLE and dresses like it
+  const rib = `M 13 13 L ${fx(w - 13)} 13 L ${fx(w - 13)} ${fx(h - 13)} L 13 ${fx(h - 13)} Z`
+  s += `<path d="${rib}" fill="none" stroke="#b0603f" stroke-width="4" opacity="0.85" stroke-linejoin="round"/>`
+  for (const [cx2, cy2] of [[13, 13], [w - 13, 13], [13, h - 13], [w - 13, h - 13]]) {
+    s += `<circle cx="${fx(cx2)}" cy="${fx(cy2)}" r="7" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="1.6"/>`
+    s += `<circle cx="${fx(cx2)}" cy="${fx(cy2)}" r="2.6" fill="${GOLD_LIT}"/>`
+  }
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -2926,13 +2943,21 @@ function keyboardDoor(w, h, seed, plate) {
     s += `<path d="M ${fx(x0 + w * 0.12)} ${fx(hy)} L ${fx(x0 + w * 0.28)} ${fx(hy)}" stroke="${IRON}" stroke-width="${fx(h * 0.07)}" stroke-linecap="round"/>` // strap across the plank
     s += `<circle cx="${fx(x0 + w * 0.05)}" cy="${fx(hy)}" r="2.6" fill="${IRON_LIT}"/>` // nail
   }
-  // brass number plate, centred + upright
-  const px = w * 0.52, py = h * 0.5, prx = w * 0.15, pry = h * 0.3
-  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 2)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.35)}" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="1.6" stroke-opacity="0.7"/>`
+  // brass number plate, centred + upright — ENLARGED to a celebrated tag
+  // (E3 s2 affordance pass: the refs' BIG numbered plates, not a modest label)
+  const px = w * 0.52, py = h * 0.5, prx = w * 0.19, pry = h * 0.37
+  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 2)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.32)}" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="2" stroke-opacity="0.75"/>`
   s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 0.5)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.3)}" fill="${GOLD_LIT}" opacity="0.6"/>`
-  for (const [dx, dy] of [[-prx * 0.66, -pry * 0.82], [prx * 0.66, -pry * 0.82], [-prx * 0.66, pry * 0.82], [prx * 0.66, pry * 0.82]])
-    s += `<circle cx="${fx(px + dx)}" cy="${fx(py + dy)}" r="2.4" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.5"/>` // plate screws
-  s += `<text x="${fx(px)}" y="${fx(py + pry * 0.42)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(pry * 1.15)}" font-weight="bold" text-anchor="middle" fill="${WOOD_EDGE}">${plate}</text>`
+  for (const [dx, dy] of [[-prx * 0.72, -pry * 0.78], [prx * 0.72, -pry * 0.78], [-prx * 0.72, pry * 0.78], [prx * 0.72, pry * 0.78]])
+    s += `<circle cx="${fx(px + dx)}" cy="${fx(py + dy)}" r="2.6" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.5"/>` // plate screws
+  s += `<text x="${fx(px)}" y="${fx(py + pry * 0.44)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(pry * 1.3)}" font-weight="bold" text-anchor="middle" fill="${WOOD_EDGE}">${plate}</text>`
+  // door 3's tag carries the tiny PAW PRINT — the cat, foreshadowed
+  if (plate === 3) {
+    const pawX = px + prx * 0.62, pawY = py + pry * 0.52, P = pry * 0.16
+    s += `<ellipse cx="${fx(pawX)}" cy="${fx(pawY + P * 0.5)}" rx="${fx(P * 0.62)}" ry="${fx(P * 0.5)}" fill="${WOOD_EDGE}" opacity="0.8"/>`
+    for (const [tx, ty] of [[-P * 0.62, -P * 0.28], [-P * 0.21, -P * 0.52], [P * 0.21, -P * 0.52], [P * 0.62, -P * 0.28]])
+      s += `<circle cx="${fx(pawX + tx)}" cy="${fx(pawY + ty)}" r="${fx(P * 0.21)}" fill="${WOOD_EDGE}" opacity="0.8"/>`
+  }
   // iron ring handle at the RIGHT (fore/lift) edge
   const rcx = w * 0.85, rcy = h * 0.5, rrad = h * 0.2
   s += `<circle cx="${fx(rcx)}" cy="${fx(rcy)}" r="${fx(rrad)}" fill="none" stroke="${IRON}" stroke-width="${fx(h * 0.06)}"/>`
@@ -3401,6 +3426,880 @@ function postRoadSpread(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
+// ============================================================================
+// E3 s2 — THE INN OF A HUNDRED KEYS stage set (scene pack 2026-07-25, register
+// R3 THEATER-warm). Nightfall arrival: three width-graded gutter-spanning
+// planes (sleeping mountain > lamplit inn row > open gate), the linked welcome
+// rank, the key-sign + dormer + brass-key children on the inn row's crease,
+// the fore wall re-cut as a key-baluster frieze, and the T-FLOOR page print
+// (cobble fan / key trail / WELCOME mat / LIFT banner + manicule / geese).
+// House rules as everywhere: standalone SVG on transparent ground (the ALPHA
+// is the die-cut), pale raw-paper rim on every cut edge (rimPath), walnut ink
+// linework, deterministic mulberry32 — no Math.random.
+// ============================================================================
+
+const INN = {
+  sky: '#e8a978', // peach twilight
+  skyDeep: '#c26a33', // deep horizon band
+  slate: '#626e7d', // mountain slate
+  slateDim: '#4a5563',
+  snow: '#f3ecda',
+  stoneLit: '#e3cd98',
+  stoneMid: '#cbb078',
+  stoneDim: '#a98a5c',
+  roofLit: '#d97e54', // terracotta
+  roofDim: '#b0603f',
+  lamp: '#f3d980',
+  brass: '#c9a227',
+  green: '#6a8f5f', // courtyard green
+}
+
+/** A tiny brass key glyph (bow up, bit down) centered on (0,0), height S —
+ *  shared by the sign, the frieze balusters and the page-print key trail. */
+function keyGlyph(S, fill = GOLD, lit = GOLD_LIT) {
+  const bowR = S * 0.21
+  const shaftW = S * 0.13
+  let s = `<circle cx="0" cy="${fx(-S * 0.29)}" r="${fx(bowR)}" fill="none" stroke="${fill}" stroke-width="${fx(shaftW)}"/>`
+  s += `<rect x="${fx(-shaftW / 2)}" y="${fx(-S * 0.12)}" width="${fx(shaftW)}" height="${fx(S * 0.55)}" rx="${fx(shaftW * 0.3)}" fill="${fill}"/>`
+  s += `<rect x="${fx(-shaftW / 2)}" y="${fx(S * 0.3)}" width="${fx(S * 0.2)}" height="${fx(S * 0.1)}" fill="${fill}"/>`
+  s += `<rect x="${fx(-shaftW / 2)}" y="${fx(S * 0.16)}" width="${fx(S * 0.14)}" height="${fx(S * 0.08)}" fill="${fill}"/>`
+  s += `<circle cx="${fx(-bowR * 0.3)}" cy="${fx(-S * 0.29 - bowR * 0.3)}" r="${fx(bowR * 0.24)}" fill="${lit}" opacity="0.8"/>`
+  return s
+}
+
+/** A jittered "torn paper" horizontal edge from (x0,y0) to (x1,y1) — small
+ *  seeded tears, returned as path points (no M/L prefix). */
+function tornEdge(r, x0, y0, x1, y1, n, amp) {
+  const pts = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const x = lerp(x0, x1, t)
+    const y = lerp(y0, y1, t) + (i === 0 || i === n ? 0 : rr(r, -amp, amp))
+    pts.push(`${fx(x)} ${fx(y)}`)
+  }
+  return pts.join(' L ')
+}
+
+// ---- PLANE A — THE SLEEPING MOUNTAIN (ch1-mountain, 1.9 x 0.92 backdrop).
+// A torn-paper sky sheet: peach twilight bands + star pricks, the slate
+// mountain asleep under a snow crown (the asymmetry the solver took from the
+// crease lives HERE, peak at u ~0.45), a row of tiny far rooftops at the
+// base. Full-bleed sides/bottom; the torn crest is the only cut edge. ----
+function mountainTwilight(w, h, seed) {
+  const r = mulberry32(seed)
+  // torn sky edge: high over the peak, dipping toward the fore edges
+  const edge = `M 0 ${fx(h * 0.16)} L ${tornEdge(r, 0, h * 0.16, w * 0.45, h * 0.045, 26, h * 0.02)} L ${tornEdge(
+    r, w * 0.45, h * 0.045, w, h * 0.13, 30, h * 0.02
+  )} L ${w} ${fx(h * 0.13)}`
+  const sheet = `${edge} L ${w} ${h} L 0 ${h} Z`
+  let s = `<g><path d="${sheet}" fill="url(#s2sky)"/>`
+  s += `<g clip-path="url(#s2skyCut)">`
+  // deep horizon band + a second haze band
+  s += `<rect x="0" y="${fx(h * 0.62)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.skyDeep}" opacity="0.5"/>`
+  s += `<rect x="0" y="${fx(h * 0.5)}" width="${w}" height="${fx(h * 0.08)}" fill="${INN.skyDeep}" opacity="0.22"/>`
+  // star pricks in the high sky
+  for (let i = 0; i < 46; i++) {
+    const x = rr(r, 0, w)
+    const y = rr(r, h * 0.06, h * 0.46)
+    s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(rr(r, 0.8, 2))}" fill="${INN.snow}" opacity="${fx(rr(r, 0.35, 0.9))}"/>`
+  }
+  // one early bright star over the peak
+  s += `<circle cx="${fx(w * 0.52)}" cy="${fx(h * 0.14)}" r="2.6" fill="#fff8e0"/>`
+  s += `<path d="M ${fx(w * 0.52)} ${fx(h * 0.08)} L ${fx(w * 0.52)} ${fx(h * 0.2)} M ${fx(w * 0.5)} ${fx(h * 0.14)} L ${fx(w * 0.54)} ${fx(h * 0.14)}" stroke="#fff8e0" stroke-width="1.2" opacity="0.7"/>`
+  // THE MOUNTAIN — slate mass, peak at x 0.45, long sleeping shoulders
+  const mtn =
+    `M 0 ${fx(h * 0.66)} L ${fx(w * 0.12)} ${fx(h * 0.52)} L ${fx(w * 0.24)} ${fx(h * 0.42)} ` +
+    `L ${fx(w * 0.36)} ${fx(h * 0.24)} L ${fx(w * 0.45)} ${fx(h * 0.12)} L ${fx(w * 0.53)} ${fx(h * 0.26)} ` +
+    `L ${fx(w * 0.62)} ${fx(h * 0.38)} L ${fx(w * 0.75)} ${fx(h * 0.34)} L ${fx(w * 0.86)} ${fx(h * 0.48)} ` +
+    `L ${w} ${fx(h * 0.58)} L ${w} ${h} L 0 ${h} Z`
+  s += `<path d="${mtn}" fill="${INN.slate}"/>`
+  // shadowed east faces
+  s += `<path d="M ${fx(w * 0.45)} ${fx(h * 0.12)} L ${fx(w * 0.53)} ${fx(h * 0.26)} L ${fx(w * 0.62)} ${fx(h * 0.38)} L ${fx(w * 0.6)} ${fx(h * 0.62)} L ${fx(w * 0.47)} ${fx(h * 0.5)} Z" fill="${INN.slateDim}" opacity="0.8"/>`
+  s += `<path d="M ${fx(w * 0.75)} ${fx(h * 0.34)} L ${fx(w * 0.86)} ${fx(h * 0.48)} L ${fx(w * 0.83)} ${fx(h * 0.66)} L ${fx(w * 0.72)} ${fx(h * 0.52)} Z" fill="${INN.slateDim}" opacity="0.6"/>`
+  // SNOW CROWN on the peak + a thin drift on the second shoulder
+  s += `<path d="M ${fx(w * 0.38)} ${fx(h * 0.21)} L ${fx(w * 0.45)} ${fx(h * 0.12)} L ${fx(w * 0.52)} ${fx(h * 0.24)} L ${fx(w * 0.485)} ${fx(h * 0.23)} L ${fx(w * 0.465)} ${fx(h * 0.28)} L ${fx(w * 0.44)} ${fx(h * 0.24)} L ${fx(w * 0.415)} ${fx(h * 0.27)} Z" fill="${INN.snow}"/>`
+  s += `<path d="M ${fx(w * 0.72)} ${fx(h * 0.37)} L ${fx(w * 0.75)} ${fx(h * 0.34)} L ${fx(w * 0.79)} ${fx(h * 0.38)} L ${fx(w * 0.755)} ${fx(h * 0.4)} Z" fill="${INN.snow}" opacity="0.85"/>`
+  // faint ridge inks
+  s += `<path d="M ${fx(w * 0.45)} ${fx(h * 0.12)} L ${fx(w * 0.42)} ${fx(h * 0.52)} M ${fx(w * 0.36)} ${fx(h * 0.24)} L ${fx(w * 0.3)} ${fx(h * 0.6)}" stroke="${INK}" stroke-width="1.4" opacity="0.25" fill="none"/>`
+  // TINY FAR ROOFTOPS along the base — the stone city asleep under the peak
+  const baseY = h * 0.88
+  for (let i = 0; i < 15; i++) {
+    const bx = (w * (i + rr(r, 0.1, 0.4))) / 15
+    const bw = rr(r, w * 0.028, w * 0.05)
+    const bh = rr(r, h * 0.05, h * 0.1)
+    s += `<path d="M ${fx(bx)} ${fx(baseY)} L ${fx(bx)} ${fx(baseY - bh)} L ${fx(bx + bw / 2)} ${fx(baseY - bh - h * 0.035)} L ${fx(bx + bw)} ${fx(baseY - bh)} L ${fx(bx + bw)} ${fx(baseY)} Z" fill="${INK}" opacity="0.82"/>`
+    if (r() < 0.6) s += `<rect x="${fx(bx + bw * 0.35)}" y="${fx(baseY - bh * 0.6)}" width="${fx(bw * 0.2)}" height="${fx(bh * 0.3)}" fill="${INN.lamp}" opacity="0.9"/>`
+  }
+  s += `<rect x="0" y="${fx(baseY)}" width="${w}" height="${fx(h - baseY)}" fill="${INK}" opacity="0.5"/>`
+  s += `</g>`
+  s += rimPath(sheet, 5)
+  s += `</g>`
+  const defs =
+    `<clipPath id="s2skyCut"><path d="${sheet}"/></clipPath>` +
+    `<linearGradient id="s2sky" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#b0603f"/>` +
+    `<stop offset="0.42" stop-color="${INN.skyDeep}"/>` +
+    `<stop offset="0.8" stop-color="${INN.sky}"/>` +
+    `<stop offset="1" stop-color="${INN.sky}"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- PLANE B — THE LAMPLIT INN ROW (ch1-inn-row, 1.5 x 0.68 HERO). Full-
+// span timber-and-stone facades astride the gutter: a central double-gable
+// hall on the crease (art x = creaseU 0.58), flanking timber wings, ten gold
+// windows, terracotta roofs, a chimney with the cut-paper smoke curl IN the
+// outline, the "100" shield over the great door and the painted lock
+// escutcheon low on the door (where the ch1-key child pops off the crease).
+function innRowStage(w, h, seed) {
+  const r = mulberry32(seed)
+  const CX = w * 0.58 // the crease — the hall's centreline
+  const ROOF_L = h * 0.34 // wing eaves line
+  const GROUND = h
+  // --- silhouette: left wing roof -> smoke chimney -> hall double gable ->
+  // right chimney -> right wing roof. Built left-to-right as the cut edge.
+  const smokeCx = w * 0.17
+  const gA = CX - w * 0.115 // hall gable A peak x
+  const gB = CX + w * 0.105
+  const smoke =
+    // chimney stack, then the curl: an S of paper smoke leaning right
+    `L ${fx(smokeCx - w * 0.022)} ${fx(h * 0.245)} L ${fx(smokeCx - w * 0.022)} ${fx(h * 0.155)} ` +
+    `C ${fx(smokeCx - w * 0.05)} ${fx(h * 0.1)} ${fx(smokeCx - w * 0.014)} ${fx(h * 0.03)} ${fx(smokeCx + w * 0.03)} ${fx(h * 0.048)} ` +
+    `C ${fx(smokeCx + w * 0.055)} ${fx(h * 0.06)} ${fx(smokeCx + w * 0.052)} ${fx(h * 0.1)} ${fx(smokeCx + w * 0.028)} ${fx(h * 0.1)} ` +
+    `C ${fx(smokeCx + w * 0.012)} ${fx(h * 0.098)} ${fx(smokeCx + w * 0.012)} ${fx(h * 0.075)} ${fx(smokeCx + w * 0.026)} ${fx(h * 0.07)} ` +
+    `L ${fx(smokeCx + w * 0.022)} ${fx(h * 0.155)} L ${fx(smokeCx + w * 0.022)} ${fx(h * 0.235)}`
+  const roofline =
+    `M 0 ${fx(GROUND)} L 0 ${fx(h * 0.46)} ` +
+    `L ${fx(w * 0.045)} ${fx(h * 0.43)} L ${fx(w * 0.1)} ${fx(ROOF_L)} ` + // left wing rise
+    smoke +
+    `L ${fx(w * 0.26)} ${fx(h * 0.305)} L ${fx(w * 0.34)} ${fx(h * 0.33)} ` + // wing ridge run
+    `L ${fx(gA - w * 0.095)} ${fx(h * 0.30)} L ${fx(gA)} ${fx(h * 0.105)} L ${fx(gA + w * 0.083)} ${fx(h * 0.27)} ` + // gable A
+    `L ${fx(gB - w * 0.08)} ${fx(h * 0.24)} L ${fx(gB)} ${fx(h * 0.07)} L ${fx(gB + w * 0.088)} ${fx(h * 0.28)} ` + // gable B (taller)
+    `L ${fx(w * 0.78)} ${fx(h * 0.315)} ` +
+    `L ${fx(w * 0.805)} ${fx(h * 0.19)} L ${fx(w * 0.845)} ${fx(h * 0.19)} L ${fx(w * 0.845)} ${fx(h * 0.315)} ` + // right chimney
+    `L ${fx(w * 0.9)} ${fx(h * 0.36)} L ${fx(w * 0.955)} ${fx(h * 0.43)} L ${fx(w)} ${fx(h * 0.45)} ` + // right wing fall
+    `L ${fx(w)} ${fx(GROUND)} Z`
+  let s = `<g><path d="${roofline}" fill="${INN.stoneMid}"/>`
+  s += `<g clip-path="url(#s2innCut)">`
+  // night wash: the walls sit in dusk, warmer near the lamps below
+  s += `<rect width="${w}" height="${h}" fill="url(#s2innDusk)"/>`
+  // --- ROOFS: everything above each eaves line, terracotta with course lines
+  const roofBand = (x0, x1, yEave) => {
+    let out = `<path d="M ${fx(x0)} 0 L ${fx(x1)} 0 L ${fx(x1)} ${fx(yEave)} L ${fx(x0)} ${fx(yEave)} Z" fill="${INN.roofDim}"/>`
+    for (let i = 1; i < 5; i++) {
+      const y = (yEave * i) / 5
+      out += `<line x1="${fx(x0)}" y1="${fx(y)}" x2="${fx(x1)}" y2="${fx(y)}" stroke="${INK}" stroke-width="1.6" opacity="0.3"/>`
+    }
+    return out
+  }
+  s += roofBand(0, gA - w * 0.095, h * 0.40)
+  s += roofBand(gB + w * 0.088, w, h * 0.42)
+  // hall gables get LIT terracotta (they catch the last light + the lamps)
+  s += `<path d="M ${fx(gA - w * 0.095)} ${fx(h * 0.5)} L ${fx(gA - w * 0.095)} ${fx(h * 0.3)} L ${fx(gA)} ${fx(h * 0.105)} L ${fx(gA + w * 0.083)} ${fx(h * 0.27)} L ${fx(gB - w * 0.08)} ${fx(h * 0.24)} L ${fx(gB)} ${fx(h * 0.07)} L ${fx(gB + w * 0.088)} ${fx(h * 0.28)} L ${fx(gB + w * 0.088)} ${fx(h * 0.5)} Z" fill="${INN.roofLit}"/>`
+  s += `<path d="M ${fx(gA)} ${fx(h * 0.105)} L ${fx(gA + w * 0.083)} ${fx(h * 0.27)} L ${fx(gA + w * 0.024)} ${fx(h * 0.44)} L ${fx(gA - w * 0.024)} ${fx(h * 0.3)} Z" fill="${INN.roofDim}" opacity="0.55"/>`
+  // eaves shadow under the hall roofs so the gables sit ON the wall face
+  s += `<path d="M ${fx(gA - w * 0.095)} ${fx(h * 0.335)} L ${fx(gA)} ${fx(h * 0.14)} L ${fx(gA + w * 0.083)} ${fx(h * 0.305)} L ${fx(gB - w * 0.08)} ${fx(h * 0.275)} L ${fx(gB)} ${fx(h * 0.105)} L ${fx(gB + w * 0.088)} ${fx(h * 0.315)}" fill="none" stroke="${INK}" stroke-width="5" opacity="0.35"/>`
+  // gable ridge inks + finials
+  s += `<path d="M ${fx(gA - w * 0.095)} ${fx(h * 0.3)} L ${fx(gA)} ${fx(h * 0.105)} L ${fx(gA + w * 0.083)} ${fx(h * 0.27)} M ${fx(gB - w * 0.08)} ${fx(h * 0.24)} L ${fx(gB)} ${fx(h * 0.07)} L ${fx(gB + w * 0.088)} ${fx(h * 0.28)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>`
+  s += `<circle cx="${fx(gA)}" cy="${fx(h * 0.105)}" r="3.2" fill="${GOLD}"/>`
+  s += `<circle cx="${fx(gB)}" cy="${fx(h * 0.07)}" r="3.6" fill="${GOLD}"/>`
+  // --- WALL BODIES below the eaves: hall face lit stone, wings dimmer
+  s += `<rect x="0" y="${fx(h * 0.40)}" width="${fx(gA - w * 0.095)}" height="${fx(h * 0.6)}" fill="${INN.stoneMid}"/>`
+  s += `<rect x="${fx(gB + w * 0.088)}" y="${fx(h * 0.42)}" width="${fx(w - gB - w * 0.088)}" height="${fx(h * 0.58)}" fill="${INN.stoneMid}"/>`
+  s += `<rect x="${fx(gA - w * 0.095)}" y="${fx(h * 0.27)}" width="${fx(gB - gA + w * 0.183)}" height="${fx(h * 0.73)}" fill="${INN.stoneLit}"/>`
+  // stone base course across everything
+  s += `<rect x="0" y="${fx(h * 0.84)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.stoneDim}"/>`
+  for (let i = 0; i < 30; i++) {
+    const jx = (w * (i + 0.5)) / 30
+    s += `<line x1="${fx(jx)}" y1="${fx(h * 0.84)}" x2="${fx(jx + rr(r, -4, 4))}" y2="${fx(h)}" stroke="${INK}" stroke-width="1.3" opacity="0.22"/>`
+  }
+  s += `<line x1="0" y1="${fx(h * 0.84)}" x2="${w}" y2="${fx(h * 0.84)}" stroke="${INK}" stroke-width="2" opacity="0.4"/>`
+  // --- TIMBER FRAME on the wings (walnut beams + diagonal braces)
+  const timber = (x0, x1, y0) => {
+    let out = ''
+    out += `<line x1="${fx(x0)}" y1="${fx(y0 + h * 0.18)}" x2="${fx(x1)}" y2="${fx(y0 + h * 0.18)}" stroke="${INK}" stroke-width="4" opacity="0.75"/>`
+    const bays = Math.max(2, Math.round((x1 - x0) / (w * 0.075)))
+    for (let b = 0; b <= bays; b++) {
+      const bx = lerp(x0, x1, b / bays)
+      out += `<line x1="${fx(bx)}" y1="${fx(y0)}" x2="${fx(bx)}" y2="${fx(h * 0.84)}" stroke="${INK}" stroke-width="3.4" opacity="0.7"/>`
+      if (b < bays && b % 2 === 0)
+        out += `<line x1="${fx(bx)}" y1="${fx(y0 + h * 0.18)}" x2="${fx(lerp(x0, x1, (b + 1) / bays))}" y2="${fx(y0 + h * 0.42)}" stroke="${INK}" stroke-width="2.6" opacity="0.55"/>`
+    }
+    return out
+  }
+  s += timber(w * 0.012, gA - w * 0.075, h * 0.42)
+  s += timber(gB + w * 0.075, w * 0.99, h * 0.44)
+  // --- WINDOWS: ten golden lights (glow halo painted, frame walnut)
+  const win = (x, y, ww, wh, arched = false) => {
+    let out = `<ellipse cx="${fx(x + ww / 2)}" cy="${fx(y + wh / 2)}" rx="${fx(ww * 1.5)}" ry="${fx(wh * 1.25)}" fill="url(#s2winGlow)"/>`
+    const shape = arched
+      ? `M ${fx(x)} ${fx(y + wh)} L ${fx(x)} ${fx(y + wh * 0.34)} Q ${fx(x + ww / 2)} ${fx(y - wh * 0.16)} ${fx(x + ww)} ${fx(y + wh * 0.34)} L ${fx(x + ww)} ${fx(y + wh)} Z`
+      : `M ${fx(x)} ${fx(y)} L ${fx(x + ww)} ${fx(y)} L ${fx(x + ww)} ${fx(y + wh)} L ${fx(x)} ${fx(y + wh)} Z`
+    out += `<path d="${shape}" fill="${INN.lamp}" stroke="${INK}" stroke-width="2.4"/>`
+    out += `<line x1="${fx(x + ww / 2)}" y1="${fx(y)}" x2="${fx(x + ww / 2)}" y2="${fx(y + wh)}" stroke="${INK}" stroke-width="1.4" opacity="0.75"/>`
+    out += `<line x1="${fx(x)}" y1="${fx(y + wh * 0.5)}" x2="${fx(x + ww)}" y2="${fx(y + wh * 0.5)}" stroke="${INK}" stroke-width="1.4" opacity="0.75"/>`
+    return out
+  }
+  const WW = w * 0.036
+  const WH = h * 0.115
+  // wings: two pairs each
+  s += win(w * 0.06, h * 0.52, WW, WH) + win(w * 0.135, h * 0.52, WW, WH)
+  s += win(w * 0.24, h * 0.5, WW, WH) + win(w * 0.315, h * 0.5, WW, WH)
+  s += win(w * 0.845, h * 0.52, WW, WH) + win(w * 0.92, h * 0.52, WW, WH)
+  // hall: gable lights + a pair flanking the door
+  s += win(gA - WW / 2, h * 0.36, WW, WH, true)
+  s += win(gB - WW / 2, h * 0.31, WW, WH, true)
+  s += win(CX - w * 0.075, h * 0.56, WW, WH) + win(CX + w * 0.075 - WW, h * 0.56, WW, WH)
+  // --- THE GREAT DOOR astride the crease: arched double door, warm spill
+  const dw = w * 0.062
+  const dh = h * 0.30
+  const dx = CX - dw / 2
+  const dy = h - dh
+  s += `<ellipse cx="${fx(CX)}" cy="${fx(h * 0.97)}" rx="${fx(dw * 1.6)}" ry="${fx(h * 0.05)}" fill="${INN.lamp}" opacity="0.4"/>`
+  s += `<path d="M ${fx(dx - 5)} ${fx(h)} L ${fx(dx - 5)} ${fx(dy + dh * 0.22)} Q ${fx(CX)} ${fx(dy - dh * 0.18)} ${fx(dx + dw + 5)} ${fx(dy + dh * 0.22)} L ${fx(dx + dw + 5)} ${fx(h)} Z" fill="${INN.stoneDim}"/>`
+  s += `<path d="M ${fx(dx)} ${fx(h)} L ${fx(dx)} ${fx(dy + dh * 0.24)} Q ${fx(CX)} ${fx(dy - dh * 0.1)} ${fx(dx + dw)} ${fx(dy + dh * 0.24)} L ${fx(dx + dw)} ${fx(h)} Z" fill="#4a3218"/>`
+  s += `<line x1="${fx(CX)}" y1="${fx(dy)}" x2="${fx(CX)}" y2="${fx(h)}" stroke="${INK}" stroke-width="2" opacity="0.8"/>`
+  for (const off of [-dw * 0.3, dw * 0.3])
+    for (let k = 0; k < 3; k++)
+      s += `<circle cx="${fx(CX + off)}" cy="${fx(dy + dh * (0.3 + k * 0.22))}" r="1.8" fill="${GOLD_DIM}"/>`
+  // the painted LOCK ESCUTCHEON, low on the crease — the ch1-key child pops here
+  s += `<circle cx="${fx(CX)}" cy="${fx(h * 0.86)}" r="${fx(w * 0.017)}" fill="#4a3218" stroke="${GOLD}" stroke-width="3"/>`
+  s += `<path d="M ${fx(CX)} ${fx(h * 0.85)} a ${fx(w * 0.004)} ${fx(w * 0.004)} 0 1 1 0.1 0 M ${fx(CX)} ${fx(h * 0.853)} L ${fx(CX)} ${fx(h * 0.872)}" stroke="${GOLD_LIT}" stroke-width="2.4" fill="none"/>`
+  // the "100" SHIELD over the door
+  const shY = dy - h * 0.14
+  s += `<path d="M ${fx(CX - w * 0.026)} ${fx(shY)} L ${fx(CX + w * 0.026)} ${fx(shY)} L ${fx(CX + w * 0.026)} ${fx(shY + h * 0.08)} Q ${fx(CX)} ${fx(shY + h * 0.115)} ${fx(CX - w * 0.026)} ${fx(shY + h * 0.08)} Z" fill="${PARCH}" stroke="${INK}" stroke-width="2.4"/>`
+  s += `<text x="${fx(CX)}" y="${fx(shY + h * 0.068)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(h * 0.052)}" font-weight="bold" text-anchor="middle" fill="${INK}">100</text>`
+  // lamp brackets flanking the door
+  for (const lx of [dx - w * 0.02, dx + dw + w * 0.02]) {
+    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.013)}" fill="url(#s2winGlow)"/>`
+    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.0062)}" fill="${INN.lamp}" stroke="${INK}" stroke-width="1.8"/>`
+    s += `<line x1="${fx(lx)}" y1="${fx(h * 0.685)}" x2="${fx(lx)}" y2="${fx(h * 0.665)}" stroke="${INK}" stroke-width="2" opacity="0.8"/>`
+  }
+  // chimney pots + smoke shading (the curl is already cut in the outline)
+  s += `<rect x="${fx(smokeCx - w * 0.022)}" y="${fx(h * 0.155)}" width="${fx(w * 0.044)}" height="${fx(h * 0.09)}" fill="${INN.roofDim}" stroke="${INK}" stroke-width="1.8"/>`
+  s += `<path d="M ${fx(smokeCx - w * 0.02)} ${fx(h * 0.14)} C ${fx(smokeCx - w * 0.045)} ${fx(h * 0.095)} ${fx(smokeCx - w * 0.012)} ${fx(h * 0.038)} ${fx(smokeCx + w * 0.028)} ${fx(h * 0.052)}" fill="none" stroke="${INN.snow}" stroke-width="7" opacity="0.9" stroke-linecap="round"/>`
+  s += `<rect x="${fx(w * 0.805)}" y="${fx(h * 0.19)}" width="${fx(w * 0.04)}" height="${fx(h * 0.04)}" fill="${INN.roofDim}" stroke="${INK}" stroke-width="1.6"/>`
+  s += `</g>`
+  s += rimPath(roofline, 5)
+  s += `</g>`
+  const defs =
+    `<clipPath id="s2innCut"><path d="${roofline}"/></clipPath>` +
+    `<linearGradient id="s2innDusk" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0.32"/>` +
+    `<stop offset="0.55" stop-color="${INK}" stop-opacity="0.12"/>` +
+    `<stop offset="1" stop-color="${INN.skyDeep}" stop-opacity="0.08"/></linearGradient>` +
+    `<radialGradient id="s2winGlow" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.5"/>` +
+    `<stop offset="0.7" stop-color="${INN.lamp}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- PLANE C — THE OPEN GATE (ch1-gate, 0.76 x 0.42). Two stone gateposts
+// with lit lanterns + moth halos, low swung-open timber gate leaves running
+// to the outer edges, and the key-bunting swag as the outline's central dip
+// (v ~0.45, so plane B's windows burn through above it). Single closed ring.
+function gateOpen(w, h, seed) {
+  const r = mulberry32(seed)
+  const pL = w * 0.315 // post centrelines
+  const pR = w * 0.685
+  const PW = w * 0.052
+  const swagY = h * 0.55 // image-y of the swag's lowest point (v 0.45)
+  const postTop = h * 0.045
+  const capY = h * 0.16
+  const gateTop = h * 0.5
+  // silhouette: left leaf -> left post (lantern head) -> swag dip -> right post -> right leaf
+  const outline =
+    `M 0 ${fx(h)} L 0 ${fx(h * 0.56)} ` +
+    `L ${fx(w * 0.06)} ${fx(h * 0.54)} L ${fx(w * 0.13)} ${fx(gateTop)} L ${fx(pL - PW)} ${fx(h * 0.52)} ` + // left leaf top
+    `L ${fx(pL - PW)} ${fx(capY)} L ${fx(pL - PW * 1.5)} ${fx(capY)} L ${fx(pL - PW * 0.62)} ${fx(postTop + h * 0.03)} ` + // cap lip
+    `L ${fx(pL)} ${fx(postTop)} L ${fx(pL + PW * 0.62)} ${fx(postTop + h * 0.03)} L ${fx(pL + PW * 1.5)} ${fx(capY)} L ${fx(pL + PW)} ${fx(capY)} ` +
+    `C ${fx(w * 0.42)} ${fx(swagY)} ${fx(w * 0.58)} ${fx(swagY)} ${fx(pR - PW)} ${fx(capY)} ` + // the swag dip
+    `L ${fx(pR - PW * 1.5)} ${fx(capY)} L ${fx(pR - PW * 0.62)} ${fx(postTop + h * 0.03)} L ${fx(pR)} ${fx(postTop)} ` +
+    `L ${fx(pR + PW * 0.62)} ${fx(postTop + h * 0.03)} L ${fx(pR + PW * 1.5)} ${fx(capY)} L ${fx(pR + PW)} ${fx(capY)} ` +
+    `L ${fx(pR + PW)} ${fx(h * 0.52)} L ${fx(w * 0.87)} ${fx(gateTop)} L ${fx(w * 0.94)} ${fx(h * 0.54)} L ${fx(w)} ${fx(h * 0.56)} ` + // right leaf
+    `L ${fx(w)} ${fx(h)} Z`
+  let s = `<g><path d="${outline}" fill="${INN.stoneMid}"/>`
+  s += `<g clip-path="url(#s2gateCut)">`
+  // moth-glow halos around the lantern heads FIRST (under everything)
+  for (const px of [pL, pR]) {
+    s += `<circle cx="${fx(px)}" cy="${fx(h * 0.1)}" r="${fx(w * 0.085)}" fill="url(#s2winGlow2)"/>`
+    for (let m = 0; m < 5; m++) {
+      const a = rr(r, 0, Math.PI * 2)
+      const rad = rr(r, w * 0.03, w * 0.07)
+      s += `<path d="M ${fx(px + Math.cos(a) * rad)} ${fx(h * 0.1 + Math.sin(a) * rad * 0.9)} l 3 -2 l -1.6 3 Z" fill="${INK}" opacity="0.55"/>` // moths
+    }
+  }
+  // POSTS: coursed stone, lit inner faces (the lamplight between them)
+  for (const px of [pL, pR]) {
+    s += `<rect x="${fx(px - PW)}" y="${fx(capY)}" width="${fx(PW * 2)}" height="${fx(h - capY)}" fill="${INN.stoneMid}"/>`
+    const inner = px === pL ? px : px - PW
+    s += `<rect x="${fx(inner)}" y="${fx(capY)}" width="${fx(PW)}" height="${fx(h - capY)}" fill="${INN.stoneLit}"/>`
+    for (let c = 1; c < 6; c++) {
+      const cy = capY + ((h - capY) * c) / 6
+      s += `<line x1="${fx(px - PW)}" y1="${fx(cy)}" x2="${fx(px + PW)}" y2="${fx(cy)}" stroke="${INK}" stroke-width="1.8" opacity="0.4"/>`
+      s += `<line x1="${fx(px + (c % 2 ? -PW * 0.3 : PW * 0.3))}" y1="${fx(cy)}" x2="${fx(px + (c % 2 ? -PW * 0.3 : PW * 0.3))}" y2="${fx(cy - (h - capY) / 6)}" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
+    }
+    // cap + LANTERN head: iron cage, gold light
+    s += `<rect x="${fx(px - PW * 1.5)}" y="${fx(capY - h * 0.012)}" width="${fx(PW * 3)}" height="${fx(h * 0.03)}" fill="${INN.stoneDim}" stroke="${INK}" stroke-width="1.8"/>`
+    s += `<rect x="${fx(px - PW * 0.52)}" y="${fx(postTop + h * 0.035)}" width="${fx(PW * 1.04)}" height="${fx(h * 0.085)}" fill="${INN.lamp}" stroke="${IRON}" stroke-width="3"/>`
+    s += `<line x1="${fx(px)}" y1="${fx(postTop + h * 0.035)}" x2="${fx(px)}" y2="${fx(postTop + h * 0.12)}" stroke="${IRON}" stroke-width="2" opacity="0.85"/>`
+    s += `<path d="M ${fx(px - PW * 0.62)} ${fx(postTop + h * 0.033)} L ${fx(px)} ${fx(postTop - h * 0.002)} L ${fx(px + PW * 0.62)} ${fx(postTop + h * 0.033)} Z" fill="${IRON}"/>`
+  }
+  // THE KEY-BUNTING SWAG: rope + hanging key pennants painted ON the dip band
+  const swag = (t) => {
+    const mt = 1 - t
+    const x = mt * mt * mt * (pL + PW) + 3 * mt * mt * t * (w * 0.42) + 3 * mt * t * t * (w * 0.58) + t * t * t * (pR - PW)
+    const y = mt * mt * mt * capY + 3 * mt * mt * t * swagY + 3 * mt * t * t * swagY + t * t * t * capY
+    return [x, y]
+  }
+  s += `<path d="M ${fx(pL + PW)} ${fx(capY)} C ${fx(w * 0.42)} ${fx(swagY)} ${fx(w * 0.58)} ${fx(swagY)} ${fx(pR - PW)} ${fx(capY)}" fill="none" stroke="${LEATHER}" stroke-width="4"/>`
+  for (let k = 1; k < 8; k++) {
+    const [kx, ky] = swag(k / 8)
+    s += `<g transform="translate(${fx(kx)} ${fx(ky + h * 0.052)}) rotate(${fx(rr(r, -10, 10))})">${keyGlyph(h * 0.09)}</g>`
+    s += `<line x1="${fx(kx)}" y1="${fx(ky)}" x2="${fx(kx)}" y2="${fx(ky + h * 0.022)}" stroke="${LEATHER}" stroke-width="1.6"/>`
+  }
+  // stone coursing + a lamplight wash on the central span (the low wall the
+  // key-bunting hangs over — B's burning windows read ABOVE its crest)
+  s += `<rect x="${fx(pL + PW)}" y="${fx(swagY)}" width="${fx(pR - pL - 2 * PW)}" height="${fx(h - swagY)}" fill="url(#s2winGlow2)" opacity="0.5"/>`
+  for (let c = 0; c < 4; c++) {
+    const cy = swagY + ((h - swagY) * (c + 1)) / 5
+    s += `<line x1="${fx(pL + PW)}" y1="${fx(cy)}" x2="${fx(pR - PW)}" y2="${fx(cy)}" stroke="${INK}" stroke-width="1.6" opacity="0.3"/>`
+    for (let b = 0; b < 7; b++) {
+      const jx = pL + PW + ((pR - pL - 2 * PW) * (b + (c % 2 ? 0.5 : 0))) / 7
+      s += `<line x1="${fx(jx)}" y1="${fx(cy)}" x2="${fx(jx)}" y2="${fx(cy - (h - swagY) / 5)}" stroke="${INK}" stroke-width="1.2" opacity="0.2"/>`
+    }
+  }
+  // GATE LEAVES: low planked timber swung open to the outer edges (top edges
+  // track the outline cut so no bare stone shows above the wood)
+  const leaf = (x0, x1, topAtEdge, topAtHinge) => {
+    let out = `<path d="M ${fx(x0)} ${fx(h)} L ${fx(x0)} ${fx(topAtEdge)} L ${fx(x1)} ${fx(topAtHinge)} L ${fx(x1)} ${fx(h)} Z" fill="${WOOD_LIT}"/>`
+    const planks = 5
+    for (let p = 1; p < planks; p++) {
+      const px2 = lerp(x0, x1, p / planks)
+      const py2 = lerp(topAtEdge, topAtHinge, p / planks)
+      out += `<line x1="${fx(px2)}" y1="${fx(py2 + 3)}" x2="${fx(px2)}" y2="${fx(h)}" stroke="${WOOD_DK}" stroke-width="3" opacity="0.85"/>`
+    }
+    out += `<path d="M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.26))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.26))} M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.7))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.7))}" stroke="${IRON}" stroke-width="5"/>`
+    out += `<path d="M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.26))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.7))}" stroke="${IRON}" stroke-width="3.4" opacity="0.8"/>` // diagonal brace
+    for (const t of [0.26, 0.7])
+      out += `<circle cx="${fx(lerp(x0, x1, 0.5))}" cy="${fx(lerp(lerp(topAtEdge, h, t), lerp(topAtHinge, h, t), 0.5))}" r="2.4" fill="${IRON_LIT}"/>`
+    return out
+  }
+  s += leaf(0, pL - PW, h * 0.545, h * 0.505)
+  s += leaf(pR + PW, w, h * 0.505, h * 0.545) // mirrored: hinge at the post side
+  // ground cobble hints
+  for (let i = 0; i < 14; i++) {
+    const gx = rr(r, 0, w)
+    s += `<ellipse cx="${fx(gx)}" cy="${fx(rr(r, h * 0.93, h * 0.99))}" rx="${fx(rr(r, 6, 12))}" ry="${fx(rr(r, 3, 5))}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
+  }
+  s += `</g>`
+  s += rimPath(outline, 5)
+  s += `</g>`
+  const defs =
+    `<clipPath id="s2gateCut"><path d="${outline}"/></clipPath>` +
+    `<radialGradient id="s2winGlow2" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.6"/>` +
+    `<stop offset="0.65" stop-color="${INN.lamp}" stop-opacity="0.18"/>` +
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE WELCOME RANK (ch1-rank, stripflap 0.34 x 0.21): innkeeper with a
+// raised lantern, spouse with the enchanted ledger, a waving child and the
+// dog — ONE die-cut chain, hands linked, feet on one ground strip (the strip
+// flap die needs the continuous base). Warm figures rimmed in lamplight. ----
+function welcomeRank(w, h, seed) {
+  const r = mulberry32(seed)
+  const G = h * 0.9 // ground line
+  // figure stations (centre x, half-width, head top y)
+  const F = {
+    keeper: { x: w * 0.18, hw: w * 0.075, top: h * 0.2 },
+    spouse: { x: w * 0.42, hw: w * 0.07, top: h * 0.26 },
+    child: { x: w * 0.63, hw: w * 0.05, top: h * 0.47 },
+    dog: { x: w * 0.82, hw: w * 0.055, top: h * 0.62 },
+  }
+  const lantX = w * 0.055
+  const lantY = h * 0.16
+  // ONE closed silhouette: ground strip + bodies + linked arms + lantern arm
+  const outline =
+    `M 0 ${fx(h)} L 0 ${fx(G - h * 0.03)} ` +
+    // lantern arm up from the keeper
+    `L ${fx(F.keeper.x - F.keeper.hw)} ${fx(G - h * 0.42)} ` +
+    `L ${fx(lantX + w * 0.03)} ${fx(lantY + h * 0.1)} L ${fx(lantX - w * 0.022)} ${fx(lantY + h * 0.06)} ` +
+    `L ${fx(lantX - w * 0.022)} ${fx(lantY - h * 0.09)} L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.09)} ` +
+    `L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.02)} L ${fx(lantX + w * 0.05)} ${fx(lantY + h * 0.04)} ` + // lantern head
+    `L ${fx(F.keeper.x - F.keeper.hw * 0.4)} ${fx(F.keeper.top + h * 0.16)} ` +
+    `L ${fx(F.keeper.x - F.keeper.hw * 0.45)} ${fx(F.keeper.top + h * 0.1)} ` +
+    `A ${fx(F.keeper.hw * 0.62)} ${fx(F.keeper.hw * 0.62)} 0 1 1 ${fx(F.keeper.x + F.keeper.hw * 0.45)} ${fx(F.keeper.top + h * 0.1)} ` + // keeper head
+    `L ${fx(F.keeper.x + F.keeper.hw)} ${fx(F.keeper.top + h * 0.3)} ` +
+    `L ${fx((F.keeper.x + F.spouse.x) / 2)} ${fx(G - h * 0.34)} ` + // linked hands dip
+    `L ${fx(F.spouse.x - F.spouse.hw)} ${fx(F.spouse.top + h * 0.28)} ` +
+    `L ${fx(F.spouse.x - F.spouse.hw * 0.45)} ${fx(F.spouse.top + h * 0.1)} ` +
+    `A ${fx(F.spouse.hw * 0.6)} ${fx(F.spouse.hw * 0.6)} 0 1 1 ${fx(F.spouse.x + F.spouse.hw * 0.45)} ${fx(F.spouse.top + h * 0.1)} ` + // spouse head
+    `L ${fx(F.spouse.x + F.spouse.hw)} ${fx(F.spouse.top + h * 0.34)} ` +
+    `L ${fx((F.spouse.x + F.child.x) / 2)} ${fx(G - h * 0.26)} ` + // second hand link
+    `L ${fx(F.child.x - F.child.hw * 0.8)} ${fx(F.child.top + h * 0.22)} ` +
+    // the child's waving arm shoots up
+    `L ${fx(F.child.x - F.child.hw * 0.2)} ${fx(F.child.top - h * 0.14)} L ${fx(F.child.x + F.child.hw * 0.35)} ${fx(F.child.top - h * 0.18)} ` +
+    `L ${fx(F.child.x + F.child.hw * 0.2)} ${fx(F.child.top + h * 0.02)} ` +
+    `A ${fx(F.child.hw * 0.58)} ${fx(F.child.hw * 0.58)} 0 1 1 ${fx(F.child.x + F.child.hw * 0.7)} ${fx(F.child.top + h * 0.16)} ` + // child head
+    `L ${fx(F.child.x + F.child.hw)} ${fx(G - h * 0.2)} ` +
+    `L ${fx((F.child.x + F.dog.x) / 2 + w * 0.01)} ${fx(G - h * 0.16)} ` + // dog leans on the child
+    `L ${fx(F.dog.x - F.dog.hw * 0.2)} ${fx(F.dog.top - h * 0.1)} L ${fx(F.dog.x + F.dog.hw * 0.4)} ${fx(F.dog.top)} ` + // ears up
+    `L ${fx(F.dog.x + F.dog.hw)} ${fx(F.dog.top + h * 0.14)} ` +
+    `L ${fx(F.dog.x + F.dog.hw * 1.5)} ${fx(G - h * 0.28)} L ${fx(F.dog.x + F.dog.hw * 1.7)} ${fx(G - h * 0.34)} ` + // tail up
+    `L ${fx(F.dog.x + F.dog.hw * 2)} ${fx(G - h * 0.28)} L ${fx(F.dog.x + F.dog.hw * 1.8)} ${fx(G - h * 0.12)} ` +
+    `L ${fx(w * 0.97)} ${fx(G - h * 0.04)} L ${fx(w)} ${fx(G - h * 0.02)} L ${fx(w)} ${fx(h)} Z`
+  let s = `<g><path d="${outline}" fill="${INN.roofDim}"/>`
+  s += `<g clip-path="url(#s2rankCut)">`
+  // lantern glow FIRST — the family is lit from the keeper's raised lamp
+  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY)}" r="${fx(w * 0.14)}" fill="url(#s2winGlow3)"/>`
+  // ground strip: courtyard green in night shadow
+  s += `<rect x="0" y="${fx(G - h * 0.05)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.green}"/>`
+  s += `<rect x="0" y="${fx(G - h * 0.05)}" width="${w}" height="${fx(h * 0.16)}" fill="${INK}" opacity="0.35"/>`
+  // THE INNKEEPER: apron over a brick coat, boots, warm face, the lantern arm
+  const K = F.keeper
+  s += `<rect x="${fx(K.x - K.hw)}" y="${fx(K.top + h * 0.24)}" width="${fx(K.hw * 2)}" height="${fx(G - K.top - h * 0.24)}" fill="${INN.roofDim}"/>`
+  s += `<path d="M ${fx(K.x - K.hw * 0.55)} ${fx(K.top + h * 0.32)} L ${fx(K.x + K.hw * 0.55)} ${fx(K.top + h * 0.32)} L ${fx(K.x + K.hw * 0.4)} ${fx(G - h * 0.02)} L ${fx(K.x - K.hw * 0.4)} ${fx(G - h * 0.02)} Z" fill="${PARCH_MID}"/>` // apron
+  s += `<line x1="${fx(K.x - K.hw * 0.4)}" y1="${fx(G - h * 0.1)}" x2="${fx(K.x + K.hw * 0.4)}" y2="${fx(G - h * 0.1)}" stroke="${LEATHER}" stroke-width="1.8" opacity="0.6"/>` // hem
+  s += `<line x1="${fx(K.x - K.hw * 0.6)}" y1="${fx(K.top + h * 0.34)}" x2="${fx(K.x + K.hw * 0.6)}" y2="${fx(K.top + h * 0.34)}" stroke="${LEATHER}" stroke-width="3"/>`
+  s += `<circle cx="${fx(K.x)}" cy="${fx(K.top + h * 0.09)}" r="${fx(K.hw * 0.58)}" fill="#e8c49a"/>`
+  s += `<path d="M ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.06)} A ${fx(K.hw * 0.62)} ${fx(K.hw * 0.62)} 0 0 1 ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.06)} L ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.02)} L ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.02)} Z" fill="${LEATHER}"/>` // cap
+  s += `<circle cx="${fx(K.x - K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/><circle cx="${fx(K.x + K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/>`
+  s += `<path d="M ${fx(K.x - K.hw * 0.16)} ${fx(K.top + h * 0.15)} Q ${fx(K.x)} ${fx(K.top + h * 0.19)} ${fx(K.x + K.hw * 0.16)} ${fx(K.top + h * 0.15)}" stroke="${INK}" stroke-width="1.6" fill="none"/>` // smile
+  // the raised arm + THE LANTERN
+  s += `<path d="M ${fx(K.x - K.hw * 0.7)} ${fx(K.top + h * 0.34)} L ${fx(lantX + w * 0.02)} ${fx(lantY + h * 0.09)}" stroke="${INN.roofDim}" stroke-width="9" stroke-linecap="round"/>`
+  s += `<rect x="${fx(lantX - w * 0.017)}" y="${fx(lantY - h * 0.075)}" width="${fx(w * 0.034)}" height="${fx(h * 0.125)}" fill="${INN.lamp}" stroke="${IRON}" stroke-width="2.6"/>`
+  s += `<line x1="${fx(lantX)}" y1="${fx(lantY - h * 0.075)}" x2="${fx(lantX)}" y2="${fx(lantY + h * 0.05)}" stroke="${IRON}" stroke-width="1.4" opacity="0.7"/>`
+  s += `<path d="M ${fx(lantX - w * 0.017)} ${fx(lantY - h * 0.075)} L ${fx(lantX)} ${fx(lantY - h * 0.095)} L ${fx(lantX + w * 0.017)} ${fx(lantY - h * 0.075)} Z" fill="${IRON}"/>`
+  // THE SPOUSE: green gown, the enchanted ledger held out, bun hair
+  const S2 = F.spouse
+  s += `<path d="M ${fx(S2.x - S2.hw)} ${fx(G)} L ${fx(S2.x - S2.hw * 0.55)} ${fx(S2.top + h * 0.22)} L ${fx(S2.x + S2.hw * 0.55)} ${fx(S2.top + h * 0.22)} L ${fx(S2.x + S2.hw)} ${fx(G)} Z" fill="${INN.green}"/>`
+  s += `<circle cx="${fx(S2.x)}" cy="${fx(S2.top + h * 0.09)}" r="${fx(S2.hw * 0.56)}" fill="#e8c49a"/>`
+  s += `<circle cx="${fx(S2.x)}" cy="${fx(S2.top - h * 0.005)}" r="${fx(S2.hw * 0.3)}" fill="${INK}"/>` // bun
+  s += `<path d="M ${fx(S2.x - S2.hw * 0.56)} ${fx(S2.top + h * 0.07)} A ${fx(S2.hw * 0.58)} ${fx(S2.hw * 0.58)} 0 0 1 ${fx(S2.x + S2.hw * 0.56)} ${fx(S2.top + h * 0.07)} Z" fill="${INK}" opacity="0.85"/>` // hair
+  s += `<circle cx="${fx(S2.x - S2.hw * 0.17)}" cy="${fx(S2.top + h * 0.09)}" r="1.6" fill="${INK}"/><circle cx="${fx(S2.x + S2.hw * 0.17)}" cy="${fx(S2.top + h * 0.09)}" r="1.6" fill="${INK}"/>`
+  s += `<path d="M ${fx(S2.x - S2.hw * 0.14)} ${fx(S2.top + h * 0.16)} Q ${fx(S2.x)} ${fx(S2.top + h * 0.195)} ${fx(S2.x + S2.hw * 0.14)} ${fx(S2.top + h * 0.16)}" stroke="${INK}" stroke-width="1.4" fill="none"/>`
+  // the LEDGER: open book, parchment pages, a gold key inked on the page
+  const LX = S2.x + S2.hw * 0.9
+  const LY = S2.top + h * 0.34
+  s += `<path d="M ${fx(LX - w * 0.045)} ${fx(LY)} Q ${fx(LX)} ${fx(LY - h * 0.045)} ${fx(LX + w * 0.045)} ${fx(LY)} L ${fx(LX + w * 0.045)} ${fx(LY + h * 0.07)} Q ${fx(LX)} ${fx(LY + h * 0.03)} ${fx(LX - w * 0.045)} ${fx(LY + h * 0.07)} Z" fill="${PARCH}" stroke="${LEATHER}" stroke-width="2.6"/>`
+  s += `<line x1="${fx(LX)}" y1="${fx(LY - h * 0.03)}" x2="${fx(LX)}" y2="${fx(LY + h * 0.05)}" stroke="${LEATHER}" stroke-width="1.6"/>`
+  s += `<g transform="translate(${fx(LX + w * 0.02)} ${fx(LY + h * 0.028)}) scale(0.5)">${keyGlyph(h * 0.09)}</g>`
+  // THE CHILD: brick smock, waving arm (cut in the outline), bright face
+  const C2 = F.child
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.8)} ${fx(G)} L ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x + C2.hw * 0.5)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x + C2.hw * 0.8)} ${fx(G)} Z" fill="${INN.roofDim}"/>`
+  s += `<circle cx="${fx(C2.x + C2.hw * 0.1)}" cy="${fx(C2.top + h * 0.04)}" r="${fx(C2.hw * 0.62)}" fill="#e8c49a"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top)} A ${fx(C2.hw * 0.65)} ${fx(C2.hw * 0.65)} 0 0 1 ${fx(C2.x + C2.hw * 0.68)} ${fx(C2.top - h * 0.01)} L ${fx(C2.x + C2.hw * 0.4)} ${fx(C2.top + h * 0.03)} Z" fill="#8a5a3b"/>` // mop of hair
+  s += `<circle cx="${fx(C2.x - C2.hw * 0.08)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/><circle cx="${fx(C2.x + C2.hw * 0.26)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.05)} ${fx(C2.top + h * 0.1)} Q ${fx(C2.x + C2.hw * 0.1)} ${fx(C2.top + h * 0.14)} ${fx(C2.x + C2.hw * 0.25)} ${fx(C2.top + h * 0.1)}" stroke="${INK}" stroke-width="1.4" fill="none"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.4)} ${fx(C2.top + h * 0.14)} L ${fx(C2.x - C2.hw * 0.05)} ${fx(C2.top - h * 0.12)}" stroke="${INN.roofDim}" stroke-width="7" stroke-linecap="round"/>` // waving arm fill
+  // THE DOG: sitting, ears + tail in the cut, collar tag glinting
+  const D = F.dog
+  s += `<path d="M ${fx(D.x - D.hw)} ${fx(G)} Q ${fx(D.x - D.hw * 0.6)} ${fx(D.top + h * 0.1)} ${fx(D.x)} ${fx(D.top + h * 0.08)} Q ${fx(D.x + D.hw * 0.9)} ${fx(D.top + h * 0.12)} ${fx(D.x + D.hw * 1.2)} ${fx(G)} Z" fill="#8a5a3b"/>`
+  s += `<circle cx="${fx(D.x + D.hw * 0.05)}" cy="${fx(D.top + h * 0.05)}" r="${fx(D.hw * 0.55)}" fill="#a06c48"/>`
+  s += `<circle cx="${fx(D.x - D.hw * 0.1)}" cy="${fx(D.top + h * 0.03)}" r="1.6" fill="${INK}"/>`
+  s += `<circle cx="${fx(D.x - D.hw * 0.32)}" cy="${fx(D.top + h * 0.1)}" r="2.4" fill="${INK}"/>` // nose
+  s += `<path d="M ${fx(D.x - D.hw * 0.28)} ${fx(D.top + h * 0.15)} Q ${fx(D.x - D.hw * 0.1)} ${fx(D.top + h * 0.19)} ${fx(D.x + D.hw * 0.08)} ${fx(D.top + h * 0.15)}" stroke="${INK}" stroke-width="1.3" fill="none"/>`
+  s += `<path d="M ${fx(D.x - D.hw * 0.2)} ${fx(D.top + h * 0.24)} A ${fx(D.hw * 0.5)} ${fx(D.hw * 0.5)} 0 0 0 ${fx(D.x + D.hw * 0.4)} ${fx(D.top + h * 0.26)}" stroke="${LEATHER}" stroke-width="3.4" fill="none"/>` // collar
+  s += `<circle cx="${fx(D.x + D.hw * 0.1)}" cy="${fx(D.top + h * 0.3)}" r="3" fill="${GOLD}"/>` // tag
+  // lamplight rim on every figure's lantern side
+  s += `<path d="M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.26)} L ${fx(K.x - K.hw)} ${fx(G)} M ${fx(S2.x - S2.hw * 0.8)} ${fx(S2.top + h * 0.24)} L ${fx(S2.x - S2.hw)} ${fx(G)} M ${fx(C2.x - C2.hw * 0.75)} ${fx(C2.top + h * 0.16)} L ${fx(C2.x - C2.hw * 0.8)} ${fx(G)}" stroke="${INN.lamp}" stroke-width="2.4" opacity="0.6" fill="none"/>`
+  s += `</g>`
+  s += rimPath(outline, 4)
+  s += `</g>`
+  const defs =
+    `<clipPath id="s2rankCut"><path d="${outline}"/></clipPath>` +
+    `<radialGradient id="s2winGlow3" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.55"/>` +
+    `<stop offset="0.7" stop-color="${INN.lamp}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE HANGING KEY-SIGN (ch1-sign, child on B's crease, 0.14 x 0.16):
+// a walnut bracket-shield with THREE brass keys on a ring — reborn as a
+// child, glue edge (v=0, image bottom) on the inn row's fold. ----
+function signKeys(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const shTop = h * 0.06
+  const shBot = h * 0.78
+  const outline =
+    `M ${fx(cx - w * 0.14)} ${fx(h)} L ${fx(cx - w * 0.14)} ${fx(shBot + h * 0.03)} ` + // mount stem
+    `L ${fx(cx - w * 0.42)} ${fx(shBot)} ` +
+    `L ${fx(cx - w * 0.46)} ${fx(lerp(shTop, shBot, 0.55))} L ${fx(cx - w * 0.4)} ${fx(shTop + h * 0.07)} ` +
+    `L ${fx(cx - w * 0.12)} ${fx(shTop)} L ${fx(cx)} ${fx(shTop - h * 0.035)} L ${fx(cx + w * 0.12)} ${fx(shTop)} ` + // top scroll
+    `L ${fx(cx + w * 0.4)} ${fx(shTop + h * 0.07)} L ${fx(cx + w * 0.46)} ${fx(lerp(shTop, shBot, 0.55))} ` +
+    `L ${fx(cx + w * 0.42)} ${fx(shBot)} L ${fx(cx + w * 0.14)} ${fx(shBot + h * 0.03)} ` +
+    `L ${fx(cx + w * 0.14)} ${fx(h)} Z`
+  let s = `<g><path d="${outline}" fill="${WOOD}"/>`
+  s += `<g clip-path="url(#s2signCut)">`
+  s += `<rect width="${w}" height="${h}" fill="${WOOD}"/>`
+  for (let i = 0; i < 14; i++) {
+    const gy = rr(r, shTop, shBot)
+    s += `<line x1="${fx(cx - w * 0.4)}" y1="${fx(gy)}" x2="${fx(cx + rr(r, -w * 0.1, w * 0.4))}" y2="${fx(gy)}" stroke="${WOOD_DK}" stroke-width="1.2" opacity="${fx(rr(r, 0.15, 0.3))}"/>`
+  }
+  // gold border + inner ink line
+  s += `<path d="M ${fx(cx - w * 0.36)} ${fx(shBot - h * 0.035)} L ${fx(cx - w * 0.395)} ${fx(lerp(shTop, shBot, 0.55))} L ${fx(cx - w * 0.34)} ${fx(shTop + h * 0.1)} L ${fx(cx)} ${fx(shTop + h * 0.015)} L ${fx(cx + w * 0.34)} ${fx(shTop + h * 0.1)} L ${fx(cx + w * 0.395)} ${fx(lerp(shTop, shBot, 0.55))} L ${fx(cx + w * 0.36)} ${fx(shBot - h * 0.035)} Z" fill="none" stroke="${GOLD}" stroke-width="3.4"/>`
+  // THE RING + three keys fanned from it
+  const ringY = shTop + h * 0.24
+  s += `<circle cx="${fx(cx)}" cy="${fx(ringY)}" r="${fx(w * 0.09)}" fill="none" stroke="${GOLD}" stroke-width="5"/>`
+  s += `<circle cx="${fx(cx - w * 0.03)}" cy="${fx(ringY - w * 0.03)}" r="${fx(w * 0.02)}" fill="${GOLD_LIT}" opacity="0.85"/>`
+  for (const [ang, kx] of [[-24, cx - w * 0.16], [0, cx], [24, cx + w * 0.16]]) {
+    s += `<g transform="translate(${fx(kx)} ${fx(ringY + h * 0.27)}) rotate(${ang}) scale(1.9)">${keyGlyph(h * 0.12)}</g>`
+  }
+  // lamplit sheen from below-left (the door lamps sit under the sign)
+  s += `<path d="M ${fx(cx - w * 0.42)} ${fx(shBot)} L ${fx(cx - w * 0.46)} ${fx(lerp(shTop, shBot, 0.55))} L ${fx(cx - w * 0.3)} ${fx(lerp(shTop, shBot, 0.55))} L ${fx(cx - w * 0.26)} ${fx(shBot)} Z" fill="${INN.lamp}" opacity="0.12"/>`
+  s += `</g>`
+  s += rimPath(outline, 4)
+  s += `</g>`
+  const defs = `<clipPath id="s2signCut"><path d="${outline}"/></clipPath>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE LIT DORMER (ch1-dormer, child on B's crease, 0.16 x 0.14): a
+// gabled attic window popping off the stage fold — terracotta cap, one gold
+// arched light, stone cheeks. Upright die (phi-74 parent, no flip). ----
+function dormerLit(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const outline =
+    `M ${fx(w * 0.08)} ${fx(h)} L ${fx(w * 0.08)} ${fx(h * 0.52)} L ${fx(cx)} ${fx(h * 0.05)} L ${fx(w * 0.92)} ${fx(h * 0.52)} L ${fx(w * 0.92)} ${fx(h)} Z`
+  let s = `<g><path d="${outline}" fill="${INN.stoneLit}"/>`
+  s += `<g clip-path="url(#s2dormCut)">`
+  // terracotta gable cap
+  s += `<path d="M ${fx(w * 0.02)} ${fx(h * 0.56)} L ${fx(cx)} ${fx(h * 0.02)} L ${fx(w * 0.98)} ${fx(h * 0.56)} L ${fx(w * 0.86)} ${fx(h * 0.56)} L ${fx(cx)} ${fx(h * 0.17)} L ${fx(w * 0.14)} ${fx(h * 0.56)} Z" fill="${INN.roofLit}" stroke="${INK}" stroke-width="2.2"/>`
+  for (let i = 0; i < 8; i++) {
+    const gy = rr(r, h * 0.6, h * 0.96)
+    s += `<line x1="${fx(rr(r, w * 0.12, w * 0.3))}" y1="${fx(gy)}" x2="${fx(rr(r, w * 0.7, w * 0.88))}" y2="${fx(gy)}" stroke="${INK}" stroke-width="1.2" opacity="${fx(rr(r, 0.12, 0.24))}"/>`
+  }
+  // the gold arched light + glow
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(h * 0.66)}" rx="${fx(w * 0.3)}" ry="${fx(h * 0.28)}" fill="url(#s2winGlow4)"/>`
+  s += `<path d="M ${fx(cx - w * 0.16)} ${fx(h * 0.92)} L ${fx(cx - w * 0.16)} ${fx(h * 0.52)} Q ${fx(cx)} ${fx(h * 0.34)} ${fx(cx + w * 0.16)} ${fx(h * 0.52)} L ${fx(cx + w * 0.16)} ${fx(h * 0.92)} Z" fill="${INN.lamp}" stroke="${INK}" stroke-width="2.6"/>`
+  s += `<line x1="${fx(cx)}" y1="${fx(h * 0.4)}" x2="${fx(cx)}" y2="${fx(h * 0.92)}" stroke="${INK}" stroke-width="1.6" opacity="0.8"/>`
+  s += `<line x1="${fx(cx - w * 0.16)}" y1="${fx(h * 0.66)}" x2="${fx(cx + w * 0.16)}" y2="${fx(h * 0.66)}" stroke="${INK}" stroke-width="1.6" opacity="0.8"/>`
+  // a cat-shaped shadow in the pane? no — the cat is door 3's secret. curtains:
+  s += `<path d="M ${fx(cx - w * 0.16)} ${fx(h * 0.52)} Q ${fx(cx - w * 0.1)} ${fx(h * 0.7)} ${fx(cx - w * 0.14)} ${fx(h * 0.92)}" stroke="${INN.roofDim}" stroke-width="4" fill="none" opacity="0.7"/>`
+  s += `<path d="M ${fx(cx + w * 0.16)} ${fx(h * 0.52)} Q ${fx(cx + w * 0.1)} ${fx(h * 0.7)} ${fx(cx + w * 0.14)} ${fx(h * 0.92)}" stroke="${INN.roofDim}" stroke-width="4" fill="none" opacity="0.7"/>`
+  // gable finial
+  s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.05)}" r="3" fill="${GOLD}"/>`
+  s += `</g>`
+  s += rimPath(outline, 4)
+  s += `</g>`
+  const defs =
+    `<clipPath id="s2dormCut"><path d="${outline}"/></clipPath>` +
+    `<radialGradient id="s2winGlow4" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.5"/>` +
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE FIRST KEY (ch1-key, child on B's door crease, 0.11 x 0.09): the
+// first of a hundred brass keys, standing proud of the great door's lock as
+// the book opens. Bow up, bit down at the glue edge; ornate but one closed
+// silhouette. ----
+function brassKeyStandee(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const bowR = w * 0.155
+  const bowCy = h * 0.24
+  const shaftW = w * 0.075
+  // closed outline: outer bow ring + shaft + two bit teeth touching the base
+  const outline =
+    `M ${fx(cx - shaftW)} ${fx(h)} L ${fx(cx - shaftW)} ${fx(h * 0.52)} ` +
+    `L ${fx(cx - bowR * 1.3)} ${fx(bowCy + bowR * 0.62)} ` +
+    `A ${fx(bowR * 1.3)} ${fx(bowR * 1.3)} 0 1 1 ${fx(cx + bowR * 1.3)} ${fx(bowCy + bowR * 0.62)} ` +
+    `L ${fx(cx + shaftW)} ${fx(h * 0.52)} L ${fx(cx + shaftW)} ${fx(h * 0.62)} ` +
+    `L ${fx(cx + w * 0.29)} ${fx(h * 0.62)} L ${fx(cx + w * 0.29)} ${fx(h * 0.74)} L ${fx(cx + shaftW)} ${fx(h * 0.74)} ` + // big tooth
+    `L ${fx(cx + shaftW)} ${fx(h * 0.82)} ` +
+    `L ${fx(cx + w * 0.2)} ${fx(h * 0.82)} L ${fx(cx + w * 0.2)} ${fx(h * 0.92)} L ${fx(cx + shaftW)} ${fx(h * 0.92)} ` + // small tooth
+    `L ${fx(cx + shaftW)} ${fx(h)} Z`
+  let s = `<g><path d="${outline}" fill="${GOLD}"/>`
+  s += `<g clip-path="url(#s2keyCut)">`
+  s += `<rect width="${w}" height="${h}" fill="${GOLD}"/>`
+  // bow: open ring look painted (dark center disc, not an alpha hole)
+  s += `<circle cx="${fx(cx)}" cy="${fx(bowCy)}" r="${fx(bowR * 0.55)}" fill="#4a3218"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(bowCy)}" r="${fx(bowR * 0.55)}" fill="none" stroke="${GOLD_DIM}" stroke-width="4"/>`
+  // trefoil knobs on the bow
+  for (const a of [-Math.PI / 2, -Math.PI / 2 - 1.05, -Math.PI / 2 + 1.05])
+    s += `<circle cx="${fx(cx + Math.cos(a) * bowR * 1.22)}" cy="${fx(bowCy + Math.sin(a) * bowR * 1.22)}" r="${fx(w * 0.055)}" fill="${GOLD_LIT}" stroke="${GOLD_DIM}" stroke-width="1.8"/>`
+  // shaft collars + lit edge
+  s += `<rect x="${fx(cx - shaftW)}" y="${fx(h * 0.5)}" width="${fx(shaftW * 0.7)}" height="${fx(h * 0.5)}" fill="${GOLD_LIT}" opacity="0.7"/>`
+  for (const cy of [h * 0.5, h * 0.575])
+    s += `<rect x="${fx(cx - shaftW * 1.3)}" y="${fx(cy)}" width="${fx(shaftW * 2.6)}" height="${fx(h * 0.026)}" fill="${GOLD_DIM}"/>`
+  s += `<rect x="${fx(cx + shaftW)}" y="${fx(h * 0.62)}" width="${fx(w * 0.29 - shaftW)}" height="${fx(h * 0.045)}" fill="${GOLD_LIT}" opacity="0.6"/>` // tooth glint
+  s += `<circle cx="${fx(cx - bowR * 0.62)}" cy="${fx(bowCy - bowR * 0.72)}" r="${fx(w * 0.042)}" fill="#fff4cf" opacity="0.8"/>` // sparkle
+  s += `</g>`
+  s += rimPath(outline, 3.6)
+  s += `</g>`
+  void r
+  const defs = `<clipPath id="s2keyCut"><path d="${outline}"/></clipPath>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE KEY-BALUSTER FRIEZE (ch1-wall RE-CUT, 1.25 x 0.2 fore wall): the
+// courtyard wall's die-cut top edge becomes a rank of key-shaped balusters
+// (bows solid — no alpha holes on the fore edge), with the painted villager-
+// and-geese frieze band along the base. ----
+function friezeKeys(w, h, seed) {
+  const r = mulberry32(seed)
+  const wallTop = h * 0.52
+  const N = 11
+  // build the crest: wall coping with N key balusters standing out of it
+  let d = `M 0 ${fx(h)} L 0 ${fx(wallTop)} `
+  for (let i = 0; i < N; i++) {
+    const cx = (w * (i + 0.5)) / N
+    const kw = w * 0.011 // shaft half-width
+    const bowR = w * 0.0165
+    const bowCy = h * 0.17
+    d +=
+      `L ${fx(cx - kw)} ${fx(wallTop)} L ${fx(cx - kw)} ${fx(h * 0.42)} ` +
+      // a bit tooth on each shaft's left flank (the fence IS keys)
+      `L ${fx(cx - kw - w * 0.009)} ${fx(h * 0.42)} L ${fx(cx - kw - w * 0.009)} ${fx(h * 0.365)} L ${fx(cx - kw)} ${fx(h * 0.365)} ` +
+      `L ${fx(cx - kw)} ${fx(h * 0.31)} ` +
+      `L ${fx(cx - bowR * 1.3)} ${fx(bowCy + bowR)} ` +
+      `A ${fx(bowR * 1.3)} ${fx(bowR * 1.3)} 0 1 1 ${fx(cx + bowR * 1.3)} ${fx(bowCy + bowR)} ` +
+      `L ${fx(cx + kw)} ${fx(h * 0.31)} L ${fx(cx + kw)} ${fx(wallTop)} `
+  }
+  d += `L ${fx(w)} ${fx(wallTop)} L ${fx(w)} ${fx(h)} Z`
+  let s = `<g><path d="${d}" fill="${INN.stoneMid}"/>`
+  s += `<g clip-path="url(#s2friezeCut)">`
+  s += `<rect width="${w}" height="${h}" fill="${INN.stoneMid}"/>`
+  // baluster paint: brass keys against dusk
+  for (let i = 0; i < N; i++) {
+    const cx = (w * (i + 0.5)) / N
+    s += `<rect x="${fx(cx - w * 0.011)}" y="${fx(h * 0.22)}" width="${fx(w * 0.022)}" height="${fx(h * 0.32)}" fill="${GOLD_DIM}" opacity="0.55"/>`
+    s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.17)}" r="${fx(w * 0.0135)}" fill="#5a4520"/>`
+    s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.17)}" r="${fx(w * 0.0135)}" fill="none" stroke="${GOLD}" stroke-width="2.4"/>`
+  }
+  // coping + coursing
+  s += `<rect x="0" y="${fx(wallTop)}" width="${w}" height="${fx(h * 0.06)}" fill="${INN.stoneLit}"/>`
+  s += `<line x1="0" y1="${fx(wallTop + h * 0.06)}" x2="${w}" y2="${fx(wallTop + h * 0.06)}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
+  for (let i = 0; i < 40; i++) {
+    const jx = (w * (i + (i % 2 ? 0.25 : 0.75))) / 40
+    s += `<line x1="${fx(jx)}" y1="${fx(wallTop + h * 0.06 + (i % 3) * h * 0.1)}" x2="${fx(jx)}" y2="${fx(wallTop + h * 0.06 + (i % 3) * h * 0.1 + h * 0.1)}" stroke="${INK}" stroke-width="1.2" opacity="0.22"/>`
+  }
+  s += `<line x1="0" y1="${fx(h * 0.72)}" x2="${w}" y2="${fx(h * 0.72)}" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
+  s += `<line x1="0" y1="${fx(h * 0.86)}" x2="${w}" y2="${fx(h * 0.86)}" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
+  // THE PAINTED FRIEZE BAND: little villagers walking to the inn + geese
+  const bandY = h * 0.79
+  for (let i = 0; i < 9; i++) {
+    const vx = w * (0.06 + i * 0.11) + rr(r, -w * 0.012, w * 0.012)
+    const vh = h * 0.14
+    if (i % 3 === 2) {
+      // a goose: teardrop body + neck
+      s += `<ellipse cx="${fx(vx)}" cy="${fx(bandY + vh * 0.32)}" rx="${fx(vh * 0.42)}" ry="${fx(vh * 0.26)}" fill="${INK}" opacity="0.75"/>`
+      s += `<path d="M ${fx(vx + vh * 0.3)} ${fx(bandY + vh * 0.24)} Q ${fx(vx + vh * 0.52)} ${fx(bandY - vh * 0.16)} ${fx(vx + vh * 0.62)} ${fx(bandY - vh * 0.05)}" stroke="${INK}" stroke-width="2.4" fill="none" opacity="0.75"/>`
+      s += `<circle cx="${fx(vx + vh * 0.62)}" cy="${fx(bandY - vh * 0.06)}" r="1.8" fill="${INK}" opacity="0.75"/>`
+    } else {
+      // a walking villager: cloak triangle + head + bundle/lantern
+      s += `<path d="M ${fx(vx - vh * 0.24)} ${fx(bandY + vh * 0.5)} L ${fx(vx)} ${fx(bandY - vh * 0.22)} L ${fx(vx + vh * 0.24)} ${fx(bandY + vh * 0.5)} Z" fill="${INK}" opacity="0.75"/>`
+      s += `<circle cx="${fx(vx)}" cy="${fx(bandY - vh * 0.32)}" r="${fx(vh * 0.14)}" fill="${INK}" opacity="0.75"/>`
+      if (i % 3 === 0) s += `<circle cx="${fx(vx + vh * 0.32)}" cy="${fx(bandY + vh * 0.06)}" r="${fx(vh * 0.09)}" fill="${GOLD}" opacity="0.9"/>` // a lantern
+    }
+  }
+  s += `</g>`
+  s += rimPath(d, 4)
+  s += `</g>`
+  const defs = `<clipPath id="s2friezeCut"><path d="${d}"/></clipPath>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE T-FLOOR (page-2 spread print, both pages in ONE image — same uv
+// contract as page-4: image x=0 the LEFT fore edge, 0.5 the spine, 1 the
+// RIGHT fore edge; image TOP the far page edge z=-0.75, BOTTOM the apron).
+// The floor CONTINUES the 3D motion into 2D: a cobble fan radiating from the
+// gate through to the great door, a trail of scattered brass keys leading
+// from the fore edge past the KEY-BOARD to the door, warm window-light pools
+// under plane B, the WELCOME doormat, the goose family, guest footprints,
+// and the celebrated affordances (the LIFT ribbon + the woodcut manicule
+// aimed at door 1). ----
+function innCourtyardSpread(w, h, seed) {
+  const r = mulberry32(seed)
+  const PX = (f) => f * w
+  const PY = (f) => f * h
+  const WALNUT = '#5c4526'
+  // scene anchors in image fractions (pageFX/pageFY from the page-4 module)
+  const doorX = 0.5
+  const doorY = pageFY(-0.2) // the great door's station at the spine
+  const gateY = pageFY(0.16)
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${ROOK.parch}"/>`
+  // laid-paper tooth
+  for (let i = 0; i < 150; i++) {
+    const y = rr(r, 0, h)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${WALNUT}" stroke-width="1" opacity="${fx(rr(r, 0.02, 0.05))}"/>`
+  }
+  // dusk falls on the far half (under the mountain + behind the inn row)
+  s += `<rect width="${w}" height="${fx(h * 0.34)}" fill="url(#s2pgDusk)"/>`
+  // the gutter valley
+  s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#s2pgGutter)"/>`
+
+  // ---- WINDOW-LIGHT POOLS under plane B's facades (glue band z -0.2..-0.41)
+  for (const side of ['left', 'right']) {
+    for (let k = 0; k < 6; k++) {
+      const radial = lerp(0.12, PAGE_W_U * 0.92, (k + rr(r, 0.2, 0.8)) / 6)
+      const fy = pageFY(lerp(-0.36, -0.22, rr(r, 0, 1)))
+      const rad = rr(r, 0.07, 0.12)
+      s += `<ellipse cx="${fx(PX(pageFX(radial, side)))}" cy="${fx(PY(fy))}" rx="${fx(PX(rad * 0.62))}" ry="${fx(PY(rad * 0.3))}" fill="url(#s2pgPool)"/>`
+    }
+  }
+  // warm spill out of the great door itself
+  s += `<ellipse cx="${fx(PX(doorX))}" cy="${fx(PY(doorY + 0.03))}" rx="${fx(PX(0.055))}" ry="${fx(PY(0.032))}" fill="url(#s2pgPool)" opacity="0.95"/>`
+
+  // ---- THE COBBLE FAN: rays from the door station through the gate span,
+  // opening to the whole apron; arcs cross them concentric on the door.
+  const FAN0 = { x: doorX, y: doorY + 0.02 }
+  const rays = 13
+  s += `<g opacity="0.5">`
+  for (let i = 0; i < rays; i++) {
+    const t = i / (rays - 1)
+    const endX = lerp(-0.06, 1.06, t)
+    // rays pass through the gate opening: pinch toward the gate span at gateY
+    const gateX = lerp(0.365, 0.635, t)
+    s += `<path d="M ${fx(PX(FAN0.x))} ${fx(PY(FAN0.y))} C ${fx(PX(gateX))} ${fx(PY(gateY))} ${fx(PX(lerp(gateX, endX, 0.4)))} ${fx(PY(lerp(gateY, 1, 0.45)))} ${fx(PX(endX))} ${fx(PY(1.02))}" fill="none" stroke="${WALNUT}" stroke-width="2" opacity="0.5"/>`
+  }
+  s += `</g>`
+  // concentric cobble arcs + stones between (the fan's paving courses)
+  const ARCS = 9
+  for (let a = 1; a <= ARCS; a++) {
+    const t = a / ARCS
+    const fy = lerp(FAN0.y + 0.06, 1.04, t * t)
+    const span = lerp(0.1, 0.62, t)
+    s += `<path d="M ${fx(PX(FAN0.x - span))} ${fx(PY(fy + 0.05))} Q ${fx(PX(FAN0.x))} ${fx(PY(fy - lerp(0.015, 0.06, t)))} ${fx(PX(FAN0.x + span))} ${fx(PY(fy + 0.05))}" fill="none" stroke="${WALNUT}" stroke-width="2.2" opacity="${fx(0.42 - t * 0.14)}"/>`
+    // cobblestones dotted along the arc
+    const stones = 6 + a * 2
+    for (let c2 = 0; c2 < stones; c2++) {
+      const ct = c2 / (stones - 1)
+      const sx2 = FAN0.x + (ct - 0.5) * 2 * span * 0.92
+      const sy2 = fy + 0.05 - Math.sin(ct * Math.PI) * lerp(0.015, 0.06, t) - 0.012
+      const sr = lerp(0.006, 0.016, t)
+      s += `<ellipse cx="${fx(PX(sx2 + rr(r, -0.006, 0.006)))}" cy="${fx(PY(sy2 + rr(r, -0.004, 0.004)))}" rx="${fx(PX(sr))}" ry="${fx(PY(sr * 0.6))}" fill="none" stroke="${WALNUT}" stroke-width="1.5" opacity="${fx(rr(r, 0.2, 0.38))}"/>`
+    }
+  }
+
+  // ---- THE WELCOME DOORMAT, just downstage of the gate span
+  const matY = pageFY(0.3)
+  const matW = 0.128
+  const matH = 0.052
+  s += `<g transform="rotate(-1.2 ${fx(PX(0.5))} ${fx(PY(matY))})">`
+  s += `<rect x="${fx(PX(0.5 - matW / 2))}" y="${fx(PY(matY - matH / 2))}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="${INN.roofDim}" opacity="0.85"/>`
+  s += `<rect x="${fx(PX(0.5 - matW / 2) + 5)}" y="${fx(PY(matY - matH / 2) + 5)}" width="${fx(PX(matW) - 10)}" height="${fx(PY(matH) - 10)}" fill="none" stroke="${ROOK.parch}" stroke-width="2.4" stroke-dasharray="7 4" opacity="0.9"/>`
+  s += `<text x="${fx(PX(0.5))}" y="${fx(PY(matY) + PY(matH) * 0.16)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(PY(matH) * 0.44)}" font-weight="bold" letter-spacing="2" text-anchor="middle" fill="${ROOK.parch}" opacity="0.95">WELCOME</text>`
+  s += `</g>`
+
+  // ---- THE BRASS-KEY TRAIL: fore edge -> past the key-board -> the door.
+  // (board: right page, d 0.40..0.62 -> x 0.674..0.770, z -0.03..0.42)
+  const trail = (t) => {
+    const mt = 1 - t
+    const P = [[0.985, pageFY(0.5)], [0.9, pageFY(0.52)], [0.84, pageFY(0.1)], [0.62, pageFY(-0.12)]]
+    return [0, 1].map((k) => mt * mt * mt * P[0][k] + 3 * mt * mt * t * P[1][k] + 3 * mt * t * t * P[2][k] + t * t * t * P[3][k])
+  }
+  for (let k = 0; k < 9; k++) {
+    const [kx, ky] = trail(k / 8 + rr(r, -0.02, 0.02))
+    const S = lerp(h * 0.035, h * 0.022, k / 8)
+    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})" opacity="0.85">${keyGlyph(S, WALNUT, '#7d6238')}</g>`
+  }
+  // ... and two strays on the left page for the wanderers
+  for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
+    s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.6">${keyGlyph(h * 0.024, WALNUT, '#7d6238')}</g>`
+
+  // ---- THE LIFT RIBBON BANNER arcing over the key-board (celebrated, not
+  // apologetic): brick-red ribbon, parchment letters, gold tails.
+  const ribY = pageFY(-0.1)
+  const ribX0 = 0.655
+  const ribX1 = 0.795
+  const ribD = `M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.022))} Q ${fx(PX((ribX0 + ribX1) / 2))} ${fx(PY(ribY - 0.03))} ${fx(PX(ribX1))} ${fx(PY(ribY + 0.022))}`
+  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="${fx(h * 0.036)}" stroke-linecap="butt"/>`
+  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.5" transform="translate(0 ${fx(-h * 0.017)})"/>`
+  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.5" transform="translate(0 ${fx(h * 0.017)})"/>`
+  // ribbon tails
+  s += `<path d="M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.012))} l ${fx(-w * 0.017)} ${fx(h * 0.012)} l ${fx(w * 0.011)} ${fx(h * 0.011)} l ${fx(-w * 0.004)} ${fx(h * 0.012)} l ${fx(w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
+  s += `<path d="M ${fx(PX(ribX1))} ${fx(PY(ribY + 0.012))} l ${fx(w * 0.017)} ${fx(h * 0.012)} l ${fx(-w * 0.011)} ${fx(h * 0.011)} l ${fx(w * 0.004)} ${fx(h * 0.012)} l ${fx(-w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
+  s += `<text x="${fx(PX((ribX0 + ribX1) / 2))}" y="${fx(PY(ribY + 0.008))}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(h * 0.03)}" font-weight="bold" letter-spacing="5" text-anchor="middle" fill="${ROOK.parch}">LIFT</text>`
+
+  // ---- THE WOODCUT MANICULE on the floor, aimed at door 1 (z ~0.04): a
+  // pointing hand with a ruffled cuff, printed walnut like a chapbook dingbat.
+  const mx = PX(0.845)
+  const my = PY(pageFY(0.055))
+  s += `<g transform="translate(${fx(mx)} ${fx(my)}) rotate(186)" opacity="0.8">`
+  s += `<path d="M 0 0 L ${fx(w * 0.026)} ${fx(-h * 0.006)} L ${fx(w * 0.026)} ${fx(h * 0.007)} Z" fill="${WALNUT}"/>` // pointing finger
+  s += `<rect x="${fx(-w * 0.02)}" y="${fx(-h * 0.011)}" width="${fx(w * 0.022)}" height="${fx(h * 0.024)}" rx="4" fill="${WALNUT}"/>` // fist
+  for (let f2 = 0; f2 < 3; f2++)
+    s += `<line x1="${fx(-w * 0.002)}" y1="${fx(-h * 0.002 + f2 * h * 0.0055)}" x2="${fx(w * 0.004)}" y2="${fx(-h * 0.002 + f2 * h * 0.0055)}" stroke="${ROOK.parch}" stroke-width="1.4" opacity="0.8"/>` // folded fingers
+  s += `<path d="M ${fx(-w * 0.02)} ${fx(-h * 0.013)} L ${fx(-w * 0.028)} ${fx(-h * 0.016)} L ${fx(-w * 0.028)} ${fx(h * 0.016)} L ${fx(-w * 0.02)} ${fx(h * 0.014)} Z" fill="${WALNUT}"/>` // cuff
+  s += `<line x1="${fx(-w * 0.024)}" y1="${fx(-h * 0.012)}" x2="${fx(-w * 0.024)}" y2="${fx(h * 0.012)}" stroke="${ROOK.parch}" stroke-width="1.6" opacity="0.7"/>`
+  s += `</g>`
+
+  // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate
+  const geese = [
+    [0.155, 0.8, 1],
+    [0.21, 0.84, 0.62],
+    [0.255, 0.815, 0.56],
+    [0.3, 0.85, 0.6],
+  ]
+  for (const [gx, gy, gs] of geese) {
+    const B2 = h * 0.05 * gs
+    s += `<g transform="translate(${fx(PX(gx))} ${fx(PY(gy))})">`
+    s += `<ellipse cx="0" cy="0" rx="${fx(B2 * 0.85)}" ry="${fx(B2 * 0.55)}" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="2"/>`
+    s += `<path d="M ${fx(B2 * 0.6)} ${fx(-B2 * 0.3)} Q ${fx(B2 * 1.05)} ${fx(-B2 * 0.9)} ${fx(B2 * 1.2)} ${fx(-B2 * 0.75)}" fill="none" stroke="${INN.snow}" stroke-width="${fx(Math.max(2.4, B2 * 0.26))}"/>`
+    s += `<path d="M ${fx(B2 * 0.6)} ${fx(-B2 * 0.3)} Q ${fx(B2 * 1.05)} ${fx(-B2 * 0.9)} ${fx(B2 * 1.2)} ${fx(-B2 * 0.75)}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="0.6"/>`
+    s += `<circle cx="${fx(B2 * 1.22)}" cy="${fx(-B2 * 0.78)}" r="${fx(Math.max(2, B2 * 0.19))}" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="1.4"/>`
+    s += `<path d="M ${fx(B2 * 1.38)} ${fx(-B2 * 0.78)} l ${fx(B2 * 0.3)} ${fx(B2 * 0.08)} l ${fx(-B2 * 0.28)} ${fx(B2 * 0.12)} Z" fill="#c98b4a"/>` // beak
+    s += `<path d="M ${fx(-B2 * 0.2)} ${fx(B2 * 0.5)} l ${fx(-B2 * 0.1)} ${fx(B2 * 0.34)} m ${fx(B2 * 0.42)} ${fx(-B2 * 0.34)} l ${fx(B2 * 0.1)} ${fx(B2 * 0.34)}" stroke="#c98b4a" stroke-width="2.2" fill="none"/>` // feet
+    s += `<path d="M ${fx(-B2 * 0.5)} ${fx(-B2 * 0.1)} Q 0 ${fx(-B2 * 0.4)} ${fx(B2 * 0.45)} ${fx(-B2 * 0.12)}" fill="none" stroke="${WALNUT}" stroke-width="1.3" opacity="0.5"/>` // wing line
+    s += `</g>`
+  }
+  // webbed goose prints trailing behind them
+  for (let i = 0; i < 7; i++) {
+    const px2 = 0.12 + i * 0.033 + rr(r, -0.006, 0.006)
+    const py2 = 0.87 + (i % 2 ? 0.014 : -0.008)
+    s += `<path d="M ${fx(PX(px2))} ${fx(PY(py2))} l -3.4 5 m 3.4 -5 l 0 5.4 m 0 -5.4 l 3.4 5" stroke="${WALNUT}" stroke-width="1.3" opacity="0.4" fill="none"/>`
+  }
+
+  // ---- GUEST FOOTPRINTS doodled into the cobbles (Vegas floor-doodle
+  // license): two boot trails wandering in from the aprons to the door.
+  const bootTrail = (x0, y0, x1, y1, steps) => {
+    let out = ''
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1)
+      const bx = lerp(x0, x1, t) + (i % 2 ? 0.012 : -0.012) + rr(r, -0.003, 0.003)
+      const by = lerp(y0, y1, t) + rr(r, -0.004, 0.004)
+      const ang = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI + 90 + rr(r, -14, 14)
+      out += `<g transform="translate(${fx(PX(bx))} ${fx(PY(by))}) rotate(${fx(ang)})" opacity="${fx(rr(r, 0.2, 0.32))}">` +
+        `<ellipse cx="0" cy="-3.4" rx="3.2" ry="5" fill="${WALNUT}"/>` +
+        `<ellipse cx="0" cy="5" rx="2.6" ry="2.2" fill="${WALNUT}"/></g>`
+    }
+    return out
+  }
+  s += bootTrail(0.08, 0.97, 0.44, pageFY(0.05), 9)
+  s += bootTrail(0.9, 0.99, 0.56, pageFY(0.12), 8)
+
+  // dusk shadow of the stable in the gutter lane (kept box, z 0.43..0.58)
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.5)))}" rx="${fx(PX(0.07))}" ry="${fx(PY(0.03))}" fill="${WALNUT}" opacity="0.07"/>`
+  // vignette
+  s += `<rect width="${w}" height="${h}" fill="url(#s2pgVig)"/>`
+  s += `</g>`
+  const defs =
+    `<linearGradient id="s2pgDusk" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${INN.skyDeep}" stop-opacity="0.26"/>` +
+    `<stop offset="0.6" stop-color="${INN.skyDeep}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${INN.skyDeep}" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="s2pgGutter" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="s2pgPool" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.6"/>` +
+    `<stop offset="0.6" stop-color="${INN.lamp}" stop-opacity="0.2"/>` +
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>` +
+    `<radialGradient id="s2pgVig" cx="0.5" cy="0.55" r="0.75">` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.28"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -3477,13 +4376,22 @@ const PIECES = [
   { id: 'ch5-goods-deck', seed: 60220, w: 584, h: 512, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'goods') } },
   { id: 'ch5-arch-garland', seed: 60230, w: 768, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'garland') } },
   { id: 'ch5-arch-keystone', seed: 60231, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'keystone') } },
-  // ---- Spread 2 — the Inn (E3 stage set; kept stable box + keyboard) ----
-  // E3 s2 retirement: the eaves/lamp dress patches and the coaching-yard
-  // deck left content.ts with the old ch1-inn/ch1-yard (their content is
-  // absorbed into the stage planes' paint), so their painters are dropped;
-  // stage-plane painters (mountainTwilight / innRowStage / gateOpen /
-  // brassKey / welcomeRank / signKeys / dormerLit / friezeKeys) land with
-  // the s2 art pass (scene pack §4.4).
+  // ---- Spread 2 — the Inn (E3 stage set: three graded gutter-spanning
+  // planes + crease children + the linked rank; kept stable box + keyboard).
+  // Pixel dims at each piece's true mesh aspect: mountain 1.9x0.92, inn row
+  // 1.5x0.68, gate 0.76x0.42, sign 0.14x0.16, dormer 0.16x0.14, key
+  // 0.11x0.09, rank 0.34x0.21, wall 1.25x0.2. The mountain deliberately sits
+  // at the 512 backdrop budget (it is the DIM plane; haze covers it). ----
+  { id: 'ch1-mountain', seed: 20260, w: 512, h: 248, grain: 14, paint() { return mountainTwilight(this.w, this.h, this.seed) } },
+  { id: 'ch1-inn-row', seed: 20261, w: 1024, h: 464, grain: 14, paint() { return innRowStage(this.w, this.h, this.seed) } },
+  { id: 'ch1-gate', seed: 20262, w: 1024, h: 566, grain: 12, paint() { return gateOpen(this.w, this.h, this.seed) } },
+  { id: 'ch1-rank', seed: 20264, w: 512, h: 316, grain: 10, paint() { return welcomeRank(this.w, this.h, this.seed) } },
+  { id: 'ch1-sign', seed: 20265, w: 252, h: 288, grain: 10, paint() { return signKeys(this.w, this.h, this.seed) } },
+  { id: 'ch1-dormer', seed: 20266, w: 256, h: 224, grain: 10, paint() { return dormerLit(this.w, this.h, this.seed) } },
+  { id: 'ch1-key', seed: 20263, w: 264, h: 216, grain: 8, paint() { return brassKeyStandee(this.w, this.h, this.seed) } },
+  { id: 'ch1-wall', seed: 20267, w: 1024, h: 164, grain: 12, paint() { return friezeKeys(this.w, this.h, this.seed) } },
+  // the T-FLOOR flagship: the s2 spread print (same uv contract as page-4)
+  { id: 'page-2', seed: 20270, w: 1024, h: 683, grain: 10, paint() { return innCourtyardSpread(this.w, this.h, this.seed) } },
   { id: 'ch1-stable-side', seed: 20210, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'barn') } },
   { id: 'ch1-stable-back', seed: 20211, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'barn') } },
   { id: 'ch1-stable-top', seed: 20212, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'barn') } },

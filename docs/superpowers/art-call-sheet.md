@@ -155,10 +155,12 @@ down on the press before the final die-cut), decided per-piece by the physics
 (`dieFlipped`), not a fixed rule from mount height or `vDir` alone — verified by
 actually running the solver, not eyeballed:
 
-**Rotated 180° (8 shipped pieces + 2 fan members):** `ch1-dormer`, `ch2-bee-c`,
+**Rotated 180° (7 shipped pieces + 2 fan members):** `ch2-bee-c`,
 `ch4-coins`, `ch5-lantern`, `ch5-lantern-b`, `ch6-door`, `ch6-banner`, `title-crest`,
 `satchel-burst-m0`, `satchel-burst-m1`. (`end-raven` is now a kinetic arm — upright,
-like `ch2-windmill`.)
+like `ch2-windmill`; `ch1-dormer` moved to the phi-74 E3 inn ROW, no longer a
+deep-V parent, and prints upright again alongside its new siblings `ch1-sign`
+and `ch1-key`.)
 
 Every other STAND piece prints upright, including `satchel-burst-m2` and **every
 page-glued `vfold` layer without exception** (standing validity keeps a page-glued
@@ -172,7 +174,7 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 |---|---|---|---|---|---|
 | `ch1-mountain` | `ch1-mountain` | STAGE PLANE A (rear, widest): the sleeping mountain — peach twilight sky bands, slate mass + snow crown, tiny far rooftops at the base, star pricks; torn-paper crest outline | ≈2.07:1 landscape (1.9:0.92) | STAND | **art** (procedural) |
 | `ch1-inn-row` | `ch1-inn-row` | STAGE PLANE B (mid, THE HERO): full-span lamplit inn-row facades astride the gutter — central double-gable hall on the crease, timber wings, 9–11 gold windows, terracotta roofs, chimney + cut-paper smoke curl IN the outline, "100" shield over the door, painted lock escutcheon under the key rotor (right panel u 0.18, v 0.35) | ≈2.21:1 landscape (1.5:0.68) | STAND | **art** (procedural) |
-| `ch1-dormer` | `ch1-dormer` | Attic dormer riding the inn row's crease — gabled, one gold window, terracotta cap | ≈1.14:1 near-square | STAND — **ROTATED 180** | **art** (procedural) |
+| `ch1-dormer` | `ch1-dormer` | Attic dormer riding the inn row's crease — gabled, one gold window, terracotta cap | ≈1.14:1 near-square | STAND (upright on the phi-74 parent) | **art** (procedural) |
 | `ch1-sign` | `ch1-sign` | Hanging key-sign riding the inn row's crease low (a child again, not a standalone v-fold): swinging bracket shield, three brass keys on a ring, walnut + gold | ≈0.88:1 portrait | STAND | **art** (procedural) |
 | `ch1-key` | `ch1-key` | The great brass KEY rotor turning in the lock as the page opens — ornate key on a round walnut escutcheon disc, hub-riveted coplanar on the inn row's right panel (oriented disc art: side-aware UV flip) | 1:1 disc | FLAT (rotor disc) | **art** (procedural) |
 | `ch1-gate` | `ch1-gate` | STAGE PLANE C (front, narrowest): the open gate — stone gateposts with lit lanterns + moth-glow halos, low swung-open timber gates at the outer edges, key-bunting swag as the outline's central dip (span low ≈v 0.45 so B's windows show through) | ≈1.81:1 landscape (0.76:0.42) | STAND | **art** (procedural) |
