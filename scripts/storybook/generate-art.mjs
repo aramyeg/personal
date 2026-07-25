@@ -103,485 +103,373 @@ function simplifyOutline(pts, eps = 1e-5) {
 }
 
 /**
- * THE ART MODULE. Pure: (seed, dims, palette, motif) -> { outline, svg }.
- * `outline` is the closed silhouette in normalized [0,1]^2 with v UP from the
- * hinge (v=0 = base glued to page) to the crest (v=1) — exactly the ROW_UVS
- * convention popup-skyline.ts already maps. That same array triangulates to
- * the shaped mesh at runtime; here it also drives the SVG cut path.
+ * THE ROOKERY ART MODULE (E3 s4, "The Rookery of Four Billion Ravens"). Pure:
+ * (seed, dims, variant) -> { outline, svg }. `outline` is the closed silhouette
+ * in normalized [0,1]^2 with v UP from the hinge (v=0 = base glued to page) to
+ * the crest (v=1) — exactly the ROW_UVS convention popup-skyline.ts maps. That
+ * same array triangulates to the shaped mesh AND drives the SVG cut path, so
+ * "geometry IS the silhouette" (charter G3) stays an identity.
+ *
+ * The s4 scene pack retires the fairy-tale citadel these six strips used to
+ * carry and replaces it with Berlin's central ROOKERY: a radial amphitheater of
+ * slate DOVECOTE FACADES, every front pierced by regimented ranks of arched
+ * raven portals with a scattered fifth glowing amber from within (the only warm
+ * light in a slate + parchment world), deep-cut crenellation rooflines, and
+ * along every parapet a rank of perched ravens cut as ONE LINKED CHAIN in the
+ * silhouette — order, not swarm (swarm is s3's grammar). Every cut edge carries
+ * a PALE core-edge rim (T1/T-EDGE).
+ *
+ * Three variants share the generator: `flank` (the six re-dressed skyline
+ * rows), `ringMid` (the ring's downstage arms — two storeys, biggest portals,
+ * most lit) and `ringFront` (the low gate wall, lantern posts, road shadow).
  */
-function citadelStrip({ seed, w, h, palette = CITADEL, towers = 7, smoke = false }) {
-  const rand = mulberry32(seed)
-  const P = palette
-  const X = (u) => u * w // normalized u -> px
-  const Y = (v) => (1 - v) * h // normalized v (up) -> px (down)
-  const FIN = 0.05 // finial spike height (v)
-  const FINW = 0.006
 
-  // ---- LAYOUT: a composed row of DISTINCT building types (round tower, big
-  // hall w/ dormers, gabled houses, gatehouse) across three depth PLANES.
-  // Hard rule: never > 2 adjacent similar gables. ----
-  const n = Math.max(7, towers)
-  const kind = new Array(n).fill('house')
-  const plane = new Array(n).fill('main')
-  const towerIdx = Math.min(n - 2, Math.max(1, Math.round(n / 2) + ((seed % 3) - 1)))
-  kind[towerIdx] = 'tower'
-  const roomLeft = towerIdx
-  let hallIdx = roomLeft >= n - 1 - towerIdx ? towerIdx - 2 : towerIdx + 2
-  if (hallIdx < 0 || hallIdx >= n || kind[hallIdx] !== 'house') hallIdx = kind[1] === 'house' ? 1 : n - 2
-  kind[hallIdx] = 'hall'
-  const gateIdx = seed % 2 ? 0 : n - 1
-  if (kind[gateIdx] === 'house') kind[gateIdx] = 'gatehouse'
-  // recede the tower's flanking houses (far plane) so the centerpiece pops
-  for (const j of [towerIdx - 1, towerIdx + 1]) if (kind[j] === 'house') plane[j] = 'far'
-  // one more far house on the longer side for a third-plane read
-  for (let i = 0; i < n; i++) if (kind[i] === 'house' && plane[i] === 'main' && Math.abs(i - towerIdx) >= 3) { plane[i] = 'far'; break }
+// Scene-pack palette: slate #5a6470, ink #2b2d33, parchment #e7d5a8, amber
+// #d98e3f, plus the raw-paper core #f6eedb every cut edge is rimmed with.
+const ROOK = {
+  slate: '#5a6470',
+  slateLit: '#79828f',
+  slateDim: '#48515c',
+  slateDeep: '#363e48',
+  ink: '#2b2d33',
+  parch: '#e7d5a8',
+  parchLit: '#f3e7c6',
+  parchDim: '#c2ab7c',
+  amber: '#d98e3f',
+  amberLit: '#f2bd71',
+  amberDeep: '#7d4a1a',
+  rim: '#f6eedb',
+}
 
-  const relW = { tower: 1.5, hall: 1.55, gatehouse: 1.2, house: 0.95 }
+/** The PALE core-edge rim every rookery cut edge carries: a band of raw paper
+ *  core along the silhouette with NO ink centreline — a dark hairline read
+ *  BACKWARDS on these pieces (a cut edge is the paper's pale core, never a
+ *  drawn line), and this is the fix. */
+function rookRim(d, wCore = 5) {
+  return (
+    `<path d="${d}" fill="none" stroke="${ROOK.rim}" stroke-width="${fx(wCore)}" opacity="0.97" stroke-linejoin="round" stroke-linecap="round"/>` +
+    `<path d="${d}" fill="none" stroke="${ROOK.parchLit}" stroke-width="${fx(wCore * 0.42)}" opacity="0.6" stroke-linejoin="round" stroke-linecap="round"/>`
+  )
+}
+
+/** One perched raven's TOP PROFILE over its own cell — beak spike, crown, nape
+ *  dip, back hump, tail slope — in cell fractions (u) and bird-height fractions
+ *  (v), nominally facing u-DECREASING (spine-ward). */
+const RAVEN_PROFILE = [
+  [0.0, 0.55], [0.05, 0.66], [0.1, 0.8], [0.14, 0.92],
+  [0.07, 0.88], [0.13, 0.96], [0.2, 1.0], [0.28, 0.95], [0.34, 0.86],
+  [0.48, 0.92], [0.68, 0.88], [0.84, 0.76], [0.94, 0.63], [1.0, 0.55],
+]
+
+/** How wide one bird's cell is, as a multiple of its height — the rank is sized
+ *  in PIXELS (not in u) so every strip aspect gets birds of the same build.
+ *  The chain links at v = 0.30 of the bird height: a SHALLOW notch between
+ *  neighbours, which is what reads as one rank rather than a row of peaks. */
+const RAVEN_CELL = 0.6
+
+/** A RANK of perched ravens cut as ONE LINKED CHAIN: consecutive birds share
+ *  their low tail/foot point, so the contour never returns to the parapet
+ *  between them (T-LINKED-RANK — order, not swarm, at zero piece cost). */
+function ravenChainTop(x0, x1, v0, bh, count, facing) {
+  const cw = (x1 - x0) / count
+  const prof = facing === 'left' ? RAVEN_PROFILE : RAVEN_PROFILE.map(([du, dv]) => [1 - du, dv]).reverse()
+  const pts = []
+  for (let k = 0; k < count; k++) {
+    const a = x0 + k * cw
+    for (const [du, dv] of prof) {
+      const u = a + du * cw
+      const v = v0 + dv * bh
+      const last = pts[pts.length - 1]
+      if (last && Math.abs(last[0] - u) < 1e-9 && Math.abs(last[1] - v) < 1e-9) continue
+      pts.push([u, v])
+    }
+  }
+  return pts
+}
+
+/** Deep-cut crenellation across [x0,x1] as outline points (u ascending), the
+ *  merlon tops at topV over gaps cut back to baseV. */
+function crenelTop(x0, x1, baseV, topV, teeth) {
+  const out = []
+  const tw = (x1 - x0) / (teeth * 2 - 1)
+  for (let t = 0; t < teeth; t++) {
+    const xa = x0 + t * 2 * tw
+    out.push([xa, topV], [xa + tw, topV], [xa + tw, baseV])
+    if (t < teeth - 1) out.push([xa + 2 * tw, baseV], [xa + 2 * tw, topV])
+  }
+  return out
+}
+
+/** A lantern post standing proud of a parapet: a T silhouette (thin post, wider
+ *  lantern head, finial cap). u is NOT monotonic across the head's overhang —
+ *  still a simple polygon, so earcut is happy and the bilerp stays in-quad. */
+function lanternTop(a, lw, v0, lh) {
+  return [
+    [a + 0.36 * lw, v0], [a + 0.36 * lw, v0 + 0.5 * lh], [a + 0.12 * lw, v0 + 0.56 * lh],
+    [a + 0.2 * lw, v0 + 0.82 * lh], [a + 0.5 * lw, v0 + lh], [a + 0.8 * lw, v0 + 0.82 * lh],
+    [a + 0.88 * lw, v0 + 0.56 * lh], [a + 0.64 * lw, v0 + 0.5 * lh], [a + 0.64 * lw, v0],
+  ]
+}
+
+/** ONE arched raven portal in px. `lit` fills it with the warm interior glow
+ *  (the amber traffic light) plus a perch bar, a bird in the opening and a
+ *  lamplight pool spilling down the wall; unlit it is an ink recess. Both carry
+ *  a parchment hood mould and sill so the rank reads as cut stone. */
+function ravenPortal(bx, by, bw, bh, lit) {
+  const sy = by - bh * 0.5
+  const apex = by - bh
+  const cy = lerp(sy, apex, 0.55)
+  const arch =
+    `M ${fx(bx)} ${fx(by)} L ${fx(bx)} ${fx(sy)} Q ${fx(bx)} ${fx(cy)} ${fx(bx + bw / 2)} ${fx(apex)} ` +
+    `Q ${fx(bx + bw)} ${fx(cy)} ${fx(bx + bw)} ${fx(sy)} L ${fx(bx + bw)} ${fx(by)} Z`
+  let s = ''
+  if (lit) s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx(by + bh * 0.3)}" rx="${fx(bw * 1.3)}" ry="${fx(bh * 0.4)}" fill="${ROOK.amber}" opacity="0.22"/>`
+  s += `<path d="${arch}" fill="${lit ? 'url(#rookGlow)' : ROOK.ink}"/>`
+  if (lit) {
+    const rw = bw * 0.34
+    s += `<rect x="${fx(bx + bw * 0.1)}" y="${fx(by - bh * 0.28)}" width="${fx(bw * 0.8)}" height="${fx(Math.max(1.2, bh * 0.045))}" fill="${ROOK.ink}" opacity="0.7"/>`
+    s += `<ellipse cx="${fx(bx + bw * 0.52)}" cy="${fx(by - bh * 0.4)}" rx="${fx(rw * 0.55)}" ry="${fx(bh * 0.13)}" fill="${ROOK.ink}" opacity="0.88"/>`
+    s += `<circle cx="${fx(bx + bw * 0.52 - rw * 0.5)}" cy="${fx(by - bh * 0.53)}" r="${fx(Math.max(1.4, bw * 0.085))}" fill="${ROOK.ink}" opacity="0.88"/>`
+  }
+  s += `<path d="${arch}" fill="none" stroke="${ROOK.ink}" stroke-width="1.5" opacity="0.6"/>`
+  s += `<path d="M ${fx(bx)} ${fx(sy)} Q ${fx(bx)} ${fx(cy)} ${fx(bx + bw / 2)} ${fx(apex)} Q ${fx(bx + bw)} ${fx(cy)} ${fx(bx + bw)} ${fx(sy)}" fill="none" stroke="${ROOK.parchDim}" stroke-width="${fx(Math.max(1.6, bw * 0.1))}" opacity="0.62"/>`
+  s += `<rect x="${fx(bx - bw * 0.14)}" y="${fx(by)}" width="${fx(bw * 1.28)}" height="${fx(Math.max(2, bh * 0.075))}" fill="${ROOK.parch}" opacity="0.9"/>`
+  return s
+}
+
+/** The shared dovecote-facade generator. Returns the silhouette contour (v-up,
+ *  hinge->crest) and the SVG paint drawn in the SAME space. `mirror` reflects
+ *  the whole composition about u=0.5; the raven ranks are authored with the
+ *  opposite facing when mirrored so EVERY rank still faces the spine (u=0 is
+ *  the spine end on BOTH pages — popup-skyline solves d0 = F outward). */
+function dovecoteFacade({ seed, w, h, variant = 'flank', blocks = 5, mirror = false }) {
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+  const CAP_V = 0.975 // the outline MUST stay inside the unit square (shaped-mesh contract)
+  const PROF = {
+    flank: { lo: 0.46, hi: 0.63, tower: 0.79, rows: 1, pMin: 4, pMax: 6, th: 0.13, rh: 0.18, teeth: 11 },
+    ringMid: { lo: 0.54, hi: 0.7, tower: 0.8, rows: 2, pMin: 5, pMax: 6, th: 0.11, rh: 0.17, teeth: 13 },
+    ringFront: { lo: 0.32, hi: 0.42, tower: 0.5, rows: 1, pMin: 4, pMax: 5, th: 0.1, rh: 0.24, teeth: 15 },
+  }[variant]
+  const facing = mirror ? 'right' : 'left'
+  /** Birds per zone, sized in pixels so every strip aspect gets the same build. */
+  const rankCount = (z0, z1, rh) => Math.max(2, Math.round(((z1 - z0) * w) / Math.max(6, rh * h * RAVEN_CELL)))
+  /** Merlons per zone, likewise pitched in pixels (a narrow block would
+   *  otherwise grow a rank of hair-thin spikes at the same tooth COUNT). */
+  const teethCount = (z0, z1) => Math.max(2, Math.min(9, Math.round(((z1 - z0) * w) / (PROF.teeth * 2.6))))
+
+  // ---- LAYOUT: a rank of facade blocks, one narrow COTE TOWER among them. ----
+  const nb = Math.max(3, Math.round(blocks))
   const rel = []
-  for (let i = 0; i < n; i++) rel.push((relW[kind[i]] ?? 1) * (plane[i] === 'far' ? 0.8 : 1) * (0.9 + mulberry32((seed * 17 + i) | 0)() * 0.3))
-  const total = rel.reduce((a, b) => a + b, 0)
+  for (let i = 0; i < nb; i++) rel.push(0.82 + mulberry32((seed * 31 + i * 719) | 0)() * 0.5)
+  const towerIdx = 1 + Math.floor(mulberry32((seed * 97 + 13) | 0)() * (nb - 2))
+  rel[towerIdx] *= 0.6
+  const tot = rel.reduce((a, b) => a + b, 0)
 
-  const units = []
-  let xacc = 0
-  for (let i = 0; i < n; i++) {
-    const wv = rel[i] / total
-    const x0 = xacc
-    const x1 = xacc + wv
-    xacc = x1
-    const uSeed = (seed * 131 + i * 977) | 0
-    const r2 = mulberry32(uSeed)
-    const far = plane[i] === 'far'
-    const base = { x0, x1, uSeed, kind: kind[i], far }
-    if (kind[i] === 'tower') {
-      const corbelV = 0.58 + r2() * 0.04
-      // peakV capped so the finial tip (peakV + FIN) stays <= 1 — the outline
-      // MUST live inside the unit square for the shaped-mesh contract (the
-      // bilerp stays within the solver quad iff u,v in [0,1]).
-      units.push({ ...base, corbelV, eaveV: corbelV, peakV: 0.9 + r2() * 0.04, drumInset: (x1 - x0) * 0.14 })
-    } else if (kind[i] === 'hall') {
-      const eaveV = 0.42 + r2() * 0.05
-      units.push({ ...base, eaveV, peakV: eaveV + 0.16 + r2() * 0.05, ridgeHalf: 0.3 + r2() * 0.08, hip: true })
-    } else if (kind[i] === 'gatehouse') {
-      const topV = 0.5 + r2() * 0.05
-      units.push({ ...base, eaveV: topV, topV, crenelV: topV - 0.03, teeth: 4 })
-    } else {
-      // house — varied height/pitch; far ones shorter. Alternate hip/gable so
-      // neighbours never read as the same roof.
-      const eaveV = (far ? 0.34 : 0.46) + r2() * 0.08
-      const pitch = (far ? 0.1 : 0.16) + r2() * 0.14
-      const hip = i % 2 === 0
-      units.push({ ...base, eaveV, peakV: Math.min(far ? 0.62 : 0.8, eaveV + pitch), hip, ridgeHalf: hip ? 0.16 + r2() * 0.1 : 0 })
-    }
+  const blocksArr = []
+  let acc = 0
+  for (let i = 0; i < nb; i++) {
+    const bw = rel[i] / tot
+    const x0 = acc
+    const x1 = acc + bw
+    acc = x1
+    const bseed = (seed * 137 + i * 911) | 0
+    const r2 = mulberry32(bseed)
+    const isTower = i === towerIdx
+    const parapetV = Math.min(CAP_V - 0.02, isTower ? PROF.tower : lerp(PROF.lo, PROF.hi, r2()))
+    const head = CAP_V - parapetV
+    blocksArr.push({
+      i,
+      x0,
+      x1,
+      bseed,
+      isTower,
+      parapetV,
+      th: Math.min(PROF.th, head),
+      rh: Math.min(PROF.rh, head),
+      ravenFirst: r2() < 0.5,
+      rows: isTower ? PROF.rows + 1 : PROF.rows,
+      perRow: PROF.pMin + Math.floor(r2() * (PROF.pMax - PROF.pMin + 1)),
+      far: !isTower && r2() < 0.34,
+    })
   }
 
-  // chimneys in the valleys between main houses/halls
-  const chimneys = []
-  for (let i = 1; i < n; i++) {
-    const r2 = mulberry32((seed * 53 + i * 613) | 0)
-    if (units[i].kind === 'tower' || units[i - 1].kind === 'tower' || r2() > 0.55) continue
-    const eave = Math.min(units[i - 1].eaveV, units[i].eaveV)
-    chimneys.push({ x: units[i].x0 - 0.024, wv: 0.048, baseV: eave - 0.04, topV: eave + 0.18 + r2() * 0.08, uSeed: (seed * 91 + i) | 0, accent: r2() < 0.5 ? P.accent : P.accent2 })
-  }
+  // The gate wall carries two lantern posts (scene pack 4e); nothing else does.
+  const lanternIdx = variant === 'ringFront' ? [...new Set([1, nb - 2])].filter((k) => k > 0 && k < nb) : []
 
-  // ---- OUTLINE: one closed contour per unit type, spent on interesting mass. ----
-  const merlonTop = (x0, x1, baseV, topV, teeth) => {
-    const out = []
-    const tw = (x1 - x0) / (teeth * 2 - 1)
-    for (let t = 0; t < teeth; t++) {
-      const xa = x0 + t * 2 * tw
-      out.push([xa, topV], [xa + tw, topV], [xa + tw, baseV])
-      if (t < teeth - 1) out.push([xa + 2 * tw, baseV], [xa + 2 * tw, topV])
-    }
-    return out
-  }
-  const unitTop = (u) => {
-    const mid = (u.x0 + u.x1) / 2
-    if (u.kind === 'tower') return [[u.x0, u.corbelV], [mid - FINW, u.peakV], [mid, u.peakV + FIN], [mid + FINW, u.peakV], [u.x1, u.corbelV]]
-    if (u.kind === 'gatehouse') return [[u.x0, u.crenelV], ...merlonTop(u.x0, u.x1, u.crenelV, u.topV, u.teeth), [u.x1, u.crenelV]]
-    if (u.hip) {
-      const rw = (u.x1 - u.x0) * u.ridgeHalf
-      return [[u.x0, u.eaveV], [mid - rw, u.peakV], [mid + rw, u.peakV], [u.x1, u.eaveV]]
-    }
-    return [[u.x0, u.eaveV], [mid - FINW, u.peakV], [mid, u.peakV + FIN], [mid + FINW, u.peakV], [u.x1, u.eaveV]]
-  }
-  const top = []
-  units.forEach((u) => {
-    for (const c of chimneys)
-      if (Math.abs(c.x + 0.012 - u.x0) < 1e-6) top.push([c.x, u.eaveV], [c.x, c.topV], [c.x + c.wv, c.topV], [c.x + c.wv, u.eaveV])
-    top.push(...unitTop(u))
+  // Per block: an optional lantern post, then a RAVEN-RANK zone and a
+  // CRENELLATION zone (order alternates per block) — so every parapet shows
+  // both the deep cut and one unbroken chain of birds.
+  const layout = blocksArr.map((b) => {
+    const lantern = lanternIdx.includes(b.i)
+      ? { a: b.x0 + (b.x1 - b.x0) * 0.06, lw: Math.min((b.x1 - b.x0) * 0.42, 0.1), lh: Math.min(0.3, CAP_V - b.parapetV) }
+      : null
+    const a = lantern ? lantern.a + lantern.lw : b.x0
+    const split = a + (b.x1 - a) * 0.55
+    const zones = b.ravenFirst
+      ? [{ kind: 'raven', z0: a, z1: split }, { kind: 'crenel', z0: split, z1: b.x1 }]
+      : [{ kind: 'crenel', z0: a, z1: split }, { kind: 'raven', z0: split, z1: b.x1 }]
+    return { b, lantern, zones: zones.filter((z) => z.z1 - z.z0 > 1e-4) }
   })
-  // Simplify so the outline is a clean corner ring (drives BOTH the SVG cut and
-  // the shaped mesh — same array, the G3 identity).
-  const outline = simplifyOutline([[0, 0], ...top, [1, 0]])
 
-  // ---- PAINT ----
-  const dOf = (pts) => pts.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
-  const silhouette = dOf(outline)
-  const defs = []
-  const parts = []
-  const sky = [] // UNCLIPPED overlay (smoke, high pennants) that drifts past the cut edge
-  let clipId = 0
-
-  // masonry: warm fill + HEAVY walnut coursing, block-varied joints, weathered
-  // dark/light blocks. Line alpha varies per course (weathering), 2-3x the
-  // former weight so coursing reads at contact-sheet scale.
-  const stoneWall = (x0, x1, yTop, yBot, fill, r2, dim, courseV = 0.05) => {
-    let s = `<rect x="${fx(X(x0))}" y="${fx(yTop)}" width="${fx(X(x1 - x0))}" height="${fx(yBot - yTop)}" fill="${fill}"/>`
-    s += `<rect x="${fx(X(x0))}" y="${fx(yTop)}" width="${fx(w * 0.005)}" height="${fx(yBot - yTop)}" fill="${P.paperLit}" opacity="0.55"/>` // lit left edge
-    s += `<rect x="${fx(X(x1) - w * 0.006)}" y="${fx(yTop)}" width="${fx(w * 0.006)}" height="${fx(yBot - yTop)}" fill="${P.ink}" opacity="0.1"/>` // shadowed right edge
-    const courseH = h * courseV
-    let cy = yBot
-    let row = 0
-    while (cy > yTop + 2) {
-      s += `<line x1="${fx(X(x0))}" y1="${fx(cy)}" x2="${fx(X(x1))}" y2="${fx(cy)}" stroke="${P.ink}" stroke-width="1.5" opacity="${(0.42 + r2() * 0.24).toFixed(2)}"/>`
-      const blocks = 3 + Math.floor(r2() * 3)
-      for (let b = 0; b <= blocks; b++) {
-        const jx = lerp(x0, x1, (b + (row % 2 ? 0.5 : 0)) / blocks)
-        if (jx <= x0 || jx >= x1) continue
-        s += `<line x1="${fx(X(jx))}" y1="${fx(cy)}" x2="${fx(X(jx))}" y2="${fx(cy - courseH)}" stroke="${P.ink}" stroke-width="1.3" opacity="0.36"/>`
+  // ---- OUTLINE ----
+  const top = []
+  for (const { b, lantern, zones } of layout) {
+    top.push([b.x0, b.parapetV])
+    if (lantern) top.push([lantern.a, b.parapetV], ...lanternTop(lantern.a, lantern.lw, b.parapetV, lantern.lh))
+    for (const z of zones) {
+      if (z.kind === 'crenel') {
+        top.push([z.z0, b.parapetV], ...crenelTop(z.z0, z.z1, b.parapetV, b.parapetV + b.th, teethCount(z.z0, z.z1)), [z.z1, b.parapetV])
+      } else {
+        const n = rankCount(z.z0, z.z1, b.rh)
+        top.push([z.z0, b.parapetV], ...ravenChainTop(z.z0, z.z1, b.parapetV, b.rh, n, facing), [z.z1, b.parapetV])
       }
-      const roll = r2()
-      if (roll < 0.2) s += `<rect x="${fx(X(lerp(x0, x1, r2() * 0.7)))}" y="${fx(cy - courseH)}" width="${fx(X((x1 - x0) * 0.18))}" height="${fx(courseH)}" fill="${dim}" opacity="0.55"/>`
-      else if (roll < 0.32) s += `<rect x="${fx(X(lerp(x0, x1, r2() * 0.7)))}" y="${fx(cy - courseH)}" width="${fx(X((x1 - x0) * 0.16))}" height="${fx(courseH)}" fill="${P.paperLit}" opacity="0.4"/>`
-      cy -= courseH
-      row++
     }
-    return s
   }
+  const raw = [[0, 0], ...top, [1, 0]]
+  const outline = simplifyOutline(mirror ? raw.map(([u, v]) => [1 - u, v]).reverse() : raw)
 
-  const shingles = (clip, x0, x1, eaveY, ridgeY, tint) => {
-    let s = `<g clip-path="url(#${clip})">`
-    const rows = 9
-    const sc = w * 0.019
-    for (let i = 0; i < rows; i++) {
-      const y = lerp(eaveY, ridgeY, i / rows)
-      const amp = ((eaveY - ridgeY) / rows) * 0.6
-      s += `<rect x="${fx(X(x0) - 6)}" y="${fx(y - amp)}" width="${fx(X(x1 - x0) + 12)}" height="${fx(amp + 2)}" fill="${i % 2 ? tint : P.ink}" opacity="${i % 2 ? 0.32 : 0.2}"/>`
-      let d = `M ${fx(X(x0) - 6)} ${fx(y)}`
-      for (let x = X(x0) - 6; x < X(x1) + sc; x += sc) d += ` q ${fx(sc / 2)} ${fx(amp)} ${fx(sc)} 0`
-      s += `<path d="${d}" fill="none" stroke="${P.ink}" stroke-width="1.9" opacity="0.62"/>`
-    }
-    s += `</g>`
-    return s
-  }
+  // ---- PAINT (authored un-mirrored; the mirror is one transform group) ----
+  const parts = []
+  parts.push(`<rect width="${w}" height="${h}" fill="${ROOK.slateDeep}"/>`)
 
-  const lancet = (cx, sillV, ww, hh, lit, r2) => {
-    const bx = X(cx - ww / 2)
-    const bw = X(ww)
-    const by = Y(sillV)
-    const hpx = hh * h
-    const sy = by - hpx * 0.5
-    const apex = sy - hpx * 0.55
-    const cyc = lerp(sy, apex, 0.5)
-    const frame = `M ${fx(bx)} ${fx(by)} L ${fx(bx)} ${fx(sy)} Q ${fx(bx)} ${fx(cyc)} ${fx(bx + bw / 2)} ${fx(apex)} Q ${fx(bx + bw)} ${fx(cyc)} ${fx(bx + bw)} ${fx(sy)} L ${fx(bx + bw)} ${fx(by)} Z`
-    let s = ''
-    if (lit) s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx((apex + by) / 2)}" rx="${fx(bw * 0.9)}" ry="${fx((by - apex) * 0.6)}" fill="${P.ember}" opacity="0.16"/>`
-    s += `<path d="${frame}" fill="${lit ? 'url(#glow)' : P.ink}" opacity="${lit ? 1 : 0.82}"/>`
-    if (lit) {
-      s += `<line x1="${fx(bx + bw / 2)}" y1="${fx(apex + 3)}" x2="${fx(bx + bw / 2)}" y2="${fx(by)}" stroke="${P.ink}" stroke-width="1.4" opacity="0.72"/>`
-      for (const t of [0.4, 0.72]) s += `<line x1="${fx(bx)}" y1="${fx(lerp(sy, by, t))}" x2="${fx(bx + bw)}" y2="${fx(lerp(sy, by, t))}" stroke="${P.ink}" stroke-width="1.2" opacity="0.6"/>`
-    }
-    s += `<path d="${frame}" fill="none" stroke="${P.ink}" stroke-width="2.2" opacity="0.88"/>`
-    s += `<path d="${frame}" fill="none" stroke="${P.paperLit}" stroke-width="0.8" opacity="0.4"/>`
-    return s
-  }
-
-  const finialAt = (midXpx, peakV) => {
-    const baseY = Y(peakV)
-    const tipY = Y(peakV + FIN)
-    return `<rect x="${fx(midXpx - 1.6)}" y="${fx(tipY)}" width="3.2" height="${fx(baseY - tipY)}" fill="${P.gold}"/><circle cx="${fx(midXpx)}" cy="${fx(tipY)}" r="5" fill="${P.goldLit}"/><circle cx="${fx(midXpx)}" cy="${fx(tipY)}" r="5" fill="none" stroke="${P.ink}" stroke-width="1" opacity="0.5"/><circle cx="${fx(midXpx)}" cy="${fx(baseY - 4)}" r="3" fill="${P.gold}"/>`
-  }
-  // pennant: 2-3x larger, saturated accent, on a pole above the finial tip
-  const pennant = (midXpx, peakV, color) => {
-    const y = Y(peakV + FIN) - 4
-    const L = w * 0.075
-    const drop = 9
-    return `<path d="M ${fx(midXpx)} ${fx(y)} l 0 ${fx(-18)}" stroke="${P.ink}" stroke-width="1.6" opacity="0.65"/><path d="M ${fx(midXpx)} ${fx(y - 17)} q ${fx(L * 0.55)} ${fx(-2)} ${fx(L)} ${fx(drop)} q ${fx(-L * 0.5)} ${fx(-1)} ${fx(-L * 0.5)} ${fx(drop + 2)} q ${fx(-L * 0.5)} ${fx(1)} ${fx(-L * 0.5)} ${fx(-drop - 1)} z" fill="${color}"/><path d="M ${fx(midXpx)} ${fx(y - 17)} q ${fx(L * 0.55)} ${fx(-2)} ${fx(L)} ${fx(drop)}" fill="none" stroke="${P.ink}" stroke-width="1" opacity="0.4"/>`
-  }
-  // cut-paper smoke: ONE small tapered S-ribbon, paper-white, ATTACHED at the
-  // mouth, height capped to the chimney's own height, tapering to a point.
-  const smokeRibbon = (cx, mouthY, mouthW, chimneyHpx, r2) => {
-    const dir = r2() < 0.5 ? 1 : -1
-    const sh = Math.min(chimneyHpx * 0.85, h * 0.17) // <= the chimney's own height
-    const mx = X(cx)
-    const N = 12
-    const L = []
-    const R = []
-    for (let i = 0; i <= N; i++) {
-      const t = i / N
-      const cxi = mx + Math.sin(t * Math.PI * 0.95) * mouthW * 0.7 * dir // gentle S
-      const cyi = mouthY - t * sh
-      const half = mouthW * 0.42 * (1 - t) ** 0.9 // taper to a point
-      L.push([cxi - half, cyi])
-      R.push([cxi + half, cyi])
-    }
-    const pts = [...L, ...R.reverse()]
-    const d = 'M ' + pts.map((p) => `${fx(p[0])} ${fx(p[1])}`).join(' L ') + ' Z'
-    return `<path d="${d}" fill="${P.smoke}" opacity="0.78"/>`
-  }
-  // ground-level DOOR: framed arched opening with a timber/iron leaf + step stones.
-  const door = (cx, wallTopV, r2) => {
-    const dw = 0.05
-    const dhpx = h * (0.1 + r2() * 0.03)
-    const bx = X(cx - dw / 2)
-    const bw = X(dw)
-    const by = h
-    const sy = by - dhpx * 0.55
-    const apex = sy - bw * 0.5
-    const arch = `M ${fx(bx)} ${fx(by)} L ${fx(bx)} ${fx(sy)} Q ${fx(bx)} ${fx(lerp(sy, apex, 0.5))} ${fx(bx + bw / 2)} ${fx(apex)} Q ${fx(bx + bw)} ${fx(lerp(sy, apex, 0.5))} ${fx(bx + bw)} ${fx(sy)} L ${fx(bx + bw)} ${fx(by)} Z`
-    let s = `<path d="${arch}" fill="#2a1d13"/>` // recessed doorway
-    const iron = r2() < 0.5
-    if (iron) {
-      for (const t of [0.4, 0.7]) s += `<line x1="${fx(bx + 2)}" y1="${fx(lerp(sy, by, t))}" x2="${fx(bx + bw - 2)}" y2="${fx(lerp(sy, by, t))}" stroke="${P.ink}" stroke-width="2" opacity="0.8"/>` // iron bands
-    } else {
-      for (let p = 1; p < 4; p++) s += `<line x1="${fx(bx + (bw * p) / 4)}" y1="${fx(apex + 2)}" x2="${fx(bx + (bw * p) / 4)}" y2="${fx(by)}" stroke="${P.ink}" stroke-width="1.6" opacity="0.6"/>` // timber planks
-    }
-    s += `<path d="${arch}" fill="none" stroke="${P.ink}" stroke-width="2.6" opacity="0.85"/>` // heavy frame
-    s += `<path d="${arch}" fill="none" stroke="${P.paperLit}" stroke-width="1" opacity="0.4"/>`
-    // one or two step stones
-    s += `<rect x="${fx(bx - 4)}" y="${fx(by - 6)}" width="${fx(bw + 8)}" height="6" fill="${P.paperMid}" stroke="${P.ink}" stroke-width="1" stroke-opacity="0.4"/>`
-    return s
-  }
-
-  const leftShadow = (u, yTop) => `<rect x="${fx(X(u.x0) - 7)}" y="${fx(yTop)}" width="8" height="${fx(h - yTop)}" fill="${P.ink}" opacity="0.16"/>`
-
-  // ---- per-type painters ----
-  const drawHouse = (u) => {
-    const r2 = mulberry32(u.uSeed ^ 0x9e37)
-    const wallFill = u.far ? P.paperDim : P.paper
-    const wallDim = u.far ? P.paperDeep : P.paperMid
-    const roofTint = u.far ? P.slateDim : P.slate
-    const eaveY = Y(u.eaveV)
-    const ridgeY = Y(u.peakV)
-    const mid = (u.x0 + u.x1) / 2
-    const rlX = X(mid - (u.hip ? u.ridgeHalf * (u.x1 - u.x0) : 0))
-    const rrX = X(mid + (u.hip ? u.ridgeHalf * (u.x1 - u.x0) : 0))
-    const cid = `r${clipId++}`
-    const roof = `M ${fx(X(u.x0))} ${fx(eaveY)} L ${fx(rlX)} ${fx(ridgeY)} L ${fx(rrX)} ${fx(ridgeY)} L ${fx(X(u.x1))} ${fx(eaveY)} Z`
-    defs.push(`<clipPath id="${cid}"><path d="${roof}"/></clipPath>`)
-    let s = `<g>${leftShadow(u, eaveY)}`
-    s += stoneWall(u.x0, u.x1, eaveY, h, wallFill, r2, wallDim)
-    if (u.far) s += `<rect x="${fx(X(u.x0))}" y="${fx(eaveY)}" width="${fx(X(u.x1 - u.x0))}" height="${fx(h - eaveY)}" fill="${P.slateDeep}" opacity="0.26"/>`
-    s += `<path d="${roof}" fill="${roofTint}"/>`
-    s += `<path d="M ${fx(X(u.x0))} ${fx(eaveY)} L ${fx(rlX)} ${fx(ridgeY)} L ${fx(rlX)} ${fx(eaveY)} Z" fill="${P.slateLit}" opacity="0.35"/>`
-    s += shingles(cid, u.x0, u.x1, eaveY, ridgeY, roofTint)
-    s += `<path d="${roof}" fill="none" stroke="${P.ink}" stroke-width="2.4" opacity="0.72"/>`
-    s += `<rect x="${fx(X(u.x0) - 3)}" y="${fx(eaveY)}" width="${fx(X(u.x1 - u.x0) + 6)}" height="4.5" fill="${P.paperLit}" opacity="0.75"/>` // eave board
-    s += `<rect x="${fx(X(u.x0))}" y="${fx(eaveY + 4.5)}" width="${fx(X(u.x1 - u.x0))}" height="6" fill="${P.ink}" opacity="0.18"/>` // overhang shadow
-    if (u.hip) s += `<line x1="${fx(rlX)}" y1="${fx(ridgeY)}" x2="${fx(rrX)}" y2="${fx(ridgeY)}" stroke="${P.paperLit}" stroke-width="1.8" opacity="0.55"/>`
-    else s += finialAt(X(mid), u.peakV)
-    // ground DOOR (main houses only — far ones are distant), framed
-    if (!u.far) s += door((u.x0 + u.x1) / 2, u.eaveV, mulberry32((u.uSeed ^ 0xd001) | 0))
-    // UPPER window row: height capped to <=17% of building height, sill sits in
-    // the upper wall (never touches the ground line — that zone is the door).
-    const wins = u.far ? 1 : r2() < 0.5 ? 2 : 1
-    const winH = Math.min(0.15 * ((u.far ? 0.6 : 0.8) + r2() * 0.3), 0.17 * u.peakV)
-    const sill = u.eaveV - 0.03 - winH * 1.05
-    for (let k = 0; k < wins; k++) {
-      const wx = lerp(u.x0, u.x1, wins === 1 ? 0.5 : 0.32 + k * 0.36)
-      s += lancet(wx, sill, 0.045, winH, r2() < (u.far ? 0.5 : 0.72), mulberry32((u.uSeed ^ (k * 7)) | 0))
-    }
-    return s + `</g>`
-  }
-
-  // big hall: low hipped roof with TWO dormers breaking the eave line
-  const drawHall = (u) => {
-    const r2 = mulberry32(u.uSeed ^ 0x40a3)
-    const eaveY = Y(u.eaveV)
-    const ridgeY = Y(u.peakV)
-    const mid = (u.x0 + u.x1) / 2
-    const rw = u.ridgeHalf * (u.x1 - u.x0)
-    const rlX = X(mid - rw)
-    const rrX = X(mid + rw)
-    const cid = `r${clipId++}`
-    const roof = `M ${fx(X(u.x0))} ${fx(eaveY)} L ${fx(rlX)} ${fx(ridgeY)} L ${fx(rrX)} ${fx(ridgeY)} L ${fx(X(u.x1))} ${fx(eaveY)} Z`
-    defs.push(`<clipPath id="${cid}"><path d="${roof}"/></clipPath>`)
-    let s = `<g>${leftShadow(u, eaveY)}`
-    s += stoneWall(u.x0, u.x1, eaveY, h, P.paper, r2, P.paperMid)
-    s += `<path d="${roof}" fill="${P.slate}"/>`
-    s += `<path d="M ${fx(X(u.x0))} ${fx(eaveY)} L ${fx(rlX)} ${fx(ridgeY)} L ${fx(rlX)} ${fx(eaveY)} Z" fill="${P.slateLit}" opacity="0.32"/>`
-    s += shingles(cid, u.x0, u.x1, eaveY, ridgeY, P.slate)
-    s += `<path d="${roof}" fill="none" stroke="${P.ink}" stroke-width="2.4" opacity="0.72"/>`
-    s += `<line x1="${fx(rlX)}" y1="${fx(ridgeY)}" x2="${fx(rrX)}" y2="${fx(ridgeY)}" stroke="${P.paperLit}" stroke-width="2" opacity="0.6"/>`
-    s += `<rect x="${fx(X(u.x0) - 3)}" y="${fx(eaveY)}" width="${fx(X(u.x1 - u.x0) + 6)}" height="5" fill="${P.paperLit}" opacity="0.75"/>`
-    // two dormers breaking through the eave, each a mini gable + lit window
-    for (const dx of [0.32, 0.68]) {
-      const cxN = lerp(u.x0, u.x1, dx)
-      const dw = (u.x1 - u.x0) * 0.16
-      const dEave = u.eaveV + 0.06
-      const dPeak = dEave + 0.09
-      const dcid = `r${clipId++}`
-      const dtri = `M ${fx(X(cxN - dw / 2))} ${fx(Y(dEave))} L ${fx(X(cxN))} ${fx(Y(dPeak))} L ${fx(X(cxN + dw / 2))} ${fx(Y(dEave))} Z`
-      defs.push(`<clipPath id="${dcid}"><path d="${dtri}"/></clipPath>`)
-      s += `<rect x="${fx(X(cxN - dw / 2))}" y="${fx(Y(dEave))}" width="${fx(X(dw))}" height="${fx(Y(u.eaveV - 0.02) - Y(dEave))}" fill="${P.paperLit}"/>`
-      s += `<path d="${dtri}" fill="${P.slate}"/>`
-      s += shingles(dcid, cxN - dw / 2, cxN + dw / 2, Y(dEave), Y(dPeak), P.slate)
-      s += `<path d="${dtri}" fill="none" stroke="${P.ink}" stroke-width="1.8" opacity="0.7"/>`
-      s += `<rect x="${fx(X(cxN - dw / 2))}" y="${fx(Y(dEave))}" width="${fx(X(dw))}" height="${fx(Y(u.eaveV - 0.02) - Y(dEave))}" fill="none" stroke="${P.ink}" stroke-width="1.4" opacity="0.5"/>`
-      s += lancet(cxN, dEave - 0.075, 0.03, 0.075, true, r2)
-    }
-    // grand central DOOR + flanking upper windows (capped, off the ground)
-    s += door((u.x0 + u.x1) / 2, u.eaveV, mulberry32((u.uSeed ^ 0xd002) | 0))
-    const hwinH = Math.min(0.13, 0.16 * u.peakV)
-    const hsill = u.eaveV - 0.03 - hwinH * 1.05
-    for (const wx of [0.22, 0.78]) s += lancet(lerp(u.x0, u.x1, wx), hsill, 0.042, hwinH, r2() < 0.75, mulberry32((u.uSeed ^ Math.round(wx * 100)) | 0))
-    return s + `</g>`
-  }
-
-  // round tower: coursed drum, corbel BALCONY ring, arched drum windows, steep
-  // cone WIDER than the drum, gold finial + accent pennant.
-  const drawTower = (u) => {
-    const r2 = mulberry32(u.uSeed ^ 0x51ed)
-    const cx = (u.x0 + u.x1) / 2
-    const dx0 = u.x0 + u.drumInset
-    const dx1 = u.x1 - u.drumInset
-    const drumTopY = Y(u.corbelV)
-    const apexY = Y(u.peakV)
+  for (const { b, lantern, zones } of layout) {
+    const r2 = mulberry32(b.bseed ^ 0x51a7)
+    const yTop = Y(b.parapetV)
+    const bx = X(b.x0)
+    const bwPx = X(b.x1 - b.x0)
     let s = `<g>`
-    s += `<ellipse cx="${fx(X(cx))}" cy="${fx(Y(u.corbelV - 0.02))}" rx="${fx(X((u.x1 - u.x0) * 0.72))}" ry="12" fill="${P.ink}" opacity="0.16"/>` // cast shadow on flanks
-    // drum body: coursed stone + barrel shade
-    s += stoneWall(dx0, dx1, drumTopY, h, P.paperLit, r2, P.paperMid, 0.045)
-    s += `<rect x="${fx(X(dx0))}" y="${fx(drumTopY)}" width="${fx(X(dx1 - dx0))}" height="${fx(h - drumTopY)}" fill="url(#barrel)"/>`
-    // arched drum windows (a couple, lit) mid-drum
-    for (const wy of [0.34, 0.5]) s += lancet(cx, wy, 0.05, 0.13, r2() < 0.85, mulberry32((u.uSeed ^ Math.round(wy * 90)) | 0))
-    // corbel BALCONY ring: a wider band with little bracket ticks + a lit lip
-    const ringY = Y(u.corbelV - 0.02)
-    const ringW = (u.x1 - u.x0) * 0.5
-    s += `<rect x="${fx(X(cx) - X(ringW))}" y="${fx(ringY)}" width="${fx(X(ringW) * 2)}" height="14" fill="${P.paper}"/>`
-    s += `<rect x="${fx(X(cx) - X(ringW))}" y="${fx(ringY)}" width="${fx(X(ringW) * 2)}" height="14" fill="none" stroke="${P.ink}" stroke-width="1.8" opacity="0.6"/>`
-    for (let b = -4; b <= 4; b++) s += `<line x1="${fx(X(cx) + b * X(ringW) / 4.5)}" y1="${fx(ringY + 14)}" x2="${fx(X(cx) + b * X(ringW) / 4.5)}" y2="${fx(ringY + 22)}" stroke="${P.ink}" stroke-width="1.6" opacity="0.5"/>` // corbel brackets
-    s += `<rect x="${fx(X(cx) - X(ringW))}" y="${fx(ringY)}" width="${fx(X(ringW) * 2)}" height="3" fill="${P.paperLit}"/>` // lit lip
-    // belfry arcade just under the cone
-    const bandV = u.corbelV + 0.04
-    for (let a = 0; a < 5; a++) s += lancet(lerp(u.x0 + 0.02, u.x1 - 0.02, (a + 0.5) / 5), bandV, 0.024, 0.055, r2() < 0.85, mulberry32((u.uSeed ^ (a * 13)) | 0))
-    // steep cone, WIDER than the drum, shingled
-    const ox = (u.x1 - u.x0) * 0.06
-    const coneBaseY = Y(u.corbelV + 0.1)
-    const cid = `c${clipId++}`
-    const cone = `M ${fx(X(u.x0 - ox))} ${fx(coneBaseY)} L ${fx(X(cx))} ${fx(apexY)} L ${fx(X(u.x1 + ox))} ${fx(coneBaseY)} Z`
-    defs.push(`<clipPath id="${cid}"><path d="${cone}"/></clipPath>`)
-    s += `<path d="${cone}" fill="${P.slate}"/>`
-    s += `<path d="M ${fx(X(u.x0 - ox))} ${fx(coneBaseY)} L ${fx(X(cx))} ${fx(apexY)} L ${fx(X(cx))} ${fx(coneBaseY)} Z" fill="${P.slateLit}" opacity="0.4"/>`
-    s += shingles(cid, u.x0 - ox, u.x1 + ox, coneBaseY, apexY, P.slate)
-    s += `<path d="${cone}" fill="none" stroke="${P.ink}" stroke-width="2.4" opacity="0.72"/>`
-    s += finialAt(X(cx), u.peakV)
-    s += pennant(X(cx), u.peakV, P.accent)
-    return s + `</g>`
-  }
-
-  const drawGatehouse = (u) => {
-    const r2 = mulberry32(u.uSeed ^ 0x2b1c)
-    const topY = Y(u.topV)
-    const crenelY = Y(u.crenelV)
-    const mid = (u.x0 + u.x1) / 2
-    let s = `<g>${leftShadow(u, crenelY)}`
-    s += stoneWall(u.x0, u.x1, crenelY, h, P.paper, r2, P.paperMid)
-    // merlons on top
-    const tw = (u.x1 - u.x0) / (u.teeth * 2 - 1)
-    for (let t = 0; t < u.teeth; t++) {
-      const xa = u.x0 + t * 2 * tw
-      s += `<rect x="${fx(X(xa))}" y="${fx(topY)}" width="${fx(X(tw))}" height="${fx(crenelY - topY)}" fill="${P.paper}"/>`
-      s += `<rect x="${fx(X(xa))}" y="${fx(topY)}" width="${fx(X(tw))}" height="${fx(crenelY - topY)}" fill="none" stroke="${P.ink}" stroke-width="1.6" opacity="0.55"/>`
+    s += `<rect x="${fx(bx)}" y="${fx(yTop)}" width="${fx(bwPx)}" height="${fx(h - yTop)}" fill="${b.far ? ROOK.slateDim : ROOK.slate}"/>`
+    if (b.far) s += `<rect x="${fx(bx)}" y="${fx(yTop)}" width="${fx(bwPx)}" height="${fx(h - yTop)}" fill="${ROOK.slateDeep}" opacity="0.32"/>`
+    // lit spine-side reveal + shadowed fore-side reveal (cut-card relief)
+    s += `<rect x="${fx(bx)}" y="${fx(yTop)}" width="${fx(Math.max(2, w * 0.004))}" height="${fx(h - yTop)}" fill="${ROOK.slateLit}" opacity="0.6"/>`
+    s += `<rect x="${fx(bx + bwPx - Math.max(2, w * 0.005))}" y="${fx(yTop)}" width="${fx(Math.max(2, w * 0.005))}" height="${fx(h - yTop)}" fill="${ROOK.ink}" opacity="0.3"/>`
+    // ashlar coursing
+    const courseH = h * 0.055
+    for (let cy = h - courseH * 0.5; cy > yTop; cy -= courseH) {
+      s += `<line x1="${fx(bx)}" y1="${fx(cy)}" x2="${fx(bx + bwPx)}" y2="${fx(cy)}" stroke="${ROOK.ink}" stroke-width="1.4" opacity="${(0.18 + r2() * 0.16).toFixed(2)}"/>`
     }
-    s += `<line x1="${fx(X(u.x0))}" y1="${fx(crenelY)}" x2="${fx(X(u.x1))}" y2="${fx(crenelY)}" stroke="${P.ink}" stroke-width="2" opacity="0.5"/>` // wall-walk line
-    // big arched GATE with a portcullis grid
-    const gw = (u.x1 - u.x0) * 0.5
-    const gx0 = X(mid - gw / 2)
-    const gbw = X(gw)
-    const gby = h
-    const gsy = h - (h - crenelY) * 0.42
-    const gapex = gsy - gbw * 0.55
-    const gate = `M ${fx(gx0)} ${fx(gby)} L ${fx(gx0)} ${fx(gsy)} Q ${fx(gx0)} ${fx(lerp(gsy, gapex, 0.5))} ${fx(gx0 + gbw / 2)} ${fx(gapex)} Q ${fx(gx0 + gbw)} ${fx(lerp(gsy, gapex, 0.5))} ${fx(gx0 + gbw)} ${fx(gsy)} L ${fx(gx0 + gbw)} ${fx(gby)} Z`
-    s += `<path d="${gate}" fill="#241a12"/>`
-    s += `<g clip-path="url(#gt${clipId})">`
-    defs.push(`<clipPath id="gt${clipId}"><path d="${gate}"/></clipPath>`)
-    clipId++
-    for (let g = 1; g < 6; g++) s += `<line x1="${fx(gx0 + (gbw * g) / 6)}" y1="${fx(gapex)}" x2="${fx(gx0 + (gbw * g) / 6)}" y2="${fx(gby)}" stroke="${P.ink}" stroke-width="2" opacity="0.85"/>`
-    for (let g = 1; g < 5; g++) s += `<line x1="${fx(gx0)}" y1="${fx(lerp(gsy, gby, g / 5))}" x2="${fx(gx0 + gbw)}" y2="${fx(lerp(gsy, gby, g / 5))}" stroke="${P.ink}" stroke-width="2" opacity="0.85"/>`
+    // parapet wall-walk shade under the crown
+    s += `<rect x="${fx(bx)}" y="${fx(yTop)}" width="${fx(bwPx)}" height="${fx(Math.max(3, h * 0.02))}" fill="${ROOK.ink}" opacity="0.24"/>`
+
+    // crown bands: merlon mass above the parapet (the clip carves the teeth) and
+    // the raven rank mass (the clip carves the birds).
+    for (const z of zones) {
+      const zx = X(z.z0)
+      const zw = X(z.z1 - z.z0)
+      if (z.kind === 'crenel') {
+        // merlons drawn one by one on the SAME tooth maths the outline cuts, so
+        // each gets a lit cap and a shadowed fore-side reveal (deep-cut relief).
+        const teeth = teethCount(z.z0, z.z1)
+        const tw = (z.z1 - z.z0) / (teeth * 2 - 1)
+        const topY = Y(b.parapetV + b.th)
+        const merH = Y(b.parapetV) - topY
+        for (let t = 0; t < teeth; t++) {
+          const mx = X(z.z0 + t * 2 * tw)
+          const mw = X(tw)
+          s += `<rect x="${fx(mx)}" y="${fx(topY)}" width="${fx(mw)}" height="${fx(merH)}" fill="${b.far ? ROOK.slateDim : ROOK.slate}"/>`
+          s += `<rect x="${fx(mx)}" y="${fx(topY)}" width="${fx(mw)}" height="${fx(Math.max(2, merH * 0.18))}" fill="${ROOK.slateLit}" opacity="0.75"/>`
+          s += `<rect x="${fx(mx + mw * 0.72)}" y="${fx(topY)}" width="${fx(mw * 0.28)}" height="${fx(merH)}" fill="${ROOK.ink}" opacity="0.28"/>`
+        }
+        s += `<rect x="${fx(zx)}" y="${fx(Y(b.parapetV))}" width="${fx(zw)}" height="${fx(Math.max(2, h * 0.014))}" fill="${ROOK.ink}" opacity="0.3"/>`
+      } else {
+        // the rank's mass; the clip carves it into the linked chain of birds.
+        const n = rankCount(z.z0, z.z1, b.rh)
+        const perchV = b.parapetV + b.rh * RAVEN_PROFILE[0][1]
+        s += `<rect x="${fx(zx)}" y="${fx(Y(perchV))}" width="${fx(zw)}" height="${fx(Y(b.parapetV) - Y(perchV))}" fill="${b.far ? ROOK.slateDim : ROOK.slate}"/>`
+        s += `<rect x="${fx(zx)}" y="${fx(Y(perchV))}" width="${fx(zw)}" height="${fx(Math.max(2, h * 0.012))}" fill="${ROOK.slateLit}" opacity="0.7"/>`
+        s += `<rect x="${fx(zx)}" y="${fx(Y(b.parapetV + b.rh))}" width="${fx(zw)}" height="${fx(Y(perchV) - Y(b.parapetV + b.rh))}" fill="${ROOK.ink}"/>`
+        const cw = (z.z1 - z.z0) / n
+        const cwPx = X(cw)
+        for (let k = 0; k < n; k++) {
+          const hu = facing === 'left' ? 0.17 : 0.83
+          const bu = facing === 'left' ? 0.58 : 0.42
+          s += `<circle cx="${fx(X(z.z0 + cw * (k + hu)))}" cy="${fx(Y(b.parapetV + b.rh * 0.94))}" r="${fx(Math.max(1.3, b.rh * h * 0.05))}" fill="${ROOK.amberLit}" opacity="0.95"/>`
+          s += `<ellipse cx="${fx(X(z.z0 + cw * (k + bu)))}" cy="${fx(Y(b.parapetV + b.rh * 0.82))}" rx="${fx(cwPx * 0.22)}" ry="${fx(b.rh * h * 0.05)}" fill="${ROOK.slateLit}" opacity="0.3"/>`
+        }
+      }
+    }
+
+    // lantern post paint (gate wall only)
+    if (lantern) {
+      const lx = X(lantern.a)
+      const lwPx = X(lantern.lw)
+      s += `<rect x="${fx(lx + lwPx * 0.34)}" y="${fx(Y(b.parapetV + lantern.lh * 0.52))}" width="${fx(lwPx * 0.32)}" height="${fx(Y(b.parapetV) - Y(b.parapetV + lantern.lh * 0.52))}" fill="${ROOK.slateDim}"/>`
+      s += `<rect x="${fx(lx + lwPx * 0.1)}" y="${fx(Y(b.parapetV + lantern.lh))}" width="${fx(lwPx * 0.8)}" height="${fx(Y(b.parapetV + lantern.lh * 0.5) - Y(b.parapetV + lantern.lh))}" fill="url(#rookGlow)"/>`
+      s += `<rect x="${fx(lx + lwPx * 0.1)}" y="${fx(Y(b.parapetV + lantern.lh))}" width="${fx(lwPx * 0.8)}" height="${fx(Y(b.parapetV + lantern.lh * 0.5) - Y(b.parapetV + lantern.lh))}" fill="none" stroke="${ROOK.ink}" stroke-width="1.8" opacity="0.65"/>`
+      s += `<line x1="${fx(lx + lwPx * 0.5)}" y1="${fx(Y(b.parapetV + lantern.lh))}" x2="${fx(lx + lwPx * 0.5)}" y2="${fx(Y(b.parapetV + lantern.lh * 0.5))}" stroke="${ROOK.ink}" stroke-width="1.5" opacity="0.5"/>`
+      s += `<ellipse cx="${fx(lx + lwPx * 0.5)}" cy="${fx(Y(b.parapetV) + h * 0.02)}" rx="${fx(lwPx * 1.1)}" ry="${fx(h * 0.05)}" fill="${ROOK.amber}" opacity="0.2"/>`
+    }
+
+    // ---- PORTAL RANKS: regimented rows, ~1 in 5 lit, scattered as traffic ----
+    const rowsAt = b.rows === 1 ? [0.44] : b.rows === 2 ? [0.66, 0.3] : [0.72, 0.48, 0.24]
+    const pW = (b.x1 - b.x0) / (b.perRow * 1.85)
+    const pH = b.parapetV * (b.rows === 1 ? 0.3 : 0.24)
+    const pr = mulberry32(b.bseed ^ 0x2f19)
+    let litPrev = false
+    for (const rowT of rowsAt) {
+      const sillV = b.parapetV * rowT
+      // string course the rank stands on
+      s += `<rect x="${fx(bx)}" y="${fx(Y(sillV) + Math.max(2, h * 0.012))}" width="${fx(bwPx)}" height="${fx(Math.max(2, h * 0.012))}" fill="${ROOK.parchDim}" opacity="0.55"/>`
+      for (let k = 0; k < b.perRow; k++) {
+        const t = b.perRow === 1 ? 0.5 : k / (b.perRow - 1)
+        const cu = lerp(b.x0 + pW * 0.95, b.x1 - pW * 0.95, t)
+        const roll = pr()
+        const lit = roll < 0.2 || (litPrev && roll < 0.44)
+        litPrev = lit
+        s += ravenPortal(X(cu - pW / 2), Y(sillV), X(pW), pH * h, lit)
+      }
+    }
     s += `</g>`
-    s += `<path d="${gate}" fill="none" stroke="${P.ink}" stroke-width="3" opacity="0.8"/>` // heavy arch voussoir
-    s += `<path d="${gate}" fill="none" stroke="${P.paperLit}" stroke-width="1" opacity="0.4"/>`
-    // a lit window over the gate
-    s += lancet(mid, u.crenelV - 0.12, 0.05, 0.12, true, r2)
-    return s + `</g>`
+    parts.push(s)
   }
 
-  // ---- assemble planes: far distant fill, far units, main units (tower last),
-  // chimneys+smoke, then the near foreground parapet in FRONT. ----
-  parts.push(`<rect x="0" y="${fx(Y(0.5))}" width="${w}" height="${fx(Y(0) - Y(0.5))}" fill="${P.slateDeep}" opacity="0.5"/>`) // distant cool wash behind gaps
-  const painter = (u) => (u.kind === 'tower' ? drawTower(u) : u.kind === 'hall' ? drawHall(u) : u.kind === 'gatehouse' ? drawGatehouse(u) : drawHouse(u))
-  units.forEach((u) => u.far && parts.push(painter(u)))
-  units.forEach((u) => !u.far && u.kind !== 'tower' && parts.push(painter(u)))
-  units.forEach((u) => u.kind === 'tower' && parts.push(painter(u)))
-  for (const c of chimneys) {
-    const r2 = mulberry32(c.uSeed)
-    const y0 = Y(c.topV)
-    parts.push(stoneWall(c.x, c.x + c.wv, y0 + 7, Y(c.baseV), P.brick, r2, P.brickDim, 0.035))
-    parts.push(`<rect x="${fx(X(c.x) - 4)}" y="${fx(y0)}" width="${fx(X(c.wv) + 8)}" height="9" fill="${P.brickLit}"/>`) // cap
-    parts.push(`<rect x="${fx(X(c.x) - 4)}" y="${fx(y0)}" width="${fx(X(c.wv) + 8)}" height="9" fill="none" stroke="${P.ink}" stroke-width="1.6" opacity="0.65"/>`)
-    if (smoke) sky.push(smokeRibbon(c.x + c.wv / 2, y0, X(c.wv) * 0.8, (c.topV - c.baseV) * h, r2)) // tapered paper ribbon, attached at the mouth
+  // the gate wall's ROAD SHADOW: the post-road passing the wall throws a dark
+  // slant across its base (the page print carries the road itself).
+  if (variant === 'ringFront') {
+    const rx = w * 0.6
+    parts.push(
+      `<path d="M ${fx(rx)} ${fx(h)} L ${fx(rx + w * 0.07)} ${fx(h * 0.74)} L ${fx(rx + w * 0.13)} ${fx(h * 0.74)} L ${fx(rx + w * 0.09)} ${fx(h)} Z" fill="${ROOK.ink}" opacity="0.2"/>`
+    )
   }
-  // a second pennant on the tallest non-tower gable (accent2), in the sky layer
-  const tallGable = units
-    .filter((u) => (u.kind === 'house' || u.kind === 'hall') && !u.hip)
-    .sort((a, b) => b.peakV - a.peakV)[0]
-  if (tallGable) sky.push(pennant(X((tallGable.x0 + tallGable.x1) / 2), tallGable.peakV, P.accent2))
-  // NEAR plane: a low foreground BASTION spanning ONE side (a section, not a
-  // full band — so the town's doors stay visible), warmest/lightest, merlon
-  // crown, coursing, casting a shade line onto itself from the town behind.
-  const nearV = 0.16
-  const nearY = Y(nearV)
-  const nr = mulberry32(seed ^ 0x7a11)
-  const onLeft = seed % 2 === 0
-  const bx0 = onLeft ? 0 : w * 0.62
-  const bx1 = onLeft ? w * 0.38 : w
-  const bw = bx1 - bx0
-  let near = `<rect x="${fx(bx0)}" y="${fx(nearY)}" width="${fx(bw)}" height="${fx(h - nearY)}" fill="${P.paperLit}"/>`
-  near += `<rect x="${fx(bx0)}" y="${fx(nearY)}" width="${fx(bw)}" height="11" fill="${P.ink}" opacity="0.2"/>` // shade cast by the town behind
-  near += `<rect x="${fx(bx0)}" y="${fx(nearY + 3)}" width="${fx(bw)}" height="3" fill="${P.paperLit}"/>` // lit wall-walk
-  const nteeth = 8
-  const ntw = bw / (nteeth * 2 - 1)
-  for (let t = 0; t < nteeth; t++) near += `<rect x="${fx(bx0 + t * 2 * ntw)}" y="${fx(nearY - 13)}" width="${fx(ntw)}" height="13" fill="${P.paperLit}" stroke="${P.ink}" stroke-width="1.3" stroke-opacity="0.45"/>`
-  for (let cy = h - h * 0.05; cy > nearY; cy -= h * 0.05) near += `<line x1="${fx(bx0)}" y1="${fx(cy)}" x2="${fx(bx1)}" y2="${fx(cy)}" stroke="${P.ink}" stroke-width="1.5" opacity="${(0.34 + nr() * 0.2).toFixed(2)}"/>`
-  // vertical drop shadow on the town where the bastion's inner end occludes it
-  const edge = onLeft ? bx1 : bx0
-  near += `<rect x="${fx(edge - (onLeft ? 7 : 0))}" y="${fx(nearY)}" width="7" height="${fx(h - nearY)}" fill="${P.ink}" opacity="0.14"/>`
-  parts.push(near)
+  // contact shade where the flap meets the page
+  parts.push(`<rect x="0" y="${fx(h * 0.94)}" width="${w}" height="${fx(h * 0.06)}" fill="${ROOK.ink}" opacity="0.34"/>`)
 
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+  const body = mirror ? `<g transform="translate(${fx(w)} 0) scale(-1 1)">${parts.join('')}</g>` : parts.join('')
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
     <defs>
-      <clipPath id="cut"><path d="${silhouette}"/></clipPath>
-      <radialGradient id="glow" cx="0.5" cy="0.42" r="0.75">
-        <stop offset="0" stop-color="${P.goldLit}"/>
-        <stop offset="0.55" stop-color="${P.gold}"/>
-        <stop offset="1" stop-color="#7a5514"/>
+      <clipPath id="cut"><path d="${d}"/></clipPath>
+      <radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">
+        <stop offset="0" stop-color="${ROOK.amberLit}"/>
+        <stop offset="0.5" stop-color="${ROOK.amber}"/>
+        <stop offset="1" stop-color="${ROOK.amberDeep}"/>
       </radialGradient>
-      <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="${P.paperLit}" stop-opacity="0.12"/>
-        <stop offset="0.5" stop-color="#000000" stop-opacity="0"/>
-        <stop offset="1" stop-color="#241606" stop-opacity="0.4"/>
+      <linearGradient id="rookShade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.14"/>
+        <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+        <stop offset="1" stop-color="${ROOK.ink}" stop-opacity="0.42"/>
       </linearGradient>
-      <linearGradient id="barrel" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="${P.paperDeep}" stop-opacity="0.5"/>
-        <stop offset="0.22" stop-color="${P.paperLit}" stop-opacity="0.55"/>
-        <stop offset="0.5" stop-color="${P.paperLit}" stop-opacity="0"/>
-        <stop offset="1" stop-color="${P.paperDeep}" stop-opacity="0.6"/>
-      </linearGradient>
-      ${defs.join('')}
     </defs>
     <g clip-path="url(#cut)">
-      <rect width="${w}" height="${h}" fill="${P.paperMid}"/>
-      ${parts.join('')}
-      <rect width="${w}" height="${h}" fill="url(#shade)"/>
+      ${body}
+      <rect width="${w}" height="${h}" fill="url(#rookShade)"/>
     </g>
-    <!-- smoke + high pennants drift past the die-cut edge into the sky -->
-    ${sky.join('')}
-    <!-- die-cut raw-paper rim on the FRONT plane's edge: thick + rim-lit -->
-    <path d="${silhouette}" fill="none" stroke="${P.rim}" stroke-width="5" opacity="0.95" stroke-linejoin="round"/>
-    <path d="${silhouette}" fill="none" stroke="${P.ink}" stroke-width="1.4" opacity="0.55" stroke-linejoin="round"/>
+    ${rookRim(d, 5)}
   </svg>`
 
   return { outline, svg }
+}
+
+/**
+ * The skyline-slot art module under its historical name — the procart outline
+ * bench imports `citadelStrip` as "the module the six ch3-skyline slots ship",
+ * so the name stays a stable seam while the s4 pack changes WHAT it paints
+ * (dovecote fronts, not a fairy-tale citadel). `smoke` is accepted and ignored:
+ * the rookery has no chimneys.
+ */
+function citadelStrip({ seed, w, h, towers = 7 }) {
+  return dovecoteFacade({ seed, w, h, variant: 'flank', blocks: Math.max(3, Math.round(towers / 1.6)) })
 }
 
 // ---- seeded grain pass: a whisper of monochrome tooth, its alpha MASKED by
@@ -601,13 +489,18 @@ function grainOverArt(flatRaw, w, h, seed, amount) {
   return sharp(g, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer()
 }
 
-async function bake(seed, w, h, smoke, towers = 7 + (seed % 2)) {
-  const { outline, svg } = citadelStrip({ seed, w, h, towers, smoke })
+/** SVG -> flat PNG -> seeded grain masked by the art's own alpha, for a module
+ *  that also emits an outline (the shaped-mesh bakes). */
+async function bakeShaped({ outline, svg }, seed, w, h, grain = 22) {
   const flat = await sharp(Buffer.from(svg)).png().toBuffer()
   const flatRaw = await sharp(flat).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const grainCut = await grainOverArt(flatRaw, w, h, seed, 22)
+  const grainCut = await grainOverArt(flatRaw, w, h, seed, grain)
   const out = await sharp(flat).composite([{ input: grainCut, blend: 'over' }]).png().toBuffer()
   return { outline, out }
+}
+
+async function bake(seed, w, h, smoke, towers = 7 + (seed % 2)) {
+  return bakeShaped(citadelStrip({ seed, w, h, towers }), seed, w, h, 22)
 }
 
 // ============================================================================
@@ -2554,9 +2447,10 @@ function tallyMarks(cx, cy, a, count, rIn, rOut, span, color) {
 }
 
 // A minimal stroke-vector capital alphabet (unit cell, x right / y down, 0=top)
-// for the card's engraved "DISPATCH" — path-based so the label is font-free and
-// byte-identical across bakes (no librsvg font dependency). Only D I S P A T C H.
-const DISPATCH_GLYPHS = {
+// for the desk's engraved labels — path-based so they are font-free and
+// byte-identical across bakes (no librsvg font dependency). Covers exactly the
+// letters s4 engraves: DISPATCH + "SPIN — ROUTE THE RAVENS", plus the em dash.
+const ENGRAVE_GLYPHS = {
   D: [[['M', 0, 0], ['L', 0, 1]], [['M', 0, 0], ['C', 0.95, 0.02, 0.95, 0.98, 0, 1]]],
   I: [[['M', 0.5, 0], ['L', 0.5, 1]], [['M', 0.2, 0], ['L', 0.8, 0]], [['M', 0.2, 1], ['L', 0.8, 1]]],
   S: [[['M', 0.92, 0.14], ['C', 0.55, -0.04, 0.06, 0.06, 0.09, 0.34], ['C', 0.11, 0.54, 0.9, 0.5, 0.88, 0.72], ['C', 0.86, 1.0, 0.34, 1.0, 0.06, 0.84]]],
@@ -2565,15 +2459,26 @@ const DISPATCH_GLYPHS = {
   T: [[['M', 0, 0], ['L', 1, 0]], [['M', 0.5, 0], ['L', 0.5, 1]]],
   C: [[['M', 0.94, 0.16], ['C', 0.58, -0.05, 0.06, 0.1, 0.06, 0.5], ['C', 0.06, 0.9, 0.58, 1.05, 0.94, 0.84]]],
   H: [[['M', 0, 0], ['L', 0, 1]], [['M', 1, 0], ['L', 1, 1]], [['M', 0, 0.5], ['L', 1, 0.5]]],
+  N: [[['M', 0, 1], ['L', 0, 0]], [['M', 0, 0], ['L', 1, 1]], [['M', 1, 1], ['L', 1, 0]]],
+  R: [
+    [['M', 0.06, 0], ['L', 0.06, 1]],
+    [['M', 0.06, 0], ['L', 0.6, 0], ['C', 1.0, 0.04, 1.0, 0.5, 0.6, 0.54], ['L', 0.06, 0.54]],
+    [['M', 0.48, 0.54], ['L', 1.0, 1]],
+  ],
+  O: [[['M', 0.5, 0], ['C', 0.04, 0.02, 0.04, 0.98, 0.5, 1], ['C', 0.96, 0.98, 0.96, 0.02, 0.5, 0]]],
+  U: [[['M', 0, 0], ['L', 0, 0.6], ['C', 0.02, 1.06, 0.98, 1.06, 1, 0.6], ['L', 1, 0]]],
+  E: [[['M', 1, 0], ['L', 0, 0], ['L', 0, 1], ['L', 1, 1]], [['M', 0, 0.5], ['L', 0.76, 0.5]]],
+  V: [[['M', 0, 0], ['L', 0.5, 1], ['L', 1, 0]]],
+  '—': [[['M', 0, 0.52], ['L', 1, 0.52]]],
 }
 
-/** Engrave a word from DISPATCH_GLYPHS as stroke paths, left cell at (x0,y0),
+/** Engrave a word from ENGRAVE_GLYPHS as stroke paths, left cell at (x0,y0),
  *  each cell cw x ch with `gap` between cells. Deterministic, font-free. */
 function engraveWord(word, x0, y0, cw, ch, gap, stroke, sw, extra = '') {
   let out = ''
   let x = x0
   for (const c of word) {
-    const g = DISPATCH_GLYPHS[c]
+    const g = ENGRAVE_GLYPHS[c]
     if (g) {
       for (const sub of g) {
         let d = ''
@@ -2592,73 +2497,162 @@ function engraveWord(word, x0, y0, cw, ch, gap, stroke, sw, extra = '') {
   return out
 }
 
-// ---- 1) THE SPUN DIAL (ch3-dispatch-dial). A brass/amber die-cut disc: eight
-// 45deg wedge sectors around an engraved hub, each sector's distinguishing motif
-// kept in the read annulus 0.40-0.84R. Motifs: four ravens banking at DIFFERENT
-// headings (k=0,2,4,6), a compass route-needle (k=1), a cardinal rose (k=5) and
-// two tally bands of different counts (k=3:10, k=7:7). A thumb-tab grip lobe
-// protrudes past the rim so it reads as spinnable. ----
+// ---- THE SORTING DESK (E3 s4 re-dress of the dispatch volvelle). The dial and
+// the window card keep their registration EXACTLY: disc radius w*0.46875, hub
+// 0.30R, the read band 0.40-0.84R (rMid 0.62R, rHalf 0.22R), three apertures at
+// math-angles 45/90/135 of half-width 16deg, eight 45deg detent sectors. Only
+// the dressing changes: the instrument is now the rookery's SORTING OFFICE —
+// pigeonhole shelves banked around every window, raven-sigil sectors on the
+// wheel, and a celebrated brass tag telling the reader what to do with it.
+//
+// *** SCREEN-SPACE AUTHORING (the side-aware UV-flip law) ***
+// ch3-dispatch is on the RIGHT page, where discUvs('right') = [0,1, 1,1, 1,0,
+// 0,0] over the disc corners [(-r,-r), (r,-r), (r,r), (-r,r)] on the page frame
+// (pu = page-fore = screen RIGHT, pv = +z = screen DOWN). Corner by corner:
+// screen top-left <- uv(0,1), top-right <- uv(1,1), bottom-right <- uv(1,0),
+// bottom-left <- uv(0,0); with three's default flipY, uv v=1 IS the image's top
+// row. So the composed mapping is the IDENTITY — the v-flip in discUvs exists
+// precisely to cancel the +z-is-screen-down inversion. Therefore this art is
+// authored in plain SCREEN SPACE: image-top reads as screen-top (away from the
+// reader), image-left as spine-ward, and the polX/polY math-angle convention
+// (+y UP) already used here maps straight through. Labels read upright.
+
+/** A polar bank of PIGEONHOLES: cols x rows recessed cells over the angular
+ *  span [psi±halfW] and the radial band [rIn,rOut], a parchment card slip
+ *  filed in a scattered few. The desk wall the windows are set into. */
+function pigeonBank(cx, cy, psi, halfW, rIn, rOut, cols, rows, rand) {
+  let s = ''
+  for (let c = 0; c < cols; c++) {
+    const a0 = psi - halfW + (2 * halfW * c) / cols
+    const a1 = psi - halfW + (2 * halfW * (c + 1)) / cols
+    const pad = (a1 - a0) * 0.08
+    for (let q = 0; q < rows; q++) {
+      const r0 = lerp(rIn, rOut, q / rows) + 3
+      const r1 = lerp(rIn, rOut, (q + 1) / rows) - 3
+      if (r1 - r0 < 4) continue
+      const mid = (a0 + a1) / 2
+      const half = (a1 - a0) / 2 - pad
+      const cell = annularSectorPath(cx, cy, mid, half, r0, r1, 6)
+      s += `<path d="${cell}" fill="${ROOK.ink}" opacity="0.6"/>`
+      s += `<path d="${cell}" fill="none" stroke="${ROOK.slateLit}" stroke-width="1.5" opacity="0.75"/>`
+      if (rand() < 0.45) {
+        s += `<path d="${annularSectorPath(cx, cy, mid, half * 0.8, lerp(r0, r1, 0.1), lerp(r0, r1, 0.7), 6)}" fill="${ROOK.parch}" opacity="0.92"/>`
+      }
+    }
+  }
+  return s
+}
+
+/** The circled numeral ① — a stroke-vector glyph so the tag stays font-free. */
+function circledOne(cx, cy, rad, stroke, sw) {
+  return (
+    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rad)}" fill="none" stroke="${stroke}" stroke-width="${fx(sw)}"/>` +
+    `<path d="M ${fx(cx - rad * 0.34)} ${fx(cy - rad * 0.16)} L ${fx(cx - 0.02 * rad)} ${fx(cy - rad * 0.52)} L ${fx(cx - 0.02 * rad)} ${fx(cy + rad * 0.5)}" fill="none" stroke="${stroke}" stroke-width="${fx(sw)}" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<line x1="${fx(cx - rad * 0.34)}" y1="${fx(cy + rad * 0.5)}" x2="${fx(cx + rad * 0.32)}" y2="${fx(cy + rad * 0.5)}" stroke="${stroke}" stroke-width="${fx(sw)}" stroke-linecap="round"/>`
+  )
+}
+
+/** A printer's MANICULE ☞ — cuff, fist, thumb and a pointing index finger,
+ *  nominally pointing +x. The affordance's "do this" mark. */
+function manicule(x, y, S, body, ink) {
+  const ax = (a) => x + S * a
+  const ay = (b) => y + S * b
+  let s = `<g>`
+  s += `<path d="M ${fx(ax(-1.1))} ${fx(ay(-0.5))} L ${fx(ax(-0.6))} ${fx(ay(-0.5))} L ${fx(ax(-0.6))} ${fx(ay(0.54))} L ${fx(ax(-1.1))} ${fx(ay(0.54))} L ${fx(ax(-0.94))} ${fx(ay(0.02))} Z" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}" stroke-linejoin="round"/>`
+  s += `<rect x="${fx(ax(-0.68))}" y="${fx(ay(-0.46))}" width="${fx(S * 0.76)}" height="${fx(S * 0.98)}" rx="${fx(S * 0.26)}" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}"/>`
+  s += `<path d="M ${fx(ax(-0.12))} ${fx(ay(-0.22))} L ${fx(ax(0.76))} ${fx(ay(-0.14))} L ${fx(ax(1.08))} ${fx(ay(0.0))} L ${fx(ax(0.76))} ${fx(ay(0.14))} L ${fx(ax(-0.12))} ${fx(ay(0.2))} Z" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}" stroke-linejoin="round"/>`
+  s += `<path d="M ${fx(ax(-0.5))} ${fx(ay(-0.44))} q ${fx(S * 0.34)} ${fx(-S * 0.26)} ${fx(S * 0.5)} ${fx(S * 0.06)}" fill="none" stroke="${body}" stroke-width="${fx(S * 0.24)}" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(ax(-0.5))} ${fx(ay(-0.44))} q ${fx(S * 0.34)} ${fx(-S * 0.26)} ${fx(S * 0.5)} ${fx(S * 0.06)}" fill="none" stroke="${ink}" stroke-width="${fx(S * 0.06)}" stroke-linecap="round"/>`
+  s += `</g>`
+  return s
+}
+
+/** One raven-sigil roundel — a brass-rimmed disc with a slate raven banked to
+ *  `bank` degrees. The dial's repeated mark: four billion ravens, one wheel. */
+function ravenSigil(mx, my, rad, bank, brass, brassLit) {
+  let s = `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(rad)}" fill="${ROOK.parchLit}" opacity="0.85"/>`
+  s += `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(rad)}" fill="none" stroke="${brass}" stroke-width="2.6" opacity="0.95"/>`
+  s += `<circle cx="${fx(mx)}" cy="${fx(my)}" r="${fx(rad * 0.86)}" fill="none" stroke="${brassLit}" stroke-width="1.2" opacity="0.7"/>`
+  s += `<g transform="translate(${fx(mx)} ${fx(my)}) rotate(${fx(bank)})">${miniRaven(rad * 0.86, ROOK.ink, ROOK.slateLit)}</g>`
+  return s
+}
+
+// ---- 1) THE SPUN WHEEL (ch3-dispatch-dial). The sorting desk's route wheel: a
+// parchment disc in a brass rim, eight 45deg sectors reading through the card's
+// windows, six of them RAVEN SIGILS banked to distinct headings and two route
+// glyphs (a needle and a tally) so the rank never reads as a repeat pattern. A
+// thumb-tab grip lobe protrudes past the rim so it reads as spinnable. ----
 function dispatchDial(w, h, seed) {
   const r = mulberry32(seed)
-  const cx = w / 2, cy = h / 2
+  const cx = w / 2
+  const cy = h / 2
   const R = w * 0.46875 // 300 @ 640 — shared disc-radius basis with the card
   const hubR = R * 0.3
-  const bandIn = R * 0.4, bandOut = R * 0.84, bandMid = R * 0.62
-  const BR = GOLD, BR_LIT = '#e7b24d', BR_DIM = GOLD_DIM, BR_DEEP = '#7a5f16'
-  const SLATE = '#3f4a57', SHEEN = '#6b7580'
+  const bandIn = R * 0.4
+  const bandOut = R * 0.84
+  const bandMid = R * 0.62
+  const BR = GOLD
+  const BR_LIT = '#e7b24d'
+  const BR_DIM = GOLD_DIM
+  const BR_DEEP = '#7a5f16'
 
   const defs =
     `<clipPath id="dialCut"><circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}"/></clipPath>` +
     `<radialGradient id="dialLite" cx="0.38" cy="0.30" r="0.78">` +
-    `<stop offset="0" stop-color="${BR_LIT}" stop-opacity="0.5"/>` +
+    `<stop offset="0" stop-color="${BR_LIT}" stop-opacity="0.42"/>` +
     `<stop offset="0.55" stop-color="${BR_LIT}" stop-opacity="0"/>` +
     `<stop offset="1" stop-color="${BR_DEEP}" stop-opacity="0.5"/>` +
     `</radialGradient>`
 
   // thumb-tab grip lobe protruding past the rim (down-right, stays in-canvas)
-  const tabA = 300, tabHalf = 12, tabR = R * 1.12
-  const bx0 = polX(cx, tabA - tabHalf, R * 0.99), by0 = polY(cy, tabA - tabHalf, R * 0.99)
-  const bx1 = polX(cx, tabA + tabHalf, R * 0.99), by1 = polY(cy, tabA + tabHalf, R * 0.99)
+  const tabA = 300
+  const tabHalf = 12
+  const tabR = R * 1.12
+  const bx0 = polX(cx, tabA - tabHalf, R * 0.99)
+  const by0 = polY(cy, tabA - tabHalf, R * 0.99)
+  const bx1 = polX(cx, tabA + tabHalf, R * 0.99)
+  const by1 = polY(cy, tabA + tabHalf, R * 0.99)
   const tabD = `M ${fx(bx0)} ${fx(by0)} Q ${fx(polX(cx, tabA, tabR * 1.06))} ${fx(polY(cy, tabA, tabR * 1.06))} ${fx(bx1)} ${fx(by1)} Z`
   let tab = `<path d="${tabD}" fill="${BR_DIM}"/>`
-  tab += `<path d="${tabD}" fill="none" stroke="${RIM}" stroke-width="4.5" opacity="0.9" stroke-linejoin="round"/>`
-  tab += `<path d="${tabD}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.5" stroke-linejoin="round"/>`
+  tab += rookRim(tabD, 4.5)
   for (let i = 0; i < 3; i++) {
     const rad = R + (tabR - R) * (0.3 + i * 0.22)
     tab += `<line x1="${fx(polX(cx, tabA - tabHalf * 0.55, rad))}" y1="${fx(polY(cy, tabA - tabHalf * 0.55, rad))}" x2="${fx(polX(cx, tabA + tabHalf * 0.55, rad))}" y2="${fx(polY(cy, tabA + tabHalf * 0.55, rad))}" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
   }
 
   let g = `<g clip-path="url(#dialCut)">`
-  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${BR}"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${PARCH_MID}"/>`
   for (let k = 0; k < 8; k++) {
-    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${k % 2 ? BR_DIM : BR_LIT}" opacity="${k % 2 ? '0.30' : '0.22'}"/>`
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${k % 2 ? ROOK.slate : BR_LIT}" opacity="${k % 2 ? '0.16' : '0.16'}"/>`
   }
-  // parchment READ-BAND (the annulus the card windows reveal) so the windowed
-  // sectors read as aged parchment — dark ravens/glyphs pop against it — rather
-  // than muddy amber; the aged-brass field stays for the rim + hub.
-  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${PARCH_MID}" opacity="0.66"/>`
-  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.4"/>`
-  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.35"/>`
+  // the READ BAND the card's windows reveal — aged parchment, so slate ravens
+  // and brass glyphs pop against it rather than muddying into the field.
+  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${PARCH}" opacity="0.8"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${BR}" stroke-width="3" opacity="0.75"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${BR}" stroke-width="2.6" opacity="0.7"/>`
+  // detent ticks on the sector boundaries (the 45deg clicks)
   for (let k = 0; k < 8; k++) {
     const a = k * 45 + 22.5
-    g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${INK}" stroke-width="1.6" opacity="0.42"/>`
+    g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${INK}" stroke-width="1.7" opacity="0.4"/>`
+    g += `<circle cx="${fx(polX(cx, a, bandOut + 12))}" cy="${fx(polY(cy, a, bandOut + 12))}" r="4" fill="${BR}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.55"/>`
   }
-  const ravenRot = { 0: -35, 2: 20, 4: 135, 6: -110 }
+  // sector marks: six raven sigils on distinct headings + two route glyphs
+  const bank = { 0: -28, 1: 62, 2: 145, 4: -104, 5: 18, 7: -152 }
   for (let k = 0; k < 8; k++) {
     const a = k * 45
-    const mx = polX(cx, a, bandMid), my = polY(cy, a, bandMid)
-    if (k === 1) g += compassNeedle(mx, my, a, R * 0.4, R * 0.095, BR_LIT, SLATE)
-    else if (k === 5) g += compassRose(mx, my, a, R * 0.17, SLATE, GOLD_LIT)
-    else if (k === 3) g += tallyMarks(cx, cy, a, 10, R * 0.5, R * 0.72, 30, INK)
-    else if (k === 7) g += tallyMarks(cx, cy, a, 7, R * 0.5, R * 0.72, 26, INK)
-    else g += `<g transform="translate(${fx(mx)} ${fx(my)}) rotate(${ravenRot[k]})">${miniRaven(R * 0.153, SLATE, SHEEN)}</g>`
+    const mx = polX(cx, a, bandMid)
+    const my = polY(cy, a, bandMid)
+    if (k === 3) g += compassNeedle(mx, my, a, R * 0.4, R * 0.095, BR_LIT, ROOK.slate)
+    else if (k === 6) g += tallyMarks(cx, cy, a, 9, R * 0.5, R * 0.74, 28, INK)
+    else g += ravenSigil(mx, my, R * 0.16, bank[k], BR, BR_LIT)
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#dialLite)"/>`
   for (let i = 0; i < 14; i++) {
-    const a = rr(r, 0, 360), rad = rr(r, hubR * 1.15, R * 0.95)
-    g += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 1.8))}" fill="${INK}" opacity="${fx(rr(r, 0.1, 0.22))}"/>`
+    const a = rr(r, 0, 360)
+    const rad = rr(r, hubR * 1.15, R * 0.95)
+    g += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 1.8))}" fill="${INK}" opacity="${fx(rr(r, 0.08, 0.18))}"/>`
   }
-  // engraved central hub — brass boss, knurled rim, a compass emblem, a rivet
+  // engraved central hub — brass boss, knurled rim, compass emblem, rivet
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="${BR_DIM}"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.65"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.78)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.45"/>`
@@ -2666,48 +2660,50 @@ function dispatchDial(w, h, seed) {
     const a = i * 7.5
     g += `<line x1="${fx(polX(cx, a, hubR * 0.87))}" y1="${fx(polY(cy, a, hubR * 0.87))}" x2="${fx(polX(cx, a, hubR))}" y2="${fx(polY(cy, a, hubR))}" stroke="${INK}" stroke-width="1.1" opacity="0.4"/>`
   }
-  g += compassRose(cx, cy, 90, hubR * 0.5, SLATE, GOLD_LIT)
+  g += compassRose(cx, cy, 90, hubR * 0.5, ROOK.slate, GOLD_LIT)
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.26)}" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
   g += `<circle cx="${fx(cx - hubR * 0.08)}" cy="${fx(cy - hubR * 0.08)}" r="${fx(hubR * 0.1)}" fill="#ffffff" opacity="0.4"/>`
   g += `</g>`
 
-  const rim =
-    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${RIM}" stroke-width="5" opacity="0.92"/>` +
-    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
-
+  const rim = rookRim(circlePath(cx, cy, R), 5)
   return svgPiece(w, h, tab + g + rim, defs)
 }
 
-// ---- 2) THE WINDOW CARD (ch3-dispatch-card). A dark-brass die-cut faceplate
-// over the dial: opaque plate, transparent OUTSIDE the inscribed circle, with
-// THREE die-cut apertures (true alpha-0 holes) punched at math-angles 45/90/135,
-// each an annular sector of half-width 16deg over the read band 0.40-0.84R. Built
-// as a single even-odd compound path (outer disc + three window sub-paths + a
-// thumb-notch) so the holes are genuine cut-outs the dial shows through. Carries
-// engraved window bezels, a central rivet, rim rivets and a "DISPATCH" label. ----
+// ---- 2) THE DESK FACEPLATE (ch3-dispatch-card). The sorting desk's slate board
+// laid over the wheel: opaque plate, transparent outside the inscribed circle,
+// with THREE die-cut apertures (true alpha-0 holes) at math-angles 45/90/135 over
+// the read band 0.40-0.84R, each set into a BANK OF PIGEONHOLES above and below.
+// Built as one even-odd compound path so the holes are genuine cut-outs. The
+// lower half carries the celebrated brass tag "(1) SPIN - ROUTE THE RAVENS" with
+// a pointing manicule, engraved font-free from ENGRAVE_GLYPHS. ----
 function dispatchCard(w, h, seed) {
   const r = mulberry32(seed)
-  const cx = w / 2, cy = h / 2
+  const cx = w / 2
+  const cy = h / 2
   const R = w * 0.46875
-  const bandIn = R * 0.4, bandOut = R * 0.84
+  const bandIn = R * 0.4
+  const bandOut = R * 0.84
   const halfW = 16
   const wins = [45, 90, 135]
-  // Aged-brass ground (warmer + a step brighter than the old muddy olive) with
-  // walnut engraving — reads as a distinct instrument beside the winch's bright
-  // yellow-gold (this is browner/bronze, not gold).
-  const PLATE = '#9c7b3c', PLATE_LIT = '#c2a05a', PLATE_DK = '#4a3316'
+  const PLATE = ROOK.slate
+  const PLATE_LIT = ROOK.slateLit
+  const PLATE_DK = ROOK.ink
+  const BR = GOLD
+  const BR_LIT = '#e7b24d'
+  const BR_DK = GOLD_DIM
 
   const defs =
     `<radialGradient id="cardLite" cx="0.36" cy="0.30" r="0.82">` +
-    `<stop offset="0" stop-color="${PLATE_LIT}" stop-opacity="0.55"/>` +
+    `<stop offset="0" stop-color="${PLATE_LIT}" stop-opacity="0.5"/>` +
     `<stop offset="0.5" stop-color="${PLATE_LIT}" stop-opacity="0"/>` +
     `<stop offset="1" stop-color="#000000" stop-opacity="0.42"/>` +
     `</radialGradient>`
 
-  // even-odd compound plate: outer disc + 3 window holes + thumb-notch hole.
-  // A point inside a window is enclosed by 2 sub-paths (disc + window) => even
-  // => UNFILLED => true alpha-0 aperture the dial reads through.
-  const notchX = polX(cx, 270, R), notchY = polY(cy, 270, R)
+  // even-odd compound plate: outer disc + 3 window holes + thumb-notch hole. A
+  // point inside a window is enclosed by 2 sub-paths => even => UNFILLED => a
+  // true alpha-0 aperture the wheel reads through.
+  const notchX = polX(cx, 270, R)
+  const notchY = polY(cy, 270, R)
   let plateD = circlePath(cx, cy, R)
   for (const psi of wins) plateD += ' ' + annularSectorPath(cx, cy, psi, halfW, bandIn, bandOut)
   plateD += ' ' + circlePath(notchX, notchY, R * 0.09)
@@ -2715,50 +2711,93 @@ function dispatchCard(w, h, seed) {
   let s = `<g>`
   s += `<path fill-rule="evenodd" d="${plateD}" fill="${PLATE}"/>`
   s += `<path fill-rule="evenodd" d="${plateD}" fill="url(#cardLite)"/>`
-  // concentric engraved rings — kept OUT of the 0.40-0.84 window band
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.93)}" fill="none" stroke="${PLATE_DK}" stroke-width="2" opacity="0.7"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.955)}" fill="none" stroke="${PLATE_LIT}" stroke-width="1.2" opacity="0.6"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.34)}" fill="none" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.6"/>`
-  // engraved bezel frames on the plate around each aperture (never enter the hole)
+  s += `<g clip-path="url(#cardPlate)">`
+  // PIGEONHOLE SHELVES: a bank outboard of every window and a bank inboard, so
+  // each aperture reads as one slot in a wall of them.
   for (const psi of wins) {
-    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 2.4, bandIn - 9, bandOut + 9)}" fill="none" stroke="${PLATE_DK}" stroke-width="3" opacity="0.85"/>`
-    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 1.6, bandIn - 4, bandOut + 4)}" fill="none" stroke="${PLATE_LIT}" stroke-width="1.4" opacity="0.7"/>`
+    s += pigeonBank(cx, cy, psi, halfW - 1, bandOut + 12, R * 0.965, 2, 1, r)
+    s += pigeonBank(cx, cy, psi, halfW - 1, R * 0.4, bandIn - 12, 2, 1, r)
   }
-  // patina flecks on the outer ring (radius > 0.84R, never inside a window)
-  for (let i = 0; i < 12; i++) {
-    const a = rr(r, 0, 360), rad = rr(r, R * 0.86, R * 0.96)
-    s += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 1.6))}" fill="#000000" opacity="${fx(rr(r, 0.08, 0.16))}"/>`
+  // and the shelf runs filling the plate between and below the windows, so the
+  // apertures read as three slots in one wall of pigeonholes.
+  for (const psi of [21, 67.5, 112.5, 159]) s += pigeonBank(cx, cy, psi, 9.5, R * 0.4, R * 0.95, 1, 4, r)
+  for (const psi of [193, 216, 324, 347]) s += pigeonBank(cx, cy, psi, 10, R * 0.44, R * 0.95, 1, 3, r)
+  s += `</g>`
+  // engraved rings — kept OUT of the 0.40-0.84 window band
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.985)}" fill="none" stroke="${BR}" stroke-width="4" opacity="0.85"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.34)}" fill="none" stroke="${BR_DK}" stroke-width="2" opacity="0.6"/>`
+  // brass bezel frames around each aperture (never enter the hole)
+  for (const psi of wins) {
+    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 2.4, bandIn - 9, bandOut + 9)}" fill="none" stroke="${BR_DK}" stroke-width="3.4" opacity="0.9"/>`
+    s += `<path d="${annularSectorPath(cx, cy, psi, halfW + 1.6, bandIn - 4, bandOut + 4)}" fill="none" stroke="${BR_LIT}" stroke-width="1.6" opacity="0.8"/>`
   }
   // rim rivets (avoid the windows in the upper half and the thumb-notch at 270)
   for (const a of [0, 180, 225, 315]) {
-    const rx = polX(cx, a, R * 0.9), ry = polY(cy, a, R * 0.9)
-    s += `<circle cx="${fx(rx)}" cy="${fx(ry)}" r="6" fill="${PLATE_LIT}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
+    const rx = polX(cx, a, R * 0.92)
+    const ry = polY(cy, a, R * 0.92)
+    s += `<circle cx="${fx(rx)}" cy="${fx(ry)}" r="6" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
     s += `<circle cx="${fx(rx - 1.6)}" cy="${fx(ry - 1.6)}" r="2" fill="#ffffff" opacity="0.35"/>`
   }
-  // engraved DISPATCH label across the free bottom half
-  const word = 'DISPATCH', cw = R * 0.058, ch = R * 0.12, gap = R * 0.03
-  const totalW = word.length * cw + (word.length - 1) * gap
-  const lx = cx - totalW / 2, ly = cy + R * 0.5
-  s += engraveWord(word, lx, ly + 1.4, cw, ch, gap, PLATE_LIT, 2.4, 'opacity="0.55"')
-  s += engraveWord(word, lx, ly, cw, ch, gap, PLATE_DK, 2.6, 'opacity="0.95"')
-  s += `<line x1="${fx(lx)}" y1="${fx(ly + ch + 6)}" x2="${fx(lx + totalW)}" y2="${fx(ly + ch + 6)}" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.6"/>`
-  // central rivet at the hub — pins the plate flat over the dial
+
+  // ---- THE CELEBRATED BRASS TAG (T-AFFORDANCE) ----
+  // Two engraved lines reading, in order, (1) SPIN - ROUTE THE RAVENS, on a
+  // brass plate screwed across the free lower half; a manicule points into it.
+  const tagW = R * 1.5
+  const tagH = R * 0.56
+  const tagX = cx - tagW / 2
+  const tagY = cy + R * 0.28
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="${BR}"/>`
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH * 0.34)}" rx="${fx(R * 0.05)}" fill="${BR_LIT}" opacity="0.45"/>`
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.7"/>`
+  s += `<rect x="${fx(tagX + 6)}" y="${fx(tagY + 6)}" width="${fx(tagW - 12)}" height="${fx(tagH - 12)}" rx="${fx(R * 0.04)}" fill="none" stroke="${BR_DK}" stroke-width="1.6" opacity="0.8"/>`
+  for (const sx of [tagX + 14, tagX + tagW - 14]) {
+    for (const sy of [tagY + 13, tagY + tagH - 13]) {
+      s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="3.4" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.1" stroke-opacity="0.6"/>`
+    }
+  }
+  const line = (word, cw, ch, gap, yTop, x0) => {
+    let out = engraveWord(word, x0, yTop + 1.4, cw, ch, gap, BR_LIT, 2.6, 'opacity="0.5"')
+    out += engraveWord(word, x0, yTop, cw, ch, gap, PLATE_DK, 2.8, 'opacity="0.95"')
+    return out
+  }
+  const wordW = (word, cw, gap) => word.length * cw + (word.length - 1) * gap
+  // line 1: the circled numeral, SPIN, the em dash
+  const cw1 = R * 0.082
+  const ch1 = R * 0.15
+  const gap1 = R * 0.035
+  const oneR = ch1 * 0.56
+  const pad1 = gap1 * 3
+  const l1W = oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1 + cw1
+  const l1X = cx - l1W / 2
+  const l1Y = tagY + tagH * 0.16
+  s += circledOne(l1X + oneR, l1Y + ch1 * 0.5, oneR, PLATE_DK, 3.2)
+  s += line('SPIN', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1)
+  s += line('—', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1)
+  // line 2: ROUTE THE RAVENS (one engraved run; the space cell has no glyph)
+  const cw2 = R * 0.062
+  const ch2 = R * 0.13
+  const gap2 = R * 0.026
+  const l2 = 'ROUTE THE RAVENS'
+  const l2X = cx - wordW(l2, cw2, gap2) / 2
+  const l2Y = tagY + tagH * 0.56
+  s += line(l2, cw2, ch2, gap2, l2Y, l2X)
+  s += `<line x1="${fx(l2X)}" y1="${fx(l2Y + ch2 + 6)}" x2="${fx(l2X + wordW(l2, cw2, gap2))}" y2="${fx(l2Y + ch2 + 6)}" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.5"/>`
+  // the manicule, pointing into the tag from the spine side
+  s += manicule(tagX - R * 0.16, tagY + tagH * 0.42, R * 0.125, PARCH, INK)
+
+  // central rivet at the hub — pins the plate flat over the wheel
   const rivR = R * 0.14
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR)}" fill="${PLATE_LIT}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.65"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.62)}" fill="${PLATE}" stroke="${PLATE_DK}" stroke-width="1.4"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR)}" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.65"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.62)}" fill="${BR}" stroke="${BR_DK}" stroke-width="1.4"/>`
   s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.3)}" fill="${PLATE_DK}"/>`
   s += `<circle cx="${fx(cx - rivR * 0.34)}" cy="${fx(cy - rivR * 0.34)}" r="${fx(rivR * 0.16)}" fill="#ffffff" opacity="0.4"/>`
   // thumb-notch bezel on the plate side of the rim cut
-  s += `<circle cx="${fx(notchX)}" cy="${fx(notchY)}" r="${fx(R * 0.11)}" fill="none" stroke="${PLATE_DK}" stroke-width="2" opacity="0.7"/>`
+  s += `<circle cx="${fx(notchX)}" cy="${fx(notchY)}" r="${fx(R * 0.11)}" fill="none" stroke="${BR_DK}" stroke-width="2" opacity="0.75"/>`
   s += `</g>`
 
-  const rim =
-    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${RIM}" stroke-width="5" opacity="0.92"/>` +
-    `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
-
-  return svgPiece(w, h, s + rim, defs)
+  const rim = rookRim(circlePath(cx, cy, R), 5)
+  return svgPiece(w, h, s + rim, defs + `<clipPath id="cardPlate"><path fill-rule="evenodd" d="${plateD}"/></clipPath>`)
 }
-
 // ============================================================================
 // E2.2 BATCH B — THE LIFT-THE-FLAP (s2 ch1-keyboard). The Inn of a Hundred
 // Keys' key-board: a timber tavern plaque of numbered door leaves the reader
@@ -3009,6 +3048,359 @@ function cofferInterior(w, h, seed) {
   return svgPiece(w, h, s)
 }
 
+// ============================================================================
+// E3 s4 BATCH C — THE RING'S REMAINING PIECES: the gatehouse tower (stripflap,
+// alpha die-cut, no outline sidecar), the s4 spread print (the cobbled
+// post-road) and the rookery's outer yard wall. Same rookery palette and the
+// same PALE core-edge rim as the facades. Deterministic: mulberry32(seed).
+// ============================================================================
+
+// ---- THE GATEHOUSE TOWER (ch3-ring-tower, stripflap w0.12/h0.20). A slender
+// dovecote tower where the post-road enters the ring: plinth, a shaft of stacked
+// portal ranks, a corbelled crenellated cap, an amber crown lantern and one
+// raven perched on it. Rectangular mesh — the ALPHA carries the die-cut. ----
+// The lone crown raven: `bh` chosen so its LINK level (0.55 of the bird height)
+// lands exactly on the lantern head at v 0.834 and its crown at v 0.99 — no
+// pedestal band, just the bird.
+const TOWER_RAVEN_H = 0.347
+const TOWER_RAVEN_V0 = 0.99 - TOWER_RAVEN_H
+
+function ringTower(w, h, seed) {
+  const r = mulberry32(seed)
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+
+  const ring = [
+    [0.08, 0.0], [0.08, 0.05], [0.18, 0.09], [0.18, 0.56], [0.12, 0.6],
+    ...crenelTop(0.12, 0.4, 0.6, 0.68, 3),
+    [0.4, 0.6], [0.46, 0.6], [0.46, 0.7], [0.4, 0.7], [0.4, 0.834], [0.3375, 0.834],
+    ...ravenChainTop(0.3375, 0.6625, TOWER_RAVEN_V0, TOWER_RAVEN_H, 1, 'left'),
+    [0.6625, 0.834], [0.6, 0.834], [0.6, 0.7], [0.54, 0.7], [0.54, 0.6], [0.6, 0.6],
+    ...crenelTop(0.6, 0.88, 0.6, 0.68, 3),
+    [0.88, 0.6], [0.88, 0.56], [0.82, 0.56], [0.82, 0.09], [0.92, 0.05], [0.92, 0.0],
+  ]
+  const outline = simplifyOutline(ring)
+  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  let g = `<g clip-path="url(#towerCut)">`
+  g += `<rect width="${w}" height="${h}" fill="${ROOK.slate}"/>`
+  // shaft shading: lit spine-side reveal, shadowed fore-side
+  g += `<rect x="${fx(X(0.18))}" y="0" width="${fx(X(0.05))}" height="${h}" fill="${ROOK.slateLit}" opacity="0.5"/>`
+  g += `<rect x="${fx(X(0.74))}" y="0" width="${fx(X(0.08))}" height="${h}" fill="${ROOK.ink}" opacity="0.22"/>`
+  // ashlar coursing up the shaft
+  for (let cy = h; cy > Y(0.6); cy -= h * 0.036) {
+    g += `<line x1="${fx(X(0.06))}" y1="${fx(cy)}" x2="${fx(X(0.94))}" y2="${fx(cy)}" stroke="${ROOK.ink}" stroke-width="1.4" opacity="${(0.16 + r() * 0.14).toFixed(2)}"/>`
+  }
+  // plinth + corbel band
+  g += `<rect x="${fx(X(0.06))}" y="${fx(Y(0.09))}" width="${fx(X(0.88))}" height="${fx(Y(0.05) - Y(0.09))}" fill="${ROOK.slateDim}"/>`
+  g += `<rect x="${fx(X(0.1))}" y="${fx(Y(0.58))}" width="${fx(X(0.8))}" height="${fx(Math.max(3, h * 0.012))}" fill="${ROOK.parchDim}" opacity="0.7"/>`
+  // stacked portal ranks — 5 tiers of 2, a scattered fifth lit
+  const pw = 0.145
+  const ph = 0.12
+  let litPrev = false
+  for (const sillV of [0.15, 0.26, 0.37, 0.48, 0.55]) {
+    g += `<rect x="${fx(X(0.18))}" y="${fx(Y(sillV) + Math.max(2, h * 0.006))}" width="${fx(X(0.64))}" height="${fx(Math.max(2, h * 0.006))}" fill="${ROOK.parchDim}" opacity="0.5"/>`
+    for (const cu of [0.35, 0.65]) {
+      const roll = r()
+      const lit = roll < 0.24 || (litPrev && roll < 0.5)
+      litPrev = lit
+      g += ravenPortal(X(cu - pw / 2), Y(sillV), X(pw), ph * h, lit)
+    }
+  }
+  // crenellated cap merlons
+  for (const [z0, z1] of [[0.12, 0.4], [0.6, 0.88]]) {
+    const tw = (z1 - z0) / 5
+    for (let t = 0; t < 3; t++) {
+      const mx = X(z0 + t * 2 * tw)
+      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Y(0.6) - Y(0.68))}" fill="${ROOK.slate}"/>`
+      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Math.max(2, h * 0.006))}" fill="${ROOK.slateLit}" opacity="0.75"/>`
+    }
+  }
+  // the CROWN LANTERN, amber, with its own glow pool on the cap
+  g += `<ellipse cx="${fx(X(0.5))}" cy="${fx(Y(0.64))}" rx="${fx(X(0.44))}" ry="${fx(h * 0.03)}" fill="${ROOK.amber}" opacity="0.24"/>`
+  g += `<rect x="${fx(X(0.46))}" y="${fx(Y(0.7))}" width="${fx(X(0.08))}" height="${fx(Y(0.6) - Y(0.7))}" fill="${ROOK.slateDim}"/>`
+  g += `<rect x="${fx(X(0.4))}" y="${fx(Y(0.834))}" width="${fx(X(0.2))}" height="${fx(Y(0.7) - Y(0.834))}" fill="url(#rookGlow)"/>`
+  g += `<rect x="${fx(X(0.4))}" y="${fx(Y(0.834))}" width="${fx(X(0.2))}" height="${fx(Y(0.7) - Y(0.834))}" fill="none" stroke="${ROOK.ink}" stroke-width="2" opacity="0.7"/>`
+  g += `<line x1="${fx(X(0.5))}" y1="${fx(Y(0.834))}" x2="${fx(X(0.5))}" y2="${fx(Y(0.7))}" stroke="${ROOK.ink}" stroke-width="1.6" opacity="0.55"/>`
+  // the raven perched on the lantern (the contour already cut its silhouette)
+  g += `<rect x="${fx(X(0.33))}" y="${fx(Y(0.995))}" width="${fx(X(0.34))}" height="${fx(Y(0.83) - Y(0.995))}" fill="${ROOK.ink}"/>`
+  g += `<circle cx="${fx(X(0.3375 + 0.325 * 0.17))}" cy="${fx(Y(TOWER_RAVEN_V0 + TOWER_RAVEN_H * 0.93))}" r="${fx(Math.max(1.8, h * 0.011))}" fill="${ROOK.amberLit}"/>`
+  g += `<rect width="${w}" height="${h}" fill="url(#rookShade)"/>`
+  g += `</g>`
+
+  const defs =
+    `<clipPath id="towerCut"><path d="${d}"/></clipPath>` +
+    `<radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">` +
+    `<stop offset="0" stop-color="${ROOK.amberLit}"/><stop offset="0.5" stop-color="${ROOK.amber}"/>` +
+    `<stop offset="1" stop-color="${ROOK.amberDeep}"/></radialGradient>` +
+    `<linearGradient id="rookShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.14"/>` +
+    `<stop offset="0.5" stop-color="#000000" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${ROOK.ink}" stop-opacity="0.4"/></linearGradient>`
+
+  return svgPiece(w, h, g + rookRim(d, 5), defs)
+}
+
+// ---- THE ROOKERY'S OUTER YARD WALL (ch3-fringe, foreground vfold, very wide/
+// short; crease at image centre). Slate ashlar with a coping, a rank of perched
+// ravens along the crest, and a ROAD NOTCH punched through its base on the RIGHT
+// (spread-x ~0.86) where the post-road painted on page-4 passes through. ----
+function rookeryFringe(w, h, seed) {
+  const r = mulberry32(seed)
+  const crestV = 0.5 // wall top, in v-up fractions of the strip height
+  const Y = (v) => (1 - v) * h
+  const X = (u) => u * w
+  const rankV = 0.44 // raven-rank height above the coping
+
+  // wall body + linked raven rank along the crest, as one contour
+  const top = []
+  top.push([0, crestV])
+  const bands = [[0.03, 0.31], [0.37, 0.63], [0.69, 0.79], [0.92, 0.98]]
+  let cursor = 0.02
+  for (const [z0, z1] of bands) {
+    top.push([cursor, crestV], [z0, crestV])
+    const n = Math.max(3, Math.round(((z1 - z0) * w) / Math.max(6, rankV * h * RAVEN_CELL)))
+    top.push(...ravenChainTop(z0, z1, crestV, rankV, n, 'left'), [z1, crestV])
+    cursor = z1
+  }
+  top.push([1, crestV])
+  const wall = simplifyOutline([[0, 0], ...top, [1, 0]])
+  const wallD = wall.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  // the ROAD NOTCH: a true alpha hole (even-odd) the post-road runs through
+  const nx0 = 0.8
+  const nx1 = 0.9
+  const nTop = 0.42
+  const notchD =
+    `M ${fx(X(nx0))} ${fx(h)} L ${fx(X(nx0 + 0.008))} ${fx(Y(nTop * 0.7))} ` +
+    `Q ${fx(X((nx0 + nx1) / 2))} ${fx(Y(nTop))} ${fx(X(nx1 - 0.008))} ${fx(Y(nTop * 0.7))} L ${fx(X(nx1))} ${fx(h)} Z`
+
+  let s = `<g>`
+  s += `<path fill-rule="evenodd" d="${wallD} ${notchD}" fill="${ROOK.slate}"/>`
+  s += `<g clip-path="url(#fringeCut)">`
+  // coping + ashlar coursing + a lit crest line
+  s += `<rect x="0" y="${fx(Y(crestV))}" width="${w}" height="${fx(Math.max(3, h * 0.04))}" fill="${ROOK.slateLit}" opacity="0.55"/>`
+  for (let i = 1; i * h * 0.16 < h; i++) {
+    const cy = h - i * h * 0.16
+    s += `<line x1="0" y1="${fx(cy)}" x2="${w}" y2="${fx(cy)}" stroke="${ROOK.ink}" stroke-width="1.6" opacity="${(0.2 + r() * 0.16).toFixed(2)}"/>`
+    for (let b = 0; b < 26; b++) {
+      const jx = ((b + (i % 2 ? 0.5 : 0)) / 26) * w
+      s += `<line x1="${fx(jx)}" y1="${fx(cy)}" x2="${fx(jx)}" y2="${fx(cy - h * 0.16)}" stroke="${ROOK.ink}" stroke-width="1.3" opacity="0.24"/>`
+    }
+  }
+  // the rank's bodies (the contour already cut them) + eyes
+  for (const [z0, z1] of bands) {
+    const n = Math.max(3, Math.round(((z1 - z0) * w) / Math.max(6, rankV * h * RAVEN_CELL)))
+    const perchV = crestV + rankV * RAVEN_PROFILE[0][1]
+    s += `<rect x="${fx(X(z0))}" y="${fx(Y(crestV + rankV))}" width="${fx(X(z1 - z0))}" height="${fx(Y(perchV) - Y(crestV + rankV))}" fill="${ROOK.ink}"/>`
+    const cw = (z1 - z0) / n
+    for (let k = 0; k < n; k++) {
+      s += `<circle cx="${fx(X(z0 + cw * (k + 0.17)))}" cy="${fx(Y(crestV + rankV * 0.94))}" r="${fx(Math.max(1.3, rankV * h * 0.05))}" fill="${ROOK.amberLit}" opacity="0.95"/>`
+    }
+  }
+  // road shadow spilling out of the notch onto the yard face
+  s += `<path d="M ${fx(X(nx0 - 0.02))} ${fx(h)} L ${fx(X(nx0 + 0.01))} ${fx(Y(nTop * 0.6))} L ${fx(X(nx1 - 0.01))} ${fx(Y(nTop * 0.6))} L ${fx(X(nx1 + 0.02))} ${fx(h)} Z" fill="${ROOK.ink}" opacity="0.3"/>`
+  // a bill-posted notice pair (the yard wall is where routes are posted)
+  for (const [px, pv] of [[0.2, 0.4], [0.62, 0.36]]) {
+    s += `<rect x="${fx(X(px))}" y="${fx(Y(pv))}" width="${fx(w * 0.035)}" height="${fx(h * 0.3)}" fill="${ROOK.parch}" opacity="0.92" transform="rotate(-2 ${fx(X(px))} ${fx(Y(pv))})"/>`
+    for (let l = 0; l < 4; l++) {
+      s += `<line x1="${fx(X(px) + 4)}" y1="${fx(Y(pv) + h * 0.06 + l * h * 0.055)}" x2="${fx(X(px) + w * 0.03)}" y2="${fx(Y(pv) + h * 0.06 + l * h * 0.055)}" stroke="${ROOK.ink}" stroke-width="1.4" opacity="0.45"/>`
+    }
+  }
+  s += `<rect x="0" y="${fx(h * 0.86)}" width="${w}" height="${fx(h * 0.14)}" fill="${ROOK.ink}" opacity="0.26"/>`
+  s += `</g>`
+  s += rookRim(wallD, 5)
+  s += rookRim(notchD, 4)
+  s += `</g>`
+
+  const defs = `<clipPath id="fringeCut"><path fill-rule="evenodd" d="${wallD} ${notchD}"/></clipPath>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- THE s4 SPREAD PRINT (page-4, both pages in ONE image). The renderer
+// splits it right = repeat(0.5,1)/offset(0.5,0), left = repeat(-0.5,1)/offset
+// (0.5,0) over a mesh with scale.x = -1 — the two transforms compose to a
+// CONTINUOUS spread: image x=0 is the LEFT page's fore edge, x=0.5 the spine,
+// x=1 the RIGHT page's fore edge. Page uvs are u = x/PAGE_W, v = 1 - row with
+// row 0 at z = -PAGE_H/2, so with the default flipY image-TOP is the FAR page
+// edge (z = -0.75) and image-BOTTOM is the reader's apron (z = +0.75).
+//
+// Painted on parchment in walnut/slate: the cobbled POST-ROAD sweeping in at the
+// right page's fore edge, curving through the open court, under the balcony and
+// dying into the keep's gate at the spine; wheeling raven shadows over both
+// pages; a cobble apron under the sorting desk (right foreground); lamplight
+// pools under the ranks of lit portals. ----
+const PAGE_W_U = 1.15
+const PAGE_H_U = 1.5
+/** Scene (radial, z) -> page-print image fractions, per the uv maths above. */
+const pageFX = (radial, side) => 0.5 + (side === 'left' ? -1 : 1) * (radial / (2 * PAGE_W_U))
+const pageFY = (z) => (z + PAGE_H_U / 2) / PAGE_H_U
+
+function postRoadSpread(w, h, seed) {
+  const r = mulberry32(seed)
+  const PX = (f) => f * w
+  const PY = (f) => f * h
+  const WALNUT = '#5c4526'
+  const WALNUT_LT = '#7d6238'
+  const clampNum = (x, a, b) => Math.min(b, Math.max(a, x))
+
+  // ---- the post-road's centreline: the RIGHT page's fore edge -> the apron ->
+  // the court between the ring's front arms -> the keep's gate at the spine.
+  const CTRL = [[1.02, 0.9], [0.86, 0.99], [0.6, 0.95], [0.5, 0.735]]
+  const road = (t) => {
+    const mt = 1 - t
+    return [0, 1].map(
+      (k) =>
+        mt * mt * mt * CTRL[0][k] + 3 * mt * mt * t * CTRL[1][k] + 3 * mt * t * t * CTRL[2][k] + t * t * t * CTRL[3][k]
+    )
+  }
+  const roadHalf = (t) => lerp(0.075, 0.022, t) // perspective taper toward the gate
+  /** Centre + the half-width offset along the centreline's normal, taken in a
+   *  SQUARE metric and converted back to image fractions so the band keeps a
+   *  constant width on a 3:2 page instead of pinching on the diagonal. */
+  const roadFrame = (t) => {
+    const [cx, cy] = road(t)
+    const [nx, ny] = road(Math.min(1, t + 0.008))
+    const dxs = (nx - cx) * (w / h)
+    const dys = ny - cy
+    const L = Math.hypot(dxs, dys) || 1
+    const hw = roadHalf(t)
+    return { cx, cy, px: ((-dys / L) * hw * h) / w, py: (dxs / L) * hw }
+  }
+
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${ROOK.parch}"/>`
+  // laid-paper tooth
+  for (let i = 0; i < 170; i++) {
+    const y = rr(r, 0, h)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${WALNUT}" stroke-width="1" opacity="${fx(rr(r, 0.02, 0.05))}"/>`
+  }
+  // the far half hazes out so the deep flank stations recede
+  s += `<rect width="${w}" height="${fx(h * 0.36)}" fill="url(#pageHaze)"/>`
+
+  // ---- THE RADIAL STATIONS painted on the yard: concentric arcs about the keep
+  // at the spine, the amphitheater's own geometry (ORDER) laid into the ground.
+  for (const [z, dash] of [[-0.52, '20 16'], [-0.38, '16 14'], [-0.16, '13 12'], [0.12, '11 11'], [0.575, '9 10']]) {
+    const fy = pageFY(z)
+    const rise = 0.09 - (z + 0.75) * 0.045
+    s += `<path d="M 0 ${fx(PY(fy - rise * 0.55))} Q ${fx(PX(0.5))} ${fx(PY(fy + rise))} ${w} ${fx(PY(fy - rise * 0.55))}" fill="none" stroke="${WALNUT}" stroke-width="2.6" stroke-dasharray="${dash}" opacity="0.28"/>`
+  }
+  // the gutter: a soft valley shadow down the spine
+  s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#pageGutter)"/>`
+
+  // ---- LAMPLIGHT POOLS beneath the ranks of lit portals: the three flank rows,
+  // the ring-mid arms and the gate wall. Jittered along their station arc so
+  // they read as scattered live traffic, never as a printed row.
+  for (const [z, n] of [[-0.52, 5], [-0.38, 4], [-0.16, 4], [0.12, 3], [0.575, 2]]) {
+    for (const side of ['left', 'right']) {
+      for (let k = 0; k < n; k++) {
+        const radial = lerp(0.2, PAGE_W_U * 0.94, (k + rr(r, 0.15, 0.85)) / n)
+        const fy = pageFY(z + rr(r, 0.01, 0.05))
+        const rad = rr(r, 0.03, 0.07)
+        s += `<ellipse cx="${fx(PX(pageFX(radial, side)))}" cy="${fx(PY(fy))}" rx="${fx(PX(rad * 0.62))}" ry="${fx(PY(rad * 0.3))}" fill="url(#pagePool)" opacity="${fx(rr(r, 0.4, 0.75))}"/>`
+      }
+    }
+  }
+
+  // ---- THE COBBLED POST-ROAD ----
+  const N = 60
+  const edgeL = []
+  const edgeR = []
+  for (let i = 0; i <= N; i++) {
+    const { cx, cy, px, py } = roadFrame(i / N)
+    edgeL.push([cx + px, cy + py])
+    edgeR.push([cx - px, cy - py])
+  }
+  const bandD =
+    'M ' +
+    edgeL.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ') +
+    ' L ' +
+    [...edgeR].reverse().map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ') +
+    ' Z'
+  s += `<path d="${bandD}" fill="${ROOK.slate}" opacity="0.44"/>`
+  s += `<path d="${bandD}" fill="url(#roadShade)" opacity="0.5"/>`
+  s += `<g clip-path="url(#roadCut)">`
+  // cobble courses: a band of stones ACROSS the road every step, staggered
+  const rows = 38
+  for (let i = 0; i <= rows; i++) {
+    const t = i / rows
+    const { cx, cy, px, py } = roadFrame(t)
+    const stones = 6
+    for (let c = 0; c < stones; c++) {
+      const o = ((c + 0.5) / stones - 0.5) * 2 + (i % 2 ? 1 / stones : 0)
+      const sx = cx + px * o
+      const sy = cy + py * o
+      const rx = Math.hypot(px * w, py * h) / stones
+      s += `<ellipse cx="${fx(PX(sx))}" cy="${fx(PY(sy))}" rx="${fx(rx * 0.92)}" ry="${fx(rx * 0.66)}" fill="none" stroke="${WALNUT}" stroke-width="1.9" opacity="0.42"/>`
+    }
+  }
+  s += `</g>`
+  // kerbs: a light stone edge on the lit side, a walnut shadow on the other
+  s += `<path d="M ${edgeL.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')}" fill="none" stroke="${WALNUT_LT}" stroke-width="4" opacity="0.55"/>`
+  s += `<path d="M ${edgeR.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')}" fill="none" stroke="${WALNUT}" stroke-width="4.5" opacity="0.5"/>`
+  // the gate mouth the road dies into, at the spine
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.028))}" ry="${fx(PY(0.022))}" fill="${ROOK.ink}" opacity="0.3"/>`
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.028))}" ry="${fx(PY(0.022))}" fill="none" stroke="${WALNUT}" stroke-width="2.4" opacity="0.45"/>`
+
+  // ---- THE COBBLE APRON under the sorting desk (right page foreground: the
+  // desk's own station, radial >= 0.42, z 0.14..0.62). Rows converge slightly
+  // toward the spine so the paving lies down instead of standing up as a grid.
+  const APRON_ROWS = 6
+  const APRON_COLS = 8
+  const aprX = (row, t) => lerp(pageFX(lerp(0.52, 0.46, row / APRON_ROWS), 'right'), pageFX(lerp(1.0, 1.1, row / APRON_ROWS), 'right'), t)
+  const aprY = (row, t) => pageFY(lerp(0.18, 0.58, row / APRON_ROWS)) + t * 0.014
+  s += `<path d="M ${fx(PX(aprX(0, 0)))} ${fx(PY(aprY(0, 0)))} L ${fx(PX(aprX(0, 1)))} ${fx(PY(aprY(0, 1)))} L ${fx(PX(aprX(APRON_ROWS, 1)))} ${fx(PY(aprY(APRON_ROWS, 1)))} L ${fx(PX(aprX(APRON_ROWS, 0)))} ${fx(PY(aprY(APRON_ROWS, 0)))} Z" fill="${ROOK.slate}" opacity="0.12"/>`
+  for (let row = 0; row < APRON_ROWS; row++) {
+    for (let c = 0; c < APRON_COLS; c++) {
+      const t0 = (c + (row % 2 ? 0.5 : 0)) / APRON_COLS
+      const t1 = t0 + 0.92 / APRON_COLS
+      if (t1 > 1) continue
+      const d =
+        `M ${fx(PX(aprX(row, t0)))} ${fx(PY(aprY(row, t0)))} L ${fx(PX(aprX(row, t1)))} ${fx(PY(aprY(row, t1)))} ` +
+        `L ${fx(PX(aprX(row + 0.88, t1)))} ${fx(PY(aprY(row + 0.88, t1)))} L ${fx(PX(aprX(row + 0.88, t0)))} ${fx(PY(aprY(row + 0.88, t0)))} Z`
+      s += `<path d="${d}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="${fx(rr(r, 0.12, 0.24))}"/>`
+    }
+  }
+
+  // ---- WHEELING RAVEN SHADOWS: the 3D flight continued in 2D, gathered into
+  // two loose gyres (one per page) rather than sprinkled evenly.
+  for (const [side, gz, gr, n] of [['left', -0.22, 0.62, 11], ['right', -0.3, 0.66, 12]]) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rr(r, -0.3, 0.3)
+      const rad = rr(r, 0.35, 1) * gr
+      const radial = clampNum(0.5 + Math.cos(a) * rad * 0.62, 0.06, PAGE_W_U * 0.99)
+      const z = clampNum(gz + Math.sin(a) * rad * 0.4, -0.72, 0.66)
+      const S = rr(r, w * 0.008, w * 0.026)
+      s += `<g transform="translate(${fx(PX(pageFX(radial, side)))} ${fx(PY(pageFY(z)))}) rotate(${fx(rr(r, -60, 60))})" opacity="${fx(rr(r, 0.1, 0.22))}">${miniRaven(S, ROOK.ink, ROOK.ink)}</g>`
+    }
+  }
+  // a vignette so the spread sits in its gutter
+  s += `<rect width="${w}" height="${h}" fill="url(#pageVig)"/>`
+  s += `</g>`
+
+  const defs =
+    `<clipPath id="roadCut"><path d="${bandD}"/></clipPath>` +
+    `<linearGradient id="pageHaze" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.8"/>` +
+    `<stop offset="1" stop-color="${ROOK.parchLit}" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="pageGutter" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0.32"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="pagePool" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${ROOK.amber}" stop-opacity="0.55"/>` +
+    `<stop offset="0.6" stop-color="${ROOK.amber}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${ROOK.amber}" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="roadShade" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${ROOK.ink}" stop-opacity="0.34"/>` +
+    `<stop offset="1" stop-color="${ROOK.ink}" stop-opacity="0.05"/></linearGradient>` +
+    `<radialGradient id="pageVig" cx="0.5" cy="0.55" r="0.75">` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.3"/></radialGradient>`
+
+  return svgPiece(w, h, s, defs)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -3107,9 +3499,23 @@ const PIECES = [
   { id: 'ch3-keep-spire-m0', seed: 40301, w: 595, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 0) } },
   { id: 'ch3-keep-spire-m1', seed: 40302, w: 376, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 1) } },
   { id: 'ch3-keep-spire-m2', seed: 40303, w: 253, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 2) } },
-  // the dispatch volvelle — a spun raven dial beneath a punched window card
+  // the sorting desk — a spun raven wheel beneath a punched pigeonhole faceplate
   { id: 'ch3-dispatch-dial', seed: 40310, w: 640, h: 640, grain: 10, paint() { return dispatchDial(this.w, this.h, this.seed) } },
   { id: 'ch3-dispatch-card', seed: 40320, w: 640, h: 640, grain: 10, paint() { return dispatchCard(this.w, this.h, this.seed) } },
+  // the gatehouse tower (stripflap: rectangular mesh, the ALPHA is the die-cut,
+  // so this is a PIECE bake with no outline sidecar). Mesh 0.12 x 0.20 = 0.6.
+  { id: 'ch3-ring-tower', seed: 40330, w: 384, h: 640, grain: 12, paint() { return ringTower(this.w, this.h, this.seed) } },
+  // the rookery's outer yard wall (foreground vfold) and the s4 spread print.
+  // Both keep the pixel dims their committed predecessors shipped with — they
+  // are full-bleed page/apron art, not sliver cutouts (see the report note on
+  // the 1024 long-edge cap, which these two predate).
+  // Both sit at the G5 1024 long-edge cap, at the SAME aspect the legacy bakes
+  // shipped (1441x203 -> 1024x144, 1536x1024 -> 1024x683). Nothing is lost: the
+  // runtime already downscales every art texture to a 1024 long edge at load
+  // (ART_TIER, book/use-layer-texture.ts), so the extra pixels never reached the
+  // GPU — they only carried the oversize-art violation forward.
+  { id: 'ch3-fringe', seed: 40340, w: 1024, h: 144, grain: 14, paint() { return rookeryFringe(this.w, this.h, this.seed) } },
+  { id: 'page-4', seed: 40350, w: 1024, h: 683, grain: 10, paint() { return postRoadSpread(this.w, this.h, this.seed) } },
   // ---- Spread 7 — the Northern Treasury (ch6, northern aurora/teal/gold) ----
   { id: 'ch6-strongbox-front', seed: 70201, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'strongbox') } },
   { id: 'ch6-strongbox-back', seed: 70202, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'strongbox') } },
@@ -3126,12 +3532,11 @@ const PIECES = [
   { id: 'ch6-coffer-door1', seed: 70261, w: 512, h: 486, grain: 12, paint() { return cofferLid(this.w, this.h, this.seed) } },
 ]
 
-// The SIX skyline mound slots, one strip each (procedural kills the FAN_OUT
-// 3-painting reuse). Dims are the TRUE mesh aspect = row.width / row.height,
-// read straight from content.ts ch3-skyline-l/r rows (2026-07-24). Seeds are
-// chosen so cross-gutter pairs (l-mound0 vs r-mound0, ...) differ in parity —
-// which flips the gatehouse/bastion side — so no two symmetric slots read as
-// near-duplicates. `towers` varies the building count per slot.
+// The SIX legacy skyline mound slots, one strip each. Dims are the TRUE mesh
+// aspect = row.width / row.height, read straight from content.ts ch3-skyline-l/r
+// rows (2026-07-24). Seeds are chosen so cross-gutter pairs (l-mound0 vs
+// r-mound0, ...) differ in parity, so no two symmetric slots read as near
+// duplicates; `towers` varies the facade-block count per slot.
 const SLOTS = [
   { id: 'ch3-skyline-l-mound0', w: 0.3219, h: 0.1089, seed: 10008, towers: 7 },
   { id: 'ch3-skyline-l-mound1', w: 0.292, h: 0.0838, seed: 10011, towers: 8 },
@@ -3140,22 +3545,214 @@ const SLOTS = [
   { id: 'ch3-skyline-r-mound1', w: 0.2921, h: 0.0988, seed: 40034, towers: 6 },
   { id: 'ch3-skyline-r-mound2', w: 0.232, h: 0.0666, seed: 40037, towers: 7 },
 ]
+
+// The THREE new ring rows (s4 pack §4a A/B). They slot into the same
+// `<layerId>-mound<k>` scheme and bake through the same shaped-mesh path, but
+// carry the ring variants and their own pixel dims. Kept in a SEPARATE array
+// because SLOTS is the procart bench's iteration set and its ROWS table only
+// covers the six legacy ids.
+const RING_SLOTS = [
+  // ring-mid arms: mesh 0.26 x 0.16 = 1.625. The RIGHT arm is the mirror of the
+  // left (see dovecoteFacade: the raven ranks are authored with the opposite
+  // facing under `mirror`, so both arms' birds still face the spine).
+  { id: 'ch3-skyline-l-mound3', w: 0.26, h: 0.16, W: 832, H: 512, seed: 10017, variant: 'ringMid', blocks: 4 },
+  { id: 'ch3-skyline-r-mound3', w: 0.26, h: 0.16, W: 832, H: 512, seed: 40040, variant: 'ringMid', blocks: 4, mirror: true },
+  // ring-front gate wall: mesh 0.19 x 0.10 = 1.9.
+  { id: 'ch3-skyline-l-mound4', w: 0.19, h: 0.1, W: 972, H: 512, seed: 10020, variant: 'ringFront', blocks: 5 },
+]
 const SLOT_LONG_EDGE = 1024 // gate-matrix G5 budget: art max dim <= 1024
 
 function slotDims(slot) {
+  if (slot.W && slot.H) return { W: slot.W, H: slot.H }
   return { W: SLOT_LONG_EDGE, H: Math.round((SLOT_LONG_EDGE * slot.h) / slot.w) }
 }
 
 /** Bakes one slot straight into the art dir as <id>.webp + <id>.outline.json.
- *  Ship default: smoke off. The webp is the painted texture; the outline JSON is
- *  the shaped-mesh contour (normalized [0,1]^2, v-up hinge->crest). */
+ *  The webp is the painted texture; the outline JSON is the shaped-mesh contour
+ *  (normalized [0,1]^2, v-up hinge->crest). */
 async function bakeSlot(slot, outDir) {
   const { W, H } = slotDims(slot)
-  const { outline, out } = await bake(slot.seed, W, H, false, slot.towers)
+  const art = dovecoteFacade({
+    seed: slot.seed,
+    w: W,
+    h: H,
+    variant: slot.variant ?? 'flank',
+    blocks: slot.blocks ?? Math.max(3, Math.round((slot.towers ?? 7) / 1.6)),
+    mirror: slot.mirror ?? false,
+  })
+  const { outline, out } = await bakeShaped(art, slot.seed, W, H, 22)
   const webp = await sharp(out).webp({ quality: 82 }).toBuffer()
   await writeFile(path.join(outDir, `${slot.id}.webp`), webp)
   await writeFile(path.join(outDir, `${slot.id}.outline.json`), JSON.stringify(outline))
   return { id: slot.id, W, H, aspect: (slot.w / slot.h).toFixed(3), points: outline.length, bytes: webp.length }
+}
+
+// ============================================================================
+// INFRA-1 — SHARED ATLAS PAGES. Composites already-baked webps into 1024²
+// pages and emits the sidecar the runtime reads (components/labs/storybook/
+// art-atlas.ts): many pieces, ONE texture upload. The merged keep mesh has a
+// single material, so its page must carry EVERY keep art id or the renderer
+// silently falls back to ~50 per-face draws.
+//
+// *** rect is in TEXTURE UV SPACE, v measured from the image BOTTOM *** — three
+// uploads with the default flipY. For a region at image-space (x, yTop, w, h) on
+// a page of size P: u0 = x/P, u1 = (x+w)/P, v0 = 1-(yTop+h)/P, v1 = 1-yTop/P.
+// The EXACT region rect is written; the runtime applies the half-texel inset.
+// ============================================================================
+
+const ATLAS_PAGE = 1024
+const ATLAS_GUTTER = 2
+
+// `w` or `h` is the requested region size; the other is derived from the
+// SOURCE's own aspect so nothing is stretched. `opaque` flattens a face whose
+// alpha is incidental — the merged keep's material is alphaTest 0.1, so a solid
+// face must be fully opaque for the test to be a no-op on it.
+const ATLASES = [
+  {
+    id: 'keep-atlas-s4',
+    // Sizes from s4 pack §4f: the three reader-facing plates get the pixels, the
+    // spire members and balcony a fair share, the wall/top/back faces are
+    // slivers at the pinned camera and get 64-96px.
+    regions: [
+      { id: 'ch3-keep-hall-front', w: 896, opaque: false },
+      { id: 'ch3-keep-gallery-front', w: 830, opaque: false },
+      { id: 'ch3-keep-loft-front', w: 700, opaque: false },
+      { id: 'ch3-keep-spire-m0', h: 280, opaque: false },
+      { id: 'ch3-keep-spire-m1', h: 280, opaque: false },
+      { id: 'ch3-keep-spire-m2', h: 280, opaque: false },
+      // The balcony deck and the loft's arched side are DIE-CUT art (21% / 28%
+      // of their pixels are fully transparent — the deck's shaped desk and the
+      // loft's open arch). Flattening them would print an opaque rectangle where
+      // the void belongs, so they keep their alpha; alphaTest 0.1 cuts them
+      // exactly as it does today. Every genuinely solid face below is flattened.
+      { id: 'ch3-keep-balcony', w: 256, opaque: false },
+      { id: 'ch3-keep-raven', w: 128, opaque: false },
+      { id: 'ch3-keep-loft-side', w: 96, opaque: false },
+      { id: 'ch3-keep-hall-side', w: 96, opaque: true },
+      { id: 'ch3-keep-gallery-side', w: 96, opaque: true },
+      { id: 'ch3-keep-hall-back', w: 64, opaque: true },
+      { id: 'ch3-keep-gallery-back', w: 64, opaque: true },
+      { id: 'ch3-keep-loft-back', w: 64, opaque: true },
+      { id: 'ch3-keep-hall-top', w: 64, opaque: true },
+      { id: 'ch3-keep-gallery-top', w: 64, opaque: true },
+      { id: 'ch3-keep-loft-top', w: 64, opaque: true },
+    ],
+  },
+  {
+    id: 'flank-atlas-s4',
+    // The nine skyline strips are slivers at the reading camera (pack 4f caps
+    // their regions at 512 wide; 400 packs two per shelf with room to spare),
+    // plus the gatehouse tower.
+    regions: [
+      { id: 'ch3-skyline-l-mound0', w: 400, opaque: false },
+      { id: 'ch3-skyline-l-mound1', w: 400, opaque: false },
+      { id: 'ch3-skyline-l-mound2', w: 400, opaque: false },
+      { id: 'ch3-skyline-l-mound3', w: 400, opaque: false },
+      { id: 'ch3-skyline-l-mound4', w: 400, opaque: false },
+      { id: 'ch3-skyline-r-mound0', w: 400, opaque: false },
+      { id: 'ch3-skyline-r-mound1', w: 400, opaque: false },
+      { id: 'ch3-skyline-r-mound2', w: 400, opaque: false },
+      { id: 'ch3-skyline-r-mound3', w: 400, opaque: false },
+      { id: 'ch3-ring-tower', h: 360, opaque: false },
+    ],
+  },
+]
+
+/** Shelf-pack (next-fit decreasing height), deterministic: sort by descending
+ *  height, ties broken by id. Returns null when the set does not fit. */
+function shelfPack(items, page, gutter) {
+  const sorted = [...items].sort((a, b) => b.h - a.h || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const placed = []
+  let shelfY = 0
+  let shelfX = 0
+  let shelfH = 0
+  for (const it of sorted) {
+    if (it.w > page) return null
+    if (shelfX > 0 && shelfX + gutter + it.w > page) {
+      shelfY += shelfH + gutter
+      shelfX = 0
+      shelfH = 0
+    }
+    const x = shelfX === 0 ? 0 : shelfX + gutter
+    if (shelfY + it.h > page) return null
+    placed.push({ ...it, x, y: shelfY })
+    shelfX = x + it.w
+    shelfH = Math.max(shelfH, it.h)
+  }
+  return shelfY + shelfH <= page ? placed : null
+}
+
+/** Reads each region's source aspect, derives its missing dimension, then packs
+ *  — retrying with ONE uniform scale factor across every region until it fits. */
+async function packAtlas(atlas, dir) {
+  const base = []
+  for (const region of atlas.regions) {
+    const meta = await sharp(path.join(dir, `${region.id}.webp`)).metadata()
+    const ar = meta.width / meta.height
+    const w = region.w ?? Math.round(region.h * ar)
+    const h = region.h ?? Math.round(region.w / ar)
+    base.push({ id: region.id, w, h, opaque: !!region.opaque })
+  }
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const factor = Math.pow(0.97, attempt)
+    const items = base.map((b) => ({
+      ...b,
+      w: Math.max(8, Math.round(b.w * factor)),
+      h: Math.max(8, Math.round(b.h * factor)),
+    }))
+    const placed = shelfPack(items, ATLAS_PAGE, ATLAS_GUTTER)
+    if (placed) return { placed, factor }
+  }
+  throw new Error(`atlas ${atlas.id}: no uniform scale fits ${base.length} regions on ${ATLAS_PAGE}px`)
+}
+
+/** Composites one atlas page and returns its sprite rects in TEXTURE uv space. */
+async function writeAtlasPage(atlas, dir) {
+  const { placed, factor } = await packAtlas(atlas, dir)
+  const layers = []
+  for (const p of [...placed].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    const src = sharp(path.join(dir, `${p.id}.webp`)).resize(p.w, p.h, { fit: 'fill' })
+    const buf = await (p.opaque ? src.flatten({ background: ROOK.ink }) : src).ensureAlpha().png().toBuffer()
+    layers.push({ input: buf, left: p.x, top: p.y })
+  }
+  const page = await sharp({
+    create: { width: ATLAS_PAGE, height: ATLAS_PAGE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite(layers)
+    .png()
+    .toBuffer()
+  const webp = await sharp(page).webp({ quality: 90, alphaQuality: 100 }).toBuffer()
+  await writeFile(path.join(dir, `${atlas.id}.webp`), webp)
+
+  const sprites = {}
+  const P = ATLAS_PAGE
+  for (const p of [...placed].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    sprites[p.id] = {
+      atlas: atlas.id,
+      // v from the image BOTTOM (flipY): a mistake here renders every keep face
+      // upside-down, so it is written once, here, and nowhere else.
+      rect: [p.x / P, 1 - (p.y + p.h) / P, (p.x + p.w) / P, 1 - p.y / P],
+    }
+  }
+  const used = placed.reduce((s, p) => s + p.w * p.h, 0)
+  return { sprites, factor, occupancy: used / (P * P), count: placed.length, bytes: webp.length }
+}
+
+/** Writes every atlas page plus the atlas.json sidecar the runtime reads. */
+async function writeAtlases(dir) {
+  const pages = {}
+  const sprites = {}
+  const report = []
+  for (const atlas of ATLASES) {
+    const res = await writeAtlasPage(atlas, dir)
+    pages[atlas.id] = ATLAS_PAGE
+    Object.assign(sprites, res.sprites)
+    report.push({ id: atlas.id, ...res })
+  }
+  const ordered = {}
+  for (const id of Object.keys(sprites).sort()) ordered[id] = sprites[id]
+  await writeFile(path.join(dir, 'atlas.json'), JSON.stringify({ pages, sprites: ordered }, null, 2) + '\n')
+  return report
 }
 
 /** Rebuilds manifest.json (every art id from the webp listing — same contract as
@@ -3175,10 +3772,13 @@ async function writeManifests(dir) {
 async function main() {
   await mkdir(ART_DIR, { recursive: true })
   const info = []
-  for (const slot of SLOTS) info.push(await bakeSlot(slot, ART_DIR))
+  for (const slot of [...SLOTS, ...RING_SLOTS]) info.push(await bakeSlot(slot, ART_DIR))
   for (const wing of VISTA_WINGS) info.push(await bakeVistaWing(wing, ART_DIR))
   const pieceInfo = []
   for (const piece of PIECES) pieceInfo.push(await bakePieceTexture(piece, ART_DIR))
+  // Atlases pack the loose webps just baked, so they run LAST — and the
+  // manifests after them, so the two pages appear as art ids of their own.
+  const atlasInfo = await writeAtlases(ART_DIR)
   const { artIds, outlineIds } = await writeManifests(ART_DIR)
   for (const r of info) {
     process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  a=${r.aspect}  ${r.points}pts  ${(r.bytes / 1024).toFixed(1)}kb\n`)
@@ -3186,10 +3786,31 @@ async function main() {
   for (const r of pieceInfo) {
     process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  ${(r.bytes / 1024).toFixed(1)}kb\n`)
   }
+  for (const a of atlasInfo) {
+    process.stdout.write(
+      `${a.id.padEnd(24)} ${ATLAS_PAGE}x${ATLAS_PAGE}  ${a.count} regions  scale=${a.factor.toFixed(3)}  ` +
+        `occupancy=${(a.occupancy * 100).toFixed(1)}%  ${(a.bytes / 1024).toFixed(1)}kb\n`
+    )
+  }
   process.stdout.write(`manifest: ${artIds.length} art ids, ${outlineIds.length} outline sidecars -> ${path.relative(REPO_ROOT, ART_DIR)}\n`)
 }
 
-export { citadelStrip, CITADEL, SLOTS, slotDims, bake, bakeSlot, PIECES, bakePieceTexture }
+export {
+  citadelStrip,
+  dovecoteFacade,
+  CITADEL,
+  ROOK,
+  SLOTS,
+  RING_SLOTS,
+  slotDims,
+  bake,
+  bakeSlot,
+  PIECES,
+  bakePieceTexture,
+  ATLASES,
+  ATLAS_PAGE,
+  writeAtlases,
+}
 
 if (pathToFileURL(process.argv[1]).href === import.meta.url) {
   main().catch((e) => {

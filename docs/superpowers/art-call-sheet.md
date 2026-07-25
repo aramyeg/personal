@@ -207,7 +207,11 @@ ONE grand structure replaces the old rookery crowd (`ch3-towers`/`ch3-rank`/`ch3
 all retired per the fate list): a four-story keep (`ch3-keep`, expanding to four stacked box
 poses through the box renderer), a jutting gold balcony, the kept hero raven folded onto the
 crown, an interactive tower-hoist winch (`ch3-keep-winch`), a flanking mound skyline
-(`ch3-skyline-l` / `ch3-skyline-r`), and the kept fore wall (`ch3-fringe`). The old wing-rank
+(`ch3-skyline-l` / `ch3-skyline-r`), and the kept fore wall (`ch3-fringe`). **E3 s4 (scenes/
+s4-scene-pack.md)** turns that flanking rank into a RADIAL AMPHITHEATER: the six existing rows
+are re-dressed as dovecote facades and become the ring's REAR stations, three NEW downstage rows
+(`-mound3` on both pages, `-mound4` on the left) sweep the ring around to the reader's apron, and
+a strip-erected gatehouse (`ch3-ring-tower`) stands where the painted post-road enters. The old wing-rank
 stage-set flats are GONE: the citadel canyon is PAINTED aerial recession — stepped rooflines,
 dusk-violet on the deepest — INTO the keep's own upper **back-wall faces** (`-back`), no separate
 mechanism. Palette §1.1 Ch III (slate `#5a6470`, raven `#2b2d33`, dusk violet `#6f5a7d`, window
@@ -237,11 +241,15 @@ principle) before any of these land.
 | `ch3-keep-winch` | `ch3-keep-winch-semaphore` | Gold signal paddle arm — the semaphore sweeping up to vertical | wide strip | STAND | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-iris` | One raven-shutter blade (repeats around the loft rim) — slate shutter, amber roost-glow behind | ≈0.5:1 | STAND | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-counterweight` | Slate counterweight block on a cable, dropping down the keep flank | ≈1:1 | STAND | placeholder |
-| `ch3-skyline-l` | `ch3-skyline-l-mound0`, `ch3-skyline-l-mound1`, `ch3-skyline-l-mound2` | Left-page flanking citadel rooftops — low slate rooflines, chimneys, amber windows; dusk-violet on the deepest (stepping back in Z) | ≈2:1 each | STAND (mound) | placeholder |
-| `ch3-skyline-r` | `ch3-skyline-r-mound0`, `ch3-skyline-r-mound1`, `ch3-skyline-r-mound2` | Right-page flanking citadel rooftops (mirror rank) | ≈2:1 each | STAND (mound) | placeholder |
-| `ch3-fringe` | `ch3-fringe` | Fore-edge dispatch-yard wall — slate, iron straps, pinned amber dispatch-notices | ≈5.2:1 low strip | FACE | placeholder |
-| `ch3-dispatch` | `ch3-dispatch-dial` | The reader-spun DISPATCH DIAL (volvelle, riveted flat into the right-page yard, mirroring the winch) — a brass wheel of 8 sectors: ravens banking at staggered headings, route glyphs, a tally band; a thumb-tab on the rim | 1:1 square (disc, radius 0.11 → canvas 0.22×0.22) | DISC | placeholder |
-| `ch3-dispatch` | `ch3-dispatch-card` | The static WINDOW CARD over the dial — dark brass faceplate with 3 die-cut windows (top + two flanks at 45°) and a thumb-notch, engraved "DISPATCH"; the sectors show through the cut windows | 1:1 square (disc, matches the dial) | DISC (windowed) | placeholder |
+| `ch3-skyline-l` | `ch3-skyline-l-mound0`, `ch3-skyline-l-mound1`, `ch3-skyline-l-mound2` | REAR RING STATIONS, left page (E3 s4 re-dress) — dovecote facades: regimented ranks of arched raven portals, 1-in-5 amber-lit, deep-cut crenellation, a linked raven rank cut into the parapet silhouette; coolest/dimmest of the ring, stepping back in Z | ≈3.0:1 / ≈3.5:1 / ≈3.2:1 | STAND (mound, shaped) | procedural |
+| `ch3-skyline-l` | `ch3-skyline-l-mound3` | RING-MID left arm — the ring's tallest station: two-story dovecote terrace, the biggest portals and the most amber-lit windows, parapet raven rank facing spine-ward | ≈1.625:1 | STAND (mound, shaped) | procedural |
+| `ch3-skyline-l` | `ch3-skyline-l-mound4` | RING-FRONT gate wall (left page only; the right front station is the dispatch desk) — low gate-wall, lantern posts, a raven pair, the post-road's shadow at its base | ≈1.9:1 | STAND (mound, shaped) | procedural |
+| `ch3-skyline-r` | `ch3-skyline-r-mound0`, `ch3-skyline-r-mound1`, `ch3-skyline-r-mound2` | REAR RING STATIONS, right page (mirror rank, same dovecote grammar) | ≈3.2:1 / ≈3.0:1 / ≈3.5:1 | STAND (mound, shaped) | procedural |
+| `ch3-skyline-r` | `ch3-skyline-r-mound3` | RING-MID right arm — the left arm's mirror (one drawing, flipped; own grain seed) | ≈1.625:1 | STAND (mound, shaped) | procedural |
+| `ch3-ring-tower` | `ch3-ring-tower` | THE GATEHOUSE (E3 s4) — a slender strip-erected dovecote tower where the painted post-road enters the ring: stacked portal ranks, amber crown lantern, a raven atop; the right page's vertical accent, balancing the semaphore mast on the left | ≈0.6:1 | STAND (die-cut) | procedural |
+| `ch3-fringe` | `ch3-fringe` | Fore-edge dispatch-yard wall — the rookery's outer yard wall in slate, a raven rank along its top, and the ROAD NOTCH where the post-road passes through | ≈7.1:1 low strip | FACE | procedural |
+| `ch3-dispatch` | `ch3-dispatch-dial` | The reader-spun SORTING DESK dial (volvelle, riveted flat into the right-page yard, mirroring the winch) — a brass wheel of 8 sectors: raven sigils at staggered headings, route glyphs, a tally band | 1:1 square (disc, radius 0.11 → canvas 0.22×0.22) | DISC | procedural |
+| `ch3-dispatch` | `ch3-dispatch-card` | The static WINDOW CARD over the dial — the sorting-office faceplate: pigeonhole shelves around 3 die-cut windows (top + two flanks at 45°) and the celebrated brass tag "① SPIN — ROUTE THE RAVENS" with a pointing manicule; the sectors show through the cut windows. RIGHT-PAGE V-FLIP applies — author in screen space | 1:1 square (disc, matches the dial) | DISC (windowed) | procedural |
 
 ## 5. Chapter IV — The Vault-Dragon of the Golden Dunes (spread 5)
 

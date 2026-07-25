@@ -361,16 +361,54 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // row/fringe/winch-disc D-G2, real-time 3% margin, fits-page, pinned-camera
   // sightline 63% visible). Slot->strip aspect per the prepare-art FAN_OUT
   // (a-strips 2.956 -> l0/r1, b-strips 3.484 -> l1/r2, c-strips 3.185 -> l2/r0).
+  // E3 s4 RING (scenes/s4-scene-pack.md §4a): the three legacy rows per page are
+  // the ring's REAR stations (the far rim, upstage of the keep at zc -0.52/-0.38/
+  // -0.16); rows 3-4 below are the NEW downstage arms that turn a flanking city
+  // into a radial amphitheater sweeping around to the reader's apron. Same
+  // mechanism, same envelope class, zero new physics — the pack's R1 amendment
+  // proved the facade-plate "ring arms" idea geometrically dead (plate-overhang
+  // wedge excursion 0.070 vs 0.02 tol), so the ring is built from the page-riding
+  // family this spread already fields. Bench .superpowers/sdd/bench/e3s4-ring.mjs.
+  //
+  // R3 LAW UPGRADE, and the reason these rows may finally be TALL: the real-time
+  // rotation-radius cap is hypot(F + width, height * sin(stand)) <= 0.752, NOT the
+  // flat F + width the old reading used. The 0.107 height era was bound by the
+  // delivered 3.2:1 strip ART aspect, not by physics; at F+w 0.70 the honest cap
+  // allows height up to ~0.28. The mid arms take 0.16 (1.5x the old rows) and land
+  // at radius 0.700-0.740.
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
     { F: 0.43, zc: -0.52, height: 0.1089, width: 0.3219, standDeg: 64 },
     { F: 0.46, zc: -0.38, height: 0.0838, width: 0.292, standDeg: 64 },
     { F: 0.52, zc: -0.16, height: 0.0728, width: 0.2319, standDeg: 64 },
+    // ring-mid left arm: dovecote facade, the ring's tallest station — biggest
+    // portals, most amber-lit windows, the parapet raven rank facing spine-ward.
+    { F: 0.44, zc: 0.12, height: 0.16, width: 0.26, standDeg: 64 },
+    // ring-front gate wall (LEFT PAGE ONLY; the right page's front station is the
+    // dispatch desk). F 0.55 is RAY-GATED, not chosen for looks: inboard variants
+    // (F 0.42-0.48) occluded 12-15% of the winch disc rim from the pinned camera;
+    // at 0.55 it is 3.1% (bench C3).
+    { F: 0.55, zc: 0.575, height: 0.1, width: 0.19, standDeg: 64 },
   ] },
   { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
     { F: 0.43, zc: -0.52, height: 0.1011, width: 0.322, standDeg: 64 },
     { F: 0.46, zc: -0.38, height: 0.0988, width: 0.2921, standDeg: 64 },
     { F: 0.52, zc: -0.16, height: 0.0666, width: 0.232, standDeg: 64 },
+    // ring-mid right arm — the left arm's mirror (art shares one drawing, flipped).
+    { F: 0.44, zc: 0.12, height: 0.16, width: 0.26, standDeg: 64 },
   ] },
+  // THE GATEHOUSE (s4 pack §4a-C): a slender strip-erected dovecote tower where
+  // the painted post-road enters the ring — the right page's vertical accent,
+  // balancing the winch's semaphore mast on the left. Its legality is a Z-BAND
+  // trick: the keep's hall wall plane sweeps lateral 0 -> 0.40 while opening, but
+  // only within z <= |0.34|, and this tower's fold footprint lives in z
+  // [0.38, 0.58] — z-disjoint by 0.02 (bench C2), which is what makes a tower
+  // standing in mid-court legal at all. Radial band [0.30, 0.42] threads the same
+  // corridor: outside the balcony's lateral sweep (<= 0.26), inside the dial
+  // paper (radial >= 0.49). The default fold sign lays the leaf along +z from the
+  // hinge, so hingeZ 0.38 puts the footprint exactly in band (no mirror needed).
+  { id: 'ch3-ring-tower', kind: 'midground', role: 'figure', mech: 'stripflap',
+    side: 'right', anchor: 0.2, anchorZ: 0.48, slot: 0.26, slotZ: 0.48,
+    hingeX: 0.36, hingeZ: 0.38, width: 0.12, height: 0.2 },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
   // discR = crankR = 0.13, pin on the rim) that the reader TWISTS; a Scotch-yoke

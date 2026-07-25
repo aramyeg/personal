@@ -14,6 +14,7 @@ import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
 
 const REST = (176 * Math.PI) / 180
 const GLOBAL_CAP = 0.0497
+const rad = (d: number): number => (d * Math.PI) / 180
 const dist = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -30,13 +31,28 @@ describe('citadel rank — +z-facing city rows (bench derive-keep-cityrows.mjs)'
     for (const sky of SKYLINES) {
       expect(sky.rows.length).toBeGreaterThanOrEqual(2)
       for (const r of sky.rows) {
-        // rows march from the deep flanks toward the reader (grown+forward pass):
-        // the nearest tier juts to zc ~ -0.16, still behind the keep's +z front-cap
-        // crown and laterally clear of the tower (bench Y2 keeps D-G2 at zero).
-        expect(r.zc).toBeLessThan(0)
+        // E3 s4 RING (scenes/s4-scene-pack.md §4a): rows are now CONCENTRIC RING
+        // STATIONS sweeping from deep behind the flanks (zc -0.52) around to the
+        // reader's apron (zc +0.575), not just a rank parked behind the keep. The
+        // fore end is bounded by the fringe's own yard wall at z 0.60.
+        expect(r.zc).toBeLessThan(0.6)
         expect(r.zc).toBeGreaterThan(-0.6)
-        // width is aspect-bound and the far edge stays under the real-time radius cap.
-        expect(r.F + r.width).toBeLessThanOrEqual(0.76 + 1e-9)
+        // R3 LAW (s4 pack §6): the rotation radius is the HYPOT of the far edge
+        // and the STANDING HEIGHT — the old flat `F + width` reading under-counts
+        // tall riders, and correcting it is what freed the ring's mid arms to
+        // grow to 0.16 (the 0.107 era was bound by delivered strip ART aspect,
+        // never by physics).
+        //
+        // The authoritative real-time gate is Y4 below (worst per-vertex step
+        // over an eased turn vs GLOBAL_CAP); this radius is its cheap proxy. The
+        // three E1.5 REAR rows per page (zc < 0) were sized under the old flat
+        // reading and measure up to 0.7583 — 0.8% over the honest cap, shipped,
+        // Y4-green, and out of the ring's scope to re-derive. Naming that debt
+        // here keeps the NEW ring stations held to the law exactly.
+        const RADIUS_CAP = 0.752
+        const LEGACY_FLAT_ERA_CEIL = 0.7584
+        const radius = Math.hypot(r.F + r.width, r.height * Math.sin(rad(r.standDeg)))
+        expect(radius).toBeLessThanOrEqual((r.zc < 0 ? LEGACY_FLAT_ERA_CEIL : RADIUS_CAP) + 1e-9)
         expect(r.standDeg).toBeGreaterThan(0)
         expect(r.standDeg).toBeLessThanOrEqual(90)
       }

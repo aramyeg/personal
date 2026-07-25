@@ -332,6 +332,19 @@ const WHITELIST: readonly WhitelistEntry[] = [
       'belongs to are one market beat by construction, not two pieces that happen to collide.',
   },
   {
+    pair: 'ch3-keep x ch3-ring-tower',
+    reason: 'depth-echo',
+    note:
+      'E3 s4 ring (scenes/s4-scene-pack.md §2): the gatehouse is a NEAR piece standing downstage of the ' +
+      'far keep — z band [0.38, 0.58] against the keep body at |z| <= 0.34, which is the very z-disjointness ' +
+      'that makes a mid-court tower legal (bench C2, margin 0.020). It occludes 0.0% of the court, the keep ' +
+      "gate, the balcony and the dial (bench C3), so the overlap is the amphitheater's depth staging, not a " +
+      'mask. MEASURED CAVEAT for the eye-test, recorded rather than hidden: at the pinned camera the tower ' +
+      "sits ENTIRELY below the keep's silhouette in its own x band (clearance -0.148 screen units, 0% of the " +
+      'tower rises clear), so it reads against the keep facade rather than against sky — flagged in the s4 ' +
+      'build ledger for the chapter-boundary review.',
+  },
+  {
     pair: 'ch6-treasury x ch6-steps',
     reason: 'depth-echo',
     note:

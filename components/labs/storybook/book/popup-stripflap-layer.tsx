@@ -40,7 +40,8 @@ import {
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import { TURN_MS, type TurnFrame } from './use-turn-driver'
-import { useLayerTexture } from './use-layer-texture'
+import { useLayerSprite } from './use-layer-texture'
+import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
@@ -143,11 +144,16 @@ export function StripFlapPopupLayer({
   const slopRef = useRef<THREE.Mesh>(null)
   const gl = useThree((s) => s.gl)
 
-  const texture = useLayerTexture(layer.id, layer.kind, accents)
+  const { texture, rect } = useLayerSprite(layer.id, layer.kind, accents)
 
+  // Rebuilt if an atlas rect resolves, so the two half-quads address this
+  // figure's region of a shared page instead of the whole atlas.
   const geometries = useMemo(
-    () => ({ right: makePanelGeometry(RIGHT_UVS), left: makePanelGeometry(LEFT_UVS) }),
-    []
+    () => ({
+      right: makePanelGeometry(applyUvRect(RIGHT_UVS, rect)),
+      left: makePanelGeometry(applyUvRect(LEFT_UVS, rect)),
+    }),
+    [rect]
   )
   const slopGeometry = useMemo(() => makePanelGeometry(RIGHT_UVS), [])
   const materials = useMemo(() => {

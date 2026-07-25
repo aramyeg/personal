@@ -22,7 +22,8 @@ import { easeTurnWeighted } from './page-geometry'
 import { shadowLift } from './shadow-light'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { useArtSprite } from './use-layer-texture'
+import { applyUvRect, type UvRect } from '../art-atlas'
 import { useLayerOutline, type Outline } from './use-layer-outline'
 
 const FLAT_EPSILON = 0.02
@@ -67,7 +68,7 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
 // with u,v in [0,1] is a convex combination of the four corners, every shaped
 // vertex stays inside the solver quad — fold-flat + wedge containment are
 // inherited (proven per-slot in .superpowers/sdd/bench/procart-outline-bench.mjs).
-export function makeShapedGeometry(outline: Outline): THREE.BufferGeometry {
+export function makeShapedGeometry(outline: Outline, rect: UvRect | null = null): THREE.BufferGeometry {
   const n = outline.length
   const contour = outline.map(([u, v]) => new THREE.Vector2(u, v))
   const faces = THREE.ShapeUtils.triangulateShape(contour, [])
@@ -80,7 +81,11 @@ export function makeShapedGeometry(outline: Outline): THREE.BufferGeometry {
     uv[i * 2 + 1] = outline[i][1]
   }
   geometry.setAttribute('position', positions)
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+  // INFRA-1: the outline IS the uv table (identity), so an atlas-backed strip
+  // remaps it into its region with the same affine pass every other layer uses.
+  // The POSITION write below is untouched — it interpolates the solver corners
+  // by the outline's own u,v, which is what inherits the containment proof.
+  geometry.setAttribute('uv', new THREE.BufferAttribute(applyUvRect(uv, rect), 2))
   const index: number[] = []
   for (const [a, b, c] of faces) index.push(a, b, c)
   geometry.setIndex(index)
@@ -139,7 +144,7 @@ function SkylineRow({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const shadowGroupRef = useRef<THREE.Group>(null)
-  const faceArt = useArtTexture(`${layer.id}-mound${k}`)
+  const { texture: faceArt, rect } = useArtSprite(`${layer.id}-mound${k}`)
   // The code-generated shaped-mesh contour, or null until it loads / when no
   // sidecar exists — in which case we keep the original rectangle quad.
   const outline = useLayerOutline(`${layer.id}-mound${k}`)
@@ -147,9 +152,11 @@ function SkylineRow({
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const row = layer.rows[k]
 
+  // Rebuilt when the atlas rect resolves (it arrives a frame or two after the
+  // outline), so the uvs address this row's region of the shared flank page.
   const geometry = useMemo(
-    () => (outline ? makeShapedGeometry(outline) : makeQuadGeometry(new Float32Array(ROW_UVS))),
-    [outline]
+    () => (outline ? makeShapedGeometry(outline, rect) : makeQuadGeometry(applyUvRect(ROW_UVS, rect))),
+    [outline, rect]
   )
   const paperTexture = sharedPaperTexture()
   // ONE die-cut flap: the full roofline art (alpha-tested silhouette), DoubleSide
