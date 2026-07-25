@@ -270,8 +270,15 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     // weaken any physics/quality gate (D-G2 collision, real-time, sightline
     // stay hard). Keyed to the declared `showpiece` marker (not a spread index)
     // so it extends to the E2 grand chapter with no test edit.
+    // STAGE-SET EXEMPTION (E3 scene packs, s2 pack Q2 APPROVED by the
+    // orchestrator 2026-07-25): a Birmingham-118 graded stage set carries its
+    // depth in three receding gutter-spanning planes; a platform buried behind
+    // a full-span hero plane is invisible scaffolding (riser-silhouette law),
+    // so the per-chapter platform template no longer binds spreads rebuilt as
+    // stage sets. Listed per spread as each pack's retirement is accepted.
+    const STAGE_SET_SPREADS: ReadonlySet<number> = new Set([2])
     for (const chapter of CHAPTERS) {
-      if (chapter.showpiece) continue
+      if (chapter.showpiece || STAGE_SET_SPREADS.has(chapter.spread)) continue
       expect(
         chapter.layers.some((l) => l.mech === 'platform'),
         `spread ${chapter.spread} has no floating platform`

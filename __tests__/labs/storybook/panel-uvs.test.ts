@@ -23,10 +23,11 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
   it('children of deep-V parents tip past vertical and need the flip', () => {
     // User-reported upside down 2026-07-11: sign, dormer, lantern (inn and
     // arch are deep-V parents — child fold elevation lambda > 90deg). The
-    // sign has since become a freestanding v-fold; the dormer still pins
-    // the inn's deep-V case.
+    // sign became a freestanding v-fold and is now a child again on the E3
+    // stage set; the dormer moved with it to the phi-74 inn ROW (E3 s2), no
+    // longer a deep-V parent — both now pin the upright case below, and the
+    // deep-V flip case is carried by the lantern/banner/bees.
     for (const [spread, id] of [
-      [2, 'ch1-dormer'],
       // bee-b re-homed to the deep-V hero in D5 (it was 100% swallowed as a
       // backdrop child) — it now tips past vertical like its sibling bee-c.
       [3, 'ch2-bee-b'],
@@ -51,8 +52,14 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
   it('children of near-flat wall parents stand upright — no flip', () => {
     // User-verified upright: bees on the alpine ridge. (The ch3 rookery
     // children — the balcony and its ravens — retired in the E1 keep rebuild;
-    // the near-flat-wall upright case is now carried by the alpine bee.)
-    for (const [spread, id] of [[3, 'ch2-bee-a']] as const) {
+    // the near-flat-wall upright case is now carried by the alpine bee, plus
+    // the E3 s2 stage-set children riding the phi-74 inn row.)
+    for (const [spread, id] of [
+      [3, 'ch2-bee-a'],
+      [2, 'ch1-dormer'],
+      [2, 'ch1-sign'],
+      [2, 'ch1-key'],
+    ] as const) {
       const { layer, parent } = byId(layersOf(spread), id)
       expect(dieFlipped(layer, parent), id).toBe(false)
     }

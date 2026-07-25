@@ -266,14 +266,8 @@ type WhitelistEntry = { pair: string; reason: Reason; note: string }
 // this list on purpose — see the accompanying report for why they read as
 // composition debt rather than a genuine complement.
 const WHITELIST: readonly WhitelistEntry[] = [
-  {
-    pair: 'ch1-inn x ch1-yard',
-    reason: 'depth-echo',
-    note:
-      'the coaching-yard platform sits in the back lane behind the inn; its capture-confirmed crest and ' +
-      "struts break the roofline on both sides — the documented COMPOSITION SPREAD-D intent ('a rampart-" +
-      "terrace behind the inn instead of a flap the hero fully masks'), not a graze.",
-  },
+  // (the E3 s2 stage-set rebuild retired both halves of the old
+  // 'ch1-inn x ch1-yard' depth-echo pair — entry removed with them.)
   {
     pair: 'ch2-hero x ch2-hive',
     reason: 'silhouette-dialogue',

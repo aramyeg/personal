@@ -975,7 +975,14 @@ describe('D-G2 v2 — rest-pose zero + near-rest and mid-turn severity ratchets'
     // well before the pieces stand). Rest + near-rest stay ZERO (Parts 1/2 —
     // clean where the eye dwells), and the source-of-truth bench (derive-
     // depthvista.mjs) proves the erected range (beta >= 0.9) fully clear.
-    'spread-2': 123, 'spread-3': 122, 'spread-4': 179, 'spread-5': 218,
+    // spread-2 re-pinned 123 -> 184 for the E3 s2 stage-set rebuild (scene
+    // pack 2026-07-25): three full-span gutter-spanning planes (mountain /
+    // inn row / gate) replace the old backdrop+inn+yard crowd, and wide
+    // planes brushing while the sandwich collapses deep in the turn is
+    // exactly the tolerated transient this ratchet bounds. Where the eye
+    // dwells the spread is CLEANER than before: Part 1 rest = ZERO pairs and
+    // Part 2 near-rest measures within the unchanged ceiling of 8.
+    'spread-2': 184, 'spread-3': 122, 'spread-4': 179, 'spread-5': 218,
     'spread-6': 77, 'spread-7': 122, 'extra-1': 21, 'extra-8': 38, 'extra-9': 0,
   }
   /** Spread number from the set name ('spread-4' -> 4, 'extra-8' -> 8). */

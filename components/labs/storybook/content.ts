@@ -126,25 +126,64 @@ export const END_CLOSING_LINE =
 // the full Part-A invariant suite (flat fold, containment, no tearing,
 // separation) — sizes were chosen against those bounds.
 
-// Chapter I — stone city beneath a sleeping mountain. RICHER-STRUCTURE
-// PHASE: the inn is now a compound two-story coaching inn — one bigger
-// parent wall carrying TWO children (the hanging key-sign low on the fold,
-// an attic dormer above it — the stories of the building are literally
-// stories of the fold), the stable tented in the yard IN FRONT of it
-// (asymmetric parallel, ridge toward the left page — pieces placed behind
-// a taller mid-page piece are invisible from the reading camera), and the
-// low field wall pushed to the very front edge. Four depth planes plus a
-// cascade — the densest chapter open.
+// Chapter I — E3 s2 scene pack "The Inn of a Hundred Keys" (register R3
+// THEATER-warm; .superpowers/sdd/scenes/s2-scene-pack.md, bench
+// e3s2-reach.mjs 9/9). WELCOME — an enclosure opening toward the reader:
+// a Birmingham-118 STAGE SET of three width-graded gutter-spanning valley
+// folds (rear widest: mountain 1.9 > inn row 1.5 > gate 0.76), the full-
+// span lamplit inn row as the hero plane carrying a dormer and the hanging
+// key-sign on its crease (G6 multi-stage: folds on the fold) plus the
+// great brass KEY rotor turning in the lock as the page opens, the open
+// gate plane downstage, and the innkeeper's family strip-erected as ONE
+// linked welcome rank in the courtyard air between them. The old
+// single-sheet backdrop, the 0.72-wide inn painting with its two dress
+// patches, the standalone sign v-fold and the fully-occluded yard platform
+// are retired into this graded theater (v-fold count NET ZERO). The
+// key-board playable, the stable box and the fore-edge wall are KEPT
+// verbatim (repaint only).
 const CH1_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch1-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 82, rhoDeg: 88.8, skewDeg: -1.5, creaseU: 0.42, width: 1.6, height: 0.85 },
-  { id: 'ch1-inn', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.06, vDir: 1, phiDeg: 56, rhoDeg: 81, skewDeg: 3, creaseU: 0.55, width: 0.72, height: 0.7 },
-  // DRESSED ASSEMBLY (C1v2): the inn is now a v-fold core wearing shaped
-  // silhouette patches — the eaves overhang its roofline off the left
-  // panel, a hanging lamp bracket off the right.
-  { id: 'ch1-inn-eaves', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch1-inn', seat: 'left', u: 0.06, v: 0.62, width: 0.3, height: 0.12 },
-  { id: 'ch1-inn-lamp', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch1-inn', seat: 'right', u: 0.13, v: 0.28, width: 0.08, height: 0.14 },
-  { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn', mount: 0.62, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.15 },
-  { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: 0.2, vDir: 1, phiDeg: 58, rhoDeg: 82, width: 0.2, height: 0.26 },
+  // PLANE A — the sleeping mountain (rear, widest; the DIM plane). Solver
+  // drift from the pack's pre-flight (phi 83/rho 88.8/skew -1.5/creaseU
+  // 0.45/apexZ -0.52): that config's 5.8deg standing margin flops the crease
+  // ~0.3 world TOWARD the reader at the near-flat rest pose, spearing plane
+  // B's band, and its closed fold overreached the page (1.169 > 1.15).
+  // phi 80/rho 88 (margin 8) with a centered crease stands the mountain up
+  // (rest z <= -0.45), folds flat at 1.13, and the deeper apex keeps the
+  // glue ends inside the page. Asymmetry moved to the painted crest.
+  { id: 'ch1-mountain', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.55, vDir: -1, phiDeg: 80, rhoDeg: 88, creaseU: 0.5, width: 1.9, height: 0.92 },
+  // PLANE B — the inn row (mid, THE HERO): edge-to-edge lamplit facades at
+  // phi 74, a real toward-reader cant so the window art reads at the
+  // lid-dominant camera and its children get a live crease dihedral.
+  // Role 'scenery' (a stage-set plane, not a volumetric prop): the pack's
+  // R2 covenant-allowlist rename predates the C1v2 census — a story-role
+  // v-fold now needs >= 2 dress patches, and this scene retires the inn's
+  // dresses into the plane's own paint per the stage-set grammar.
+  { id: 'ch1-inn-row', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.2, vDir: -1, phiDeg: 74, rhoDeg: 86, skewDeg: 2, creaseU: 0.58, width: 1.5, height: 0.68 },
+  // Folds on the fold (G6): the attic dormer and the hanging key-sign ride
+  // the inn row's own crease — Reinhart's V-fold off a V-fold.
+  // (dormer mount dropped 0.66 -> 0.63: the child's glue edge runs ~0.030
+  // up the crease past its mount, and the pack's 0.66 left it 0.010 off the
+  // end of B's 0.68 crease — A11 glue-on-the-paper.)
+  { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.63, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.14 },
+  { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.16 },
+  // The first of a hundred keys standing proud of the great door AS the
+  // book opens. The pack's rotor form is GEARED-DEAD here (honest
+  // rejection, the s6 mech-37 precedent): any rivet-riding decoration on a
+  // wall-regime stage panel inherits the panel's late bloom and measures
+  // max/mean ~3.5-4.1 against the rotor family's 2.0 character ceiling
+  // (measured across phi 56..74 and spin/radius/restAt sweeps). A third
+  // small fold on the door crease keeps the beat kinetic with a family
+  // whose ceiling was calibrated on exactly this seat regime.
+  { id: 'ch1-key', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.1, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.11, height: 0.09 },
+  // PLANE C — the open gate (front, narrowest): the gates open toward the
+  // reader exactly when the spread opens. Its 0.376 panel x-reach + 0.02
+  // margin clears the kept key-board at boardD0 0.40 (bench C1).
+  { id: 'ch1-gate', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: 0.16, vDir: -1, phiDeg: 82, rhoDeg: 87.5, creaseU: 0.5, width: 0.76, height: 0.42 },
+  // The WELCOME RANK — innkeeper with lantern, spouse with the enchanted
+  // ledger, waving child, dog, die-cut as ONE linked chain and stood up
+  // frontal by a hidden strip under the floor (law L5). Tip radius 0.576;
+  // z band 0.23..0.57 clears the gate slab by 0.07 and the frieze by 0.09.
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21 },
   // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
   // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
   // open mid-ground meadow (where loose brass keys are already printed) carries
@@ -175,15 +214,11 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
   { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.07, height: 0.12 },
   { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
-  // FLOATING TIER (C3v2): the inn's coaching-yard deck — a BRIDGE platform,
-  // two mirror strut ranks (equal closed reach, qA===qB) carrying one deck
-  // across the gap between them. COMPOSITION SPREAD-D: raised on tall struts
-  // (rise 0.26) and widened by a lopsided glue split (0.30/0.14, qA 0.30) so
-  // the deck crest clears the inn's roofline and its struts show past the
-  // building on both sides — a rampart-terrace behind the inn instead of a
-  // flap the hero fully masks. Still sunk in the back lane so it owns its
-  // depth band (the inn nudged to apexZ 0.06 to drop its screen-top clear).
-  { id: 'ch1-yard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.3, glueR: 0.14, rise: 0.26, spans: [[-0.24, -0.19], [-0.17, -0.12]] }, strutB: { glueL: 0.14, glueR: 0.3, rise: 0.26, spans: [[-0.24, -0.19], [-0.17, -0.12]] }, qA: 0.28, qB: 0.28, deckZ0: -0.24, deckZ1: -0.12 },
+  // The old coaching-yard platform is RETIRED (riser-silhouette law: the
+  // full-span inn row buries it — struts behind a hero read as invisible
+  // scaffolding; pack Q2 approved, no gate requires a per-chapter platform
+  // post-E3). The fore-edge wall is KEPT at its station; its art is re-cut
+  // as the key-baluster courtyard frieze.
   { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
 ]
 
@@ -653,7 +688,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Once upon a time, in a stone-built city beneath a sleeping mountain, a young clerk of the merchant’s guild grew tired of selling things and resolved instead to make them. He apprenticed himself to the code-wrights of BlueNet, and his first great labor was an enchanted ledger for the Inn of a Hundred Keys — a book that knew every guest, every room, and every candle lit therein. And the innkeepers marveled, for nothing was ever lost again.",
     accents: ['#6a8f5f', '#b0603f', '#e8a978'],
     layers: CH1_LAYERS,
-    hero: 'ch1-inn', // vfold, sweep 0.85
+    hero: 'ch1-inn-row', // vfold, expected sweep ~0.8 (s1 stripflap / s3 child — rotation holds)
   },
   {
     spread: 3,
