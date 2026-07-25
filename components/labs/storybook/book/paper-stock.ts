@@ -25,9 +25,11 @@ export type KraftTint = {
   /** The shaded sibling (the panel turned away from the key light) —
    *  replaces the shared PAPER_SHADE_TINT fallback. */
   shade: string
-  /** A darker sibling for cut-edge hairlines on artless faces only — enough
-   *  step down from `lit`/`shade` that a piece's silhouette still separates
-   *  from a same-family neighbor mid-turn (D3 edge-legibility package). */
+  /** A paler core sibling for cut-edge hairlines on artless faces only — the
+   *  die-cut exposes the sheet's uninked core, so this jumps LIGHTER than
+   *  `lit`/`shade` (not darker); separation from a same-family neighbor
+   *  mid-turn now comes from the lightness jump, not darkness (D3
+   *  edge-legibility package). */
   edge: string
 }
 
@@ -48,9 +50,10 @@ const FAMILY_LIT: readonly StockHsl[] = [
 ]
 
 // Deltas measured off the original pair's own lit->shade step (~ -9% sat,
-// -10% light); the edge sibling pushes further down for hairline contrast.
+// -10% light); the edge sibling jumps lighter and slightly less saturated —
+// the pale core, not a hairline shadow.
 const SHADE_DELTA = { s: -0.09, l: -0.1 }
-const EDGE_DELTA = { s: 0.08, l: -0.34 }
+const EDGE_DELTA = { s: -0.12, l: 0.15 }
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 
