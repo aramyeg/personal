@@ -171,14 +171,21 @@ export function keepSlots(layer: SceneLayer & KeepStackGeom): Slot[] {
       slots.push({ artId: `${layer.id}-${g.key}-front`, uvs: new Float32Array(uvs), tint: PLAIN, hairline: false })
     }
   }
+  // DIE-CUT PIECES DRAW NO QUAD-BORDER HAIRLINE. A cut-edge hairline marks where
+  // the paper was cut; on a die-cut piece the cut runs INSIDE the quad, so tracing
+  // the quad border draws a box around the silhouette instead of along it. The
+  // balcony desk and the spire sails are both die-cut art, and at the pinned
+  // camera the three spire members' borders read as a wireframe CAGE around the
+  // spire (orchestrator eye-test round 1). Their true cut edge is carried by the
+  // baked pale rim in the art (T1/T-EDGE), which is what the ring pieces use.
   if (layer.balcony) {
     for (const uvs of BALCONY_DECK_UVS) {
-      slots.push({ artId: `${layer.id}-balcony`, uvs: new Float32Array(uvs), tint: PLAIN, hairline: true })
+      slots.push({ artId: `${layer.id}-balcony`, uvs: new Float32Array(uvs), tint: PLAIN, hairline: false })
     }
   }
   layer.spire?.members.forEach((_, i) => {
     for (const uvs of SPIRE_MEMBER_UVS) {
-      slots.push({ artId: `${layer.id}-spire-m${i}`, uvs: new Float32Array(uvs), tint: PLAIN, hairline: true })
+      slots.push({ artId: `${layer.id}-spire-m${i}`, uvs: new Float32Array(uvs), tint: PLAIN, hairline: false })
     }
   })
   if (layer.spire?.raven) {

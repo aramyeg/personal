@@ -20,6 +20,15 @@ import type { loadArtTexture as LoadArtTexture } from '@/components/labs/storybo
 // test resets the module registry and re-imports fresh — otherwise only
 // the first test's mocked manifest would ever be consulted.
 
+// Every wait below is for a MICROTASK chain (manifest promise -> loader call),
+// so it resolves in well under a millisecond of actual work. What it waits on in
+// practice is this worker finishing its first import of three.js, which on a
+// loaded machine has been measured at over 2s — past vi.waitFor's implicit 1s
+// timeout, which made this file flake in full-suite runs while passing alone.
+// The generous ceiling does not weaken any assertion: each one is a discrete
+// "did this fire" check that either happens or never will.
+const SETTLE = { timeout: 15000 } as const
+
 type ManifestResponse = { ok: boolean; json: () => Promise<string[]> }
 
 function mockManifestFetch(ids: readonly string[]): void {
@@ -75,7 +84,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     const onError = vi.fn()
     loadArtTexture('piece-a', onLoad, onError)
 
-    await vi.waitFor(() => expect(loader.callCount()).toBe(1))
+    await vi.waitFor(() => expect(loader.callCount()).toBe(1), SETTLE)
     const texture = new THREE.Texture()
     loader.resolve(0, texture)
 
@@ -93,7 +102,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     const onError = vi.fn()
     loadArtTexture('piece-a', onLoad, onError)
 
-    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1), SETTLE)
     expect(onLoad).not.toHaveBeenCalled()
     expect(loader.callCount()).toBe(0)
   })
@@ -120,7 +129,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     loadArtTexture('piece-a', onLoad2, onError2)
 
     // Only the live (second) call ever reaches the image loader.
-    await vi.waitFor(() => expect(loader.callCount()).toBe(1))
+    await vi.waitFor(() => expect(loader.callCount()).toBe(1), SETTLE)
     expect(onLoad1).not.toHaveBeenCalled()
     expect(onError1).not.toHaveBeenCalled()
 
@@ -150,7 +159,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     const onError = vi.fn()
     const { cancel } = loadArtTexture('piece-a', onLoad, onError)
 
-    await vi.waitFor(() => expect(loader.callCount()).toBe(1)) // manifest resolved, image request issued
+    await vi.waitFor(() => expect(loader.callCount()).toBe(1), SETTLE) // manifest resolved, image request issued
     cancel() // unmount while the image is still decoding
 
     const texture = new THREE.Texture()
@@ -169,7 +178,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     const onLoad = vi.fn()
     const { cancel } = loadArtTexture('piece-a', onLoad, vi.fn())
 
-    await vi.waitFor(() => expect(loader.callCount()).toBe(1))
+    await vi.waitFor(() => expect(loader.callCount()).toBe(1), SETTLE)
     loader.resolve(0)
     expect(onLoad).toHaveBeenCalledTimes(1)
 
@@ -184,7 +193,7 @@ describe('loadArtTexture cancel/dispose lifecycle', () => {
     const onError = vi.fn()
     const { cancel } = loadArtTexture('piece-a', vi.fn(), onError)
 
-    await vi.waitFor(() => expect(loader.callCount()).toBe(1))
+    await vi.waitFor(() => expect(loader.callCount()).toBe(1), SETTLE)
     cancel()
     loader.reject(0)
 

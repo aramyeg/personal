@@ -306,14 +306,19 @@ function KeepStackMeshedLayer({
             return deck ? { a: deck.deckL, b: deck.deckR } : null
           }}
           uvs={BALCONY_DECK_UVS}
+          // The desk is die-cut art: its cut runs inside the quad, so a
+          // quad-border hairline would box the silhouette (see the merged path).
+          alpha
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}
         />
       )}
       {/* THE FAN SPIRE — each M-fold member (two panels meeting at the shared
-          ridge crease) rides as one split painting, drawn like the box lids
-          (solid paper, cut-edge hairlines). Seated on the loft's flat lid. */}
+          ridge crease) rides as one split painting. Seated on the loft's flat lid.
+          The sails are DIE-CUT, so like the raven they draw no quad-border
+          hairline: three nested member borders read as a wireframe cage around
+          the spire at the pinned camera (eye-test round 1). */}
       {layer.spire?.members.map((_, i) => (
         <TwoQuadRide
           key={`spire-m${i}`}
@@ -323,6 +328,7 @@ function KeepStackMeshedLayer({
             return poses ? { a: poses[i].left, b: poses[i].right } : null
           }}
           uvs={SPIRE_MEMBER_UVS}
+          alpha
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}

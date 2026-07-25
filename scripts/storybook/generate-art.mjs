@@ -215,7 +215,7 @@ function lanternTop(a, lw, v0, lh) {
  *  (the amber traffic light) plus a perch bar, a bird in the opening and a
  *  lamplight pool spilling down the wall; unlit it is an ink recess. Both carry
  *  a parchment hood mould and sill so the rank reads as cut stone. */
-function ravenPortal(bx, by, bw, bh, lit) {
+function ravenPortal(bx, by, bw, bh, lit, boost = 0) {
   const sy = by - bh * 0.5
   const apex = by - bh
   const cy = lerp(sy, apex, 0.55)
@@ -223,8 +223,17 @@ function ravenPortal(bx, by, bw, bh, lit) {
     `M ${fx(bx)} ${fx(by)} L ${fx(bx)} ${fx(sy)} Q ${fx(bx)} ${fx(cy)} ${fx(bx + bw / 2)} ${fx(apex)} ` +
     `Q ${fx(bx + bw)} ${fx(cy)} ${fx(bx + bw)} ${fx(sy)} L ${fx(bx + bw)} ${fx(by)} Z`
   let s = ''
-  if (lit) s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx(by + bh * 0.3)}" rx="${fx(bw * 1.3)}" ry="${fx(bh * 0.4)}" fill="${ROOK.amber}" opacity="0.22"/>`
+  // `boost` is the ring-MID / gatehouse strength (eye-review r1): a soft HALO
+  // bleeding onto the surrounding slate plus a brighter core, so "multiplicity
+  // as light" survives at the pinned camera. Rear rows pass boost 0 and stay dim.
+  if (lit && boost > 0) {
+    s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx(by - bh * 0.3)}" rx="${fx(bw * (1.3 + boost * 0.55))}" ry="${fx(bh * (0.78 + boost * 0.3))}" fill="url(#rookHalo)" opacity="${(0.26 + boost * 0.14).toFixed(2)}"/>`
+  }
+  if (lit) s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx(by + bh * 0.3)}" rx="${fx(bw * (1.3 + boost * 0.4))}" ry="${fx(bh * (0.4 + boost * 0.14))}" fill="${ROOK.amber}" opacity="${(0.22 + boost * 0.1).toFixed(2)}"/>`
   s += `<path d="${arch}" fill="${lit ? 'url(#rookGlow)' : ROOK.ink}"/>`
+  if (lit && boost > 0) {
+    s += `<ellipse cx="${fx(bx + bw / 2)}" cy="${fx(lerp(sy, apex, 0.35))}" rx="${fx(bw * 0.3)}" ry="${fx(bh * 0.18)}" fill="${ROOK.amberLit}" opacity="${(0.42 + boost * 0.16).toFixed(2)}"/>`
+  }
   if (lit) {
     const rw = bw * 0.34
     s += `<rect x="${fx(bx + bw * 0.1)}" y="${fx(by - bh * 0.28)}" width="${fx(bw * 0.8)}" height="${fx(Math.max(1.2, bh * 0.045))}" fill="${ROOK.ink}" opacity="0.7"/>`
@@ -246,10 +255,15 @@ function dovecoteFacade({ seed, w, h, variant = 'flank', blocks = 5, mirror = fa
   const X = (u) => u * w
   const Y = (v) => (1 - v) * h
   const CAP_V = 0.975 // the outline MUST stay inside the unit square (shaped-mesh contract)
+  // `litP` / `litClump` = the chance a portal is lit, and the chance it is lit
+  // GIVEN its neighbour was (which is what keeps the traffic clumped rather
+  // than a regular pattern). Eye-review r1 graded these: the rear flank rows
+  // stay at the pack's 1-in-5, the ring-MID arms rise to ~1-in-3 and carry a
+  // glow `boost`, so the ring reads as one sweeping form brightening forward.
   const PROF = {
-    flank: { lo: 0.46, hi: 0.63, tower: 0.79, rows: 1, pMin: 4, pMax: 6, th: 0.13, rh: 0.18, teeth: 11 },
-    ringMid: { lo: 0.54, hi: 0.7, tower: 0.8, rows: 2, pMin: 5, pMax: 6, th: 0.11, rh: 0.17, teeth: 13 },
-    ringFront: { lo: 0.32, hi: 0.42, tower: 0.5, rows: 1, pMin: 4, pMax: 5, th: 0.1, rh: 0.24, teeth: 15 },
+    flank: { lo: 0.46, hi: 0.63, tower: 0.79, rows: 1, pMin: 4, pMax: 6, th: 0.13, rh: 0.18, teeth: 11, litP: 0.2, litClump: 0.44, boost: 0 },
+    ringMid: { lo: 0.54, hi: 0.7, tower: 0.8, rows: 2, pMin: 5, pMax: 6, th: 0.11, rh: 0.17, teeth: 13, litP: 0.3, litClump: 0.56, boost: 0.85 },
+    ringFront: { lo: 0.32, hi: 0.42, tower: 0.5, rows: 1, pMin: 4, pMax: 5, th: 0.1, rh: 0.24, teeth: 15, litP: 0.2, litClump: 0.44, boost: 0.4 },
   }[variant]
   const facing = mirror ? 'right' : 'left'
   /** Birds per zone, sized in pixels so every strip aspect gets the same build. */
@@ -415,9 +429,9 @@ function dovecoteFacade({ seed, w, h, variant = 'flank', blocks = 5, mirror = fa
         const t = b.perRow === 1 ? 0.5 : k / (b.perRow - 1)
         const cu = lerp(b.x0 + pW * 0.95, b.x1 - pW * 0.95, t)
         const roll = pr()
-        const lit = roll < 0.2 || (litPrev && roll < 0.44)
+        const lit = roll < PROF.litP || (litPrev && roll < PROF.litClump)
         litPrev = lit
-        s += ravenPortal(X(cu - pW / 2), Y(sillV), X(pW), pH * h, lit)
+        s += ravenPortal(X(cu - pW / 2), Y(sillV), X(pW), pH * h, lit, b.far ? PROF.boost * 0.4 : PROF.boost)
       }
     }
     s += `</g>`
@@ -444,6 +458,11 @@ function dovecoteFacade({ seed, w, h, variant = 'flank', blocks = 5, mirror = fa
         <stop offset="0" stop-color="${ROOK.amberLit}"/>
         <stop offset="0.5" stop-color="${ROOK.amber}"/>
         <stop offset="1" stop-color="${ROOK.amberDeep}"/>
+      </radialGradient>
+      <radialGradient id="rookHalo" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="${ROOK.amberLit}" stop-opacity="0.85"/>
+        <stop offset="0.4" stop-color="${ROOK.amber}" stop-opacity="0.44"/>
+        <stop offset="1" stop-color="${ROOK.amber}" stop-opacity="0"/>
       </radialGradient>
       <linearGradient id="rookShade" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.14"/>
@@ -3083,28 +3102,39 @@ function ringTower(w, h, seed) {
   const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
 
   let g = `<g clip-path="url(#towerCut)">`
-  g += `<rect width="${w}" height="${h}" fill="${ROOK.slate}"/>`
-  // shaft shading: lit spine-side reveal, shadowed fore-side
-  g += `<rect x="${fx(X(0.18))}" y="0" width="${fx(X(0.05))}" height="${h}" fill="${ROOK.slateLit}" opacity="0.5"/>`
-  g += `<rect x="${fx(X(0.74))}" y="0" width="${fx(X(0.08))}" height="${h}" fill="${ROOK.ink}" opacity="0.22"/>`
+  // Eye-review r1: the tower could not be picked out at full size because it
+  // stands in front of the keep's MID-GREY slate lower facade in its own
+  // mid-grey slate. The body now sits a full step DARKER (slateDim over a
+  // slateDeep fore-side) with a crisp pale reveal down its spine-side, so the
+  // silhouette separates from its backdrop by value, not just by outline.
+  g += `<rect width="${w}" height="${h}" fill="${ROOK.slateDim}"/>`
+  g += `<rect x="${fx(X(0.18))}" y="0" width="${fx(X(0.09))}" height="${h}" fill="${ROOK.slateLit}" opacity="0.55"/>`
+  g += `<rect x="${fx(X(0.18))}" y="0" width="${fx(X(0.028))}" height="${h}" fill="${ROOK.parchDim}" opacity="0.75"/>`
+  g += `<rect x="${fx(X(0.66))}" y="0" width="${fx(X(0.16))}" height="${h}" fill="${ROOK.slateDeep}" opacity="0.62"/>`
+  g += `<rect x="${fx(X(0.78))}" y="0" width="${fx(X(0.04))}" height="${h}" fill="${ROOK.ink}" opacity="0.4"/>`
   // ashlar coursing up the shaft
   for (let cy = h; cy > Y(0.6); cy -= h * 0.036) {
-    g += `<line x1="${fx(X(0.06))}" y1="${fx(cy)}" x2="${fx(X(0.94))}" y2="${fx(cy)}" stroke="${ROOK.ink}" stroke-width="1.4" opacity="${(0.16 + r() * 0.14).toFixed(2)}"/>`
+    g += `<line x1="${fx(X(0.06))}" y1="${fx(cy)}" x2="${fx(X(0.94))}" y2="${fx(cy)}" stroke="${ROOK.ink}" stroke-width="1.4" opacity="${(0.22 + r() * 0.16).toFixed(2)}"/>`
   }
   // plinth + corbel band
-  g += `<rect x="${fx(X(0.06))}" y="${fx(Y(0.09))}" width="${fx(X(0.88))}" height="${fx(Y(0.05) - Y(0.09))}" fill="${ROOK.slateDim}"/>`
-  g += `<rect x="${fx(X(0.1))}" y="${fx(Y(0.58))}" width="${fx(X(0.8))}" height="${fx(Math.max(3, h * 0.012))}" fill="${ROOK.parchDim}" opacity="0.7"/>`
-  // stacked portal ranks — 5 tiers of 2, a scattered fifth lit
+  g += `<rect x="${fx(X(0.06))}" y="${fx(Y(0.09))}" width="${fx(X(0.88))}" height="${fx(Y(0.05) - Y(0.09))}" fill="${ROOK.slateDeep}"/>`
+  g += `<rect x="${fx(X(0.06))}" y="${fx(Y(0.09))}" width="${fx(X(0.88))}" height="${fx(Math.max(2, h * 0.008))}" fill="${ROOK.parchDim}" opacity="0.8"/>`
+  g += `<rect x="${fx(X(0.1))}" y="${fx(Y(0.58))}" width="${fx(X(0.8))}" height="${fx(Math.max(3, h * 0.016))}" fill="${ROOK.parchDim}" opacity="0.88"/>`
+  // stacked portal ranks — 5 tiers of 2, boosted glow and more of them lit so
+  // the gatehouse is legible as a lit dovecote and not as furniture.
   const pw = 0.145
   const ph = 0.12
   let litPrev = false
   for (const sillV of [0.15, 0.26, 0.37, 0.48, 0.55]) {
-    g += `<rect x="${fx(X(0.18))}" y="${fx(Y(sillV) + Math.max(2, h * 0.006))}" width="${fx(X(0.64))}" height="${fx(Math.max(2, h * 0.006))}" fill="${ROOK.parchDim}" opacity="0.5"/>`
+    g += `<rect x="${fx(X(0.18))}" y="${fx(Y(sillV) + Math.max(2, h * 0.006))}" width="${fx(X(0.64))}" height="${fx(Math.max(2, h * 0.008))}" fill="${ROOK.parchDim}" opacity="0.65"/>`
     for (const cu of [0.35, 0.65]) {
       const roll = r()
-      const lit = roll < 0.24 || (litPrev && roll < 0.5)
+      // the tower is only TWO portals wide, so neighbouring halos overlap hard —
+      // a small boost here, and the legibility comes from the crown lantern and
+      // the body's value step instead of from flooding the shaft with amber
+      const lit = roll < 0.26 || (litPrev && roll < 0.42)
       litPrev = lit
-      g += ravenPortal(X(cu - pw / 2), Y(sillV), X(pw), ph * h, lit)
+      g += ravenPortal(X(cu - pw / 2), Y(sillV), X(pw), ph * h, lit, 0.2)
     }
   }
   // crenellated cap merlons
@@ -3112,19 +3142,24 @@ function ringTower(w, h, seed) {
     const tw = (z1 - z0) / 5
     for (let t = 0; t < 3; t++) {
       const mx = X(z0 + t * 2 * tw)
-      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Y(0.6) - Y(0.68))}" fill="${ROOK.slate}"/>`
-      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Math.max(2, h * 0.006))}" fill="${ROOK.slateLit}" opacity="0.75"/>`
+      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Y(0.6) - Y(0.68))}" fill="${ROOK.slateDim}"/>`
+      g += `<rect x="${fx(mx)}" y="${fx(Y(0.68))}" width="${fx(X(tw))}" height="${fx(Math.max(2, h * 0.008))}" fill="${ROOK.rim}" opacity="0.85"/>`
     }
   }
-  // the CROWN LANTERN, amber, with its own glow pool on the cap
-  g += `<ellipse cx="${fx(X(0.5))}" cy="${fx(Y(0.64))}" rx="${fx(X(0.44))}" ry="${fx(h * 0.03)}" fill="${ROOK.amber}" opacity="0.24"/>`
-  g += `<rect x="${fx(X(0.46))}" y="${fx(Y(0.7))}" width="${fx(X(0.08))}" height="${fx(Y(0.6) - Y(0.7))}" fill="${ROOK.slateDim}"/>`
-  g += `<rect x="${fx(X(0.4))}" y="${fx(Y(0.834))}" width="${fx(X(0.2))}" height="${fx(Y(0.7) - Y(0.834))}" fill="url(#rookGlow)"/>`
-  g += `<rect x="${fx(X(0.4))}" y="${fx(Y(0.834))}" width="${fx(X(0.2))}" height="${fx(Y(0.7) - Y(0.834))}" fill="none" stroke="${ROOK.ink}" stroke-width="2" opacity="0.7"/>`
-  g += `<line x1="${fx(X(0.5))}" y1="${fx(Y(0.834))}" x2="${fx(X(0.5))}" y2="${fx(Y(0.7))}" stroke="${ROOK.ink}" stroke-width="1.6" opacity="0.55"/>`
-  // the raven perched on the lantern (the contour already cut its silhouette)
+  // the CROWN LANTERN — the tower's signature (pack 4e), so it is genuinely
+  // bright: a wide halo washing the whole cap, then the amber box, then a
+  // white-hot core. This is what the reader should pick out at full size.
+  g += `<ellipse cx="${fx(X(0.5))}" cy="${fx(Y(0.735))}" rx="${fx(X(0.62))}" ry="${fx(h * 0.085)}" fill="url(#rookHalo)" opacity="0.6"/>`
+  g += `<ellipse cx="${fx(X(0.5))}" cy="${fx(Y(0.632))}" rx="${fx(X(0.34))}" ry="${fx(h * 0.026)}" fill="${ROOK.amber}" opacity="0.34"/>`
+  g += `<rect x="${fx(X(0.46))}" y="${fx(Y(0.7))}" width="${fx(X(0.08))}" height="${fx(Y(0.6) - Y(0.7))}" fill="${ROOK.slateDeep}"/>`
+  g += `<rect x="${fx(X(0.38))}" y="${fx(Y(0.84))}" width="${fx(X(0.24))}" height="${fx(Y(0.695) - Y(0.84))}" fill="url(#rookGlow)"/>`
+  g += `<ellipse cx="${fx(X(0.5))}" cy="${fx(Y(0.775))}" rx="${fx(X(0.038))}" ry="${fx(h * 0.023)}" fill="${ROOK.rim}" opacity="0.85"/>`
+  g += `<rect x="${fx(X(0.38))}" y="${fx(Y(0.84))}" width="${fx(X(0.24))}" height="${fx(Y(0.695) - Y(0.84))}" fill="none" stroke="${ROOK.ink}" stroke-width="2.6" opacity="0.85"/>`
+  g += `<line x1="${fx(X(0.5))}" y1="${fx(Y(0.84))}" x2="${fx(X(0.5))}" y2="${fx(Y(0.695))}" stroke="${ROOK.ink}" stroke-width="1.8" opacity="0.6"/>`
+  // the raven perched on the lantern (the contour already cut its silhouette):
+  // solid ink against the lit lantern below it, so the bird reads as a shape.
   g += `<rect x="${fx(X(0.33))}" y="${fx(Y(0.995))}" width="${fx(X(0.34))}" height="${fx(Y(0.83) - Y(0.995))}" fill="${ROOK.ink}"/>`
-  g += `<circle cx="${fx(X(0.3375 + 0.325 * 0.17))}" cy="${fx(Y(TOWER_RAVEN_V0 + TOWER_RAVEN_H * 0.93))}" r="${fx(Math.max(1.8, h * 0.011))}" fill="${ROOK.amberLit}"/>`
+  g += `<circle cx="${fx(X(0.3375 + 0.325 * 0.17))}" cy="${fx(Y(TOWER_RAVEN_V0 + TOWER_RAVEN_H * 0.93))}" r="${fx(Math.max(2, h * 0.013))}" fill="${ROOK.amberLit}"/>`
   g += `<rect width="${w}" height="${h}" fill="url(#rookShade)"/>`
   g += `</g>`
 
@@ -3133,12 +3168,18 @@ function ringTower(w, h, seed) {
     `<radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">` +
     `<stop offset="0" stop-color="${ROOK.amberLit}"/><stop offset="0.5" stop-color="${ROOK.amber}"/>` +
     `<stop offset="1" stop-color="${ROOK.amberDeep}"/></radialGradient>` +
+    `<radialGradient id="rookHalo" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${ROOK.amberLit}" stop-opacity="0.85"/>` +
+    `<stop offset="0.4" stop-color="${ROOK.amber}" stop-opacity="0.44"/>` +
+    `<stop offset="1" stop-color="${ROOK.amber}" stop-opacity="0"/></radialGradient>` +
     `<linearGradient id="rookShade" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.14"/>` +
     `<stop offset="0.5" stop-color="#000000" stop-opacity="0"/>` +
     `<stop offset="1" stop-color="${ROOK.ink}" stop-opacity="0.4"/></linearGradient>`
 
-  return svgPiece(w, h, g + rookRim(d, 5), defs)
+  // a wider pale core-edge rim than the flanks get: this piece must hold its
+  // own silhouette against the keep's facade directly behind it.
+  return svgPiece(w, h, g + rookRim(d, 6.5), defs)
 }
 
 // ---- THE ROOKERY'S OUTER YARD WALL (ch3-fringe, foreground vfold, very wide/
@@ -3242,114 +3283,230 @@ function postRoadSpread(w, h, seed) {
   const PY = (f) => f * h
   const WALNUT = '#5c4526'
   const WALNUT_LT = '#7d6238'
+  const WALNUT_DK = '#38290f'
   const clampNum = (x, a, b) => Math.min(b, Math.max(a, x))
+  /** Opacities need 2dp: fx() is a 1dp PIXEL formatter and silently rounds
+   *  anything under 0.05 to "0.0" (which is what made the paper tooth and the
+   *  raven shadows invisible in the pre-review bake). */
+  const op = (n) => clampNum(n, 0, 1).toFixed(2)
 
-  // ---- the post-road's centreline: the RIGHT page's fore edge -> the apron ->
-  // the court between the ring's front arms -> the keep's gate at the spine.
-  const CTRL = [[1.02, 0.9], [0.86, 0.99], [0.6, 0.95], [0.5, 0.735]]
+  // ---- the post-road's centreline. Eye-review r1 REROUTED it: the old curve
+  // dipped to y 0.95-0.99, i.e. behind the fringe yard wall (which occludes
+  // y 0.900-0.940) and into the page's most foreshortened band, so almost none
+  // of it survived at the pinned camera and it never climbed into the court.
+  // It now sweeps in at the right fore edge, runs OUTSIDE the sorting desk,
+  // threads between the desk and the gatehouse tower foot, enters the open
+  // court and dies into the keep's gate at the spine — every waypoint
+  // registered to where a 3D piece actually meets the page.
+  const WAY = [
+    [1.05, 0.918], // off the fore edge, so the road runs off-page rather than starting
+    [0.97, 0.9], // enters at the right apron
+    [0.82, 0.86], // past outside the dispatch desk (centre 0.761, 0.740)
+    [0.68, 0.8], // between the desk and the gatehouse foot (0.630-0.683, 0.753)
+    [0.58, 0.76], // entering the open court (0.435-0.565, 0.740-1.0)
+    [0.5, 0.735], // dies into the KEEP GATE at the spine (0.50, 0.73)
+  ]
+  /** Catmull-Rom through WAY with duplicated endpoints — unlike the old single
+   *  cubic it passes through EVERY waypoint exactly, which is what the road
+   *  registration proof samples. */
   const road = (t) => {
-    const mt = 1 - t
-    return [0, 1].map(
-      (k) =>
-        mt * mt * mt * CTRL[0][k] + 3 * mt * mt * t * CTRL[1][k] + 3 * mt * t * t * CTRL[2][k] + t * t * t * CTRL[3][k]
-    )
+    const n = WAY.length - 1
+    const u = clampNum(t, 0, 1) * n
+    const i = Math.min(n - 1, Math.floor(u))
+    const f = u - i
+    const P = (k) => WAY[clampNum(k, 0, n)]
+    const p0 = P(i - 1)
+    const p1 = P(i)
+    const p2 = P(i + 1)
+    const p3 = P(i + 2)
+    return [0, 1].map((k) => {
+      const a = 2 * p1[k]
+      const b = p2[k] - p0[k]
+      const c = 2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]
+      const dd = -p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]
+      return 0.5 * (a + b * f + c * f * f + dd * f * f * f)
+    })
   }
-  const roadHalf = (t) => lerp(0.075, 0.022, t) // perspective taper toward the gate
+  /** Half-width in image-HEIGHT fractions: full width 0.124 at the apron down
+   *  to 0.066 at the gate (pack: generous, perspective-tapered). */
+  const roadHalf = (t) => lerp(0.062, 0.033, t)
   /** Centre + the half-width offset along the centreline's normal, taken in a
    *  SQUARE metric and converted back to image fractions so the band keeps a
-   *  constant width on a 3:2 page instead of pinching on the diagonal. */
-  const roadFrame = (t) => {
+   *  constant width on a 3:2 page instead of pinching on the diagonal. `k`
+   *  scales the width (gutter lines inside the bed, kerb stones outside it). */
+  const roadFrame = (t, k = 1) => {
     const [cx, cy] = road(t)
     const [nx, ny] = road(Math.min(1, t + 0.008))
     const dxs = (nx - cx) * (w / h)
     const dys = ny - cy
     const L = Math.hypot(dxs, dys) || 1
-    const hw = roadHalf(t)
+    const hw = roadHalf(t) * k
     return { cx, cy, px: ((-dys / L) * hw * h) / w, py: (dxs / L) * hw }
   }
+  const N = 76
+  /** The road's two edge polylines at width scale `k`, in image fractions. */
+  const edgesAt = (k) => {
+    const eL = []
+    const eR = []
+    for (let i = 0; i <= N; i++) {
+      const { cx, cy, px, py } = roadFrame(i / N, k)
+      eL.push([cx + px, cy + py])
+      eR.push([cx - px, cy - py])
+    }
+    return [eL, eR]
+  }
+  const poly = (pts) => 'M ' + pts.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')
 
   let s = `<g>`
   s += `<rect width="${w}" height="${h}" fill="${ROOK.parch}"/>`
   // laid-paper tooth
   for (let i = 0; i < 170; i++) {
     const y = rr(r, 0, h)
-    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${WALNUT}" stroke-width="1" opacity="${fx(rr(r, 0.02, 0.05))}"/>`
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${WALNUT}" stroke-width="1" opacity="${op(rr(r, 0.03, 0.07))}"/>`
   }
   // the far half hazes out so the deep flank stations recede
   s += `<rect width="${w}" height="${fx(h * 0.36)}" fill="url(#pageHaze)"/>`
 
-  // ---- THE RADIAL STATIONS painted on the yard: concentric arcs about the keep
-  // at the spine, the amphitheater's own geometry (ORDER) laid into the ground.
-  for (const [z, dash] of [[-0.52, '20 16'], [-0.38, '16 14'], [-0.16, '13 12'], [0.12, '11 11'], [0.575, '9 10']]) {
-    const fy = pageFY(z)
-    const rise = 0.09 - (z + 0.75) * 0.045
-    s += `<path d="M 0 ${fx(PY(fy - rise * 0.55))} Q ${fx(PX(0.5))} ${fx(PY(fy + rise))} ${w} ${fx(PY(fy - rise * 0.55))}" fill="none" stroke="${WALNUT}" stroke-width="2.6" stroke-dasharray="${dash}" opacity="0.28"/>`
-  }
+  // ---- THE RADIAL STATIONS: eye-review r1 KILLED these. Five dashed arcs
+  // across the yard read at the pinned camera as sewing guides, not
+  // architecture, and the plaza's far kerb below now states the ring's
+  // recession properly. Nothing replaces them; the bare yard behind the plaza
+  // is the point (the rookery's ground only becomes paved at the court).
   // the gutter: a soft valley shadow down the spine
   s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#pageGutter)"/>`
 
-  // ---- LAMPLIGHT POOLS beneath the ranks of lit portals: the three flank rows,
-  // the ring-mid arms and the gate wall. Jittered along their station arc so
-  // they read as scattered live traffic, never as a printed row.
-  for (const [z, n] of [[-0.52, 5], [-0.38, 4], [-0.16, 4], [0.12, 3], [0.575, 2]]) {
-    for (const side of ['left', 'right']) {
-      for (let k = 0; k < n; k++) {
-        const radial = lerp(0.2, PAGE_W_U * 0.94, (k + rr(r, 0.15, 0.85)) / n)
-        const fy = pageFY(z + rr(r, 0.01, 0.05))
-        const rad = rr(r, 0.03, 0.07)
-        s += `<ellipse cx="${fx(PX(pageFX(radial, side)))}" cy="${fx(PY(fy))}" rx="${fx(PX(rad * 0.62))}" ry="${fx(PY(rad * 0.3))}" fill="url(#pagePool)" opacity="${fx(rr(r, 0.4, 0.75))}"/>`
-      }
+  // ---- THE COURT / PLAZA (pack risk R2's paint-first mitigant). ONE
+  // continuous radial apron that all nine dovecote facades stand on, so the
+  // flanks stop reading as scattered islands. Its outer arc passes through BOTH
+  // ring-MID arm feet (x 0.19 and 0.81 at y 0.58) and its near edge opens
+  // toward the reader; flagging radiates from the gate, which is the ring's
+  // own centre, so the paving states the amphitheater's geometry.
+  const GX = 0.5
+  const GY = 0.735
+  // The plaza's ONLY drawn boundary is its far arc — its flanks and near edge
+  // run off the image, so it reads as GROUND rather than as a grey tray sitting
+  // on the page (which is what a full closed kerb looked like on first bake).
+  const PLAZA_FAR =
+    `M ${fx(PX(0.045))} ${fx(PY(0.665))} ` +
+    `C ${fx(PX(0.1))} ${fx(PY(0.602))} ${fx(PX(0.15))} ${fx(PY(0.586))} ${fx(PX(0.19))} ${fx(PY(0.58))} ` +
+    `C ${fx(PX(0.36))} ${fx(PY(0.523))} ${fx(PX(0.64))} ${fx(PY(0.523))} ${fx(PX(0.81))} ${fx(PY(0.58))} ` +
+    `C ${fx(PX(0.85))} ${fx(PY(0.586))} ${fx(PX(0.9))} ${fx(PY(0.602))} ${fx(PX(0.955))} ${fx(PY(0.665))}`
+  const PLAZA_D = `${PLAZA_FAR} L ${fx(PX(1.03))} ${fx(PY(1.06))} L ${fx(PX(-0.03))} ${fx(PY(1.06))} Z`
+  const pol = (th, rho) => [GX + Math.cos(th) * rho * 0.47, GY - Math.sin(th) * rho * 0.31]
+  s += `<g clip-path="url(#plazaCut)">`
+  s += `<path d="${PLAZA_D}" fill="${ROOK.slate}" opacity="0.12"/>`
+  s += `<path d="${PLAZA_D}" fill="url(#plazaShade)" opacity="0.4"/>`
+  // Flagging radiating from the gate — the ring's own centre — so the paving
+  // states the amphitheater's geometry. Drawn as BROKEN joints (short dashes
+  // with gaps) because continuous spokes and full circles read as a wireframe.
+  for (let k = 0; k < 30; k++) {
+    const th = (k / 30) * Math.PI * 2 + 0.07
+    for (const [r0, r1] of [[0.2, 0.44], [0.52, 0.74], [0.82, 1.06], [1.14, 1.44]]) {
+      const [ax, ay] = pol(th, rr(r, r0, r0 + 0.05))
+      const [bx2, by2] = pol(th, rr(r, r1 - 0.05, r1))
+      s += `<line x1="${fx(PX(ax))}" y1="${fx(PY(ay))}" x2="${fx(PX(bx2))}" y2="${fx(PY(by2))}" stroke="${WALNUT}" stroke-width="1.4" opacity="${op(rr(r, 0.09, 0.16))}"/>`
     }
   }
-
-  // ---- THE COBBLED POST-ROAD ----
-  const N = 60
-  const edgeL = []
-  const edgeR = []
-  for (let i = 0; i <= N; i++) {
-    const { cx, cy, px, py } = roadFrame(i / N)
-    edgeL.push([cx + px, cy + py])
-    edgeR.push([cx - px, cy - py])
-  }
-  const bandD =
-    'M ' +
-    edgeL.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ') +
-    ' L ' +
-    [...edgeR].reverse().map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ') +
-    ' Z'
-  s += `<path d="${bandD}" fill="${ROOK.slate}" opacity="0.44"/>`
-  s += `<path d="${bandD}" fill="url(#roadShade)" opacity="0.5"/>`
-  s += `<g clip-path="url(#roadCut)">`
-  // cobble courses: a band of stones ACROSS the road every step, staggered
-  const rows = 38
-  for (let i = 0; i <= rows; i++) {
-    const t = i / rows
-    const { cx, cy, px, py } = roadFrame(t)
-    const stones = 6
-    for (let c = 0; c < stones; c++) {
-      const o = ((c + 0.5) / stones - 0.5) * 2 + (i % 2 ? 1 / stones : 0)
-      const sx = cx + px * o
-      const sy = cy + py * o
-      const rx = Math.hypot(px * w, py * h) / stones
-      s += `<ellipse cx="${fx(PX(sx))}" cy="${fx(PY(sy))}" rx="${fx(rx * 0.92)}" ry="${fx(rx * 0.66)}" fill="none" stroke="${WALNUT}" stroke-width="1.9" opacity="0.42"/>`
+  for (const rho of [0.32, 0.54, 0.76, 0.98, 1.2, 1.42]) {
+    for (let seg = 0; seg < 22; seg++) {
+      const th0 = (seg / 22) * Math.PI * 2 + rr(r, 0.01, 0.05)
+      const pts = []
+      for (let k = 0; k <= 6; k++) pts.push(pol(th0 + (k / 6) * (Math.PI * 2 / 22) * 0.8, rho))
+      s += `<path d="${poly(pts)}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="${op(rr(r, 0.09, 0.16))}"/>`
     }
   }
   s += `</g>`
-  // kerbs: a light stone edge on the lit side, a walnut shadow on the other
-  s += `<path d="M ${edgeL.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')}" fill="none" stroke="${WALNUT_LT}" stroke-width="4" opacity="0.55"/>`
-  s += `<path d="M ${edgeR.map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')}" fill="none" stroke="${WALNUT}" stroke-width="4.5" opacity="0.5"/>`
-  // the gate mouth the road dies into, at the spine
-  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.028))}" ry="${fx(PY(0.022))}" fill="${ROOK.ink}" opacity="0.3"/>`
-  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.028))}" ry="${fx(PY(0.022))}" fill="none" stroke="${WALNUT}" stroke-width="2.4" opacity="0.45"/>`
+  // NO CONTINUOUS KERB. Eye-review r1 round 2: a single stroke along PLAZA_FAR ran
+  // unbroken across the whole page and, with the pale fill above, made the plaza
+  // read as an outlined oval sticker laid on the parchment — the same "grey tray"
+  // failure in the other value direction. A reader must never be able to point at
+  // where the ground ends. What remains is the graded fill plus BROKEN kerb
+  // segments only where a facade foot actually meets the arc, so the edge is
+  // implied by the architecture standing on it.
+  for (const [kx, khw] of [[0.2525, 0.062], [0.7475, 0.062]]) {
+    const seg = []
+    for (let k = 0; k <= 8; k++) {
+      const t = kx - khw + (k / 8) * khw * 2
+      // follow the far arc's own local curve (a parabola through the mid feet)
+      seg.push([t, 0.58 - 0.057 * (1 - ((t - 0.5) / 0.31) ** 2)])
+    }
+    const segD = seg.map(([a, b], i) => `${i ? 'L' : 'M'} ${fx(PX(a))} ${fx(PY(b))}`).join(' ')
+    s += `<path d="${segD}" fill="none" stroke="${WALNUT_LT}" stroke-width="2.6" opacity="0.26"/>`
+  }
+
+  // ---- COBBLED SPURS: a SHORT paved ramp tying each facade foot to the plaza,
+  // so no dovecote reads as an island. Deliberately small and quiet — at full
+  // length these became grey planks flying across the page.
+  //
+  // ONLY THE FEET THAT ACTUALLY STAND ON THE PLAZA get one. Eye-review r1 round 2:
+  // spurs were also emitted for the six REAR rows (y 0.153/0.247/0.393), which sit
+  // UPSTAGE of the plaza's far arc (y ~0.52-0.58) — so each was a grey striped
+  // quad marooned on bare parchment, joining nothing, and they read as debris
+  // scattered among the raven shadows. The rear rim's connection to the ground is
+  // the aerial-recession wash and its own lamplight pools, not paving: a far rim
+  // seen across a court does not show its kerbstones.
+  const SPURS = [
+    [0.2525, 0.58, 0.036], // ring-MID left arm foot (0.196-0.309)
+    [0.7475, 0.58, 0.036], // ring-MID right arm foot (0.691-0.804)
+    [0.6565, 0.753, 0.024], // gatehouse tower foot (0.630-0.683)
+    [0.2195, 0.883, 0.03], // ring-FRONT gate wall foot (0.178-0.261)
+  ]
+  for (const [sfx, sfy, hwF] of SPURS) {
+    const dx = GX - sfx
+    const dy = GY - sfy
+    const L = Math.hypot(dx, dy) || 1
+    const reach = 0.05 // fixed short reach toward the gate, in image fractions
+    const ex = sfx + (dx / L) * reach
+    const ey = sfy + (dy / L) * reach
+    const hwE = hwF * 0.6
+    const d =
+      `M ${fx(PX(sfx - hwF))} ${fx(PY(sfy))} L ${fx(PX(sfx + hwF))} ${fx(PY(sfy))} ` +
+      `L ${fx(PX(ex + hwE))} ${fx(PY(ey))} L ${fx(PX(ex - hwE))} ${fx(PY(ey))} Z`
+    s += `<path d="${d}" fill="${ROOK.slateDim}" opacity="0.16"/>`
+    for (let k = 1; k <= 2; k++) {
+      const t = k / 3
+      const cxs = lerp(sfx, ex, t)
+      const hwT = lerp(hwF, hwE, t)
+      s += `<line x1="${fx(PX(cxs - hwT))}" y1="${fx(PY(lerp(sfy, ey, t)))}" x2="${fx(PX(cxs + hwT))}" y2="${fx(PY(lerp(sfy, ey, t)))}" stroke="${WALNUT}" stroke-width="1.5" opacity="0.24"/>`
+    }
+  }
+
+  // ---- LAMPLIGHT POOLS. Eye-review r1: these were scattered by a generic
+  // radial sweep and came out near-invisible. They are now REGISTERED to where
+  // the lit portals actually stand on the page (the pack's footprint table) and
+  // graded — brightest under the two ring-MID arms and the gatehouse, dim at
+  // the back — so the light itself carries the ring's sweep.
+  const POOLS = [
+    { x0: 0.196, x1: 0.309, y: 0.586, n: 3, rx: 0.032, ry: 0.02, o: 0.92 }, // ring-MID left arm feet
+    { x0: 0.691, x1: 0.804, y: 0.586, n: 3, rx: 0.032, ry: 0.02, o: 0.92 }, // ring-MID right arm feet
+    { x0: 0.178, x1: 0.261, y: 0.884, n: 2, rx: 0.028, ry: 0.014, o: 0.72 }, // ring-FRONT gate wall foot
+    { x0: 0.2, x1: 0.44, y: 0.4, n: 2, rx: 0.026, ry: 0.014, o: 0.44 }, // flank-near rows
+    { x0: 0.56, x1: 0.8, y: 0.4, n: 2, rx: 0.026, ry: 0.014, o: 0.44 },
+    { x0: 0.24, x1: 0.46, y: 0.254, n: 2, rx: 0.022, ry: 0.012, o: 0.3 }, // flank-mid rows
+    { x0: 0.54, x1: 0.76, y: 0.254, n: 2, rx: 0.022, ry: 0.012, o: 0.3 },
+    { x0: 0.28, x1: 0.46, y: 0.16, n: 1, rx: 0.02, ry: 0.011, o: 0.22 }, // flank-rear rows, dimmest
+    { x0: 0.54, x1: 0.72, y: 0.16, n: 1, rx: 0.02, ry: 0.011, o: 0.22 },
+  ]
+  for (const p of POOLS) {
+    for (let k = 0; k < p.n; k++) {
+      const cxs = p.n === 1 ? (p.x0 + p.x1) / 2 : lerp(p.x0, p.x1, (k + rr(r, 0.2, 0.8)) / p.n)
+      const cys = p.y + rr(r, -0.004, 0.008)
+      const j = rr(r, 0.85, 1.2)
+      s += `<ellipse cx="${fx(PX(cxs))}" cy="${fx(PY(cys))}" rx="${fx(PX(p.rx * j))}" ry="${fx(PY(p.ry * j))}" fill="url(#pagePool)" opacity="${op(p.o * rr(r, 0.82, 1))}"/>`
+    }
+  }
 
   // ---- THE COBBLE APRON under the sorting desk (right page foreground: the
   // desk's own station, radial >= 0.42, z 0.14..0.62). Rows converge slightly
   // toward the spine so the paving lies down instead of standing up as a grid.
+  // Drawn BEFORE the road now, so its pale joints cannot wash the road out.
   const APRON_ROWS = 6
   const APRON_COLS = 8
   const aprX = (row, t) => lerp(pageFX(lerp(0.52, 0.46, row / APRON_ROWS), 'right'), pageFX(lerp(1.0, 1.1, row / APRON_ROWS), 'right'), t)
   const aprY = (row, t) => pageFY(lerp(0.18, 0.58, row / APRON_ROWS)) + t * 0.014
-  s += `<path d="M ${fx(PX(aprX(0, 0)))} ${fx(PY(aprY(0, 0)))} L ${fx(PX(aprX(0, 1)))} ${fx(PY(aprY(0, 1)))} L ${fx(PX(aprX(APRON_ROWS, 1)))} ${fx(PY(aprY(APRON_ROWS, 1)))} L ${fx(PX(aprX(APRON_ROWS, 0)))} ${fx(PY(aprY(APRON_ROWS, 0)))} Z" fill="${ROOK.slate}" opacity="0.12"/>`
+  // clipped to the plaza: the desk's paving is a DENSER patch of the same court,
+  // not a separate slab hanging off the edge of it
+  s += `<g clip-path="url(#plazaCut)">`
   for (let row = 0; row < APRON_ROWS; row++) {
     for (let c = 0; c < APRON_COLS; c++) {
       const t0 = (c + (row % 2 ? 0.5 : 0)) / APRON_COLS
@@ -3358,20 +3515,83 @@ function postRoadSpread(w, h, seed) {
       const d =
         `M ${fx(PX(aprX(row, t0)))} ${fx(PY(aprY(row, t0)))} L ${fx(PX(aprX(row, t1)))} ${fx(PY(aprY(row, t1)))} ` +
         `L ${fx(PX(aprX(row + 0.88, t1)))} ${fx(PY(aprY(row + 0.88, t1)))} L ${fx(PX(aprX(row + 0.88, t0)))} ${fx(PY(aprY(row + 0.88, t0)))} Z`
-      s += `<path d="${d}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="${fx(rr(r, 0.12, 0.24))}"/>`
+      s += `<path d="${d}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="${op(rr(r, 0.09, 0.16))}"/>`
     }
   }
+  s += `</g>`
+
+  // ---- THE COBBLED POST-ROAD: painted LAST on the floor and deliberately the
+  // strongest value on the parchment (eye-review r1: the old road was a pale
+  // slate wash at 0.44 that vanished at the pinned camera). Dark cobble bed +
+  // a darker verge/gutter inside each edge + pale kerb stones outside them +
+  // lit cobble crowns, so the road carries the eye from the apron to the gate.
+  const [edgeL, edgeR] = edgesAt(1)
+  const [gutL, gutR] = edgesAt(0.84)
+  const [kerbL, kerbR] = edgesAt(1.14)
+  const bandD = `${poly(edgeL)} L ${[...edgeR].reverse().map(([a, b]) => `${fx(PX(a))} ${fx(PY(b))}`).join(' L ')} Z`
+  // the road's cast shadow, offset a touch fore-and-down so it sits IN the yard
+  s += `<path d="${bandD}" transform="translate(${fx(w * 0.005)} ${fx(h * 0.008)})" fill="${ROOK.ink}" opacity="0.14"/>`
+  // pale kerb stones first, so the dark bed is drawn over their inner halves
+  s += `<path d="${poly(kerbL)}" fill="none" stroke="${WALNUT_LT}" stroke-width="4.5" opacity="0.4"/>`
+  s += `<path d="${poly(kerbR)}" fill="none" stroke="${ROOK.parchDim}" stroke-width="5" opacity="0.5"/>`
+  // The bed is a WARM dark stone, not slate and not ink-black: slate reads as a
+  // blue-grey plastic strip on parchment and near-black reads as a hole cut in
+  // the page. This sits ~85 luminance levels under the parchment (the value
+  // contrast the road needs) while still reading as painted stone.
+  s += `<path d="${bandD}" fill="#574c3e" opacity="0.97"/>`
+  s += `<path d="${bandD}" fill="url(#roadShade)" opacity="0.24"/>`
+  s += `<g clip-path="url(#roadCut)">`
+  // cobble courses drawn as SCALLOPED JOINTS across the road — the painted-road
+  // convention. (Filled stone ellipses with lit crowns turned the bed into a
+  // rubber mat of studs, so the stones are described by their joints instead.)
+  const rows = 46
+  for (let i = 0; i <= rows; i++) {
+    const t = i / rows
+    const { cx, cy, px, py } = roadFrame(t)
+    const stones = t > 0.6 ? 5 : 6
+    for (let c = 0; c < stones; c++) {
+      const o = ((c + 0.5) / stones - 0.5) * 2 + (i % 2 ? 1 / stones : 0) + rr(r, -0.05, 0.05)
+      const sx = cx + px * o
+      const sy = cy + py * o
+      const rx = (Math.hypot(px * w, py * h) / stones) * rr(r, 0.85, 1.1)
+      const ry = rx * rr(r, 0.6, 0.8)
+      const glow = 1 - Math.abs(o) * 0.8 // the road's crown catches the lamplight
+      const scallop = (dy2, col, wd, o2) =>
+        `<path d="M ${fx(PX(sx) - rx * 0.9)} ${fx(PY(sy) + ry * 0.4 + dy2)} Q ${fx(PX(sx))} ${fx(PY(sy) - ry * 1.05 + dy2)} ${fx(PX(sx) + rx * 0.9)} ${fx(PY(sy) + ry * 0.4 + dy2)}" fill="none" stroke="${col}" stroke-width="${wd}" stroke-linecap="round" opacity="${op(o2)}"/>`
+      s += scallop(0, '#241c12', 1.7, rr(r, 0.42, 0.62))
+      if (r() < 0.62) s += scallop(-1.8, ROOK.parchDim, 1.4, (0.1 + glow * 0.14) * rr(r, 0.7, 1.3))
+    }
+  }
+  // a faint lit crown down the middle so the bed cambers instead of lying flat
+  s += `<path d="${poly(edgesAt(0)[0])}" fill="none" stroke="${ROOK.parchDim}" stroke-width="${fx(h * 0.022)}" opacity="0.1"/>`
+  // the VERGE / GUTTER: a dark channel inside each edge, the darkest note here
+  s += `<path d="${poly(gutL)}" fill="none" stroke="#231a0d" stroke-width="5" opacity="0.68"/>`
+  s += `<path d="${poly(gutR)}" fill="none" stroke="#231a0d" stroke-width="6.5" opacity="0.78"/>`
+  s += `</g>`
+  // the gate mouth the road dies into, at the spine
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.026))}" ry="${fx(PY(0.024))}" fill="#2e2618" opacity="0.8"/>`
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(0.737))}" rx="${fx(PX(0.026))}" ry="${fx(PY(0.024))}" fill="none" stroke="${WALNUT_LT}" stroke-width="2.4" opacity="0.5"/>`
+
+  // ---- the GATEHOUSE's lamplight lands ON the road (its foot at x 0.630-0.683,
+  // y ~0.753, sits inside the road band), so this one pool is painted OVER the
+  // cobbles: warm light on a dark wet bed, which is also what sells the road.
+  s += `<ellipse cx="${fx(PX(0.6565))}" cy="${fx(PY(0.762))}" rx="${fx(PX(0.052))}" ry="${fx(PY(0.036))}" fill="url(#pagePool)" opacity="0.62"/>`
+  s += `<ellipse cx="${fx(PX(0.6565))}" cy="${fx(PY(0.752))}" rx="${fx(PX(0.03))}" ry="${fx(PY(0.017))}" fill="url(#pagePool)" opacity="0.8"/>`
 
   // ---- WHEELING RAVEN SHADOWS: the 3D flight continued in 2D, gathered into
-  // two loose gyres (one per page) rather than sprinkled evenly.
+  // two loose gyres (one per page). Eye-review r1: they were invisible (the old
+  // opacity went through fx(), which rounded 0.1-0.22 to one decimal, and the
+  // scale was flat). Now they read as soft dark shapes, and BOTH size and
+  // strength grade with depth — largest and darkest near the reader.
   for (const [side, gz, gr, n] of [['left', -0.22, 0.62, 11], ['right', -0.3, 0.66, 12]]) {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rr(r, -0.3, 0.3)
       const rad = rr(r, 0.35, 1) * gr
       const radial = clampNum(0.5 + Math.cos(a) * rad * 0.62, 0.06, PAGE_W_U * 0.99)
       const z = clampNum(gz + Math.sin(a) * rad * 0.4, -0.72, 0.66)
-      const S = rr(r, w * 0.008, w * 0.026)
-      s += `<g transform="translate(${fx(PX(pageFX(radial, side)))} ${fx(PY(pageFY(z)))}) rotate(${fx(rr(r, -60, 60))})" opacity="${fx(rr(r, 0.1, 0.22))}">${miniRaven(S, ROOK.ink, ROOK.ink)}</g>`
+      const near = pageFY(z) // 0 far, 1 at the reader
+      const S = w * (0.009 + near * 0.026) * rr(r, 0.85, 1.15)
+      s += `<g transform="translate(${fx(PX(pageFX(radial, side)))} ${fx(PY(pageFY(z)))}) rotate(${fx(rr(r, -60, 60))})" opacity="${op((0.16 + near * 0.2) * rr(r, 0.85, 1.1))}">${miniRaven(S, ROOK.ink, ROOK.ink)}</g>`
     }
   }
   // a vignette so the spread sits in its gutter
@@ -3380,6 +3600,15 @@ function postRoadSpread(w, h, seed) {
 
   const defs =
     `<clipPath id="roadCut"><path d="${bandD}"/></clipPath>` +
+    `<clipPath id="plazaCut"><path d="${PLAZA_D}"/></clipPath>` +
+    // The plaza is paving, so it is never LIGHTER than the bare parchment around
+    // it (eye-review r1 round 2: a parchLit core made it read as a pale sticker).
+    // A faint walnut wash at the centre deepening toward the far arc keeps it a
+    // hair darker than the ground everywhere, and the outward ramp is what
+    // dissolves its far edge now that no kerb stroke draws it.
+    `<radialGradient id="plazaShade" cx="0.5" cy="0.42" r="0.7">` +
+    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0.05"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.2"/></radialGradient>` +
     `<linearGradient id="pageHaze" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${ROOK.parchLit}" stop-opacity="0.8"/>` +
     `<stop offset="1" stop-color="${ROOK.parchLit}" stop-opacity="0"/></linearGradient>` +
@@ -3388,8 +3617,9 @@ function postRoadSpread(w, h, seed) {
     `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0.32"/>` +
     `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0"/></linearGradient>` +
     `<radialGradient id="pagePool" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${ROOK.amber}" stop-opacity="0.55"/>` +
-    `<stop offset="0.6" stop-color="${ROOK.amber}" stop-opacity="0.16"/>` +
+    `<stop offset="0" stop-color="${ROOK.amberLit}" stop-opacity="0.9"/>` +
+    `<stop offset="0.32" stop-color="${ROOK.amber}" stop-opacity="0.6"/>` +
+    `<stop offset="0.7" stop-color="${ROOK.amber}" stop-opacity="0.22"/>` +
     `<stop offset="1" stop-color="${ROOK.amber}" stop-opacity="0"/></radialGradient>` +
     `<linearGradient id="roadShade" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${ROOK.ink}" stop-opacity="0.34"/>` +
