@@ -10015,7 +10015,8 @@ const ATLASES = [
     id: 'vault-atlas-s5',
     regions: [
       { id: 'ch4-hero', w: 560, opaque: false },
-      { id: 'ch4-hoard-deck', w: 620, opaque: false },
+      // (ch4-hoard-deck region removed — the hoard platform retired with its
+      //  wireframe rig; see content.ts + the s6s5r4 polish round.)
       { id: 'ch4-frieze', w: 620, opaque: false },
       { id: 'ch4-chest-front', w: 320, opaque: false },
       { id: 'ch4-aureole', w: 300, opaque: false },
