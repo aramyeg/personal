@@ -3470,9 +3470,14 @@ const INN = {
   stoneLit: '#e3cd98',
   stoneMid: '#cbb078',
   stoneDim: '#a98a5c',
+  // the dusk value ladder (E3 relight): gold can only BURN against walnut-
+  // shaded stone, so the night facades drop to these instead of the day tones
+  stoneDusk: '#8a6e45',
+  stoneNight: '#6b5334',
   roofLit: '#d97e54', // terracotta
   roofDim: '#b0603f',
   lamp: '#f3d980',
+  paneHot: '#fbe9a8', // the burning pane core
   brass: '#c9a227',
   green: '#6a8f5f', // courtyard green
 }
@@ -3625,12 +3630,14 @@ function innRowStage(w, h, seed) {
   s += `<path d="M ${fx(gA - w * 0.095)} ${fx(h * 0.3)} L ${fx(gA)} ${fx(h * 0.105)} L ${fx(gA + w * 0.083)} ${fx(h * 0.27)} M ${fx(gB - w * 0.08)} ${fx(h * 0.24)} L ${fx(gB)} ${fx(h * 0.07)} L ${fx(gB + w * 0.088)} ${fx(h * 0.28)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>`
   s += `<circle cx="${fx(gA)}" cy="${fx(h * 0.105)}" r="3.2" fill="${GOLD}"/>`
   s += `<circle cx="${fx(gB)}" cy="${fx(h * 0.07)}" r="3.6" fill="${GOLD}"/>`
-  // --- WALL BODIES below the eaves: hall face lit stone, wings dimmer
-  s += `<rect x="0" y="${fx(h * 0.40)}" width="${fx(gA - w * 0.095)}" height="${fx(h * 0.6)}" fill="${INN.stoneMid}"/>`
-  s += `<rect x="${fx(gB + w * 0.088)}" y="${fx(h * 0.42)}" width="${fx(w - gB - w * 0.088)}" height="${fx(h * 0.58)}" fill="${INN.stoneMid}"/>`
-  s += `<rect x="${fx(gA - w * 0.095)}" y="${fx(h * 0.27)}" width="${fx(gB - gA + w * 0.183)}" height="${fx(h * 0.73)}" fill="${INN.stoneLit}"/>`
+  // --- WALL BODIES below the eaves: dusk-shaded stone (the relight law —
+  // walls drop to the walnut end of the ladder so the windows BURN), the
+  // hall face a half-step lighter than the wings for hierarchy
+  s += `<rect x="0" y="${fx(h * 0.40)}" width="${fx(gA - w * 0.095)}" height="${fx(h * 0.6)}" fill="${INN.stoneDusk}"/>`
+  s += `<rect x="${fx(gB + w * 0.088)}" y="${fx(h * 0.42)}" width="${fx(w - gB - w * 0.088)}" height="${fx(h * 0.58)}" fill="${INN.stoneDusk}"/>`
+  s += `<rect x="${fx(gA - w * 0.095)}" y="${fx(h * 0.27)}" width="${fx(gB - gA + w * 0.183)}" height="${fx(h * 0.73)}" fill="${INN.stoneDim}"/>`
   // stone base course across everything
-  s += `<rect x="0" y="${fx(h * 0.84)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.stoneDim}"/>`
+  s += `<rect x="0" y="${fx(h * 0.84)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.stoneNight}"/>`
   for (let i = 0; i < 30; i++) {
     const jx = (w * (i + 0.5)) / 30
     s += `<line x1="${fx(jx)}" y1="${fx(h * 0.84)}" x2="${fx(jx + rr(r, -4, 4))}" y2="${fx(h)}" stroke="${INK}" stroke-width="1.3" opacity="0.22"/>`
@@ -3653,13 +3660,14 @@ function innRowStage(w, h, seed) {
   s += timber(gB + w * 0.075, w * 0.99, h * 0.44)
   // --- WINDOWS: ten golden lights (glow halo painted, frame walnut)
   const win = (x, y, ww, wh, arched = false) => {
-    let out = `<ellipse cx="${fx(x + ww / 2)}" cy="${fx(y + wh / 2)}" rx="${fx(ww * 1.5)}" ry="${fx(wh * 1.25)}" fill="url(#s2winGlow)"/>`
+    // the burn: a wide gold wash on the wall, then a hot pane over it
+    let out = `<ellipse cx="${fx(x + ww / 2)}" cy="${fx(y + wh / 2)}" rx="${fx(ww * 2.4)}" ry="${fx(wh * 1.9)}" fill="url(#s2winGlow)"/>`
     const shape = arched
       ? `M ${fx(x)} ${fx(y + wh)} L ${fx(x)} ${fx(y + wh * 0.34)} Q ${fx(x + ww / 2)} ${fx(y - wh * 0.16)} ${fx(x + ww)} ${fx(y + wh * 0.34)} L ${fx(x + ww)} ${fx(y + wh)} Z`
       : `M ${fx(x)} ${fx(y)} L ${fx(x + ww)} ${fx(y)} L ${fx(x + ww)} ${fx(y + wh)} L ${fx(x)} ${fx(y + wh)} Z`
-    out += `<path d="${shape}" fill="${INN.lamp}" stroke="${INK}" stroke-width="2.4"/>`
-    out += `<line x1="${fx(x + ww / 2)}" y1="${fx(y)}" x2="${fx(x + ww / 2)}" y2="${fx(y + wh)}" stroke="${INK}" stroke-width="1.4" opacity="0.75"/>`
-    out += `<line x1="${fx(x)}" y1="${fx(y + wh * 0.5)}" x2="${fx(x + ww)}" y2="${fx(y + wh * 0.5)}" stroke="${INK}" stroke-width="1.4" opacity="0.75"/>`
+    out += `<path d="${shape}" fill="${INN.paneHot}" stroke="${INK}" stroke-width="2.6"/>`
+    out += `<line x1="${fx(x + ww / 2)}" y1="${fx(y)}" x2="${fx(x + ww / 2)}" y2="${fx(y + wh)}" stroke="${INK}" stroke-width="1.5" opacity="0.85"/>`
+    out += `<line x1="${fx(x)}" y1="${fx(y + wh * 0.5)}" x2="${fx(x + ww)}" y2="${fx(y + wh * 0.5)}" stroke="${INK}" stroke-width="1.5" opacity="0.85"/>`
     return out
   }
   const WW = w * 0.036
@@ -3677,7 +3685,7 @@ function innRowStage(w, h, seed) {
   const dh = h * 0.30
   const dx = CX - dw / 2
   const dy = h - dh
-  s += `<ellipse cx="${fx(CX)}" cy="${fx(h * 0.97)}" rx="${fx(dw * 1.6)}" ry="${fx(h * 0.05)}" fill="${INN.lamp}" opacity="0.4"/>`
+  s += `<ellipse cx="${fx(CX)}" cy="${fx(h * 0.97)}" rx="${fx(dw * 1.9)}" ry="${fx(h * 0.06)}" fill="${INN.lamp}" opacity="0.6"/>`
   s += `<path d="M ${fx(dx - 5)} ${fx(h)} L ${fx(dx - 5)} ${fx(dy + dh * 0.22)} Q ${fx(CX)} ${fx(dy - dh * 0.18)} ${fx(dx + dw + 5)} ${fx(dy + dh * 0.22)} L ${fx(dx + dw + 5)} ${fx(h)} Z" fill="${INN.stoneDim}"/>`
   s += `<path d="M ${fx(dx)} ${fx(h)} L ${fx(dx)} ${fx(dy + dh * 0.24)} Q ${fx(CX)} ${fx(dy - dh * 0.1)} ${fx(dx + dw)} ${fx(dy + dh * 0.24)} L ${fx(dx + dw)} ${fx(h)} Z" fill="#4a3218"/>`
   s += `<line x1="${fx(CX)}" y1="${fx(dy)}" x2="${fx(CX)}" y2="${fx(h)}" stroke="${INK}" stroke-width="2" opacity="0.8"/>`
@@ -3687,14 +3695,18 @@ function innRowStage(w, h, seed) {
   // the painted LOCK ESCUTCHEON, low on the crease — the ch1-key child pops here
   s += `<circle cx="${fx(CX)}" cy="${fx(h * 0.86)}" r="${fx(w * 0.017)}" fill="#4a3218" stroke="${GOLD}" stroke-width="3"/>`
   s += `<path d="M ${fx(CX)} ${fx(h * 0.85)} a ${fx(w * 0.004)} ${fx(w * 0.004)} 0 1 1 0.1 0 M ${fx(CX)} ${fx(h * 0.853)} L ${fx(CX)} ${fx(h * 0.872)}" stroke="${GOLD_LIT}" stroke-width="2.4" fill="none"/>`
-  // the "100" SHIELD over the door
+  // the "100" SHIELD — WHOLLY on the right panel (creaseU 0.58 splits the
+  // art across the real dihedral; numerals straddling u 0.58 would kink at
+  // the fold, so the shield hangs beside the door, not over it), engraved
+  // font-free from ENGRAVE_GLYPHS (no installed-typeface dependency).
+  const shX = CX + w * 0.08
   const shY = dy - h * 0.14
-  s += `<path d="M ${fx(CX - w * 0.026)} ${fx(shY)} L ${fx(CX + w * 0.026)} ${fx(shY)} L ${fx(CX + w * 0.026)} ${fx(shY + h * 0.08)} Q ${fx(CX)} ${fx(shY + h * 0.115)} ${fx(CX - w * 0.026)} ${fx(shY + h * 0.08)} Z" fill="${PARCH}" stroke="${INK}" stroke-width="2.4"/>`
-  s += `<text x="${fx(CX)}" y="${fx(shY + h * 0.068)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(h * 0.052)}" font-weight="bold" text-anchor="middle" fill="${INK}">100</text>`
-  // lamp brackets flanking the door
+  s += `<path d="M ${fx(shX - w * 0.028)} ${fx(shY)} L ${fx(shX + w * 0.028)} ${fx(shY)} L ${fx(shX + w * 0.028)} ${fx(shY + h * 0.085)} Q ${fx(shX)} ${fx(shY + h * 0.122)} ${fx(shX - w * 0.028)} ${fx(shY + h * 0.085)} Z" fill="${PARCH}" stroke="${INK}" stroke-width="2.4"/>`
+  s += engraveWord('100', shX - w * 0.0205, shY + h * 0.022, w * 0.0115, h * 0.05, w * 0.0035, INK, 3)
+  // lamp brackets flanking the door — real burning lanterns now
   for (const lx of [dx - w * 0.02, dx + dw + w * 0.02]) {
-    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.013)}" fill="url(#s2winGlow)"/>`
-    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.0062)}" fill="${INN.lamp}" stroke="${INK}" stroke-width="1.8"/>`
+    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.022)}" fill="url(#s2winGlow)"/>`
+    s += `<circle cx="${fx(lx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.0062)}" fill="${INN.paneHot}" stroke="${INK}" stroke-width="1.8"/>`
     s += `<line x1="${fx(lx)}" y1="${fx(h * 0.685)}" x2="${fx(lx)}" y2="${fx(h * 0.665)}" stroke="${INK}" stroke-width="2" opacity="0.8"/>`
   }
   // chimney pots + smoke shading (the curl is already cut in the outline)
@@ -3707,12 +3719,12 @@ function innRowStage(w, h, seed) {
   const defs =
     `<clipPath id="s2innCut"><path d="${roofline}"/></clipPath>` +
     `<linearGradient id="s2innDusk" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${INK}" stop-opacity="0.32"/>` +
-    `<stop offset="0.55" stop-color="${INK}" stop-opacity="0.12"/>` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0.4"/>` +
+    `<stop offset="0.55" stop-color="${INK}" stop-opacity="0.16"/>` +
     `<stop offset="1" stop-color="${INN.skyDeep}" stop-opacity="0.08"/></linearGradient>` +
     `<radialGradient id="s2winGlow" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.5"/>` +
-    `<stop offset="0.7" stop-color="${INN.lamp}" stop-opacity="0.14"/>` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.8"/>` +
+    `<stop offset="0.55" stop-color="${INN.lamp}" stop-opacity="0.3"/>` +
     `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
@@ -3741,22 +3753,24 @@ function gateOpen(w, h, seed) {
     `L ${fx(pR + PW * 0.62)} ${fx(postTop + h * 0.03)} L ${fx(pR + PW * 1.5)} ${fx(capY)} L ${fx(pR + PW)} ${fx(capY)} ` +
     `L ${fx(pR + PW)} ${fx(h * 0.52)} L ${fx(w * 0.87)} ${fx(gateTop)} L ${fx(w * 0.94)} ${fx(h * 0.54)} L ${fx(w)} ${fx(h * 0.56)} ` + // right leaf
     `L ${fx(w)} ${fx(h)} Z`
-  let s = `<g><path d="${outline}" fill="${INN.stoneMid}"/>`
+  let s = `<g><path d="${outline}" fill="${INN.stoneDusk}"/>`
   s += `<g clip-path="url(#s2gateCut)">`
+  // dusk falls on the whole gate before anything burns
+  s += `<rect width="${w}" height="${h}" fill="${INK}" opacity="0.14"/>`
   // moth-glow halos around the lantern heads FIRST (under everything)
   for (const px of [pL, pR]) {
-    s += `<circle cx="${fx(px)}" cy="${fx(h * 0.1)}" r="${fx(w * 0.085)}" fill="url(#s2winGlow2)"/>`
+    s += `<circle cx="${fx(px)}" cy="${fx(h * 0.1)}" r="${fx(w * 0.115)}" fill="url(#s2winGlow2)"/>`
     for (let m = 0; m < 5; m++) {
       const a = rr(r, 0, Math.PI * 2)
       const rad = rr(r, w * 0.03, w * 0.07)
       s += `<path d="M ${fx(px + Math.cos(a) * rad)} ${fx(h * 0.1 + Math.sin(a) * rad * 0.9)} l 3 -2 l -1.6 3 Z" fill="${INK}" opacity="0.55"/>` // moths
     }
   }
-  // POSTS: coursed stone, lit inner faces (the lamplight between them)
+  // POSTS: coursed dusk stone, warmer inner faces (the lamplight between them)
   for (const px of [pL, pR]) {
-    s += `<rect x="${fx(px - PW)}" y="${fx(capY)}" width="${fx(PW * 2)}" height="${fx(h - capY)}" fill="${INN.stoneMid}"/>`
+    s += `<rect x="${fx(px - PW)}" y="${fx(capY)}" width="${fx(PW * 2)}" height="${fx(h - capY)}" fill="${INN.stoneDusk}"/>`
     const inner = px === pL ? px : px - PW
-    s += `<rect x="${fx(inner)}" y="${fx(capY)}" width="${fx(PW)}" height="${fx(h - capY)}" fill="${INN.stoneLit}"/>`
+    s += `<rect x="${fx(inner)}" y="${fx(capY)}" width="${fx(PW)}" height="${fx(h - capY)}" fill="${INN.stoneDim}"/>`
     for (let c = 1; c < 6; c++) {
       const cy = capY + ((h - capY) * c) / 6
       s += `<line x1="${fx(px - PW)}" y1="${fx(cy)}" x2="${fx(px + PW)}" y2="${fx(cy)}" stroke="${INK}" stroke-width="1.8" opacity="0.4"/>`
@@ -3764,7 +3778,7 @@ function gateOpen(w, h, seed) {
     }
     // cap + LANTERN head: iron cage, gold light
     s += `<rect x="${fx(px - PW * 1.5)}" y="${fx(capY - h * 0.012)}" width="${fx(PW * 3)}" height="${fx(h * 0.03)}" fill="${INN.stoneDim}" stroke="${INK}" stroke-width="1.8"/>`
-    s += `<rect x="${fx(px - PW * 0.52)}" y="${fx(postTop + h * 0.035)}" width="${fx(PW * 1.04)}" height="${fx(h * 0.085)}" fill="${INN.lamp}" stroke="${IRON}" stroke-width="3"/>`
+    s += `<rect x="${fx(px - PW * 0.52)}" y="${fx(postTop + h * 0.035)}" width="${fx(PW * 1.04)}" height="${fx(h * 0.085)}" fill="${INN.paneHot}" stroke="${IRON}" stroke-width="3"/>`
     s += `<line x1="${fx(px)}" y1="${fx(postTop + h * 0.035)}" x2="${fx(px)}" y2="${fx(postTop + h * 0.12)}" stroke="${IRON}" stroke-width="2" opacity="0.85"/>`
     s += `<path d="M ${fx(px - PW * 0.62)} ${fx(postTop + h * 0.033)} L ${fx(px)} ${fx(postTop - h * 0.002)} L ${fx(px + PW * 0.62)} ${fx(postTop + h * 0.033)} Z" fill="${IRON}"/>`
   }
@@ -3821,81 +3835,110 @@ function gateOpen(w, h, seed) {
   const defs =
     `<clipPath id="s2gateCut"><path d="${outline}"/></clipPath>` +
     `<radialGradient id="s2winGlow2" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.6"/>` +
-    `<stop offset="0.65" stop-color="${INN.lamp}" stop-opacity="0.18"/>` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.85"/>` +
+    `<stop offset="0.55" stop-color="${INN.lamp}" stop-opacity="0.32"/>` +
     `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
 
 // ---- THE WELCOME RANK (ch1-rank, stripflap 0.34 x 0.21): innkeeper with a
 // raised lantern, spouse with the enchanted ledger, a waving child and the
-// dog — ONE die-cut chain, hands linked, feet on one ground strip (the strip
-// flap die needs the continuous base). Warm figures rimmed in lamplight. ----
+// dog — ONE die-cut chain. E3 recut per eye-test: the figures join through
+// WIDE hand-bridges at arm level (flat segments, never notching back to the
+// base — the ravenChainTop rule), the valleys under the bridges are painted
+// walnut shadow so the four bodies read while staying one piece, garments
+// vary (brick / green / gold smock / brown dog), and the ground strip is
+// night cobbles, not grass — the family stands in a paved courtyard. ----
 function welcomeRank(w, h, seed) {
   const r = mulberry32(seed)
-  const G = h * 0.9 // ground line
+  const G = h * 0.88 // ground line (the strip below is the die's base)
   // figure stations (centre x, half-width, head top y)
   const F = {
-    keeper: { x: w * 0.18, hw: w * 0.075, top: h * 0.2 },
-    spouse: { x: w * 0.42, hw: w * 0.07, top: h * 0.26 },
-    child: { x: w * 0.63, hw: w * 0.05, top: h * 0.47 },
-    dog: { x: w * 0.82, hw: w * 0.055, top: h * 0.62 },
+    keeper: { x: w * 0.17, hw: w * 0.075, top: h * 0.17 },
+    spouse: { x: w * 0.41, hw: w * 0.07, top: h * 0.25 },
+    child: { x: w * 0.62, hw: w * 0.052, top: h * 0.46 },
+    dog: { x: w * 0.82, hw: w * 0.055, top: h * 0.6 },
   }
-  const lantX = w * 0.055
-  const lantY = h * 0.16
-  // ONE closed silhouette: ground strip + bodies + linked arms + lantern arm
+  const lantX = w * 0.05
+  const lantY = h * 0.15
+  // hand-bridge levels (top edge of the joining material — SHALLOW)
+  const B_KS = h * 0.52 // keeper <-> spouse
+  const B_SC = h * 0.56 // spouse <-> child
+  const B_CD = h * 0.7 // child <-> dog
+  // ONE closed silhouette: ground strip + bodies + WIDE linked-arm bridges
   const outline =
-    `M 0 ${fx(h)} L 0 ${fx(G - h * 0.03)} ` +
-    // lantern arm up from the keeper
-    `L ${fx(F.keeper.x - F.keeper.hw)} ${fx(G - h * 0.42)} ` +
+    `M 0 ${fx(h)} L 0 ${fx(G - h * 0.02)} ` +
+    `L ${fx(F.keeper.x - F.keeper.hw)} ${fx(G - h * 0.4)} ` +
+    // the lantern arm up-left, and the lantern head in the cut
     `L ${fx(lantX + w * 0.03)} ${fx(lantY + h * 0.1)} L ${fx(lantX - w * 0.022)} ${fx(lantY + h * 0.06)} ` +
-    `L ${fx(lantX - w * 0.022)} ${fx(lantY - h * 0.09)} L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.09)} ` +
-    `L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.02)} L ${fx(lantX + w * 0.05)} ${fx(lantY + h * 0.04)} ` + // lantern head
-    `L ${fx(F.keeper.x - F.keeper.hw * 0.4)} ${fx(F.keeper.top + h * 0.16)} ` +
+    `L ${fx(lantX - w * 0.022)} ${fx(lantY - h * 0.1)} L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.1)} ` +
+    `L ${fx(lantX + w * 0.022)} ${fx(lantY - h * 0.02)} L ${fx(lantX + w * 0.05)} ${fx(lantY + h * 0.04)} ` +
+    `L ${fx(F.keeper.x - F.keeper.hw * 0.4)} ${fx(F.keeper.top + h * 0.15)} ` +
     `L ${fx(F.keeper.x - F.keeper.hw * 0.45)} ${fx(F.keeper.top + h * 0.1)} ` +
-    `A ${fx(F.keeper.hw * 0.62)} ${fx(F.keeper.hw * 0.62)} 0 1 1 ${fx(F.keeper.x + F.keeper.hw * 0.45)} ${fx(F.keeper.top + h * 0.1)} ` + // keeper head
-    `L ${fx(F.keeper.x + F.keeper.hw)} ${fx(F.keeper.top + h * 0.3)} ` +
-    `L ${fx((F.keeper.x + F.spouse.x) / 2)} ${fx(G - h * 0.34)} ` + // linked hands dip
-    `L ${fx(F.spouse.x - F.spouse.hw)} ${fx(F.spouse.top + h * 0.28)} ` +
+    `A ${fx(F.keeper.hw * 0.62)} ${fx(F.keeper.hw * 0.62)} 0 1 1 ${fx(F.keeper.x + F.keeper.hw * 0.45)} ${fx(F.keeper.top + h * 0.1)} ` +
+    `L ${fx(F.keeper.x + F.keeper.hw)} ${fx(F.keeper.top + h * 0.28)} ` +
+    // WIDE bridge to the spouse: down to arm level, flat across, back up
+    `L ${fx(F.keeper.x + F.keeper.hw * 1.1)} ${fx(B_KS)} L ${fx(F.spouse.x - F.spouse.hw * 1.1)} ${fx(B_KS)} ` +
+    `L ${fx(F.spouse.x - F.spouse.hw)} ${fx(F.spouse.top + h * 0.26)} ` +
     `L ${fx(F.spouse.x - F.spouse.hw * 0.45)} ${fx(F.spouse.top + h * 0.1)} ` +
-    `A ${fx(F.spouse.hw * 0.6)} ${fx(F.spouse.hw * 0.6)} 0 1 1 ${fx(F.spouse.x + F.spouse.hw * 0.45)} ${fx(F.spouse.top + h * 0.1)} ` + // spouse head
-    `L ${fx(F.spouse.x + F.spouse.hw)} ${fx(F.spouse.top + h * 0.34)} ` +
-    `L ${fx((F.spouse.x + F.child.x) / 2)} ${fx(G - h * 0.26)} ` + // second hand link
-    `L ${fx(F.child.x - F.child.hw * 0.8)} ${fx(F.child.top + h * 0.22)} ` +
-    // the child's waving arm shoots up
-    `L ${fx(F.child.x - F.child.hw * 0.2)} ${fx(F.child.top - h * 0.14)} L ${fx(F.child.x + F.child.hw * 0.35)} ${fx(F.child.top - h * 0.18)} ` +
-    `L ${fx(F.child.x + F.child.hw * 0.2)} ${fx(F.child.top + h * 0.02)} ` +
-    `A ${fx(F.child.hw * 0.58)} ${fx(F.child.hw * 0.58)} 0 1 1 ${fx(F.child.x + F.child.hw * 0.7)} ${fx(F.child.top + h * 0.16)} ` + // child head
-    `L ${fx(F.child.x + F.child.hw)} ${fx(G - h * 0.2)} ` +
-    `L ${fx((F.child.x + F.dog.x) / 2 + w * 0.01)} ${fx(G - h * 0.16)} ` + // dog leans on the child
-    `L ${fx(F.dog.x - F.dog.hw * 0.2)} ${fx(F.dog.top - h * 0.1)} L ${fx(F.dog.x + F.dog.hw * 0.4)} ${fx(F.dog.top)} ` + // ears up
-    `L ${fx(F.dog.x + F.dog.hw)} ${fx(F.dog.top + h * 0.14)} ` +
-    `L ${fx(F.dog.x + F.dog.hw * 1.5)} ${fx(G - h * 0.28)} L ${fx(F.dog.x + F.dog.hw * 1.7)} ${fx(G - h * 0.34)} ` + // tail up
-    `L ${fx(F.dog.x + F.dog.hw * 2)} ${fx(G - h * 0.28)} L ${fx(F.dog.x + F.dog.hw * 1.8)} ${fx(G - h * 0.12)} ` +
-    `L ${fx(w * 0.97)} ${fx(G - h * 0.04)} L ${fx(w)} ${fx(G - h * 0.02)} L ${fx(w)} ${fx(h)} Z`
+    `A ${fx(F.spouse.hw * 0.6)} ${fx(F.spouse.hw * 0.6)} 0 1 1 ${fx(F.spouse.x + F.spouse.hw * 0.45)} ${fx(F.spouse.top + h * 0.1)} ` +
+    `L ${fx(F.spouse.x + F.spouse.hw)} ${fx(F.spouse.top + h * 0.3)} ` +
+    // WIDE bridge to the child
+    `L ${fx(F.spouse.x + F.spouse.hw * 1.15)} ${fx(B_SC)} L ${fx(F.child.x - F.child.hw * 1.5)} ${fx(B_SC)} ` +
+    // the child's waving arm shoots up out of the bridge
+    `L ${fx(F.child.x - F.child.hw * 0.3)} ${fx(F.child.top - h * 0.13)} L ${fx(F.child.x + F.child.hw * 0.3)} ${fx(F.child.top - h * 0.17)} ` +
+    `L ${fx(F.child.x + F.child.hw * 0.16)} ${fx(F.child.top + h * 0.01)} ` +
+    `A ${fx(F.child.hw * 0.6)} ${fx(F.child.hw * 0.6)} 0 1 1 ${fx(F.child.x + F.child.hw * 0.85)} ${fx(F.child.top + h * 0.14)} ` +
+    // WIDE bridge to the dog (the child's hand rests on its head)
+    `L ${fx(F.child.x + F.child.hw * 1.2)} ${fx(B_CD)} L ${fx(F.dog.x - F.dog.hw * 1.15)} ${fx(B_CD)} ` +
+    `L ${fx(F.dog.x - F.dog.hw * 0.2)} ${fx(F.dog.top - h * 0.09)} L ${fx(F.dog.x + F.dog.hw * 0.4)} ${fx(F.dog.top)} ` + // ears up
+    `L ${fx(F.dog.x + F.dog.hw)} ${fx(F.dog.top + h * 0.13)} ` +
+    `L ${fx(F.dog.x + F.dog.hw * 1.5)} ${fx(G - h * 0.26)} L ${fx(F.dog.x + F.dog.hw * 1.7)} ${fx(G - h * 0.33)} ` + // tail up
+    `L ${fx(F.dog.x + F.dog.hw * 2)} ${fx(G - h * 0.27)} L ${fx(F.dog.x + F.dog.hw * 1.8)} ${fx(G - h * 0.1)} ` +
+    `L ${fx(w * 0.97)} ${fx(G - h * 0.03)} L ${fx(w)} ${fx(G - h * 0.01)} L ${fx(w)} ${fx(h)} Z`
   let s = `<g><path d="${outline}" fill="${INN.roofDim}"/>`
   s += `<g clip-path="url(#s2rankCut)">`
   // lantern glow FIRST — the family is lit from the keeper's raised lamp
-  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY)}" r="${fx(w * 0.14)}" fill="url(#s2winGlow3)"/>`
-  // ground strip: courtyard green in night shadow
-  s += `<rect x="0" y="${fx(G - h * 0.05)}" width="${w}" height="${fx(h * 0.16)}" fill="${INN.green}"/>`
-  s += `<rect x="0" y="${fx(G - h * 0.05)}" width="${w}" height="${fx(h * 0.16)}" fill="${INK}" opacity="0.35"/>`
-  // THE INNKEEPER: apron over a brick coat, boots, warm face, the lantern arm
+  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY)}" r="${fx(w * 0.17)}" fill="url(#s2winGlow3)"/>`
+  // NIGHT COBBLE ground strip (the courtyard, not grass)
+  s += `<rect x="0" y="${fx(G - h * 0.04)}" width="${w}" height="${fx(h * 0.18)}" fill="${INN.stoneNight}"/>`
+  for (let i = 0; i < 20; i++) {
+    const gx2 = rr(r, 0, w)
+    s += `<ellipse cx="${fx(gx2)}" cy="${fx(rr(r, G, h * 0.99))}" rx="${fx(rr(r, 8, 15))}" ry="${fx(rr(r, 3.4, 5.6))}" fill="${INN.stoneDusk}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5" opacity="0.8"/>`
+  }
+  // painted WALNUT VALLEYS below the hand-bridges: the figures separate to
+  // the eye while the paper stays one chain
+  const valley = (x0, x1, yTop) =>
+    `<path d="M ${fx(x0)} ${fx(yTop + h * 0.055)} Q ${fx((x0 + x1) / 2)} ${fx(yTop + h * 0.02)} ${fx(x1)} ${fx(yTop + h * 0.055)} L ${fx(x1)} ${fx(G)} L ${fx(x0)} ${fx(G)} Z" fill="${INK}" opacity="0.55"/>`
+  s += valley(F.keeper.x + F.keeper.hw * 1.02, F.spouse.x - F.spouse.hw * 1.02, B_KS)
+  s += valley(F.spouse.x + F.spouse.hw * 1.05, F.child.x - F.child.hw * 1.4, B_SC)
+  s += valley(F.child.x + F.child.hw * 1.1, F.dog.x - F.dog.hw * 1.05, B_CD)
+  // THE INNKEEPER: brick coat, parchment apron, warm face, the lantern arm
   const K = F.keeper
-  s += `<rect x="${fx(K.x - K.hw)}" y="${fx(K.top + h * 0.24)}" width="${fx(K.hw * 2)}" height="${fx(G - K.top - h * 0.24)}" fill="${INN.roofDim}"/>`
+  s += `<rect x="${fx(K.x - K.hw)}" y="${fx(K.top + h * 0.22)}" width="${fx(K.hw * 2)}" height="${fx(G - K.top - h * 0.22)}" fill="${INN.roofDim}"/>`
   s += `<path d="M ${fx(K.x - K.hw * 0.55)} ${fx(K.top + h * 0.32)} L ${fx(K.x + K.hw * 0.55)} ${fx(K.top + h * 0.32)} L ${fx(K.x + K.hw * 0.4)} ${fx(G - h * 0.02)} L ${fx(K.x - K.hw * 0.4)} ${fx(G - h * 0.02)} Z" fill="${PARCH_MID}"/>` // apron
   s += `<line x1="${fx(K.x - K.hw * 0.4)}" y1="${fx(G - h * 0.1)}" x2="${fx(K.x + K.hw * 0.4)}" y2="${fx(G - h * 0.1)}" stroke="${LEATHER}" stroke-width="1.8" opacity="0.6"/>` // hem
-  s += `<line x1="${fx(K.x - K.hw * 0.6)}" y1="${fx(K.top + h * 0.34)}" x2="${fx(K.x + K.hw * 0.6)}" y2="${fx(K.top + h * 0.34)}" stroke="${LEATHER}" stroke-width="3"/>`
   s += `<circle cx="${fx(K.x)}" cy="${fx(K.top + h * 0.09)}" r="${fx(K.hw * 0.58)}" fill="#e8c49a"/>`
   s += `<path d="M ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.06)} A ${fx(K.hw * 0.62)} ${fx(K.hw * 0.62)} 0 0 1 ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.06)} L ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.02)} L ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.02)} Z" fill="${LEATHER}"/>` // cap
   s += `<circle cx="${fx(K.x - K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/><circle cx="${fx(K.x + K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/>`
   s += `<path d="M ${fx(K.x - K.hw * 0.16)} ${fx(K.top + h * 0.15)} Q ${fx(K.x)} ${fx(K.top + h * 0.19)} ${fx(K.x + K.hw * 0.16)} ${fx(K.top + h * 0.15)}" stroke="${INK}" stroke-width="1.6" fill="none"/>` // smile
-  // the raised arm + THE LANTERN
+  // the raised arm + THE LANTERN (burning)
   s += `<path d="M ${fx(K.x - K.hw * 0.7)} ${fx(K.top + h * 0.34)} L ${fx(lantX + w * 0.02)} ${fx(lantY + h * 0.09)}" stroke="${INN.roofDim}" stroke-width="9" stroke-linecap="round"/>`
-  s += `<rect x="${fx(lantX - w * 0.017)}" y="${fx(lantY - h * 0.075)}" width="${fx(w * 0.034)}" height="${fx(h * 0.125)}" fill="${INN.lamp}" stroke="${IRON}" stroke-width="2.6"/>`
-  s += `<line x1="${fx(lantX)}" y1="${fx(lantY - h * 0.075)}" x2="${fx(lantX)}" y2="${fx(lantY + h * 0.05)}" stroke="${IRON}" stroke-width="1.4" opacity="0.7"/>`
-  s += `<path d="M ${fx(lantX - w * 0.017)} ${fx(lantY - h * 0.075)} L ${fx(lantX)} ${fx(lantY - h * 0.095)} L ${fx(lantX + w * 0.017)} ${fx(lantY - h * 0.075)} Z" fill="${IRON}"/>`
-  // THE SPOUSE: green gown, the enchanted ledger held out, bun hair
+  s += `<rect x="${fx(lantX - w * 0.017)}" y="${fx(lantY - h * 0.08)}" width="${fx(w * 0.034)}" height="${fx(h * 0.13)}" fill="${INN.paneHot}" stroke="${IRON}" stroke-width="2.6"/>`
+  s += `<line x1="${fx(lantX)}" y1="${fx(lantY - h * 0.08)}" x2="${fx(lantX)}" y2="${fx(lantY + h * 0.05)}" stroke="${IRON}" stroke-width="1.4" opacity="0.7"/>`
+  s += `<path d="M ${fx(lantX - w * 0.017)} ${fx(lantY - h * 0.08)} L ${fx(lantX)} ${fx(lantY - h * 0.1)} L ${fx(lantX + w * 0.017)} ${fx(lantY - h * 0.08)} Z" fill="${IRON}"/>`
+  // THE LINKED ARMS painted over the bridges: keeper's sleeve meets the
+  // spouse's, hands joined at the middle of each bridge
+  const armBand = (x0, x1, yTop, c0, c1) => {
+    const mid = (x0 + x1) / 2
+    let out = `<path d="M ${fx(x0)} ${fx(yTop + h * 0.005)} L ${fx(mid)} ${fx(yTop + h * 0.03)}" stroke="${c0}" stroke-width="7.4" stroke-linecap="round" fill="none"/>`
+    out += `<path d="M ${fx(x1)} ${fx(yTop + h * 0.005)} L ${fx(mid)} ${fx(yTop + h * 0.03)}" stroke="${c1}" stroke-width="7.4" stroke-linecap="round" fill="none"/>`
+    out += `<circle cx="${fx(mid)}" cy="${fx(yTop + h * 0.03)}" r="4.2" fill="#e8c49a" stroke="${INK}" stroke-width="1"/>` // the held hands
+    return out
+  }
+  s += armBand(F.keeper.x + F.keeper.hw * 0.6, F.spouse.x - F.spouse.hw * 0.6, B_KS, INN.roofDim, INN.green)
+  s += armBand(F.spouse.x + F.spouse.hw * 0.6, F.child.x - F.child.hw * 0.7, B_SC, INN.green, '#c99b46')
+  // THE SPOUSE: green gown, bun, the enchanted ledger held out
   const S2 = F.spouse
   s += `<path d="M ${fx(S2.x - S2.hw)} ${fx(G)} L ${fx(S2.x - S2.hw * 0.55)} ${fx(S2.top + h * 0.22)} L ${fx(S2.x + S2.hw * 0.55)} ${fx(S2.top + h * 0.22)} L ${fx(S2.x + S2.hw)} ${fx(G)} Z" fill="${INN.green}"/>`
   s += `<circle cx="${fx(S2.x)}" cy="${fx(S2.top + h * 0.09)}" r="${fx(S2.hw * 0.56)}" fill="#e8c49a"/>`
@@ -3903,39 +3946,46 @@ function welcomeRank(w, h, seed) {
   s += `<path d="M ${fx(S2.x - S2.hw * 0.56)} ${fx(S2.top + h * 0.07)} A ${fx(S2.hw * 0.58)} ${fx(S2.hw * 0.58)} 0 0 1 ${fx(S2.x + S2.hw * 0.56)} ${fx(S2.top + h * 0.07)} Z" fill="${INK}" opacity="0.85"/>` // hair
   s += `<circle cx="${fx(S2.x - S2.hw * 0.17)}" cy="${fx(S2.top + h * 0.09)}" r="1.6" fill="${INK}"/><circle cx="${fx(S2.x + S2.hw * 0.17)}" cy="${fx(S2.top + h * 0.09)}" r="1.6" fill="${INK}"/>`
   s += `<path d="M ${fx(S2.x - S2.hw * 0.14)} ${fx(S2.top + h * 0.16)} Q ${fx(S2.x)} ${fx(S2.top + h * 0.195)} ${fx(S2.x + S2.hw * 0.14)} ${fx(S2.top + h * 0.16)}" stroke="${INK}" stroke-width="1.4" fill="none"/>`
-  // the LEDGER: open book, parchment pages, a gold key inked on the page
-  const LX = S2.x + S2.hw * 0.9
-  const LY = S2.top + h * 0.34
-  s += `<path d="M ${fx(LX - w * 0.045)} ${fx(LY)} Q ${fx(LX)} ${fx(LY - h * 0.045)} ${fx(LX + w * 0.045)} ${fx(LY)} L ${fx(LX + w * 0.045)} ${fx(LY + h * 0.07)} Q ${fx(LX)} ${fx(LY + h * 0.03)} ${fx(LX - w * 0.045)} ${fx(LY + h * 0.07)} Z" fill="${PARCH}" stroke="${LEATHER}" stroke-width="2.6"/>`
+  // the LEDGER: open book at her hip, parchment pages, a gold key inked in
+  const LX = S2.x - S2.hw * 1.0
+  const LY = S2.top + h * 0.36
+  s += `<path d="M ${fx(LX - w * 0.042)} ${fx(LY)} Q ${fx(LX)} ${fx(LY - h * 0.045)} ${fx(LX + w * 0.042)} ${fx(LY)} L ${fx(LX + w * 0.042)} ${fx(LY + h * 0.07)} Q ${fx(LX)} ${fx(LY + h * 0.03)} ${fx(LX - w * 0.042)} ${fx(LY + h * 0.07)} Z" fill="${PARCH}" stroke="${LEATHER}" stroke-width="2.6"/>`
   s += `<line x1="${fx(LX)}" y1="${fx(LY - h * 0.03)}" x2="${fx(LX)}" y2="${fx(LY + h * 0.05)}" stroke="${LEATHER}" stroke-width="1.6"/>`
-  s += `<g transform="translate(${fx(LX + w * 0.02)} ${fx(LY + h * 0.028)}) scale(0.5)">${keyGlyph(h * 0.09)}</g>`
-  // THE CHILD: brick smock, waving arm (cut in the outline), bright face
+  s += `<g transform="translate(${fx(LX + w * 0.018)} ${fx(LY + h * 0.028)}) scale(0.5)">${keyGlyph(h * 0.09)}</g>`
+  // THE CHILD: gold festival smock (a third garment color), waving
   const C2 = F.child
-  s += `<path d="M ${fx(C2.x - C2.hw * 0.8)} ${fx(G)} L ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x + C2.hw * 0.5)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x + C2.hw * 0.8)} ${fx(G)} Z" fill="${INN.roofDim}"/>`
-  s += `<circle cx="${fx(C2.x + C2.hw * 0.1)}" cy="${fx(C2.top + h * 0.04)}" r="${fx(C2.hw * 0.62)}" fill="#e8c49a"/>`
-  s += `<path d="M ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top)} A ${fx(C2.hw * 0.65)} ${fx(C2.hw * 0.65)} 0 0 1 ${fx(C2.x + C2.hw * 0.68)} ${fx(C2.top - h * 0.01)} L ${fx(C2.x + C2.hw * 0.4)} ${fx(C2.top + h * 0.03)} Z" fill="#8a5a3b"/>` // mop of hair
-  s += `<circle cx="${fx(C2.x - C2.hw * 0.08)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/><circle cx="${fx(C2.x + C2.hw * 0.26)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/>`
-  s += `<path d="M ${fx(C2.x - C2.hw * 0.05)} ${fx(C2.top + h * 0.1)} Q ${fx(C2.x + C2.hw * 0.1)} ${fx(C2.top + h * 0.14)} ${fx(C2.x + C2.hw * 0.25)} ${fx(C2.top + h * 0.1)}" stroke="${INK}" stroke-width="1.4" fill="none"/>`
-  s += `<path d="M ${fx(C2.x - C2.hw * 0.4)} ${fx(C2.top + h * 0.14)} L ${fx(C2.x - C2.hw * 0.05)} ${fx(C2.top - h * 0.12)}" stroke="${INN.roofDim}" stroke-width="7" stroke-linecap="round"/>` // waving arm fill
-  // THE DOG: sitting, ears + tail in the cut, collar tag glinting
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.9)} ${fx(G)} L ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top + h * 0.11)} L ${fx(C2.x + C2.hw * 0.5)} ${fx(C2.top + h * 0.11)} L ${fx(C2.x + C2.hw * 0.9)} ${fx(G)} Z" fill="#c99b46"/>`
+  s += `<line x1="${fx(C2.x - C2.hw * 0.62)}" y1="${fx(G - h * 0.16)}" x2="${fx(C2.x + C2.hw * 0.62)}" y2="${fx(G - h * 0.16)}" stroke="${LEATHER}" stroke-width="2" opacity="0.6"/>` // belt
+  s += `<circle cx="${fx(C2.x + C2.hw * 0.12)}" cy="${fx(C2.top + h * 0.04)}" r="${fx(C2.hw * 0.62)}" fill="#e8c49a"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.5)} ${fx(C2.top)} A ${fx(C2.hw * 0.65)} ${fx(C2.hw * 0.65)} 0 0 1 ${fx(C2.x + C2.hw * 0.7)} ${fx(C2.top - h * 0.01)} L ${fx(C2.x + C2.hw * 0.42)} ${fx(C2.top + h * 0.03)} Z" fill="#8a5a3b"/>` // mop of hair
+  s += `<circle cx="${fx(C2.x - C2.hw * 0.06)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/><circle cx="${fx(C2.x + C2.hw * 0.28)}" cy="${fx(C2.top + h * 0.045)}" r="1.5" fill="${INK}"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.03)} ${fx(C2.top + h * 0.1)} Q ${fx(C2.x + C2.hw * 0.12)} ${fx(C2.top + h * 0.14)} ${fx(C2.x + C2.hw * 0.27)} ${fx(C2.top + h * 0.1)}" stroke="${INK}" stroke-width="1.4" fill="none"/>`
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.45)} ${fx(C2.top + h * 0.13)} L ${fx(C2.x - C2.hw * 0.05)} ${fx(C2.top - h * 0.11)}" stroke="#c99b46" stroke-width="7" stroke-linecap="round"/>` // waving arm
+  s += `<circle cx="${fx(C2.x - C2.hw * 0.02)}" cy="${fx(C2.top - h * 0.13)}" r="3.6" fill="#e8c49a" stroke="${INK}" stroke-width="0.9"/>` // waving hand
+  // the child's other hand resting on THE DOG's head (the third link)
+  s += `<path d="M ${fx(C2.x + C2.hw * 0.7)} ${fx(B_CD + h * 0.01)} L ${fx(F.dog.x - F.dog.hw * 0.5)} ${fx(B_CD + h * 0.035)}" stroke="#c99b46" stroke-width="6.4" stroke-linecap="round" fill="none"/>`
+  // THE DOG: sitting, ears + tail in the cut, muzzle patch, collar tag
   const D = F.dog
-  s += `<path d="M ${fx(D.x - D.hw)} ${fx(G)} Q ${fx(D.x - D.hw * 0.6)} ${fx(D.top + h * 0.1)} ${fx(D.x)} ${fx(D.top + h * 0.08)} Q ${fx(D.x + D.hw * 0.9)} ${fx(D.top + h * 0.12)} ${fx(D.x + D.hw * 1.2)} ${fx(G)} Z" fill="#8a5a3b"/>`
-  s += `<circle cx="${fx(D.x + D.hw * 0.05)}" cy="${fx(D.top + h * 0.05)}" r="${fx(D.hw * 0.55)}" fill="#a06c48"/>`
-  s += `<circle cx="${fx(D.x - D.hw * 0.1)}" cy="${fx(D.top + h * 0.03)}" r="1.6" fill="${INK}"/>`
-  s += `<circle cx="${fx(D.x - D.hw * 0.32)}" cy="${fx(D.top + h * 0.1)}" r="2.4" fill="${INK}"/>` // nose
-  s += `<path d="M ${fx(D.x - D.hw * 0.28)} ${fx(D.top + h * 0.15)} Q ${fx(D.x - D.hw * 0.1)} ${fx(D.top + h * 0.19)} ${fx(D.x + D.hw * 0.08)} ${fx(D.top + h * 0.15)}" stroke="${INK}" stroke-width="1.3" fill="none"/>`
-  s += `<path d="M ${fx(D.x - D.hw * 0.2)} ${fx(D.top + h * 0.24)} A ${fx(D.hw * 0.5)} ${fx(D.hw * 0.5)} 0 0 0 ${fx(D.x + D.hw * 0.4)} ${fx(D.top + h * 0.26)}" stroke="${LEATHER}" stroke-width="3.4" fill="none"/>` // collar
-  s += `<circle cx="${fx(D.x + D.hw * 0.1)}" cy="${fx(D.top + h * 0.3)}" r="3" fill="${GOLD}"/>` // tag
+  s += `<path d="M ${fx(D.x - D.hw)} ${fx(G)} Q ${fx(D.x - D.hw * 0.6)} ${fx(D.top + h * 0.1)} ${fx(D.x)} ${fx(D.top + h * 0.07)} Q ${fx(D.x + D.hw * 0.9)} ${fx(D.top + h * 0.11)} ${fx(D.x + D.hw * 1.2)} ${fx(G)} Z" fill="#7a4e30"/>`
+  s += `<circle cx="${fx(D.x + D.hw * 0.05)}" cy="${fx(D.top + h * 0.05)}" r="${fx(D.hw * 0.58)}" fill="#a06c48"/>`
+  s += `<ellipse cx="${fx(D.x - D.hw * 0.3)}" cy="${fx(D.top + h * 0.11)}" rx="${fx(D.hw * 0.34)}" ry="${fx(D.hw * 0.24)}" fill="#c99e78"/>` // muzzle patch
+  s += `<circle cx="${fx(D.x - D.hw * 0.05)}" cy="${fx(D.top + h * 0.02)}" r="1.7" fill="${INK}"/>` // eye
+  s += `<circle cx="${fx(D.x - D.hw * 0.48)}" cy="${fx(D.top + h * 0.1)}" r="2.6" fill="${INK}"/>` // nose
+  s += `<path d="M ${fx(D.x - D.hw * 0.26)} ${fx(D.top + h * 0.16)} Q ${fx(D.x - D.hw * 0.06)} ${fx(D.top + h * 0.2)} ${fx(D.x + D.hw * 0.12)} ${fx(D.top + h * 0.16)}" stroke="${INK}" stroke-width="1.3" fill="none"/>`
+  s += `<path d="M ${fx(D.x - D.hw * 0.2)} ${fx(D.top + h * 0.25)} A ${fx(D.hw * 0.5)} ${fx(D.hw * 0.5)} 0 0 0 ${fx(D.x + D.hw * 0.42)} ${fx(D.top + h * 0.27)}" stroke="${LEATHER}" stroke-width="3.4" fill="none"/>` // collar
+  s += `<circle cx="${fx(D.x + D.hw * 0.12)}" cy="${fx(D.top + h * 0.31)}" r="3" fill="${GOLD}"/>` // tag
+  // white chest patch for value against the dusk
+  s += `<path d="M ${fx(D.x - D.hw * 0.28)} ${fx(D.top + h * 0.22)} Q ${fx(D.x - D.hw * 0.1)} ${fx(G - h * 0.06)} ${fx(D.x + D.hw * 0.14)} ${fx(D.top + h * 0.24)} Z" fill="${INN.snow}" opacity="0.5"/>`
   // lamplight rim on every figure's lantern side
-  s += `<path d="M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.26)} L ${fx(K.x - K.hw)} ${fx(G)} M ${fx(S2.x - S2.hw * 0.8)} ${fx(S2.top + h * 0.24)} L ${fx(S2.x - S2.hw)} ${fx(G)} M ${fx(C2.x - C2.hw * 0.75)} ${fx(C2.top + h * 0.16)} L ${fx(C2.x - C2.hw * 0.8)} ${fx(G)}" stroke="${INN.lamp}" stroke-width="2.4" opacity="0.6" fill="none"/>`
+  s += `<path d="M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.24)} L ${fx(K.x - K.hw)} ${fx(G)} M ${fx(S2.x - S2.hw * 0.8)} ${fx(S2.top + h * 0.24)} L ${fx(S2.x - S2.hw)} ${fx(G)} M ${fx(C2.x - C2.hw * 0.85)} ${fx(C2.top + h * 0.14)} L ${fx(C2.x - C2.hw * 0.9)} ${fx(G)} M ${fx(D.x - D.hw)} ${fx(G - h * 0.02)} L ${fx(D.x - D.hw * 0.7)} ${fx(D.top + h * 0.12)}" stroke="${INN.lamp}" stroke-width="2.6" opacity="0.7" fill="none"/>`
   s += `</g>`
   s += rimPath(outline, 4)
   s += `</g>`
   const defs =
     `<clipPath id="s2rankCut"><path d="${outline}"/></clipPath>` +
     `<radialGradient id="s2winGlow3" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.55"/>` +
-    `<stop offset="0.7" stop-color="${INN.lamp}" stop-opacity="0.16"/>` +
+    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.7"/>` +
+    `<stop offset="0.6" stop-color="${INN.lamp}" stop-opacity="0.22"/>` +
     `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
@@ -4171,36 +4221,43 @@ function innCourtyardSpread(w, h, seed) {
   // warm spill out of the great door itself
   s += `<ellipse cx="${fx(PX(doorX))}" cy="${fx(PY(doorY + 0.03))}" rx="${fx(PX(0.055))}" ry="${fx(PY(0.032))}" fill="url(#s2pgPool)" opacity="0.95"/>`
 
-  // ---- THE COBBLE FAN: rays from the door station through the gate span,
-  // opening to the whole apron; arcs cross them concentric on the door.
+  // ---- THE COBBLE FAN, painted as MASS (the s4 floor-rejection law: fill
+  // the stones, never wireframe them). First the paved FIELD — a fan-shaped
+  // courtyard polygon a full value step below the parchment, pinched at the
+  // gate span and opening to the whole apron — then FILLED cobble courses
+  // laid concentric on the great door, stones growing toward the reader.
   const FAN0 = { x: doorX, y: doorY + 0.02 }
-  const rays = 13
-  s += `<g opacity="0.5">`
-  for (let i = 0; i < rays; i++) {
-    const t = i / (rays - 1)
-    const endX = lerp(-0.06, 1.06, t)
-    // rays pass through the gate opening: pinch toward the gate span at gateY
-    const gateX = lerp(0.365, 0.635, t)
-    s += `<path d="M ${fx(PX(FAN0.x))} ${fx(PY(FAN0.y))} C ${fx(PX(gateX))} ${fx(PY(gateY))} ${fx(PX(lerp(gateX, endX, 0.4)))} ${fx(PY(lerp(gateY, 1, 0.45)))} ${fx(PX(endX))} ${fx(PY(1.02))}" fill="none" stroke="${WALNUT}" stroke-width="2" opacity="0.5"/>`
-  }
-  s += `</g>`
-  // concentric cobble arcs + stones between (the fan's paving courses)
-  const ARCS = 9
-  for (let a = 1; a <= ARCS; a++) {
-    const t = a / ARCS
-    const fy = lerp(FAN0.y + 0.06, 1.04, t * t)
-    const span = lerp(0.1, 0.62, t)
-    s += `<path d="M ${fx(PX(FAN0.x - span))} ${fx(PY(fy + 0.05))} Q ${fx(PX(FAN0.x))} ${fx(PY(fy - lerp(0.015, 0.06, t)))} ${fx(PX(FAN0.x + span))} ${fx(PY(fy + 0.05))}" fill="none" stroke="${WALNUT}" stroke-width="2.2" opacity="${fx(0.42 - t * 0.14)}"/>`
-    // cobblestones dotted along the arc
-    const stones = 6 + a * 2
+  const field =
+    `M ${fx(PX(FAN0.x - 0.085))} ${fx(PY(FAN0.y + 0.02))} ` +
+    `Q ${fx(PX(0.36))} ${fx(PY(gateY - 0.02))} ${fx(PX(0.3))} ${fx(PY(gateY + 0.1))} ` +
+    `Q ${fx(PX(0.06))} ${fx(PY(0.86))} ${fx(PX(-0.04))} ${fx(PY(1.05))} ` +
+    `L ${fx(PX(1.04))} ${fx(PY(1.05))} ` +
+    `Q ${fx(PX(0.94))} ${fx(PY(0.86))} ${fx(PX(0.7))} ${fx(PY(gateY + 0.1))} ` +
+    `Q ${fx(PX(0.64))} ${fx(PY(gateY - 0.02))} ${fx(PX(FAN0.x + 0.085))} ${fx(PY(FAN0.y + 0.02))} Z`
+  s += `<path d="${field}" fill="#dcc697"/>`
+  s += `<path d="${field}" fill="url(#s2pgPave)"/>`
+  s += `<path d="${field}" fill="none" stroke="${WALNUT}" stroke-width="3" opacity="0.4"/>`
+  s += `<g clip-path="url(#s2pgField)">`
+  const COURSES = 12
+  const STONE_FILLS = ['#cbb078', '#a98a5c', '#c3a76e', '#b6976a']
+  for (let a = 0; a <= COURSES; a++) {
+    const t = a / COURSES
+    const fy = lerp(FAN0.y + 0.045, 1.06, t * t * 0.92 + t * 0.08)
+    const span = lerp(0.1, 0.66, t)
+    const sr = lerp(0.009, 0.024, t)
+    const stones = 5 + a * 2
     for (let c2 = 0; c2 < stones; c2++) {
-      const ct = c2 / (stones - 1)
-      const sx2 = FAN0.x + (ct - 0.5) * 2 * span * 0.92
-      const sy2 = fy + 0.05 - Math.sin(ct * Math.PI) * lerp(0.015, 0.06, t) - 0.012
-      const sr = lerp(0.006, 0.016, t)
-      s += `<ellipse cx="${fx(PX(sx2 + rr(r, -0.006, 0.006)))}" cy="${fx(PY(sy2 + rr(r, -0.004, 0.004)))}" rx="${fx(PX(sr))}" ry="${fx(PY(sr * 0.6))}" fill="none" stroke="${WALNUT}" stroke-width="1.5" opacity="${fx(rr(r, 0.2, 0.38))}"/>`
+      const ct = stones === 1 ? 0.5 : c2 / (stones - 1)
+      const sx2 = FAN0.x + (ct - 0.5) * 2 * span * 0.94
+      const sy2 = fy - Math.sin(ct * Math.PI) * lerp(0.012, 0.05, t)
+      const fill = STONE_FILLS[(c2 + a) % STONE_FILLS.length]
+      s += `<ellipse cx="${fx(PX(sx2 + rr(r, -0.004, 0.004)))}" cy="${fx(PY(sy2 + rr(r, -0.003, 0.003)))}" rx="${fx(PX(sr * rr(r, 0.82, 1)))}" ry="${fx(PY(sr * 0.62))}" fill="${fill}" stroke="${WALNUT}" stroke-width="1.7" stroke-opacity="0.55"/>`
+      if (r() < 0.12) s += `<ellipse cx="${fx(PX(sx2))}" cy="${fx(PY(sy2))}" rx="${fx(PX(sr * 0.7))}" ry="${fx(PY(sr * 0.44))}" fill="${WALNUT}" opacity="0.28"/>` // a darker set stone
     }
   }
+  // the warm spill from the door running down the fan's throat
+  s += `<path d="M ${fx(PX(FAN0.x - 0.05))} ${fx(PY(FAN0.y))} L ${fx(PX(FAN0.x - 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.05))} ${fx(PY(FAN0.y))} Z" fill="${INN.lamp}" opacity="0.16"/>`
+  s += `</g>`
 
   // ---- THE WELCOME DOORMAT, just downstage of the gate span
   const matY = pageFY(0.3)
@@ -4209,7 +4266,14 @@ function innCourtyardSpread(w, h, seed) {
   s += `<g transform="rotate(-1.2 ${fx(PX(0.5))} ${fx(PY(matY))})">`
   s += `<rect x="${fx(PX(0.5 - matW / 2))}" y="${fx(PY(matY - matH / 2))}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="${INN.roofDim}" opacity="0.85"/>`
   s += `<rect x="${fx(PX(0.5 - matW / 2) + 5)}" y="${fx(PY(matY - matH / 2) + 5)}" width="${fx(PX(matW) - 10)}" height="${fx(PY(matH) - 10)}" fill="none" stroke="${ROOK.parch}" stroke-width="2.4" stroke-dasharray="7 4" opacity="0.9"/>`
-  s += `<text x="${fx(PX(0.5))}" y="${fx(PY(matY) + PY(matH) * 0.16)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(PY(matH) * 0.44)}" font-weight="bold" letter-spacing="2" text-anchor="middle" fill="${ROOK.parch}" opacity="0.95">WELCOME</text>`
+  // engraved font-free (ENGRAVE_GLYPHS) — no installed-typeface dependency
+  {
+    const cw2 = PX(0.0102)
+    const gap2 = PX(0.0028)
+    const ch2 = PY(0.0225)
+    const total = 7 * cw2 + 6 * gap2
+    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2, cw2, ch2, gap2, ROOK.parch, 2.6, 'opacity="0.95"')
+  }
   s += `</g>`
 
   // ---- THE BRASS-KEY TRAIL: fore edge -> past the key-board -> the door.
@@ -4221,8 +4285,8 @@ function innCourtyardSpread(w, h, seed) {
   }
   for (let k = 0; k < 9; k++) {
     const [kx, ky] = trail(k / 8 + rr(r, -0.02, 0.02))
-    const S = lerp(h * 0.035, h * 0.022, k / 8)
-    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})" opacity="0.85">${keyGlyph(S, WALNUT, '#7d6238')}</g>`
+    const S = lerp(h * 0.047, h * 0.03, k / 8)
+    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})">${keyGlyph(S, WALNUT, '#7d6238')}</g>`
   }
   // ... and two strays on the left page for the wanderers
   for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
@@ -4240,20 +4304,17 @@ function innCourtyardSpread(w, h, seed) {
   // ribbon tails
   s += `<path d="M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.012))} l ${fx(-w * 0.017)} ${fx(h * 0.012)} l ${fx(w * 0.011)} ${fx(h * 0.011)} l ${fx(-w * 0.004)} ${fx(h * 0.012)} l ${fx(w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
   s += `<path d="M ${fx(PX(ribX1))} ${fx(PY(ribY + 0.012))} l ${fx(w * 0.017)} ${fx(h * 0.012)} l ${fx(-w * 0.011)} ${fx(h * 0.011)} l ${fx(w * 0.004)} ${fx(h * 0.012)} l ${fx(-w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
-  s += `<text x="${fx(PX((ribX0 + ribX1) / 2))}" y="${fx(PY(ribY + 0.008))}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(h * 0.03)}" font-weight="bold" letter-spacing="5" text-anchor="middle" fill="${ROOK.parch}">LIFT</text>`
+  {
+    const cw3 = PX(0.011)
+    const gap3 = PX(0.0042)
+    const ch3 = PY(0.026)
+    const total3 = 4 * cw3 + 3 * gap3
+    s += engraveWord('LIFT', PX((ribX0 + ribX1) / 2) - total3 / 2, PY(ribY - 0.006) - ch3 / 2, cw3, ch3, gap3, ROOK.parch, 3, 'opacity="0.96"')
+  }
 
-  // ---- THE WOODCUT MANICULE on the floor, aimed at door 1 (z ~0.04): a
-  // pointing hand with a ruffled cuff, printed walnut like a chapbook dingbat.
-  const mx = PX(0.845)
-  const my = PY(pageFY(0.055))
-  s += `<g transform="translate(${fx(mx)} ${fx(my)}) rotate(186)" opacity="0.8">`
-  s += `<path d="M 0 0 L ${fx(w * 0.026)} ${fx(-h * 0.006)} L ${fx(w * 0.026)} ${fx(h * 0.007)} Z" fill="${WALNUT}"/>` // pointing finger
-  s += `<rect x="${fx(-w * 0.02)}" y="${fx(-h * 0.011)}" width="${fx(w * 0.022)}" height="${fx(h * 0.024)}" rx="4" fill="${WALNUT}"/>` // fist
-  for (let f2 = 0; f2 < 3; f2++)
-    s += `<line x1="${fx(-w * 0.002)}" y1="${fx(-h * 0.002 + f2 * h * 0.0055)}" x2="${fx(w * 0.004)}" y2="${fx(-h * 0.002 + f2 * h * 0.0055)}" stroke="${ROOK.parch}" stroke-width="1.4" opacity="0.8"/>` // folded fingers
-  s += `<path d="M ${fx(-w * 0.02)} ${fx(-h * 0.013)} L ${fx(-w * 0.028)} ${fx(-h * 0.016)} L ${fx(-w * 0.028)} ${fx(h * 0.016)} L ${fx(-w * 0.02)} ${fx(h * 0.014)} Z" fill="${WALNUT}"/>` // cuff
-  s += `<line x1="${fx(-w * 0.024)}" y1="${fx(-h * 0.012)}" x2="${fx(-w * 0.024)}" y2="${fx(h * 0.012)}" stroke="${ROOK.parch}" stroke-width="1.6" opacity="0.7"/>`
-  s += `</g>`
+  // ---- THE WOODCUT MANICULE on the floor, aimed at door 1 (z ~0.04) — the
+  // house helper (nominally +x), MIRRORED to point spine-ward at the board.
+  s += `<g transform="translate(${fx(PX(0.858))} ${fx(PY(pageFY(0.055)))}) scale(-1 1)" opacity="0.92">${manicule(0, 0, w * 0.021, ROOK.parch, WALNUT)}</g>`
 
   // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate
   const geese = [
@@ -4290,7 +4351,7 @@ function innCourtyardSpread(w, h, seed) {
       const bx = lerp(x0, x1, t) + (i % 2 ? 0.012 : -0.012) + rr(r, -0.003, 0.003)
       const by = lerp(y0, y1, t) + rr(r, -0.004, 0.004)
       const ang = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI + 90 + rr(r, -14, 14)
-      out += `<g transform="translate(${fx(PX(bx))} ${fx(PY(by))}) rotate(${fx(ang)})" opacity="${fx(rr(r, 0.2, 0.32))}">` +
+      out += `<g transform="translate(${fx(PX(bx))} ${fx(PY(by))}) rotate(${fx(ang)})" opacity="${fx(rr(r, 0.3, 0.44))}">` +
         `<ellipse cx="0" cy="-3.4" rx="3.2" ry="5" fill="${WALNUT}"/>` +
         `<ellipse cx="0" cy="5" rx="2.6" ry="2.2" fill="${WALNUT}"/></g>`
     }
@@ -4305,6 +4366,11 @@ function innCourtyardSpread(w, h, seed) {
   s += `<rect width="${w}" height="${h}" fill="url(#s2pgVig)"/>`
   s += `</g>`
   const defs =
+    `<clipPath id="s2pgField"><path d="${field}"/></clipPath>` +
+    `<linearGradient id="s2pgPave" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0.3"/>` +
+    `<stop offset="0.45" stop-color="${WALNUT}" stop-opacity="0.12"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.05"/></linearGradient>` +
     `<linearGradient id="s2pgDusk" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${INN.skyDeep}" stop-opacity="0.26"/>` +
     `<stop offset="0.6" stop-color="${INN.skyDeep}" stop-opacity="0.1"/>` +
