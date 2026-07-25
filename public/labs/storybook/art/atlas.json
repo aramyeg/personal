@@ -4,9 +4,315 @@
     "flank-atlas-s4": 1024,
     "nave-atlas-s7": 1024,
     "bazaar-atlas-s6": 1024,
-    "figure-atlas-s6": 512
+    "figure-atlas-s6": 1024,
+    "tread-atlas-s6": 512,
+    "title-atlas-s1": 1024,
+    "inn-atlas-s2": 1024,
+    "apiary-atlas-s3": 1024,
+    "flight-atlas-s3": 1024,
+    "vault-atlas-s5": 1024,
+    "treasury-atlas-s7": 1024,
+    "satchel-atlas-s8": 1024,
+    "end-atlas-s9": 1024
   },
   "sprites": {
+    "ch1-dormer": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.306640625,
+        0.40625,
+        0.443359375,
+        0.5263671875
+      ]
+    },
+    "ch1-gate": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.607421875,
+        0.794921875,
+        0.978515625,
+        1
+      ]
+    },
+    "ch1-inn-row": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0,
+        0.7255859375,
+        0.60546875,
+        1
+      ]
+    },
+    "ch1-key": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.1484375,
+        0.3984375,
+        0.3046875,
+        0.5263671875
+      ]
+    },
+    "ch1-mountain": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.3134765625,
+        0.5341796875,
+        0.7041015625,
+        0.7236328125
+      ]
+    },
+    "ch1-rank": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.7060546875,
+        0.54296875,
+        0.9990234375,
+        0.7236328125
+      ]
+    },
+    "ch1-sign": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0,
+        0.359375,
+        0.146484375,
+        0.5263671875
+      ]
+    },
+    "ch1-stable-back": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.4453125,
+        0.4140625,
+        0.640625,
+        0.5263671875
+      ]
+    },
+    "ch1-stable-hay": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0,
+        0.24609375,
+        0.1953125,
+        0.357421875
+      ]
+    },
+    "ch1-stable-side": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0,
+        0.5283203125,
+        0.1953125,
+        0.7236328125
+      ]
+    },
+    "ch1-stable-top": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.642578125,
+        0.4140625,
+        0.837890625,
+        0.5263671875
+      ]
+    },
+    "ch1-stable-vane": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.197265625,
+        0.5283203125,
+        0.3115234375,
+        0.7236328125
+      ]
+    },
+    "ch1-wall": {
+      "atlas": "inn-atlas-s2",
+      "rect": [
+        0.197265625,
+        0.2607421875,
+        0.802734375,
+        0.357421875
+      ]
+    },
+    "ch2-backdrop": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0,
+        0.1064453125,
+        0.46875,
+        0.373046875
+      ]
+    },
+    "ch2-bee-a": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.357421875,
+        0.783203125,
+        0.767578125,
+        1
+      ]
+    },
+    "ch2-bee-b": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0,
+        0.5927734375,
+        0.328125,
+        0.775390625
+      ]
+    },
+    "ch2-bee-c": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0,
+        0.107421875,
+        0.328125,
+        0.2578125
+      ]
+    },
+    "ch2-chain-l": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.439453125,
+        0.2666015625,
+        0.876953125,
+        0.4208984375
+      ]
+    },
+    "ch2-chain-r": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.439453125,
+        0.4267578125,
+        0.876953125,
+        0.5908203125
+      ]
+    },
+    "ch2-cloud-l": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0,
+        0.259765625,
+        0.4375,
+        0.4208984375
+      ]
+    },
+    "ch2-cloud-r": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0,
+        0.4228515625,
+        0.4375,
+        0.5908203125
+      ]
+    },
+    "ch2-crown-b": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.330078125,
+        0.1171875,
+        0.576171875,
+        0.2578125
+      ]
+    },
+    "ch2-crown-c": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.578125,
+        0.125,
+        0.82421875,
+        0.2578125
+      ]
+    },
+    "ch2-fringe": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0,
+        0.00390625,
+        0.546875,
+        0.1044921875
+      ]
+    },
+    "ch2-hero": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0,
+        0.375,
+        0.3583984375,
+        1
+      ]
+    },
+    "ch2-hive-back": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0.765625,
+        0.2587890625,
+        0.912109375,
+        0.373046875
+      ]
+    },
+    "ch2-hive-flowers": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0.330078125,
+        0.59765625,
+        0.685546875,
+        0.775390625
+      ]
+    },
+    "ch2-hive-front": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0.470703125,
+        0.1455078125,
+        0.763671875,
+        0.373046875
+      ]
+    },
+    "ch2-hive-side": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0.6689453125,
+        0.70703125,
+        0.919921875,
+        1
+      ]
+    },
+    "ch2-hive-swarm": {
+      "atlas": "flight-atlas-s3",
+      "rect": [
+        0,
+        0.77734375,
+        0.35546875,
+        1
+      ]
+    },
+    "ch2-hive-top": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0.548828125,
+        0.0068359375,
+        0.6953125,
+        0.1044921875
+      ]
+    },
+    "ch2-windmill": {
+      "atlas": "apiary-atlas-s3",
+      "rect": [
+        0.3603515625,
+        0.62890625,
+        0.6669921875,
+        1
+      ]
+    },
+    "ch3-fringe": {
+      "atlas": "flank-atlas-s4",
+      "rect": [
+        0.392578125,
+        0.5029296875,
+        0.998046875,
+        0.587890625
+      ]
+    },
     "ch3-keep-balcony": {
       "atlas": "keep-atlas-s4",
       "rect": [
@@ -160,22 +466,148 @@
         0.7412109375
       ]
     },
-    "ch3-ring-tower": {
+    "ch3-keep-winch-counterweight": {
+      "atlas": "flank-atlas-s4",
+      "rect": [
+        0.4716796875,
+        0.70703125,
+        0.6572265625,
+        1
+      ]
+    },
+    "ch3-keep-winch-disc": {
+      "atlas": "flank-atlas-s4",
+      "rect": [
+        0.6591796875,
+        0.70703125,
+        0.9521484375,
+        1
+      ]
+    },
+    "ch3-keep-winch-iris": {
       "atlas": "flank-atlas-s4",
       "rect": [
         0,
+        0.58984375,
+        0.130859375,
+        1
+      ]
+    },
+    "ch3-keep-winch-semaphore": {
+      "atlas": "flank-atlas-s4",
+      "rect": [
+        0.1328125,
+        0.58984375,
+        0.2568359375,
+        1
+      ]
+    },
+    "ch3-ring-tower": {
+      "atlas": "flank-atlas-s4",
+      "rect": [
+        0.2587890625,
         0.6484375,
-        0.2109375,
+        0.4697265625,
         1
       ]
     },
     "ch3-skyline-l-mound0": {
       "atlas": "flank-atlas-s4",
       "rect": [
-        0.212890625,
-        0.7939453125,
-        0.603515625,
+        0,
+        0.3818359375,
+        0.390625,
+        0.587890625
+      ]
+    },
+    "ch4-aureole": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0,
+        0.3115234375,
+        0.29296875,
+        0.5703125
+      ]
+    },
+    "ch4-chest-back": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0,
+        0.0537109375,
+        0.1953125,
+        0.1513671875
+      ]
+    },
+    "ch4-chest-front": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0,
+        0.1533203125,
+        0.3125,
+        0.3095703125
+      ]
+    },
+    "ch4-chest-lid": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.294921875,
+        0.3359375,
+        0.5126953125,
+        0.5703125
+      ]
+    },
+    "ch4-chest-side": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.5146484375,
+        0.375,
+        0.7099609375,
+        0.5703125
+      ]
+    },
+    "ch4-chest-spill": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.7119140625,
+        0.3798828125,
+        0.9658203125,
+        0.5703125
+      ]
+    },
+    "ch4-coins": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.548828125,
+        0.708984375,
+        0.841796875,
         1
+      ]
+    },
+    "ch4-frieze": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.197265625,
+        0.0869140625,
+        0.802734375,
+        0.1513671875
+      ]
+    },
+    "ch4-hero": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0,
+        0.572265625,
+        0.546875,
+        1
+      ]
+    },
+    "ch4-hoard-deck": {
+      "atlas": "vault-atlas-s5",
+      "rect": [
+        0.314453125,
+        0.1650390625,
+        0.919921875,
+        0.3095703125
       ]
     },
     "ch5-arc-inner-arc-back": {
@@ -250,6 +682,51 @@
         0.130859375
       ]
     },
+    "ch5-city": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0,
+        0.42578125,
+        0.7763671875,
+        0.6953125
+      ]
+    },
+    "ch5-crowd-low": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0,
+        0.130859375,
+        0.568359375,
+        0.2490234375
+      ]
+    },
+    "ch5-crowd-mid": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0,
+        0.0126953125,
+        0.568359375,
+        0.12890625
+      ]
+    },
+    "ch5-pigeon-a": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0.5703125,
+        0.0244140625,
+        0.7783203125,
+        0.12890625
+      ]
+    },
+    "ch5-pigeon-b": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0.7802734375,
+        0.0341796875,
+        0.9697265625,
+        0.12890625
+      ]
+    },
     "ch5-souk-l-mound0": {
       "atlas": "bazaar-atlas-s6",
       "rect": [
@@ -290,8 +767,8 @@
       "atlas": "figure-atlas-s6",
       "rect": [
         0,
-        0.53125,
-        0.41015625,
+        0.697265625,
+        0.265625,
         1
       ]
     },
@@ -299,9 +776,81 @@
       "atlas": "figure-atlas-s6",
       "rect": [
         0,
-        0.32421875,
-        0.78125,
-        0.52734375
+        0.2509765625,
+        0.6630859375,
+        0.423828125
+      ]
+    },
+    "ch5-tread-low-back": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.087890625,
+        0.5859375,
+        0.138671875
+      ]
+    },
+    "ch5-tread-low-front": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.142578125,
+        0.859375,
+        0.216796875
+      ]
+    },
+    "ch5-tread-low-side": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.220703125,
+        0.234375,
+        0.30859375
+      ]
+    },
+    "ch5-tread-low-top": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.802734375,
+        0.859375,
+        1
+      ]
+    },
+    "ch5-tread-mid-back": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0.23828125,
+        0.224609375,
+        0.82421875,
+        0.30859375
+      ]
+    },
+    "ch5-tread-mid-front": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.3125,
+        0.8984375,
+        0.44140625
+      ]
+    },
+    "ch5-tread-mid-side": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.4453125,
+        0.234375,
+        0.599609375
+      ]
+    },
+    "ch5-tread-mid-top": {
+      "atlas": "tread-atlas-s6",
+      "rect": [
+        0,
+        0.603515625,
+        0.8984375,
+        0.798828125
       ]
     },
     "ch6-clerk": {
@@ -311,6 +860,15 @@
         0.451171875,
         0.939453125,
         0.6953125
+      ]
+    },
+    "ch6-crest": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0,
+        0.7392578125,
+        0.29296875,
+        1
       ]
     },
     "ch6-nave-a": {
@@ -383,6 +941,258 @@
         0.1865234375,
         0.53125,
         0.22265625
+      ]
+    },
+    "ch6-steps-deck": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0,
+        0.267578125,
+        0.68359375,
+        0.48828125
+      ]
+    },
+    "ch6-strongbox-back": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0.294921875,
+        0.1630859375,
+        0.490234375,
+        0.265625
+      ]
+    },
+    "ch6-strongbox-coins": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0,
+        0.119140625,
+        0.29296875,
+        0.265625
+      ]
+    },
+    "ch6-strongbox-front": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0,
+        0.490234375,
+        0.46875,
+        0.7373046875
+      ]
+    },
+    "ch6-strongbox-seal": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0.294921875,
+        0.74609375,
+        0.548828125,
+        1
+      ]
+    },
+    "ch6-strongbox-side": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0.470703125,
+        0.4931640625,
+        0.763671875,
+        0.7373046875
+      ]
+    },
+    "ch6-strongbox-top": {
+      "atlas": "treasury-atlas-s7",
+      "rect": [
+        0.685546875,
+        0.3037109375,
+        0.978515625,
+        0.48828125
+      ]
+    },
+    "end-letter": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0.255859375,
+        0.626953125,
+        0.802734375,
+        1
+      ]
+    },
+    "end-raven": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0,
+        0.58984375,
+        0.25390625,
+        1
+      ]
+    },
+    "end-routes-m0": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0.294921875,
+        0.333984375,
+        0.802734375,
+        0.587890625
+      ]
+    },
+    "end-routes-m1": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0,
+        0.080078125,
+        0.48828125,
+        0.29296875
+      ]
+    },
+    "end-routes-m2": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0.490234375,
+        0.107421875,
+        0.958984375,
+        0.29296875
+      ]
+    },
+    "end-seal": {
+      "atlas": "end-atlas-s9",
+      "rect": [
+        0,
+        0.294921875,
+        0.29296875,
+        0.587890625
+      ]
+    },
+    "satchel-astrolabe": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.1572265625,
+        0.3427734375,
+        0.4326171875,
+        0.6123046875
+      ]
+    },
+    "satchel-bag": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.3564453125,
+        0.7021484375,
+        0.8525390625,
+        1
+      ]
+    },
+    "satchel-burst-m0": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.4345703125,
+        0.373046875,
+        0.673828125,
+        0.6123046875
+      ]
+    },
+    "satchel-burst-m1": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.498046875,
+        0.1318359375,
+        0.7373046875,
+        0.3349609375
+      ]
+    },
+    "satchel-burst-m2": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.7392578125,
+        0.1630859375,
+        0.978515625,
+        0.3349609375
+      ]
+    },
+    "satchel-compass": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0.1357421875,
+        0.6875,
+        0.3544921875,
+        1
+      ]
+    },
+    "satchel-scroll": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0,
+        0.3369140625,
+        0.1552734375,
+        0.6123046875
+      ]
+    },
+    "satchel-sword": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0,
+        0.6142578125,
+        0.1337890625,
+        1
+      ]
+    },
+    "satchel-table-deck": {
+      "atlas": "satchel-atlas-s8",
+      "rect": [
+        0,
+        0.119140625,
+        0.49609375,
+        0.3349609375
+      ]
+    },
+    "title-border": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0,
+        0.2314453125,
+        0.552734375,
+        0.4453125
+      ]
+    },
+    "title-crest": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0,
+        0.0234375,
+        0.28515625,
+        0.2294921875
+      ]
+    },
+    "title-hero": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0.2060546875,
+        0.5009765625,
+        0.5068359375,
+        1
+      ]
+    },
+    "title-quill": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0,
+        0.447265625,
+        0.2041015625,
+        1
+      ]
+    },
+    "title-swell": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0.287109375,
+        0.0751953125,
+        0.7509765625,
+        0.2294921875
+      ]
+    },
+    "title-swell-seal": {
+      "atlas": "title-atlas-s1",
+      "rect": [
+        0.5546875,
+        0.2373046875,
+        0.822265625,
+        0.4453125
       ]
     }
   }

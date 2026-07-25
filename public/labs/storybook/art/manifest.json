@@ -1,4 +1,5 @@
 [
+  "apiary-atlas-s3",
   "bazaar-atlas-s6",
   "ch1-dormer",
   "ch1-gate",
@@ -150,6 +151,7 @@
   "ch6-treasury-vines",
   "cover-corner",
   "cover-crest",
+  "end-atlas-s9",
   "end-keepsake",
   "end-letter",
   "end-mound",
@@ -161,6 +163,8 @@
   "end-seal",
   "figure-atlas-s6",
   "flank-atlas-s4",
+  "flight-atlas-s3",
+  "inn-atlas-s2",
   "keep-atlas-s4",
   "nave-atlas-s7",
   "page-1",
@@ -173,6 +177,7 @@
   "page-8",
   "page-9",
   "satchel-astrolabe",
+  "satchel-atlas-s8",
   "satchel-bag",
   "satchel-burst-m0",
   "satchel-burst-m1",
@@ -184,10 +189,14 @@
   "satchel-vista-mid",
   "satchel-vista-near",
   "satchel-vista-rear",
+  "title-atlas-s1",
   "title-border",
   "title-crest",
   "title-hero",
   "title-quill",
   "title-swell",
-  "title-swell-seal"
+  "title-swell-seal",
+  "tread-atlas-s6",
+  "treasury-atlas-s7",
+  "vault-atlas-s5"
 ]

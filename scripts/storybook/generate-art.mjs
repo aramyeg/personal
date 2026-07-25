@@ -9478,9 +9478,21 @@ const ATLASES = [
     // E3 s4 ROUND-3: nine skyline strips down to one. What is left to share a
     // page is the surviving yard wall and the gatehouse tower — the cliffs
     // themselves are tall single pieces and carry their own textures.
+    //
+    // INFRA-2 fills the other 85% of the page with the TOWER-HOIST WINCH's four
+    // pieces and the foreground fringe. The winch is what stood between spread 4
+    // and the 8-file budget: its disc + three output bodies were four separate
+    // uploads for one mechanism, and the page they now share was already paid
+    // for. The keep's own faces stay on keep-atlas-s4 — that page belongs to a
+    // MERGED single-material mesh and must carry every keep id or nothing.
     regions: [
       { id: 'ch3-skyline-l-mound0', w: 400, opaque: false },
       { id: 'ch3-ring-tower', h: 360, opaque: false },
+      { id: 'ch3-fringe', w: 620, opaque: false },
+      { id: 'ch3-keep-winch-disc', w: 300, opaque: false },
+      { id: 'ch3-keep-winch-semaphore', h: 420, opaque: false },
+      { id: 'ch3-keep-winch-iris', h: 420, opaque: false },
+      { id: 'ch3-keep-winch-counterweight', h: 300, opaque: false },
     ],
   },
   {
@@ -9525,16 +9537,185 @@ const ATLASES = [
     ],
   },
   {
-    // E3 s6 ATLAS-B — the bazaar's FIGURES on a 512 page (pack §4f). Only the
-    // sprite-consuming stripflap family rides it today (throng + tea share the
-    // upload with their spread); the rider/child/vfold figure pieces stay
-    // loose webps until those renderers grow sprite support (INFRA-1 shipped
-    // consumption for keepstack/skyline/stripflap only).
+    // E3 s6 ATLAS-B — the bazaar's INHABITED page. Held two stripflap figures
+    // on a 512 page while INFRA-1's sprite consumption stopped at keepstack/
+    // skyline/stripflap; INFRA-2 gave the rider and generic two-quad families
+    // the same addressing, so the crowd chains, the pigeons and the city wall
+    // that closes the rear all join them here. Promoted to 1024 to fit them at
+    // a useful density — the wall is a full-width backdrop, not a figure.
     id: 'figure-atlas-s6',
+    regions: [
+      { id: 'ch5-city', w: 820, opaque: false },
+      { id: 'ch5-throng', w: 700, opaque: false },
+      { id: 'ch5-tea', h: 320, opaque: false },
+      { id: 'ch5-crowd-mid', w: 600, opaque: false },
+      { id: 'ch5-crowd-low', w: 600, opaque: false },
+      { id: 'ch5-pigeon-a', w: 220, opaque: false },
+      { id: 'ch5-pigeon-b', w: 200, opaque: false },
+    ],
+  },
+  {
+    // E3 s6 ATLAS-C — the stepped TERRACE TRAIN's eight box faces. A 512 page,
+    // not a share of bazaar-atlas-s6: that page already packs at scale 0.833
+    // (71.5% occupancy) and its two die-cut facade plates are the spread's
+    // reader-facing hero art, so widening it would cost plate resolution to
+    // save a page that costs a quarter as much. Every face here is a shallow
+    // strip — the treads are seen from above and edge-on.
+    id: 'tread-atlas-s6',
     page: 512,
     regions: [
-      { id: 'ch5-throng', w: 400, opaque: false },
-      { id: 'ch5-tea', h: 240, opaque: false },
+      { id: 'ch5-tread-mid-top', w: 460, opaque: false },
+      { id: 'ch5-tread-mid-front', w: 460, opaque: false },
+      { id: 'ch5-tread-mid-side', w: 120, opaque: false },
+      { id: 'ch5-tread-mid-back', w: 300, opaque: false },
+      { id: 'ch5-tread-low-top', w: 440, opaque: false },
+      { id: 'ch5-tread-low-front', w: 440, opaque: false },
+      { id: 'ch5-tread-low-side', w: 120, opaque: false },
+      { id: 'ch5-tread-low-back', w: 300, opaque: false },
+    ],
+  },
+  {
+    // ---- INFRA-2 — the per-spread scenery pages. Each one carries everything
+    // its spread mounts through a sprite-aware renderer, so a chapter's whole
+    // built world is one upload plus the handful of exempt pieces below. The
+    // permanent exemptions (never packed): the page prints, the dissolve's
+    // dunes/gold crossfade pair and its brass tab, the dispatch dial + window
+    // card (a REGISTRATION pair — they must stay pixel-aligned to each other,
+    // not to a packer's scale factor), the tabpiece band strips, the depthvista
+    // wings, and the pieces that are already atlas sheets in their own right
+    // (ch2-swarm-atlas, ch4-range, the stagedchain cliffs). ----
+    id: 'title-atlas-s1',
+    regions: [
+      { id: 'title-hero', h: 560, opaque: false },
+      { id: 'title-quill', h: 620, opaque: false },
+      { id: 'title-border', w: 620, opaque: false },
+      { id: 'title-swell', w: 520, opaque: false },
+      { id: 'title-crest', w: 320, opaque: false },
+      { id: 'title-swell-seal', w: 300, opaque: false },
+    ],
+  },
+  {
+    // Chapter I — the inn yard. The lift-flap key board and its four door
+    // leaves stay loose: popup-liftflap-layer.tsx has no sprite path yet, so
+    // packing them would cost page area and still fetch five webps.
+    id: 'inn-atlas-s2',
+    regions: [
+      { id: 'ch1-inn-row', w: 620, opaque: false },
+      { id: 'ch1-wall', w: 620, opaque: false },
+      { id: 'ch1-mountain', w: 400, opaque: false },
+      { id: 'ch1-gate', w: 380, opaque: false },
+      { id: 'ch1-rank', w: 300, opaque: false },
+      { id: 'ch1-stable-side', w: 200, opaque: false },
+      { id: 'ch1-stable-back', w: 200, opaque: false },
+      { id: 'ch1-stable-top', w: 200, opaque: false },
+      { id: 'ch1-stable-hay', w: 200, opaque: false },
+      { id: 'ch1-stable-vane', h: 200, opaque: false },
+      { id: 'ch1-key', w: 160, opaque: false },
+      { id: 'ch1-sign', w: 150, opaque: false },
+      { id: 'ch1-dormer', w: 140, opaque: false },
+    ],
+  },
+  {
+    // Chapter II — the apiary's STRUCTURE. Split from the swarm props below so
+    // the hero hive-keeper and the windmill keep their texel density; two 1024
+    // pages at ~70% beat one at 140% (which the packer would resolve by
+    // shrinking every region until the hero was illegible).
+    id: 'apiary-atlas-s3',
+    regions: [
+      { id: 'ch2-hero', h: 640, opaque: false },
+      { id: 'ch2-backdrop', w: 480, opaque: false },
+      { id: 'ch2-windmill', h: 380, opaque: false },
+      { id: 'ch2-fringe', w: 560, opaque: false },
+      { id: 'ch2-hive-front', w: 300, opaque: false },
+      { id: 'ch2-hive-side', h: 300, opaque: false },
+      { id: 'ch2-hive-back', w: 150, opaque: false },
+      { id: 'ch2-hive-top', w: 150, opaque: false },
+    ],
+  },
+  {
+    // Chapter II — the apiary's SWARM AND SKY: bees, crowns, clouds, flower
+    // beds, the chain garlands. All small, all die-cut, all riding one page.
+    // (ch2-swarm-atlas is itself a 1024 sprite sheet and is never repacked.)
+    id: 'flight-atlas-s3',
+    regions: [
+      { id: 'ch2-cloud-l', w: 448, opaque: false },
+      { id: 'ch2-cloud-r', w: 448, opaque: false },
+      { id: 'ch2-chain-l', w: 448, opaque: false },
+      { id: 'ch2-chain-r', w: 448, opaque: false },
+      { id: 'ch2-bee-a', w: 420, opaque: false },
+      { id: 'ch2-hive-flowers', w: 364, opaque: false },
+      { id: 'ch2-hive-swarm', w: 364, opaque: false },
+      { id: 'ch2-bee-b', w: 336, opaque: false },
+      { id: 'ch2-bee-c', w: 336, opaque: false },
+      { id: 'ch2-crown-b', w: 252, opaque: false },
+      { id: 'ch2-crown-c', w: 252, opaque: false },
+    ],
+  },
+  {
+    // Chapter IV — the vault. The dragon on the vault door is the book's money
+    // shot, so it takes the largest region on any INFRA-2 page. The dissolve's
+    // dunes/gold pair is mechanism-load-bearing (one painting is the BackSide of
+    // the other across a slat flip) and stays loose, with its brass tab.
+    id: 'vault-atlas-s5',
+    regions: [
+      { id: 'ch4-hero', w: 560, opaque: false },
+      { id: 'ch4-hoard-deck', w: 620, opaque: false },
+      { id: 'ch4-frieze', w: 620, opaque: false },
+      { id: 'ch4-chest-front', w: 320, opaque: false },
+      { id: 'ch4-aureole', w: 300, opaque: false },
+      { id: 'ch4-coins', w: 300, opaque: false },
+      { id: 'ch4-chest-spill', w: 260, opaque: false },
+      { id: 'ch4-chest-lid', h: 240, opaque: false },
+      { id: 'ch4-chest-side', w: 200, opaque: false },
+      { id: 'ch4-chest-back', w: 200, opaque: false },
+    ],
+  },
+  {
+    // Chapter VI — the treasury's furniture: the strongbox's four faces and its
+    // two dressed patches, the stair deck, the clerk's crest rider. The four
+    // oanave ranks keep nave-atlas-s7 to themselves (73.6% at scale 1.0 — no
+    // room, and their die-cut apertures are the spread's whole idea).
+    id: 'treasury-atlas-s7',
+    regions: [
+      { id: 'ch6-steps-deck', w: 700, opaque: false },
+      { id: 'ch6-strongbox-front', w: 480, opaque: false },
+      { id: 'ch6-strongbox-side', w: 300, opaque: false },
+      { id: 'ch6-strongbox-top', w: 300, opaque: false },
+      { id: 'ch6-strongbox-coins', w: 300, opaque: false },
+      { id: 'ch6-crest', w: 300, opaque: false },
+      { id: 'ch6-strongbox-seal', w: 260, opaque: false },
+      { id: 'ch6-strongbox-back', w: 200, opaque: false },
+    ],
+  },
+  {
+    // The satchel spread. The depthvista wings stay loose — that renderer takes
+    // no rect yet, and its three flaps are mirrored to both flanks from one art
+    // each, so they are already the cheapest pieces on the page.
+    id: 'satchel-atlas-s8',
+    regions: [
+      { id: 'satchel-bag', w: 540, opaque: false },
+      { id: 'satchel-table-deck', w: 540, opaque: false },
+      { id: 'satchel-compass', h: 340, opaque: false },
+      { id: 'satchel-sword', h: 420, opaque: false },
+      { id: 'satchel-astrolabe', w: 300, opaque: false },
+      { id: 'satchel-scroll', h: 300, opaque: false },
+      { id: 'satchel-burst-m0', w: 260, opaque: false },
+      { id: 'satchel-burst-m1', w: 260, opaque: false },
+      { id: 'satchel-burst-m2', w: 260, opaque: false },
+    ],
+  },
+  {
+    // The end spread. `end-keepsake` stays loose: the keepsake card is its own
+    // renderer with no sprite path, and it is the one piece the reader is
+    // invited to look at closely.
+    id: 'end-atlas-s9',
+    regions: [
+      { id: 'end-letter', w: 560, opaque: false },
+      { id: 'end-routes-m0', w: 520, opaque: false },
+      { id: 'end-routes-m1', w: 500, opaque: false },
+      { id: 'end-routes-m2', w: 480, opaque: false },
+      { id: 'end-raven', h: 420, opaque: false },
+      { id: 'end-seal', w: 300, opaque: false },
     ],
   },
 ]
