@@ -257,9 +257,9 @@ principle) before any of these land.
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `ch4-backdrop` | `ch4-backdrop` | Desert panorama at sunset, layered dunes, distant caravan | ≈2.57:1 landscape | STAND | **art** |
-| `ch4-midground` | `ch4-midground` | Golden-domed desert city skyline strip | ≈4.04:1 very wide | STAND | **art** |
-| `ch4-hero` | `ch4-hero` | THE MONEY SHOT: the hero bridling the coin-scaled dragon (canonical hero reference image) | ≈1.28:1 landscape | STAND | **art** |
+| `ch4-range` | `ch4-range` | E3 NOCTURNE MASSIF (mfoldrange, family #21): FOUR dune ranks + two valley-floor gusset strips on ONE 1024×1024 atlas — rows top→bottom r4 380px / r3 270px / r2 190px / r1 136px / gusset-left 24px / gusset-right 24px (popup-mfoldrange.ts `MFOLD_ATLAS_ROWS`). VAULT_NIGHT palette: violet-shadowed lee faces, gold-lit windward faces; r4's upper 40% is night sky with painted heat-shimmer columns, haze wisps die-cut into r4/r2 top edges; r3 silhouette DIPS ≤0.36 inside \|x\|<0.45 (the notch framing the dragon); r2 carries the printed micro-caravan on its lit face | 1:1 atlas (row bands per rank) | ATLAS-ROWS | placeholder |
+| `ch4-hero` | `ch4-hero` | THE MONEY SHOT: the vault-dragon coiled on the round vault door, GOLD-FOIL facet treatment (seeded 4-stop gradients, ~10% thin-film teal/magenta, sparkles) — the one glowing thing in a dark spread | ≈1.28:1 landscape | STAND | **art** |
+| `ch4-aureole` | `ch4-aureole` | Gilded guilloché vault-ring arc (dress on the hero's right panel, behind the head): engine-turned gilt, pierced filigree, pale rim edge | ≈1.13:1 near-square | FLAT | placeholder |
 | `ch4-coins` | `ch4-coins` | Gold coins spilling off the dragon's own fold | ≈1.0:1 square | STAND — **ROTATED 180** | **art** |
 | `ch4-chest` | `ch4-chest-front`, `ch4-chest-back`, `ch4-chest-side` (**no `-top`** — `roof:'open'`, hollow, no lid) | Open treasure chest — hollow box, reading camera looks straight down into a raw-paper interior; only 3 exterior faces need art | side ≈1.0:1 · front/back ≈2.0:1 | FACE | placeholder |
 | `ch4-chest-lid` | `ch4-chest-lid` | Dressed propped-open lid silhouette off the chest's side wall | ≈0.93:1 near-square | FLAT | placeholder |
@@ -267,7 +267,7 @@ principle) before any of these land.
 | `ch4-hoard` | `ch4-hoard-deck` | Gold-hoard BRIDGE deck, deep behind the dragon, cresting above the skyline | ≈4.2:1 very wide strip | TOPDOWN | placeholder |
 | `ch4-goldpile` | `ch4-goldpile-face` | MOUND tab piece: loose gold rising as the spread blooms, tab creeps out the fore edge | u:v ≈0.54:1 (portrait unfolded strip) — bands: `slopeIn` v∈[0,0.5], `slopeOut` v∈[0.5,1] | UNFOLD | placeholder |
 | `ch4-dissolve` | `ch4-dissolve-dunes`, `ch4-dissolve-gold` | PULL-TAB DISSOLVE (Birmingham 92/93; the book's only paper CROSSFADE): a page-flat rack of 6 venetian SLATS on the LEFT-page open sand field (the mirror of the right-page goldpile tab). Pull the tab and rolling DUNES with a distant camel-train FLIP through the edge-on "blinds close" to the dragon's GOLD hoard — the two paintings share ONE composition (matching ridgelines, sun, and caravan station) so the flip reads as a transmutation. `-dunes` is the up-face at rest (tau=0), `-gold` the under-face revealed at tau=PI. Painted in SCREEN space (image-x = the page-fore axis d = the 6-slat stack; image-y = the spine axis z, SVG top = far sky, SVG bottom = near foreground), sliced into 6 vertical strips. | ≈1.18:1 each (d 0.52 : z 0.44) | SLAT-FLIP (screen-space) | **art** (procedural) |
-| `ch4-foreground` | `ch4-foreground` | Dune-crest fringe, desert grass, scattered coins, one cactus | ≈5.09:1 very wide | STAND | **art** |
+| `ch4-frieze` | `ch4-frieze` | Ember-sashed camel caravan frieze: ONE linked-chain cutout walking INTO the picture toward the brass PULL tab; silhouette dips ≤0.06 in x∈[−0.75,−0.44] (camel-leg gaps keep the dissolve placard sightline) | ≈9.4:1 very wide sliver | STAND | placeholder |
 
 ## 6. Chapter V — The Bazaar of a Thousand Stalls (spread 6)
 

@@ -44,6 +44,7 @@ import {
 } from './popup-dissolve'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
+import { turnCullOpacity } from './turn-cull'
 import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { peakHeight, shadowLift } from './shadow-light'
 import type { TurnFrame } from './use-turn-driver'
@@ -183,17 +184,19 @@ export function DissolvePopupLayer({
   const slitGeom = useMemo(() => makeSlitGeometry(), [])
   const handleMaterial = sharedHandleMaterial()
 
+  // Transparent so the turn-cull ramp (C-3) can fade the rack out/in; at
+  // opacity 1 (any rest frame) the prints render exactly as before.
   const dunesMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff' }),
+    () => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff', transparent: true }),
     []
   )
   const goldMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: '#ffffff' }),
+    () => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: '#ffffff', transparent: true }),
     []
   )
-  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: SAND_COLOR }), [])
-  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: SAND_SHADE }), [])
-  const tabMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: tint.shade }), [tint])
+  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: SAND_COLOR, transparent: true }), [])
+  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: SAND_SHADE, transparent: true }), [])
+  const tabMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: tint.shade, transparent: true }), [tint])
   const edgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: tint.edge, transparent: true, opacity: 0.9 }),
     [tint]
@@ -348,10 +351,22 @@ export function DissolvePopupLayer({
       f ? easeTurnWeighted(f.t) : 0
     )
     const beta = thetaL - thetaR
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    // TURN-CULL (C-3, dissolve-class): the rack is interaction-only and
+    // page-flat — mid-turn it is an edge-on sliver nobody is reading, so it
+    // stops drawing through the fast middle and ramps back inside the
+    // landing-settle beat. Pose maths below are untouched (no fold-flat
+    // proof is affected); hiding the group is what returns the draw calls.
+    const cull = layer.turnCull ? turnCullOpacity(f ? easeTurnWeighted(f.t) : 0) : 1
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
+    if (layer.turnCull) {
+      for (const m of [dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial]) {
+        m.opacity = cull
+      }
+      edgeMaterial.opacity = 0.9 * cull // its rest opacity, ramped
+    }
 
     // Snap-on-release: ease the held flip to the nearest pure end {0,PI} so the
     // picture clicks to dunes or gold (no half-dissolve rest state).

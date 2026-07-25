@@ -48,6 +48,7 @@ import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/story
 import { keepSkylineQuads, solveKeepSkylinePose } from '@/components/labs/storybook/book/popup-skyline'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
+import { rankVFoldGeom, solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
 import {
   keepsakeCardInPlane,
   keepsakePExit,
@@ -177,6 +178,16 @@ const allQuads = (
     const pose = solveDissolvePose(layer, 0, thetaL, thetaR)
     return [pose.base, ...pose.slats, pose.tab]
   }
+  // The range is ONE card of k v-fold ranks + flat valley gussets — every
+  // rigid world quad it poses, so the whole A-suite (rigidity, flat fold,
+  // continuity, separation, wedge containment) gates the family wholesale.
+  if (layer.mech === 'mfoldrange') {
+    const pose = solveMFoldRangePose(layer, thetaL, thetaR)
+    return [
+      ...pose.ranks.flatMap((r) => [r.right, r.left]),
+      ...pose.gussets.flatMap((g) => [g.left, g.right]),
+    ]
+  }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -299,6 +310,28 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         // stroke + run-band + z-band rules; keepsake sleeve/slit/seat rules), and
         // the E1 showpiece test files (popup-keepstack/-keepwinch/-skyline.test.ts:
         // telescoping + glue chain, crank + stagger + D-G2 scrub, mound band).
+        return
+      }
+      if (layer.mech === 'mfoldrange') {
+        // Every rank is a plain symmetric v-fold handed to the shipped
+        // solver verbatim (rankVFoldGeom) — the v-fold laws apply per rank.
+        expect(layer.ranks.length).toBeGreaterThanOrEqual(4)
+        expect(layer.ranks.length).toBeLessThanOrEqual(8)
+        layer.ranks.forEach((rank, k) => {
+          const vf = rankVFoldGeom(layer, rank)
+          expect(vf.rhoDeg).toBeGreaterThan(vf.phiDeg)
+          expect(vf.phiDeg + vf.rhoDeg).toBeLessThan(180)
+          // linkage reachable at every beta (no jam/tear)
+          expect(Math.abs(Math.cos(rad(vf.rhoDeg)))).toBeLessThanOrEqual(
+            Math.cos(rad(vf.phiDeg)) + 1e-12
+          )
+          expect(Math.abs(vf.apexZ)).toBeLessThanOrEqual(PAGE_H / 2)
+          // stands as a wall at rest
+          const rest = solveVFoldPose(vf, Math.PI, 0)
+          expect(rest.crease[1]).toBeGreaterThan(0.25)
+          // sequential stations: apexZ strictly ascending back->front
+          if (k > 0) expect(rank.apexZ).toBeGreaterThan(layer.ranks[k - 1].apexZ)
+        })
         return
       }
       if (layer.mech === 'stripflap') {
@@ -537,6 +570,29 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
           // liftflap-board class): no page-glued FOLD panel, so A1's glue-in-page
           // check does not apply — its coplanarity + fold-flat live in
           // derive-dissolve.mjs D6/D8 and popup-dissolve.test.ts.
+          continue
+        }
+        if (layer.mech === 'mfoldrange') {
+          // Every rank is a page-glued v-fold: its glue edges (corners 0,1 of
+          // each panel) lie in the page planes; every gusset strip lies whole
+          // in its page (flat by construction — the same card, printed).
+          const pose = solveMFoldRangePose(layer, thetaL, thetaR)
+          for (const rank of pose.ranks) {
+            for (const p of [rank.right[0], rank.right[1]]) {
+              expect(Math.abs(p[0] * nR[0] + p[1] * nR[1])).toBeLessThan(1e-9)
+            }
+            for (const p of [rank.left[0], rank.left[1]]) {
+              expect(Math.abs(p[0] * nL[0] + p[1] * nL[1])).toBeLessThan(1e-9)
+            }
+          }
+          for (const gusset of pose.gussets) {
+            for (const p of gusset.right) {
+              expect(Math.abs(p[0] * nR[0] + p[1] * nR[1])).toBeLessThan(1e-9)
+            }
+            for (const p of gusset.left) {
+              expect(Math.abs(p[0] * nL[0] + p[1] * nL[1])).toBeLessThan(1e-9)
+            }
+          }
           continue
         }
         const pose = poseAt(layer, layers, thetaL, thetaR)

@@ -169,6 +169,13 @@ const familyOf = (l: SceneLayer): string | null => {
       // family, distinct from the volvelle's rotating window and the liftflap's
       // hinged reveal.
       return 'dissolve'
+    case 'mfoldrange':
+      // The multi-fold range (Birmingham 28/57) — ONE card of k standing
+      // v-fold ranks at DISTINCT apexZ stations chained by page-glued flat
+      // gussets. Distinct from the fan (k planes at ONE shared apex): the
+      // sequential stations give each rank its own closed-form response
+      // curve — the bloom wave — which a shared-vertex fan cannot produce.
+      return 'mfoldrange'
     case 'dress':
       return null
   }

@@ -22,6 +22,7 @@ import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keep
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
@@ -173,6 +174,15 @@ const allQuads = (
     const pose = solveDissolvePose(layer, 0, thetaL, thetaR)
     return [pose.base, ...pose.slats, pose.tab]
   }
+  // The range is purely page-driven: k v-fold ranks on one card + flat
+  // gussets — every rank's motion is the shipped v-fold closed form.
+  if (layer.mech === 'mfoldrange') {
+    const pose = solveMFoldRangePose(layer, thetaL, thetaR)
+    return [
+      ...pose.ranks.flatMap((r) => [r.right, r.left]),
+      ...pose.gussets.flatMap((g) => [g.left, g.right]),
+    ]
+  }
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -310,6 +320,16 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // N2) proves every output cam has bounded slope (no snap); its real bound is
   // Gate 2's absolute cap, which N7 holds ~88% clear. Measured 8.86x + ~10%.
   keepwinch: 9.8,
+  // MULTI-FOLD RANGE (E3 s5): ONE card of k v-fold ranks + page-flat valley
+  // gussets. Every rank drives through the same smooth closed form as the
+  // vfold family (ceiling 15.5), but the composite MEAN is diluted by the
+  // short front ranks and the near-page gusset corners (which barely move),
+  // while the MAX is the tall back rank's late-blooming crest — the same
+  // static-corner dilution that raises the kinetic arm's and keep-winch's
+  // ratios. Measured worst 17.29x (ch4-range, beta domain) + 10%. Smooth and
+  // branch-free per rank; the real-time GLOBAL_CAP tests below hold it
+  // absolutely bounded at real turn speed.
+  mfoldrange: 19,
   // VOLVELLE (E2.2 Batch B): at a FROZEN twist the dial + card ride the page as a
   // rigid coplanar square, so their only page-driven motion is the pure rigid
   // page sweep — every corner's step is proportional to its distance from the
