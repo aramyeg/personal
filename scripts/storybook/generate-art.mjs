@@ -4234,7 +4234,10 @@ function innCourtyardSpread(w, h, seed) {
   s += `<path d="${field}" fill="#dcc697"/>`
   s += `<path d="${field}" fill="url(#s2pgPave)"/>`
   s += `<g clip-path="url(#s2pgField)">`
-  const STONE_FILLS = ['#cbb078', '#a98a5c', '#c3a76e', '#b6976a']
+  // Six setts spanning a real LIGHT-to-DARK range, not four mid-tones: paving
+  // can only carry as much value range as its palette holds, and a mid-only
+  // palette caps the whole print's contrast however the lighting is graded.
+  const STONE_FILLS = ['#e2c88f', '#cbb078', '#c3a76e', '#b6976a', '#a98a5c', '#8a6f47']
   // Courses are true ARCS about the great door, walked outward in PIXEL space so
   // they stay circular on the plate: this is what makes the painted perspective
   // CONVERGE on plane B's door (T-FLOOR, scene pack 1). Straight full-width rows
@@ -4264,7 +4267,7 @@ function innCourtyardSpread(w, h, seed) {
       const sx2 = OXp + Math.cos(th) * R
       const sy2 = OYp + Math.sin(th) * R
       if (sy2 < -ry * 2 || sy2 > h + ry * 2 || sx2 < -rx * 2 || sx2 > w + rx * 2) continue
-      const fill = STONE_FILLS[Math.floor(r() * STONE_FILLS.length)]
+      const fill = STONE_FILLS[Math.min(STONE_FILLS.length - 1, Math.floor(((r() + r()) / 2) * STONE_FILLS.length))] // triangular: mid-tones dominate
       const spin = fx((th * 180) / Math.PI - 90 + rr(r, -7, 7))
       const erx = fx(rx * rr(r, 0.8, 1))
       const ery = fx(ry * rr(r, 0.86, 1.04))
@@ -4299,16 +4302,27 @@ function innCourtyardSpread(w, h, seed) {
   const matY = pageFY(0.3)
   const matW = 0.128
   const matH = 0.052
+  // Dark COIR against lit paving, with its own contact shadow and a pale bound
+  // edge: at 0.85 over roofDim the mat measured 19 luminance off the cobbles it
+  // lies on, i.e. below the threshold where a shape still reads at the pinned
+  // camera. A doormat is a dark object on a light floor — paint it that way.
   s += `<g transform="rotate(-1.2 ${fx(PX(0.5))} ${fx(PY(matY))})">`
-  s += `<rect x="${fx(PX(0.5 - matW / 2))}" y="${fx(PY(matY - matH / 2))}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="${INN.roofDim}" opacity="0.85"/>`
-  s += `<rect x="${fx(PX(0.5 - matW / 2) + 5)}" y="${fx(PY(matY - matH / 2) + 5)}" width="${fx(PX(matW) - 10)}" height="${fx(PY(matH) - 10)}" fill="none" stroke="${ROOK.parch}" stroke-width="2.4" stroke-dasharray="7 4" opacity="0.9"/>`
+  s += `<rect x="${fx(PX(0.5 - matW / 2) + 2)}" y="${fx(PY(matY - matH / 2) + 6)}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="${INK}" opacity="0.34"/>`
+  s += `<rect x="${fx(PX(0.5 - matW / 2))}" y="${fx(PY(matY - matH / 2))}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="#6d5334"/>`
+  // coir bristle tooth, so the mat reads as woven rather than as a flat plate
+  for (let i = 0; i <= 46; i++) {
+    const bx = lerp(PX(0.5 - matW / 2) + 4, PX(0.5 + matW / 2) - 4, i / 46)
+    s += `<line x1="${fx(bx)}" y1="${fx(PY(matY - matH / 2) + 4)}" x2="${fx(bx)}" y2="${fx(PY(matY + matH / 2) - 4)}" stroke="${INK}" stroke-width="1.5" opacity="0.14"/>`
+  }
+  s += `<rect x="${fx(PX(0.5 - matW / 2) + 5)}" y="${fx(PY(matY - matH / 2) + 5)}" width="${fx(PX(matW) - 10)}" height="${fx(PY(matH) - 10)}" fill="none" stroke="${INN.stone}" stroke-width="2.6" opacity="0.9"/>`
   // engraved font-free (ENGRAVE_GLYPHS) — no installed-typeface dependency
   {
     const cw2 = PX(0.0102)
     const gap2 = PX(0.0028)
     const ch2 = PY(0.0225)
     const total = 7 * cw2 + 6 * gap2
-    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2, cw2, ch2, gap2, ROOK.parch, 2.6, 'opacity="0.95"')
+    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2 + 1.4, cw2, ch2, gap2, INK, 4.2, 'opacity="0.45"')
+    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2, cw2, ch2, gap2, ROOK.parchLit, 3.2, 'opacity="0.98"')
   }
   s += `</g>`
 
@@ -4319,14 +4333,23 @@ function innCourtyardSpread(w, h, seed) {
     const P = [[0.985, pageFY(0.5)], [0.9, pageFY(0.52)], [0.84, pageFY(0.1)], [0.62, pageFY(-0.12)]]
     return [0, 1].map((k) => mt * mt * mt * P[0][k] + 3 * mt * mt * t * P[1][k] + 3 * mt * t * t * P[2][k] + t * t * t * P[3][k])
   }
+  // BRASS on a walnut under-copy, each on its own contact shadow. Drawn in
+  // WALNUT they were the same colour as the cobble joints and measured x0.99
+  // local contrast against the paving — a named story element, invisible. The
+  // shared keyGlyph is untouched (ch1-sign/-gate and s4 call it); only this
+  // caller's palette changes.
+  const strewnKey = (S) =>
+    `<ellipse cx="0" cy="${fx(S * 0.34)}" rx="${fx(S * 0.42)}" ry="${fx(S * 0.13)}" fill="${INK}" opacity="0.3"/>` +
+    `<g transform="translate(1.6 2.2)" opacity="0.55">${keyGlyph(S, INK, INK)}</g>` +
+    keyGlyph(S, GOLD, GOLD_LIT)
   for (let k = 0; k < 9; k++) {
     const [kx, ky] = trail(k / 8 + rr(r, -0.02, 0.02))
     const S = lerp(h * 0.047, h * 0.03, k / 8)
-    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})">${keyGlyph(S, WALNUT, '#7d6238')}</g>`
+    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})">${strewnKey(S)}</g>`
   }
   // ... and two strays on the left page for the wanderers
   for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
-    s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.6">${keyGlyph(h * 0.024, WALNUT, '#7d6238')}</g>`
+    s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.8">${strewnKey(h * 0.026)}</g>`
 
   // ---- THE LIFT RIBBON BANNER arcing over the key-board (celebrated, not
   // apologetic): brick-red ribbon, parchment letters, gold tails.
