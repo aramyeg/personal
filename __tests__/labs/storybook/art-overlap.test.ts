@@ -317,19 +317,39 @@ const WHITELIST: readonly WhitelistEntry[] = [
       "the skyline and shows through the torn-paper sky' — confirmed in the capture escaping past the " +
       "dragon's wing from its own deep lane.",
   },
+  // (The old bazaar entries — ch5-arch x ch5-goods, ch5-stall x ch5-goods —
+  // retired with their pieces in the E3 s6 amphitheater rebuild; the new
+  // spread's deliberate concentric stacking is whitelisted below.)
   {
-    pair: 'ch5-arch x ch5-goods',
-    reason: 'framing',
+    pair: 'ch5-arc-rear x ch5-arc-inner',
+    reason: 'depth-echo',
     note:
-      'the capture shows the goods table staged directly beneath/within the archway opening — a literal ' +
-      'architectural frame around the market wares, the clearest framing case in the book.',
+      'the two concentric stall arcs ARE the amphitheater (scenes/s6-scene-pack.md §2: rear arc "behind" the ' +
+      'inner arc by construction) — a bowl of terraced stalls reads as rings stacked up the screen from the ' +
+      'lid-dominant camera; measured 0.31 is the composition, not a mask.',
   },
   {
-    pair: 'ch5-stall x ch5-goods',
-    reason: 'silhouette-dialogue',
+    pair: 'ch5-arc-inner x ch5-tread-mid',
+    reason: 'depth-echo',
     note:
-      "documented intent: the goods platform 'spans the stall row' — the wares table and the stall it " +
-      'belongs to are one market beat by construction, not two pieces that happen to collide.',
+      'the terrace bowl descends from the inner arc\'s feet (pack §2 "stepped plinths descending to the ' +
+      'apron") — the upper tread reads directly beneath the stall fronts it serves, the staircase relationship ' +
+      'the box train exists to draw.',
+  },
+  {
+    pair: 'ch5-arc-inner x ch5-crowd-mid',
+    reason: 'framing',
+    note:
+      'the mid-terrace shopper chain stands with the inner stall arc as its backdrop — figures framed against ' +
+      'the stalls they shop at (pack §2 "crowd ranks on the treads, the inner stall arc rising behind them"); ' +
+      'the 0.64 ratio is the chain almost fully inside the arc silhouette, which is the market-crowd read.',
+  },
+  {
+    pair: 'ch5-tread-mid x ch5-crowd-low',
+    reason: 'depth-echo',
+    note:
+      'the lower crowd rank stands one step down from the mid tread behind it — consecutive terrace tiers ' +
+      'overlap by the riser height from the reading camera; the same staircase read as the tread pair itself.',
   },
   {
     pair: 'ch3-keep x ch3-ring-tower',

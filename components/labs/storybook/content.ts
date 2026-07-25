@@ -537,48 +537,96 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
 ]
 
-// Chapter V — the bazaar: rose-stone skyline, then a ROW of identical
-// stall fronts flanking the archway (the "master patterns" story told as
-// repetition — its wide flanks stay visible past the arch), the archway
-// strung with TWO lanterns (children at different heights on one fold),
-// and the market awning tented out front, ridge toward the right page and
-// sized so the arch shows over it.
+// Chapter V — THE BAZAAR OF A THOUSAND STALLS (E3 s6 rebuild;
+// scenes/s6-scene-pack.md, register R4 GRAND-DENSE amphitheater, bench
+// e3s6-terrace.mjs ALL GREEN). Chapter meaning = DENSITY: no tall hero — the
+// MASS is the hero. From the city gate the bazaar opens like a bowl: the
+// retained city v-fold (repainted — curved streets, die-cut dome skyline)
+// closes the rear under two wheeling pigeons; two concentric stall arcs
+// (1-story keepstacks wearing die-cut facade plates — 7 gables + the modest
+// gate-minaret at y 0.55 rear, 5 larger awninged fronts inner) curve around
+// a sunken market floor; souk skyline wings run both arcs out to the page
+// edges at matched depths; a stepped BOX TRAIN of terrace treads descends to
+// the apron (the mech-37 stepped-terrace READ on the proven glued-box family
+// — a cut-from-base parallelogram is geared-dead at our 176° rest bloom,
+// sin(2°) = 3.5% of its riser), carrying linked crowd-chain riders on its
+// carpet lids (2 pieces read as 11 figures); the 8-shopper throng stripflap
+// surges up at the terrace foot (the signature moment); the tea-corner
+// stripflap steams at the right apron; and the retained tabpiece is re-themed
+// into the chapter's whole point — ⟡ RAISE A STALL ⟡. Concentricity is
+// COMPOSED, not bent: gutter boxes grade a 0.40 → 0.34 → 0.30 → 0.26 toward
+// the reader (Birmingham 118: front narrowest), the plates + souk wings carry
+// the curve in paint and die-cut, the doodled floor print closes the arcs.
+// Retired per the pack fate list: ch5-stalls, ch5-arch (+garland/keystone),
+// ch5-lantern/-b (re-seated as die-cut lantern strings swagged across BOTH
+// plates), ch5-stall (+valance/crates), ch5-goods (its wares role moved to
+// the tread lids). ch5-market-table renamed → ch5-raise-stall (same solver
+// params, re-themed).
 const CH5_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch5-city', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.44, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: -1.2, creaseU: 0.58, width: 1.7, height: 0.72 },
-  { id: 'ch5-stalls', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: -0.24, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.2, creaseU: 0.62, width: 1.15, height: 0.3 },
-  // (C6 round 4: the canopy fan that briefly lived here was shrunk to a
-  // nubbin by the packed bazaar lanes and read as nothing — the fan
-  // showcase moved to the TITLE spread at full size, where it has room to
-  // be six planes. The bazaar keeps its four families without it:
-  // vfold / child / box / platform.)
-  // Arch pulled a step deeper (C6 round 4 band audit): its panel centroid
-  // sat within the goods table's band and the two merged once the canopy
-  // fan left — a real depth gap between archway and market table restores
-  // the fifth band the eye reads.
-  { id: 'ch5-arch', kind: 'hero', role: 'story', mech: 'vfold', apexZ: -0.16, vDir: 1, phiDeg: 54, rhoDeg: 81, width: 0.8, height: 0.8 },
-  // Dress on the arch: a garland swagged high across the right panel, a keystone medallion high-center on the left.
-  { id: 'ch5-arch-garland', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'right', u: 0.05, v: 0.72, width: 0.3, height: 0.1 },
-  { id: 'ch5-arch-keystone', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch5-arch', seat: 'left', u: 0.15, v: 0.68, width: 0.1, height: 0.1 },
-  { id: 'ch5-lantern', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.54, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.15, height: 0.26 },
-  { id: 'ch5-lantern-b', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch5-arch', mount: 0.66, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.09, height: 0.252 },
-  // VOLUMETRIC: the awning tent is reimagined as an OPEN-FRONT market
-  // stall — left wall, right wall, canvas canopy, open toward the shopper
-  // (market stalls ARE open-fronted; C6 round-1 made this the canonical
-  // read). Back wall braces. Sized so the arch's painted opening and the
-  // hero walking through it stay clear above it.
-  { id: 'ch5-stall', kind: 'backdrop', role: 'story', mech: 'box', a: 0.12, height: 0.15, z0: 0.36, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
-  // Dress on the stall: a scalloped valance hanging off the canopy edge, stacked crates low against the side wall.
-  { id: 'ch5-stall-valance', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch5-stall', seat: 'roofL', u: 0, v: 0.07, width: 0.2, height: 0.07 },
-  { id: 'ch5-stall-crates', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch5-stall', seat: 'wallL', u: 0.04, v: 0, width: 0.12, height: 0.09 },
-  // FLOATING TIER (C3v2): the goods table — a BRIDGE platform spanning the
-  // stall row, its deck the laid-out wares.
-  { id: 'ch5-goods', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.12, spans: [[0.08, 0.14], [0.24, 0.3]] }, qA: 0.09, qB: 0.09, deckZ0: 0.08, deckZ1: 0.3 },
-  // D1 TAB PIECE: a market TABLE erected by its own fore-edge tab on the
-  // left page, downstage of the stall row — legs + level deck. Inner
-  // hinge at 0.34 clears the stall box's left-wall reach (~0.27); the
-  // z band sits past the goods platform (z <= 0.3) and the stalls fold
-  // (z ~ -0.2). Mirrors ch4's mound on the other side of the book.
-  { id: 'ch5-market-table', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60 },
+  // Curved painted city wall closing the rear. RETAINED v-fold, repainted +
+  // re-cut: die-cut dome/rooftop top edge, painted concentric streets.
+  { id: 'ch5-city', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.5, vDir: -1, phiDeg: 84, rhoDeg: 88, creaseU: 0.5, width: 1.9, height: 0.66 },
+  // (Pack §4b said mount 0.7 — but a child's mount is a station in WORLD units
+  // up the parent fold and the city sheet is 0.66 tall: 0.7 is off the paper
+  // (A11 glue-on-paper). Re-seated at 0.58, the same "high on the crease" read
+  // with the dormer's proven 0.08 top margin.)
+  { id: 'ch5-pigeon-a', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.58, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.07 },
+  { id: 'ch5-pigeon-b', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.45, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.11, height: 0.055 },
+  // REAR STALL ARC — single-story keepstack; the facade plate is the arc:
+  // 7 linked stall gables + gate-minaret (top y 0.55, the ONE modest vertical),
+  // lantern strings die-cut between finials. Plate overhangs laterally to 0.44.
+  //
+  // CAP-LEAN LAW (in-engine D-G2 correction to the pack's flat T5 z-bands —
+  // the bench-vs-render trap): a box's front cap leans +z by a*cos(h) as the
+  // book closes, so consecutive train members need gap >= a_prev*cos(h) at
+  // every dwell station (beta >= 165), not merely disjoint flat bands. The
+  // train's z1 edges are pulled back accordingly (-0.08 -> -0.12, 0.14 ->
+  // 0.10, 0.32 -> 0.29); with those gaps the D-G2 rest/near-rest gates hold
+  // with every brace cap in place.
+  // Plates FLUSH with their caps (width = 2a), NOT the pack's 0.44 lateral
+  // overhang: in-engine A10 proves any wh > a dips below the opposite page
+  // plane mid-turn by (wh - a)*sin(cap-page angle) — past the 0.004 lift
+  // slack — which is the ch3 bailey-wing rejection re-derived at 1/20 the
+  // overhang. Every plate this book has ever shipped is flush for exactly
+  // this reason. UP-the-plane overhang (the 0.55 minaret die-cut) is legal —
+  // the raven-finial precedent. The arc's continuation past the wall corners
+  // is the souk wings' job; the plate/souk paint seam widens 0.06 -> 0.10
+  // (risk 4, bridged by matched stripe cadence + the backdrop behind).
+  { id: 'ch5-arc-rear', kind: 'backdrop', role: 'story', mech: 'keepstack',
+    stories: [{ key: 'arc', a: 0.4, height: 0.17, z0: -0.34, z1: -0.12, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.8, height: 0.55 } }] },
+  // INNER STALL ARC — nearer/larger 5-stall row, scalloped awning die-cut.
+  { id: 'ch5-arc-inner', kind: 'midground', role: 'story', mech: 'keepstack',
+    stories: [{ key: 'arc', a: 0.34, height: 0.12, z0: -0.06, z1: 0.1, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.24 } }] },
+  // SOUK WINGS — the arcs continued to both page edges at matched depths
+  // (row0 ~ rear arc, row1 ~ inner arc). ch3 citadel form, rfar <= 0.752.
+  { id: 'ch5-souk-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
+    { F: 0.5, zc: -0.3, height: 0.1, width: 0.24, standDeg: 64 },
+    { F: 0.55, zc: -0.02, height: 0.08, width: 0.2, standDeg: 64 } ] },
+  { id: 'ch5-souk-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
+    { F: 0.5, zc: -0.3, height: 0.1, width: 0.24, standDeg: 64 },
+    { F: 0.55, zc: -0.02, height: 0.08, width: 0.2, standDeg: 64 } ] },
+  // TERRACE TREADS — the stepped plinth apron (mech-37 read, box family).
+  // Lids = carpets + goods (lid-dominant camera), front caps = arcade risers.
+  { id: 'ch5-tread-mid', kind: 'midground', role: 'story', mech: 'box', a: 0.3, height: 0.085, z0: 0.16, z1: 0.29, roof: 'flat', capFront: true },
+  { id: 'ch5-tread-low', kind: 'midground', role: 'story', mech: 'box', a: 0.26, height: 0.045, z0: 0.34, z1: 0.46, roof: 'flat', capFront: true },
+  // CROWD CHAINS — one linked cutout each (6 + 5 figures), standing on lids.
+  // WALL REGIME, not the pack's 30/46 prop regime: a rider's width runs ALONG
+  // its glue lines, whose z-run is width*cos(phi) — at phi 30 a 0.44 chain
+  // marches 0.38 down the gutter, off its own lid and into the throng's band
+  // (the A9 crossing that killed it). At phi 84 the same chain spans its
+  // width LATERALLY across the tread (z-run 0.046, on-lid), which is the
+  // rank-facing-the-reader read the pack's T8 "0.8 x lid span" law describes.
+  { id: 'ch5-crowd-mid', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch5-tread-mid', seat: 'boxLid', mountZ: 0.22, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 0.44, height: 0.09 },
+  { id: 'ch5-crowd-low', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch5-tread-low', seat: 'boxLid', mountZ: 0.4, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 0.36, height: 0.075 },
+  // THE THRONG (HERO) — 8-shopper linked rank surging up at the terrace foot.
+  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.55, slot: 0.3, slotZ: 0.55, hingeX: 0.4, hingeZ: 0.55, width: 0.5, height: 0.13 },
+  // TEA CORNER — the intimate counterweight, right apron, over a painted rug.
+  { id: 'ch5-tea', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.5, anchorZ: 0.17, slot: 0.56, slotZ: 0.17, hingeX: 0.62, hingeZ: 0.17, width: 0.14, height: 0.16 },
+  // RAISE A STALL — the retained tabpiece, geometry verbatim, re-themed: legs
+  // repainted as stall posts, deck a striped awning mid-raise, the fore-edge
+  // tab a woodcut ⟡ RAISE A STALL ⟡ cartouche (B-MEANING: the playable IS the
+  // chapter's meaning — he carved the patterns any hands can raise).
+  { id: 'ch5-raise-stall', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60 },
 ]
 
 // Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —
@@ -709,7 +757,18 @@ export const CHAPTERS: readonly Chapter[] = [
       "Homeward then, to the rose-stone city, where a bazaar of a thousand stalls was to be raised. The hero did not build the stalls. He did something cleverer: he carved master patterns from which any stall could be raised in a day, true and identical, by any pair of willing hands. Masons came from far away just to study the stones.",
     accents: ['#c4766a', '#a63d2f', '#e7d5a8'],
     layers: CH5_LAYERS,
-    hero: 'ch5-lantern-b', // recursion (child), sweep 0.67 — a bazaar lantern
+    // E3 s6 R4 GRAND-DENSE register: ONE amphitheater composition (arcs +
+    // wings + box train) rather than the per-chapter crowd template — the
+    // goods platform's role moved onto the tread lids, so the spread rides
+    // the declared showpiece exemption exactly as the E1 keep does (charter
+    // E-P2; the Chapter.showpiece doc anticipates extending it this way).
+    // Physics/quality gates (A9/A10, motion, sightline) stay hard.
+    showpiece: true,
+    // D-G1/D-G8: the throng stripflap — the 8-shopper rank surging upright at
+    // the terrace foot as the spread blooms (density arriving). Strip-driven
+    // family → exempt from the 0.525 sweep floor; rotation holds (prev ch4
+    // hero tabpiece, next ch6 hero vfold).
+    hero: 'ch5-throng',
   },
   {
     spread: 7,

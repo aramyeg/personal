@@ -285,6 +285,14 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   child: 15.5,
   fan: 4.5,
   stripflap: 5.0,
+  // RIDER joined the smooth-but-steep class with the E3 s6 crowd chains: a
+  // rider is a v-fold solved in its seat's bisector frame (solveRiderPose ->
+  // the same closed-form spherical four-bar as vfold/child), so a WALL-regime
+  // rider (phi 84 / rho 88 — the lateral crowd-rank read) inherits exactly
+  // the late bloom the vfold/child ceilings document. The old implicit 3x
+  // floor had only ever measured PROP-regime riders (phi ~30, worst 2.51).
+  // Measured worst now 6.69x (ch5-crowd-low) + 10%.
+  rider: 7.4,
   // KINETIC arm (D4): its ARM panel rides a 45-deg v-fold ridge, so it
   // inherits the v-fold's late-bloom — the tip's per-station step grows
   // toward flat-open — while its apex corner is STATIC (on the spine, step
