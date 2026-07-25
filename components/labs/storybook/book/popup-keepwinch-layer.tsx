@@ -123,13 +123,20 @@ function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
   committedSpread: RefObject<number>
-): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; eased: number } {
+): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; turnT: number } {
   return () => {
     const f = frame.current
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const eased = f ? easeTurnWeighted(f.t) : 0
-    const { thetaL, thetaR } = spreadPageAnglesTilted(spreadIndex, committedSpread.current, f?.dir ?? null, eased)
-    return { role, thetaL, thetaR, beta: thetaL - thetaR, eased }
+    // See the volvelle layer: the cull window is specified against the driver's
+    // RAW published progress, not the eased page angle.
+    const turnT = f?.t ?? 0
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
+      f?.dir ?? null,
+      f ? easeTurnWeighted(turnT) : 0
+    )
+    return { role, thetaL, thetaR, beta: thetaL - thetaR, turnT }
   }
 }
 
@@ -270,11 +277,11 @@ function WinchDisc({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    const { role, thetaL, thetaR, beta, turnT } = readAngles()
     // TURN-CULL (C-3): the winch is the reader's machine. Mid-turn nobody is
     // cranking it, so the disc stops drawing (see ./turn-cull.ts). The KEEP it
     // drives is structure and is never culled.
-    const cull = turnCullOpacity(eased)
+    const cull = turnCullOpacity(turnT)
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
@@ -362,9 +369,9 @@ function WinchOutput({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    const { role, thetaL, thetaR, beta, turnT } = readAngles()
     // TURN-CULL (C-3), same window as the disc that drives these bodies.
-    const cull = turnCullOpacity(eased)
+    const cull = turnCullOpacity(turnT)
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return

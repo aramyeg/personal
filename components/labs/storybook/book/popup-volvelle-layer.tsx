@@ -136,13 +136,20 @@ function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
   committedSpread: RefObject<number>
-): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; eased: number } {
+): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; turnT: number } {
   return () => {
     const f = frame.current
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const eased = f ? easeTurnWeighted(f.t) : 0
-    const { thetaL, thetaR } = spreadPageAnglesTilted(spreadIndex, committedSpread.current, f?.dir ?? null, eased)
-    return { role, thetaL, thetaR, beta: thetaL - thetaR, eased }
+    // turnT is the driver's RAW published progress (0 at rest, no frame at all);
+    // the cull window is specified against it, not against the eased angle.
+    const turnT = f?.t ?? 0
+    const { thetaL, thetaR } = spreadPageAnglesTilted(
+      spreadIndex,
+      committedSpread.current,
+      f?.dir ?? null,
+      f ? easeTurnWeighted(turnT) : 0
+    )
+    return { role, thetaL, thetaR, beta: thetaL - thetaR, turnT }
   }
 }
 
@@ -300,12 +307,12 @@ export function VolvellePopupLayer({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    const { role, thetaL, thetaR, beta, turnT } = readAngles()
     // TURN-CULL (C-3): the dial is a reader's instrument, not structure — it
-    // stops drawing through the fast middle of a page turn and ramps back in
-    // the landing beat. Pose maths below are untouched (it still solves; it
-    // just isn't submitted), so no fold-flat proof is affected.
-    const cull = turnCullOpacity(eased)
+    // stops drawing for the body of a page turn and ramps back across the
+    // landing settle. Pose maths below are untouched (it still solves; it just
+    // isn't submitted), so no fold-flat proof is affected.
+    const cull = turnCullOpacity(turnT)
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
