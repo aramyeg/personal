@@ -1743,40 +1743,114 @@ function deckSurface(w, h, seed, kind) {
 // ---- THE MEADOW FRINGE (s3 ch2-fringe, foreground vfold, very wide/short —
 // the old flat "blue wave strip"). A low alpine meadow band: grass tufts and
 // wildflowers along a lit ridge, transparent above. Crease centre. ----
+// E3 s3 REPAINT (pack §4d): the first cut was one flat green slab with hairline
+// blades and 4 px flower dots — at the pinned camera the piece is roughly
+// 600x60 px, so those dots landed under 5 px and the whole fringe read as a
+// painted green bar. A meadow is FLOWERS; this one is built as a real flower
+// field: three value bands in the turf, three depth layers of blades, and
+// cream daisies / gold buttercups / blue scabious drawn as rosettes big enough
+// to survive the camera, with two couriers skimming the crest.
 function meadowFringe(w, h, seed) {
   const r = mulberry32(seed)
-  const crest = h * 0.36
-  let ridge = `M 0 ${fx(h)} L 0 ${fx(crest + h * 0.12)}`
-  const n = 14
+  const TURF = SWARM.meadow
+  const TURF_DIM = '#4e6f47'
+  const TURF_LIT = '#87a874'
+  const crest = h * 0.5
+  const n = 16
   const pts = []
-  for (let i = 0; i <= n; i++) pts.push([(w * i) / n, crest + Math.sin(i * 1.3 + seed) * h * 0.08 + rr(r, -h * 0.04, h * 0.04)])
-  for (let i = 0; i < pts.length; i++) ridge += ` L ${fx(pts[i][0])} ${fx(pts[i][1])}`
-  const crestLine = ridge
-  ridge += ` L ${fx(w)} ${fx(h)} Z`
-  let s = `<g>`
-  s += `<path d="${ridge}" fill="#6f8a4a"/>`
-  s += `<rect x="0" y="${fx(h * 0.7)}" width="${w}" height="${fx(h * 0.3)}" fill="#4f6a34" opacity="0.5"/>`
-  s += `<path d="${crestLine}" fill="none" stroke="#8fac66" stroke-width="5" opacity="0.7"/>`
-  // grass blades + wildflowers along the ridge
-  const blades = 60
-  for (let i = 0; i < blades; i++) {
-    const x = (w * i) / blades + rr(r, -4, 4)
-    const seg = Math.min(n, Math.round((x / w) * n))
-    const y = pts[seg] ? pts[seg][1] : crest
-    const bh = rr(r, h * 0.1, h * 0.26)
-    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(rr(r, -5, 5))} ${fx(-bh)} ${fx(rr(r, -3, 3))} ${fx(-bh)}" fill="none" stroke="${i % 2 ? '#6f8a4a' : '#8fac66'}" stroke-width="2" opacity="0.8"/>`
-    if (i % 7 === 3) s += `<circle cx="${fx(x)}" cy="${fx(y - bh)}" r="4" fill="${['#d9a441', '#c46a6a', '#e6e0b0', '#8a6fd6'][i % 4]}" stroke="${INK}" stroke-width="0.9" stroke-opacity="0.35"/>`
+  for (let i = 0; i <= n; i++) pts.push([(w * i) / n, crest + Math.sin(i * 1.3 + seed) * h * 0.09 + rr(r, -h * 0.045, h * 0.045)])
+  const crestAt = (x) => {
+    const t = Math.max(0, Math.min(n - 0.001, (x / w) * n))
+    const i = Math.floor(t)
+    return lerp(pts[i][1], pts[i + 1][1], t - i)
   }
+  let crestLine = `M 0 ${fx(h)} L 0 ${fx(pts[0][1])}`
+  for (const p of pts) crestLine += ` L ${fx(p[0])} ${fx(p[1])}`
+  const ridge = `${crestLine} L ${fx(w)} ${fx(h)} Z`
+
+  let s = `<g>`
+  // ---- TURF: three bands, so the mass has a light-to-dark structure instead
+  // of being one fill the eye slides off
+  s += `<path d="${ridge}" fill="${TURF}"/>`
+  s += `<rect x="0" y="${fx(h * 0.62)}" width="${w}" height="${fx(h * 0.38)}" fill="${TURF_DIM}" opacity="0.55"/>`
+  s += `<path d="${crestLine}" fill="none" stroke="${TURF_LIT}" stroke-width="${fx(h * 0.055)}" opacity="0.8"/>`
+  // shadow pockets in the hollows of the ridge, lit swells on the humps
+  for (let i = 0; i < 26; i++) {
+    const x = rr(r, 0, w)
+    const y = crestAt(x) + rr(r, h * 0.08, h * 0.42)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, w * 0.03, w * 0.09))}" ry="${fx(rr(r, h * 0.06, h * 0.16))}" fill="${r() < 0.5 ? TURF_DIM : TURF_LIT}" opacity="${fx(rr(r, 0.07, 0.16))}"/>`
+  }
+
+  // ---- GRASS, three depth layers back-to-front (pale + fine behind, dark +
+  // coarse in front): a fringe reads as depth or it reads as a comb.
+  const bladeLayer = (count, colour, wid, hiMin, hiMax, op) => {
+    let g = ''
+    for (let i = 0; i < count; i++) {
+      const x = (w * (i + rr(r, 0, 1))) / count
+      const y = crestAt(x) + rr(r, -h * 0.02, h * 0.06)
+      // clamped so no blade is sliced flat by the canvas top edge
+      const bh = Math.min(rr(r, h * hiMin, h * hiMax), y - h * 0.02)
+      const lean = rr(r, -0.5, 0.5) * bh
+      g += `<path d="M ${fx(x)} ${fx(y)} q ${fx(lean * 0.25)} ${fx(-bh * 0.6)} ${fx(lean)} ${fx(-bh)}" fill="none" stroke="${colour}" stroke-width="${fx(wid)}" stroke-linecap="round" opacity="${op}"/>`
+    }
+    return g
+  }
+  s += bladeLayer(90, TURF_LIT, 2.2, 0.14, 0.34, 0.55)
+  s += bladeLayer(70, TURF, 3, 0.12, 0.42, 0.85)
+  s += bladeLayer(46, TURF_DIM, 3.8, 0.1, 0.3, 0.9)
+
+  // ---- THE FLOWERS. Rosettes with real petals, not dots: cream daisies are
+  // the field (the daisy reference the whole spread is graded against), gold
+  // buttercups the accent rhythm, a few blue scabious for the cool note. Red
+  // never appears here — the pack spends its one saturated accent on the
+  // hero's satchel and the three wax seals.
+  const daisy = (cx, cy, rad, petal, heart) => {
+    let g = ''
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2 + rr(r, -0.1, 0.1)
+      g += `<ellipse cx="${fx(cx + Math.cos(a) * rad * 0.62)}" cy="${fx(cy + Math.sin(a) * rad * 0.62)}" rx="${fx(rad * 0.46)}" ry="${fx(rad * 0.3)}" fill="${petal}" stroke="${INK}" stroke-width="1" stroke-opacity="0.28" transform="rotate(${fx((a * 180) / Math.PI)} ${fx(cx)} ${fx(cy)})"/>`
+    }
+    g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rad * 0.36)}" fill="${heart}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.4"/>`
+    return g
+  }
+  const bell = (cx, cy, rad, colour) =>
+    `<path d="M ${fx(cx - rad * 0.62)} ${fx(cy - rad * 0.3)} q ${fx(rad * 0.62)} ${fx(-rad * 0.9)} ${fx(rad * 1.24)} 0 q ${fx(-rad * 0.62)} ${fx(rad * 1.1)} ${fx(-rad * 1.24)} 0 Z" fill="${colour}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.35"/>`
+  const FLOWERS = 34
+  for (let i = 0; i < FLOWERS; i++) {
+    const x = (w * (i + rr(r, 0.15, 0.85))) / FLOWERS
+    const y0 = crestAt(x)
+    const rad = h * rr(r, 0.075, 0.115)
+    // the head is clamped inside the canvas: a daisy sliced flat by the top
+    // edge stops reading as a flower entirely
+    const stem = Math.min(rr(r, h * 0.16, h * 0.42), y0 - rad - h * 0.035)
+    const lean = rr(r, -0.42, 0.42) * stem
+    const fxp = x + lean
+    const fyp = y0 - stem
+    s += `<path d="M ${fx(x)} ${fx(y0 + h * 0.03)} q ${fx(lean * 0.2)} ${fx(-stem * 0.6)} ${fx(lean)} ${fx(-stem)}" fill="none" stroke="${TURF_DIM}" stroke-width="2.4" stroke-linecap="round"/>`
+    const kind = i % 5
+    if (kind === 0 || kind === 2 || kind === 3) s += daisy(fxp, fyp, rad, SWARM.cream, SWARM.gold)
+    else if (kind === 1) s += daisy(fxp, fyp, rad * 0.86, SWARM.gold, SWARM.amber)
+    else s += bell(fxp, fyp, rad * 0.9, '#8fa9c4')
+    // one paired leaf on the stem so it is a plant, not a pin
+    s += `<path d="M ${fx(x + lean * 0.4)} ${fx(y0 - stem * 0.42)} q ${fx(h * 0.09)} ${fx(-h * 0.04)} ${fx(h * 0.13)} ${fx(h * 0.03)} q ${fx(-h * 0.08)} ${fx(h * 0.02)} ${fx(-h * 0.13)} ${fx(-h * 0.03)} Z" fill="${TURF_LIT}" opacity="0.8"/>`
+  }
+  // clover bedded low in the turf: small edged rosettes, not pale discs (as
+  // plain circles they read as foam floating on the grass)
+  for (let i = 0; i < 14; i++) {
+    const x = rr(r, 0, w)
+    const y = crestAt(x) + rr(r, h * 0.04, h * 0.15)
+    s += daisy(x, y, h * rr(r, 0.045, 0.062), SWARM.cream, SWARM.amber)
+  }
+
   s += rimPath(crestLine, 4)
-  // E3 s3 repaint: two couriers perched ON the crest (touching the ridge so
-  // the die-cut stays paper-true — no floating alpha islands), gold dashed
-  // flight trails leading up toward the 3D ring overhead (pack §4d).
-  for (const [bx, bs] of [[0.24, 0.13], [0.71, 0.11]]) {
-    const seg = Math.min(n, Math.round(bx * n))
-    const ridgeY = pts[seg] ? pts[seg][1] : crest
-    const y = ridgeY - h * bs * 0.45
-    s += swarmBee(w * bx, y, h * bs, 'wingsMid')
-    s += `<path d="M ${fx(w * bx + h * 0.12)} ${fx(y - h * 0.1)} q ${fx(h * 0.12)} ${fx(-h * 0.1)} ${fx(h * 0.3)} ${fx(-h * 0.13)}" fill="none" stroke="${SWARM.gold}" stroke-width="1.6" stroke-dasharray="4 4" opacity="0.7"/>`
+  // two couriers SKIMMING the crest (touching the ridge so the die-cut stays
+  // paper-true — no floating alpha islands), gold dashed flight trails leading
+  // up toward the 3D ring overhead (pack §4d).
+  for (const [bx, bs] of [[0.22, 0.28], [0.73, 0.24]]) {
+    const y = crestAt(w * bx) - h * bs * 0.5
+    const f = beeFit(h * bs * 1.34, 'wingsMid')
+    s += swarmBee(w * bx + f.dx, y, f.s, 'wingsMid')
+    s += `<path d="M ${fx(w * bx + h * 0.28)} ${fx(y - h * 0.12)} q ${fx(h * 0.16)} ${fx(-h * 0.12)} ${fx(h * 0.42)} ${fx(-h * 0.16)}" fill="none" stroke="${SWARM.gold}" stroke-width="2.4" stroke-dasharray="6 5" opacity="0.85"/>`
   }
   s += `</g>`
   return svgPiece(w, h, s)
