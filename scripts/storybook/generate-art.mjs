@@ -2351,14 +2351,32 @@ function vaultDragon(w, h, seed) {
       return `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${VAULT.foilDeep}" stroke-width="2" opacity="0.45"/>`
     }).join('') +
     `</g>`
-  // scale crescents along the coil's outer half (quiet violet texture)
-  for (let k = 0; k < 22; k++) {
-    const a = lerp(aHead + 0.06 * Math.PI, aTail - 0.06 * Math.PI, k / 21) + rr(r, -0.02, 0.02)
-    const rad = rMid + band * rr(r, 0.1, 0.34)
+  // cylinder modeling: a dark shade band along the coil's outer half and a
+  // soft top-light along the inner — the tube reads ROUND, and the deepened
+  // violet mass frames the foil glow instead of flattening beside it
+  const bandStroke = (rad, color, width, opacity) => {
+    let d = ''
+    for (let k = 0; k <= 64; k++) {
+      const a = lerp(aHead + 0.02 * Math.PI, aTail - 0.02 * Math.PI, k / 64)
+      const [px, py] = coilPt(a, rad)
+      d += `${k === 0 ? 'M' : ' L'} ${fx(px)} ${fx(py)}`
+    }
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${fx(width)}" opacity="${opacity}" stroke-linecap="round"/>`
+  }
+  s += bandStroke(rMid + band * 0.34, hideDeep, band * 0.3, 0.5)
+  s += bandStroke(rMid - band * 0.16, '#6a5280', band * 0.22, 0.45)
+  // FOIL EDGE-LIGHT on the hoard-facing (inner) edge: the treasure's glow
+  // catching the underside of the coil — the pack's "one glowing thing"
+  s += bandStroke(rMid - band / 2 + R * 0.012, VAULT.foilLit, 3, 0.9)
+  s += bandStroke(rMid - band / 2 + R * 0.026, VAULT.foilHi, 1.2, 0.6)
+  // scale crescents along the coil's outer half — bold enough to read
+  for (let k = 0; k < 30; k++) {
+    const a = lerp(aHead + 0.06 * Math.PI, aTail - 0.06 * Math.PI, (k % 15) / 14) + rr(r, -0.02, 0.02)
+    const rad = rMid + band * (k < 15 ? rr(r, 0.16, 0.34) : rr(r, -0.08, 0.1))
     const [sx, sy] = coilPt(a, rad)
-    const sc = R * rr(r, 0.045, 0.075)
+    const sc = R * rr(r, 0.05, 0.085)
     const rot = ((a + Math.PI / 2) * 180) / Math.PI
-    s += `<path d="M ${fx(sx - sc)} ${fx(sy)} a ${fx(sc)} ${fx(sc)} 0 0 0 ${fx(sc * 2)} 0" fill="none" stroke="${hideDeep}" stroke-width="1.6" opacity="0.6" transform="rotate(${fx(rot)} ${fx(sx)} ${fx(sy)})"/>`
+    s += `<path d="M ${fx(sx - sc)} ${fx(sy)} a ${fx(sc)} ${fx(sc)} 0 0 0 ${fx(sc * 2)} 0" fill="none" stroke="#8468a0" stroke-width="2.2" opacity="0.8" transform="rotate(${fx(rot)} ${fx(sx)} ${fx(sy)})"/>`
   }
 
   // spine ridge sails riding the coil's OUTER edge, leaning with the wrap
@@ -2388,36 +2406,81 @@ function vaultDragon(w, h, seed) {
     `q ${fx(R * 0.18)} ${fx(R * 0.14)} ${fx(R * 0.4)} ${fx(R * 0.06)} ` +
     `q ${fx(R * 0.22)} ${fx(-R * 0.08)} ${fx(R * 0.42)} ${fx(-R * 0.36)} Z`
   s += `<path d="${tail}" fill="${hide}" stroke="${hideDeep}" stroke-width="2.2"/>`
+  // small ridge spikes continuing down the tail, then the spade tip
+  for (const [tt, tu] of [[0.22, -0.06], [0.45, -0.1], [0.66, -0.12]]) {
+    const px = tex - R * tt * 1.0
+    const py = tey - band * 0.42 + R * tt * 0.28 + R * tu * 0
+    s += `<path d="M ${fx(px - R * 0.04)} ${fx(py)} q ${fx(R * 0.03)} ${fx(-R * 0.09)} ${fx(R * 0.09)} ${fx(-R * 0.02)} Z" fill="${hideDeep}" stroke="${VAULT.duneDim}" stroke-width="1"/>`
+  }
   const spx = tex - R * 0.8
   const spy = tey + R * 0.02
-  s += `<path d="M ${fx(spx)} ${fx(spy)} l ${fx(-R * 0.16)} ${fx(-R * 0.1)} l ${fx(R * 0.03)} ${fx(R * 0.16)} l ${fx(-R * 0.13)} ${fx(R * 0.07)} l ${fx(R * 0.2)} ${fx(R * 0.05)} Z" fill="${hideDeep}"/>`
+  s += `<path d="M ${fx(spx)} ${fx(spy)} l ${fx(-R * 0.18)} ${fx(-R * 0.12)} l ${fx(R * 0.04)} ${fx(R * 0.17)} l ${fx(-R * 0.15)} ${fx(R * 0.08)} l ${fx(R * 0.23)} ${fx(R * 0.05)} Z" fill="${hideDeep}" stroke="${VAULT.duneDim}" stroke-width="1.4"/>`
 
-  // talons hooked over the coil at the door's chin — the grip
-  for (const aC of [2.38 * Math.PI, 2.55 * Math.PI]) {
-    const [px, py] = coilPt(aC, rMid + band * 0.42)
-    s += `<path d="M ${fx(px - R * 0.07)} ${fx(py - R * 0.06)} q ${fx(R * 0.07)} ${fx(R * 0.05)} ${fx(R * 0.14)} ${fx(0)} l ${fx(-R * 0.02)} ${fx(R * 0.1)} q ${fx(-R * 0.05)} ${fx(R * 0.05)} ${fx(-R * 0.1)} ${fx(0)} Z" fill="${hide}" stroke="${hideDeep}" stroke-width="1.6"/>`
-    for (const t of [0, 1, 2]) {
-      s += `<path d="M ${fx(px - R * 0.05 + t * R * 0.045)} ${fx(py + R * 0.06)} l ${fx(R * 0.014)} ${fx(R * 0.06)} l ${fx(R * 0.024)} ${fx(-R * 0.05)} Z" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="0.8" stroke-opacity="0.5"/>`
+  // fore-claws GRIPPING the door's rim ("coiled about its treasure" — the
+  // grip sells the hoard): forearms reach from the coil's inner edge across
+  // the rim, bone talons hooking INWARD over the door face
+  for (const aC of [2.4 * Math.PI, 2.56 * Math.PI]) {
+    const [fx0, fy0] = coilPt(aC, rMid - band * 0.1)
+    const [fx1, fy1] = coilPt(aC, R * 0.76)
+    const dxn = (fx1 - fx0) / Math.hypot(fx1 - fx0, fy1 - fy0)
+    const dyn = (fy1 - fy0) / Math.hypot(fx1 - fx0, fy1 - fy0)
+    // forearm: a tapering wedge from the coil onto the door
+    s += `<path d="M ${fx(fx0 - dyn * R * 0.085)} ${fx(fy0 + dxn * R * 0.085)} L ${fx(fx0 + dyn * R * 0.085)} ${fx(fy0 - dxn * R * 0.085)} L ${fx(fx1 + dyn * R * 0.05)} ${fx(fy1 - dxn * R * 0.05)} L ${fx(fx1 - dyn * R * 0.05)} ${fx(fy1 + dxn * R * 0.05)} Z" fill="${hide}" stroke="${hideDeep}" stroke-width="2"/>`
+    // three bone talons curving inward past the knuckle
+    for (const t of [-1, 0, 1]) {
+      const kx = fx1 + dyn * R * 0.04 * t
+      const ky = fy1 - dxn * R * 0.04 * t
+      s += `<path d="M ${fx(kx)} ${fx(ky)} q ${fx(dxn * R * 0.09 - dyn * R * 0.02)} ${fx(dyn * R * 0.09 + dxn * R * 0.02)} ${fx(dxn * R * 0.13 + dyn * R * 0.045)} ${fx(dyn * R * 0.13 - dxn * R * 0.045)} q ${fx(-dxn * R * 0.06)} ${fx(-dyn * R * 0.02)} ${fx(-dxn * R * 0.1)} ${fx(-dyn * R * 0.055)} Z" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="1.1" stroke-opacity="0.55"/>`
     }
   }
 
-  // folded wing lying along the coil's right shoulder: violet membrane,
-  // foil ribs — clear of the spindle wheel so the door still reads
-  const wing =
-    `M ${fx(cx + R * 0.38)} ${fx(cy + R * 0.4)} ` +
-    `q ${fx(R * 0.66)} ${fx(-R * 0.62)} ${fx(R * 0.95)} ${fx(-R * 0.28)} ` +
-    `q ${fx(-R * 0.1)} ${fx(R * 0.38)} ${fx(-R * 0.44)} ${fx(R * 0.58)} ` +
-    `q ${fx(-R * 0.3)} ${fx(R * 0.17)} ${fx(-R * 0.55)} ${fx(R * 0.08)} Z`
-  s += `<path d="${wing}" fill="${VAULT.duneDim}" stroke="${hideDeep}" stroke-width="2.4"/>`
-  for (const t of [0.3, 0.55, 0.8]) {
-    s += `<path d="M ${fx(cx + R * 0.4)} ${fx(cy + R * 0.38)} q ${fx(R * 0.5 * (0.55 + t))} ${fx(-R * 0.55 * t)} ${fx(R * (0.42 + t * 0.5))} ${fx(-R * (0.3 * t))}" fill="none" stroke="${VAULT.foil}" stroke-width="2" opacity="0.8"/>`
+  // the WING: a folded bat wing over the coil's right shoulder — arm bone to
+  // a knuckle, four finger ribs, scalloped membrane between the tips, the
+  // membrane itself in gold foil (the pack's glowing wing)
+  const S0 = [cx + R * 0.32, cy + R * 0.45]
+  const K = [cx + R * 0.72, cy + R * 0.02]
+  const tips = [
+    [cx + R * 1.38, cy - R * 0.18],
+    [cx + R * 1.34, cy + R * 0.14],
+    [cx + R * 1.16, cy + R * 0.42],
+    [cx + R * 0.94, cy + R * 0.6],
+  ]
+  const scallop = (a, b) => {
+    const mx = (a[0] + b[0]) / 2 + (K[0] - (a[0] + b[0]) / 2) * 0.22
+    const my = (a[1] + b[1]) / 2 + (K[1] - (a[1] + b[1]) / 2) * 0.22
+    return `Q ${fx(mx)} ${fx(my)} ${fx(b[0])} ${fx(b[1])}`
   }
+  const wing =
+    `M ${fx(K[0])} ${fx(K[1])} L ${fx(tips[0][0])} ${fx(tips[0][1])} ` +
+    scallop(tips[0], tips[1]) + ' ' + scallop(tips[1], tips[2]) + ' ' + scallop(tips[2], tips[3]) +
+    ` Q ${fx((tips[3][0] + S0[0]) / 2)} ${fx((tips[3][1] + S0[1]) / 2 + R * 0.04)} ${fx(S0[0])} ${fx(S0[1])} Z`
+  const wingClip = 'vwing'
+  defs += `<clipPath id="${wingClip}"><path d="${wing}"/></clipPath>`
+  const wingFoil = goldFoilFacets(r, 'vw', K[0] - R * 0.1, cy - R * 0.25, cx + R * 1.42, cy + R * 0.66, R * 0.16, {
+    sparkles: 10,
+    streaks: 3,
+    dir: -30,
+  })
+  defs += wingFoil.defs
+  s += `<path d="${wing}" fill="${VAULT.duneDim}"/>`
+  s += `<g clip-path="url(#${wingClip})">${wingFoil.body}</g>`
+  s += `<path d="${wing}" fill="none" stroke="${hideDeep}" stroke-width="2.6" stroke-linejoin="round"/>`
+  // finger ribs over the membrane, knuckle thumb-spur, arm bone
+  for (const t of tips) {
+    s += `<path d="M ${fx(K[0])} ${fx(K[1])} Q ${fx((K[0] + t[0]) / 2)} ${fx((K[1] + t[1]) / 2 - R * 0.03)} ${fx(t[0])} ${fx(t[1])}" fill="none" stroke="${hideDeep}" stroke-width="${fx(R * 0.038)}" stroke-linecap="round"/>`
+  }
+  s += `<path d="M ${fx(S0[0])} ${fx(S0[1])} Q ${fx(S0[0] + R * 0.14)} ${fx(S0[1] - R * 0.32)} ${fx(K[0])} ${fx(K[1])}" fill="none" stroke="${hide}" stroke-width="${fx(R * 0.12)}" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(S0[0])} ${fx(S0[1])} Q ${fx(S0[0] + R * 0.14)} ${fx(S0[1] - R * 0.32)} ${fx(K[0])} ${fx(K[1])}" fill="none" stroke="${hideDeep}" stroke-width="${fx(R * 0.12)}" stroke-opacity="0.4" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(K[0])} ${fx(K[1])} l ${fx(R * 0.02)} ${fx(-R * 0.12)} l ${fx(R * 0.055)} ${fx(R * 0.1)} Z" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="1.1" stroke-opacity="0.5"/>`
+  // pale cut rim along the scalloped trailing edge
+  s += `<path d="M ${fx(tips[0][0])} ${fx(tips[0][1])} ${scallop(tips[0], tips[1])} ${scallop(tips[1], tips[2])} ${scallop(tips[2], tips[3])}" fill="none" stroke="${VAULT.rim}" stroke-width="3" opacity="0.9"/>`
 
   // the head: rising off the coil's start, over the door's upper-left,
   // gazing left into the notch (where the reader first finds it)
   const hx = cx - R * 0.5
   const hy = cy - R * 0.92
-  // neck: joins the head base to the coil's start (one continuous beast)
+  // neck: joins the head base to the coil's start (one continuous beast),
+  // with a foil throat-light on its hoard-facing underside
   const [n0x, n0y] = coilPt(aHead + 0.03 * Math.PI, rMid + band * 0.34)
   const [n1x, n1y] = coilPt(aHead + 0.16 * Math.PI, rMid - band * 0.42)
   const neck =
@@ -2426,22 +2489,53 @@ function vaultDragon(w, h, seed) {
     `L ${fx(hx + R * 0.4)} ${fx(hy + R * 0.42)} ` +
     `Q ${fx(cx - R * 0.32)} ${fx(cy - R * 0.62)} ${fx(n1x)} ${fx(n1y)} Z`
   s += `<path d="${neck}" fill="${hide}" stroke="${hideDeep}" stroke-width="2.2"/>`
+  s += `<path d="M ${fx(hx + R * 0.4)} ${fx(hy + R * 0.42)} Q ${fx(cx - R * 0.32)} ${fx(cy - R * 0.62)} ${fx(n1x)} ${fx(n1y)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="2.6" opacity="0.85"/>`
+
+  // SKULL + SNOUT: an angular wedge with a brow dip and a slightly open jaw
+  // (the beast sleeps lightly, one tooth glinting) — the dragon read
   const head =
-    `M ${fx(hx + R * 0.34)} ${fx(hy + R * 0.34)} ` +
-    `q ${fx(-R * 0.05)} ${fx(-R * 0.3)} ${fx(-R * 0.3)} ${fx(-R * 0.34)} ` +
-    `q ${fx(-R * 0.28)} ${fx(-R * 0.04)} ${fx(-R * 0.52)} ${fx(R * 0.08)} ` + // muzzle
-    `l ${fx(R * 0.05)} ${fx(R * 0.1)} l ${fx(R * 0.2)} ${fx(0)} ` + // jaw step
-    `q ${fx(-R * 0.08)} ${fx(R * 0.14)} ${fx(0.5)} ${fx(R * 0.26)} ` +
-    `q ${fx(R * 0.3)} ${fx(R * 0.16)} ${fx(R * 0.57)} ${fx(-R * 0.1)} Z`
+    `M ${fx(hx + 0.3 * R)} ${fx(hy - 0.05 * R)} ` + // skull back-top
+    `q ${fx(-0.16 * R)} ${fx(-0.1 * R)} ${fx(-0.34 * R)} ${fx(-0.06 * R)} ` + // crown to brow
+    `l ${fx(-0.1 * R)} ${fx(0.06 * R)} ` + // brow dip
+    `q ${fx(-0.24 * R)} ${fx(-0.02 * R)} ${fx(-0.4 * R)} ${fx(0.09 * R)} ` + // snout ridge
+    `l ${fx(0.03 * R)} ${fx(0.07 * R)} ` + // nostril bump drop
+    `l ${fx(0.46 * R)} ${fx(0.06 * R)} ` + // upper jaw line (mouth gap under)
+    `l ${fx(-0.04 * R)} ${fx(0.1 * R)} ` + // cheek notch
+    `q ${fx(0.22 * R)} ${fx(0.14 * R)} ${fx(0.43 * R)} ${fx(0.08 * R)} ` + // jaw back
+    `Z`
   s += `<path d="${head}" fill="${hide}" stroke="${hideDeep}" stroke-width="2.4"/>`
-  // horns (bone), ear frill, ember eye, nostril
-  s += `<path d="M ${fx(hx + R * 0.22)} ${fx(hy - R * 0.02)} q ${fx(R * 0.2)} ${fx(-R * 0.26)} ${fx(R * 0.42)} ${fx(-R * 0.3)} q ${fx(-R * 0.26)} ${fx(R * 0.02)} ${fx(-R * 0.3)} ${fx(R * 0.2)} Z" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="1.4" stroke-opacity="0.5"/>`
-  s += `<path d="M ${fx(hx + R * 0.3)} ${fx(hy + R * 0.12)} q ${fx(R * 0.18)} ${fx(-R * 0.08)} ${fx(R * 0.3)} ${fx(R * 0.02)} q ${fx(-R * 0.16)} ${fx(R * 0.1)} ${fx(-R * 0.3)} ${fx(R * 0.08)} Z" fill="${VAULT.duneDim}" stroke="${hideDeep}" stroke-width="1.6"/>`
-  s += `<circle cx="${fx(hx - R * 0.08)}" cy="${fx(hy + R * 0.05)}" r="${fx(R * 0.055)}" fill="${VAULT.ember}"/>`
-  s += `<circle cx="${fx(hx - R * 0.08)}" cy="${fx(hy + R * 0.05)}" r="${fx(R * 0.022)}" fill="#ffe9b8"/>`
-  s += `<circle cx="${fx(hx - R * 0.44)}" cy="${fx(hy + R * 0.1)}" r="${fx(R * 0.02)}" fill="${VAULT.nightDeep}"/>`
-  // a curl of night-breath from the nostril (the beast sleeps lightly)
-  s += `<path d="M ${fx(hx - R * 0.5)} ${fx(hy + R * 0.06)} q ${fx(-R * 0.14)} ${fx(-R * 0.08)} ${fx(-R * 0.1)} ${fx(-R * 0.2)} q ${fx(R * 0.03)} ${fx(-R * 0.09)} ${fx(R * 0.12)} ${fx(-R * 0.08)}" fill="none" stroke="${VAULT.duneDim}" stroke-width="2.6" opacity="0.8"/>`
+  // lower jaw: a thin open wedge beneath the upper jaw line
+  const jaw =
+    `M ${fx(hx + 0.08 * R)} ${fx(hy + 0.26 * R)} ` +
+    `l ${fx(-0.5 * R)} ${fx(-0.02 * R)} ` +
+    `l ${fx(0.04 * R)} ${fx(0.1 * R)} ` +
+    `q ${fx(0.26 * R)} ${fx(0.1 * R)} ${fx(0.5 * R)} ${fx(0.02 * R)} Z`
+  s += `<path d="${jaw}" fill="${hide}" stroke="${hideDeep}" stroke-width="2"/>`
+  // the mouth shadow between the jaws + teeth (one fang glints)
+  s += `<path d="M ${fx(hx + 0.06 * R)} ${fx(hy + 0.2 * R)} l ${fx(-0.46 * R)} ${fx(-0.045 * R)} l ${fx(0.02 * R)} ${fx(0.075 * R)} l ${fx(0.46 * R)} ${fx(0.035 * R)} Z" fill="${VAULT.nightDeep}"/>`
+  for (const [tx2, tw] of [[-0.34, 0.032], [-0.2, 0.026], [-0.06, 0.03]]) {
+    s += `<path d="M ${fx(hx + tx2 * R)} ${fx(hy + 0.165 * R)} l ${fx(tw * R * 0.5)} ${fx(0.06 * R)} l ${fx(tw * R * 0.5)} ${fx(-0.055 * R)} Z" fill="${VAULT.rim}"/>`
+  }
+  s += `<path d="M ${fx(hx - 0.31 * R)} ${fx(hy + 0.23 * R)} l ${fx(0.014 * R)} ${fx(-0.05 * R)} l ${fx(0.02 * R)} ${fx(0.048 * R)} Z" fill="${VAULT.rim}"/>` // lower fang
+  s += `<circle cx="${fx(hx - 0.33 * R)}" cy="${fx(hy + 0.17 * R)}" r="${fx(R * 0.012)}" fill="#ffffff" opacity="0.95"/>` // tooth glint
+  // TWO swept-back horns (bone) — the silhouette that says dragon, not ear
+  const horn = (bx, by, tx3, ty, wdt) =>
+    `M ${fx(bx)} ${fx(by)} Q ${fx((bx + tx3) / 2)} ${fx(Math.min(by, ty) - R * 0.14)} ${fx(tx3)} ${fx(ty)} ` +
+    `Q ${fx((bx + tx3) / 2 + R * 0.02)} ${fx(Math.min(by, ty) - R * 0.02)} ${fx(bx + wdt)} ${fx(by + R * 0.04)} Z`
+  s += `<path d="${horn(hx + 0.04 * R, hy - 0.06 * R, hx + 0.66 * R, hy - 0.28 * R, R * 0.13)}" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="1.4" stroke-opacity="0.55"/>`
+  s += `<path d="${horn(hx + 0.16 * R, hy + 0.02 * R, hx + 0.56 * R, hy - 0.08 * R, R * 0.1)}" fill="${VAULT.rim}" stroke="${VAULT.ink}" stroke-width="1.2" stroke-opacity="0.55"/>`
+  // horn ridge rings
+  for (const t of [0.22, 0.38]) {
+    s += `<path d="M ${fx(hx + (0.04 + t * 0.62) * R)} ${fx(hy - (0.06 + t * 0.22) * R - R * 0.05)} q ${fx(R * 0.03)} ${fx(R * 0.05)} ${fx(R * 0.005)} ${fx(R * 0.09)}" fill="none" stroke="${VAULT.ink}" stroke-width="1.1" opacity="0.4"/>`
+  }
+  // brow spike, deep eye socket, EMBER EYE (kept), nostril + night-breath
+  s += `<path d="M ${fx(hx - 0.02 * R)} ${fx(hy - 0.02 * R)} l ${fx(-0.05 * R)} ${fx(-0.11 * R)} l ${fx(-0.08 * R)} ${fx(0.09 * R)} Z" fill="${hideDeep}"/>`
+  s += `<path d="M ${fx(hx - 0.2 * R)} ${fx(hy + 0.02 * R)} q ${fx(0.12 * R)} ${fx(-0.05 * R)} ${fx(0.2 * R)} ${fx(0.01 * R)} q ${fx(-0.1 * R)} ${fx(0.06 * R)} ${fx(-0.2 * R)} ${fx(0.035 * R)} Z" fill="${hideDeep}"/>`
+  s += `<circle cx="${fx(hx - 0.1 * R)}" cy="${fx(hy + 0.045 * R)}" r="${fx(R * 0.05)}" fill="${VAULT.ember}"/>`
+  s += `<circle cx="${fx(hx - 0.1 * R)}" cy="${fx(hy + 0.045 * R)}" r="${fx(R * 0.02)}" fill="#ffe9b8"/>`
+  s += `<circle cx="${fx(hx - 0.44 * R)}" cy="${fx(hy + 0.1 * R)}" r="${fx(R * 0.016)}" fill="${VAULT.nightDeep}"/>`
+  // foil edge-light under the jaw — the hoard's glow reaching the chin
+  s += `<path d="M ${fx(hx - 0.42 * R)} ${fx(hy + 0.34 * R)} q ${fx(0.26 * R)} ${fx(0.1 * R)} ${fx(0.5 * R)} ${fx(0.02 * R)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="2.2" opacity="0.85"/>`
 
   // rims: the door's exposed upper arc + the head carry the house cut edge
   // (the coil's outer rim went down before the head)
