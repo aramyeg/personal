@@ -275,9 +275,26 @@ principle) before any of these land.
 E3 s6 amphitheater rebuild (scenes/s6-scene-pack.md, register R4 GRAND-DENSE).
 Palette: rose stone `#c4766a`, deep terracotta `#a63d2f`, sand parchment
 `#e7d5a8` (+lit `#f0e2bd`), saffron `#e0a33c`, market teal `#3f7d74`, cream
-`#f2e8cf`, walnut ink `#3b2a1a` (all linework). Shared-atlas discipline (G5):
-architecture faces ride ATLAS-A (1024²), figure chains ride ATLAS-B (512²) via
-`art/atlas.json` sub-rects; the city backdrop keeps its own 1024.
+`#f2e8cf`, walnut ink `#3b2a1a` (all linework). One shared stripe cadence
+(`BAZ_STRIPES_PER_BAY`) registers every awning in the spread — plates, souk
+wings and the raise-stall deck — so the 0.10 plate/souk seam is bridged by
+MATCHED PAINT rather than by paper (pack risk 4).
+
+Shared-atlas discipline (G5), as SHIPPED: `bazaar-atlas-s6` (1024²) carries both
+arcs' full face sets — the merged keepstack mesh needs every one of its ids on a
+single page or it silently falls back to per-face draws — plus the four souk
+sprites; `figure-atlas-s6` (512²) carries the two stripflap figures. That is the
+whole atlas-eligible set: INFRA-1 shipped sprite consumption for the
+**keepstack, skyline and stripflap** families only, so the crowd-chain riders,
+the pigeon children, the city v-fold, the tabpiece face and the eight tread box
+faces are still fetched as their own webps (`useLayerTexture`/`useArtTexture`
+take no `uvRect`). Spread-6 texture uploads therefore land at **17** (2 atlas
+pages + 14 loose + the page print), not the pack §5 estimate of 4 — that figure
+assumed a manifest-wide `uvRect` affordance the pipeline never grew. The largest
+remaining win is teaching `popup-box-layer.tsx` to use `useArtSprite` +
+`applyUvRect` (its half-split face tables are already covered by an
+`art-atlas.test.ts` case): that would fold 8 of the 14 onto the existing page
+here and pay again on every other box in the book.
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
