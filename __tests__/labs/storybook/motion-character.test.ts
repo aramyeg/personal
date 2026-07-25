@@ -366,9 +366,11 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // playbook Gate-1 note called for a measured family ceiling.) The absolute
   // bound that matters is Gate 2's real-time GLOBAL_CAP, which the cam planner
   // targets directly and the tests below hold at 3.6-4.2% margin. Every cam is
-  // monotone and piecewise-linear in beta (no snap). Measured worst 37.41x
-  // (ch3-cliff-l, beta domain) + 10%.
-  stagedchain: 42,
+  // monotone and piecewise-linear in beta (no snap). Measured worst 11.15x
+  // (ch3-cliff-l, beta domain) + 10%. (The first, ACCORDION cliffs measured
+  // 37x here; the ribbon that wedge containment forced on them is far gentler,
+  // because a ribbon joint never swings a panel through vertical.)
+  stagedchain: 13,
   // VOLVELLE (E2.2 Batch B): at a FROZEN twist the dial + card ride the page as a
   // rigid coplanar square, so their only page-driven motion is the pure rigid
   // page sweep — every corner's step is proportional to its distance from the
