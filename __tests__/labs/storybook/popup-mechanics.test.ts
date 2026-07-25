@@ -405,7 +405,8 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         }
       } else {
         // a leaning piece must still read as standing at full open
-        const rest = solveVFoldPose(layer, Math.PI, 0)
+        // (solveLayerPose routes an oanave to its verbatim v-fold host).
+        const rest = solveLayerPose(layer, undefined, Math.PI, 0)
         expect(rest.crease[1]).toBeGreaterThan(0.25)
       }
     }

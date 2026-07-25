@@ -32,18 +32,18 @@ describe('dieFlipped — rest-pose screen-up rule, pinned to user-verified piece
       // backdrop child) — it now tips past vertical like its sibling bee-c.
       [3, 'ch2-bee-b'],
       [6, 'ch5-lantern'],
-      [7, 'ch6-banner'],
+      // ch6-banner retired with the treasury exterior (E3 s7 nave rebuild);
+      // the deep-V child case stays pinned by the dormer/bee/lantern trio.
     ] as const) {
       const { layer, parent } = byId(layersOf(spread), id)
       expect(dieFlipped(layer, parent), id).toBe(true)
     }
   })
 
-  it('hanging children (coins, vault door) need the flip', () => {
-    for (const [spread, id] of [
-      [5, 'ch4-coins'],
-      [7, 'ch6-door'],
-    ] as const) {
+  it('hanging children (coins) need the flip', () => {
+    // ch6-door (the other hanging child) retired with the treasury exterior
+    // (E3 s7 nave rebuild); the coins still pin the hanging case.
+    for (const [spread, id] of [[5, 'ch4-coins']] as const) {
       const { layer, parent } = byId(layersOf(spread), id)
       expect(dieFlipped(layer, parent), id).toBe(true)
     }

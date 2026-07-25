@@ -366,6 +366,14 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // closed-form smoothstep windows, no discontinuity; Gate 2's absolute cap
   // still binds the real-time speed.
   swarmarc: 5.1,
+  // OANAVE (E3 s7): the host IS the v-fold wall solver verbatim, so it
+  // carries the same smooth-but-steep late-bloom character as the vfold
+  // walls (phi 72-84 with a small rho-phi margin), and its relief strata
+  // are dihedral-slaved to the host fold — no drive of their own to add a
+  // discontinuity. Measured worst 9.05x (ch6-nave-a, the phi-84 apse — the
+  // wall regime, exactly the vfold walls' geometry) + 10% per the house
+  // measured-ceiling law (pack §4a beta-ratio note).
+  oanave: 10.0,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

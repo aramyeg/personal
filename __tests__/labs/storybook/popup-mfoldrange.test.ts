@@ -9,7 +9,13 @@ import {
   solveMFoldRangePose,
   type MFoldRangeGeom,
 } from '@/components/labs/storybook/book/popup-mfoldrange'
-import { TURN_CULL_RAMP, turnCullOpacity, turnCulled } from '@/components/labs/storybook/book/turn-cull'
+import {
+  TURN_CULL_HIDE_AT,
+  TURN_CULL_RESTORE_FROM,
+  TURN_CULL_RESTORE_TO,
+  turnCullOpacity,
+  turnCulled,
+} from '@/components/labs/storybook/book/turn-cull'
 
 const rad = (d: number): number => (d * Math.PI) / 180
 
@@ -184,13 +190,15 @@ describe('s5 retirement + turn-cull wiring', () => {
     expect(turnCullOpacity(1)).toBe(1)
     // the fast middle is fully culled (draws actually returned)
     expect(turnCulled(0.5)).toBe(true)
-    expect(turnCulled(TURN_CULL_RAMP)).toBe(true)
-    expect(turnCulled(1 - TURN_CULL_RAMP)).toBe(true)
-    // 15% ramps: fading but visible inside the ramp windows
-    const midRamp = turnCullOpacity(TURN_CULL_RAMP / 2)
+    expect(turnCulled(TURN_CULL_HIDE_AT)).toBe(true)
+    // the restore band IS the landing settle: mid-band the piece is fading
+    // back (visible, not culled), whole again by the commit
+    expect(turnCulled((TURN_CULL_RESTORE_FROM + TURN_CULL_RESTORE_TO) / 2)).toBe(false)
+    // ramps on the driver's real clock: fading but visible inside each window
+    const midRamp = turnCullOpacity(TURN_CULL_HIDE_AT / 2)
     expect(midRamp).toBeGreaterThan(0)
     expect(midRamp).toBeLessThan(1)
-    const landing = turnCullOpacity(1 - TURN_CULL_RAMP / 2)
+    const landing = turnCullOpacity((TURN_CULL_RESTORE_FROM + TURN_CULL_RESTORE_TO) / 2)
     expect(landing).toBeGreaterThan(0)
     expect(landing).toBeLessThan(1)
   })

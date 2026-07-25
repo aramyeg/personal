@@ -61,6 +61,10 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *     VISIBLE tab at the fore edge; the tab slides out by exactly the
  *     strip draw as the book opens (solver in book/popup-tabpiece.ts).
  *     The future interactive pull/push handle (D6).
+ *   - 'oanave' (E3 s7): an origamic-architecture nave rank — a v-fold wall
+ *     host (kinematics verbatim) with a die-cut portal aperture and OA
+ *     relief strata cut FROM the sheet (Birmingham 37): zero glue, driven
+ *     purely by the host's own central-fold dihedral (book/popup-oanave.ts).
  *  Constraints enforced by tests: pieces stand when open, fold exactly
  *  flat when closed, stay inside the closed page ("nothing sticks out"),
  *  never tear or jam, and children keep their glue on the parent's paper.
@@ -699,19 +703,41 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   { id: 'ch5-market-table', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60 },
 ]
 
-// Chapter VI — the crescendo: pine treeline and the book's LARGEST hero —
-// the glass treasury grown to a true multi-story compound: vault door low
-// on the fold (ground story), banner raised high (top story), the whole
-// piece leaning with real skew. Low pine fringe up front.
+// Chapter VI — the crescendo steps THROUGH the door (E3 s7 scene pack,
+// .superpowers/sdd/scenes/s7-scene-pack.md): the book's first INTERIOR.
+// Every prior chapter showed a building from outside; here the viewer
+// stands inside the nave of vaults, looking down the processional axis.
+// REVERENCE = symmetry + recession, explicitly not size (playbook §6): four
+// width-graded arched oanave ranks recede down the gutter axis, rank behind
+// rank, rear widest — at the high reading camera they read as a rising
+// stack of gilded arch crowns (bench e3s7-nave-sightline.mjs: 15.3 / 8.6 /
+// 7.4 / 7.6% frameH crown bands), with the floor theater (painted gold
+// processional path + pooled aurora light) visible THROUGH the nested
+// portals. The old exterior compound (pines / treasury / spire / vines /
+// door / banner / fringe) is retired per the pack's fate list: the 0.91
+// centered hero was exactly the occluder class that killed the prior
+// vista, and the fringe would sit on the painted path. Rank rho values sit
+// 3 degrees above the pack's sketch: the flat-plane sightline bench never
+// modeled the standing LEAN (crease z-recession ~ h * cot(lambda)), and at
+// the sketch's rho the mouth ranks' wing tops pierced the apse sheet at
+// rest (D-G2); the raised rho stands the ranks upright enough to clear
+// while leaving every bench-fixed number (stations, widths, heights,
+// apertures) untouched — chevron tracks phi, so the relief pop survives
+// (measured in popup-oanave.test.ts, R3).
 const CH6_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch6-pines', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.42, vDir: -1, phiDeg: 84, rhoDeg: 88, skewDeg: 1.4, creaseU: 0.44, width: 1.7, height: 0.69 },
-  { id: 'ch6-treasury', kind: 'hero', role: 'story', mech: 'vfold', apexZ: 0.04, vDir: 1, phiDeg: 54, rhoDeg: 80, skewDeg: -2, creaseU: 0.47, width: 0.86, height: 0.91 },
-  // Dress on the treasury: a glass spire overhanging the roofline off the
-  // left panel, climbing vines low across the right — the dressed hero.
-  { id: 'ch6-treasury-spire', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch6-treasury', seat: 'left', u: 0.14, v: 0.75, width: 0.14, height: 0.2 },
-  { id: 'ch6-treasury-vines', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch6-treasury', seat: 'right', u: 0.13, v: 0.02, width: 0.2, height: 0.12 },
-  { id: 'ch6-door', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.18, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
-  { id: 'ch6-banner', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch6-treasury', mount: 0.66, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.18, height: 0.36 },
+  // THE NAVE (new family 'oanave' — popup-oanave.ts: host kinematics = the
+  // shipped v-fold wall solver VERBATIM; die-cut portal apertures; OA relief
+  // strata cut FROM each sheet, zero glue, dihedral-slaved). Deepest first:
+  // the apse — solid, no relief; the aurora-rose window and treasure tiers
+  // are painted (the grazing ray through D's portal apex reaches y = -0.11
+  // at this plane: the apse face is INVISIBLE through the portals, so its
+  // glow ships as the dome crown band + pooled floor light, bench §B).
+  { id: 'ch6-nave-a', kind: 'backdrop', role: 'backdrop', mech: 'oanave', apexZ: -0.52, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.9, height: 0.62, crownWingH: 0.46, chevronDeg: 10, aperture: null, strata: [] },
+  { id: 'ch6-nave-b', kind: 'midground', role: 'story', mech: 'oanave', apexZ: -0.3, vDir: -1, phiDeg: 76, rhoDeg: 87.5, width: 1.52, height: 0.52, chevronDeg: 14, aperture: { halfW: 0.2, apexH: 0.38 }, strata: [{ kind: 'archMolding', e: 0.1, band: [0.4, 0.5] }, { kind: 'columnPair', e: 0.09, band: [0.02, 0.36] }] },
+  { id: 'ch6-nave-c', kind: 'midground', role: 'story', mech: 'oanave', apexZ: -0.08, vDir: -1, phiDeg: 74, rhoDeg: 86.5, width: 1.16, height: 0.44, chevronDeg: 14, aperture: { halfW: 0.24, apexH: 0.32 }, strata: [{ kind: 'archMolding', e: 0.075, band: [0.34, 0.42] }, { kind: 'columnPair', e: 0.09, band: [0.02, 0.3] }] },
+  // Rank D, the portal mouth — the keystone step is the book's only ORDER-2
+  // relief cascade (a stratum whose spine is the parent stratum's crease).
+  { id: 'ch6-nave-d', kind: 'hero', role: 'story', mech: 'oanave', apexZ: 0.157, vDir: -1, phiDeg: 72, rhoDeg: 85.5, width: 0.78, height: 0.36, chevronDeg: 14, aperture: { halfW: 0.28, apexH: 0.26 }, strata: [{ kind: 'archMolding', e: 0.1, band: [0.27, 0.34] }, { kind: 'keystoneStep', e: 0.05, parent: 0, band: [0.3, 0.34] }] },
   // VOLUMETRIC: a banker's strongbox on the path to the vaults — the
   // chapter's enclosed volume until the treasury itself becomes a box
   // (waiting on the art split). Completes the census: 6/6 chapters.
@@ -748,16 +774,22 @@ const CH6_LAYERS: readonly SceneLayer[] = [
       { z0: 0.01, z1: 0.23, reveal: 'key', plate: 1 },
     ],
   },
-  // FLOATING TIER (C3v2): the treasury's glass gallery — a BRIDGE platform in
-  // the approach lane behind the vault. COMPOSITION SPREAD-D: the treasury is
-  // the book's TALLEST hero (0.91) and it LEANS RIGHT (skew -2), so a wide
-  // deck raised on tall struts (rise 0.40, qA 0.28) crests near its shoulder
-  // while its LEFT wing — deck and struts — swings toward the open left of
-  // the leaning tower. Was a narrow one-sided TERRACE the treasury fully hid;
-  // the wide bridge and the lean together give it a real reveal. Deep back
-  // lane, so it keeps its own depth band.
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.26, glueR: 0.14, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, strutB: { glueL: 0.14, glueR: 0.26, rise: 0.4, spans: [[-0.32, -0.24], [-0.22, -0.14]] }, qA: 0.28, qB: 0.28, deckZ0: -0.32, deckZ1: -0.14 },
-  { id: 'ch6-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.25 },
+  // FLOATING TIER (C3v2, retuned per pack §4c): the entrance DAIS the gold
+  // processional path climbs into rank D's portal — a low wide BRIDGE just
+  // downstage of the mouth. Its grazing ray lands at y ~ 0 exactly at D's
+  // sill, so it hides nothing inside the nave (bench §A), and the
+  // strongbox's shadow dies at z ~ 0.22 before its top. (Re-derived from
+  // the pack's sketch: its two identical strut ranks share one
+  // cross-section — coincident ridges make a degenerate vertical deck — so
+  // the dais is built as a proper LOW MIRROR BRIDGE in the ch5-goods
+  // proportions instead, same z band and rise as the pack.)
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.1, spans: [[0.2, 0.245], [0.275, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.1, spans: [[0.2, 0.245], [0.275, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
+  // NEW: the intimate counterweight (T-COUNTERWEIGHT, ref 140028 Kristoff
+  // corner) — a tiny clerk kneeling over his ledger by candlelight on the
+  // left apron, already at prayer while the vaults are still rising around
+  // him (stripflap = the early-riser family). His 3/4 facing toward the
+  // coffer is a zero-cost affordance pointer (R5 discoverability).
+  { id: 'ch6-clerk', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.44, slot: 0.3, slotZ: 0.44, hingeX: 0.55, hingeZ: 0.44, hingeDeg: 30, width: 0.16, height: 0.2 },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [
@@ -841,9 +873,16 @@ export const CHAPTERS: readonly Chapter[] = [
     title: 'The Northern Treasury',
     narration:
       "And so at last the road bent north, to a kingdom of pine and long light, where a new treasury was rising — AMIO by name — with walls of glass, so the people might always see their gold. There the hero works to this day: raising vaults, drawing plans with the founders themselves, and teaching young apprentices the old craft. Whether he lives happily ever after is not yet written — the best chronicles never quite end.",
-    accents: ['#2e5244', '#4fd6b8', '#8a6fd6', '#1d2a45'],
+    // Accents swap (pack §4e, PACK REVIEW s7 decision 2: pine-green -> gold,
+    // provisionally approved): the chapter is now a midnight/teal INTERIOR
+    // full of quiet gold, not a pine exterior. Audited usages: accents[0] is
+    // the chapter's page-edge/tab tint (book.tsx) — deep teal #14454b reads
+    // as the same dark family the pine green did; placeholder art cycles the
+    // whole array, where gold #d4a13c replaces amethyst (aurora amethyst now
+    // lives ONLY in the painted apse window, the daisy-ref discipline).
+    accents: ['#14454b', '#4fd6b8', '#d4a13c', '#1d2a45'],
     layers: CH6_LAYERS,
-    hero: 'ch6-treasury', // vfold, sweep 0.97 — the northern treasury (the crescendo)
+    hero: 'ch6-nave-a', // oanave (new family) — the apse rank; R2 sweep measured 1.337 in popup-oanave.test.ts
   },
 ]
 

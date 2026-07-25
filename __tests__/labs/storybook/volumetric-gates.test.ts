@@ -28,6 +28,7 @@ import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissol
 import { solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
+import { oanavePatches } from '@/components/labs/storybook/book/popup-oanave'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -176,6 +177,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
         ...pose.gussets.flatMap((g) => [g.left, g.right]),
       ]
     }
+    case 'oanave':
+      // Host wings + the die-cut relief strata — the rank's full depth
+      // footprint (popup-oanave.ts).
+      return oanavePatches(l, tL, tR).map((p) => p.quad)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }

@@ -296,23 +296,32 @@ principle) before any of these land.
 
 ## 7. Chapter VI — The Northern Treasury (spread 7)
 
-*The book's largest hero (`ch6-treasury`, height 0.91) — leans right, real skew.*
+*The book's first INTERIOR (E3 s7 nave rebuild, scenes/s7-scene-pack.md): four
+width-graded arched `oanave` ranks recede down the gutter axis — teal vault
+masonry, gilt arch rims, die-cut portal apertures (alpha), painted coin-shelf
+strata lines in each wing's TOP 0.20 band. The OA relief strata are cut FROM
+each painted sheet, so relief paint continuity is automatic. One shared 1024
+nave atlas covers the four rank faces + the clerk. Palette: midnight vault
+`#16223a` · deep teal `#14454b` · floor teal-black `#0b2530` · gold leaf
+`#d4a13c` · bright gilt `#f0cd7a` · frost white `#eef4f6`; aurora mint
+`#4fd6b8` / amethyst `#8a6fd6` ONLY in the apse window + pooled floor light.
+T1 GOLD-edge variant: rank D rim + coffer lid fore-edge get gilt `#f0cd7a`
+edge ribbons; all other pieces frost. The retired exterior set (pines,
+treasury + spire/vines/door/banner, fringe) leaves those webp files orphaned.*
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `ch6-pines` | `ch6-pines` | Pine treeline under the aurora | ≈2.46:1 landscape | STAND | **art** |
-| `ch6-treasury` | `ch6-treasury` | The chapter hero: multi-story glass treasury, leaning | ≈0.95:1 near-square | STAND | **art** |
-| `ch6-treasury-spire` | `ch6-treasury-spire` | Dressed glass spire overhanging the roofline, off the left panel | ≈0.7:1 portrait | FLAT | placeholder |
-| `ch6-treasury-vines` | `ch6-treasury-vines` | Dressed climbing vines low across the right panel | ≈1.67:1 landscape | FLAT | placeholder |
-| `ch6-door` | `ch6-door` | Round vault door, low on the treasury's fold (ground story) | ≈1.0:1 square | STAND — **ROTATED 180** | **art** |
-| `ch6-banner` | `ch6-banner` | Raised banner, high on the treasury's fold (top story) | ≈0.5:1 tall banner strip | STAND — **ROTATED 180** | **art** |
-| `ch6-strongbox` | `ch6-strongbox-front`, `ch6-strongbox-back`, `ch6-strongbox-side`, `ch6-strongbox-top` | Banker's strongbox on the path to the vaults | side ≈1.09:1 · front/back ≈1.82:1 · top ≈1.67:1 | FACE / TOPDOWN | placeholder |
+| `ch6-nave-a` | `ch6-nave-a`, `ch6-nave-a-back` | The APSE rank: scalloped dome crown silhouette (die-cut alpha), aurora-rose window (radial mint→amethyst→gilt core) centered in the visible band y 0.43–0.62, flat painted treasure tiers below (mostly hidden — cheap fills), frost dusting on the crown edge. `-back` = the T4 print-back tint carrying the same die alpha | ≈3.06:1 landscape (1.90 × 0.62) | STAND | **art** (procedural) |
+| `ch6-nave-b` | `ch6-nave-b`, `ch6-nave-b-back` | Nave rank B: teal vault masonry, gilt arch rim + voussoirs ringing the aperture, coin-shelf strata lines in the wings' top band; relief = arch molding + column pair (paint continuous across the cuts — the strata are cut FROM this sheet) | ≈2.92:1 landscape (1.52 × 0.52) | STAND | **art** (procedural) |
+| `ch6-nave-c` | `ch6-nave-c`, `ch6-nave-c-back` | Nave rank C: same grammar, one bay nearer | ≈2.64:1 landscape (1.16 × 0.44) | STAND | **art** (procedural) |
+| `ch6-nave-d` | `ch6-nave-d`, `ch6-nave-d-back` | Rank D, the portal MOUTH (the depth-band hero): gilt arch rim + voussoirs, keystone step relief (order-2, gilt painted exactly over its stratum band), T1 GOLD edge ribbon | ≈2.17:1 landscape (0.78 × 0.36) | STAND | **art** (procedural) |
+| `ch6-clerk` | `ch6-clerk` | The intimate counterweight: a kneeling clerk over an open ledger, one candle — midnight coat, candle-gold face; painted both sides; gaze 3/4 toward the coffer | ≈0.8:1 portrait (0.16 × 0.20) | STAND | placeholder |
+| `ch6-strongbox` | `ch6-strongbox-front`, `ch6-strongbox-back`, `ch6-strongbox-side`, `ch6-strongbox-top` | Banker's strongbox — now the waystation the painted gold path splits around (R7: height frozen ≤ 0.12) | side ≈1.09:1 · front/back ≈1.82:1 · top ≈1.67:1 | FACE / TOPDOWN | placeholder |
 | `ch6-crest` | `ch6-crest` | Bank's griffin crest, standing ON the strongbox lid (rider recursion) | ≈1.13:1 near-square | STAND | placeholder |
 | `ch6-strongbox-seal` | `ch6-strongbox-seal` | Dressed wax seal on the strongbox's front cap | ≈1.0:1 square | FLAT | placeholder |
 | `ch6-strongbox-coins` | `ch6-strongbox-coins` | Dressed minted coins heaped at the strongbox's side-wall base | ≈2.0:1 wide | FLAT | placeholder |
 | `ch6-coffer` | `ch6-coffer-board`, `ch6-coffer-door1` | LIFT-THE-FLAP (the spread's playable, G4): a TREASURE COFFER on the open right-page ground fore of the vault — the reader lifts a teal-steel strongbox lid and an aurora-lit gold hoard glows inside. Reuses the s2 liftflap family with ONE lid (a chest, not numbered doors). `-board` = the OPEN interior painted in the revealed state (aurora-lit minted-gold heap in the fore half, violet wax seal, dark teal-steel cavity); `-door1` = the closed teal-steel lid (gold reinforced corners, rivets, iron hinge straps at the spine edge, a bright gold HASP + keyhole at the fore/lift edge — the affordance) | painted in SCREEN space (image-x = page-fore d = screen-right, image-y = spine z = screen-down): board ≈1.2:1 (d 0.24 : z 0.20) · lid ≈1.05:1 near-square (d 0.19 : z 0.18) | FLAT (page-flat, screen-space uvs) | **art** (procedural) |
-| `ch6-steps` | `ch6-steps-deck` | Glass-gallery BRIDGE deck in the approach lane, crests near the treasury's shoulder | ≈3.11:1 very wide | TOPDOWN | placeholder |
-| `ch6-fringe` | `ch6-fringe` | Low pine fringe at the very front edge | ≈5.2:1 very wide | STAND | **art** |
+| `ch6-steps` | `ch6-steps-deck` | The entrance DAIS — a low bridge deck the painted gold processional path climbs into rank D's portal | ≈2.08:1 wide (0.25 × 0.12) | TOPDOWN | placeholder |
 
 ## 8. Title page (spread 1)
 
