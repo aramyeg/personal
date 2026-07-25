@@ -62,14 +62,14 @@ const TAB_Y_LIFT = 0.003
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
 /** uv rect of one atlas cell (row 0 at the TOP of the image — canvas paint
- *  order), optionally `cells` wide, optionally u-mirrored. */
-function cellUvs(cell: number, cells: number, flip: boolean): [number, number][] {
+ *  order), optionally `cells` wide / `cellsY` tall, optionally u-mirrored. */
+function cellUvs(cell: number, cells: number, flip: boolean, cellsY = 1): [number, number][] {
   const cx = cell % ATLAS_GRID
   const cy = Math.floor(cell / ATLAS_GRID)
   const u0 = cx / ATLAS_GRID
   const u1 = (cx + cells) / ATLAS_GRID
   const v1 = 1 - cy / ATLAS_GRID
-  const v0 = 1 - (cy + 1) / ATLAS_GRID
+  const v0 = 1 - (cy + cellsY) / ATLAS_GRID
   const [a, b] = flip ? [u1, u0] : [u0, u1]
   // corner order [foot-in, foot-out, tip-out, tip-in]: u across, v foot→tip
   return [
@@ -155,8 +155,10 @@ export function SwarmArcPopupLayer({
     return makeMergedQuads(n, applyUvRect(uv, rect))
   }, [n, layer.struts, rect])
   const tabGeometry = useMemo(() => {
+    // The STIR tab reads the atlas's 2x2 region (cells 17-18 + 25-26): banner
+    // lettering over the bee-on-honey-drop pull.
     const uv = new Float32Array(4 * 2)
-    cellUvs(17, 2, false).forEach(([u, v], c) => uv.set([u, v], c * 2))
+    cellUvs(17, 2, false, 2).forEach(([u, v], c) => uv.set([u, v], c * 2))
     return makeMergedQuads(1, applyUvRect(uv, rect))
   }, [rect])
 
