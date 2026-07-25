@@ -98,12 +98,37 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
   return t * t * (3 - 2 * t)
 }
 
-/** Wave-window deploy fraction for wave key `w` at envelope `E` (§3 formula):
- *  smoothstep over [b0, b0 + 0.38], b0 = 0.18 + 0.42·w. All windows close by
- *  E = 0.98 for w ≤ 1; the window floor never goes below 0 (outriders w < 0). */
-export function swarmWaveWindow(w: number, E: number): number {
-  const b0 = Math.max(0, 0.18 + 0.42 * w)
-  return smoothstep(b0, b0 + 0.38, E)
+/** Normalized page openness s = beta / betaRest, clamped to [0, 1] — the
+ *  wave's clock. s(0) = 0 exactly (fold-flat), s(rest) = 1. */
+export function swarmOpenness(geom: SwarmArcGeom, beta: number): number {
+  return clamp(beta / rad(geom.restAtDeg ?? DEFAULT_REST_DEG), 0, 1)
+}
+
+/** Wave-window deploy fraction for wave key `w` at openness `s`: smoothstep
+ *  over [c0, 1], c0 = 0.34·w (outriders w < 0 floor at 0).
+ *  DERIVED CHANGE vs the pack's §3 windows a_i(E) = smoothstep(b0, b0+0.38, E):
+ *  the wave clock is the DIHEDRAL FRACTION s = beta/rest, not the envelope E,
+ *  and every window closes at s = 1. Two house gates forced this, both
+ *  measured against the real code:
+ *  (1) A10 wedge containment — a strut anchored near the gutter subtends a
+ *      spine angle atan(L_eff·sin a / F_inner) far LARGER than its deploy
+ *      angle a (the crown: F−r ≈ 0.079 vs reach 0.61 → 83° at full deploy).
+ *      E(beta) front-loads deploy into NARROW wedges (E(60°) = 0.70), so
+ *      E-clocked crown struts pierced the moving page mid-close (measured
+ *      poke 0.06°–10°+). Clocking on s keeps a(beta) growing no faster than
+ *      the wedge itself opens: worst crown spine-angle 47° inside an 82.5°
+ *      wedge.
+ *  (2) D-G5 Gate 2 — 0.38-wide E-windows quadruple the deploy rate and land
+ *      the crown's window on easeTurnWeighted's peak-speed station (measured
+ *      step 0.075 > 0.0497 cap); s-clocked windows spread deploy across the
+ *      turn's back two-thirds where the eased clock decelerates (measured
+ *      worst combined step ~0.033).
+ *  The pour SURVIVES: starts staggered by w (outriders/front limbs first,
+ *  crown last), per-strut monotone, q(0) = 0 exact, all full at rest and
+ *  ≥ 0.99 by s = 0.98. */
+export function swarmWaveWindow(w: number, s: number): number {
+  const c0 = Math.max(0, 0.34 * w)
+  return smoothstep(c0, 1, s)
 }
 
 /** Stir ripple delta (deg) for rank `k` at tab stroke `s` (§3 formula). */
@@ -112,13 +137,14 @@ export function swarmStirDelta(spec: SwarmStirSpec, k: number, s: number): numbe
   return spec.deg * Math.sin(Math.PI * clamp(s / spec.stroke - spec.phaseStep * k, 0, 1))
 }
 
-/** The strut's SHOWN deploy angle (radians) at envelope E and tab stroke s —
- *  the liftflap persistence composition: both the wave-windowed rest term and
- *  the user ripple are inside the envelope, so a(E=0) = 0 exactly for ANY
- *  held stir state (fold-flat law). */
-export function swarmDeployAngle(geom: SwarmArcGeom, strut: SwarmStrut, E: number, stirS: number): number {
-  const restTerm = rad(strut.aRestDeg) * swarmWaveWindow(strut.wave, E)
-  const stirTerm = rad(swarmStirDelta(geom.stir, strut.stir, stirS)) * E
+/** The strut's SHOWN deploy angle (radians) at dihedral `beta` and tab stroke
+ *  `stirS` — the liftflap persistence composition: the wave term rides the
+ *  openness clock s(beta) and the user ripple rides the envelope E(beta),
+ *  both exactly 0 at beta = 0, so a(0) = 0 for ANY held stir state
+ *  (fold-flat law). */
+export function swarmDeployAngle(geom: SwarmArcGeom, strut: SwarmStrut, beta: number, stirS: number): number {
+  const restTerm = rad(strut.aRestDeg) * swarmWaveWindow(strut.wave, swarmOpenness(geom, beta))
+  const stirTerm = rad(swarmStirDelta(geom.stir, strut.stir, stirS)) * swarmArcEnvelope(geom, beta)
   return restTerm + stirTerm
 }
 
@@ -156,8 +182,7 @@ export function solveSwarmStrut(
   stirS = 0
 ): SwarmStrutPose {
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const E = swarmArcEnvelope(geom, beta)
-  const a = swarmDeployAngle(geom, strut, E, stirS)
+  const a = swarmDeployAngle(geom, strut, beta, stirS)
   const { u, n } = pageFrame(strut.side, thetaL, thetaR)
   const sa = Math.sin(a)
   const ca = Math.cos(a)

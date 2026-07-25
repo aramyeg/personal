@@ -1,6 +1,7 @@
 import { experiences } from '@/data'
 import type { Experience } from '@/types'
 import type { LayerGeom } from '@/components/labs/storybook/book/popup-mechanics'
+import { buildSwarmStruts } from '@/components/labs/storybook/book/popup-swarmarc'
 
 export type LayerKind = 'backdrop' | 'midground' | 'hero' | 'foreground'
 
@@ -193,7 +194,26 @@ const CH1_LAYERS: readonly SceneLayer[] = [
 // contrast is part of the variation.
 const CH2_LAYERS: readonly SceneLayer[] = [
   { id: 'ch2-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.45, vDir: -1, phiDeg: 84, rhoDeg: 88.5, skewDeg: 1.5, creaseU: 0.6, width: 1.65, height: 0.94 },
-  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.48, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117 },
+  // CROWN ACCENT TRIO (E3 s3, pack §2.2): the vortex flings its top riders
+  // above the strut ceiling — three flung bees on the BACKDROP CREASE (gutter
+  // class, the only legal way past the swarmarc 0.75 radius wall). bee-a is
+  // PROMOTED, not cut: same die-cut geometry, re-seated near the crease top.
+  // Mounts SOLVED against solveChildPose (crease leans back ~25°, so tips ride
+  // z ≈ −0.73..−0.78 at the gated heights): tips land 0.08–0.30 above the ring
+  // crown (y 0.609) with |x| ≤ 0.2 — the S4 accent-band gate in
+  // __tests__/labs/storybook/popup-swarmarc-scene.test.ts.
+  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.84, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117 },
+  { id: 'ch2-crown-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.9, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.08 },
+  { id: 'ch2-crown-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.82, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.13, height: 0.07 },
+  // ATMOSPHERE INTERLEAVE (ref 10): cut-paper clouds on the backdrop panels —
+  // atmosphere BETWEEN the painted sky and the wheeling ring.
+  // (u/v are world offsets from the panel's spine-side corner — the clouds
+  // sit OUTBOARD at the ring's shoulders, overhanging the panel edges, clear
+  // of the crown struts' sweep lane.)
+  { id: 'ch2-cloud-l', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-backdrop', seat: 'left', u: 0.62, v: 0.55, width: 0.3, height: 0.11 },
+  // (cloud-r stays mid-panel: outboard it brushes the right limb's mid-turn
+  // sweep lane — measured 11 extra mid-turn hits vs ~0 here.)
+  { id: 'ch2-cloud-r', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-backdrop', seat: 'right', u: 0.26, v: 0.6, width: 0.26, height: 0.1 },
   { id: 'ch2-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
   { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.62, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
   { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069 },
@@ -204,17 +224,27 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // Dress on the hive: a bee swarm hanging off the lid, flowers at the base.
   { id: 'ch2-hive-swarm', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-hive', seat: 'lidR', u: 0, v: 0.01, width: 0.16, height: 0.1 },
   { id: 'ch2-hive-flowers', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-hive', seat: 'wallL', u: 0, v: 0, width: 0.14, height: 0.07 },
-  // FLOATING TIER (C3v2): an alpine meadow shelf — a TERRACE platform (two
-  // strut ranks of DIFFERENT closed reach, qA+qB spanning the gap) so the
-  // deck steps down toward the reader. D5 arm-lane pass: its depth footprint
-  // was tightened (deckZ -0.28..-0.10, was -0.30..-0.02) — pulling the shelf's
-  // reader edge back opens clean air at the spine for the windmill downstage
-  // of it and drops the meadow's mid-turn crossings with the backdrop/hero/
-  // bees by ~30, the budget the visible sail spends against the backdrop.
-  { id: 'ch2-meadow', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.12, glueR: 0.12, rise: 0.14, spans: [[-0.28, -0.22]] }, strutB: { glueL: 0.1, glueR: 0.1, rise: 0.06, spans: [[-0.16, -0.1]] }, qA: 0.06, qB: 0.06, deckZ0: -0.28, deckZ1: -0.1 },
+  // THE CARRIER SWARM (E3 s3, NEW FAMILY 'swarmarc' — replaces the ch2-meadow
+  // platform, which sat exactly in the left arm's anchor lane and duplicated
+  // the multiplicity role the ring now owns; retiring returns ~30 mid-turn
+  // crossings + 3 draws + 2 textures). A horseshoe ring of 24 couriers on
+  // graded hairline struts + 4 outrider strays, wheeling around the hero:
+  // full table regenerated from the bench constants (e3s3-swarmarc.mjs, ALL
+  // GATES GREEN S1–S7), wave-staggered deploy poured out of the hive by the
+  // page itself, and the STIR THE SWARM fore-edge tab rippling the 5
+  // right-arm members (drive channel `ch2-swarm~stir`, held state).
+  { id: 'ch2-swarm', kind: 'midground', role: 'figure', mech: 'swarmarc', struts: buildSwarmStruts(), strutW: 0.01, stir: { side: 'right', stroke: 0.14, deg: 12, phaseStep: 0.12 } },
   // The long-planned painted meadow fringe up front (call sheet v5): a low
   // wide reader-edge wall that ratchets the chapter's depth bands.
   { id: 'ch2-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.56, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.2, height: 0.22 },
+  // LINKED-RANK CHAINS (T-LINKED-RANK): each ONE die-cut of 2 bees + a strung
+  // envelope on painted thread, overhanging the fringe top edge (the Sabuda
+  // overhang recipe) — they hand the ring's width past the strut radius wall
+  // and lead the eye down to the painted floor routes.
+  // (outboard at x ≈ ±0.45..0.79 per the pack's ±0.52/±0.78 span targets —
+  // clear of the gutter hive; they widen the composition past the strut wall.)
+  { id: 'ch2-chain-l', kind: 'foreground', role: 'scenery', mech: 'dress', parentId: 'ch2-fringe', seat: 'left', u: 0.45, v: 0.14, width: 0.34, height: 0.12 },
+  { id: 'ch2-chain-r', kind: 'foreground', role: 'scenery', mech: 'dress', parentId: 'ch2-fringe', seat: 'right', u: 0.44, v: 0.13, width: 0.32, height: 0.12 },
   // KINETIC (D4/D5): a WINDMILL SAIL standing in the meadow — Birmingham mech
   // 73, a 45-deg arm that sweeps a quarter-turn up to vertical as the book
   // opens (the sail catching the wind). D5 arm-lane pass moved it from the deep
@@ -665,7 +695,11 @@ export const CHAPTERS: readonly Chapter[] = [
       "Word of the apprentice’s craft crossed the mountains to the alpine city of Zürich, where the Guild of the Bee kept a thousand couriers aloft. ‘Build us a looking-glass,’ said the beekeepers, ‘that we may see every wing at once.’ So he built it from nothing at all — his first work made to be carried in a pocket — and from that day no parcel, however small, ever wandered from its path.",
     accents: ['#7d9bb5', '#8a5a3b', '#d9a441'],
     layers: CH2_LAYERS,
-    hero: 'ch2-bee-a', // recursion (child), sweep 0.82 — the carrier bee
+    // E3 s3: the SWARM is the chapter — 24 wave-staggered struts pour out of
+    // the hive as the page opens (crown strut tip chord 0.78 > 0.525 floor,
+    // and 24 of them do it in a wave). Family swarmarc differs from s2
+    // (vfold) and s4 (keepwinch) — rotation law holds.
+    hero: 'ch2-swarm',
   },
   {
     spread: 4,

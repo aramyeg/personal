@@ -5,6 +5,7 @@ import {
   solveSwarmStrut,
   swarmArcEnvelope,
   swarmDeployAngle,
+  swarmOpenness,
   swarmStirDelta,
   swarmStrutRadius,
   swarmWaveWindow,
@@ -123,6 +124,7 @@ describe('swarmarc radius + step gates (S1–S3)', () => {
 describe('swarmarc fold-flat + wave stagger (M1 / S7)', () => {
   it('q(0) = 0 exactly: closed book zeroes every strut for ANY held stir state', () => {
     expect(swarmArcEnvelope(GEOM, 0)).toBe(0)
+    expect(swarmOpenness(GEOM, 0)).toBe(0)
     for (const s of STRUTS) {
       expect(swarmDeployAngle(GEOM, s, 0, 0)).toBe(0)
       expect(swarmDeployAngle(GEOM, s, 0, GEOM.stir.stroke)).toBe(0)
@@ -138,35 +140,55 @@ describe('swarmarc fold-flat + wave stagger (M1 / S7)', () => {
     }
   })
 
-  it('wave windows are monotone in the wave key and all close by E = 0.98', () => {
-    for (const E of [0.2, 0.4, 0.6, 0.8, 0.95]) {
+  it('wave windows are monotone in the wave key and all close by s = 0.98', () => {
+    for (const u of [0.2, 0.4, 0.6, 0.8, 0.95]) {
       for (let i = 1; i < STRUTS.length; i++) {
         const a = STRUTS[i - 1]
         const b = STRUTS[i]
         if (a.wave <= b.wave) {
-          expect(swarmWaveWindow(a.wave, E)).toBeGreaterThanOrEqual(swarmWaveWindow(b.wave, E) - 1e-12)
+          expect(swarmWaveWindow(a.wave, u)).toBeGreaterThanOrEqual(swarmWaveWindow(b.wave, u) - 1e-12)
         }
       }
     }
-    for (const s of STRUTS) expect(swarmWaveWindow(s.wave, 0.98)).toBeCloseTo(1, 6)
-    // outriders lead the front ends, crown lands last
+    for (const s of STRUTS) {
+      expect(swarmWaveWindow(s.wave, 1)).toBe(1)
+      expect(swarmWaveWindow(s.wave, 0.98)).toBeGreaterThanOrEqual(0.99)
+    }
+    // outriders lead (or tie — the b0 floor clamps at 0) the front ends,
+    // crown lands last
     const outrider = STRUTS[24]
     const front = STRUTS[0]
     const crown = STRUTS[12]
-    expect(swarmWaveWindow(outrider.wave, 0.3)).toBeGreaterThan(swarmWaveWindow(front.wave, 0.3))
+    expect(swarmWaveWindow(outrider.wave, 0.3)).toBeGreaterThanOrEqual(swarmWaveWindow(front.wave, 0.3))
     expect(swarmWaveWindow(front.wave, 0.5)).toBeGreaterThan(swarmWaveWindow(crown.wave, 0.5))
   })
 
   it('each strut deploys monotonically as the book opens', () => {
+    const rest = rad(176)
     for (const s of [STRUTS[0], STRUTS[12], STRUTS[19], STRUTS[27]]) {
       let last = -1
       for (let k = 0; k <= 20; k++) {
-        const E = k / 20
-        const a = swarmDeployAngle(GEOM, s, E, 0)
+        const beta = (k / 20) * rest
+        const a = swarmDeployAngle(GEOM, s, beta, 0)
         expect(a).toBeGreaterThanOrEqual(last - 1e-12)
         last = a
       }
-      expect(swarmDeployAngle(GEOM, s, 1, 0)).toBeCloseTo(rad(s.aRestDeg), 10)
+      expect(swarmDeployAngle(GEOM, s, rest, 0)).toBeCloseTo(rad(s.aRestDeg), 10)
+    }
+  })
+
+  it('A10 wedge law: every strut tip subtends a spine angle inside the closing wedge', () => {
+    // The family's containment law re-derived for near-spine anchors: the tip
+    // spine-angle atan(L_eff·sin a / F_inner) must stay <= beta at every
+    // dihedral (else the strut pierces a bounding page mid-close).
+    for (const s of STRUTS) {
+      const fInner = s.F - Math.max(s.r, GEOM.strutW / 2)
+      for (let k = 1; k <= 40; k++) {
+        const beta = (k / 40) * rad(176)
+        const a = swarmDeployAngle(GEOM, s, beta, 0)
+        const spineAng = Math.atan2((s.L + s.r) * Math.sin(a), fInner)
+        expect(spineAng).toBeLessThanOrEqual(beta + 1e-9)
+      }
     }
   })
 
@@ -207,13 +229,15 @@ describe('swarmarc stir ripple (the STIR THE SWARM tab)', () => {
     expect(swarmStirDelta(spec, -1, spec.stroke)).toBe(0)
   })
 
-  it('persistence law: shown angle = rest·W(E) + Δa·E — held stir folds flat at close', () => {
+  it('persistence law: shown angle = rest·W(s(β)) + Δa·E(β) — held stir folds flat at close', () => {
     const s = STRUTS[23] // rank 0, the tab-nearest strut
     const held = GEOM.stir.stroke * 0.5
-    for (const E of [0, 0.25, 0.5, 0.75, 1]) {
+    for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
+      const beta = frac * rad(176)
       const expected =
-        rad(s.aRestDeg) * swarmWaveWindow(s.wave, E) + rad(swarmStirDelta(GEOM.stir, s.stir, held)) * E
-      expect(swarmDeployAngle(GEOM, s, E, held)).toBeCloseTo(expected, 12)
+        rad(s.aRestDeg) * swarmWaveWindow(s.wave, swarmOpenness(GEOM, beta)) +
+        rad(swarmStirDelta(GEOM.stir, s.stir, held)) * swarmArcEnvelope(GEOM, beta)
+      expect(swarmDeployAngle(GEOM, s, beta, held)).toBeCloseTo(expected, 12)
     }
     expect(swarmDeployAngle(GEOM, s, 0, held)).toBe(0)
   })
