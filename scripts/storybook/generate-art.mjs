@@ -3497,13 +3497,39 @@ function naveRankFace(w, h, seed, cfg) {
   s += `<line x1="0" y1="${fx(h * (1 - m0))}" x2="${w}" y2="${fx(h * (1 - m0))}" stroke="${NAVE_C.gold}" stroke-width="2.4" opacity="0.7"/>`
   s += `</g>`
   // gilt arch rim ringing the aperture (drawn unclipped so the ring sits ON
-  // the die edge), then the keystone at the crown for the mouth rank.
+  // the die edge), with radiating voussoir ticks — the cathedral archivolt.
   s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gold}" stroke-width="7" opacity="0.95"/>`
   s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.6" opacity="0.9"/>`
-  if (cfg.keystone) {
+  {
     const cx = w / 2
+    const aw = cfg.apHw * w
     const yA = h * (1 - cfg.apApex)
-    s += `<path d="M ${fx(cx - w * 0.035)} ${fx(yA + 4)} L ${fx(cx + w * 0.035)} ${fx(yA + 4)} L ${fx(cx + w * 0.022)} ${fx(yA - h * 0.16)} L ${fx(cx - w * 0.022)} ${fx(yA - h * 0.16)} Z" fill="${NAVE_C.gilt}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
+    const ySpring = Math.min(h, yA + aw * 1.1)
+    const vCx = cx
+    const vCy = ySpring
+    const ticks = 9
+    for (let i = 0; i <= ticks; i++) {
+      const a = Math.PI + (Math.PI * i) / ticks // left horizon over the crown to right
+      const rx = Math.cos(a)
+      const ry = Math.sin(a) * ((ySpring - yA) / aw + 0.12)
+      const n = Math.hypot(rx, ry) || 1
+      const x0 = vCx + (rx / n) * aw
+      const y0 = Math.min(ySpring, vCy + (ry / n) * aw)
+      const x1 = vCx + (rx / n) * (aw + Math.min(w, h) * 0.045)
+      const y1 = Math.min(ySpring, vCy + (ry / n) * (aw + Math.min(w, h) * 0.045))
+      s += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${NAVE_C.gold}" stroke-width="2.2" opacity="0.6"/>`
+    }
+  }
+  // the keystone, painted EXACTLY over its stratum band so the popped
+  // order-2 relief carries the gilt (band fracs from content.ts, khw = the
+  // keystone arm as a width fraction — the cut edges land inside the paint).
+  if (cfg.kb) {
+    const cx = w / 2
+    const y0 = h * (1 - cfg.kb[1])
+    const y1 = h * (1 - cfg.kb[0])
+    const kw = cfg.khw * w
+    s += `<path d="M ${fx(cx - kw * 1.2)} ${fx(y1)} L ${fx(cx + kw * 1.2)} ${fx(y1)} L ${fx(cx + kw * 0.85)} ${fx(y0)} L ${fx(cx - kw * 0.85)} ${fx(y0)} Z" fill="${NAVE_C.gilt}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
+    s += `<line x1="${fx(cx - kw * 1.2)}" y1="${fx(y1 - 2)}" x2="${fx(cx + kw * 1.2)}" y2="${fx(y1 - 2)}" stroke="${NAVE_C.frost}" stroke-width="1.6" opacity="0.8"/>`
   }
   // the painted column pair standing in the portal centre — the sheet strip
   // the columnPair stratum folds back from (it must stay painted: the cut
@@ -3838,7 +3864,7 @@ const PIECES = [
   { id: 'ch6-nave-a', seed: 70300, w: 950, h: 310, grain: 11, paint() { return naveApseFace(this.w, this.h, this.seed) } },
   { id: 'ch6-nave-b', seed: 70301, w: 760, h: 260, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.1316, apApex: 0.7308, topBand: 0.3846, mold: [0.769, 0.962], colHalf: 0.0592, colTop: 0.6923, edge: 'frost' }) } },
   { id: 'ch6-nave-c', seed: 70302, w: 580, h: 220, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.2069, apApex: 0.7273, topBand: 0.4545, mold: [0.7727, 0.9545], colHalf: 0.0776, colTop: 0.6818, edge: 'frost' }) } },
-  { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], keystone: true, edge: 'gilt' }) } },
+  { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], kb: [0.8333, 0.9444], khw: 0.0641, edge: 'gilt' }) } },
   { id: 'ch6-clerk', seed: 70304, w: 200, h: 250, grain: 10, paint() { return naveClerk(this.w, this.h, this.seed) } },
   { id: 'page-7', seed: 70310, w: 1024, h: 683, grain: 10, paint() { return navePage(this.w, this.h, this.seed) } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },

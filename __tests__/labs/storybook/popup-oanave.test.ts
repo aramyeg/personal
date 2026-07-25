@@ -42,16 +42,72 @@ describe('oanave family — geometry gates OA-1..OA-6 (fold physics)', () => {
   it('OA-1 arm identity E = H per stratum, err < 1e-12 across the fold range', () => {
     for (const r of NAVE) {
       for (let beta = 0.05; beta <= Math.PI + 1e-9; beta += 0.1) {
-        const patches = oanavePatches(r, ...bloom(beta))
+        const { bR, bL, b, cosG } = oanaveReliefFrame(solveOanaveHostPose(r, ...bloom(beta)))
+        for (const st of r.strata) {
+          if (st.parent !== undefined) continue
+          // Mountain crease q on the wings' bisector at 2e*cosG; both arms
+          // |q - s±| must equal the in-sheet arm e (E = H) identically.
+          const q: Vec3 = [2 * st.e * cosG * b[0], 2 * st.e * cosG * b[1], 2 * st.e * cosG * b[2]]
+          const sR: Vec3 = [st.e * bR[0], st.e * bR[1], st.e * bR[2]]
+          const sL: Vec3 = [st.e * bL[0], st.e * bL[1], st.e * bL[2]]
+          expect(Math.abs(dist(q, sR) - st.e)).toBeLessThan(1e-12)
+          expect(Math.abs(dist(q, sL) - st.e)).toBeLessThan(1e-12)
+        }
+      }
+    }
+  })
+
+  it('OA-1b material conservation: each stratum\'s relief quads tile [0, e] exactly; the die never loses or doubles paper', () => {
+    for (const r of NAVE) {
+      const patches = oanavePatches(r, ...REST)
+      r.strata.forEach((st, i) => {
+        const spans = patches
+          .filter((p) => p.stratum === i && p.face === 'reliefR')
+          .map((p) => p.sRange!)
+          .sort((a, b) => a[0] - b[0])
+        expect(spans.length).toBeGreaterThan(0)
+        // keystone-owned inner material is excluded from the parent's spans
+        // over the child band ONLY — outside it the parent reaches the crease.
+        let reach = spans[0][0]
+        const children = r.strata.filter((k) => k.parent === i)
+        if (children.length === 0) expect(reach).toBe(0)
+        for (const [s0, s1] of spans) {
+          expect(s0).toBeLessThanOrEqual(reach + 1e-12) // no gap between spans
+          reach = Math.max(reach, s1)
+          expect(s1).toBeLessThanOrEqual(st.e + 1e-12)
+        }
+        expect(reach).toBeCloseTo(st.e, 12)
+      })
+    }
+  })
+
+  it('OA-1c score-line weld: every relief quad\'s outer edge lies exactly on its score line; wing notches stop at the score', () => {
+    for (const r of NAVE) {
+      for (const beta of [0.4, 1.6, Math.PI]) {
+        const [tL, tR] = bloom(beta)
+        const pose = solveOanaveHostPose(r, tL, tR)
+        const { bR, bL } = oanaveReliefFrame(pose)
+        const patches = oanavePatches(r, tL, tR)
         for (const p of patches) {
           if (p.stratum === undefined) continue
-          const e = r.strata[p.stratum].e
-          // quad = [crease@v0, score@v0, score@v1, crease@v1]: both cut edges
-          // must measure exactly the arm e in 3D (H) — and the uv rect spans
-          // exactly e/width in sheet space (E), so E = H identically.
-          expect(Math.abs(dist(p.quad[0], p.quad[1]) - e)).toBeLessThan(1e-12)
-          expect(Math.abs(dist(p.quad[3], p.quad[2]) - e)).toBeLessThan(1e-12)
-          expect(Math.abs(Math.abs(p.uv[2] - p.uv[0]) * r.width - e)).toBeLessThan(1e-12)
+          const st = r.strata[p.stratum]
+          if (st.parent !== undefined) continue // order-2 scores live on the parent panels
+          // outer corners (indices 1, 2) sit on the line apex + e*b(side) + t*crease
+          const bSide = p.face === 'reliefR' ? bR : bL
+          for (const corner of [p.quad[1], p.quad[2]]) {
+            const d: Vec3 = [
+              corner[0] - pose.apex[0] - st.e * bSide[0],
+              corner[1] - pose.apex[1] - st.e * bSide[1],
+              corner[2] - pose.apex[2] - st.e * bSide[2],
+            ]
+            const along = d[0] * pose.crease[0] + d[1] * pose.crease[1] + d[2] * pose.crease[2]
+            const off = Math.hypot(
+              d[0] - along * pose.crease[0],
+              d[1] - along * pose.crease[1],
+              d[2] - along * pose.crease[2]
+            )
+            expect(off, `${r.id} ${st.kind} off-score residual`).toBeLessThan(1e-12)
+          }
         }
       }
     }
@@ -65,7 +121,7 @@ describe('oanave family — geometry gates OA-1..OA-6 (fold physics)', () => {
         const patches = oanavePatches(r, tL, tR)
         for (const p of patches) {
           if (p.stratum === undefined) continue
-          // Side edges (the score line and the mountain crease) run along the
+          // Side edges (the crease-side and score-side edges) run along the
           // host crease direction: cross product with it vanishes.
           for (const [a, b] of [
             [p.quad[0], p.quad[3]],
@@ -78,13 +134,25 @@ describe('oanave family — geometry gates OA-1..OA-6 (fold physics)', () => {
             const cz = d[0] * pose.crease[1] - d[1] * pose.crease[0]
             expect(Math.hypot(cx, cy, cz) / l).toBeLessThan(1e-12)
           }
-          // The cut edges (band top/bottom) begin on the crease line and end
-          // on the score line — corner-shared by construction; assert the cut
-          // edge length equals the arm (no dangling cut past a score).
-          const e = r.strata[p.stratum].e
-          expect(Math.abs(dist(p.quad[0], p.quad[1]) - e)).toBeLessThan(1e-12)
+          // The cut edges (band top/bottom) run the in-sheet width of the
+          // quad's material span: |edge| = (s1 - s0) / sin(rho) — the die's
+          // glue-parallel horizontal, ending on a score, never past it.
+          const [s0, s1] = p.sRange!
+          const expected = (s1 - s0) / Math.sin((r.rhoDeg * Math.PI) / 180)
+          expect(Math.abs(dist(p.quad[0], p.quad[1]) - expected)).toBeLessThan(1e-12)
         }
       }
+    }
+  })
+
+  it('the patch list is pose-independent (the die is static; only corners move)', () => {
+    for (const r of NAVE) {
+      const at = (beta: number) =>
+        oanavePatches(r, ...bloom(beta)).map((p) => `${p.face}:${p.stratum ?? ''}:${p.uv.join(',')}`)
+      const rest = at(3.07)
+      expect(at(0.2)).toEqual(rest)
+      expect(at(Math.PI)).toEqual(rest)
+      expect(oanavePatchCount(r)).toBe(rest.length)
     }
   })
 
@@ -172,7 +240,6 @@ describe('oanave family — geometry gates OA-1..OA-6 (fold physics)', () => {
         expect(st.band[0]).toBeGreaterThanOrEqual(parent.band[0] - 1e-9)
         expect(st.band[1]).toBeLessThanOrEqual(parent.band[1] + 1e-9)
       })
-      expect(oanavePatchCount(r)).toBe(2 + r.strata.length * 2)
     }
   })
 })

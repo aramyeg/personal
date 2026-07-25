@@ -93,12 +93,23 @@ export type OanaveGeom = {
 
 /** A rank patch: host wing panels + relief panels, each with its atlas uv
  *  rect [u0, v0, u1, v1] — relief uvs are the EXACT sheet region the stratum
- *  is cut from, so paint continuity across the cuts is automatic. */
+ *  is cut from, so paint continuity across the cuts is automatic.
+ *
+ *  The wing panels are emitted as sub-quads that NOTCH OUT every stratum's
+ *  cut band: in real cut-from paper the sheet between the valley scores IS
+ *  the relief — there is no material left at the wing plane inside a band —
+ *  so the wing quads stop at the score line and the relief quads carry that
+ *  sheet region popped back, sharing the score-line edge EXACTLY (the two
+ *  parametrizations meet at a = e / sin(rho), welded by construction).
+ *  `sRange` is a relief quad's in-sheet span measured perpendicular from
+ *  the central fold — the family test uses it to prove material
+ *  conservation (a stratum's quads tile [0, e] with no gap or overlap). */
 export type OanavePatch = {
   face: 'hostL' | 'hostR' | 'reliefL' | 'reliefR'
   stratum?: number
   quad: PanelQuad
   uv: readonly [number, number, number, number]
+  sRange?: readonly [number, number]
 }
 
 const combine = (sa: number, a: Vec3, sb: number, b: Vec3): Vec3 => [
@@ -154,73 +165,171 @@ export function oanaveChevronDeg(geom: OanaveGeom, thetaL: number, thetaR: numbe
   return (Math.asin(Math.min(1, Math.max(-1, cosG))) * 180) / Math.PI
 }
 
+/** Split [0, height] at every order-1 band edge. Returns segments
+ *  [h0, h1, stratumIndex | -1] — each segment is covered by at most one
+ *  order-1 stratum (the covenant: order-1 bands are disjoint; asserted). */
+function wingSegments(geom: OanaveGeom): ReadonlyArray<readonly [number, number, number]> {
+  const order1 = geom.strata
+    .map((st, i) => ({ st, i }))
+    .filter(({ st }) => st.parent === undefined)
+    .sort((a, b) => a.st.band[0] - b.st.band[0])
+  for (let k = 1; k < order1.length; k++) {
+    if (order1[k].st.band[0] < order1[k - 1].st.band[1] - 1e-12) {
+      throw new Error('oanave: order-1 stratum bands must be disjoint (one cut band per height)')
+    }
+  }
+  const segs: (readonly [number, number, number])[] = []
+  let h = 0
+  for (const { st, i } of order1) {
+    if (st.band[0] > h + 1e-12) segs.push([h, st.band[0], -1])
+    segs.push([st.band[0], st.band[1], i])
+    h = st.band[1]
+  }
+  if (h < geom.height - 1e-12) segs.push([h, geom.height, -1])
+  return segs
+}
+
+/** Sub-segments of an order-1 band split at its children's bands:
+ *  [h0, h1, childIndex | -1]. */
+function bandSegments(
+  geom: OanaveGeom,
+  parentIndex: number
+): ReadonlyArray<readonly [number, number, number]> {
+  const parent = geom.strata[parentIndex]
+  const kids = geom.strata
+    .map((st, i) => ({ st, i }))
+    .filter(({ st }) => st.parent === parentIndex)
+    .sort((a, b) => a.st.band[0] - b.st.band[0])
+  const segs: (readonly [number, number, number])[] = []
+  let h = parent.band[0]
+  for (const { st, i } of kids) {
+    if (st.band[0] > h + 1e-12) segs.push([h, st.band[0], -1])
+    segs.push([Math.max(h, st.band[0]), Math.min(parent.band[1], st.band[1]), i])
+    h = st.band[1]
+  }
+  if (h < parent.band[1] - 1e-12) segs.push([h, parent.band[1], -1])
+  return segs
+}
+
 /**
- * Every patch of a rank at a page pose: 2 host wing panels, then 2 relief
- * panels per stratum (L/R), order-1 strata popped off the host fold and the
- * order-2 keystone popped back off its parent's relief crease. All relief
- * offsets live in the plane perpendicular to the central crease, so every
- * score/crease line stays PARALLEL to the host fold (the mech-37 cutting
- * law) at every dihedral, by construction.
+ * Every patch of a rank at a page pose — the TRUE die: wing sub-quads that
+ * notch out each stratum's cut band, plus the relief panels carrying the
+ * notched material popped onto the wings' bisector, plus the order-2
+ * keystone popped back off its parent's relief crease.
+ *
+ * Exact in-sheet parametrization (zero shear approximation): a point of the
+ * flat die is (a, h) — a along the glue line, h along the central fold. On
+ * the standing wing it maps to `apex + g*a + c*h`; art u is linear in a and
+ * art v = h / height, so the cut edges (constant h) run along the glue
+ * direction, exactly the die's horizontal. A relief point at in-sheet
+ * distance s from the fold maps to
+ *
+ *   apex + c*(h + s*cot(rho)) + profile(s),
+ *
+ * where profile(s) linearly spans crease -> score in the plane
+ * perpendicular to the fold (an isometry: |score - crease| = e = the
+ * in-sheet arm, the E = H law). At s = e this equals the wing point at
+ * a = e / sin(rho) — the score-line weld is corner-exact. All score and
+ * crease lines stay PARALLEL to the host fold at every dihedral (the
+ * mech-37 cutting law) by construction.
  */
 export function oanavePatches(geom: OanaveGeom, thetaL: number, thetaR: number): OanavePatch[] {
   const pose = solveOanaveHostPose(geom, thetaL, thetaR)
   const { bR, bL, b, cosG } = oanaveReliefFrame(pose)
   const c = pose.crease
   const apex = pose.apex
-  const at = (offset: Vec3, v: number): Vec3 => [
-    apex[0] + offset[0] + c[0] * v,
-    apex[1] + offset[1] + c[1] * v,
-    apex[2] + offset[2] + c[2] * v,
-  ]
+  const H = geom.height
+  const halfW = geom.width / 2
+  const rho = (geom.rhoDeg * Math.PI) / 180
+  const sinR = Math.sin(rho)
+  const cotR = Math.cos(rho) / sinR
+  const glueLen = halfW / sinR
 
-  const patches: OanavePatch[] = [
-    // Host wings: the standard sheared-parallelogram art mapping (fold at
-    // u = 0.5, the vfold split): left wing u [0, 0.5], right u [0.5, 1].
-    { face: 'hostL', quad: pose.left, uv: [0.5, 0, 0, 1] },
-    { face: 'hostR', quad: pose.right, uv: [0.5, 0, 1, 1] },
+  const wingPt = (g: Vec3, a: number, h: number): Vec3 => [
+    apex[0] + g[0] * a + c[0] * h,
+    apex[1] + g[1] * a + c[1] * h,
+    apex[2] + g[2] * a + c[2] * h,
   ]
+  const reliefPt = (p0: Vec3, p1: Vec3, sSpan: number, s: number, h: number): Vec3 => {
+    // profile(s) = lerp(p0 -> p1 over sSpan), lifted by the in-sheet shear
+    // shift s*cot(rho) along the crease (cut edges follow the die's
+    // glue-parallel horizontals).
+    const t = s / sSpan
+    const hc = h + s * cotR
+    return [
+      apex[0] + c[0] * hc + p0[0] + (p1[0] - p0[0]) * t,
+      apex[1] + c[1] * hc + p0[1] + (p1[1] - p0[1]) * t,
+      apex[2] + c[2] * hc + p0[2] + (p1[2] - p0[2]) * t,
+    ]
+  }
+  const uAt = (side: 1 | -1, s: number): number => 0.5 + (side * s) / geom.width
 
-  // Per-stratum relief crease offsets, kept so an order-2 child can chain.
+  const patches: OanavePatch[] = []
+
+  // ---- wing sub-quads (the die minus its cut bands) ----
+  const segs = wingSegments(geom)
+  const sides: ReadonlyArray<readonly [OanavePatch['face'], Vec3, 1 | -1]> = [
+    ['hostL', pose.glueL, -1],
+    ['hostR', pose.glueR, 1],
+  ]
+  for (const [face, g, side] of sides) {
+    for (const [h0, h1, si] of segs) {
+      const aCut = si >= 0 ? geom.strata[si].e / sinR : 0
+      patches.push({
+        face,
+        quad: [wingPt(g, aCut, h0), wingPt(g, glueLen, h0), wingPt(g, glueLen, h1), wingPt(g, aCut, h1)],
+        uv: [uAt(side, aCut * sinR), h0 / H, uAt(side, halfW), h1 / H],
+      })
+    }
+  }
+
+  // ---- relief panels: order-1 off the host fold, order-2 off the parent
+  // crease. Kept per-stratum so the family gates can audit each cut. ----
   const creaseOffsets: Vec3[] = []
   const zero: Vec3 = [0, 0, 0]
-
   geom.strata.forEach((st, i) => {
-    const [v0, v1] = st.band
-    const t0 = v0 / geom.height
-    const t1 = v1 / geom.height
-    const du = st.e / geom.width
-    if (st.parent === undefined) {
-      // Order 1: spine = the host central fold. Scores at e out each wing,
-      // mountain crease at 2e cosG on the bisector (E = H identity).
-      const q = combine(2 * st.e * cosG, b, 0, zero)
-      const sR = combine(st.e, bR, 0, zero)
-      const sL = combine(st.e, bL, 0, zero)
-      patches.push(
-        {
-          face: 'reliefR',
+    if (st.parent !== undefined) return
+    const q = combine(2 * st.e * cosG, b, 0, zero)
+    const sR = combine(st.e, bR, 0, zero)
+    const sL = combine(st.e, bL, 0, zero)
+    creaseOffsets[i] = q
+    for (const [h0, h1, child] of bandSegments(geom, i)) {
+      // where a keystone child owns the inner material, the parent panel
+      // starts at the child's score line instead of the crease.
+      const s0 = child >= 0 ? geom.strata[child].e : 0
+      for (const [face, sEnd, side] of [
+        ['reliefR', sR, 1],
+        ['reliefL', sL, -1],
+      ] as ReadonlyArray<readonly [OanavePatch['face'], Vec3, 1 | -1]>) {
+        patches.push({
+          face,
           stratum: i,
-          quad: [at(q, v0), at(sR, v0), at(sR, v1), at(q, v1)],
-          uv: [0.5, t0, 0.5 + du, t1],
-        },
-        {
-          face: 'reliefL',
-          stratum: i,
-          quad: [at(q, v0), at(sL, v0), at(sL, v1), at(q, v1)],
-          uv: [0.5, t0, 0.5 - du, t1],
-        }
-      )
-      creaseOffsets[i] = q
-      return
+          sRange: [s0, st.e],
+          quad: [
+            reliefPt(q, sEnd, st.e, s0, h0),
+            reliefPt(q, sEnd, st.e, st.e, h0),
+            reliefPt(q, sEnd, st.e, st.e, h1),
+            reliefPt(q, sEnd, st.e, s0, h1),
+          ],
+          uv: [uAt(side, s0), h0 / H, uAt(side, st.e), h1 / H],
+        })
+      }
     }
-    // Order 2 (keystone step): spine = the parent stratum's relief crease;
-    // "wings" = the parent's two relief panels. Same construction, popped
-    // back toward the sheet (the bisector of the parent panels' in-plane
-    // perpendiculars points back by symmetry).
+  })
+  geom.strata.forEach((st, i) => {
+    if (st.parent === undefined) return
     const parent = geom.strata[st.parent]
     const qp = creaseOffsets[st.parent]
     if (!parent || !qp || parent.parent !== undefined) {
       throw new Error(`oanave ${geom.apexZ}: keystone stratum ${i} needs an order-1 parent before it`)
     }
+    if (st.e > parent.e) {
+      throw new Error(`oanave ${geom.apexZ}: keystone arm ${st.e} exceeds its parent arm ${parent.e}`)
+    }
+    // The keystone's scores sit ON the parent panels at in-sheet distance e
+    // from the parent crease (isometry along the profile); its own crease
+    // pops back along the parent panels' bisector — the E = H construction
+    // one generation down (order-2 cascade, max order 2).
     const uR = normalize(combine(parent.e, bR, -1, qp))
     const uL = normalize(combine(parent.e, bL, -1, qp))
     const b2 = normalize(combine(1, uR, 1, uL))
@@ -228,25 +337,31 @@ export function oanavePatches(geom: OanaveGeom, thetaL: number, thetaR: number):
     const q2 = combine(1, qp, 2 * st.e * cosG2, b2)
     const s2R = combine(1, qp, st.e, uR)
     const s2L = combine(1, qp, st.e, uL)
-    patches.push(
-      {
-        face: 'reliefR',
+    const [h0, h1] = st.band
+    for (const [face, sEnd, side] of [
+      ['reliefR', s2R, 1],
+      ['reliefL', s2L, -1],
+    ] as ReadonlyArray<readonly [OanavePatch['face'], Vec3, 1 | -1]>) {
+      patches.push({
+        face,
         stratum: i,
-        quad: [at(q2, v0), at(s2R, v0), at(s2R, v1), at(q2, v1)],
-        uv: [0.5, t0, 0.5 + du, t1],
-      },
-      {
-        face: 'reliefL',
-        stratum: i,
-        quad: [at(q2, v0), at(s2L, v0), at(s2L, v1), at(q2, v1)],
-        uv: [0.5, t0, 0.5 - du, t1],
-      }
-    )
+        sRange: [0, st.e],
+        quad: [
+          reliefPt(q2, sEnd, st.e, 0, h0),
+          reliefPt(q2, sEnd, st.e, st.e, h0),
+          reliefPt(q2, sEnd, st.e, st.e, h1),
+          reliefPt(q2, sEnd, st.e, 0, h1),
+        ],
+        uv: [uAt(side, 0), h0 / H, uAt(side, st.e), h1 / H],
+      })
+    }
   })
 
   return patches
 }
 
-/** Patch count is constant for a geometry (host pair + a pair per stratum) —
- *  the merged-mesh renderer sizes its buffers once from this. */
-export const oanavePatchCount = (geom: OanaveGeom): number => 2 + geom.strata.length * 2
+/** Patch count is constant for a geometry (the segmentation depends only on
+ *  the die, never the dihedral) — the merged-mesh renderer sizes its
+ *  buffers once from this. */
+export const oanavePatchCount = (geom: OanaveGeom): number =>
+  oanavePatches(geom, Math.PI, 0).length
