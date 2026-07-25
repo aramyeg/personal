@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { easeTurnWeighted, easeTurnWeightedInv } from './page-geometry'
 import { sbSound } from '../sound'
 import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
@@ -34,6 +35,33 @@ const FLIP_AT_T = 0.15
 // motion stops. Bridged to the DOM overlay via turn-events (no per-frame
 // React — fired once per turn, like the sound cues below).
 const TEXT_LAND_AT_T = 0.72
+
+// Landing settle (the half-degree sigh). The main sweep stops SETTLE_DEFICIT
+// short of rest, then an exponential tail relaxes into it over SETTLE_MS
+// before the commit fires. Implemented ONCE here by warping the published
+// `t`: every consumer runs it back through easeTurnWeighted, so publishing
+// easeTurnWeightedInv(E) hands each of them exactly the progress E — sheet,
+// popup gearing, block relaxation and cover board all inherit the tail with
+// no code of their own. Derived in .superpowers/sdd/bench/e3sys-settle.mjs:
+// commit residual 0.022deg (2.5% of the already-accepted 0.5deg hand-off
+// residual), worst per-vertex step through the steepest shipped gearing
+// 0.0085 — 6x under the motion-character GLOBAL_CAP.
+export const SETTLE_MS = 250
+const SETTLE_TAU_MS = 80
+// 0.5 deg of the ~176 deg dihedral sweep, in eased-progress units.
+const SETTLE_DEFICIT = 0.5 / 176
+
+/** Eased progress at `elapsed` ms into a turn of `duration` ms: the quint
+ *  sweep scaled to fall SETTLE_DEFICIT short, then the exponential tail. */
+export const settleProgress = (elapsed: number, duration: number): number =>
+  elapsed <= duration
+    ? (1 - SETTLE_DEFICIT) * easeTurnWeighted(elapsed / duration)
+    : 1 - SETTLE_DEFICIT * Math.exp(-(elapsed - duration) / SETTLE_TAU_MS)
+
+/** The raw `t` the driver publishes at `elapsed` ms — the inverse ease of
+ *  settleProgress, so a consumer's own easeTurnWeighted(t) recovers it. */
+export const turnPublishedT = (elapsed: number, duration: number): number =>
+  easeTurnWeightedInv(settleProgress(elapsed, duration))
 
 export type TurnFrame = { t: number; dir: TurnDir; isCover: boolean }
 
@@ -82,8 +110,9 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
 
 /**
  * Returns a ref whose `.current` is `{t: 0..1, dir, isCover}` while turning,
- * `null` at rest. Starts when `store.turning` flips truthy; on `t >= 1` it
- * calls `completeTurn()` exactly once and resets its clock — if that commit
+ * `null` at rest. Starts when `store.turning` flips truthy; once the main
+ * sweep and its settle tail have both run (or a queued turn cuts the tail
+ * short) it calls `completeTurn()` exactly once and resets its clock — if that commit
  * chain-promotes a queued turn, `turning` is still truthy on the very next
  * frame, so this hook re-arms automatically without any extra bookkeeping.
  *
@@ -112,6 +141,9 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
   const firedCreak = useRef(false)
   const firedFlip = useRef(false)
   const firedLand = useRef(false)
+  // The thump latches at the PERCEPTUAL landing (main sweep end), not at the
+  // commit a settle later — the sound must sit on the moment the page hits.
+  const firedThump = useRef(false)
 
   const pose = useMemo(readPoseOverride, [])
   useEffect(() => {
@@ -143,6 +175,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       firedCreak.current = false
       firedFlip.current = false
       firedLand.current = false
+      firedThump.current = false
       return
     }
 
@@ -152,6 +185,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       firedCreak.current = false
       firedFlip.current = false
       firedLand.current = false
+      firedThump.current = false
       // Overlay choreography: the outgoing text exits now (turn-events →
       // spread-overlay.tsx). `spread` is the committed spread being left.
       emitTurnStart({ dir: turning, from: spread })
@@ -161,33 +195,44 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
     const duration = isCover ? COVER_MS : TURN_MS
 
     elapsedMs.current += delta * 1000
-    const t = Math.min(1, elapsedMs.current / duration)
-    frame.current = { t, dir: turning, isCover }
+    const elapsed = elapsedMs.current
+    // The RAW main-sweep fraction. Every cue threshold below compares against
+    // it so the settle tail leaves cue timing exactly where it was.
+    const raw = elapsed / duration
+    frame.current = { t: turnPublishedT(elapsed, duration), dir: turning, isCover }
 
     if (isCover && !firedCreak.current) {
       firedCreak.current = true
       sbSound.creak()
     }
-    if (!firedFlip.current && t >= FLIP_AT_T) {
+    if (!firedFlip.current && raw >= FLIP_AT_T) {
       firedFlip.current = true
       sbSound.flip()
     }
     // The "deliver the text" cue — fired once, a beat before landing, so the
     // incoming overlay text staggers in as the page settles rather than after.
-    if (!firedLand.current && t >= TEXT_LAND_AT_T) {
+    if (!firedLand.current && raw >= TEXT_LAND_AT_T) {
       firedLand.current = true
       emitTurnLand({ dir: turning, to: spread + (turning === 'next' ? 1 : -1) })
     }
 
-    if (t >= 1) {
-      // A large frame delta (e.g. a backgrounded tab resuming) can jump t
-      // straight from < FLIP_AT_T to >= 1 in one frame — flip still plays
-      // once, just back-to-back with thump, rather than being skipped.
+    if (raw >= 1 && !firedThump.current) {
+      // A large frame delta (e.g. a backgrounded tab resuming) can jump
+      // straight from < FLIP_AT_T past the landing in one frame — flip still
+      // plays once, just back-to-back with thump, rather than being skipped.
       if (!firedFlip.current) {
         firedFlip.current = true
         sbSound.flip()
       }
+      firedThump.current = true
       sbSound.thump()
+    }
+
+    // The settle is a sigh, not a queue: a hand already reaching for the next
+    // page kills it, like a real book. A turn queued at the sweep's end (or
+    // arriving mid-settle) commits on that frame. A single frame long enough
+    // to jump the whole tail falls straight through here too.
+    if (elapsed >= duration + SETTLE_MS || (raw >= 1 && state.queued !== null)) {
       useStorybookStore.getState().completeTurn()
       // Land the whole commit inside THIS rAF: every default-priority
       // consumer (book.tsx's page prints, the sheet, every popup layer)
@@ -195,11 +240,12 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       // DRIVER_PRIORITY, not mount order — so nulling the frame and
       // advancing the committed spread here swaps the static pages, hides
       // the sheet, and re-roles the popups in one atomic paint. Leaving
-      // frame.current at {t:1} until the next rAF let React's commit race
-      // the driver — a landed-but-still-visible sheet whose materials a
-      // passive effect had already reset painted one blank-paper frame.
-      // (At t=1 the sheet's pose is exactly the static landed page, so
-      // hiding it a frame "early" is pixel-identical.)
+      // frame.current live until the next rAF let React's commit race the
+      // driver — a landed-but-still-visible sheet whose materials a passive
+      // effect had already reset painted one blank-paper frame.
+      // (The settle has run the sheet to within 0.022deg of the static
+      // landed page — 2.5% of the accepted hand-off residual — so hiding it
+      // a frame "early" is indistinguishable, as it was at t=1 before.)
       committedSpread.current = useStorybookStore.getState().spread
       frame.current = null
       elapsedMs.current = 0
@@ -207,6 +253,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       firedCreak.current = false
       firedFlip.current = false
       firedLand.current = false
+      firedThump.current = false
     }
   }, DRIVER_PRIORITY)
 

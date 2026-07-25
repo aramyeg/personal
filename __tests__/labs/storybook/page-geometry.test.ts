@@ -12,6 +12,7 @@ import {
   buildStackBlock,
   easeTurn,
   easeTurnWeighted,
+  easeTurnWeightedInv,
   gutterShade,
   restAngles,
   updateStackBlock,
@@ -113,6 +114,31 @@ describe('easing curves', () => {
     expect(easeTurnWeighted(0.5)).toBeCloseTo(0.5, 9)
     expect(easeTurnWeighted(0.1)).toBeLessThan(easeTurn(0.1))
     expect(easeTurnWeighted(0.9)).toBeGreaterThan(easeTurn(0.9))
+  })
+
+  it('easeTurnWeightedInv inverts easeTurnWeighted exactly', () => {
+    // The landing settle publishes easeTurnWeightedInv(E) and relies on every
+    // consumer's own easeTurnWeighted(t) recovering E to the last bit. That
+    // is the direction that must be exact.
+    let worst = 0
+    for (let i = 0; i <= 1000; i++) {
+      const e = i / 1000
+      worst = Math.max(worst, Math.abs(easeTurnWeighted(easeTurnWeightedInv(e)) - e))
+    }
+    expect(worst).toBeLessThan(1e-12)
+
+    // The other direction is only as good as float can hold it: the quint is
+    // so flat at the ends that ease(t) near 1 cancels away the information
+    // needed to come back (~1e-7 at t=0.999). Away from the endpoints it is
+    // exact, and nothing in the driver depends on the ill-conditioned end.
+    let worstBack = 0
+    for (let i = 50; i <= 950; i++) {
+      const t = i / 1000
+      worstBack = Math.max(worstBack, Math.abs(easeTurnWeightedInv(easeTurnWeighted(t)) - t))
+    }
+    expect(worstBack).toBeLessThan(1e-12)
+    expect(easeTurnWeightedInv(0)).toBe(0)
+    expect(easeTurnWeightedInv(1)).toBe(1)
   })
 
   it('both curves are monotonic', () => {

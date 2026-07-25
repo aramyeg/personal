@@ -145,6 +145,17 @@ export const easeTurn = (t: number): number =>
 export const easeTurnWeighted = (t: number): number =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
 
+/**
+ * Closed-form inverse of easeTurnWeighted, exact on [0,1]. Lets the turn
+ * driver publish an arbitrary eased-progress curve through the ONE raw `t`
+ * every consumer already runs back through easeTurnWeighted: publish
+ * `easeTurnWeightedInv(E)` and every geared piece sees exactly `E`. That is
+ * how the landing settle (use-turn-driver's SETTLE_MS tail) reaches the
+ * sheet, the popups and the cover with zero per-piece code.
+ */
+export const easeTurnWeightedInv = (e: number): number =>
+  e < 0.5 ? Math.pow(e / 16, 0.2) : 1 - Math.pow((1 - e) / 16, 0.2)
+
 // ---------------------------------------------------------------------------
 // Bulge model: tilted rest poses from per-side stack thickness.
 // Derived in .superpowers/sdd/bench/derive-bulge.mjs (theorems A16-A20,
