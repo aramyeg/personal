@@ -7486,11 +7486,10 @@ function swarmParcel(cx, cy, s, tall, rot = 0) {
 
 /** A honey drop (the tab handle motif, also a solo sprite). */
 function swarmHoneyDrop(cx, cy, s) {
-  const P = SWARM
   const d = `M ${fx(cx)} ${fx(cy - s * 0.52)} C ${fx(cx + s * 0.4)} ${fx(cy - s * 0.05)} ${fx(cx + s * 0.34)} ${fx(cy + s * 0.28)} ${fx(cx)} ${fx(cy + s * 0.42)} C ${fx(cx - s * 0.34)} ${fx(cy + s * 0.28)} ${fx(cx - s * 0.4)} ${fx(cy - s * 0.05)} ${fx(cx)} ${fx(cy - s * 0.52)} Z`
-  let g = `<path d="${d}" fill="${SWARM.gold}" stroke="${SWARM.amber}" stroke-width="2"/>`
+  let g = `<path d="${d}" fill="${SWARM.gold}" stroke="${SWARM.amber}" stroke-width="${fx(Math.max(2, s * 0.045))}"/>`
   g += `<ellipse cx="${fx(cx - s * 0.12)}" cy="${fx(cy - s * 0.08)}" rx="${fx(s * 0.09)}" ry="${fx(s * 0.16)}" fill="#f7e3ae" opacity="0.9"/>`
-  g += rimPath(d, 4)
+  g += rimPath(d, Math.max(4, s * 0.05))
   return g
 }
 
@@ -7498,7 +7497,6 @@ function swarmHoneyDrop(cx, cy, s) {
 function swarmAtlas(w, h, seed) {
   const r = mulberry32(seed)
   const cs = w / 8
-  const at = (i) => [(i % 8) * cs + cs / 2, Math.floor(i / 8) * cs + cs / 2]
   // Sprite FILL, not sprite size: a rider quad is exactly one cell, so the
   // fraction of the cell a sprite covers is the fraction of the rider it is.
   // The first cut drew every sprite at 0.62 of the cell and lost a third of
@@ -7865,14 +7863,19 @@ function zurichVista(w, h, seed) {
   s += `<rect y="${fx(cityBase)}" width="${w}" height="${fx(h * 0.055)}" fill="${P.slate}" opacity="0.16"/>`
 
   // --- THE NEAR SHORE: a low meadow bank the built world stands out of
-  s += `<path d="M 0 ${fx(h * 0.79)} C ${fx(w * 0.24)} ${fx(h * 0.75)} ${fx(w * 0.62)} ${fx(h * 0.83)} ${fx(w)} ${fx(h * 0.77)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="${P.meadow}" opacity="0.55"/>`
-  s += `<path d="M 0 ${fx(h * 0.86)} C ${fx(w * 0.3)} ${fx(h * 0.9)} ${fx(w * 0.7)} ${fx(h * 0.84)} ${fx(w)} ${fx(h * 0.89)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="#55764c" opacity="0.5"/>`
-  // poplar rank along the bank — the only vertical rhythm down here
+  // Kept PALE on purpose: the hero's slate trousers and the ring's low riders
+  // stand right in front of this band, and at full meadow value the darkest
+  // parts of the built world sat on a mid-green ground and went muddy. The
+  // near shore is distance too — it just happens to be the nearest distance.
+  s += `<path d="M 0 ${fx(h * 0.79)} C ${fx(w * 0.24)} ${fx(h * 0.75)} ${fx(w * 0.62)} ${fx(h * 0.83)} ${fx(w)} ${fx(h * 0.77)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="${P.meadow}" opacity="0.4"/>`
+  s += `<path d="M 0 ${fx(h * 0.88)} C ${fx(w * 0.3)} ${fx(h * 0.92)} ${fx(w * 0.7)} ${fx(h * 0.86)} ${fx(w)} ${fx(h * 0.91)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="#55764c" opacity="0.28"/>`
+  // poplar rank along the bank — the only vertical rhythm down here, held
+  // faint so a painted tree is never mistaken for another hairline strut
   for (let i = 0; i < 14; i++) {
     const x = rr(r, w * 0.02, w * 0.98)
     const y = h * (0.79 + rr(r, 0, 0.05))
     const ph = h * rr(r, 0.03, 0.062)
-    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(-w * 0.007)} ${fx(-ph * 0.6)} 0 ${fx(-ph)} q ${fx(w * 0.007)} ${fx(ph * 0.4)} 0 ${fx(ph)} Z" fill="#4c6b44" opacity="${fx(rr(r, 0.5, 0.8))}"/>`
+    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(-w * 0.007)} ${fx(-ph * 0.6)} 0 ${fx(-ph)} q ${fx(w * 0.007)} ${fx(ph * 0.4)} 0 ${fx(ph)} Z" fill="#6d8a63" opacity="${fx(rr(r, 0.35, 0.55))}"/>`
   }
 
   // --- THE PAINTED SWARM, receding to infinity. A logarithmic spiral of dots
