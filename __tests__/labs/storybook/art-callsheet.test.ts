@@ -34,7 +34,8 @@ function allLayers(): readonly SceneLayer[] {
  *  - popup-box-layer.tsx's FACE_ART table gated by capFront/capBack/roof
  *    (walls -side always present; -front iff capFront; -back iff capBack;
  *    -top iff roof !== 'open' — an open-roof box has no lid/roof patches).
- *  - popup-platform-layer.tsx: `<id>-deck`.
+ *  - popup-platform-layer.tsx: `<id>-deck` plus `<id>-strut` (optional —
+ *    struts fall back to raw kraft when the art is not baked).
  *  - popup-tabpiece-layer.tsx: `<id>-face`.
  *  - popup-anatomy-layers.tsx's fanMemberLayers: `<id>-m<index>`, 0-based.
  *  - popup-knobtower-layer.tsx: `<id>-disc` (the knob) + `<id>-tier<k>` per
@@ -53,7 +54,10 @@ function knownGoodIds(): ReadonlySet<string> {
       if (layer.capBack ?? true) ids.add(`${layer.id}-back`)
       if (layer.roof !== 'open') ids.add(`${layer.id}-top`)
     }
-    if (layer.mech === 'platform') ids.add(`${layer.id}-deck`)
+    if (layer.mech === 'platform') {
+      ids.add(`${layer.id}-deck`)
+      ids.add(`${layer.id}-strut`)
+    }
     if (layer.mech === 'tabpiece') ids.add(`${layer.id}-face`)
     if (layer.mech === 'fan') {
       layer.members.forEach((_, i) => ids.add(`${layer.id}-m${i}`))
@@ -197,7 +201,7 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
         if (layer.capBack ?? true) constructed.push(`${layer.id}-back`)
         if (layer.roof !== 'open') constructed.push(`${layer.id}-top`)
       }
-      if (layer.mech === 'platform') constructed.push(`${layer.id}-deck`)
+      if (layer.mech === 'platform') constructed.push(`${layer.id}-deck`, `${layer.id}-strut`)
       if (layer.mech === 'tabpiece') constructed.push(`${layer.id}-face`)
       if (layer.mech === 'fan') layer.members.forEach((_, i) => constructed.push(`${layer.id}-m${i}`))
       if (layer.mech === 'knobtower') {
