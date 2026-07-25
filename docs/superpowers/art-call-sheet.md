@@ -111,6 +111,30 @@ the SUBJECT's own proportions need to match the "Aspect" column below, not the c
 | page prints | `page-<spread>`, spreads 1–9 (fixed, book-level) | **OPAQUE** full-bleed; one print per spread, split left/right by the app |
 | satchel drawer icons | `item-<name>` (fixed; **HTML overlay**, not a WebGL layer — see §4) | **ALPHA** |
 
+Nothing about authoring changes when a key is packed onto a shared atlas page:
+the artist still drops `<id>.png` and the pipeline still bakes `<id>.webp`. The
+packer (`ATLASES` in `scripts/storybook/generate-art.mjs`) composites those
+already-baked webps afterward and writes `art/atlas.json`, and the renderer
+remaps its uv table into the region. Which is why the ONE thing that matters
+here is whether the key's renderer can address a sub-rect at all:
+
+- **Sprite-aware** (packable): `box`, `platform`, `dress`, `rotor`, `fan`,
+  `keepstack` (all-or-nothing — a merged mesh has one material, so every id of
+  a keep must land on the SAME page), `skyline`, `stripflap`, `swarmarc`,
+  `oanave`, `keepwinch`, and the generic two-quad path (`vfold`, `child`,
+  `rider`, `parallel`, `kinetic`).
+- **Loose only** (packing them costs page area and still fetches the webp):
+  `liftflap`, `tabpiece`, `volvelle`, `depthvista`, `dissolve`, `keepsake`,
+  `mfoldrange`, `stagedchain`, page prints, cover decals.
+
+Some keys are exempt from packing even though their renderer could address
+them: the page prints, the dissolve's dunes/gold pair (one painting is the
+BackSide of the other across a slat flip — mechanism-load-bearing), the
+dispatch dial + window card (a registration pair that must stay aligned to
+each other, not to a packer's scale factor), and the pieces that are already
+atlas sheets in their own right (`ch2-swarm-atlas`, `ch4-range`, the
+stagedchain cliffs).
+
 ### 1.6 Orientation — v=1 is always the image TOP; which world edge that lands on depends on the mechanism's "Map":
 
 - **STAND** (vfold, child, rider, stripflap, kinetic, fan members): the subject stands
@@ -293,18 +317,20 @@ MATCHED PAINT rather than by paper (pack risk 4).
 Shared-atlas discipline (G5), as SHIPPED: `bazaar-atlas-s6` (1024²) carries both
 arcs' full face sets — the merged keepstack mesh needs every one of its ids on a
 single page or it silently falls back to per-face draws — plus the four souk
-sprites; `figure-atlas-s6` (512²) carries the two stripflap figures. That is the
-whole atlas-eligible set: INFRA-1 shipped sprite consumption for the
-**keepstack, skyline and stripflap** families only, so the crowd-chain riders,
-the pigeon children, the city v-fold, the tabpiece face and the eight tread box
-faces are still fetched as their own webps (`useLayerTexture`/`useArtTexture`
-take no `uvRect`). Spread-6 texture uploads therefore land at **17** (2 atlas
-pages + 14 loose + the page print), not the pack §5 estimate of 4 — that figure
-assumed a manifest-wide `uvRect` affordance the pipeline never grew. The largest
-remaining win is teaching `popup-box-layer.tsx` to use `useArtSprite` +
-`applyUvRect` (its half-split face tables are already covered by an
-`art-atlas.test.ts` case): that would fold 8 of the 14 onto the existing page
-here and pay again on every other box in the book.
+sprites. INFRA-2 then gave the **box, platform, dress/rotor, generic two-quad and
+keepwinch** renderers the same `useArtSprite` + `applyUvRect` addressing INFRA-1
+had shipped for keepstack/skyline/stripflap, which brought the rest of this
+spread onto pages: `figure-atlas-s6` (promoted to 1024²) now carries the city
+wall, both pigeons, both crowd chains and the two stripflap figures, and
+`tread-atlas-s6` (512²) carries the terrace train's eight box faces. Spread-6
+texture uploads land at **5** — three atlas pages, the page print, and the
+`raise-stall` tabpiece band strip, whose renderer still takes no rect.
+
+`bazaar-atlas-s6` was deliberately NOT widened to absorb the treads: it already
+packs at scale 0.833 (71.5% occupancy), and its two die-cut facade plates are
+this spread's reader-facing hero art, so a wider page would have paid plate
+resolution to save a 512² upload. The per-spread file arithmetic is enforced by
+`__tests__/labs/storybook/texture-budget.test.ts`.
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|

@@ -136,7 +136,11 @@ export function BoxPopupLayer({
 
   // Fix C tiering: the front cap faces the reader straight-on (full 1024
   // art), but the top/back/side faces are edge-on slivers or hollow-interior
-  // faces at the reading camera — half-size, no mips.
+  // faces at the reading camera — half-size, no mips. The tier only bites on
+  // the LOOSE path: an atlas page is shared by hero faces and slivers alike and
+  // is always loaded whole (see acquireAtlasPage), and the per-piece saving
+  // there comes from packing instead — a packed sliver costs its share of one
+  // upload rather than a 512² upload of its own.
   const front = useArtSprite(`${layer.id}-front`)
   const back = useArtSprite(`${layer.id}-back`, SLIVER_TIER)
   const side = useArtSprite(`${layer.id}-side`, SLIVER_TIER)
