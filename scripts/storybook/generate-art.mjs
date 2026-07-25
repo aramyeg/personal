@@ -7281,6 +7281,20 @@ const SWARM = {
   red: '#b0483a',
 }
 
+/** The silhouette half-extents of a swarmBee, in units of its body size `s`
+ *  (the head cap sticks out further than the stinger, so the shape is NOT
+ *  centred on cx). `beeFit` inverts it: the body size that makes the bee span
+ *  `span` px, plus the shift that recentres it. Riders are sampled at ~17 px
+ *  on screen, so every unused pixel of the atlas cell is legibility thrown
+ *  away — the sprites are sized to FILL their cell, not to sit politely in it. */
+function beeFit(span, pose) {
+  const fat = pose === 'bumble' ? 1.25 : pose === 'scout' ? 0.82 : 1
+  const left = 0.47 * fat + 0.16 // stinger tip
+  const right = Math.max(0.6708 * fat, 0.51 * fat + 0.2) // head cap / antenna tip
+  const s = span / (left + right)
+  return { s, dx: ((left - right) / 2) * s }
+}
+
 /** One courier bee. `s` = body length px; poses: wingsUp / wingsMid /
  *  wingsDown / profile / bumble / scout / satchel. Rim halo behind the body
  *  so the sprite reads as a die-cut card chip. */
@@ -7289,13 +7303,24 @@ function swarmBee(cx, cy, s, pose) {
   const fat = pose === 'bumble' ? 1.25 : pose === 'scout' ? 0.82 : 1
   const rx = s * 0.5 * fat
   const ry = s * 0.34 * fat
+  // Rim, wing edge and leg weights all scale with `s`: fixed pixel weights
+  // vanished once the sprites grew, which is how a bee turns back into a
+  // lozenge at the reading camera.
+  const rimW = Math.max(2.5, s * 0.055)
+  const edgeW = Math.max(1.6, s * 0.045)
   let g = `<g>`
   // die-cut rim halo (body + head footprint)
-  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx + 3)}" ry="${fx(ry + 3)}" fill="${RIM}" opacity="0.9"/>`
-  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62 + 3)}" fill="${RIM}" opacity="0.9"/>`
-  // wings BEHIND the body for up/profile, in front for down (paper layering)
+  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx + rimW)}" ry="${fx(ry + rimW)}" fill="${RIM}" opacity="0.9"/>`
+  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62 + rimW)}" fill="${RIM}" opacity="0.9"/>`
+  // wings BEHIND the body for up/profile, in front for down (paper layering).
+  // Pale, but EDGED in slate over its own rim: an unedged white ellipse reads
+  // as a blank cap sitting on the bee rather than as a wing.
   const wing = (wx, wy, wrx, wry, rot) =>
-    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${P.wing}" opacity="0.92" stroke="${P.slate}" stroke-width="1.3" stroke-opacity="0.55" transform="rotate(${rot} ${fx(wx)} ${fx(wy)})"/>`
+    `<g transform="rotate(${rot} ${fx(wx)} ${fx(wy)})">` +
+    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx + rimW * 0.7)}" ry="${fx(wry + rimW * 0.7)}" fill="${RIM}" opacity="0.85"/>` +
+    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${P.wing}" opacity="0.95" stroke="${P.slate}" stroke-width="${fx(edgeW)}" stroke-opacity="0.9"/>` +
+    `<path d="M ${fx(wx - wrx * 0.7)} ${fx(wy)} L ${fx(wx + wrx * 0.75)} ${fx(wy - wry * 0.3)}" stroke="${P.blue}" stroke-width="${fx(edgeW * 0.6)}" opacity="0.7" fill="none"/>` +
+    `</g>`
   const wingsBehind =
     pose === 'wingsUp' || pose === 'satchel'
       ? wing(cx - rx * 0.28, cy - ry * 1.5, s * 0.34, s * 0.15, -38) + wing(cx + rx * 0.18, cy - ry * 1.55, s * 0.34, s * 0.15, -18)
@@ -7305,19 +7330,23 @@ function swarmBee(cx, cy, s, pose) {
           ? wing(cx - rx * 0.1, cy - ry * 1.35, s * 0.4, s * 0.16, -26)
           : ''
   g += wingsBehind
-  // body + gold stripes + head
-  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx)}" ry="${fx(ry)}" fill="${P.bee}"/>`
-  for (const t of [-0.15, 0.28]) {
-    const sxp = cx + rx * t
-    const half = ry * Math.sqrt(Math.max(0.1, 1 - t * t)) * 0.92
-    g += `<line x1="${fx(sxp)}" y1="${fx(cy - half)}" x2="${fx(sxp)}" y2="${fx(cy + half)}" stroke="${P.gold}" stroke-width="${fx(s * 0.11)}"/>`
-  }
-  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62)}" fill="${P.bee}"/>`
-  g += `<circle cx="${fx(cx + rx * 1.1)}" cy="${fx(cy - ry * 0.34)}" r="${fx(s * 0.035)}" fill="${P.wing}"/>`
-  // stinger + legs
-  g += `<path d="M ${fx(cx - rx)} ${fx(cy)} l ${fx(-s * 0.1)} ${fx(s * 0.04)}" stroke="${P.bee}" stroke-width="2"/>`
+  // legs first (behind the body), so the abdomen stays an unbroken dark mass
   for (const lt of [-0.3, 0.05, 0.4])
-    g += `<path d="M ${fx(cx + rx * lt)} ${fx(cy + ry * 0.8)} q ${fx(s * 0.02)} ${fx(s * 0.12)} ${fx(-s * 0.05)} ${fx(s * 0.16)}" fill="none" stroke="${P.bee}" stroke-width="1.6"/>`
+    g += `<path d="M ${fx(cx + rx * lt)} ${fx(cy + ry * 0.6)} q ${fx(s * 0.03)} ${fx(s * 0.14)} ${fx(-s * 0.07)} ${fx(s * 0.2)}" fill="none" stroke="${P.bee}" stroke-width="${fx(edgeW)}" stroke-linecap="round"/>`
+  // body + gold stripes + head. Three fat stripes, not two thin ones: at
+  // rider scale the stripe rhythm IS the "this is a bee" cue.
+  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx)}" ry="${fx(ry)}" fill="${P.bee}"/>`
+  for (const t of [-0.42, -0.08, 0.28]) {
+    const sxp = cx + rx * t
+    const half = ry * Math.sqrt(Math.max(0.1, 1 - t * t)) * 0.94
+    g += `<line x1="${fx(sxp)}" y1="${fx(cy - half)}" x2="${fx(sxp)}" y2="${fx(cy + half)}" stroke="${P.gold}" stroke-width="${fx(s * 0.13)}"/>`
+  }
+  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx)}" ry="${fx(ry)}" fill="none" stroke="${P.bee}" stroke-width="${fx(edgeW * 0.8)}"/>`
+  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62)}" fill="${P.bee}"/>`
+  g += `<circle cx="${fx(cx + rx * 1.06)}" cy="${fx(cy - ry * 0.36)}" r="${fx(s * 0.05)}" fill="${P.wing}"/>`
+  // antenna + stinger — the two spikes that break the pill silhouette
+  g += `<path d="M ${fx(cx + rx * 1.02)} ${fx(cy - ry * 0.7)} q ${fx(s * 0.1)} ${fx(-s * 0.12)} ${fx(s * 0.2)} ${fx(-s * 0.08)}" fill="none" stroke="${P.bee}" stroke-width="${fx(edgeW * 0.85)}" stroke-linecap="round"/>`
+  g += `<path d="M ${fx(cx - rx * 0.94)} ${fx(cy)} l ${fx(-s * 0.16)} ${fx(s * 0.05)}" stroke="${P.bee}" stroke-width="${fx(edgeW)}" stroke-linecap="round"/>`
   // wings IN FRONT for the downstroke
   if (pose === 'wingsDown') {
     g += wing(cx - rx * 0.34, cy + ry * 1.3, s * 0.33, s * 0.14, 34)
@@ -7339,20 +7368,24 @@ function swarmEnvelope(cx, cy, s, kind, rot = 0) {
   const P = SWARM
   const wq = s
   const hq = s * 0.68
+  // Ink borders scaled to the chip: a cream rectangle with a 1.5 px hairline
+  // is a pale smudge at rider scale — the BORDER is what makes it a letter.
+  const rimW = Math.max(2.5, s * 0.05)
+  const edgeW = Math.max(1.8, s * 0.042)
   let g = `<g transform="rotate(${rot} ${fx(cx)} ${fx(cy)})">`
-  g += `<rect x="${fx(cx - wq / 2 - 3)}" y="${fx(cy - hq / 2 - 3)}" width="${fx(wq + 6)}" height="${fx(hq + 6)}" rx="3" fill="${RIM}" opacity="0.9"/>`
-  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${kind === 'sealed' ? P.parch : P.cream}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
+  g += `<rect x="${fx(cx - wq / 2 - rimW)}" y="${fx(cy - hq / 2 - rimW)}" width="${fx(wq + rimW * 2)}" height="${fx(hq + rimW * 2)}" rx="3" fill="${RIM}" opacity="0.9"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${kind === 'sealed' ? P.parch : P.cream}" stroke="${INK}" stroke-width="${fx(edgeW)}" stroke-opacity="0.85"/>`
   if (kind === 'back') {
-    for (const ly of [-0.12, 0.08, 0.28])
-      g += `<line x1="${fx(cx - wq * 0.32)}" y1="${fx(cy + hq * ly)}" x2="${fx(cx + wq * 0.34)}" y2="${fx(cy + hq * ly)}" stroke="${P.slate}" stroke-width="1.6" opacity="0.65"/>`
-    g += `<rect x="${fx(cx + wq * 0.16)}" y="${fx(cy - hq * 0.42)}" width="${fx(wq * 0.2)}" height="${fx(hq * 0.28)}" fill="${P.blue}" opacity="0.5" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.4"/>` // stamp
+    for (const ly of [-0.14, 0.08, 0.3])
+      g += `<line x1="${fx(cx - wq * 0.32)}" y1="${fx(cy + hq * ly)}" x2="${fx(cx + wq * 0.3)}" y2="${fx(cy + hq * ly)}" stroke="${P.slate}" stroke-width="${fx(edgeW * 0.9)}" opacity="0.85"/>`
+    g += `<rect x="${fx(cx + wq * 0.14)}" y="${fx(cy - hq * 0.44)}" width="${fx(wq * 0.26)}" height="${fx(hq * 0.34)}" fill="${P.blue}" stroke="${INK}" stroke-width="${fx(edgeW * 0.7)}" stroke-opacity="0.7"/>` // stamp
   } else {
-    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy - hq / 2)} L ${fx(cx)} ${fx(cy + hq * 0.12)} L ${fx(cx + wq / 2)} ${fx(cy - hq / 2)}" fill="none" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
-    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx - wq * 0.14)} ${fx(cy + hq * 0.02)} M ${fx(cx + wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx + wq * 0.14)} ${fx(cy + hq * 0.02)}" fill="none" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.35"/>`
+    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy - hq / 2)} L ${fx(cx)} ${fx(cy + hq * 0.14)} L ${fx(cx + wq / 2)} ${fx(cy - hq / 2)}" fill="none" stroke="${INK}" stroke-width="${fx(edgeW)}" stroke-opacity="0.8"/>`
+    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx - wq * 0.14)} ${fx(cy + hq * 0.02)} M ${fx(cx + wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx + wq * 0.14)} ${fx(cy + hq * 0.02)}" fill="none" stroke="${INK}" stroke-width="${fx(edgeW * 0.8)}" stroke-opacity="0.55"/>`
   }
   if (kind === 'sealed') {
-    g += `<circle cx="${fx(cx)}" cy="${fx(cy + hq * 0.1)}" r="${fx(s * 0.13)}" fill="${P.red}" stroke="#8c352a" stroke-width="1.4"/>`
-    g += `<circle cx="${fx(cx - s * 0.035)}" cy="${fx(cy + hq * 0.1 - s * 0.035)}" r="${fx(s * 0.045)}" fill="#c96a5c" opacity="0.8"/>`
+    g += `<circle cx="${fx(cx)}" cy="${fx(cy + hq * 0.1)}" r="${fx(s * 0.17)}" fill="${P.red}" stroke="#7a2b22" stroke-width="${fx(edgeW)}"/>`
+    g += `<circle cx="${fx(cx - s * 0.05)}" cy="${fx(cy + hq * 0.1 - s * 0.05)}" r="${fx(s * 0.06)}" fill="#d9877a" opacity="0.9"/>`
   }
   g += `</g>`
   return g
@@ -7363,14 +7396,16 @@ function swarmParcel(cx, cy, s, tall, rot = 0) {
   const P = SWARM
   const wq = s
   const hq = s * (tall ? 0.9 : 0.62)
+  const rimW = Math.max(2.5, s * 0.05)
+  const edgeW = Math.max(1.8, s * 0.042)
   let g = `<g transform="rotate(${rot} ${fx(cx)} ${fx(cy)})">`
-  g += `<rect x="${fx(cx - wq / 2 - 3)}" y="${fx(cy - hq / 2 - 3)}" width="${fx(wq + 6)}" height="${fx(hq + 6)}" rx="3" fill="${RIM}" opacity="0.9"/>`
-  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${P.parch}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
-  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy + hq * 0.22)}" width="${fx(wq)}" height="${fx(hq * 0.28)}" fill="${P.amber}" opacity="0.25"/>`
-  g += `<line x1="${fx(cx)}" y1="${fx(cy - hq / 2)}" x2="${fx(cx)}" y2="${fx(cy + hq / 2)}" stroke="${P.amber}" stroke-width="2.4"/>`
-  g += `<line x1="${fx(cx - wq / 2)}" y1="${fx(cy)}" x2="${fx(cx + wq / 2)}" y2="${fx(cy)}" stroke="${P.amber}" stroke-width="2.4"/>`
-  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(s * 0.07)}" fill="${P.amber}"/>`
-  g += `<path d="M ${fx(cx)} ${fx(cy)} l ${fx(s * 0.1)} ${fx(-s * 0.08)} M ${fx(cx)} ${fx(cy)} l ${fx(-s * 0.1)} ${fx(-s * 0.07)}" stroke="${P.amber}" stroke-width="1.6" fill="none"/>`
+  g += `<rect x="${fx(cx - wq / 2 - rimW)}" y="${fx(cy - hq / 2 - rimW)}" width="${fx(wq + rimW * 2)}" height="${fx(hq + rimW * 2)}" rx="3" fill="${RIM}" opacity="0.9"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${P.parch}" stroke="${INK}" stroke-width="${fx(edgeW)}" stroke-opacity="0.85"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy + hq * 0.22)}" width="${fx(wq)}" height="${fx(hq * 0.28)}" fill="${P.amber}" opacity="0.3"/>`
+  g += `<line x1="${fx(cx)}" y1="${fx(cy - hq / 2)}" x2="${fx(cx)}" y2="${fx(cy + hq / 2)}" stroke="${P.amber}" stroke-width="${fx(edgeW * 1.6)}"/>`
+  g += `<line x1="${fx(cx - wq / 2)}" y1="${fx(cy)}" x2="${fx(cx + wq / 2)}" y2="${fx(cy)}" stroke="${P.amber}" stroke-width="${fx(edgeW * 1.6)}"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(s * 0.09)}" fill="${P.amber}"/>`
+  g += `<path d="M ${fx(cx)} ${fx(cy)} l ${fx(s * 0.13)} ${fx(-s * 0.11)} M ${fx(cx)} ${fx(cy)} l ${fx(-s * 0.13)} ${fx(-s * 0.09)}" stroke="${P.amber}" stroke-width="${fx(edgeW)}" fill="none" stroke-linecap="round"/>`
   g += `</g>`
   return g
 }
@@ -7390,58 +7425,59 @@ function swarmAtlas(w, h, seed) {
   const r = mulberry32(seed)
   const cs = w / 8
   const at = (i) => [(i % 8) * cs + cs / 2, Math.floor(i / 8) * cs + cs / 2]
-  const S = cs * 0.62 // sprite major size inside a cell
+  // Sprite FILL, not sprite size: a rider quad is exactly one cell, so the
+  // fraction of the cell a sprite covers is the fraction of the rider it is.
+  // The first cut drew every sprite at 0.62 of the cell and lost a third of
+  // its own quad to transparent margin — at the pinned camera a rider spans
+  // ~17 px, so that margin was the difference between a courier and a chip.
+  // FILL is the span each sprite is fitted to; the geometry (strut radius r)
+  // is untouched, which keeps the S2 radius wall out of this.
+  const FILL = cs * 0.95
+  const S = cs * 0.62 // legacy nominal, still used for the chainlet layout
+  // Each rider is painted inside a NESTED SVG viewport covering exactly its
+  // own cell, in cell-local coordinates. A nested <svg> clips to its viewport,
+  // so a sprite can no longer bleed into the neighbouring cell's uv rect —
+  // cell isolation becomes a property of the atlas rather than of arithmetic
+  // I have to keep re-deriving every time a sprite grows a leg or an antenna.
+  // (`ky` recentres poses whose silhouette is not symmetric about the body:
+  // upswept wings reach further above the abdomen than the legs reach below.)
+  const inCell = (i, inner) => {
+    const x0 = (i % 8) * cs
+    const y0 = Math.floor(i / 8) * cs
+    return `<svg x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" viewBox="0 0 ${fx(cs)} ${fx(cs)}">${inner}</svg>`
+  }
+  const M = cs / 2
   let s = `<g>`
   // --- cells 0-15: the 16 rider sprites (no two neighbors share one; the
   // solver's stride-7 sampling never puts equal cells adjacent) ---
   const bees = ['wingsUp', 'wingsMid', 'wingsDown', 'profile', 'bumble']
+  const beeLift = { wingsUp: 0.1, wingsMid: 0.06, wingsDown: -0.08, profile: 0.09, bumble: 0.05, scout: 0.06, satchel: 0.06 }
+  const beeCell = (i, pose, span, dx = 0) => {
+    const f = beeFit(span, pose)
+    return inCell(i, swarmBee(M + f.dx + dx, M + f.s * beeLift[pose], f.s, pose))
+  }
   bees.forEach((pose, i) => {
-    const [cx, cy] = at(i)
-    s += swarmBee(cx, cy, S * (pose === 'bumble' ? 0.86 : 0.94), pose)
+    s += beeCell(i, pose, FILL)
   })
-  {
-    const [cx, cy] = at(5)
-    s += swarmEnvelope(cx, cy, S * 0.9, 'face', rr(r, -9, -3))
-  }
-  {
-    const [cx, cy] = at(6)
-    s += swarmEnvelope(cx, cy, S * 0.88, 'back', rr(r, 3, 9))
-  }
-  {
-    const [cx, cy] = at(7)
-    s += swarmEnvelope(cx, cy, S * 0.9, 'sealed', rr(r, -6, 6)) // wax seal 1 of 3
-  }
-  {
-    const [cx, cy] = at(8)
-    s += swarmParcel(cx, cy, S * 0.78, false, rr(r, -8, -2))
-  }
-  {
-    const [cx, cy] = at(9)
-    s += swarmParcel(cx, cy, S * 0.66, true, rr(r, 2, 8))
-  }
+  s += inCell(5, swarmEnvelope(M, M, FILL * 0.84, 'face', rr(r, -9, -3)))
+  s += inCell(6, swarmEnvelope(M, M, FILL * 0.84, 'back', rr(r, 3, 9)))
+  s += inCell(7, swarmEnvelope(M, M, FILL * 0.84, 'sealed', rr(r, -6, 6))) // wax seal 1 of 3
+  s += inCell(8, swarmParcel(M, M, FILL * 0.86, false, rr(r, -8, -2)))
+  s += inCell(9, swarmParcel(M, M, FILL * 0.8, true, rr(r, 2, 8)))
   {
     // letter-pair chainlet: two small envelopes strung on one thread
-    const [cx, cy] = at(10)
-    s += `<path d="M ${fx(cx - S * 0.42)} ${fx(cy - S * 0.3)} Q ${fx(cx)} ${fx(cy + S * 0.05)} ${fx(cx + S * 0.42)} ${fx(cy - S * 0.26)}" fill="none" stroke="${SWARM.slate}" stroke-width="1.8"/>`
-    s += swarmEnvelope(cx - S * 0.22, cy + S * 0.08, S * 0.42, 'face', -8)
-    s += swarmEnvelope(cx + S * 0.24, cy + S * 0.12, S * 0.38, 'back', 7)
+    let g = `<path d="M ${fx(M - S * 0.72)} ${fx(M - S * 0.52)} Q ${fx(M)} ${fx(M + S * 0.33)} ${fx(M + S * 0.72)} ${fx(M - S * 0.46)}" fill="none" stroke="${SWARM.slate}" stroke-width="4"/>`
+    g += swarmEnvelope(M - S * 0.38, M + S * 0.16, S * 0.78, 'face', -9)
+    g += swarmEnvelope(M + S * 0.4, M + S * 0.22, S * 0.72, 'back', 8)
+    s += inCell(10, g)
   }
-  {
-    const [cx, cy] = at(11)
-    s += swarmHoneyDrop(cx, cy, S * 0.8)
-  }
+  s += inCell(11, swarmHoneyDrop(M, M, FILL * 0.94))
   for (const [k, i] of [[0, 12], [1, 13]]) {
-    const [cx, cy] = at(i)
-    s += swarmBee(cx + (k ? -S * 0.05 : S * 0.04), cy, S * 0.62, 'scout')
+    // scouts stay the ring's small change, but READ small rather than vanish
+    s += beeCell(i, 'scout', FILL * 0.84, k ? -S * 0.05 : S * 0.04)
   }
-  {
-    const [cx, cy] = at(14)
-    s += swarmBee(cx, cy, S * 0.9, 'satchel')
-  }
-  {
-    const [cx, cy] = at(15)
-    s += swarmEnvelope(cx, cy, S * 0.84, 'face', -24)
-  }
+  s += beeCell(14, 'satchel', FILL * 0.92)
+  s += inCell(15, swarmEnvelope(M, M, FILL * 0.76, 'face', -24))
   // --- cell 16: the hairline strut swatch. OPAQUE full cell (the strut mesh
   // material carries no alpha test); sky-tinted with a lighter core so the
   // 4px screen hairline reads as lit paper, plus faint cut edges. ---
