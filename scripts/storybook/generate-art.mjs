@@ -7551,6 +7551,323 @@ function crownBee(w, h, seed, k) {
 }
 
 /**
+ * THE APPRENTICE AND THE LOOKING-GLASS (ch2-hero, kept v-fold 0.51x0.89 —
+ * REPAINT, pack §4d). The spread depicts the instant the glass works, so the
+ * piece it is built around is the GLASS: the apprentice holds a round brass
+ * looking-glass ALOFT on the right panel (clear of the crease at u 0.45, so
+ * the disc is never bent into an ellipse by the fold) and the whole 3D vortex
+ * wheels around that raised lens. The red courier satchel is THE saturated
+ * accent of the spread — one object, worn across the body, at the figure's
+ * value centre. Everything else is the alpine-airy register: cream sleeves,
+ * alpine-blue tunic, slate trousers, walnut boots.
+ *
+ * Built as LAYERED die-cut card rather than one silhouette: arms behind, body
+ * and head over them, satchel and glass glued on top, each with the house
+ * pale core rim — which is what a paper apprentice actually is.
+ */
+function apprenticeGlass(w, h, seed) {
+  const r = mulberry32(seed)
+  const P = SWARM
+  const SKIN = '#d8a878'
+  const SKIN_DIM = '#b07f52'
+  const BOOT = '#3a3128'
+  // landmarks (px). The crease sits at u 0.45; the body straddles it, the
+  // raised arm and the glass live entirely on the right panel.
+  const headC = [w * 0.42, h * 0.27]
+  const headR = w * 0.115
+  const shoulder = [w * 0.5, h * 0.39] // arm ROOTS sit inside the tunic, so the
+  const shoulderL = [w * 0.32, h * 0.39] // limb's round cap never shows as a knob
+  const hand = [w * 0.655, h * 0.245]
+  const lensC = [w * 0.78, h * 0.135]
+  const lensR = w * 0.17
+  const hipY = h * 0.63
+  const footY = h * 0.985
+
+  const limb = (pts, wid, fill) => {
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'} ${fx(x)} ${fx(y)}`).join(' ')
+    return (
+      `<path d="${d}" fill="none" stroke="${RIM}" stroke-width="${fx(wid + 9)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>` +
+      `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(wid + 4)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>` +
+      `<path d="${d}" fill="none" stroke="${fill}" stroke-width="${fx(wid)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    )
+  }
+
+  let s = `<g>`
+  // ---- ARMS (back layer): the raised right arm reaching for the sky, the
+  // left hanging with a letter in its fist.
+  s += limb([shoulder, [w * 0.6, h * 0.3], hand], w * 0.085, P.cream)
+  s += limb([shoulderL, [w * 0.17, h * 0.52], [w * 0.16, h * 0.6]], w * 0.08, P.cream)
+  // both fists
+  for (const [fxp, fyp] of [hand, [w * 0.16, h * 0.605]]) {
+    s += `<circle cx="${fx(fxp)}" cy="${fx(fyp)}" r="${fx(w * 0.062)}" fill="${RIM}" opacity="0.95"/>`
+    s += `<circle cx="${fx(fxp)}" cy="${fx(fyp)}" r="${fx(w * 0.05)}" fill="${SKIN}" stroke="${INK}" stroke-width="2" stroke-opacity="0.5"/>`
+  }
+  // a letter held in the low fist — he is a courier before he is an inventor
+  s += swarmEnvelope(w * 0.13, h * 0.66, w * 0.19, 'face', -14)
+
+  // ---- LEGS + TORSO (one silhouette, so the figure has a single card body)
+  const body =
+    `M ${fx(w * 0.29)} ${fx(h * 0.375)} ` +
+    `C ${fx(w * 0.3)} ${fx(h * 0.34)} ${fx(w * 0.53)} ${fx(h * 0.34)} ${fx(w * 0.55)} ${fx(h * 0.375)} ` + // shoulder line
+    `L ${fx(w * 0.58)} ${fx(hipY)} L ${fx(w * 0.59)} ${fx(h * 0.78)} ` +
+    `L ${fx(w * 0.605)} ${fx(footY)} L ${fx(w * 0.475)} ${fx(footY)} ` +
+    `L ${fx(w * 0.458)} ${fx(h * 0.72)} L ${fx(w * 0.422)} ${fx(h * 0.72)} ` + // the legs part at mid-thigh
+    `L ${fx(w * 0.405)} ${fx(footY)} L ${fx(w * 0.275)} ${fx(footY)} ` +
+    `L ${fx(w * 0.29)} ${fx(h * 0.78)} L ${fx(w * 0.28)} ${fx(hipY)} Z`
+  s += `<path d="${body}" fill="${P.slateDeep}"/>`
+  // tunic over the trousers: alpine blue, hem at mid-thigh, lit on the left
+  const tunic = `M ${fx(w * 0.29)} ${fx(h * 0.375)} C ${fx(w * 0.3)} ${fx(h * 0.34)} ${fx(w * 0.53)} ${fx(h * 0.34)} ${fx(w * 0.55)} ${fx(h * 0.375)} L ${fx(w * 0.575)} ${fx(h * 0.66)} L ${fx(w * 0.285)} ${fx(h * 0.665)} Z`
+  s += `<path d="${tunic}" fill="${P.blue}"/>`
+  s += `<path d="M ${fx(w * 0.29)} ${fx(h * 0.375)} L ${fx(w * 0.285)} ${fx(h * 0.665)} L ${fx(w * 0.36)} ${fx(h * 0.664)} L ${fx(w * 0.35)} ${fx(h * 0.372)} Z" fill="${P.sky}" opacity="0.35"/>` // lit edge
+  s += `<path d="M ${fx(w * 0.5)} ${fx(h * 0.36)} L ${fx(w * 0.55)} ${fx(h * 0.375)} L ${fx(w * 0.575)} ${fx(h * 0.66)} L ${fx(w * 0.51)} ${fx(h * 0.662)} Z" fill="${P.slate}" opacity="0.4"/>` // shade edge
+  // collar + placket
+  s += `<path d="M ${fx(w * 0.35)} ${fx(h * 0.352)} L ${fx(w * 0.42)} ${fx(h * 0.42)} L ${fx(w * 0.49)} ${fx(h * 0.35)}" fill="none" stroke="${P.cream}" stroke-width="${fx(w * 0.022)}"/>`
+  s += `<line x1="${fx(w * 0.42)}" y1="${fx(h * 0.42)}" x2="${fx(w * 0.43)}" y2="${fx(h * 0.66)}" stroke="${P.slate}" stroke-width="2.6" opacity="0.6"/>`
+  // knee-boots
+  for (const [bx0, bx1] of [[0.282, 0.355], [0.462, 0.545]]) {
+    s += `<path d="M ${fx(w * bx0)} ${fx(h * 0.845)} L ${fx(w * (bx1 + 0.05))} ${fx(h * 0.845)} L ${fx(w * (bx1 + 0.06))} ${fx(footY)} L ${fx(w * (bx0 - 0.005))} ${fx(footY)} Z" fill="${BOOT}"/>`
+    s += `<line x1="${fx(w * bx0)}" y1="${fx(h * 0.87)}" x2="${fx(w * (bx1 + 0.052))}" y2="${fx(h * 0.87)}" stroke="${P.gold}" stroke-width="3" opacity="0.7"/>`
+  }
+  s += rimPath(body, 5)
+
+  // ---- HEAD: skin, walnut crop, a bee-gold guild cap band, one profile eye
+  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR + 5)}" fill="${RIM}" opacity="0.95"/>`
+  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR)}" fill="${SKIN}"/>`
+  s += `<path d="M ${fx(headC[0] - headR)} ${fx(headC[1])} a ${fx(headR)} ${fx(headR)} 0 0 1 ${fx(headR * 2)} 0 l ${fx(-headR * 0.2)} ${fx(headR * 0.16)} a ${fx(headR * 0.86)} ${fx(headR * 0.7)} 0 0 0 ${fx(-headR * 1.6)} 0 Z" fill="${P.bee}"/>` // crop
+  s += `<circle cx="${fx(headC[0] + headR * 0.34)}" cy="${fx(headC[1] + headR * 0.12)}" r="${fx(headR * 0.13)}" fill="${INK}"/>`
+  s += `<path d="M ${fx(headC[0] + headR * 0.1)} ${fx(headC[1] + headR * 0.52)} q ${fx(headR * 0.28)} ${fx(headR * 0.2)} ${fx(headR * 0.5)} ${fx(-headR * 0.04)}" fill="none" stroke="${SKIN_DIM}" stroke-width="2.6"/>` // half-smile
+  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR)}" fill="none" stroke="${INK}" stroke-width="2" stroke-opacity="0.45"/>`
+
+  // ---- THE RED COURIER SATCHEL: the ONE saturated accent, worn across the
+  // body so it sits at the figure's centre of value and cannot be missed.
+  const strap = `M ${fx(w * 0.51)} ${fx(h * 0.375)} L ${fx(w * 0.34)} ${fx(h * 0.585)}`
+  s += `<path d="${strap}" fill="none" stroke="${RIM}" stroke-width="${fx(w * 0.072)}" opacity="0.9"/>`
+  s += `<path d="${strap}" fill="none" stroke="${P.red}" stroke-width="${fx(w * 0.052)}"/>`
+  s += `<path d="${strap}" fill="none" stroke="#7a2b22" stroke-width="${fx(w * 0.052)}" stroke-dasharray="1 14" opacity="0.5"/>`
+  const bagX = w * 0.215
+  const bagY = h * 0.578
+  const bagW = w * 0.265
+  const bagH = h * 0.1
+  s += `<rect x="${fx(bagX - 5)}" y="${fx(bagY - 5)}" width="${fx(bagW + 10)}" height="${fx(bagH + 10)}" rx="7" fill="${RIM}" opacity="0.95"/>`
+  s += `<rect x="${fx(bagX)}" y="${fx(bagY)}" width="${fx(bagW)}" height="${fx(bagH)}" rx="5" fill="${P.red}" stroke="#7a2b22" stroke-width="3"/>`
+  s += `<path d="M ${fx(bagX)} ${fx(bagY)} h ${fx(bagW)} v ${fx(bagH * 0.46)} q ${fx(-bagW / 2)} ${fx(bagH * 0.24)} ${fx(-bagW)} 0 Z" fill="#c2604f" stroke="#7a2b22" stroke-width="2.6"/>` // flap
+  s += `<rect x="${fx(bagX + bagW * 0.42)}" y="${fx(bagY + bagH * 0.42)}" width="${fx(bagW * 0.16)}" height="${fx(bagH * 0.3)}" rx="3" fill="${P.gold}" stroke="${P.amber}" stroke-width="2"/>` // buckle
+  // letters poking out of the mouth
+  for (const [lx, lr] of [[0.18, -12], [0.62, 9]])
+    s += swarmEnvelope(bagX + bagW * lx, bagY - bagH * 0.16, bagW * 0.34, 'face', lr)
+
+  // ---- THE LOOKING-GLASS, held aloft: a brass ring with a pale lens, the
+  // one round thing in a spread built of arcs. Two amber rings + a gold core
+  // so the metal reads at distance; the glass carries a cool sky wash, a
+  // crescent specular and a hairline crosshair (it is an instrument).
+  const stem = `M ${fx(hand[0])} ${fx(hand[1])} L ${fx(lensC[0] - lensR * 0.42)} ${fx(lensC[1] + lensR * 0.72)}`
+  s += `<path d="${stem}" fill="none" stroke="${RIM}" stroke-width="${fx(w * 0.058)}" stroke-linecap="round" opacity="0.95"/>`
+  s += `<path d="${stem}" fill="none" stroke="${P.amber}" stroke-width="${fx(w * 0.04)}" stroke-linecap="round"/>`
+  s += `<circle cx="${fx(lensC[0])}" cy="${fx(lensC[1])}" r="${fx(lensR + 6)}" fill="${RIM}" opacity="0.95"/>`
+  s += `<circle cx="${fx(lensC[0])}" cy="${fx(lensC[1])}" r="${fx(lensR)}" fill="${P.amber}"/>`
+  s += `<circle cx="${fx(lensC[0])}" cy="${fx(lensC[1])}" r="${fx(lensR * 0.88)}" fill="${P.gold}"/>`
+  s += `<circle cx="${fx(lensC[0])}" cy="${fx(lensC[1])}" r="${fx(lensR * 0.72)}" fill="${P.sky}" stroke="${P.amber}" stroke-width="${fx(lensR * 0.09)}"/>`
+  s += `<path d="M ${fx(lensC[0] - lensR * 0.5)} ${fx(lensC[1])} a ${fx(lensR * 0.5)} ${fx(lensR * 0.5)} 0 0 1 ${fx(lensR * 0.62)} ${fx(-lensR * 0.34)}" fill="none" stroke="#ffffff" stroke-width="${fx(lensR * 0.16)}" opacity="0.8" stroke-linecap="round"/>` // specular crescent
+  s += `<path d="M ${fx(lensC[0] - lensR * 0.62)} ${fx(lensC[1])} h ${fx(lensR * 1.24)} M ${fx(lensC[0])} ${fx(lensC[1] - lensR * 0.62)} v ${fx(lensR * 1.24)}" stroke="${P.blue}" stroke-width="2" opacity="0.5"/>` // crosshair
+  // knurling on the brass ring
+  for (let k = 0; k < 20; k++) {
+    const a = (k / 20) * Math.PI * 2 + 0.15
+    s += `<line x1="${fx(lensC[0] + Math.cos(a) * lensR * 0.78)}" y1="${fx(lensC[1] + Math.sin(a) * lensR * 0.78)}" x2="${fx(lensC[0] + Math.cos(a) * lensR * 0.97)}" y2="${fx(lensC[1] + Math.sin(a) * lensR * 0.97)}" stroke="${P.amber}" stroke-width="2.4" opacity="0.75"/>`
+  }
+  // ONE guild bee, PERCHED ON the brass rim rather than floating beside it:
+  // a die-cut piece cannot carry detached alpha islands, and the inner orbit
+  // is already flying as the ch2-bee-b/-c children.
+  {
+    const a = Math.PI * 1.17
+    const f = beeFit(w * 0.15, 'wingsUp')
+    s += swarmBee(
+      lensC[0] + Math.cos(a) * lensR * 0.98 + f.dx + rr(r, -3, 3),
+      lensC[1] + Math.sin(a) * lensR * 0.98 + f.s * 0.1,
+      f.s,
+      'wingsUp'
+    )
+  }
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+/**
+ * ZÜRICH FROM THE MEADOW (ch2-backdrop, kept v-fold 1.65x0.94 — REPAINT,
+ * pack §4d). The E1 art here was a warm, densely painted chalet mountainside:
+ * the most detailed, highest-contrast thing on a spread whose declared first
+ * read is the swarm, so it took the eye and held it. This is the opposite
+ * piece — a PALE alpine distance that the vortex can be read against:
+ *
+ *   sky wash and snow ranks in aerial blue, a lake band, the city as a flat
+ *   SLATE SILHOUETTE (Grossmünster's twin towers, Fraumünster's spire, a rank
+ *   of gabled roofs) with a few gold window glints, and — the piece the pack
+ *   asks for by name — PAINTED SWARM DOTS spiralling up off the built ring's
+ *   crown and receding to nothing, so the thousand couriers continue past the
+ *   twenty-eight the paper can hold.
+ *
+ * Full-bleed opaque: the S5 strut-silhouette gate wants this panel covering
+ * the whole ring cone, so no alpha is carved anywhere near the top edge.
+ */
+function zurichVista(w, h, seed) {
+  const r = mulberry32(seed)
+  const P = SWARM
+  const CREASE = 0.6 // content.ts creaseU — the fold catches the crest light
+  const horizon = h * 0.6
+
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="url(#s3sky)"/>`
+  // --- SNOW RANKS: three ranges, each paler and lower-contrast than the one
+  // in front, so distance is carried by VALUE rather than by detail.
+  const range = (baseV, amp, n, fill, phase) => {
+    let d = `M 0 ${fx(h)} L 0 ${fx(h * baseV)}`
+    for (let i = 0; i <= n; i++) {
+      const x = (w * i) / n
+      const peak = h * baseV - Math.abs(Math.sin(i * 1.31 + phase)) * h * amp - rr(r, 0, h * amp * 0.3)
+      d += ` L ${fx(x - w / n / 2.4)} ${fx(peak)} L ${fx(x)} ${fx(h * baseV - rr(r, 0, h * amp * 0.18))}`
+    }
+    return `<path d="${d} L ${fx(w)} ${fx(h)} Z" fill="${fill}"/>`
+  }
+  s += range(0.5, 0.17, 7, '#c6d7e4', 0.4)
+  s += range(0.545, 0.11, 9, '#b1c7da', 2.1)
+  s += range(0.578, 0.06, 13, '#9db6cc', 3.7)
+  // a low warm band along the horizon — alpine light, and the one warm note
+  // keeping the pale distance from reading as grey card
+  s += `<rect y="${fx(h * 0.44)}" width="${w}" height="${fx(h * 0.18)}" fill="url(#s3warm)"/>`
+  // snow caps: pale wedges on the front rank's tips only (detail dies with
+  // distance, so only the nearest range gets any)
+  for (let i = 0; i < 9; i++) {
+    const x = w * (0.06 + i * 0.11)
+    const y = h * (0.53 + rr(r, -0.012, 0.012))
+    s += `<path d="M ${fx(x)} ${fx(y)} l ${fx(w * 0.017)} ${fx(h * 0.028)} l ${fx(-w * 0.034)} 0 Z" fill="#f4f8fb" opacity="0.85"/>`
+  }
+
+  // --- THE LAKE: a flat band with pale ripple rules, darkening downstage
+  s += `<rect y="${fx(horizon)}" width="${w}" height="${fx(h * 0.22)}" fill="url(#s3lake)"/>`
+  for (let i = 0; i < 26; i++) {
+    const y = horizon + rr(r, h * 0.012, h * 0.2)
+    const x0 = rr(r, 0, w * 0.8)
+    s += `<line x1="${fx(x0)}" y1="${fx(y)}" x2="${fx(x0 + rr(r, w * 0.04, w * 0.19))}" y2="${fx(y)}" stroke="#eaf1f6" stroke-width="${fx(rr(r, 1.4, 3))}" opacity="${fx(rr(r, 0.3, 0.62))}"/>`
+  }
+
+  // --- THE CITY, flat slate on the far shore. Silhouette only: at this
+  // distance a skyline is a shape, and any modelling would out-detail the
+  // die-cut ring standing in front of it.
+  const cityBase = horizon + h * 0.006
+  const roofRank = (x0, x1, top, gables) => {
+    let d = `M ${fx(x0)} ${fx(cityBase)} L ${fx(x0)} ${fx(top)}`
+    const step = (x1 - x0) / gables
+    for (let i = 0; i < gables; i++) {
+      const gx = x0 + step * i
+      const gh = rr(r, h * 0.008, h * 0.03)
+      d += ` L ${fx(gx)} ${fx(top + gh)} L ${fx(gx + step / 2)} ${fx(top + gh - h * 0.022)} L ${fx(gx + step)} ${fx(top + gh)}`
+    }
+    return `${d} L ${fx(x1)} ${fx(cityBase)} Z`
+  }
+  s += `<path d="${roofRank(w * 0.06, w * 0.44, h * 0.545, 7)}" fill="${P.slate}" opacity="0.92"/>`
+  s += `<path d="${roofRank(w * 0.56, w * 0.97, h * 0.552, 8)}" fill="${P.slate}" opacity="0.92"/>`
+  s += `<path d="${roofRank(w * 0.4, w * 0.62, h * 0.558, 4)}" fill="${P.slateDeep}" opacity="0.9"/>`
+  // Grossmünster: the twin square towers, each with a stepped cap
+  const tower = (cx, tw, topY) => {
+    let g = `<rect x="${fx(cx - tw / 2)}" y="${fx(topY)}" width="${fx(tw)}" height="${fx(cityBase - topY)}" fill="${P.slateDeep}"/>`
+    g += `<path d="M ${fx(cx - tw * 0.62)} ${fx(topY)} L ${fx(cx)} ${fx(topY - h * 0.05)} L ${fx(cx + tw * 0.62)} ${fx(topY)} Z" fill="${P.slateDeep}"/>`
+    g += `<rect x="${fx(cx - tw * 0.62)}" y="${fx(topY - h * 0.004)}" width="${fx(tw * 1.24)}" height="${fx(h * 0.008)}" fill="${P.slate}"/>`
+    // one gold-lit belfry window per tower — the guild is awake
+    g += `<rect x="${fx(cx - tw * 0.16)}" y="${fx(topY + h * 0.016)}" width="${fx(tw * 0.32)}" height="${fx(h * 0.026)}" rx="${fx(tw * 0.16)}" fill="${P.gold}" opacity="0.85"/>`
+    return g
+  }
+  s += tower(w * 0.3, w * 0.032, h * 0.44)
+  s += tower(w * 0.35, w * 0.032, h * 0.442)
+  // Fraumünster: the single slim spire across the water
+  s += `<rect x="${fx(w * 0.685)}" y="${fx(h * 0.475)}" width="${fx(w * 0.022)}" height="${fx(cityBase - h * 0.475)}" fill="${P.slateDeep}"/>`
+  s += `<path d="M ${fx(w * 0.679)} ${fx(h * 0.475)} L ${fx(w * 0.696)} ${fx(h * 0.4)} L ${fx(w * 0.713)} ${fx(h * 0.475)} Z" fill="${P.slateDeep}"/>`
+  s += `<circle cx="${fx(w * 0.696)}" cy="${fx(h * 0.393)}" r="${fx(w * 0.005)}" fill="${P.gold}"/>`
+  // scattered lit windows along both ranks
+  for (let i = 0; i < 22; i++) {
+    const x = rr(r, w * 0.07, w * 0.96)
+    const y = rr(r, h * 0.565, cityBase - h * 0.004)
+    s += `<rect x="${fx(x)}" y="${fx(y)}" width="${fx(w * 0.005)}" height="${fx(h * 0.008)}" fill="${P.gold}" opacity="${fx(rr(r, 0.4, 0.85))}"/>`
+  }
+  // the city's reflection, a soft slate smear on the near water
+  s += `<rect y="${fx(cityBase)}" width="${w}" height="${fx(h * 0.055)}" fill="${P.slate}" opacity="0.16"/>`
+
+  // --- THE NEAR SHORE: a low meadow bank the built world stands out of
+  s += `<path d="M 0 ${fx(h * 0.79)} C ${fx(w * 0.24)} ${fx(h * 0.75)} ${fx(w * 0.62)} ${fx(h * 0.83)} ${fx(w)} ${fx(h * 0.77)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="${P.meadow}" opacity="0.55"/>`
+  s += `<path d="M 0 ${fx(h * 0.86)} C ${fx(w * 0.3)} ${fx(h * 0.9)} ${fx(w * 0.7)} ${fx(h * 0.84)} ${fx(w)} ${fx(h * 0.89)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z" fill="#55764c" opacity="0.5"/>`
+  // poplar rank along the bank — the only vertical rhythm down here
+  for (let i = 0; i < 14; i++) {
+    const x = rr(r, w * 0.02, w * 0.98)
+    const y = h * (0.79 + rr(r, 0, 0.05))
+    const ph = h * rr(r, 0.03, 0.062)
+    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(-w * 0.007)} ${fx(-ph * 0.6)} 0 ${fx(-ph)} q ${fx(w * 0.007)} ${fx(ph * 0.4)} 0 ${fx(ph)} Z" fill="#4c6b44" opacity="${fx(rr(r, 0.5, 0.8))}"/>`
+  }
+
+  // --- THE PAINTED SWARM, receding to infinity. A logarithmic spiral of dots
+  // wheeling up off the built ring's crown: the paper can hold 28 couriers,
+  // the guild keeps a thousand, and this is where the other 972 live. Dots
+  // shrink and pale toward the spiral's eye — aerial recession PAINTED, so
+  // the effect costs no strut and no radius margin.
+  // Three NESTED HORSESHOES, not one spiral: a spiral closes on itself and
+  // reads as a drawn lasso hung in the sky. The built ring is a horseshoe
+  // open at the front, so the painted ranks repeat that same open arc,
+  // each one smaller, higher, tighter and paler than the rank in front —
+  // which is what a receding rank of a moving ring looks like.
+  const ARC_RANKS = [
+    { cy: 0.36, rx: 0.48, ry: 0.155, n: 60, sz: 1, op: 0.68, wings: true },
+    { cy: 0.325, rx: 0.35, ry: 0.115, n: 44, sz: 0.62, op: 0.44, wings: false },
+    { cy: 0.302, rx: 0.23, ry: 0.075, n: 30, sz: 0.36, op: 0.27, wings: false },
+  ]
+  for (const rank of ARC_RANKS) {
+    for (let k = 0; k < rank.n; k++) {
+      const u = k / (rank.n - 1)
+      const a = Math.PI * (1.04 + u * 0.92)
+      const jitR = 1 + rr(r, -0.06, 0.06)
+      const dx = w * 0.5 + Math.cos(a) * w * rank.rx * jitR
+      const dy = h * rank.cy + Math.sin(a) * h * rank.ry * jitR + rr(r, -h * 0.014, h * 0.014)
+      // the crest of the arc is its DEEPEST point (it sweeps behind the hero),
+      // so a courier shrinks and pales as it rides over the top and grows
+      // again coming down the near arms
+      const depth = 0.42 + 0.58 * Math.abs(Math.cos(a))
+      const dr = w * 0.0046 * rank.sz * depth * rr(r, 0.75, 1.3)
+      s += `<ellipse cx="${fx(dx)}" cy="${fx(dy)}" rx="${fx(dr * 1.45)}" ry="${fx(dr)}" fill="${P.slateDeep}" opacity="${fx(rank.op * depth * rr(r, 0.85, 1.15))}"/>`
+      // the front rank still shows a wing pair, so the ranks behind read as
+      // bees thinning into haze rather than as speckle on the sky
+      if (rank.wings && depth > 0.7 && k % 3 === 0) {
+        s += `<ellipse cx="${fx(dx - dr * 0.5)}" cy="${fx(dy - dr * 1.3)}" rx="${fx(dr * 1.3)}" ry="${fx(dr * 0.5)}" fill="${P.wing}" opacity="${fx(rank.op * 0.85)}" transform="rotate(-24 ${fx(dx)} ${fx(dy)})"/>`
+      }
+    }
+  }
+
+  // --- CREST LIGHT on the crease (u 0.6): the fold is the panel's own light
+  // source in a v-fold, so it gets a warm pale gradient either side.
+  s += `<rect x="${fx(w * CREASE - w * 0.13)}" y="0" width="${fx(w * 0.26)}" height="${h}" fill="url(#s3crest)"/>`
+  s += `<rect width="${w}" height="${h}" fill="url(#s3vig)"/>`
+  s += `</g>`
+
+  const defs =
+    `<linearGradient id="s3sky" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#bcd3e4"/>` +
+    `<stop offset="0.45" stop-color="#dfeaf2"/>` +
+    `<stop offset="0.72" stop-color="${P.sky}"/>` +
+    `<stop offset="1" stop-color="#dfe7ec"/></linearGradient>` +
+    `<linearGradient id="s3warm" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#f6e6c4" stop-opacity="0"/>` +
+    `<stop offset="0.72" stop-color="#f6e6c4" stop-opacity="0.4"/>` +
+    `<stop offset="1" stop-color="#f6e6c4" stop-opacity="0.1"/></linearGradient>` +
+    `<linearGradient id="s3lake" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#9db6c9"/>` +
+    `<stop offset="1" stop-color="${P.blue}"/></linearGradient>` +
+    `<linearGradient id="s3crest" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="#ffffff" stop-opacity="0"/>` +
+    `<stop offset="0.5" stop-color="#fff8e8" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="s3vig" cx="0.5" cy="0.42" r="0.78">` +
+    `<stop offset="0.55" stop-color="${P.slateDeep}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${P.slateDeep}" stop-opacity="0.2"/></radialGradient>`
+
+  return svgPiece(w, h, s, defs)
+}
+
+/**
  * THE s3 SPREAD PRINT (page-3, both pages in ONE image — the pack's third
  * read and "our biggest ref gap", the T-FLOOR). Same split/coordinate maths
  * as postRoadSpread (pageFX/pageFY; image TOP = far page edge z −0.75).
@@ -7885,6 +8202,11 @@ const PIECES = [
   // ---- Spread 3 — THE CARRIER SWARM (E3 s3): the swarmarc sprite atlas, the
   // crown accent trio's two new bees, the cloud interleave, the fringe chains.
   // Pixel dims at each piece's true mesh aspect (content.ts), slivers <= 512.
+  // The three E3 s3 REPAINTS the build lane left standing on E1-era imported
+  // art (pack §4d). Pixel dims at each piece's true mesh aspect (content.ts):
+  // hero 0.51/0.89, backdrop 1.65/0.94.
+  { id: 'ch2-hero', seed: 30220, w: 587, h: 1024, grain: 10, paint() { return apprenticeGlass(this.w, this.h, this.seed) } },
+  { id: 'ch2-backdrop', seed: 30221, w: 1024, h: 583, grain: 12, paint() { return zurichVista(this.w, this.h, this.seed) } },
   { id: 'ch2-swarm-atlas', seed: 30250, w: 1024, h: 1024, grain: 8, paint() { return swarmAtlas(this.w, this.h, this.seed) } },
   { id: 'ch2-crown-b', seed: 30260, w: 256, h: 146, grain: 8, paint() { return crownBee(this.w, this.h, this.seed, 1) } },
   { id: 'ch2-crown-c', seed: 30261, w: 256, h: 138, grain: 8, paint() { return crownBee(this.w, this.h, this.seed, 2) } },
