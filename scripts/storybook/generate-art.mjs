@@ -3564,16 +3564,13 @@ function naveRankFace(w, h, seed, cfg) {
   return svgPiece(w, h, s, defs)
 }
 
-/** The apse face (rank A): scalloped dome crown silhouette (alpha above the
- *  crown line), the aurora-rose window centred in the visible band, flat
- *  painted treasure tiers below (mostly hidden — cheap fills), frost dusting
- *  on the crown edge. The ONLY home of aurora mint/amethyst on the walls. */
-function naveApseFace(w, h, seed) {
-  const r = mulberry32(seed)
-  const yWing = h * (1 - 0.46 / 0.62) // crown wings at world 0.46 of 0.62
+/** The apse silhouette (deterministic, shared by the face and its T4 back):
+ *  five scalloped arcs over the central dome, crown wings flat at the world
+ *  0.46-of-0.62 line. */
+function apseSilPath(w, h) {
+  const yWing = h * (1 - 0.46 / 0.62)
   const domeHw = w * 0.19
   const cx = w / 2
-  // scalloped dome: five arcs over the crown, wings flat at yWing.
   let sil = `M 0 ${h} L 0 ${fx(yWing)} L ${fx(cx - domeHw)} ${fx(yWing)}`
   const scallops = 5
   for (let i = 0; i < scallops; i++) {
@@ -3584,6 +3581,33 @@ function naveApseFace(w, h, seed) {
     sil += ` Q ${fx(mid)} ${fx(Math.max(4, yWing - rise))} ${fx(x1)} ${fx(yWing)}`
   }
   sil += ` L ${w} ${fx(yWing)} L ${w} ${h} Z`
+  return { sil, yWing, domeHw, cx }
+}
+
+/** T4 print-backs: the rank sheet's reverse is plain shaded paper carrying
+ *  the SAME die (aperture / dome scallop as alpha) — never mirrored art.
+ *  Baked tiny (~100px/world); the merged oanave mesh points its back-face
+ *  quads at these sprites on the same atlas page: zero extra draws. */
+function naveRankBack(w, h, cfg) {
+  const arch = naveArchPath(w, h, cfg.apHw, cfg.apApex)
+  const sheet = `M 0 0 L ${w} 0 L ${w} ${h} L 0 ${h} Z ${arch}`
+  let s = `<path d="${sheet}" fill-rule="evenodd" fill="#12333c"/>`
+  s += `<path d="${sheet}" fill-rule="evenodd" fill="${NAVE_C.midnight}" opacity="0.25"/>`
+  return svgPiece(w, h, s)
+}
+
+function naveApseBack(w, h) {
+  const { sil } = apseSilPath(w, h)
+  return svgPiece(w, h, `<path d="${sil}" fill="#12333c"/><path d="${sil}" fill="${NAVE_C.midnight}" opacity="0.25"/>`)
+}
+
+/** The apse face (rank A): scalloped dome crown silhouette (alpha above the
+ *  crown line), the aurora-rose window centred in the visible band, flat
+ *  painted treasure tiers below (mostly hidden — cheap fills), frost dusting
+ *  on the crown edge. The ONLY home of aurora mint/amethyst on the walls. */
+function naveApseFace(w, h, seed) {
+  const r = mulberry32(seed)
+  const { sil, yWing, domeHw, cx } = apseSilPath(w, h)
   let s = `<g clip-path="url(#apse-clip)">`
   s += `<rect width="${w}" height="${h}" fill="url(#rank-grad-a)"/>`
   s += naveMasonry(w, h, r, 0.3)
@@ -3880,6 +3904,11 @@ const PIECES = [
   { id: 'ch6-nave-c', seed: 70302, w: 580, h: 220, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.2069, apApex: 0.7273, topBand: 0.4545, mold: [0.7727, 0.9545], colHalf: 0.0776, colTop: 0.6818, edge: 'frost' }) } },
   { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], kb: [0.8333, 0.9444], khw: 0.0641, edge: 'gilt' }) } },
   { id: 'ch6-clerk', seed: 70304, w: 200, h: 250, grain: 10, paint() { return naveClerk(this.w, this.h, this.seed) } },
+  // T4 print-backs (tiny): flat shaded paper carrying the same die alpha.
+  { id: 'ch6-nave-a-back', seed: 70305, w: 190, h: 62, grain: 6, paint() { return naveApseBack(this.w, this.h) } },
+  { id: 'ch6-nave-b-back', seed: 70306, w: 152, h: 52, grain: 6, paint() { return naveRankBack(this.w, this.h, { apHw: 0.1316, apApex: 0.7308 }) } },
+  { id: 'ch6-nave-c-back', seed: 70307, w: 116, h: 44, grain: 6, paint() { return naveRankBack(this.w, this.h, { apHw: 0.2069, apApex: 0.7273 }) } },
+  { id: 'ch6-nave-d-back', seed: 70308, w: 80, h: 37, grain: 6, paint() { return naveRankBack(this.w, this.h, { apHw: 0.359, apApex: 0.7222 }) } },
   { id: 'page-7', seed: 70310, w: 1024, h: 683, grain: 10, paint() { return navePage(this.w, this.h, this.seed) } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
   { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
@@ -4023,6 +4052,12 @@ const ATLASES = [
       { id: 'ch6-nave-c', w: 580, opaque: false },
       { id: 'ch6-nave-d', w: 400, opaque: false },
       { id: 'ch6-clerk', w: 200, opaque: false },
+      // T4 print-back tints — same page so the merged mesh's back-face
+      // quads stay inside the ONE texture upload (zero extra draws).
+      { id: 'ch6-nave-a-back', w: 190, opaque: false },
+      { id: 'ch6-nave-b-back', w: 152, opaque: false },
+      { id: 'ch6-nave-c-back', w: 116, opaque: false },
+      { id: 'ch6-nave-d-back', w: 80, opaque: false },
     ],
   },
 ]

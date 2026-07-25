@@ -51,39 +51,60 @@ export function OanavePopupLayer({
   const shadowRef = useRef<THREE.Mesh>(null)
   // Atlas-aware: the whole nave + clerk share ONE 1024 page (nave-atlas-s7);
   // the sprite rect remaps this rank's unit-square uv table into its region.
+  // The T4 print-back sprite (flat shaded paper carrying the same die alpha,
+  // never mirrored art) lives on the SAME page, so the back-face quads stay
+  // inside the one texture upload — zero extra draws.
   const { texture: faceArt, rect } = useArtSprite(layer.id)
+  const { rect: backRect } = useArtSprite(`${layer.id}-back`)
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
-  // ONE merged geometry: host pair + a relief pair per stratum. UVs and the
-  // index are static (the patch list is constant for a geometry); positions
-  // are rewritten each frame from the solver.
+  // ONE merged geometry: every die patch twice — a FRONT quad wound toward
+  // the painted side (left-hand faces flip their index winding so every
+  // front quad faces the valley/camera side at rest) and a BACK quad wound
+  // the other way sampling the print-back tint. UVs and the index are
+  // static (the patch list is pose-independent); positions are rewritten
+  // each frame from the solver.
   const quadCount = oanavePatchCount(layer)
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry()
-    const positions = new THREE.BufferAttribute(new Float32Array(quadCount * 12), 3)
+    const positions = new THREE.BufferAttribute(new Float32Array(quadCount * 24), 3)
     positions.setUsage(THREE.DynamicDrawUsage)
     g.setAttribute('position', positions)
-    const uvs = new Float32Array(quadCount * 8)
     const patches = oanavePatches(layer, Math.PI, 0)
+    const frontUvs = new Float32Array(quadCount * 8)
+    const backUvs = new Float32Array(quadCount * 8)
     patches.forEach((p, k) => {
       const [u0, v0, u1, v1] = p.uv
       // Quad corner order [inner@v0, outer@v0, outer@v1, inner@v1].
-      uvs.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8)
+      frontUvs.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8)
+      backUvs.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8)
     })
-    g.setAttribute('uv', new THREE.BufferAttribute(applyUvRect(uvs, rect), 2))
-    const index = new Uint16Array(quadCount * 6)
-    for (let k = 0; k < quadCount; k++)
-      index.set([k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3], k * 6)
+    const uvs = new Float32Array(quadCount * 16)
+    uvs.set(applyUvRect(frontUvs, rect), 0)
+    // A missing back sprite falls back to the face art (mirrored, the old
+    // DoubleSide read) rather than sampling a wrong region.
+    uvs.set(applyUvRect(backUvs, backRect ?? rect), quadCount * 8)
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    const index = new Uint16Array(quadCount * 12)
+    patches.forEach((p, k) => {
+      const flip = p.face === 'hostL' || p.face === 'reliefL'
+      const f = k * 4
+      const b = (quadCount + k) * 4
+      index.set(flip ? [f, f + 2, f + 1, f, f + 3, f + 2] : [f, f + 1, f + 2, f, f + 2, f + 3], k * 6)
+      index.set(flip ? [b, b + 1, b + 2, b, b + 2, b + 3] : [b, b + 2, b + 1, b, b + 3, b + 2], (quadCount + k) * 6)
+    })
     g.setIndex(new THREE.BufferAttribute(index, 1))
     return g
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- geometry is sized by the (static) content entry + its atlas rect
-  }, [layer.id, quadCount, rect])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geometry is sized by the (static) content entry + its atlas rects
+  }, [layer.id, quadCount, rect, backRect])
 
   const paperTexture = sharedPaperTexture()
+  // FrontSide: the geometry carries explicit front AND back quads (T4 —
+  // the reverse of the sheet is shaded paper, not mirrored art).
   const material = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        side: THREE.DoubleSide,
+        side: THREE.FrontSide,
         color: '#ffffff',
         transparent: true,
         alphaTest: 0.1,
@@ -144,11 +165,15 @@ export function OanavePopupLayer({
     const patches = oanavePatches(layer, thetaL, thetaR)
     const attr = geometry.getAttribute('position') as THREE.BufferAttribute
     const arr = attr.array as Float32Array
+    const backBase = patches.length * 12
     patches.forEach((p, k) => {
       for (let c = 0; c < 4; c++) {
         arr[k * 12 + c * 3] = p.quad[c][0]
         arr[k * 12 + c * 3 + 1] = p.quad[c][1]
         arr[k * 12 + c * 3 + 2] = p.quad[c][2]
+        arr[backBase + k * 12 + c * 3] = p.quad[c][0]
+        arr[backBase + k * 12 + c * 3 + 1] = p.quad[c][1]
+        arr[backBase + k * 12 + c * 3 + 2] = p.quad[c][2]
       }
     })
     attr.needsUpdate = true

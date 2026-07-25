@@ -108,6 +108,9 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'depthvista') {
       for (const wing of layer.wings) ids.add(`${layer.id}-${wing.key}`)
     }
+    // The oanave rank (popup-oanave-layer.tsx): the face art plus the T4
+    // print-back tint sprite (`<id>-back`) its back-face quads sample.
+    if (layer.mech === 'oanave') ids.add(`${layer.id}-back`)
     // popup-dissolve-layer.tsx: the two crossfade paintings (dunes up-face,
     // gold under-face) sliced across the venetian slats.
     if (layer.mech === 'dissolve') {
