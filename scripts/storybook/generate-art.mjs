@@ -3468,15 +3468,17 @@ const PIECES = [
   // (d1-d0):(z1-z0) = 0.52:0.40 ~ 1.30:1; sliced into 6 vertical slat strips.
   { id: 'ch4-dissolve-dunes', seed: 50240, w: 1024, h: 788, grain: 12, paint() { return dissolveDunes(this.w, this.h, this.seed) } },
   { id: 'ch4-dissolve-gold', seed: 50241, w: 1024, h: 788, grain: 12, paint() { return dissolveGold(this.w, this.h, this.seed) } },
-  // ---- Spread 6 — the Bazaar (ch5 stall box, goods, arch dress) ----
-  { id: 'ch5-stall-back', seed: 60201, w: 512, h: 320, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'stall') } },
-  { id: 'ch5-stall-side', seed: 60202, w: 512, h: 349, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'stall') } },
-  { id: 'ch5-stall-top', seed: 60203, w: 512, h: 470, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'stall') } },
-  { id: 'ch5-stall-valance', seed: 60210, w: 640, h: 224, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'valance') } },
-  { id: 'ch5-stall-crates', seed: 60211, w: 512, h: 384, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'crates') } },
-  { id: 'ch5-goods-deck', seed: 60220, w: 584, h: 512, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'goods') } },
-  { id: 'ch5-arch-garland', seed: 60230, w: 768, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'garland') } },
-  { id: 'ch5-arch-keystone', seed: 60231, w: 420, h: 420, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'keystone') } },
+  // ---- Spread 6 — the Bazaar. E3 s6 REBUILD (scenes/s6-scene-pack.md §4f):
+  // the D-series stall/goods/arch painters retired with their pieces; their
+  // webps are pruned from the art dir. The amphitheater's own painter list —
+  // ATLAS-A 1024 (arc plates, tread carpets/risers, souk strips), ATLAS-B 512
+  // (crowd chains, throng, tea, pigeons, raise-stall faces), the repainted
+  // city backdrop and the doodled floor page print — is the s6 art pass,
+  // tracked in docs/superpowers/art-call-sheet.md §6. Until it lands, the new
+  // pieces render on the procedural placeholder painter, and the retained
+  // tabpiece keeps its shipped face under its new id (ch5-raise-stall-face,
+  // copied from the old ch5-market-table-face bake — same solver, same UNFOLD
+  // bands; the woodcut RAISE-A-STALL re-theme rides the art pass). ----
   // ---- Spread 2 — the Inn (ch1 dress quads, stable box, coaching yard) ----
   { id: 'ch1-inn-eaves', seed: 20201, w: 640, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'eaves') } },
   { id: 'ch1-inn-lamp', seed: 20202, w: 292, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'lamp') } },
