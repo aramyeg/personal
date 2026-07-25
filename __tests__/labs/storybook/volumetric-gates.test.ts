@@ -274,16 +274,46 @@ describe('C3v2 depth occupancy — pieces spread across >= 5 depth bands', () =>
     return zSum / aSum
   }
 
+  /** The z centroids one independent layer contributes.
+   *
+   *  Normally one — a platform occupies its floating deck as ONE piece, a fan
+   *  its shared spine apex like a v-fold, and the gate is measuring PARALLAX
+   *  PLANES, so pieces welded to a common station may not be double-counted.
+   *
+   *  The RANGE is the exception the family exists for. An mfoldrange is one
+   *  card carrying k standing v-fold ranks at DISTINCT apexZ stations
+   *  (Birmingham 28/57) — ch4-range stands at -0.50, -0.44, -0.125, -0.095 —
+   *  and those ranks parallax against each other exactly as separate cards
+   *  would; sharing a sheet of paper is a fabrication fact, not a depth fact.
+   *  Folding them into a single area-weighted centroid made the gate report
+   *  the book's deepest scene as one flat plane, which is the opposite of what
+   *  it is for. Each rank is measured on its own station and then clustered by
+   *  the same SEPARATION as everything else, so ranks that genuinely sit in
+   *  one plane still collapse into one band.
+   */
+  const stationsOf = (layer: SceneLayer, chapter: (typeof CHAPTERS)[number]): number[] => {
+    if (layer.mech !== 'mfoldrange') return [centroidOf(layer, chapter)]
+    const pose = solveMFoldRangePose(layer, Math.PI, 0)
+    return pose.ranks.map((rank) => {
+      let zSum = 0
+      let aSum = 0
+      for (const q of [rank.right, rank.left]) {
+        const a = quadArea(q)
+        zSum += ((q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4) * a
+        aSum += a
+      }
+      return zSum / aSum
+    })
+  }
+
   const bandsOf = (chapter: (typeof CHAPTERS)[number]): number => {
     // Independent (page-glued) pieces define the parallax planes via
-    // single-linkage clustering. A platform occupies its floating deck as
-    // ONE independent piece; a fan occupies its spine apex like a v-fold.
-    // Dependent pieces (children, riders, dress) ride another's paper — they
-    // may JOIN a plane or, when they jut clear of everything, form their own,
-    // but they can never BRIDGE two planes into one.
+    // single-linkage clustering. Dependent pieces (children, riders, dress)
+    // ride another's paper — they may JOIN a plane or, when they jut clear of
+    // everything, form their own, but they can never BRIDGE two planes.
     const indep = chapter.layers
       .filter((l) => !isDependent(l))
-      .map((l) => centroidOf(l, chapter))
+      .flatMap((l) => stationsOf(l, chapter))
       .sort((a, b) => a - b)
     const bands: Array<{ min: number; max: number }> = []
     for (const z of indep) {
@@ -317,6 +347,13 @@ describe('C3v2 depth occupancy — pieces spread across >= 5 depth bands', () =>
     // physics/quality gate is weakened. Keyed to the declared `showpiece` marker
     // (not a spread index) so it extends to the E2 grand chapter, no test edit.
     const RATCHET: Record<number, number> = { 2: 5, 3: 5, 4: 7, 5: 5, 6: 5, 7: 5 }
+    console.table(
+      CHAPTERS.filter((c) => !c.showpiece).map((c) => ({
+        spread: c.spread,
+        bands: bandsOf(c),
+        ratchet: RATCHET[c.spread],
+      }))
+    )
     for (const chapter of CHAPTERS) {
       if (chapter.showpiece) continue
       expect(bandsOf(chapter), `spread ${chapter.spread} depth bands`).toBeGreaterThanOrEqual(

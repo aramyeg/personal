@@ -48,6 +48,7 @@ import {
   type TabPieceFace,
 } from './popup-tabpiece'
 import { peakHeight, shadowLift } from './shadow-light'
+import { turnCullOpacity } from './turn-cull'
 import { easeTurnWeighted } from './page-geometry'
 import { TURN_MS, type TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
@@ -212,6 +213,13 @@ export function TabPiecePopupLayer({
     [patches]
   )
 
+  // TURN-CULL opt-in (C-3). A culled piece must be able to RAMP, and an
+  // opacity ramp needs materials this piece alone owns and may write — the
+  // pool's own contract forbids mutating a shared material's opacity. So the
+  // flag also decides two allocation questions below: transparent exteriors,
+  // and an unpooled interior. Un-culled pieces keep the E-G4 pooling exactly.
+  const culled = layer.turnCull === true
+
   const paperTexture = sharedPaperTexture()
   const tabGripTexture = sharedTabGripTexture()
   const materials = useMemo(() => {
@@ -220,17 +228,35 @@ export function TabPiecePopupLayer({
         new THREE.MeshBasicMaterial({
           side: THREE.FrontSide,
           color: isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff',
+          transparent: culled,
         })
     )
     return { exterior }
-  }, [patches])
+  }, [patches, culled])
   // Every tab piece's underside is the same raw-paper-stock BackSide wall,
   // pooled (E-G4 fix wave) — shared with box/platform's interior material.
+  // A culled piece owns its copy instead: the pool is only safe for materials
+  // nobody writes after acquiring, and this one's opacity is written per frame
+  // through the cull ramp.
   const interiorMaterial = useMemo(
-    () => acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
-    [paperTexture]
+    () =>
+      culled
+        ? new THREE.MeshBasicMaterial({
+            side: THREE.BackSide,
+            map: paperTexture,
+            color: INTERIOR_SHADOW_TINT,
+            transparent: true,
+          })
+        : acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
+    [paperTexture, culled]
   )
-  useEffect(() => () => releaseMaterial(interiorMaterial), [interiorMaterial])
+  useEffect(
+    () => () => {
+      if (culled) interiorMaterial.dispose()
+      else releaseMaterial(interiorMaterial)
+    },
+    [interiorMaterial, culled]
+  )
 
   // The invisible grab handles (law H3/H6): an exact-tab mesh for mouse/pen
   // precision and a 1.5x slop mesh for touch. Both raycast (object visible)
@@ -420,12 +446,27 @@ export function TabPiecePopupLayer({
     )
     const beta = thetaL - thetaR
 
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    // TURN-CULL (C-3, the dial/winch/dissolve lever): a playable tab piece is
+    // the reader's instrument, not the spread's structure — mid-turn it is a
+    // sliver on a sheet sweeping past at speed and nobody is reading it, so it
+    // stops drawing and ramps back across the landing settle. `frame.t` is the
+    // driver's RAW published progress (turn-cull.ts is explicit that the eased
+    // value is still ~0 a fifth of the way in, which would put the fade nowhere
+    // near the specified window). Everything below — pose, lift, envelope,
+    // fold-flat — is untouched; hiding the group is what returns the draws.
+    const cull = culled ? turnCullOpacity(f?.t ?? 0) : 1
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) {
       prevStructRef.current = null
       return
+    }
+    if (culled) {
+      for (const m of materials.exterior) m.opacity = cull
+      interiorMaterial.opacity = cull
+      for (const m of edgeMaterials) m.opacity = 0.8 * cull // its rest opacity, ramped
+      slitMaterial.opacity = 0.9 * cull
     }
 
     // --- Effective lift (laws H2/H3): reader drive, release return, or cam.
@@ -490,7 +531,7 @@ export function TabPiecePopupLayer({
     slitAttr.needsUpdate = true
     slitGeometry.computeBoundingSphere()
 
-    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2
+    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2 * cull
     prevStructRef.current = structVerts(solved)
   })
 

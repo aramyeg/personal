@@ -321,7 +321,16 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     // a full-span hero plane is invisible scaffolding (riser-silhouette law),
     // so the per-chapter platform template no longer binds spreads rebuilt as
     // stage sets. Listed per spread as each pack's retirement is accepted.
-    const STAGE_SET_SPREADS: ReadonlySet<number> = new Set([2])
+    // Spread 5 joins on the same law, measured rather than asserted: its
+    // mfoldrange massif is four width-graded gutter-spanning planes, and the
+    // ch4-hoard platform that used to sit between them was the riser-
+    // silhouette failure in person — a strut rig hung in the range's notch
+    // above the dragon. The only rise/q that tucks it under r3's painted notch
+    // cap (0.219 world / 0.054 screen) puts its whole footprint 0.110 screen
+    // units below the hero's top edge, i.e. invisible. Buried scaffolding or
+    // no scaffolding: the gate cannot be satisfied here by anything that also
+    // reads, so the piece is retired and the exemption records why.
+    const STAGE_SET_SPREADS: ReadonlySet<number> = new Set([2, 5])
     // SWARMARC EXEMPTION (E3 s3 pack §2): the carrier swarm IS the floating
     // tier generalized — 28 struts holding rider art 0.09–0.61 above the page
     // plane (the platform family's whole depth win, multiplied), and the

@@ -329,14 +329,8 @@ const WHITELIST: readonly WhitelistEntry[] = [
       "the design comment is explicit — 'an open treasure chest in front of the dragon' — and the capture " +
       'shows it sitting right at the coiled dragon\'s feet: the guardian-and-treasure beat the chapter is about.',
   },
-  {
-    pair: 'ch4-hero x ch4-hoard',
-    reason: 'depth-echo',
-    note:
-      "documented intent: the hoard platform is 'grown onto tall struts... so the gold heap crests ABOVE " +
-      "the skyline and shows through the torn-paper sky' — confirmed in the capture escaping past the " +
-      "dragon's wing from its own deep lane.",
-  },
+  // (ch4-hero x ch4-hoard retired with its piece: what escaped past the
+  // dragon's wing turned out to be strut scaffolding, not a gold heap.)
   // (The old bazaar entries — ch5-arch x ch5-goods, ch5-stall x ch5-goods —
   // retired with their pieces in the E3 s6 amphitheater rebuild; the new
   // spread's deliberate concentric stacking is whitelisted below.)

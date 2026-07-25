@@ -399,6 +399,16 @@ export type TabPieceGeom = {
   restAtDeg?: number
   /** Visible tab width along the spine (default 0.1). */
   tabW?: number
+  /** Turn-time culling (Batch C-3, the dial/winch/dissolve lever): the piece
+   *  is a reader's playable rather than a spread's structure, so mid-turn it
+   *  stops drawing — the renderer ramps it out/in over the turn-cull window
+   *  (turn-cull.ts) and restores it inside the landing-settle beat. Visual
+   *  only: the solver, the pose, the fold-flat envelope and every containment
+   *  proof are untouched; the piece simply is not submitted. Opting IN also
+   *  costs the piece its pooled interior material and puts its faces in the
+   *  transparent pass, which is what buys the ramp — so set it only where the
+   *  mid-turn draws are worth that (see ch5-raise-stall). */
+  turnCull?: boolean
 }
 
 /**

@@ -7665,16 +7665,24 @@ function bazCity(w, h, seed) {
   const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
 
   let g = `<g clip-path="url(#bazCityCut)">`
-  g += `<rect width="${w}" height="${h}" fill="${BAZ.roseLit}"/>`
+  // GROUND: the deep rose the whole plane is cut from. It used to start at
+  // roseLit and then take a 0.62 sandLit haze on top, which left the sheet a
+  // near-uniform pale wash — against a black sky the die-cut dome skyline had
+  // no value to read with (board eye-test: "too pale"). Starting from `rose`
+  // and spending far less of the range on haze keeps the recession soft while
+  // giving the crowns something to be soft AGAINST.
+  g += `<rect width="${w}" height="${h}" fill="${BAZ.rose}"/>`
   // CONCENTRIC STREETS receding to the gate: nested ellipse arcs about the
   // crease base — the amphitheater's own geometry painted into the city.
   for (let i = 0; i < 5; i++) {
     const t = i / 4
     const ry = h * lerp(0.16, 0.62, t)
     const rx = w * lerp(0.1, 0.62, t)
-    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="${fx(0.32 - t * 0.2)}"/>`
-    // roofline band riding each street arc
-    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${t > 0.5 ? BAZ.rose : BAZ.roseDim}" stroke-width="${fx(h * lerp(0.1, 0.05, t))}" opacity="${fx(0.5 - t * 0.28)}"/>`
+    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="${fx(0.44 - t * 0.24)}"/>`
+    // Roofline band riding each street arc. The near rings go DARKER than the
+    // ground (roseDim -> terraDim) and the far ones lighter, so the rings are
+    // the plane's value ladder rather than a tonal repeat of it.
+    g += `<path d="M ${fx(X(0.5) - rx)} ${fx(h)} A ${fx(rx)} ${fx(ry)} 0 0 1 ${fx(X(0.5) + rx)} ${fx(h)}" fill="none" stroke="${t > 0.5 ? BAZ.roseDim : BAZ.terraDim}" stroke-width="${fx(h * lerp(0.1, 0.05, t))}" opacity="${fx(0.6 - t * 0.3)}"/>`
   }
   // windows + doors scattered on the street bands, a few saffron-lit
   for (let i = 0; i < 130; i++) {
@@ -7684,8 +7692,9 @@ function bazCity(w, h, seed) {
     const s2 = rr(r, 2.2, 4.6)
     g += `<rect x="${fx(X(u))}" y="${fx(Y(v))}" width="${fx(s2)}" height="${fx(s2 * 1.5)}" fill="${lit ? BAZ.saffron : INK}" opacity="${lit ? 0.85 : fx(rr(r, 0.25, 0.45))}"/>`
   }
-  // dome + minaret paint above the wall line
-  g += `<rect y="0" width="${w}" height="${fx(Y(0.58))}" fill="${BAZ.sand}" opacity="0.24"/>`
+  // dome + minaret paint above the wall line (the sky-band lift, halved: at
+  // 0.24 over the old pale ground it bleached the crown region flat)
+  g += `<rect y="0" width="${w}" height="${fx(Y(0.58))}" fill="${BAZ.sand}" opacity="0.12"/>`
   g += `<path d="M ${fx(X(0.44))} ${fx(Y(0.7))} L ${fx(X(0.56))} ${fx(Y(0.7))} L ${fx(X(0.555))} ${fx(Y(0.62))} L ${fx(X(0.445))} ${fx(Y(0.62))} Z" fill="${BAZ.sand}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.45"/>`
   for (const [uc, rad, vb] of [[0.14, 0.028, 0.66], [0.385, 0.032, 0.68], [0.5, 0.055, 0.7], [0.655, 0.03, 0.7], [0.88, 0.026, 0.66]]) {
     g += `<path d="M ${fx(X(uc - rad))} ${fx(Y(vb))} A ${fx(X(rad))} ${fx(X(rad) * 0.95)} 0 0 1 ${fx(X(uc + rad))} ${fx(Y(vb))} Z" fill="${BAZ.terra}"/>`
@@ -7705,10 +7714,16 @@ function bazCity(w, h, seed) {
 
   const defs =
     `<clipPath id="bazCityCut"><path d="${d}"/></clipPath>` +
+    // AERIAL RECESSION, re-graded. The haze must pale the far city WITHOUT
+    // erasing the value step the die-cut crowns are read by: the top stop
+    // drops 0.62 -> 0.30 (soft, not bleached), the mid-band lift goes to
+    // near-nothing so the wall keeps its own colour, and the base ink
+    // deepens 0.18 -> 0.34 so the plane sits BEHIND the sand-coloured stall
+    // arcs instead of competing with them.
     `<linearGradient id="bazCityHaze" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.62"/>` +
-    `<stop offset="0.5" stop-color="${BAZ.sandLit}" stop-opacity="0.12"/>` +
-    `<stop offset="1" stop-color="${INK}" stop-opacity="0.18"/></linearGradient>`
+    `<stop offset="0" stop-color="${BAZ.sandLit}" stop-opacity="0.30"/>` +
+    `<stop offset="0.42" stop-color="${BAZ.sandLit}" stop-opacity="0.05"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.34"/></linearGradient>`
 
   return svgPiece(w, h, g + rimPath(d, 5), defs)
 }
@@ -8063,76 +8078,126 @@ function bazPigeon(w, h, seed, bank) {
   g += `<path d="M ${fx(X(0.86))} ${fx(Y(0.54))} L ${fx(X(0.97))} ${fx(Y(0.52))} L ${fx(X(0.86))} ${fx(Y(0.47))} Z" fill="${BAZ.saffron}"/>`
   g += `<path d="M ${fx(X(0.66))} ${fx(Y(0.58))} Q ${fx(X(0.7))} ${fx(Y(0.5))} ${fx(X(0.66))} ${fx(Y(0.42))}" fill="none" stroke="${BAZ.teal}" stroke-width="2.2" opacity="${fx(rr(r, 0.5, 0.7))}"/>`
   g += `</g>`
+  // The defs MUST ship with the piece: a dangling `url(#pigeonCut)` reference
+  // is ignored rather than honoured, so the die-cut silently stopped cutting
+  // and the #b3a49c ground rect filled the whole tile — the piece baked with
+  // no alpha at all and rendered as a blank kraft chevron over the bazaar's
+  // backdrop crown (bench/out/e3-board-s6.png, the "blank finial" artifact).
   const defs = `<clipPath id="pigeonCut"><path d="${d}"/></clipPath>`
-  return svgPiece(w, h, g + rimPath(d, 3))
+  return svgPiece(w, h, g + rimPath(d, 3), defs)
 }
 
 /** THE RAISE-A-STALL FACE (ch5-raise-stall-face): the retained tabpiece
  *  re-themed into the chapter's meaning. UNFOLD bands (v-up): legIn 0..0.32 =
  *  carved stall posts + a leaning master-pattern stone, deck 0.32..0.68 = the
  *  striped awning mid-raise carrying the woodcut ⟡ RAISE A STALL ⟡ cartouche,
- *  legOut 0.68..1 = posts again with the pattern-glyph row toward the tab. */
+ *  legOut 0.68..1 = posts again with the pattern-glyph row toward the tab.
+ *
+ *  PRESENCE PASS (s6 polish round). At rest the piece read as a giant tent
+ *  rather than a half-raised stall, and the cause was SCALE CADENCE, not
+ *  geometry (which is bench-fixed and untouched here). The deck spans 0.28
+ *  world along the spine; at 12 stripes that is 0.0233 world per stripe
+ *  against the ~0.0165 every other awning in the spread paints (BAZ_STRIPES
+ *  _PER_BAY 7 over the arc plates' ~0.12-0.14 world bays). A 40%-coarser
+ *  stripe on the piece nearest the reader tells the eye the stall is half
+ *  again as big as the souk behind it. So: 17 stripes (0.0165 world, the
+ *  house cadence), a valance scalloped at that same pitch, a cartouche sized
+ *  as a hung signboard instead of a banner across the whole awning, and a
+ *  graded ink shadow thrown DOWN both leg bands from the deck seams — the
+ *  shade a raised awning casts on its own posts, which is what makes it read
+ *  as raised rather than as a closed tent. */
 function bazRaiseStallFace(w, h, seed) {
   const r = mulberry32(seed)
   const Y = (v) => (1 - v) * h
   const WOODB = '#6b4a26'
   const WOODB_LIT = '#9a7038'
+  // House awning cadence carried onto the deck (see the note above).
+  const nst = 17
+  const pitch = w / nst
   let s = `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
 
-  const legBand = (v0, v1, glyphRow) => {
+  // Four slim posts instead of two fat ones: same frame, read at the souk's
+  // own scale. `goods` gives the two bands different furniture so the unfold
+  // does not read as one mirrored shape.
+  const legBand = (v0, v1, glyphRow, goods) => {
     let out = ''
     const y0 = Y(v1)
     const bh = Y(v0) - Y(v1)
-    // two carved posts + cross-brace
-    for (const ux of [0.18, 0.74]) {
-      out += `<rect x="${fx(ux * w)}" y="${fx(y0)}" width="${fx(w * 0.09)}" height="${fx(bh)}" fill="${WOODB}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>`
-      out += `<rect x="${fx(ux * w + 2)}" y="${fx(y0)}" width="${fx(w * 0.02)}" height="${fx(bh)}" fill="${WOODB_LIT}" opacity="0.7"/>`
-      for (let c = 0; c < 5; c++) {
-        const cy = y0 + bh * (0.14 + c * 0.18)
-        out += `<path d="M ${fx(ux * w + w * 0.02)} ${fx(cy)} L ${fx(ux * w + w * 0.045)} ${fx(cy - 6)} L ${fx(ux * w + w * 0.07)} ${fx(cy)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.6" opacity="0.75"/>`
+    const pw = w * 0.055
+    for (const ux of [0.14, 0.33, 0.585, 0.79]) {
+      out += `<rect x="${fx(ux * w)}" y="${fx(y0)}" width="${fx(pw)}" height="${fx(bh)}" fill="${WOODB}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.55"/>`
+      out += `<rect x="${fx(ux * w + 1.5)}" y="${fx(y0)}" width="${fx(w * 0.013)}" height="${fx(bh)}" fill="${WOODB_LIT}" opacity="0.7"/>`
+      for (let c = 0; c < 8; c++) {
+        const cy = y0 + bh * (0.09 + c * 0.115)
+        out += `<path d="M ${fx(ux * w + w * 0.012)} ${fx(cy)} L ${fx(ux * w + pw / 2)} ${fx(cy - 4)} L ${fx(ux * w + pw - w * 0.012)} ${fx(cy)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.3" opacity="0.7"/>`
       }
     }
-    out += `<line x1="${fx(w * 0.27)}" y1="${fx(y0 + bh * 0.85)}" x2="${fx(w * 0.74)}" y2="${fx(y0 + bh * 0.15)}" stroke="${WOODB}" stroke-width="7" opacity="0.9"/>`
-    out += `<line x1="${fx(w * 0.27)}" y1="${fx(y0 + bh * 0.15)}" x2="${fx(w * 0.74)}" y2="${fx(y0 + bh * 0.85)}" stroke="${WOODB}" stroke-width="7" opacity="0.9"/>`
-    // the leaning master-pattern stone between the posts
-    const sx = w * 0.38
-    const sy = y0 + bh * 0.42
+    // cross-braces, one per post bay
+    for (const [ua, ub] of [[0.195, 0.325], [0.385, 0.58], [0.64, 0.785]]) {
+      out += `<line x1="${fx(ua * w)}" y1="${fx(y0 + bh * 0.82)}" x2="${fx(ub * w)}" y2="${fx(y0 + bh * 0.2)}" stroke="${WOODB}" stroke-width="4.5" opacity="0.85"/>`
+      out += `<line x1="${fx(ua * w)}" y1="${fx(y0 + bh * 0.2)}" x2="${fx(ub * w)}" y2="${fx(y0 + bh * 0.82)}" stroke="${WOODB}" stroke-width="4.5" opacity="0.85"/>`
+    }
+    // the leaning master-pattern stone, now one object among several
+    const sx = w * 0.395
+    const sy = y0 + bh * 0.46
     out += `<g transform="rotate(-8 ${fx(sx)} ${fx(sy)})">` +
-      `<rect x="${fx(sx)}" y="${fx(sy)}" width="${fx(w * 0.24)}" height="${fx(bh * 0.42)}" rx="6" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.6"/>`
+      `<rect x="${fx(sx)}" y="${fx(sy)}" width="${fx(w * 0.165)}" height="${fx(bh * 0.3)}" rx="4" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
     for (let gk = 0; gk < 3; gk++) {
-      const gx = sx + w * 0.045 + gk * w * 0.065
-      out += `<path d="M ${fx(gx)} ${fx(sy + bh * 0.21)} l 8 -8 l 8 8 l -8 8 Z" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.7"/>`
+      const gx = sx + w * 0.03 + gk * w * 0.045
+      out += `<path d="M ${fx(gx)} ${fx(sy + bh * 0.15)} l 5.5 -5.5 l 5.5 5.5 l -5.5 5.5 Z" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.7"/>`
     }
     out += `</g>`
+    if (goods) {
+      // crates + jars stacked against the outer posts — the scale ruler
+      for (const [ux, cwF, chF] of [[0.045, 0.085, 0.13], [0.045, 0.06, 0.09], [0.865, 0.09, 0.15]]) {
+        const cy = y0 + bh * (0.86 - chF)
+        out += `<rect x="${fx(ux * w)}" y="${fx(cy)}" width="${fx(w * cwF)}" height="${fx(bh * chF)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
+        out += `<line x1="${fx(ux * w)}" y1="${fx(cy + bh * chF * 0.5)}" x2="${fx((ux + cwF) * w)}" y2="${fx(cy + bh * chF * 0.5)}" stroke="${INK}" stroke-width="1.2" opacity="0.45"/>`
+      }
+      for (const [ux, uv] of [[0.475, 0.2], [0.53, 0.19]]) {
+        out += `<ellipse cx="${fx(ux * w)}" cy="${fx(y0 + bh * 0.8)}" rx="${fx(w * 0.028)}" ry="${fx(bh * uv * 0.35)}" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.55"/>`
+      }
+    }
     if (glyphRow) {
-      for (let gk = 0; gk < 5; gk++) {
-        const gx = w * (0.2 + gk * 0.14)
-        out += `<path d="M ${fx(gx)} ${fx(y0 + bh * 0.06)} l 7 -7 l 7 7 l -7 7 Z" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.55"/>`
+      for (let gk = 0; gk < 7; gk++) {
+        const gx = w * (0.13 + gk * 0.125)
+        out += `<path d="M ${fx(gx)} ${fx(y0 + bh * 0.05)} l 5 -5 l 5 5 l -5 5 Z" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
       }
     }
     return out
   }
 
-  s += legBand(0, 0.32, false)
-  s += legBand(0.68, 1, true)
+  s += legBand(0, 0.32, false, true)
+  s += legBand(0.68, 1, true, false)
 
   // THE DECK: striped awning mid-raise + the woodcut cartouche
   const dy0 = Y(0.68)
   const dh = Y(0.32) - Y(0.68)
-  const nst = 12
   for (let i = 0; i < nst; i++) {
-    s += `<rect x="${fx((i / nst) * w)}" y="${fx(dy0)}" width="${fx(w / nst + 0.5)}" height="${fx(dh)}" fill="${i % 2 ? BAZ.cream : BAZ.teal}"/>`
-  }
-  // scallop rules at both band seams
-  for (const by of [dy0, dy0 + dh]) {
-    for (let i = 0; i < nst; i++) {
-      const cx = ((i + 0.5) / nst) * w
-      s += `<path d="M ${fx(cx - w / nst / 2)} ${fx(by)} A ${fx(w / nst / 2)} ${fx(w * 0.03)} 0 0 0 ${fx(cx + w / nst / 2)} ${fx(by)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.4"/>`
+    s += `<rect x="${fx(i * pitch)}" y="${fx(dy0)}" width="${fx(pitch + 0.5)}" height="${fx(dh)}" fill="${i % 2 ? BAZ.cream : BAZ.teal}"/>`
+    // a saffron pinstripe down each cream bay: sub-stripe grain, so the
+    // awning still holds detail when the deck foreshortens at rest
+    if (i % 2) {
+      s += `<line x1="${fx(i * pitch + pitch / 2)}" y1="${fx(dy0)}" x2="${fx(i * pitch + pitch / 2)}" y2="${fx(dy0 + dh)}" stroke="${BAZ.saffron}" stroke-width="1.5" opacity="0.42"/>`
     }
   }
+  // scalloped valance at both band seams, hung at the stripe pitch
+  for (const by of [dy0, dy0 + dh]) {
+    for (let i = 0; i < nst; i++) {
+      const cx = (i + 0.5) * pitch
+      s += `<path d="M ${fx(cx - pitch / 2)} ${fx(by)} A ${fx(pitch / 2)} ${fx(pitch * 0.44)} 0 0 0 ${fx(cx + pitch / 2)} ${fx(by)}" fill="none" stroke="${INK}" stroke-width="1.3" opacity="0.45"/>`
+    }
+  }
+  // THE SHADOW THE AWNING THROWS: a graded ink band running off each deck
+  // seam down its leg band. This is the read the resting pose was missing —
+  // an unshaded seam makes deck and legs one continuous sheet (a tent);
+  // shaded, the deck sits ABOVE the posts it is being raised over.
+  const shadeH = dh * 0.5
+  s += `<rect x="0" y="${fx(dy0 - shadeH)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeUp)"/>`
+  s += `<rect x="0" y="${fx(dy0 + dh)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeDown)"/>`
   // the woodcut cartouche: walnut plate, cream field, engraved legend
-  const cw2 = w * 0.86
-  const chh = dh * 0.34
+  const cw2 = w * 0.68
+  const chh = dh * 0.26
   const cx0 = (w - cw2) / 2
   const cy0 = dy0 + dh / 2 - chh / 2
   s += `<rect x="${fx(cx0)}" y="${fx(cy0)}" width="${fx(cw2)}" height="${fx(chh)}" rx="10" fill="${INK}" opacity="0.92"/>`
@@ -8150,7 +8215,19 @@ function bazRaiseStallFace(w, h, seed) {
     s += `<circle cx="${fx(lx)}" cy="${fx(cy0 + chh / 2)}" r="2.4" fill="${INK}"/>`
   }
   void r
-  return svgPiece(w, h, s)
+  // Deck-seam shadow ramps: darkest AT the seam, gone half a deck-height into
+  // each leg band. `Up` runs off the deck's upper seam into legOut, `Down` off
+  // the lower seam into legIn.
+  const defs =
+    `<linearGradient id="stallShadeUp" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0"/>` +
+    `<stop offset="0.62" stop-color="${INK}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.46"/></linearGradient>` +
+    `<linearGradient id="stallShadeDown" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0.5"/>` +
+    `<stop offset="0.38" stop-color="${INK}" stop-opacity="0.18"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
 }
 
 /**
@@ -9502,7 +9579,7 @@ const PIECES = [
   { id: 'ch4-chest-side', seed: 50203, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'chest') } },
   { id: 'ch4-chest-lid', seed: 50210, w: 476, h: 512, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'chestLid') } },
   { id: 'ch4-chest-spill', seed: 50211, w: 512, h: 384, grain: 12, paint() { return dressPatch(this.w, this.h, this.seed, 'goldSpill') } },
-  { id: 'ch4-hoard-deck', seed: 50220, w: 1024, h: 244, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'hoard') } },
+  // (ch4-hoard-deck retired with the ch4-hoard platform — see content.ts.)
   { id: 'ch4-goldpile-face', seed: 50230, w: 900, h: 900, grain: 14, paint() { return goldHeap(this.w, this.h, this.seed) } },
   // the pull-tab DISSOLVE: dunes (A) and gold (B) share one composition (matching
   // ridgelines) so the venetian flip transmutes desert -> hoard. Aspect w:h =
