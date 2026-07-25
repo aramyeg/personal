@@ -566,6 +566,32 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // at the side-wall base (v=0 — no overhang below the page-glued edge).
   { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
   { id: 'ch6-strongbox-coins', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'wallL', u: 0, v: 0, width: 0.12, height: 0.06 },
+  // PLAYABLE (E2.2 s7, charter gate G4): a lift-the-flap TREASURE COFFER out on
+  // the open right-page ground — the reader lifts a teal-steel strongbox lid and
+  // an aurora-lit gold hoard glows inside (the Northern Treasury made drivable).
+  // REUSES the shipped liftflap family (popup-liftflap solver/layer verbatim)
+  // with a DIFFERENT read — one chest lid, not the s2 numbered doors — which also
+  // serves variety. Page-rooted, NOT on the standing strongbox: that box self-
+  // folds (its own lid/caps crease) so a rigid flap glued to it would fight the
+  // fold, and it shows the reading camera mostly its front cap (its top is a
+  // foreshortened sliver), so an up-opening lid there reveals edge-on. Page-flat,
+  // the lid + open interior read square-on at the lid-dominant reading camera
+  // (the winch/volvelle/keyboard precedent). SEATED in the eye-proven VISIBLE
+  // right-page zone (d~0.42-0.70, z~0-0.24): the first spot at z~0.44 rendered
+  // occluded behind the fringe/figures (a G4 discoverability miss caught in the
+  // interaction capture); out here it reads clear, right of the treasury, and
+  // forms its own depth band (C3v2 ratchet 5 -> 6). A visible gold hasp on the
+  // lid's fore edge is the affordance. The door HOLDS its open/shut state (H4);
+  // E(beta) eases the lid shut at book close. Bench-verified in derive-s7lid.mjs
+  // (L1-L9 + L5b strongbox no-clip). The standing strongbox stays (massing + the
+  // 6/6 box census).
+  {
+    id: 'ch6-coffer', kind: 'foreground', role: 'scenery', mech: 'liftflap', side: 'right',
+    hingeD: 0.46, leafLen: 0.24, boardD0: 0.42, boardD1: 0.7, boardZ0: 0.0, boardZ1: 0.24,
+    doors: [
+      { z0: 0.01, z1: 0.23, reveal: 'key', plate: 1 },
+    ],
+  },
   // FLOATING TIER (C3v2): the treasury's glass gallery — a BRIDGE platform in
   // the approach lane behind the vault. COMPOSITION SPREAD-D: the treasury is
   // the book's TALLEST hero (0.91) and it LEANS RIGHT (skew -2), so a wide
@@ -666,8 +692,29 @@ export const CHAPTERS: readonly Chapter[] = [
 // tuned one-off decorative sets, since there's no career experience to
 // derive them from. The end spread gets its raven as a child riding the
 // letter's fold — the raven the closing line asks the reader to send.
+// E2.2 OVERTURE MASSING (endpapers-composition lane, 2026-07-25): the title
+// page was the book's palest, thinnest spread — a lone hero on empty parchment
+// behind a washed-out banner (G3 pale/sparse + G6 thin, both honest FAILs).
+// Rebuilt as a GRANDIOSE proscenium overture that promises the whole tale: a
+// bold aged-parchment PROSCENIUM (the enlarged + rebaked banner — heavy walnut
+// scroll-frame, gold rule, burgundy cartouche, painted-in pennant bunting AND a
+// row of the six-kingdom heraldic shields), the boy hero + crest, the writer's
+// QUILL still strip-erected at the fore edge (the spread's hero), and the far
+// berm. NO net-new v-fold: title-border + title-hero stay the only two v-folds.
+// (An earlier backdrop-fan "crown" was cut — occluded behind the proscenium at
+// the lid-dominant camera; the six kingdoms are painted into the banner where
+// the camera sees them.)
 export const TITLE_LAYERS: readonly SceneLayer[] = [
-  { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.25, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.3, height: 0.5 },
+  // THE PROSCENIUM (vfold, enlarged 1.3->1.55 + rebaked BOLD): the grand aged-
+  // parchment banner-canopy framing the hero — heavy walnut scroll-frame, gold
+  // rule, a burgundy title cartouche, painted-in pennant bunting along the top
+  // rail, and a row of the SIX-KINGDOM heraldic SHIELDS across the cloth (the
+  // promise of the realms, carried IN the banner). Was pale/thin; now the
+  // overture arch. The six kingdoms ride the banner rather than a backdrop fan
+  // because a spine-anchored fan behind this wider/taller spine-anchored
+  // proscenium is fully occluded at the lid-dominant reading camera (verified
+  // in the e28-r1 capture — cf. the "backdrop wings vs central tower wall" law).
+  { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.22, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.55, height: 0.6 },
   { id: 'title-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.38, height: 0.63 },
   { id: 'title-crest', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'title-hero', mount: 0.24, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.13 },
   // D5 MASSING (silhouette review: the title was "a lone small cutout"). The
@@ -678,12 +725,11 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // downstage of the emblem in its own z-band (z >= 0.44) so, since spine
   // rotation preserves z, it never crosses the center cluster (extra-1 ceiling).
   { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.0887, height: 0.24 },
-  // The second supporting piece (massing): a low GROUND SWELL (parallel fold,
-  // covenant: scenery, rise <= 0.08, carries a rider) far upstage behind the
-  // border — a distant berm with a wax-seal tuft, filling the empty top of
-  // frame. Own z-band (z <= -0.36) so it never crosses the center cluster.
-  { id: 'title-swell', kind: 'backdrop', role: 'scenery', mech: 'parallel', glueL: 0.3, glueR: 0.3, rise: 0.06, z0: -0.52, z1: -0.36 },
-  { id: 'title-swell-seal', kind: 'backdrop', role: 'scenery', mech: 'rider', parentId: 'title-swell', seat: 'tentRidge', mountZ: -0.44, vDir: -1, phiDeg: 32, rhoDeg: 52, width: 0.18, height: 0.14 },
+  // The far berm massing (ground swell — parallel fold, covenant: scenery,
+  // rise <= 0.08, carries a rider) upstage behind the crown, a distant berm
+  // with a wax-seal tuft. Own z-band (z <= -0.36) so it never crosses center.
+  { id: 'title-swell', kind: 'backdrop', role: 'scenery', mech: 'parallel', glueL: 0.24, glueR: 0.24, rise: 0.05, z0: -0.62, z1: -0.48 },
+  { id: 'title-swell-seal', kind: 'backdrop', role: 'scenery', mech: 'rider', parentId: 'title-swell', seat: 'tentRidge', mountZ: -0.55, vDir: -1, phiDeg: 32, rhoDeg: 52, width: 0.12, height: 0.095 },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
@@ -740,28 +786,40 @@ const SATCHEL_LAYERS: readonly SceneLayer[] = [
 const SATCHEL_ACCENTS: readonly string[] = ['#c9a227', '#8a5a3b'] // gold + leather
 
 const END_LAYERS: readonly SceneLayer[] = [
-  // D5 MASSING (silhouette review: the end was "a lone small cutout"). The
-  // HERO is now the far country the road bent through — a FAN of distant
-  // hills fanning open behind the letter (Birmingham M-fold, k=3 nested
-  // ridges from one deep spine apex). Sited in its own z-band far upstage
-  // (z <= -0.46) so, since spine rotation preserves z, it can never cross
-  // the mid-page letter at any angle (extra-9's zero collision ceiling).
-  // Wide members read as receding downs AND carry the D-G8 sweep (fan is
-  // the spread's hero family — no other extra can field it).
-  { id: 'end-hills', kind: 'backdrop', role: 'scenery', mech: 'fan', apexZ: -0.46, vDir: -1, members: [{ phiDeg: 58, rhoDeg: 74, width: 0.72, height: 0.18 }, { phiDeg: 66, rhoDeg: 80, width: 0.96, height: 0.21 }, { phiDeg: 74, rhoDeg: 84, width: 1.2, height: 0.24 }] },
-  { id: 'end-letter', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.75, height: 0.5 },
-  { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'child', parentId: 'end-letter', mount: 0.28, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.2, height: 0.15 },
-  // The low mound the letter rests against (massing): a GROUND SWELL (parallel
-  // fold, covenant: scenery, rise <= 0.08, carries a rider) at the fore edge
-  // in its own z-band (z >= 0.42) — grounds the letter without crowding it.
-  { id: 'end-mound', kind: 'foreground', role: 'scenery', mech: 'parallel', glueL: 0.22, glueR: 0.22, rise: 0.06, z0: 0.42, z1: 0.64 },
-  { id: 'end-mound-tuft', kind: 'foreground', role: 'scenery', mech: 'rider', parentId: 'end-mound', seat: 'tentRidge', mountZ: 0.53, vDir: 1, phiDeg: 32, rhoDeg: 52, width: 0.16, height: 0.14 },
-  // KINETIC (D4 wave 2): the hero's SIGNET SEAL, its heraldic rosette turning
-  // 110deg as the letter is unfolded — a die-cut disc hub-riveted flat on the
-  // letter's left panel (Birmingham mech 76). The end spread carries no
-  // backdrop, so the rotor's coplanar disc adds ZERO collision footprint here
-  // (the rotor's virtue: on a clean parent it costs nothing).
-  { id: 'end-seal', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'end-letter', seat: 'left', u: 0.19, v: 0.25, radius: 0.13, spinDeg: 110 },
+  // E2.2 EPILOGUE MASSING (endpapers-composition lane, 2026-07-25): the end
+  // page was thin (G6 FAIL) — small scattered props on an empty desk behind an
+  // ugly cold-green hill fan that clashed with the warm printed desk. Rebuilt
+  // as the writer's WRITING-DESK vignette that CONVERSES with the page print's
+  // candle, inkwell and wax seals: the letter grown into the clear centrepiece,
+  // a warm fan of postmarked ROUTE-CARDS fanned behind it (the hero's letters
+  // home — replacing the green hills), the raven LARGER and launching mid-flight
+  // on a 45-degree kinetic arm ("the raven away"), a warm desk-edge foreground
+  // band, and the removable ex-libris keepsake. NO net-new v-fold (the letter
+  // stays the only one); routes are the fan hero, the raven trades its child
+  // mount for the kinetic family.
+  //
+  // THE ROUTE-CARDS (fan hero, was end-hills): a warm fan of postmarked cards
+  // fanning open behind the letter — the correspondence the closing line is
+  // about. Deep own z-band (apex z <= -0.4) so, since spine rotation preserves
+  // z, it never crosses the mid-page letter at any turn angle. Bloom outward.
+  { id: 'end-routes', kind: 'backdrop', role: 'scenery', mech: 'fan', apexZ: -0.5, vDir: -1, members: [{ phiDeg: 40, rhoDeg: 66, width: 0.42, height: 0.19 }, { phiDeg: 50, rhoDeg: 74, width: 0.55, height: 0.22 }, { phiDeg: 60, rhoDeg: 82, width: 0.68, height: 0.24 }] },
+  // THE LETTER (vfold, grown 0.75->0.85 into the clear centrepiece): the letter
+  // the closing line asks the reader to answer — ruled hand, burgundy wax seal.
+  { id: 'end-letter', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.13, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.85, height: 0.58 },
+  // KINETIC (Birmingham mech 76): the hero's SIGNET SEAL, its heraldic rosette
+  // turning 110deg as the letter unfolds — a die-cut disc hub-riveted flat on
+  // the letter's left panel. Coplanar, so it adds ZERO collision footprint.
+  { id: 'end-seal', kind: 'hero', role: 'scenery', mech: 'rotor', parentId: 'end-letter', seat: 'left', u: 0.2, v: 0.27, radius: 0.13, spinDeg: 110 },
+  // THE RAVEN AWAY (kinetic 45-degree arm — Birmingham mech 73; was a small
+  // child riding the letter fold): larger and LAUNCHING up off the desk in
+  // front of the letter as the book opens — "send a raven". Its 45-fold arm
+  // sweeps a clean quarter-turn; downstage own z-band, clear of the letter.
+  { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'kinetic', apexZ: 0.45, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.26, armLen: 0.42, flapW: 0.16, flapLen: 0.16 },
+  // (An earlier fore-edge desk-BAND ground swell was cut: on the spine
+  // centerline it collided with the launching raven's arm at rest — A9 — and
+  // its low parallel fold read as a chevron "paper airplane". The launching
+  // raven and the removable keepsake carry the foreground; the letter/routes/
+  // seal carry mid+back. The desk itself is the printed page ground.)
   // D6 REMOVABLE KEEPSAKE (the book's first removable piece; law H7/H8): the
   // reader's own EX-LIBRIS — a wax-sealed card of the six kingdoms — tucked in
   // a printed pocket on the right endpaper. Pull its dog-eared fore corner and
@@ -789,12 +847,14 @@ export const EXTRA_SPREAD_LAYERS: Readonly<Record<number, readonly SceneLayer[]>
 /** D-G1/D-G8 hero declaration for the non-chapter spreads (same contract as
  *  Chapter.hero). Title fields the stripflap family (the erected quill,
  *  strip-driven so exempt from the sweep floor), satchel the platform (the
- *  map table, sweep 0.78), end the fan (the distant hills, sweep 0.82) — the
- *  three families no career chapter can host. */
+ *  map table, sweep 0.78), end the LETTER unfolding (vfold — the epilogue's
+ *  signature moment; the route-cards fan had to be shrunk deep to clear the
+ *  grown letter and no longer sweeps the wow floor, and the kinetic raven's
+ *  max-corner sweep sits just under it). */
 export const EXTRA_SPREAD_HERO: Readonly<Record<number, string>> = {
   1: 'title-quill',
   8: 'satchel-table',
-  9: 'end-hills',
+  9: 'end-letter',
 }
 
 /** The declared hero layer id for any spread (chapter or extra), or undefined

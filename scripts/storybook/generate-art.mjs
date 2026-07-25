@@ -1225,19 +1225,32 @@ function titleBanner(w, h, seed) {
   // banner with swallowtail bottom
   const d = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x1 - w * 0.06)} ${fx(y1 - notch)} L ${fx(cx)} ${fx(y1)} L ${fx(x0 + w * 0.06)} ${fx(y1 - notch)} L ${fx(x0)} ${fx(y1)} Z`
   let s = `<g>`
-  // AGED parchment ground (#E7D5A8 family — was near-white) + weathering
+  // AGED parchment ground with a DEEPER value range (was milky at small size):
+  // a mid-parchment body, a bright sunlit left leaf, a dim shaded right leaf,
+  // and a walnut inner vignette so the cloth reads as illuminated card, not sheet
   s += `<path d="${d}" fill="${PARCH_MID}"/>`
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#efe0b6" opacity="0.28"/>`
-  s += `<rect x="${fx(cx)}" y="${fx(y0)}" width="${fx(x1 - cx)}" height="${fx(y1 - y0)}" fill="${PARCH_DIM}" opacity="0.2"/>`
-  for (let i = 0; i < 16; i++) s += `<circle cx="${fx(rr(r, x0, x1))}" cy="${fx(rr(r, y0, y1))}" r="${fx(rr(r, 3, 7))}" fill="#c3a86f" opacity="0.14"/>`
-  // strong walnut scroll-frame + gold rule inside it
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cx - x0)}" height="${fx(y1 - y0)}" fill="#f2e6bd" opacity="0.45"/>` // sunlit left leaf
+  s += `<rect x="${fx(cx)}" y="${fx(y0)}" width="${fx(x1 - cx)}" height="${fx(y1 - y0)}" fill="${PARCH_DIM}" opacity="0.4"/>` // shaded right leaf
+  s += `<rect x="${fx(x0)}" y="${fx(y1 - h * 0.16)}" width="${fx(x1 - x0)}" height="${fx(h * 0.16)}" fill="#8a6a3c" opacity="0.28"/>` // grounded lower vignette
+  for (let i = 0; i < 22; i++) s += `<circle cx="${fx(rr(r, x0, x1))}" cy="${fx(rr(r, y0, y1))}" r="${fx(rr(r, 3, 8))}" fill="#b0925c" opacity="0.16"/>` // foxing
+  // strong DOUBLE walnut scroll-frame + gold rule inside it
   const ix0 = x0 + w * 0.03,
     ix1 = x1 - w * 0.03,
     iy0 = y0 + h * 0.1,
     iy1 = y1 - h * 0.18
-  s += `<rect x="${fx(ix0)}" y="${fx(iy0)}" width="${fx(ix1 - ix0)}" height="${fx(iy1 - iy0)}" fill="none" stroke="${INK}" stroke-width="4" opacity="0.72"/>` // walnut frame
-  s += `<rect x="${fx(ix0 + 6)}" y="${fx(iy0 + 6)}" width="${fx(ix1 - ix0 - 12)}" height="${fx(iy1 - iy0 - 12)}" fill="none" stroke="${GOLD}" stroke-width="3" opacity="0.9"/>` // gold rule
-  s += `<rect x="${fx(ix0 + 10)}" y="${fx(iy0 + 10)}" width="${fx(ix1 - ix0 - 20)}" height="${fx(iy1 - iy0 - 20)}" fill="none" stroke="${INK}" stroke-width="1.2" opacity="0.4"/>`
+  s += `<rect x="${fx(ix0)}" y="${fx(iy0)}" width="${fx(ix1 - ix0)}" height="${fx(iy1 - iy0)}" fill="none" stroke="${INK}" stroke-width="6" opacity="0.85"/>` // walnut frame (heavier)
+  s += `<rect x="${fx(ix0 + 8)}" y="${fx(iy0 + 8)}" width="${fx(ix1 - ix0 - 16)}" height="${fx(iy1 - iy0 - 16)}" fill="none" stroke="${GOLD}" stroke-width="3.5" opacity="0.95"/>` // gold rule
+  s += `<rect x="${fx(ix0 + 13)}" y="${fx(iy0 + 13)}" width="${fx(ix1 - ix0 - 26)}" height="${fx(iy1 - iy0 - 26)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.45"/>`
+  // a burgundy CARTOUCHE band across the centre, behind the HTML title card, so
+  // the pale title text pops off a rich illuminated ground (was milky parchment)
+  s += `<rect x="${fx(ix0 + 16)}" y="${fx(h * 0.32)}" width="${fx(ix1 - ix0 - 32)}" height="${fx(h * 0.3)}" fill="${SEAL_RED}" opacity="0.34"/>`
+  s += `<rect x="${fx(ix0 + 16)}" y="${fx(h * 0.32)}" width="${fx(ix1 - ix0 - 32)}" height="${fx(h * 0.09)}" fill="#ffffff" opacity="0.06"/>` // lit top of the band
+  s += `<rect x="${fx(ix0 + 22)}" y="${fx(h * 0.35)}" width="${fx(ix1 - ix0 - 44)}" height="${fx(h * 0.24)}" fill="none" stroke="${GOLD}" stroke-width="2" opacity="0.7"/>` // gold inner rule
+  s += `<line x1="${fx(ix0 + 16)}" y1="${fx(h * 0.32)}" x2="${fx(ix1 - 16)}" y2="${fx(h * 0.32)}" stroke="${GOLD}" stroke-width="1.8" opacity="0.7"/>`
+  s += `<line x1="${fx(ix0 + 16)}" y1="${fx(h * 0.62)}" x2="${fx(ix1 - 16)}" y2="${fx(h * 0.62)}" stroke="${GOLD}" stroke-width="1.8" opacity="0.7"/>`
+  // gold corner bosses + swag rings on the top rail
+  for (const [bx, by] of [[ix0, iy0], [ix1, iy0], [ix0, iy1], [ix1, iy1]])
+    s += `<circle cx="${fx(bx)}" cy="${fx(by)}" r="${fx(w * 0.012)}" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
   // corner flourishes
   for (const [ox, oy, sx, sy] of [
     [ix0, iy0, 1, 1],
@@ -1247,21 +1260,43 @@ function titleBanner(w, h, seed) {
   ]) {
     s += `<path d="M ${fx(ox)} ${fx(oy + sy * h * 0.1)} q 0 ${fx(-sy * h * 0.08)} ${fx(sx * w * 0.05)} ${fx(-sy * h * 0.08)} q ${fx(sx * w * 0.05)} 0 ${fx(sx * w * 0.05)} ${fx(sy * h * 0.05)}" fill="none" stroke="${GOLD}" stroke-width="2.6" opacity="0.8"/>`
   }
-  // a central rule with stars where the HTML title card overlays
-  for (let k = -3; k <= 3; k++) {
-    const x = cx + k * w * 0.09
-    const y = h * 0.5
-    const rl = w * 0.012
+  // a row of the SIX-KINGDOM heraldic SHIELDS along the lower cloth — the promise
+  // of the realms carried IN the banner (the backdrop-fan crown was occluded at
+  // the reading camera, so the six kingdoms ride the banner where they show)
+  const shieldFields = ['#2f3f66', '#6e2531', '#2f5a44', '#7a5a2a', '#3a3550', '#4a2c14']
+  const shy = h * 0.74
+  const ssz = w * 0.026
+  for (let k = 0; k < 6; k++) {
+    const scx = cx + (k - 2.5) * w * 0.092
+    const sd = `M ${fx(scx - ssz)} ${fx(shy - ssz)} L ${fx(scx + ssz)} ${fx(shy - ssz)} L ${fx(scx + ssz)} ${fx(shy + ssz * 0.5)} Q ${fx(scx + ssz)} ${fx(shy + ssz * 1.5)} ${fx(scx)} ${fx(shy + ssz * 1.9)} Q ${fx(scx - ssz)} ${fx(shy + ssz * 1.5)} ${fx(scx - ssz)} ${fx(shy + ssz * 0.5)} Z`
+    s += `<path d="${sd}" fill="${shieldFields[k]}" stroke="${GOLD}" stroke-width="2.2" stroke-opacity="0.9"/>`
+    s += `<path d="M ${fx(scx - ssz)} ${fx(shy - ssz)} L ${fx(scx)} ${fx(shy - ssz)} L ${fx(scx)} ${fx(shy + ssz * 1.9)} Q ${fx(scx - ssz)} ${fx(shy + ssz * 1.5)} ${fx(scx - ssz)} ${fx(shy + ssz * 0.5)} Z" fill="#ffffff" opacity="0.1"/>` // lit dexter half
     const star = []
     for (let j = 0; j < 10; j++) {
       const a = (j * Math.PI) / 5 - Math.PI / 2
-      const r2 = j % 2 ? rl * 0.45 : rl
-      star.push(`${fx(x + Math.cos(a) * r2)} ${fx(y + Math.sin(a) * r2)}`)
+      const rl = j % 2 ? ssz * 0.26 : ssz * 0.58
+      star.push(`${fx(scx + Math.cos(a) * rl)} ${fx(shy + ssz * 0.25 + Math.sin(a) * rl)}`)
     }
-    s += `<path d="M ${star.join(' L ')} Z" fill="${GOLD}" opacity="0.7"/>`
+    s += `<path d="M ${star.join(' L ')} Z" fill="${GOLD_LIT}"/>` // a mullet charge
   }
-  // faint vine scroll along the top rail
-  s += `<path d="M ${fx(ix0)} ${fx(iy0 - h * 0.02)} q ${fx(w * 0.1)} ${fx(-h * 0.06)} ${fx(w * 0.2)} 0 q ${fx(w * 0.1)} ${fx(h * 0.06)} ${fx(w * 0.2)} 0 q ${fx(w * 0.1)} ${fx(-h * 0.06)} ${fx(w * 0.2)} 0" fill="none" stroke="#6f8a4f" stroke-width="2" opacity="0.4"/>`
+  // heraldic pennant BUNTING draped along the top rail (painted in, not a rigid
+  // dress patch — see content.ts title-border): a catenary cord with a row of
+  // small heraldic gonfalons hanging from it in the realm's colours
+  const buntCols = ['#6e2531', '#2f3f66', '#2f5a44', GOLD]
+  const railY = y0 + h * 0.05
+  const sag = h * 0.05
+  s += `<path d="M ${fx(x0 + w * 0.02)} ${fx(railY)} Q ${fx(cx)} ${fx(railY + sag)} ${fx(x1 - w * 0.02)} ${fx(railY)}" fill="none" stroke="${GOLD_DIM}" stroke-width="2.4" opacity="0.8"/>`
+  const bn = 9
+  for (let i = 0; i <= bn; i++) {
+    const u = 0.04 + (i / bn) * 0.92
+    const px = x0 + (x1 - x0) * u
+    const yTop = railY + sag * (1 - Math.pow(2 * (u - 0.5), 2))
+    const pw = w * 0.018
+    const pl = h * (0.055 + (i % 2) * 0.02)
+    const col = buntCols[i % buntCols.length]
+    s += `<path d="M ${fx(px - pw)} ${fx(yTop)} L ${fx(px + pw)} ${fx(yTop)} L ${fx(px)} ${fx(yTop + pl)} Z" fill="${col}" stroke="${INK}" stroke-width="1" stroke-opacity="0.4"/>`
+    s += `<path d="M ${fx(px - pw)} ${fx(yTop)} L ${fx(px)} ${fx(yTop)} L ${fx(px)} ${fx(yTop + pl)} Z" fill="#ffffff" opacity="0.12"/>`
+  }
   s += `<line x1="${fx(cx)}" y1="${fx(y0)}" x2="${fx(cx)}" y2="${fx(y1)}" stroke="${INK}" stroke-width="1.5" opacity="0.16"/>`
   s += rimPath(d)
   s += `</g>`
@@ -1307,6 +1342,180 @@ function heraldCrest(w, h, seed) {
   // heavy gold border
   s += `<path d="${d}" fill="none" stroke="${GOLD}" stroke-width="6" opacity="0.9"/>`
   s += rimPath(d, 4)
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+// ============================================================================
+// E2.2 ENDPAPER-COMPOSITION painters (2026-07-25): the title-page CROWN + swags
+// and the end-page ROUTE-CARDS + launching raven + desk-edge band that clear
+// the two honest composition FAILs (s1 pale/thin, s9 thin). Warm heraldic +
+// writing-desk vocabulary; deterministic mulberry32; screen-space device art.
+// ============================================================================
+
+// ---- THE ROUTE-CARDS (s9 end-routes-mK, fan member — was the cold-green
+// distantHills). A warm fan of postmarked correspondence: overlapping cream
+// cards with ruled address hands, a franked postmark ring, a burgundy wax dot,
+// and a dashed route line — the hero's letters home, conversing with the desk's
+// printed inkwell + seals. Receding warmth per idx. ----
+function routeCards(w, h, seed, idx) {
+  const r = mulberry32(seed)
+  const grounds = ['#efe1bd', '#e4d2a6', '#d3bd8b'] // near warm -> far dim
+  const ground = grounds[idx % 3]
+  // the member silhouette: a shallow arc of card tops (gentle scallop), not a
+  // sawtooth — reads as a spread hand of letters, base glued along the bottom.
+  const teeth = 4 + idx
+  const topY = h * (0.2 + idx * 0.05)
+  let top = `M 0 ${fx(h)} L 0 ${fx(topY + h * 0.12)}`
+  const tips = []
+  for (let i = 0; i <= teeth; i++) {
+    const bx = (w * i) / teeth
+    const ty = topY + Math.sin(i * 1.3 + seed) * h * 0.05
+    tips.push({ bx, ty })
+    top += ` L ${fx(bx)} ${fx(ty)}`
+  }
+  top += ` L ${fx(w)} ${fx(topY + h * 0.12)} L ${fx(w)} ${fx(h)} Z`
+  let s = `<g>`
+  s += `<path d="${top}" fill="${ground}"/>`
+  s += `<rect x="0" y="${fx(h * 0.66)}" width="${w}" height="${fx(h * 0.34)}" fill="${LEATHER_DIM}" opacity="0.14"/>` // base shade
+  // per-card face: ruled address hand + postmark ring + wax dot on each scallop
+  for (let i = 0; i < teeth; i++) {
+    const x0 = (w * i) / teeth + w * 0.01
+    const x1 = (w * (i + 1)) / teeth - w * 0.01
+    const cardTop = (tips[i].ty + tips[i + 1].ty) / 2 + h * 0.03
+    s += `<rect x="${fx(x0)}" y="${fx(cardTop)}" width="${fx(x1 - x0)}" height="${fx(h - cardTop - h * 0.04)}" fill="#f4e8c6" opacity="0.5" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.28"/>`
+    // ruled address lines
+    for (let k = 0; k < 3; k++)
+      s += `<line x1="${fx(x0 + (x1 - x0) * 0.12)}" y1="${fx(cardTop + h * (0.14 + k * 0.12))}" x2="${fx(x0 + (x1 - x0) * (0.62 - k * 0.06))}" y2="${fx(cardTop + h * (0.14 + k * 0.12))}" stroke="#5a4326" stroke-width="1.6" opacity="0.45"/>`
+    // franked postmark ring (upper right of the card)
+    const pmx = x0 + (x1 - x0) * 0.76,
+      pmy = cardTop + h * 0.2
+    s += `<circle cx="${fx(pmx)}" cy="${fx(pmy)}" r="${fx((x1 - x0) * 0.14)}" fill="none" stroke="${SEAL_RED}" stroke-width="2" opacity="0.5"/>`
+    s += `<circle cx="${fx(pmx)}" cy="${fx(pmy)}" r="${fx((x1 - x0) * 0.08)}" fill="none" stroke="${SEAL_RED}" stroke-width="1.3" opacity="0.4"/>`
+    for (let k = -1; k <= 1; k++)
+      s += `<line x1="${fx(pmx - (x1 - x0) * 0.14)}" y1="${fx(pmy + k * 3)}" x2="${fx(pmx + (x1 - x0) * 0.14)}" y2="${fx(pmy + k * 3)}" stroke="${SEAL_RED}" stroke-width="1" opacity="0.3"/>`
+    // a wax seal dot at the card foot
+    s += `<circle cx="${fx((x0 + x1) / 2)}" cy="${fx(h - h * 0.12)}" r="${fx((x1 - x0) * 0.1)}" fill="${SEAL_RED}" stroke="#4a141c" stroke-width="1.4"/>`
+    s += `<circle cx="${fx((x0 + x1) / 2 - (x1 - x0) * 0.03)}" cy="${fx(h - h * 0.135)}" r="${fx((x1 - x0) * 0.05)}" fill="${SEAL_RED_LIT}" opacity="0.5"/>`
+  }
+  // gold rule + dashed route line meandering along the tops (the courier route)
+  let route = `M 0 ${fx(topY + h * 0.16)}`
+  for (let i = 0; i <= teeth; i++) route += ` L ${fx(tips[i].bx)} ${fx(tips[i].ty + h * 0.05)}`
+  s += `<path d="${route}" fill="none" stroke="${GOLD}" stroke-width="2" stroke-dasharray="7 5" opacity="0.6"/>`
+  let inkEdge = `M 0 ${fx(topY + h * 0.12)}`
+  for (let i = 0; i <= teeth; i++) inkEdge += ` L ${fx(tips[i].bx)} ${fx(tips[i].ty)}`
+  inkEdge += ` L ${fx(w)} ${fx(topY + h * 0.12)}`
+  s += `<path d="${inkEdge}" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.4" stroke-linejoin="round"/>`
+  s += rimPath(inkEdge, 4)
+  void r
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+// ---- THE RAVEN AWAY (s9 end-raven, kinetic arm — was a small perched child).
+// A raven LAUNCHING: body pitched up along the arm ridge (image TOP = up the
+// crease), wings thrown open, tail streaming down toward the gutter. Reads as
+// mid-flight lift as the 45-fold arm sweeps it vertical. Portrait cell. ----
+function ravenLaunch(w, h, seed) {
+  const r = mulberry32(seed)
+  const BLACK = '#221b26',
+    BLACK_LIT = '#3a3040',
+    SHEEN = '#5a5165'
+  const cx = w * 0.5
+  // body: a rising wedge from the tail (bottom) up to the head (top)
+  const body =
+    `M ${fx(cx - w * 0.08)} ${fx(h * 0.94)}` + // tail base (down toward gutter)
+    ` Q ${fx(cx - w * 0.18)} ${fx(h * 0.7)} ${fx(cx - w * 0.06)} ${fx(h * 0.5)}` + // back
+    ` Q ${fx(cx) } ${fx(h * 0.34)} ${fx(cx + w * 0.04)} ${fx(h * 0.24)}` + // shoulders -> neck
+    ` Q ${fx(cx + w * 0.08)} ${fx(h * 0.12)} ${fx(cx + w * 0.18)} ${fx(h * 0.1)}` + // crown
+    ` L ${fx(cx + w * 0.34)} ${fx(h * 0.08)} L ${fx(cx + w * 0.16)} ${fx(h * 0.16)}` + // beak
+    ` Q ${fx(cx + w * 0.14)} ${fx(h * 0.3)} ${fx(cx + w * 0.1)} ${fx(h * 0.46)}` + // throat
+    ` Q ${fx(cx + w * 0.16)} ${fx(h * 0.72)} ${fx(cx + w * 0.1)} ${fx(h * 0.94)}` + // belly -> tail
+    ` L ${fx(cx + w * 0.02)} ${fx(h * 0.99)} L ${fx(cx - w * 0.08)} ${fx(h * 0.94)} Z`
+  let s = `<g>`
+  // thrown-open wings behind the body (two great sweeps)
+  const wingUp = `M ${fx(cx - w * 0.02)} ${fx(h * 0.42)} Q ${fx(cx - w * 0.44)} ${fx(h * 0.3)} ${fx(cx - w * 0.42)} ${fx(h * 0.06)} Q ${fx(cx - w * 0.2)} ${fx(h * 0.22)} ${fx(cx + w * 0.02)} ${fx(h * 0.3)} Z`
+  const wingLow = `M ${fx(cx + w * 0.02)} ${fx(h * 0.46)} Q ${fx(cx + w * 0.46)} ${fx(h * 0.4)} ${fx(cx + w * 0.46)} ${fx(h * 0.16)} Q ${fx(cx + w * 0.2)} ${fx(h * 0.34)} ${fx(cx + w * 0.06)} ${fx(h * 0.4)} Z`
+  s += `<path d="${wingUp}" fill="${BLACK_LIT}"/>`
+  s += `<path d="${wingLow}" fill="${BLACK}"/>`
+  s += `<path d="${body}" fill="${BLACK}"/>`
+  // primary-feather quills on the raised wing
+  for (let i = 0; i < 4; i++) {
+    const t = i / 4
+    s += `<path d="M ${fx(cx - w * (0.06 + t * 0.32))} ${fx(h * (0.28 - t * 0.16))} Q ${fx(cx - w * (0.16 + t * 0.16))} ${fx(h * (0.22 - t * 0.08))} ${fx(cx - w * (0.24 + t * 0.14))} ${fx(h * (0.14 - t * 0.02))}" fill="none" stroke="${SHEEN}" stroke-width="2" opacity="0.5"/>`
+  }
+  // sheen along the back + gold eye + beak line
+  s += `<path d="M ${fx(cx - w * 0.04)} ${fx(h * 0.5)} Q ${fx(cx)} ${fx(h * 0.34)} ${fx(cx + w * 0.06)} ${fx(h * 0.24)}" fill="none" stroke="${SHEEN}" stroke-width="2.4" opacity="0.5"/>`
+  s += `<circle cx="${fx(cx + w * 0.15)}" cy="${fx(h * 0.15)}" r="${fx(w * 0.025)}" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1" stroke-opacity="0.5"/>`
+  s += `<circle cx="${fx(cx + w * 0.155)}" cy="${fx(h * 0.153)}" r="${fx(w * 0.01)}" fill="${INK}"/>`
+  s += `<line x1="${fx(cx + w * 0.16)}" y1="${fx(h * 0.13)}" x2="${fx(cx + w * 0.32)}" y2="${fx(h * 0.09)}" stroke="${INK}" stroke-width="1.4" opacity="0.6"/>`
+  s += rimPath(body, 4)
+  void r
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+// ---- THE DESK-EDGE BAND (s9 end-mound, parallel ground swell — was the green
+// grass berm). A warm fore-edge lip of the writing desk: a leather blotter band
+// with a stack of sealed letters and a spilled inkwell shadow along it, grounding
+// the vignette in the desk. Lower body opaque, transparent above the ridge. ----
+function deskBand(w, h, seed) {
+  const r = mulberry32(seed)
+  const LEATH = '#6b4a2c',
+    LEATH_LIT = '#8a6238',
+    LEATH_DIM = '#4a3018'
+  const crest = h * 0.32
+  let ridge = `M 0 ${fx(crest + h * 0.12)}`
+  const n = 5
+  const pts = []
+  for (let i = 0; i <= n; i++) pts.push([(w * i) / n, crest + Math.sin(i * 1.7 + seed) * h * 0.05 + rr(r, -h * 0.02, h * 0.02)])
+  for (let i = 0; i < pts.length; i++) {
+    const [x, y] = pts[i]
+    ridge += i === 0 ? ` L ${fx(x)} ${fx(y)}` : ` Q ${fx((pts[i - 1][0] + x) / 2)} ${fx(Math.min(pts[i - 1][1], y) - h * 0.03)} ${fx(x)} ${fx(y)}`
+  }
+  const crestLine = ridge
+  ridge += ` L ${fx(w)} ${fx(crest + h * 0.12)} L ${fx(w)} ${fx(h)} L 0 ${fx(h)} Z`
+  let s = `<g>`
+  s += `<path d="${ridge}" fill="${LEATH}"/>`
+  s += `<rect x="0" y="${fx(h * 0.72)}" width="${w}" height="${fx(h * 0.28)}" fill="${LEATH_DIM}" opacity="0.6"/>` // shadowed base
+  s += `<path d="${crestLine} L ${fx(w)} ${fx(crest + h * 0.12)}" fill="none" stroke="${LEATH_LIT}" stroke-width="5" opacity="0.7"/>` // lit lip
+  // tooled gold rule along the blotter edge
+  s += `<path d="${crestLine} L ${fx(w)} ${fx(crest + h * 0.12)}" fill="none" stroke="${GOLD}" stroke-width="1.6" opacity="0.4" stroke-dasharray="10 6"/>`
+  // a few sealed letters lying along the band
+  for (let i = 0; i < 4; i++) {
+    const lx = w * (0.12 + i * 0.22) + rr(r, -8, 8)
+    const ly = crest + h * (0.24 + (i % 2) * 0.12)
+    const lw = w * 0.14,
+      lh = h * 0.24
+    s += `<g transform="rotate(${fx(rr(r, -8, 8))} ${fx(lx)} ${fx(ly)})">`
+    s += `<rect x="${fx(lx - lw / 2)}" y="${fx(ly)}" width="${fx(lw)}" height="${fx(lh)}" rx="3" fill="#efe1bd" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.35"/>`
+    s += `<circle cx="${fx(lx)}" cy="${fx(ly + lh * 0.5)}" r="${fx(lw * 0.16)}" fill="${SEAL_RED}"/>` // wax seal
+    s += `</g>`
+  }
+  s += rimPath(`${crestLine} L ${fx(w)} ${fx(crest + h * 0.12)}`, 4)
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+// ---- THE DESK TUFT (s9 end-mound-tuft, rider on the band ridge — was a grass
+// reed clump). A little upright cluster on the desk lip: a quill standing in an
+// inkpot beside a stacked pair of wax-sealed letters. ----
+function deskTuft(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  // a small stack of letters as the silhouette base
+  const gb = `M ${fx(w * 0.16)} ${fx(h)} L ${fx(w * 0.16)} ${fx(h * 0.52)} L ${fx(w * 0.84)} ${fx(h * 0.52)} L ${fx(w * 0.84)} ${fx(h)} Z`
+  let s = `<g>`
+  s += `<rect x="${fx(w * 0.16)}" y="${fx(h * 0.52)}" width="${fx(w * 0.68)}" height="${fx(h * 0.46)}" fill="#efe1bd" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.4"/>`
+  s += `<rect x="${fx(w * 0.2)}" y="${fx(h * 0.6)}" width="${fx(w * 0.6)}" height="${fx(h * 0.34)}" fill="#e4d2a6" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.3"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.72)}" r="${fx(w * 0.1)}" fill="${SEAL_RED}" stroke="#4a141c" stroke-width="1.6"/>` // wax seal
+  s += `<circle cx="${fx(cx - w * 0.03)}" cy="${fx(h * 0.7)}" r="${fx(w * 0.045)}" fill="${SEAL_RED_LIT}" opacity="0.5"/>`
+  // a quill leaning out of an inkpot on the left
+  s += `<rect x="${fx(w * 0.16)}" y="${fx(h * 0.4)}" width="${fx(w * 0.16)}" height="${fx(h * 0.16)}" rx="3" fill="${INK}" opacity="0.75"/>` // inkpot
+  s += `<path d="M ${fx(w * 0.24)} ${fx(h * 0.44)} Q ${fx(w * 0.5)} ${fx(h * 0.1)} ${fx(w * 0.7)} ${fx(h * 0.02)}" fill="none" stroke="${GOLD_LIT}" stroke-width="4" opacity="0.9"/>` // quill shaft
+  s += `<path d="M ${fx(w * 0.6)} ${fx(h * 0.08)} Q ${fx(w * 0.72)} ${fx(h * 0.02)} ${fx(w * 0.7)} ${fx(h * 0.02)} Q ${fx(w * 0.66)} ${fx(h * 0.12)} ${fx(w * 0.6)} ${fx(h * 0.08)} Z" fill="${GOLD}" opacity="0.8"/>` // feather vane
+  s += rimPath(gb, 4)
+  void r
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -2697,6 +2906,109 @@ function keyboardDoor(w, h, seed, plate) {
   return svgPiece(w, h, s)
 }
 
+// E2.2 s7 PLAYABLE — THE TREASURE COFFER (ch6-coffer). A lift-the-flap on the
+// open right-page ground fore of the northern vault: the reader lifts a teal-
+// steel strongbox lid and an aurora-lit gold hoard glows inside (charter G4).
+// Same screen-space law as the s2 key-board (image-x = page-fore d = screen-
+// RIGHT, image-y = spine z = screen-DOWN, no rotation): the LID hinges at the
+// LEFT (spine) edge and its gold HASP (the affordance) sits at the RIGHT (fore/
+// lift) edge; the interior BOARD keeps the brightest hoard in the FORE (RIGHT)
+// half so a lifted lid uncovers it first (bench derive-s7lid.mjs L6). Northern
+// strongbox vocabulary (teal STEEL, GOLD reinforced corners, AUR aurora sheen,
+// violet wax seal). Deterministic: mulberry32(seed).
+
+/** THE COFFER LID (ch6-coffer-door1): a closed teal-steel strongbox lid seen
+ *  top-down — iron hinge straps at the LEFT (spine) edge, a bright gold HASP +
+ *  latch plate at the RIGHT (fore/lift) edge, gold reinforced corners, aurora
+ *  sheen on the FAR (top) edge. Opaque (covers the hoard when shut). */
+function cofferLid(w, h, seed) {
+  const r = mulberry32(seed)
+  const STEEL = '#2e5244', SLIT = '#3f6b5a', SDIM = '#1c352b', AUR = '#4fd6b8'
+  const IRON = '#2b2620', ILIT = '#6b6156'
+  const x0 = w * 0.03, x1 = w * 0.97, y0 = h * 0.04, y1 = h * 0.96
+  const W = x1 - x0, H = y1 - y0
+  const lidD = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x0)} ${fx(y1)} Z`
+  let s = `<g>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H)}" fill="${STEEL}"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W * 0.5)}" height="${fx(H)}" fill="${SLIT}" opacity="0.3"/>` // lit toward the hinge (up-screen-left key light)
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H * 0.14)}" fill="${AUR}" opacity="0.18"/>` // aurora sheen, far edge
+  for (let i = 0; i < 30; i++) {
+    const gy = rr(r, y0, y1)
+    s += `<line x1="${fx(x0)}" y1="${fx(gy)}" x2="${fx(x0 + rr(r, W * 0.3, W * 0.9))}" y2="${fx(gy)}" stroke="${SDIM}" stroke-width="1" opacity="${fx(rr(r, 0.1, 0.28))}"/>` // brushed-steel grain
+  }
+  // gold reinforced corner brackets (strongbox vocabulary)
+  const corner = (cx, cy, sx, sy) =>
+    `<path d="M ${fx(cx)} ${fx(cy + sy * H * 0.2)} L ${fx(cx)} ${fx(cy)} L ${fx(cx + sx * W * 0.16)} ${fx(cy)}" fill="none" stroke="${GOLD}" stroke-width="6" opacity="0.92"/>`
+  s += corner(x0 + 6, y0 + 6, 1, 1) + corner(x1 - 6, y0 + 6, -1, 1) + corner(x0 + 6, y1 - 6, 1, -1) + corner(x1 - 6, y1 - 6, -1, -1)
+  for (const [rx, ry] of [[0.5, 0.1], [0.5, 0.9], [0.16, 0.5]])
+    s += `<circle cx="${fx(x0 + W * rx)}" cy="${fx(y0 + H * ry)}" r="3.4" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1"/>` // rivets
+  // iron hinge straps at the LEFT (spine/hinge) edge
+  for (const hy of [0.3, 0.7]) {
+    s += `<rect x="${fx(x0)}" y="${fx(y0 + H * hy - H * 0.09)}" width="${fx(W * 0.12)}" height="${fx(H * 0.18)}" rx="2" fill="${IRON}"/>`
+    s += `<path d="M ${fx(x0 + W * 0.1)} ${fx(y0 + H * hy)} L ${fx(x0 + W * 0.24)} ${fx(y0 + H * hy)}" stroke="${IRON}" stroke-width="${fx(H * 0.06)}" stroke-linecap="round"/>`
+    s += `<circle cx="${fx(x0 + W * 0.05)}" cy="${fx(y0 + H * hy)}" r="2.6" fill="${ILIT}"/>` // nail
+  }
+  // THE GOLD HASP at the RIGHT (fore/lift) edge — the visible grab affordance
+  const hcy = (y0 + y1) / 2, hx = x1 - W * 0.11
+  s += `<rect x="${fx(x1 - W * 0.22)}" y="${fx(hcy - H * 0.17)}" width="${fx(W * 0.18)}" height="${fx(H * 0.34)}" rx="4" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>` // latch plate
+  s += `<rect x="${fx(x1 - W * 0.22)}" y="${fx(hcy - H * 0.17)}" width="${fx(W * 0.06)}" height="${fx(H * 0.34)}" rx="3" fill="${GOLD_LIT}" opacity="0.6"/>`
+  s += `<circle cx="${fx(x1 - W * 0.1)}" cy="${fx(hcy + H * 0.02)}" r="3.2" fill="${INK}" opacity="0.7"/>` // keyhole
+  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.14)}" fill="none" stroke="${GOLD}" stroke-width="${fx(H * 0.06)}"/>` // hasp loop over the fore edge
+  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.14)}" fill="none" stroke="${GOLD_LIT}" stroke-width="1.6" opacity="0.85"/>`
+  s += `<circle cx="${fx(hx - H * 0.05)}" cy="${fx(hcy - H * 0.05)}" r="${fx(H * 0.03)}" fill="#fff" opacity="0.45"/>` // glint
+  s += `<path d="${lidD}" fill="none" stroke="${SDIM}" stroke-width="6" opacity="0.9" stroke-linejoin="round"/>`
+  s += `<path d="${lidD}" fill="none" stroke="${AUR}" stroke-width="1.4" opacity="0.4" stroke-linejoin="round"/>`
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+/** THE COFFER INTERIOR (ch6-coffer-board): the OPEN aurora-lit hoard — a dark
+ *  teal-steel cavity (back wall up-screen/top), a heap of minted gold coins
+ *  filling the FORE (right/lower) half under a teal-aurora glow wash, a violet
+ *  wax seal nestled in the hoard. Opaque; painted in the revealed state (the
+ *  lid covers it when shut). */
+function cofferInterior(w, h, seed) {
+  const r = mulberry32(seed)
+  const SDIM = '#1c352b', SDK = '#122420', AUR = '#4fd6b8'
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${SDK}"/>` // cavity
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.42)}" fill="${SDIM}" opacity="0.85"/>` // upright back (far) wall
+  s += `<rect x="0" y="0" width="${fx(w * 0.2)}" height="${h}" fill="#000" opacity="0.3"/>` // hinge-side lip in shadow (spine)
+  s += `<ellipse cx="${fx(w * 0.6)}" cy="${fx(h * 0.56)}" rx="${fx(w * 0.5)}" ry="${fx(h * 0.42)}" fill="${AUR}" opacity="0.14"/>` // aurora glow pooling on the hoard
+  s += `<rect x="0" y="${fx(h * 0.4)}" width="${w}" height="${fx(h * 0.05)}" fill="${AUR}" opacity="0.12"/>` // aurora reflection line
+  // THE HOARD — minted gold heaped in the fore (right/lower) half so a lifted lid uncovers it first
+  const heap = `M 0 ${fx(h)} Q ${fx(w * 0.25)} ${fx(h * 0.52)} ${fx(w * 0.5)} ${fx(h * 0.6)} Q ${fx(w * 0.78)} ${fx(h * 0.48)} ${fx(w)} ${fx(h * 0.55)} L ${fx(w)} ${fx(h)} Z`
+  s += `<path d="${heap}" fill="#c79a24"/>`
+  s += `<path d="${heap}" fill="${AUR}" opacity="0.08"/>`
+  for (let i = 0; i < 82; i++) {
+    const x = rr(r, 0, w), y = rr(r, h * 0.5, h)
+    const cr = rr(r, 6, 12)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.72)}" fill="${r() < 0.55 ? GOLD_LIT : GOLD}" stroke="#b8901e" stroke-width="1"/>`
+    if (r() < 0.4) s += `<ellipse cx="${fx(x - cr * 0.2)}" cy="${fx(y - cr * 0.2)}" rx="${fx(cr * 0.3)}" ry="${fx(cr * 0.2)}" fill="#fff4cf" opacity="0.85"/>` // glint
+  }
+  // violet wax seal nestled in the back hoard (the northern seal motif)
+  const sx = w * 0.6, sy = h * 0.32, R = Math.min(w, h) * 0.13
+  s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="${fx(R)}" fill="#5a3f8a" stroke="#2a1c45" stroke-width="2"/>`
+  s += `<circle cx="${fx(sx - R * 0.28)}" cy="${fx(sy - R * 0.28)}" r="${fx(R * 0.7)}" fill="#7256a8" opacity="0.4"/>`
+  s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="${fx(R * 0.62)}" fill="none" stroke="#2a1c45" stroke-width="1.4" opacity="0.7"/>`
+  const star = []
+  for (let k = 0; k < 12; k++) {
+    const a = (k * Math.PI) / 6 - Math.PI / 2
+    const rl = k % 2 ? R * 0.24 : R * 0.5
+    star.push(`${fx(sx + Math.cos(a) * rl)} ${fx(sy + Math.sin(a) * rl)}`)
+  }
+  s += `<path d="M ${star.join(' L ')} Z" fill="#2a1c45" opacity="0.55"/>`
+  for (let i = 0; i < 11; i++) {
+    const x = rr(r, w * 0.3, w * 0.96), y = rr(r, h * 0.34, h * 0.6)
+    s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(rr(r, 1.2, 2.6))}" fill="${AUR}" opacity="${fx(rr(r, 0.3, 0.7))}"/>` // aurora sparkles off the gold
+  }
+  const frame = `M 3 3 L ${fx(w - 3)} 3 L ${fx(w - 3)} ${fx(h - 3)} L 3 ${fx(h - 3)} Z`
+  s += `<path d="${frame}" fill="none" stroke="${SDIM}" stroke-width="6" opacity="0.9" stroke-linejoin="round"/>` // steel interior lip
+  s += `<path d="${frame}" fill="none" stroke="${GOLD}" stroke-width="1.4" opacity="0.45" stroke-linejoin="round"/>`
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
 async function bakePieceTexture(piece, outDir) {
@@ -2726,16 +3038,18 @@ const PIECES = [
   { id: 'satchel-scroll', seed: 80130, w: 288, h: 512, grain: 12, paint() { return rolledScroll(this.w, this.h, this.seed) } },
   // (the depth vista's 3 graded wing flaps are SHAPED-MESH bakes — they carry
   //  outline sidecars, so they run through bakeVistaWing / VISTA_WINGS, not here.)
-  // ---- Spread 9 — the End Letter ----
-  { id: 'end-letter', seed: 90101, w: 1024, h: 683, grain: 14, paint() { return foldedLetter(this.w, this.h, this.seed) } },
-  { id: 'end-hills-m0', seed: 90110, w: 1024, h: 256, grain: 12, paint() { return distantHills(this.w, this.h, this.seed, 0) } },
-  { id: 'end-hills-m1', seed: 90111, w: 1024, h: 224, grain: 12, paint() { return distantHills(this.w, this.h, this.seed, 1) } },
-  { id: 'end-hills-m2', seed: 90112, w: 1024, h: 205, grain: 12, paint() { return distantHills(this.w, this.h, this.seed, 2) } },
-  { id: 'end-raven', seed: 90120, w: 683, h: 512, grain: 10, paint() { return ravenFigure(this.w, this.h, this.seed) } },
-  { id: 'end-mound', seed: 90130, w: 768, h: 256, grain: 16, paint() { return earthBerm(this.w, this.h, this.seed, 'grass') } },
-  { id: 'end-mound-tuft', seed: 90140, w: 512, h: 448, grain: 12, paint() { return grassTuft(this.w, this.h, this.seed) } },
-  // ---- Spread 1 — the Title ----
-  { id: 'title-border', seed: 10101, w: 1024, h: 394, grain: 14, paint() { return titleBanner(this.w, this.h, this.seed) } },
+  // ---- Spread 9 — the End (writing-desk vignette; E2.2 endpapers rebuild) ----
+  { id: 'end-letter', seed: 90101, w: 1024, h: 699, grain: 14, paint() { return foldedLetter(this.w, this.h, this.seed) } },
+  // the postmarked ROUTE-CARDS fan (warm; was the cold-green distant hills)
+  { id: 'end-routes-m0', seed: 90110, w: 1024, h: 512, grain: 12, paint() { return routeCards(this.w, this.h, this.seed, 0) } },
+  { id: 'end-routes-m1', seed: 90111, w: 1024, h: 446, grain: 12, paint() { return routeCards(this.w, this.h, this.seed, 1) } },
+  { id: 'end-routes-m2', seed: 90112, w: 1024, h: 405, grain: 12, paint() { return routeCards(this.w, this.h, this.seed, 2) } },
+  // the raven LAUNCHING on the kinetic arm (portrait; image top = up the ridge)
+  { id: 'end-raven', seed: 90120, w: 560, h: 904, grain: 10, paint() { return ravenLaunch(this.w, this.h, this.seed) } },
+  { id: 'end-mound', seed: 90130, w: 768, h: 256, grain: 16, paint() { return deskBand(this.w, this.h, this.seed) } },
+  { id: 'end-mound-tuft', seed: 90140, w: 512, h: 448, grain: 12, paint() { return deskTuft(this.w, this.h, this.seed) } },
+  // ---- Spread 1 — the Title (overture proscenium; E2.2 endpapers rebuild) ----
+  { id: 'title-border', seed: 10101, w: 1024, h: 397, grain: 14, paint() { return titleBanner(this.w, this.h, this.seed) } },
   { id: 'title-crest', seed: 10110, w: 640, h: 462, grain: 10, paint() { return heraldCrest(this.w, this.h, this.seed) } },
   { id: 'title-swell', seed: 10120, w: 768, h: 256, grain: 16, paint() { return earthBerm(this.w, this.h, this.seed, 'grass') } },
   { id: 'title-swell-seal', seed: 10130, w: 512, h: 398, grain: 12, paint() { return sealTuft(this.w, this.h, this.seed) } },
@@ -2807,6 +3121,9 @@ const PIECES = [
   { id: 'ch6-treasury-vines', seed: 70221, w: 512, h: 307, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'vines') } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
   { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
+  // s7 PLAYABLE (G4): the treasure coffer — interior board + one teal-steel lid.
+  { id: 'ch6-coffer-board', seed: 70260, w: 576, h: 480, grain: 12, paint() { return cofferInterior(this.w, this.h, this.seed) } },
+  { id: 'ch6-coffer-door1', seed: 70261, w: 512, h: 486, grain: 12, paint() { return cofferLid(this.w, this.h, this.seed) } },
 ]
 
 // The SIX skyline mound slots, one strip each (procedural kills the FAN_OUT

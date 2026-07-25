@@ -192,3 +192,111 @@ describe('lift-flap — key-board gates (bench derive-liftflap.mjs, page-rooted)
     expect(liftFlapEnvelope(CFG, REST)).toBeGreaterThan(0.99) // book open -> full lift
   })
 })
+
+// The s7 treasure COFFER (content.ts ch6-coffer) — the same family, ONE lid,
+// gates ported from the source-of-truth bench derive-s7lid.mjs. A DIFFERENT
+// read (a chest lid, not the s2 numbered doors) on the same page-rooted math.
+const COFFER: LiftFlapGeom = {
+  mech: 'liftflap',
+  side: 'right',
+  hingeD: 0.46,
+  leafLen: 0.24,
+  boardD0: 0.42,
+  boardD1: 0.7,
+  boardZ0: 0.0,
+  boardZ1: 0.24,
+  doors: [{ z0: 0.01, z1: 0.23, reveal: 'key', plate: 1 }],
+}
+const COFFER_MAX = liftFlapMax(COFFER)
+
+describe('lift-flap — s7 treasure coffer gates (bench derive-s7lid.mjs, one lid)', () => {
+  it('L1 hinge rigidity: the lid leaf keeps its pairwise corner distances across the arc + beta sweep', () => {
+    const ref = liftFlapDoorQuad(COFFER, 0, 0, ...bloom(REST))
+    const refD = pairwise(ref)
+    for (const aUser of [0, COFFER_MAX * 0.5, COFFER_MAX]) {
+      for (const betaDeg of [8, 60, 120, 176]) {
+        const q = liftFlapDoorQuad(COFFER, 0, aUser, ...bloom(rad(betaDeg)))
+        pairwise(q).forEach((d, i) => expect(d).toBeCloseTo(refD[i], 9))
+      }
+    }
+  })
+
+  it('L2 arc clamp + monotone: shown lift clamps at LIFT_MAX and rises monotonically with the reader angle', () => {
+    const beta = REST
+    let prev = -1
+    for (let i = 0; i <= 200; i++) {
+      const aUser = (rad(140) * i) / 200
+      const a = liftFlapShownLift(COFFER, aUser, beta)
+      expect(a).toBeLessThanOrEqual(COFFER_MAX * liftFlapEnvelope(COFFER, beta) + 1e-12)
+      if (aUser <= COFFER_MAX) expect(a).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = a
+    }
+  })
+
+  it('L3 host non-interpenetration: every leaf corner rides at/above the board plane through the arc', () => {
+    for (let i = 0; i <= 80; i++) {
+      const [tL, tR] = bloom(REST)
+      const n = pageNormal(tR)
+      const q = liftFlapDoorQuad(COFFER, 0, (COFFER_MAX * i) / 80, tL, tR)
+      for (const p of q) expect(offPage(p, n)).toBeGreaterThanOrEqual(LIFTFLAP_BOARD_LIFT - 1e-9)
+    }
+  })
+
+  it('L4 band preservation: the lid preserves its z-band at every (a, beta) — pure (d, n) rotation', () => {
+    for (const [betaDeg, aUser] of [[176, COFFER_MAX], [90, rad(50)], [30, rad(20)]] as const) {
+      const q = liftFlapDoorQuad(COFFER, 0, aUser, ...bloom(rad(betaDeg)))
+      const zs = q.map((p) => p[2]).sort((a, b) => a - b)
+      expect(zs[0]).toBeCloseTo(COFFER.doors[0].z0, 9)
+      expect(zs[3]).toBeCloseTo(COFFER.doors[0].z1, 9)
+    }
+  })
+
+  it('L6 reveal registration: the treasure art band sits inside the aperture and the lift uncovers it', () => {
+    const L = COFFER.leafLen
+    const aOpen = liftFlapOpenAngle(COFFER)
+    const dCoverOpen = COFFER.hingeD + L * Math.cos(aOpen)
+    const dCoverShut = COFFER.hingeD + L
+    const keyMargin = 0.02
+    const dKey0 = dCoverOpen + keyMargin
+    const dKey1 = COFFER.hingeD + L - keyMargin
+    expect(dKey0).toBeLessThan(dKey1)
+    expect(dKey0).toBeGreaterThanOrEqual(COFFER.hingeD - 1e-9)
+    expect(dKey1).toBeLessThanOrEqual(COFFER.hingeD + L + 1e-9)
+    expect(dCoverShut).toBeGreaterThan(dKey1) // shut covers the hoard
+    expect(dCoverOpen).toBeLessThan(dKey0) // open exposes it (the G4 evidence)
+  })
+
+  it('L7 fold-flat: at book-closed the board + lid sit within the flat-page lift class and inside the page rectangle, for ANY held angle', () => {
+    const n = pageNormal(0)
+    for (const aUser of [0, rad(45), COFFER_MAX, rad(140)]) {
+      const pose = solveLiftFlapPose(COFFER, [aUser], 0, 0)
+      for (const p of [pose.board, ...pose.doors].flat()) {
+        expect(Math.abs(offPage(p, n))).toBeLessThanOrEqual(LIFTFLAP_FLAP_LIFT + 1e-9)
+        expect(p[0]).toBeGreaterThanOrEqual(-1e-9)
+        expect(p[0]).toBeLessThanOrEqual(PAGE_W + 1e-9)
+        expect(Math.abs(p[2])).toBeLessThanOrEqual(PAGE_H / 2 + 1e-9)
+      }
+    }
+  })
+
+  it('L9 speed cap: at a frozen held angle the fastest lid corner real-time step over the eased page-turn clock stays under the global cap', () => {
+    let capMax = 0
+    let prev: PanelQuad | null = null
+    for (let i = 0; i <= 240; i++) {
+      const beta = Math.PI * easeTurnWeighted(i / 240)
+      const q = liftFlapDoorQuad(COFFER, 0, COFFER_MAX, ...bloom(beta))
+      if (prev) for (let c = 0; c < 4; c++) capMax = Math.max(capMax, dist(prev[c], q[c]))
+      prev = q
+    }
+    expect(capMax).toBeLessThan(GLOBAL_CAP)
+  })
+
+  it('coplanar rest + envelope: board one glue layer proud, the shut lid one paper thickness above, envelope zeroes at close', () => {
+    const [tL, tR] = bloom(REST)
+    const n = pageNormal(tR)
+    for (const p of liftFlapBoardQuad(COFFER, tL, tR)) expect(offPage(p, n)).toBeCloseTo(LIFTFLAP_BOARD_LIFT, 9)
+    for (const p of liftFlapDoorQuad(COFFER, 0, 0, tL, tR)) expect(offPage(p, n)).toBeCloseTo(LIFTFLAP_FLAP_LIFT, 9)
+    expect(liftFlapEnvelope(COFFER, 0)).toBeCloseTo(0, 12)
+    expect(liftFlapEnvelope(COFFER, REST)).toBeGreaterThan(0.99)
+  })
+})

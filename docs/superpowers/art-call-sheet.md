@@ -155,9 +155,10 @@ down on the press before the final die-cut), decided per-piece by the physics
 (`dieFlipped`), not a fixed rule from mount height or `vDir` alone — verified by
 actually running the solver, not eyeballed:
 
-**Rotated 180° (9 shipped pieces + 2 fan members):** `ch1-dormer`, `ch2-bee-c`,
+**Rotated 180° (8 shipped pieces + 2 fan members):** `ch1-dormer`, `ch2-bee-c`,
 `ch4-coins`, `ch5-lantern`, `ch5-lantern-b`, `ch6-door`, `ch6-banner`, `title-crest`,
-`end-raven`, `satchel-burst-m0`, `satchel-burst-m1`.
+`satchel-burst-m0`, `satchel-burst-m1`. (`end-raven` is now a kinetic arm — upright,
+like `ch2-windmill`.)
 
 Every other STAND piece prints upright, including `satchel-burst-m2` and **every
 page-glued `vfold` layer without exception** (standing validity keeps a page-glued
@@ -293,6 +294,7 @@ principle) before any of these land.
 | `ch6-crest` | `ch6-crest` | Bank's griffin crest, standing ON the strongbox lid (rider recursion) | ≈1.13:1 near-square | STAND | placeholder |
 | `ch6-strongbox-seal` | `ch6-strongbox-seal` | Dressed wax seal on the strongbox's front cap | ≈1.0:1 square | FLAT | placeholder |
 | `ch6-strongbox-coins` | `ch6-strongbox-coins` | Dressed minted coins heaped at the strongbox's side-wall base | ≈2.0:1 wide | FLAT | placeholder |
+| `ch6-coffer` | `ch6-coffer-board`, `ch6-coffer-door1` | LIFT-THE-FLAP (the spread's playable, G4): a TREASURE COFFER on the open right-page ground fore of the vault — the reader lifts a teal-steel strongbox lid and an aurora-lit gold hoard glows inside. Reuses the s2 liftflap family with ONE lid (a chest, not numbered doors). `-board` = the OPEN interior painted in the revealed state (aurora-lit minted-gold heap in the fore half, violet wax seal, dark teal-steel cavity); `-door1` = the closed teal-steel lid (gold reinforced corners, rivets, iron hinge straps at the spine edge, a bright gold HASP + keyhole at the fore/lift edge — the affordance) | painted in SCREEN space (image-x = page-fore d = screen-right, image-y = spine z = screen-down): board ≈1.2:1 (d 0.24 : z 0.20) · lid ≈1.05:1 near-square (d 0.19 : z 0.18) | FLAT (page-flat, screen-space uvs) | **art** (procedural) |
 | `ch6-steps` | `ch6-steps-deck` | Glass-gallery BRIDGE deck in the approach lane, crests near the treasury's shoulder | ≈3.11:1 very wide | TOPDOWN | placeholder |
 | `ch6-fringe` | `ch6-fringe` | Low pine fringe at the very front edge | ≈5.2:1 very wide | STAND | **art** |
 
@@ -300,11 +302,11 @@ principle) before any of these land.
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `title-border` | `title-border` | Illuminated vine border framing the title page | ≈2.6:1 landscape | STAND | placeholder |
+| `title-border` | `title-border` | E2.2 PROSCENIUM — the enlarged (1.3→1.55) + rebaked title banner-canopy: aged parchment, heavy walnut scroll-frame, gold rule, a burgundy cartouche behind the HTML title card, painted-in heraldic pennant bunting along the top rail, and a row of the six-kingdom heraldic shields across the cloth (the promise of the realms, carried IN the banner since a backdrop fan is occluded at the reading camera) | ≈2.58:1 landscape | STAND | placeholder |
 | `title-hero` | `title-hero` | Small hero figurine waving, opening line ink | ≈0.60:1 portrait | STAND | **art** |
 | `title-crest` | `title-crest` | Small crest riding the hero's own fold | ≈1.39:1 landscape | STAND — **ROTATED 180** | placeholder |
 | `title-quill` | `title-quill` | The writer's quill, strip-erected at the fore edge — the tale being written as the book opens (the spread's D-G8 hero; strip-driven, no visible connector) | ≈0.92:1 near-square | STAND | placeholder |
-| `title-swell` | `title-swell` | A low distant berm behind the border — ground-swell massing that fills the top of frame | ≈2.2:1 wide low | FLAT | placeholder |
+| `title-swell` | `title-swell` | A low distant berm far upstage behind the crown — ground-swell massing | ≈2.2:1 wide low | FLAT | placeholder |
 | `title-swell-seal` | `title-swell-seal` | A wax-seal tuft standing on the berm's ridge | ≈1.29:1 landscape | STAND | placeholder |
 
 ## 9. The Hero's Satchel (spread 8) — the fan showcase
@@ -328,11 +330,9 @@ monoculture.*
 
 | Layer id | Asset key(s) | Piece & story | Aspect (W:H) | Map | Status |
 |---|---|---|---|---|---|
-| `end-hills` | `end-hills-m0`, `end-hills-m1`, `end-hills-m2` | The far country the road bent through — a fan of 3 nested distant-hill ridges from one deep apex, receding front-to-back (the spread's D-G8 hero). Deep upstage z-band so it never crosses the letter | m0 ≈4.0:1 · m1 ≈4.6:1 · m2 ≈5.0:1 wide low | STAND — **m2 upright; m0/m1 per fold** | placeholder |
-| `end-letter` | `end-letter` | Folded letter with a burgundy wax seal, closing the tale | ≈1.5:1 landscape | STAND | placeholder |
-| `end-raven` | `end-raven` | Raven riding the letter's own fold — the raven the closing line asks the reader to send | ≈1.33:1 landscape | STAND — **ROTATED 180** | placeholder |
-| `end-mound` | `end-mound` | The low mound the letter rests against — a fore-edge ground swell (parallel fold) grounding the scene | ≈2.4:1 wide low | FLAT | placeholder |
-| `end-mound-tuft` | `end-mound-tuft` | A grass tuft standing on the mound's ridge | ≈1.14:1 landscape | STAND | placeholder |
+| `end-routes` | `end-routes-m0`, `end-routes-m1`, `end-routes-m2` | E2.2 EPILOGUE — a warm fan of postmarked ROUTE-CARDS fanning open behind the letter (the hero's correspondence, replacing the cold-green distant hills; the spread's D-G8 fan hero): overlapping cream cards with ruled address hands, franked postmark rings, wax dots, a dashed courier route. Deep upstage z-band so it never crosses the letter | m0 ≈2.0:1 · m1 ≈2.29:1 · m2 ≈2.53:1 | STAND — card fan | placeholder |
+| `end-letter` | `end-letter` | Folded letter with a burgundy wax seal, grown into the clear centrepiece, closing the tale | ≈1.47:1 landscape | STAND | placeholder |
+| `end-raven` | `end-raven` | E2.2 — the raven LARGER and LAUNCHING mid-flight on a 45° kinetic arm as the book opens ("the raven away"; was a small child on the letter fold). Body pitched up the ridge, wings thrown open | ≈0.62:1 portrait | STAND — kinetic arm, image top = up the ridge | placeholder |
 | `end-seal` | `end-seal` | Hero's signet seal, heraldic rosette turning as the letter unfolds (rotor, coplanar, zero collision cost) | 1:1 square (disc, radius 0.13 → canvas 0.26×0.26) | DISC | placeholder |
 | `end-keepsake` | `end-keepsake` | The reader's REMOVABLE keepsake — a wax-sealed ex-libris card of the six kingdoms, tucked in a right-endpaper sleeve; pull its dog-eared fore corner to draw it out and seat it on the desk (law H7/H8). Paint the whole die-cut card face; the loose-card grammar (rounded/notched corner, scored dogear, own drop shadow) must read against the flush tab pieces | ≈2.27:1 landscape (cardL 0.34 × cardW 0.15) | CARD — die-cut, ALPHA corners | placeholder |
 
