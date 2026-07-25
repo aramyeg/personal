@@ -38,6 +38,7 @@ import { ROTOR_LIFT } from './popup-rotor'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture } from './shared-procedural-textures'
+import { turnCullOpacity } from './turn-cull'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
@@ -122,17 +123,13 @@ function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
   committedSpread: RefObject<number>
-): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
+): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; eased: number } {
   return () => {
     const f = frame.current
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const { thetaL, thetaR } = spreadPageAnglesTilted(
-      spreadIndex,
-      committedSpread.current,
-      f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
-    )
-    return { role, thetaL, thetaR, beta: thetaL - thetaR }
+    const eased = f ? easeTurnWeighted(f.t) : 0
+    const { thetaL, thetaR } = spreadPageAnglesTilted(spreadIndex, committedSpread.current, f?.dir ?? null, eased)
+    return { role, thetaL, thetaR, beta: thetaL - thetaR, eased }
   }
 }
 
@@ -273,10 +270,16 @@ function WinchDisc({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta } = readAngles()
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    // TURN-CULL (C-3): the winch is the reader's machine. Mid-turn nobody is
+    // cranking it, so the disc stops drawing (see ./turn-cull.ts). The KEEP it
+    // drives is structure and is never culled.
+    const cull = turnCullOpacity(eased)
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+    materials.front.opacity = cull
+    materials.back.opacity = cull
     const disc = keepWinchDiscQuad(layer, readWinchTheta(layer), thetaL, thetaR)
     writeQuad(geometry, disc)
     writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
@@ -359,10 +362,13 @@ function WinchOutput({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta } = readAngles()
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    // TURN-CULL (C-3), same window as the disc that drives these bodies.
+    const cull = turnCullOpacity(eased)
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+    material.opacity = cull
     const quads = solve(readWinchTheta(layer), beta, thetaL, thetaR)
     quads.forEach((q, i) => {
       if (geometries[i]) writeQuad(geometries[i], q)

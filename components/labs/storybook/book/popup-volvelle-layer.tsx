@@ -32,6 +32,7 @@ import {
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture } from './shared-procedural-textures'
+import { turnCullOpacity } from './turn-cull'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
@@ -135,17 +136,13 @@ function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
   committedSpread: RefObject<number>
-): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
+): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; eased: number } {
   return () => {
     const f = frame.current
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const { thetaL, thetaR } = spreadPageAnglesTilted(
-      spreadIndex,
-      committedSpread.current,
-      f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
-    )
-    return { role, thetaL, thetaR, beta: thetaL - thetaR }
+    const eased = f ? easeTurnWeighted(f.t) : 0
+    const { thetaL, thetaR } = spreadPageAnglesTilted(spreadIndex, committedSpread.current, f?.dir ?? null, eased)
+    return { role, thetaL, thetaR, beta: thetaL - thetaR, eased }
   }
 }
 
@@ -303,10 +300,18 @@ export function VolvellePopupLayer({
   useFrame(() => {
     const group = groupRef.current
     if (!group) return
-    const { role, thetaL, thetaR, beta } = readAngles()
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    const { role, thetaL, thetaR, beta, eased } = readAngles()
+    // TURN-CULL (C-3): the dial is a reader's instrument, not structure — it
+    // stops drawing through the fast middle of a page turn and ramps back in
+    // the landing beat. Pose maths below are untouched (it still solves; it
+    // just isn't submitted), so no fold-flat proof is affected.
+    const cull = turnCullOpacity(eased)
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+    for (const m of [dialMaterials.front, dialMaterials.back, cardMaterials.front, cardMaterials.back]) {
+      m.opacity = cull
+    }
 
     // Detent snap-on-release: while not grabbed (and no dev override), ease the
     // held twist to the nearest detent so the sectors click into their windows.
