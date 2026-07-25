@@ -25,6 +25,7 @@ import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
+import { solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 
@@ -165,6 +166,15 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       // base + the coplanar slats + the flush tab, the resting depth footprint.
       const pose = solveDissolvePose(l, 0, tL, tR)
       return [pose.base, ...pose.slats, pose.tab]
+    }
+    case 'mfoldrange': {
+      // The range is ONE card of k v-fold ranks at distinct apexZ stations +
+      // flat valley gussets — its whole depth footprint spans the rank run.
+      const pose = solveMFoldRangePose(l, tL, tR)
+      return [
+        ...pose.ranks.flatMap((r) => [r.right, r.left]),
+        ...pose.gussets.flatMap((g) => [g.left, g.right]),
+      ]
     }
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)

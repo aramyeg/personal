@@ -549,9 +549,54 @@ const CH3_LAYERS: readonly SceneLayer[] = [
 // displays its print undistorted. One storytelling child joins them:
 // coins spilling off the dragon's own fold (placeholder art until Batch-2).
 const CH4_LAYERS: readonly SceneLayer[] = [
-  { id: 'ch4-backdrop', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.4, vDir: -1, phiDeg: 80, rhoDeg: 88, width: 1.9, height: 0.74 },
-  { id: 'ch4-midground', kind: 'midground', role: 'backdrop', mech: 'vfold', apexZ: -0.05, vDir: -1, phiDeg: 84, rhoDeg: 88.5, width: 2.0, height: 0.495 },
+  // E3 s5 NOCTURNE MASSIF (pack §4; bench e3s5-mfoldrange.mjs ALL GREEN):
+  // the NEW mfoldrange family — ONE card carrying 4 width-graded dune ranks
+  // at distinct apexZ stations, painted gussets between them as the valley
+  // floor. Replaces the retired ch4-backdrop + ch4-midground flat walls.
+  // Phi graded 82/84/85/86 back->front = the closed-form BLOOM WAVE (front
+  // ranks complete later, from angle grading alone); creaseU alternates
+  // 0.44/0.60/0.35/0.65 for the witch-ref diagonal sweep; width 2.0 -> 1.5
+  // front-narrowest (mech 118 law). Art constraint (bench G-E): r3's
+  // silhouette dips <= 0.36 inside |x| < 0.45 — the notch that frames the
+  // gold-foil dragon as the one glowing thing in a dark spread.
+  // BUILD-LANE DIVERGENCE from the pack table: r4 width 2.0 -> 1.82 and r3
+  // 1.85 -> 1.80. The pack's off-center creases put a 0.56/0.60 panel share
+  // on one page, and at book-closed that panel's flat reach (glueLen*sin phi
+  // + height*sin(phi+rho)) ran past the fore edge (1.245/1.177 > PAGE_W
+  // 1.15) — the A4 closed-containment gate the derivation bench never
+  // sampled. Trimming width (not creaseU, not heights) keeps the diagonal
+  // sweep, the crest stack, the notch, and the bloom wave bench-identical.
+  // Second divergence — the STATION/HEIGHT schedule is re-derived against
+  // the KEPT hoard, which the pack's schedule never collision-checked
+  // (bench G-D only sampled rank-vs-rank). The hoard's strut planes sweep
+  // the spine channel (lateral -0.22..+0.17, up to y 0.55, deck to 0.68)
+  // across z in [-0.3, -0.2], and a wall rank's crest SWEEPS z by
+  // +-cot(lambda)*height ~ +-0.26..0.38*h between full open (lambda ~73-79
+  // deg, leaning away from its vDir) and the tilted rest (lambda ~101-111
+  // deg, leaning past vertical the OTHER way). No wall taller than ~0.3x
+  // its clearance can stand near the slab, from either side, with either
+  // vDir — so the chain alternates mountain/valley (the TRUE Birmingham
+  // M-fold section): the tall back pair folds -1 and lives fully BEHIND
+  // the slab (r4 -0.46 -> -0.50 h 0.82; r3 -0.33 -> -0.44 h 0.56 -> 0.50),
+  // the short front pair folds +1 and lives fully IN FRONT (r2 -0.21 ->
+  // -0.125, h 0.36 -> 0.22; r1 -0.10 -> -0.095, h 0.22 -> 0.18), each
+  // pair parallel-leaning so it never self-converges. Angles, creaseU
+  // diagonals, and the phi-graded bloom wave are pack-verbatim.
+  // gussetReach 0.12: the valley-floor prints stay inside the spine channel,
+  // clear of the hoard platform's strut glue (0.14 from the spine) whose
+  // bays sit between the r3/r2 stations.
+  { id: 'ch4-range', kind: 'backdrop', role: 'backdrop', mech: 'mfoldrange', vDir: -1, gussetReach: 0.12,
+    ranks: [
+      { apexZ: -0.50, phiDeg: 82, rhoDeg: 88.5, creaseU: 0.44, width: 1.82, height: 0.82 },
+      { apexZ: -0.44, phiDeg: 84, rhoDeg: 88.5, creaseU: 0.60, width: 1.80, height: 0.50 },
+      { apexZ: -0.125, phiDeg: 85, rhoDeg: 88.5, creaseU: 0.35, width: 1.70, height: 0.22, vDir: 1 },
+      { apexZ: -0.095, phiDeg: 86, rhoDeg: 88.5, creaseU: 0.65, width: 1.50, height: 0.18, vDir: 1 },
+    ] },
   { id: 'ch4-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.06, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.794, height: 0.62 },
+  // The gilded vault-ring AUREOLE: a guilloché arc dress overhanging the
+  // hero's right panel behind the dragon's head — preciousness by framing
+  // (Cinderella-carriage grammar), zero DOF, zero solver work.
+  { id: 'ch4-aureole', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch4-hero', seat: 'right', u: 0.04, v: 0.34, width: 0.34, height: 0.30 },
   { id: 'ch4-coins', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch4-hero', mount: 0.22, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
   // VOLUMETRIC: an open treasure chest in front of the dragon — the
   // book's HOLLOW box (open top, no backbone): the reading camera looks
@@ -598,8 +643,16 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // clear of the spine-hugging chest (d<=0.24), the deep hoard shelf (z<=-0.18)
   // and the hero dragon's base footprint (d<=~0.32) — it does NOT touch the
   // ch4-hoard strut region behind the dragon.
-  { id: 'ch4-dissolve', kind: 'midground', role: 'story', mech: 'dissolve', side: 'left', d0: 0.46, d1: 0.98, z0: 0.2, z1: 0.6, slats: 6, stroke: 0.14 },
-  { id: 'ch4-foreground', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.295 },
+  // Promoted to the spread's THESIS (celebrated brass ▼PULL▼ affordance) and
+  // turn-culled (Batch C-3, the dial-class lever): interaction-only + page-
+  // flat, it stops drawing through the fast middle of a turn and ramps back
+  // inside the landing-settle window (~13 draws returned on the s4->s5 peak).
+  { id: 'ch4-dissolve', kind: 'midground', role: 'story', mech: 'dissolve', side: 'left', d0: 0.46, d1: 0.98, z0: 0.2, z1: 0.6, slats: 6, stroke: 0.14, turnCull: true },
+  // The ember-sashed camel caravan FRIEZE (replaces the retired flat
+  // ch4-foreground fringe): one linked-chain cutout walking INTO the picture
+  // toward the PULL tab. Art constraint (pack §4.2): silhouette dips <= 0.06
+  // in x in [-0.75, -0.44] (camel-leg gaps) to keep the placard sightline.
+  { id: 'ch4-frieze', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.16 },
 ]
 
 // Chapter V — the bazaar: rose-stone skyline, then a ROW of identical

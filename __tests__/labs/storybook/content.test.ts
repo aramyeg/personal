@@ -91,6 +91,8 @@ describe('storybook content', () => {
                                               ? l.slats
                                               : l.mech === 'swarmarc'
                                                 ? l.struts.length
+                                                : l.mech === 'mfoldrange'
+                                                  ? l.ranks.length
                                                 : l.width
             return `${l.mech}:${size}`
           })

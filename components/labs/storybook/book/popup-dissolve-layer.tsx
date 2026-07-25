@@ -44,6 +44,7 @@ import {
 } from './popup-dissolve'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
+import { turnCullOpacity } from './turn-cull'
 import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { peakHeight, shadowLift } from './shadow-light'
 import type { TurnFrame } from './use-turn-driver'
@@ -67,11 +68,11 @@ const TOUCH_SLOP = 1.5
  *  detent ease). A soft exponential so the picture "clicks" to dunes or gold. */
 const SNAP_EASE = 0.3
 const SNAP_EPS = 1e-4
-/** Warm desert-floor sand under the slats (ch4 dune palette) — leans gold-ochre
- *  so the one-pitch band the flipped rack vacates reads as warm floor, not a
- *  pale gap, and the gaps between tilted slats mid-flip read as desert. */
-const SAND_COLOR = '#caa049'
-const SAND_SHADE = '#a67d34'
+/** Desert-floor sand under the slats — VAULT_NIGHT register (E3 s5): violet
+ *  dune shadow, so the one-pitch band the flipped rack vacates reads as the
+ *  night floor and the gaps between tilted slats mid-flip read as dark sand. */
+const SAND_COLOR = '#5c4160'
+const SAND_SHADE = '#38294a'
 
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
@@ -168,6 +169,9 @@ export function DissolvePopupLayer({
 
   const dunesArt = useArtTexture(`${layer.id}-dunes`)
   const goldArt = useArtTexture(`${layer.id}-gold`)
+  // The celebrated affordance (T-AFFORDANCE): the tab wears its own engraved
+  // brass-plate art when painted, falling back to the shared kraft grip.
+  const tabArt = useArtTexture(`${layer.id}-tab`)
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
   const paperTexture = sharedPaperTexture()
   const tabGripTexture = sharedTabGripTexture()
@@ -183,17 +187,19 @@ export function DissolvePopupLayer({
   const slitGeom = useMemo(() => makeSlitGeometry(), [])
   const handleMaterial = sharedHandleMaterial()
 
+  // Transparent so the turn-cull ramp (C-3) can fade the rack out/in; at
+  // opacity 1 (any rest frame) the prints render exactly as before.
   const dunesMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff' }),
+    () => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: '#ffffff', transparent: true }),
     []
   )
   const goldMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: '#ffffff' }),
+    () => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: '#ffffff', transparent: true }),
     []
   )
-  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: SAND_COLOR }), [])
-  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: SAND_SHADE }), [])
-  const tabMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: tint.shade }), [tint])
+  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: SAND_COLOR, transparent: true }), [])
+  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: SAND_SHADE, transparent: true }), [])
+  const tabMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: tint.shade, transparent: true }), [tint])
   const edgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: tint.edge, transparent: true, opacity: 0.9 }),
     [tint]
@@ -214,9 +220,14 @@ export function DissolvePopupLayer({
       mat.color.set(art ? '#ffffff' : tint.lit)
       mat.needsUpdate = true
     }
-    tabMaterial.map = tabGripTexture
+    if (tabArt) {
+      tabArt.wrapS = THREE.ClampToEdgeWrapping
+      tabArt.wrapT = THREE.ClampToEdgeWrapping
+    }
+    tabMaterial.map = tabArt ?? tabGripTexture
+    tabMaterial.color.set(tabArt ? '#ffffff' : tint.shade)
     tabMaterial.needsUpdate = true
-  }, [dunesArt, goldArt, paperTexture, tabGripTexture, dunesMaterial, goldMaterial, tabMaterial, tint])
+  }, [dunesArt, goldArt, tabArt, paperTexture, tabGripTexture, dunesMaterial, goldMaterial, tabMaterial, tint])
 
   // Contact shadow scaled by the placard's rest peak (it lies nearly flat, so a
   // gentle pool; deepens a touch mid-flip when the slats stand — the venetian).
@@ -348,10 +359,22 @@ export function DissolvePopupLayer({
       f ? easeTurnWeighted(f.t) : 0
     )
     const beta = thetaL - thetaR
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    // TURN-CULL (C-3, dissolve-class): the rack is interaction-only and
+    // page-flat — mid-turn it is an edge-on sliver nobody is reading, so it
+    // stops drawing through the fast middle and ramps back inside the
+    // landing-settle beat. Pose maths below are untouched (no fold-flat
+    // proof is affected); hiding the group is what returns the draw calls.
+    const cull = layer.turnCull ? turnCullOpacity(f ? easeTurnWeighted(f.t) : 0) : 1
+    const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
+    if (layer.turnCull) {
+      for (const m of [dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial]) {
+        m.opacity = cull
+      }
+      edgeMaterial.opacity = 0.9 * cull // its rest opacity, ramped
+    }
 
     // Snap-on-release: ease the held flip to the nearest pure end {0,PI} so the
     // picture clicks to dunes or gold (no half-dissolve rest state).

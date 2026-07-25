@@ -98,6 +98,10 @@ import type { KeepStackGeom } from './popup-keepstack'
 import type { KeepWinchGeom } from './popup-keepwinch'
 import type { KeepSkylineGeom } from './popup-skyline'
 import type { SwarmArcGeom } from './popup-swarmarc'
+// The E3 s5 range family (Birmingham 28/57): ONE card of k standing v-fold
+// ranks at distinct apexZ stations + flat gusset strips. TYPE-ONLY import
+// (popup-mfoldrange requires solveVFoldPose from this file, not the reverse).
+import type { MFoldRangeGeom } from './popup-mfoldrange'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -726,6 +730,12 @@ export type DissolveGeom = {
   stroke?: number
   /** Visible tab width along the spine (default 0.1). */
   tabW?: number
+  /** Turn-time culling (Batch C-3, the dial-class lever): the rack is
+   *  interaction-only and page-flat, so mid-turn it stops drawing — the
+   *  renderer ramps it out/in over the turn-cull window (turn-cull.ts) and
+   *  restores it inside the landing-settle beat. Visual only: no pose,
+   *  envelope, or fold-flat proof is touched. */
+  turnCull?: boolean
 }
 
 export type LayerGeom =
@@ -751,6 +761,7 @@ export type LayerGeom =
   | SwarmArcGeom
   | DepthVistaGeom
   | DissolveGeom
+  | MFoldRangeGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1275,6 +1286,8 @@ export function solveLayerPose(
       throw new Error('storybook: depth-vista layers are multi-patch (arches + wings) — use solveDepthVistaPose (popup-depthvista)')
     case 'dissolve':
       throw new Error('storybook: dissolve layers are multi-patch + user-driven — use solveDissolvePose (popup-dissolve)')
+    case 'mfoldrange':
+      throw new Error('storybook: range layers are multi-rank — use solveMFoldRangePose (popup-mfoldrange)')
   }
 }
 
