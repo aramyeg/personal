@@ -7991,29 +7991,40 @@ function beeRoutesSpread(w, h, seed) {
   // a painted flat courier (top view) at image fraction (x,y), rotated along
   // its route: gold body, walnut line, paper-white wing pair.
   const flatBee = (x, y, s, ang, dim) => {
-    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="${fx(dim)}">`
-    g += `<ellipse cx="0" cy="${fx(-s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="1.1" stroke-opacity="0.5" transform="rotate(-24)"/>`
-    g += `<ellipse cx="0" cy="${fx(s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="1.1" stroke-opacity="0.5" transform="rotate(24)"/>`
-    g += `<ellipse cx="0" cy="0" rx="${fx(s * 0.5)}" ry="${fx(s * 0.3)}" fill="${SWARM.gold}" stroke="${WALNUT}" stroke-width="1.4"/>`
-    for (const t of [-0.12, 0.2]) g += `<line x1="${fx(s * t)}" y1="${fx(-s * 0.26)}" x2="${fx(s * t)}" y2="${fx(s * 0.26)}" stroke="${WALNUT}" stroke-width="${fx(s * 0.13)}"/>`
-    g += `<circle cx="${fx(s * 0.56)}" cy="0" r="${fx(s * 0.16)}" fill="${SWARM.bee}"/>`
-    g += `</g>`
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))})">`
+    // contact shadow FIRST, un-rotated: a painted courier lies ON the floor,
+    // and the shadow is what seats it there (s2 T-FLOOR recipe)
+    g += `<ellipse cx="${fx(s * 0.1)}" cy="${fx(s * 0.22)}" rx="${fx(s * 0.6)}" ry="${fx(s * 0.34)}" fill="${INK}" opacity="0.24"/>`
+    g += `<g transform="rotate(${fx(ang)})" opacity="${fx(dim)}">`
+    g += `<ellipse cx="0" cy="${fx(-s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="${fx(Math.max(1.4, s * 0.05))}" stroke-opacity="0.85" transform="rotate(-24)"/>`
+    g += `<ellipse cx="0" cy="${fx(s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="${fx(Math.max(1.4, s * 0.05))}" stroke-opacity="0.85" transform="rotate(24)"/>`
+    g += `<ellipse cx="0" cy="0" rx="${fx(s * 0.5)}" ry="${fx(s * 0.3)}" fill="${SWARM.bee}"/>`
+    for (const t of [-0.26, 0, 0.26]) g += `<line x1="${fx(s * t)}" y1="${fx(-s * 0.27)}" x2="${fx(s * t)}" y2="${fx(s * 0.27)}" stroke="${SWARM.gold}" stroke-width="${fx(s * 0.15)}"/>`
+    g += `<ellipse cx="0" cy="0" rx="${fx(s * 0.5)}" ry="${fx(s * 0.3)}" fill="none" stroke="${SWARM.bee}" stroke-width="${fx(Math.max(1.6, s * 0.06))}"/>`
+    g += `<circle cx="${fx(s * 0.56)}" cy="0" r="${fx(s * 0.2)}" fill="${SWARM.bee}"/>`
+    g += `</g></g>`
     return g
   }
   const flatLetter = (x, y, s, ang, sealed) => {
-    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="0.9">`
-    g += `<rect x="${fx(-s * 0.5)}" y="${fx(-s * 0.34)}" width="${fx(s)}" height="${fx(s * 0.68)}" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.3"/>`
-    g += `<path d="M ${fx(-s * 0.5)} ${fx(-s * 0.34)} L 0 ${fx(s * 0.08)} L ${fx(s * 0.5)} ${fx(-s * 0.34)}" fill="none" stroke="${WALNUT}" stroke-width="1.1" opacity="0.6"/>`
-    if (sealed) g += `<circle cx="0" cy="${fx(s * 0.06)}" r="${fx(s * 0.14)}" fill="${SWARM.red}" stroke="#8c352a" stroke-width="1.2"/>`
-    g += `</g>`
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))})">`
+    g += `<ellipse cx="${fx(s * 0.1)}" cy="${fx(s * 0.2)}" rx="${fx(s * 0.58)}" ry="${fx(s * 0.4)}" fill="${INK}" opacity="0.22"/>`
+    g += `<g transform="rotate(${fx(ang)})">`
+    // cream on parchment is a +20 luminance whisper; the BORDER is the mark
+    g += `<rect x="${fx(-s * 0.5)}" y="${fx(-s * 0.34)}" width="${fx(s)}" height="${fx(s * 0.68)}" fill="${SWARM.cream}" stroke="${INK}" stroke-width="${fx(Math.max(1.8, s * 0.06))}"/>`
+    g += `<path d="M ${fx(-s * 0.5)} ${fx(-s * 0.34)} L 0 ${fx(s * 0.1)} L ${fx(s * 0.5)} ${fx(-s * 0.34)}" fill="none" stroke="${WALNUT}" stroke-width="${fx(Math.max(1.5, s * 0.05))}" opacity="0.9"/>`
+    g += `<path d="M ${fx(-s * 0.5)} ${fx(s * 0.34)} L ${fx(-s * 0.14)} ${fx(s * 0.02)} M ${fx(s * 0.5)} ${fx(s * 0.34)} L ${fx(s * 0.14)} ${fx(s * 0.02)}" fill="none" stroke="${WALNUT}" stroke-width="${fx(Math.max(1.2, s * 0.04))}" opacity="0.55"/>`
+    if (sealed) g += `<circle cx="0" cy="${fx(s * 0.08)}" r="${fx(s * 0.18)}" fill="${SWARM.red}" stroke="#7a2b22" stroke-width="${fx(Math.max(1.4, s * 0.05))}"/>`
+    g += `</g></g>`
     return g
   }
   const flatParcel = (x, y, s, ang) => {
-    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="0.85">`
-    g += `<rect x="${fx(-s * 0.42)}" y="${fx(-s * 0.34)}" width="${fx(s * 0.84)}" height="${fx(s * 0.68)}" fill="${SWARM.parch}" stroke="${WALNUT}" stroke-width="1.2"/>`
-    g += `<line x1="0" y1="${fx(-s * 0.34)}" x2="0" y2="${fx(s * 0.34)}" stroke="${SWARM.amber}" stroke-width="1.6"/>`
-    g += `<line x1="${fx(-s * 0.42)}" y1="0" x2="${fx(s * 0.42)}" y2="0" stroke="${SWARM.amber}" stroke-width="1.6"/>`
-    g += `</g>`
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))})">`
+    g += `<ellipse cx="${fx(s * 0.09)}" cy="${fx(s * 0.2)}" rx="${fx(s * 0.5)}" ry="${fx(s * 0.38)}" fill="${INK}" opacity="0.2"/>`
+    g += `<g transform="rotate(${fx(ang)})">`
+    g += `<rect x="${fx(-s * 0.42)}" y="${fx(-s * 0.34)}" width="${fx(s * 0.84)}" height="${fx(s * 0.68)}" fill="${SWARM.parch}" stroke="${INK}" stroke-width="${fx(Math.max(1.6, s * 0.055))}"/>`
+    g += `<line x1="0" y1="${fx(-s * 0.34)}" x2="0" y2="${fx(s * 0.34)}" stroke="${SWARM.amber}" stroke-width="${fx(Math.max(2, s * 0.08))}"/>`
+    g += `<line x1="${fx(-s * 0.42)}" y1="0" x2="${fx(s * 0.42)}" y2="0" stroke="${SWARM.amber}" stroke-width="${fx(Math.max(2, s * 0.08))}"/>`
+    g += `</g></g>`
     return g
   }
 
@@ -8032,8 +8043,8 @@ function beeRoutesSpread(w, h, seed) {
     const x = rr(r, 0, w)
     const y = rr(r, h * 0.6, h * 0.985)
     const gl = rr(r, 5, 13) * (y / h)
-    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(rr(r, -3, 3))} ${fx(-gl)} ${fx(rr(r, -2, 2))} ${fx(-gl * 1.25)}" fill="none" stroke="${SWARM.meadow}" stroke-width="1.3" opacity="${fx(rr(r, 0.25, 0.5))}"/>`
-    if (i % 11 === 4) s += `<circle cx="${fx(x)}" cy="${fx(y - gl)}" r="${fx(rr(r, 1.6, 3))}" fill="${['#d9a441', '#c46a6a', '#e6e0b0'][i % 3]}" opacity="0.7"/>`
+    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(rr(r, -3, 3))} ${fx(-gl)} ${fx(rr(r, -2, 2))} ${fx(-gl * 1.25)}" fill="none" stroke="#4e6f47" stroke-width="1.8" opacity="${fx(rr(r, 0.45, 0.75))}"/>`
+    if (i % 11 === 4) s += `<circle cx="${fx(x)}" cy="${fx(y - gl)}" r="${fx(rr(r, 2.2, 3.8))}" fill="${['#d9a441', '#e6e0b0', '#8fa9c4'][i % 3]}" stroke="${WALNUT}" stroke-width="1" stroke-opacity="0.45"/>`
   }
   // far half hazes out; the backdrop glues over most of it at rest
   s += `<rect width="${w}" height="${fx(h * 0.36)}" fill="url(#pageHaze3)"/>`
@@ -8042,9 +8053,17 @@ function beeRoutesSpread(w, h, seed) {
 
   // ---- THE GOLD ROUTES: dashed spirals out of the hive mouth, an amber echo
   // under each so they read as painted ribbon, not plot lines.
+  // Gold on parchment is a same-value pairing: at 2.8 px over a 0.18 amber
+  // halo the routes measured as a tint, not a mark. Painted the s2 key-trail
+  // way instead — a walnut under-copy carrying its own contact offset, an
+  // amber ribbon body, then the gold dash double-struck with its highlight.
   for (const P of ROUTES) {
-    s += `<path d="${pathOf(P)}" fill="none" stroke="${SWARM.amber}" stroke-width="5" opacity="0.18"/>`
-    s += `<path d="${pathOf(P)}" fill="none" stroke="${SWARM.gold}" stroke-width="2.8" stroke-dasharray="11 9" opacity="0.85"/>`
+    const d = pathOf(P)
+    s += `<g transform="translate(1.5 3)"><path d="${d}" fill="none" stroke="${WALNUT}" stroke-width="6" opacity="0.22"/></g>`
+    s += `<path d="${d}" fill="none" stroke="${SWARM.amber}" stroke-width="5.6" opacity="0.42"/>`
+    s += `<path d="${d}" fill="none" stroke="${WALNUT}" stroke-width="4.4" stroke-dasharray="11 9" opacity="0.75"/>`
+    s += `<path d="${d}" fill="none" stroke="${SWARM.gold}" stroke-width="3" stroke-dasharray="11 9"/>`
+    s += `<path d="${d}" fill="none" stroke="${SWARM.goldLit}" stroke-width="1.2" stroke-dasharray="11 9" opacity="0.85"/>`
   }
   // the hive mouth they all pour from
   s += `<ellipse cx="${fx(PX(HIVE[0]))}" cy="${fx(PY(HIVE[1]))}" rx="${fx(PX(0.024))}" ry="${fx(PY(0.016))}" fill="${SWARM.amber}" opacity="0.35"/>`
@@ -8083,21 +8102,22 @@ function beeRoutesSpread(w, h, seed) {
     const cy = PY(pageFY(0.4))
     const SQ = 0.68 // lying-flat foreshortening
     const R = w * 0.082
-    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="${SWARM.gold}" opacity="0.08"/>`
-    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="2.2" opacity="0.5"/>`
-    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R * 0.8)}" ry="${fx(R * 0.8 * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="1.2" stroke-dasharray="5 6" opacity="0.42"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="${SWARM.gold}" opacity="0.14"/>`
+    s += `<ellipse cx="${fx(cx + 1.5)}" cy="${fx(cy + 3)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="none" stroke="${WALNUT}" stroke-width="3" opacity="0.2"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="3" opacity="0.85"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R * 0.8)}" ry="${fx(R * 0.8 * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="1.8" stroke-dasharray="5 6" opacity="0.7"/>`
     // cardinal + intercardinal ticks on the outer ring
     for (let k = 0; k < 8; k++) {
       const a = (k * Math.PI) / 4
       const len = k % 2 === 0 ? 0.14 : 0.07
-      s += `<line x1="${fx(cx + Math.cos(a) * R * (1 - len))}" y1="${fx(cy + Math.sin(a) * R * (1 - len) * SQ)}" x2="${fx(cx + Math.cos(a) * R * 1.06)}" y2="${fx(cy + Math.sin(a) * R * 1.06 * SQ)}" stroke="${SWARM.amber}" stroke-width="${k % 2 === 0 ? 2.4 : 1.4}" opacity="0.55"/>`
+      s += `<line x1="${fx(cx + Math.cos(a) * R * (1 - len))}" y1="${fx(cy + Math.sin(a) * R * (1 - len) * SQ)}" x2="${fx(cx + Math.cos(a) * R * 1.06)}" y2="${fx(cy + Math.sin(a) * R * 1.06 * SQ)}" stroke="${SWARM.amber}" stroke-width="${k % 2 === 0 ? 3.2 : 2}" opacity="0.9"/>`
     }
     // the honeycomb heart: 7 tiny pointy-top hexes clustered at the center
     const hex = (hx, hy, hr) =>
       `<polygon points="${Array.from({ length: 6 }, (_, k) => {
         const a = Math.PI / 2 + (k * Math.PI) / 3
         return `${fx(hx + Math.cos(a) * hr)},${fx(hy + Math.sin(a) * hr * SQ)}`
-      }).join(' ')}" fill="${SWARM.gold}" fill-opacity="0.14" stroke="${SWARM.amber}" stroke-width="1.3" opacity="0.6"/>`
+      }).join(' ')}" fill="${SWARM.gold}" fill-opacity="0.3" stroke="${SWARM.amber}" stroke-width="2" opacity="0.9"/>`
     const hr = R * 0.17
     s += hex(cx, cy, hr)
     for (let k = 0; k < 6; k++) {
@@ -8155,8 +8175,8 @@ function beeRoutesSpread(w, h, seed) {
   const defs =
     `<linearGradient id="meadowWash" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${SWARM.meadow}" stop-opacity="0"/>` +
-    `<stop offset="0.55" stop-color="${SWARM.meadow}" stop-opacity="0.16"/>` +
-    `<stop offset="1" stop-color="${SWARM.meadow}" stop-opacity="0.3"/></linearGradient>` +
+    `<stop offset="0.55" stop-color="${SWARM.meadow}" stop-opacity="0.26"/>` +
+    `<stop offset="1" stop-color="${SWARM.meadow}" stop-opacity="0.46"/></linearGradient>` +
     `<linearGradient id="pageHaze3" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="#f2ead2" stop-opacity="0.85"/>` +
     `<stop offset="1" stop-color="#f2ead2" stop-opacity="0"/></linearGradient>` +
