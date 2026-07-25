@@ -1542,11 +1542,34 @@ function boxFace(w, h, seed, face, kind) {
       s += `<rect x="${fx(w * 0.38)}" y="${fx(h * 0.12)}" width="${fx(w * 0.24)}" height="${fx(h * 0.24)}" fill="#3a2a18" stroke="${WDIM}" stroke-width="3"/>` // loft opening
       s += `<line x1="${fx(w * 0.5)}" y1="${fx(h * 0.12)}" x2="${fx(w * 0.5)}" y2="${fx(h * 0.36)}" stroke="${WDIM}" stroke-width="2"/>`
     } else {
-      // side wall: X-braced timber frame
+      // side wall — E3 s2 COACH-HOUSE re-skin (scene pack, optional item):
+      // the timber frame keeps one diagonal brace, and a mail-coach wheel +
+      // draw tongue lean against the wall with a small lantern at the open
+      // front edge (u=1 side, toward the reader).
       s += plank(true, 6, WDIM)
       s += `<rect x="${fx(w * 0.06)}" y="${fx(h * 0.1)}" width="${fx(w * 0.88)}" height="${fx(h * 0.82)}" fill="none" stroke="${WDIM}" stroke-width="6"/>`
       s += `<line x1="${fx(w * 0.06)}" y1="${fx(h * 0.1)}" x2="${fx(w * 0.94)}" y2="${fx(h * 0.92)}" stroke="${WDIM}" stroke-width="5"/>`
-      s += `<line x1="${fx(w * 0.94)}" y1="${fx(h * 0.1)}" x2="${fx(w * 0.06)}" y2="${fx(h * 0.92)}" stroke="${WDIM}" stroke-width="5"/>`
+      // THE MAIL-COACH WHEEL: a big spoked wheel resting against the frame
+      const wx = w * 0.36
+      const wy = h * 0.62
+      const WR = w * 0.24
+      s += `<circle cx="${fx(wx)}" cy="${fx(wy)}" r="${fx(WR)}" fill="none" stroke="${WDIM}" stroke-width="9"/>`
+      s += `<circle cx="${fx(wx)}" cy="${fx(wy)}" r="${fx(WR)}" fill="none" stroke="${IRON}" stroke-width="3"/>` // iron tyre
+      for (let sp = 0; sp < 8; sp++) {
+        const a = (sp * Math.PI) / 4 + 0.2
+        s += `<line x1="${fx(wx)}" y1="${fx(wy)}" x2="${fx(wx + Math.cos(a) * WR * 0.92)}" y2="${fx(wy + Math.sin(a) * WR * 0.92)}" stroke="${WDIM}" stroke-width="4.4"/>`
+      }
+      s += `<circle cx="${fx(wx)}" cy="${fx(wy)}" r="${fx(WR * 0.2)}" fill="${WDIM}" stroke="${IRON}" stroke-width="2.4"/>` // hub
+      s += `<circle cx="${fx(wx)}" cy="${fx(wy)}" r="${fx(WR * 0.07)}" fill="${IRON_LIT}"/>`
+      // THE DRAW TONGUE leaning past the wheel
+      s += `<line x1="${fx(w * 0.14)}" y1="${fx(h * 0.9)}" x2="${fx(w * 0.68)}" y2="${fx(h * 0.24)}" stroke="${WDIM}" stroke-width="7" stroke-linecap="round"/>`
+      s += `<line x1="${fx(w * 0.14)}" y1="${fx(h * 0.9)}" x2="${fx(w * 0.68)}" y2="${fx(h * 0.24)}" stroke="${WLIT}" stroke-width="2.2" opacity="0.5" stroke-linecap="round"/>`
+      s += `<circle cx="${fx(w * 0.68)}" cy="${fx(h * 0.24)}" r="4" fill="${IRON}"/>` // hitch ring
+      // THE LANTERN by the open front (u=1 edge), a warm dot in the dusk
+      s += `<circle cx="${fx(w * 0.87)}" cy="${fx(h * 0.34)}" r="${fx(w * 0.075)}" fill="${GOLD_LIT}" opacity="0.22"/>`
+      s += `<rect x="${fx(w * 0.855)}" y="${fx(h * 0.3)}" width="${fx(w * 0.03)}" height="${fx(h * 0.07)}" fill="${GOLD_LIT}" stroke="${IRON}" stroke-width="2.4"/>`
+      s += `<path d="M ${fx(w * 0.855)} ${fx(h * 0.3)} L ${fx(w * 0.87)} ${fx(h * 0.28)} L ${fx(w * 0.885)} ${fx(h * 0.3)} Z" fill="${IRON}"/>`
+      s += `<line x1="${fx(w * 0.87)}" y1="${fx(h * 0.28)}" x2="${fx(w * 0.87)}" y2="${fx(h * 0.25)}" stroke="${IRON}" stroke-width="2.2"/>`
     }
     s += border(WOOD)
     return svgPiece(w, h, s)
