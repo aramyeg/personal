@@ -104,6 +104,12 @@ function writeQuadAt(arr: Float32Array, q: number, quad: PanelQuad): void {
   }
 }
 
+// Shared pointer-projection scratch (module scope, the tabpiece idiom — never
+// allocated in the render path).
+const _u = new THREE.Vector3()
+const _plane = new THREE.Plane()
+const _hit = new THREE.Vector3()
+
 export function SwarmArcPopupLayer({
   layer,
   spreadIndex,
@@ -220,9 +226,6 @@ export function SwarmArcPopupLayer({
     const { thetaL, thetaR } = readAngles()
     return { thetaL, thetaR }
   }
-  const _u = new THREE.Vector3()
-  const _plane = new THREE.Plane()
-  const _hit = new THREE.Vector3()
   const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaR: number): number | null => {
     _u.set(Math.cos(thetaR), Math.sin(thetaR), 0)
     _plane.setComponents(Math.sin(thetaR), -Math.cos(thetaR), 0, 0)
