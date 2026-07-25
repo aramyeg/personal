@@ -1,7 +1,9 @@
 {
   "pages": {
     "keep-atlas-s4": 1024,
-    "flank-atlas-s4": 1024
+    "flank-atlas-s4": 1024,
+    "bazaar-atlas-s6": 1024,
+    "figure-atlas-s6": 512
   },
   "sprites": {
     "ch3-keep-balcony": {
@@ -245,6 +247,132 @@
         0.759765625,
         0.99609375,
         1
+      ]
+    },
+    "ch5-arc-inner-arc-back": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.6337890625,
+        0.1220703125,
+        0.685546875,
+        0.130859375
+      ]
+    },
+    "ch5-arc-inner-arc-front": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0,
+        0.2705078125,
+        0.6669921875,
+        0.505859375
+      ]
+    },
+    "ch5-arc-inner-arc-side": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.080078125,
+        0.072265625,
+        0.158203125,
+        0.130859375
+      ]
+    },
+    "ch5-arc-inner-arc-top": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.3701171875,
+        0.08203125,
+        0.578125,
+        0.130859375
+      ]
+    },
+    "ch5-arc-rear-arc-back": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.580078125,
+        0.119140625,
+        0.6318359375,
+        0.130859375
+      ]
+    },
+    "ch5-arc-rear-arc-front": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0,
+        0.5078125,
+        0.7158203125,
+        1
+      ]
+    },
+    "ch5-arc-rear-arc-side": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0,
+        0.0703125,
+        0.078125,
+        0.130859375
+      ]
+    },
+    "ch5-arc-rear-arc-top": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.16015625,
+        0.0732421875,
+        0.3681640625,
+        0.130859375
+      ]
+    },
+    "ch5-souk-l-mound0": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.6689453125,
+        0.3701171875,
+        0.994140625,
+        0.505859375
+      ]
+    },
+    "ch5-souk-l-mound1": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.3271484375,
+        0.138671875,
+        0.65234375,
+        0.2685546875
+      ]
+    },
+    "ch5-souk-r-mound0": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0,
+        0.1328125,
+        0.3251953125,
+        0.2685546875
+      ]
+    },
+    "ch5-souk-r-mound1": {
+      "atlas": "bazaar-atlas-s6",
+      "rect": [
+        0.654296875,
+        0.138671875,
+        0.9794921875,
+        0.2685546875
+      ]
+    },
+    "ch5-tea": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0,
+        0.53125,
+        0.41015625,
+        1
+      ]
+    },
+    "ch5-throng": {
+      "atlas": "figure-atlas-s6",
+      "rect": [
+        0,
+        0.32421875,
+        0.78125,
+        0.52734375
       ]
     }
   }
