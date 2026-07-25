@@ -628,11 +628,15 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // 1.15) — the A4 closed-containment gate the derivation bench never
   // sampled. Trimming width (not creaseU, not heights) keeps the diagonal
   // sweep, the crest stack, the notch, and the bloom wave bench-identical.
-  // Second divergence — the STATION/HEIGHT schedule is re-derived against
-  // the KEPT hoard, which the pack's schedule never collision-checked
-  // (bench G-D only sampled rank-vs-rank). The hoard's strut planes sweep
-  // the spine channel (lateral -0.22..+0.17, up to y 0.55, deck to 0.68)
-  // across z in [-0.3, -0.2], and a wall rank's crest SWEEPS z by
+  // Second divergence — the STATION/HEIGHT schedule was re-derived against
+  // the then-KEPT hoard, which the pack's schedule never collision-checked
+  // (bench G-D only sampled rank-vs-rank). The hoard has since been retired
+  // (see its note below), so this schedule is now strictly SLACKER than the
+  // clearance it was solved for — nothing here needs to move, and growing the
+  // front ranks back into the freed channel is a separate, benched call.
+  // The reasoning is kept because it is what pins these numbers: the hoard's
+  // strut planes swept the spine channel (lateral -0.22..+0.17, up to y 0.55,
+  // deck to 0.68) across z in [-0.3, -0.2], and a wall rank's crest SWEEPS z by
   // +-cot(lambda)*height ~ +-0.26..0.38*h between full open (lambda ~73-79
   // deg, leaning away from its vDir) and the tilted rest (lambda ~101-111
   // deg, leaning past vertical the OTHER way). No wall taller than ~0.3x
@@ -669,15 +673,31 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // base — paper cannot overhang below a page-glued edge).
   { id: 'ch4-chest-lid', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'wallL', u: 0, v: 0.02, width: 0.13, height: 0.14 },
   { id: 'ch4-chest-spill', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch4-chest', seat: 'capFrontR', u: 0, v: 0, width: 0.12, height: 0.09 },
-  // FLOATING TIER (C3v2): the gold-hoard shelf — a BRIDGE platform in the
-  // deep lane behind the dragon (the back of its lair), where the coin is
-  // heaped. COMPOSITION SPREAD-D: this deck was buried behind BOTH the city
-  // skyline (a full-width standing wall) and the dragon. Kept DEEP (its own
-  // depth band) but grown onto tall struts (rise 0.40, qA 0.21) and a
-  // lopsided glue split so the gold heap crests ABOVE the skyline and shows
-  // through the torn-paper sky — deep AND tall, since a deeper piece sits
-  // HIGHER on this top-down camera.
-  { id: 'ch4-hoard', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.22, glueR: 0.14, rise: 0.4, spans: [[-0.3, -0.26], [-0.24, -0.2]] }, strutB: { glueL: 0.14, glueR: 0.22, rise: 0.4, spans: [[-0.3, -0.26], [-0.24, -0.2]] }, qA: 0.21, qB: 0.21, deckZ0: -0.3, deckZ1: -0.2 },
+  // (RETIRED — ch4-hoard, the gold-hoard BRIDGE platform. It was grown onto
+  // tall struts, rise 0.40 / q 0.21, "so the gold heap crests ABOVE the
+  // skyline"; the E3 rebuild replaced that skyline with the mfoldrange massif
+  // and the piece stopped reading as a heap and started reading as a wireframe
+  // kite hung in the range's notch above the dragon — its deck panels are only
+  // 0.21 x 0.10 world and near edge-on, so all the reader ever saw was strut
+  // scaffolding against the night sky (bench/out/e3-board-s5.png, riser-
+  // silhouette law).
+  //
+  // Lowering it was tried first and is ruled out by measurement, not taste.
+  // The rig's own top is ridgeX(rise) + the deck-crease rise, and the target
+  // is the r3 rank's PAINTED notch cap — capV 0.44 of h 0.50 = 0.219 world,
+  // screen-y 0.054 at the pinned camera. Sweeping rise 0.02..0.42 x q
+  // 0.05..0.24 x five glue splits, the only settings that clear that cap sit
+  // at rise <= ~0.09; and q may not drop below half the ridge separation
+  // (~0.105 there) or the deck stops reaching across its own ranks. That
+  // leaves exactly one legal candidate, rise 0.08 / q 0.11 — whose entire
+  // screen footprint, x [-0.108, 0.108] y [-0.199, 0.027], lands 0.110 screen
+  // units BELOW the dragon's top edge across its whole x window. The hero
+  // stands nearer the camera (z 0.06..0.30 against the rig's -0.30..-0.20), so
+  // the only rig that stops silhouetting is a rig nothing can see: not depth
+  // mass, just draws. Retired instead, s2 precedent — the platform census has
+  // no per-chapter requirement (composition-covenant STAGE_SET_SPREADS), the
+  // family still ships on ch6-steps and satchel-table, and s5's depth is
+  // carried by the four graded range planes the chapter was rebuilt around.)
   // D1 TAB PIECE: the hoard's loose gold rises as a MOUND on the right
   // page, its tab creeping out of the fore edge as the spread blooms —
   // the treasure literally grows when the book opens. Strip-driven family
@@ -702,9 +722,9 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // "blinds close" over to the dragon's GOLD hoard — the transmutation. Both end
   // states are coplanar (volvelle-class, no fold-flat envelope); the release
   // snaps to a pure end {dunes, gold} the book remembers. Placed downstage-left
-  // clear of the spine-hugging chest (d<=0.24), the deep hoard shelf (z<=-0.18)
-  // and the hero dragon's base footprint (d<=~0.32) — it does NOT touch the
-  // ch4-hoard strut region behind the dragon.
+  // clear of the spine-hugging chest (d<=0.24) and the hero dragon's base
+  // footprint (d<=~0.32); it also cleared the retired hoard shelf (z<=-0.18)
+  // and never touched its strut region behind the dragon.
   // Promoted to the spread's THESIS (celebrated brass ▼PULL▼ affordance) and
   // turn-culled (Batch C-3, the dial-class lever): interaction-only + page-
   // flat, it stops drawing through the fast middle of a turn and ramps back
