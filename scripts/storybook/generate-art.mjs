@@ -1759,6 +1759,16 @@ function meadowFringe(w, h, seed) {
     if (i % 7 === 3) s += `<circle cx="${fx(x)}" cy="${fx(y - bh)}" r="4" fill="${['#d9a441', '#c46a6a', '#e6e0b0', '#8a6fd6'][i % 4]}" stroke="${INK}" stroke-width="0.9" stroke-opacity="0.35"/>`
   }
   s += rimPath(crestLine, 4)
+  // E3 s3 repaint: two couriers perched ON the crest (touching the ridge so
+  // the die-cut stays paper-true — no floating alpha islands), gold dashed
+  // flight trails leading up toward the 3D ring overhead (pack §4d).
+  for (const [bx, bs] of [[0.24, 0.13], [0.71, 0.11]]) {
+    const seg = Math.min(n, Math.round(bx * n))
+    const ridgeY = pts[seg] ? pts[seg][1] : crest
+    const y = ridgeY - h * bs * 0.45
+    s += swarmBee(w * bx, y, h * bs, 'wingsMid')
+    s += `<path d="M ${fx(w * bx + h * 0.12)} ${fx(y - h * 0.1)} q ${fx(h * 0.12)} ${fx(-h * 0.1)} ${fx(h * 0.3)} ${fx(-h * 0.13)}" fill="none" stroke="${SWARM.gold}" stroke-width="1.6" stroke-dasharray="4 4" opacity="0.7"/>`
+  }
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -4687,6 +4697,547 @@ function innCourtyardSpread(w, h, seed) {
 
 // ---- texture-only bake: SVG -> flat PNG -> seeded grain masked by alpha ->
 // webp. No outline sidecar (mesh stays the solver quad). ----
+// ============================================================================
+// THE CARRIER SWARM ART MODULE (E3 s3, "The Carrier Swarm"). One 1024 sprite
+// atlas feeds all 28 swarmarc riders + the hairline strut swatch + the STIR
+// tab (G5 FIELD discipline: many pieces, ONE texture). Cell convention is
+// popup-swarmarc-layer.tsx's contract, written once THERE and honored HERE:
+// 8x8 grid of 128px cells, row 0 at the image TOP; cells 0-15 the 16 rider
+// sprites, cell 16 the strut swatch (OPAQUE — the strut mesh has no alpha
+// test), cells 17-18 + 25-26 the 2x2 STIR tab (banner lettering over the
+// bee-on-honey-drop handle), cells 19-22 the printed banner strip reserved
+// for the page print. Palette is the pack's alpine-airy set — 3 values + 1
+// metal + ONE saturated accent (daisy-ref discipline): the red appears ONLY
+// on wax seals + the tab bow, never on bees or satchels.
+// ============================================================================
+
+const SWARM = {
+  sky: '#e7eef4',
+  blue: '#7d9bb5',
+  slate: '#4a5c6e',
+  slateDeep: '#37475a',
+  gold: '#d9a441',
+  goldLit: '#ecc26b',
+  amber: '#a86a24',
+  cream: '#f2e8d0',
+  parch: '#e7d5a8',
+  bee: '#2f2a22',
+  wing: '#eef2f5',
+  meadow: '#6a8f5f',
+  strut: '#a9bccb',
+  red: '#b0483a',
+}
+
+/** One courier bee. `s` = body length px; poses: wingsUp / wingsMid /
+ *  wingsDown / profile / bumble / scout / satchel. Rim halo behind the body
+ *  so the sprite reads as a die-cut card chip. */
+function swarmBee(cx, cy, s, pose) {
+  const P = SWARM
+  const fat = pose === 'bumble' ? 1.25 : pose === 'scout' ? 0.82 : 1
+  const rx = s * 0.5 * fat
+  const ry = s * 0.34 * fat
+  let g = `<g>`
+  // die-cut rim halo (body + head footprint)
+  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx + 3)}" ry="${fx(ry + 3)}" fill="${RIM}" opacity="0.9"/>`
+  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62 + 3)}" fill="${RIM}" opacity="0.9"/>`
+  // wings BEHIND the body for up/profile, in front for down (paper layering)
+  const wing = (wx, wy, wrx, wry, rot) =>
+    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${P.wing}" opacity="0.92" stroke="${P.slate}" stroke-width="1.3" stroke-opacity="0.55" transform="rotate(${rot} ${fx(wx)} ${fx(wy)})"/>`
+  const wingsBehind =
+    pose === 'wingsUp' || pose === 'satchel'
+      ? wing(cx - rx * 0.28, cy - ry * 1.5, s * 0.34, s * 0.15, -38) + wing(cx + rx * 0.18, cy - ry * 1.55, s * 0.34, s * 0.15, -18)
+      : pose === 'wingsMid' || pose === 'bumble' || pose === 'scout'
+        ? wing(cx - rx * 0.5, cy - ry * 1.1, s * 0.38, s * 0.14, -8) + wing(cx + rx * 0.28, cy - ry * 1.15, s * 0.36, s * 0.13, 6)
+        : pose === 'profile'
+          ? wing(cx - rx * 0.1, cy - ry * 1.35, s * 0.4, s * 0.16, -26)
+          : ''
+  g += wingsBehind
+  // body + gold stripes + head
+  g += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(rx)}" ry="${fx(ry)}" fill="${P.bee}"/>`
+  for (const t of [-0.15, 0.28]) {
+    const sxp = cx + rx * t
+    const half = ry * Math.sqrt(Math.max(0.1, 1 - t * t)) * 0.92
+    g += `<line x1="${fx(sxp)}" y1="${fx(cy - half)}" x2="${fx(sxp)}" y2="${fx(cy + half)}" stroke="${P.gold}" stroke-width="${fx(s * 0.11)}"/>`
+  }
+  g += `<circle cx="${fx(cx + rx * 0.92)}" cy="${fx(cy - ry * 0.22)}" r="${fx(ry * 0.62)}" fill="${P.bee}"/>`
+  g += `<circle cx="${fx(cx + rx * 1.1)}" cy="${fx(cy - ry * 0.34)}" r="${fx(s * 0.035)}" fill="${P.wing}"/>`
+  // stinger + legs
+  g += `<path d="M ${fx(cx - rx)} ${fx(cy)} l ${fx(-s * 0.1)} ${fx(s * 0.04)}" stroke="${P.bee}" stroke-width="2"/>`
+  for (const lt of [-0.3, 0.05, 0.4])
+    g += `<path d="M ${fx(cx + rx * lt)} ${fx(cy + ry * 0.8)} q ${fx(s * 0.02)} ${fx(s * 0.12)} ${fx(-s * 0.05)} ${fx(s * 0.16)}" fill="none" stroke="${P.bee}" stroke-width="1.6"/>`
+  // wings IN FRONT for the downstroke
+  if (pose === 'wingsDown') {
+    g += wing(cx - rx * 0.34, cy + ry * 1.3, s * 0.33, s * 0.14, 34)
+    g += wing(cx + rx * 0.14, cy + ry * 1.35, s * 0.33, s * 0.14, 16)
+  }
+  // slate courier satchel, gold buckle (accent red stays reserved for seals)
+  if (pose === 'satchel') {
+    g += `<path d="M ${fx(cx - rx * 0.42)} ${fx(cy + ry * 0.55)} h ${fx(s * 0.34)} v ${fx(s * 0.22)} h ${fx(-s * 0.34)} Z" fill="${P.slate}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+    g += `<path d="M ${fx(cx - rx * 0.42)} ${fx(cy + ry * 0.55)} q ${fx(s * 0.17)} ${fx(-s * 0.3)} ${fx(s * 0.34)} 0" fill="none" stroke="${P.slate}" stroke-width="2.2"/>`
+    g += `<circle cx="${fx(cx - rx * 0.25 + s * 0.17)}" cy="${fx(cy + ry * 0.55 + s * 0.11)}" r="${fx(s * 0.035)}" fill="${P.gold}"/>`
+  }
+  g += `</g>`
+  return g
+}
+
+/** One courier envelope chip. kinds: face / back / sealed (sealed spends one
+ *  of the pack's three wax-seal accents). */
+function swarmEnvelope(cx, cy, s, kind, rot = 0) {
+  const P = SWARM
+  const wq = s
+  const hq = s * 0.68
+  let g = `<g transform="rotate(${rot} ${fx(cx)} ${fx(cy)})">`
+  g += `<rect x="${fx(cx - wq / 2 - 3)}" y="${fx(cy - hq / 2 - 3)}" width="${fx(wq + 6)}" height="${fx(hq + 6)}" rx="3" fill="${RIM}" opacity="0.9"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${kind === 'sealed' ? P.parch : P.cream}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
+  if (kind === 'back') {
+    for (const ly of [-0.12, 0.08, 0.28])
+      g += `<line x1="${fx(cx - wq * 0.32)}" y1="${fx(cy + hq * ly)}" x2="${fx(cx + wq * 0.34)}" y2="${fx(cy + hq * ly)}" stroke="${P.slate}" stroke-width="1.6" opacity="0.65"/>`
+    g += `<rect x="${fx(cx + wq * 0.16)}" y="${fx(cy - hq * 0.42)}" width="${fx(wq * 0.2)}" height="${fx(hq * 0.28)}" fill="${P.blue}" opacity="0.5" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.4"/>` // stamp
+  } else {
+    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy - hq / 2)} L ${fx(cx)} ${fx(cy + hq * 0.12)} L ${fx(cx + wq / 2)} ${fx(cy - hq / 2)}" fill="none" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
+    g += `<path d="M ${fx(cx - wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx - wq * 0.14)} ${fx(cy + hq * 0.02)} M ${fx(cx + wq / 2)} ${fx(cy + hq / 2)} L ${fx(cx + wq * 0.14)} ${fx(cy + hq * 0.02)}" fill="none" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.35"/>`
+  }
+  if (kind === 'sealed') {
+    g += `<circle cx="${fx(cx)}" cy="${fx(cy + hq * 0.1)}" r="${fx(s * 0.13)}" fill="${P.red}" stroke="#8c352a" stroke-width="1.4"/>`
+    g += `<circle cx="${fx(cx - s * 0.035)}" cy="${fx(cy + hq * 0.1 - s * 0.035)}" r="${fx(s * 0.045)}" fill="#c96a5c" opacity="0.8"/>`
+  }
+  g += `</g>`
+  return g
+}
+
+/** One twine-wrapped parcel chip. */
+function swarmParcel(cx, cy, s, tall, rot = 0) {
+  const P = SWARM
+  const wq = s
+  const hq = s * (tall ? 0.9 : 0.62)
+  let g = `<g transform="rotate(${rot} ${fx(cx)} ${fx(cy)})">`
+  g += `<rect x="${fx(cx - wq / 2 - 3)}" y="${fx(cy - hq / 2 - 3)}" width="${fx(wq + 6)}" height="${fx(hq + 6)}" rx="3" fill="${RIM}" opacity="0.9"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy - hq / 2)}" width="${fx(wq)}" height="${fx(hq)}" fill="${P.parch}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
+  g += `<rect x="${fx(cx - wq / 2)}" y="${fx(cy + hq * 0.22)}" width="${fx(wq)}" height="${fx(hq * 0.28)}" fill="${P.amber}" opacity="0.25"/>`
+  g += `<line x1="${fx(cx)}" y1="${fx(cy - hq / 2)}" x2="${fx(cx)}" y2="${fx(cy + hq / 2)}" stroke="${P.amber}" stroke-width="2.4"/>`
+  g += `<line x1="${fx(cx - wq / 2)}" y1="${fx(cy)}" x2="${fx(cx + wq / 2)}" y2="${fx(cy)}" stroke="${P.amber}" stroke-width="2.4"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(s * 0.07)}" fill="${P.amber}"/>`
+  g += `<path d="M ${fx(cx)} ${fx(cy)} l ${fx(s * 0.1)} ${fx(-s * 0.08)} M ${fx(cx)} ${fx(cy)} l ${fx(-s * 0.1)} ${fx(-s * 0.07)}" stroke="${P.amber}" stroke-width="1.6" fill="none"/>`
+  g += `</g>`
+  return g
+}
+
+/** A honey drop (the tab handle motif, also a solo sprite). */
+function swarmHoneyDrop(cx, cy, s) {
+  const P = SWARM
+  const d = `M ${fx(cx)} ${fx(cy - s * 0.52)} C ${fx(cx + s * 0.4)} ${fx(cy - s * 0.05)} ${fx(cx + s * 0.34)} ${fx(cy + s * 0.28)} ${fx(cx)} ${fx(cy + s * 0.42)} C ${fx(cx - s * 0.34)} ${fx(cy + s * 0.28)} ${fx(cx - s * 0.4)} ${fx(cy - s * 0.05)} ${fx(cx)} ${fx(cy - s * 0.52)} Z`
+  let g = `<path d="${d}" fill="${SWARM.gold}" stroke="${SWARM.amber}" stroke-width="2"/>`
+  g += `<ellipse cx="${fx(cx - s * 0.12)}" cy="${fx(cy - s * 0.08)}" rx="${fx(s * 0.09)}" ry="${fx(s * 0.16)}" fill="#f7e3ae" opacity="0.9"/>`
+  g += rimPath(d, 4)
+  return g
+}
+
+/** The full 8x8 sprite atlas (1024x1024, transparent ground). */
+function swarmAtlas(w, h, seed) {
+  const r = mulberry32(seed)
+  const cs = w / 8
+  const at = (i) => [(i % 8) * cs + cs / 2, Math.floor(i / 8) * cs + cs / 2]
+  const S = cs * 0.62 // sprite major size inside a cell
+  let s = `<g>`
+  // --- cells 0-15: the 16 rider sprites (no two neighbors share one; the
+  // solver's stride-7 sampling never puts equal cells adjacent) ---
+  const bees = ['wingsUp', 'wingsMid', 'wingsDown', 'profile', 'bumble']
+  bees.forEach((pose, i) => {
+    const [cx, cy] = at(i)
+    s += swarmBee(cx, cy, S * (pose === 'bumble' ? 0.86 : 0.94), pose)
+  })
+  {
+    const [cx, cy] = at(5)
+    s += swarmEnvelope(cx, cy, S * 0.9, 'face', rr(r, -9, -3))
+  }
+  {
+    const [cx, cy] = at(6)
+    s += swarmEnvelope(cx, cy, S * 0.88, 'back', rr(r, 3, 9))
+  }
+  {
+    const [cx, cy] = at(7)
+    s += swarmEnvelope(cx, cy, S * 0.9, 'sealed', rr(r, -6, 6)) // wax seal 1 of 3
+  }
+  {
+    const [cx, cy] = at(8)
+    s += swarmParcel(cx, cy, S * 0.78, false, rr(r, -8, -2))
+  }
+  {
+    const [cx, cy] = at(9)
+    s += swarmParcel(cx, cy, S * 0.66, true, rr(r, 2, 8))
+  }
+  {
+    // letter-pair chainlet: two small envelopes strung on one thread
+    const [cx, cy] = at(10)
+    s += `<path d="M ${fx(cx - S * 0.42)} ${fx(cy - S * 0.3)} Q ${fx(cx)} ${fx(cy + S * 0.05)} ${fx(cx + S * 0.42)} ${fx(cy - S * 0.26)}" fill="none" stroke="${SWARM.slate}" stroke-width="1.8"/>`
+    s += swarmEnvelope(cx - S * 0.22, cy + S * 0.08, S * 0.42, 'face', -8)
+    s += swarmEnvelope(cx + S * 0.24, cy + S * 0.12, S * 0.38, 'back', 7)
+  }
+  {
+    const [cx, cy] = at(11)
+    s += swarmHoneyDrop(cx, cy, S * 0.8)
+  }
+  for (const [k, i] of [[0, 12], [1, 13]]) {
+    const [cx, cy] = at(i)
+    s += swarmBee(cx + (k ? -S * 0.05 : S * 0.04), cy, S * 0.62, 'scout')
+  }
+  {
+    const [cx, cy] = at(14)
+    s += swarmBee(cx, cy, S * 0.9, 'satchel')
+  }
+  {
+    const [cx, cy] = at(15)
+    s += swarmEnvelope(cx, cy, S * 0.84, 'face', -24)
+  }
+  // --- cell 16: the hairline strut swatch. OPAQUE full cell (the strut mesh
+  // material carries no alpha test); sky-tinted with a lighter core so the
+  // 4px screen hairline reads as lit paper, plus faint cut edges. ---
+  {
+    const x0 = (16 % 8) * cs
+    const y0 = Math.floor(16 / 8) * cs
+    s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" fill="${SWARM.strut}"/>`
+    s += `<rect x="${fx(x0 + cs * 0.3)}" y="${fx(y0)}" width="${fx(cs * 0.4)}" height="${fx(cs)}" fill="#bfd0dd"/>`
+    s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
+    s += `<rect x="${fx(x0 + cs * 0.93)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
+  }
+  // --- cells 17-18 + 25-26: the STIR tab (2x2 region, 256x256): the printed
+  // banner arc over the die-cut bee-on-honey-drop pull. The red bow is wax
+  // accent 2 of 3; the lettering is slate + gold (T-AFFORDANCE, celebrated).
+  {
+    const x0 = (17 % 8) * cs
+    const y0 = Math.floor(17 / 8) * cs
+    const tw = cs * 2
+    const cx = x0 + tw / 2
+    // dashed bee-loop swooping down toward the ribbon
+    s += `<path d="M ${fx(x0 + tw * 0.2)} ${fx(y0 + cs * 0.42)} C ${fx(x0 + tw * 0.34)} ${fx(y0 + cs * 0.08)} ${fx(x0 + tw * 0.72)} ${fx(y0 + cs * 0.06)} ${fx(x0 + tw * 0.8)} ${fx(y0 + cs * 0.34)}" fill="none" stroke="${SWARM.amber}" stroke-width="2.6" stroke-dasharray="7 6" opacity="0.9"/>`
+    s += swarmBee(x0 + tw * 0.18, y0 + cs * 0.38, cs * 0.26, 'scout')
+    // ribbon: the full phrase stacked on two lines so nothing leaves the region
+    s += `<rect x="${fx(x0 + tw * 0.13)}" y="${fx(y0 + cs * 0.5)}" width="${fx(tw * 0.74)}" height="${fx(cs * 0.62)}" rx="9" fill="${SWARM.slate}" stroke="${SWARM.gold}" stroke-width="2.4"/>`
+    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 0.76)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.17)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">STIR THE</text>`
+    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 1.0)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.17)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">SWARM</text>`
+    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 1.28)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.2)}" text-anchor="middle" fill="${SWARM.gold}">&#9660;</text>`
+    // the pull: a fat honey drop with a perched bee; the red wax bow sits ON
+    // the drop's neck (wax accent 2 of 3)
+    s += swarmHoneyDrop(cx, y0 + cs * 1.66, cs * 0.6)
+    s += swarmBee(cx + cs * 0.02, y0 + cs * 1.42, cs * 0.3, 'wingsUp')
+    s += `<circle cx="${fx(cx - cs * 0.14)}" cy="${fx(y0 + cs * 1.52)}" r="${fx(cs * 0.07)}" fill="${SWARM.red}" stroke="#8c352a" stroke-width="1.6"/>`
+  }
+  // --- cells 19-22: the printed banner strip (512x128) reserved for the page
+  // print composite ("STIR THE SWARM" affordance printed at the fore edge). ---
+  {
+    const x0 = (19 % 8) * cs
+    const y0 = Math.floor(19 / 8) * cs
+    const bw = cs * 4
+    s += `<rect x="${fx(x0 + bw * 0.04)}" y="${fx(y0 + cs * 0.24)}" width="${fx(bw * 0.92)}" height="${fx(cs * 0.5)}" rx="10" fill="${SWARM.slate}" stroke="${SWARM.gold}" stroke-width="3"/>`
+    s += `<path d="M ${fx(x0 + bw * 0.04)} ${fx(y0 + cs * 0.49)} l ${fx(-bw * 0.03)} 0 M ${fx(x0 + bw * 0.96)} ${fx(y0 + cs * 0.49)} l ${fx(bw * 0.03)} 0" stroke="${SWARM.gold}" stroke-width="3"/>`
+    s += `<text x="${fx(x0 + bw / 2)}" y="${fx(y0 + cs * 0.62)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.3)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">STIR THE SWARM &#9660;</text>`
+  }
+  s += `</g>`
+  return svgPiece(w, h, s)
+}
+
+/** Flung crown bee (backdrop-crease child): wings-spread carrier with a tiny
+ *  slate+gold satchel, filling the quad, crease at u 0.5. */
+function crownBee(w, h, seed, k) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const cy = h * 0.56
+  const s = h * 0.72
+  let g = `<g>`
+  // full-span upswept wings first (behind), spanning most of the card
+  const wing = (wx, wy, wrx, wry, rot) =>
+    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx + 3)}" ry="${fx(wry + 3)}" fill="${RIM}" opacity="0.9" transform="rotate(${rot} ${fx(wx)} ${fx(wy)})"/>` +
+    `<ellipse cx="${fx(wx)}" cy="${fx(wy)}" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${SWARM.wing}" opacity="0.94" stroke="${SWARM.slate}" stroke-width="1.6" stroke-opacity="0.6" transform="rotate(${rot} ${fx(wx)} ${fx(wy)})"/>`
+  g += wing(cx - w * 0.24, cy - h * 0.22, w * 0.21, h * 0.13, -24 + k * 4)
+  g += wing(cx + w * 0.24, cy - h * 0.24, w * 0.21, h * 0.13, 24 - k * 4)
+  // wing veins
+  for (const sgn of [-1, 1])
+    g += `<path d="M ${fx(cx)} ${fx(cy - h * 0.1)} q ${fx(sgn * w * 0.16)} ${fx(-h * 0.16)} ${fx(sgn * w * 0.34)} ${fx(-h * 0.16)}" fill="none" stroke="${SWARM.blue}" stroke-width="1.6" opacity="0.7"/>`
+  g += swarmBee(cx, cy, s, 'satchel')
+  // a carried letter tucked under the legs (cream chip, slight tilt; NO wax —
+  // the pack allots exactly 3 seals: strut letter, floor letter, stir tab)
+  g += swarmEnvelope(cx + w * 0.02, cy + h * 0.24, s * 0.5, k === 2 ? 'back' : 'face', rr(r, -10, 10))
+  g += `</g>`
+  return svgPiece(w, h, g)
+}
+
+/**
+ * THE s3 SPREAD PRINT (page-3, both pages in ONE image — the pack's third
+ * read and "our biggest ref gap", the T-FLOOR). Same split/coordinate maths
+ * as postRoadSpread (pageFX/pageFY; image TOP = far page edge z −0.75).
+ *
+ * The printed valley floor of the Guild of the Bee: warm parchment with a
+ * meadow wash on the aprons; GOLD DASHED FLIGHT-ROUTES spiralling out of the
+ * hive mouth (gutter, z ≈ 0.40) across BOTH pages; 10 painted flat bees + 6
+ * painted letters strung along them, sizes grading DOWN toward the 3D ring
+ * (2D paint accelerating into 3D paper — the Alice floor-cards recipe); tiny
+ * parcels mid-route; a honeycomb compass rose under the free right yard; the
+ * PAINTED APIARIST with smoke bellows lower-left (T-COUNTERWEIGHT — the
+ * horseshoe's front gap is where the keeper stands), smoke curling toward
+ * that gap; and a dashed bee-loop affordance leading to the die-cut STIR tab
+ * (the tab itself carries the lettering, so the print points, never repeats).
+ * The floor letter by the compass carries wax seal 3 of 3.
+ */
+function beeRoutesSpread(w, h, seed) {
+  const r = mulberry32(seed)
+  const PX = (f) => f * w
+  const PY = (f) => f * h
+  const WALNUT = '#5c4526'
+
+  // cubic bezier evaluator + tangent in image fractions
+  const bez = (P, t) => {
+    const mt = 1 - t
+    return [0, 1].map(
+      (k) => mt * mt * mt * P[0][k] + 3 * mt * mt * t * P[1][k] + 3 * mt * t * t * P[2][k] + t * t * t * P[3][k]
+    )
+  }
+  const bezTan = (P, t) => {
+    const [x0, y0] = bez(P, Math.max(0, t - 0.01))
+    const [x1, y1] = bez(P, Math.min(1, t + 0.01))
+    return Math.atan2((y1 - y0) * h, (x1 - x0) * w) * (180 / Math.PI)
+  }
+  const pathOf = (P) =>
+    `M ${fx(PX(P[0][0]))} ${fx(PY(P[0][1]))} C ${fx(PX(P[1][0]))} ${fx(PY(P[1][1]))} ${fx(PX(P[2][0]))} ${fx(PY(P[2][1]))} ${fx(PX(P[3][0]))} ${fx(PY(P[3][1]))}`
+
+  // the routes, hive mouth -> both aprons (t=0 at the hive, t=1 at the edge)
+  const HIVE = [0.5, pageFY(0.42)]
+  const ROUTES = [
+    [[0.515, 0.79], [0.63, 0.71], [0.78, 0.84], [0.97, 0.87]], // right outer
+    [[0.512, 0.77], [0.6, 0.6], [0.73, 0.55], [0.9, 0.64]], // right inner, to the compass yard
+    [[0.485, 0.79], [0.37, 0.72], [0.22, 0.86], [0.03, 0.88]], // left outer
+    [[0.488, 0.77], [0.4, 0.62], [0.3, 0.56], [0.12, 0.63]], // left inner, past the windmill lane
+  ]
+
+  // a painted flat courier (top view) at image fraction (x,y), rotated along
+  // its route: gold body, walnut line, paper-white wing pair.
+  const flatBee = (x, y, s, ang, dim) => {
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="${fx(dim)}">`
+    g += `<ellipse cx="0" cy="${fx(-s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="1.1" stroke-opacity="0.5" transform="rotate(-24)"/>`
+    g += `<ellipse cx="0" cy="${fx(s * 0.52)}" rx="${fx(s * 0.44)}" ry="${fx(s * 0.2)}" fill="${SWARM.wing}" stroke="${WALNUT}" stroke-width="1.1" stroke-opacity="0.5" transform="rotate(24)"/>`
+    g += `<ellipse cx="0" cy="0" rx="${fx(s * 0.5)}" ry="${fx(s * 0.3)}" fill="${SWARM.gold}" stroke="${WALNUT}" stroke-width="1.4"/>`
+    for (const t of [-0.12, 0.2]) g += `<line x1="${fx(s * t)}" y1="${fx(-s * 0.26)}" x2="${fx(s * t)}" y2="${fx(s * 0.26)}" stroke="${WALNUT}" stroke-width="${fx(s * 0.13)}"/>`
+    g += `<circle cx="${fx(s * 0.56)}" cy="0" r="${fx(s * 0.16)}" fill="${SWARM.bee}"/>`
+    g += `</g>`
+    return g
+  }
+  const flatLetter = (x, y, s, ang, sealed) => {
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="0.9">`
+    g += `<rect x="${fx(-s * 0.5)}" y="${fx(-s * 0.34)}" width="${fx(s)}" height="${fx(s * 0.68)}" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.3"/>`
+    g += `<path d="M ${fx(-s * 0.5)} ${fx(-s * 0.34)} L 0 ${fx(s * 0.08)} L ${fx(s * 0.5)} ${fx(-s * 0.34)}" fill="none" stroke="${WALNUT}" stroke-width="1.1" opacity="0.6"/>`
+    if (sealed) g += `<circle cx="0" cy="${fx(s * 0.06)}" r="${fx(s * 0.14)}" fill="${SWARM.red}" stroke="#8c352a" stroke-width="1.2"/>`
+    g += `</g>`
+    return g
+  }
+  const flatParcel = (x, y, s, ang) => {
+    let g = `<g transform="translate(${fx(PX(x))} ${fx(PY(y))}) rotate(${fx(ang)})" opacity="0.85">`
+    g += `<rect x="${fx(-s * 0.42)}" y="${fx(-s * 0.34)}" width="${fx(s * 0.84)}" height="${fx(s * 0.68)}" fill="${SWARM.parch}" stroke="${WALNUT}" stroke-width="1.2"/>`
+    g += `<line x1="0" y1="${fx(-s * 0.34)}" x2="0" y2="${fx(s * 0.34)}" stroke="${SWARM.amber}" stroke-width="1.6"/>`
+    g += `<line x1="${fx(-s * 0.42)}" y1="0" x2="${fx(s * 0.42)}" y2="0" stroke="${SWARM.amber}" stroke-width="1.6"/>`
+    g += `</g>`
+    return g
+  }
+
+  let s = `<g>`
+  s += `<rect width="${w}" height="${h}" fill="${SWARM.parch}"/>`
+  // laid-paper tooth
+  for (let i = 0; i < 170; i++) {
+    const y = rr(r, 0, h)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${WALNUT}" stroke-width="1" opacity="${fx(rr(r, 0.02, 0.05))}"/>`
+  }
+  // the meadow wash: soft green on the reader aprons, thinning toward the ring
+  // lane so the die-cut world stays the star
+  s += `<rect y="${fx(h * 0.52)}" width="${w}" height="${fx(h * 0.48)}" fill="url(#meadowWash)"/>`
+  // grass ticks + tiny meadow flowers, apron band only
+  for (let i = 0; i < 130; i++) {
+    const x = rr(r, 0, w)
+    const y = rr(r, h * 0.6, h * 0.985)
+    const gl = rr(r, 5, 13) * (y / h)
+    s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(rr(r, -3, 3))} ${fx(-gl)} ${fx(rr(r, -2, 2))} ${fx(-gl * 1.25)}" fill="none" stroke="${SWARM.meadow}" stroke-width="1.3" opacity="${fx(rr(r, 0.25, 0.5))}"/>`
+    if (i % 11 === 4) s += `<circle cx="${fx(x)}" cy="${fx(y - gl)}" r="${fx(rr(r, 1.6, 3))}" fill="${['#d9a441', '#c46a6a', '#e6e0b0'][i % 3]}" opacity="0.7"/>`
+  }
+  // far half hazes out; the backdrop glues over most of it at rest
+  s += `<rect width="${w}" height="${fx(h * 0.36)}" fill="url(#pageHaze3)"/>`
+  // gutter valley shadow
+  s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#pageGutter3)"/>`
+
+  // ---- THE GOLD ROUTES: dashed spirals out of the hive mouth, an amber echo
+  // under each so they read as painted ribbon, not plot lines.
+  for (const P of ROUTES) {
+    s += `<path d="${pathOf(P)}" fill="none" stroke="${SWARM.amber}" stroke-width="5" opacity="0.18"/>`
+    s += `<path d="${pathOf(P)}" fill="none" stroke="${SWARM.gold}" stroke-width="2.8" stroke-dasharray="11 9" opacity="0.85"/>`
+  }
+  // the hive mouth they all pour from
+  s += `<ellipse cx="${fx(PX(HIVE[0]))}" cy="${fx(PY(HIVE[1]))}" rx="${fx(PX(0.024))}" ry="${fx(PY(0.016))}" fill="${SWARM.amber}" opacity="0.35"/>`
+  s += `<ellipse cx="${fx(PX(HIVE[0]))}" cy="${fx(PY(HIVE[1]))}" rx="${fx(PX(0.024))}" ry="${fx(PY(0.016))}" fill="none" stroke="${WALNUT}" stroke-width="2" opacity="0.5"/>`
+
+  // ---- COURIERS ALONG THE ROUTES: 10 bees + 6 letters + 3 parcels, sizes
+  // grading DOWN toward the hive/ring (t=0) and UP toward the reader corners.
+  const BEE_STATIONS = [
+    [0, 0.3], [0, 0.62], [0, 0.9], [1, 0.45], [1, 0.8],
+    [2, 0.28], [2, 0.58], [2, 0.88], [3, 0.5], [3, 0.85],
+  ]
+  for (const [ri, t] of BEE_STATIONS) {
+    const [x, y] = bez(ROUTES[ri], t)
+    const sz = w * lerp(0.011, 0.024, t) * rr(r, 0.9, 1.1)
+    s += flatBee(x, y + rr(r, -0.012, 0.012), sz, bezTan(ROUTES[ri], t) + rr(r, -14, 14), lerp(0.7, 0.95, t))
+  }
+  const LETTER_STATIONS = [[0, 0.48], [0, 0.76], [1, 0.62], [2, 0.42], [2, 0.72], [3, 0.68]]
+  LETTER_STATIONS.forEach(([ri, t], i) => {
+    const [x, y] = bez(ROUTES[ri], t)
+    const sz = w * lerp(0.014, 0.026, t)
+    // the ONE sealed floor letter (wax 3 of 3) rides the compass-yard route
+    s += flatLetter(x, y + rr(r, -0.01, 0.014), sz, bezTan(ROUTES[ri], t) + rr(r, -30, 30), i === 2)
+  })
+  for (const [ri, t] of [[1, 0.3], [3, 0.32], [0, 0.86]]) {
+    const [x, y] = bez(ROUTES[ri], t)
+    s += flatParcel(x, y + rr(r, -0.01, 0.01), w * lerp(0.012, 0.02, t), rr(r, -35, 35))
+  }
+
+  // ---- HONEYCOMB COMPASS ROSE under the free right yard (radial ~0.62,
+  // z ~0.42): a lying compass DIAL — outer ring circle with cardinal ticks,
+  // a honeycomb patch of 7 small hexes at its heart, a gold needle flying at
+  // the hive with a bee on its tail. (Concentric hexes + spokes read as an
+  // isometric crate at this squash — measured on the first bake.)
+  {
+    const cx = PX(pageFX(0.62, 'right'))
+    const cy = PY(pageFY(0.4))
+    const SQ = 0.68 // lying-flat foreshortening
+    const R = w * 0.082
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="${SWARM.gold}" opacity="0.08"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="2.2" opacity="0.5"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R * 0.8)}" ry="${fx(R * 0.8 * SQ)}" fill="none" stroke="${SWARM.amber}" stroke-width="1.2" stroke-dasharray="5 6" opacity="0.42"/>`
+    // cardinal + intercardinal ticks on the outer ring
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4
+      const len = k % 2 === 0 ? 0.14 : 0.07
+      s += `<line x1="${fx(cx + Math.cos(a) * R * (1 - len))}" y1="${fx(cy + Math.sin(a) * R * (1 - len) * SQ)}" x2="${fx(cx + Math.cos(a) * R * 1.06)}" y2="${fx(cy + Math.sin(a) * R * 1.06 * SQ)}" stroke="${SWARM.amber}" stroke-width="${k % 2 === 0 ? 2.4 : 1.4}" opacity="0.55"/>`
+    }
+    // the honeycomb heart: 7 tiny pointy-top hexes clustered at the center
+    const hex = (hx, hy, hr) =>
+      `<polygon points="${Array.from({ length: 6 }, (_, k) => {
+        const a = Math.PI / 2 + (k * Math.PI) / 3
+        return `${fx(hx + Math.cos(a) * hr)},${fx(hy + Math.sin(a) * hr * SQ)}`
+      }).join(' ')}" fill="${SWARM.gold}" fill-opacity="0.14" stroke="${SWARM.amber}" stroke-width="1.3" opacity="0.6"/>`
+    const hr = R * 0.17
+    s += hex(cx, cy, hr)
+    for (let k = 0; k < 6; k++) {
+      const a = Math.PI / 6 + (k * Math.PI) / 3
+      s += hex(cx + Math.cos(a) * hr * 1.74, cy + Math.sin(a) * hr * 1.74 * SQ, hr)
+    }
+    // the needle: a clear gold arrow flying at the hive, a bee on its tail
+    const na = Math.atan2((PY(HIVE[1]) - cy) / SQ, PX(HIVE[0]) - cx)
+    const ne = [cx + Math.cos(na) * R * 0.94, cy + Math.sin(na) * R * 0.94 * SQ]
+    s += `<line x1="${fx(cx - Math.cos(na) * R * 0.5)}" y1="${fx(cy - Math.sin(na) * R * 0.5 * SQ)}" x2="${fx(ne[0])}" y2="${fx(ne[1])}" stroke="${SWARM.gold}" stroke-width="3" opacity="0.9"/>`
+    s += `<path d="M ${fx(ne[0])} ${fx(ne[1])} l ${fx(-Math.cos(na - 0.42) * w * 0.016)} ${fx(-Math.sin(na - 0.42) * w * 0.016 * SQ)} M ${fx(ne[0])} ${fx(ne[1])} l ${fx(-Math.cos(na + 0.42) * w * 0.016)} ${fx(-Math.sin(na + 0.42) * w * 0.016 * SQ)}" stroke="${SWARM.gold}" stroke-width="3" fill="none" opacity="0.9"/>`
+    s += flatBee(pageFX(0.62, 'right') - (Math.cos(na) * R * 0.62) / w, pageFY(0.4) - (Math.sin(na) * R * 0.62 * SQ) / h, w * 0.012, (na * 180) / Math.PI, 0.9)
+  }
+
+  // ---- THE PAINTED APIARIST, lower-left apron (T-COUNTERWEIGHT): a robed
+  // keeper in slate with a wide veil hat, puffing the smoke bellows toward the
+  // horseshoe's front gap — the gap is STORY: it is where the keeper stands.
+  {
+    const kx = PX(pageFX(0.66, 'left'))
+    const ky = PY(pageFY(0.56))
+    const S = w * 0.052
+    let g = `<g opacity="0.92">`
+    g += `<path d="M ${fx(kx - S * 0.34)} ${fx(ky + S * 0.9)} Q ${fx(kx - S * 0.42)} ${fx(ky - S * 0.1)} ${fx(kx - S * 0.06)} ${fx(ky - S * 0.42)} L ${fx(kx + S * 0.18)} ${fx(ky - S * 0.34)} Q ${fx(kx + S * 0.4)} ${fx(ky + S * 0.1)} ${fx(kx + S * 0.3)} ${fx(ky + S * 0.9)} Z" fill="${SWARM.slate}" stroke="${WALNUT}" stroke-width="1.6"/>` // robe
+    g += `<circle cx="${fx(kx + S * 0.04)}" cy="${fx(ky - S * 0.58)}" r="${fx(S * 0.2)}" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.4"/>` // veiled head
+    g += `<path d="M ${fx(kx - S * 0.3)} ${fx(ky - S * 0.62)} Q ${fx(kx + S * 0.04)} ${fx(ky - S * 0.95)} ${fx(kx + S * 0.38)} ${fx(ky - S * 0.62)} Z" fill="${SWARM.gold}" stroke="${WALNUT}" stroke-width="1.4"/>` // wide hat
+    // the bellows: two amber boards pinched around a cream pleat, a dark nozzle
+    g += `<path d="M ${fx(kx + S * 0.24)} ${fx(ky - S * 0.16)} l ${fx(S * 0.42)} ${fx(-S * 0.1)} l ${fx(S * 0.02)} ${fx(S * 0.1)} l ${fx(-S * 0.42)} ${fx(S * 0.06)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.3"/>`
+    g += `<path d="M ${fx(kx + S * 0.26)} ${fx(ky + S * 0.08)} l ${fx(S * 0.42)} ${fx(-S * 0.02)} l ${fx(-S * 0.02)} ${fx(S * 0.12)} l ${fx(-S * 0.38)} ${fx(-S * 0.02)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.3"/>`
+    g += `<path d="M ${fx(kx + S * 0.66)} ${fx(ky - S * 0.22)} L ${fx(kx + S * 0.72)} ${fx(ky + S * 0.14)} L ${fx(kx + S * 0.5)} ${fx(ky + S * 0.02)} Z" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.2"/>`
+    g += `<line x1="${fx(kx + S * 0.7)}" y1="${fx(ky - S * 0.04)}" x2="${fx(kx + S * 0.88)}" y2="${fx(ky - S * 0.02)}" stroke="${WALNUT}" stroke-width="2.4"/>`
+    g += `</g>`
+    s += g
+    // the smoke: a thin curling wisp puffed toward the horseshoe's front gap
+    // at the gutter (down-right toward the hive mouth), loosening as it goes
+    const smoke = `M ${fx(kx + S * 0.92)} ${fx(ky - S * 0.02)} c ${fx(S * 0.5)} ${fx(-S * 0.3)} ${fx(S * 0.62)} ${fx(S * 0.28)} ${fx(S * 1.12)} ${fx(S * 0.06)} c ${fx(S * 0.42)} ${fx(-S * 0.18)} ${fx(S * 0.54)} ${fx(S * 0.32)} ${fx(S * 1.06)} ${fx(S * 0.16)} c ${fx(S * 0.44)} ${fx(-S * 0.14)} ${fx(S * 0.86)} ${fx(S * 0.1)} ${fx(S * 1.5)} ${fx(S * 0.34)}`
+    s += `<path d="${smoke}" fill="none" stroke="#f3ecda" stroke-width="${fx(S * 0.13)}" stroke-linecap="round" opacity="0.75"/>`
+    s += `<path d="${smoke}" fill="none" stroke="${WALNUT}" stroke-width="1" opacity="0.28"/>`
+    // three thinning puffs where the wisp dies at the gap
+    for (const [px2, py2, pr] of [[4.35, 0.5, 0.16], [4.75, 0.62, 0.11], [5.05, 0.72, 0.07]])
+      s += `<circle cx="${fx(kx + S * px2)}" cy="${fx(ky + S * py2)}" r="${fx(S * pr)}" fill="#f3ecda" opacity="0.55"/>`
+  }
+
+  // ---- AFFORDANCE TRAIL to the STIR tab (fore edge right, z 0.30-0.42): the
+  // die-cut tab carries its own lettering, so the print POINTS — a dashed
+  // amber bee-loop curling from the compass yard into the tab's seat.
+  {
+    const d = `M ${fx(PX(pageFX(0.74, 'right')))} ${fx(PY(pageFY(0.44)))} C ${fx(PX(pageFX(0.88, 'right')))} ${fx(PY(pageFY(0.52)))} ${fx(PX(pageFX(0.92, 'right')))} ${fx(PY(pageFY(0.28)))} ${fx(PX(pageFX(1.0, 'right')))} ${fx(PY(pageFY(0.36)))}`
+    s += `<path d="${d}" fill="none" stroke="${SWARM.amber}" stroke-width="2.4" stroke-dasharray="8 7" opacity="0.8"/>`
+    s += `<path d="M ${fx(PX(pageFX(1.0, 'right')))} ${fx(PY(pageFY(0.36)))} l ${fx(-w * 0.011)} ${fx(-h * 0.014)} l ${fx(w * 0.016)} ${fx(h * 0.012)} l ${fx(-w * 0.015)} ${fx(h * 0.013)} Z" fill="${SWARM.amber}" opacity="0.85"/>`
+  }
+
+  s += `<rect width="${w}" height="${h}" fill="url(#pageVig3)"/>`
+  s += `</g>`
+
+  const defs =
+    `<linearGradient id="meadowWash" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${SWARM.meadow}" stop-opacity="0"/>` +
+    `<stop offset="0.55" stop-color="${SWARM.meadow}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${SWARM.meadow}" stop-opacity="0.3"/></linearGradient>` +
+    `<linearGradient id="pageHaze3" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#f2ead2" stop-opacity="0.85"/>` +
+    `<stop offset="1" stop-color="#f2ead2" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="pageGutter3" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0.28"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0"/></linearGradient>` +
+    `<radialGradient id="pageVig3" cx="0.5" cy="0.55" r="0.75">` +
+    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.26"/></radialGradient>`
+
+  return svgPiece(w, h, s, defs)
+}
+
+/** Flat cut-paper cloud (ref-10 register): white lobes over a sky-wash base,
+ *  slate underside hint, transparent elsewhere. */
+function cloudPatch(w, h, seed) {
+  const r = mulberry32(seed)
+  const baseY = h * 0.78
+  const lobes = []
+  const n = 6
+  for (let i = 0; i <= n; i++) {
+    const x = lerp(w * 0.08, w * 0.92, i / n) + rr(r, -w * 0.02, w * 0.02)
+    const lr = h * rr(r, 0.26, 0.44) * (i === 0 || i === n ? 0.6 : 1)
+    lobes.push([x, baseY - lr * 0.55, lr])
+  }
+  let g = `<g>`
+  // rim halo pass, then the lobes, then a flat base line closing the cut
+  for (const [x, y, lr] of lobes) g += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(lr + 4)}" fill="${RIM}" opacity="0.9"/>`
+  g += `<rect x="${fx(w * 0.05)}" y="${fx(baseY - 4)}" width="${fx(w * 0.9)}" height="${fx(h * 0.16)}" rx="8" fill="${RIM}" opacity="0.9"/>`
+  for (const [x, y, lr] of lobes) g += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(lr)}" fill="#fdfefe"/>`
+  g += `<rect x="${fx(w * 0.06)}" y="${fx(baseY - h * 0.1)}" width="${fx(w * 0.88)}" height="${fx(h * 0.14)}" rx="7" fill="#fdfefe"/>`
+  // sky-wash shading inside the lower half + slate underside
+  for (const [x, y, lr] of lobes) g += `<circle cx="${fx(x + lr * 0.12)}" cy="${fx(y + lr * 0.3)}" r="${fx(lr * 0.72)}" fill="${SWARM.sky}" opacity="0.8"/>`
+  g += `<rect x="${fx(w * 0.08)}" y="${fx(baseY - h * 0.02)}" width="${fx(w * 0.84)}" height="${fx(h * 0.06)}" fill="${SWARM.blue}" opacity="0.35"/>`
+  g += `</g>`
+  return svgPiece(w, h, g)
+}
+
+/** Linked-rank chain (T-LINKED-RANK): 2 bees + a strung cream envelope on one
+ *  painted thread — ONE die-cut silhouette overhanging the fringe top. */
+function chainLink(w, h, seed, mirrored) {
+  const r = mulberry32(seed)
+  const m = (x) => (mirrored ? w - x : x)
+  let g = `<g>`
+  // the thread: one sagging catenary the whole chain hangs from
+  const thread = `M ${fx(m(w * 0.04))} ${fx(h * 0.34)} C ${fx(m(w * 0.3))} ${fx(h * 0.62)} ${fx(m(w * 0.62))} ${fx(h * 0.14)} ${fx(m(w * 0.96))} ${fx(h * 0.4)}`
+  g += `<path d="${thread}" fill="none" stroke="${RIM}" stroke-width="6" opacity="0.9"/>`
+  g += `<path d="${thread}" fill="none" stroke="${SWARM.slate}" stroke-width="2" opacity="0.9"/>`
+  // bee 1 leads, envelope strung mid-thread, bee 2 trails higher
+  g += swarmBee(m(w * 0.14), h * 0.3, h * 0.34, 'wingsMid')
+  g += `<line x1="${fx(m(w * 0.47))}" y1="${fx(h * 0.38)}" x2="${fx(m(w * 0.47))}" y2="${fx(h * 0.52)}" stroke="${SWARM.slate}" stroke-width="1.8"/>`
+  g += swarmEnvelope(m(w * 0.47), h * 0.66, h * 0.42, 'face', rr(r, -7, 7))
+  g += swarmBee(m(w * 0.8), h * 0.26, h * 0.3, 'wingsUp')
+  // two tiny honey drops falling off the thread
+  for (const [tx, ty] of [[0.32, 0.62], [0.64, 0.4]])
+    g += `<circle cx="${fx(m(w * tx))}" cy="${fx(h * ty)}" r="${fx(h * 0.035)}" fill="${SWARM.gold}" stroke="${SWARM.amber}" stroke-width="1.2"/>`
+  g += `</g>`
+  return svgPiece(w, h, g)
+}
+
 async function bakePieceTexture(piece, outDir) {
   const svg = piece.paint()
   const flat = await sharp(Buffer.from(svg)).png().toBuffer()
@@ -4736,9 +5287,23 @@ const PIECES = [
   { id: 'ch2-hive-top', seed: 30204, w: 512, h: 341, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'hive') } },
   { id: 'ch2-hive-swarm', seed: 30210, w: 512, h: 320, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'hiveSwarm') } },
   { id: 'ch2-hive-flowers', seed: 30211, w: 512, h: 256, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'flowers') } },
-  { id: 'ch2-meadow-deck', seed: 30220, w: 683, h: 512, grain: 16, paint() { return deckSurface(this.w, this.h, this.seed, 'meadow') } },
+  // (ch2-meadow-deck retired with the meadow platform — the swarm owns its
+  //  lane and its texture budget now; E3 s3 pack §2.)
   { id: 'ch2-fringe', seed: 30230, w: 1024, h: 188, grain: 14, paint() { return meadowFringe(this.w, this.h, this.seed) } },
   { id: 'ch2-windmill', seed: 30240, w: 512, h: 620, grain: 12, paint() { return windmillSail(this.w, this.h, this.seed) } },
+  // ---- Spread 3 — THE CARRIER SWARM (E3 s3): the swarmarc sprite atlas, the
+  // crown accent trio's two new bees, the cloud interleave, the fringe chains.
+  // Pixel dims at each piece's true mesh aspect (content.ts), slivers <= 512.
+  { id: 'ch2-swarm-atlas', seed: 30250, w: 1024, h: 1024, grain: 8, paint() { return swarmAtlas(this.w, this.h, this.seed) } },
+  { id: 'ch2-crown-b', seed: 30260, w: 256, h: 146, grain: 8, paint() { return crownBee(this.w, this.h, this.seed, 1) } },
+  { id: 'ch2-crown-c', seed: 30261, w: 256, h: 138, grain: 8, paint() { return crownBee(this.w, this.h, this.seed, 2) } },
+  { id: 'ch2-cloud-l', seed: 30270, w: 512, h: 188, grain: 8, paint() { return cloudPatch(this.w, this.h, this.seed) } },
+  { id: 'ch2-cloud-r', seed: 30271, w: 512, h: 197, grain: 8, paint() { return cloudPatch(this.w, this.h, this.seed) } },
+  { id: 'ch2-chain-l', seed: 30280, w: 512, h: 181, grain: 8, paint() { return chainLink(this.w, this.h, this.seed, false) } },
+  { id: 'ch2-chain-r', seed: 30281, w: 512, h: 192, grain: 8, paint() { return chainLink(this.w, this.h, this.seed, true) } },
+  // the s3 spread print — the T-FLOOR (gold routes / painted couriers /
+  // compass rose / apiarist counterweight / tab affordance trail)
+  { id: 'page-3', seed: 30350, w: 1024, h: 683, grain: 10, paint() { return beeRoutesSpread(this.w, this.h, this.seed) } },
   // ---- Spread 5 — the Vault-Dragon (ch4 chest box, hoard, goldpile) ----
   { id: 'ch4-chest-front', seed: 50201, w: 512, h: 256, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'chest') } },
   { id: 'ch4-chest-back', seed: 50202, w: 512, h: 256, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'chest') } },

@@ -46,6 +46,7 @@ import { KeepsakePopupLayer } from './popup-keepsake-layer'
 import { KeepStackPopupLayer } from './popup-keepstack-layer'
 import { KeepWinchPopupLayer } from './popup-keepwinch-layer'
 import { KeepSkylinePopupLayer } from './popup-skyline-layer'
+import { SwarmArcPopupLayer } from './popup-swarmarc-layer'
 import { DepthVistaPopupLayer } from './popup-depthvista-layer'
 import { DissolvePopupLayer } from './popup-dissolve-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
@@ -109,6 +110,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'keepsake') return 0.5 // single card quad, no fold
   // The E1 showpiece mechs carry their per-face uvs in their own layers.
   if (layer.mech === 'keepstack' || layer.mech === 'keepwinch' || layer.mech === 'skyline') return 0.5
+  if (layer.mech === 'swarmarc') return 0.5 // merged strut/rider quads, per-cell uvs in the swarmarc layer
   if (layer.mech === 'depthvista') return 0.5 // arch decks + wing quads, per-face uvs in the depthvista layer
   if (layer.mech === 'dissolve') return 0.5 // base + slat + tab quads, per-slat uvs in the dissolve layer
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
@@ -154,6 +156,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
   if (layer.mech === 'keepsake') return false // single card quad, its own renderer
   // The E1 showpiece mechs pose their own per-face uvs in their own renderers.
   if (layer.mech === 'keepstack' || layer.mech === 'keepwinch' || layer.mech === 'skyline') return false
+  if (layer.mech === 'swarmarc') return false // atlas-cell uvs live in the swarmarc layer
   if (layer.mech === 'depthvista') return false // per-face uvs live in the depthvista layer
   if (layer.mech === 'dissolve') return false // per-slat screen-space uvs live in the dissolve layer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
@@ -502,6 +505,17 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'keepwinch') {
           return (
             <KeepWinchPopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        if (layer.mech === 'swarmarc') {
+          return (
+            <SwarmArcPopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}

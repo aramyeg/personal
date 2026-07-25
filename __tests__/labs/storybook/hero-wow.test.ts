@@ -17,6 +17,7 @@ import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 import { easeTurnWeighted, PAGE_H } from '@/components/labs/storybook/book/page-geometry'
 import {
   heroForSpread,
@@ -117,6 +118,7 @@ const allQuads = (
   if (layer.mech === 'keepstack') return keepStackQuads(layer, thetaL, thetaR)
   if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
   if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
+  if (layer.mech === 'swarmarc') return swarmArcQuads(layer, thetaL, thetaR)
   const pose = solveLayerPose(layer, parentOf(layer, layers), thetaL, thetaR)
   return [pose.right, pose.left]
 }

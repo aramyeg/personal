@@ -24,6 +24,7 @@ import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 
 // D-G7 ART & OVERLAP whitelist gate, second half (benchmark spec
 // docs/superpowers/specs/2026-07-13-grand-book-benchmark.md): "Screen-space
@@ -146,6 +147,8 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       return keepWinchOutputQuads(l, keepWinchThetaMax(l), tL, tR)
     case 'skyline':
       return keepSkylineQuads(l, tL, tR)
+    case 'swarmarc':
+      return swarmArcQuads(l, tL, tR)
     default:
       throw new Error(`poseQuads: unhandled mech ${(l as SceneLayer).mech}`)
   }
@@ -276,25 +279,42 @@ const WHITELIST: readonly WhitelistEntry[] = [
       'hive read as one beat (Chapter II is literally about the Guild of the Bee), not an incidental clash.',
   },
   {
-    pair: 'ch2-hero x ch2-meadow',
-    reason: 'depth-echo',
+    pair: 'ch2-hero x ch2-swarm',
+    reason: 'framing',
     note:
-      'the alpine meadow terrace is the ground plane the balloon floats over; a wide midground shelf fully ' +
-      "containing a narrower hero above it is ordinary depth staging, confirmed in the capture as clean.",
+      'THE composition (E3 s3 pack §1): the horseshoe vortex wheels AROUND the hero — the swarm ring is a ' +
+      'literal frame centered on the raised looking-glass; total screen containment is the design, not a clash.',
   },
   {
-    pair: 'ch2-bee-c x ch2-meadow',
+    pair: 'ch2-bee-b x ch2-swarm',
     reason: 'depth-echo',
     note:
-      'same terrace-grounding relationship as ch2-hero x ch2-meadow, extended to the small bee that circles ' +
-      'the hero directly above the same shelf.',
+      "the hero's pop-off bee is the swarm's INNER ORBIT (pack §1 second read) — a ring member at hero depth, " +
+      'inside the same wheeling silhouette by construction.',
   },
   {
-    pair: 'ch2-bee-b x ch2-meadow',
+    pair: 'ch2-bee-c x ch2-swarm',
     reason: 'depth-echo',
+    note: 'same inner-orbit relationship as bee-b — the second pop-off bee brushing past the hero inside the ring.',
+  },
+  {
+    pair: 'ch2-hive x ch2-swarm',
+    reason: 'framing',
     note:
-      'the same grounding read as bee-c after the D5 re-home (bee-b was 100% swallowed behind the balloon ' +
-      'as a backdrop child — a wasted piece; it now rides the hero left panel and floats over the shelf).',
+      "the ring ERUPTS from the hive (pack §2.6): the front strut ends (θ ±150°) hover just upstage of the hive " +
+      'box so the eruption reads point-blank — the overlap is the story beat.',
+  },
+  {
+    pair: 'ch2-bee-a x ch2-crown-b',
+    reason: 'silhouette-dialogue',
+    note:
+      'the crown accent trio (three flung bees on the backdrop crease) reads as ONE burst above the ring crown; ' +
+      'bee-a is the promoted center of that cluster — the trio overlapping each other is the cluster.',
+  },
+  {
+    pair: 'ch2-bee-a x ch2-crown-c',
+    reason: 'silhouette-dialogue',
+    note: 'same crown-trio cluster read — the third flung bee tucks under the promoted bee-a.',
   },
   {
     pair: 'ch4-hero x ch4-chest',

@@ -103,6 +103,11 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'skyline') {
       layer.rows.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
     }
+    // The carrier swarm (popup-swarmarc-layer.tsx): ONE shared sprite atlas
+    // for all 28 riders + the strut swatch + the stir-tab handle.
+    if (layer.mech === 'swarmarc') {
+      ids.add(`${layer.id}-atlas`)
+    }
     // The depth vista (popup-depthvista-layer.tsx): one shaped flap art per wing
     // config (`<id>-<key>`, e.g. -near/-mid/-rear), each mirrored to both flanks.
     if (layer.mech === 'depthvista') {
@@ -212,6 +217,9 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
       }
       if (layer.mech === 'skyline') {
         layer.rows.forEach((_, i) => constructed.push(`${layer.id}-mound${i}`))
+      }
+      if (layer.mech === 'swarmarc') {
+        constructed.push(`${layer.id}-atlas`)
       }
     }
     const missing = constructed.filter((key) => !doc.includes(`\`${key}\``))

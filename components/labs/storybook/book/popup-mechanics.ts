@@ -97,6 +97,7 @@ import { solveKineticArmPose } from './popup-kinetic'
 import type { KeepStackGeom } from './popup-keepstack'
 import type { KeepWinchGeom } from './popup-keepwinch'
 import type { KeepSkylineGeom } from './popup-skyline'
+import type { SwarmArcGeom } from './popup-swarmarc'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -747,6 +748,7 @@ export type LayerGeom =
   | KeepStackGeom
   | KeepWinchGeom
   | KeepSkylineGeom
+  | SwarmArcGeom
   | DepthVistaGeom
   | DissolveGeom
 
@@ -1267,6 +1269,8 @@ export function solveLayerPose(
       throw new Error('storybook: keepwinch layers are multi-output + user-driven — use solveKeepWinchPose (popup-keepwinch)')
     case 'skyline':
       throw new Error('storybook: skyline layers are multi-mound — use solveKeepSkylinePose (popup-skyline)')
+    case 'swarmarc':
+      throw new Error('storybook: swarmarc layers are multi-strut + user-stirred — use solveSwarmArcPose (popup-swarmarc)')
     case 'depthvista':
       throw new Error('storybook: depth-vista layers are multi-patch (arches + wings) — use solveDepthVistaPose (popup-depthvista)')
     case 'dissolve':

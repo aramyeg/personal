@@ -89,7 +89,9 @@ describe('storybook content', () => {
                                             ? l.wings.length
                                             : l.mech === 'dissolve'
                                               ? l.slats
-                                              : l.width
+                                              : l.mech === 'swarmarc'
+                                                ? l.struts.length
+                                                : l.width
             return `${l.mech}:${size}`
           })
           .join('|')

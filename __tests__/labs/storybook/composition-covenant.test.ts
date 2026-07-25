@@ -148,6 +148,11 @@ const familyOf = (l: SceneLayer): string | null => {
       // A row of page-driven rooftop mounds (the tab-piece/knob-tier cross-
       // section without a knob) — its own low-scenery family.
       return 'skyline'
+    case 'swarmarc':
+      // The graded-strut carrier swarm (E3 s3): many radial-hinge page-riding
+      // struts wave-staggered into one wheeling ring + a stir ripple tab — an
+      // inherent multi-member assembly, its own family.
+      return 'swarmarc'
     case 'volvelle':
       // The reader-spun windowed dial (Birmingham 103/104) — a rotating-window
       // reveal, distinct from the winch's crank/iris: its own hand-driven family.
@@ -277,10 +282,16 @@ describe('composition covenant v2 — dressed assemblies by default (gate C1v2)'
     // so the per-chapter platform template no longer binds spreads rebuilt as
     // stage sets. Listed per spread as each pack's retirement is accepted.
     const STAGE_SET_SPREADS: ReadonlySet<number> = new Set([2])
+    // SWARMARC EXEMPTION (E3 s3 pack §2): the carrier swarm IS the floating
+    // tier generalized — 28 struts holding rider art 0.09–0.61 above the page
+    // plane (the platform family's whole depth win, multiplied), and the
+    // retired ch2-meadow platform sat exactly in the ring's left anchor lane.
+    // The gate accepts either the platform piece or the strut-swarm carrying
+    // that structural role.
     for (const chapter of CHAPTERS) {
       if (chapter.showpiece || STAGE_SET_SPREADS.has(chapter.spread)) continue
       expect(
-        chapter.layers.some((l) => l.mech === 'platform'),
+        chapter.layers.some((l) => l.mech === 'platform' || l.mech === 'swarmarc'),
         `spread ${chapter.spread} has no floating platform`
       ).toBe(true)
     }

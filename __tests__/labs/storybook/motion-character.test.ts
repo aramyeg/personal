@@ -22,6 +22,7 @@ import { keepsakeCardInPlane } from '@/components/labs/storybook/book/popup-keep
 import { keepStackQuads } from '@/components/labs/storybook/book/popup-keepstack'
 import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/storybook/book/popup-keepwinch'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
@@ -161,6 +162,9 @@ const allQuads = (
   // (THETA_MAX) — the worst envelope amplitude. Disc excluded (coplanar handle).
   if (layer.mech === 'keepwinch') return keepWinchOutputQuads(layer, keepWinchThetaMax(layer), thetaL, thetaR)
   if (layer.mech === 'skyline') return keepSkylineQuads(layer, thetaL, thetaR)
+  // The swarm's page-driven motion is the wave-staggered deploy at stir 0 (the
+  // stir ripple is user-paced, cap-exempt like the winch twist).
+  if (layer.mech === 'swarmarc') return swarmArcQuads(layer, thetaL, thetaR)
   // The depth vista is fully page-driven: N wing configs mirrored to both pages,
   // one single cammed flap each — every world quad it poses.
   if (layer.mech === 'depthvista') {
@@ -258,8 +262,21 @@ const worstPerFamily = (rows: readonly NoSnapRow[]) => {
     }))
 }
 
+// A dress patch is a rigid zero-DOF silhouette riding ONE parent panel — its
+// beta-domain character IS its parent's. The E3 s3 pieces made this visible:
+// the clouds ride the ch2-backdrop WALL v-fold (phi 84) and the chains the
+// ch2-fringe wall, so they inherit the wall's geometric late bloom (measured
+// worst 10.4x — inside the vfold's own 15.5 ceiling), while box/platform-
+// seated dress keeps measuring under the plain 3x floor. Key dress rows by
+// parent family so each seat is judged by its parent's character.
+const familyKey = (layer: SceneLayer, layers: readonly SceneLayer[]): string => {
+  if (layer.mech !== 'dress') return layer.mech
+  const parent = layers.find((l) => l.id === layer.parentId)
+  return `dress:${parent?.mech ?? 'none'}`
+}
+
 const BETA_DOMAIN_STATS: readonly NoSnapRow[] = ALL_LAYERS.map(([id, layer, layers]) =>
-  toRow(id, layer.mech, stepStatsOverBetas(layer, layers, uniformBetas(REST_BETA, STATIONS)))
+  toRow(id, familyKey(layer, layers), stepStatsOverBetas(layer, layers, uniformBetas(REST_BETA, STATIONS)))
 )
 
 /** Gate 1 per-family ceiling on the beta-domain max/mean step ratio.
@@ -317,6 +334,18 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // farthest to the mean corner distance). Measured worst ~1.2x + margin; smooth
   // and branch-free (the twist itself is user-paced and cap-exempt).
   volvelle: 1.6,
+  // DRESS ON A WALL V-FOLD (E3 s3): zero-DOF patches riding a wall panel
+  // (ch2-backdrop clouds, ch2-fringe chains) inherit the v-fold's late-bloom
+  // verbatim — measured worst 10.4x (ch2-cloud-r), bounded by the parent
+  // family's own 15.5 ceiling. Box/lid-seated dress stays on the 3x default.
+  'dress:vfold': 15.5,
+  // SWARMARC (E3 s3): the wave-staggered deploy CONCENTRATES each strut's
+  // erection into its own 0.38-wide window of E (pack §3 — that is the
+  // family's signature "pour out of the hive" character), so per-corner max
+  // runs over the whole-turn mean. Measured 4.56x (ch2-swarm) + ~10%; smooth
+  // closed-form smoothstep windows, no discontinuity; Gate 2's absolute cap
+  // still binds the real-time speed.
+  swarmarc: 5.1,
 }
 
 describe('D-G5 Gate 1 — mechanism character (beta domain, ENFORCED)', () => {

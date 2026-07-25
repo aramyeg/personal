@@ -26,6 +26,7 @@ import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/story
 import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
+import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -146,6 +147,9 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       return keepWinchOutputQuads(l, keepWinchThetaMax(l), tL, tR)
     case 'skyline':
       return keepSkylineQuads(l, tL, tR)
+    case 'swarmarc':
+      // Radial-hinge strut ring + riders at stir 0 — its whole depth footprint.
+      return swarmArcQuads(l, tL, tR)
     case 'kinetic': {
       const pose = solveKineticArmPose(l, tL, tR)
       return [pose.right, pose.left]

@@ -197,7 +197,13 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `ch2-hive` | `ch2-hive-front`, `ch2-hive-back`, `ch2-hive-side`, `ch2-hive-top` | Lidded beehive box in the meadow — real hives ARE stacked boxes | side ≈0.86:1 · front/back ≈1.29:1 · top ≈1.5:1 | FACE / TOPDOWN | placeholder |
 | `ch2-hive-swarm` | `ch2-hive-swarm` | Dressed bee swarm hanging off the hive lid | ≈1.6:1 wide | FLAT | placeholder |
 | `ch2-hive-flowers` | `ch2-hive-flowers` | Dressed flowers at the hive's base | ≈2.0:1 wide | FLAT | placeholder |
-| `ch2-meadow` | `ch2-meadow-deck` | Alpine meadow TERRACE deck, stepping down toward the reader | ≈0.67:1 tall strip | TOPDOWN | placeholder |
+| `ch2-swarm` | `ch2-swarm-atlas` | THE CARRIER SWARM (E3 s3): ONE 1024 sprite atlas, 8×8 cell grid — cells 0–15 the 16 rider sprites (bees wings-up/mid/down, envelopes, red-wax sealed letter, twine parcels, honey-drop, scouts), cell 16 the hairline strut swatch (`#a9bccb`), cells 17–18 the stir-tab bee-on-honey-drop handle, cells 19–22 the "STIR THE SWARM ▼" banner | 1:1 atlas | FLAT | placeholder |
+| `ch2-crown-b` | `ch2-crown-b` | Flung crown bee (backdrop crease), wings spread, tiny satchel, slate+gold | ≈1.75:1 landscape | STAND | placeholder |
+| `ch2-crown-c` | `ch2-crown-c` | Flung crown bee (backdrop crease), the smallest of the trio | ≈1.86:1 landscape | STAND | placeholder |
+| `ch2-cloud-l` | `ch2-cloud-l` | Flat cut-paper cloud behind the ring's left shoulder, sky wash + white lobes | ≈2.7:1 wide | FLAT | placeholder |
+| `ch2-cloud-r` | `ch2-cloud-r` | Flat cut-paper cloud, right shoulder | ≈2.6:1 wide | FLAT | placeholder |
+| `ch2-chain-l` | `ch2-chain-l` | Linked-rank chain: 2 bees + a strung cream envelope on painted thread, ONE silhouette overhanging the fringe top | ≈2.8:1 wide | FLAT | placeholder |
+| `ch2-chain-r` | `ch2-chain-r` | Linked-rank chain, right side | ≈2.7:1 wide | FLAT | placeholder |
 | `ch2-fringe` | `ch2-fringe` | Painted meadow fringe at the very front edge | ≈5.45:1 very wide | STAND | placeholder |
 | `ch2-windmill` | `ch2-windmill` | Windmill sail standing in the meadow, just downstage of the courier hero, sweeps to vertical as the book opens | combined ≈0.80:1 portrait-ish (arm dominates; see §1.6 caveat below) | STAND (kinetic) | placeholder — **moved from the deep-upstage park to a visible downstage lane (2026-07-13, in-flight composition pass); geometry above is current as of verification but may still be tuning — recheck `armLen`/`apexZ` before painting if this row looks stale** |
 
