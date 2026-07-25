@@ -8725,14 +8725,10 @@ const PIECES = [
 // rows (2026-07-24). Seeds are chosen so cross-gutter pairs (l-mound0 vs
 // r-mound0, ...) differ in parity, so no two symmetric slots read as near
 // duplicates; `towers` varies the facade-block count per slot.
-const SLOTS = [
-  { id: 'ch3-skyline-l-mound0', w: 0.3219, h: 0.1089, seed: 10008, towers: 7 },
-  { id: 'ch3-skyline-l-mound1', w: 0.292, h: 0.0838, seed: 10011, towers: 8 },
-  { id: 'ch3-skyline-l-mound2', w: 0.2319, h: 0.0728, seed: 10014, towers: 6 },
-  { id: 'ch3-skyline-r-mound0', w: 0.322, h: 0.1011, seed: 40031, towers: 8 },
-  { id: 'ch3-skyline-r-mound1', w: 0.2921, h: 0.0988, seed: 40034, towers: 6 },
-  { id: 'ch3-skyline-r-mound2', w: 0.232, h: 0.0666, seed: 40037, towers: 7 },
-]
+// E3 s4 ROUND-3: the six legacy flank rows are RETIRED. The rear ring stations
+// and both ring-mid arms are replaced by the two stagedchain ROOKERY CLIFFS
+// (PIECES `ch3-cliff-l` / `ch3-cliff-r`), and ch3-skyline-r is gone entirely.
+const SLOTS = []
 
 // The THREE new ring rows (s4 pack §4a A/B). They slot into the same
 // `<layerId>-mound<k>` scheme and bake through the same shaped-mesh path, but
@@ -8740,13 +8736,11 @@ const SLOTS = [
 // because SLOTS is the procart bench's iteration set and its ROWS table only
 // covers the six legacy ids.
 const RING_SLOTS = [
-  // ring-mid arms: mesh 0.26 x 0.16 = 1.625. The RIGHT arm is the mirror of the
-  // left (see dovecoteFacade: the raven ranks are authored with the opposite
-  // facing under `mirror`, so both arms' birds still face the spine).
-  { id: 'ch3-skyline-l-mound3', w: 0.26, h: 0.16, W: 832, H: 512, seed: 10017, variant: 'ringMid', blocks: 4 },
-  { id: 'ch3-skyline-r-mound3', w: 0.26, h: 0.16, W: 832, H: 512, seed: 40040, variant: 'ringMid', blocks: 4, mirror: true },
-  // ring-front gate wall: mesh 0.19 x 0.10 = 1.9.
-  { id: 'ch3-skyline-l-mound4', w: 0.19, h: 0.1, W: 972, H: 512, seed: 10020, variant: 'ringFront', blocks: 5 },
+  // THE YARD WALL — all that survives of the ring (E3 s4 round-3): the left
+  // page's lamplit gate wall where the post-road enters the court. It is now
+  // ch3-skyline-l's ONLY row, so its id moves from `-mound4` to `-mound0`; the
+  // seed is unchanged, so the painting itself is byte-identical.
+  { id: 'ch3-skyline-l-mound0', w: 0.19, h: 0.1, W: 972, H: 512, seed: 10020, variant: 'ringFront', blocks: 5 },
 ]
 
 // E3 s6 — the SOUK WINGS (ch5-souk-{l,r}-mound{0,1}): the bazaar's stall arcs
@@ -8851,19 +8845,11 @@ const ATLASES = [
   },
   {
     id: 'flank-atlas-s4',
-    // The nine skyline strips are slivers at the reading camera (pack 4f caps
-    // their regions at 512 wide; 400 packs two per shelf with room to spare),
-    // plus the gatehouse tower.
+    // E3 s4 ROUND-3: nine skyline strips down to one. What is left to share a
+    // page is the surviving yard wall and the gatehouse tower — the cliffs
+    // themselves are tall single pieces and carry their own textures.
     regions: [
       { id: 'ch3-skyline-l-mound0', w: 400, opaque: false },
-      { id: 'ch3-skyline-l-mound1', w: 400, opaque: false },
-      { id: 'ch3-skyline-l-mound2', w: 400, opaque: false },
-      { id: 'ch3-skyline-l-mound3', w: 400, opaque: false },
-      { id: 'ch3-skyline-l-mound4', w: 400, opaque: false },
-      { id: 'ch3-skyline-r-mound0', w: 400, opaque: false },
-      { id: 'ch3-skyline-r-mound1', w: 400, opaque: false },
-      { id: 'ch3-skyline-r-mound2', w: 400, opaque: false },
-      { id: 'ch3-skyline-r-mound3', w: 400, opaque: false },
       { id: 'ch3-ring-tower', h: 360, opaque: false },
     ],
   },
