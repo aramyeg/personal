@@ -106,6 +106,10 @@ import type { MFoldRangeGeom } from './popup-mfoldrange'
 // v-fold wall host) — geom + relief math in its own module, TYPE-ONLY here
 // (popup-oanave requires solveVFoldPose from this file, not the reverse).
 import type { OanaveGeom } from './popup-oanave'
+// The E3 s4 staged-chain family (round-3 rookery cliffs): a page-rooted chain
+// of storey panels whose joints deploy on their own beta cams. TYPE-ONLY here
+// (popup-stagedchain only needs PanelQuad/Vec3 from this file).
+import type { StagedChainGeom } from './popup-stagedchain'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -767,6 +771,7 @@ export type LayerGeom =
   | DissolveGeom
   | MFoldRangeGeom
   | OanaveGeom
+  | StagedChainGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1293,6 +1298,8 @@ export function solveLayerPose(
       throw new Error('storybook: dissolve layers are multi-patch + user-driven — use solveDissolvePose (popup-dissolve)')
     case 'mfoldrange':
       throw new Error('storybook: range layers are multi-rank — use solveMFoldRangePose (popup-mfoldrange)')
+    case 'stagedchain':
+      throw new Error('storybook: staged-chain layers are multi-storey with per-joint cams — use solveStagedChainPose (popup-stagedchain)')
     case 'oanave':
       // The nave rank's HOST is the shipped v-fold wall solver verbatim; the
       // dihedral-slaved relief strata are extra patches (oanavePatches in

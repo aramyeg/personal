@@ -24,6 +24,7 @@ import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/story
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 import { solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
+import { stagedChainQuads } from '@/components/labs/storybook/book/popup-stagedchain'
 import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-depthvista'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
@@ -187,6 +188,9 @@ const allQuads = (
       ...pose.gussets.flatMap((g) => [g.left, g.right]),
     ]
   }
+  // The staged chain is purely page-driven: every joint's q is a monotone cam
+  // in beta alone, so its whole motion is the merged storey strip.
+  if (layer.mech === 'stagedchain') return stagedChainQuads(layer, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -355,6 +359,16 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // branch-free per rank; the real-time GLOBAL_CAP tests below hold it
   // absolutely bounded at real turn speed.
   mfoldrange: 19,
+  // STAGED CHAIN (E3 s4): the family's whole point is UNEVEN pacing — each
+  // joint holds still through the fast mid-turn station and spends its arc in
+  // the eased tails, so a high beta-domain max/mean is the mechanism working,
+  // not a defect. (The research bench measured 13-54x at frontier heights;
+  // playbook Gate-1 note called for a measured family ceiling.) The absolute
+  // bound that matters is Gate 2's real-time GLOBAL_CAP, which the cam planner
+  // targets directly and the tests below hold at 3.6-4.2% margin. Every cam is
+  // monotone and piecewise-linear in beta (no snap). Measured worst 37.41x
+  // (ch3-cliff-l, beta domain) + 10%.
+  stagedchain: 42,
   // VOLVELLE (E2.2 Batch B): at a FROZEN twist the dial + card ride the page as a
   // rigid coplanar square, so their only page-driven motion is the pure rigid
   // page sweep — every corner's step is proportional to its distance from the

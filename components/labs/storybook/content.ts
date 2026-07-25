@@ -445,25 +445,83 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // delivered 3.2:1 strip ART aspect, not by physics; at F+w 0.70 the honest cap
   // allows height up to ~0.28. The mid arms take 0.16 (1.5x the old rows) and land
   // at radius 0.700-0.740.
+  // E3 s4 ROUND-3 — THE ROOKERY CLIFFS (bench .superpowers/sdd/bench/
+  // e3s4-cliffs.mjs, ALL GATES GREEN). The user's verdict on the ring was that
+  // it read "uneffectful" and squat: nine flank strips of height 0.107-0.16
+  // aggregating to 46k px^2 of screen. They are RETIRED here (the rear three
+  // rows per side and both ring-mid arms) and replaced by TWO page-rooted
+  // multi-storey cliffs of the new STAGEDCHAIN family — each one alone
+  // out-massing the entire old ring (51.9k / 49.1k px^2) and standing 0.80-0.84
+  // world tall instead of 0.16. Only the ring-front gate wall survives, as the
+  // left page's lamplit yard wall.
+  //
+  // WHY THIS IS LEGAL AT ALL (playbook §1): a single-stage page-rooted flap's
+  // worst real-time step is its far base corner riding the page, rfar*dtheta —
+  // which capped row height near 0.11 and killed the "true 2x" ask. A CHAIN of
+  // storey panels, each joint on its own beta cam, spends its joint arc in the
+  // eased TAILS of the turn and holds a shallow pose through the fast mid-turn
+  // station. The four family conditions (hold-through-midturn reach <= 0.252 at
+  // rfar 0.73, joint arc fits the two tails, top-down unroll, q(0)=0 exact) are
+  // asserted per config in popup-stagedchain.test.ts.
+  //
+  // THE LEAN-BACK LEVER (this scene's addition to the derivation, which swept
+  // rootDeg 90 only): raking the chain back trades apex height for chain
+  // LENGTH — the hold-through-midturn reach scales with sin(root), while the
+  // elevated reading camera sees a raked face nearly square-on instead of
+  // edge-on (the lid-dominant sightline law). An upright H 0.82 cliff projects
+  // 40k px^2; the 58deg-raked chain of length 0.94 projects 51.9k at a LOWER
+  // apex (0.816), so the keep's 1.01 spire keeps the gutter crown.
+  //
+  // AND THE WALL THAT SHAPED THEM: both cliffs are RIBBONS, not accordions. An
+  // accordion storey swings through vertical on its way open and raises a tent
+  // of nearly its own panel height — at the SMALLEST betas, because the
+  // top-down unroll law deploys upper joints first. That breaks wedge
+  // containment (measured 0.45 past the limit at beta 10deg, caught by the
+  // book-wide A10 gate). A ribbon lies extended-collinear at close and only
+  // ever articulates by relDeg, so it never tents. The price is page depth: the
+  // closed footprint is the full chain length, which is what caps these chains
+  // at 0.88 from a hinge at z 0.15 (0.15 + PAGE_H/2 = 0.90).
+  //
+  // Feet sit at radial 0.43 (0.03 clear of the keep's 0.40 gutter band) and the
+  // hinge at z 0.15 — upstage of the winch disc (z 0.17+) and the dial (0.21+),
+  // so the cliffs are BEHIND the keep facade and outboard of its cone: they
+  // block 0.0% of the hall / gallery / spire sightline rays (bench S3).
+  {
+    id: 'ch3-cliff-l', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
+    side: 'left', F: 0.43, w: 0.3, zc: 0.15, rootDeg: 58, safe: 0.95, camRestDeg: 173,
+    style: 'ribbon',
+    // Three storeys, tapered 0.78 up the chain: the base rank of portals is the
+    // widest band of art, the crown the narrowest. relDeg 20 tips each storey
+    // 20deg more upright than the one below, so the cliff face CURVES up and
+    // over the canyon (58 / 78 / 98deg) instead of reading as one raked card.
+    stages: [
+      { h: 0.368449, relDeg: 0 },
+      { h: 0.28739, relDeg: 20 },
+      { h: 0.224161, relDeg: 20 },
+    ],
+  },
+  {
+    id: 'ch3-cliff-r', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
+    side: 'right', F: 0.43, w: 0.3, zc: 0.15, rootDeg: 48, safe: 0.95, camRestDeg: 173,
+    style: 'ribbon',
+    // The canyon's other wall is deliberately NOT a mirror (variety law): two
+    // taller storeys, a much flatter 48deg rake and a stronger 22deg terrace, so
+    // it reads as a long shelving scarp against the left's stepped massif. Apex
+    // 0.736 vs the left's 0.816 keeps a clear hierarchy across the gutter, and
+    // the flatter rake is why it still out-masses the old ring (46.9k px^2).
+    stages: [
+      { h: 0.463158, relDeg: 0 },
+      { h: 0.416842, relDeg: 22 },
+    ],
+  },
+  // KEPT: the lamplit yard wall where the post-road enters the court — the one
+  // survivor of the ring, now the left page's only skyline row. F 0.55 is
+  // RAY-GATED, not chosen for looks: inboard variants (F 0.42-0.48) occluded
+  // 12-15% of the winch disc rim from the pinned camera; at 0.55 it is 3.1%.
+  // (ch3-skyline-r is retired outright — the right page's downstage stations
+  // are the dispatch dial and the gatehouse tower.)
   { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
-    { F: 0.43, zc: -0.52, height: 0.1089, width: 0.3219, standDeg: 64 },
-    { F: 0.46, zc: -0.38, height: 0.0838, width: 0.292, standDeg: 64 },
-    { F: 0.52, zc: -0.16, height: 0.0728, width: 0.2319, standDeg: 64 },
-    // ring-mid left arm: dovecote facade, the ring's tallest station — biggest
-    // portals, most amber-lit windows, the parapet raven rank facing spine-ward.
-    { F: 0.44, zc: 0.12, height: 0.16, width: 0.26, standDeg: 64 },
-    // ring-front gate wall (LEFT PAGE ONLY; the right page's front station is the
-    // dispatch desk). F 0.55 is RAY-GATED, not chosen for looks: inboard variants
-    // (F 0.42-0.48) occluded 12-15% of the winch disc rim from the pinned camera;
-    // at 0.55 it is 3.1% (bench C3).
     { F: 0.55, zc: 0.575, height: 0.1, width: 0.19, standDeg: 64 },
-  ] },
-  { id: 'ch3-skyline-r', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'right', rows: [
-    { F: 0.43, zc: -0.52, height: 0.1011, width: 0.322, standDeg: 64 },
-    { F: 0.46, zc: -0.38, height: 0.0988, width: 0.2921, standDeg: 64 },
-    { F: 0.52, zc: -0.16, height: 0.0666, width: 0.232, standDeg: 64 },
-    // ring-mid right arm — the left arm's mirror (art shares one drawing, flipped).
-    { F: 0.44, zc: 0.12, height: 0.16, width: 0.26, standDeg: 64 },
   ] },
   // THE GATEHOUSE (s4 pack §4a-C): a slender strip-erected dovecote tower where
   // the painted post-road enters the ring — the right page's vertical accent,

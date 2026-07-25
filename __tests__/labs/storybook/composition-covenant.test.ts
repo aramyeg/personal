@@ -181,6 +181,15 @@ const familyOf = (l: SceneLayer): string | null => {
       // sequential stations give each rank its own closed-form response
       // curve — the bloom wave — which a shared-vertex fan cannot produce.
       return 'mfoldrange'
+    case 'stagedchain':
+      // The staged chain (E3 s4) — a page-rooted chain of storey panels whose
+      // joints each ride their OWN beta cam, so the wall unrolls TOP-DOWN
+      // across the turn instead of standing as one rigid flap. Distinct from
+      // the skyline (one hinge, one envelope, height capped near 0.11 by the
+      // page-sweep radius) and from the m-fold range (independent v-fold ranks
+      // at separate spine stations, no per-joint scheduling): the delay is the
+      // mechanism here, and it is what buys page-tall page-rooted height.
+      return 'stagedchain'
     case 'oanave':
       // The origamic-architecture nave rank (E3 s7) — a v-fold wall host
       // carrying die-cut relief strata folded from its own sheet: the

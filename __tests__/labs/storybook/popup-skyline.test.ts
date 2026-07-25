@@ -27,9 +27,14 @@ const SKYLINES = CHAPTERS.find((c) => c.spread === 4)!.layers.filter(
 
 describe('citadel rank — +z-facing city rows (bench derive-keep-cityrows.mjs)', () => {
   it('ships one skyline per outer page, each with city rows behind the keep', () => {
-    expect(SKYLINES.map((s) => s.side).sort()).toEqual(['left', 'right'])
+    // E3 s4 ROUND-3: the ring is RETIRED into the stagedchain cliffs
+    // (popup-stagedchain.test.ts). The rear rows and both ring-mid arms are
+    // gone and ch3-skyline-r with them; what survives is the LEFT page's
+    // lamplit yard wall, where the post-road enters the court. The right
+    // page's downstage stations are the dispatch dial and gatehouse tower.
+    expect(SKYLINES.map((s) => s.side)).toEqual(['left'])
     for (const sky of SKYLINES) {
-      expect(sky.rows.length).toBeGreaterThanOrEqual(2)
+      expect(sky.rows.length).toBeGreaterThanOrEqual(1)
       for (const r of sky.rows) {
         // E3 s4 RING (scenes/s4-scene-pack.md §4a): rows are now CONCENTRIC RING
         // STATIONS sweeping from deep behind the flanks (zc -0.52) around to the

@@ -51,11 +51,18 @@ import { solveDepthVistaPose } from '@/components/labs/storybook/book/popup-dept
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { rankVFoldGeom, solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
 import {
+  stagedChainApex,
+  stagedChainCam,
+  stagedChainLength,
+  stagedChainQ,
+  stagedChainQuads,
+} from '@/components/labs/storybook/book/popup-stagedchain'
+import {
   keepsakeCardInPlane,
   keepsakePExit,
 } from '@/components/labs/storybook/book/popup-keepsake'
 import { CHAPTERS, EXTRA_SPREAD_LAYERS, type SceneLayer } from '@/components/labs/storybook/content'
-import { PAGE_H, PAGE_W, restAngles } from '@/components/labs/storybook/book/page-geometry'
+import { PAGE_H, PAGE_W, easeTurnWeighted, restAngles } from '@/components/labs/storybook/book/page-geometry'
 
 // Benchmark Part A (docs/superpowers/specs/2026-07-10-popup-physics-benchmark.md):
 // geometric invariants of the dihedral-driven engine, tested against every
@@ -193,6 +200,10 @@ const allQuads = (
       ...pose.gussets.flatMap((g) => [g.left, g.right]),
     ]
   }
+  // The staged chain is one quad per storey — every rigid world quad it poses,
+  // so the whole A-suite (rigidity, flat fold, continuity, separation, wedge
+  // containment) gates the new family wholesale like every other.
+  if (layer.mech === 'stagedchain') return stagedChainQuads(layer, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -316,6 +327,66 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         // stroke + run-band + z-band rules; keepsake sleeve/slit/seat rules), and
         // the E1 showpiece test files (popup-keepstack/-keepwinch/-skyline.test.ts:
         // telescoping + glue chain, crank + stagger + D-G2 scrub, mound band).
+        return
+      }
+      if (layer.mech === 'stagedchain') {
+        // THE FOUR FAMILY CONDITIONS (playbook §1). A staged chain is legal
+        // only if its cam can drain every joint's arc into the eased tails
+        // while holding a shallow enough pose through the fast mid-turn
+        // station — so these are spec-validity gates, not motion gates.
+        expect(layer.stages.length).toBeGreaterThanOrEqual(2)
+        expect(layer.stages.length).toBeLessThanOrEqual(4)
+        layer.stages.forEach((st) => expect(st.h).toBeGreaterThan(0))
+        const rfar = layer.F + layer.w
+        // rooted clear of the keep's gutter band and inside the page
+        expect(layer.F).toBeGreaterThanOrEqual(0.415)
+        expect(rfar).toBeLessThanOrEqual(PAGE_W)
+        expect(Math.abs(layer.zc)).toBeLessThanOrEqual(PAGE_H / 2)
+
+        // (2) the joint arc fits the two eased tails
+        const cam = stagedChainCam(layer)
+        expect(cam.feasible).toBe(true)
+
+        // (4) q(0) = 0 EXACTLY -> fold-flat is free (no epsilon allowed: the
+        // whole family's flat-fold proof is this identity)
+        layer.stages.forEach((_, k) => expect(stagedChainQ(layer, k, 0)).toBe(0))
+        expect(stagedChainApex(layer, 0)).toBe(0)
+
+        // (3) TOP-DOWN unroll: an upper joint may never lag the one below it,
+        // or a still-folded parent points its deployed child through the page
+        for (let i = 0; i <= 240; i++) {
+          const beta = (i / 240) * Math.PI
+          for (let k = 1; k < layer.stages.length; k++) {
+            expect(stagedChainQ(layer, k, beta) + 1e-9).toBeGreaterThanOrEqual(
+              stagedChainQ(layer, k - 1, beta)
+            )
+          }
+        }
+
+        // (1) hold-through-midturn reach: at the fastest station of the eased
+        // clock the composite rotation radius hypot(rfar, eta) must stay under
+        // GLOBAL_CAP / dtheta_max, or the page sweep alone breaks the step cap
+        let dthetaMax = 0
+        for (let i = 0; i < 240; i++) {
+          dthetaMax = Math.max(
+            dthetaMax,
+            (easeTurnWeighted((i + 1) / 240) - easeTurnWeighted(i / 240)) * Math.PI
+          )
+        }
+        const holdCap = Math.sqrt((0.0497 / dthetaMax) ** 2 - rfar ** 2)
+        expect(stagedChainApex(layer, Math.PI / 2)).toBeLessThanOrEqual(holdCap)
+
+        // fully deployed at the pose the reader actually holds (the book's real
+        // rest dihedral is 173.72deg, NOT the 176 the derivation assumed)
+        const restBeta = Math.PI - restAngles(3).aL - restAngles(3).aR
+        layer.stages.forEach((_, k) =>
+          expect(stagedChainQ(layer, k, restBeta)).toBeGreaterThanOrEqual(1 - 1e-9)
+        )
+        // stands as a wall, under the crop ceiling and under the keep's crown
+        const apex = stagedChainApex(layer, restBeta)
+        expect(apex).toBeGreaterThan(0.6)
+        expect(apex).toBeLessThan(1.0)
+        expect(stagedChainLength(layer)).toBeGreaterThan(apex)
         return
       }
       if (layer.mech === 'mfoldrange') {
@@ -448,6 +519,20 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
             for (const p of glue) {
               expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
             }
+          }
+          continue
+        }
+        if (layer.mech === 'stagedchain') {
+          // One-page mechanism, and only the ROOT storey is glued: the chain's
+          // upper joints are hinges between panels, not glue to paper — so the
+          // gate is the root panel's base edge lying in its own page plane
+          // (which is also what makes fold-flat land the whole wall on that
+          // page). The seams above are gated as shared edges in
+          // popup-stagedchain.test.ts.
+          const root = stagedChainQuads(layer, thetaL, thetaR)[0]
+          const n = layer.side === 'left' ? nL : nR
+          for (const p of [root[0], root[1]]) {
+            expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
           }
           continue
         }

@@ -217,7 +217,10 @@ ONE grand structure replaces the old rookery crowd (`ch3-towers`/`ch3-rank`/`ch3
 all retired per the fate list): a four-story keep (`ch3-keep`, expanding to four stacked box
 poses through the box renderer), a jutting gold balcony, the kept hero raven folded onto the
 crown, an interactive tower-hoist winch (`ch3-keep-winch`), a flanking mound skyline
-(`ch3-skyline-l` / `ch3-skyline-r`), and the kept fore wall (`ch3-fringe`). **E3 s4 (scenes/
+(`ch3-skyline-l`), and the kept fore wall (`ch3-fringe`). **E3 s4 ROUND-3** retires that ring
+outright — the user read it as squat and "uneffectful" — and replaces it with THE ROOKERY
+CLIFFS: two page-rooted multi-storey `stagedchain` walls (`ch3-cliff-l` / `ch3-cliff-r`) that
+unroll storey by storey as the page opens, each one alone out-massing the whole old ring. **E3 s4 (scenes/
 s4-scene-pack.md)** turns that flanking rank into a RADIAL AMPHITHEATER: the six existing rows
 are re-dressed as dovecote facades and become the ring's REAR stations, three NEW downstage rows
 (`-mound3` on both pages, `-mound4` on the left) sweep the ring around to the reader's apron, and
@@ -251,11 +254,9 @@ principle) before any of these land.
 | `ch3-keep-winch` | `ch3-keep-winch-semaphore` | Gold signal paddle arm — the semaphore sweeping up to vertical | wide strip | STAND | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-iris` | One raven-shutter blade (repeats around the loft rim) — slate shutter, amber roost-glow behind | ≈0.5:1 | STAND | placeholder |
 | `ch3-keep-winch` | `ch3-keep-winch-counterweight` | Slate counterweight block on a cable, dropping down the keep flank | ≈1:1 | STAND | placeholder |
-| `ch3-skyline-l` | `ch3-skyline-l-mound0`, `ch3-skyline-l-mound1`, `ch3-skyline-l-mound2` | REAR RING STATIONS, left page (E3 s4 re-dress) — dovecote facades: regimented ranks of arched raven portals, 1-in-5 amber-lit, deep-cut crenellation, a linked raven rank cut into the parapet silhouette; coolest/dimmest of the ring, stepping back in Z | ≈3.0:1 / ≈3.5:1 / ≈3.2:1 | STAND (mound, shaped) | procedural |
-| `ch3-skyline-l` | `ch3-skyline-l-mound3` | RING-MID left arm — the ring's tallest station: two-story dovecote terrace, the biggest portals and the most amber-lit windows, parapet raven rank facing spine-ward | ≈1.625:1 | STAND (mound, shaped) | procedural |
-| `ch3-skyline-l` | `ch3-skyline-l-mound4` | RING-FRONT gate wall (left page only; the right front station is the dispatch desk) — low gate-wall, lantern posts, a raven pair, the post-road's shadow at its base | ≈1.9:1 | STAND (mound, shaped) | procedural |
-| `ch3-skyline-r` | `ch3-skyline-r-mound0`, `ch3-skyline-r-mound1`, `ch3-skyline-r-mound2` | REAR RING STATIONS, right page (mirror rank, same dovecote grammar) | ≈3.2:1 / ≈3.0:1 / ≈3.5:1 | STAND (mound, shaped) | procedural |
-| `ch3-skyline-r` | `ch3-skyline-r-mound3` | RING-MID right arm — the left arm's mirror (one drawing, flipped; own grain seed) | ≈1.625:1 | STAND (mound, shaped) | procedural |
+| `ch3-skyline-l` | `ch3-skyline-l-mound0` | THE YARD WALL (the ring's one survivor; was `-mound4`) — low lamplit gate-wall where the post-road enters the court, lantern posts, a raven pair, the road's shadow at its base | ≈1.9:1 | STAND (mound, shaped) | procedural |
+| `ch3-cliff-l` | `ch3-cliff-l` | THE ROOKERY CLIFF, LEFT — ONE continuous portrait painting of a 3-storey dovecote cliff face, sliced into per-storey v-bands by the mesh (`stagedChainBand`). Dispatch-hour register: dark slate rock, each storey a RANK of blazing amber raven portals with perched raven silhouettes, rim-lit crenellated ledges between storeys, a lantern crown at the top. Base band widest, crown narrowest | ≈0.341:1 (w 0.30 : chain 0.88) — width : height | STAGED CHAIN (merged mesh, one atlas, v-banded per storey) | procedural |
+| `ch3-cliff-r` | `ch3-cliff-r` | THE ROOKERY CLIFF, RIGHT — the canyon's other wall, NOT a mirror: 2 taller storeys on a flatter scarp, its own portal cadence and ledge rhythm, same dispatch-hour register | ≈0.375:1 (w 0.30 : chain 0.80) — width : height | STAGED CHAIN (merged mesh, one atlas, v-banded per storey) | procedural |
 | `ch3-ring-tower` | `ch3-ring-tower` | THE GATEHOUSE (E3 s4) — a slender strip-erected dovecote tower where the painted post-road enters the ring: stacked portal ranks, amber crown lantern, a raven atop; the right page's vertical accent, balancing the semaphore mast on the left | ≈0.6:1 | STAND (die-cut) | procedural |
 | `ch3-fringe` | `ch3-fringe` | Fore-edge dispatch-yard wall — the rookery's outer yard wall in slate, a raven rank along its top, and the ROAD NOTCH where the post-road passes through | ≈7.1:1 low strip | FACE | procedural |
 | `ch3-dispatch` | `ch3-dispatch-dial` | The reader-spun SORTING DESK dial (volvelle, riveted flat into the right-page yard, mirroring the winch) — a brass wheel of 8 sectors: raven sigils at staggered headings, route glyphs, a tally band | 1:1 square (disc, radius 0.11 → canvas 0.22×0.22) | DISC | procedural |

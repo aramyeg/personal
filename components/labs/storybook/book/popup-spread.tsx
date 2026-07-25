@@ -50,6 +50,7 @@ import { SwarmArcPopupLayer } from './popup-swarmarc-layer'
 import { DepthVistaPopupLayer } from './popup-depthvista-layer'
 import { DissolvePopupLayer } from './popup-dissolve-layer'
 import { MFoldRangePopupLayer } from './popup-mfoldrange-layer'
+import { StagedChainPopupLayer } from './popup-stagedchain-layer'
 import { OanavePopupLayer } from './popup-oanave-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import { VolvellePopupLayer } from './popup-volvelle-layer'
@@ -116,6 +117,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'depthvista') return 0.5 // arch decks + wing quads, per-face uvs in the depthvista layer
   if (layer.mech === 'dissolve') return 0.5 // base + slat + tab quads, per-slat uvs in the dissolve layer
   if (layer.mech === 'mfoldrange') return 0.5 // per-rank atlas uvs live in the range layer
+  if (layer.mech === 'stagedchain') return 0.5 // per-storey atlas bands live in the staged-chain layer
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   if (layer.mech === 'oanave') return 0.5 // host + relief uvs live in the oanave layer (fold at 0.5, symmetric)
   return layer.creaseU ?? 0.5
@@ -164,6 +166,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
   if (layer.mech === 'depthvista') return false // per-face uvs live in the depthvista layer
   if (layer.mech === 'dissolve') return false // per-slat screen-space uvs live in the dissolve layer
   if (layer.mech === 'mfoldrange') return false // per-rank atlas uvs live in the range layer
+  if (layer.mech === 'stagedchain') return false // per-storey atlas bands live in the staged-chain layer
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -572,6 +575,20 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'mfoldrange') {
           return (
             <MFoldRangePopupLayer
+              key={layer.id}
+              layer={layer}
+              accents={accents}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        // The E3 s4 rookery cliffs: a multi-storey page-rooted wall whose
+        // storeys unroll top-down on their own beta cams — one merged mesh.
+        if (layer.mech === 'stagedchain') {
+          return (
+            <StagedChainPopupLayer
               key={layer.id}
               layer={layer}
               accents={accents}

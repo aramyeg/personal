@@ -26,6 +26,7 @@ import { keepWinchOutputQuads, keepWinchThetaMax } from '@/components/labs/story
 import { solveLiftFlapPose } from '@/components/labs/storybook/book/popup-liftflap'
 import { solveDissolvePose } from '@/components/labs/storybook/book/popup-dissolve'
 import { solveMFoldRangePose } from '@/components/labs/storybook/book/popup-mfoldrange'
+import { stagedChainQuads } from '@/components/labs/storybook/book/popup-stagedchain'
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 import { oanavePatches } from '@/components/labs/storybook/book/popup-oanave'
@@ -177,6 +178,10 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
         ...pose.gussets.flatMap((g) => [g.left, g.right]),
       ]
     }
+    case 'stagedchain':
+      // The cliff is one quad per storey — its depth footprint is the whole
+      // raked chain run from the root hinge back up the page.
+      return stagedChainQuads(l, tL, tR)
     case 'oanave':
       // Host wings + the die-cut relief strata — the rank's full depth
       // footprint (popup-oanave.ts).
