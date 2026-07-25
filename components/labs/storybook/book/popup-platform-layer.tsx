@@ -34,7 +34,8 @@ import { easeTurnWeighted } from './page-geometry'
 import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { useArtSprite } from './use-layer-texture'
+import { applyUvRect, type UvRect } from '../art-atlas'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -62,11 +63,12 @@ const isDeck = (face: PlatformFace): boolean => face === 'deckA' || face === 'de
 const isShaded = (face: PlatformFace): boolean => face === 'deckA' || face === 'strutR'
 
 /** Per-face uvs. Deck faces take their half of the split painting (image top
- *  on the far edge, matching the box lid); struts print raw kraft, so their
- *  uvs are the identity square. */
-function platformFaceUvs(face: PlatformFace, split: number): Float32Array {
-  if (face === 'deckA') return new Float32Array([0, 0, split, 0, split, 1, 0, 1])
-  if (face === 'deckB') return new Float32Array([split, 0, 1, 0, 1, 1, split, 1])
+ *  on the far edge, matching the box lid), then that painting's region of the
+ *  atlas page it was packed onto (INFRA-2); struts print raw kraft, so their
+ *  uvs stay the identity square whatever the deck resolved to. */
+function platformFaceUvs(face: PlatformFace, split: number, deckRect: UvRect | null): Float32Array {
+  if (face === 'deckA') return applyUvRect(new Float32Array([0, 0, split, 0, split, 1, 0, 1]), deckRect)
+  if (face === 'deckB') return applyUvRect(new Float32Array([split, 0, 1, 0, 1, 1, split, 1]), deckRect)
   return new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])
 }
 
@@ -135,7 +137,7 @@ export function PlatformPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const shadowGroupRef = useRef<THREE.Group>(null)
 
-  const deckArt = useArtTexture(`${layer.id}-deck`)
+  const { texture: deckArt, rect: deckRect } = useArtSprite(`${layer.id}-deck`)
   const split = layer.qA / (layer.qA + layer.qB)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
@@ -146,8 +148,8 @@ export function PlatformPopupLayer({
   // only the corners move. Solve once at rest to build it.
   const patches = useMemo(() => solvePlatformPose(layer, Math.PI, 0), [layer])
   const geometries = useMemo(
-    () => patches.map((p) => makeFaceGeometry(platformFaceUvs(p.face, split))),
-    [patches, split]
+    () => patches.map((p) => makeFaceGeometry(platformFaceUvs(p.face, split, deckRect))),
+    [patches, split, deckRect]
   )
   const edgeGeometries = useMemo(() => patches.map(() => makeEdgeGeometry()), [patches])
   // One hairline material per patch (not shared): artless faces get this

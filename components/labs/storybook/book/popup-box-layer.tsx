@@ -13,6 +13,15 @@
  * Corner order comes from solveBoxPose ([bl, br, tr, tl] seen from outside
  * at rest), so each face's uvs are the identity square — split in half for
  * the paired faces (caps, lid, roof), whose shared crease sits at u = 0.5.
+ *
+ * INFRA-2: those four assets resolve through `useArtSprite`, so a box whose
+ * faces are packed onto a shared atlas page addresses its regions instead of
+ * fetching four webps of its own — the single largest texture-file win left in
+ * the book (every chapter spread carries at least one box, and the terraced
+ * spreads carry two). Each face composes TWO uv transforms: its own half-split
+ * within the asset (`FACE_ART`), then the asset's rect within the page. All four
+ * assets are addressed independently, so a box may be half-packed with no
+ * special case.
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
@@ -32,7 +41,8 @@ import { peakHeight, shadowLift } from './shadow-light'
 import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
-import { SLIVER_TIER, useArtTexture } from './use-layer-texture'
+import { SLIVER_TIER, useArtSprite } from './use-layer-texture'
+import { applyUvRect, type UvRect } from '../art-atlas'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -59,8 +69,13 @@ const INTERIOR_SHADOW_TINT = '#5f5138'
 // read as CONSTRUCTED from sheets rather than extruded.
 const CUT_EDGE_COLOR = '#f6eedb'
 
+/** The four per-face assets a box prints, keyed as `FACE_ART` names them. */
+type BoxAsset = 'front' | 'back' | 'side' | 'top'
+/** Each asset's atlas region, or null where it owns its whole texture. */
+type BoxRects = Readonly<Record<BoxAsset, UvRect | null>>
+
 /** Which art asset a face prints, and which horizontal half of it. */
-const FACE_ART: Record<BoxFace, { asset: 'front' | 'back' | 'side' | 'top' | null; u0: number; u1: number }> = {
+const FACE_ART: Record<BoxFace, { asset: BoxAsset | null; u0: number; u1: number }> = {
   wallL: { asset: 'side', u0: 0, u1: 1 },
   wallR: { asset: 'side', u0: 0, u1: 1 },
   lidL: { asset: 'top', u0: 0, u1: 0.5 },
@@ -77,17 +92,20 @@ const FACE_ART: Record<BoxFace, { asset: 'front' | 'back' | 'side' | 'top' | nul
 /** The darker sibling of each split pair (and the always-shaded backbone). */
 const SHADED_FACES: ReadonlySet<BoxFace> = new Set(['wallL', 'lidL', 'roofL', 'capBackL', 'capBackR', 'backbone'])
 
-const faceUvs = (face: BoxFace): Float32Array => {
-  const { u0, u1 } = FACE_ART[face]
-  return new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1])
+/** A face's uvs: its half of the asset, then that asset's region of the atlas
+ *  page it was packed onto (identity when the asset owns its own texture). */
+const faceUvs = (face: BoxFace, rects: BoxRects): Float32Array => {
+  const { asset, u0, u1 } = FACE_ART[face]
+  const own = new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1])
+  return applyUvRect(own, asset ? rects[asset] : null)
 }
 
-function makeFaceGeometry(face: BoxFace): THREE.BufferGeometry {
+function makeFaceGeometry(face: BoxFace, rects: BoxRects): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
   const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
   positions.setUsage(THREE.DynamicDrawUsage)
   geometry.setAttribute('position', positions)
-  geometry.setAttribute('uv', new THREE.BufferAttribute(faceUvs(face), 2))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(faceUvs(face, rects), 2))
   geometry.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
   return geometry
 }
@@ -119,10 +137,20 @@ export function BoxPopupLayer({
   // Fix C tiering: the front cap faces the reader straight-on (full 1024
   // art), but the top/back/side faces are edge-on slivers or hollow-interior
   // faces at the reading camera — half-size, no mips.
-  const frontArt = useArtTexture(`${layer.id}-front`)
-  const backArt = useArtTexture(`${layer.id}-back`, SLIVER_TIER)
-  const sideArt = useArtTexture(`${layer.id}-side`, SLIVER_TIER)
-  const topArt = useArtTexture(`${layer.id}-top`, SLIVER_TIER)
+  const front = useArtSprite(`${layer.id}-front`)
+  const back = useArtSprite(`${layer.id}-back`, SLIVER_TIER)
+  const side = useArtSprite(`${layer.id}-side`, SLIVER_TIER)
+  const top = useArtSprite(`${layer.id}-top`, SLIVER_TIER)
+  const frontArt = front.texture
+  const backArt = back.texture
+  const sideArt = side.texture
+  const topArt = top.texture
+  // Rects change exactly once per box (null -> resolved, when the sidecar and
+  // the page land), so the geometry rebuild they trigger below is a one-off.
+  const rects = useMemo<BoxRects>(
+    () => ({ front: front.rect, back: back.rect, side: side.rect, top: top.rect }),
+    [front.rect, back.rect, side.rect, top.rect]
+  )
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless boxes separates by tone instead of reading as one mass.
@@ -146,7 +174,7 @@ export function BoxPopupLayer({
 
   // The face list is constant per geometry — only the corners move.
   const faces = useMemo(() => solveBoxPose(layer, Math.PI, 0).map((p) => p.face), [layer])
-  const geometries = useMemo(() => faces.map((face) => makeFaceGeometry(face)), [faces])
+  const geometries = useMemo(() => faces.map((face) => makeFaceGeometry(face, rects)), [faces, rects])
   const edgeGeometries = useMemo(() => (showCutEdge ? faces.map(() => makeEdgeGeometry()) : []), [faces, showCutEdge])
   // One hairline material per face (not shared): artless faces get this
   // piece's own darker `tint.edge` for contrast against same-family

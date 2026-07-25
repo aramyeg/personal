@@ -44,7 +44,8 @@ import { solveDressPose, solvePlatformPose } from './popup-anatomy'
 import { solveRotorPose } from './popup-rotor'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { useArtSprite } from './use-layer-texture'
+import { applyUvRect, type UvRect } from '../art-atlas'
 
 const FLAT_EPSILON = 0.02
 
@@ -95,6 +96,19 @@ function solveSeatQuad(
   return null
 }
 
+/** The single quad both a dress patch and a rotor disc draw: identity uvs
+ *  remapped into the piece's atlas region when it has one (INFRA-2), positions
+ *  rewritten from the solver every frame. */
+function makePatchGeometry(rect: UvRect | null): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry()
+  const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
+  positions.setUsage(THREE.DynamicDrawUsage)
+  g.setAttribute('position', positions)
+  g.setAttribute('uv', new THREE.BufferAttribute(applyUvRect(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), rect), 2))
+  g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
+  return g
+}
+
 export function DressPopupLayer({
   layer,
   layers,
@@ -109,7 +123,7 @@ export function DressPopupLayer({
   committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const art = useArtTexture(layer.id)
+  const { texture: art, rect } = useArtSprite(layer.id)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless dress patches separates by tone instead of reading as one mass.
@@ -123,15 +137,7 @@ export function DressPopupLayer({
     return { parent: p, grandParent: gp }
   }, [layers, layer.parentId])
 
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
-    positions.setUsage(THREE.DynamicDrawUsage)
-    g.setAttribute('position', positions)
-    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
-    g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
-    return g
-  }, [])
+  const geometry = useMemo(() => makePatchGeometry(rect), [rect])
 
   const paperTexture = sharedPaperTexture()
   const materials = useMemo(
@@ -221,7 +227,7 @@ export function RotorPopupLayer({
   committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const art = useArtTexture(layer.id)
+  const { texture: art, rect } = useArtSprite(layer.id)
   const tint = useMemo(() => kraftTints(layer.id), [layer.id])
 
   const { parent, grandParent } = useMemo(() => {
@@ -230,15 +236,7 @@ export function RotorPopupLayer({
     return { parent: p, grandParent: gp }
   }, [layers, layer.parentId])
 
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
-    positions.setUsage(THREE.DynamicDrawUsage)
-    g.setAttribute('position', positions)
-    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
-    g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
-    return g
-  }, [])
+  const geometry = useMemo(() => makePatchGeometry(rect), [rect])
 
   // Placeholder is a spoked DISC (not a paper square) so the spin reads before
   // real art lands; its transparent corners keep the die-cut circular.

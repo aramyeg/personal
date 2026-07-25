@@ -56,7 +56,8 @@ import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anato
 import { VolvellePopupLayer } from './popup-volvelle-layer'
 import { LiftFlapPopupLayer } from './popup-liftflap-layer'
 import type { TurnFrame } from './use-turn-driver'
-import { useLayerTexture } from './use-layer-texture'
+import { useLayerSprite } from './use-layer-texture'
+import { applyUvRect } from '../art-atlas'
 
 const SHADOW_HEIGHT = 0.16
 const SHADOW_Y_LIFT = 0.001
@@ -285,7 +286,13 @@ function PopupLayer({
    *  pure function of the layer alone (riders re-solve their parent). */
   solvePose?: (thetaL: number, thetaR: number) => MechPose | null
 }) {
-  const texture = useLayerTexture(layer.id, layer.kind, accents)
+  // INFRA-2: the generic two-quad path is the widest family in the book
+  // (v-folds, children, ground swells, riders, kinetic arms, and every fan
+  // member), so teaching it the sprite path is what lets a whole spread's
+  // scenery share one page. `panelUvs` already authors in the unit square —
+  // including its die-flips and off-centre creases — so one affine remap
+  // carries any of its tables into the region.
+  const { texture, rect } = useLayerSprite(layer.id, layer.kind, accents)
   const cutoutRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   const rightMeshRef = useRef<THREE.Mesh>(null)
@@ -294,10 +301,10 @@ function PopupLayer({
   const geometries = useMemo(() => {
     const flipped = dieFlipped(layer, parent)
     return {
-      right: makePanelGeometry(panelUvs(layer, 'right', flipped)),
-      left: makePanelGeometry(panelUvs(layer, 'left', flipped)),
+      right: makePanelGeometry(applyUvRect(panelUvs(layer, 'right', flipped), rect)),
+      left: makePanelGeometry(applyUvRect(panelUvs(layer, 'left', flipped), rect)),
     }
-  }, [layer, parent])
+  }, [layer, parent, rect])
 
   // Unlit print materials — the artwork carries its own light, like ink on
   // paper; scene lights set the mood around the book, not on the print. One

@@ -40,7 +40,8 @@ import { easeTurnWeighted } from './page-geometry'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture } from './shared-procedural-textures'
 import { turnCullOpacity } from './turn-cull'
 import type { TurnFrame } from './use-turn-driver'
-import { useArtTexture } from './use-layer-texture'
+import { useArtSprite } from './use-layer-texture'
+import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
@@ -156,12 +157,17 @@ function WinchDisc({
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
   const gl = useThree((s) => s.gl)
-  const art = useArtTexture(`${layer.id}-disc`)
+  const { texture: art, rect } = useArtSprite(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const thetaMax = useMemo(() => keepWinchThetaMax(layer), [layer])
 
-  const geometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
+  // Only the DRAWN quad is remapped into the atlas region; the touch-slop quad
+  // below is invisible (shared handle material) and never samples art.
+  const geometry = useMemo(
+    () => makeQuadGeometry(applyUvRect(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), rect)),
+    [rect]
+  )
   const slopGeometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const handleMaterial = sharedHandleMaterial()
   const knobTexture = sharedKnobTexture()
@@ -335,12 +341,15 @@ function WinchOutput({
   committedSpread: RefObject<number>
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const art = useArtTexture(artId)
+  const { texture: art, rect } = useArtSprite(artId)
   const tint = useMemo(() => kraftTints(artId), [artId])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const geometries = useMemo(
-    () => Array.from({ length: count }, (_, i) => makeQuadGeometry(new Float32Array(uvs?.[i] ?? [0, 0, 1, 0, 1, 1, 0, 1]))),
-    [count, uvs]
+    () =>
+      Array.from({ length: count }, (_, i) =>
+        makeQuadGeometry(applyUvRect(new Float32Array(uvs?.[i] ?? [0, 0, 1, 0, 1, 1, 0, 1]), rect))
+      ),
+    [count, uvs, rect]
   )
   const material = useMemo(
     () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, alphaTest: 0.1, color: '#ffffff' }),
