@@ -13,7 +13,8 @@
  * takes u in [0, split] and is the SHADED sibling (same fold-shading rule as
  * the box lid's lidL); deckB takes [split, 1] and is lit. v runs along the
  * spine with the image top on the far edge (dz0), exactly like the box lid.
- * The struts carry no art — raw warm kraft, strutR shaded, strutL lit.
+ * The struts print `<id>-strut` if the piece supplies one and raw warm kraft
+ * otherwise; either way strutR is shaded and strutL lit.
  *
  * Two shadow tiers sell the stack: a tight footprint under each strut bay
  * (sized from the bay span and the strut's glue reach) and one wide, soft
@@ -63,7 +64,7 @@ const isShaded = (face: PlatformFace): boolean => face === 'deckA' || face === '
 
 /** Per-face uvs. Deck faces take their half of the split painting (image top
  *  on the far edge, matching the box lid); struts print raw kraft, so their
- *  uvs are the identity square. */
+ *  uvs are the identity square, so one strut sheet serves every strut face. */
 function platformFaceUvs(face: PlatformFace, split: number): Float32Array {
   if (face === 'deckA') return new Float32Array([0, 0, split, 0, split, 1, 0, 1])
   if (face === 'deckB') return new Float32Array([split, 0, 1, 0, 1, 1, split, 1])
@@ -136,6 +137,10 @@ export function PlatformPopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
 
   const deckArt = useArtTexture(`${layer.id}-deck`)
+  // Struts print `<id>-strut` when a piece supplies one, and fall back to raw
+  // kraft when it doesn't (missing art resolves to null) — so a platform whose
+  // trusses would otherwise out-value its own scene can paint them instead.
+  const strutArt = useArtTexture(`${layer.id}-strut`)
   const split = layer.qA / (layer.qA + layer.qB)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
@@ -182,7 +187,7 @@ export function PlatformPopupLayer({
   useEffect(() => {
     patches.forEach((p, i) => {
       const material = materials.exterior[i]
-      const art = isDeck(p.face) ? deckArt : null
+      const art = isDeck(p.face) ? deckArt : strutArt
       material.map = art ?? paperTexture
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
@@ -194,7 +199,7 @@ export function PlatformPopupLayer({
       material.needsUpdate = true
       edgeMaterials[i].color.set(art ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [patches, materials, edgeMaterials, paperTexture, deckArt, tint])
+  }, [patches, materials, edgeMaterials, paperTexture, deckArt, strutArt, tint])
 
   const shadowTexture = sharedShadowTexture()
   const strutShadowMaterial = useMemo(

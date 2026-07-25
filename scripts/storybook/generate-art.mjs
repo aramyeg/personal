@@ -1624,9 +1624,13 @@ function boxFace(w, h, seed, face, kind) {
   if (kind === 'strongbox') {
     // banker's strongbox — teal steel with brass/gold reinforced corners,
     // rivets, a big gold lock (northern palette). Aurora sheen highlight.
-    const STEEL = '#2e5244',
-      SLIT = '#3f6b5a',
-      SDIM = '#1c352b',
+    // Regraded onto the s7 nave's teal/midnight ladder (NAVE_C): the old
+    // sage-green steel sat off-hue against the vault it now stands inside,
+    // and read lighter than the wall behind it — a waystation is not supposed
+    // to out-value the architecture.
+    const STEEL = '#153f47',
+      SLIT = '#1f5c63',
+      SDIM = '#081f26',
       AUR = '#4fd6b8'
     let s = `<rect width="${w}" height="${h}" fill="${STEEL}"/>`
     s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${SLIT}" opacity="0.35"/>`
@@ -6668,12 +6672,56 @@ const NAVE_C = {
   midnight: '#16223a',
   teal: '#14454b',
   tealLit: '#1d5a60',
+  // The value ladder the flat-slab round was missing: a crown course that is
+  // genuinely LIT, a base course that is genuinely dark, and a near-black the
+  // gilt is read against. Hue stays inside the teal/midnight family.
+  tealHi: '#2f838a',
+  base: '#071820',
+  niche: '#08131c',
   floor: '#0b2530',
   gold: '#d4a13c',
   gilt: '#f0cd7a',
+  giltHi: '#fdeec2',
   frost: '#eef4f6',
   mint: '#4fd6b8',
   amethyst: '#8a6fd6',
+}
+
+/** Per-rank painter constants (aperture, strata bands, column strip, T1 edge),
+ *  derived from the content.ts rank numbers. Named and exported rather than
+ *  inlined at the PIECES call sites so the art-QA harness can derive its
+ *  sample boxes from the SAME numbers the painter draws with — a contrast
+ *  measurement against hand-typed boxes measures the typist, not the art. */
+const NAVE_RANKS = {
+  'ch6-nave-b': { apHw: 0.1316, apApex: 0.7308, topBand: 0.3846, mold: [0.769, 0.962], colHalf: 0.0592, colTop: 0.6923, edge: 'frost' },
+  'ch6-nave-c': { apHw: 0.2069, apApex: 0.7273, topBand: 0.4545, mold: [0.7727, 0.9545], colHalf: 0.0776, colTop: 0.6818, edge: 'frost' },
+  'ch6-nave-d': { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], kb: [0.8333, 0.9444], khw: 0.0641, edge: 'gilt' },
+}
+
+/** The apse's own constants, same contract: crown-wing line (world 0.46 of the
+ *  0.62 face), dome half-width, and the aurora window.
+ *
+ *  The window is a FAN seated on the crown line, not a disc floating above it.
+ *  The dome silhouette is five narrow scallops (the widest is 2·domeHw/5 across
+ *  while the centre one runs the full sheet height), so a disc big enough to
+ *  glow got sliced into a bowl by the clip and a disc small enough to survive
+ *  lit one scallop out of five. A half-round seated at `roseCy` fills every
+ *  scallop from a single hot core, and its core sits inside the 0.187-world
+ *  crown band the camera can actually see (bench §A). */
+const NAVE_APSE = { crownFrac: 0.46 / 0.62, domeHwFrac: 0.19, roseCy: 1 - 0.46 / 0.62, roseRw: 0.194, topBand: 0.3 }
+
+/** Linear blend of two #rrggbb strings — the value ladder above is mixed, not
+ *  enumerated, so a course's tone is a function of its height on the wall. */
+function naveMix(a, b, t) {
+  const k = Math.max(0, Math.min(1, t))
+  const ch = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16)
+  let out = '#'
+  for (let i = 0; i < 3; i++) {
+    out += Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return out
 }
 
 /** The pointed-arch aperture path (image space, y down, bottom = sheet base).
@@ -6692,29 +6740,122 @@ function naveArchPath(w, h, hwFrac, apexFrac) {
   )
 }
 
-/** Teal vault masonry + coin-shelf strata lines shared by every rank face.
- *  `topBand` is the wing band (image y fraction) the camera actually sees
- *  (bench §4b) — the gilt coin shelves concentrate there. */
-function naveMasonry(w, h, r, topBandFrac) {
+/** Ashlar coursing shared by every rank face — the wall's VALUE structure, not
+ *  a grid drawn on a flat fill. Three things stack, and each survives a
+ *  different scale of downsampling:
+ *   - a per-course tone mixed off the crown->base value ramp (low frequency:
+ *     this is what still reads once the rank is 300px wide on screen);
+ *   - per-stone value jitter (mid frequency: the mosaic tooth);
+ *   - a shadowed reveal at every bed joint — a dark joint line with the LIT
+ *     top edge of the course below riding under it (high frequency: what makes
+ *     stone read as cut stone up close).
+ *  Deterministic: every jitter draws from the caller's mulberry32 stream. */
+function naveWall(w, h, r) {
   let s = ''
-  const course = h / 7
-  for (let i = 1; i < 7; i++) {
-    const y = i * course + rr(r, -1.5, 1.5)
-    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${NAVE_C.midnight}" stroke-width="2" opacity="0.5"/>`
-    const stagger = i % 2 ? course * 0.9 : course * 0.45
-    for (let x = stagger; x < w; x += course * 1.8) {
-      s += `<line x1="${fx(x)}" y1="${fx(y)}" x2="${fx(x)}" y2="${fx(y - course)}" stroke="${NAVE_C.midnight}" stroke-width="1.4" opacity="0.35"/>`
+  const N = 11
+  const ch = h / N
+  for (let i = 0; i < N; i++) {
+    const y0 = i * ch
+    const lit = Math.pow(1 - (i + 0.5) / N, 1.5)
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(ch + 1)}" fill="${naveMix(NAVE_C.base, NAVE_C.tealHi, 0.16 + 0.84 * lit)}"/>`
+    const sw = ch * 1.75
+    const off = (i % 2 ? 0.55 : 0.05) * sw
+    for (let x = -off; x < w; x += sw) {
+      const j = rr(r, -0.11, 0.11)
+      s += `<rect x="${fx(x + 1)}" y="${fx(y0 + 1)}" width="${fx(sw - 2)}" height="${fx(ch - 2)}" fill="${j < 0 ? NAVE_C.base : NAVE_C.frost}" opacity="${fx(Math.abs(j))}"/>`
+      s += `<line x1="${fx(x)}" y1="${fx(y0)}" x2="${fx(x)}" y2="${fx(y0 + ch)}" stroke="${NAVE_C.base}" stroke-width="2" opacity="0.72"/>`
+      s += `<line x1="${fx(x + 1.8)}" y1="${fx(y0)}" x2="${fx(x + 1.8)}" y2="${fx(y0 + ch)}" stroke="${NAVE_C.tealHi}" stroke-width="1.1" opacity="0.28"/>`
+    }
+    s += `<line x1="0" y1="${fx(y0 + ch)}" x2="${w}" y2="${fx(y0 + ch)}" stroke="${NAVE_C.base}" stroke-width="3" opacity="0.82"/>`
+    s += `<line x1="0" y1="${fx(y0 + ch + 2.4)}" x2="${w}" y2="${fx(y0 + ch + 2.4)}" stroke="${NAVE_C.tealHi}" stroke-width="1.7" opacity="${fx(0.14 + 0.34 * lit)}"/>`
+  }
+  return s
+}
+
+/** Two shadowed pilaster reveals per wing: a dark recess with a lit return on
+ *  its outboard side. Vertical rhythm is the cheapest cure for a wing that
+ *  reads as one slab — it costs four rects and survives any downsample. */
+function naveWingPilasters(w, h, cfg) {
+  let s = ''
+  const inner = (0.5 - (cfg.apHw ?? NAVE_APSE.domeHwFrac)) * w
+  const pw = Math.max(3, w * 0.011)
+  for (const sgn of [-1, 1]) {
+    for (let k = 1; k <= 2; k++) {
+      const x = w / 2 + sgn * inner * (0.3 + 0.62 * (k / 3))
+      s += `<rect x="${fx(x - pw)}" y="0" width="${fx(pw * 2)}" height="${h}" fill="${NAVE_C.base}" opacity="0.36"/>`
+      s += `<rect x="${fx(x + pw)}" y="0" width="${fx(pw * 0.55)}" height="${h}" fill="${NAVE_C.tealHi}" opacity="0.22"/>`
     }
   }
-  // coin shelves in the visible top band: gilt shelf lines with coin-stack
-  // dashes, brightest nearest the crown (the "quiet gold" of the treasury).
-  const shelfBand = h * topBandFrac
-  for (let k = 0; k < 3; k++) {
-    const y = shelfBand * (0.28 + k * 0.3)
-    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${NAVE_C.gold}" stroke-width="2.2" opacity="${fx(0.55 - k * 0.12)}"/>`
-    for (let x = rr(r, 6, 26); x < w; x += rr(r, 26, 54)) {
-      s += `<rect x="${fx(x)}" y="${fx(y - 5)}" width="${fx(rr(r, 8, 15))}" height="5" rx="1.5" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.5, 0.85))}"/>`
+  return s
+}
+
+/** THE TREASURY FRIEZE — the coin-shelf strata, in the only band the reading
+ *  camera actually sees (each wing's top 0.20 world, pack §4b), and the one
+ *  place on the wall allowed to be loud.
+ *
+ *  The previous round painted gilt shelf LINES straight onto the lit teal
+ *  wall, so the two values sat a few percent apart and the strata vanished at
+ *  distance. This one cuts a near-black NICHE first and reads the gilt against
+ *  that: every ledge is a dark cast shadow, a gold ledge, a gilt face and a
+ *  lit nosing, with coin stacks standing on it as discs with their own
+ *  highlight. The contrast is between the niche and the ledge, not between two
+ *  neighbouring teals. */
+function naveShelfFrieze(w, h, r, cfg) {
+  let s = ''
+  const yTop = h * (1 - cfg.mold[0]) + h * 0.015
+  const yBot = h * cfg.topBand
+  const band = yBot - yTop
+  if (band < 10) return s
+  const pad = cfg.apHw * w + Math.max(6, w * 0.035)
+  const n = Math.max(2, Math.min(4, Math.round(band / 22)))
+  // Each wing's frieze is broken into BAYS separated by gilt mullions. One
+  // unbroken niche per wing gave the rank a second full-width dark bar, and
+  // with three ranks stacked the whole nave went stripey; bays put vertical
+  // beats into the only band the camera sees, which is what stops a row of
+  // shelves from reading as a painted line.
+  const wings = []
+  for (const [wx0, wx1] of [[w * 0.014, w / 2 - pad], [w / 2 + pad, w * 0.986]]) {
+    if (wx1 - wx0 < 14) continue
+    const bays = Math.max(1, Math.round((wx1 - wx0) / (band * 1.7)))
+    const gap = Math.max(2.5, band * 0.13)
+    const bw = (wx1 - wx0 - gap * (bays - 1)) / bays
+    for (let b = 0; b < bays; b++) {
+      const bx = wx0 + b * (bw + gap)
+      wings.push([bx, bx + bw])
+      if (b) {
+        // the mullion standing between two bays
+        s += `<rect x="${fx(bx - gap)}" y="${fx(yTop)}" width="${fx(gap)}" height="${fx(band)}" fill="${NAVE_C.gold}" opacity="0.8"/>`
+        s += `<rect x="${fx(bx - gap)}" y="${fx(yTop)}" width="${fx(gap * 0.36)}" height="${fx(band)}" fill="${NAVE_C.giltHi}" opacity="0.75"/>`
+      }
     }
+  }
+  for (const [x0, x1] of wings) {
+    s += `<rect x="${fx(x0)}" y="${fx(yTop)}" width="${fx(x1 - x0)}" height="${fx(band)}" fill="${NAVE_C.niche}" opacity="0.78"/>`
+    s += `<rect x="${fx(x0)}" y="${fx(yTop)}" width="${fx(x1 - x0)}" height="${fx(band * 0.2)}" fill="#000000" opacity="0.3"/>`
+    for (let k = 0; k < n; k++) {
+      const y = yTop + (band * (k + 1)) / (n + 0.4)
+      const lw = Math.max(2.6, band * 0.085)
+      const seg = (yy, col, sw2, op) =>
+        `<line x1="${fx(x0)}" y1="${fx(yy)}" x2="${fx(x1)}" y2="${fx(yy)}" stroke="${col}" stroke-width="${fx(sw2)}" opacity="${op}"/>`
+      s += seg(y + lw * 0.95, NAVE_C.base, lw * 1.5, '0.9')
+      s += seg(y, NAVE_C.gold, lw, '1')
+      s += seg(y - lw * 0.16, NAVE_C.gilt, lw * 0.5, '1')
+      s += seg(y - lw * 0.42, NAVE_C.giltHi, lw * 0.22, '0.95')
+      const cr = Math.max(1.5, lw * 0.62)
+      for (let x = x0 + rr(r, 3, 12); x < x1 - cr * 1.2; x += rr(r, cr * 2.8, cr * 7.5)) {
+        const stack = 1 + Math.floor(rr(r, 0, 2.7))
+        for (let q = 0; q < stack; q++) {
+          const cy = y - lw * 0.5 - cr * (0.95 + q * 1.5)
+          if (cy - cr < yTop + band * 0.16) break
+          s += `<circle cx="${fx(x)}" cy="${fx(cy)}" r="${fx(cr)}" fill="${NAVE_C.gold}" stroke="${NAVE_C.base}" stroke-width="0.9"/>`
+          s += `<circle cx="${fx(x - cr * 0.28)}" cy="${fx(cy - cr * 0.3)}" r="${fx(cr * 0.44)}" fill="${NAVE_C.giltHi}" opacity="0.95"/>`
+        }
+      }
+    }
+    const rw = Math.max(3, band * 0.1)
+    s += `<line x1="${fx(x0)}" y1="${fx(yBot)}" x2="${fx(x1)}" y2="${fx(yBot)}" stroke="${NAVE_C.gold}" stroke-width="${fx(rw)}"/>`
+    s += `<line x1="${fx(x0)}" y1="${fx(yBot - rw * 0.3)}" x2="${fx(x1)}" y2="${fx(yBot - rw * 0.3)}" stroke="${NAVE_C.giltHi}" stroke-width="${fx(rw * 0.28)}" opacity="0.9"/>`
+    s += `<line x1="${fx(x0)}" y1="${fx(yBot + rw * 0.8)}" x2="${fx(x1)}" y2="${fx(yBot + rw * 0.8)}" stroke="${NAVE_C.base}" stroke-width="${fx(rw)}" opacity="0.75"/>`
   }
   return s
 }
@@ -6739,20 +6880,50 @@ function naveRankFace(w, h, seed, cfg) {
   const r = mulberry32(seed)
   const arch = naveArchPath(w, h, cfg.apHw, cfg.apApex)
   const sheet = `M 0 0 L ${w} 0 L ${w} ${h} L 0 ${h} Z ${arch}`
+  const rw = Math.max(6, Math.min(w, h) * 0.05)
   let s = `<g clip-path="url(#rank-clip)">`
   s += `<rect width="${w}" height="${h}" fill="url(#rank-grad)"/>`
-  s += naveMasonry(w, h, r, cfg.topBand)
-  // tympanum molding band — gilt + frost lines the archMolding stratum is cut
-  // through (paint continuity across the relief cuts).
+  s += naveWall(w, h, r)
+  s += naveWingPilasters(w, h, cfg)
+  // the vault light: a soft warm wash falling from the crown, so the face is
+  // LIT rather than merely tinted, and the base falls away into the dark.
+  s += `<ellipse cx="${fx(w / 2)}" cy="0" rx="${fx(w * 0.62)}" ry="${fx(h * 0.72)}" fill="url(#rank-glow)"/>`
+  s += `<rect x="0" y="${fx(h * 0.55)}" width="${w}" height="${fx(h * 0.45)}" fill="url(#rank-base)"/>`
+  // the architrave — the band the archMolding stratum is cut through, so its
+  // gilt runs continuously across the relief cuts and the popped molding
+  // carries gold on its face. Dentils give the band tooth at distance.
   const [m0, m1] = cfg.mold
-  s += `<rect x="0" y="${fx(h * (1 - m1))}" width="${w}" height="${fx(h * (m1 - m0))}" fill="${NAVE_C.midnight}" opacity="0.35"/>`
-  s += `<line x1="0" y1="${fx(h * (1 - m1))}" x2="${w}" y2="${fx(h * (1 - m1))}" stroke="${NAVE_C.gilt}" stroke-width="3" opacity="0.8"/>`
-  s += `<line x1="0" y1="${fx(h * (1 - m0))}" x2="${w}" y2="${fx(h * (1 - m0))}" stroke="${NAVE_C.gold}" stroke-width="2.4" opacity="0.7"/>`
+  const my0 = h * (1 - m1)
+  const my1 = h * (1 - m0)
+  const mb = my1 - my0
+  s += `<rect x="0" y="${fx(my0)}" width="${w}" height="${fx(mb)}" fill="${NAVE_C.niche}" opacity="0.34"/>`
+  s += `<line x1="0" y1="${fx(my0)}" x2="${w}" y2="${fx(my0)}" stroke="${NAVE_C.gold}" stroke-width="${fx(rw * 0.5)}"/>`
+  s += `<line x1="0" y1="${fx(my0 - rw * 0.13)}" x2="${w}" y2="${fx(my0 - rw * 0.13)}" stroke="${NAVE_C.giltHi}" stroke-width="${fx(rw * 0.16)}" opacity="0.9"/>`
+  s += `<line x1="0" y1="${fx(my1)}" x2="${w}" y2="${fx(my1)}" stroke="${NAVE_C.gold}" stroke-width="${fx(rw * 0.4)}"/>`
+  {
+    // A reeded molding, not a dentil course. Three ranks stack in one frame, so
+    // any block-scale motif on this band repeats three times and reads as a
+    // keyboard; fine vertical reeds between two gilt fasciae read as a turned
+    // gilt molding up close and as one warm line at distance — and they leave
+    // the coin frieze below as the only loud thing on the wall.
+    for (const f of [0.34, 0.68]) {
+      s += `<line x1="0" y1="${fx(my0 + mb * f)}" x2="${w}" y2="${fx(my0 + mb * f)}" stroke="${NAVE_C.gold}" stroke-width="${fx(rw * 0.16)}" opacity="0.85"/>`
+    }
+    const dw = Math.max(1.4, mb * 0.1)
+    for (let x = dw; x < w; x += dw * 2) {
+      s += `<line x1="${fx(x)}" y1="${fx(my0 + mb * 0.34)}" x2="${fx(x)}" y2="${fx(my0 + mb * 0.68)}" stroke="${NAVE_C.gilt}" stroke-width="${fx(dw * 0.8)}" opacity="0.3"/>`
+    }
+  }
+  s += naveShelfFrieze(w, h, r, cfg)
   s += `</g>`
   // gilt arch rim ringing the aperture (drawn unclipped so the ring sits ON
   // the die edge), with radiating voussoir ticks — the cathedral archivolt.
-  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gold}" stroke-width="7" opacity="0.95"/>`
-  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.6" opacity="0.9"/>`
+  // The dark halo under the gold is what makes the rim a RIM: without a
+  // shadowed reveal behind it the gold sat at wall value and read as a scratch.
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.base}" stroke-width="${fx(rw * 2.3)}" opacity="0.9"/>`
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(rw)}"/>`
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="${fx(rw * 0.42)}"/>`
+  s += `<path d="${arch}" fill="none" stroke="${NAVE_C.giltHi}" stroke-width="${fx(rw * 0.15)}" opacity="0.95"/>`
   {
     const cx = w / 2
     const aw = cfg.apHw * w
@@ -6760,17 +6931,21 @@ function naveRankFace(w, h, seed, cfg) {
     const ySpring = Math.min(h, yA + aw * 1.1)
     const vCx = cx
     const vCy = ySpring
-    const ticks = 9
+    const ticks = 11
+    const r0 = aw + rw * 0.42
+    const r1 = r0 + rw * 1.15
     for (let i = 0; i <= ticks; i++) {
       const a = Math.PI + (Math.PI * i) / ticks // left horizon over the crown to right
       const rx = Math.cos(a)
       const ry = Math.sin(a) * ((ySpring - yA) / aw + 0.12)
       const n = Math.hypot(rx, ry) || 1
-      const x0 = vCx + (rx / n) * aw
-      const y0 = Math.min(ySpring, vCy + (ry / n) * aw)
-      const x1 = vCx + (rx / n) * (aw + Math.min(w, h) * 0.045)
-      const y1 = Math.min(ySpring, vCy + (ry / n) * (aw + Math.min(w, h) * 0.045))
-      s += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${NAVE_C.gold}" stroke-width="2.2" opacity="0.6"/>`
+      const x0 = vCx + (rx / n) * r0
+      const y0 = Math.min(ySpring, vCy + (ry / n) * r0)
+      const x1 = vCx + (rx / n) * r1
+      const y1 = Math.min(ySpring, vCy + (ry / n) * r1)
+      // alternating voussoirs: gold block, gilt block — the archivolt reads as
+      // cut wedges rather than as a hatched fringe.
+      s += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${i % 2 ? NAVE_C.gilt : NAVE_C.gold}" stroke-width="${fx(rw * 0.5)}" opacity="0.95"/>`
     }
   }
   // the keystone, painted EXACTLY over its stratum band so the popped
@@ -6808,9 +6983,16 @@ function naveRankFace(w, h, seed, cfg) {
   s += naveFrostDust(r, w, () => 3, 26)
   const defs =
     `<linearGradient id="rank-grad" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${NAVE_C.midnight}"/>` +
+    `<stop offset="0" stop-color="${NAVE_C.tealHi}"/>` +
     `<stop offset="0.45" stop-color="${NAVE_C.teal}"/>` +
-    `<stop offset="1" stop-color="${NAVE_C.tealLit}"/></linearGradient>` +
+    `<stop offset="1" stop-color="${NAVE_C.base}"/></linearGradient>` +
+    `<radialGradient id="rank-glow" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.gilt}" stop-opacity="0.2"/>` +
+    `<stop offset="0.55" stop-color="${NAVE_C.gilt}" stop-opacity="0.07"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.gilt}" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="rank-base" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${NAVE_C.base}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.base}" stop-opacity="0.82"/></linearGradient>` +
     `<clipPath id="rank-clip"><path d="${sheet}" fill-rule="evenodd"/></clipPath>`
   // the sheet itself is painted only inside the evenodd clip, so the arch
   // aperture rasterizes TRANSPARENT — the runtime alphaTest die-cuts it.
@@ -6821,8 +7003,8 @@ function naveRankFace(w, h, seed, cfg) {
  *  five scalloped arcs over the central dome, crown wings flat at the world
  *  0.46-of-0.62 line. */
 function apseSilPath(w, h) {
-  const yWing = h * (1 - 0.46 / 0.62)
-  const domeHw = w * 0.19
+  const yWing = h * (1 - NAVE_APSE.crownFrac)
+  const domeHw = w * NAVE_APSE.domeHwFrac
   const cx = w / 2
   let sil = `M 0 ${h} L 0 ${fx(yWing)} L ${fx(cx - domeHw)} ${fx(yWing)}`
   const scallops = 5
@@ -6861,28 +7043,43 @@ function naveApseBack(w, h) {
 function naveApseFace(w, h, seed) {
   const r = mulberry32(seed)
   const { sil, yWing, domeHw, cx } = apseSilPath(w, h)
+  const wy = h * NAVE_APSE.roseCy
+  const wr = w * NAVE_APSE.roseRw
   let s = `<g clip-path="url(#apse-clip)">`
   s += `<rect width="${w}" height="${h}" fill="url(#rank-grad-a)"/>`
-  s += naveMasonry(w, h, r, 0.3)
+  s += naveWall(w, h, r)
+  s += naveWingPilasters(w, h, {})
   // flat painted treasure tiers below the sightline (bench: the apse lower
   // face is invisible through the portals — cheap fills, no vista wasted).
   for (let k = 0; k < 3; k++) {
     const y = h * (0.55 + k * 0.15)
     s += `<rect x="0" y="${fx(y)}" width="${w}" height="${fx(h * 0.05)}" fill="${NAVE_C.gold}" opacity="${fx(0.28 - k * 0.07)}"/>`
   }
-  // the aurora-rose window: radial mint -> amethyst -> gilt core ring,
-  // spoked — CENTRED ON the visible band (world y 0.43..0.62 of the 0.62
-  // face, bench §A); the rose is generous so the crown band glows, and
-  // whatever dips under the clip line only warms the dark below it.
-  const wy = h * 0.155
-  const wr = h * 0.23
-  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="url(#rose-grad)"/>`
-  for (let i = 0; i < 8; i++) {
-    const a = (Math.PI * i) / 4
-    s += `<line x1="${fx(cx)}" y1="${fx(wy)}" x2="${fx(cx + wr * Math.cos(a))}" y2="${fx(wy + wr * Math.sin(a))}" stroke="${NAVE_C.midnight}" stroke-width="2.4" opacity="0.65"/>`
+  // THE BLOOM. The rose is the only light source the reader can see, so its
+  // glow has to leave the window: a broad falloff across the whole apse plus a
+  // warm ledge of light lying along the crown-wing line. That spill is what
+  // makes rank A's crown — the 0.187-world band floating above the stack —
+  // read as lit stone catching the window rather than as more dark teal.
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(wy)}" rx="${fx(w * 0.4)}" ry="${fx(h * 0.55)}" fill="url(#rose-bloom)"/>`
+  s += `<rect x="0" y="${fx(yWing - h * 0.09)}" width="${w}" height="${fx(h * 0.2)}" fill="url(#crown-wash)"/>`
+  // the aurora window: a half-round FAN seated on the crown line, hot frost/
+  // gilt at the core and running out through mint to amethyst. Seated rather
+  // than floating, it fills all five scallops from one source instead of being
+  // sliced into a bowl by the dome clip.
+  const fan = `M ${fx(cx - wr)} ${fx(wy)} A ${fx(wr)} ${fx(wr)} 0 0 1 ${fx(cx + wr)} ${fx(wy)} Z`
+  s += `<path d="${fan}" fill="url(#rose-grad)"/>`
+  for (let i = 1; i < 8; i++) {
+    const a = Math.PI + (Math.PI * i) / 8
+    s += `<line x1="${fx(cx)}" y1="${fx(wy)}" x2="${fx(cx + wr * Math.cos(a))}" y2="${fx(wy + wr * Math.sin(a))}" stroke="${NAVE_C.midnight}" stroke-width="2.4" opacity="0.4"/>`
   }
-  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="4.5" opacity="0.95"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(wy)}" r="${fx(wr * 0.32)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.2" opacity="0.9"/>`
+  for (const k of [0.36, 0.68]) {
+    s += `<path d="M ${fx(cx - wr * k)} ${fx(wy)} A ${fx(wr * k)} ${fx(wr * k)} 0 0 1 ${fx(cx + wr * k)} ${fx(wy)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="2.8" opacity="0.85"/>`
+  }
+  s += `<path d="${fan}" fill="none" stroke="${NAVE_C.gold}" stroke-width="7"/>`
+  s += `<path d="${fan}" fill="none" stroke="${NAVE_C.giltHi}" stroke-width="2.4"/>`
+  // the gilt sill the fan stands on — the lit ledge running out along the crown
+  s += `<line x1="0" y1="${fx(wy)}" x2="${w}" y2="${fx(wy)}" stroke="${NAVE_C.gold}" stroke-width="5" opacity="0.9"/>`
+  s += `<line x1="0" y1="${fx(wy - 2.5)}" x2="${w}" y2="${fx(wy - 2.5)}" stroke="${NAVE_C.giltHi}" stroke-width="2" opacity="0.8"/>`
   s += `</g>`
   // frost cut edge along the whole scalloped crown + dusting beneath it.
   s += `<path d="${sil}" fill="none" stroke="${NAVE_C.frost}" stroke-width="4" opacity="0.95" stroke-linejoin="round"/>`
@@ -6890,14 +7087,28 @@ function naveApseFace(w, h, seed) {
   s += naveFrostDust(r, w, (x) => (Math.abs(x - cx) < domeHw ? yWing - h * 0.4 : yWing), 40)
   const defs =
     `<linearGradient id="rank-grad-a" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${NAVE_C.midnight}"/>` +
+    `<stop offset="0" stop-color="${NAVE_C.tealHi}"/>` +
     `<stop offset="0.5" stop-color="${NAVE_C.teal}"/>` +
-    `<stop offset="1" stop-color="${NAVE_C.floor}"/></linearGradient>` +
-    `<radialGradient id="rose-grad" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${NAVE_C.gilt}"/>` +
-    `<stop offset="0.35" stop-color="${NAVE_C.mint}"/>` +
-    `<stop offset="0.8" stop-color="${NAVE_C.amethyst}"/>` +
-    `<stop offset="1" stop-color="${NAVE_C.midnight}"/></radialGradient>` +
+    `<stop offset="1" stop-color="${NAVE_C.base}"/></linearGradient>` +
+    // The fan is a light SOURCE, so its core is white-hot and the saturated
+    // aurora is pushed out to the rim: amethyst is the edge of the glass, not
+    // the subject. (cy=1 so the gradient's centre sits on the fan's own seat.)
+    `<radialGradient id="rose-grad" cx="0.5" cy="1" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.frost}"/>` +
+    `<stop offset="0.3" stop-color="${NAVE_C.giltHi}"/>` +
+    `<stop offset="0.5" stop-color="${NAVE_C.gilt}"/>` +
+    `<stop offset="0.72" stop-color="${NAVE_C.mint}"/>` +
+    `<stop offset="0.92" stop-color="${NAVE_C.amethyst}"/>` +
+    `<stop offset="1" stop-color="#3a2c66"/></radialGradient>` +
+    `<radialGradient id="rose-bloom" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.giltHi}" stop-opacity="0.34"/>` +
+    `<stop offset="0.3" stop-color="${NAVE_C.gilt}" stop-opacity="0.2"/>` +
+    `<stop offset="0.62" stop-color="${NAVE_C.mint}" stop-opacity="0.09"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.mint}" stop-opacity="0"/></radialGradient>` +
+    `<radialGradient id="crown-wash" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.giltHi}" stop-opacity="0.42"/>` +
+    `<stop offset="0.45" stop-color="${NAVE_C.gilt}" stop-opacity="0.2"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.gilt}" stop-opacity="0"/></radialGradient>` +
     `<clipPath id="apse-clip"><path d="${sil}"/></clipPath>`
   return svgPiece(w, h, s, defs)
 }
@@ -6957,10 +7168,18 @@ function navePage(w, h, seed) {
   // the ground even where the paper is cut away.
   for (const z of [-0.52, -0.3, -0.08, 0.157]) {
     const fy = pageFY(z)
-    s += `<rect x="0" y="${fx(PY(fy) - 7)}" width="${w}" height="14" fill="#000000" opacity="0.28"/>`
+    s += `<rect x="0" y="${fx(PY(fy) - 8)}" width="${w}" height="16" fill="#000000" opacity="0.38"/>`
   }
-  // pooled aurora-gold light through the portals (z -0.05 .. -0.32 on axis)
-  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(-0.185)))}" rx="${fx(PX(0.14))}" ry="${fx(PY(0.095))}" fill="url(#pool-grad)"/>`
+  // Pooled aurora-gold light through the portals (z -0.05 .. -0.32 on axis) —
+  // the floor theater IS the vista (bench §B: the apse face is invisible
+  // through the portals), so this pool is the whole payoff of looking down the
+  // axis and it has to be the brightest thing on the print. A wide spill halo
+  // carries it out to the rank seats; the hot core sits on the axis.
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(-0.185)))}" rx="${fx(PX(0.3))}" ry="${fx(PY(0.2))}" fill="url(#spill-grad)"/>`
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(-0.185)))}" rx="${fx(PX(0.18))}" ry="${fx(PY(0.12))}" fill="url(#pool-grad)"/>`
+  // the throat: light spilling forward through rank D's mouth onto the dais
+  // approach, so the portal reads as an opening onto light, not a dark hole.
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.06)))}" rx="${fx(PX(0.1))}" ry="${fx(PY(0.075))}" fill="url(#throat-grad)"/>`
   // the gold processional path: apron (bottom centre) -> splits around the
   // strongbox (z 0.38..0.5, |x| <= 0.095 world) -> dais -> through the
   // mouth to the pooled light. Two smooth ribbons (main left lobe + a
@@ -6989,17 +7208,17 @@ function navePage(w, h, seed) {
   // the full-width trunk on the apron, HALVED into the two lobes at the
   // fork (the inlay parts around the box, it does not double), rejoining
   // into the narrowed nave run.
-  s += `<line x1="${fx(xC)}" y1="${fx(yApron)}" x2="${fx(xC)}" y2="${fx(y56)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.072))}" opacity="0.5"/>`
-  s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.5" stroke-linejoin="round"/>`
-  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.03))}" opacity="0.42" stroke-linejoin="round"/>`
-  s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.5"/>`
+  s += `<line x1="${fx(xC)}" y1="${fx(yApron)}" x2="${fx(xC)}" y2="${fx(y56)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.072))}" opacity="0.74"/>`
+  s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.74" stroke-linejoin="round"/>`
+  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.03))}" opacity="0.4" stroke-linejoin="round"/>`
+  s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.82"/>`
   // gold lozenge inlay down the path centreline (painted-perspective narrowing)
   for (let i = 0; i < 26; i++) {
     const t = i / 26
     const fy = 1 - t * (1 - pageFY(-0.3))
     const size = PX(0.016) * (1 - 0.55 * t)
     const cxx = PX(0.5) + (fy > pageFY(0.38) && fy < pageFY(0.52) ? -PX(0.06) : 0)
-    s += `<path d="M ${fx(cxx)} ${fx(PY(fy) - size)} L ${fx(cxx + size)} ${fx(PY(fy))} L ${fx(cxx)} ${fx(PY(fy) + size)} L ${fx(cxx - size)} ${fx(PY(fy))} Z" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.6, 0.9))}"/>`
+    s += `<path d="M ${fx(cxx)} ${fx(PY(fy) - size)} L ${fx(cxx + size)} ${fx(PY(fy))} L ${fx(cxx)} ${fx(PY(fy) + size)} L ${fx(cxx - size)} ${fx(PY(fy))} Z" fill="${NAVE_C.giltHi}" opacity="${fx(rr(r, 0.78, 1))}"/>`
   }
   // the gutter valley shadow
   s += `<rect x="${fx(w * 0.47)}" y="0" width="${fx(w * 0.06)}" height="${h}" fill="#000000" opacity="0.14"/>`
@@ -7020,10 +7239,64 @@ function navePage(w, h, seed) {
   s += `</g>`
   const defs =
     `<radialGradient id="pool-grad" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${NAVE_C.gilt}" stop-opacity="0.55"/>` +
-    `<stop offset="0.55" stop-color="${NAVE_C.mint}" stop-opacity="0.3"/>` +
-    `<stop offset="1" stop-color="${NAVE_C.amethyst}" stop-opacity="0"/></radialGradient>`
+    `<stop offset="0" stop-color="${NAVE_C.giltHi}" stop-opacity="0.95"/>` +
+    `<stop offset="0.3" stop-color="${NAVE_C.gilt}" stop-opacity="0.72"/>` +
+    `<stop offset="0.62" stop-color="${NAVE_C.mint}" stop-opacity="0.42"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.amethyst}" stop-opacity="0"/></radialGradient>` +
+    `<radialGradient id="spill-grad" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.gilt}" stop-opacity="0.34"/>` +
+    `<stop offset="0.55" stop-color="${NAVE_C.mint}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.amethyst}" stop-opacity="0"/></radialGradient>` +
+    `<radialGradient id="throat-grad" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${NAVE_C.giltHi}" stop-opacity="0.6"/>` +
+    `<stop offset="0.5" stop-color="${NAVE_C.gold}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
+}
+
+/** THE DAIS FLIGHT (ch6-steps-strut): the mirror-bridge's strut faces painted
+ *  as a carved stone stair with gilt nosings.
+ *
+ *  Struts default to raw kraft, and on this spread that was the whole problem:
+ *  in a midnight-teal nave the two pale tan trusses were the brightest mass
+ *  below the arches, so the dais read as scaffolding holding the picture up
+ *  rather than as the step the processional path climbs. Painting them costs
+ *  nothing at runtime (the layer already samples one texture per face) and
+ *  fixes the value order twice over — the field drops to nave-wall value, and
+ *  the only bright thing left on the piece is gold that belongs to the story.
+ *
+ *  Identity uvs on strut faces, so this one sheet serves strutL and strutR;
+ *  the layer shades the right-hand sibling on its own. Treads run across the
+ *  sheet so the flight reads as steps at any strut lean. */
+function naveStepRiser(w, h, seed) {
+  const r = mulberry32(seed)
+  const N = 4
+  const sh = h / N
+  let s = `<rect width="${w}" height="${h}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.55)}"/>`
+  for (let i = 0; i < N; i++) {
+    const y0 = i * sh
+    // the riser: darker the deeper it sits in the flight
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh)}" fill="${naveMix(NAVE_C.base, NAVE_C.tealLit, 0.72 - 0.5 * (i / N))}"/>`
+    // the nosing — a gold tread edge with a lit top and its own cast shadow
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.2)}" fill="${NAVE_C.gold}"/>`
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.06)}" fill="${NAVE_C.giltHi}" opacity="0.9"/>`
+    s += `<rect x="0" y="${fx(y0 + sh * 0.2)}" width="${w}" height="${fx(sh * 0.1)}" fill="${NAVE_C.base}" opacity="0.75"/>`
+    // carved lozenges down the riser face (the treasury's inlay, quiet)
+    const n = 4
+    for (let k = 0; k < n; k++) {
+      const cx = (w * (k + 0.5)) / n + rr(r, -3, 3)
+      const cy = y0 + sh * 0.65
+      const q = Math.min(w / n, sh) * 0.2
+      s += `<path d="M ${fx(cx)} ${fx(cy - q)} L ${fx(cx + q)} ${fx(cy)} L ${fx(cx)} ${fx(cy + q)} L ${fx(cx - q)} ${fx(cy)} Z" fill="${NAVE_C.gold}" opacity="0.42"/>`
+      s += `<path d="M ${fx(cx)} ${fx(cy - q)} L ${fx(cx + q)} ${fx(cy)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="1.4" opacity="0.7"/>`
+    }
+  }
+  // gilt stringers down both jambs of the flight
+  for (const x of [0, w * 0.965]) {
+    s += `<rect x="${fx(x)}" y="0" width="${fx(w * 0.035)}" height="${h}" fill="${NAVE_C.gold}" opacity="0.85"/>`
+    s += `<rect x="${fx(x)}" y="0" width="${fx(w * 0.012)}" height="${h}" fill="${NAVE_C.giltHi}" opacity="0.8"/>`
+  }
+  return svgPiece(w, h, s)
 }
 
 // E3 s6 — THE BAZAAR OF A THOUSAND STALLS (scenes/s6-scene-pack.md §4f).
@@ -9333,9 +9606,9 @@ const PIECES = [
   // ~500px/world (pack §4e atlas layout); band fractions derive from the
   // content.ts rank numbers (aperture, strata bands, crown wings).
   { id: 'ch6-nave-a', seed: 70300, w: 950, h: 310, grain: 11, paint() { return naveApseFace(this.w, this.h, this.seed) } },
-  { id: 'ch6-nave-b', seed: 70301, w: 760, h: 260, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.1316, apApex: 0.7308, topBand: 0.3846, mold: [0.769, 0.962], colHalf: 0.0592, colTop: 0.6923, edge: 'frost' }) } },
-  { id: 'ch6-nave-c', seed: 70302, w: 580, h: 220, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.2069, apApex: 0.7273, topBand: 0.4545, mold: [0.7727, 0.9545], colHalf: 0.0776, colTop: 0.6818, edge: 'frost' }) } },
-  { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, { apHw: 0.359, apApex: 0.7222, topBand: 0.5556, mold: [0.75, 0.9444], kb: [0.8333, 0.9444], khw: 0.0641, edge: 'gilt' }) } },
+  { id: 'ch6-nave-b', seed: 70301, w: 760, h: 260, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, NAVE_RANKS['ch6-nave-b']) } },
+  { id: 'ch6-nave-c', seed: 70302, w: 580, h: 220, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, NAVE_RANKS['ch6-nave-c']) } },
+  { id: 'ch6-nave-d', seed: 70303, w: 400, h: 185, grain: 11, paint() { return naveRankFace(this.w, this.h, this.seed, NAVE_RANKS['ch6-nave-d']) } },
   { id: 'ch6-clerk', seed: 70304, w: 200, h: 250, grain: 10, paint() { return naveClerk(this.w, this.h, this.seed) } },
   // T4 print-backs (tiny): flat shaded paper carrying the same die alpha.
   { id: 'ch6-nave-a-back', seed: 70305, w: 190, h: 62, grain: 6, paint() { return naveApseBack(this.w, this.h) } },
@@ -9345,6 +9618,7 @@ const PIECES = [
   { id: 'page-7', seed: 70310, w: 1024, h: 683, grain: 10, paint() { return navePage(this.w, this.h, this.seed) } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
   { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
+  { id: 'ch6-steps-strut', seed: 70241, w: 512, h: 256, grain: 12, paint() { return naveStepRiser(this.w, this.h, this.seed) } },
   // s7 PLAYABLE (G4): the treasure coffer — interior board + one teal-steel lid.
   { id: 'ch6-coffer-board', seed: 70260, w: 576, h: 480, grain: 12, paint() { return cofferInterior(this.w, this.h, this.seed) } },
   { id: 'ch6-coffer-door1', seed: 70261, w: 512, h: 486, grain: 12, paint() { return cofferLid(this.w, this.h, this.seed) } },
@@ -9738,6 +10012,11 @@ export {
   bakeSlot,
   PIECES,
   bakePieceTexture,
+  NAVE_C,
+  NAVE_RANKS,
+  NAVE_APSE,
+  naveArchPath,
+  pageFY,
   ATLASES,
   ATLAS_PAGE,
   writeAtlases,
