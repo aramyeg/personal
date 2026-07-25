@@ -101,3 +101,24 @@ describe('C-3 scope — which s4 pieces the cull is allowed to touch', () => {
     expect(['volvelle', 'keepwinch']).not.toContain(mechOf('ch3-keep'))
   })
 })
+
+describe('C-3 opt-in pieces — the flagged playables, and the structure left alone', () => {
+  const layerOf = (spread: number, id: string): SceneLayer =>
+    CHAPTERS.find((c) => c.spread === spread)!.layers.find((l) => l.id === id)!
+
+  it('ch5-raise-stall is culled — the s5->s6 turn pair was the last draw-budget miss', () => {
+    const stall = layerOf(6, 'ch5-raise-stall')
+    expect(stall.mech).toBe('tabpiece')
+    if (stall.mech === 'tabpiece') expect(stall.turnCull).toBe(true)
+  })
+
+  it('the OTHER tab piece stays uncalled: s5 goldpile is the spread\'s standing gold, not an instrument', () => {
+    // The flag costs a pooled material and moves the piece into the transparent
+    // pass, so it is opt-in per piece rather than per family. ch4-goldpile is
+    // the mound the treasure "grows" as the spread blooms — it reads as scene,
+    // and the s4->s5 pair already clears its budget without culling it.
+    const goldpile = layerOf(5, 'ch4-goldpile')
+    expect(goldpile.mech).toBe('tabpiece')
+    if (goldpile.mech === 'tabpiece') expect(goldpile.turnCull ?? false).toBe(false)
+  })
+})

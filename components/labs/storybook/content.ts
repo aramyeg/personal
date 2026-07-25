@@ -806,7 +806,13 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // repainted as stall posts, deck a striped awning mid-raise, the fore-edge
   // tab a woodcut ⟡ RAISE A STALL ⟡ cartouche (B-MEANING: the playable IS the
   // chapter's meaning — he carved the patterns any hands can raise).
-  { id: 'ch5-raise-stall', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60 },
+  // TURN-CULLED (Batch C-3, the dial/winch/dissolve lever): the spread's one
+  // interaction-only piece, and the s5->s6 turn pair was the book's last
+  // draw-budget miss (171.8 vs 170, gate-matrix G5). Its faces + hairlines +
+  // shadow stop drawing through the fast middle of a turn and ramp back
+  // inside the landing settle. Geometry is verbatim — no solver, pose or
+  // fold-flat proof is touched.
+  { id: 'ch5-raise-stall', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60, turnCull: true },
 ]
 
 // Chapter VI — the crescendo steps THROUGH the door (E3 s7 scene pack,
