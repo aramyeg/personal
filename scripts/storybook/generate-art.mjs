@@ -6993,7 +6993,12 @@ function naveRankFace(w, h, seed, cfg) {
     `<linearGradient id="rank-base" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${NAVE_C.base}" stop-opacity="0"/>` +
     `<stop offset="1" stop-color="${NAVE_C.base}" stop-opacity="0.82"/></linearGradient>` +
-    `<clipPath id="rank-clip"><path d="${sheet}" fill-rule="evenodd"/></clipPath>`
+    // `clip-rule`, NOT `fill-rule`: a clipPath child's winding is governed by
+    // clip-rule and renderers ignore fill-rule there. With only fill-rule set
+    // the aperture subpath was unioned instead of subtracted, so the portal
+    // rasterized SOLID and the runtime's alphaTest had nothing to cut — the
+    // whole nested floor-theater read (bench §B) was painted shut.
+    `<clipPath id="rank-clip"><path d="${sheet}" clip-rule="evenodd" fill-rule="evenodd"/></clipPath>`
   // the sheet itself is painted only inside the evenodd clip, so the arch
   // aperture rasterizes TRANSPARENT — the runtime alphaTest die-cuts it.
   return svgPiece(w, h, s, defs)
