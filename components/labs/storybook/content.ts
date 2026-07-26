@@ -269,15 +269,36 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // __tests__/labs/storybook/popup-swarmarc-scene.test.ts.
   // IDLE (BW-2, the finding this spread earned by name: "a spread titled 'The
   // Carrier Swarm' containing ~30 bees in which no bee ever moves is a dead
-  // diorama"). The three named couriers sway — a sub-degree swivel of each die
-  // about its own mount crease, the paper-true version of a wingbeat: the bee
-  // is a rigid cutout on a glue tab, and a glue tab gives in a draught. Their
-  // phases come from an id hash in both wave terms, so the three never twitch
-  // together. The 24-strut ring itself is left to its own `stir` drive — a
-  // whole wheeling armature is a scene lane's problem, not a draught's.
-  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.84, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117, idle: { kind: 'sway' } },
-  { id: 'ch2-crown-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.9, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.08 },
-  { id: 'ch2-crown-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.82, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.13, height: 0.07 },
+  // diorama"). The three named couriers move — a sub-degree swivel or a
+  // sub-millimetre slide of each die about its own mount crease, the paper-true
+  // version of a wingbeat: the bee is a rigid cutout on a glue tab, and a glue
+  // tab gives in a draught. Their phases come from an id hash in both wave
+  // terms, so the three never twitch together. The ring itself is left to its
+  // own `stir` drive — a whole wheeling armature is a scene lane's problem, not
+  // a draught's.
+  // WAVE-2 KIND PASS: the two high couriers take 'drift' (idle-life reserves the
+  // slide for pieces the art shows as AIRBORNE, where the eye reads it as hover
+  // rather than glue creep) and the chest bee keeps 'sway'. The clover and the
+  // cut-paper clouds were the other two candidates the ledger names and BOTH are
+  // ineligible: they are mech 'dress', which is not in IDLE_SUPPORTED_MECHS
+  // (popup-spread.tsx routes dress patches through a seat quad, not the generic
+  // two-quad pose the idle transform rides), and the per-spread tag ceiling is 3.
+  // CREST CLEARANCE (WAVE-2, blind reader finding 6, "wings clipped through the
+  // top of the back wall... reads as a rendering error"): at mounts 0.84/0.90
+  // these two dies protruded 4.8 px and 11.7 px ABOVE the backdrop's projected
+  // top edge, so the wall's crest cut across a bee. Lowered to 0.78/0.83, which
+  // measures +15.7 px and +14.0 px of clearance BELOW the crest at the pinned
+  // camera — the trio now wheels wholly against the painted sky. Gated by
+  // __tests__/labs/storybook/popup-swarmarc-scene.test.ts (crest gate).
+  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.75, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117, idle: { kind: 'drift' } },
+  { id: 'ch2-crown-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.83, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.08 },
+  // (the trio is FANNED along the crease at 0.75 / 0.83 / 0.67 rather than
+  //  bunched at 0.84 / 0.90 / 0.82. Two reasons, both measured: crown-b at 0.90
+  //  and bee-a at 0.84 straddled the crest, and crown-b vs crown-c at 0.83/0.82
+  //  measured 86% mutual screen overlap — one die hiding inside another is not a
+  //  cluster. At the shipped mounts the three centres sit 29 px and 35 px apart
+  //  on screen with 14/28/48 px of crest clearance: three readable couriers.)
+  { id: 'ch2-crown-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.67, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.13, height: 0.07 },
   // ATMOSPHERE INTERLEAVE (ref 10): cut-paper clouds on the backdrop panels —
   // atmosphere BETWEEN the painted sky and the wheeling ring.
   // (u/v are world offsets from the panel's spine-side corner — the clouds
@@ -288,7 +309,24 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // sweep lane — measured 11 extra mid-turn hits vs ~0 here.)
   { id: 'ch2-cloud-r', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-backdrop', seat: 'right', u: 0.26, v: 0.6, width: 0.26, height: 0.1 },
   { id: 'ch2-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
-  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.62, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089, idle: { kind: 'sway' } },
+  // BEE-B OFF THE FACE (WAVE-2, blind reader finding 3: "his head is a blank tan
+  // oval with a yellow-and-black V smeared across the middle... whether that V is
+  // a bee hovering in front of him is unresolvable even at 4x zoom"). Decomposed
+  // rather than guessed at: the V was this die, and it was BOTH in the wrong place
+  // and in the wrong pose.
+  //  - PLACE: at mount 0.62 its projected box is x 772..826, y 337..376, and the
+  //    hero's painted head band is y 330..380 — a dead-centre hit on the face.
+  //    Moved to 0.86, which puts it at y 230..279: a courier flying up beside the
+  //    raised looking-glass (painted at ~x 867, y 284), which is where the eye is
+  //    already going.
+  //  - POSE: vDir −1 tipped both panels away from the reader, so the die
+  //    presented 683 px² of the 2406 px² it can — a bee squashed into two gold
+  //    slivers meeting at a crease, i.e. exactly the unresolvable V. vDir +1 (its
+  //    sibling bee-c's setting, which the same reader read correctly as "a big
+  //    detailed bee") presents 2406 px², 3.5x more. dieFlipped stays true either
+  //    way (the deep-V hero tips its children past vertical regardless), so the
+  //    panel-uvs flip pin is unaffected.
+  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.86, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089, idle: { kind: 'drift' } },
   { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069, idle: { kind: 'sway' } },
   // VOLUMETRIC: the guild's hive — a small lidded box in the meadow (real
   // beehives ARE stacked boxes); keeps the chapter airy but gives it its
@@ -304,9 +342,12 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // graded hairline struts + 4 outrider strays, wheeling around the hero:
   // full table regenerated from the bench constants (e3s3-swarmarc.mjs, ALL
   // GATES GREEN S1–S7), wave-staggered deploy poured out of the hive by the
-  // page itself, and the STIR THE SWARM fore-edge tab rippling the 5
-  // right-arm members (drive channel `ch2-swarm~stir`, held state).
-  { id: 'ch2-swarm', kind: 'midground', role: 'figure', mech: 'swarmarc', struts: buildSwarmStruts(), strutW: 0.01, stir: { side: 'right', stroke: 0.14, deg: 12, phaseStep: 0.12 } },
+  // page itself, and the STIR THE SWARM tab rippling the outer right-arm
+  // members (drive channel `ch2-swarm~stir`, held state).
+  // WAVE-2: 22 members (was 28) and the ripple retuned from a 12° whisper to a
+  // 38° wave with a 0.8 crest limiter — see popup-swarmarc.ts's header for the
+  // measured screen travel and why each number is what it is.
+  { id: 'ch2-swarm', kind: 'midground', role: 'figure', mech: 'swarmarc', struts: buildSwarmStruts(), strutW: 0.01, stir: { side: 'right', stroke: 0.14, deg: 38, phaseStep: 0.2, crest: 0.8 } },
   // The long-planned painted meadow fringe up front (call sheet v5): a low
   // wide reader-edge wall that ratchets the chapter's depth bands.
   { id: 'ch2-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.56, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.2, height: 0.22 },
@@ -318,15 +359,23 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // clear of the gutter hive; they widen the composition past the strut wall.)
   { id: 'ch2-chain-l', kind: 'foreground', role: 'scenery', mech: 'dress', parentId: 'ch2-fringe', seat: 'left', u: 0.45, v: 0.14, width: 0.34, height: 0.12 },
   { id: 'ch2-chain-r', kind: 'foreground', role: 'scenery', mech: 'dress', parentId: 'ch2-fringe', seat: 'right', u: 0.44, v: 0.13, width: 0.32, height: 0.12 },
-  // KINETIC (D4/D5): a WINDMILL SAIL standing in the meadow — Birmingham mech
-  // 73, a 45-deg arm that sweeps a quarter-turn up to vertical as the book
-  // opens (the sail catching the wind). D5 arm-lane pass moved it from the deep
-  // upstage park (apexZ -0.62) to a VISIBLE mid-page downstage lane (apexZ 0.20,
-  // vDir +1): it stands at the meadow's front edge, just downstage of the
-  // courier hero, rising a hair over the fringe. Its quarter-turn sweep costs
-  // ~18 mid-turn brushes against the big backdrop wall; the meadow-shelf
-  // tightening above returns that budget (net mid-turn count DROPS vs the park).
-  { id: 'ch2-windmill', kind: 'midground', role: 'scenery', mech: 'kinetic', apexZ: 0.2, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.12, armLen: 0.3, flapW: 0.14, flapLen: 0.18 },
+  // THE MEADOW WINDMILL IS RETIRED (E3 Wave-2, blind reader finding 8's
+  // "clear the hero's silhouette zone" + his item 17). The kinetic sail stood at
+  // apexZ 0.20 and measured x 752..838, y 487..628 at the pinned camera — wholly
+  // inside the hero's own box (707..912, 232..617) and DOWNSTAGE of him (0.20 vs
+  // his 0.10), so it drew across his legs from hip to boot. The first-time reader
+  // named it "a stack of cream slabs ruled with brown verticals, sitting in a
+  // wooden crate ... hive frames in a hive box": the one unreadable object in the
+  // middle of the composition, and the thing masking the protagonist's stance.
+  // It cannot be moved out of the way, and that is the honest reason it goes: a
+  // kinetic arm's apex is ON THE SPINE by construction, so every legal placement
+  // is in the hero's screen column — upstage of him it is simply invisible behind
+  // him (measured: its whole box falls inside his), downstage of him it masks him.
+  // This is the backdrop-wings law again (a tall spine-anchored centrepiece
+  // forbids other spine-anchored pieces in its column). Returns ~18 mid-turn
+  // brushes against the backdrop wall, 2 draws and a texture; s3 keeps 4 distinct
+  // mechanism families (vfold / recursion / box / swarmarc), which is the C4v2
+  // floor, and the swarmarc is itself a 22-member assembly.
 ]
 
 // Chapter III — THE DISPATCH KEEP (E1 pilot showpiece; derivation

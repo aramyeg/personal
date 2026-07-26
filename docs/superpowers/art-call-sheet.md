@@ -181,7 +181,7 @@ actually running the solver, not eyeballed:
 
 **Rotated 180° (3 shipped pieces + 2 fan members):** `ch2-bee-c`,
 `ch4-coins`, `title-crest`, `satchel-burst-m0`, `satchel-burst-m1`.
-(`end-raven` is now a kinetic arm — upright, like `ch2-windmill`;
+(`end-raven` is now the book's only kinetic arm, and prints upright;
 `ch1-dormer` moved to the phi-74 E3 inn ROW, no longer a deep-V parent, and
 prints upright alongside its new siblings `ch1-sign` and `ch1-key`; the ch5
 lantern pair retired in the E3 s6 rebuild — the lanterns are now die-cut
@@ -223,7 +223,7 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `ch2-hive` | `ch2-hive-front`, `ch2-hive-back`, `ch2-hive-side`, `ch2-hive-top` | Lidded beehive box in the meadow — real hives ARE stacked boxes | side ≈0.86:1 · front/back ≈1.29:1 · top ≈1.5:1 | FACE / TOPDOWN | placeholder |
 | `ch2-hive-swarm` | `ch2-hive-swarm` | Dressed bee swarm hanging off the hive lid | ≈1.6:1 wide | FLAT | placeholder |
 | `ch2-hive-flowers` | `ch2-hive-flowers` | Dressed flowers at the hive's base | ≈2.0:1 wide | FLAT | placeholder |
-| `ch2-swarm` | `ch2-swarm-atlas` | THE CARRIER SWARM (E3 s3): ONE 1024 sprite atlas, 8×8 cell grid — cells 0–15 the 16 rider sprites (bees wings-up/mid/down, envelopes, red-wax sealed letter, twine parcels, honey-drop, scouts), cell 16 the hairline strut swatch (`#a9bccb`), cells 17–18 the stir-tab bee-on-honey-drop handle, cells 19–22 the "STIR THE SWARM ▼" banner | 1:1 atlas | FLAT | placeholder |
+| `ch2-swarm` | `ch2-swarm-atlas` | THE CARRIER SWARM (E3 s3, Wave-2 recut): ONE 1024 sprite atlas, 8×8 cell grid — cells 0–15 the 16 rider sprites (bees wings-up/mid/down, envelopes, red-wax sealed letter, twine parcels, honey-drop, scouts), each with its body in the cell's upper 60% and a hairline flight thread running down the cell's centre to the foot edge so the courier reads as HOVERING at the head of its stalk rather than skewered on it; cells 16 / 23 / 24 the three hairline stalk swatches (reed / twine / twig, all opaque full-cell); a 5×3 block from cell 32 (640×384, aspect 1.667) the STIR THE SWARM pull tab, painted as a diegetic honey-gold tab with a score line, a grip notch at its outboard (right) edge and a label at ≥ 12 px on-screen cap height | 1:1 atlas | FLAT | placeholder |
 | `ch2-crown-b` | `ch2-crown-b` | Flung crown bee (backdrop crease), wings spread, tiny satchel, slate+gold | ≈1.75:1 landscape | STAND | placeholder |
 | `ch2-crown-c` | `ch2-crown-c` | Flung crown bee (backdrop crease), the smallest of the trio | ≈1.86:1 landscape | STAND | placeholder |
 | `ch2-cloud-l` | `ch2-cloud-l` | Flat cut-paper cloud behind the ring's left shoulder, sky wash + white lobes | ≈2.7:1 wide | FLAT | placeholder |
@@ -231,7 +231,16 @@ crease up by construction — confirmed for all 33 vfold layers in the book).
 | `ch2-chain-l` | `ch2-chain-l` | Linked-rank chain: 2 bees + a strung cream envelope on painted thread, ONE silhouette overhanging the fringe top | ≈2.8:1 wide | FLAT | placeholder |
 | `ch2-chain-r` | `ch2-chain-r` | Linked-rank chain, right side | ≈2.7:1 wide | FLAT | placeholder |
 | `ch2-fringe` | `ch2-fringe` | Painted meadow fringe at the very front edge | ≈5.45:1 very wide | STAND | placeholder |
-| `ch2-windmill` | `ch2-windmill` | Windmill sail standing in the meadow, just downstage of the courier hero, sweeps to vertical as the book opens | combined ≈0.80:1 portrait-ish (arm dominates; see §1.6 caveat below) | STAND (kinetic) | placeholder — **moved from the deep-upstage park to a visible downstage lane (2026-07-13, in-flight composition pass); geometry above is current as of verification but may still be tuning — recheck `armLen`/`apexZ` before painting if this row looks stale** |
+
+**The meadow windmill sail is RETIRED** (E3 Wave-2, s3 scene lane). Its row is gone
+because its layer is gone: a kinetic arm's apex sits ON THE SPINE by construction, so
+every legal placement put it inside the courier hero's own screen column — downstage of
+him (its shipped apexZ 0.20) it drew across his legs from hip to boot and a first-time
+reader read it as "a stack of cream slabs ruled with brown verticals ... hive frames in a
+hive box"; upstage of him its whole projected box falls behind him. Nothing replaces it:
+the guild hive already holds the gutter foreground, and the 22-member carrier swarm is the
+spread's assembly. Chapter II keeps four mechanism families (vfold / recursion / box /
+swarmarc).
 
 ## 4. Chapter III — The Rookery of Four Billion Ravens · THE DISPATCH KEEP (spread 4)
 
@@ -500,9 +509,9 @@ flat drawer icons, never as a paper mechanism.
    them generic enough to read correctly on either side.
 3. **The ch3 semaphore is now a winch output.** The old `ch3-semaphore` kinetic arm was
    ABSORBED into the tower-hoist winch (E1 showpiece) — it is one of the three staggered
-   outputs the crank drives, painted as `ch3-keep-winch-semaphore` (§4). `ch2-windmill`
-   remains the book's standalone kinetic arm in its visible downstage lane (see §3) — its
-   geometry is current as of verification; recheck before painting.
+   outputs the crank drives, painted as `ch3-keep-winch-semaphore` (§4). The ch2 meadow
+   windmill retired in E3 Wave-2 (see §3), so `end-raven` is now the book's only standalone
+   kinetic arm.
 4. **The ch5 archway retired.** The old low-res arch (and the whole D-series
    bazaar crowd around it) was replaced wholesale by the E3 s6 amphitheater —
    its stale webps in the manifest are pruned by the s6 bake; nothing requests
