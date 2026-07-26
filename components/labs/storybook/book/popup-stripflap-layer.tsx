@@ -53,6 +53,7 @@ import {
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_HEIGHT = 0.16
@@ -70,15 +71,6 @@ const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 /** Wrap an angle delta to (-pi, pi] so a grab tracks the short way round. */
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
-
-// Scratch for the H3 angle-about-hinge projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
-const _center = new THREE.Vector3()
-const _hinge = new THREE.Vector3()
-const _n = new THREE.Vector3()
-const _flat = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 
 // Stripflap uvs are fixed (fold split 0.5, never die-flipped): the print
 // continues seamlessly across the invisible centre seam (matches panelUvs).
@@ -226,15 +218,7 @@ export function StripFlapPopupLayer({
    *  normal to the hinge axis, then atan2(along n, along flat). */
   const angleAboutHinge = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
     const fr = stripFlapFrame(layer, thetaL, thetaR)
-    _center.set(fr.center[0], fr.center[1], fr.center[2])
-    _hinge.set(fr.hinge[0], fr.hinge[1], fr.hinge[2])
-    _plane.setFromNormalAndCoplanarPoint(_hinge, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    _n.set(fr.n[0], fr.n[1], fr.n[2])
-    _flat.set(fr.flat[0], fr.flat[1], fr.flat[2])
-    return Math.atan2(_rel.dot(_n), _rel.dot(_flat))
+    return projectHingeAngle(pointerLocalRay(e), fr.center, fr.hinge, fr.flat, fr.n)
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {

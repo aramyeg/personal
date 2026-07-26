@@ -38,6 +38,7 @@ import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const HUB_DEADZONE = 0.25
@@ -67,13 +68,6 @@ const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
-const _center = new THREE.Vector3()
-const _n = new THREE.Vector3()
-const _e1 = new THREE.Vector3()
-const _e2 = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 
 function readKnobOverrideDeg(): number | null {
   if (process.env.NODE_ENV === 'production') return null
@@ -234,18 +228,9 @@ export function VolvellePopupLayer({
     thetaR: number
   ): { angle: number; stable: boolean } | null => {
     const { center, e1, e2, n } = volvelleHubFrame(layer, thetaL, thetaR, VOLVELLE_LIFT)
-    _center.set(center[0], center[1], center[2])
-    _n.set(n[0], n[1], n[2])
-    _e1.set(e1[0], e1[1], e1[2])
-    _e2.set(e2[0], e2[1], e2[2])
-    _plane.setFromNormalAndCoplanarPoint(_n, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    const along = _rel.dot(_e1)
-    const spin = _rel.dot(_e2)
-    const r = Math.hypot(along, spin)
-    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.radius }
+    const hub = projectHubAngle(pointerLocalRay(e), center, e1, e2, n)
+    if (!hub) return null
+    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.radius }
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {

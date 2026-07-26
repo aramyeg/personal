@@ -38,6 +38,7 @@ import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -58,12 +59,9 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
 // Scratch for the H4 angle-about-hub projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
 const _center = new THREE.Vector3()
 const _n = new THREE.Vector3()
 const _u = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 const _ez = new THREE.Vector3(0, 0, 1)
 
 /** Dev-only knob-angle override for the D6 capture deck: `?sbknob=<deg>`
@@ -236,14 +234,15 @@ function KnobDisc({
       layer.hubD * _u.y + ROTOR_LIFT * _n.y,
       layer.hubZ
     )
-    _plane.setFromNormalAndCoplanarPoint(_n, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    const along = _rel.dot(_u)
-    const spin = _rel.dot(_ez)
-    const r = Math.hypot(along, spin)
-    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.discR }
+    const hub = projectHubAngle(
+      pointerLocalRay(e),
+      [_center.x, _center.y, _center.z],
+      [_u.x, _u.y, _u.z],
+      [_ez.x, _ez.y, _ez.z],
+      [_n.x, _n.y, _n.z]
+    )
+    if (!hub) return null
+    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.discR }
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {

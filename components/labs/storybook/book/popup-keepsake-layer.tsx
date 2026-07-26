@@ -56,6 +56,7 @@ import {
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -67,9 +68,6 @@ const TOUCH_SLOP = 1.5
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
 // Scratch for the H7 pointer projection (one grab at a time, consumed at once).
-const _plane = new THREE.Plane()
-const _u = new THREE.Vector3()
-const _hit = new THREE.Vector3()
 // Scratch for the world <-> layer-local seat transform (law H8 desk-fix).
 const _xf = new THREE.Vector3()
 
@@ -273,14 +271,8 @@ export function KeepsakePopupLayer({
   /** The pointer's projection onto the live page's slide axis (page-frame u),
    *  in the layer's local frame — the pull coordinate d (law H7, rebuilt from
    *  theta each event). */
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
-    const t = layer.side === 'left' ? thetaL : thetaR
-    _u.set(Math.cos(t), Math.sin(t), 0)
-    _plane.setComponents(Math.sin(t), -Math.cos(t), 0, 0) // page plane through the spine
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    return _hit.dot(_u)
-  }
+  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null =>
+    projectPageD(pointerLocalRay(e), layer.side === 'left' ? thetaL : thetaR)
 
   const endExtractionGrab = (e: ThreeEvent<PointerEvent>): void => {
     grabRef.current = null

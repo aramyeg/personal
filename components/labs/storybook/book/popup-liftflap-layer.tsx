@@ -36,6 +36,7 @@ import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const TOUCH_SLOP = 1.4
@@ -66,14 +67,6 @@ function flatUvs(side: 'left' | 'right'): Float32Array {
     ? new Float32Array([1, 1, 1, 0, 0, 0, 0, 1])
     : new Float32Array([0, 1, 0, 0, 1, 0, 1, 1])
 }
-
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
-const _center = new THREE.Vector3()
-const _flat = new THREE.Vector3()
-const _n = new THREE.Vector3()
-const _axis = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 
 /** Dev override for a specific door: `?sbdrive=${id}#${k}:<deg>`. */
 function readDoorOverrideDeg(layerId: string, k: number): number | null {
@@ -229,15 +222,7 @@ export function LiftFlapPopupLayer({
   /** The pointer's angle about door k's hinge line, in its swing plane (H3). */
   const angleAboutHinge = (e: ThreeEvent<PointerEvent>, k: number, thetaL: number, thetaR: number): number | null => {
     const fr = liftFlapHingeFrame(layer, k, thetaL, thetaR)
-    _center.set(fr.center[0], fr.center[1], fr.center[2])
-    _flat.set(fr.flat[0], fr.flat[1], fr.flat[2])
-    _n.set(fr.n[0], fr.n[1], fr.n[2])
-    _axis.set(fr.axis[0], fr.axis[1], fr.axis[2])
-    _plane.setFromNormalAndCoplanarPoint(_axis, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    return Math.atan2(_rel.dot(_n), _rel.dot(_flat))
+    return projectHingeAngle(pointerLocalRay(e), fr.center, fr.axis, fr.flat, fr.n)
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {

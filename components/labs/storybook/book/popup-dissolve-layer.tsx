@@ -59,6 +59,7 @@ import {
   writeUserDrive,
 } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -78,9 +79,6 @@ const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
 // Scratch for the H3 pointer projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _u = new THREE.Vector3()
-const _hit = new THREE.Vector3()
 
 /**
  * Screen-space band uvs for slat k of N (the liftflap flatUvs law, banded).
@@ -283,14 +281,8 @@ export function DissolvePopupLayer({
 
   /** The pointer's projection onto the live page's fore axis (page-frame u),
    *  in the layer's local frame (law H3: rebuilt from theta each event). */
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
-    const t = layer.side === 'left' ? thetaL : thetaR
-    _u.set(Math.cos(t), Math.sin(t), 0)
-    _plane.setComponents(Math.sin(t), -Math.cos(t), 0, 0) // page plane through the spine
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    return _hit.dot(_u)
-  }
+  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null =>
+    projectPageD(pointerLocalRay(e), layer.side === 'left' ? thetaL : thetaR)
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return

@@ -27,7 +27,11 @@ import type { SceneLayer } from '../content'
 import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
 import {
   solveSwarmArcPose,
-  swarmArcEnvelope,
+  swarmStirTabQuad,
+  SWARM_TAB_D0,
+  SWARM_TAB_W,
+  SWARM_TAB_Z0,
+  SWARM_TAB_Z1,
   type SwarmArcGeom,
 } from './popup-swarmarc'
 import { kraftTints } from './paper-stock'
@@ -46,18 +50,13 @@ import {
   writeUserDrive,
 } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 /** Overdamped release time constant (s) — ~95% settled inside 300 ms. */
 const RELEASE_TAU = 0.08
 const RELEASE_EPS = 0.002
 const ATLAS_GRID = 8
-/** Tab die-cut footprint on the right page (world units, page-flat). */
-const TAB_D0 = 1.0
-const TAB_W = 0.12
-const TAB_Z0 = 0.3
-const TAB_Z1 = 0.42
-const TAB_Y_LIFT = 0.003
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -103,12 +102,6 @@ function writeQuadAt(arr: Float32Array, q: number, quad: PanelQuad): void {
     arr[(q * 4 + c) * 3 + 2] = quad[c][2]
   }
 }
-
-// Shared pointer-projection scratch (module scope, the tabpiece idiom — never
-// allocated in the render path).
-const _u = new THREE.Vector3()
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
 
 export function SwarmArcPopupLayer({
   layer,
@@ -226,13 +219,8 @@ export function SwarmArcPopupLayer({
     const { thetaL, thetaR } = readAngles()
     return { thetaL, thetaR }
   }
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaR: number): number | null => {
-    _u.set(Math.cos(thetaR), Math.sin(thetaR), 0)
-    _plane.setComponents(Math.sin(thetaR), -Math.cos(thetaR), 0, 0)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    return _hit.dot(_u)
-  }
+  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaR: number): number | null =>
+    projectPageD(pointerLocalRay(e), thetaR)
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
@@ -328,21 +316,11 @@ export function SwarmArcPopupLayer({
     riderGeometry.computeBoundingSphere()
 
     // The tab rides the right page plane at the fore edge and slides out by
-    // exactly the stroke (Birmingham 84 pull-strip grammar). It fades shut
-    // with the envelope like everything else (position-only: the quad lies in
-    // the page plane, so fold-flat containment is trivial).
-    const E = swarmArcEnvelope(layer, beta)
-    const uR: [number, number] = [Math.cos(thetaR), Math.sin(thetaR)]
-    const nR: [number, number] = [-Math.sin(thetaR), Math.cos(thetaR)]
+    // exactly the stroke (Birmingham 84 pull-strip grammar) — one shared quad
+    // helper (popup-swarmarc.ts) so the bench can aim at the handle the reader
+    // sees. It fades shut with the envelope like everything else.
     const tabArr = (tabGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
-    const d0 = TAB_D0 + s * E
-    const corners: PanelQuad = [
-      [d0 * uR[0] + TAB_Y_LIFT * nR[0], d0 * uR[1] + TAB_Y_LIFT * nR[1], TAB_Z1],
-      [(d0 + TAB_W) * uR[0] + TAB_Y_LIFT * nR[0], (d0 + TAB_W) * uR[1] + TAB_Y_LIFT * nR[1], TAB_Z1],
-      [(d0 + TAB_W) * uR[0] + TAB_Y_LIFT * nR[0], (d0 + TAB_W) * uR[1] + TAB_Y_LIFT * nR[1], TAB_Z0],
-      [d0 * uR[0] + TAB_Y_LIFT * nR[0], d0 * uR[1] + TAB_Y_LIFT * nR[1], TAB_Z0],
-    ]
-    writeQuadAt(tabArr, 0, corners)
+    writeQuadAt(tabArr, 0, swarmStirTabQuad(layer, s, thetaL, thetaR))
     ;(tabGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
     tabGeometry.computeBoundingSphere()
   })
