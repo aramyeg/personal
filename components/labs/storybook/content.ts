@@ -1227,7 +1227,13 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // lid-dominant reading camera is a blade, and four of them mirrored is a
   // splay. One WIDE bay per rank over the same z band gives the same deck the
   // same rise on two SOLID risers, which is what a flight of steps looks like.
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.1, spans: [[0.2, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.1, spans: [[0.2, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
+  // The RISE drops 0.1 -> 0.055 in the same pass. Widening the bays alone left
+  // two broad tent panels splaying like wings over the portal arch — legible as
+  // an object at last, but not yet as a STEP. A dais is low by definition (the
+  // pack calls it "a low wide BRIDGE just downstage of the mouth"); at half the
+  // stand-proud slack the tents lie shallow, the deck sits down where a landing
+  // belongs, and the piece stops competing with the strongbox in front of it.
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.055, spans: [[0.2, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.055, spans: [[0.2, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
   // NEW: the intimate counterweight (T-COUNTERWEIGHT, ref 140028 Kristoff
   // corner) — a tiny clerk kneeling over his ledger by candlelight on the
   // left apron, already at prayer while the vaults are still rising around

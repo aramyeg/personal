@@ -9558,8 +9558,14 @@ function naveClerk(w, h, seed) {
   // The candle's pool and halo, drawn first and drawn WIDE: this is the only
   // warm light on the left apron, and it is what the idle `glint` tag makes
   // breathe (content.ts ch6-clerk) - the flicker the blind reader asked for.
-  s += `<ellipse cx="${fx(w * 0.7)}" cy="${fx(h * 0.6)}" rx="${fx(w * 0.52)}" ry="${fx(h * 0.44)}" fill="url(#candle-glow)"/>`
-  s += `<ellipse cx="${fx(w * 0.62)}" cy="${fx(h * 0.93)}" rx="${fx(w * 0.46)}" ry="${fx(h * 0.06)}" fill="${NAVE_C.gold}" opacity="0.22"/>`
+  // ALPHATEST DISCIPLINE. The layer cuts this die at alphaTest 0.1, which turns
+  // any soft gradient into a HARD-EDGED blob wherever it crosses that line, and
+  // a flat 0.22 wash into a solid shape. A first pass gave the candle a wide
+  // halo plus a floor pool and the eye-test showed exactly that: a rounded
+  // rectangle of tinted paper standing behind the figure. So the halo is small
+  // and STEEP - it must fall under 0.1 well inside the sheet - and the floor
+  // pool is gone; the page print already lays warm light on this apron.
+  s += `<ellipse cx="${fx(w * 0.78)}" cy="${fx(h * 0.56)}" rx="${fx(w * 0.3)}" ry="${fx(h * 0.26)}" fill="url(#candle-glow)"/>`
   // THE DESK - a low writing slope, so the ledger has somewhere to be and the
   // vignette reads as a workplace rather than a figure on bare floor.
   s += `<path d="M ${fx(w * 0.44)} ${fx(h * 0.9)} L ${fx(w * 0.98)} ${fx(h * 0.78)} L ${fx(w * 0.98)} ${fx(h * 0.86)} L ${fx(w * 0.44)} ${fx(h * 0.98)} Z" fill="${NAVE_C.base}" stroke="${NAVE_C.teal}" stroke-width="2"/>`
@@ -9600,8 +9606,9 @@ function naveClerk(w, h, seed) {
   s += `</g>`
   const defs =
     `<radialGradient id="candle-glow" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${NAVE_C.gold}" stop-opacity="0.55"/>` +
-    `<stop offset="0.55" stop-color="${NAVE_C.gold}" stop-opacity="0.18"/>` +
+    `<stop offset="0" stop-color="${NAVE_C.gilt}" stop-opacity="0.6"/>` +
+    `<stop offset="0.34" stop-color="${NAVE_C.gold}" stop-opacity="0.2"/>` +
+    `<stop offset="0.6" stop-color="${NAVE_C.gold}" stop-opacity="0.04"/>` +
     `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
@@ -9796,34 +9803,38 @@ function navePage(w, h, seed) {
  *  sheet so the flight reads as steps at any strut lean. */
 function naveStepRiser(w, h, seed) {
   const r = mulberry32(seed)
-  const N = 4
+  // WAVE-2 s7 (S7-3), QUIETED. Four gold-nosed treads with carved lozenges down
+  // every riser turned each strut into a slatted blade: at the reading camera a
+  // tent panel is seen near edge-on, so four bright horizontal bands read as a
+  // chevron lattice, and two mirrored ranks of them read as wings. That paint
+  // was half of what the blind reader called "pure geometric noise". TWO treads,
+  // ONE gilt nosing each, no lozenges: the flanking walls of a low flight, dark
+  // enough to sit behind the strongbox and let the gold path be the bright thing.
+  const N = 2
   const sh = h / N
-  let s = `<rect width="${w}" height="${h}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.55)}"/>`
+  let s = `<rect width="${w}" height="${h}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.42)}"/>`
   for (let i = 0; i < N; i++) {
     const y0 = i * sh
-    // the riser: darker the deeper it sits in the flight
-    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh)}" fill="${naveMix(NAVE_C.base, NAVE_C.tealLit, 0.72 - 0.5 * (i / N))}"/>`
-    // the nosing — a gold tread edge with a lit top and its own cast shadow
-    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.2)}" fill="${NAVE_C.gold}"/>`
-    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.06)}" fill="${NAVE_C.giltHi}" opacity="0.9"/>`
-    s += `<rect x="0" y="${fx(y0 + sh * 0.2)}" width="${w}" height="${fx(sh * 0.1)}" fill="${NAVE_C.base}" opacity="0.75"/>`
-    // carved lozenges down the riser face (the treasury's inlay, quiet)
-    const n = 4
-    for (let k = 0; k < n; k++) {
-      const cx = (w * (k + 0.5)) / n + rr(r, -3, 3)
-      const cy = y0 + sh * 0.65
-      const q = Math.min(w / n, sh) * 0.2
-      s += `<path d="M ${fx(cx)} ${fx(cy - q)} L ${fx(cx + q)} ${fx(cy)} L ${fx(cx)} ${fx(cy + q)} L ${fx(cx - q)} ${fx(cy)} Z" fill="${NAVE_C.gold}" opacity="0.42"/>`
-      s += `<path d="M ${fx(cx)} ${fx(cy - q)} L ${fx(cx + q)} ${fx(cy)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="1.4" opacity="0.7"/>`
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh)}" fill="${naveMix(NAVE_C.base, NAVE_C.tealLit, 0.5 - 0.28 * (i / N))}"/>`
+    // one gilt nosing per tread, with its own cast shadow under it
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.09)}" fill="${NAVE_C.gold}" opacity="0.9"/>`
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(sh * 0.03)}" fill="${NAVE_C.giltHi}" opacity="0.85"/>`
+    s += `<rect x="0" y="${fx(y0 + sh * 0.09)}" width="${w}" height="${fx(sh * 0.06)}" fill="${NAVE_C.base}" opacity="0.7"/>`
+    // ashlar joints only — value, not ornament
+    const bw = w / 5
+    for (let k = 1; k < 5; k++) {
+      const x = bw * k + (i % 2 ? bw * 0.5 : 0)
+      if (x > w - 2) continue
+      s += `<line x1="${fx(x)}" y1="${fx(y0 + sh * 0.16)}" x2="${fx(x)}" y2="${fx(y0 + sh)}" stroke="${NAVE_C.base}" stroke-width="2" opacity="${fx(rr(r, 0.4, 0.6))}"/>`
     }
   }
-  // gilt stringers down both jambs of the flight
-  for (const x of [0, w * 0.965]) {
-    s += `<rect x="${fx(x)}" y="0" width="${fx(w * 0.035)}" height="${h}" fill="${NAVE_C.gold}" opacity="0.85"/>`
-    s += `<rect x="${fx(x)}" y="0" width="${fx(w * 0.012)}" height="${h}" fill="${NAVE_C.giltHi}" opacity="0.8"/>`
-  }
+  // one gilt stringer down the outboard jamb only (was both, which framed the
+  // panel like a card and made the strut read as a standing plaque)
+  s += `<rect x="${fx(w * 0.968)}" y="0" width="${fx(w * 0.032)}" height="${h}" fill="${NAVE_C.gold}" opacity="0.8"/>`
+  s += `<rect x="${fx(w * 0.968)}" y="0" width="${fx(w * 0.011)}" height="${h}" fill="${NAVE_C.giltHi}" opacity="0.75"/>`
   return svgPiece(w, h, s)
 }
+
 
 // ============================================================================
 // E3 WAVE-2 s7 — THE COUNTING WHEEL (`ch6-assay`, volvelle). The chapter's own
@@ -9977,22 +9988,25 @@ function assayDial(w, h, seed) {
   const defs =
     `<clipPath id="assayCut"><circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}"/></clipPath>` +
     `<radialGradient id="assayLite" cx="0.34" cy="0.26" r="0.86">` +
-    `<stop offset="0" stop-color="${H}" stop-opacity="0.34"/>` +
-    `<stop offset="0.4" stop-color="${L}" stop-opacity="0.14"/>` +
-    `<stop offset="1" stop-color="${K}" stop-opacity="0.6"/></radialGradient>`
+    `<stop offset="0" stop-color="${H}" stop-opacity="0.28"/>` +
+    `<stop offset="0.4" stop-color="${L}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${K}" stop-opacity="0.4"/></radialGradient>`
 
   // THE WAX-SEAL THUMB LOBE, protruding past the rim so it stands clear of the
   // faceplate and reads as the one thing on the wheel a hand belongs on.
-  const tabHalf = 13
-  const tabR = R * 1.14
+  // The lobe is wide and reaches well past the rim: it is the GRIP, and the
+  // faceplate's own disc runs to R, so anything timid here is a handle hiding
+  // under a lid. The eye-test had the seal half-tucked behind the plate.
+  const tabHalf = 17
+  const tabR = R * 1.24
   const bx0 = polX(cx, ASSAY_TAB_A - tabHalf, R * 0.99)
   const by0 = polY(cy, ASSAY_TAB_A - tabHalf, R * 0.99)
   const bx1 = polX(cx, ASSAY_TAB_A + tabHalf, R * 0.99)
   const by1 = polY(cy, ASSAY_TAB_A + tabHalf, R * 0.99)
   const tabD = `M ${fx(bx0)} ${fx(by0)} Q ${fx(polX(cx, ASSAY_TAB_A, tabR * 1.08))} ${fx(polY(cy, ASSAY_TAB_A, tabR * 1.08))} ${fx(bx1)} ${fx(by1)} Z`
-  const sealX = polX(cx, ASSAY_TAB_A, R * 1.02)
-  const sealY = polY(cy, ASSAY_TAB_A, R * 1.02)
-  const sealR = R * 0.15
+  const sealX = polX(cx, ASSAY_TAB_A, R * 1.09)
+  const sealY = polY(cy, ASSAY_TAB_A, R * 1.09)
+  const sealR = R * 0.17
   let tab = `<path d="${tabD}" fill="${G}"/>`
   tab += rimPath(tabD, 4)
   tab += `<circle cx="${fx(sealX)}" cy="${fx(sealY)}" r="${fx(sealR)}" fill="#5a3f8a" stroke="#2a1c45" stroke-width="${fx(sealR * 0.14)}"/>`
@@ -10016,9 +10030,14 @@ function assayDial(w, h, seed) {
   // stand off it. Axis 3's per-sector wash then runs at full strength INSIDE it,
   // which is the only difference that covers a whole aperture rather than a
   // glyph's worth of one.
-  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${NAVE_C.frost}" opacity="0.9"/>`
+  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${NAVE_C.frost}" opacity="0.97"/>`
+  // The field wash runs at 0.3, not 0.5. The nave's value ladder is a NIGHT
+  // palette, and washing a vellum band with it at half strength put the vault
+  // contents back into the dark the reader is looking through a window to
+  // escape. Axis 3 still measures (the detent bench reads a 28-point spread
+  // across the eight window luminances); it just no longer eats axes 1 and 2.
   for (let k = 0; k < 8; k++) {
-    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.5"/>`
+    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.3"/>`
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${G}" stroke-width="3.4" opacity="0.85"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${G}" stroke-width="2.8" opacity="0.8"/>`
@@ -10201,7 +10220,16 @@ function assayCard(w, h, seed) {
     s += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 2.1))}" fill="${NAVE_C.frost}" opacity="${fx(rr(r, 0.2, 0.5))}"/>`
   }
   s += `</g>`
-  return svgPiece(w, h, s + rimPath(circlePath(cx, cy, R), 5), defs + `<clipPath id="assayPlate"><path fill-rule="evenodd" d="${plateD}"/></clipPath>`)
+  // `clip-rule`, NOT `fill-rule` — the same trap the nave rank clip fell into
+  // and documents. A clipPath child's winding is governed by clip-rule, and
+  // renderers ignore fill-rule there, so with only fill-rule set the three
+  // vitrines were UNIONED into the clip instead of subtracted and the curtain-
+  // wall grid painted straight through them. The base plate still punched its
+  // holes correctly, so the piece LOOKED right in isolation while the windows
+  // sat at 73% alpha: the wheel was being read through frosted glass, and the
+  // detent bench measured every adjacent step at 5.2 dRGB against a floor of
+  // 12 (19.3 with the plate removed). Both rules are set, as the nave does.
+  return svgPiece(w, h, s + rimPath(circlePath(cx, cy, R), 5), defs + `<clipPath id="assayPlate"><path d="${plateD}" clip-rule="evenodd" fill-rule="evenodd"/></clipPath>`)
 }
 
 // E3 s6 — THE BAZAAR OF A THOUSAND STALLS (scenes/s6-scene-pack.md §4f).
