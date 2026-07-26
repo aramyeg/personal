@@ -31,6 +31,7 @@ import { writeFile, mkdir, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sharp from 'sharp'
+import { S4_DIAL_ROUTES } from './s4-dial-routes.mjs'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(SCRIPT_DIR, '..', '..')
@@ -284,14 +285,38 @@ function ravenPortal(bx, by, bw, bh, lit, boost = 0) {
   }
   s += `<path d="${arch}" fill="${lit ? 'url(#rookGlow)' : DUSK.ink}"/>`
   if (lit) {
-    // the white-hot core: the reading that survives at the pinned camera
-    s += `<ellipse cx="${fx(mx)}" cy="${fx(lerp(sy, apex, 0.3))}" rx="${fx(bw * 0.34)}" ry="${fx(bh * 0.2)}" fill="${DUSK.amberLit}" opacity="${(0.56 + boost * 0.18).toFixed(2)}"/>`
-    s += `<ellipse cx="${fx(mx)}" cy="${fx(lerp(sy, apex, 0.34))}" rx="${fx(bw * 0.19)}" ry="${fx(bh * 0.12)}" fill="${DUSK.amberCore}" opacity="${(0.5 + boost * 0.22).toFixed(2)}"/>`
+    // WAVE-2 (S4-5). A blind reader's verdict on the strongest storytelling beat
+    // in this model: "~25 windows and ~10 wall niches each contain a raven. At 1x
+    // they are dark 3px blobs; the whole 'every window holds a messenger' idea is
+    // invisible at the size it ships."
+    //
+    // Two things were wrong, and only one of them was the bird. The hot core sat
+    // ABOVE the perch — the bird stood in front of the darker throat of the arch
+    // instead of against the blaze — so the silhouette had almost no field to be
+    // a silhouette against. The core is now a tall lozenge that reaches DOWN past
+    // the perch line, and the bird is bigger and shaped like a bird: body, head,
+    // and a tail that breaks the lozenge outline. Growth is proportional with px
+    // FLOORS, because the small portals are the whole problem: on the colossus's
+    // 17px foot row the bird goes from ~3.2x3.9px to ~5.1x6.3px with a 2.2px
+    // head, and on the 46px gate arches it reads as a raven outright.
+    s += `<ellipse cx="${fx(mx)}" cy="${fx(lerp(sy, apex, 0.3))}" rx="${fx(bw * 0.36)}" ry="${fx(bh * 0.26)}" fill="${DUSK.amberLit}" opacity="${(0.6 + boost * 0.18).toFixed(2)}"/>`
+    s += `<ellipse cx="${fx(mx)}" cy="${fx(lerp(sy, apex, 0.46))}" rx="${fx(bw * 0.24)}" ry="${fx(bh * 0.24)}" fill="${DUSK.amberCore}" opacity="${(0.58 + boost * 0.22).toFixed(2)}"/>`
     // perch bar + the bird standing in the light, cut black against it
-    const rw = bw * 0.34
+    const rbx = bx + bw * 0.54
+    const rby = by - bh * 0.42
+    const rrx = Math.max(2, bw * 0.3)
+    const rry = Math.max(1.8, bh * 0.21)
     s += `<rect x="${fx(bx + bw * 0.1)}" y="${fx(by - bh * 0.28)}" width="${fx(bw * 0.8)}" height="${fx(Math.max(1.2, bh * 0.05))}" fill="${DUSK.ink}" opacity="0.82"/>`
-    s += `<ellipse cx="${fx(bx + bw * 0.52)}" cy="${fx(by - bh * 0.4)}" rx="${fx(rw * 0.55)}" ry="${fx(bh * 0.13)}" fill="${DUSK.ink}" opacity="0.95"/>`
-    s += `<circle cx="${fx(bx + bw * 0.52 - rw * 0.5)}" cy="${fx(by - bh * 0.53)}" r="${fx(Math.max(1.4, bw * 0.085))}" fill="${DUSK.ink}" opacity="0.95"/>`
+    s += `<ellipse cx="${fx(rbx)}" cy="${fx(rby)}" rx="${fx(rrx)}" ry="${fx(rry)}" fill="${DUSK.ink}" opacity="0.95"/>`
+    // the tail: a wedge off the outboard flank, so the body stops reading as a
+    // lozenge the moment it is more than a few pixels across
+    s += `<path d="M ${fx(rbx + rrx * 0.5)} ${fx(rby - rry * 0.3)} L ${fx(rbx + rrx * 2.0)} ${fx(rby + rry * 0.9)} L ${fx(rbx + rrx * 0.4)} ${fx(rby + rry * 0.7)} Z" fill="${DUSK.ink}" opacity="0.95"/>`
+    s += `<circle cx="${fx(rbx - rrx * 0.85)}" cy="${fx(rby - rry * 0.95)}" r="${fx(Math.max(2.2, bw * 0.13))}" fill="${DUSK.ink}" opacity="0.95"/>`
+    // the beak, and a folded wing — only where there are pixels to spend on them
+    if (bw >= 16) {
+      s += `<path d="M ${fx(rbx - rrx * 1.5)} ${fx(rby - rry * 0.95)} L ${fx(rbx - rrx * 2.3)} ${fx(rby - rry * 0.62)} L ${fx(rbx - rrx * 1.4)} ${fx(rby - rry * 0.5)} Z" fill="${DUSK.ink}" opacity="0.95"/>`
+      s += `<path d="M ${fx(rbx - rrx * 0.5)} ${fx(rby - rry * 0.35)} Q ${fx(rbx + rrx * 0.4)} ${fx(rby + rry * 0.1)} ${fx(rbx + rrx * 0.95)} ${fx(rby + rry * 0.62)}" fill="none" stroke="${DUSK.slateLit}" stroke-width="${fx(Math.max(1, bw * 0.035))}" opacity="0.34"/>`
+    }
   } else {
     // an unlit opening still has an inside: one cold catch under the arch head
     s += `<path d="M ${fx(bx + bw * 0.12)} ${fx(sy)} Q ${fx(bx + bw * 0.12)} ${fx(cy)} ${fx(mx)} ${fx(apex + bh * 0.06)}" fill="none" stroke="${DUSK.slateLit}" stroke-width="${fx(Math.max(1, bw * 0.07))}" opacity="0.3"/>`
@@ -3860,9 +3885,34 @@ function ravenSigil(mx, my, rad, bank, brass, brassLit) {
 
 // ---- 1) THE SPUN WHEEL (ch3-dispatch-dial). The sorting desk's route wheel: a
 // parchment disc in a brass rim, eight 45deg sectors reading through the card's
-// windows, six of them RAVEN SIGILS banked to distinct headings and two route
-// glyphs (a needle and a tally) so the rank never reads as a repeat pattern. A
-// thumb-tab grip lobe protrudes past the rim so it reads as spinnable. ----
+// windows, and a thumb-tab grip lobe protruding past the rim so it reads as
+// spinnable.
+//
+// THE EIGHT SECTORS ARE EIGHT DESTINATIONS, and the destinations are a CONTRACT
+// (`./s4-dial-routes.mjs`), not a decision this painter gets to make. Round 1
+// dressed six of the eight as the SAME brass raven roundel differing only in
+// bank angle, and a blind reader reported the whole dial as stone dead after 450
+// degrees of drag: the input was alive, but a window exposing ~21x27 SCREEN px
+// cannot tell "the same badge, tilted" from "nothing happened". So every sector
+// now differs on three independent axes at once, in descending order of what
+// survives the downscale:
+//   1. a COUNT of ravens on a pale roost shelf (1, 2 or 3) — a count is the one
+//      difference that reads at 6 screen px per bird, and the shelf is shared by
+//      all eight so the birds are dark-on-pale whatever the field beneath does.
+//   2. a PRINCIPAL DEVICE that changes SILHOUETTE, not tone: sigil, needle,
+//      tally tablet, crescent, chevron, wax seal, star, cross. Bold filled
+//      shapes at ~65px source (~14 screen px) — no fine linework survives here.
+//   3. the wedge's FIELD tint, stepped through the DUSK table. Tone alone was
+//      round 1's mistake, so it is the supporting difference, not the read.
+// plus the destination name engraved small, and a bar/dot rim cadence keyed to
+// the sector index so the wheel reads as having a POSITION and not just a state.
+//
+// AUTHORED IN EACH SECTOR'S OWN FRAME. Every sector is one group carrying
+// `translate(cx,cy) rotate(90 - a)`, which puts the sector's math-angle onto
+// local math-angle 90. Inside that group "radially outward" is straight UP, a
+// tangential offset is plain local x, and the legend reads the same way out of
+// every sector — which is also the only orientation that reads upright through
+// all three windows (they sit at 45/90/135, the card's upper half). ----
 function dispatchDial(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
@@ -3871,7 +3921,6 @@ function dispatchDial(w, h, seed) {
   const hubR = R * 0.3
   const bandIn = R * 0.4
   const bandOut = R * 0.84
-  const bandMid = R * 0.62
   const BR = GOLD
   const BR_LIT = '#e7b24d'
   const BR_DIM = GOLD_DIM
@@ -3909,12 +3958,19 @@ function dispatchDial(w, h, seed) {
 
   let g = `<g clip-path="url(#dialCut)">`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${PARCH_MID}"/>`
+  // the eight DESTINATION wedges, each tinted from its route's `field`
   for (let k = 0; k < 8; k++) {
-    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${k % 2 ? DUSK.slate : BR_LIT}" opacity="${k % 2 ? '0.22' : '0.2'}"/>`
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${DUSK[S4_DIAL_ROUTES[k].field]}" opacity="0.3"/>`
   }
   // the READ BAND the card's windows reveal — aged parchment, so slate ravens
   // and brass glyphs pop against it rather than muddying into the field.
   g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${PARCH}" opacity="0.86"/>`
+  // ...and the per-sector wash INSIDE it, at full strength. This is the one
+  // difference that covers the whole aperture rather than a glyph's worth of it,
+  // so it carries the "a real share of the window changed" half of the read.
+  for (let k = 0; k < 8; k++) {
+    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${DUSK[S4_DIAL_ROUTES[k].field]}" opacity="0.62"/>`
+  }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${BR}" stroke-width="3" opacity="0.75"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${BR}" stroke-width="2.6" opacity="0.7"/>`
   // detent ticks on the sector boundaries (the 45deg clicks)
@@ -3923,15 +3979,174 @@ function dispatchDial(w, h, seed) {
     g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${INK}" stroke-width="1.7" opacity="0.4"/>`
     g += `<circle cx="${fx(polX(cx, a, bandOut + 12))}" cy="${fx(polY(cy, a, bandOut + 12))}" r="4" fill="${BR}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.55"/>`
   }
-  // sector marks: six raven sigils on distinct headings + two route glyphs
-  const bank = { 0: -28, 1: 62, 2: 145, 4: -104, 5: 18, 7: -152 }
+  // ---- THE EIGHT DESTINATIONS ------------------------------------------------
+  // Local frame per sector (see the header): outward is -y, tangential is +x.
+  // The read band 0.40-0.84R is budgeted radially, outermost first, because the
+  // window is only ~132px deep in the source and every band has to earn it:
+  //   0.826-0.882R  the destination name, engraved small
+  //   0.625-0.755R  the pale roost shelf and its COUNT of ravens
+  //   0.400-0.610R  the principal device
+  // and the bar/dot bearing cadence sits at 0.855-0.975R, clear of the band.
+  const closed = (arr) => 'M ' + arr.map(([px, py]) => `${fx(px)} ${fx(py)}`).join(' L ') + ' Z'
+  const arcPts = (ox, oy, rad, t0, t1, steps) => {
+    const out = []
+    for (let i = 0; i <= steps; i++) {
+      const t = lerp(t0, t1, i / steps) * D2R
+      out.push([ox + rad * Math.cos(t), oy + rad * Math.sin(t)])
+    }
+    return out
+  }
+
+  /** One sector's PRINCIPAL DEVICE, centred on the local origin, bold enough to
+   *  survive being ~14 screen px wide. `S` is its half-size. */
+  const device = (kind, S, weight) => {
+    if (kind === 'sigil') return ravenSigil(0, 0, S * 0.98, 0, BR, BR_LIT)
+    if (kind === 'needle') return compassNeedle(0, 0, 90, S * 2.05, S * 0.66, BR_LIT, DUSK.slate)
+    if (kind === 'tally') {
+      // a STRUCK TALLY TABLET rather than a bare five-bar gate: bare radial
+      // strokes at this size are sub-pixel on screen, so the gate is cut into a
+      // brass plate whose WIDTH is the route's traffic and whose bars are thick.
+      const tw = S * (1.05 + weight * 0.056)
+      const th = S * 1.28
+      let s = `<rect x="${fx(-tw / 2)}" y="${fx(-th / 2)}" width="${fx(tw)}" height="${fx(th)}" rx="${fx(S * 0.16)}" fill="${BR_LIT}"/>`
+      s += `<rect x="${fx(-tw / 2)}" y="${fx(-th / 2)}" width="${fx(tw)}" height="${fx(th)}" rx="${fx(S * 0.16)}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.8"/>`
+      const pitch = tw / 5.2
+      for (let i = 0; i < 4; i++) {
+        const bx = (i - 1.5) * pitch
+        s += `<line x1="${fx(bx)}" y1="${fx(-th * 0.32)}" x2="${fx(bx)}" y2="${fx(th * 0.32)}" stroke="${INK}" stroke-width="${fx(S * 0.19)}" stroke-linecap="round"/>`
+      }
+      s += `<line x1="${fx(-1.9 * pitch)}" y1="${fx(th * 0.34)}" x2="${fx(1.9 * pitch)}" y2="${fx(-th * 0.34)}" stroke="${INK}" stroke-width="${fx(S * 0.17)}" stroke-linecap="round"/>`
+      return s
+    }
+    if (kind === 'crescent') {
+      // the harbour mouth: outer circle minus an offset inner one, horns
+      // tangential, the opening facing radially OUT
+      const th0 = 61.6
+      const pts = arcPts(0, 0, S, th0, 360 - th0, 18).concat(arcPts(S * 0.5, 0, S * 0.88, 360 - 91.6, 91.6, 18))
+      const d = closed(pts)
+      return (
+        `<g transform="rotate(-90)"><path d="${d}" fill="${BR_LIT}"/>` +
+        `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.11)}" stroke-opacity="0.85" stroke-linejoin="round"/></g>`
+      )
+    }
+    if (kind === 'chevron') {
+      // the mountain pass: two stacked chevron bands pointing radially outward
+      let s = ''
+      for (const [shift, arm] of [[S * 0.1, S * 0.92], [S * 0.66, S * 0.72]]) {
+        const t = S * 0.36
+        const d = closed([
+          [-arm, -S * 0.12 + shift], [0, -S + shift], [arm, -S * 0.12 + shift],
+          [arm, -S * 0.12 + shift + t], [0, -S + shift + t], [-arm, -S * 0.12 + shift + t],
+        ])
+        s += `<path d="${d}" fill="${BR_LIT}"/>`
+        s += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>`
+      }
+      return s
+    }
+    if (kind === 'seal') {
+      // sealed correspondence only: a lobed wax blob, the one non-brass device
+      const lobes = []
+      for (let i = 0; i <= 72; i++) {
+        const t = (i / 72) * 360 * D2R
+        const rad = S * 0.92 * (1 + 0.085 * Math.cos(9 * t))
+        lobes.push([rad * Math.cos(t), rad * Math.sin(t)])
+      }
+      const d = closed(lobes)
+      let s = `<path d="${d}" fill="${SEAL_RED}"/>`
+      s += `<ellipse cx="${fx(-S * 0.26)}" cy="${fx(-S * 0.28)}" rx="${fx(S * 0.48)}" ry="${fx(S * 0.42)}" fill="${SEAL_RED_LIT}" opacity="0.6"/>`
+      s += `<circle cx="0" cy="0" r="${fx(S * 0.46)}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" opacity="0.55"/>`
+      s += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.09)}" stroke-opacity="0.7" stroke-linejoin="round"/>`
+      return s
+    }
+    if (kind === 'star') {
+      // the unmapped far stations: a five-point star, one point radially outward
+      const pts = []
+      for (let i = 0; i < 10; i++) {
+        const t = (-90 + i * 36) * D2R
+        const rad = i % 2 ? S * 0.44 : S
+        pts.push([rad * Math.cos(t), rad * Math.sin(t)])
+      }
+      const d = closed(pts)
+      return (
+        `<path d="${d}" fill="${BR_LIT}"/>` +
+        `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>` +
+        `<circle cx="0" cy="0" r="${fx(S * 0.16)}" fill="${DUSK.amberCore}" opacity="0.9"/>`
+      )
+    }
+    // 'cross' — escorted birds: a cross pattée, the blockiest silhouette here
+    const A = S
+    const Wq = S * 0.28
+    const T = S * 0.52
+    const d = closed([
+      [-Wq, -Wq], [-T, -A], [T, -A], [Wq, -Wq],
+      [A, -T], [A, T], [Wq, Wq],
+      [T, A], [-T, A], [-Wq, Wq],
+      [-A, T], [-A, -T],
+    ])
+    return (
+      `<path d="${d}" fill="${BR_LIT}"/>` +
+      `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>` +
+      `<circle cx="0" cy="0" r="${fx(S * 0.2)}" fill="${INK}" opacity="0.75"/>`
+    )
+  }
+
+  const shelfIn = R * 0.625
+  const shelfOut = R * 0.755
+  const shelfHalf = 15
+  const birdS = R * 0.041
+  const markR = R * 0.505
+  const markS = R * 0.105
   for (let k = 0; k < 8; k++) {
-    const a = k * 45
-    const mx = polX(cx, a, bandMid)
-    const my = polY(cy, a, bandMid)
-    if (k === 3) g += compassNeedle(mx, my, a, R * 0.4, R * 0.095, BR_LIT, DUSK.slate)
-    else if (k === 6) g += tallyMarks(cx, cy, a, 9, R * 0.5, R * 0.74, 28, INK)
-    else g += ravenSigil(mx, my, R * 0.16, bank[k], BR, BR_LIT)
+    const route = S4_DIAL_ROUTES[k]
+    let sec = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(90 - k * 45)})">`
+
+    // the BEARING CADENCE, struck inside the rim: bars keyed to k parity, dots to
+    // k/2, so all eight rim marks are a different pattern and the wheel has a
+    // position. Held clear of the 0.40-0.84R window band on purpose.
+    const bars = 1 + (k % 2)
+    const dots = Math.floor(k / 2)
+    for (let i = 0; i < bars; i++) {
+      const bx = (i - (bars - 1) / 2) * R * 0.05
+      sec += `<line x1="${fx(bx)}" y1="${fx(-R * 0.875)}" x2="${fx(bx)}" y2="${fx(-R * 0.975)}" stroke="${INK}" stroke-width="${fx(R * 0.015)}" opacity="0.7" stroke-linecap="round"/>`
+      sec += `<line x1="${fx(bx)}" y1="${fx(-R * 0.875)}" x2="${fx(bx)}" y2="${fx(-R * 0.975)}" stroke="${BR_LIT}" stroke-width="${fx(R * 0.005)}" opacity="0.6" stroke-linecap="round"/>`
+    }
+    for (let j = 0; j < dots; j++) {
+      const dx = (j - (dots - 1) / 2) * R * 0.055
+      sec += `<circle cx="${fx(dx)}" cy="${fx(-R * 0.852)}" r="${fx(R * 0.014)}" fill="${BR}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.6"/>`
+    }
+
+    // the ROOST SHELF and its count of ravens. The shelf is IDENTICAL in all
+    // eight sectors on purpose: a constant pale ground is what makes 1 vs 2 vs 3
+    // ink birds a legible count rather than a tonal guess, and it is also the
+    // largest per-detent change in the aperture.
+    const shelf = annularSectorPath(0, 0, 90, shelfHalf, shelfIn, shelfOut, 14)
+    sec += `<path d="${shelf}" fill="${DUSK.parchLit}" opacity="0.9"/>`
+    sec += `<path d="${shelf}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
+    const pitch = birdS * 3.1
+    for (let i = 0; i < route.ravens; i++) {
+      const bx = (i - (route.ravens - 1) / 2) * pitch
+      // a perch notch under each bird: if the birds themselves blur at 1x, the
+      // notches still count them
+      sec += `<line x1="${fx(bx)}" y1="${fx(-shelfIn - R * 0.004)}" x2="${fx(bx)}" y2="${fx(-shelfIn - R * 0.028)}" stroke="${INK}" stroke-width="${fx(R * 0.013)}" opacity="0.85" stroke-linecap="round"/>`
+      sec += `<g transform="translate(${fx(bx)} ${fx(-R * 0.69)})">${miniRaven(birdS, DUSK.ink, DUSK.parchDim)}</g>`
+    }
+
+    // the principal device
+    sec += `<g transform="translate(0 ${fx(-markR)})">${device(route.mark, markS, route.weight)}</g>`
+
+    // the destination, engraved small — doubled (bright ghost under a dark cut)
+    // so it holds on both the amber fields and the slate ones
+    const kn = route.key.length
+    const kcw = R * 0.0435
+    const kch = R * 0.056
+    const kgap = R * 0.0105
+    const kx = -(kn * kcw + (kn - 1) * kgap) / 2
+    const ky = -R * 0.826
+    sec += engraveWord(route.key, kx, ky + R * 0.005, kcw, kch, kgap, DUSK.parchLit, 3, 'opacity="0.6"')
+    sec += engraveWord(route.key, kx, ky, kcw, kch, kgap, INK, 3.2, 'opacity="0.92"')
+
+    sec += `</g>`
+    g += sec
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#dialLite)"/>`
   for (let i = 0; i < 14; i++) {
@@ -3961,8 +4176,9 @@ function dispatchDial(w, h, seed) {
 // with THREE die-cut apertures (true alpha-0 holes) at math-angles 45/90/135 over
 // the read band 0.40-0.84R, each set into a BANK OF PIGEONHOLES above and below.
 // Built as one even-odd compound path so the holes are genuine cut-outs. The
-// lower half carries the celebrated brass tag "(1) SPIN - ROUTE THE RAVENS" with
-// a pointing manicule, engraved font-free from ENGRAVE_GLYPHS. ----
+// lower half carries the celebrated brass tag, engraved font-free from
+// ENGRAVE_GLYPHS with a pointing manicule: ONE word, SPIN, at the largest cap
+// height the plate will hold (see the tag block below for why it is one word). ----
 function dispatchCard(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
@@ -4027,10 +4243,20 @@ function dispatchCard(w, h, seed) {
   }
 
   // ---- THE CELEBRATED BRASS TAG (T-AFFORDANCE) ----
-  // Two engraved lines reading, in order, (1) SPIN - ROUTE THE RAVENS, on a
-  // brass plate screwed across the free lower half; a manicule points into it.
-  const tagW = R * 1.5
-  const tagH = R * 0.56
+  // ONE WORD. The plate used to read "(1) SPIN — ROUTE THE RAVENS" over two
+  // lines and the reader could only make it out by rendering at 3x: the whole
+  // interaction hung on ~100x20 screen px of dark-gold-on-gold at a steep
+  // foreshortening. Two findings, one fix each:
+  //   - unreadable at 1x  ->  drop the second line and the numeral, and spend
+  //     the entire plate on SPIN at ~2.4x the old cap height (R*0.36, which is
+  //     ~22 screen px at the ~130px the card projects).
+  //   - "(1)" implies a (2) and a (3)  ->  there is no other numbered plate on
+  //     this spread, so the numeral goes. `circledOne` stays in the module for
+  //     art that wants it; nothing here calls it.
+  // The manicule still points into the word, and the plate is sized to the word
+  // rather than the word squeezed into the plate.
+  const tagW = R * 1.3
+  const tagH = R * 0.5
   const tagX = cx - tagW / 2
   const tagY = cy + R * 0.28
   s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="${BR}"/>`
@@ -4042,35 +4268,27 @@ function dispatchCard(w, h, seed) {
       s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="3.4" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.1" stroke-opacity="0.6"/>`
     }
   }
-  const line = (word, cw, ch, gap, yTop, x0) => {
-    let out = engraveWord(word, x0, yTop + 1.4, cw, ch, gap, BR_LIT, 2.6, 'opacity="0.5"')
-    out += engraveWord(word, x0, yTop, cw, ch, gap, PLATE_DK, 2.8, 'opacity="0.95"')
+  // the doubled-stroke engraving idiom: a bright ghost offset under a dark cut,
+  // which is what makes struck metal survive a 5x downscale. Weights scale with
+  // the cap height now that the cap height is worth scaling.
+  const line = (word, cw, ch, gap, yTop, x0, sw) => {
+    let out = engraveWord(word, x0, yTop + sw * 0.34, cw, ch, gap, BR_LIT, fx(sw * 0.9), 'opacity="0.55"')
+    out += engraveWord(word, x0, yTop, cw, ch, gap, PLATE_DK, fx(sw), 'opacity="0.96"')
     return out
   }
   const wordW = (word, cw, gap) => word.length * cw + (word.length - 1) * gap
-  // line 1: the circled numeral, SPIN, the em dash
-  const cw1 = R * 0.082
-  const ch1 = R * 0.15
-  const gap1 = R * 0.035
-  const oneR = ch1 * 0.56
-  const pad1 = gap1 * 3
-  const l1W = oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1 + cw1
-  const l1X = cx - l1W / 2
-  const l1Y = tagY + tagH * 0.16
-  s += circledOne(l1X + oneR, l1Y + ch1 * 0.5, oneR, PLATE_DK, 3.2)
-  s += line('SPIN', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1)
-  s += line('—', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1)
-  // line 2: ROUTE THE RAVENS (one engraved run; the space cell has no glyph)
-  const cw2 = R * 0.062
-  const ch2 = R * 0.13
-  const gap2 = R * 0.026
-  const l2 = 'ROUTE THE RAVENS'
-  const l2X = cx - wordW(l2, cw2, gap2) / 2
-  const l2Y = tagY + tagH * 0.56
-  s += line(l2, cw2, ch2, gap2, l2Y, l2X)
-  s += `<line x1="${fx(l2X)}" y1="${fx(l2Y + ch2 + 6)}" x2="${fx(l2X + wordW(l2, cw2, gap2))}" y2="${fx(l2Y + ch2 + 6)}" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.5"/>`
-  // the manicule, pointing into the tag from the spine side
-  s += manicule(tagX - R * 0.16, tagY + tagH * 0.42, R * 0.125, PARCH, INK)
+  // SPIN, and nothing else, filling the plate
+  const cwS = R * 0.2
+  const chS = R * 0.36
+  const gapS = R * 0.05
+  const swS = R * 0.038
+  const lS = 'SPIN'
+  const lX = cx - wordW(lS, cwS, gapS) / 2
+  const lY = tagY + (tagH - chS) / 2
+  s += line(lS, cwS, chS, gapS, lY, lX, swS)
+  // the manicule, pointing into the word from the spine side. Held inboard of
+  // R*0.10 from the plate: further out and its cuff runs off the disc.
+  s += manicule(tagX - R * 0.1, tagY + tagH * 0.5, R * 0.1, PARCH, INK)
 
   // central rivet at the hub — pins the plate flat over the wheel
   const rivR = R * 0.14
@@ -4774,10 +4992,23 @@ function roostWindow(bx, by, bw, bh, lit) {
   if (lit) {
     s += `<ellipse cx="${fx(cx)}" cy="${fx(by - bh * 0.4)}" rx="${fx(bw * 1.5)}" ry="${fx(bh * 1.15)}" fill="url(#rookHalo)" opacity="0.62"/>`
     s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(bh)}" fill="url(#rookGlow)"/>`
-    s += `<rect x="${fx(bx + bw * 0.18)}" y="${fx(by - bh * 0.82)}" width="${fx(bw * 0.64)}" height="${fx(bh * 0.5)}" fill="${DUSK.amberCore}" opacity="0.85"/>`
+    // WAVE-2 (S4-5), the same fix as `ravenPortal`: the hot field now reaches DOWN
+    // to the sill so the bird has something to be a silhouette against, and the
+    // bird is a bird — body, head, tail — with px floors, because the terraces'
+    // upper storeys shrink these windows well past the point where a bw*0.2
+    // ellipse is a bird rather than a speck.
+    s += `<rect x="${fx(bx + bw * 0.14)}" y="${fx(by - bh * 0.86)}" width="${fx(bw * 0.72)}" height="${fx(bh * 0.74)}" fill="${DUSK.amberCore}" opacity="0.9"/>`
     // a bird cut black against the blaze, because every window here is a roost
-    s += `<ellipse cx="${fx(bx + bw * 0.58)}" cy="${fx(by - bh * 0.24)}" rx="${fx(bw * 0.2)}" ry="${fx(bh * 0.16)}" fill="${DUSK.ink}"/>`
-    s += `<circle cx="${fx(bx + bw * 0.4)}" cy="${fx(by - bh * 0.4)}" r="${fx(Math.max(1.2, bw * 0.11))}" fill="${DUSK.ink}"/>`
+    const wbx = bx + bw * 0.58
+    const wby = by - bh * 0.26
+    const wrx = Math.max(2, bw * 0.27)
+    const wry = Math.max(1.8, bh * 0.23)
+    s += `<ellipse cx="${fx(wbx)}" cy="${fx(wby)}" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${DUSK.ink}"/>`
+    s += `<path d="M ${fx(wbx + wrx * 0.5)} ${fx(wby - wry * 0.3)} L ${fx(wbx + wrx * 1.8)} ${fx(wby + wry * 0.8)} L ${fx(wbx + wrx * 0.4)} ${fx(wby + wry * 0.7)} Z" fill="${DUSK.ink}"/>`
+    s += `<circle cx="${fx(wbx - wrx * 0.8)}" cy="${fx(wby - wry * 0.95)}" r="${fx(Math.max(2, bw * 0.16))}" fill="${DUSK.ink}"/>`
+    if (bw >= 16) {
+      s += `<path d="M ${fx(wbx - wrx * 1.4)} ${fx(wby - wry * 0.95)} L ${fx(wbx - wrx * 2.2)} ${fx(wby - wry * 0.66)} L ${fx(wbx - wrx * 1.3)} ${fx(wby - wry * 0.52)} Z" fill="${DUSK.ink}"/>`
+    }
   } else {
     s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(bh)}" fill="${DUSK.ink}"/>`
     s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(Math.max(1, bh * 0.2))}" fill="${DUSK.slateLit}" opacity="0.26"/>`
@@ -5662,6 +5893,86 @@ function dispatchCablePanel({ w, h, seed, cable, baskets }) {
     `<path d="${line}" fill="none" stroke="${DUSK.parch}" stroke-width="${fx(core * 0.26)}" opacity="0.8" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,${fx(-core * 0.44)})"/>`
   )
 
+  // ---- THE SEND CUE (T-AFFORDANCE) -----------------------------------------
+  // Both working mechanisms on this spread shipped silent while the dial — the
+  // one that LOOKED dead — carried the only instruction on the page. That reads
+  // as a wiring error from the reader's chair. The winch answered it with an
+  // engraved HOIST band; the cable answers it here: a brass plate struck SEND,
+  // bracketed off the NEAR mast (the gutter-side high end, where the trolley
+  // sits at riderHome = 0.06), with a short arrow running down the wire.
+  //
+  // SIZED FOR THE BOARD, NOT FOR THE SHEET. The panel projects to ~139x253
+  // screen px, so a label-sized decal here is a smudge: the plate is 31% of the
+  // panel's width (~42 screen px) with a ~11 screen px cap height, which makes
+  // it several times the mast head it hangs off. And because ~97% of this sheet
+  // is cut away, the light on it is `warmBloom` — a soft halo out here prints as
+  // a grey disc once the grain pass floors every non-transparent pixel.
+  const mHeadX = X(cable[0][0] + 0.03)
+  const mHeadY = Y(cable[0][1])
+  const pw = w * 0.312
+  const ph = w * 0.108
+  const px0 = mHeadX + w * 0.059
+  const py0 = mHeadY - ph * 0.42
+  const plateD = `M ${fx(px0)} ${fx(py0)} L ${fx(px0 + pw)} ${fx(py0)} L ${fx(px0 + pw)} ${fx(py0 + ph)} L ${fx(px0)} ${fx(py0 + ph)} Z`
+  // the two bolt-arms back to the mast head, so the plate is MOUNTED and not
+  // floating in the air the rest of this sheet is made of
+  for (const t of [0.26, 0.74]) {
+    parts.push(
+      `<path d="M ${fx(mHeadX)} ${fx(mHeadY)} L ${fx(px0)} ${fx(py0 + ph * t)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(4, w * 0.016))}" stroke-linecap="round"/>`
+    )
+    parts.push(
+      `<path d="M ${fx(mHeadX)} ${fx(mHeadY)} L ${fx(px0)} ${fx(py0 + ph * t)}" stroke="${DUSK.amber}" stroke-width="${fx(Math.max(2, w * 0.007))}" stroke-linecap="round"/>`
+    )
+  }
+  parts.push(warmBloom(px0, py0 + ph * 0.5, ph * 0.55))
+  parts.push(`<path d="${plateD}" fill="${DUSK.amber}"/>`)
+  parts.push(`<rect x="${fx(px0)}" y="${fx(py0)}" width="${fx(pw)}" height="${fx(ph * 0.3)}" fill="${DUSK.amberLit}" opacity="0.7"/>`)
+  parts.push(rookRim(plateD, 3.4))
+  for (const bx of [px0 + pw * 0.045, px0 + pw * 0.955]) {
+    parts.push(`<circle cx="${fx(bx)}" cy="${fx(py0 + ph * 0.5)}" r="${fx(ph * 0.075)}" fill="${DUSK.amberCore}" stroke="${DUSK.ink}" stroke-width="2"/>`)
+  }
+  const scw = pw * 0.174
+  const sgap = pw * 0.0435
+  const sch = ph * 0.68
+  const ssw = ph * 0.14
+  const sx0 = px0 + (pw - (4 * scw + 3 * sgap)) / 2
+  const sy0 = py0 + (ph - sch) / 2
+  parts.push(engraveWord('SEND', sx0, sy0 + ssw * 0.3, scw, sch, sgap, DUSK.amberCore, fx(ssw * 0.85), 'opacity="0.6"'))
+  parts.push(engraveWord('SEND', sx0, sy0, scw, sch, sgap, DUSK.ink, fx(ssw), 'opacity="0.95"'))
+
+  // THE DIRECTION ARROW, laid parallel to the wire just off its lit edge and
+  // pointing the way the trolley runs (riderHome -> 1, i.e. outboard and down).
+  {
+    const [au, av] = cableAt(cable, 0.1)
+    const [bu, bv] = cableAt(cable, 0.19)
+    const ax = X(au)
+    const ay = Y(av)
+    const bx = X(bu)
+    const by = Y(bv)
+    const dx = bx - ax
+    const dy = by - ay
+    const L = Math.hypot(dx, dy) || 1
+    // the perpendicular on the wire's UPPER side, where the baskets are not
+    const nx = dy / L
+    const ny = -dx / L
+    const off = w * 0.036
+    const hl = w * 0.05
+    const hw = w * 0.026
+    const sxA = ax + nx * off
+    const syA = ay + ny * off
+    const sxB = bx + nx * off
+    const syB = by + ny * off
+    const tailX = sxB - (dx / L) * hl
+    const tailY = syB - (dy / L) * hl
+    parts.push(`<path d="M ${fx(sxA)} ${fx(syA)} L ${fx(tailX)} ${fx(tailY)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.019)}" stroke-linecap="round"/>`)
+    parts.push(`<path d="M ${fx(sxA)} ${fx(syA)} L ${fx(tailX)} ${fx(tailY)}" stroke="${DUSK.amberLit}" stroke-width="${fx(w * 0.008)}" stroke-linecap="round"/>`)
+    const headD =
+      `M ${fx(sxB)} ${fx(syB)} L ${fx(tailX + nx * hw)} ${fx(tailY + ny * hw)} ` +
+      `L ${fx(tailX - nx * hw)} ${fx(tailY - ny * hw)} Z`
+    parts.push(`<path d="${headD}" fill="${DUSK.amber}"/>`)
+    parts.push(`<path d="${headD}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(2, w * 0.006))}" stroke-linejoin="round"/>`)
+  }
+
   // THE HANGING LETTER-BASKETS. Each is a hook over the wire, a short yoke, a
   // wicker pannier and one lit lantern — the fixed three the reader does not
   // touch, so the eye reads the wire as WORKING before a hand ever lands on it.
@@ -5833,41 +6144,94 @@ function readerBasket(w, h, seed) {
   return svgPiece(w, h, parts.join(''), cityLampDefs())
 }
 // ---- THE ROOKERY'S OUTER YARD WALL (ch3-fringe, foreground vfold, very wide/
-// short; crease at image centre). Slate ashlar with a coping, a rank of perched
-// ravens along the crest, and a ROAD NOTCH punched through its base on the RIGHT
-// (spread-x ~0.86) where the post-road painted on page-4 passes through. ----
+// short; crease at image centre). Slate ashlar, a CRENELLATED coping, six short
+// groups of perched ravens standing on it, lit dispatch hatches the whole length,
+// and a working GATE where the post-road painted on page-4 passes through.
+//
+// WAVE-2 REWORK (S4-6 + S4-7), and the render that forced it. Downscaled to the
+// 860x105 screen box this wall actually occupies, the round-3 crest read as a row
+// of cream SCALLOPS — a lace trim, exactly as the blind reader called it — while
+// the right third of the wall was bare brick with a big empty arch at the end.
+// Three causes, all measurable:
+//
+//  (a) THE CREST WAS ALL BIRDS. Four linked raven chains covered 68% of the
+//      wall's length, so the silhouette had no architecture in it at all. A
+//      68%-bird parapet does not read as birds on a wall; it reads as a decorative
+//      border, and the pale cut-edge rim tracing it turned that border cream.
+//      The crest is now genuinely CRENELLATED — merlons and gaps, which is what
+//      the pale rim is for — with birds in SIX SHORT GROUPS totalling ~26%, each
+//      bird twice its old height so a group reads as birds rather than as a
+//      frill. (The file's own warning at rookRim, "the raven chain a scalloped
+//      ribbon rather than birds", was right and was only half-heeded.)
+//  (b) NOTHING WAS LIT PAST u 0.765. The hatch loop ran cu = 0.045 + (k/14)*0.72,
+//      so the wall's whole outboard quarter had no light in it. Hatches now run
+//      the full length, skipping only the gate.
+//  (c) THE GATE WAS A HOLE. Its only treatment was one halo ellipse, so the
+//      reader read "one large blank outlined arch... an unfinished cutout". It is
+//      now a gate: ashlar jambs, a voussoir arch with a keystone, a lantern
+//      bracketed each side, warm light on the road inside, and two ravens
+//      standing in the mouth where the light is strongest. ----
 function rookeryFringe(w, h, seed) {
   const r = mulberry32(seed)
   const crestV = 0.5 // wall top, in v-up fractions of the strip height
   const Y = (v) => (1 - v) * h
   const X = (u) => u * w
-  const rankV = 0.44 // raven-rank height above the coping
+  // rankV is capped by the CANVAS, not by taste: the birds stand at crestV +
+  // rankV in a v-space that ends at 1.0, so 0.47 is the tallest bird this strip
+  // holds (a first pass at 0.86 clipped every head flat and the groups came out
+  // indistinguishable from the merlons — the render caught it). The height that
+  // matters is the RELIEF above the coping, 0.45*rankV = 0.21 of the strip, about
+  // 22 screen px against the merlons' 14: birds standing on a battlement.
+  const rankV = 0.47 // raven height above the coping
+  const merlonV = 0.13 // merlon height above the coping
+  // SIX SHORT GROUPS, ~28% of the length, spaced so the eye reads wall-then-birds
+  // -then-wall rather than one continuous frill, and each wide enough for TWO
+  // birds at their natural build (cell = 0.6 x height) rather than four squeezed
+  // ones. The two widest sit either side of the gate, which is where a rookery's
+  // birds would actually wait.
+  const bands = [[0.05, 0.145], [0.215, 0.3], [0.385, 0.48], [0.545, 0.615], [0.685, 0.78], [0.895, 0.96]]
 
-  // wall body + linked raven rank along the crest, as one contour
-  const top = []
-  top.push([0, crestV])
-  const bands = [[0.03, 0.31], [0.37, 0.63], [0.69, 0.79], [0.92, 0.98]]
-  let cursor = 0.02
+  // wall body: crenellated coping with the six bird groups standing on it, as ONE
+  // contour (the silhouette IS the die-cut, so anything meant to break the sky
+  // has to be in here).
+  const top = [[0, crestV]]
+  let cursor = 0.008
   for (const [z0, z1] of bands) {
-    top.push([cursor, crestV], [z0, crestV])
-    const n = Math.max(3, Math.round(((z1 - z0) * w) / Math.max(6, rankV * h * RAVEN_CELL)))
+    // crenellation from the last group's end up to this group's start
+    const teeth = Math.max(2, Math.round(((z0 - cursor) * w) / Math.max(14, h * 0.24)))
+    if (z0 - cursor > 0.01) top.push(...crenelTop(cursor, z0, crestV, crestV + merlonV, teeth))
+    top.push([z0, crestV])
+    const n = Math.max(2, Math.round(((z1 - z0) * w) / Math.max(10, rankV * h * RAVEN_CELL)))
     top.push(...ravenChainTop(z0, z1, crestV, rankV, n, 'left'), [z1, crestV])
     cursor = z1
   }
+  const teethEnd = Math.max(2, Math.round(((0.992 - cursor) * w) / Math.max(14, h * 0.24)))
+  top.push(...crenelTop(cursor, 0.992, crestV, crestV + merlonV, teethEnd))
   top.push([1, crestV])
   const wall = simplifyOutline([[0, 0], ...top, [1, 0]])
   const wallD = wall.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
 
-  // the ROAD NOTCH: a true alpha hole (even-odd) the post-road runs through
-  const nx0 = 0.8
+  // THE GATE: a true alpha hole (even-odd) the post-road runs through. Widened
+  // and raised a little so it reads as the yard's gate rather than a mouse hole,
+  // and moved a hair inboard so the wall still has crenellated shoulder outboard
+  // of it (an arch flush with the end of a wall reads as a broken wall).
+  const nx0 = 0.785
   const nx1 = 0.9
-  const nTop = 0.42
+  const nTop = 0.52
   const notchD =
     `M ${fx(X(nx0))} ${fx(h)} L ${fx(X(nx0 + 0.008))} ${fx(Y(nTop * 0.7))} ` +
     `Q ${fx(X((nx0 + nx1) / 2))} ${fx(Y(nTop))} ${fx(X(nx1 - 0.008))} ${fx(Y(nTop * 0.7))} L ${fx(X(nx1))} ${fx(h)} Z`
 
   let s = `<g>`
-  s += `<path fill-rule="evenodd" d="${wallD} ${notchD}" fill="${DUSK.slate}"/>`
+  // THE GATE IS NOT A HOLE ANY MORE. It was cut as a true alpha aperture "so the
+  // post-road passes through" — but the road painted on page-4 does not line up
+  // behind it, so what a reader saw through the aperture was night sky, which is
+  // exactly why it read as "one large blank outlined arch... an unfinished
+  // cutout". A gate you can see through is only a trick worth having when there
+  // is something behind it. So the wall stays SOLID here and the archway is
+  // PAINTED: a warm tunnel with the road receding into it. The notch path is kept
+  // because the rim still traces it, which is what makes it an arch.
+  s += `<path d="${wallD}" fill="${DUSK.slate}"/>`
   s += `<g clip-path="url(#fringeCut)">`
   // coping + ashlar coursing + a lit crest line
   s += `<rect x="0" y="${fx(Y(crestV))}" width="${w}" height="${fx(Math.max(3, h * 0.04))}" fill="${DUSK.slateLit}" opacity="0.55"/>`
@@ -5884,33 +6248,91 @@ function rookeryFringe(w, h, seed) {
   // read as dead slate. It is now a working wall: a rank of lit dispatch hatches
   // along it, the notch mouth glowing where the post-road comes through, and the
   // perched ravens rim-lit from below by both.
+  //
+  // (b) THE HATCHES NOW RUN THE WHOLE WALL. 21 stations over u 0.035..0.965 at an
+  // even pitch, skipping only the gate — the round-3 loop stopped at 0.765 and
+  // left the outboard quarter dark, which is the "bare brick" the reader named.
+  // The lit CHANCE is graded down outboard (0.72 -> 0.46) so the wall still
+  // recedes away from the keep instead of blazing evenly.
   const hatchV = 0.28
-  const hatchW = 0.026
-  const hatchH = 0.3
+  const hatchW = 0.03
+  const hatchH = 0.32
   let litPrev = false
-  for (let k = 0; k < 15; k++) {
-    const cu = 0.045 + (k / 14) * 0.72
-    if (cu > nx0 - 0.05 && cu < nx1 + 0.05) continue
+  const HATCHES = 21
+  for (let k = 0; k < HATCHES; k++) {
+    const cu = 0.035 + (k / (HATCHES - 1)) * 0.93
+    if (cu > nx0 - 0.055 && cu < nx1 + 0.055) continue
     const roll = r()
-    const lit = roll < 0.5 || (litPrev && roll < 0.7)
+    const chance = lerp(0.72, 0.46, cu)
+    const lit = roll < chance || (litPrev && roll < chance + 0.2)
     litPrev = lit
     s += ravenPortal(X(cu - hatchW / 2), Y(hatchV), X(hatchW), hatchH * h, lit, 0.5)
   }
-  // the notch mouth: light from the road beyond spills through the arch
-  s += `<ellipse cx="${fx(X((nx0 + nx1) / 2))}" cy="${fx(Y(nTop * 0.5))}" rx="${fx(X(0.1))}" ry="${fx(h * 0.34)}" fill="url(#rookHalo)" opacity="0.75"/>`
-  // the rank's bodies (the contour already cut them) + eyes, rim-lit from below
+  // ---- (c) THE GATE, built rather than punched: a painted tunnel that recedes,
+  // the masonry that makes it an arch, and two birds standing in the warmest spot
+  // on the whole wall.
+  const gcu = (nx0 + nx1) / 2
+  const gHalf = (nx1 - nx0) / 2
+  s += `<ellipse cx="${fx(X(gcu))}" cy="${fx(Y(nTop * 0.5))}" rx="${fx(X(gHalf * 2.1))}" ry="${fx(h * 0.4)}" fill="url(#rookHalo)" opacity="0.85"/>`
+  // the tunnel: the arch's own interior, dark at the crown and blazing at the
+  // floor where the lamplit road runs in — three nested washes inside the notch
+  // shape, so the depth is stated by tone rather than by a hole
+  s += `<path d="${notchD}" fill="${DUSK.amberDeep}" opacity="0.9"/>`
+  s += `<ellipse cx="${fx(X(gcu))}" cy="${fx(h * 0.98)}" rx="${fx(X(gHalf * 0.92))}" ry="${fx(h * 0.4)}" fill="url(#rookGlow)" opacity="0.85"/>`
+  s += `<ellipse cx="${fx(X(gcu))}" cy="${fx(h)}" rx="${fx(X(gHalf * 0.62))}" ry="${fx(h * 0.26)}" fill="${DUSK.amberCore}" opacity="0.8"/>`
+  // the road's own crown running out of the gate mouth toward the reader
+  s += `<path d="M ${fx(X(gcu - gHalf * 0.5))} ${fx(h)} L ${fx(X(gcu - gHalf * 0.16))} ${fx(Y(nTop * 0.5))} L ${fx(X(gcu + gHalf * 0.16))} ${fx(Y(nTop * 0.5))} L ${fx(X(gcu + gHalf * 0.5))} ${fx(h)} Z" fill="${DUSK.parch}" opacity="0.3"/>`
+  // a soffit shadow under the arch head so the tunnel has a ceiling
+  s += `<path d="M ${fx(X(nx0 + 0.012))} ${fx(Y(nTop * 0.66))} Q ${fx(X(gcu))} ${fx(Y(nTop * 0.96))} ${fx(X(nx1 - 0.012))} ${fx(Y(nTop * 0.66))} L ${fx(X(nx1 - 0.012))} ${fx(Y(nTop * 0.4))} Q ${fx(X(gcu))} ${fx(Y(nTop * 0.62))} ${fx(X(nx0 + 0.012))} ${fx(Y(nTop * 0.4))} Z" fill="${DUSK.ink}" opacity="0.55"/>`
+  // voussoir arch + keystone over the opening
+  for (let k = -4; k <= 4; k++) {
+    const a = 90 - k * 19
+    const vx = X(gcu) + Math.cos((a * Math.PI) / 180) * X(gHalf * 1.06)
+    const vy = Y(nTop * 0.78) - Math.sin((a * Math.PI) / 180) * h * 0.2
+    s += `<rect x="${fx(vx - X(0.008))}" y="${fx(vy - h * 0.07)}" width="${fx(X(0.016))}" height="${fx(h * 0.14)}" fill="${k === 0 ? DUSK.parch : DUSK.slateLit}" opacity="${k === 0 ? '0.85' : '0.6'}" transform="rotate(${fx(90 - a)} ${fx(vx)} ${fx(vy)})"/>`
+  }
+  // jambs: a dressed stone edge each side of the opening
+  for (const jx of [nx0, nx1]) {
+    s += `<rect x="${fx(X(jx) - X(0.007))}" y="${fx(Y(nTop * 0.82))}" width="${fx(X(0.014))}" height="${fx(h - Y(nTop * 0.82))}" fill="${DUSK.slateLit}" opacity="0.5"/>`
+  }
+  // a lantern bracketed each side of the gate — the reason the mouth is bright
+  for (const lx of [nx0 - 0.028, nx1 + 0.028]) {
+    s += warmBloom(X(lx), Y(nTop * 0.92), X(0.026))
+    s += lampHead(X(lx), Y(nTop * 1.02), Y(nTop * 0.78), X(0.017), 0)
+  }
+  // two ravens standing in the gate mouth, where the light is strongest: the
+  // wall's own restatement of the chapter's beat at the size it reads best
+  for (const [gx, gs] of [[gcu - gHalf * 0.42, 0.3], [gcu + gHalf * 0.34, 0.24]]) {
+    s += `<g transform="translate(${fx(X(gx))} ${fx(h - h * 0.1)})">${miniRaven(h * gs, DUSK.ink, DUSK.slateLit)}</g>`
+  }
+  // The rank's bodies (the contour already cut them) are filled INK so the birds
+  // read as dark silhouettes against the night rather than as the pale cut edge —
+  // which is the other half of the lace-trim failure. Eyes and a lit perch ledge
+  // rim them from below; the crenellation between the groups gets a coping catch
+  // of its own, so the pale rim along the merlons reads as masonry.
+  const perchV = crestV + rankV * RAVEN_PROFILE[0][1]
   for (const [z0, z1] of bands) {
-    const n = Math.max(3, Math.round(((z1 - z0) * w) / Math.max(6, rankV * h * RAVEN_CELL)))
-    const perchV = crestV + rankV * RAVEN_PROFILE[0][1]
+    const n = Math.max(2, Math.round(((z1 - z0) * w) / Math.max(10, rankV * h * RAVEN_CELL)))
     s += `<rect x="${fx(X(z0))}" y="${fx(Y(crestV + rankV))}" width="${fx(X(z1 - z0))}" height="${fx(Y(perchV) - Y(crestV + rankV))}" fill="${DUSK.ink}"/>`
     s += `<rect x="${fx(X(z0))}" y="${fx(Y(perchV) - Math.max(1.6, h * 0.014))}" width="${fx(X(z1 - z0))}" height="${fx(Math.max(1.6, h * 0.014))}" fill="${DUSK.amberLit}" opacity="0.5"/>`
     const cw = (z1 - z0) / n
     for (let k = 0; k < n; k++) {
-      s += `<circle cx="${fx(X(z0 + cw * (k + 0.17)))}" cy="${fx(Y(crestV + rankV * 0.94))}" r="${fx(Math.max(1.3, rankV * h * 0.05))}" fill="${DUSK.amberCore}" opacity="0.95"/>`
+      // eye + a beak notch of sky, so a bird at 12 screen px still has a face
+      s += `<circle cx="${fx(X(z0 + cw * (k + 0.14)))}" cy="${fx(Y(crestV + rankV * 0.86))}" r="${fx(Math.max(1.6, rankV * h * 0.055))}" fill="${DUSK.amberCore}" opacity="0.95"/>`
     }
   }
-  // road shadow spilling out of the notch onto the yard face
-  s += `<path d="M ${fx(X(nx0 - 0.02))} ${fx(h)} L ${fx(X(nx0 + 0.01))} ${fx(Y(nTop * 0.6))} L ${fx(X(nx1 - 0.01))} ${fx(Y(nTop * 0.6))} L ${fx(X(nx1 + 0.02))} ${fx(h)} Z" fill="${DUSK.ink}" opacity="0.3"/>`
+  // A THIRD posted notice, out on the stretch that used to be bare — on the
+  // OUTBOARD shoulder past the gate (a first pass put it at u 0.84, which is
+  // inside the gate's own alpha hole, so it hung in the archway).
+  for (const [px, pv] of [[0.938, 0.34]]) {
+    s += `<ellipse cx="${fx(X(px) + w * 0.018)}" cy="${fx(Y(pv) + h * 0.15)}" rx="${fx(w * 0.05)}" ry="${fx(h * 0.34)}" fill="url(#rookHalo)" opacity="0.55"/>`
+    s += `<rect x="${fx(X(px))}" y="${fx(Y(pv))}" width="${fx(w * 0.032)}" height="${fx(h * 0.28)}" fill="${DUSK.parch}" opacity="0.92" transform="rotate(2 ${fx(X(px))} ${fx(Y(pv))})"/>`
+    for (let l = 0; l < 4; l++) {
+      s += `<line x1="${fx(X(px) + 4)}" y1="${fx(Y(pv) + h * 0.055 + l * h * 0.05)}" x2="${fx(X(px) + w * 0.028)}" y2="${fx(Y(pv) + h * 0.055 + l * h * 0.05)}" stroke="${DUSK.ink}" stroke-width="1.4" opacity="0.45"/>`
+    }
+  }
+  // (the round-3 road shadow on the wall face is gone with the aperture: a solid
+  // gate throws light OUT, it does not spill a shadow onto its own masonry)
   // a bill-posted notice pair (the yard wall is where routes are posted), each
   // under its own reading lamp — the only parchment the night register allows
   for (const [px, pv] of [[0.2, 0.4], [0.62, 0.36]]) {
@@ -5924,12 +6346,17 @@ function rookeryFringe(w, h, seed) {
   s += `<rect width="${w}" height="${h}" fill="url(#fringeNight)"/>`
   s += `<rect x="0" y="${fx(h * 0.86)}" width="${w}" height="${fx(h * 0.14)}" fill="${DUSK.ink}" opacity="0.26"/>`
   s += `</g>`
-  s += rookRim(wallD, 5)
-  s += rookRim(notchD, 4)
+  // S4-7: the crest rim is HALVED. At 860 screen px the round-3 weight put a
+  // 3.6px cream core on a silhouette that was 68% birds, and the sum of those two
+  // decisions is the lace. With architecture back in the crest the rim can do its
+  // real job — saying "this edge is cut paper" along the merlons — at a weight
+  // that does not out-draw the birds it also traces.
+  s += rookRim(wallD, 2.6)
+  s += rookRim(notchD, 3)
   s += `</g>`
 
   const defs =
-    `<clipPath id="fringeCut"><path fill-rule="evenodd" d="${wallD} ${notchD}"/></clipPath>` +
+    `<clipPath id="fringeCut"><path d="${wallD}"/></clipPath>` +
     `<radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">` +
     `<stop offset="0" stop-color="${DUSK.amberLit}"/><stop offset="0.5" stop-color="${DUSK.amber}"/>` +
     `<stop offset="1" stop-color="${DUSK.amberDeep}"/></radialGradient>` +
@@ -6077,64 +6504,88 @@ function postRoadSpread(w, h, seed) {
   // the gutter: a soft valley shadow down the spine
   s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#pageGutter)"/>`
 
-  // ---- THE COURT / PLAZA (pack risk R2's paint-first mitigant). ONE
-  // continuous radial apron that all nine dovecote facades stand on, so the
-  // flanks stop reading as scattered islands. Its outer arc passes through BOTH
-  // ring-MID arm feet (x 0.19 and 0.81 at y 0.58) and its near edge opens
-  // toward the reader; flagging radiates from the gate, which is the ring's
-  // own centre, so the paving states the amphitheater's geometry.
+  // ---- THE PAVED DISPATCH YARD (was "the court / plaza").
+  //
+  // WAVE-2 RE-DERIVATION (S4-6). A blind reader named this the biggest single
+  // shape on the page and could not say what it was: "Road? river? paper
+  // texture? It is one of the biggest single shapes on the page and I cannot name
+  // it." The cause is not its texture, it is its GEOMETRY — and the old comment
+  // here says so out loud: "ONE continuous radial apron that all nine dovecote
+  // facades stand on... its outer arc passes through BOTH ring-MID arm feet
+  // (x 0.19 and 0.81 at y 0.58)".
+  //
+  // Every one of those nine facades was retired in round 4, along with both
+  // ring-MID arms, the gatehouse tower and the ring-FRONT gate wall. The band was
+  // the FOOTPRINT OF A COMPOSITION THAT NO LONGER STANDS ON IT — a yard shaped
+  // around buildings the reader cannot see. No amount of retuning its hatch
+  // weight could ever have named it.
+  //
+  // So it is re-cut for the seven pieces that DO stand here, their feet derived
+  // through this file's own pageFX/pageFY:
+  //     the crooked tower   image x 0.187..0.317 at y 0.700
+  //     the terraced roosts           0.683..0.817    y 0.627
+  //     the keep's front cap          0.326..0.674    y 0.727
+  //     the winch's disc              0.217..0.330    y 0.713..0.887
+  //     the sorting dial              0.713..0.809    y 0.667..0.813
+  // and it is COMMITTED TO as one nameable thing: a paved yard, radiating from
+  // the keep's gate, with a lamplit kerb a reader can point at.
+  //
+  // That last part reverses an earlier call, deliberately. Round 2 removed the
+  // continuous kerb because "a reader must never be able to point at where the
+  // ground ends" — and the price of that rule was a shape nobody could name. The
+  // kerb comes back, but as LIGHT rather than as outline: a warm lamplit line
+  // where the yard's edge catches the lamps, which is how a real kerb announces
+  // itself at night, instead of the pale hairline that made it a sticker.
   const GX = 0.5
   const GY = 0.735
-  // The plaza's ONLY drawn boundary is its far arc — its flanks and near edge
-  // run off the image, so it reads as GROUND rather than as a grey tray sitting
-  // on the page (which is what a full closed kerb looked like on first bake).
+  // The far arc now passes just UPSTAGE of the real feet — the tower's on the
+  // left, the roosts' on the right — and bows up behind the keep so the keep
+  // stands on the yard too rather than behind its edge.
   const PLAZA_FAR =
-    `M ${fx(PX(0.045))} ${fx(PY(0.665))} ` +
-    `C ${fx(PX(0.1))} ${fx(PY(0.602))} ${fx(PX(0.15))} ${fx(PY(0.586))} ${fx(PX(0.19))} ${fx(PY(0.58))} ` +
-    `C ${fx(PX(0.36))} ${fx(PY(0.523))} ${fx(PX(0.64))} ${fx(PY(0.523))} ${fx(PX(0.81))} ${fx(PY(0.58))} ` +
-    `C ${fx(PX(0.85))} ${fx(PY(0.586))} ${fx(PX(0.9))} ${fx(PY(0.602))} ${fx(PX(0.955))} ${fx(PY(0.665))}`
+    `M ${fx(PX(0.03))} ${fx(PY(0.86))} ` +
+    `C ${fx(PX(0.09))} ${fx(PY(0.78))} ${fx(PX(0.15))} ${fx(PY(0.735))} ${fx(PX(0.187))} ${fx(PY(0.712))} ` +
+    `C ${fx(PX(0.26))} ${fx(PY(0.664))} ${fx(PX(0.33))} ${fx(PY(0.606))} ${fx(PX(0.5))} ${fx(PY(0.594))} ` +
+    `C ${fx(PX(0.63))} ${fx(PY(0.585))} ${fx(PX(0.7))} ${fx(PY(0.604))} ${fx(PX(0.817))} ${fx(PY(0.638))} ` +
+    `C ${fx(PX(0.88))} ${fx(PY(0.656))} ${fx(PX(0.93))} ${fx(PY(0.7))} ${fx(PX(0.985))} ${fx(PY(0.78))}`
   const PLAZA_D = `${PLAZA_FAR} L ${fx(PX(1.03))} ${fx(PY(1.06))} L ${fx(PX(-0.03))} ${fx(PY(1.06))} Z`
   const pol = (th, rho) => [GX + Math.cos(th) * rho * 0.47, GY - Math.sin(th) * rho * 0.31]
   s += `<g clip-path="url(#plazaCut)">`
   s += `<path d="${PLAZA_D}" fill="url(#plazaFill)"/>`
   s += `<path d="${PLAZA_D}" fill="url(#plazaShade)" opacity="0.55"/>`
-  // Flagging radiating from the gate — the ring's own centre — so the paving
-  // states the amphitheater's geometry. Drawn as BROKEN joints (short dashes
-  // with gaps) because continuous spokes and full circles read as a wireframe.
-  for (let k = 0; k < 30; k++) {
-    const th = (k / 30) * Math.PI * 2 + 0.07
-    for (const [r0, r1] of [[0.2, 0.44], [0.52, 0.74], [0.82, 1.06], [1.14, 1.44]]) {
-      const [ax, ay] = pol(th, rr(r, r0, r0 + 0.05))
-      const [bx2, by2] = pol(th, rr(r, r1 - 0.05, r1))
-      s += `<line x1="${fx(PX(ax))}" y1="${fx(PY(ay))}" x2="${fx(PX(bx2))}" y2="${fx(PY(by2))}" stroke="${JOINT}" stroke-width="1.4" opacity="${op(rr(r, 0.05, 0.1))}"/>`
-    }
+  // FLAGSTONE COURSES radiating from the gate. Round 2 drew these as broken
+  // dashes at opacity 0.05-0.10 to avoid "a wireframe", and at that weight they
+  // are simply not there: a reader sees an undifferentiated wash, which is half of
+  // why the shape is unnameable. They are now real paving — CONTINUOUS concentric
+  // courses at a coarser pitch, crossed by continuous radial joints, at a weight
+  // that reads (0.13-0.22). What keeps it from being a wireframe is not
+  // faintness, it is that the courses BREAK where a course line would otherwise
+  // run through a building's foot, and that every joint is a warm stone joint
+  // rather than a drafting line.
+  for (let k = 0; k < 26; k++) {
+    const th = (k / 26) * Math.PI * 2 + 0.07
+    const [ax, ay] = pol(th, 0.24)
+    const [bx2, by2] = pol(th, 1.5)
+    s += `<line x1="${fx(PX(ax))}" y1="${fx(PY(ay))}" x2="${fx(PX(bx2))}" y2="${fx(PY(by2))}" stroke="${JOINT}" stroke-width="1.6" opacity="${op(rr(r, 0.13, 0.2))}"/>`
   }
-  for (const rho of [0.32, 0.54, 0.76, 0.98, 1.2, 1.42]) {
-    for (let seg = 0; seg < 22; seg++) {
-      const th0 = (seg / 22) * Math.PI * 2 + rr(r, 0.01, 0.05)
-      const pts = []
-      for (let k = 0; k <= 6; k++) pts.push(pol(th0 + (k / 6) * (Math.PI * 2 / 22) * 0.8, rho))
-      s += `<path d="${poly(pts)}" fill="none" stroke="${JOINT}" stroke-width="1.4" opacity="${op(rr(r, 0.05, 0.1))}"/>`
-    }
+  for (const rho of [0.34, 0.6, 0.88, 1.18, 1.5]) {
+    const pts = []
+    for (let k = 0; k <= 96; k++) pts.push(pol((k / 96) * Math.PI * 2, rho * rr(r, 0.995, 1.005)))
+    s += `<path d="${poly(pts)}" fill="none" stroke="${JOINT}" stroke-width="1.8" opacity="${op(rr(r, 0.16, 0.22))}"/>`
+  }
+  // a few stones catching the lamps outright, so the paving has grain as well as
+  // pattern (the difference between "paved" and "ruled")
+  for (let k = 0; k < 90; k++) {
+    const th = rr(r, 0, Math.PI * 2)
+    const rho = rr(r, 0.3, 1.45)
+    const [sx2, sy2] = pol(th, rho)
+    s += `<ellipse cx="${fx(PX(sx2))}" cy="${fx(PY(sy2))}" rx="${fx(PX(rr(r, 0.006, 0.014)))}" ry="${fx(PY(rr(r, 0.004, 0.008)))}" fill="${COBBLE_LIT}" opacity="${op(rr(r, 0.05, 0.13))}"/>`
   }
   s += `</g>`
-  // NO CONTINUOUS KERB. Eye-review r1 round 2: a single stroke along PLAZA_FAR ran
-  // unbroken across the whole page and, with the pale fill above, made the plaza
-  // read as an outlined oval sticker laid on the parchment — the same "grey tray"
-  // failure in the other value direction. A reader must never be able to point at
-  // where the ground ends. What remains is the graded fill plus BROKEN kerb
-  // segments only where a facade foot actually meets the arc, so the edge is
-  // implied by the architecture standing on it.
-  for (const [kx, khw] of [[0.2525, 0.062], [0.7475, 0.062]]) {
-    const seg = []
-    for (let k = 0; k <= 8; k++) {
-      const t = kx - khw + (k / 8) * khw * 2
-      // follow the far arc's own local curve (a parabola through the mid feet)
-      seg.push([t, 0.58 - 0.057 * (1 - ((t - 0.5) / 0.31) ** 2)])
-    }
-    const segD = seg.map(([a, b], i) => `${i ? 'L' : 'M'} ${fx(PX(a))} ${fx(PY(b))}`).join(' ')
-    s += `<path d="${segD}" fill="none" stroke="${JOINT}" stroke-width="2.6" opacity="0.2"/>`
-  }
+  // THE LAMPLIT KERB — the yard's edge, stated as light. One warm stroke along the
+  // far arc, brightest in the middle where the keep's own gate lamps reach it and
+  // fading out at both ends so it never closes into an outline.
+  s += `<path d="${PLAZA_FAR}" fill="none" stroke="${COBBLE_LIT}" stroke-width="4.5" opacity="0.3" stroke-linecap="round"/>`
+  s += `<path d="${PLAZA_FAR}" fill="none" stroke="${DUSK.amberLit}" stroke-width="2" opacity="0.22" stroke-linecap="round"/>`
 
   // ---- COBBLED SPURS: a SHORT paved ramp tying each facade foot to the plaza,
   // so no dovecote reads as an island. Deliberately small and quiet — at full
@@ -6147,11 +6598,13 @@ function postRoadSpread(w, h, seed) {
   // scattered among the raven shadows. The rear rim's connection to the ground is
   // the aerial-recession wash and its own lamplight pools, not paving: a far rim
   // seen across a court does not show its kerbstones.
+  // WAVE-2: re-pointed at the feet that exist. All four old entries named retired
+  // pieces, so every spur was a striped quad joining nothing to nothing.
   const SPURS = [
-    [0.2525, 0.58, 0.036], // ring-MID left arm foot (0.196-0.309)
-    [0.7475, 0.58, 0.036], // ring-MID right arm foot (0.691-0.804)
-    [0.6565, 0.753, 0.024], // gatehouse tower foot (0.630-0.683)
-    [0.2195, 0.883, 0.03], // ring-FRONT gate wall foot (0.178-0.261)
+    [0.252, 0.7, 0.04], // the crooked tower's foot (0.187-0.317)
+    [0.75, 0.627, 0.04], // the terraced roosts' foot (0.683-0.817)
+    [0.274, 0.8, 0.03], // the winch disc's station (0.217-0.330)
+    [0.761, 0.74, 0.028], // the sorting dial's station (0.713-0.809)
   ]
   for (const [sfx, sfy, hwF] of SPURS) {
     const dx = GX - sfx
@@ -6183,18 +6636,21 @@ function postRoadSpread(w, h, seed) {
   // (hub 0.60, 0.36 on the right page) and the winch's (hub 0.50, 0.30 on the
   // left), so both readers' handles sit in a warm island rather than on cold
   // ground. Positions are the layer hubs mapped through pageFX/pageFY.
+  // WAVE-2: seven of the eleven pools were registered to retired ranks (y 0.586 /
+  // 0.4 / 0.254 / 0.16), so most of the page's light fell where nothing stands and
+  // the two machines' own lamps had drifted off their hubs. Re-registered to the
+  // seven live layers' feet, graded by depth as before.
   const POOLS = [
-    { x0: 0.196, x1: 0.309, y: 0.586, n: 3, rx: 0.05, ry: 0.032, o: 1 }, // ring-MID left arm feet
-    { x0: 0.691, x1: 0.804, y: 0.586, n: 3, rx: 0.05, ry: 0.032, o: 1 }, // ring-MID right arm feet
-    { x0: 0.178, x1: 0.261, y: 0.884, n: 2, rx: 0.046, ry: 0.024, o: 0.9 }, // ring-FRONT gate wall foot
-    { x0: 0.2, x1: 0.44, y: 0.4, n: 3, rx: 0.038, ry: 0.02, o: 0.5 }, // flank-near rows
-    { x0: 0.56, x1: 0.8, y: 0.4, n: 3, rx: 0.038, ry: 0.02, o: 0.5 },
-    { x0: 0.24, x1: 0.46, y: 0.254, n: 3, rx: 0.026, ry: 0.014, o: 0.32 }, // flank-mid rows
-    { x0: 0.54, x1: 0.76, y: 0.254, n: 3, rx: 0.026, ry: 0.014, o: 0.32 },
-    { x0: 0.28, x1: 0.46, y: 0.16, n: 3, rx: 0.021, ry: 0.011, o: 0.22 }, // flank-rear rows, dimmest
-    { x0: 0.54, x1: 0.72, y: 0.16, n: 3, rx: 0.021, ry: 0.011, o: 0.22 },
-    { x0: 0.7, x1: 0.822, y: 0.74, n: 2, rx: 0.062, ry: 0.04, o: 0.88 }, // the SORTING DESK's lamp
-    { x0: 0.226, x1: 0.34, y: 0.7, n: 2, rx: 0.058, ry: 0.038, o: 0.8 }, // the WINCH corner's lamp
+    { x0: 0.187, x1: 0.317, y: 0.7, n: 3, rx: 0.05, ry: 0.032, o: 1 }, // the crooked tower's foot
+    { x0: 0.683, x1: 0.817, y: 0.627, n: 3, rx: 0.048, ry: 0.03, o: 0.92 }, // the terraced roosts' foot
+    { x0: 0.42, x1: 0.58, y: 0.727, n: 2, rx: 0.055, ry: 0.034, o: 1 }, // the keep's lit gate
+    { x0: 0.713, x1: 0.809, y: 0.74, n: 2, rx: 0.06, ry: 0.038, o: 0.88 }, // the SORTING DIAL's lamp
+    { x0: 0.217, x1: 0.33, y: 0.8, n: 2, rx: 0.058, ry: 0.038, o: 0.8 }, // the WINCH corner's lamp
+    { x0: 0.63, x1: 0.7, y: 0.94, n: 1, rx: 0.05, ry: 0.026, o: 0.85 }, // the yard wall's GATE (fringe u 0.84)
+    { x0: 0.83, x1: 0.97, y: 0.82, n: 3, rx: 0.05, ry: 0.03, o: 0.82 }, // the landing field's posts
+    { x0: 0.3, x1: 0.46, y: 0.44, n: 2, rx: 0.03, ry: 0.016, o: 0.34 }, // painted far roofs, left
+    { x0: 0.56, x1: 0.72, y: 0.42, n: 2, rx: 0.03, ry: 0.016, o: 0.34 }, // painted far roofs, right
+    { x0: 0.82, x1: 0.98, y: 0.4, n: 3, rx: 0.024, ry: 0.013, o: 0.26 }, // the far landing sheds
   ]
   for (const p of POOLS) {
     for (let k = 0; k < p.n; k++) {
@@ -6228,6 +6684,114 @@ function postRoadSpread(w, h, seed) {
     }
   }
   s += `</g>`
+
+  // ---- THE LANDING FIELD (S4-6, the void on the right).
+  //
+  // The reader's measurement: "Between the roost tower and the caption card there
+  // is nothing but a flat dark-grey plane and a tan hatched band — roughly a third
+  // of the spread's area carrying zero content. The composition is all crammed
+  // left of centre."
+  //
+  // The roosts cannot simply grow into it: a page-rooted ribbon's real-time
+  // rotation radius is capped at hypot(F + w, h*sin(stand)) <= 0.752 and the
+  // roosts already sit at F + w = 0.73, so widening them by even 0.02 puts the
+  // outboard corner past the cap. What CAN fill it is what the scene says is
+  // there — the ground the ravens land on. So the right page's outboard strip
+  // (image x 0.82..0.99) becomes the landing field: route-marker posts with lit
+  // heads, a rank of birds standing ON the paving, stacked letter crates, cart
+  // ruts running up to the roosts' foot, and a receding line of low landing sheds
+  // painted on the far band so the sky above it is not empty either.
+  //
+  // It is print, not paper — this lane is not adding a mechanism to fix a
+  // composition. But print that names what the ground is beats a grey plane, and
+  // the caption card covers the outer half of this strip anyway.
+  /** A raven standing ON the ground: body, head, tail, at image scale. */
+  const groundRaven = (cu, cv, sz, flip) => {
+    const bx = PX(cu)
+    const by = PY(cv)
+    const rx = PX(sz)
+    const ry = PY(sz * 1.15)
+    const dir = flip ? -1 : 1
+    let g = `<ellipse cx="${fx(bx)}" cy="${fx(by - ry)}" rx="${fx(rx)}" ry="${fx(ry * 0.78)}" fill="${DUSK.ink}" opacity="0.92"/>`
+    g += `<path d="M ${fx(bx + dir * rx * 0.4)} ${fx(by - ry * 1.1)} L ${fx(bx + dir * rx * 2.1)} ${fx(by - ry * 0.1)} L ${fx(bx + dir * rx * 0.3)} ${fx(by - ry * 0.2)} Z" fill="${DUSK.ink}" opacity="0.92"/>`
+    g += `<circle cx="${fx(bx - dir * rx * 0.8)}" cy="${fx(by - ry * 1.7)}" r="${fx(rx * 0.44)}" fill="${DUSK.ink}" opacity="0.92"/>`
+    g += `<path d="M ${fx(bx - dir * rx * 1.15)} ${fx(by - ry * 1.72)} L ${fx(bx - dir * rx * 1.95)} ${fx(by - ry * 1.5)} L ${fx(bx - dir * rx * 1.1)} ${fx(by - ry * 1.42)} Z" fill="${DUSK.ink}" opacity="0.92"/>`
+    // two legs, so it is standing on the yard rather than floating over it
+    for (const lo of [-0.3, 0.3]) {
+      g += `<line x1="${fx(bx + rx * lo)}" y1="${fx(by - ry * 0.5)}" x2="${fx(bx + rx * lo)}" y2="${fx(by)}" stroke="${DUSK.ink}" stroke-width="1.6" opacity="0.85"/>`
+    }
+    return g
+  }
+  s += `<g clip-path="url(#plazaCut)">`
+  // cart ruts curving off the roosts' foot toward the fore edge
+  for (const off of [-0.014, 0.014]) {
+    s += `<path d="M ${fx(PX(0.79 + off))} ${fx(PY(0.64))} C ${fx(PX(0.86 + off))} ${fx(PY(0.74))} ${fx(PX(0.9 + off))} ${fx(PY(0.86))} ${fx(PX(0.93 + off))} ${fx(PY(1.0))}" fill="none" stroke="${ROADBED}" stroke-width="5" opacity="0.4"/>`
+    s += `<path d="M ${fx(PX(0.79 + off))} ${fx(PY(0.64))} C ${fx(PX(0.86 + off))} ${fx(PY(0.74))} ${fx(PX(0.9 + off))} ${fx(PY(0.86))} ${fx(PX(0.93 + off))} ${fx(PY(1.0))}" fill="none" stroke="${COBBLE_LIT}" stroke-width="1.6" opacity="0.18"/>`
+  }
+  s += `</g>`
+  // A LOW LANDING SHED — the field needs one built thing in it, or the posts and
+  // birds read as litter on an empty plane. Painted, small, and firmly on the
+  // paving: a shingled lean-to with a lit doorway and a raven on its ridge.
+  {
+    const su = 0.878
+    const sv = 0.716
+    const sw = 0.108
+    const sh2 = 0.072
+    const x0s = PX(su)
+    const y0s = PY(sv)
+    const wS = PX(sw)
+    const hS = PY(sv) - PY(sv - sh2)
+    s += `<ellipse cx="${fx(x0s + wS / 2)}" cy="${fx(y0s)}" rx="${fx(wS * 0.8)}" ry="${fx(hS * 0.3)}" fill="url(#pagePool)" opacity="0.7"/>`
+    s += `<rect x="${fx(x0s)}" y="${fx(y0s - hS * 0.62)}" width="${fx(wS)}" height="${fx(hS * 0.62)}" fill="${DUSK.slate}" opacity="0.96"/>`
+    // shingled lean-to roof, pitched away from the reader
+    s += `<path d="M ${fx(x0s - wS * 0.08)} ${fx(y0s - hS * 0.6)} L ${fx(x0s + wS * 0.46)} ${fx(y0s - hS)} L ${fx(x0s + wS * 1.08)} ${fx(y0s - hS * 0.6)} Z" fill="${DUSK.slateDim}" opacity="0.96"/>`
+    s += `<path d="M ${fx(x0s - wS * 0.08)} ${fx(y0s - hS * 0.6)} L ${fx(x0s + wS * 0.46)} ${fx(y0s - hS)} L ${fx(x0s + wS * 1.08)} ${fx(y0s - hS * 0.6)} Z" fill="none" stroke="${DUSK.slateLit}" stroke-width="2" opacity="0.5"/>`
+    // the lit doorway: the warmest thing on the landing field
+    s += `<rect x="${fx(x0s + wS * 0.34)}" y="${fx(y0s - hS * 0.5)}" width="${fx(wS * 0.28)}" height="${fx(hS * 0.5)}" fill="url(#rookGlow)"/>`
+    s += `<rect x="${fx(x0s + wS * 0.4)}" y="${fx(y0s - hS * 0.42)}" width="${fx(wS * 0.16)}" height="${fx(hS * 0.42)}" fill="${DUSK.amberCore}" opacity="0.85"/>`
+    // two shuttered roost hatches either side of the door
+    for (const hu of [0.1, 0.72]) {
+      s += `<rect x="${fx(x0s + wS * hu)}" y="${fx(y0s - hS * 0.46)}" width="${fx(wS * 0.16)}" height="${fx(hS * 0.2)}" fill="${DUSK.amberDeep}" opacity="0.9"/>`
+      s += `<rect x="${fx(x0s + wS * hu)}" y="${fx(y0s - hS * 0.46)}" width="${fx(wS * 0.16)}" height="${fx(Math.max(2, hS * 0.05))}" fill="${DUSK.parchDim}" opacity="0.6"/>`
+    }
+    s += groundRaven(su + sw * 0.46, sv - sh2 * 1.0, 0.014, false)
+  }
+  // three route-marker posts, each a lit head over a painted board. Sizes doubled
+  // from the first pass: at 1x the field's marks came out as a scatter of specks,
+  // which reads as noise on a grey plane rather than as a place.
+  for (const [mu, mv, ms] of [[0.836, 0.665, 0.05], [0.912, 0.812, 0.062], [0.958, 0.93, 0.07]]) {
+    s += `<ellipse cx="${fx(PX(mu))}" cy="${fx(PY(mv))}" rx="${fx(PX(ms * 1.5))}" ry="${fx(PY(ms * 0.8))}" fill="url(#pagePool)" opacity="0.6"/>`
+    s += `<rect x="${fx(PX(mu) - 2)}" y="${fx(PY(mv - ms * 2.1))}" width="4" height="${fx(PY(mv) - PY(mv - ms * 2.1))}" fill="${DUSK.slateDeep}" opacity="0.9"/>`
+    s += `<rect x="${fx(PX(mu - ms * 0.5))}" y="${fx(PY(mv - ms * 1.5))}" width="${fx(PX(ms))}" height="${fx(PY(mv) - PY(mv - ms * 0.42))}" fill="${DUSK.parchDim}" opacity="0.8"/>`
+    s += `<rect x="${fx(PX(mu - ms * 0.26))}" y="${fx(PY(mv - ms * 2.3))}" width="${fx(PX(ms * 0.52))}" height="${fx(PY(mv) - PY(mv - ms * 0.34))}" fill="${DUSK.amberCore}" opacity="0.9"/>`
+  }
+  // the standing rank: the ravens that have already landed
+  for (const [gu, gv, gs, gf] of [
+    [0.836, 0.79, 0.015, false], [0.868, 0.806, 0.016, false], [0.898, 0.786, 0.014, true],
+    [0.934, 0.816, 0.017, false], [0.966, 0.834, 0.018, true],
+    [0.856, 0.902, 0.021, false], [0.9, 0.928, 0.023, true], [0.948, 0.958, 0.025, false],
+  ]) {
+    s += groundRaven(gu, gv, gs, gf)
+  }
+  // stacked letter crates by the near post
+  for (const [cu2, cv2, cw2, ch2] of [[0.816, 0.878, 0.042, 0.03], [0.822, 0.912, 0.036, 0.026], [0.86, 0.958, 0.046, 0.034]]) {
+    const x0c = PX(cu2)
+    const y0c = PY(cv2)
+    const wc = PX(cw2)
+    const hc = PY(cv2) - PY(cv2 - ch2)
+    s += `<rect x="${fx(x0c)}" y="${fx(y0c - hc)}" width="${fx(wc)}" height="${fx(hc)}" fill="${LEATHER_DIM}" opacity="0.85"/>`
+    s += `<rect x="${fx(x0c)}" y="${fx(y0c - hc)}" width="${fx(wc)}" height="${fx(Math.max(2, hc * 0.22))}" fill="${LEATHER_LIT}" opacity="0.5"/>`
+    s += `<line x1="${fx(x0c)}" y1="${fx(y0c - hc)}" x2="${fx(x0c + wc)}" y2="${fx(y0c)}" stroke="${JOINT}" stroke-width="1.4" opacity="0.4"/>`
+  }
+  // the far landing sheds: a receding roofline on the storm band, dim lit slits,
+  // so the sky over the landing field carries recession instead of nothing
+  for (let k = 0; k < 7; k++) {
+    const su = 0.8 + k * 0.029
+    const sh = 0.026 - k * 0.0018
+    const y0s = PY(0.44)
+    s += `<path d="M ${fx(PX(su))} ${fx(y0s)} L ${fx(PX(su))} ${fx(y0s - PY(0.44) + PY(0.44 - sh))} L ${fx(PX(su + 0.014))} ${fx(y0s - PY(0.44) + PY(0.44 - sh * 1.35))} L ${fx(PX(su + 0.028))} ${fx(y0s - PY(0.44) + PY(0.44 - sh))} L ${fx(PX(su + 0.028))} ${fx(y0s)} Z" fill="${DUSK.slateDim}" opacity="${op(0.5 - k * 0.05)}"/>`
+    s += `<rect x="${fx(PX(su + 0.009))}" y="${fx(y0s - (PY(0.44) - PY(0.44 - sh * 0.55)))}" width="${fx(PX(0.007))}" height="${fx(Math.max(2, (PY(0.44) - PY(0.44 - sh * 0.3))))}" fill="${DUSK.amberLit}" opacity="${op(0.5 - k * 0.055)}"/>`
+  }
 
   // ---- THE POST-ROAD, NOW A LAMPLIT RIBBON. Round 1 read the road correctly as
   // "the strongest value contrast on the page" and delivered it as a DARK band
@@ -6375,6 +6939,933 @@ function postRoadSpread(w, h, seed) {
     `<stop offset="1" stop-color="${NIGHT_DEEP}" stop-opacity="0.62"/></radialGradient>`
 
   return svgPiece(w, h, s, defs)
+}
+
+// ============================================================================
+// E3 s4 WAVE-2 — THE TOWER-HOIST WINCH AND ITS DISPATCH DESK
+// (ch3-keep-winch-{disc,mast,semaphore,iris,counterweight}, ch3-keep-balcony).
+//
+// Six pieces that arrived in E1 as hand-delivered PNG placeholders and were
+// never painted: prepare-art had been feeding them out of public/labs/storybook/
+// art-src/, a directory that no longer exists, so its pass over them had quietly
+// become a no-op and the webps on disk WERE the placeholders. A blind first-time
+// reader cranked the winch and named the damage exactly. The DISPATCH BOARDS —
+// the object the chapter's own narration is about ("he was set over the great
+// dispatch boards") — read as "four featureless grey slabs poking out of a roof
+// ... at 1x they read as construction scaffolding". The DISPATCH DESK, the
+// narrative centrepiece, read as "a gold crescent with a white smear in it". And
+// the wheel the whole machine hangs off "carries no label of any kind", so the
+// discovery of the one interactive object on the spread was "pure luck".
+//
+// Both art verdicts are the same failure twice: the pieces were composed for a
+// 3x inspection and the reader is on a normal monitor. So the rule these six are
+// painted to is 1x FIRST — fewer objects, bigger, separated by VALUE rather than
+// by line, because a downscale keeps value and throws linework away. Each piece
+// below was baked, resampled to the screen size its own mesh projects, and
+// LOOKED AT before it shipped; where a detail could not survive that it was
+// enlarged or deleted rather than kept for the inspector.
+//
+// *** THE UV CONTRACTS ***
+// Derived from popup-keepwinch.ts / popup-keepstack.ts and the uv tables in the
+// layers that draw them. Getting one of these backwards pins a board's route
+// slips upside down, which is precisely the class of bug this block records.
+//
+//  ch3-keep-winch-disc — keepWinchDiscQuad, identity uvs over the corner order
+//    [(-R,-R), (R,-R), (R,R), (-R,R)] in the disc's own in-plane frame. Square,
+//    side 2*discR = 0.26 -> ASPECT 1.000. art-u runs along the page-fore axis,
+//    art-v along the spine (+z). The disc SPINS with the reader's drag through
+//    a full 368deg wind, so no rotation is privileged: everything on it is
+//    either radial or struck TWICE at opposite stations.
+//
+//  ch3-keep-winch-mast — keepWinchMastQuad, identity uvs, corners [foot-L,
+//    foot-R, head-R, head-L]. art-u runs ACROSS the post; art-v runs from the
+//    FOOT (0) to the HEAD (1), and with three's default flipY art-v 1 is the
+//    image TOP — so the foot collar is painted at the image BOTTOM and the
+//    pulley head at the TOP. Width 2*armHalfW = 0.039 over the run baseX -
+//    (mastFootX + MAST_FOOT_SEAM) = 1.05 - 0.5468 = 0.5032 -> ASPECT 0.0775.
+//    (The seam ply is included on purpose: it is the quad the solver actually
+//    poses, not the nominal foot station.)
+//
+//  ch3-keep-winch-semaphore — keepWinchSemaphoreQuad, identity uvs, corners
+//    [base-(-y), base-(+y), tip-(+y), tip-(-y)]. art-v runs PIVOT (0) -> TIP
+//    (1), so under flipY the pivot collar is the image BOTTOM and the flag's
+//    free end the image TOP. Width 2*armHalfW = 0.039 over armLen 0.1287 ->
+//    ASPECT 0.3030 (exactly 10/33, so the canvas is 200x660). art-u runs toward
+//    reader-LEFT, i.e. mirrored against the screen — which is why the flag's
+//    device is a symmetric bird and not lettering.
+//
+//  ch3-keep-winch-iris — keepWinchIrisQuads, identity uvs, corners [hinge-low,
+//    hinge-high, free-high, free-low] where "low/high" are the r-stations up the
+//    loft wall. So art-u runs UP THE WALL ALONG THE HINGE (image-x, left = the
+//    board's world-BOTTOM rail, right = its world-TOP rail) and art-v runs OUT
+//    from the hinge — flipY putting the HINGED EDGE at the image BOTTOM and the
+//    free edge at the image TOP. The board is therefore painted A QUARTER TURN
+//    OVER: world-up is image-RIGHT, and anything that must stand upright in the
+//    world (the perched raven, the chalked legend) is drawn in a rotate(90)
+//    group. Hinge span (IRIS_R_HI - IRIS_R_LO) * loft height = 0.56 * 0.18 =
+//    0.1008 against bladeLen 0.10 -> ASPECT 1.008 (= 126/125, canvas 630x625).
+//
+//  ch3-keep-winch-counterweight — keepWinchCounterweightDeck, printed as ONE
+//    image across the loft cap crease by COUNTERWEIGHT_DECK_UVS: art-u 0.5 at
+//    the crease fanning to 0 on the reader-LEFT half and 1 on the right, art-v 0
+//    at the block's bottom -> 1 at its top. So the crease is the image's
+//    vertical centreline and the weight is painted upright. Block 2*CW_BW x
+//    2*CW_BH = 0.0506 x 0.08 -> ASPECT 0.6325 (canvas 405x640).
+//
+//  ch3-keep-balcony — keepStackBalconyDeck + BALCONY_DECK_UVS. Each half-deck is
+//    [seam-z0, seam-z1, outer-z1, outer-z0]; art-u is 0.5 at the seam fanning to
+//    0 (deckL, reader LEFT) / 1 (deckR), and art-v is 1 at z0 and 0 at z1, so
+//    under flipY the image TOP is the far edge against the keep facade and the
+//    image BOTTOM is the front rail jutting toward the reader. A plan view, and
+//    displayed with image-up as screen-up, so lettering on it reads normally.
+//    THE ASPECT IS THE FULL DECK, not one half: art-u spans both halves, i.e.
+//    2*halfW = 0.52 across against the z-span z1 - z0 = 0.28 deep -> ASPECT
+//    1.857 (= 13/7 exactly, canvas 910x490). The call sheet's inherited "~1.7:1"
+//    is WRONG — it predates the E1.5 grow of the balcony to halfW 0.26 / z
+//    0.30..0.58 and was never re-derived; the row is corrected with this bake.
+// ============================================================================
+
+/** Opacity formatter for this block. `fx` rounds to one decimal, which turns
+ *  every opacity under 0.05 into the string "0.0" — fine for pixels, fatal for
+ *  a wash. (Same reason postRoadSpread carries its own.) */
+const fxOp = (n) => Math.max(0, Math.min(1, n)).toFixed(2)
+
+// The winch is IRONWORK where the keep is stone, so it needs two tones the DUSK
+// stone ladder does not carry: cast iron reads colder and darker than DUSK.ink's
+// blue-black, and a ground bevel on a casting catches the roost lamps as bare
+// steel rather than as parchment. Everything else on these pieces comes out of
+// DUSK / GOLD, so the winch still belongs to the rookery's palette.
+const WINCH_IRON = '#151a21'
+const WINCH_IRON_LIT = '#39424f'
+const WINCH_BEVEL = '#8e99a6'
+// And the dispatch boards are TIMBER, not slate — a board that route slips are
+// pinned to is oak, and at dispatch hour the roost-glow rakes across it warm.
+// Two walnut-dark browns, so the cream slips have wood to sit on instead of the
+// same blue-grey the loft wall behind them is cut from.
+const BOARD_OAK = '#221b12'
+const BOARD_BATTEN = '#3a2e1d'
+
+/** A PERCHED corvid, in a canonical frame: feet on the local line y=0, standing
+ *  UP (-y), facing -x, overall height ~1.06*S and length ~2.0*S. Solid ink with
+ *  a wing sheen and a pale eye.
+ *
+ *  Distinct from the two raven helpers already here, on purpose: `miniRaven` is
+ *  a bird in FLIGHT (wings spread, for the dial's sigils) and `RAVEN_PROFILE` is
+ *  a rank's top CONTOUR (for ravenChainTop's linked chain). Neither is a single
+ *  bird standing on a rail, which is what the dispatch board needs — and needs
+ *  at a size where only the silhouette survives, so this shape spends all its
+ *  vocabulary on the four cues that make a corvid a corvid: a heavy wedge beak,
+ *  a domed crown, a deep breast, and a long wedge tail. */
+function perchedRaven(S, body = DUSK.ink, sheen = DUSK.slateLit) {
+  const P = (x, y) => `${fx(S * x)} ${fx(S * y)}`
+  const d =
+    `M ${P(-0.9, -0.84)}` + // beak tip
+    ` L ${P(-0.48, -0.95)}` + // beak root, upper mandible
+    ` Q ${P(-0.24, -1.06)} ${P(-0.02, -0.97)}` + // domed crown
+    ` Q ${P(0.16, -0.9)} ${P(0.34, -0.78)}` + // nape into the back
+    ` Q ${P(0.66, -0.57)} ${P(0.88, -0.45)}` + // the back's long fall to the tail
+    ` L ${P(1.18, -0.36)} L ${P(0.99, -0.25)}` + // upper tail vane + the notch
+    ` L ${P(1.12, -0.13)} L ${P(0.7, -0.17)}` + // lower vane back to the vent
+    ` Q ${P(0.34, -0.17)} ${P(0.1, -0.31)}` + // belly
+    ` Q ${P(-0.16, -0.46)} ${P(-0.32, -0.67)}` + // deep breast into the throat
+    ` L ${P(-0.5, -0.77)} Z` // chin, closing on the beak
+  let s = ''
+  // legs first, so the body prints over their tops and the bird reads as
+  // standing ON the rail rather than balanced above it
+  for (const lx of [0.06, 0.3]) {
+    s += `<rect x="${fx(S * (lx - 0.03))}" y="${fx(-S * 0.3)}" width="${fx(S * 0.06)}" height="${fx(S * 0.3)}" fill="${body}"/>`
+    s += `<rect x="${fx(S * (lx - 0.1))}" y="${fx(-S * 0.05)}" width="${fx(S * 0.2)}" height="${fx(S * 0.05)}" fill="${body}"/>`
+  }
+  s += `<path d="${d}" fill="${body}"/>`
+  s += `<path d="M ${P(-0.02, -0.62)} Q ${P(0.36, -0.52)} ${P(0.82, -0.4)}" fill="none" stroke="${sheen}" stroke-width="${fx(Math.max(1.4, S * 0.035))}" opacity="0.5"/>`
+  s += `<circle cx="${fx(-S * 0.34)}" cy="${fx(-S * 0.87)}" r="${fx(Math.max(1.2, S * 0.055))}" fill="${DUSK.amberLit}" opacity="0.9"/>`
+  s += `<path d="${d}" fill="none" stroke="${DUSK.rim}" stroke-width="${fx(Math.max(1, S * 0.022))}" opacity="0.3" stroke-linejoin="round"/>`
+  return s
+}
+
+/** A ROUTE SLIP pinned to a board: a cream chit at a small cant with two or
+ *  three ruled ink strokes standing in for a clerk's hand and a brass pin dot at
+ *  its head. `wPx`/`hPx` are the slip's own box; the cant is passed in so the
+ *  caller (not the PRNG) owns the rank's rhythm. Drawn about its own centre so
+ *  the rotation never walks it off the board. */
+function routeSlip(cx, cy, wPx, hPx, cant, rand, sealed) {
+  const x0 = -wPx / 2
+  const y0 = -hPx / 2
+  let s = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(cant)})">`
+  // the chit's own drop shadow — the one thing that keeps six pale rectangles
+  // from flattening into one pale field when the piece is downscaled
+  s += `<rect x="${fx(x0 + hPx * 0.07)}" y="${fx(y0 + hPx * 0.09)}" width="${fx(wPx)}" height="${fx(hPx)}" fill="${DUSK.ink}" opacity="0.55"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(wPx)}" height="${fx(hPx)}" fill="${DUSK.parchLit}"/>`
+  // a warm lower half: the roost-glow rakes the board from the hinge side, so
+  // the slips are lit unevenly and read as paper rather than as white tiles
+  s += `<rect x="${fx(x0)}" y="${fx(y0 + hPx * 0.52)}" width="${fx(wPx)}" height="${fx(hPx * 0.48)}" fill="${DUSK.parch}" opacity="0.85"/>`
+  // ruled strokes. The slip is world-PORTRAIT (its long axis runs up the wall =
+  // image x), so a clerk's lines run across it as short image-VERTICAL strokes.
+  const rules = 3
+  for (let i = 0; i < rules; i++) {
+    const rx = x0 + wPx * (0.26 + 0.24 * i)
+    const inset = hPx * (0.14 + rand() * 0.12)
+    s += `<line x1="${fx(rx)}" y1="${fx(y0 + inset)}" x2="${fx(rx)}" y2="${fx(y0 + hPx - inset)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(2, wPx * 0.05))}" opacity="0.8"/>`
+  }
+  if (sealed) {
+    // a folded, sealed chit: a wax blob over the fold, big enough to survive
+    const sr = Math.min(wPx, hPx) * 0.28
+    s += `<circle cx="${fx(x0 + wPx * 0.72)}" cy="${fx(y0 + hPx * 0.5)}" r="${fx(sr)}" fill="${SEAL_RED}"/>`
+    s += `<circle cx="${fx(x0 + wPx * 0.68)}" cy="${fx(y0 + hPx * 0.42)}" r="${fx(sr * 0.5)}" fill="${SEAL_RED_LIT}" opacity="0.75"/>`
+  }
+  // the brass pin at the head of the slip
+  s += `<circle cx="${fx(x0 + wPx * 0.1)}" cy="${fx(y0 + hPx * 0.5)}" r="${fx(Math.max(2.4, wPx * 0.075))}" fill="${GOLD_LIT}"/>`
+  s += `<circle cx="${fx(x0 + wPx * 0.1)}" cy="${fx(y0 + hPx * 0.5)}" r="${fx(Math.max(2.4, wPx * 0.075))}" fill="none" stroke="${DUSK.ink}" stroke-width="1.4" opacity="0.7"/>`
+  s += `</g>`
+  return s
+}
+
+// ---- A) THE DISPATCH BOARD (`ch3-keep-winch-iris`, one board printed on all
+// four shutters). The chapter's namesake object, and the payoff of the reader's
+// first turn of the crank — so the ONE thing it must not read as is a plank.
+// A near-square oak board (aspect 1.008) hinged on its lower image edge: iron
+// hinge straps and a batten frame, SEVEN pinned route slips big enough to be
+// separate chits at 1x, two of them wax-sealed, a chalked POST legend on a slate
+// let into the bottom rail, and a raven a quarter of the board tall perched on
+// the upper batten. Painted a quarter turn over per the UV contract above.
+//
+// The U-BUDGET is the whole layout, and it is tight enough to be worth writing
+// down: the legend's slate takes U 0.03..0.16 (the word runs along O, so its cap
+// height eats U), the pinned rank takes three columns over U 0.205..0.695, the
+// perch batten sits at U 0.73 and the bird stands from there to U 0.99. Every one
+// of those bands was pushed apart after a 1x bake showed a slip lying across the
+// slate and the chalked word hanging off the canvas entirely. ----
+function dispatchBoard(w, h, seed) {
+  const r = mulberry32(seed)
+  // Board space: U up the wall along the hinge (-> image x), O out from the
+  // hinge (-> image y, inverted by flipY, so O=0 is the image bottom edge).
+  const X = (u) => u * w
+  const Y = (o) => (1 - o) * h
+  // A quarter-turn group for anything that must stand upright IN THE WORLD.
+  // rotate(90) maps local (x,y) -> (-y, x), so local UP (-y) lands on image +x =
+  // up the wall, and the local advance (+x) runs toward the hinge. The two loft
+  // walls carry mirrored outward normals, so on one of them that advance reads
+  // right-to-left on screen — which is why the chalked legend is one short word
+  // and never a sentence.
+  const upright = (u, o) => `<g transform="translate(${fx(X(u))} ${fx(Y(o))}) rotate(90)">`
+
+  const pad = Math.max(4, w * 0.012)
+  const die = `M ${fx(pad)} ${fx(pad)} L ${fx(w - pad)} ${fx(pad)} L ${fx(w - pad)} ${fx(h - pad)} L ${fx(pad)} ${fx(h - pad)} Z`
+  const fbU = w * 0.075 // batten frame width along U
+  const fbO = h * 0.075 // ... and along O
+  const fx0 = pad + fbU
+  const fy0 = pad + fbO
+  const fw = w - 2 * fx0
+  const fh = h - 2 * fy0
+
+  const defs =
+    // the roost-glow rakes OUT of the loft mouth, i.e. from the hinge edge (the
+    // image bottom) across the board's face and off its free edge
+    `<linearGradient id="boardRake" x1="0" y1="1" x2="0.18" y2="0">` +
+    `<stop offset="0" stop-color="${DUSK.amberLit}" stop-opacity="0.42"/>` +
+    `<stop offset="0.42" stop-color="${DUSK.amber}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0.34"/></linearGradient>` +
+    // A genuinely SOFT pool, which the transparent pieces in this chapter are not
+    // allowed (see warmBloom's note: alphaTest plus the grain floor turn a wide
+    // falloff into a grey disc hanging in the air). The board is an opaque plank,
+    // so the reason does not apply — and the first bake proved the point from the
+    // other side: warmBloom's stepped rings printed as three visible hard discs
+    // on solid wood, which is exactly the sticker the helper exists to avoid.
+    `<radialGradient id="boardPool" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${DUSK.amberLit}" stop-opacity="0.34"/>` +
+    `<stop offset="0.4" stop-color="${DUSK.amber}" stop-opacity="0.17"/>` +
+    `<stop offset="0.74" stop-color="${DUSK.amber}" stop-opacity="0.05"/>` +
+    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>`
+
+  let s = `<g>`
+  // the board carcass, then the recessed field the slips are pinned into
+  s += `<path d="${die}" fill="${BOARD_BATTEN}"/>`
+  s += `<rect x="${fx(fx0)}" y="${fx(fy0)}" width="${fx(fw)}" height="${fx(fh)}" fill="${BOARD_OAK}"/>`
+  // plank seams running out from the hinge (lines of constant O), offset from the
+  // slip rows so they read as boarding rather than as shelves under the chits
+  for (const o of [0.2, 0.44, 0.7, 0.9]) {
+    s += `<line x1="${fx(fx0)}" y1="${fx(Y(o))}" x2="${fx(fx0 + fw)}" y2="${fx(Y(o))}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.008)}" opacity="0.7"/>`
+    s += `<line x1="${fx(fx0)}" y1="${fx(Y(o) + w * 0.008)}" x2="${fx(fx0 + fw)}" y2="${fx(Y(o) + w * 0.008)}" stroke="${BOARD_BATTEN}" stroke-width="${fx(w * 0.005)}" opacity="0.6"/>`
+  }
+  s += `<rect x="${fx(fx0)}" y="${fx(fy0)}" width="${fx(fw)}" height="${fx(fh)}" fill="url(#boardRake)"/>`
+  // two lamp pools where the roost mouth's light actually lands on the board
+  for (const [pu, po, pr] of [
+    [0.34, 0.08, 0.3],
+    [0.86, 0.06, 0.24],
+  ]) {
+    s += `<ellipse cx="${fx(X(pu))}" cy="${fx(Y(po))}" rx="${fx(h * pr)}" ry="${fx(h * pr * 0.9)}" fill="url(#boardPool)"/>`
+  }
+
+  // ---- the hinge. A dark seat band along the image bottom, four iron straps
+  // stepping up the hinge, each with a pintle knuckle at its root.
+  s += `<rect x="${fx(pad)}" y="${fx(Y(0.055))}" width="${fx(w - 2 * pad)}" height="${fx(h * 0.055 - pad)}" fill="${WINCH_IRON}" opacity="0.9"/>`
+  for (const u of [0.12, 0.4, 0.68, 0.92]) {
+    const sw = w * 0.055
+    const x0 = X(u) - sw / 2
+    s += `<path d="M ${fx(x0)} ${fx(Y(0.0))} L ${fx(x0 + sw)} ${fx(Y(0.0))} L ${fx(x0 + sw * 0.62)} ${fx(Y(0.17))} L ${fx(x0 + sw * 0.38)} ${fx(Y(0.17))} Z" fill="${WINCH_IRON}"/>`
+    s += `<line x1="${fx(x0 + sw * 0.28)}" y1="${fx(Y(0.02))}" x2="${fx(x0 + sw * 0.42)}" y2="${fx(Y(0.155))}" stroke="${WINCH_BEVEL}" stroke-width="${fx(w * 0.006)}" opacity="0.45"/>`
+    s += `<circle cx="${fx(X(u))}" cy="${fx(Y(0.028))}" r="${fx(w * 0.032)}" fill="${WINCH_IRON_LIT}"/>`
+    s += `<circle cx="${fx(X(u))}" cy="${fx(Y(0.028))}" r="${fx(w * 0.032)}" fill="none" stroke="${WINCH_IRON}" stroke-width="${fx(w * 0.012)}"/>`
+    s += `<circle cx="${fx(X(u) - w * 0.011)}" cy="${fx(Y(0.034))}" r="${fx(w * 0.011)}" fill="${WINCH_BEVEL}" opacity="0.55"/>`
+  }
+
+  // ---- the CHALKED LEGEND, on a slate let into the board's world-BOTTOM rail.
+  // The word runs along O (a chalked word reads horizontally in the WORLD, and
+  // world-horizontal on this board is the out-from-hinge axis), so its cap height
+  // is what costs U — and `engraveWord`'s glyphs grow along local +y, which the
+  // quarter turn sends toward DECREASING U. That is why the anchor sits at the
+  // TOP of the slate's U band and not at its foot: the first bake anchored at
+  // U 0.035 and put every letter off the left edge of the canvas.
+  const cw = h * 0.075
+  const ch = w * 0.085
+  const gap = h * 0.022
+  const legendO = 0.21
+  const legendLen = 4 * cw + 3 * gap
+  const legendU = 0.16
+  s += `<rect x="${fx(X(0.03))}" y="${fx(Y(legendO + legendLen / h))}" width="${fx(X(legendU) - X(0.03) + ch * 0.2)}" height="${fx(legendLen)}" fill="${DUSK.slateDim}" opacity="0.95"/>`
+  s += `<rect x="${fx(X(0.03))}" y="${fx(Y(legendO + legendLen / h))}" width="${fx(X(legendU) - X(0.03) + ch * 0.2)}" height="${fx(legendLen)}" fill="none" stroke="${GOLD_DIM}" stroke-width="${fx(w * 0.008)}" opacity="0.8"/>`
+  s += upright(legendU, legendO + legendLen / h)
+  s += engraveWord('POST', 0, ch * 0.2 + 2.4, cw, ch, gap, DUSK.ink, Math.max(3, w * 0.014), 'opacity="0.75"')
+  s += engraveWord('POST', 0, ch * 0.2, cw, ch, gap, DUSK.parchLit, Math.max(3, w * 0.013), 'opacity="0.95"')
+  s += `</g>`
+
+  // ---- the pinned rank. SEVEN slips, each ~15% of the board's short side: at the
+  // ~40-56 screen px the mesh projects that is a 6-8px chit, which is the smallest
+  // mark that still reads as a SEPARATE piece of paper rather than as speckle. The
+  // stations are AUTHORED rather than looped, so the rank has a rhythm (two full
+  // courses and one lone late slip out by the free edge) instead of a grid.
+  const slipU = w * 0.15
+  const slipO = h * 0.125
+  const pinned = [
+    [0.28, 0.3, false],
+    [0.45, 0.32, false],
+    [0.62, 0.29, true],
+    [0.28, 0.56, true],
+    [0.45, 0.54, false],
+    [0.62, 0.57, false],
+    [0.45, 0.81, false],
+  ]
+  for (const [u, o, sealed] of pinned) {
+    s += routeSlip(X(u), Y(o), slipU, slipO, rr(r, -8, 8), r, sealed)
+  }
+
+  // ---- the raven. It perches on the UPPER batten and stands a quarter of the
+  // board's height, which is the whole point: at 1x a bird drawn "to scale" is a
+  // four-pixel smudge, and a four-pixel smudge is what the reader called
+  // scaffolding. Its warm ground goes down first, so a black bird has something
+  // to be black against.
+  const perchU = 0.73
+  s += `<rect x="${fx(X(perchU) - w * 0.02)}" y="${fx(fy0)}" width="${fx(w * 0.04)}" height="${fx(fh)}" fill="${BOARD_BATTEN}"/>`
+  s += `<rect x="${fx(X(perchU) + w * 0.014)}" y="${fx(fy0)}" width="${fx(w * 0.008)}" height="${fx(fh)}" fill="${DUSK.parchDim}" opacity="0.6"/>`
+  s += `<ellipse cx="${fx(X(0.86))}" cy="${fx(Y(0.56))}" rx="${fx(w * 0.2)}" ry="${fx(h * 0.3)}" fill="url(#boardPool)"/>`
+  s += upright(perchU, 0.6)
+  s += perchedRaven(w * 0.245)
+  s += `</g>`
+
+  // ---- the frame's own light: a lit arris on the batten toward the roost mouth
+  // and an inked one on the free edge, so the board reads as a thick object.
+  s += `<rect x="${fx(pad)}" y="${fx(h - pad - fbO * 0.34)}" width="${fx(w - 2 * pad)}" height="${fx(fbO * 0.34)}" fill="${DUSK.amberLit}" opacity="0.3"/>`
+  s += `<rect x="${fx(pad)}" y="${fx(pad)}" width="${fx(w - 2 * pad)}" height="${fx(fbO * 0.4)}" fill="${DUSK.ink}" opacity="0.45"/>`
+  s += `</g>`
+  return svgPiece(w, h, s + rookRim(die, 6), defs)
+}
+
+// ---- B) THE DISPATCH DESK (`ch3-keep-balcony`), the balcony deck seen from
+// above and the spread's narrative centrepiece: "the single object that says
+// 'this man ran the message desk'". It projects roughly 200x110 screen px, so it
+// is composed of five things and no more — a brass counter with a dark inset
+// writing bed, ONE open ledger straddling the spine crease, TWO quills as long
+// pale diagonals, TWO inkwells, and THREE wax-sealed letters — plus one candle
+// to explain why the desk is the brightest warm island on the whole tier.
+//
+// The ledger's GUTTER is laid exactly ON the crease, which looks like the one
+// thing the split-art rule forbids and is in fact the strongest form of obeying
+// it: the two half-decks part by BALCONY_LIFT*cos(beta/2) at mid-turn, and the
+// only place that hairline can appear without damage is inside a feature which
+// is already a dark line. Nothing else critical crosses x = w/2. ----
+function dispatchDesk(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+
+  const defs =
+    `<linearGradient id="deskBrass" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${GOLD_DIM}"/><stop offset="0.42" stop-color="${GOLD}"/>` +
+    `<stop offset="1" stop-color="${GOLD_LIT}"/></linearGradient>` +
+    `<radialGradient id="deskPool" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${DUSK.amberCore}" stop-opacity="0.5"/>` +
+    `<stop offset="0.38" stop-color="${DUSK.amberLit}" stop-opacity="0.26"/>` +
+    `<stop offset="0.72" stop-color="${DUSK.amber}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>` +
+    // OUTBOARD FALL-OFF. The deck is lit by the one candle standing on it, so its
+    // far ends should be leaving the light — and the board capture showed it
+    // reading uniformly bright right out to both tips, which is what makes a deck
+    // look like a decal laid on the tier instead of a plane receding from a lamp.
+    // Symmetric about the crease (each half-deck is the mirror of the other), so
+    // this darkens BOTH outboard ends and leaves the middle untouched.
+    // Held to 0.38 at the tips with a wide flat middle: enough to bend the plane
+    // away from the lamp, not enough to mute the nameplate that sits partway out
+    // on the right, or to swallow the outboard inkwell and letter.
+    `<linearGradient id="deckEnds" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${DUSK.ink}" stop-opacity="0.38"/>` +
+    `<stop offset="0.14" stop-color="${DUSK.ink}" stop-opacity="0.14"/>` +
+    `<stop offset="0.28" stop-color="${DUSK.ink}" stop-opacity="0"/>` +
+    `<stop offset="0.72" stop-color="${DUSK.ink}" stop-opacity="0"/>` +
+    `<stop offset="0.86" stop-color="${DUSK.ink}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0.38"/></linearGradient>`
+
+  // THE DECK SILHOUETTE. A die-cut, not a rectangle: the front corners are cut
+  // back so the cantilever reads as a shaped counter from above, while the
+  // middle of the front rail keeps its full reach toward the reader.
+  const cut = w * 0.075
+  const front = h * 0.995
+  const back = h * 0.006
+  const die =
+    `M ${fx(w * 0.004)} ${fx(back)} L ${fx(w - w * 0.004)} ${fx(back)} ` +
+    `L ${fx(w - w * 0.004)} ${fx(front - cut * 0.62)} L ${fx(w - cut)} ${fx(front)} ` +
+    `L ${fx(cut)} ${fx(front)} L ${fx(w * 0.004)} ${fx(front - cut * 0.62)} Z`
+
+  let s = `<g>`
+  s += `<path d="${die}" fill="url(#deskBrass)"/>`
+  // the shadowed strip where the deck meets the gallery facade (image top)
+  s += `<rect x="0" y="${fx(back)}" width="${fx(w)}" height="${fx(h * 0.115)}" fill="${DUSK.ink}" opacity="0.62"/>`
+  s += `<rect x="0" y="${fx(h * 0.115)}" width="${fx(w)}" height="${fx(h * 0.016)}" fill="${GOLD_LIT}" opacity="0.75"/>`
+
+  // THE WRITING BED — a dark leather inset. The desk's whole legibility rests on
+  // this: the reader saw "a gold crescent with a white smear", because the pale
+  // ledger sat on pale brass. A dark bed under it is the contrast.
+  const bx0 = w * 0.075
+  const bx1 = w - bx0
+  const by0 = h * 0.185
+  const by1 = h * 0.775
+  s += `<rect x="${fx(bx0)}" y="${fx(by0)}" width="${fx(bx1 - bx0)}" height="${fx(by1 - by0)}" rx="${fx(w * 0.012)}" fill="${DUSK.ink}"/>`
+  s += `<rect x="${fx(bx0)}" y="${fx(by0)}" width="${fx(bx1 - bx0)}" height="${fx(by1 - by0)}" rx="${fx(w * 0.012)}" fill="none" stroke="${GOLD_DIM}" stroke-width="${fx(w * 0.008)}" opacity="0.9"/>`
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(h * 0.46)}" rx="${fx(w * 0.46)}" ry="${fx(h * 0.44)}" fill="url(#deskPool)"/>`
+
+  // THE LEDGER. Two pages of the brightest note on the piece, a gutter on the
+  // crease, five heavy rules a side, and blocky ink entries on some of them —
+  // rules at real weight, because hairlines are exactly what a downscale eats.
+  const lw = w * 0.42
+  const lh = h * 0.44
+  const lx0 = cx - lw / 2
+  const ly0 = h * 0.27
+  s += `<rect x="${fx(lx0 + w * 0.007)}" y="${fx(ly0 + h * 0.016)}" width="${fx(lw)}" height="${fx(lh)}" fill="#000000" opacity="0.42"/>`
+  s += `<rect x="${fx(lx0)}" y="${fx(ly0)}" width="${fx(lw)}" height="${fx(lh)}" fill="${DUSK.parchLit}"/>`
+  // each page falls off a little toward its outer edge, so the spread reads as
+  // two leaves rising out of a gutter rather than as one flat card
+  for (const side of [-1, 1]) {
+    const px0 = side < 0 ? lx0 : cx
+    s += `<rect x="${fx(px0)}" y="${fx(ly0)}" width="${fx(lw / 2)}" height="${fx(lh)}" fill="url(#deskPool)" opacity="0.5"/>`
+    s += `<rect x="${fx(side < 0 ? lx0 : lx0 + lw * 0.9)}" y="${fx(ly0)}" width="${fx(lw * 0.1)}" height="${fx(lh)}" fill="${DUSK.parchDim}" opacity="0.5"/>`
+  }
+  const rules = 5
+  for (let i = 0; i < rules; i++) {
+    const ry = ly0 + lh * (0.18 + (0.66 * i) / (rules - 1))
+    for (const side of [-1, 1]) {
+      const a = side < 0 ? lx0 + lw * 0.06 : cx + lw * 0.05
+      const b = side < 0 ? cx - lw * 0.05 : lx0 + lw * 0.94
+      s += `<line x1="${fx(a)}" y1="${fx(ry)}" x2="${fx(b)}" y2="${fx(ry)}" stroke="${DUSK.ink}" stroke-width="${fx(h * 0.012)}" opacity="0.78"/>`
+      // a clerk's entry: one blocky run of ink on most rules, its length seeded
+      if (r() < 0.78) {
+        const t = rr(r, 0.32, 0.74)
+        s += `<line x1="${fx(a)}" y1="${fx(ry - h * 0.014)}" x2="${fx(lerp(a, b, t))}" y2="${fx(ry - h * 0.014)}" stroke="${DUSK.ink}" stroke-width="${fx(h * 0.018)}" opacity="0.9"/>`
+      }
+    }
+    // the ruled money column, in ledger red
+    for (const side of [-1, 1]) {
+      const mx = side < 0 ? cx - lw * 0.12 : lx0 + lw * 0.87
+      s += `<line x1="${fx(mx)}" y1="${fx(ly0 + lh * 0.1)}" x2="${fx(mx)}" y2="${fx(ly0 + lh * 0.9)}" stroke="${SEAL_RED}" stroke-width="${fx(h * 0.008)}" opacity="0.7"/>`
+    }
+  }
+  // the gutter, ON the crease (see the header note)
+  s += `<rect x="${fx(cx - lw * 0.022)}" y="${fx(ly0)}" width="${fx(lw * 0.044)}" height="${fx(lh)}" fill="${DUSK.ink}" opacity="0.62"/>`
+  s += `<rect x="${fx(lx0)}" y="${fx(ly0)}" width="${fx(lw)}" height="${fx(lh)}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(h * 0.008)}" opacity="0.5"/>`
+
+  // TWO QUILLS, drawn as what a quill IS at 1x: a long pale diagonal against a
+  // dark bed. Fine barb hatching would vanish, so the vane is a filled lens and
+  // the barbs are only a few heavy strokes inside it.
+  const quill = (x0, y0, x1, y1) => {
+    const dx = x1 - x0
+    const dy = y1 - y0
+    const L = Math.hypot(dx, dy)
+    const ux = dx / L
+    const uy = dy / L
+    const px = -uy
+    const py = ux
+    const vw = L * 0.1 // vane half-width
+    // `t` runs 0 (nib) -> 1 (feather tip) along the quill, `off` steps sideways
+    // across it; `at` formats a path point and `atX/atY` give the raw numbers the
+    // barb strokes need as separate attributes.
+    const atX = (t, off) => x0 + ux * L * t + px * off
+    const atY = (t, off) => y0 + uy * L * t + py * off
+    const at = (t, off) => `${fx(atX(t, off))} ${fx(atY(t, off))}`
+    let q = ''
+    // the shaft, nib end at (x0,y0)
+    q += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${DUSK.ink}" stroke-width="${fx(L * 0.055)}" opacity="0.5"/>`
+    q += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${DUSK.parch}" stroke-width="${fx(L * 0.035)}" stroke-linecap="round"/>`
+    // the vane: a lens over the outer 62% of the feather
+    q += `<path d="M ${at(0.36, 0)} Q ${at(0.66, vw)} ${at(1.0, vw * 0.16)} Q ${at(0.66, -vw)} ${at(0.36, 0)} Z" fill="${DUSK.parchLit}"/>`
+    q += `<path d="M ${at(0.36, 0)} Q ${at(0.66, vw)} ${at(1.0, vw * 0.16)} Q ${at(0.66, -vw)} ${at(0.36, 0)} Z" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(L * 0.014)}" opacity="0.8"/>`
+    for (const t of [0.5, 0.62, 0.74, 0.86]) {
+      q += `<line x1="${fx(atX(t, -vw * 0.72))}" y1="${fx(atY(t, -vw * 0.72))}" x2="${fx(atX(t + 0.05, vw * 0.72))}" y2="${fx(atY(t + 0.05, vw * 0.72))}" stroke="${DUSK.parchDim}" stroke-width="${fx(L * 0.012)}" opacity="0.6"/>`
+    }
+    // the brass ferrule and a wet ink nib
+    q += `<circle cx="${fx(x0 + ux * L * 0.3)}" cy="${fx(y0 + uy * L * 0.3)}" r="${fx(L * 0.035)}" fill="${GOLD_LIT}" stroke="${DUSK.ink}" stroke-width="${fx(L * 0.01)}"/>`
+    q += `<circle cx="${fx(x0)}" cy="${fx(y0)}" r="${fx(L * 0.032)}" fill="${DUSK.ink}"/>`
+    return q
+  }
+  s += quill(w * 0.115, h * 0.73, w * 0.235, h * 0.21)
+  s += quill(w * 0.9, h * 0.7, w * 0.775, h * 0.24)
+
+  // TWO INKWELLS — dark wells with a bright brass rim and one specular dot, the
+  // cheapest object here that still reads at 1x because it is pure value.
+  for (const [ix, iy, rad] of [
+    [w * 0.135, h * 0.34, w * 0.05],
+    [w * 0.865, h * 0.31, w * 0.042],
+  ]) {
+    s += `<circle cx="${fx(ix)}" cy="${fx(iy)}" r="${fx(rad * 1.22)}" fill="${GOLD}" opacity="0.95"/>`
+    s += `<circle cx="${fx(ix)}" cy="${fx(iy)}" r="${fx(rad * 1.22)}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(rad * 0.2)}"/>`
+    s += `<circle cx="${fx(ix)}" cy="${fx(iy)}" r="${fx(rad)}" fill="#05070a"/>`
+    s += `<circle cx="${fx(ix - rad * 0.3)}" cy="${fx(iy - rad * 0.34)}" r="${fx(rad * 0.28)}" fill="${DUSK.amberCore}" opacity="0.8"/>`
+  }
+
+  // THE CANDLE, seen from directly above: a brass pan, a bright collar and a
+  // white-hot core. One object, and the reason the whole deck is warm.
+  const kx = w * 0.625
+  const ky = h * 0.245
+  const kr = w * 0.032
+  s += `<ellipse cx="${fx(kx)}" cy="${fx(ky)}" rx="${fx(kr * 2.6)}" ry="${fx(kr * 2.4)}" fill="url(#deskPool)"/>`
+  s += `<circle cx="${fx(kx)}" cy="${fx(ky)}" r="${fx(kr * 1.5)}" fill="${GOLD}" stroke="${DUSK.ink}" stroke-width="${fx(kr * 0.22)}" stroke-opacity="0.6"/>`
+  s += `<circle cx="${fx(kx)}" cy="${fx(ky)}" r="${fx(kr)}" fill="${DUSK.parchLit}"/>`
+  s += `<circle cx="${fx(kx)}" cy="${fx(ky)}" r="${fx(kr * 0.5)}" fill="${DUSK.amberCore}"/>`
+
+  // THREE WAX-SEALED LETTERS on the counter, in front of the ledger and clear of
+  // the crease. Cream rectangles with one big seal each — the seals are the only
+  // saturated red on the piece, so they carry the eye down to the front rail.
+  for (const [lxc, lyc, cant] of [
+    [w * 0.185, h * 0.62, -8],
+    [w * 0.335, h * 0.7, 6],
+    [w * 0.79, h * 0.6, -5],
+  ]) {
+    const lwv = w * 0.135
+    const lhv = h * 0.16
+    s += `<g transform="translate(${fx(lxc)} ${fx(lyc)}) rotate(${fx(cant)})">`
+    s += `<rect x="${fx(-lwv / 2 + w * 0.005)}" y="${fx(-lhv / 2 + h * 0.014)}" width="${fx(lwv)}" height="${fx(lhv)}" fill="#000000" opacity="0.45"/>`
+    s += `<rect x="${fx(-lwv / 2)}" y="${fx(-lhv / 2)}" width="${fx(lwv)}" height="${fx(lhv)}" fill="${DUSK.parch}"/>`
+    s += `<path d="M ${fx(-lwv / 2)} ${fx(-lhv / 2)} L 0 ${fx(lhv * 0.06)} L ${fx(lwv / 2)} ${fx(-lhv / 2)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(h * 0.008)}" opacity="0.8"/>`
+    s += `<circle cx="0" cy="${fx(lhv * 0.1)}" r="${fx(lhv * 0.3)}" fill="${SEAL_RED}"/>`
+    s += `<circle cx="${fx(-lhv * 0.09)}" cy="${fx(lhv * 0.02)}" r="${fx(lhv * 0.14)}" fill="${SEAL_RED_LIT}" opacity="0.8"/>`
+    s += `</g>`
+  }
+
+  // THE FRONT RAIL — the brass moulding that gives the cantilever its
+  // silhouette, with turned balusters and a screwed nameplate reading POST,
+  // struck off-centre so nothing legible sits on the crease.
+  const railY = h * 0.815
+  s += `<rect x="0" y="${fx(railY)}" width="${fx(w)}" height="${fx(h * 0.05)}" fill="${GOLD_DIM}"/>`
+  s += `<rect x="0" y="${fx(railY)}" width="${fx(w)}" height="${fx(h * 0.018)}" fill="${GOLD_LIT}" opacity="0.85"/>`
+  for (let i = 0; i < 13; i++) {
+    const bxp = w * (0.045 + (0.91 * i) / 12)
+    s += `<ellipse cx="${fx(bxp)}" cy="${fx(railY + h * 0.1)}" rx="${fx(w * 0.018)}" ry="${fx(h * 0.045)}" fill="${GOLD}"/>`
+    s += `<ellipse cx="${fx(bxp - w * 0.005)}" cy="${fx(railY + h * 0.095)}" rx="${fx(w * 0.006)}" ry="${fx(h * 0.03)}" fill="${GOLD_LIT}" opacity="0.8"/>`
+  }
+  // Kept deliberately UNDER the ledger in weight — the first bake struck it in
+  // full ink at nearly the ledger's own contrast and it competed with the desk's
+  // hero object for the eye, which is the wrong fight for a nameplate to win.
+  const pw = h * 0.055
+  const ph = h * 0.078
+  const pgap = h * 0.018
+  const px0 = w * 0.655
+  const py0 = railY + h * 0.062
+  s += `<rect x="${fx(px0 - pgap * 1.6)}" y="${fx(py0 - pgap)}" width="${fx(4 * pw + 3 * pgap + 3.2 * pgap)}" height="${fx(ph + pgap * 2)}" rx="${fx(h * 0.012)}" fill="${GOLD}" stroke="${GOLD_DIM}" stroke-width="${fx(h * 0.008)}"/>`
+  s += engraveWord('POST', px0, py0 + 2, pw, ph, pgap, GOLD_LIT, Math.max(3, h * 0.011), `opacity="${fxOp(0.6)}"`)
+  s += engraveWord('POST', px0, py0, pw, ph, pgap, DUSK.ink, Math.max(2.6, h * 0.011), 'opacity="0.8"')
+  // the outboard fall-off goes over the whole deck LAST, clipped to the die, so it
+  // grades one continuous plane rather than a stack of separately-lit objects
+  s += `<g clip-path="url(#deckDie)"><rect x="0" y="0" width="${fx(w)}" height="${fx(h)}" fill="url(#deckEnds)"/></g>`
+  s += `</g>`
+  return svgPiece(w, h, s + rookRim(die, 6), defs + `<clipPath id="deckDie"><path d="${die}"/></clipPath>`)
+}
+
+// ---- C) THE CRANK WHEEL (`ch3-keep-winch-disc`). The reader's first two
+// findings were "the working winch is unlabelled" and "the only labelled disc on
+// the spread is the OTHER one", which together read as a wiring error. The fix is
+// diegetic rather than a UI sticker: a heavy brass capstan carrying a riveted
+// MAKER'S PLATE struck HOIST on its face, at two opposite stations, plus a
+// directional arrow and a stop mark on the rim.
+//
+// Everything about the plate's size is set by ONE measurement, and the note at
+// the plate itself records it: the bench projects this page-flat wheel into
+// 140x74 screen px, not the 140x140 a flat preview suggests, so anything sized
+// off the art's own diameter loses half its height on screen. ----
+function crankWheel(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const cy = h / 2
+  const R = w * 0.44
+  const rimIn = R * 0.84 // knurled rim band
+  const legIn = R * 0.56 // spoke web / open ground boundary
+  const hubR = R * 0.29
+  const BR = GOLD
+  const BR_LIT = GOLD_LIT
+  const BR_DK = GOLD_DIM
+
+  const defs =
+    `<radialGradient id="wheelLite" cx="0.36" cy="0.3" r="0.86">` +
+    `<stop offset="0" stop-color="${BR_LIT}" stop-opacity="0.55"/>` +
+    `<stop offset="0.52" stop-color="${BR_LIT}" stop-opacity="0.05"/>` +
+    `<stop offset="1" stop-color="#000000" stop-opacity="0.46"/></radialGradient>`
+
+  // The grip lobe protrudes PAST the rim — the one cue that says "a hand turns
+  // this" on a page-flat disc — and it rotates with the wheel, so it doubles as
+  // the reader's read-out of how far they have wound.
+  const lobeA = 320
+  const lobeR = R * 1.09
+  const lobe =
+    `M ${fx(polX(cx, lobeA - 16, R * 0.93))} ${fx(polY(cy, lobeA - 16, R * 0.93))} ` +
+    `Q ${fx(polX(cx, lobeA - 10, lobeR))} ${fx(polY(cy, lobeA - 10, lobeR))} ` +
+    `${fx(polX(cx, lobeA, lobeR))} ${fx(polY(cy, lobeA, lobeR))} ` +
+    `Q ${fx(polX(cx, lobeA + 10, lobeR))} ${fx(polY(cy, lobeA + 10, lobeR))} ` +
+    `${fx(polX(cx, lobeA + 16, R * 0.93))} ${fx(polY(cy, lobeA + 16, R * 0.93))} Z`
+
+  let s = `<g>`
+  s += `<path d="${lobe}" fill="${BR}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${BR}"/>`
+  // the wheel is a RING with spokes, not a plate: the ground between the spokes
+  // falls to the loft's night so the spokes read as spokes at any size
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(legIn)}" fill="${DUSK.slateDeep}"/>`
+  // EIGHT tapered spokes
+  for (let i = 0; i < 8; i++) {
+    const a = i * 45 + 22.5
+    const halfIn = 7.5
+    const halfOut = 4.2
+    const sd =
+      `M ${fx(polX(cx, a - halfIn, hubR * 0.9))} ${fx(polY(cy, a - halfIn, hubR * 0.9))} ` +
+      `L ${fx(polX(cx, a - halfOut, legIn + 6))} ${fx(polY(cy, a - halfOut, legIn + 6))} ` +
+      `L ${fx(polX(cx, a + halfOut, legIn + 6))} ${fx(polY(cy, a + halfOut, legIn + 6))} ` +
+      `L ${fx(polX(cx, a + halfIn, hubR * 0.9))} ${fx(polY(cy, a + halfIn, hubR * 0.9))} Z`
+    s += `<path d="${sd}" fill="${BR}"/>`
+    s += `<path d="M ${fx(polX(cx, a - halfIn * 0.4, hubR * 0.9))} ${fx(polY(cy, a - halfIn * 0.4, hubR * 0.9))} L ${fx(polX(cx, a - halfOut * 0.4, legIn + 6))} ${fx(polY(cy, a - halfOut * 0.4, legIn + 6))}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.012)}" opacity="0.7"/>`
+  }
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#wheelLite)"/>`
+
+  // ---- the KNURLED rim: a band of radial cuts, every fourth one deeper, so the
+  // rim reads as gripped metal instead of as a gold hoop.
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx((R + rimIn) / 2)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R - rimIn)}" opacity="0.35"/>`
+  for (let i = 0; i < 72; i++) {
+    const a = (i * 360) / 72
+    const deep = i % 4 === 0
+    s += `<line x1="${fx(polX(cx, a, rimIn + (deep ? 0 : (R - rimIn) * 0.28)))}" y1="${fx(polY(cy, a, rimIn + (deep ? 0 : (R - rimIn) * 0.28)))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${deep ? DUSK.ink : BR_DK}" stroke-width="${fx(R * (deep ? 0.016 : 0.01))}" opacity="${fxOp(deep ? 0.7 : 0.5)}"/>`
+  }
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.985)}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.018)}" opacity="0.8"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rimIn)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R * 0.016)}" opacity="0.8"/>`
+
+  // ---- THE MAKER'S PLATE. Two brass plates riveted across the wheel's FACE,
+  // each struck HOIST, at opposite stations.
+  //
+  // ROUND 2, and the measurement that forced it. The first bake engraved the word
+  // into the RIM BAND at cap height 9.25% of the disc diameter, which read fine on
+  // a flat 140x140 preview and read as a tangle of dark scoring in the actual
+  // board capture. The reason is that a page-flat disc is FORESHORTENED hard at
+  // the pinned camera: the bench (e3w2s4-board.mjs) measures this wheel at
+  // 140x74 screen px at rest and 145x90 at full wind, i.e. the vertical is
+  // squashed to ~0.53, so a 9.25% cap height became under 7 screen px of
+  // hairline. There is no rotation that escapes it — the disc turns 290deg of
+  // shown wind — so the only honest levers are SIZE, WEIGHT and CONTRAST:
+  //   - cap height 11% of the diameter and the word 53.6% of it (the top of the
+  //     legible band; wider and a straight chord no longer fits inside a circle),
+  //   - strokes at 20% of cap height instead of 12%,
+  //   - near-black on a GOLD_LIT plate rather than engraved gold-on-gold, so the
+  //     label survives as a plate with writing on it even at the sizes where the
+  //     individual letters stop resolving — which is what "the winch is labelled"
+  //     actually requires,
+  //   - and the atlas region raised 300 -> 460px, because the old region threw
+  //     away half the label's texels before the GPU ever saw them.
+  // The plates cost the outer reach of the four spokes they cross; they carry a
+  // drop shadow so they read as bolted ON the face rather than as gaps in it, and
+  // the spokes at 22.5/157.5/202.5/337.5 stay open end to end.
+  //
+  // STATIONS ARE BUDGETED IN DEGREES, because the first bake spent the same band
+  // twice and struck an arrow clean through the word: plates own 49-131 and
+  // 229-311 (their own corners), arrows 334-26 and 154-206, the stop mark 44, the
+  // grip lobe 320 — and the lobe only lives outside 0.93R, where no plate reaches.
+  const cwL = R * 0.168
+  const chL = R * 0.22
+  const gapL = R * 0.058
+  const wordW = 5 * cwL + 4 * gapL
+  const plateHW = R * 0.585
+  const plateHH = R * 0.155
+  const plateCY = R * 0.51
+  const strike = (rot) => {
+    let g = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(rot)}) translate(0 ${fx(-plateCY)})">`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH + R * 0.018)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="#000000" opacity="0.45"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="${BR_LIT}"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 0.5)}" rx="${fx(R * 0.03)}" fill="#ffffff" opacity="0.18"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R * 0.016)}"/>`
+    // the word, doubled: a bright ghost laid down first and the dark cut over it,
+    // so the letters keep an edge on both sides at any downscale
+    g += engraveWord('HOIST', -wordW / 2, -chL / 2 + R * 0.022, cwL, chL, gapL, '#ffffff', Math.max(3, R * 0.04), `opacity="${fxOp(0.5)}"`)
+    g += engraveWord('HOIST', -wordW / 2, -chL / 2, cwL, chL, gapL, DUSK.ink, Math.max(3, R * 0.044), 'opacity="0.98"')
+    for (const rx of [-plateHW + R * 0.045, plateHW - R * 0.045]) {
+      g += `<circle cx="${fx(rx)}" cy="0" r="${fx(R * 0.03)}" fill="${BR}" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.01)}" stroke-opacity="0.65"/>`
+    }
+    g += `</g>`
+    return g
+  }
+  const legR = (legIn + rimIn) / 2
+
+  // ---- THE DIRECTION ARROWS, struck in the same band a quarter turn off the
+  // legends. The disc's shown angle rotates the art from the page-fore axis
+  // toward +z, which at the reading camera runs screen-LEFT -> screen-DOWN, i.e.
+  // visually COUNTERCLOCKWISE; the image->screen map is a 180deg rotation and so
+  // orientation-preserving, which means increasing math-angle here (polX/polY,
+  // +y up) is the direction the reader's hand actually winds. Head at a1.
+  const arrow = (a0, a1) => {
+    const steps = 14
+    let d = `M ${fx(polX(cx, a0, legR))} ${fx(polY(cy, a0, legR))}`
+    for (let i = 1; i <= steps; i++) {
+      const a = lerp(a0, a1, i / steps)
+      d += ` L ${fx(polX(cx, a, legR))} ${fx(polY(cy, a, legR))}`
+    }
+    let g = `<path d="${d}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.038)}" opacity="0.85" stroke-linecap="round"/>`
+    g += `<path d="${d}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.014)}" opacity="0.55" stroke-linecap="round"/>`
+    const hw = R * 0.075
+    const tip = a1 + 7
+    g +=
+      `<path d="M ${fx(polX(cx, tip, legR))} ${fx(polY(cy, tip, legR))} ` +
+      `L ${fx(polX(cx, a1, legR + hw))} ${fx(polY(cy, a1, legR + hw))} ` +
+      `L ${fx(polX(cx, a1, legR - hw))} ${fx(polY(cy, a1, legR - hw))} Z" fill="${DUSK.ink}" opacity="0.9"/>`
+    return g
+  }
+  s += arrow(-26, 26)
+  s += arrow(154, 206)
+
+  // the two plates go down over the spoke web, AFTER the arrows so nothing on the
+  // rim can cut into a letter
+  s += strike(0)
+  s += strike(180)
+
+  // ---- THE STOP MARK where the wind ends: a struck chevron and a filed notch on
+  // the rim, in the gap between the arrow at 26 and the plate corner at 49.
+  const stopA = 44
+  s += `<path d="M ${fx(polX(cx, stopA, rimIn * 0.94))} ${fx(polY(cy, stopA, rimIn * 0.94))} L ${fx(polX(cx, stopA - 5, R * 0.99))} ${fx(polY(cy, stopA - 5, R * 0.99))} L ${fx(polX(cx, stopA + 5, R * 0.99))} ${fx(polY(cy, stopA + 5, R * 0.99))} Z" fill="${DUSK.ink}" opacity="0.9"/>`
+  s += `<path d="M ${fx(polX(cx, stopA, rimIn * 0.99))} ${fx(polY(cy, stopA, rimIn * 0.99))} L ${fx(polX(cx, stopA, R * 0.96))} ${fx(polY(cy, stopA, R * 0.96))}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.014)}" opacity="0.7"/>`
+
+  // ---- THE RIVETED HUB. Six rivets on a ring, a turned boss and a square drive
+  // socket — the pin the yoke actually hangs on.
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="${BR}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R * 0.022)}" opacity="0.9"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.96)}" fill="url(#wheelLite)"/>`
+  for (let i = 0; i < 6; i++) {
+    const a = i * 60 + 30
+    const rx = polX(cx, a, hubR * 0.68)
+    const ry = polY(cy, a, hubR * 0.68)
+    s += `<circle cx="${fx(rx)}" cy="${fx(ry)}" r="${fx(R * 0.042)}" fill="${BR_LIT}" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.012)}" stroke-opacity="0.7"/>`
+    s += `<circle cx="${fx(rx - R * 0.014)}" cy="${fx(ry - R * 0.014)}" r="${fx(R * 0.014)}" fill="#ffffff" opacity="0.4"/>`
+  }
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(hubR * 0.42)}" fill="${WINCH_IRON_LIT}" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.014)}"/>`
+  s += `<rect x="${fx(cx - hubR * 0.2)}" y="${fx(cy - hubR * 0.2)}" width="${fx(hubR * 0.4)}" height="${fx(hubR * 0.4)}" fill="${WINCH_IRON}"/>`
+  s += `<circle cx="${fx(cx - hubR * 0.16)}" cy="${fx(cy - hubR * 0.2)}" r="${fx(R * 0.02)}" fill="${WINCH_BEVEL}" opacity="0.5"/>`
+  // a few cast-metal pits, so the brass is not a vector gradient
+  for (let i = 0; i < 14; i++) {
+    const a = rr(r, 0, 360)
+    const rad = rr(r, legIn + 8, R * 0.96)
+    s += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 1.4, 3.4))}" fill="${BR_DK}" opacity="${fxOp(rr(r, 0.2, 0.45))}"/>`
+  }
+  s += `</g>`
+
+  const die = circlePath(cx, cy, R) + ' ' + lobe
+  return svgPiece(w, h, s + rookRim(die, 5), defs)
+}
+
+// ---- D) THE SIGNAL MAST (`ch3-keep-winch-mast`). A new static piece, added
+// because the blind reader read the hoisted paddle as "a detached prop that
+// escaped its parent" — a post is the whole answer, and the ROPE running its
+// length is the answer to "no rope, mast or cable connecting it to anything".
+// It projects about 12 x 142 screen px, so nothing here is thinner than ~8 art
+// px (12 screen px across a canvas 80 wide means one screen pixel costs 6.7 art
+// px, and a stroke under that is a stroke the reader never sees). Foot collar at
+// the image bottom, brass pulley head at the top, per the UV contract. ----
+function signalMast(w, h, seed) {
+  const r = mulberry32(seed)
+  const upX = [w * 0.2, w * 0.8] // the two uprights' centres
+  const uw = w * 0.13 // upright width (~1.5 screen px — the floor)
+  const footTop = h * 0.955
+  const headBot = h * 0.06
+
+  let s = `<g>`
+  // ---- the FOOT: a bracketed collar clamped to the loft lid, with two knee
+  // braces. The reader has to believe the post STANDS on something.
+  s += `<rect x="0" y="${fx(footTop)}" width="${fx(w)}" height="${fx(h - footTop)}" fill="${WINCH_IRON}"/>`
+  s += `<rect x="0" y="${fx(footTop)}" width="${fx(w)}" height="${fx((h - footTop) * 0.3)}" fill="${WINCH_BEVEL}" opacity="0.4"/>`
+  s += `<rect x="${fx(w * 0.06)}" y="${fx(footTop - h * 0.012)}" width="${fx(w * 0.88)}" height="${fx(h * 0.014)}" fill="${GOLD_DIM}"/>`
+  for (const [x0, x1] of [
+    [w * 0.06, upX[0]],
+    [w * 0.94, upX[1]],
+  ]) {
+    s += `<path d="M ${fx(x0)} ${fx(footTop)} L ${fx(x1)} ${fx(footTop - h * 0.032)} L ${fx(x1)} ${fx(footTop)} Z" fill="${WINCH_IRON}"/>`
+  }
+
+  // ---- the LATTICE: two uprights and X-bracing. The bracing bays are uneven so
+  // the post reads as built rather than extruded.
+  for (const x of upX) {
+    s += `<rect x="${fx(x - uw / 2)}" y="${fx(headBot)}" width="${fx(uw)}" height="${fx(footTop - headBot)}" fill="${DUSK.slateDim}"/>`
+    s += `<rect x="${fx(x - uw / 2)}" y="${fx(headBot)}" width="${fx(uw * 0.34)}" height="${fx(footTop - headBot)}" fill="${DUSK.slateLit}" opacity="0.45"/>`
+  }
+  const bays = 15
+  const cuts = unevenSplit(headBot + h * 0.02, footTop - h * 0.01, bays, r, 0.3)
+  for (let i = 0; i < bays; i++) {
+    const y0 = cuts[i]
+    const y1 = cuts[i + 1]
+    const flip = i % 2 === 0
+    s += `<line x1="${fx(upX[0])}" y1="${fx(flip ? y0 : y1)}" x2="${fx(upX[1])}" y2="${fx(flip ? y1 : y0)}" stroke="${DUSK.slate}" stroke-width="${fx(w * 0.1)}" opacity="0.95"/>`
+    s += `<line x1="${fx(upX[0])}" y1="${fx(y1)}" x2="${fx(upX[1])}" y2="${fx(y1)}" stroke="${DUSK.slateDeep}" stroke-width="${fx(w * 0.07)}" opacity="0.8"/>`
+  }
+
+  // ---- the ROPE. It runs the mast's WHOLE length from the pulley to the foot —
+  // the piece's single most load-bearing mark, so it is the palest thing on the
+  // post and it never breaks.
+  s += `<line x1="${fx(w * 0.5)}" y1="${fx(headBot + h * 0.006)}" x2="${fx(w * 0.5)}" y2="${fx(footTop)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.16)}" opacity="0.6"/>`
+  s += `<line x1="${fx(w * 0.5)}" y1="${fx(headBot + h * 0.006)}" x2="${fx(w * 0.5)}" y2="${fx(footTop)}" stroke="${DUSK.parch}" stroke-width="${fx(w * 0.1)}"/>`
+  // whipping ticks, so the rope reads as laid cord and not as a drawn line
+  for (let i = 0; i < 22; i++) {
+    const y = lerp(headBot + h * 0.03, footTop - h * 0.02, (i + 0.5) / 22)
+    s += `<line x1="${fx(w * 0.42)}" y1="${fx(y)}" x2="${fx(w * 0.58)}" y2="${fx(y + h * 0.004)}" stroke="${DUSK.parchDim}" stroke-width="${fx(w * 0.05)}" opacity="0.7"/>`
+  }
+
+  // ---- the PULLEY HEAD the paddle pivots on: a brass cheek block the full
+  // width of the post, a dark sheave and an axle pin. The semaphore's own collar
+  // is painted to continue straight out of this.
+  s += `<rect x="${fx(w * 0.04)}" y="${fx(headBot - h * 0.004)}" width="${fx(w * 0.92)}" height="${fx(h * 0.016)}" fill="${GOLD_DIM}"/>`
+  s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.032)}" r="${fx(w * 0.42)}" fill="${GOLD}"/>`
+  s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.032)}" r="${fx(w * 0.42)}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(w * 0.1)}" opacity="0.9"/>`
+  s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.032)}" r="${fx(w * 0.24)}" fill="${WINCH_IRON}"/>`
+  s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.032)}" r="${fx(w * 0.09)}" fill="${WINCH_BEVEL}"/>`
+
+  const die =
+    `M ${fx(upX[0] - uw / 2)} ${fx(headBot)} L ${fx(upX[0] - uw / 2)} ${fx(footTop)} ` +
+    `M ${fx(upX[1] + uw / 2)} ${fx(headBot)} L ${fx(upX[1] + uw / 2)} ${fx(footTop)}`
+  s += `</g>`
+  return svgPiece(w, h, s + rookRim(die, 4))
+}
+
+// ---- E) THE SIGNAL FLAG (`ch3-keep-winch-semaphore`). The stagger now ENDS on
+// this output, so it is the "dispatch open" cue the reader's crank finishes on —
+// which makes "is it recognisable as a flag going up?" the only question that
+// matters. At ~12 x 40 screen px the answer has to be silhouette: a brass
+// pivot collar continuing the mast's pulley head, then a gold PENNANT with a
+// swallowtail notch cut into its free end, one saturated red band, and a raven
+// device. Pivot at the image bottom, tip at the top, per the UV contract. ----
+function signalFlag(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const pivotY = h * 0.99
+  const collarTop = h * 0.8
+  const flagBot = h * 0.66
+  const notch = h * 0.14
+
+  const defs =
+    `<linearGradient id="flagLite" x1="0" y1="1" x2="0.4" y2="0">` +
+    `<stop offset="0" stop-color="${GOLD_DIM}"/><stop offset="0.5" stop-color="${GOLD}"/>` +
+    `<stop offset="1" stop-color="${GOLD_LIT}"/></linearGradient>`
+
+  // The pennant: full-width at its root, a swallowtail cut into the free (image
+  // top) end. The notch is the whole silhouette read — a rectangle at this size
+  // is a grey post, which is exactly what the reader saw before.
+  const fx0 = w * 0.045
+  const fx1 = w - fx0
+  const pennant =
+    `M ${fx(fx0)} ${fx(flagBot)} L ${fx(fx0)} ${fx(h * 0.012)} ` +
+    `L ${fx(cx)} ${fx(notch)} L ${fx(fx1)} ${fx(h * 0.012)} ` +
+    `L ${fx(fx1)} ${fx(flagBot)} Z`
+  const staffW = w * 0.3
+
+  let s = `<g>`
+  // ---- the ARM below the flag: the pivot collar and a short slate shaft, drawn
+  // to read as the same ironwork the mast head is made of.
+  s += `<rect x="${fx(cx - staffW / 2)}" y="${fx(h * 0.4)}" width="${fx(staffW)}" height="${fx(pivotY - h * 0.4)}" fill="${DUSK.slateDim}"/>`
+  s += `<rect x="${fx(cx - staffW / 2)}" y="${fx(h * 0.4)}" width="${fx(staffW * 0.34)}" height="${fx(pivotY - h * 0.4)}" fill="${DUSK.slateLit}" opacity="0.5"/>`
+  s += `<rect x="${fx(w * 0.06)}" y="${fx(collarTop)}" width="${fx(w * 0.88)}" height="${fx(h * 0.13)}" rx="${fx(w * 0.14)}" fill="${GOLD}"/>`
+  s += `<rect x="${fx(w * 0.06)}" y="${fx(collarTop)}" width="${fx(w * 0.88)}" height="${fx(h * 0.045)}" rx="${fx(w * 0.14)}" fill="${GOLD_LIT}" opacity="0.8"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.955)}" r="${fx(w * 0.3)}" fill="${WINCH_IRON}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.955)}" r="${fx(w * 0.3)}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(w * 0.08)}" opacity="0.85"/>`
+  s += `<circle cx="${fx(cx - w * 0.08)}" cy="${fx(h * 0.94)}" r="${fx(w * 0.08)}" fill="${WINCH_BEVEL}" opacity="0.6"/>`
+
+  // ---- the PENNANT
+  s += `<path d="${pennant}" fill="url(#flagLite)"/>`
+  // the saturated band, low on the flag where it is widest
+  s += `<rect x="${fx(fx0)}" y="${fx(h * 0.5)}" width="${fx(fx1 - fx0)}" height="${fx(h * 0.11)}" fill="${SEAL_RED}"/>`
+  s += `<rect x="${fx(fx0)}" y="${fx(h * 0.5)}" width="${fx(fx1 - fx0)}" height="${fx(h * 0.03)}" fill="${SEAL_RED_LIT}" opacity="0.8"/>`
+  // the raven device, in the flag's upper field. A symmetric spread-wing mark on
+  // purpose: art-u runs toward reader-LEFT, so this piece prints mirrored against
+  // the screen and anything with a handedness would print backwards.
+  //
+  // `miniRaven` and NOT `wheelRavenPath`, on the evidence of the 1x bake: the
+  // wheeling-gull silhouette is 0.35 as tall as it is wide, so at the flag's 12px
+  // width it resolved to two horizontal dashes that read as a slot in the cloth.
+  // miniRaven carries a body and a wedge tail at 0.58 of its span, which is ~6
+  // screen px of bird instead of ~4 of dash.
+  s += `<g transform="translate(${fx(cx)} ${fx(h * 0.29)})">${miniRaven(w * 0.42, DUSK.ink, DUSK.slateLit)}</g>`
+  // the hoist edge catches the roost lamps; the free end falls to night
+  s += `<rect x="${fx(fx0)}" y="${fx(h * 0.012)}" width="${fx((fx1 - fx0) * 0.16)}" height="${fx(flagBot - h * 0.012)}" fill="${GOLD_LIT}" opacity="0.4"/>`
+  s += `<path d="${pennant}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.05)}" opacity="0.55" stroke-linejoin="round"/>`
+  // three sewn grommets down the hoist, the flag's only fine detail — it costs
+  // nothing if it dissolves, and at 3x it says "sewn cloth on a paddle"
+  for (const t of [0.2, 0.45, 0.7]) {
+    s += `<circle cx="${fx(fx0 + (fx1 - fx0) * 0.09)}" cy="${fx(lerp(h * 0.05, flagBot - h * 0.03, t))}" r="${fx(w * 0.055)}" fill="${GOLD_DIM}" opacity="${fxOp(0.7 + rr(r, 0, 0.2))}"/>`
+  }
+  s += `</g>`
+  return svgPiece(w, h, s + rookRim(pennant, 4), defs)
+}
+
+// ---- F) THE SASH WEIGHT (`ch3-keep-winch-counterweight`). The reader never
+// noticed it, which for a counterweight descending a belfry mouth is close to
+// correct — so it stays simple and honest rather than being made loud: a cast
+// iron block with a ground top bevel, a lifting eye and a short run of chain.
+// Printed across the loft cap crease, so the crease is the image's vertical
+// centreline and the block is painted upright (art-v 0 = bottom). ----
+function sashWeight(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const bx0 = w * 0.1
+  const bx1 = w * 0.9
+  const byTop = h * 0.26
+  const byBot = h * 0.985
+
+  let s = `<g>`
+  // ---- the CHAIN above the block: three links, drawn as heavy rings so they
+  // survive at the ~31 screen px the whole piece stands.
+  // Struck in WINCH_IRON_LIT rather than WINCH_IRON: the block hangs in the
+  // belfry MOUTH, which is the darkest opening on the keep, and the 1x bake showed
+  // ink-on-ink chain reading as nothing at all above a block that did read.
+  for (let i = 0; i < 3; i++) {
+    const cyl = h * (0.035 + i * 0.072)
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cyl)}" rx="${fx(w * (i % 2 ? 0.1 : 0.16))}" ry="${fx(h * 0.045)}" fill="none" stroke="${WINCH_IRON_LIT}" stroke-width="${fx(w * 0.075)}"/>`
+    s += `<ellipse cx="${fx(cx - w * 0.03)}" cy="${fx(cyl - h * 0.008)}" rx="${fx(w * (i % 2 ? 0.1 : 0.16))}" ry="${fx(h * 0.045)}" fill="none" stroke="${WINCH_BEVEL}" stroke-width="${fx(w * 0.022)}" opacity="0.5"/>`
+  }
+  // ---- the LIFTING EYE, symmetric about the crease so the seam between the two
+  // half-quads falls down its own centreline and has nothing to break.
+  s += `<path d="M ${fx(cx - w * 0.13)} ${fx(byTop + h * 0.02)} Q ${fx(cx - w * 0.13)} ${fx(h * 0.19)} ${fx(cx)} ${fx(h * 0.19)} Q ${fx(cx + w * 0.13)} ${fx(h * 0.19)} ${fx(cx + w * 0.13)} ${fx(byTop + h * 0.02)} Z" fill="${WINCH_IRON}"/>`
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(h * 0.205)}" rx="${fx(w * 0.055)}" ry="${fx(h * 0.022)}" fill="none" stroke="${WINCH_BEVEL}" stroke-width="${fx(w * 0.02)}" opacity="0.5"/>`
+
+  // ---- the BLOCK
+  const die = `M ${fx(bx0)} ${fx(byTop)} L ${fx(bx1)} ${fx(byTop)} L ${fx(bx1 - w * 0.03)} ${fx(byBot)} L ${fx(bx0 + w * 0.03)} ${fx(byBot)} Z`
+  s += `<path d="${die}" fill="${WINCH_IRON}"/>`
+  // the ground top bevel — the one bright note, and what makes the block read as
+  // a heavy solid rather than a hole in the belfry
+  s += `<path d="M ${fx(bx0)} ${fx(byTop)} L ${fx(bx1)} ${fx(byTop)} L ${fx(bx1 - w * 0.06)} ${fx(byTop + h * 0.055)} L ${fx(bx0 + w * 0.06)} ${fx(byTop + h * 0.055)} Z" fill="${WINCH_BEVEL}" opacity="0.8"/>`
+  s += `<path d="M ${fx(bx0 + w * 0.03)} ${fx(byTop + h * 0.06)} L ${fx(bx0 + w * 0.07)} ${fx(byBot - h * 0.01)}" fill="none" stroke="${WINCH_IRON_LIT}" stroke-width="${fx(w * 0.05)}" opacity="0.7"/>`
+  // ONE casting seam down the flank. The first bake had two seams plus a foundry
+  // rib across the waist, and at 20x31 screen px that grid of three panels read
+  // as a WINDOW in the belfry rather than as a solid weight hanging in one.
+  s += `<line x1="${fx(lerp(bx0, bx1, 0.42))}" y1="${fx(byTop + h * 0.07)}" x2="${fx(lerp(bx0, bx1, 0.42))}" y2="${fx(byBot - h * 0.02)}" stroke="${WINCH_IRON_LIT}" stroke-width="${fx(w * 0.022)}" opacity="0.35"/>`
+  // a lamplit rim where the belfry's roost-glow grazes the weight's near arris
+  s += `<line x1="${fx(bx1)}" y1="${fx(byTop + h * 0.01)}" x2="${fx(bx1 - w * 0.03)}" y2="${fx(byBot)}" stroke="${DUSK.amber}" stroke-width="${fx(w * 0.03)}" opacity="0.35"/>`
+  // cast pitting
+  for (let i = 0; i < 16; i++) {
+    s += `<circle cx="${fx(rr(r, bx0 + w * 0.05, bx1 - w * 0.05))}" cy="${fx(rr(r, byTop + h * 0.08, byBot - h * 0.02))}" r="${fx(rr(r, 1.4, 3.6))}" fill="${WINCH_IRON_LIT}" opacity="${fxOp(rr(r, 0.2, 0.4))}"/>`
+  }
+  s += `</g>`
+  return svgPiece(w, h, s + rookRim(die, 5))
 }
 
 // ============================================================================
@@ -10986,6 +12477,30 @@ const PIECES = [
   { id: 'ch3-dispatch-line-basket', seed: 40363, w: 256, h: 256, grain: 8, paint() { return readerBasket(this.w, this.h, this.seed) } },
   { id: 'ch3-terrace', seed: 40361, w: 1024, h: 991, grain: 12, paint() { return terracedRoosts({ w: this.w, h: this.h, seed: this.seed, storeys: [0.0773, 0.0653, 0.06, 0.0514, 0.046], spans: [[0.42, 0.31], [0.425, 0.3], [0.44, 0.285], [0.45, 0.265], [0.47, 0.24], [0.485, 0.215]] }) } },
   { id: 'page-4', seed: 40350, w: 1024, h: 683, grain: 10, paint() { return postRoadSpread(this.w, this.h, this.seed) } },
+  // ---- Spread 4 — THE TOWER-HOIST WINCH + THE DISPATCH DESK (wave 2). Six ids
+  // that used to arrive as hand-delivered PNGs through prepare-art and are now
+  // procedural; their PAD_TO_ASPECT / ROTATE entries there are removed, so a
+  // re-added source PNG can no longer silently overwrite these bakes. Every
+  // pixel dim below is the quad's TRUE mesh aspect, derived in the block header
+  // above from popup-keepwinch.ts / popup-keepstack.ts and the layers' uv
+  // tables — a wrong aspect here is a stretch the mesh cannot undo.
+  //
+  // disc     square 2*discR 0.26                              -> 1.000  640x640
+  // mast     0.039 / (1.05 - 0.5468)                           -> 0.0775  80x1032
+  // flag     0.039 / armLen 0.1287            (= 10/33 exact)  -> 0.3030 200x660
+  // board    0.56*0.18 / bladeLen 0.10        (= 126/125)      -> 1.008  630x625
+  // weight   2*CW_BW / 2*CW_BH                                 -> 0.6325 405x640
+  // desk     2*halfW 0.52 / z-span 0.28       (= 13/7 exact)   -> 1.857  910x490
+  { id: 'ch3-keep-winch-disc', seed: 40370, w: 640, h: 640, grain: 10, paint() { return crankWheel(this.w, this.h, this.seed) } },
+  // The mast and the flag are MOSTLY TRANSPARENT slivers (a lattice post and a
+  // pennant), so they take the low grain the cable panel takes: the house grain
+  // pass floors every non-transparent pixel, and on a piece whose whole job is to
+  // have almost none, a normal dose prints as haze around the rigging.
+  { id: 'ch3-keep-winch-mast', seed: 40371, w: 80, h: 1032, grain: 6, paint() { return signalMast(this.w, this.h, this.seed) } },
+  { id: 'ch3-keep-winch-semaphore', seed: 40372, w: 200, h: 660, grain: 6, paint() { return signalFlag(this.w, this.h, this.seed) } },
+  { id: 'ch3-keep-winch-iris', seed: 40373, w: 630, h: 625, grain: 12, paint() { return dispatchBoard(this.w, this.h, this.seed) } },
+  { id: 'ch3-keep-winch-counterweight', seed: 40374, w: 405, h: 640, grain: 10, paint() { return sashWeight(this.w, this.h, this.seed) } },
+  { id: 'ch3-keep-balcony', seed: 40375, w: 910, h: 490, grain: 10, paint() { return dispatchDesk(this.w, this.h, this.seed) } },
   // ---- Spread 7 — the Northern Treasury (ch6, northern aurora/teal/gold) ----
   { id: 'ch6-strongbox-front', seed: 70201, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'strongbox') } },
   { id: 'ch6-strongbox-back', seed: 70202, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'strongbox') } },
@@ -11157,10 +12672,22 @@ const ATLASES = [
       // retired with the cliffs when the raven city took spread 4; no renderer
       // addresses them, and the INFRA-2 guard rightly refuses dead freight.)
       { id: 'ch3-fringe', w: 620, opaque: false },
-      { id: 'ch3-keep-winch-disc', w: 300, opaque: false },
+      // WAVE-2: the disc region goes 300 -> 460. It carries the only WORD on the
+      // spread (the HOIST maker's plate that closes finding S4-1), and a 640px art
+      // packed at 300 threw away half that label's texels before the GPU saw it —
+      // on the one piece where legibility IS the requirement. The page has the
+      // room (it was at 42.5% occupancy), so this is texels moved to where they
+      // are read, not texels added.
+      { id: 'ch3-keep-winch-disc', w: 460, opaque: false },
       { id: 'ch3-keep-winch-semaphore', h: 420, opaque: false },
       { id: 'ch3-keep-winch-iris', h: 420, opaque: false },
       { id: 'ch3-keep-winch-counterweight', h: 300, opaque: false },
+      // WAVE-2: the signal MAST joins its own mechanism's page. It is the
+      // thinnest region on any atlas — 0.0775 aspect, so h 420 buys a 33px-wide
+      // strip — and that is already ~2.7x the 12 screen px the post projects.
+      // Without it the winch would be five ids on the page plus one loose webp,
+      // i.e. a sixth upload for the piece that costs the fewest texels.
+      { id: 'ch3-keep-winch-mast', h: 420, opaque: false },
     ],
   },
   {

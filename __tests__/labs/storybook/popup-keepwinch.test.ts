@@ -5,15 +5,25 @@ import {
   keepWinchCrank,
   keepWinchDiscQuad,
   keepWinchEngageTheta,
+  keepWinchEnvelope,
   keepWinchIrisQuads,
+  keepWinchMastQuad,
   keepWinchOutputQuads,
   keepWinchOutputValue,
+  keepWinchPhase,
+  keepWinchReduction,
   keepWinchSemaphoreQuad,
+  keepWinchShownTheta,
   keepWinchStrokeFull,
   keepWinchThetaMax,
   type KeepWinchGeom,
 } from '@/components/labs/storybook/book/popup-keepwinch'
-import { keepStackStoryGeoms, type KeepStackGeom } from '@/components/labs/storybook/book/popup-keepstack'
+import {
+  keepStackSeatHeight,
+  keepStackSpireRaven,
+  keepStackStoryGeoms,
+  type KeepStackGeom,
+} from '@/components/labs/storybook/book/popup-keepstack'
 import { solveBoxPose, type PanelQuad, type Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
 import { easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
 import { CHAPTERS, type SceneLayer } from '@/components/labs/storybook/content'
@@ -40,21 +50,34 @@ const KEEP = spread4.layers.find((l): l is SceneLayer & KeepStackGeom => l.mech 
 const THETA_MAX = keepWinchThetaMax(WINCH)
 
 describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () => {
-  it('N1 crank law s(theta) = crankR(1 - cos theta): exact, monotone, zero slope at liftoff', () => {
+  it('N1 geared+phased crank law: exact, monotone, bounded slope at liftoff (no dead zone, no snap)', () => {
+    const N = keepWinchReduction(WINCH)
+    const PH = keepWinchPhase(WINCH)
     let maxErr = 0
     for (let i = 0; i <= 400; i++) {
-      const th = (Math.PI * i) / 400
-      const geo = WINCH.crankR - WINCH.crankR * Math.cos(th) // pin projected on the yoke guide
-      maxErr = Math.max(maxErr, Math.abs(keepWinchCrank(WINCH.crankR, th) - geo))
+      const th = (THETA_MAX * i) / 400
+      // pin projected on the yoke guide, measured from its start position
+      const geo = WINCH.crankR * (Math.cos(PH) - Math.cos(th / N + PH))
+      maxErr = Math.max(maxErr, Math.abs(keepWinchCrank(WINCH.crankR, th, N, PH) - geo))
     }
     expect(maxErr).toBeLessThan(1e-12)
+    expect(keepWinchCrank(WINCH.crankR, 0, N, PH)).toBeCloseTo(0, 12) // starts at zero pull
     let prev = -1
     for (let i = 0; i <= 400; i++) {
-      const s = keepWinchCrank(WINCH.crankR, (THETA_MAX * i) / 400)
+      const s = keepWinchCrank(WINCH.crankR, (THETA_MAX * i) / 400, N, PH)
       expect(s).toBeGreaterThanOrEqual(prev - 1e-15)
       prev = s
     }
-    expect(WINCH.crankR * Math.sin(0)).toBe(0) // ds/dtheta = 0 at liftoff — no snap
+    // liftoff slope: FINITE (so the first degree of the hand moves paper) and
+    // small (so nothing snaps). ds/dtheta(0) = crankR*sin(phase)/N.
+    const slope0 = (WINCH.crankR * Math.sin(PH)) / N
+    expect(slope0).toBeGreaterThan(0.005)
+    expect(slope0).toBeLessThan(WINCH.crankR)
+    // The gearing is a pure re-parameterization: the PULL range is untouched,
+    // which is why every fold-flat / wedge / collision proof carries over in s.
+    expect(keepWinchCrank(WINCH.crankR, THETA_MAX, N, PH)).toBeCloseTo(keepWinchStrokeFull(WINCH), 12)
+    // and phase 0 collapses to the original single-turn law exactly.
+    expect(keepWinchCrank(WINCH.crankR, 1.0)).toBeCloseTo(WINCH.crankR * (1 - Math.cos(1.0)), 12)
   })
 
   it('N2 all three output cams are monotone and C1 (bounded slope, no snap) at rest', () => {
@@ -75,12 +98,80 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
     }
   })
 
-  it('N3 stagger: the outputs engage in SEQUENCE semaphore -> iris -> counterweight', () => {
-    const tSem = keepWinchEngageTheta(WINCH, WINCH.semaphore)
+  it('N3 stagger: the outputs engage in SEQUENCE dispatch boards -> counterweight -> signal flag', () => {
+    // WAVE-2 re-order (S4-2): the crank now ENDS on the flag, so the reader's
+    // last degrees of wind produce the scene's "dispatch open".
     const tIris = keepWinchEngageTheta(WINCH, WINCH.iris)
     const tCw = keepWinchEngageTheta(WINCH, WINCH.counterweight)
-    expect(tSem).toBeLessThan(tIris)
+    const tSem = keepWinchEngageTheta(WINCH, WINCH.semaphore)
     expect(tIris).toBeLessThan(tCw)
+    expect(tCw).toBeLessThan(tSem)
+    // and the flag is the LAST thing still moving at the stop.
+    expect(WINCH.semaphore.L + WINCH.semaphore.sMax).toBeCloseTo(keepWinchStrokeFull(WINCH), 12)
+  })
+
+  it('S4-2 gearing: meaningful travel spans a real crank, and no window of it is dead', () => {
+    // The blind reader measured "dead for 23deg, complete by 45deg, then
+    // free-spin forever". The gate: the wind is at least 300deg, and no 12deg
+    // window of it is dead — every step of the reader's crank moves something.
+    expect(deg(THETA_MAX)).toBeGreaterThanOrEqual(300)
+    // Windows are taken over the WORKING span: the final pawl band is meant to be
+    // still (that is where the wheel itself stiffens and says "done"), so a dead
+    // window there is the design, not a defect.
+    const STEP = rad(12)
+    const WORK = THETA_MAX - rad(24)
+    let deadest = Infinity
+    let deadAt = 0
+    for (let th = 0; th + STEP <= WORK + 1e-9; th += STEP / 2) {
+      let moved = 0
+      for (const which of ['semaphore', 'iris', 'counterweight'] as const) {
+        const a = keepWinchOutputValue(WINCH, which, th, REST)
+        const b = keepWinchOutputValue(WINCH, which, th + STEP, REST)
+        // Normalized against each output's own range, so a drop and a sweep are
+        // compared as fractions of what the reader can actually see change.
+        moved += Math.abs(b - a) / WINCH[which].range
+      }
+      if (moved < deadest) {
+        deadest = moved
+        deadAt = th
+      }
+    }
+    expect(deadest, `deadest 12deg window opens at ${deg(deadAt).toFixed(0)}deg`).toBeGreaterThan(0.01)
+  })
+
+  it('S4-2 end-stop: the wheel runs into a pawl — stiffens, seats, never reverses, never free-spins', () => {
+    for (const f of [0, 0.25, 0.5, 0.75]) {
+      const th = THETA_MAX * f
+      expect(keepWinchShownTheta(WINCH, th)).toBeCloseTo(th, 12)
+    }
+    // never runs backwards under the hand (that would read as a bug, not a detent)
+    let prev = -Infinity
+    for (let i = 0; i <= 2000; i++) {
+      const shown = keepWinchShownTheta(WINCH, (THETA_MAX * i) / 2000)
+      expect(shown).toBeGreaterThanOrEqual(prev)
+      prev = shown
+    }
+    // it visibly gives up travel at the stop, and its response fades to nothing
+    const seated = THETA_MAX - keepWinchShownTheta(WINCH, THETA_MAX)
+    expect(deg(seated)).toBeGreaterThan(6)
+    const slopeAt = (th: number): number =>
+      (keepWinchShownTheta(WINCH, th) - keepWinchShownTheta(WINCH, th - 1e-5)) / 1e-5
+    expect(slopeAt(THETA_MAX * 0.5)).toBeCloseTo(1, 3)
+    expect(slopeAt(THETA_MAX - rad(12))).toBeLessThan(0.6)
+    expect(slopeAt(THETA_MAX)).toBeLessThan(0.02)
+    // past the stop the wheel is DEAD, not free-spinning
+    expect(keepWinchShownTheta(WINCH, THETA_MAX * 4)).toBeCloseTo(keepWinchShownTheta(WINCH, THETA_MAX), 12)
+    const [tL, tR] = bloom(REST)
+    const atStop = keepWinchDiscQuad(WINCH, THETA_MAX, tL, tR)
+    const wayPast = keepWinchDiscQuad(WINCH, THETA_MAX * 4, tL, tR)
+    for (let c = 0; c < 4; c++) expect(dist(atStop[c], wayPast[c])).toBeLessThan(1e-12)
+    // and the outputs still reach full travel at the raw stop — the click is free
+    for (const which of ['semaphore', 'iris', 'counterweight'] as const) {
+      expect(keepWinchOutputValue(WINCH, which, THETA_MAX, REST)).toBeCloseTo(
+        WINCH[which].range * keepWinchEnvelope(WINCH, REST),
+        10
+      )
+    }
   })
 
   it('N4 body containment: every output BODY folds into the page at book-closed for ANY frozen theta', () => {
@@ -116,11 +207,115 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
     expect(keepWinchIrisQuads(WINCH, THETA_MAX, REST, ...bloom(REST)).length).toBe(KEEP_WINCH_IRIS_SHUTTERS)
   })
 
-  it('N5 ergonomics: THETA_MAX is the crank inverse of s_full and inside the 270deg ceiling (~112.6deg)', () => {
+  it('N5 ergonomics: THETA_MAX is the GEARED crank inverse of s_full — one full crank, not a flick', () => {
     const sFull = keepWinchStrokeFull(WINCH)
-    expect(THETA_MAX).toBeCloseTo(Math.acos(1 - sFull / WINCH.crankR), 12)
-    expect(deg(THETA_MAX)).toBeLessThanOrEqual(270)
-    expect(deg(THETA_MAX)).toBeCloseTo(112.6, 0)
+    const N = keepWinchReduction(WINCH)
+    const PH = keepWinchPhase(WINCH)
+    expect(THETA_MAX).toBeCloseTo(N * (Math.acos(Math.cos(PH) - sFull / WINCH.crankR) - PH), 12)
+    // One comfortable crank: past a full turn, well short of the re-grip a
+    // reader would resent.
+    expect(deg(THETA_MAX)).toBeGreaterThanOrEqual(300)
+    expect(deg(THETA_MAX)).toBeLessThanOrEqual(450)
+    expect(deg(THETA_MAX)).toBeCloseTo(301.7, 0)
+  })
+
+
+  // --- S4-4 THE SIGNAL MAST ------------------------------------------------
+  // The blind reader could not name the paddle at all, reported it "sitting
+  // on/through the weathervane raven's back" at rest, and — once the winch had
+  // hoisted it — "floating alone in black sky with no rope, mast or cable
+  // connecting it to anything... a detached prop that escaped its parent".
+  //
+  // Both halves are SCREEN-SPACE facts, so they are gated in screen space: the
+  // book's pinned reading camera, the same eye the composition benches use.
+  // Boxes are derived from the solvers, never eyeballed off a capture.
+  const CAM: Vec3 = [0, 1.85, 3.05]
+  const LOOK: Vec3 = [0, 0.38, 0.05]
+  const vunit = (v: Vec3): Vec3 => {
+    const l = Math.hypot(v[0], v[1], v[2])
+    return [v[0] / l, v[1] / l, v[2] / l]
+  }
+  const vsub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+  const vcross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ]
+  const vdot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const FWD = vunit(vsub(LOOK, CAM))
+  const RIGHT = vunit(vcross(FWD, [0, 1, 0]))
+  const UP = vcross(RIGHT, FWD)
+  const VIEW_W = 1600
+  const FOCAL = 1.2
+  /** Screen px at 1600x900, y DOWN. */
+  const project = (p: Vec3): [number, number] => {
+    const d = vsub(p, CAM)
+    const z = vdot(d, FWD)
+    return [
+      (VIEW_W / 2) * (1 + (vdot(d, RIGHT) / z) * FOCAL),
+      (VIEW_W / 2) * (1 - (vdot(d, UP) / z) * FOCAL),
+    ]
+  }
+  type SBox = { x0: number; x1: number; y0: number; y1: number }
+  const screenBox = (quads: readonly PanelQuad[]): SBox => {
+    let x0 = Infinity
+    let x1 = -Infinity
+    let y0 = Infinity
+    let y1 = -Infinity
+    for (const q of quads)
+      for (const pt of q) {
+        const [x, y] = project(pt)
+        x0 = Math.min(x0, x)
+        x1 = Math.max(x1, x)
+        y0 = Math.min(y0, y)
+        y1 = Math.max(y1, y)
+      }
+    return { x0, x1, y0, y1 }
+  }
+  const overlaps = (a: SBox, b: SBox): boolean =>
+    a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
+
+  it('S4-4 the signal arm clears the crown raven on screen, at rest and all the way up', () => {
+    const [tL, tR] = bloom(REST)
+    const raven = keepStackSpireRaven(KEEP, tL, tR)
+    expect(raven, 'the keep still carries its crown raven').not.toBeNull()
+    const ravenBox = screenBox([raven!.crestL, raven!.crestR])
+    // The arm must sit ABOVE the raven's screen box at every wind, with real
+    // daylight between them (a 1px miss is not a fix a reader can see).
+    const CLEAR_PX = 8
+    for (let i = 0; i <= 40; i++) {
+      const theta = (THETA_MAX * i) / 40
+      const armBox = screenBox([keepWinchSemaphoreQuad(WINCH, theta, REST, tL, tR)])
+      expect(
+        armBox.y1,
+        `arm bottom ${armBox.y1.toFixed(1)} vs raven top ${ravenBox.y0.toFixed(1)} at theta ${deg(theta).toFixed(0)}`
+      ).toBeLessThan(ravenBox.y0 - CLEAR_PX)
+      expect(overlaps(armBox, ravenBox)).toBe(false)
+    }
+  })
+
+  it('S4-4 the mast carries the paddle: it stands on the loft lid and reaches the pivot, unbroken', () => {
+    const [tL, tR] = bloom(REST)
+    // rooted on the keep's own spire seat (the loft lid), not in the air
+    expect(WINCH.semaphore.mastFootX).toBeCloseTo(keepStackSeatHeight(KEEP), 12)
+    const mast = keepWinchMastQuad(WINCH, tL, tR)
+    const armAtRest = keepWinchSemaphoreQuad(WINCH, 0, REST, tL, tR)
+    // the mast HEAD and the arm PIVOT are the same line — no gap to read as a
+    // floating prop (this is the whole finding)
+    const mastHead: Vec3[] = [mast[2], mast[3]]
+    const armBase: Vec3[] = [armAtRest[0], armAtRest[1]]
+    let worstGap = 0
+    for (const h of mastHead) {
+      worstGap = Math.max(worstGap, Math.min(...armBase.map((b) => dist(h, b))))
+    }
+    expect(worstGap).toBeLessThan(1e-9)
+    // and it is a MAST, not a wall: long, and narrower than a tenth of its run
+    const mastBox = screenBox([mast])
+    expect(mastBox.y1 - mastBox.y0).toBeGreaterThan(100) // screen px of post
+    expect(mastBox.x1 - mastBox.x0).toBeLessThan((mastBox.y1 - mastBox.y0) / 8)
+    // it folds into the page with the arm it carries (same residual budget)
+    for (const q of [keepWinchMastQuad(WINCH, Math.PI, Math.PI)])
+      for (const pt of q) expect(Math.abs(pt[1])).toBeLessThanOrEqual(0.02)
   })
 
   it('N7 real-time: the autonomous collapse (page turn at frozen full twist) stays under the global cap', () => {
@@ -288,6 +483,8 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
       for (let ti = 0; ti <= 200; ti++) {
         const theta = (THETA_MAX * ti) / 200
         const bodies: ReadonlyArray<{ name: string; quads: PanelQuad[]; isHost: (s: string, f: string) => boolean }> = [
+          // The mast's glued host is the loft LID it stands on (the legal joint).
+          { name: 'mast', quads: [keepWinchMastQuad(WINCH, tL, tR)], isHost: (st, f) => st === 'loft' && (f === 'lidL' || f === 'lidR') },
           { name: 'semaphore', quads: [keepWinchSemaphoreQuad(WINCH, theta, beta, tL, tR)], isHost: () => false },
           { name: 'iris', quads: keepWinchIrisQuads(WINCH, theta, beta, tL, tR), isHost: isIrisHost },
           { name: 'counterweight', quads: (() => { const cw = keepWinchCounterweightDeck(WINCH, theta, beta, tL, tR); return [cw.crestL, cw.crestR] })(), isHost: isCwHost },
@@ -300,13 +497,16 @@ describe('tower-hoist winch — D6/N gates (bench derive-keep-winch.mjs)', () =>
                 worst = `${body.name} x ${B.story}[${B.face}] @ ${label} theta ${deg(theta).toFixed(0)}`
               }
         for (let a = 0; a < bodies.length; a++)
-          for (let b = a + 1; b < bodies.length; b++)
+          for (let b = a + 1; b < bodies.length; b++) {
+            // mast x semaphore share the pivot line — that IS the mechanism.
+            if (bodies[a].name === 'mast' && bodies[b].name === 'semaphore') continue
             for (const A of bodies[a].quads)
               for (const B of bodies[b].quads)
                 if (illegal(A, B, tL, tR)) {
                   illegalCount++
                   worst = `${bodies[a].name} x ${bodies[b].name} @ ${label}`
                 }
+          }
       }
     }
     expect(illegalCount, worst).toBe(0)

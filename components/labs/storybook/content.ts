@@ -665,9 +665,9 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
   // discR = crankR = 0.13, pin on the rim) that the reader TWISTS; a Scotch-yoke
   // crank drives THREE staggered outputs in sequence off one drag — the
-  // semaphore paddle up (engages 0deg), the roost-mouth shutters ajar around the
-  // loft (55deg), the counterweight sash-weight descending the hall flank (81deg).
-  // THETA_MAX 112.6deg, one comfortable winding drag; release HOLDS the twist
+  // dispatch boards swinging out (0 -> 117deg), the counterweight sash-weight
+  // descending the belfry mouth (90 -> 184deg), the signal flag rising
+  // (164 -> 302deg). THETA_MAX 302deg — a real crank — and release HOLDS the twist
   // (H4, the disc remembers). RIGID-FOLD re-derivation (2026-07-16): the iris is
   // 4 shutters hinged on the loft walls (off-wall reach 0.10*sin(deploy)*E ->0 at
   // close, riding the folding wall), and the counterweight is an IN-PLANE
@@ -689,18 +689,44 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // disc downstage into the yard buys 0.14 of tower (apex 0.88 -> 1.017) and
     // seats the crank where the reader's hand already is, at the tower's foot.
     hubD: 0.52, hubZ: 0.45, discR: 0.13, crankR: 0.13,
-    // Semaphore mast lifted to baseX 0.96 to sit just above the re-massed
-    // structural crown (~0.90) so the paddle reads over the crest. armHalfW is
-    // the at-close off-page residual the N4/N8 fold-flat gates ride on; 0.0195
-    // leaves a 2.5% margin under the 0.02 paper-thickness tol.
-    semaphore: { L: 0, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 0.96, armLen: 0.1287, armHalfW: 0.0195 },
+    // WAVE-2 (S4-2). A blind reader cranked this wheel and got "one abrupt
+    // 22-degree-wide snap followed by minutes of meaningless spinning": a bare
+    // Scotch yoke tops out at half a turn, so the whole machine fired inside a
+    // flick of the wrist. `reduction: 3` puts a gear train between the hand and
+    // the yoke pin — the pull s keeps its exact range (so every fold-flat and
+    // collision proof is untouched in s) while the WIND becomes 367.9deg, just
+    // over one full crank, with something moving the whole way:
+    //   boards 0 -> 195deg, weight 164 -> 263deg, flag 244 -> 368deg.
+    // The last 24deg run into a pawl whose response fades to zero (the wheel
+    // stiffens and dies under the hand instead of silently free-spinning).
+    //
+    // phaseDeg 40: the yoke pin starts 40deg past top-dead-centre. Without it the
+    // old law's zero-slope liftoff — a virtue at 112deg of wind — becomes a
+    // 3x-longer dead zone, which is the OTHER half of what the reader hit.
+    reduction: 3, phaseDeg: 40,
+    // THE SIGNAL FLAG, now the LAST output — the crank ends on a flag going up.
+    //
+    // Re-sited baseX 0.96 -> 1.05 and given a mast (S4-4). At 0.96 the paddle's
+    // screen box (y 626.7..637.8 at the pinned camera) LANDED ON the crown
+    // raven's (y 632.1..667.1): the reader saw a grey post through the
+    // weathervane's back. At 1.05 the paddle rests at y 600.0..610.3 — 21.8px
+    // clear above the raven — and the hoist carries it to y 560.6. The mast
+    // stands on the loft lid (bisector-x 0.3648 + 0.18 = 0.5448) at the arm's own
+    // z, so the paddle is carried by a visible post; where the post passes the
+    // raven it is simply OCCLUDED by it (mast z -0.08 vs raven z +0.13), which is
+    // a roofline, not a detachment. armHalfW is the at-close off-page residual
+    // the N4/N8 fold-flat gates ride on; 0.0195 leaves a 2.5% margin under the
+    // 0.02 paper-thickness tol, and the mast shares it.
+    semaphore: { L: 0.11, sMax: 0.09, range: (90 * Math.PI) / 180, baseX: 1.05, armLen: 0.1287, armHalfW: 0.0195, mastFootX: 0.5448 },
     // Iris + counterweight hosts RE-STATIONED to the re-massed LOFT story
     // (a 0.27, height 0.18, z +-0.20, baseH 0.3648 = hall.H 0.1799 + gallery.H 0.1849).
     // Both must equal the keep's loft story (asserted by popup-keepwinch.test).
-    iris: { L: 0.055, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
+    // THE DISPATCH BOARDS lead the stagger now (L 0): the reader's first turn
+    // swings the chapter's namesake object out of the loft.
+    iris: { L: 0, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
     // Counterweight on the LOFT FRONT CAP (belfry mouth), dead-center in the
     // reading sightline; descends within the cap plane (zero off-plane reach).
-    counterweight: { L: 0.11, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
+    counterweight: { L: 0.055, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
   },
   // KEPT: the fore-edge low wall (the dispatch-yard foreground), a jutting
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its

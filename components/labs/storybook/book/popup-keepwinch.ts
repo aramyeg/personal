@@ -5,18 +5,21 @@
  * keep-derivation.md.
  *
  * THE BOARD: "twist the tower-hoist winch (disc + hub) -> ONE crank drives
- * THREE linked parts — semaphore paddle up, raven-shutter ring iris,
- * counterweight drop — with an eased settle. A paper machine, not a 1-axis
+ * THREE linked parts — dispatch boards out, counterweight drop, signal flag up
+ * — with an eased settle. A paper machine, not a 1-axis
  * tilt." Directly answers the D-series verdict ("a piece of paper tilting in a
  * choppy manner in 1 axis").
  *
  * THE DERIVATION reuses the shipped KNOB-TWIST TOWER laws verbatim (popup-
  * knobtower.ts): a die-cut disc hub-riveted flat into the LEFT page, the reader
  * twists it by theta; a Scotch-yoke crank converts the twist to a linear pull
- * s(theta) = crankR*(1 - cos theta) (slope 0 at theta=0, no liftoff snap).
+ * s(theta) = crankR*(cos(phase) - cos(theta/reduction + phase)) — bounded slope
+ * everywhere including liftoff, no snap; see the WAVE-2 GEARING note below for
+ * why the reduction and the phase exist.
  * STAGGERED slack thresholds L_k phase the three outputs into a SEQUENCE (mech
- * 90 stagger) so one drag plays semaphore -> iris -> counterweight, not three
- * things at once. Each output is a DESIGNED cam on its own progress
+ * 90 stagger) so one drag plays dispatch boards -> counterweight -> signal flag,
+ * not three things at once — and the LAST thing to move is the flag, so the
+ * reader's crank ends on a visible "dispatch open". Each output is a DESIGNED cam on its own progress
  *   p_k = clamp((s - L_k)/sMax_k, 0, 1),  out_k = range_k * sin(p_k * pi/2)
  * (finite slope at liftoff, smooth landing — the snap-free tab/rotor idiom).
  * FOLD-FLAT composition: out_shown = out(theta) * E(beta), E(0)=0 => every
@@ -32,7 +35,7 @@
  * stories), so the winch is self-contained given (thetaL, thetaR).
  */
 
-import { rivetLift } from './lift-ladder'
+import { plyLift, rivetLift } from './lift-ladder'
 import type { BoxGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { solveBoxPose } from './popup-mechanics'
 import { ROTOR_LIFT } from './popup-rotor'
@@ -42,6 +45,43 @@ const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 const rad = (d: number): number => (d * Math.PI) / 180
 
 const DEFAULT_REST_DEG = 176
+
+// ---------------------------------------------------------------------------
+// WAVE-2 GEARING (blind-review finding S4-2). The reader's verdict on the
+// original single-turn yoke was exact and damning: "nothing moves for the first
+// ~23 degrees, everything completes by ~45, and past that the wheel free-spins
+// forever." A bare Scotch yoke cannot be stretched past a half turn — s(theta)
+// = crankR(1 - cos theta) REVERSES after pi — so the wheel could never be a
+// wheel; it was a 112-degree lever wearing a capstan's clothes.
+//
+// The fix is the one a real winch uses: a REDUCTION between the crank the hand
+// turns and the yoke pin that pulls the rope. `reduction` = crank turns per
+// yoke turn, and the pin starts `phaseDeg` PAST top-dead-centre:
+//
+//   s(theta) = crankR * (cos(phase) - cos(theta / reduction + phase))
+//
+// The phase is not decoration, it is the other half of the reader's complaint.
+// The original law had ds/dtheta = 0 at theta = 0 — a deliberate "no liftoff
+// snap" — and gearing that down by 3 turns a graceful liftoff into a
+// three-times-longer DEAD ZONE, which is precisely the "nothing moves for the
+// first 23 degrees" the reader hit. Starting the pin off top-dead-centre gives a
+// finite, small liftoff slope: the wheel answers the very first degree of the
+// hand, and the slope is still bounded (no snap; gated by N2).
+//
+// Everything downstream is untouched in s: the pull keeps its exact range, so
+// every cam, every fold-flat envelope and every collision proof carries over —
+// only the hand's journey to each s gets longer, and every cam slope falls by
+// 1/reduction, which is strictly gentler.
+//
+// THE END-STOP is the third part of the finding ("no resistance, no click, no
+// visual that's it"). A bare clamp is invisible: the wheel stops tracking and
+// the reader reads that as being ignored. So the last PAWL_BAND of the wind runs
+// into a pawl — the wheel's SHOWN angle gives up PAWL_SEAT = PAWL_BAND/2 on a
+// square law, so its response to the hand fades linearly to exactly zero at the
+// stop. The wheel stiffens, seats, and dies under the hand instead of
+// free-spinning. The outputs still reach full travel at the raw stop, so the
+// click costs the machine nothing.
+const PAWL_BAND = rad(24)
 
 /** One staggered output: the crank slack `L` it waits through, the pull `sMax`
  *  it consumes to reach full travel, and `range` (radians for the angular
@@ -62,10 +102,19 @@ export type KeepWinchGeom = {
   hubZ: number
   discR: number
   crankR: number
+  /** Crank turns per yoke turn (default 1 = the bare Scotch yoke). >1 gears the
+   *  wind DOWN so meaningful travel spans a real crank instead of a flick. */
+  reduction?: number
+  /** Degrees the yoke pin starts PAST top-dead-centre (default 0). Non-zero
+   *  gives the wind a finite liftoff slope, so the first degree of the hand
+   *  already moves paper — see the WAVE-2 GEARING note. */
+  phaseDeg?: number
   /** Semaphore mast: pivot bisector-x, arm length + half-width; `range` is the
    *  sweep angle (rad). Folds flat for free — at close it lies along the fold-
-   *  invariant spine axis (0.015 residual = paper thickness). */
-  semaphore: KeepWinchOutput & { baseX: number; armLen: number; armHalfW: number }
+   *  invariant spine axis (0.015 residual = paper thickness). `mastFootX` is the
+   *  bisector-x the STATIC mast stands on (a keep lid), so the paddle is visibly
+   *  carried by a post instead of hanging in the sky (S4-4). */
+  semaphore: KeepWinchOutput & { baseX: number; armLen: number; armHalfW: number; mastFootX: number }
   /** RIGID roost-mouth shutters (re-derived 2026-07-16): 2 flaps per loft wall
    *  hinged on the wall's vertical edges, swinging out of the wall plane by the
    *  deploy angle `range` (rad). `bladeLen` is the flap length; off-wall reach =
@@ -87,18 +136,57 @@ export type KeepWinchGeom = {
   restAtDeg?: number
 }
 
-/** Scotch-yoke crank pull: s(theta) = crankR (1 - cos theta). */
-export const keepWinchCrank = (crankR: number, theta: number): number =>
-  crankR * (1 - Math.cos(theta))
+/** Crank turns per yoke turn (>= 1). */
+export const keepWinchReduction = (geom: KeepWinchGeom): number =>
+  Math.max(1, geom.reduction ?? 1)
 
-/** Strip pull for full erection: the last output's slack + its sMax. */
+/** Yoke start phase past top-dead-centre (radians, in [0, pi/2)). */
+export const keepWinchPhase = (geom: KeepWinchGeom): number =>
+  clamp(rad(geom.phaseDeg ?? 0), 0, Math.PI / 2 - 1e-6)
+
+/** Geared, phased Scotch-yoke pull:
+ *  s(theta) = crankR (cos(phase) - cos(theta/reduction + phase)).
+ *  At phase 0 this is exactly the original crankR(1 - cos(theta/reduction)). */
+export const keepWinchCrank = (crankR: number, theta: number, reduction = 1, phase = 0): number =>
+  crankR * (Math.cos(phase) - Math.cos(theta / Math.max(1, reduction) + phase))
+
+/** The crank inverse: the wind that reaches a given pull. */
+const windFor = (geom: KeepWinchGeom, s: number): number => {
+  const phase = keepWinchPhase(geom)
+  return (
+    keepWinchReduction(geom) *
+    (Math.acos(clamp(Math.cos(phase) - s / geom.crankR, -1, 1)) - phase)
+  )
+}
+
+/** Strip pull for full erection: the LAST output's slack + its sMax. The stagger
+ *  now ends on the semaphore (the flag that says "dispatch open"), so the last
+ *  output is the one the reader is looking at when the pawl bites. */
 export const keepWinchStrokeFull = (geom: KeepWinchGeom): number =>
-  geom.counterweight.L + geom.counterweight.sMax
+  Math.max(
+    geom.semaphore.L + geom.semaphore.sMax,
+    geom.iris.L + geom.iris.sMax,
+    geom.counterweight.L + geom.counterweight.sMax
+  )
 
-/** Total knob wind for full erection: THETA_MAX = acos(1 - s_full/crankR), the
- *  crank inverse (radians). acos caps at pi <= the 270deg ergonomic ceiling. */
+/** Total knob wind for full erection — the geared, phased crank inverse of
+ *  s_full (radians). */
 export function keepWinchThetaMax(geom: KeepWinchGeom): number {
-  return Math.acos(clamp(1 - keepWinchStrokeFull(geom) / geom.crankR, -1, 1))
+  return windFor(geom, keepWinchStrokeFull(geom))
+}
+
+/** The angle the WHEEL is drawn at for a raw wind theta — the pawl. Identity
+ *  everywhere except the last PAWL_BAND of the wind, where the wheel gives up
+ *  band/2 of travel on a square law, so its response to the hand fades linearly
+ *  to zero exactly at the stop: it stiffens, seats, and goes dead rather than
+ *  free-spinning. Never decreasing. The outputs ignore this and keep driving off
+ *  the raw theta, so the click is free. */
+export function keepWinchShownTheta(geom: KeepWinchGeom, theta: number): number {
+  const max = keepWinchThetaMax(geom)
+  const t = clamp(theta, 0, max)
+  const band = Math.min(PAWL_BAND, max * 0.5)
+  const u = clamp((t - (max - band)) / band, 0, 1)
+  return t - (band / 2) * u * u
 }
 
 /** Page-openness envelope E(beta) — the shared fold-flat cam (E(0)=0 exact). */
@@ -115,7 +203,12 @@ const outCam = (s: number, out: KeepWinchOutput): number =>
 
 /** The crank pull at a frozen (clamped) knob angle. */
 const strokeAt = (geom: KeepWinchGeom, theta: number): number =>
-  keepWinchCrank(geom.crankR, clamp(theta, 0, keepWinchThetaMax(geom)))
+  keepWinchCrank(
+    geom.crankR,
+    clamp(theta, 0, keepWinchThetaMax(geom)),
+    keepWinchReduction(geom),
+    keepWinchPhase(geom)
+  )
 
 /** Shown output value at (theta, beta) with the fold-flat envelope: the
  *  semaphore sweep angle / iris open angle (radians) or the counterweight drop
@@ -133,7 +226,7 @@ export function keepWinchOutputValue(
 /** The knob angle at which an output ENGAGES (its slack is consumed): the crank
  *  inverse of L. Ordered sem <= iris <= cw is the stagger sequence (gate N3). */
 export const keepWinchEngageTheta = (geom: KeepWinchGeom, out: KeepWinchOutput): number =>
-  Math.acos(clamp(1 - out.L / geom.crankR, -1, 1))
+  windFor(geom, out.L)
 
 // ---------------------------------------------------------------------------
 // Poses. The disc rides the PAGE frame; the outputs ride the KEEP bisector.
@@ -176,8 +269,11 @@ export function keepWinchDiscQuad(
 ): PanelQuad {
   const { u, center } = pageFrame(geom, thetaL, thetaR)
   const e2: Vec3 = [0, 0, 1]
-  const ca = Math.cos(theta)
-  const sa = Math.sin(theta)
+  // The wheel shows the PAWL angle, not the raw wind: the last stretch stiffens
+  // and seats. Rigid rotation either way, so the handle stays a rigid handle.
+  const shown = keepWinchShownTheta(geom, theta)
+  const ca = Math.cos(shown)
+  const sa = Math.sin(shown)
   const pu: Vec3 = [u[0] * ca + e2[0] * sa, u[1] * ca + e2[1] * sa, u[2] * ca + e2[2] * sa]
   const pv: Vec3 = [-u[0] * sa + e2[0] * ca, -u[1] * sa + e2[1] * ca, -u[2] * sa + e2[2] * ca]
   const R = geom.discR
@@ -196,6 +292,32 @@ export function keepWinchDiscQuad(
 // above the crest (baseX 0.9 > 0.844) so it reads, and winds up vertical behind
 // the raven.
 const SEMAPHORE_BASE_Z = -0.08
+
+/** One paper ply of glue seam between the mast's foot and the lid it stands on. */
+const MAST_FOOT_SEAM = plyLift(1)
+
+/** THE SIGNAL MAST (S4-4) — a STATIC post standing on a keep lid at the arm's
+ *  own z, running up the crown's back to the paddle pivot. The blind reader
+ *  could not name the paddle and, once hoisted, read it as "a detached prop
+ *  that escaped its parent"; a post is the whole answer. It is a rigid quad in
+ *  the keep bisector frame at bisector-y ~ 0, so at book-close it lies ALONG
+ *  the page (world-Y residual = armHalfW, the same paper-thickness residual the
+ *  arm already rides) and its wedge term is bx*sin(beta/2) >= 0 for free. */
+export function keepWinchMastQuad(
+  geom: KeepWinchGeom,
+  thetaL: number,
+  thetaR: number
+): PanelQuad {
+  const W = keepFrame(thetaL, thetaR)
+  const s = geom.semaphore
+  const w = s.armHalfW
+  const z = SEMAPHORE_BASE_Z
+  // The foot sits one paper ply ABOVE the lid it stands on — the glue-seam
+  // convention every seated rider in this book uses, and what keeps the A9
+  // rest-separation gate an honest "nothing pierces anything".
+  const foot = Math.min(s.mastFootX + MAST_FOOT_SEAM, s.baseX)
+  return [W(foot, -w, z), W(foot, w, z), W(s.baseX, w, z), W(s.baseX, -w, z)]
+}
 
 export function keepWinchSemaphoreQuad(
   geom: KeepWinchGeom,
@@ -248,14 +370,22 @@ const seatPt = (F: SeatFrame, s: number, r: number, lift: number): Vec3 => [
 /** Number of roost-mouth shutters the iris renders (2 per loft wall x 2 walls). */
 export const KEEP_WINCH_IRIS_SHUTTERS = 4
 
-// Shutter hinge height band up the wall (fractions r of the loft wall). Narrowed
-// 0.25..0.85 -> 0.461..0.639 so each shutter's mesh aspect (hinge-span world /
-// bladeLen) matches the delivered iris art (0.319 w/h — a tall narrow shutter).
+// Shutter hinge height band up the wall (fractions r of the loft wall).
+//
+// WAVE-2 (S4-3): the band was 0.461..0.639, an aspect of 0.319 chosen to match
+// a delivered placeholder strip — which is how the spread's loudest interactive
+// payoff ended up as four narrow planks the blind reader called "construction
+// scaffolding". These are the DISPATCH BOARDS of the chapter title, so they are
+// now boards: the band opens to 0.28..0.84, a hinge span of 0.56 of the loft
+// wall (0.1008 world) against bladeLen 0.10 — a near-square board with room for
+// pinned route slips, seals and a perched raven.
+//
 // bladeLen is HELD at 0.10, so the off-wall reach (bladeLen*sin deploy) and thus
-// the winch N8 wedge / N4 fold-flat proofs are unchanged; only the in-wall hinge
-// span (along e2, up the folding wall) shrinks.
-const IRIS_R_LO = 0.461
-const IRIS_R_HI = 0.639
+// the winch N8 wedge / N4 fold-flat proofs are untouched: only the in-wall hinge
+// span (along e2, up the folding wall) changes, and an in-wall span folds with
+// the wall it is cut into.
+const IRIS_R_LO = 0.28
+const IRIS_R_HI = 0.84
 
 /** The roost-mouth shutters — 2 rigid flaps hinged on the VERTICAL edges of
  *  each loft wall (wallL, wallR), covering the mouths when closed and swinging
@@ -367,6 +497,7 @@ export function keepWinchOutputQuads(
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
   const cw = keepWinchCounterweightDeck(geom, theta, beta, thetaL, thetaR)
   return [
+    keepWinchMastQuad(geom, thetaL, thetaR),
     keepWinchSemaphoreQuad(geom, theta, beta, thetaL, thetaR),
     ...keepWinchIrisQuads(geom, theta, beta, thetaL, thetaR),
     cw.crestL,

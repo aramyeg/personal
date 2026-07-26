@@ -104,6 +104,7 @@ function knownGoodIds(): ReadonlySet<string> {
     // the three output bodies.
     if (layer.mech === 'keepwinch') {
       ids.add(`${layer.id}-disc`)
+      ids.add(`${layer.id}-mast`)
       ids.add(`${layer.id}-semaphore`)
       ids.add(`${layer.id}-iris`)
       ids.add(`${layer.id}-counterweight`)
@@ -231,7 +232,13 @@ describe('art call sheet — doc/code sync (D-G7)', () => {
         }
       }
       if (layer.mech === 'keepwinch') {
-        constructed.push(`${layer.id}-disc`, `${layer.id}-semaphore`, `${layer.id}-iris`, `${layer.id}-counterweight`)
+        constructed.push(
+          `${layer.id}-disc`,
+          `${layer.id}-mast`,
+          `${layer.id}-semaphore`,
+          `${layer.id}-iris`,
+          `${layer.id}-counterweight`
+        )
       }
       if (layer.mech === 'skyline') {
         layer.rows.forEach((_, i) => constructed.push(`${layer.id}-mound${i}`))
