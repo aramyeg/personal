@@ -861,21 +861,13 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // no per-chapter requirement (composition-covenant STAGE_SET_SPREADS), the
   // family still ships on ch6-steps and satchel-table, and s5's depth is
   // carried by the four graded range planes the chapter was rebuilt around.)
-  // D1 TAB PIECE: the hoard's loose gold rises as a MOUND on the right
-  // page, its tab creeping out of the fore edge as the spread blooms —
-  // the treasure literally grows when the book opens. Strip-driven family
-  // beyond the satchel (palette law), opposite side from ch5's table.
-  // D6 THE HAND re-site: the old z-band (0.08..0.36) put the fore-edge tab
-  // exactly behind the right-column HTML plaque (tab screen box inside the
-  // card's box), so the pull handle was hidden at grab time. The band moved
-  // DOWNSTAGE to 0.26..0.54 (tab centre 0.40) so the tab projects clear
-  // BELOW the plaque's bottom edge at the resting/grab-hover view (probe:
-  // +41px neutral, +10px at grab-hover; the mound's parallax swing still
-  // grazes the plaque only at the mouse-far-corner extreme — inherent to the
-  // book's tilt, not a grab-time state). Still clear of the midground wall's
-  // glue (z ~0.04) and the spine-hugging chest (x <= ~0.24; z overlap is at a
-  // disjoint x, no crossing). Ships at the same 218/13 spread-5 ceilings.
-  { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.26, z1: 0.54, legW: 0.26, liftDeg: 55 },
+  // BECKON ORDER (E3 W2 S5-7): the dissolve is listed BEFORE the gold pile.
+  // handle-beckon.ts picks a spread's primary playable by family rank and
+  // breaks ties by content order, and dissolve/tabpiece rank equally — so the
+  // author's reading order is the vote. The blind reader called the golden
+  // arcade behind this rack "the best image on the spread and the literal
+  // payoff of the text", invisible at rest behind the least discoverable
+  // control. The spread's one invitation now twitches THAT.
   // E2.2 PULL-TAB DISSOLVE (Birmingham 92/93/119; bench derive-dissolve.mjs):
   // the book's first paper CROSSFADE and a genuinely NEW mechanism family for
   // G1. A page-flat rack of 6 venetian SLATS in the open sand field on the LEFT
@@ -892,11 +884,54 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // turn-culled (Batch C-3, the dial-class lever): interaction-only + page-
   // flat, it stops drawing through the fast middle of a turn and ramps back
   // inside the landing-settle window (~13 draws returned on the s4->s5 peak).
-  { id: 'ch4-dissolve', kind: 'midground', role: 'story', mech: 'dissolve', side: 'left', d0: 0.46, d1: 0.98, z0: 0.2, z1: 0.6, slats: 6, stroke: 0.14, turnCull: true },
-  // The ember-sashed camel caravan FRIEZE (replaces the retired flat
-  // ch4-foreground fringe): one linked-chain cutout walking INTO the picture
-  // toward the PULL tab. Art constraint (pack §4.2): silhouette dips <= 0.06
-  // in x in [-0.75, -0.44] (camel-leg gaps) to keep the placard sightline.
+  // E3 W2 S5-1/S5-7: tabW 0.1 -> 0.26 and a 0.06 TONGUE past the fore edge at
+  // rest, taking the handle from a measured 24x27 screen px ("a tiny gold
+  // splinter"; found on the eighth scripted attempt) to 78x70 — a 7.5x hit area.
+  // The tongue is paper the binder cut long, not a change to the drive
+  // (dissolveTabOut still equals the draw exactly), and the latched-gold state
+  // already reached 0.14 past the trim, so nothing about the closed book is
+  // newly out of bounds. 0.06 rather than more: the tongue's outer corner lands
+  // at screen x 217 against the narration's last line, which ends at x 213 — the
+  // handle stays clear of the HTML column that hid the OTHER tab in D6.
+  // The rack's own slats are grab surfaces now too (popup-dissolve-layer.tsx),
+  // which is the half of the fix that makes the CLIMAX findable: the reader
+  // presses the picture, and the picture turns to gold.
+  { id: 'ch4-dissolve', kind: 'midground', role: 'story', mech: 'dissolve', side: 'left', d0: 0.46, d1: 0.98, z0: 0.2, z1: 0.6, slats: 6, stroke: 0.14, tabW: 0.26, tabTip: 0.06, turnCull: true },
+  // D1 TAB PIECE: the hoard's loose gold rises as a MOUND on the right
+  // page, its tab creeping out of the fore edge as the spread blooms —
+  // the treasure literally grows when the book opens. Strip-driven family
+  // beyond the satchel (palette law), opposite side from ch5's table.
+  // D6 THE HAND re-site: the old z-band (0.08..0.36) put the fore-edge tab
+  // exactly behind the right-column HTML plaque (tab screen box inside the
+  // card's box), so the pull handle was hidden at grab time. The band moved
+  // DOWNSTAGE to 0.26..0.54 (tab centre 0.40) so the tab projects clear
+  // BELOW the plaque's bottom edge at the resting/grab-hover view (probe:
+  // +41px neutral, +10px at grab-hover; the mound's parallax swing still
+  // grazes the plaque only at the mouse-far-corner extreme — inherent to the
+  // book's tilt, not a grab-time state). Still clear of the midground wall's
+  // glue (z ~0.04) and the spine-hugging chest (x <= ~0.24; z overlap is at a
+  // disjoint x, no crossing). Ships at the same 218/13 spread-5 ceilings.
+  // E3 W2 S5-1: tabW 0.1 -> 0.24. The blind reader measured this handle at
+  // 100x25 screen px ("a flat grey plate floating in the black off-page void")
+  // and found it only by brute-force-sweeping a 1500-point hover grid. 0.24 is
+  // the strip's own z-extent (0.28) less a binder's margin, so the tongue is now
+  // exactly as wide as the paper that drives it — the widest a tab can honestly
+  // be — and it takes painted art (`ch4-goldpile-tab`) instead of the shared
+  // grey kraft grip (BW-13).
+  { id: 'ch4-goldpile', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'right', form: 'mound', hingeX: 0.9, z0: 0.26, z1: 0.54, legW: 0.26, liftDeg: 55, tabW: 0.24 },
+  // THE PASSAGE OF GLASS (E3 W2 S5-3, repaint of the caravan frieze). The
+  // chapter's whole point — "passages of glass through which the people could
+  // reach their gold" — was text-only: the blind reader found the frieze's own
+  // ground bar and called it "a thin white/silver rail... it reads as a metal
+  // bar", and read the dune ranks' violet lee flanks as "pale translucent
+  // quadrilaterals, unfinished geometry". So the frieze IS the passage now: a
+  // glazed gallery in elevation (kerb, mullions, arched glazing, gold top rail)
+  // with the caravan walking INSIDE it toward the vault's own reveal. Same card,
+  // same station, same height — geometry untouched, the paint carries it.
+  // Art constraint (pack §4.2, kept): silhouette dips <= 0.06 world in
+  // x in [-0.75, -0.44] (u <= 0.207) — the gallery's PORTAL mouth stands at
+  // u ~ 0.21 and only the low kerb continues past it, so the dissolve placard
+  // still reads through.
   { id: 'ch4-frieze', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.16 },
 ]
 

@@ -818,7 +818,12 @@ describe('A2/A12 rigidity — the paper does not stretch (multi-patch included)'
       // A tab piece's TAB quad is exempt: it is the clipped VIEW of a longer
       // rigid strip emerging through the fore-edge slit — its visible extent
       // legitimately grows with the draw. The structure panels stay rigid.
-      const tabIndex = layer.mech === 'tabpiece' ? refQuads.length - 1 : -1
+      // The DISSOLVE's tab quad is exempt for exactly the same reason, and for
+      // the same mechanism: its strip now carries an automatic slack take-up
+      // (dissolveTabTip), so opening the book presents the tongue and closing
+      // it withdraws it — the same page-driven draw the tab piece runs on.
+      const tabIndex =
+        layer.mech === 'tabpiece' || layer.mech === 'dissolve' ? refQuads.length - 1 : -1
       const refDists = refQuads.map((q) => {
         const ds: number[] = []
         for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) ds.push(dist(q[a], q[b]))
