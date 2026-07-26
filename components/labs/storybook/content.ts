@@ -486,56 +486,125 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // hinge at z 0.15 — upstage of the winch disc (z 0.17+) and the dial (0.21+),
   // so the cliffs are BEHIND the keep facade and outboard of its cone: they
   // block 0.0% of the hall / gallery / spire sightline rays (bench S3).
+  // ==========================================================================
+  // E3 s4 ROUND-4 — "THE RAVEN CITY". The r3 mirror is RETIRED (ch3-cliff-l /
+  // ch3-cliff-r, and with them ch3-skyline-l and the ch3-ring-tower gatehouse).
+  // The user's verdict on the canyon was "still needs to be bigger and to have
+  // some structures revised, maybe adding some asymmetry will help" — and the
+  // mirror was the problem underneath all three notes: two near-identical
+  // cliffs flanking the gutter make a SYMMETRY, and a symmetry has no scale,
+  // because there is nothing for the eye to measure the big thing against.
+  //
+  // So the spread is rebuilt as ONE DIAGONAL SWEEP: a colossal crooked rookery
+  // tower climbing the left page past the keep's crown, a working dispatch line
+  // falling across the spread with letter-baskets on it, and a low sprawl of
+  // terraced roosts on the right where the ravens land. Asymmetry IS the
+  // composition. Derived in three benches — e3s4r4-tower.mjs, e3s4r4-cable.mjs,
+  // e3s4r4-city.mjs — all gates green.
+  //
+  // THE CROOKED COLOSSUS. apex 1.017 (the r3 cliff was 0.816), chain length
+  // 1.045, four UNEVEN storeys. Three things had to be derived to get here:
+  //
+  //  (a) THE WALL WAS A TAPE MEASURE, NOT KINEMATICS. A ribbon's closed
+  //      footprint costs its full chain length in page depth, so
+  //      L <= zc + PAGE_H/2 — and the winch disc's closed footprint pinned zc
+  //      at 0.155, capping apex near 0.88 before the physics was even asked.
+  //      The disc moves downstage (hubZ 0.30 -> 0.45) and buys 0.14 of tower.
+  //      That move is structural, not cosmetic.
+  //  (b) THE TRAPEZOID CHAIN. Per-node radial spans (rTop / wTop) cost nothing
+  //      in the page-local (xi, eta) plane and give the whole crooked-tower
+  //      vocabulary: widths taper 0.300 -> 0.203 as it climbs, while the inner
+  //      edge ZIG-ZAGS 0.420 -> 0.445 -> 0.425 -> 0.450 -> 0.440, so the stack
+  //      kicks out at the gantry belt and pulls back at the belfry. A tower
+  //      that grew too fast to stand straight, in plan.
+  //  (c) THE PER-NODE ROTATION RADIUS. The r3 cam charged every node the
+  //      widest node's radius; the honest hypot(r_j + w_j, eta_j) widened the
+  //      crown's hold-through-midturn window from 0.136 to 0.515, which is what
+  //      makes a tower this tall affordable at all.
+  //
+  // (A fourth lever, the CROWN FLAP — a fold-back top storey deployed LAST —
+  // was derived, proved legal, and NOT shipped: it buys chain past the depth
+  // budget at pi x h of joint arc, and break-even needs relDeg > 180 - rootDeg,
+  // which is not a crown. The bench keeps it measured, with a negative control.)
   {
-    id: 'ch3-cliff-l', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
-    side: 'left', F: 0.43, w: 0.3, zc: 0.15, rootDeg: 58, safe: 0.95, camRestDeg: 173,
+    id: 'ch3-tower', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
+    side: 'left', F: 0.42, w: 0.3, zc: 0.3, rootDeg: 74, safe: 0.98, camRestDeg: 173,
     style: 'ribbon',
-    // Three storeys, tapered 0.78 up the chain: the base rank of portals is the
-    // widest band of art, the crown the narrowest. relDeg 20 tips each storey
-    // 20deg more upright than the one below, so the cliff face CURVES up and
-    // over the canyon (58 / 78 / 98deg) instead of reading as one raked card.
     stages: [
-      { h: 0.368449, relDeg: 0 },
-      { h: 0.28739, relDeg: 20 },
-      { h: 0.224161, relDeg: 20 },
+      // 1 — the buttressed foot: the widest storey, the rank of big gate arches.
+      { h: 0.301206, relDeg: 0, rTop: 0.445, wTop: 0.276 },
+      // 2 — the squat gantry belt, shoved OUTBOARD (the first kink).
+      { h: 0.221294, relDeg: 1.8, rTop: 0.425, wTop: 0.2613 },
+      // 3 — the tall belfry storey, pulled back INBOARD (the second kink).
+      { h: 0.28174, relDeg: 1.4, rTop: 0.45, wTop: 0.2274 },
+      // 4 — the crown, kicking back out over the canyon. The dispatch line's
+      //     first stretch and its gantry arm are DIE-CUT into this storey's
+      //     sheet: the cable leaves the tower on the tower's own paper.
+      { h: 0.24076, relDeg: 4.9, rTop: 0.44, wTop: 0.2031 },
     ],
   },
+  // THE DISPATCH LINE — the working cable, and the spread's new playable.
+  //
+  // A cable CANNOT cross the gutter here, and the bench says why in three
+  // measurements: a cross-gutter thread carries ~1.2 of slack at book-closed; a
+  // dress overhang reaching spine-ward dies at the backdrop-wings wedge
+  // (rnear -> 0); and a gutter-anchored die-cut v-fold — the answer that should
+  // have worked, since a v-fold IS spine-anchored — rakes its crest through
+  // z = apexZ + height*vDir*cos(lambda(beta)), an excursion of ~1.25 x height,
+  // straight through the volume the keep occupies. HOUSE LAW: the keep owns the
+  // gutter. A second gutter-class piece must be short or seated on the stack.
+  //
+  // So the line crosses the gutter the way a cut-paper book crosses anything:
+  // the reader's eye does. It leaves the tower's crown storey (die-cut there),
+  // passes the keep's spire lantern (painted on a piece already standing), and
+  // lands HERE — a page-rooted die-cut panel carrying the long swooping run,
+  // the basket lanterns, and the basket the reader pushes down the wire.
+  // Upstage of everything (zc -0.28) so the baskets fly BEHIND the roosts.
   {
-    id: 'ch3-cliff-r', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
-    side: 'right', F: 0.43, w: 0.3, zc: 0.15, rootDeg: 48, safe: 0.95, camRestDeg: 173,
+    id: 'ch3-dispatch-line', kind: 'backdrop', role: 'scenery', mech: 'dispatchline',
+    side: 'right', F: 0.415, w: 0.315, zc: -0.28, rootDeg: 82, safe: 0.95, camRestDeg: 173,
     style: 'ribbon',
-    // The canyon's other wall is deliberately NOT a mirror (variety law): two
-    // taller storeys, a much flatter 48deg rake and a stronger 22deg terrace, so
-    // it reads as a long shelving scarp against the left's stepped massif. Apex
-    // 0.736 vs the left's 0.816 keeps a clear hierarchy across the gutter, and
-    // the flatter rake is why it still out-masses the old ring (46.9k px^2).
     stages: [
-      { h: 0.463158, relDeg: 0 },
-      { h: 0.416842, relDeg: 22 },
+      { h: 0.27, relDeg: 0, rTop: 0.415, wTop: 0.315 },
+      // The upper storey kicks 9deg downstage so the sheet's top edge leans out
+      // and the die-cut cable reads as hanging in the air, not pasted on a wall.
+      { h: 0.2, relDeg: 9, rTop: 0.415, wTop: 0.315 },
+    ],
+    // The cable in panel (u, v): enters high at the gutter side, where the eye
+    // has just followed it off the keep's crown, and sags away outboard to the
+    // roosts. Monotone in u and falling in v — the scene's one-diagonal law,
+    // gated as L9/D4.
+    cable: [
+      [0.0, 0.98], [0.12, 0.905], [0.25, 0.825], [0.38, 0.745], [0.5, 0.665],
+      [0.62, 0.585], [0.74, 0.505], [0.86, 0.42], [1.0, 0.32],
+    ],
+    baskets: [0.2, 0.47, 0.72],
+    riderHome: 0.06,
+    basketHalfU: 0.055,
+    basketHalfV: 0.05,
+  },
+  // THE TERRACED ROOSTS — the right page's answer to a colossus, and the piece
+  // that kills the mirror by being its OPPOSITE. Where the tower is one tall
+  // crooked stack, the roosts are a low, wide, five-storey sprawl, each storey
+  // kicked back 7-12deg from the one below so the sheet reads as roof after
+  // roof stepping away from the reader. Same family, opposite grammar; apex
+  // 0.431 against the tower's 1.017.
+  //
+  // zc 0.19 is a three-way tape measure: the closed ribbon must clear the
+  // dispatch line's ribbon behind it (front edge -0.28) AND stay 0.02 clear of
+  // the dispatch dial's riveted card at z 0.21.
+  {
+    id: 'ch3-terrace', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
+    side: 'right', F: 0.42, w: 0.31, zc: 0.19, rootDeg: 62, safe: 0.95, camRestDeg: 173,
+    style: 'ribbon',
+    stages: [
+      { h: 0.116, relDeg: 0, rTop: 0.425, wTop: 0.3 },
+      { h: 0.098, relDeg: 12, rTop: 0.44, wTop: 0.285 },
+      { h: 0.09, relDeg: 10, rTop: 0.45, wTop: 0.265 },
+      { h: 0.077, relDeg: 9, rTop: 0.47, wTop: 0.24 },
+      { h: 0.069, relDeg: 7, rTop: 0.485, wTop: 0.215 },
     ],
   },
-  // KEPT: the lamplit yard wall where the post-road enters the court — the one
-  // survivor of the ring, now the left page's only skyline row. F 0.55 is
-  // RAY-GATED, not chosen for looks: inboard variants (F 0.42-0.48) occluded
-  // 12-15% of the winch disc rim from the pinned camera; at 0.55 it is 3.1%.
-  // (ch3-skyline-r is retired outright — the right page's downstage stations
-  // are the dispatch dial and the gatehouse tower.)
-  { id: 'ch3-skyline-l', kind: 'backdrop', role: 'scenery', mech: 'skyline', side: 'left', rows: [
-    { F: 0.55, zc: 0.575, height: 0.1, width: 0.19, standDeg: 64 },
-  ] },
-  // THE GATEHOUSE (s4 pack §4a-C): a slender strip-erected dovecote tower where
-  // the painted post-road enters the ring — the right page's vertical accent,
-  // balancing the winch's semaphore mast on the left. Its legality is a Z-BAND
-  // trick: the keep's hall wall plane sweeps lateral 0 -> 0.40 while opening, but
-  // only within z <= |0.34|, and this tower's fold footprint lives in z
-  // [0.38, 0.58] — z-disjoint by 0.02 (bench C2), which is what makes a tower
-  // standing in mid-court legal at all. Radial band [0.30, 0.42] threads the same
-  // corridor: outside the balcony's lateral sweep (<= 0.26), inside the dial
-  // paper (radial >= 0.49). The default fold sign lays the leaf along +z from the
-  // hinge, so hingeZ 0.38 puts the footprint exactly in band (no mirror needed).
-  { id: 'ch3-ring-tower', kind: 'midground', role: 'figure', mech: 'stripflap',
-    side: 'right', anchor: 0.2, anchorZ: 0.48, slot: 0.26, slotZ: 0.48,
-    hingeX: 0.36, hingeZ: 0.38, width: 0.12, height: 0.2 },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine
   // moment. A die-cut disc hub-riveted into the LEFT page (hubD 0.34, hubZ 0.30,
   // discR = crankR = 0.13, pin on the rim) that the reader TWISTS; a Scotch-yoke
@@ -552,11 +621,18 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // loft + hall stories (asserted by the winch test).
   {
     id: 'ch3-keep-winch', kind: 'hero', role: 'scenery', mech: 'keepwinch', side: 'left',
-    // Disc moved OUT to hubD 0.50 so it clears the re-massed hall flank (a 0.40)
+    // Disc moved OUT to hubD 0.52 so it clears the re-massed hall flank (a 0.40)
     // and reads on the open left page beside the keep; discR/crankR 0.13 hold the
     // proven THETA_MAX 112.6deg and cam behaviour. (At the low composition camera
     // a page-flat handle foreshortens; it reads full at the interaction camera.)
-    hubD: 0.5, hubZ: 0.3, discR: 0.13, crankR: 0.13,
+    //
+    // ROUND-4: hubZ 0.30 -> 0.45. This is STRUCTURAL, not a look. A page-rooted
+    // ribbon's closed footprint costs its whole chain length in page depth, so
+    // the crooked colossus can only be as tall as zc + PAGE_H/2 — and zc was
+    // pinned by this disc's closed footprint starting at z 0.17. Walking the
+    // disc downstage into the yard buys 0.14 of tower (apex 0.88 -> 1.017) and
+    // seats the crank where the reader's hand already is, at the tower's foot.
+    hubD: 0.52, hubZ: 0.45, discR: 0.13, crankR: 0.13,
     // Semaphore mast lifted to baseX 0.96 to sit just above the re-massed
     // structural crown (~0.90) so the paddle reads over the crest. armHalfW is
     // the at-close off-page residual the N4/N8 fold-flat gates ride on; 0.0195

@@ -93,7 +93,7 @@ describe('storybook content', () => {
                                                 ? l.struts.length
                                                 : l.mech === 'mfoldrange'
                                                   ? l.ranks.length
-                                                  : l.mech === 'stagedchain'
+                                                  : l.mech === 'stagedchain' || l.mech === 'dispatchline'
                                                     ? l.stages.length
                                                 : l.width
             return `${l.mech}:${size}`

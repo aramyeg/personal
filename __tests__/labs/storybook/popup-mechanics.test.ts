@@ -56,7 +56,19 @@ import {
   stagedChainLength,
   stagedChainQ,
   stagedChainQuads,
+  stagedChainRFar,
+  stagedChainRNear,
+  stagedChainSpans,
+  stagedChainMaxRadius,
+  stagedChainNodes,
+  stagedChainClosedDepth,
+  type StagedChainGeom,
 } from '@/components/labs/storybook/book/popup-stagedchain'
+import {
+  dispatchLineCableAt,
+  dispatchLineCableIsLegal,
+  dispatchLinePoint,
+} from '@/components/labs/storybook/book/popup-dispatchline'
 import {
   keepsakeCardInPlane,
   keepsakePExit,
@@ -204,6 +216,10 @@ const allQuads = (
   // so the whole A-suite (rigidity, flat fold, continuity, separation, wedge
   // containment) gates the new family wholesale like every other.
   if (layer.mech === 'stagedchain') return stagedChainQuads(layer, thetaL, thetaR)
+  // The dispatch line IS a staged chain plus a die-cut and an in-plane rider;
+  // its paper is the chain's paper, so the A-suite gates it identically.
+  if (layer.mech === 'dispatchline')
+    return stagedChainQuads({ ...layer, mech: 'stagedchain' }, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -329,43 +345,56 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         // telescoping + glue chain, crank + stagger + D-G2 scrub, mound band).
         return
       }
-      if (layer.mech === 'stagedchain') {
-        // THE FOUR FAMILY CONDITIONS (playbook §1). A staged chain is legal
-        // only if its cam can drain every joint's arc into the eased tails
-        // while holding a shallow enough pose through the fast mid-turn
-        // station — so these are spec-validity gates, not motion gates.
-        expect(layer.stages.length).toBeGreaterThanOrEqual(2)
-        expect(layer.stages.length).toBeLessThanOrEqual(4)
-        layer.stages.forEach((st) => expect(st.h).toBeGreaterThan(0))
-        const rfar = layer.F + layer.w
-        // rooted clear of the keep's gutter band and inside the page
-        expect(layer.F).toBeGreaterThanOrEqual(0.415)
+      if (layer.mech === 'stagedchain' || layer.mech === 'dispatchline') {
+        // THE FAMILY CONDITIONS (playbook §1, extended by the E3 s4 round-4
+        // derivations in .superpowers/sdd/bench/e3s4r4-tower.mjs). A staged
+        // chain is legal only if its cam can drain every joint's arc into the
+        // eased tails while holding a shallow enough pose through the fast
+        // mid-turn station — so these are spec-validity gates, not motion gates.
+        // A dispatch line IS a staged chain (its rider is in-plane and adds no
+        // degree of freedom), so it takes the identical gate set.
+        const chain: StagedChainGeom = { ...layer, mech: 'stagedchain' }
+        expect(chain.stages.length).toBeGreaterThanOrEqual(2)
+        expect(chain.stages.length).toBeLessThanOrEqual(6)
+        chain.stages.forEach((st) => expect(st.h).toBeGreaterThan(0))
+
+        // THE TRAPEZOID (round-4): every node's radial span must be a real
+        // span, the innermost one must clear the keep's gutter band, and the
+        // widest must fit the page.
+        const spans = stagedChainSpans(chain)
+        spans.forEach(([r, w]) => {
+          expect(r).toBeGreaterThan(0)
+          expect(w).toBeGreaterThan(0)
+        })
+        const rfar = stagedChainRFar(chain)
+        expect(stagedChainRNear(chain)).toBeGreaterThanOrEqual(0.415)
         expect(rfar).toBeLessThanOrEqual(PAGE_W)
-        expect(Math.abs(layer.zc)).toBeLessThanOrEqual(PAGE_H / 2)
+        expect(Math.abs(chain.zc)).toBeLessThanOrEqual(PAGE_H / 2)
 
         // (2) the joint arc fits the two eased tails
-        const cam = stagedChainCam(layer)
-        expect(cam.feasible).toBe(true)
+        expect(stagedChainCam(chain).feasible).toBe(true)
 
         // (4) q(0) = 0 EXACTLY -> fold-flat is free (no epsilon allowed: the
         // whole family's flat-fold proof is this identity)
-        layer.stages.forEach((_, k) => expect(stagedChainQ(layer, k, 0)).toBe(0))
-        expect(stagedChainApex(layer, 0)).toBe(0)
+        chain.stages.forEach((_, k) => expect(stagedChainQ(chain, k, 0)).toBe(0))
+        expect(stagedChainApex(chain, 0)).toBe(0)
 
         // (3) TOP-DOWN unroll: an upper joint may never lag the one below it,
         // or a still-folded parent points its deployed child through the page
         for (let i = 0; i <= 240; i++) {
           const beta = (i / 240) * Math.PI
-          for (let k = 1; k < layer.stages.length; k++) {
-            expect(stagedChainQ(layer, k, beta) + 1e-9).toBeGreaterThanOrEqual(
-              stagedChainQ(layer, k - 1, beta)
+          for (let k = 1; k < chain.stages.length; k++) {
+            expect(stagedChainQ(chain, k, beta) + 1e-9).toBeGreaterThanOrEqual(
+              stagedChainQ(chain, k - 1, beta)
             )
           }
         }
 
-        // (1) hold-through-midturn reach: at the fastest station of the eased
-        // clock the composite rotation radius hypot(rfar, eta) must stay under
-        // GLOBAL_CAP / dtheta_max, or the page sweep alone breaks the step cap
+        // (1) hold-through-midturn, PER NODE (round-4). Each node sweeps a
+        // circle about the spine axis of radius hypot(its own radial, its own
+        // reach); charging a narrow crown the wide base's radius invents a
+        // radius no point on the piece ever has, and it is what used to cap
+        // this family near apex 0.88.
         let dthetaMax = 0
         for (let i = 0; i < 240; i++) {
           dthetaMax = Math.max(
@@ -373,20 +402,42 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
             (easeTurnWeighted((i + 1) / 240) - easeTurnWeighted(i / 240)) * Math.PI
           )
         }
-        const holdCap = Math.sqrt((0.0497 / dthetaMax) ** 2 - rfar ** 2)
-        expect(stagedChainApex(layer, Math.PI / 2)).toBeLessThanOrEqual(holdCap)
+        expect(
+          stagedChainMaxRadius(chain, stagedChainNodes(chain, Math.PI / 2))
+        ).toBeLessThanOrEqual(0.0497 / dthetaMax)
 
         // fully deployed at the pose the reader actually holds (the book's real
         // rest dihedral is 173.72deg, NOT the 176 the derivation assumed)
         const restBeta = Math.PI - restAngles(3).aL - restAngles(3).aR
-        layer.stages.forEach((_, k) =>
-          expect(stagedChainQ(layer, k, restBeta)).toBeGreaterThanOrEqual(1 - 1e-9)
+        chain.stages.forEach((_, k) =>
+          expect(stagedChainQ(chain, k, restBeta)).toBeGreaterThanOrEqual(1 - 1e-9)
         )
-        // stands as a wall, under the crop ceiling and under the keep's crown
-        const apex = stagedChainApex(layer, restBeta)
-        expect(apex).toBeGreaterThan(0.6)
-        expect(apex).toBeLessThan(1.0)
-        expect(stagedChainLength(layer)).toBeGreaterThan(apex)
+        // stands as a real piece, under the crop ceiling
+        const apex = stagedChainApex(chain, restBeta)
+        expect(apex).toBeGreaterThan(0.25)
+        expect(apex).toBeLessThan(1.2)
+        expect(stagedChainLength(chain)).toBeGreaterThan(apex)
+
+        // THE DEPTH BUDGET — the wall that turned out to be a tape measure. A
+        // ribbon lies extended at close, so its footprint costs the full chain
+        // length up the page and must fit between the hinge and the page edge.
+        expect(stagedChainClosedDepth(chain)).toBeLessThanOrEqual(chain.zc + PAGE_H / 2 + 1e-9)
+
+        if (layer.mech === 'dispatchline') {
+          // The die-cut cable must lie inside its own sheet and fall
+          // monotonically outboard — the scene's one-diagonal law, and the
+          // precondition for the rider's parameter to be single-valued.
+          expect(dispatchLineCableIsLegal(layer)).toBe(true)
+          expect(layer.baskets.length).toBeGreaterThan(0)
+          // EVERY rider position folds DEAD FLAT with the sheet, because it is
+          // a constant-weight bilinear point of it. This is the reason a reader
+          // may park a basket mid-wire and still shut the book.
+          for (let t = 0; t <= 1.0001; t += 0.05) {
+            const [u, v] = dispatchLineCableAt(layer, Math.min(1, t))
+            const flat = dispatchLinePoint(layer, u, v, Math.PI / 2, Math.PI / 2)
+            expect(Math.abs(flat[0])).toBeLessThan(1e-12)
+          }
+        }
         return
       }
       if (layer.mech === 'mfoldrange') {
@@ -522,14 +573,14 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
           }
           continue
         }
-        if (layer.mech === 'stagedchain') {
+        if (layer.mech === 'stagedchain' || layer.mech === 'dispatchline') {
           // One-page mechanism, and only the ROOT storey is glued: the chain's
           // upper joints are hinges between panels, not glue to paper — so the
           // gate is the root panel's base edge lying in its own page plane
           // (which is also what makes fold-flat land the whole wall on that
           // page). The seams above are gated as shared edges in
           // popup-stagedchain.test.ts.
-          const root = stagedChainQuads(layer, thetaL, thetaR)[0]
+          const root = stagedChainQuads({ ...layer, mech: 'stagedchain' }, thetaL, thetaR)[0]
           const n = layer.side === 'left' ? nL : nR
           for (const p of [root[0], root[1]]) {
             expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)

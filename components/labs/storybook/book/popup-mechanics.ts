@@ -110,6 +110,7 @@ import type { OanaveGeom } from './popup-oanave'
 // of storey panels whose joints deploy on their own beta cams. TYPE-ONLY here
 // (popup-stagedchain only needs PanelQuad/Vec3 from this file).
 import type { StagedChainGeom } from './popup-stagedchain'
+import type { DispatchLineGeom } from './popup-dispatchline'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -772,6 +773,7 @@ export type LayerGeom =
   | MFoldRangeGeom
   | OanaveGeom
   | StagedChainGeom
+  | DispatchLineGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1300,6 +1302,8 @@ export function solveLayerPose(
       throw new Error('storybook: range layers are multi-rank — use solveMFoldRangePose (popup-mfoldrange)')
     case 'stagedchain':
       throw new Error('storybook: staged-chain layers are multi-storey with per-joint cams — use solveStagedChainPose (popup-stagedchain)')
+    case 'dispatchline':
+      throw new Error('storybook: dispatch-line layers are a die-cut chain panel + an in-plane rider — use solveStagedChainPose + dispatchLineBasketQuad (popup-dispatchline)')
     case 'oanave':
       // The nave rank's HOST is the shipped v-fold wall solver verbatim; the
       // dihedral-slaved relief strata are extra patches (oanavePatches in
