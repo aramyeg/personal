@@ -637,7 +637,7 @@ describe('strip flaps — the reader must be able to sweep the whole window, and
    *  window has said, in content, "I intend the reader to move this between
    *  these two stops". The book's other strip flaps (the title quill, the
    *  satchel's sword and compass) are page-driven standing die-cuts that take
-   *  the family's default [0, 90] and are dressing, not mechanisms � they are
+   *  the family's default [0, 90] and are dressing, not mechanisms � they are
    *  still held to the visible-excursion floor below, but nobody has promised a
    *  reader can walk them stop to stop. */
   const authored = () => stripFlaps().filter((f) => f.geom.travelDeg !== undefined)
@@ -708,7 +708,8 @@ describe('strip flaps — the reader must be able to sweep the whole window, and
         `${id}: its whole declared travel moves the paper ${worst.toFixed(1)} screen px at the ` +
           `reading camera. A reader cannot see that. (The usual cause is a swing plane the camera ` +
           `sees edge-on, where the tip's climb in y and its travel in z project to opposite screen ` +
-          `directions and cancel — see StripFlapGeom.lie.)`
+          `directions and cancel. StripFlapGeom.hingeDeg is the dial that trades that cancellation ` +
+          `for page-fore travel, and carries the derivation.)`
       ).toBeGreaterThanOrEqual(WINDOW_SCREEN_PX_MIN)
     })
   }

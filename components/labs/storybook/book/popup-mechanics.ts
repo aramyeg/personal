@@ -368,33 +368,35 @@ export type StripFlapGeom = {
    *  the page, and z. */
   hingeX: number
   hingeZ: number
-  /** Hinge orientation in the page plane, degrees: 0 = across the page
-   *  (frontal figure, face to the reader), 90 = along the spine
-   *  (profile). 180 flips which way the flap lies when flat. */
-  hingeDeg?: number
   /**
-   * WHICH WAY THE FLAP LIES WHEN DOWN, stated ABSOLUTELY (E3 s2 round-2,
-   * S2R2-3). Omitted, the lie direction is `hinge x n`, whose SIGN DEPENDS ON
-   * THE PAGE: for a right-side flap it points FORE (+z, toward the reader) and
-   * for a left-side flap AFT (-z, toward the backdrop). That asymmetry is
-   * invisible in world units and decisive on screen.
+   * Hinge orientation in the page plane, degrees: 0 = across the page
+   * (frontal figure, face to the reader), 90 = along the spine (profile). 180
+   * flips which way the flap lies when flat.
    *
-   * At the pinned reading camera the page-fore axis z renders at 244 px/world
-   * and standing height y at 371, and +z runs DOWN the screen while +y runs up.
-   * So the tip of a flap at hinge angle A sits, in screen-up units, at
-   *   FORE lie:  R * (371 sin A - 244 cos A) = R * 443 * sin(A - 33.3deg)
-   *   AFT  lie:  R * (371 sin A + 244 cos A) = R * 443 * sin(A + 33.3deg)
-   * The fore lie is monotonic across the whole legal window: raising the flap
-   * always raises it on screen. The aft lie PEAKS AT A = 56.7deg and comes back
-   * down, because the tip's climb in y and its retreat in z project to opposite
-   * screen directions and cancel — a window straddling that peak renders as
-   * almost no motion at all whatever the reader does.
+   * IT IS ALSO THE ONLY DIAL THAT DECIDES WHETHER A READER CAN SEE THIS
+   * MECHANISM AT ALL (E3 s2 round-2, S2R2-3). At `hingeDeg` 0 the flap's tip
+   * sweeps the y-z plane, and at the pinned reading camera z renders at 244
+   * px/world DOWN the screen while y renders at 371 px/world UP it, so the
+   * tip's screen height is
+   *     R * (371 sin A +- 244 cos A) = R * 443 * sin(A +- 33.3deg)
+   * — plus for the aft lie (`hinge x n` on the LEFT page), minus for the fore
+   * lie (the RIGHT page). The aft form PEAKS at A = 56.7deg, so a window either
+   * side of that peak renders as almost no motion whatever the reader does; the
+   * fore form is monotone but its low angles point the print at the floor. s2's
+   * welcome rank shipped aft-lying across the peak and moved 16 screen px for
+   * its whole 46deg of travel, which a blind re-reader (correctly) called dead.
    *
-   * Naming the lie absolutely lets a left-page figure take the fore lie without
-   * `hingeDeg: 180`, which would also swap h0/h1 and mirror the piece's print.
-   * Untouched pieces resolve to `hinge x n` exactly as before.
+   * Skewing the hinge is the way out, because it trades some of that cancelling
+   * vertical for page-fore travel, and the page-fore axis renders at 441
+   * px/world with nothing to cancel it:
+   *     dScreen = R * sqrt[ (371 dsinA + 244 cos(hingeDeg) dcosA)^2
+   *                       + (441 sin(hingeDeg) dcosA)^2 ]
+   * The cost is frontality — the standing flap turns `hingeDeg` away from the
+   * reader — so a figure that must face the reader wants the SMALLEST skew that
+   * clears the visible-excursion floor, not the largest. Gated in
+   * handle-drag-regression.test.ts.
    */
-  lie?: 'fore' | 'aft'
+  hingeDeg?: number
   /**
    * HOW THE READER'S POINTER IS TURNED INTO A HINGE ANGLE (E3 s2 round-2,
    * S2R2-3). Omitted, the layer intersects the pointer ray with the flap's SWING
@@ -1229,16 +1231,7 @@ export function stripFlapFrame(
   const n: Vec3 = geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
   const hd = rad(geom.hingeDeg ?? 0)
   const hinge: Vec3 = [Math.cos(hd) * u[0], Math.cos(hd) * u[1], Math.sin(hd)]
-  // The flap's lie direction when flat. `hinge x n` is the family's original
-  // answer and stays the default; a piece may instead NAME the lie it wants in
-  // absolute page terms (StripFlapGeom.lie), because that cross product points
-  // fore on one page and aft on the other and the difference is what the reader
-  // sees. Only the sign can change — the lie is always along the same line.
-  const base = cross(hinge, n)
-  const flat: Vec3 =
-    geom.lie === undefined || base[2] === 0 || base[2] > 0 === (geom.lie === 'fore')
-      ? base
-      : [-base[0], -base[1], -base[2]]
+  const flat = cross(hinge, n) // the flap's lie direction when flat
   const center: Vec3 = [geom.hingeX * u[0], geom.hingeX * u[1], geom.hingeZ]
   const h0 = combine(1, center, -geom.width / 2, hinge)
   const h1 = combine(1, center, geom.width / 2, hinge)

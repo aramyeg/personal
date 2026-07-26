@@ -271,11 +271,61 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // conditioned by the circle's angular width from the camera rather than by a
   // vanishing dot product: ~1:1 with the paper, live in both directions.
   //
+  // ROUND-2, S2R2-3: THE RANK IS SKEWED UNTIL A READER CAN SEE IT MOVE.
+  // A blind re-reader put 900 px of drag through this handle and got "one tiny
+  // change and then saturation - the figure card shifts about 8-12 px and tips
+  // a couple of degrees; every offset from -50 px to -900 px produces the
+  // identical pixel diff". Two failures, one geometric fact: at hingeDeg 0 this
+  // flap's tip sweeps the y-z plane, and the pinned camera parks on x = 0 and
+  // therefore sees that plane EXACTLY EDGE-ON.
+  //
+  // (1) THE TRAVEL WAS NEVER THERE. The note below derives ~60 screen px from
+  // the tip chord alone, which is a WORLD length. On screen the tip's height is
+  // R*443*sin(A + 33.3deg) for an aft-lying flap (the derivation lives on
+  // StripFlapGeom.hingeDeg): its climb in y and its retreat in z project to
+  // OPPOSITE screen directions and very nearly cancel. That curve PEAKS at
+  // 56.7deg and the window [44, 90] straddles the peak, so both ends sit at
+  // almost the same screen height and the whole mechanism measured 16 px. It is
+  // not a regression; it never moved.
+  //   The FORE lie is monotone and measures 67 px, and it is wrong for this
+  //   piece: below ~33deg a fore-lying flap's print faces the floor, so at the
+  //   44deg rest the rank showed 0.31 of its face and stood 18 px tall - the
+  //   welcome party face-down on the cobbles, the exact failure round 1 chose
+  //   this window to avoid.
+  //   So the lever is the HINGE SKEW, which trades cancelling vertical for
+  //   page-fore travel on the 441 px/world axis that has nothing to cancel it.
+  //   Swept: 25deg -> 26 px, 30 -> 31, 34 -> 34, 38 -> 38, 45 -> 44, 55 -> 52,
+  //   with the standing rank's face-on falling 0.90 -> 0.78 -> 0.70 -> 0.51.
+  //   38 was the first choice and is REJECTED by the collision ratchet (it adds
+  //   2 mid-turn brushes on a spread whose ceiling may only ever fall), so the
+  //   shipped skew is 34 with hingeZ/slotZ/anchorZ 0.40 -> 0.42. Measured on
+  //   the shipped piece: 31.0 px of worst-vertex travel across the window
+  //   (1.9x what it had, over the 25 px floor), the die 134 px tall at rest and
+  //   127 standing (it was 95 and 85 - the group also reads bigger, which the
+  //   same reader wanted), face-on 0.85 at rest and 0.78 standing against 0.94
+  //   and 0.90 before. The rank now reads as a queue angled toward the gate
+  //   rather than a police line-up.
+  //   CLEARANCES UNCHANGED, and that is why hingeZ moved with the skew: the
+  //   die's z band is 0.234..0.535 against round 1's 0.23..0.57, so the gate
+  //   slab keeps its 0.07 and the frieze gains 0.035. Fore reach grows 0.51 ->
+  //   0.561, well inside the 1.15 page. D-G2 Part 1 (hard zero at rest) and
+  //   both severity ratchets are green at these numbers and were the binding
+  //   constraint on the skew.
+  //
+  // (2) THE HAND WAS NEVER ANSWERED. The edge-on swing plane also breaks the
+  // pointer projection: |ray . planeNormal| = 0.10, so 10 px of drag drove the
+  // piece to its far stop, and the other way the ray missed the infinite plane
+  // and the layer wrote nothing at all. `grabProjection: 'cylinder'` reads the
+  // angle off the flap's own tip circle instead (handle-projection class B1-C),
+  // conditioned by that circle's angular width from the camera rather than by a
+  // vanishing dot product. Measured on the shipped piece: 10 px -> 7deg,
+  // 40 px -> 28deg, 80 px -> the stop, and live in both directions.
+  //
   // Travel derived, not eyeballed: 46deg of hinge sweep on a 0.21-deep flap
-  // moves the tip 2*0.21*sin(23deg) = 0.164 world; at the pinned camera the
-  // page-fore axis runs 441 px/world and standing height 371 px/world, so the
-  // tip travels ~60 screen px — comfortably over the 25px floor the sweep set.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90], lie: 'fore', grabProjection: 'cylinder' },
+  // moves the tip 2*0.21*sin(23deg) = 0.164 world; what a reader SEES of that
+  // is the projection above, gated in handle-drag-regression.test.ts against
+  // the 25 px visible-excursion floor.
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.45, slot: 0.26, slotZ: 0.45, hingeX: 0.34, hingeZ: 0.45, hingeDeg: 30, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90], grabProjection: 'cylinder' },
   // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
   // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
   // open mid-ground meadow (where loose brass keys are already printed) carries
