@@ -120,3 +120,81 @@
   background: color-mix(in srgb, var(--sb-paper-aged) 30%, transparent);
 }
 .sb-plaque strong { font-weight: 700; letter-spacing: 0.06em; }
+
+/* BW-3 / BW-16 (overlay/nav.tsx): neither the arrow buttons nor the corner
+   hotspots ever picked up a `pointer` cursor — a <button> defaults to
+   `cursor: default`, not `pointer`, so every clickable thing on the bottom
+   bar read as inert under a real mouse ("keep a `default` cursor... nothing
+   advertises itself as clickable"). Fine pointers don't need this value
+   directly: the lab hides the native cursor there and grows the custom gold
+   quill instead (quill-cursor.tsx) whenever it crosses a `data-sb-hover`
+   element, so `cursor: inherit` under `(pointer: fine)` just falls back to
+   `.sb-root`'s `cursor: none` — the native arrow must never reappear
+   mid-quill. Coarse pointers (no quill, no `(pointer: fine)` match) get
+   `pointer` directly. */
+.sb-nav-clickable {
+  cursor: pointer;
+}
+@media (pointer: fine) {
+  .sb-nav-clickable {
+    cursor: inherit;
+  }
+}
+
+/* BW-3 / BW-16: the corner hotspots were "completely invisible... no
+   visual affordance... no page-curl preview." A dog-ear reads as paper, not
+   as a UI widget, so it lives inside the (otherwise transparent) hotspot
+   button rather than being styled to look like a control. `pointer-events:
+   none` keeps it from ever being the click target itself — the hit-test
+   falls through to the button underneath either way, so the corner still
+   turns the page whether the pointer lands on the fold or the empty space
+   around it. Rendered only when that corner's turn is available (nav.tsx
+   conditionally mounts it) — no fold on "back" at the cover or "next" at
+   the last spread, the same bound the arrows already enforce with
+   `disabled`. At rest it's a whisper (low opacity, slightly shrunk) so it
+   never competes with the diorama; hovering/focusing the button (not the
+   fold, which can't receive either) lifts it — a little bigger, a little
+   more shadow, a hairline of gold on the fold edge. */
+.sb-dogear {
+  position: absolute;
+  bottom: 0;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  opacity: 0.32;
+  transform: scale(0.82);
+  filter: drop-shadow(0 -1px 4px rgba(0, 0, 0, 0.4));
+  transition: transform 200ms ease, opacity 200ms ease, filter 200ms ease;
+}
+.sb-dogear--left {
+  left: 0;
+  transform-origin: bottom left;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  background: linear-gradient(135deg, var(--sb-paper) 0%, var(--sb-paper-aged) 55%, var(--sb-paper-deep) 100%);
+}
+.sb-dogear--right {
+  right: 0;
+  transform-origin: bottom right;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  background: linear-gradient(-135deg, var(--sb-paper) 0%, var(--sb-paper-aged) 55%, var(--sb-paper-deep) 100%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sb-nav-clickable:hover .sb-dogear {
+    opacity: 0.82;
+    transform: scale(1);
+    filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 3px var(--sb-gold));
+  }
+}
+.sb-nav-clickable:focus-visible .sb-dogear {
+  opacity: 0.82;
+  transform: scale(1);
+  filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 3px var(--sb-gold));
+}
+/* Reduced motion: the fold still lifts on hover/focus, it just snaps
+   instead of easing — same instant-swap rule storybook-overlay.css already
+   applies to the page-turn text choreography. */
+@media (prefers-reduced-motion: reduce) {
+  .sb-dogear {
+    transition: none;
+  }
+}
