@@ -1102,20 +1102,85 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // chapter's enclosed volume until the treasury itself becomes a box
   // (waiting on the art split). Completes the census: 6/6 chapters.
   { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.095, height: 0.1, z0: 0.38, z1: 0.5, roof: 'flat' },
-  // RECURSION (C4v2): the bank's griffin crest standing ON the strongbox lid.
-  // IDLE (BW-2 s7: "there is a lit candle with a painted halo that never
-  // flickers... every bit of motion in the page is welded to the mouse"). The
-  // crest is the ONLY loose prop on a spread made entirely of nave ranks, the
-  // strongbox and the vault flap — so it carries the whole draught alone, a
-  // sub-degree swivel on its lid seat. The nave ranks are deliberately exempt:
-  // an OA relief cascade is cut from the sheet, and a cathedral that trembles is
-  // a broken mechanism, not weather. The candle halo the reader wants belongs to
-  // the s7 scene lane's page print, not here.
-  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08, idle: { kind: 'sway' } },
-  // Dress on the strongbox: a wax seal on the front cap, minted coins heaped
-  // at the side-wall base (v=0 — no overhang below the page-glued edge).
+  // RECURSION (C4v2): the treasury's NIGHT-LAMP standing ON the strongbox lid.
+  //
+  // WAVE-2 s7 (blind finding 16 "a lit candle with a painted halo that never
+  // flickers", and the ledger's idle-accent order). The piece was a rampant
+  // griffin crest, which at its 0.09-world size is ~45 screen px of gold
+  // filigree — a silhouette no reader could name. Recast as the object the
+  // chapter's own light needs: a hooded brass lamp burning over the waystation,
+  // whose flame is the spread's IDLE ACCENT. `glint` not `sway` — a lamp
+  // hanging in still air does not swing, it BREATHES, and a 12% modulation of a
+  // hot core is exactly what a flame does. (The nave ranks stay exempt: an OA
+  // relief cascade is cut from the sheet, and a cathedral that trembles is a
+  // broken mechanism, not weather.)
+  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08, idle: { kind: 'glint' } },
+  // Dress on the strongbox: the GLAZED INSPECTION PANE on the front cap, minted
+  // coins heaped at the side-wall base (v=0 — no overhang below the page-glued
+  // edge).
+  //
+  // WAVE-2 s7 (S7-1). The pane slot used to carry a violet WAX SEAL, and with
+  // the box's own gold lock plate beside it that made the strongest press-me cue
+  // on the spread — dead centre foreground, on a piece the reader can never
+  // move (a `box` is posed by the spread dihedral alone). The blind reader
+  // clicked it and dragged it four ways and called it "the strongest interact-
+  // with-me object on the page is dead". The seal now rides the COUNTING WHEEL's
+  // hub (`ch6-assay`, below), which turns; what stays here is a small pane of
+  // the treasury's own glass with the gold showing behind it — the chapter's
+  // thesis in miniature, and scenery that no longer advertises. The ID keeps its
+  // `-seal` name deliberately (the s6 lane's ch5-throng precedent): renaming a
+  // baked piece churns five files and has broken the atlas region lists three
+  // times; the name is documented here instead.
+  // NOT idle-tagged, deliberately: a `dress` renders through DressPopupLayer,
+  // not the generic two-quad layer, so a tag here would be dead paperwork —
+  // and idle-life.test.ts says so out loud rather than letting it rot. The
+  // spread's two accents ride the pieces whose renderers honour them: the lamp
+  // (a rider) and the clerk's candle (a strip flap, glint-only).
   { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
   { id: 'ch6-strongbox-coins', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'wallL', u: 0, v: 0, width: 0.12, height: 0.06 },
+  // PLAYABLE, THE SPREAD'S HEADLINE (WAVE-2 s7, S7-1) — THE COUNTING WHEEL.
+  //
+  // "...a new treasury was rising — AMIO by name — with walls of glass, so the
+  // people might always see their gold." The chapter's own sentence is a
+  // WINDOWED DIAL: strongrooms turning past panes of glass so anyone may look
+  // in. So the play is a volvelle (popup-volvelle.ts, the shipped s4 family,
+  // solver and layer used VERBATIM — this piece adds no mechanism code at all):
+  // a gilt wheel riveted flat into the treasury floor under a static card die-
+  // cut with three GLASS ARCH windows. Eight sectors, eight strongrooms (bar
+  // gold, coin, plate, ledgers, the jewel case, the aurora vault...); one 45deg
+  // detent step advances every window by one room, so the art VISIBLY changes
+  // per click — the s4 lane's hard-won lesson (six tilted copies of one badge do
+  // not communicate a change; the sectors here are eight DIFFERENT rooms).
+  //
+  // WHERE THE SEAL WENT. The violet wax seal comes off the strongbox and rides
+  // this wheel — but on the THUMB LOBE that juts past the rim, NOT on the hub.
+  // The layer's grab reads a pointer angle about the hub and discards anything
+  // inside HUB_DEADZONE (0.25 R), so a seal painted at the centre would be the
+  // one part of the dial that does not answer a twist: the exact defect this
+  // item exists to kill, rebuilt one ring inward. On the lobe the seal is the
+  // grip — the object the blind reader tried to press is now the thing the hand
+  // turns — and the hub carries a plain gold rivet, which is what a hub is.
+  //
+  // SEAT (all footprints from the pieces' own numbers): quad d 0.33..0.59,
+  // z 0.37..0.63. Clear of ch6-coffer (z <= 0.24, margin 0.13), of ch6-steps
+  // (z <= 0.32, margin 0.05) and of ch6-strongbox (right-page d <= 0.095,
+  // margin 0.235). Coplanar, so it needs no fold-flat envelope — it rides the
+  // folding page and the book's own close carries it down (the volvelle rule),
+  // and the reader's angle latches through page turns under the release law.
+  {
+    // `scenery`, like the s4 dial: the C1v2 anatomy census admits only assembly
+    // mechs at `story` role, and art-overlap's pose solver has no volvelle case
+    // (a coplanar disc has no silhouette to overlap) — both throw on a `story`
+    // volvelle. The role is a census word, not a ranking; this piece is the
+    // spread's headline all the same.
+    id: 'ch6-assay', kind: 'foreground', role: 'scenery', mech: 'volvelle',
+    side: 'right', hubD: 0.46, hubZ: 0.5, radius: 0.13, sectors: 8,
+    windows: [
+      { psiDeg: 45, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
+      { psiDeg: 90, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
+      { psiDeg: 135, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
+    ],
+  },
   // PLAYABLE (E2.2 s7, charter gate G4): a lift-the-flap TREASURE COFFER out on
   // the open right-page ground — the reader lifts a teal-steel strongbox lid and
   // an aurora-lit gold hoard glows inside (the Northern Treasury made drivable).
@@ -1151,13 +1216,43 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // cross-section — coincident ridges make a degenerate vertical deck — so
   // the dais is built as a proper LOW MIRROR BRIDGE in the ch5-goods
   // proportions instead, same z band and rise as the pack.)
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.1, spans: [[0.2, 0.245], [0.275, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.1, spans: [[0.2, 0.245], [0.275, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
+  //
+  // WAVE-2 s7 (S7-3), RE-DERIVED. Each rank used to carry TWO 0.045-deep bays
+  // ([[0.2,0.245],[0.275,0.32]]), so four narrow tent blades stood in a row
+  // behind the strongbox. Decomposition capture (bench e3w2s7-decompose.sh:
+  // drop this one layer and the shape vanishes) proved those blades ARE the
+  // "spray of ~20 thin strips exploding outward in a spiky starburst" the blind
+  // reader could not identify at 3x — the ~120x90px foreground centrepiece that
+  // "reads as pure geometric noise". A narrow tent seen near end-on at the
+  // lid-dominant reading camera is a blade, and four of them mirrored is a
+  // splay. One WIDE bay per rank over the same z band gives the same deck the
+  // same rise on two SOLID risers, which is what a flight of steps looks like.
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.1, spans: [[0.2, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.1, spans: [[0.2, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
   // NEW: the intimate counterweight (T-COUNTERWEIGHT, ref 140028 Kristoff
   // corner) — a tiny clerk kneeling over his ledger by candlelight on the
   // left apron, already at prayer while the vaults are still rising around
   // him (stripflap = the early-riser family). His 3/4 facing toward the
   // coffer is a zero-cost affordance pointer (R5 discoverability).
-  { id: 'ch6-clerk', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.44, slot: 0.3, slotZ: 0.44, hingeX: 0.55, hingeZ: 0.44, hingeDeg: 30, width: 0.16, height: 0.2 },
+  //
+  // WAVE-2 s7 (S7-8 + the idle-accent order). The blind reader found him
+  // "only legible at 4x zoom; at 1:1 a ~50px navy blob", and his bow "almost
+  // invisible payoff for a gesture nobody will find". Two changes, no new
+  // mechanism and NO inversion of the gesture:
+  //  - SIZE. 0.16x0.20 -> 0.21x0.26. The figure is the chapter's intimate
+  //    counterweight against a full-spread nave; at the old size the whole
+  //    vignette (hood, ledger, candle) was under 50px and none of it read.
+  //    Bigger body = a bigger swept silhouette, so the SAME fold now moves
+  //    a shape the reader can see from across the spread.
+  //  - LIFE + PAYOFF. `idle: glint` is the CANDLE — he is the only lit thing
+  //    on the left apron and his flame never moved; a 12% breath on his print
+  //    is the halo the blind reader asked for, and it is also his reward for
+  //    being found (the ledger order's own first option). The stripflap layer
+  //    gained the OPT-IN idle hook popup-spread.tsx has had since FIX-SYS;
+  //    untagged strip flaps are bit-identical.
+  //  DELIBERATELY NOT DONE: an angle-keyed art payoff ("the quill writes a
+  //  line"). This family prints ONE texture on a rigid die-cut, so a reveal
+  //  that changes with the fold angle is a new mechanism, not a scene fix.
+  { id: 'ch6-clerk', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.44, slot: 0.3, slotZ: 0.44, hingeX: 0.55, hingeZ: 0.44, hingeDeg: 30, width: 0.21, height: 0.26, idle: { kind: 'glint' } },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [

@@ -1670,9 +1670,21 @@ function boxFace(w, h, seed, face, kind) {
         void sx
       }
       if (face === 'front') {
-        s += `<rect x="${fx(w * 0.42)}" y="${fx(h * 0.34)}" width="${fx(w * 0.16)}" height="${fx(h * 0.34)}" rx="4" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.5"/>` // lock plate
-        s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.46)}" r="${fx(w * 0.02)}" fill="${SDIM}"/>` // keyhole
-        s += `<rect x="${fx(w * 0.48)}" y="${fx(h * 0.46)}" width="${fx(w * 0.04)}" height="${fx(h * 0.12)}" fill="${SDIM}"/>`
+        // WAVE-2 s7 (S7-1). This used to be a big bright GOLD LOCK PLATE with a
+        // keyhole cut in it, dead centre of the spread's foreground — and the
+        // blind reader read it exactly as it was drawn: "a small gold plate with
+        // a dark keyhole... about as strong a turn-me/press-me signal as a
+        // pop-up book can emit. Click: nothing. Drag in 4 directions: nothing."
+        // A `box` is posed by the spread dihedral; it has no drive to give. So
+        // the box stops advertising: two iron STRAPS banding a shut chest, and a
+        // small dark escutcheon at their crossing instead of a gilt button.
+        for (const by of [0.26, 0.74]) {
+          s += `<rect x="0" y="${fx(h * by - h * 0.045)}" width="${w}" height="${fx(h * 0.09)}" fill="${SDIM}" opacity="0.9"/>`
+          s += `<rect x="0" y="${fx(h * by - h * 0.045)}" width="${w}" height="${fx(h * 0.02)}" fill="${SLIT}" opacity="0.55"/>`
+          for (let i = 1; i < 5; i++) s += `<circle cx="${fx((w * i) / 5)}" cy="${fx(h * by)}" r="2.6" fill="${GOLD_LIT}" opacity="0.6"/>`
+        }
+        s += `<rect x="${fx(w * 0.455)}" y="${fx(h * 0.42)}" width="${fx(w * 0.09)}" height="${fx(h * 0.16)}" rx="3" fill="${SDIM}" stroke="${GOLD}" stroke-width="2" stroke-opacity="0.55"/>` // escutcheon, sunk not gilt
+        s += `<rect x="${fx(w * 0.49)}" y="${fx(h * 0.47)}" width="${fx(w * 0.02)}" height="${fx(h * 0.06)}" fill="#000000" opacity="0.7"/>`
       }
     } else {
       for (let i = 1; i < 4; i++) for (const ry of [0.3, 0.7]) s += `<circle cx="${fx((w * i) / 4)}" cy="${fx(h * ry)}" r="3" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="0.9"/>` // rivets
@@ -3508,35 +3520,85 @@ function dressPatch(w, h, seed, kind) {
     return svgPiece(w, h, s)
   }
   if (kind === 'griffin') {
-    // the bank's griffin crest — a rampant griffin in gold on a teal shield
+    // THE TREASURY'S NIGHT-LAMP (ch6-crest). WAVE-2 s7 (S7-3 + the idle-accent
+    // order). The id keeps its `griffin` name — the piece it dresses is
+    // `ch6-crest`, a rider on the strongbox lid, and renaming baked art churns
+    // five files for nothing — but what it paints is no longer a rampant
+    // griffin. At 0.09 world the crest is ~45 screen px, and a heraldic beast
+    // at 45px is gold filigree: the blind reader could not name it, and its
+    // filigree contributed to the noise cluster at the spine.
+    //
+    // A hooded LAMP is the object this waystation needs anyway: the page print
+    // already pools warm light around the strongbox with nothing to cast it,
+    // and a flame is the honest home for the spread's IDLE GLINT (content.ts
+    // tags the crest `glint`, so this print breathes). Built for 45px: one
+    // hexagonal body, one hot white core, a bold gold hood and foot, a hanging
+    // ring. Silhouette first, detail second.
     const cx = w / 2
-    const sh = `M ${fx(w * 0.16)} ${fx(h * 0.1)} L ${fx(w * 0.84)} ${fx(h * 0.1)} L ${fx(w * 0.84)} ${fx(h * 0.5)} Q ${fx(w * 0.84)} ${fx(h * 0.86)} ${fx(cx)} ${fx(h * 0.96)} Q ${fx(w * 0.16)} ${fx(h * 0.86)} ${fx(w * 0.16)} ${fx(h * 0.5)} Z`
-    let s = `<path d="${sh}" fill="#2e5244"/>`
-    s += `<path d="M ${fx(w * 0.16)} ${fx(h * 0.1)} L ${fx(cx)} ${fx(h * 0.1)} L ${fx(cx)} ${fx(h * 0.96)} Q ${fx(w * 0.16)} ${fx(h * 0.86)} ${fx(w * 0.16)} ${fx(h * 0.5)} Z" fill="#3f6b5a" opacity="0.5"/>`
-    // stylised rampant griffin (wing + beak + raised claw) in gold
-    s += `<path d="M ${fx(cx - w * 0.12)} ${fx(h * 0.78)} Q ${fx(cx - w * 0.2)} ${fx(h * 0.5)} ${fx(cx - w * 0.04)} ${fx(h * 0.42)} Q ${fx(cx - w * 0.02)} ${fx(h * 0.28)} ${fx(cx + w * 0.1)} ${fx(h * 0.26)} L ${fx(cx + w * 0.22)} ${fx(h * 0.22)} L ${fx(cx + w * 0.1)} ${fx(h * 0.32)} Q ${fx(cx + w * 0.14)} ${fx(h * 0.5)} ${fx(cx + w * 0.04)} ${fx(h * 0.6)} Q ${fx(cx + w * 0.16)} ${fx(h * 0.74)} ${fx(cx + w * 0.02)} ${fx(h * 0.8)} Z" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>`
-    s += `<path d="M ${fx(cx - w * 0.06)} ${fx(h * 0.4)} Q ${fx(cx + w * 0.06)} ${fx(h * 0.34)} ${fx(cx + w * 0.12)} ${fx(h * 0.46)}" fill="none" stroke="${GOLD_LIT}" stroke-width="2.4" opacity="0.8"/>` // wing sweep
-    s += `<circle cx="${fx(cx + w * 0.12)}" cy="${fx(h * 0.28)}" r="2.6" fill="${INK}"/>` // eye
-    s += `<path d="${sh}" fill="none" stroke="${GOLD}" stroke-width="4" opacity="0.85"/>`
-    s += rimPath(sh, 4)
-    return svgPiece(w, h, s)
+    const bodyT = h * 0.34
+    const bodyB = h * 0.78
+    const hw = w * 0.2
+    const glass = `M ${fx(cx - hw)} ${fx(bodyT)} L ${fx(cx + hw)} ${fx(bodyT)} L ${fx(cx + hw * 0.82)} ${fx(bodyB)} L ${fx(cx - hw * 0.82)} ${fx(bodyB)} Z`
+    let s = `<ellipse cx="${fx(cx)}" cy="${fx(h * 0.55)}" rx="${fx(w * 0.46)}" ry="${fx(h * 0.42)}" fill="url(#lampHalo)"/>`
+    // the hanging ring + strap, so it reads as a lamp hung on the lid, not a blob
+    s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.11)}" r="${fx(w * 0.06)}" fill="none" stroke="${GOLD}" stroke-width="${fx(w * 0.035)}"/>`
+    s += `<rect x="${fx(cx - w * 0.02)}" y="${fx(h * 0.15)}" width="${fx(w * 0.04)}" height="${fx(h * 0.08)}" fill="${GOLD}"/>`
+    // the hood — the widest, darkest mark, which is what carries the shape
+    s += `<path d="M ${fx(cx - hw * 1.34)} ${fx(bodyT)} L ${fx(cx - hw * 0.5)} ${fx(h * 0.2)} L ${fx(cx + hw * 0.5)} ${fx(h * 0.2)} L ${fx(cx + hw * 1.34)} ${fx(bodyT)} Z" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.6"/>`
+    s += `<path d="M ${fx(cx - hw * 1.34)} ${fx(bodyT)} L ${fx(cx - hw * 0.5)} ${fx(h * 0.2)} L ${fx(cx)} ${fx(h * 0.2)} L ${fx(cx)} ${fx(bodyT)} Z" fill="${GOLD_LIT}" opacity="0.55"/>`
+    // the glazed body and its flame
+    s += `<path d="${glass}" fill="#2e5244"/>`
+    s += `<path d="${glass}" fill="#7fe6cf" opacity="0.22"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(h * 0.6)}" rx="${fx(hw * 0.62)}" ry="${fx(h * 0.15)}" fill="${GOLD_LIT}"/>`
+    s += `<path d="M ${fx(cx)} ${fx(h * 0.44)} Q ${fx(cx + hw * 0.44)} ${fx(h * 0.56)} ${fx(cx)} ${fx(h * 0.68)} Q ${fx(cx - hw * 0.44)} ${fx(h * 0.56)} ${fx(cx)} ${fx(h * 0.44)} Z" fill="#fff4cf"/>`
+    for (const k of [-1, 1]) {
+      s += `<line x1="${fx(cx + k * hw)}" y1="${fx(bodyT)}" x2="${fx(cx + k * hw * 0.82)}" y2="${fx(bodyB)}" stroke="${GOLD}" stroke-width="${fx(w * 0.028)}"/>`
+    }
+    // the foot
+    s += `<path d="M ${fx(cx - hw * 1.16)} ${fx(h * 0.93)} L ${fx(cx + hw * 1.16)} ${fx(h * 0.93)} L ${fx(cx + hw * 0.86)} ${fx(bodyB)} L ${fx(cx - hw * 0.86)} ${fx(bodyB)} Z" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.6"/>`
+    s += rimPath(glass, 3)
+    const defs =
+      `<radialGradient id="lampHalo" cx="0.5" cy="0.5" r="0.5">` +
+      `<stop offset="0" stop-color="${GOLD_LIT}" stop-opacity="0.42"/>` +
+      `<stop offset="1" stop-color="${GOLD_LIT}" stop-opacity="0"/></radialGradient>`
+    return svgPiece(w, h, s, defs)
   }
   if (kind === 'waxSealN') {
-    // a violet/teal wax seal for the strongbox (northern)
-    const cx = w / 2,
-      cy = h / 2,
-      R = Math.min(w, h) * 0.4
-    let s = `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="#5a3f8a" stroke="#2a1c45" stroke-width="2.4"/>`
-    s += `<circle cx="${fx(cx - R * 0.28)}" cy="${fx(cy - R * 0.28)}" r="${fx(R * 0.7)}" fill="#7256a8" opacity="0.4"/>`
-    s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.66)}" fill="none" stroke="#2a1c45" stroke-width="1.6" opacity="0.7"/>`
-    const star = []
-    for (let k = 0; k < 12; k++) {
-      const a = (k * Math.PI) / 6 - Math.PI / 2
-      const rl = k % 2 ? R * 0.22 : R * 0.5
-      star.push(`${fx(cx + Math.cos(a) * rl)} ${fx(cy + Math.sin(a) * rl)}`)
+    // THE STRONGBOX'S GLAZED INSPECTION PANE (ch6-strongbox-seal). WAVE-2 s7
+    // (S7-1): this slot used to paint a violet WAX SEAL on the strongbox's front
+    // cap, which — beside the box's own gold lock plate — made "the strongest
+    // interact-with-me object on the page" out of a piece the reader can never
+    // move. The seal moved to the counting wheel's thumb lobe, where a hand can
+    // reach it. What stands here now is the chapter's thesis in miniature: a
+    // small pane of the treasury's own glass with gold showing behind it, so the
+    // waystation says "there is gold in me" without saying "press me". Tagged
+    // `glint` in content.ts — this is the spread's GLASS accent.
+    const m = Math.min(w, h)
+    const x0 = (w - m * 0.86) / 2
+    const y0 = (h - m * 0.86) / 2
+    const S = m * 0.86
+    const frame = `M ${fx(x0)} ${fx(y0)} L ${fx(x0 + S)} ${fx(y0)} L ${fx(x0 + S)} ${fx(y0 + S)} L ${fx(x0)} ${fx(y0 + S)} Z`
+    let s = `<path d="${frame}" fill="#0d2b30"/>`
+    // the gold behind the glass — bars stacked low, dimmed and cooled by glazing
+    for (let k = 0; k < 3; k++) {
+      const bw = S * 0.52
+      const bh = S * 0.13
+      const bx = x0 + S * 0.24 + (k % 2) * S * 0.06
+      const by = y0 + S * 0.76 - k * (bh + S * 0.035)
+      s += `<path d="M ${fx(bx)} ${fx(by + bh)} L ${fx(bx + bw * 0.12)} ${fx(by)} L ${fx(bx + bw * 0.88)} ${fx(by)} L ${fx(bx + bw)} ${fx(by + bh)} Z" fill="${GOLD}" opacity="0.8"/>`
+      s += `<rect x="${fx(bx + bw * 0.12)}" y="${fx(by)}" width="${fx(bw * 0.76)}" height="${fx(bh * 0.34)}" fill="${GOLD_LIT}" opacity="0.85"/>`
     }
-    s += `<path d="M ${star.join(' L ')} Z" fill="#2a1c45" opacity="0.55"/>`
-    s += rimPath(`M ${fx(cx - R)} ${fx(cy)} a ${fx(R)} ${fx(R)} 0 1 0 ${fx(R * 2)} 0 a ${fx(R)} ${fx(R)} 0 1 0 ${fx(-R * 2)} 0 Z`, 4)
+    // the glazing: two panes, a gold mullion, one raking specular
+    s += `<rect x="${fx(x0 + S * 0.47)}" y="${fx(y0)}" width="${fx(S * 0.06)}" height="${fx(S)}" fill="${GOLD}" opacity="0.9"/>`
+    s += `<path d="M ${fx(x0 + S * 0.06)} ${fx(y0 + S * 0.94)} L ${fx(x0 + S * 0.6)} ${fx(y0 + S * 0.06)} L ${fx(x0 + S * 0.8)} ${fx(y0 + S * 0.06)} L ${fx(x0 + S * 0.26)} ${fx(y0 + S * 0.94)} Z" fill="#ffffff" opacity="0.17"/>`
+    s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(S)}" height="${fx(S * 0.2)}" fill="#4fd6b8" opacity="0.14"/>`
+    // the heavy gold surround that makes it a fitted pane, not a painted square
+    s += `<path d="${frame}" fill="none" stroke="${GOLD}" stroke-width="${fx(S * 0.11)}"/>`
+    s += `<path d="${frame}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(S * 0.03)}" opacity="0.85"/>`
+    for (const [rx, ry] of [[0.04, 0.04], [0.96, 0.04], [0.04, 0.96], [0.96, 0.96]]) {
+      s += `<circle cx="${fx(x0 + S * rx)}" cy="${fx(y0 + S * ry)}" r="${fx(S * 0.045)}" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.6"/>`
+    }
+    s += rimPath(frame, 4)
     return svgPiece(w, h, s)
   }
   if (kind === 'mintedCoins') {
@@ -4477,47 +4539,91 @@ function keyboardDoor(w, h, seed, plate) {
 // strongbox vocabulary (teal STEEL, GOLD reinforced corners, AUR aurora sheen,
 // violet wax seal). Deterministic: mulberry32(seed).
 
-/** THE COFFER LID (ch6-coffer-door1): a closed teal-steel strongbox lid seen
- *  top-down — iron hinge straps at the LEFT (spine) edge, a bright gold HASP +
- *  latch plate at the RIGHT (fore/lift) edge, gold reinforced corners, aurora
- *  sheen on the FAR (top) edge. Opaque (covers the hoard when shut). */
+/** THE VAULT LID, SHUT (ch6-coffer-door1) — the state 100% of readers see.
+ *
+ *  WAVE-2 s7 (S7-4). The lid was a plate of brushed teal steel, and the blind
+ *  reader's verdict on it was flat: "Closed, this reads as an unidentifiable
+ *  green card... a flat dark-green rectangle with an unreadable dark-red bar
+ *  motif. Nothing suggests a lid, a hinge, or contents. The good art (coins,
+ *  seal, glass walls, key) is hidden behind an undiscoverable gesture." Every
+ *  part of that indictment is a PROMISE the closed state failed to make, and the
+ *  cure is not more steel — the chapter is about walls of glass, so the lid
+ *  becomes a GLAZED DISPLAY LID and promises all three at once:
+ *    - CONTENTS: three panes of glass with the coin bed showing THROUGH them,
+ *      the gold value-crushed and cooled by the glazing (a promise, not a
+ *      reveal — the reader still has to lift it to see the hoard properly).
+ *    - A LID: a heavy gold frame with mitred corners plus a specular streak
+ *      running across every pane, which is what tells the eye there is a
+ *      surface above the gold rather than gold printed on the floor.
+ *    - A HINGE: a dark reveal down the spine edge with three bright knuckles
+ *      standing on it, and a cast shadow at the fore edge from the lifted lip.
+ *      The old iron straps were dark brown on dark teal at 15 screen px, which
+ *      is what the reader saw as an "unreadable dark-red bar motif".
+ *  Screen-space law unchanged: image-x = page-fore = screen-RIGHT, so the hinge
+ *  is at LEFT and the hasp at RIGHT (bench derive-s7lid.mjs L6). */
 function cofferLid(w, h, seed) {
   const r = mulberry32(seed)
-  const STEEL = '#2e5244', SLIT = '#3f6b5a', SDIM = '#1c352b', AUR = '#4fd6b8'
-  const IRON = '#2b2620', ILIT = '#6b6156'
+  const GLASS = '#20463d', GLASS_LIT = '#2f6154', SDIM = '#132a24', AUR = '#4fd6b8'
+  const KNUCK = '#c9c2b2', HINGE_DK = '#0c1a17'
   const x0 = w * 0.03, x1 = w * 0.97, y0 = h * 0.04, y1 = h * 0.96
   const W = x1 - x0, H = y1 - y0
   const lidD = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x0)} ${fx(y1)} Z`
+  // the frame's inner opening — the glazed field
+  const fw = W * 0.075
+  const gx0 = x0 + fw * 1.6, gx1 = x1 - fw * 2.2, gy0 = y0 + fw, gy1 = y1 - fw
   let s = `<g>`
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H)}" fill="${STEEL}"/>`
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W * 0.5)}" height="${fx(H)}" fill="${SLIT}" opacity="0.3"/>` // lit toward the hinge (up-screen-left key light)
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H * 0.14)}" fill="${AUR}" opacity="0.18"/>` // aurora sheen, far edge
-  for (let i = 0; i < 30; i++) {
-    const gy = rr(r, y0, y1)
-    s += `<line x1="${fx(x0)}" y1="${fx(gy)}" x2="${fx(x0 + rr(r, W * 0.3, W * 0.9))}" y2="${fx(gy)}" stroke="${SDIM}" stroke-width="1" opacity="${fx(rr(r, 0.1, 0.28))}"/>` // brushed-steel grain
+  // ---- the frame -----------------------------------------------------------
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H)}" fill="${SDIM}"/>`
+  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(W)}" height="${fx(H)}" fill="none" stroke="${GOLD}" stroke-width="${fx(fw * 0.9)}"/>`
+  s += `<rect x="${fx(x0 + fw * 0.28)}" y="${fx(y0 + fw * 0.28)}" width="${fx(W - fw * 0.56)}" height="${fx(H - fw * 0.56)}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(fw * 0.2)}" opacity="0.85"/>`
+  // mitre marks at the corners — the join that says "a frame", not "a border"
+  for (const [mx, my, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+    s += `<path d="M ${fx(mx)} ${fx(my + sy * fw * 1.5)} L ${fx(mx + sx * fw * 1.5)} ${fx(my)}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
   }
-  // gold reinforced corner brackets (strongbox vocabulary)
-  const corner = (cx, cy, sx, sy) =>
-    `<path d="M ${fx(cx)} ${fx(cy + sy * H * 0.2)} L ${fx(cx)} ${fx(cy)} L ${fx(cx + sx * W * 0.16)} ${fx(cy)}" fill="none" stroke="${GOLD}" stroke-width="6" opacity="0.92"/>`
-  s += corner(x0 + 6, y0 + 6, 1, 1) + corner(x1 - 6, y0 + 6, -1, 1) + corner(x0 + 6, y1 - 6, 1, -1) + corner(x1 - 6, y1 - 6, -1, -1)
-  for (const [rx, ry] of [[0.5, 0.1], [0.5, 0.9], [0.16, 0.5]])
-    s += `<circle cx="${fx(x0 + W * rx)}" cy="${fx(y0 + H * ry)}" r="3.4" fill="${GOLD_LIT}" stroke="${INK}" stroke-width="1"/>` // rivets
-  // iron hinge straps at the LEFT (spine/hinge) edge
-  for (const hy of [0.3, 0.7]) {
-    s += `<rect x="${fx(x0)}" y="${fx(y0 + H * hy - H * 0.09)}" width="${fx(W * 0.12)}" height="${fx(H * 0.18)}" rx="2" fill="${IRON}"/>`
-    s += `<path d="M ${fx(x0 + W * 0.1)} ${fx(y0 + H * hy)} L ${fx(x0 + W * 0.24)} ${fx(y0 + H * hy)}" stroke="${IRON}" stroke-width="${fx(H * 0.06)}" stroke-linecap="round"/>`
-    s += `<circle cx="${fx(x0 + W * 0.05)}" cy="${fx(y0 + H * hy)}" r="2.6" fill="${ILIT}"/>` // nail
+  // ---- THE GLASS, and the coin bed promised through it ---------------------
+  const panes = 3
+  const pw = (gx1 - gx0) / panes
+  for (let k = 0; k < panes; k++) {
+    const px = gx0 + k * pw
+    s += `<rect x="${fx(px)}" y="${fx(gy0)}" width="${fx(pw)}" height="${fx(gy1 - gy0)}" fill="${k === 1 ? GLASS_LIT : GLASS}"/>`
+    // the hoard under the glazing: heaped discs, value-crushed and cooled so the
+    // gold reads as SEEN THROUGH something rather than lying open.
+    const n = 9
+    for (let i = 0; i < n; i++) {
+      const cxx = px + rr(r, pw * 0.14, pw * 0.86)
+      const cyy = rr(r, gy0 + (gy1 - gy0) * 0.34, gy1 - (gy1 - gy0) * 0.1)
+      const cr = rr(r, (gy1 - gy0) * 0.06, (gy1 - gy0) * 0.1)
+      s += `<ellipse cx="${fx(cxx)}" cy="${fx(cyy)}" rx="${fx(cr)}" ry="${fx(cr * 0.66)}" fill="${GOLD}" opacity="0.62"/>`
+      s += `<ellipse cx="${fx(cxx - cr * 0.24)}" cy="${fx(cyy - cr * 0.2)}" rx="${fx(cr * 0.34)}" ry="${fx(cr * 0.22)}" fill="${GOLD_LIT}" opacity="0.5"/>`
+    }
+    // one raking specular streak per pane — the whole reason this reads as glass
+    s += `<path d="M ${fx(px + pw * 0.08)} ${fx(gy1 - (gy1 - gy0) * 0.06)} L ${fx(px + pw * 0.62)} ${fx(gy0 + (gy1 - gy0) * 0.06)} L ${fx(px + pw * 0.82)} ${fx(gy0 + (gy1 - gy0) * 0.06)} L ${fx(px + pw * 0.28)} ${fx(gy1 - (gy1 - gy0) * 0.06)} Z" fill="#ffffff" opacity="0.16"/>`
+    s += `<rect x="${fx(px)}" y="${fx(gy0)}" width="${fx(pw)}" height="${fx((gy1 - gy0) * 0.16)}" fill="${AUR}" opacity="0.14"/>`
+    // the gold mullion between panes
+    if (k) s += `<rect x="${fx(px - fw * 0.16)}" y="${fx(gy0)}" width="${fx(fw * 0.32)}" height="${fx(gy1 - gy0)}" fill="${GOLD}" opacity="0.95"/>`
   }
-  // THE GOLD HASP at the RIGHT (fore/lift) edge — the visible grab affordance
-  const hcy = (y0 + y1) / 2, hx = x1 - W * 0.11
-  s += `<rect x="${fx(x1 - W * 0.22)}" y="${fx(hcy - H * 0.17)}" width="${fx(W * 0.18)}" height="${fx(H * 0.34)}" rx="4" fill="${GOLD}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.55"/>` // latch plate
-  s += `<rect x="${fx(x1 - W * 0.22)}" y="${fx(hcy - H * 0.17)}" width="${fx(W * 0.06)}" height="${fx(H * 0.34)}" rx="3" fill="${GOLD_LIT}" opacity="0.6"/>`
-  s += `<circle cx="${fx(x1 - W * 0.1)}" cy="${fx(hcy + H * 0.02)}" r="3.2" fill="${INK}" opacity="0.7"/>` // keyhole
-  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.14)}" fill="none" stroke="${GOLD}" stroke-width="${fx(H * 0.06)}"/>` // hasp loop over the fore edge
-  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.14)}" fill="none" stroke="${GOLD_LIT}" stroke-width="1.6" opacity="0.85"/>`
-  s += `<circle cx="${fx(hx - H * 0.05)}" cy="${fx(hcy - H * 0.05)}" r="${fx(H * 0.03)}" fill="#fff" opacity="0.45"/>` // glint
-  s += `<path d="${lidD}" fill="none" stroke="${SDIM}" stroke-width="6" opacity="0.9" stroke-linejoin="round"/>`
-  s += `<path d="${lidD}" fill="none" stroke="${AUR}" stroke-width="1.4" opacity="0.4" stroke-linejoin="round"/>`
+  s += `<rect x="${fx(gx0)}" y="${fx(gy0)}" width="${fx(gx1 - gx0)}" height="${fx(gy1 - gy0)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.55"/>`
+  // ---- THE HINGE at the LEFT (spine) edge ---------------------------------
+  s += `<rect x="${fx(x0 + fw * 0.9)}" y="${fx(gy0)}" width="${fx(fw * 0.7)}" height="${fx(gy1 - gy0)}" fill="${HINGE_DK}"/>` // the reveal
+  for (const hy of [0.22, 0.5, 0.78]) {
+    const ky = gy0 + (gy1 - gy0) * hy
+    s += `<rect x="${fx(x0 + fw * 0.6)}" y="${fx(ky - (gy1 - gy0) * 0.09)}" width="${fx(fw * 1.35)}" height="${fx((gy1 - gy0) * 0.18)}" rx="${fx(fw * 0.3)}" fill="${KNUCK}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.7"/>`
+    s += `<rect x="${fx(x0 + fw * 0.6)}" y="${fx(ky - (gy1 - gy0) * 0.09)}" width="${fx(fw * 1.35)}" height="${fx((gy1 - gy0) * 0.06)}" rx="${fx(fw * 0.24)}" fill="#ffffff" opacity="0.4"/>`
+    s += `<circle cx="${fx(x0 + fw * 1.27)}" cy="${fx(ky)}" r="${fx(fw * 0.19)}" fill="${INK}" opacity="0.6"/>` // the pin
+  }
+  // ---- THE HASP at the RIGHT (fore/lift) edge, and the lifted lip ---------
+  const hcy = (y0 + y1) / 2, hx = x1 - W * 0.085
+  s += `<rect x="${fx(x1 - W * 0.2)}" y="${fx(hcy - H * 0.2)}" width="${fx(W * 0.16)}" height="${fx(H * 0.4)}" rx="4" fill="${GOLD}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.6"/>`
+  s += `<rect x="${fx(x1 - W * 0.2)}" y="${fx(hcy - H * 0.2)}" width="${fx(W * 0.055)}" height="${fx(H * 0.4)}" rx="3" fill="${GOLD_LIT}" opacity="0.7"/>`
+  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.17)}" fill="none" stroke="${INK}" stroke-width="${fx(H * 0.09)}" opacity="0.5"/>`
+  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.17)}" fill="none" stroke="${GOLD}" stroke-width="${fx(H * 0.07)}"/>`
+  s += `<circle cx="${fx(hx)}" cy="${fx(hcy)}" r="${fx(H * 0.17)}" fill="none" stroke="${GOLD_LIT}" stroke-width="2" opacity="0.9"/>`
+  s += `<circle cx="${fx(hx - H * 0.06)}" cy="${fx(hcy - H * 0.06)}" r="${fx(H * 0.035)}" fill="#fff" opacity="0.6"/>`
+  // the LIFTED LIP: a dark wedge tucked under the fore edge, deepest at the
+  // hasp. A lid that casts nothing under its free edge is a printed rectangle.
+  s += `<path d="M ${fx(x1)} ${fx(y0 + H * 0.1)} L ${fx(x1)} ${fx(y1 - H * 0.1)} L ${fx(x1 - W * 0.055)} ${fx(y1 - H * 0.18)} L ${fx(x1 - W * 0.055)} ${fx(y0 + H * 0.18)} Z" fill="#000000" opacity="0.34"/>`
+  s += `<path d="${lidD}" fill="none" stroke="${SDIM}" stroke-width="5" opacity="0.9" stroke-linejoin="round"/>`
+  s += `<path d="${lidD}" fill="none" stroke="${GOLD_LIT}" stroke-width="1.6" opacity="0.5" stroke-linejoin="round"/>`
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -9022,7 +9128,11 @@ function naveShelfFrieze(w, h, r, cfg) {
   const band = yBot - yTop
   if (band < 10) return s
   const pad = cfg.apHw * w + Math.max(6, w * 0.035)
-  const n = Math.max(2, Math.min(4, Math.round(band / 22)))
+  // Two ledges at most (was up to four): the gold standing on a shelf now has to
+  // be tall enough to READ, and four shelves in a 36px band leave 4px of
+  // headroom each. Fewer, deeper shelves is the same S7-7 trade as fewer,
+  // bigger ingots — the frieze keeps its rhythm from the BAYS, not from stripes.
+  const n = Math.max(1, Math.min(2, Math.round(band / 26)))
   // Each wing's frieze is broken into BAYS separated by gilt mullions. One
   // unbroken niche per wing gave the rank a second full-width dark bar, and
   // with three ranks stacked the whole nave went stripey; bays put vertical
@@ -9056,14 +9166,32 @@ function naveShelfFrieze(w, h, r, cfg) {
       s += seg(y, NAVE_C.gold, lw, '1')
       s += seg(y - lw * 0.16, NAVE_C.gilt, lw * 0.5, '1')
       s += seg(y - lw * 0.42, NAVE_C.giltHi, lw * 0.22, '0.95')
-      const cr = Math.max(1.5, lw * 0.62)
-      for (let x = x0 + rr(r, 3, 12); x < x1 - cr * 1.2; x += rr(r, cr * 2.8, cr * 7.5)) {
-        const stack = 1 + Math.floor(rr(r, 0, 2.7))
-        for (let q = 0; q < stack; q++) {
-          const cy = y - lw * 0.5 - cr * (0.95 + q * 1.5)
-          if (cy - cr < yTop + band * 0.16) break
-          s += `<circle cx="${fx(x)}" cy="${fx(cy)}" r="${fx(cr)}" fill="${NAVE_C.gold}" stroke="${NAVE_C.base}" stroke-width="0.9"/>`
-          s += `<circle cx="${fx(x - cr * 0.28)}" cy="${fx(cy - cr * 0.3)}" r="${fx(cr * 0.44)}" fill="${NAVE_C.giltHi}" opacity="0.95"/>`
+      // THE GOLD ITSELF (WAVE-2 s7, S7-7). This used to be coin DISCS of radius
+      // max(1.5, lw*0.62) — 1.9px in the source, which is 1.1px once rank B
+      // projects to the ~450 screen px it actually occupies. The blind reader
+      // called them "4-5px specks... the walls-of-glass-so-the-people-can-see-
+      // their-gold payoff only appears if you zoom in, which a reader cannot
+      // do." So: FEWER and BIGGER, and sized off the SHELF BAND rather than off
+      // a line width — an ingot is band*0.55 wide and band*0.30 tall, ~12x6
+      // screen px on rank B, with a hard giltHi top face and a base keyline so
+      // the value step survives the downscale. Bar gold, not coin: a stubby
+      // trapezoid keeps its silhouette at six pixels where a circle turns to mush.
+      const iw = Math.max(6, band * 0.55)
+      const ih = Math.max(3, band * 0.3)
+      const pitch = iw * 1.5
+      const first = x0 + (x1 - x0 - (Math.max(1, Math.floor((x1 - x0) / pitch)) - 1) * pitch) / 2
+      const count = Math.max(1, Math.floor((x1 - x0) / pitch))
+      for (let q = 0; q < count; q++) {
+        const x = first + q * pitch
+        // 1 or 2 bars high, alternating off the deterministic stream so a bay
+        // reads as a stacked hoard rather than a printed row.
+        const tall = rr(r, 0, 1) < 0.42 ? 2 : 1
+        for (let t = 0; t < tall; t++) {
+          const by = y - lw * 0.55 - ih * (t + 1) - t * 1.5
+          if (by < yTop + band * 0.1) break
+          const inset = iw * 0.16
+          s += `<path d="M ${fx(x - iw / 2)} ${fx(by + ih)} L ${fx(x - iw / 2 + inset)} ${fx(by)} L ${fx(x + iw / 2 - inset)} ${fx(by)} L ${fx(x + iw / 2)} ${fx(by + ih)} Z" fill="${NAVE_C.gold}" stroke="${NAVE_C.base}" stroke-width="1.1" stroke-opacity="0.85"/>`
+          s += `<rect x="${fx(x - iw / 2 + inset)}" y="${fx(by)}" width="${fx(iw - inset * 2)}" height="${fx(ih * 0.38)}" fill="${NAVE_C.giltHi}"/>`
         }
       }
     }
@@ -9071,6 +9199,71 @@ function naveShelfFrieze(w, h, r, cfg) {
     s += `<line x1="${fx(x0)}" y1="${fx(yBot)}" x2="${fx(x1)}" y2="${fx(yBot)}" stroke="${NAVE_C.gold}" stroke-width="${fx(rw)}"/>`
     s += `<line x1="${fx(x0)}" y1="${fx(yBot - rw * 0.3)}" x2="${fx(x1)}" y2="${fx(yBot - rw * 0.3)}" stroke="${NAVE_C.giltHi}" stroke-width="${fx(rw * 0.28)}" opacity="0.9"/>`
     s += `<line x1="${fx(x0)}" y1="${fx(yBot + rw * 0.8)}" x2="${fx(x1)}" y2="${fx(yBot + rw * 0.8)}" stroke="${NAVE_C.base}" stroke-width="${fx(rw)}" opacity="0.75"/>`
+  }
+  return s
+}
+
+/** THE FAR CURTAIN WALL (WAVE-2 s7, S7-6) — recession painted onto the apse's
+ *  CROWN WINGS, the two flat slabs of rank A that stand clear of every rank in
+ *  front of it, left and right of the dome.
+ *
+ *  The blind reader: "Two large plain teal brick slabs standing far left and far
+ *  right, behind the building, white-outlined, with no detail on their visible
+ *  face... among the biggest objects in frame and carry no detail whatsoever.
+ *  From the default pose they look like grey cardboard offcuts propped behind
+ *  the set." The backdrop-wings law says paint RECESSION on them, and on this
+ *  spread recession has a subject the chapter hands over: the treasury's own
+ *  walls of glass, seen far off.
+ *
+ *  So each wing gets a rank of tall glazed BAYS — mullioned, each with a dim
+ *  warm core (the gold inside, which is the whole point of a glass wall) — under
+ *  a cornice shadow, and a low pine-black skyline notch along the crown so the
+ *  eye reads "north" rather than "wall". Everything here is AERIAL: the values
+ *  are compressed toward the wall's own dark and cool-shifted, because these
+ *  bays are the deepest plane in the picture and the apse bench holds the outer
+ *  wall under a mean of 70. Detail, not brightness, is what kills a cardboard
+ *  offcut. Deterministic — draws from the caller's stream. */
+function naveApseWings(w, h, r, yWing, domeHw, cx) {
+  let s = ''
+  const top = yWing + h * 0.055
+  const bot = yWing + h * 0.46
+  const bayH = bot - top
+  if (bayH < 12) return s
+  for (const [wx0, wx1] of [[w * 0.02, cx - domeHw - w * 0.02], [cx + domeHw + w * 0.02, w * 0.98]]) {
+    if (wx1 - wx0 < 24) continue
+    // the cornice the bays hang under — a dark reveal, so the rank reads as
+    // standing BEHIND something rather than being lit like the front ranks.
+    s += `<rect x="${fx(wx0)}" y="${fx(top - h * 0.03)}" width="${fx(wx1 - wx0)}" height="${fx(h * 0.03)}" fill="${NAVE_C.base}" opacity="0.62"/>`
+    s += `<line x1="${fx(wx0)}" y1="${fx(top - h * 0.03)}" x2="${fx(wx1)}" y2="${fx(top - h * 0.03)}" stroke="${NAVE_C.gold}" stroke-width="${fx(Math.max(1.6, h * 0.008))}" opacity="0.55"/>`
+    const bays = Math.max(3, Math.round((wx1 - wx0) / (bayH * 0.42)))
+    const p = (wx1 - wx0) / bays
+    for (let b = 0; b < bays; b++) {
+      const bx = wx0 + b * p
+      const gw = p * 0.66
+      const gx = bx + (p - gw) / 2
+      // the glazed bay: a cold dark pane, a warm core low in it (the gold on the
+      // shelves inside), and a frost mullion up its middle.
+      s += `<rect x="${fx(gx)}" y="${fx(top)}" width="${fx(gw)}" height="${fx(bayH)}" fill="${NAVE_C.niche}" opacity="0.85"/>`
+      s += `<rect x="${fx(gx)}" y="${fx(top + bayH * 0.52)}" width="${fx(gw)}" height="${fx(bayH * 0.26)}" fill="${NAVE_C.gold}" opacity="${fx(rr(r, 0.16, 0.34))}"/>`
+      s += `<rect x="${fx(gx + gw * 0.46)}" y="${fx(top)}" width="${fx(Math.max(1, gw * 0.09))}" height="${fx(bayH)}" fill="${NAVE_C.frost}" opacity="0.2"/>`
+      for (const f of [0.3, 0.62]) {
+        s += `<line x1="${fx(gx)}" y1="${fx(top + bayH * f)}" x2="${fx(gx + gw)}" y2="${fx(top + bayH * f)}" stroke="${NAVE_C.frost}" stroke-width="1.2" opacity="0.16"/>`
+      }
+      s += `<rect x="${fx(bx)}" y="${fx(top)}" width="${fx((p - gw) / 2)}" height="${fx(bayH)}" fill="${NAVE_C.tealHi}" opacity="0.12"/>`
+    }
+    // THE PINE LINE: a low black sawtooth of far firs standing on the wing's
+    // crown, the one mark that says which kingdom this is ("a kingdom of pine
+    // and long light"). Black on dark teal — a silhouette, so it costs the
+    // outer-wall value gate nothing.
+    let pine = `M ${fx(wx0)} ${fx(yWing + h * 0.03)}`
+    for (let x = wx0; x < wx1; ) {
+      const tw = rr(r, w * 0.012, w * 0.026)
+      const th = rr(r, h * 0.035, h * 0.075)
+      pine += ` L ${fx(x + tw / 2)} ${fx(yWing + h * 0.03 - th)} L ${fx(x + tw)} ${fx(yWing + h * 0.03)}`
+      x += tw
+    }
+    pine += ` L ${fx(wx1)} ${fx(yWing + h * 0.09)} L ${fx(wx0)} ${fx(yWing + h * 0.09)} Z`
+    s += `<path d="${pine}" fill="${NAVE_C.midnight}" opacity="0.82"/>`
   }
   return s
 }
@@ -9173,6 +9366,25 @@ function naveRankFace(w, h, seed, cfg) {
     const kw = cfg.khw * w
     s += `<path d="M ${fx(cx - kw * 1.2)} ${fx(y1)} L ${fx(cx + kw * 1.2)} ${fx(y1)} L ${fx(cx + kw * 0.85)} ${fx(y0)} L ${fx(cx - kw * 0.85)} ${fx(y0)} Z" fill="${NAVE_C.gilt}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
     s += `<line x1="${fx(cx - kw * 1.2)}" y1="${fx(y1 - 2)}" x2="${fx(cx + kw * 1.2)}" y2="${fx(y1 - 2)}" stroke="${NAVE_C.frost}" stroke-width="1.6" opacity="0.8"/>`
+    // THE NAME (WAVE-2 s7, S7-5). This gilt keystone is the cream V-shaped plate
+    // the blind reader found at the exact focal point of the V-fold and reported
+    // "completely blank... the prose names the bank AMIO. This reads as an
+    // unfinished asset." It is a keystone, and a bank's name cut into its
+    // keystone is what the building would actually do. Dark-on-gilt, because at
+    // the ~50 screen px this plate projects that is the only value pair that
+    // survives; strokes are sized off the plate itself (cap = 62% of its height)
+    // so the letters can never be squeezed to fit a plate they did not set.
+    const nx0 = cx - kw * 0.85
+    const nx1 = cx + kw * 0.85
+    const word = 'AMIO'
+    const chN = (y1 - y0) * 0.62
+    const gapN = (nx1 - nx0) * 0.055
+    const cwN = (nx1 - nx0 - gapN * (word.length + 1) - gapN * (word.length - 1)) / word.length
+    const wN = word.length * cwN + (word.length - 1) * gapN
+    const yN = y0 + (y1 - y0 - chN) * 0.46
+    const swN = Math.max(1.6, chN * 0.19)
+    s += engraveWord(word, cx - wN / 2, yN + swN * 0.5, cwN, chN, gapN, NAVE_C.giltHi, fx(swN * 0.85), 'opacity="0.7"')
+    s += engraveWord(word, cx - wN / 2, yN, cwN, chN, gapN, NAVE_C.midnight, fx(swN), 'opacity="0.95"')
   }
   // the painted column pair standing in the portal centre — the sheet strip
   // the columnPair stratum folds back from (it must stay painted: the cut
@@ -9280,6 +9492,10 @@ function naveApseFace(w, h, seed) {
   // warm ledge of light lying along the crown-wing line. That spill is what
   // makes rank A's crown — the 0.187-world band floating above the stack —
   // read as lit stone catching the window rather than as more dark teal.
+  // S7-6: the far curtain wall on the crown wings, drawn BEFORE the bloom and
+  // the crown wash so the rose's light falls across it like light falls across
+  // anything else on this face.
+  s += naveApseWings(w, h, r, yWing, domeHw, cx)
   s += `<ellipse cx="${fx(cx)}" cy="${fx(wy)}" rx="${fx(w * 0.4)}" ry="${fx(h * 0.55)}" fill="url(#rose-bloom)"/>`
   s += `<rect x="0" y="${fx(yWing - h * 0.09)}" width="${w}" height="${fx(h * 0.2)}" fill="url(#crown-wash)"/>`
   // the aurora window: a half-round FAN seated on the crown line, hot frost/
@@ -9339,33 +9555,90 @@ function naveApseFace(w, h, seed) {
 function naveClerk(w, h, seed) {
   const r = mulberry32(seed)
   let s = `<g>`
-  // candle glow halo behind everything
-  s += `<circle cx="${fx(w * 0.72)}" cy="${fx(h * 0.52)}" r="${fx(w * 0.3)}" fill="url(#candle-glow)"/>`
-  // kneeling body: coat sweeping to the floor, leaning forward over the book
-  s += `<path d="M ${fx(w * 0.18)} ${fx(h * 0.97)} Q ${fx(w * 0.14)} ${fx(h * 0.6)} ${fx(w * 0.34)} ${fx(h * 0.42)} Q ${fx(w * 0.52)} ${fx(h * 0.28)} ${fx(w * 0.6)} ${fx(h * 0.46)} L ${fx(w * 0.56)} ${fx(h * 0.97)} Z" fill="${NAVE_C.midnight}" stroke="${NAVE_C.teal}" stroke-width="2"/>`
-  // hood + candle-gold face, turned 3/4 to the right (toward the coffer)
-  s += `<circle cx="${fx(w * 0.52)}" cy="${fx(h * 0.3)}" r="${fx(w * 0.13)}" fill="${NAVE_C.midnight}"/>`
-  s += `<circle cx="${fx(w * 0.565)}" cy="${fx(h * 0.315)}" r="${fx(w * 0.085)}" fill="${NAVE_C.gilt}"/>`
-  // reaching arm toward the ledger
-  s += `<path d="M ${fx(w * 0.5)} ${fx(h * 0.5)} Q ${fx(w * 0.66)} ${fx(h * 0.56)} ${fx(w * 0.7)} ${fx(h * 0.72)}" fill="none" stroke="${NAVE_C.midnight}" stroke-width="${fx(w * 0.07)}" stroke-linecap="round"/>`
-  // the open ledger on the floor
-  s += `<path d="M ${fx(w * 0.52)} ${fx(h * 0.86)} L ${fx(w * 0.72)} ${fx(h * 0.79)} L ${fx(w * 0.92)} ${fx(h * 0.86)} L ${fx(w * 0.72)} ${fx(h * 0.93)} Z" fill="${NAVE_C.frost}" stroke="${NAVE_C.midnight}" stroke-width="2"/>`
-  s += `<line x1="${fx(w * 0.72)}" y1="${fx(h * 0.79)}" x2="${fx(w * 0.72)}" y2="${fx(h * 0.93)}" stroke="${NAVE_C.midnight}" stroke-width="1.6" opacity="0.7"/>`
-  for (const k of [0.82, 0.855, 0.885]) {
-    s += `<line x1="${fx(w * 0.56)}" y1="${fx(h * k + 2)}" x2="${fx(w * 0.7)}" y2="${fx(h * (k - 0.02))}" stroke="${NAVE_C.teal}" stroke-width="1.2" opacity="0.8"/>`
+  // The candle's pool and halo, drawn first and drawn WIDE: this is the only
+  // warm light on the left apron, and it is what the idle `glint` tag makes
+  // breathe (content.ts ch6-clerk) - the flicker the blind reader asked for.
+  s += `<ellipse cx="${fx(w * 0.7)}" cy="${fx(h * 0.6)}" rx="${fx(w * 0.52)}" ry="${fx(h * 0.44)}" fill="url(#candle-glow)"/>`
+  s += `<ellipse cx="${fx(w * 0.62)}" cy="${fx(h * 0.93)}" rx="${fx(w * 0.46)}" ry="${fx(h * 0.06)}" fill="${NAVE_C.gold}" opacity="0.22"/>`
+  // THE DESK - a low writing slope, so the ledger has somewhere to be and the
+  // vignette reads as a workplace rather than a figure on bare floor.
+  s += `<path d="M ${fx(w * 0.44)} ${fx(h * 0.9)} L ${fx(w * 0.98)} ${fx(h * 0.78)} L ${fx(w * 0.98)} ${fx(h * 0.86)} L ${fx(w * 0.44)} ${fx(h * 0.98)} Z" fill="${NAVE_C.base}" stroke="${NAVE_C.teal}" stroke-width="2"/>`
+  // Kneeling body: coat sweeping to the floor, leaning over the book. Heavier
+  // and taller than the round-1 figure - at 1x this silhouette IS the
+  // character, and the blind reader saw "a ~50px navy blob".
+  s += `<path d="M ${fx(w * 0.1)} ${fx(h * 0.97)} Q ${fx(w * 0.06)} ${fx(h * 0.56)} ${fx(w * 0.3)} ${fx(h * 0.36)} Q ${fx(w * 0.5)} ${fx(h * 0.2)} ${fx(w * 0.62)} ${fx(h * 0.42)} L ${fx(w * 0.58)} ${fx(h * 0.97)} Z" fill="${NAVE_C.midnight}" stroke="${NAVE_C.tealHi}" stroke-width="2.6"/>`
+  // one bright rim on the hood: what separates a coat from a hole in the page
+  s += `<path d="M ${fx(w * 0.3)} ${fx(h * 0.36)} Q ${fx(w * 0.5)} ${fx(h * 0.2)} ${fx(w * 0.62)} ${fx(h * 0.42)}" fill="none" stroke="${NAVE_C.gilt}" stroke-width="${fx(w * 0.022)}" opacity="0.75"/>`
+  // hood + candle-gold face, turned 3/4 toward the coffer (image right)
+  s += `<circle cx="${fx(w * 0.5)}" cy="${fx(h * 0.29)}" r="${fx(w * 0.165)}" fill="${NAVE_C.midnight}"/>`
+  s += `<circle cx="${fx(w * 0.55)}" cy="${fx(h * 0.31)}" r="${fx(w * 0.105)}" fill="${NAVE_C.gilt}"/>`
+  s += `<circle cx="${fx(w * 0.585)}" cy="${fx(h * 0.3)}" r="${fx(w * 0.018)}" fill="${NAVE_C.base}"/>`
+  // the writing arm, and the QUILL standing in his hand over the page
+  s += `<path d="M ${fx(w * 0.5)} ${fx(h * 0.52)} Q ${fx(w * 0.66)} ${fx(h * 0.58)} ${fx(w * 0.7)} ${fx(h * 0.74)}" fill="none" stroke="${NAVE_C.midnight}" stroke-width="${fx(w * 0.085)}" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(w * 0.72)} ${fx(h * 0.76)} L ${fx(w * 0.86)} ${fx(h * 0.44)}" stroke="${NAVE_C.frost}" stroke-width="${fx(w * 0.032)}" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(w * 0.86)} ${fx(h * 0.44)} Q ${fx(w * 0.94)} ${fx(h * 0.34)} ${fx(w * 0.82)} ${fx(h * 0.3)}" fill="none" stroke="${NAVE_C.frost}" stroke-width="${fx(w * 0.02)}" opacity="0.8"/>`
+  // THE LEDGER, open on the desk: a bright page, a column of gold figures and
+  // one FRESH INK LINE running out from under the quill. It is the reward for
+  // looking at him, and a column of ticks reads at a size prose never would.
+  const lx = w * 0.5
+  const ly = h * 0.84
+  const led = `M ${fx(lx)} ${fx(ly)} L ${fx(w * 0.74)} ${fx(ly - h * 0.08)} L ${fx(w * 0.98)} ${fx(ly)} L ${fx(w * 0.74)} ${fx(ly + h * 0.08)} Z`
+  s += `<path d="${led}" fill="${NAVE_C.frost}" stroke="${NAVE_C.base}" stroke-width="2.4"/>`
+  s += `<line x1="${fx(w * 0.74)}" y1="${fx(ly - h * 0.08)}" x2="${fx(w * 0.74)}" y2="${fx(ly + h * 0.08)}" stroke="${NAVE_C.base}" stroke-width="2" opacity="0.7"/>`
+  for (let i = 0; i < 5; i++) {
+    s += `<rect x="${fx(w * 0.78 + i * w * 0.034)}" y="${fx(ly - h * 0.032 + i * h * 0.008)}" width="${fx(w * 0.019)}" height="${fx(h * 0.024)}" fill="${NAVE_C.gold}" opacity="0.9"/>`
   }
-  // the candle: stick, flame, gold pool
-  s += `<rect x="${fx(w * 0.8)}" y="${fx(h * 0.6)}" width="${fx(w * 0.05)}" height="${fx(h * 0.18)}" fill="${NAVE_C.frost}"/>`
-  s += `<ellipse cx="${fx(w * 0.825)}" cy="${fx(h * 0.795)}" rx="${fx(w * 0.085)}" ry="${fx(h * 0.02)}" fill="${NAVE_C.gold}" opacity="0.8"/>`
-  s += `<path d="M ${fx(w * 0.825)} ${fx(h * 0.5)} Q ${fx(w * 0.86)} ${fx(h * 0.55)} ${fx(w * 0.825)} ${fx(h * 0.59)} Q ${fx(w * 0.79)} ${fx(h * 0.55)} ${fx(w * 0.825)} ${fx(h * 0.5)} Z" fill="${NAVE_C.gilt}"/>`
-  s += `<circle cx="${fx(w * 0.825)}" cy="${fx(h * 0.545)}" r="${fx(w * 0.02)}" fill="${NAVE_C.frost}"/>`
+  s += `<path d="M ${fx(w * 0.56)} ${fx(ly + h * 0.028)} L ${fx(w * 0.71)} ${fx(ly + h * 0.004)}" stroke="${NAVE_C.base}" stroke-width="${fx(h * 0.011)}" stroke-linecap="round"/>`
+  s += `<circle cx="${fx(w * 0.715)}" cy="${fx(ly + h * 0.004)}" r="${fx(h * 0.009)}" fill="${NAVE_C.base}"/>`
+  // THE CANDLE: a real stick with a hot white core, sized to be seen at 1x
+  s += `<rect x="${fx(w * 0.86)}" y="${fx(h * 0.58)}" width="${fx(w * 0.07)}" height="${fx(h * 0.2)}" fill="${NAVE_C.frost}"/>`
+  s += `<rect x="${fx(w * 0.86)}" y="${fx(h * 0.58)}" width="${fx(w * 0.025)}" height="${fx(h * 0.2)}" fill="${NAVE_C.base}" opacity="0.25"/>`
+  s += `<ellipse cx="${fx(w * 0.895)}" cy="${fx(h * 0.785)}" rx="${fx(w * 0.11)}" ry="${fx(h * 0.022)}" fill="${NAVE_C.gold}" opacity="0.85"/>`
+  s += `<path d="M ${fx(w * 0.895)} ${fx(h * 0.44)} Q ${fx(w * 0.955)} ${fx(h * 0.52)} ${fx(w * 0.895)} ${fx(h * 0.58)} Q ${fx(w * 0.835)} ${fx(h * 0.52)} ${fx(w * 0.895)} ${fx(h * 0.44)} Z" fill="${NAVE_C.gilt}"/>`
+  s += `<path d="M ${fx(w * 0.895)} ${fx(h * 0.48)} Q ${fx(w * 0.93)} ${fx(h * 0.53)} ${fx(w * 0.895)} ${fx(h * 0.565)} Q ${fx(w * 0.86)} ${fx(h * 0.53)} ${fx(w * 0.895)} ${fx(h * 0.48)} Z" fill="#fff4cf"/>`
+  void r
   s += `</g>`
   const defs =
     `<radialGradient id="candle-glow" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${NAVE_C.gold}" stop-opacity="0.5"/>` +
+    `<stop offset="0" stop-color="${NAVE_C.gold}" stop-opacity="0.55"/>` +
+    `<stop offset="0.55" stop-color="${NAVE_C.gold}" stop-opacity="0.18"/>` +
     `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>`
-  s += `` // clerk figure stays inside its die — no rectangular rim (die-cut alpha)
   return svgPiece(w, h, s, defs)
+}
+
+/** THE DAIS LANDING (ch6-steps-deck). WAVE-2 s7 (S7-3): the deck used to borrow
+ *  `deckSurface('glass')` - a teal glass GALLERY panel - which laid a pane of
+ *  curtain wall flat on the floor at the head of a stone flight, and supplied
+ *  the grid-lit quad crowning the shape the blind reader called a spiky
+ *  starburst. What the story wants here is the LANDING the gold processional
+ *  path crosses on its way into rank D's portal: cut stone flags, the path
+ *  running across the sheet, and a gilt nosing on both long edges repeating the
+ *  risers below, so deck and struts read as ONE object. */
+function naveDaisDeck(w, h, seed) {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${naveMix(NAVE_C.base, NAVE_C.tealLit, 0.5)}"/>`
+  const cols = 8
+  const rows = 3
+  for (let ci = 0; ci < cols; ci++) {
+    for (let ri = 0; ri < rows; ri++) {
+      const x = (w * ci) / cols + (ri % 2 ? w / cols / 2 : 0)
+      const y = (h * ri) / rows
+      s += `<rect x="${fx(x + 2)}" y="${fx(y + 2)}" width="${fx(w / cols - 4)}" height="${fx(h / rows - 4)}" fill="${naveMix(NAVE_C.base, NAVE_C.tealHi, rr(r, 0.32, 0.6))}"/>`
+      s += `<line x1="${fx(x + 2)}" y1="${fx(y + 2)}" x2="${fx(x + w / cols - 2)}" y2="${fx(y + 2)}" stroke="${NAVE_C.tealHi}" stroke-width="1.6" opacity="0.3"/>`
+    }
+  }
+  s += `<rect x="${fx(w * 0.38)}" y="0" width="${fx(w * 0.24)}" height="${h}" fill="${NAVE_C.base}" opacity="0.5"/>`
+  s += `<rect x="${fx(w * 0.4)}" y="0" width="${fx(w * 0.2)}" height="${h}" fill="${NAVE_C.gold}" opacity="0.62"/>`
+  for (let i = 0; i < 4; i++) {
+    const y = (h * (i + 0.5)) / 4
+    const q = Math.min(w * 0.05, h * 0.13)
+    s += `<rect x="${fx(w * 0.5 - q / 2)}" y="${fx(y - q / 2)}" width="${fx(q)}" height="${fx(q)}" fill="${NAVE_C.gilt}" opacity="0.55"/>`
+  }
+  for (const y of [0, h - Math.max(4, h * 0.075)]) {
+    s += `<rect x="0" y="${fx(y)}" width="${w}" height="${fx(Math.max(4, h * 0.075))}" fill="${NAVE_C.gold}"/>`
+    s += `<rect x="0" y="${fx(y)}" width="${w}" height="${fx(Math.max(1.6, h * 0.022))}" fill="${NAVE_C.giltHi}" opacity="0.9"/>`
+  }
+  return svgPiece(w, h, s)
 }
 
 /** The s7 page print — T-FLOOR, the refs' loudest norm: the gold lozenge
@@ -9428,17 +9701,43 @@ function navePage(w, h, seed) {
   // the full-width trunk on the apron, HALVED into the two lobes at the
   // fork (the inlay parts around the box, it does not double), rejoining
   // into the narrowed nave run.
-  s += `<line x1="${fx(xC)}" y1="${fx(yApron)}" x2="${fx(xC)}" y2="${fx(y56)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.072))}" opacity="0.74"/>`
-  s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.74" stroke-linejoin="round"/>`
-  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.03))}" opacity="0.4" stroke-linejoin="round"/>`
-  s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.82"/>`
-  // gold lozenge inlay down the path centreline (painted-perspective narrowing)
-  for (let i = 0; i < 26; i++) {
-    const t = i / 26
+  // WAVE-2 s7 (S7-2), THE FALSE PULL-TAB RETIRED. This print used to carry a
+  // column of 26 near-white giltHi LOZENGES marching down the path centreline
+  // and off the bottom page edge, over a gold ribbon painted at 74% on a dark
+  // floor. Decomposition proved that print — not any piece of paper — is what
+  // the blind reader inventoried as "pale, semi-transparent gold slabs shaped
+  // like mushrooms/anvils, surfaced with white chevron zigzags, ONE RUNNING DOWN
+  // THE SPINE OFF THE BOTTOM PAGE EDGE", and then indicted: "a sawtooth strip
+  // crossing the page edge is the universal 'pull this tab' glyph in this
+  // medium, and it is completely inert. Actively misleading."
+  //
+  // Print cannot be wired to a mechanism, so the glyph has to go. What replaces
+  // it is the same processional path built as INLAY instead of as a highlight:
+  //   - a DARK KERB either side of every run, so the gold sits IN the floor
+  //     (a sunk edge is the one cue that separates inlay from a strip lying on
+  //     top, and it is what stopped the fork reading as an anvil-shaped slab);
+  //   - the trunk TAPERED into the apron instead of running full width off the
+  //     page edge, so nothing terminates in a graspable stub;
+  //   - the centreline studs cut from 26 near-white lozenges to widely spaced,
+  //     DIMMED gold squares that never brighten past the ribbon they sit in.
+  const kerb = (d, wdt) => `<path d="${d}" fill="none" stroke="${NAVE_C.base}" stroke-width="${fx(wdt * 1.5)}" opacity="0.5" stroke-linejoin="round"/>`
+  const trunkD = `M ${fx(xC)} ${fx(yApron)} L ${fx(xC)} ${fx(y56)}`
+  s += kerb(trunkD, PX(0.058)) + kerb(mainD, PX(0.04)) + kerb(`M ${fx(xC)} ${fx(y32)} L ${fx(xC)} ${fx(yEnd)}`, PX(0.048))
+  // the trunk narrows into the apron so the ribbon FADES off the page instead of
+  // ending in a tab-shaped stub at the trim.
+  s += `<path d="${trunkD}" fill="none" stroke="url(#trunk-fade)" stroke-width="${fx(PX(0.058))}"/>`
+  s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.66" stroke-linejoin="round"/>`
+  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.026))}" opacity="0.3" stroke-linejoin="round"/>`
+  s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.78"/>`
+  // sunk square studs down the centreline — 9, not 26, and never above the
+  // ribbon's own value, so they read as inlay and not as a sawtooth.
+  for (let i = 0; i < 9; i++) {
+    const t = i / 9
     const fy = 1 - t * (1 - pageFY(-0.3))
-    const size = PX(0.016) * (1 - 0.55 * t)
+    const size = PX(0.011) * (1 - 0.5 * t)
     const cxx = PX(0.5) + (fy > pageFY(0.38) && fy < pageFY(0.52) ? -PX(0.06) : 0)
-    s += `<path d="M ${fx(cxx)} ${fx(PY(fy) - size)} L ${fx(cxx + size)} ${fx(PY(fy))} L ${fx(cxx)} ${fx(PY(fy) + size)} L ${fx(cxx - size)} ${fx(PY(fy))} Z" fill="${NAVE_C.giltHi}" opacity="${fx(rr(r, 0.78, 1))}"/>`
+    s += `<rect x="${fx(cxx - size)}" y="${fx(PY(fy) - size)}" width="${fx(size * 2)}" height="${fx(size * 2)}" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.4, 0.55))}"/>`
+    s += `<rect x="${fx(cxx - size)}" y="${fx(PY(fy) - size)}" width="${fx(size * 2)}" height="${fx(size * 0.55)}" fill="${NAVE_C.base}" opacity="0.4"/>`
   }
   // the gutter valley shadow
   s += `<rect x="${fx(w * 0.47)}" y="0" width="${fx(w * 0.06)}" height="${h}" fill="#000000" opacity="0.14"/>`
@@ -9470,7 +9769,14 @@ function navePage(w, h, seed) {
     `<radialGradient id="throat-grad" cx="0.5" cy="0.5" r="0.5">` +
     `<stop offset="0" stop-color="${NAVE_C.giltHi}" stop-opacity="0.6"/>` +
     `<stop offset="0.5" stop-color="${NAVE_C.gold}" stop-opacity="0.3"/>` +
-    `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>`
+    `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0"/></radialGradient>` +
+    // S7-2: the apron trunk fades out toward the trim so the processional path
+    // never terminates in a graspable stub at the page edge — the shape a reader
+    // reads as a pull tab. userSpaceOnUse, because a vertical stroke's object
+    // bounding box has zero width and objectBoundingBox degenerates on it.
+    `<linearGradient id="trunk-fade" x1="0" y1="${fx(yApron)}" x2="0" y2="${fx(y56)}" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="${NAVE_C.gold}" stop-opacity="0.04"/>` +
+    `<stop offset="1" stop-color="${NAVE_C.gold}" stop-opacity="0.66"/></linearGradient>`
   return svgPiece(w, h, s, defs)
 }
 
@@ -9517,6 +9823,385 @@ function naveStepRiser(w, h, seed) {
     s += `<rect x="${fx(x)}" y="0" width="${fx(w * 0.012)}" height="${h}" fill="${NAVE_C.giltHi}" opacity="0.8"/>`
   }
   return svgPiece(w, h, s)
+}
+
+// ============================================================================
+// E3 WAVE-2 s7 — THE COUNTING WHEEL (`ch6-assay`, volvelle). The chapter's own
+// sentence is a windowed dial: "a new treasury was rising — AMIO by name — with
+// walls of glass, so the people might always see their gold." So the spread's
+// headline play is a gilt wheel of EIGHT STRONGROOMS turning behind a round
+// GLASS FACEPLATE with three arched vitrines cut through it. One 45deg detent
+// brings the next vault to every window.
+//
+// THE THREE-AXIS SECTOR LAW, inherited from the s4 dial's expensive lesson: a
+// window exposing ~22x30 SCREEN px cannot tell "the same badge, rotated" from
+// "nothing happened", so every sector must differ on three independent axes at
+// once, in descending order of what survives the downscale:
+//   1. a COUNT of gold BARS on a shared pale shelf (1..4) — a count is the one
+//      difference that reads at a handful of pixels per bar, and the shelf is
+//      common to all eight so the bars are gold-on-pale whatever the field does.
+//   2. a PRINCIPAL DEVICE that changes SILHOUETTE, not tone: ingot stack, coin
+//      column, chalice, cut gem, ledger roll, crown, key, lamp. Bold filled
+//      shapes only — no linework survives here.
+//   3. the wedge's FIELD tint, stepped through the nave's own value ladder.
+// plus a ROMAN NUMERAL naming the vault (the chapter numbering idiom, and the
+// only lettering that survives at this size because I and V are two strokes).
+//
+// Registration is the shared basis R = w*0.46875 and the band [0.38R, 0.86R],
+// used identically by the dial and the card — the pair is an atlas exemption
+// precisely so a packer's scale factor can never shear them apart.
+// ============================================================================
+
+/** Shared disc-radius basis for the counting wheel pair (300 @ 640). */
+const ASSAY_R = 0.46875
+/** The read band the faceplate's vitrines expose, in units of ASSAY_R. */
+const ASSAY_BAND = [0.38, 0.86]
+/** Window centres (math-angle, deg) and angular half-width — congruent to the
+ *  45deg sector centres, so every detent frames all three at once. */
+const ASSAY_WINS = [45, 90, 135]
+const ASSAY_HALFW = 16
+/** The thumb lobe's bearing: where the WAX SEAL rides, well outside the layer's
+ *  0.25R hub dead zone, so the object the reader wants to press is the object
+ *  the grab actually reads. */
+const ASSAY_TAB_A = 300
+
+/** THE EIGHT STRONGROOMS. `bars` is axis 1 (the count), `device` axis 2 (the
+ *  silhouette), `field` axis 3 (the wedge tint off NAVE_C). No two sectors
+ *  share a (bars, device) pair, so a single detent step changes both the count
+ *  and the shape in every window — the gate the s4 lane had to add after a
+ *  blind reader called a live dial dead. */
+const ASSAY_VAULTS = [
+  { numeral: 'I', bars: 3, device: 'ingots', field: 'teal' },
+  { numeral: 'II', bars: 1, device: 'coins', field: 'base' },
+  { numeral: 'III', bars: 2, device: 'chalice', field: 'tealLit' },
+  { numeral: 'IV', bars: 4, device: 'gem', field: 'niche' },
+  { numeral: 'V', bars: 2, device: 'scrolls', field: 'tealHi' },
+  { numeral: 'VI', bars: 1, device: 'crown', field: 'floor' },
+  { numeral: 'VII', bars: 3, device: 'key', field: 'teal' },
+  { numeral: 'VIII', bars: 4, device: 'lamp', field: 'base' },
+]
+
+/** One strongroom's PRINCIPAL DEVICE, centred on the local origin (outward is
+ *  -y, tangential is +x), bold enough to survive ~14 screen px. `S` is its
+ *  half-size. */
+function assayDevice(kind, S) {
+  const G = NAVE_C.gold
+  const L = NAVE_C.gilt
+  const H = NAVE_C.giltHi
+  const K = NAVE_C.base
+  const p = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" stroke="${K}" stroke-width="${fx(S * 0.09)}" stroke-opacity="0.65" ${extra}/>`
+  if (kind === 'ingots') {
+    // three bars in a pyramid — the treasury's own unit
+    let s = ''
+    for (const [ox, oy, ww] of [[-S * 0.5, S * 0.42, S * 0.86], [S * 0.5, S * 0.42, S * 0.86], [0, -S * 0.36, S * 0.86]]) {
+      s += p(`M ${fx(ox - ww / 2)} ${fx(oy + S * 0.3)} L ${fx(ox - ww / 2 + S * 0.14)} ${fx(oy - S * 0.3)} L ${fx(ox + ww / 2 - S * 0.14)} ${fx(oy - S * 0.3)} L ${fx(ox + ww / 2)} ${fx(oy + S * 0.3)} Z`, G)
+      s += `<rect x="${fx(ox - ww / 2 + S * 0.14)}" y="${fx(oy - S * 0.3)}" width="${fx(ww - S * 0.28)}" height="${fx(S * 0.16)}" fill="${H}"/>`
+    }
+    return s
+  }
+  if (kind === 'coins') {
+    // one fat stacked column of coin — a cylinder, not a scatter
+    let s = ''
+    for (let i = 0; i < 5; i++) {
+      const y = S * 0.72 - i * S * 0.34
+      s += `<ellipse cx="0" cy="${fx(y)}" rx="${fx(S * 0.78)}" ry="${fx(S * 0.26)}" fill="${i % 2 ? G : L}" stroke="${K}" stroke-width="${fx(S * 0.08)}" stroke-opacity="0.6"/>`
+    }
+    s += `<ellipse cx="${fx(-S * 0.22)}" cy="${fx(S * 0.72 - 4 * S * 0.34 - S * 0.06)}" rx="${fx(S * 0.26)}" ry="${fx(S * 0.1)}" fill="${H}"/>`
+    return s
+  }
+  if (kind === 'chalice') {
+    return (
+      p(`M ${fx(-S * 0.72)} ${fx(-S * 0.8)} L ${fx(S * 0.72)} ${fx(-S * 0.8)} L ${fx(S * 0.34)} ${fx(S * 0.06)} L ${fx(-S * 0.34)} ${fx(S * 0.06)} Z`, G) +
+      `<rect x="${fx(-S * 0.14)}" y="${fx(S * 0.02)}" width="${fx(S * 0.28)}" height="${fx(S * 0.6)}" fill="${G}"/>` +
+      p(`M ${fx(-S * 0.66)} ${fx(S * 0.92)} L ${fx(S * 0.66)} ${fx(S * 0.92)} L ${fx(S * 0.44)} ${fx(S * 0.6)} L ${fx(-S * 0.44)} ${fx(S * 0.6)} Z`, L) +
+      `<rect x="${fx(-S * 0.56)}" y="${fx(-S * 0.72)}" width="${fx(S * 0.34)}" height="${fx(S * 0.2)}" fill="${H}"/>`
+    )
+  }
+  if (kind === 'gem') {
+    return (
+      p(`M ${fx(-S * 0.9)} ${fx(-S * 0.2)} L ${fx(-S * 0.42)} ${fx(-S * 0.86)} L ${fx(S * 0.42)} ${fx(-S * 0.86)} L ${fx(S * 0.9)} ${fx(-S * 0.2)} L 0 ${fx(S * 0.94)} Z`, L) +
+      `<path d="M ${fx(-S * 0.9)} ${fx(-S * 0.2)} L ${fx(S * 0.9)} ${fx(-S * 0.2)}" stroke="${K}" stroke-width="${fx(S * 0.1)}" opacity="0.5"/>` +
+      `<path d="M ${fx(-S * 0.42)} ${fx(-S * 0.86)} L 0 ${fx(S * 0.94)} L ${fx(S * 0.42)} ${fx(-S * 0.86)}" fill="none" stroke="${K}" stroke-width="${fx(S * 0.08)}" opacity="0.4"/>` +
+      `<path d="M ${fx(-S * 0.42)} ${fx(-S * 0.86)} L ${fx(-S * 0.16)} ${fx(-S * 0.2)} L ${fx(-S * 0.62)} ${fx(-S * 0.2)} Z" fill="${H}"/>`
+    )
+  }
+  if (kind === 'scrolls') {
+    let s = ''
+    for (const ox of [-S * 0.46, S * 0.46]) {
+      s += `<rect x="${fx(ox - S * 0.3)}" y="${fx(-S * 0.86)}" width="${fx(S * 0.6)}" height="${fx(S * 1.72)}" rx="${fx(S * 0.28)}" fill="${NAVE_C.frost}" stroke="${K}" stroke-width="${fx(S * 0.09)}" stroke-opacity="0.6"/>`
+      s += `<ellipse cx="${fx(ox)}" cy="${fx(-S * 0.78)}" rx="${fx(S * 0.3)}" ry="${fx(S * 0.14)}" fill="${G}"/>`
+    }
+    s += `<rect x="${fx(-S * 0.92)}" y="${fx(-S * 0.1)}" width="${fx(S * 1.84)}" height="${fx(S * 0.24)}" fill="${G}"/>`
+    return s
+  }
+  if (kind === 'crown') {
+    return (
+      p(`M ${fx(-S * 0.92)} ${fx(S * 0.62)} L ${fx(-S * 0.92)} ${fx(-S * 0.5)} L ${fx(-S * 0.46)} ${fx(0)} L 0 ${fx(-S * 0.9)} L ${fx(S * 0.46)} ${fx(0)} L ${fx(S * 0.92)} ${fx(-S * 0.5)} L ${fx(S * 0.92)} ${fx(S * 0.62)} Z`, G) +
+      `<rect x="${fx(-S * 0.92)}" y="${fx(S * 0.24)}" width="${fx(S * 1.84)}" height="${fx(S * 0.24)}" fill="${H}"/>`
+    )
+  }
+  if (kind === 'key') {
+    return (
+      `<circle cx="0" cy="${fx(-S * 0.52)}" r="${fx(S * 0.44)}" fill="none" stroke="${G}" stroke-width="${fx(S * 0.3)}"/>` +
+      `<rect x="${fx(-S * 0.13)}" y="${fx(-S * 0.2)}" width="${fx(S * 0.26)}" height="${fx(S * 1.1)}" fill="${G}"/>` +
+      `<rect x="${fx(-S * 0.13)}" y="${fx(S * 0.44)}" width="${fx(S * 0.62)}" height="${fx(S * 0.2)}" fill="${G}"/>` +
+      `<rect x="${fx(-S * 0.13)}" y="${fx(S * 0.76)}" width="${fx(S * 0.46)}" height="${fx(S * 0.2)}" fill="${G}"/>`
+    )
+  }
+  // lamp — the aurora vault's own light
+  return (
+    p(`M ${fx(-S * 0.62)} ${fx(S * 0.8)} L ${fx(-S * 0.44)} ${fx(-S * 0.3)} L ${fx(S * 0.44)} ${fx(-S * 0.3)} L ${fx(S * 0.62)} ${fx(S * 0.8)} Z`, NAVE_C.mint) +
+    `<ellipse cx="0" cy="${fx(S * 0.26)}" rx="${fx(S * 0.3)}" ry="${fx(S * 0.44)}" fill="${H}"/>` +
+    `<rect x="${fx(-S * 0.72)}" y="${fx(S * 0.78)}" width="${fx(S * 1.44)}" height="${fx(S * 0.26)}" fill="${G}"/>` +
+    `<rect x="${fx(-S * 0.5)}" y="${fx(-S * 0.5)}" width="${fx(S * 1.0)}" height="${fx(S * 0.22)}" fill="${G}"/>`
+  )
+}
+
+/** THE COUNTING WHEEL (ch6-assay-dial): the spun disc. Gilt rim, eight vault
+ *  wedges, the read band the faceplate exposes, and the WAX SEAL thumb lobe
+ *  protruding past the rim — the grip, and the piece of art this whole item
+ *  exists to make turn. */
+function assayDial(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const cy = h / 2
+  const R = w * ASSAY_R
+  const hubR = R * 0.3
+  const bandIn = R * ASSAY_BAND[0]
+  const bandOut = R * ASSAY_BAND[1]
+  const G = NAVE_C.gold
+  const L = NAVE_C.gilt
+  const H = NAVE_C.giltHi
+  const K = NAVE_C.base
+
+  const defs =
+    `<clipPath id="assayCut"><circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}"/></clipPath>` +
+    `<radialGradient id="assayLite" cx="0.34" cy="0.26" r="0.86">` +
+    `<stop offset="0" stop-color="${H}" stop-opacity="0.34"/>` +
+    `<stop offset="0.4" stop-color="${L}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${K}" stop-opacity="0.6"/></radialGradient>`
+
+  // THE WAX-SEAL THUMB LOBE, protruding past the rim so it stands clear of the
+  // faceplate and reads as the one thing on the wheel a hand belongs on.
+  const tabHalf = 13
+  const tabR = R * 1.14
+  const bx0 = polX(cx, ASSAY_TAB_A - tabHalf, R * 0.99)
+  const by0 = polY(cy, ASSAY_TAB_A - tabHalf, R * 0.99)
+  const bx1 = polX(cx, ASSAY_TAB_A + tabHalf, R * 0.99)
+  const by1 = polY(cy, ASSAY_TAB_A + tabHalf, R * 0.99)
+  const tabD = `M ${fx(bx0)} ${fx(by0)} Q ${fx(polX(cx, ASSAY_TAB_A, tabR * 1.08))} ${fx(polY(cy, ASSAY_TAB_A, tabR * 1.08))} ${fx(bx1)} ${fx(by1)} Z`
+  const sealX = polX(cx, ASSAY_TAB_A, R * 1.02)
+  const sealY = polY(cy, ASSAY_TAB_A, R * 1.02)
+  const sealR = R * 0.15
+  let tab = `<path d="${tabD}" fill="${G}"/>`
+  tab += rimPath(tabD, 4)
+  tab += `<circle cx="${fx(sealX)}" cy="${fx(sealY)}" r="${fx(sealR)}" fill="#5a3f8a" stroke="#2a1c45" stroke-width="${fx(sealR * 0.14)}"/>`
+  tab += `<circle cx="${fx(sealX - sealR * 0.28)}" cy="${fx(sealY - sealR * 0.28)}" r="${fx(sealR * 0.7)}" fill="#7256a8" opacity="0.42"/>`
+  {
+    const star = []
+    for (let k = 0; k < 12; k++) {
+      const a = (k * Math.PI) / 6 - Math.PI / 2
+      const rl = k % 2 ? sealR * 0.24 : sealR * 0.56
+      star.push(`${fx(sealX + Math.cos(a) * rl)} ${fx(sealY + Math.sin(a) * rl)}`)
+    }
+    tab += `<path d="M ${star.join(' L ')} Z" fill="${H}"/>`
+  }
+
+  let g = `<g clip-path="url(#assayCut)">`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.7)}"/>`
+  for (let k = 0; k < 8; k++) {
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.5"/>`
+  }
+  // the READ BAND — a pale vellum ring, so gold devices and dark numerals both
+  // stand off it. Axis 3's per-sector wash then runs at full strength INSIDE it,
+  // which is the only difference that covers a whole aperture rather than a
+  // glyph's worth of one.
+  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${NAVE_C.frost}" opacity="0.9"/>`
+  for (let k = 0; k < 8; k++) {
+    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.5"/>`
+  }
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${G}" stroke-width="3.4" opacity="0.85"/>`
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${G}" stroke-width="2.8" opacity="0.8"/>`
+  for (let k = 0; k < 8; k++) {
+    const a = k * 45 + 22.5
+    g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${K}" stroke-width="2" opacity="0.55"/>`
+    g += `<circle cx="${fx(polX(cx, a, bandOut + 13))}" cy="${fx(polY(cy, a, bandOut + 13))}" r="4.4" fill="${G}" stroke="${K}" stroke-width="1.2" stroke-opacity="0.6"/>`
+  }
+  // ---- THE EIGHT STRONGROOMS, each in its own frame -------------------------
+  // `translate(cx,cy) rotate(90 - a)` puts the sector's math-angle onto local
+  // 90, so "radially outward" is straight UP and every legend reads the same way
+  // out of every sector — the only orientation upright through all three
+  // windows, which sit at 45/90/135 in the card's upper half.
+  for (let k = 0; k < 8; k++) {
+    const v = ASSAY_VAULTS[k]
+    const a = k * 45
+    let sec = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(90 - a)})">`
+    // the numeral, engraved outermost (0.86-0.92R)
+    {
+      const chN = R * 0.075
+      const cwN = R * 0.05
+      const gapN = R * 0.017
+      const wN = v.numeral.length * cwN + (v.numeral.length - 1) * gapN
+      const yN = -R * 0.905
+      sec += engraveWord(v.numeral, -wN / 2, yN + R * 0.005, cwN, chN, gapN, H, fx(R * 0.016), 'opacity="0.6"')
+      sec += engraveWord(v.numeral, -wN / 2, yN, cwN, chN, gapN, K, fx(R * 0.018), 'opacity="0.95"')
+    }
+    // axis 1 — the COUNT of gold bars on the shared pale shelf (0.62-0.76R)
+    {
+      const shelfY = -R * 0.7
+      const shelfW = R * 0.5
+      sec += `<rect x="${fx(-shelfW / 2)}" y="${fx(shelfY + R * 0.05)}" width="${fx(shelfW)}" height="${fx(R * 0.035)}" fill="${NAVE_C.frost}" opacity="0.95"/>`
+      sec += `<rect x="${fx(-shelfW / 2)}" y="${fx(shelfY + R * 0.085)}" width="${fx(shelfW)}" height="${fx(R * 0.02)}" fill="${K}" opacity="0.6"/>`
+      const bw = R * 0.085
+      const total = v.bars * bw + (v.bars - 1) * R * 0.028
+      for (let b = 0; b < v.bars; b++) {
+        const bx = -total / 2 + b * (bw + R * 0.028)
+        sec += `<rect x="${fx(bx)}" y="${fx(shelfY - R * 0.055)}" width="${fx(bw)}" height="${fx(R * 0.105)}" fill="${G}" stroke="${K}" stroke-width="1.4" stroke-opacity="0.7"/>`
+        sec += `<rect x="${fx(bx)}" y="${fx(shelfY - R * 0.055)}" width="${fx(bw)}" height="${fx(R * 0.03)}" fill="${H}"/>`
+      }
+    }
+    // axis 2 — the principal device (0.40-0.60R)
+    sec += `<g transform="translate(0 ${fx(-R * 0.5)})">${assayDevice(v.device, R * 0.095)}</g>`
+    sec += `</g>`
+    g += sec
+  }
+  g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#assayLite)"/>`
+  // frost dusting so the wheel belongs to the northern page it lies in
+  for (let i = 0; i < 40; i++) {
+    const a = rr(r, 0, 360)
+    const rad = rr(r, hubR, R * 0.98)
+    g += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.7, 1.9))}" fill="${NAVE_C.frost}" opacity="${fx(rr(r, 0.15, 0.4))}"/>`
+  }
+  g += `</g>`
+  // the gilt rim, and the pale core cut edge the whole book wears
+  let s = tab + g
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.97)}" fill="none" stroke="${G}" stroke-width="${fx(R * 0.05)}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.955)}" fill="none" stroke="${H}" stroke-width="2" opacity="0.7"/>`
+  s += rimPath(circlePath(cx, cy, R), 4.5)
+  return svgPiece(w, h, s, defs)
+}
+
+/** THE GLASS FACEPLATE (ch6-assay-card): the static plate riveted over the
+ *  wheel — a round pane-wall of the treasury's own curtain glass with THREE
+ *  ARCHED VITRINES cut clean through it (true alpha-0 holes, even-odd compound
+ *  path) and one brass tag reading TURN. The plate must be transparent outside
+ *  its inscribed circle: the quad's corners would otherwise print as paper. */
+function assayCard(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const cy = h / 2
+  const R = w * ASSAY_R
+  const bandIn = R * ASSAY_BAND[0]
+  const bandOut = R * ASSAY_BAND[1]
+  const G = NAVE_C.gold
+  const L = NAVE_C.gilt
+  const H = NAVE_C.giltHi
+  const K = NAVE_C.base
+
+  const defs =
+    `<radialGradient id="assayCardLite" cx="0.36" cy="0.28" r="0.84">` +
+    `<stop offset="0" stop-color="${NAVE_C.tealHi}" stop-opacity="0.55"/>` +
+    `<stop offset="0.5" stop-color="${NAVE_C.tealHi}" stop-opacity="0.08"/>` +
+    `<stop offset="1" stop-color="#000000" stop-opacity="0.46"/></radialGradient>`
+
+  // even-odd compound plate: outer disc + 3 vitrine holes. A point inside a
+  // window is enclosed by two sub-paths => even => UNFILLED => a true alpha-0
+  // aperture the wheel reads through.
+  let plateD = circlePath(cx, cy, R)
+  for (const psi of ASSAY_WINS) plateD += ' ' + annularSectorPath(cx, cy, psi, ASSAY_HALFW, bandIn, bandOut)
+
+  let s = `<g>`
+  s += `<path fill-rule="evenodd" d="${plateD}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.5)}"/>`
+  s += `<g clip-path="url(#assayPlate)">`
+  // THE CURTAIN WALL: the same gold mullion grid the nave's facade wears, so the
+  // faceplate reads as a disc cut out of the treasury's own glass rather than as
+  // a lid dropped on the page. Panes are square-ish and generous — a fine grid
+  // dissolves into hatching at this projection.
+  {
+    const p = R * 0.2
+    for (let gx = -5; gx <= 5; gx++) {
+      for (let gy = -5; gy <= 5; gy++) {
+        const px = cx + gx * p
+        const py = cy + gy * p
+        if (Math.hypot(px - cx, py - cy) > R * 1.05) continue
+        s += `<rect x="${fx(px - p * 0.44)}" y="${fx(py - p * 0.44)}" width="${fx(p * 0.88)}" height="${fx(p * 0.88)}" fill="${(gx + gy) % 2 ? NAVE_C.teal : NAVE_C.tealLit}" opacity="0.55"/>`
+        s += `<path d="M ${fx(px - p * 0.36)} ${fx(py + p * 0.36)} L ${fx(px + p * 0.1)} ${fx(py - p * 0.36)}" stroke="${NAVE_C.mint}" stroke-width="2.2" opacity="0.32"/>`
+      }
+    }
+    for (let gx = -5; gx <= 5; gx++) {
+      s += `<line x1="${fx(cx + gx * p - p * 0.5)}" y1="0" x2="${fx(cx + gx * p - p * 0.5)}" y2="${h}" stroke="${G}" stroke-width="3.2" opacity="0.9"/>`
+      s += `<line x1="0" y1="${fx(cy + gx * p - p * 0.5)}" x2="${w}" y2="${fx(cy + gx * p - p * 0.5)}" stroke="${G}" stroke-width="3.2" opacity="0.9"/>`
+    }
+    s += `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#assayCardLite)"/>`
+  }
+  s += `</g>`
+  // THE VITRINE ARCHES: a gold bezel ringing each aperture (drawn on the plate,
+  // never into the hole) with a keystone tick at its crown, so the three windows
+  // read as arched display cases in a wall and not as slots milled in a disc.
+  for (const psi of ASSAY_WINS) {
+    s += `<path d="${annularSectorPath(cx, cy, psi, ASSAY_HALFW + 2.6, bandIn - 10, bandOut + 10)}" fill="none" stroke="${K}" stroke-width="7" opacity="0.75"/>`
+    s += `<path d="${annularSectorPath(cx, cy, psi, ASSAY_HALFW + 2.6, bandIn - 10, bandOut + 10)}" fill="none" stroke="${G}" stroke-width="4" opacity="0.95"/>`
+    s += `<path d="${annularSectorPath(cx, cy, psi, ASSAY_HALFW + 1.7, bandIn - 5, bandOut + 5)}" fill="none" stroke="${H}" stroke-width="1.8" opacity="0.85"/>`
+    const kx = polX(cx, psi, bandOut + 20)
+    const ky = polY(cy, psi, bandOut + 20)
+    s += `<circle cx="${fx(kx)}" cy="${fx(ky)}" r="${fx(R * 0.038)}" fill="${L}" stroke="${K}" stroke-width="1.5" stroke-opacity="0.65"/>`
+  }
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.985)}" fill="none" stroke="${G}" stroke-width="4.4" opacity="0.9"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.34)}" fill="none" stroke="${G}" stroke-width="2.2" opacity="0.65"/>`
+  for (const a of [0, 180, 225, 315]) {
+    const rx = polX(cx, a, R * 0.93)
+    const ry = polY(cy, a, R * 0.93)
+    s += `<circle cx="${fx(rx)}" cy="${fx(ry)}" r="6" fill="${L}" stroke="${K}" stroke-width="1.4" stroke-opacity="0.65"/>`
+    s += `<circle cx="${fx(rx - 1.6)}" cy="${fx(ry - 1.6)}" r="2" fill="#ffffff" opacity="0.4"/>`
+  }
+
+  // ---- THE BRASS TAG (T-AFFORDANCE) ----
+  // ONE WORD, at the cap height the s4 lane had to fight for: R*0.36 is ~22
+  // screen px at the ~145px this card projects. A second line or a numeral buys
+  // nothing at 1x and "(1)" would imply steps 2 and 3 that do not exist.
+  const tagW = R * 1.3
+  const tagH = R * 0.5
+  const tagX = cx - tagW / 2
+  const tagY = cy + R * 0.28
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="${G}"/>`
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH * 0.34)}" rx="${fx(R * 0.05)}" fill="${H}" opacity="0.5"/>`
+  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="none" stroke="${K}" stroke-width="2.6" opacity="0.75"/>`
+  s += `<rect x="${fx(tagX + 6)}" y="${fx(tagY + 6)}" width="${fx(tagW - 12)}" height="${fx(tagH - 12)}" rx="${fx(R * 0.04)}" fill="none" stroke="${L}" stroke-width="1.6" opacity="0.8"/>`
+  for (const sx of [tagX + 14, tagX + tagW - 14]) {
+    for (const sy of [tagY + 13, tagY + tagH - 13]) {
+      s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="3.4" fill="${H}" stroke="${K}" stroke-width="1.1" stroke-opacity="0.6"/>`
+    }
+  }
+  {
+    // the doubled-stroke engraving idiom: a bright ghost offset under a dark
+    // cut, which is what makes struck metal survive a 5x downscale.
+    const word = 'TURN'
+    const cw = R * 0.19
+    const ch = R * 0.36
+    const gap = R * 0.048
+    const sw = R * 0.038
+    const wordW = word.length * cw + (word.length - 1) * gap
+    const x0 = cx - wordW / 2
+    const y0 = tagY + (tagH - ch) / 2
+    s += engraveWord(word, x0, y0 + sw * 0.34, cw, ch, gap, H, fx(sw * 0.9), 'opacity="0.5"')
+    s += engraveWord(word, x0, y0, cw, ch, gap, K, fx(sw), 'opacity="0.96"')
+  }
+  s += manicule(tagX - R * 0.1, tagY + tagH * 0.5, R * 0.1, NAVE_C.frost, K)
+  // the hub RIVET. Deliberately a rivet and nothing more: the layer discards any
+  // twist begun inside 0.25R, so a device painted here would be the one part of
+  // the wheel that does not answer a hand.
+  const rivR = R * 0.14
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR)}" fill="${L}" stroke="${K}" stroke-width="1.8" stroke-opacity="0.7"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.62)}" fill="${G}" stroke="${K}" stroke-width="1.4" stroke-opacity="0.6"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rivR * 0.3)}" fill="${K}"/>`
+  s += `<circle cx="${fx(cx - rivR * 0.34)}" cy="${fx(cy - rivR * 0.34)}" r="${fx(rivR * 0.16)}" fill="#ffffff" opacity="0.45"/>`
+  for (let i = 0; i < 26; i++) {
+    const a = rr(r, 190, 350)
+    const rad = rr(r, R * 0.4, R * 0.95)
+    s += `<circle cx="${fx(polX(cx, a, rad))}" cy="${fx(polY(cy, a, rad))}" r="${fx(rr(r, 0.8, 2.1))}" fill="${NAVE_C.frost}" opacity="${fx(rr(r, 0.2, 0.5))}"/>`
+  }
+  s += `</g>`
+  return svgPiece(w, h, s + rimPath(circlePath(cx, cy, R), 5), defs + `<clipPath id="assayPlate"><path fill-rule="evenodd" d="${plateD}"/></clipPath>`)
 }
 
 // E3 s6 — THE BAZAAR OF A THOUSAND STALLS (scenes/s6-scene-pack.md §4f).
@@ -12524,9 +13209,17 @@ const PIECES = [
   { id: 'ch6-nave-d-back', seed: 70308, w: 80, h: 37, grain: 6, paint() { return naveRankBack(this.w, this.h, { apHw: 0.359, apApex: 0.7222 }) } },
   { id: 'page-7', seed: 70310, w: 1024, h: 683, grain: 10, paint() { return navePage(this.w, this.h, this.seed) } },
   { id: 'ch6-crest', seed: 70230, w: 460, h: 409, grain: 10, paint() { return dressPatch(this.w, this.h, this.seed, 'griffin') } },
-  { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return deckSurface(this.w, this.h, this.seed, 'glass') } },
+  { id: 'ch6-steps-deck', seed: 70240, w: 1024, h: 330, grain: 14, paint() { return naveDaisDeck(this.w, this.h, this.seed) } },
   { id: 'ch6-steps-strut', seed: 70241, w: 512, h: 256, grain: 12, paint() { return naveStepRiser(this.w, this.h, this.seed) } },
   // s7 PLAYABLE (G4): the treasure coffer — interior board + one teal-steel lid.
+  // THE COUNTING WHEEL (WAVE-2 s7, S7-1) — a REGISTRATION PAIR. Deliberately
+  // OFF the atlases, like the s4 dispatch dial/card: the two discs must stay
+  // pixel-aligned to EACH OTHER, and a packer's uniform scale factor plus its
+  // half-texel inset is exactly the thing that shears them apart. (The volvelle
+  // layer asks for them by id through useArtTexture, never as sprites, so a
+  // packed entry would also strand itself in texture-budget's sprite audit.)
+  { id: 'ch6-assay-dial', seed: 70270, w: 640, h: 640, grain: 10, paint() { return assayDial(this.w, this.h, this.seed) } },
+  { id: 'ch6-assay-card', seed: 70280, w: 640, h: 640, grain: 10, paint() { return assayCard(this.w, this.h, this.seed) } },
   { id: 'ch6-coffer-board', seed: 70260, w: 576, h: 480, grain: 12, paint() { return cofferInterior(this.w, this.h, this.seed) } },
   { id: 'ch6-coffer-door1', seed: 70261, w: 512, h: 486, grain: 12, paint() { return cofferLid(this.w, this.h, this.seed) } },
 ]
@@ -13120,6 +13813,17 @@ export {
   NAVE_APSE,
   naveArchPath,
   pageFY,
+  // Counting-wheel registration basis + the polar helpers the dial/card are laid
+  // out with. Exported (no behaviour change) so the art-QA benches can derive
+  // their sample masks from the SAME numbers the painter draws with — a window
+  // aperture typed by hand measures the typist, not the art.
+  ASSAY_R,
+  ASSAY_BAND,
+  ASSAY_WINS,
+  ASSAY_HALFW,
+  ASSAY_VAULTS,
+  polX,
+  polY,
   ATLASES,
   ATLAS_PAGE,
   writeAtlases,
