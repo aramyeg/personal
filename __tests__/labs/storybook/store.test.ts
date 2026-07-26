@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  WHEEL_COOLDOWN_MS,
   WHEEL_THRESHOLD,
   accumulateWheel,
   useStorybookStore,
+  type WheelAcc,
 } from '@/components/labs/storybook/store'
 
 const s = () => useStorybookStore.getState()
@@ -50,19 +52,78 @@ describe('turn machine', () => {
 })
 
 describe('accumulateWheel', () => {
-  it('fires next after accumulated scroll and resets', () => {
-    let acc = { value: 0, lastMs: 0 }
+  const fresh = (): WheelAcc => ({ value: 0, lastMs: 0, lockUntilMs: 0, lockDir: null })
+
+  it('fires next after a deliberate accumulated scroll and resets', () => {
+    let acc = fresh()
     let fire = null
+    // Three chunky events close together — a deliberate shove, not a notch.
     for (const t of [0, 16, 32]) {
-      ;({ acc, fire } = accumulateWheel(acc, 80, t))
+      ;({ acc, fire } = accumulateWheel(acc, 200, t))
     }
     expect(fire).toBe('next')
     expect(acc.value).toBe(0)
   })
+
   it('decays stale momentum', () => {
-    let { acc } = accumulateWheel({ value: 0, lastMs: 0 }, WHEEL_THRESHOLD - 1, 0)
+    const { acc } = accumulateWheel(fresh(), WHEEL_THRESHOLD - 1, 0)
     const r = accumulateWheel(acc, 2, 2000) // long pause → decayed
     expect(r.fire).toBeNull()
+  })
+
+  it('an ordinary two-notch scroll (the old, too-low threshold) no longer fires', () => {
+    let acc = fresh()
+    let fire = null
+    for (const t of [0, 16, 32]) {
+      ;({ acc, fire } = accumulateWheel(acc, 80, t))
+    }
+    expect(fire).toBeNull()
+  })
+
+  it('one realistic inertia train (a long run of small same-direction deltas) fires at most once', () => {
+    let acc = fresh()
+    let fires = 0
+    let t = 0
+    // 60 events at 16ms apart (~1s of trackpad inertia), each well under a
+    // notch — this is exactly the "one ordinary scroll gesture" a reader's
+    // hand produces while just looking around.
+    for (let i = 0; i < 60; i++) {
+      t += 16
+      const r = accumulateWheel(acc, 30, t)
+      acc = r.acc
+      if (r.fire) fires++
+    }
+    expect(fires).toBeLessThanOrEqual(1)
+  })
+
+  it('after a fire, the SAME direction cannot re-fire until the cooldown clock runs out', () => {
+    let acc = fresh()
+    // Cross threshold decisively at t=0.
+    let r = accumulateWheel(acc, WHEEL_THRESHOLD, 0)
+    expect(r.fire).toBe('next')
+    acc = r.acc
+    // The tail of the same gesture keeps arriving well inside the cooldown
+    // window — every one of these must be swallowed, not just the first.
+    for (const t of [50, 150, 250, 350]) {
+      r = accumulateWheel(acc, 200, t)
+      acc = r.acc
+      expect(r.fire).toBeNull()
+      expect(acc.value).toBe(0)
+    }
+    // Cooldown has now elapsed — the same direction is free to fire again.
+    r = accumulateWheel(acc, WHEEL_THRESHOLD, WHEEL_COOLDOWN_MS + 1)
+    expect(r.fire).toBe('next')
+  })
+
+  it('a direction reversal breaks the lock immediately, without waiting for the cooldown', () => {
+    let acc = fresh()
+    let r = accumulateWheel(acc, WHEEL_THRESHOLD, 0)
+    expect(r.fire).toBe('next')
+    acc = r.acc
+    // Well inside the cooldown window, but scrolling the OTHER way — this
+    // reads as a fresh, deliberate gesture and must not be swallowed.
+    r = accumulateWheel(acc, -WHEEL_THRESHOLD, 10)
+    expect(r.fire).toBe('prev')
   })
 })
 

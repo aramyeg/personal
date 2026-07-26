@@ -27,14 +27,15 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { kraftTints } from './paper-stock'
-import { acquireMaterial, releaseMaterial } from './material-pool'
+import { acquireMaterial, releaseMaterial, useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 import {
+  tabPieceCamShape,
   solveTabPiecePose,
   solveTabPiecePoseAt,
   tabPieceCeiling,
@@ -50,19 +51,22 @@ import {
 import { peakHeight, shadowLift } from './shadow-light'
 import { turnCullOpacity } from './turn-cull'
 import { easeTurnWeighted } from './page-geometry'
-import { TURN_MS, type TurnFrame } from './use-turn-driver'
+import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
-  clearUserDrive,
   endGrabChannel,
   readDriveOverride,
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -76,14 +80,13 @@ const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 /** Coarse-pointer hit widening (law H6): the invisible slop mesh is 1.5x the
  *  tab, engaged only for `pointerType === 'touch'`. */
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
 // Scratch for the H3 pointer projection (one grab at a time, consumed at once).
-const _plane = new THREE.Plane()
-const _u = new THREE.Vector3()
-const _hit = new THREE.Vector3()
 
 /** The darker sibling of each crease pair — the face turned away from the
  *  fore edge's light in the flat print (slopeOut/legOut), plus the tab. */
@@ -159,23 +162,6 @@ function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
   return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k] as Vec3)
 }
 
-/** The structure ship-vertices of a solved pose (every panel except the tab
- *  reveal — the motion-character convention the return cap measures against). */
-function structVerts(patches: readonly { face: TabPieceFace; quad: readonly Vec3[] }[]): Vec3[] {
-  const verts: Vec3[] = []
-  for (const p of patches) if (p.face !== 'tab') for (const c of p.quad) verts.push(c)
-  return verts
-}
-
-/** Worst per-vertex world step between two equal-length vertex lists. */
-function worstVert(a: readonly Vec3[], b: readonly Vec3[]): number {
-  let d = 0
-  for (let i = 0; i < a.length; i++) {
-    d = Math.max(d, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]))
-  }
-  return d
-}
-
 export function TabPiecePopupLayer({
   layer,
   spreadIndex,
@@ -191,7 +177,6 @@ export function TabPiecePopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
   const handleRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
 
   const faceArt = useArtTexture(`${layer.id}-face`)
   // This piece's own stock (D3 kraft-legibility package): replaces the
@@ -322,38 +307,25 @@ export function TabPiecePopupLayer({
   const aStop = useMemo(() => tabPieceStopLift(layer), [layer])
   const sStop = useMemo(() => tabPieceStopSlide(layer), [layer])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterials.forEach((m) => m.dispose())
-      materials.exterior.forEach((m) => m.dispose())
-      // paperTexture/tabGripTexture/shadowTexture/handleMaterial are shared
-      // singletons — never disposed per-instance; interiorMaterial is
-      // pooled — released above.
-      handleGeometry.dispose()
-      slopGeometry.dispose()
-      slitGeometry.dispose()
-      slitMaterial.dispose()
-      shadowMaterial.dispose()
-    },
-    [
-      geometries,
-      edgeGeometries,
-      edgeMaterials,
-      materials,
-      handleGeometry,
-      slopGeometry,
-      slitGeometry,
-      slitMaterial,
-      shadowMaterial,
-    ]
-  )
+  // paperTexture/tabGripTexture/shadowTexture/handleMaterial are shared
+  // singletons — never disposed per-instance; interiorMaterial is pooled —
+  // released above.
+  useGuardedDispose([
+    ...geometries,
+    ...edgeGeometries,
+    ...edgeMaterials,
+    ...materials.exterior,
+    handleGeometry,
+    slopGeometry,
+    slitGeometry,
+    slitMaterial,
+    shadowMaterial,
+  ])
 
   // --- Grab lifecycle (laws H1-H3). High-frequency values flow through the
   // module scrub channel; only the low-frequency grab identity touches zustand.
   const grabRef = useRef<{ sGrabStart: number; dGrab: number } | null>(null)
-  const prevStructRef = useRef<Vec3[] | null>(null)
+  const tap = useHandleTap()
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -365,18 +337,13 @@ export function TabPiecePopupLayer({
 
   /** The pointer's projection onto the live page's strip axis (page-frame u),
    *  in the layer's local frame (law H3: rebuilt from theta each event). */
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
-    const t = layer.side === 'left' ? thetaL : thetaR
-    _u.set(Math.cos(t), Math.sin(t), 0)
-    _plane.setComponents(Math.sin(t), -Math.cos(t), 0, 0) // page plane through the spine
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    return _hit.dot(_u)
-  }
+  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null =>
+    projectPageD(pointerLocalRay(e), layer.side === 'left' ? thetaL : thetaR)
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never drew the strip answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -388,8 +355,7 @@ export function TabPiecePopupLayer({
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
     // Touch uses the 1.5x slop mesh; mouse/pen use the exact tab mesh (H6).
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = restAnglesNow()
@@ -401,6 +367,7 @@ export function TabPiecePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return // booted/turning re-check no-oped
     grabRef.current = { sGrabStart: tabPieceSlideFromLift(layer, aGrabStart), dGrab }
     writeUserDrive(layer.id, aGrabStart, [0, aStop])
+    tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -419,18 +386,24 @@ export function TabPiecePopupLayer({
     const dNow = projectPointerD(e, thetaL, thetaR)
     if (dNow === null) return
     const sUser = clamp(grab.sGrabStart + (dNow - grab.dGrab), 0, sStop)
-    writeUserDrive(layer.id, tabPieceLiftFromSlide(layer, sUser), [0, aStop])
+    const aUser = tabPieceLiftFromSlide(layer, sUser)
+    writeUserDrive(layer.id, aUser, [0, aStop])
+    tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
 
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
   useFrame((_, delta) => {
@@ -458,9 +431,20 @@ export function TabPiecePopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
-    if (!visible) {
-      prevStructRef.current = null
-      return
+    if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [...materials.exterior, interiorMaterial]) applyHandleGlow(m, w)
     }
     if (culled) {
       for (const m of materials.exterior) m.opacity = cull
@@ -481,31 +465,30 @@ export function TabPiecePopupLayer({
     } else if (grabbed) {
       effectiveA = channelA ?? camA
     } else if (channelA !== undefined) {
-      // Release return — capped exponential toward the cam, yielding its
-      // per-frame budget to a page turn moving the same piece (gate UT).
-      const structAt = (a: number): Vec3[] =>
-        structVerts(solveTabPiecePoseAt(layer, a, thetaL, thetaR))
-      const heldStruct = structAt(Math.min(channelA, ceiling))
-      const pageStep = prevStructRef.current ? worstVert(prevStructRef.current, heldStruct) : 0
-      const budget = Math.max(0, STEP_CAP - pageStep)
-      const { next, settled } = stepUserDriveReturn(
-        channelA,
-        camA,
-        turnFrames(delta, TURN_MS),
-        (a0, a1) => worstVert(structAt(a0), structAt(a1)),
-        budget
-      )
-      if (settled) {
-        clearUserDrive(layer.id)
-        effectiveA = camA
-      } else {
-        writeUserDrive(layer.id, next, [0, aStop])
-        effectiveA = next
-      }
+      // RELEASE = LATCH (E3 release law, BW-12). This used to decay back to the
+      // page cam, and it was the single most deflating thing a blind reader
+      // reported on spread 5: "Travel follows the drag continuously — that part
+      // feels genuinely good, like working a real paper strip. On release it
+      // snaps all the way back to the closed tent. Delightful while held,
+      // deflating on let-go." The identical mechanism one chapter later
+      // latched, and the reader called the inconsistency a bug. It is.
+      // The held angle stays put; the SHOWN lift is angle * S(beta) (the shared
+      // cam shape), which is the lift-flap persistence composition in this
+      // family's units — 0 at book close for any held angle, and never a
+      // faster per-frame step than the always-on ceiling that already gates it.
+      effectiveA = clamp(channelA, 0, aStop) * tabPieceCamShape(layer, beta)
     } else {
       effectiveA = camA
     }
-    const rendered = Math.min(effectiveA, ceiling)
+    // Tap answer (BW-18), render-time only: the excursion never reaches the
+    // scrub channel, so the release return and the press-and-peel ceiling below
+    // both still see the reader's own value.
+    const nudged = clamp(
+      effectiveA + nudgeOffset(layer.id, effectiveA, 0, aStop, NUDGE_SPAN_ANGLE),
+      0,
+      aStop
+    )
+    const rendered = Math.min(nudged, ceiling)
 
     const solved = solveTabPiecePoseAt(layer, rendered, thetaL, thetaR)
     solved.forEach((patch, i) => {
@@ -517,7 +500,7 @@ export function TabPiecePopupLayer({
     // Track the tab quad onto the invisible grab handles.
     const tab = solved[solved.length - 1].quad
     writeQuad(handleGeometry, tab)
-    writeQuad(slopGeometry, enlargeQuad(tab, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(tab, handleSlopFactor(tab, TOUCH_SLOP)))
 
     const [slitA, slitB] = tabPieceSlit(layer, thetaL, thetaR)
     const slitAttr = slitGeometry.getAttribute('position') as THREE.BufferAttribute
@@ -532,7 +515,6 @@ export function TabPiecePopupLayer({
     slitGeometry.computeBoundingSphere()
 
     shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2 * cull
-    prevStructRef.current = structVerts(solved)
   })
 
   return (

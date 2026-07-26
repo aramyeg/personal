@@ -32,7 +32,7 @@ import { liveSpreadRole, spreadPageAnglesTilted, type PlatformGeom } from './pop
 import { solvePlatformPose, type PlatformFace } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import { acquireMaterial, releaseMaterial } from './material-pool'
+import { acquireMaterial, releaseMaterial, useGuardedDispose } from './material-pool'
 import { sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtSprite, useArtTexture } from './use-layer-texture'
@@ -235,19 +235,16 @@ export function PlatformPopupLayer({
     }
   }, [layer])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterials.forEach((m) => m.dispose())
-      materials.exterior.forEach((m) => m.dispose())
-      strutShadowMaterial.dispose()
-      deckShadowMaterial.dispose()
-      // paperTexture/shadowTexture are shared singletons — never disposed
-      // per-instance; interiorMaterial is pooled — released above.
-    },
-    [geometries, edgeGeometries, edgeMaterials, materials, strutShadowMaterial, deckShadowMaterial]
-  )
+  // paperTexture/shadowTexture are shared singletons — never disposed
+  // per-instance; interiorMaterial is pooled — released above.
+  useGuardedDispose([
+    ...geometries,
+    ...edgeGeometries,
+    ...edgeMaterials,
+    ...materials.exterior,
+    strutShadowMaterial,
+    deckShadowMaterial,
+  ])
 
   useFrame(() => {
     const group = groupRef.current

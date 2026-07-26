@@ -1,0 +1,72 @@
+/**
+ * ONE HIT LAW for every grab handle in the book.
+ *
+ * THE DEFECT IT FIXES (blind sweep 2026-07-26, BW-11 / S6-2 / S6-4): each
+ * handle carried two raycast surfaces — the EXACT die-cut quad and a 1.4-1.5x
+ * "slop" quad for coarse pointers — and both carried the hover handlers, while
+ * `onPointerDown` accepted the exact mesh for mouse/pen ONLY and the slop mesh
+ * for touch ONLY. So a mouse hovering the slop ring got a `grab` cursor and a
+ * press that was silently discarded. Measured on the live page: roughly half
+ * the `grab`-cursor band engaged nothing, and s6's mauve pull tab never
+ * engaged at all.
+ *
+ * THE LAW: any pointer type may engage EITHER surface. The slop defers only
+ * when the exact surface is under the pointer too, so precision still wins
+ * where the reader is actually on the die-cut. Hover region == engaging
+ * region, by construction, for every family.
+ */
+
+import * as THREE from 'three'
+import type { ThreeEvent } from '@react-three/fiber'
+import type { Vec3 } from './popup-mechanics'
+
+/** Slop factor for a PAGE-FLAT handle (pull tabs, cards, discs). These lie in
+ *  the page plane, so the ~27deg reading camera foreshortens them to a sliver
+ *  — the STIR tab measured 55x22 screen px. They get the most generous pad. */
+export const HANDLE_SLOP_FLAT = 1.8
+/** Slop factor for a STANDING handle (a flap the reader grabs face-on). These
+ *  already present their full area to the camera. */
+export const HANDLE_SLOP_STANDING = 1.5
+
+/**
+ * ABSOLUTE FLOOR on a handle's effective hit surface, in world units — roughly
+ * 45 screen px at the pinned reading camera, i.e. the ordinary touch-target
+ * floor. A relative pad alone is not enough: the s4 cable-carrier grab box
+ * measured ~26x40 screen px and the s3 STIR tab 55x22, and 1.8x a sliver is
+ * still a sliver. `handleSlopFactor` grows the pad until the piece's SHORTEST
+ * edge clears this, so small handles get proportionally more help than large
+ * ones and nothing is padded below its own die-cut.
+ */
+export const HANDLE_MIN_HIT = 0.12
+
+const edge = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+/**
+ * The slop factor to enlarge `quad` by: at least `base`, and enough that the
+ * quad's shortest edge reaches HANDLE_MIN_HIT. Capped so a degenerate (zero
+ * area) quad cannot ask for an unbounded pad.
+ */
+export function handleSlopFactor(quad: readonly Vec3[], base: number): number {
+  if (quad.length < 4) return base
+  let shortest = Infinity
+  for (let i = 0; i < 4; i++) {
+    const d = edge(quad[i], quad[(i + 1) % 4])
+    if (d > 1e-6 && d < shortest) shortest = d
+  }
+  if (!Number.isFinite(shortest)) return base
+  return Math.min(6, Math.max(base, HANDLE_MIN_HIT / shortest))
+}
+
+/**
+ * Whether this pointerdown should be consumed by the surface it landed on.
+ * `slop` is the layer's coarse-pointer mesh (or null if it has none).
+ */
+export function acceptsHandleHit(
+  e: ThreeEvent<PointerEvent>,
+  slop: THREE.Object3D | null
+): boolean {
+  if (!slop || e.object !== slop) return true
+  // A slop-only hit engages; a slop hit that ALSO has the exact surface under
+  // the pointer defers to the pass this same handler makes for that surface.
+  return !e.intersections.some((i) => i.eventObject === e.eventObject && i.object !== slop)
+}

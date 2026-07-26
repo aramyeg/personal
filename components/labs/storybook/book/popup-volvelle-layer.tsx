@@ -17,9 +17,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted, type VolvelleGeom } from './popup-mechanics'
 import {
@@ -37,11 +38,18 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const HUB_DEADZONE = 0.25
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 /** Detent-snap ease rate per frame while the dial is released and off a detent.
  *  A soft exponential so the sectors "click" into their windows (bench-proven
  *  snap target volvelleSnap); it stops once within SNAP_EPS. */
@@ -67,13 +75,6 @@ const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
-const _center = new THREE.Vector3()
-const _n = new THREE.Vector3()
-const _e1 = new THREE.Vector3()
-const _e2 = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 
 function readKnobOverrideDeg(): number | null {
   if (process.env.NODE_ENV === 'production') return null
@@ -95,7 +96,13 @@ function readVolvelleTheta(layer: SceneLayer & VolvelleGeom): number {
   const drive = readDriveOverride(layer.id)
   if (drive !== null) return clamp(rad(drive), 0, max)
   const channel = readUserDrive(layer.id)
-  return channel !== undefined ? clamp(channel, 0, max) : 0
+  const held = channel !== undefined ? clamp(channel, 0, max) : 0
+  // Tap answer (BW-18): a press that never turned the dial rocks it a few
+  // degrees and lets it settle. Applied HERE, in the one reader every consumer
+  // shares, so the disc and everything it drives stay one rigid machine — and
+  // only on the channel path, so a frozen ?sbdrive/?sbknob capture pose is
+  // never disturbed. Render-time only: the excursion is not written back.
+  return clamp(held + nudgeOffset(layer.id, held, 0, max, NUDGE_SPAN_ANGLE), 0, max)
 }
 /** True when a dev override is pinning the twist — the release ease must not
  *  fight a frozen capture pose. */
@@ -178,13 +185,7 @@ function useDiscMaterials(fallbackTexture: THREE.Texture, artId: string) {
     materials.front.needsUpdate = true
     materials.back.needsUpdate = true
   }, [art, fallbackTexture, materials, tint])
-  useEffect(
-    () => () => {
-      materials.front.dispose()
-      materials.back.dispose()
-    },
-    [materials]
-  )
+  useGuardedDispose([materials.front, materials.back])
   return materials
 }
 
@@ -201,7 +202,6 @@ export function VolvellePopupLayer({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const thetaMax = volvelleThetaMax()
 
@@ -215,18 +215,12 @@ export function VolvellePopupLayer({
   const dialMaterials = useDiscMaterials(knobTexture, `${layer.id}-dial`)
   const cardMaterials = useDiscMaterials(paperTexture, `${layer.id}-card`)
 
-  useEffect(
-    () => () => {
-      dialGeometry.dispose()
-      cardGeometry.dispose()
-      slopGeometry.dispose()
-    },
-    [dialGeometry, cardGeometry, slopGeometry]
-  )
+  useGuardedDispose([dialGeometry, cardGeometry, slopGeometry])
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the hub
   // measured on the page's own e1/e2 axes (the knob-tower/winch disc idiom).
   const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  const tap = useHandleTap()
 
   const angleAboutHub = (
     e: ThreeEvent<PointerEvent>,
@@ -234,23 +228,15 @@ export function VolvellePopupLayer({
     thetaR: number
   ): { angle: number; stable: boolean } | null => {
     const { center, e1, e2, n } = volvelleHubFrame(layer, thetaL, thetaR, VOLVELLE_LIFT)
-    _center.set(center[0], center[1], center[2])
-    _n.set(n[0], n[1], n[2])
-    _e1.set(e1[0], e1[1], e1[2])
-    _e2.set(e2[0], e2[1], e2[2])
-    _plane.setFromNormalAndCoplanarPoint(_n, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    const along = _rel.dot(_e1)
-    const spin = _rel.dot(_e2)
-    const r = Math.hypot(along, spin)
-    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.radius }
+    const hub = projectHubAngle(pointerLocalRay(e), center, e1, e2, n)
+    if (!hub) return null
+    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.radius }
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never turned the dial answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // theta HELD; the frame loop eases it to a detent
     try {
@@ -261,15 +247,16 @@ export function VolvellePopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
     const hub = angleAboutHub(e, thetaL, thetaR)
     st.beginGrab(layer.id, 'knob')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
-    writeUserDrive(layer.id, clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax), [0, thetaMax])
+    const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+    writeUserDrive(layer.id, seeded, [0, thetaMax])
+    tap.begin(seeded)
     grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -288,7 +275,9 @@ export function VolvellePopupLayer({
     if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
     if (grab.lastAngle !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      writeUserDrive(layer.id, clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax), [0, thetaMax])
+      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      writeUserDrive(layer.id, next, [0, thetaMax])
+      tap.track(next, TAP_EPS)
     }
     grab.lastAngle = hub.angle
     e.stopPropagation()
@@ -297,14 +286,18 @@ export function VolvellePopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta, turnT } = readAngles()
@@ -316,6 +309,20 @@ export function VolvellePopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [dialMaterials.front, dialMaterials.back]) applyHandleGlow(m, w)
+    }
     for (const m of [dialMaterials.front, dialMaterials.back, cardMaterials.front, cardMaterials.back]) {
       m.opacity = cull
     }
@@ -338,7 +345,7 @@ export function VolvellePopupLayer({
     const pose = solveVolvellePose(layer, thetaL, thetaR, readVolvelleTheta(layer))
     writeQuad(dialGeometry, pose.dial)
     writeQuad(cardGeometry, pose.card)
-    writeQuad(slopGeometry, enlargeQuad(pose.dial, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(pose.dial, handleSlopFactor(pose.dial, TOUCH_SLOP)))
   })
 
   return (

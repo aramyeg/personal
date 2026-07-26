@@ -36,12 +36,13 @@
  * which is byte-for-byte what shipped before.
  */
 
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import type { UvRect } from '../art-atlas'
 import { applyUvRect } from '../art-atlas'
+import { useGuardedDispose } from './material-pool'
 import type { BoxFace, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, solveBoxPose, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -338,18 +339,9 @@ export function KeepStackMergedLayer({
     [shadowSpecs, shadowTexture]
   )
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      edgeGeometry.dispose()
-      material.dispose()
-      edgeMaterial.dispose()
-      shadowMaterials.forEach((m) => m.dispose())
-      // The atlas texture is shared and refcounted by useAtlasSet; the shadow
-      // texture is a module singleton. Neither is disposed here.
-    },
-    [geometry, edgeGeometry, material, edgeMaterial, shadowMaterials]
-  )
+  // The atlas texture is shared and refcounted by useAtlasSet; the shadow
+  // texture is a module singleton. Neither is disposed here.
+  useGuardedDispose([geometry, edgeGeometry, material, edgeMaterial, ...shadowMaterials])
 
   useFrame(() => {
     const group = groupRef.current

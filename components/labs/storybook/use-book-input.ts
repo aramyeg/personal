@@ -4,8 +4,8 @@
  * Plain DOM input grammar for the book: wheel, keyboard, and pointer swipe
  * all funnel into `requestTurn`, which already owns bounds/queueing (see
  * store.ts). Lives outside the r3f canvas (the loader mounts it alongside
- * `<BookScene/>`), uses window listeners with no capture phase, and never
- * touches Escape — that key belongs exclusively to `<GalleryChrome>`.
+ * `<BookScene/>`), uses window listeners with no capture phase — with ONE
+ * deliberate exception, the Escape interception below.
  *
  * Hit-target disambiguation (hand-interaction-laws.md law H1): a handle
  * grab starts on the r3f canvas's own pointerdown, which runs first on the
@@ -15,6 +15,18 @@
  * swipe start at all. `onPointerUp` needs no matching check: with no start
  * recorded, the swipe is already inert no matter which handler releases
  * the grab first (suppress at start, not at end).
+ *
+ * Escape ordinarily belongs exclusively to `<GalleryChrome>` (exit to
+ * /labs) — this file does not decide when the reader leaves the lab. But a
+ * reader with a handle mid-grab who taps Escape to back out of the
+ * interaction, not the whole book, was instead getting yanked out of the
+ * lab entirely with no confirmation. So `onEscapeDuringGrab` below listens
+ * in the CAPTURE phase (must win the race against GalleryChrome's
+ * bubble-phase handler regardless of mount order — the same reason
+ * snowpark's input.ts captures Escape) and, only while a grab is live,
+ * calls `preventDefault()` and releases the grab instead of letting the
+ * key reach GalleryChrome. With no grab active, it does nothing and the
+ * key proceeds to GalleryChrome exactly as before.
  */
 
 import { useEffect, useRef } from 'react'
@@ -38,7 +50,7 @@ const targetsOverlayPanel = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.sb-overlay') !== null
 
 export function useBookInput(enabled: boolean): void {
-  const wheelAcc = useRef<WheelAcc>({ value: 0, lastMs: 0 })
+  const wheelAcc = useRef<WheelAcc>({ value: 0, lastMs: 0, lockUntilMs: 0, lockDir: null })
   const pointerStart = useRef<PointerStart | null>(null)
 
   useEffect(() => {
@@ -53,15 +65,15 @@ export function useBookInput(enabled: boolean): void {
       if (fire) requestTurn(fire)
     }
 
+    // Space is deliberately NOT bound here: it is not a page-turn idiom for
+    // a book, and a reader poking at the scene (the handles, the corner
+    // hotspots) taps Space far more readily than a keyboard reader reaches
+    // for it as "next page" — binding it cost readers their spread.
     const onKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowRight':
         case 'ArrowDown':
         case 'PageDown':
-          requestTurn('next')
-          break
-        case ' ':
-          e.preventDefault()
           requestTurn('next')
           break
         case 'ArrowLeft':
@@ -73,6 +85,16 @@ export function useBookInput(enabled: boolean): void {
         default:
           break
       }
+    }
+
+    // See the file header: only intercepts Escape while a grab is live, and
+    // only to release that grab — GalleryChrome's own Escape handling is
+    // otherwise untouched.
+    const onEscapeDuringGrab = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (useStorybookStore.getState().grab === null) return
+      e.preventDefault()
+      useStorybookStore.getState().endGrab()
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -102,12 +124,18 @@ export function useBookInput(enabled: boolean): void {
 
     window.addEventListener('wheel', onWheel, { passive: true })
     window.addEventListener('keydown', onKeyDown)
+    // Capture phase: must run before GalleryChrome's bubble-phase Escape
+    // handler regardless of which mounts first, or the endGrab()
+    // preventDefault loses the race and Esc navigates away instead of
+    // releasing the grab (mirrors snowpark's input.ts).
+    window.addEventListener('keydown', onEscapeDuringGrab, true)
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('pointerup', onPointerUp)
 
     return () => {
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onEscapeDuringGrab, true)
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointerup', onPointerUp)
     }

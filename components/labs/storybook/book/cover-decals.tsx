@@ -31,6 +31,7 @@ import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { createCanvas } from '../procedural/canvas-utils'
 import { BOOK_SUBTITLE, BOOK_TITLE } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { BOOK, makeCanvasTexture } from './book'
 import { plyLift } from './lift-ladder'
 import { useArtTexture } from './use-layer-texture'
@@ -135,15 +136,7 @@ function CrestAndCorners({ coverTopY }: { coverTopY: number }) {
     cornerMaterial.needsUpdate = true
   }, [cornerMaterial, cornerTexture])
 
-  useEffect(
-    () => () => {
-      crestGeometry.dispose()
-      cornerGeometry.dispose()
-      crestMaterial.dispose()
-      cornerMaterial.dispose()
-    },
-    [crestGeometry, cornerGeometry, crestMaterial, cornerMaterial]
-  )
+  useGuardedDispose([crestGeometry, cornerGeometry, crestMaterial, cornerMaterial])
 
   const decalY = coverTopY + DECAL_LIFT
   const crestZ = BOOK.coverH * CREST_Z_FRAC

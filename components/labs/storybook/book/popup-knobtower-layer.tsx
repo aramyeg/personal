@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { kraftTints } from './paper-stock'
@@ -31,13 +31,18 @@ import { knobTowerThetaMax, knobTowerTierLift, solveKnobTowerPose } from './popu
 import { ROTOR_LIFT } from './popup-rotor'
 import { shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import { acquireMaterial, releaseMaterial } from './material-pool'
+import { acquireMaterial, releaseMaterial, useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import { type TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -52,18 +57,17 @@ const CUT_EDGE_COLOR = '#f6eedb'
 /** Deltas from hit points inside this fraction of the disc radius are
  *  discarded — angle is numerically unstable at the hub (law H4). */
 const HUB_DEADZONE = 0.25
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
 // Scratch for the H4 angle-about-hub projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
 const _center = new THREE.Vector3()
 const _n = new THREE.Vector3()
 const _u = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 const _ez = new THREE.Vector3(0, 0, 1)
 
 /** Dev-only knob-angle override for the D6 capture deck: `?sbknob=<deg>`
@@ -87,7 +91,13 @@ function readKnobTheta(layer: SceneLayer & KnobTowerGeom): number {
   const override = readKnobOverrideDeg()
   if (override !== null) return clamp(rad(override), 0, max)
   const channel = readUserDrive(layer.id)
-  return channel !== undefined ? clamp(channel, 0, max) : 0
+  const held = channel !== undefined ? clamp(channel, 0, max) : 0
+  // Tap answer (BW-18): a press that never turned the dial rocks it a few
+  // degrees and lets it settle. Applied HERE, in the one reader every consumer
+  // shares, so the disc and everything it drives stay one rigid machine — and
+  // only on the channel path, so a frozen ?sbdrive/?sbknob capture pose is
+  // never disturbed. Render-time only: the excursion is not written back.
+  return clamp(held + nudgeOffset(layer.id, held, 0, max, NUDGE_SPAN_ANGLE), 0, max)
 }
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
@@ -167,7 +177,6 @@ function KnobDisc({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const art = useArtTexture(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
@@ -204,21 +213,12 @@ function KnobDisc({
     materials.back.needsUpdate = true
   }, [art, knobTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      slopGeometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-      // handleMaterial/knobTexture are shared singletons — never disposed
-      // per-instance.
-    },
-    [geometry, slopGeometry, materials]
-  )
+  useGuardedDispose([geometry, slopGeometry, materials.front, materials.back])
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the
   // hub; the last stable angle holds through the unstable centre.
   const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  const tap = useHandleTap()
 
   /** The pointer's angle about the hub in the disc's seat plane, plus whether
    *  the hit fell inside the unstable centre deadzone. */
@@ -236,19 +236,21 @@ function KnobDisc({
       layer.hubD * _u.y + ROTOR_LIFT * _n.y,
       layer.hubZ
     )
-    _plane.setFromNormalAndCoplanarPoint(_n, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    const along = _rel.dot(_u)
-    const spin = _rel.dot(_ez)
-    const r = Math.hypot(along, spin)
-    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.discR }
+    const hub = projectHubAngle(
+      pointerLocalRay(e),
+      [_center.x, _center.y, _center.z],
+      [_u.x, _u.y, _u.z],
+      [_ez.x, _ez.y, _ez.z],
+      [_n.x, _n.y, _n.z]
+    )
+    if (!hub) return null
+    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.discR }
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never turned the dial answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // theta HELD in the channel (law H4)
     try {
@@ -259,8 +261,7 @@ function KnobDisc({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
@@ -268,7 +269,9 @@ function KnobDisc({
     st.beginGrab(layer.id, 'knob')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     // Seed the channel with the current held twist so accumulation is relative.
-    writeUserDrive(layer.id, clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax), [0, thetaMax])
+    const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+    writeUserDrive(layer.id, seeded, [0, thetaMax])
+    tap.begin(seeded)
     grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -287,7 +290,9 @@ function KnobDisc({
     if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
     if (grab.lastAngle !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      writeUserDrive(layer.id, clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax), [0, thetaMax])
+      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      writeUserDrive(layer.id, next, [0, thetaMax])
+      tap.track(next, TAP_EPS)
     }
     grab.lastAngle = hub.angle
     e.stopPropagation()
@@ -296,24 +301,42 @@ function KnobDisc({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
     const visible = role !== 'hidden' && beta > FLAT_EPSILON
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.front, materials.back]) applyHandleGlow(m, w)
+    }
     const patches = solveKnobTowerPose(layer, readKnobTheta(layer), thetaL, thetaR)
     const disc = patches[0].quad // 'disc' is always the first patch
     writeQuad(geometry, disc)
-    writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(disc, handleSlopFactor(disc, TOUCH_SLOP)))
   })
 
   return (
@@ -434,22 +457,7 @@ function KnobTier({
     }
   }, [layer, tier])
 
-  useEffect(
-    () => () => {
-      geometries.in.dispose()
-      geometries.out.dispose()
-      edgeGeometries.in.dispose()
-      edgeGeometries.out.dispose()
-      edgeMaterials.in.dispose()
-      edgeMaterials.out.dispose()
-      materials.in.dispose()
-      materials.out.dispose()
-      shadowMaterial.dispose()
-      // paperTexture/shadowTexture are shared singletons — never disposed
-      // per-instance; interiorMaterial is pooled — released above.
-    },
-    [geometries, edgeGeometries, edgeMaterials, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.in, geometries.out, edgeGeometries.in, edgeGeometries.out, edgeMaterials.in, edgeMaterials.out, materials.in, materials.out, shadowMaterial])
 
   useFrame(() => {
     const group = groupRef.current

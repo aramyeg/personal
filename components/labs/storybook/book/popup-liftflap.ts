@@ -54,6 +54,47 @@ export const liftFlapMax = (geom: LiftFlapGeom): number => rad(geom.liftMaxDeg ?
  *  key art lives in the aperture fore-half so this lift uncovers it (bench L6). */
 export const liftFlapOpenAngle = (geom: LiftFlapGeom): number => rad(geom.regOpenDeg ?? DEFAULT_OPEN_DEG)
 
+/** Coarse-pointer slop for a door leaf, before the per-door z cap below. */
+export const LIFTFLAP_TOUCH_SLOP = 1.4
+
+/**
+ * Per-door slop factors: TOUCH_SLOP, but never wide enough in z for one leaf's
+ * pad to overlap the next leaf's.
+ *
+ * WHY IT MATTERS (s2 finding 4: "row 1 always falls shut on release while rows
+ * 2, 3 and 4 swing up and stay up"). The doors sit on a 0.105 pitch with 0.085
+ * leaves — a flat 1.4x pad spans 0.119 and so pokes into both neighbours. r3f
+ * calls this ONE handler once per intersected surface, so a press inside an
+ * overlap ran onPointerDown twice with two different door indices and the
+ * second call overwrote the first's grab record: the reader dragged one leaf
+ * and either a different leaf answered or the grab pointed at a door the
+ * pointer was never on. Disjoint pads make that ambiguity unrepresentable; the
+ * re-entrant guard in onPointerDown makes it unreachable even if some future
+ * geometry reintroduces an overlap.
+ *
+ * A gap g between neighbouring bands allows f <= 1 + g/h, since enlarging a
+ * band of height h about its centre grows each side by (f - 1)h/2.
+ */
+export function doorSlopFactors(doors: LiftFlapGeom['doors']): number[] {
+  return doors.map((door, k) => {
+    const h = Math.abs(door.z1 - door.z0)
+    if (h <= 0) return 1
+    let gap = Infinity
+    for (let j = 0; j < doors.length; j++) {
+      if (j === k) continue
+      const other = doors[j]
+      const d = Math.max(
+        Math.min(door.z0, door.z1) - Math.max(other.z0, other.z1),
+        Math.min(other.z0, other.z1) - Math.max(door.z0, door.z1)
+      )
+      if (d < gap) gap = d
+    }
+    if (!Number.isFinite(gap)) return LIFTFLAP_TOUCH_SLOP
+    return Math.max(1, Math.min(LIFTFLAP_TOUCH_SLOP, 1 + Math.max(0, gap) / h))
+  })
+}
+
+
 /** Page-openness envelope E(beta) — the shared fold-flat cam (knobTowerTierLift).
  *  E(0) = 0 exactly, so every leaf flattens at book-closed regardless of a_user. */
 export function liftFlapEnvelope(geom: LiftFlapGeom, beta: number): number {

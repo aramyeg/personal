@@ -3,10 +3,37 @@
 /**
  * Fixed bottom chrome for the book: back/next arrow buttons, a center folio
  * naming the current spread, an sr-only live region for screen readers, and
- * two invisible corner hotspots so a single tap advances/retreats on coarse
- * (touch) pointers — the XP lab's single-tap lesson. Mounted by the loader
- * alongside the canvas; always present (including at the cover, so the
- * "next" arrow/hotspot is itself an alternate way to open the book).
+ * two corner hotspots so a single tap advances/retreats on coarse (touch)
+ * pointers — the XP lab's single-tap lesson. Mounted by the loader alongside
+ * the canvas; always present (including at the cover, so the "next"
+ * arrow/hotspot is itself an alternate way to open the book).
+ *
+ * BW-3 / BW-16 (all five blind readers flagged the corners): they were
+ * fully invisible — transparent, `default` cursor, no hover/focus state, no
+ * curl preview — so a reader only ever found one by dragging across it by
+ * accident. Fixed on three axes without restructuring the file:
+ *  - aria: the corners stay OUT of the accessibility tree (aria-hidden +
+ *    tabIndex={-1}), deliberately, not by omission. They are a second,
+ *    touch-only route to the exact `requestTurn` action the labeled `‹`/`›`
+ *    arrows already expose to keyboard/AT users a few pixels away with a
+ *    real aria-label and a real focus stop. Giving the corners their own
+ *    name would plant two same-purpose, differently-shaped controls in
+ *    every screen-reader user's page-turn story — one of them a hit region
+ *    they have no way to perceive the bounds of — for zero gain over the
+ *    arrows. That's a worse AT experience, not a more honest one, so the
+ *    hidden treatment stays; see the commit message for the full argument.
+ *  - cursor: `data-sb-hover` (quill-cursor.tsx's growth/gold-catch trigger)
+ *    now covers the corners too, matching the arrows. `.sb-nav-clickable`
+ *    (storybook.css) gives every one of these buttons a `pointer` cursor on
+ *    the coarse-pointer path where the native cursor is still the one the
+ *    reader sees — arrows included, since reviewers found the arrows just
+ *    as unlabeled-by-cursor as the corners.
+ *  - a visible paper dog-ear (storybook.css `.sb-dogear`) now sits inside
+ *    each corner button — a whisper-quiet fold at rest, lifting a touch on
+ *    hover/focus — replacing "no visual sign at all" with a hint that
+ *    reads as paper, not as UI. Rendered only on the side that can
+ *    currently turn (never on "back" at the cover, never on "next" at the
+ *    last spread), same rule the arrows already enforce with `disabled`.
  */
 
 import { chapterForSpread, SPREAD_COUNT } from '../content'
@@ -57,7 +84,7 @@ export function BookNav() {
           disabled={atStart}
           onClick={() => requestTurn('prev')}
           data-sb-hover
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
+          className="sb-nav-clickable grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
         >
           <span aria-hidden="true">‹</span>
         </button>
@@ -72,7 +99,7 @@ export function BookNav() {
           disabled={atEnd}
           onClick={() => requestTurn('next')}
           data-sb-hover
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
+          className="sb-nav-clickable grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--sb-gold)] bg-black/30 text-lg text-[var(--sb-gold)] backdrop-blur-sm transition-colors hover:bg-[var(--sb-gold)]/15 disabled:pointer-events-none disabled:opacity-30"
         >
           <span aria-hidden="true">›</span>
         </button>
@@ -86,18 +113,26 @@ export function BookNav() {
         type="button"
         aria-hidden="true"
         tabIndex={-1}
+        disabled={atStart}
         onClick={() => requestTurn('prev')}
-        className="fixed bottom-0 left-0 z-30"
+        data-sb-hover
+        className="sb-nav-clickable fixed bottom-0 left-0 z-30 disabled:pointer-events-none"
         style={HOTSPOT_STYLE}
-      />
+      >
+        {!atStart && <span className="sb-dogear sb-dogear--left" aria-hidden="true" />}
+      </button>
       <button
         type="button"
         aria-hidden="true"
         tabIndex={-1}
+        disabled={atEnd}
         onClick={() => requestTurn('next')}
-        className="fixed right-0 bottom-0 z-30"
+        data-sb-hover
+        className="sb-nav-clickable fixed right-0 bottom-0 z-30 disabled:pointer-events-none"
         style={HOTSPOT_STYLE}
-      />
+      >
+        {!atEnd && <span className="sb-dogear sb-dogear--right" aria-hidden="true" />}
+      </button>
     </>
   )
 }

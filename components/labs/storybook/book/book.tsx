@@ -44,6 +44,7 @@ import { PopupSpread, type PopupRole } from './popup-spread'
 import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
 import { plyLift } from './lift-ladder'
+import { useGuardedDispose } from './material-pool'
 
 export const BOOK = {
   coverW: 1.22,
@@ -167,14 +168,12 @@ function useBookTextures(): {
   const leather = useMemo(() => makeCanvasTexture(leatherCanvas), [leatherCanvas])
   const crease = useMemo(() => makeCanvasTexture(creaseCanvas), [creaseCanvas])
 
-  useEffect(
-    () => () => {
-      paper.dispose()
-      leather.dispose()
-      crease.dispose()
-    },
-    [paper, leather, crease]
-  )
+  // useGuardedDispose, not a plain dispose-in-cleanup effect (E-G6 root
+  // cause — see material-pool.ts's doc comment): these textures are built
+  // once in useMemo and never rebuilt, so a StrictMode mount rehearsal's
+  // premature cleanup would dispose the exact objects every page/cover
+  // material keeps mapping to for the rest of the book's life.
+  useGuardedDispose([paper, leather, crease])
 
   return { paper, leather, crease }
 }
@@ -194,7 +193,7 @@ function useBlockGeometry(): THREE.BufferGeometry {
     geo.computeVertexNormals()
     return geo
   }, [])
-  useEffect(() => () => geometry.dispose(), [geometry])
+  useGuardedDispose(geometry) // E-G6: see useBookTextures' comment above
   return geometry
 }
 
@@ -231,7 +230,7 @@ function usePageGeometry(): THREE.BufferGeometry {
     return geo
   }, [])
 
-  useEffect(() => () => geometry.dispose(), [geometry])
+  useGuardedDispose(geometry) // E-G6: see useBookTextures' comment above
 
   return geometry
 }
@@ -383,18 +382,26 @@ export function Book() {
     () => new THREE.MeshStandardMaterial({ color: EDGE_COLOR, roughness: 0.92, side: THREE.DoubleSide }),
     []
   )
-  useEffect(
-    () => () => {
-      for (const t of [...stackEdgeTextures.left, ...stackEdgeTextures.right]) t.dispose()
-      leftStackMaterial.dispose()
-      rightStackMaterial.dispose()
-      rightRimMaterial.dispose()
-      leftRimMaterial.dispose()
-      sheetRimMaterial.dispose()
-      pedestalMaterial.dispose()
-      coverPageMaterial.dispose()
-      coverRimMaterial.dispose()
-    },
+  // E-G6 (see material-pool.ts's useGuardedDispose doc): a plain
+  // dispose-in-cleanup effect here disposed these live materials/textures
+  // the instant React's dev-only StrictMode mount rehearsal ran, while the
+  // stacks/rims/cover page kept rendering with them for the rest of the
+  // session. Combined into one memoized array (deps below are every one of
+  // these object's own useMemo deps, all stable post-mount) so the guard's
+  // single effect fires once, not on every render.
+  const stackAndRimDisposables = useMemo(
+    () => [
+      ...stackEdgeTextures.left,
+      ...stackEdgeTextures.right,
+      leftStackMaterial,
+      rightStackMaterial,
+      rightRimMaterial,
+      leftRimMaterial,
+      sheetRimMaterial,
+      pedestalMaterial,
+      coverPageMaterial,
+      coverRimMaterial,
+    ],
     [
       stackEdgeTextures,
       leftStackMaterial,
@@ -407,6 +414,7 @@ export function Book() {
       coverRimMaterial,
     ]
   )
+  useGuardedDispose(stackAndRimDisposables)
 
   // The turning sheet's two printed faces. Owned HERE (not in
   // turning-page.tsx) because their maps must swap inside the useFrame
@@ -441,16 +449,21 @@ export function Book() {
     [paper]
   )
 
-  useEffect(
-    () => () => {
-      leatherMaterial.dispose()
-      paperMaterial.dispose()
-      leftPageMaterial.dispose()
-      rightPageMaterial.dispose()
-      creaseMaterial.dispose()
-      sheetFrontMaterial.dispose()
-      sheetBackMaterial.dispose()
-    },
+  // E-G6 (see material-pool.ts's useGuardedDispose doc): same premature-
+  // dispose hazard as the two disposal groups above — every one of these is
+  // the book's single, always-visible page/cover material, so a rehearsal-
+  // triggered dispose here was the single biggest source of the "never-
+  // ending on another [spread]" half of the blind sweep's GL spam report.
+  const coreMaterialDisposables = useMemo(
+    () => [
+      leatherMaterial,
+      paperMaterial,
+      leftPageMaterial,
+      rightPageMaterial,
+      creaseMaterial,
+      sheetFrontMaterial,
+      sheetBackMaterial,
+    ],
     [
       leatherMaterial,
       paperMaterial,
@@ -461,6 +474,7 @@ export function Book() {
       sheetBackMaterial,
     ]
   )
+  useGuardedDispose(coreMaterialDisposables)
 
   // Committed open/closed state — drives the cover's *rest* pose and the
   // spine's standing-vs-flat shape. Deliberately NOT blended with `turning`

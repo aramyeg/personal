@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createElement, StrictMode, useEffect, useMemo } from 'react'
+import { act, render } from '@testing-library/react'
 import * as THREE from 'three'
-import { acquireMaterial, releaseMaterial, _poolDebugSnapshot } from '@/components/labs/storybook/book/material-pool'
+import {
+  acquireMaterial,
+  releaseMaterial,
+  useGuardedDispose,
+  _poolDebugSnapshot,
+} from '@/components/labs/storybook/book/material-pool'
 
 describe('material-pool', () => {
   it('two acquires with an identical spec return the SAME object', () => {
@@ -100,5 +107,122 @@ describe('material-pool', () => {
     expect(() => acquireMaterial(spec)).not.toThrow()
     const b = acquireMaterial(spec)
     releaseMaterial(b)
+  })
+})
+
+// E-G6: the blind sweep's continuous `GL_INVALID_VALUE: glGetProgramiv:
+// Program object expected` spam traced to `useEffect(() => () =>
+// target.dispose(), [target])` — book.tsx's original pattern for every
+// useMemo'd material/geometry/texture. React's dev-only StrictMode mount
+// rehearsal runs that cleanup once and its (no-op) setup again,
+// SYNCHRONOUSLY, right after the real mount, to flush out non-idempotent
+// effects — but `useMemo`'s factory is never re-invoked by the rehearsal, so
+// the SAME object the mesh keeps rendering with gets disposed while the
+// component is, and stays, mounted. Disposing a material also releases the
+// (often shader-shared) WebGLProgram it cached, which is what the reported
+// spam actually was: three re-querying a program some OTHER still-live
+// material had already deleted the GPU side of.
+//
+// This suite proves the failure mode against the ORIGINAL naive pattern
+// first (so a regression in the fix shows up as a genuine dispose-during-
+// mount, not a false negative), then proves `useGuardedDispose` — the
+// drop-in replacement now used throughout book.tsx — survives the exact
+// same rehearsal.
+describe('useGuardedDispose (E-G6 StrictMode premature-dispose fix)', () => {
+  // Flushes the one microtask useGuardedDispose defers its real dispose
+  // call through (see the hook's own doc comment for why: that deferral is
+  // exactly what lets a StrictMode replay cancel it).
+  async function flushMicrotasks(): Promise<void> {
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  }
+
+  it('control: a plain useEffect(() => () => target.dispose(), [target]) DOES dispose during the StrictMode mount rehearsal', () => {
+    const dispose = vi.fn()
+    const target = { dispose }
+
+    // Mirrors the pre-fix book.tsx shape exactly: useMemo builds the object
+    // once, a plain effect's cleanup alone disposes it — no guard.
+    function Naive() {
+      const stable = useMemo(() => target, [])
+      useEffect(() => () => stable.dispose(), [stable])
+      return null
+    }
+
+    act(() => {
+      render(createElement(StrictMode, null, createElement(Naive)))
+    })
+
+    // The component is still mounted (unmount() was never called) — a
+    // correct lifecycle must not have disposed anything yet. It has.
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('disposes the target on real unmount', async () => {
+    const dispose = vi.fn()
+    const target = { dispose }
+
+    function Consumer() {
+      useGuardedDispose(target)
+      return null
+    }
+
+    const view = render(createElement(Consumer))
+    view.unmount()
+    await flushMicrotasks()
+
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('survives the StrictMode mount rehearsal: does NOT dispose while genuinely mounted, still disposes exactly once on the real unmount', async () => {
+    const dispose = vi.fn()
+    const target = { dispose }
+
+    function Consumer() {
+      useGuardedDispose(target)
+      return null
+    }
+
+    const view = render(createElement(StrictMode, null, createElement(Consumer)))
+
+    // Flush any microtask the rehearsal's cleanup may have scheduled — the
+    // fix's whole point is that the replayed setup already cancelled it.
+    await flushMicrotasks()
+    expect(dispose).not.toHaveBeenCalled()
+
+    view.unmount()
+    await flushMicrotasks()
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it("array form (book.tsx's stack-edge texture set) disposes every entry exactly once on real unmount, none early", async () => {
+    const targets = [{ dispose: vi.fn() }, { dispose: vi.fn() }, { dispose: vi.fn() }]
+
+    function Consumer() {
+      useGuardedDispose(targets)
+      return null
+    }
+
+    const view = render(createElement(StrictMode, null, createElement(Consumer)))
+    await flushMicrotasks()
+    for (const t of targets) expect(t.dispose).not.toHaveBeenCalled()
+
+    view.unmount()
+    await flushMicrotasks()
+    for (const t of targets) expect(t.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a null/undefined target is a safe no-op', () => {
+    function Consumer() {
+      useGuardedDispose(null)
+      useGuardedDispose(undefined)
+      return null
+    }
+    expect(() => {
+      const view = render(createElement(Consumer))
+      view.unmount()
+    }).not.toThrow()
   })
 })

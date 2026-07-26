@@ -22,9 +22,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedShadowTexture } from './shared-procedural-textures'
 import {
   liveSpreadRole,
@@ -33,26 +34,29 @@ import {
   spreadPageAnglesTilted,
   stripFlapCamLift,
   stripFlapFrame,
-  type MechPose,
+  stripFlapHoldEnvelope,
   type StripFlapGeom,
   type Vec3,
 } from './popup-mechanics'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import { TURN_MS, type TurnFrame } from './use-turn-driver'
+import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
-  clearUserDrive,
   endGrabChannel,
   readDriveOverride,
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_HEIGHT = 0.16
@@ -64,21 +68,12 @@ const FOLD_SHADE_TINT = '#d9cdb4'
 // kraft placeholder flap (no texture) so painted art is not dimmed + warm-cast.
 const PAINTED_FOLD_SHADE = '#e4e4e4'
 const ANTI_FLIP = Math.PI / 2 // the user ceiling (law H3): past vertical the figure flips
-const TOUCH_SLOP = 1.5
+const TOUCH_SLOP = HANDLE_SLOP_STANDING
 
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 /** Wrap an angle delta to (-pi, pi] so a grab tracks the short way round. */
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
-
-// Scratch for the H3 angle-about-hinge projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
-const _center = new THREE.Vector3()
-const _hinge = new THREE.Vector3()
-const _n = new THREE.Vector3()
-const _flat = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 
 // Stripflap uvs are fixed (fold split 0.5, never die-flipped): the print
 // continues seamlessly across the invisible centre seam (matches panelUvs).
@@ -114,18 +109,6 @@ function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
   return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k] as Vec3)
 }
 
-/** Every flap vertex is a ship vertex (no tab reveal) — the return cap
- *  measures the worst step over all eight corners. */
-const flapVerts = (pose: MechPose): Vec3[] => [...pose.right, ...pose.left]
-
-const worstVert = (a: readonly Vec3[], b: readonly Vec3[]): number => {
-  let d = 0
-  for (let i = 0; i < a.length; i++) {
-    d = Math.max(d, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]))
-  }
-  return d
-}
-
 export function StripFlapPopupLayer({
   layer,
   accents,
@@ -142,7 +125,6 @@ export function StripFlapPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
 
   const { texture, rect } = useLayerSprite(layer.id, layer.kind, accents)
 
@@ -195,23 +177,11 @@ export function StripFlapPopupLayer({
     [shadowTexture]
   )
 
-  useEffect(
-    () => () => {
-      geometries.right.dispose()
-      geometries.left.dispose()
-      slopGeometry.dispose()
-      materials.right.dispose()
-      materials.left.dispose()
-      shadowMaterial.dispose()
-      // handleMaterial/shadowTexture are shared singletons — never disposed
-      // per-instance.
-    },
-    [geometries, slopGeometry, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.right, geometries.left, slopGeometry, materials.right, materials.left, shadowMaterial])
 
   // --- Grab lifecycle (laws H1-H3). Offset-captured hinge angle for continuity.
   const grabRef = useRef<{ aGrabStart: number; angleGrab: number } | null>(null)
-  const prevVertsRef = useRef<Vec3[] | null>(null)
+  const tap = useHandleTap()
 
   const anglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -226,20 +196,13 @@ export function StripFlapPopupLayer({
    *  normal to the hinge axis, then atan2(along n, along flat). */
   const angleAboutHinge = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
     const fr = stripFlapFrame(layer, thetaL, thetaR)
-    _center.set(fr.center[0], fr.center[1], fr.center[2])
-    _hinge.set(fr.hinge[0], fr.hinge[1], fr.hinge[2])
-    _plane.setFromNormalAndCoplanarPoint(_hinge, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    _n.set(fr.n[0], fr.n[1], fr.n[2])
-    _flat.set(fr.flat[0], fr.flat[1], fr.flat[2])
-    return Math.atan2(_rel.dot(_n), _rel.dot(_flat))
+    return projectHingeAngle(pointerLocalRay(e), fr.center, fr.hinge, fr.flat, fr.n)
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never moved the flap answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -250,8 +213,7 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = anglesNow()
@@ -263,6 +225,7 @@ export function StripFlapPopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { aGrabStart, angleGrab }
     writeUserDrive(layer.id, aGrabStart, [0, ANTI_FLIP])
+    tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -280,17 +243,22 @@ export function StripFlapPopupLayer({
     if (angleNow === null) return
     const aUser = clamp(grab.aGrabStart + wrapDelta(angleNow - grab.angleGrab), 0, ANTI_FLIP)
     writeUserDrive(layer.id, aUser, [0, ANTI_FLIP])
+    tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
 
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
   useFrame((_, delta) => {
@@ -309,9 +277,20 @@ export function StripFlapPopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
     group.visible = visible
     if (shadowRef.current) shadowRef.current.visible = visible
-    if (!visible) {
-      prevVertsRef.current = null
-      return
+    if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.right, materials.left]) applyHandleGlow(m, w)
     }
 
     const camA = stripFlapCamLift(layer, beta)
@@ -324,36 +303,33 @@ export function StripFlapPopupLayer({
     } else if (grabbed) {
       effectiveA = channelA ?? camA
     } else if (channelA !== undefined) {
-      const vertsAt = (a: number): Vec3[] => flapVerts(solveStripFlapPoseAt(layer, a, thetaL, thetaR))
-      const held = vertsAt(channelA)
-      const pageStep = prevVertsRef.current ? worstVert(prevVertsRef.current, held) : 0
-      const budget = Math.max(0, STEP_CAP - pageStep)
-      const { next, settled } = stepUserDriveReturn(
-        channelA,
-        camA,
-        turnFrames(delta, TURN_MS),
-        (a0, a1) => worstVert(vertsAt(a0), vertsAt(a1)),
-        budget
-      )
-      if (settled) {
-        clearUserDrive(layer.id)
-        effectiveA = camA
-      } else {
-        writeUserDrive(layer.id, next, [0, ANTI_FLIP])
-        effectiveA = next
-      }
+      // RELEASE = LATCH (E3 release law, BW-12). This used to decay back to the
+      // page cam, and blind readers hated it in the same words on two different
+      // spreads: "springs back on release; nothing persists", "the one hidden
+      // gesture produces a ~30px bow that springs straight back". A real paper
+      // flap stays where your finger left it. The held angle is kept as-is and
+      // the SHOWN lift is angle * stripFlapHoldEnvelope(beta) — the lift-flap
+      // persistence composition — so fold-flat at book close is preserved for
+      // any held angle without a per-frame return at all.
+      effectiveA = clamp(channelA, 0, ANTI_FLIP) * stripFlapHoldEnvelope(layer, beta)
     } else {
       effectiveA = camA
     }
 
-    const pose = solveStripFlapPoseAt(layer, effectiveA, thetaL, thetaR)
+    // Tap answer (BW-18): a render-time excursion only — never written to the
+    // channel, so it cannot survive a turn or leak into the release return.
+    const shownA = clamp(
+      effectiveA + nudgeOffset(layer.id, effectiveA, 0, ANTI_FLIP, NUDGE_SPAN_ANGLE),
+      0,
+      ANTI_FLIP
+    )
+    const pose = solveStripFlapPoseAt(layer, shownA, thetaL, thetaR)
     writeQuad(geometries.right, pose.right)
     writeQuad(geometries.left, pose.left)
     // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.
     const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
-    writeQuad(slopGeometry, enlargeQuad(full, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(full, handleSlopFactor(full, TOUCH_SLOP)))
     shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
-    prevVertsRef.current = flapVerts(pose)
   })
 
   return (

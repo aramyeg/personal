@@ -1,0 +1,545 @@
+/**
+ * DRAG-REGRESSION BENCH — "a handle that takes a grab must move paper."
+ *
+ * WHY: five context-quarantined blind readers (2026-07-26) each found at least
+ * one handle that showed a `grab` cursor, captured the pointer, and then moved
+ * NOTHING. Every existing suite passed the whole time, because every existing
+ * suite tests solvers with hand-fed drive values — nobody tested the PIPELINE
+ * (screen ray -> projector -> drive value -> solver -> vertices).
+ *
+ * This bench closes that hole for EVERY handle family in the book. For each
+ * shipped grabbable it:
+ *   1. poses the piece at rest from the real content.ts entry,
+ *   2. aims a ray from the pinned reading camera at the handle's own surface,
+ *   3. drags that aim point across the screen basis in 8 directions,
+ *   4. runs the layer's real projector (book/handle-projection.ts) and the
+ *      layer's real drive arithmetic,
+ *   5. re-solves the piece and measures the worst vertex displacement.
+ *
+ * A family passes only if SOME drag direction moves the piece at least
+ * MIN_TRAVEL world units. A dead handle — bad projection, zero-range clamp,
+ * unit mismatch, wrong sign into a saturated stop — fails here, at unit-test
+ * speed, instead of in a reader's hands.
+ *
+ * The camera and the drag stroke are deliberately coarse: this is a
+ * liveness gate, not a pixel golden. See MIN_TRAVEL for the bar.
+ */
+
+import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
+import {
+  projectHingeAngle,
+  projectHubAngle,
+  projectPageD,
+} from '@/components/labs/storybook/book/handle-projection'
+import {
+  liveSpreadRole,
+  solveStripFlapPoseAt,
+  spreadPageAnglesTilted,
+  stripFlapCamLift,
+  stripFlapFrame,
+  type PanelQuad,
+  type StripFlapGeom,
+  type Vec3,
+} from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  liftFlapDoorQuad,
+  liftFlapHingeFrame,
+  liftFlapMax,
+  type LiftFlapGeom,
+} from '@/components/labs/storybook/book/popup-liftflap'
+import {
+  solveTabPiecePoseAt,
+  tabPieceCeiling,
+  tabPieceLift,
+  tabPieceLiftFromSlide,
+  tabPieceSlideFromLift,
+  tabPieceStopSlide,
+  type TabPieceGeom,
+} from '@/components/labs/storybook/book/popup-tabpiece'
+import {
+  dissolveStroke,
+  dissolveTabOut,
+  dissolveTabQuad,
+  dissolveTauFromDraw,
+  solveDissolvePose,
+  type DissolveGeom,
+} from '@/components/labs/storybook/book/popup-dissolve'
+import {
+  solveSwarmArcPose,
+  swarmStirTabQuad,
+  type SwarmArcGeom,
+} from '@/components/labs/storybook/book/popup-swarmarc'
+import {
+  keepsakeCardInPlane,
+  keepsakePExit,
+  type KeepsakeGeom,
+} from '@/components/labs/storybook/book/popup-keepsake'
+import {
+  keepWinchDiscQuad,
+  keepWinchOutputQuads,
+  keepWinchThetaMax,
+  type KeepWinchGeom,
+} from '@/components/labs/storybook/book/popup-keepwinch'
+import {
+  knobTowerThetaMax,
+  solveKnobTowerPose,
+  type KnobTowerGeom,
+} from '@/components/labs/storybook/book/popup-knobtower'
+import {
+  solveVolvellePose,
+  volvelleDetentStep,
+  volvelleHubFrame,
+  volvelleSectorSeen,
+  volvelleThetaMax,
+  VOLVELLE_LIFT,
+  type VolvelleGeom,
+} from '@/components/labs/storybook/book/popup-volvelle'
+import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
+import {
+  SPREAD_COUNT,
+  popupContentForSpread,
+  type SceneLayer,
+} from '@/components/labs/storybook/content'
+
+// --- The reading stage -------------------------------------------------------
+// book-scene.tsx's pinned camera, expressed in a layer's own local frame. The
+// spread group sits a few millimetres above the desk, which is far below the
+// resolution this gate cares about, so the world camera is used as-is.
+const CAMERA = new THREE.Vector3(0, 1.85, 3.05)
+const LOOK_AT = new THREE.Vector3(0, 0.38, 0.05)
+const WORLD_UP = new THREE.Vector3(0, 1, 0)
+
+const VIEW = LOOK_AT.clone().sub(CAMERA).normalize()
+const SCREEN_RIGHT = VIEW.clone().cross(WORLD_UP).normalize()
+const SCREEN_UP = SCREEN_RIGHT.clone().cross(VIEW).normalize()
+
+/** Probe stroke in world units at the piece's own depth. At the pinned camera
+ *  the open spread spans ~2.3 world units across ~900 screen px, so 0.20 is
+ *  roughly a 75 px drag — a deliberate, unambiguous reader gesture. */
+const STROKE = 0.2
+
+/** The bar: the piece's worst vertex must travel at least this far (world
+ *  units, ~8 screen px at the reading camera) in SOME drag direction. Below
+ *  this a reader cannot see that anything happened, which is exactly the
+ *  defect this file exists to prevent. */
+const MIN_TRAVEL = 0.02
+
+/** The eight screen directions a reader might try, as unit vectors in the
+ *  camera's screen basis. */
+const DIRECTIONS: readonly THREE.Vector3[] = (() => {
+  const out: THREE.Vector3[] = []
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4
+    out.push(
+      SCREEN_RIGHT.clone().multiplyScalar(Math.cos(a)).addScaledVector(SCREEN_UP, Math.sin(a))
+    )
+  }
+  return out
+})()
+
+const rayTo = (p: THREE.Vector3): THREE.Ray =>
+  new THREE.Ray(CAMERA.clone(), p.clone().sub(CAMERA).normalize())
+
+const centroid = (quad: PanelQuad | readonly Vec3[]): THREE.Vector3 => {
+  const v = new THREE.Vector3()
+  for (const c of quad) v.add(new THREE.Vector3(c[0], c[1], c[2]))
+  return v.multiplyScalar(1 / quad.length)
+}
+
+const worstTravel = (a: readonly Vec3[], b: readonly Vec3[]): number => {
+  let d = 0
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    d = Math.max(d, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]))
+  }
+  return d
+}
+
+const flatten = (quads: readonly (PanelQuad | readonly Vec3[])[]): Vec3[] =>
+  quads.flatMap((q) => q.map((c) => [c[0], c[1], c[2]] as Vec3))
+
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
+const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
+
+/** Rest page angles for the spread a layer lives on (no turn in flight). */
+function restAngles(spreadIndex: number): { thetaL: number; thetaR: number } {
+  expect(liveSpreadRole(spreadIndex, spreadIndex, null)).toBe('current')
+  return spreadPageAnglesTilted(spreadIndex, spreadIndex, null, 0)
+}
+
+/** A grabbable, described end to end. */
+type HandleCase = {
+  /** Layer id (or `id#door`) — the test name. */
+  name: string
+  /** A point ON the handle surface at rest, in the layer's local frame. */
+  grabPoint: THREE.Vector3
+  /** The layer's real projector, applied to a ray. Returns the projector's
+   *  scalar, or null if the ray misses the handle's working plane. */
+  project: (ray: THREE.Ray) => number | null
+  /** The layer's real drive arithmetic: grab scalar + current scalar -> drive. */
+  driveFrom: (pGrab: number, pNow: number) => number
+  /** The drive value the piece rests at with no reader input. */
+  restDrive: number
+  /** The piece's own vertices at a drive value. */
+  vertsAt: (drive: number) => Vec3[]
+}
+
+/** Locate a layer anywhere in the book (spread index included). */
+function locate(id: string): { layer: SceneLayer; spreadIndex: number } {
+  for (let s = 0; s < SPREAD_COUNT; s++) {
+    const layer = popupContentForSpread(s)?.layers.find((l) => l.id === id)
+    if (layer) return { layer, spreadIndex: s }
+  }
+  throw new Error(`no layer ${id} in the book`)
+}
+
+// --- Case builders (one per family) -----------------------------------------
+
+function liftFlapCases(id: string): HandleCase[] {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & LiftFlapGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const max = liftFlapMax(geom)
+  return geom.doors.map((_, k) => {
+    const fr = liftFlapHingeFrame(geom, k, thetaL, thetaR)
+    // The reader grabs the FREE (fore) edge of a shut leaf, not the hinge.
+    const shut = liftFlapDoorQuad(geom, k, 0, thetaL, thetaR)
+    const grabPoint = centroid([shut[1], shut[2]]).lerp(centroid(shut), 0.35)
+    return {
+      name: `${id}#door${k}`,
+      grabPoint,
+      project: (ray) => projectHingeAngle(ray, fr.center, fr.axis, fr.flat, fr.n),
+      driveFrom: (g, n) => clamp(0 + wrapDelta(n - g), 0, max),
+      restDrive: 0,
+      vertsAt: (a) => flatten([liftFlapDoorQuad(geom, k, a, thetaL, thetaR)]),
+    }
+  })
+}
+
+function stripFlapCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & StripFlapGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const beta = thetaL - thetaR
+  const camA = stripFlapCamLift(geom, beta)
+  const fr = stripFlapFrame(geom, thetaL, thetaR)
+  const rest = solveStripFlapPoseAt(geom, camA, thetaL, thetaR)
+  const ANTI_FLIP = Math.PI / 2
+  return {
+    name: id,
+    grabPoint: centroid([...rest.right, ...rest.left]),
+    project: (ray) => projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n),
+    driveFrom: (g, n) => clamp(camA + wrapDelta(n - g), 0, ANTI_FLIP),
+    restDrive: camA,
+    vertsAt: (a) => {
+      const pose = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
+      return flatten([pose.right, pose.left])
+    },
+  }
+}
+
+function tabPieceCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & TabPieceGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const beta = thetaL - thetaR
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const camA = tabPieceLift(geom, beta)
+  const sStop = tabPieceStopSlide(geom)
+  const aStop = tabPieceLiftFromSlide(geom, sStop)
+  const sGrabStart = tabPieceSlideFromLift(geom, camA)
+  const restPatches = solveTabPiecePoseAt(geom, camA, thetaL, thetaR)
+  const tabQuad = restPatches[restPatches.length - 1].quad
+  const ceiling = tabPieceCeiling(geom, beta)
+  return {
+    name: id,
+    grabPoint: centroid(tabQuad),
+    project: (ray) => projectPageD(ray, t),
+    driveFrom: (g, n) =>
+      tabPieceLiftFromSlide(geom, clamp(sGrabStart + (n - g), 0, sStop)),
+    restDrive: camA,
+    vertsAt: (a) =>
+      flatten(solveTabPiecePoseAt(geom, Math.min(clamp(a, 0, aStop), ceiling), thetaL, thetaR).map((p) => p.quad)),
+  }
+}
+
+function dissolveCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & DissolveGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const stroke = dissolveStroke(geom)
+  const deltaStart = dissolveTabOut(geom, 0)
+  return {
+    name: id,
+    grabPoint: centroid(dissolveTabQuad(geom, 0, thetaL, thetaR)),
+    project: (ray) => projectPageD(ray, t),
+    driveFrom: (g, n) => dissolveTauFromDraw(geom, clamp(deltaStart + (n - g), 0, stroke)),
+    restDrive: 0,
+    vertsAt: (tau) => {
+      const pose = solveDissolvePose(geom, tau, thetaL, thetaR)
+      return flatten(pose.slats)
+    },
+  }
+}
+
+function swarmArcCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & SwarmArcGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const t = geom.stir.side === 'left' ? thetaL : thetaR
+  return {
+    name: id,
+    grabPoint: centroid(swarmStirTabQuad(geom, 0, thetaL, thetaR)),
+    project: (ray) => projectPageD(ray, t),
+    driveFrom: (g, n) => clamp(0 + (n - g), 0, geom.stir.stroke),
+    restDrive: 0,
+    vertsAt: (s) => {
+      // The stir must move the SWARM, not just the tab it is pulled by.
+      const poses = solveSwarmArcPose(geom, thetaL, thetaR, s)
+      return flatten(poses.flatMap((p) => [p.strut, p.rider]))
+    },
+  }
+}
+
+function keepsakeCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & KeepsakeGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const pExit = keepsakePExit(geom)
+  return {
+    name: id,
+    grabPoint: centroid(keepsakeCardInPlane(geom, 0, thetaL, thetaR)),
+    project: (ray) => projectPageD(ray, t),
+    driveFrom: (g, n) => clamp(0 + (n - g), 0, pExit),
+    restDrive: 0,
+    vertsAt: (p) => flatten([keepsakeCardInPlane(geom, p, thetaL, thetaR)]),
+  }
+}
+
+const HUB_DEADZONE = 0.18
+
+function keepWinchCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & KeepWinchGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const u: Vec3 = [Math.cos(t), Math.sin(t), 0]
+  const n: Vec3 =
+    geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
+  const center: Vec3 = [
+    geom.hubD * u[0] + ROTOR_LIFT * n[0],
+    geom.hubD * u[1] + ROTOR_LIFT * n[1],
+    geom.hubZ,
+  ]
+  const ez: Vec3 = [0, 0, 1]
+  const thetaMax = keepWinchThetaMax(geom)
+  // The reader grabs the rim, not the hub: the deadzone discards centre hits.
+  const grabPoint = new THREE.Vector3(center[0], center[1], center[2]).addScaledVector(
+    new THREE.Vector3(u[0], u[1], u[2]),
+    geom.discR * 0.7
+  )
+  return {
+    name: id,
+    grabPoint,
+    project: (ray) => {
+      const hub = projectHubAngle(ray, center, u, ez, n)
+      return hub && hub.r >= HUB_DEADZONE * geom.discR ? hub.angle : null
+    },
+    driveFrom: (g, nn) => clamp(0 + wrapDelta(nn - g), 0, thetaMax),
+    restDrive: 0,
+    vertsAt: (spin) =>
+      flatten([
+        keepWinchDiscQuad(geom, thetaL, thetaR, spin),
+        ...keepWinchOutputQuads(geom, thetaL, thetaR, spin),
+      ]),
+  }
+}
+
+function volvelleCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & VolvelleGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const fr = volvelleHubFrame(geom, thetaL, thetaR, VOLVELLE_LIFT)
+  const thetaMax = volvelleThetaMax()
+  const grabPoint = new THREE.Vector3(fr.center[0], fr.center[1], fr.center[2]).addScaledVector(
+    new THREE.Vector3(fr.e1[0], fr.e1[1], fr.e1[2]),
+    geom.radius * 0.7
+  )
+  return {
+    name: id,
+    grabPoint,
+    project: (ray) => {
+      const hub = projectHubAngle(ray, fr.center, fr.e1, fr.e2, fr.n)
+      return hub && hub.r >= HUB_DEADZONE * geom.radius ? hub.angle : null
+    },
+    driveFrom: (g, n) => clamp(0 + wrapDelta(n - g), 0, thetaMax),
+    restDrive: 0,
+    vertsAt: (spin) => flatten([solveVolvellePose(geom, thetaL, thetaR, spin).dial]),
+  }
+}
+
+/** The knob tower ships no content entry today (its family code is live and
+ *  reachable from the spread dispatcher), so the gate runs against a
+ *  representative geom rather than skipping the family entirely. */
+const KNOBTOWER_PROBE: KnobTowerGeom = {
+  mech: 'knobtower',
+  side: 'right',
+  hubD: 0.5,
+  hubZ: 0.2,
+  discR: 0.12,
+  crankR: 0.12,
+  foreHingeD: 0.86,
+  tiers: [
+    { w: 0.1, aRestDeg: 62, zc: -0.12, ridgeLen: 0.2 },
+    { w: 0.08, aRestDeg: 58, zc: 0.14, ridgeLen: 0.16 },
+  ],
+}
+
+function knobTowerCase(): HandleCase {
+  const geom = KNOBTOWER_PROBE
+  const thetaL = Math.PI
+  const thetaR = 0
+  const t = geom.side === 'left' ? thetaL : thetaR
+  const u: Vec3 = [Math.cos(t), Math.sin(t), 0]
+  const n: Vec3 =
+    geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
+  const center: Vec3 = [
+    geom.hubD * u[0] + ROTOR_LIFT * n[0],
+    geom.hubD * u[1] + ROTOR_LIFT * n[1],
+    geom.hubZ,
+  ]
+  const ez: Vec3 = [0, 0, 1]
+  const thetaMax = knobTowerThetaMax(geom)
+  return {
+    name: 'knobtower(probe)',
+    grabPoint: new THREE.Vector3(center[0], center[1], center[2]).addScaledVector(
+      new THREE.Vector3(u[0], u[1], u[2]),
+      geom.discR * 0.7
+    ),
+    project: (ray) => {
+      const hub = projectHubAngle(ray, center, u, ez, n)
+      return hub && hub.r >= HUB_DEADZONE * geom.discR ? hub.angle : null
+    },
+    driveFrom: (g, nn) => clamp(0 + wrapDelta(nn - g), 0, thetaMax),
+    restDrive: 0,
+    vertsAt: (spin) => flatten(solveKnobTowerPose(geom, thetaL, thetaR, spin).map((p) => p.quad)),
+  }
+}
+
+// --- The gate ----------------------------------------------------------------
+
+/** Best displacement over the eight probe directions, plus the direction that
+ *  produced it (for a failure message a human can act on). */
+function bestTravel(c: HandleCase): { travel: number; dir: number; drive: number } {
+  const rayGrab = rayTo(c.grabPoint)
+  const pGrab = c.project(rayGrab)
+  expect(pGrab, `${c.name}: the projector missed its own handle at rest`).not.toBeNull()
+  const restVerts = c.vertsAt(c.restDrive)
+  let best = { travel: 0, dir: -1, drive: c.restDrive }
+  DIRECTIONS.forEach((d, i) => {
+    const pNow = c.project(rayTo(c.grabPoint.clone().addScaledVector(d, STROKE)))
+    if (pNow === null) return
+    const drive = c.driveFrom(pGrab as number, pNow)
+    const travel = worstTravel(restVerts, c.vertsAt(drive))
+    if (travel > best.travel) best = { travel, dir: i, drive }
+  })
+  return best
+}
+
+const CASES: HandleCase[] = [
+  ...liftFlapCases('ch1-keyboard'),
+  ...liftFlapCases('ch6-coffer'),
+  stripFlapCase('ch1-rank'),
+  stripFlapCase('ch3-ring-tower'),
+  stripFlapCase('ch5-throng'),
+  stripFlapCase('ch5-tea'),
+  stripFlapCase('ch6-clerk'),
+  tabPieceCase('ch4-goldpile'),
+  tabPieceCase('ch5-raise-stall'),
+  dissolveCase('ch4-dissolve'),
+  swarmArcCase('ch2-swarm'),
+  keepsakeCase('end-keepsake'),
+  keepWinchCase('ch3-keep-winch'),
+  volvelleCase('ch3-dispatch'),
+  knobTowerCase(),
+]
+
+describe('handle drag regression — every grabbable must move paper', () => {
+  it('covers every handle family the book ships', () => {
+    // Guard against a family silently dropping out of the gate.
+    const families = new Set<string>(
+      CASES.map((c) => c.name.replace(/[#(].*$/, '')).map((id) =>
+        id === 'knobtower' ? 'knobtower' : (locate(id).layer.mech as string)
+      )
+    )
+    for (const family of [
+      'liftflap',
+      'stripflap',
+      'tabpiece',
+      'dissolve',
+      'swarmarc',
+      'keepsake',
+      'keepwinch',
+      'volvelle',
+      'knobtower',
+    ]) {
+      expect(families.has(family), `family ${family} is not covered`).toBe(true)
+    }
+  })
+
+  for (const c of CASES) {
+    it(`${c.name} answers a reader's drag with visible travel`, () => {
+      const best = bestTravel(c)
+      expect(
+        best.travel,
+        `${c.name}: no drag direction moved it (best ${best.travel.toFixed(4)} world units at ` +
+          `drive ${best.drive.toFixed(4)}; the handle takes a grab and returns silence)`
+      ).toBeGreaterThan(MIN_TRAVEL)
+    })
+  }
+})
+
+/**
+ * DIAL VISIBILITY (E3 s4 review, "dead handle #4"). The s4 reader reported the
+ * SPIN dial showing both a `grab` and a `grabbing` cursor and then producing
+ * "ZERO scene change" for 450 degrees of circular drag, linear drags, rim-peg
+ * drags and clicks.
+ *
+ * The pipeline above proves that handle is LIVE: its projector, its drive
+ * arithmetic and its solver move the dial's own vertices 0.26 world units. So
+ * the failure is DOWNSTREAM of the mechanism, and it has a specific shape worth
+ * gating: a dial that snaps to a detent whose step equals its own art's
+ * rotational symmetry period renders pixel-identically after ANY drag. The
+ * reader measured after release, which is exactly when the snap has landed.
+ *
+ * The mechanism's OBSERVABLE output is which sector each window frames. This
+ * asserts that a single detent step changes every window's reading — i.e. the
+ * mechanism does have something to show. Whether the reader can SEE it is then
+ * purely a question of the dial's sectors being painted differently from one
+ * another, which is a scene-lane art requirement, not an input one.
+ */
+describe('volvelle — a detent step must change what the windows frame', () => {
+  it('ch3-dispatch: every window reads a different sector one detent on', () => {
+    const { layer } = locate('ch3-dispatch')
+    const geom = layer as SceneLayer & VolvelleGeom
+    const step = volvelleDetentStep(geom)
+    expect(geom.windows.length).toBeGreaterThan(0)
+    for (const w of geom.windows) {
+      const at0 = volvelleSectorSeen(geom, w, 0)
+      const at1 = volvelleSectorSeen(geom, w, step)
+      expect(at1).not.toBe(at0)
+    }
+  })
+
+  it('ch3-dispatch: a full turn walks every sector past a window', () => {
+    const { layer } = locate('ch3-dispatch')
+    const geom = layer as SceneLayer & VolvelleGeom
+    const step = volvelleDetentStep(geom)
+    const seen = new Set<number>()
+    for (let k = 0; k < geom.sectors; k++) seen.add(volvelleSectorSeen(geom, geom.windows[0], k * step))
+    // If a drag cannot bring a new sector into view, no art could rescue it.
+    expect(seen.size).toBe(geom.sectors)
+  })
+})

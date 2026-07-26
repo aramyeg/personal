@@ -20,9 +20,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -44,7 +45,12 @@ import { useArtSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 // Counterweight deck UVs — the iron-weight art split across the loft cap crease
@@ -57,17 +63,16 @@ const COUNTERWEIGHT_DECK_UVS: readonly Float32Array[] = [
   new Float32Array([0.5, 0, 0.5, 1, 1, 1, 1, 0]), // crestR
 ]
 const HUB_DEADZONE = 0.25
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
-const _plane = new THREE.Plane()
-const _hit = new THREE.Vector3()
 const _center = new THREE.Vector3()
 const _n = new THREE.Vector3()
 const _u = new THREE.Vector3()
-const _rel = new THREE.Vector3()
 const _ez = new THREE.Vector3(0, 0, 1)
 
 function readKnobOverrideDeg(): number | null {
@@ -88,7 +93,13 @@ function readWinchTheta(layer: SceneLayer & KeepWinchGeom): number {
   const drive = readDriveOverride(layer.id)
   if (drive !== null) return clamp(rad(drive), 0, max)
   const channel = readUserDrive(layer.id)
-  return channel !== undefined ? clamp(channel, 0, max) : 0
+  const held = channel !== undefined ? clamp(channel, 0, max) : 0
+  // Tap answer (BW-18): a press that never turned the dial rocks it a few
+  // degrees and lets it settle. Applied HERE, in the one reader every consumer
+  // shares, so the disc and everything it drives stay one rigid machine — and
+  // only on the channel path, so a frozen ?sbdrive/?sbknob capture pose is
+  // never disturbed. Render-time only: the excursion is not written back.
+  return clamp(held + nudgeOffset(layer.id, held, 0, max, NUDGE_SPAN_ANGLE), 0, max)
 }
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
@@ -156,7 +167,6 @@ function WinchDisc({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const { texture: art, rect } = useArtSprite(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
@@ -193,17 +203,10 @@ function WinchDisc({
     materials.back.needsUpdate = true
   }, [art, knobTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      slopGeometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-    },
-    [geometry, slopGeometry, materials]
-  )
+  useGuardedDispose([geometry, slopGeometry, materials.front, materials.back])
 
   const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  const tap = useHandleTap()
 
   const angleAboutHub = (
     e: ThreeEvent<PointerEvent>,
@@ -214,19 +217,21 @@ function WinchDisc({
     _u.set(Math.cos(t), Math.sin(t), 0)
     _n.set(layer.side === 'left' ? Math.sin(t) : -Math.sin(t), layer.side === 'left' ? -Math.cos(t) : Math.cos(t), 0)
     _center.set(layer.hubD * _u.x + ROTOR_LIFT * _n.x, layer.hubD * _u.y + ROTOR_LIFT * _n.y, layer.hubZ)
-    _plane.setFromNormalAndCoplanarPoint(_n, _center)
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    _rel.copy(_hit).sub(_center)
-    const along = _rel.dot(_u)
-    const spin = _rel.dot(_ez)
-    const r = Math.hypot(along, spin)
-    return { angle: Math.atan2(spin, along), stable: r >= HUB_DEADZONE * layer.discR }
+    const hub = projectHubAngle(
+      pointerLocalRay(e),
+      [_center.x, _center.y, _center.z],
+      [_u.x, _u.y, _u.z],
+      [_ez.x, _ez.y, _ez.z],
+      [_n.x, _n.y, _n.z]
+    )
+    if (!hub) return null
+    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.discR }
   }
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never turned the dial answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -237,15 +242,16 @@ function WinchDisc({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
     const hub = angleAboutHub(e, thetaL, thetaR)
     st.beginGrab(layer.id, 'knob')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
-    writeUserDrive(layer.id, clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax), [0, thetaMax])
+    const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+    writeUserDrive(layer.id, seeded, [0, thetaMax])
+    tap.begin(seeded)
     grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -264,7 +270,9 @@ function WinchDisc({
     if (!hub || !hub.stable) return
     if (grab.lastAngle !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      writeUserDrive(layer.id, clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax), [0, thetaMax])
+      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      writeUserDrive(layer.id, next, [0, thetaMax])
+      tap.track(next, TAP_EPS)
     }
     grab.lastAngle = hub.angle
     e.stopPropagation()
@@ -273,14 +281,18 @@ function WinchDisc({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta, turnT } = readAngles()
@@ -291,11 +303,25 @@ function WinchDisc({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.front, materials.back]) applyHandleGlow(m, w)
+    }
     materials.front.opacity = cull
     materials.back.opacity = cull
     const disc = keepWinchDiscQuad(layer, readWinchTheta(layer), thetaL, thetaR)
     writeQuad(geometry, disc)
-    writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(disc, handleSlopFactor(disc, TOUCH_SLOP)))
   })
 
   return (
@@ -367,13 +393,7 @@ function WinchOutput({
     }
   }, [art, paperTexture, material, tint])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      material.dispose()
-    },
-    [geometries, material]
-  )
+  useGuardedDispose([...geometries, material])
 
   useFrame(() => {
     const group = groupRef.current

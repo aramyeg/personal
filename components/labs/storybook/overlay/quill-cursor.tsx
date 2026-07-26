@@ -17,6 +17,17 @@
  * values and writes the transform once per frame, so a burst of pointer
  * events never forces more than one style write per frame.
  *
+ * E3 AFFORDANCE (BW-1, and the s4 "two cursors at once" report): the quill is
+ * the book's ONE cursor identity, so it is also where a grabbable announces
+ * itself. Over a live handle in the 3D scene — the store's `hover`, written by
+ * the handle layers themselves — the pen tips into a PINCH pose: it rolls a few
+ * degrees toward the paper, drops closer to its nib, and catches the same gold
+ * light the DOM chrome's `data-sb-hover` already gives it. While a grab is
+ * actually held it pinches harder and stops trailing, which reads as the fingers
+ * closing. Nothing in the 3D scene writes `style.cursor` any more (book-scene's
+ * CanvasCursor is the only writer, and only where this sprite is not drawn), so
+ * the native hand can never appear underneath the quill again.
+ *
  * Task 18 polish: still a single rAF loop writing one `transform` per
  * frame (translate + rotate + scale only) —
  *  - Rotation lags the pointer's horizontal velocity (eased toward a
@@ -29,12 +40,18 @@
 
 import { useEffect, useRef } from 'react'
 import { COMPACT_QUERY } from './compact-layout'
+import { useStorybookStore } from '../store'
 
 const ROT_MAX_DEG = 9
 const ROT_SENSITIVITY = 0.7
 const ROT_LAG = 0.18
 const PRESS_DURATION_MS = 220
 const PRESS_DIP = 0.22
+/** Pinch roll (deg) added over a grabbable, and again while a grab is held —
+ *  the pen turning its nib toward the paper it is about to take hold of. */
+const PINCH_ROT_DEG = 14
+/** How fast the pinch eases in and out (per-frame lerp weight). */
+const PINCH_LAG = 0.22
 
 export function QuillCursor() {
   const elRef = useRef<HTMLDivElement>(null)
@@ -43,6 +60,7 @@ export function QuillCursor() {
   const rotation = useRef(0)
   const hovering = useRef(false)
   const pressedAt = useRef<number | null>(null)
+  const pinch = useRef(0)
   const rafId = useRef<number | null>(null)
 
   useEffect(() => {
@@ -60,6 +78,13 @@ export function QuillCursor() {
       pos.current = { x: e.clientX, y: e.clientY }
       const target = e.target
       hovering.current = target instanceof Element && target.closest('[data-sb-hover]') !== null
+    }
+
+    // The 3D scene has no DOM to carry `data-sb-hover`, so the pinch state reads
+    // the store the handle layers write (see handle-hit.ts / handle-hover.ts).
+    const readPinch = (): number => {
+      const { hover, grab } = useStorybookStore.getState()
+      return grab !== null ? 1 : hover !== null ? 0.7 : 0
     }
 
     const onDown = () => {
@@ -85,11 +110,18 @@ export function QuillCursor() {
         if (pressT >= 1) pressedAt.current = null
       }
 
-      const hoverScale = hovering.current ? 1.15 : 1
-      const scale = hoverScale * (1 - pressDip)
+      // Pinch: eased so arriving at a handle is a settle, not a snap.
+      const pinchTarget = readPinch()
+      pinch.current += (pinchTarget - pinch.current) * PINCH_LAG
+      if (pinch.current < 0.004 && pinchTarget === 0) pinch.current = 0
 
-      el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rotation.current.toFixed(2)}deg) scale(${scale.toFixed(3)})`
-      el.classList.toggle('sb-quill-cursor--hover', hovering.current)
+      const hoverScale = hovering.current || pinch.current > 0.02 ? 1.15 : 1
+      const scale = hoverScale * (1 - pressDip)
+      const roll = rotation.current + PINCH_ROT_DEG * pinch.current
+
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${roll.toFixed(2)}deg) scale(${scale.toFixed(3)})`
+      el.classList.toggle('sb-quill-cursor--hover', hovering.current || pinch.current > 0.02)
+      el.classList.toggle('sb-quill-cursor--pinch', pinch.current > 0.02)
       rafId.current = requestAnimationFrame(tick)
     }
 

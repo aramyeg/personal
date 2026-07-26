@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { kraftTints } from './paper-stock'
 import { liveSpreadRole, spreadPageAnglesTilted, type DepthVistaGeom, type DepthVistaWing, type PanelQuad } from './popup-mechanics'
 import { depthVistaEnvelope, moundPatches } from './popup-depthvista'
@@ -144,13 +145,7 @@ function WingFlap({
   }, [wing, side])
 
   useEffect(() => () => geometry.dispose(), [geometry])
-  useEffect(
-    () => () => {
-      material.dispose()
-      shadowMaterial.dispose()
-    },
-    [material, shadowMaterial]
-  )
+  useGuardedDispose([material, shadowMaterial])
 
   useFrame(() => {
     const group = groupRef.current

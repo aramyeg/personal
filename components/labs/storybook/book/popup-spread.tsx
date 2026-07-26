@@ -33,6 +33,7 @@ import {
   type MechPose,
   type PanelQuad,
 } from './popup-mechanics'
+import { useGuardedDispose } from './material-pool'
 import { solveRiderPose } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
@@ -59,6 +60,7 @@ import { LiftFlapPopupLayer } from './popup-liftflap-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
+import { idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
 
 const SHADOW_HEIGHT = 0.16
 const SHADOW_Y_LIFT = 0.001
@@ -92,6 +94,35 @@ type PopupSpreadProps = {
   role: PopupRole
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
+}
+
+// IDLE LIFE (BW-2 — all five blind readers: "the scene is completely static
+// when the pointer is still"). Scratch reused by every tagged piece: the
+// excursion is applied to the cutout GROUP, never to the solved quads, so the
+// piece stays a rigid die-cut and the mechanism's own pose is bit-identical to
+// what the containment benches measured. One frame's use is synchronous, so a
+// single module-scope set serves the whole spread with zero per-frame garbage.
+const idleAxis = new THREE.Vector3()
+const idlePivot = new THREE.Vector3()
+const idleQuat = new THREE.Quaternion()
+// A 'glint' rewrites both panel tints every frame, so it needs their bases.
+// They are the SAME two constants the material effect below installs on a
+// textured piece (white lit panel, neutral painted step on the shaded one) —
+// and a piece only ever reaches the idle code while it is visible, which
+// requires its texture, which means the effect has run. Re-derived here rather
+// than snapshotted so the two cannot silently disagree.
+const IDLE_SHADE_BASE = new THREE.Color(PAINTED_FOLD_SHADE)
+
+/** The physics bench and the blind-capture harness pin a pose with
+ *  `?sbpose=<spread>` (use-turn-driver.ts). A REST override leaves the turn
+ *  frame null, so idle life would tick underneath it and every golden capture
+ *  would differ run to run — the one thing those captures exist to rule out.
+ *  Any pose override therefore freezes the idle clock too. Dev-only, exactly
+ *  like the override it mirrors. */
+function idlePosePinned(): boolean {
+  if (process.env.NODE_ENV === 'production') return false
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).has('sbpose')
 }
 
 /** Fold-line position in texture u, fixed per die-cut: where the art's
@@ -357,6 +388,22 @@ function PopupLayer({
       maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
     }
   }, [layer, parent])
+  // IDLE LIFE, resolved ONCE per piece: the kind, the seed hashed off the
+  // layer id (so two neighbours are out of phase in both wave terms), and the
+  // budget-clamped peak. Untagged pieces resolve to null and pay nothing but a
+  // null check per frame — the group keeps its identity transform and its
+  // material tints, so nothing about an untagged piece changes at all.
+  const idle = useMemo(() => {
+    const tag = layer.idle
+    if (!tag) return null
+    return {
+      kind: tag.kind as IdleKind,
+      seed: idleSeed(layer.id),
+      peak: idlePeak(tag.kind, tag.amp),
+      pinned: idlePosePinned(),
+    }
+  }, [layer.idle, layer.id])
+
   const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () =>
@@ -369,19 +416,9 @@ function PopupLayer({
     [shadowTexture]
   )
 
-  useEffect(
-    () => () => {
-      geometries.right.dispose()
-      geometries.left.dispose()
-      materials.right.dispose()
-      materials.left.dispose()
-      shadowMaterial.dispose()
-      // shadowTexture is a shared singleton — never disposed per-instance.
-    },
-    [geometries, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.right, geometries.left, materials.right, materials.left, shadowMaterial])
 
-  useFrame(() => {
+  useFrame((state) => {
     const cutout = cutoutRef.current
     if (!cutout) return
 
@@ -417,6 +454,49 @@ function PopupLayer({
     // dihedral as the paper (one shared angle, benchmark B9/B11); its
     // elevation-weighted ceiling is baked into `shadow.maxOpacity`.
     shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
+
+    if (!idle) return
+    // IDLE LIFE. The only motion in the book that is not a function of the
+    // dihedral, so it is gated on the dihedral anyway: idleOffset multiplies by
+    // E(beta) (exactly 0 at fold-flat) and returns 0 outright while a turn is
+    // in flight — the turn already moves this piece, and a tremor on top of it
+    // reads as a glitch. The excursion rides the GROUP, so the solved quads are
+    // untouched and the piece stays rigid paper.
+    const excursion = idleOffset(
+      idle.peak,
+      idle.seed,
+      state.clock.elapsedTime,
+      beta,
+      idle.pinned || (f?.dir ?? null) !== null
+    )
+    if (idle.kind === 'glint') {
+      // Light, not motion: the print catches a little more or less of the
+      // room. Both panels scale together so the fold's own lit/shade step
+      // survives, and at excursion 0 both land back on their exact bases.
+      const k = 1 + excursion
+      materials.right.color.setScalar(k)
+      materials.left.color.copy(IDLE_SHADE_BASE).multiplyScalar(k)
+      return
+    }
+    // The piece's own crease is its stiff spine and the axis its glue tabs can
+    // give against: a die-cut can swivel a hair about it (a shop sign in a
+    // draught) or ride a fraction of a millimetre along it (an airborne piece
+    // hovering), and neither is a deformation. A degenerate crease would make
+    // setFromAxisAngle produce a non-unit quaternion — i.e. scale the piece —
+    // so a zero-length axis is simply left alone.
+    idleAxis.set(pose.crease[0], pose.crease[1], pose.crease[2])
+    if (idleAxis.lengthSq() < 1e-12) return
+    idleAxis.normalize()
+    if (idle.kind === 'drift') {
+      cutout.position.copy(idleAxis).multiplyScalar(excursion)
+      return
+    }
+    idleQuat.setFromAxisAngle(idleAxis, excursion)
+    idlePivot.set(pose.apex[0], pose.apex[1], pose.apex[2])
+    // Rotation about the axis through the piece's OWN apex, not the group
+    // origin: p = apex - R*apex is the translation that pins the apex.
+    cutout.quaternion.copy(idleQuat)
+    cutout.position.copy(idlePivot).applyQuaternion(idleQuat).negate().add(idlePivot)
   })
 
   return (

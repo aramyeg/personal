@@ -15,6 +15,9 @@ import { easeTurnWeighted, easeTurnWeightedInv } from './page-geometry'
 import { sbSound } from '../sound'
 import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
+import { resetUserDrives } from '../user-drive'
+import { resetNudgePulses } from './handle-nudge'
+import { initialBeckonState, stepBeckon } from './handle-beckon'
 import { emitTurnLand, emitTurnStart } from '../turn-events'
 
 // task 18: nudged up from 1100/1400 — paired with page-geometry's
@@ -144,6 +147,10 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
   // The thump latches at the PERCEPTUAL landing (main sweep end), not at the
   // commit a settle later — the sound must sit on the moment the page hits.
   const firedThump = useRef(false)
+  // The idle beckon's clock (handle-beckon.ts). It lives here because this is
+  // the one frame loop that already knows the committed spread and whether a
+  // turn is in flight — the two things a beckon must never fight.
+  const beckon = useRef(initialBeckonState())
 
   const pose = useMemo(readPoseOverride, [])
   useEffect(() => {
@@ -157,7 +164,30 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
 
   useFrame((_, delta) => {
     const state = useStorybookStore.getState()
+    // SPREAD-EXIT RESET (E3 BW-19). The committed spread has just changed, so
+    // the reader has LEFT a page: drop every held reader value and any pending
+    // tap pulse, because a reopened page is a fresh pop-up. (A blind reader
+    // turned away from spread 7 and back and found the vault lid still standing
+    // open.) Done here rather than in the store because the drives live outside
+    // React entirely, and this ref moves in lockstep with the sheet — the same
+    // clock the pieces themselves are posed on.
+    if (committedSpread.current !== state.spread) {
+      resetUserDrives()
+      resetNudgePulses()
+    }
     committedSpread.current = state.spread
+
+    // AFFORDANCE, third leg (BW-1): if the reader has touched nothing for a few
+    // seconds, the spread's primary playable twitches once — the same nudge a
+    // press would give it. It withdraws the offer the moment a grab happens and
+    // never offers more than BECKON_LIMIT times.
+    stepBeckon(
+      beckon.current,
+      state.spread,
+      delta,
+      state.booted && state.turning === null && frame.current === null,
+      state.grab !== null
+    )
 
     if (pose && pose.t !== null) {
       // Frozen benchmark pose: hold the frame forever, no clock, no

@@ -28,9 +28,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -58,12 +59,19 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
+import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
 const STRUCT_SHADOW_MAX = 0.2
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 /** Snap-to-end ease per frame while released and off a pure end (the volvelle
  *  detent ease). A soft exponential so the picture "clicks" to dunes or gold. */
 const SNAP_EASE = 0.3
@@ -78,9 +86,6 @@ const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
 // Scratch for the H3 pointer projection (one grab at a time).
-const _plane = new THREE.Plane()
-const _u = new THREE.Vector3()
-const _hit = new THREE.Vector3()
 
 /**
  * Screen-space band uvs for slat k of N (the liftflap flatUvs law, banded).
@@ -164,7 +169,6 @@ export function DissolvePopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
   const handleRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const n = layer.slats
 
   const dunesArt = useArtTexture(`${layer.id}-dunes`)
@@ -247,31 +251,29 @@ export function DissolvePopupLayer({
     }
   }, [layer])
 
-  useEffect(
-    () => () => {
-      dunesGeoms.forEach((g) => g.dispose())
-      goldGeoms.forEach((g) => g.dispose())
-      baseGeom.dispose()
-      tabGeom.dispose()
-      handleGeom.dispose()
-      slopGeom.dispose()
-      slitGeom.dispose()
-      dunesMaterial.dispose()
-      goldMaterial.dispose()
-      baseMaterial.dispose()
-      baseBackMaterial.dispose()
-      tabMaterial.dispose()
-      edgeMaterial.dispose()
-      shadowMaterial.dispose()
-    },
-    [dunesGeoms, goldGeoms, baseGeom, tabGeom, handleGeom, slopGeom, slitGeom, dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial, edgeMaterial, shadowMaterial]
-  )
+  useGuardedDispose([
+    ...dunesGeoms,
+    ...goldGeoms,
+    baseGeom,
+    tabGeom,
+    handleGeom,
+    slopGeom,
+    slitGeom,
+    dunesMaterial,
+    goldMaterial,
+    baseMaterial,
+    baseBackMaterial,
+    tabMaterial,
+    edgeMaterial,
+    shadowMaterial,
+  ])
 
   const stroke = useMemo(() => dissolveStroke(layer), [layer])
 
   // --- Grab lifecycle (laws H1-H3): the LINEAR tab drive (tab-piece idiom),
   // held + snapped on release (volvelle idiom).
   const grabRef = useRef<{ deltaStart: number; dGrab: number } | null>(null)
+  const tap = useHandleTap()
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -283,18 +285,13 @@ export function DissolvePopupLayer({
 
   /** The pointer's projection onto the live page's fore axis (page-frame u),
    *  in the layer's local frame (law H3: rebuilt from theta each event). */
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
-    const t = layer.side === 'left' ? thetaL : thetaR
-    _u.set(Math.cos(t), Math.sin(t), 0)
-    _plane.setComponents(Math.sin(t), -Math.cos(t), 0, 0) // page plane through the spine
-    const ray = pointerLocalRay(e)
-    if (!ray.intersectPlane(_plane, _hit)) return null
-    return _hit.dot(_u)
-  }
+  const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null =>
+    projectPageD(pointerLocalRay(e), layer.side === 'left' ? thetaL : thetaR)
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never drew the strip answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // tau HELD; the frame loop snaps it to a pure end
     try {
@@ -305,8 +302,7 @@ export function DissolvePopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = restAnglesNow()
@@ -317,6 +313,7 @@ export function DissolvePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { deltaStart: dissolveTabOut(layer, tauStart), dGrab }
     writeUserDrive(layer.id, tauStart, [0, Math.PI])
+    tap.begin(tauStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -333,21 +330,27 @@ export function DissolvePopupLayer({
     const dNow = projectPointerD(e, thetaL, thetaR)
     if (dNow === null) return
     const deltaNow = clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke)
-    writeUserDrive(layer.id, dissolveTauFromDraw(layer, deltaNow), [0, Math.PI])
+    const tauNow = dissolveTauFromDraw(layer, deltaNow)
+    writeUserDrive(layer.id, tauNow, [0, Math.PI])
+    tap.track(tauNow, TAP_EPS)
     e.stopPropagation()
   }
 
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -369,6 +372,20 @@ export function DissolvePopupLayer({
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [tabMaterial]) applyHandleGlow(m, w)
+    }
     if (layer.turnCull) {
       for (const m of [dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial]) {
         m.opacity = cull
@@ -391,7 +408,13 @@ export function DissolvePopupLayer({
       }
     }
 
-    const tau = readDissolveTau(layer)
+    // Tap answer (BW-18): the slats twitch toward the reveal and settle back.
+    // Render-time only — the snap-on-release above still owns the channel.
+    const tauHeld = readDissolveTau(layer)
+    const tau = Math.min(
+      Math.PI,
+      Math.max(0, tauHeld + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
+    )
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
     pose.slats.forEach((quad, k) => {
@@ -400,7 +423,7 @@ export function DissolvePopupLayer({
     })
     writeQuad(tabGeom, pose.tab)
     writeQuad(handleGeom, pose.tab)
-    writeQuad(slopGeom, enlargeQuad(pose.tab, TOUCH_SLOP))
+    writeQuad(slopGeom, enlargeQuad(pose.tab, handleSlopFactor(pose.tab, TOUCH_SLOP)))
 
     const [slitA, slitB] = dissolveSlit(layer, thetaL, thetaR)
     const slitArr = (slitGeom.getAttribute('position') as THREE.BufferAttribute).array as Float32Array

@@ -214,6 +214,37 @@ export function solveSwarmArcPose(
   return geom.struts.map((s) => solveSwarmStrut(geom, s, thetaL, thetaR, stirS))
 }
 
+/** STIR tab die-cut footprint on its page (world units, page-flat). Lives here
+ *  rather than in the layer so the drag-regression bench can aim a ray at the
+ *  handle the reader actually sees. */
+export const SWARM_TAB_D0 = 1.0
+export const SWARM_TAB_W = 0.12
+export const SWARM_TAB_Z0 = 0.3
+export const SWARM_TAB_Z1 = 0.42
+export const SWARM_TAB_Y_LIFT = 0.003
+
+/** The STIR pull tab's quad at stroke `s`: it rides its page at the fore edge
+ *  and slides out by exactly s·E(beta) (Birmingham 84 pull-strip grammar).
+ *  Position-only — the quad lies IN the page plane, so fold-flat containment
+ *  is trivial. */
+export function swarmStirTabQuad(
+  geom: SwarmArcGeom,
+  s: number,
+  thetaL: number,
+  thetaR: number
+): PanelQuad {
+  const beta = clamp(thetaL - thetaR, 0, Math.PI)
+  const { u, n } = pageFrame(geom.stir.side, thetaL, thetaR)
+  const d0 = SWARM_TAB_D0 + clamp(s, 0, geom.stir.stroke) * swarmArcEnvelope(geom, beta)
+  const d1 = d0 + SWARM_TAB_W
+  const P = (d: number, z: number): Vec3 => [
+    d * u[0] + SWARM_TAB_Y_LIFT * n[0],
+    d * u[1] + SWARM_TAB_Y_LIFT * n[1],
+    z,
+  ]
+  return [P(d0, SWARM_TAB_Z1), P(d1, SWARM_TAB_Z1), P(d1, SWARM_TAB_Z0), P(d0, SWARM_TAB_Z0)]
+}
+
 /** Every world-space quad the swarm poses (strut + rider per member) — for
  *  the collision / motion / depth dispatchers. */
 export function swarmArcQuads(geom: SwarmArcGeom, thetaL: number, thetaR: number): PanelQuad[] {

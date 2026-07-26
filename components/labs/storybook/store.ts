@@ -31,6 +31,13 @@ type SbState = {
    *  value it drives lives outside React entirely (see user-drive.ts); this
    *  field exists only so cursor/affordance UI can react to grab start/end. */
   grab: Grab
+  /** The id of the grabbable the pointer is currently OVER (low-frequency,
+   *  like `grab`, and for the same reason: cursor/affordance UI needs it on
+   *  React's clock, the scrub value does not). Drives the quill cursor's
+   *  pinch pose, the hover lift on the piece itself, and the parallax
+   *  steadying that keeps "what the cursor says" and "what a press will hit"
+   *  the same statement (BW-10/BW-11). */
+  hover: string | null
   /** Per-card keepsake macro state (law H8). A card absent from the map is
    *  HOME; the layer resets its card HOME on every mount (lab exit / unmount is
    *  a state reset — a card can never persist OUT across a lab re-entry). */
@@ -45,6 +52,12 @@ type SbState = {
   markBooted: () => void
   beginGrab: (id: string, kind: GrabKind) => void
   endGrab: () => void
+  /** Claim the hover for `id`. */
+  setHover: (id: string) => void
+  /** Release the hover, but only if `id` still owns it — a stale `onPointerOut`
+   *  from a piece the reader has already left must not blank the piece they
+   *  have just arrived on. */
+  clearHover: (id: string) => void
   /** HOME -> OUT: the card has detached past p_exit and is settling/seated. */
   keepsakeOut: (id: string) => void
   /** OUT -> RETURNING: the reader grabbed the seated card to send it home. */
@@ -65,8 +78,12 @@ const anyKeepsakeActive = (keepsakes: Record<string, KeepsakeState>): boolean =>
  *  turn (bounds-checked). Shared verbatim by requestTurn's no-keepsake path and
  *  the deferred-turn fire, so the turn semantics stay bit-identical whether a
  *  keepsake was ever involved or not. */
-const applyTurn = (st: { grab: Grab; turning: TurnDir | null; queued: TurnDir | null; spread: number }, dir: TurnDir): void => {
+const applyTurn = (
+  st: { grab: Grab; hover: string | null; turning: TurnDir | null; queued: TurnDir | null; spread: number },
+  dir: TurnDir
+): void => {
   st.grab = null
+  st.hover = null
   if (st.turning) {
     st.queued = dir
     return
@@ -83,6 +100,7 @@ export const useStorybookStore = create<SbState>()(
       soundOn: false,
       booted: false,
       grab: null,
+      hover: null,
       keepsakes: {},
       pendingTurn: null,
       requestTurn: (dir) =>
@@ -121,6 +139,14 @@ export const useStorybookStore = create<SbState>()(
           st.grab = { id, kind }
         }),
       endGrab: () => set((st) => void (st.grab = null)),
+      setHover: (id) =>
+        set((st) => {
+          if (st.hover !== id) st.hover = id
+        }),
+      clearHover: (id) =>
+        set((st) => {
+          if (st.hover === id) st.hover = null
+        }),
       keepsakeOut: (id) => set((st) => void (st.keepsakes[id] = 'out')),
       keepsakeReturn: (id) => set((st) => void (st.keepsakes[id] = 'returning')),
       keepsakeHomed: (id) =>
@@ -152,19 +178,49 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   ;(window as unknown as { __sbStore?: typeof useStorybookStore }).__sbStore = useStorybookStore
 }
 
-export type WheelAcc = { value: number; lastMs: number }
-export const WHEEL_THRESHOLD = 160
+/** `lockUntilMs`/`lockDir` are the post-fire cooldown (see WHEEL_COOLDOWN_MS
+ *  below) — zero/null means "not locked". They ride alongside the decaying
+ *  `value` accumulator so the whole gesture stays one plain object a caller
+ *  can store in a ref and never has to reason about separately. */
+export type WheelAcc = { value: number; lastMs: number; lockUntilMs: number; lockDir: TurnDir | null }
+
+/** Two ordinary notches used to be enough to throw a reader a full chapter
+ *  by accident (a wandering look-around scroll reads identically to a
+ *  deliberate "turn the page" shove). WHEEL_THRESHOLD is raised well past
+ *  that so only a clearly deliberate push fires. That alone still isn't
+ *  enough, because trackpad inertia is a long train of small wheel events —
+ *  a single continued gesture could decay-and-reaccumulate past threshold a
+ *  second time before the reader's hand has left the pad. WHEEL_COOLDOWN_MS
+ *  is a hard lockout on that: once a turn fires, the SAME direction cannot
+ *  fire again until either the cooldown clock runs out (the gesture went
+ *  quiet) or the reader scrolls the other way (an unambiguous new gesture,
+ *  which breaks the lock immediately rather than waiting out the clock). */
+export const WHEEL_THRESHOLD = 480
+export const WHEEL_COOLDOWN_MS = 400
 
 export function accumulateWheel(
   acc: WheelAcc,
   deltaY: number,
   nowMs: number
 ): { acc: WheelAcc; fire: TurnDir | null } {
+  if (nowMs < acc.lockUntilMs) {
+    // Still cooling down from the last fire. A same-direction delta is the
+    // tail of the same gesture that already fired — swallow it outright (no
+    // accumulation at all) so a long inertia train can never creep back up
+    // to threshold on its own. A reversal is treated as a brand new gesture:
+    // fall through and accumulate it normally (acc.value is still 0 from the
+    // fire, so this starts clean — that IS "reset by direction reversal").
+    const reversed = acc.lockDir === 'next' ? deltaY < 0 : deltaY > 0
+    if (!reversed) {
+      return { acc: { ...acc, lastMs: nowMs }, fire: null }
+    }
+  }
   const dt = Math.max(0, nowMs - acc.lastMs)
   const decayed = acc.value * Math.pow(0.5, dt / 200)
   const value = decayed + deltaY
   if (Math.abs(value) >= WHEEL_THRESHOLD) {
-    return { acc: { value: 0, lastMs: nowMs }, fire: value > 0 ? 'next' : 'prev' }
+    const dir: TurnDir = value > 0 ? 'next' : 'prev'
+    return { acc: { value: 0, lastMs: nowMs, lockUntilMs: nowMs + WHEEL_COOLDOWN_MS, lockDir: dir }, fire: dir }
   }
-  return { acc: { value, lastMs: nowMs }, fire: null }
+  return { acc: { value, lastMs: nowMs, lockUntilMs: 0, lockDir: null }, fire: null }
 }
