@@ -452,7 +452,9 @@ const CASES: HandleCase[] = [
   ...liftFlapCases('ch1-keyboard'),
   ...liftFlapCases('ch6-coffer'),
   stripFlapCase('ch1-rank'),
-  stripFlapCase('ch3-ring-tower'),
+  // (ch3-ring-tower retired in ROUND-4 — the raven city's terraced roosts
+  // replaced the gatehouse; its dispatchline family needs its own case, see
+  // the Wave-2 s4 lane.)
   stripFlapCase('ch5-throng'),
   stripFlapCase('ch5-tea'),
   stripFlapCase('ch6-clerk'),

@@ -71,7 +71,7 @@ const locate = (id: string): SceneLayer => {
   throw new Error(`no layer ${id}`)
 }
 
-const STRIPFLAPS = ['ch1-rank', 'ch3-ring-tower', 'ch5-throng', 'ch5-tea', 'ch6-clerk']
+const STRIPFLAPS = ['ch1-rank', 'ch5-throng', 'ch5-tea', 'ch6-clerk']
 const TABPIECES = ['ch4-goldpile', 'ch5-raise-stall']
 const LIFTFLAPS = ['ch1-keyboard', 'ch6-coffer']
 
