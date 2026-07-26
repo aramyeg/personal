@@ -1688,13 +1688,30 @@ function boxFace(w, h, seed, face, kind) {
     let s = `<rect width="${w}" height="${h}" fill="${WOOD}"/>`
     s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${WLIT}" opacity="0.16"/>`
     if (face === 'top') {
-      // wood-shingle gable roof, ridge at u=0.5
-      s += plank(false, 8, WDIM)
-      for (let i = 0; i < 8; i++) {
-        const y = (h * i) / 8
-        s += `<path d="M 0 ${fx(y)} q ${fx(w * 0.06)} 5 ${fx(w * 0.12)} 0" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+      // WOOD-SHINGLE GABLE ROOF, ridge at u=0.5. S2-6(b): this is the ONLY
+      // face of the stable the lid-dominant reading camera really shows, so it
+      // is the face that has to say "barn" — the blind reader got "a brown
+      // tented slab, ribbed like planking" out of eight flat plank lines and a
+      // pale ridge stripe. Five bold scalloped shingle COURSES instead (butts
+      // drawn as lobes, which is the mark that separates a roof from decking),
+      // a leaded ridge cap with a run of finials, and two moss patches, so the
+      // slab is weathered timber rather than a ruled board.
+      for (let i = 1; i < 5; i++) {
+        const y = (h * i) / 5
+        s += `<rect x="0" y="${fx(y - h * 0.012)}" width="${w}" height="${fx(h * 0.024)}" fill="${WDIM}" opacity="0.55"/>`
+        for (let k = 0; k < 9; k++) {
+          const x0 = (w * k) / 9
+          s += `<path d="M ${fx(x0)} ${fx(y)} q ${fx(w / 18)} ${fx(h * 0.03)} ${fx(w / 9)} 0" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.42"/>`
+        }
       }
-      s += `<rect x="${fx(w * 0.48)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${WLIT}" opacity="0.6"/>` // ridge cap
+      for (let k = 0; k < 10; k++)
+        s += `<line x1="${fx((w * (k + 0.5)) / 10)}" y1="0" x2="${fx((w * (k + 0.5)) / 10)}" y2="${h}" stroke="${WDIM}" stroke-width="1.6" opacity="0.3"/>` // shingle joints
+      s += `<rect x="${fx(w * 0.44)}" y="0" width="${fx(w * 0.12)}" height="${h}" fill="${WDIM}"/>` // leaded ridge cap
+      s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${WLIT}" opacity="0.7"/>`
+      for (let k = 0; k < 5; k++)
+        s += `<circle cx="${fx(w * 0.5)}" cy="${fx((h * (k + 0.5)) / 5)}" r="${fx(w * 0.028)}" fill="${WLIT}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>` // ridge finials
+      for (const [mx, my, mr] of [[0.18, 0.32, 0.1], [0.8, 0.72, 0.075]])
+        s += `<ellipse cx="${fx(w * mx)}" cy="${fx(h * my)}" rx="${fx(w * mr)}" ry="${fx(h * mr * 0.7)}" fill="#7d8a52" opacity="0.42"/>` // moss
     } else if (face === 'back') {
       s += plank(false, 5, WDIM)
       s += `<rect x="${fx(w * 0.38)}" y="${fx(h * 0.12)}" width="${fx(w * 0.24)}" height="${fx(h * 0.24)}" fill="#3a2a18" stroke="${WDIM}" stroke-width="3"/>` // loft opening
@@ -3428,16 +3445,44 @@ function dressPatch(w, h, seed, kind) {
     )
   }
   if (kind === 'vane') {
-    // a weathervane: a rod topped by a cockerel + a N-S arrow (tall)
+    // A WEATHERVANE: a rod topped by a cockerel + a N-S arrow (tall die).
+    //
+    // S2-6(b). The blind reader of spread 2 read the stable it stands on as
+    // "a brown tented/pitched slab... with a small blue nib/quill standing at
+    // the ridge", and — because the narration promises an enchanted ledger —
+    // concluded the whole thing might be a book stood tent-open with a pen in
+    // it. The nib was THIS: a slate #454550 cockerel filling 0.16 of a die that
+    // renders ~31x44 screen px, i.e. a 12px blue-grey blob on a stick. A blue
+    // nib on a pitched brown slab is a quill on a ledger; a gold COCKEREL on a
+    // pitched brown slab is a barn. So the bird is what changes: it fills the
+    // top third of the die, it is brass over ink (never slate), and it carries
+    // the four marks that can only be a rooster — comb, wattle, a hooked beak
+    // and a fan of tail sickles.
     const cx = w / 2
+    const bodyY = h * 0.2
     let s = `<g>`
-    s += `<rect x="${fx(cx - w * 0.04)} " y="${fx(h * 0.3)}" width="${fx(w * 0.08)}" height="${fx(h * 0.7)}" fill="#454550"/>` // rod
-    // direction arrow
-    s += `<path d="M ${fx(w * 0.1)} ${fx(h * 0.42)} L ${fx(w * 0.9)} ${fx(h * 0.42)} M ${fx(w * 0.9)} ${fx(h * 0.42)} l ${fx(-w * 0.12)} ${fx(-h * 0.04)} m ${fx(w * 0.12)} ${fx(h * 0.04)} l ${fx(-w * 0.12)} ${fx(h * 0.04)}" fill="none" stroke="#3a3a40" stroke-width="3"/>`
-    // cockerel silhouette on top
-    const cd = `M ${fx(cx - w * 0.18)} ${fx(h * 0.28)} Q ${fx(cx - w * 0.24)} ${fx(h * 0.14)} ${fx(cx - w * 0.02)} ${fx(h * 0.12)} Q ${fx(cx)} ${fx(h * 0.02)} ${fx(cx + w * 0.08)} ${fx(h * 0.04)} Q ${fx(cx + w * 0.04)} ${fx(h * 0.1)} ${fx(cx + w * 0.12)} ${fx(h * 0.12)} Q ${fx(cx + w * 0.28)} ${fx(h * 0.16)} ${fx(cx + w * 0.18)} ${fx(h * 0.28)} Q ${fx(cx)} ${fx(h * 0.24)} ${fx(cx - w * 0.18)} ${fx(h * 0.28)} Z`
-    s += `<path d="${cd}" fill="#454550" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
-    s += `<circle cx="${fx(cx - w * 0.02)}" cy="${fx(h * 0.11)}" r="2.6" fill="${GOLD_LIT}"/>` // eye
+    s += `<rect x="${fx(cx - w * 0.045)}" y="${fx(h * 0.42)}" width="${fx(w * 0.09)}" height="${fx(h * 0.58)}" fill="#2b2620"/>` // rod
+    // the N-S cross-arms with a clear bar and a spearhead
+    s += `<path d="M ${fx(w * 0.06)} ${fx(h * 0.54)} L ${fx(w * 0.94)} ${fx(h * 0.54)}" stroke="#2b2620" stroke-width="${fx(h * 0.014)}" stroke-linecap="round"/>`
+    s += `<path d="M ${fx(w * 0.94)} ${fx(h * 0.54)} l ${fx(-w * 0.16)} ${fx(-h * 0.026)} l 0 ${fx(h * 0.052)} Z" fill="#2b2620"/>`
+    s += `<circle cx="${fx(w * 0.06)}" cy="${fx(h * 0.54)}" r="${fx(w * 0.05)}" fill="none" stroke="#2b2620" stroke-width="${fx(h * 0.012)}"/>`
+    s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.47)}" r="${fx(w * 0.075)}" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="1.6"/>` // the pivot ball
+    // THE COCKEREL — big, brass, and unmistakably a bird
+    const cd =
+      `M ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} ` + // tail root
+      `C ${fx(cx - w * 0.56)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.5)} ${fx(bodyY - h * 0.16)} ${fx(cx - w * 0.28)} ${fx(bodyY - h * 0.15)} ` + // upper sickle
+      `C ${fx(cx - w * 0.36)} ${fx(bodyY - h * 0.02)} ${fx(cx - w * 0.24)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.12)} ${fx(bodyY - h * 0.02)} ` + // back
+      `C ${fx(cx - w * 0.02)} ${fx(bodyY - h * 0.06)} ${fx(cx + w * 0.06)} ${fx(bodyY - h * 0.1)} ${fx(cx + w * 0.08)} ${fx(bodyY - h * 0.15)} ` + // neck
+      `L ${fx(cx + w * 0.04)} ${fx(bodyY - h * 0.19)} L ${fx(cx + w * 0.12)} ${fx(bodyY - h * 0.2)} ` + // comb notch
+      `L ${fx(cx + w * 0.14)} ${fx(bodyY - h * 0.24)} L ${fx(cx + w * 0.22)} ${fx(bodyY - h * 0.2)} ` +
+      `C ${fx(cx + w * 0.3)} ${fx(bodyY - h * 0.19)} ${fx(cx + w * 0.32)} ${fx(bodyY - h * 0.15)} ${fx(cx + w * 0.28)} ${fx(bodyY - h * 0.12)} ` + // head
+      `L ${fx(cx + w * 0.46)} ${fx(bodyY - h * 0.1)} L ${fx(cx + w * 0.28)} ${fx(bodyY - h * 0.06)} ` + // beak
+      `L ${fx(cx + w * 0.3)} ${fx(bodyY + h * 0.01)} L ${fx(cx + w * 0.22)} ${fx(bodyY - h * 0.02)} ` + // wattle
+      `C ${fx(cx + w * 0.24)} ${fx(bodyY + h * 0.1)} ${fx(cx + w * 0.02)} ${fx(bodyY + h * 0.19)} ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} Z`
+    s += `<path d="${cd}" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.8"/>`
+    s += `<path d="M ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} C ${fx(cx - w * 0.5)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.44)} ${fx(bodyY - h * 0.12)} ${fx(cx - w * 0.3)} ${fx(bodyY - h * 0.12)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>` // tail sickle line
+    s += `<path d="M ${fx(cx - w * 0.14)} ${fx(bodyY + h * 0.02)} C ${fx(cx - w * 0.02)} ${fx(bodyY - h * 0.04)} ${fx(cx + w * 0.08)} ${fx(bodyY + h * 0.06)} ${fx(cx - w * 0.06)} ${fx(bodyY + h * 0.1)} Z" fill="${GOLD_LIT}" opacity="0.75"/>` // wing
+    s += `<circle cx="${fx(cx + w * 0.24)}" cy="${fx(bodyY - h * 0.135)}" r="${fx(w * 0.035)}" fill="${INK}"/>` // eye
     s += rimPath(cd, 3)
     s += `</g>`
     return svgPiece(w, h, s)

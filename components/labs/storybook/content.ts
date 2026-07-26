@@ -289,6 +289,25 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   {
     id: 'ch1-keyboard', kind: 'foreground', role: 'scenery', mech: 'liftflap', side: 'right',
     hingeD: 0.435, leafLen: 0.26, boardD0: 0.4, boardD1: 0.74, boardZ0: -0.09, boardZ1: 0.57,
+    // S2-2, and it is NOT a uv flip. Captured at 1x with ?sbdrive: at the old
+    // 95deg ceiling a lifted leaf is 9deg off EDGE-ON to the reading camera and
+    // renders as a ~7px-wide sliver — its face, its number and its ring all
+    // gone. Between about 40 and 80deg it is visible but its art frame has
+    // swung: the leaf's long axis (image-x) rotates from screen-RIGHT at shut
+    // to screen-UP at vertical, so the numeral tilts with it. That 90deg swing
+    // is what the blind reader read as "rotated 180deg / mirrored glyphs".
+    //
+    // No uv assignment can fix it, and the memory law's own general clause
+    // says so: a rigid texture cannot be upright in two poses 90deg apart. The
+    // numeral's own up-vector (-image-y = -z) in fact projects screen-UP at
+    // EVERY lift angle — that is gated below — so nothing is inverted; what
+    // was wrong was the CEILING. It drops 95 -> 64deg, where the leaf still
+    // presents 67% of its shut-pose screen area and reads as a little door
+    // standing open on its straps. Nothing is lost from the reveal: the 1x
+    // capture shows the niche key FULLY uncovered by 55deg, because the key art
+    // sits in the aperture's fore half (bench L6). The open threshold follows
+    // it down so a door still registers open well before the stop.
+    liftMaxDeg: 64, regOpenDeg: 46,
     doors: [
       { z0: -0.072, z1: 0.07, reveal: 'key', plate: 1 },
       { z0: 0.089, z1: 0.231, reveal: 'key', plate: 2 },
@@ -303,7 +322,10 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // forward so the inn's painted story and the signpost stay clear.
   { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.15, z0: 0.43, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
   // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
-  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.07, height: 0.12 },
+  // S2-6(b): the vane grows ~17% (it read as a 12px "blue nib" at 1x, which is
+  // how a barn came to read as a tented ledger with a quill in it) — the die
+  // keeps its 0.583 aspect, so the repainted cockerel simply lands bigger.
+  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.082, height: 0.14 },
   { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
   // The old coaching-yard platform is RETIRED (riser-silhouette law: the
   // full-span inn row buries it — struts behind a hero read as invisible
