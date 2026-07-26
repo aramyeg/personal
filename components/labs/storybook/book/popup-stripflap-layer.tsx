@@ -40,7 +40,7 @@ import {
   type StripFlapGeom,
   type Vec3,
 } from './popup-mechanics'
-import { idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
+import { idleClockPinned, idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -75,14 +75,12 @@ const PAINTED_FOLD_SHADE = '#e4e4e4'
  *  silently disagree (popup-spread.tsx keeps the identical pair). */
 const IDLE_SHADE_BASE = new THREE.Color(PAINTED_FOLD_SHADE)
 
-/** A pinned pose (`?sbpose=`) freezes the idle clock, so golden captures and
- *  the physics bench stay run-to-run identical. Local twin of the generic
- *  layer's guard: importing it would couple two renderers for four lines. */
-function idlePosePinned(): boolean {
-  if (process.env.NODE_ENV === 'production') return false
-  if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).has('sbpose')
-}
+/** A pinned pose (`?sbpose=`) freezes the idle clock so golden captures and the
+ *  physics bench stay run-to-run identical; `?sbidle=1` starts it again. This
+ *  was a local twin of the generic layer's guard — four duplicated lines that
+ *  turned out to decide whether a blind reviewer can see the book breathe at
+ *  all (S2R2-4), which is not a decision to keep two copies of. */
+const idlePosePinned = idleClockPinned
 const ANTI_FLIP = STRIPFLAP_ANTI_FLIP // the user ceiling (law H3): past vertical the figure flips
 const TOUCH_SLOP = HANDLE_SLOP_STANDING
 

@@ -200,6 +200,38 @@ export function idleOffset(
  *  with a handle catching the lamp. */
 export const IDLE_MOTION_KINDS: readonly IdleKind[] = ['sway', 'drift']
 
+/**
+ * IS THE IDLE CLOCK FROZEN? — the one owner of that question (E3 s2 round-2,
+ * S2R2-4). Both renderers that implement idle life asked it privately, in
+ * duplicate, and both answered "yes whenever `?sbpose` is present".
+ *
+ * WHY THAT MATTERED FAR MORE THAN IT LOOKS. `?sbpose=<spread>` is how the
+ * physics bench pins a deterministic pose — and it is also how every blind
+ * reviewer in this round is sent to a spread. So each of them read a book with
+ * ITS ENTIRE IDLE LIFE SWITCHED OFF and then reported, correctly and uselessly,
+ * that nothing on the page ever moves. s2's re-reviewer: "over 8 frames at rest
+ * the only motion in the entire spread is drifting dust motes... no smoke, no
+ * flame flicker, no bird flight. The scene is a still life." Both of that
+ * spread's glints were tagged, wired and live; neither could ever have fired at
+ * that URL. A measurement instrument that removes the property being measured
+ * is worse than no measurement.
+ *
+ * The freeze itself is right and stays: a rest override leaves the turn frame
+ * null, so a ticking clock would make every golden capture differ run to run,
+ * which is the one thing those captures exist to rule out. What it needed was a
+ * way OUT. `?sbidle=1` re-starts the clock under a pinned pose. The capture
+ * bench passes no such flag, so every golden is byte-identical to before; a
+ * human (or a reviewer's browser) reading a pinned spread asks for it and sees
+ * the book the production reader sees.
+ */
+export function idleClockPinned(): boolean {
+  if (process.env.NODE_ENV === 'production') return false
+  if (typeof window === 'undefined') return false
+  const q = new URLSearchParams(window.location.search)
+  if (!q.has('sbpose')) return false
+  return q.get('sbidle') !== '1'
+}
+
 /** Grab-handle mechanism families. A handle that SWAYS or DRIFTS would tremble
  *  under the reader's hand and fight the drive it is being dragged by, so
  *  content.ts may not give one a motion tag (gated in idle-life.test.ts).

@@ -60,7 +60,7 @@ import { LiftFlapPopupLayer } from './popup-liftflap-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
-import { idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
+import { idleClockPinned, idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
 
 const SHADOW_HEIGHT = 0.16
 const SHADOW_Y_LIFT = 0.001
@@ -114,16 +114,12 @@ const idleQuat = new THREE.Quaternion()
 const IDLE_SHADE_BASE = new THREE.Color(PAINTED_FOLD_SHADE)
 
 /** The physics bench and the blind-capture harness pin a pose with
- *  `?sbpose=<spread>` (use-turn-driver.ts). A REST override leaves the turn
- *  frame null, so idle life would tick underneath it and every golden capture
- *  would differ run to run — the one thing those captures exist to rule out.
- *  Any pose override therefore freezes the idle clock too. Dev-only, exactly
- *  like the override it mirrors. */
-function idlePosePinned(): boolean {
-  if (process.env.NODE_ENV === 'production') return false
-  if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).has('sbpose')
-}
+ *  `?sbpose=<spread>` (use-turn-driver.ts), which freezes the idle clock so
+ *  golden captures cannot differ run to run — and `?sbidle=1` starts it again
+ *  for a human reading a pinned spread. One owner, in idle-life.ts: this used
+ *  to be two private copies, and while they agreed they silently blinded every
+ *  blind reviewer in the round to every glint in the book (S2R2-4). */
+const idlePosePinned = idleClockPinned
 
 /** Fold-line position in texture u, fixed per die-cut: where the art's
  *  crease falls for v-folds/children, where the ridge splits a parallel

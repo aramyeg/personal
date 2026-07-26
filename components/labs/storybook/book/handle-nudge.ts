@@ -61,7 +61,23 @@ export const NUDGE_SPAN_ANGLE = (6 * Math.PI) / 180
  *  strip creeps out and slides back. */
 export const NUDGE_SPAN_STROKE_FRAC = 0.18
 
-const pulses = new Map<string, number>()
+/**
+ * A PULSE MAY BE LOUDER THAN A TAP ANSWER (E3 s2 round-2, S2R2-1/S2R2-4).
+ *
+ * The tap answer and the idle beckon share this channel and used to share its
+ * amplitude, and they should not: a tap answers a finger that is already ON the
+ * piece, while a beckon has to be caught by a reader whose eye is somewhere
+ * else on the spread — s2's re-reader logged the beckon as "one ~2 px whole-
+ * board twitch roughly once every 5 s" and did not connect it to anything. So a
+ * pulse now carries a GAIN, and `handle-beckon.ts` asks for BECKON_GAIN.
+ *
+ * It stays inside the law the tap answer was written under: `nudgeOffset` still
+ * caps the excursion at the piece's own remaining room, so a gain can never
+ * push a flap past a stop, and at 2x a lift-flap leaf cracks about a fifth of
+ * its travel — unmistakably a MOVEMENT, still unmistakably not the mechanism
+ * having been worked.
+ */
+const pulses = new Map<string, { at: number; gain: number }>()
 
 const nowMs = (): number =>
   typeof performance !== 'undefined' ? performance.now() : Date.now()
@@ -78,9 +94,10 @@ export function nudgeShape(t: number): number {
   return Math.min(1, u * Math.exp(1 - u) * tail * tail * PEAK_NORM)
 }
 
-/** Start (or restart) the pulse for `id`. */
-export function pulseHandle(id: string, at: number = nowMs()): void {
-  pulses.set(id, at)
+/** Start (or restart) the pulse for `id`. `gain` scales the excursion (1 = a
+ *  tap answer; see the note above the pulse map). */
+export function pulseHandle(id: string, at: number = nowMs(), gain = 1): void {
+  pulses.set(id, { at, gain: Math.max(0, gain) })
 }
 
 export function clearNudgePulse(id: string): void {
@@ -96,14 +113,22 @@ export function resetNudgePulses(): void {
 /** The raw pulse shape for `id` right now, in [0, 1]; 0 when idle. Retires the
  *  entry once the window has passed so the map never grows. */
 export function readNudgePulse(id: string, at: number = nowMs()): number {
-  const start = pulses.get(id)
-  if (start === undefined) return 0
-  const t = (at - start) / NUDGE_MS
+  const p = pulses.get(id)
+  if (p === undefined) return 0
+  const t = (at - p.at) / NUDGE_MS
   if (t >= 1) {
     pulses.delete(id)
     return 0
   }
   return nudgeShape(t)
+}
+
+/** The gain the live pulse for `id` was started with (1 when there is none).
+ *  Deliberately separate from the shape: the gain scales the piece's SPAN and
+ *  is then re-capped by its remaining room, so a loud invitation can never do
+ *  what a loud shape would — carry the excursion past a hard stop. */
+export function readNudgeGain(id: string): number {
+  return pulses.get(id)?.gain ?? 1
 }
 
 /**
@@ -128,5 +153,8 @@ export function nudgeOffset(
   // Toward the roomier end: a piece resting at its ceiling rocks downward.
   const room = hi - rest >= rest - lo ? hi - rest : -(rest - lo)
   const dir = room >= 0 ? 1 : -1
-  return dir * Math.min(span, Math.abs(room)) * pulse
+  // The gain widens the SPAN and the room cap then binds, so `rest + offset`
+  // stays inside [lo, hi] at any gain — the invariant this function was written
+  // to hold does not get a loophole because an invitation wanted to be louder.
+  return dir * Math.min(span * readNudgeGain(id), Math.abs(room)) * pulse
 }

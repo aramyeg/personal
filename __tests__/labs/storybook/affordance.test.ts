@@ -18,6 +18,7 @@ import {
 import {
   BECKON_EVERY_S,
   BECKON_FIRST_S,
+  BECKON_GAIN,
   BECKON_LIMIT,
   initialBeckonState,
   primaryPlayableChannel,
@@ -28,7 +29,13 @@ import {
   HANDLE_SLOP_FLAT,
   handleSlopFactor,
 } from '@/components/labs/storybook/book/handle-hit'
-import { readNudgePulse, resetNudgePulses } from '@/components/labs/storybook/book/handle-nudge'
+import {
+  NUDGE_MS,
+  nudgeOffset,
+  pulseHandle,
+  readNudgePulse,
+  resetNudgePulses,
+} from '@/components/labs/storybook/book/handle-nudge'
 import { popupContentForSpread, SPREAD_COUNT } from '@/components/labs/storybook/content'
 import type { Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
 
@@ -180,6 +187,40 @@ describe('idle beckon — one restrained invitation per spread', () => {
       )
       expect(owner, `spread ${s} beckoned ${channel}`).toBeDefined()
     }
+  })
+
+  /**
+   * S2R2-1. The blind re-reader of spread 2: "the spread gives a reader no
+   * reason to touch it... discovery here is luck." The beckon WAS landing on
+   * that spread's key-board the whole time — the reader logged its twitch — but
+   * nothing in the suite said it had to keep landing there, and the beckon
+   * picks by FAMILY RANK, so a future scene edit that added, say, a second
+   * playable could silently move a spread's one invitation onto the wrong
+   * piece. This nails the invitation to the mechanism each chapter is actually
+   * about, by name, for the two spreads whose headline playable has been argued
+   * in a blind review.
+   */
+  it('offers s2 the key-board — the spread IS the lift-the-flap', () => {
+    expect(primaryPlayableChannel(2)).toBe('ch1-keyboard~0')
+  })
+
+  it('a beckon is louder than a tap answer, and still bounded by the piece', () => {
+    // The pulse is read on the channel, so this exercises the real path: the
+    // beckon fires, and the excursion it produces is BECKON_GAIN times the one
+    // a tap would have produced at the same phase of the window.
+    resetNudgePulses()
+    const at = 1000
+    pulseHandle('probe-tap', at, 1)
+    pulseHandle('probe-beckon', at, BECKON_GAIN)
+    const phase = at + NUDGE_MS * 0.22 // the shape's peak
+    const room = { lo: 0, hi: 1 }
+    const tap = nudgeOffset('probe-tap', 0, room.lo, room.hi, 0.1, phase)
+    const beckon = nudgeOffset('probe-beckon', 0, room.lo, room.hi, 0.1, phase)
+    expect(beckon).toBeCloseTo(tap * BECKON_GAIN, 12)
+    // ...but never past the piece's own remaining room, whatever the gain.
+    resetNudgePulses()
+    pulseHandle('probe-tight', at, 12)
+    expect(Math.abs(nudgeOffset('probe-tight', 0, 0, 0.01, 0.1, phase))).toBeLessThanOrEqual(0.01)
   })
 
   it('never beckons a keepsake (a one-way door must not invite a first touch)', () => {

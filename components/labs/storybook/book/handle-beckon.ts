@@ -50,6 +50,19 @@ export const BECKON_FIRST_S = 6
 export const BECKON_EVERY_S = 9
 /** How many invitations a spread will ever offer. */
 export const BECKON_LIMIT = 3
+/**
+ * How much louder an invitation is than a tap answer (E3 s2 round-2, S2R2-1).
+ *
+ * A tap answers a finger already on the paper; an invitation has to be caught
+ * by an eye that is somewhere else on the spread — s2's blind re-reader
+ * recorded this beckon as "one ~2 px whole-board twitch roughly once every 5 s"
+ * in the same report that says "the spread gives a reader no reason to touch
+ * it". At 2x a lift-flap leaf cracks about a fifth of its travel: large enough
+ * to be seen from the narration column, and still capped by `nudgeOffset` at
+ * the piece's own remaining room, so it can neither pass a stop nor be mistaken
+ * for the mechanism having been worked.
+ */
+export const BECKON_GAIN = 2
 
 /**
  * The pulse channel of the spread's primary playable, or null if the spread has
@@ -127,6 +140,6 @@ export function stepBeckon(
     return null
   }
   state.offered += 1
-  pulseHandle(channel)
+  pulseHandle(channel, undefined, BECKON_GAIN)
   return channel
 }

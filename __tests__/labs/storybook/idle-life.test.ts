@@ -21,6 +21,7 @@ import {
   IDLE_REST_DEG,
   IDLE_SUPPORTED_MECHS,
   IDLE_SWAY_MAX_DEG,
+  idleClockPinned,
   idleGate,
   idleOffset,
   idlePeak,
@@ -276,5 +277,44 @@ describe('idle life — where tags are allowed to land', () => {
     }
     // At least half the book's spreads must have some life, or BW-2 is not fixed.
     expect(perSpread.size).toBeGreaterThanOrEqual(5)
+  })
+})
+
+/**
+ * THE CLOCK PIN (E3 s2 round-2, S2R2-4) — the instrument must not delete the
+ * thing it is measuring.
+ *
+ * `?sbpose=<spread>` freezes the idle clock so golden captures are byte-stable.
+ * It is ALSO the URL every blind reviewer in this round is sent to, so each of
+ * them read a book whose entire idle life was switched off and reported, quite
+ * correctly, that nothing on the page ever moves. s2's re-reviewer, on a spread
+ * carrying two live glint tags: "the scene is a still life."
+ *
+ * These gate the escape hatch and the default in the same breath, so neither
+ * can drift: no pin without `?sbpose`, a pin with it, and no pin when a reader
+ * has asked for the book to breathe with `?sbidle=1`.
+ */
+describe('idle clock pin — a capture freezes, a reader does not', () => {
+  const at = (search: string) => {
+    window.history.replaceState({}, '', `/labs/storybook${search}`)
+    return idleClockPinned()
+  }
+
+  it('never freezes an ordinary reader', () => {
+    expect(at('')).toBe(false)
+    expect(at('?sbidle=1')).toBe(false)
+  })
+
+  it('freezes a pinned pose, so goldens cannot drift run to run', () => {
+    expect(at('?sbpose=2')).toBe(true)
+    expect(at('?sbpose=2:0.4:next')).toBe(true)
+  })
+
+  it('lets a reader on a pinned spread see the book breathe', () => {
+    expect(at('?sbpose=2&sbidle=1')).toBe(false)
+    // ...and only for that exact opt-in, so a stray value cannot un-freeze a
+    // capture run by accident.
+    expect(at('?sbpose=2&sbidle=0')).toBe(true)
+    expect(at('?sbpose=2&sbidle=yes')).toBe(true)
   })
 })
