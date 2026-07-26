@@ -887,8 +887,9 @@ const CH4_LAYERS: readonly SceneLayer[] = [
 // the apron (the mech-37 stepped-terrace READ on the proven glued-box family
 // — a cut-from-base parallelogram is geared-dead at our 176° rest bloom,
 // sin(2°) = 3.5% of its riser), carrying linked crowd-chain riders on its
-// carpet lids (2 pieces read as 11 figures); the 8-shopper throng stripflap
-// surges up at the terrace foot (the signature moment); the tea-corner
+// carpet lids (2 pieces read as 11 figures); the six-stall rank stripflap lies
+// flat on the near apron for the READER to raise (the signature moment, E3 s6
+// Wave-2: the chapter's verb is now the chapter's playable); the tea-corner
 // stripflap steams at the right apron; and the retained tabpiece is re-themed
 // into the chapter's whole point — ⟡ RAISE A STALL ⟡. Concentricity is
 // COMPOSED, not bent: gutter boxes grade a 0.40 → 0.34 → 0.30 → 0.26 toward
@@ -962,10 +963,67 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // rank-facing-the-reader read the pack's T8 "0.8 x lid span" law describes.
   { id: 'ch5-crowd-mid', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch5-tread-mid', seat: 'boxLid', mountZ: 0.22, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 0.44, height: 0.09 },
   { id: 'ch5-crowd-low', kind: 'midground', role: 'figure', mech: 'rider', parentId: 'ch5-tread-low', seat: 'boxLid', mountZ: 0.4, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 0.36, height: 0.075 },
-  // THE THRONG (HERO) — 8-shopper linked rank surging up at the terrace foot.
-  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.55, slot: 0.3, slotZ: 0.55, hingeX: 0.4, hingeZ: 0.55, width: 0.5, height: 0.13 },
+  // THE STALL ROW (HERO, was the 8-shopper throng) — SIX IDENTICAL STALLS the
+  // READER RAISES. E3 s6 Wave-2, findings S6-5/S6-6.
+  //
+  // The blind reader found this spread's one working mechanism running backwards
+  // to its own story: "the text and the card are about RAISING stalls. The
+  // stalls start fully raised, and the only thing a reader can do is drag them
+  // DOWN. There is no raise gesture on this page." They also could not find it
+  // (25 screen px of travel, no rest cue) and could not read it ("dome with two
+  // prongs... my first reading was backpacks").
+  //
+  // All three are one design fault: the chapter's verb was scenery. So the rank
+  // is now the chapter's verb. It ships SLACK (restDeg) — six identical stall
+  // patterns lying flat on the near apron when the spread opens, awning-and-post
+  // die-cuts printed on the page like the master pattern the prose describes —
+  // and the reader's drag stands them up, where the release law latches them.
+  // Identical is the POINT: the reader praised "the same stall stamped out four
+  // times — the repetition is the point", so the six are one shape six times,
+  // raised by one gesture.
+  //
+  // NUMBERS (derived, __tests__/labs/storybook/s6-stall-row.test.ts):
+  //  - height 0.13 -> 0.2 takes the top edge's FULL-STROKE screen travel from
+  //    87 px to 134 px at the pinned reading camera. The bigger win is not the
+  //    54%: it is that the stroke is now the reader's RAISE rather than a
+  //    lowering of a row that was already up, so the whole 134 px is a payoff
+  //    instead of a subtraction (the reader measured only ~25 px because they
+  //    were nudging an erected row part-way down). Bounded ABOVE by page
+  //    containment: the flat rest pose reaches hingeZ + height = 0.72 up the
+  //    page, inside PAGE_H/2 = 0.75.
+  //  - width 0.5 -> 0.6 keeps each stall 0.1 world wide (1:2 against the new
+  //    height — a booth, not a mast) at six copies.
+  //  - hingeX 0.4 -> 0.62 moves the rank OFF the terrace train's lateral span.
+  //    At 0.4 the taller row screen-overlapped the tread-low carpet lid by 24%
+  //    and the crowd-low rank by 13% (D-G7 art-overlap gate, floor 8%): the
+  //    treads straddle the gutter with half-span a = 0.26, so a rank centred at
+  //    0.4 always sits partly in front of them. At 0.62 the rank spans radial
+  //    0.32..0.92 — its screen band starts 30 px outboard of the tread lid's
+  //    edge — and it also mirrors the RAISE A STALL card's station on the left
+  //    page (0.52..0.90): pattern on one page, the stalls it raises on the other.
+  //  - restDeg 5 rather than 0: a leaf at exactly 0 is coplanar with the page it
+  //    is glued to and z-fights the floor print. At 5 degrees the free edge sits
+  //    a scored-fold's height proud — which is also the grab lip.
+  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.52, slot: 0.3, slotZ: 0.52, hingeX: 0.62, hingeZ: 0.52, width: 0.6, height: 0.2, restDeg: 5, travelDeg: [5, 90] },
   // TEA CORNER — the intimate counterweight, right apron, over a painted rug.
-  { id: 'ch5-tea', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.5, anchorZ: 0.17, slot: 0.56, slotZ: 0.17, hingeX: 0.62, hingeZ: 0.17, width: 0.14, height: 0.16 },
+  //
+  // TRAVEL WINDOW (S6-3): "Drag it down or right and it rotates past flat and
+  // comes to rest fully upside-down — striped valance on top, dome pointing
+  // down-left, steam plume drooping below the rug it was sitting on. This does
+  // not read as folding; it reads as a hinge with no stop."
+  //
+  // The hinge always HAD its stop — the drive has been clamped to [0, 90] since
+  // the family shipped, and 0 is flat on the page. What the reader met is that
+  // FLAT READS AS INVERTED at this camera: the pinned reading eye is 27 degrees
+  // above the desk, so its screen-up basis crosses zero at a hinge angle of
+  // ~32 degrees, and below that the flap's own tip projects BELOW its hinge.
+  // Clamping harder at 0 would have changed nothing.
+  //
+  // So the stop moves to 50 degrees, where the tip still stands ~21 px clear
+  // above its hinge, and the fold reads as a fold for its whole travel. That is
+  // also the more paper-true bound: the hidden strip is inextensible and taut at
+  // rest, so a real strip flap has almost no downward give to give.
+  { id: 'ch5-tea', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.5, anchorZ: 0.17, slot: 0.56, slotZ: 0.17, hingeX: 0.62, hingeZ: 0.17, width: 0.14, height: 0.16, travelDeg: [50, 90] },
   // RAISE A STALL — the retained tabpiece, geometry verbatim, re-themed: legs
   // repainted as stall posts, deck a striped awning mid-raise, the fore-edge
   // tab a woodcut ⟡ RAISE A STALL ⟡ cartouche (B-MEANING: the playable IS the
@@ -1154,10 +1212,12 @@ export const CHAPTERS: readonly Chapter[] = [
     // E-P2; the Chapter.showpiece doc anticipates extending it this way).
     // Physics/quality gates (A9/A10, motion, sightline) stay hard.
     showpiece: true,
-    // D-G1/D-G8: the throng stripflap — the 8-shopper rank surging upright at
-    // the terrace foot as the spread blooms (density arriving). Strip-driven
-    // family → exempt from the 0.525 sweep floor; rotation holds (prev ch4
-    // hero tabpiece, next ch6 hero vfold).
+    // D-G1/D-G8: the stall-rank stripflap — six identical stalls the READER
+    // raises at the terrace foot. Strip-driven family → exempt from the 0.525
+    // page-turn sweep floor, and after the s6 Wave-2 inversion that exemption is
+    // literal rather than anticipatory: this piece's signature moment IS the
+    // hand-driven one, exactly the rationale D-G8 states. Rotation holds (prev
+    // ch4 hero tabpiece, next ch6 hero vfold).
     hero: 'ch5-throng',
   },
   {
