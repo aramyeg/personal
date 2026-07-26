@@ -491,9 +491,20 @@ describe('s6 RAISE A STALL card — the structure is a handle (S6-1)', () => {
     expect(tip).toBeLessThan(PAGE_W)
     // the rail is a real stroke, not a token one: at least a fifth of the page
     expect(tip - home).toBeGreaterThan(PAGE_W / 5)
-    // its lane is clear of the structure's own z band, so the card is never
-    // hidden under the stall it raises
-    expect(rail.z1 <= geom.z0 || rail.z0 >= geom.z1).toBe(true)
+    // ITS LANE IS ON THE READER'S SIDE of the structure, not the gutter side.
+    // Two reasons, and the second is the one the eye-test found. (1) A handle
+    // belongs between the reader and the thing it moves, never behind it.
+    // (2) This spread's chapter copy is HTML laid OVER the book and covers the
+    // left page's FAR-fore quadrant at the pinned camera — measured off the 1x
+    // capture, roughly x <= 437, y <= 615 of a 1600x900 frame. A gutter-side
+    // lane (z 0.14..0.28) put the card at (311..390, 588..625) at full pull,
+    // i.e. under the paragraph's last line: on the paper, and still colliding
+    // with the text, which is exactly half of what the finding said. Stated as
+    // a z relation rather than a screen box on purpose — this file's projection
+    // does not carry the book group's own transform, so an absolute screen
+    // floor here would be unsound, while the z relation is exact.
+    expect(rail.z0).toBeGreaterThanOrEqual(geom.z1)
+    expect(rail.z1).toBeLessThanOrEqual(PAGE_H / 2)
     // and the card's SCREEN travel at the pinned reading camera is a stroke a
     // reader can see they made
     const { thetaL, thetaR } = restAngles(spreadIndex)
