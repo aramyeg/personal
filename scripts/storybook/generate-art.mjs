@@ -13183,8 +13183,16 @@ function bazaarFloorSpread(w, h, seed) {
   // CUT: three of the four lanes, one of the two rut routes, eight of the ten
   // spice spills, two of the four price tags, six of the nine footfall clusters,
   // all twelve loose sack rings (they were literally the reader's "dark rings"),
-  // and all ten broom fans (they were the "scattered dashes", and they sat
-  // exactly where the pull-tab linkage below now goes).
+  // and all ten broom fans (they were the "scattered dashes").
+  //
+  // THAT LAST CLAUSE USED TO READ "and they sat exactly where the pull-tab
+  // linkage below now goes". It does not any more: the tabpiece grew an on-page
+  // rail, so the linkage moved off the fore edge (d 0.88..1.15 at z 0.45..0.55)
+  // and into the spine lane at d 0.60..1.087, z 0.14..0.28. The broom fans stay
+  // cut on their own merits — they were the reader's "scattered dashes" — but
+  // nothing about their old station is load-bearing now. The pieces the rail DID
+  // displace are named where they are cut: two rugs, the spice spill and one
+  // footfall trail.
   const LANE_Z = 0.1
   const laneFy = pageFY(LANE_Z)
   const laneRise = 0.085 - (LANE_Z + 0.75) * 0.04
