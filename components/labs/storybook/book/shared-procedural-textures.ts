@@ -51,5 +51,14 @@ export const sharedKnobTexture = lazySingleton(() => makeCanvasTexture(makeKnobC
 /** The invisible touch-slop / raycast-only sentinel (`visible: false`, no
  *  map, never mutated) that every grabbable layer used to allocate its own
  *  copy of. One instance, shared and never disposed — same lifetime as the
- *  module, like the other singletons above. */
-export const sharedHandleMaterial = lazySingleton(() => new THREE.MeshBasicMaterial({ visible: false }))
+ *  module, like the other singletons above.
+ *
+ *  DoubleSide is load-bearing, not tidiness (blind sweep 2026-07-26): three's
+ *  raycaster honours `material.side`, so with the default FrontSide a handle
+ *  quad whose winding faces away from the reading camera — which is exactly
+ *  what the side-aware z winding does to LEFT-page page-flat pieces — was
+ *  simply not hittable. That is a whole class of "the cursor says grab and
+ *  the press does nothing". A raycast sentinel has no front. */
+export const sharedHandleMaterial = lazySingleton(
+  () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+)

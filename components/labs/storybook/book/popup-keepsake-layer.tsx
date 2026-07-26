@@ -56,6 +56,7 @@ import {
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
+import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
 import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -63,7 +64,9 @@ const SHADOW_Y_LIFT = 0.001
 const CARD_SHADOW_MAX = 0.3
 const FOLD_SHADE_TINT = '#d9cdb4'
 const CUT_EDGE_COLOR = '#f6eedb'
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -286,8 +289,7 @@ export function KeepsakePopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const store = useStorybookStore.getState()
     if (!store.booted || store.turning !== null || store.spread !== spreadIndex) return
     const state = store.keepsakes[layer.id] ?? 'home'
@@ -342,10 +344,13 @@ export function KeepsakePopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    const st = useStorybookStore.getState()
+    if (st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame((state, delta) => {

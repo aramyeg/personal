@@ -36,6 +36,7 @@ import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { acceptsHandleHit } from './handle-hit'
 import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -245,8 +246,7 @@ export function LiftFlapPopupLayer({
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
     const idx = doorIndexOf(e.object)
     if (idx === null) return
-    const isSlop = e.object === slopMeshRefs.current[idx]
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopMeshRefs.current[idx])) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
@@ -281,10 +281,13 @@ export function LiftFlapPopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    const st = useStorybookStore.getState()
+    if (st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame(() => {

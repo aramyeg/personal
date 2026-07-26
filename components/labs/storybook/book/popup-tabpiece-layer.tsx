@@ -63,6 +63,7 @@ import {
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
+import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
 import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -77,7 +78,9 @@ const INTERIOR_SHADOW_TINT = '#5f5138'
 const CUT_EDGE_COLOR = '#f6eedb'
 /** Coarse-pointer hit widening (law H6): the invisible slop mesh is 1.5x the
  *  tab, engaged only for `pointerType === 'touch'`. */
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -380,8 +383,7 @@ export function TabPiecePopupLayer({
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
     // Touch uses the 1.5x slop mesh; mouse/pen use the exact tab mesh (H6).
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = restAnglesNow()
@@ -419,10 +421,13 @@ export function TabPiecePopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    const st = useStorybookStore.getState()
+    if (st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame((_, delta) => {

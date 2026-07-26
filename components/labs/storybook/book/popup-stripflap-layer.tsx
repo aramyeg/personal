@@ -53,6 +53,7 @@ import {
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
+import { acceptsHandleHit, HANDLE_SLOP_STANDING } from './handle-hit'
 import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -65,7 +66,7 @@ const FOLD_SHADE_TINT = '#d9cdb4'
 // kraft placeholder flap (no texture) so painted art is not dimmed + warm-cast.
 const PAINTED_FOLD_SHADE = '#e4e4e4'
 const ANTI_FLIP = Math.PI / 2 // the user ceiling (law H3): past vertical the figure flips
-const TOUCH_SLOP = 1.5
+const TOUCH_SLOP = HANDLE_SLOP_STANDING
 
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
@@ -234,8 +235,7 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = anglesNow()
@@ -271,10 +271,13 @@ export function StripFlapPopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    const st = useStorybookStore.getState()
+    if (st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame((_, delta) => {

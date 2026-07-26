@@ -58,9 +58,21 @@ const CANDLE_DISTANCE = 3.6
 // more") — the pointer now swings the desk noticeably, letting the standing
 // paper parallax against the page prints. Still well inside the frustum
 // margin verified for ~1.05-tall pieces.
-const PARALLAX_TILT_X = 0.07
-const PARALLAX_TILT_Y = 0.11
-const PARALLAX_EASE_RATE = 4
+// E3 BW-17 TRIM (2026-07-26): a blind reader measured an 8px pointer move
+// repainting 2.9% of the frame — "reaching for a 40px prop swings the world
+// out from under the cursor". The gain is book-wide (there is no per-spread
+// camera config), and four of five readers called the parallax the best thing
+// on the page, so this is a ~22% trim, not a redesign: the swing still reads,
+// it just stops out-running the hand.
+const PARALLAX_TILT_X = 0.055
+const PARALLAX_TILT_Y = 0.085
+// Raised 4 -> 7 (time constant 250ms -> 143ms, settled inside ~0.5s). The old
+// rate left the diorama drifting for well over a second after the pointer
+// stopped, which is the window BW-10 lived in.
+const PARALLAX_EASE_RATE = 7
+// Below this per-frame rotation step the rig counts as parked and stops
+// re-stitching hover state (see ParallaxRig). One thousandth of a degree.
+const PARALLAX_PARKED_EPS = 1.7e-5
 // DRAG-TO-TILT v1 REVERTED (2026-07-11): a canvas-wide left-drag tilt
 // collided with the existing swipe-to-turn gesture (use-book-input.ts:
 // 60px within 600ms turns the page) — the user vetoed it on first touch.
@@ -134,6 +146,7 @@ function CandleLight() {
  *  when a grab starts or ends. */
 function ParallaxRig({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null)
+  const eventsUpdate = useThree((s) => s.events.update)
 
   useFrame((state, delta) => {
     const group = groupRef.current
@@ -142,14 +155,29 @@ function ParallaxRig({ children }: { children: ReactNode }) {
     const ease = Math.min(1, delta * PARALLAX_EASE_RATE)
     const targetX = grabbed ? group.rotation.x : -state.pointer.y * PARALLAX_TILT_X
     const targetY = grabbed ? group.rotation.y : state.pointer.x * PARALLAX_TILT_Y
-    group.rotation.x += (targetX - group.rotation.x) * ease
-    group.rotation.y += (targetY - group.rotation.y) * ease
+    const stepX = (targetX - group.rotation.x) * ease
+    const stepY = (targetY - group.rotation.y) * ease
+    group.rotation.x += stepX
+    group.rotation.y += stepY
     group.position.y = parallaxLift(
       group.rotation.x,
       group.rotation.y,
       COVER_FOOTPRINT_HALF_W,
       COVER_FOOTPRINT_HALF_D
     )
+    // HOVER TRUTH (E3 BW-10/BW-11, the top input bug of the blind sweep).
+    // r3f re-raycasts only when a pointer EVENT arrives. This rig keeps moving
+    // the whole book for a beat AFTER the pointer stops, and no event ever
+    // comes to correct what the reader is told: measured on the live page, a
+    // settled `grab` cursor sat over bare paper while the live handle 40px
+    // away gave no cursor at all — and a press, which DOES raycast the current
+    // pose, then disagreed with the cursor in both directions. Re-running the
+    // last pointer move on any frame the rig actually turned keeps hover state
+    // pinned to the geometry the reader can see, so "the cursor says grab" and
+    // "a press engages" become one statement again.
+    if (Math.abs(stepX) > PARALLAX_PARKED_EPS || Math.abs(stepY) > PARALLAX_PARKED_EPS) {
+      eventsUpdate?.()
+    }
   })
 
   return <group ref={groupRef}>{children}</group>

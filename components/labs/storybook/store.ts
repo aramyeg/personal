@@ -31,6 +31,13 @@ type SbState = {
    *  value it drives lives outside React entirely (see user-drive.ts); this
    *  field exists only so cursor/affordance UI can react to grab start/end. */
   grab: Grab
+  /** The id of the grabbable the pointer is currently OVER (low-frequency,
+   *  like `grab`, and for the same reason: cursor/affordance UI needs it on
+   *  React's clock, the scrub value does not). Drives the quill cursor's
+   *  pinch pose, the hover lift on the piece itself, and the parallax
+   *  steadying that keeps "what the cursor says" and "what a press will hit"
+   *  the same statement (BW-10/BW-11). */
+  hover: string | null
   /** Per-card keepsake macro state (law H8). A card absent from the map is
    *  HOME; the layer resets its card HOME on every mount (lab exit / unmount is
    *  a state reset — a card can never persist OUT across a lab re-entry). */
@@ -45,6 +52,12 @@ type SbState = {
   markBooted: () => void
   beginGrab: (id: string, kind: GrabKind) => void
   endGrab: () => void
+  /** Claim the hover for `id`. */
+  setHover: (id: string) => void
+  /** Release the hover, but only if `id` still owns it — a stale `onPointerOut`
+   *  from a piece the reader has already left must not blank the piece they
+   *  have just arrived on. */
+  clearHover: (id: string) => void
   /** HOME -> OUT: the card has detached past p_exit and is settling/seated. */
   keepsakeOut: (id: string) => void
   /** OUT -> RETURNING: the reader grabbed the seated card to send it home. */
@@ -65,8 +78,12 @@ const anyKeepsakeActive = (keepsakes: Record<string, KeepsakeState>): boolean =>
  *  turn (bounds-checked). Shared verbatim by requestTurn's no-keepsake path and
  *  the deferred-turn fire, so the turn semantics stay bit-identical whether a
  *  keepsake was ever involved or not. */
-const applyTurn = (st: { grab: Grab; turning: TurnDir | null; queued: TurnDir | null; spread: number }, dir: TurnDir): void => {
+const applyTurn = (
+  st: { grab: Grab; hover: string | null; turning: TurnDir | null; queued: TurnDir | null; spread: number },
+  dir: TurnDir
+): void => {
   st.grab = null
+  st.hover = null
   if (st.turning) {
     st.queued = dir
     return
@@ -83,6 +100,7 @@ export const useStorybookStore = create<SbState>()(
       soundOn: false,
       booted: false,
       grab: null,
+      hover: null,
       keepsakes: {},
       pendingTurn: null,
       requestTurn: (dir) =>
@@ -121,6 +139,14 @@ export const useStorybookStore = create<SbState>()(
           st.grab = { id, kind }
         }),
       endGrab: () => set((st) => void (st.grab = null)),
+      setHover: (id) =>
+        set((st) => {
+          if (st.hover !== id) st.hover = id
+        }),
+      clearHover: (id) =>
+        set((st) => {
+          if (st.hover === id) st.hover = null
+        }),
       keepsakeOut: (id) => set((st) => void (st.keepsakes[id] = 'out')),
       keepsakeReturn: (id) => set((st) => void (st.keepsakes[id] = 'returning')),
       keepsakeHomed: (id) =>

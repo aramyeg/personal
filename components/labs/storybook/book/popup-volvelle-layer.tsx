@@ -38,11 +38,14 @@ import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
+import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
 import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const HUB_DEADZONE = 0.25
-const TOUCH_SLOP = 1.5
+/** Page-flat handle: the reading camera foreshortens it hard, so it takes
+ *  the generous pad (handle-hit.ts). */
+const TOUCH_SLOP = HANDLE_SLOP_FLAT
 /** Detent-snap ease rate per frame while the dial is released and off a detent.
  *  A soft exponential so the sectors "click" into their windows (bench-proven
  *  snap target volvelleSnap); it stops once within SNAP_EPS. */
@@ -246,8 +249,7 @@ export function VolvellePopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    const isSlop = e.object === slopRef.current
-    if ((e.pointerType === 'touch') !== isSlop) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
@@ -283,10 +285,13 @@ export function VolvellePopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (useStorybookStore.getState().grab === null) gl.domElement.style.cursor = ''
+    const st = useStorybookStore.getState()
+    if (st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame(() => {

@@ -36,7 +36,7 @@ import {
 } from './popup-swarmarc'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
-import { sharedPaperTexture } from './shared-procedural-textures'
+import { sharedHandleMaterial, sharedPaperTexture } from './shared-procedural-textures'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
@@ -51,6 +51,7 @@ import {
 } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
+import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
 
 const FLAT_EPSILON = 0.02
 /** Overdamped release time constant (s) — ~95% settled inside 300 ms. */
@@ -95,6 +96,16 @@ function makeMergedQuads(count: number, uvs: Float32Array): THREE.BufferGeometry
   return geometry
 }
 
+/** The quad scaled about its own centroid — the coarse-pointer slop pad. */
+function enlargeQuad(quad: PanelQuad, k: number): PanelQuad {
+  const c = [0, 1, 2].map((a) => (quad[0][a] + quad[1][a] + quad[2][a] + quad[3][a]) / 4)
+  return quad.map((p) => [
+    c[0] + (p[0] - c[0]) * k,
+    c[1] + (p[1] - c[1]) * k,
+    c[2] + (p[2] - c[2]) * k,
+  ]) as unknown as PanelQuad
+}
+
 function writeQuadAt(arr: Float32Array, q: number, quad: PanelQuad): void {
   for (let c = 0; c < 4; c++) {
     arr[(q * 4 + c) * 3] = quad[c][0]
@@ -117,6 +128,7 @@ export function SwarmArcPopupLayer({
   const gl = useThree((s) => s.gl)
   const groupRef = useRef<THREE.Group>(null)
   const tabRef = useRef<THREE.Mesh>(null)
+  const slopRef = useRef<THREE.Mesh>(null)
   const grabRef = useRef<{ sGrabStart: number; dGrab: number } | null>(null)
   const stirRef = useRef(0)
   const { texture: atlasArt, rect } = useArtSprite(`${layer.id}-atlas`)
@@ -160,6 +172,9 @@ export function SwarmArcPopupLayer({
     cellUvs(17, 2, false, 2).forEach(([u, v], c) => uv.set([u, v], c * 2))
     return makeMergedQuads(1, applyUvRect(uv, rect))
   }, [rect])
+  // Coarse/foreshortened-pointer slop pad, invisible: the tab die-cut itself
+  // is a 55x22px sliver at the reading camera (handle-hit.ts).
+  const slopGeometry = useMemo(() => makeMergedQuads(1, new Float32Array(8)), [])
 
   const paperTexture = sharedPaperTexture()
   const riderMaterial = useMemo(
@@ -202,8 +217,9 @@ export function SwarmArcPopupLayer({
       riderGeometry.dispose()
       strutGeometry.dispose()
       tabGeometry.dispose()
+      slopGeometry.dispose()
     },
-    [riderGeometry, strutGeometry, tabGeometry]
+    [riderGeometry, strutGeometry, tabGeometry, slopGeometry]
   )
   useEffect(
     () => () => {
@@ -235,6 +251,8 @@ export function SwarmArcPopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (grabRef.current) return
+    if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaR } = restAnglesNow()
@@ -268,12 +286,13 @@ export function SwarmArcPopupLayer({
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
       gl.domElement.style.cursor = 'grab'
+      st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    if (!grabRef.current && useStorybookStore.getState().grab === null) {
-      gl.domElement.style.cursor = ''
-    }
+    const st = useStorybookStore.getState()
+    if (!grabRef.current && st.grab === null) gl.domElement.style.cursor = ''
+    st.clearHover(layer.id)
   }
 
   useFrame((_, delta) => {
@@ -319,8 +338,13 @@ export function SwarmArcPopupLayer({
     // exactly the stroke (Birmingham 84 pull-strip grammar) — one shared quad
     // helper (popup-swarmarc.ts) so the bench can aim at the handle the reader
     // sees. It fades shut with the envelope like everything else.
+    const tabQuad = swarmStirTabQuad(layer, s, thetaL, thetaR)
     const tabArr = (tabGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
-    writeQuadAt(tabArr, 0, swarmStirTabQuad(layer, s, thetaL, thetaR))
+    writeQuadAt(tabArr, 0, tabQuad)
+    const slopArr = (slopGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
+    writeQuadAt(slopArr, 0, enlargeQuad(tabQuad, HANDLE_SLOP_FLAT))
+    ;(slopGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
+    slopGeometry.computeBoundingSphere()
     ;(tabGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
     tabGeometry.computeBoundingSphere()
   })
@@ -329,11 +353,7 @@ export function SwarmArcPopupLayer({
     <group ref={groupRef} name={`swarmarc-${layer.id}`} visible={false}>
       <mesh geometry={strutGeometry} material={strutMaterial} renderOrder={0} />
       <mesh geometry={riderGeometry} material={riderMaterial} renderOrder={0} />
-      <mesh
-        ref={tabRef}
-        geometry={tabGeometry}
-        material={tabMaterial}
-        renderOrder={1}
+      <group
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={releaseGrab}
@@ -341,7 +361,10 @@ export function SwarmArcPopupLayer({
         onLostPointerCapture={releaseGrab}
         onPointerOver={onPointerOver}
         onPointerOut={onPointerOut}
-      />
+      >
+        <mesh ref={tabRef} geometry={tabGeometry} material={tabMaterial} renderOrder={1} />
+        <mesh ref={slopRef} geometry={slopGeometry} material={sharedHandleMaterial()} renderOrder={2} />
+      </group>
     </group>
   )
 }
