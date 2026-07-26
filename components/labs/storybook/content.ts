@@ -1,6 +1,7 @@
 import { experiences } from '@/data'
 import type { Experience } from '@/types'
 import type { LayerGeom } from '@/components/labs/storybook/book/popup-mechanics'
+import type { IdleTag } from '@/components/labs/storybook/book/idle-life'
 import { buildSwarmStruts } from '@/components/labs/storybook/book/popup-swarmarc'
 
 export type LayerKind = 'backdrop' | 'midground' | 'hero' | 'foreground'
@@ -69,7 +70,24 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *  flat when closed, stay inside the closed page ("nothing sticks out"),
  *  never tear or jam, and children keep their glue on the parent's paper.
  */
-export type SceneLayer = { id: string; kind: LayerKind; role: LayerRole } & LayerGeom
+/** IDLE LIFE tag (BW-2 — every blind reader independently: "the scene is
+ *  completely static when the pointer is still... for a page selling
+ *  'enchanted', the diorama is frozen"). An OPTIONAL, purely decorative marker
+ *  on a small ACCENT piece: a hanging sign, a bee, a bird, a glint of brass.
+ *  book/idle-life.ts turns it into a sub-degree rigid swivel, a sub-millimetre
+ *  slide or a brightness flicker that dies to exactly zero at fold-flat and
+ *  during a turn. Three standing rules, all gated by
+ *  __tests__/labs/storybook/idle-life.test.ts:
+ *   - NEVER on a grab handle (a tagged handle trembles under the reader's own
+ *     hand and fights the drive it is being dragged by);
+ *   - NEVER on a structural hero — backdrop walls, facades, keeps, the
+ *     treasury, the nave ranks. Those pieces ARE the architecture; architecture
+ *     that shivers reads as a broken mechanism, not as air;
+ *   - only on families the generic two-quad renderer poses, or the tag is dead
+ *     paperwork.
+ *  Deeper per-spread ambient art (smoke, candle halos, twinkle) belongs to the
+ *  scene lanes; this is the draught in the room, nothing more. */
+export type SceneLayer = { id: string; kind: LayerKind; role: LayerRole; idle?: IdleTag } & LayerGeom
 
 export type Chapter = {
   spread: number
@@ -170,7 +188,11 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // up the crease past its mount, and the pack's 0.66 left it 0.010 off the
   // end of B's 0.68 crease — A11 glue-on-the-paper.)
   { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.63, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.14 },
-  { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.16 },
+  // IDLE (BW-2): the key-sign HANGS from the inn crease, which is the one
+  // thing on this spread a draught would obviously move. Sway swivels the whole
+  // die about its own crease axis — a shop sign turning on its irons, ~1.2deg,
+  // which walks its outer corner about 1.5 thousandths of a page width.
+  { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.16, idle: { kind: 'sway' } },
   // The first of a hundred keys standing proud of the great door AS the
   // book opens. The pack's rotor form is GEARED-DEAD here (honest
   // rejection, the s6 mech-37 precedent): any rivet-riding decoration on a
@@ -179,7 +201,11 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // (measured across phi 56..74 and spin/radius/restAt sweeps). A third
   // small fold on the door crease keeps the beat kinetic with a family
   // whose ceiling was calibrated on exactly this seat regime.
-  { id: 'ch1-key', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.1, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.11, height: 0.09 },
+  // IDLE (BW-2): the great brass key gets the LIGHT treatment, not motion — a
+  // lamplit inn row is exactly where polished brass would breathe in and out of
+  // the lamp. Glint leaves the geometry alone, so the key stands as still and
+  // proud as the scene wants it to while the spread stops being pixel-frozen.
+  { id: 'ch1-key', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.1, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.11, height: 0.09, idle: { kind: 'glint' } },
   // PLANE C — the open gate (front, narrowest): the gates open toward the
   // reader exactly when the spread opens. Its 0.376 panel x-reach + 0.02
   // margin clears the kept key-board at boardD0 0.40 (bench C1).
@@ -241,7 +267,15 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // z ≈ −0.73..−0.78 at the gated heights): tips land 0.08–0.30 above the ring
   // crown (y 0.609) with |x| ≤ 0.2 — the S4 accent-band gate in
   // __tests__/labs/storybook/popup-swarmarc-scene.test.ts.
-  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.84, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117 },
+  // IDLE (BW-2, the finding this spread earned by name: "a spread titled 'The
+  // Carrier Swarm' containing ~30 bees in which no bee ever moves is a dead
+  // diorama"). The three named couriers sway — a sub-degree swivel of each die
+  // about its own mount crease, the paper-true version of a wingbeat: the bee
+  // is a rigid cutout on a glue tab, and a glue tab gives in a draught. Their
+  // phases come from an id hash in both wave terms, so the three never twitch
+  // together. The 24-strut ring itself is left to its own `stir` drive — a
+  // whole wheeling armature is a scene lane's problem, not a draught's.
+  { id: 'ch2-bee-a', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.84, vDir: 1, phiDeg: 60, rhoDeg: 83, width: 0.22, height: 0.117, idle: { kind: 'sway' } },
   { id: 'ch2-crown-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.9, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.08 },
   { id: 'ch2-crown-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-backdrop', mount: 0.82, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.13, height: 0.07 },
   // ATMOSPHERE INTERLEAVE (ref 10): cut-paper clouds on the backdrop panels —
@@ -254,8 +288,8 @@ const CH2_LAYERS: readonly SceneLayer[] = [
   // sweep lane — measured 11 extra mid-turn hits vs ~0 here.)
   { id: 'ch2-cloud-r', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch2-backdrop', seat: 'right', u: 0.26, v: 0.6, width: 0.26, height: 0.1 },
   { id: 'ch2-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.1, vDir: 1, phiDeg: 50, rhoDeg: 82, skewDeg: -2, creaseU: 0.45, width: 0.51, height: 0.89 },
-  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.62, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089 },
-  { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069 },
+  { id: 'ch2-bee-b', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.62, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.089, idle: { kind: 'sway' } },
+  { id: 'ch2-bee-c', kind: 'hero', role: 'figure', mech: 'child', parentId: 'ch2-hero', mount: 0.4, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.15, height: 0.069, idle: { kind: 'sway' } },
   // VOLUMETRIC: the guild's hive — a small lidded box in the meadow (real
   // beehives ARE stacked boxes); keeps the chapter airy but gives it its
   // enclosed volume and a third fold family.
@@ -311,6 +345,14 @@ const CH2_LAYERS: readonly SceneLayer[] = [
 // walls (art, not mechanism — see the art call sheet). ch3-raven-a is kept as
 // the hero raven, folded onto the crown (its child-v-fold parent retired, and
 // nothing external can parent onto the one-entry keep).
+//
+// NO IDLE TAG on this spread, deliberately (BW-2 pass). Every piece here is
+// either a showpiece mech that poses itself (keepstack, stagedchain, skyline,
+// keepwinch) or a grab handle (the ring-tower strip, the dispatch volvelle),
+// plus one structural fore-edge fringe. There is no small loose accent to give
+// the draught to, and inventing one to satisfy a checklist would be a new piece
+// of scenery smuggled in as a bug fix. This spread's ambient life is a scene
+// lane's job.
 const CH3_LAYERS: readonly SceneLayer[] = [
   // THE KEEP — one content entry expanding to four stacked box poses
   // (popup-keepstack.ts), each rendered through the existing box renderer. The
@@ -663,7 +705,12 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // hero's right panel behind the dragon's head — preciousness by framing
   // (Cinderella-carriage grammar), zero DOF, zero solver work.
   { id: 'ch4-aureole', kind: 'hero', role: 'scenery', mech: 'dress', parentId: 'ch4-hero', seat: 'right', u: 0.04, v: 0.34, width: 0.34, height: 0.30 },
-  { id: 'ch4-coins', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch4-hero', mount: 0.22, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24 },
+  // IDLE (BW-2): the spilling coins glint. A hoard is the one thing in the book
+  // where a light that will not move is a defect the reader can name — and
+  // spilled coins must NOT shift, so the treatment has to be light rather than
+  // motion. The dragon, the range and the chest stay dead still: this spread's
+  // architecture is its subject.
+  { id: 'ch4-coins', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch4-hero', mount: 0.22, vDir: -1, phiDeg: 60, rhoDeg: 83, width: 0.24, height: 0.24, idle: { kind: 'glint' } },
   // VOLUMETRIC: an open treasure chest in front of the dragon — the
   // book's HOLLOW box (open top, no backbone): the reading camera looks
   // straight down into a raw-paper interior (benchmark B16).
@@ -770,8 +817,15 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // up the parent fold and the city sheet is 0.66 tall: 0.7 is off the paper
   // (A11 glue-on-paper). Re-seated at 0.58, the same "high on the crease" read
   // with the dormer's proven 0.08 top margin.)
-  { id: 'ch5-pigeon-a', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.58, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.07 },
-  { id: 'ch5-pigeon-b', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.45, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.11, height: 0.055 },
+  // IDLE (BW-2). The two pigeons are this spread's only pieces that are not
+  // architecture or crowd, so they carry the draught: pigeon-a is PERCHED high
+  // on the wall crease and sways (a bird shifting its weight); pigeon-b hangs
+  // off the crease toward the reader — it is the one the art shows airborne, so
+  // it drifts instead, a fraction of a millimetre along its own crease axis,
+  // which reads as hover rather than as a swivel. The souk's stalls, treads and
+  // crowd ranks stay still; a bazaar that shivers reads as an earthquake.
+  { id: 'ch5-pigeon-a', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.58, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.07, idle: { kind: 'sway' } },
+  { id: 'ch5-pigeon-b', kind: 'backdrop', role: 'figure', mech: 'child', parentId: 'ch5-city', mount: 0.45, vDir: -1, phiDeg: 64, rhoDeg: 85, width: 0.11, height: 0.055, idle: { kind: 'drift' } },
   // REAR STALL ARC — single-story keepstack; the facade plate is the arc:
   // 7 linked stall gables + gate-minaret (top y 0.55, the ONE modest vertical),
   // lantern strings die-cut between finials. Plate overhangs laterally to 0.44.
@@ -875,7 +929,15 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // (waiting on the art split). Completes the census: 6/6 chapters.
   { id: 'ch6-strongbox', kind: 'backdrop', role: 'story', mech: 'box', a: 0.095, height: 0.1, z0: 0.38, z1: 0.5, roof: 'flat' },
   // RECURSION (C4v2): the bank's griffin crest standing ON the strongbox lid.
-  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08 },
+  // IDLE (BW-2 s7: "there is a lit candle with a painted halo that never
+  // flickers... every bit of motion in the page is welded to the mouse"). The
+  // crest is the ONLY loose prop on a spread made entirely of nave ranks, the
+  // strongbox and the vault flap — so it carries the whole draught alone, a
+  // sub-degree swivel on its lid seat. The nave ranks are deliberately exempt:
+  // an OA relief cascade is cut from the sheet, and a cathedral that trembles is
+  // a broken mechanism, not weather. The candle halo the reader wants belongs to
+  // the s7 scene lane's page print, not here.
+  { id: 'ch6-crest', kind: 'midground', role: 'scenery', mech: 'rider', parentId: 'ch6-strongbox', seat: 'boxLid', mountZ: 0.42, vDir: 1, phiDeg: 29, rhoDeg: 43, width: 0.09, height: 0.08, idle: { kind: 'sway' } },
   // Dress on the strongbox: a wax seal on the front cap, minted coins heaped
   // at the side-wall base (v=0 — no overhang below the page-glued edge).
   { id: 'ch6-strongbox-seal', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch6-strongbox', seat: 'capFrontL', u: 0.02, v: 0.03, width: 0.07, height: 0.07 },
@@ -1058,7 +1120,12 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // in the e28-r1 capture — cf. the "backdrop wings vs central tower wall" law).
   { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.22, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.55, height: 0.6 },
   { id: 'title-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.38, height: 0.63 },
-  { id: 'title-crest', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'title-hero', mount: 0.24, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.13 },
+  // IDLE (BW-2): the boy's gilt crest glints. The overture is the first thing a
+  // reader looks at and the longest thing they look at before touching
+  // anything — if any spread must not be pixel-frozen it is this one — but the
+  // proscenium is the promise of the tale and must hold absolutely still, so the
+  // life goes on the two small pieces in front of it.
+  { id: 'title-crest', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'title-hero', mount: 0.24, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.18, height: 0.13, idle: { kind: 'glint' } },
   // D5 MASSING (silhouette review: the title was "a lone small cutout"). The
   // HERO is now the writer's QUILL erected by a hidden pull strip — the tale
   // being written as the book opens (stripflap, the spread's hero FAMILY: no
@@ -1071,7 +1138,9 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // rise <= 0.08, carries a rider) upstage behind the crown, a distant berm
   // with a wax-seal tuft. Own z-band (z <= -0.36) so it never crosses center.
   { id: 'title-swell', kind: 'backdrop', role: 'scenery', mech: 'parallel', glueL: 0.24, glueR: 0.24, rise: 0.05, z0: -0.62, z1: -0.48 },
-  { id: 'title-swell-seal', kind: 'backdrop', role: 'scenery', mech: 'rider', parentId: 'title-swell', seat: 'tentRidge', mountZ: -0.55, vDir: -1, phiDeg: 32, rhoDeg: 52, width: 0.12, height: 0.095 },
+  // (…and the wax-seal tuft on the berm sways: a scrap of a piece standing in
+  // the open upstage, the same swivel about its own ridge.)
+  { id: 'title-swell-seal', kind: 'backdrop', role: 'scenery', mech: 'rider', parentId: 'title-swell', seat: 'tentRidge', mountZ: -0.55, vDir: -1, phiDeg: 32, rhoDeg: 52, width: 0.12, height: 0.095, idle: { kind: 'sway' } },
 ]
 const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 
@@ -1089,6 +1158,14 @@ const TITLE_ACCENTS: readonly string[] = ['#c9a227', '#6a8f5f']
 // paper's honesty; 7c rejected dominant ramps, not the family), and
 // strip-erected frontal figures (hidden pull strips — no connectors at
 // all). Variety and asymmetry ARE the aesthetic.
+//
+// NO IDLE TAG here either (BW-2 pass): the spread is the bag, the burst and the
+// map table — its own composition — and everything else is a handle, a dress
+// patch or a rotor. The fan burst looks like the obvious candidate and is not:
+// its members are synthesized v-fold layers (`fanMemberLayers`) that carry only
+// the fields listed there, so a tag on the fan would be dead paperwork. Giving
+// the treasures a shimmer means teaching that synthesis to carry the tag, which
+// is a change to the anatomy layer, not to this file.
 const SATCHEL_LAYERS: readonly SceneLayer[] = [
   // DEPTH VISTA (E2.2 Batch B; bench derive-depthvista.mjs, all gates GREEN): an
   // ALL-WINGS graded tunnel-frame around the satchel hero — 3 page-rooted flap
@@ -1156,7 +1233,12 @@ const END_LAYERS: readonly SceneLayer[] = [
   // child riding the letter fold): larger and LAUNCHING up off the desk in
   // front of the letter as the book opens — "send a raven". Its 45-fold arm
   // sweeps a clean quarter-turn; downstage own z-band, clear of the letter.
-  { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'kinetic', apexZ: 0.45, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.26, armLen: 0.42, flapW: 0.16, flapLen: 0.16 },
+  // IDLE (BW-2): the raven is mid-LAUNCH, the one piece in the whole book whose
+  // art says it is not resting on anything — so it drifts, a fraction of a
+  // millimetre along its own arm axis. On a bird already off the desk the eye
+  // reads that as the beat of a wing catching air; the closing line asks the
+  // reader to send it, and a frozen raven refuses.
+  { id: 'end-raven', kind: 'hero', role: 'figure', mech: 'kinetic', apexZ: 0.45, vDir: 1, phiDeg: 45, rhoDeg: 88, armW: 0.26, armLen: 0.42, flapW: 0.16, flapLen: 0.16, idle: { kind: 'drift' } },
   // (An earlier fore-edge desk-BAND ground swell was cut: on the spine
   // centerline it collided with the launching raven's arm at rest — A9 — and
   // its low parallel fold read as a chevron "paper airplane". The launching
