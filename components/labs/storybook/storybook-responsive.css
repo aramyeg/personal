@@ -37,6 +37,13 @@
 .sb-quill-cursor--hover {
   filter: drop-shadow(0 0 4px var(--sb-gold-bright)) drop-shadow(0 0 9px var(--sb-gold-deep));
 }
+/* Over a live grabbable in the 3D scene (E3 BW-1): the nib brightens past the
+   ordinary DOM-chrome hover so a handle reads as a firmer offer than a link,
+   and the sprite's own transform rolls it into a pinch (quill-cursor.tsx). */
+.sb-quill-cursor--pinch {
+  filter: drop-shadow(0 0 5px var(--sb-gold-bright)) drop-shadow(0 0 12px var(--sb-gold-bright))
+    drop-shadow(0 1px 2px rgb(0 0 0 / 0.55));
+}
 
 /* ---------------------------------------------------------------------
    Portrait / narrow layout (task-17 rework): the canvas stays full-bleed

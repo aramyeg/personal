@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { kraftTints } from './paper-stock'
@@ -31,14 +31,15 @@ import { knobTowerThetaMax, knobTowerTierLift, solveKnobTowerPose } from './popu
 import { ROTOR_LIFT } from './popup-rotor'
 import { shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import { acquireMaterial, releaseMaterial } from './material-pool'
+import { acquireMaterial, releaseMaterial, useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture, sharedShadowTexture } from './shared-procedural-textures'
 import { type TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHubAngle } from './handle-projection'
@@ -176,7 +177,6 @@ function KnobDisc({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const art = useArtTexture(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
@@ -213,17 +213,7 @@ function KnobDisc({
     materials.back.needsUpdate = true
   }, [art, knobTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      slopGeometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-      // handleMaterial/knobTexture are shared singletons — never disposed
-      // per-instance.
-    },
-    [geometry, slopGeometry, materials]
-  )
+  useGuardedDispose([geometry, slopGeometry, materials.front, materials.back])
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the
   // hub; the last stable angle holds through the unstable centre.
@@ -311,27 +301,42 @@ function KnobDisc({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
     const visible = role !== 'hidden' && beta > FLAT_EPSILON
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.front, materials.back]) applyHandleGlow(m, w)
+    }
     const patches = solveKnobTowerPose(layer, readKnobTheta(layer), thetaL, thetaR)
     const disc = patches[0].quad // 'disc' is always the first patch
     writeQuad(geometry, disc)
-    writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(disc, handleSlopFactor(disc, TOUCH_SLOP)))
   })
 
   return (
@@ -452,22 +457,7 @@ function KnobTier({
     }
   }, [layer, tier])
 
-  useEffect(
-    () => () => {
-      geometries.in.dispose()
-      geometries.out.dispose()
-      edgeGeometries.in.dispose()
-      edgeGeometries.out.dispose()
-      edgeMaterials.in.dispose()
-      edgeMaterials.out.dispose()
-      materials.in.dispose()
-      materials.out.dispose()
-      shadowMaterial.dispose()
-      // paperTexture/shadowTexture are shared singletons — never disposed
-      // per-instance; interiorMaterial is pooled — released above.
-    },
-    [geometries, edgeGeometries, edgeMaterials, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.in, geometries.out, edgeGeometries.in, edgeGeometries.out, edgeMaterials.in, edgeMaterials.out, materials.in, materials.out, shadowMaterial])
 
   useFrame(() => {
     const group = groupRef.current

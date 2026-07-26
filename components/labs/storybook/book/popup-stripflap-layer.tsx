@@ -22,9 +22,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedShadowTexture } from './shared-procedural-textures'
 import {
   liveSpreadRole,
@@ -50,8 +51,9 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_STANDING } from './handle-hit'
+import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
@@ -123,7 +125,6 @@ export function StripFlapPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
 
   const { texture, rect } = useLayerSprite(layer.id, layer.kind, accents)
 
@@ -176,19 +177,7 @@ export function StripFlapPopupLayer({
     [shadowTexture]
   )
 
-  useEffect(
-    () => () => {
-      geometries.right.dispose()
-      geometries.left.dispose()
-      slopGeometry.dispose()
-      materials.right.dispose()
-      materials.left.dispose()
-      shadowMaterial.dispose()
-      // handleMaterial/shadowTexture are shared singletons — never disposed
-      // per-instance.
-    },
-    [geometries, slopGeometry, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.right, geometries.left, slopGeometry, materials.right, materials.left, shadowMaterial])
 
   // --- Grab lifecycle (laws H1-H3). Offset-captured hinge angle for continuity.
   const grabRef = useRef<{ aGrabStart: number; angleGrab: number } | null>(null)
@@ -261,17 +250,18 @@ export function StripFlapPopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -288,6 +278,20 @@ export function StripFlapPopupLayer({
     group.visible = visible
     if (shadowRef.current) shadowRef.current.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.right, materials.left]) applyHandleGlow(m, w)
+    }
 
     const camA = stripFlapCamLift(layer, beta)
     const override = readDriveOverride(layer.id)
@@ -324,7 +328,7 @@ export function StripFlapPopupLayer({
     writeQuad(geometries.left, pose.left)
     // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.
     const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
-    writeQuad(slopGeometry, enlargeQuad(full, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(full, handleSlopFactor(full, TOUCH_SLOP)))
     shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
   })
 

@@ -21,9 +21,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
 import {
   solveSwarmArcPose,
@@ -44,9 +45,10 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 
@@ -119,7 +121,6 @@ export function SwarmArcPopupLayer({
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
 }) {
-  const gl = useThree((s) => s.gl)
   const groupRef = useRef<THREE.Group>(null)
   const tabRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
@@ -207,23 +208,8 @@ export function SwarmArcPopupLayer({
     }
   }, [atlasArt, paperTexture, riderMaterial, strutMaterial, tabMaterial, tint])
 
-  useEffect(
-    () => () => {
-      riderGeometry.dispose()
-      strutGeometry.dispose()
-      tabGeometry.dispose()
-      slopGeometry.dispose()
-    },
-    [riderGeometry, strutGeometry, tabGeometry, slopGeometry]
-  )
-  useEffect(
-    () => () => {
-      riderMaterial.dispose()
-      strutMaterial.dispose()
-      tabMaterial.dispose()
-    },
-    [riderMaterial, strutMaterial, tabMaterial]
-  )
+  useGuardedDispose([riderGeometry, strutGeometry, tabGeometry, slopGeometry])
+  useGuardedDispose([riderMaterial, strutMaterial, tabMaterial])
 
   // --- STIR grab (tabpiece idiom: H2 scrub channel, H3 release, H6 slop) ---
   const restAnglesNow = () => {
@@ -284,23 +270,38 @@ export function SwarmArcPopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (!grabRef.current && st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
     const visible = role !== 'hidden' && beta > FLAT_EPSILON
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [tabMaterial]) applyHandleGlow(m, w)
+    }
 
     // Stir stroke: the channel, held. RELEASE = LATCH (E3 release law, BW-12).
     // This used to decay to 0 over ~300ms, so the one interaction the spread
@@ -345,7 +346,7 @@ export function SwarmArcPopupLayer({
     const tabArr = (tabGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
     writeQuadAt(tabArr, 0, tabQuad)
     const slopArr = (slopGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
-    writeQuadAt(slopArr, 0, enlargeQuad(tabQuad, HANDLE_SLOP_FLAT))
+    writeQuadAt(slopArr, 0, enlargeQuad(tabQuad, handleSlopFactor(tabQuad, HANDLE_SLOP_FLAT)))
     ;(slopGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
     slopGeometry.computeBoundingSphere()
     ;(tabGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true

@@ -17,6 +17,7 @@ import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
 import { resetUserDrives } from '../user-drive'
 import { resetNudgePulses } from './handle-nudge'
+import { initialBeckonState, stepBeckon } from './handle-beckon'
 import { emitTurnLand, emitTurnStart } from '../turn-events'
 
 // task 18: nudged up from 1100/1400 — paired with page-geometry's
@@ -146,6 +147,10 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
   // The thump latches at the PERCEPTUAL landing (main sweep end), not at the
   // commit a settle later — the sound must sit on the moment the page hits.
   const firedThump = useRef(false)
+  // The idle beckon's clock (handle-beckon.ts). It lives here because this is
+  // the one frame loop that already knows the committed spread and whether a
+  // turn is in flight — the two things a beckon must never fight.
+  const beckon = useRef(initialBeckonState())
 
   const pose = useMemo(readPoseOverride, [])
   useEffect(() => {
@@ -171,6 +176,18 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       resetNudgePulses()
     }
     committedSpread.current = state.spread
+
+    // AFFORDANCE, third leg (BW-1): if the reader has touched nothing for a few
+    // seconds, the spread's primary playable twitches once — the same nudge a
+    // press would give it. It withdraws the offer the moment a grab happens and
+    // never offers more than BECKON_LIMIT times.
+    stepBeckon(
+      beckon.current,
+      state.spread,
+      delta,
+      state.booted && state.turning === null && frame.current === null,
+      state.grab !== null
+    )
 
     if (pose && pose.t !== null) {
       // Frozen benchmark pose: hold the frame forever, no clock, no

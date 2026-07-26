@@ -15,6 +15,7 @@ import { Dust } from './dust'
 import { parallaxLift } from './parallax-lift'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 import { useStorybookStore } from '../store'
+import { activeGrabId } from '../user-drive'
 
 // task-17: the book is the whole-screen hero now (side-column narration
 // replaces the old on-page text plates), so the camera sits noticeably
@@ -73,6 +74,9 @@ const PARALLAX_EASE_RATE = 7
 // Below this per-frame rotation step the rig counts as parked and stops
 // re-stitching hover state (see ParallaxRig). One thousandth of a degree.
 const PARALLAX_PARKED_EPS = 1.7e-5
+/** How long (s) to keep re-deriving hover after a grab ends — long enough to
+ *  cover a latched piece settling into its new pose. */
+const RESTITCH_TAIL_S = 0.7
 // DRAG-TO-TILT v1 REVERTED (2026-07-11): a canvas-wide left-drag tilt
 // collided with the existing swipe-to-turn gesture (use-book-input.ts:
 // 60px within 600ms turns the page) — the user vetoed it on first touch.
@@ -146,6 +150,7 @@ function CandleLight() {
  *  when a grab starts or ends. */
 function ParallaxRig({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null)
+  const settleRef = useRef(0)
   const eventsUpdate = useThree((s) => s.events.update)
 
   useFrame((state, delta) => {
@@ -175,7 +180,21 @@ function ParallaxRig({ children }: { children: ReactNode }) {
     // last pointer move on any frame the rig actually turned keeps hover state
     // pinned to the geometry the reader can see, so "the cursor says grab" and
     // "a press engages" become one statement again.
-    if (Math.abs(stepX) > PARALLAX_PARKED_EPS || Math.abs(stepY) > PARALLAX_PARKED_EPS) {
+    // The same argument applies whenever the PAPER moves rather than the rig: a
+    // grabbed piece travels under a pointer that may be perfectly still, and a
+    // latched piece comes to rest somewhere new (s4 reader: the cable-carrier
+    // handle "RELOCATES after travel with no cue"). So restitch while a grab is
+    // live and for a beat after it ends, which is exactly when a handle's hit
+    // surface and its hover glow have moved out from under the reader.
+    const grabLive = grabbed || activeGrabId() !== null
+    if (grabLive) settleRef.current = RESTITCH_TAIL_S
+    else if (settleRef.current > 0) settleRef.current = Math.max(0, settleRef.current - delta)
+    if (
+      grabLive ||
+      settleRef.current > 0 ||
+      Math.abs(stepX) > PARALLAX_PARKED_EPS ||
+      Math.abs(stepY) > PARALLAX_PARKED_EPS
+    ) {
       eventsUpdate?.()
     }
   })
@@ -183,21 +202,41 @@ function ParallaxRig({ children }: { children: ReactNode }) {
   return <group ref={groupRef}>{children}</group>
 }
 
-/** Cursor contract for law H2: while any grab is active the canvas shows 'grabbing'; it
- *  reverts to the default on release/unmount. Hover 'grab' cursors are per-handle and
- *  arrive with the handle wave — this only ever shows the active-grab state. */
-function GrabCursor() {
+/**
+ * THE ONE CURSOR OWNER (E3, s4 reader: "the canvas is cursor:none with the quill
+ * sprite, but handle meshes set inline cursor:grab — readers get the native hand
+ * AND the gold quill simultaneously"). Every handle layer used to write
+ * `gl.domElement.style.cursor` itself, which produced two cursors wherever the
+ * quill is drawn and a sticky one wherever an `onPointerOut` was missed.
+ *
+ * Now the store's `hover`/`grab` are the single source of truth and this is the
+ * only writer. It shows a native hand ONLY where the quill sprite is not drawn —
+ * the quill is fine-pointer, non-narrow (see storybook-responsive.css, which
+ * also owns the `cursor: none` that hides the native one) — so the two can never
+ * appear together, and a coarse or narrow reader still gets a real hint.
+ */
+const QUILL_QUERY = '(pointer: fine) and not (max-width: 820px) and not (orientation: portrait)'
+
+function CanvasCursor() {
   const gl = useThree((s) => s.gl)
 
   useEffect(() => {
     const el = gl.domElement
-    const applyCursor = (grab: ReturnType<typeof useStorybookStore.getState>['grab']) => {
-      el.style.cursor = grab !== null ? 'grabbing' : ''
+    const quill = window.matchMedia(QUILL_QUERY)
+    const apply = () => {
+      const { grab, hover } = useStorybookStore.getState()
+      if (quill.matches) {
+        el.style.cursor = ''
+        return
+      }
+      el.style.cursor = grab !== null ? 'grabbing' : hover !== null ? 'grab' : ''
     }
-    applyCursor(useStorybookStore.getState().grab)
-    const unsubscribe = useStorybookStore.subscribe((state) => applyCursor(state.grab))
+    apply()
+    const unsubscribe = useStorybookStore.subscribe(apply)
+    quill.addEventListener('change', apply)
     return () => {
       unsubscribe()
+      quill.removeEventListener('change', apply)
       el.style.cursor = ''
     }
   }, [gl])
@@ -235,7 +274,7 @@ export default function BookScene() {
       <CandleLight />
       <Desk />
       <Dust />
-      <GrabCursor />
+      <CanvasCursor />
       <ParallaxRig>
         <Book />
       </ParallaxRig>

@@ -18,9 +18,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { LiftFlapGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -36,8 +37,9 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit } from './handle-hit'
+import { acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
@@ -130,13 +132,7 @@ function useFaceMaterials(fallbackTexture: THREE.Texture, artId: string) {
     materials.front.needsUpdate = true
     materials.back.needsUpdate = true
   }, [art, fallbackTexture, materials, tint])
-  useEffect(
-    () => () => {
-      materials.front.dispose()
-      materials.back.dispose()
-    },
-    [materials]
-  )
+  useGuardedDispose([materials.front, materials.back])
   return materials
 }
 
@@ -182,7 +178,6 @@ export function LiftFlapPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const doorMeshRefs = useRef<(THREE.Mesh | null)[]>([])
   const slopMeshRefs = useRef<(THREE.Mesh | null)[]>([])
-  const gl = useThree((s) => s.gl)
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const thetaMax = liftFlapMax(layer)
   const doorCount = layer.doors.length
@@ -210,14 +205,7 @@ export function LiftFlapPopupLayer({
   const door3 = useFaceMaterials(knobTexture, doorArtIds[3] ?? `${layer.id}-door`)
   const doorMaterials = [door0, door1, door2, door3].slice(0, doorCount)
 
-  useEffect(
-    () => () => {
-      boardGeometry.dispose()
-      doorGeometries.forEach((g) => g.dispose())
-      slopGeometries.forEach((g) => g.dispose())
-    },
-    [boardGeometry, doorGeometries, slopGeometries]
-  )
+  useGuardedDispose([boardGeometry, ...doorGeometries, ...slopGeometries])
 
   // --- Grab lifecycle (laws H3/H4). One door at a time; offset-captured hinge
   // angle for continuity; release HOLDS the door's angle.
@@ -294,23 +282,38 @@ export function LiftFlapPopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
     const visible = role !== 'hidden' && beta > FLAT_EPSILON
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of doorMaterials.flatMap((m) => [m.front, m.back])) applyHandleGlow(m, w)
+    }
 
     // Held reader angle + the tap excursion, per door. The nudge is render-time
     // only (handle-nudge.ts): it never reaches the scrub channel, so a door's
@@ -323,7 +326,7 @@ export function LiftFlapPopupLayer({
     writeQuad(boardGeometry, pose.board)
     pose.doors.forEach((quad, k) => {
       writeQuad(doorGeometries[k], quad)
-      writeQuad(slopGeometries[k], enlargeQuad(quad, slopFactors[k]))
+      writeQuad(slopGeometries[k], enlargeQuad(quad, handleSlopFactor(quad, slopFactors[k])))
     })
   })
 

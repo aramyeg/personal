@@ -20,9 +20,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -44,8 +45,9 @@ import { useArtSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHubAngle } from './handle-projection'
@@ -165,7 +167,6 @@ function WinchDisc({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const { texture: art, rect } = useArtSprite(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
@@ -202,15 +203,7 @@ function WinchDisc({
     materials.back.needsUpdate = true
   }, [art, knobTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      slopGeometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-    },
-    [geometry, slopGeometry, materials]
-  )
+  useGuardedDispose([geometry, slopGeometry, materials.front, materials.back])
 
   const grabRef = useRef<{ lastAngle: number | null } | null>(null)
   const tap = useHandleTap()
@@ -288,17 +281,18 @@ function WinchDisc({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta, turnT } = readAngles()
@@ -309,11 +303,25 @@ function WinchDisc({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [materials.front, materials.back]) applyHandleGlow(m, w)
+    }
     materials.front.opacity = cull
     materials.back.opacity = cull
     const disc = keepWinchDiscQuad(layer, readWinchTheta(layer), thetaL, thetaR)
     writeQuad(geometry, disc)
-    writeQuad(slopGeometry, enlargeQuad(disc, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(disc, handleSlopFactor(disc, TOUCH_SLOP)))
   })
 
   return (
@@ -385,13 +393,7 @@ function WinchOutput({
     }
   }, [art, paperTexture, material, tint])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      material.dispose()
-    },
-    [geometries, material]
-  )
+  useGuardedDispose([...geometries, material])
 
   useFrame(() => {
     const group = groupRef.current

@@ -27,11 +27,11 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { kraftTints } from './paper-stock'
-import { acquireMaterial, releaseMaterial } from './material-pool'
+import { acquireMaterial, releaseMaterial, useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 import {
@@ -61,8 +61,9 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectPageD } from './handle-projection'
@@ -176,7 +177,6 @@ export function TabPiecePopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
   const handleRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
 
   const faceArt = useArtTexture(`${layer.id}-face`)
   // This piece's own stock (D3 kraft-legibility package): replaces the
@@ -307,33 +307,20 @@ export function TabPiecePopupLayer({
   const aStop = useMemo(() => tabPieceStopLift(layer), [layer])
   const sStop = useMemo(() => tabPieceStopSlide(layer), [layer])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterials.forEach((m) => m.dispose())
-      materials.exterior.forEach((m) => m.dispose())
-      // paperTexture/tabGripTexture/shadowTexture/handleMaterial are shared
-      // singletons — never disposed per-instance; interiorMaterial is
-      // pooled — released above.
-      handleGeometry.dispose()
-      slopGeometry.dispose()
-      slitGeometry.dispose()
-      slitMaterial.dispose()
-      shadowMaterial.dispose()
-    },
-    [
-      geometries,
-      edgeGeometries,
-      edgeMaterials,
-      materials,
-      handleGeometry,
-      slopGeometry,
-      slitGeometry,
-      slitMaterial,
-      shadowMaterial,
-    ]
-  )
+  // paperTexture/tabGripTexture/shadowTexture/handleMaterial are shared
+  // singletons — never disposed per-instance; interiorMaterial is pooled —
+  // released above.
+  useGuardedDispose([
+    ...geometries,
+    ...edgeGeometries,
+    ...edgeMaterials,
+    ...materials.exterior,
+    handleGeometry,
+    slopGeometry,
+    slitGeometry,
+    slitMaterial,
+    shadowMaterial,
+  ])
 
   // --- Grab lifecycle (laws H1-H3). High-frequency values flow through the
   // module scrub channel; only the low-frequency grab identity touches zustand.
@@ -408,17 +395,18 @@ export function TabPiecePopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -444,6 +432,20 @@ export function TabPiecePopupLayer({
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [...materials.exterior, interiorMaterial]) applyHandleGlow(m, w)
+    }
     if (culled) {
       for (const m of materials.exterior) m.opacity = cull
       interiorMaterial.opacity = cull
@@ -498,7 +500,7 @@ export function TabPiecePopupLayer({
     // Track the tab quad onto the invisible grab handles.
     const tab = solved[solved.length - 1].quad
     writeQuad(handleGeometry, tab)
-    writeQuad(slopGeometry, enlargeQuad(tab, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(tab, handleSlopFactor(tab, TOUCH_SLOP)))
 
     const [slitA, slitB] = tabPieceSlit(layer, thetaL, thetaR)
     const slitAttr = slitGeometry.getAttribute('position') as THREE.BufferAttribute

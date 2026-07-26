@@ -17,9 +17,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted, type VolvelleGeom } from './popup-mechanics'
 import {
@@ -37,8 +38,9 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHubAngle } from './handle-projection'
@@ -183,13 +185,7 @@ function useDiscMaterials(fallbackTexture: THREE.Texture, artId: string) {
     materials.front.needsUpdate = true
     materials.back.needsUpdate = true
   }, [art, fallbackTexture, materials, tint])
-  useEffect(
-    () => () => {
-      materials.front.dispose()
-      materials.back.dispose()
-    },
-    [materials]
-  )
+  useGuardedDispose([materials.front, materials.back])
   return materials
 }
 
@@ -206,7 +202,6 @@ export function VolvellePopupLayer({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
   const thetaMax = volvelleThetaMax()
 
@@ -220,14 +215,7 @@ export function VolvellePopupLayer({
   const dialMaterials = useDiscMaterials(knobTexture, `${layer.id}-dial`)
   const cardMaterials = useDiscMaterials(paperTexture, `${layer.id}-card`)
 
-  useEffect(
-    () => () => {
-      dialGeometry.dispose()
-      cardGeometry.dispose()
-      slopGeometry.dispose()
-    },
-    [dialGeometry, cardGeometry, slopGeometry]
-  )
+  useGuardedDispose([dialGeometry, cardGeometry, slopGeometry])
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the hub
   // measured on the page's own e1/e2 axes (the knob-tower/winch disc idiom).
@@ -298,17 +286,18 @@ export function VolvellePopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta, turnT } = readAngles()
@@ -320,6 +309,20 @@ export function VolvellePopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [dialMaterials.front, dialMaterials.back]) applyHandleGlow(m, w)
+    }
     for (const m of [dialMaterials.front, dialMaterials.back, cardMaterials.front, cardMaterials.back]) {
       m.opacity = cull
     }
@@ -342,7 +345,7 @@ export function VolvellePopupLayer({
     const pose = solveVolvellePose(layer, thetaL, thetaR, readVolvelleTheta(layer))
     writeQuad(dialGeometry, pose.dial)
     writeQuad(cardGeometry, pose.card)
-    writeQuad(slopGeometry, enlargeQuad(pose.dial, TOUCH_SLOP))
+    writeQuad(slopGeometry, enlargeQuad(pose.dial, handleSlopFactor(pose.dial, TOUCH_SLOP)))
   })
 
   return (

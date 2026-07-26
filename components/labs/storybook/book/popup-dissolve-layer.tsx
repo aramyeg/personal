@@ -28,9 +28,10 @@
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -58,8 +59,9 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { applyHandleGlow, stepHoverGlow } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectPageD } from './handle-projection'
@@ -167,7 +169,6 @@ export function DissolvePopupLayer({
   const shadowGroupRef = useRef<THREE.Group>(null)
   const handleRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const gl = useThree((s) => s.gl)
   const n = layer.slats
 
   const dunesArt = useArtTexture(`${layer.id}-dunes`)
@@ -250,25 +251,22 @@ export function DissolvePopupLayer({
     }
   }, [layer])
 
-  useEffect(
-    () => () => {
-      dunesGeoms.forEach((g) => g.dispose())
-      goldGeoms.forEach((g) => g.dispose())
-      baseGeom.dispose()
-      tabGeom.dispose()
-      handleGeom.dispose()
-      slopGeom.dispose()
-      slitGeom.dispose()
-      dunesMaterial.dispose()
-      goldMaterial.dispose()
-      baseMaterial.dispose()
-      baseBackMaterial.dispose()
-      tabMaterial.dispose()
-      edgeMaterial.dispose()
-      shadowMaterial.dispose()
-    },
-    [dunesGeoms, goldGeoms, baseGeom, tabGeom, handleGeom, slopGeom, slitGeom, dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial, edgeMaterial, shadowMaterial]
-  )
+  useGuardedDispose([
+    ...dunesGeoms,
+    ...goldGeoms,
+    baseGeom,
+    tabGeom,
+    handleGeom,
+    slopGeom,
+    slitGeom,
+    dunesMaterial,
+    goldMaterial,
+    baseMaterial,
+    baseBackMaterial,
+    tabMaterial,
+    edgeMaterial,
+    shadowMaterial,
+  ])
 
   const stroke = useMemo(() => dissolveStroke(layer), [layer])
 
@@ -341,17 +339,18 @@ export function DissolvePopupLayer({
   const onPointerOver = (): void => {
     const st = useStorybookStore.getState()
     if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      gl.domElement.style.cursor = 'grab'
+      // ONE cursor identity (s4 reader: the native hand and the gold quill both
+      // appeared over a handle). The store's `hover` is the single source; the
+      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
+      // shows a native hand ONLY where the quill sprite is not drawn.
       st.setHover(layer.id)
     }
   }
   const onPointerOut = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null) gl.domElement.style.cursor = ''
-    st.clearHover(layer.id)
+    useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -373,6 +372,20 @@ export function DissolvePopupLayer({
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
+
+    // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
+    // candlelight. Light rather than motion, deliberately — a geometric lift
+    // would be a second, smaller version of the mechanism's own travel, which is
+    // the one thing a hover must not imply (see handle-hover.ts).
+    {
+      const glowSt = useStorybookStore.getState()
+      const w = stepHoverGlow(
+        layer.id,
+        delta,
+        glowSt.hover === layer.id || glowSt.grab?.id === layer.id
+      )
+      for (const m of [tabMaterial]) applyHandleGlow(m, w)
+    }
     if (layer.turnCull) {
       for (const m of [dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial]) {
         m.opacity = cull
@@ -410,7 +423,7 @@ export function DissolvePopupLayer({
     })
     writeQuad(tabGeom, pose.tab)
     writeQuad(handleGeom, pose.tab)
-    writeQuad(slopGeom, enlargeQuad(pose.tab, TOUCH_SLOP))
+    writeQuad(slopGeom, enlargeQuad(pose.tab, handleSlopFactor(pose.tab, TOUCH_SLOP)))
 
     const [slitA, slitB] = dissolveSlit(layer, thetaL, thetaR)
     const slitArr = (slitGeom.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
