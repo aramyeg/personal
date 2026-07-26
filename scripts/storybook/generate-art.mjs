@@ -13003,6 +13003,167 @@ function bazRaiseStallFace(w, h, seed) {
 }
 
 /**
+ * THE RAISE-A-STALL INTERIOR (ch5-raise-stall-inner).
+ *
+ * Eye-test round 2. At the 88-degree stop the table opens TOWARD the reader, so
+ * only ONE leg shows its painted face; the aft leg presents its BACK, which is
+ * the INSIDE of the stall, and until the layer grew an `<id>-inner` hook that
+ * was raw kraft under a shadow tint — "a plain dark slab" beside a loaded
+ * counter. A real pop-up prints the inside, so here it is.
+ *
+ * SAME SHEET, SAME BANDS as bazRaiseStallFace (the layer's own unfolded-die-cut
+ * v table): v 0..0.3214 legIn, 0.3214..0.6786 deck, 0.6786..1 legOut, at the
+ * same 512x1024. Only the viewing SIDE differs, so `gy(f)` maps floor -> seam
+ * exactly as it does on the face — legIn runs up the image, legOut down it.
+ *
+ * IT RENDERS MIRRORED across u, so nothing here may depend on its handedness:
+ * no legend, no cartouche, no direction mark. The composition is built about
+ * u = 0.5 — a centred lamp, shelves that read the same either way, stock that is
+ * a rhythm rather than a sentence — so the mirror costs nothing.
+ *
+ * VALUE. The layer prints this UNTINTED (`color: '#ffffff'` when the art
+ * exists), so the shade has to be in the paint. Everything is laid over the
+ * facade's own rose and then carried down by a global ink wash, with the
+ * hanging lamp as the one hot accent and the only warm light in the piece. It
+ * must read as "inside a lit stall", not as a second bright facade.
+ */
+function bazRaiseStallInner(w, h, seed) {
+  const r = mulberry32(seed)
+  const Y = (v) => (1 - v) * h
+  const WOODB = '#6b4a26'
+  const WOODB_LIT = '#9a7038'
+
+  let s = `<rect width="${w}" height="${h}" fill="${BAZ.roseDim}"/>`
+
+  // ---- legIn (v 0..0.3214): THE BACK WALL OF THE STALL. This is the band the
+  // reader actually looks into at full pull, so it carries the whole read.
+  {
+    const gy = (f) => Y(0) + (Y(0.32) - Y(0)) * f
+    const yTop = Math.min(gy(0), gy(1))
+    s += `<rect x="0" y="${fx(yTop)}" width="${w}" height="${fx(Math.abs(gy(1) - gy(0)))}" fill="${BAZ.roseDim}"/>`
+    for (let k = 1; k < 6; k++) {
+      s += `<line x1="0" y1="${fx(gy(k / 6))}" x2="${w}" y2="${fx(gy(k / 6))}" stroke="${INK}" stroke-width="1.4" opacity="0.16"/>`
+    }
+    // the floor the stock stands on
+    s += `<rect x="0" y="${fx(Math.min(gy(0), gy(0.075)))}" width="${w}" height="${fx(Math.abs(gy(0.075) - gy(0)))}" fill="${WOODB}"/>`
+    for (let k = 1; k < 7; k++) {
+      s += `<line x1="${fx((k / 7) * w)}" y1="${fx(gy(0))}" x2="${fx((k / 7) * w)}" y2="${fx(gy(0.075))}" stroke="${INK}" stroke-width="1.5" opacity="0.4"/>`
+    }
+    // SACKS OF STOCK on the floor, heaped symmetrically so the mirror is free
+    for (const [ux, sw2, sh2] of [[0.13, 0.075, 0.17], [0.27, 0.06, 0.13], [0.73, 0.06, 0.13], [0.87, 0.075, 0.17]]) {
+      s += `<path d="M ${fx((ux - sw2) * w)} ${fx(gy(0.075))} Q ${fx((ux - sw2 * 1.2) * w)} ${fx(gy(0.075 + sh2 * 0.7))} ${fx(ux * w)} ${fx(gy(0.075 + sh2))} Q ${fx((ux + sw2 * 1.2) * w)} ${fx(gy(0.075 + sh2 * 0.7))} ${fx((ux + sw2) * w)} ${fx(gy(0.075))} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2" stroke-opacity="0.7"/>`
+      s += `<line x1="${fx((ux - sw2 * 0.42) * w)}" y1="${fx(gy(0.075 + sh2 * 0.86))}" x2="${fx((ux + sw2 * 0.42) * w)}" y2="${fx(gy(0.075 + sh2 * 0.86))}" stroke="${INK}" stroke-width="2" opacity="0.6"/>`
+    }
+    // THREE SHELVES of stock — jars, bolts and baskets, the spread's own goods
+    // vocabulary held down in value.
+    for (let t = 0; t < 3; t++) {
+      const f0 = 0.3 + t * 0.21
+      s += `<rect x="0" y="${fx(Math.min(gy(f0 - 0.03), gy(f0)))}" width="${w}" height="${fx(Math.abs(gy(f0) - gy(f0 - 0.03)))}" fill="${INK}" opacity="0.22"/>`
+      s += `<rect x="0" y="${fx(Math.min(gy(f0), gy(f0 + 0.024)))}" width="${w}" height="${fx(Math.abs(gy(f0 + 0.024) - gy(f0)))}" fill="${WOODB}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.7"/>`
+      s += `<rect x="0" y="${fx(Math.min(gy(f0 + 0.024), gy(f0 + 0.034)))}" width="${w}" height="${fx(Math.abs(gy(f0 + 0.034) - gy(f0 + 0.024)))}" fill="${WOODB_LIT}" opacity="0.6"/>`
+      const cols = 6
+      for (let k = 0; k < cols; k++) {
+        const ux = (k + 0.5) / cols
+        const col = [BAZ.terra, BAZ.tealDim, BAZ.saffron, BAZ.terraDim, BAZ.teal, BAZ.sand][(k + t) % 6]
+        const kind = (k + t) % 3
+        if (kind === 0) {
+          s += `<path d="M ${fx((ux - 0.035) * w)} ${fx(gy(f0 + 0.034))} Q ${fx((ux - 0.048) * w)} ${fx(gy(f0 + 0.1))} ${fx((ux - 0.026) * w)} ${fx(gy(f0 + 0.145))} L ${fx((ux + 0.026) * w)} ${fx(gy(f0 + 0.145))} Q ${fx((ux + 0.048) * w)} ${fx(gy(f0 + 0.1))} ${fx((ux + 0.035) * w)} ${fx(gy(f0 + 0.034))} Z" fill="${col}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.72"/>`
+          s += `<rect x="${fx((ux - 0.03) * w)}" y="${fx(Math.min(gy(f0 + 0.145), gy(f0 + 0.175)))}" width="${fx(w * 0.06)}" height="${fx(Math.abs(gy(f0 + 0.175) - gy(f0 + 0.145)))}" fill="${BAZ.cream}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.7"/>`
+        } else if (kind === 1) {
+          s += `<rect x="${fx((ux - 0.03) * w)}" y="${fx(Math.min(gy(f0 + 0.034), gy(f0 + 0.17)))}" width="${fx(w * 0.06)}" height="${fx(Math.abs(gy(f0 + 0.17) - gy(f0 + 0.034)))}" rx="${fx(w * 0.028)}" fill="${col}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.72"/>`
+        } else {
+          s += `<path d="M ${fx((ux - 0.042) * w)} ${fx(gy(f0 + 0.15))} L ${fx((ux + 0.042) * w)} ${fx(gy(f0 + 0.15))} L ${fx((ux + 0.032) * w)} ${fx(gy(f0 + 0.034))} L ${fx((ux - 0.032) * w)} ${fx(gy(f0 + 0.034))} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.72"/>`
+          for (let q = 1; q < 3; q++) {
+            s += `<line x1="${fx((ux - 0.04) * w)}" y1="${fx(gy(f0 + 0.034 + q * 0.039))}" x2="${fx((ux + 0.04) * w)}" y2="${fx(gy(f0 + 0.034 + q * 0.039))}" stroke="${INK}" stroke-width="1.4" opacity="0.45"/>`
+          }
+        }
+      }
+    }
+    // THE HANGING BRASS LAMP, dead centre so the mirror leaves it alone.
+    const lx = w / 2
+    const lampY = gy(0.9)
+    s += `<line x1="${fx(lx)}" y1="${fx(gy(0.99))}" x2="${fx(lx)}" y2="${fx(lampY)}" stroke="${INK}" stroke-width="2.4" opacity="0.85"/>`
+    s += `<path d="M ${fx(lx - w * 0.16)} ${fx(lampY)} L ${fx(lx + w * 0.16)} ${fx(lampY)} L ${fx(lx + w * 0.07)} ${fx(gy(0.965))} L ${fx(lx - w * 0.07)} ${fx(gy(0.965))} Z" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="2.4" stroke-opacity="0.8"/>`
+  }
+
+  // ---- deck (v 0.3214..0.6786): THE AWNING FROM UNDERNEATH — the canvas seen
+  // through, and the poles carrying it.
+  {
+    const dy0 = Y(0.68)
+    const dh = Y(0.32) - Y(0.68)
+    s += `<rect x="0" y="${fx(dy0)}" width="${w}" height="${fx(dh)}" fill="${BAZ.sandDim}"/>`
+    // the face's stripes showing faintly THROUGH the canvas
+    const nst2 = 17
+    const pitch2 = w / nst2
+    for (let i = 0; i < nst2; i++) {
+      if (i % 2) continue
+      s += `<rect x="${fx(i * pitch2)}" y="${fx(dy0)}" width="${fx(pitch2 + 0.5)}" height="${fx(dh)}" fill="${BAZ.tealDim}" opacity="0.12"/>`
+    }
+    // the purlins the canvas is stretched over, running ACROSS the stripes
+    for (let k = 0; k <= 4; k++) {
+      const py = dy0 + (dh * k) / 4
+      s += `<rect x="0" y="${fx(py - dh * 0.026)}" width="${w}" height="${fx(dh * 0.052)}" fill="${WOODB}" stroke="${INK}" stroke-width="2" stroke-opacity="0.7"/>`
+      s += `<rect x="0" y="${fx(py - dh * 0.026)}" width="${w}" height="${fx(dh * 0.018)}" fill="${WOODB_LIT}" opacity="0.7"/>`
+      s += `<rect x="0" y="${fx(py + dh * 0.026)}" width="${w}" height="${fx(dh * 0.03)}" fill="${INK}" opacity="0.24"/>`
+    }
+    // the two side rails the purlins land on
+    for (const ux of [0.035, 0.945]) {
+      s += `<rect x="${fx(ux * w)}" y="${fx(dy0)}" width="${fx(w * 0.02)}" height="${fx(dh)}" fill="${WOODB}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.6"/>`
+    }
+    // the canvas sagging between purlins
+    for (let k = 0; k < 4; k++) {
+      const py = dy0 + (dh * (k + 0.5)) / 4
+      s += `<path d="M 0 ${fx(py - dh * 0.03)} Q ${fx(w / 2)} ${fx(py + dh * 0.02)} ${w} ${fx(py - dh * 0.03)}" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.2"/>`
+    }
+    // the lamp washing up the underside from the legIn seam
+    s += `<rect x="0" y="${fx(dy0 + dh * 0.5)}" width="${w}" height="${fx(dh * 0.5)}" fill="url(#stallLampDeck)"/>`
+  }
+
+  // ---- legOut (v 0.6786..1): the BACK of the counter. Barely seen at any pose,
+  // so it stays quiet: boards, two braces, and the deep shade of the corner the
+  // lamp does not reach.
+  {
+    const gy = (f) => Y(1) + (Y(0.68) - Y(1)) * f
+    s += `<rect x="0" y="${fx(Math.min(gy(0), gy(1)))}" width="${w}" height="${fx(Math.abs(gy(1) - gy(0)))}" fill="${WOODB}" opacity="0.85"/>`
+    for (let k = 1; k < 6; k++) {
+      s += `<line x1="${fx((k / 6) * w)}" y1="${fx(gy(0))}" x2="${fx((k / 6) * w)}" y2="${fx(gy(1))}" stroke="${INK}" stroke-width="1.6" opacity="0.34"/>`
+    }
+    for (const [ua, ub] of [[0.08, 0.46], [0.54, 0.92]]) {
+      s += `<line x1="${fx(ua * w)}" y1="${fx(gy(0.14))}" x2="${fx(ub * w)}" y2="${fx(gy(0.76))}" stroke="${WOODB_LIT}" stroke-width="5" opacity="0.6"/>`
+    }
+    s += `<rect x="0" y="${fx(Math.min(gy(0), gy(1)))}" width="${w}" height="${fx(Math.abs(gy(1) - gy(0)))}" fill="${INK}" opacity="0.3"/>`
+  }
+
+  // THE INTERIOR WASH. The layer prints this piece untinted, so "in shade" has
+  // to live here. Laid over everything — and then the lamp's own globe is
+  // painted back on TOP of it, so it stays the one hot thing in the piece.
+  s += `<rect width="${w}" height="${h}" fill="${INK}" opacity="0.28"/>`
+  {
+    const gy = (f) => Y(0) + (Y(0.32) - Y(0)) * f
+    const lx = w / 2
+    // THE POOL OF LIGHT goes on AFTER the wash, which is both how light works and
+    // the only way it survives: painted under the wash it was a 0.62 saffron
+    // gradient with a 0.28 ink sheet laid over the top, and the shelves it is
+    // supposed to be lighting came out as dark as the corners.
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(gy(0.52))}" rx="${fx(w * 0.66)}" ry="${fx(Math.abs(gy(0.95) - gy(0.1)) * 0.68)}" fill="url(#stallLampPool)"/>`
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(gy(0.9))}" rx="${fx(w * 0.115)}" ry="${fx(Math.abs(gy(0.9) - gy(0.855)))}" fill="${BAZ.saffron}"/>`
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(gy(0.9))}" rx="${fx(w * 0.078)}" ry="${fx(Math.abs(gy(0.9) - gy(0.868)))}" fill="${BAZ.saffronLit}"/>`
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(gy(0.9))}" rx="${fx(w * 0.038)}" ry="${fx(Math.abs(gy(0.9) - gy(0.881)))}" fill="${BAZ.cream}"/>`
+  }
+  void r
+
+  const defs =
+    `<radialGradient id="stallLampPool" cx="0.5" cy="0.14" r="0.66">` +
+    `<stop offset="0" stop-color="${BAZ.saffronLit}" stop-opacity="0.62"/>` +
+    `<stop offset="0.45" stop-color="${BAZ.saffron}" stop-opacity="0.26"/>` +
+    `<stop offset="1" stop-color="${BAZ.saffron}" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="stallLampDeck" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.saffronLit}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${BAZ.saffronLit}" stop-opacity="0.3"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+/**
  * THE RAISE-A-STALL PULL TAB (ch5-raise-stall-tab).
  *
  * A-3(ii). The tabpiece grew an on-page RAIL (content.ts:
@@ -13035,9 +13196,9 @@ function bazRaiseStallTab(w, h, seed) {
   const r = mulberry32(seed)
   const Y = (v) => (1 - v) * h
   const WOODB = '#6b4a26'
-  // Six stripes across 0.14 world = 0.0233 per stripe. The house cadence is
-  // 0.0165, so this card takes EIGHT.
-  const nst = 8
+  // The house awning cadence is 0.0165 world per stripe; this card is 0.10
+  // world across the spine, so it takes SIX.
+  const nst = 6
   const pitch = w / nst
   const inset = w * 0.055 // the card's printed margin
 
@@ -13304,7 +13465,11 @@ function bazaarFloorSpread(w, h, seed) {
   // diagonals plus four lanes were reading as a junction, and the right-hand
   // route ran under the new stall row's footprint where nothing can be seen.
   {
-    const CTRL = [[0.14, 1.0], [0.24, 0.84], [0.34, 0.66], [0.43, 0.47]]
+    // Entered at (0.14, 1.0), which is now inside the pull-tab lane
+    // (x 0.027..0.239 at y 0.930..0.997): a cart rut crossing the printed rail
+    // would read as part of it. Shifted fore of the lane's outer edge; the route
+    // it threads afterwards is unchanged.
+    const CTRL = [[0.29, 1.0], [0.35, 0.84], [0.4, 0.66], [0.46, 0.47]]
     const bez = (t) => {
       const mt = 1 - t
       return [0, 1].map((k) => mt * mt * mt * CTRL[0][k] + 3 * mt * mt * t * CTRL[1][k] + 3 * mt * t * t * CTRL[2][k] + t * t * t * CTRL[3][k])
@@ -13356,14 +13521,11 @@ function bazaarFloorSpread(w, h, seed) {
   // (these five plus the tea rug) form a single unbroken line across the spread.
   const RUG_W = 0.1
   const RUG_H = 0.072
-  // THE RAIL TOOK THE LEFT END OF THIS ROW. The pull-tab lane (A-3iii) occupies
-  // image x 0.027..0.239 at y 0.593..0.687, and the rugs at t 0.08 and 0.2 lay
-  // squarely inside it -- goods printed under a moving card. They are cut rather
-  // than shuffled: the rail is a far stronger horizontal structure than they
-  // were, so the left page keeps an organising line, and four rugs (these three
-  // plus the tea rug) is the same row read at the house's own "fewer, larger,
-  // clearer" rate.
-  const rugTs = [0.32, 0.615, 0.86]
+  // The two leftmost rugs were cut for one round, when the pull-tab lane ran the
+  // gutter side at y 0.593..0.687 and they lay inside it. The lane has since moved
+  // to the near apron (y 0.930..0.997), so that band is theirs again and the row
+  // is whole: five rugs plus the tea rug, one unbroken line across the spread.
+  const rugTs = [0.08, 0.2, 0.32, 0.615, 0.86]
   const rugXY = rugTs.map((t) => [PX(t - RUG_W / 2), PY(laneY(t) + 0.024)])
   rugXY.forEach(([rgx, rgy], i) => {
     const rw = PX(RUG_W)
@@ -13402,7 +13564,7 @@ function bazaarFloorSpread(w, h, seed) {
   // ---- TWO PRICE TAGS, and both of them ON a rug. Four tags scattered over the
   // open floor were labels pinned in front of the scene with nothing to label;
   // a tag lying on the goods it prices is a caption.
-  ;[rugXY[0], rugXY[2]].forEach(([rgx, rgy], i) => {
+  ;[rugXY[1], rugXY[3]].forEach(([rgx, rgy], i) => {
     const tx = rgx + PX(RUG_W) * 0.14
     const ty = rgy + PY(RUG_H) * 0.2
     const tw = 26
@@ -13575,7 +13737,7 @@ function bazaarFloorSpread(w, h, seed) {
   // reader's apron. Nine clusters at random headings were the "scattered dashes";
   // a trail that starts on the street and walks out of frame is traffic.
   for (let tr = 0; tr < 3; tr++) {
-    const t = [0.36, 0.5, 0.78][tr] // 0.22 walked straight down the pull-tab lane
+    const t = [0.22, 0.5, 0.78][tr]
     const bx = PX(t)
     const by = PY(laneY(t) + 0.052)
     for (let k = 0; k < 4; k++) {
@@ -13661,8 +13823,16 @@ function bazaarFloorSpread(w, h, seed) {
   // d 0.88 -> 1.15 at z 0.45..0.55 and ended in a slit mouth cut in the page's
   // fore edge, because that is where the tab used to surface. `rail` moved both
   // ends of that sentence: the slot is now cut INSIDE the left page at radial
-  // d 0.60 across z 0.14..0.28, and the handle is a fixed 0.14 card that slides
-  // fore along that lane to d 1.087 at full pull. The old span is REMOVED
+  // d 0.60, and the handle is a fixed 0.14 card that slides fore along that lane
+  // to d 1.087 at full pull.
+  //
+  // THE LANE MOVED AGAIN after the first eye-test, and this is the version that
+  // ships: z 0.645..0.745, on the READER's side of the structure. The gutter-side
+  // lane (z 0.14..0.28) put the card under the chapter copy, which is HTML laid
+  // OVER the book -- at full pull it sat at frame (311..390, 588..625), inside
+  // the copy's measured footprint of x <= 437 / y <= 615. Out here the track runs
+  // along the flat pattern's near edge instead, so its ink weight is held at the
+  // cart ruts' so it reads as setting-out and not as a second stall. The old span is REMOVED
   // outright -- left in place it printed a rail nothing runs on, lying exactly
   // where the raised stall's fore leg now lands (the body occupies d 0.34..0.90
   // at z 0.36..0.64).
@@ -13675,8 +13845,8 @@ function bazaarFloorSpread(w, h, seed) {
   {
     const xSlot = PX(pageFX(0.6, 'left'))
     const xEnd = PX(pageFX(1.087, 'left'))
-    const yTop = PY(pageFY(0.14))
-    const yBot = PY(pageFY(0.28))
+    const yTop = PY(pageFY(0.645))
+    const yBot = PY(pageFY(0.745))
     const yMid = (yTop + yBot) / 2
     const chW = xSlot - xEnd
     s += `<rect x="${fx(xEnd)}" y="${fx(yTop)}" width="${fx(chW)}" height="${fx(yBot - yTop)}" fill="${BAZ.terraDim}" opacity="0.16"/>`
@@ -15348,13 +15518,20 @@ const PIECES = [
   { id: 'ch5-throng', seed: 60452, w: 512, h: 171, grain: 10, paint() { return bazStallRank(this.w, this.h, this.seed, { count: 6 }) } },
   { id: 'ch5-tea', seed: 60453, w: 256, h: 293, grain: 10, paint() { return bazTeaCorner(this.w, this.h, this.seed) } },
   { id: 'ch5-raise-stall-face', seed: 60460, w: 512, h: 1024, grain: 12, paint() { return bazRaiseStallFace(this.w, this.h, this.seed) } },
+  // THE INSIDE OF THE STALL (eye-test round 2). At the 88-degree stop only ONE
+  // leg shows its painted face; the aft leg shows its BACK, which is the stall's
+  // interior, and the tabpiece layer printed raw kraft there. The layer now
+  // requests `<id>-inner` and prints it on the BackSide wall when it exists.
+  // Same sheet, same unfolded-die-cut v bands and same pixel size as the face.
+  { id: 'ch5-raise-stall-inner', seed: 60462, w: 512, h: 1024, grain: 12, paint() { return bazRaiseStallInner(this.w, this.h, this.seed) } },
   // The tabpiece's own PULL TAB art (the engine requests `<id>-tab` and falls
   // back to the shared grey grip when it is absent — reader finding BW-13).
-  // SQUARE since the rail landed (A-3ii): the handle is a fixed 0.14 x 0.14
-  // card lying ON the page, not a 0.1 x 0.20 strip poking off the fore edge, and
-  // a 128x256 texture on a square quad is a 2:1 stretch the mesh cannot undo.
+  // Aspect follows the rail card exactly: 0.10 world across the spine (image x)
+  // by 0.14 along the pull (image y). It was briefly square, when the lane ran
+  // z 0.14..0.28; the lane moved to the reader's side (z 0.645..0.745) to clear
+  // the chapter copy and the card went with it.
   // Atlas-exempt like every other tab strip.
-  { id: 'ch5-raise-stall-tab', seed: 60461, w: 192, h: 192, grain: 10, paint() { return bazRaiseStallTab(this.w, this.h, this.seed) } },
+  { id: 'ch5-raise-stall-tab', seed: 60461, w: 160, h: 224, grain: 10, paint() { return bazRaiseStallTab(this.w, this.h, this.seed) } },
   { id: 'page-6', seed: 60470, w: 1024, h: 683, grain: 10, paint() { return bazaarFloorSpread(this.w, this.h, this.seed) } },
   // ---- Spread 2 — the Inn (E3 stage set: three graded gutter-spanning
   // planes + crease children + the linked rank; kept stable box + keyboard).
