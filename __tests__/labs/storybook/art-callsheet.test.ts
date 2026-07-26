@@ -36,7 +36,9 @@ function allLayers(): readonly SceneLayer[] {
  *    -top iff roof !== 'open' — an open-roof box has no lid/roof patches).
  *  - popup-platform-layer.tsx: `<id>-deck` plus `<id>-strut` (optional —
  *    struts fall back to raw kraft when the art is not baked).
- *  - popup-tabpiece-layer.tsx: `<id>-face`.
+ *  - popup-tabpiece-layer.tsx: `<id>-face`, plus an OPTIONAL `<id>-tab` (a
+ *    painted pull tab; without it the tab wears the shared kraft grip texture,
+ *    so the key is allowed in the sheet but never required of a piece).
  *  - popup-anatomy-layers.tsx's fanMemberLayers: `<id>-m<index>`, 0-based.
  *  - popup-knobtower-layer.tsx: `<id>-disc` (the knob) + `<id>-tier<k>` per
  *    tier, 0-based (KnobDisc/KnobTier request them directly).
@@ -58,7 +60,10 @@ function knownGoodIds(): ReadonlySet<string> {
       ids.add(`${layer.id}-deck`)
       ids.add(`${layer.id}-strut`)
     }
-    if (layer.mech === 'tabpiece') ids.add(`${layer.id}-face`)
+    if (layer.mech === 'tabpiece') {
+      ids.add(`${layer.id}-face`)
+      ids.add(`${layer.id}-tab`) // optional — see the header note
+    }
     if (layer.mech === 'fan') {
       layer.members.forEach((_, i) => ids.add(`${layer.id}-m${i}`))
     }

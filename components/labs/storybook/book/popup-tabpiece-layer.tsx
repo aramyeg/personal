@@ -13,6 +13,23 @@
  * high-frequency drive value lives in the module-level scrub channel
  * (user-drive.ts), never React state; zustand holds only the grab identity.
  *
+ * THE STRUCTURE IS A HANDLE TOO (E3 s6 S6-1, "the headline lie"). A blind reader
+ * met this family on spread 6, where the piece carries the chapter's only
+ * imperative — a woodcut cartouche reading RAISE A STALL — and reported: "it is
+ * the only labelled object in the scene. Highest-priority affordance by far...
+ * it does nothing on click or on drag in any direction. This is the spread's
+ * headline affordance and it is a lie." The tab WAS live; it was 0.25 world
+ * units away across the page's fore edge, and nothing connected the two.
+ *
+ * So the erected body — legs and deck — now raycasts into the SAME grab, with
+ * the same projector and the same drive arithmetic. That is paper-true, not a
+ * shortcut: the structure has exactly one degree of freedom, and pushing a
+ * table-form piece fore by its deck draws its strip by the identical slide (the
+ * deck's own stations move fore as the lift rises, so the sign even agrees).
+ * The reader presses the thing the instruction is printed on and the instruction
+ * comes true. The scene lane's other half of the fix is the painted linkage on
+ * the floor print and real art on the tab (below).
+ *
  * Follows the platform layer's every convention: unlit print, kraft
  * fallback tints, BackSide interior mesh in deep shadow, cut-edge
  * hairlines, DynamicDrawUsage positions rewritten per frame, two-tier
@@ -22,8 +39,14 @@
  * — u along the spine, v along the unrolled slide direction (0 at the
  * inner hinge, 1 at the fixed hinge; the ridge/deck breaks sit at their
  * arc-length stations). Printed exactly like a real die-cut sheet: the
- * image is continuous over every crease. The tab prints raw kraft with a
- * shaded tint — a visibly separate strip of card, the grab handle.
+ * image is continuous over every crease.
+ *
+ * The tab takes its OWN painting, `<id>-tab`, when the piece ships one: u across
+ * the tab's width, v along the pull (0 at the slit, 1 at the outer tip). Without
+ * it the tab falls back to the shared kraft grip texture, which is what every
+ * tab wore until a blind reader named it (BW-13): "the shared grey tab-grip
+ * reads as an untextured placeholder". A handle a reader is meant to trust has
+ * to look painted, on-palette and attached.
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
@@ -179,6 +202,10 @@ export function TabPiecePopupLayer({
   const slopRef = useRef<THREE.Mesh>(null)
 
   const faceArt = useArtTexture(`${layer.id}-face`)
+  // Optional per-piece tab painting (BW-13). `useArtTexture` returns null for
+  // an id the manifest does not carry, so a piece without one costs nothing and
+  // keeps the kraft grip below.
+  const tabArt = useArtTexture(`${layer.id}-tab`)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless tab pieces separates by tone instead of reading as one mass.
@@ -255,21 +282,24 @@ export function TabPiecePopupLayer({
   useEffect(() => {
     patches.forEach((p, i) => {
       const material = materials.exterior[i]
-      const art = p.face === 'tab' ? null : faceArt
-      // The tab never prints art (file header) — its raw-kraft map carries
-      // the grip-notch texture instead of the generic paper grain.
+      // The tab takes its own painting when the piece ships one, otherwise the
+      // raw-kraft grip-notch texture (never the face art — different unfold).
+      const art = p.face === 'tab' ? tabArt : faceArt
       material.map = art ?? (p.face === 'tab' ? tabGripTexture : paperTexture)
       if (art) {
         art.wrapS = THREE.ClampToEdgeWrapping
         art.wrapT = THREE.ClampToEdgeWrapping
-        material.color.set(isShaded(p.face) ? PAINTED_FOLD_SHADE : '#ffffff')
+        // A PAINTED tab is lit like any other painted face: the `isShaded` step
+        // exists to separate creases in raw kraft, and stepping a painted tab
+        // down would dim the very handle the reader is being invited to find.
+        material.color.set(p.face === 'tab' || !isShaded(p.face) ? '#ffffff' : PAINTED_FOLD_SHADE)
       } else {
         material.color.set(isShaded(p.face) ? tint.shade : tint.lit)
       }
       material.needsUpdate = true
       edgeMaterials[i].color.set(art ? CUT_EDGE_COLOR : tint.edge)
     })
-  }, [patches, materials, edgeMaterials, paperTexture, tabGripTexture, faceArt, tint])
+  }, [patches, materials, edgeMaterials, paperTexture, tabGripTexture, faceArt, tabArt, tint])
 
   // The fore-edge SLIT the tab emerges through (D3 tab-legibility package):
   // a short hairline riding the page rigidly at d = PAGE_W, tinted this
@@ -529,7 +559,11 @@ export function TabPiecePopupLayer({
         ))}
         <lineSegments geometry={slitGeometry} material={slitMaterial} renderOrder={1} />
         {/* Invisible grab handles (raycast targets, never rendered) — the tab
-            quad exact for mouse/pen, 1.5x for touch (laws H3/H6). */}
+            quad exact for mouse/pen, padded for coarse pointers (laws H3/H6),
+            PLUS the erected body's own faces (S6-1: the structure the
+            instruction is printed on is a handle). The body meshes borrow the
+            render geometries, which the frame loop already rewrites, so they
+            cost one draw-free mesh each and can never drift from the paper. */}
         <group
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -541,6 +575,11 @@ export function TabPiecePopupLayer({
         >
           <mesh ref={handleRef} geometry={handleGeometry} material={handleMaterial} renderOrder={2} />
           <mesh ref={slopRef} geometry={slopGeometry} material={handleMaterial} renderOrder={2} />
+          {patches.map((p, i) =>
+            p.face === 'tab' ? null : (
+              <mesh key={p.face} geometry={geometries[i]} material={handleMaterial} renderOrder={2} />
+            )
+          )}
         </group>
       </group>
       <group ref={shadowGroupRef} visible={false}>
