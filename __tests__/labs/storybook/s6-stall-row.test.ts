@@ -50,6 +50,7 @@ import {
   type TabPieceGeom,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { projectHingeAngle, projectPageD } from '@/components/labs/storybook/book/handle-projection'
+import { primaryPlayableChannel } from '@/components/labs/storybook/book/handle-beckon'
 import { PAGE_H, PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 import {
   SPREAD_COUNT,
@@ -459,6 +460,17 @@ describe('s6 RAISE A STALL card — the structure is a handle (S6-1)', () => {
       ).toBeGreaterThan(MIN_TRAVEL)
     })
   }
+
+  it('the spread beckons the card, which is now the honest headline affordance', () => {
+    // S6-6's second half. The idle beckon offers ONE piece per spread, ranked by
+    // family, and on spread 6 that is this tab piece rather than the stall rank.
+    // Before S6-1 that was the worst possible choice — it twitched the one object
+    // in the scene that answered nothing. Now the twitch and the imperative and
+    // the mechanism are all the same piece. (The rank gets the other two
+    // affordance legs: the hover glow every grabbable layer applies, and the
+    // press-nudge, which the travel window now aims UP out of the flat rest.)
+    expect(primaryPlayableChannel(SPREAD)).toBe('ch5-raise-stall')
+  })
 
   it('the painted linkage has a page-side gap to cover, and it is where the floor print puts it', () => {
     // S6-1's other half: the tab exits at the fore edge, the card's fore hinge
