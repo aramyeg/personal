@@ -209,6 +209,16 @@ export function TabPiecePopupLayer({
   // an id the manifest does not carry, so a piece without one costs nothing and
   // keeps the kraft grip below.
   const tabArt = useArtTexture(`${layer.id}-tab`)
+  // OPTIONAL INTERIOR PAINTING (A-3, measured at the reading camera). A raised
+  // table-form piece opens TOWARD the reader: at the s6 stall's 88-degree stop
+  // the fore leg shows its printed face, but the aft leg and the deck present
+  // their BACKS — so the reader met "a plain open shell", a dark kraft slab
+  // where the goods should be. That is not a paint bug on the face art; it is
+  // the inside of the stall, and a real pop-up prints it. A piece that ships
+  // `<id>-inner` gets it on the BackSide wall, in the same unfolded-die-cut v
+  // bands as the face; a piece without one keeps the shared kraft interior and
+  // is bit-identical.
+  const innerArt = useArtTexture(`${layer.id}-inner`)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless tab pieces separates by tone instead of reading as one mass.
@@ -253,24 +263,33 @@ export function TabPiecePopupLayer({
   // A culled piece owns its copy instead: the pool is only safe for materials
   // nobody writes after acquiring, and this one's opacity is written per frame
   // through the cull ramp.
+  // A PAINTED interior also owns its material (the pool is only safe for
+  // materials nobody writes after acquiring, and this one carries a per-piece
+  // map), so the two opt-ins share one unpooled branch.
+  const ownsInterior = culled || innerArt !== null
   const interiorMaterial = useMemo(
     () =>
-      culled
+      ownsInterior
         ? new THREE.MeshBasicMaterial({
             side: THREE.BackSide,
-            map: paperTexture,
-            color: INTERIOR_SHADOW_TINT,
+            map: innerArt ?? paperTexture,
+            color: innerArt ? '#ffffff' : INTERIOR_SHADOW_TINT,
             transparent: true,
           })
         : acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
-    [paperTexture, culled]
+    [paperTexture, ownsInterior, innerArt]
   )
+  useEffect(() => {
+    if (!innerArt) return
+    innerArt.wrapS = THREE.ClampToEdgeWrapping
+    innerArt.wrapT = THREE.ClampToEdgeWrapping
+  }, [innerArt])
   useEffect(
     () => () => {
-      if (culled) interiorMaterial.dispose()
+      if (ownsInterior) interiorMaterial.dispose()
       else releaseMaterial(interiorMaterial)
     },
-    [interiorMaterial, culled]
+    [interiorMaterial, ownsInterior]
   )
 
   // The invisible grab handles (law H3/H6): an exact-tab mesh for mouse/pen
