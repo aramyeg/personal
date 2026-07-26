@@ -46,7 +46,7 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
@@ -234,14 +234,14 @@ export function SwarmArcPopupLayer({
   const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaR: number): number | null =>
     projectPageD(pointerLocalRay(e), thetaR)
 
-  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
     tap.end(stirChannel) // a press that never drew the tab answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone — nothing to release
     }
@@ -261,12 +261,13 @@ export function SwarmArcPopupLayer({
     grabRef.current = { sGrabStart: sStart, dGrab }
     writeUserDrive(stirChannel, sStart, [0, layer.stir.stroke])
     tap.begin(sStart)
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     if (useStorybookStore.getState().grab?.id !== layer.id) {
@@ -283,14 +284,7 @@ export function SwarmArcPopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over a handle). The store's `hover` is the single source; the
-      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
-      // shows a native hand ONLY where the quill sprite is not drawn.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)

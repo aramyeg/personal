@@ -14,6 +14,7 @@ import { PlainTale } from './plain-tale'
 import { resolveSbView, type SbView } from './resolve-view'
 import { useStorybookStore } from './store'
 import { useBookInput } from './use-book-input'
+import { installPointerTracker } from './book/hover-prime'
 import { BookNav } from './overlay/nav'
 import { QuillCursor } from './overlay/quill-cursor'
 import { SoundToggle } from './overlay/sound-toggle'
@@ -125,6 +126,11 @@ function BookTale() {
 export function StorybookLoader() {
   const params = useSearchParams()
   const [view, setView] = useState<SbView | null>(null)
+
+  // Starts remembering where the reader's hand is BEFORE the canvas exists
+  // (book/hover-prime.ts): a hand already resting on a piece at load produces no
+  // further pointer events, and r3f can only learn a pointer position from one.
+  useEffect(() => installPointerTracker(), [])
 
   useEffect(() => {
     setView(

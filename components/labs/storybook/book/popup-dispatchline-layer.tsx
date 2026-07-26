@@ -67,7 +67,7 @@ import {
 import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
 import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { sharedHandleMaterial } from './shared-procedural-textures'
 import { useGuardedDispose } from './material-pool'
 
@@ -232,13 +232,13 @@ export function DispatchLinePopupLayer({
   // panel's width, which is what makes the gesture feel like the wire's length.
   const stroke = Math.max(0.05, layer.w)
 
-  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone — nothing to release
     }
@@ -256,12 +256,13 @@ export function DispatchLinePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { sStart, dGrab }
     writeUserDrive(sendChannel, sStart, [0, 1])
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     if (useStorybookStore.getState().grab?.id !== layer.id) {
@@ -276,14 +277,7 @@ export function DispatchLinePopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over this trolley at once — it wrote gl.domElement.style.cursor
-      // itself). The store's `hover` is the single source; the canvas cursor is
-      // owned entirely by book-scene.tsx's CanvasCursor.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)

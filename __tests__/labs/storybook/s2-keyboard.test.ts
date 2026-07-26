@@ -3,7 +3,7 @@ import {
   CAMERA_FOV,
   CAMERA_LOOKAT,
   CAMERA_POSITION,
-} from '@/components/labs/storybook/book/book-scene'
+} from '@/components/labs/storybook/book/reading-stage'
 import {
   liftFlapDoorQuad,
   liftFlapMax,
