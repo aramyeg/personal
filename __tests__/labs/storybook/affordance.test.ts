@@ -107,8 +107,24 @@ describe('hit-target floor — a sliver still gets a reachable pad', () => {
     [0, 0, h],
   ]
 
-  it('leaves a comfortable handle at its family pad', () => {
-    expect(handleSlopFactor(quad(0.3, 0.3), HANDLE_SLOP_FLAT)).toBe(HANDLE_SLOP_FLAT)
+  // S2R2-3b: the family pad is a TARGET SIZE, not a multiplier. A handle already
+  // past `base * HANDLE_MIN_HIT` is left on its own die-cut, because a grab band
+  // that reaches beyond the art promises paper where there is pavement — the
+  // blind re-reader's 270x145 px box over s2's 159x95 px welcome rank, which
+  // also covered half of an unrelated prop. Below that size the pad is exactly
+  // what it always was.
+  it('leaves a handle that already reads at its own die-cut', () => {
+    expect(handleSlopFactor(quad(0.3, 0.3), HANDLE_SLOP_FLAT)).toBe(1)
+    // ...and the pad is still generous where it matters: the target is met.
+    expect(0.3).toBeGreaterThanOrEqual(HANDLE_SLOP_FLAT * HANDLE_MIN_HIT)
+  })
+
+  it('carries a middling handle up to its family target and no further', () => {
+    const target = HANDLE_SLOP_FLAT * HANDLE_MIN_HIT
+    const short = 0.15 // over the bare floor, under the family target
+    expect(short).toBeGreaterThan(HANDLE_MIN_HIT)
+    const f = handleSlopFactor(quad(0.4, short), HANDLE_SLOP_FLAT)
+    expect(short * f).toBeCloseTo(target, 12)
   })
 
   it('grows a small handle until its shortest edge clears the floor', () => {
@@ -127,7 +143,7 @@ describe('hit-target floor — a sliver still gets a reachable pad', () => {
       [0.4, 1e-9],
     ]) {
       const f = handleSlopFactor(quad(w, h), HANDLE_SLOP_FLAT)
-      expect(f).toBeGreaterThanOrEqual(HANDLE_SLOP_FLAT)
+      expect(f).toBeGreaterThanOrEqual(1)
       expect(f).toBeLessThanOrEqual(6)
     }
   })

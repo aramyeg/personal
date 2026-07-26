@@ -242,11 +242,40 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // ("he was welcomed"), it is the direction the story runs in, and both ends
   // detent so the piece clicks home instead of asymptoting.
   //
+  // ROUND-2, S2R2-3: THE RANK LIES FORE AND IS GRABBED OFF ITS OWN TIP CIRCLE.
+  // A blind re-reader put 900 px of drag through this handle and got "one tiny
+  // change and then saturation — the figure card shifts about 8-12 px and tips
+  // a couple of degrees; every offset from -50 px to -900 px produces the
+  // identical pixel diff". Both halves of that were one geometric fact: the
+  // rank's swing plane is the y-z plane, which the pinned camera (parked on
+  // x = 0) sees EXACTLY EDGE-ON.
+  //
+  // (1) WHAT THE READER SEES. The travel note below was derived with the tip's
+  // screen height as R*443*sin(A - 33.3deg) — monotone, ~60 px across the
+  // window. That is the FORE-lying sign, and `flat = hinge x n` points fore only
+  // on the RIGHT page. This is a LEFT-side flap, so it shipped aft-lying, whose
+  // screen height is R*443*sin(A + 33.3deg): a sinusoid PEAKING AT 56.7deg,
+  // which the window [44, 90] straddles. Both of its ends therefore sit at
+  // nearly the same screen height and the whole 46deg of travel measured 16 px
+  // worst-vertex. `lie: 'fore'` restores the sign the derivation assumed and the
+  // travel is ~60 px again, monotone, with the rank bowing toward the reader at
+  // rest and coming upright as it is raised. The z footprint SHRINKS into the
+  // band this piece was already cleared in (tip 0.40..0.551 against the old
+  // 0.23..0.57), so no clearance argument is reopened.
+  //
+  // (2) WHAT THE READER'S HAND DOES. The swing plane containing the view
+  // direction also breaks the pointer projection: |ray . planeNormal| = 0.10, so
+  // ~20 px of sideways drag swept the whole window and the other way missed the
+  // plane and wrote nothing. `grabProjection: 'cylinder'` reads the angle off
+  // the flap's own tip circle instead (handle-projection class B1-C), which is
+  // conditioned by the circle's angular width from the camera rather than by a
+  // vanishing dot product: ~1:1 with the paper, live in both directions.
+  //
   // Travel derived, not eyeballed: 46deg of hinge sweep on a 0.21-deep flap
   // moves the tip 2*0.21*sin(23deg) = 0.164 world; at the pinned camera the
   // page-fore axis runs 441 px/world and standing height 371 px/world, so the
   // tip travels ~60 screen px — comfortably over the 25px floor the sweep set.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90] },
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90], lie: 'fore', grabProjection: 'cylinder' },
   // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
   // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
   // open mid-ground meadow (where loose brass keys are already printed) carries

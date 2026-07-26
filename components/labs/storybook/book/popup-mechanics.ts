@@ -372,6 +372,44 @@ export type StripFlapGeom = {
    *  (frontal figure, face to the reader), 90 = along the spine
    *  (profile). 180 flips which way the flap lies when flat. */
   hingeDeg?: number
+  /**
+   * WHICH WAY THE FLAP LIES WHEN DOWN, stated ABSOLUTELY (E3 s2 round-2,
+   * S2R2-3). Omitted, the lie direction is `hinge x n`, whose SIGN DEPENDS ON
+   * THE PAGE: for a right-side flap it points FORE (+z, toward the reader) and
+   * for a left-side flap AFT (-z, toward the backdrop). That asymmetry is
+   * invisible in world units and decisive on screen.
+   *
+   * At the pinned reading camera the page-fore axis z renders at 244 px/world
+   * and standing height y at 371, and +z runs DOWN the screen while +y runs up.
+   * So the tip of a flap at hinge angle A sits, in screen-up units, at
+   *   FORE lie:  R * (371 sin A - 244 cos A) = R * 443 * sin(A - 33.3deg)
+   *   AFT  lie:  R * (371 sin A + 244 cos A) = R * 443 * sin(A + 33.3deg)
+   * The fore lie is monotonic across the whole legal window: raising the flap
+   * always raises it on screen. The aft lie PEAKS AT A = 56.7deg and comes back
+   * down, because the tip's climb in y and its retreat in z project to opposite
+   * screen directions and cancel — a window straddling that peak renders as
+   * almost no motion at all whatever the reader does.
+   *
+   * Naming the lie absolutely lets a left-page figure take the fore lie without
+   * `hingeDeg: 180`, which would also swap h0/h1 and mirror the piece's print.
+   * Untouched pieces resolve to `hinge x n` exactly as before.
+   */
+  lie?: 'fore' | 'aft'
+  /**
+   * HOW THE READER'S POINTER IS TURNED INTO A HINGE ANGLE (E3 s2 round-2,
+   * S2R2-3). Omitted, the layer intersects the pointer ray with the flap's SWING
+   * PLANE (handle-projection.ts class B1), which is what every hinge in the book
+   * has always done.
+   *
+   * 'cylinder' switches to class B1-C, the silhouette-clamped cylinder about the
+   * hinge axis. Opt in when the swing plane is near EDGE-ON to the reading
+   * camera: a frontal standing figure hinges about an axis that runs across the
+   * screen, so its swing plane contains the view direction and the plane
+   * intersection is ill-conditioned — a couple of dozen pixels of sideways drag
+   * sweeps the entire window, and the other way the ray misses the plane
+   * outright and the handle answers nothing. See projectHingeAngleCyl.
+   */
+  grabProjection?: 'plane' | 'cylinder'
   width: number
   height: number
   /** Dihedral (deg) at which the figure stands exactly upright.
@@ -1191,7 +1229,16 @@ export function stripFlapFrame(
   const n: Vec3 = geom.side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
   const hd = rad(geom.hingeDeg ?? 0)
   const hinge: Vec3 = [Math.cos(hd) * u[0], Math.cos(hd) * u[1], Math.sin(hd)]
-  const flat = cross(hinge, n) // the flap's lie direction when flat
+  // The flap's lie direction when flat. `hinge x n` is the family's original
+  // answer and stays the default; a piece may instead NAME the lie it wants in
+  // absolute page terms (StripFlapGeom.lie), because that cross product points
+  // fore on one page and aft on the other and the difference is what the reader
+  // sees. Only the sign can change — the lie is always along the same line.
+  const base = cross(hinge, n)
+  const flat: Vec3 =
+    geom.lie === undefined || base[2] === 0 || base[2] > 0 === (geom.lie === 'fore')
+      ? base
+      : [-base[0], -base[1], -base[2]]
   const center: Vec3 = [geom.hingeX * u[0], geom.hingeX * u[1], geom.hingeZ]
   const h0 = combine(1, center, -geom.width / 2, hinge)
   const h1 = combine(1, center, geom.width / 2, hinge)

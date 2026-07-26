@@ -29,6 +29,7 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
   projectHingeAngle,
+  projectHingeAngleCyl,
   projectHubAngle,
   projectPageD,
 } from '@/components/labs/storybook/book/handle-projection'
@@ -108,6 +109,7 @@ import {
   HANDLE_SLOP_STANDING,
   handleSlopFactor,
 } from '@/components/labs/storybook/book/handle-hit'
+import { toScreenPx } from '@/components/labs/storybook/book/reading-stage'
 import {
   SPREAD_COUNT,
   popupContentForSpread,
@@ -565,6 +567,223 @@ describe('handle drag regression — every grabbable must move paper', () => {
       ).toBeGreaterThan(MIN_TRAVEL)
     })
   }
+})
+
+/**
+ * THE WHOLE WINDOW, AND SOMETHING TO SEE FOR IT (E3 s2 round-2, S2R2-3).
+ *
+ * THE HOLE THIS CLOSES. The gate above passed s2's welcome rank the entire time
+ * a blind re-reader was calling it "functionally dead — it advertises grab and
+ * delivers an 8-12 px shift that is identical at 50 px and 900 px of travel".
+ * Both of them were right, because MIN_TRAVEL is a LIVENESS floor: 0.02 world
+ * units, about 8 screen px, taken as the best of eight directions. A piece whose
+ * entire declared travel is worth 16 screen px clears it comfortably and is
+ * still, to a reader, a picture that will not move.
+ *
+ * So this adds the two questions the liveness gate does not ask.
+ *
+ *  1. CAN A READER REACH BOTH STOPS? Not "does a drag change something" but
+ *     "does a drag of reader scale carry the piece from one hard stop to the
+ *     other, and back". This drives the pipeline TWICE — grabbing the piece
+ *     where it actually is at each stop, because the grab point rides the pose
+ *     — which is how a saturating projector (one that spends the whole window
+ *     in twenty pixels and then answers nothing) and a starved one (which never
+ *     arrives) both get caught by the same assertion.
+ *
+ *  2. IS THE WINDOW WORTH TRAVELLING? The piece's own worst-vertex displacement
+ *     between its two stops, in reference-viewport pixels through the book's one
+ *     camera definition (reading-stage.ts). The floor is the 25 px the s2 lane
+ *     itself wrote into content.ts when it derived this rank's travel — the
+ *     smallest excursion that lane was willing to call visible. The rank shipped
+ *     at 16 px against its own note promising 60.
+ *
+ * Both run over EVERY strip flap the book ships, discovered from content rather
+ * than listed, so a new figure cannot quietly arrive without answering them.
+ */
+describe('strip flaps — the reader must be able to sweep the whole window, and see it', () => {
+  /** A big but ordinary reader drag: 0.4 world at the piece's depth is ~150 px
+   *  at the pinned camera, roughly a thumb's length of pointer. */
+  const STROKE_FULL = 0.4
+  /** Radians of slack allowed at each stop (the detent lands exactly ON it, so
+   *  this only absorbs the search grid's coarseness). */
+  const STOP_EPS = 1e-6
+  /** The visible-excursion floor, in REFERENCE_VIEW pixels. content.ts's own
+   *  number, quoted: "comfortably over the 25px floor the sweep set". */
+  const WINDOW_SCREEN_PX_MIN = 25
+
+  /** 16 directions rather than 8: a projector with a narrow live sector (the
+   *  cylinder read answers only where the flap has freedom) must not be able to
+   *  fall between two probes. */
+  const FINE_DIRECTIONS: readonly THREE.Vector3[] = (() => {
+    const out: THREE.Vector3[] = []
+    for (let i = 0; i < 16; i++) {
+      const a = (i * Math.PI) / 8
+      out.push(SCREEN_RIGHT.clone().multiplyScalar(Math.cos(a)).addScaledVector(SCREEN_UP, Math.sin(a)))
+    }
+    return out
+  })()
+
+  const stripFlaps = (): { id: string; geom: SceneLayer & StripFlapGeom; spreadIndex: number }[] => {
+    const out: { id: string; geom: SceneLayer & StripFlapGeom; spreadIndex: number }[] = []
+    for (let s = 0; s < SPREAD_COUNT; s++) {
+      for (const l of popupContentForSpread(s)?.layers ?? []) {
+        if (l.mech === 'stripflap') out.push({ id: l.id, geom: l as SceneLayer & StripFlapGeom, spreadIndex: s })
+      }
+    }
+    return out
+  }
+
+  /** The AUTHORED mechanisms: a strip flap whose lane wrote down a travel
+   *  window has said, in content, "I intend the reader to move this between
+   *  these two stops". The book's other strip flaps (the title quill, the
+   *  satchel's sword and compass) are page-driven standing die-cuts that take
+   *  the family's default [0, 90] and are dressing, not mechanisms � they are
+   *  still held to the visible-excursion floor below, but nobody has promised a
+   *  reader can walk them stop to stop. */
+  const authored = () => stripFlaps().filter((f) => f.geom.travelDeg !== undefined)
+
+  it('covers every strip flap in the book, and knows which are mechanisms', () => {
+    expect(stripFlaps().map((f) => f.id).sort()).toEqual(
+      ['ch1-rank', 'ch5-tea', 'ch5-throng', 'ch6-clerk', 'satchel-compass', 'satchel-sword', 'title-quill'].sort()
+    )
+    expect(authored().map((f) => f.id).sort()).toEqual(['ch1-rank', 'ch5-tea', 'ch5-throng'].sort())
+  })
+
+  for (const { id, geom, spreadIndex } of stripFlaps()) {
+    /** The layer's own projector for this piece — the plane read, or the
+     *  cylinder read for a piece whose swing plane the camera sees edge-on. */
+    const project = (ray: THREE.Ray, fr: ReturnType<typeof stripFlapFrame>): number | null =>
+      geom.grabProjection === 'cylinder'
+        ? projectHingeAngleCyl(ray, fr.center, fr.hinge, fr.flat, fr.n, geom.height)
+        : projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n)
+
+    /** Grab the piece AT `from`, drag STROKE_FULL in every direction, and report
+     *  the extreme drive reached — exactly the layer's own arithmetic. */
+    const sweepFrom = (from: number, want: 'up' | 'down'): number => {
+      const { thetaL, thetaR } = restAngles(spreadIndex)
+      const [lo, hi] = stripFlapTravel(geom)
+      const fr = stripFlapFrame(geom, thetaL, thetaR)
+      const pose = solveStripFlapPoseAt(geom, from, thetaL, thetaR)
+      const grabPoint = centroid([...pose.right, ...pose.left])
+      const pGrab = project(rayTo(grabPoint), fr)
+      expect(pGrab, `${id}: the projector missed the piece at ${from.toFixed(3)} rad`).not.toBeNull()
+      let best = from
+      for (const d of FINE_DIRECTIONS) {
+        const pNow = project(rayTo(grabPoint.clone().addScaledVector(d, STROKE_FULL)), fr)
+        if (pNow === null) continue
+        const drive = stripFlapDetent(from + wrapDelta(pNow - (pGrab as number)), lo, hi)
+        if (want === 'up' ? drive > best : drive < best) best = drive
+      }
+      return best
+    }
+
+    it.skipIf(geom.travelDeg === undefined)(`${id}: a reader-scale drag carries it from stop to stop, both ways`, () => {
+      const [lo, hi] = stripFlapTravel(geom)
+      expect(hi - lo, `${id}: a travel window of zero width is not a mechanism`).toBeGreaterThan(0.01)
+      expect(
+        sweepFrom(lo, 'up'),
+        `${id}: grabbed at its lower stop, no ${STROKE_FULL} drag reached the upper one ` +
+          `(window ${((lo * 180) / Math.PI).toFixed(1)}..${((hi * 180) / Math.PI).toFixed(1)} deg)`
+      ).toBeGreaterThanOrEqual(hi - STOP_EPS)
+      expect(
+        sweepFrom(hi, 'down'),
+        `${id}: grabbed at its upper stop, no ${STROKE_FULL} drag brought it back down — ` +
+          `a piece the reader can raise and never lower is a one-way switch, not a flap`
+      ).toBeLessThanOrEqual(lo + STOP_EPS)
+    })
+
+    it(`${id}: the travel window is worth a reader's arm`, () => {
+      const { thetaL, thetaR } = restAngles(spreadIndex)
+      const [lo, hi] = stripFlapTravel(geom)
+      const at = (a: number): { x: number; y: number }[] => {
+        const p = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
+        return [...p.right, ...p.left].map((v) => toScreenPx(v))
+      }
+      const a = at(lo)
+      const b = at(hi)
+      let worst = 0
+      for (let k = 0; k < a.length; k++) worst = Math.max(worst, Math.hypot(a[k].x - b[k].x, a[k].y - b[k].y))
+      expect(
+        worst,
+        `${id}: its whole declared travel moves the paper ${worst.toFixed(1)} screen px at the ` +
+          `reading camera. A reader cannot see that. (The usual cause is a swing plane the camera ` +
+          `sees edge-on, where the tip's climb in y and its travel in z project to opposite screen ` +
+          `directions and cancel — see StripFlapGeom.lie.)`
+      ).toBeGreaterThanOrEqual(WINDOW_SCREEN_PX_MIN)
+    })
+  }
+})
+
+/**
+ * THE EDGE-ON HINGE READ (E3 s2 round-2, S2R2-3) — a unit gate on the projector
+ * itself, so the reason class B1-C exists is written down in an assertion rather
+ * than only in a comment.
+ *
+ * The setup is s2's welcome rank in miniature and in the abstract: a hinge whose
+ * axis runs ACROSS the screen, so the camera's view direction lies IN the swing
+ * plane. This asserts the pathology of the plane read (a ten-pixel twitch
+ * delivers more angle than the whole window) and that the cylinder read is
+ * graded over the same strokes — small drag, small answer; reader-scale drag,
+ * whole window.
+ */
+describe('projectHingeAngleCyl — the read for a swing plane seen edge-on', () => {
+  const CENTER: Vec3 = [-0.34, 0, 0.4]
+  const AXIS: Vec3 = [-1, 0, 0] // across the screen: the camera sits on x = 0
+  const FLAT: Vec3 = [0, 0, 1]
+  const NRM: Vec3 = [0, 1, 0]
+  const R = 0.21
+  /** The grab point: the flap's tip at 44 deg, where s2's rank is handed over. */
+  const grabPoint = new THREE.Vector3(
+    CENTER[0],
+    CENTER[1] + R * Math.sin(Math.PI * (44 / 180)),
+    CENTER[2] + R * Math.cos(Math.PI * (44 / 180))
+  )
+  /** ~10 px and ~150 px of pointer at this depth. */
+  const TWITCH = 0.027
+  const FULL = 0.4
+
+  const spread = (project: (r: THREE.Ray) => number | null, stroke: number): number => {
+    const pGrab = project(rayTo(grabPoint))
+    if (pGrab === null) return NaN
+    let worst = 0
+    for (let i = 0; i < 16; i++) {
+      const a = (i * Math.PI) / 8
+      const d = SCREEN_RIGHT.clone().multiplyScalar(Math.cos(a)).addScaledVector(SCREEN_UP, Math.sin(a))
+      const pNow = project(rayTo(grabPoint.clone().addScaledVector(d, stroke)))
+      // A null IS the pathology for the plane read (the ray misses the infinite
+      // plane), and counts as an unbounded excursion for the purposes below.
+      if (pNow === null) return Infinity
+      worst = Math.max(worst, Math.abs(wrapDelta(pNow - pGrab)))
+    }
+    return worst
+  }
+
+  const planeRead = (r: THREE.Ray): number | null => projectHingeAngle(r, CENTER, AXIS, FLAT, NRM)
+  const cylRead = (r: THREE.Ray): number | null => projectHingeAngleCyl(r, CENTER, AXIS, FLAT, NRM, R)
+
+  it('the plane read saturates here — this is the defect, stated', () => {
+    // Ten pixels of pointer buys more than a right angle (or misses the plane
+    // outright). That is what "identical at 50 px and 900 px" looked like.
+    expect(spread(planeRead, TWITCH)).toBeGreaterThan(Math.PI / 2)
+  })
+
+  it('the cylinder read is graded: a twitch is a twitch', () => {
+    expect(spread(cylRead, TWITCH)).toBeLessThan((15 * Math.PI) / 180)
+  })
+
+  it('the cylinder read still spans a whole window on a real drag', () => {
+    // s2's rank asks for 46 deg; a reader-scale drag must comfortably clear it.
+    expect(spread(cylRead, FULL)).toBeGreaterThan((46 * Math.PI) / 180)
+  })
+
+  it('never returns null for a pointer anywhere on the stage', () => {
+    // The silhouette clamp: past the tip circle the reader keeps a live handle.
+    for (let i = 0; i < 16; i++) {
+      const a = (i * Math.PI) / 8
+      const d = SCREEN_RIGHT.clone().multiplyScalar(Math.cos(a)).addScaledVector(SCREEN_UP, Math.sin(a))
+      expect(cylRead(rayTo(grabPoint.clone().addScaledVector(d, 1.2)))).not.toBeNull()
+    }
+  })
 })
 
 /**

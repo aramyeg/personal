@@ -59,7 +59,7 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_STANDING, acceptsHandleHit, hitQuadFor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectHingeAngle } from './handle-projection'
+import { projectHingeAngle, projectHingeAngleCyl } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_HEIGHT = 0.16
@@ -229,12 +229,17 @@ export function StripFlapPopupLayer({
       frame.current ? easeTurnWeighted(frame.current.t) : 0
     )
 
-  /** The pointer's angle about the flap hinge line, in the flap swing plane
-   *  (law H3): intersect the ray with the plane through the hinge centre
-   *  normal to the hinge axis, then atan2(along n, along flat). */
+  /** The pointer's angle about the flap hinge line (law H3). The family's
+   *  default is the swing-PLANE intersection; a piece whose swing plane the
+   *  reading camera sees edge-on opts into the CYLINDER read instead, where the
+   *  flap's own tip circle — not an infinite plane — carries the angle
+   *  (StripFlapGeom.grabProjection, handle-projection.ts class B1-C). */
   const angleAboutHinge = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null => {
     const fr = stripFlapFrame(layer, thetaL, thetaR)
-    return projectHingeAngle(pointerLocalRay(e), fr.center, fr.hinge, fr.flat, fr.n)
+    const ray = pointerLocalRay(e)
+    return layer.grabProjection === 'cylinder'
+      ? projectHingeAngleCyl(ray, fr.center, fr.hinge, fr.flat, fr.n, layer.height)
+      : projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n)
   }
 
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {

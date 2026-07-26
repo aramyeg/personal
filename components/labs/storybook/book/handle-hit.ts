@@ -43,9 +43,27 @@ export const HANDLE_MIN_HIT = 0.12
 const edge = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 
 /**
- * The slop factor to enlarge `quad` by: at least `base`, and enough that the
- * quad's shortest edge reaches HANDLE_MIN_HIT. Capped so a degenerate (zero
- * area) quad cannot ask for an unbounded pad.
+ * The slop factor to enlarge `quad` by: enough that the quad's shortest edge
+ * reaches `base` TIMES the floor, and never more. Capped so a degenerate (zero
+ * area) quad cannot ask for an unbounded pad, and floored at 1 so no handle is
+ * ever padded below its own die-cut.
+ *
+ * WHY IT IS A TARGET AND NOT A MULTIPLIER (E3 s2 round-2, S2R2-3b). `base` used
+ * to be an unconditional 1.4-1.8x pad on top of the floor, which is right for
+ * the slivers this file was written for and wrong for everything else: a blind
+ * re-reader found s2's welcome rank — a die-cut already measuring 159 x 95
+ * screen px, three and a half times the floor — advertising a 270 x 145 px grab
+ * band, so "pinching over empty pavement and over an unrelated prop both promise
+ * something and pay nothing". A hit box that reaches past its own art is not
+ * generosity; it is a lie about where the paper is, and it lands on props that
+ * then answer nothing.
+ *
+ * So the pad is stated as a TARGET SIZE. Every handle is carried to at least
+ * `base * HANDLE_MIN_HIT` (0.18 world for a standing flap, 0.216 for a page-flat
+ * one — about 67 and 80 screen px, comfortably over the touch floor), and a
+ * handle already bigger than that is left exactly at its die-cut, where its art
+ * is. The pieces this file was written to rescue are unaffected: they are far
+ * under the floor, where the old and the new law agree to within their own cap.
  */
 export function handleSlopFactor(quad: readonly Vec3[], base: number): number {
   if (quad.length < 4) return base
@@ -55,7 +73,7 @@ export function handleSlopFactor(quad: readonly Vec3[], base: number): number {
     if (d > 1e-6 && d < shortest) shortest = d
   }
   if (!Number.isFinite(shortest)) return base
-  return Math.min(6, Math.max(base, HANDLE_MIN_HIT / shortest))
+  return Math.min(6, Math.max(1, (base * HANDLE_MIN_HIT) / shortest))
 }
 
 /** Scales a quad about its own centre — the shared shape of every layer's

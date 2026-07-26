@@ -71,6 +71,76 @@ export function projectHingeAngle(
 }
 
 /**
+ * CLASS B1-C — the angle about a hinge line, read off the CYLINDER the flap's
+ * own tip sweeps rather than off its swing plane.
+ *
+ * WHY IT EXISTS (E3 s2 round-2, S2R2-3). Class B1 intersects the pointer ray
+ * with the swing plane. That is exact and well-behaved for a hinge whose axis
+ * runs INTO the page (the lift-flap doors: their plane's normal is the spine
+ * axis, and the reading camera meets it at ~64deg — a blind reader called that
+ * drag "1:1, weighted, clean end-stops"). It collapses for a hinge whose axis
+ * runs ACROSS the screen, which is every frontal standing figure in the book:
+ * the pinned camera sits on x = 0 and the axis is +-x, so the view direction
+ * LIES IN the swing plane. Measured on s2's welcome rank: |ray . planeNormal|
+ * = 0.10, so ~20 px of sideways drag swept the whole 46deg window while the
+ * opposite direction missed the infinite plane altogether and the handle
+ * answered nothing at all. The reader's report — "any leftward drag of >= 50 px
+ * produces one tiny change and then saturates; rightward does nothing".
+ *
+ * The cylinder of radius `radius` about the hinge axis is invariant along that
+ * axis, so intersecting it is exactly a 2D ray/circle problem in the flap's own
+ * (flat, n) swing basis — drop the axis component of the ray and solve. That is
+ * well-conditioned precisely where the plane is not: the circle subtends a real
+ * angular width from the camera, so the pointer walks around it at a rate the
+ * hand can feel, and motion ALONG the axis (which the reader sees as sideways,
+ * where the flap has no freedom) is discarded rather than amplified.
+ *
+ * A ray that misses the circle is CLAMPED TO THE SILHOUETTE (the classic arcball
+ * clamp): the closest approach is pushed out to `radius` and its angle
+ * returned, so a reader who drags past the end keeps a live, monotone handle
+ * instead of a null. Returns null only if the ray is parallel to the hinge axis,
+ * where no angle exists.
+ */
+export function projectHingeAngleCyl(
+  ray: THREE.Ray,
+  center: Vec3,
+  axis: Vec3,
+  flat: Vec3,
+  n: Vec3,
+  radius: number
+): number | null {
+  _center.set(center[0], center[1], center[2])
+  _a.set(flat[0], flat[1], flat[2])
+  _b.set(n[0], n[1], n[2])
+  _rel.copy(ray.origin).sub(_center)
+  // The ray, reduced to the swing basis (this IS the projection along the axis).
+  const px = _rel.dot(_a)
+  const py = _rel.dot(_b)
+  const qx = ray.direction.dot(_a)
+  const qy = ray.direction.dot(_b)
+  const qq = qx * qx + qy * qy
+  if (qq < 1e-12) return null // looking straight down the hinge: no angle exists
+  const r = Math.max(radius, 1e-6)
+  const pq = px * qx + py * qy
+  const tClosest = -pq / qq
+  const disc = pq * pq - qq * (px * px + py * py - r * r)
+  let t = tClosest
+  if (disc > 0) {
+    const root = Math.sqrt(disc) / qq
+    const near = tClosest - root
+    // The near hit unless it is behind the reader's eye, then the far one.
+    t = near > 0 ? near : tClosest + root
+  }
+  const hx = px + t * qx
+  const hy = py + t * qy
+  // Silhouette clamp: a miss (or a degenerate hit at the axis) still yields the
+  // direction the reader is pointing, carried out to the tip circle.
+  const h = Math.hypot(hx, hy)
+  if (h < 1e-9) return null
+  return Math.atan2(hy, hx)
+}
+
+/**
  * CLASS B2 — the angle about a DISC HUB (knob tower, keep winch, volvelle).
  * The seat plane is the disc's own plane (normal `n` through `center`); the
  * angle is measured on the disc's in-plane basis (e1, e2). `r` is the hit's
