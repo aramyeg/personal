@@ -1,18 +1,19 @@
 'use client'
 
 /**
- * Renders the CARRIER SWARM (popup-swarmarc.ts): 28 graded hairline struts +
+ * Renders the CARRIER SWARM (popup-swarmarc.ts): 22 graded hairline struts +
  * rider silhouettes as TWO merged dynamic meshes (one draw for all struts, one
- * for all riders — the pack's approved merged-geometry path, never 28 draws),
+ * for all riders — the pack's approved merged-geometry path, never 22 draws),
  * plus the visible STIR THE SWARM pull tab (one more draw). Riders sample ONE
  * shared sprite atlas (`<id>-atlas`, 8×8 cell grid): per-strut uv rects are
- * STATIC (cell + mirror flip baked at build), only positions rewrite per pose
- * tick. Kraft fallback when unpainted: sky-tinted hairline struts (#a9bccb,
- * the daisy trick) and kraft rider chips.
+ * STATIC (cell + mirror flip + stalk swatch baked at build), only positions
+ * rewrite per pose tick. Kraft fallback when unpainted: sky-tinted hairline
+ * struts (#a9bccb, the daisy trick) and kraft rider chips.
  *
  * Atlas cell convention (generate-art.mjs paints to this): cells 0–15 the 16
- * rider sprites, cell 16 the hairline strut swatch, cells 17–18 the tab's
- * bee-on-honey-drop handle (2 cells wide), cells 19–22 the printed banner.
+ * rider sprites (body in the cell's upper 60%, flight thread continuing the
+ * stalk below it — see SWARM_RIDER_SEAT), cells 16/23/24 the three hairline
+ * stalk swatches, and a 5x3 block from cell 32 for the STIR pull tab.
  *
  * STIR tab (H2/H3/H6 hand laws, tabpiece grab idiom): drive channel
  * `<id>~stir` holds the stroke s ∈ [0, stroke] while grabbed; release decays
@@ -54,6 +55,13 @@ import { useHandleTap } from './use-handle-tap'
 
 const FLAT_EPSILON = 0.02
 const ATLAS_GRID = 8
+/** Hairline-stalk swatch cells, indexed by `strut.swatch`: reed / twine / twig.
+ *  All three are OPAQUE full cells (the strut mesh carries no alpha test). */
+const STALK_CELLS = [16, 23, 24] as const
+/** The STIR tab's atlas block: 5 cells wide x 3 tall from cell 32. */
+const TAB_CELL = 32
+const TAB_CELLS_X = 5
+const TAB_CELLS_Y = 3
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -156,20 +164,27 @@ export function SwarmArcPopupLayer({
   }, [layer.struts, n, rect])
   const strutGeometry = useMemo(() => {
     const uv = new Float32Array(n * 4 * 2)
-    for (let i = 0; i < n; i++) {
-      cellUvs(16, 1, false).forEach(([u, v], c) => uv.set([u, v], (i * 4 + c) * 2))
-    }
+    layer.struts.forEach((s, i) => {
+      // three hairline-stalk swatches (reed / twine / twig) instead of one, so
+      // 18 stalks stop reading as a machined picket fence (s3 reader finding 8)
+      cellUvs(STALK_CELLS[s.swatch % STALK_CELLS.length], 1, false).forEach(([u, v], c) =>
+        uv.set([u, v], (i * 4 + c) * 2)
+      )
+    })
     return makeMergedQuads(n, applyUvRect(uv, rect))
   }, [n, layer.struts, rect])
   const tabGeometry = useMemo(() => {
-    // The STIR tab reads the atlas's 2x2 region (cells 17-18 + 25-26): banner
-    // lettering over the bee-on-honey-drop pull.
+    // The STIR tab reads the atlas's 5x3 block from cell 32 (640x384 px, aspect
+    // 1.667 ≈ the tab quad's 1.71 screen aspect, so the lettering lands
+    // unstretched — the old 2x2 region was being stretched 1.7x wide).
     const uv = new Float32Array(4 * 2)
-    cellUvs(17, 2, false, 2).forEach(([u, v], c) => uv.set([u, v], c * 2))
+    cellUvs(TAB_CELL, TAB_CELLS_X, false, TAB_CELLS_Y).forEach(([u, v], c) => uv.set([u, v], c * 2))
     return makeMergedQuads(1, applyUvRect(uv, rect))
   }, [rect])
-  // Coarse/foreshortened-pointer slop pad, invisible: the tab die-cut itself
-  // is a 55x22px sliver at the reading camera (handle-hit.ts).
+  // Coarse/foreshortened-pointer slop pad, invisible. The tab die-cut is now a
+  // 145x85px plaque rather than the 57x34px sliver it shipped as, but the pad
+  // stays: it is what a coarse pointer and a foreshortened page-flat quad still
+  // need (handle-hit.ts), and it is the same law on every handle in the book.
   const slopGeometry = useMemo(() => makeMergedQuads(1, new Float32Array(8)), [])
 
   const paperTexture = sharedPaperTexture()

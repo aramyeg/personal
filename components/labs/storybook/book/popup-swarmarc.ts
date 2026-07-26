@@ -30,12 +30,26 @@
  * exactly since E(0)=0). Opening the page pours the swarm out of the hive.
  *
  * STIR THE SWARM (user tab, drive channel `ch2-swarm~stir`): stroke
- * s ∈ [0, stroke] rocks the 5 right-arm STIR struts by
- * Δa_k(s) = deg° · sin(π · clamp(s/stroke − phaseStep·k, 0, 1)), k = rank from
- * the tab inward — a ripple that runs up the arm and dies at the side. The
- * SHOWN angle is (aRest·W_i(E) + Δa_k(s)) · gated by E via the liftflap
- * persistence law (user state × envelope): both terms carry the envelope, so
- * fold-flat survives any held stir state.
+ * s ∈ [0, stroke] rocks the right-arm STIR struts by
+ * Δa_k(s) = deg° · sin(π · clamp(crest·s/stroke − phaseStep·k, 0, 1)), k = rank
+ * from the tab inward — a ripple that runs up the arm. The SHOWN angle is
+ * (aRest·W_i(E) + Δa_k(s)) · gated by E via the liftflap persistence law (user
+ * state × envelope): both terms carry the envelope, so fold-flat survives any
+ * held stir state.
+ *
+ * E3 WAVE-2 RETUNE (blind reader s3, finding 1 + the ledger's STIR PAYOFF item).
+ * The tab was proven live end to end and STILL read as dead, because the shipped
+ * ripple was invisible at reading distance: deg 12 over phaseStep 0.12 moved the
+ * furthest rider 17.5 screen px and the tab-nearest rider EXACTLY 0 px at full
+ * stroke (clamp hits 1, sin π = 0 — the wave had already run off the end of the
+ * arm by the time the reader finished pulling). Three derived changes, measured
+ * at the pinned reading camera in popup-swarmarc-scene.test.ts:
+ *   deg 12 -> 38        peak rider travel 17.5 px -> 37 px
+ *   phaseStep 0.12 -> 0.20   the four ranks separate into a readable wave
+ *   crest (NEW, 0.8)    at full stroke rank 0 sits at sin(0.8π), not sin(π):
+ *                       every member of the arm is displaced at s = max, so the
+ *                       s=0 / s=max capture pair differs everywhere along it
+ *                       (18 / 31 / 32 / 36 px) instead of at one strut.
  */
 
 import type { PanelQuad, Vec3 } from './popup-mechanics'
@@ -52,7 +66,10 @@ const DEFAULT_REST_DEG = 176
  *  (reach L_eff = L + r), `aRestDeg` the rest deploy angle, `wave` the stagger
  *  key w (b0 = 0.18 + 0.42·w), `stir` the ripple rank from the tab inward
  *  (−1 = not a stir member), `sprite` the atlas cell its rider samples,
- *  `flip` a u-mirror so no two neighbors share sprite+flip. */
+ *  `flip` a u-mirror so no two neighbors share sprite+flip, `swatch` which of
+ *  the three hairline-stalk swatches the strut samples (0 reed / 1 twine /
+ *  2 twig — the s3 blind reader read ~25 identical pale sticks as a picket
+ *  fence, so the stalks themselves now vary). */
 export type SwarmStrut = {
   side: 'left' | 'right'
   F: number
@@ -64,6 +81,7 @@ export type SwarmStrut = {
   stir: number
   sprite: number
   flip: boolean
+  swatch: number
 }
 
 export type SwarmStirSpec = {
@@ -74,6 +92,11 @@ export type SwarmStirSpec = {
   deg: number
   /** Phase lag per rank (fraction of the normalized stroke). */
   phaseStep: number
+  /** How far along its own half-wave rank 0 has travelled at FULL stroke
+   *  (default 1 = the wave runs clean off the arm and rank 0 returns to rest,
+   *  which is why the shipped ripple showed zero travel on the strut the
+   *  reader's eye was already on). < 1 leaves every rank displaced at s = max. */
+  crest?: number
 }
 
 export type SwarmArcGeom = {
@@ -131,10 +154,12 @@ export function swarmWaveWindow(w: number, s: number): number {
   return smoothstep(c0, 1, s)
 }
 
-/** Stir ripple delta (deg) for rank `k` at tab stroke `s` (§3 formula). */
+/** Stir ripple delta (deg) for rank `k` at tab stroke `s` (§3 formula, plus the
+ *  Wave-2 `crest` limiter — see the module header). */
 export function swarmStirDelta(spec: SwarmStirSpec, k: number, s: number): number {
   if (k < 0) return 0
-  return spec.deg * Math.sin(Math.PI * clamp(s / spec.stroke - spec.phaseStep * k, 0, 1))
+  const crest = spec.crest ?? 1
+  return spec.deg * Math.sin(Math.PI * clamp((crest * s) / spec.stroke - spec.phaseStep * k, 0, 1))
 }
 
 /** The strut's SHOWN deploy angle (radians) at dihedral `beta` and tab stroke
@@ -163,6 +188,20 @@ function pageFrame(side: 'left' | 'right', thetaL: number, thetaR: number): { u:
   const n: Vec3 = side === 'left' ? [Math.sin(t), -Math.cos(t), 0] : [-Math.sin(t), Math.cos(t), 0]
   return { u, n }
 }
+
+/** How far SHORT of the rider's centre the opaque hairline stalk now stops, in
+ *  units of the rider radius r. The rider quad still spans rho ∈ [L−r, L+r]
+ *  (reach, radius wall and every containment proof are untouched — this only
+ *  shortens the stalk), but the stalk used to run all the way to rho = L, i.e.
+ *  to the rider sprite's exact CENTRE, and the s3 blind reader's first reading
+ *  of the result was "bees skewered on sticks" / "bee lollipops". Stopping at
+ *  rho = L − 0.30·r lands the stalk tip at 35% of the sprite cell's height,
+ *  measured from the cell's foot edge; the atlas paints each courier's body in
+ *  the cell's upper 60% with a hairline FLIGHT THREAD continuing the stalk up
+ *  to its belly, so the die stays ONE continuous cut (no floating alpha island,
+ *  paper truth intact) while the bee reads as hovering at the top of a thread
+ *  rather than impaled on the middle of a pole. */
+export const SWARM_RIDER_SEAT = 0.3
 
 export type SwarmStrutPose = {
   /** Hairline strut quad [foot-in, foot-out, tip-out, tip-in] (u across width, v foot→tip). */
@@ -194,7 +233,15 @@ export function solveSwarmStrut(
   const hw = geom.strutW / 2
   const L = strut.L
   const r = strut.r
-  const strutQuad: PanelQuad = [P(strut.F - hw, 0), P(strut.F + hw, 0), P(strut.F + hw, L), P(strut.F - hw, L)]
+  // the stalk stops short of the rider's centre (SWARM_RIDER_SEAT) so the
+  // courier hovers at the head of a painted thread instead of on a spike
+  const stalk = L - r * SWARM_RIDER_SEAT
+  const strutQuad: PanelQuad = [
+    P(strut.F - hw, 0),
+    P(strut.F + hw, 0),
+    P(strut.F + hw, stalk),
+    P(strut.F - hw, stalk),
+  ]
   const rider: PanelQuad = [
     P(strut.F - r, L - r),
     P(strut.F + r, L - r),
@@ -216,11 +263,27 @@ export function solveSwarmArcPose(
 
 /** STIR tab die-cut footprint on its page (world units, page-flat). Lives here
  *  rather than in the layer so the drag-regression bench can aim a ray at the
- *  handle the reader actually sees. */
-export const SWARM_TAB_D0 = 1.0
-export const SWARM_TAB_W = 0.12
-export const SWARM_TAB_Z0 = 0.3
-export const SWARM_TAB_Z1 = 0.42
+ *  handle the reader actually sees.
+ *
+ *  E3 WAVE-2 REBUILD (blind reader s3, findings 4 + BW-13). The shipped tab was
+ *  0.12 x 0.12 at d0 1.0, which projects to 57 x 34 screen px at the pinned
+ *  camera — "cap height ~4px; nearest-neighbour zoom shows two rows of grey
+ *  mush", and parked alone in the emptiest corner of the composition. Worse, a
+ *  world-SQUARE page-flat quad foreshortens to a 1.7:1 screen parallelogram, so
+ *  the 1:1 atlas region it sampled was being stretched 1.7x horizontally —
+ *  half of why the lettering was illegible even before the size.
+ *  Rebuilt as 0.30 (radial) x 0.32 (z) at d0 0.82: 145 x 85 screen px centred
+ *  at (1243, 599), i.e. 6.4x the area, and seated right beside the right arm of
+ *  the ring it drives (the arm's front anchors run x 0.35..0.65, z 0.20..0.27)
+ *  instead of out in the bare corner. Its atlas region moves to a 5x3 cell
+ *  block (aspect 1.667 ≈ the 1.71 screen aspect), so letterforms land
+ *  unstretched. Still fully inside the page at rest (d1 1.12 < PAGE_W 1.15) and
+ *  still clear of the fringe die (|x| <= 0.6) and the printed compass yard
+ *  (radial 0.62), both inboard of d0. */
+export const SWARM_TAB_D0 = 0.82
+export const SWARM_TAB_W = 0.3
+export const SWARM_TAB_Z0 = 0.14
+export const SWARM_TAB_Z1 = 0.46
 export const SWARM_TAB_Y_LIFT = 0.003
 
 /** The STIR pull tab's quad at stroke `s`: it rides its page at the fore edge
@@ -272,24 +335,61 @@ const A0 = 57
 const A1 = 21
 const R0 = 0.052
 const R1 = 0.016
-const N_SIDE = 12
+/** E3 WAVE-2 THINNING (blind reader s3, finding 8): 12 struts a side put ~25
+ *  near-identical pale stalks across the ground and the reader called the middle
+ *  ground "a picket fence of vertical sticks — visual noise that flattens the
+ *  whole field into wallpaper". 9 a side (18 ring + 4 outriders = 22 pieces)
+ *  opens the plan spacing by a third; the multiplicity the ring gave up is paid
+ *  back by the painted swarm on the backdrop and the printed floor couriers,
+ *  which cost no radius margin at all. */
+const N_SIDE = 9
 const TH_MIN = 10
 const TH_MAX = 150
-/** Ring thetas that the stir tab rocks (right page, |θ| ≥ 99°). */
-const STIR_MIN_THETA = 98
+/** Ring thetas that the stir tab rocks (right page, θ ≥ 97° — the 4 outermost
+ *  right-arm members; with N_SIDE 9 the next one in is 0.31 long and would need
+ *  the ripple amplitude cut in half to stay inside the radius wall). */
+const STIR_MIN_THETA = 97
 /** Outriders erect just before the front ends (wave floor clamps b0 at 0). */
 const OUTRIDER_WAVE = -0.05
 const SPRITE_COUNT = 16
 const SPRITE_STRIDE = 7 // coprime with 16 → consecutive struts never share a cell
+const SWATCH_COUNT = 3 // reed / twine / twig hairline stalks
 
-function ringStrut(thetaDeg: number, side: 'left' | 'right', index: number): SwarmStrut {
+/** DETERMINISTIC RING DETUNE (E3 Wave-2, same finding 8). The ring's laws are
+ *  smooth in θ, which is what makes the vortex read as ONE wheeling sweep — and
+ *  is also what made every stalk look machined to the same pattern. Each strut
+ *  therefore carries a bounded, index-keyed detune (a pure sine of the ring
+ *  index: no RNG anywhere near the engine, so the table stays byte-stable):
+ *    θ  ± 2.8°       uneven plan spacing — kills the picket RHYTHM
+ *    y  0 .. −7%     height wobble on top of the graded crest
+ *    a  0 .. +9°     the stalks stop being parallel (neighbours lean up to 9° apart)
+ *  The two SIGNED-ONE-WAY terms are signed one way for a measured reason, not
+ *  for tidiness. A strut's hinge depth is z0 = z − L·cos(a) with L = y/sin(a), so
+ *  a TALLER or a FLATTER strut plants its foot further upstage, toward the
+ *  backdrop wall. Two-sided jitter (±6% y, ±6° a) pushed the D-G2 near-rest
+ *  ratchet for spread 3 from 8 illegal brushes to 9 (a crown strut and the
+ *  backdrop panel, plus a strut and the right cut-paper cloud, at the landing
+ *  tail β 168–170°). Shortening-only y and straightening-only a move every foot
+ *  DOWNSTAGE instead, and the count lands back on 8 with the variety kept.
+ *  The remaining ceiling is the S4 vortex-coherence gate (curvature-sign flips
+ *  along the projected tip chain): at y −10% the chain reads as a ragged scatter
+ *  rather than one arc (measured 4 flips, gate ≤ 2); at −7% it is 0. */
+const TH_JIT_DEG = 2.8
+const Y_JIT = 0.07
+const A_JIT_DEG = 9
+const detune = (index: number, k: number, phase: number): number => Math.sin(index * k + phase)
+
+function ringStrut(thetaNom: number, side: 'left' | 'right', index: number): SwarmStrut {
   const sideSign = side === 'left' ? -1 : 1
+  const thetaDeg = clamp(thetaNom + TH_JIT_DEG * detune(index, 2.399, 0.7), TH_MIN, TH_MAX)
   const th = rad(thetaDeg)
   const c = 0.5 + 0.5 * Math.cos(th)
   const x = RX * Math.sin(th)
   const z = ZC - RZ * Math.cos(th)
-  const y = Y0 + YA * Math.pow(c, YEXP) + YSKEW * sideSign * Math.sin(th)
-  const aRest = A0 + A1 * c
+  const y =
+    (Y0 + YA * Math.pow(c, YEXP) + YSKEW * sideSign * Math.sin(th)) *
+    (1 - Y_JIT * 0.5 * (1 + detune(index, 1.723, 2.1)))
+  const aRest = A0 + A1 * c + A_JIT_DEG * (0.5 + 0.5 * detune(index, 2.917, 1.3))
   const r = R0 - R1 * c
   const L = y / Math.sin(rad(aRest))
   const z0 = z - L * Math.cos(rad(aRest))
@@ -307,6 +407,7 @@ function ringStrut(thetaDeg: number, side: 'left' | 'right', index: number): Swa
     stir,
     sprite: (index * SPRITE_STRIDE) % SPRITE_COUNT,
     flip: index % 2 === 1,
+    swatch: index % SWATCH_COUNT,
   }
 }
 
@@ -331,10 +432,11 @@ function outriderStrut(
     stir: -1,
     sprite: (index * SPRITE_STRIDE) % SPRITE_COUNT,
     flip: index % 2 === 1,
+    swatch: index % SWATCH_COUNT,
   }
 }
 
-/** The full 28-member swarm: 24 ring struts ordered θ −150° → +150° (left arm
+/** The full 22-member swarm: 18 ring struts ordered θ −150° → +150° (left arm
  *  front→crown, right arm crown→front), then the 4 outrider strays. Matches
  *  the bench table e3s3-swarmarc.mjs row for row. */
 export function buildSwarmStruts(): readonly SwarmStrut[] {
@@ -342,10 +444,10 @@ export function buildSwarmStruts(): readonly SwarmStrut[] {
   const leftArm = [...thetas].reverse().map((t, i) => ringStrut(t, 'left', i))
   const rightArm = thetas.map((t, i) => ringStrut(t, 'right', N_SIDE + i))
   const outriders = [
-    outriderStrut(-0.73, 0.1, 0.42, 56, 0.05, 24),
-    outriderStrut(-0.7, 0.14, 0.16, 58, 0.048, 25),
-    outriderStrut(0.73, 0.09, 0.44, 56, 0.05, 26),
-    outriderStrut(0.71, 0.13, 0.2, 58, 0.048, 27),
+    outriderStrut(-0.73, 0.1, 0.42, 56, 0.05, 2 * N_SIDE),
+    outriderStrut(-0.7, 0.14, 0.16, 58, 0.048, 2 * N_SIDE + 1),
+    outriderStrut(0.73, 0.09, 0.44, 56, 0.05, 2 * N_SIDE + 2),
+    outriderStrut(0.71, 0.13, 0.2, 58, 0.048, 2 * N_SIDE + 3),
   ]
   return [...leftArm, ...rightArm, ...outriders]
 }
