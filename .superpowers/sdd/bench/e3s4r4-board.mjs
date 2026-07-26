@@ -17,7 +17,7 @@
 
 import { createRequire } from 'node:module'
 import { REST, panelQuads, nodeSpans, project, VW, VH, TOWER } from './e3s4r4-tower.mjs'
-import { LINE, CABLE, linePoint } from './e3s4r4-cable.mjs'
+import { LINE, CABLE, RIDER_HOME, RIDER_HALF_U, RIDER_HALF_V, linePoint } from './e3s4r4-cable.mjs'
 import { TERRACE } from './e3s4r4-city.mjs'
 
 const require = createRequire(import.meta.url)
@@ -160,25 +160,30 @@ const run = async () => {
     for (const d of chainDraws(geom)) drawQuad(d.pts, d.uv, tex)
   }
 
-  // the reader's basket, parked where it starts
+  // The reader's trolley, drawn at BOTH ends of its travel so the capture shows
+  // what the hand actually gets: where it starts, and where a full push puts it.
   const basket = await loadTex('ch3-dispatch-line-basket')
-  const s = 0.06
-  const i = Math.min(CABLE.length - 2, Math.floor(s * (CABLE.length - 1)))
-  const f = s * (CABLE.length - 1) - i
-  const u = CABLE[i][0] + (CABLE[i + 1][0] - CABLE[i][0]) * f
-  const v = CABLE[i][1] + (CABLE[i + 1][1] - CABLE[i][1]) * f
-  const hu = 0.055
-  const hv = 0.05
-  drawQuad(
-    [
-      linePoint(LINE, u - hu, v - 2 * hv, REST.thetaL, REST.thetaR),
-      linePoint(LINE, u + hu, v - 2 * hv, REST.thetaL, REST.thetaR),
-      linePoint(LINE, u + hu, v, REST.thetaL, REST.thetaR),
-      linePoint(LINE, u - hu, v, REST.thetaL, REST.thetaR),
-    ].map(project),
-    [[0, 0], [1, 0], [1, 1], [0, 1]],
-    basket
-  )
+  const hu = RIDER_HALF_U
+  const hv = RIDER_HALF_V
+  for (const s of [RIDER_HOME, 1]) {
+    const i = Math.min(CABLE.length - 2, Math.floor(s * (CABLE.length - 1)))
+    const f = s * (CABLE.length - 1) - i
+    const uRaw = CABLE[i][0] + (CABLE[i + 1][0] - CABLE[i][0]) * f
+    const vRaw = CABLE[i][1] + (CABLE[i + 1][1] - CABLE[i][1]) * f
+    // centre-clamped and centred ON the wire, exactly as the solver poses it
+    const u = Math.min(Math.max(uRaw, hu), 1 - hu)
+    const v = Math.min(Math.max(vRaw, hv), 1 - hv)
+    drawQuad(
+      [
+        linePoint(LINE, u - hu, v - hv, REST.thetaL, REST.thetaR),
+        linePoint(LINE, u + hu, v - hv, REST.thetaL, REST.thetaR),
+        linePoint(LINE, u + hu, v + hv, REST.thetaL, REST.thetaR),
+        linePoint(LINE, u - hu, v + hv, REST.thetaL, REST.thetaR),
+      ].map(project),
+      [[0, 0], [1, 0], [1, 1], [0, 1]],
+      basket
+    )
+  }
 
   await sharp(Buffer.from(buf.buffer), { raw: { width: W, height: H, channels: 4 } }).png().toFile(OUT)
   console.log(`wrote ${OUT}`)

@@ -149,12 +149,24 @@ export function dispatchLineBasketQuad(
   thetaL: number,
   thetaR: number
 ): PanelQuad {
-  const [u, v] = dispatchLineCableAt(geom, s)
-  const u0 = clamp(u - geom.basketHalfU, 0, 1)
-  const u1 = clamp(u + geom.basketHalfU, 0, 1)
-  // The basket HANGS: its top edge is the cable, its body below it.
-  const v1 = clamp(v, 0, 1)
-  const v0 = clamp(v - 2 * geom.basketHalfV, 0, 1)
+  const [uRaw, vRaw] = dispatchLineCableAt(geom, s)
+  // Clamp the basket's CENTRE into the sheet, never its corners. Clamping
+  // corners looks harmless and is not: at the outboard end of the wire the
+  // quad's far edge pins to u = 1 while its near edge keeps travelling, so the
+  // basket SQUASHES to half width exactly where the reader has just pushed it —
+  // measured at 7.2 px across, against 14.8 anywhere else. A handle that shrinks
+  // as you use it is worse than a small one.
+  const u = clamp(uRaw, geom.basketHalfU, 1 - geom.basketHalfU)
+  const u0 = u - geom.basketHalfU
+  const u1 = u + geom.basketHalfU
+  // The trolley is CENTRED on the cable, not hung beneath it: the pulley wheel
+  // and its hanger ride above the wire, the pannier below. That is what a cable
+  // trolley is, and it is also the only way the handle fits — a quad hung
+  // entirely below the wire dips 0.244 at the outboard end, under the roosts'
+  // 0.287 crest, and a handle behind a roof is not a handle (gate L17).
+  const v = clamp(vRaw, geom.basketHalfV, 1 - geom.basketHalfV)
+  const v0 = v - geom.basketHalfV
+  const v1 = v + geom.basketHalfV
   const at = (uu: number, vv: number): Vec3 => dispatchLinePoint(geom, uu, vv, thetaL, thetaR)
   return [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)]
 }

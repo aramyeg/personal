@@ -585,8 +585,15 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     ],
     baskets: [0.2, 0.47, 0.72],
     riderHome: 0.06,
-    basketHalfU: 0.055,
-    basketHalfV: 0.05,
+    // THE HANDLE, SIZED BY MEASUREMENT (blind-review finding: mechanism handles
+    // across the book are undiscoverable at 1:1). The reader's trolley used to
+    // project 15 x 25 px at the pinned camera — a speck — and worse, it SQUASHED
+    // to 7 px wide at the outboard end because the quad's corners were clamped
+    // into the sheet while its centre kept travelling. It is now 29 x 43 px at
+    // every station (gates L15/L16), centred ON the wire like a real trolley so
+    // its pannier still clears the roosts' 0.287 crest (L17).
+    basketHalfU: 0.11,
+    basketHalfV: 0.09,
   },
   // THE TERRACED ROOSTS — the right page's answer to a colossus, and the piece
   // that kills the mirror by being its OPPOSITE. Where the tower is one tall

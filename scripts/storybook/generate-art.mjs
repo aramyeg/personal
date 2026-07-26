@@ -5724,62 +5724,107 @@ function dispatchCablePanel({ w, h, seed, cable, baskets }) {
  *  reader pushes down the wire. The quad hangs it BELOW the cable, so the yoke
  *  and its hook sit at the very top of the image and the pannier fills the rest;
  *  the sprite is drawn to the cell because the cell is all the paper it gets. */
+/**
+ * THE READER'S TROLLEY (ch3-dispatch-line-basket) — the one thing on this
+ * spread the reader's hand operates, so it is drawn to be FOUND and to be
+ * GRABBED, which are two different jobs.
+ *
+ * FOUND: it carries the brightest lantern on the wire, with a bloom behind it.
+ * On a black page at 1600x900 the eye lands on warm light before it lands on
+ * shape, and the three static lanterns are deliberately dimmer and smaller.
+ *
+ * GRABBED: a brass PULL-RING hangs under the pannier. A ring on a cord is the
+ * oldest "pull me" in the world, it is diegetic on a dispatch line (that is how
+ * you haul a trolley in), and it is on-palette — the same brass the lanterns and
+ * the winch crank are made of, not a grey UI affordance pasted onto a painting.
+ *
+ * CENTRED ON THE WIRE, not hung below it: the quad's middle is the cable, so the
+ * grooved pulley WHEEL sits at the image's centre with the pannier below and the
+ * hanger above. That is what a cable trolley is, and it is also the only way the
+ * handle fits — hung wholly below the wire the same quad dips under the roosts'
+ * crest at the outboard end (popup-dispatchline.ts, gate L17). The panel's own
+ * painted cable passes through the wheel's centre from both sides, so the wheel
+ * reads as clipped over it at every point of the run regardless of the wire's
+ * local slope.
+ */
 function readerBasket(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
+  const cy = h * 0.5 // the cable runs through here: the quad is centred on it
   const parts = []
-  // the hook over the wire, at the image's top edge
+
+  // ---- the pulley WHEEL, sitting on the wire -------------------------------
+  const wheelR = w * 0.13
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 1.18)}" fill="${DUSK.ink}" opacity="0.85"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR)}" fill="${DUSK.amber}"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 0.66)}" fill="${DUSK.amberDeep}"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 0.22)}" fill="${DUSK.amberCore}"/>`)
+  // a specular catch on the upper-left of the rim: brass, lit from the keep side
   parts.push(
-    `<path d="M ${fx(cx - w * 0.11)} ${fx(h * 0.09)} A ${fx(w * 0.11)} ${fx(h * 0.075)} 0 1 1 ${fx(cx + w * 0.11)} ${fx(h * 0.11)}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.035)}" stroke-linecap="round"/>`
+    `<path d="M ${fx(cx - wheelR * 0.86)} ${fx(cy - wheelR * 0.36)} A ${fx(wheelR)} ${fx(wheelR)} 0 0 1 ${fx(cx - wheelR * 0.2)} ${fx(cy - wheelR * 0.94)}" fill="none" stroke="${DUSK.amberCore}" stroke-width="${fx(w * 0.018)}" opacity="0.85" stroke-linecap="round"/>`
+  )
+  // the stirrup: a brass yoke over the axle, its arms running down to the pannier
+  parts.push(
+    `<path d="M ${fx(cx - wheelR * 1.05)} ${fx(cy - wheelR * 0.5)} L ${fx(cx - wheelR * 1.05)} ${fx(h * 0.635)} M ${fx(cx + wheelR * 1.05)} ${fx(cy - wheelR * 0.5)} L ${fx(cx + wheelR * 1.05)} ${fx(h * 0.635)}" fill="none" stroke="${DUSK.amber}" stroke-width="${fx(w * 0.028)}" stroke-linecap="round"/>`
   )
   parts.push(
-    `<path d="M ${fx(cx - w * 0.11)} ${fx(h * 0.085)} A ${fx(w * 0.11)} ${fx(h * 0.075)} 0 1 1 ${fx(cx + w * 0.11)} ${fx(h * 0.105)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(w * 0.012)}" opacity="0.7" stroke-linecap="round"/>`
+    `<path d="M ${fx(cx - wheelR * 1.05)} ${fx(cy - wheelR * 0.72)} A ${fx(wheelR * 1.05)} ${fx(wheelR * 0.8)} 0 0 1 ${fx(cx + wheelR * 1.05)} ${fx(cy - wheelR * 0.72)}" fill="none" stroke="${DUSK.amber}" stroke-width="${fx(w * 0.026)}"/>`
   )
-  // the yoke bar and its two hanger cords
-  parts.push(`<rect x="${fx(w * 0.2)}" y="${fx(h * 0.14)}" width="${fx(w * 0.6)}" height="${fx(h * 0.045)}" fill="${DUSK.slateDim}"/>`)
-  parts.push(`<rect x="${fx(w * 0.2)}" y="${fx(h * 0.14)}" width="${fx(w * 0.6)}" height="${fx(h * 0.014)}" fill="${DUSK.parch}" opacity="0.7"/>`)
-  parts.push(
-    `<path d="M ${fx(w * 0.24)} ${fx(h * 0.185)} L ${fx(w * 0.19)} ${fx(h * 0.42)} M ${fx(w * 0.76)} ${fx(h * 0.185)} L ${fx(w * 0.81)} ${fx(h * 0.42)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.024)}"/>`
-  )
-  // the WICKER pannier. Warm brown, not slate: it is the only basketwork in the
-  // chapter and it has to read as a different material from every wall behind it
-  const by = h * 0.42
-  const bb = h * 0.94
-  const body = `M ${fx(w * 0.15)} ${fx(by)} L ${fx(w * 0.85)} ${fx(by)} L ${fx(w * 0.72)} ${fx(bb)} L ${fx(w * 0.28)} ${fx(bb)} Z`
+
+  // ---- the yoke bar and the WICKER pannier, below the wire -----------------
+  const yb = h * 0.635
+  parts.push(`<rect x="${fx(w * 0.22)}" y="${fx(yb)}" width="${fx(w * 0.56)}" height="${fx(h * 0.038)}" fill="${DUSK.slateDim}"/>`)
+  parts.push(`<rect x="${fx(w * 0.22)}" y="${fx(yb)}" width="${fx(w * 0.56)}" height="${fx(h * 0.012)}" fill="${DUSK.parch}" opacity="0.7"/>`)
+
+  const by = h * 0.685
+  const bb = h * 0.86
+  const body = `M ${fx(w * 0.19)} ${fx(by)} L ${fx(w * 0.81)} ${fx(by)} L ${fx(w * 0.7)} ${fx(bb)} L ${fx(w * 0.3)} ${fx(bb)} Z`
   parts.push(`<path d="${body}" fill="#5a3b1e"/>`)
   // the lit half follows the pannier's own taper — a vertical seam down a
   // tapering basket reads as a fold in the paper, not as light on wicker
-  parts.push(`<path d="M ${fx(w * 0.15)} ${fx(by)} L ${fx(w * 0.52)} ${fx(by)} L ${fx(w * 0.43)} ${fx(bb)} L ${fx(w * 0.28)} ${fx(bb)} Z" fill="#7a5228" opacity="0.75"/>`)
-  parts.push(`<rect x="${fx(w * 0.13)}" y="${fx(by - h * 0.04)}" width="${fx(w * 0.74)}" height="${fx(h * 0.05)}" fill="#8a5f2f"/>`)
-  parts.push(`<rect x="${fx(w * 0.13)}" y="${fx(by - h * 0.04)}" width="${fx(w * 0.74)}" height="${fx(h * 0.016)}" fill="${DUSK.parch}" opacity="0.8"/>`)
-  for (let i = 1; i <= 4; i++) {
-    const t = i / 5
+  parts.push(`<path d="M ${fx(w * 0.19)} ${fx(by)} L ${fx(w * 0.5)} ${fx(by)} L ${fx(w * 0.44)} ${fx(bb)} L ${fx(w * 0.3)} ${fx(bb)} Z" fill="#7a5228" opacity="0.75"/>`)
+  parts.push(`<rect x="${fx(w * 0.17)}" y="${fx(by - h * 0.032)}" width="${fx(w * 0.66)}" height="${fx(h * 0.04)}" fill="#8a5f2f"/>`)
+  parts.push(`<rect x="${fx(w * 0.17)}" y="${fx(by - h * 0.032)}" width="${fx(w * 0.66)}" height="${fx(h * 0.013)}" fill="${DUSK.parch}" opacity="0.8"/>`)
+  for (let i = 1; i <= 3; i++) {
+    const t = i / 4
     const y = lerp(by, bb, t)
-    const half = lerp(w * 0.35, w * 0.22, t)
-    parts.push(`<path d="M ${fx(cx - half)} ${fx(y)} L ${fx(cx + half)} ${fx(y)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.014)}" opacity="0.6"/>`)
-    parts.push(`<path d="M ${fx(cx - half)} ${fx(y - h * 0.012)} L ${fx(cx + half)} ${fx(y - h * 0.012)}" stroke="#a87a3d" stroke-width="${fx(w * 0.008)}" opacity="0.5"/>`)
+    const half = lerp(w * 0.31, w * 0.2, t)
+    parts.push(`<path d="M ${fx(cx - half)} ${fx(y)} L ${fx(cx + half)} ${fx(y)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.012)}" opacity="0.6"/>`)
+    parts.push(`<path d="M ${fx(cx - half)} ${fx(y - h * 0.01)} L ${fx(cx + half)} ${fx(y - h * 0.01)}" stroke="#a87a3d" stroke-width="${fx(w * 0.007)}" opacity="0.5"/>`)
   }
-  for (let i = 0; i < 7; i++) {
-    const x = lerp(w * 0.19, w * 0.81, i / 6) + (r() * 2 - 1) * w * 0.01
-    parts.push(`<path d="M ${fx(x)} ${fx(by)} L ${fx(lerp(x, cx, 0.22))} ${fx(bb)}" stroke="#3a2410" stroke-width="${fx(w * 0.01)}" opacity="0.6"/>`)
+  for (let i = 0; i < 6; i++) {
+    const x = lerp(w * 0.23, w * 0.77, i / 5) + (r() * 2 - 1) * w * 0.008
+    parts.push(`<path d="M ${fx(x)} ${fx(by)} L ${fx(lerp(x, cx, 0.2))} ${fx(bb)}" stroke="#3a2410" stroke-width="${fx(w * 0.009)}" opacity="0.6"/>`)
   }
-  parts.push(rookRim(body, 2.6))
+  parts.push(rookRim(body, 2.4))
+
   // two envelopes poking out of the mouth, cream against the night
-  for (const [ex, tilt] of [[0.34, -0.22], [0.55, 0.16]]) {
+  for (const [ex, tilt] of [[0.36, -0.22], [0.55, 0.16]]) {
     const x = w * ex
-    const ew = w * 0.2
-    const eh = h * 0.14
+    const ew = w * 0.17
+    const eh = h * 0.1
     const c = Math.cos(tilt)
     const sn = Math.sin(tilt)
     const P = (dx, dy) => `${fx(x + dx * c - dy * sn)} ${fx(by + dx * sn + dy * c)}`
     parts.push(`<path d="M ${P(0, 0)} L ${P(ew, -eh * 0.3)} L ${P(ew, -eh)} L ${P(0, -eh * 0.7)} Z" fill="${DUSK.parch}"/>`)
-    parts.push(`<path d="M ${P(0, -eh * 0.7)} L ${P(ew * 0.5, -eh * 0.72)} L ${P(ew, -eh)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(w * 0.01)}"/>`)
+    parts.push(`<path d="M ${P(0, -eh * 0.7)} L ${P(ew * 0.5, -eh * 0.72)} L ${P(ew, -eh)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(w * 0.009)}"/>`)
   }
-  // the lantern slung off the yoke — the basket has to be findable on a black
-  // page from across the spread, and this is the thing that finds it
-  parts.push(`<path d="M ${fx(w * 0.82)} ${fx(h * 0.18)} L ${fx(w * 0.86)} ${fx(h * 0.36)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.016)}"/>`)
-  parts.push(warmBloom(w * 0.86, h * 0.47, w * 0.2))
-  parts.push(lampHead(w * 0.86, h * 0.36, h * 0.58, w * 0.17, 0))
+
+  // ---- the BRASS PULL-RING: the thing that says "take hold of me" ----------
+  parts.push(`<path d="M ${fx(cx)} ${fx(bb)} L ${fx(cx)} ${fx(h * 0.878)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.02)}"/>`)
+  const ringY = h * 0.918
+  const ringR = w * 0.055
+  parts.push(warmBloom(cx, ringY, ringR * 2.1))
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(ringY)}" r="${fx(ringR + w * 0.018)}" fill="${DUSK.ink}" opacity="0.8"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(ringY)}" r="${fx(ringR)}" fill="none" stroke="${DUSK.amberLit}" stroke-width="${fx(w * 0.026)}"/>`)
+  parts.push(
+    `<path d="M ${fx(cx - ringR * 0.72)} ${fx(ringY - ringR * 0.5)} A ${fx(ringR)} ${fx(ringR)} 0 0 1 ${fx(cx + ringR * 0.1)} ${fx(ringY - ringR)}" fill="none" stroke="${DUSK.amberCore}" stroke-width="${fx(w * 0.014)}" stroke-linecap="round"/>`
+  )
+
+  // ---- the lantern: the trolley has to be findable from across the spread ---
+  parts.push(`<path d="M ${fx(w * 0.79)} ${fx(yb + h * 0.01)} L ${fx(w * 0.85)} ${fx(h * 0.68)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.015)}"/>`)
+  parts.push(warmBloom(w * 0.85, h * 0.755, w * 0.21))
+  parts.push(lampHead(w * 0.85, h * 0.68, h * 0.84, w * 0.145, 0))
 
   return svgPiece(w, h, parts.join(''), cityLampDefs())
 }

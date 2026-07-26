@@ -122,6 +122,10 @@ export const CABLE = [
 /** Fixed basket lanterns (die-cut, painted) and the reader's own basket start. */
 export const BASKETS = [0.2, 0.47, 0.72]
 export const RIDER_HOME = 0.06
+/** The reader's grab quad, in panel (u, v) half-extents. Sized by gate L15, not
+ *  by taste: a handle has to be findable and hittable at 1600x900 with no zoom. */
+export const RIDER_HALF_U = 0.11
+export const RIDER_HALF_V = 0.09
 
 /** Panel-(u, v) -> world on the shipped line, using the chain's own trapezoid
  *  map. v is measured over the WHOLE chain length, so a rider crosses the
@@ -284,6 +288,60 @@ if (IS_ENTRY) {
   }
   gate('L14 the reader stroke sends the basket a real distance', travelPx >= 150,
     `${travelPx.toFixed(0)} px of screen arc at the pinned camera (frame is 1600 wide)`)
+
+  // --- THE HAND HAS TO BE FINDABLE (blind-review finding, book-wide) ---------
+  // The sweep across the book reported that mechanism handles are undiscoverable
+  // at 1:1 — placeholder-grey tabs and 10px text. Measured here rather than
+  // eyeballed: the rider's grab quad, projected at the pinned camera, at every
+  // station it can be parked at. 28 px is the smaller dimension a thumb-sized
+  // target needs before it stops reading as a speck; 40 px is what makes it the
+  // obvious thing on the wire to reach for.
+  const riderQuadPx = (sAt) => {
+    const [uRaw, vRaw] = at(sAt)
+    const u = Math.min(Math.max(uRaw, RIDER_HALF_U), 1 - RIDER_HALF_U)
+    const v = Math.min(Math.max(vRaw, RIDER_HALF_V), 1 - RIDER_HALF_V)
+    const P = (a, b) => project(linePoint(LINE, a, b, REST.thetaL, REST.thetaR))
+    const bl = P(u - RIDER_HALF_U, v - RIDER_HALF_V)
+    const br = P(u + RIDER_HALF_U, v - RIDER_HALF_V)
+    const tl = P(u - RIDER_HALF_U, v + RIDER_HALF_V)
+    return { w: Math.hypot(br.x - bl.x, br.y - bl.y), h: Math.hypot(tl.x - bl.x, tl.y - bl.y) }
+  }
+  let minSide = Infinity
+  let minLong = Infinity
+  for (let t = RIDER_HOME; t <= 1.0001; t += 0.02) {
+    const q = riderQuadPx(Math.min(1, t))
+    minSide = Math.min(minSide, Math.min(q.w, q.h))
+    minLong = Math.min(minLong, Math.max(q.w, q.h))
+  }
+  gate('L15 the reader handle reads at 1600x900 with no zoom', minSide >= 28 && minLong >= 40,
+    `worst grab quad over the whole wire: ${minSide.toFixed(0)} x ${minLong.toFixed(0)} px`)
+
+  // L16 — and it must not SQUASH. Clamping the quad's corners into the sheet
+  // pins its far edge while the near edge keeps travelling, so the handle
+  // shrinks to half width exactly at the end of the reader's push (measured 7.2
+  // px against 14.8 everywhere else). The solver clamps the CENTRE instead;
+  // this is the measurement that holds it to that.
+  const w0 = riderQuadPx(RIDER_HOME).w
+  let widthSpread = 0
+  for (let t = RIDER_HOME; t <= 1.0001; t += 0.02) {
+    widthSpread = Math.max(widthSpread, Math.abs(riderQuadPx(Math.min(1, t)).w - w0))
+  }
+  gate('L16 the handle keeps its size all the way to the end of the wire', widthSpread <= 2.5,
+    `width varies by ${widthSpread.toFixed(1)} px across the travel`)
+
+  // L17 — a handle hidden behind a roof is not a handle. The trolley is centred
+  // on the wire (wheel above, pannier below), so its bottom edge is what has to
+  // clear the roost crest — and centring it is precisely what buys the room:
+  // hung entirely below the wire the same quad measured 0.244, under the crest.
+  let lowest = Infinity
+  for (let t = RIDER_HOME; t <= 1.0001; t += 0.02) {
+    const [uRaw, vRaw] = at(Math.min(1, t))
+    const u = Math.min(Math.max(uRaw, RIDER_HALF_U), 1 - RIDER_HALF_U)
+    const v = Math.min(Math.max(vRaw, RIDER_HALF_V), 1 - RIDER_HALF_V)
+    lowest = Math.min(lowest, linePoint(LINE, u, v - RIDER_HALF_V, REST.thetaL, REST.thetaR)[1])
+  }
+  gate('L17 the handle never sinks behind the roosts', lowest >= 0.287,
+    `lowest point of the grab quad ${lowest.toFixed(3)} vs roost crest 0.287`)
 
   console.log(`\n  the rejected gutter v-fold, for the record: donor rake ${crestRake(V_DONOR).rake.toFixed(3)} in z (run \`vfold\` mode)`)
   console.log(`\n${failures === 0 ? 'ALL GATES GREEN' : failures + ' GATE(S) FAILED'}`)
