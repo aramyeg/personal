@@ -347,8 +347,8 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   rotor: 2.0,
   // KEEP-WINCH (E1 showpiece): one crank driving three staggered outputs. Its
   // per-corner MEAN is low — the iris blades and counterweight barely travel —
-  // while the TALL semaphore arm (baseX 0.9, armLen 0.16, tip ~1.06 from the
-  // spine) swings through the envelope's late-rise, so the max/mean ratio runs
+  // while the TALL signal arm (Wave-2: baseX 1.05, armLen 0.1287, tip ~1.18 from
+  // the spine) swings through the envelope's late-rise, so the max/mean ratio runs
   // high (measured 8.86x, ch3-keep-winch) the same way the kinetic arm's static
   // apex raises its ratio. Smooth, monotone, C1 — the bench (derive-keep-winch
   // N2) proves every output cam has bounded slope (no snap); its real bound is

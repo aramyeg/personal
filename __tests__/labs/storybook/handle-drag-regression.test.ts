@@ -95,7 +95,17 @@ import {
   VOLVELLE_LIFT,
   type VolvelleGeom,
 } from '@/components/labs/storybook/book/popup-volvelle'
+import {
+  dispatchLineBasketQuad,
+  dispatchLineRiderS,
+  type DispatchLineGeom,
+} from '@/components/labs/storybook/book/popup-dispatchline'
 import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
+import {
+  HANDLE_MIN_HIT,
+  HANDLE_SLOP_STANDING,
+  handleSlopFactor,
+} from '@/components/labs/storybook/book/handle-hit'
 import {
   SPREAD_COUNT,
   popupContentForSpread,
@@ -318,6 +328,48 @@ function keepsakeCase(id: string): HandleCase {
   }
 }
 
+/**
+ * THE DISPATCH LINE's cable trolley — the one handle a blind reader called "the
+ * one thing on the page that behaves like a paper toy", which makes it the one
+ * this gate can least afford to leave uncovered.
+ *
+ * It is a CLASS A page-plane slide like the pull tabs, even though the piece it
+ * rides stands off the page: the rider translates in the standing sheet, but the
+ * sheet is rooted on the page, so the layer reads the drag off the carrying
+ * page's plane through `projectPageD` on its own side.
+ *
+ * REST is drive 0, which is NOT s = 0: drive is the send stroke and the rider's
+ * arc parameter is `dispatchLineRiderS(geom, drive)`, so at rest the trolley sits
+ * at `riderHome` (0.06 as shipped) — `vertsAt` maps through the same function the
+ * layer does so the gate cannot pass on an off-by-a-home error.
+ */
+function dispatchLineCase(id: string): HandleCase {
+  const { layer, spreadIndex } = locate(id)
+  const geom = layer as SceneLayer & DispatchLineGeom
+  const { thetaL, thetaR } = restAngles(spreadIndex)
+  const t = geom.side === 'left' ? thetaL : thetaR
+  // The layer's own stroke, verbatim: a drag of the panel's WIDTH across the
+  // sheet is a full send, which is what makes the gesture feel like the wire's
+  // length. The floor guards a degenerate geom against a division blow-up.
+  const stroke = Math.max(0.05, geom.w)
+  const riderQuad = (drive: number): PanelQuad =>
+    dispatchLineBasketQuad(geom, dispatchLineRiderS(geom, drive), thetaL, thetaR)
+  return {
+    name: id,
+    // The reader grabs the trolley itself — there is no tab, the basket IS the
+    // handle — so the aim point is its own centre at rest.
+    grabPoint: centroid(riderQuad(0)),
+    project: (ray) => projectPageD(ray, t),
+    driveFrom: (g, n) => clamp(0 + (n - g) / stroke, 0, 1),
+    restDrive: 0,
+    // Deliberately the RIDER quad alone, not the panel: the panel is scenery and
+    // is posed by the page angles, so including it would let a dead drive channel
+    // pass on the sheet's own motion. What must travel is the thing the reader
+    // has hold of.
+    vertsAt: (drive) => flatten([riderQuad(drive)]),
+  }
+}
+
 const HUB_DEADZONE = 0.18
 
 function keepWinchCase(id: string): HandleCase {
@@ -453,8 +505,7 @@ const CASES: HandleCase[] = [
   ...liftFlapCases('ch6-coffer'),
   stripFlapCase('ch1-rank'),
   // (ch3-ring-tower retired in ROUND-4 — the raven city's terraced roosts
-  // replaced the gatehouse; its dispatchline family needs its own case, see
-  // the Wave-2 s4 lane.)
+  // replaced the gatehouse. Its dispatchline family is covered below.)
   stripFlapCase('ch5-throng'),
   stripFlapCase('ch5-tea'),
   stripFlapCase('ch6-clerk'),
@@ -465,6 +516,7 @@ const CASES: HandleCase[] = [
   keepsakeCase('end-keepsake'),
   keepWinchCase('ch3-keep-winch'),
   volvelleCase('ch3-dispatch'),
+  dispatchLineCase('ch3-dispatch-line'),
   knobTowerCase(),
 ]
 
@@ -485,6 +537,7 @@ describe('handle drag regression — every grabbable must move paper', () => {
       'keepsake',
       'keepwinch',
       'volvelle',
+      'dispatchline',
       'knobtower',
     ]) {
       expect(families.has(family), `family ${family} is not covered`).toBe(true)
@@ -543,5 +596,79 @@ describe('volvelle — a detent step must change what the windows frame', () => 
     for (let k = 0; k < geom.sectors; k++) seen.add(volvelleSectorSeen(geom, geom.windows[0], k * step))
     // If a drag cannot bring a new sector into view, no art could rescue it.
     expect(seen.size).toBe(geom.sectors)
+  })
+})
+
+/**
+ * THE TROLLEY MUST STAY FINDABLE ALONG ITS WHOLE TRAVEL.
+ *
+ * The blind reader who called the dispatch line "the one thing on the page that
+ * behaves like a paper toy" reported the defect that nearly cost it: "the grab
+ * box is ~26x40 px" — a handle it had to hunt for. `handle-hit.ts` answers that
+ * with HANDLE_MIN_HIT, an absolute world-unit floor (~45 screen px at the pinned
+ * reading camera) that `handleSlopFactor` grows a pad until the piece's SHORTEST
+ * edge clears.
+ *
+ * This gate holds the trolley to that floor at STATIONS ALONG ITS TRAVEL, not
+ * just at home, because the reader's other finding was that after one trip the
+ * handle is somewhere else — a floor that only held at rest would be no floor at
+ * all. Everything below is derived from the shipped geom and the shipped
+ * constants: no pixel number appears in an assertion.
+ */
+describe('dispatch line — the trolley clears the book hit floor along the wire', () => {
+  /** The layer's own slop pad, scaled about the quad's centroid. Same helper
+   *  popup-dispatchline-layer.tsx writes into its slop geometry each frame. */
+  const enlargeQuad = (quad: PanelQuad, kf: number): Vec3[] => {
+    const c = centroid(quad)
+    return quad.map((p) => [
+      c.x + (p[0] - c.x) * kf,
+      c.y + (p[1] - c.y) * kf,
+      c.z + (p[2] - c.z) * kf,
+    ] as Vec3)
+  }
+
+  const shortestEdge = (quad: readonly Vec3[]): number => {
+    let shortest = Infinity
+    for (let i = 0; i < 4; i++) {
+      const a = quad[i]
+      const b = quad[(i + 1) % 4]
+      shortest = Math.min(shortest, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]))
+    }
+    return shortest
+  }
+
+  const STATIONS = [0, 0.25, 0.5, 0.75, 1] as const
+
+  it('ch3-dispatch-line: the padded grab surface clears HANDLE_MIN_HIT at every station', () => {
+    const { layer, spreadIndex } = locate('ch3-dispatch-line')
+    const geom = layer as SceneLayer & DispatchLineGeom
+    const { thetaL, thetaR } = restAngles(spreadIndex)
+    for (const drive of STATIONS) {
+      const quad = dispatchLineBasketQuad(geom, dispatchLineRiderS(geom, drive), thetaL, thetaR)
+      // HANDLE_SLOP_STANDING is the base the layer picks: the rider is in-plane
+      // on a sheet that STANDS off the page, so it presents its face to the
+      // camera rather than foreshortening to a sliver.
+      const padded = enlargeQuad(quad, handleSlopFactor(quad, HANDLE_SLOP_STANDING))
+      // The floor binds exactly (the factor is HANDLE_MIN_HIT / shortest), so the
+      // comparison carries a float epsilon rather than a safety margin.
+      expect(
+        shortestEdge(padded),
+        `trolley at drive ${drive}: die-cut short edge ${shortestEdge(quad).toFixed(4)} padded to ` +
+          `${shortestEdge(padded).toFixed(4)}, under the book's ${HANDLE_MIN_HIT} floor`
+      ).toBeGreaterThanOrEqual(HANDLE_MIN_HIT - 1e-9)
+    }
+  })
+
+  it('ch3-dispatch-line: the pad grows the die-cut rather than replacing it', () => {
+    // A pad that shrank a handle, or one applied to a quad that had already
+    // cleared the floor, would both be bugs — the law is "at least `base`, and
+    // enough to reach the floor" (handle-hit.ts).
+    const { layer, spreadIndex } = locate('ch3-dispatch-line')
+    const geom = layer as SceneLayer & DispatchLineGeom
+    const { thetaL, thetaR } = restAngles(spreadIndex)
+    const quad = dispatchLineBasketQuad(geom, dispatchLineRiderS(geom, 0), thetaL, thetaR)
+    const kf = handleSlopFactor(quad, HANDLE_SLOP_STANDING)
+    expect(kf).toBeGreaterThanOrEqual(HANDLE_SLOP_STANDING)
+    expect(shortestEdge(enlargeQuad(quad, kf))).toBeGreaterThan(shortestEdge(quad))
   })
 })
