@@ -10577,8 +10577,9 @@ const ATLASES = [
     // for. The keep's own faces stay on keep-atlas-s4 — that page belongs to a
     // MERGED single-material mesh and must carry every keep id or nothing.
     regions: [
-      { id: 'ch3-skyline-l-mound0', w: 400, opaque: false },
-      { id: 'ch3-ring-tower', h: 360, opaque: false },
+      // (ch3-skyline-l-mound0 + ch3-ring-tower regions removed — both pieces
+      // retired with the cliffs when the raven city took spread 4; no renderer
+      // addresses them, and the INFRA-2 guard rightly refuses dead freight.)
       { id: 'ch3-fringe', w: 620, opaque: false },
       { id: 'ch3-keep-winch-disc', w: 300, opaque: false },
       { id: 'ch3-keep-winch-semaphore', h: 420, opaque: false },
