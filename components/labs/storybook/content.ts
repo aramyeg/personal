@@ -562,21 +562,26 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // Upstage of everything (zc -0.28) so the baskets fly BEHIND the roosts.
   {
     id: 'ch3-dispatch-line', kind: 'backdrop', role: 'scenery', mech: 'dispatchline',
-    side: 'right', F: 0.415, w: 0.315, zc: -0.28, rootDeg: 82, safe: 0.95, camRestDeg: 173,
+    side: 'right', F: 0.415, w: 0.315, zc: -0.125, rootDeg: 82, safe: 0.95, camRestDeg: 173,
     style: 'ribbon',
     stages: [
-      { h: 0.27, relDeg: 0, rTop: 0.415, wTop: 0.315 },
+      { h: 0.36, relDeg: 0, rTop: 0.415, wTop: 0.315 },
       // The upper storey kicks 9deg downstage so the sheet's top edge leans out
       // and the die-cut cable reads as hanging in the air, not pasted on a wall.
-      { h: 0.2, relDeg: 9, rTop: 0.415, wTop: 0.315 },
+      { h: 0.265, relDeg: 9, rTop: 0.415, wTop: 0.315 },
     ],
     // The cable in panel (u, v): enters high at the gutter side, where the eye
     // has just followed it off the keep's crown, and sags away outboard to the
     // roosts. Monotone in u and falling in v — the scene's one-diagonal law,
     // gated as L9/D4.
+    // The first board capture failed HERE, and it is worth naming: the roosts
+    // stood downstage of the line and their crest sat above it, so 79% of the
+    // cable hid behind roofs and the spread's signature read as a stub. The
+    // line is taller now and the sag shallower, so the cable clears the
+    // roofline along its whole run and only meets it at the landing.
     cable: [
-      [0.0, 0.98], [0.12, 0.905], [0.25, 0.825], [0.38, 0.745], [0.5, 0.665],
-      [0.62, 0.585], [0.74, 0.505], [0.86, 0.42], [1.0, 0.32],
+      [0.0, 0.965], [0.12, 0.894], [0.25, 0.822], [0.38, 0.752], [0.5, 0.692],
+      [0.62, 0.635], [0.74, 0.584], [0.86, 0.535], [1.0, 0.48],
     ],
     baskets: [0.2, 0.47, 0.72],
     riderHome: 0.06,
@@ -588,21 +593,23 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // crooked stack, the roosts are a low, wide, five-storey sprawl, each storey
   // kicked back 7-12deg from the one below so the sheet reads as roof after
   // roof stepping away from the reader. Same family, opposite grammar; apex
-  // 0.431 against the tower's 1.017.
+  // 0.287 against the tower's 1.017.
   //
   // zc 0.19 is a three-way tape measure: the closed ribbon must clear the
-  // dispatch line's ribbon behind it (front edge -0.28) AND stay 0.02 clear of
-  // the dispatch dial's riveted card at z 0.21.
+  // dispatch line's ribbon behind it (front edge -0.125) AND stay 0.02 clear of
+  // the dispatch dial's riveted card at z 0.21 — which is what caps the roosts
+  // at 0.30 of chain. They are SHORT on purpose as well as by necessity: the
+  // cable has to fly over them, and a taller sprawl would swallow it.
   {
     id: 'ch3-terrace', kind: 'backdrop', role: 'scenery', mech: 'stagedchain',
     side: 'right', F: 0.42, w: 0.31, zc: 0.19, rootDeg: 62, safe: 0.95, camRestDeg: 173,
     style: 'ribbon',
     stages: [
-      { h: 0.116, relDeg: 0, rTop: 0.425, wTop: 0.3 },
-      { h: 0.098, relDeg: 12, rTop: 0.44, wTop: 0.285 },
-      { h: 0.09, relDeg: 10, rTop: 0.45, wTop: 0.265 },
-      { h: 0.077, relDeg: 9, rTop: 0.47, wTop: 0.24 },
-      { h: 0.069, relDeg: 7, rTop: 0.485, wTop: 0.215 },
+      { h: 0.0773, relDeg: 0, rTop: 0.425, wTop: 0.3 },
+      { h: 0.0653, relDeg: 12, rTop: 0.44, wTop: 0.285 },
+      { h: 0.06, relDeg: 10, rTop: 0.45, wTop: 0.265 },
+      { h: 0.0514, relDeg: 9, rTop: 0.47, wTop: 0.24 },
+      { h: 0.046, relDeg: 7, rTop: 0.485, wTop: 0.215 },
     ],
   },
   // THE TOWER-HOIST WINCH (derive-keep-winch.mjs) — the E-G6 composed-machine

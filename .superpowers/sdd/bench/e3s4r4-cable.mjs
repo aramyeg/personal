@@ -98,13 +98,13 @@ export const LINE = {
   side: 'right',
   F: 0.415,
   w: 0.315,
-  zc: -0.28,
+  zc: -0.125,
   rootDeg: 82,
   safe: 0.95,
   camRestDeg: 173,
   stages: [
-    { h: 0.27, relDeg: 0, rTop: 0.415, wTop: 0.315 },
-    { h: 0.2, relDeg: 9, rTop: 0.415, wTop: 0.315 },
+    { h: 0.36, relDeg: 0, rTop: 0.415, wTop: 0.315 },
+    { h: 0.265, relDeg: 9, rTop: 0.415, wTop: 0.315 },
   ],
 }
 
@@ -116,8 +116,8 @@ export const LINE = {
  * this polyline (plus the masts and basket lanterns) is cut away.
  */
 export const CABLE = [
-  [0.0, 0.98], [0.12, 0.905], [0.25, 0.825], [0.38, 0.745], [0.5, 0.665],
-  [0.62, 0.585], [0.74, 0.505], [0.86, 0.42], [1.0, 0.32],
+  [0.0, 0.965], [0.12, 0.894], [0.25, 0.822], [0.38, 0.752], [0.5, 0.692],
+  [0.62, 0.635], [0.74, 0.584], [0.86, 0.535], [1.0, 0.48],
 ]
 /** Fixed basket lanterns (die-cut, painted) and the reader's own basket start. */
 export const BASKETS = [0.2, 0.47, 0.72]
@@ -206,8 +206,8 @@ if (IS_ENTRY) {
     `${m.worst.toFixed(5)} (${m.worstPath}) margin ${((1 - m.worst / GLOBAL_CAP) * 100).toFixed(1)}%`)
   gate('L4 clears the keep radially (gutter belongs to the keep)', m.rnear >= 0.415 - 1e-9,
     `rnear ${m.rnear.toFixed(3)} vs keep radial 0.40 (+0.015 margin)`)
-  gate('L5 closed footprint on the page, clear of the terraces at z -0.26',
-    m.footZ[0] >= -PAGE_H / 2 - 1e-9 && m.footZ[1] <= -0.26 - 0.015 + 1e-9,
+  gate('L5 closed footprint on the page, clear of the terraces at z -0.11',
+    m.footZ[0] >= -PAGE_H / 2 - 1e-9 && m.footZ[1] <= -0.11 - 0.015 + 1e-9,
     `closed z [${m.footZ[0].toFixed(3)}, ${m.footZ[1].toFixed(3)}]`)
   gate('L6 stays inside the closing wedge', m.wedgeWorst <= 1e-9, `worst excursion ${m.wedgeWorst.toFixed(4)}`)
   gate('L7 crop ceiling: top <= 1.2', maxY <= 1.2, `topY ${maxY.toFixed(3)}`)

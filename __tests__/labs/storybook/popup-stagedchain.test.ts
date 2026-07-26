@@ -113,8 +113,13 @@ describe('staged chain — the family exists', () => {
     // climbs past it (r3's best cliff reached 0.816)
     expect(tallest).toBeGreaterThan(1.01)
     expect(chains[apexes.indexOf(tallest)].id).toBe('ch3-tower')
-    // ...and the right page answers with a sprawl, not a second colossus
-    apexes.filter((a) => a !== tallest).forEach((a) => expect(a).toBeLessThan(0.6))
+    // ...and the right page answers with a sprawl and a wire, not a second
+    // colossus: the tower must stand at least half again as tall as anything
+    // else on the spread, which is what makes the picture readable as ONE tall
+    // thing rather than as a skyline.
+    apexes
+      .filter((a) => a !== tallest)
+      .forEach((a) => expect(tallest / a).toBeGreaterThanOrEqual(1.5))
   })
 
   it('is a TRAPEZOID chain: storeys taper, and the colossus is crooked in plan', () => {
@@ -187,7 +192,13 @@ describe.each(chains.map((c) => [c.id, c] as const))(
       }
     })
 
-    it.skipIf(stagedChainLength(geom) < 0.5)('condition 5: an ACCORDION at this height would FAIL the wedge (the wall is real)', () => {
+    // The wedge wall is a HEIGHT wall, not a universal one: a fold-back joint
+    // tents to about its own panel height, and atan(h / rnear) only exceeds the
+    // dihedral once the panels are long. So the control runs on chains tall
+    // enough for the accordion to actually be illegal — on the short roosts and
+    // the wire panel an accordion would be perfectly legal, and pretending
+    // otherwise would make the ribbon choice look forced.
+    it.skipIf(stagedChainLength(geom) < 0.9)('condition 5: an ACCORDION at this height would FAIL the wedge (the wall is real)', () => {
       // Same chain, same cam, accordion folding: the tent appears and the gate
       // trips. Keeps the ribbon choice honest rather than decorative.
       const asAccordion: StagedChainGeom = { ...geom, style: 'accordion' }
