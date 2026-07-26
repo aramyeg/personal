@@ -88,7 +88,9 @@ import {
 } from '@/components/labs/storybook/book/popup-knobtower'
 import {
   solveVolvellePose,
+  volvelleDetentStep,
   volvelleHubFrame,
+  volvelleSectorSeen,
   volvelleThetaMax,
   VOLVELLE_LIFT,
   type VolvelleGeom,
@@ -497,4 +499,47 @@ describe('handle drag regression — every grabbable must move paper', () => {
       ).toBeGreaterThan(MIN_TRAVEL)
     })
   }
+})
+
+/**
+ * DIAL VISIBILITY (E3 s4 review, "dead handle #4"). The s4 reader reported the
+ * SPIN dial showing both a `grab` and a `grabbing` cursor and then producing
+ * "ZERO scene change" for 450 degrees of circular drag, linear drags, rim-peg
+ * drags and clicks.
+ *
+ * The pipeline above proves that handle is LIVE: its projector, its drive
+ * arithmetic and its solver move the dial's own vertices 0.26 world units. So
+ * the failure is DOWNSTREAM of the mechanism, and it has a specific shape worth
+ * gating: a dial that snaps to a detent whose step equals its own art's
+ * rotational symmetry period renders pixel-identically after ANY drag. The
+ * reader measured after release, which is exactly when the snap has landed.
+ *
+ * The mechanism's OBSERVABLE output is which sector each window frames. This
+ * asserts that a single detent step changes every window's reading — i.e. the
+ * mechanism does have something to show. Whether the reader can SEE it is then
+ * purely a question of the dial's sectors being painted differently from one
+ * another, which is a scene-lane art requirement, not an input one.
+ */
+describe('volvelle — a detent step must change what the windows frame', () => {
+  it('ch3-dispatch: every window reads a different sector one detent on', () => {
+    const { layer } = locate('ch3-dispatch')
+    const geom = layer as SceneLayer & VolvelleGeom
+    const step = volvelleDetentStep(geom)
+    expect(geom.windows.length).toBeGreaterThan(0)
+    for (const w of geom.windows) {
+      const at0 = volvelleSectorSeen(geom, w, 0)
+      const at1 = volvelleSectorSeen(geom, w, step)
+      expect(at1).not.toBe(at0)
+    }
+  })
+
+  it('ch3-dispatch: a full turn walks every sector past a window', () => {
+    const { layer } = locate('ch3-dispatch')
+    const geom = layer as SceneLayer & VolvelleGeom
+    const step = volvelleDetentStep(geom)
+    const seen = new Set<number>()
+    for (let k = 0; k < geom.sectors; k++) seen.add(volvelleSectorSeen(geom, geom.windows[0], k * step))
+    // If a drag cannot bring a new sector into view, no art could rescue it.
+    expect(seen.size).toBe(geom.sectors)
+  })
 })
