@@ -29,12 +29,14 @@ import { useGuardedDispose } from './material-pool'
 import { sharedHandleMaterial, sharedShadowTexture } from './shared-procedural-textures'
 import {
   liveSpreadRole,
-  solveStripFlapPose,
   solveStripFlapPoseAt,
   spreadPageAnglesTilted,
-  stripFlapCamLift,
+  stripFlapDetent,
   stripFlapFrame,
   stripFlapHoldEnvelope,
+  stripFlapRestLift,
+  stripFlapTravel,
+  STRIPFLAP_ANTI_FLIP,
   type StripFlapGeom,
   type Vec3,
 } from './popup-mechanics'
@@ -67,7 +69,7 @@ const FOLD_SHADE_TINT = '#d9cdb4'
 // shaded leaf; the warm FOLD_SHADE_TINT (~x0.85/0.80/0.71) is reserved for a
 // kraft placeholder flap (no texture) so painted art is not dimmed + warm-cast.
 const PAINTED_FOLD_SHADE = '#e4e4e4'
-const ANTI_FLIP = Math.PI / 2 // the user ceiling (law H3): past vertical the figure flips
+const ANTI_FLIP = STRIPFLAP_ANTI_FLIP // the user ceiling (law H3): past vertical the figure flips
 const TOUCH_SLOP = HANDLE_SLOP_STANDING
 
 const rad = (d: number): number => (d * Math.PI) / 180
@@ -161,8 +163,18 @@ export function StripFlapPopupLayer({
     materials.left.needsUpdate = true
   }, [texture, materials])
 
+  // The reader's hard stops for this piece (law H3 + the s6 travel window).
+  const travel = useMemo(() => stripFlapTravel(layer), [layer])
+
   const shadow = useMemo(() => {
-    const rest = solveStripFlapPose(layer, Math.PI, 0)
+    // Reference pose for the pool's SIZE and DEPTH: the piece STANDING. A
+    // page-driven flap stands at rest, so this is the shadow it always had. A
+    // reader-raised flap is handed over lying down, so its pool is sized to the
+    // pose the reader will raise it to — the pool then only has to fade in
+    // (below), never re-derive its own geometry mid-drag.
+    const standing =
+      layer.restDeg === undefined ? stripFlapRestLift(layer, Math.PI) : travel[1]
+    const rest = solveStripFlapPoseAt(layer, standing, Math.PI, 0)
     const lift = shadowLift(peakHeight([rest.left, rest.right]))
     const sign = layer.side === 'left' ? -1 : 1
     return {
@@ -170,7 +182,7 @@ export function StripFlapPopupLayer({
       size: [layer.width * 0.9 * lift.spread, SHADOW_HEIGHT * 0.8 * lift.spread] as [number, number],
       maxOpacity: SHADOW_MAX_OPACITY * lift.depth,
     }
-  }, [layer])
+  }, [layer, travel])
   const shadowTexture = sharedShadowTexture()
   const shadowMaterial = useMemo(
     () => new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }),
@@ -219,12 +231,12 @@ export function StripFlapPopupLayer({
     const { thetaL, thetaR } = anglesNow()
     const angleGrab = angleAboutHinge(e, thetaL, thetaR)
     if (angleGrab === null) return
-    const camA = stripFlapCamLift(layer, thetaL - thetaR)
-    const aGrabStart = clamp(readUserDrive(layer.id) ?? camA, 0, ANTI_FLIP)
+    const restA = stripFlapRestLift(layer, thetaL - thetaR)
+    const aGrabStart = clamp(readUserDrive(layer.id) ?? restA, travel[0], travel[1])
     st.beginGrab(layer.id, 'flap')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { aGrabStart, angleGrab }
-    writeUserDrive(layer.id, aGrabStart, [0, ANTI_FLIP])
+    writeUserDrive(layer.id, aGrabStart, travel)
     tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -241,8 +253,13 @@ export function StripFlapPopupLayer({
     const { thetaL, thetaR } = anglesNow()
     const angleNow = angleAboutHinge(e, thetaL, thetaR)
     if (angleNow === null) return
-    const aUser = clamp(grab.aGrabStart + wrapDelta(angleNow - grab.angleGrab), 0, ANTI_FLIP)
-    writeUserDrive(layer.id, aUser, [0, ANTI_FLIP])
+    // The detent runs on the DRIVE so the piece latches exactly on a stop.
+    const aUser = stripFlapDetent(
+      grab.aGrabStart + wrapDelta(angleNow - grab.angleGrab),
+      travel[0],
+      travel[1]
+    )
+    writeUserDrive(layer.id, aUser, travel)
     tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
@@ -293,7 +310,10 @@ export function StripFlapPopupLayer({
       for (const m of [materials.right, materials.left]) applyHandleGlow(m, w)
     }
 
-    const camA = stripFlapCamLift(layer, beta)
+    // The un-driven pose: the strip cam for a page-driven flap, the declared
+    // rest angle for a reader-raised one (S6-5 — the stalls are handed over
+    // lying flat on the page and the reader is the one who raises them).
+    const camA = stripFlapRestLift(layer, beta)
     const override = readDriveOverride(layer.id)
     const grabbed = useStorybookStore.getState().grab?.id === layer.id
     const channelA = readUserDrive(layer.id)
@@ -311,15 +331,19 @@ export function StripFlapPopupLayer({
       // the SHOWN lift is angle * stripFlapHoldEnvelope(beta) — the lift-flap
       // persistence composition — so fold-flat at book close is preserved for
       // any held angle without a per-frame return at all.
-      effectiveA = clamp(channelA, 0, ANTI_FLIP) * stripFlapHoldEnvelope(layer, beta)
+      effectiveA = clamp(channelA, travel[0], travel[1]) * stripFlapHoldEnvelope(layer, beta)
     } else {
       effectiveA = camA
     }
 
     // Tap answer (BW-18): a render-time excursion only — never written to the
     // channel, so it cannot survive a turn or leak into the release return.
+    // Bounded by the piece's own travel window, so the nudge rocks the flap the
+    // way the reader could — a piece lying at its lower stop rocks UP (which is
+    // exactly the invitation a reader-raised row wants), one standing at its
+    // ceiling rocks down.
     const shownA = clamp(
-      effectiveA + nudgeOffset(layer.id, effectiveA, 0, ANTI_FLIP, NUDGE_SPAN_ANGLE),
+      effectiveA + nudgeOffset(layer.id, effectiveA, travel[0], travel[1], NUDGE_SPAN_ANGLE),
       0,
       ANTI_FLIP
     )
@@ -329,7 +353,19 @@ export function StripFlapPopupLayer({
     // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.
     const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
     writeQuad(slopGeometry, enlargeQuad(full, handleSlopFactor(full, TOUCH_SLOP)))
-    shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
+    // THE POOL TRACKS THE LIFT (s6 S6-3, second half). The pool used to depend
+    // on the page dihedral alone, so a flap the reader had pressed all the way
+    // down still cast a standing figure's shadow — the one cue that would have
+    // told them the fold had landed, contradicting it. The ratio is measured
+    // against the piece's OWN standing reference at this same dihedral, so an
+    // un-driven page-driven flap is exactly 1 at every beta and its pool is
+    // bit-identical to the shipped one; only a moved flap changes.
+    const standingNow =
+      layer.restDeg === undefined ? camA : travel[1] * stripFlapHoldEnvelope(layer, beta)
+    const ref = Math.sin(Math.min(standingNow, ANTI_FLIP))
+    const liftFraction = ref > 1e-6 ? clamp(Math.sin(shownA) / ref, 0, 1) : 0
+    shadowMaterial.opacity =
+      (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2 * liftFraction
   })
 
   return (

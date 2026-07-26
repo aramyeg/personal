@@ -377,6 +377,41 @@ export type StripFlapGeom = {
   /** Dihedral (deg) at which the figure stands exactly upright.
    *  Default 176 — the book's rest bloom. */
   erectAtDeg?: number
+  /**
+   * THE UN-DRIVEN LIFT, degrees — the pose the reader is HANDED (E3 s6 S6-5).
+   * Omitted (the default) the flap is page-driven: the hidden strip is taut and
+   * the book's own opening erects it, which is the family's original law.
+   *
+   * Given, the strip ships SLACK: the flap lies down at this angle when the
+   * spread opens and the READER is the one who raises it (the persistence law
+   * then latches whatever they leave — user-drive.ts / stripFlapHoldEnvelope).
+   * The paper is Birmingham mech 94/95, the reader-lifted flap, on this
+   * family's hinge; the value is a small positive angle rather than 0 because a
+   * leaf at exactly 0 is coplanar with the page it is glued to and z-fights the
+   * page print (the lift-flap family solves the same problem with FLAP_LIFT).
+   *
+   * WHY s6 needed it: a blind reader found the spread's one working mechanism
+   * running BACKWARDS to its own story — "the text and the card are about
+   * raising stalls. The stalls start fully raised, and the only thing a reader
+   * can do is drag them down. There is no raise gesture on this page."
+   */
+  restDeg?: number
+  /**
+   * THE READER'S TRAVEL WINDOW [lo, hi] in degrees (E3 s6 S6-3). Default
+   * [0, 90] — flat to the anti-flip stop.
+   *
+   * A LOWER stop above 0 is the more paper-true bound for a page-driven flap,
+   * not a looser one: the hidden strip is inextensible and taut at rest, so
+   * pressing the figure down has to find slack from somewhere, and a real strip
+   * flap has almost none. It is also what the tea corner needed — a blind
+   * reader dragged it down and reported "it continues through flat and ends
+   * fully inverted, striped skirt uppermost, dome hanging down-left". The
+   * mechanism never passed flat; FLAT ITSELF reads as inverted at the pinned
+   * reading camera, whose screen-up basis crosses zero at a hinge angle of
+   * ~32deg (below that a flap's own tip projects BELOW its hinge). So the stop
+   * is set above that crossing, and the fold reads as a fold.
+   */
+  travelDeg?: readonly [number, number]
 }
 
 export type TabPieceGeom = {
@@ -1195,6 +1230,71 @@ export function stripFlapHoldEnvelope(geom: StripFlapGeom, beta: number): number
   const rest = stripFlapCamLift(geom, rad(geom.erectAtDeg ?? 176))
   if (rest <= 1e-9) return 0
   return clamp(stripFlapCamLift(geom, beta) / rest, 0, 1)
+}
+
+/** The anti-flip ceiling every strip flap shares: past vertical the figure
+ *  falls over backward. The layer's clamp and the travel window below are both
+ *  stated against it. */
+export const STRIPFLAP_ANTI_FLIP = Math.PI / 2
+
+/** The reader's travel window in radians (see StripFlapGeom.travelDeg): the
+ *  hinge's hard stops, [0, 90deg] unless the piece names its own. */
+export function stripFlapTravel(geom: StripFlapGeom): readonly [number, number] {
+  const [lo, hi] = geom.travelDeg ?? [0, 90]
+  return [clamp(rad(lo), 0, STRIPFLAP_ANTI_FLIP), clamp(rad(hi), 0, STRIPFLAP_ANTI_FLIP)]
+}
+
+/**
+ * THE UN-DRIVEN LIFT at dihedral beta — what the flap shows before the reader
+ * has touched it.
+ *
+ * Page-driven (the default): the strip cam, unchanged, bit-identical to what
+ * this family has always drawn. Reader-raised (`restDeg` given): the declared
+ * rest angle carried through the SAME hold envelope the latch uses, so the
+ * handed-over pose folds flat at book close exactly like a held one and needs
+ * no separate fold-flat argument.
+ */
+export function stripFlapRestLift(geom: StripFlapGeom, beta: number): number {
+  if (geom.restDeg === undefined) return stripFlapCamLift(geom, beta)
+  return rad(geom.restDeg) * stripFlapHoldEnvelope(geom, beta)
+}
+
+/** Width of the sticky band at each hard stop, radians (the last few degrees a
+ *  paper crease takes over and closes for you). */
+export const STRIPFLAP_DETENT = rad(9)
+/** Fraction of the detent band that sits AT the stop — the dead zone that makes
+ *  the stop feel like a click instead of an asymptote. */
+const DETENT_HOLD = 0.42
+
+const smooth01 = (x: number): number => x * x * (3 - 2 * x)
+
+/**
+ * THE END DETENT (E3 s6 S6-3, "it reads as a hinge with no stop").
+ *
+ * A hard clamp gives a reader no feedback that they have arrived: the paper just
+ * stops answering while their finger keeps travelling. Real card does the
+ * opposite — the crease takes the last few degrees out of your hand and the
+ * piece clicks home. This remaps the reader's requested angle inside a narrow
+ * band at EACH stop so the innermost DETENT_HOLD of the band lands exactly ON
+ * the stop, then eases out. The flap therefore latches at precisely lo or hi
+ * (not lo + epsilon), and leaving the stop takes a deliberate pull.
+ *
+ * Applied to the DRIVE, not the render, so the latched value is the detented
+ * one; away from the two bands it is the identity, so nothing else changes.
+ */
+export function stripFlapDetent(a: number, lo: number, hi: number): number {
+  const band = Math.min(STRIPFLAP_DETENT, (hi - lo) / 2)
+  if (band <= 0) return clamp(a, lo, hi)
+  const x = clamp(a, lo, hi)
+  if (x - lo < band) {
+    const t = clamp((x - lo) / band - DETENT_HOLD, 0, 1 - DETENT_HOLD) / (1 - DETENT_HOLD)
+    return lo + band * smooth01(t)
+  }
+  if (hi - x < band) {
+    const t = clamp((hi - x) / band - DETENT_HOLD, 0, 1 - DETENT_HOLD) / (1 - DETENT_HOLD)
+    return hi - band * smooth01(t)
+  }
+  return x
 }
 
 export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {

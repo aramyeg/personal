@@ -36,8 +36,10 @@ import {
   liveSpreadRole,
   solveStripFlapPoseAt,
   spreadPageAnglesTilted,
-  stripFlapCamLift,
+  stripFlapDetent,
   stripFlapFrame,
+  stripFlapRestLift,
+  stripFlapTravel,
   type PanelQuad,
   type StripFlapGeom,
   type Vec3,
@@ -221,16 +223,20 @@ function stripFlapCase(id: string): HandleCase {
   const geom = layer as SceneLayer & StripFlapGeom
   const { thetaL, thetaR } = restAngles(spreadIndex)
   const beta = thetaL - thetaR
-  const camA = stripFlapCamLift(geom, beta)
+  // The un-driven pose the reader actually grabs — the strip cam for a
+  // page-driven flap, the declared slack angle for a reader-raised one (s6's
+  // stall rank ships lying flat and is RAISED by the drag) — and the piece's own
+  // hard stops, which are [0, 90deg] unless it names a narrower window.
+  const restA = stripFlapRestLift(geom, beta)
+  const [lo, hi] = stripFlapTravel(geom)
   const fr = stripFlapFrame(geom, thetaL, thetaR)
-  const rest = solveStripFlapPoseAt(geom, camA, thetaL, thetaR)
-  const ANTI_FLIP = Math.PI / 2
+  const rest = solveStripFlapPoseAt(geom, restA, thetaL, thetaR)
   return {
     name: id,
     grabPoint: centroid([...rest.right, ...rest.left]),
     project: (ray) => projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n),
-    driveFrom: (g, n) => clamp(camA + wrapDelta(n - g), 0, ANTI_FLIP),
-    restDrive: camA,
+    driveFrom: (g, n) => stripFlapDetent(restA + wrapDelta(n - g), lo, hi),
+    restDrive: restA,
     vertsAt: (a) => {
       const pose = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
       return flatten([pose.right, pose.left])
