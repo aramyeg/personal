@@ -221,6 +221,5 @@ export function useGuardedDispose(target: Disposable | readonly Disposable[] | n
     return () => {
       targets.forEach(unclaim)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target])
 }
