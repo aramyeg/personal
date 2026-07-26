@@ -54,9 +54,14 @@ const skipsRim = (id) => id.startsWith('cover-') || id.startsWith('page-')
 // in a larger transparent field — never for full-bleed faces (which must be
 // redrawn to the mesh aspect, not letterboxed). See the keep art-aspect bench
 // (.superpowers/sdd/bench/check-keep-art-aspects.mjs).
-const PAD_TO_ASPECT = {
-  'ch3-keep-winch-disc': 1.0, // hub disc is a square 2*discR quad -> the circle must stay round
-}
+// (Empty since E3 s4 wave 2: the only entry was `ch3-keep-winch-disc`, and the
+// whole tower-hoist winch — disc, mast, semaphore, iris, counterweight — plus
+// `ch3-keep-balcony` are now PROCEDURAL bakes owned by generate-art.mjs, which
+// emits each at its quad's exact mesh aspect. Do NOT re-add a source PNG for any
+// of those ids: prepare-art runs BEFORE generate-art, but a delivery landing
+// under one of those names would put a second file in play for the same id and
+// the next person to reorder the two scripts would silently lose the bake.)
+const PAD_TO_ASPECT = {}
 
 // CROP-TO-ASPECT (per id, target width/height): centered cover-crop applied
 // after the trim, for FULL-BLEED texture-like faces (pavement, deck boards,
@@ -98,13 +103,12 @@ const FAN_OUT = {}
 
 // ROTATE (per id, degrees clockwise): lossless quarter-turn applied at load,
 // for deliveries authored transposed relative to their mesh's texture axes.
-// The semaphore quad maps the arm's LONG axis to texture V with the pivot at
-// the base (v=0 = image bottom under three's flipY), so its landscape source
-// (pivot at the left) turns 90deg CCW into a portrait with the pivot at the
-// bottom edge.
-const ROTATE = {
-  'ch3-keep-winch-semaphore': 270,
-}
+//
+// (Empty since E3 s4 wave 2: the only entry was `ch3-keep-winch-semaphore`,
+// which is now a procedural bake authored directly in its mesh's texture axes —
+// pivot at the image bottom, tip at the top — so there is nothing to transpose.
+// See the PAD_TO_ASPECT note above before adding a source PNG for any winch id.)
+const ROTATE = {}
 
 // Die-cut edge: real pop-up pieces show a sliver of raw paper where the
 // blade cut through the printed sheet. Approximated by dilating the alpha
