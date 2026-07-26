@@ -13,9 +13,11 @@ import {
   IDLE_DETUNE,
   IDLE_DRIFT_MAX,
   IDLE_FORBIDDEN_MECHS,
+  IDLE_GLINT_ONLY_MECHS,
   IDLE_GLINT_MAX,
   IDLE_HZ_FAST,
   IDLE_HZ_SLOW,
+  IDLE_MOTION_KINDS,
   IDLE_REST_DEG,
   IDLE_SUPPORTED_MECHS,
   IDLE_SWAY_MAX_DEG,
@@ -219,21 +221,37 @@ describe('idle life — zero allocation in the hot path', () => {
 })
 
 describe('idle life — where tags are allowed to land', () => {
-  it('never tags a grab-handle family', () => {
+  it('never MOVES a grab-handle family', () => {
+    // Narrowed in E3 WAVE-2 s7 from "never tags" to "never moves": a handle
+    // that sways or drifts twitches under the reader's hand and fights the
+    // drive they are dragging it by, which is the defect this law exists for.
+    // A glint moves no vertex and cannot fight a drive, so a handle is allowed
+    // to catch the lamp - and the s7 clerk's candle is why that matters.
     for (const { spread, layer } of taggedLayers()) {
+      if (!IDLE_FORBIDDEN_MECHS.includes(layer.mech)) continue
       expect(
-        IDLE_FORBIDDEN_MECHS.includes(layer.mech),
-        `spread ${spread}: ${layer.id} is a ${layer.mech} handle`
+        IDLE_MOTION_KINDS.includes(layer.idle!.kind),
+        `spread ${spread}: ${layer.id} is a ${layer.mech} handle carrying a ${layer.idle!.kind}`
       ).toBe(false)
     }
   })
 
-  it('only tags families the generic two-quad renderer actually poses', () => {
+  it('only tags families some renderer actually applies the tag on', () => {
     for (const { spread, layer } of taggedLayers()) {
+      const generic = IDLE_SUPPORTED_MECHS.includes(layer.mech)
+      const glintOnly = IDLE_GLINT_ONLY_MECHS.includes(layer.mech)
       expect(
-        IDLE_SUPPORTED_MECHS.includes(layer.mech),
-        `spread ${spread}: ${layer.id} is a ${layer.mech}, which popup-spread.tsx routes elsewhere`
+        generic || glintOnly,
+        `spread ${spread}: ${layer.id} is a ${layer.mech}, which no renderer applies an idle tag on`
       ).toBe(true)
+      if (glintOnly) {
+        // A motion tag on a glint-only renderer would be silently dead
+        // paperwork - exactly what this pair of gates exists to prevent.
+        expect(
+          layer.idle!.kind,
+          `spread ${spread}: ${layer.id} is a ${layer.mech}, whose renderer honours light only`
+        ).toBe('glint')
+      }
     }
   })
 

@@ -194,10 +194,28 @@ export function idleOffset(
   return peak * idleWave(seed, t) * gate
 }
 
-/** Grab-handle mechanism families. A tagged handle would tremble under the
- *  reader's hand and fight the drive it is being dragged by, so content.ts is
- *  forbidden from tagging one (gated in idle-life.test.ts). Exported so the
- *  gate and this module cannot disagree about the list. */
+/** The idle kinds that MOVE paper, as opposed to the one that only changes how
+ *  much light it catches. The distinction is the whole of the handle law below
+ *  (E3 WAVE-2 s7): a grab handle must never twitch, but there is nothing wrong
+ *  with a handle catching the lamp. */
+export const IDLE_MOTION_KINDS: readonly IdleKind[] = ['sway', 'drift']
+
+/** Grab-handle mechanism families. A handle that SWAYS or DRIFTS would tremble
+ *  under the reader's hand and fight the drive it is being dragged by, so
+ *  content.ts may not give one a motion tag (gated in idle-life.test.ts).
+ *
+ *  E3 WAVE-2 s7 narrowed this from "no tag at all" to "no MOTION tag". The
+ *  original list was belt-and-braces: at the time it was written, idle life was
+ *  wired into the generic two-quad layer only, so every family named here was
+ *  already unreachable and the rule cost nothing to state at full strength. It
+ *  started costing something when the s7 clerk needed his candle to flicker —
+ *  a blind reader's sharpest idle finding on that spread was "a lit candle with
+ *  a painted halo that never flickers" — and he is a strip flap. A `glint` is
+ *  light, not motion: it moves no vertex, cannot fight a drive, and the strip
+ *  flap layer additionally yields it to the hover glow while the reader's hand
+ *  is on the piece, so the two never write the same tint in one frame.
+ *
+ *  Exported so the gate and this module cannot disagree about the list. */
 export const IDLE_FORBIDDEN_MECHS: readonly string[] = [
   'tabpiece',
   'dissolve',
@@ -222,3 +240,11 @@ export const IDLE_SUPPORTED_MECHS: readonly string[] = [
   'rider',
   'kinetic',
 ]
+
+/** Families whose OWN renderer implements the glint (and only the glint), so a
+ *  `glint` tag on them is live paperwork even though they never reach the
+ *  generic layer. Kept separate from IDLE_SUPPORTED_MECHS rather than merged
+ *  into it, because the two lists mean different things: that one says "the
+ *  generic layer poses this", this one says "this renderer honours light only".
+ *  A motion tag on a family listed here is still dead, and still gated. */
+export const IDLE_GLINT_ONLY_MECHS: readonly string[] = ['stripflap']
