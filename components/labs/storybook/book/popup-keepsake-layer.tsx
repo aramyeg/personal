@@ -56,7 +56,7 @@ import {
   writeUserDrive,
 } from '../user-drive'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
@@ -258,13 +258,13 @@ export function KeepsakePopupLayer({
   const projectPointerD = (e: ThreeEvent<PointerEvent>, thetaL: number, thetaR: number): number | null =>
     projectPageD(pointerLocalRay(e), layer.side === 'left' ? thetaL : thetaR)
 
-  const endExtractionGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const endExtractionGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     grabRef.current = null
     tap.end(layer.id) // a press that never drew the card answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone — nothing to release
     }
@@ -292,12 +292,13 @@ export function KeepsakePopupLayer({
     grabRef.current = { pGrabStart: pStart, dGrab }
     writeUserDrive(layer.id, pStart, [0, pExit])
     tap.begin(pStart)
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, endExtractionGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     // A keyboard/wheel turn cannot force-release a keepsake grab (it sequences
@@ -326,14 +327,7 @@ export function KeepsakePopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over a handle). The store's `hover` is the single source; the
-      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
-      // shows a native hand ONLY where the quill sprite is not drawn.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)

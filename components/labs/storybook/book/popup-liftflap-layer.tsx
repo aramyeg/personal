@@ -37,9 +37,9 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { acceptsHandleHit, hitQuadFor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
@@ -98,13 +98,6 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
   }
   attr.needsUpdate = true
   geometry.computeBoundingSphere()
-}
-
-function enlargeQuad(quad: PanelQuad, kf: number): PanelQuad {
-  const cx = (quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4
-  const cy = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
-  const cz = (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4
-  return quad.map((p) => [cx + (p[0] - cx) * kf, cy + (p[1] - cy) * kf, cz + (p[2] - cz) * kf]) as unknown as PanelQuad
 }
 
 /** One coplanar/hinged quad (board or door) — a FrontSide print over a kraft
@@ -218,7 +211,7 @@ export function LiftFlapPopupLayer({
     return projectHingeAngle(pointerLocalRay(e), fr.center, fr.axis, fr.flat, fr.n)
   }
 
-  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     const tapped = grabRef.current.doorIndex
     grabRef.current = null
@@ -228,7 +221,7 @@ export function LiftFlapPopupLayer({
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // the door's angle is HELD (persistence)
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone
     }
@@ -258,12 +251,13 @@ export function LiftFlapPopupLayer({
     grabRef.current = { doorIndex: idx, aGrabStart, angleGrab }
     writeUserDrive(doorChannel(layer.id, idx), aGrabStart, [0, thetaMax])
     tap.begin(aGrabStart)
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     if (useStorybookStore.getState().grab?.id !== layer.id) {
@@ -280,14 +274,7 @@ export function LiftFlapPopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over a handle). The store's `hover` is the single source; the
-      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
-      // shows a native hand ONLY where the quill sprite is not drawn.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)
@@ -326,7 +313,12 @@ export function LiftFlapPopupLayer({
     writeQuad(boardGeometry, pose.board)
     pose.doors.forEach((quad, k) => {
       writeQuad(doorGeometries[k], quad)
-      writeQuad(slopGeometries[k], enlargeQuad(quad, handleSlopFactor(quad, slopFactors[k])))
+      // SCREEN HIT FLOOR (R-3): a door at full open turns edge-on to the
+      // reading camera (measured 19 px across at 95 deg) and a reader-held door
+      // KEEPS that angle, so the leaf that is standing wide open would be the
+      // one the reader can no longer shut. Stretched along the collapsing axis
+      // only; a shut or half-open leaf is untouched.
+      writeQuad(slopGeometries[k], hitQuadFor(quad, slopFactors[k]))
     })
   })
 

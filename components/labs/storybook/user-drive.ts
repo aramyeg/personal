@@ -22,6 +22,7 @@
 
 const drive = new Map<string, number>()
 let grabbedId: string | null = null
+let grabRelease: (() => void) | null = null
 
 export function readUserDrive(id: string): number | undefined {
   return drive.get(id)
@@ -59,6 +60,7 @@ export function clearUserDrive(id: string): void {
 export function resetUserDrives(): void {
   drive.clear()
   grabbedId = null
+  grabRelease = null
 }
 
 export function listUserDriveIds(): readonly string[] {
@@ -80,19 +82,58 @@ export function readDriveOverride(id: string): number | null {
   return Number.isFinite(v) ? v : null
 }
 
-/** Grab bookkeeping the frame loop needs synchronously, alongside the drive
- *  values themselves — kept in this module (not store.ts) so a per-frame
- *  read never touches zustand. */
-export function beginGrabChannel(id: string): void {
+/**
+ * Grab bookkeeping the frame loop needs synchronously, alongside the drive
+ * values themselves — kept in this module (not store.ts) so a per-frame read
+ * never touches zustand.
+ *
+ * THE RELEASE HOOK (E3 R-1, the re-review's blocker: "after pointerup the
+ * mechanism keeps tracking the mouse… the page feels possessed"). Every handle
+ * layer wires `onPointerUp` / `onPointerCancel` / `onLostPointerCapture` on its
+ * own mesh and believes that is belt-and-braces. It is not: r3f v9 SPECIAL-CASES
+ * two of those three (events dist, `handlePointer`) — `onPointerCancel` and
+ * `onLostPointerCapture` are intercepted at the DOM level and turned into an
+ * internal `cancelPointer([])`, and are NEVER dispatched to an object's
+ * handlers. So the ONLY live release path is a `pointerup` that r3f delivers to
+ * that exact eventObject, which requires the pointer capture to have survived
+ * the drag. Measured live (bench/hotfix-r1-p45.mjs): steal the capture mid-drag
+ * — which the browser itself does on element removal, on a real pointercancel,
+ * and on a dev Fast Refresh — release the button anywhere else, and the store
+ * grab, the scrub channel and the `grabbing` cursor all stay live for the rest
+ * of the session, with the naked pointer still driving the piece.
+ *
+ * So a layer hands its own teardown over here when it takes a grab, and ONE
+ * backstop (use-book-input.ts, on window) can always end it, whatever the
+ * browser did with the pointer.
+ */
+export function beginGrabChannel(id: string, release?: () => void): void {
   grabbedId = id
+  grabRelease = release ?? null
 }
 
 export function endGrabChannel(id: string): void {
-  if (grabbedId === id) grabbedId = null
+  if (grabbedId !== id) return
+  grabbedId = null
+  grabRelease = null
 }
 
 export function activeGrabId(): string | null {
   return grabbedId
+}
+
+/**
+ * Force-ends whatever grab is live, from outside the r3f event system: runs the
+ * grabbing layer's own release (so its grab ref, its tap/nudge bookkeeping and
+ * its pointer capture are torn down exactly as a real pointerup would) and then
+ * clears the channel regardless. Idempotent, and a no-op when nothing is held.
+ * The zustand side (`endGrab`) is cleared by the caller, which already owns the
+ * store — this module stays react/zustand-free on purpose.
+ */
+export function forceEndGrabChannel(): void {
+  const release = grabRelease
+  grabbedId = null
+  grabRelease = null
+  release?.()
 }
 
 // Dev-only escape hatch for the D6 bench probes, mirroring store.ts's
@@ -109,6 +150,7 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
         resetUserDrives: typeof resetUserDrives
         beginGrabChannel: typeof beginGrabChannel
         endGrabChannel: typeof endGrabChannel
+        forceEndGrabChannel: typeof forceEndGrabChannel
         activeGrabId: typeof activeGrabId
       }
     }
@@ -120,6 +162,7 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
     resetUserDrives,
     beginGrabChannel,
     endGrabChannel,
+    forceEndGrabChannel,
     activeGrabId,
   }
 }

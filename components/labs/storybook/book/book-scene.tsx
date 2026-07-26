@@ -16,6 +16,9 @@ import { parallaxLift } from './parallax-lift'
 import { makeDeskCanvas } from '../procedural/paper-texture'
 import { useStorybookStore } from '../store'
 import { activeGrabId } from '../user-drive'
+import { CAMERA_FOV, CAMERA_LOOKAT, CAMERA_POSITION } from './reading-stage'
+import { COMPACT_QUERY } from '../overlay/compact-layout'
+import { primeHover } from './hover-prime'
 
 // task-17: the book is the whole-screen hero now (side-column narration
 // replaces the old on-page text plates), so the camera sits noticeably
@@ -32,9 +35,9 @@ import { activeGrabId } from '../user-drive'
 // decision from E1.5 on is composed for THIS frame; probed against all
 // 10 spreads (standing scenes gain, flat-lay spreads stay legible)
 // before pinning. Goldens re-blessed book-wide at this camera.
-const CAMERA_POSITION: [number, number, number] = [0, 1.85, 3.05]
-const CAMERA_LOOKAT: [number, number, number] = [0, 0.38, 0.05]
-const CAMERA_FOV = 34
+// The three numbers themselves now live in reading-stage.ts, so the layers'
+// screen-space hit floor and the unit gates measure "screen px" against the
+// SAME eye this Canvas mounts (E3 R-3).
 const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
 // E-G5 floor (b) rebalance: removing the ACES tone-map lifted every rendered
@@ -186,11 +189,23 @@ function ParallaxRig({ children }: { children: ReactNode }) {
     // handle "RELOCATES after travel with no cue"). So restitch while a grab is
     // live and for a beat after it ends, which is exactly when a handle's hit
     // surface and its hover glow have moved out from under the reader.
+    // The same argument covers the book being BUSY (R-2). A layer refuses to
+    // write `hover` while the book is booting, mid page-turn, or holding another
+    // grab — and r3f announces an object as hovered exactly ONCE, on entry, so a
+    // refusal is permanent for a pointer that does not move: measured on the
+    // lane server, a pointer parked through the boot read `hover: null` for six
+    // seconds on a live handle, which is precisely the reader's "the cursor lies
+    // whenever I pause". Replaying the last move through the busy window and for
+    // a beat after gives the layers the chance to answer once the answer can
+    // change (see handle-hover.ts's markHandleHovered).
+    const store = useStorybookStore.getState()
+    const busy = !store.booted || store.turning !== null
     const grabLive = grabbed || activeGrabId() !== null
-    if (grabLive) settleRef.current = RESTITCH_TAIL_S
+    if (grabLive || busy) settleRef.current = RESTITCH_TAIL_S
     else if (settleRef.current > 0) settleRef.current = Math.max(0, settleRef.current - delta)
     if (
       grabLive ||
+      busy ||
       settleRef.current > 0 ||
       Math.abs(stepX) > PARALLAX_PARKED_EPS ||
       Math.abs(stepY) > PARALLAX_PARKED_EPS
@@ -211,21 +226,75 @@ function ParallaxRig({ children }: { children: ReactNode }) {
  *
  * Now the store's `hover`/`grab` are the single source of truth and this is the
  * only writer. It shows a native hand ONLY where the quill sprite is not drawn —
- * the quill is fine-pointer, non-narrow (see storybook-responsive.css, which
+ * the quill is fine-pointer, non-compact (see storybook-responsive.css, which
  * also owns the `cursor: none` that hides the native one) — so the two can never
- * appear together, and a coarse or narrow reader still gets a real hint.
+ * appear together, and a coarse or compact reader still gets a real hint.
+ *
+ * THE TWO-CURSOR BUG, PART 2 (E3 R-2, caught by the s6 blind RE-review: "you get
+ * the gold sparkle AND a system hand fighting each other" — on the very build
+ * that claimed the fix). The scope above was hand-rolled as
+ *   `(pointer: fine) and not (max-width: 820px) and not (orientation: portrait)`
+ * and `not` is only legal at the START of a media query — Chrome parses that
+ * whole string as INVALID and reports it back as `not all`, which matches
+ * nothing, ever. So `quill.matches` was permanently false and this component
+ * wrote a native `grab`/`grabbing` under the quill on every desktop. Measured on
+ * the lane server: `matchMedia(QUILL_QUERY).media === 'not all'`.
+ *
+ * The fix is not a better hand-rolled negation — it is to stop hand-rolling one.
+ * The quill's own conditions are `(pointer: fine)` AND not `COMPACT_QUERY`
+ * (quill-cursor.tsx watches exactly those two), so this reads the SAME two
+ * queries and negates the compact one in JS, where negation is unambiguous and
+ * cannot drift from the breakpoint the CSS uses.
  */
-const QUILL_QUERY = '(pointer: fine) and not (max-width: 820px) and not (orientation: portrait)'
+const FINE_POINTER_QUERY = '(pointer: fine)'
+
+/**
+ * HOVER TRUTH FOR A HAND THAT NEVER MOVES (E3 R-2). ParallaxRig can only replay
+ * an event r3f has already seen; a reader who parked their pointer while the
+ * book was booting, or who turned the page from the keyboard without lifting
+ * their hand, has never given it one. This re-delivers the last position the
+ * WINDOW saw (book/hover-prime.ts, installed by the loader) to the canvas the
+ * moment the book becomes able to answer differently — boot finishing, a turn
+ * landing, a spread committing — so the cursor and the piece's glow describe
+ * where the hand actually is instead of where it last happened to arrive.
+ */
+function HoverPrime() {
+  const gl = useThree((s) => s.gl)
+
+  useEffect(() => {
+    const el = gl.domElement
+    let raf = 0
+    const prime = () => {
+      cancelAnimationFrame(raf)
+      // One frame later: the piece the reader is over has to have been posed by
+      // the frame loop before a hit test can tell the truth about it.
+      raf = requestAnimationFrame(() => primeHover(el))
+    }
+    prime()
+    const unsubscribe = useStorybookStore.subscribe((s, prev) => {
+      if (s.booted !== prev.booted || s.turning !== prev.turning || s.spread !== prev.spread) prime()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      unsubscribe()
+    }
+  }, [gl])
+
+  return null
+}
 
 function CanvasCursor() {
   const gl = useThree((s) => s.gl)
 
   useEffect(() => {
     const el = gl.domElement
-    const quill = window.matchMedia(QUILL_QUERY)
+    const fine = window.matchMedia(FINE_POINTER_QUERY)
+    const compact = window.matchMedia(COMPACT_QUERY)
     const apply = () => {
       const { grab, hover } = useStorybookStore.getState()
-      if (quill.matches) {
+      // Where the quill sprite is drawn, the native cursor stays hidden and the
+      // quill alone carries the state (quill-cursor.tsx reads the same store).
+      if (fine.matches && !compact.matches) {
         el.style.cursor = ''
         return
       }
@@ -233,10 +302,12 @@ function CanvasCursor() {
     }
     apply()
     const unsubscribe = useStorybookStore.subscribe(apply)
-    quill.addEventListener('change', apply)
+    fine.addEventListener('change', apply)
+    compact.addEventListener('change', apply)
     return () => {
       unsubscribe()
-      quill.removeEventListener('change', apply)
+      fine.removeEventListener('change', apply)
+      compact.removeEventListener('change', apply)
       el.style.cursor = ''
     }
   }, [gl])
@@ -261,7 +332,7 @@ export default function BookScene() {
       // shadows, which are rebalanced (ambient/directional/candle) to hold the
       // dark-theatre look now that the film curve no longer dims the whole frame.
       gl={{ antialias: true, alpha: false, toneMapping: THREE.NoToneMapping }}
-      camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
+      camera={{ position: [...CAMERA_POSITION], fov: CAMERA_FOV }}
       onCreated={(state) => state.camera.lookAt(...CAMERA_LOOKAT)}
     >
       <color attach="background" args={[DESK_COLOR]} />
@@ -275,6 +346,7 @@ export default function BookScene() {
       <Desk />
       <Dust />
       <CanvasCursor />
+      <HoverPrime />
       <ParallaxRig>
         <Book />
       </ParallaxRig>

@@ -71,3 +71,44 @@ describe('compact layout: the book owns the viewport at rest', () => {
     expect(compactBlock).toContain('env(safe-area-inset-bottom, 0px)')
   })
 })
+
+/**
+ * R-2 (s6 blind re-review, finding 3): "the page has HIDDEN the cursor
+ * (`cursor: none`), so on a grabbable you get the gold sparkle AND a system hand
+ * fighting each other" — reported against the build that had just claimed this
+ * fixed. The canvas cursor owner had hand-rolled its scope as
+ *   `(pointer: fine) and not (max-width: 820px) and not (orientation: portrait)`
+ * and `not` is legal only at the START of a media query, so Chrome parsed the
+ * whole string as invalid and reported it back as `not all`. Measured on the
+ * lane server: `matchMedia(QUILL_QUERY).media === 'not all'`, matches === false
+ * forever, so the native cursor was written on every desktop, under the quill.
+ *
+ * A jsdom matchMedia does not parse media queries, so the gate is on the SOURCE:
+ * the one place that decides where the quill is drawn must reuse COMPACT_QUERY
+ * and negate it in JS, where negation cannot be mis-parsed.
+ */
+describe('one cursor: the canvas cursor owner shares the quill s own scope', () => {
+  const bookScene = labFile('book/book-scene.tsx')
+
+  it('reuses COMPACT_QUERY instead of hand-rolling a negation', () => {
+    expect(bookScene).toContain("import { COMPACT_QUERY } from '../overlay/compact-layout'")
+    expect(bookScene).toContain("window.matchMedia(COMPACT_QUERY)")
+  })
+
+  it('contains no `and not (...)` media query anywhere (the invalid form)', () => {
+    // Comments are stripped first: the files are free to QUOTE the broken query
+    // in their own postmortem, which is exactly where it belongs.
+    const code = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    for (const src of [bookScene, quillCursor, labFile('overlay/compact-layout.ts')]) {
+      expect(code(src)).not.toMatch(/and\s+not\s+\(/)
+    }
+  })
+
+  it('hides the native cursor exactly where the quill is drawn', () => {
+    // Both halves of the condition, and the quill sprite is gated on the same
+    // two queries (quill-cursor.tsx watches `(pointer: fine)` + COMPACT_QUERY).
+    expect(bookScene).toContain("const FINE_POINTER_QUERY = '(pointer: fine)'")
+    expect(bookScene).toContain('fine.matches && !compact.matches')
+    expect(quillCursor).toContain("window.matchMedia('(pointer: fine)')")
+  })
+})

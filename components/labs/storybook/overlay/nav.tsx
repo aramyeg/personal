@@ -38,13 +38,27 @@
 
 import { chapterForSpread, SPREAD_COUNT } from '../content'
 import { useStorybookStore } from '../store'
+import { CORNER_H_PCT, CORNER_W_PCT } from './corner-hotspot'
 import { useSpreadChoreography } from './use-spread-choreography'
 
+/**
+ * R-4 (s6 blind re-review): "The invisible 288x198 corner button overlaps the
+ * stall row's last cards. Press-and-drag at (1330,715) and nothing at all
+ * happens: the row won't rise and the page won't turn." A DOM button over the
+ * canvas eats the MOVES as well as the press, so the scene never even raycasts
+ * there. The paper wins: the hotspot no longer takes pointer events at all, and
+ * the corner turn is re-armed as a tap in use-book-input.ts, which fires only
+ * when the canvas reports nothing grabbable under the press (overlay/
+ * corner-hotspot.ts owns the shared geometry). The `onClick` handlers stay for
+ * the keyboard/AT path the arrows above already own — and because a button that
+ * still knows its own action is easier to reason about than one that doesn't.
+ */
 const HOTSPOT_STYLE = {
-  width: '18vw',
-  height: '22vh',
+  width: `${CORNER_W_PCT}vw`,
+  height: `${CORNER_H_PCT}vh`,
   touchAction: 'manipulation' as const,
   background: 'transparent',
+  pointerEvents: 'none' as const,
 }
 
 const spreadLabel = (spread: number): string => {

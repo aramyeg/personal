@@ -184,6 +184,18 @@
     transform: scale(1);
     filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 3px var(--sb-gold));
   }
+  /* R-4: the corner hotspots no longer take pointer events (the paper under
+     them has to be reachable — overlay/nav.tsx), so they can never be `:hover`
+     either. use-book-input.ts stamps the corner the pointer is actually in on
+     the root element, and ONLY while the scene has nothing grabbable there — so
+     the fold now lifts exactly where the tap would work, and stays down over a
+     piece the reader can grab instead. */
+  :root[data-sb-corner='left'] .sb-dogear--left,
+  :root[data-sb-corner='right'] .sb-dogear--right {
+    opacity: 0.82;
+    transform: scale(1);
+    filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 3px var(--sb-gold));
+  }
 }
 .sb-nav-clickable:focus-visible .sb-dogear {
   opacity: 0.82;

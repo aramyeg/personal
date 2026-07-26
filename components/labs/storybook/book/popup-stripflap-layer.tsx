@@ -53,9 +53,9 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { HANDLE_SLOP_STANDING, acceptsHandleHit, hitQuadFor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
@@ -102,13 +102,6 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: readonly Vec3[]): void 
   }
   attr.needsUpdate = true
   geometry.computeBoundingSphere()
-}
-
-function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
-  const cx = (quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4
-  const cy = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
-  const cz = (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4
-  return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k] as Vec3)
 }
 
 export function StripFlapPopupLayer({
@@ -211,14 +204,14 @@ export function StripFlapPopupLayer({
     return projectHingeAngle(pointerLocalRay(e), fr.center, fr.hinge, fr.flat, fr.n)
   }
 
-  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
     tap.end(layer.id) // a press that never moved the flap answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone — nothing to release
     }
@@ -238,12 +231,13 @@ export function StripFlapPopupLayer({
     grabRef.current = { aGrabStart, angleGrab }
     writeUserDrive(layer.id, aGrabStart, travel)
     tap.begin(aGrabStart)
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     if (useStorybookStore.getState().grab?.id !== layer.id) {
@@ -265,14 +259,7 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over a handle). The store's `hover` is the single source; the
-      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
-      // shows a native hand ONLY where the quill sprite is not drawn.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)
@@ -352,7 +339,15 @@ export function StripFlapPopupLayer({
     writeQuad(geometries.left, pose.left)
     // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.
     const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
-    writeQuad(slopGeometry, enlargeQuad(full, handleSlopFactor(full, TOUCH_SLOP)))
+    // SCREEN HIT FLOOR (R-3): the world-space pad above cannot see that a
+    // leaning flap has turned nearly edge-on to the reader — rotating a quad
+    // never changes its edge LENGTHS, only its projection. Measured across this
+    // family's own travel: the s6 vendor collapses 96x94 -> 108x37 px at his
+    // latch, and the stall row passes through 474x21 px. A latched state whose
+    // handle is a sliver is a piece the reader cannot take back, so the hit quad
+    // is stretched along whichever of its own axes is collapsing until it clears
+    // the touch floor. A piece facing the reader is untouched (k = 1).
+    writeQuad(slopGeometry, hitQuadFor(full, TOUCH_SLOP))
     // THE POOL TRACKS THE LIFT (s6 S6-3, second half). The pool used to depend
     // on the page dihedral alone, so a flap the reader had pressed all the way
     // down still cast a standing figure's shadow — the one cue that would have

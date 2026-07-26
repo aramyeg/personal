@@ -31,11 +31,13 @@
 
 import { useEffect, useRef } from 'react'
 import { accumulateWheel, useStorybookStore, type TurnDir, type WheelAcc } from './store'
+import { activeGrabId, forceEndGrabChannel } from './user-drive'
+import { cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
 
 const SWIPE_MIN_PX = 60
 const SWIPE_MAX_MS = 600
 
-type PointerStart = { x: number; y: number; t: number }
+type PointerStart = { x: number; y: number; t: number; corner: TurnDir | null }
 
 /** `.sb-overlay` is the book's HTML text layer: fixed side columns flanking
  *  the (always screen-centered) book on desktop, a bottom drawer over the
@@ -99,14 +101,35 @@ export function useBookInput(enabled: boolean): void {
 
     const onPointerDown = (e: PointerEvent) => {
       if (targetsOverlayPanel(e.target)) return
-      if (useStorybookStore.getState().grab !== null) return
-      pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now() }
+      // The canvas listener has already run on the bubble path (see the header),
+      // so `grab` is authoritative here: a press that took hold of a piece is a
+      // grab, never a swipe and never a corner turn. `hover` covers the same
+      // press before the scene has decided (a handle that refused the press for
+      // its own reasons still owns the pixel the reader aimed at).
+      const st = useStorybookStore.getState()
+      if (st.grab !== null) return
+      const corner =
+        st.hover === null ? cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight) : null
+      pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now(), corner }
     }
 
     const onPointerUp = (e: PointerEvent) => {
       const start = pointerStart.current
       pointerStart.current = null
-      if (!start || performance.now() - start.t > SWIPE_MAX_MS) return
+      if (!start) return
+
+      // CORNER TURN (R-4). The hotspots no longer take pointer events of their
+      // own — the paper under them has to be reachable — so the tap that turns
+      // the page is recognised here, and only if the scene had nothing to offer
+      // at the press. A press-drag through a corner falls through to the swipe
+      // rule below exactly like a press-drag anywhere else.
+      if (start.corner !== null) {
+        if (isCornerTap(start.x, start.y, start.t, e.clientX, e.clientY, performance.now())) {
+          requestTurn(start.corner)
+          return
+        }
+      }
+      if (performance.now() - start.t > SWIPE_MAX_MS) return
 
       const dx = e.clientX - start.x
       const dy = e.clientY - start.y
@@ -122,6 +145,41 @@ export function useBookInput(enabled: boolean): void {
       }
     }
 
+    // THE RELEASE BACKSTOP (R-1, the re-review's blocker: "after pointerup the
+    // mechanism keeps tracking the mouse… the page feels possessed"). A handle
+    // layer can only hear a `pointerup` that r3f delivers to its own mesh, and
+    // r3f only does that while the pointer capture holds — it also swallows
+    // `pointercancel` and `lostpointercapture` before they ever reach an object
+    // (see user-drive.ts's note). Any capture loss mid-drag therefore stranded
+    // the grab for the rest of the session, with the naked pointer still driving
+    // the piece. This runs on WINDOW, after the canvas has had its own go, and
+    // ends whatever is still held: the layer's own teardown first (so the tap
+    // nudge and the scrub channel behave exactly as on a normal release), then
+    // the store, unconditionally.
+    const endAnyGrab = () => {
+      if (useStorybookStore.getState().grab === null && activeGrabId() === null) return
+      forceEndGrabChannel()
+      useStorybookStore.getState().endGrab()
+    }
+
+    // The corner fold answers the pointer even though its button no longer takes
+    // events (R-4): the same rect test that arms the turn lifts the dog-ear, so
+    // the hint appears exactly where the tap would work and stays away when the
+    // scene owns that pixel.
+    const onCornerHint = (e: PointerEvent) => {
+      const st = useStorybookStore.getState()
+      const corner =
+        st.grab === null && st.hover === null
+          ? cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
+          : null
+      const value = corner === 'prev' ? 'left' : corner === 'next' ? 'right' : ''
+      const root = document.documentElement
+      if ((root.dataset.sbCorner ?? '') !== value) {
+        if (value === '') delete root.dataset.sbCorner
+        else root.dataset.sbCorner = value
+      }
+    }
+
     window.addEventListener('wheel', onWheel, { passive: true })
     window.addEventListener('keydown', onKeyDown)
     // Capture phase: must run before GalleryChrome's bubble-phase Escape
@@ -131,6 +189,15 @@ export function useBookInput(enabled: boolean): void {
     window.addEventListener('keydown', onEscapeDuringGrab, true)
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointermove', onCornerHint)
+    // Bubble phase on purpose: the canvas element's own listener has already
+    // run, so a grab that ended normally is already gone and this sees nothing
+    // to do. It only fires for real when the pointer stream ended somewhere the
+    // scene never heard about.
+    window.addEventListener('pointerup', endAnyGrab)
+    window.addEventListener('pointercancel', endAnyGrab)
+    window.addEventListener('lostpointercapture', endAnyGrab)
+    window.addEventListener('blur', endAnyGrab)
 
     return () => {
       window.removeEventListener('wheel', onWheel)
@@ -138,6 +205,12 @@ export function useBookInput(enabled: boolean): void {
       window.removeEventListener('keydown', onEscapeDuringGrab, true)
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointermove', onCornerHint)
+      window.removeEventListener('pointerup', endAnyGrab)
+      window.removeEventListener('pointercancel', endAnyGrab)
+      window.removeEventListener('lostpointercapture', endAnyGrab)
+      window.removeEventListener('blur', endAnyGrab)
+      delete document.documentElement.dataset.sbCorner
     }
   }, [enabled])
 }

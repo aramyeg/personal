@@ -38,7 +38,7 @@ import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
-import { applyHandleGlow, stepHoverGlow } from './handle-hover'
+import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
@@ -233,14 +233,14 @@ export function VolvellePopupLayer({
     return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.radius }
   }
 
-  const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
+  const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
     tap.end(layer.id) // a press that never turned the dial answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // theta HELD; the frame loop eases it to a detent
     try {
-      ;(e.target as Element).releasePointerCapture(e.pointerId)
+      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
       // capture already gone
     }
@@ -258,12 +258,13 @@ export function VolvellePopupLayer({
     writeUserDrive(layer.id, seeded, [0, thetaMax])
     tap.begin(seeded)
     grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
-    beginGrabChannel(layer.id)
+    beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
     if (useStorybookStore.getState().grab?.id !== layer.id) {
@@ -284,14 +285,7 @@ export function VolvellePopupLayer({
   }
 
   const onPointerOver = (): void => {
-    const st = useStorybookStore.getState()
-    if (st.grab === null && st.booted && st.turning === null && st.spread === spreadIndex) {
-      // ONE cursor identity (s4 reader: the native hand and the gold quill both
-      // appeared over a handle). The store's `hover` is the single source; the
-      // canvas cursor is owned entirely by book-scene.tsx's CanvasCursor, which
-      // shows a native hand ONLY where the quill sprite is not drawn.
-      st.setHover(layer.id)
-    }
+    markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
     useStorybookStore.getState().clearHover(layer.id)

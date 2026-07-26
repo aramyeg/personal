@@ -18,7 +18,8 @@
 
 import * as THREE from 'three'
 import type { ThreeEvent } from '@react-three/fiber'
-import type { Vec3 } from './popup-mechanics'
+import type { PanelQuad, Vec3 } from './popup-mechanics'
+import { withScreenHitFloor } from './reading-stage'
 
 /** Slop factor for a PAGE-FLAT handle (pull tabs, cards, discs). These lie in
  *  the page plane, so the ~27deg reading camera foreshortens them to a sliver
@@ -55,6 +56,30 @@ export function handleSlopFactor(quad: readonly Vec3[], base: number): number {
   }
   if (!Number.isFinite(shortest)) return base
   return Math.min(6, Math.max(base, HANDLE_MIN_HIT / shortest))
+}
+
+/** Scales a quad about its own centre — the shared shape of every layer's
+ *  private `enlargeQuad`, kept here so the hit surface a family raycasts and the
+ *  hit surface the gates measure are produced by ONE function. */
+export function enlargeQuad(quad: readonly Vec3[], k: number): PanelQuad {
+  const c = [0, 1, 2].map((i) => (quad[0][i] + quad[1][i] + quad[2][i] + quad[3][i]) / 4)
+  const grow = (p: Vec3): Vec3 => [
+    c[0] + (p[0] - c[0]) * k,
+    c[1] + (p[1] - c[1]) * k,
+    c[2] + (p[2] - c[2]) * k,
+  ]
+  return [grow(quad[0]), grow(quad[1]), grow(quad[2]), grow(quad[3])]
+}
+
+/**
+ * THE HIT SURFACE a grabbable actually raycasts: the die-cut quad, padded by the
+ * world-space slop rule above, then held to the screen-space floor
+ * (reading-stage.ts) so a piece that has turned edge-on to the reader is still
+ * something a hand can land on. Both halves are floors — a handle already facing
+ * the reader comes back exactly as the world pad left it.
+ */
+export function hitQuadFor(quad: readonly Vec3[], base: number): PanelQuad {
+  return withScreenHitFloor(enlargeQuad(quad, handleSlopFactor(quad, base)))
 }
 
 /**
