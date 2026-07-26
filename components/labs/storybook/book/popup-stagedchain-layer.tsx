@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { solveStagedChainPose, stagedChainBand, type StagedChainGeom } from './popup-stagedchain'
 import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
@@ -107,13 +108,7 @@ export function StagedChainPopupLayer({
     material.needsUpdate = true
   }, [texture, material])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material]
-  )
+  useGuardedDispose([geometry, material])
 
   useFrame(() => {
     const mesh = meshRef.current

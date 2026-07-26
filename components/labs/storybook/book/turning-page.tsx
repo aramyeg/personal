@@ -35,9 +35,10 @@
  * lifting page casts on the stack beneath it.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useGuardedDispose } from './material-pool'
 import { PAGE_H, PAGE_W, buildPageTemplate, easeTurnWeighted } from './page-geometry'
 import { sheetAngleTilted } from './popup-mechanics'
 import { makeCanvasTexture } from './book'
@@ -116,13 +117,7 @@ export function TurningPage({
     [shadeTexture]
   )
 
-  useEffect(
-    () => () => {
-      shadeTexture.dispose()
-      shadeMaterial.dispose()
-    },
-    [shadeTexture, shadeMaterial]
-  )
+  useGuardedDispose([shadeTexture, shadeMaterial])
 
   // Flat page geometry shared by both printed faces, built once before
   // first paint. Rigid: never rewritten — the pivot group's rotation does

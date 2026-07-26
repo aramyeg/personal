@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { kraftTints } from './paper-stock'
 import {
   liveSpreadRole,
@@ -138,13 +139,7 @@ export function OanavePopupLayer({
   }, [layer])
 
   useEffect(() => () => geometry.dispose(), [geometry])
-  useEffect(
-    () => () => {
-      material.dispose()
-      shadowMaterial.dispose()
-    },
-    [material, shadowMaterial]
-  )
+  useGuardedDispose([material, shadowMaterial])
 
   useFrame(() => {
     const group = groupRef.current

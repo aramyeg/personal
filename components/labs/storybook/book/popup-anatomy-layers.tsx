@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import { kraftTints } from './paper-stock'
 import { sharedPaperTexture, sharedRotorTexture } from './shared-procedural-textures'
 import {
@@ -162,15 +163,7 @@ export function DressPopupLayer({
     materials.back.needsUpdate = true
   }, [art, paperTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-      // paperTexture is a shared singleton — never disposed per-instance.
-    },
-    [geometry, materials]
-  )
+  useGuardedDispose([geometry, materials.front, materials.back])
 
   useFrame(() => {
     const group = groupRef.current
@@ -263,15 +256,7 @@ export function RotorPopupLayer({
     materials.back.needsUpdate = true
   }, [art, discTexture, materials, tint])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      materials.front.dispose()
-      materials.back.dispose()
-      // discTexture is a shared singleton — never disposed per-instance.
-    },
-    [geometry, materials]
-  )
+  useGuardedDispose([geometry, materials.front, materials.back])
 
   useFrame(() => {
     const group = groupRef.current

@@ -33,6 +33,7 @@ import {
   type MechPose,
   type PanelQuad,
 } from './popup-mechanics'
+import { useGuardedDispose } from './material-pool'
 import { solveRiderPose } from './popup-anatomy'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
@@ -412,17 +413,7 @@ function PopupLayer({
     [shadowTexture]
   )
 
-  useEffect(
-    () => () => {
-      geometries.right.dispose()
-      geometries.left.dispose()
-      materials.right.dispose()
-      materials.left.dispose()
-      shadowMaterial.dispose()
-      // shadowTexture is a shared singleton — never disposed per-instance.
-    },
-    [geometries, materials, shadowMaterial]
-  )
+  useGuardedDispose([geometries.right, geometries.left, materials.right, materials.left, shadowMaterial])
 
   useFrame((state) => {
     const cutout = cutoutRef.current

@@ -11,10 +11,11 @@
  * hairlines, DynamicDrawUsage positions rewritten per frame).
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { BoxGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
@@ -161,15 +162,7 @@ function TwoQuadRide({
     })
   }, [art, paperTexture, materials, edgeMaterials, tint])
 
-  useEffect(
-    () => () => {
-      geometries.forEach((g) => g.dispose())
-      edgeGeometries.forEach((g) => g.dispose())
-      edgeMaterials.forEach((m) => m.dispose())
-      materials.forEach((m) => m.dispose())
-    },
-    [geometries, edgeGeometries, edgeMaterials, materials]
-  )
+  useGuardedDispose([...geometries, ...edgeGeometries, ...edgeMaterials, ...materials])
 
   useFrame(() => {
     const group = groupRef.current

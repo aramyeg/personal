@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
+import { useGuardedDispose } from './material-pool'
 import type { MFoldRangeGeom } from './popup-mfoldrange'
 import {
   MFOLD_GUSSET_ROW_LEFT,
@@ -138,13 +139,7 @@ export function MFoldRangePopupLayer({
     material.needsUpdate = true
   }, [texture, material])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material]
-  )
+  useGuardedDispose([geometry, material])
 
   useFrame(() => {
     const mesh = meshRef.current
