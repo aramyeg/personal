@@ -31,6 +31,10 @@ import {
   stagedChainQ,
   stagedChainQuads,
   stagedChainClosedDepth,
+  stagedChainMaxRadius,
+  stagedChainRFar,
+  stagedChainRNear,
+  stagedChainSpans,
   stagedChainWedgeExcursion,
   type StagedChainGeom,
 } from '@/components/labs/storybook/book/popup-stagedchain'
@@ -38,9 +42,12 @@ import {
 const GLOBAL_CAP = 0.0497
 const N_ST = 240
 
-const chains: (SceneLayer & StagedChainGeom)[] = CHAPTERS.flatMap((c) => c.layers).filter(
-  (l): l is SceneLayer & StagedChainGeom => l.mech === 'stagedchain'
-)
+// Every piece the family poses, including the DISPATCH LINE — its rider is
+// in-plane and adds no degree of freedom, so its sheet IS a staged chain and
+// owes the family's whole gate set.
+const chains: (SceneLayer & StagedChainGeom)[] = CHAPTERS.flatMap((c) => c.layers)
+  .filter((l) => l.mech === 'stagedchain' || l.mech === 'dispatchline')
+  .map((l) => ({ ...l, mech: 'stagedchain' }) as SceneLayer & StagedChainGeom)
 
 /** Max per-station beta step of the eased 240-station turn clock. */
 const DTHETA_MAX = (() => {
@@ -76,20 +83,64 @@ function quadsAt(geom: StagedChainGeom, t: number, beta: number) {
 }
 
 describe('staged chain — the family exists', () => {
-  it('ships two cliffs on chapter III', () => {
-    expect(chains.map((c) => c.id)).toEqual(['ch3-cliff-l', 'ch3-cliff-r'])
-    expect(chains.map((c) => c.side)).toEqual(['left', 'right'])
+  it('ships THE RAVEN CITY on chapter III: one colossus, one line, one sprawl', () => {
+    expect(chains.map((c) => c.id)).toEqual(['ch3-tower', 'ch3-dispatch-line', 'ch3-terrace'])
+    // The whole point of round-4: one tall piece on the left, two low ones on
+    // the right, at three different depths.
+    expect(chains.map((c) => c.side)).toEqual(['left', 'right', 'right'])
+    expect(new Set(chains.map((c) => c.zc)).size).toBe(3)
   })
 
   it('is a chain, not a flap: every cliff carries at least two storeys', () => {
     for (const c of chains) expect(c.stages.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('reads as two different cliffs, not a mirrored pair (variety law)', () => {
-    const [l, r] = chains
-    expect(l.stages.length).not.toBe(r.stages.length)
-    expect(l.rootDeg).not.toBe(r.rootDeg)
-    expect(stagedChainApex(l, REST_BETA)).not.toBeCloseTo(stagedChainApex(r, REST_BETA), 2)
+  it('reads as three different structures, never a mirrored pair (variety law)', () => {
+    // r3 shipped two cliffs of the same construction on opposite flanks and the
+    // user's eye called it. A symmetry has no scale, because nothing in the
+    // picture measures the big thing against anything. So no two chains here
+    // may share a stage count, a rake, or an apex.
+    expect(new Set(chains.map((c) => c.stages.length)).size).toBe(chains.length)
+    expect(new Set(chains.map((c) => c.rootDeg)).size).toBe(chains.length)
+    const apexes = chains.map((c) => stagedChainApex(c, REST_BETA))
+    apexes.forEach((a, i) => apexes.forEach((b, j) => i === j || expect(a).not.toBeCloseTo(b, 2)))
+  })
+
+  it('the COLOSSUS out-tops the keep, and everything else stays low', () => {
+    const apexes = chains.map((c) => stagedChainApex(c, REST_BETA))
+    const tallest = Math.max(...apexes)
+    // the keep's fan spire crowns at 1.01; the tower is the one thing that
+    // climbs past it (r3's best cliff reached 0.816)
+    expect(tallest).toBeGreaterThan(1.01)
+    expect(chains[apexes.indexOf(tallest)].id).toBe('ch3-tower')
+    // ...and the right page answers with a sprawl and a wire, not a second
+    // colossus: the tower must stand at least half again as tall as anything
+    // else on the spread, which is what makes the picture readable as ONE tall
+    // thing rather than as a skyline.
+    apexes
+      .filter((a) => a !== tallest)
+      .forEach((a) => expect(tallest / a).toBeGreaterThanOrEqual(1.5))
+  })
+
+  it('is a TRAPEZOID chain: storeys taper, and the colossus is crooked in plan', () => {
+    for (const c of chains) {
+      stagedChainSpans(c).forEach(([r, w]) => {
+        expect(r).toBeGreaterThan(0)
+        expect(w).toBeGreaterThan(0)
+      })
+      // nothing may come nearer the gutter than the keep's own radial band
+      expect(stagedChainRNear(c)).toBeGreaterThanOrEqual(0.415)
+      expect(stagedChainRFar(c)).toBeLessThanOrEqual(PAGE_W)
+    }
+    const tower = chains.find((c) => c.id === 'ch3-tower')!
+    const rs = stagedChainSpans(tower).map(([r]) => r)
+    const ws = stagedChainSpans(tower).map(([, w]) => w)
+    expect(ws[ws.length - 1]).toBeLessThan(ws[0])
+    // CROOKED means NON-MONOTONE: the stack kicks out at the gantry belt and
+    // pulls back at the belfry. A monotone taper would read as a pylon.
+    const up = rs.every((r, i) => i === 0 || r >= rs[i - 1])
+    const down = rs.every((r, i) => i === 0 || r <= rs[i - 1])
+    expect(up || down).toBe(false)
   })
 })
 
@@ -141,7 +192,13 @@ describe.each(chains.map((c) => [c.id, c] as const))(
       }
     })
 
-    it('condition 5: an ACCORDION at this height would FAIL the wedge (the wall is real)', () => {
+    // The wedge wall is a HEIGHT wall, not a universal one: a fold-back joint
+    // tents to about its own panel height, and atan(h / rnear) only exceeds the
+    // dihedral once the panels are long. So the control runs on chains tall
+    // enough for the accordion to actually be illegal — on the short roosts and
+    // the wire panel an accordion would be perfectly legal, and pretending
+    // otherwise would make the ribbon choice look forced.
+    it.skipIf(stagedChainLength(geom) < 0.9)('condition 5: an ACCORDION at this height would FAIL the wedge (the wall is real)', () => {
       // Same chain, same cam, accordion folding: the tent appears and the gate
       // trips. Keeps the ribbon choice honest rather than decorative.
       const asAccordion: StagedChainGeom = { ...geom, style: 'accordion' }
@@ -191,10 +248,14 @@ describe.each(chains.map((c) => [c.id, c] as const))(
 
     // ---- CONDITION 1: hold-through-midturn reach ----------------------------
     it('condition 1: holds a shallow enough pose through the fast mid-turn station', () => {
-      const rfar = geom.F + geom.w
-      const holdCap = Math.sqrt(RADIUS_CAP ** 2 - rfar ** 2)
-      // beta = PI/2 is where the eased clock is fastest on both moving paths.
-      expect(stagedChainApex(geom, Math.PI / 2)).toBeLessThanOrEqual(holdCap)
+      // ROUND-4: PER NODE. A point sweeps a circle about the spine axis of
+      // radius hypot(its own radial, its own reach). The r3 reading charged
+      // every node the widest node's radius, which on a trapezoid invents a
+      // radius no point on the piece ever has — and is what capped this family
+      // near apex 0.88. beta = PI/2 is where the eased clock is fastest.
+      expect(
+        stagedChainMaxRadius(geom, stagedChainNodes(geom, Math.PI / 2))
+      ).toBeLessThanOrEqual(RADIUS_CAP)
     })
 
     it('condition 1 consequence: real-time worst step clears GLOBAL_CAP on all four paths', () => {
@@ -230,9 +291,9 @@ describe.each(chains.map((c) => [c.id, c] as const))(
         }
         prev = pts
       }
-      // 13 = 11.15 measured (ch3-cliff-l) + 10%, mirrored in
+      // 14 = 12.55 measured (ch3-tower) + 10%, mirrored in
       // motion-character.test.ts's FAMILY_RATIO_CEILINGS.
-      expect(max / (sum / n)).toBeLessThan(13)
+      expect(max / (sum / n)).toBeLessThan(14)
     })
 
     // ---- the pose the reader actually holds ---------------------------------
@@ -242,11 +303,12 @@ describe.each(chains.map((c) => [c.id, c] as const))(
       geom.stages.forEach((_, k) => expect(stagedChainQ(geom, k, REST_BETA)).toBe(1))
     })
 
-    it('stands tall but leaves the keep the gutter crown, under the crop ceiling', () => {
+    it('stands as a real piece, under the crop ceiling', () => {
       const apex = stagedChainApex(geom, REST_BETA)
-      expect(apex).toBeGreaterThan(0.7)
-      // the keep's fan spire reaches ~1.01; nothing is built above ~1.2
-      expect(apex).toBeLessThan(1.0)
+      expect(apex).toBeGreaterThan(0.25)
+      // the crop lid: nothing in this book is built above ~1.2, because the
+      // frame top crops there at the worst tilt (playbook section 2)
+      expect(apex).toBeLessThan(1.2)
       const maxY = quadsAt(geom, Math.PI / 2 - REST_BETA / 2, REST_BETA)
         .flat()
         .reduce((a, p) => Math.max(a, p[1]), 0)
@@ -262,6 +324,21 @@ describe.each(chains.map((c) => [c.id, c] as const))(
     })
   }
 )
+
+/** Every storey's three measurable edge lengths at a reference pose — the
+ *  rigidity gate compares against these rather than against (w, h), because a
+ *  trapezoid storey's side edges are slanted by design. */
+const REF_EDGES: Record<string, { base: number; outer: number; inner: number }[]> =
+  Object.fromEntries(
+    chains.map((geom) => [
+      geom.id,
+      solveStagedChainPose(geom, Math.PI, 0).panels.map((q) => ({
+        base: dist(q[0], q[1]),
+        outer: dist(q[1], q[2]),
+        inner: dist(q[0], q[3]),
+      })),
+    ])
+  )
 
 describe('staged chain — solver contract', () => {
   it('poses one quad per storey, root first, sharing the storey seams', () => {
@@ -281,9 +358,14 @@ describe('staged chain — solver contract', () => {
       for (let i = 0; i <= 60; i++) {
         const beta = (i / 60) * Math.PI
         const { panels } = solveStagedChainPose(geom, beta, 0)
+        // RIGIDITY on a TRAPEZOID is CONSTANCY, not equality to (w, h): a
+        // storey whose top node is narrower or shifted has slanted side edges
+        // of length hypot(h, delta-r), and it is those lengths that must not
+        // change as the page turns.
         panels.forEach((quad, k) => {
-          expect(dist(quad[0], quad[1])).toBeCloseTo(geom.w, 9)
-          expect(dist(quad[0], quad[3])).toBeCloseTo(geom.stages[k].h, 9)
+          expect(dist(quad[0], quad[1])).toBeCloseTo(REF_EDGES[geom.id][k].base, 9)
+          expect(dist(quad[1], quad[2])).toBeCloseTo(REF_EDGES[geom.id][k].outer, 9)
+          expect(dist(quad[0], quad[3])).toBeCloseTo(REF_EDGES[geom.id][k].inner, 9)
         })
       }
     }

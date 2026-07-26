@@ -190,6 +190,15 @@ const familyOf = (l: SceneLayer): string | null => {
       // at separate spine stations, no per-joint scheduling): the delay is the
       // mechanism here, and it is what buys page-tall page-rooted height.
       return 'stagedchain'
+    case 'dispatchline':
+      // The dispatch line (E3 s4 round-4) — the staged chain's sheet die-cut
+      // down to a cable, carrying an IN-PLANE rider the reader pushes along it.
+      // Distinct from the staged chain it is built on (that family's output is
+      // a silhouette; this one's is a TRACK), and from the winch (whose outputs
+      // leave their host's plane): a rider that never leaves the sheet inherits
+      // fold-flat and wedge containment from the sheet, which is why the reader
+      // may park a basket mid-span and still shut the book.
+      return 'dispatchline'
     case 'oanave':
       // The origamic-architecture nave rank (E3 s7) — a v-fold wall host
       // carrying die-cut relief strata folded from its own sheet: the

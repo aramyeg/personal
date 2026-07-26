@@ -19,7 +19,12 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
-import { solveStagedChainPose, stagedChainBand, type StagedChainGeom } from './popup-stagedchain'
+import {
+  solveStagedChainPose,
+  stagedChainBand,
+  stagedChainNodeU,
+  type StagedChainGeom,
+} from './popup-stagedchain'
 import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -29,13 +34,17 @@ const FLAT_EPSILON = 0.02
 
 /** Static uvs, quad-ordered exactly as the position writer walks the pose:
  *  one quad per storey, root first, corners [inner-base, outer-base,
- *  outer-top, inner-top]. u runs radially outward across the wall, v climbs
- *  the storey's band of the shared painting. */
+ *  outer-top, inner-top]. v climbs the storey's band of the shared painting;
+ *  u is the storey's own sub-range of the chain's full radial extent, so a
+ *  TRAPEZOID wall cuts the right slice of one crooked silhouette instead of
+ *  stretching the whole sheet across every storey. */
 function chainUvs(geom: StagedChainGeom): Float32Array {
   const uvs: number[] = []
   geom.stages.forEach((_, k) => {
     const [v0, v1] = stagedChainBand(geom, k)
-    uvs.push(0, v0, 1, v0, 1, v1, 0, v1)
+    const [u0a, u1a] = stagedChainNodeU(geom, k)
+    const [u0b, u1b] = stagedChainNodeU(geom, k + 1)
+    uvs.push(u0a, v0, u1a, v0, u1b, v1, u0b, v1)
   })
   return new Float32Array(uvs)
 }

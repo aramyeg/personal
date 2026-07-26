@@ -89,6 +89,11 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export type StagedChainStage = {
   h: number
   relDeg?: number
+  /** THE TRAPEZOID CHAIN (E3 s4 round-4). Radial span of this stage's TOP node:
+   *  inner edge `rTop`, width `wTop`. Anything unset inherits the node below, so
+   *  a plain rectangular wall stays exactly what it was. */
+  rTop?: number
+  wTop?: number
 }
 
 /**
@@ -166,6 +171,59 @@ export type StagedChainCam = {
 /** A chain node in page-local coordinates: [xi (flat, toward -z), eta (off-page)]. */
 export type StagedChainNode = readonly [number, number]
 
+/**
+ * THE TRAPEZOID CHAIN — per-node radial span [r_j, r_j + w_j] (E3 s4 round-4,
+ * derived in `.superpowers/sdd/bench/e3s4r4-tower.mjs`).
+ *
+ * The r3 family gave every node the same span [F, F+w], so a stagedchain could
+ * only ever be a rectangular wall — which is why two of them read as two cards.
+ * Letting each node carry its own span costs NOTHING kinematically: the chain
+ * solves in the page-local (xi, eta) plane and the radial coordinate is a pure
+ * spanwise parameter. What it buys is the whole crooked-tower vocabulary —
+ * TAPER (widths narrowing as the tower climbs) and SKEW (the inner edge
+ * drifting, so the stack zig-zags in plan and reads as a thing that grew too
+ * fast to stand straight).
+ *
+ * Node 0 is the root span (geom.F, geom.w); stage k may re-declare the span at
+ * its TOP node, and anything unset inherits the node below.
+ */
+export function stagedChainSpans(geom: StagedChainGeom): readonly (readonly [number, number])[] {
+  const spans: (readonly [number, number])[] = [[geom.F, geom.w]]
+  for (const stage of geom.stages) {
+    const prev = spans[spans.length - 1]
+    spans.push([stage.rTop ?? prev[0], stage.wTop ?? prev[1]])
+  }
+  return spans
+}
+
+/** Widest node — the piece's real-time rotation-radius extreme. */
+export const stagedChainRFar = (geom: StagedChainGeom): number =>
+  Math.max(...stagedChainSpans(geom).map(([r, w]) => r + w))
+/** Innermost node — the edge the closing wedge binds on. */
+export const stagedChainRNear = (geom: StagedChainGeom): number =>
+  Math.min(...stagedChainSpans(geom).map(([r]) => r))
+
+/**
+ * THE PER-NODE ROTATION RADIUS. A point on a page-rooted piece sweeps a circle
+ * about the SPINE AXIS of radius hypot(radial, off-page reach). The r3 planner
+ * charged every node the chain's single worst radius hypot(rfar, eta_top) —
+ * exactly right when every node shares one span, and needlessly brutal once
+ * they do not. On a trapezoid tower the two extremes never coincide: the base
+ * is wide but sits at eta = 0, and the crown is high but narrow. Charging the
+ * crown the base's width invents a radius no point on the piece ever has, and
+ * on the shipped tower it would have shrunk the crown's hold-through-midturn
+ * window from 0.515 to 0.136.
+ */
+export function stagedChainMaxRadius(
+  geom: StagedChainGeom,
+  nodes: readonly StagedChainNode[]
+): number {
+  const spans = stagedChainSpans(geom)
+  let r = 0
+  for (let j = 0; j < nodes.length; j++) r = Math.max(r, Math.hypot(spans[j][0] + spans[j][1], nodes[j][1]))
+  return r
+}
+
 /** Depth the chain occupies up the page at book-closed. A ribbon lies extended
  *  (the full chain length); an accordion superposes to its alternating prefix
  *  reach. This is what the closed pose must fit inside the page with. */
@@ -238,7 +296,6 @@ export function planStagedChainCam(geom: StagedChainGeom): StagedChainCam {
   const n = geom.stages.length
   const safe = geom.safe ?? DEFAULT_SAFE
   const camRest = rad(geom.camRestDeg ?? DEFAULT_CAM_REST_DEG)
-  const rfar = geom.F + geom.w
 
   // lever[j] = chain length above joint j; travel[j] = the arc it must cover.
   const levers = geom.stages.map((_, j) => geom.stages.slice(j).reduce((a, s) => a + s.h, 0))
@@ -264,9 +321,7 @@ export function planStagedChainCam(geom: StagedChainGeom): StagedChainCam {
   let joint = 0
   for (let i = iRest; i >= 1; i--) {
     const dbeta = betas[i] - betas[i - 1]
-    let etaTop = 0
-    for (const [, eta] of stagedChainNodesQ(geom, qNow)) etaTop = Math.max(etaTop, eta)
-    let headroom = safe * GLOBAL_CAP - Math.hypot(rfar, etaTop) * dbeta
+    let headroom = safe * GLOBAL_CAP - stagedChainMaxRadius(geom, stagedChainNodesQ(geom, qNow)) * dbeta
     while (headroom > 1e-12 && joint < n) {
       const arc = Math.min(remaining[joint], headroom)
       remaining[joint] -= arc
@@ -331,7 +386,7 @@ export function stagedChainNodes(geom: StagedChainGeom, beta: number): readonly 
  */
 export function stagedChainWedgeExcursion(geom: StagedChainGeom, beta: number): number {
   if (beta >= Math.PI / 2) return -Infinity
-  const limit = geom.F * Math.tan(beta)
+  const limit = stagedChainRNear(geom) * Math.tan(beta)
   let worst = -Infinity
   for (const [, eta] of stagedChainNodes(geom, beta)) worst = Math.max(worst, eta - limit)
   return worst
@@ -371,13 +426,16 @@ export function solveStagedChainPose(
     d * u[1] + node[1] * n[1],
     geom.zc - node[0],
   ]
-  const dIn = geom.F
-  const dOut = geom.F + geom.w
+  // TRAPEZOID: each storey's quad runs from its BOTTOM node's radial span to its
+  // TOP node's, so a tapering, skewing chain is still one quad per storey.
+  const spans = stagedChainSpans(geom)
   const panels: PanelQuad[] = []
   for (let k = 0; k + 1 < nodes.length; k++) {
     const base = nodes[k]
     const top = nodes[k + 1]
-    panels.push([at(dIn, base), at(dOut, base), at(dOut, top), at(dIn, top)])
+    const [r0, w0] = spans[k]
+    const [r1, w1] = spans[k + 1]
+    panels.push([at(r0, base), at(r0 + w0, base), at(r1 + w1, top), at(r1, top)])
   }
   return { panels }
 }
@@ -409,9 +467,26 @@ export function stagedChainBand(geom: StagedChainGeom, stage: number): readonly 
   return [below / total, (below + geom.stages[stage].h) / total]
 }
 
+/**
+ * NODE j's u-range in its wall's texture. On a trapezoid the storeys do not all
+ * span the same radial band, so the painting is authored across the chain's FULL
+ * radial extent [rNear, rFar] and each node samples the sub-range it actually
+ * occupies. That is what lets the painter draw ONE crooked tower silhouette in
+ * one image and have the mesh cut it correctly storey by storey (a plain
+ * rectangular chain gets [0, 1] on every node, exactly as before).
+ */
+export function stagedChainNodeU(geom: StagedChainGeom, node: number): readonly [number, number] {
+  const rNear = stagedChainRNear(geom)
+  const extent = stagedChainRFar(geom) - rNear
+  if (extent <= 0) return [0, 1]
+  const [r, w] = stagedChainSpans(geom)[node]
+  return [(r - rNear) / extent, (r + w - rNear) / extent]
+}
+
 /** Pixel dimensions for a wall's art at a given long edge, preserving the
- *  chain's true aspect (the "true mesh aspect" law — no stretched prints). */
+ *  chain's true aspect (the "true mesh aspect" law — no stretched prints).
+ *  The width is the FULL radial extent, which is the sheet the painter fills. */
 export function stagedChainArtSize(geom: StagedChainGeom, longEdge = 1024): { w: number; h: number } {
-  const aspect = geom.w / stagedChainLength(geom)
+  const aspect = (stagedChainRFar(geom) - stagedChainRNear(geom)) / stagedChainLength(geom)
   return { w: Math.round(longEdge * aspect), h: longEdge }
 }

@@ -26,13 +26,16 @@ const SKYLINES = CHAPTERS.find((c) => c.spread === 4)!.layers.filter(
 )
 
 describe('citadel rank — +z-facing city rows (bench derive-keep-cityrows.mjs)', () => {
-  it('ships one skyline per outer page, each with city rows behind the keep', () => {
-    // E3 s4 ROUND-3: the ring is RETIRED into the stagedchain cliffs
-    // (popup-stagedchain.test.ts). The rear rows and both ring-mid arms are
-    // gone and ch3-skyline-r with them; what survives is the LEFT page's
-    // lamplit yard wall, where the post-road enters the court. The right
-    // page's downstage stations are the dispatch dial and gatehouse tower.
-    expect(SKYLINES.map((s) => s.side)).toEqual(['left'])
+  it('has no s4 rows left at all — the family retired off this spread', () => {
+    // E3 s4 ROUND-3 retired the ring into the stagedchain cliffs, leaving one
+    // survivor: the LEFT page's lamplit yard wall. ROUND-4 retires that too.
+    // The crooked colossus's closed ribbon needs the left page's depth, and the
+    // yard wall's job — telling the reader where the post-road enters the court
+    // — now belongs to the terraced roosts' own lamplit foot on the right page.
+    // The family is still shipped and gated on other spreads; s4 simply has no
+    // skyline rows any more, and this asserts that on purpose rather than by
+    // an empty loop quietly passing.
+    expect(SKYLINES).toEqual([])
     for (const sky of SKYLINES) {
       expect(sky.rows.length).toBeGreaterThanOrEqual(1)
       for (const r of sky.rows) {

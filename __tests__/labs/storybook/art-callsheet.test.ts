@@ -107,6 +107,10 @@ function knownGoodIds(): ReadonlySet<string> {
     if (layer.mech === 'skyline') {
       layer.rows.forEach((_, i) => ids.add(`${layer.id}-mound${i}`))
     }
+    // The dispatch line (popup-dispatchline-layer.tsx): the die-cut cable PANEL
+    // requests the layer id itself, plus `<id>-basket` for the in-plane rider
+    // the reader pushes down the wire.
+    if (layer.mech === 'dispatchline') ids.add(`${layer.id}-basket`)
     // The carrier swarm (popup-swarmarc-layer.tsx): ONE shared sprite atlas
     // for all 28 riders + the strut swatch + the stir-tab handle.
     if (layer.mech === 'swarmarc') {

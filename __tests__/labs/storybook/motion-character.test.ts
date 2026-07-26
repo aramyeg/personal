@@ -191,6 +191,11 @@ const allQuads = (
   // The staged chain is purely page-driven: every joint's q is a monotone cam
   // in beta alone, so its whole motion is the merged storey strip.
   if (layer.mech === 'stagedchain') return stagedChainQuads(layer, thetaL, thetaR)
+  // The dispatch line's paper IS the chain's paper (its rider is in-plane and
+  // adds no degree of freedom), so it is paced by the same cam and measured here
+  // with the same quads.
+  if (layer.mech === 'dispatchline')
+    return stagedChainQuads({ ...layer, mech: 'stagedchain' }, thetaL, thetaR)
   const pose = poseAt(layer, layers, thetaL, thetaR)
   return [pose.right, pose.left]
 }
@@ -370,7 +375,13 @@ const BETA_FAMILY_CEILING: Readonly<Record<string, number>> = {
   // (ch3-cliff-l, beta domain) + 10%. (The first, ACCORDION cliffs measured
   // 37x here; the ribbon that wedge containment forced on them is far gentler,
   // because a ribbon joint never swings a panel through vertical.)
-  stagedchain: 13,
+  // ROUND-4 re-measure: the crooked colossus, the dispatch line and the
+  // terraced roosts measure 12.55 worst (ch3-tower, beta domain) -> 14.
+  stagedchain: 14,
+  // DISPATCH LINE (E3 s4 round-4): the staged chain's cam verbatim, so it takes
+  // the same ceiling; the rider is a constant-weight bilinear point of the sheet
+  // and therefore can never step further than the sheet's own worst corner.
+  dispatchline: 14,
   // VOLVELLE (E2.2 Batch B): at a FROZEN twist the dial + card ride the page as a
   // rigid coplanar square, so their only page-driven motion is the pure rigid
   // page sweep — every corner's step is proportional to its distance from the

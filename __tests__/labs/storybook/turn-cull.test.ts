@@ -97,7 +97,14 @@ describe('C-3 scope — which s4 pieces the cull is allowed to touch', () => {
     expect(mechOf('ch3-dispatch')).toBe('volvelle')
     expect(mechOf('ch3-keep-winch')).toBe('keepwinch')
     expect(mechOf('ch3-keep')).toBe('keepstack')
-    expect(mechOf('ch3-ring-tower')).toBe('stripflap')
+    // ROUND-4: the ch3-ring-tower gatehouse is retired — the terraced roosts
+    // stand where it did and do its job at ten times the size. The dispatch
+    // LINE is the spread's new reader instrument, and it must NOT be culled:
+    // its rider is in-plane, so a basket parked mid-wire has to stay legible
+    // through the turn rather than fading with the instruments.
+    expect(mechOf('ch3-tower')).toBe('stagedchain')
+    expect(mechOf('ch3-dispatch-line')).toBe('dispatchline')
+    expect(['volvelle', 'keepwinch']).not.toContain(mechOf('ch3-dispatch-line'))
     expect(['volvelle', 'keepwinch']).not.toContain(mechOf('ch3-keep'))
   })
 })

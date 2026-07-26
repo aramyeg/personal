@@ -4487,35 +4487,41 @@ function ringTower(w, h, seed) {
 }
 
 // ============================================================================
-// E3 s4 ROUND-3 — THE ROOKERY CLIFFS (PIECES ch3-cliff-l / ch3-cliff-r, the
-// `stagedchain` family). ONE continuous portrait painting per cliff, which the
-// mesh slices into per-storey horizontal v-bands (popup-stagedchain.ts
-// `stagedChainBand`) that hinge against each other by 20deg (left) / 22deg
-// (right) as the page opens. The two walls face each other across the gutter and
-// make a CANYON of ravens with the keep as its crown; the lamplit post-road runs
-// the canyon floor to the gate.
+// E3 s4 ROUND-4 — THE RAVEN CITY (PIECES `ch3-tower`, `ch3-dispatch-line`,
+// `ch3-dispatch-line-basket`, `ch3-terrace`). The r3 canyon was a MIRROR — two
+// near-identical cliffs facing each other across the gutter — and a mirror has
+// no scale, because nothing in it measures anything else. Round 4 paints ONE
+// DIAGONAL SWEEP at dispatch hour instead: a colossal crooked rookery tower
+// climbing the LEFT page past the keep's crown, a working dispatch cable falling
+// across the RIGHT page with letter-baskets riding it, and a low sprawl of
+// terraced roosts where the ravens sort. The keep nests in the tower's shadow.
 //
-// THE BAND CONTRACT. `chainBands` re-derives the fold lines from the SAME storey
-// lengths content.ts hands the solver, so a cornice can never drift into the
-// middle of a window. Every interior band edge is painted as a rim-lit corbelled
-// LEDGE — shadow reveal, dentil course, lit coping, crenellated parapet — whose
-// coping top lands exactly ON the fold, and the storey above starts from a pale
-// plinth. Nothing that must read as ONE object (a portal, a lantern, a perched
-// bird) may cross a fold: every rank is clamped under its own storey's cornice,
-// and the linked raven ranks stand at the BASE of the storey above, so they
-// tilt with the panel they are printed on.
+// THE TRAPEZOID CONTRACT. The mesh no longer hands a storey the whole sheet:
+// `stagedChainNodeU` gives each NODE the u sub-range its radial span actually
+// occupies, so a storey is a TRAPEZOID in the painting and the union of them is
+// the piece's die. `chainBands` + `chainNodeUs` re-derive both from the SAME
+// numbers content.ts hands the solver, so a cornice can never drift into the
+// middle of a window and a gantry can never be cut off by the die. Everything
+// outside the band is fully transparent — never sampled, so a stroke painted
+// there is a stroke thrown away. The storeys deliberately do NOT line up: the
+// kinks in that band ARE the crooked read, which is why the flanks are bitten
+// INWARD by a seeded jitter everywhere EXCEPT at the deck windows, where the
+// paper runs flush to the boundary and a platform juts out over the storey
+// below without ever leaving the sheet.
 //
-// u runs 0 at the SPINE-side (inner, canyon-facing) edge to 1 at the outer page
-// edge on BOTH cliffs, so the light — the road lamps and the keep's gate on the
-// canyon floor — always falls from image-LEFT and the crown falls to night.
+// WHAT BEATS THE r3 CLIFFS IS VALUE, NOT DETAIL. Those walls read pale and
+// washed out against the black page: three full-sheet atmosphere gradients plus
+// a halo per portal lifted the whole face to a flat lavender, and a 5px
+// near-white rim piped the die like a cake. Here the stone starts near-black,
+// every wash is LOCAL (a warm pool at the foot, a night fall at the crown, a
+// lamplit inboard flank — never a full-sheet grey), the rim is narrowed to a
+// hairline of raw paper, and the amber is spent only where it buys contrast:
+// inside the portals, on the ledges the lamps stand on, and nowhere else.
 //
-// WHAT ESCALATES over the retired dovecote flanks is AGGREGATE, not scale: every
-// storey carries a full RANK of blazing arched raven portals at its OWN cadence
-// (monumental 3s at the foot, regimented 5s mid, dense 7s in the crown on the
-// left; a staggered bond and a raked shelving rank on the right), plus rock
-// ribs, hanging roost boxes, corbelled ledges, linked ranks of perched ravens on
-// every fold, lantern posts, a crown beacon, and ravens wheeling free of the
-// crest in the die-cut margin.
+// LIGHT. u = 0 is the INBOARD (gutter) edge on every piece here, and that is
+// where the scene's light lives — the keep's gate, the lamplit road, the city.
+// So the inboard flank is the lit face and the outboard falls to night, on the
+// tower and on the roosts alike.
 // ============================================================================
 
 /** Storey v-bands of a staged chain's art, v-UP in image fractions, ROOT FIRST
@@ -4533,11 +4539,86 @@ function chainBands(storeys) {
   return out
 }
 
+/** Per-NODE u-ranges of a TRAPEZOID chain's art — the exact fractions
+ *  `stagedChainNodeU` hands the mesh, from the same radial spans content.ts
+ *  hands the solver. `spans` are [radius, width] pairs, root node first; the
+ *  painting is authored across the chain's full radial extent and each node
+ *  samples the sub-range it occupies. */
+function chainNodeUs(spans) {
+  const rNear = Math.min(...spans.map(([r]) => r))
+  const rFar = Math.max(...spans.map(([r, sw]) => r + sw))
+  const extent = Math.max(1e-6, rFar - rNear)
+  return spans.map(([r, sw]) => [(r - rNear) / extent, (r + sw - rNear) / extent])
+}
+
+/** The die edge at height v. `side` 0 is the INBOARD (gutter) flank, 1 the
+ *  outboard one. Piecewise linear between node u-ranges — this band is the only
+ *  paper there is, so every rank, ledge and lamp is placed against it. */
+function chainEdgeAt(bands, us, v, side) {
+  let k = 0
+  while (k < bands.length - 1 && v > bands[k][1]) k++
+  const [v0, v1] = bands[k]
+  const t = Math.min(1, Math.max(0, (v - v0) / Math.max(1e-6, v1 - v0)))
+  return lerp(us[k][side], us[k + 1][side], t)
+}
+
+/** One flank of a trapezoid stack's die, walked bottom to top. The wall is
+ *  bitten INWARD by a seeded jitter; a DECK window runs flush to the trapezoid
+ *  boundary and enters and leaves on a horizontal STEP, which is what a jutting
+ *  platform looks like from the side. `decks` is one window list per storey, in
+ *  storey-height fractions. `vMax` is where the flank MEETS THE SKYLINE: a flank
+ *  walked all the way to v = 1 under a crest cut at 0.9 leaves a needle standing
+ *  in each top corner of the die, which is what the first bake printed. */
+function stackFlank(bands, us, side, decks, rand, inset, stations, vMax = 1) {
+  const sgn = side === 0 ? 1 : -1
+  const pts = []
+  let wasDeck = null
+  // the bite is a slow random WALK, not per-station noise: a weathered edge
+  // wanders over several storeys, and white noise on a die edge reads as a bad
+  // scan rather than as cut paper
+  let walk = 0.5
+  for (let k = 0; k < bands.length; k++) {
+    const [v0, v1] = bands[k]
+    const win = decks[k] ?? []
+    for (let i = 0; i <= stations; i++) {
+      const t = i / stations
+      const v = lerp(v0, v1, t)
+      const deck = win.some(([a, b]) => t >= a && t <= b)
+      walk = Math.min(1, Math.max(0, walk + (rand() * 2 - 1) * 0.4))
+      const u = chainEdgeAt(bands, us, v, side) + (deck ? 0 : sgn * inset * (0.22 + walk * 1.35))
+      if (v > vMax) {
+        if (pts.length) pts.push([pts[pts.length - 1][0], vMax])
+        return pts
+      }
+      if (wasDeck !== null && deck !== wasDeck && pts.length) pts.push([pts[pts.length - 1][0], v])
+      pts.push([u, v])
+      wasDeck = deck
+    }
+  }
+  return pts
+}
+
+/** The lamp gradients every raven-city piece paints with. `ravenPortal` and the
+ *  lantern heads address them by name, so a piece that forgets them prints its
+ *  windows as holes. */
+function cityLampDefs() {
+  return (
+    `<radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">` +
+    `<stop offset="0" stop-color="${DUSK.amberCore}"/><stop offset="0.42" stop-color="${DUSK.amber}"/>` +
+    `<stop offset="1" stop-color="${DUSK.amberDeep}"/></radialGradient>` +
+    `<radialGradient id="rookHalo" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${DUSK.amberLit}" stop-opacity="0.66"/>` +
+    `<stop offset="0.24" stop-color="${DUSK.amber}" stop-opacity="0.26"/>` +
+    `<stop offset="0.56" stop-color="${DUSK.amber}" stop-opacity="0.07"/>` +
+    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>`
+  )
+}
+
 /** A crest lantern's silhouette: a SHORT stout post under a broad glazed head
  *  and a finial. The shared `lanternTop` was authored for a parapet post on a
- *  wide facade, and at a cliff merlon's width it cuts a 8px flagpole with a
- *  pinhead lamp — this profile puts two thirds of the height into the head, so
- *  the crown lamps read as lamps at the reading camera. */
+ *  wide facade, and at a merlon's width it cuts an 8px flagpole with a pinhead
+ *  lamp — this profile puts two thirds of the height into the head, so the crown
+ *  lamps read as lamps at the reading camera. */
 function cliffLanternTop(a, lw, v0, lh) {
   return [
     [a + 0.34 * lw, v0], [a + 0.34 * lw, v0 + 0.3 * lh], [a + 0.06 * lw, v0 + 0.38 * lh],
@@ -4547,9 +4628,8 @@ function cliffLanternTop(a, lw, v0, lh) {
   ]
 }
 
-/** A wavy bedding line across the rock face — strata, not ashlar coursing. The
- *  cliffs are ROCK with architecture cut into it, and the straight line is what
- *  would make them read as another building. */
+/** A wavy bedding line across a face — hand-cut coursing, not machine ashlar.
+ *  A dead straight line is what makes cut paper read as print. */
 function strataPath(y, x0, x1, amp, segs, rand) {
   let d = `M ${fx(x0)} ${fx(y)}`
   for (let i = 1; i <= segs; i++) {
@@ -4558,9 +4638,10 @@ function strataPath(y, x0, x1, amp, segs, rand) {
   return d
 }
 
-/** One raven wheeling free of the crest, as a closed gull silhouette — cut into
- *  the transparent margin above the cliff, so the die itself carries the birds
- *  (T-LINKED-RANK's opposite number: the few that are NOT in the rank). */
+/** One raven wheeling free of a crest, as a closed gull silhouette — cut into
+ *  the transparent sky the die leaves above the roofline, so the paper itself
+ *  carries the birds (T-LINKED-RANK's opposite number: the few NOT in the
+ *  rank). */
 function wheelRavenPath(cx, cy, s, tilt) {
   const c = Math.cos(tilt)
   const sn = Math.sin(tilt)
@@ -4573,242 +4654,363 @@ function wheelRavenPath(cx, cy, s, tilt) {
   )
 }
 
-/**
- * The two cliffs, authored as tables rather than as two painters: same idiom,
- * deliberately different cadence everywhere it is visible (variety law — they
- * must not read as a mirrored pair).
- *
- *   `inner`/`outer`  the mass's u extent per storey (root first). The LEFT steps
- *                    hard inward each storey (a stepped massif); the RIGHT barely
- *                    steps (a long shelving scarp).
- *   `crestIn/Out`    crest height at the crown's inner/outer end, as band
- *                    fractions of the CROWN storey. The right's raked crest is
- *                    its silhouette signature.
- *   `rows`           portal ranks per storey, in band fractions: sill height,
- *                    portal height, count, portal width as a fraction of its
- *                    cell, half-cell stagger, and the sill's rake across the
- *                    face. `lit` is the chance a portal blazes.
- */
-const CLIFF_SPEC = {
-  left: {
-    // the stepped massif: three storeys, each stepping hard in from the one
-    // below, so the die reads as a staircase of rock even before the lights
-    inner: [0.0, 0.03, 0.07],
-    outer: [1.0, 0.875, 0.7],
-    base: [DUSK.slate, DUSK.slateDim, DUSK.slateDim],
-    ribs: [5, 5, 4],
-    crestIn: 0.62,
-    crestOut: 0.55,
-    teeth: 7,
-    toothV: 0.02,
-    lanternAt: [1, 5],
-    beaconAt: -1,
-    lanternV: 0.07,
-    ravens: [null, { u: [0.1, 0.46], bh: 0.031 }, { u: [0.24, 0.6], bh: 0.027 }],
-    wheel: [
-      [0.86, 0.932, 0.075, -0.2], [0.93, 0.835, 0.055, 0.18], [0.79, 0.986, 0.048, 0.32],
-      [0.58, 0.968, 0.062, -0.12], [0.3, 0.984, 0.042, 0.24],
-    ],
-    rows: [
-      // THE GATE RANK: a low course of roost holes under four monumental arches
-      [
-        { n: 7, sill: 0.12, hF: 0.12, wid: 0.44, off: 0, rake: 0, lit: 0.6 },
-        { n: 4, sill: 0.42, hF: 0.24, wid: 0.46, off: 0, rake: 0, lit: 0.9 },
-      ],
-      // the regimented middle: two aligned ranks of six
-      [
-        { n: 6, sill: 0.13, hF: 0.22, wid: 0.48, off: 0, rake: 0, lit: 0.68 },
-        { n: 6, sill: 0.5, hF: 0.22, wid: 0.48, off: 0, rake: 0, lit: 0.68 },
-      ],
-      // the crown: the dovecote proper — dense sevens, the tightest cadence
-      [
-        { n: 6, sill: 0.15, hF: 0.12, wid: 0.52, off: 0, rake: 0, lit: 0.64 },
-        { n: 6, sill: 0.33, hF: 0.12, wid: 0.52, off: 0, rake: 0, lit: 0.64 },
-      ],
-    ],
-  },
-  right: {
-    // the shelving scarp: two tall storeys, barely stepped, under a long RAKED
-    // crest that falls away from the gutter — nothing about it mirrors the left
-    inner: [0.0, 0.025],
-    outer: [1.0, 0.94],
-    base: [DUSK.slate, DUSK.slateDim],
-    ribs: [6, 5],
-    crestIn: 0.84,
-    crestOut: 0.62,
-    teeth: 9,
-    toothV: 0.019,
-    lanternAt: [4, 7],
-    // the scarp's high inner shoulder carries the canyon BEACON — one oversized
-    // lantern, the brightest point on either wall, answering the left's pair
-    beaconAt: 1,
-    lanternV: 0.05,
-    ravens: [null, { u: [0.14, 0.54], bh: 0.029 }],
-    wheel: [
-      [0.3, 0.985, 0.06, 0.18], [0.52, 0.966, 0.08, -0.22], [0.7, 0.932, 0.05, 0.26],
-      [0.86, 0.902, 0.066, -0.1], [0.97, 0.8, 0.04, 0.3],
-    ],
-    rows: [
-      // the scarp foot: nine roost holes, a staggered bond of six, four big
-      [
-        { n: 9, sill: 0.075, hF: 0.08, wid: 0.4, off: 0, rake: 0, lit: 0.55 },
-        { n: 6, sill: 0.22, hF: 0.16, wid: 0.46, off: 0.5, rake: 0, lit: 0.72 },
-        { n: 4, sill: 0.5, hF: 0.19, wid: 0.46, off: 0, rake: 0, lit: 0.9 },
-      ],
-      // the shelving upper scarp: both ranks RAKE with the crest, so the storey
-      // reads as bedding tilted out of the canyon and not as another floor
-      [
-        { n: 7, sill: 0.2, hF: 0.11, wid: 0.44, off: 0.5, rake: -0.07, lit: 0.6 },
-        { n: 5, sill: 0.48, hF: 0.15, wid: 0.5, off: 0, rake: -0.13, lit: 0.86 },
-      ],
-    ],
-  },
+/** The cut-paper FACET LATTICE under every raven-city facade: angular planes,
+ *  each a shade off its neighbours, lit on the inboard arris and inked on the
+ *  outboard one. Painted UNDER the architecture, so a rank reads as cut into a
+ *  mass rather than stamped on a flat wall. Tones run pale-to-ink so the caller
+ *  picks how dark the mass sits. */
+function cityFacets(x0, x1, yTop, yBot, tones, nx, ny, rand, h) {
+  const grid = []
+  for (let j = 0; j <= ny; j++) {
+    const row = []
+    for (let i = 0; i <= nx; i++) {
+      const edge = i === 0 || i === nx
+      const cap = j === 0 || j === ny
+      const x = edge ? (i === 0 ? x0 - 3 : x1 + 3) : lerp(x0, x1, i / nx) + (rand() * 2 - 1) * ((x1 - x0) / nx) * 0.32
+      row.push([x, lerp(yBot, yTop, j / ny) + (cap ? 0 : (rand() * 2 - 1) * h * 0.011)])
+    }
+    grid.push(row)
+  }
+  let s = ''
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const a = grid[j][i]
+      const b = grid[j][i + 1]
+      const c = grid[j + 1][i + 1]
+      const e = grid[j + 1][i]
+      const pd = `M ${fx(a[0])} ${fx(a[1])} L ${fx(b[0])} ${fx(b[1])} L ${fx(c[0])} ${fx(c[1])} L ${fx(e[0])} ${fx(e[1])} Z`
+      // planes facing the gutter (low i) lean toward the lamplight, outer ones to ink
+      const pick = Math.min(tones.length - 1, Math.max(0, Math.round((i / Math.max(1, nx - 1)) * (tones.length - 1) + (rand() * 2 - 1) * 1.2)))
+      s += `<path d="${pd}" fill="${tones[pick]}" opacity="${(0.5 + rand() * 0.34).toFixed(2)}"/>`
+      s += `<path d="M ${fx(a[0])} ${fx(a[1])} L ${fx(e[0])} ${fx(e[1])}" fill="none" stroke="${DUSK.slateLit}" stroke-width="${fx(1.4 + rand() * 1.8)}" opacity="${(0.2 + rand() * 0.22).toFixed(2)}"/>`
+      s += `<path d="M ${fx(b[0])} ${fx(b[1])} L ${fx(c[0])} ${fx(c[1])}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(1.6 + rand() * 1.8)}" opacity="${(0.34 + rand() * 0.3).toFixed(2)}"/>`
+    }
+  }
+  return s
 }
 
-/** THE ROOKERY CLIFF. One portrait painting; `storeys` are the chain's panel
- *  lengths, ROOT FIRST, and every fold line is computed from them. */
-function rookeryCliff({ w, h, seed, side, storeys }) {
+/** A seeded UNEVEN partition of [a, b] into `n` cells, returned as n+1 cut
+ *  points. The raven city's first bake printed rank after rank of identical
+ *  cells, and a terrace of identical cells is a spreadsheet: houses were built
+ *  in different decades by different people, so their frontages differ. `spread`
+ *  is how far a cell may stray from its equal share (0.4 = +-40%). */
+function unevenSplit(a, b, n, rand, spread) {
+  const wts = []
+  let tot = 0
+  for (let i = 0; i < n; i++) {
+    const x = 1 + (rand() * 2 - 1) * spread
+    wts.push(x)
+    tot += x
+  }
+  const out = [a]
+  let acc = 0
+  for (let i = 0; i < n; i++) {
+    acc += wts[i]
+    out.push(lerp(a, b, acc / tot))
+  }
+  return out
+}
+
+/** A LINKED RANK of ravens standing on a ledge, with a wash of lamplight behind
+ *  it so the birds have something to be black against — a chain of ink on ink is
+ *  what reads as a scallop instead of as birds. Drawn in px. */
+function perchedRank(X, Y, u0, u1, v0, bh, w, h) {
+  const cnt = Math.max(2, Math.round(((u1 - u0) * w) / Math.max(6, bh * h * RAVEN_CELL)))
+  // the contour is closed at HALF a bird's height, not at the ledge: the profile
+  // only dips to 0.55 between neighbours, so filling all the way down prints one
+  // black bar with a sawtooth on it instead of a rank of birds
+  const foot = v0 + bh * 0.5
+  const chain = ravenChainTop(u0, u1, foot, bh * 0.5, cnt, 'left')
+  let d = `M ${fx(X(u0))} ${fx(Y(foot))}`
+  for (const [u, v] of chain) d += ` L ${fx(X(u))} ${fx(Y(v))}`
+  d += ` L ${fx(X(u1))} ${fx(Y(foot))} Z`
+  // a wash of lamplight behind the rank, so the birds have something to be black
+  // against — a chain of ink on ink is what reads as a scallop
+  let s = `<ellipse cx="${fx(X((u0 + u1) / 2))}" cy="${fx(Y(v0 + bh * 0.55))}" rx="${fx(X(u1 - u0) * 0.62)}" ry="${fx(bh * h)}" fill="url(#rookHalo)" opacity="0.85"/>`
+  const cw = (u1 - u0) / cnt
+  for (let i = 0; i < cnt; i++) {
+    const lx = X(u0 + cw * (i + 0.42))
+    s += `<rect x="${fx(lx)}" y="${fx(Y(foot))}" width="${fx(Math.max(1.6, bh * h * 0.06))}" height="${fx(Y(v0) - Y(foot))}" fill="${DUSK.ink}"/>`
+  }
+  s += `<path d="${d}" fill="${DUSK.ink}"/>`
+  s += `<path d="${d}" fill="none" stroke="${DUSK.rim}" stroke-width="1.3" opacity="0.3" stroke-linejoin="round"/>`
+  s += `<rect x="${fx(X(u0))}" y="${fx(Y(v0) - Math.max(1.8, h * 0.0035))}" width="${fx(X(u1 - u0))}" height="${fx(Math.max(1.8, h * 0.0035))}" fill="${DUSK.amberLit}" opacity="0.72"/>`
+  return s
+}
+
+/** A BOUNDED lamp bloom for the mostly-transparent pieces. `rookHalo` fades to
+ *  zero over a wide radius, and out here that is a trap: the panel renders at
+ *  alphaTest 0.1 and the house grain pass floors EVERY non-transparent pixel at
+ *  ~16% alpha, so a wide soft halo prints as a grey disc hanging in the air.
+ *  Two hard-edged warm ellipses instead — small, warm enough to read as light,
+ *  and they stop where they stop. */
+function warmBloom(cx, cy, r) {
+  // three stepped rings rather than one disc: a single hard-edged ellipse reads
+  // as a sticker, and three read as falloff even though every edge is hard
+  return [1, 0.68, 0.4]
+    .map((f, i) => `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(r * f)}" ry="${fx(r * f * 0.94)}" fill="${i === 2 ? DUSK.amberLit : DUSK.amber}" opacity="${[0.14, 0.18, 0.26][i]}"/>`)
+    .join('')
+}
+
+/** A glazed lantern head on a post, in px — the one warm object the raven city
+ *  repeats at every scale (crown post, gantry lamp, roost lamp, basket lamp).
+ *  `halo` 0 skips the soft wash, for the die-cut pieces that cannot afford it. */
+function lampHead(cx, yTop, yBot, lw, halo) {
+  const hh = yBot - yTop
+  let s = halo > 0 ? `<ellipse cx="${fx(cx)}" cy="${fx((yTop + yBot) / 2)}" rx="${fx(lw * halo)}" ry="${fx(hh * halo * 0.8)}" fill="url(#rookHalo)"/>` : ''
+  s += `<rect x="${fx(cx - lw * 0.5)}" y="${fx(yTop)}" width="${fx(lw)}" height="${fx(hh)}" fill="url(#rookGlow)"/>`
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(lerp(yTop, yBot, 0.5))}" rx="${fx(lw * 0.26)}" ry="${fx(hh * 0.26)}" fill="${DUSK.amberCore}"/>`
+  s += `<rect x="${fx(cx - lw * 0.5)}" y="${fx(yTop)}" width="${fx(lw)}" height="${fx(hh)}" fill="none" stroke="${DUSK.ink}" stroke-width="2.2" opacity="0.92"/>`
+  s += `<rect x="${fx(cx - lw * 0.62)}" y="${fx(yTop - Math.max(2, hh * 0.16))}" width="${fx(lw * 1.24)}" height="${fx(Math.max(2, hh * 0.16))}" fill="${DUSK.ink}" opacity="0.92"/>`
+  return s
+}
+
+/** A small warm ROOST WINDOW — square-headed, lintel and sill, the terraces'
+ *  answer to the tower's arched portals. Horizontal, domestic, and repeated by
+ *  the dozen: the whole point is that the roosts are NOT the colossus. */
+function roostWindow(bx, by, bw, bh, lit) {
+  const cx = bx + bw / 2
+  let s = ''
+  if (lit) {
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(by - bh * 0.4)}" rx="${fx(bw * 1.5)}" ry="${fx(bh * 1.15)}" fill="url(#rookHalo)" opacity="0.62"/>`
+    s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(bh)}" fill="url(#rookGlow)"/>`
+    s += `<rect x="${fx(bx + bw * 0.18)}" y="${fx(by - bh * 0.82)}" width="${fx(bw * 0.64)}" height="${fx(bh * 0.5)}" fill="${DUSK.amberCore}" opacity="0.85"/>`
+    // a bird cut black against the blaze, because every window here is a roost
+    s += `<ellipse cx="${fx(bx + bw * 0.58)}" cy="${fx(by - bh * 0.24)}" rx="${fx(bw * 0.2)}" ry="${fx(bh * 0.16)}" fill="${DUSK.ink}"/>`
+    s += `<circle cx="${fx(bx + bw * 0.4)}" cy="${fx(by - bh * 0.4)}" r="${fx(Math.max(1.2, bw * 0.11))}" fill="${DUSK.ink}"/>`
+  } else {
+    s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(bh)}" fill="${DUSK.ink}"/>`
+    s += `<rect x="${fx(bx)}" y="${fx(by - bh)}" width="${fx(bw)}" height="${fx(Math.max(1, bh * 0.2))}" fill="${DUSK.slateLit}" opacity="0.26"/>`
+  }
+  s += `<rect x="${fx(bx - bw * 0.14)}" y="${fx(by - bh - Math.max(2, bh * 0.16))}" width="${fx(bw * 1.28)}" height="${fx(Math.max(2, bh * 0.16))}" fill="${lit ? DUSK.parch : DUSK.parchDim}" opacity="${lit ? '0.82' : '0.46'}"/>`
+  s += `<rect x="${fx(bx - bw * 0.1)}" y="${fx(by)}" width="${fx(bw * 1.2)}" height="${fx(Math.max(2, bh * 0.13))}" fill="${lit ? DUSK.parch : DUSK.parchDim}" opacity="${lit ? '0.78' : '0.4'}"/>`
+  return s
+}
+
+// ---- THE CROOKED COLOSSUS (`ch3-tower`) ------------------------------------
+// Four UNEVEN storeys — tall buttressed foot, squat gantry belt, tall belfry,
+// short leaning crown — each in its own trapezoid, each with its OWN portal
+// cadence so the stack reads as STOREYS rather than as wallpaper. `decks` are
+// the jutting platforms, and they are one table for both the die and the paint.
+const COLOSSUS = {
+  stone: ['#2e3a4b', '#26303f', '#1e2733', '#171f29'],
+  // tone ladders per storey: the higher it climbs, the further from the road's
+  // lamplight it stands, so each storey's facet lattice starts a step darker
+  facets: [
+    ['#3c4a5e', '#2e3a4b', '#232d3b', '#1a2230', '#0f141d'],
+    ['#364456', '#2a3644', '#212a37', '#171e29', '#0d1118'],
+    ['#303d4e', '#26313f', '#1d2632', '#141b25', '#0d1118'],
+    ['#2a3646', '#212b38', '#19212c', '#111721', '#0d1118'],
+  ],
+  storeys: [
+    {
+      // 1 — the buttressed foot: three monumental gate arches over a roost
+      // course, on a battered plinth the road's lamplight pools against
+      ribs: 4,
+      rows: [
+        { n: 6, sill: 0.08, hF: 0.1, wid: 0.4, off: 0, lit: 0.5 },
+        { n: 3, sill: 0.3, hF: 0.36, wid: 0.54, off: 0, lit: 0.95 },
+      ],
+      decks: [[], [[0.66, 0.78]]],
+      lamps: [],
+    },
+    {
+      // 2 — the squat gantry belt, kicked OUTBOARD: the working storey, all
+      // platform and no grandeur, two crooked gantries hung off the inboard face
+      ribs: 3,
+      rows: [
+        { n: 5, sill: 0.14, hF: 0.3, wid: 0.5, off: 0, lit: 0.78 },
+        { n: 6, sill: 0.62, hF: 0.18, wid: 0.46, off: 0.5, lit: 0.62 },
+      ],
+      decks: [[[0.06, 0.3], [0.54, 0.76]], [[0.12, 0.28]]],
+      lamps: [[0.18, 0.24], [0.65, 0.24]],
+    },
+    {
+      // 3 — the tall belfry storey, pulled back INBOARD: a four-bay arcade of
+      // tall roost mouths over a dense course, the tallest openings on the piece
+      ribs: 4,
+      rows: [
+        { n: 4, sill: 0.16, hF: 0.44, wid: 0.56, off: 0, lit: 0.9 },
+        { n: 6, sill: 0.72, hF: 0.14, wid: 0.48, off: 0, lit: 0.6 },
+      ],
+      decks: [[[0.02, 0.14]], [[0.58, 0.72]]],
+      lamps: [[0.08, 0.66]],
+    },
+    {
+      // 4 — the leaning crown: the dovecote proper, dense small ranks, and the
+      // GANTRY ARM the dispatch cable leaves on
+      ribs: 3,
+      rows: [
+        { n: 4, sill: 0.05, hF: 0.17, wid: 0.54, off: 0, lit: 0.78 },
+        { n: 4, sill: 0.32, hF: 0.15, wid: 0.54, off: 0.5, lit: 0.78 },
+      ],
+      decks: [[[0.3, 0.5]], [[0.06, 0.18]]],
+      lamps: [[0.4, 0.62]],
+    },
+  ],
+  // the crown skyline: raked so the mass piles toward the gutter, which is the
+  // direction the whole storey leans
+  crestIn: 0.958,
+  crestOut: 0.906,
+  teeth: 7,
+  toothV: 0.017,
+  lanternAt: [1, 5],
+  rankAt: 3,
+  // ravens wheeling in the die-cut sky the crest leaves under v = 1
+  wheel: [[0.16, 0.975, 0.062, 0.2], [0.33, 0.99, 0.046, -0.16], [0.58, 0.962, 0.054, 0.26]],
+}
+
+/** THE CROOKED COLOSSUS. ONE continuous portrait painting; `storeys` are the
+ *  chain's panel lengths and `spans` its per-node [radius, width] pairs, both
+ *  root first, so every fold line and every trapezoid edge is computed from the
+ *  same numbers the solver folds the paper along. */
+function crookedColossus({ w, h, seed, storeys, spans }) {
   const X = (u) => u * w
   const Y = (v) => (1 - v) * h
   const bands = chainBands(storeys)
+  const us = chainNodeUs(spans)
   const nS = bands.length
-  const spec = CLIFF_SPEC[side]
-  const inner = spec.inner.slice(0, nS)
-  const outer = spec.outer.slice(0, nS)
+  const uIn = (v) => chainEdgeAt(bands, us, v, 0)
+  const uOut = (v) => chainEdgeAt(bands, us, v, 1)
   const rEdge = mulberry32((seed * 7 + 0x9e37) | 0)
+  const spec = COLOSSUS
 
-  // The cornice assembly, in v (image-height fractions). It hangs BELOW its fold
-  // so the whole break lives in the lower storey, and its coping's lit top edge
-  // IS the fold line.
-  const CORN = { shadow: 0.009, dentil: 0.01, ledge: 0.011, merlon: 0.021 }
+  // The cornice assembly, in v. It hangs BELOW its fold so the whole break lives
+  // in the lower storey, and its coping's lit top edge IS the fold line.
+  const CORN = { shadow: 0.006, dentil: 0.007, ledge: 0.008, merlon: 0.015 }
   const CORN_V = CORN.shadow + CORN.dentil + CORN.ledge + CORN.merlon
+  const INSET = 0.024
 
-  const crown = bands[nS - 1]
   const crestBase = (u) => {
-    const t = (u - inner[nS - 1]) / Math.max(1e-6, outer[nS - 1] - inner[nS - 1])
-    const f = lerp(spec.crestIn, spec.crestOut, Math.min(1, Math.max(0, t)))
-    return crown[0] + f * (crown[1] - crown[0])
+    const a = uIn(spec.crestIn)
+    const b = uOut(spec.crestIn)
+    const t = Math.min(1, Math.max(0, (u - a) / Math.max(1e-6, b - a)))
+    return lerp(spec.crestIn, spec.crestOut, t)
   }
 
-  // ---- CREST TEETH: a broken skyline, not a machine-cut parapet — jittered
-  // merlon widths and heights with the occasional TOR standing twice as proud,
-  // and two cells given over to lantern posts (one of them, on the scarp, the
-  // oversized canyon beacon). Lantern cells are widened so the post the die cuts
-  // is broad enough to hold a real glazed lamp instead of a spike. ----
+  // ---- THE CROWN SKYLINE: uneven merlons with the odd tor standing twice as
+  // proud, two glazed lantern posts, and one cell given over to a linked rank of
+  // ravens. The crown is where a tower earns its silhouette, so this is DIE. ----
   const teeth = []
   {
-    const uA = inner[nS - 1]
-    const uB = outer[nS - 1]
+    const uA = uIn(spec.crestOut) + 0.014
+    const uB = uOut(spec.crestOut) - 0.014
     const cell = (uB - uA) / spec.teeth
     for (let t = 0; t < spec.teeth; t++) {
-      const isBeacon = spec.beaconAt === t
-      const isLan = isBeacon || spec.lanternAt.includes(t)
+      const isLan = spec.lanternAt.includes(t)
+      const isRank = spec.rankAt === t
       const c0 = uA + t * cell
-      const mw = cell * (isBeacon ? 0.96 : isLan ? 0.9 : 0.5 + rEdge() * 0.24)
+      const mw = cell * (isLan ? 0.86 : isRank ? 0.98 : 0.52 + rEdge() * 0.26)
       const u0 = c0 + (cell - mw) * 0.5
       const base = crestBase(c0 + cell * 0.5)
-      const tor = !isLan && rEdge() < 0.3
-      const grow = isLan ? 0.5 : tor ? 1.9 : 0.45 + rEdge() * 0.95
+      const tor = !isLan && !isRank && rEdge() < 0.32
+      const grow = isLan ? 0.55 : tor ? 1.5 : 0.4 + rEdge() * 0.7
       const top = base + spec.toothV * grow
       teeth.push({
-        c0,
-        c1: c0 + cell,
-        u0,
-        u1: u0 + mw,
-        base,
-        top,
+        c0, c1: c0 + cell, u0, u1: u0 + mw, base,
+        top: isRank ? base + spec.toothV * 0.4 : top,
         lantern: isLan,
-        // the outline MUST stay inside the unit square: a beacon tall enough to
-        // out-rank the posts is also tall enough to be sheared off at v = 1.
-        lv: Math.min(spec.lanternV * (isBeacon ? 2.4 : 1), 0.985 - top),
+        rank: isRank,
+        // a post tall enough to out-rank the merlons is also tall enough to be
+        // sheared off at v = 1
+        lv: Math.min(0.058, 0.985 - top),
       })
     }
   }
 
-  // ---- SILHOUETTE: inner edge up, crest across, outer edge down (stepping out
-  // at every fold, so the paper's own break is also the die's), foot closed on
-  // the page. Everything else is clipped to it, which is what stops the piece
-  // reading as a rectangle. The edges are sampled at six jittered stations per
-  // storey with an occasional deep notch — this is a rock face, and a straight
-  // cut edge is what made the first bake read as a tower. ----
-  const pts = [[inner[0], 0]]
-  const innerRun = [[inner[0], 0]]
-  const EDGE_N = 8
-  for (let k = 0; k < nS; k++) {
-    const [v0, v1] = bands[k]
-    const topV = k === nS - 1 ? crestBase(inner[k]) : v1
-    for (let i = 1; i <= EDGE_N; i++) {
-      const v = lerp(v0, topV, i / EDGE_N)
-      // the canyon-facing edge stays the steep, legible LIT face: it is jogged,
-      // never bitten (a notch here would eat the rank standing behind it)
-      const u = Math.max(0, inner[k] + (i === EDGE_N ? 0 : (rEdge() * 2 - 1) * 0.022))
-      pts.push([u, v])
-      innerRun.push([u, v])
-    }
-    if (k < nS - 1) {
-      pts.push([inner[k + 1], v1])
-      innerRun.push([inner[k + 1], v1])
-    }
-  }
+  // ---- SILHOUETTE: inboard flank up, crown skyline across, outboard flank
+  // down, foot closed on the page. Both flanks are bitten inward except at the
+  // deck windows, so the gantries read as jutting over the kinks. ----
+  const decksIn = spec.storeys.map((s) => s.decks[0])
+  const decksOut = spec.storeys.map((s) => s.decks[1])
+  const innerRun = stackFlank(bands, us, 0, decksIn, rEdge, INSET, 7, spec.crestIn)
+  const outerRun = stackFlank(bands, us, 1, decksOut, rEdge, INSET, 7, spec.crestOut)
+  const pts = [[uIn(0), 0], ...innerRun]
   for (const t of teeth) {
     pts.push([t.c0, crestBase(t.c0)], [t.u0, t.base], [t.u0, t.top])
     if (t.lantern) pts.push(...cliffLanternTop(t.u0, t.u1 - t.u0, t.top, t.lv))
+    else if (t.rank) {
+      const bh = 0.026
+      for (const [u, v] of ravenChainTop(t.u0, t.u1, t.top, bh, Math.max(2, Math.round(((t.u1 - t.u0) * w) / Math.max(6, bh * h * RAVEN_CELL))), 'left')) {
+        pts.push([u, v])
+      }
+    }
     pts.push([t.u1, t.top], [t.u1, t.base], [t.c1, crestBase(t.c1)])
   }
-  for (let k = nS - 1; k >= 0; k--) {
-    const [v0, v1] = bands[k]
-    const fromV = k === nS - 1 ? crestBase(outer[k]) : v1
-    for (let i = 0; i < EDGE_N; i++) {
-      const v = lerp(fromV, v0, i / EDGE_N)
-      // the OUTER edge is the weathered back of the massif: jogged, bitten by
-      // the odd chasm, and now and then throwing a spur out over the page
-      const roll = rEdge()
-      const bite = roll < 0.2 ? -0.07 : roll > 0.86 ? 0.04 : 0
-      pts.push([Math.min(1, outer[k] + (i === 0 ? 0 : (rEdge() * 2 - 1) * 0.026 + bite)), v])
-    }
-    pts.push([outer[k], v0])
-    if (k > 0) pts.push([outer[k - 1], v0])
-  }
-  pts.push([outer[0], 0])
+  for (let i = outerRun.length - 1; i >= 0; i--) pts.push(outerRun[i])
+  pts.push([uOut(0), 0])
   const d = pts.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
 
   // ---- PAINT ----
   const parts = []
 
-  /** The corbelled LEDGE that IS the fold between storey k and k+1. */
+  /** The corbelled LEDGE that IS the fold between storey k and k+1. Its span is
+   *  the trapezoid's own width at the fold, so it can never overhang the die. */
   const cornice = (k) => {
     const foldV = bands[k][1]
-    const x0 = X(Math.min(inner[k], inner[k + 1]))
-    const x1 = X(outer[k])
+    const x0 = X(uIn(foldV))
+    const x1 = X(uOut(foldV))
     const wid = x1 - x0
     const rc = mulberry32((seed * 13 + k * 3121) | 0)
-    let s = ''
-    // the deep reveal the whole course throws on the wall beneath it
-    s += `<rect x="${fx(x0)}" y="${fx(Y(foldV))}" width="${fx(wid)}" height="${fx(CORN_V * h)}" fill="${DUSK.ink}" opacity="0.3"/>`
-    s += `<rect x="${fx(x0)}" y="${fx(Y(foldV - CORN_V))}" width="${fx(wid)}" height="${fx(CORN.shadow * h)}" fill="${DUSK.ink}" opacity="0.62"/>`
-    // dentil corbels carrying the coping out over the face
+    let s = `<rect x="${fx(x0)}" y="${fx(Y(foldV))}" width="${fx(wid)}" height="${fx(CORN_V * h)}" fill="${DUSK.ink}" opacity="0.42"/>`
+    s += `<rect x="${fx(x0)}" y="${fx(Y(foldV - CORN_V))}" width="${fx(wid)}" height="${fx(CORN.shadow * h)}" fill="${DUSK.ink}" opacity="0.8"/>`
     const dn = Math.max(6, Math.round(wid / (w * 0.055)))
     const dw = wid / dn
     for (let i = 0; i < dn; i++) {
-      s += `<rect x="${fx(x0 + i * dw + dw * 0.18)}" y="${fx(Y(foldV - CORN.dentil - CORN.ledge - CORN.merlon))}" width="${fx(dw * 0.56)}" height="${fx(CORN.dentil * h)}" fill="${DUSK.slateLit}" opacity="0.6"/>`
+      s += `<rect x="${fx(x0 + i * dw + dw * 0.18)}" y="${fx(Y(foldV - CORN.dentil - CORN.ledge - CORN.merlon))}" width="${fx(dw * 0.56)}" height="${fx(CORN.dentil * h)}" fill="${DUSK.slateLit}" opacity="0.5"/>`
     }
-    // the coping: one lit band running the FULL width, its top edge on the fold
     const copeY = Y(foldV - CORN.merlon)
     s += `<rect x="${fx(x0)}" y="${fx(copeY)}" width="${fx(wid)}" height="${fx(CORN.ledge * h)}" fill="${DUSK.slateLit}"/>`
-    s += `<rect x="${fx(x0)}" y="${fx(copeY)}" width="${fx(wid)}" height="${fx(Math.max(2, CORN.ledge * h * 0.36))}" fill="${DUSK.parch}" opacity="0.72"/>`
-    // the crenellated parapet standing on it — merlon caps in lamplight, uneven
-    // in height (the ledge is a rock shelf someone built a parapet along), the
-    // embrasures between them falling to ink
+    s += `<rect x="${fx(x0)}" y="${fx(copeY)}" width="${fx(wid)}" height="${fx(Math.max(2, CORN.ledge * h * 0.4))}" fill="${DUSK.parch}" opacity="0.66"/>`
     const mn = Math.max(5, Math.round(wid / (w * 0.115)))
     const mw = wid / (mn * 2 - 1)
-    s += `<rect x="${fx(x0)}" y="${fx(Y(foldV))}" width="${fx(wid)}" height="${fx(CORN.merlon * h)}" fill="${DUSK.ink}" opacity="0.55"/>`
+    s += `<rect x="${fx(x0)}" y="${fx(Y(foldV))}" width="${fx(wid)}" height="${fx(CORN.merlon * h)}" fill="${DUSK.ink}" opacity="0.72"/>`
     for (let i = 0; i < mn; i++) {
       const mx = x0 + i * 2 * mw
-      const mh = CORN.merlon * h * (0.74 + rc() * 0.26)
+      const mh = CORN.merlon * h * (0.72 + rc() * 0.28)
       const my = Y(foldV) + (CORN.merlon * h - mh)
-      s += `<rect x="${fx(mx)}" y="${fx(my)}" width="${fx(mw)}" height="${fx(mh)}" fill="${DUSK.slate}"/>`
-      s += `<rect x="${fx(mx)}" y="${fx(my)}" width="${fx(mw)}" height="${fx(Math.max(2.5, mh * 0.24))}" fill="${DUSK.rim}" opacity="${(0.78 + rc() * 0.2).toFixed(2)}"/>`
-      s += `<rect x="${fx(mx + mw * 0.74)}" y="${fx(my)}" width="${fx(mw * 0.26)}" height="${fx(mh)}" fill="${DUSK.ink}" opacity="0.36"/>`
+      s += `<rect x="${fx(mx)}" y="${fx(my)}" width="${fx(mw)}" height="${fx(mh)}" fill="${DUSK.slateDim}"/>`
+      s += `<rect x="${fx(mx)}" y="${fx(my)}" width="${fx(mw)}" height="${fx(Math.max(2, mh * 0.22))}" fill="${DUSK.rim}" opacity="${(0.6 + rc() * 0.2).toFixed(2)}"/>`
+    }
+    return s
+  }
+
+  /** A jutting GANTRY PLATFORM, painted off the SAME deck window the die was cut
+   *  from: a slab thrown out over the kink, its underside in deep shadow, a
+   *  raking strut back to the wall, and a plank rail on top. */
+  const gantry = (k, side, win, lamps) => {
+    const [v0, v1] = bands[k]
+    const sgn = side === 0 ? 1 : -1
+    const a = lerp(v0, v1, win[0])
+    const b = lerp(v0, v1, win[1])
+    const edge = (v) => chainEdgeAt(bands, us, v, side)
+    const deep = 0.3
+    const xE = (v) => X(edge(v))
+    const xI = (v) => X(edge(v) + sgn * deep * (uOut(v) - uIn(v)))
+    const slabT = a + (b - a) * 0.34
+    // the shadow the platform throws down the wall under it — the single move
+    // that makes a painted deck read as a thing standing OFF the facade
+    let s = `<path d="M ${fx(xE(a))} ${fx(Y(a))} L ${fx(xI(a))} ${fx(Y(a))} L ${fx(xI(a))} ${fx(Y(a) + h * 0.026)} L ${fx(xE(a))} ${fx(Y(a) + h * 0.038)} Z" fill="${DUSK.ink}" opacity="0.82"/>`
+    // a raking strut back under the slab — "this is hung off the wall", which a
+    // floating rectangle never says
+    s += `<path d="M ${fx(xE(a))} ${fx(Y(a))} L ${fx(xI(a - (b - a) * 0.9))} ${fx(Y(a - (b - a) * 0.9))}" stroke="${DUSK.slateDeep}" stroke-width="${fx(Math.max(4, w * 0.02))}" opacity="0.95" stroke-linecap="round"/>`
+    // the slab, with a lamplit lip along its outer edge
+    s += `<path d="M ${fx(xE(a))} ${fx(Y(a))} L ${fx(xI(a))} ${fx(Y(a))} L ${fx(xI(slabT))} ${fx(Y(slabT))} L ${fx(xE(slabT))} ${fx(Y(slabT))} Z" fill="${DUSK.slate}"/>`
+    s += `<rect x="${fx(Math.min(xE(slabT), xI(slabT)))}" y="${fx(Y(slabT))}" width="${fx(Math.abs(xI(slabT) - xE(slabT)))}" height="${fx(Math.max(3, h * 0.005))}" fill="${DUSK.parch}" opacity="0.86"/>`
+    // rail posts and the plank rail they carry
+    const posts = 4
+    for (let i = 0; i <= posts; i++) {
+      const px = lerp(xE(b), xI(b), i / posts)
+      s += `<rect x="${fx(px - Math.max(2, w * 0.007))}" y="${fx(Y(b))}" width="${fx(Math.max(4, w * 0.014))}" height="${fx(Y(slabT) - Y(b))}" fill="${DUSK.ink}"/>`
+    }
+    s += `<path d="M ${fx(xE(b))} ${fx(Y(b))} L ${fx(xI(b))} ${fx(Y(b))}" stroke="${DUSK.slateLit}" stroke-width="${fx(Math.max(3.5, h * 0.005))}" opacity="0.85"/>`
+    // a crate or two on the deck: the storey is a working belt, not a viewpoint
+    s += `<rect x="${fx(lerp(xE(slabT), xI(slabT), 0.42))}" y="${fx(Y(slabT) - (b - slabT) * h * 0.5)}" width="${fx(Math.abs(xI(a) - xE(a)) * 0.18)}" height="${fx((b - slabT) * h * 0.5)}" fill="${DUSK.slateDeep}"/>`
+    for (const [lt, lv] of lamps) {
+      if (lt < win[0] || lt > win[1]) continue
+      const lx = lerp(xE(b), xI(b), 0.3)
+      const lh = (b - a) * lv * h * 0.8
+      s += lampHead(lx, Y(b) - lh, Y(b) - lh * 0.34, Math.max(6, w * 0.032), 2.8)
     }
     return s
   }
@@ -4818,295 +5020,817 @@ function rookeryCliff({ w, h, seed, side, storeys }) {
     const bhV = v1 - v0
     const yTop = Y(v1)
     const yBot = Y(v0)
+    const st = spec.storeys[k]
     const rk = mulberry32((seed * 137 + k * 911) | 0)
     const pr = mulberry32((seed * 61 + k * 2477) | 0)
     let s = `<g>`
 
-    // 1. the rock mass. Each storey stands at its own rake, so each catches the
-    // canyon's lamplight differently — the higher, the darker.
-    s += `<rect x="0" y="${fx(yTop)}" width="${w}" height="${fx(yBot - yTop)}" fill="${spec.base[k]}"/>`
+    // 1. the mass — near-black stone, because a night facade that starts at mid
+    // grey has nowhere left to go once the lamps land on it
+    s += `<rect x="0" y="${fx(yTop)}" width="${w}" height="${fx(yBot - yTop)}" fill="${spec.stone[k]}"/>`
+    s += cityFacets(0, w, yTop, yBot, spec.facets[k], 4, Math.max(3, Math.round(bhV / 0.07)), rk, h)
 
-    // 2. BEDDING: broad tonal bands with wavy boundaries, alternating a shade up
-    // and a shade down. Value, not line, is what makes stone read as strata.
-    const nb = 4 + (k % 2)
-    for (let i = 0; i < nb; i++) {
-      const ya = lerp(yBot, yTop, i / nb)
-      const yb = lerp(yBot, yTop, (i + 0.58) / nb)
-      let bd = `M 0 ${fx(ya)}`
-      for (let j = 1; j <= 7; j++) bd += ` L ${fx((j / 7) * w)} ${fx(ya + (rk() * 2 - 1) * h * 0.009)}`
-      bd += ` L ${w} ${fx(yb)}`
-      for (let j = 6; j >= 0; j--) bd += ` L ${fx((j / 7) * w)} ${fx(yb + (rk() * 2 - 1) * h * 0.009)}`
-      s += `<path d="${bd} Z" fill="${i % 2 ? DUSK.ink : DUSK.slateLit}" opacity="${i % 2 ? '0.16' : '0.09'}"/>`
-    }
-    // 2b. FACETING — the move that finally stopped these reading as a tower.
-    // A cliff in this book is CUT PAPER: a jittered lattice of angular planes,
-    // each a shade off its neighbours, each catching the canyon light on its
-    // spine-side arris and shadowed on its fore-side. Painted under the
-    // architecture, so every rank reads as cut INTO rock rather than built on a
-    // flat wall.
-    {
-      const nx = 4
-      const ny = Math.max(3, Math.round(bhV / 0.075))
-      const gx = (i, j) => (i / nx) * w + (j === 0 || j === ny ? 0 : (rk() * 2 - 1) * (w / nx) * 0.34)
-      const gy = (j) => lerp(yBot, yTop, j / ny)
-      // corner lattice, jittered once so adjacent facets share their edges
-      const grid = []
-      for (let j = 0; j <= ny; j++) {
-        const row = []
-        for (let i = 0; i <= nx; i++) row.push([i === 0 ? -2 : i === nx ? w + 2 : gx(i, j), gy(j) + (j === 0 || j === ny ? 0 : (rk() * 2 - 1) * h * 0.012)])
-        grid.push(row)
-      }
-      const tone = [DUSK.slateLit, DUSK.slate, DUSK.slateDim, DUSK.slateDeep, DUSK.ink]
-      for (let j = 0; j < ny; j++) {
-        for (let i = 0; i < nx; i++) {
-          const a = grid[j][i]
-          const b = grid[j][i + 1]
-          const c = grid[j + 1][i + 1]
-          const e = grid[j + 1][i]
-          const pd = `M ${fx(a[0])} ${fx(a[1])} L ${fx(b[0])} ${fx(b[1])} L ${fx(c[0])} ${fx(c[1])} L ${fx(e[0])} ${fx(e[1])} Z`
-          // planes facing the canyon (low i) lean pale, the outer ones to ink
-          const pick = Math.min(4, Math.max(0, Math.round(0.2 + (i / (nx - 1)) * 3 + (rk() * 2 - 1) * 1.3)))
-          s += `<path d="${pd}" fill="${tone[pick]}" opacity="${(0.34 + rk() * 0.3).toFixed(2)}"/>`
-          // the arris: a lit line down the plane's spine-side break, an inked
-          // one down its fore-side — the cut-card relief the whole book reads by
-          s += `<path d="M ${fx(a[0])} ${fx(a[1])} L ${fx(e[0])} ${fx(e[1])}" fill="none" stroke="${DUSK.slateLit}" stroke-width="${fx(1.6 + rk() * 2)}" opacity="${(0.26 + rk() * 0.28).toFixed(2)}"/>`
-          s += `<path d="M ${fx(b[0])} ${fx(b[1])} L ${fx(c[0])} ${fx(c[1])}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(1.6 + rk() * 1.6)}" opacity="${(0.24 + rk() * 0.26).toFixed(2)}"/>`
-        }
-      }
-    }
-
-    // fine bedding lines riding the bands
-    const sn = Math.max(7, Math.round(bhV / 0.026))
+    // 2. hand-cut coursing riding the facets
+    const sn = Math.max(6, Math.round(bhV / 0.03))
     for (let i = 1; i < sn; i++) {
       const y = lerp(yBot, yTop, i / sn)
-      s += `<path d="${strataPath(y, 0, w, h * 0.0035, 6, rk)}" fill="none" stroke="${DUSK.ink}" stroke-width="1.5" opacity="${(0.14 + rk() * 0.18).toFixed(2)}"/>`
-      s += `<path d="${strataPath(y - h * 0.004, 0, w, h * 0.003, 6, rk)}" fill="none" stroke="${DUSK.slateLit}" stroke-width="1.2" opacity="${(0.07 + rk() * 0.11).toFixed(2)}"/>`
+      s += `<path d="${strataPath(y, 0, w, h * 0.003, 6, rk)}" fill="none" stroke="${DUSK.ink}" stroke-width="1.6" opacity="${(0.2 + rk() * 0.2).toFixed(2)}"/>`
+      s += `<path d="${strataPath(y - h * 0.0035, 0, w, h * 0.0025, 6, rk)}" fill="none" stroke="${DUSK.slateLit}" stroke-width="1.1" opacity="${(0.06 + rk() * 0.1).toFixed(2)}"/>`
     }
 
-    // 3. rock ribs (vertical relief, lit spine-side face and dark flank) and the
-    // open JOINTS that crack up between them
-    const nR = spec.ribs[k]
-    for (let i = 0; i < nR; i++) {
-      const u = lerp(inner[k] + 0.06, outer[k] - 0.06, nR === 1 ? 0.5 : i / (nR - 1))
-      const rw = w * (0.06 + rk() * 0.06)
-      s += `<rect x="${fx(X(u) - rw / 2)}" y="${fx(yTop)}" width="${fx(rw)}" height="${fx(yBot - yTop)}" fill="${DUSK.slateLit}" opacity="0.11"/>`
-      s += `<rect x="${fx(X(u) + rw * 0.3)}" y="${fx(yTop)}" width="${fx(rw * 0.4)}" height="${fx(yBot - yTop)}" fill="${DUSK.ink}" opacity="0.18"/>`
-    }
-    const nc = 4 + Math.round(rk() * 4)
-    for (let i = 0; i < nc; i++) {
-      let cx = rk() * w
-      let cy = lerp(yBot, yTop, rk() * 0.9)
-      let cd = `M ${fx(cx)} ${fx(cy)}`
-      const len = 4 + Math.round(rk() * 5)
-      for (let j = 0; j < len; j++) {
-        cx += (rk() * 2 - 1) * w * 0.08
-        cy -= h * 0.014 * (0.4 + rk())
-        cd += ` L ${fx(cx)} ${fx(cy)}`
-      }
-      s += `<path d="${cd}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(1.2 + rk() * 2)}" opacity="0.42" stroke-linecap="round"/>`
-      s += `<path d="${cd}" fill="none" stroke="${DUSK.slateLit}" stroke-width="1.1" opacity="0.15" stroke-linecap="round" transform="translate(2.2,-1.2)"/>`
+    // 3. buttress pilasters: a lit inboard reveal and an inked flank each
+    for (let i = 0; i < st.ribs; i++) {
+      const u = lerp(uIn(v0) + 0.08, uOut(v0) - 0.08, st.ribs === 1 ? 0.5 : i / (st.ribs - 1))
+      const rw = w * (0.05 + rk() * 0.05)
+      s += `<rect x="${fx(X(u) - rw / 2)}" y="${fx(yTop)}" width="${fx(rw)}" height="${fx(yBot - yTop)}" fill="${DUSK.slateLit}" opacity="0.1"/>`
+      s += `<rect x="${fx(X(u) + rw * 0.32)}" y="${fx(yTop)}" width="${fx(rw * 0.44)}" height="${fx(yBot - yTop)}" fill="${DUSK.ink}" opacity="0.3"/>`
     }
 
-    // 4. the storey's PLINTH and, on every fold above the root, the linked rank
-    // of ravens standing on the ledge below (printed on THIS panel, so it tilts
-    // with the storey it belongs to and never straddles the crease).
+    // 4. the storey's plinth, and on every fold above the root the linked rank of
+    // ravens standing on the ledge below (printed on THIS panel, so it tilts with
+    // the storey it belongs to and never straddles the crease)
     if (k > 0) {
-      s += `<rect x="${fx(X(inner[k]))}" y="${fx(yBot - Math.max(2, h * 0.007))}" width="${fx(X(outer[k] - inner[k]))}" height="${fx(Math.max(2, h * 0.007))}" fill="${DUSK.parchDim}" opacity="0.6"/>`
-      const rv = spec.ravens[k]
-      if (rv) {
-        const [u0, u1] = rv.u
-        const cnt = Math.max(2, Math.round(((u1 - u0) * w) / Math.max(6, rv.bh * h * RAVEN_CELL)))
-        const chain = ravenChainTop(u0, u1, v0, rv.bh, cnt, 'left')
-        let rd = `M ${fx(X(u0))} ${fx(Y(v0))}`
-        for (const [u, v] of chain) rd += ` L ${fx(X(u))} ${fx(Y(v))}`
-        rd += ` L ${fx(X(u1))} ${fx(Y(v0))} Z`
-        // a wash of lamplight behind the rank, so the birds have something to be
-        // black against — a chain of ink on ink is what reads as a scallop
-        s += `<ellipse cx="${fx(X((u0 + u1) / 2))}" cy="${fx(Y(v0 + rv.bh * 0.4))}" rx="${fx(X(u1 - u0) * 0.62)}" ry="${fx(rv.bh * h * 1.5)}" fill="url(#rookHalo)" opacity="0.75"/>`
-        s += `<path d="${rd}" fill="${DUSK.ink}"/>`
-        // a pale core-edge along the rank's back, so the chain reads as BIRDS
-        // and not as one scalloped lump of ink
-        s += `<path d="${rd}" fill="none" stroke="${DUSK.rim}" stroke-width="1.6" opacity="0.42" stroke-linejoin="round"/>`
-        s += `<rect x="${fx(X(u0))}" y="${fx(Y(v0) - Math.max(1.8, h * 0.0038))}" width="${fx(X(u1 - u0))}" height="${fx(Math.max(1.8, h * 0.0038))}" fill="${DUSK.amberLit}" opacity="0.7"/>`
-        const cw = (u1 - u0) / cnt
-        for (let i = 0; i < cnt; i++) {
-          s += `<circle cx="${fx(X(u0 + cw * (i + 0.17)))}" cy="${fx(Y(v0 + rv.bh * 0.93))}" r="${fx(Math.max(1.4, rv.bh * h * 0.055))}" fill="${DUSK.amberCore}" opacity="0.95"/>`
-        }
-      }
+      s += `<rect x="${fx(X(uIn(v0)))}" y="${fx(yBot - Math.max(2, h * 0.006))}" width="${fx(X(uOut(v0) - uIn(v0)))}" height="${fx(Math.max(2, h * 0.006))}" fill="${DUSK.parchDim}" opacity="0.56"/>`
+      const a = lerp(uIn(v0), uOut(v0), 0.12 + 0.1 * (k % 2))
+      const b = lerp(uIn(v0), uOut(v0), 0.42 + 0.12 * (k % 2))
+      s += perchedRank(X, Y, a, b, v0, 0.034, w, h)
     }
 
-    // 5. THE PORTAL RANKS — the loudest thing on the cliff. Each storey keeps
-    // its own cadence so the wall reads as STOREYS, not as wallpaper. `boost`
-    // grades the throw with height: the foot stands in the road's lamplight, the
-    // crown only in its own. (Round-1 shipped boost ~1.15 and the overlapping
-    // halos flooded the rock to a flat lavender — the blaze has to sit ON dark
-    // stone to read as a blaze at all.)
-    const ceiling = k === nS - 1 ? null : v1 - CORN_V - 0.006
-    const boost = 0.55 - k * 0.14
+    // 5. THE PORTAL RANKS — the loudest thing on the tower, and the reason it
+    // reads at all against the black page. `boost` grades the throw with height:
+    // the foot stands in the road's lamplight, the crown only in its own.
+    const ceiling = k === nS - 1 ? null : v1 - CORN_V - 0.005
+    const boost = 0.62 - k * 0.1
     let litPrev = false
     let darkRun = 0
-    for (const row of spec.rows[k]) {
-      // margins clear the die's own jog and its chasm bites, so no rank is ever
-      // half-eaten by the silhouette
-      const usable = [inner[k] + 0.05, outer[k] - 0.09]
+    for (const row of st.rows) {
+      const usable = [uIn(v0) + 0.07, uOut(v1) - 0.07]
       const cw = (usable[1] - usable[0]) / row.n
       const pwU = cw * row.wid
       const pxW = X(pwU)
       const sills = []
       for (let i = 0; i < row.n; i++) {
         const cu = usable[0] + cw * (i + 0.5 + (row.off ? (i % 2 === 1 ? row.off * 0.5 : -row.off * 0.5) : 0))
-        const tu = (cu - usable[0]) / Math.max(1e-6, usable[1] - usable[0])
-        // a whisper of per-opening jitter: the ranks stay regimented (that IS
-        // the rookery's theme) but read cut BY HAND into rock rather than
-        // stamped, which is most of what separates a cliff from a cathedral
+        // a whisper of per-opening jitter: the ranks stay regimented (that IS the
+        // rookery's theme) but read cut BY HAND rather than stamped
         const hV = row.hF * bhV * (0.94 + pr() * 0.12)
-        let sillV = v0 + (row.sill + row.rake * tu) * bhV + (pr() * 2 - 1) * bhV * 0.012
-        const cap = ceiling === null ? crestBase(cu) - 0.012 : ceiling
+        let sillV = v0 + row.sill * bhV + (pr() * 2 - 1) * bhV * 0.01
+        // under the crown the ceiling is the crest MINUS the merlon blocks that
+        // stand on it: a rank clamped only to the crest line is a rank half
+        // buried in parapet
+        const cap = ceiling === null ? crestBase(cu) - 0.05 : ceiling
         if (sillV + hV > cap) sillV = cap - hV
         sills.push([X(cu - pwU / 2), Y(sillV)])
         // clumped as traffic, but never three dark in a row: an unlit triplet
-        // punches a hole in the rank, and the RANK — not the individual window —
-        // is the thing that has to read at the reading camera.
+        // punches a hole in the rank, and the RANK is what has to read
         const roll = pr()
         const lit = roll < row.lit || (litPrev && roll < row.lit + 0.24) || darkRun >= 2
         litPrev = lit
         darkRun = lit ? 0 : darkRun + 1
         s += ravenPortal(X(cu - pwU / 2), Y(sillV), pxW, hV * h, lit, boost)
       }
-      // the string course the rank stands on, drawn per-portal so a RAKED rank
-      // gets a stepping course instead of one flat stripe across the bedding
       for (const [sx, sy] of sills) {
-        s += `<rect x="${fx(sx - pxW * 0.3)}" y="${fx(sy + Math.max(2, h * 0.006))}" width="${fx(pxW * 1.6)}" height="${fx(Math.max(2, h * 0.005))}" fill="${DUSK.parchDim}" opacity="0.44"/>`
+        s += `<rect x="${fx(sx - pxW * 0.28)}" y="${fx(sy + Math.max(2, h * 0.005))}" width="${fx(pxW * 1.56)}" height="${fx(Math.max(2, h * 0.004))}" fill="${DUSK.parchDim}" opacity="0.4"/>`
       }
-      // hanging roost boxes slung between the portals of the upper ranks
-      if (row.hF > 0.1) {
+      // hanging roost boxes slung between the openings of the taller ranks
+      if (row.hF > 0.18) {
         for (let i = 0; i + 1 < row.n; i += 2) {
           const mx = (sills[i][0] + pxW + sills[i + 1][0]) / 2
-          const my = (sills[i][1] + sills[i + 1][1]) / 2 - h * 0.012
-          const bw = pxW * 0.44
-          const bx = bw * 0.8
-          s += `<line x1="${fx(mx - bw * 0.6)}" y1="${fx(my)}" x2="${fx(mx + bw * 0.6)}" y2="${fx(my)}" stroke="${DUSK.slateLit}" stroke-width="2" opacity="0.55"/>`
+          const my = (sills[i][1] + sills[i + 1][1]) / 2 - h * 0.01
+          const bw = pxW * 0.46
+          const bx = bw * 0.82
+          s += `<line x1="${fx(mx - bw * 0.6)}" y1="${fx(my)}" x2="${fx(mx + bw * 0.6)}" y2="${fx(my)}" stroke="${DUSK.slateLit}" stroke-width="2" opacity="0.5"/>`
           s += `<rect x="${fx(mx - bw / 2)}" y="${fx(my)}" width="${fx(bw)}" height="${fx(bx)}" fill="${DUSK.slateDeep}"/>`
-          s += `<rect x="${fx(mx - bw / 2)}" y="${fx(my)}" width="${fx(bw)}" height="${fx(Math.max(1.5, bx * 0.14))}" fill="${DUSK.slateLit}" opacity="0.7"/>`
-          s += `<rect x="${fx(mx - bw * 0.16)}" y="${fx(my + bx * 0.3)}" width="${fx(bw * 0.32)}" height="${fx(bx * 0.42)}" fill="${DUSK.amberLit}" opacity="0.85"/>`
+          s += `<rect x="${fx(mx - bw / 2)}" y="${fx(my)}" width="${fx(bw)}" height="${fx(Math.max(1.5, bx * 0.14))}" fill="${DUSK.slateLit}" opacity="0.62"/>`
+          s += `<rect x="${fx(mx - bw * 0.16)}" y="${fx(my + bx * 0.3)}" width="${fx(bw * 0.32)}" height="${fx(bx * 0.42)}" fill="${DUSK.amberLit}" opacity="0.88"/>`
         }
       }
     }
 
-    // 6. the fold: a rim-lit corbelled ledge, painted LAST in the storey so it
-    // cuts every portal halo that tried to spill over the crease.
+    // 6. the jutting gantries, off the same windows the die was cut from
+    for (const win of st.decks[0]) s += gantry(k, 0, win, st.lamps)
+    for (const win of st.decks[1]) s += gantry(k, 1, win, [])
+
+    // 7. the fold, painted LAST in the storey so it cuts every halo that tried to
+    // spill over the crease
     if (k < nS - 1) s += cornice(k)
     s += `</g>`
     parts.push(s)
   }
 
-  // ---- THE CREST: merlon blocks on the same tooth maths the die cut, then the
-  // lantern posts and (on the scarp) the canyon beacon. ----
+  // ---- THE CROWN: merlon blocks on the same tooth maths the die cut, then the
+  // lantern posts. ----
   {
     let s = `<g>`
     for (const t of teeth) {
       const x0 = X(t.u0)
       const tw = X(t.u1 - t.u0)
       const topY = Y(t.top)
-      const footY = Y(t.base - 0.035)
+      const footY = Y(t.base - 0.03)
       s += `<rect x="${fx(x0)}" y="${fx(topY)}" width="${fx(tw)}" height="${fx(footY - topY)}" fill="${DUSK.slateDim}"/>`
-      s += `<rect x="${fx(x0)}" y="${fx(topY)}" width="${fx(tw)}" height="${fx(Math.max(2.5, h * 0.005))}" fill="${DUSK.rim}" opacity="0.85"/>`
-      s += `<rect x="${fx(x0 + tw * 0.76)}" y="${fx(topY)}" width="${fx(tw * 0.24)}" height="${fx(footY - topY)}" fill="${DUSK.ink}" opacity="0.32"/>`
+      s += `<rect x="${fx(x0)}" y="${fx(topY)}" width="${fx(tw)}" height="${fx(Math.max(2.5, h * 0.004))}" fill="${DUSK.rim}" opacity="0.8"/>`
+      s += `<rect x="${fx(x0 + tw * 0.78)}" y="${fx(topY)}" width="${fx(tw * 0.22)}" height="${fx(footY - topY)}" fill="${DUSK.ink}" opacity="0.42"/>`
+      if (t.rank) s += `<rect x="${fx(x0)}" y="${fx(topY)}" width="${fx(tw)}" height="${fx(Math.max(3, h * 0.005))}" fill="${DUSK.amberLit}" opacity="0.6"/>`
       if (!t.lantern) continue
-      // a lantern post on the crest: glazed amber box in an iron cage, halo big
-      // enough that the crown reads as lit by its own lamps
       const lw = tw
-      const headTop = Y(t.top + t.lv * 0.84)
-      const headBot = Y(t.top + t.lv * 0.34)
-      const hcx = x0 + lw / 2
-      const headH = headBot - headTop
-      s += `<ellipse cx="${fx(hcx)}" cy="${fx((headTop + headBot) / 2)}" rx="${fx(lw * 4.2)}" ry="${fx(headH * 3.4)}" fill="url(#rookHalo)" opacity="1"/>`
-      s += `<rect x="${fx(hcx - lw * 0.16)}" y="${fx(headBot)}" width="${fx(lw * 0.32)}" height="${fx(Y(t.top) - headBot)}" fill="${DUSK.slateDeep}"/>`
-      s += `<rect x="${fx(x0 + lw * 0.08)}" y="${fx(headTop)}" width="${fx(lw * 0.84)}" height="${fx(headH)}" fill="url(#rookGlow)"/>`
-      s += `<ellipse cx="${fx(hcx)}" cy="${fx(lerp(headTop, headBot, 0.46))}" rx="${fx(lw * 0.26)}" ry="${fx(headH * 0.3)}" fill="${DUSK.amberLit}"/>`
-      s += `<ellipse cx="${fx(hcx)}" cy="${fx(lerp(headTop, headBot, 0.46))}" rx="${fx(lw * 0.15)}" ry="${fx(headH * 0.18)}" fill="${DUSK.amberCore}"/>`
-      s += `<rect x="${fx(x0 + lw * 0.08)}" y="${fx(headTop)}" width="${fx(lw * 0.84)}" height="${fx(headH)}" fill="none" stroke="${DUSK.ink}" stroke-width="2.6" opacity="0.9"/>`
-      s += `<line x1="${fx(hcx)}" y1="${fx(headTop)}" x2="${fx(hcx)}" y2="${fx(headBot)}" stroke="${DUSK.ink}" stroke-width="1.8" opacity="0.7"/>`
-      s += `<line x1="${fx(x0 + lw * 0.08)}" y1="${fx(lerp(headTop, headBot, 0.5))}" x2="${fx(x0 + lw * 0.92)}" y2="${fx(lerp(headTop, headBot, 0.5))}" stroke="${DUSK.ink}" stroke-width="1.6" opacity="0.55"/>`
-      // the cap the head hangs from, and the pool it throws back onto the crest
-      s += `<rect x="${fx(x0)}" y="${fx(headTop - Math.max(2.5, h * 0.008))}" width="${fx(lw)}" height="${fx(Math.max(2.5, h * 0.008))}" fill="${DUSK.ink}" opacity="0.9"/>`
-      s += `<ellipse cx="${fx(hcx)}" cy="${fx(Y(t.top))}" rx="${fx(lw * 1.9)}" ry="${fx(h * 0.02)}" fill="url(#rookHalo)" opacity="0.7"/>`
+      s += lampHead(x0 + lw / 2, Y(t.top + t.lv * 0.86), Y(t.top + t.lv * 0.36), lw * 0.84, 3.6)
+      s += `<rect x="${fx(x0 + lw * 0.42)}" y="${fx(Y(t.top + t.lv * 0.36))}" width="${fx(lw * 0.16)}" height="${fx(Y(t.top) - Y(t.top + t.lv * 0.36))}" fill="${DUSK.slateDeep}"/>`
     }
     s += `</g>`
     parts.push(s)
   }
 
-  // ---- THE TALUS: broken rock piled where the cliff meets the page, lit along
-  // its top by the road running the canyon floor. It is what roots the wall on
-  // the paper instead of letting it end on a ruled line. ----
+  // ---- THE DISPATCH CABLE'S FIRST STRETCH. It leaves the crown's gantry arm on
+  // the TOWER'S OWN PAPER and falls inboard across the belfry face, exiting
+  // through the inboard flank where the reader's eye picks it up again on the
+  // die-cut cable panel. A cable that started in mid-air over the gutter would
+  // be a painted claim; this one is a cut one. ----
+  {
+    const [cv0, cv1] = bands[nS - 1]
+    const armV = lerp(cv0, cv1, 0.42)
+    const ax = X(uIn(armV))
+    const ay = Y(armV)
+    const bx = X(uIn(0.66) - 0.02)
+    const by = Y(0.66)
+    // the arm itself, thrown out over the kink, and the pulley on its nose
+    let s = `<path d="M ${fx(ax + w * 0.16)} ${fx(ay - h * 0.006)} L ${fx(ax)} ${fx(ay)} L ${fx(ax + w * 0.16)} ${fx(ay + h * 0.01)} Z" fill="${DUSK.slateDeep}"/>`
+    s += `<path d="M ${fx(ax + w * 0.16)} ${fx(ay - h * 0.006)} L ${fx(ax)} ${fx(ay)}" stroke="${DUSK.parchDim}" stroke-width="2.4" opacity="0.7"/>`
+    s += `<circle cx="${fx(ax)}" cy="${fx(ay)}" r="${fx(Math.max(4, w * 0.02))}" fill="${DUSK.slateLit}" stroke="${DUSK.ink}" stroke-width="2.4"/>`
+    s += `<circle cx="${fx(ax)}" cy="${fx(ay)}" r="${fx(Math.max(1.4, w * 0.006))}" fill="${DUSK.ink}"/>`
+    s += `<path d="M ${fx(ax)} ${fx(ay)} L ${fx(bx)} ${fx(by)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(4.5, w * 0.018))}" stroke-linecap="round"/>`
+    s += `<path d="M ${fx(ax)} ${fx(ay)} L ${fx(bx)} ${fx(by)}" stroke="${DUSK.parch}" stroke-width="${fx(Math.max(1.6, w * 0.006))}" opacity="0.8" stroke-linecap="round" transform="translate(0,-1.6)"/>`
+    parts.push(s)
+  }
+
+  // ---- THE FOOT: broken rock and yard rubble piled where the tower meets the
+  // page, lit along its top by the lamplit road running to the keep's gate. ----
   {
     const rt = mulberry32((seed * 29 + 0x51a7) | 0)
-    let td = `M 0 ${fx(h)}`
     const n = 11
     const pk = []
-    for (let i = 0; i <= n; i++) pk.push([(i / n) * w, h - h * (0.018 + rt() * 0.032)])
-    td += ` L 0 ${fx(pk[0][1])}`
+    for (let i = 0; i <= n; i++) pk.push([(i / n) * w, h - h * (0.014 + rt() * 0.026)])
+    let td = `M 0 ${fx(h)} L 0 ${fx(pk[0][1])}`
     for (const [x, y] of pk) td += ` L ${fx(x)} ${fx(y)}`
     td += ` L ${w} ${fx(h)} Z`
     let s = `<path d="${td}" fill="${DUSK.slateDeep}"/>`
-    s += `<path d="${pk.map(([x, y], i) => `${i ? 'L' : 'M'}${fx(x)} ${fx(y)}`).join(' ')}" fill="none" stroke="${DUSK.parchDim}" stroke-width="2.6" opacity="0.55"/>`
-    for (let i = 0; i < 22; i++) {
-      const x = rt() * w
-      const y = h - h * rt() * 0.045
-      s += `<circle cx="${fx(x)}" cy="${fx(y)}" r="${fx(1.5 + rt() * 3.5)}" fill="${DUSK.ink}" opacity="0.45"/>`
+    s += `<path d="${pk.map(([x, y], i) => `${i ? 'L' : 'M'}${fx(x)} ${fx(y)}`).join(' ')}" fill="none" stroke="${DUSK.parchDim}" stroke-width="2.4" opacity="0.6"/>`
+    for (let i = 0; i < 20; i++) {
+      s += `<circle cx="${fx(rt() * w)}" cy="${fx(h - h * rt() * 0.04)}" r="${fx(1.5 + rt() * 3)}" fill="${DUSK.ink}" opacity="0.5"/>`
     }
     parts.push(s)
   }
 
-  // ---- ATMOSPHERE: the crown falls to night, the canyon side (u = 0) catches
-  // the road lamps, and the foot stands in the pooled lamplight of the post-road
-  // running to the gate. ----
-  parts.push(`<rect width="${w}" height="${h}" fill="url(#cliffNight)"/>`)
-  parts.push(`<rect width="${w}" height="${h}" fill="url(#cliffSide)"/>`)
+  // ---- ATMOSPHERE, kept LOCAL. The r3 walls died of three full-sheet washes;
+  // here the crown falls to night over the top fifth, the gutter flank catches
+  // the city's lamplight over the inboard eighth, and the road pools at the
+  // foot. Nothing crosses the middle of the piece. ----
+  parts.push(`<rect width="${w}" height="${fx(h * 0.34)}" fill="url(#towerNight)"/>`)
+  parts.push(`<rect width="${fx(w * 0.16)}" height="${h}" fill="url(#towerLitFlank)"/>`)
   parts.push(
-    `<ellipse cx="${fx(w * 0.28)}" cy="${fx(h * 1.03)}" rx="${fx(w * 1.15)}" ry="${fx(h * 0.15)}" fill="url(#rookHalo)" opacity="0.95"/>`
+    `<ellipse cx="${fx(w * 0.22)}" cy="${fx(h * 1.02)}" rx="${fx(w * 0.95)}" ry="${fx(h * 0.1)}" fill="url(#rookHalo)" opacity="0.95"/>`
   )
-  parts.push(`<rect width="${w}" height="${h}" fill="url(#cliffFoot)"/>`)
-  // the canyon-facing edge, rim-lit by everything burning below it
   parts.push(
-    `<path d="${innerRun.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ')}" fill="none" stroke="${DUSK.parch}" stroke-width="${fx(Math.max(2.5, w * 0.011))}" opacity="0.38" stroke-linejoin="round"/>`
+    `<path d="${innerRun.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ')}" fill="none" stroke="${DUSK.parch}" stroke-width="${fx(Math.max(2, w * 0.008))}" opacity="0.34" stroke-linejoin="round"/>`
   )
 
   const defs =
-    `<clipPath id="cliffCut"><path d="${d}"/></clipPath>` +
-    `<radialGradient id="rookGlow" cx="0.5" cy="0.62" r="0.8">` +
-    `<stop offset="0" stop-color="${DUSK.amberLit}"/><stop offset="0.5" stop-color="${DUSK.amber}"/>` +
-    `<stop offset="1" stop-color="${DUSK.amberDeep}"/></radialGradient>` +
-    `<radialGradient id="rookHalo" cx="0.5" cy="0.5" r="0.5">` +
-    `<stop offset="0" stop-color="${DUSK.amberLit}" stop-opacity="0.72"/>` +
-    `<stop offset="0.22" stop-color="${DUSK.amber}" stop-opacity="0.34"/>` +
-    `<stop offset="0.52" stop-color="${DUSK.amber}" stop-opacity="0.12"/>` +
-    `<stop offset="0.78" stop-color="${DUSK.amber}" stop-opacity="0.03"/>` +
-    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>` +
-    `<linearGradient id="cliffNight" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${DUSK.ink}" stop-opacity="0.58"/>` +
-    `<stop offset="0.34" stop-color="${DUSK.ink}" stop-opacity="0.26"/>` +
-    `<stop offset="0.74" stop-color="${DUSK.ink}" stop-opacity="0.1"/>` +
-    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0.06"/></linearGradient>` +
-    `<linearGradient id="cliffSide" x1="0" y1="0" x2="1" y2="0">` +
-    `<stop offset="0" stop-color="${DUSK.amber}" stop-opacity="0.08"/>` +
-    `<stop offset="0.4" stop-color="${DUSK.ink}" stop-opacity="0.04"/>` +
-    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0.42"/></linearGradient>` +
-    `<linearGradient id="cliffFoot" x1="0" y1="1" x2="0" y2="0">` +
-    `<stop offset="0" stop-color="${DUSK.amber}" stop-opacity="0.32"/>` +
-    `<stop offset="0.16" stop-color="${DUSK.amber}" stop-opacity="0.09"/>` +
+    `<clipPath id="towerCut"><path d="${d}"/></clipPath>` +
+    cityLampDefs() +
+    `<linearGradient id="towerNight" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${DUSK.ink}" stop-opacity="0.5"/>` +
+    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="towerLitFlank" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${DUSK.amber}" stop-opacity="0.16"/>` +
     `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></linearGradient>`
 
-  // the ravens wheeling clear of the crest are cut as their OWN die shapes in
-  // the transparent margin — outside the cliff clip, each with the same pale
-  // core-edge rim the rock carries
+  // the ravens wheeling clear of the crest are cut as their OWN die shapes in the
+  // sky the crown skyline leaves behind, INSIDE the trapezoid (paper outside it
+  // is never sampled, so a bird painted there would simply not exist)
   let wheel = ''
   for (const [u, v, sz, tilt] of spec.wheel) {
-    const wd = wheelRavenPath(X(u), Y(v), Math.max(12, w * sz), tilt)
-    wheel += `<path d="${wd}" fill="${DUSK.ink}"/>` + rookRim(wd, 2)
+    const wd = wheelRavenPath(X(u), Y(v), Math.max(11, w * sz), tilt)
+    wheel += `<path d="${wd}" fill="${DUSK.ink}"/>` + rookRim(wd, 1.8)
   }
 
-  return svgPiece(w, h, `<g clip-path="url(#cliffCut)">${parts.join('')}</g>` + rookRim(d, 5.5) + wheel, defs)
+  return svgPiece(w, h, `<g clip-path="url(#towerCut)">${parts.join('')}</g>` + rookRim(d, 3.2) + wheel, defs)
+}
+
+// ---- THE TERRACED ROOSTS (`ch3-terrace`) -----------------------------------
+// The right page's answer to a colossus, and the piece that kills the mirror by
+// being its OPPOSITE. Where the tower is one tall crooked stack of arched
+// portals, the roosts are a low wide sprawl of roof after roof stepping back,
+// every storey a long horizontal rank of small square-headed roost windows, a
+// perch rail of ravens on every coping, a lamplit road entering at the foot, and
+// a low landing mast at the outboard end where the dispatch cable comes down.
+// NOTHING here is allowed to be vertical drama: the tower is the one tall thing
+// on the spread, and this piece's whole job is to make that legible.
+//
+// ROUND 4b — WIDER THAN TALL, AND NOT A GRID. The sheet re-proportions from
+// 705x1024 to 1024x991: the roosts had to come DOWN so the dispatch cable could
+// fly over them, and the same numbers that shortened the chain widened the
+// radial extent past it. A low sprawl is what this piece was always described
+// as; r4a's sheet made it a ziggurat because it was taller than it was wide.
+//
+// The other thing 4a printed was a SPREADSHEET: every house the same frontage,
+// every bay the same pitch, every cell lit. Three moves fix that and they all
+// cost nothing but seeded numbers. (1) Houses and their window bays are UNEVEN
+// splits, so frontage and pitch wander; each house also sits a little high or
+// low on its own string course, the way a terrace built down a slope does.
+// (2) Two storeys carry a GABLE END standing in the roof plane with a hoist
+// beam and a lit loft door, and two carry a JETTIED upper floor oversailing on
+// corbels — one horizontal shadow that no rank crosses. (3) A house may be
+// SHUTTERED outright, and the per-cell lit roll now clumps in BOTH directions,
+// so dark windows fall among the warm ones instead of one lonely gap per rank.
+const TERRACE = {
+  stone: ['#2f3a49', '#28313e', '#212933', '#1a2129', '#141a21'],
+  facets: [
+    ['#3f4d60', '#313d4d', '#27313f', '#1c2531', '#12181f'],
+    ['#374453', '#2a3542', '#222a35', '#181f28', '#0f141b'],
+    ['#303b48', '#242e39', '#1d242d', '#141a21', '#0d1118'],
+    ['#293441', '#1f2832', '#181e26', '#11161d', '#0d1118'],
+    ['#232d38', '#1a222b', '#141a21', '#0e1319', '#0d1118'],
+  ],
+  // per storey: how much of the band is WALL (the rest is the roof plane above
+  // it), how many HOUSES the terrace is divided into by party pilasters (uneven
+  // frontages, seeded), TWO window ranks per wall so no storey is ever a blank
+  // field, and the dormer roost-boxes standing on the roof. `n` is the NOMINAL
+  // bay pitch across the whole terrace — the real bays are an uneven split of
+  // each house at about that pitch. `jetty`/`gable` name the house index that
+  // breaks the rank; -1 for none. Lit chance falls as it climbs, which is the
+  // whole aerial recession — the far roosts are the dark ones.
+  storeys: [
+    // the foot storey's ranks start high enough to leave the lamplit road its
+    // own clear band across the bottom of the sheet
+    { wall: 0.7, houses: 6, rows: [{ n: 13, sill: 0.3, hF: 0.2, wid: 0.5, lit: 0.8 }, { n: 13, sill: 0.66, hF: 0.19, wid: 0.5, lit: 0.7 }], dormers: 5, jetty: 3, gable: -1 },
+    { wall: 0.68, houses: 5, rows: [{ n: 12, sill: 0.3, hF: 0.2, wid: 0.5, lit: 0.72 }, { n: 12, sill: 0.66, hF: 0.19, wid: 0.5, lit: 0.62 }], dormers: 4, jetty: -1, gable: 1 },
+    { wall: 0.66, houses: 5, rows: [{ n: 11, sill: 0.3, hF: 0.22, wid: 0.5, lit: 0.64 }, { n: 11, sill: 0.66, hF: 0.2, wid: 0.5, lit: 0.54 }], dormers: 4, jetty: 1, gable: -1 },
+    { wall: 0.62, houses: 4, rows: [{ n: 10, sill: 0.3, hF: 0.24, wid: 0.5, lit: 0.56 }, { n: 10, sill: 0.66, hF: 0.22, wid: 0.5, lit: 0.46 }], dormers: 3, jetty: -1, gable: 2 },
+    { wall: 0.58, houses: 4, rows: [{ n: 9, sill: 0.32, hF: 0.26, wid: 0.5, lit: 0.48 }], dormers: 3, jetty: -1, gable: -1 },
+  ],
+  // the roofline steps: segment heights above the crest base, in v. `gableAt`
+  // are the segments cut as a PEAK rather than a flat run — the one silhouette
+  // break the crest is allowed, and small enough that the landing mast still
+  // out-tops it and the tower still owns the spread.
+  ridge: [0.006, 0.017, 0.004, 0.02, 0.007, 0.014, 0.005, 0.016, 0.004],
+  gableAt: [2, 6],
+  gableV: 0.019,
+  crest: 0.962,
+  mastU: 0.84,
+  mastTop: 0.996,
+  wheel: [[0.3, 0.986, 0.04, 0.22], [0.62, 0.978, 0.032, -0.18]],
+}
+
+/** THE TERRACED ROOSTS. Same trapezoid contract as the tower, opposite grammar:
+ *  low, wide, horizontal, and warm. */
+function terracedRoosts({ w, h, seed, storeys, spans }) {
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+  const bands = chainBands(storeys)
+  const us = chainNodeUs(spans)
+  const nS = bands.length
+  const uIn = (v) => chainEdgeAt(bands, us, v, 0)
+  const uOut = (v) => chainEdgeAt(bands, us, v, 1)
+  const rEdge = mulberry32((seed * 7 + 0x4d21) | 0)
+  const spec = TERRACE
+  const INSET = 0.012
+
+  // ---- SILHOUETTE. The EAVE runs flush to the trapezoid — a roof overhangs its
+  // wall, that is what an eave is — and the wall band is bitten in behind it, so
+  // every storey ends on a crisp overhanging lip. The crest is a stepped
+  // roofline with one low landing mast at the outboard end. ----
+  const eaves = spec.storeys.map((s) => [[s.wall - 0.03, s.wall + 0.16]])
+  const innerRun = stackFlank(bands, us, 0, eaves, rEdge, INSET, 6, spec.crest)
+  const outerRun = stackFlank(bands, us, 1, eaves, rEdge, INSET, 6, spec.crest)
+
+  const crest = spec.crest
+  const uA = uIn(crest) + 0.008
+  const uB = uOut(crest) - 0.008
+  const segs = spec.ridge.length
+  const ridge = []
+  {
+    const cell = (uB - uA) / segs
+    for (let i = 0; i < segs; i++) {
+      ridge.push({
+        u0: uA + i * cell,
+        u1: uA + (i + 1) * cell,
+        top: crest + spec.ridge[i],
+        gable: spec.gableAt.includes(i),
+      })
+    }
+  }
+
+  const pts = [[uIn(0), 0], ...innerRun]
+  for (const seg of ridge) {
+    // a GABLE segment cuts a shallow peak into the crest instead of a flat run:
+    // the only silhouette break a piece that must stay low can afford, and it is
+    // what stops the roofline reading as one sawn board
+    if (seg.gable) {
+      pts.push([seg.u0, seg.top], [lerp(seg.u0, seg.u1, 0.5), seg.top + spec.gableV], [seg.u1, seg.top])
+    } else pts.push([seg.u0, seg.top], [seg.u1, seg.top])
+    // the LOW landing mast at the outboard end, where the wire comes down out of
+    // the sky. Low is the point: it answers the colossus without competing.
+    if (spec.mastU >= seg.u0 && spec.mastU < seg.u1) {
+      const mw = 0.014
+      const mv = spec.mastTop - seg.top
+      pts.push(
+        [spec.mastU - mw, seg.top], [spec.mastU - mw * 0.45, seg.top + mv * 0.74],
+        [spec.mastU - mw * 1.7, seg.top + mv * 0.84], [spec.mastU, spec.mastTop],
+        [spec.mastU + mw * 1.7, seg.top + mv * 0.84], [spec.mastU + mw * 0.45, seg.top + mv * 0.74],
+        [spec.mastU + mw, seg.top]
+      )
+    }
+  }
+  for (let i = outerRun.length - 1; i >= 0; i--) pts.push(outerRun[i])
+  pts.push([uOut(0), 0])
+  const d = pts.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+
+  const parts = []
+  for (let k = 0; k < nS; k++) {
+    const [v0, v1] = bands[k]
+    const bhV = v1 - v0
+    const st = spec.storeys[k]
+    const wallTop = v0 + bhV * st.wall
+    const rk = mulberry32((seed * 149 + k * 733) | 0)
+    const pr = mulberry32((seed * 71 + k * 1289) | 0)
+    let s = `<g>`
+
+    // 1. the wall band — the storey's working face, all of it under a roof
+    s += `<rect x="0" y="${fx(Y(wallTop))}" width="${w}" height="${fx(Y(v0) - Y(wallTop))}" fill="${spec.stone[k]}"/>`
+    s += cityFacets(0, w, Y(wallTop), Y(v0), spec.facets[k], 5, Math.max(2, Math.round((bhV * st.wall) / 0.07)), rk, h)
+    const cn = Math.max(4, Math.round((bhV * st.wall) / 0.022))
+    for (let i = 1; i < cn; i++) {
+      const y = lerp(Y(v0), Y(wallTop), i / cn)
+      s += `<path d="${strataPath(y, 0, w, h * 0.0022, 8, rk)}" fill="none" stroke="${DUSK.ink}" stroke-width="1.5" opacity="${(0.16 + rk() * 0.16).toFixed(2)}"/>`
+    }
+
+    // 2. THE HOUSES. The terrace is a ROW OF HOUSES, not a wall with holes in
+    // it, and the single cheapest way to say so is to give them different
+    // frontages: an uneven split, each house sitting a little high or low on its
+    // own courses, one of them shuttered for the night, one of them jettied.
+    const rh = mulberry32((seed * 313 + k * 617) | 0)
+    const uL = uIn(v0) + 0.02
+    const uR = uOut(wallTop) - 0.02
+    const hb = unevenSplit(uL, uR, st.houses, rh, 0.4)
+    const wallV = bhV * st.wall
+    const houses = []
+    for (let i = 0; i < st.houses; i++) {
+      houses.push({
+        u0: hb[i],
+        u1: hb[i + 1],
+        dv: (rh() * 2 - 1) * wallV * 0.055,
+        jetty: i === st.jetty,
+        gable: i === st.gable,
+        dark: rh() < 0.15,
+      })
+    }
+
+    // PARTY PILASTERS on the house joints — what keeps a long low wall from
+    // reading as one blank slab, now landing on uneven bays.
+    for (let i = 1; i < st.houses; i++) {
+      const u = hb[i]
+      const pw = w * 0.011
+      s += `<rect x="${fx(X(u) - pw)}" y="${fx(Y(wallTop))}" width="${fx(pw * 2)}" height="${fx(Y(v0) - Y(wallTop))}" fill="${DUSK.slateDim}"/>`
+      s += `<rect x="${fx(X(u) - pw)}" y="${fx(Y(wallTop))}" width="${fx(pw * 0.6)}" height="${fx(Y(v0) - Y(wallTop))}" fill="${DUSK.slateLit}" opacity="0.42"/>`
+      s += `<rect x="${fx(X(u) + pw * 0.4)}" y="${fx(Y(wallTop))}" width="${fx(pw * 0.6)}" height="${fx(Y(v0) - Y(wallTop))}" fill="${DUSK.ink}" opacity="0.5"/>`
+    }
+
+    // THE JETTIED HOUSE: its upper floor oversails on corbel brackets, so one
+    // house throws a hard horizontal shadow no rank crosses. A terrace where
+    // every facade is in one plane is a drawing of a terrace, not a terrace.
+    for (const ho of houses) {
+      if (!ho.jetty) continue
+      const jv = v0 + wallV * 0.5 + ho.dv
+      const jx0 = X(ho.u0) - w * 0.008
+      const jx1 = X(ho.u1) + w * 0.008
+      const jy = Y(jv)
+      const th = Math.max(4, h * 0.0075)
+      // the shadow the oversail throws down the storey below it
+      s += `<rect x="${fx(jx0)}" y="${fx(jy)}" width="${fx(jx1 - jx0)}" height="${fx(th * 1.9)}" fill="${DUSK.ink}" opacity="0.72"/>`
+      // three corbels carrying it
+      for (let i = 0; i < 3; i++) {
+        const bx = lerp(jx0 + w * 0.02, jx1 - w * 0.02, i / 2)
+        s += `<path d="M ${fx(bx - w * 0.008)} ${fx(jy + th)} L ${fx(bx + w * 0.008)} ${fx(jy + th)} L ${fx(bx)} ${fx(jy + th * 3.2)} Z" fill="${DUSK.slateDim}"/>`
+      }
+      s += `<rect x="${fx(jx0)}" y="${fx(jy - th)}" width="${fx(jx1 - jx0)}" height="${fx(th * 2)}" fill="${DUSK.slate}"/>`
+      s += `<rect x="${fx(jx0)}" y="${fx(jy - th)}" width="${fx(jx1 - jx0)}" height="${fx(th * 0.7)}" fill="${DUSK.parch}" opacity="0.72"/>`
+    }
+
+    // 3. the window ranks — many small warm openings on two long horizontal
+    // lines, the exact opposite of the tower's few monumental arches. Bays are
+    // an UNEVEN split of each house at roughly the row's nominal pitch, so no
+    // two frontages carry the same cell width or the same number of them.
+    for (const row of st.rows) {
+      const cellU = (uR - uL) / row.n
+      for (const ho of houses) {
+        const nb = Math.max(2, Math.round((ho.u1 - ho.u0) / cellU))
+        const bb = unevenSplit(ho.u0 + cellU * 0.16, ho.u1 - cellU * 0.16, nb, pr, 0.32)
+        // a jettied house's upper rank rides ON the oversail, a touch higher
+        const lift = ho.jetty && row.sill > 0.5 ? wallV * 0.035 : 0
+        let litPrev = false
+        for (let i = 0; i < nb; i++) {
+          const pwU = (bb[i + 1] - bb[i]) * row.wid
+          const cu = (bb[i] + bb[i + 1]) / 2
+          const hV = row.hF * wallV * (0.9 + pr() * 0.2)
+          const sillV = v0 + row.sill * wallV + ho.dv + lift + (pr() * 2 - 1) * bhV * 0.004
+          // the roll clumps in BOTH directions now: warm windows cluster and so
+          // do dark ones, which is what "inhabited" looks like. A shuttered
+          // house goes dark outright.
+          const roll = pr()
+          const lit = ho.dark ? roll < 0.12 : roll < (litPrev ? row.lit + 0.14 : row.lit - 0.12)
+          litPrev = lit
+          s += roostWindow(X(cu - pwU / 2), Y(sillV), X(pwU), hV * h, lit)
+        }
+        // the string course the rank stands on, per HOUSE so it steps with it
+        const csY = Y(v0 + row.sill * wallV + ho.dv + lift)
+        s += `<rect x="${fx(X(ho.u0))}" y="${fx(csY + Math.max(2, h * 0.004))}" width="${fx(X(ho.u1 - ho.u0))}" height="${fx(Math.max(2, h * 0.003))}" fill="${DUSK.parchDim}" opacity="0.34"/>`
+      }
+    }
+
+    // 4. SORTING PERCHES: ravens landing on the RIDGE of the storey below —
+    // printed on THIS panel, so they tilt with the terrace they stand on and
+    // never straddle a crease. Two short ranks, staggered storey to storey.
+    if (k > 0) {
+      for (const [t0, t1] of [[0.08 + 0.1 * (k % 2), 0.28 + 0.1 * (k % 2)], [0.56 + 0.08 * (k % 2), 0.72 + 0.08 * (k % 2)]]) {
+        s += perchedRank(X, Y, lerp(uIn(v0), uOut(v0), t0), lerp(uIn(v0), uOut(v0), t1), v0, 0.024, w, h)
+      }
+    }
+
+    // 5. the roof plane above the wall: slate courses running the FULL width, a
+    // deep eave shadow under it and a lit ridge on the fold. Roof after roof
+    // stepping back is the whole silhouette of this piece.
+    const yR0 = Y(wallTop)
+    const yR1 = Y(v1)
+    s += `<rect x="0" y="${fx(yR1)}" width="${w}" height="${fx(yR0 - yR1)}" fill="${DUSK.slate}"/>`
+    s += cityFacets(0, w, yR1, yR0, [DUSK.slateLit, DUSK.slate, DUSK.slateDim, DUSK.slateDeep], 6, 2, rk, h)
+    const tiles = Math.max(3, Math.round((bhV * (1 - st.wall)) / 0.013))
+    for (let i = 1; i < tiles; i++) {
+      const y = lerp(yR0, yR1, i / tiles)
+      s += `<path d="${strataPath(y, 0, w, h * 0.0018, 9, rk)}" fill="none" stroke="${DUSK.ink}" stroke-width="2" opacity="0.4"/>`
+      s += `<path d="${strataPath(y - h * 0.0028, 0, w, h * 0.0016, 9, rk)}" fill="none" stroke="${DUSK.slateLit}" stroke-width="1.2" opacity="0.2"/>`
+    }
+    // CHIMNEY STACKS: two per roof, standing off the ridge line. They cost one
+    // rectangle each and they are most of what stops a slate plane reading as a
+    // sheet of grey paper at the reading camera.
+    for (let i = 0; i < 2; i++) {
+      const u = lerp(uIn(v1) + 0.1, uOut(v1) - 0.1, 0.22 + rk() * 0.62)
+      const cw2 = w * (0.012 + rk() * 0.008)
+      const ch2 = (yR0 - yR1) * (0.5 + rk() * 0.3)
+      const cy2 = yR1 + (yR0 - yR1) * 0.28
+      s += `<rect x="${fx(X(u) - cw2)}" y="${fx(cy2 - ch2)}" width="${fx(cw2 * 2)}" height="${fx(ch2)}" fill="${DUSK.slateDeep}"/>`
+      s += `<rect x="${fx(X(u) - cw2)}" y="${fx(cy2 - ch2)}" width="${fx(cw2 * 0.7)}" height="${fx(ch2)}" fill="${DUSK.slateDim}" opacity="0.8"/>`
+      s += `<rect x="${fx(X(u) - cw2 * 1.3)}" y="${fx(cy2 - ch2)}" width="${fx(cw2 * 2.6)}" height="${fx(Math.max(2.5, h * 0.005))}" fill="${DUSK.slateLit}" opacity="0.85"/>`
+    }
+    // DORMER ROOST-BOXES standing on the roof plane — small gabled hutches with
+    // an amber slit each. They ride INSIDE the roof band, because anything above
+    // the fold belongs to the storey behind it. Spacing is an uneven split too:
+    // dormers on an even pitch are the loudest grid on a roof.
+    const db = unevenSplit(uIn(v1) + 0.05, uOut(v1) - 0.05, st.dormers, rk, 0.42)
+    for (let i = 0; i < st.dormers; i++) {
+      const u = (db[i] + db[i + 1]) / 2
+      const dw = w * (0.026 + rk() * 0.016)
+      const dh = (yR0 - yR1) * (0.4 + rk() * 0.16)
+      const dy = yR0 - (yR0 - yR1) * 0.22 - dh
+      s += `<path d="M ${fx(X(u) - dw / 2)} ${fx(dy + dh)} L ${fx(X(u) - dw / 2)} ${fx(dy + dh * 0.3)} L ${fx(X(u))} ${fx(dy)} L ${fx(X(u) + dw / 2)} ${fx(dy + dh * 0.3)} L ${fx(X(u) + dw / 2)} ${fx(dy + dh)} Z" fill="${DUSK.slateDeep}"/>`
+      s += `<path d="M ${fx(X(u) - dw * 0.6)} ${fx(dy + dh * 0.34)} L ${fx(X(u))} ${fx(dy - dh * 0.05)} L ${fx(X(u) + dw * 0.6)} ${fx(dy + dh * 0.34)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="2.6" opacity="0.8"/>`
+      s += `<rect x="${fx(X(u) - dw * 0.18)}" y="${fx(dy + dh * 0.42)}" width="${fx(dw * 0.36)}" height="${fx(dh * 0.42)}" fill="${DUSK.amberLit}" opacity="0.9"/>`
+    }
+    // THE GABLE END: one house turned end-on to the street, its wall carried up
+    // through the roof plane to a peak, with barge-boards, a hoist beam and a
+    // lit loft door under it. Painted LAST on the roof so no dormer crowds it,
+    // and kept to the middle of its house so the pitch is steep enough to read
+    // as a gable rather than as a pediment. It stays INSIDE the roof band —
+    // anything above the fold belongs to the storey behind, which would simply
+    // overpaint it.
+    for (const ho of houses) {
+      if (!ho.gable) continue
+      const gcx = X((ho.u0 + ho.u1) / 2)
+      const half = X(ho.u1 - ho.u0) * 0.31
+      const peak = yR1 + (yR0 - yR1) * 0.04
+      const rise = yR0 - peak
+      const face = `M ${fx(gcx - half)} ${fx(yR0)} L ${fx(gcx)} ${fx(peak)} L ${fx(gcx + half)} ${fx(yR0)} Z`
+      s += `<path d="${face}" fill="${spec.stone[k]}"/>`
+      s += `<path d="M ${fx(gcx - half * 1.1)} ${fx(yR0)} L ${fx(gcx)} ${fx(peak - rise * 0.08)}" stroke="${DUSK.parch}" stroke-width="${fx(Math.max(3.5, h * 0.006))}" opacity="0.85"/>`
+      s += `<path d="M ${fx(gcx)} ${fx(peak - rise * 0.08)} L ${fx(gcx + half * 1.1)} ${fx(yR0)}" stroke="${DUSK.parchDim}" stroke-width="${fx(Math.max(3.5, h * 0.006))}" opacity="0.8"/>`
+      // the hoist beam every loft door in a working city has over it
+      s += `<rect x="${fx(gcx - half * 0.34)}" y="${fx(peak + rise * 0.17)}" width="${fx(half * 0.68)}" height="${fx(Math.max(3, h * 0.004))}" fill="${DUSK.ink}"/>`
+      s += roostWindow(gcx - half * 0.24, yR0 - rise * 0.14, half * 0.48, rise * 0.42, true)
+    }
+    // the eave: a shadow the roof throws down the wall, then its lit lip
+    s += `<rect x="0" y="${fx(yR0 - Math.max(4, h * 0.008))}" width="${w}" height="${fx(Math.max(4, h * 0.008))}" fill="${DUSK.ink}" opacity="0.85"/>`
+    s += `<rect x="0" y="${fx(yR0 - Math.max(6, h * 0.011))}" width="${w}" height="${fx(Math.max(3, h * 0.004))}" fill="${DUSK.parch}" opacity="0.7"/>`
+    // the ridge on the fold: the lit line the storey above steps back behind
+    s += `<rect x="0" y="${fx(yR1)}" width="${w}" height="${fx(Math.max(3, h * 0.004))}" fill="${DUSK.parchDim}" opacity="0.72"/>`
+    s += `</g>`
+    parts.push(s)
+  }
+
+  // ---- THE LAMPLIT ROAD, entering at the foot from the gutter side (it inherits
+  // that job from the retired yard wall): a warm kerbed band across the bottom of
+  // the sprawl with three lamp posts standing in their own pools. ----
+  {
+    const roadV = 0.038
+    let s = `<rect x="0" y="${fx(Y(roadV))}" width="${w}" height="${fx(h - Y(roadV))}" fill="${DUSK.slateDeep}"/>`
+    s += `<path d="M 0 ${fx(Y(roadV))} L ${w} ${fx(Y(roadV * 0.72))}" stroke="${DUSK.parchDim}" stroke-width="${fx(Math.max(2.5, h * 0.004))}" opacity="0.6"/>`
+    s += `<ellipse cx="${fx(w * 0.1)}" cy="${fx(h)}" rx="${fx(w * 0.5)}" ry="${fx(h * 0.05)}" fill="url(#rookHalo)"/>`
+    for (const [u, lh] of [[0.14, 0.055], [0.46, 0.048], [0.78, 0.042]]) {
+      const px = X(u)
+      s += `<rect x="${fx(px - Math.max(1.5, w * 0.004))}" y="${fx(Y(roadV + lh))}" width="${fx(Math.max(3, w * 0.008))}" height="${fx(Y(roadV) - Y(roadV + lh))}" fill="${DUSK.ink}"/>`
+      s += lampHead(px, Y(roadV + lh + 0.018), Y(roadV + lh), Math.max(6, w * 0.018), 3)
+    }
+    parts.push(s)
+  }
+
+  // ---- THE LANDING MAST's stays and pulley at the outboard end, where the
+  // dispatch cable comes down out of the sky. ----
+  {
+    const py = Y(spec.mastTop - 0.008)
+    const mx = X(spec.mastU)
+    let s = `<path d="M ${fx(mx)} ${fx(py)} L ${fx(X(spec.mastU - 0.09))} ${fx(Y(crest - 0.006))}" stroke="${DUSK.ink}" stroke-width="2.6" opacity="0.9"/>`
+    s += `<path d="M ${fx(mx)} ${fx(py)} L ${fx(X(spec.mastU + 0.07))} ${fx(Y(crest - 0.004))}" stroke="${DUSK.ink}" stroke-width="2.6" opacity="0.9"/>`
+    s += `<circle cx="${fx(mx)}" cy="${fx(py)}" r="${fx(Math.max(3, w * 0.007))}" fill="${DUSK.slateLit}" stroke="${DUSK.ink}" stroke-width="1.8"/>`
+    parts.push(s)
+  }
+
+  // ---- ATMOSPHERE: local only. Night falls on the upper terraces, the gutter
+  // flank catches the city, the road pools at the foot. ----
+  parts.push(`<rect width="${w}" height="${fx(h * 0.3)}" fill="url(#terraceNight)"/>`)
+  parts.push(`<rect width="${fx(w * 0.2)}" height="${h}" fill="url(#terraceLitFlank)"/>`)
+
+  const defs =
+    `<clipPath id="terraceCut"><path d="${d}"/></clipPath>` +
+    cityLampDefs() +
+    `<linearGradient id="terraceNight" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${DUSK.ink}" stop-opacity="0.46"/>` +
+    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="terraceLitFlank" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${DUSK.amber}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></linearGradient>`
+
+  let wheel = ''
+  for (const [u, v, sz, tilt] of spec.wheel) {
+    const wd = wheelRavenPath(X(u), Y(v), Math.max(10, w * sz), tilt)
+    wheel += `<path d="${wd}" fill="${DUSK.ink}"/>` + rookRim(wd, 1.6)
+  }
+
+  return svgPiece(w, h, `<g clip-path="url(#terraceCut)">${parts.join('')}</g>` + rookRim(d, 3) + wheel, defs)
+}
+
+// ---- THE DISPATCH LINE (`ch3-dispatch-line`) --------------------------------
+// A sheet of paper that has to read as a WIRE IN THE AIR, so almost all of it is
+// cut away: the alpha carries the cable, its two masts and its three hanging
+// letter-baskets, and nothing else. The panel renders at alphaTest 0.1 and the
+// house grain pass floors every non-transparent pixel at ~0.16 alpha, so a soft
+// halo out here would print as a grey disc — every glow on this piece is small,
+// bounded, and paid for.
+//
+// ROUND 4b — SIZED FOR THE READING CAMERA, NOT FOR THE SHEET. The board capture
+// projects this 516x1024 panel into roughly 139x253 screen px, so a source
+// stroke is divided by ~3.7 before anyone sees it: the round-4a rope (4.6px
+// core, 1.6px highlight) landed at 1.2 and 0.4 screen px and read as a scratch,
+// and the lanterns landed at 2.5px. Every weight on this piece is now quoted in
+// FRACTIONS OF THE PANEL, which are scale-invariant on screen, and chosen so
+// the wire is ~2 screen px of lit rope and each basket ~16x19 screen px with a
+// blazing head on it. The sheet is TALLER relative to its width than r4a's and
+// the sag is shallower, so most of it is empty air above and below the wire —
+// that emptiness is the point and nothing may be painted into it.
+
+/** A point on the cable, at arc parameter s over the node list (s = index / 8,
+ *  the same parameter `dispatchLineCableAt` walks). */
+function cableAt(cable, s) {
+  const x = Math.min(1, Math.max(0, s)) * (cable.length - 1)
+  const i = Math.min(cable.length - 2, Math.floor(x))
+  const f = x - i
+  return [lerp(cable[i][0], cable[i + 1][0], f), lerp(cable[i][1], cable[i + 1][1], f)]
+}
+
+/** A slender die-cut MAST rising to meet the wire, with a pulley at its head. */
+function cableMast(X, Y, u, vTop, vFoot, halfU, w, h) {
+  const x = X(u)
+  const hw = X(halfU)
+  const yT = Y(vTop)
+  const yF = Y(vFoot)
+  const body = `M ${fx(x - hw * 0.4)} ${fx(yT)} L ${fx(x + hw * 0.4)} ${fx(yT)} L ${fx(x + hw)} ${fx(yF)} L ${fx(x - hw)} ${fx(yF)} Z`
+  let s = `<path d="${body}" fill="${DUSK.slateDim}"/>`
+  s += `<path d="M ${fx(x - hw * 0.4)} ${fx(yT)} L ${fx(x - hw)} ${fx(yF)}" stroke="${DUSK.parch}" stroke-width="${fx(Math.max(3, hw * 0.34))}" opacity="0.68"/>`
+  s += `<path d="M ${fx(x + hw * 0.4)} ${fx(yT)} L ${fx(x + hw)} ${fx(yF)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(3, hw * 0.4))}" opacity="0.7"/>`
+  // cross-braces: a slender post reads as a MAST only once it is trussed
+  for (let i = 1; i <= 3; i++) {
+    const y = lerp(yT, yF, i / 4)
+    const bw = lerp(hw * 0.4, hw, i / 4)
+    s += `<path d="M ${fx(x - bw)} ${fx(y)} L ${fx(x + bw)} ${fx(y)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(2.6, hw * 0.3))}"/>`
+    s += `<path d="M ${fx(x - bw)} ${fx(y)} L ${fx(x + lerp(hw * 0.4, hw, (i + 1) / 4))} ${fx(lerp(yT, yF, (i + 1) / 4))}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(2.2, hw * 0.24))}" opacity="0.75"/>`
+  }
+  s += rookRim(body, 2.6)
+  // the head: a pulley wheel with a warm catch on it, so the wire visibly ENDS
+  // on something rather than running off the edge of the sheet
+  s += warmBloom(x, yT, Math.max(10, w * 0.05))
+  s += `<circle cx="${fx(x)}" cy="${fx(yT)}" r="${fx(Math.max(6, w * 0.026))}" fill="${DUSK.slateLit}" stroke="${DUSK.ink}" stroke-width="3"/>`
+  s += `<circle cx="${fx(x)}" cy="${fx(yT)}" r="${fx(Math.max(2, w * 0.009))}" fill="${DUSK.ink}"/>`
+  return s
+}
+
+/** THE DIE-CUT CABLE PANEL. `cable` is the SAME (u, v) node list content.ts
+ *  hands the solver, so the painted wire and the wire the reader's basket rides
+ *  are one polyline. */
+function dispatchCablePanel({ w, h, seed, cable, baskets }) {
+  const X = (u) => u * w
+  const Y = (v) => (1 - v) * h
+  const r = mulberry32(seed)
+  const line = cable.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ')
+  const parts = []
+
+  // the two masts, cut before the rope so the rope crosses their heads
+  // (offset inboard by more than a half-width, so neither mast's splayed foot is
+  // sheared off by the edge of the sheet)
+  parts.push(cableMast(X, Y, cable[0][0] + 0.03, cable[0][1], cable[0][1] - 0.2, 0.026, w, h))
+  const last = cable[cable.length - 1]
+  // the outboard mast runs DOWN to the roost crest it lands on: stopping it
+  // short leaves a post hanging in the air over the roofs on the board
+  parts.push(cableMast(X, Y, last[0] - 0.03, last[1], last[1] - 0.245, 0.026, w, h))
+
+  // THE ROPE, in FRACTIONS of the panel. A dark core carries the wire wherever
+  // it crosses something lit, and a LIT strand lifted off its top edge carries
+  // it over the black page — on a night spread the ink core is invisible and the
+  // highlight is the whole read, so the highlight is the heavier half of the
+  // pair here, not a glint on it.
+  const core = Math.max(5, w * 0.016)
+  parts.push(`<path d="${line}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(core)}" stroke-linejoin="round" stroke-linecap="round"/>`)
+  parts.push(
+    `<path d="${line}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(core * 0.62)}" opacity="0.9" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,${fx(-core * 0.34)})"/>`
+  )
+  parts.push(
+    `<path d="${line}" fill="none" stroke="${DUSK.parch}" stroke-width="${fx(core * 0.26)}" opacity="0.8" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,${fx(-core * 0.44)})"/>`
+  )
+
+  // THE HANGING LETTER-BASKETS. Each is a hook over the wire, a short yoke, a
+  // wicker pannier and one lit lantern — the fixed three the reader does not
+  // touch, so the eye reads the wire as WORKING before a hand ever lands on it.
+  for (const s of baskets) {
+    const [u, v] = cableAt(cable, s)
+    const cx = X(u)
+    const cy = Y(v)
+    const bw = w * 0.105
+    const bh = h * 0.072
+    const hook = Math.max(4, bw * 0.09)
+    let g = `<path d="M ${fx(cx - bw * 0.22)} ${fx(cy - bh * 0.16)} A ${fx(bw * 0.22)} ${fx(bh * 0.16)} 0 1 1 ${fx(cx + bw * 0.22)} ${fx(cy - bh * 0.1)}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(hook)}"/>`
+    g += `<path d="M ${fx(cx)} ${fx(cy)} L ${fx(cx - bw * 0.4)} ${fx(cy + bh * 0.42)} M ${fx(cx)} ${fx(cy)} L ${fx(cx + bw * 0.4)} ${fx(cy + bh * 0.42)}" stroke="${DUSK.ink}" stroke-width="${fx(hook * 0.8)}"/>`
+    const by = cy + bh * 0.42
+    const pan = `M ${fx(cx - bw * 0.44)} ${fx(by)} L ${fx(cx + bw * 0.44)} ${fx(by)} L ${fx(cx + bw * 0.3)} ${fx(by + bh * 0.66)} L ${fx(cx - bw * 0.3)} ${fx(by + bh * 0.66)} Z`
+    g += `<path d="${pan}" fill="#4a3018"/>`
+    // the lit half of the wicker, on the gutter flank where the city is: a
+    // pannier painted one flat brown is a bag, and this has to read as a basket
+    g += `<path d="M ${fx(cx - bw * 0.44)} ${fx(by)} L ${fx(cx - bw * 0.02)} ${fx(by)} L ${fx(cx - bw * 0.02)} ${fx(by + bh * 0.66)} L ${fx(cx - bw * 0.3)} ${fx(by + bh * 0.66)} Z" fill="#7a5228" opacity="0.8"/>`
+    g += `<path d="M ${fx(cx - bw * 0.46)} ${fx(by)} L ${fx(cx + bw * 0.46)} ${fx(by)}" stroke="${DUSK.parch}" stroke-width="${fx(hook * 1.05)}" opacity="0.88"/>`
+    for (let i = 1; i <= 2; i++) {
+      const y = by + (bh * 0.66 * i) / 3
+      const t = i / 3
+      g += `<path d="M ${fx(cx - lerp(bw * 0.44, bw * 0.3, t))} ${fx(y)} L ${fx(cx + lerp(bw * 0.44, bw * 0.3, t))} ${fx(y)}" stroke="${DUSK.ink}" stroke-width="${fx(hook * 0.6)}" opacity="0.7"/>`
+    }
+    g += rookRim(pan, Math.max(2, bw * 0.05))
+    // the envelopes riding in it, and the lamp that says the run is live
+    g += `<path d="M ${fx(cx - bw * 0.3)} ${fx(by)} L ${fx(cx - bw * 0.02)} ${fx(by - bh * 0.24)} L ${fx(cx + bw * 0.12)} ${fx(by)} Z" fill="${DUSK.parch}" opacity="0.94"/>`
+    const lx = cx + bw * 0.54
+    g += warmBloom(lx, by + bh * 0.18, Math.max(14, w * 0.052))
+    g += lampHead(lx, by - bh * 0.04, by + bh * 0.34, Math.max(10, w * 0.032), 0)
+    parts.push(g)
+  }
+
+  // RANKS riding the wire — the cheapest possible statement that the line is a
+  // raven road. Each rank is rotated onto the cable's own slope, because a
+  // horizontal rank on a falling wire reads as birds hovering beside it.
+  for (const [s, n] of [[0.31, 2], [0.62, 2], [0.9, 2]]) {
+    const [u, v] = cableAt(cable, s)
+    const [ua, va] = cableAt(cable, Math.max(0, s - 0.03))
+    const [ub, vb] = cableAt(cable, Math.min(1, s + 0.03))
+    const ang = (Math.atan2(Y(vb) - Y(va), X(ub) - X(ua)) * 180) / Math.PI
+    const bh = 0.029 + r() * 0.005
+    const halfU = (n * bh * h * RAVEN_CELL) / (2 * w)
+    let dd = `M ${fx(X(u - halfU))} ${fx(Y(v))}`
+    for (const [cu, cv] of ravenChainTop(u - halfU, u + halfU, v, bh, n, 'left')) {
+      dd += ` L ${fx(X(cu))} ${fx(Y(cv))}`
+    }
+    dd += ` L ${fx(X(u + halfU))} ${fx(Y(v))} Z`
+    // slate, not ink: a bird cut in ink and hung in mid-air over a BLACK page is
+    // a pale rim scribble and nothing else — out here the silhouette has to be
+    // lighter than the night it sits in
+    parts.push(
+      `<g transform="rotate(${ang.toFixed(2)} ${fx(X(u))} ${fx(Y(v))})">` +
+        `<path d="${dd}" fill="${DUSK.slateDim}"/>` +
+        `<path d="${dd}" fill="none" stroke="${DUSK.rim}" stroke-width="${fx(Math.max(2.4, w * 0.008))}" opacity="0.66" stroke-linejoin="round"/>` +
+        `</g>`
+    )
+  }
+
+  return svgPiece(w, h, parts.join(''), cityLampDefs())
+}
+
+/** THE READER'S BASKET (`ch3-dispatch-line-basket`) — the in-plane rider the
+ *  reader pushes down the wire. The quad hangs it BELOW the cable, so the yoke
+ *  and its hook sit at the very top of the image and the pannier fills the rest;
+ *  the sprite is drawn to the cell because the cell is all the paper it gets. */
+/**
+ * THE READER'S TROLLEY (ch3-dispatch-line-basket) — the one thing on this
+ * spread the reader's hand operates, so it is drawn to be FOUND and to be
+ * GRABBED, which are two different jobs.
+ *
+ * FOUND: it carries the brightest lantern on the wire, with a bloom behind it.
+ * On a black page at 1600x900 the eye lands on warm light before it lands on
+ * shape, and the three static lanterns are deliberately dimmer and smaller.
+ *
+ * GRABBED: a brass PULL-RING hangs under the pannier. A ring on a cord is the
+ * oldest "pull me" in the world, it is diegetic on a dispatch line (that is how
+ * you haul a trolley in), and it is on-palette — the same brass the lanterns and
+ * the winch crank are made of, not a grey UI affordance pasted onto a painting.
+ *
+ * CENTRED ON THE WIRE, not hung below it: the quad's middle is the cable, so the
+ * grooved pulley WHEEL sits at the image's centre with the pannier below and the
+ * hanger above. That is what a cable trolley is, and it is also the only way the
+ * handle fits — hung wholly below the wire the same quad dips under the roosts'
+ * crest at the outboard end (popup-dispatchline.ts, gate L17). The panel's own
+ * painted cable passes through the wheel's centre from both sides, so the wheel
+ * reads as clipped over it at every point of the run regardless of the wire's
+ * local slope.
+ */
+function readerBasket(w, h, seed) {
+  const r = mulberry32(seed)
+  const cx = w / 2
+  const cy = h * 0.5 // the cable runs through here: the quad is centred on it
+  const parts = []
+
+  // ---- the pulley WHEEL, sitting on the wire -------------------------------
+  const wheelR = w * 0.13
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 1.18)}" fill="${DUSK.ink}" opacity="0.85"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR)}" fill="${DUSK.amber}"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 0.66)}" fill="${DUSK.amberDeep}"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(wheelR * 0.22)}" fill="${DUSK.amberCore}"/>`)
+  // a specular catch on the upper-left of the rim: brass, lit from the keep side
+  parts.push(
+    `<path d="M ${fx(cx - wheelR * 0.86)} ${fx(cy - wheelR * 0.36)} A ${fx(wheelR)} ${fx(wheelR)} 0 0 1 ${fx(cx - wheelR * 0.2)} ${fx(cy - wheelR * 0.94)}" fill="none" stroke="${DUSK.amberCore}" stroke-width="${fx(w * 0.018)}" opacity="0.85" stroke-linecap="round"/>`
+  )
+  // the stirrup: a brass yoke over the axle, its arms running down to the pannier
+  parts.push(
+    `<path d="M ${fx(cx - wheelR * 1.05)} ${fx(cy - wheelR * 0.5)} L ${fx(cx - wheelR * 1.05)} ${fx(h * 0.635)} M ${fx(cx + wheelR * 1.05)} ${fx(cy - wheelR * 0.5)} L ${fx(cx + wheelR * 1.05)} ${fx(h * 0.635)}" fill="none" stroke="${DUSK.amber}" stroke-width="${fx(w * 0.028)}" stroke-linecap="round"/>`
+  )
+  parts.push(
+    `<path d="M ${fx(cx - wheelR * 1.05)} ${fx(cy - wheelR * 0.72)} A ${fx(wheelR * 1.05)} ${fx(wheelR * 0.8)} 0 0 1 ${fx(cx + wheelR * 1.05)} ${fx(cy - wheelR * 0.72)}" fill="none" stroke="${DUSK.amber}" stroke-width="${fx(w * 0.026)}"/>`
+  )
+
+  // ---- the yoke bar and the WICKER pannier, below the wire -----------------
+  const yb = h * 0.635
+  parts.push(`<rect x="${fx(w * 0.22)}" y="${fx(yb)}" width="${fx(w * 0.56)}" height="${fx(h * 0.038)}" fill="${DUSK.slateDim}"/>`)
+  parts.push(`<rect x="${fx(w * 0.22)}" y="${fx(yb)}" width="${fx(w * 0.56)}" height="${fx(h * 0.012)}" fill="${DUSK.parch}" opacity="0.7"/>`)
+
+  const by = h * 0.685
+  const bb = h * 0.86
+  const body = `M ${fx(w * 0.19)} ${fx(by)} L ${fx(w * 0.81)} ${fx(by)} L ${fx(w * 0.7)} ${fx(bb)} L ${fx(w * 0.3)} ${fx(bb)} Z`
+  parts.push(`<path d="${body}" fill="#5a3b1e"/>`)
+  // the lit half follows the pannier's own taper — a vertical seam down a
+  // tapering basket reads as a fold in the paper, not as light on wicker
+  parts.push(`<path d="M ${fx(w * 0.19)} ${fx(by)} L ${fx(w * 0.5)} ${fx(by)} L ${fx(w * 0.44)} ${fx(bb)} L ${fx(w * 0.3)} ${fx(bb)} Z" fill="#7a5228" opacity="0.75"/>`)
+  parts.push(`<rect x="${fx(w * 0.17)}" y="${fx(by - h * 0.032)}" width="${fx(w * 0.66)}" height="${fx(h * 0.04)}" fill="#8a5f2f"/>`)
+  parts.push(`<rect x="${fx(w * 0.17)}" y="${fx(by - h * 0.032)}" width="${fx(w * 0.66)}" height="${fx(h * 0.013)}" fill="${DUSK.parch}" opacity="0.8"/>`)
+  for (let i = 1; i <= 3; i++) {
+    const t = i / 4
+    const y = lerp(by, bb, t)
+    const half = lerp(w * 0.31, w * 0.2, t)
+    parts.push(`<path d="M ${fx(cx - half)} ${fx(y)} L ${fx(cx + half)} ${fx(y)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.012)}" opacity="0.6"/>`)
+    parts.push(`<path d="M ${fx(cx - half)} ${fx(y - h * 0.01)} L ${fx(cx + half)} ${fx(y - h * 0.01)}" stroke="#a87a3d" stroke-width="${fx(w * 0.007)}" opacity="0.5"/>`)
+  }
+  for (let i = 0; i < 6; i++) {
+    const x = lerp(w * 0.23, w * 0.77, i / 5) + (r() * 2 - 1) * w * 0.008
+    parts.push(`<path d="M ${fx(x)} ${fx(by)} L ${fx(lerp(x, cx, 0.2))} ${fx(bb)}" stroke="#3a2410" stroke-width="${fx(w * 0.009)}" opacity="0.6"/>`)
+  }
+  parts.push(rookRim(body, 2.4))
+
+  // two envelopes poking out of the mouth, cream against the night
+  for (const [ex, tilt] of [[0.36, -0.22], [0.55, 0.16]]) {
+    const x = w * ex
+    const ew = w * 0.17
+    const eh = h * 0.1
+    const c = Math.cos(tilt)
+    const sn = Math.sin(tilt)
+    const P = (dx, dy) => `${fx(x + dx * c - dy * sn)} ${fx(by + dx * sn + dy * c)}`
+    parts.push(`<path d="M ${P(0, 0)} L ${P(ew, -eh * 0.3)} L ${P(ew, -eh)} L ${P(0, -eh * 0.7)} Z" fill="${DUSK.parch}"/>`)
+    parts.push(`<path d="M ${P(0, -eh * 0.7)} L ${P(ew * 0.5, -eh * 0.72)} L ${P(ew, -eh)}" fill="none" stroke="${DUSK.parchDim}" stroke-width="${fx(w * 0.009)}"/>`)
+  }
+
+  // ---- the BRASS PULL-RING: the thing that says "take hold of me" ----------
+  parts.push(`<path d="M ${fx(cx)} ${fx(bb)} L ${fx(cx)} ${fx(h * 0.878)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.02)}"/>`)
+  const ringY = h * 0.918
+  const ringR = w * 0.055
+  parts.push(warmBloom(cx, ringY, ringR * 2.1))
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(ringY)}" r="${fx(ringR + w * 0.018)}" fill="${DUSK.ink}" opacity="0.8"/>`)
+  parts.push(`<circle cx="${fx(cx)}" cy="${fx(ringY)}" r="${fx(ringR)}" fill="none" stroke="${DUSK.amberLit}" stroke-width="${fx(w * 0.026)}"/>`)
+  parts.push(
+    `<path d="M ${fx(cx - ringR * 0.72)} ${fx(ringY - ringR * 0.5)} A ${fx(ringR)} ${fx(ringR)} 0 0 1 ${fx(cx + ringR * 0.1)} ${fx(ringY - ringR)}" fill="none" stroke="${DUSK.amberCore}" stroke-width="${fx(w * 0.014)}" stroke-linecap="round"/>`
+  )
+
+  // ---- the lantern: the trolley has to be findable from across the spread ---
+  parts.push(`<path d="M ${fx(w * 0.79)} ${fx(yb + h * 0.01)} L ${fx(w * 0.85)} ${fx(h * 0.68)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.015)}"/>`)
+  parts.push(warmBloom(w * 0.85, h * 0.755, w * 0.21))
+  parts.push(lampHead(w * 0.85, h * 0.68, h * 0.84, w * 0.145, 0))
+
+  return svgPiece(w, h, parts.join(''), cityLampDefs())
 }
 // ---- THE ROOKERY'S OUTER YARD WALL (ch3-fringe, foreground vfold, very wide/
 // short; crease at image centre). Slate ashlar with a coping, a rank of perched
@@ -9667,14 +10391,24 @@ const PIECES = [
   // (ART_TIER, book/use-layer-texture.ts), so the extra pixels never reached the
   // GPU — they only carried the oversize-art violation forward.
   { id: 'ch3-fringe', seed: 40340, w: 1024, h: 144, grain: 14, paint() { return rookeryFringe(this.w, this.h, this.seed) } },
-  // THE ROOKERY CLIFFS (stagedchain). ONE portrait painting per wall at the
-  // chain's TRUE mesh aspect (w / sum(stages.h) -> 349x1024 and 384x1024, the
-  // numbers stagedChainArtSize returns), sliced by the mesh into per-storey
-  // v-bands. `storeys` here are the SAME panel lengths content.ts hands the
-  // solver, root first, so the cornices the painter draws land exactly on the
-  // creases the paper folds along.
-  { id: 'ch3-cliff-l', seed: 40360, w: 349, h: 1024, grain: 12, paint() { return rookeryCliff({ w: this.w, h: this.h, seed: this.seed, side: 'left', storeys: [0.368449, 0.28739, 0.224161] }) } },
-  { id: 'ch3-cliff-r', seed: 40361, w: 384, h: 1024, grain: 12, paint() { return rookeryCliff({ w: this.w, h: this.h, seed: this.seed, side: 'right', storeys: [0.463158, 0.416842] }) } },
+  // THE RAVEN CITY (E3 s4 round-4). `storeys` are the SAME panel lengths and
+  // `spans` the SAME per-node [radius, width] pairs content.ts hands the solver,
+  // root first, so every fold the painter draws lands on a crease the paper
+  // actually folds along and every trapezoid edge is the die the mesh samples.
+  // Pixel dims are the chain's true aspect (extent / length) at a 1024 LONG
+  // edge — whichever side that is: 0.301/1.045 -> 295x1024, 0.315/0.625 ->
+  // 516x1024, and 0.31/0.30 -> 1024x991, the one piece here that is wider than
+  // it is tall. ROUND 4b re-derived the right page around VISIBILITY (the
+  // dispatch line grew to 0.625 of chain and the roosts dropped to 0.30 so the
+  // cable flies clear of the roofs), and both of those pieces are re-authored
+  // at the sub-rects the mesh now samples.
+  { id: 'ch3-tower', seed: 40360, w: 295, h: 1024, grain: 12, paint() { return crookedColossus({ w: this.w, h: this.h, seed: this.seed, storeys: [0.301206, 0.221294, 0.28174, 0.24076], spans: [[0.42, 0.3], [0.445, 0.276], [0.425, 0.2613], [0.45, 0.2274], [0.44, 0.2031]] }) } },
+  // the cable panel is MOSTLY TRANSPARENT — grain 6, because the house grain
+  // pass floors every non-transparent pixel and this sheet's whole job is to
+  // have almost none. `cable` is the content.ts node list, unmodified.
+  { id: 'ch3-dispatch-line', seed: 40362, w: 516, h: 1024, grain: 6, paint() { return dispatchCablePanel({ w: this.w, h: this.h, seed: this.seed, cable: [[0, 0.965], [0.12, 0.894], [0.25, 0.822], [0.38, 0.752], [0.5, 0.692], [0.62, 0.635], [0.74, 0.584], [0.86, 0.535], [1, 0.48]], baskets: [0.2, 0.47, 0.72] }) } },
+  { id: 'ch3-dispatch-line-basket', seed: 40363, w: 256, h: 256, grain: 8, paint() { return readerBasket(this.w, this.h, this.seed) } },
+  { id: 'ch3-terrace', seed: 40361, w: 1024, h: 991, grain: 12, paint() { return terracedRoosts({ w: this.w, h: this.h, seed: this.seed, storeys: [0.0773, 0.0653, 0.06, 0.0514, 0.046], spans: [[0.42, 0.31], [0.425, 0.3], [0.44, 0.285], [0.45, 0.265], [0.47, 0.24], [0.485, 0.215]] }) } },
   { id: 'page-4', seed: 40350, w: 1024, h: 683, grain: 10, paint() { return postRoadSpread(this.w, this.h, this.seed) } },
   // ---- Spread 7 — the Northern Treasury (ch6, northern aurora/teal/gold) ----
   { id: 'ch6-strongbox-front', seed: 70201, w: 512, h: 270, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'front', 'strongbox') } },
@@ -9711,9 +10445,10 @@ const PIECES = [
 // rows (2026-07-24). Seeds are chosen so cross-gutter pairs (l-mound0 vs
 // r-mound0, ...) differ in parity, so no two symmetric slots read as near
 // duplicates; `towers` varies the facade-block count per slot.
-// E3 s4 ROUND-3: the six legacy flank rows are RETIRED. The rear ring stations
-// and both ring-mid arms are replaced by the two stagedchain ROOKERY CLIFFS
-// (PIECES `ch3-cliff-l` / `ch3-cliff-r`), and ch3-skyline-r is gone entirely.
+// E3 s4 ROUND-3: the six legacy flank rows are RETIRED, and ROUND-4 retires the
+// cliffs that replaced them along with the whole mirror. What stands on spread 4
+// now is THE RAVEN CITY (PIECES `ch3-tower` / `ch3-dispatch-line` /
+// `ch3-terrace`); ch3-skyline-r is gone entirely.
 const SLOTS = []
 
 // The THREE new ring rows (s4 pack §4a A/B). They slot into the same
