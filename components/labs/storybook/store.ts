@@ -178,19 +178,49 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   ;(window as unknown as { __sbStore?: typeof useStorybookStore }).__sbStore = useStorybookStore
 }
 
-export type WheelAcc = { value: number; lastMs: number }
-export const WHEEL_THRESHOLD = 160
+/** `lockUntilMs`/`lockDir` are the post-fire cooldown (see WHEEL_COOLDOWN_MS
+ *  below) — zero/null means "not locked". They ride alongside the decaying
+ *  `value` accumulator so the whole gesture stays one plain object a caller
+ *  can store in a ref and never has to reason about separately. */
+export type WheelAcc = { value: number; lastMs: number; lockUntilMs: number; lockDir: TurnDir | null }
+
+/** Two ordinary notches used to be enough to throw a reader a full chapter
+ *  by accident (a wandering look-around scroll reads identically to a
+ *  deliberate "turn the page" shove). WHEEL_THRESHOLD is raised well past
+ *  that so only a clearly deliberate push fires. That alone still isn't
+ *  enough, because trackpad inertia is a long train of small wheel events —
+ *  a single continued gesture could decay-and-reaccumulate past threshold a
+ *  second time before the reader's hand has left the pad. WHEEL_COOLDOWN_MS
+ *  is a hard lockout on that: once a turn fires, the SAME direction cannot
+ *  fire again until either the cooldown clock runs out (the gesture went
+ *  quiet) or the reader scrolls the other way (an unambiguous new gesture,
+ *  which breaks the lock immediately rather than waiting out the clock). */
+export const WHEEL_THRESHOLD = 480
+export const WHEEL_COOLDOWN_MS = 400
 
 export function accumulateWheel(
   acc: WheelAcc,
   deltaY: number,
   nowMs: number
 ): { acc: WheelAcc; fire: TurnDir | null } {
+  if (nowMs < acc.lockUntilMs) {
+    // Still cooling down from the last fire. A same-direction delta is the
+    // tail of the same gesture that already fired — swallow it outright (no
+    // accumulation at all) so a long inertia train can never creep back up
+    // to threshold on its own. A reversal is treated as a brand new gesture:
+    // fall through and accumulate it normally (acc.value is still 0 from the
+    // fire, so this starts clean — that IS "reset by direction reversal").
+    const reversed = acc.lockDir === 'next' ? deltaY < 0 : deltaY > 0
+    if (!reversed) {
+      return { acc: { ...acc, lastMs: nowMs }, fire: null }
+    }
+  }
   const dt = Math.max(0, nowMs - acc.lastMs)
   const decayed = acc.value * Math.pow(0.5, dt / 200)
   const value = decayed + deltaY
   if (Math.abs(value) >= WHEEL_THRESHOLD) {
-    return { acc: { value: 0, lastMs: nowMs }, fire: value > 0 ? 'next' : 'prev' }
+    const dir: TurnDir = value > 0 ? 'next' : 'prev'
+    return { acc: { value: 0, lastMs: nowMs, lockUntilMs: nowMs + WHEEL_COOLDOWN_MS, lockDir: dir }, fire: dir }
   }
-  return { acc: { value, lastMs: nowMs }, fire: null }
+  return { acc: { value, lastMs: nowMs, lockUntilMs: 0, lockDir: null }, fire: null }
 }
