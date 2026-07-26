@@ -69,7 +69,11 @@ export function artRequests(layer: SceneLayer): readonly ArtRequest[] {
     case 'oanave':
       return sprite(layer.id, `${layer.id}-back`)
     case 'tabpiece':
-      return loose(`${layer.id}-face`)
+      // `-tab` is the OPTIONAL painted pull tab (BW-13). Tab strips are
+      // permanently atlas-exempt, so it is a loose fetch when a piece ships one;
+      // a piece without it costs nothing here, because the caller filters
+      // requests down to ids the manifest actually carries.
+      return loose(`${layer.id}-face`, `${layer.id}-tab`)
     // Fan members re-enter popup-spread.tsx's generic two-quad path as
     // synthesized v-folds, so they inherit its sprite support.
     case 'fan':
