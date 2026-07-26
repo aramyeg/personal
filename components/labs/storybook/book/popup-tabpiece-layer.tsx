@@ -35,6 +35,7 @@ import { acquireMaterial, releaseMaterial } from './material-pool'
 import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTabGripTexture } from './shared-procedural-textures'
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 import {
+  tabPieceCamShape,
   solveTabPiecePose,
   solveTabPiecePoseAt,
   tabPieceCeiling,
@@ -50,18 +51,16 @@ import {
 import { peakHeight, shadowLift } from './shadow-light'
 import { turnCullOpacity } from './turn-cull'
 import { easeTurnWeighted } from './page-geometry'
-import { TURN_MS, type TurnFrame } from './use-turn-driver'
+import type { TurnFrame } from './use-turn-driver'
 import { useArtTexture } from './use-layer-texture'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
-  clearUserDrive,
   endGrabChannel,
   readDriveOverride,
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
@@ -160,23 +159,6 @@ function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
   const cy = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
   const cz = (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4
   return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k] as Vec3)
-}
-
-/** The structure ship-vertices of a solved pose (every panel except the tab
- *  reveal — the motion-character convention the return cap measures against). */
-function structVerts(patches: readonly { face: TabPieceFace; quad: readonly Vec3[] }[]): Vec3[] {
-  const verts: Vec3[] = []
-  for (const p of patches) if (p.face !== 'tab') for (const c of p.quad) verts.push(c)
-  return verts
-}
-
-/** Worst per-vertex world step between two equal-length vertex lists. */
-function worstVert(a: readonly Vec3[], b: readonly Vec3[]): number {
-  let d = 0
-  for (let i = 0; i < a.length; i++) {
-    d = Math.max(d, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]))
-  }
-  return d
 }
 
 export function TabPiecePopupLayer({
@@ -357,7 +339,6 @@ export function TabPiecePopupLayer({
   // module scrub channel; only the low-frequency grab identity touches zustand.
   const grabRef = useRef<{ sGrabStart: number; dGrab: number } | null>(null)
   const tap = useHandleTap()
-  const prevStructRef = useRef<Vec3[] | null>(null)
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -437,7 +418,7 @@ export function TabPiecePopupLayer({
     st.clearHover(layer.id)
   }
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -462,10 +443,7 @@ export function TabPiecePopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
-    if (!visible) {
-      prevStructRef.current = null
-      return
-    }
+    if (!visible) return
     if (culled) {
       for (const m of materials.exterior) m.opacity = cull
       interiorMaterial.opacity = cull
@@ -485,27 +463,18 @@ export function TabPiecePopupLayer({
     } else if (grabbed) {
       effectiveA = channelA ?? camA
     } else if (channelA !== undefined) {
-      // Release return — capped exponential toward the cam, yielding its
-      // per-frame budget to a page turn moving the same piece (gate UT).
-      const structAt = (a: number): Vec3[] =>
-        structVerts(solveTabPiecePoseAt(layer, a, thetaL, thetaR))
-      const heldStruct = structAt(Math.min(channelA, ceiling))
-      const pageStep = prevStructRef.current ? worstVert(prevStructRef.current, heldStruct) : 0
-      const budget = Math.max(0, STEP_CAP - pageStep)
-      const { next, settled } = stepUserDriveReturn(
-        channelA,
-        camA,
-        turnFrames(delta, TURN_MS),
-        (a0, a1) => worstVert(structAt(a0), structAt(a1)),
-        budget
-      )
-      if (settled) {
-        clearUserDrive(layer.id)
-        effectiveA = camA
-      } else {
-        writeUserDrive(layer.id, next, [0, aStop])
-        effectiveA = next
-      }
+      // RELEASE = LATCH (E3 release law, BW-12). This used to decay back to the
+      // page cam, and it was the single most deflating thing a blind reader
+      // reported on spread 5: "Travel follows the drag continuously — that part
+      // feels genuinely good, like working a real paper strip. On release it
+      // snaps all the way back to the closed tent. Delightful while held,
+      // deflating on let-go." The identical mechanism one chapter later
+      // latched, and the reader called the inconsistency a bug. It is.
+      // The held angle stays put; the SHOWN lift is angle * S(beta) (the shared
+      // cam shape), which is the lift-flap persistence composition in this
+      // family's units — 0 at book close for any held angle, and never a
+      // faster per-frame step than the always-on ceiling that already gates it.
+      effectiveA = clamp(channelA, 0, aStop) * tabPieceCamShape(layer, beta)
     } else {
       effectiveA = camA
     }
@@ -544,7 +513,6 @@ export function TabPiecePopupLayer({
     slitGeometry.computeBoundingSphere()
 
     shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2 * cull
-    prevStructRef.current = structVerts(solved)
   })
 
   return (

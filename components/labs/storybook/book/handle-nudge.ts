@@ -87,6 +87,12 @@ export function clearNudgePulse(id: string): void {
   pulses.delete(id)
 }
 
+/** Drops every pending pulse — used by the spread-exit reset (BW-19), so a tap
+ *  answer cannot arrive on a page the reader has already turned away from. */
+export function resetNudgePulses(): void {
+  pulses.clear()
+}
+
 /** The raw pulse shape for `id` right now, in [0, 1]; 0 when idle. Retires the
  *  entry once the window has passed so the map never grows. */
 export function readNudgePulse(id: string, at: number = nowMs()): number {

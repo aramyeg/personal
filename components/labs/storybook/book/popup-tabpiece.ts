@@ -61,6 +61,25 @@ export function tabPieceLift(geom: TabPieceGeom, beta: number): number {
   return rad(geom.liftDeg ?? 55) * Math.sin((u * Math.PI) / 2)
 }
 
+/**
+ * THE CAM SHAPE S(beta) that every one of this family's angles is built from:
+ * tabPieceLift = liftDeg * S, tabPieceCeiling = stopLift * S. S(0) = 0 exactly,
+ * S(rest) = 1.
+ *
+ * Exported for the E3 release law (BW-12): a reader-pulled tab LATCHES, and its
+ * shown lift is the held angle times S — the lift-flap persistence law in this
+ * family's units. Because the shown lift is then min(a_user, a_stop) * S and
+ * a_user can never exceed a_stop, a latched tab's per-frame vertex step can
+ * never exceed the always-on ceiling's own step, which is already gated. So the
+ * latch needs no new turn-step argument, and a piece left at its page cam angle
+ * renders bit-identically to the non-interactive pose.
+ */
+export function tabPieceCamShape(geom: TabPieceGeom, beta: number): number {
+  const rest = rad(geom.restAtDeg ?? 176)
+  const u = clamp(Math.sin(beta / 2) / Math.sin(rest / 2), 0, 1)
+  return Math.sin((u * Math.PI) / 2)
+}
+
 /** Strip slide distance = visible tab protrusion (inextensible strip). */
 export function tabPieceTabOut(geom: TabPieceGeom, beta: number): number {
   return 2 * geom.legW * (1 - Math.cos(tabPieceLift(geom, beta)))

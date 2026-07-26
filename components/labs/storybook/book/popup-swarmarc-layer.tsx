@@ -28,10 +28,6 @@ import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-
 import {
   solveSwarmArcPose,
   swarmStirTabQuad,
-  SWARM_TAB_D0,
-  SWARM_TAB_W,
-  SWARM_TAB_Z0,
-  SWARM_TAB_Z1,
   type SwarmArcGeom,
 } from './popup-swarmarc'
 import { kraftTints } from './paper-stock'
@@ -43,7 +39,6 @@ import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
-  clearUserDrive,
   endGrabChannel,
   readDriveOverride,
   readUserDrive,
@@ -56,9 +51,6 @@ import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 
 const FLAT_EPSILON = 0.02
-/** Overdamped release time constant (s) — ~95% settled inside 300 ms. */
-const RELEASE_TAU = 0.08
-const RELEASE_EPS = 0.002
 const ATLAS_GRID = 8
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
@@ -302,7 +294,7 @@ export function SwarmArcPopupLayer({
     st.clearHover(layer.id)
   }
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
@@ -310,23 +302,19 @@ export function SwarmArcPopupLayer({
     group.visible = visible
     if (!visible) return
 
-    // Stir stroke: the channel while grabbed; overdamped decay to 0 on release
-    // (~300 ms). Dev override (?sbdrive=<id>~stir:<s>) freezes it for captures.
+    // Stir stroke: the channel, held. RELEASE = LATCH (E3 release law, BW-12).
+    // This used to decay to 0 over ~300ms, so the one interaction the spread
+    // advertises in words undid itself the instant the reader let go — and a
+    // pull strip is the family of paper mechanism that most obviously STAYS
+    // where you leave it. The tab now stays drawn out and the ripple holds.
+    // Fold-flat is untouched, and for the usual reason rather than a new one:
+    // solveSwarmArcPose multiplies the stir term by E(beta) (see
+    // swarmDeployAngle), so any held stroke renders as zero at book close.
+    // Dev override (?sbdrive=<id>~stir:<s>) still freezes it for captures.
     const override = readDriveOverride(stirChannel)
     const channel = readUserDrive(stirChannel)
-    let s: number
-    if (override !== null) {
-      s = clamp(override, 0, layer.stir.stroke)
-    } else if (grabRef.current && channel !== undefined) {
-      s = channel
-    } else {
-      s = (channel ?? stirRef.current) * Math.exp(-delta / RELEASE_TAU)
-      if (s < RELEASE_EPS) s = 0
-      if (channel !== undefined) {
-        if (s === 0) clearUserDrive(stirChannel)
-        else writeUserDrive(stirChannel, s, [0, layer.stir.stroke])
-      }
-    }
+    const s =
+      override !== null ? clamp(override, 0, layer.stir.stroke) : clamp(channel ?? 0, 0, layer.stir.stroke)
     stirRef.current = s
 
     // Tap answer (BW-18): the tab creeps out and the ripple starts running up

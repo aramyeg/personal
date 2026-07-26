@@ -15,6 +15,8 @@ import { easeTurnWeighted, easeTurnWeightedInv } from './page-geometry'
 import { sbSound } from '../sound'
 import { SPREAD_COUNT } from '../content'
 import { useStorybookStore, type TurnDir } from '../store'
+import { resetUserDrives } from '../user-drive'
+import { resetNudgePulses } from './handle-nudge'
 import { emitTurnLand, emitTurnStart } from '../turn-events'
 
 // task 18: nudged up from 1100/1400 — paired with page-geometry's
@@ -157,6 +159,17 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
 
   useFrame((_, delta) => {
     const state = useStorybookStore.getState()
+    // SPREAD-EXIT RESET (E3 BW-19). The committed spread has just changed, so
+    // the reader has LEFT a page: drop every held reader value and any pending
+    // tap pulse, because a reopened page is a fresh pop-up. (A blind reader
+    // turned away from spread 7 and back and found the vault lid still standing
+    // open.) Done here rather than in the store because the drives live outside
+    // React entirely, and this ref moves in lockstep with the sheet — the same
+    // clock the pieces themselves are posed on.
+    if (committedSpread.current !== state.spread) {
+      resetUserDrives()
+      resetNudgePulses()
+    }
     committedSpread.current = state.spread
 
     if (pose && pose.t !== null) {

@@ -24,6 +24,7 @@ import type { SceneLayer } from '../content'
 import type { LiftFlapGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
+  doorSlopFactors,
   liftFlapHingeFrame,
   liftFlapMax,
   solveLiftFlapPose,
@@ -42,7 +43,6 @@ import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
-const TOUCH_SLOP = 1.4
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
@@ -196,6 +196,7 @@ export function LiftFlapPopupLayer({
     () => layer.doors.map(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]))),
     [layer.doors]
   )
+  const slopFactors = useMemo(() => doorSlopFactors(layer.doors), [layer.doors])
 
   const handleMaterial = sharedHandleMaterial()
   const knobTexture = sharedKnobTexture()
@@ -251,6 +252,10 @@ export function LiftFlapPopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    // One leaf per press. r3f calls this handler once per intersected surface,
+    // so without this a press could re-enter and hand the grab to a door the
+    // pointer is not on (see doorSlopFactors).
+    if (grabRef.current) return
     const idx = doorIndexOf(e.object)
     if (idx === null) return
     if (!acceptsHandleHit(e, slopMeshRefs.current[idx])) return
@@ -318,7 +323,7 @@ export function LiftFlapPopupLayer({
     writeQuad(boardGeometry, pose.board)
     pose.doors.forEach((quad, k) => {
       writeQuad(doorGeometries[k], quad)
-      writeQuad(slopGeometries[k], enlargeQuad(quad, TOUCH_SLOP))
+      writeQuad(slopGeometries[k], enlargeQuad(quad, slopFactors[k]))
     })
   })
 
@@ -351,7 +356,15 @@ export function LiftFlapPopupLayer({
             renderOrder={1}
             userData={{ doorIndex: k }}
           />
-          <mesh geometry={doorGeometries[k]} material={doorMaterials[k].back} renderOrder={1} />
+          {/* The underside of a LIFTED leaf faces the reader; without the
+              door index the shared handler silently bailed on it, so "close it
+              again" only worked while the leaf was still nearly shut (BW-20). */}
+          <mesh
+            geometry={doorGeometries[k]}
+            material={doorMaterials[k].back}
+            renderOrder={1}
+            userData={{ doorIndex: k }}
+          />
           {/* Coarse-pointer slop (law H6): 1.4x the leaf, touch only. */}
           <mesh
             ref={(m) => {

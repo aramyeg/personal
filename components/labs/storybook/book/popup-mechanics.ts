@@ -1171,6 +1171,30 @@ export function stripFlapCamLift(geom: StripFlapGeom, beta: number): number {
   return Math.acos(clamp(1 - pull / reach, -1, 1))
 }
 
+/**
+ * THE HOLD ENVELOPE (E3 release law, BW-12). A reader-lifted flap LATCHES: the
+ * channel keeps the angle the reader left it at, and the SHOWN lift is that
+ * angle times this envelope — the piece's own chord-law cam, normalised to its
+ * value at rest. Exactly the lift-flap persistence law, in the strip flap's
+ * own units.
+ *
+ * Two facts make it free:
+ *  - stripFlapCamLift(erectAt) is ALWAYS acos(0) = 90deg by construction (the
+ *    chord `reach` is defined as the pull at erectAt), so the envelope is 1 at
+ *    rest and a flap left at its own cam angle renders bit-identically to the
+ *    non-interactive pose. Nothing about the shipped look changes.
+ *  - it is 0 at beta = 0, so fold-flat survives ANY held angle, with no
+ *    per-frame return needed. And since a held angle can never exceed the
+ *    90deg anti-flip stop, which IS the cam's rest value, the latched flap's
+ *    per-frame vertex step can never exceed the un-driven page cam's own step —
+ *    the turn-step budget (gate UT) is inherited rather than re-argued.
+ */
+export function stripFlapHoldEnvelope(geom: StripFlapGeom, beta: number): number {
+  const rest = stripFlapCamLift(geom, rad(geom.erectAtDeg ?? 176))
+  if (rest <= 1e-9) return 0
+  return clamp(stripFlapCamLift(geom, beta) / rest, 0, 1)
+}
+
 export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {
   const beta = clamp(thetaL - thetaR, 0, Math.PI)
   return solveStripFlapPoseAt(geom, stripFlapCamLift(geom, beta), thetaL, thetaR)

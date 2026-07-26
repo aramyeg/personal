@@ -33,25 +33,23 @@ import {
   spreadPageAnglesTilted,
   stripFlapCamLift,
   stripFlapFrame,
-  type MechPose,
+  stripFlapHoldEnvelope,
   type StripFlapGeom,
   type Vec3,
 } from './popup-mechanics'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
-import { TURN_MS, type TurnFrame } from './use-turn-driver'
+import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
 import { useStorybookStore } from '../store'
 import {
   beginGrabChannel,
-  clearUserDrive,
   endGrabChannel,
   readDriveOverride,
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
-import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_STANDING } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
@@ -107,18 +105,6 @@ function enlargeQuad(quad: readonly Vec3[], k: number): Vec3[] {
   const cy = (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4
   const cz = (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4
   return quad.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, cz + (p[2] - cz) * k] as Vec3)
-}
-
-/** Every flap vertex is a ship vertex (no tab reveal) — the return cap
- *  measures the worst step over all eight corners. */
-const flapVerts = (pose: MechPose): Vec3[] => [...pose.right, ...pose.left]
-
-const worstVert = (a: readonly Vec3[], b: readonly Vec3[]): number => {
-  let d = 0
-  for (let i = 0; i < a.length; i++) {
-    d = Math.max(d, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]))
-  }
-  return d
 }
 
 export function StripFlapPopupLayer({
@@ -207,7 +193,6 @@ export function StripFlapPopupLayer({
   // --- Grab lifecycle (laws H1-H3). Offset-captured hinge angle for continuity.
   const grabRef = useRef<{ aGrabStart: number; angleGrab: number } | null>(null)
   const tap = useHandleTap()
-  const prevVertsRef = useRef<Vec3[] | null>(null)
 
   const anglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -286,7 +271,7 @@ export function StripFlapPopupLayer({
     st.clearHover(layer.id)
   }
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -302,10 +287,7 @@ export function StripFlapPopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
     group.visible = visible
     if (shadowRef.current) shadowRef.current.visible = visible
-    if (!visible) {
-      prevVertsRef.current = null
-      return
-    }
+    if (!visible) return
 
     const camA = stripFlapCamLift(layer, beta)
     const override = readDriveOverride(layer.id)
@@ -317,24 +299,15 @@ export function StripFlapPopupLayer({
     } else if (grabbed) {
       effectiveA = channelA ?? camA
     } else if (channelA !== undefined) {
-      const vertsAt = (a: number): Vec3[] => flapVerts(solveStripFlapPoseAt(layer, a, thetaL, thetaR))
-      const held = vertsAt(channelA)
-      const pageStep = prevVertsRef.current ? worstVert(prevVertsRef.current, held) : 0
-      const budget = Math.max(0, STEP_CAP - pageStep)
-      const { next, settled } = stepUserDriveReturn(
-        channelA,
-        camA,
-        turnFrames(delta, TURN_MS),
-        (a0, a1) => worstVert(vertsAt(a0), vertsAt(a1)),
-        budget
-      )
-      if (settled) {
-        clearUserDrive(layer.id)
-        effectiveA = camA
-      } else {
-        writeUserDrive(layer.id, next, [0, ANTI_FLIP])
-        effectiveA = next
-      }
+      // RELEASE = LATCH (E3 release law, BW-12). This used to decay back to the
+      // page cam, and blind readers hated it in the same words on two different
+      // spreads: "springs back on release; nothing persists", "the one hidden
+      // gesture produces a ~30px bow that springs straight back". A real paper
+      // flap stays where your finger left it. The held angle is kept as-is and
+      // the SHOWN lift is angle * stripFlapHoldEnvelope(beta) — the lift-flap
+      // persistence composition — so fold-flat at book close is preserved for
+      // any held angle without a per-frame return at all.
+      effectiveA = clamp(channelA, 0, ANTI_FLIP) * stripFlapHoldEnvelope(layer, beta)
     } else {
       effectiveA = camA
     }
@@ -353,7 +326,6 @@ export function StripFlapPopupLayer({
     const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
     writeQuad(slopGeometry, enlargeQuad(full, TOUCH_SLOP))
     shadowMaterial.opacity = (shadow?.maxOpacity ?? SHADOW_MAX_OPACITY) * Math.sin(beta / 2) ** 2
-    prevVertsRef.current = flapVerts(pose)
   })
 
   return (

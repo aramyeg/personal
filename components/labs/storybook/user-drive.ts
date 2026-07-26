@@ -39,6 +39,28 @@ export function clearUserDrive(id: string): void {
   drive.delete(id)
 }
 
+/**
+ * Drops EVERY scrub channel and any active grab identity — the spread-exit
+ * reset (E3 BW-19).
+ *
+ * A blind reader turned away from spread 7 and back and found the vault lid
+ * still standing open: "Whether intended or not, the spread does not reset."
+ * The house answer is that a reopened page is a FRESH pop-up. Real paper does
+ * hold a lifted flap, and it holds it for as long as the page is open — but the
+ * page here has been closed and reopened in between, which is exactly the
+ * gesture that flattens every mechanism (the E(beta) envelope drives them all
+ * to zero at beta = 0 anyway; this makes the state agree with the geometry
+ * instead of springing back open behind the reader's back).
+ *
+ * Clearing ALL ids rather than one spread's is deliberate and safe: only the
+ * live spread's pieces can hold a reader value, and the neighbours mounted
+ * either side of it are at rest by construction.
+ */
+export function resetUserDrives(): void {
+  drive.clear()
+  grabbedId = null
+}
+
 export function listUserDriveIds(): readonly string[] {
   return Array.from(drive.keys())
 }
@@ -84,6 +106,7 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
         writeUserDrive: typeof writeUserDrive
         clearUserDrive: typeof clearUserDrive
         listUserDriveIds: typeof listUserDriveIds
+        resetUserDrives: typeof resetUserDrives
         beginGrabChannel: typeof beginGrabChannel
         endGrabChannel: typeof endGrabChannel
         activeGrabId: typeof activeGrabId
@@ -94,6 +117,7 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
     writeUserDrive,
     clearUserDrive,
     listUserDriveIds,
+    resetUserDrives,
     beginGrabChannel,
     endGrabChannel,
     activeGrabId,
