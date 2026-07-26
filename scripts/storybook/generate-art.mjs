@@ -31,6 +31,7 @@ import { writeFile, mkdir, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sharp from 'sharp'
+import { S4_DIAL_ROUTES } from './s4-dial-routes.mjs'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(SCRIPT_DIR, '..', '..')
@@ -3884,9 +3885,34 @@ function ravenSigil(mx, my, rad, bank, brass, brassLit) {
 
 // ---- 1) THE SPUN WHEEL (ch3-dispatch-dial). The sorting desk's route wheel: a
 // parchment disc in a brass rim, eight 45deg sectors reading through the card's
-// windows, six of them RAVEN SIGILS banked to distinct headings and two route
-// glyphs (a needle and a tally) so the rank never reads as a repeat pattern. A
-// thumb-tab grip lobe protrudes past the rim so it reads as spinnable. ----
+// windows, and a thumb-tab grip lobe protruding past the rim so it reads as
+// spinnable.
+//
+// THE EIGHT SECTORS ARE EIGHT DESTINATIONS, and the destinations are a CONTRACT
+// (`./s4-dial-routes.mjs`), not a decision this painter gets to make. Round 1
+// dressed six of the eight as the SAME brass raven roundel differing only in
+// bank angle, and a blind reader reported the whole dial as stone dead after 450
+// degrees of drag: the input was alive, but a window exposing ~21x27 SCREEN px
+// cannot tell "the same badge, tilted" from "nothing happened". So every sector
+// now differs on three independent axes at once, in descending order of what
+// survives the downscale:
+//   1. a COUNT of ravens on a pale roost shelf (1, 2 or 3) — a count is the one
+//      difference that reads at 6 screen px per bird, and the shelf is shared by
+//      all eight so the birds are dark-on-pale whatever the field beneath does.
+//   2. a PRINCIPAL DEVICE that changes SILHOUETTE, not tone: sigil, needle,
+//      tally tablet, crescent, chevron, wax seal, star, cross. Bold filled
+//      shapes at ~65px source (~14 screen px) — no fine linework survives here.
+//   3. the wedge's FIELD tint, stepped through the DUSK table. Tone alone was
+//      round 1's mistake, so it is the supporting difference, not the read.
+// plus the destination name engraved small, and a bar/dot rim cadence keyed to
+// the sector index so the wheel reads as having a POSITION and not just a state.
+//
+// AUTHORED IN EACH SECTOR'S OWN FRAME. Every sector is one group carrying
+// `translate(cx,cy) rotate(90 - a)`, which puts the sector's math-angle onto
+// local math-angle 90. Inside that group "radially outward" is straight UP, a
+// tangential offset is plain local x, and the legend reads the same way out of
+// every sector — which is also the only orientation that reads upright through
+// all three windows (they sit at 45/90/135, the card's upper half). ----
 function dispatchDial(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
@@ -3895,7 +3921,6 @@ function dispatchDial(w, h, seed) {
   const hubR = R * 0.3
   const bandIn = R * 0.4
   const bandOut = R * 0.84
-  const bandMid = R * 0.62
   const BR = GOLD
   const BR_LIT = '#e7b24d'
   const BR_DIM = GOLD_DIM
@@ -3933,12 +3958,19 @@ function dispatchDial(w, h, seed) {
 
   let g = `<g clip-path="url(#dialCut)">`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${PARCH_MID}"/>`
+  // the eight DESTINATION wedges, each tinted from its route's `field`
   for (let k = 0; k < 8; k++) {
-    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${k % 2 ? DUSK.slate : BR_LIT}" opacity="${k % 2 ? '0.22' : '0.2'}"/>`
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${DUSK[S4_DIAL_ROUTES[k].field]}" opacity="0.3"/>`
   }
   // the READ BAND the card's windows reveal — aged parchment, so slate ravens
   // and brass glyphs pop against it rather than muddying into the field.
   g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${PARCH}" opacity="0.86"/>`
+  // ...and the per-sector wash INSIDE it, at full strength. This is the one
+  // difference that covers the whole aperture rather than a glyph's worth of it,
+  // so it carries the "a real share of the window changed" half of the read.
+  for (let k = 0; k < 8; k++) {
+    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${DUSK[S4_DIAL_ROUTES[k].field]}" opacity="0.62"/>`
+  }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${BR}" stroke-width="3" opacity="0.75"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${BR}" stroke-width="2.6" opacity="0.7"/>`
   // detent ticks on the sector boundaries (the 45deg clicks)
@@ -3947,15 +3979,174 @@ function dispatchDial(w, h, seed) {
     g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${INK}" stroke-width="1.7" opacity="0.4"/>`
     g += `<circle cx="${fx(polX(cx, a, bandOut + 12))}" cy="${fx(polY(cy, a, bandOut + 12))}" r="4" fill="${BR}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.55"/>`
   }
-  // sector marks: six raven sigils on distinct headings + two route glyphs
-  const bank = { 0: -28, 1: 62, 2: 145, 4: -104, 5: 18, 7: -152 }
+  // ---- THE EIGHT DESTINATIONS ------------------------------------------------
+  // Local frame per sector (see the header): outward is -y, tangential is +x.
+  // The read band 0.40-0.84R is budgeted radially, outermost first, because the
+  // window is only ~132px deep in the source and every band has to earn it:
+  //   0.826-0.882R  the destination name, engraved small
+  //   0.625-0.755R  the pale roost shelf and its COUNT of ravens
+  //   0.400-0.610R  the principal device
+  // and the bar/dot bearing cadence sits at 0.855-0.975R, clear of the band.
+  const closed = (arr) => 'M ' + arr.map(([px, py]) => `${fx(px)} ${fx(py)}`).join(' L ') + ' Z'
+  const arcPts = (ox, oy, rad, t0, t1, steps) => {
+    const out = []
+    for (let i = 0; i <= steps; i++) {
+      const t = lerp(t0, t1, i / steps) * D2R
+      out.push([ox + rad * Math.cos(t), oy + rad * Math.sin(t)])
+    }
+    return out
+  }
+
+  /** One sector's PRINCIPAL DEVICE, centred on the local origin, bold enough to
+   *  survive being ~14 screen px wide. `S` is its half-size. */
+  const device = (kind, S, weight) => {
+    if (kind === 'sigil') return ravenSigil(0, 0, S * 0.98, 0, BR, BR_LIT)
+    if (kind === 'needle') return compassNeedle(0, 0, 90, S * 2.05, S * 0.66, BR_LIT, DUSK.slate)
+    if (kind === 'tally') {
+      // a STRUCK TALLY TABLET rather than a bare five-bar gate: bare radial
+      // strokes at this size are sub-pixel on screen, so the gate is cut into a
+      // brass plate whose WIDTH is the route's traffic and whose bars are thick.
+      const tw = S * (1.05 + weight * 0.056)
+      const th = S * 1.28
+      let s = `<rect x="${fx(-tw / 2)}" y="${fx(-th / 2)}" width="${fx(tw)}" height="${fx(th)}" rx="${fx(S * 0.16)}" fill="${BR_LIT}"/>`
+      s += `<rect x="${fx(-tw / 2)}" y="${fx(-th / 2)}" width="${fx(tw)}" height="${fx(th)}" rx="${fx(S * 0.16)}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.8"/>`
+      const pitch = tw / 5.2
+      for (let i = 0; i < 4; i++) {
+        const bx = (i - 1.5) * pitch
+        s += `<line x1="${fx(bx)}" y1="${fx(-th * 0.32)}" x2="${fx(bx)}" y2="${fx(th * 0.32)}" stroke="${INK}" stroke-width="${fx(S * 0.19)}" stroke-linecap="round"/>`
+      }
+      s += `<line x1="${fx(-1.9 * pitch)}" y1="${fx(th * 0.34)}" x2="${fx(1.9 * pitch)}" y2="${fx(-th * 0.34)}" stroke="${INK}" stroke-width="${fx(S * 0.17)}" stroke-linecap="round"/>`
+      return s
+    }
+    if (kind === 'crescent') {
+      // the harbour mouth: outer circle minus an offset inner one, horns
+      // tangential, the opening facing radially OUT
+      const th0 = 61.6
+      const pts = arcPts(0, 0, S, th0, 360 - th0, 18).concat(arcPts(S * 0.5, 0, S * 0.88, 360 - 91.6, 91.6, 18))
+      const d = closed(pts)
+      return (
+        `<g transform="rotate(-90)"><path d="${d}" fill="${BR_LIT}"/>` +
+        `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.11)}" stroke-opacity="0.85" stroke-linejoin="round"/></g>`
+      )
+    }
+    if (kind === 'chevron') {
+      // the mountain pass: two stacked chevron bands pointing radially outward
+      let s = ''
+      for (const [shift, arm] of [[S * 0.1, S * 0.92], [S * 0.66, S * 0.72]]) {
+        const t = S * 0.36
+        const d = closed([
+          [-arm, -S * 0.12 + shift], [0, -S + shift], [arm, -S * 0.12 + shift],
+          [arm, -S * 0.12 + shift + t], [0, -S + shift + t], [-arm, -S * 0.12 + shift + t],
+        ])
+        s += `<path d="${d}" fill="${BR_LIT}"/>`
+        s += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>`
+      }
+      return s
+    }
+    if (kind === 'seal') {
+      // sealed correspondence only: a lobed wax blob, the one non-brass device
+      const lobes = []
+      for (let i = 0; i <= 72; i++) {
+        const t = (i / 72) * 360 * D2R
+        const rad = S * 0.92 * (1 + 0.085 * Math.cos(9 * t))
+        lobes.push([rad * Math.cos(t), rad * Math.sin(t)])
+      }
+      const d = closed(lobes)
+      let s = `<path d="${d}" fill="${SEAL_RED}"/>`
+      s += `<ellipse cx="${fx(-S * 0.26)}" cy="${fx(-S * 0.28)}" rx="${fx(S * 0.48)}" ry="${fx(S * 0.42)}" fill="${SEAL_RED_LIT}" opacity="0.6"/>`
+      s += `<circle cx="0" cy="0" r="${fx(S * 0.46)}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" opacity="0.55"/>`
+      s += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.09)}" stroke-opacity="0.7" stroke-linejoin="round"/>`
+      return s
+    }
+    if (kind === 'star') {
+      // the unmapped far stations: a five-point star, one point radially outward
+      const pts = []
+      for (let i = 0; i < 10; i++) {
+        const t = (-90 + i * 36) * D2R
+        const rad = i % 2 ? S * 0.44 : S
+        pts.push([rad * Math.cos(t), rad * Math.sin(t)])
+      }
+      const d = closed(pts)
+      return (
+        `<path d="${d}" fill="${BR_LIT}"/>` +
+        `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>` +
+        `<circle cx="0" cy="0" r="${fx(S * 0.16)}" fill="${DUSK.amberCore}" opacity="0.9"/>`
+      )
+    }
+    // 'cross' — escorted birds: a cross pattée, the blockiest silhouette here
+    const A = S
+    const Wq = S * 0.28
+    const T = S * 0.52
+    const d = closed([
+      [-Wq, -Wq], [-T, -A], [T, -A], [Wq, -Wq],
+      [A, -T], [A, T], [Wq, Wq],
+      [T, A], [-T, A], [-Wq, Wq],
+      [-A, T], [-A, -T],
+    ])
+    return (
+      `<path d="${d}" fill="${BR_LIT}"/>` +
+      `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${fx(S * 0.1)}" stroke-opacity="0.85" stroke-linejoin="round"/>` +
+      `<circle cx="0" cy="0" r="${fx(S * 0.2)}" fill="${INK}" opacity="0.75"/>`
+    )
+  }
+
+  const shelfIn = R * 0.625
+  const shelfOut = R * 0.755
+  const shelfHalf = 15
+  const birdS = R * 0.041
+  const markR = R * 0.505
+  const markS = R * 0.105
   for (let k = 0; k < 8; k++) {
-    const a = k * 45
-    const mx = polX(cx, a, bandMid)
-    const my = polY(cy, a, bandMid)
-    if (k === 3) g += compassNeedle(mx, my, a, R * 0.4, R * 0.095, BR_LIT, DUSK.slate)
-    else if (k === 6) g += tallyMarks(cx, cy, a, 9, R * 0.5, R * 0.74, 28, INK)
-    else g += ravenSigil(mx, my, R * 0.16, bank[k], BR, BR_LIT)
+    const route = S4_DIAL_ROUTES[k]
+    let sec = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(90 - k * 45)})">`
+
+    // the BEARING CADENCE, struck inside the rim: bars keyed to k parity, dots to
+    // k/2, so all eight rim marks are a different pattern and the wheel has a
+    // position. Held clear of the 0.40-0.84R window band on purpose.
+    const bars = 1 + (k % 2)
+    const dots = Math.floor(k / 2)
+    for (let i = 0; i < bars; i++) {
+      const bx = (i - (bars - 1) / 2) * R * 0.05
+      sec += `<line x1="${fx(bx)}" y1="${fx(-R * 0.875)}" x2="${fx(bx)}" y2="${fx(-R * 0.975)}" stroke="${INK}" stroke-width="${fx(R * 0.015)}" opacity="0.7" stroke-linecap="round"/>`
+      sec += `<line x1="${fx(bx)}" y1="${fx(-R * 0.875)}" x2="${fx(bx)}" y2="${fx(-R * 0.975)}" stroke="${BR_LIT}" stroke-width="${fx(R * 0.005)}" opacity="0.6" stroke-linecap="round"/>`
+    }
+    for (let j = 0; j < dots; j++) {
+      const dx = (j - (dots - 1) / 2) * R * 0.055
+      sec += `<circle cx="${fx(dx)}" cy="${fx(-R * 0.852)}" r="${fx(R * 0.014)}" fill="${BR}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.6"/>`
+    }
+
+    // the ROOST SHELF and its count of ravens. The shelf is IDENTICAL in all
+    // eight sectors on purpose: a constant pale ground is what makes 1 vs 2 vs 3
+    // ink birds a legible count rather than a tonal guess, and it is also the
+    // largest per-detent change in the aperture.
+    const shelf = annularSectorPath(0, 0, 90, shelfHalf, shelfIn, shelfOut, 14)
+    sec += `<path d="${shelf}" fill="${DUSK.parchLit}" opacity="0.9"/>`
+    sec += `<path d="${shelf}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.5"/>`
+    const pitch = birdS * 3.1
+    for (let i = 0; i < route.ravens; i++) {
+      const bx = (i - (route.ravens - 1) / 2) * pitch
+      // a perch notch under each bird: if the birds themselves blur at 1x, the
+      // notches still count them
+      sec += `<line x1="${fx(bx)}" y1="${fx(-shelfIn - R * 0.004)}" x2="${fx(bx)}" y2="${fx(-shelfIn - R * 0.028)}" stroke="${INK}" stroke-width="${fx(R * 0.013)}" opacity="0.85" stroke-linecap="round"/>`
+      sec += `<g transform="translate(${fx(bx)} ${fx(-R * 0.69)})">${miniRaven(birdS, DUSK.ink, DUSK.parchDim)}</g>`
+    }
+
+    // the principal device
+    sec += `<g transform="translate(0 ${fx(-markR)})">${device(route.mark, markS, route.weight)}</g>`
+
+    // the destination, engraved small — doubled (bright ghost under a dark cut)
+    // so it holds on both the amber fields and the slate ones
+    const kn = route.key.length
+    const kcw = R * 0.0435
+    const kch = R * 0.056
+    const kgap = R * 0.0105
+    const kx = -(kn * kcw + (kn - 1) * kgap) / 2
+    const ky = -R * 0.826
+    sec += engraveWord(route.key, kx, ky + R * 0.005, kcw, kch, kgap, DUSK.parchLit, 3, 'opacity="0.6"')
+    sec += engraveWord(route.key, kx, ky, kcw, kch, kgap, INK, 3.2, 'opacity="0.92"')
+
+    sec += `</g>`
+    g += sec
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#dialLite)"/>`
   for (let i = 0; i < 14; i++) {
@@ -3985,8 +4176,9 @@ function dispatchDial(w, h, seed) {
 // with THREE die-cut apertures (true alpha-0 holes) at math-angles 45/90/135 over
 // the read band 0.40-0.84R, each set into a BANK OF PIGEONHOLES above and below.
 // Built as one even-odd compound path so the holes are genuine cut-outs. The
-// lower half carries the celebrated brass tag "(1) SPIN - ROUTE THE RAVENS" with
-// a pointing manicule, engraved font-free from ENGRAVE_GLYPHS. ----
+// lower half carries the celebrated brass tag, engraved font-free from
+// ENGRAVE_GLYPHS with a pointing manicule: ONE word, SPIN, at the largest cap
+// height the plate will hold (see the tag block below for why it is one word). ----
 function dispatchCard(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
@@ -4051,10 +4243,20 @@ function dispatchCard(w, h, seed) {
   }
 
   // ---- THE CELEBRATED BRASS TAG (T-AFFORDANCE) ----
-  // Two engraved lines reading, in order, (1) SPIN - ROUTE THE RAVENS, on a
-  // brass plate screwed across the free lower half; a manicule points into it.
-  const tagW = R * 1.5
-  const tagH = R * 0.56
+  // ONE WORD. The plate used to read "(1) SPIN — ROUTE THE RAVENS" over two
+  // lines and the reader could only make it out by rendering at 3x: the whole
+  // interaction hung on ~100x20 screen px of dark-gold-on-gold at a steep
+  // foreshortening. Two findings, one fix each:
+  //   - unreadable at 1x  ->  drop the second line and the numeral, and spend
+  //     the entire plate on SPIN at ~2.4x the old cap height (R*0.36, which is
+  //     ~22 screen px at the ~130px the card projects).
+  //   - "(1)" implies a (2) and a (3)  ->  there is no other numbered plate on
+  //     this spread, so the numeral goes. `circledOne` stays in the module for
+  //     art that wants it; nothing here calls it.
+  // The manicule still points into the word, and the plate is sized to the word
+  // rather than the word squeezed into the plate.
+  const tagW = R * 1.3
+  const tagH = R * 0.5
   const tagX = cx - tagW / 2
   const tagY = cy + R * 0.28
   s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="${BR}"/>`
@@ -4066,35 +4268,27 @@ function dispatchCard(w, h, seed) {
       s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="3.4" fill="${BR_LIT}" stroke="${INK}" stroke-width="1.1" stroke-opacity="0.6"/>`
     }
   }
-  const line = (word, cw, ch, gap, yTop, x0) => {
-    let out = engraveWord(word, x0, yTop + 1.4, cw, ch, gap, BR_LIT, 2.6, 'opacity="0.5"')
-    out += engraveWord(word, x0, yTop, cw, ch, gap, PLATE_DK, 2.8, 'opacity="0.95"')
+  // the doubled-stroke engraving idiom: a bright ghost offset under a dark cut,
+  // which is what makes struck metal survive a 5x downscale. Weights scale with
+  // the cap height now that the cap height is worth scaling.
+  const line = (word, cw, ch, gap, yTop, x0, sw) => {
+    let out = engraveWord(word, x0, yTop + sw * 0.34, cw, ch, gap, BR_LIT, fx(sw * 0.9), 'opacity="0.55"')
+    out += engraveWord(word, x0, yTop, cw, ch, gap, PLATE_DK, fx(sw), 'opacity="0.96"')
     return out
   }
   const wordW = (word, cw, gap) => word.length * cw + (word.length - 1) * gap
-  // line 1: the circled numeral, SPIN, the em dash
-  const cw1 = R * 0.082
-  const ch1 = R * 0.15
-  const gap1 = R * 0.035
-  const oneR = ch1 * 0.56
-  const pad1 = gap1 * 3
-  const l1W = oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1 + cw1
-  const l1X = cx - l1W / 2
-  const l1Y = tagY + tagH * 0.16
-  s += circledOne(l1X + oneR, l1Y + ch1 * 0.5, oneR, PLATE_DK, 3.2)
-  s += line('SPIN', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1)
-  s += line('—', cw1, ch1, gap1, l1Y, l1X + oneR * 2 + pad1 + wordW('SPIN', cw1, gap1) + pad1)
-  // line 2: ROUTE THE RAVENS (one engraved run; the space cell has no glyph)
-  const cw2 = R * 0.062
-  const ch2 = R * 0.13
-  const gap2 = R * 0.026
-  const l2 = 'ROUTE THE RAVENS'
-  const l2X = cx - wordW(l2, cw2, gap2) / 2
-  const l2Y = tagY + tagH * 0.56
-  s += line(l2, cw2, ch2, gap2, l2Y, l2X)
-  s += `<line x1="${fx(l2X)}" y1="${fx(l2Y + ch2 + 6)}" x2="${fx(l2X + wordW(l2, cw2, gap2))}" y2="${fx(l2Y + ch2 + 6)}" stroke="${PLATE_DK}" stroke-width="1.6" opacity="0.5"/>`
-  // the manicule, pointing into the tag from the spine side
-  s += manicule(tagX - R * 0.16, tagY + tagH * 0.42, R * 0.125, PARCH, INK)
+  // SPIN, and nothing else, filling the plate
+  const cwS = R * 0.2
+  const chS = R * 0.36
+  const gapS = R * 0.05
+  const swS = R * 0.038
+  const lS = 'SPIN'
+  const lX = cx - wordW(lS, cwS, gapS) / 2
+  const lY = tagY + (tagH - chS) / 2
+  s += line(lS, cwS, chS, gapS, lY, lX, swS)
+  // the manicule, pointing into the word from the spine side. Held inboard of
+  // R*0.10 from the plate: further out and its cuff runs off the disc.
+  s += manicule(tagX - R * 0.1, tagY + tagH * 0.5, R * 0.1, PARCH, INK)
 
   // central rivet at the hub — pins the plate flat over the wheel
   const rivR = R * 0.14
@@ -5699,6 +5893,86 @@ function dispatchCablePanel({ w, h, seed, cable, baskets }) {
     `<path d="${line}" fill="none" stroke="${DUSK.parch}" stroke-width="${fx(core * 0.26)}" opacity="0.8" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,${fx(-core * 0.44)})"/>`
   )
 
+  // ---- THE SEND CUE (T-AFFORDANCE) -----------------------------------------
+  // Both working mechanisms on this spread shipped silent while the dial — the
+  // one that LOOKED dead — carried the only instruction on the page. That reads
+  // as a wiring error from the reader's chair. The winch answered it with an
+  // engraved HOIST band; the cable answers it here: a brass plate struck SEND,
+  // bracketed off the NEAR mast (the gutter-side high end, where the trolley
+  // sits at riderHome = 0.06), with a short arrow running down the wire.
+  //
+  // SIZED FOR THE BOARD, NOT FOR THE SHEET. The panel projects to ~139x253
+  // screen px, so a label-sized decal here is a smudge: the plate is 31% of the
+  // panel's width (~42 screen px) with a ~11 screen px cap height, which makes
+  // it several times the mast head it hangs off. And because ~97% of this sheet
+  // is cut away, the light on it is `warmBloom` — a soft halo out here prints as
+  // a grey disc once the grain pass floors every non-transparent pixel.
+  const mHeadX = X(cable[0][0] + 0.03)
+  const mHeadY = Y(cable[0][1])
+  const pw = w * 0.312
+  const ph = w * 0.108
+  const px0 = mHeadX + w * 0.059
+  const py0 = mHeadY - ph * 0.42
+  const plateD = `M ${fx(px0)} ${fx(py0)} L ${fx(px0 + pw)} ${fx(py0)} L ${fx(px0 + pw)} ${fx(py0 + ph)} L ${fx(px0)} ${fx(py0 + ph)} Z`
+  // the two bolt-arms back to the mast head, so the plate is MOUNTED and not
+  // floating in the air the rest of this sheet is made of
+  for (const t of [0.26, 0.74]) {
+    parts.push(
+      `<path d="M ${fx(mHeadX)} ${fx(mHeadY)} L ${fx(px0)} ${fx(py0 + ph * t)}" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(4, w * 0.016))}" stroke-linecap="round"/>`
+    )
+    parts.push(
+      `<path d="M ${fx(mHeadX)} ${fx(mHeadY)} L ${fx(px0)} ${fx(py0 + ph * t)}" stroke="${DUSK.amber}" stroke-width="${fx(Math.max(2, w * 0.007))}" stroke-linecap="round"/>`
+    )
+  }
+  parts.push(warmBloom(px0, py0 + ph * 0.5, ph * 0.55))
+  parts.push(`<path d="${plateD}" fill="${DUSK.amber}"/>`)
+  parts.push(`<rect x="${fx(px0)}" y="${fx(py0)}" width="${fx(pw)}" height="${fx(ph * 0.3)}" fill="${DUSK.amberLit}" opacity="0.7"/>`)
+  parts.push(rookRim(plateD, 3.4))
+  for (const bx of [px0 + pw * 0.045, px0 + pw * 0.955]) {
+    parts.push(`<circle cx="${fx(bx)}" cy="${fx(py0 + ph * 0.5)}" r="${fx(ph * 0.075)}" fill="${DUSK.amberCore}" stroke="${DUSK.ink}" stroke-width="2"/>`)
+  }
+  const scw = pw * 0.174
+  const sgap = pw * 0.0435
+  const sch = ph * 0.68
+  const ssw = ph * 0.14
+  const sx0 = px0 + (pw - (4 * scw + 3 * sgap)) / 2
+  const sy0 = py0 + (ph - sch) / 2
+  parts.push(engraveWord('SEND', sx0, sy0 + ssw * 0.3, scw, sch, sgap, DUSK.amberCore, fx(ssw * 0.85), 'opacity="0.6"'))
+  parts.push(engraveWord('SEND', sx0, sy0, scw, sch, sgap, DUSK.ink, fx(ssw), 'opacity="0.95"'))
+
+  // THE DIRECTION ARROW, laid parallel to the wire just off its lit edge and
+  // pointing the way the trolley runs (riderHome -> 1, i.e. outboard and down).
+  {
+    const [au, av] = cableAt(cable, 0.1)
+    const [bu, bv] = cableAt(cable, 0.19)
+    const ax = X(au)
+    const ay = Y(av)
+    const bx = X(bu)
+    const by = Y(bv)
+    const dx = bx - ax
+    const dy = by - ay
+    const L = Math.hypot(dx, dy) || 1
+    // the perpendicular on the wire's UPPER side, where the baskets are not
+    const nx = dy / L
+    const ny = -dx / L
+    const off = w * 0.036
+    const hl = w * 0.05
+    const hw = w * 0.026
+    const sxA = ax + nx * off
+    const syA = ay + ny * off
+    const sxB = bx + nx * off
+    const syB = by + ny * off
+    const tailX = sxB - (dx / L) * hl
+    const tailY = syB - (dy / L) * hl
+    parts.push(`<path d="M ${fx(sxA)} ${fx(syA)} L ${fx(tailX)} ${fx(tailY)}" stroke="${DUSK.ink}" stroke-width="${fx(w * 0.019)}" stroke-linecap="round"/>`)
+    parts.push(`<path d="M ${fx(sxA)} ${fx(syA)} L ${fx(tailX)} ${fx(tailY)}" stroke="${DUSK.amberLit}" stroke-width="${fx(w * 0.008)}" stroke-linecap="round"/>`)
+    const headD =
+      `M ${fx(sxB)} ${fx(syB)} L ${fx(tailX + nx * hw)} ${fx(tailY + ny * hw)} ` +
+      `L ${fx(tailX - nx * hw)} ${fx(tailY - ny * hw)} Z`
+    parts.push(`<path d="${headD}" fill="${DUSK.amber}"/>`)
+    parts.push(`<path d="${headD}" fill="none" stroke="${DUSK.ink}" stroke-width="${fx(Math.max(2, w * 0.006))}" stroke-linejoin="round"/>`)
+  }
+
   // THE HANGING LETTER-BASKETS. Each is a hook over the wire, a short yoke, a
   // wicker pannier and one lit lantern — the fixed three the reader does not
   // touch, so the eye reads the wire as WORKING before a hand ever lands on it.
@@ -7021,7 +7295,23 @@ function dispatchDesk(w, h, seed) {
     `<stop offset="0" stop-color="${DUSK.amberCore}" stop-opacity="0.5"/>` +
     `<stop offset="0.38" stop-color="${DUSK.amberLit}" stop-opacity="0.26"/>` +
     `<stop offset="0.72" stop-color="${DUSK.amber}" stop-opacity="0.1"/>` +
-    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>`
+    `<stop offset="1" stop-color="${DUSK.amber}" stop-opacity="0"/></radialGradient>` +
+    // OUTBOARD FALL-OFF. The deck is lit by the one candle standing on it, so its
+    // far ends should be leaving the light — and the board capture showed it
+    // reading uniformly bright right out to both tips, which is what makes a deck
+    // look like a decal laid on the tier instead of a plane receding from a lamp.
+    // Symmetric about the crease (each half-deck is the mirror of the other), so
+    // this darkens BOTH outboard ends and leaves the middle untouched.
+    // Held to 0.38 at the tips with a wide flat middle: enough to bend the plane
+    // away from the lamp, not enough to mute the nameplate that sits partway out
+    // on the right, or to swallow the outboard inkwell and letter.
+    `<linearGradient id="deckEnds" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${DUSK.ink}" stop-opacity="0.38"/>` +
+    `<stop offset="0.14" stop-color="${DUSK.ink}" stop-opacity="0.14"/>` +
+    `<stop offset="0.28" stop-color="${DUSK.ink}" stop-opacity="0"/>` +
+    `<stop offset="0.72" stop-color="${DUSK.ink}" stop-opacity="0"/>` +
+    `<stop offset="0.86" stop-color="${DUSK.ink}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${DUSK.ink}" stop-opacity="0.38"/></linearGradient>`
 
   // THE DECK SILHOUETTE. A die-cut, not a rectangle: the front corners are cut
   // back so the cantilever reads as a shaped counter from above, while the
@@ -7189,25 +7479,31 @@ function dispatchDesk(w, h, seed) {
   s += `<rect x="${fx(px0 - pgap * 1.6)}" y="${fx(py0 - pgap)}" width="${fx(4 * pw + 3 * pgap + 3.2 * pgap)}" height="${fx(ph + pgap * 2)}" rx="${fx(h * 0.012)}" fill="${GOLD}" stroke="${GOLD_DIM}" stroke-width="${fx(h * 0.008)}"/>`
   s += engraveWord('POST', px0, py0 + 2, pw, ph, pgap, GOLD_LIT, Math.max(3, h * 0.011), `opacity="${fxOp(0.6)}"`)
   s += engraveWord('POST', px0, py0, pw, ph, pgap, DUSK.ink, Math.max(2.6, h * 0.011), 'opacity="0.8"')
+  // the outboard fall-off goes over the whole deck LAST, clipped to the die, so it
+  // grades one continuous plane rather than a stack of separately-lit objects
+  s += `<g clip-path="url(#deckDie)"><rect x="0" y="0" width="${fx(w)}" height="${fx(h)}" fill="url(#deckEnds)"/></g>`
   s += `</g>`
-  return svgPiece(w, h, s + rookRim(die, 6), defs)
+  return svgPiece(w, h, s + rookRim(die, 6), defs + `<clipPath id="deckDie"><path d="${die}"/></clipPath>`)
 }
 
 // ---- C) THE CRANK WHEEL (`ch3-keep-winch-disc`). The reader's first two
 // findings were "the working winch is unlabelled" and "the only labelled disc on
 // the spread is the OTHER one", which together read as a wiring error. The fix is
-// diegetic rather than a UI sticker: a heavy brass capstan whose RIM BAND is
-// struck HOIST with a directional arrow, engraved as metal (a dark cut under a
-// bright ghost) and struck at TWO opposite stations so the legend is never all
-// upside down through the 368deg wind. Cap height ~9% of the disc diameter,
-// which is ~13 screen px at the ~140px the wheel projects. ----
+// diegetic rather than a UI sticker: a heavy brass capstan carrying a riveted
+// MAKER'S PLATE struck HOIST on its face, at two opposite stations, plus a
+// directional arrow and a stop mark on the rim.
+//
+// Everything about the plate's size is set by ONE measurement, and the note at
+// the plate itself records it: the bench projects this page-flat wheel into
+// 140x74 screen px, not the 140x140 a flat preview suggests, so anything sized
+// off the art's own diameter loses half its height on screen. ----
 function crankWheel(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
   const cy = h / 2
   const R = w * 0.44
   const rimIn = R * 0.84 // knurled rim band
-  const legIn = R * 0.56 // engraved legend band
+  const legIn = R * 0.56 // spoke web / open ground boundary
   const hubR = R * 0.29
   const BR = GOLD
   const BR_LIT = GOLD_LIT
@@ -7263,31 +7559,59 @@ function crankWheel(w, h, seed) {
   s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.985)}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.018)}" opacity="0.8"/>`
   s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(rimIn)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R * 0.016)}" opacity="0.8"/>`
 
-  // ---- THE ENGRAVED LEGEND. Two opposed strikes of HOIST in the band, each
-  // doubled (a dark cut with a bright offset ghost — dispatchCard's `line`
-  // idiom) so it survives the downscale as struck metal.
+  // ---- THE MAKER'S PLATE. Two brass plates riveted across the wheel's FACE,
+  // each struck HOIST, at opposite stations.
   //
-  // THE BAND IS BUDGETED IN DEGREES, because the first bake spent it twice: the
-  // word is wordW long on a chord at legR, i.e. 2*asin(wordW/2/legR) ~= 58deg
-  // wide, and the arrows were laid down over the SAME 56deg the top legend
-  // occupies, striking a dark arc clean through HOIST. The four stations are now
-  // legends centred on 90/270 and arrows centred on 0/180, leaving four ~34deg
-  // gaps — one of which carries the stop mark and one the grip lobe.
-  const legR = (legIn + rimIn) / 2
-  const cwL = R * 0.105
-  const chL = R * 0.185
-  const gapL = R * 0.045
+  // ROUND 2, and the measurement that forced it. The first bake engraved the word
+  // into the RIM BAND at cap height 9.25% of the disc diameter, which read fine on
+  // a flat 140x140 preview and read as a tangle of dark scoring in the actual
+  // board capture. The reason is that a page-flat disc is FORESHORTENED hard at
+  // the pinned camera: the bench (e3w2s4-board.mjs) measures this wheel at
+  // 140x74 screen px at rest and 145x90 at full wind, i.e. the vertical is
+  // squashed to ~0.53, so a 9.25% cap height became under 7 screen px of
+  // hairline. There is no rotation that escapes it — the disc turns 290deg of
+  // shown wind — so the only honest levers are SIZE, WEIGHT and CONTRAST:
+  //   - cap height 11% of the diameter and the word 53.6% of it (the top of the
+  //     legible band; wider and a straight chord no longer fits inside a circle),
+  //   - strokes at 20% of cap height instead of 12%,
+  //   - near-black on a GOLD_LIT plate rather than engraved gold-on-gold, so the
+  //     label survives as a plate with writing on it even at the sizes where the
+  //     individual letters stop resolving — which is what "the winch is labelled"
+  //     actually requires,
+  //   - and the atlas region raised 300 -> 460px, because the old region threw
+  //     away half the label's texels before the GPU ever saw them.
+  // The plates cost the outer reach of the four spokes they cross; they carry a
+  // drop shadow so they read as bolted ON the face rather than as gaps in it, and
+  // the spokes at 22.5/157.5/202.5/337.5 stay open end to end.
+  //
+  // STATIONS ARE BUDGETED IN DEGREES, because the first bake spent the same band
+  // twice and struck an arrow clean through the word: plates own 49-131 and
+  // 229-311 (their own corners), arrows 334-26 and 154-206, the stop mark 44, the
+  // grip lobe 320 — and the lobe only lives outside 0.93R, where no plate reaches.
+  const cwL = R * 0.168
+  const chL = R * 0.22
+  const gapL = R * 0.058
   const wordW = 5 * cwL + 4 * gapL
+  const plateHW = R * 0.585
+  const plateHH = R * 0.155
+  const plateCY = R * 0.51
   const strike = (rot) => {
-    let g = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(rot)}) translate(${fx(-wordW / 2)} ${fx(-legR - chL / 2)})">`
-    g += `<rect x="${fx(-gapL)}" y="${fx(-gapL * 0.6)}" width="${fx(wordW + 2 * gapL)}" height="${fx(chL + gapL * 1.2)}" rx="${fx(R * 0.02)}" fill="${BR_DK}" opacity="0.35"/>`
-    g += engraveWord('HOIST', 0, 2.4, cwL, chL, gapL, BR_LIT, Math.max(3, R * 0.021), `opacity="${fxOp(0.62)}"`)
-    g += engraveWord('HOIST', 0, 0, cwL, chL, gapL, DUSK.ink, Math.max(3, R * 0.022), 'opacity="0.95"')
+    let g = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(rot)}) translate(0 ${fx(-plateCY)})">`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH + R * 0.018)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="#000000" opacity="0.45"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="${BR_LIT}"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 0.5)}" rx="${fx(R * 0.03)}" fill="#ffffff" opacity="0.18"/>`
+    g += `<rect x="${fx(-plateHW)}" y="${fx(-plateHH)}" width="${fx(plateHW * 2)}" height="${fx(plateHH * 2)}" rx="${fx(R * 0.03)}" fill="none" stroke="${BR_DK}" stroke-width="${fx(R * 0.016)}"/>`
+    // the word, doubled: a bright ghost laid down first and the dark cut over it,
+    // so the letters keep an edge on both sides at any downscale
+    g += engraveWord('HOIST', -wordW / 2, -chL / 2 + R * 0.022, cwL, chL, gapL, '#ffffff', Math.max(3, R * 0.04), `opacity="${fxOp(0.5)}"`)
+    g += engraveWord('HOIST', -wordW / 2, -chL / 2, cwL, chL, gapL, DUSK.ink, Math.max(3, R * 0.044), 'opacity="0.98"')
+    for (const rx of [-plateHW + R * 0.045, plateHW - R * 0.045]) {
+      g += `<circle cx="${fx(rx)}" cy="0" r="${fx(R * 0.03)}" fill="${BR}" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.01)}" stroke-opacity="0.65"/>`
+    }
     g += `</g>`
     return g
   }
-  s += strike(0)
-  s += strike(180)
+  const legR = (legIn + rimIn) / 2
 
   // ---- THE DIRECTION ARROWS, struck in the same band a quarter turn off the
   // legends. The disc's shown angle rotates the art from the page-fore axis
@@ -7315,8 +7639,13 @@ function crankWheel(w, h, seed) {
   s += arrow(-26, 26)
   s += arrow(154, 206)
 
+  // the two plates go down over the spoke web, AFTER the arrows so nothing on the
+  // rim can cut into a letter
+  s += strike(0)
+  s += strike(180)
+
   // ---- THE STOP MARK where the wind ends: a struck chevron and a filed notch on
-  // the rim, in the gap between the arrow at 26 and the legend from 61.
+  // the rim, in the gap between the arrow at 26 and the plate corner at 49.
   const stopA = 44
   s += `<path d="M ${fx(polX(cx, stopA, rimIn * 0.94))} ${fx(polY(cy, stopA, rimIn * 0.94))} L ${fx(polX(cx, stopA - 5, R * 0.99))} ${fx(polY(cy, stopA - 5, R * 0.99))} L ${fx(polX(cx, stopA + 5, R * 0.99))} ${fx(polY(cy, stopA + 5, R * 0.99))} Z" fill="${DUSK.ink}" opacity="0.9"/>`
   s += `<path d="M ${fx(polX(cx, stopA, rimIn * 0.99))} ${fx(polY(cy, stopA, rimIn * 0.99))} L ${fx(polX(cx, stopA, R * 0.96))} ${fx(polY(cy, stopA, R * 0.96))}" fill="none" stroke="${BR_LIT}" stroke-width="${fx(R * 0.014)}" opacity="0.7"/>`
@@ -11767,7 +12096,13 @@ const ATLASES = [
       // retired with the cliffs when the raven city took spread 4; no renderer
       // addresses them, and the INFRA-2 guard rightly refuses dead freight.)
       { id: 'ch3-fringe', w: 620, opaque: false },
-      { id: 'ch3-keep-winch-disc', w: 300, opaque: false },
+      // WAVE-2: the disc region goes 300 -> 460. It carries the only WORD on the
+      // spread (the HOIST maker's plate that closes finding S4-1), and a 640px art
+      // packed at 300 threw away half that label's texels before the GPU saw it —
+      // on the one piece where legibility IS the requirement. The page has the
+      // room (it was at 42.5% occupancy), so this is texels moved to where they
+      // are read, not texels added.
+      { id: 'ch3-keep-winch-disc', w: 460, opaque: false },
       { id: 'ch3-keep-winch-semaphore', h: 420, opaque: false },
       { id: 'ch3-keep-winch-iris', h: 420, opaque: false },
       { id: 'ch3-keep-winch-counterweight', h: 300, opaque: false },
