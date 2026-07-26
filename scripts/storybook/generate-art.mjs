@@ -1700,13 +1700,30 @@ function boxFace(w, h, seed, face, kind) {
     let s = `<rect width="${w}" height="${h}" fill="${WOOD}"/>`
     s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${WLIT}" opacity="0.16"/>`
     if (face === 'top') {
-      // wood-shingle gable roof, ridge at u=0.5
-      s += plank(false, 8, WDIM)
-      for (let i = 0; i < 8; i++) {
-        const y = (h * i) / 8
-        s += `<path d="M 0 ${fx(y)} q ${fx(w * 0.06)} 5 ${fx(w * 0.12)} 0" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+      // WOOD-SHINGLE GABLE ROOF, ridge at u=0.5. S2-6(b): this is the ONLY
+      // face of the stable the lid-dominant reading camera really shows, so it
+      // is the face that has to say "barn" — the blind reader got "a brown
+      // tented slab, ribbed like planking" out of eight flat plank lines and a
+      // pale ridge stripe. Five bold scalloped shingle COURSES instead (butts
+      // drawn as lobes, which is the mark that separates a roof from decking),
+      // a leaded ridge cap with a run of finials, and two moss patches, so the
+      // slab is weathered timber rather than a ruled board.
+      for (let i = 1; i < 5; i++) {
+        const y = (h * i) / 5
+        s += `<rect x="0" y="${fx(y - h * 0.012)}" width="${w}" height="${fx(h * 0.024)}" fill="${WDIM}" opacity="0.55"/>`
+        for (let k = 0; k < 9; k++) {
+          const x0 = (w * k) / 9
+          s += `<path d="M ${fx(x0)} ${fx(y)} q ${fx(w / 18)} ${fx(h * 0.03)} ${fx(w / 9)} 0" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.42"/>`
+        }
       }
-      s += `<rect x="${fx(w * 0.48)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${WLIT}" opacity="0.6"/>` // ridge cap
+      for (let k = 0; k < 10; k++)
+        s += `<line x1="${fx((w * (k + 0.5)) / 10)}" y1="0" x2="${fx((w * (k + 0.5)) / 10)}" y2="${h}" stroke="${WDIM}" stroke-width="1.6" opacity="0.3"/>` // shingle joints
+      s += `<rect x="${fx(w * 0.44)}" y="0" width="${fx(w * 0.12)}" height="${h}" fill="${WDIM}"/>` // leaded ridge cap
+      s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${WLIT}" opacity="0.7"/>`
+      for (let k = 0; k < 5; k++)
+        s += `<circle cx="${fx(w * 0.5)}" cy="${fx((h * (k + 0.5)) / 5)}" r="${fx(w * 0.028)}" fill="${WLIT}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>` // ridge finials
+      for (const [mx, my, mr] of [[0.18, 0.32, 0.1], [0.8, 0.72, 0.075]])
+        s += `<ellipse cx="${fx(w * mx)}" cy="${fx(h * my)}" rx="${fx(w * mr)}" ry="${fx(h * mr * 0.7)}" fill="#7d8a52" opacity="0.42"/>` // moss
     } else if (face === 'back') {
       s += plank(false, 5, WDIM)
       s += `<rect x="${fx(w * 0.38)}" y="${fx(h * 0.12)}" width="${fx(w * 0.24)}" height="${fx(h * 0.24)}" fill="#3a2a18" stroke="${WDIM}" stroke-width="3"/>` // loft opening
@@ -3440,16 +3457,44 @@ function dressPatch(w, h, seed, kind) {
     )
   }
   if (kind === 'vane') {
-    // a weathervane: a rod topped by a cockerel + a N-S arrow (tall)
+    // A WEATHERVANE: a rod topped by a cockerel + a N-S arrow (tall die).
+    //
+    // S2-6(b). The blind reader of spread 2 read the stable it stands on as
+    // "a brown tented/pitched slab... with a small blue nib/quill standing at
+    // the ridge", and — because the narration promises an enchanted ledger —
+    // concluded the whole thing might be a book stood tent-open with a pen in
+    // it. The nib was THIS: a slate #454550 cockerel filling 0.16 of a die that
+    // renders ~31x44 screen px, i.e. a 12px blue-grey blob on a stick. A blue
+    // nib on a pitched brown slab is a quill on a ledger; a gold COCKEREL on a
+    // pitched brown slab is a barn. So the bird is what changes: it fills the
+    // top third of the die, it is brass over ink (never slate), and it carries
+    // the four marks that can only be a rooster — comb, wattle, a hooked beak
+    // and a fan of tail sickles.
     const cx = w / 2
+    const bodyY = h * 0.2
     let s = `<g>`
-    s += `<rect x="${fx(cx - w * 0.04)} " y="${fx(h * 0.3)}" width="${fx(w * 0.08)}" height="${fx(h * 0.7)}" fill="#454550"/>` // rod
-    // direction arrow
-    s += `<path d="M ${fx(w * 0.1)} ${fx(h * 0.42)} L ${fx(w * 0.9)} ${fx(h * 0.42)} M ${fx(w * 0.9)} ${fx(h * 0.42)} l ${fx(-w * 0.12)} ${fx(-h * 0.04)} m ${fx(w * 0.12)} ${fx(h * 0.04)} l ${fx(-w * 0.12)} ${fx(h * 0.04)}" fill="none" stroke="#3a3a40" stroke-width="3"/>`
-    // cockerel silhouette on top
-    const cd = `M ${fx(cx - w * 0.18)} ${fx(h * 0.28)} Q ${fx(cx - w * 0.24)} ${fx(h * 0.14)} ${fx(cx - w * 0.02)} ${fx(h * 0.12)} Q ${fx(cx)} ${fx(h * 0.02)} ${fx(cx + w * 0.08)} ${fx(h * 0.04)} Q ${fx(cx + w * 0.04)} ${fx(h * 0.1)} ${fx(cx + w * 0.12)} ${fx(h * 0.12)} Q ${fx(cx + w * 0.28)} ${fx(h * 0.16)} ${fx(cx + w * 0.18)} ${fx(h * 0.28)} Q ${fx(cx)} ${fx(h * 0.24)} ${fx(cx - w * 0.18)} ${fx(h * 0.28)} Z`
-    s += `<path d="${cd}" fill="#454550" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
-    s += `<circle cx="${fx(cx - w * 0.02)}" cy="${fx(h * 0.11)}" r="2.6" fill="${GOLD_LIT}"/>` // eye
+    s += `<rect x="${fx(cx - w * 0.045)}" y="${fx(h * 0.42)}" width="${fx(w * 0.09)}" height="${fx(h * 0.58)}" fill="#2b2620"/>` // rod
+    // the N-S cross-arms with a clear bar and a spearhead
+    s += `<path d="M ${fx(w * 0.06)} ${fx(h * 0.54)} L ${fx(w * 0.94)} ${fx(h * 0.54)}" stroke="#2b2620" stroke-width="${fx(h * 0.014)}" stroke-linecap="round"/>`
+    s += `<path d="M ${fx(w * 0.94)} ${fx(h * 0.54)} l ${fx(-w * 0.16)} ${fx(-h * 0.026)} l 0 ${fx(h * 0.052)} Z" fill="#2b2620"/>`
+    s += `<circle cx="${fx(w * 0.06)}" cy="${fx(h * 0.54)}" r="${fx(w * 0.05)}" fill="none" stroke="#2b2620" stroke-width="${fx(h * 0.012)}"/>`
+    s += `<circle cx="${fx(cx)}" cy="${fx(h * 0.47)}" r="${fx(w * 0.075)}" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="1.6"/>` // the pivot ball
+    // THE COCKEREL — big, brass, and unmistakably a bird
+    const cd =
+      `M ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} ` + // tail root
+      `C ${fx(cx - w * 0.56)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.5)} ${fx(bodyY - h * 0.16)} ${fx(cx - w * 0.28)} ${fx(bodyY - h * 0.15)} ` + // upper sickle
+      `C ${fx(cx - w * 0.36)} ${fx(bodyY - h * 0.02)} ${fx(cx - w * 0.24)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.12)} ${fx(bodyY - h * 0.02)} ` + // back
+      `C ${fx(cx - w * 0.02)} ${fx(bodyY - h * 0.06)} ${fx(cx + w * 0.06)} ${fx(bodyY - h * 0.1)} ${fx(cx + w * 0.08)} ${fx(bodyY - h * 0.15)} ` + // neck
+      `L ${fx(cx + w * 0.04)} ${fx(bodyY - h * 0.19)} L ${fx(cx + w * 0.12)} ${fx(bodyY - h * 0.2)} ` + // comb notch
+      `L ${fx(cx + w * 0.14)} ${fx(bodyY - h * 0.24)} L ${fx(cx + w * 0.22)} ${fx(bodyY - h * 0.2)} ` +
+      `C ${fx(cx + w * 0.3)} ${fx(bodyY - h * 0.19)} ${fx(cx + w * 0.32)} ${fx(bodyY - h * 0.15)} ${fx(cx + w * 0.28)} ${fx(bodyY - h * 0.12)} ` + // head
+      `L ${fx(cx + w * 0.46)} ${fx(bodyY - h * 0.1)} L ${fx(cx + w * 0.28)} ${fx(bodyY - h * 0.06)} ` + // beak
+      `L ${fx(cx + w * 0.3)} ${fx(bodyY + h * 0.01)} L ${fx(cx + w * 0.22)} ${fx(bodyY - h * 0.02)} ` + // wattle
+      `C ${fx(cx + w * 0.24)} ${fx(bodyY + h * 0.1)} ${fx(cx + w * 0.02)} ${fx(bodyY + h * 0.19)} ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} Z`
+    s += `<path d="${cd}" fill="${GOLD}" stroke="${INK}" stroke-width="2" stroke-opacity="0.8"/>`
+    s += `<path d="M ${fx(cx - w * 0.3)} ${fx(bodyY + h * 0.16)} C ${fx(cx - w * 0.5)} ${fx(bodyY + h * 0.02)} ${fx(cx - w * 0.44)} ${fx(bodyY - h * 0.12)} ${fx(cx - w * 0.3)} ${fx(bodyY - h * 0.12)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>` // tail sickle line
+    s += `<path d="M ${fx(cx - w * 0.14)} ${fx(bodyY + h * 0.02)} C ${fx(cx - w * 0.02)} ${fx(bodyY - h * 0.04)} ${fx(cx + w * 0.08)} ${fx(bodyY + h * 0.06)} ${fx(cx - w * 0.06)} ${fx(bodyY + h * 0.1)} Z" fill="${GOLD_LIT}" opacity="0.75"/>` // wing
+    s += `<circle cx="${fx(cx + w * 0.24)}" cy="${fx(bodyY - h * 0.135)}" r="${fx(w * 0.035)}" fill="${INK}"/>` // eye
     s += rimPath(cd, 3)
     s += `</g>`
     return svgPiece(w, h, s)
@@ -3816,6 +3861,18 @@ const ENGRAVE_GLYPHS = {
   M: [[['M', 0, 1], ['L', 0, 0], ['L', 0.5, 0.62], ['L', 1, 0], ['L', 1, 1]]],
   '0': [[['M', 0.5, 0], ['C', 0.06, 0.03, 0.06, 0.97, 0.5, 1], ['C', 0.94, 0.97, 0.94, 0.03, 0.5, 0]]],
   '1': [[['M', 0.2, 0.22], ['L', 0.52, 0]], [['M', 0.52, 0], ['L', 0.52, 1]], [['M', 0.16, 1], ['L', 0.9, 1]]],
+  // E3 WAVE-2 s2 additions — the key-board's door numbers. They were set in
+  // `<text font-family="Georgia">`, i.e. the one place in this file that still
+  // depended on a typeface being installed on the baking host; stroked here
+  // instead they are both host-stable and far bolder at the ~19px cap height
+  // the rescaled doors give them. Additive: no shipped word uses 2/3/4, so
+  // every existing engraving stays byte-identical.
+  '2': [[['M', 0.08, 0.24], ['C', 0.12, -0.06, 0.9, -0.08, 0.92, 0.26], ['C', 0.93, 0.5, 0.36, 0.66, 0.08, 1], ['L', 0.94, 1]]],
+  '3': [
+    [['M', 0.1, 0.1], ['C', 0.42, -0.08, 0.88, 0.0, 0.86, 0.24], ['C', 0.85, 0.42, 0.6, 0.48, 0.4, 0.48]],
+    [['M', 0.4, 0.48], ['C', 0.68, 0.48, 0.92, 0.56, 0.9, 0.76], ['C', 0.88, 1.02, 0.36, 1.08, 0.08, 0.9]],
+  ],
+  '4': [[['M', 0.72, 1], ['L', 0.72, 0]], [['M', 0.72, 0], ['L', 0.06, 0.72], ['L', 0.98, 0.72]]],
 }
 
 /** Engrave a word from ENGRAVE_GLYPHS as stroke paths, left cell at (x0,y0),
@@ -4382,17 +4439,62 @@ function brassKeyLying(x0, x1, cy, r) {
   return s
 }
 
-/** A curled sleeping cat silhouette (the surprise behind one door). Faces LEFT,
- *  tucked into the niche; nose toward the fore (right) so it reads on reveal. */
+/** A curled sleeping cat (the surprise behind one door). Faces RIGHT (toward
+ *  the fore, so a lifted leaf uncovers the head first); tucked into the niche.
+ *
+ *  S2-4 ("slot 3 reveals a dark grey amorphous blob beside the key"). The cat
+ *  WAS the blob: it was drawn in #2b2620 on a #22190f niche — 39 vs 26
+ *  luminance, a 13-step separation, and the niche additionally carries a black
+ *  0.32 depth-shade over its spine half. A near-black silhouette inside a
+ *  near-black cavity cannot read as anything, which is exactly what the blind
+ *  reader reported ("I cannot tell whether that is a shadow, an unlit mesh, or
+ *  an object"). The surprise behind door 3 is the one payoff on the board, so
+ *  it is repainted as a GINGER TABBY lit by the niche lamp: a warm body two
+ *  full value steps above the cavity, a cream chest/muzzle/paw for the light
+ *  end, ink stripes for the texture, and a readable face (ear triangles, a
+ *  closed sleepy eye, a pink nose, whiskers). Palette derived from the niche
+ *  fills, not eyeballed: CAT_MID #c07a3c luminance ~131, CAT_LIT #e8c49a ~200,
+ *  against the #22190f cavity at ~26 -> min separation 105. */
 function sleepingCat(cx, cy, size) {
+  const CAT_DK = '#7d4519', CAT_MID = '#c07a3c', CAT_LIT = '#e8c49a'
   const bodyR = size * 0.5
-  let s = `<ellipse cx="${fx(cx)}" cy="${fx(cy + size * 0.08)}" rx="${fx(bodyR)}" ry="${fx(bodyR * 0.6)}" fill="#2b2620"/>` // curled body
-  s += `<circle cx="${fx(cx + bodyR * 0.72)}" cy="${fx(cy - size * 0.04)}" r="${fx(size * 0.24)}" fill="#2b2620"/>` // head (toward fore/right)
-  s += `<path d="M ${fx(cx + bodyR * 0.62)} ${fx(cy - size * 0.2)} l ${fx(-size * 0.02)} ${fx(-size * 0.18)} l ${fx(size * 0.15)} ${fx(size * 0.06)} Z" fill="#2b2620"/>` // ear
-  s += `<path d="M ${fx(cx + bodyR * 0.95)} ${fx(cy - size * 0.17)} l ${fx(size * 0.1)} ${fx(-size * 0.16)} l ${fx(-size * 0.14)} ${fx(size * 0.04)} Z" fill="#2b2620"/>` // ear
-  s += `<path d="M ${fx(cx - bodyR * 0.72)} ${fx(cy + size * 0.16)} q ${fx(-size * 0.28)} ${fx(-size * 0.04)} ${fx(-size * 0.12)} ${fx(-size * 0.3)}" fill="none" stroke="#2b2620" stroke-width="${fx(size * 0.13)}" stroke-linecap="round"/>` // tail
-  s += `<path d="M ${fx(cx + bodyR * 0.62)} ${fx(cy - size * 0.02)} a ${fx(size * 0.14)} ${fx(size * 0.14)} 0 0 1 ${fx(size * 0.16)} 0" fill="none" stroke="${GOLD_LIT}" stroke-width="3" opacity="0.85"/>` // sleepy eye
-  s += `<circle cx="${fx(cx + bodyR * 0.96)}" cy="${fx(cy - size * 0.01)}" r="${fx(size * 0.05)}" fill="#c98b4a"/>` // nose
+  const hx = cx + bodyR * 0.78 // head centre (toward the fore/right)
+  const hy = cy - size * 0.08
+  const hr = size * 0.27
+  let s = ''
+  // the lamp reaching into the niche, so the cat sits IN light rather than on ink
+  s += `<ellipse cx="${fx(cx + bodyR * 0.2)}" cy="${fx(cy)}" rx="${fx(size * 1.05)}" ry="${fx(size * 0.62)}" fill="${GOLD_LIT}" opacity="0.14"/>`
+  // curled body + tucked haunch
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(cy + size * 0.1)}" rx="${fx(bodyR * 1.06)}" ry="${fx(bodyR * 0.66)}" fill="${CAT_MID}"/>`
+  s += `<ellipse cx="${fx(cx - bodyR * 0.42)}" cy="${fx(cy + size * 0.06)}" rx="${fx(bodyR * 0.5)}" ry="${fx(bodyR * 0.46)}" fill="${CAT_DK}" opacity="0.55"/>` // haunch
+  // tabby stripes across the back
+  for (const t of [-0.5, -0.18, 0.16, 0.48]) {
+    const sx = cx + bodyR * t
+    s += `<path d="M ${fx(sx)} ${fx(cy - size * 0.2)} q ${fx(size * 0.05)} ${fx(size * 0.11)} ${fx(-size * 0.02)} ${fx(size * 0.22)}" fill="none" stroke="${CAT_DK}" stroke-width="${fx(size * 0.07)}" stroke-linecap="round" opacity="0.9"/>`
+  }
+  // cream chest + a forepaw over the sill (the light end of the value ladder)
+  s += `<ellipse cx="${fx(cx + bodyR * 0.34)}" cy="${fx(cy + size * 0.26)}" rx="${fx(bodyR * 0.5)}" ry="${fx(bodyR * 0.26)}" fill="${CAT_LIT}"/>`
+  s += `<ellipse cx="${fx(cx + bodyR * 0.78)}" cy="${fx(cy + size * 0.31)}" rx="${fx(size * 0.14)}" ry="${fx(size * 0.09)}" fill="${CAT_LIT}"/>` // paw
+  // tail curling back around the body
+  s += `<path d="M ${fx(cx - bodyR * 0.95)} ${fx(cy + size * 0.2)} q ${fx(-size * 0.34)} ${fx(-size * 0.1)} ${fx(-size * 0.16)} ${fx(-size * 0.36)}" fill="none" stroke="${CAT_MID}" stroke-width="${fx(size * 0.16)}" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(cx - bodyR * 1.16)} ${fx(cy - size * 0.02)} q ${fx(-size * 0.06)} ${fx(-size * 0.09)} ${fx(-size * 0.02)} ${fx(-size * 0.14)}" fill="none" stroke="${CAT_LIT}" stroke-width="${fx(size * 0.14)}" stroke-linecap="round"/>` // white tail tip
+  // ears (behind the head circle so they read as triangles on the skull)
+  s += `<path d="M ${fx(hx - hr * 0.85)} ${fx(hy - hr * 0.5)} L ${fx(hx - hr * 0.72)} ${fx(hy - hr * 1.5)} L ${fx(hx - hr * 0.06)} ${fx(hy - hr * 0.86)} Z" fill="${CAT_MID}" stroke="${CAT_DK}" stroke-width="1.4"/>`
+  s += `<path d="M ${fx(hx + hr * 0.86)} ${fx(hy - hr * 0.5)} L ${fx(hx + hr * 0.8)} ${fx(hy - hr * 1.46)} L ${fx(hx + hr * 0.1)} ${fx(hy - hr * 0.88)} Z" fill="${CAT_MID}" stroke="${CAT_DK}" stroke-width="1.4"/>`
+  // head + muzzle
+  s += `<circle cx="${fx(hx)}" cy="${fx(hy)}" r="${fx(hr)}" fill="${CAT_MID}"/>`
+  s += `<path d="M ${fx(hx - hr * 0.5)} ${fx(hy - hr * 0.62)} q ${fx(hr * 0.5)} ${fx(hr * 0.34)} ${fx(hr * 1.0)} 0" fill="none" stroke="${CAT_DK}" stroke-width="${fx(size * 0.05)}" opacity="0.8"/>` // brow stripe
+  s += `<ellipse cx="${fx(hx + hr * 0.1)}" cy="${fx(hy + hr * 0.44)}" rx="${fx(hr * 0.6)}" ry="${fx(hr * 0.4)}" fill="${CAT_LIT}"/>` // muzzle
+  s += `<path d="M ${fx(hx - hr * 0.62)} ${fx(hy + hr * 0.02)} a ${fx(hr * 0.4)} ${fx(hr * 0.4)} 0 0 1 ${fx(hr * 0.72)} 0" fill="none" stroke="${INK}" stroke-width="2.6"/>` // closed sleepy eye
+  s += `<path d="M ${fx(hx + hr * 0.3)} ${fx(hy + hr * 0.02)} a ${fx(hr * 0.34)} ${fx(hr * 0.34)} 0 0 1 ${fx(hr * 0.6)} 0" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.75"/>` // far eye
+  s += `<path d="M ${fx(hx + hr * 0.1)} ${fx(hy + hr * 0.3)} l ${fx(-hr * 0.16)} ${fx(hr * 0.14)} l ${fx(hr * 0.32)} 0 Z" fill="#e08f8f"/>` // nose
+  for (const dy of [-hr * 0.1, hr * 0.12, hr * 0.32])
+    s += `<line x1="${fx(hx + hr * 0.28)}" y1="${fx(hy + hr * 0.4)}" x2="${fx(hx + hr * 1.5)}" y2="${fx(hy + hr * 0.4 + dy)}" stroke="${CAT_LIT}" stroke-width="1.6" opacity="0.85"/>` // whiskers
+  // three sleep marks so the reveal reads as "asleep", not "hiding"
+  for (let k = 0; k < 3; k++) {
+    const zx = hx + hr * (1.5 + k * 0.62), zy = hy - hr * (0.9 + k * 0.72), zs = size * (0.08 + k * 0.03)
+    s += `<path d="M ${fx(zx - zs)} ${fx(zy - zs)} L ${fx(zx + zs)} ${fx(zy - zs)} L ${fx(zx - zs)} ${fx(zy + zs)} L ${fx(zx + zs)} ${fx(zy + zs)}" fill="none" stroke="${CAT_LIT}" stroke-width="2" opacity="${fx(0.75 - k * 0.16)}"/>`
+  }
   return s
 }
 
@@ -4479,23 +4581,32 @@ function keyboardDoor(w, h, seed, plate) {
     s += `<path d="M ${fx(x0 + w * 0.12)} ${fx(hy)} L ${fx(x0 + w * 0.28)} ${fx(hy)}" stroke="${IRON}" stroke-width="${fx(h * 0.07)}" stroke-linecap="round"/>` // strap across the plank
     s += `<circle cx="${fx(x0 + w * 0.05)}" cy="${fx(hy)}" r="2.6" fill="${IRON_LIT}"/>` // nail
   }
-  // brass number plate, centred + upright — ENLARGED to a celebrated tag
-  // (E3 s2 affordance pass: the refs' BIG numbered plates, not a modest label)
-  const px = w * 0.52, py = h * 0.5, prx = w * 0.19, pry = h * 0.37
-  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 2)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.32)}" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="2" stroke-opacity="0.75"/>`
-  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 0.5)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.3)}" fill="${GOLD_LIT}" opacity="0.6"/>`
-  for (const [dx, dy] of [[-prx * 0.72, -pry * 0.78], [prx * 0.72, -pry * 0.78], [-prx * 0.72, pry * 0.78], [prx * 0.72, pry * 0.78]])
-    s += `<circle cx="${fx(px + dx)}" cy="${fx(py + dy)}" r="2.6" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.5"/>` // plate screws
-  s += `<text x="${fx(px)}" y="${fx(py + pry * 0.44)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(pry * 1.3)}" font-weight="bold" text-anchor="middle" fill="${WOOD_EDGE}">${plate}</text>`
+  // THE BRASS NUMBER PLATE, centred + upright, at the size the rescaled door
+  // can actually carry (S2-1): the plate is 0.82 of the door's height and the
+  // digit 0.56 of it, which on the shipped 115x35px door quad is a 28px plate
+  // with a ~19px cap-height numeral — against ~10px, stretched 2.4x sideways,
+  // before. The digit is STROKED from ENGRAVE_GLYPHS rather than set in
+  // Georgia: font-free (host-stable bakes) and much bolder at this size.
+  const px = w * 0.5, py = h * 0.5, prx = w * 0.108, pry = h * 0.41
+  s += `<rect x="${fx(px - prx - 2)}" y="${fx(py - pry - 2)}" width="${fx(prx * 2 + 4)}" height="${fx(pry * 2 + 4)}" rx="${fx(prx * 0.34)}" fill="${WOOD_EDGE}" opacity="0.55"/>` // plate shadow
+  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 2)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.3)}" fill="${GOLD}" stroke="${WOOD_EDGE}" stroke-width="2.4" stroke-opacity="0.8"/>`
+  s += `<rect x="${fx(px - prx)}" y="${fx(py - pry)}" width="${fx(prx * 0.42)}" height="${fx(pry * 2)}" rx="${fx(prx * 0.3)}" fill="${GOLD_LIT}" opacity="0.6"/>`
+  for (const [dx, dy] of [[-prx * 0.66, -pry * 0.82], [prx * 0.66, -pry * 0.82], [-prx * 0.66, pry * 0.82], [prx * 0.66, pry * 0.82]])
+    s += `<circle cx="${fx(px + dx)}" cy="${fx(py + dy)}" r="2.4" fill="${GOLD_DIM}" stroke="${INK}" stroke-width="0.8" stroke-opacity="0.5"/>` // plate screws
+  {
+    const ch = pry * 1.32 // cap height (~19 screen px on the shipped quad)
+    const cw = ch * 0.6
+    s += engraveWord(String(plate), px - cw / 2, py - ch / 2, cw, ch, 0, WOOD_EDGE, Math.max(4, ch * 0.15))
+  }
   // door 3's tag carries the tiny PAW PRINT — the cat, foreshadowed
   if (plate === 3) {
-    const pawX = px + prx * 0.62, pawY = py + pry * 0.52, P = pry * 0.16
-    s += `<ellipse cx="${fx(pawX)}" cy="${fx(pawY + P * 0.5)}" rx="${fx(P * 0.62)}" ry="${fx(P * 0.5)}" fill="${WOOD_EDGE}" opacity="0.8"/>`
+    const pawX = px + prx * 1.65, pawY = py + pry * 0.26, P = pry * 0.3
+    s += `<ellipse cx="${fx(pawX)}" cy="${fx(pawY + P * 0.5)}" rx="${fx(P * 0.62)}" ry="${fx(P * 0.5)}" fill="${WOOD_EDGE}" opacity="0.85"/>`
     for (const [tx, ty] of [[-P * 0.62, -P * 0.28], [-P * 0.21, -P * 0.52], [P * 0.21, -P * 0.52], [P * 0.62, -P * 0.28]])
-      s += `<circle cx="${fx(pawX + tx)}" cy="${fx(pawY + ty)}" r="${fx(P * 0.21)}" fill="${WOOD_EDGE}" opacity="0.8"/>`
+      s += `<circle cx="${fx(pawX + tx)}" cy="${fx(pawY + ty)}" r="${fx(P * 0.21)}" fill="${WOOD_EDGE}" opacity="0.85"/>`
   }
   // iron ring handle at the RIGHT (fore/lift) edge
-  const rcx = w * 0.85, rcy = h * 0.5, rrad = h * 0.2
+  const rcx = w * 0.86, rcy = h * 0.5, rrad = h * 0.3
   s += `<circle cx="${fx(rcx)}" cy="${fx(rcy)}" r="${fx(rrad)}" fill="none" stroke="${IRON}" stroke-width="${fx(h * 0.06)}"/>`
   s += `<circle cx="${fx(rcx)}" cy="${fx(rcy)}" r="${fx(rrad)}" fill="none" stroke="${IRON_LIT}" stroke-width="1.4" opacity="0.7"/>`
   s += `<circle cx="${fx(rcx + rrad)}" cy="${fx(rcy)}" r="${fx(h * 0.05)}" fill="${IRON}"/>` // mount boss (toward the fore edge)
@@ -8179,7 +8290,20 @@ function innRowStage(w, h, seed) {
   s += win(w * 0.06, h * 0.52, WW, WH) + win(w * 0.135, h * 0.52, WW, WH)
   s += win(w * 0.24, h * 0.5, WW, WH) + win(w * 0.315, h * 0.5, WW, WH)
   s += win(w * 0.845, h * 0.52, WW, WH) + win(w * 0.92, h * 0.52, WW, WH)
-  // hall: gable lights + a pair flanking the door
+  // hall: gable lights + a pair flanking the door.
+  // POLISH BACKLOG "hall gable lights +13 vs wings +34": the two gable lights
+  // sit on the hall face, which is deliberately a half value step LIGHTER than
+  // the wings (stoneDim 140 vs stoneDusk 112) for hierarchy — so the same pane
+  // burned half as hard there, and the ruled item was left unfixed at close-out
+  // under token discipline. Fixed the way a real gable does it rather than by
+  // touching the ladder: a gable stands in its own roof's shade, so each light
+  // now gets a walnut shadow field under the pitch it sits in (dropping its
+  // local ground to ~104, BELOW the wings') and a wider halo over it. The hall
+  // face keeps its hierarchy everywhere else.
+  for (const [gx, gy] of [[gA, h * 0.36], [gB, h * 0.31]]) {
+    s += `<ellipse cx="${fx(gx)}" cy="${fx(gy + WH * 0.5)}" rx="${fx(WW * 1.9)}" ry="${fx(WH * 1.5)}" fill="${INK}" opacity="0.34"/>`
+    s += `<ellipse cx="${fx(gx)}" cy="${fx(gy + WH * 0.5)}" rx="${fx(WW * 3.4)}" ry="${fx(WH * 2.6)}" fill="url(#s2winGlow)"/>`
+  }
   s += win(gA - WW / 2, h * 0.36, WW, WH, true)
   s += win(gB - WW / 2, h * 0.31, WW, WH, true)
   s += win(CX - w * 0.075, h * 0.56, WW, WH) + win(CX + w * 0.075 - WW, h * 0.56, WW, WH)
@@ -8309,24 +8433,89 @@ function gateOpen(w, h, seed) {
       s += `<line x1="${fx(jx)}" y1="${fx(cy)}" x2="${fx(jx)}" y2="${fx(cy - (h - swagY) / 5)}" stroke="${INK}" stroke-width="1.2" opacity="0.2"/>`
     }
   }
-  // GATE LEAVES: low planked timber swung open to the outer edges (top edges
-  // track the outline cut so no bare stone shows above the wood)
-  const leaf = (x0, x1, topAtEdge, topAtHinge) => {
-    let out = `<path d="M ${fx(x0)} ${fx(h)} L ${fx(x0)} ${fx(topAtEdge)} L ${fx(x1)} ${fx(topAtHinge)} L ${fx(x1)} ${fx(h)} Z" fill="${WOOD_LIT}"/>`
-    const planks = 5
-    for (let p = 1; p < planks; p++) {
-      const px2 = lerp(x0, x1, p / planks)
-      const py2 = lerp(topAtEdge, topAtHinge, p / planks)
-      out += `<line x1="${fx(px2)}" y1="${fx(py2 + 3)}" x2="${fx(px2)}" y2="${fx(h)}" stroke="${WOOD_DK}" stroke-width="3" opacity="0.85"/>`
+  // GATE LEAVES: the two swung-open timber gates (top edges track the outline
+  // cut so no bare stone shows above the wood).
+  //
+  // S2-6(a). The blind reader could not name these at all — "Two tan lattice/
+  // grid panels... Gates? scaffolding? shutters? open casements? They are big
+  // (~120x60px each) and I never worked out what they are". The old paint was a
+  // flat WOOD_LIT rectangle ruled by four plank lines, two horizontal iron
+  // bands and one diagonal — at ~100x60 screen px that IS a grid, and a grid of
+  // pale tan on pale tan stone reads as scaffolding. Repainted with the four
+  // things that say GATE and nothing else:
+  //   1. it is HINGED — two heavy iron strap hinges reaching out of the post
+  //      side, on visible pintles, plus the dark gap the swung leaf leaves
+  //      behind it (a shutter is flush; an open gate stands off its post);
+  //   2. it is BRACED — one bold Z (rail-rail-diagonal), the universal gate
+  //      diagram, at gate scale rather than as hairlines;
+  //   3. it is CRESTED — a shallow arc top with spear finials answering the
+  //      stone caps, so the silhouette differs from a panel;
+  //   4. it is HANDLED — a big iron drop-ring at the free (outer) edge.
+  // The timber also drops from WOOD_LIT to WOOD so it separates from the
+  // stoneDusk posts by value, not only by hue (86 vs 122 luminance).
+  const leaf = (x0, x1, topAtEdge, topAtHinge, hingeAtRight) => {
+    const span = x1 - x0
+    const hx = hingeAtRight ? x1 : x0 // the post edge
+    const fxEdge = hingeAtRight ? x0 : x1 // the free (swung-out) edge
+    const yAt = (x) => lerp(topAtEdge, topAtHinge, (x - x0) / span)
+    // the shadow the standing leaf throws back onto the stone behind it
+    let out = `<path d="M ${fx(hx)} ${fx(h)} L ${fx(hx)} ${fx(yAt(hx))} L ${fx(lerp(hx, fxEdge, 0.18))} ${fx(yAt(lerp(hx, fxEdge, 0.18)))} L ${fx(lerp(hx, fxEdge, 0.18))} ${fx(h)} Z" fill="${INK}" opacity="0.42"/>`
+    // The leaf body runs flush to the die's own cut edge — the crown ornament
+    // is PAINTED under it rather than cut through it, because raising this
+    // silhouette would eat the inn row's wing windows standing behind the gate.
+    const body = `M ${fx(x0)} ${fx(h)} L ${fx(x0)} ${fx(topAtEdge)} L ${fx(x1)} ${fx(topAtHinge)} L ${fx(x1)} ${fx(h)} Z`
+    out += `<path d="${body}" fill="${WOOD}"/>`
+    out += `<path d="${body}" fill="${INK}" opacity="0.18"/>` // the leaf faces away from the door lamps
+    // TWO plank seams only (four read as a mesh at 100px), each a dark groove
+    // with a lit arris so the boards have thickness
+    for (const t of [0.36, 0.68]) {
+      const px2 = lerp(x0, x1, t)
+      out += `<line x1="${fx(px2)}" y1="${fx(yAt(px2))}" x2="${fx(px2)}" y2="${fx(h)}" stroke="${WOOD_EDGE}" stroke-width="4.4" opacity="0.9"/>`
+      out += `<line x1="${fx(px2 + 3)}" y1="${fx(yAt(px2))}" x2="${fx(px2 + 3)}" y2="${fx(h)}" stroke="${WOOD_LIT}" stroke-width="1.8" opacity="0.4"/>`
     }
-    out += `<path d="M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.26))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.26))} M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.7))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.7))}" stroke="${IRON}" stroke-width="5"/>`
-    out += `<path d="M ${fx(x0)} ${fx(lerp(topAtEdge, h, 0.26))} L ${fx(x1)} ${fx(lerp(topAtHinge, h, 0.7))}" stroke="${IRON}" stroke-width="3.4" opacity="0.8"/>` // diagonal brace
-    for (const t of [0.26, 0.7])
-      out += `<circle cx="${fx(lerp(x0, x1, 0.5))}" cy="${fx(lerp(lerp(topAtEdge, h, t), lerp(topAtHinge, h, t), 0.5))}" r="2.4" fill="${IRON_LIT}"/>`
+    // THE Z-BRACE: top rail, bottom rail, one diagonal running down FROM the
+    // hinge (the way a real gate is braced, and the way the eye reads "gate")
+    const railTop = (x) => lerp(yAt(x), h, 0.2)
+    const railBot = (x) => lerp(yAt(x), h, 0.76)
+    out += `<path d="M ${fx(x0)} ${fx(railTop(x0))} L ${fx(x1)} ${fx(railTop(x1))}" stroke="${IRON}" stroke-width="${fx(h * 0.028)}" stroke-linecap="butt"/>`
+    out += `<path d="M ${fx(x0)} ${fx(railBot(x0))} L ${fx(x1)} ${fx(railBot(x1))}" stroke="${IRON}" stroke-width="${fx(h * 0.028)}" stroke-linecap="butt"/>`
+    out += `<path d="M ${fx(hx)} ${fx(railBot(hx))} L ${fx(fxEdge)} ${fx(railTop(fxEdge))}" stroke="${IRON}" stroke-width="${fx(h * 0.022)}"/>`
+    out += `<path d="M ${fx(x0)} ${fx(railTop(x0) - h * 0.006)} L ${fx(x1)} ${fx(railTop(x1) - h * 0.006)}" stroke="${IRON_LIT}" stroke-width="1.8" opacity="0.55"/>`
+    // clench bolts along the rails
+    for (const t of [0.18, 0.52, 0.86]) {
+      const bx = lerp(x0, x1, t)
+      out += `<circle cx="${fx(bx)}" cy="${fx(railTop(bx))}" r="3" fill="${IRON_LIT}"/>`
+      out += `<circle cx="${fx(bx)}" cy="${fx(railBot(bx))}" r="3" fill="${IRON_LIT}"/>`
+    }
+    // SPEAR HEADS standing on the top rail — the gate's crown, painted in the
+    // band between the cut edge and the rail so it never touches the die line.
+    for (let k = 0; k < 5; k++) {
+      const t = 0.12 + k * 0.19
+      const sx = lerp(x0, x1, t)
+      const base = railTop(sx) - h * 0.006
+      const tip = yAt(sx) + h * 0.008
+      out += `<path d="M ${fx(sx - w * 0.009)} ${fx(base)} L ${fx(sx)} ${fx(tip)} L ${fx(sx + w * 0.009)} ${fx(base)} Z" fill="${IRON}"/>`
+      out += `<path d="M ${fx(sx - w * 0.003)} ${fx(base)} L ${fx(sx)} ${fx(tip)} L ${fx(sx + w * 0.001)} ${fx(base)} Z" fill="${IRON_LIT}" opacity="0.6"/>`
+      out += `<circle cx="${fx(sx)}" cy="${fx(base)}" r="2.8" fill="${GOLD_DIM}"/>`
+    }
+    // STRAP HINGES on the post side — the L that says "this thing swings"
+    for (const t of [0.3, 0.74]) {
+      const hy = lerp(yAt(hx), h, t)
+      const reach = span * 0.46 * (hingeAtRight ? -1 : 1)
+      out += `<path d="M ${fx(hx)} ${fx(hy)} L ${fx(hx + reach)} ${fx(hy)}" stroke="${IRON}" stroke-width="${fx(h * 0.026)}" stroke-linecap="round"/>`
+      out += `<path d="M ${fx(hx + reach * 0.82)} ${fx(hy - h * 0.016)} L ${fx(hx + reach)} ${fx(hy)} L ${fx(hx + reach * 0.82)} ${fx(hy + h * 0.016)}" fill="none" stroke="${IRON}" stroke-width="3"/>` // strap tip
+      out += `<circle cx="${fx(hx)}" cy="${fx(hy)}" r="${fx(h * 0.019)}" fill="${IRON}" stroke="${IRON_LIT}" stroke-width="1.6"/>` // pintle knuckle
+    }
+    // the DROP-RING handle at the free edge
+    const rx2 = lerp(fxEdge, hx, 0.13)
+    const ry2 = lerp(yAt(rx2), h, 0.48)
+    out += `<circle cx="${fx(rx2)}" cy="${fx(ry2)}" r="${fx(h * 0.032)}" fill="none" stroke="${IRON}" stroke-width="${fx(h * 0.014)}"/>`
+    out += `<circle cx="${fx(rx2)}" cy="${fx(ry2)}" r="${fx(h * 0.032)}" fill="none" stroke="${IRON_LIT}" stroke-width="1.4" opacity="0.7"/>`
+    out += `<circle cx="${fx(rx2)}" cy="${fx(ry2 - h * 0.036)}" r="${fx(h * 0.011)}" fill="${IRON}"/>` // ring boss
     return out
   }
-  s += leaf(0, pL - PW, h * 0.545, h * 0.505)
-  s += leaf(pR + PW, w, h * 0.505, h * 0.545) // mirrored: hinge at the post side
+  s += leaf(0, pL - PW, h * 0.545, h * 0.505, true)
+  s += leaf(pR + PW, w, h * 0.505, h * 0.545, false) // mirrored: hinge at the post side
   // ground cobble hints
   for (let i = 0; i < 14; i++) {
     const gx = rr(r, 0, w)
@@ -8399,10 +8588,19 @@ function welcomeRank(w, h, seed) {
     `L ${fx(F.dog.x + F.dog.hw * 1.5)} ${fx(G - h * 0.26)} L ${fx(F.dog.x + F.dog.hw * 1.7)} ${fx(G - h * 0.33)} ` + // tail up
     `L ${fx(F.dog.x + F.dog.hw * 2)} ${fx(G - h * 0.27)} L ${fx(F.dog.x + F.dog.hw * 1.8)} ${fx(G - h * 0.1)} ` +
     `L ${fx(w * 0.97)} ${fx(G - h * 0.03)} L ${fx(w)} ${fx(G - h * 0.01)} L ${fx(w)} ${fx(h)} Z`
+  // S2-6(c) — "a red spiky two-pointed shape behind the figure group", which
+  // the blind reader could not resolve at all. It was the DIE ITSELF showing
+  // through: the outline is flood-filled with INN.roofDim (the innkeeper's
+  // brick coat — correct under his raised sleeve, which IS a cut wedge) and
+  // every OTHER cut appendage was then never painted over. The dog's pricked
+  // ears and raised tail and the child's waving hand therefore stood behind
+  // the family as brick-red spikes, in a colour that belongs to a garment two
+  // figures away. Each is painted in its own creature's colour below; the
+  // flood fill stays, because it is load-bearing for the keeper's arm.
   let s = `<g><path d="${outline}" fill="${INN.roofDim}"/>`
   s += `<g clip-path="url(#s2rankCut)">`
   // lantern glow FIRST — the family is lit from the keeper's raised lamp
-  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY)}" r="${fx(w * 0.17)}" fill="url(#s2winGlow3)"/>`
+  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY)}" r="${fx(w * 0.26)}" fill="url(#s2winGlow3)"/>`
   // NIGHT COBBLE ground strip (the courtyard, not grass)
   s += `<rect x="0" y="${fx(G - h * 0.04)}" width="${w}" height="${fx(h * 0.18)}" fill="${INN.stoneNight}"/>`
   for (let i = 0; i < 20; i++) {
@@ -8425,18 +8623,41 @@ function welcomeRank(w, h, seed) {
   s += `<path d="M ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.06)} A ${fx(K.hw * 0.62)} ${fx(K.hw * 0.62)} 0 0 1 ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.06)} L ${fx(K.x + K.hw * 0.58)} ${fx(K.top + h * 0.02)} L ${fx(K.x - K.hw * 0.58)} ${fx(K.top + h * 0.02)} Z" fill="${LEATHER}"/>` // cap
   s += `<circle cx="${fx(K.x - K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/><circle cx="${fx(K.x + K.hw * 0.18)}" cy="${fx(K.top + h * 0.08)}" r="1.6" fill="${INK}"/>`
   s += `<path d="M ${fx(K.x - K.hw * 0.16)} ${fx(K.top + h * 0.15)} Q ${fx(K.x)} ${fx(K.top + h * 0.19)} ${fx(K.x + K.hw * 0.16)} ${fx(K.top + h * 0.15)}" stroke="${INK}" stroke-width="1.6" fill="none"/>` // smile
-  // the raised arm + THE LANTERN (burning)
+  // the raised arm + THE LANTERN (burning). POLISH BACKLOG "keeper's lantern
+  // unlit": the E3 close-out measured the gate lanterns at +65 and the rank at
+  // +51 over their grounds while THIS lamp — the one the whole family is
+  // supposed to be lit by — measured as an outlier. Its pane was paneHot with
+  // no hotter core and a halo only 0.17w across, so it lost to its own iron
+  // cage. Now: a white burning core inside the pane, a doubled halo, and four
+  // short rays, so the lamp is the brightest thing on the die by construction.
   s += `<path d="M ${fx(K.x - K.hw * 0.7)} ${fx(K.top + h * 0.34)} L ${fx(lantX + w * 0.02)} ${fx(lantY + h * 0.09)}" stroke="${INN.roofDim}" stroke-width="9" stroke-linecap="round"/>`
+  s += `<circle cx="${fx(lantX)}" cy="${fx(lantY - h * 0.015)}" r="${fx(w * 0.055)}" fill="${INN.lamp}" opacity="0.55"/>`
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2 + 0.4
+    s += `<line x1="${fx(lantX + Math.cos(a) * w * 0.03)}" y1="${fx(lantY - h * 0.015 + Math.sin(a) * h * 0.05)}" x2="${fx(lantX + Math.cos(a) * w * 0.075)}" y2="${fx(lantY - h * 0.015 + Math.sin(a) * h * 0.125)}" stroke="${INN.lamp}" stroke-width="2.6" opacity="0.5" stroke-linecap="round"/>`
+  }
   s += `<rect x="${fx(lantX - w * 0.017)}" y="${fx(lantY - h * 0.08)}" width="${fx(w * 0.034)}" height="${fx(h * 0.13)}" fill="${INN.paneHot}" stroke="${IRON}" stroke-width="2.6"/>`
-  s += `<line x1="${fx(lantX)}" y1="${fx(lantY - h * 0.08)}" x2="${fx(lantX)}" y2="${fx(lantY + h * 0.05)}" stroke="${IRON}" stroke-width="1.4" opacity="0.7"/>`
+  s += `<ellipse cx="${fx(lantX)}" cy="${fx(lantY - h * 0.012)}" rx="${fx(w * 0.011)}" ry="${fx(h * 0.042)}" fill="#fffaea"/>` // the flame core — the die's brightest pixel
+  s += `<line x1="${fx(lantX)}" y1="${fx(lantY - h * 0.08)}" x2="${fx(lantX)}" y2="${fx(lantY + h * 0.05)}" stroke="${IRON}" stroke-width="1.4" opacity="0.5"/>`
   s += `<path d="M ${fx(lantX - w * 0.017)} ${fx(lantY - h * 0.08)} L ${fx(lantX)} ${fx(lantY - h * 0.1)} L ${fx(lantX + w * 0.017)} ${fx(lantY - h * 0.08)} Z" fill="${IRON}"/>`
   // THE LINKED ARMS painted over the bridges: keeper's sleeve meets the
   // spouse's, hands joined at the middle of each bridge
+  // POLISH BACKLOG "rank link-blocks": the joining material between two figures
+  // is a flat-topped band ~0.055h deep, and the old armBand drew a 7.4px sleeve
+  // stroke down the middle of it — so the top third of every bridge stayed raw
+  // brick die-fill and the family read as figures wired together with red bars.
+  // The band is now FILLED edge to edge by the two sleeves (each a wedge that
+  // thickens toward its own shoulder and meets its partner at the joined
+  // hands), so the paper's link IS the sleeve rather than sitting inside it.
   const armBand = (x0, x1, yTop, c0, c1) => {
     const mid = (x0 + x1) / 2
-    let out = `<path d="M ${fx(x0)} ${fx(yTop + h * 0.005)} L ${fx(mid)} ${fx(yTop + h * 0.03)}" stroke="${c0}" stroke-width="7.4" stroke-linecap="round" fill="none"/>`
-    out += `<path d="M ${fx(x1)} ${fx(yTop + h * 0.005)} L ${fx(mid)} ${fx(yTop + h * 0.03)}" stroke="${c1}" stroke-width="7.4" stroke-linecap="round" fill="none"/>`
-    out += `<circle cx="${fx(mid)}" cy="${fx(yTop + h * 0.03)}" r="4.2" fill="#e8c49a" stroke="${INK}" stroke-width="1"/>` // the held hands
+    const yb = yTop + h * 0.058 // the underside of the bridge (the valley lip)
+    const yh = yTop + h * 0.028 // the wrists, mid-band
+    let out = `<path d="M ${fx(x0)} ${fx(yTop - h * 0.004)} L ${fx(mid)} ${fx(yh - h * 0.014)} L ${fx(mid)} ${fx(yh + h * 0.014)} L ${fx(x0)} ${fx(yb)} Z" fill="${c0}"/>`
+    out += `<path d="M ${fx(x1)} ${fx(yTop - h * 0.004)} L ${fx(mid)} ${fx(yh - h * 0.014)} L ${fx(mid)} ${fx(yh + h * 0.014)} L ${fx(x1)} ${fx(yb)} Z" fill="${c1}"/>`
+    out += `<path d="M ${fx(x0)} ${fx(yTop - h * 0.002)} L ${fx(mid)} ${fx(yh - h * 0.012)}" stroke="${INN.lamp}" stroke-width="1.8" opacity="0.45" fill="none"/>` // lamp rim along the top of both sleeves
+    out += `<path d="M ${fx(x1)} ${fx(yTop - h * 0.002)} L ${fx(mid)} ${fx(yh - h * 0.012)}" stroke="${INN.lamp}" stroke-width="1.8" opacity="0.28" fill="none"/>`
+    out += `<circle cx="${fx(mid)}" cy="${fx(yh)}" r="5.2" fill="#e8c49a" stroke="${INK}" stroke-width="1.2"/>` // the held hands
     return out
   }
   s += armBand(F.keeper.x + F.keeper.hw * 0.6, F.spouse.x - F.spouse.hw * 0.6, B_KS, INN.roofDim, INN.green)
@@ -8479,6 +8700,19 @@ function welcomeRank(w, h, seed) {
   s += `<circle cx="${fx(D.x + D.hw * 0.12)}" cy="${fx(D.top + h * 0.31)}" r="3" fill="${GOLD}"/>` // tag
   // white chest patch for value against the dusk
   s += `<path d="M ${fx(D.x - D.hw * 0.28)} ${fx(D.top + h * 0.22)} Q ${fx(D.x - D.hw * 0.1)} ${fx(G - h * 0.06)} ${fx(D.x + D.hw * 0.14)} ${fx(D.top + h * 0.24)} Z" fill="${INN.snow}" opacity="0.5"/>`
+  // THE TWO SPIKES THE READER COULD NOT NAME (S2-6c). Both are cut appendages
+  // that the old paint never reached, so both showed raw brick die-fill:
+  // (1) the pricked EAR standing off the skull, and (2) the raised TAIL. Each
+  // is filled in fur with an inner ear / a lit plume edge so it reads as dog.
+  s += `<path d="M ${fx(D.x - D.hw * 0.62)} ${fx(D.top + h * 0.07)} L ${fx(D.x - D.hw * 0.2)} ${fx(D.top - h * 0.092)} L ${fx(D.x + D.hw * 0.42)} ${fx(D.top + h * 0.005)} L ${fx(D.x + D.hw * 0.2)} ${fx(D.top + h * 0.09)} Z" fill="#7a4e30"/>` // ear
+  s += `<path d="M ${fx(D.x - D.hw * 0.42)} ${fx(D.top + h * 0.05)} L ${fx(D.x - D.hw * 0.21)} ${fx(D.top - h * 0.07)} L ${fx(D.x + D.hw * 0.16)} ${fx(D.top + h * 0.01)} Z" fill="#a06c48" opacity="0.85"/>` // inner ear
+  s += `<path d="M ${fx(D.x + D.hw * 0.95)} ${fx(D.top + h * 0.15)} L ${fx(D.x + D.hw * 1.5)} ${fx(G - h * 0.262)} L ${fx(D.x + D.hw * 1.7)} ${fx(G - h * 0.332)} L ${fx(D.x + D.hw * 2.02)} ${fx(G - h * 0.268)} L ${fx(D.x + D.hw * 1.82)} ${fx(G - h * 0.098)} L ${fx(D.x + D.hw * 1.05)} ${fx(G - h * 0.06)} Z" fill="#7a4e30"/>` // tail
+  s += `<path d="M ${fx(D.x + D.hw * 1.24)} ${fx(D.top + h * 0.2)} Q ${fx(D.x + D.hw * 1.74)} ${fx(G - h * 0.3)} ${fx(D.x + D.hw * 1.9)} ${fx(G - h * 0.13)}" fill="none" stroke="#c99e78" stroke-width="4.4" opacity="0.7"/>` // lit plume edge
+  // and the CHILD's waving hand, the third bare spike (the cut goes higher
+  // than the painted sleeve ever did)
+  s += `<path d="M ${fx(C2.x - C2.hw * 0.32)} ${fx(C2.top - h * 0.115)} L ${fx(C2.x + C2.hw * 0.3)} ${fx(C2.top - h * 0.168)} L ${fx(C2.x + C2.hw * 0.17)} ${fx(C2.top + h * 0.012)} L ${fx(C2.x - C2.hw * 0.28)} ${fx(C2.top - h * 0.02)} Z" fill="#e8c49a" stroke="${INK}" stroke-width="1" stroke-opacity="0.5"/>` // open palm
+  for (const fk of [-0.18, 0.02, 0.2])
+    s += `<line x1="${fx(C2.x + C2.hw * (0.05 + fk))}" y1="${fx(C2.top - h * 0.13)}" x2="${fx(C2.x + C2.hw * (0.12 + fk))}" y2="${fx(C2.top - h * 0.158)}" stroke="${INK}" stroke-width="1.2" opacity="0.45"/>` // fingers
   // lamplight rim on every figure's lantern side
   s += `<path d="M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.24)} L ${fx(K.x - K.hw)} ${fx(G)} M ${fx(S2.x - S2.hw * 0.8)} ${fx(S2.top + h * 0.24)} L ${fx(S2.x - S2.hw)} ${fx(G)} M ${fx(C2.x - C2.hw * 0.85)} ${fx(C2.top + h * 0.14)} L ${fx(C2.x - C2.hw * 0.9)} ${fx(G)} M ${fx(D.x - D.hw)} ${fx(G - h * 0.02)} L ${fx(D.x - D.hw * 0.7)} ${fx(D.top + h * 0.12)}" stroke="${INN.lamp}" stroke-width="2.6" opacity="0.7" fill="none"/>`
   s += `</g>`
@@ -8620,6 +8854,7 @@ function brassKeyStandee(w, h, seed) {
 // and-geese frieze band along the base. ----
 function friezeKeys(w, h, seed) {
   const r = mulberry32(seed)
+  void r // the villager parade that used the stream is retired (S2-6d, below)
   const wallTop = h * 0.52
   const N = 11
   // build the crest: wall coping with N key balusters standing out of it
@@ -8652,28 +8887,52 @@ function friezeKeys(w, h, seed) {
   // coping + coursing
   s += `<rect x="0" y="${fx(wallTop)}" width="${w}" height="${fx(h * 0.06)}" fill="${INN.stoneLit}"/>`
   s += `<line x1="0" y1="${fx(wallTop + h * 0.06)}" x2="${w}" y2="${fx(wallTop + h * 0.06)}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
-  for (let i = 0; i < 40; i++) {
-    const jx = (w * (i + (i % 2 ? 0.25 : 0.75))) / 40
-    s += `<line x1="${fx(jx)}" y1="${fx(wallTop + h * 0.06 + (i % 3) * h * 0.1)}" x2="${fx(jx)}" y2="${fx(wallTop + h * 0.06 + (i % 3) * h * 0.1 + h * 0.1)}" stroke="${INK}" stroke-width="1.2" opacity="0.22"/>`
+  // S2-6(d) — the counter glyph strip. The blind reader named this the worst
+  // offender on the spread: "a repeating line of tiny dark glyphs, alternating
+  // a chess-pawn shape and a circle-with-a-curved-tail... at 1:1 they are 8px
+  // tall... it spans the full width of the spread and reads as texture noise."
+  // They were nine walking villagers and three geese, plus forty masonry
+  // joints. DERIVED, not eyeballed: this wall is 0.2 world tall and its face
+  // below the coping is 0.48 of the art height = 0.096 world; the piece's
+  // measured screen scale (blind report: the 0.028-world frieze band read 8px)
+  // puts the ENTIRE face at ~27 screen px. No figure can live in 27px. So the
+  // parade is retired and the face carries only marks that survive it: three
+  // deep ashlar courses instead of forty hairline joints, and five big carved
+  // KEY ROUNDELS at 0.62 of the face height (~17 screen px across) with a
+  // hanging lamp between each pair. Six large marks, not forty-eight small.
+  const faceY0 = wallTop + h * 0.06
+  const faceH = h - faceY0
+  for (const t of [0.36, 0.72]) {
+    const cy = faceY0 + faceH * t
+    s += `<line x1="0" y1="${fx(cy)}" x2="${w}" y2="${fx(cy)}" stroke="${INK}" stroke-width="2.6" opacity="0.34"/>`
+    s += `<line x1="0" y1="${fx(cy + 2.6)}" x2="${w}" y2="${fx(cy + 2.6)}" stroke="${INN.stoneLit}" stroke-width="1.6" opacity="0.4"/>`
   }
-  s += `<line x1="0" y1="${fx(h * 0.72)}" x2="${w}" y2="${fx(h * 0.72)}" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
-  s += `<line x1="0" y1="${fx(h * 0.86)}" x2="${w}" y2="${fx(h * 0.86)}" stroke="${INK}" stroke-width="1.4" opacity="0.3"/>`
-  // THE PAINTED FRIEZE BAND: little villagers walking to the inn + geese
-  const bandY = h * 0.79
-  for (let i = 0; i < 9; i++) {
-    const vx = w * (0.06 + i * 0.11) + rr(r, -w * 0.012, w * 0.012)
-    const vh = h * 0.14
-    if (i % 3 === 2) {
-      // a goose: teardrop body + neck
-      s += `<ellipse cx="${fx(vx)}" cy="${fx(bandY + vh * 0.32)}" rx="${fx(vh * 0.42)}" ry="${fx(vh * 0.26)}" fill="${INK}" opacity="0.75"/>`
-      s += `<path d="M ${fx(vx + vh * 0.3)} ${fx(bandY + vh * 0.24)} Q ${fx(vx + vh * 0.52)} ${fx(bandY - vh * 0.16)} ${fx(vx + vh * 0.62)} ${fx(bandY - vh * 0.05)}" stroke="${INK}" stroke-width="2.4" fill="none" opacity="0.75"/>`
-      s += `<circle cx="${fx(vx + vh * 0.62)}" cy="${fx(bandY - vh * 0.06)}" r="1.8" fill="${INK}" opacity="0.75"/>`
-    } else {
-      // a walking villager: cloak triangle + head + bundle/lantern
-      s += `<path d="M ${fx(vx - vh * 0.24)} ${fx(bandY + vh * 0.5)} L ${fx(vx)} ${fx(bandY - vh * 0.22)} L ${fx(vx + vh * 0.24)} ${fx(bandY + vh * 0.5)} Z" fill="${INK}" opacity="0.75"/>`
-      s += `<circle cx="${fx(vx)}" cy="${fx(bandY - vh * 0.32)}" r="${fx(vh * 0.14)}" fill="${INK}" opacity="0.75"/>`
-      if (i % 3 === 0) s += `<circle cx="${fx(vx + vh * 0.32)}" cy="${fx(bandY + vh * 0.06)}" r="${fx(vh * 0.09)}" fill="${GOLD}" opacity="0.9"/>` // a lantern
+  // wide perpends: one every ~w/9, staggered course to course, heavy enough to
+  // survive the downscale (the old 1.2px/0.22-opacity joints could not)
+  for (let c = 0; c < 3; c++) {
+    const yA = faceY0 + faceH * [0, 0.36, 0.72][c]
+    const yB = faceY0 + faceH * [0.36, 0.72, 1][c]
+    for (let i = 0; i < 9; i++) {
+      const jx = (w * (i + (c % 2 ? 0.5 : 0))) / 9
+      if (jx <= 0 || jx >= w) continue
+      s += `<line x1="${fx(jx)}" y1="${fx(yA)}" x2="${fx(jx)}" y2="${fx(yB)}" stroke="${INK}" stroke-width="2.2" opacity="0.3"/>`
     }
+  }
+  // FIVE CARVED KEY ROUNDELS + four hanging lamps between them
+  const medY = faceY0 + faceH * 0.5
+  const medR = faceH * 0.31
+  for (let i = 0; i < 5; i++) {
+    const cx = (w * (i + 0.5)) / 5
+    s += `<circle cx="${fx(cx)}" cy="${fx(medY + 3)}" r="${fx(medR)}" fill="${INK}" opacity="0.28"/>` // carved recess shadow
+    s += `<circle cx="${fx(cx)}" cy="${fx(medY)}" r="${fx(medR)}" fill="${INN.stoneDusk}" stroke="${INN.stoneLit}" stroke-width="3.4"/>`
+    s += `<g transform="translate(${fx(cx)} ${fx(medY)}) rotate(38)">${keyGlyph(medR * 1.5)}</g>`
+  }
+  for (let i = 0; i < 4; i++) {
+    const lx = (w * (i + 1)) / 5
+    s += `<circle cx="${fx(lx)}" cy="${fx(medY + faceH * 0.06)}" r="${fx(faceH * 0.3)}" fill="${INN.lamp}" opacity="0.16"/>`
+    s += `<line x1="${fx(lx)}" y1="${fx(faceY0 + faceH * 0.06)}" x2="${fx(lx)}" y2="${fx(medY - faceH * 0.06)}" stroke="${INK}" stroke-width="3"/>` // bracket
+    s += `<path d="M ${fx(lx - faceH * 0.11)} ${fx(medY + faceH * 0.14)} L ${fx(lx - faceH * 0.08)} ${fx(medY - faceH * 0.06)} L ${fx(lx + faceH * 0.08)} ${fx(medY - faceH * 0.06)} L ${fx(lx + faceH * 0.11)} ${fx(medY + faceH * 0.14)} Z" fill="${INN.paneHot}" stroke="${INK}" stroke-width="2.6"/>` // lamp
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(medY + faceH * 0.04)}" rx="${fx(faceH * 0.035)}" ry="${fx(faceH * 0.08)}" fill="#fffaea"/>`
   }
   s += `</g>`
   s += rimPath(d, 4)
@@ -8854,47 +9113,107 @@ function innCourtyardSpread(w, h, seed) {
   for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
     s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.8">${strewnKey(h * 0.026)}</g>`
 
-  // ---- THE LIFT RIBBON BANNER arcing over the key-board (celebrated, not
-  // apologetic): brick-red ribbon, parchment letters, gold tails.
-  const ribY = pageFY(-0.1)
-  const ribX0 = 0.655
-  const ribX1 = 0.795
-  const ribD = `M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.022))} Q ${fx(PX((ribX0 + ribX1) / 2))} ${fx(PY(ribY - 0.03))} ${fx(PX(ribX1))} ${fx(PY(ribY + 0.022))}`
-  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="${fx(h * 0.036)}" stroke-linecap="butt"/>`
-  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.5" transform="translate(0 ${fx(-h * 0.017)})"/>`
-  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.5" transform="translate(0 ${fx(h * 0.017)})"/>`
-  // ribbon tails
-  s += `<path d="M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.012))} l ${fx(-w * 0.017)} ${fx(h * 0.012)} l ${fx(w * 0.011)} ${fx(h * 0.011)} l ${fx(-w * 0.004)} ${fx(h * 0.012)} l ${fx(w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
-  s += `<path d="M ${fx(PX(ribX1))} ${fx(PY(ribY + 0.012))} l ${fx(w * 0.017)} ${fx(h * 0.012)} l ${fx(-w * 0.011)} ${fx(h * 0.011)} l ${fx(w * 0.004)} ${fx(h * 0.012)} l ${fx(-w * 0.014)} ${fx(-h * 0.012)} Z" fill="${INN.roofDim}"/>`
+  // ---- THE LIFT BANNER over the key-board.
+  //
+  // S2-1, second half. The blind reader: "the LIFT banner is dark red on brown
+  // and is physically overlapped by the board's own top-left corner so it reads
+  // as LIF + noise." Two separate defects, both fixed here.
+  //
+  // (1) COLLISION. The rescaled board now occupies image x 0.674..0.822 and y
+  // 0.44..0.88 (pageFX/pageFY of d 0.40..0.74, z -0.09..0.57), so the banner
+  // moves clear ABOVE it — its lowest ink sits at y 0.413, a clear 27px of
+  // image height above the board's top edge, and it now spans the board's full
+  // new width instead of starting inboard of it.
+  //
+  // (2) SIZE + CONTRAST. Derived: this print is 1024x683 over a 2.30 x 1.50
+  // world spread, so image-x runs ~1:1 to screen px while image-y renders at
+  // 0.54x (z is the foreshortened axis) — the old 0.026h caps were 17.8 art px
+  // = 9.5 SCREEN px, and squat with it. Caps go to 0.060h (41 art px = 22
+  // screen px) on a ribbon deep enough to hold them, and the value inverts:
+  // PARCHMENT ribbon with WALNUT letters, not walnut-red ribbon with parchment
+  // letters, because the ground it lies on is mid-value cobble.
+  //
+  // The word STAYS "LIFT" rather than being dropped now that click-nudge
+  // exists. The nudge cracks a leaf and says "this moves"; it does not say
+  // which way, and the gesture that gets the reveal is still a lift. The
+  // affordance system and the sign do different jobs.
+  const ribY = pageFY(-0.19)
+  const ribX0 = 0.664
+  const ribX1 = 0.832
+  const ribMid = (ribX0 + ribX1) / 2
+  const ribBand = h * 0.078
+  const ribD = `M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.02))} Q ${fx(PX(ribMid))} ${fx(PY(ribY - 0.034))} ${fx(PX(ribX1))} ${fx(PY(ribY + 0.02))}`
+  // ribbon tails (behind the band, brick red so the parchment reads as the sign)
+  s += `<path d="M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.006))} l ${fx(-w * 0.026)} ${fx(h * 0.018)} l ${fx(w * 0.016)} ${fx(h * 0.016)} l ${fx(-w * 0.006)} ${fx(h * 0.018)} l ${fx(w * 0.022)} ${fx(-h * 0.018)} Z" fill="${INN.roofDim}" stroke="${WALNUT}" stroke-width="2"/>`
+  s += `<path d="M ${fx(PX(ribX1))} ${fx(PY(ribY + 0.006))} l ${fx(w * 0.026)} ${fx(h * 0.018)} l ${fx(-w * 0.016)} ${fx(h * 0.016)} l ${fx(w * 0.006)} ${fx(h * 0.018)} l ${fx(-w * 0.022)} ${fx(-h * 0.018)} Z" fill="${INN.roofDim}" stroke="${WALNUT}" stroke-width="2"/>`
+  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="${fx(ribBand)}" opacity="0.3" transform="translate(3 ${fx(h * 0.008)})"/>` // cast shadow
+  s += `<path d="${ribD}" fill="none" stroke="${ROOK.parchLit}" stroke-width="${fx(ribBand)}" stroke-linecap="butt"/>`
+  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="4" transform="translate(0 ${fx(-ribBand / 2 + 3)})"/>` // brick-red edge banding
+  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="4" transform="translate(0 ${fx(ribBand / 2 - 3)})"/>`
   {
-    const cw3 = PX(0.011)
-    const gap3 = PX(0.0042)
-    const ch3 = PY(0.026)
+    const cw3 = PX(0.0132)
+    const gap3 = PX(0.0052)
+    const ch3 = PY(0.06)
     const total3 = 4 * cw3 + 3 * gap3
-    s += engraveWord('LIFT', PX((ribX0 + ribX1) / 2) - total3 / 2, PY(ribY - 0.006) - ch3 / 2, cw3, ch3, gap3, ROOK.parch, 3, 'opacity="0.96"')
+    s += engraveWord('LIFT', PX(ribMid) - total3 / 2, PY(ribY - 0.008) - ch3 / 2, cw3, ch3, gap3, WALNUT, 6.5, 'opacity="0.98"')
   }
 
-  // ---- THE WOODCUT MANICULE on the floor, aimed at door 1 (z ~0.04) — the
-  // house helper (nominally +x), MIRRORED to point spine-ward at the board.
-  s += `<g transform="translate(${fx(PX(0.858))} ${fx(PY(pageFY(0.055)))}) scale(-1 1)" opacity="0.92">${manicule(0, 0, w * 0.021, ROOK.parch, WALNUT)}</g>`
+  // ---- THE WOODCUT MANICULE on the floor, aimed at the board — the house
+  // helper (nominally +x), MIRRORED to point spine-ward at door 1.
+  //
+  // S2-6(e), second half: the reader logged "one white blade-with-a-handle on
+  // the right page" as an unidentifiable object. That was this hand — drawn in
+  // PARCHMENT on parchment-toned cobble at S = w*0.021 (21 art px), so the only
+  // thing that survived was its pale silhouette, which is a blade with a
+  // handle. A printer's manicule is BLACK INK on paper; it is now walnut-bodied
+  // with a parchment rim at S = w*0.036, and it sits on its own paper card so
+  // the fist has a light ground to read against.
+  {
+    const mx = PX(0.872), my = PY(pageFY(0.055)), MS = w * 0.036
+    s += `<rect x="${fx(mx - MS * 1.5)}" y="${fx(my - MS * 0.95)}" width="${fx(MS * 3)}" height="${fx(MS * 1.9)}" rx="${fx(MS * 0.2)}" fill="${ROOK.parchLit}" stroke="${WALNUT}" stroke-width="2.4" opacity="0.92" transform="rotate(-4 ${fx(mx)} ${fx(my)})"/>`
+    s += `<g transform="translate(${fx(mx)} ${fx(my)}) scale(-1 1)">${manicule(0, 0, MS, WALNUT, INK)}</g>`
+  }
 
-  // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate
+  // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate.
+  //
+  // S2-6(e). The blind reader logged these as "two white oval-with-a-handle
+  // objects lying on the left page — frying pans? a bread peel? a hand mirror?"
+  // and that is precisely what the old drawing was: a plain white ellipse plus
+  // a snow-white neck stroke 0.26 of the body deep, i.e. a pan and its handle.
+  // The head (r = 0.19B, ~3.5 screen px) was far too small to break the read.
+  // Rebuilt so the silhouette can only be a bird: a breast-forward body with a
+  // POINTED TAIL aft, a thin S-neck at 0.13B, a head three times the old area
+  // with a dark eye and a big orange bill, a grey folded wing dividing the
+  // body, orange legs standing on their own contact shadow.
   const geese = [
     [0.155, 0.8, 1],
-    [0.21, 0.84, 0.62],
-    [0.255, 0.815, 0.56],
-    [0.3, 0.85, 0.6],
+    [0.213, 0.845, 0.66],
+    [0.258, 0.815, 0.6],
+    [0.305, 0.855, 0.64],
   ]
   for (const [gx, gy, gs] of geese) {
-    const B2 = h * 0.05 * gs
+    const B2 = h * 0.055 * gs
     s += `<g transform="translate(${fx(PX(gx))} ${fx(PY(gy))})">`
-    s += `<ellipse cx="0" cy="0" rx="${fx(B2 * 0.85)}" ry="${fx(B2 * 0.55)}" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="2"/>`
-    s += `<path d="M ${fx(B2 * 0.6)} ${fx(-B2 * 0.3)} Q ${fx(B2 * 1.05)} ${fx(-B2 * 0.9)} ${fx(B2 * 1.2)} ${fx(-B2 * 0.75)}" fill="none" stroke="${INN.snow}" stroke-width="${fx(Math.max(2.4, B2 * 0.26))}"/>`
-    s += `<path d="M ${fx(B2 * 0.6)} ${fx(-B2 * 0.3)} Q ${fx(B2 * 1.05)} ${fx(-B2 * 0.9)} ${fx(B2 * 1.2)} ${fx(-B2 * 0.75)}" fill="none" stroke="${WALNUT}" stroke-width="1.4" opacity="0.6"/>`
-    s += `<circle cx="${fx(B2 * 1.22)}" cy="${fx(-B2 * 0.78)}" r="${fx(Math.max(2, B2 * 0.19))}" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="1.4"/>`
-    s += `<path d="M ${fx(B2 * 1.38)} ${fx(-B2 * 0.78)} l ${fx(B2 * 0.3)} ${fx(B2 * 0.08)} l ${fx(-B2 * 0.28)} ${fx(B2 * 0.12)} Z" fill="#c98b4a"/>` // beak
-    s += `<path d="M ${fx(-B2 * 0.2)} ${fx(B2 * 0.5)} l ${fx(-B2 * 0.1)} ${fx(B2 * 0.34)} m ${fx(B2 * 0.42)} ${fx(-B2 * 0.34)} l ${fx(B2 * 0.1)} ${fx(B2 * 0.34)}" stroke="#c98b4a" stroke-width="2.2" fill="none"/>` // feet
-    s += `<path d="M ${fx(-B2 * 0.5)} ${fx(-B2 * 0.1)} Q 0 ${fx(-B2 * 0.4)} ${fx(B2 * 0.45)} ${fx(-B2 * 0.12)}" fill="none" stroke="${WALNUT}" stroke-width="1.3" opacity="0.5"/>` // wing line
+    s += `<ellipse cx="0" cy="${fx(B2 * 0.62)}" rx="${fx(B2 * 0.8)}" ry="${fx(B2 * 0.2)}" fill="${INK}" opacity="0.26"/>` // contact shadow
+    // legs first, so the body sits on them
+    for (const lx of [-B2 * 0.2, B2 * 0.24]) {
+      s += `<line x1="${fx(lx)}" y1="${fx(B2 * 0.2)}" x2="${fx(lx - B2 * 0.06)}" y2="${fx(B2 * 0.56)}" stroke="#d08b3a" stroke-width="${fx(Math.max(2.2, B2 * 0.1))}"/>`
+      s += `<path d="M ${fx(lx - B2 * 0.22)} ${fx(B2 * 0.6)} L ${fx(lx - B2 * 0.06)} ${fx(B2 * 0.52)} L ${fx(lx + B2 * 0.16)} ${fx(B2 * 0.6)} Z" fill="#d08b3a"/>` // webbed foot
+    }
+    // body: breast forward (+x), tail a point aft (-x)
+    s += `<path d="M ${fx(B2 * 0.86)} ${fx(-B2 * 0.06)} C ${fx(B2 * 0.92)} ${fx(B2 * 0.42)} ${fx(B2 * 0.2)} ${fx(B2 * 0.5)} ${fx(-B2 * 0.5)} ${fx(B2 * 0.32)} ` +
+      `L ${fx(-B2 * 1.24)} ${fx(B2 * 0.1)} L ${fx(-B2 * 0.62)} ${fx(-B2 * 0.16)} ` +
+      `C ${fx(-B2 * 0.3)} ${fx(-B2 * 0.56)} ${fx(B2 * 0.6)} ${fx(-B2 * 0.5)} ${fx(B2 * 0.86)} ${fx(-B2 * 0.06)} Z" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="2.2"/>`
+    // folded wing — a grey block so the body is never a plain oval
+    s += `<path d="M ${fx(B2 * 0.42)} ${fx(-B2 * 0.24)} C ${fx(B2 * 0.5)} ${fx(B2 * 0.22)} ${fx(-B2 * 0.1)} ${fx(B2 * 0.34)} ${fx(-B2 * 0.56)} ${fx(B2 * 0.06)} ` +
+      `C ${fx(-B2 * 0.2)} ${fx(-B2 * 0.1)} ${fx(B2 * 0.16)} ${fx(-B2 * 0.3)} ${fx(B2 * 0.42)} ${fx(-B2 * 0.24)} Z" fill="#cdc4b0" stroke="${WALNUT}" stroke-width="1.4" opacity="0.9"/>`
+    s += `<path d="M ${fx(-B2 * 1.24)} ${fx(B2 * 0.1)} L ${fx(-B2 * 0.66)} ${fx(-B2 * 0.02)}" stroke="${WALNUT}" stroke-width="1.4" opacity="0.6"/>` // tail line
+    // the S-neck: thin, and the head is unmistakably a head
+    s += `<path d="M ${fx(B2 * 0.62)} ${fx(-B2 * 0.28)} C ${fx(B2 * 1.06)} ${fx(-B2 * 0.5)} ${fx(B2 * 0.86)} ${fx(-B2 * 1.02)} ${fx(B2 * 1.14)} ${fx(-B2 * 1.16)}" fill="none" stroke="${INN.snow}" stroke-width="${fx(Math.max(2.6, B2 * 0.2))}" stroke-linecap="round"/>`
+    s += `<path d="M ${fx(B2 * 0.62)} ${fx(-B2 * 0.28)} C ${fx(B2 * 1.06)} ${fx(-B2 * 0.5)} ${fx(B2 * 0.86)} ${fx(-B2 * 1.02)} ${fx(B2 * 1.14)} ${fx(-B2 * 1.16)}" fill="none" stroke="${WALNUT}" stroke-width="1.2" opacity="0.55"/>`
+    s += `<ellipse cx="${fx(B2 * 1.2)}" cy="${fx(-B2 * 1.2)}" rx="${fx(B2 * 0.32)}" ry="${fx(B2 * 0.26)}" fill="${INN.snow}" stroke="${WALNUT}" stroke-width="1.8"/>` // head
+    s += `<path d="M ${fx(B2 * 1.44)} ${fx(-B2 * 1.3)} L ${fx(B2 * 2.02)} ${fx(-B2 * 1.14)} L ${fx(B2 * 1.42)} ${fx(-B2 * 1.02)} Z" fill="#d08b3a" stroke="${WALNUT}" stroke-width="1.2"/>` // bill
+    s += `<circle cx="${fx(B2 * 1.22)}" cy="${fx(-B2 * 1.26)}" r="${fx(Math.max(1.6, B2 * 0.09))}" fill="${INK}"/>` // eye
     s += `</g>`
   }
   // webbed goose prints trailing behind them
@@ -8921,6 +9240,90 @@ function innCourtyardSpread(w, h, seed) {
   }
   s += bootTrail(0.08, 0.97, 0.44, pageFY(0.05), 9)
   s += bootTrail(0.9, 0.99, 0.56, pageFY(0.12), 8)
+
+  // ---- S2-7 — THE COACHING YARD, filling the spread's dead right third.
+  //
+  // The blind reader: "Past the LIFT board there is nothing but cobblestone
+  // until the page edge, while everything of interest is packed into the middle
+  // 40%. The plaque floats over that void rather than over anything." The board
+  // itself now reaches image x 0.822 (it was 0.770); this fills the rest.
+  //
+  // PRINT, not paper, and deliberately so: everything here is a thing that lies
+  // ON a yard floor and can be honestly drawn in plan at a 27deg reading angle
+  // — a kerbed turning circle, the wheel ruts that cut it, a stone horse
+  // trough, a mounting block, a parked hand-cart, a spilled feed sack, a coil
+  // of rope and a drain. A printed floor may not stand things up: a lantern
+  // POST drawn on the paving would read as a post lying down, so the posts on
+  // the fore wall are represented by what they actually put on the ground —
+  // three lamplight pools stepping up the page toward the gate, which is also
+  // the directional line the void was missing.
+  {
+    const yardCx = 0.905, yardCy = pageFY(0.26)
+    // the coach turning circle: a kerbed ring of setts
+    s += `<ellipse cx="${fx(PX(yardCx))} " cy="${fx(PY(yardCy))}" rx="${fx(PX(0.108))}" ry="${fx(PY(0.088))}" fill="none" stroke="${INN.stoneLit}" stroke-width="7" opacity="0.5"/>`
+    s += `<ellipse cx="${fx(PX(yardCx))}" cy="${fx(PY(yardCy))}" rx="${fx(PX(0.108))}" ry="${fx(PY(0.088))}" fill="none" stroke="${WALNUT}" stroke-width="2.4" opacity="0.5"/>`
+    s += `<ellipse cx="${fx(PX(yardCx))}" cy="${fx(PY(yardCy))}" rx="${fx(PX(0.03))}" ry="${fx(PY(0.024))}" fill="${WALNUT}" opacity="0.12"/>` // the worn centre
+    // wheel ruts sweeping in from the fore-right corner, through the circle,
+    // out toward the gate — the coaches' own line across the empty quarter
+    for (const off of [-0.012, 0.012]) {
+      const rut =
+        `M ${fx(PX(1.02 + off))} ${fx(PY(0.99))} ` +
+        `C ${fx(PX(0.96 + off))} ${fx(PY(0.86))} ${fx(PX(0.98 + off))} ${fx(PY(0.66))} ${fx(PX(0.9 + off))} ${fx(PY(pageFY(0.2)))} ` +
+        `C ${fx(PX(0.84 + off))} ${fx(PY(pageFY(-0.02)))} ${fx(PX(0.74 + off))} ${fx(PY(pageFY(-0.1)))} ${fx(PX(0.6 + off))} ${fx(PY(pageFY(-0.16)))}`
+      s += `<path d="${rut}" fill="none" stroke="${WALNUT}" stroke-width="6" opacity="0.24"/>`
+      s += `<path d="${rut}" fill="none" stroke="${INN.stoneLit}" stroke-width="2" opacity="0.3" transform="translate(0 -3)"/>`
+    }
+    // THE STONE HORSE TROUGH, in plan against the fore wall
+    {
+      const tx = PX(0.938), ty = PY(0.9), tw = PX(0.078), th2 = PY(0.05)
+      s += `<rect x="${fx(tx - tw / 2 + 3)}" y="${fx(ty - th2 / 2 + 5)}" width="${fx(tw)}" height="${fx(th2)}" rx="4" fill="${INK}" opacity="0.3"/>`
+      s += `<rect x="${fx(tx - tw / 2)}" y="${fx(ty - th2 / 2)}" width="${fx(tw)}" height="${fx(th2)}" rx="4" fill="${INN.stoneLit}" stroke="${WALNUT}" stroke-width="2.6"/>`
+      s += `<rect x="${fx(tx - tw / 2 + 6)}" y="${fx(ty - th2 / 2 + 6)}" width="${fx(tw - 12)}" height="${fx(th2 - 12)}" rx="3" fill="#5d7a82"/>` // water
+      s += `<path d="M ${fx(tx - tw / 2 + 10)} ${fx(ty - 2)} q ${fx(tw * 0.16)} -4 ${fx(tw * 0.32)} 0 q ${fx(tw * 0.16)} 4 ${fx(tw * 0.32)} 0" fill="none" stroke="${INN.snow}" stroke-width="2" opacity="0.55"/>` // ripple
+    }
+    // THE MOUNTING BLOCK — three stone steps beside the trough
+    for (let k = 0; k < 3; k++) {
+      const bw = PX(0.05 - k * 0.011), bx = PX(0.845), by = PY(0.86 + k * 0.024)
+      s += `<rect x="${fx(bx - bw / 2)}" y="${fx(by)}" width="${fx(bw)}" height="${fx(PY(0.022))}" rx="2" fill="${INN.stoneLit}" stroke="${WALNUT}" stroke-width="2.2"/>`
+      s += `<rect x="${fx(bx - bw / 2)}" y="${fx(by)}" width="${fx(bw)}" height="4" fill="${INN.snow}" opacity="0.35"/>`
+    }
+    // THE PORTER'S HAND-CART parked by the circle: bed, shafts, two wheels
+    {
+      const cx3 = PX(0.955), cy3 = PY(pageFY(0.1)), cw4 = PX(0.062), ch4 = PY(0.062)
+      s += `<g transform="rotate(-14 ${fx(cx3)} ${fx(cy3)})">`
+      s += `<ellipse cx="${fx(cx3)}" cy="${fx(cy3 + 7)}" rx="${fx(cw4 * 0.7)}" ry="${fx(ch4 * 0.5)}" fill="${INK}" opacity="0.26"/>`
+      s += `<rect x="${fx(cx3 - cw4 / 2)}" y="${fx(cy3 - ch4 / 2)}" width="${fx(cw4)}" height="${fx(ch4)}" rx="3" fill="${WOOD}" stroke="${WOOD_EDGE}" stroke-width="2.6"/>`
+      for (let p = 1; p < 4; p++)
+        s += `<line x1="${fx(cx3 - cw4 / 2)}" y1="${fx(cy3 - ch4 / 2 + (ch4 * p) / 4)}" x2="${fx(cx3 + cw4 / 2)}" y2="${fx(cy3 - ch4 / 2 + (ch4 * p) / 4)}" stroke="${WOOD_EDGE}" stroke-width="1.8" opacity="0.7"/>`
+      for (const sy of [-ch4 * 0.3, ch4 * 0.3])
+        s += `<line x1="${fx(cx3 - cw4 / 2)}" y1="${fx(cy3 + sy)}" x2="${fx(cx3 - cw4 * 1.15)}" y2="${fx(cy3 + sy * 0.6)}" stroke="${WOOD}" stroke-width="4.4" stroke-linecap="round"/>` // shafts
+      for (const wy of [-ch4 * 0.62, ch4 * 0.62]) {
+        s += `<ellipse cx="${fx(cx3 + cw4 * 0.06)}" cy="${fx(cy3 + wy)}" rx="${fx(cw4 * 0.3)}" ry="${fx(ch4 * 0.12)}" fill="none" stroke="${IRON}" stroke-width="4"/>`
+        s += `<line x1="${fx(cx3 - cw4 * 0.24)}" y1="${fx(cy3 + wy)}" x2="${fx(cx3 + cw4 * 0.36)}" y2="${fx(cy3 + wy)}" stroke="${IRON}" stroke-width="2"/>`
+      }
+      s += `</g>`
+    }
+    // a spilled FEED SACK and a COIL OF ROPE, the small litter that says "used"
+    s += `<g transform="translate(${fx(PX(0.86))} ${fx(PY(pageFY(0.36)))}) rotate(18)">` +
+      `<ellipse cx="0" cy="4" rx="${fx(PX(0.026))}" ry="${fx(PY(0.02))}" fill="${INK}" opacity="0.24"/>` +
+      `<path d="M ${fx(-PX(0.024))} ${fx(PY(0.016))} Q ${fx(-PX(0.03))} ${fx(-PY(0.014))} 0 ${fx(-PY(0.018))} Q ${fx(PX(0.03))} ${fx(-PY(0.014))} ${fx(PX(0.024))} ${fx(PY(0.016))} Z" fill="#c8ab74" stroke="${WALNUT}" stroke-width="2.2"/>` +
+      `<path d="M ${fx(-PX(0.008))} ${fx(-PY(0.018))} q ${fx(PX(0.008))} ${fx(-PY(0.012))} ${fx(PX(0.016))} 0" fill="none" stroke="${WALNUT}" stroke-width="2.4"/>` +
+      `<g opacity="0.65">${[0, 1, 2, 3, 4].map((k) => `<circle cx="${fx(PX(0.02) + k * 5)}" cy="${fx(PY(0.014) + (k % 2) * 4)}" r="2.2" fill="#d8b95e"/>`).join('')}</g></g>`
+    for (let k = 0; k < 3; k++)
+      s += `<ellipse cx="${fx(PX(0.99))}" cy="${fx(PY(pageFY(0.42)))}" rx="${fx(PX(0.022 - k * 0.006))}" ry="${fx(PY(0.017 - k * 0.005))}" fill="none" stroke="#9c8a5e" stroke-width="3.4"/>` // rope coil
+    // the yard DRAIN, a grated square where the ruts converge
+    s += `<rect x="${fx(PX(0.9))}" y="${fx(PY(pageFY(0.44)))}" width="${fx(PX(0.03))}" height="${fx(PY(0.024))}" fill="#3a3128" stroke="${INN.stoneLit}" stroke-width="2.4"/>`
+    for (let k = 1; k < 4; k++)
+      s += `<line x1="${fx(PX(0.9) + (PX(0.03) * k) / 4)}" y1="${fx(PY(pageFY(0.44)))}" x2="${fx(PX(0.9) + (PX(0.03) * k) / 4)}" y2="${fx(PY(pageFY(0.44)) + PY(0.024))}" stroke="${INN.stoneLit}" stroke-width="1.6" opacity="0.6"/>`
+    // THREE LAMPLIGHT POOLS stepping up the right quarter toward the gate —
+    // what the yard's lantern posts leave on the paving (the posts themselves
+    // stand on the fore wall's crest, and a floor print may not draw them)
+    for (const [lx, ly, lr] of [[0.985, 0.9, 0.062], [0.93, pageFY(0.26), 0.05], [0.865, pageFY(-0.04), 0.04]]) {
+      s += `<ellipse cx="${fx(PX(lx))}" cy="${fx(PY(ly))}" rx="${fx(PX(lr))}" ry="${fx(PY(lr * 0.72))}" fill="url(#s2pgPool)"/>`
+      s += `<circle cx="${fx(PX(lx))}" cy="${fx(PY(ly))}" r="4.4" fill="${INN.lamp}" opacity="0.6"/>` // the post's own foot
+      s += `<circle cx="${fx(PX(lx))}" cy="${fx(PY(ly))}" r="8.5" fill="none" stroke="${WALNUT}" stroke-width="2.4" opacity="0.5"/>`
+    }
+  }
 
   // dusk shadow of the stable in the gutter lane (kept box, z 0.43..0.58)
   s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.5)))}" rx="${fx(PX(0.07))}" ry="${fx(PY(0.03))}" fill="${WALNUT}" opacity="0.07"/>`
@@ -13613,11 +14016,15 @@ const PIECES = [
   // spine z): the BOARD is PORTRAIT (d-span 0.22 : z-span 0.45, row runs down)
   // and the DOORS LANDSCAPE (d-span 0.16 : z-span 0.085, number upright). Cat
   // behind door 3 (index 2). Odd seeds so grain differs per leaf.
-  { id: 'ch1-keyboard-board', seed: 20250, w: 500, h: 1024, grain: 12, paint() { return keyboardBoard(this.w, this.h, this.seed, 4, 2) } },
-  { id: 'ch1-keyboard-door1', seed: 20251, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 1) } },
-  { id: 'ch1-keyboard-door2', seed: 20253, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 2) } },
-  { id: 'ch1-keyboard-door3', seed: 20255, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 3) } },
-  { id: 'ch1-keyboard-door4', seed: 20257, w: 512, h: 272, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 4) } },
+  // S2-1: canvases re-cut to the pieces' SCREEN aspects (see the ch1-keyboard
+  // note in content.ts). Board 0.34 d x 0.66 z -> 150 x 161 px -> 512x552;
+  // door 0.26 d x 0.142 z -> 115 x 35 px -> 512x155. The old 512x272 door on a
+  // 71x21 px quad stretched every glyph 2.4x sideways.
+  { id: 'ch1-keyboard-board', seed: 20250, w: 512, h: 552, grain: 12, paint() { return keyboardBoard(this.w, this.h, this.seed, 4, 2) } },
+  { id: 'ch1-keyboard-door1', seed: 20251, w: 512, h: 155, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 1) } },
+  { id: 'ch1-keyboard-door2', seed: 20253, w: 512, h: 155, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 2) } },
+  { id: 'ch1-keyboard-door3', seed: 20255, w: 512, h: 155, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 3) } },
+  { id: 'ch1-keyboard-door4', seed: 20257, w: 512, h: 155, grain: 10, paint() { return keyboardDoor(this.w, this.h, this.seed, 4) } },
   // ---- Spread 4 — the Keep's fan spire ----
   { id: 'ch3-keep-spire-m0', seed: 40301, w: 595, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 0) } },
   { id: 'ch3-keep-spire-m1', seed: 40302, w: 376, h: 640, grain: 12, paint() { return spireMember(this.w, this.h, this.seed, 1) } },

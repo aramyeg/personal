@@ -32,9 +32,13 @@ import { activeGrabId } from '../user-drive'
 // decision from E1.5 on is composed for THIS frame; probed against all
 // 10 spreads (standing scenes gain, flat-lay spreads stay legible)
 // before pinning. Goldens re-blessed book-wide at this camera.
-const CAMERA_POSITION: [number, number, number] = [0, 1.85, 3.05]
-const CAMERA_LOOKAT: [number, number, number] = [0, 0.38, 0.05]
-const CAMERA_FOV = 34
+// EXPORTED (E3 wave-2 s2): scene benches must derive screen-pixel sizes from
+// the camera the book actually ships rather than re-typing it — an art gate
+// that hard-codes a stale camera is the "eyeballed QA box" failure with extra
+// steps. See __tests__/labs/storybook/s2-keyboard.test.ts.
+export const CAMERA_POSITION: [number, number, number] = [0, 1.85, 3.05]
+export const CAMERA_LOOKAT: [number, number, number] = [0, 0.38, 0.05]
+export const CAMERA_FOV = 34
 const DESK_COLOR = '#17100b'
 const DESK_SIZE: [number, number] = [9, 6]
 // E-G5 floor (b) rebalance: removing the ACES tone-map lifted every rendered

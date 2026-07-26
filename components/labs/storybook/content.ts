@@ -209,12 +209,44 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // PLANE C — the open gate (front, narrowest): the gates open toward the
   // reader exactly when the spread opens. Its 0.376 panel x-reach + 0.02
   // margin clears the kept key-board at boardD0 0.40 (bench C1).
-  { id: 'ch1-gate', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: 0.16, vDir: -1, phiDeg: 82, rhoDeg: 87.5, creaseU: 0.5, width: 0.76, height: 0.42 },
+  // IDLE (BW-2, WAVE-2 accent pass): the two gate lanterns are the only OPEN
+  // FLAMES the reader stands next to, so the gate plane takes the 'glint' — a
+  // sub-visible brightness breath on the print, which is what a lantern in a
+  // yard does and what a rigid die-cut is allowed to do. NOT sway: this plane
+  // is a stone gateway.
+  //
+  // The chimney smoke could NOT be tagged and is a deliberate non-fix: the
+  // smoke curl is cut into ch1-inn-row's OWN silhouette (innRowStage builds it
+  // into the roofline path), so the only handle on it is the hero plane itself
+  // — and idle-life forbids tagging a spread hero. Giving the smoke its own
+  // motion means a new crease-child die and a new reach proof, which is a scene
+  // change, not an accent tag.
+  { id: 'ch1-gate', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: 0.16, vDir: -1, phiDeg: 82, rhoDeg: 87.5, creaseU: 0.5, width: 0.76, height: 0.42, idle: { kind: 'glint' } },
   // The WELCOME RANK — innkeeper with lantern, spouse with the enchanted
   // ledger, waving child, dog, die-cut as ONE linked chain and stood up
   // frontal by a hidden strip under the floor (law L5). Tip radius 0.576;
   // z band 0.23..0.57 clears the gate slab by 0.07 and the frieze by 0.09.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21 },
+  // S2-5 THE RANK NOW HAS A PAYOFF. Once the book-wide hit fixes made this
+  // handle answer at all, what it did was WRONG: page-driven, the strip is taut
+  // and the family is handed over already at the 90deg anti-flip stop, so the
+  // only gesture available was pushing the welcome party face-down through flat
+  // onto the cobbles — and below ~32deg a flap's own tip projects BELOW its
+  // hinge at this camera, so the last of that travel reads as the family
+  // inverting (the s6 tea-corner finding, same class).
+  //
+  // The s6 opt-ins, on this piece: the strip ships SLACK (`restDeg`) and the
+  // READER raises the rank. At rest the family leans back at 44deg — clearly
+  // standing, well above the inversion crossing, so the courtyard is never
+  // empty of figures — and pulling them to 90deg brings the whole linked chain
+  // upright: lantern raised, ledger out, child waving. That IS the chapter
+  // ("he was welcomed"), it is the direction the story runs in, and both ends
+  // detent so the piece clicks home instead of asymptoting.
+  //
+  // Travel derived, not eyeballed: 46deg of hinge sweep on a 0.21-deep flap
+  // moves the tip 2*0.21*sin(23deg) = 0.164 world; at the pinned camera the
+  // page-fore axis runs 441 px/world and standing height 371 px/world, so the
+  // tip travels ~60 screen px — comfortably over the 25px floor the sweep set.
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.4, slot: 0.26, slotZ: 0.4, hingeX: 0.34, hingeZ: 0.4, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90] },
   // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
   // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
   // open mid-ground meadow (where loose brass keys are already printed) carries
@@ -226,14 +258,61 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // turns; the page-openness envelope eases them shut at book close. Numbers
   // bench-verified in derive-liftflap.mjs (L1-L9). Clears the stable (z 0.43+)
   // and the spine v-folds (it sits out at d 0.4+).
+  // S2-1 THE BOARD IS RESCALED TO READ AT 1x. A blind reader: "the whole board
+  // is ~110x95 px on a 1600x900 screen; the digits 1-4 are ~10px tall... A
+  // reader at normal distance sees a brown smudge with yellow dots."
+  //
+  // Derived from the pinned camera, not eyeballed (book-scene.tsx: pos
+  // (0,1.85,3.05), lookAt (0,0.38,0.05), fov 34, so k = (900/2)/tan(17deg) =
+  // 1471.9 px per unit of screen-plane offset, at depth 3.337 over the board):
+  //   * one world unit along the page-fore axis d  = 441 screen px
+  //   * one world unit along the spine axis z      = 244 screen px  (0.55x — z
+  //     is the foreshortened axis at a 27deg reading angle)
+  //   * one world unit of standing height y        = 371 screen px
+  // The board was 0.22 x 0.45 world = 97 x 110 px, and each door 0.16 x 0.085 =
+  // 71 x 21 px, into which a 512x272 art plate was mapped — a 2.4x HORIZONTAL
+  // STRETCH of every glyph on top of the smallness. Both are fixed here: the
+  // board grows to 0.34 x 0.66 world = 150 x 161 px (2.2x the area), each door
+  // to 0.26 x 0.142 = 115 x 35 px, and the art canvases are re-cut to the
+  // pieces' SCREEN aspects (board 512x552, door 512x155) so a circle drawn in
+  // the painter is a circle on the page. Digits land ~19px.
+  //
+  // Bands are the painter's own layout, so nothing has to be kept in sync by
+  // hand: keyboardBoard lays out `gap = h*0.028` and `slot = (h - 5*gap)/4`,
+  // i.e. gap = 0.028*Z and slot = 0.215*Z of the board's z span Z = 0.66 ->
+  // gap 0.0185, slot 0.142, which is exactly the ladder below.
+  //
+  // Clearances re-checked at the new size: d stays >= 0.40 (the gate's 0.376
+  // panel reach + 0.02 margin, bench C1) and ends at 0.74, well inside the
+  // 1.15 page; z runs -0.09..0.57, clear of the inn row's glue band about
+  // z -0.2 and of the fore wall's apex at z 0.66.
   {
     id: 'ch1-keyboard', kind: 'foreground', role: 'scenery', mech: 'liftflap', side: 'right',
-    hingeD: 0.44, leafLen: 0.16, boardD0: 0.4, boardD1: 0.62, boardZ0: -0.03, boardZ1: 0.42,
+    hingeD: 0.435, leafLen: 0.26, boardD0: 0.4, boardD1: 0.74, boardZ0: -0.09, boardZ1: 0.57,
+    // S2-2, and it is NOT a uv flip. Captured at 1x with ?sbdrive: at the old
+    // 95deg ceiling a lifted leaf is 9deg off EDGE-ON to the reading camera and
+    // renders as a ~7px-wide sliver — its face, its number and its ring all
+    // gone. Between about 40 and 80deg it is visible but its art frame has
+    // swung: the leaf's long axis (image-x) rotates from screen-RIGHT at shut
+    // to screen-UP at vertical, so the numeral tilts with it. That 90deg swing
+    // is what the blind reader read as "rotated 180deg / mirrored glyphs".
+    //
+    // No uv assignment can fix it, and the memory law's own general clause
+    // says so: a rigid texture cannot be upright in two poses 90deg apart. The
+    // numeral's own up-vector (-image-y = -z) in fact projects screen-UP at
+    // EVERY lift angle — that is gated below — so nothing is inverted; what
+    // was wrong was the CEILING. It drops 95 -> 64deg, where the leaf still
+    // presents 67% of its shut-pose screen area and reads as a little door
+    // standing open on its straps. Nothing is lost from the reveal: the 1x
+    // capture shows the niche key FULLY uncovered by 55deg, because the key art
+    // sits in the aperture's fore half (bench L6). The open threshold follows
+    // it down so a door still registers open well before the stop.
+    liftMaxDeg: 64, regOpenDeg: 46,
     doors: [
-      { z0: -0.005, z1: 0.08, reveal: 'key', plate: 1 },
-      { z0: 0.1, z1: 0.185, reveal: 'key', plate: 2 },
-      { z0: 0.215, z1: 0.3, reveal: 'cat', plate: 3 },
-      { z0: 0.33, z1: 0.415, reveal: 'key', plate: 4 },
+      { z0: -0.072, z1: 0.07, reveal: 'key', plate: 1 },
+      { z0: 0.089, z1: 0.231, reveal: 'key', plate: 2 },
+      { z0: 0.249, z1: 0.391, reveal: 'cat', plate: 3 },
+      { z0: 0.41, z1: 0.552, reveal: 'key', plate: 4 },
     ],
   },
   // VOLUMETRIC: the stable is a gabled OPEN-FRONT barn at the gate — the
@@ -243,7 +322,10 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // forward so the inn's painted story and the signpost stay clear.
   { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.15, z0: 0.43, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
   // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
-  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.07, height: 0.12 },
+  // S2-6(b): the vane grows ~17% (it read as a 12px "blue nib" at 1x, which is
+  // how a barn came to read as a tented ledger with a quill in it) — the die
+  // keeps its 0.583 aspect, so the repainted cockerel simply lands bigger.
+  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.082, height: 0.14 },
   { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
   // The old coaching-yard platform is RETIRED (riser-silhouette law: the
   // full-span inn row buries it — struts behind a hero read as invisible

@@ -15,6 +15,7 @@ import {
 import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
 import type { PanelQuad, Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
 import { PAGE_H, PAGE_W, easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
+import { CHAPTERS } from '@/components/labs/storybook/content'
 
 // LIFT-THE-FLAP gates, ported in-engine from the source-of-truth bench
 // .superpowers/sdd/bench/derive-liftflap.mjs (L1-L9). Uses the shipped s2
@@ -28,23 +29,16 @@ const bloom = (beta: number): [number, number] => [Math.PI / 2 + beta / 2, Math.
 const REST = rad(176)
 const GLOBAL_CAP = 0.0497
 
-// The shipped s2 key-board (content.ts ch1-keyboard).
-const CFG: LiftFlapGeom = {
-  mech: 'liftflap',
-  side: 'right',
-  hingeD: 0.44,
-  leafLen: 0.16,
-  boardD0: 0.4,
-  boardD1: 0.62,
-  boardZ0: -0.03,
-  boardZ1: 0.42,
-  doors: [
-    { z0: -0.005, z1: 0.08, reveal: 'key', plate: 1 },
-    { z0: 0.1, z1: 0.185, reveal: 'key', plate: 2 },
-    { z0: 0.215, z1: 0.3, reveal: 'cat', plate: 3 },
-    { z0: 0.33, z1: 0.415, reveal: 'key', plate: 4 },
-  ],
-}
+// THE SHIPPED s2 key-board, READ FROM content.ts.
+//
+// This was a hand-copied literal, under a comment claiming it "uses the
+// shipped s2 ch1-keyboard config so the in-engine gates track content.ts
+// exactly". It did not: the wave-2 rescale (S2-1) moved every number in the
+// piece and L1-L9 went on proving things about a board that no longer exists.
+// A gate that carries its own copy of the subject is not a gate.
+const CFG = CHAPTERS.find((c) => c.spread === 2)!.layers.find(
+  (l) => l.id === 'ch1-keyboard'
+) as unknown as LiftFlapGeom
 const N = CFG.doors.length
 const LIFT_MAX = liftFlapMax(CFG)
 
@@ -186,8 +180,16 @@ describe('lift-flap — key-board gates (bench derive-liftflap.mjs, page-rooted)
     expect(LIFTFLAP_FLAP_LIFT).toBeCloseTo(2 * ROTOR_LIFT, 12)
   })
 
-  it('the doors are free hand-driven handles: LIFT_MAX is the anti-flip ceiling and the envelope zeroes at close', () => {
-    expect(deg(liftFlapMax(CFG))).toBeCloseTo(95, 9)
+  it('the doors are free hand-driven handles: LIFT_MAX is the readable-face ceiling and the envelope zeroes at close', () => {
+    // Was the family's 95deg anti-flip default. The s2 board now names its own
+    // ceiling (S2-2): 95deg puts a leaf 9deg off edge-on to the reading camera,
+    // where it renders as a sliver with no face at all. The screen-area proof
+    // for the new number lives in s2-keyboard.test.ts; here we only pin that
+    // the piece declares a ceiling BELOW the family default and above the angle
+    // at which it registers open.
+    expect(deg(liftFlapMax(CFG))).toBeCloseTo(64, 9)
+    expect(liftFlapMax(CFG)).toBeLessThan(rad(95))
+    expect(liftFlapMax(CFG)).toBeGreaterThan(liftFlapOpenAngle(CFG))
     expect(liftFlapEnvelope(CFG, 0)).toBeCloseTo(0, 12) // book closed -> every leaf flat
     expect(liftFlapEnvelope(CFG, REST)).toBeGreaterThan(0.99) // book open -> full lift
   })
