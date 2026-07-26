@@ -60,6 +60,37 @@ export const DISSOLVE_BASE_LIFT = ROTOR_LIFT
 const DEFAULT_STROKE = 0.14
 /** Grabbable lip left inside the fore edge even when flush (the tabpiece TAB_LIP). */
 export const DISSOLVE_TAB_LIP = 0.02
+
+/** The dihedral the automatic take-up normalizes to — the book's rest bloom,
+ *  the same constant the tab piece's cam uses. */
+const TIP_REST = (176 * Math.PI) / 180
+
+/**
+ * THE TONGUE (E3 Wave-2 S5-1) and its AUTOMATIC TAKE-UP (Birmingham mech 116,
+ * "page opening as the actuator" — the identical drive the tab piece next door
+ * runs on).
+ *
+ * WHY a tongue at all: the s5 blind reader measured this handle at 24x27 screen
+ * px at rest — "a tiny gold splinter; nobody will find the left one" — and found
+ * it only on the eighth scripted attempt. A pull tab that hides in its own slit
+ * is not a pull tab.
+ *
+ * WHY it is driven rather than constant: the book's containment law says nothing
+ * may reach past the fore edge at book-closed, and a constant tongue breaks it
+ * (measured: 1.21 against PAGE_W 1.15). So the strip carries a slack loop of
+ * length `tabTip`; opening the book consumes the slack and presents the tongue,
+ * closing it takes the slack back and the tongue withdraws flush. The strip
+ * stays inextensible — total length is slack + draw, and the slack is fully
+ * spent by rest, so the reader's pull goes straight into flip travel:
+ * `dissolveTabOut` is untouched and still equals the draw exactly.
+ *
+ * Default 0 keeps every other dissolve bit-identical.
+ */
+export function dissolveTabTip(geom: DissolveGeom, beta: number = TIP_REST): number {
+  const tip = geom.tabTip ?? 0
+  if (tip === 0) return 0
+  return tip * clamp(Math.sin(clamp(beta, 0, Math.PI) / 2) / Math.sin(TIP_REST / 2), 0, 1)
+}
 /** The two pure end states the release snaps to — a 2-detent dial. */
 export const DISSOLVE_ENDS = [0, Math.PI] as const
 
@@ -157,11 +188,11 @@ export function dissolveSlit(geom: DissolveGeom, thetaL: number, thetaR: number)
   return [P(PAGE_W, 0, zc - (sign * tabW) / 2), P(PAGE_W, 0, zc + (sign * tabW) / 2)]
 }
 
-/** The visible tab reveal quad at the fore edge — protrudes out the slit by
+/** The visible tab reveal quad at the fore edge — the tongue's own length plus
  *  exactly the strip draw (inextensible), the designed grab handle. */
 export function dissolveTabQuad(geom: DissolveGeom, tau: number, thetaL: number, thetaR: number): PanelQuad {
   const { P } = dissolvePageFrame(geom, thetaL, thetaR)
-  const s = dissolveTabOut(geom, tau)
+  const s = dissolveTabTip(geom, thetaL - thetaR) + dissolveTabOut(geom, tau)
   const tabW = geom.tabW ?? 0.1
   const zc = (geom.z0 + geom.z1) / 2
   const sign = geom.side === 'left' ? -1 : 1

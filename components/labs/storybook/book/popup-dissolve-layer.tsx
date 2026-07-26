@@ -17,6 +17,18 @@
  * lives in the module scrub channel, never React state; zustand holds only the
  * grab identity.
  *
+ * THE RACK IS A HANDLE TOO (E3 Wave-2 S5-1, the tab-piece precedent from s6).
+ * A blind reader met this family on spread 5 and reported the tab as "a ~14x25px
+ * gold splinter hanging off the page edge... discovering it was luck: it took me
+ * eight scripted attempts". The picture the tab transmutes, meanwhile, is 280x116
+ * screen px of painted card sitting right there — and pressing it did nothing.
+ * So the slats and the sand base now raycast into the SAME grab, with the same
+ * page-fore projector and the same draw arithmetic. That is paper-true rather
+ * than a shortcut: the rack has exactly one degree of freedom, and dragging a
+ * slat fore draws the strip by the identical delta the tab would (the projection
+ * is onto the page's fore axis, not onto the handle's own surface, so the sign
+ * and the gearing are literally the same function).
+ *
  * Art: TWO paintings per piece — `<id>-dunes` (up-face at tau=0) and
  * `<id>-gold` (under-face, revealed at tau=PI) — each sliced into N vertical
  * strips by the slats. Slat k shows strip k of each, mapped in SCREEN space
@@ -384,7 +396,10 @@ export function DissolvePopupLayer({
         delta,
         glowSt.hover === layer.id || glowSt.grab?.id === layer.id
       )
-      for (const m of [tabMaterial]) applyHandleGlow(m, w)
+      // The whole rack lights, not just the tongue: the body is a grab surface
+      // now (S5-1), so the hover answer has to cover the area the press does or
+      // the cursor is telling the reader something the picture denies.
+      for (const m of [tabMaterial, dunesMaterial, goldMaterial]) applyHandleGlow(m, w)
     }
     if (layer.turnCull) {
       for (const m of [dunesMaterial, goldMaterial, baseMaterial, baseBackMaterial, tabMaterial]) {
@@ -467,6 +482,13 @@ export function DissolvePopupLayer({
         >
           <mesh ref={handleRef} geometry={handleGeom} material={handleMaterial} renderOrder={3} />
           <mesh ref={slopRef} geometry={slopGeom} material={handleMaterial} renderOrder={3} />
+          {/* The rack's own body (S5-1): the slats and the sand base borrow the
+              render geometries the frame loop already rewrites, so they cost one
+              draw-free mesh each and can never drift from the paper. */}
+          <mesh geometry={baseGeom} material={handleMaterial} renderOrder={3} />
+          {dunesGeoms.map((g, k) => (
+            <mesh key={k} geometry={g} material={handleMaterial} renderOrder={3} />
+          ))}
         </group>
       </group>
       <group ref={shadowGroupRef} visible={false}>

@@ -784,6 +784,10 @@ export type DissolveGeom = {
   stroke?: number
   /** Visible tab width along the spine (default 0.1). */
   tabW?: number
+  /** Tongue length past the fore edge at ZERO draw (world units; default 0 —
+   *  the tab hides in its slit). See `dissolveTabTip`: the paper tongue the
+   *  binder left proud of the trim so the reader's hand can find it at rest. */
+  tabTip?: number
   /** Turn-time culling (Batch C-3, the dial-class lever): the rack is
    *  interaction-only and page-flat, so mid-turn it stops drawing — the
    *  renderer ramps it out/in over the turn-cull window (turn-cull.ts) and
