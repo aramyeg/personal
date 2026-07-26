@@ -83,6 +83,7 @@ export function artRequests(layer: SceneLayer): readonly ArtRequest[] {
     case 'keepwinch':
       return sprite(
         `${layer.id}-disc`,
+        `${layer.id}-mast`,
         `${layer.id}-semaphore`,
         `${layer.id}-iris`,
         `${layer.id}-counterweight`

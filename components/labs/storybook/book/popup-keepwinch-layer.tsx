@@ -31,6 +31,7 @@ import {
   keepWinchCounterweightDeck,
   keepWinchDiscQuad,
   keepWinchIrisQuads,
+  keepWinchMastQuad,
   keepWinchSemaphoreQuad,
   keepWinchThetaMax,
   type KeepWinchGeom,
@@ -434,6 +435,17 @@ export function KeepWinchPopupLayer({
   return (
     <group name={`keepwinch-${layer.id}`}>
       <WinchDisc layer={layer} spreadIndex={spreadIndex} frame={frame} committedSpread={committedSpread} />
+      {/* The STATIC signal mast the paddle pivots on (S4-4) — drawn before the
+          arm so the arm's pivot sits over the mast head. */}
+      <WinchOutput
+        layer={layer}
+        artId={`${layer.id}-mast`}
+        count={1}
+        solve={(_theta, _beta, tL, tR) => [keepWinchMastQuad(layer, tL, tR)]}
+        spreadIndex={spreadIndex}
+        frame={frame}
+        committedSpread={committedSpread}
+      />
       <WinchOutput
         layer={layer}
         artId={`${layer.id}-semaphore`}
