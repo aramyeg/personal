@@ -11346,18 +11346,28 @@ function bazArcPlate(w, h, seed, kind) {
     // else. The swags now stop at their own gable groups (below) and the tower
     // keeps a NAMEABLE piece of architecture instead.
     g += `<rect x="${fx(X(0.452))}" y="${fx(Y(0.855))}" width="${fx(X(0.096))}" height="${fx(Y(0.8) - Y(0.855))}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.5"/>`
-    for (const cu of [0.466, 0.5, 0.534]) {
-      g += `<path d="M ${fx(X(cu - 0.008))} ${fx(Y(0.8))} L ${fx(X(cu + 0.008))} ${fx(Y(0.8))} L ${fx(X(cu))} ${fx(Y(0.775))} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
+    // the corbel course under it. These must live INSIDE the shaft's own u band
+    // (0.462..0.528): anything painted outboard of it above the eave is cut away
+    // by bazPlateCut, which is where the first cut's bracket went.
+    // Shallow trapezoid corbels in the shaft's own stone. Cut as deep saturated
+    // triangles they were a row of red teeth under the balcony — bunting, or a
+    // sawtooth frieze, and this tower has already had one unnameable mark on it.
+    for (const cu of [0.472, 0.487, 0.502, 0.517]) {
+      g += `<path d="M ${fx(X(cu - 0.0068))} ${fx(Y(0.8))} L ${fx(X(cu + 0.0068))} ${fx(Y(0.8))} L ${fx(X(cu + 0.0034))} ${fx(Y(0.784))} L ${fx(X(cu - 0.0034))} ${fx(Y(0.784))} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.6"/>`
     }
+    g += `<rect x="${fx(X(0.462))}" y="${fx(Y(0.8))}" width="${fx(X(0.066))}" height="${fx(Y(0.79) - Y(0.8))}" fill="${INK}" opacity="0.16"/>`
     for (let k = 0; k <= 5; k++) {
       const bu = 0.456 + k * 0.0176
       g += `<line x1="${fx(X(bu))}" y1="${fx(Y(0.855))}" x2="${fx(X(bu))}" y2="${fx(Y(0.808))}" stroke="${INK}" stroke-width="1.4" opacity="0.6"/>`
     }
     g += `<line x1="${fx(X(0.452))}" y1="${fx(Y(0.855))}" x2="${fx(X(0.548))}" y2="${fx(Y(0.855))}" stroke="${INK}" stroke-width="2" opacity="0.7"/>`
-    // the lantern BRACKET off the balcony: one arm, one lantern, hung where two
-    // ropes used to cross
-    g += `<path d="M ${fx(X(0.548))} ${fx(Y(0.836))} L ${fx(X(0.578))} ${fx(Y(0.836))} L ${fx(X(0.578))} ${fx(Y(0.812))}" fill="none" stroke="${INK}" stroke-width="2" opacity="0.75"/>`
-    g += bazLantern(X(0.578), Y(0.796), w * 0.022)
+    // NO hanging lantern here, deliberately. It has to live inside the shaft's
+    // own u band (outboard of it the die-cut removes it), and the only clear
+    // stretch of shaft between the corbel course at v 0.78 and the upper window
+    // at v 0.735 is 0.045 tall — a lantern that fits it lands ON the window and
+    // the two fuse into one saffron blob. The balcony, its rail and its corbels
+    // are the nameable object; a second one crowded onto the same 40 px of
+    // masonry would put the ambiguity straight back.
     for (const wv of [0.56, 0.68]) {
       g += `<rect x="${fx(X(0.489))}" y="${fx(Y(wv + 0.055))}" width="${fx(X(0.022))}" height="${fx(Y(wv) - Y(wv + 0.055))}" rx="${fx(w * 0.008)}" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.5"/>`
     }
