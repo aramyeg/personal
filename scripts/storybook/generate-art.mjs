@@ -12942,7 +12942,12 @@ function bazaarFloorSpread(w, h, seed) {
   // FLOOR at the pinned camera; the doodles then sit on a field, not on blank
   // paper. Kept off the far quarter so the recession still reads.
   s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.16)))}" rx="${fx(PX(0.52))}" ry="${fx(PY(0.3))}" fill="url(#bazDust6)"/>`
-  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.3)))}" rx="${fx(PX(0.36))}" ry="${fx(PY(0.14))}" fill="${BAZ.terraDim}" opacity="0.13"/>`
+  // The trodden core used to be a FLAT terraDim ellipse at 0.13, and a flat fill
+  // has an EDGE: 737x191 px of soft brown with a defined rim and nothing on it
+  // is the "large soft brown shadow ellipse with NOTHING above it, bigger than
+  // any object near it" the reader could not name (finding 16). Same pigment,
+  // same value step, no rim — it is a wash now, so there is no oval to read.
+  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.3)))}" rx="${fx(PX(0.36))}" ry="${fx(PY(0.14))}" fill="url(#bazTrod6)"/>`
   s += `<rect width="${w}" height="${fx(h * 0.26)}" fill="url(#bazHaze6)"/>`
 
   // ---- READER FINDING S6-7c: "the page-floor graphics read as dirt. The tan
@@ -13002,10 +13007,71 @@ function bazaarFloorSpread(w, h, seed) {
       const cx = PX(t)
       const cy = PY(laneY(t) + yo)
       const o = op * edge
-      s += `<rect x="${fx(cx - sx / 2)}" y="${fx(cy - sy / 2)}" width="${fx(sx)}" height="${fx(sy)}" rx="${fx(sy * 0.34)}" transform="rotate(${fx(rr(r, -26, 26))} ${fx(cx)} ${fx(cy)})" fill="${INK}" fill-opacity="${fx(o * rr(r, 0.14, 0.34))}" stroke="${INK}" stroke-width="${fx(rr(r, 2, 2.9))}" stroke-opacity="${fx(o * rr(r, 0.62, 1))}"/>`
+      // A SETT IS A STONE, not a ring. These carried an almost-empty ink fill
+      // (0.14-0.34 of an already-faded opacity) inside a heavy ink stroke, so at
+      // reading distance each one was a small dark loop on tan — a hundred and
+      // fifty of them, and the leading candidate for the reader's "scatter of
+      // ~20 small dark rings/ovals... bowls? bracelets? barrel hoops?" A pale
+      // stone with a dark joint around it cannot be read as a hoop.
+      s += `<rect x="${fx(cx - sx / 2)}" y="${fx(cy - sy / 2)}" width="${fx(sx)}" height="${fx(sy)}" rx="${fx(sy * 0.34)}" transform="rotate(${fx(rr(r, -26, 26))} ${fx(cx)} ${fx(cy)})" fill="${rr(r, 0, 1) < 0.5 ? BAZ.sandDim : BAZ.sandLit}" fill-opacity="${fx2(o * rr(r, 0.78, 0.95))}" stroke="${INK}" stroke-width="${fx(rr(r, 1.8, 2.5))}" stroke-opacity="${fx2(o * rr(r, 0.5, 0.78))}"/>`
     }
   }
   s += `<rect x="${fx(w * 0.46)}" y="0" width="${fx(w * 0.08)}" height="${h}" fill="url(#bazGutter6)"/>`
+
+  // ---- A THOUSAND STALLS (blind finding 15: "four clusters of ~4 thumbnails;
+  // the square is mostly bare floor. The title promises density the composition
+  // never delivers"). The page print is the only surface that can hold a market
+  // this big, and from the reading camera a stall on the ground is its AWNING
+  // TOP: a striped canopy seen from above, its ridge, its eave shade and the
+  // shadow it throws. Three ranks at attenuating scale — packed and hazed at the
+  // back, larger and clear toward the reader — so the square reads as a market
+  // that keeps going rather than as four groups on an empty floor.
+  //
+  // WHERE THEY ARE, and why they are all BEHIND the lane. Every station on this
+  // page is derived from the pieces' own numbers, not eyeballed. Going down the
+  // page: the rear arc's foot is at z -0.12 (y 0.42); the far floor runs from
+  // there to the inner arc's foot at z 0.10 (y 0.567), which is also where the
+  // swept lane runs; the ROW OF RUGS occupies y 0.59..0.66; the terrace train
+  // takes y 0.607..0.807 across x 0.37..0.63; the tea corner stands at x
+  // 0.74..0.80 / y 0.61..0.72; the dyer's corner is at x 0.62..0.82 / y
+  // 0.68..0.82; the RAISE A STALL card lands at x 0.11..0.27 / y 0.74..0.93; and
+  // the stall row's flat rest pose covers x 0.64..0.90 / y 0.85..0.98.
+  //
+  // The one band with room for a market is therefore y 0.45..0.55, and it is
+  // also the RIGHT band: that is the far ground, where "packed at the back,
+  // thinning toward the reader" belongs. A first cut put ranks at y 0.61 and
+  // 0.69 and they landed squarely on the rug row and on the spice spill — more
+  // clutter over the page's one organising structure, which is the failure this
+  // round exists to undo. Two larger stalls stand nearer, in the only two open
+  // pockets outboard of everything, so the run has a near end to recede from.
+  const topAwning = (cx, cy, aw, ah, phase, fade, stripes) => {
+    let o = ''
+    const clear = 1 - fade
+    o += `<ellipse cx="${fx(cx)}" cy="${fx(cy + ah * 0.66)}" rx="${fx(aw * 0.54)}" ry="${fx(ah * 0.3)}" fill="${INK}" opacity="${fx2(0.15 * clear)}"/>`
+    for (let k = 0; k < stripes; k++) {
+      o += `<rect x="${fx(cx - aw / 2 + (k * aw) / stripes)}" y="${fx(cy - ah / 2)}" width="${fx(aw / stripes + 0.5)}" height="${fx(ah)}" fill="${(k + phase) % 2 ? BAZ.cream : BAZ.teal}" opacity="${fx2(0.94 - fade * 0.5)}"/>`
+    }
+    o += `<line x1="${fx(cx - aw / 2)}" y1="${fx(cy)}" x2="${fx(cx + aw / 2)}" y2="${fx(cy)}" stroke="${INK}" stroke-width="1.4" opacity="${fx2(0.34 * clear)}"/>`
+    o += `<rect x="${fx(cx - aw / 2)}" y="${fx(cy + ah * 0.34)}" width="${fx(aw)}" height="${fx(ah * 0.16)}" fill="${INK}" opacity="${fx2(0.2 * clear)}"/>`
+    o += `<rect x="${fx(cx - aw / 2)}" y="${fx(cy - ah / 2)}" width="${fx(aw)}" height="${fx(ah)}" fill="none" stroke="${INK}" stroke-width="1.5" stroke-opacity="${fx2(0.45 * clear)}"/>`
+    return o
+  }
+  for (const [yc, n, aw, fade, stripes, wob] of [
+    [0.45, 22, 0.019, 0.62, 3, 0.011],
+    [0.491, 16, 0.028, 0.4, 3, 0.014],
+    [0.539, 12, 0.039, 0.18, 4, 0.017],
+  ]) {
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n
+      s += topAwning(PX(t), PY(yc + wob * Math.sin(t * 7.1 + n)), PX(aw), PY(aw * 1.05), k, fade, stripes)
+    }
+  }
+  // the two NEAR stalls, in the only pockets nothing else claims — outboard of
+  // the terrace train on the left and of the dyer's corner on the right
+  for (const [tx, ty] of [[0.325, 0.7], [0.947, 0.706]]) {
+    s += topAwning(PX(tx), PY(ty), PX(0.05), PY(0.055), 1, 0.06, 5)
+    s += `<rect x="${fx(PX(tx) - PX(0.05) * 0.42)}" y="${fx(PY(ty) + PY(0.055) * 0.5)}" width="${fx(PX(0.05) * 0.84)}" height="${fx(PY(0.018))}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.75"/>`
+  }
 
   // ---- ONE CART RUT ROUTE, in from the left apron and threading the tread gap
   // toward the arc doors. What separates a rut from a rail is that a rut is
@@ -13121,41 +13187,151 @@ function bazaarFloorSpread(w, h, seed) {
     s += `</g>`
   })
 
-  // ---- TWO SPICE SPILLS, each with its own TIPPED SACK, set on the apron side
-  // of the lane. Ten free-floating drifts of saffron and terracotta were the
-  // "ochre/red splashes"; a spill with a visible culprit is an incident.
-  for (const [sxf, syf, col] of [[0.155, 0.72, BAZ.saffron], [0.72, 0.755, BAZ.terra]]) {
-    const sx = PX(sxf)
-    const sy = PY(syf)
+  // ---- ONE SPICE SPILL, left page, with the sack it came out of. The sack used
+  // to be a smooth teardrop with a tie stroke on it, which is the "beige teardrop
+  // with a dot — bellows? a fan? a lute? a leather flask?" of finding 16. It is
+  // now drawn as a sack is drawn: a bellied body with a fold seam, a ROLLED
+  // COLLAR at the mouth and a cord bound round the neck, tipped over so the
+  // mouth faces the drift it made.
+  {
+    const sx = PX(0.155)
+    const sy = PY(0.72)
     const rad = 40
+    const col = BAZ.saffron
     s += `<ellipse cx="${fx(sx + 20)}" cy="${fx(sy + 10)}" rx="${fx(rad)}" ry="${fx(rad * 0.46)}" fill="${col}" opacity="0.6"/>`
     s += `<ellipse cx="${fx(sx + 8)}" cy="${fx(sy + 4)}" rx="${fx(rad * 0.5)}" ry="${fx(rad * 0.24)}" fill="${col}" opacity="0.5"/>`
-    for (let k = 0; k < 22; k++) {
+    for (let k = 0; k < 16; k++) {
       const a = rr(r, 0, Math.PI * 2)
-      const rr2 = rad * rr(r, 1.02, 1.7)
-      s += `<circle cx="${fx(sx + 20 + Math.cos(a) * rr2)}" cy="${fx(sy + 10 + Math.sin(a) * rr2 * 0.45)}" r="${fx(rr(r, 1.8, 4))}" fill="${col}" opacity="${fx(rr(r, 0.5, 0.85))}"/>`
+      const rr2 = rad * rr(r, 1.02, 1.45)
+      s += `<circle cx="${fx(sx + 20 + Math.cos(a) * rr2)}" cy="${fx(sy + 10 + Math.sin(a) * rr2 * 0.45)}" r="${fx(rr(r, 2.2, 4.4))}" fill="${col}" opacity="${fx(rr(r, 0.5, 0.85))}"/>`
     }
-    // the sack it came out of, mouth toward the drift
-    s += `<path d="M ${fx(sx)} ${fx(sy)} q ${fx(-26)} ${fx(-8)} ${fx(-34)} ${fx(-30)} q ${fx(14)} ${fx(-12)} ${fx(34)} ${fx(-6)} q ${fx(12)} ${fx(16)} 0 ${fx(36)} Z" fill="${BAZ.sandDim}" opacity="0.8" stroke="${INK}" stroke-width="2.8" stroke-opacity="0.75"/>`
-    s += `<path d="M ${fx(sx - 34)} ${fx(sy - 30)} q ${fx(10)} ${fx(-9)} ${fx(20)} ${fx(-4)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.6"/>`
+    s += `<ellipse cx="${fx(sx - 26)}" cy="${fx(sy - 4)}" rx="30" ry="11" fill="${INK}" opacity="0.18"/>`
+    s += `<path d="M ${fx(sx - 6)} ${fx(sy - 4)} q ${fx(-16)} ${fx(14)} ${fx(-36)} ${fx(8)} q ${fx(-22)} ${fx(-7)} ${fx(-18)} ${fx(-26)} q ${fx(4)} ${fx(-18)} ${fx(26)} ${fx(-16)} q ${fx(22)} ${fx(2)} ${fx(28)} ${fx(34)} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2.8" stroke-opacity="0.8"/>`
+    for (const fu of [0.3, 0.55, 0.78]) {
+      s += `<path d="M ${fx(sx - 58 + fu * 10)} ${fx(sy - 26 + fu * 30)} q ${fx(12)} ${fx(6)} ${fx(24)} ${fx(2)}" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.4"/>`
+    }
+    // the rolled collar at the mouth, and the cord bound under it
+    s += `<path d="M ${fx(sx - 12)} ${fx(sy - 18)} q ${fx(12)} ${fx(10)} ${fx(6)} ${fx(24)} q ${fx(-12)} ${fx(2)} ${fx(-14)} ${fx(-12)} Z" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="2.6" stroke-opacity="0.8"/>`
+    s += `<path d="M ${fx(sx - 20)} ${fx(sy - 14)} q ${fx(8)} ${fx(8)} ${fx(4)} ${fx(18)}" fill="none" stroke="${INK}" stroke-width="2.8" opacity="0.72"/>`
   }
 
-  // ---- THE CROWD, as SHADOW POOLS. The reader's crowd read failed because the
-  // crowd was painted as scatter, and scatter on paper is dirt. A tight group of
-  // soft ink ellipses on the ground cannot be read as anything except people
-  // standing there, and it carries real dark weight without adding a new KIND of
-  // mark. Four groups, each one placed at a rug, on the far side of the lane.
+  // ---- THE DYER'S CORNER, right page, where a maroon pool with radiating
+  // splatter used to sit. Blind finding 17: "the big red pool reads as blood —
+  // maroon puddle with radiating splatter dots in a market square. If it's dye
+  // or wine, nothing says so: no vat, no bolt of cloth, no spilled jar near it."
+  //
+  // What kills the blood read is VARIETY, not shape: one red pool is a wound,
+  // three vats in madder, indigo and saffron are a trade. So the corner is built
+  // as a dyer would leave it — three brimming vats seen from above with their
+  // rims and a skin of dye on top, DRIP MARKS running down the outside of each
+  // rim (never radiating spray, which is what splatter means), stacked bolts of
+  // undyed cloth beside them, and a cord of dyed cloth hung out to dry above.
+  {
+    const dx0 = PX(0.72)
+    const dy0 = PY(0.755)
+    const vats = [
+      [-46, 6, 30, BAZ.terra, BAZ.terraDim],
+      [16, -12, 25, BAZ.tealDim, '#24484f'],
+      [50, 14, 21, BAZ.saffron, BAZ.saffronLit],
+    ]
+    for (const [ox, oy, vr, dye, dyeDeep] of vats) {
+      const cx = dx0 + ox
+      const cy = dy0 + oy
+      s += `<ellipse cx="${fx(cx)}" cy="${fx(cy + vr * 0.34)}" rx="${fx(vr * 1.16)}" ry="${fx(vr * 0.46)}" fill="${INK}" opacity="0.2"/>`
+      // the vat: a staved tub, its rim band, and the dye brimming inside it
+      s += `<path d="M ${fx(cx - vr)} ${fx(cy)} L ${fx(cx - vr * 0.86)} ${fx(cy + vr * 0.5)} A ${fx(vr * 0.86)} ${fx(vr * 0.42)} 0 0 0 ${fx(cx + vr * 0.86)} ${fx(cy + vr * 0.5)} L ${fx(cx + vr)} ${fx(cy)} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2.6" stroke-opacity="0.8"/>`
+      s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(vr)}" ry="${fx(vr * 0.46)}" fill="${dyeDeep}" stroke="${INK}" stroke-width="2.8" stroke-opacity="0.85"/>`
+      s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(vr * 0.8)}" ry="${fx(vr * 0.34)}" fill="${dye}"/>`
+      s += `<path d="M ${fx(cx - vr * 0.5)} ${fx(cy - vr * 0.1)} A ${fx(vr * 0.5)} ${fx(vr * 0.2)} 0 0 1 ${fx(cx + vr * 0.2)} ${fx(cy - vr * 0.14)}" fill="none" stroke="${BAZ.cream}" stroke-width="2" opacity="0.4"/>`
+      // DRIPS down the outside of the rim, not spray across the floor
+      for (let k = 0; k < 3; k++) {
+        const du = -0.66 + k * 0.62
+        const dxp = cx + vr * du
+        const dyp = cy + vr * 0.42 * Math.sqrt(Math.max(0, 1 - du * du)) + 1
+        const dl = vr * (0.3 + k * 0.12)
+        s += `<path d="M ${fx(dxp)} ${fx(dyp)} L ${fx(dxp)} ${fx(dyp + dl)}" stroke="${dyeDeep}" stroke-width="${fx(3.4 - k * 0.5)}" stroke-linecap="round" opacity="0.9"/>`
+        s += `<circle cx="${fx(dxp)}" cy="${fx(dyp + dl)}" r="${fx(2.6)}" fill="${dyeDeep}" opacity="0.9"/>`
+      }
+      // the stave joints, so the tub is coopered and not a ring
+      for (let k = -1; k <= 1; k++) {
+        s += `<line x1="${fx(cx + k * vr * 0.5)}" y1="${fx(cy + vr * 0.2)}" x2="${fx(cx + k * vr * 0.44)}" y2="${fx(cy + vr * 0.62)}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+      }
+    }
+    // STACKED BOLTS of cloth beside the vats — rolled, seen end-on
+    for (let k = 0; k < 3; k++) {
+      const bxp = dx0 - 96
+      const byp = dy0 + 26 - k * 13
+      s += `<rect x="${fx(bxp)}" y="${fx(byp)}" width="52" height="12" rx="6" fill="${[BAZ.cream, BAZ.sand, BAZ.sandLit][k]}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.8"/>`
+      s += `<ellipse cx="${fx(bxp + 6)}" cy="${fx(byp + 6)}" rx="4" ry="5" fill="none" stroke="${INK}" stroke-width="1.8" opacity="0.6"/>`
+    }
+    // THE DRYING LINE: a cord slung above the vats carrying four dyed cloths, in
+    // the same three dyes. This is the mark that names the whole corner.
+    const ly0 = dy0 - 62
+    s += `<path d="M ${fx(dx0 - 104)} ${fx(ly0 - 4)} Q ${fx(dx0)} ${fx(ly0 + 12)} ${fx(dx0 + 84)} ${fx(ly0 - 6)}" fill="none" stroke="${INK}" stroke-width="2.6" opacity="0.8"/>`
+    for (let k = 0; k < 4; k++) {
+      const t = (k + 0.5) / 4
+      const cxp = dx0 - 104 + t * 188
+      const cyp = ly0 - 4 + (1 - t) * t * 4 * 14
+      const cw4 = 32
+      const ch4 = 34 + (k % 2) * 8
+      // the hem SAGS. The first cut curved it upward, which is a swallowtail —
+      // four pennants on a rope, not four cloths hung out to dry.
+      s += `<path d="M ${fx(cxp - cw4 / 2)} ${fx(cyp)} L ${fx(cxp + cw4 / 2)} ${fx(cyp)} L ${fx(cxp + cw4 / 2 - 3)} ${fx(cyp + ch4 - 4)} Q ${fx(cxp)} ${fx(cyp + ch4 + 7)} ${fx(cxp - cw4 / 2 + 3)} ${fx(cyp + ch4 - 4)} Z" fill="${[BAZ.terra, BAZ.tealDim, BAZ.saffron, BAZ.terraDim][k]}" opacity="0.9" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.7"/>`
+      // the peg it hangs from, so the cord is a washing line and not a garland
+      s += `<line x1="${fx(cxp - cw4 / 2 + 4)}" y1="${fx(cyp - 5)}" x2="${fx(cxp - cw4 / 2 + 4)}" y2="${fx(cyp + 5)}" stroke="${INK}" stroke-width="2.4" opacity="0.8"/>`
+      s += `<line x1="${fx(cxp - cw4 / 2 + 5)}" y1="${fx(cyp + ch4 * 0.42)}" x2="${fx(cxp + cw4 / 2 - 5)}" y2="${fx(cyp + ch4 * 0.42)}" stroke="${BAZ.cream}" stroke-width="2" opacity="0.45"/>`
+    }
+  }
+
+  // ---- GOODS SET DOWN ON THE GROUND, where four clusters of abstract shadow
+  // pools used to stand. The pools were a deliberate move — "a soft dark ellipse
+  // on the ground is unambiguously somebody standing here" — and the reader
+  // read the twenty of them as "a scatter of ~20 small dark rings/ovals... bowls?
+  // bracelets? barrel hoops? footprints?" (finding 16). A soft ellipse with a
+  // softer halo IS a ring, and the light core the halo leaves is why. Worse, the
+  // pools were the spread's only shadows with nothing above them.
+  //
+  // So each cluster becomes ground goods a reader can NAME at reading distance,
+  // and every one of them casts its own short shadow: an open basket seen from
+  // above (rim, dark mouth, produce heaped over the edge), a stack of brass
+  // bowls with a rim highlight, and a coil of rope. Fewer marks, larger, and
+  // each of them an object rather than a stain.
   for (let cl = 0; cl < 4; cl++) {
     const t = [0.11, 0.29, 0.56, 0.82][cl]
     const bx = PX(t)
-    // just clear of the cobble band: inside it the setts ate the pools
-    const by = PY(laneY(t) - 0.034)
-    for (let k = 0; k < 5; k++) {
-      const ox = (k - 2) * 16 + (k % 2 ? 6 : -6)
-      const oy = (k % 3) * 7 - 6
-      const prx = 16 - Math.abs(k - 2) * 2
-      s += `<ellipse cx="${fx(bx + ox)}" cy="${fx(by + oy)}" rx="${fx(prx * 1.35)}" ry="${fx(prx * 0.62)}" fill="${INK}" opacity="0.09"/>`
-      s += `<ellipse cx="${fx(bx + ox)}" cy="${fx(by + oy)}" rx="${fx(prx)}" ry="${fx(prx * 0.42)}" fill="${INK}" opacity="0.22"/>`
+    const by = PY(laneY(t) - 0.036)
+    // 1 — the basket, mouth toward the reader
+    {
+      const br = 21
+      s += `<ellipse cx="${fx(bx - 30)}" cy="${fx(by + br * 0.5)}" rx="${fx(br * 1.15)}" ry="${fx(br * 0.44)}" fill="${INK}" opacity="0.2"/>`
+      s += `<ellipse cx="${fx(bx - 30)}" cy="${fx(by)}" rx="${fx(br)}" ry="${fx(br * 0.5)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2.6" stroke-opacity="0.8"/>`
+      s += `<ellipse cx="${fx(bx - 30)}" cy="${fx(by)}" rx="${fx(br * 0.74)}" ry="${fx(br * 0.34)}" fill="${INK}" opacity="0.45"/>`
+      for (const [ox, oy, rad] of [[-8, -3, 7], [7, -2, 7], [0, -8, 8]]) {
+        s += `<circle cx="${fx(bx - 30 + ox)}" cy="${fx(by + oy)}" r="${fx(rad)}" fill="${cl % 2 ? BAZ.terra : BAZ.teal}" stroke="${INK}" stroke-width="2" stroke-opacity="0.7"/>`
+      }
+    }
+    // 2 — the stack of brass bowls, three deep with a rim highlight
+    {
+      const sx2 = bx + 12
+      s += `<ellipse cx="${fx(sx2)}" cy="${fx(by + 16)}" rx="${fx(20)}" ry="${fx(7)}" fill="${INK}" opacity="0.2"/>`
+      for (let k = 2; k >= 0; k--) {
+        const cy2 = by + 6 - k * 8
+        s += `<path d="M ${fx(sx2 - 17)} ${fx(cy2)} A 17 9 0 0 0 ${fx(sx2 + 17)} ${fx(cy2)} Z" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.75"/>`
+        s += `<path d="M ${fx(sx2 - 13)} ${fx(cy2 - 1.5)} A 13 5 0 0 0 ${fx(sx2 + 13)} ${fx(cy2 - 1.5)}" fill="none" stroke="${BAZ.saffronLit}" stroke-width="2.4" opacity="0.9"/>`
+      }
+    }
+    // 3 — the coil of rope, three turns
+    {
+      const rx2 = bx + 48
+      s += `<ellipse cx="${fx(rx2)}" cy="${fx(by + 8)}" rx="${fx(17)}" ry="${fx(7)}" fill="${INK}" opacity="0.18"/>`
+      for (let k = 0; k < 3; k++) {
+        s += `<ellipse cx="${fx(rx2)}" cy="${fx(by + 2 - k * 2.6)}" rx="${fx(15 - k * 3.4)}" ry="${fx(6 - k * 1.4)}" fill="none" stroke="${BAZ.sandDim}" stroke-width="4.2"/>`
+        s += `<ellipse cx="${fx(rx2)}" cy="${fx(by + 2 - k * 2.6)}" rx="${fx(15 - k * 3.4)}" ry="${fx(6 - k * 1.4)}" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
+      }
+      // the loose END lying off the coil — three concentric rings are rings
+      // until one of them stops being closed
+      s += `<path d="M ${fx(rx2 + 15)} ${fx(by + 2)} q 12 5 20 -2" fill="none" stroke="${BAZ.sandDim}" stroke-width="4.2"/>`
+      s += `<path d="M ${fx(rx2 + 15)} ${fx(by + 2)} q 12 5 20 -2" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
     }
   }
 
@@ -13177,15 +13353,34 @@ function bazaarFloorSpread(w, h, seed) {
     }
   }
 
-  // ---- TWO CRATES set down ON the lane (the twelve loose sack rings scattered
-  // over the whole spread are gone — those were the reader's "dark rings").
+  // ---- TWO TRESTLE TABLES set down ON the lane. These were CRATES drawn as an
+  // unfilled outline with one rule across the middle at 0.6 opacity, and that is
+  // exactly the reader's "thin black wire-outline rectangle with an internal bar
+  // — reads as an unpainted placeholder" (finding 16). The fix is not more
+  // contrast on the outline: an outline with nothing in it is a placeholder at
+  // any weight. So they become tables — a SOLID plank top, a shadow under it,
+  // crossed trestle legs and goods standing ON the plank.
   for (const t of [0.42, 0.9]) {
     const bx = PX(t)
-    const by = PY(laneY(t) + 0.006)
-    const cw3 = 34
-    s += `<path d="M ${fx(bx - cw3 / 2)} ${fx(by)} L ${fx(bx + cw3 / 2)} ${fx(by)} L ${fx(bx + cw3 / 2)} ${fx(by - cw3 * 0.55)} L ${fx(bx - cw3 / 2)} ${fx(by - cw3 * 0.55)} Z" fill="${BAZ.sandDim}" fill-opacity="0.6" stroke="${INK}" stroke-width="2.6" opacity="0.6"/>`
-    s += `<line x1="${fx(bx - cw3 / 2)}" y1="${fx(by - cw3 * 0.27)}" x2="${fx(bx + cw3 / 2)}" y2="${fx(by - cw3 * 0.27)}" stroke="${INK}" stroke-width="1.8" opacity="0.45"/>`
-    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + 3)}" rx="${fx(cw3 * 0.6)}" ry="4.5" fill="${INK}" opacity="0.18"/>`
+    const by = PY(laneY(t) + 0.01)
+    const tw2 = 62
+    const th2 = 9
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + 16)}" rx="${fx(tw2 * 0.56)}" ry="6" fill="${INK}" opacity="0.2"/>`
+    // the trestles under it
+    for (const sgn of [-1, 1]) {
+      const lx = bx + sgn * tw2 * 0.31
+      s += `<path d="M ${fx(lx - 9)} ${fx(by + 16)} L ${fx(lx + 9)} ${fx(by)} M ${fx(lx + 9)} ${fx(by + 16)} L ${fx(lx - 9)} ${fx(by)}" fill="none" stroke="#6b4a26" stroke-width="4" opacity="0.95"/>`
+    }
+    // the plank, solid, with its own end grain
+    s += `<rect x="${fx(bx - tw2 / 2)}" y="${fx(by - th2)}" width="${fx(tw2)}" height="${fx(th2)}" fill="#9a7038" stroke="${INK}" stroke-width="2.4" stroke-opacity="0.85"/>`
+    s += `<line x1="${fx(bx - tw2 / 2)}" y1="${fx(by - th2 * 0.42)}" x2="${fx(bx + tw2 / 2)}" y2="${fx(by - th2 * 0.42)}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
+    // goods standing on it: two melons and a stack of flatbreads
+    for (const [ox, rad, col] of [[-19, 9, BAZ.teal], [-2, 8, BAZ.terra]]) {
+      s += `<circle cx="${fx(bx + ox)}" cy="${fx(by - th2 - rad + 2)}" r="${fx(rad)}" fill="${col}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.75"/>`
+    }
+    for (let k = 0; k < 3; k++) {
+      s += `<ellipse cx="${fx(bx + 20)}" cy="${fx(by - th2 - 3 - k * 5)}" rx="14" ry="4.4" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="2" stroke-opacity="0.75"/>`
+    }
   }
 
   // ---- THE CAT AND THE FISH CRATE, kept because it survives the cull as a
@@ -13290,6 +13485,12 @@ function bazaarFloorSpread(w, h, seed) {
     `<stop offset="0" stop-color="${BAZ.terra}" stop-opacity="0.26"/>` +
     `<stop offset="0.62" stop-color="${BAZ.rose}" stop-opacity="0.17"/>` +
     `<stop offset="1" stop-color="${BAZ.rose}" stop-opacity="0"/></radialGradient>` +
+    // the trodden core of the bowl: the same pigment the flat ellipse carried,
+    // with no rim for the eye to read as an object (finding 16)
+    `<radialGradient id="bazTrod6" cx="0.5" cy="0.5" r="0.5">` +
+    `<stop offset="0" stop-color="${BAZ.terraDim}" stop-opacity="0.18"/>` +
+    `<stop offset="0.55" stop-color="${BAZ.terraDim}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${BAZ.terraDim}" stop-opacity="0"/></radialGradient>` +
     // the lane bands fade out at both page edges so they read as arcs of a bowl
     // rather than as full-width rules ruled across the paper
     `<linearGradient id="bazLane6" x1="0" y1="0" x2="1" y2="0">` +
