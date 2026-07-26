@@ -1614,33 +1614,78 @@ function boxFace(w, h, seed, face, kind) {
     return svgPiece(w, h, s)
   }
   if (kind === 'chest') {
-    // VAULT_NIGHT regrade (E3 s5): walnut-BLACK strongchest, foil glints —
-    // the enclosure goes quiet and dark so the dragon's foil reads as the
-    // one glowing thing in the spread.
+    // THE BANK'S COUNTER IN THE DUNES (E3 W2 S5-6). This box used to be painted
+    // as a strongchest, and the blind reader met it as "the least-finished-
+    // looking solid in the scene... a flat brown box on four posts with no
+    // signage, no detail and no silhouette; at reading distance it is a smudge
+    // under the dragon." It is also the only place in the picture where the
+    // people and the bank actually MEET, so it is worth its 115x49 screen px.
+    //
+    // Painted at that size: three bands, nothing finer. A ruled signboard
+    // across the top (signage, not type — 5 px of stroke lettering reads as
+    // noise, which is exactly what the reader reported the last time this
+    // spread tried it), an arched teller window with a grille and a lamp
+    // behind it, and a gold-capped counter with coin stacks and a ledger.
     const WOOD = '#3a2418',
       WLIT = '#553520',
-      WDIM = '#221409',
+      WDIM = '#1d1108',
       IRON = '#33333e',
       ILIT = '#5a5a68'
     let s = `<rect width="${w}" height="${h}" fill="${WOOD}"/>`
-    s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${WLIT}" opacity="0.18"/>`
-    // foil glow spilling over the top edge (the chest is open)
-    s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.14)}" fill="${VAULT.foilLit}" opacity="0.38"/>`
+    s += `<rect width="${fx(w * 0.5)}" height="${h}" fill="${WLIT}" opacity="0.2"/>`
     if (face === 'front' || face === 'back') {
-      s += plank(false, 4, WDIM)
-      const straps = face === 'front' ? [0.22, 0.5, 0.78] : [0.3, 0.7]
-      for (const sx of straps) {
-        s += `<rect x="${fx(w * sx - w * 0.02)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${IRON}"/>`
-        s += `<rect x="${fx(w * sx - w * 0.02)}" y="0" width="${fx(w * 0.012)}" height="${h}" fill="${ILIT}" opacity="0.6"/>`
-        for (const ry of [0.2, 0.5, 0.8]) s += `<circle cx="${fx(w * sx)}" cy="${fx(h * ry)}" r="3.5" fill="${ILIT}" stroke="${INK}" stroke-width="1"/>`
+      // ---- the signboard, top ~30% ----
+      s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.3)}" fill="${WDIM}"/>`
+      s += `<rect x="${fx(w * 0.04)}" y="${fx(h * 0.045)}" width="${fx(w * 0.92)}" height="${fx(h * 0.21)}" rx="${fx(h * 0.03)}" fill="${VAULT.foil}" stroke="${VAULT.foilDeep}" stroke-width="2.4"/>`
+      s += `<rect x="${fx(w * 0.04)}" y="${fx(h * 0.045)}" width="${fx(w * 0.92)}" height="${fx(h * 0.07)}" rx="${fx(h * 0.03)}" fill="${VAULT.foilLit}" opacity="0.75"/>`
+      for (const [x0, x1] of [[0.1, 0.44], [0.5, 0.72], [0.76, 0.92]]) {
+        s += `<rect x="${fx(w * x0)}" y="${fx(h * 0.12)}" width="${fx(w * (x1 - x0))}" height="${fx(h * 0.062)}" fill="${VAULT.ink}" opacity="0.65"/>`
       }
-      if (face === 'front') {
-        s += `<rect x="${fx(w * 0.44)}" y="${fx(h * 0.36)}" width="${fx(w * 0.12)}" height="${fx(h * 0.28)}" rx="3" fill="${VAULT.foil}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.5"/>` // lock plate
-        s += `<rect x="${fx(w * 0.445)}" y="${fx(h * 0.37)}" width="${fx(w * 0.025)}" height="${fx(h * 0.26)}" fill="${VAULT.foilHi}" opacity="0.5"/>` // foil glint
+      // a struck token at each end of the board — the bank's mark
+      for (const cxn of [0.07, 0.93]) {
+        s += `<circle cx="${fx(w * cxn)}" cy="${fx(h * 0.15)}" r="${fx(h * 0.055)}" fill="${VAULT.foilHi}" stroke="${VAULT.foilDeep}" stroke-width="1.8"/>`
+      }
+      // ---- the teller window, middle ----
+      const wy0 = h * 0.34
+      const wy1 = h * 0.74
+      const wx0 = w * (face === 'front' ? 0.3 : 0.34)
+      const wx1 = w * (face === 'front' ? 0.7 : 0.66)
+      const wmid = (wx0 + wx1) / 2
+      const arch =
+        `M ${fx(wx0)} ${fx(wy1)} L ${fx(wx0)} ${fx(wy0 + h * 0.1)} ` +
+        `Q ${fx(wmid)} ${fx(wy0 - h * 0.06)} ${fx(wx1)} ${fx(wy0 + h * 0.1)} L ${fx(wx1)} ${fx(wy1)} Z`
+      s += `<path d="${arch}" fill="${VAULT.nightDeep}"/>`
+      s += `<path d="${arch}" fill="${VAULT.foilLit}" opacity="0.4"/>` // lamplight inside
+      s += `<circle cx="${fx(wmid)}" cy="${fx(wy0 + h * 0.16)}" r="${fx(h * 0.07)}" fill="${VAULT.foilHi}" opacity="0.95"/>`
+      // the clerk's silhouette at the window
+      s += `<circle cx="${fx(wmid + w * 0.03)}" cy="${fx(wy0 + h * 0.24)}" r="${fx(h * 0.075)}" fill="${VAULT.duneDeep}"/>`
+      s += `<path d="M ${fx(wmid - w * 0.04)} ${fx(wy1)} q ${fx(w * 0.07)} ${fx(-h * 0.28)} ${fx(w * 0.14)} 0 Z" fill="${VAULT.duneDeep}"/>`
+      // grille bars
+      for (let i = 1; i < 5; i++) {
+        const gx = wx0 + ((wx1 - wx0) * i) / 5
+        s += `<line x1="${fx(gx)}" y1="${fx(wy0 + h * 0.02)}" x2="${fx(gx)}" y2="${fx(wy1)}" stroke="${VAULT.foil}" stroke-width="2.2" opacity="0.9"/>`
+      }
+      s += `<path d="${arch}" fill="none" stroke="${VAULT.foil}" stroke-width="3.2"/>`
+      // ---- the counter, bottom ----
+      s += `<rect x="0" y="${fx(h * 0.76)}" width="${w}" height="${fx(h * 0.24)}" fill="${WLIT}"/>`
+      s += `<rect x="0" y="${fx(h * 0.76)}" width="${w}" height="${fx(h * 0.05)}" fill="${VAULT.foil}"/>`
+      s += `<rect x="0" y="${fx(h * 0.76)}" width="${w}" height="${fx(h * 0.018)}" fill="${VAULT.foilHi}" opacity="0.8"/>`
+      // coin stacks + a ledger on the ledge
+      for (const [sx, n] of [[0.12, 4], [0.2, 6], [0.84, 5]]) {
+        for (let k = 0; k < n; k++) {
+          s += `<ellipse cx="${fx(w * sx)}" cy="${fx(h * 0.755 - k * h * 0.028)}" rx="${fx(w * 0.032)}" ry="${fx(h * 0.017)}" fill="${k % 2 ? VAULT.foilLit : VAULT.foil}" stroke="${VAULT.foilDeep}" stroke-width="1"/>`
+        }
+      }
+      s += `<rect x="${fx(w * 0.72)}" y="${fx(h * 0.7)}" width="${fx(w * 0.1)}" height="${fx(h * 0.055)}" fill="${VAULT.rim}" opacity="0.85" transform="rotate(-8 ${fx(w * 0.77)} ${fx(h * 0.73)})"/>`
+      // corner posts, the box's own structure
+      for (const px of [0.02, 0.96]) {
+        s += `<rect x="${fx(w * px)}" y="0" width="${fx(w * 0.022)}" height="${h}" fill="${IRON}"/>`
+        s += `<rect x="${fx(w * px)}" y="0" width="${fx(w * 0.007)}" height="${h}" fill="${ILIT}" opacity="0.6"/>`
       }
     } else {
+      // the side walls are 3 screen px at the reading camera — plank + strap
       s += plank(true, 3, WDIM)
-      s += `<rect x="${fx(w * 0.44)}" y="0" width="${fx(w * 0.12)}" height="${h}" fill="${IRON}"/>` // corner strap
+      s += `<rect x="${fx(w * 0.44)}" y="0" width="${fx(w * 0.12)}" height="${h}" fill="${IRON}"/>`
       s += `<rect x="${fx(w * 0.44)}" y="0" width="${fx(w * 0.03)}" height="${h}" fill="${ILIT}" opacity="0.6"/>`
     }
     s += border(WOOD)
@@ -2241,10 +2286,26 @@ function duneRankRow(r, pfx, w, y0, y1, cfg) {
       const drop = (y1 - yTop) * rr(r, 0.5, 0.9)
       s += `<path d="M ${fx(x)} ${fx(yTop)} q ${fx(drop * 0.9)} ${fx(drop * 0.45)} ${fx(drop * 1.7)} ${fx(drop)}" fill="none" stroke="${x / w < uCut ? VAULT.dune : VAULT.duneDeep}" stroke-width="1.4" opacity="0.22"/>`
     }
+    // LEE STRUCTURE (E3 W2 S5-3). The blind reader read these flanks as "pale,
+    // semi-transparent quadrilaterals with thin white outlines... they read as
+    // ghosted placeholders", and derived screen boxes put both of the panels
+    // they named inside r3-left and r2-right. The flanks WERE nearly flat: a
+    // single lee gradient, eight hairline ripples at 0.35, and a bright cream
+    // die-cut rim, which is a recipe for "unfinished geometry". So the lee gets
+    // a deep basal band, a second crest shadow following the silhouette, and
+    // ripples with enough weight to survive the reading camera.
+    {
+      // the sand deepens toward the foot, out of the moon
+      s += `<rect x="0" y="${fx(y1 - H * 0.34)}" width="${w}" height="${fx(H * 0.34)}" fill="${VAULT.nightDeep}" opacity="0.28"/>`
+      // a shadow line under the crest, parallel to the cut — the lee's own form
+      let under = ''
+      for (const [x, vf] of prof) under += (under ? ' L' : 'M') + ` ${fx(x)} ${fx(topY(vf * 0.86))}`
+      s += `<path d="${under}" fill="none" stroke="${VAULT.nightDeep}" stroke-width="${fx(H * 0.055)}" opacity="0.3"/>`
+    }
     // sand ripples near the row foot
-    for (let i = 0; i < 8; i++) {
-      const y = y1 - rr(r, 0.04, 0.22) * H
-      s += `<path d="M 0 ${fx(y)} Q ${fx(w * 0.5)} ${fx(y - H * 0.03)} ${fx(w)} ${fx(y)}" fill="none" stroke="${litFlank ? VAULT.dune : VAULT.duneDeep}" stroke-width="1.4" opacity="0.35"/>`
+    for (let i = 0; i < 12; i++) {
+      const y = y1 - rr(r, 0.03, 0.34) * H
+      s += `<path d="M 0 ${fx(y)} Q ${fx(w * 0.5)} ${fx(y - H * 0.03)} ${fx(w)} ${fx(y)}" fill="none" stroke="${litFlank ? VAULT.dune : VAULT.duneDim}" stroke-width="${fx(1.8 + rr(r, 0, 1.4))}" opacity="${(0.4 + rr(r, 0, 0.2)).toFixed(2)}"/>`
     }
     // ridge lip along the whole silhouette
     let lip = ''
@@ -2279,7 +2340,11 @@ function duneRankRow(r, pfx, w, y0, y1, cfg) {
   }
 
   s += `</g>`
-  s += rimPath(d, 3.4)
+  // A quieter rim on the INTERIOR ranks: at 3.4 the cream cut edge was the
+  // strongest mark on a flank whose body carried almost no value change, which
+  // is half of why the reader read a dune as a sheet of glass. The great dune
+  // keeps the full weight — it is the spread's horizon.
+  s += rimPath(d, cfg.style === 'night' ? 3.4 : 2.4)
   s += `</g>` // row clip
   return { defs, body: s }
 }
@@ -2371,12 +2436,30 @@ function rangeAtlas(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
-/** THE GUILLOCHÉ AUREOLE (ch4-aureole, 512x512): the bank's vault ring as a
- *  gilded engine-turned halo behind the dragon's head. An annulus of foil
- *  facets under two interfering families of fine engraved arcs (the
- *  guilloché), pierced filigree bores, bolt lugs, and the house rim on both
- *  cut edges. Alpha carves the ring — dress quad, zero DOF. */
-function guillocheAureole(w, h, seed) {
+/**
+ * THE RISING COIL (ch4-aureole, 512x452) — E3 W2 S5-4.
+ *
+ * This dress used to be a guilloché brass ring — "preciousness by framing".
+ * The blind reader listed it under things they could not identify: "gold beaded
+ * torus behind/above the disc... a hoard ring, or the dragon's coil rendered as
+ * a ring — it reads as a separate donut prop, not as part of the dragon."
+ *
+ * It is repainted as what the narration already says it is: a LOOP OF THE
+ * DRAGON, rising off the coil that rings the vault door and dropping back into
+ * it. The connection is geometric, not hopeful — the dress's centre is derived
+ * to sit ON the hero's coil band, so the loop's two crossing zones land where
+ * the body already runs:
+ *
+ *   dress u,v (0.04, 0.34) + half its 0.34 x 0.30 extent = panel (0.21, 0.49)
+ *   -> ch4-hero art (779, 168) at 1270 px/world across, 1290 down
+ *   the hero's coil band rides r = R = 327.7 about (532, 416); at the
+ *   upper-right quarter (315 deg) that is (764, 184) — 24 px from the loop's
+ *   centre, i.e. the coil passes through the loop's own hole.
+ *
+ * So the same hide, the same belly foil, the same dorsal sails and the same
+ * house rim as vaultDragon's coil: where they overlap, one beast.
+ */
+function dragonCoilLoop(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
   const cy = h / 2
@@ -2384,53 +2467,71 @@ function guillocheAureole(w, h, seed) {
   // aspect, so a circle in canvas pixels displays as a circle
   const R1 = h * 0.46
   const R0 = h * 0.285
+  const rMid = (R0 + R1) / 2
+  const band = R1 - R0
+  const HIDE = '#584169'
+  const HIDE_DEEP = '#3a2a4a'
   const ring = (rad) => `M ${fx(cx - rad)} ${fx(cy)} a ${fx(rad)} ${fx(rad)} 0 1 0 ${fx(rad * 2)} 0 a ${fx(rad)} ${fx(rad)} 0 1 0 ${fx(-rad * 2)} 0`
-  // annulus silhouette via fill-rule evenodd
   const annulus = `${ring(R1)} ${ring(R0)}`
-  const clip = `auc`
-  const foil = goldFoilFacets(r, 'au', cx - R1, cy - R1, cx + R1, cy + R1, w * 0.09, {
-    sparkles: 10,
-    streaks: 3,
-  })
-  let defs = `<clipPath id="${clip}"><path d="${annulus}" fill-rule="evenodd" clip-rule="evenodd"/></clipPath>` + foil.defs
-  let s = `<g clip-path="url(#${clip})">`
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R1)}" fill="${VAULT.foil}"/>`
-  s += foil.body
-  // guilloché: two interfering families of fine arcs (engine turning)
-  for (let k = 0; k < 26; k++) {
-    const a = (k / 26) * Math.PI * 2
-    const ox = Math.cos(a) * w * 0.052
-    const oy = Math.sin(a) * w * 0.052
-    s += `<circle cx="${fx(cx + ox)}" cy="${fx(cy + oy)}" r="${fx((R0 + R1) / 2)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="0.9" opacity="0.5"/>`
-    s += `<circle cx="${fx(cx - ox * 0.6)}" cy="${fx(cy - oy * 0.6)}" r="${fx((R0 + R1) / 2 - w * 0.02)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="0.7" opacity="0.35"/>`
+  const at = (a, rad) => [cx + Math.cos(a) * rad, cy + Math.sin(a) * rad]
+  const arcPath = (rad, a0, a1, steps = 72) => {
+    let d = ''
+    for (let k = 0; k <= steps; k++) {
+      const [px, py] = at(lerp(a0, a1, k / steps), rad)
+      d += `${k === 0 ? 'M' : ' L'} ${fx(px)} ${fx(py)}`
+    }
+    return d
   }
-  // radial engraved ticks
-  for (let k = 0; k < 72; k++) {
-    const a = (k / 72) * Math.PI * 2
-    const rA = k % 6 === 0 ? R0 + w * 0.01 : (R0 + R1) / 2 + w * 0.03
-    s += `<line x1="${fx(cx + Math.cos(a) * rA)}" y1="${fx(cy + Math.sin(a) * rA)}" x2="${fx(cx + Math.cos(a) * (R1 - w * 0.012))}" y2="${fx(cy + Math.sin(a) * (R1 - w * 0.012))}" stroke="${VAULT.ink}" stroke-width="1" opacity="${k % 6 === 0 ? 0.5 : 0.25}"/>`
+  const clip = 'dcl'
+  // the belly foil rides the loop's INNER half on its lower-right run — the
+  // hoard's light reaching the underside, exactly as on the coil
+  const foil = goldFoilFacets(r, 'dc', cx - R1, cy - R1, cx + R1, cy + R1, w * 0.1, { sparkles: 8, streaks: 3 })
+  let defs =
+    `<clipPath id="${clip}"><path d="${annulus}" fill-rule="evenodd" clip-rule="evenodd"/></clipPath>` +
+    `<clipPath id="${clip}b"><path d="${arcPath(rMid + band * 0.02, 0.05 * Math.PI, 0.95 * Math.PI)} ${arcPath(R0, 0.95 * Math.PI, 0.05 * Math.PI)} Z"/></clipPath>` +
+    foil.defs
+  let s = `<g clip-path="url(#${clip})">`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R1)}" fill="${HIDE}"/>`
+  // cylinder modelling: dark along the outer half, a lifted top-light inside,
+  // so the loop reads ROUND like the coil it grows out of
+  s += `<path d="${arcPath(rMid + band * 0.34, 0, Math.PI * 2)}" fill="none" stroke="${HIDE_DEEP}" stroke-width="${fx(band * 0.34)}" opacity="0.55"/>`
+  s += `<path d="${arcPath(rMid - band * 0.18, 0, Math.PI * 2)}" fill="none" stroke="#6a5280" stroke-width="${fx(band * 0.24)}" opacity="0.45"/>`
+  // the belly: gold-foil plates on the lower inner run
+  s += `<g clip-path="url(#${clip}b)">${foil.body}`
+  for (let i = 0; i < 18; i++) {
+    const a = lerp(0.08 * Math.PI, 0.92 * Math.PI, i / 17)
+    const [x0, y0] = at(a, R0)
+    const [x1, y1] = at(a, rMid + band * 0.02)
+    s += `<line x1="${fx(x0)}" y1="${fx(y0)}" x2="${fx(x1)}" y2="${fx(y1)}" stroke="${VAULT.foilDeep}" stroke-width="2" opacity="0.45"/>`
   }
   s += `</g>`
-  // pierced filigree bores + bolt lugs riding the band (outside the clip so
-  // the bores read as true holes: painted as page-showing alpha? no — bores
-  // are dark ink wells, the LUGS are gold studs; alpha piercing would need a
-  // mask and the dress rides close over painted panel anyway)
-  for (let k = 0; k < 12; k++) {
-    const a = (k / 12) * Math.PI * 2 + Math.PI / 12
-    const rM = (R0 + R1) / 2
-    const bx = cx + Math.cos(a) * rM
-    const by = cy + Math.sin(a) * rM
-    if (k % 2 === 0) {
-      s += `<circle cx="${fx(bx)}" cy="${fx(by)}" r="${fx(w * 0.022)}" fill="${VAULT.nightDeep}"/>` // bore
-      s += `<circle cx="${fx(bx)}" cy="${fx(by)}" r="${fx(w * 0.022)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.2" opacity="0.8"/>`
-    } else {
-      s += `<circle cx="${fx(bx)}" cy="${fx(by)}" r="${fx(w * 0.018)}" fill="${VAULT.foilLit}" stroke="${VAULT.ink}" stroke-width="1.2" stroke-opacity="0.5"/>` // lug
-      s += `<circle cx="${fx(bx - w * 0.005)}" cy="${fx(by - w * 0.005)}" r="${fx(w * 0.006)}" fill="#ffffff" opacity="0.8"/>`
-    }
+  // scale crescents over the outer half — the same motif at the same scale as
+  // the coil's, which is what makes the eye join the two
+  for (let k = 0; k < 34; k++) {
+    const a = (k / 34) * Math.PI * 2 + rr(r, -0.04, 0.04)
+    const rad = rMid + band * rr(r, 0.06, 0.36)
+    const [sx, sy] = at(a, rad)
+    const sc = w * rr(r, 0.026, 0.045)
+    const rot = ((a + Math.PI / 2) * 180) / Math.PI
+    s += `<path d="M ${fx(sx - sc)} ${fx(sy)} a ${fx(sc)} ${fx(sc)} 0 0 0 ${fx(sc * 2)} 0" fill="none" stroke="#8468a0" stroke-width="2" opacity="0.8" transform="rotate(${fx(rot)} ${fx(sx)} ${fx(sy)})"/>`
   }
-  s += `<path d="${ring(R1)}" fill="none" stroke="${VAULT.rim}" stroke-width="4" opacity="0.95"/>`
+  // FOIL EDGE-LIGHT on the hoard-facing (inner) edge — the coil's signature
+  s += `<path d="${arcPath(R0 + w * 0.008, 0, Math.PI * 2)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="3" opacity="0.85"/>`
+  s += `<path d="${arcPath(R0 + w * 0.018, 0, Math.PI * 2)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.2" opacity="0.55"/>`
+  s += `</g>`
+  // dorsal sails riding the loop's OUTER edge, leaning with the wrap
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2 + 0.11
+    const ln = w * (0.045 + 0.022 * Math.sin(k * 1.7))
+    const [bx0, by0] = at(a - 0.032 * Math.PI, R1 - w * 0.004)
+    const [bx1, by1] = at(a + 0.032 * Math.PI, R1 - w * 0.004)
+    const [tx, ty] = at(a + 0.05 * Math.PI, R1 + ln)
+    s += `<path d="M ${fx(bx0)} ${fx(by0)} Q ${fx(tx)} ${fx(ty)} ${fx(bx1)} ${fx(by1)} Z" fill="${HIDE_DEEP}" stroke="${VAULT.duneDim}" stroke-width="1.2"/>`
+  }
+  // the house rim on both cut edges, the coil's own weights
+  s += `<path d="${ring(R1)}" fill="none" stroke="${VAULT.rim}" stroke-width="3.6" opacity="0.95"/>`
   s += `<path d="${ring(R1)}" fill="none" stroke="${VAULT.ink}" stroke-width="1.4" opacity="0.5"/>`
-  s += `<path d="${ring(R0)}" fill="none" stroke="${VAULT.rim}" stroke-width="3.4" opacity="0.95"/>`
+  s += `<path d="${ring(R0)}" fill="none" stroke="${VAULT.rim}" stroke-width="3" opacity="0.9"/>`
   s += `<path d="${ring(R0)}" fill="none" stroke="${VAULT.ink}" stroke-width="1.2" opacity="0.5"/>`
   return svgPiece(w, h, s, defs)
 }
@@ -2439,8 +2540,8 @@ function guillocheAureole(w, h, seed) {
  *  toward the brass PULL on the left page): standing silhouette with an
  *  ember sash + gold cargo, legs clear of the ground bar so the placard
  *  keeps its sightline through the gaps. Local coords: feet at y=0. */
-function friezeCamel(x, yFoot, s, r) {
-  const B = VAULT.duneDeep
+function friezeCamel(x, yFoot, s, r, ink) {
+  const B = ink ?? VAULT.duneDeep
   let g = `<g>`
   // legs (thin, the see-through gaps live between them)
   for (const [lx, lean] of [[-1.9, -0.12], [-0.9, 0.08], [0.9, -0.06], [1.8, 0.14]]) {
@@ -2470,48 +2571,198 @@ function friezeCamel(x, yFoot, s, r) {
   return g
 }
 
-/** THE CARAVAN FRIEZE (ch4-frieze, 1024x192): one linked-chain cutout — an
- *  ember-sashed camel train walking INTO the picture toward the PULL tab.
- *  Pack §4.2 sightline law: silhouette dips <= 0.06 world (37% of h 0.16)
- *  in x in [-0.75, -0.44] = u in [0, 0.207] — only the low ground bar and
- *  leg gaps live there, so the dissolve placard reads through. */
-function caravanFrieze(w, h, seed) {
+/** One hooded walker on foot inside the passage — a customer of the bank, so
+ *  the glass reads as a thing PEOPLE use. Feet at yFoot, facing left. */
+function passageWalker(x, yFoot, s2, ink) {
+  let g = ''
+  g += `<path d="M ${fx(x - 1.0 * s2)} ${fx(yFoot)} L ${fx(x - 0.5 * s2)} ${fx(yFoot - 2.6 * s2)} L ${fx(x + 0.5 * s2)} ${fx(yFoot - 2.6 * s2)} L ${fx(x + 1.0 * s2)} ${fx(yFoot)} Z" fill="${ink}"/>`
+  g += `<circle cx="${fx(x - 0.1 * s2)}" cy="${fx(yFoot - 3.2 * s2)}" r="${fx(0.72 * s2)}" fill="${ink}"/>`
+  g += `<path d="M ${fx(x - 0.55 * s2)} ${fx(yFoot - 2.05 * s2)} l ${fx(1.1 * s2)} ${fx(-0.16 * s2)} l ${fx(0.06 * s2)} ${fx(0.5 * s2)} l ${fx(-1.2 * s2)} ${fx(0.16 * s2)} Z" fill="${VAULT.ember}"/>`
+  return g
+}
+
+/**
+ * THE PASSAGE OF GLASS (ch4-frieze, 1024x109) — E3 W2 S5-3/S5-4.
+ *
+ * The chapter's whole point ("passages of glass through which the people could
+ * reach their gold — safely, swiftly, and without waking so much as one scale")
+ * had no object in the scene at all. What the blind reader found instead was
+ * this card's old connector bar: "the thin white/silver rail they stand on...
+ * it reads as a metal bar", listed under "large elements I could not identify",
+ * with the note that IF the rails are the passages of glass "they are
+ * illegible".
+ *
+ * So the frieze IS the passage now, drawn in elevation across the whole spread:
+ * a kerbed, gold-framed, glazed gallery with the caravan and its customers
+ * walking INSIDE it toward the vault. Same card, same station, same 0.16 height
+ * — the geometry is untouched; the paint carries the whole fix, and the rail
+ * the reader could not name becomes the gallery's kerb.
+ *
+ * The glazing is genuinely translucent (fill-opacity ~0.3 on an alpha-blended
+ * die-cut), so the sand, the bank stall behind it and the dragon read THROUGH
+ * the glass. That is not decoration: seeing the dragon through the glass while
+ * standing safely inside it is the sentence the chapter is about.
+ *
+ * SIGHTLINE LAW (pack §4.2, kept and re-derived): the silhouette may not rise
+ * above 0.06 world = 37.5% of h in x in [-0.75, -0.44] = u in [0, 0.207], or the
+ * card covers the dissolve placard — the spread's climax. The gallery therefore
+ * ENDS at u = 0.21 in a portal (its mouth, which is what the caravan is walking
+ * toward), and only the 20%-tall kerb continues past it as the paved approach.
+ */
+/** The passage's own numbers, exported so the raster gate measures the art
+ *  against the painter rather than against a screenshot. */
+const S5_GLASS = {
+  /** The portal's station. Not the 0.207 sightline edge itself: the i=0 mullion
+   *  and its finial are drawn CENTRED on gx0, so the run's leftmost ink is
+   *  gx0 - bw*0.11, which 0.218 puts at u = 0.2122 — inside the window. */
+  U0: 0.218,
+  BAYS: 15,
+  /** Glazed band as fractions of h: springing line and sill. */
+  SPRING: 0.42,
+  SILL: 0.78,
+  /** Pack §4.2: silhouette ceiling inside u <= SIGHT_U, as a fraction of h. */
+  SIGHT_U: 0.207,
+  SIGHT_V: 0.375,
+}
+
+function glassPassage(w, h, seed) {
   const r = mulberry32(seed)
-  const barTop = h * 0.72 // ground bar: the chain's connector (28% tall)
-  // ground bar with a rippled top edge, full width (the linked chain)
-  let bar = `M 0 ${fx(h)} L 0 ${fx(barTop + h * 0.06)}`
-  for (let i = 0; i <= 24; i++) {
-    const x = (w * i) / 24
-    bar += ` L ${fx(x)} ${fx(barTop + Math.sin(i * 1.3) * h * 0.028 + h * 0.03)}`
+  // Sandstone kerb + gold frame + pale glazing, all inside the VAULT ramp.
+  const STONE = '#6c5673'
+  const STONE_LIT = '#8b7290'
+  const STONE_DEEP = '#3b2b4c'
+  const GLASS = '#a9d2cd' // a lit thin-film teal — VAULT.film1 raised to glazing
+  const CARAVAN_INK = '#241a33' // near-ink: the travellers must read AGAINST the lamplight
+  const U0 = S5_GLASS.U0 // the portal: where the gallery's mouth stands
+  const yGround = h
+  const yKerbTop = h * 0.8
+  const yKerbCap = h * 0.845
+  const ySill = h * S5_GLASS.SILL
+  const ySpring = h * S5_GLASS.SPRING // where the glazing arches spring
+  const yHead = h * 0.16 // the underside of the top rail
+  const yRail = h * 0.05
+
+  let defsFrieze = ''
+  let s = ''
+  // ---- the paved approach (u < U0): kerb only, so the placard reads through ----
+  s += `<rect x="0" y="${fx(yKerbTop)}" width="${fx(w * U0)}" height="${fx(h - yKerbTop)}" fill="${STONE_DEEP}"/>`
+  s += `<rect x="0" y="${fx(yKerbTop)}" width="${fx(w * U0)}" height="${fx(yKerbCap - yKerbTop)}" fill="${STONE_LIT}" opacity="0.75"/>`
+  for (let i = 0; i < 7; i++) {
+    const x = (w * U0 * i) / 7 + 4
+    s += `<line x1="${fx(x)}" y1="${fx(yKerbCap)}" x2="${fx(x)}" y2="${fx(yGround)}" stroke="${STONE_DEEP}" stroke-width="1.4" opacity="0.8"/>`
   }
-  bar += ` L ${fx(w)} ${fx(h)} Z`
-  let s = `<path d="${bar}" fill="${VAULT.duneDeep}"/>`
-  s += `<path d="M 0 ${fx(h * 0.92)} Q ${fx(w * 0.5)} ${fx(h * 0.86)} ${fx(w)} ${fx(h * 0.92)}" fill="none" stroke="${VAULT.duneDim}" stroke-width="2" opacity="0.7"/>`
-  // gold moon-lip along the bar's ripple
-  s += `<path d="M 0 ${fx(barTop + h * 0.05)} Q ${fx(w * 0.5)} ${fx(barTop - h * 0.01)} ${fx(w)} ${fx(barTop + h * 0.05)}" fill="none" stroke="${VAULT.dune}" stroke-width="1.8" opacity="0.6"/>`
-  // the camels: chain starts PAST the sightline window (u > 0.24), walking left
-  const scale = h * 0.135
-  const stations = [0.27, 0.38, 0.5, 0.62, 0.75, 0.88]
-  for (const [i, u] of stations.entries()) {
-    s += friezeCamel(w * u, barTop + h * 0.04, scale * (i % 2 === 0 ? 1 : 0.92), r)
-    // lead rope linking to the camel ahead
-    if (i > 0) {
-      const xa = w * stations[i - 1] + 2.2 * scale
-      const xb = w * u - 3.6 * scale
-      s += `<path d="M ${fx(xb)} ${fx(barTop - h * 0.28)} Q ${fx((xa + xb) / 2)} ${fx(barTop - h * 0.14)} ${fx(xa)} ${fx(barTop - h * 0.32)}" fill="none" stroke="${VAULT.ember}" stroke-width="1.6" opacity="0.85"/>`
+
+  // ---- the gallery run: kerb, glazing, top rail ----
+  const gx0 = w * U0
+  const gw = w - gx0
+  const bays = S5_GLASS.BAYS
+  const bw = gw / bays
+  s += `<rect x="${fx(gx0)}" y="${fx(yKerbTop)}" width="${fx(gw)}" height="${fx(h - yKerbTop)}" fill="${STONE}"/>`
+  s += `<rect x="${fx(gx0)}" y="${fx(yKerbTop)}" width="${fx(gw)}" height="${fx(yKerbCap - yKerbTop)}" fill="${STONE_LIT}"/>`
+  s += `<line x1="${fx(gx0)}" y1="${fx(yKerbTop)}" x2="${fx(w)}" y2="${fx(yKerbTop)}" stroke="${VAULT.foilLit}" stroke-width="2.2" opacity="0.9"/>`
+  s += `<line x1="0" y1="${fx(yKerbCap)}" x2="${fx(w)}" y2="${fx(yKerbCap)}" stroke="${STONE_DEEP}" stroke-width="2.6" opacity="0.9"/>`
+  for (let i = 0; i <= bays * 2; i++) {
+    const x = gx0 + (gw * i) / (bays * 2)
+    s += `<line x1="${fx(x)}" y1="${fx(yKerbCap)}" x2="${fx(x)}" y2="${fx(yGround)}" stroke="${STONE_DEEP}" stroke-width="1.5" opacity="0.85"/>`
+  }
+  // the road inside the gallery — a paved floor the caravan walks on
+  s += `<rect x="${fx(gx0)}" y="${fx(ySill)}" width="${fx(gw)}" height="${fx(yKerbTop - ySill)}" fill="${STONE_DEEP}" opacity="0.9"/>`
+
+  // ---- lamplight INSIDE the passage ----
+  // Without it the travellers are dark violet silhouettes on dark violet sand
+  // seen through a cool pane, which is a smudge. A lamplit gallery at night is
+  // also the truer picture: the glass is what lets people come here after dark
+  // without the beast noticing them.
+  // Clipped to the glazed opening: a glow that spills past the sill washes the
+  // kerb out and the built edge stops reading (measured on the first bake).
+  const glowClip = 'gpglow'
+  defsFrieze += `<clipPath id="${glowClip}"><rect x="${fx(gx0)}" y="${fx(yHead)}" width="${fx(gw)}" height="${fx(ySill - yHead)}"/></clipPath>`
+  s += `<g clip-path="url(#${glowClip})">`
+  for (let i = 0; i < bays; i++) {
+    const cx2 = gx0 + (i + 0.5) * bw
+    s += `<ellipse cx="${fx(cx2)}" cy="${fx(ySill)}" rx="${fx(bw * 0.58)}" ry="${fx((ySill - ySpring) * 0.9)}" fill="${VAULT.duneLit}" opacity="0.26"/>`
+    s += `<ellipse cx="${fx(cx2)}" cy="${fx(ySill - h * 0.03)}" rx="${fx(bw * 0.28)}" ry="${fx((ySill - ySpring) * 0.45)}" fill="${VAULT.foilLit}" opacity="0.26"/>`
+  }
+  s += `</g>`
+
+  // ---- the walkers, BEHIND the glazing ----
+  const foot = ySill + 1
+  const camelScale = h * 0.108
+  for (const [i, u] of [0.3, 0.42, 0.55, 0.68, 0.81, 0.93].entries()) {
+    s += friezeCamel(w * u, foot, camelScale * (i % 2 === 0 ? 1 : 0.93), r, CARAVAN_INK)
+  }
+  for (const u of [0.25, 0.36, 0.49, 0.62, 0.75, 0.88, 0.97]) {
+    s += passageWalker(w * u, foot, h * 0.075, CARAVAN_INK)
+  }
+
+  // ---- the glazing: one arched pane per bay, translucent ----
+  for (let i = 0; i < bays; i++) {
+    const x0 = gx0 + i * bw + bw * 0.12
+    const x1 = gx0 + (i + 1) * bw - bw * 0.12
+    const mid = (x0 + x1) / 2
+    const pane =
+      `M ${fx(x0)} ${fx(ySill)} L ${fx(x0)} ${fx(ySpring)} ` +
+      `Q ${fx(mid)} ${fx(yHead - h * 0.06)} ${fx(x1)} ${fx(ySpring)} L ${fx(x1)} ${fx(ySill)} Z`
+    s += `<path d="${pane}" fill="${GLASS}" fill-opacity="0.3"/>`
+    // specular: one diagonal band and a lit head, so the pane reads as GLASS
+    s += `<path d="M ${fx(x0 + bw * 0.1)} ${fx(ySill)} L ${fx(mid)} ${fx(ySpring - h * 0.05)} L ${fx(mid + bw * 0.16)} ${fx(ySpring - h * 0.05)} L ${fx(x0 + bw * 0.32)} ${fx(ySill)} Z" fill="#ffffff" opacity="0.24"/>`
+    s += `<path d="M ${fx(x0)} ${fx(ySpring)} Q ${fx(mid)} ${fx(yHead - h * 0.06)} ${fx(x1)} ${fx(ySpring)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.6" opacity="0.75"/>`
+    // glazing bar: the horizontal transom every pane carries
+    s += `<line x1="${fx(x0)}" y1="${fx(ySpring + h * 0.16)}" x2="${fx(x1)}" y2="${fx(ySpring + h * 0.16)}" stroke="${VAULT.foil}" stroke-width="1.5" opacity="0.7"/>`
+  }
+
+  // ---- the gold MULLIONS between the bays (drawn over the glazing) ----
+  for (let i = 0; i <= bays; i++) {
+    const x = gx0 + i * bw
+    s += `<rect x="${fx(x - bw * 0.05)}" y="${fx(yHead)}" width="${fx(bw * 0.1)}" height="${fx(ySill - yHead)}" fill="${VAULT.foil}"/>`
+    s += `<rect x="${fx(x - bw * 0.05)}" y="${fx(yHead)}" width="${fx(bw * 0.035)}" height="${fx(ySill - yHead)}" fill="${VAULT.foilLit}" opacity="0.8"/>`
+    s += `<rect x="${fx(x - bw * 0.085)}" y="${fx(ySpring - h * 0.05)}" width="${fx(bw * 0.17)}" height="${fx(h * 0.05)}" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="0.8"/>`
+    s += `<rect x="${fx(x - bw * 0.085)}" y="${fx(ySill - h * 0.045)}" width="${fx(bw * 0.17)}" height="${fx(h * 0.045)}" fill="${VAULT.foil}" stroke="${VAULT.foilDeep}" stroke-width="0.8"/>`
+    // a lamp hung off every second post, inside the glass
+    if (i % 2 === 1 && i < bays) {
+      const lx = x + bw * 0.5
+      s += `<line x1="${fx(lx)}" y1="${fx(ySpring - h * 0.02)}" x2="${fx(lx)}" y2="${fx(ySpring + h * 0.08)}" stroke="${VAULT.foilDeep}" stroke-width="1.1"/>`
+      s += `<circle cx="${fx(lx)}" cy="${fx(ySpring + h * 0.12)}" r="${fx(h * 0.045)}" fill="${VAULT.foilHi}" opacity="0.95"/>`
+      s += `<circle cx="${fx(lx)}" cy="${fx(ySpring + h * 0.12)}" r="${fx(h * 0.085)}" fill="${VAULT.foilLit}" opacity="0.3"/>`
     }
   }
-  // the caravan master on foot at the head of the chain, staff forward —
-  // clear of the sightline window's edge (u 0.205) with real margin
-  const mx = w * 0.235
-  s += `<circle cx="${fx(mx)}" cy="${fx(barTop - h * 0.34)}" r="${fx(h * 0.05)}" fill="${VAULT.duneDeep}"/>`
-  s += `<path d="M ${fx(mx - h * 0.03)} ${fx(barTop + h * 0.04)} L ${fx(mx - h * 0.012)} ${fx(barTop - h * 0.3)} L ${fx(mx + h * 0.05)} ${fx(barTop - h * 0.26)} L ${fx(mx + h * 0.06)} ${fx(barTop + h * 0.04)} Z" fill="${VAULT.duneDeep}"/>`
-  s += `<path d="M ${fx(mx - h * 0.02)} ${fx(barTop - h * 0.18)} l ${fx(-h * 0.06)} ${fx(h * 0.02)}" stroke="${VAULT.ember}" stroke-width="2.4"/>` // sash
-  s += `<line x1="${fx(mx - h * 0.09)}" y1="${fx(barTop + h * 0.04)}" x2="${fx(mx - h * 0.1)}" y2="${fx(barTop - h * 0.42)}" stroke="${VAULT.duneDeep}" stroke-width="2.6"/>` // staff
-  // rim along the whole chain's cut edge (bar + backs), approximated on the
-  // bar ripple + each camel handled by its own dark mass (tiny at scene scale)
-  s += `<path d="M 0 ${fx(barTop + h * 0.06)} Q ${fx(w * 0.5)} ${fx(barTop)} ${fx(w)} ${fx(barTop + h * 0.06)}" fill="none" stroke="${VAULT.rim}" stroke-width="3" opacity="0.9"/>`
-  return svgPiece(w, h, s)
+
+  // ---- the top rail (entablature) running the length of the gallery ----
+  s += `<rect x="${fx(gx0)}" y="${fx(yRail)}" width="${fx(gw)}" height="${fx(yHead - yRail)}" fill="${VAULT.foil}"/>`
+  s += `<rect x="${fx(gx0)}" y="${fx(yRail)}" width="${fx(gw)}" height="${fx((yHead - yRail) * 0.34)}" fill="${VAULT.foilLit}"/>`
+  s += `<line x1="${fx(gx0)}" y1="${fx(yHead)}" x2="${fx(w)}" y2="${fx(yHead)}" stroke="${VAULT.foilDeep}" stroke-width="1.6" opacity="0.8"/>`
+  // ridge finials over every second mullion — the roofline that makes the run
+  // read as ARCHITECTURE from across the spread
+  for (let i = 0; i <= bays; i += 2) {
+    const x = gx0 + i * bw
+    s += `<path d="M ${fx(x - bw * 0.11)} ${fx(yRail)} L ${fx(x)} ${fx(yRail - h * 0.075)} L ${fx(x + bw * 0.11)} ${fx(yRail)} Z" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="1"/>`
+  }
+
+  // ---- the PORTAL: the gallery's mouth, where the caravan is heading ----
+  // Everything the portal owns starts AT gx0 and grows into the gallery: the
+  // raster gate (e3w2s5-art-gates G1) caught an earlier draft whose jamb and
+  // plaque reached back to u=0.193 at full height, which is precisely the
+  // sightline the pack reserves for the dissolve placard.
+  const px = gx0
+  s += `<rect x="${fx(px)}" y="${fx(yRail - h * 0.08)}" width="${fx(w * 0.024)}" height="${fx(ySill - yRail + h * 0.08)}" fill="${VAULT.foil}"/>`
+  s += `<rect x="${fx(px)}" y="${fx(yRail - h * 0.08)}" width="${fx(w * 0.008)}" height="${fx(ySill - yRail + h * 0.08)}" fill="${VAULT.foilLit}"/>`
+  // the mouth's arch head + a hanging lamp inside it
+  s += `<path d="M ${fx(px + w * 0.026)} ${fx(ySill)} L ${fx(px + w * 0.026)} ${fx(ySpring - h * 0.05)} Q ${fx(px + w * 0.044)} ${fx(yHead - h * 0.12)} ${fx(px + w * 0.062)} ${fx(ySpring - h * 0.05)} L ${fx(px + w * 0.062)} ${fx(ySill)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="2.4"/>`
+  s += `<circle cx="${fx(px + w * 0.044)}" cy="${fx(ySpring + h * 0.06)}" r="${fx(h * 0.05)}" fill="${VAULT.foilHi}" opacity="0.9"/>`
+  s += `<line x1="${fx(px + w * 0.044)}" y1="${fx(ySpring - h * 0.02)}" x2="${fx(px + w * 0.044)}" y2="${fx(yHead)}" stroke="${VAULT.foilDeep}" stroke-width="1.2"/>`
+  // keystone plaque over the mouth — a bank sign. Its letters are ruled, not
+  // written: at 0.09w it would be 5 screen px of type, and the reader already
+  // told us what unreadable type reads as ("tiny vertical lettering"). What
+  // carries here is the SIGNBOARD, which is the information.
+  s += `<rect x="${fx(px)}" y="${fx(yRail - h * 0.2)}" width="${fx(w * 0.096)}" height="${fx(h * 0.16)}" rx="2" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="1.4"/>`
+  for (let i = 0; i < 3; i++) {
+    s += `<line x1="${fx(px + w * 0.008)}" y1="${fx(yRail - h * 0.155 + i * h * 0.045)}" x2="${fx(px + w * 0.086)}" y2="${fx(yRail - h * 0.155 + i * h * 0.045)}" stroke="${VAULT.ink}" stroke-width="1.5" opacity="0.6"/>`
+  }
+
+  // ---- the house rim along the whole cut edge of the built run ----
+  const rim = `M 0 ${fx(yKerbTop)} L ${fx(gx0)} ${fx(yKerbTop)} L ${fx(gx0)} ${fx(yRail - h * 0.2)} L ${fx(w)} ${fx(yRail - h * 0.2)}`
+  s += `<path d="${rim}" fill="none" stroke="${VAULT.rim}" stroke-width="2.6" opacity="0.85" stroke-linejoin="round"/>`
+  return svgPiece(w, h, s, defsFrieze)
 }
 
 /** THE VAULT-DRAGON (ch4-hero repaint, 1024x800): the bank's dragon lies
@@ -2543,15 +2794,88 @@ function vaultDragon(w, h, seed) {
     s += `<circle cx="${fx(cx + Math.cos(a) * R * 0.82)}" cy="${fx(cy + Math.sin(a) * R * 0.82)}" r="${fx(R * 0.045)}" fill="${VAULT.foilLit}" stroke="${VAULT.ink}" stroke-width="1.6" stroke-opacity="0.6"/>`
     s += `<circle cx="${fx(cx + Math.cos(a) * R * 0.82 - R * 0.012)}" cy="${fx(cy + Math.sin(a) * R * 0.82 - R * 0.012)}" r="${fx(R * 0.014)}" fill="#ffffff" opacity="0.85"/>`
   }
-  // the spindle wheel at the door's heart
-  const spokes = 5
-  for (let k = 0; k < spokes; k++) {
-    const a = (k / spokes) * Math.PI * 2 + 0.3
-    s += `<line x1="${fx(cx)}" y1="${fx(cy)}" x2="${fx(cx + Math.cos(a) * R * 0.34)}" y2="${fx(cy + Math.sin(a) * R * 0.34)}" stroke="${VAULT.foil}" stroke-width="${fx(R * 0.045)}" stroke-linecap="round"/>`
+  // ---- THE DOOR IS A DOOR, NOT A DIAL (E3 W2 S5-5) ----
+  // This spot carried a five-spoke spindle wheel on a hub. The blind reader:
+  // "The spoked disc is an interaction trap. It has a hub, three spokes and a
+  // studded rim — it is drawn as a wheel/dial. I tried to turn it eight ways.
+  // It is inert." The honest fix is not to make the door spin: a vault door a
+  // reader can crank open is a different chapter, and this one turns entirely
+  // on NOT disturbing what is behind it. So the paint stops promising a
+  // mechanism the paper does not have. No spokes, no hub — a struck bank seal
+  // where the wheel was, hinge knuckles on the jamb side, and a seam of the
+  // hoard's own light leaking around the shut edge. That last part is also the
+  // closed-state law the s7 lane's cousin finding asks for: a thing that is
+  // shut at rest must show its lid, its hinge, and that there are CONTENTS.
+  const sealR = R * 0.235
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(sealR)}" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="${fx(sealR * 0.13)}"/>`
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(sealR * 0.8)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(sealR * 0.06)}" opacity="0.7"/>`
+  // milled edge — a struck coin, not a knob
+  for (let k = 0; k < 40; k++) {
+    const a = (k / 40) * Math.PI * 2
+    s += `<line x1="${fx(cx + Math.cos(a) * sealR * 0.86)}" y1="${fx(cy + Math.sin(a) * sealR * 0.86)}" x2="${fx(cx + Math.cos(a) * sealR)}" y2="${fx(cy + Math.sin(a) * sealR)}" stroke="${VAULT.foilDeep}" stroke-width="1.6" opacity="0.55"/>`
   }
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.34)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="${fx(R * 0.04)}"/>`
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.09)}" fill="${VAULT.foilLit}" stroke="${VAULT.ink}" stroke-width="2" stroke-opacity="0.5"/>`
+  // the seal's device: the same struck dune the pull tongues carry, so the two
+  // tabs read as this bank's own tokens rather than as system widgets
+  s += `<path d="M ${fx(cx - sealR * 0.6)} ${fx(cy + sealR * 0.38)} q ${fx(sealR * 0.34)} ${fx(-sealR * 0.8)} ${fx(sealR * 0.6)} ${fx(-sealR * 0.14)} q ${fx(sealR * 0.26)} ${fx(-sealR * 0.5)} ${fx(sealR * 0.58)} ${fx(sealR * 0.2)} l 0 ${fx(sealR * 0.34)} Z" fill="${VAULT.foilDeep}" opacity="0.85"/>`
+  s += `<circle cx="${fx(cx - sealR * 0.3)}" cy="${fx(cy - sealR * 0.36)}" r="${fx(sealR * 0.15)}" fill="${VAULT.foilHi}" opacity="0.85"/>`
+  // the shut SEAM: the leaf meets its jamb on a circle just inside the rim,
+  // with the hoard's glow bleeding through it on the hoard side (lower left)
+  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R * 0.955)}" fill="none" stroke="${VAULT.ink}" stroke-width="${fx(R * 0.022)}" opacity="0.65"/>`
+  for (const [a0, a1, wgt] of [[0.6, 0.9, 1], [0.92, 0.98, 0.5]]) {
+    let seam = ''
+    for (let k = 0; k <= 40; k++) {
+      const a = lerp(a0 * Math.PI, a1 * Math.PI, k / 40)
+      seam += `${k === 0 ? 'M' : ' L'} ${fx(cx + Math.cos(a) * R * 0.955)} ${fx(cy + Math.sin(a) * R * 0.955)}`
+    }
+    s += `<path d="${seam}" fill="none" stroke="${VAULT.foilLit}" stroke-width="${fx(R * 0.06 * wgt)}" opacity="${(0.3 * wgt).toFixed(2)}"/>`
+    s += `<path d="${seam}" fill="none" stroke="${VAULT.foilHi}" stroke-width="${fx(R * 0.02 * wgt)}" opacity="${(0.9 * wgt).toFixed(2)}"/>`
+  }
+  // three hinge knuckles on the jamb side (upper right, clear of the head)
+  // ...on the LEFT arc, the only part of the rim the coil does not lie across
+  // (the coil runs 226.8 deg -> 500.4 deg, so 183-206 deg is bare door)
+  for (const t of [0, 0.062, 0.124]) {
+    const a = (1.02 + t) * Math.PI
+    const kx = cx + Math.cos(a) * R * 0.955
+    const ky = cy + Math.sin(a) * R * 0.955
+    s += `<rect x="${fx(kx - R * 0.055)}" y="${fx(ky - R * 0.035)}" width="${fx(R * 0.11)}" height="${fx(R * 0.07)}" rx="${fx(R * 0.028)}" fill="${VAULT.foil}" stroke="${VAULT.ink}" stroke-width="1.6" stroke-opacity="0.55" transform="rotate(${fx(((a + Math.PI / 2) * 180) / Math.PI)} ${fx(kx)} ${fx(ky)})"/>`
+    s += `<circle cx="${fx(kx)}" cy="${fx(ky)}" r="${fx(R * 0.016)}" fill="${VAULT.foilHi}" opacity="0.8"/>`
+  }
   s += `</g>`
+
+  // WHERE THE RISING COIL LIES (E3 W2 S5-4). ch4-aureole is a dress on this
+  // panel, so its footprint in THIS canvas is fully derived, not guessed:
+  //   right panel glue length = (width * creaseU) / sin(rho)
+  //                           = (0.794 * 0.5) / sin(80 deg) = 0.40312 world
+  //   dress centre = (u + width/2, v + height/2) = (0.21, 0.49) in panel units
+  //   -> art x = 512 + (0.21 / 0.40312) * 512 = 778.7
+  //      art y = 800 - (0.49 / 0.62) * 800    = 167.7
+  //   dress outer radius = 0.46 * height = 0.138 world
+  //      -> 175.3 px across, 178.1 px down
+  // Paper does not draw an edge through a piece lying on top of it, so every
+  // cut edge below stops inside this ellipse. Without that, the coil's own rim
+  // and the door's rim drew two bright hairlines straight across the middle of
+  // the dragon's raised loop — which is exactly the "separate donut prop"
+  // reading the blind reader could not shake.
+  const LOOP_X = 512 + (0.21 / 0.40312) * 512
+  const LOOP_Y = 800 - (0.49 / 0.62) * 800
+  const LOOP_RX = 0.138 * (512 / 0.40312)
+  const LOOP_RY = 0.138 * (800 / 0.62)
+  const underLoop = (px, py) => ((px - LOOP_X) / LOOP_RX) ** 2 + ((py - LOOP_Y) / LOOP_RY) ** 2 < 1
+  /** A polyline through `pt(t)` for t in [0,1], broken wherever the loop covers it. */
+  const brokenEdge = (pt, steps) => {
+    let d = ''
+    let pen = false
+    for (let k = 0; k <= steps; k++) {
+      const [px, py] = pt(k / steps)
+      if (underLoop(px, py)) {
+        pen = false
+        continue
+      }
+      d += `${pen ? ' L' : 'M'} ${fx(px)} ${fx(py)}`
+      pen = true
+    }
+    return d
+  }
 
   // ---- the dragon coiled on the door ----
   // The coil is an ANNULUS BAND hugging the door's rim (sampled polygon —
@@ -2583,12 +2907,10 @@ function vaultDragon(w, h, seed) {
   s += `<path d="${coil}" fill="none" stroke="${hideDeep}" stroke-width="2.6" opacity="0.75"/>`
   // the coil's OUTER cut edge only carries the house rim (an inner rim would
   // arc across the door face — pure noise on the dark steel)
-  let coilOuter = ''
-  for (let k = 0; k <= 64; k++) {
-    const a = lerp(aHead, aTail, k / 64)
-    const [ox, oy] = coilPt(a, rMid + band / 2 + R * 0.022 * Math.sin(a * 5.3))
-    coilOuter += `${k === 0 ? 'M' : ' L'} ${fx(ox)} ${fx(oy)}`
-  }
+  const coilOuter = brokenEdge((t) => {
+    const a = lerp(aHead, aTail, t)
+    return coilPt(a, rMid + band / 2 + R * 0.022 * Math.sin(a * 5.3))
+  }, 96)
 
   // belly band: FOIL FACETS on the coil's inner half along the lower + right
   // run — the glowing underside catching the hoard's light (the one
@@ -2790,15 +3112,37 @@ function vaultDragon(w, h, seed) {
   // brow spike, deep eye socket, EMBER EYE (kept), nostril + night-breath
   s += `<path d="M ${fx(hx - 0.02 * R)} ${fx(hy - 0.02 * R)} l ${fx(-0.05 * R)} ${fx(-0.11 * R)} l ${fx(-0.08 * R)} ${fx(0.09 * R)} Z" fill="${hideDeep}"/>`
   s += `<path d="M ${fx(hx - 0.2 * R)} ${fx(hy + 0.02 * R)} q ${fx(0.12 * R)} ${fx(-0.05 * R)} ${fx(0.2 * R)} ${fx(0.01 * R)} q ${fx(-0.1 * R)} ${fx(0.06 * R)} ${fx(-0.2 * R)} ${fx(0.035 * R)} Z" fill="${hideDeep}"/>`
-  s += `<circle cx="${fx(hx - 0.1 * R)}" cy="${fx(hy + 0.045 * R)}" r="${fx(R * 0.05)}" fill="${VAULT.ember}"/>`
-  s += `<circle cx="${fx(hx - 0.1 * R)}" cy="${fx(hy + 0.045 * R)}" r="${fx(R * 0.02)}" fill="#ffe9b8"/>`
+  // THE EYE IS SHUT (E3 W2 S5-5). It used to be an open ember disc with a white
+  // pupil, and the blind reader named the head "the single most inviting object
+  // on the page" — then found it inert. It is inert on purpose: the chapter's
+  // whole trick is that the people reach their gold "without waking so much as
+  // one scale". A dragon painted awake and staring is an invitation the paper
+  // will never accept. Painted asleep, the same head reads as the thing you are
+  // deliberately not touching — and the ember still burns behind the lid, so it
+  // is asleep rather than dead.
+  const ex = hx - 0.1 * R
+  const ey = hy + 0.045 * R
+  s += `<path d="M ${fx(ex - R * 0.062)} ${fx(ey + R * 0.008)} q ${fx(R * 0.062)} ${fx(R * 0.055)} ${fx(R * 0.124)} 0 q ${fx(-R * 0.062)} ${fx(-R * 0.03)} ${fx(-R * 0.124)} 0 Z" fill="${VAULT.ember}" opacity="0.8"/>`
+  s += `<path d="M ${fx(ex - R * 0.068)} ${fx(ey + R * 0.006)} q ${fx(R * 0.068)} ${fx(-R * 0.055)} ${fx(R * 0.136)} 0 l 0 ${fx(R * 0.012)} q ${fx(-R * 0.068)} ${fx(-R * 0.045)} ${fx(-R * 0.136)} 0 Z" fill="${hide}" stroke="${hideDeep}" stroke-width="1.4"/>`
+  s += `<path d="M ${fx(ex - R * 0.068)} ${fx(ey + R * 0.008)} q ${fx(R * 0.068)} ${fx(R * 0.036)} ${fx(R * 0.136)} 0" fill="none" stroke="${VAULT.ink}" stroke-width="2.4" opacity="0.9"/>`
+  for (const t of [-0.55, 0, 0.55]) {
+    s += `<line x1="${fx(ex + t * R * 0.048)}" y1="${fx(ey + R * 0.02)}" x2="${fx(ex + t * R * 0.055 - R * 0.014)}" y2="${fx(ey + R * 0.048)}" stroke="${VAULT.ink}" stroke-width="1.4" opacity="0.65"/>`
+  }
   s += `<circle cx="${fx(hx - 0.44 * R)}" cy="${fx(hy + 0.1 * R)}" r="${fx(R * 0.016)}" fill="${VAULT.nightDeep}"/>`
+  // sleeping breath drifting off the nostril — the one cue that says the beast
+  // is alive, and should stay exactly as it is
+  for (const [k, sc] of [[0, 1], [1, 0.74], [2, 0.52]]) {
+    const bx = hx - (0.5 + k * 0.14) * R
+    const by = hy + (0.08 - k * 0.06) * R
+    s += `<path d="M ${fx(bx)} ${fx(by)} q ${fx(-R * 0.075 * sc)} ${fx(-R * 0.06 * sc)} ${fx(-R * 0.02 * sc)} ${fx(-R * 0.12 * sc)} q ${fx(R * 0.065 * sc)} ${fx(-R * 0.05 * sc)} ${fx(R * 0.015 * sc)} ${fx(-R * 0.11 * sc)}" fill="none" stroke="${VAULT.rim}" stroke-width="${fx(R * 0.015 * sc)}" opacity="${(0.3 * sc).toFixed(2)}" stroke-linecap="round"/>`
+  }
   // foil edge-light under the jaw — the hoard's glow reaching the chin
   s += `<path d="M ${fx(hx - 0.42 * R)} ${fx(hy + 0.34 * R)} q ${fx(0.26 * R)} ${fx(0.1 * R)} ${fx(0.5 * R)} ${fx(0.02 * R)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="2.2" opacity="0.85"/>`
 
   // rims: the door's exposed upper arc + the head carry the house cut edge
   // (the coil's outer rim went down before the head)
-  s += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="none" stroke="${VAULT.rim}" stroke-width="4" opacity="0.5"/>`
+  // The door's own cut edge, broken under the loop by the same rule.
+  s += `<path d="${brokenEdge((t) => coilPt(t * Math.PI * 2, R), 128)}" fill="none" stroke="${VAULT.rim}" stroke-width="4" opacity="0.5"/>`
   s += rimPath(head, 3)
   return svgPiece(w, h, s, defs)
 }
@@ -2821,6 +3165,92 @@ function strokeWord(word, x, y, gs, color, sw = 2.2) {
     cx += 13 * gs
   }
   return s
+}
+
+/**
+ * THE PULL TONGUE (E3 W2 S5-1) — one painter, both of spread 5's handles.
+ *
+ * The blind reader found the right handle only by sweeping a 1500-point hover
+ * grid and called it "a flat grey plate floating in the black off-page void...
+ * the single lowest-craft object on screen"; the left one was "a ~14x25px gold
+ * splinter". Both wore the shared kraft grip (BW-13: "handles must be diegetic —
+ * painted, on-palette, attached-looking"). This is that paint.
+ *
+ * Texture axes for a fore-edge tab (popup-tabpiece-layer identity uvs, and the
+ * dissolve layer's matching convention): image u runs across the tab's WIDTH
+ * (the spine axis z), image v along the page-fore axis with v=1 the OUTER tip.
+ * SVG y=0 is v=1, so the tip is the image TOP and the slit is the image BOTTOM.
+ *
+ * The read, from the slit outward: a shadowed root where the paper leaves the
+ * cut, two ember chevrons aimed out of the page, a struck bank token (the
+ * emblem tells the reader WHICH machine this drives), a thumb dish, the
+ * engraved word, and a rolled grip lip along the tip. Full-bleed: the tab
+ * materials are opaque, so alpha would cut nothing.
+ *
+ * `wordRot` is the side's own reading direction (+90 on the left page, -90 on
+ * the right — the fore axis points opposite ways on screen).
+ */
+function pullTongue(w, h, seed, opts) {
+  const { emblem = 'coin', seedShift = 0 } = opts ?? {}
+  const r = mulberry32(seed + seedShift)
+  const pfx = `pt${Math.abs(seed) % 100000}`
+  const m = Math.min(w, h)
+  // Root -> tip value ramp: the paper is in the page's shadow where it leaves
+  // the slit and catches the moon at the tip, so the tongue reads as a solid
+  // that comes OUT rather than a decal lying flat.
+  let defs =
+    `<linearGradient id="${pfx}g" x1="0" y1="1" x2="0" y2="0">` +
+    `<stop offset="0" stop-color="${VAULT.foilDeep}"/>` +
+    `<stop offset="0.4" stop-color="${VAULT.foil}"/>` +
+    `<stop offset="1" stop-color="${VAULT.foilLit}"/></linearGradient>`
+  let s = `<rect width="${w}" height="${h}" fill="url(#${pfx}g)"/>`
+  const foil = goldFoilFacets(r, `${pfx}f`, 0, 0, w, h, m * 0.34, { filmShare: 0.06, sparkles: 5, streaks: 3 })
+  defs += foil.defs
+  s += `<g opacity="0.45">${foil.body}</g>`
+  // engraved double border — a struck plate, not a sticker
+  s += `<rect x="${fx(w * 0.06)}" y="${fx(h * 0.05)}" width="${fx(w * 0.88)}" height="${fx(h * 0.89)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(m * 0.03)}" opacity="0.75"/>`
+  s += `<rect x="${fx(w * 0.1)}" y="${fx(h * 0.082)}" width="${fx(w * 0.8)}" height="${fx(h * 0.826)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="${fx(m * 0.01)}" opacity="0.55"/>`
+
+  // ---- the ROOT (image bottom, v=0): the cut the paper comes through ----
+  s += `<rect x="0" y="${fx(h * 0.9)}" width="${w}" height="${fx(h * 0.1)}" fill="${VAULT.ink}" opacity="0.6"/>`
+  s += `<rect x="0" y="${fx(h * 0.862)}" width="${w}" height="${fx(h * 0.04)}" fill="${VAULT.nightDeep}" opacity="0.45"/>`
+  // binder's stitch ticks along the slit — the tab is SEWN to the page, not
+  // floating beside it (the reader's "grey plate in the black void")
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.11 + i * 0.128)
+    s += `<line x1="${fx(x)}" y1="${fx(h * 0.951)}" x2="${fx(x + w * 0.05)}" y2="${fx(h * 0.951)}" stroke="${VAULT.foilLit}" stroke-width="${fx(m * 0.016)}" opacity="0.6"/>`
+  }
+
+  // ---- the TIP (image top, v=1): a rolled grip lip ----
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.062)}" fill="${VAULT.foilHi}" opacity="0.8"/>`
+  s += `<rect x="0" y="${fx(h * 0.062)}" width="${w}" height="${fx(h * 0.028)}" fill="${VAULT.foilDeep}" opacity="0.6"/>`
+
+  // ---- ONE big ember arrow aimed OUT of the page (image up) ----
+  // Two shallow chevrons read as parallel bars once the reading camera lays the
+  // tongue down at ~25 deg (measured on the first bake); one arrow with a real
+  // head and shaft survives the foreshortening.
+  const aTip = h * 0.12
+  const aBase = h * 0.34
+  const aHalf = w * 0.28
+  s += `<path d="M ${fx(w * 0.5)} ${fx(aTip)} L ${fx(w * 0.5 + aHalf)} ${fx(aBase)} L ${fx(w * 0.5 + aHalf * 0.42)} ${fx(aBase)} L ${fx(w * 0.5 + aHalf * 0.42)} ${fx(h * 0.44)} L ${fx(w * 0.5 - aHalf * 0.42)} ${fx(h * 0.44)} L ${fx(w * 0.5 - aHalf * 0.42)} ${fx(aBase)} L ${fx(w * 0.5 - aHalf)} ${fx(aBase)} Z" fill="${VAULT.ember}" stroke="${VAULT.ink}" stroke-width="${fx(m * 0.012)}" stroke-opacity="0.45" stroke-linejoin="round"/>`
+  s += `<path d="M ${fx(w * 0.5)} ${fx(aTip + h * 0.035)} L ${fx(w * 0.5 + aHalf * 0.62)} ${fx(aBase - h * 0.012)} L ${fx(w * 0.5 - aHalf * 0.62)} ${fx(aBase - h * 0.012)} Z" fill="#ffffff" opacity="0.22"/>`
+
+  // ---- the struck token: which machine this tongue drives ----
+  const tx = w * 0.5
+  const ty = h * 0.66
+  const tr = Math.min(w * 0.3, h * 0.15)
+  s += `<circle cx="${fx(tx)}" cy="${fx(ty)}" r="${fx(tr)}" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="${fx(tr * 0.14)}"/>`
+  s += `<circle cx="${fx(tx)}" cy="${fx(ty)}" r="${fx(tr * 0.78)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(tr * 0.07)}" opacity="0.6"/>`
+  s += `<circle cx="${fx(tx - tr * 0.3)}" cy="${fx(ty - tr * 0.34)}" r="${fx(tr * 0.17)}" fill="${VAULT.foilHi}" opacity="0.85"/>`
+  if (emblem === 'coin') {
+    // a struck dune crest: the gold pile's own currency
+    s += `<path d="M ${fx(tx - tr * 0.58)} ${fx(ty + tr * 0.4)} q ${fx(tr * 0.34)} ${fx(-tr * 0.8)} ${fx(tr * 0.6)} ${fx(-tr * 0.14)} q ${fx(tr * 0.26)} ${fx(-tr * 0.5)} ${fx(tr * 0.56)} ${fx(tr * 0.2)} l 0 ${fx(tr * 0.34)} Z" fill="${VAULT.foilDeep}" opacity="0.85"/>`
+  } else {
+    // a glazed arch: the passage of glass this tongue draws open
+    s += `<path d="M ${fx(tx - tr * 0.46)} ${fx(ty + tr * 0.48)} L ${fx(tx - tr * 0.46)} ${fx(ty - tr * 0.04)} q ${fx(tr * 0.46)} ${fx(-tr * 0.7)} ${fx(tr * 0.92)} 0 L ${fx(tx + tr * 0.46)} ${fx(ty + tr * 0.48)} Z" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(tr * 0.18)}" stroke-linejoin="round"/>`
+    s += `<line x1="${fx(tx)}" y1="${fx(ty + tr * 0.48)}" x2="${fx(tx)}" y2="${fx(ty - tr * 0.38)}" stroke="${VAULT.foilDeep}" stroke-width="${fx(tr * 0.11)}"/>`
+  }
+  return svgPiece(w, h, s, defs)
 }
 
 /** The engraved brass slot plate + giant ember chevrons + PULL, painted
@@ -2849,39 +3279,9 @@ function brassPullPlate(w, h) {
   return s
 }
 
-/** THE BRASS PULL TAB (ch4-dissolve-tab): the grab handle itself, engraved
- *  brass with ember chevrons — the celebrated affordance in the reader's
- *  hand. Texture axes (popup-dissolve-layer tab quad): image u runs along
- *  the spine (z), image v along the page-fore axis d with v=1 = the OUTER
- *  end — so chevrons point image-UP (the pull direction) and the word
- *  rotates 90 deg to read screen-upright on the left page. */
-function dissolveTabPlate(w, h, seed) {
-  const r = mulberry32(seed)
-  let s = `<rect width="${w}" height="${h}" rx="${fx(w * 0.06)}" fill="${VAULT.foil}"/>`
-  s += `<rect width="${fx(w * 0.22)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.5"/>`
-  s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" rx="${fx(w * 0.05)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="3"/>`
-  s += `<rect x="10" y="10" width="${fx(w - 20)}" height="${fx(h - 20)}" rx="${fx(w * 0.04)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.4" opacity="0.7"/>`
-  // engraved hatching (brushed brass)
-  for (let i = 0; i < 12; i++) {
-    const y = h * (0.06 + i * 0.08) + rr(r, -3, 3)
-    s += `<line x1="14" y1="${fx(y)}" x2="${fx(w - 14)}" y2="${fx(y)}" stroke="${VAULT.foilDeep}" stroke-width="0.8" opacity="0.3"/>`
-  }
-  // ember chevrons pointing image-UP = outward, the pull direction
-  for (const t of [0.3, 0.19]) {
-    const cy = h * t
-    s += `<path d="M ${fx(w * 0.24)} ${fx(cy + h * 0.045)} L ${fx(w * 0.5)} ${fx(cy - h * 0.02)} L ${fx(w * 0.76)} ${fx(cy + h * 0.045)}" fill="none" stroke="${VAULT.ember}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
-  }
-  // PULL reading screen-upright (rotate 90: word-up -> image-right); the
-  // word is 4 glyphs x 13 grid units long, sized to sit inside the lower half
-  const gs = w * 0.014
-  const wx = w * 0.5
-  const wy = h * 0.62
-  s += `<g transform="rotate(90 ${fx(wx)} ${fx(wy)})">${strokeWord('PULL', wx - 24 * gs, wy - 7 * gs, gs, VAULT.ink, 2.6)}</g>`
-  s += `<g transform="rotate(90 ${fx(wx)} ${fx(wy)})">${strokeWord('PULL', wx - 24 * gs - 1, wy - 7 * gs - 1, gs, VAULT.foilHi, 1.1)}</g>`
-  // the slit shadow at the inner (v=0) edge, where the strip disappears
-  s += `<rect x="0" y="${fx(h - 8)}" width="${w}" height="8" fill="${VAULT.ink}" opacity="0.45"/>`
-  return svgPiece(w, h, s)
-}
+// (RETIRED — dissolveTabPlate. Both s5 tongues now come out of the shared
+//  pullTongue painter above: one vocabulary for the spread's two handles, and
+//  the same struck-token/chevron/stitched-root grammar on each.)
 
 /** THE SPREAD-5 FLOOR PRINT (page-5, full-bleed page faces): rippled
  *  sand-to-gold fans leading from the apron (image bottom = near) to the
@@ -3174,7 +3574,10 @@ function dissolveDunes(w, h, seed) {
   })
   // the camel train on the ridge — bold dark silhouettes (kept: the caravan's
   // "destination" appearance, the same chain the frieze + r2 print carry)
-  for (const [x, y] of camels) s += camelGlyph(x, y, h * 0.03, '#140e22')
+  // 3.5 screen px is what h*0.03 bought here, and the blind reader duly called
+  // the caravan "a flock of birds". At h*0.072 the same glyphs are 8-9 px and
+  // read as loaded camels — the anchor the gold face has to match.
+  for (const [x, y] of camels) s += camelGlyph(x, y, h * 0.072, '#140e22')
   // foreground ripples + a few pebbles
   const r = mulberry32(seed ^ 0x1d)
   for (let i = 0; i < 12; i++) {
@@ -3185,6 +3588,27 @@ function dissolveDunes(w, h, seed) {
     const x = rr(r, w * 0.04, w * 0.96), y = rr(r, h * 0.82, h * 0.97)
     s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, 5, 9))}" ry="3.4" fill="#241a2e" opacity="0.7"/>`
   }
+  // ---- THE SEAMS OF LIGHT (E3 W2 S5-7) ----
+  // "The story's climax is invisible at rest. The golden arcade behind the left
+  // panel is the best image on the spread and the literal payoff of the text —
+  // and at rest it is completely hidden behind a card that reads as unrelated
+  // wall art." The card cannot be repainted as the gold it hides: dunes-into-
+  // gold IS the mechanism, and a rest face that already showed the gold would
+  // have nothing to transmute. What a shut venetian rack really does is LEAK,
+  // so it leaks. The rack is sliced into `slats` vertical strips at exactly
+  // u = k/N (popup-dissolve-layer's slatUvs), and a warm seam painted on each
+  // of those lines reads at rest as light getting past the blinds — the promise
+  // that something gold is behind this.
+  const SLATS = 6
+  for (let k = 1; k < SLATS; k++) {
+    const x = (w * k) / SLATS
+    s += `<rect x="${fx(x - w * 0.016)}" y="0" width="${fx(w * 0.032)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.16"/>`
+    s += `<rect x="${fx(x - w * 0.005)}" y="0" width="${fx(w * 0.01)}" height="${h}" fill="${VAULT.foilHi}" opacity="0.55"/>`
+    s += `<rect x="${fx(x + w * 0.005)}" y="0" width="${fx(w * 0.004)}" height="${h}" fill="${VAULT.ink}" opacity="0.4"/>`
+  }
+  // and a warm rim right around the rack's own edge — the shut hatch's halo
+  s += `<rect x="1.5" y="1.5" width="${fx(w - 3)}" height="${fx(h - 3)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="4" opacity="0.5"/>`
+  s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.6" opacity="0.45"/>`
   // the celebrated affordance: engraved brass slot plate + ember chevrons +
   // PULL along the tab-exit edge (shared by both faces so the plate never
   // flickers as the slats flip)
@@ -3241,7 +3665,7 @@ function dissolveGold(w, h, seed) {
   // since the sun/medallion is occluded by the scene goldpile at the camera).
   const CW = fx(h * 0.006) // outline weight
   camels.forEach(([x, y], i) => {
-    const g = h * 0.042
+    const g = h * 0.09 // matches the dunes face's camel scale (the A<->B anchor)
     if (i % 2 === 0) {
       // crown — solid gold, dark rim, jewelled band
       s += `<path d="M ${fx(x - g)} ${fx(y)} L ${fx(x - g)} ${fx(y - g * 0.85)} L ${fx(x - g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x)} ${fx(y - g * 1.05)} L ${fx(x + g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x + g)} ${fx(y - g * 0.85)} L ${fx(x + g)} ${fx(y)} Z" fill="${GOLD_LIT}" stroke="#4a3208" stroke-width="${CW}" stroke-linejoin="round"/>`
@@ -7711,7 +8135,7 @@ function signalMast(w, h, seed) {
     s += `<rect x="${fx(x - uw / 2)}" y="${fx(headBot)}" width="${fx(uw)}" height="${fx(footTop - headBot)}" fill="${DUSK.slateDim}"/>`
     s += `<rect x="${fx(x - uw / 2)}" y="${fx(headBot)}" width="${fx(uw * 0.34)}" height="${fx(footTop - headBot)}" fill="${DUSK.slateLit}" opacity="0.45"/>`
   }
-  const bays = 15
+  const bays = S5_GLASS.BAYS
   const cuts = unevenSplit(headBot + h * 0.02, footTop - h * 0.01, bays, r, 0.3)
   for (let i = 0; i < bays; i++) {
     const y0 = cuts[i]
@@ -12344,14 +12768,28 @@ const PIECES = [
   // The precious object: gold-foil vault-dragon coiled on the round door.
   { id: 'ch4-hero', seed: 50252, w: 1024, h: 800, grain: 10, paint() { return vaultDragon(this.w, this.h, this.seed) } },
   // Dress mesh 0.34 x 0.30 world -> canvas at the true aspect (1.133) so the
-  // guilloché ring displays ROUND, not squashed to an ellipse.
-  { id: 'ch4-aureole', seed: 50254, w: 512, h: 452, grain: 8, paint() { return guillocheAureole(this.w, this.h, this.seed) } },
+  // loop displays ROUND, not squashed to an ellipse. (Was the guilloché
+  // aureole; S5-4 repainted it as a loop of the dragon itself.)
+  { id: 'ch4-aureole', seed: 50254, w: 512, h: 452, grain: 8, paint() { return dragonCoilLoop(this.w, this.h, this.seed) } },
   // Frieze mesh 1.5 x 0.16 world = 9.375 -> 1024x109 (the fringe convention:
   // ch2 1024x188 = 5.45, ch3 1024x144 = 7.11; 192px displayed 1.76x squashed).
-  { id: 'ch4-frieze', seed: 50256, w: 1024, h: 109, grain: 10, paint() { return caravanFrieze(this.w, this.h, this.seed) } },
-  // The celebrated brass PULL tab itself (popup-dissolve-layer.tsx requests
-  // `<id>-tab`, falling back to the shared kraft grip when absent).
-  { id: 'ch4-dissolve-tab', seed: 50259, w: 284, h: 512, grain: 8, paint() { return dissolveTabPlate(this.w, this.h, this.seed) } },
+  { id: 'ch4-frieze', seed: 50256, w: 1024, h: 109, grain: 10, paint() { return glassPassage(this.w, this.h, this.seed) } },
+  // THE TWO PULL TONGUES (E3 W2 S5-1). Both layers request `<id>-tab` and fall
+  // back to the shared grey kraft grip when it is absent — which is exactly what
+  // the blind reader met ("the single lowest-craft object on screen"). Canvas
+  // aspects are the tabs' own world quads at REST, in their texture axes (image
+  // u = tab width along the spine, image v = the page-fore axis):
+  //   goldpile  tabW 0.24 : lip+slide 0.2417  -> 1 : 1.007  -> 460 x 464
+  //   dissolve  tabW 0.26 : lip+tongue 0.08   -> 1 : 0.31   -> 512 x 220 is the
+  //             compromise between rest (1:0.31) and the latched-gold end
+  //             (1:0.85); the art is banded ACROSS the pull so the stretch
+  //             between those two states only spreads the bands.
+  // No engraved word on either tongue: the reading camera lays a fore-edge tab
+  // down at a hard angle, and stroke letters that survive it would have to be
+  // the whole plate. The reader already had letters here and called them "tiny
+  // vertical lettering" — one ember arrow and a struck token carry it instead.
+  { id: 'ch4-dissolve-tab', seed: 50259, w: 512, h: 220, grain: 8, paint() { return pullTongue(this.w, this.h, this.seed, { emblem: 'arch' }) } },
+  { id: 'ch4-goldpile-tab', seed: 50231, w: 460, h: 464, grain: 10, paint() { return pullTongue(this.w, this.h, this.seed, { emblem: 'coin' }) } },
   // The T-FLOOR page print: rippled sand->gold fans, apron -> placard -> notch.
   // 1024 long edge like page-4 (use-layer-texture downscales to 1024 anyway —
   // larger only re-opens the G5 oversize violation this pack closes).
@@ -13104,6 +13542,7 @@ async function main() {
 }
 
 export {
+  S5_GLASS,
   citadelStrip,
   dovecoteFacade,
   CITADEL,
