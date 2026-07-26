@@ -66,7 +66,7 @@ describe('accumulateWheel', () => {
   })
 
   it('decays stale momentum', () => {
-    let { acc } = accumulateWheel(fresh(), WHEEL_THRESHOLD - 1, 0)
+    const { acc } = accumulateWheel(fresh(), WHEEL_THRESHOLD - 1, 0)
     const r = accumulateWheel(acc, 2, 2000) // long pause → decayed
     expect(r.fire).toBeNull()
   })
