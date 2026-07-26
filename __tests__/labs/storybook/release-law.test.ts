@@ -30,6 +30,7 @@ import {
   tabPieceCeiling,
   tabPieceLift,
   tabPieceStopLift,
+  RAIL_CARD_LIFT,
   type TabPieceGeom,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import {
@@ -154,8 +155,13 @@ describe('tab piece — latch, then fold flat', () => {
       const [tL, tR] = bloom(beta)
       const t = geom.side === 'left' ? tL : tR
       const shown = Math.min(held * tabPieceCamShape(geom, beta), tabPieceCeiling(geom, beta))
+      // A RAIL slider's handle is a card LYING ON the page: it folds with the
+      // page rather than to it, so it settles at one glue ply off the sheet
+      // (RAIL_CARD_LIFT) instead of at zero — the dress/rotor lift class. The
+      // structure itself still closes through the exact cam zero.
+      const tol = (geom.rail ? RAIL_CARD_LIFT : 0) + 1e-4
       for (const patch of solveTabPiecePoseAt(geom, shown, tL, tR)) {
-        for (const v of patch.quad) expect(offPage(v, t)).toBeLessThan(1e-4)
+        for (const v of patch.quad) expect(offPage(v, t)).toBeLessThan(tol)
       }
     })
 

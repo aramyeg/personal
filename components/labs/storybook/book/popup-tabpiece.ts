@@ -29,6 +29,7 @@
  * emerges by precisely the slide distance (bench gate T3).
  */
 
+import { Z_GUARD, plyLift } from './lift-ladder'
 import { PAGE_W } from './page-geometry'
 import type { PanelQuad, TabPieceGeom, Vec3 } from './popup-mechanics'
 
@@ -47,6 +48,24 @@ const rad = (d: number): number => (d * Math.PI) / 180
 /** How far the tab stays visible inside the fore edge even when flush —
  *  the grabbable lip (and the slit's cap strip). */
 export const TAB_LIP = 0.02
+
+/** A card lying ON the page (the opt-in `rail` slider, A-2) rides ONE ply proud
+ *  of the print it slides over — the stack-order ladder's glue-lift class
+ *  (lift-ladder.ts), and the same reason the strip flap rests at 5 degrees
+ *  rather than 0: paper coplanar with the page it is glued to z-fights it. The
+ *  slot the strip comes up through is a CUT in the page, so its hairline takes
+ *  the decal z-guard, not a ply. */
+export const RAIL_CARD_LIFT = plyLift(1)
+const RAIL_SLIT_LIFT = Z_GUARD
+
+/** The card's travel band along the page for a rail piece — [inner edge at zero
+ *  draw, outer tip at the mechanical stop]. Exported so the containment gate
+ *  can state "the tab never leaves the paper" in the piece's own numbers. */
+export function tabPieceRailSpan(geom: TabPieceGeom): readonly [number, number] {
+  const rail = geom.rail
+  if (!rail) return [PAGE_W - TAB_LIP, PAGE_W + tabPieceStopSlide(geom)]
+  return [rail.slitD, rail.slitD + tabPieceStopSlide(geom) + rail.tabLen]
+}
 
 /** Flat (closed-book) span of the structure from fixed hinge to inner
  *  hinge — the footprint the covenant checks against the page. */
@@ -158,6 +177,10 @@ function pagePoint(
  *  something pulled through a cut in the page). */
 export function tabPieceSlit(geom: TabPieceGeom, thetaL: number, thetaR: number): readonly [Vec3, Vec3] {
   const P = pagePoint(geom, thetaL, thetaR)
+  const rail = geom.rail
+  // RAIL (A-2): the slot is cut INSIDE the page at slitD, across the card's own
+  // lane — the same rigid page frame, one paper thickness under the card.
+  if (rail) return [P(rail.slitD, RAIL_SLIT_LIFT, rail.z0), P(rail.slitD, RAIL_SLIT_LIFT, rail.z1)]
   const tabW = geom.tabW ?? 0.1
   const zc = (geom.z0 + geom.z1) / 2
   const tabSign = geom.side === 'left' ? -1 : 1
@@ -222,6 +245,27 @@ export function solveTabPiecePoseAt(
           panel('deck', F - reach - (geom.deckD ?? 0), h, F - reach, h),
           panel('legOut', F - reach, h, F, 0),
         ]
+
+  const rail = geom.rail
+  if (rail) {
+    // RAIL (A-2): a card of FIXED length riding on the page, its inner edge one
+    // strip-draw fore of the slot. Same corner order as `panel` above (dA -> dB,
+    // za -> zb) so identity uvs print upright: u across the card, v along the
+    // pull, 0 at the slot.
+    const [ra, rb] = geom.side === 'left' ? [rail.z1, rail.z0] : [rail.z0, rail.z1]
+    const d0 = rail.slitD + s
+    const d1 = d0 + rail.tabLen
+    patches.push({
+      face: 'tab',
+      quad: [
+        P(d0, RAIL_CARD_LIFT, ra),
+        P(d0, RAIL_CARD_LIFT, rb),
+        P(d1, RAIL_CARD_LIFT, rb),
+        P(d1, RAIL_CARD_LIFT, ra),
+      ],
+    })
+    return patches
+  }
 
   const tabW = geom.tabW ?? 0.1
   const zc = (geom.z0 + geom.z1) / 2

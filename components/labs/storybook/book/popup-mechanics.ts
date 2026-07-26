@@ -412,6 +412,30 @@ export type StripFlapGeom = {
    * is set above that crossing, and the fold reads as a fold.
    */
   travelDeg?: readonly [number, number]
+  /**
+   * THE RIPPLE, OPT-IN (E3 s6 round-2 A-4). A strip flap that carries a RANK of
+   * repeated cards on one hinge line — the six market stalls — raises every card
+   * at once, and a blind reader named exactly that: "the six stalls rise in
+   * perfect unison. No stagger, no ripple, no wave. The one place the page could
+   * have earned 'a thousand stalls, raised by any pair of willing hands' and it
+   * moves like a single rigid object."
+   *
+   * Declaring a ripple splits the flap's width into `count` independently hinged
+   * cards along the SAME hinge line (they tile it exactly, so the union of their
+   * paper is the flap that shipped) and lags each card's rise behind its
+   * neighbour by `lag` of the reader's travel. Every card still ENDS at the
+   * requested angle — identical is the point, and the prose says so — but the
+   * row arrives as a wave running down the rank rather than as one board.
+   *
+   * Free, mechanically: the phase map (`stripFlapRipplePhase`) is monotone,
+   * lands on 0 at progress 0 and 1 at progress 1, and is bounded ABOVE by the
+   * un-rippled progress at every point. So a rippled card's angle can never
+   * exceed the rank's own angle, its per-frame turn step is inherited from the
+   * gate that already covers the un-rippled rank, and fold-flat at book close
+   * needs no new argument. A piece that declares no ripple resolves to a single
+   * column at phase identity and renders bit-identically.
+   */
+  ripple?: { readonly count: number; readonly lag: number }
 }
 
 export type TabPieceGeom = {
@@ -435,6 +459,35 @@ export type TabPieceGeom = {
   restAtDeg?: number
   /** Visible tab width along the spine (default 0.1). */
   tabW?: number
+  /**
+   * THE ON-PAGE RAIL, OPT-IN (E3 s6 round-2 A-2). By default a tab piece's strip
+   * leaves through the page's FORE EDGE and the emerged length hangs past it —
+   * which is what a pull tab does in the hand, and which a blind reader met as
+   * "the pull tab travels off the page into the void. At full pull the tab card
+   * is entirely off the left page edge, floating over black table and
+   * overlapping the body-copy column. Paper doesn't do that."
+   *
+   * They are right about the surround: a page whose fore edge is a cliff over a
+   * dark table has no hand to hold the tab out in. So the piece may instead be
+   * built as a SLIDER — the strip runs under the page and comes up through a
+   * die-cut slot at `slitD`, and a card of fixed length `tabLen` lies ON the
+   * page beyond it, in its own lane [z0, z1] clear of the structure. The card
+   * translates fore by exactly the strip draw, so the reader's gesture, the
+   * direct-manipulation projection and the inextensible-strip law are all
+   * unchanged; only the rail it runs on is now cut in the page instead of off
+   * its edge. Choose `slitD + tabLen + tabPieceStopSlide(geom) <= PAGE_W` and
+   * the tab can never leave the paper. (Birmingham mech 84, the strip in a slot
+   * — the grammar the fore-edge tab is only the open-ended case of.)
+   */
+  rail?: {
+    /** Where the slot is cut, as a distance from the gutter along the page. */
+    readonly slitD: number
+    /** The card's fixed length along the pull. */
+    readonly tabLen: number
+    /** The card's lane along the spine. */
+    readonly z0: number
+    readonly z1: number
+  }
   /** Turn-time culling (Batch C-3, the dial/winch/dissolve lever): the piece
    *  is a reader's playable rather than a spread's structure, so mid-turn it
    *  stops drawing — the renderer ramps it out/in over the turn-cull window
@@ -1299,6 +1352,59 @@ export function stripFlapDetent(a: number, lo: number, hi: number): number {
     return hi - band * smooth01(t)
   }
   return x
+}
+
+// --- THE RIPPLE (A-4). Two pure functions: one splits the rank's paper into
+// the cards it is printed as, the other says how far behind the rank each card
+// runs. Both are the identity for a flap that declares no ripple.
+
+/** The largest total lag a ripple may spend, as a fraction of the reader's
+ *  travel: the LAST card still has three quarters of the stroke to itself, so
+ *  the wave reads as a wave and never as a card that only twitches at the end. */
+export const STRIPFLAP_RIPPLE_MAX_SPREAD = 0.25
+
+/**
+ * The rank's paper, split into the cards it is printed as: `count` sub-flaps
+ * tiling the SAME hinge line, each `width / count` across, centred on its own
+ * share. Their union is exactly the flap that shipped, so nothing about the
+ * rank's footprint, hit surface or shadow changes — only how many hinges it has.
+ * A flap with no ripple returns itself, unwrapped, and every downstream call is
+ * the one it always made.
+ */
+export function stripFlapRippleColumns(geom: StripFlapGeom): readonly StripFlapGeom[] {
+  const n = geom.ripple?.count ?? 1
+  if (n <= 1) return [geom]
+  const w = geom.width / n
+  const hd = rad(geom.hingeDeg ?? 0)
+  return Array.from({ length: n }, (_, i) => {
+    const off = (i - (n - 1) / 2) * w
+    return {
+      ...geom,
+      ripple: undefined,
+      width: w,
+      hingeX: geom.hingeX + off * Math.cos(hd),
+      hingeZ: geom.hingeZ + off * Math.sin(hd),
+    }
+  })
+}
+
+/**
+ * Card `i`'s share of the rank's progress `p` (both in [0, 1], 0 = the rank
+ * lying at its lower stop, 1 = at its upper one).
+ *
+ * Card i waits until the rank is `lag * i` of the way up, then covers what is
+ * left of the stroke — so phase(0) = 0 and phase(1) = 1 for every card (they
+ * start together and finish together, which is what "true and identical" means)
+ * and phase(p) <= p everywhere in between, which is what makes the ripple free:
+ * no card ever leads the rank, so no card's step can exceed the rank's own.
+ */
+export function stripFlapRipplePhase(geom: StripFlapGeom, p: number, i: number): number {
+  const rip = geom.ripple
+  if (!rip || rip.count <= 1) return clamp(p, 0, 1)
+  const lag = clamp(rip.lag, 0, STRIPFLAP_RIPPLE_MAX_SPREAD / Math.max(1, rip.count - 1))
+  const start = lag * clamp(i, 0, rip.count - 1)
+  if (start >= 1) return 0
+  return clamp((clamp(p, 0, 1) - start) / (1 - start), 0, 1)
 }
 
 export function solveStripFlapPose(geom: StripFlapGeom, thetaL: number, thetaR: number): MechPose {

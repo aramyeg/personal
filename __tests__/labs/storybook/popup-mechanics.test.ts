@@ -34,9 +34,12 @@ import {
   tabPieceFlatSpan,
   tabPieceLift,
   tabPieceLiftFromSlide,
+  tabPieceRailSpan,
   tabPieceSlideFromLift,
+  tabPieceStopLift,
   tabPieceStopSlide,
   tabPieceTabOut,
+  RAIL_CARD_LIFT,
   TAB_LIP,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { solveRotorPose } from '@/components/labs/storybook/book/popup-rotor'
@@ -283,6 +286,11 @@ const flatTol = (layer: SceneLayer): number => {
   // spine axis leaving a paper-thickness residual (0.015) — the bench's N4
   // FLAT_TOL exactly (derive-keep-winch.mjs), same rationale as the knob disc.
   if (layer.mech === 'keepwinch') return 0.02
+  // A RAIL tab piece (A-2) is a slider: its structure closes through the exact
+  // cam zero like any tab piece, but its handle is a CARD LYING ON THE PAGE, so
+  // at book-closed it flattens to the page plus one glue ply (RAIL_CARD_LIFT) —
+  // the dress/rotor lift class, and for the identical reason.
+  if (layer.mech === 'tabpiece' && layer.rail) return 0.003
   // Tab pieces close through an exact cam zero (a = 0 at beta = 0).
   return 1e-9 // symmetric v-folds, boxes, tab pieces: analytically exact
 }
@@ -483,11 +491,18 @@ describe('layer spec validity (design constraints, every shipped layer)', () => 
         expect(layer.z0).toBeLessThan(layer.z1)
         expect(Math.abs(layer.z0)).toBeLessThanOrEqual(PAGE_H / 2)
         expect(Math.abs(layer.z1)).toBeLessThanOrEqual(PAGE_H / 2)
-        // stands proud at rest
-        const top = Math.max(
-          ...solveTabPiecePose(layer, Math.PI, 0).flatMap((p) => p.quad.map((c) => c[1]))
-        )
-        expect(top).toBeGreaterThan(0.05)
+        // Stands proud — at REST for a page-raised piece, at the reader's STOP
+        // for one handed over flat (A-3: s6's stall is the master PATTERN when
+        // the spread opens and the reader is the one who raises it, exactly as
+        // the strip flap's restDeg does for the rank across the gutter). Either
+        // way the structure must be a structure at the pose it is meant to be
+        // seen in, and must never lie coplanar with the page it is glued to.
+        const topAt = (a: number): number =>
+          Math.max(...solveTabPiecePoseAt(layer, a, Math.PI, 0).flatMap((p) => p.quad.map((c) => c[1])))
+        const restLift = tabPieceLift(layer, Math.PI)
+        const readerRaised = restLift < 0.5 * tabPieceStopLift(layer)
+        expect(topAt(readerRaised ? tabPieceStopLift(layer) : restLift)).toBeGreaterThan(0.05)
+        expect(restLift).toBeGreaterThan(rad(3)) // never coplanar with its page
         return
       }
       if (layer.mech === 'kinetic') {
@@ -608,9 +623,20 @@ describe('A1 glue coherence — glue edges lie in their host surface at every an
                   : patch.face === 'tab'
                     ? [0, 1, 2, 3]
                     : []
+            // A RAIL card is not glued to the page, it SLIDES on it: its plane
+            // is the page's, offset by exactly the one glue ply of its lift
+            // class (RAIL_CARD_LIFT) — parallel at every dihedral, which is the
+            // coherence statement that actually applies to a slider.
+            // (the gate's nL is the outward normal of the LEFT page, the
+            // opposite sense to the solver's into-the-wedge n, so the left
+            // page's card reads one ply NEGATIVE here)
+            const off =
+              patch.face === 'tab' && layer.rail
+                ? (layer.side === 'left' ? -1 : 1) * RAIL_CARD_LIFT
+                : 0
             for (const i of onPage) {
               const p = patch.quad[i]
-              expect(Math.abs(p[0] * n[0] + p[1] * n[1])).toBeLessThan(1e-9)
+              expect(Math.abs(p[0] * n[0] + p[1] * n[1] - off)).toBeLessThan(1e-9)
             }
           }
           continue
@@ -1924,9 +1950,42 @@ describe('tabpiece — fore-edge tab slider (D1 gates, bench derive-tabpiece.mjs
         // tab tip = corner 2/3 of the tab quad
         const tab = patches[patches.length - 1]
         const tipD = tab.quad[2][0] * u[0] + tab.quad[2][1] * u[1]
-        const tabOut = tipD - PAGE_W
+        // The inextensible-strip law reads off whichever end of the strip the
+        // piece exposes: a fore-edge tab's protrusion past PAGE_W, a RAIL
+        // slider's card tip past its own zero-draw station (slitD + tabLen).
+        const tabHome = layer.rail ? layer.rail.slitD + layer.rail.tabLen : PAGE_W
+        const tabOut = tipD - tabHome
         expect(Math.abs(innerD - innerFlat - tabOut)).toBeLessThan(1e-9)
         expect(Math.abs(tabOut - tabPieceTabOut(layer, tL - tR))).toBeLessThan(1e-9)
+      }
+    }
+  )
+
+  it.each(TAB_LAYERS.filter(([, l]) => l.rail).map(([id, l]) => [id, l] as const))(
+    '%s: the RAIL card never leaves the paper, at any reachable draw (A-2)',
+    (_id, layer) => {
+      const rail = layer.rail!
+      const [home, tip] = tabPieceRailSpan(layer)
+      // the whole card, at zero draw and at the mechanical stop, lies between
+      // the gutter and the fore edge — the finding this rail exists to answer
+      expect(home).toBeGreaterThan(0)
+      expect(tip).toBeLessThan(PAGE_W)
+      // and its lane is clear of the structure's own z band
+      expect(rail.z0).toBeLessThan(rail.z1)
+      expect(rail.z1 <= layer.z0 || rail.z0 >= layer.z1).toBe(true)
+      // the slot itself sits fore of the piece's inner hinge (the strip runs
+      // under the page from the sliding hinge to the slot, never backwards)
+      expect(rail.slitD).toBeGreaterThanOrEqual(layer.hingeX - tabPieceFlatSpan(layer))
+      // swept across the whole reader window, measured along the page's own run
+      // (both pages flat right, the A3 convention: u = -x on the left page)
+      const sign = layer.side === 'left' ? -1 : 1
+      for (let i = 0; i <= 24; i++) {
+        const a = (tabPieceStopLift(layer) * i) / 24
+        const patches = solveTabPiecePoseAt(layer, a, Math.PI, 0)
+        for (const c of patches[patches.length - 1].quad) {
+          expect(sign * c[0]).toBeGreaterThanOrEqual(-1e-9)
+          expect(sign * c[0]).toBeLessThanOrEqual(PAGE_W + 1e-9)
+        }
       }
     }
   )
@@ -1935,9 +1994,12 @@ describe('tabpiece — fore-edge tab slider (D1 gates, bench derive-tabpiece.mjs
     '%s: flush at closed, erect at rest, monotone rise',
     (_id, layer) => {
       // closed: dead flat, tab fully home (only the lip inside the edge) —
-      // evaluated with both pages flat right, the A3 convention
+      // evaluated with both pages flat right, the A3 convention. A RAIL card is
+      // a sheet lying ON the page, so it closes to one glue ply, not to zero
+      // (RAIL_CARD_LIFT; the dress/rotor lift class).
+      const closedTol = layer.rail ? RAIL_CARD_LIFT + 1e-12 : 1e-12
       for (const closed of solveTabPiecePose(layer, 0, 0)) {
-        for (const p of closed.quad) expect(Math.abs(p[1])).toBeLessThan(1e-12)
+        for (const p of closed.quad) expect(Math.abs(p[1])).toBeLessThanOrEqual(closedTol)
       }
       expect(tabPieceTabOut(layer, 0)).toBe(0)
       // rest: full designed lift
