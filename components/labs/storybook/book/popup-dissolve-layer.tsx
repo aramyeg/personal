@@ -60,6 +60,8 @@ import {
 } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -273,6 +275,7 @@ export function DissolvePopupLayer({
   // --- Grab lifecycle (laws H1-H3): the LINEAR tab drive (tab-piece idiom),
   // held + snapped on release (volvelle idiom).
   const grabRef = useRef<{ deltaStart: number; dGrab: number } | null>(null)
+  const tap = useHandleTap()
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
     spreadPageAnglesTilted(
@@ -290,6 +293,7 @@ export function DissolvePopupLayer({
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never drew the strip answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // tau HELD; the frame loop snaps it to a pure end
     try {
@@ -311,6 +315,7 @@ export function DissolvePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { deltaStart: dissolveTabOut(layer, tauStart), dGrab }
     writeUserDrive(layer.id, tauStart, [0, Math.PI])
+    tap.begin(tauStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -327,7 +332,9 @@ export function DissolvePopupLayer({
     const dNow = projectPointerD(e, thetaL, thetaR)
     if (dNow === null) return
     const deltaNow = clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke)
-    writeUserDrive(layer.id, dissolveTauFromDraw(layer, deltaNow), [0, Math.PI])
+    const tauNow = dissolveTauFromDraw(layer, deltaNow)
+    writeUserDrive(layer.id, tauNow, [0, Math.PI])
+    tap.track(tauNow, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -388,7 +395,13 @@ export function DissolvePopupLayer({
       }
     }
 
-    const tau = readDissolveTau(layer)
+    // Tap answer (BW-18): the slats twitch toward the reveal and settle back.
+    // Render-time only — the snap-on-release above still owns the channel.
+    const tauHeld = readDissolveTau(layer)
+    const tau = Math.min(
+      Math.PI,
+      Math.max(0, tauHeld + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
+    )
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
     pose.slats.forEach((quad, k) => {

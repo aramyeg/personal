@@ -64,6 +64,8 @@ import {
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -354,6 +356,7 @@ export function TabPiecePopupLayer({
   // --- Grab lifecycle (laws H1-H3). High-frequency values flow through the
   // module scrub channel; only the low-frequency grab identity touches zustand.
   const grabRef = useRef<{ sGrabStart: number; dGrab: number } | null>(null)
+  const tap = useHandleTap()
   const prevStructRef = useRef<Vec3[] | null>(null)
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
@@ -372,6 +375,7 @@ export function TabPiecePopupLayer({
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never drew the strip answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -395,6 +399,7 @@ export function TabPiecePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return // booted/turning re-check no-oped
     grabRef.current = { sGrabStart: tabPieceSlideFromLift(layer, aGrabStart), dGrab }
     writeUserDrive(layer.id, aGrabStart, [0, aStop])
+    tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -413,7 +418,9 @@ export function TabPiecePopupLayer({
     const dNow = projectPointerD(e, thetaL, thetaR)
     if (dNow === null) return
     const sUser = clamp(grab.sGrabStart + (dNow - grab.dGrab), 0, sStop)
-    writeUserDrive(layer.id, tabPieceLiftFromSlide(layer, sUser), [0, aStop])
+    const aUser = tabPieceLiftFromSlide(layer, sUser)
+    writeUserDrive(layer.id, aUser, [0, aStop])
+    tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -502,7 +509,15 @@ export function TabPiecePopupLayer({
     } else {
       effectiveA = camA
     }
-    const rendered = Math.min(effectiveA, ceiling)
+    // Tap answer (BW-18), render-time only: the excursion never reaches the
+    // scrub channel, so the release return and the press-and-peel ceiling below
+    // both still see the reader's own value.
+    const nudged = clamp(
+      effectiveA + nudgeOffset(layer.id, effectiveA, 0, aStop, NUDGE_SPAN_ANGLE),
+      0,
+      aStop
+    )
+    const rendered = Math.min(nudged, ceiling)
 
     const solved = solveTabPiecePoseAt(layer, rendered, thetaL, thetaR)
     solved.forEach((patch, i) => {

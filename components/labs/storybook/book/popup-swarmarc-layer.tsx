@@ -52,6 +52,8 @@ import {
 import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 
 const FLAT_EPSILON = 0.02
 /** Overdamped release time constant (s) — ~95% settled inside 300 ms. */
@@ -130,6 +132,7 @@ export function SwarmArcPopupLayer({
   const tabRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
   const grabRef = useRef<{ sGrabStart: number; dGrab: number } | null>(null)
+  const tap = useHandleTap()
   const stirRef = useRef(0)
   const { texture: atlasArt, rect } = useArtSprite(`${layer.id}-atlas`)
   const tint = useMemo(() => kraftTints(`${layer.id}-atlas`), [layer.id])
@@ -241,6 +244,7 @@ export function SwarmArcPopupLayer({
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(stirChannel) // a press that never drew the tab answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -263,6 +267,7 @@ export function SwarmArcPopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { sGrabStart: sStart, dGrab }
     writeUserDrive(stirChannel, sStart, [0, layer.stir.stroke])
+    tap.begin(sStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -278,7 +283,9 @@ export function SwarmArcPopupLayer({
     const { thetaR } = restAnglesNow()
     const dNow = projectPointerD(e, thetaR)
     if (dNow === null) return
-    writeUserDrive(stirChannel, grab.sGrabStart + (dNow - grab.dGrab), [0, layer.stir.stroke])
+    const sUser = clamp(grab.sGrabStart + (dNow - grab.dGrab), 0, layer.stir.stroke)
+    writeUserDrive(stirChannel, sUser, [0, layer.stir.stroke])
+    tap.track(sUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -322,7 +329,15 @@ export function SwarmArcPopupLayer({
     }
     stirRef.current = s
 
-    const poses = solveSwarmArcPose(layer, thetaL, thetaR, s)
+    // Tap answer (BW-18): the tab creeps out and the ripple starts running up
+    // the arm — render-time only, never written to the stir channel, so the
+    // release decay above owns the reader's own stroke unchanged.
+    const shownS = clamp(
+      s + nudgeOffset(stirChannel, s, 0, layer.stir.stroke, NUDGE_SPAN_STROKE_FRAC * layer.stir.stroke),
+      0,
+      layer.stir.stroke
+    )
+    const poses = solveSwarmArcPose(layer, thetaL, thetaR, shownS)
     const strutArr = (strutGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
     const riderArr = (riderGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
     poses.forEach((pose, i) => {
@@ -338,7 +353,7 @@ export function SwarmArcPopupLayer({
     // exactly the stroke (Birmingham 84 pull-strip grammar) — one shared quad
     // helper (popup-swarmarc.ts) so the bench can aim at the handle the reader
     // sees. It fades shut with the envelope like everything else.
-    const tabQuad = swarmStirTabQuad(layer, s, thetaL, thetaR)
+    const tabQuad = swarmStirTabQuad(layer, shownS, thetaL, thetaR)
     const tabArr = (tabGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array
     writeQuadAt(tabArr, 0, tabQuad)
     const slopArr = (slopGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array

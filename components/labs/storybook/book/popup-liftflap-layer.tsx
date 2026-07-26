@@ -37,6 +37,8 @@ import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -219,6 +221,7 @@ export function LiftFlapPopupLayer({
   // --- Grab lifecycle (laws H3/H4). One door at a time; offset-captured hinge
   // angle for continuity; release HOLDS the door's angle.
   const grabRef = useRef<{ doorIndex: number; aGrabStart: number; angleGrab: number } | null>(null)
+  const tap = useHandleTap()
 
   /** The pointer's angle about door k's hinge line, in its swing plane (H3). */
   const angleAboutHinge = (e: ThreeEvent<PointerEvent>, k: number, thetaL: number, thetaR: number): number | null => {
@@ -228,7 +231,11 @@ export function LiftFlapPopupLayer({
 
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
+    const tapped = grabRef.current.doorIndex
     grabRef.current = null
+    // A press that never swung the leaf answers with a nudge of THAT door
+    // (BW-18) — the pulse is keyed per door, like the held angle itself.
+    tap.end(doorChannel(layer.id, tapped))
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab() // the door's angle is HELD (persistence)
     try {
@@ -257,6 +264,7 @@ export function LiftFlapPopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { doorIndex: idx, aGrabStart, angleGrab }
     writeUserDrive(doorChannel(layer.id, idx), aGrabStart, [0, thetaMax])
+    tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -274,6 +282,7 @@ export function LiftFlapPopupLayer({
     if (angleNow === null) return
     const aUser = clamp(grab.aGrabStart + wrapDelta(angleNow - grab.angleGrab), 0, thetaMax)
     writeUserDrive(doorChannel(layer.id, grab.doorIndex), aUser, [0, thetaMax])
+    tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -298,7 +307,13 @@ export function LiftFlapPopupLayer({
     group.visible = visible
     if (!visible) return
 
-    const held = layer.doors.map((_, k) => readDoorAngle(layer, k))
+    // Held reader angle + the tap excursion, per door. The nudge is render-time
+    // only (handle-nudge.ts): it never reaches the scrub channel, so a door's
+    // remembered open angle and the fold-flat envelope are both untouched.
+    const held = layer.doors.map((_, k) => {
+      const a = readDoorAngle(layer, k)
+      return clamp(a + nudgeOffset(doorChannel(layer.id, k), a, 0, thetaMax, NUDGE_SPAN_ANGLE), 0, thetaMax)
+    })
     const pose = solveLiftFlapPose(layer, held, thetaL, thetaR)
     writeQuad(boardGeometry, pose.board)
     pose.doors.forEach((quad, k) => {

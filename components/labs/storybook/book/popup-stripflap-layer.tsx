@@ -54,6 +54,8 @@ import {
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_STANDING } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -204,6 +206,7 @@ export function StripFlapPopupLayer({
 
   // --- Grab lifecycle (laws H1-H3). Offset-captured hinge angle for continuity.
   const grabRef = useRef<{ aGrabStart: number; angleGrab: number } | null>(null)
+  const tap = useHandleTap()
   const prevVertsRef = useRef<Vec3[] | null>(null)
 
   const anglesNow = (): { thetaL: number; thetaR: number } =>
@@ -225,6 +228,7 @@ export function StripFlapPopupLayer({
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never moved the flap answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -247,6 +251,7 @@ export function StripFlapPopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { aGrabStart, angleGrab }
     writeUserDrive(layer.id, aGrabStart, [0, ANTI_FLIP])
+    tap.begin(aGrabStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -264,6 +269,7 @@ export function StripFlapPopupLayer({
     if (angleNow === null) return
     const aUser = clamp(grab.aGrabStart + wrapDelta(angleNow - grab.angleGrab), 0, ANTI_FLIP)
     writeUserDrive(layer.id, aUser, [0, ANTI_FLIP])
+    tap.track(aUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -333,7 +339,14 @@ export function StripFlapPopupLayer({
       effectiveA = camA
     }
 
-    const pose = solveStripFlapPoseAt(layer, effectiveA, thetaL, thetaR)
+    // Tap answer (BW-18): a render-time excursion only — never written to the
+    // channel, so it cannot survive a turn or leak into the release return.
+    const shownA = clamp(
+      effectiveA + nudgeOffset(layer.id, effectiveA, 0, ANTI_FLIP, NUDGE_SPAN_ANGLE),
+      0,
+      ANTI_FLIP
+    )
+    const pose = solveStripFlapPoseAt(layer, shownA, thetaL, thetaR)
     writeQuad(geometries.right, pose.right)
     writeQuad(geometries.left, pose.left)
     // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.

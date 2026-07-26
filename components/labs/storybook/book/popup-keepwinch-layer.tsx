@@ -46,6 +46,8 @@ import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectHubAngle } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -89,7 +91,13 @@ function readWinchTheta(layer: SceneLayer & KeepWinchGeom): number {
   const drive = readDriveOverride(layer.id)
   if (drive !== null) return clamp(rad(drive), 0, max)
   const channel = readUserDrive(layer.id)
-  return channel !== undefined ? clamp(channel, 0, max) : 0
+  const held = channel !== undefined ? clamp(channel, 0, max) : 0
+  // Tap answer (BW-18): a press that never turned the dial rocks it a few
+  // degrees and lets it settle. Applied HERE, in the one reader every consumer
+  // shares, so the disc and everything it drives stay one rigid machine — and
+  // only on the channel path, so a frozen ?sbdrive/?sbknob capture pose is
+  // never disturbed. Render-time only: the excursion is not written back.
+  return clamp(held + nudgeOffset(layer.id, held, 0, max, NUDGE_SPAN_ANGLE), 0, max)
 }
 
 function makeQuadGeometry(uvs: Float32Array): THREE.BufferGeometry {
@@ -205,6 +213,7 @@ function WinchDisc({
   )
 
   const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  const tap = useHandleTap()
 
   const angleAboutHub = (
     e: ThreeEvent<PointerEvent>,
@@ -229,6 +238,7 @@ function WinchDisc({
   const releaseGrab = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(layer.id) // a press that never turned the dial answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -246,7 +256,9 @@ function WinchDisc({
     const hub = angleAboutHub(e, thetaL, thetaR)
     st.beginGrab(layer.id, 'knob')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
-    writeUserDrive(layer.id, clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax), [0, thetaMax])
+    const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+    writeUserDrive(layer.id, seeded, [0, thetaMax])
+    tap.begin(seeded)
     grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -265,7 +277,9 @@ function WinchDisc({
     if (!hub || !hub.stable) return
     if (grab.lastAngle !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      writeUserDrive(layer.id, clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax), [0, thetaMax])
+      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      writeUserDrive(layer.id, next, [0, thetaMax])
+      tap.track(next, TAP_EPS)
     }
     grab.lastAngle = hub.angle
     e.stopPropagation()

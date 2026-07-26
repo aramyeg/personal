@@ -57,6 +57,8 @@ import {
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import { pointerLocalRay } from './user-drive-pointer'
 import { acceptsHandleHit, HANDLE_SLOP_FLAT } from './handle-hit'
+import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
@@ -254,6 +256,7 @@ export function KeepsakePopupLayer({
   // module scrub channel; only the low-frequency grab identity + H8 macro state
   // touch zustand.
   const grabRef = useRef<{ pGrabStart: number; dGrab: number } | null>(null)
+  const tap = useHandleTap()
   // The card's live WORLD pose, captured so an auto-return starts from wherever
   // the card actually is (a seated card, or an interrupted mid-settle one). Held
   // in world (not local) because the settle/return polylines interpolate in
@@ -279,6 +282,7 @@ export function KeepsakePopupLayer({
 
   const endExtractionGrab = (e: ThreeEvent<PointerEvent>): void => {
     grabRef.current = null
+    tap.end(layer.id) // a press that never drew the card answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -309,6 +313,7 @@ export function KeepsakePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return // booted/turning re-check no-oped
     grabRef.current = { pGrabStart: pStart, dGrab }
     writeUserDrive(layer.id, pStart, [0, pExit])
+    tap.begin(pStart)
     beginGrabChannel(layer.id)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -336,7 +341,9 @@ export function KeepsakePopupLayer({
       e.stopPropagation()
       return
     }
-    writeUserDrive(layer.id, clamp(pRaw, 0, pExit), [0, pExit])
+    const pUser = clamp(pRaw, 0, pExit)
+    writeUserDrive(layer.id, pUser, [0, pExit])
+    tap.track(pUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -433,7 +440,15 @@ export function KeepsakePopupLayer({
       } else {
         p = 0
       }
-      card = keepsakeCardInPlane(layer, p, thetaL, thetaR)
+      // Tap answer (BW-18): the card peeks out of its sleeve and slides back.
+      // Render-time only, and capped well inside p_exit, so a tap can never
+      // detach the card (law H8's one-way door stays the reader's to open).
+      const pShown = clamp(
+        p + nudgeOffset(layer.id, p, 0, pExit, NUDGE_SPAN_STROKE_FRAC * pExit),
+        0,
+        pExit
+      )
+      card = keepsakeCardInPlane(layer, pShown, thetaL, thetaR)
       cardWorld = card.map(toWorld)
     } else if (macro === 'out') {
       // Detached: settle exit -> seat in WORLD (the card leaves the parallax
