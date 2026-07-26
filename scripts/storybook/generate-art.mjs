@@ -3569,38 +3569,16 @@ function dressPatch(w, h, seed, kind) {
   return svgPiece(w, h, s)
 }
 
-// ---- THE MEADOW WINDMILL SAIL (s3 ch2-windmill, kinetic arm|flap). A wooden
-// lattice sail catching the wind. Painted as a battened frame with canvas
-// panels — orientation-tolerant (reads as a sail whichever half is arm vs
-// flap) so the split can't produce wrong art. Alpha carves the blade. ----
-function windmillSail(w, h, seed) {
-  const r = mulberry32(seed)
-  const WOOD = '#8a5a34',
-    WLIT = '#a6744c',
-    CANVAS = '#efe3c6'
-  const x0 = w * 0.16,
-    x1 = w * 0.84,
-    y0 = h * 0.06,
-    y1 = h * 0.94
-  const d = `M ${fx(x0)} ${fx(y0)} L ${fx(x1)} ${fx(y0)} L ${fx(x1)} ${fx(y1)} L ${fx(x0)} ${fx(y1)} Z`
-  let s = `<g>`
-  // canvas backing
-  s += `<path d="${d}" fill="${CANVAS}"/>`
-  s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx((x1 - x0) * 0.5)}" height="${fx(y1 - y0)}" fill="#ffffff" opacity="0.18"/>`
-  // lattice battens
-  const spar = w * 0.5
-  s += `<rect x="${fx(spar - w * 0.03)}" y="${fx(y0)}" width="${fx(w * 0.06)}" height="${fx(y1 - y0)}" fill="${WOOD}"/>` // main spar
-  for (let i = 1; i < 8; i++) {
-    const y = lerp(y0, y1, i / 8)
-    s += `<line x1="${fx(x0)}" y1="${fx(y)}" x2="${fx(x1)}" y2="${fx(y)}" stroke="${WOOD}" stroke-width="4" opacity="0.9"/>` // battens
-    s += `<line x1="${fx(x0)}" y1="${fx(y - 1)}" x2="${fx(x1)}" y2="${fx(y - 1)}" stroke="${WLIT}" stroke-width="1.4" opacity="0.6"/>`
-  }
-  for (const bx of [x0 + (x1 - x0) * 0.25, x0 + (x1 - x0) * 0.75]) s += `<rect x="${fx(bx - w * 0.015)}" y="${fx(y0)}" width="${fx(w * 0.03)}" height="${fx(y1 - y0)}" fill="${WOOD}" opacity="0.85"/>`
-  s += rimPath(d, 4)
-  s += `</g>`
-  void r
-  return svgPiece(w, h, s)
-}
+// ---- RETIRED, E3 Wave-2: the s3 meadow windmill (ch2-windmill, kinetic
+// arm|flap) and its windmillSail() painter are gone, layer and art together.
+// A kinetic arm has its apex ON THE SPINE by construction, so this sail could
+// only ever project into the courier hero's own screen column (its box
+// 752..838 x 487..628 sits inside his 707..912 x 232..617): downstage of him it
+// drew across his legs — the blind reader read the result as "cream slabs ruled
+// with brown verticals ... hive frames" — and upstage of him it was entirely
+// hidden behind him. Do not restore it: the GEOMETRY, not the paint, is what
+// made it unshowable. A meadow windmill would need its own off-spine hinge to
+// be visible on this spread at all. ----
 
 // ============================================================================
 // THE DISPATCH VOLVELLE (Spread 4). A reader-spun raven "dispatch dial" riveted
@@ -11349,16 +11327,31 @@ function bazaarFloorSpread(w, h, seed) {
 // webp. No outline sidecar (mesh stays the solver quad). ----
 // ============================================================================
 // THE CARRIER SWARM ART MODULE (E3 s3, "The Carrier Swarm"). One 1024 sprite
-// atlas feeds all 28 swarmarc riders + the hairline strut swatch + the STIR
+// atlas feeds all 22 swarmarc riders + the three strut swatches + the STIR
 // tab (G5 FIELD discipline: many pieces, ONE texture). Cell convention is
 // popup-swarmarc-layer.tsx's contract, written once THERE and honored HERE:
-// 8x8 grid of 128px cells, row 0 at the image TOP; cells 0-15 the 16 rider
-// sprites, cell 16 the strut swatch (OPAQUE — the strut mesh has no alpha
-// test), cells 17-18 + 25-26 the 2x2 STIR tab (banner lettering over the
-// bee-on-honey-drop handle), cells 19-22 the printed banner strip reserved
-// for the page print. Palette is the pack's alpine-airy set — 3 values + 1
-// metal + ONE saturated accent (daisy-ref discipline): the red appears ONLY
-// on wax seals + the tab bow, never on bees or satchels.
+// 8x8 grid of 128px cells, row 0 at the image TOP, and within a rider cell the
+// TOP edge is OUTWARD (the strut tip's direction) while the BOTTOM edge is
+// where the strut arrives. ROUND 2 LAYOUT:
+//   cells 0-15   the 16 rider sprites — sprite in the cell's UPPER band with a
+//                painted flight thread below it (see THE HOVER CONTRACT below)
+//   cell 16      strut swatch variant 0, the paper hairline
+//   cell 23      strut swatch variant 1, waxed twine
+//   cell 24      strut swatch variant 2, a slim twig with one knot
+//                (all three OPAQUE full cells — the strut mesh has no alpha test).
+//                Per-strut `swatch` 0/1/2 picks among them, so across the 22
+//                stalks each swatch carries about a third — these two new cells
+//                are load-bearing, not decoration
+//   cells 32-36
+//   + 40-44
+//   + 48-52      the STIR pull tab, one 640x384 block (aspect 1.667 to match its
+//                145x85 screen quad, so letterforms come out unstretched)
+//   cells 17-22
+//   + 25-26      TRANSPARENT. They held round 1's 2x2 STIR tab and a printed
+//                banner strip; nothing samples either any more.
+// Palette is the pack's alpine-airy set — 3 values + 1 metal + ONE saturated
+// accent (daisy-ref discipline): the red appears ONLY on wax seals, the tab bow
+// and the hero's satchel, never on bees.
 // ============================================================================
 
 const SWARM = {
@@ -11520,104 +11513,329 @@ function swarmHoneyDrop(cx, cy, s) {
 function swarmAtlas(w, h, seed) {
   const r = mulberry32(seed)
   const cs = w / 8
-  // Sprite FILL, not sprite size: a rider quad is exactly one cell, so the
-  // fraction of the cell a sprite covers is the fraction of the rider it is.
-  // The first cut drew every sprite at 0.62 of the cell and lost a third of
-  // its own quad to transparent margin — at the pinned camera a rider spans
-  // ~17 px, so that margin was the difference between a courier and a chip.
-  // FILL is the span each sprite is fitted to; the geometry (strut radius r)
-  // is untouched, which keeps the S2 radius wall out of this.
-  const FILL = cs * 0.95
-  const S = cs * 0.62 // legacy nominal, still used for the chainlet layout
   // Each rider is painted inside a NESTED SVG viewport covering exactly its
   // own cell, in cell-local coordinates. A nested <svg> clips to its viewport,
   // so a sprite can no longer bleed into the neighbouring cell's uv rect —
   // cell isolation becomes a property of the atlas rather than of arithmetic
   // I have to keep re-deriving every time a sprite grows a leg or an antenna.
-  // (`ky` recentres poses whose silhouette is not symmetric about the body:
-  // upswept wings reach further above the abdomen than the legs reach below.)
   const inCell = (i, inner) => {
     const x0 = (i % 8) * cs
     const y0 = Math.floor(i / 8) * cs
     return `<svg x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" viewBox="0 0 ${fx(cs)} ${fx(cs)}">${inner}</svg>`
   }
   const M = cs / 2
+
+  // ==========================================================================
+  // THE HOVER CONTRACT (round 2 repaint of cells 0-15).
+  //
+  // The blind reader on round 1: "two dozen identical thin pale-blue poles each
+  // capped with a bee lying flat on a disc. My first reading was 'bees skewered
+  // on sticks'." The cause was geometric, not painterly: the strut's opaque quad
+  // ran all the way to the rider cell's exact CENTRE, so the pole crossed the
+  // middle of every abdomen. popup-swarmarc-layer.tsx now stops the strut at 35%
+  // of the cell height measured UP from the cell's BOTTOM edge (TIP_Y below),
+  // and this atlas paints to that contract:
+  //   * the sprite lives in the UPPER band of its cell, body centre 36-40% down
+  //     from the cell top (= 60-64% up from the bottom, the cell's TOP edge
+  //     being outward / the strut tip's direction);
+  //   * a painted FLIGHT THREAD continues the strut from the cell's bottom edge
+  //     up to the sprite's underside, in cell 16's own swatch colours;
+  //   * so the strut and the thread are ONE die-cut and the rider reads as
+  //     HOVERING at the top of a thread rather than impaled on a pole.
+  //
+  // WHAT THIS COSTS, stated because it partly undoes the FILL doctrine the
+  // previous round won: with the body centre at ~0.40 cs instead of ~0.57 cs, a
+  // wings-up bee (whose silhouette reaches 0.83 s ABOVE its body centre) can
+  // only be 0.60 cs wide before its wing tips clip the cell's top edge. Sprite
+  // spans therefore land at 0.60-0.81 cs (mean 0.69) where round 1 ran every
+  // sprite at 0.95 cs — a rider that spanned ~17 px on screen now spans ~12 px
+  // of painted bee. The cell's top edge, NOT the strut tip, is the binding
+  // constraint, so the only way to buy the width back is a taller rider quad.
+  // ==========================================================================
+  const TIP_Y = cs * 0.65 // where the strut's opaque quad now ends (35% up from the bottom)
+  const CLEAR = cs * 0.025 // the sprite's underside must clear that tip
+  const TOPM = cs * 0.016 // ... and the cell's top edge
+  const CHIP_Y = cs * 0.32 // letters/parcels/drops hang higher than the bees do:
+  // their footprint is symmetric, so the balance point of the two budgets is up
+  // at 0.32 cs rather than 0.40 cs, and that is worth ~10% of chip size.
+  /** Per-pose silhouette reach in units of the body size `s`, measured from the
+   *  body centre: [above, below]. Upswept wings reach roughly twice as far above
+   *  the abdomen as the legs reach below it, which is the whole reason sprite
+   *  sizes now differ per pose. Verified against rendered per-cell alpha bboxes. */
+  const REACH = {
+    wingsUp: [0.83, 0.45],
+    wingsMid: [0.65, 0.45],
+    wingsDown: [0.4, 0.66],
+    profile: [0.83, 0.45],
+    bumble: [0.71, 0.48],
+    scout: [0.58, 0.4],
+    satchel: [0.83, 0.46],
+  }
+  const spanPerS = (pose) => 1 / beeFit(1, pose).s // = beeFit's (left + right)
+  /** The body centre and body size that make a pose as LARGE as the hover band
+   *  allows: `cy` is clamped into the contract's 36-40%-down window, then `s` is
+   *  whichever of the two clearances binds. */
+  const fitBee = (pose) => {
+    const [up, dn] = REACH[pose]
+    const ideal = (up * (TIP_Y - CLEAR) + dn * TOPM) / (up + dn)
+    const cy = Math.min(cs * 0.4, Math.max(cs * 0.36, ideal))
+    const s = Math.min((cy - TOPM) / up, (TIP_Y - CLEAR - cy) / dn)
+    return { cy, s, span: s * spanPerS(pose) }
+  }
+  /** The largest chip size whose ROTATED footprint clears both budgets. */
+  const fitChip = (aspect, rot, rimF = 0.05) => {
+    const a = Math.abs(Math.sin((rot * Math.PI) / 180))
+    const b = Math.abs(Math.cos((rot * Math.PI) / 180))
+    const halfPerS = (a + aspect * b) / 2 + rimF
+    return Math.min((CHIP_Y - TOPM) / halfPerS, (TIP_Y - CLEAR - CHIP_Y) / halfPerS)
+  }
+  /** THE FLIGHT THREAD — the painted continuation of the hairline strut, running
+   *  up the cell's horizontal CENTRE from the cell's bottom edge to just inside
+   *  the sprite's underside. Same swatch structure as cell 16 (a #bfd0dd core
+   *  over `SWARM.strut`, with faint `SWARM.blue` cut edges) so the strut mesh and
+   *  the painted thread are indistinguishable and the die-cut reads as one piece.
+   *  Width 14 px of a 128 px cell = 11%; a rider spans 17-40 px on screen, so the
+   *  thread lands at 1.9-4.4 px there, matching the strut's own screen hairline.
+   *
+   *  The core is #c7cfd2, a NEUTRAL pale grey, not cell 16's cool #bfd0dd. Only one
+   *  stalk in three samples cell 16 now; the other two are the warmer twine and
+   *  twig, and squashing the thread and each swatch to their true 4 px and averaging
+   *  measured the twig sitting 23 units warmer than a cool thread on the R-B axis
+   *  (dRGB 26.5) — a visible hue STEP at the join, where the whole point of the
+   *  thread is that the stalk and it are ONE die-cut. Neutral here, plus the twig
+   *  desaturated to a warm grey, puts the worst join at an R-B shift of 8. */
+  const thread = (topY) => {
+    const tw = cs * 0.11
+    const x0 = M - tw / 2
+    const y0 = Math.max(0, Math.min(cs - cs * 0.1, topY))
+    const hgt = cs - y0
+    return (
+      `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(tw)}" height="${fx(hgt)}" fill="${SWARM.strut}"/>` +
+      `<rect x="${fx(x0 + tw * 0.3)}" y="${fx(y0)}" width="${fx(tw * 0.4)}" height="${fx(hgt)}" fill="#c7cfd2"/>` +
+      `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(tw * 0.16)}" height="${fx(hgt)}" fill="${SWARM.blue}" opacity="0.55"/>` +
+      `<rect x="${fx(x0 + tw * 0.84)}" y="${fx(y0)}" width="${fx(tw * 0.16)}" height="${fx(hgt)}" fill="${SWARM.blue}" opacity="0.55"/>`
+    )
+  }
   let s = `<g>`
-  // --- cells 0-15: the 16 rider sprites (no two neighbors share one; the
-  // solver's stride-7 sampling never puts equal cells adjacent) ---
-  const bees = ['wingsUp', 'wingsMid', 'wingsDown', 'profile', 'bumble']
-  const beeLift = { wingsUp: 0.1, wingsMid: 0.06, wingsDown: -0.08, profile: 0.09, bumble: 0.05, scout: 0.06, satchel: 0.06 }
-  const beeCell = (i, pose, span, dx = 0) => {
-    const f = beeFit(span, pose)
-    return inCell(i, swarmBee(M + f.dx + dx, M + f.s * beeLift[pose], f.s, pose))
+  // --- cells 0-15: the 16 rider sprites, every one body-high over its own
+  // flight thread (no two neighbours share a sprite; the solver's stride-7
+  // sampling never puts equal cells adjacent). `wingsDown` is retired from the
+  // rider set: its wings hang BELOW the abdomen, which both fought the thread
+  // and was the one pose that could read as a bee sitting on something. ---
+  const bees = ['wingsUp', 'wingsMid', 'bumble', 'profile', 'scout']
+  const beeCell = (i, pose, k = 1, dx = 0) => {
+    const f0 = fitBee(pose)
+    const f = beeFit(f0.span * k, pose)
+    return inCell(
+      i,
+      thread(f0.cy + f.s * REACH[pose][1] * 0.82) + swarmBee(M + f.dx + dx, f0.cy, f.s, pose)
+    )
   }
   bees.forEach((pose, i) => {
-    s += beeCell(i, pose, FILL)
+    s += beeCell(i, pose)
   })
-  s += inCell(5, swarmEnvelope(M, M, FILL * 0.84, 'face', rr(r, -9, -3)))
-  s += inCell(6, swarmEnvelope(M, M, FILL * 0.84, 'back', rr(r, 3, 9)))
-  s += inCell(7, swarmEnvelope(M, M, FILL * 0.84, 'sealed', rr(r, -6, 6))) // wax seal 1 of 3
-  s += inCell(8, swarmParcel(M, M, FILL * 0.86, false, rr(r, -8, -2)))
-  s += inCell(9, swarmParcel(M, M, FILL * 0.8, true, rr(r, 2, 8)))
-  {
-    // letter-pair chainlet: two small envelopes strung on one thread
-    let g = `<path d="M ${fx(M - S * 0.72)} ${fx(M - S * 0.52)} Q ${fx(M)} ${fx(M + S * 0.33)} ${fx(M + S * 0.72)} ${fx(M - S * 0.46)}" fill="none" stroke="${SWARM.slate}" stroke-width="4"/>`
-    g += swarmEnvelope(M - S * 0.38, M + S * 0.16, S * 0.78, 'face', -9)
-    g += swarmEnvelope(M + S * 0.4, M + S * 0.22, S * 0.72, 'back', 8)
-    s += inCell(10, g)
+  const chipCell = (i, aspect, rot, make, k = 1) => {
+    const cq = fitChip(aspect, rot) * k
+    const a = Math.abs(Math.sin((rot * Math.PI) / 180))
+    const b = Math.abs(Math.cos((rot * Math.PI) / 180))
+    const half = cq * ((a + aspect * b) / 2 + 0.05)
+    return inCell(i, thread(CHIP_Y + half * 0.86) + make(cq))
   }
-  s += inCell(11, swarmHoneyDrop(M, M, FILL * 0.94))
-  for (const [k, i] of [[0, 12], [1, 13]]) {
-    // scouts stay the ring's small change, but READ small rather than vanish
-    s += beeCell(i, 'scout', FILL * 0.84, k ? -S * 0.05 : S * 0.04)
-  }
-  s += beeCell(14, 'satchel', FILL * 0.92)
-  s += inCell(15, swarmEnvelope(M, M, FILL * 0.76, 'face', -24))
-  // --- cell 16: the hairline strut swatch. OPAQUE full cell (the strut mesh
-  // material carries no alpha test); sky-tinted with a lighter core so the
-  // 4px screen hairline reads as lit paper, plus faint cut edges. ---
   {
-    const x0 = (16 % 8) * cs
-    const y0 = Math.floor(16 / 8) * cs
-    s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" fill="${SWARM.strut}"/>`
-    s += `<rect x="${fx(x0 + cs * 0.3)}" y="${fx(y0)}" width="${fx(cs * 0.4)}" height="${fx(cs)}" fill="#bfd0dd"/>`
-    s += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
-    s += `<rect x="${fx(x0 + cs * 0.93)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
+    const ra = rr(r, -9, -3)
+    s += chipCell(5, 0.68, ra, (q) => swarmEnvelope(M, CHIP_Y, q, 'face', ra))
+    const rb = rr(r, 3, 9)
+    s += chipCell(6, 0.68, rb, (q) => swarmEnvelope(M, CHIP_Y, q, 'back', rb))
+    const rc = rr(r, -6, 6)
+    s += chipCell(7, 0.68, rc, (q) => swarmEnvelope(M, CHIP_Y, q, 'sealed', rc)) // wax seal 1 of 3
+    const rd = rr(r, -8, -2)
+    s += chipCell(8, 0.62, rd, (q) => swarmParcel(M, CHIP_Y, q, false, rd))
+    const re = rr(r, 2, 8)
+    s += chipCell(9, 0.9, re, (q) => swarmParcel(M, CHIP_Y, q, true, re))
   }
-  // --- cells 17-18 + 25-26: the STIR tab (2x2 region, 256x256): the printed
-  // banner arc over the die-cut bee-on-honey-drop pull. The red bow is wax
-  // accent 2 of 3; the lettering is slate + gold (T-AFFORDANCE, celebrated).
   {
-    const x0 = (17 % 8) * cs
-    const y0 = Math.floor(17 / 8) * cs
-    const tw = cs * 2
-    const cx = x0 + tw / 2
-    // dashed bee-loop swooping down toward the ribbon
-    s += `<path d="M ${fx(x0 + tw * 0.2)} ${fx(y0 + cs * 0.42)} C ${fx(x0 + tw * 0.34)} ${fx(y0 + cs * 0.08)} ${fx(x0 + tw * 0.72)} ${fx(y0 + cs * 0.06)} ${fx(x0 + tw * 0.8)} ${fx(y0 + cs * 0.34)}" fill="none" stroke="${SWARM.amber}" stroke-width="2.6" stroke-dasharray="7 6" opacity="0.9"/>`
-    s += swarmBee(x0 + tw * 0.18, y0 + cs * 0.38, cs * 0.26, 'scout')
-    // ribbon: the full phrase stacked on two lines so nothing leaves the region
-    s += `<rect x="${fx(x0 + tw * 0.13)}" y="${fx(y0 + cs * 0.5)}" width="${fx(tw * 0.74)}" height="${fx(cs * 0.62)}" rx="9" fill="${SWARM.slate}" stroke="${SWARM.gold}" stroke-width="2.4"/>`
-    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 0.76)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.17)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">STIR THE</text>`
-    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 1.0)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.17)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">SWARM</text>`
-    s += `<text x="${fx(cx)}" y="${fx(y0 + cs * 1.28)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.2)}" text-anchor="middle" fill="${SWARM.gold}">&#9660;</text>`
-    // the pull: a fat honey drop with a perched bee; the red wax bow sits ON
-    // the drop's neck (wax accent 2 of 3)
-    s += swarmHoneyDrop(cx, y0 + cs * 1.66, cs * 0.6)
-    s += swarmBee(cx + cs * 0.02, y0 + cs * 1.42, cs * 0.3, 'wingsUp')
-    s += `<circle cx="${fx(cx - cs * 0.14)}" cy="${fx(y0 + cs * 1.52)}" r="${fx(cs * 0.07)}" fill="${SWARM.red}" stroke="#8c352a" stroke-width="1.6"/>`
+    // letter-pair chainlet: two small envelopes strung on one twine, the pair
+    // hung high with the flight thread rising to the lower chip's corner
+    const q = fitChip(0.68, 9) * 0.62
+    const eA = [M - q * 0.5, CHIP_Y - q * 0.1]
+    const eB = [M + q * 0.52, CHIP_Y + q * 0.2]
+    let g = `<path d="M ${fx(eA[0] - q * 0.2)} ${fx(eA[1] - q * 0.42)} Q ${fx(M)} ${fx(CHIP_Y + q * 0.5)} ${fx(eB[0] + q * 0.16)} ${fx(eB[1] - q * 0.44)}" fill="none" stroke="${SWARM.slate}" stroke-width="4"/>`
+    g += swarmEnvelope(eA[0], eA[1], q, 'face', -9)
+    g += swarmEnvelope(eB[0], eB[1], q, 'back', 8)
+    s += inCell(10, thread(eB[1] + q * 0.34) + g)
   }
-  // --- cells 19-22: the printed banner strip (512x128) reserved for the page
-  // print composite ("STIR THE SWARM" affordance printed at the fore edge). ---
   {
-    const x0 = (19 % 8) * cs
-    const y0 = Math.floor(19 / 8) * cs
-    const bw = cs * 4
-    s += `<rect x="${fx(x0 + bw * 0.04)}" y="${fx(y0 + cs * 0.24)}" width="${fx(bw * 0.92)}" height="${fx(cs * 0.5)}" rx="10" fill="${SWARM.slate}" stroke="${SWARM.gold}" stroke-width="3"/>`
-    s += `<path d="M ${fx(x0 + bw * 0.04)} ${fx(y0 + cs * 0.49)} l ${fx(-bw * 0.03)} 0 M ${fx(x0 + bw * 0.96)} ${fx(y0 + cs * 0.49)} l ${fx(bw * 0.03)} 0" stroke="${SWARM.gold}" stroke-width="3"/>`
-    s += `<text x="${fx(x0 + bw / 2)}" y="${fx(y0 + cs * 0.62)}" font-family="Georgia, 'Times New Roman', serif" font-size="${fx(cs * 0.3)}" font-weight="bold" text-anchor="middle" fill="${SWARM.cream}">STIR THE SWARM &#9660;</text>`
+    // The honey drop is intrinsically TALL and NARROW: reaches are 0.57 q above
+    // and 0.47 q below its own centre (0.52/0.42 of the path plus its rimPath),
+    // while its bezier controls overshoot so the ink is only 0.61 q ACROSS. Sized
+    // to the hover band that leaves a drop alone filling 0.36 cs, which is the
+    // FILL doctrine's own failure case — so it rides with a scout at its
+    // shoulder (the tab's bee-on-honey-drop motif), taking the cell to 0.65 cs.
+    // Watch out when re-measuring this cell: the drop's bottom TIP sits inside
+    // the thread column, so a bbox that excludes that column reads it as
+    // clearing the strut tip when it does not.
+    const q = (TIP_Y - CLEAR - TOPM) / 1.04
+    const dy = TOPM + q * 0.57
+    const bf = beeFit(cs * 0.44, 'scout')
+    s += inCell(
+      11,
+      thread(dy + q * 0.36) + swarmBee(M - cs * 0.26 + bf.dx, cs * 0.23, bf.s, 'scout') + swarmHoneyDrop(M, dy, q)
+    )
+  }
+  s += beeCell(12, 'wingsMid', 0.86, cs * 0.03)
+  s += beeCell(13, 'scout', 0.9, -cs * 0.03)
+  s += beeCell(14, 'satchel')
+  {
+    const rf = -16
+    s += chipCell(15, 0.68, rf, (q) => swarmEnvelope(M, CHIP_Y, q, 'face', rf), 0.92)
+  }
+  // --- cells 16 / 23 / 24: the THREE strut swatches, variants 0 / 1 / 2. Each
+  // is an OPAQUE full cell (the strut mesh material carries no alpha test), so
+  // every one of them fills its cell edge to edge. All 22 struts sampling ONE
+  // swatch made the ring read as a rank of identical machined poles; three
+  // swatches in the SAME value family give the rank variety without any of them
+  // out-reading its rider (the daisy rule: a stem must never beat its flower).
+  const swatch = (i, paint) => {
+    const x0 = (i % 8) * cs
+    const y0 = Math.floor(i / 8) * cs
+    return paint(x0, y0)
+  }
+  // variant 0 — the hairline paper strut: sky-tinted with a lighter core so the
+  // 4px screen hairline reads as lit paper, plus faint cut edges.
+  s += swatch(16, (x0, y0) => {
+    let g = `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" fill="${SWARM.strut}"/>`
+    g += `<rect x="${fx(x0 + cs * 0.3)}" y="${fx(y0)}" width="${fx(cs * 0.4)}" height="${fx(cs)}" fill="#bfd0dd"/>`
+    g += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
+    g += `<rect x="${fx(x0 + cs * 0.93)}" y="${fx(y0)}" width="${fx(cs * 0.07)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.55"/>`
+    return g
+  })
+  // variant 1 — WAXED TWINE: same sky tint, but the core is finer (0.22 of the
+  // width against 0.40) and warmer, so a twine strut reads as thread rather than
+  // as a cut paper edge. On screen that core is ~0.9 px of a 4 px strut.
+  s += swatch(23, (x0, y0) => {
+    let g = `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" fill="${SWARM.strut}"/>`
+    g += `<rect x="${fx(x0 + cs * 0.26)}" y="${fx(y0)}" width="${fx(cs * 0.48)}" height="${fx(cs)}" fill="#b6c6d1"/>`
+    g += `<rect x="${fx(x0 + cs * 0.39)}" y="${fx(y0)}" width="${fx(cs * 0.22)}" height="${fx(cs)}" fill="#dcd8c8"/>`
+    g += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs * 0.08)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.5"/>`
+    g += `<rect x="${fx(x0 + cs * 0.92)}" y="${fx(y0)}" width="${fx(cs * 0.08)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.5"/>`
+    return g
+  })
+  // variant 2 — a slim TWIG / reed. Its core is a warm GREY, not the walnut tint
+  // the first cut used: at 4 px on screen a swatch has no drawing left, only an
+  // averaged tint, and a walnut one put this stalk 23 R-B units warmer than the
+  // rider cells' flight thread — a hue step at the join (see `thread` above).
+  // The KNOT is what says twig at reading size, so it keeps the amber and does the
+  // work; the tint stays low-contrast so a twig strut still disappears behind its
+  // rider (the daisy rule again). Values are also held LIGHT: once the hue was
+  // matched, what was left of the join was a lightness step, and dropping the twig
+  // 16 units darker in blue than the thread showed up as a shaded band at the seam.
+  // Measured joins against the thread now: hairline dRGB 7.7, twine 7.8, twig 10.3,
+  // and no R-B shift above 8 — where the twig alone used to be 26.5 / 23.
+  s += swatch(24, (x0, y0) => {
+    let g = `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs)}" height="${fx(cs)}" fill="${SWARM.strut}"/>`
+    g += `<rect x="${fx(x0 + cs * 0.32)}" y="${fx(y0)}" width="${fx(cs * 0.36)}" height="${fx(cs)}" fill="#b6b5ac"/>`
+    g += `<rect x="${fx(x0 + cs * 0.43)}" y="${fx(y0)}" width="${fx(cs * 0.14)}" height="${fx(cs)}" fill="#c8c5be"/>`
+    g += `<rect x="${fx(x0 + cs * 0.32)}" y="${fx(y0 + cs * 0.56)}" width="${fx(cs * 0.36)}" height="${fx(cs * 0.09)}" fill="${SWARM.amber}" opacity="0.5"/>` // the knot — the twig's whole read
+    g += `<rect x="${fx(x0)}" y="${fx(y0)}" width="${fx(cs * 0.08)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.45"/>`
+    g += `<rect x="${fx(x0 + cs * 0.92)}" y="${fx(y0)}" width="${fx(cs * 0.08)}" height="${fx(cs)}" fill="${SWARM.blue}" opacity="0.45"/>`
+    return g
+  })
+  // ==========================================================================
+  // --- cells 32-36 / 40-44 / 48-52: THE STIR TAB, a 5x3 block = 640x384 px
+  // with its top-left cell at 32.
+  //
+  // Round 1 put this on a 2x2 (256x256) region driving a 55x22 screen quad. Two
+  // separate faults, and the reader caught the compound: "cap height is ~4px;
+  // nearest-neighbour zoom shows two rows of grey mush ... a 55x22px plaque
+  // parked alone on empty ground in the far right corner." The label was
+  // stretched (a 1:1 atlas region on a 2.5:1 quad squashes every letterform),
+  // and 22 screen px of quad cannot carry two lines of type at any size.
+  // The quad is rebuilt in world space at 0.30 x 0.32 -> 145 x 85 screen px
+  // beside the swarm arm it drives, and THIS region is 640x384 (aspect 1.667
+  // against the quad's 1.706, a 2.3% stretch), so letterforms come out true.
+  //
+  // Measured: the region maps to screen at 0.2266x across and 0.2214x down, so
+  // the font-size 92 Georgia bold caps here are 63.7 px of art = 14.1 px of
+  // on-screen CAP HEIGHT (the brief's floor was 55 px of art / 12 px on screen).
+  //
+  // Painted as a DIEGETIC pull tab per law BW-13, never an untextured plate: a
+  // honey-gold die-cut card with a scored fold at the inboard end where it
+  // leaves its slit, a cream rule, an INK ply shadow down its lower edge, and a
+  // SCALLOPED GRIP with a finger notch at the OUTBOARD (fore-edge) side, which
+  // is the RIGHT of the region — the direction the tab is pulled. The dashed
+  // amber bee-loop and its arrowhead point the same way; the red wax bow on the
+  // fold is wax accent 2 of 3.
+  // ==========================================================================
+  {
+    const TX = 0 // cell 32 = row 4, col 0
+    const TY = 4 * cs
+    const TW = 5 * cs
+    const TH = 3 * cs
+    const tu = (u) => TX + TW * u
+    const tv = (v) => TY + TH * v
+    const CARD =
+      `M ${fx(tu(0.045))} ${fx(tv(0.24))} ` +
+      `Q ${fx(tu(0.045))} ${fx(tv(0.13))} ${fx(tu(0.12))} ${fx(tv(0.13))} ` +
+      `L ${fx(tu(0.78))} ${fx(tv(0.13))} ` +
+      `C ${fx(tu(0.845))} ${fx(tv(0.13))} ${fx(tu(0.876))} ${fx(tv(0.175))} ${fx(tu(0.906))} ${fx(tv(0.225))} ` +
+      `Q ${fx(tu(0.966))} ${fx(tv(0.33))} ${fx(tu(0.906))} ${fx(tv(0.44))} ` + // grip scallop 1
+      `Q ${fx(tu(0.848))} ${fx(tv(0.5))} ${fx(tu(0.906))} ${fx(tv(0.56))} ` + // the finger notch, pinched IN
+      `Q ${fx(tu(0.966))} ${fx(tv(0.67))} ${fx(tu(0.906))} ${fx(tv(0.775))} ` + // grip scallop 2
+      `C ${fx(tu(0.876))} ${fx(tv(0.825))} ${fx(tu(0.845))} ${fx(tv(0.87))} ${fx(tu(0.78))} ${fx(tv(0.87))} ` +
+      `L ${fx(tu(0.12))} ${fx(tv(0.87))} ` +
+      `Q ${fx(tu(0.045))} ${fx(tv(0.87))} ${fx(tu(0.045))} ${fx(tv(0.76))} Z`
+    // the ply shadow FIRST — this is what lifts the tab off the page rather than
+    // printing it onto the page
+    s += `<g transform="translate(10 14)"><path d="${CARD}" fill="${INK}" opacity="0.32"/></g>`
+    s += rimPath(CARD, 9) // house pale core rim = the die cut
+    s += `<path d="${CARD}" fill="url(#s3tabFace)" stroke="${SWARM.amber}" stroke-width="5"/>`
+    // cream rule, inset off the silhouette
+    s += `<rect x="${fx(tu(0.082))}" y="${fx(tv(0.2))}" width="${fx(tu(0.79) - tu(0.082))}" height="${fx(tv(0.8) - tv(0.2))}" rx="16" fill="none" stroke="${SWARM.cream}" stroke-width="4.5" opacity="0.7"/>`
+    // the slit the tab comes out of, then the scored fold just outboard of it
+    s += `<path d="M ${fx(tu(0.045))} ${fx(tv(0.24))} L ${fx(tu(0.045))} ${fx(tv(0.76))}" stroke="${INK}" stroke-width="9" opacity="0.3"/>`
+    s += `<path d="M ${fx(tu(0.077))} ${fx(tv(0.155))} L ${fx(tu(0.077))} ${fx(tv(0.845))}" stroke="${INK}" stroke-width="4" stroke-dasharray="14 11" opacity="0.42"/>`
+    s += `<path d="M ${fx(tu(0.089))} ${fx(tv(0.16))} L ${fx(tu(0.089))} ${fx(tv(0.84))}" stroke="${SWARM.goldLit}" stroke-width="4" opacity="0.75"/>`
+    // grip knurling: three short amber arcs echoing the scallops
+    for (const gv of [0.3, 0.5, 0.7])
+      s += `<path d="M ${fx(tu(0.862))} ${fx(tv(gv - 0.055))} Q ${fx(tu(0.892))} ${fx(tv(gv))} ${fx(tu(0.862))} ${fx(tv(gv + 0.055))}" fill="none" stroke="${SWARM.amber}" stroke-width="4" opacity="0.6"/>`
+    // the pull direction: a dashed bee-loop sweeping OUTBOARD into an arrowhead,
+    // with two courier bees riding it (motif, and both kept well inside the
+    // silhouette — a die-cut cannot carry detached alpha islands)
+    const loop = `M ${fx(tu(0.15))} ${fx(tv(0.315))} C ${fx(tu(0.33))} ${fx(tv(0.17))} ${fx(tu(0.56))} ${fx(tv(0.17))} ${fx(tu(0.735))} ${fx(tv(0.27))}`
+    s += `<path d="${loop}" fill="none" stroke="${INK}" stroke-width="4.6" stroke-dasharray="15 12" opacity="0.35"/>`
+    s += `<path d="${loop}" fill="none" stroke="${SWARM.amber}" stroke-width="3.4" stroke-dasharray="15 12"/>`
+    s += `<path d="M ${fx(tu(0.735))} ${fx(tv(0.27))} l ${fx(-TW * 0.026)} ${fx(-TH * 0.05)} l ${fx(TW * 0.042)} ${fx(TH * 0.038)} l ${fx(-TW * 0.04)} ${fx(TH * 0.045)} Z" fill="${SWARM.amber}"/>`
+    s += swarmBee(tu(0.3), tv(0.235), cs * 0.3, 'wingsMid')
+    s += swarmBee(tu(0.6), tv(0.225), cs * 0.26, 'scout')
+    // the label, two lines, centred on the interior between rule and grip
+    const lx = (tu(0.1) + tu(0.78)) / 2
+    const label = (v, txt) =>
+      `<text x="${fx(lx)}" y="${fx(tv(v))}" font-family="Georgia, 'Times New Roman', serif" font-size="84" font-weight="bold" text-anchor="middle" fill="${SWARM.slateDeep}">${txt}</text>`
+    // Baselines: measured at font-size 84 the caps are 61 px of art (13.5 px on
+    // screen) and "STIR THE" inks 428 px wide, so the pair is set at 0.52/0.775
+    // to keep every letter inside the cream rule (0.20..0.80) — at 0.83 the
+    // SWARM row crossed the rule's bottom edge.
+    s += label(0.52, 'STIR THE')
+    s += label(0.775, 'SWARM')
+    // the red wax bow, seated ON the scored fold and kept clear of the S of STIR
+    // (wax accent 2 of 3)
+    const wx = tu(0.072)
+    const wy = tv(0.28)
+    s += `<path d="M ${fx(wx - 17)} ${fx(wy - 14)} q 17 14 0 28 M ${fx(wx + 17)} ${fx(wy - 14)} q -17 14 0 28" fill="#c2604f" stroke="#7a2b22" stroke-width="2.4"/>`
+    s += `<circle cx="${fx(wx)}" cy="${fx(wy)}" r="14" fill="${SWARM.red}" stroke="#7a2b22" stroke-width="3"/>`
+    s += `<circle cx="${fx(wx - 4)}" cy="${fx(wy - 4)}" r="4.5" fill="#d9877a" opacity="0.9"/>`
   }
   s += `</g>`
-  return svgPiece(w, h, s)
+  // Cells 17-22 and 25-26 are now deliberately TRANSPARENT: they held round 1's
+  // 2x2 STIR tab and the printed banner strip, and nothing samples either any
+  // more (the tab moved to the 5x3 block at cell 32, and the page print points
+  // at the tab instead of repeating its lettering).
+  const defs =
+    `<linearGradient id="s3tabFace" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${SWARM.goldLit}"/>` +
+    `<stop offset="0.55" stop-color="${SWARM.gold}"/>` +
+    `<stop offset="1" stop-color="${SWARM.amber}" stop-opacity="0.82"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
 }
 
 /** Flung crown bee (backdrop-crease child): wings-spread carrier with a tiny
@@ -11669,7 +11887,12 @@ function apprenticeGlass(w, h, seed) {
   // landmarks (px). The crease sits at u 0.45; the body straddles it, the
   // raised arm and the glass live entirely on the right panel.
   const headC = [w * 0.42, h * 0.27]
-  const headR = w * 0.115
+  // Head grown 0.115w -> 0.125w (135 -> 147 px of art, 1.087x — inside the
+  // 1.15x the mesh quad tolerates). The face is the piece that has to survive
+  // the 0.256x reading downscale, and on a 135 px head there was no room to
+  // carry a fringe, a brow, two eyes AND a mouth at the 12 px-of-art floor.
+  // 147 px of head is 37.6 px on screen at the pinned camera.
+  const headR = w * 0.125
   const shoulder = [w * 0.5, h * 0.39] // arm ROOTS sit inside the tunic, so the
   const shoulderL = [w * 0.32, h * 0.39] // limb's round cap never shows as a knob
   const hand = [w * 0.655, h * 0.245]
@@ -11725,13 +11948,71 @@ function apprenticeGlass(w, h, seed) {
   }
   s += rimPath(body, 5)
 
-  // ---- HEAD: skin, walnut crop, a bee-gold guild cap band, one profile eye
-  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR + 5)}" fill="${RIM}" opacity="0.95"/>`
-  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR)}" fill="${SKIN}"/>`
-  s += `<path d="M ${fx(headC[0] - headR)} ${fx(headC[1])} a ${fx(headR)} ${fx(headR)} 0 0 1 ${fx(headR * 2)} 0 l ${fx(-headR * 0.2)} ${fx(headR * 0.16)} a ${fx(headR * 0.86)} ${fx(headR * 0.7)} 0 0 0 ${fx(-headR * 1.6)} 0 Z" fill="${P.bee}"/>` // crop
-  s += `<circle cx="${fx(headC[0] + headR * 0.34)}" cy="${fx(headC[1] + headR * 0.12)}" r="${fx(headR * 0.13)}" fill="${INK}"/>`
-  s += `<path d="M ${fx(headC[0] + headR * 0.1)} ${fx(headC[1] + headR * 0.52)} q ${fx(headR * 0.28)} ${fx(headR * 0.2)} ${fx(headR * 0.5)} ${fx(-headR * 0.04)}" fill="none" stroke="${SKIN_DIM}" stroke-width="2.6"/>` // half-smile
-  s += `<circle cx="${fx(headC[0])}" cy="${fx(headC[1])}" r="${fx(headR)}" fill="none" stroke="${INK}" stroke-width="2" stroke-opacity="0.45"/>`
+  // ---- HEAD — the readability piece of the whole spread. Round 1 gave him ONE
+  // INK dot of r = headR*0.13 (8.8 px of art, 2.3 px on screen) and a 2.6 px
+  // half-smile (0.7 px on screen) under a bowl cut that came down to the
+  // eyeline; the blind reader's verdict was "a blank tan oval under a dark
+  // bowl-cut, no eyes, no mouth — the protagonist of the spread is the least
+  // readable object in it". Repainted to a hard floor: at 0.256x anything under
+  // 12 px of art is under 3 px on screen and dissolves into the skin, so EVERY
+  // feature below is sized off HR = 73.4 px and its screen size is stated.
+  // The fringe is lifted clear of the brow line so there is a forehead to hang
+  // features on, and the pair of eyes (not one) is what says "face" at 37 px.
+  const HR = headR
+  const hcx = headC[0]
+  const hcy = headC[1]
+  const faceX = hcx + HR * 0.05 // turned a hair toward the raised glass
+  s += `<circle cx="${fx(hcx)}" cy="${fx(hcy)}" r="${fx(HR + 5)}" fill="${RIM}" opacity="0.95"/>`
+  s += `<circle cx="${fx(hcx)}" cy="${fx(hcy)}" r="${fx(HR)}" fill="${SKIN}"/>`
+  // cheek/jaw shade on the away side — a ball, not a disc
+  s += `<path d="M ${fx(hcx + HR * 0.52)} ${fx(hcy - HR * 0.5)} A ${fx(HR)} ${fx(HR)} 0 0 1 ${fx(hcx + HR * 0.2)} ${fx(hcy + HR * 0.98)} Q ${fx(hcx + HR * 0.62)} ${fx(hcy + HR * 0.42)} ${fx(hcx + HR * 0.52)} ${fx(hcy - HR * 0.5)} Z" fill="${SKIN_DIM}" opacity="0.3"/>`
+  // walnut bowl cut: skull cap + sideburn tabs, fringe swept to HR*0.24-0.30
+  // ABOVE centre (was ON the eyeline), which is what buys the forehead.
+  const hy = HR * 0.34
+  const hxE = HR * 0.9404 // = sqrt(1 - 0.34^2), the sideburn root on the skull
+  const crop =
+    `M ${fx(hcx - hxE)} ${fx(hcy + hy)} ` +
+    `A ${fx(HR)} ${fx(HR)} 0 1 1 ${fx(hcx + hxE)} ${fx(hcy + hy)} ` + // large-arc: OVER the skull
+
+    `L ${fx(hcx + HR * 0.84)} ${fx(hcy - HR * 0.02)} ` +
+    `Q ${fx(hcx + HR * 0.52)} ${fx(hcy - HR * 0.42)} ${fx(hcx + HR * 0.02)} ${fx(hcy - HR * 0.3)} ` +
+    `Q ${fx(hcx - HR * 0.52)} ${fx(hcy - HR * 0.24)} ${fx(hcx - HR * 0.84)} ${fx(hcy + HR * 0.06)} Z`
+  s += `<path d="${crop}" fill="${P.bee}"/>`
+  s += `<path d="M ${fx(hcx - HR * 0.5)} ${fx(hcy - HR * 0.62)} Q ${fx(hcx - HR * 0.12)} ${fx(hcy - HR * 0.82)} ${fx(hcx + HR * 0.3)} ${fx(hcy - HR * 0.64)}" fill="none" stroke="${P.slate}" stroke-width="${fx(HR * 0.1)}" opacity="0.55"/>` // crown sheen
+  // the guild-gold cap band, sitting ON the bowl cut well above the brows
+  // (12.5 px of art = 3.2 px on screen; gold on walnut is the spread's highest
+  // contrast pairing, so it survives the downscale as a band, not a smear)
+  s += `<path d="M ${fx(hcx - HR * 0.76)} ${fx(hcy - HR * 0.5)} Q ${fx(hcx - HR * 0.02)} ${fx(hcy - HR * 0.72)} ${fx(hcx + HR * 0.76)} ${fx(hcy - HR * 0.48)}" fill="none" stroke="${P.gold}" stroke-width="${fx(HR * 0.17)}" stroke-linecap="butt"/>`
+  s += `<path d="M ${fx(hcx - HR * 0.76)} ${fx(hcy - HR * 0.5)} Q ${fx(hcx - HR * 0.02)} ${fx(hcy - HR * 0.72)} ${fx(hcx + HR * 0.76)} ${fx(hcy - HR * 0.48)}" fill="none" stroke="${P.amber}" stroke-width="${fx(HR * 0.04)}" opacity="0.7"/>`
+  // ear on the near side: 26 px of art across = 6.8 px on screen
+  s += `<circle cx="${fx(hcx - HR * 0.94)}" cy="${fx(hcy + HR * 0.18)}" r="${fx(HR * 0.18)}" fill="${SKIN}" stroke="${INK}" stroke-width="2.4" stroke-opacity="0.5"/>`
+  s += `<path d="M ${fx(hcx - HR * 0.98)} ${fx(hcy + HR * 0.1)} q ${fx(HR * 0.1)} ${fx(HR * 0.08)} ${fx(-HR * 0.01)} ${fx(HR * 0.16)}" fill="none" stroke="${SKIN_DIM}" stroke-width="3"/>`
+  // BROWS — 30 px long x 12.5 px thick of art = 7.7 x 3.2 px on screen. Raised
+  // (he is watching the glass work), and they are what turns two dots into eyes.
+  for (const sgn of [-1, 1]) {
+    const bx = faceX + sgn * HR * 0.31
+    s += `<path d="M ${fx(bx - HR * 0.2)} ${fx(hcy - HR * (sgn < 0 ? 0.06 : 0.09))} Q ${fx(bx)} ${fx(hcy - HR * (sgn < 0 ? 0.19 : 0.22))} ${fx(bx + HR * 0.2)} ${fx(hcy - HR * (sgn < 0 ? 0.09 : 0.05))}" fill="none" stroke="${P.bee}" stroke-width="${fx(HR * 0.17)}" stroke-linecap="round"/>`
+  }
+  // EYES — r = HR*0.165, i.e. 24 px of art across each = 6.2 px on screen, and
+  // a PAIR, which is the cue the single round-1 dot could not carry.
+  for (const sgn of [-1, 1]) {
+    const ex = faceX + sgn * HR * 0.31
+    const ey = hcy + HR * 0.16
+    s += `<circle cx="${fx(ex)}" cy="${fx(ey)}" r="${fx(HR * 0.165)}" fill="${P.bee}"/>`
+    s += `<circle cx="${fx(ex + HR * 0.055)}" cy="${fx(ey - HR * 0.06)}" r="${fx(HR * 0.052)}" fill="${P.cream}" opacity="0.92"/>` // catchlight, gaze up-right
+  }
+  // nose: a dim wedge only — low contrast on purpose, so it models the face
+  // without competing with the eyes for the three screen pixels available
+  s += `<path d="M ${fx(faceX + HR * 0.03)} ${fx(hcy + HR * 0.3)} L ${fx(faceX + HR * 0.13)} ${fx(hcy + HR * 0.5)} L ${fx(faceX - HR * 0.07)} ${fx(hcy + HR * 0.49)} Z" fill="${SKIN_DIM}" opacity="0.75"/>`
+  // MOUTH — an open grin painted as a FILLED crescent, 41 px wide x 13 px deep
+  // of art = 10.5 x 3.4 px on screen. Round 1 stroked this at 2.6 px (0.7 px on
+  // screen), which is why the reader found no mouth at all.
+  const mo = `M ${fx(faceX - HR * 0.28)} ${fx(hcy + HR * 0.56)} Q ${fx(faceX)} ${fx(hcy + HR * 0.88)} ${fx(faceX + HR * 0.28)} ${fx(hcy + HR * 0.54)} Q ${fx(faceX)} ${fx(hcy + HR * 0.52)} Z`
+  s += `<path d="${mo}" fill="${P.bee}"/>`
+  s += `<path d="M ${fx(faceX - HR * 0.2)} ${fx(hcy + HR * 0.575)} Q ${fx(faceX)} ${fx(hcy + HR * 0.62)} ${fx(faceX + HR * 0.2)} ${fx(hcy + HR * 0.565)}" fill="none" stroke="${P.cream}" stroke-width="${fx(HR * 0.05)}" opacity="0.85"/>` // teeth sliver
+  // chin shadow, seating the jaw under the grin
+  s += `<path d="M ${fx(faceX - HR * 0.24)} ${fx(hcy + HR * 0.8)} Q ${fx(faceX + HR * 0.02)} ${fx(hcy + HR * 0.92)} ${fx(faceX + HR * 0.26)} ${fx(hcy + HR * 0.76)}" fill="none" stroke="${SKIN_DIM}" stroke-width="${fx(HR * 0.06)}" opacity="0.5"/>`
+  s += `<circle cx="${fx(hcx)}" cy="${fx(hcy)}" r="${fx(HR)}" fill="none" stroke="${INK}" stroke-width="2" stroke-opacity="0.45"/>`
 
   // ---- THE RED COURIER SATCHEL: the ONE saturated accent, worn across the
   // body so it sits at the figure's centre of value and cannot be missed.
@@ -11796,9 +12077,10 @@ function apprenticeGlass(w, h, seed) {
  *   sky wash and snow ranks in aerial blue, a lake band, the city as a flat
  *   SLATE SILHOUETTE (Grossmünster's twin towers, Fraumünster's spire, a rank
  *   of gabled roofs) with a few gold window glints, and — the piece the pack
- *   asks for by name — PAINTED SWARM DOTS spiralling up off the built ring's
+ *   asks for by name — PAINTED SKEINS OF BEES wheeling up off the built ring's
  *   crown and receding to nothing, so the thousand couriers continue past the
- *   twenty-eight the paper can hold.
+ *   twenty-two the paper can hold. (Round 1 painted these as 134 soft dots and
+ *   the blind reader read them as mildew; see the swarm block for the repaint.)
  *
  * Full-bleed opaque: the S5 strut-silhouette gate wants this panel covering
  * the whole ring cone, so no alpha is carved anywhere near the top edge.
@@ -11901,39 +12183,108 @@ function zurichVista(w, h, seed) {
     s += `<path d="M ${fx(x)} ${fx(y)} q ${fx(-w * 0.007)} ${fx(-ph * 0.6)} 0 ${fx(-ph)} q ${fx(w * 0.007)} ${fx(ph * 0.4)} 0 ${fx(ph)} Z" fill="#6d8a63" opacity="${fx(rr(r, 0.35, 0.55))}"/>`
   }
 
-  // --- THE PAINTED SWARM, receding to infinity. A logarithmic spiral of dots
-  // wheeling up off the built ring's crown: the paper can hold 28 couriers,
-  // the guild keeps a thousand, and this is where the other 972 live. Dots
-  // shrink and pale toward the spiral's eye — aerial recession PAINTED, so
-  // the effect costs no strut and no radius margin.
-  // Three NESTED HORSESHOES, not one spiral: a spiral closes on itself and
-  // reads as a drawn lasso hung in the sky. The built ring is a horseshoe
-  // open at the front, so the painted ranks repeat that same open arc,
-  // each one smaller, higher, tighter and paler than the rank in front —
-  // which is what a receding rank of a moving ring looks like.
-  const ARC_RANKS = [
-    { cy: 0.36, rx: 0.48, ry: 0.155, n: 60, sz: 1, op: 0.68, wings: true },
-    { cy: 0.325, rx: 0.35, ry: 0.115, n: 44, sz: 0.62, op: 0.44, wings: false },
-    { cy: 0.302, rx: 0.23, ry: 0.075, n: 30, sz: 0.36, op: 0.27, wings: false },
+  // --- THE PAINTED SWARM, receding to infinity. The paper can hold 28
+  // couriers, the guild keeps a thousand, and this is where the other 972 live:
+  // painted bees wheeling up off the built ring's crown, aerial recession done
+  // in VALUE so the effect costs no strut and no radius margin.
+  //
+  // ROUND 2 — REPAINT. Round 1 painted three nested horseshoe RANKS of 60+44+30
+  // = 134 soft `slateDeep` ellipses at 0.27-0.68 opacity, an even spray with a
+  // wing hint on every third front-rank dot. The blind reader's verdict: "~120
+  // soft dark-grey round blobs strung across both wall panels ...
+  // indistinguishable from mildew, gravel, or a compression artefact. Nothing
+  // about it says 'bees'." Three faults, all three addressed:
+  //   COUNT — 134 marks over ~1000 px of sky is a TEXTURE. Now 43 bees.
+  //   SHAPE — a bare soft ellipse carries no insect. Every bee in the near
+  //     three tiers is now body + head + a PALE WING-DOT PAIR rotated onto its
+  //     own flight tangent; the crest pass keeps one pale dash above; only the
+  //     single farthest skein degrades to plain specks, which is the recession.
+  //   GROUPING — an even arc spray reads as speckle however it is shaped. The
+  //     43 are strung into 8 SKEINS of 4-7 along their own bezier flight lines,
+  //     with 25-45 px of art (17-32 px on screen) of genuinely empty sky
+  //     between neighbouring skeins.
+  // Value: this sky is #dfeaf2..#e7eef4, so the near skeins are slateDeep at
+  // 0.84 (round 1 went as low as 0.27) and 12.3 x 8.2 px of art, which is
+  // 8.6 x 5.7 px on screen at the ~0.70x this panel displays at. The layout
+  // still reads as ONE open horseshoe seen near edge-on — near arms low and
+  // outboard, crest high and central — and the crest is deliberately the
+  // sparsest, palest pass so the crease light band at u 0.6 stays clean.
+  const cbez = (P4, t) => {
+    const mt = 1 - t
+    return [0, 1].map(
+      (k) => mt * mt * mt * P4[0][k] + 3 * mt * mt * t * P4[1][k] + 3 * mt * t * t * P4[2][k] + t * t * t * P4[3][k]
+    )
+  }
+  // A wing dot is slate-BODIED with a pale core, and it is set OUTBOARD of the
+  // abdomen rather than tucked over it. Two measured failures got it here:
+  //   (1) pale-only wings in `P.wing` (#eef2f5) on a #dfeaf2 sky are a +5
+  //       luminance whisper — at 0.70x they vanished and each bee read as a
+  //       little grey blimp with a light cap.
+  //   (2) dark wings tucked ABOVE the body at -1.24 bry merged into it and the
+  //       mark went back to being a lumpy dot.
+  // What survives at 6 px is the SILHOUETTE, so the wings are dark enough to
+  // join it AND stick out past the body: total mark 16.6 x 9.5 px of art, i.e.
+  // 11.7 x 6.7 px on screen, with two spikes off a dark oval.
+  const wingDot = (wx, wy, wrx, wry, rot, op) =>
+    `<g transform="translate(${fx(wx)} ${fx(wy)}) rotate(${fx(rot)})">` +
+    `<ellipse cx="0" cy="0" rx="${fx(wrx)}" ry="${fx(wry)}" fill="${P.slate}" opacity="${fx(Math.min(0.95, op))}"/>` +
+    `<ellipse cx="0" cy="0" rx="${fx(wrx * 0.5)}" ry="${fx(wry * 0.46)}" fill="${P.wing}" opacity="${fx(Math.min(0.9, op * 0.85))}"/></g>`
+  /** One distant courier: dark body + head between an outswept wing pair, set
+   *  on its own flight tangent. `wings` is 2 (a wing either side, which is what
+   *  breaks the oval into an insect), 1 (one dash above) or 0 (a far speck).
+   *  `stripe` paints one gold cross-band — the species cue, spent only on the
+   *  near tiers where 2.9 px of art still carries a hue. */
+  const distantBee = (bx, by, brx, bry, ang, op, wings, stripe) => {
+    let g = `<g transform="translate(${fx(bx)} ${fx(by)}) rotate(${fx(ang)})">`
+    if (wings >= 2) {
+      g += wingDot(-brx * 0.95, -bry * 0.98, brx * 0.62, bry * 0.36, -28, op * 0.92)
+      g += wingDot(brx * 0.95, -bry * 1.02, brx * 0.58, bry * 0.34, 28, op * 0.8)
+    } else if (wings === 1) {
+      g += wingDot(brx * 0.06, -bry * 1.22, brx * 1.05, bry * 0.32, -13, op * 0.95)
+    }
+    g += `<ellipse cx="0" cy="0" rx="${fx(brx)}" ry="${fx(bry)}" fill="${P.slateDeep}" opacity="${fx(op)}"/>`
+    if (stripe)
+      g += `<line x1="${fx(-brx * 0.12)}" y1="${fx(-bry * 0.82)}" x2="${fx(-brx * 0.12)}" y2="${fx(bry * 0.82)}" stroke="${P.gold}" stroke-width="${fx(bry * 0.62)}" opacity="${fx(op * 0.85)}"/>`
+    if (wings >= 1) g += `<circle cx="${fx(brx * 0.94)}" cy="${fx(-bry * 0.18)}" r="${fx(bry * 0.68)}" fill="${P.slateDeep}" opacity="${fx(op)}"/>`
+    g += `</g>`
+    return g
+  }
+  // 8 skeins, left arm -> crest -> right arm, plus one far inner skein. `sz`
+  // and `op` carry the aerial recession the nested ranks used to carry.
+  const CHAINS = [
+    { p: [[0.038, 0.292], [0.082, 0.252], [0.132, 0.24], [0.182, 0.216]], n: 7, sz: 1, op: 0.84, wings: 2 },
+    { p: [[0.222, 0.252], [0.258, 0.214], [0.3, 0.212], [0.34, 0.192]], n: 6, sz: 0.9, op: 0.78, wings: 2 },
+    { p: [[0.38, 0.198], [0.412, 0.176], [0.444, 0.174], [0.474, 0.164]], n: 5, sz: 0.76, op: 0.62, wings: 2 },
+    { p: [[0.512, 0.152], [0.556, 0.14], [0.622, 0.142], [0.66, 0.152]], n: 5, sz: 0.54, op: 0.44, wings: 1 },
+    { p: [[0.702, 0.17], [0.734, 0.178], [0.762, 0.182], [0.792, 0.196]], n: 5, sz: 0.76, op: 0.62, wings: 2 },
+    { p: [[0.828, 0.21], [0.86, 0.222], [0.884, 0.23], [0.912, 0.246]], n: 6, sz: 0.9, op: 0.78, wings: 2 },
+    { p: [[0.94, 0.262], [0.958, 0.274], [0.974, 0.288], [0.99, 0.3]], n: 4, sz: 1, op: 0.84, wings: 2 },
+    { p: [[0.286, 0.132], [0.33, 0.118], [0.39, 0.114], [0.436, 0.122]], n: 5, sz: 0.42, op: 0.32, wings: 0 },
   ]
-  for (const rank of ARC_RANKS) {
-    for (let k = 0; k < rank.n; k++) {
-      const u = k / (rank.n - 1)
-      const a = Math.PI * (1.04 + u * 0.92)
-      const jitR = 1 + rr(r, -0.06, 0.06)
-      const dx = w * 0.5 + Math.cos(a) * w * rank.rx * jitR
-      const dy = h * rank.cy + Math.sin(a) * h * rank.ry * jitR + rr(r, -h * 0.014, h * 0.014)
-      // the crest of the arc is its DEEPEST point (it sweeps behind the hero),
-      // so a courier shrinks and pales as it rides over the top and grows
-      // again coming down the near arms
-      const depth = 0.42 + 0.58 * Math.abs(Math.cos(a))
-      const dr = w * 0.0046 * rank.sz * depth * rr(r, 0.75, 1.3)
-      s += `<ellipse cx="${fx(dx)}" cy="${fx(dy)}" rx="${fx(dr * 1.45)}" ry="${fx(dr)}" fill="${P.slateDeep}" opacity="${fx(rank.op * depth * rr(r, 0.85, 1.15))}"/>`
-      // the front rank still shows a wing pair, so the ranks behind read as
-      // bees thinning into haze rather than as speckle on the sky
-      if (rank.wings && depth > 0.7 && k % 3 === 0) {
-        s += `<ellipse cx="${fx(dx - dr * 0.5)}" cy="${fx(dy - dr * 1.3)}" rx="${fx(dr * 1.3)}" ry="${fx(dr * 0.5)}" fill="${P.wing}" opacity="${fx(rank.op * 0.85)}" transform="rotate(-24 ${fx(dx)} ${fx(dy)})"/>`
-      }
+  const BRX = w * 0.0052 // 5.3 px of art = 3.7 px on screen at 0.70x
+  const BRY = w * 0.0035 // 3.6 px of art = 2.5 px on screen; the WING SPAN, not
+  // the abdomen, is the mark: 2 * 1.56 * BRX = 16.6 px of art = 11.7 px on screen
+  for (const ch of CHAINS) {
+    for (let k = 0; k < ch.n; k++) {
+      // members are spaced along the skein with a little slop, so a chain reads
+      // as a flying string rather than as a stamped dotted rule
+      const t = ch.n === 1 ? 0.5 : k / (ch.n - 1) + rr(r, -0.045, 0.045)
+      const tc = Math.min(1, Math.max(0, t))
+      const [ux, uy] = cbez(ch.p, tc)
+      const [ax, ay] = cbez(ch.p, Math.min(1, tc + 0.02))
+      const [bx2, by2] = cbez(ch.p, Math.max(0, tc - 0.02))
+      const ang = (Math.atan2((ay - by2) * h, (ax - bx2) * w) * 180) / Math.PI
+      const j = ch.sz * rr(r, 0.86, 1.16)
+      s += distantBee(
+        w * ux + rr(r, -w * 0.004, w * 0.004),
+        h * uy + rr(r, -h * 0.016, h * 0.016),
+        BRX * j,
+        BRY * j,
+        ang,
+        ch.op * rr(r, 0.9, 1.08),
+        ch.wings,
+        ch.sz >= 0.9
+      )
     }
   }
 
@@ -11977,10 +12328,11 @@ function zurichVista(w, h, seed) {
  * hive mouth (gutter, z ≈ 0.40) across BOTH pages; 10 painted flat bees + 6
  * painted letters strung along them, sizes grading DOWN toward the 3D ring
  * (2D paint accelerating into 3D paper — the Alice floor-cards recipe); tiny
- * parcels mid-route; a honeycomb compass rose under the free right yard; the
- * PAINTED APIARIST with smoke bellows lower-left (T-COUNTERWEIGHT — the
- * horseshoe's front gap is where the keeper stands), smoke curling toward
- * that gap; and a dashed bee-loop affordance leading to the die-cut STIR tab
+ * parcels mid-route; a honeycomb compass rose under the free right yard; a
+ * painted STRAW SKEP with its smoker lying beside it, out in the lower-left
+ * reader apron (T-COUNTERWEIGHT — the horseshoe's front gap is where the keeper
+ * works), smoke rising toward that gap; and a dashed bee-loop affordance
+ * leading to the die-cut STIR tab
  * (the tab itself carries the lettering, so the print points, never repeats).
  * The floor letter by the compass carries wax seal 3 of 3.
  */
@@ -12010,8 +12362,15 @@ function beeRoutesSpread(w, h, seed) {
   const ROUTES = [
     [[0.515, 0.79], [0.63, 0.71], [0.78, 0.84], [0.97, 0.87]], // right outer
     [[0.512, 0.77], [0.6, 0.6], [0.73, 0.55], [0.9, 0.64]], // right inner, to the compass yard
-    [[0.485, 0.79], [0.37, 0.72], [0.22, 0.86], [0.03, 0.88]], // left outer
-    [[0.488, 0.77], [0.4, 0.62], [0.3, 0.56], [0.12, 0.63]], // left inner, past the windmill lane
+    // left outer — LIFTED in round 2. It used to dive to y 0.86-0.88 across the
+    // lower-left apron, i.e. straight through the painted keeper who stood
+    // there; the reader read the resulting tangle as "a brown rail passes
+    // straight through it". The skep that replaced the keeper sits at radial
+    // 0.86 / z 0.665, so this route now holds y ~0.775 out to the fore edge and
+    // clears the skep's dome by 47 px = 4.6% of the image width (the brief's
+    // floor was 3%).
+    [[0.485, 0.79], [0.37, 0.705], [0.215, 0.752], [0.03, 0.748]], // left outer
+    [[0.488, 0.77], [0.4, 0.62], [0.3, 0.56], [0.12, 0.63]], // left inner, across the meadow lane
   ]
 
   // a painted flat courier (top view) at image fraction (x,y), rotated along
@@ -12099,14 +12458,17 @@ function beeRoutesSpread(w, h, seed) {
   // grading DOWN toward the hive/ring (t=0) and UP toward the reader corners.
   const BEE_STATIONS = [
     [0, 0.3], [0, 0.62], [0, 0.9], [1, 0.45], [1, 0.8],
-    [2, 0.28], [2, 0.58], [2, 0.88], [3, 0.5], [3, 0.85],
+    // the outer-left station moved 0.88 -> 0.76: at 0.88 it sat 28.7 px (2.8% of
+    // w) off the skep's dome, under the brief's 3% floor. It now clears by 40 px.
+    [2, 0.28], [2, 0.58], [2, 0.76], [3, 0.5], [3, 0.85],
   ]
   for (const [ri, t] of BEE_STATIONS) {
     const [x, y] = bez(ROUTES[ri], t)
     const sz = w * lerp(0.011, 0.024, t) * rr(r, 0.9, 1.1)
     s += flatBee(x, y + rr(r, -0.012, 0.012), sz, bezTan(ROUTES[ri], t) + rr(r, -14, 14), lerp(0.7, 0.95, t))
   }
-  const LETTER_STATIONS = [[0, 0.48], [0, 0.76], [1, 0.62], [2, 0.42], [2, 0.72], [3, 0.68]]
+  // ... and the outer-left letter 0.72 -> 0.66, for the same reason (34 -> 52 px).
+  const LETTER_STATIONS = [[0, 0.48], [0, 0.76], [1, 0.62], [2, 0.42], [2, 0.66], [3, 0.68]]
   LETTER_STATIONS.forEach(([ri, t], i) => {
     const [x, y] = bez(ROUTES[ri], t)
     const sz = w * lerp(0.014, 0.026, t)
@@ -12158,41 +12520,147 @@ function beeRoutesSpread(w, h, seed) {
     s += flatBee(pageFX(0.62, 'right') - (Math.cos(na) * R * 0.62) / w, pageFY(0.4) - (Math.sin(na) * R * 0.62 * SQ) / h, w * 0.012, (na * 180) / Math.PI, 0.9)
   }
 
-  // ---- THE PAINTED APIARIST, lower-left apron (T-COUNTERWEIGHT): a robed
-  // keeper in slate with a wide veil hat, puffing the smoke bellows toward the
-  // horseshoe's front gap — the gap is STORY: it is where the keeper stands.
+  // ---- THE STRAW SKEP AND ITS SMOKER, reader apron lower-left
+  // (T-COUNTERWEIGHT). The horseshoe's front gap is STORY — it is where the
+  // keeper works — and the smoke wisp is what points at it.
+  //
+  // ROUND 2. Round 1 painted a keeper here instead: a slate robe under a gold
+  // veil hat, drawn as a FRONT-VIEW STANDING FIGURE on a print the eye reads as
+  // a FLOOR. The blind reader could not name it: "I cannot identify the dark
+  // slate teardrop with the straw brim in the left foreground. Beekeeper from
+  // behind? Mailbag? A brown rail passes straight through it and the green
+  // meadow slab cuts it in half. It is a large, prominent foreground object and
+  // it is unreadable." Three causes, all three fixed:
+  //   * A standing figure cannot read on a floor print. It is replaced by a
+  //     straw SKEP HIVE in the same lying-flat 3/4 projection the honeycomb
+  //     compass rose already uses — stacked straw coils with an arched entrance,
+  //     a domed silhouette and a cast shadow seating it on the page. A skep is
+  //     also unambiguous where a robed figure was not: nothing else in the book
+  //     is a bell of coiled straw with bees at a door in it.
+  //   * The "brown rail" was ROUTES[2], which ran straight through him; that
+  //     route is lifted (see its comment above) and the skep now has 47 px of
+  //     clear page above it.
+  //   * The 3D meadow fringe cut his lower half off. The fringe die spans
+  //     |x| <= 0.6 and stands at z 0.50-0.56, so the whole vignette moved
+  //     OUTBOARD and DOWNSTAGE of it, to radial 0.86 (clear laterally) and
+  //     z 0.645 (clear in depth) — the reader apron, in front of everything.
+  // Size is w*0.065, 1.25x round 1's w*0.052. Measured vignette extremes, all
+  // inside the >= 2% margin: left x 0.079 w, bottom y 0.962 h (the cast shadow),
+  // top y 0.800 h (the highest airborne bee), right x 0.512 w (the last smoke
+  // puff, dying at the gutter where the horseshoe's front gap is). Note the
+  // dome's base ELLIPSE hangs 0.41 S below the contact line — that, not the
+  // shadow, is what nearly ran the vignette off the page at z 0.665.
   {
-    const kx = PX(pageFX(0.66, 'left'))
-    const ky = PY(pageFY(0.56))
-    const S = w * 0.052
-    let g = `<g opacity="0.92">`
-    g += `<path d="M ${fx(kx - S * 0.34)} ${fx(ky + S * 0.9)} Q ${fx(kx - S * 0.42)} ${fx(ky - S * 0.1)} ${fx(kx - S * 0.06)} ${fx(ky - S * 0.42)} L ${fx(kx + S * 0.18)} ${fx(ky - S * 0.34)} Q ${fx(kx + S * 0.4)} ${fx(ky + S * 0.1)} ${fx(kx + S * 0.3)} ${fx(ky + S * 0.9)} Z" fill="${SWARM.slate}" stroke="${WALNUT}" stroke-width="1.6"/>` // robe
-    g += `<circle cx="${fx(kx + S * 0.04)}" cy="${fx(ky - S * 0.58)}" r="${fx(S * 0.2)}" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.4"/>` // veiled head
-    g += `<path d="M ${fx(kx - S * 0.3)} ${fx(ky - S * 0.62)} Q ${fx(kx + S * 0.04)} ${fx(ky - S * 0.95)} ${fx(kx + S * 0.38)} ${fx(ky - S * 0.62)} Z" fill="${SWARM.gold}" stroke="${WALNUT}" stroke-width="1.4"/>` // wide hat
-    // the bellows: two amber boards pinched around a cream pleat, a dark nozzle
-    g += `<path d="M ${fx(kx + S * 0.24)} ${fx(ky - S * 0.16)} l ${fx(S * 0.42)} ${fx(-S * 0.1)} l ${fx(S * 0.02)} ${fx(S * 0.1)} l ${fx(-S * 0.42)} ${fx(S * 0.06)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.3"/>`
-    g += `<path d="M ${fx(kx + S * 0.26)} ${fx(ky + S * 0.08)} l ${fx(S * 0.42)} ${fx(-S * 0.02)} l ${fx(-S * 0.02)} ${fx(S * 0.12)} l ${fx(-S * 0.38)} ${fx(-S * 0.02)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.3"/>`
-    g += `<path d="M ${fx(kx + S * 0.66)} ${fx(ky - S * 0.22)} L ${fx(kx + S * 0.72)} ${fx(ky + S * 0.14)} L ${fx(kx + S * 0.5)} ${fx(ky + S * 0.02)} Z" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.2"/>`
-    g += `<line x1="${fx(kx + S * 0.7)}" y1="${fx(ky - S * 0.04)}" x2="${fx(kx + S * 0.88)}" y2="${fx(ky - S * 0.02)}" stroke="${WALNUT}" stroke-width="2.4"/>`
-    g += `</g>`
-    s += g
-    // the smoke: a thin curling wisp puffed toward the horseshoe's front gap
-    // at the gutter (down-right toward the hive mouth), loosening as it goes
-    const smoke = `M ${fx(kx + S * 0.92)} ${fx(ky - S * 0.02)} c ${fx(S * 0.5)} ${fx(-S * 0.3)} ${fx(S * 0.62)} ${fx(S * 0.28)} ${fx(S * 1.12)} ${fx(S * 0.06)} c ${fx(S * 0.42)} ${fx(-S * 0.18)} ${fx(S * 0.54)} ${fx(S * 0.32)} ${fx(S * 1.06)} ${fx(S * 0.16)} c ${fx(S * 0.44)} ${fx(-S * 0.14)} ${fx(S * 0.86)} ${fx(S * 0.1)} ${fx(S * 1.5)} ${fx(S * 0.34)}`
-    s += `<path d="${smoke}" fill="none" stroke="#f3ecda" stroke-width="${fx(S * 0.13)}" stroke-linecap="round" opacity="0.75"/>`
-    s += `<path d="${smoke}" fill="none" stroke="${WALNUT}" stroke-width="1" opacity="0.28"/>`
-    // three thinning puffs where the wisp dies at the gap
-    for (const [px2, py2, pr] of [[4.35, 0.5, 0.16], [4.75, 0.62, 0.11], [5.05, 0.72, 0.07]])
-      s += `<circle cx="${fx(kx + S * px2)}" cy="${fx(ky + S * py2)}" r="${fx(S * pr)}" fill="#f3ecda" opacity="0.55"/>`
+    const kx = PX(pageFX(0.86, 'left'))
+    const ky = PY(pageFY(0.645)) // the skep's ground contact, not its centre
+    const S = w * 0.065
+    const SQ = 0.62 // lying-flat foreshortening — the print is a FLOOR
+    // STRAW is the one value in this vignette that is not already in SWARM, and it
+    // has to be: the page ground IS `SWARM.parch`, so a parch skep on a parch page
+    // has no silhouette at all. It is that same hue held two steps deeper, and the
+    // lit side is the palette's own cream.
+    const STRAW = '#e0c98d'
+    const STRAW_LIT = SWARM.cream
+    // cast shadow, two plies, seating the skep on the page
+    s += `<ellipse cx="${fx(kx + S * 0.14)}" cy="${fx(ky + S * 0.1)}" rx="${fx(S * 0.86)}" ry="${fx(S * 0.86 * SQ * 0.42)}" fill="${INK}" opacity="0.13"/>`
+    s += `<ellipse cx="${fx(kx + S * 0.1)}" cy="${fx(ky + S * 0.1)}" rx="${fx(S * 0.72)}" ry="${fx(S * 0.72 * SQ * 0.42)}" fill="${INK}" opacity="0.15"/>`
+    // the dome: a bell of straw closed along its foreshortened base ellipse
+    const dome =
+      `M ${fx(kx - S * 0.66)} ${fx(ky)} ` +
+      `C ${fx(kx - S * 0.72)} ${fx(ky - S * 0.56)} ${fx(kx - S * 0.4)} ${fx(ky - S * 0.98)} ${fx(kx)} ${fx(ky - S * 0.98)} ` +
+      `C ${fx(kx + S * 0.4)} ${fx(ky - S * 0.98)} ${fx(kx + S * 0.72)} ${fx(ky - S * 0.56)} ${fx(kx + S * 0.66)} ${fx(ky)} ` +
+      `A ${fx(S * 0.66)} ${fx(S * 0.66 * SQ)} 0 0 1 ${fx(kx - S * 0.66)} ${fx(ky)} Z`
+    s += `<path d="${dome}" fill="${STRAW}" stroke="${WALNUT}" stroke-width="2.4"/>`
+    s += `<path d="M ${fx(kx - S * 0.62)} ${fx(ky - S * 0.06)} C ${fx(kx - S * 0.68)} ${fx(ky - S * 0.58)} ${fx(kx - S * 0.4)} ${fx(ky - S * 0.94)} ${fx(kx - S * 0.08)} ${fx(ky - S * 0.95)} L ${fx(kx - S * 0.22)} ${fx(ky - S * 0.2)} Z" fill="${STRAW_LIT}" opacity="0.6"/>` // lit side
+    // the COILS: stacked straw ropes, each bowing forward, walnut-shadowed on
+    // its underside and cream-lit on its crown — the cue that says "woven straw"
+    for (let k = 1; k <= 8; k++) {
+      const v = k / 9
+      const cy2 = ky - S * 0.98 * v
+      const hw = S * 0.66 * Math.sqrt(Math.max(0.05, 1 - Math.pow(v, 2.4)))
+      s += `<path d="M ${fx(kx - hw)} ${fx(cy2)} Q ${fx(kx)} ${fx(cy2 + S * 0.1)} ${fx(kx + hw)} ${fx(cy2)}" fill="none" stroke="${WALNUT}" stroke-width="${fx(S * 0.042)}" opacity="0.38"/>`
+      s += `<path d="M ${fx(kx - hw * 0.94)} ${fx(cy2 - S * 0.035)} Q ${fx(kx)} ${fx(cy2 + S * 0.065)} ${fx(kx + hw * 0.94)} ${fx(cy2 - S * 0.035)}" fill="none" stroke="${STRAW_LIT}" stroke-width="${fx(S * 0.03)}" opacity="0.5"/>`
+    }
+    // the crown knot the coiling finishes on
+    s += `<ellipse cx="${fx(kx)}" cy="${fx(ky - S * 0.99)}" rx="${fx(S * 0.11)}" ry="${fx(S * 0.07)}" fill="${STRAW_LIT}" stroke="${WALNUT}" stroke-width="1.8"/>`
+    s += `<line x1="${fx(kx - S * 0.07)}" y1="${fx(ky - S * 1.0)}" x2="${fx(kx + S * 0.07)}" y2="${fx(ky - S * 0.98)}" stroke="${WALNUT}" stroke-width="1.6" opacity="0.7"/>`
+    // the arched ENTRANCE at the front — the second unambiguous skep cue
+    const door = `M ${fx(kx - S * 0.13)} ${fx(ky + S * 0.11)} L ${fx(kx - S * 0.13)} ${fx(ky - S * 0.04)} Q ${fx(kx)} ${fx(ky - S * 0.2)} ${fx(kx + S * 0.13)} ${fx(ky - S * 0.04)} L ${fx(kx + S * 0.13)} ${fx(ky + S * 0.11)} Z`
+    s += `<path d="${door}" fill="${WALNUT}"/>`
+    s += `<path d="M ${fx(kx - S * 0.09)} ${fx(ky + S * 0.09)} L ${fx(kx - S * 0.09)} ${fx(ky - S * 0.03)} Q ${fx(kx)} ${fx(ky - S * 0.15)} ${fx(kx + S * 0.09)} ${fx(ky - S * 0.03)} L ${fx(kx + S * 0.09)} ${fx(ky + S * 0.09)} Z" fill="${INK}" opacity="0.72"/>`
+    s += `<ellipse cx="${fx(kx)}" cy="${fx(ky + S * 0.13)}" rx="${fx(S * 0.2)}" ry="${fx(S * 0.05)}" fill="${SWARM.amber}" opacity="0.35"/>` // the worn alighting board
+    // ---- THE SMOKER, LYING beside the skep in top view: two amber boards
+    // pinched around a cream pleat with a dark nozzle, the same three parts as
+    // round 1's bellows but flat on the page instead of held by a figure.
+    const bx = kx + S * 1.42
+    const by = ky - S * 0.04
+    s += `<ellipse cx="${fx(bx + S * 0.06)}" cy="${fx(by + S * 0.2)}" rx="${fx(S * 0.56)}" ry="${fx(S * 0.16)}" fill="${INK}" opacity="0.16"/>`
+    s += `<path d="M ${fx(bx - S * 0.44)} ${fx(by - S * 0.05)} Q ${fx(bx + S * 0.02)} ${fx(by - S * 0.3)} ${fx(bx + S * 0.44)} ${fx(by - S * 0.11)} L ${fx(bx + S * 0.42)} ${fx(by - S * 0.02)} Q ${fx(bx + S * 0.02)} ${fx(by - S * 0.16)} ${fx(bx - S * 0.46)} ${fx(by + S * 0.03)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.6"/>`
+    s += `<path d="M ${fx(bx - S * 0.46)} ${fx(by + S * 0.03)} Q ${fx(bx + S * 0.02)} ${fx(by - S * 0.12)} ${fx(bx + S * 0.42)} ${fx(by + S * 0.02)} L ${fx(bx + S * 0.4)} ${fx(by + S * 0.1)} Q ${fx(bx + S * 0.02)} ${fx(by + S * 0.02)} ${fx(bx - S * 0.44)} ${fx(by + S * 0.16)} Z" fill="${SWARM.cream}" stroke="${WALNUT}" stroke-width="1.4"/>` // the pleat
+    for (const pv of [-0.2, 0, 0.2])
+      s += `<line x1="${fx(bx + S * pv)}" y1="${fx(by + S * 0.02)}" x2="${fx(bx + S * (pv - 0.03))}" y2="${fx(by + S * 0.12)}" stroke="${WALNUT}" stroke-width="1.2" opacity="0.55"/>`
+    s += `<path d="M ${fx(bx - S * 0.44)} ${fx(by + S * 0.16)} Q ${fx(bx + S * 0.02)} ${fx(by + S * 0.04)} ${fx(bx + S * 0.4)} ${fx(by + S * 0.1)} L ${fx(bx + S * 0.36)} ${fx(by + S * 0.2)} Q ${fx(bx + S * 0.02)} ${fx(by + S * 0.16)} ${fx(bx - S * 0.4)} ${fx(by + S * 0.26)} Z" fill="${SWARM.amber}" stroke="${WALNUT}" stroke-width="1.6"/>`
+    s += `<path d="M ${fx(bx + S * 0.42)} ${fx(by - S * 0.09)} L ${fx(bx + S * 0.86)} ${fx(by - S * 0.05)} L ${fx(bx + S * 0.84)} ${fx(by + S * 0.04)} L ${fx(bx + S * 0.4)} ${fx(by + S * 0.09)} Z" fill="${SWARM.slateDeep}" stroke="${WALNUT}" stroke-width="1.3"/>` // nozzle
+    // the smoke: a thin curling wisp RISING toward the horseshoe's front gap at
+    // the gutter, dying in three thinning puffs just short of it
+    const smoke =
+      `M ${fx(bx + S * 0.84)} ${fx(by - S * 0.04)} ` +
+      `c ${fx(S * 0.46)} ${fx(-S * 0.4)} ${fx(S * 0.66)} ${fx(S * 0.1)} ${fx(S * 1.05)} ${fx(-S * 0.24)} ` +
+      `c ${fx(S * 0.42)} ${fx(-S * 0.34)} ${fx(S * 0.6)} ${fx(S * 0.12)} ${fx(S * 1.0)} ${fx(-S * 0.32)} ` +
+      `c ${fx(S * 0.44)} ${fx(-S * 0.3)} ${fx(S * 0.8)} ${fx(S * 0.04)} ${fx(S * 1.01)} ${fx(-S * 0.4)}`
+    // Held DELIBERATELY faint. The first cut of this repaint carried it over from
+    // round 1 at 8.7 px of near-white at 0.75 opacity — but round 1's wisp ran along
+    // y 0.87 h where the meadow wash is thin, and out here at y 0.83-0.88 h over
+    // the full-strength wash that same stroke measured as the highest-contrast
+    // mark in the entire print: a white rope crossing a third of the page, which
+    // would have out-read the skep it belongs to. Warmed onto the palette and
+    // dropped to the palette cream at 6 px / 0.5, its walnut under-copy drawing it.
+    s += `<path d="${smoke}" fill="none" stroke="${SWARM.cream}" stroke-width="${fx(S * 0.09)}" stroke-linecap="round" opacity="0.5"/>`
+    s += `<path d="${smoke}" fill="none" stroke="${WALNUT}" stroke-width="1.2" opacity="0.3"/>`
+    for (const [px2, py2, pr] of [[4.05, -1.02, 0.13], [4.22, -1.1, 0.085], [4.36, -1.18, 0.055]])
+      s += `<circle cx="${fx(bx + S * px2)}" cy="${fx(by + S * py2)}" r="${fx(S * pr)}" fill="${SWARM.cream}" opacity="0.42"/>`
+    // bees AT the door and in the air over the skep — the third cue, and the one
+    // that makes the dome a hive rather than a basket
+    for (const [dx2, dy2, sz2, a2] of [[-0.3, 0.02, 0.011, 14], [0.34, 0.08, 0.0102, -162]])
+      s += flatBee((kx + S * dx2) / w, (ky + S * dy2) / h, w * sz2, a2, 0.95)
+    for (const [dx2, dy2, sz2, a2] of [[-0.56, -1.1, 0.0122, -32], [0.3, -1.22, 0.0112, 26], [0.8, -0.88, 0.0104, -12]])
+      s += flatBee((kx + S * dx2) / w, (ky + S * dy2) / h, w * sz2, a2, 0.9)
   }
 
-  // ---- AFFORDANCE TRAIL to the STIR tab (fore edge right, z 0.30-0.42): the
-  // die-cut tab carries its own lettering, so the print POINTS — a dashed
-  // amber bee-loop curling from the compass yard into the tab's seat.
+  // ---- AFFORDANCE TRAIL to the STIR tab: the die-cut tab carries its own
+  // lettering, so the print POINTS — a dashed amber bee-loop curling out of the
+  // compass yard and RUNNING OUT at the tab's inboard edge.
+  //
+  // ROUND 2 RE-AIM. The tab used to start at radial 1.0, so the trail put its
+  // arrowhead exactly there, ON the tab's inboard edge. The rebuilt tab occupies
+  // radial 0.82 -> 1.12 x z 0.14 -> 0.46 and is page-flat, lifted only 0.003, so
+  // that arrowhead and the last third of the loop ended up UNDERNEATH the die:
+  // invisible, while the visible remainder appeared to stop in mid-air short of
+  // the tab. Every control point is now held at radial <= 0.785, which bounds the
+  // whole curve inside radial 0.785 by the convex-hull property — 16 px of clear
+  // page inboard of the die's edge, measured.
+  // AND IT GOES OVER THE DIAL'S SHOULDER, not past its outboard rim. Measured: the
+  // honeycomb compass dial is an ellipse at image (789, 524) with rx 84 / ry 57, so
+  // its rightmost point is x 873 and the tab's inboard edge is x 877 — a FOUR-pixel
+  // gap. There is no outboard corridor between them, and the first cut of this
+  // re-aim drove the dashed loop straight through the dial, where it was
+  // indistinguishable from the dial's own dashed inner ring. The clear lane is the
+  // band just ABOVE the dial's crown (y 440-478, x 788-873): route 1 runs 15-58 px
+  // higher, route 0 runs 75 px lower, and the dial's crown is at y 467.
   {
-    const d = `M ${fx(PX(pageFX(0.74, 'right')))} ${fx(PY(pageFY(0.44)))} C ${fx(PX(pageFX(0.88, 'right')))} ${fx(PY(pageFY(0.52)))} ${fx(PX(pageFX(0.92, 'right')))} ${fx(PY(pageFY(0.28)))} ${fx(PX(pageFX(1.0, 'right')))} ${fx(PY(pageFY(0.36)))}`
+    const T = [[0.62, 0.24], [0.69, 0.213], [0.75, 0.285], [0.785, 0.299]]
+    const tX = (radial) => PX(pageFX(radial, 'right'))
+    const tY = (z) => PY(pageFY(z))
+    const d =
+      `M ${fx(tX(T[0][0]))} ${fx(tY(T[0][1]))} C ${fx(tX(T[1][0]))} ${fx(tY(T[1][1]))} ` +
+      `${fx(tX(T[2][0]))} ${fx(tY(T[2][1]))} ${fx(tX(T[3][0]))} ${fx(tY(T[3][1]))}`
     s += `<path d="${d}" fill="none" stroke="${SWARM.amber}" stroke-width="2.4" stroke-dasharray="8 7" opacity="0.8"/>`
-    s += `<path d="M ${fx(PX(pageFX(1.0, 'right')))} ${fx(PY(pageFY(0.36)))} l ${fx(-w * 0.011)} ${fx(-h * 0.014)} l ${fx(w * 0.016)} ${fx(h * 0.012)} l ${fx(-w * 0.015)} ${fx(h * 0.013)} Z" fill="${SWARM.amber}" opacity="0.85"/>`
+    // the arrowhead sits ON the end point with its barbs trailing BEHIND it, so
+    // the mark's outboard tip is the 0.785 bound rather than overshooting it
+    const ta = (Math.atan2(tY(T[3][1]) - tY(T[2][1]), tX(T[3][0]) - tX(T[2][0])) * 180) / Math.PI
+    const ah = w * 0.016
+    s += `<g transform="translate(${fx(tX(T[3][0]))} ${fx(tY(T[3][1]))}) rotate(${fx(ta)})">` +
+      `<path d="M 0 0 L ${fx(-ah * 1.5)} ${fx(-ah * 0.52)} L ${fx(-ah * 1.12)} 0 L ${fx(-ah * 1.5)} ${fx(ah * 0.52)} Z" fill="${SWARM.amber}" opacity="0.9"/></g>`
   }
 
   s += `<rect width="${w}" height="${h}" fill="url(#pageVig3)"/>`
@@ -12318,7 +12786,6 @@ const PIECES = [
   // (ch2-meadow-deck retired with the meadow platform — the swarm owns its
   //  lane and its texture budget now; E3 s3 pack §2.)
   { id: 'ch2-fringe', seed: 30230, w: 1024, h: 188, grain: 14, paint() { return meadowFringe(this.w, this.h, this.seed) } },
-  { id: 'ch2-windmill', seed: 30240, w: 512, h: 620, grain: 12, paint() { return windmillSail(this.w, this.h, this.seed) } },
   // ---- Spread 3 — THE CARRIER SWARM (E3 s3): the swarmarc sprite atlas, the
   // crown accent trio's two new bees, the cloud interleave, the fringe chains.
   // Pixel dims at each piece's true mesh aspect (content.ts), slivers <= 512.
@@ -12812,14 +13279,16 @@ const ATLASES = [
   },
   {
     // Chapter II — the apiary's STRUCTURE. Split from the swarm props below so
-    // the hero hive-keeper and the windmill keep their texel density; two 1024
-    // pages at ~70% beat one at 140% (which the packer would resolve by
-    // shrinking every region until the hero was illegible).
+    // the courier hero and the backdrop keep their texel density; two 1024 pages
+    // at ~70% beat one at 140% (which the packer would resolve by shrinking every
+    // region until the hero was illegible). Round 2 dropped ch2-windmill from this
+    // page (see the retirement note where its painter was), which re-lays the page
+    // out and hands its texels to the hero and the backdrop — welcome, since the
+    // hero's whole face now has to survive a 0.256x downscale.
     id: 'apiary-atlas-s3',
     regions: [
       { id: 'ch2-hero', h: 640, opaque: false },
       { id: 'ch2-backdrop', w: 480, opaque: false },
-      { id: 'ch2-windmill', h: 380, opaque: false },
       { id: 'ch2-fringe', w: 560, opaque: false },
       { id: 'ch2-hive-front', w: 300, opaque: false },
       { id: 'ch2-hive-side', h: 300, opaque: false },
