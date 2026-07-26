@@ -6,12 +6,13 @@
  * wax-seal button, sigil links, the cover CTA). Fine-pointer only — coarse
  * (touch) pointers never see it, and `.sb-root` keeps its native cursor
  * there (see the `(pointer: fine)` guard in storybook-responsive.css).
- * Also stays off in the portrait/narrow layout (same breakpoint as
- * storybook-responsive.css's `.sb-quill-cursor { display: none }`) — the
- * element is hidden there but the rAF loop doesn't know that on its own, so
- * it's gated on the same query and torn down rather than spinning forever
- * writing a transform nobody sees. Both queries are watched for `change` so
- * resizing/rotating across the breakpoint starts or stops the loop live.
+ * Also stays off on the compact layout — the shared `COMPACT_QUERY`
+ * (compact-layout.ts), same breakpoint as storybook-responsive.css's
+ * `.sb-quill-cursor { display: none }`. The element is hidden there but the
+ * rAF loop doesn't know that on its own, so it's gated on the same query and
+ * torn down rather than spinning forever writing a transform nobody sees.
+ * Both queries are watched for `change` so resizing/rotating across the
+ * breakpoint starts or stops the loop live.
  * Position is written on every `pointermove`; the rAF loop reads the latest
  * values and writes the transform once per frame, so a burst of pointer
  * events never forces more than one style write per frame.
@@ -27,8 +28,8 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { COMPACT_QUERY } from './compact-layout'
 
-const NARROW_QUERY = '(max-width: 820px), (orientation: portrait)'
 const ROT_MAX_DEG = 9
 const ROT_SENSITIVITY = 0.7
 const ROT_LAG = 0.18
@@ -51,7 +52,7 @@ export function QuillCursor() {
     if (!el) return
 
     const fineMql = window.matchMedia('(pointer: fine)')
-    const narrowMql = window.matchMedia(NARROW_QUERY)
+    const narrowMql = window.matchMedia(COMPACT_QUERY)
 
     let running = false
 

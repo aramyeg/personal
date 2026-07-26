@@ -44,8 +44,11 @@ export function BookNav() {
 
   return (
     <>
+      {/* `sb-nav` is the styling hook the compact layout needs (tighter gaps,
+          and a bottom offset that respects the iOS home indicator, which the
+          flat `bottom-6` below ignores) — see storybook-responsive.css. */}
       <nav
-        className="fixed inset-x-0 bottom-6 z-40 flex items-center justify-center gap-6 px-6"
+        className="sb-nav fixed inset-x-0 bottom-6 z-40 flex items-center justify-center gap-6 px-6"
         aria-label="Page navigation"
       >
         <button

@@ -1,8 +1,8 @@
-/* Storybook lab — cursor + responsive/portrait styles, split out of
-   storybook.css (Task 12 follow-up review) to keep files under the 400-line
-   cap. Imported last in storybook-loader.tsx (after storybook.css and
-   storybook-overlay.css), so the portrait overrides below reliably beat the
-   desktop grid rules in storybook-overlay.css. */
+/* Storybook lab — cursor + compact-layout (phone / narrow-tablet / landscape-
+   phone) styles, split out of storybook.css (Task 12 follow-up review) to keep
+   files under the 400-line cap. Imported last in storybook-loader.tsx (after
+   storybook.css and storybook-overlay.css), so the overrides below reliably
+   beat the desktop grid rules in storybook-overlay.css. */
 
 /* ---------------------------------------------------------------------
    Quill cursor (Task 12). Native cursor hidden only on fine pointers —
@@ -39,55 +39,228 @@
 }
 
 /* ---------------------------------------------------------------------
-   Portrait / narrow layout (task-17 rework): the canvas stays full-bleed
-   (no more top-canvas/bottom-scroll-panel split — the book fills the whole
-   screen here too, same single-window philosophy as desktop) and
-   `.sb-overlay` becomes a bottom drawer sitting ON the scene: collapsed to
-   its header (kicker + title + the `.sb-drawer-toggle` affordance), and
-   expandable via that button (a real `aria-expanded` toggle, state owned by
-   spread-overlay.tsx) to reveal narration/plaque/etc, scrolling internally
-   up to ~55dvh. `.sb-overlay` itself is the scroll container so the sticky
-   toggle can stay pinned at its top edge throughout. No page-level scroll
-   is introduced anywhere — the drawer is the only scrollable region, and it
-   already carries the `.sb-overlay` class use-book-input.ts's
-   `targetsOverlayPanel` guard checks, so a swipe/wheel starting on it never
-   also fires a page turn. ---------------------------------------------- */
-@media (orientation: portrait), (max-width: 820px) {
+   Scrim behind the open story drawer. Styled outside the compact media
+   query on purpose: spread-overlay.tsx only ever RENDERS it on the compact
+   layout (`useCompactLayout()`), so gating it again in CSS would only add a
+   way for the two gates to disagree. A `<button>` rather than a div — same
+   idiom as BookNav's corner hotspots — so it inherits `.sb-overlay button`'s
+   `pointer-events: auto` and needs no role of its own.
+   ---------------------------------------------------------------------- */
+@keyframes sb-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sb-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1; /* inside .sb-overlay: under the sheet (2) and handle (3) */
+  border: 0;
+  padding: 0;
+  cursor: default;
+  background: radial-gradient(
+    ellipse 90% 70% at 50% 34%,
+    rgba(12, 7, 4, 0.32) 0%,
+    rgba(12, 7, 4, 0.68) 100%
+  );
+  animation: sb-scrim-in 240ms ease both;
+}
+
+/* ---------------------------------------------------------------------
+   COMPACT LAYOUT — phones, narrow tablets, landscape phones.
+
+   The one rule here: THE BOOK IS THE VIEW. At rest not a single pixel of
+   narration, plaque or title plate sits on the canvas — the only chrome the
+   overlay contributes is a gold-ruled "unfold the tale" tab floating just
+   above BookNav. (Before this rework the collapsed drawer still planted a
+   ~35%-tall leather plate across the bottom of the screen AND claimed
+   `pointer-events: auto` over all of it, so the book was both cropped and
+   un-swipeable there.)
+
+   Tapping the tab slides a bottom SHEET up over the book carrying the same
+   chapter text + credential plaque the desktop columns show, over a scrim.
+   It dismisses four ways: the tab again, a tap on the scrim, a downward
+   flick from the sheet's top, or Escape (use-drawer-sheet.ts).
+
+   Geometry, so the numbers below are readable:
+     - `.sb-overlay` stays the full-viewport, pointer-transparent container
+       it is on desktop — deliberately NOT transformed, so its two fixed
+       children resolve against the viewport rather than against it.
+     - `#sb-drawer-panel` is the sheet: bottom-anchored, translated fully
+       below the fold at rest, `transform: none` when open.
+     - `.sb-drawer-handle` is the tab: bottom-anchored too, lifted clear of
+       BookNav's row by `--sb-nav-lift` at rest and dropping INTO that row
+       when the sheet is open (the sheet has covered the nav by then), so the
+       control never leaves the thumb zone it started in.
+
+   The media query MUST stay character-identical to `COMPACT_QUERY` in
+   overlay/compact-layout.ts — compact-layout.test.ts reads this file and
+   fails the build if the two drift apart.
+   ---------------------------------------------------------------------- */
+@media (max-width: 820px), (orientation: portrait), (max-height: 540px) and (max-width: 1000px) {
   .sb-overlay {
-    position: fixed;
-    inset: auto 0 0 0;
+    /* Extra lift that keeps the resting tab clear of BookNav's 2.5rem pill
+       row (which itself sits 1.4rem + safe-area off the bottom edge). */
+    --sb-nav-lift: 3.6rem;
+    /* How far the sheet's bottom fade reaches above the tab. Content
+       dissolves into it instead of being sliced by the floating pill. */
+    --sb-fade-rise: 2rem;
+
+    z-index: 45; /* over BookNav (40) + its corner hotspots (30) */
     display: block;
     grid-template-columns: none;
     column-gap: 0;
     padding: 0;
-    height: auto;
-    pointer-events: auto;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sb-desk) 55%, transparent) 0%,
-      color-mix(in srgb, var(--sb-leather-shadow) 88%, var(--sb-desk) 12%) 100%
-    );
-    border-top: 1px solid var(--sb-gold);
-    box-shadow: 0 -10px 26px -14px rgba(0, 0, 0, 0.65);
-  }
-  .sb-overlay[data-expanded='true'] {
-    max-height: 55dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    /* Inherited from the base rule and never relaxed on this layout: at rest
+       every canvas pixel belongs to the book. The sheet, scrim and tab each
+       switch themselves back on. */
+    pointer-events: none;
   }
 
+  /* ---- the sheet ---------------------------------------------------- */
   #sb-drawer-panel {
-    display: block;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    display: block; /* desktop's `display: contents` off — this is a box now */
+    max-height: 76vh;
+    max-height: 76dvh;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    /* Clears the tab (which floats over the sheet's bottom edge when open)
+       AND the fade band above it, so the last block can always be scrolled
+       clear of both. */
+    padding: 0.4rem 0 calc(6.3rem + env(safe-area-inset-bottom, 0px));
+    pointer-events: none;
+    /* Desk-dark sheet, warming into leather only at the foot — the same
+       near-black the desktop columns read against, not a burgundy slab. A
+       candle bloom at the top edge keeps it from looking die-cut. */
+    background:
+      radial-gradient(
+        130% 62% at 50% 0%,
+        color-mix(in srgb, var(--sb-candle) 9%, transparent) 0%,
+        transparent 64%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--sb-desk) 97%, var(--sb-leather) 3%) 0%,
+        color-mix(in srgb, var(--sb-desk) 89%, var(--sb-leather) 11%) 60%,
+        color-mix(in srgb, var(--sb-leather-shadow) 32%, var(--sb-desk) 68%) 100%
+      );
+    border-top: 1px solid var(--sb-gold);
+    border-radius: 18px 18px 0 0;
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--sb-gold-bright) 26%, transparent),
+      0 -22px 46px -20px rgba(0, 0, 0, 0.9);
+    /* Off-screen at rest. Percentage of its OWN height, so a short spread
+       (the colophon) hides just as completely as a long one. */
+    transform: translateY(100%);
+    transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
   }
+  .sb-overlay[data-expanded='true'] #sb-drawer-panel {
+    overflow-y: auto;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  /* ---- the tab ------------------------------------------------------ */
+  .sb-drawer-handle {
+    position: fixed;
+    right: 0;
+    bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    pointer-events: none; /* only the button inside is a target */
+    transform: translateY(calc(-1 * var(--sb-nav-lift)));
+    transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sb-overlay[data-expanded='true'] .sb-drawer-handle {
+    transform: none; /* drops into the row the sheet just covered */
+  }
+  /* The tab floats over a SCROLLING sheet, so without this it would slice
+     whatever line happens to be passing behind it. This band — painted under
+     the pill, over the sheet — fades the text out into the sheet's bottom
+     edge instead; the sheet's matching bottom padding means the last block
+     can still be scrolled clear of it. */
+  .sb-drawer-handle::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--sb-fade-rise)) 0 calc(-1.4rem - env(safe-area-inset-bottom, 0px)) 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 220ms ease;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--sb-leather-shadow) 22%, var(--sb-desk) 78%) 58%,
+      color-mix(in srgb, var(--sb-leather-shadow) 32%, var(--sb-desk) 68%) 100%
+    );
+  }
+  .sb-overlay[data-expanded='true'] .sb-drawer-handle::before {
+    opacity: 1;
+  }
+
+  .sb-drawer-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem; /* 44px touch target */
+    max-width: min(78vw, 22rem);
+    padding: 0.5rem 1.4rem;
+    border: 1px solid var(--sb-gold);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sb-leather-shadow) 58%, rgba(0, 0, 0, 0.55));
+    backdrop-filter: blur(6px);
+    font-family: var(--font-sb-caps);
+    font-variant: small-caps;
+    letter-spacing: 0.1em;
+    font-size: 0.82rem;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--sb-gold-bright);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--sb-gold-bright) 20%, transparent),
+      0 3px 12px -3px rgba(0, 0, 0, 0.75);
+    touch-action: manipulation;
+    transition: background-color 200ms ease, border-color 200ms ease;
+  }
+  .sb-overlay[data-expanded='true'] .sb-drawer-toggle {
+    background: color-mix(in srgb, var(--sb-leather) 52%, rgba(0, 0, 0, 0.6));
+    border-color: var(--sb-gold-bright);
+  }
+  /* The lab hides the native cursor on fine pointers and has no focus styling
+     of its own, so the one keyboard-reachable control on this layout supplies
+     its own ring. `:focus-visible`, not `:focus` — a tap must not leave one. */
+  .sb-drawer-toggle:focus-visible {
+    outline: 2px solid var(--sb-gold-bright);
+    outline-offset: 3px;
+  }
+  /* The glyph points the way the sheet travels: ⌃ unfolds it up, ⌄ folds it
+     away down (spread-overlay.tsx swaps the character — no rotation trick,
+     which would fight the label change). */
+  .sb-drawer-toggle-glyph {
+    font-size: 0.95rem;
+  }
+
+  /* ---- the text, re-set for one full-width column ------------------- */
   .sb-col-left,
   .sb-col-right,
   .sb-title-panel {
     grid-column: auto;
-    max-width: none;
     width: 100%;
+    max-width: none;
     margin: 0;
     align-self: auto;
-    padding: 0 1.25rem;
+    padding: 0 1.35rem;
     background: none;
     text-align: left;
     align-items: flex-start;
@@ -96,96 +269,106 @@
   .sb-title-panel .sb-drawer-body {
     align-items: flex-start;
   }
-
-  /* BookNav's pill (fixed, bottom-6, z-40) sits above the drawer (z-20) and
-     can overlap its last ~4.5rem regardless of the drawer's own height —
-     both are anchored to the viewport bottom. Reserved here so a wrapped
-     chapter title (collapsed) or the last scrolled block (expanded) never
-     renders underneath it. */
-  #sb-drawer-panel > *:last-child {
-    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-  }
-  .sb-overlay:not([data-expanded='true']) .sb-drawer-header {
-    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* Sticky "unfold the tale" handle: pinned to the drawer's own top edge
-     (it's a child of the scroll container above) through the whole
-     expanded scroll, so it's always reachable to collapse again. */
-  .sb-drawer-toggle {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    width: 100%;
-    justify-content: center;
-    padding: 0.85rem 1rem;
-    background: color-mix(in srgb, var(--sb-desk) 90%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--sb-gold) 32%, transparent);
-  }
-  .sb-overlay[data-expanded='true'] .sb-drawer-toggle-glyph {
-    transform: rotate(180deg);
-  }
-
   .sb-drawer-header {
-    padding-top: 0.9rem;
-  }
-  /* `visibility` rides along with the max-height/opacity collapse so the
-     mailto/sigil links (End spread) and any other focusable content inside
-     a collapsed drawer body can't be tabbed to while it reads as gone —
-     without it, max-height:0/opacity:0 hides the content visually but
-     leaves it in the tab order. Delayed 0s→260ms so it only *becomes*
-     hidden once the collapse animation finishes (staying visible through
-     the transition you can see), while the expand direction below flips it
-     back to visible immediately so the reveal animates on-screen instead
-     of popping in after the fact. */
-  .sb-drawer-body {
-    max-height: 0;
-    margin-top: 0;
-    opacity: 0;
-    overflow: hidden;
-    visibility: hidden;
-    transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease,
-      visibility 0s linear 260ms;
-  }
-  .sb-overlay[data-expanded='true'] .sb-drawer-body {
-    max-height: 60vh;
-    margin-top: 0.85rem;
-    opacity: 1;
-    visibility: visible;
-    transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease,
-      visibility 0s linear;
+    padding-top: 0.6rem;
   }
   .sb-col-right.sb-drawer-body {
     margin-top: 0;
-    padding-top: 0.9rem;
+    padding-top: 1.15rem;
   }
-  .sb-overlay[data-expanded='true'] .sb-col-right.sb-drawer-body {
-    margin-top: 0;
+  /* Stacked into one column, the left column's closing hairline and the right
+     column's opening one land back-to-back — two gold rules and the plaque's
+     own crest dot within a few pixels. One rule carries the seam. */
+  .sb-col-right.sb-drawer-body > .sb-hairline:first-child {
+    display: none;
   }
 
   .sb-chapter-title {
     font-size: clamp(1.4rem, 6.5vw, 2rem);
   }
+  .sb-title-hero {
+    font-size: clamp(1.85rem, 8.5vw, 2.6rem);
+  }
+  .sb-plaque--dark {
+    margin-top: 0.4rem;
+  }
+  .sb-colophon {
+    text-align: left;
+  }
+  .sb-satchel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
+  /* ---- BookNav, compacted ------------------------------------------ */
+  /* `.sb-root` prefix only to outrank nav.tsx's Tailwind `bottom-6`/`gap-6`
+     utilities without an `!important`. The safe-area term keeps the row off
+     an iOS home indicator, which the flat `bottom-6` ignored. */
+  .sb-root .sb-nav {
+    bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.7rem;
+    padding-inline: 0.7rem;
+  }
   /* The desktop nav pill's fixed 21rem (storybook-overlay.css) assumes
      desktop-width headroom to spend on identical arrow positions; a narrow
      viewport doesn't have it (21rem alone can exceed the screen), so the
      pill goes back to hugging its label, capped like it always was. */
   .sb-nav-pill {
     width: auto;
-    max-width: 60vw;
-  }
-  .sb-plaque--dark {
-    margin-top: 0.4rem;
-  }
-  .sb-satchel-grid {
-    grid-template-columns: repeat(2, 1fr);
+    max-width: 58vw;
   }
 
   /* The quill never suits a touch surface; belt-and-braces alongside the
      (pointer: fine) guards above. */
   .sb-quill-cursor {
     display: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   LANDSCAPE PHONES. Same decision as portrait — book full-bleed, text in
+   the drawer — because the alternative (a side column) reintroduces exactly
+   the crop this rework removed, on the axis where the multi-stage pop-ups
+   are widest. Only the proportions change: the sheet may take almost the
+   whole short viewport while it's open (you are reading, not looking), the
+   tab sits a little lower, and the satchel grid widens to three columns
+   because there is width to spare and almost no height.
+   ---------------------------------------------------------------------- */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+  .sb-overlay {
+    --sb-nav-lift: 3.1rem;
+    --sb-fade-rise: 1.5rem;
+  }
+  #sb-drawer-panel {
+    max-height: 88vh;
+    max-height: 88dvh;
+    padding-bottom: calc(5.6rem + env(safe-area-inset-bottom, 0px));
+    border-radius: 14px 14px 0 0;
+  }
+  .sb-chapter-title {
+    font-size: clamp(1.15rem, 4.4vh, 1.6rem);
+  }
+  .sb-title-hero {
+    font-size: clamp(1.4rem, 6vh, 2rem);
+  }
+  .sb-narration {
+    font-size: 0.95rem;
+    line-height: 1.52;
+  }
+  .sb-satchel-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Reduced motion: the sheet and tab arrive/leave without travel, and the
+   scrim without a fade. State still changes — only the animation goes. */
+@media (prefers-reduced-motion: reduce) {
+  #sb-drawer-panel,
+  .sb-drawer-handle,
+  .sb-drawer-handle::before,
+  .sb-drawer-toggle {
+    transition: none !important;
+  }
+  .sb-drawer-scrim {
+    animation: none !important;
   }
 }

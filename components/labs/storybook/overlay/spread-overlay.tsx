@@ -8,18 +8,25 @@
  * centered `.sb-title-panel` for the title spread) rather than tracking the
  * spread's on-screen rect: no projection math, no `pageRect` in the store.
  * `#sb-drawer-panel` is `display: contents` (storybook-overlay.css) so those
- * elements land as direct children of `.sb-overlay` — a grid on desktop
- * (real side columns) and a flex column in portrait (a bottom drawer,
- * storybook-responsive.css) — without two different component trees.
+ * elements land as direct children of `.sb-overlay` — a real three-track grid
+ * on desktop — without two different component trees.
  *
- * Each column carries a `.sb-drawer-header` (kicker + flourish + title —
- * always visible) and one or more `.sb-drawer-body` blocks (narration,
- * plaque, satchel grid, colophon — collapsed to nothing in the portrait
- * drawer until `.sb-drawer-toggle` expands it; always visible on desktop).
- * The overlay joins the page turn's choreography (see the SpreadOverlay
- * component + turn-events.ts): the outgoing text exits as the turn begins and
- * the incoming text staggers in a beat before the page settles, rather than
- * flat-fading in after the motion stops. All copy is
+ * ON THE COMPACT LAYOUT (phones, narrow tablets, landscape phones — see
+ * `useCompactLayout()`) the same nodes become a bottom SHEET instead, and the
+ * book gets the whole viewport back: nothing from `#sb-drawer-panel` is on
+ * screen at rest, only a gold-ruled "unfold the tale" tab floating above
+ * BookNav. Tapping it slides the sheet up over a scrim; the tab, the scrim, a
+ * downward flick and Escape all put it away again (use-drawer-sheet.ts owns
+ * that behaviour, storybook-responsive.css the geometry). The panel is
+ * `inert` while folded away, so a screen reader or Tab key can't wander into
+ * text the reader can't see.
+ *
+ * Each column carries a `.sb-drawer-header` (kicker + flourish + title) and
+ * one or more `.sb-drawer-body` blocks (narration, plaque, satchel grid,
+ * colophon). The overlay joins the page turn's choreography (see the
+ * SpreadOverlay component + turn-events.ts): the outgoing text exits as the
+ * turn begins and the incoming text staggers in a beat before the page
+ * settles, rather than flat-fading in after the motion stops. All copy is
  * real facts pulled from `content.ts` / `satchel-items.ts` /
  * `lib/constants.ts` — nothing hardcoded here beyond structural glue
  * (kickers, the colophon line) and decorative punctuation spans
@@ -27,10 +34,11 @@
  * source strings — it never changes them).
  */
 
-import { useEffect, useState } from 'react'
 import { skills } from '@/data'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { useArtIds } from '../art-manifest'
+import { useCompactLayout } from './compact-layout'
+import { useDrawerSheet } from './use-drawer-sheet'
 import { useSpreadChoreography } from './use-spread-choreography'
 import {
   BOOK_SUBTITLE,
@@ -246,45 +254,71 @@ export function SpreadOverlay() {
   // Shared with the nav label (use-spread-choreography.ts) so both text
   // surfaces swap on the same land cue rather than the overlay leading.
   const { displaySpread, exiting, frozenTurn } = useSpreadChoreography()
-  const [expanded, setExpanded] = useState(false)
-
-  // A fresh spread always starts collapsed (portrait drawer) — otherwise the
-  // previous page's fully-open drawer would keep covering the newly turned
-  // scene the instant it lands.
-  useEffect(() => setExpanded(false), [displaySpread])
+  const compact = useCompactLayout()
+  const { expanded, toggle, close, sheetRef, toggleRef, sheetProps } = useDrawerSheet(
+    compact,
+    displaySpread
+  )
 
   const content = contentForSpread(displaySpread)
-  // Hidden on the closed cover (spread 0 has no text, and the portrait
-  // "unfold the tale" toggle must not dangle over the shut book) and over a
-  // frozen benchmark pose. Everything else is choreographed, never flat-faded.
+  // Hidden on the closed cover (spread 0 has no text) and over a frozen
+  // benchmark pose. Everything else is choreographed, never flat-faded.
   const hidden = frozenTurn || displaySpread === 0
+  // The tab is a real, tappable control, so it is only mounted when there is
+  // in fact a tale to unfold: over the shut cover the old build left an
+  // invisible (`opacity: 0`) but still clickable button dangling there.
+  const showHandle = compact && !hidden
+  const showScrim = showHandle && expanded
 
   return (
     <div
+      ref={sheetRef}
       className="sb-overlay"
       data-expanded={expanded}
       data-sb-phase={exiting ? 'exiting' : 'resting'}
       style={hidden ? { opacity: 0 } : undefined}
+      {...sheetProps}
     >
-      <button
-        type="button"
-        className="sb-drawer-toggle"
-        aria-expanded={expanded}
-        aria-controls="sb-drawer-panel"
-        onClick={() => setExpanded((v) => !v)}
-        data-sb-hover
-      >
-        <span>{expanded ? 'fold it away' : 'unfold the tale'}</span>
-        <span className="sb-drawer-toggle-glyph" aria-hidden="true">
-          {expanded ? '⌃' : '⌄'}
-        </span>
-      </button>
+      {showScrim && (
+        <button
+          type="button"
+          className="sb-drawer-scrim"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={close}
+        />
+      )}
       {/* Keyed by the shown spread so a landing REMOUNTS the panel, replaying
           the staggered CSS entrance (storybook-overlay.css) exactly once per
           arrival — a plain re-render (e.g. the drawer toggle) never replays it. */}
-      <div id="sb-drawer-panel" key={displaySpread}>
+      <div
+        id="sb-drawer-panel"
+        key={displaySpread}
+        inert={compact && !expanded ? true : undefined}
+      >
         {content}
       </div>
+      {/* Last in DOM order as well as on top in paint order: with the sheet
+          open, the tab is the first thing a Tab press after the panel reaches
+          and the last thing a pointer can hit. */}
+      {showHandle && (
+        <div className="sb-drawer-handle">
+          <button
+            ref={toggleRef}
+            type="button"
+            className="sb-drawer-toggle"
+            aria-expanded={expanded}
+            aria-controls="sb-drawer-panel"
+            onClick={toggle}
+            data-sb-hover
+          >
+            <span>{expanded ? 'fold the tale away' : 'unfold the tale'}</span>
+            <span className="sb-drawer-toggle-glyph" aria-hidden="true">
+              {expanded ? '⌄' : '⌃'}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

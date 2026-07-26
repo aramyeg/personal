@@ -464,22 +464,9 @@
   width: 21rem;
 }
 
-/* Portrait drawer toggle — hidden here, shown full-width in
-   storybook-responsive.css. Kept in the base file (not the media query) so
-   its resting/hover states are defined once. */
-.sb-drawer-toggle {
-  display: none;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--font-sb-caps);
-  font-variant: small-caps;
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
-  color: var(--sb-gold-bright);
-  background: none;
-  border: none;
-}
-.sb-drawer-toggle-glyph {
-  font-size: 0.9rem;
-  transition: transform 150ms ease;
-}
+/* The story drawer's tab, sheet and scrim are compact-layout-only surfaces
+   and live entirely in storybook-responsive.css. They used to be declared
+   here too — a `display: none` shell that made `.sb-drawer-toggle` a real
+   0×0 node in the desktop DOM. spread-overlay.tsx now gates them on
+   `useCompactLayout()` instead, so on desktop they simply don't exist and
+   there is nothing here to hide. */
