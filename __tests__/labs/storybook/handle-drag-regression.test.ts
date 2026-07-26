@@ -522,6 +522,11 @@ const CASES: HandleCase[] = [
   keepsakeCase('end-keepsake'),
   keepWinchCase('ch3-keep-winch'),
   volvelleCase('ch3-dispatch'),
+  // E3 WAVE-2 s7: the counting wheel, the spread's headline play. Listed
+  // explicitly rather than leaning on the family-coverage guard (which is
+  // satisfied by any ONE volvelle) — s7's whole S7-1 finding was a foreground
+  // touch cue that did not move, and this is the gate that says it does.
+  volvelleCase('ch6-assay'),
   dispatchLineCase('ch3-dispatch-line'),
   knobTowerCase(),
 ]

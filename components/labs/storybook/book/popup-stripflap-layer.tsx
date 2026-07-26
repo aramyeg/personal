@@ -40,6 +40,7 @@ import {
   type StripFlapGeom,
   type Vec3,
 } from './popup-mechanics'
+import { idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
 import { peakHeight, shadowLift } from './shadow-light'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
@@ -69,6 +70,19 @@ const FOLD_SHADE_TINT = '#d9cdb4'
 // shaded leaf; the warm FOLD_SHADE_TINT (~x0.85/0.80/0.71) is reserved for a
 // kraft placeholder flap (no texture) so painted art is not dimmed + warm-cast.
 const PAINTED_FOLD_SHADE = '#e4e4e4'
+/** The glint's shade-panel base — the SAME constant the texture effect installs
+ *  on the shaded leaf, re-derived rather than snapshotted so the two cannot
+ *  silently disagree (popup-spread.tsx keeps the identical pair). */
+const IDLE_SHADE_BASE = new THREE.Color(PAINTED_FOLD_SHADE)
+
+/** A pinned pose (`?sbpose=`) freezes the idle clock, so golden captures and
+ *  the physics bench stay run-to-run identical. Local twin of the generic
+ *  layer's guard: importing it would couple two renderers for four lines. */
+function idlePosePinned(): boolean {
+  if (process.env.NODE_ENV === 'production') return false
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).has('sbpose')
+}
 const ANTI_FLIP = STRIPFLAP_ANTI_FLIP // the user ceiling (law H3): past vertical the figure flips
 const TOUCH_SLOP = HANDLE_SLOP_STANDING
 
@@ -165,6 +179,25 @@ export function StripFlapPopupLayer({
 
   // The reader's hard stops for this piece (law H3 + the s6 travel window).
   const travel = useMemo(() => stripFlapTravel(layer), [layer])
+
+  // IDLE LIFE, OPT-IN (E3 WAVE-2 s7). FIX-SYS wired idle-life into the generic
+  // PopupLayer only, which covers v-folds/children/riders — every strip flap in
+  // the book (the s7 clerk with his never-flickering candle among them) was left
+  // outside it. This is the same resolve-once shape popup-spread.tsx uses, and
+  // it is GLINT-ONLY by design: 'sway'/'drift' would move a figure the reader
+  // can also grab, i.e. a second, smaller copy of this family's own travel —
+  // the exact thing handle-hover.ts forbids an untouched piece from implying.
+  // An UNTAGGED strip flap resolves to null and pays one null check per frame:
+  // no transform, no tint write, bit-identical to what it drew before.
+  const idle = useMemo(() => {
+    const tag = layer.idle
+    if (!tag || tag.kind !== 'glint') return null
+    return {
+      seed: idleSeed(layer.id),
+      peak: idlePeak(tag.kind as IdleKind, tag.amp),
+      pinned: idlePosePinned(),
+    }
+  }, [layer.idle, layer.id])
 
   const shadow = useMemo(() => {
     // Reference pose for the pool's SIZE and DEPTH: the piece STANDING. A
@@ -278,7 +311,7 @@ export function StripFlapPopupLayer({
     useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
     const f = frame.current
@@ -308,6 +341,25 @@ export function StripFlapPopupLayer({
         glowSt.hover === layer.id || glowSt.grab?.id === layer.id
       )
       for (const m of [materials.right, materials.left]) applyHandleGlow(m, w)
+      // IDLE GLINT, composed under the hover glow rather than fought with it:
+      // the glow snapshots whatever colour it finds as its restore base, so a
+      // glint writing every frame would hand it a moving base. While the hand is
+      // on the piece the glow owns the tint (which is what a reader wants — the
+      // answer to their pointer, not weather); the breath resumes the moment the
+      // glow lets go, and at excursion 0 both panels land on their exact bases.
+      if (idle && w <= 0) {
+        const k =
+          1 +
+          idleOffset(
+            idle.peak,
+            idle.seed,
+            state.clock.elapsedTime,
+            beta,
+            idle.pinned || (f?.dir ?? null) !== null
+          )
+        materials.right.color.setScalar(k)
+        materials.left.color.copy(IDLE_SHADE_BASE).multiplyScalar(k)
+      }
     }
 
     // The un-driven pose: the strip cam for a page-driven flap, the declared

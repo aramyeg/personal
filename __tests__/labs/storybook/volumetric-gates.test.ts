@@ -30,6 +30,7 @@ import { stagedChainQuads } from '@/components/labs/storybook/book/popup-stagedc
 import { keepSkylineQuads } from '@/components/labs/storybook/book/popup-skyline'
 import { swarmArcQuads } from '@/components/labs/storybook/book/popup-swarmarc'
 import { oanavePatches } from '@/components/labs/storybook/book/popup-oanave'
+import { solveVolvellePose } from '@/components/labs/storybook/book/popup-volvelle'
 
 // Volumetric benchmark gates C2 + C3, RAISED to Part C v2 (spec 2026-07-11)
 // as numeric floors. Capture review remains the other half of both gates —
@@ -182,6 +183,14 @@ const poseQuads = (l: SceneLayer, layers: readonly SceneLayer[], tL: number, tR:
       // The cliff is one quad per storey — its depth footprint is the whole
       // raked chain run from the root hinge back up the page.
       return stagedChainQuads(l, tL, tR)
+    case 'volvelle': {
+      // A coplanar hub-riveted disc pair (E3 WAVE-2 s7 ch6-assay, and the s4
+      // dispatch dial). No twist channel in the depth gates - pose at theta 0;
+      // the dial and card are the same square footprint one paper thickness
+      // apart, so the piece contributes exactly one station at its hub.
+      const pose = solveVolvellePose(l, tL, tR, 0)
+      return [pose.dial, pose.card]
+    }
     case 'oanave':
       // Host wings + the die-cut relief strata — the rank's full depth
       // footprint (popup-oanave.ts).
