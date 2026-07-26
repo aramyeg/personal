@@ -12367,9 +12367,10 @@ function bazFigureRank(w, h, seed, { count, basketAt = -1 }) {
  * is exactly why the LIFT LIP lives there.
  *
  * The die-cut steps three times per stall — a wide counter at the hem, slim
- * posts, then the awning overhanging both (a T silhouette). Between neighbours
- * the contour drops to the shared link at vLink, so the whole rank is one piece
- * of cut paper (T-LINKED-RANK, as bazFigureRank).
+ * posts, then the awning overhanging both (a T silhouette). The stalls are cut
+ * APART (see the A-4 note in the body): six separate cards on one hinge line,
+ * NOT the T-LINKED-RANK chain bazFigureRank uses, because each one now moves on
+ * its own.
  */
 function bazStallRank(w, h, seed, { count }) {
   const r = mulberry32(seed)
@@ -12378,13 +12379,29 @@ function bazStallRank(w, h, seed, { count }) {
   const WOODB = '#6b4a26'
   const WOODB_LIT = '#9a7038'
 
-  const u0 = 0.012
-  const u1 = 0.988
-  const span = (u1 - u0) / count
+  // A-4, THE RANK IS NO LONGER ONE FLAP. Each of the six stalls is independently
+  // hinged on the same line and lags its neighbour by 5% of the stroke, so the
+  // row rises as a wave. The painter used to tie them together with a CONTINUOUS
+  // LINK STRIP -- vLink 0.16, the contour running [0,0] [0,vLink] ... [1,vLink]
+  // [1,0] so the whole width was one uncut band at the hem -- and under the
+  // ripple that band is being asked to be six things at six angles, which is not
+  // paper. It is cut: six separate cards, transparent between them all the way
+  // down to the hinge.
+  //
+  // REGISTRATION. The column cuts fall at texture u = k/6, and the old pitch
+  // (u0 0.012, span 0.976/6) put the outer two of those ~0.0007 outside their
+  // gaps, clipping the outermost awnings. u0 = 0 and span = 1/6 with every stall
+  // centred in its own sixth puts each cut at the exact centre of a gap, so the
+  // die-cut, the paint and the hinges register.
+  //
+  // WHERE THE "ONE RANK" READ WENT: onto the page. bazaarFloorSpread prints a
+  // setting-out board along the hinge line with a marked bay per card.
+  const u0 = 0
+  const span = 1 / count
   const cHalf = span * 0.4 // the counter at the hem
   const pHalf = span * 0.29 // the post frame
   const aHalf = span * 0.455 // the awning, overhanging both
-  const vLink = 0.16 // the shared link the rank is one sheet at
+  const vLink = 0 // each card runs to the hinge on its own
   const vHem = 0.3 // counter top
   const vEave = 0.72 // awning underside
   const vLip = 0.928 // the printed lift lip starts here
@@ -12394,27 +12411,23 @@ function bazStallRank(w, h, seed, { count }) {
   // world per stripe, and a stall here is 0.1 world wide — six stripes.
   const nst = 6
 
-  const pts = [[0, 0], [0, vLink]]
-  for (let i = 0; i < count; i++) {
+  // ONE SUBPATH PER CARD. A multi-subpath `d` clips and rims exactly as a single
+  // contour does, and it is what makes the six read as six.
+  const d = Array.from({ length: count }, (_, i) => {
     const cx = u0 + span * (i + 0.5)
-    pts.push(
-      [cx - cHalf, vLink], [cx - cHalf, vHem],
+    const card = [
+      [cx - cHalf, 0], [cx - cHalf, vHem],
       [cx - pHalf, vHem], [cx - pHalf, vEave],
       [cx - aHalf, vEave], [cx - aHalf, vTop],
       [cx + aHalf, vTop], [cx + aHalf, vEave],
       [cx + pHalf, vEave], [cx + pHalf, vHem],
-      [cx + cHalf, vHem], [cx + cHalf, vLink]
-    )
-  }
-  pts.push([1, vLink], [1, 0])
-  const outline = simplifyOutline(pts)
-  const d = outline.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+      [cx + cHalf, vHem], [cx + cHalf, 0],
+    ]
+    return card.map(([u, v], k) => `${k ? 'L' : 'M'}${fx(X(u))} ${fx(Y(v))}`).join(' ') + ' Z'
+  }).join(' ')
 
   let g = `<g clip-path="url(#stallRankCut)">`
   g += `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
-  // the link band the six stalls share, read as one strip of card
-  g += `<rect y="${fx(Y(vLink))}" width="${w}" height="${fx(Y(0) - Y(vLink))}" fill="${BAZ.sandDim}"/>`
-  g += `<line x1="0" y1="${fx(Y(vLink))}" x2="${w}" y2="${fx(Y(vLink))}" stroke="${INK}" stroke-width="1.6" opacity="0.4"/>`
 
   for (let i = 0; i < count; i++) {
     const cx = u0 + span * (i + 0.5)
@@ -12446,7 +12459,7 @@ function bazStallRank(w, h, seed, { count }) {
     // WOODB_LIT lit edge, cream chevron notches down the grain). At span*0.055
     // they baked 4.6 px wide — half of that once the flap is on screen — so the
     // frame vanished and the awning looked unsupported.
-    const pw = X(span * 0.09)
+    const pw = X(span * 0.125)
     for (const sgn of [-1, 1]) {
       const px = X(cx + sgn * pHalf * 0.94) - pw / 2
       g += `<rect x="${fx(px)}" y="${fx(Y(vEave + 0.01))}" width="${fx(pw)}" height="${fx(Y(vLink) - Y(vEave + 0.01))}" fill="${WOODB}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.55"/>`
@@ -12459,11 +12472,21 @@ function bazStallRank(w, h, seed, { count }) {
 
     // ---- the counter of goods at the hem: a crate front, then three spice
     // cones and two jars standing ON it. Identical stall to stall.
+    // The counter face runs the whole way to the hinge now that the shared link
+    // band is cut away, so it is twice the height it was designed at and a flat
+    // fill there reads as a blank plinth. Boarded: a lit capping, vertical
+    // planks, and the card's own foot in shadow at the hinge.
     const cy0 = Y(vHem)
-    const cyH = Y(vLink) - cy0
-    g += `<rect x="${fx(X(cx - cHalf))}" y="${fx(cy0)}" width="${fx(X(cHalf * 2))}" height="${fx(cyH)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
-    g += `<rect x="${fx(X(cx - cHalf))}" y="${fx(cy0)}" width="${fx(X(cHalf * 2))}" height="${fx(cyH * 0.26)}" fill="${BAZ.sandLit}" opacity="0.55"/>`
-    g += `<line x1="${fx(X(cx - cHalf))}" y1="${fx(cy0 + cyH * 0.6)}" x2="${fx(X(cx + cHalf))}" y2="${fx(cy0 + cyH * 0.6)}" stroke="${INK}" stroke-width="1.3" opacity="0.4"/>`
+    const cyH = Y(0) - cy0
+    const cxL = X(cx - cHalf)
+    const cwF = X(cHalf * 2)
+    g += `<rect x="${fx(cxL)}" y="${fx(cy0)}" width="${fx(cwF)}" height="${fx(cyH)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.55"/>`
+    g += `<rect x="${fx(cxL)}" y="${fx(cy0)}" width="${fx(cwF)}" height="${fx(cyH * 0.16)}" fill="${BAZ.sandLit}" opacity="0.7"/>`
+    g += `<line x1="${fx(cxL)}" y1="${fx(cy0 + cyH * 0.16)}" x2="${fx(cxL + cwF)}" y2="${fx(cy0 + cyH * 0.16)}" stroke="${INK}" stroke-width="1.6" opacity="0.5"/>`
+    for (let b = 1; b < 4; b++) {
+      g += `<line x1="${fx(cxL + (cwF * b) / 4)}" y1="${fx(cy0 + cyH * 0.16)}" x2="${fx(cxL + (cwF * b) / 4)}" y2="${fx(cy0 + cyH * 0.82)}" stroke="${INK}" stroke-width="1.4" opacity="0.32"/>`
+    }
+    g += `<rect x="${fx(cxL)}" y="${fx(cy0 + cyH * 0.82)}" width="${fx(cwF)}" height="${fx(cyH * 0.18)}" fill="${INK}" opacity="0.24"/>`
     for (const [uf, col, hf] of [[-0.6, BAZ.saffron, 0.085], [0.6, BAZ.saffron, 0.085]]) {
       const gx = X(cx + uf * cHalf)
       const gw = X(span * 0.1)
@@ -12698,59 +12721,198 @@ function bazRaiseStallFace(w, h, seed) {
   const pitch = w / nst
   let s = `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
 
-  // Four slim posts instead of two fat ones: same frame, read at the souk's
-  // own scale. `goods` gives the two bands different furniture so the unfold
-  // does not read as one mirrored shape.
-  const legBand = (v0, v1, glyphRow, goods) => {
+  // ---- A-3(i), THE PAYOFF. Blind finding 11: "the fully-raised tent is a plain
+  // white/mustard open shell — no goods, no counter, no vendor, no colour. The
+  // COLLAPSED state is far more beautiful than the raised one, which inverts the
+  // whole point of the mechanism." The cause was a placement bug rather than a
+  // shortage of drawing: `legBand(0, 0.32, false, true)` put every crate and jar
+  // on legIn, and `legBand(0.68, 1, true, false)` gave legOut nothing but a row
+  // of diamond glyphs — so the face the reader meets when the stall stands up
+  // was the empty one, and the loaded one faced the gutter.
+  //
+  // Both bands are now authored for what they actually show:
+  //   legOut (v 0.68..1, faces the reader) = THE COUNTER, loaded.
+  //   legIn  (v 0..0.32, faces the gutter) = THE BACK OF THE STALL and the
+  //          VENDOR standing behind his counter.
+  // The flat rest pose is now the pose the spread OPENS on, so everything the
+  // reviewer praised in it survives: four posts, the X-braces under the counter,
+  // the leaning master-pattern stone, the glyph row, and legible fold lines.
+  //
+  // BAND COORDINATES. Both leg bands run FLOOR -> DECK SEAM, but in opposite
+  // image directions (the unfold mirrors): legOut's floor is image y 0 and its
+  // seam y 0.32h; legIn's floor is image y h and its seam 0.68h. `gy(f)` hides
+  // that — f = 0 is always the ground and f = 1 always the seam under the deck.
+  //
+  // SCALE. At full pull each leg band is seen tall and NARROW (the brief's ~35 px
+  // of width against ~149 of height), so the width of this 512 px band is
+  // compressed several times harder than its height. Everything here is
+  // therefore laid out as FULL-WIDTH HORIZONTAL REGISTERS carrying few, large
+  // objects: a register survives any amount of horizontal squash, and five big
+  // wares squashed together still read as "loaded" where fifteen small ones
+  // would smear into noise.
+  const legFrame = (gy, glyphRow, stone) => {
     let out = ''
-    const y0 = Y(v1)
-    const bh = Y(v0) - Y(v1)
-    const pw = w * 0.055
-    for (const ux of [0.14, 0.33, 0.585, 0.79]) {
-      out += `<rect x="${fx(ux * w)}" y="${fx(y0)}" width="${fx(pw)}" height="${fx(bh)}" fill="${WOODB}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.55"/>`
-      out += `<rect x="${fx(ux * w + 1.5)}" y="${fx(y0)}" width="${fx(w * 0.013)}" height="${fx(bh)}" fill="${WOODB_LIT}" opacity="0.7"/>`
-      for (let c = 0; c < 8; c++) {
-        const cy = y0 + bh * (0.09 + c * 0.115)
-        out += `<path d="M ${fx(ux * w + w * 0.012)} ${fx(cy)} L ${fx(ux * w + pw / 2)} ${fx(cy - 4)} L ${fx(ux * w + pw - w * 0.012)} ${fx(cy)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.3" opacity="0.7"/>`
+    const pw = w * 0.062
+    // the ground the stall stands on
+    out += `<rect x="0" y="${fx(Math.min(gy(0), gy(0.045)))}" width="${w}" height="${fx(Math.abs(gy(0.045) - gy(0)))}" fill="${INK}" opacity="0.26"/>`
+    for (const ux of [0.05, 0.31, 0.63, 0.89]) {
+      const yA = gy(0.02)
+      const yB = gy(1)
+      out += `<rect x="${fx(ux * w)}" y="${fx(Math.min(yA, yB))}" width="${fx(pw)}" height="${fx(Math.abs(yB - yA))}" fill="${WOODB}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
+      out += `<rect x="${fx(ux * w + 2)}" y="${fx(Math.min(yA, yB))}" width="${fx(w * 0.016)}" height="${fx(Math.abs(yB - yA))}" fill="${WOODB_LIT}" opacity="0.7"/>`
+      for (let c = 0; c < 5; c++) {
+        const cy = gy(0.06 + c * 0.085)
+        out += `<path d="M ${fx(ux * w + w * 0.014)} ${fx(cy)} L ${fx(ux * w + pw / 2)} ${fx(cy - 5)} L ${fx(ux * w + pw - w * 0.014)} ${fx(cy)}" fill="none" stroke="${BAZ.cream}" stroke-width="1.4" opacity="0.7"/>`
       }
     }
-    // cross-braces, one per post bay
-    for (const [ua, ub] of [[0.195, 0.325], [0.385, 0.58], [0.64, 0.785]]) {
-      out += `<line x1="${fx(ua * w)}" y1="${fx(y0 + bh * 0.82)}" x2="${fx(ub * w)}" y2="${fx(y0 + bh * 0.2)}" stroke="${WOODB}" stroke-width="4.5" opacity="0.85"/>`
-      out += `<line x1="${fx(ua * w)}" y1="${fx(y0 + bh * 0.2)}" x2="${fx(ub * w)}" y2="${fx(y0 + bh * 0.82)}" stroke="${WOODB}" stroke-width="4.5" opacity="0.85"/>`
+    // THE X-BRACES, under the counter where a trestle stall really carries them.
+    // These are the reviewer's one delight in the flat pose and they stay.
+    for (const [ua, ub] of [[0.11, 0.31], [0.37, 0.63], [0.69, 0.89]]) {
+      out += `<line x1="${fx(ua * w)}" y1="${fx(gy(0.08))}" x2="${fx(ub * w)}" y2="${fx(gy(0.42))}" stroke="${WOODB}" stroke-width="5" opacity="0.85"/>`
+      out += `<line x1="${fx(ua * w)}" y1="${fx(gy(0.42))}" x2="${fx(ub * w)}" y2="${fx(gy(0.08))}" stroke="${WOODB}" stroke-width="5" opacity="0.85"/>`
     }
-    // the leaning master-pattern stone, now one object among several
-    const sx = w * 0.395
-    const sy = y0 + bh * 0.46
-    out += `<g transform="rotate(-8 ${fx(sx)} ${fx(sy)})">` +
-      `<rect x="${fx(sx)}" y="${fx(sy)}" width="${fx(w * 0.165)}" height="${fx(bh * 0.3)}" rx="4" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
-    for (let gk = 0; gk < 3; gk++) {
-      const gx = sx + w * 0.03 + gk * w * 0.045
-      out += `<path d="M ${fx(gx)} ${fx(sy + bh * 0.15)} l 5.5 -5.5 l 5.5 5.5 l -5.5 5.5 Z" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.7"/>`
-    }
-    out += `</g>`
-    if (goods) {
-      // crates + jars stacked against the outer posts — the scale ruler
-      for (const [ux, cwF, chF] of [[0.045, 0.085, 0.13], [0.045, 0.06, 0.09], [0.865, 0.09, 0.15]]) {
-        const cy = y0 + bh * (0.86 - chF)
-        out += `<rect x="${fx(ux * w)}" y="${fx(cy)}" width="${fx(w * cwF)}" height="${fx(bh * chF)}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.6"/>`
-        out += `<line x1="${fx(ux * w)}" y1="${fx(cy + bh * chF * 0.5)}" x2="${fx((ux + cwF) * w)}" y2="${fx(cy + bh * chF * 0.5)}" stroke="${INK}" stroke-width="1.2" opacity="0.45"/>`
+    if (stone) {
+      // the leaning master-pattern stone, kept verbatim in spirit: the object the
+      // whole chapter is about, propped against the frame
+      const sx = w * 0.39
+      const sy = Math.min(gy(0.1), gy(0.42))
+      out += `<g transform="rotate(-8 ${fx(sx)} ${fx(sy)})">` +
+        `<rect x="${fx(sx)}" y="${fx(sy)}" width="${fx(w * 0.2)}" height="${fx(Math.abs(gy(0.42) - gy(0.1)))}" rx="4" fill="${BAZ.sandLit}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.65"/>`
+      for (let gk = 0; gk < 3; gk++) {
+        const gx = sx + w * 0.038 + gk * w * 0.052
+        out += `<path d="M ${fx(gx)} ${fx(sy + Math.abs(gy(0.42) - gy(0.1)) * 0.5)} l 7 -7 l 7 7 l -7 7 Z" fill="none" stroke="${INK}" stroke-width="1.7" opacity="0.75"/>`
       }
-      for (const [ux, uv] of [[0.475, 0.2], [0.53, 0.19]]) {
-        out += `<ellipse cx="${fx(ux * w)}" cy="${fx(y0 + bh * 0.8)}" rx="${fx(w * 0.028)}" ry="${fx(bh * uv * 0.35)}" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="1.3" stroke-opacity="0.55"/>`
-      }
+      out += `</g>`
     }
     if (glyphRow) {
       for (let gk = 0; gk < 7; gk++) {
         const gx = w * (0.13 + gk * 0.125)
-        out += `<path d="M ${fx(gx)} ${fx(y0 + bh * 0.05)} l 5 -5 l 5 5 l -5 5 Z" fill="none" stroke="${INK}" stroke-width="1.4" opacity="0.55"/>`
+        out += `<path d="M ${fx(gx)} ${fx(gy(0.012))} l 6 -6 l 6 6 l -6 6 Z" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.6"/>`
       }
     }
     return out
   }
 
-  s += legBand(0, 0.32, false, true)
-  s += legBand(0.68, 1, true, false)
+  /** A board spanning the frame at height f, seen edge-on: plank, lit top, the
+   *  shadow it drops on the frame below. */
+  const legBoard = (gy, f, thick) => {
+    const yA = gy(f)
+    const yB = gy(f + thick)
+    const y0 = Math.min(yA, yB)
+    const bh2 = Math.abs(yB - yA)
+    return (
+      `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(bh2)}" fill="${WOODB_LIT}" stroke="${INK}" stroke-width="2" stroke-opacity="0.7"/>` +
+      `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(bh2 * 0.3)}" fill="${BAZ.sandLit}" opacity="0.5"/>` +
+      `<rect x="0" y="${fx(Math.min(gy(f), gy(f - 0.05)))}" width="${w}" height="${fx(Math.abs(gy(f - 0.05) - gy(f)))}" fill="${INK}" opacity="0.2"/>`
+    )
+  }
+
+  // ---- legOut: THE COUNTER. Five wares standing on the board, each one wide
+  // enough to survive the squash, in the spread's own goods vocabulary.
+  {
+    const gy = (f) => Y(1) + (Y(0.68) - Y(1)) * f
+    s += legFrame(gy, true, false)
+    // the boarded counter front, under the board
+    s += `<rect x="0" y="${fx(Math.min(gy(0.045), gy(0.44)))}" width="${w}" height="${fx(Math.abs(gy(0.44) - gy(0.045)))}" fill="${WOODB}" opacity="0.55"/>`
+    for (let k = 1; k < 5; k++) {
+      s += `<line x1="${fx((k / 5) * w)}" y1="${fx(gy(0.045))}" x2="${fx((k / 5) * w)}" y2="${fx(gy(0.44))}" stroke="${INK}" stroke-width="1.6" opacity="0.35"/>`
+    }
+    s += legBoard(gy, 0.44, 0.07)
+    const gTop = 0.9
+    // 1 — three BOLTS of cloth stacked on end
+    for (let k = 0; k < 3; k++) {
+      const bx = w * (0.035 + k * 0.052)
+      s += `<rect x="${fx(bx)}" y="${fx(Math.min(gy(0.51), gy(gTop - k * 0.08)))}" width="${fx(w * 0.046)}" height="${fx(Math.abs(gy(gTop - k * 0.08) - gy(0.51)))}" rx="${fx(w * 0.022)}" fill="${[BAZ.terra, BAZ.tealDim, BAZ.cream][k]}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.7"/>`
+    }
+    // 2 — two brass POTS, big and round
+    for (const [ux, rw, rh] of [[0.235, 0.055, 0.19], [0.325, 0.042, 0.14]]) {
+      const cyp = gy(0.51 + rh * 0.5)
+      s += `<path d="M ${fx((ux - rw * 0.55) * w)} ${fx(gy(0.51))} Q ${fx((ux - rw * 1.05) * w)} ${fx(cyp)} ${fx((ux - rw * 0.4) * w)} ${fx(gy(0.51 + rh))} L ${fx((ux + rw * 0.4) * w)} ${fx(gy(0.51 + rh))} Q ${fx((ux + rw * 1.05) * w)} ${fx(cyp)} ${fx((ux + rw * 0.55) * w)} ${fx(gy(0.51))} Z" fill="${BAZ.saffron}" stroke="${INK}" stroke-width="1.9" stroke-opacity="0.7"/>`
+      s += `<rect x="${fx((ux - rw * 0.5) * w)}" y="${fx(Math.min(gy(0.51 + rh), gy(0.51 + rh + 0.03)))}" width="${fx(rw * w)}" height="${fx(Math.abs(gy(0.51 + rh + 0.03) - gy(0.51 + rh)))}" fill="${BAZ.saffronLit}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.7"/>`
+    }
+    // 3 — THE HANGING SCALE, slung from the deck above the counter
+    {
+      const cxs = w * 0.47
+      s += `<line x1="${fx(cxs)}" y1="${fx(gy(0.96))}" x2="${fx(cxs)}" y2="${fx(gy(0.8))}" stroke="${INK}" stroke-width="2.2" opacity="0.85"/>`
+      s += `<line x1="${fx(cxs - w * 0.075)}" y1="${fx(gy(0.8))}" x2="${fx(cxs + w * 0.075)}" y2="${fx(gy(0.8))}" stroke="${INK}" stroke-width="2.6" opacity="0.85"/>`
+      for (const sgn of [-1, 1]) {
+        const px = cxs + sgn * w * 0.075
+        s += `<line x1="${fx(px)}" y1="${fx(gy(0.8))}" x2="${fx(px)}" y2="${fx(gy(0.68))}" stroke="${INK}" stroke-width="1.8" opacity="0.8"/>`
+        s += `<path d="M ${fx(px - w * 0.042)} ${fx(gy(0.68))} A ${fx(w * 0.042)} ${fx(w * 0.042)} 0 0 0 ${fx(px + w * 0.042)} ${fx(gy(0.68))} Z" fill="${BAZ.saffronLit}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.75"/>`
+      }
+    }
+    // 4 — a stack of SACKS
+    for (const [ux, sw2, sh2] of [[0.63, 0.062, 0.17], [0.71, 0.05, 0.13]]) {
+      s += `<path d="M ${fx((ux - sw2) * w)} ${fx(gy(0.51))} Q ${fx((ux - sw2 * 1.15) * w)} ${fx(gy(0.51 + sh2 * 0.7))} ${fx(ux * w)} ${fx(gy(0.51 + sh2))} Q ${fx((ux + sw2 * 1.15) * w)} ${fx(gy(0.51 + sh2 * 0.7))} ${fx((ux + sw2) * w)} ${fx(gy(0.51))} Z" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="1.9" stroke-opacity="0.7"/>`
+      s += `<line x1="${fx((ux - sw2 * 0.4) * w)}" y1="${fx(gy(0.51 + sh2 * 0.86))}" x2="${fx((ux + sw2 * 0.4) * w)}" y2="${fx(gy(0.51 + sh2 * 0.86))}" stroke="${INK}" stroke-width="2" opacity="0.6"/>`
+    }
+    // 5 — a spice heap and a jar at the far end
+    s += `<path d="M ${fx(w * 0.79)} ${fx(gy(0.51))} L ${fx(w * 0.885)} ${fx(gy(0.51))} L ${fx(w * 0.8375)} ${fx(gy(0.72))} Z" fill="${BAZ.terra}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.7"/>`
+    s += `<rect x="${fx(w * 0.91)}" y="${fx(Math.min(gy(0.51), gy(0.74)))}" width="${fx(w * 0.062)}" height="${fx(Math.abs(gy(0.74) - gy(0.51)))}" rx="${fx(w * 0.026)}" fill="${BAZ.terraDim}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.7"/>`
+    s += `<rect x="${fx(w * 0.918)}" y="${fx(Math.min(gy(0.74), gy(0.79)))}" width="${fx(w * 0.046)}" height="${fx(Math.abs(gy(0.79) - gy(0.74)))}" fill="${BAZ.cream}" stroke="${INK}" stroke-width="1.5" stroke-opacity="0.7"/>`
+  }
+
+  // ---- legIn: THE BACK OF THE STALL, with the vendor standing behind it. Same
+  // figure vocabulary as the crowd chains (bazFigureRank): a trapezoid robe that
+  // flares to the hem, a shoulder that STEPS, a neck that pinches, a round head
+  // with a jaw wider than the neck, and one arm. He is seen from the waist up,
+  // because that is what a man behind a counter shows.
+  {
+    const gy = (f) => Y(0) + (Y(0.32) - Y(0)) * f
+    s += legFrame(gy, false, true)
+    s += legBoard(gy, 0.44, 0.07)
+    // shelves either side, three tiers of big wares
+    for (const [x0, x1] of [[0.02, 0.28], [0.72, 0.98]]) {
+      for (let t = 0; t < 3; t++) {
+        const f0 = 0.53 + t * 0.145
+        s += `<rect x="${fx(x0 * w)}" y="${fx(Math.min(gy(f0), gy(f0 + 0.022)))}" width="${fx((x1 - x0) * w)}" height="${fx(Math.abs(gy(f0 + 0.022) - gy(f0)))}" fill="${WOODB}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.65"/>`
+        for (let k = 0; k < 3; k++) {
+          const ux = x0 + ((k + 0.5) / 3) * (x1 - x0)
+          const col = [BAZ.terra, BAZ.teal, BAZ.saffron, BAZ.tealDim, BAZ.cream][(k + t) % 5]
+          if ((k + t) % 2) {
+            s += `<rect x="${fx((ux - 0.032) * w)}" y="${fx(Math.min(gy(f0 + 0.022), gy(f0 + 0.13)))}" width="${fx(w * 0.064)}" height="${fx(Math.abs(gy(f0 + 0.13) - gy(f0 + 0.022)))}" rx="${fx(w * 0.014)}" fill="${col}" stroke="${INK}" stroke-width="1.7" stroke-opacity="0.7"/>`
+          } else {
+            s += `<path d="M ${fx((ux - 0.036) * w)} ${fx(gy(f0 + 0.022))} Q ${fx((ux - 0.042) * w)} ${fx(gy(f0 + 0.095))} ${fx(ux * w)} ${fx(gy(f0 + 0.12))} Q ${fx((ux + 0.042) * w)} ${fx(gy(f0 + 0.095))} ${fx((ux + 0.036) * w)} ${fx(gy(f0 + 0.022))} Z" fill="${col}" stroke="${INK}" stroke-width="1.7" stroke-opacity="0.7"/>`
+          }
+        }
+      }
+    }
+    // THE VENDOR
+    const vx = w * 0.5
+    // Proportions: the first cut sized him in w-fractions across and band
+    // fractions up, and since the band is 512 x 328 that made every horizontal
+    // measure 1.6x its vertical partner -- a 87 x 30 head, which reads as a mask
+    // on a block rather than as a face. Held here in a single scale so the
+    // figure is honestly proportioned in the texture.
+    const hemF = 0.47
+    const shF = 0.8
+    const neckF = 0.825
+    const jawF = 0.855
+    const cenF = 0.895
+    const crownF = 0.965
+    const hemH = w * 0.145
+    const waistH = w * 0.09
+    const shH = w * 0.12
+    const neckH = w * 0.028
+    const headR = w * 0.062
+    s += `<path d="M ${fx(vx - hemH)} ${fx(gy(hemF))} L ${fx(vx - hemH * 0.7)} ${fx(gy(hemF + 0.12))} L ${fx(vx - waistH)} ${fx(gy(hemF + 0.2))} L ${fx(vx - shH)} ${fx(gy(shF - 0.02))} L ${fx(vx - shH * 0.88)} ${fx(gy(shF))} L ${fx(vx - neckH * 1.6)} ${fx(gy(shF + 0.01))} L ${fx(vx - neckH)} ${fx(gy(neckF))} L ${fx(vx - neckH)} ${fx(gy(jawF))} L ${fx(vx - headR)} ${fx(gy(cenF))} L ${fx(vx)} ${fx(gy(crownF))} L ${fx(vx + headR)} ${fx(gy(cenF))} L ${fx(vx + neckH)} ${fx(gy(jawF))} L ${fx(vx + neckH)} ${fx(gy(neckF))} L ${fx(vx + neckH * 1.6)} ${fx(gy(shF + 0.01))} L ${fx(vx + shH * 0.88)} ${fx(gy(shF))} L ${fx(vx + shH)} ${fx(gy(shF - 0.02))} L ${fx(vx + waistH)} ${fx(gy(hemF + 0.2))} L ${fx(vx + hemH * 0.7)} ${fx(gy(hemF + 0.12))} L ${fx(vx + hemH)} ${fx(gy(hemF))} Z" fill="${BAZ.teal}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.75"/>`
+    // sash, yoke, sleeve seams
+    s += `<rect x="${fx(vx - waistH * 1.1)}" y="${fx(Math.min(gy(hemF + 0.18), gy(hemF + 0.23)))}" width="${fx(waistH * 2.2)}" height="${fx(Math.abs(gy(hemF + 0.23) - gy(hemF + 0.18)))}" fill="${BAZ.saffron}" opacity="0.95"/>`
+    s += `<path d="M ${fx(vx - shH)} ${fx(gy(shF - 0.01))} Q ${fx(vx)} ${fx(gy(shF - 0.038))} ${fx(vx + shH)} ${fx(gy(shF - 0.008))} L ${fx(vx + shH)} ${fx(gy(shF - 0.05))} L ${fx(vx - shH)} ${fx(gy(shF - 0.05))} Z" fill="${BAZ.cream}" opacity="0.9"/>`
+    for (const sgn of [-1, 1]) {
+      s += `<line x1="${fx(vx + sgn * shH * 0.8)}" y1="${fx(gy(shF - 0.05))}" x2="${fx(vx + sgn * waistH * 0.95)}" y2="${fx(gy(hemF + 0.22))}" stroke="${INK}" stroke-width="1.8" opacity="0.35"/>`
+    }
+    // ONE ARM, reaching out over the counter toward the reader's side
+    s += `<path d="M ${fx(vx + shH * 0.85)} ${fx(gy(shF - 0.02))} L ${fx(vx + shH * 1.16)} ${fx(gy(shF - 0.075))} L ${fx(vx + shH * 1.28)} ${fx(gy(shF - 0.145))}" fill="none" stroke="${BAZ.teal}" stroke-width="${fx(w * 0.038)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    s += `<path d="M ${fx(vx + shH * 0.85)} ${fx(gy(shF - 0.02))} L ${fx(vx + shH * 1.16)} ${fx(gy(shF - 0.075))} L ${fx(vx + shH * 1.28)} ${fx(gy(shF - 0.145))}" fill="none" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.4"/>`
+    s += `<circle cx="${fx(vx + shH * 1.32)}" cy="${fx(gy(shF - 0.168))}" r="${fx(w * 0.024)}" fill="${BAZ.skin}" stroke="${INK}" stroke-width="1.6" stroke-opacity="0.6"/>`
+    // neck, head, turban, face
+    s += `<rect x="${fx(vx - neckH)}" y="${fx(Math.min(gy(shF), gy(jawF)))}" width="${fx(neckH * 2)}" height="${fx(Math.abs(gy(jawF) - gy(shF)))}" fill="${BAZ.skin}"/>`
+    s += `<ellipse cx="${fx(vx)}" cy="${fx(gy(cenF))}" rx="${fx(headR)}" ry="${fx(Math.abs(gy(cenF) - gy(jawF)) * 1.65)}" fill="${BAZ.skin}"/>`
+    s += `<path d="M ${fx(vx - headR * 1.06)} ${fx(gy(cenF + 0.012))} A ${fx(headR * 1.06)} ${fx(headR * 0.82)} 0 0 1 ${fx(vx + headR * 1.06)} ${fx(gy(cenF + 0.012))} Z" fill="${BAZ.cream}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.6"/>`
+    for (const sgn of [-1, 1]) s += `<circle cx="${fx(vx + sgn * headR * 0.38)}" cy="${fx(gy(cenF - 0.005))}" r="${fx(Math.max(2.4, w * 0.008))}" fill="${INK}"/>`
+    s += `<path d="M ${fx(vx - headR * 0.6)} ${fx(gy(cenF - 0.016))} Q ${fx(vx)} ${fx(gy(jawF - 0.012))} ${fx(vx + headR * 0.6)} ${fx(gy(cenF - 0.016))} Z" fill="${INK}" opacity="0.7"/>`
+  }
 
   // THE DECK: striped awning mid-raise + the woodcut cartouche
   const dy0 = Y(0.68)
@@ -12775,6 +12937,28 @@ function bazRaiseStallFace(w, h, seed) {
   // an unshaded seam makes deck and legs one continuous sheet (a tent);
   // shaded, the deck sits ABOVE the posts it is being raised over.
   const shadeH = dh * 0.5
+  // HANGING WARES off BOTH deck seams — a lantern string and hung goods dangling
+  // into the leg bands, so the deck reads as a roof that things hang from rather
+  // than as a lid. Drawn before the shade ramps so the ramps settle over them.
+  // The swag hangs UNDER THE EAVE and no further: each leg band's top 8.5% is
+  // the only clear air there is (below it stand the counter wares on one side
+  // and the vendor's shelves on the other), and a longer drop simply lands the
+  // lanterns on top of the goods this repaint exists to show.
+  for (const [seamY, dir] of [[dy0, -1], [dy0 + dh, 1]]) {
+    const drop = (dy0 - Y(1)) * 0.075
+    s += `<path d="M 0 ${fx(seamY + dir * drop * 0.08)} Q ${fx(w / 2)} ${fx(seamY + dir * drop * 0.5)} ${w} ${fx(seamY + dir * drop * 0.08)}" fill="none" stroke="${INK}" stroke-width="2.4" opacity="0.8"/>`
+    // Stations chosen to leave the middle of the swag EMPTY: the vendor's turban
+    // stands at u 0.5 just under legIn's seam, and a lantern hung there sat on
+    // his head like an ornament.
+    for (const t of [0.1, 0.28, 0.72, 0.9]) {
+      const hy = seamY + dir * drop * (0.08 + 4 * t * (1 - t) * 0.3)
+      s += bazLantern(t * w, hy + dir * drop * 0.28, w * 0.026)
+    }
+  }
+  // THE LAMP BURNING INSIDE: a saffron light-wash bleeding off both seams into
+  // the leg bands, under the ink shade. The stall is lit from its own roof.
+  s += `<rect x="0" y="${fx(dy0 - shadeH)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallGlowUp)"/>`
+  s += `<rect x="0" y="${fx(dy0 + dh)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallGlowDown)"/>`
   s += `<rect x="0" y="${fx(dy0 - shadeH)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeUp)"/>`
   s += `<rect x="0" y="${fx(dy0 + dh)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeDown)"/>`
   // the woodcut cartouche: walnut plate, cream field, engraved legend
@@ -12808,102 +12992,118 @@ function bazRaiseStallFace(w, h, seed) {
     `<linearGradient id="stallShadeDown" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${INK}" stop-opacity="0.5"/>` +
     `<stop offset="0.38" stop-color="${INK}" stop-opacity="0.18"/>` +
-    `<stop offset="1" stop-color="${INK}" stop-opacity="0"/></linearGradient>`
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0"/></linearGradient>` +
+    `<linearGradient id="stallGlowUp" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.saffronLit}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${BAZ.saffronLit}" stop-opacity="0.16"/></linearGradient>` +
+    `<linearGradient id="stallGlowDown" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${BAZ.saffronLit}" stop-opacity="0.16"/>` +
+    `<stop offset="1" stop-color="${BAZ.saffronLit}" stop-opacity="0"/></linearGradient>`
   return svgPiece(w, h, s, defs)
 }
 
 /**
- * THE RAISE-A-STALL PULL TAB (ch5-raise-stall-tab). Reader finding BW-13: "the
- * shared grey tab-grip reads as an untextured placeholder" — the tabpiece was
- * printing the engine's fallback kraft grip because no `<id>-tab` art existed.
- * The engine now prints this when it is present, so the handle can be the same
- * printed card stock as the card it pulls.
+ * THE RAISE-A-STALL PULL TAB (ch5-raise-stall-tab).
  *
- * GEOMETRY THIS PAINTS TO (do not re-derive): the tab is a portrait quad whose
- * image x runs ACROSS the tab's width (0.1 world along the spine) and whose
- * image y runs ALONG the pull direction (0.20 world at rest). v=1 (image TOP) is
- * the OUTER TIP, the end sticking off the page edge; the image BOTTOM is where
- * the strip enters the slit in the page fore edge. So the bottom band is painted
- * as the part still coming out of the page — darker walnut with a hard ink line
- * at the very cut — and the top as the finger end.
+ * A-3(ii). The tabpiece grew an on-page RAIL (content.ts:
+ * `rail: { slitD: 0.6, tabLen: 0.14, z0: 0.14, z1: 0.28 }`), and that changes
+ * what this piece IS. It used to be a strip poking off the book's fore edge
+ * through a slit in the page's cut edge, so it was painted as a portrait shaft
+ * with a walnut band at the bottom "still coming out of the page". There is no
+ * fore-edge slit any more: the strip surfaces through a slot cut INSIDE the
+ * left page at radial d 0.60, and the handle is a FIXED 0.14 x 0.14 card lying
+ * flat ON the page, sliding fore along the spine lane z 0.14..0.28.
  *
- * The middle carries the SAME stripe cadence as the bazRaiseStallFace deck (the
- * house 0.0165 world pitch: six stripes across the tab's 0.1 world) plus its
- * saffron pinstripe and a cream cartouche, so tab and card are visibly one sheet
- * of stock rather than a handle stuck onto a card. On-palette only — the grey it
- * replaces was the only grey in the chapter.
+ * So the canvas is SQUARE (192x192, matching the quad exactly -- a portrait
+ * texture on a square quad is a stretch the mesh cannot undo), and the painting
+ * is a printed paper handle seen from above rather than a strip in a slot.
+ *
+ * GEOMETRY THIS PAINTS TO (popup-tabpiece.ts, the `rail` branch -- do not
+ * re-derive): the quad's corners run P(d0, ra) P(d0, rb) P(d1, rb) P(d1, ra)
+ * with identity uvs, so image x runs ACROSS the card along the spine and image
+ * y runs ALONG the pull. v = 0 (image BOTTOM) is the inner edge, nearest the
+ * slot; v = 1 (image TOP) is the outer tip the finger takes. The card travels
+ * TOWARD the fore edge, i.e. toward image TOP, which is where the direction
+ * mark points.
+ *
+ * It stays the same stock as the card it pulls -- the deck's teal/cream awning
+ * stripe at the house pitch with its saffron pinstripe -- so handle and stall
+ * read as one sheet, and it carries a printed drop shadow along two edges so it
+ * sits ON the floor instead of in it.
  */
 function bazRaiseStallTab(w, h, seed) {
   const r = mulberry32(seed)
   const Y = (v) => (1 - v) * h
   const WOODB = '#6b4a26'
-  const WOODB_LIT = '#9a7038'
-  const nst = 6
+  // Six stripes across 0.14 world = 0.0233 per stripe. The house cadence is
+  // 0.0165, so this card takes EIGHT.
+  const nst = 8
   const pitch = w / nst
-  const vSlit = 0.18 // below this the strip is still inside the page
-  const vGrip = 0.7 // above this is the finger end
+  const inset = w * 0.055 // the card's printed margin
 
-  let s = `<rect width="${w}" height="${h}" fill="${BAZ.sand}"/>`
+  let s = ''
+  // THE SHADOW THE CARD DROPS ON THE PAGE, offset toward the reader and the
+  // spine — the mark that says this is a loose card lying on the floor rather
+  // than a panel printed into it.
+  s += `<rect x="${fx(inset * 1.5)}" y="${fx(inset * 1.5)}" width="${fx(w - inset * 1.6)}" height="${fx(h - inset * 1.6)}" rx="${fx(w * 0.05)}" fill="${INK}" opacity="0.26"/>`
 
-  // ---- THE STRIPED SHAFT: the card's own awning stock, run along the pull.
+  // ---- THE CARD. Awning stock, running ACROSS the card so the stripes are
+  // square to the pull.
+  s += `<rect x="${fx(inset * 0.5)}" y="${fx(inset * 0.5)}" width="${fx(w - inset)}" height="${fx(h - inset)}" rx="${fx(w * 0.05)}" fill="${BAZ.sand}"/>`
+  s += `<g clip-path="url(#stallTabCut)">`
   for (let k = 0; k < nst; k++) {
-    s += `<rect x="${fx(k * pitch)}" y="${fx(Y(vGrip))}" width="${fx(pitch + 0.5)}" height="${fx(Y(vSlit) - Y(vGrip))}" fill="${k % 2 ? BAZ.cream : BAZ.teal}"/>`
+    s += `<rect x="${fx(k * pitch)}" y="0" width="${fx(pitch + 0.5)}" height="${h}" fill="${k % 2 ? BAZ.cream : BAZ.teal}"/>`
     if (k % 2) {
-      s += `<line x1="${fx((k + 0.5) * pitch)}" y1="${fx(Y(vGrip))}" x2="${fx((k + 0.5) * pitch)}" y2="${fx(Y(vSlit))}" stroke="${BAZ.saffron}" stroke-width="1.6" opacity="0.45"/>`
+      s += `<line x1="${fx((k + 0.5) * pitch)}" y1="0" x2="${fx((k + 0.5) * pitch)}" y2="${h}" stroke="${BAZ.saffron}" stroke-width="1.8" opacity="0.45"/>`
     }
   }
-  // the cream cartouche strip across the shaft, lozenges in the house pattern
-  const cy0 = Y(0.54)
-  const chh = Y(0.41) - cy0
-  s += `<rect x="${fx(w * 0.06)}" y="${fx(cy0)}" width="${fx(w * 0.88)}" height="${fx(chh)}" rx="5" fill="${INK}" opacity="0.9"/>`
-  s += `<rect x="${fx(w * 0.06 + 3.5)}" y="${fx(cy0 + 3.5)}" width="${fx(w * 0.88 - 7)}" height="${fx(chh - 7)}" rx="3.5" fill="${BAZ.cream}"/>`
-  for (const lx of [w * 0.28, w * 0.5, w * 0.72]) {
-    const lz = chh * 0.24
-    s += `<path d="M ${fx(lx)} ${fx(cy0 + chh / 2 - lz)} l ${fx(lz)} ${fx(lz)} l ${fx(-lz)} ${fx(lz)} l ${fx(-lz)} ${fx(-lz)} Z" fill="none" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`
-  }
+  // the inner edge sits in the slot's own shade: the card is one ply proud of
+  // the page and the slot lip throws a line across its heel
+  s += `<rect x="0" y="${fx(Y(0.14))}" width="${w}" height="${fx(Y(0) - Y(0.14))}" fill="url(#stallTabHeel)"/>`
+  s += `</g>`
+  // the cut edge: cream core + ink rule, the flat-print equivalent of a die-cut rim
+  s += `<rect x="${fx(inset * 0.5)}" y="${fx(inset * 0.5)}" width="${fx(w - inset)}" height="${fx(h - inset)}" rx="${fx(w * 0.05)}" fill="none" stroke="${RIM}" stroke-width="4"/>`
+  s += `<rect x="${fx(inset * 0.5)}" y="${fx(inset * 0.5)}" width="${fx(w - inset)}" height="${fx(h - inset)}" rx="${fx(w * 0.05)}" fill="none" stroke="${INK}" stroke-width="2" stroke-opacity="0.65"/>`
 
-  // ---- THE SLIT END: the walnut band still emerging from the page, with the
-  // cut it is pulled through drawn as a hard ink line at the very bottom edge.
-  s += `<rect y="${fx(Y(vSlit))}" width="${w}" height="${fx(Y(0) - Y(vSlit))}" fill="${WOODB}"/>`
-  s += `<rect y="${fx(Y(vSlit))}" width="${w}" height="3" fill="${WOODB_LIT}" opacity="0.75"/>`
-  s += `<rect y="${fx(Y(vSlit) + 3)}" width="${w}" height="${fx(Y(0) - Y(vSlit) - 3)}" fill="url(#stallTabSlit)"/>`
-  s += `<line x1="0" y1="${fx(h - 1.6)}" x2="${w}" y2="${fx(h - 1.6)}" stroke="${INK}" stroke-width="3.2"/>`
-
-  // ---- THE FINGER END: a cream pad carrying the punched hole, the lozenge and
-  // an outward chevron, so the reader can see which way the strip travels.
-  s += `<rect y="0" width="${w}" height="${fx(Y(vGrip))}" fill="${BAZ.cream}"/>`
-  s += `<line x1="0" y1="${fx(Y(vGrip))}" x2="${w}" y2="${fx(Y(vGrip))}" stroke="${INK}" stroke-width="1.8" opacity="0.5"/>`
-  // the chevron: outward = toward the tip = up the image. Kept clear of the
-  // finger hole — the first bake had the two overlapping and the pair read as a
-  // face (a dark eye over a smiling V) rather than as a handle.
+  // ---- THE DIRECTION MARK, THE THUMB PAD, THE PLAQUE. Three registers with
+  // clear air between them, in that order out toward the tip. The first cut
+  // stacked a punched finger hole at v 0.90 over chevrons at v 0.86 and 0.78,
+  // and a dark disc above a pair of open V's is a FACE -- which is the exact
+  // trap the strip version of this painter already recorded once. The hole is
+  // gone: a card lying flat on the floor is pushed with a thumb, not hooked with
+  // a finger, so what it wants is a printed pad and not a punch.
   const cxm = w / 2
-  s += `<path d="M ${fx(cxm - w * 0.17)} ${fx(h * 0.052)} L ${fx(cxm)} ${fx(h * 0.014)} L ${fx(cxm + w * 0.17)} ${fx(h * 0.052)}" fill="none" stroke="${INK}" stroke-width="3" stroke-linejoin="round" opacity="0.8"/>`
-  // the punched finger hole: the dark of the hole, its ink rim, and the cream
-  // lip the punch pushed up on the far side
-  const fhy = h * 0.175
-  const fhr = w * 0.16
-  s += `<circle cx="${fx(cxm)}" cy="${fx(fhy)}" r="${fx(fhr)}" fill="${INK}" opacity="0.86"/>`
-  s += `<circle cx="${fx(cxm)}" cy="${fx(fhy)}" r="${fx(fhr)}" fill="none" stroke="${INK}" stroke-width="2.4"/>`
-  s += `<path d="M ${fx(cxm - fhr * 0.72)} ${fx(fhy + fhr * 0.5)} A ${fx(fhr * 0.88)} ${fx(fhr * 0.88)} 0 0 0 ${fx(cxm + fhr * 0.72)} ${fx(fhy + fhr * 0.5)}" fill="none" stroke="${BAZ.cream}" stroke-width="2.6" opacity="0.9"/>`
-  // the rounded lozenge plaque below the hole, matching the card cartouche's
-  // flanking pair — the printed maker's mark that ties handle to card
-  const pl0 = h * 0.3
-  const plh = h * 0.085
-  s += `<rect x="${fx(w * 0.22)}" y="${fx(pl0)}" width="${fx(w * 0.56)}" height="${fx(plh)}" rx="${fx(plh * 0.45)}" fill="${BAZ.cream}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.8"/>`
-  const lz2 = plh * 0.3
-  s += `<path d="M ${fx(cxm)} ${fx(pl0 + plh / 2 - lz2)} l ${fx(lz2)} ${fx(lz2)} l ${fx(-lz2)} ${fx(lz2)} l ${fx(-lz2)} ${fx(-lz2)} Z" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`
-  s += `<circle cx="${fx(cxm)}" cy="${fx(pl0 + plh / 2)}" r="2.2" fill="${INK}"/>`
-
-  // ---- the printed card edge: a cream core and an ink rule inset from the cut,
-  // the flat-print equivalent of the die-cut rim the shaped pieces carry
-  s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" fill="none" stroke="${RIM}" stroke-width="3" opacity="0.85"/>`
-  s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.55"/>`
+  // the chevrons at the very tip: the card travels toward image TOP
+  for (const [vv, sc] of [[0.955, 1], [0.885, 0.8]]) {
+    const cy2 = Y(vv)
+    s += `<path d="M ${fx(cxm - w * 0.2 * sc)} ${fx(cy2 + h * 0.06 * sc)} L ${fx(cxm)} ${fx(cy2)} L ${fx(cxm + w * 0.2 * sc)} ${fx(cy2 + h * 0.06 * sc)}" fill="none" stroke="${INK}" stroke-width="${fx(5 * sc)}" stroke-linejoin="round" stroke-linecap="round" opacity="${fx2(0.9 * sc)}"/>`
+  }
+  // the thumb pad: a cream plate with grip ridges, where the hand belongs
+  const tpY = Y(0.79)
+  const tpH = Y(0.66) - tpY
+  s += `<rect x="${fx(cxm - w * 0.26)}" y="${fx(tpY)}" width="${fx(w * 0.52)}" height="${fx(tpH)}" rx="${fx(tpH * 0.34)}" fill="${BAZ.cream}" stroke="${INK}" stroke-width="2.6" stroke-opacity="0.8"/>`
+  for (let k = 0; k < 3; k++) {
+    const ry2 = tpY + tpH * (0.28 + k * 0.22)
+    s += `<line x1="${fx(cxm - w * 0.17)}" y1="${fx(ry2)}" x2="${fx(cxm + w * 0.17)}" y2="${fx(ry2)}" stroke="${INK}" stroke-width="2.4" opacity="0.55"/>`
+  }
+  // the maker's plaque: the chapter's lozenge, the mark that ties handle to card
+  const plY = Y(0.56)
+  const plH = Y(0.3) - plY
+  const plW = w * 0.62
+  s += `<rect x="${fx(cxm - plW / 2)}" y="${fx(plY)}" width="${fx(plW)}" height="${fx(plH)}" rx="${fx(plH * 0.28)}" fill="${INK}" opacity="0.9"/>`
+  s += `<rect x="${fx(cxm - plW / 2 + 4)}" y="${fx(plY + 4)}" width="${fx(plW - 8)}" height="${fx(plH - 8)}" rx="${fx(plH * 0.22)}" fill="${BAZ.cream}"/>`
+  const lz = plH * 0.28
+  s += `<path d="M ${fx(cxm)} ${fx(plY + plH / 2 - lz)} l ${fx(lz)} ${fx(lz)} l ${fx(-lz)} ${fx(lz)} l ${fx(-lz)} ${fx(-lz)} Z" fill="none" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>`
+  s += `<circle cx="${fx(cxm)}" cy="${fx(plY + plH / 2)}" r="3" fill="${INK}"/>`
+  // the walnut heel bar at the inner edge — the ply the strip runs under
+  s += `<rect x="${fx(inset)}" y="${fx(Y(0.13))}" width="${fx(w - inset * 2)}" height="${fx(Y(0.05) - Y(0.13))}" rx="3" fill="${WOODB}" stroke="${INK}" stroke-width="1.8" stroke-opacity="0.7"/>`
   void r
 
   const defs =
-    `<linearGradient id="stallTabSlit" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${INK}" stop-opacity="0.05"/>` +
-    `<stop offset="1" stop-color="${INK}" stop-opacity="0.55"/></linearGradient>`
+    `<clipPath id="stallTabCut"><rect x="${fx(inset * 0.5)}" y="${fx(inset * 0.5)}" width="${fx(w - inset)}" height="${fx(h - inset)}" rx="${fx(w * 0.05)}"/></clipPath>` +
+    `<linearGradient id="stallTabHeel" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${INK}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${INK}" stop-opacity="0.45"/></linearGradient>`
   return svgPiece(w, h, s, defs)
 }
 
@@ -13078,7 +13278,13 @@ function bazaarFloorSpread(w, h, seed) {
   }
   // the two NEAR stalls, in the only pockets nothing else claims — outboard of
   // the terrace train on the left and of the dyer's corner on the right
-  for (const [tx, ty] of [[0.325, 0.7], [0.947, 0.706]]) {
+  // ONE near stall only, and on the LEFT page. The right-hand one stood at image
+  // x 0.947 = radial 1.028, i.e. FORE of the stall row's own right edge at
+  // d 0.92 -- a printed awning-and-counter card past the end of the row, which is
+  // exactly the "cards read further right than the row" class of mark item 6
+  // asked me to hunt for. It is cut rather than moved: the right page already
+  // carries the dyer's corner, a trestle table, a goods cluster and three ranks.
+  for (const [tx, ty] of [[0.325, 0.7]]) {
     s += topAwning(PX(tx), PY(ty), PX(0.05), PY(0.055), 1, 0.06, 5)
     s += `<rect x="${fx(PX(tx) - PX(0.05) * 0.42)}" y="${fx(PY(ty) + PY(0.055) * 0.5)}" width="${fx(PX(0.05) * 0.84)}" height="${fx(PY(0.018))}" fill="${BAZ.sandDim}" stroke="${INK}" stroke-width="2.2" stroke-opacity="0.75"/>`
   }
@@ -13142,7 +13348,14 @@ function bazaarFloorSpread(w, h, seed) {
   // (these five plus the tea rug) form a single unbroken line across the spread.
   const RUG_W = 0.1
   const RUG_H = 0.072
-  const rugTs = [0.08, 0.2, 0.32, 0.615, 0.86]
+  // THE RAIL TOOK THE LEFT END OF THIS ROW. The pull-tab lane (A-3iii) occupies
+  // image x 0.027..0.239 at y 0.593..0.687, and the rugs at t 0.08 and 0.2 lay
+  // squarely inside it -- goods printed under a moving card. They are cut rather
+  // than shuffled: the rail is a far stronger horizontal structure than they
+  // were, so the left page keeps an organising line, and four rugs (these three
+  // plus the tea rug) is the same row read at the house's own "fewer, larger,
+  // clearer" rate.
+  const rugTs = [0.32, 0.615, 0.86]
   const rugXY = rugTs.map((t) => [PX(t - RUG_W / 2), PY(laneY(t) + 0.024)])
   rugXY.forEach(([rgx, rgy], i) => {
     const rw = PX(RUG_W)
@@ -13181,7 +13394,7 @@ function bazaarFloorSpread(w, h, seed) {
   // ---- TWO PRICE TAGS, and both of them ON a rug. Four tags scattered over the
   // open floor were labels pinned in front of the scene with nothing to label;
   // a tag lying on the goods it prices is a caption.
-  ;[rugXY[1], rugXY[3]].forEach(([rgx, rgy], i) => {
+  ;[rugXY[0], rugXY[2]].forEach(([rgx, rgy], i) => {
     const tx = rgx + PX(RUG_W) * 0.14
     const ty = rgy + PY(RUG_H) * 0.2
     const tw = 26
@@ -13204,8 +13417,13 @@ function bazaarFloorSpread(w, h, seed) {
   // COLLAR at the mouth and a cord bound round the neck, tipped over so the
   // mouth faces the drift it made.
   {
-    const sx = PX(0.155)
-    const sy = PY(0.72)
+    // Re-seated off the mechanism (A-3iii): the rail lane runs x 0.027..0.239 at
+    // y 0.593..0.687 and the RAISE A STALL body covers x 0.109..0.352 at
+    // y 0.740..0.927, which between them owned the spill's old station at
+    // (0.155, 0.72). This corner -- left page, fore of the terrace train and
+    // inboard of the card -- is the one piece of open apron left on this page.
+    const sx = PX(0.415)
+    const sy = PY(0.845)
     const rad = 40
     const col = BAZ.saffron
     s += `<ellipse cx="${fx(sx + 20)}" cy="${fx(sy + 10)}" rx="${fx(rad)}" ry="${fx(rad * 0.46)}" fill="${col}" opacity="0.6"/>`
@@ -13349,7 +13567,7 @@ function bazaarFloorSpread(w, h, seed) {
   // reader's apron. Nine clusters at random headings were the "scattered dashes";
   // a trail that starts on the street and walks out of frame is traffic.
   for (let tr = 0; tr < 3; tr++) {
-    const t = [0.22, 0.5, 0.78][tr]
+    const t = [0.36, 0.5, 0.78][tr] // 0.22 walked straight down the pull-tab lane
     const bx = PX(t)
     const by = PY(laneY(t) + 0.052)
     for (let k = 0; k < 4; k++) {
@@ -13431,57 +13649,92 @@ function bazaarFloorSpread(w, h, seed) {
     }
   }
 
-  // ---- THE SETTING-OUT TRACK (reader finding S6-1): "the RAISE A STALL card is
-  // the only imperative text in the scene and its actual control (the mauve
-  // plate) floats disconnected off the page edge." The card and its pull tab were
-  // physically linked and pictorially unrelated, because the strip between them
-  // runs UNDER the page and the gap it crosses was blank parchment.
+  // ---- THE SETTING-OUT TRACK, RE-LAID FOR THE RAIL (A-3iii). The old track ran
+  // d 0.88 -> 1.15 at z 0.45..0.55 and ended in a slit mouth cut in the page's
+  // fore edge, because that is where the tab used to surface. `rail` moved both
+  // ends of that sentence: the slot is now cut INSIDE the left page at radial
+  // d 0.60 across z 0.14..0.28, and the handle is a fixed 0.14 card that slides
+  // fore along that lane to d 1.087 at full pull. The old span is REMOVED
+  // outright -- left in place it printed a rail nothing runs on, lying exactly
+  // where the raised stall's fore leg now lands (the body occupies d 0.34..0.90
+  // at z 0.36..0.64).
   //
-  // Derived geometry, LEFT page, not re-derived by eye: the card body occupies
-  // radial d 0.52..0.90 at spine z 0.36..0.64; its fore hinge is at d 0.90; the
-  // slit the tab is pulled through is at d = PAGE_W = 1.15 spanning z 0.45..0.55.
-  // So the empty gap is d 0.88 -> 1.15 at z 0.45..0.55, and d = 1.15 is exactly
-  // image x = 0 (the left page's fore edge).
-  //
-  // It is painted as a MASON'S SETTING-OUT TRACK — the trade's own mark for "this
-  // is where the thing travels": a trodden channel band, a double rule down its
-  // centre with regular ticks across it, the cartouche's lozenge at the card end,
-  // and the mouth of the slit drawn as a hard ink lip where the strip goes into
-  // the page. Ink weight is the cart ruts', so it belongs to the same hand.
+  // Same mason's language as before, because it worked: a trodden channel, a
+  // double rule with ticks across it, a hard ink lip at the cut and the shadow
+  // of the strip diving under the page. The cartouche lozenge moves to the OUTER
+  // end -- the mark now sits where the pull FINISHES, so the printed line reads
+  // as an instruction with a destination instead of a decoration by the card.
   {
-    const xSlit = PX(pageFX(1.15, 'left'))
-    const xCard = PX(pageFX(0.88, 'left'))
-    const yTop = PY(pageFY(0.45))
-    const yBot = PY(pageFY(0.55))
-    const yMid = PY(pageFY(0.5))
-    const chW = xCard - xSlit
-    // the trodden channel the strip runs in
-    s += `<rect x="${fx(xSlit)}" y="${fx(yTop)}" width="${fx(chW)}" height="${fx(yBot - yTop)}" fill="${BAZ.terraDim}" opacity="0.16"/>`
-    s += `<rect x="${fx(xSlit)}" y="${fx(yTop + (yBot - yTop) * 0.2)}" width="${fx(chW)}" height="${fx((yBot - yTop) * 0.6)}" fill="${INK}" opacity="0.07"/>`
+    const xSlot = PX(pageFX(0.6, 'left'))
+    const xEnd = PX(pageFX(1.087, 'left'))
+    const yTop = PY(pageFY(0.14))
+    const yBot = PY(pageFY(0.28))
+    const yMid = (yTop + yBot) / 2
+    const chW = xSlot - xEnd
+    s += `<rect x="${fx(xEnd)}" y="${fx(yTop)}" width="${fx(chW)}" height="${fx(yBot - yTop)}" fill="${BAZ.terraDim}" opacity="0.16"/>`
+    s += `<rect x="${fx(xEnd)}" y="${fx(yTop + (yBot - yTop) * 0.2)}" width="${fx(chW)}" height="${fx((yBot - yTop) * 0.6)}" fill="${INK}" opacity="0.07"/>`
     for (const yy of [yTop, yBot]) {
-      s += `<line x1="${fx(xSlit)}" y1="${fx(yy)}" x2="${fx(xCard)}" y2="${fx(yy)}" stroke="${INK}" stroke-width="2" opacity="0.42"/>`
+      s += `<line x1="${fx(xEnd)}" y1="${fx(yy)}" x2="${fx(xSlot)}" y2="${fx(yy)}" stroke="${INK}" stroke-width="2" opacity="0.42"/>`
     }
-    // the double rule, and ticks across it
     for (const dy of [-3, 3]) {
-      s += `<line x1="${fx(xSlit)}" y1="${fx(yMid + dy)}" x2="${fx(xCard)}" y2="${fx(yMid + dy)}" stroke="${INK}" stroke-width="2.2" opacity="0.7"/>`
+      s += `<line x1="${fx(xEnd)}" y1="${fx(yMid + dy)}" x2="${fx(xSlot)}" y2="${fx(yMid + dy)}" stroke="${INK}" stroke-width="2.2" opacity="0.7"/>`
     }
     const ticks = Math.max(4, Math.round(chW / 14))
     for (let k = 1; k < ticks; k++) {
-      const tx = xCard - (chW * k) / ticks
-      s += `<line x1="${fx(tx)}" y1="${fx(yMid - 6)}" x2="${fx(tx)}" y2="${fx(yMid + 6)}" stroke="${INK}" stroke-width="1.8" opacity="0.55"/>`
+      const tx = xSlot - (chW * k) / ticks
+      s += `<line x1="${fx(tx)}" y1="${fx(yMid - 7)}" x2="${fx(tx)}" y2="${fx(yMid + 7)}" stroke="${INK}" stroke-width="1.8" opacity="0.55"/>`
     }
-    // the lozenge at the card end — the same mark the cartouche flanks its
-    // legend with, so the eye leaves the card already following this line
-    const lzy = yMid
-    const lzx = xCard - 9
-    const lzr = 8
-    s += `<path d="M ${fx(lzx)} ${fx(lzy - lzr)} l ${fx(lzr)} ${fx(lzr)} l ${fx(-lzr)} ${fx(lzr)} l ${fx(-lzr)} ${fx(-lzr)} Z" fill="${ROOK.parch}" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round" opacity="0.85"/>`
-    s += `<circle cx="${fx(lzx)}" cy="${fx(lzy)}" r="2.6" fill="${INK}"/>`
-    // THE MOUTH OF THE SLIT at d = 1.15: the cut, its lip, and the shadow the
-    // strip throws as it goes under the page
-    s += `<rect x="${fx(xSlit)}" y="${fx(yTop - 5)}" width="14" height="${fx(yBot - yTop + 10)}" fill="url(#bazSlit6)"/>`
-    s += `<line x1="${fx(xSlit + 2)}" y1="${fx(yTop - 5)}" x2="${fx(xSlit + 2)}" y2="${fx(yBot + 5)}" stroke="${INK}" stroke-width="4" opacity="0.8"/>`
-    s += `<path d="M ${fx(xSlit + 2)} ${fx(yTop - 5)} q 9 ${fx((yBot - yTop) / 2 + 5)} 0 ${fx(yBot - yTop + 10)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.5"/>`
+    // the lozenge at the OUTER end, where the pull finishes
+    const lzx = xEnd + 11
+    const lzr = 9
+    s += `<path d="M ${fx(lzx)} ${fx(yMid - lzr)} l ${fx(lzr)} ${fx(lzr)} l ${fx(-lzr)} ${fx(lzr)} l ${fx(-lzr)} ${fx(-lzr)} Z" fill="${ROOK.parch}" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round" opacity="0.9"/>`
+    s += `<circle cx="${fx(lzx)}" cy="${fx(yMid)}" r="2.8" fill="${INK}"/>`
+    // THE SLOT at d = 0.60: the cut across the lane, its lip, and the shadow the
+    // strip throws going under the page. It is a slot INSIDE the sheet now, so
+    // the shade falls on the FORE side of the cut (the way the strip travels).
+    s += `<rect x="${fx(xSlot - 15)}" y="${fx(yTop - 5)}" width="15" height="${fx(yBot - yTop + 10)}" fill="url(#bazSlit6)"/>`
+    s += `<line x1="${fx(xSlot)}" y1="${fx(yTop - 4)}" x2="${fx(xSlot)}" y2="${fx(yBot + 4)}" stroke="${INK}" stroke-width="4.5" opacity="0.85"/>`
+    s += `<path d="M ${fx(xSlot)} ${fx(yTop - 4)} q -9 ${fx((yBot - yTop) / 2 + 4)} 0 ${fx(yBot - yTop + 8)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.5"/>`
+    // the two die-cut nicks at the ends of the slot, the way a real slot is cut
+    for (const yy of [yTop - 4, yBot + 4]) {
+      s += `<line x1="${fx(xSlot - 7)}" y1="${fx(yy)}" x2="${fx(xSlot + 7)}" y2="${fx(yy)}" stroke="${INK}" stroke-width="2.4" opacity="0.7"/>`
+    }
+  }
+
+  // ---- THE STALL ROW'S SETTING-OUT BOARD (A-4). The rank is six independently
+  // hinged cards now, so the paint can no longer tie them together with an uncut
+  // link strip at the hem -- that band was being asked to be six things at six
+  // angles. The "one rank, one master pattern" read moves onto the PAGE, which is
+  // also the honest place for it and answers the reader's "the best mechanism on
+  // the page has no affordance at all": a printed base board along the hinge
+  // line with a bay marked out for every card.
+  //
+  // Derived, not eyeballed: the row hinges on the RIGHT page at spine z 0.52
+  // across radial d 0.32..0.92, and card k owns d 0.32 + (k/6)*0.6. Those seven
+  // stations land at image x 0.6391 / 0.6826 / 0.7261 / 0.7696 / 0.8130 / 0.8565
+  // / 0.9000, and the board stops dead at the last one -- nothing may be printed
+  // fore of d 0.92 that could read as more of the row.
+  {
+    const bx0 = PX(pageFX(0.32, 'right'))
+    const bx1 = PX(pageFX(0.92, 'right'))
+    const by = PY(pageFY(0.52))
+    const bh2 = PY(0.028)
+    s += `<rect x="${fx(bx0)}" y="${fx(by - bh2 * 0.2)}" width="${fx(bx1 - bx0)}" height="${fx(bh2)}" fill="${BAZ.terraDim}" opacity="0.15"/>`
+    s += `<rect x="${fx(bx0)}" y="${fx(by)}" width="${fx(bx1 - bx0)}" height="${fx(bh2 * 0.42)}" fill="${INK}" opacity="0.1"/>`
+    for (const dy of [0, bh2 * 0.62]) {
+      s += `<line x1="${fx(bx0)}" y1="${fx(by + dy)}" x2="${fx(bx1)}" y2="${fx(by + dy)}" stroke="${INK}" stroke-width="2.4" opacity="0.62"/>`
+    }
+    for (let k = 0; k <= 6; k++) {
+      const tx = bx0 + ((bx1 - bx0) * k) / 6
+      s += `<line x1="${fx(tx)}" y1="${fx(by - bh2 * 0.34)}" x2="${fx(tx)}" y2="${fx(by + bh2 * 0.96)}" stroke="${INK}" stroke-width="2.6" opacity="0.72"/>`
+      if (k < 6) {
+        // one lozenge per bay — the chapter's own stamp, six times, which is the
+        // sentence the row is telling
+        const cxm = bx0 + ((bx1 - bx0) * (k + 0.5)) / 6
+        const lz = bh2 * 0.3
+        s += `<path d="M ${fx(cxm)} ${fx(by + bh2 * 0.31 - lz)} l ${fx(lz)} ${fx(lz)} l ${fx(-lz)} ${fx(lz)} l ${fx(-lz)} ${fx(-lz)} Z" fill="none" stroke="${INK}" stroke-width="2" opacity="0.6"/>`
+      }
+    }
   }
 
   s += `<rect width="${w}" height="${h}" fill="url(#bazVig6)"/>`
@@ -15089,9 +15342,11 @@ const PIECES = [
   { id: 'ch5-raise-stall-face', seed: 60460, w: 512, h: 1024, grain: 12, paint() { return bazRaiseStallFace(this.w, this.h, this.seed) } },
   // The tabpiece's own PULL TAB art (the engine requests `<id>-tab` and falls
   // back to the shared grey grip when it is absent — reader finding BW-13).
-  // Aspect is the tab's quad: 0.1 world across the spine by 0.20 along the pull.
+  // SQUARE since the rail landed (A-3ii): the handle is a fixed 0.14 x 0.14
+  // card lying ON the page, not a 0.1 x 0.20 strip poking off the fore edge, and
+  // a 128x256 texture on a square quad is a 2:1 stretch the mesh cannot undo.
   // Atlas-exempt like every other tab strip.
-  { id: 'ch5-raise-stall-tab', seed: 60461, w: 128, h: 256, grain: 10, paint() { return bazRaiseStallTab(this.w, this.h, this.seed) } },
+  { id: 'ch5-raise-stall-tab', seed: 60461, w: 192, h: 192, grain: 10, paint() { return bazRaiseStallTab(this.w, this.h, this.seed) } },
   { id: 'page-6', seed: 60470, w: 1024, h: 683, grain: 10, paint() { return bazaarFloorSpread(this.w, this.h, this.seed) } },
   // ---- Spread 2 — the Inn (E3 stage set: three graded gutter-spanning
   // planes + crease children + the linked rank; kept stable box + keyboard).
