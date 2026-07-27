@@ -15691,18 +15691,24 @@ function swarmAtlas(w, h, seed) {
     // a direction is what a chevron set is for.
     //
     // Aimed image-right: outboard, toward the fore edge, which is the way the
-    // grip scallops face and the way the card travels. Sized to the interior
-    // the type used to occupy (between the cream rule at 0.082 and the grip at
-    // 0.79) — cueArrow keeps every vertex inside size/2 of the centre, so a
-    // 380 px box centred at tu(0.44) lands the whole set on the card with room
-    // to spare, and its 0.17-of-size arms sit inside the rule at 0.20..0.80.
+    // grip scallops face and the way the card travels.
+    //
+    // SIZE, off a live capture rather than off the space the type vacated. The
+    // first cut simply filled the old label's box (380 px) and came out reading
+    // as a badge stamped across the card — louder than the s5 reference the
+    // whole vocabulary answers to, which is a rhythm running down a track, not
+    // a mark shouting from the middle of a plate. At 300 px the set spans
+    // 240 px of the card's 435 px interior, its arms clear the cream rule at
+    // 0.2..0.8 by a comfortable margin (0.467..0.733), and its stroke comes out
+    // 3.2 SCREEN px on the shipped 145x85 quad — printed ornament, and the
+    // dashed bee-loop above it stays the busier mark.
     const lx = (tu(0.1) + tu(0.78)) / 2
-    s += cueArrow(lx, tv(0.62), 380, {
+    s += cueArrow(lx, tv(0.6), 300, {
       dir: 0,
       variant: 'chevrons',
       count: 4,
-      weight: 0.8,
-      opacity: 0.5,
+      weight: 0.62,
+      opacity: 0.45,
     })
     // the red wax bow, seated ON the scored fold and kept clear of the S of STIR
     // (wax accent 2 of 3)
