@@ -430,13 +430,37 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
 
   const source = readFileSync(SCRIPT_PATH, 'utf8')
 
+  /**
+   * The painter with its comments taken out — block first, then line comments
+   * that are not the `//` of a `http://` (the SVG namespace is on more lines
+   * than one, and eating the rest of those lines would blind the gate to
+   * whatever else sat on them).
+   */
+  const CODE = source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+  /** Every phrase the book used to print AT a trigger, in the order it retired
+   *  them: s4 round-3, s7 round-2, s5 round-2, then the cue sweep. */
+  const RETIRED_PHRASES = [
+    'HOIST',
+    'SPIN',
+    'SEND',
+    'TURN',
+    'PULL',
+    'LIFT',
+    'STIR THE',
+    'SWARM SWARM',
+    'RAISE A STALL',
+  ]
+
   for (const helper of ['cutShadow', 'raisedEdgeShadow', 'cueArrow']) {
     it(`${helper} is defined and exported, and called only by declared adopters`, () => {
       expect(source).toContain(`function ${helper}(`)
       // reachable from the piece painters and from this test
       expect(source).toMatch(new RegExp(`\\n\\s*${helper},`))
 
-      const callSites = [...source.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
+      const callSites = [...CODE.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
         (m) => m[1] !== 'function '
       )
       expect(
@@ -459,15 +483,34 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
         `${verb} is being engraved again — the affordance law retired it`
       ).toBe(false)
     }
-    // STIR THE SWARM was SET IN TYPE rather than engraved, so a verb gate that
-    // only watched `engraveWord` would have missed it entirely. The two words
-    // are banned as strings anywhere in the painter, in either machinery.
-    for (const phrase of ['STIR THE', "'SWARM'", 'RAISE A STALL']) {
-      expect(
-        source.includes(`>${phrase}<`) || source.includes(`(${phrase})`),
-        `${phrase} is being printed again`
-      ).toBe(false)
+    // STIR THE SWARM was SET IN TYPE, not engraved, so a verb gate watching
+    // only `engraveWord` would have missed it entirely — and the s6 legend came
+    // out of a CONTRACT constant, which such a gate would have missed twice.
+    // The rule is therefore about the STRING LITERAL: the moment a retired
+    // phrase appears inside quotes IN CODE it is about to be drawn.
+    //
+    // Prose is exempt, and has to be: this painter's notes quote every phrase
+    // they retired, including inside quotation marks ("The 'RAISE A STALL'
+    // plaque is rendered rotated 180 degrees" is a blind reader's own words,
+    // sitting in the comment that records why the plate was turned). A gate
+    // that forbade discussing the defect would be deleted by the next lane that
+    // needed to explain one. So the source is stripped of comments first — and
+    // that also stops a call site inside a commented-out block from being
+    // counted as an adopter above.
+    for (const phrase of RETIRED_PHRASES) {
+      for (const q of ["'", '"', '`']) {
+        expect(
+          CODE.includes(`${q}${phrase}${q}`),
+          `${phrase} is a string literal in the painter again — that is a label about to be drawn`
+        ).toBe(false)
+      }
     }
+    // and the machinery that SET the type is gone from the swarm tab, the way
+    // s5 deleted strokeWord rather than leaving it one edit from being called
+    const tab = source.slice(source.indexOf('// --- cells 32-36 / 40-44 / 48-52'))
+    const tabEnd = tab.indexOf('Cells 17-22 and 25-26 are now deliberately TRANSPARENT')
+    expect(tabEnd, 'the swarm tab block not found').toBeGreaterThan(200)
+    expect(tab.slice(0, tabEnd), 'the swarm tab is setting type again').not.toContain('<text')
     // s7's TURN, scoped to assayCard's own body so the other spreads' plates —
     // which their own lanes will convert in their own commits — are none of
     // this file's business. Sliced at the function's closing brace at column 0
