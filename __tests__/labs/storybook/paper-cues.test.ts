@@ -315,16 +315,29 @@ describe('paper-cue vocabulary — subtlety ceilings', () => {
   })
 })
 
-describe('paper-cue vocabulary — additive, no existing art changed', () => {
+describe('paper-cue vocabulary — the register of who speaks paper', () => {
   // The vocabulary is MACHINERY. Adopting it — deleting a label plate and
   // painting a cue in its place — is per-spread scene work owned by the art
-  // lanes. Until a lane does that, no painter may reference these helpers, so
-  // every already-baked piece is byte-identical to what it was before.
+  // lanes, and this block is the REGISTER of who has done it. Every call site
+  // in the painter must be accounted for here, so a cue cannot spread quietly:
+  // adopting one means writing down which piece, and which mark, and why.
   //
-  // WHEN THE FIRST SPREAD ADOPTS A CUE: add its painter's name to ADOPTERS.
-  // The list is the record of which pieces speak paper instead of printing a
-  // verb, and this test then guards that the machinery is only used there.
-  const ADOPTERS: readonly string[] = []
+  // s7's counting wheel is the first adopter (S7R2-4). Its brass tag reading
+  // TURN is gone; what stands in its place is a cut on every vitrine, a raised
+  // edge on the faceplate rim and on the thumb lobe that grips it, and one pair
+  // of ember chevrons riding the lobe around the rim.
+  const ADOPTERS: Readonly<Record<string, readonly string[]>> = {
+    cutShadow: ['assayCard: the three vitrine apertures, die-cut through the faceplate'],
+    raisedEdgeShadow: [
+      'cofferLid: the shut lid, a loose ply sitting on its box',
+      'assayDial: the wax-seal thumb lobe standing proud of the plate',
+      'assayCard: the faceplate rim, a ply riveted over the wheel',
+    ],
+    cueArrow: [
+      'cofferLid: one ember arrow at the hasp, along the free edge travel',
+      'assayDial: the two ember chevron sets flanking the thumb lobe',
+    ],
+  }
 
   const source = readFileSync(SCRIPT_PATH, 'utf8')
 
@@ -337,14 +350,27 @@ describe('paper-cue vocabulary — additive, no existing art changed', () => {
       const callSites = [...source.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
         (m) => m[1] !== 'function '
       )
-      expect(callSites.length).toBe(ADOPTERS.length)
+      expect(
+        callSites.length,
+        `${helper} has ${callSites.length} call sites and ${ADOPTERS[helper].length} declared — ` +
+          `a cue that spreads without being written down is a cue nobody reviewed`
+      ).toBe(ADOPTERS[helper].length)
     })
   }
 
-  it('the transitional label plates are nobody else’s business here', () => {
-    // This lane must not have touched a spread's art. If a plate disappears it
-    // is because that spread's own pass replaced it with a cue, in its own
-    // commit — so this file makes no assertion about plate contents at all.
-    expect(ADOPTERS).toEqual([])
+  it('the wheel that adopted the cues no longer prints a verb', () => {
+    // The user's law, gated on the one piece that has converted: the transitional
+    // brass plate is gone, and nothing put a word back in its place. Scoped to
+    // assayCard's own body so the other spreads' plates — which their own lanes
+    // will convert in their own commits — are none of this file's business.
+    // Sliced at the function's own closing brace at column 0. The line ending
+    // has to be tolerated: this file is checked out CRLF on the lane that wrote
+    // the gate, and an `\n}\n` search silently ran on to the NEXT function.
+    const body = source.slice(source.indexOf('function assayCard('))
+    const end = body.search(/\r?\n\}\r?\n/)
+    const card = body.slice(0, end < 0 ? body.length : end)
+    expect(card.length, 'assayCard body not found').toBeGreaterThan(200)
+    expect(card).not.toContain("'TURN'")
+    expect(card, 'assayCard is engraving words again').not.toContain('engraveWord')
   })
 })

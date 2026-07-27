@@ -5423,6 +5423,19 @@ function cofferLid(w, h, seed) {
   s += `<path d="M ${fx(x1)} ${fx(y0 + H * 0.1)} L ${fx(x1)} ${fx(y1 - H * 0.1)} L ${fx(x1 - W * 0.055)} ${fx(y1 - H * 0.18)} L ${fx(x1 - W * 0.055)} ${fx(y0 + H * 0.18)} Z" fill="#000000" opacity="0.34"/>`
   s += `<path d="${lidD}" fill="none" stroke="${SDIM}" stroke-width="5" opacity="0.9" stroke-linejoin="round"/>`
   s += `<path d="${lidD}" fill="none" stroke="${GOLD_LIT}" stroke-width="1.6" opacity="0.5" stroke-linejoin="round"/>`
+  // ---- THE PAPER CUES (S7R2-4) --------------------------------------------
+  // "The two mechanisms that do work are invisible until you brute-force them.
+  //  Nothing at rest ever hints they are alive — no ghost of the flap edge."
+  // The lid gets the two marks that say LOOSE and LIFTS, in paper:
+  //   - a RAISED EDGE round the whole leaf (its lit lip), because a lid is a
+  //     separate ply sitting on a box and this is the mark that says so;
+  //   - one ember arrow at the hasp, aimed along +x, which at this piece's
+  //     screen-space law (image-x = page-fore = screen-RIGHT, hinge LEFT) is
+  //     the direction the free edge travels when it swings up and over.
+  // No verb, no plate. The hasp was already drawn as a handle; the arrow only
+  // says which way the handle goes.
+  s += raisedEdgeShadow(lidD, { lift: H * 0.03, part: 'lip', strength: 0.85, ink: INK, lip: GOLD_LIT })
+  s += cueArrow(x1 - W * 0.085, y1 - H * 0.13, H * 0.2, { dir: 0, variant: 'arrow', opacity: 0.4, ink: INK })
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -10778,24 +10791,35 @@ function navePage(w, h, seed) {
   // reads as an inlay parting around the waystation, not lumped capsules;
   // perspective narrowing in two width steps at the dais.
   const yApron = PY(1.0)
-  const y56 = PY(pageFY(0.56))
+  // The bend's four stations. Round-2 spread them (0.56/0.50/0.38/0.32 ->
+  // 0.66/0.50/0.38/0.22): over the old 0.06 of run each turn was a right angle,
+  // and two right angles is a bracket, not a path.
+  const y56 = PY(pageFY(0.66))
   const y50 = PY(pageFY(0.5))
   const y38 = PY(pageFY(0.38))
-  const y32 = PY(pageFY(0.32))
+  const y32 = PY(pageFY(0.22))
   const yEnd = PY(pageFY(-0.32))
   const xC = PX(0.5)
   const xL = PX(0.44)
-  const xR = PX(0.565)
+  // ROUND-2 (S7R2-2): ONE RIBBON, NOT A FORK. The path used to split into a
+  // bright left lobe and a faint right one that rejoined at the dais, which
+  // closes a shape — and a closed rounded shape on a dark floor is an OBJECT.
+  // The blind re-reader inventoried it as "a large tan/khaki rounded slab with
+  // two pale rectangular marks on it... I cannot tell whether it is a mound, a
+  // rug, a ramp, or a spill of coins", 220 x 90 px, far above accent size. It
+  // was never a piece of paper at all: isolating page-7.webp shows the loop
+  // whole, and dropping every ch6 layer leaves it standing (bench out/s7r2).
+  //
+  // The fork existed so the inlay would "part around the waystation" — but the
+  // reader cannot see a waystation UNDER a path from this camera, so all the
+  // parting communicated was an outline. A single ribbon that BENDS around an
+  // obstacle says the same thing and cannot enclose anything: a path is a line,
+  // and a line has no inside for the eye to fill in.
   const mainD =
     `M ${fx(xC)} ${fx(y56)} ` +
     `C ${fx(xC)} ${fx((y56 + y50) / 2)} ${fx(xL)} ${fx(y56)} ${fx(xL)} ${fx(y50)} ` +
     `L ${fx(xL)} ${fx(y38)} ` +
     `C ${fx(xL)} ${fx((y38 + y32) / 2)} ${fx(xC)} ${fx(y38)} ${fx(xC)} ${fx(y32)}`
-  const lobeD =
-    `M ${fx(xC)} ${fx(y56)} ` +
-    `C ${fx(xC)} ${fx((y56 + y50) / 2)} ${fx(xR)} ${fx(y56)} ${fx(xR)} ${fx(y50)} ` +
-    `L ${fx(xR)} ${fx(y38)} ` +
-    `C ${fx(xR)} ${fx((y38 + y32) / 2)} ${fx(xC)} ${fx(y38)} ${fx(xC)} ${fx(y32)}`
   // the full-width trunk on the apron, HALVED into the two lobes at the
   // fork (the inlay parts around the box, it does not double), rejoining
   // into the narrowed nave run.
@@ -10818,14 +10842,16 @@ function navePage(w, h, seed) {
   //     page edge, so nothing terminates in a graspable stub;
   //   - the centreline studs cut from 26 near-white lozenges to widely spaced,
   //     DIMMED gold squares that never brighten past the ribbon they sit in.
-  const kerb = (d, wdt) => `<path d="${d}" fill="none" stroke="${NAVE_C.base}" stroke-width="${fx(wdt * 1.5)}" opacity="0.5" stroke-linejoin="round"/>`
+  // The kerb is the sunk edge either side of the inlay. At 1.5x the ribbon it
+  // was drawing a mass half again as wide as the gold, which is most of how the
+  // fork read as a slab; 1.22x still separates inlay from a strip lying on top.
+  const kerb = (d, wdt) => `<path d="${d}" fill="none" stroke="${NAVE_C.base}" stroke-width="${fx(wdt * 1.22)}" opacity="0.5" stroke-linejoin="round"/>`
   const trunkD = `M ${fx(xC)} ${fx(yApron)} L ${fx(xC)} ${fx(y56)}`
   s += kerb(trunkD, PX(0.058)) + kerb(mainD, PX(0.04)) + kerb(`M ${fx(xC)} ${fx(y32)} L ${fx(xC)} ${fx(yEnd)}`, PX(0.048))
   // the trunk narrows into the apron so the ribbon FADES off the page instead of
   // ending in a tab-shaped stub at the trim.
   s += `<path d="${trunkD}" fill="none" stroke="url(#trunk-fade)" stroke-width="${fx(PX(0.058))}"/>`
   s += `<path d="${mainD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.04))}" opacity="0.66" stroke-linejoin="round"/>`
-  s += `<path d="${lobeD}" fill="none" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.026))}" opacity="0.3" stroke-linejoin="round"/>`
   s += `<line x1="${fx(xC)}" y1="${fx(y32)}" x2="${fx(xC)}" y2="${fx(yEnd)}" stroke="${NAVE_C.gold}" stroke-width="${fx(PX(0.048))}" opacity="0.78"/>`
   // sunk square studs down the centreline — 9, not 26, and never above the
   // ribbon's own value, so they read as inlay and not as a sawtooth.
@@ -10833,6 +10859,8 @@ function navePage(w, h, seed) {
     const t = i / 9
     const fy = 1 - t * (1 - pageFY(-0.3))
     const size = PX(0.011) * (1 - 0.5 * t)
+    // follow the one ribbon through its bend (it runs at xL between z 0.38 and
+    // 0.50), rather than jumping to a lobe that no longer exists.
     const cxx = PX(0.5) + (fy > pageFY(0.38) && fy < pageFY(0.52) ? -PX(0.06) : 0)
     s += `<rect x="${fx(cxx - size)}" y="${fx(PY(fy) - size)}" width="${fx(size * 2)}" height="${fx(size * 2)}" fill="${NAVE_C.gilt}" opacity="${fx(rr(r, 0.4, 0.55))}"/>`
     s += `<rect x="${fx(cxx - size)}" y="${fx(PY(fy) - size)}" width="${fx(size * 2)}" height="${fx(size * 0.55)}" fill="${NAVE_C.base}" opacity="0.4"/>`
@@ -10956,32 +10984,83 @@ function naveStepRiser(w, h, seed) {
 
 /** Shared disc-radius basis for the counting wheel pair (300 @ 640). */
 const ASSAY_R = 0.46875
-/** The read band the faceplate's vitrines expose, in units of ASSAY_R. */
-const ASSAY_BAND = [0.38, 0.86]
+/** The read band the faceplate's vitrines expose, in units of ASSAY_R. Round-2
+ *  (S7R2-1b) widened it with the windows: content.ts's rMid 0.63 +- rHalf 0.28. */
+const ASSAY_BAND = [0.35, 0.91]
 /** Window centres (math-angle, deg) and angular half-width — congruent to the
- *  45deg sector centres, so every detent frames all three at once. */
+ *  45deg sector centres, so every detent frames all three at once. The
+ *  half-width is 18: the family's registration gate allows Delta/2 - 4deg. */
 const ASSAY_WINS = [45, 90, 135]
-const ASSAY_HALFW = 16
+const ASSAY_HALFW = 18
 /** The thumb lobe's bearing: where the WAX SEAL rides, well outside the layer's
  *  0.25R hub dead zone, so the object the reader wants to press is the object
  *  the grab actually reads. */
 const ASSAY_TAB_A = 300
 
-/** THE EIGHT STRONGROOMS. `bars` is axis 1 (the count), `device` axis 2 (the
- *  silhouette), `field` axis 3 (the wedge tint off NAVE_C). No two sectors
- *  share a (bars, device) pair, so a single detent step changes both the count
- *  and the shape in every window — the gate the s4 lane had to add after a
- *  blind reader called a live dial dead. */
+/**
+ * THE EIGHT STRONGROOMS — ROUND-2 (S7R2-1b): THE ROOMS NOW COUNT.
+ *
+ * The Wave-2 wheel gave every room a DIFFERENT count, a different device and a
+ * different tint, which is three axes of difference and no MEANING: a reader who
+ * clicks it sees three little pictures swap for three other little pictures.
+ * The user's directive is that an interaction must transform something — and
+ * the chapter's own sentence names what this one transforms ("a new treasury
+ * was rising... so the people might always see their gold").
+ *
+ * So the eight rooms are ONE room filling up, eight times over. `fill` runs
+ * 1..8 in order and drives BOTH the height of the gold inside the room and the
+ * lamp-level of the room itself (`field`, a monotone climb up the nave's value
+ * ladder from a dark empty vault to a lit full one). The three vitrines always
+ * frame three CONSECUTIVE rooms (volvelle-crank.test.ts gates that), so at any
+ * detent the reader is looking at a staircase of gold, and one click marches the
+ * whole staircase along: the counting-house counting.
+ *
+ * WHY THIS SURVIVES THE DOWNSCALE where the Wave-2 art did not. Live
+ * decomposition put each vitrine at roughly 30 x 20 screen px BEFORE the wheel
+ * was enlarged — a size at which a swapped 12 px glyph is invisible and a
+ * WHOLE-APERTURE change of value is not. The count is carried by the height of
+ * a solid gold mass and by the brightness of the field behind it, both of which
+ * are aperture-scale. The `device` stays as the third axis, doing what it can at
+ * the top of the room; it is no longer asked to carry the read alone.
+ *
+ * `bars` is kept as the exported name of the count so the art-QA harness's
+ * sample boxes keep deriving from the painter's own constants.
+ */
 const ASSAY_VAULTS = [
-  { numeral: 'I', bars: 3, device: 'ingots', field: 'teal' },
-  { numeral: 'II', bars: 1, device: 'coins', field: 'base' },
-  { numeral: 'III', bars: 2, device: 'chalice', field: 'tealLit' },
-  { numeral: 'IV', bars: 4, device: 'gem', field: 'niche' },
-  { numeral: 'V', bars: 2, device: 'scrolls', field: 'tealHi' },
-  { numeral: 'VI', bars: 1, device: 'crown', field: 'floor' },
-  { numeral: 'VII', bars: 3, device: 'key', field: 'teal' },
-  { numeral: 'VIII', bars: 4, device: 'lamp', field: 'base' },
+  { numeral: 'I', bars: 1, fill: 1, device: 'coins', field: 'niche' },
+  { numeral: 'II', bars: 2, fill: 2, device: 'ingots', field: 'base' },
+  { numeral: 'III', bars: 3, fill: 3, device: 'scrolls', field: 'floor' },
+  { numeral: 'IV', bars: 4, fill: 4, device: 'chalice', field: 'teal' },
+  { numeral: 'V', bars: 5, fill: 5, device: 'key', field: 'tealLit' },
+  { numeral: 'VI', bars: 6, fill: 6, device: 'gem', field: 'tealHi' },
+  { numeral: 'VII', bars: 7, fill: 7, device: 'crown', field: 'mint' },
+  { numeral: 'VIII', bars: 8, fill: 8, device: 'lamp', field: 'frost' },
 ]
+/** Room count — the fill ramp's denominator, and the detent count content.ts
+ *  declares. Named so the ramp and the sector loop cannot drift apart. */
+const ASSAY_ROOMS = ASSAY_VAULTS.length
+
+/**
+ * THE LAMP RAMP — the room's own light at index k, as an EVEN climb.
+ *
+ * The named palette keys are a hue family, not a value scale: laid end to end
+ * they run 18, 22, 33, 63, 80, 118, 186, 242 in luminance, so the first two
+ * steps of the ramp were 4 and 11 points and a reader clicking through the dark
+ * half of the wheel saw nothing move. Measured live inside the wheel's own
+ * layer-drop footprint (bench/s7r2-wheel-delta.mjs), those steps came back at
+ * mad 2.1-2.5 against a render noise floor of 2.24 — indistinguishable from
+ * doing nothing, which is the exact finding this item exists to close.
+ *
+ * So the field is MIXED, in two segments through the palette's own midpoint:
+ * niche -> tealHi over the first half, tealHi -> frost over the second. Even
+ * steps of ~25 and ~31 luminance, still entirely inside the nave's teal family.
+ */
+function assayRoomField(k) {
+  const t = ASSAY_ROOMS > 1 ? k / (ASSAY_ROOMS - 1) : 0
+  return t <= 0.5
+    ? naveMix(NAVE_C.niche, NAVE_C.tealHi, t * 2)
+    : naveMix(NAVE_C.tealHi, NAVE_C.frost, (t - 0.5) * 2)
+}
 
 /** One strongroom's PRINCIPAL DEVICE, centred on the local origin (outward is
  *  -y, tangential is +x), bold enough to survive ~14 screen px. `S` is its
@@ -11111,28 +11190,52 @@ function assayDial(w, h, seed) {
     }
     tab += `<path d="M ${star.join(' L ')} Z" fill="${H}"/>`
   }
+  // ---- THE PAPER CUES (S7R2-4; the user's no-labels law) --------------------
+  // The brass TURN tag is gone off the faceplate. What says "this turns" now is
+  // paper: the lobe stands PROUD of the plate (a raised edge, with its lit lip
+  // and the pool it drops on the wheel beneath it), and one pair of ember
+  // chevrons rides the rim either side of the lobe, tangential — which way it
+  // goes. They live on the DIAL, not the card, so they turn with the grip and
+  // can never point at a lobe that has moved away from them.
+  tab += raisedEdgeShadow(tabD, { lift: R * 0.05, part: 'both', strength: 0.9, ink: K, lip: H })
+  for (const side of [-1, 1]) {
+    const aC = ASSAY_TAB_A + side * (tabHalf + 15)
+    tab += cueArrow(polX(cx, aC, R * 1.02), polY(cy, aC, R * 1.02), R * 0.3, {
+      // The rim's tangent at aC, in SVG space (y down): d/da of (cos a, -sin a)
+      // is (-sin a, -cos a), so the outward-going sense is that, negated for the
+      // near side. Stated from the angle rather than typed as a number, so the
+      // marks stay glued to the lobe if its bearing ever moves.
+      dir: side > 0 ? -(aC + 90) : -(aC - 90),
+      variant: 'chevrons',
+      count: 3,
+      opacity: 0.42,
+    })
+  }
 
   let g = `<g clip-path="url(#assayCut)">`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="${naveMix(NAVE_C.base, NAVE_C.teal, 0.7)}"/>`
-  for (let k = 0; k < 8; k++) {
-    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.5"/>`
+  for (let k = 0; k < ASSAY_ROOMS; k++) {
+    g += `<path d="${wedgePath(cx, cy, k * 45 - 22.5, k * 45 + 22.5, R)}" fill="${assayRoomField(k)}" opacity="0.4"/>`
   }
-  // the READ BAND — a pale vellum ring, so gold devices and dark numerals both
-  // stand off it. Axis 3's per-sector wash then runs at full strength INSIDE it,
-  // which is the only difference that covers a whole aperture rather than a
-  // glyph's worth of one.
-  g += `<path fill-rule="evenodd" d="${circlePath(cx, cy, bandOut)} ${circlePath(cx, cy, bandIn)}" fill="${NAVE_C.frost}" opacity="0.97"/>`
-  // The field wash runs at 0.3, not 0.5. The nave's value ladder is a NIGHT
-  // palette, and washing a vellum band with it at half strength put the vault
-  // contents back into the dark the reader is looking through a window to
-  // escape. Axis 3 still measures (the detent bench reads a 28-point spread
-  // across the eight window luminances); it just no longer eats axes 1 and 2.
-  for (let k = 0; k < 8; k++) {
-    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)}" fill="${NAVE_C[ASSAY_VAULTS[k].field]}" opacity="0.3"/>`
+  // ---- THE ROOM WALLS -------------------------------------------------------
+  // ROUND-2: the read band is no longer one pale vellum ring with a 30% tint
+  // washed over it. Each room's aperture is filled EDGE TO EDGE with that room's
+  // own lamp level, because a whole-aperture value is the only difference that
+  // survives 30 x 20 screen px — and because the ramp IS the content (a vault
+  // gets brighter as it fills). A pale sill at the outer lip keeps the gold
+  // reading against the lit rooms at the top of the ramp.
+  for (let k = 0; k < ASSAY_ROOMS; k++) {
+    const v = ASSAY_VAULTS[k]
+    const room = annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandOut, 18)
+    g += `<path d="${room}" fill="${assayRoomField(k)}"/>`
+    // the room's back wall darkens toward the hub, so the gold sits IN a room
+    // rather than on a swatch
+    g += `<path d="${annularSectorPath(cx, cy, k * 45, 22.5, bandIn, bandIn + (bandOut - bandIn) * 0.34, 18)}" fill="${K}" opacity="0.34"/>`
+    g += `<path d="${room}" fill="none" stroke="${K}" stroke-width="2.2" opacity="0.5"/>`
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandOut)}" fill="none" stroke="${G}" stroke-width="3.4" opacity="0.85"/>`
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(bandIn)}" fill="none" stroke="${G}" stroke-width="2.8" opacity="0.8"/>`
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < ASSAY_ROOMS; k++) {
     const a = k * 45 + 22.5
     g += `<line x1="${fx(polX(cx, a, hubR))}" y1="${fx(polY(cy, a, hubR))}" x2="${fx(polX(cx, a, R))}" y2="${fx(polY(cy, a, R))}" stroke="${K}" stroke-width="2" opacity="0.55"/>`
     g += `<circle cx="${fx(polX(cx, a, bandOut + 13))}" cy="${fx(polY(cy, a, bandOut + 13))}" r="4.4" fill="${G}" stroke="${K}" stroke-width="1.2" stroke-opacity="0.6"/>`
@@ -11142,38 +11245,48 @@ function assayDial(w, h, seed) {
   // 90, so "radially outward" is straight UP and every legend reads the same way
   // out of every sector — the only orientation upright through all three
   // windows, which sit at 45/90/135 in the card's upper half.
-  for (let k = 0; k < 8; k++) {
+  //
+  // The room, radially: a pale SILL at the band's inner lip, the HOARD heaping
+  // outward from it, and the DEVICE hung above where the gold never reaches.
+  // Stated once, in units of R, so the three cannot drift into each other as
+  // the ramp is tuned. The hoard is drawn as the room's OWN annular sector at a
+  // slightly narrower half-width: a straight slab of fixed width overflows into
+  // both neighbours at the sill, where a 22.5deg wedge is only 0.31R across.
+  const SILL = ASSAY_BAND[0] + 0.01 // 0.36R
+  const HOARD_TOP = ASSAY_BAND[1] - 0.135 // 0.775R — room VIII's brim
+  const DEVICE_AT = ASSAY_BAND[1] - 0.055 // 0.855R
+  const HOARD_HW = 19.5 // deg, inside the 22.5deg room with a mullion's margin
+  const COURSE = (R * (HOARD_TOP - SILL)) / ASSAY_ROOMS
+  for (let k = 0; k < ASSAY_ROOMS; k++) {
     const v = ASSAY_VAULTS[k]
     const a = k * 45
-    let sec = `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(90 - a)})">`
-    // the numeral, engraved outermost (0.86-0.92R)
+    const rSill = R * SILL
+    // the pale sill the hoard stands on
+    g += `<path d="${annularSectorPath(cx, cy, a, HOARD_HW, rSill - R * 0.035, rSill)}" fill="${NAVE_C.frost}" opacity="0.9"/>`
+    // AXIS 1 — THE HOARD. A gold mass whose DEPTH is the room's number, heaped
+    // on the sill and climbing toward the rim. Eight courses across the room's
+    // usable depth, so one detent is one course of gold appearing (or vanishing)
+    // in every vitrine at once — which is the whole item.
     {
-      const chN = R * 0.075
-      const cwN = R * 0.05
-      const gapN = R * 0.017
-      const wN = v.numeral.length * cwN + (v.numeral.length - 1) * gapN
-      const yN = -R * 0.905
-      sec += engraveWord(v.numeral, -wN / 2, yN + R * 0.005, cwN, chN, gapN, H, fx(R * 0.016), 'opacity="0.6"')
-      sec += engraveWord(v.numeral, -wN / 2, yN, cwN, chN, gapN, K, fx(R * 0.018), 'opacity="0.95"')
-    }
-    // axis 1 — the COUNT of gold bars on the shared pale shelf (0.62-0.76R)
-    {
-      const shelfY = -R * 0.7
-      const shelfW = R * 0.5
-      sec += `<rect x="${fx(-shelfW / 2)}" y="${fx(shelfY + R * 0.05)}" width="${fx(shelfW)}" height="${fx(R * 0.035)}" fill="${NAVE_C.frost}" opacity="0.95"/>`
-      sec += `<rect x="${fx(-shelfW / 2)}" y="${fx(shelfY + R * 0.085)}" width="${fx(shelfW)}" height="${fx(R * 0.02)}" fill="${K}" opacity="0.6"/>`
-      const bw = R * 0.085
-      const total = v.bars * bw + (v.bars - 1) * R * 0.028
-      for (let b = 0; b < v.bars; b++) {
-        const bx = -total / 2 + b * (bw + R * 0.028)
-        sec += `<rect x="${fx(bx)}" y="${fx(shelfY - R * 0.055)}" width="${fx(bw)}" height="${fx(R * 0.105)}" fill="${G}" stroke="${K}" stroke-width="1.4" stroke-opacity="0.7"/>`
-        sec += `<rect x="${fx(bx)}" y="${fx(shelfY - R * 0.055)}" width="${fx(bw)}" height="${fx(R * 0.03)}" fill="${H}"/>`
+      const rTop = rSill + v.fill * COURSE
+      g += `<path d="${annularSectorPath(cx, cy, a, HOARD_HW, rSill, rTop)}" fill="${G}" stroke="${K}" stroke-width="1.6" stroke-opacity="0.55"/>`
+      // the courses, so the count is also countable up close
+      for (let c = 1; c < v.fill; c++) {
+        const rc = rSill + c * COURSE
+        g += `<path d="${annularSectorPath(cx, cy, a, HOARD_HW * 0.94, rc, rc)}" fill="none" stroke="${K}" stroke-width="1.5" opacity="0.32"/>`
       }
+      // the lit brim — the gold catching the room's own lamp, and the edge whose
+      // POSITION is the number the reader is reading
+      g += `<path d="${annularSectorPath(cx, cy, a, HOARD_HW, rTop - COURSE * 0.36, rTop)}" fill="${H}" opacity="0.92"/>`
     }
-    // axis 2 — the principal device (0.40-0.60R)
-    sec += `<g transform="translate(0 ${fx(-R * 0.5)})">${assayDevice(v.device, R * 0.095)}</g>`
-    sec += `</g>`
-    g += sec
+    // AXIS 2 — the room's principal device, hung on the back wall above the
+    // brim. `translate(cx,cy) rotate(90 - a)` puts the sector's math-angle onto
+    // local 90, so radially outward is straight UP and every device reads the
+    // same way out of every room — the only orientation upright through all
+    // three windows, which sit at 45/90/135 in the card's upper half.
+    g +=
+      `<g transform="translate(${fx(cx)} ${fx(cy)}) rotate(${fx(90 - a)})">` +
+      `<g transform="translate(0 ${fx(-R * DEVICE_AT)})">${assayDevice(v.device, R * 0.05)}</g></g>`
   }
   g += `<circle cx="${fx(cx)}" cy="${fx(cy)}" r="${fx(R)}" fill="url(#assayLite)"/>`
   // frost dusting so the wheel belongs to the northern page it lies in
@@ -11194,8 +11307,10 @@ function assayDial(w, h, seed) {
 /** THE GLASS FACEPLATE (ch6-assay-card): the static plate riveted over the
  *  wheel — a round pane-wall of the treasury's own curtain glass with THREE
  *  ARCHED VITRINES cut clean through it (true alpha-0 holes, even-odd compound
- *  path) and one brass tag reading TURN. The plate must be transparent outside
- *  its inscribed circle: the quad's corners would otherwise print as paper. */
+ *  path). NO LETTERING: the affordance is paper (cut shadows on the apertures,
+ *  the plate's own raised edge, and the dial's ember chevrons). The plate must
+ *  be transparent outside its inscribed circle: the quad's corners would
+ *  otherwise print as paper. */
 function assayCard(w, h, seed) {
   const r = mulberry32(seed)
   const cx = w / 2
@@ -11265,38 +11380,33 @@ function assayCard(w, h, seed) {
     s += `<circle cx="${fx(rx - 1.6)}" cy="${fx(ry - 1.6)}" r="2" fill="#ffffff" opacity="0.4"/>`
   }
 
-  // ---- THE BRASS TAG (T-AFFORDANCE) ----
-  // ONE WORD, at the cap height the s4 lane had to fight for: R*0.36 is ~22
-  // screen px at the ~145px this card projects. A second line or a numeral buys
-  // nothing at 1x and "(1)" would imply steps 2 and 3 that do not exist.
-  const tagW = R * 1.3
-  const tagH = R * 0.5
-  const tagX = cx - tagW / 2
-  const tagY = cy + R * 0.28
-  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="${G}"/>`
-  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH * 0.34)}" rx="${fx(R * 0.05)}" fill="${H}" opacity="0.5"/>`
-  s += `<rect x="${fx(tagX)}" y="${fx(tagY)}" width="${fx(tagW)}" height="${fx(tagH)}" rx="${fx(R * 0.05)}" fill="none" stroke="${K}" stroke-width="2.6" opacity="0.75"/>`
-  s += `<rect x="${fx(tagX + 6)}" y="${fx(tagY + 6)}" width="${fx(tagW - 12)}" height="${fx(tagH - 12)}" rx="${fx(R * 0.04)}" fill="none" stroke="${L}" stroke-width="1.6" opacity="0.8"/>`
-  for (const sx of [tagX + 14, tagX + tagW - 14]) {
-    for (const sy of [tagY + 13, tagY + tagH - 13]) {
-      s += `<circle cx="${fx(sx)}" cy="${fx(sy)}" r="3.4" fill="${H}" stroke="${K}" stroke-width="1.1" stroke-opacity="0.6"/>`
-    }
+  // ---- WHERE THE BRASS TAG USED TO BE (S7R2-4) ------------------------------
+  // A gold plate reading TURN sat across the lower half of this faceplate. It is
+  // gone, under the user's law of 2026-07-26 ("written action labels near
+  // triggers are OUT... triggers must read through PAPER language"). Three
+  // things replace it and none of them spells a verb:
+  //   - the DIE-CUT CUTS. Each vitrine gets the book's cut mark on its own
+  //     aperture path: a dark severed hairline, a lit raw-paper lip on the
+  //     lamp side, and the penumbra the plate stops carrying just past the
+  //     slit. That is what a hole punched in a card looks like, and it says
+  //     "something comes through here" — which is exactly what does.
+  //   - the FACEPLATE'S OWN RAISED EDGE, a contact pool under its rim: the
+  //     plate is a separate ply riveted over a wheel, not print on the page.
+  //   - on the DIAL, the thumb lobe's raised edge and its two ember chevrons
+  //     (assayDial) — the only mark that names a direction, and it rides the
+  //     grip it belongs to.
+  // The plate also gets its lower half BACK as glass, which is what the tag was
+  // covering: the curtain wall now reads all the way round.
+  for (const psi of ASSAY_WINS) {
+    s += cutShadow(0, 0, 0, 0, {
+      d: annularSectorPath(cx, cy, psi, ASSAY_HALFW, bandIn, bandOut),
+      spread: R * 0.035,
+      strength: 0.85,
+      ink: K,
+      lip: H,
+    })
   }
-  {
-    // the doubled-stroke engraving idiom: a bright ghost offset under a dark
-    // cut, which is what makes struck metal survive a 5x downscale.
-    const word = 'TURN'
-    const cw = R * 0.19
-    const ch = R * 0.36
-    const gap = R * 0.048
-    const sw = R * 0.038
-    const wordW = word.length * cw + (word.length - 1) * gap
-    const x0 = cx - wordW / 2
-    const y0 = tagY + (tagH - ch) / 2
-    s += engraveWord(word, x0, y0 + sw * 0.34, cw, ch, gap, H, fx(sw * 0.9), 'opacity="0.5"')
-    s += engraveWord(word, x0, y0, cw, ch, gap, K, fx(sw), 'opacity="0.96"')
-  }
-  s += manicule(tagX - R * 0.1, tagY + tagH * 0.5, R * 0.1, NAVE_C.frost, K)
+  s += raisedEdgeShadow(circlePath(cx, cy, R * 0.985), { lift: R * 0.04, part: 'lip', strength: 0.8, ink: K, lip: H })
   // the hub RIVET. Deliberately a rivet and nothing more: the layer discards any
   // twist begun inside 0.25R, so a device painted here would be the one part of
   // the wheel that does not answer a hand.
