@@ -61,6 +61,11 @@ import {
   dissolveGold,
   goldHeap,
 } from '../../../scripts/storybook/generate-art.mjs'
+import {
+  SPREAD_COUNT,
+  popupContentForSpread,
+  type SceneLayer,
+} from '@/components/labs/storybook/content'
 
 const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'storybook', 'generate-art.mjs')
 const SOURCE = readFileSync(SCRIPT_PATH, 'utf8')
@@ -104,12 +109,47 @@ describe('L1 — the arcade\'s bays and the rack\'s slats agree', () => {
     }
   })
 
-  it('leaves the slot plate its own station on both faces', () => {
-    expect(S5_PLATE.U0 + S5_PLATE.W).toBeCloseTo(1, 10)
+  it('leaves the slot plate its own station on both faces, on the tab side', () => {
+    // The plate is one plate-width of image, hard against ONE edge, and which
+    // edge is the whole of the cue-sweep fix: `slatUvs` mirrors u on the left
+    // page, so the fore edge the tongue comes out of is u=0 there and u=1 on
+    // the right. A plate that does not touch the tab-side edge is furniture
+    // sitting in the middle of the picture.
+    for (const side of ['left', 'right'] as const) {
+      const band = S5_PLATE.band(side)
+      const pic = S5_PLATE.picture(side)
+      expect(band.u1 - band.u0).toBeCloseTo(S5_PLATE.W, 10)
+      expect(side === 'left' ? band.u0 : band.u1).toBeCloseTo(side === 'left' ? 0 : 1, 10)
+      // plate and picture tile the image exactly, and never overlap
+      expect(pic.u1 - pic.u0).toBeCloseTo(1 - S5_PLATE.W, 10)
+      expect(Math.min(band.u1, pic.u1) - Math.max(band.u0, pic.u0)).toBeLessThanOrEqual(1e-12)
+      // the marks point at the tab, which is the edge the plate is hard against
+      expect(S5_PLATE.toTab(side)).toBe(side === 'left' ? -1 : 1)
+    }
     // and the band R1 measures the openings in must fall clear of the springing
     // and of the sill, or it is measuring furniture
     expect(S5_ARCADE.SAMPLE_V0).toBeGreaterThan(S5_ARCADE.spring(RACK.w / RACK.h))
     expect(S5_ARCADE.SAMPLE_V1).toBeLessThan(S5_ARCADE.V_SILL)
+  })
+
+  it('paints the plate for the page the piece is actually on', () => {
+    // S5_PLATE.SIDE is a MIRROR of content.ts — the bake script cannot import a
+    // TS module, so the page side is copied, and a copy that nobody checks is
+    // how the plate ended up on the spine in the first place. This is the
+    // assertion that keeps the mirror honest, exactly as the CUE_LIGHT/
+    // shadow-light mirror is kept honest one file over.
+    let found: SceneLayer | undefined
+    for (let s = 0; s < SPREAD_COUNT; s++) {
+      for (const layer of popupContentForSpread(s)?.layers ?? []) {
+        if (layer.id === 'ch4-dissolve') found = layer
+      }
+    }
+    expect(found, 'ch4-dissolve is not in the book — this gate would pass vacuously')
+      .toBeDefined()
+    expect(
+      (found as { side?: string }).side,
+      'the dissolve changed pages and the brass plate did not follow it'
+    ).toBe(S5_PLATE.SIDE)
   })
 })
 
@@ -167,7 +207,9 @@ describe('L3 — the reveal registers on the closed face', () => {
       const nearestPier = Math.min(...(S5_ARCADE.PIERS as number[]).map((p) => Math.abs(p - u)))
       expect(nearestPier).toBeGreaterThan(pierHalf)
       // and none of them may wander under the slot plate
-      expect(u + halfW).toBeLessThan(S5_PLATE.U0)
+      const pic = S5_PLATE.picture(S5_PLATE.SIDE)
+      expect(u - halfW).toBeGreaterThan(pic.u0)
+      expect(u + halfW).toBeLessThan(pic.u1)
     }
   })
 })
@@ -197,7 +239,7 @@ describe('L4 — the book prints no action labels', () => {
     // ever loses it, the reader watches a brass band appear out of nothing.
     const gold = dissolveGold(RACK.w, RACK.h, RACK.seed)
     const dunes = dissolveDunes(DUNES.w, DUNES.h, DUNES.seed)
-    const plateX = (RACK.w * S5_PLATE.U0).toFixed(1).replace(/\.0$/, '')
+    const plateX = (RACK.w * S5_PLATE.band(S5_PLATE.SIDE).u0).toFixed(1).replace(/\.0$/, '')
     for (const svg of [gold, dunes]) expect(svg).toContain(plateX)
   })
 })

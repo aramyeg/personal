@@ -1,5 +1,5 @@
 /**
- * THE ONE SENTENCE ON SPREAD 6 HAS TO READ LEFT-TO-RIGHT.
+ * THE ONE MARK ON SPREAD 6 HAS TO POINT THE RIGHT WAY.
  *
  * A blind reader's re-re-review: "The 'RAISE A STALL' plaque is rendered
  * rotated 180 degrees. At every stage of travel — flat, mid-raise, fully
@@ -13,21 +13,32 @@
  * is what bit here, because this family's die-cut unfold puts image-x along the
  * SPINE and at the pinned reading camera the spine is screen-vertical.
  *
- * The fix lives in the painter (`bazRaiseStallFace`), which now turns the
- * signboard a quarter clockwise so its baseline runs along the page-fore axis.
+ * The plate carries no sentence any more. The cue-sweep lane retired
+ * ⟡ RAISE A STALL ⟡ under the no-written-labels law and cut a setting-out
+ * track with ember chevrons into it instead, which makes this gate MORE
+ * load-bearing rather than less: a quarter turn that reads as a head tilt in a
+ * legend reads as an arrow aimed at nothing in a cue, and an arrow aimed at
+ * nothing is a broken control.
+ *
+ * The fix lives in the painter (`bazRaiseStallFace`), which turns the
+ * signboard a quarter clockwise so its long axis runs along the page-fore axis.
  * That is a decision no screenshot can defend on its own, so this gate takes
  * the SHIPPED uvs (`tabFaceUvs`, imported, not copied), the SHIPPED pose solver
  * and the SHIPPED reading camera, and re-projects the legend's own axes at
  * every lift the reader can latch the piece in. It fails if the legend ever
  * stops running screen-rightward or ever stands on its head — including if the
  * piece is moved to the RIGHT page, where the page-fore axis reverses on screen
- * and this painting would read backwards (asserted explicitly below).
+ * and this painting would read backwards (asserted explicitly below). The last
+ * block closes the loop a legend never had to: it measures where the card
+ * actually travels on screen and demands the chevrons agree with it.
  *
  * Everything numeric comes from the painter's own contract
  * (scripts/storybook/s6-cartouche-orientation.mjs) or from the solver. Nothing
  * here is read off a screenshot.
  */
 
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   S6_STALL_CARTOUCHE,
@@ -54,14 +65,14 @@ const SCREEN_RIGHT: Px = { x: 1, y: 0 }
 const SCREEN_UP: Px = { x: 0, y: -1 }
 
 /**
- * How far the legend's BASELINE may lean off screen-right. The measured lean
+ * How far the plate's LONG AXIS may lean off screen-right. The measured lean
  * is the page's own tilt plus perspective — 2.9 degrees at every lift — so 15
  * is a wide margin that still fails the defect (the old authoring leaned 75)
  * and fails a 180 (177) and a mirror (177).
  */
 const BASELINE_TOL_DEG = 15
 /**
- * How far GLYPH-UP may lean off screen-up. This one is genuinely looser,
+ * How far the plate's SHORT AXIS may lean off screen-up. This one is genuinely looser,
  * and honestly so: the deck's two screen axes are not perpendicular (107
  * degrees apart at the stop), so a quad this foreshortened SHEARS the type
  * whatever you do. Worst measured across the travel is 20.6 degrees at the
@@ -132,7 +143,7 @@ const patchOf = (
   return patch!
 }
 
-describe('s6 — the stall\'s legend reads left-to-right at the reader\'s eye', () => {
+describe('s6 — the stall\'s plate is turned the way the reader is', () => {
   const { layer, spreadIndex } = findLayer(S6_STALL_CARTOUCHE.layerId)
   const geom = layer as SceneLayer & TabPieceGeom
   const { thetaL, thetaR } = spreadPageAnglesTilted(spreadIndex, spreadIndex, null, 0)
@@ -147,7 +158,7 @@ describe('s6 — the stall\'s legend reads left-to-right at the reader\'s eye', 
     expect(geom.form).toBe('table')
   })
 
-  it('baseline runs screen-right and glyph-up runs screen-up at every latchable lift', () => {
+  it('the long axis runs screen-right and the short axis screen-up at every latchable lift', () => {
     const uvs = tabFaceUvs(S6_STALL_CARTOUCHE.face as TabPieceFace, geom)
     let worstBaseline = { deg: -1, lift: 0 }
     let worstUp = { deg: -1, lift: 0 }
@@ -161,33 +172,35 @@ describe('s6 — the stall\'s legend reads left-to-right at the reader\'s eye', 
     }
     expect(
       worstBaseline.deg,
-      `"${S6_STALL_CARTOUCHE.legend}" leans ${worstBaseline.deg.toFixed(1)} deg off screen-right at ` +
-        `lift ${((worstBaseline.lift * 180) / Math.PI).toFixed(1)} deg — the reader has to tilt their head`
+      `the plate's ${S6_STALL_CARTOUCHE.marks} lean ${worstBaseline.deg.toFixed(1)} deg off ` +
+        `screen-right at lift ${((worstBaseline.lift * 180) / Math.PI).toFixed(1)} deg — the ` +
+        `reader has to tilt their head to take the mark`
     ).toBeLessThan(BASELINE_TOL_DEG)
     expect(
       worstUp.deg,
-      `"${S6_STALL_CARTOUCHE.legend}" stands ${worstUp.deg.toFixed(1)} deg off screen-up at ` +
-        `lift ${((worstUp.lift * 180) / Math.PI).toFixed(1)} deg`
+      `the plate's ${S6_STALL_CARTOUCHE.marks} stand ${worstUp.deg.toFixed(1)} deg off screen-up ` +
+        `at lift ${((worstUp.lift * 180) / Math.PI).toFixed(1)} deg`
     ).toBeLessThan(UP_TOL_DEG)
   })
 
-  it('the legend is not mirrored — baseline x glyph-up keeps the reader\'s handedness', () => {
+  it('the plate is not mirrored — long axis x short axis keeps the reader\'s handedness', () => {
     const uvs = tabFaceUvs(S6_STALL_CARTOUCHE.face as TabPieceFace, geom)
     for (let i = 0; i <= STEPS; i++) {
       const lift = (stop * i) / STEPS
       const axes = uvScreenAxes(patchOf(geom, S6_STALL_CARTOUCHE.face as TabPieceFace, lift, thetaL, thetaR).quad, uvs)
       const b = uvDirToScreen(axes, S6_STALL_CARTOUCHE.baselineUV)
       const u = uvDirToScreen(axes, S6_STALL_CARTOUCHE.upUV)
-      // Screen y is DOWN, so upright unmirrored type has baseline x up < 0.
+      // Screen y is DOWN, so an unmirrored plate has long x short < 0.
       expect(b.x * u.y - b.y * u.x, `mirrored at lift ${lift}`).toBeLessThan(0)
     }
   })
 
   it('the same painting on the RIGHT page would fail — the gate is side-aware', () => {
     // Not a hypothetical: this family already ships a right-page piece
-    // (ch4-goldpile), and the next one to want a legend must repaint rather
-    // than reuse. On the right page the page-fore axis runs screen-RIGHT, so
-    // a baseline authored as image-DOWN comes out reversed.
+    // (ch4-goldpile), and the next one to want a directed mark must repaint
+    // rather than reuse. On the right page the page-fore axis runs screen-RIGHT,
+    // so a long axis authored as image-DOWN comes out reversed — and with it
+    // every chevron drawn along it.
     const mirrored = { ...geom, side: 'right' } as SceneLayer & TabPieceGeom
     const uvs = tabFaceUvs(S6_STALL_CARTOUCHE.face as TabPieceFace, mirrored)
     const axes = uvScreenAxes(
@@ -197,6 +210,56 @@ describe('s6 — the stall\'s legend reads left-to-right at the reader\'s eye', 
     expect(
       angleBetweenDeg(uvDirToScreen(axes, S6_STALL_CARTOUCHE.baselineUV), SCREEN_RIGHT)
     ).toBeGreaterThan(180 - BASELINE_TOL_DEG)
+  })
+
+  it('the deck plate\'s chevrons point the way the card actually goes', () => {
+    // The same instrument the tab arrow is held to, and for the same reason:
+    // the travel is MEASURED as where the card's centre moves on screen between
+    // zero draw and the mechanical stop, never read off the band's own v axis,
+    // which would be circular. This is the assertion a legend never had to
+    // pass. A caption only has to be readable; a cue has to be RIGHT.
+    const centre = (face: TabPieceFace, lift: number): Px => {
+      const q = patchOf(geom, face, lift, thetaL, thetaR).quad.map((v) => toScreenPx(v))
+      return {
+        x: (q[0].x + q[1].x + q[2].x + q[3].x) / 4,
+        y: (q[0].y + q[1].y + q[2].y + q[3].y) / 4,
+      }
+    }
+    const travel = sub(centre('tab', stop), centre('tab', 0))
+    expect(Math.hypot(travel.x, travel.y), 'the card must actually travel').toBeGreaterThan(20)
+
+    const uvs = tabFaceUvs(S6_STALL_CARTOUCHE.face as TabPieceFace, geom)
+    let worst = { deg: -1, lift: 0 }
+    for (let i = 0; i <= STEPS; i++) {
+      const lift = (stop * i) / STEPS
+      const axes = uvScreenAxes(
+        patchOf(geom, S6_STALL_CARTOUCHE.face as TabPieceFace, lift, thetaL, thetaR).quad,
+        uvs
+      )
+      const deg = angleBetweenDeg(uvDirToScreen(axes, S6_STALL_CARTOUCHE.chevronUV), travel)
+      if (deg > worst.deg) worst = { deg, lift }
+    }
+    expect(
+      worst.deg,
+      `the deck chevrons point ${worst.deg.toFixed(1)} deg away from where the card slides, at ` +
+        `lift ${((worst.lift * 180) / Math.PI).toFixed(1)} deg — an arrow aimed at nothing`
+    ).toBeLessThan(20)
+  })
+
+  it('nothing on this plate is a word any more', () => {
+    // The conversion has to be real and not cosmetic: the painter may not
+    // quietly re-engrave the verb the law retired, here or anywhere on the face.
+    const source = readFileSync(
+      path.join(process.cwd(), 'scripts', 'storybook', 'generate-art.mjs'),
+      'utf8'
+    )
+    const body = source.slice(source.indexOf('function bazRaiseStallFace('))
+    const end = body.search(/\r?\n\}\r?\n/)
+    const face = body.slice(0, end < 0 ? body.length : end)
+    expect(face.length, 'bazRaiseStallFace body not found').toBeGreaterThan(200)
+    expect(face, 'the stall face is engraving words again').not.toContain('engraveWord')
+    expect(face).not.toContain('<text')
+    expect(JSON.stringify(S6_STALL_CARTOUCHE)).not.toContain('RAISE A STALL')
   })
 })
 

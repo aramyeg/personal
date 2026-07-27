@@ -48,8 +48,19 @@
  */
 
 /**
- * The woodcut ⟡ RAISE A STALL ⟡ signboard on the deck band of
- * `ch5-raise-stall-face`.
+ * The woodcut signboard on the deck band of `ch5-raise-stall-face`.
+ *
+ * CUE-SWEEP: IT NO LONGER CARRIES A SENTENCE. It used to engrave
+ * ⟡ RAISE A STALL ⟡, and the user's affordance law retired written verbs near a
+ * trigger — the card is the handle, and a handle does not need to be captioned.
+ * What is cut into the plate now is a SETTING-OUT TRACK with ember chevrons
+ * marching down it toward the tab.
+ *
+ * The orientation contract survives the conversion unchanged and is MORE
+ * load-bearing, not less: `baselineUV` and `upUV` were the legend's reading
+ * axes and are now the PLATE's own axes, which is what decides where a chevron
+ * drawn along the plate ends up pointing. A quarter turn that reads as a head
+ * tilt in a legend reads as an arrow aimed at nothing in a cue.
  */
 export const S6_STALL_CARTOUCHE = {
   layerId: 'ch5-raise-stall',
@@ -58,15 +69,27 @@ export const S6_STALL_CARTOUCHE = {
    *  `tabFaceUvs`). The deck is the one band that stays broadside to the reader
    *  at every lift — the legs go nearly edge-on at the 88-degree stop. */
   face: 'deck',
-  legend: 'RAISE A STALL',
+  /** What is cut into the plate. Not text — this is a description for the
+   *  gate's failure messages, and the gate asserts no letterforms are back. */
+  marks: 'setting-out track + ember chevrons',
   /** Degrees the whole plate is turned in image space, CLOCKWISE (SVG's
    *  positive sense, y down). 0 was the defect. */
   plateTurnDeg: 90,
-  /** The legend's READING DIRECTION in uv space, after that turn. Must land
-   *  screen-RIGHT at the reading camera. */
+  /** The plate's LONG AXIS in uv space, after that turn — the direction the
+   *  setting-out track runs, and the axis the legend's baseline used to run
+   *  along. Must land screen-RIGHT at the reading camera. */
   baselineUV: [0, -1],
-  /** The legend's GLYPH-UP in uv space, after that turn. Must land screen-UP. */
+  /** The plate's SHORT AXIS in uv space, after that turn. Must land screen-UP.
+   *  With the axis above it fixes the plate's handedness: a mirrored plate
+   *  sends the chevrons the opposite way down the same track. */
   upUV: [1, 0],
+  /** WHERE THE CHEVRONS POINT, in uv space. The painter draws them along the
+   *  plate's local -x, and the quarter turn sends local -x to image-UP, which
+   *  is +v. Measured at the reading camera, +v on this band projects to
+   *  (-268, -13) px while the tab card's own centre travels (-177, -9) px from
+   *  zero draw to the stop — 0.1 degrees apart. The gate re-derives both rather
+   *  than trusting those numbers. */
+  chevronUV: [0, 1],
   /** Plate size, as fractions of the deck BAND — length along the band's depth
    *  (image y, the page-fore axis), height across its width (image x, the
    *  spine axis). Chosen so the turned plate clears the valance scallops at

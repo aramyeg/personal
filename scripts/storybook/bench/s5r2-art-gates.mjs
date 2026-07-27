@@ -100,15 +100,26 @@ const meanBox = (img, u0, v0, u1, v1) => {
  * an untextured placemat. What separates them is what survives being squinted
  * at, which is what the quarter-scale pass measures.
  *
- * `uMax` crops the furniture off before measuring: the brass slot plate is
- * identical on both faces and is not part of the picture under test.
+ * `band` crops the furniture off before measuring: the brass slot plate is
+ * identical on both faces and is not part of the picture under test. It is a
+ * {u0,u1} RANGE and not a ceiling because the plate is side-aware now — on the
+ * left page, which is the page ch4-dissolve ships on, the plate sits at the
+ * image's LOW-u end (see S5_PLATE), so a `uMax` crop measured the plate and
+ * threw away a tenth of the picture.
  */
-async function legibility(id, [sw, sh], uMax) {
+async function legibility(id, [sw, sh], band) {
+  const { u0, u1 } = band
+  const uSpan = u1 - u0
   const stat = async (W, H) => {
     const buf = await bytes(id)
     const meta = await sharp(buf).metadata()
     const { data, info } = await sharp(buf)
-      .extract({ left: 0, top: 0, width: Math.round(meta.width * uMax), height: meta.height })
+      .extract({
+        left: Math.round(meta.width * u0),
+        top: 0,
+        width: Math.round(meta.width * uSpan),
+        height: meta.height,
+      })
       .resize(W, H, { fit: 'fill', kernel: 'lanczos3' })
       .removeAlpha()
       .raw()
@@ -135,8 +146,8 @@ async function legibility(id, [sw, sh], uMax) {
     for (let i = 0; i < W * H; i++) hist[Math.min(hist.length - 1, Math.floor(L[i] / BIN))]++
     return { grad: g / n, bands: hist.filter((c) => c >= 0.01 * W * H).length }
   }
-  const near = await stat(Math.round(sw * uMax), sh)
-  const far = await stat(Math.round((sw * uMax) / 4), Math.round(sh / 4))
+  const near = await stat(Math.round(sw * uSpan), sh)
+  const far = await stat(Math.round((sw * uSpan) / 4), Math.round(sh / 4))
   return { screen: near.grad, macro: far.grad, bands: near.bands }
 }
 
@@ -147,7 +158,10 @@ async function legibility(id, [sw, sh], uMax) {
   const f = await load('ch4-dissolve-gold')
   const A = S5_ARCADE
   const half = 0.05 / A.BAYS // a narrow column: a tenth of a bay
-  const visible = (u) => u + half < S5_PLATE.U0
+  // The plate covers one end of the image and WHICH end depends on the page
+  // side, so "visible" is a band test now, not a ceiling test.
+  const PLATE = S5_PLATE.band(S5_PLATE.SIDE)
+  const visible = (u) => u + half <= PLATE.u0 || u - half >= PLATE.u1
   const openings = A.CENTRES.filter(visible)
   const piers = A.PIERS.filter(visible)
   const openL = openings.map((u) => meanBox(f, u - half, A.SAMPLE_V0, u + half, A.SAMPLE_V1))
@@ -185,9 +199,10 @@ async function legibility(id, [sw, sh], uMax) {
     'ch4-goldpile-face': { screen: 6, macro: 8, bands: 8 },
   }
 
-  const gold = await legibility('ch4-dissolve-gold', SCREEN.rack, S5_PLATE.U0)
-  const dunes = await legibility('ch4-dissolve-dunes', SCREEN.rack, S5_PLATE.U0)
-  const pile = await legibility('ch4-goldpile-face', SCREEN.mound, 1)
+  const PICTURE = S5_PLATE.picture(S5_PLATE.SIDE)
+  const gold = await legibility('ch4-dissolve-gold', SCREEN.rack, PICTURE)
+  const dunes = await legibility('ch4-dissolve-dunes', SCREEN.rack, PICTURE)
+  const pile = await legibility('ch4-goldpile-face', SCREEN.mound, { u0: 0, u1: 1 })
 
   for (const [id, now] of [['ch4-dissolve-gold', gold], ['ch4-goldpile-face', pile]]) {
     const b = BEFORE[id]
@@ -225,7 +240,9 @@ async function legibility(id, [sw, sh], uMax) {
   const need = S5_DUNE_CAMEL.SCALE * S5_DUNE_CAMEL.INK * f.h
   // The paving's own luminance, read where no figure stands (between the last
   // walker and the slot plate), sets the "lit" the figures must be dark against.
-  const floorL = meanBox(f, 0.62, A.FIG_V - 0.1, S5_PLATE.U0 - 0.02, A.FIG_V)
+  // Expressed against the PICTURE band's far end rather than against the old
+  // literal plate station, so the sample follows the plate when it changes side.
+  const floorL = meanBox(f, 0.62, A.FIG_V - 0.1, S5_PLATE.picture(S5_PLATE.SIDE).u1 - 0.12, A.FIG_V)
   // "At least 40% darker than the paving it stands on." The walkers' ink lands
   // near L 46 against paving near L 173, so this sits far from both — and above
   // the contact pool, which is a shadow ON the paving and not part of the glyph.
