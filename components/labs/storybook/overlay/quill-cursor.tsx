@@ -122,9 +122,23 @@ export function QuillCursor() {
       }
 
       // Pinch: eased so arriving at a handle is a settle, not a snap.
+      //
+      // ...EXCEPT off the paper and onto a dog-ear (S5R2-3). The corner cue and
+      // the grip are two different promises, and the reader is entitled to see
+      // exactly one at a time. Both used to fade on their own clocks — a ~230ms
+      // pinch decay against a 200ms fold lift — so leaving a mover for the strip
+      // of corner below it showed a lifted dog-ear AND a closed grip together
+      // for a fifth of a second, which is what a parked screenshot catches.
+      // `data-sb-corner` is stamped only where the scene owns nothing
+      // (use-book-input.ts / cornerTurnFor), so it IS the statement "the paper
+      // has let go of this pixel", and the grip drops with it rather than after.
       const pinchTarget = readPinch()
-      pinch.current += (pinchTarget - pinch.current) * PINCH_LAG
-      if (pinch.current < 0.004 && pinchTarget === 0) pinch.current = 0
+      if (pinchTarget === 0 && document.documentElement.dataset.sbCorner !== undefined) {
+        pinch.current = 0
+      } else {
+        pinch.current += (pinchTarget - pinch.current) * PINCH_LAG
+        if (pinch.current < 0.004 && pinchTarget === 0) pinch.current = 0
+      }
 
       const hoverScale = hovering.current || pinch.current > 0.02 ? 1.15 : 1
       const scale = (hoverScale + PINCH_SCALE * pinch.current) * (1 - pressDip)

@@ -37,63 +37,11 @@ import { primaryPlayableChannel } from '@/components/labs/storybook/book/handle-
 import { HANDLE_MIN_HIT, HANDLE_SLOP_FLAT, handleSlopFactor } from '@/components/labs/storybook/book/handle-hit'
 import { PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 import { popupContentForSpread } from '@/components/labs/storybook/content'
+import { screenBox, shortestEdge } from './reading-camera'
 
-// ---------------------------------------------------------------------------
-// The pinned reading camera (book-scene.tsx) at the shipped 16:9 frame — the
-// only place a "screen px" claim is allowed to come from.
-const rad = (d: number): number => (d * Math.PI) / 180
-const EYE: Vec3 = [0, 1.85, 3.05]
-const LOOKAT: Vec3 = [0, 0.38, 0.05]
-const FOV_Y = rad(34)
-const FRAME_W = 1600
-const FRAME_H = 900
-
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-]
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const unit = (v: Vec3): Vec3 => {
-  const l = Math.hypot(v[0], v[1], v[2])
-  return [v[0] / l, v[1] / l, v[2] / l]
-}
-const FWD = unit(sub(LOOKAT, EYE))
-const RIGHT = unit(cross(FWD, [0, 1, 0]))
-const UP = cross(RIGHT, FWD)
-const TAN_H = Math.tan(FOV_Y / 2)
-const ASPECT = FRAME_W / FRAME_H
-
-function toScreen(p: Vec3): [number, number] {
-  const rel = sub(p, EYE)
-  const cz = dot(rel, FWD)
-  return [
-    ((dot(rel, RIGHT) / (cz * TAN_H * ASPECT)) * 0.5 + 0.5) * FRAME_W,
-    (1 - ((dot(rel, UP) / (cz * TAN_H)) * 0.5 + 0.5)) * FRAME_H,
-  ]
-}
-function screenBox(quad: readonly Vec3[]): { w: number; h: number; x0: number; y0: number; area: number } {
-  const pts = quad.map(toScreen)
-  const xs = pts.map((p) => p[0])
-  const ys = pts.map((p) => p[1])
-  const x0 = Math.min(...xs)
-  const y0 = Math.min(...ys)
-  const w = Math.max(...xs) - x0
-  const h = Math.max(...ys) - y0
-  return { w, h, x0, y0, area: w * h }
-}
-/** Shortest world edge of a quad — what handle-hit.ts's HANDLE_MIN_HIT floor is
- *  measured against before the slop pad is even applied. */
-function shortestEdge(quad: readonly Vec3[]): number {
-  let m = Infinity
-  for (let i = 0; i < 4; i++) {
-    const a = quad[i]
-    const b = quad[(i + 1) % 4]
-    m = Math.min(m, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]))
-  }
-  return m
-}
+// The pinned reading camera and its projection live in ./reading-camera.ts —
+// one copy for every file that makes a screen-px claim (S5R2 lifted it out when
+// s5-round2.test.ts needed the same numbers).
 
 const s5 = popupContentForSpread(5)
 if (!s5) throw new Error('spread 5 missing')

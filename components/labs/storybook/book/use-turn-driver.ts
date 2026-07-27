@@ -151,7 +151,7 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
  * held values THE SAME ACT, so no future edit can move one without the other.
  * Both call sites go through here.
  */
-function commitSpread(committedSpread: RefObject<number>, next: number): void {
+export function commitSpread(committedSpread: { current: number }, next: number): void {
   if (committedSpread.current === next) return
   // The reader has LEFT a page: drop every held reader value and any pending tap
   // pulse, because a reopened page is a fresh pop-up. (The drives live outside

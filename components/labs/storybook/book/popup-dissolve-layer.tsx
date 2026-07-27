@@ -6,28 +6,36 @@
  * transmute one picture into another (s5 dunes -> the dragon's gold hoard).
  * PAGE-ROOTED like the volvelle / tab piece — one page carries the whole rack.
  *
- * The tab is the grab handle. The drive is the LINEAR tab-piece idiom (law H3):
- * the pointer's projection onto the page's fore axis reads the strip draw
- * delta, mapped to the shared flip angle tau in [0,PI] (tab-piece pointer
- * projection). The HOLD + SNAP is the VOLVELLE idiom: release HOLDS tau in the
- * module scrub channel (the book remembers dunes-or-gold through page turns and
- * book close), then eases it to the nearest pure end {0,PI} — a 2-detent dial.
- * Both end states are coplanar, so — like the volvelle — the rack needs NO
- * fold-flat envelope: it rides the folding page. The high-frequency drive value
- * lives in the module scrub channel, never React state; zustand holds only the
- * grab identity.
+ * TWO HANDLES, TWO HONEST PROJECTORS, ONE SHARED TAU (S5R2-4).
+ *   the TONGUE  — a strip, so it drags 1:1 as a strip draw: the pointer's
+ *     projection onto the page's fore axis IS the draw, and the draw is the
+ *     protrusion exactly (law H3, the tab-piece idiom, class A).
+ *   the RACK    — pressing a slat and pushing it does not translate anything, it
+ *     TURNS the slat about its own hinge, which is how a person actually works a
+ *     venetian blind (class B1, about the spine-parallel hinge of the slat under
+ *     the hand). Reading a body grab as a strip draw was a convenience, and it
+ *     is the convenience a blind reader named: "I never once felt I was turning
+ *     the slats myself."
  *
- * THE RACK IS A HANDLE TOO (E3 Wave-2 S5-1, the tab-piece precedent from s6).
+ * RELEASE = LATCH, and the closing book puts it away. The rack keeps whatever
+ * flip the hand left it at — both ends detent so pure dunes and pure gold are
+ * poses you land ON — and the SHOWN flip is that held angle carried through the
+ * hold envelope (popup-dissolve.ts), which is the lift-flap persistence law in
+ * this family's units. That is what pays the fold-flat bill now that the old
+ * ease-to-the-nearest-end is gone, and it also draws the strip back inside the
+ * trim at book-closed, retiring the 0.14 a latched-gold state used to hang past
+ * the fore edge. A press that turned nothing is a CLICK, and a two-faced dial
+ * answers a click by showing the other face.
+ *
+ * The high-frequency drive value lives in the module scrub channel, never React
+ * state; zustand holds only the grab identity.
+ *
+ * THE RACK IS A HANDLE AT ALL (E3 Wave-2 S5-1, the tab-piece precedent from s6).
  * A blind reader met this family on spread 5 and reported the tab as "a ~14x25px
  * gold splinter hanging off the page edge... discovering it was luck: it took me
  * eight scripted attempts". The picture the tab transmutes, meanwhile, is 280x116
  * screen px of painted card sitting right there — and pressing it did nothing.
- * So the slats and the sand base now raycast into the SAME grab, with the same
- * page-fore projector and the same draw arithmetic. That is paper-true rather
- * than a shortcut: the rack has exactly one degree of freedom, and dragging a
- * slat fore draws the strip by the identical delta the tab would (the projection
- * is onto the page's fore axis, not onto the handle's own surface, so the sign
- * and the gearing are literally the same function).
+ * So the slats and the sand base raycast too.
  *
  * Art: TWO paintings per piece — `<id>-dunes` (up-face at tau=0) and
  * `<id>-gold` (under-face, revealed at tau=PI) — each sliced into N vertical
@@ -47,7 +55,6 @@ import { useGuardedDispose } from './material-pool'
 import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
-  DISSOLVE_TAB_LIP,
   dissolveDetent,
   dissolveShownTau,
   dissolveSlatAt,
@@ -77,11 +84,10 @@ import {
 } from '../user-drive'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { projectHingeAngle } from './handle-projection'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectPageD } from './handle-projection'
+import { projectHingeAngle, projectPageD } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
