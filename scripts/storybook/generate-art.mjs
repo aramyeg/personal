@@ -3981,75 +3981,335 @@ function dissolveDunes(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
+/**
+ * THE PASSAGE OF GLASS, FROM INSIDE — the arcade's own numbers, exported so the
+ * raster gates sample the painter rather than a screenshot.
+ *
+ * BAY RHYTHM. The rack is sliced into `SLATS` = 6 vertical strips at exactly
+ * u = k/6 (popup-dissolve-layer's slatUvs). BAYS = 12 = 2 x 6, so every slat
+ * seam lands on a bay BOUNDARY — i.e. down the middle of a PIER — and no arch
+ * centre is ever bisected by a seam at rest. Arch centres sit at odd multiples
+ * of 1/24 and the seams at even multiples, so the two sets cannot collide.
+ */
+const S5_ARCADE = {
+  BAYS: 12,
+  SLATS: 6,
+  /** Pier width as a fraction of one bay. */
+  PIER: 0.18,
+  /** v-stations, fractions of h. SVG y=0 is z1, the far/high register. */
+  V_CORNICE: 0.08,
+  V_CROWN: 0.22,
+  V_SILL: 0.6,
+  V_PLINTH: 0.65,
+  /** The springing line is DERIVED, never typed: an arch whose head rise is not
+   *  half its opening is not a round arch, and the first bake of this face drew
+   *  a 111px rise over a 63px opening, which reads as a bullet rather than as
+   *  architecture. `aspect` is the canvas w/h. */
+  spring(aspect) {
+    return this.V_CROWN + ((1 - this.PIER) / this.BAYS) * aspect * 0.5
+  },
+  /** R1's band: inside the lamp pool that fills the lower half of every bay,
+   *  clear of the springing above and of the walkers' heads below (which top out
+   *  at FIG_V - FIG_H = 0.61, past V_SILL). */
+  SAMPLE_V0: 0.44,
+  SAMPLE_V1: 0.56,
+  /** The walkers: feet station and total ink height, fractions of h. */
+  FIG_V: 0.94,
+  FIG_H: 0.35,
+  /** The cloak's widest half-width, in units of the glyph height — the window a
+   *  gate has to look in to see the whole silhouette rather than one column of
+   *  it. arcadeWalker draws the hem with this number. */
+  FIG_HALFW: 0.145,
+  /** Arch centres as u fractions — the stations R1 measures. */
+  get CENTRES() {
+    return Array.from({ length: this.BAYS }, (_, i) => (i + 0.5) / this.BAYS)
+  },
+  /** Bay boundaries (pier centres) as u fractions. */
+  get PIERS() {
+    return Array.from({ length: this.BAYS + 1 }, (_, i) => i / this.BAYS)
+  },
+}
+
+/** The dunes face's camel glyph: the nominal scale it is drawn at, and the
+ *  glyph's INK height in units of that scale (head top at y - 1.9s, foot at
+ *  y + 2.4s). The arcade's walkers may not come in under it — a blind reader
+ *  met the smaller caravan and called it "a flock of birds". */
+const S5_DUNE_CAMEL = { SCALE: 0.072, INK: 4.3 }
+
+/** One hooded customer of the bank, walking left down the passage with gold in
+ *  hand. passageWalker's grammar (robe, head, ember sash) at human proportion:
+ *  the frieze walker is deliberately squat because it is eight pixels tall
+ *  there, and at 0.33h it would read as a barrel. `hh` is the glyph's total ink
+ *  height, feet at yFoot. The centre column runs unbroken dark from crown to
+ *  sole (the load is carried forward, off the axis) so the figure survives both
+ *  the reading camera and a silhouette gate. */
+function arcadeWalker(x, yFoot, hh, ink, flip = 1) {
+  const u = hh // one unit = the whole figure
+  const HW = S5_ARCADE.FIG_HALFW // the hem's half-width, and the gates' window
+  const F = (dx) => x + flip * dx
+  let g = ''
+  // contact pool on the lit paving, thrown down-light (the book's one lamp)
+  g += `<ellipse cx="${fx(x + u * 0.05)}" cy="${fx(yFoot + u * 0.012)}" rx="${fx(u * 0.15)}" ry="${fx(u * 0.03)}" fill="${VAULT.ink}" opacity="0.32"/>`
+  // legs, under the cloak
+  g += `<path d="M ${fx(F(-u * 0.096))} ${fx(yFoot - u * 0.28)} L ${fx(F(-u * 0.116))} ${fx(yFoot)} L ${fx(F(-u * 0.032))} ${fx(yFoot)} L ${fx(F(-u * 0.016))} ${fx(yFoot - u * 0.28)} Z" fill="${ink}"/>`
+  g += `<path d="M ${fx(F(u * 0.024))} ${fx(yFoot - u * 0.28)} L ${fx(F(u * 0.052))} ${fx(yFoot)} L ${fx(F(u * 0.132))} ${fx(yFoot)} L ${fx(F(u * 0.1))} ${fx(yFoot - u * 0.28)} Z" fill="${ink}"/>`
+  // ONE continuous cloaked silhouette, hood crown to hem. Drawn as a single
+  // outline on purpose: the previous pass built the figure out of a hood, a
+  // square cape and a robe, and three stacked blocks read as an action figure,
+  // not as a person walking to the bank.
+  g +=
+    `<path d="M ${fx(F(-u * 0.056))} ${fx(yFoot - u * 0.9)} ` +
+    `L ${fx(F(-u * 0.05))} ${fx(yFoot - u * 0.845)} ` + // the neck pinch
+    `L ${fx(F(-u * 0.118))} ${fx(yFoot - u * 0.755)} ` + // and the shoulder that
+    `Q ${fx(F(-u * 0.142))} ${fx(yFoot - u * 0.5)} ${fx(F(-u * HW))} ${fx(yFoot - u * 0.24)} ` +
+    `L ${fx(F(u * (HW - 0.01)))} ${fx(yFoot - u * 0.24)} ` +
+    `Q ${fx(F(u * 0.13))} ${fx(yFoot - u * 0.5)} ${fx(F(u * 0.11))} ${fx(yFoot - u * 0.755)} ` +
+    `L ${fx(F(u * 0.045))} ${fx(yFoot - u * 0.845)} ` +
+    `L ${fx(F(u * 0.05))} ${fx(yFoot - u * 0.9)} ` +
+    `Q ${fx(F(-u * 0.003))} ${fx(yFoot - u * 1.025)} ${fx(F(-u * 0.056))} ${fx(yFoot - u * 0.9)} Z" fill="${ink}"/>`
+  // the arm hanging forward, and the GOLD on the end of it: a drawstring sack
+  // at hip height. It is kept off the centre line, which stays unbroken ink
+  // from crown to sole.
+  g += `<path d="M ${fx(F(-u * 0.07))} ${fx(yFoot - u * 0.66)} Q ${fx(F(-u * 0.13))} ${fx(yFoot - u * 0.54)} ${fx(F(-u * 0.118))} ${fx(yFoot - u * 0.4)} L ${fx(F(-u * 0.07))} ${fx(yFoot - u * 0.42)} Q ${fx(F(-u * 0.076))} ${fx(yFoot - u * 0.53)} ${fx(F(-u * 0.03))} ${fx(yFoot - u * 0.62)} Z" fill="${ink}"/>`
+  g += `<path d="M ${fx(F(-u * 0.118))} ${fx(yFoot - u * 0.4)} Q ${fx(F(-u * 0.172))} ${fx(yFoot - u * 0.34)} ${fx(F(-u * 0.144))} ${fx(yFoot - u * 0.26)} Q ${fx(F(-u * 0.1))} ${fx(yFoot - u * 0.21)} ${fx(F(-u * 0.074))} ${fx(yFoot - u * 0.29)} Q ${fx(F(-u * 0.062))} ${fx(yFoot - u * 0.36)} ${fx(F(-u * 0.118))} ${fx(yFoot - u * 0.4)} Z" fill="${VAULT.foilHi}" stroke="${VAULT.foilDeep}" stroke-width="${fx(u * 0.012)}"/>`
+  g += `<path d="M ${fx(F(-u * 0.13))} ${fx(yFoot - u * 0.385)} L ${fx(F(-u * 0.078))} ${fx(yFoot - u * 0.36)}" stroke="${VAULT.foilDeep}" stroke-width="${fx(u * 0.016)}" stroke-linecap="round"/>`
+  // the caravan's ember sash — the same thread the frieze and the camels carry
+  g += `<path d="M ${fx(F(-u * 0.108))} ${fx(yFoot - u * 0.5)} l ${fx(flip * u * 0.212)} ${fx(-u * 0.022)} l ${fx(flip * u * 0.005)} ${fx(u * 0.034)} l ${fx(-flip * u * 0.217)} ${fx(u * 0.022)} Z" fill="${VAULT.ember}" opacity="0.85"/>`
+  return g
+}
+
+/**
+ * THE ARCADE (ch4-dissolve-gold, the venetian rack's B face at tau = PI).
+ *
+ * Blind finding 10: "Both mechanisms resolve to the same visual: a flat gold
+ * rectangle lying on the deck... there is no reward state that beats the rest
+ * state." The reveal used to be a SECOND dune field painted in gold — the same
+ * ridgelines, gold heaps on them, crowns and goblets where the camels were — and
+ * at the reading camera (about 280x116 screen px) that is an untextured gold
+ * placemat. The rack's whole promise is that pulling the tab shows you something
+ * BETTER than what it hid, and it was showing you the same picture in another
+ * colour.
+ *
+ * So the reveal is now the sentence the chapter actually turns on: "the hero
+ * built passages of glass through which the people could reach their gold". The
+ * B face is the INSIDE of that passage — a lamplit colonnade at night, the
+ * golden dunes glimpsed through the glazing at the far end of every bay, and
+ * customers of the bank walking its floor with gold in their hands. This is the
+ * s6 printed-interior precedent: a flat card that, opened, shows a legible
+ * printed room.
+ *
+ * REGISTRATION IS THE MECHANISM. `dissolveScene` hands both faces the SAME
+ * stations, and the reader has to see "this became that" at each of them, so
+ * nothing is abandoned — everything is transmuted:
+ *
+ *   sun    -> the arcade's great hanging LAMP, same x, y and r as the moon.
+ *   camels -> the WALKERS, at the same four x-stations and at a glyph height
+ *             that beats the camels' own (S5_DUNE_CAMEL).
+ *   crests -> the picture's depth planes: crest 0 becomes the vaulted soffit's
+ *             wavy edge overhead, crests 1 and 2 the two dune ridges seen
+ *             THROUGH the glazing at the far end of the bays, crest 3 the
+ *             receding joint lines in the paving underfoot.
+ *
+ * It stays a NIGHT chapter — plum-indigo beyond the glass, ember lamps, bone cut
+ * rims, burnished foil — but a lamplit interior is a bright picture, and that is
+ * the point: the reveal has to out-value the rest state, not merely differ.
+ */
 function dissolveGold(w, h, seed) {
-  const { crests, camels, sun } = dissolveScene(w, h, seed) // SAME shapes as the dunes
-  const defs =
-    `<linearGradient id="dvGold" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="#8f6415"/><stop offset="0.5" stop-color="#c99a30"/><stop offset="1" stop-color="#f2cf6e"/></linearGradient>`
-  let s = `<rect width="${w}" height="${h}" fill="url(#dvGold)"/>`
-  // the sun TRANSMUTED: a great gold medallion where the sun was (the "this
-  // became that" anchor) — radiating glints, a gem at its heart
-  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.15)}" fill="#fff6d0" opacity="0.85"/>` // halo
-  for (let a = 0; a < 12; a++) {
-    const ang = (a / 12) * 6.283
-    s += `<line x1="${fx(sun.x + Math.cos(ang) * sun.r * 1.1)}" y1="${fx(sun.y + Math.sin(ang) * sun.r * 1.1)}" x2="${fx(sun.x + Math.cos(ang) * sun.r * 1.5)}" y2="${fx(sun.y + Math.sin(ang) * sun.r * 1.5)}" stroke="${GOLD_LIT}" stroke-width="2.4" opacity="0.7"/>`
+  const { crests, camels, sun } = dissolveScene(w, h, seed) // SAME stations as the dunes
+  const A = S5_ARCADE
+  const bw = w / A.BAYS
+  const pierW = bw * A.PIER
+  const yCorn = h * A.V_CORNICE
+  const yCrown = h * A.V_CROWN
+  const ySpring = h * A.spring(w / h)
+  const ySill = h * A.V_SILL
+  const yPlinth = h * A.V_PLINTH
+
+  /** One bay's opening: jambs up to the springing, then a round head whose apex
+   *  lands exactly on yCrown (a quadratic's apex is (P0 + 2C + P2)/4). */
+  const opening = (x0, x1) =>
+    `M ${fx(x0)} ${fx(ySill)} L ${fx(x0)} ${fx(ySpring)} ` +
+    `Q ${fx((x0 + x1) / 2)} ${fx(2 * yCrown - ySpring)} ${fx(x1)} ${fx(ySpring)} ` +
+    `L ${fx(x1)} ${fx(ySill)} Z`
+  const crestPath = (c) => {
+    let d = `M ${fx(c.pts[0][0])} ${fx(c.pts[0][1])}`
+    for (const [x, y] of c.pts) d += ` L ${fx(x)} ${fx(y)}`
+    return d
   }
-  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r)}" fill="${GOLD_LIT}" stroke="#b8901e" stroke-width="${fx(h * 0.008)}"/>`
-  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.62)}" fill="none" stroke="#b8901e" stroke-width="1.6" opacity="0.6"/>`
-  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.24)}" fill="#c8434e" stroke="${INK}" stroke-width="1.4" stroke-opacity="0.4"/>` // ruby heart
-  // VAULT_NIGHT regrade: the gold face speaks the pack's FOIL RAMP — the
-  // same 4 stops the dragon's facets carry, so pulling the tab transmutes
-  // the dunes into the dragon's OWN material (the spread's thesis).
-  const GOLD_HEAP = ['#fff1bd', '#f2cf6e', '#c99a30', '#8f6415'] // foilHi -> foilDeep, back -> front
-  const r = mulberry32(seed ^ 0x60)
-  // gold heaps on the SAME crest ridgelines
-  crests.forEach((c, L) => {
+
+  const bays = []
+  for (let i = 0; i < A.BAYS; i++) {
+    const x0 = i * bw + pierW / 2
+    const x1 = (i + 1) * bw - pierW / 2
+    bays.push({ i, x0, x1, cx: (x0 + x1) / 2, d: opening(x0, x1) })
+  }
+
+  let defs =
+    // the upper wall: the dark vault overhead giving way to warm foil well
+    // before the arcade's head, so the picture reads GOLD and not as night sky
+    // with gold bars across it (the first bake's fault)
+    `<linearGradient id="agWall" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${VAULT.nightDeep}"/><stop offset="0.2" stop-color="${VAULT.night}"/>` +
+    `<stop offset="0.3" stop-color="${VAULT.foilDeep}"/><stop offset="0.55" stop-color="${VAULT.foil}"/>` +
+    `<stop offset="1" stop-color="${VAULT.foilLit}"/></linearGradient>` +
+    // the sky beyond the glass: plum-indigo, because it is still night out there
+    `<linearGradient id="agBay" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${VAULT.nightDeep}"/><stop offset="0.6" stop-color="${VAULT.night}"/>` +
+    `<stop offset="1" stop-color="#584169"/></linearGradient>` +
+    // the piers, lit on the lamp side and falling to walnut-black on the other
+    `<linearGradient id="agPier" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${VAULT.foilLit}"/><stop offset="0.22" stop-color="${VAULT.foilDeep}"/>` +
+    `<stop offset="0.62" stop-color="${VAULT.ink}"/><stop offset="1" stop-color="#4a3208"/></linearGradient>` +
+    // the paving: brightest where it runs under the lamps, cooling toward the reader
+    `<linearGradient id="agFloor" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${VAULT.foilHi}"/><stop offset="0.42" stop-color="${VAULT.foilLit}"/>` +
+    `<stop offset="1" stop-color="${VAULT.foil}"/></linearGradient>` +
+    `<clipPath id="agBays">${bays.map((b) => `<path d="${b.d}"/>`).join('')}</clipPath>` +
+    `<clipPath id="agFloorClip"><rect x="0" y="${fx(yPlinth)}" width="${w}" height="${fx(h - yPlinth)}"/></clipPath>`
+
+  // ---- the vault overhead: crest 0 becomes the soffit's hand-cut edge ----
+  // Its profile is kept and its swing halved about its own baseline, so the
+  // ceiling sits ABOVE the cornice where a ceiling belongs. Left at full
+  // amplitude the dark band reached the arch springing and the colonnade under
+  // it read, correctly and fatally, as bars.
+  const soffit = crests[0].pts.map(([x, y]) => [x, h * A.V_CORNICE * 0.68 + (y - crests[0].baseY) * 0.32])
+  let s = `<rect width="${w}" height="${fx(ySpring)}" fill="url(#agWall)"/>`
+  {
+    let d = `M 0 0 L ${w} 0`
+    for (let i = soffit.length - 1; i >= 0; i--) d += ` L ${fx(soffit[i][0])} ${fx(soffit[i][1])}`
+    s += `<path d="${d} Z" fill="${VAULT.nightDeep}"/>`
+    let edge = ''
+    for (const [i, [x, y]] of soffit.entries()) edge += `${i === 0 ? 'M' : ' L'} ${fx(x)} ${fx(y)}`
+    s += `<path d="${edge}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.007)}" opacity="0.85"/>`
+    // TRANSVERSE vault ribs, following the soffit's own edge. They run ACROSS
+    // the picture on purpose: the first bake dropped them vertically, one per
+    // pier, and twelve gold verticals over a dark ground read as a cage.
+    for (let k = 1; k <= 3; k++) {
+      const dy = -k * h * 0.022
+      let rib = ''
+      for (const [i, [x, y]] of soffit.entries()) rib += `${i === 0 ? 'M' : ' L'} ${fx(x)} ${fx(y + dy)}`
+      s += `<path d="${rib}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.004)}" opacity="${(0.34 - k * 0.07).toFixed(2)}"/>`
+    }
+  }
+  // the cornice band under the vault
+  s += `<rect x="0" y="${fx(yCorn)}" width="${w}" height="${fx(h * 0.014)}" fill="${VAULT.foilLit}" opacity="0.45"/>`
+  s += `<rect x="0" y="${fx(yCorn + h * 0.014)}" width="${w}" height="${fx(h * 0.005)}" fill="${VAULT.foilDeep}" opacity="0.6"/>`
+
+  // ---- what the bays hold: night, then the golden dunes, then the lamp ----
+  s += `<g clip-path="url(#agBays)">`
+  s += `<rect width="${w}" height="${h}" fill="url(#agBay)"/>`
+  // stars in the strip of night above the far horizon
+  const rStar = mulberry32(seed ^ 0x91)
+  for (let i = 0; i < 30; i++) {
+    s += `<circle cx="${fx(rr(rStar, 0, w))}" cy="${fx(rr(rStar, yCrown, ySill))}" r="${fx(rr(rStar, 0.8, 1.7))}" fill="${VAULT.rim}" opacity="${rr(rStar, 0.35, 0.9).toFixed(2)}"/>`
+  }
+  // crests 1 and 2: the golden dunes seen THROUGH the glass at the far end —
+  // the chapter's own promise, that what you reach through this glass is gold
+  for (const [L, fill, lit] of [[1, VAULT.dune, VAULT.duneLit], [2, VAULT.duneLit, VAULT.foilHi]]) {
+    const c = crests[L]
     let d = `M 0 ${fx(c.pts[0][1])}`
     for (const [x, y] of c.pts) d += ` L ${fx(x)} ${fx(y)}`
-    d += ` L ${w} ${h} L 0 ${h} Z`
-    s += `<path d="${d}" fill="${GOLD_HEAP[L]}"/>`
-    // bright crest sheen
-    let lip = `M ${fx(c.pts[0][0])} ${fx(c.pts[0][1])}`
-    for (const [x, y] of c.pts) lip += ` L ${fx(x)} ${fx(y)}`
-    s += `<path d="${lip}" fill="none" stroke="${GOLD_LIT}" stroke-width="${fx(h * 0.01)}" opacity="${0.7 - L * 0.1}"/>`
-    // scattered coins hugging each ridge (dense, so it reads as solid gold)
-    const coins = 70 + L * 45
-    for (let i = 0; i < coins; i++) {
-      const x = rr(r, 0, w)
-      const ry = crestYAt(c.pts, x)
-      const y = ry + rr(r, 0, (h - ry) * 0.6)
-      const cr = rr(r, 6, 13)
-      const bright = r() < 0.5
-      s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.7)}" fill="${bright ? GOLD_LIT : GOLD}" stroke="#b8901e" stroke-width="0.9"/>`
-      if (r() < 0.35) s += `<ellipse cx="${fx(x - cr * 0.24)}" cy="${fx(y - cr * 0.22)}" rx="${fx(cr * 0.3)}" ry="${fx(cr * 0.2)}" fill="#fff6d6" opacity="0.85"/>`
-    }
-  })
-  // the camel train transmuted: a caravan of crowns + goblets on the ridge —
-  // rendered BOLD (solid fill + thick dark outline) so it reads at scene scale
-  // as clearly as the dunes' dark camel silhouettes (the visible A<->B anchor,
-  // since the sun/medallion is occluded by the scene goldpile at the camera).
-  const CW = fx(h * 0.006) // outline weight
-  camels.forEach(([x, y], i) => {
-    const g = h * 0.09 // matches the dunes face's camel scale (the A<->B anchor)
-    if (i % 2 === 0) {
-      // crown — solid gold, dark rim, jewelled band
-      s += `<path d="M ${fx(x - g)} ${fx(y)} L ${fx(x - g)} ${fx(y - g * 0.85)} L ${fx(x - g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x)} ${fx(y - g * 1.05)} L ${fx(x + g * 0.4)} ${fx(y - g * 0.25)} L ${fx(x + g)} ${fx(y - g * 0.85)} L ${fx(x + g)} ${fx(y)} Z" fill="${GOLD_LIT}" stroke="#4a3208" stroke-width="${CW}" stroke-linejoin="round"/>`
-      s += `<rect x="${fx(x - g)}" y="${fx(y - g * 0.28)}" width="${fx(g * 2)}" height="${fx(g * 0.28)}" fill="${GOLD}" stroke="#4a3208" stroke-width="${CW}"/>`
-      for (const jx of [-0.5, 0, 0.5]) s += `<circle cx="${fx(x + jx * g)}" cy="${fx(y - g * 0.62)}" r="${fx(g * 0.16)}" fill="#c8434e" stroke="#4a3208" stroke-width="1"/>`
-    } else {
-      // goblet — solid gold cup on a stem, dark rim
-      s += `<path d="M ${fx(x - g * 0.72)} ${fx(y - g * 1.05)} L ${fx(x + g * 0.72)} ${fx(y - g * 1.05)} Q ${fx(x)} ${fx(y - g * 0.05)} ${fx(x - g * 0.72)} ${fx(y - g * 1.05)} Z" fill="${GOLD_LIT}" stroke="#4a3208" stroke-width="${CW}" stroke-linejoin="round"/>`
-      s += `<rect x="${fx(x - g * 0.12)}" y="${fx(y - g * 0.5)}" width="${fx(g * 0.24)}" height="${fx(g * 0.5)}" fill="${GOLD}" stroke="#4a3208" stroke-width="1"/>`
-      s += `<rect x="${fx(x - g * 0.5)}" y="${fx(y)}" width="${fx(g)}" height="${fx(g * 0.16)}" fill="${GOLD}" stroke="#4a3208" stroke-width="1"/>` // foot
-    }
-  })
-  // a few big gems catching light across the heap — thin-film accents
-  for (let i = 0; i < 9; i++) {
-    const x = rr(r, w * 0.08, w * 0.92), y = rr(r, h * 0.4, h * 0.94)
-    const col = ['#3f8f82', '#c8434e', '#a85577', '#8a6fd6'][i % 4]
-    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="${col}" stroke="${INK}" stroke-width="1.1" stroke-opacity="0.4"/>`
-    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 0 Z" fill="#ffffff" opacity="0.35"/>`
+    d += ` L ${w} ${fx(ySill)} L 0 ${fx(ySill)} Z`
+    s += `<path d="${d}" fill="${fill}"/>`
+    s += `<path d="${crestPath(c)}" fill="none" stroke="${lit}" stroke-width="${fx(h * 0.008)}" opacity="0.85"/>`
   }
+  // the lamp pool washing the lower half of every bay
+  for (const b of bays) {
+    s += `<ellipse cx="${fx(b.cx)}" cy="${fx(ySill)}" rx="${fx((b.x1 - b.x0) * 0.72)}" ry="${fx((ySill - ySpring) * 0.62)}" fill="${VAULT.foilHi}" opacity="0.6"/>`
+    s += `<ellipse cx="${fx(b.cx)}" cy="${fx(ySill)}" rx="${fx((b.x1 - b.x0) * 0.42)}" ry="${fx((ySill - ySpring) * 0.34)}" fill="${VAULT.foilHi}" opacity="0.55"/>`
+  }
+  // the glazing itself: transoms and one soft raking sheen per bay, so the
+  // opening reads as GLASS and not as a hole cut in a wall
+  for (const b of bays) {
+    for (const t of [0.28, 0.58, 0.84]) {
+      const y = ySpring + (ySill - ySpring) * t
+      s += `<line x1="${fx(b.x0)}" y1="${fx(y)}" x2="${fx(b.x1)}" y2="${fx(y)}" stroke="${VAULT.foil}" stroke-width="${fx(bw * 0.03)}" opacity="0.5"/>`
+    }
+    s +=
+      `<path d="M ${fx(b.x0)} ${fx(ySill)} L ${fx(b.cx - (b.x1 - b.x0) * 0.1)} ${fx(yCrown)} ` +
+      `L ${fx(b.cx + (b.x1 - b.x0) * 0.12)} ${fx(yCrown)} L ${fx(b.x0 + (b.x1 - b.x0) * 0.3)} ${fx(ySill)} Z" fill="#ffffff" opacity="0.1"/>`
+  }
+  s += `</g>`
+
+  // ---- the arch heads: a bone reveal round every opening ----
+  for (const b of bays) {
+    s += `<path d="${b.d}" fill="none" stroke="${VAULT.rim}" stroke-width="${fx(bw * 0.05)}" opacity="0.5"/>`
+    s += `<path d="${b.d}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(bw * 0.02)}" opacity="0.8"/>`
+  }
+
+  // ---- the piers. Every slat seam runs down one of these. ----
+  for (const uP of A.PIERS) {
+    const x = w * uP
+    s += `<rect x="${fx(x - pierW / 2)}" y="${fx(yCorn)}" width="${fx(pierW)}" height="${fx(yPlinth - yCorn)}" fill="url(#agPier)"/>`
+    // capital and base, and the lit arris the lamp finds on the near edge
+    s += `<rect x="${fx(x - pierW * 0.78)}" y="${fx(ySpring - h * 0.022)}" width="${fx(pierW * 1.56)}" height="${fx(h * 0.022)}" fill="${VAULT.foilDeep}"/>`
+    s += `<rect x="${fx(x - pierW * 0.78)}" y="${fx(ySpring - h * 0.028)}" width="${fx(pierW * 1.56)}" height="${fx(h * 0.007)}" fill="${VAULT.foilLit}" opacity="0.8"/>`
+    s += `<rect x="${fx(x - pierW * 0.86)}" y="${fx(ySill)}" width="${fx(pierW * 1.72)}" height="${fx(yPlinth - ySill)}" fill="${VAULT.foilDeep}"/>`
+    s += `<line x1="${fx(x - pierW * 0.34)}" y1="${fx(yCorn)}" x2="${fx(x - pierW * 0.34)}" y2="${fx(ySill)}" stroke="${VAULT.foilLit}" stroke-width="${fx(pierW * 0.1)}" opacity="0.55"/>`
+  }
+
+  // ---- the plinth the colonnade stands on ----
+  s += `<rect x="0" y="${fx(ySill)}" width="${w}" height="${fx(yPlinth - ySill)}" fill="${VAULT.foil}"/>`
+  s += `<rect x="0" y="${fx(ySill)}" width="${w}" height="${fx((yPlinth - ySill) * 0.3)}" fill="${VAULT.foilHi}" opacity="0.7"/>`
+  s += `<line x1="0" y1="${fx(yPlinth)}" x2="${w}" y2="${fx(yPlinth)}" stroke="${VAULT.ink}" stroke-width="${fx(h * 0.006)}" opacity="0.55"/>`
+
+  // ---- the paving: crest 3 becomes the receding joint lines ----
+  s += `<rect x="0" y="${fx(yPlinth)}" width="${w}" height="${fx(h - yPlinth)}" fill="url(#agFloor)"/>`
+  s += `<g clip-path="url(#agFloorClip)">`
+  // crest 3, FLATTENED toward its own baseline before it is laid on the floor.
+  // At full amplitude the three copies cross the perspective joints and the
+  // paving reads as cracked glass rather than as courses of stone.
+  const FLAT = 0.3
+  for (let k = 0; k < 3; k++) {
+    const dy = (h - yPlinth) * (0.3 * k + 0.08)
+    const c3 = crests[3]
+    let d = ''
+    for (const [i, [x, y]] of c3.pts.entries()) {
+      const yy = c3.baseY + (y - c3.baseY) * FLAT + dy
+      d += `${i === 0 ? 'M' : ' L'} ${fx(x)} ${fx(yy)}`
+    }
+    s += `<path d="${d}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.005)}" opacity="${(0.4 - k * 0.09).toFixed(2)}"/>`
+  }
+  // joints running away from the reader toward the lamp — the floor's perspective
+  for (let k = -5; k <= 5; k++) {
+    s += `<line x1="${fx(sun.x + k * bw * 0.7)}" y1="${fx(yPlinth)}" x2="${fx(sun.x + k * bw * 2.4)}" y2="${h}" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.0035)}" opacity="0.14"/>`
+  }
+  s += `</g>`
+
+  // ---- the walkers, at the camels' own x-stations ----
+  // Alternating gait, so four customers of a bank do not march in lockstep. The
+  // glyph HEIGHT is the same for every one of them — it is the number R3 gates
+  // against the dunes face's camels, and it is not a place to be clever.
+  for (const [i, [x]] of camels.entries()) {
+    s += arcadeWalker(x, h * (A.FIG_V - (i % 2) * 0.014), h * A.FIG_H, VAULT.ink, i === 2 ? -1 : 1)
+  }
+
+  // ---- the great LAMP, hung where the moon stood ----
+  // It hangs in a SHADOWED OCULUS. Without it the lantern sat on a wall as
+  // bright as itself and simply stopped reading as a light; with it the reveal
+  // gets the one thing the dunes face has and the gold face had not — a lamp
+  // glowing out of the dark — and the two landmarks become the same kind of
+  // object, which is what lets a reader (and R4) see them as one station.
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.34)}" fill="${VAULT.nightDeep}"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.34)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.009)}"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.28)}" fill="none" stroke="${VAULT.rim}" stroke-width="${fx(h * 0.003)}" opacity="0.45"/>`
+  for (let a = 0; a < 16; a++) {
+    const ang = (a / 16) * 6.283
+    s += `<line x1="${fx(sun.x + Math.cos(ang) * sun.r * 1.02)}" y1="${fx(sun.y + Math.sin(ang) * sun.r * 1.02)}" x2="${fx(sun.x + Math.cos(ang) * sun.r * 1.46)}" y2="${fx(sun.y + Math.sin(ang) * sun.r * 1.46)}" stroke="${VAULT.foilLit}" stroke-width="${fx(h * 0.004)}" opacity="0.55"/>`
+  }
+  s += `<line x1="${fx(sun.x)}" y1="0" x2="${fx(sun.x)}" y2="${fx(sun.y - sun.r * 0.9)}" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.006)}"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 1.12)}" fill="${VAULT.foilHi}" opacity="0.28"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r)}" fill="${VAULT.foilLit}" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.009)}"/>`
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.74)}" fill="none" stroke="${VAULT.rim}" stroke-width="${fx(h * 0.004)}" opacity="0.7"/>`
+  // the lamp's tracery: eight spokes and an ember heart — a rose medallion that
+  // is also a lantern, which is what the moon has to become here
+  for (let a = 0; a < 8; a++) {
+    const ang = (a / 8) * 6.283 + 0.39
+    s += `<line x1="${fx(sun.x + Math.cos(ang) * sun.r * 0.26)}" y1="${fx(sun.y + Math.sin(ang) * sun.r * 0.26)}" x2="${fx(sun.x + Math.cos(ang) * sun.r * 0.92)}" y2="${fx(sun.y + Math.sin(ang) * sun.r * 0.92)}" stroke="${VAULT.foilDeep}" stroke-width="${fx(h * 0.005)}" opacity="0.75"/>`
+  }
+  s += `<circle cx="${fx(sun.x)}" cy="${fx(sun.y)}" r="${fx(sun.r * 0.26)}" fill="${VAULT.ember}" stroke="${VAULT.ink}" stroke-width="${fx(h * 0.003)}" stroke-opacity="0.45"/>`
+  s += `<circle cx="${fx(sun.x - sun.r * 0.09)}" cy="${fx(sun.y - sun.r * 0.1)}" r="${fx(sun.r * 0.1)}" fill="${VAULT.foilHi}" opacity="0.9"/>`
+
   // the brass slot plate rides both faces (identical station: no flicker)
   s += brassPullPlate(w, h)
   return svgPiece(w, h, s, defs)
@@ -16622,6 +16882,16 @@ async function main() {
 
 export {
   S5_GLASS,
+  // Spread 5's round-2 repaints, exported for the same reason S5_GLASS is: a
+  // sample box typed by hand measures the typist. scripts/storybook/bench/
+  // s5r2-art-gates.mjs and __tests__/labs/storybook/s5-art-legibility.test.ts
+  // derive every station they probe from these.
+  S5_PLATE,
+  S5_ARCADE,
+  S5_DUNE_CAMEL,
+  dissolveScene,
+  dissolveDunes,
+  dissolveGold,
   citadelStrip,
   dovecoteFacade,
   CITADEL,
