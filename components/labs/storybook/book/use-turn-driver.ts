@@ -112,21 +112,6 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
   (spread === 0 && dir === 'next') || (spread === 1 && dir === 'prev')
 
 /**
- * Returns a ref whose `.current` is `{t: 0..1, dir, isCover}` while turning,
- * `null` at rest. Starts when `store.turning` flips truthy; once the main
- * sweep and its settle tail have both run (or a queued turn cuts the tail
- * short) it calls `completeTurn()` exactly once and resets its clock — if that commit
- * chain-promotes a queued turn, `turning` is still truthy on the very next
- * frame, so this hook re-arms automatically without any extra bookkeeping.
- *
- * Also the single owner of the turn's procedural sound cues (task 13): a
- * `creak()` the instant a cover turn arms, a `flip()` once `t` first passes
- * `FLIP_AT_T`, and a `thump()` on landing — each latched with its own
- * "fired" ref so a sustained condition (t past the threshold, isCover true)
- * plays exactly once per turn instead of once per frame. sbSound itself
- * no-ops unless sound is on, so these calls are unconditional here.
- */
-/**
  * THE SPREAD-EXIT RESET, AS ONE FUNCTION (S5R2-2).
  *
  * A blind reader of spread 5 reported the reset that BW-19 shipped simply not
@@ -162,6 +147,21 @@ export function commitSpread(committedSpread: { current: number }, next: number)
   committedSpread.current = next
 }
 
+/**
+ * Returns a ref whose `.current` is `{t: 0..1, dir, isCover}` while turning,
+ * `null` at rest. Starts when `store.turning` flips truthy; once the main
+ * sweep and its settle tail have both run (or a queued turn cuts the tail
+ * short) it calls `completeTurn()` exactly once and resets its clock — if that commit
+ * chain-promotes a queued turn, `turning` is still truthy on the very next
+ * frame, so this hook re-arms automatically without any extra bookkeeping.
+ *
+ * Also the single owner of the turn's procedural sound cues (task 13): a
+ * `creak()` the instant a cover turn arms, a `flip()` once `t` first passes
+ * `FLIP_AT_T`, and a `thump()` on landing — each latched with its own
+ * "fired" ref so a sustained condition (t past the threshold, isCover true)
+ * plays exactly once per turn instead of once per frame. sbSound itself
+ * no-ops unless sound is on, so these calls are unconditional here.
+ */
 export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committedSpread: RefObject<number> } {
   const frame = useRef<TurnFrame | null>(null)
   // The committed `spread`, mirrored off the store every frame so consumers
