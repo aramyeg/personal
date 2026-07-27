@@ -76,10 +76,30 @@ const cross = (a, b) => ({
 const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z
 const F = norm(sub(LOOK, CAM))
 const R_AX = norm(cross(F, { x: 0, y: 1, z: 0 }))
+// The VERTICAL view axis. §A-§C never needed it — a nave rank stands up off the
+// page, so its width is the resolution that matters and its height follows the
+// piece's own aspect. §D does need it: a PAGE-FLAT disc is squashed along the
+// view-up axis and not at all along the view-right one, and a bench with no
+// vertical term literally cannot express that. (See §D's header.)
+const U_AX = norm(cross(R_AX, F))
 const tanH = Math.tan(FOV_V / 2) * ASPECT
+const tanV = Math.tan(FOV_V / 2)
+const FRAME_H = FRAME_W / ASPECT
 const sxOf = (p) => {
   const v = sub(p, CAM)
   return dot(v, R_AX) / dot(v, F) / tanH
+}
+/** Full projection to SCREEN PIXELS, origin at frame centre, y down. Pixels are
+ *  square: tanV = tanH/ASPECT and FRAME_H = FRAME_W/ASPECT, so both axes carry
+ *  the same px-per-radian and a length is comparable between them. */
+const projPx = (p) => {
+  const v = sub(p, CAM)
+  const d = dot(v, F)
+  return {
+    px: (dot(v, R_AX) / d / tanH) * ((FRAME_W * CROP) / 2),
+    py: -(dot(v, U_AX) / d / tanV) * ((FRAME_H * CROP) / 2),
+    d,
+  }
 }
 
 /** The pixel width a rank's face spans on screen: its two base corners
@@ -100,30 +120,138 @@ const RANK_GEOM = {
 }
 
 // -------------------------------------------- the counting wheel's screen ----
-// The dial/card pair does NOT live on a nave rank, so it does not get its width
-// from RANK_GEOM. It lies on the s7 APRON — the near, roughly page-flat plane in
-// front of the fold — where the pinned camera resolves about this many screen
-// pixels per world unit in a 1600px-wide frame. Named, not buried: if the apron
-// scale ever changes, this one number is what moves.
-const APRON_PX_PER_WORLD = 555
-/** The wheel's world radius (content.ts assay item). */
-const WHEEL_WORLD_R = 0.13
-/** ...so the DISC itself is ~144 screen px across at 1x. This is the whole
- *  point of §D: rotational symmetry that is invisible at 640px is invisible
- *  at 144px too, but detail that only survives at 640px is a false pass. */
-const DISC_SCREEN_PX = 2 * WHEEL_WORLD_R * APRON_PX_PER_WORLD
+// THE DISC IS AN ELLIPSE, AND IT IS DERIVED, NOT TYPED.
+//
+// The dial/card pair does NOT live on a nave rank, so it does not get its size
+// from RANK_GEOM. It lies FLAT ON THE RIGHT PAGE, and the reading camera looks
+// down that page at a steep angle — so the reader receives an ELLIPSE whose
+// short axis is a little over half its long one, not a circle.
+//
+// What used to be here was `APRON_PX_PER_WORLD = 555` and `WHEEL_WORLD_R = 0.13`,
+// two hand-typed numbers producing one SQUARE raster. All three were wrong (see
+// §D's header for what that cost). Everything below is now computed from the
+// scene's own source-of-truth constants. They are mirrored here rather than
+// imported because they live in TypeScript that this .mjs cannot load; each one
+// carries its file:line so a drift is a diff, not a mystery. The house law is
+// DERIVED BOXES — a box typed by hand measures the typist.
+
+// components/labs/storybook/book/page-geometry.ts:15-16, :174-186
+const PAGE_W = 1.15
+const SHEET_STACK_T = 0.014
+const STACK_PEDESTAL = 0.02
+const HINGE_KAPPA = 0
+const INTERIOR_SHEETS = 9
+/** The spread ch6-assay lives on (content.ts:1878). */
+const ASSAY_SPREAD = 7
+
+/** page-geometry.ts:207-220, verbatim. The book never opens dead flat: the
+ *  unread sheets stacked under each page hold it up, so the page a piece rides
+ *  is TILTED, by an angle that depends on which spread you are on. */
+function restAngles(spread) {
+  const left = Math.max(0, spread - 1)
+  const right = INTERIOR_SHEETS + 1 - Math.max(1, spread)
+  const hL = STACK_PEDESTAL + left * SHEET_STACK_T
+  const hR = STACK_PEDESTAL + right * SHEET_STACK_T
+  const hinge = STACK_PEDESTAL + HINGE_KAPPA * Math.min(left, right) * SHEET_STACK_T
+  return { aL: Math.asin((hL - hinge) / PAGE_W), aR: Math.asin((hR - hinge) / PAGE_W) }
+}
+/** popup-mechanics.ts:1790 — at rest the right page sits at thetaR = aR.
+ *  Spread 7 => 2.09deg. Small, but it is real and it is free to carry. */
+const THETA_R = restAngles(ASSAY_SPREAD).aR
+
+// content.ts:1656-1663 — the ch6-assay volvelle item.
+const HUB_D = 0.47
+const HUB_Z = 0.505
+const WHEEL_WORLD_R = 0.165
+// popup-volvelle.ts:43 VOLVELLE_LIFT = ROTOR_LIFT = rivetLift(1) = 1*PLY + Z_GUARD
+// = 1*0.002 + 0.001 (lift-ladder.ts:26,33,36); book.tsx:123 POPUP_Y.
+const VOLVELLE_LIFT = 0.003
+const POPUP_Y = 0.062
+
+/** popup-volvelle.ts:180-192 volvelleHubFrame, side 'right'. The disc spins in
+ *  the orthonormal (e1, e2) plane, so it is a true circle in WORLD space — all
+ *  the squashing happens in the projection, which is the point. e1 is the page's
+ *  across-the-spine axis and maps to the baked sheet's U; e2 is the page's z and
+ *  maps to the sheet's V. */
+const E1 = { x: Math.cos(THETA_R), y: Math.sin(THETA_R), z: 0 }
+const E2 = { x: 0, y: 0, z: 1 }
+const PAGE_N = { x: -Math.sin(THETA_R), y: Math.cos(THETA_R), z: 0 }
+const HUB_WORLD = {
+  x: HUB_D * E1.x + VOLVELLE_LIFT * PAGE_N.x,
+  y: HUB_D * E1.y + VOLVELLE_LIFT * PAGE_N.y + POPUP_Y,
+  z: HUB_Z,
+}
+
+/** The two SEMI-AXES of the projected disc, as screen-pixel vectors: the images
+ *  of R*e1 and R*e2 under the camera. Their LENGTHS are the resolution the art
+ *  is delivered at along each of the sheet's own axes, which is exactly what a
+ *  legibility bench needs — a rotation or a shear in screen space moves detail
+ *  around but does not destroy it, whereas a shortened axis does. */
+const _hub = projPx(HUB_WORLD)
+const _axis = (e) => {
+  const q = projPx({ x: HUB_WORLD.x + e.x * WHEEL_WORLD_R, y: HUB_WORLD.y + e.y * WHEEL_WORLD_R, z: HUB_WORLD.z + e.z * WHEEL_WORLD_R })
+  return Math.hypot(q.px - _hub.px, q.py - _hub.py)
+}
+const DISC_SCREEN_W = 2 * _axis(E1)
+const DISC_SCREEN_H = 2 * _axis(E2)
+/** ~0.62 at spread 7. THIS is the number the old §D silently assumed was 1.0. */
+const FORESHORTEN = DISC_SCREEN_H / DISC_SCREEN_W
+
 /** The dial/card SHEETS are baked 640x640 with the disc spanning 2*ASSAY_R of
- *  the sheet, so the sheet's screen width is the disc's, scaled back out by the
- *  same basis. Resizing the sheet to this keeps R = W*ASSAY_R true at every
- *  resolution — which is exactly the registration contract the pair is an
- *  atlas exemption to preserve. */
-const ASSAY_SHEET_PX = Math.round(DISC_SCREEN_PX / (2 * ASSAY_R))
+ *  the sheet, so each sheet axis is scaled back out from the corresponding disc
+ *  axis by the same basis. Resizing the sheet to these keeps R = W*ASSAY_R true
+ *  along U and R = H*ASSAY_R along V — the registration contract the pair is an
+ *  atlas exemption to preserve — while delivering the ANISOTROPY the reader
+ *  actually gets. */
+const ASSAY_SHEET_W = Math.round(DISC_SCREEN_W / (2 * ASSAY_R))
+const ASSAY_SHEET_H = Math.round(DISC_SCREEN_H / (2 * ASSAY_R))
+
+/** The exact projected outline, for reporting: the true ellipse's screen bbox
+ *  and area. The (W x H) resolution model above is separately right for
+ *  measuring detail, but it is an axis-aligned box around a SHEARED ellipse, so
+ *  it overstates area by a few percent. Both numbers are printed in §D rather
+ *  than one being quietly preferred. */
+function discOutline() {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+  const pts = []
+  for (let i = 0; i < 720; i++) {
+    const a = (i / 720) * 2 * Math.PI
+    const c = Math.cos(a) * WHEEL_WORLD_R
+    const s = Math.sin(a) * WHEEL_WORLD_R
+    const q = projPx({ x: HUB_WORLD.x + E1.x * c + E2.x * s, y: HUB_WORLD.y + E1.y * c + E2.y * s, z: HUB_WORLD.z + E1.z * c + E2.z * s })
+    pts.push(q)
+    x0 = Math.min(x0, q.px); x1 = Math.max(x1, q.px); y0 = Math.min(y0, q.py); y1 = Math.max(y1, q.py)
+  }
+  let a2 = 0
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]
+    const n = pts[(i + 1) % pts.length]
+    a2 += p.px * n.py - n.px * p.py
+  }
+  return { w: x1 - x0, h: y1 - y0, area: Math.abs(a2) / 2 }
+}
 
 // ---------------------------------------------------------------- sampling --
 /** Rasterize a mask SVG at the measurement size; white = sampled. */
 async function maskOf(body, W, H) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#000"/>${body}</svg>`
   const { data } = await sharp(Buffer.from(svg)).greyscale().raw().toBuffer({ resolveWithObject: true })
+  return data
+}
+
+/** Rasterize a mask in the PAINTER'S OWN square basis, then squash it to the
+ *  measurement raster by exactly the resize the ART gets. §D needs this: its
+ *  raster is anisotropic, so a circle in the painter's basis is an ellipse on
+ *  screen, and a mask drawn with circular maths directly at the screen size
+ *  would no longer sit over the apertures it is supposed to be sampling.
+ *  Deriving both from one square basis makes mis-registration impossible. */
+async function maskOfSquashed(body, srcS, W, H) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${srcS}" height="${srcS}" viewBox="0 0 ${srcS} ${srcS}"><rect width="${srcS}" height="${srcS}" fill="#000"/>${body}</svg>`
+  const { data } = await sharp(Buffer.from(svg))
+    .resize(W, H, { fit: 'fill' })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
   return data
 }
 
@@ -405,6 +533,31 @@ async function sectionC(dir) {
 // Gate 2 (the 8 window luminances must not all sit within 6) is an independent
 // check that ASSAY_VAULTS' third axis — the field tint — is doing work, so the
 // deltas are not carried by the gold devices alone.
+//
+// ---------------------------------------------------------------------------
+// THE DEFECT THIS SECTION ONCE HAD, NAMED SO IT CANNOT COME BACK:
+// A BENCH THAT MEASURES A BIGGER PICTURE THAN THE READER GETS.
+//
+// §D used to rasterise the wheel as a SQUARE disc off a typed
+// `APRON_PX_PER_WORLD = 555`. But the wheel lies PAGE-FLAT and the reading
+// camera looks down the page at a steep angle, so the reader's disc is an
+// ELLIPSE about 0.62 as tall as it is wide. The bench was reading roughly 1.6x
+// the area the reader receives, and it passed while a blind re-reader turned
+// the wheel two full revolutions and reported "I could not find one thing in
+// the scene it changes" — the change was arriving at ~12x10 px per vitrine
+// (S7R2-1b; content.ts:1620-1624 records it). BOTH NUMBERS WERE TRUE. One was
+// misleading. That is the THIRD time this project has shipped a false finding
+// of exactly this shape, which is why LAW 2 at the top of this file exists and
+// why every extent below is derived from the scene's own constants.
+//
+// The rule that kills it: a legibility bench may never assume a piece faces the
+// camera square-on. If the piece rides the page, project it — the page is
+// tilted (restAngles) and the camera is pitched, and both belong in the number.
+// Two independent checks that this section is still honest: the printed
+// foreshortening ratio must be well under 1.0, and the sheet raster must be
+// visibly NON-SQUARE. If either drifts back toward 1.0, someone has re-flattened
+// the disc.
+// ---------------------------------------------------------------------------
 
 /** annularSectorPath's geometry, rebuilt from the exported polar helpers so the
  *  mask traces the painter's aperture rather than an approximation of it. */
@@ -462,8 +615,13 @@ async function detentRaster(dialPng, cardPng, srcW, srcH, deg) {
   const stacked = cardPng
     ? await sharp(centred).composite([{ input: cardPng, left: 0, top: 0 }]).png().toBuffer()
     : centred
+  // ANISOTROPIC on purpose — this is the foreshortening. The rotation above
+  // happens at bake resolution in the SHEET's square basis (which is where the
+  // dial physically rotates: it spins in the page plane, not in screen space),
+  // and only then is the result squashed to the ellipse the camera delivers.
+  // Squashing first and rotating after would be a different, wrong mechanism.
   const { data } = await sharp(stacked)
-    .resize(ASSAY_SHEET_PX, ASSAY_SHEET_PX, { fit: 'fill' })
+    .resize(ASSAY_SHEET_W, ASSAY_SHEET_H, { fit: 'fill' })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
@@ -483,29 +641,54 @@ async function sectionD(dir) {
     .png()
     .toBuffer()
 
-  // The aperture mask, at the wheel's screen size, off the painter's basis.
-  const Wq = ASSAY_SHEET_PX
-  const cx = Wq / 2
-  const cy = Wq / 2
-  const Rq = Wq * ASSAY_R
+  // The aperture mask: drawn in the painter's OWN square basis with the
+  // painter's own polar helpers, then squashed by exactly the resize the art
+  // gets. Registration is therefore structural, not asserted.
+  const cx = srcW / 2
+  const cy = srcH / 2
+  const Rq = srcW * ASSAY_R
   const bandIn = Rq * ASSAY_BAND[0]
   const bandOut = Rq * ASSAY_BAND[1]
-  const winMask = await maskOf(
+  const winMask = await maskOfSquashed(
     ASSAY_WINS.map(
       (psi) => `<path d="${sectorPath(cx, cy, psi, ASSAY_HALFW, bandIn, bandOut)}" fill="#fff"/>`
     ).join(''),
-    Wq,
-    Wq
+    srcW,
+    ASSAY_SHEET_W,
+    ASSAY_SHEET_H
   )
-  const n = Wq * Wq
+  const n = ASSAY_SHEET_W * ASSAY_SHEET_H
 
+  const outline = discOutline()
   process.stdout.write(
-    `      apron ${APRON_PX_PER_WORLD}px/world x wheel r=${WHEEL_WORLD_R} => disc ${DISC_SCREEN_PX.toFixed(1)}px, ` +
-      `sheet ${ASSAY_SHEET_PX}px (baked ${srcW}x${srcH})\n`
+    `      page-flat projection: spread ${ASSAY_SPREAD} right-page tilt ${((THETA_R * 180) / Math.PI).toFixed(2)}deg, ` +
+      `hub (${HUB_WORLD.x.toFixed(3)}, ${HUB_WORLD.y.toFixed(3)}, ${HUB_WORLD.z.toFixed(3)}), r=${WHEEL_WORLD_R}\n` +
+      `      => disc ${DISC_SCREEN_W.toFixed(1)} x ${DISC_SCREEN_H.toFixed(1)} px ` +
+      `(FORESHORTENING ${FORESHORTEN.toFixed(3)}; 1.000 would mean the disc faces the camera, which it does not)\n` +
+      `      => sheet raster ${ASSAY_SHEET_W}x${ASSAY_SHEET_H} (baked ${srcW}x${srcH}), ` +
+      `derived px/world ${(DISC_SCREEN_W / 2 / WHEEL_WORLD_R).toFixed(1)}\n` +
+      `      exact projected outline: bbox ${outline.w.toFixed(1)} x ${outline.h.toFixed(1)} px, area ${outline.area.toFixed(0)}px^2\n`
   )
 
   const frames = []
   for (let d = 0; d < 8; d++) frames.push(await detentRaster(dialPng, cardPng, srcW, srcH, d * 45))
+
+  // ---- HOW BIG IS THE CHANGE, in the reader's pixels? ----------------------
+  // The gates below are all INTENSITY (is the change strong enough). S7R2-1b was
+  // not an intensity failure — it was a SIZE failure: the vitrines framed ~12x10
+  // px each, so a perfectly strong delta arrived too small to notice. That is
+  // the quantity the old square raster could not express, and it is reported
+  // here in the reader's own pixels so the next lane can see it directly.
+  // Deliberately UNGATED: the figure that failed (~120px^2 per vitrine) is
+  // evidence, but no one has established where the floor sits, and inventing a
+  // bar to sit just above a known-bad number would be exactly the retuning this
+  // file forbids. Read it, and if it collapses, that is a finding.
+  let winPx = 0
+  for (let i = 0; i < n; i++) if (winMask[i] >= 128) winPx++
+  process.stdout.write(
+    `      DELIVERED APERTURE: ${winPx}px^2 across ${ASSAY_WINS.length} vitrines = ` +
+      `${Math.round(winPx / ASSAY_WINS.length)}px^2 each (S7R2-1b failed the reader at ~120px^2 each)\n`
+  )
 
   const lums = frames.map((f) => stats(f, winMask, n))
   process.stdout.write('      window-mask mean luminance per detent:\n')
@@ -540,7 +723,7 @@ async function sectionD(dir) {
   for (let d = 0; d < 8; d++) minBare = Math.min(minBare, chanDiff(bare[d], bare[(d + 1) % 8], winMask, n).mad)
 
   const cardRaw = await sharp(cardPng)
-    .resize(ASSAY_SHEET_PX, ASSAY_SHEET_PX, { fit: 'fill' })
+    .resize(ASSAY_SHEET_W, ASSAY_SHEET_H, { fit: 'fill' })
     .ensureAlpha()
     .raw()
     .toBuffer()
