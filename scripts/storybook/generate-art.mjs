@@ -1,4 +1,7 @@
-#!/usr/bin/env node
+// (NO SHEBANG. This file is tracked non-executable and is documented as
+//  `node scripts/storybook/generate-art.mjs`, so the shebang was decoration —
+//  and vitest's module evaluator chokes on it, which locked every helper in
+//  here out of a unit gate. Do not re-add it.)
 /**
  * CODE-GENERATED PAPER ART (E2 procedural-art lane). A SINGLE pure art module
  * per piece emits BOTH
@@ -3311,6 +3314,288 @@ function brassPullPlate(w, h) {
 // (RETIRED — dissolveTabPlate. Both s5 tongues now come out of the shared
 //  pullTongue painter above: one vocabulary for the spread's two handles, and
 //  the same struck-token/chevron/stitched-root grammar on each.)
+
+// ============================================================================
+// THE PAPER-CUE VOCABULARY (E3 affordance language, the user's law of
+// 2026-07-26, verbatim):
+//
+//   "AFFORDANCE LANGUAGE: written action labels near triggers ('bluntly
+//    written') are OUT. Triggers must read through PAPER language: shadow,
+//    elevation, a visible cut or glue line, subtle arrows (the chapter-4/s5
+//    ember-arrow style is the approved reference — 'subtle and
+//    understandable'). The Wave-2 label plates (LIFT/HOIST/SPIN/SEND/TURN/
+//    STIR) are now a transitional style to be replaced by physical cues as
+//    spreads cycle through the loop."
+//
+// So: three marks, one per paper phenomenon, and NOTHING that spells a verb.
+//
+//   cutShadow        — the page is SEVERED here; something comes through it.
+//   raisedEdgeShadow — this piece is LOOSE and stands proud of the page.
+//   cueArrow         — which way it moves, as printed ornament (the s5
+//                      pullTongue/brassPullPlate ember family, generalised).
+//
+// These are MACHINERY, not scene work: a per-spread art pass calls them where
+// its label plate used to be and deletes the plate. Nothing here paints
+// anything on its own.
+//
+// House rules they keep: pure functions (explicit geometry in, SVG fragment
+// string out, no enclosing-piece scope, no ids to plumb); no filters, because
+// librsvg's blur/turbulence support is the same gamble feTurbulence already
+// lost here — every soft edge is a stack of stepped translated copies, which
+// also rasterises byte-identically; and no PRNG at all, since the marks are
+// wholly geometric, so two bakes of the same inputs are identical by
+// construction rather than by seeding discipline.
+// ============================================================================
+
+// THE SHARED KEY LIGHT. components/labs/storybook/book/shadow-light.ts owns the
+// book's ONE lamp — up-screen-left and high, so every lifted piece throws its
+// pool DOWN-SCREEN-RIGHT along the page-plane vector (CAST_RAW_X 1, CAST_RAW_Z
+// 0.72) at cot(elevation) = 0.6 per unit of stand height. A bake-time .mjs
+// cannot import that TS module, so its numbers are mirrored here ONCE. Before
+// this block the painter had no light constant at all: each piece described its
+// lighting in prose and picked offsets by eye, which is exactly how a cut
+// shadow and a contact pool on the same spread end up disagreeing. Change one
+// side of this mirror and you must change the other.
+//
+// Axes: for a page-flat print, image +x is screen-right (page +x) and image +y
+// is screen-down (page +z), so the cast vector transfers component for
+// component. A piece whose texture axes are rotated (the s5 tongue's v runs
+// along the page-fore axis) passes its own `light` — that is the ONE legitimate
+// per-call-site override, and it is a rotation of the shared light, not a new
+// lamp.
+const CUE_CAST_RAW_X = 1
+const CUE_CAST_RAW_Z = 0.72
+const CUE_CAST_LEN = Math.hypot(CUE_CAST_RAW_X, CUE_CAST_RAW_Z)
+const CUE_LIGHT = { x: CUE_CAST_RAW_X / CUE_CAST_LEN, y: CUE_CAST_RAW_Z / CUE_CAST_LEN }
+
+/** cot(light elevation) — pool offset per unit of stand height. Mirrors
+ *  shadow-light.ts THROW_PER_HEIGHT. */
+const CUE_THROW = 0.6
+
+/** Stepped-penumbra layer count. Five reads as soft at bake resolution and
+ *  still rasterises in one pass. */
+const CUE_PENUMBRA_STEPS = 5
+
+/**
+ * SUBTLETY CEILINGS — the reason a call site cannot quietly turn a printed cue
+ * into a UI badge. Every cue clamps against these, so making a mark louder than
+ * the book's ornament language takes editing THIS table, in the open, and
+ * facing the gate in __tests__/labs/storybook/paper-cues.test.ts.
+ */
+const CUE_LIMITS = {
+  /** Max opacity of any single mark (and of a stacked pool's composite). The
+   *  s5 reference sits at 0.45 stroke-opacity; nothing may out-shout it. */
+  opacity: 0.5,
+  /** Cut hairline stroke width, as a fraction of the penumbra reach. */
+  cutHair: 0.6,
+  /** Widest penumbra band stroke width, as a fraction of the penumbra reach. */
+  penumbra: 2.2,
+  /** Arrow/chevron stroke width, as a fraction of the arrow's declared size. */
+  arrowStroke: 0.1,
+}
+
+const cueNum = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+const cueClamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+/** Opacity attribute value, clamped to the ceiling and fixed to 2dp so the
+ *  fragment is byte-stable across platforms. */
+const cueOp = (v) => cueClamp(cueNum(v, 0), 0, CUE_LIMITS.opacity).toFixed(2)
+/** Unit cast direction, falling back to the shared light when a caller hands
+ *  over a degenerate or non-finite vector (a NaN light must not reach a coord). */
+function cueUnit(light) {
+  const x = cueNum(light?.x, CUE_LIGHT.x)
+  const y = cueNum(light?.y, CUE_LIGHT.y)
+  const len = Math.hypot(x, y)
+  return len > 1e-6 ? { x: x / len, y: y / len } : { x: CUE_LIGHT.x, y: CUE_LIGHT.y }
+}
+/** A translated copy of a fragment — the house substitute for a blur filter. */
+const cueShift = (dx, dy, inner) => `<g transform="translate(${fx(dx)} ${fx(dy)})">${inner}</g>`
+
+/**
+ * A VISIBLE CUT (the user's "a visible cut or glue line"). What a die-cut slit
+ * does to a printed page: the severed edge is a dark hairline; the flap that
+ * lifts away from it stops carrying light to the page just past the cut, so a
+ * soft penumbra spills DOWN-LIGHT of the slit; and the far lip — the edge still
+ * facing the lamp — shows the raw paper core, a shade brighter than the print.
+ * Read together they say "something comes through here", with no verb printed.
+ *
+ * Geometry: the cut runs (x0,y0)->(x1,y1); pass `opts.d` to run it along an
+ * arbitrary path instead (the endpoints then only set the default reach). The
+ * penumbra is a stack of copies translated along the cast direction, so a cut
+ * lying ALONG the light shows almost no band — which is correct: a slit edge-on
+ * to the lamp has nothing to spill.
+ *
+ * Subtlety: `strength` is clamped to [0,1] and every mark passes through cueOp,
+ * so no call site can push this past CUE_LIMITS.opacity.
+ *
+ *   opts: { d, spread, hair, strength, ink, lip, light, steps }
+ */
+function cutShadow(x0, y0, x1, y1, opts = {}) {
+  const { d, ink = INK, lip = RIM, light = CUE_LIGHT } = opts
+  const ax = cueNum(x0, 0)
+  const ay = cueNum(y0, 0)
+  const bx = cueNum(x1, 0)
+  const by = cueNum(y1, 0)
+  const len = Math.max(1e-3, Math.hypot(bx - ax, by - ay))
+  const u = cueUnit(light)
+  const k = cueClamp(cueNum(opts.strength, 1), 0, 1)
+  const steps = Math.round(cueClamp(cueNum(opts.steps, CUE_PENUMBRA_STEPS), 1, 8))
+  // Reach: how far down-light the spill carries. Scales with the cut so a long
+  // slit in a page and a short one in a tab read as the same paper.
+  const reach = Math.max(0.75, cueNum(opts.spread, len * 0.035))
+  const hair = cueClamp(cueNum(opts.hair, Math.max(0.8, reach * 0.42)), 0.35, reach * CUE_LIMITS.cutHair)
+  const path =
+    typeof d === 'string' && d.length > 0 ? d : `M ${fx(ax)} ${fx(ay)} L ${fx(bx)} ${fx(by)}`
+  const stroke = (color, w, op) =>
+    `<path d="${path}" fill="none" stroke="${color}" stroke-width="${fx(w)}" opacity="${op}" stroke-linecap="round" stroke-linejoin="round"/>`
+  // 1. the lit lip, up-light of the cut: raw paper core showing at the edge
+  let s = cueShift(-u.x * reach * 0.35, -u.y * reach * 0.35, stroke(lip, hair * 1.5, cueOp(0.3 * k)))
+  // 2. the penumbra, far band first so the near ones lie over it
+  for (let i = steps; i >= 1; i--) {
+    const t = i / steps
+    const w = Math.min(hair * (1 + 1.8 * t), reach * CUE_LIMITS.penumbra)
+    s += cueShift(u.x * reach * t, u.y * reach * t, stroke(ink, w, cueOp(0.2 * k * (1 - 0.6 * t))))
+  }
+  // 3. the cut itself: the darkest, thinnest line on the page
+  s += stroke(ink, hair, cueOp(0.5 * k))
+  return s
+}
+
+/**
+ * A RAISED EDGE (the user's "shadow, elevation"). The drop a piece standing a
+ * millimetre proud of the page casts on the page beneath — offset along the
+ * shared cast direction by lift * cot(elevation), deepest where the piece meets
+ * the page and fading outward — plus the brightening of the lifted edge itself
+ * where it turns into the lamp. This is the mark that says "this one is loose
+ * and sits on top", which is the whole of what a LIFT plate used to say.
+ *
+ * The two halves live on DIFFERENT textures, so `part` selects:
+ *   'pool' — on the page/base texture under the piece (the piece is a separate
+ *            mesh, so its own art is not in this SVG at all).
+ *   'lip'  — on the piece's own texture, over its fill, like rimPath.
+ *   'both' — one SVG that contains base and piece (a flap painted into a page).
+ *
+ * `d` is the piece's silhouette path in this SVG's coordinates; `lift` is how
+ * proud it stands, in those same units.
+ *
+ * Subtlety: the pool is a stack of filled copies, so the per-layer opacities are
+ * chosen such that even the COMPOSITE at the contact line lands under
+ * CUE_LIMITS.opacity — a contact shadow, never a slab.
+ *
+ *   opts: { lift, part, strength, ink, lip, light, steps }
+ */
+function raisedEdgeShadow(d, opts = {}) {
+  const { part = 'both', ink = INK, lip = RIM, light = CUE_LIGHT } = opts
+  const path = typeof d === 'string' && d.length > 0 ? d : ''
+  if (!path) return ''
+  const u = cueUnit(light)
+  const k = cueClamp(cueNum(opts.strength, 1), 0, 1)
+  const steps = Math.round(cueClamp(cueNum(opts.steps, CUE_PENUMBRA_STEPS), 1, 8))
+  const lift = Math.max(0.2, cueNum(opts.lift, 1.6))
+  const reach = Math.max(0.5, lift * CUE_THROW)
+  let s = ''
+  if (part === 'pool' || part === 'both') {
+    for (let i = steps; i >= 1; i--) {
+      const t = i / steps
+      s += cueShift(
+        u.x * reach * t,
+        u.y * reach * t,
+        `<path d="${path}" fill="${ink}" opacity="${cueOp(0.13 * k * (1 - 0.55 * t))}"/>`
+      )
+    }
+  }
+  if (part === 'lip' || part === 'both') {
+    // Offset UP-light: the stroke rides the edge that faces the lamp and hides
+    // under the piece's own rim on the away side.
+    const off = Math.max(0.4, reach * 0.3)
+    const w = Math.max(0.9, lift * 0.55)
+    s += cueShift(
+      -u.x * off,
+      -u.y * off,
+      `<path d="${path}" fill="none" stroke="${lip}" stroke-width="${fx(w)}" opacity="${cueOp(0.34 * k)}" stroke-linejoin="round"/>`
+    )
+  }
+  return s
+}
+
+/**
+ * THE SUBTLE ARROW (the user's "subtle arrows… the chapter-4/s5 ember-arrow
+ * style is the approved reference"). The family is lifted straight off the two
+ * approved marks: pullTongue's "ONE big ember arrow aimed OUT of the page" (an
+ * ember fill, an ink stroke at 0.45 opacity, round linejoin, a 7-vertex
+ * head-and-shaft silhouette whose shaft is 0.42 of the head half-width, and a
+ * white 0.22 sheen across the head) and brassPullPlate's repeated stroke-only
+ * ember chevrons (round cap and join). Both variants are offered because the
+ * reference contains both: one arrow where a single move is meant, chevrons
+ * where a direction is meant.
+ *
+ * Generalised on the one axis the reference lacked: `dir` is any angle in
+ * degrees in SVG space (0 = image-right, 90 = image-down, -90 = image-up, the
+ * reference's own direction). Coordinates are emitted ALREADY ROTATED rather
+ * than wrapped in a transform, so the mark's real extent is inspectable — it
+ * stays inside the box of `size` centred on (x, y), stroke included.
+ *
+ * Subtlety: this is printed ornament. Fill and stroke opacities clamp to
+ * CUE_LIMITS.opacity and the stroke to CUE_LIMITS.arrowStroke * size, so a call
+ * site cannot grow it into a UI badge without editing the ceilings.
+ *
+ *   opts: { dir, variant: 'arrow' | 'chevrons', count, weight, opacity, hue,
+ *           ink, sheen }
+ */
+function cueArrow(x, y, size, opts = {}) {
+  const { variant = 'arrow', hue = VAULT.ember, ink = INK, sheen = true } = opts
+  const cx = cueNum(x, 0)
+  const cy = cueNum(y, 0)
+  const S = Math.max(1, cueNum(size, 1))
+  const rad = cueNum(opts.dir, -90) * D2R
+  // Along-axis and its left normal, in SVG space (y down).
+  const ux = Math.cos(rad)
+  const uy = Math.sin(rad)
+  const nx = -uy
+  const ny = ux
+  const P = (a, p) => `${fx(cx + a * ux + p * nx)} ${fx(cy + a * uy + p * ny)}`
+  const k = cueClamp(cueNum(opts.opacity, 0.45), 0, 1)
+  const sw = cueClamp(cueNum(opts.weight, 1) * S * 0.075, S * 0.01, S * CUE_LIMITS.arrowStroke)
+
+  if (variant === 'chevrons') {
+    // brassPullPlate's stacked V's: stroke-only ember, round cap and join.
+    // Span and half-span are sized so the arm ends stay inside size/2 with half
+    // the stroke added on.
+    const n = Math.round(cueClamp(cueNum(opts.count, 3), 1, 5))
+    const span = S * 0.8
+    const half = S * 0.17
+    const chev = S * 0.2
+    const step = n > 1 ? (span - chev) / (n - 1) : 0
+    let s = ''
+    for (let i = 0; i < n; i++) {
+      const a = span / 2 - i * step
+      s +=
+        `<path d="M ${P(a - chev, -half)} L ${P(a, 0)} L ${P(a - chev, half)}" fill="none" ` +
+        `stroke="${hue}" stroke-width="${fx(sw)}" opacity="${cueOp(k)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    }
+    return s
+  }
+
+  // The single arrow: pullTongue's seven vertices, in proportion.
+  const L = S * 0.86
+  const headHalf = L * 0.3
+  const shaftHalf = headHalf * 0.42
+  const aTip = L / 2
+  const aHead = aTip - L * 0.62
+  const aTail = -L / 2
+  let s =
+    `<path d="M ${P(aTip, 0)} L ${P(aHead, headHalf)} L ${P(aHead, shaftHalf)} L ${P(aTail, shaftHalf)} ` +
+    `L ${P(aTail, -shaftHalf)} L ${P(aHead, -shaftHalf)} L ${P(aHead, -headHalf)} Z" ` +
+    `fill="${hue}" fill-opacity="${cueOp(k)}" stroke="${ink}" stroke-width="${fx(sw * 0.4)}" ` +
+    `stroke-opacity="${cueOp(0.45)}" stroke-linejoin="round"/>`
+  if (sheen) {
+    // The reference's white wash across the head — the ember catching the same
+    // lamp the shadows answer to.
+    s +=
+      `<path d="M ${P(aTip - L * 0.11, 0)} L ${P(aHead + L * 0.04, headHalf * 0.62)} ` +
+      `L ${P(aHead + L * 0.04, -headHalf * 0.62)} Z" fill="#ffffff" opacity="${cueOp(0.22)}"/>`
+  }
+  return s
+}
 
 /** THE SPREAD-5 FLOOR PRINT (page-5, full-bleed page faces): rippled
  *  sand-to-gold fans leading from the apron (image bottom = near) to the
@@ -15170,6 +15455,15 @@ export {
   ATLASES,
   ATLAS_PAGE,
   writeAtlases,
+  // The paper-cue vocabulary (affordance language) + the light and the ceilings
+  // it answers to, exported so per-spread art passes and the gate in
+  // __tests__/labs/storybook/paper-cues.test.ts read the SAME numbers.
+  CUE_LIGHT,
+  CUE_THROW,
+  CUE_LIMITS,
+  cutShadow,
+  raisedEdgeShadow,
+  cueArrow,
 }
 
 if (pathToFileURL(process.argv[1]).href === import.meta.url) {
