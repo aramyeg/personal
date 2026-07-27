@@ -1275,7 +1275,18 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   //  - restDeg 5 rather than 0: a leaf at exactly 0 is coplanar with the page it
   //    is glued to and z-fights the floor print. At 5 degrees the free edge sits
   //    a scored-fold's height proud — which is also the grab lip.
-  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.52, slot: 0.3, slotZ: 0.52, hingeX: 0.62, hingeZ: 0.52, width: 0.6, height: 0.2, restDeg: 5, travelDeg: [5, 90] },
+  //  - ripple (ROUND-2 A-4): "the six stalls rise in perfect unison. No stagger,
+  //    no ripple, no wave. The one place the page could have earned 'a thousand
+  //    stalls, raised by any pair of willing hands' and it moves like a single
+  //    rigid object." The rank is now hinged as the six cards it is PRINTED as
+  //    (they tile the same 0.6 of hinge line, so its footprint, hit surface and
+  //    shadow are the ones that shipped), each lagging its neighbour by 5% of
+  //    the reader's stroke — the family cap, 25% spent across the row. Every
+  //    card still ends at the same angle: identical is the point, and the wave
+  //    is what makes six identical things read as six pairs of hands rather
+  //    than one machine. Free mechanically — the phase map is bounded above by
+  //    the rank's own progress at every point (popup-mechanics.ts).
+  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.52, slot: 0.3, slotZ: 0.52, hingeX: 0.62, hingeZ: 0.52, width: 0.6, height: 0.2, restDeg: 5, travelDeg: [5, 90], ripple: { count: 6, lag: 0.05 } },
   // TEA CORNER — the intimate counterweight, right apron, over a painted rug.
   //
   // TRAVEL WINDOW (S6-3): "Drag it down or right and it rotates past flat and
@@ -1305,7 +1316,44 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // shadow stop drawing through the fast middle of a turn and ramp back
   // inside the landing settle. Geometry is verbatim — no solver, pose or
   // fold-flat proof is touched.
-  { id: 'ch5-raise-stall', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 60, turnCull: true },
+  //
+  // ROUND-2, THE STORY INVERSION (A-3). The blind reader found the mechanism
+  // running backwards to its own prose a second time, in a subtler way: "the
+  // COLLAPSED state (the X-braced flat template) is far more beautiful than the
+  // raised one, which inverts the whole point of the mechanism", and "the rest
+  // state is a half-built stall — ~60% raised at load, not flat, not standing.
+  // It reads as unfinished, and it hides the flat-pattern state, which is the
+  // state that actually illustrates the text."
+  //
+  // So the rest lift drops 60 -> 7 degrees: the spread opens on the MASTER
+  // PATTERN lying flat on the page — the thing the prose actually celebrates
+  // ("he carved master patterns from which any stall could be raised in a day")
+  // — and the reader's pull is what raises it. 7 rather than 0 for the strip
+  // flap's own reason: a leaf at exactly 0 is coplanar with the page it is glued
+  // to and z-fights the floor print; at 7 degrees the fold sits a scored crease
+  // proud, which is also the grab lip. The reader's stop is untouched at 88.
+  //
+  // THE RAIL (A-2). "The pull tab travels off the page into the void. At full
+  // pull the tab card is entirely off the left page edge, floating over black
+  // table AND overlapping the body-copy column." The strip now comes up through
+  // a slot cut in the page at d = 0.60 and the tab is a 0.14 card riding ON the
+  // paper. Full pull draws 2*legW*(1-cos 88) = 0.3474, so the card's outer tip
+  // stops at 0.60 + 0.3474 + 0.14 = 1.087 — 0.063 inside the fore edge at
+  // PAGE_W = 1.15. The tab can no longer leave the paper at any reachable draw.
+  //
+  // WHICH LANE, and why not the obvious one. The finding has TWO halves and the
+  // second is not fixed by staying on the paper: this spread's chapter column is
+  // HTML laid over the book, and at the pinned reading camera it covers the left
+  // page's own fore half (measured off the 1x capture: the copy occupies roughly
+  // x <= 437, y <= 615 of a 1600x900 frame). A lane on the gutter side of the
+  // structure (z 0.14..0.28) puts the card at (311..390, 588..625) at full pull —
+  // still under the last line of the paragraph. The lane therefore sits on the
+  // READER's side of the structure instead, z 0.645..0.745: the whole travel
+  // lands below the text block, the handle is between the reader and the pattern
+  // it raises (which is where a hand goes), and it is still clear of the
+  // structure's own z band and of both terrace treads, which never reach past
+  // d = 0.30. z1 = 0.745 keeps a 0.005 margin inside PAGE_H/2 = 0.75.
+  { id: 'ch5-raise-stall', kind: 'midground', role: 'scenery', mech: 'tabpiece', side: 'left', form: 'table', hingeX: 0.9, z0: 0.36, z1: 0.64, legW: 0.18, deckD: 0.2, liftDeg: 7, turnCull: true, rail: { slitD: 0.6, tabLen: 0.14, z0: 0.645, z1: 0.745 } },
 ]
 
 // Chapter VI — the crescendo steps THROUGH the door (E3 s7 scene pack,

@@ -106,6 +106,9 @@ const CUT_EDGE_COLOR = '#f6eedb'
 /** Page-flat handle: the reading camera foreshortens it hard, so it takes
  *  the generous pad (handle-hit.ts). */
 const TOUCH_SLOP = HANDLE_SLOP_FLAT
+/** Rest lift, as a fraction of the mechanical stop, below which a tab piece is
+ *  READER-raised rather than page-raised (see the shadow spec). */
+const READER_RAISED_REST = 0.5
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
 
@@ -206,6 +209,16 @@ export function TabPiecePopupLayer({
   // an id the manifest does not carry, so a piece without one costs nothing and
   // keeps the kraft grip below.
   const tabArt = useArtTexture(`${layer.id}-tab`)
+  // OPTIONAL INTERIOR PAINTING (A-3, measured at the reading camera). A raised
+  // table-form piece opens TOWARD the reader: at the s6 stall's 88-degree stop
+  // the fore leg shows its printed face, but the aft leg and the deck present
+  // their BACKS — so the reader met "a plain open shell", a dark kraft slab
+  // where the goods should be. That is not a paint bug on the face art; it is
+  // the inside of the stall, and a real pop-up prints it. A piece that ships
+  // `<id>-inner` gets it on the BackSide wall, in the same unfolded-die-cut v
+  // bands as the face; a piece without one keeps the shared kraft interior and
+  // is bit-identical.
+  const innerArt = useArtTexture(`${layer.id}-inner`)
   // This piece's own stock (D3 kraft-legibility package): replaces the
   // shared PAPER_TINT/PAPER_SHADE_TINT pair so a mid-turn tangle of several
   // artless tab pieces separates by tone instead of reading as one mass.
@@ -250,24 +263,33 @@ export function TabPiecePopupLayer({
   // A culled piece owns its copy instead: the pool is only safe for materials
   // nobody writes after acquiring, and this one's opacity is written per frame
   // through the cull ramp.
+  // A PAINTED interior also owns its material (the pool is only safe for
+  // materials nobody writes after acquiring, and this one carries a per-piece
+  // map), so the two opt-ins share one unpooled branch.
+  const ownsInterior = culled || innerArt !== null
   const interiorMaterial = useMemo(
     () =>
-      culled
+      ownsInterior
         ? new THREE.MeshBasicMaterial({
             side: THREE.BackSide,
-            map: paperTexture,
-            color: INTERIOR_SHADOW_TINT,
+            map: innerArt ?? paperTexture,
+            color: innerArt ? '#ffffff' : INTERIOR_SHADOW_TINT,
             transparent: true,
           })
         : acquireMaterial({ side: THREE.BackSide, map: paperTexture, color: INTERIOR_SHADOW_TINT }),
-    [paperTexture, culled]
+    [paperTexture, ownsInterior, innerArt]
   )
+  useEffect(() => {
+    if (!innerArt) return
+    innerArt.wrapS = THREE.ClampToEdgeWrapping
+    innerArt.wrapT = THREE.ClampToEdgeWrapping
+  }, [innerArt])
   useEffect(
     () => () => {
-      if (culled) interiorMaterial.dispose()
+      if (ownsInterior) interiorMaterial.dispose()
       else releaseMaterial(interiorMaterial)
     },
-    [interiorMaterial, culled]
+    [interiorMaterial, ownsInterior]
   )
 
   // The invisible grab handles (law H3/H6): an exact-tab mesh for mouse/pen
@@ -317,10 +339,23 @@ export function TabPiecePopupLayer({
   )
   // Key-light placement (shadow-light.ts): the erected mound/table stands, so
   // its pool offsets down-screen-right and deepens/spreads with its rest peak.
+  //
+  // THE POOL TRACKS THE LIFT (A-3, the strip flap's S6-3 law in this family's
+  // units). A piece the PAGE raises stands at rest, so its reference pose is the
+  // rest pose and its pool is the one it always cast. A piece the READER raises
+  // is handed over lying flat — sizing its pool from that pose would give the
+  // fully raised stall the shadow of a folded sheet — so its reference is the
+  // pose the reader can raise it to, and the pool only has to fade in (below),
+  // never re-derive its geometry mid-drag. The test is numeric, not a flag:
+  // a rest lift under half the mechanical stop is a piece handed over flat.
   const shadowSpec = useMemo(() => {
     const span = tabPieceFlatSpan(layer)
     const sign = layer.side === 'left' ? -1 : 1
-    const rest = solveTabPiecePose(layer, Math.PI, 0)
+    const stop = tabPieceStopLift(layer)
+    const readerRaised = tabPieceLift(layer, Math.PI) < READER_RAISED_REST * stop
+    const rest = readerRaised
+      ? solveTabPiecePoseAt(layer, stop, Math.PI, 0)
+      : solveTabPiecePose(layer, Math.PI, 0)
     const lift = shadowLift(peakHeight(rest.map((p) => p.quad)))
     return {
       position: [
@@ -330,6 +365,9 @@ export function TabPiecePopupLayer({
       ] as [number, number, number],
       size: [span * 0.95 * lift.spread, (layer.z1 - layer.z0) * 1.05 * lift.spread] as [number, number],
       maxOpacity: STRUCT_SHADOW_MAX * lift.depth,
+      // 0 for a page-raised piece: the frame loop then holds its pool at full
+      // strength exactly as it always did.
+      refLift: readerRaised ? stop : 0,
     }
   }, [layer])
 
@@ -538,7 +576,14 @@ export function TabPiecePopupLayer({
     slitAttr.needsUpdate = true
     slitGeometry.computeBoundingSphere()
 
-    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2 * cull
+    // The pool fades with the LIFT for a reader-raised piece (A-3): a stall the
+    // reader has pressed flat must not still cast a standing tent's shadow —
+    // that is the one cue that would tell them the fold landed, contradicting
+    // it. Measured against the piece's own reference lift, so a page-raised
+    // piece is exactly 1 at every beta and its pool is bit-identical.
+    const liftFraction =
+      shadowSpec.refLift > 1e-6 ? clamp(Math.sin(rendered) / Math.sin(shadowSpec.refLift), 0, 1) : 1
+    shadowMaterial.opacity = shadowSpec.maxOpacity * Math.sin(beta / 2) ** 2 * cull * liftFraction
   })
 
   return (

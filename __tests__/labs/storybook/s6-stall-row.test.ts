@@ -33,6 +33,8 @@ import {
   stripFlapFrame,
   stripFlapHoldEnvelope,
   stripFlapRestLift,
+  stripFlapRippleColumns,
+  stripFlapRipplePhase,
   stripFlapTravel,
   STRIPFLAP_ANTI_FLIP,
   STRIPFLAP_DETENT,
@@ -45,7 +47,9 @@ import {
   tabPieceCeiling,
   tabPieceLift,
   tabPieceLiftFromSlide,
+  tabPieceRailSpan,
   tabPieceSlideFromLift,
+  tabPieceStopLift,
   tabPieceStopSlide,
   type TabPieceGeom,
 } from '@/components/labs/storybook/book/popup-tabpiece'
@@ -472,17 +476,164 @@ describe('s6 RAISE A STALL card — the structure is a handle (S6-1)', () => {
     expect(primaryPlayableChannel(SPREAD)).toBe('ch5-raise-stall')
   })
 
-  it('the painted linkage has a page-side gap to cover, and it is where the floor print puts it', () => {
-    // S6-1's other half: the tab exits at the fore edge, the card's fore hinge
-    // stops short of it, and the empty run between them is what made the handle
-    // read as "a piece that has fallen off the page". The floor print paints a
-    // setting-out track across exactly this span, so the numbers must agree.
-    expect(geom.hingeX).toBeLessThan(PAGE_W)
-    const gap = PAGE_W - geom.hingeX
-    expect(gap).toBeGreaterThan(0.2)
-    expect(gap).toBeLessThan(0.3)
-    // and the slit's z band is the card's own centre band
-    const zc = (geom.z0 + geom.z1) / 2
-    expect(zc).toBeCloseTo(0.5, 6)
+  it('the handle runs on a RAIL cut in the page, and full pull never leaves the paper', () => {
+    // ROUND-2 A-2. S6-1's original answer was a painted linkage from the card's
+    // fore hinge out to a tab at the page's fore edge — and the re-review found
+    // what that costs: "at full pull the tab card is entirely off the left page
+    // edge, floating over black table and overlapping the body-copy column."
+    // The strip now surfaces through a slot INSIDE the page and the tab is a
+    // fixed card riding on the paper, so the whole travel is on the page.
+    const rail = geom.rail
+    expect(rail, 'the raise-stall tab must run on an on-page rail').toBeDefined()
+    if (!rail) return
+    const [home, tip] = tabPieceRailSpan(geom)
+    expect(home).toBeGreaterThan(0)
+    expect(tip).toBeLessThan(PAGE_W)
+    // the rail is a real stroke, not a token one: at least a fifth of the page
+    expect(tip - home).toBeGreaterThan(PAGE_W / 5)
+    // ITS LANE IS ON THE READER'S SIDE of the structure, not the gutter side.
+    // Two reasons, and the second is the one the eye-test found. (1) A handle
+    // belongs between the reader and the thing it moves, never behind it.
+    // (2) This spread's chapter copy is HTML laid OVER the book and covers the
+    // left page's FAR-fore quadrant at the pinned camera — measured off the 1x
+    // capture, roughly x <= 437, y <= 615 of a 1600x900 frame. A gutter-side
+    // lane (z 0.14..0.28) put the card at (311..390, 588..625) at full pull,
+    // i.e. under the paragraph's last line: on the paper, and still colliding
+    // with the text, which is exactly half of what the finding said. Stated as
+    // a z relation rather than a screen box on purpose — this file's projection
+    // does not carry the book group's own transform, so an absolute screen
+    // floor here would be unsound, while the z relation is exact.
+    expect(rail.z0).toBeGreaterThanOrEqual(geom.z1)
+    expect(rail.z1).toBeLessThanOrEqual(PAGE_H / 2)
+    // and the card's SCREEN travel at the pinned reading camera is a stroke a
+    // reader can see they made
+    const { thetaL, thetaR } = restAngles(spreadIndex)
+    const cardTip = (a: number): Vec3 =>
+      solveTabPiecePoseAt(geom, a, thetaL, thetaR).slice(-1)[0].quad[2]
+    expect(pxBetween(cardTip(0), cardTip(tabPieceStopLift(geom)))).toBeGreaterThan(80)
+  })
+
+  it('the spread opens on the FLAT master pattern, and the reader is what raises it', () => {
+    // ROUND-2 A-3. "The rest state is a half-built stall — ~60% raised at load,
+    // not flat, not standing. It reads as unfinished, and it hides the
+    // flat-pattern state, which is the state that actually illustrates the
+    // text." The rest lift is now a scored crease rather than a half-raise: far
+    // under the reader's stop, and never coplanar (which would z-fight the floor
+    // print, the same reason the rank across the gutter rests at 5 degrees).
+    const stop = tabPieceStopLift(geom)
+    const rest = tabPieceLift(geom, Math.PI)
+    expect(rest).toBeGreaterThan(rad(3))
+    expect(rest).toBeLessThan(0.25 * stop)
+    // and the payoff is a RISE: the deck's own screen travel from rest to stop
+    const { thetaL, thetaR } = restAngles(spreadIndex)
+    const deckMid = (a: number): Vec3 => {
+      const q = solveTabPiecePoseAt(geom, a, thetaL, thetaR).find((p) => p.face === 'deck')!.quad
+      return [
+        (q[0][0] + q[2][0]) / 2,
+        (q[0][1] + q[2][1]) / 2,
+        (q[0][2] + q[2][2]) / 2,
+      ]
+    }
+    expect(pxBetween(deckMid(rest), deckMid(stop))).toBeGreaterThan(60)
+    // the rise is UP the screen, not down — the reader raises a stall
+    expect(toScreen(deckMid(stop)).y).toBeLessThan(toScreen(deckMid(rest)).y - 40)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ROUND-2 A-4 — THE RIPPLE. "The six stalls rise in perfect unison. No stagger,
+// no ripple, no wave. The one place the page could have earned 'a thousand
+// stalls, raised by any pair of willing hands' and it moves like a single rigid
+// object."
+
+describe('A-4 the stall rank rises as a wave, not as a board', () => {
+  const geom = stripFlap('ch5-throng')
+  const { spreadIndex } = locate('ch5-throng')
+  const travel = stripFlapTravel(geom)
+
+  it('the rank declares a ripple, and its cards TILE the paper that shipped', () => {
+    expect(geom.ripple?.count).toBe(6)
+    const cols = stripFlapRippleColumns(geom)
+    expect(cols).toHaveLength(6)
+    // same total width, no gaps, no overlaps, all on the one hinge line
+    let sum = 0
+    for (const c of cols) {
+      expect(c.width).toBeCloseTo(geom.width / 6, 12)
+      expect(c.ripple).toBeUndefined()
+      expect(c.hingeZ).toBeCloseTo(geom.hingeZ, 12) // hingeDeg 0: the line runs in d
+      sum += c.width
+    }
+    expect(sum).toBeCloseTo(geom.width, 12)
+    const lo = Math.min(...cols.map((c) => c.hingeX - c.width / 2))
+    const hi = Math.max(...cols.map((c) => c.hingeX + c.width / 2))
+    expect(lo).toBeCloseTo(geom.hingeX - geom.width / 2, 12)
+    expect(hi).toBeCloseTo(geom.hingeX + geom.width / 2, 12)
+    for (let i = 1; i < cols.length; i++) {
+      expect(cols[i].hingeX - cols[i].width / 2).toBeCloseTo(
+        cols[i - 1].hingeX + cols[i - 1].width / 2,
+        12
+      )
+    }
+  })
+
+  it('every card starts together, ends together, and never leads the rank', () => {
+    for (let i = 0; i < 6; i++) {
+      expect(stripFlapRipplePhase(geom, 0, i)).toBe(0)
+      expect(stripFlapRipplePhase(geom, 1, i)).toBeCloseTo(1, 12)
+      let prev = -1
+      for (let k = 0; k <= 200; k++) {
+        const p = k / 200
+        const q = stripFlapRipplePhase(geom, p, i)
+        expect(q).toBeGreaterThanOrEqual(prev - 1e-12) // monotone
+        expect(q).toBeLessThanOrEqual(p + 1e-12) // never ahead of the rank
+        expect(q).toBeGreaterThanOrEqual(0)
+        prev = q
+      }
+    }
+    // FOLD-FLAT is therefore inherited: at book close the rank's own progress is
+    // 0 (the hold envelope is 0 there), so every card is at its lower stop times
+    // that envelope — which is what the un-rippled rank already proved.
+    expect(stripFlapHoldEnvelope(geom, 0)).toBe(0)
+  })
+
+  it('mid-stroke the row is visibly staggered, and at the top it is one row again', () => {
+    const { thetaL, thetaR } = restAngles(spreadIndex)
+    const cols = stripFlapRippleColumns(geom)
+    const span = travel[1] - travel[0]
+    const tipY = (a: number, i: number): number =>
+      toScreen(freeEdgeMid(cols[i], a, thetaL, thetaR)).y
+    // Each card is measured against ITSELF un-rippled — the cards sit at
+    // different stations down the page, so their screen heights differ by
+    // perspective alone and comparing them to each other would gate the camera,
+    // not the wave.
+    const lag = (p: number, i: number): number =>
+      tipY(travel[0] + stripFlapRipplePhase(geom, p, i) * span, i) -
+      tipY(travel[0] + p * span, i)
+    // halfway up, the row is a wave: every card trails the rank, further the
+    // further down the row it sits, and the tail card by a visible margin
+    const mid = [0, 1, 2, 3, 4, 5].map((i) => lag(0.5, i))
+    expect(mid[0]).toBeCloseTo(0, 9) // the leading card IS the rank
+    for (let i = 1; i < 6; i++) expect(mid[i]).toBeGreaterThan(mid[i - 1])
+    expect(mid[5]).toBeGreaterThan(8) // screen px — the reader can see many hands
+    // at the top of the stroke every card is back on the rank's own angle: true
+    // and identical, which is what the prose actually promises
+    for (let i = 0; i < 6; i++) expect(lag(1, i)).toBeCloseTo(0, 9)
+  })
+
+  it('no OTHER strip flap in the book gains a hinge (the opt-in stays opt-in)', () => {
+    for (let s = 0; s < SPREAD_COUNT; s++) {
+      for (const layer of popupContentForSpread(s)?.layers ?? []) {
+        if (layer.mech !== 'stripflap') continue
+        const cols = stripFlapRippleColumns(layer)
+        if (layer.id === 'ch5-throng') {
+          expect(cols).toHaveLength(6)
+          continue
+        }
+        expect(layer.ripple).toBeUndefined()
+        expect(cols).toHaveLength(1)
+        expect(cols[0]).toBe(layer) // the identity, not a copy — bit-identical
+        for (const p of [0, 0.3, 0.7, 1]) expect(stripFlapRipplePhase(layer, p, 0)).toBe(p)
+      }
+    }
   })
 })

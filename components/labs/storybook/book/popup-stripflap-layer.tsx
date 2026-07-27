@@ -35,6 +35,8 @@ import {
   stripFlapFrame,
   stripFlapHoldEnvelope,
   stripFlapRestLift,
+  stripFlapRippleColumns,
+  stripFlapRipplePhase,
   stripFlapTravel,
   STRIPFLAP_ANTI_FLIP,
   type StripFlapGeom,
@@ -94,27 +96,57 @@ const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 const RIGHT_UVS = new Float32Array([0.5, 0, 1, 0, 1, 1, 0.5, 1])
 const LEFT_UVS = new Float32Array([0.5, 0, 0, 0, 0, 1, 0.5, 1])
 
+/** The u band of RIPPLE column `i` of `n`, as the two half-quads' uvs. At n = 1
+ *  this returns the two constants above byte-for-byte, so an un-rippled flap
+ *  addresses its print exactly as it always did. */
+function columnUvs(i: number, n: number): { right: Float32Array; left: Float32Array } {
+  if (n <= 1) return { right: RIGHT_UVS.slice(), left: LEFT_UVS.slice() }
+  const a = i / n
+  const b = (i + 1) / n
+  const m = (a + b) / 2
+  return {
+    right: new Float32Array([m, 0, b, 0, b, 1, m, 1]),
+    left: new Float32Array([m, 0, a, 0, a, 1, m, 1]),
+  }
+}
+
+/** One buffer holding `uvs.length / 8` quads — the whole rank's lit (or shaded)
+ *  halves in ONE geometry, so a six-card ripple costs the same two draws the
+ *  single flap cost (the spread's turn-pair draw budget is already at its
+ *  ceiling: content.ts gate-matrix G5). */
 function makePanelGeometry(uvs: Float32Array): THREE.BufferGeometry {
+  const quads = uvs.length / 8
   const geometry = new THREE.BufferGeometry()
-  const positions = new THREE.BufferAttribute(new Float32Array(12), 3)
+  const positions = new THREE.BufferAttribute(new Float32Array(12 * quads), 3)
   positions.setUsage(THREE.DynamicDrawUsage)
   geometry.setAttribute('position', positions)
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-  geometry.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
+  const index = new Uint16Array(6 * quads)
+  for (let q = 0; q < quads; q++) {
+    const o = q * 4
+    index.set([o, o + 1, o + 2, o, o + 2, o + 3], q * 6)
+  }
+  geometry.setIndex(new THREE.BufferAttribute(index, 1))
   return geometry
 }
 
-function writeQuad(geometry: THREE.BufferGeometry, quad: readonly Vec3[]): void {
+function writeQuads(geometry: THREE.BufferGeometry, quads: readonly (readonly Vec3[])[]): void {
   const attr = geometry.getAttribute('position') as THREE.BufferAttribute
   const arr = attr.array as Float32Array
-  for (let c = 0; c < 4; c++) {
-    arr[c * 3] = quad[c][0]
-    arr[c * 3 + 1] = quad[c][1]
-    arr[c * 3 + 2] = quad[c][2]
+  for (let q = 0; q < quads.length; q++) {
+    for (let c = 0; c < 4; c++) {
+      const o = (q * 4 + c) * 3
+      arr[o] = quads[q][c][0]
+      arr[o + 1] = quads[q][c][1]
+      arr[o + 2] = quads[q][c][2]
+    }
   }
   attr.needsUpdate = true
   geometry.computeBoundingSphere()
 }
+
+const writeQuad = (geometry: THREE.BufferGeometry, quad: readonly Vec3[]): void =>
+  writeQuads(geometry, [quad])
 
 export function StripFlapPopupLayer({
   layer,
@@ -135,15 +167,25 @@ export function StripFlapPopupLayer({
 
   const { texture, rect } = useLayerSprite(layer.id, layer.kind, accents)
 
-  // Rebuilt if an atlas rect resolves, so the two half-quads address this
-  // figure's region of a shared page instead of the whole atlas.
-  const geometries = useMemo(
-    () => ({
-      right: makePanelGeometry(applyUvRect(RIGHT_UVS, rect)),
-      left: makePanelGeometry(applyUvRect(LEFT_UVS, rect)),
-    }),
-    [rect]
-  )
+  // THE RIPPLE (A-4): the rank's paper as the cards it is printed as. One entry
+  // — the layer itself — for every flap that declares no ripple, which is all of
+  // them but the s6 stall rank.
+  const columns = useMemo(() => stripFlapRippleColumns(layer), [layer])
+
+  // Rebuilt if an atlas rect resolves, so the half-quads address this figure's
+  // region of a shared page instead of the whole atlas. One buffer per side
+  // carrying every column, so the draw count is 2 whatever the card count is.
+  const geometries = useMemo(() => {
+    const n = columns.length
+    const right = new Float32Array(8 * n)
+    const left = new Float32Array(8 * n)
+    for (let i = 0; i < n; i++) {
+      const uv = columnUvs(i, n)
+      right.set(applyUvRect(uv.right, rect), i * 8)
+      left.set(applyUvRect(uv.left, rect), i * 8)
+    }
+    return { right: makePanelGeometry(right), left: makePanelGeometry(left) }
+  }, [rect, columns])
   const slopGeometry = useMemo(() => makePanelGeometry(RIGHT_UVS), [])
   const materials = useMemo(() => {
     const make = (tint: string) =>
@@ -389,11 +431,36 @@ export function StripFlapPopupLayer({
       0,
       ANTI_FLIP
     )
-    const pose = solveStripFlapPoseAt(layer, shownA, thetaL, thetaR)
-    writeQuad(geometries.right, pose.right)
-    writeQuad(geometries.left, pose.left)
-    // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops.
-    const full: Vec3[] = [pose.left[1], pose.right[1], pose.right[2], pose.left[2]]
+    // THE RIPPLE (A-4). The rank's own progress across the reader's window at
+    // THIS dihedral drives a per-card phase; the phase map is bounded above by
+    // that progress, so every card's angle stays under the rank's and the
+    // fold-flat / turn-step arguments are inherited rather than re-made. A flap
+    // with no ripple has one column at phase identity — the same single solve,
+    // the same two quads, bit-identical.
+    const env = stripFlapHoldEnvelope(layer, beta)
+    const floorA = travel[0] * env
+    const topA = travel[1] * env
+    const span = topA - floorA
+    const p = span > 1e-6 ? clamp((shownA - floorA) / span, 0, 1) : 0
+    const rightQuads: (readonly Vec3[])[] = []
+    const leftQuads: (readonly Vec3[])[] = []
+    for (let i = 0; i < columns.length; i++) {
+      const aCard =
+        columns.length > 1 ? floorA + stripFlapRipplePhase(layer, p, i) * span : shownA
+      const pose = solveStripFlapPoseAt(columns[i], aCard, thetaL, thetaR)
+      rightQuads.push(pose.right)
+      leftQuads.push(pose.left)
+    }
+    writeQuads(geometries.right, rightQuads)
+    writeQuads(geometries.left, leftQuads)
+    // Slop spans the WHOLE flap (both halves): base ends h0/h1 and their tops —
+    // across the rank, the outermost cards' outer edges.
+    const loPose = { left: leftQuads[0], right: rightQuads[0] }
+    const hiPose = {
+      left: leftQuads[leftQuads.length - 1],
+      right: rightQuads[rightQuads.length - 1],
+    }
+    const full: Vec3[] = [loPose.left[1], hiPose.right[1], hiPose.right[2], loPose.left[2]]
     // SCREEN HIT FLOOR (R-3): the world-space pad above cannot see that a
     // leaning flap has turned nearly edge-on to the reader — rotating a quad
     // never changes its edge LENGTHS, only its projection. Measured across this
