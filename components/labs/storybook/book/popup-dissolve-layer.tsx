@@ -12,10 +12,10 @@
  *     protrusion exactly (law H3, the tab-piece idiom, class A).
  *   the RACK    — pressing a slat and pushing it does not translate anything, it
  *     TURNS the slat about its own hinge, which is how a person actually works a
- *     venetian blind (class B1, about the spine-parallel hinge of the slat under
- *     the hand). Reading a body grab as a strip draw was a convenience, and it
- *     is the convenience a blind reader named: "I never once felt I was turning
- *     the slats myself."
+ *     venetian blind (about the spine-parallel hinge of the slat under the hand, geared off
+ *     its pitch circle). Reading a body grab as a strip draw was a convenience,
+ *     and it is the convenience a blind reader named: "I never once felt I was
+ *     turning the slats myself."
  *
  * RELEASE = LATCH, and the closing book puts it away. The rack keeps whatever
  * flip the hand left it at — both ends detent so pure dunes and pure gold are
@@ -87,7 +87,7 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectHingeAngle, projectPageD } from './handle-projection'
+import { crankTangentialDelta, projectHubAngle, projectPageD, type HubHit } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -300,7 +300,10 @@ export function DissolvePopupLayer({
   // the hold envelope (popup-dissolve.ts).
   type DissolveGrab =
     | { kind: 'tab'; deltaStart: number; dGrab: number }
-    | { kind: 'slat'; tauStart: number; angleGrab: number; k: number }
+    // `tau` is the RAW accumulated angle: the detent is applied to what gets
+    // written, never fed back into the accumulator, or the sticky band would eat
+    // every small move and the reader could never leave a station by feel.
+    | { kind: 'slat'; k: number; last: HubHit; tau: number }
   const grabRef = useRef<DissolveGrab | null>(null)
   /** Where a TAP is carrying the rack, or null when nothing is in flight. */
   const tapTargetRef = useRef<number | null>(null)
@@ -368,7 +371,8 @@ export function DissolvePopupLayer({
     grabRef.current = { kind: 'tab', deltaStart: dissolveTabOut(layer, tauStart), dGrab }
   }
 
-  /** THE RACK (class B1): the slat under the hand turns about its own hinge. */
+  /** THE RACK: the slat under the hand turns about its own hinge, geared off the
+   *  pitch circle (crankTangentialDelta — no centre singularity). */
   const onSlatPointerDown = (e: ThreeEvent<PointerEvent>): void => {
     if (!grabbable()) return
     const { thetaL, thetaR } = restAnglesNow()
@@ -376,11 +380,11 @@ export function DissolvePopupLayer({
     if (dGrab === null) return
     const k = dissolveSlatAt(layer, dGrab)
     const hinge = dissolveSlatHinge(layer, k, thetaL, thetaR)
-    const angleGrab = projectHingeAngle(pointerLocalRay(e), hinge.center, hinge.axis, hinge.flat, hinge.n)
-    if (angleGrab === null) return
+    const hit = projectHubAngle(pointerLocalRay(e), hinge.center, hinge.e1, hinge.e2, hinge.axis)
+    if (hit === null) return
     const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
     if (!beginGrab(e, tauStart)) return
-    grabRef.current = { kind: 'slat', tauStart, angleGrab, k }
+    grabRef.current = { kind: 'slat', k, last: hit, tau: tauStart }
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
@@ -399,9 +403,11 @@ export function DissolvePopupLayer({
       tauRaw = dissolveTauFromDraw(layer, clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke))
     } else {
       const hinge = dissolveSlatHinge(layer, grab.k, thetaL, thetaR)
-      const angleNow = projectHingeAngle(pointerLocalRay(e), hinge.center, hinge.axis, hinge.flat, hinge.n)
-      if (angleNow === null) return
-      tauRaw = clamp(grab.tauStart + (angleNow - grab.angleGrab), 0, Math.PI)
+      const hit = projectHubAngle(pointerLocalRay(e), hinge.center, hinge.e1, hinge.e2, hinge.axis)
+      if (hit === null) return
+      grab.tau = clamp(grab.tau + crankTangentialDelta(grab.last, hit, hinge.radius), 0, Math.PI)
+      grab.last = hit
+      tauRaw = grab.tau
     }
     // The detent runs on the DRIVE so the rack latches exactly on a pure face.
     const tauNow = dissolveDetent(tauRaw)

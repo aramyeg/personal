@@ -51,6 +51,7 @@ import {
   tabPieceStopLift,
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { spreadPageAnglesTilted, type Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
+import { crankTangentialDelta } from '@/components/labs/storybook/book/handle-projection'
 import { PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 import { commitSpread } from '@/components/labs/storybook/book/use-turn-driver'
 import { popupContentForSpread } from '@/components/labs/storybook/content'
@@ -263,11 +264,32 @@ describe('S5R2-4a — the rack turns about its own hinge, the tongue pulls as a 
           (quad[2][1] + quad[3][1]) / 2 - hinge.center[1],
           (quad[2][2] + quad[3][2]) / 2 - hinge.center[2],
         ]
-        const along = far[0] * hinge.flat[0] + far[1] * hinge.flat[1] + far[2] * hinge.flat[2]
-        const up = far[0] * hinge.n[0] + far[1] * hinge.n[1] + far[2] * hinge.n[2]
+        const along = far[0] * hinge.e1[0] + far[1] * hinge.e1[1] + far[2] * hinge.e1[2]
+        const up = far[0] * hinge.e2[0] + far[1] * hinge.e2[1] + far[2] * hinge.e2[2]
         expect(Math.atan2(up, along)).toBeCloseTo(tau, 6)
       }
     }
+  })
+
+  it('the gearing has NO centre singularity — the winch lesson, reused', () => {
+    // Class B1's angle about the hinge goes as 1/r, and the swing radius here is
+    // one slat pitch (~43 screen px), so a press a few px from the hinge line
+    // would spin at 20 deg/px. crankTangentialDelta divides the hand's TANGENTIAL
+    // travel by a FIXED reference radius instead, so the same stroke costs the
+    // same angle wherever on the slat it started...
+    const pitch = (dissolve.d1 - dissolve.d0) / dissolve.slats
+    const step = pitch * 0.05
+    const deltas = [0.1, 0.25, 0.5, 1, 1.5].map((f) => {
+      const r = pitch * f
+      return crankTangentialDelta({ angle: 0, r }, { angle: step / r, r }, pitch)
+    })
+    // (within 2% — the residue is chord-vs-arc at the tightest radius, not gain.)
+    for (const d of deltas) expect(Math.abs(d / deltas[0] - 1)).toBeLessThan(0.02)
+    // ...and pressing near the hinge turns the slat LESS, never more, which is
+    // what pinching a real blind by its hinge does.
+    const near = crankTangentialDelta({ angle: 0, r: pitch * 0.1 }, { angle: 0.5, r: pitch * 0.1 }, pitch)
+    const rim = crankTangentialDelta({ angle: 0, r: pitch }, { angle: 0.5, r: pitch }, pitch)
+    expect(Math.abs(near)).toBeLessThan(Math.abs(rim))
   })
 
   it('the hinge axis is well conditioned for the reading camera', () => {

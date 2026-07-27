@@ -143,35 +143,51 @@ export const dissolveDetent = (tau: number): number =>
   stationDetent(clamp(tau, 0, Math.PI), DISSOLVE_ENDS, DISSOLVE_DETENT)
 
 /**
- * THE HINGE THE READER'S OWN SLAT TURNS ABOUT (S5R2-4, class B1).
+ * THE HINGE THE READER'S OWN SLAT TURNS ABOUT (S5R2-4).
  *
  * The tongue is a strip and its drag is the strip's draw, 1:1 — that is what
  * pulling a paper tab is. The RACK is not: pressing a slat and pushing it does
  * not translate anything, it TURNS the slat about its own hinge, which is how a
  * person actually works a venetian blind. Reading the body grab as a strip draw
  * was a convenience, and it is the convenience the reader named ("I never once
- * felt I was turning the slats myself"). So a body grab reads the angle about
- * the hinge of the slat under the hand: same shared tau, same solver, an honest
- * projector each for the two things a reader can take hold of.
+ * felt I was turning the slats myself"). So the rack reads as a turn.
  *
- * Returns the hinge's world centre, its axis (the spine direction — every slat
- * in the rack is hinged parallel to it), and the swing basis (`flat` = the page
- * fore axis, where a shut slat lies; `n` = the page normal it swings toward),
- * so the angle handle-projection.ts measures IS tau.
+ * WHICH TURN PROJECTOR, AND WHY NOT THE OBVIOUS ONE. Class B1 (the angle of the
+ * ray/swing-plane hit about the hinge) is well conditioned here — the hinges run
+ * along the spine, which points at the eye, so the view meets the swing plane at
+ * |cos| ~ 0.9, nothing like the edge-on collapse that forced s2's cylinder
+ * opt-in. It has the OTHER defect instead, the one the winch taught this book:
+ * unbounded gain at the centre. The swing radius is one slat pitch, 0.087 world
+ * ~ 43 screen px, and dtau/dpx = 1/r, so the outer half of a slat turns at a
+ * civilised 1.2-4.4 deg/px while the few px either side of the hinge line spin
+ * at 20. The cylinder projector is no help: this circle is seen at ~25 deg
+ * incidence, so its silhouette points are exactly where a reader's hand is.
+ *
+ * So the rack uses the winch's answer — the TANGENTIAL distance the hand dragged
+ * the paper, over a FIXED reference radius (crankTangentialDelta at the pitch
+ * circle). No centre singularity, gain bounded and near-constant, exactly
+ * antisymmetric so a return stroke costs what the outward one did, and pressing
+ * near the hinge turns the slat LESS — which is what pinching a slat by its
+ * hinge does to a real blind.
+ *
+ * Returns the hub the projector needs: the hinge's world centre, the plane
+ * normal (the spine direction — every slat in the rack is hinged parallel to
+ * it), and the in-plane basis (e1 = the page fore axis, where a shut slat lies;
+ * e2 = the page normal it swings toward), so a hub angle measured on it IS tau.
  */
 export function dissolveSlatHinge(
   geom: DissolveGeom,
   k: number,
   thetaL: number,
   thetaR: number
-): { center: Vec3; axis: Vec3; flat: Vec3; n: Vec3; radius: number } {
+): { center: Vec3; axis: Vec3; e1: Vec3; e2: Vec3; radius: number } {
   const { u, n, P } = dissolvePageFrame(geom, thetaL, thetaR)
   const zc = (geom.z0 + geom.z1) / 2
   return {
     center: P(dissolveSlatHingeD(geom, k), DISSOLVE_BASE_LIFT, zc),
     axis: [0, 0, 1],
-    flat: u,
-    n,
+    e1: u,
+    e2: n,
     radius: dissolvePitch(geom),
   }
 }
