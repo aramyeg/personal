@@ -31,7 +31,7 @@
 
 import { Z_GUARD, plyLift } from './lift-ladder'
 import { PAGE_W } from './page-geometry'
-import type { PanelQuad, TabPieceGeom, Vec3 } from './popup-mechanics'
+import { stationDetent, type PanelQuad, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 
 export type { TabPieceGeom }
 
@@ -140,6 +140,46 @@ export function tabPieceStopLift(geom: TabPieceGeom): number {
 /** The user-drive strip-draw ceiling s_stop = 2w(1 - cos a_stop). */
 export const tabPieceStopSlide = (geom: TabPieceGeom): number =>
   tabPieceSlideFromLift(geom, tabPieceStopLift(geom))
+
+/**
+ * THE PIECE'S OWN HOME, IN THE CHANNEL'S UNITS (S5R2-4).
+ *
+ * The reader's channel carries an UNGEARED angle and the shown lift is that
+ * angle times the shared cam shape S(beta) (the release latch, above). The page
+ * cam is liftDeg * S. So the one channel value that renders as the piece's
+ * DESIGNED silhouette at every dihedral is liftDeg itself — beta-free, which is
+ * what lets it be a fixed detent station rather than a moving target.
+ */
+export const tabPieceRestLift = (geom: TabPieceGeom): number => rad(geom.liftDeg ?? 55)
+
+/** Sticky band around each of the three stations below, radians. About 20px of
+ *  hand at the gold pile's measured gearing (0.28 deg of lift per screen px) —
+ *  wide enough to land on deliberately, narrow enough that a reader crossing
+ *  home on the way somewhere else is not stopped by it. */
+export const TABPIECE_DETENT = rad(6)
+
+/**
+ * THE THREE POSES A READER CAN FEEL: flat, home, and the mechanical stop.
+ *
+ * "There is no detent anywhere, INCLUDING AT THE POSE THE SCENE SHIPS IN, and
+ * dragging back the same distance does not return it (drift grows with every
+ * stroke). The designed silhouette is destroyed on first touch and cannot be
+ * recovered by feel." (blind s5 re-review, finding 8.)
+ *
+ * The drift itself is not in the channel — probed live (bench/s5r2-probe.mjs,
+ * `drift`), an out-and-back inside one press returns to 55.00deg exactly at
+ * every stroke length. What grows with the stroke is the HANDLE'S OWN TRAVEL:
+ * the reader lets go, the crest they were pushing is now somewhere else, and
+ * their return stroke starts from wherever the piece moved it to. That is true
+ * of real paper too — and real paper answers it with a crease that clicks. So
+ * the mound gets one: home is a station the hand finds on the way past, and
+ * because the detent runs on the DRIVE, releasing inside it latches the shipped
+ * silhouette exactly rather than a degree either side of it.
+ */
+export function tabPieceDetent(geom: TabPieceGeom, a: number): number {
+  const stop = tabPieceStopLift(geom)
+  return stationDetent(clamp(a, 0, stop), [0, tabPieceRestLift(geom), stop], TABPIECE_DETENT)
+}
 
 /** Always-on flat-fold safety ceiling on the rendered lift: the SAME cam
  *  shape as tabPieceLift but scaled to the mechanical stop, so it DOMINATES

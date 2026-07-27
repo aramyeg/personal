@@ -48,9 +48,13 @@ import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   DISSOLVE_TAB_LIP,
-  dissolveSnap,
+  dissolveDetent,
+  dissolveShownTau,
+  dissolveSlatAt,
+  dissolveSlatHinge,
   dissolveStroke,
   dissolveTabOut,
+  dissolveTapTarget,
   dissolveTauFromDraw,
   solveDissolvePose,
   dissolveSlit,
@@ -73,6 +77,7 @@ import {
 } from '../user-drive'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
+import { projectHingeAngle } from './handle-projection'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
@@ -84,10 +89,10 @@ const STRUCT_SHADOW_MAX = 0.2
 /** Page-flat handle: the reading camera foreshortens it hard, so it takes
  *  the generous pad (handle-hit.ts). */
 const TOUCH_SLOP = HANDLE_SLOP_FLAT
-/** Snap-to-end ease per frame while released and off a pure end (the volvelle
- *  detent ease). A soft exponential so the picture "clicks" to dunes or gold. */
-const SNAP_EASE = 0.3
-const SNAP_EPS = 1e-4
+/** Ease per frame while the rack is travelling to a TAP's target end. The drag
+ *  is direct manipulation and never eases; only the click's answer does. */
+const TAP_EASE = 0.22
+const TAP_ARRIVE_EPS = 1e-3
 /** Desert-floor sand under the slats — VAULT_NIGHT register (E3 s5): violet
  *  dune shadow, so the one-pitch band the flipped rack vacates reads as the
  *  night floor and the gaps between tilted slats mid-flip read as dark sand. */
@@ -282,9 +287,17 @@ export function DissolvePopupLayer({
 
   const stroke = useMemo(() => dissolveStroke(layer), [layer])
 
-  // --- Grab lifecycle (laws H1-H3): the LINEAR tab drive (tab-piece idiom),
-  // held + snapped on release (volvelle idiom).
-  const grabRef = useRef<{ deltaStart: number; dGrab: number } | null>(null)
+  // --- Grab lifecycle (laws H1-H3). TWO honest projectors, one shared tau:
+  // the tongue is a strip and drags 1:1 as a strip draw (class A, the tab-piece
+  // idiom); the rack's own slats TURN about their hinge (class B1). Release
+  // LATCHES whatever the hand left, and the closing book folds it flat through
+  // the hold envelope (popup-dissolve.ts).
+  type DissolveGrab =
+    | { kind: 'tab'; deltaStart: number; dGrab: number }
+    | { kind: 'slat'; tauStart: number; angleGrab: number; k: number }
+  const grabRef = useRef<DissolveGrab | null>(null)
+  /** Where a TAP is carrying the rack, or null when nothing is in flight. */
+  const tapTargetRef = useRef<number | null>(null)
   const tap = useHandleTap()
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
@@ -303,9 +316,13 @@ export function DissolvePopupLayer({
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
-    tap.end(layer.id) // a press that never drew the strip answers with a nudge
+    // A press that never turned a slat is a CLICK, and a two-faced dial has one
+    // obvious answer to a click: show the other face (S5R2-3).
+    tap.end(layer.id, () => {
+      tapTargetRef.current = dissolveTapTarget(clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI))
+    })
     endGrabChannel(layer.id)
-    useStorybookStore.getState().endGrab() // tau HELD; the frame loop snaps it to a pure end
+    useStorybookStore.getState().endGrab() // tau LATCHES exactly where the hand left it
     try {
       if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
@@ -313,22 +330,51 @@ export function DissolvePopupLayer({
     }
   }
 
-  const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    if (!acceptsHandleHit(e, slopRef.current)) return
+  /** Shared opening of both grabs: the store hand-off, the tap seed and the
+   *  release hook. Returns false when the book refused the grab. */
+  const beginGrab = (e: ThreeEvent<PointerEvent>, tauStart: number): boolean => {
     const st = useStorybookStore.getState()
-    if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
-    const { thetaL, thetaR } = restAnglesNow()
-    const dGrab = projectPointerD(e, thetaL, thetaR)
-    if (dGrab === null) return
-    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
     st.beginGrab(layer.id, 'tab')
-    if (useStorybookStore.getState().grab?.id !== layer.id) return
-    grabRef.current = { deltaStart: dissolveTabOut(layer, tauStart), dGrab }
+    if (useStorybookStore.getState().grab?.id !== layer.id) return false
+    tapTargetRef.current = null // the hand overrides an answer still in flight
     writeUserDrive(layer.id, tauStart, [0, Math.PI])
     tap.begin(tauStart)
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
+    return true
+  }
+
+  const grabbable = (): boolean => {
+    const st = useStorybookStore.getState()
+    return st.booted && st.turning === null && st.spread === spreadIndex
+  }
+
+  /** THE TONGUE (class A): a strip, pulled 1:1 — draw IS protrusion. */
+  const onTabPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (!acceptsHandleHit(e, slopRef.current)) return
+    if (!grabbable()) return
+    const { thetaL, thetaR } = restAnglesNow()
+    const dGrab = projectPointerD(e, thetaL, thetaR)
+    if (dGrab === null) return
+    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+    if (!beginGrab(e, tauStart)) return
+    grabRef.current = { kind: 'tab', deltaStart: dissolveTabOut(layer, tauStart), dGrab }
+  }
+
+  /** THE RACK (class B1): the slat under the hand turns about its own hinge. */
+  const onSlatPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (!grabbable()) return
+    const { thetaL, thetaR } = restAnglesNow()
+    const dGrab = projectPointerD(e, thetaL, thetaR)
+    if (dGrab === null) return
+    const k = dissolveSlatAt(layer, dGrab)
+    const hinge = dissolveSlatHinge(layer, k, thetaL, thetaR)
+    const angleGrab = projectHingeAngle(pointerLocalRay(e), hinge.center, hinge.axis, hinge.flat, hinge.n)
+    if (angleGrab === null) return
+    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+    if (!beginGrab(e, tauStart)) return
+    grabRef.current = { kind: 'slat', tauStart, angleGrab, k }
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
@@ -340,10 +386,19 @@ export function DissolvePopupLayer({
       return
     }
     const { thetaL, thetaR } = restAnglesNow()
-    const dNow = projectPointerD(e, thetaL, thetaR)
-    if (dNow === null) return
-    const deltaNow = clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke)
-    const tauNow = dissolveTauFromDraw(layer, deltaNow)
+    let tauRaw: number | null = null
+    if (grab.kind === 'tab') {
+      const dNow = projectPointerD(e, thetaL, thetaR)
+      if (dNow === null) return
+      tauRaw = dissolveTauFromDraw(layer, clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke))
+    } else {
+      const hinge = dissolveSlatHinge(layer, grab.k, thetaL, thetaR)
+      const angleNow = projectHingeAngle(pointerLocalRay(e), hinge.center, hinge.axis, hinge.flat, hinge.n)
+      if (angleNow === null) return
+      tauRaw = clamp(grab.tauStart + (angleNow - grab.angleGrab), 0, Math.PI)
+    }
+    // The detent runs on the DRIVE so the rack latches exactly on a pure face.
+    const tauNow = dissolveDetent(tauRaw)
     writeUserDrive(layer.id, tauNow, [0, Math.PI])
     tap.track(tauNow, TAP_EPS)
     e.stopPropagation()
@@ -402,27 +457,29 @@ export function DissolvePopupLayer({
       edgeMaterial.opacity = 0.9 * cull // its rest opacity, ramped
     }
 
-    // Snap-on-release: ease the held flip to the nearest pure end {0,PI} so the
-    // picture clicks to dunes or gold (no half-dissolve rest state).
-    if (!grabRef.current && !overrideActive(layer)) {
-      const held = readUserDrive(layer.id)
-      if (held !== undefined) {
-        const target = dissolveSnap(held)
-        const delta = target - held
-        if (Math.abs(delta) > SNAP_EPS) writeUserDrive(layer.id, held + delta * SNAP_EASE, [0, Math.PI])
-        else if (held !== target) {
-          if (target === 0) clearUserDrive(layer.id)
-          else writeUserDrive(layer.id, target, [0, Math.PI])
-        }
+    // THE CLICK'S ANSWER (S5R2-3): a tap set a target end and the rack walks to
+    // it. The DRAG never eases — this is the only autonomous travel the piece
+    // has, and a grab cancels it on the frame it starts.
+    const target = tapTargetRef.current
+    if (target !== null && !grabRef.current && !overrideActive(layer)) {
+      const held = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+      if (Math.abs(target - held) <= TAP_ARRIVE_EPS) {
+        tapTargetRef.current = null
+        if (target === 0) clearUserDrive(layer.id)
+        else writeUserDrive(layer.id, target, [0, Math.PI])
+      } else {
+        writeUserDrive(layer.id, held + (target - held) * TAP_EASE, [0, Math.PI])
       }
     }
 
-    // Tap answer (BW-18): the slats twitch toward the reveal and settle back.
-    // Render-time only — the snap-on-release above still owns the channel.
+    // The reader's held flip, then the HOLD ENVELOPE: what is drawn is the held
+    // angle carried through the closing book's own take-up, so the rack lies
+    // flat A-face up at book-closed for any latched value and the strip is drawn
+    // back inside the trim with it (popup-dissolve.ts).
     const tauHeld = readDissolveTau(layer)
     const tau = Math.min(
       Math.PI,
-      Math.max(0, tauHeld + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
+      Math.max(0, dissolveShownTau(tauHeld, beta) + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
     )
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
@@ -466,7 +523,7 @@ export function DissolvePopupLayer({
         {/* Invisible grab handles (raycast targets): the tab exact for mouse/pen,
             1.5x for touch (laws H3/H6). */}
         <group
-          onPointerDown={onPointerDown}
+          onPointerDown={onTabPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={releaseGrab}
           onPointerCancel={releaseGrab}
@@ -476,9 +533,21 @@ export function DissolvePopupLayer({
         >
           <mesh ref={handleRef} geometry={handleGeom} material={handleMaterial} renderOrder={3} />
           <mesh ref={slopRef} geometry={slopGeom} material={handleMaterial} renderOrder={3} />
-          {/* The rack's own body (S5-1): the slats and the sand base borrow the
-              render geometries the frame loop already rewrites, so they cost one
-              draw-free mesh each and can never drift from the paper. */}
+        </group>
+        {/* The rack's own body (S5-1): the slats and the sand base borrow the
+            render geometries the frame loop already rewrites, so they cost one
+            draw-free mesh each and can never drift from the paper. Its own
+            pointerdown (S5R2-4) because a slat TURNS — the strip's 1:1 draw is
+            the tongue's law, not the rack's. */}
+        <group
+          onPointerDown={onSlatPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={releaseGrab}
+          onPointerCancel={releaseGrab}
+          onLostPointerCapture={releaseGrab}
+          onPointerOver={onPointerOver}
+          onPointerOut={onPointerOut}
+        >
           <mesh geometry={baseGeom} material={handleMaterial} renderOrder={3} />
           {dunesGeoms.map((g, k) => (
             <mesh key={k} geometry={g} material={handleMaterial} renderOrder={3} />

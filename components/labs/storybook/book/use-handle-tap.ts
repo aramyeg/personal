@@ -21,8 +21,13 @@ export type HandleTap = {
   /** Call from onPointerMove with the drive value just written. Past `eps` of
    *  travel (in the family's own drive domain) the press is a drag, not a tap. */
   track: (value: number, eps: number) => void
-  /** Call from the release path. Fires the nudge pulse iff nothing moved. */
-  end: (id: string) => void
+  /**
+   * Call from the release path. Fires the nudge pulse iff nothing moved — or,
+   * when the family passes `onTap`, ITS OWN answer instead (S5R2-3: a two-faced
+   * dial's obvious reply to a click is "show me the other face", and a twitch
+   * where a real answer exists is the "clicking fires neither" finding).
+   */
+  end: (id: string, onTap?: () => void) => void
 }
 
 export function useHandleTap(): HandleTap {
@@ -37,11 +42,13 @@ export function useHandleTap(): HandleTap {
     track: (value, eps) => {
       if (seed.current !== null && Math.abs(value - seed.current) > eps) moved.current = true
     },
-    end: (id) => {
+    end: (id, onTap) => {
       const wasTap = seed.current !== null && !moved.current
       seed.current = null
       moved.current = false
-      if (wasTap) pulseHandle(id)
+      if (!wasTap) return
+      if (onTap) onTap()
+      else pulseHandle(id)
     },
   }
 }
