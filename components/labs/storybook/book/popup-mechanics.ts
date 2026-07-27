@@ -659,6 +659,20 @@ export type VolvelleGeom = {
   sectors: number
   /** The die-cut windows in the static card. */
   windows: readonly VolvelleWindow[]
+  /**
+   * HOW THE READER'S STROKE BECOMES ROTATION (E3 s7 round-2, S7R2-1a). Omitted,
+   * the layer accumulates the raw atan2 sweep of the pointer about the hub —
+   * what every disc in the book did before the systems patch, and what that
+   * patch measured as unbounded gain at the centre and vanishing gain at the
+   * rim (see crankTangentialDelta).
+   *
+   * 'tangential' switches to the hand's own tangential drag at a fixed
+   * reference radius, geared, notched into felt detents and stiffened into both
+   * end stops (popup-volvelle.ts volvelleCrankStep). Opt-in per the family law:
+   * a dial that has not been re-tuned and re-eye-tested keeps the read it
+   * shipped with, bit for bit.
+   */
+  crank?: 'sweep' | 'tangential'
 }
 
 /**
