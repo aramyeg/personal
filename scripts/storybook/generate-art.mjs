@@ -4870,7 +4870,12 @@ function dispatchDial(w, h, seed) {
     // window can carry.
     if (st.span) {
       const sag = st.taut ? 0.05 : 0.22
-      const wSpan = st.taut ? R * 0.026 : R * 0.015
+      // WEIGHT, measured back from the screen. The aperture projects about 57
+      // px across for 0.70R of source, so one screen pixel costs ~0.0123R here;
+      // the first cut's 0.026R wire came out at two screen pixels, which is a
+      // hairline on a night page and is not how "a bridge appeared over a
+      // river" should land. The strung wire is drawn at three and a half.
+      const wSpan = st.taut ? R * 0.044 : R * 0.026
       let d = `M ${fx(X(A.u))} ${fx(Y(A.v))}`
       for (let i = 1; i <= 24; i++) {
         const p = online(i / 24, sag)
@@ -4892,8 +4897,8 @@ function dispatchDial(w, h, seed) {
       const lx = X(p.u)
       const ly = Y(p.v)
       s += `<line x1="${fx(lx)}" y1="${fx(ly)}" x2="${fx(lx)}" y2="${fx(ly + R * 0.045)}" stroke="${DUSK.ink}" stroke-width="${fx(R * 0.012)}" opacity="0.9"/>`
-      s += `<circle cx="${fx(lx)}" cy="${fx(ly + R * 0.075)}" r="${fx(R * 0.06)}" fill="${DUSK.amber}" opacity="0.5"/>`
-      s += `<circle cx="${fx(lx)}" cy="${fx(ly + R * 0.075)}" r="${fx(R * 0.032)}" fill="${DUSK.amberCore}"/>`
+      s += `<circle cx="${fx(lx)}" cy="${fx(ly + R * 0.08)}" r="${fx(R * 0.075)}" fill="${DUSK.amber}" opacity="0.55"/>`
+      s += `<circle cx="${fx(lx)}" cy="${fx(ly + R * 0.08)}" r="${fx(R * 0.044)}" fill="${DUSK.amberCore}"/>`
     }
 
     // --- THE CARRIERS: letter baskets hung under the wire, the traffic the
