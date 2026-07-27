@@ -79,6 +79,7 @@ import {
   type KeepsakeGeom,
 } from '@/components/labs/storybook/book/popup-keepsake'
 import {
+  keepWinchCrankStep,
   keepWinchDiscQuad,
   keepWinchOutputQuads,
   keepWinchThetaMax,
@@ -407,12 +408,26 @@ function keepWinchCase(id: string): HandleCase {
       const hub = projectHubAngle(ray, center, u, ez, n)
       return hub && hub.r >= HUB_DEADZONE * geom.discR ? hub.angle : null
     },
-    driveFrom: (g, nn) => clamp(0 + wrapDelta(nn - g), 0, thetaMax),
+    // THE ARGUMENT ORDER WAS WRONG HERE (E3 systems patch). Both of these take
+    // (geom, theta, thetaL, thetaR); this case passed (geom, thetaL, thetaR,
+    // spin), so the "drive" it varied was landing in the thetaR slot and the
+    // gate was measuring the piece re-posed by a bogus page angle. It PASSED
+    // the whole time the winch's real drive was doing nothing a reader could
+    // use — a gate that measures the wrong thing is worse than no gate.
+    //
+    // The drive arithmetic is the shipped one: at a rim grab the hand's
+    // tangential drag and its atan2 sweep agree to first order, so the sweep is
+    // the right scalar to gear here. The MAPPING itself — that a slow crank
+    // traverses the whole window, that a stroke across the hub turns nothing,
+    // that reverse costs what forward cost — is gated end to end in
+    // winch-crank.test.ts, which can carry the two-dimensional hit this
+    // one-scalar case cannot.
+    driveFrom: (g, nn) => keepWinchCrankStep(geom, 0, wrapDelta(nn - g)),
     restDrive: 0,
     vertsAt: (spin) =>
       flatten([
-        keepWinchDiscQuad(geom, thetaL, thetaR, spin),
-        ...keepWinchOutputQuads(geom, thetaL, thetaR, spin),
+        keepWinchDiscQuad(geom, spin, thetaL, thetaR),
+        ...keepWinchOutputQuads(geom, spin, thetaL, thetaR),
       ]),
   }
 }

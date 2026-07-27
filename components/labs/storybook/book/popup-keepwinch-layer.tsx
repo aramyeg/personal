@@ -5,10 +5,18 @@
  * a die-cut knob disc riveted into the left page that the reader TWISTS (H4)
  * plus three staggered output bodies the crank drives — the semaphore arm, the
  * shutter-ring iris (6 blades), and the counterweight. The disc is the sole
- * grab handle; its machinery reuses the knob-tower disc pattern verbatim
- * (pointer angle about the hub, wrapped-delta accumulation into the module
- * scrub channel, release HOLDS theta — the disc remembers the twist). Outputs
+ * grab handle; release HOLDS theta — the disc remembers the twist. Outputs
  * ride the keep's bisector frame; the disc rides the page frame.
+ *
+ * THE CRANK IS NO LONGER THE KNOB-TOWER'S WRAPPED-DELTA (E3 systems patch). The
+ * disc used to accumulate the raw atan2 sweep about its hub, which is what the
+ * s4 blind re-reviewer was fighting when they reported that slow turning is
+ * ignored, that one flick eats all 302 degrees, that the stop cannot be felt and
+ * that reverse is unreachable. It now reads the hand's TANGENTIAL DRAG
+ * (crankTangentialDelta), geared down and stiffened into its stop
+ * (keepWinchCrankStep) — see those two functions for the measurement and the
+ * argument. The knob tower and the volvelle still carry the old mapping; the
+ * change is opt-in per family on purpose.
  *
  * FOLD-FLAT (2026-07-16 rigid re-derivation): the iris is 4 roost-mouth shutters
  * hinged on the loft walls (off-wall reach 0.10*sin(deploy)*E -> 0 at close), and
@@ -28,6 +36,8 @@ import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   KEEP_WINCH_IRIS_SHUTTERS,
+  keepWinchAtPawl,
+  keepWinchCrankStep,
   keepWinchCounterweightDeck,
   keepWinchDiscQuad,
   keepWinchIrisQuads,
@@ -40,6 +50,7 @@ import { ROTOR_LIFT } from './popup-rotor'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture } from './shared-procedural-textures'
+import { sbSound } from '../sound'
 import { turnCullOpacity } from './turn-cull'
 import type { TurnFrame } from './use-turn-driver'
 import { useArtSprite } from './use-layer-texture'
@@ -51,7 +62,7 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectHubAngle } from './handle-projection'
+import { crankTangentialDelta, projectHubAngle, type HubHit } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 // Counterweight deck UVs — the iron-weight art split across the loft cap crease
@@ -63,13 +74,11 @@ const COUNTERWEIGHT_DECK_UVS: readonly Float32Array[] = [
   new Float32Array([0.5, 0, 0.5, 1, 0, 1, 0, 0]), // crestL
   new Float32Array([0.5, 0, 0.5, 1, 1, 1, 1, 0]), // crestR
 ]
-const HUB_DEADZONE = 0.25
 /** Page-flat handle: the reading camera foreshortens it hard, so it takes
  *  the generous pad (handle-hit.ts). */
 const TOUCH_SLOP = HANDLE_SLOP_FLAT
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
-const wrapDelta = (d: number): number => Math.atan2(Math.sin(d), Math.cos(d))
 
 const _center = new THREE.Vector3()
 const _n = new THREE.Vector3()
@@ -206,14 +215,19 @@ function WinchDisc({
 
   useGuardedDispose([geometry, slopGeometry, materials.front, materials.back])
 
-  const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  // The previous hub HIT, not just its angle: the crank now reads the hand's
+  // tangential drag (crankTangentialDelta), which needs the radius the hand had
+  // as well as the direction it was in. `seated` remembers whether the wind has
+  // already run into the pawl, so the seat thumps once per arrival rather than
+  // once per frame.
+  const grabRef = useRef<{ last: HubHit | null; seated: boolean } | null>(null)
   const tap = useHandleTap()
 
   const angleAboutHub = (
     e: ThreeEvent<PointerEvent>,
     thetaL: number,
     thetaR: number
-  ): { angle: number; stable: boolean } | null => {
+  ): HubHit | null => {
     const t = layer.side === 'left' ? thetaL : thetaR
     _u.set(Math.cos(t), Math.sin(t), 0)
     _n.set(layer.side === 'left' ? Math.sin(t) : -Math.sin(t), layer.side === 'left' ? -Math.cos(t) : Math.cos(t), 0)
@@ -225,8 +239,7 @@ function WinchDisc({
       [_ez.x, _ez.y, _ez.z],
       [_n.x, _n.y, _n.z]
     )
-    if (!hub) return null
-    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.discR }
+    return hub
   }
 
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
@@ -253,7 +266,7 @@ function WinchDisc({
     const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
     writeUserDrive(layer.id, seeded, [0, thetaMax])
     tap.begin(seeded)
-    grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
+    grabRef.current = { last: hub, seated: keepWinchAtPawl(layer, seeded) }
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -269,14 +282,30 @@ function WinchDisc({
     }
     const { thetaL, thetaR } = readAngles()
     const hub = angleAboutHub(e, thetaL, thetaR)
-    if (!hub || !hub.stable) return
-    if (grab.lastAngle !== null) {
+    if (!hub) return
+    if (grab.last !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      // THE HAND'S OWN CRANK, geared and stiffened into the stop. Read the two
+      // long comments this pair of calls stands on — crankTangentialDelta in
+      // handle-projection.ts for why the raw atan2 sweep had to go, and
+      // keepWinchCrankStep for what a turn of the hoist is now worth.
+      const next = keepWinchCrankStep(
+        layer,
+        cur,
+        crankTangentialDelta(grab.last, hub, layer.discR)
+      )
       writeUserDrive(layer.id, next, [0, thetaMax])
       tap.track(next, TAP_EPS)
+      // THE PAWL SEATS, ONCE. The wheel's own stiffening (keepWinchShownTheta)
+      // is silent and the reviewer never felt the stop; a single dull thud at
+      // the moment the wind runs into the pawl is the sound a real ratchet makes
+      // when it drops into its last tooth. Re-armable: back off out of the band
+      // and the next arrival seats again.
+      const inPawl = keepWinchAtPawl(layer, next)
+      if (inPawl && !grab.seated) sbSound.thump()
+      grab.seated = inPawl
     }
-    grab.lastAngle = hub.angle
+    grab.last = hub
     e.stopPropagation()
   }
 

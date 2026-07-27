@@ -140,6 +140,9 @@ export function projectHingeAngleCyl(
   return Math.atan2(hy, hx)
 }
 
+/** Where a pointer ray lands on a disc, in the disc's own polar coordinates. */
+export type HubHit = { angle: number; r: number }
+
 /**
  * CLASS B2 — the angle about a DISC HUB (knob tower, keep winch, volvelle).
  * The seat plane is the disc's own plane (normal `n` through `center`); the
@@ -152,7 +155,7 @@ export function projectHubAngle(
   e1: Vec3,
   e2: Vec3,
   n: Vec3
-): { angle: number; r: number } | null {
+): HubHit | null {
   _center.set(center[0], center[1], center[2])
   _n.set(n[0], n[1], n[2])
   _plane.setFromNormalAndCoplanarPoint(_n, _center)
@@ -163,4 +166,68 @@ export function projectHubAngle(
   const along = _rel.dot(_a)
   const spin = _rel.dot(_b)
   return { angle: Math.atan2(spin, along), r: Math.hypot(along, spin) }
+}
+
+/**
+ * CLASS B2-T — HOW FAR A HAND ACTUALLY CRANKED A DISC, between two hub hits.
+ *
+ * WHY THIS EXISTS (E3 systems patch, the s4 blind re-review of the tower
+ * hoist). Every disc in the book accumulated `wrapDelta(angle_now - angle_prev)`
+ * — the raw atan2 sweep about the hub — straight into its drive. That mapping
+ * has UNBOUNDED GAIN AT THE CENTRE and vanishing gain at distance, and a live
+ * per-move trace of the winch (bench/syspatch-winch-trace.mjs) shows exactly
+ * what a reader gets for it: a hand circling the disc drove the wind up to 95deg,
+ * then back DOWN as it kept circling the same way, stalled for four moves, then
+ * jumped 86deg in a single 6deg step. The reviewer's four complaints are all one
+ * defect wearing four hats:
+ *   "slow deliberate turning is ignored"  — a hand out at the rim, far from the
+ *      centre, is where the atan2 gain is LOWEST, and the winding it does earn
+ *      is undone by the artefacts below.
+ *   "one flick eats the whole 302deg"     — a straight stroke passing near the
+ *      hub sweeps ~180deg of atan2 in a few pixels.
+ *   "the hard stop is unfelt"             — nobody arrives at it deliberately.
+ *   "reverse is unreachable"              — the same artefacts dominate the
+ *      reverse strokes, so the accumulation is noise, not the hand's winding.
+ *
+ * THE HONEST QUANTITY is not the angle the ray swept about the centre; it is the
+ * TANGENTIAL DISTANCE THE HAND DRAGGED THE PAPER, divided by the radius the
+ * crank is gripped at. That is what turning a real knob is: you cannot turn one
+ * by touching its centre, and pushing straight across its face does not turn it
+ * either — the paper simply slides under your finger.
+ *
+ * So: take the two hits as points in the disc plane, take the tangential
+ * component of the displacement between them at the MIDPOINT radial direction,
+ * and divide by `refR` (the disc's own radius — a FIXED reference, never the
+ * instantaneous radius, which is what reintroduces the 1/r blow-up). The
+ * properties this buys, all gated in winch-crank.test.ts:
+ *   - a hand circling AT the rim turns the disc 1:1 with its own sweep,
+ *   - a hand circling at half the radius turns it half as far — as paper does,
+ *   - a stroke straight through the hub turns it essentially nothing,
+ *   - the response is exactly antisymmetric, so reverse costs what forward cost,
+ *   - there is no centre singularity, so no deadzone gate is needed to hide one.
+ *
+ * Returns the sweep in RADIANS of disc rotation, ungeared: a family that wants
+ * a crank to be several hand-turns of work multiplies this down itself.
+ */
+export function crankTangentialDelta(prev: HubHit, next: HubHit, refR: number): number {
+  const r = Math.max(refR, 1e-6)
+  const p0x = prev.r * Math.cos(prev.angle)
+  const p0y = prev.r * Math.sin(prev.angle)
+  const p1x = next.r * Math.cos(next.angle)
+  const p1y = next.r * Math.sin(next.angle)
+  // The midpoint radial direction, as the sum of the two unit radials. When the
+  // two hits are on opposite sides of the hub the sum collapses — which is the
+  // stroke straight ACROSS the face, and the honest answer there is "no turn".
+  const n0 = Math.hypot(p0x, p0y)
+  const n1 = Math.hypot(p1x, p1y)
+  if (n0 < 1e-9 || n1 < 1e-9) return 0
+  const mx = p0x / n0 + p1x / n1
+  const my = p0y / n0 + p1y / n1
+  const m = Math.hypot(mx, my)
+  if (m < 1e-6) return 0
+  // Tangent = radial turned a quarter turn, so a positive result is the same
+  // sense as an increasing atan2 angle (the sign every caller already expects).
+  const tx = -my / m
+  const ty = mx / m
+  return ((p1x - p0x) * tx + (p1y - p0y) * ty) / r
 }

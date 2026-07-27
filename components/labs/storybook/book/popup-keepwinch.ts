@@ -189,6 +189,72 @@ export function keepWinchShownTheta(geom: KeepWinchGeom, theta: number): number 
   return t - (band / 2) * u * u
 }
 
+/**
+ * THE CRANK'S GEAR — how much of a hand-turn one turn of the wind costs.
+ *
+ * WHY (E3 systems patch, s4 blind re-review): "the full 302 degrees is consumed
+ * in about a second by one flick". Once the input reads the hand's TANGENTIAL
+ * drag rather than its atan2 sweep (crankTangentialDelta), a hand circling the
+ * rim turns the wheel 1:1 — which for a 302deg wind is still under one turn of
+ * the wrist for the whole machine. A hoist that raises a flag, an iris and a
+ * counterweight should be WORK. At 0.42, full travel is 302/0.42 = 718deg of
+ * hand at the rim before the end-stop ramp, i.e. two full turns — four half-turn
+ * strokes of a real hand, which is the bar the round asked for.
+ *
+ * Only the HAND's journey changes. The wind's own range, every cam, every
+ * fold-flat envelope and every collision proof are functions of theta and are
+ * untouched — exactly the argument the `reduction: 3` gear train shipped under.
+ */
+export const KEEP_WINCH_CRANK_GEAR = 0.42
+
+/** Fraction of the wind over which the crank stiffens into its stop. */
+const RESIST_BAND_FRAC = 0.18
+/** The gear the hand is left with AT the stop — small enough to be unmistakably
+ *  heavier, never zero: a stop the reader cannot reach is a bug, not a feel. */
+const RESIST_FLOOR = 0.34
+
+/**
+ * THE END-STOP, FELT IN THE HAND (E3 systems patch; the reviewer's "the hard
+ * stop is unfelt").
+ *
+ * `keepWinchShownTheta` above already seats the WHEEL at the stop — it gives up
+ * half the pawl band so the disc stiffens and dies rather than free-spinning.
+ * That is what the stop LOOKS like, and a reader who never deliberately arrives
+ * at the stop never sees it. This is what the stop FEELS like: over the last
+ * RESIST_BAND_FRAC of the wind the hand's gearing falls on a square law to
+ * RESIST_FLOOR, so the last sixth of the travel costs roughly a third of the
+ * whole crank in hand motion. The wheel gets heavy, then seats, then thumps.
+ *
+ * Applied to WINDING ONLY (the layer passes the sign): a reader who has run the
+ * hoist to its stop must be able to back it off at the ordinary rate, or the
+ * stiffness reads as the jam the reverse complaint was about.
+ */
+export function keepWinchCrankResist(geom: KeepWinchGeom, theta: number): number {
+  const max = keepWinchThetaMax(geom)
+  const band = Math.max(1e-6, max * RESIST_BAND_FRAC)
+  const u = clamp((clamp(theta, 0, max) - (max - band)) / band, 0, 1)
+  return 1 - (1 - RESIST_FLOOR) * u * u
+}
+
+/**
+ * The wind increment for one pointer move: the hand's own tangential crank,
+ * geared down, and stiffened as it runs into the stop. `sweep` is the ungeared
+ * disc rotation the hand just applied (crankTangentialDelta), `theta` the wind
+ * it is applied FROM. Kept here rather than in the layer so the mapping curve
+ * the reader feels is a pure function the bench can walk end to end.
+ */
+export function keepWinchCrankStep(geom: KeepWinchGeom, theta: number, sweep: number): number {
+  const gear = KEEP_WINCH_CRANK_GEAR * (sweep > 0 ? keepWinchCrankResist(geom, theta) : 1)
+  return clamp(theta + sweep * gear, 0, keepWinchThetaMax(geom))
+}
+
+/** Whether `theta` has run into the pawl — the band where the wheel seats. The
+ *  layer uses it to thump exactly once per arrival. */
+export function keepWinchAtPawl(geom: KeepWinchGeom, theta: number): boolean {
+  const max = keepWinchThetaMax(geom)
+  return theta >= max - Math.min(PAWL_BAND, max * 0.5)
+}
+
 /** Page-openness envelope E(beta) — the shared fold-flat cam (E(0)=0 exact). */
 export function keepWinchEnvelope(geom: KeepWinchGeom, beta: number): number {
   const rest = rad(geom.restAtDeg ?? DEFAULT_REST_DEG)
