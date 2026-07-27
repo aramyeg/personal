@@ -99,6 +99,74 @@ function handlerBody(src: string, name: string): string {
 }
 
 /**
+ * THE SPAN OF THE JSX ELEMENT THAT BINDS `onPointerOver`, and whether `at` falls
+ * inside it (N-3's gate extension).
+ *
+ * Deliberately structural rather than clever: from the binding, walk LEFT to the
+ * `<` that opens its tag, read the tag name, then walk RIGHT counting nested
+ * `<name` / `</name>` to find where that element ends (or stop at `/>` for a
+ * self-closing one). Anything between the open tag's first character and the
+ * element's end is a child of a handler-bearing element — which is exactly the
+ * question "does this hit surface get a hover?" reduces to in r3f.
+ */
+function hoverBoundSpans(src: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = []
+  for (const m of src.matchAll(/onPointerOver=\{/g)) {
+    const bind = m.index as number
+    const start = src.lastIndexOf('<', bind)
+    if (start < 0) continue
+    const name = /^<\s*([A-Za-z0-9_.]+)/.exec(src.slice(start))?.[1]
+    if (!name) continue
+    // End of this element's OPEN tag, and whether it closed itself there.
+    let i = start
+    let depthAngle = 0
+    let openEnd = -1
+    let selfClosing = false
+    for (; i < src.length; i++) {
+      const c = src[i]
+      if (c === '{') depthAngle++
+      else if (c === '}') depthAngle--
+      else if (c === '>' && depthAngle === 0) {
+        selfClosing = src[i - 1] === '/'
+        openEnd = i
+        break
+      }
+    }
+    if (openEnd < 0) continue
+    if (selfClosing) {
+      spans.push({ start, end: openEnd })
+      continue
+    }
+    // Walk forward to the matching close tag, counting same-named nesting.
+    let depth = 1
+    let cursor = openEnd + 1
+    const open = new RegExp(`<${name}[\\s/>]`, 'g')
+    const close = new RegExp(`</${name}\\s*>`, 'g')
+    while (depth > 0 && cursor < src.length) {
+      open.lastIndex = cursor
+      close.lastIndex = cursor
+      const o = open.exec(src)
+      const c = close.exec(src)
+      if (!c) break
+      if (o && o.index < c.index) {
+        depth++
+        cursor = o.index + 1
+      } else {
+        depth--
+        cursor = c.index + c[0].length
+      }
+    }
+    spans.push({ start, end: cursor })
+  }
+  return spans
+}
+
+/** Whether the source offset `at` sits inside an element that binds a hover. */
+function enclosingBindsHover(src: string, at: number): boolean {
+  return hoverBoundSpans(src).some((s) => at >= s.start && at <= s.end)
+}
+
+/**
  * THE CHANNEL EACH FAMILY READS ITS NUDGE ON, and the proof in its own source.
  *
  * The beckon fires `pulseHandle(channel)`, and the layer reads the excursion
@@ -202,6 +270,41 @@ describe('affordance completeness — every grabbable family carries all four le
             src,
             `${family}: ${where} declares ${prop} but never binds it in JSX`
           ).toContain(`${prop}={${prop}}`)
+        }
+      })
+
+      it('puts EVERY hit surface it owns under those handlers, not just one', () => {
+        // N-3, the class this gate could not see. It proved the handlers exist
+        // and are bound to AN object; it never asked WHICH objects. A layer can
+        // satisfy every assertion above and still ship a live hit surface —
+        // a slop pad, a second sub-part, a newly split handle mesh — mounted
+        // OUTSIDE the handler element, and that surface takes the reader's press
+        // while answering their hover with nothing. The gate checked the family;
+        // the defect lives in the code path.
+        //
+        // A hit surface in this book is a mesh wearing the shared INVISIBLE
+        // raycast material (book/shared-procedural-textures.ts's
+        // `sharedHandleMaterial`, bound locally as `handleMaterial` by most
+        // layers and called inline by others). That material exists for no other
+        // purpose — a mesh wearing it is there to be pressed and nothing else —
+        // so every one of them must sit inside a JSX element that binds the
+        // pointer handlers. The check is structural: find each such mesh, then
+        // ask whether any enclosing element binds onPointerOver.
+        const surfaces = [...src.matchAll(/material=\{(?:handleMaterial|sharedHandleMaterial\(\))\}/g)]
+        expect(
+          surfaces.length,
+          `${family}: ${where} takes a grab but mounts no handleMaterial hit surface — either it ` +
+            `raycasts its RENDER meshes (say so by naming them here) or the reader has nothing to press`
+        ).toBeGreaterThan(0)
+
+        for (const surface of surfaces) {
+          const at = surface.index as number
+          expect(
+            enclosingBindsHover(src, at),
+            `${family}: ${where} mounts a hit surface at offset ${at} that is NOT inside an element ` +
+              `binding onPointerOver — the reader can press it but it will never light up, never ` +
+              `pinch the cursor, and never write \`hover\`. Move it under the handler group.`
+          ).toBe(true)
         }
       })
 

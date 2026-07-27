@@ -48,8 +48,19 @@ const ROT_LAG = 0.18
 const PRESS_DURATION_MS = 220
 const PRESS_DIP = 0.22
 /** Pinch roll (deg) added over a grabbable, and again while a grab is held —
- *  the pen turning its nib toward the paper it is about to take hold of. */
-const PINCH_ROT_DEG = 14
+ *  the pen turning its nib toward the paper it is about to take hold of.
+ *
+ *  N-3: raised from 14. With the native `grab` hand gone (it was the two-cursor
+ *  bug the hotfix removed), this roll and the grip ring in storybook-responsive
+ *  .css are the WHOLE of what tells a reader a thing is takeable — and a blind
+ *  reader sweeping 198 points reported "no cursor change" over the one live
+ *  mechanism on the spread. 22 degrees is a turn of the wrist you can see at a
+ *  glance on a 24px sprite; 14 was a wobble. */
+const PINCH_ROT_DEG = 22
+/** Extra scale over a grabbable, on top of the DOM-chrome hover's 1.15 — the
+ *  pen leaning in. Same argument as the roll: the two offers must not look
+ *  identical, because one of them can be taken hold of. */
+const PINCH_SCALE = 0.14
 /** How fast the pinch eases in and out (per-frame lerp weight). */
 const PINCH_LAG = 0.22
 
@@ -116,7 +127,7 @@ export function QuillCursor() {
       if (pinch.current < 0.004 && pinchTarget === 0) pinch.current = 0
 
       const hoverScale = hovering.current || pinch.current > 0.02 ? 1.15 : 1
-      const scale = hoverScale * (1 - pressDip)
+      const scale = (hoverScale + PINCH_SCALE * pinch.current) * (1 - pressDip)
       const roll = rotation.current + PINCH_ROT_DEG * pinch.current
 
       el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${roll.toFixed(2)}deg) scale(${scale.toFixed(3)})`

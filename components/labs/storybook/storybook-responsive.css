@@ -45,6 +45,50 @@
     drop-shadow(0 1px 2px rgb(0 0 0 / 0.55));
 }
 
+/* THE GRIP RING (N-3). "The rail-path tab has no hover response and no cursor
+   change... the quill stays a quill." — blind s6 re-re-review.
+
+   The hover STATE is live and always was (proved on the lane server: with the
+   stall raised, so the rail card stands clear of the body, the quill takes its
+   pinch class right across the card's own footprint). What actually regressed is
+   the CUE. The earlier re-review saw a native `grab` hand over handles — that
+   hand was the two-cursor bug the hotfix removed, and after it left, the only
+   answer a grabbable gives the cursor is a 14-degree roll and a slightly warmer
+   gold glow ON AN ALREADY GOLD SPRITE over a dark scene. A reader sweeping 198
+   probe points did not see it, and they were not being careless: a glow
+   differing from the DOM-chrome glow by 1px of blur radius is not a signal.
+
+   So the pinch now changes the cursor's SHAPE, not just its light: a hairline
+   gold ring closes around the nib — the hand about to take hold, drawn in the
+   book's own gold. It is a ring rather than more glow because a glow is what
+   was already being missed, and because the DOM chrome's `data-sb-hover` owns
+   the glow vocabulary; the ring belongs to the 3D scene alone, so the two
+   offers stop looking alike. Centred on the nib hotspot (the sprite's own
+   transform-origin), so it rides the pen's roll instead of sliding off it. */
+.sb-quill-cursor::after {
+  content: '';
+  position: absolute;
+  left: 19%;
+  top: 79%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 1.5px solid var(--sb-gold-bright);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.45);
+  transition: opacity 130ms ease, transform 130ms ease;
+}
+.sb-quill-cursor--pinch::after {
+  opacity: 0.95;
+  transform: scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-quill-cursor::after {
+    transition: none;
+  }
+}
+
 /* ---------------------------------------------------------------------
    Scrim behind the open story drawer. Styled outside the compact media
    query on purpose: spread-overlay.tsx only ever RENDERS it on the compact
