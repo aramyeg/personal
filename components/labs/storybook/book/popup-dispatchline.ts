@@ -76,6 +76,55 @@ export type DispatchLineGeom = Omit<StagedChainGeom, 'mech'> & {
   basketHalfV: number
   /** Atlas cell rows for the basket sprites (one row per basket sprite). */
   basketSprites?: number
+  /** THE LANDING — what arriving at the far end of the wire DOES (s4 round-3,
+   *  S4R3-2). All of it is in the panel's own plane, so all of it inherits the
+   *  sheet's cam. */
+  dock?: DispatchLineDock
+}
+
+/**
+ * THE LANDING (E3 s4 round-3, item S4R3-2).
+ *
+ * WHY IT EXISTS. A context-quarantined reader drove this trolley the whole
+ * length of the wire, both ways, and filed the best interaction on the spread
+ * with one damning sentence: "Nothing happens at either end. The mast says
+ * SEND; docking the trolley there launches no raven, drops no letter, changes
+ * no light. The carrier's white parcel is identical at both ends. The one place
+ * in the scene with an explicit verb and an obvious payoff has no payoff."
+ *
+ * WHAT ARRIVING DOES. Over the last `band` of the stroke — eased, so the
+ * landing has a run-in rather than a switch — three things happen at once:
+ *   the TIP: the pannier swings `tipDeg` on its bail and the letters go into
+ *     the roost. This is a rotation of the rider quad ABOUT ITS OWN CENTRE,
+ *     IN the panel plane: rigid (every pairwise corner distance preserved),
+ *     coplanar (it never leaves the sheet), and therefore still a
+ *     constant-weight point set of the sheet's four corners — the fold-flat,
+ *     wedge and real-time arguments the rider already carries are the same
+ *     arguments at a different angle.
+ *   the RAVEN: a die-cut bird sitting on the landing lifts off and climbs
+ *     `ravenRise` up the wire (and `ravenRun` back along it), in-plane, fading
+ *     up from nothing. It is not a bird flying past the page; it is a bird
+ *     printed on the same sheet as the wire, which is what a paper book can
+ *     honestly do.
+ *   the LAMP: the roost lantern at `lampS` comes up. Light only, no motion.
+ *
+ * ALL THREE ARE FUNCTIONS OF THE HELD DRIVE, so a reader who parks the trolley
+ * half-way into the landing gets half the event and keeps it — no timers, no
+ * animation state, nothing that could disagree with the pose the page turn
+ * solves for. And because the whole event lives in the panel plane, a page turn
+ * mid-landing folds the tipped basket, the climbing raven and the lit lamp flat
+ * with the sheet, at any held position.
+ */
+export type DispatchLineDock = {
+  /** Fraction of the stroke, at the far end, over which the landing plays. */
+  band: number
+  /** How far the pannier tips on its bail at full dock, degrees. */
+  tipDeg: number
+  /** The raven's climb and run at full dock, in panel (v, u) units. */
+  ravenRise: number
+  ravenRun: number
+  /** Where the roost lantern sits, as an arc parameter on the cable. */
+  lampS: number
 }
 
 /** The panel geom underneath — the same object, read as its own family. */
@@ -180,6 +229,160 @@ export function dispatchLineBasketQuad(
  */
 export const dispatchLineRiderS = (geom: DispatchLineGeom, drive: number): number =>
   clamp(geom.riderHome + (1 - geom.riderHome) * clamp(drive, 0, 1), 0, 1)
+
+/**
+ * HOW FAR INTO THE LANDING the reader has pushed, in [0, 1]. Zero over the
+ * whole open wire, then an eased run-in over the last `dock.band` of the
+ * stroke: sin(p*pi/2), the same snap-free cam shape every staged output in this
+ * book uses, so the event has finite slope where it starts and lands softly.
+ * A geom with no `dock` never leaves zero, which is what keeps this free for
+ * any other cable the family ever carries.
+ */
+export function dispatchLineDockT(geom: DispatchLineGeom, drive: number): number {
+  const dock = geom.dock
+  if (!dock) return 0
+  const band = Math.max(1e-6, dock.band)
+  const p = clamp((clamp(drive, 0, 1) - (1 - band)) / band, 0, 1)
+  return Math.sin((p * Math.PI) / 2)
+}
+
+/**
+ * A RIGID IN-PLANE ROTATION of a quad about its own centroid.
+ *
+ * Rodrigues about the quad's own normal, applied to each corner's offset from
+ * the centroid — so every pairwise corner distance is preserved EXACTLY (it is
+ * a rotation of a rigid body, not a re-parameterisation), for a quad that is
+ * planar or not. That matters here because the rider may straddle the panel's
+ * storey joint, where its four sample points are not exactly coplanar; taking
+ * the axis from the diagonals and rotating about it keeps the piece rigid
+ * either way.
+ *
+ * And it keeps the fold-flat argument intact rather than needing a new one: at
+ * book-close the sheet lies in the page, so the quad's normal IS the page
+ * normal, and a rotation about the page normal cannot lift anything off the
+ * page. The pannier can therefore stay tipped through a page turn — which is
+ * the liftflap persistence law satisfied structurally, exactly as the rider's
+ * own hold is.
+ */
+export function rotateQuadInPlane(quad: PanelQuad, angle: number): PanelQuad {
+  if (angle === 0) return quad
+  const c: Vec3 = [
+    (quad[0][0] + quad[1][0] + quad[2][0] + quad[3][0]) / 4,
+    (quad[0][1] + quad[1][1] + quad[2][1] + quad[3][1]) / 4,
+    (quad[0][2] + quad[1][2] + quad[2][2] + quad[3][2]) / 4,
+  ]
+  const d1: Vec3 = [quad[2][0] - quad[0][0], quad[2][1] - quad[0][1], quad[2][2] - quad[0][2]]
+  const d2: Vec3 = [quad[3][0] - quad[1][0], quad[3][1] - quad[1][1], quad[3][2] - quad[1][2]]
+  const nx = d1[1] * d2[2] - d1[2] * d2[1]
+  const ny = d1[2] * d2[0] - d1[0] * d2[2]
+  const nz = d1[0] * d2[1] - d1[1] * d2[0]
+  const nl = Math.hypot(nx, ny, nz)
+  if (nl < 1e-12) return quad
+  const k: Vec3 = [nx / nl, ny / nl, nz / nl]
+  const ca = Math.cos(angle)
+  const sa = Math.sin(angle)
+  return quad.map((p) => {
+    const v: Vec3 = [p[0] - c[0], p[1] - c[1], p[2] - c[2]]
+    const kv = k[0] * v[0] + k[1] * v[1] + k[2] * v[2]
+    const cx = k[1] * v[2] - k[2] * v[1]
+    const cy = k[2] * v[0] - k[0] * v[2]
+    const cz = k[0] * v[1] - k[1] * v[0]
+    return [
+      c[0] + v[0] * ca + cx * sa + k[0] * kv * (1 - ca),
+      c[1] + v[1] * ca + cy * sa + k[1] * kv * (1 - ca),
+      c[2] + v[2] * ca + cz * sa + k[2] * kv * (1 - ca),
+    ] as Vec3
+  }) as unknown as PanelQuad
+}
+
+/**
+ * A LANDING SPRITE — the taking-off raven and the roost lantern — as a small
+ * axis-aligned rectangle in PANEL space at (u, v), exactly the construction the
+ * fixed baskets and the rider use. Everything the rider's containment proof
+ * says is true of these too, for the same reason: a constant-weight bilinear
+ * combination of the sheet's corners can never move further than the sheet's
+ * own worst step, and folds dead flat when the sheet does.
+ */
+export function dispatchLineSpriteQuad(
+  geom: DispatchLineGeom,
+  u: number,
+  v: number,
+  halfU: number,
+  halfV: number,
+  thetaL: number,
+  thetaR: number
+): PanelQuad {
+  const uu = clamp(u, halfU, 1 - halfU)
+  const vv = clamp(v, halfV, 1 - halfV)
+  const at = (a: number, b: number): Vec3 => dispatchLinePoint(geom, a, b, thetaL, thetaR)
+  return [
+    at(uu - halfU, vv - halfV),
+    at(uu + halfU, vv - halfV),
+    at(uu + halfU, vv + halfV),
+    at(uu - halfU, vv + halfV),
+  ]
+}
+
+/** Where the landing raven sits at dock progress `t`: it starts ON the landing
+ *  (the outboard end of the wire) and climbs back up the line as it takes off. */
+export function dispatchLineRavenUV(geom: DispatchLineGeom, t: number): readonly [number, number] {
+  const dock = geom.dock
+  const [u0, v0] = dispatchLineCableAt(geom, 1)
+  if (!dock) return [u0, v0]
+  return [u0 + dock.ravenRun * t, v0 + dock.ravenRise * t]
+}
+
+/**
+ * THE TRAVEL FRAME the reader's hand is read in (s4 round-3, the
+ * ch3-dispatch-line gesture-axis known-failure).
+ *
+ * The trolley used to take the plain page-plane read every tab in the book
+ * takes, and the axis gate measured the price: 64.9 degrees between the
+ * direction a reader must drag and the direction the paper under their finger
+ * actually goes — more than twice the book's bar. The cause is that this handle
+ * is NOT on the page. It rides an arc inside a sheet standing at rootDeg 82, so
+ * reading its travel off the page's fore axis throws away the whole climb.
+ *
+ * So the hand is measured where the piece travels: on the SHEET's plane, along
+ * the CABLE's own tangent, over the wire's WORLD LENGTH. That last part is what
+ * makes the gesture feel right as well as read right — a drag of the run's
+ * length is exactly one full traverse.
+ *
+ * It lives here, not in the layer, so that the axis gate and the drag-regression
+ * gate drive the same function the renderer does. A private copy in the layer is
+ * how the old mismatch survived two reviews.
+ */
+export function dispatchLineTravelFrame(
+  geom: DispatchLineGeom,
+  s: number,
+  thetaL: number,
+  thetaR: number
+): { center: Vec3; n: Vec3; dir: Vec3; len: number } {
+  const at = (t: number): Vec3 => {
+    const [u, v] = dispatchLineCableAt(geom, t)
+    return dispatchLinePoint(geom, u, v, thetaL, thetaR)
+  }
+  const ds = 0.02
+  const pa = at(Math.max(0, s - ds))
+  const pb = at(Math.min(1, s + ds))
+  const dir: Vec3 = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]]
+  const panel = solveStagedChainPose(dispatchLinePanel(geom), thetaL, thetaR).panels[0]
+  const e1: Vec3 = [panel[1][0] - panel[0][0], panel[1][1] - panel[0][1], panel[1][2] - panel[0][2]]
+  const e2: Vec3 = [panel[3][0] - panel[0][0], panel[3][1] - panel[0][1], panel[3][2] - panel[0][2]]
+  const n: Vec3 = [
+    e1[1] * e2[2] - e1[2] * e2[1],
+    e1[2] * e2[0] - e1[0] * e2[2],
+    e1[0] * e2[1] - e1[1] * e2[0],
+  ]
+  let len = 0
+  let prev = at(0)
+  for (let i = 1; i <= 16; i++) {
+    const p = at(i / 16)
+    len += Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2])
+    prev = p
+  }
+  return { center: at(s), n, dir, len: Math.max(0.05, len) }
+}
 
 /** Screen-space-free reach check used by the tests: the cable must lie inside
  *  the sheet and fall monotonically outboard (the scene's one-diagonal law). */

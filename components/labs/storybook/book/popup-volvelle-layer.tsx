@@ -43,7 +43,7 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectHubAngle } from './handle-projection'
+import { crankTangentialDelta, projectHubAngle, type HubHit } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const HUB_DEADZONE = 0.25
@@ -219,19 +219,39 @@ export function VolvellePopupLayer({
 
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the hub
   // measured on the page's own e1/e2 axes (the knob-tower/winch disc idiom).
-  const grabRef = useRef<{ lastAngle: number | null } | null>(null)
+  //
+  // TWO READINGS OF THE SAME HAND, chosen per dial by `crank` (popup-mechanics
+  // .ts). The historical 'sweep' is the raw atan2 delta about the hub — the
+  // defect the systems patch measured on the keep winch and fixed there,
+  // deliberately leaving the other disc families to convert one at a time.
+  // 'tangential' is that fix, opted into by this spread's route plate: the
+  // honest quantity is how far the hand dragged the PAPER round, at a fixed
+  // reference radius, so the wheel cannot be spun by poking its middle and a
+  // deliberate rim stroke is worth exactly its own sweep. Nothing about the
+  // pose, the detents or the snap changes — only how much twist a given stroke
+  // is worth.
+  const grabRef = useRef<{ last: HubHit | null } | null>(null)
   const tap = useHandleTap()
+  const tangential = layer.crank === 'tangential'
 
-  const angleAboutHub = (
+  const hubHit = (
     e: ThreeEvent<PointerEvent>,
     thetaL: number,
     thetaR: number
-  ): { angle: number; stable: boolean } | null => {
+  ): { hit: HubHit; stable: boolean } | null => {
     const { center, e1, e2, n } = volvelleHubFrame(layer, thetaL, thetaR, VOLVELLE_LIFT)
     const hub = projectHubAngle(pointerLocalRay(e), center, e1, e2, n)
     if (!hub) return null
-    return { angle: hub.angle, stable: hub.r >= HUB_DEADZONE * layer.radius }
+    // The tangential read has no centre singularity to hide, so it keeps the
+    // whole disc live; the sweep read still needs its deadzone.
+    return { hit: hub, stable: tangential || hub.r >= HUB_DEADZONE * layer.radius }
   }
+
+  /** How much twist the step from `prev` to `next` is worth, in radians. */
+  const twistDelta = (prev: HubHit, next: HubHit): number =>
+    tangential
+      ? crankTangentialDelta(prev, next, layer.radius)
+      : wrapDelta(next.angle - prev.angle)
 
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
@@ -251,13 +271,13 @@ export function VolvellePopupLayer({
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
-    const hub = angleAboutHub(e, thetaL, thetaR)
+    const hub = hubHit(e, thetaL, thetaR)
     st.beginGrab(layer.id, 'knob')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
     writeUserDrive(layer.id, seeded, [0, thetaMax])
     tap.begin(seeded)
-    grabRef.current = { lastAngle: hub && hub.stable ? hub.angle : null }
+    grabRef.current = { last: hub && hub.stable ? hub.hit : null }
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -272,15 +292,15 @@ export function VolvellePopupLayer({
       return
     }
     const { thetaL, thetaR } = readAngles()
-    const hub = angleAboutHub(e, thetaL, thetaR)
+    const hub = hubHit(e, thetaL, thetaR)
     if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
-    if (grab.lastAngle !== null) {
+    if (grab.last !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      const next = clamp(cur + wrapDelta(hub.angle - grab.lastAngle), 0, thetaMax)
+      const next = clamp(cur + twistDelta(grab.last, hub.hit), 0, thetaMax)
       writeUserDrive(layer.id, next, [0, thetaMax])
       tap.track(next, TAP_EPS)
     }
-    grab.lastAngle = hub.angle
+    grab.last = hub.hit
     e.stopPropagation()
   }
 

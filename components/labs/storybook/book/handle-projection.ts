@@ -48,6 +48,48 @@ export function projectPageD(ray: THREE.Ray, theta: number): number | null {
 }
 
 /**
+ * CLASS A-P — the slide along a KNOWN DIRECTION IN A KNOWN PLANE, for a rider
+ * that travels inside a sheet the page has already stood up.
+ *
+ * WHY IT EXISTS (E3 s4 round-3, the ch3-dispatch-line gesture-axis
+ * known-failure). Class A reads the drag off the CARRYING PAGE's plane and
+ * returns its page-fore component, which is right for anything that slides
+ * across the page. The s4 cable trolley does not: it rides an arc inside a
+ * die-cut sheet standing at rootDeg 82, so the paper under the reader's finger
+ * travels 64.9 degrees away from the axis the projector was reading — over the
+ * book's 30 degree bar, and filed as a known failure the systems lane did not
+ * own. The s6 stall row's fix (the cylinder read, class B1-C) does not
+ * transplant here, because that pathology is a ROTATION whose plane the camera
+ * lies in and this piece is a TRANSLATION: there is no hinge and no swept
+ * cylinder to intersect.
+ *
+ * The honest reading for a slider is the one this file already applies to
+ * cranks: measure the hand ON THE SURFACE THE PIECE TRAVELS IN, along the
+ * direction it travels. So intersect the ray with the SHEET's plane (normal
+ * `n` through a point `center` on it — well conditioned, since a standing sheet
+ * faces the reader) and return the hit's distance along `dir`, the piece's own
+ * travel direction there. The drive is (d_now - d_grab) / (the world length of
+ * the whole run), which makes a drag of the run's length exactly one full
+ * traverse.
+ *
+ * `dir` need not be unit; it is normalised here so a caller can hand over a
+ * raw tangent. Returns null if the ray is parallel to the sheet, or if `dir`
+ * is degenerate.
+ */
+export function projectPlaneAlong(ray: THREE.Ray, center: Vec3, n: Vec3, dir: Vec3): number | null {
+  _u.set(dir[0], dir[1], dir[2])
+  if (_u.lengthSq() < 1e-12) return null
+  _u.normalize()
+  _center.set(center[0], center[1], center[2])
+  _n.set(n[0], n[1], n[2])
+  if (_n.lengthSq() < 1e-12) return null
+  _n.normalize()
+  _plane.setFromNormalAndCoplanarPoint(_n, _center)
+  if (!ray.intersectPlane(_plane, _hit)) return null
+  return _hit.dot(_u)
+}
+
+/**
  * CLASS B1 — the angle about a HINGE LINE (lift flaps, strip flaps). The swing
  * plane is the plane through the hinge `center` normal to the hinge `axis`;
  * the returned angle is measured from `flat` (where a shut leaf lies) toward

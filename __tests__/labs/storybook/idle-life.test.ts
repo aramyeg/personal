@@ -363,27 +363,30 @@ describe('idle census — no chapter is a photograph', () => {
   }
 
   /**
-   * THE ONE KNOWN GAP, and why the systems patch did not close it itself.
+   * THE ONE KNOWN GAP — CLOSED (E3 s4 round-3), and the marker retired with it.
    *
-   * Spread 4 is the measured photograph, and it has NO ELIGIBLE PIECE to tag.
-   * Its seven layers are: the keep (backdrop sheet — must be dead still), the
-   * tower and the terrace (stagedchain, a family the generic layer does not
-   * pose), the dispatch line (likewise), the winch (a grab handle AND the
-   * spread's hero — twice forbidden), the dial (a grab handle), and a 1.1-wide
-   * foreground v-fold that is the dispatch YARD WALL. Masonry does not sway and
-   * does not glint, and inventing an accent out of a wall to satisfy a gate is
-   * how a book gets a tic instead of a draught.
+   * What it said, and it was right at the time: "Spread 4 is the measured
+   * photograph, and it has NO ELIGIBLE PIECE to tag. Its seven layers are: the
+   * keep (backdrop sheet — must be dead still), the tower and the terrace
+   * (stagedchain, a family the generic layer does not pose), the dispatch line
+   * (likewise), the winch (a grab handle AND the spread's hero — twice
+   * forbidden), the dial (a grab handle), and a 1.1-wide foreground v-fold that
+   * is the dispatch YARD WALL. Masonry does not sway and does not glint, and
+   * inventing an accent out of a wall to satisfy a gate is how a book gets a tic
+   * instead of a draught... What the spread needs is a small loose, lit or
+   * airborne thing that the art puts there on purpose — a raven settling on the
+   * wire, A LAMP AT THE YARD GATE, a pennant on the mast."
    *
-   * What the spread needs is a small loose, lit or airborne thing that the art
-   * puts there on purpose — a raven settling on the wire, a lamp at the yard
-   * gate, a pennant on the mast. That is scene authoring, and it belongs to the
-   * lane that owns this spread's art.
-   *
-   * This marker RETIRES ITSELF: the moment spread 4 carries a tag the `.fails`
-   * stops failing, vitest reports it, and whoever added the tag moves it up into
-   * the census above.
+   * It was already there, on the dispatch line: that sheet is die-cut down to a
+   * wire, its masts and its hanging lanterns, and everything else is cut away.
+   * So a GLINT on its print — no motion at all, only how much light the paper
+   * catches — lands on those lamps and on nothing else. The family joins the
+   * strip flap on IDLE_GLINT_ONLY_MECHS (a handle may catch the lamp; it may not
+   * twitch), and the renderer puts the tint on the PANEL only, so the trolley's
+   * hover glow and the breath never write the same frame. No scenery was
+   * invented to satisfy this gate.
    */
-  const KNOWN_GAP = new Set([4])
+  const KNOWN_GAP = new Set<number>()
 
   it('finds the chapters', () => {
     expect(chapterSpreads().length).toBeGreaterThanOrEqual(6)

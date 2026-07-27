@@ -258,6 +258,10 @@ export const IDLE_FORBIDDEN_MECHS: readonly string[] = [
   'keepwinch',
   'volvelle',
   'swarmarc',
+  // E3 s4 round-3: the dispatch line joins the list for the same reason as the
+  // rest — the reader's hand is on its trolley — and joins the glint-only list
+  // below for the same reason as the strip flap.
+  'dispatchline',
 ]
 
 /** Mechanism families that actually route through popup-spread.tsx's generic
@@ -278,5 +282,15 @@ export const IDLE_SUPPORTED_MECHS: readonly string[] = [
  *  generic layer. Kept separate from IDLE_SUPPORTED_MECHS rather than merged
  *  into it, because the two lists mean different things: that one says "the
  *  generic layer poses this", this one says "this renderer honours light only".
- *  A motion tag on a family listed here is still dead, and still gated. */
-export const IDLE_GLINT_ONLY_MECHS: readonly string[] = ['stripflap']
+ *  A motion tag on a family listed here is still dead, and still gated.
+ *
+ *  E3 s4 ROUND-3 adds 'dispatchline' on exactly the same argument, and it is
+ *  what closed the book's one remaining idle gap. Spread 4 had no eligible
+ *  piece: showpieces that pose themselves, grab handles, and masonry. What it
+ *  DID have was a sheet die-cut down to a wire, its masts and its hanging
+ *  lanterns — so a glint on that print lands on the lamps and on nothing else,
+ *  which is the accent the census asked for ("a small loose, lit or airborne
+ *  thing that the art puts there on purpose"). The renderer applies it to the
+ *  PANEL only; the trolley keeps the hover glow, so the two can never write the
+ *  same tint in one frame. */
+export const IDLE_GLINT_ONLY_MECHS: readonly string[] = ['stripflap', 'dispatchline']

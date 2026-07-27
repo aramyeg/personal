@@ -659,6 +659,23 @@ export type VolvelleGeom = {
   sectors: number
   /** The die-cut windows in the static card. */
   windows: readonly VolvelleWindow[]
+  /**
+   * HOW THE HAND IS READ, opt-in (E3 s4 round-3). The default `'sweep'` is the
+   * historical raw-atan2 accumulation every disc in the book shipped with:
+   * wrapDelta(angle_now - angle_prev) about the hub, straight into the drive.
+   * The systems patch proved that mapping has unbounded gain at the centre and
+   * vanishing gain at the rim (handle-projection.ts, crankTangentialDelta) and
+   * fixed the keep winch with it; the volvelle and the knob tower were left
+   * carrying the same defect on purpose, to be converted per piece rather than
+   * by changing shared behaviour under two live lanes at once.
+   *
+   * `'tangential'` opts a dial in to the honest quantity — the tangential
+   * distance the hand dragged the paper, over a fixed reference radius — so a
+   * hand at the rim turns it 1:1, a hand at half radius turns it half as far,
+   * and a stroke straight across the face turns it essentially nothing. Any
+   * dial may take it; nothing changes for a dial that does not.
+   */
+  crank?: 'sweep' | 'tangential'
 }
 
 /**

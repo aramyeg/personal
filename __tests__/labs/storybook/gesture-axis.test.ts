@@ -52,6 +52,7 @@ import {
   projectHingeAngleCyl,
   projectHubAngle,
   projectPageD,
+  projectPlaneAlong,
 } from '@/components/labs/storybook/book/handle-projection'
 import {
   liveSpreadRole,
@@ -117,6 +118,7 @@ import {
 import {
   dispatchLineBasketQuad,
   dispatchLineRiderS,
+  dispatchLineTravelFrame,
   type DispatchLineGeom,
 } from '@/components/labs/storybook/book/popup-dispatchline'
 import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
@@ -472,17 +474,21 @@ function dispatchLineCase(id: string): AxisCase {
   const { layer, spreadIndex } = locate(id)
   const geom = layer as SceneLayer & DispatchLineGeom
   const { thetaL, thetaR } = restAngles(spreadIndex)
-  const t = geom.side === 'left' ? thetaL : thetaR
-  const stroke = Math.max(0.05, geom.w)
   const riderQuad = (drive: number): PanelQuad =>
     dispatchLineBasketQuad(geom, dispatchLineRiderS(geom, drive), thetaL, thetaR)
+  // CLASS A-P, the renderer's own frame (s4 round-3). This case used to build a
+  // page-plane read of its own and measured 64.9 deg of mismatch for it; the
+  // frame now comes from the shipped solver, so the gate drives the same
+  // function the layer does and a private copy cannot drift out of agreement
+  // with it again.
+  const frame = dispatchLineTravelFrame(geom, dispatchLineRiderS(geom, 0), thetaL, thetaR)
   return {
     name: id,
     family: 'dispatchline',
     rotary: false,
     grabPoint: centroid(riderQuad(0)),
-    project: (ray: THREE.Ray) => projectPageD(ray, t),
-    driveFrom: (g: number, n: number) => clamp(0 + (n - g) / stroke, 0, 1),
+    project: (ray: THREE.Ray) => projectPlaneAlong(ray, frame.center, frame.n, frame.dir),
+    driveFrom: (g: number, n: number) => clamp(0 + (n - g) / frame.len, 0, 1),
     restDrive: 0,
     driveRange: [0, 1] as const,
     handleQuad: riderQuad,
@@ -637,11 +643,16 @@ const CASES: AxisCase[] = [
  * re-derive it to know whether they have moved the number.
  *
  * They share one shape: the piece travels along an axis its projector does not
- * read. The plane-read strip flaps and the trolley are the acute cases — the
- * trolley rides an arc across the wire while `projectPageD` reads only the
- * page-fore component of the hand, and the strip flaps read a swing plane the
- * reading camera very nearly lies in (the pathology class B1-C exists for;
- * ch1-rank already uses the cylinder read and is still inverted).
+ * read. The strip flaps read a swing plane the reading camera very nearly lies
+ * in (the pathology class B1-C exists for; ch1-rank already uses the cylinder
+ * read and is still inverted).
+ *
+ * ch3-dispatch-line CAME OFF THIS LIST (s4 round-3). Its 64.9 deg was the
+ * acute case on the list and it needed a projector nobody had written: the
+ * cylinder read that rescued the stall row is for a ROTATION whose swing plane
+ * the camera lies in, and the trolley is a TRANSLATION inside a standing sheet.
+ * Class A-P (`projectPlaneAlong`) reads the hand on the SHEET's plane along the
+ * CABLE's tangent, over the wire's world length, and the mark came out with it.
  *
  * ch5-throng CAME OFF THIS LIST (N-5), exactly as the paragraph above promised:
  * the s6 stall row was the blind reader's "six identical stall kits sit inert
@@ -654,7 +665,6 @@ const OTHER_LANE_AXIS_FAILURES: Record<string, string> = {
   'ch1-rank': '110.9 deg (drag DOWN raises it) — popup-stripflap-layer.tsx, stripflap lane',
   'ch5-tea': '71.8 deg — popup-stripflap-layer.tsx, stripflap lane',
   'ch6-clerk': '51.3 deg — popup-stripflap-layer.tsx, stripflap lane',
-  'ch3-dispatch-line': '64.9 deg (rides the wire, reads page-fore) — popup-dispatchline-layer.tsx',
 }
 
 // --- The gate ----------------------------------------------------------------

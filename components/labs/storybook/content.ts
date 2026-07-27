@@ -816,6 +816,25 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     id: 'ch3-dispatch-line', kind: 'backdrop', role: 'scenery', mech: 'dispatchline',
     side: 'right', F: 0.415, w: 0.315, zc: -0.125, rootDeg: 82, safe: 0.95, camRestDeg: 173,
     style: 'ribbon',
+    // THE SPREAD'S DRAUGHT (E3 s4 ROUND-3, item 5). The idle census carried
+    // spread 4 as its one KNOWN GAP behind a self-retiring `it.fails`, and the
+    // reason it gave was sound: every other piece here is a showpiece that
+    // poses itself, a grab handle (forbidden a motion tag), or masonry — and
+    // "inventing an accent out of a wall to satisfy a gate is how a book gets a
+    // tic instead of a draught".
+    //
+    // The accent this spread already owns is LIGHT. This sheet is die-cut down
+    // to a wire, its masts and its hanging lanterns: everything else is cut
+    // away. So a `glint` — no motion at all, only how much light the print
+    // catches — lands on nothing but those lamps, which is the one thing on a
+    // night page that ought never to hold perfectly still. The stripflap
+    // precedent exactly (a lit candle that never flickers was that reader's
+    // sharpest idle finding): a handle family may catch the lamp because light
+    // moves no vertex and cannot fight the drive. The renderer puts it on the
+    // PANEL only — the trolley keeps the hover glow, so the two never write the
+    // same tint in one frame. amp 0.6 because the cable spans the page and the
+    // bar is "did the room breathe", not "did something animate".
+    idle: { kind: 'glint', amp: 0.6 },
     stages: [
       { h: 0.36, relDeg: 0, rTop: 0.415, wTop: 0.315 },
       // The upper storey kicks 9deg downstage so the sheet's top edge leans out
@@ -846,6 +865,21 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // its pannier still clears the roosts' 0.287 crest (L17).
     basketHalfU: 0.11,
     basketHalfV: 0.09,
+    // THE LANDING (E3 s4 ROUND-3, item S4R3-2). The blind reader's finding was
+    // one sentence and it was the right sentence: "the mast says SEND; docking
+    // the trolley there launches no raven, drops no letter, changes no light.
+    // The one place in the scene with an explicit verb and an obvious payoff
+    // has no payoff." So the last fifth of the wire is a LANDING, and arriving
+    // on it does three small physical things at once: the trolley's pannier
+    // TIPS on its bail (an in-plane rotation of the rider quad about its own
+    // centre — rigid, coplanar, so the sheet's cam is still its envelope), a
+    // ROOST LAMP comes up under it, and a RAVEN takes wing off the landing and
+    // climbs away up the wire. Both new pieces are in-plane quads on the same
+    // die-cut sheet, which is the whole reason this is affordable: a
+    // constant-weight bilinear point of a folding sheet folds with the sheet at
+    // any held position, so the payoff inherits fold-flat, wedge containment
+    // and the real-time bound from the panel exactly as the rider does.
+    dock: { band: 0.2, tipDeg: 34, ravenRise: 0.19, ravenRun: -0.07, lampS: 0.985 },
   },
   // THE TERRACED ROOSTS — the right page's answer to a colossus, and the piece
   // that kills the mirror by being its OPPOSITE. Where the tower is one tall
@@ -898,7 +932,20 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // pinned by this disc's closed footprint starting at z 0.17. Walking the
     // disc downstage into the yard buys 0.14 of tower (apex 0.88 -> 1.017) and
     // seats the crank where the reader's hand already is, at the tower's foot.
-    hubD: 0.52, hubZ: 0.45, discR: 0.13, crankR: 0.13,
+    //
+    // ROUND-3 hubD 0.52 -> 0.62 (systems-patch residual: "winch disc
+    // half-occluded by keep — spine-half presses never land"). The disc is a
+    // SPUN quad, so its page footprint reaches hubD +- discR*sqrt2 = +-0.184,
+    // and at 0.52 that put its spine-side corner at radial 0.336 — INSIDE the
+    // keep's hall flank (a 0.40), i.e. under a wall that stands between it and
+    // the reader. Half of a round handle promised a grip the raycast could
+    // never be reached for. At 0.62 the whole footprint starts at 0.436, clear
+    // of the hall by 0.036, so every part of the wheel the cursor can touch is
+    // a part of the wheel the eye can see. Nothing else moves: hubZ is
+    // untouched, so the closed-footprint tape measure that pins the crooked
+    // tower's zc is exactly as it was, and the three outputs live in the keep's
+    // own bisector frame and never saw the hub at all.
+    hubD: 0.62, hubZ: 0.45, discR: 0.13, crankR: 0.13,
     // WAVE-2 (S4-2). A blind reader cranked this wheel and got "one abrupt
     // 22-degree-wide snap followed by minutes of meaningless spinning": a bare
     // Scotch yoke tops out at half a turn, so the whole machine fired inside a
@@ -933,7 +980,27 @@ const CH3_LAYERS: readonly SceneLayer[] = [
     // Both must equal the keep's loft story (asserted by popup-keepwinch.test).
     // THE DISPATCH BOARDS lead the stagger now (L 0): the reader's first turn
     // swings the chapter's namesake object out of the loft.
-    iris: { L: 0, sMax: 0.075, range: (68 * Math.PI) / 180, bladeLen: 0.1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
+    //
+    // ROUND-3 "BIGGER STRUCTURES" (the user's note on this wheel, verbatim:
+    // the winch "should move BIGGER structures... bigger structures moved by
+    // its spin, or something else"). The syspatch fixed the HAND — the crank
+    // now costs 718 degrees of honest winding — so what was left was the
+    // PAYOFF, and the boards are the payoff a blind reader singled out as "the
+    // one genuinely delightful beat in the spread... they fan open like wings".
+    // Two levers, both free of the fold-flat proof, which is why they are the
+    // ones taken:
+    //   bladeLen 0.100 -> 0.128 grows the board itself; its off-wall reach is
+    //     bladeLen*sin(deploy)*E(beta), which is still exactly zero at close, so
+    //     N4 fold-flat is untouched in KIND and only re-measured in degree.
+    //   range 68 -> 86deg swings them from ajar to very nearly square-on to the
+    //     reader, which is where a board with pinned notices on it can actually
+    //     be read. This is the "more dramatic in travel" half.
+    // The hinge band up the wall widens with them (IRIS_R_LO/HI in
+    // popup-keepwinch.ts, 0.28..0.84 -> 0.18..0.94), and that span is IN the
+    // wall, so it folds with the wall it is cut into and costs no proof at all.
+    // Board area 0.100 x 0.1008 -> 0.128 x 0.1368: 1.74x the paper, at 1.26x
+    // the reach. N6 collision and N8 mid-turn wedge re-run at the new numbers.
+    iris: { L: 0, sMax: 0.075, range: (86 * Math.PI) / 180, bladeLen: 0.128, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
     // Counterweight on the LOFT FRONT CAP (belfry mouth), dead-center in the
     // reading sightline; descends within the cap plane (zero off-plane reach).
     counterweight: { L: 0.055, sMax: 0.07, range: 1, host: { mech: 'box', a: 0.27, height: 0.18, z0: -0.2, z1: 0.2, roof: 'flat', capFront: true, capBack: true, baseH: 0.3648 } },
@@ -942,33 +1009,77 @@ const CH3_LAYERS: readonly SceneLayer[] = [
   // v-fold at the fore edge — the spread's nearest plane framing the keep, its
   // scalloped painter reading as the yard's front wall until real art lands.
   { id: 'ch3-fringe', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.1, height: 0.155 },
-  // THE DISPATCH DIAL (E2.2 Batch B — the book's first VOLVELLE; Birmingham mech
-  // 103 THE HUB + 104 ROTATING WINDOW; bench derive-volvelle.mjs V1-V10). A
-  // reader-spun raven dial riveted flat into the RIGHT page (the dispatch yard),
-  // MIRRORING the winch's crank knob on the left — winch left, dispatch dial
-  // right. The reader twists the dial (the winch/knob H4 idiom: pointer angle
-  // about the hub, release HOLDS the twist) and raven silhouettes + route glyphs
-  // cycle through the three die-cut windows of the static card over it — "four
-  // billion ravens routed by one wheel." Release clicks the sectors into their
-  // windows (45deg detents, snap ease). A coplanar disc lies flat at ANY
-  // rotation, so the dial simply rides the folding page (no envelope) and folds
-  // dead flat at close — the book remembers the twist through page turns. Second
-  // user-driven piece on s4 beside the winch by DESIGN: a windowed dial is a new
-  // mechanism FAMILY (G1), reads distinct from the crank machine, and sits on the
-  // opposite page. hubD 0.60 seats the dial in the open lower-right yard: its
-  // spine-side swept corner (0.60 - 0.11*sqrt2 = 0.44) clears the keep's
-  // full-open hall wall (x=0.40) with margin, and it reads clear of the keep at
-  // the real rest (where the near-flat book collapses the keep to x~0.02). hubZ
-  // 0.36 sits downstage of the skyline, upstage of the fringe (z 0.60+). Art:
-  // ch3-dispatch-dial (8 sectors) + ch3-dispatch-card (3 windows + thumb-tab).
+  // THE ROUTE PLATE (E3 s4 ROUND-3, item S4R3-1) — the book's VOLVELLE, rebuilt
+  // as the reader's own library mechanism. His words: "a big circle cutout in
+  // the paper which had a spinning wheel... when spinning it created a new
+  // meaning, for example a bridge appeared over a river."
+  //
+  // WHAT WAS HERE BEFORE, and why it could not be that. A blind reader spent an
+  // hour on this spread and filed the dial as the page's biggest lie: "it takes
+  // the drag and its inner card ring turns a few degrees. Nothing else in the
+  // spread changes... the only changed pixels in the entire 1600x900 frame were
+  // four 32-px blocks on the dial itself." Both halves of that are true and only
+  // one of them is a mechanism defect. The dial WAS an instrument, and an
+  // instrument is all it could ever be: a 95 x 56 px plate carrying three
+  // 23 x 13 px windows, each showing one route badge out of eight. Nothing that
+  // small can carry a PICTURE, so nothing it did could change the page's
+  // meaning; the most it could report was an index.
+  //
+  // The library mechanism's grammar is the opposite way round. The cutout is in
+  // the SCENE's paper and the wheel behind supplies the missing piece of the
+  // scene — the river is printed on the page, the bridge comes up through the
+  // hole, and the picture means something new. So this piece stops being a desk
+  // faceplate and becomes THE ROUTE PLATE: a brass-rimmed plate set into the
+  // dispatch yard's paving, with ONE big arched die-cut looking down into the
+  // raven canyon, and four quarter-turn states behind it that string the route
+  // across that canyon — empty gulf -> the line cast -> the lamps lit -> the
+  // flight. One click of the reader's thumb and the crossing exists.
+  //
+  // DERIVED, NOT CHOSEN (bench .superpowers/sdd/bench/e3s4r3-plate.mjs, P1-P4).
+  //  - RADIUS 0.11 -> 0.18. A disc quad is a square of half-side R SPUN about
+  //    its hub, so the page rectangle sees R*sqrt2, not R: reach 0.2546.
+  //  - HUB 0.60,0.36 -> 0.86,0.47. Two walls set this. Upstage, the terraced
+  //    roosts' CLOSED ribbon runs its whole 0.30 chain up the page to z 0.19,
+  //    so the plate's own upstage corner must stay downstage of it (0.47 -
+  //    0.2546 = 0.215, clear by 0.025 — better than the 0.014 the small dial
+  //    had). Downstage and spine-ward, the fore-edge yard wall (ch3-fringe)
+  //    reaches radial ~0.55 on this page and would stand in front of the plate,
+  //    so the plate moves OUTBOARD of it (0.86 - 0.2546 = 0.605) — which also
+  //    lands it in the ~340x220 px of empty ground the same reader could not
+  //    identify ("letters? crates? unfinished blockout?"). The dead third of
+  //    the page becomes the machine.
+  //  - SECTORS 8 -> 4. The registration law (V3/V4) caps an aperture at
+  //    halfWidth <= 180/S - 4 degrees, so eight sectors could never hold a
+  //    window wider than 41 degrees of arc between them. Four sectors buy an
+  //    82-degree aperture — and four STATES is a story, where eight badges was
+  //    a lookup table.
+  //  - APERTURE AT psi 180, NOT 90. The reading camera compresses the spine
+  //    axis about 2:1 against the page-fore axis, so an annular sector spends
+  //    its radial run on whichever axis its psi points down. At psi 90 the
+  //    legal maximum window projects 103 x 36 px — a letterbox. Rotated to psi
+  //    180 (spine-ward, facing INTO the scene) the identical window projects
+  //    70 x 62 px: a picture instead of a slot, for free.
+  // Result at the pinned camera: plate 118x60 -> 213x104 px, and the
+  // transforming picture 299 -> 4353 px^2. Fourteen times the reveal.
+  //
+  // Everything the family already proved is untouched: a coplanar disc lies
+  // flat at ANY rotation, so the plate rides the folding page with no envelope
+  // and folds dead flat at close (V9 re-run at the grown radius), and release
+  // HOLDS the twist, so the book remembers which way the route is set. Art:
+  // ch3-dispatch-dial (4 crossing states) + ch3-dispatch-card (the plate, one
+  // die-cut arch, and paper cues in place of the retired SPIN tag).
   {
     id: 'ch3-dispatch', kind: 'foreground', role: 'scenery', mech: 'volvelle',
-    side: 'right', hubD: 0.6, hubZ: 0.36, radius: 0.11, sectors: 8,
-    windows: [
-      { psiDeg: 45, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-      { psiDeg: 90, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-      { psiDeg: 135, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-    ],
+    side: 'right', hubD: 0.86, hubZ: 0.47, radius: 0.18, sectors: 4,
+    windows: [{ psiDeg: 180, halfWidthDeg: 41, rMid: 0.605, rHalf: 0.35 }],
+    // And the LATENT defect the systems patch flagged and left: this dial still
+    // accumulated the raw atan2 sweep about its hub, the exact mapping that made
+    // the keep winch answer a poke at its centre with a whole revolution and
+    // ignore a deliberate stroke at its rim. The plate opts in to the winch's
+    // fix (crankTangentialDelta at the disc radius) — an opt-in rather than a
+    // change of shared behaviour, because a sibling lane is working the s7
+    // counting wheel in the same family this round.
+    crank: 'tangential',
   },
 ]
 

@@ -446,12 +446,20 @@ export const KEEP_WINCH_IRIS_SHUTTERS = 4
 // wall (0.1008 world) against bladeLen 0.10 — a near-square board with room for
 // pinned route slips, seals and a perched raven.
 //
-// bladeLen is HELD at 0.10, so the off-wall reach (bladeLen*sin deploy) and thus
-// the winch N8 wedge / N4 fold-flat proofs are untouched: only the in-wall hinge
-// span (along e2, up the folding wall) changes, and an in-wall span folds with
-// the wall it is cut into.
-const IRIS_R_LO = 0.28
-const IRIS_R_HI = 0.84
+// bladeLen was HELD at 0.10 there, so the off-wall reach (bladeLen*sin deploy)
+// and thus the winch N8 wedge / N4 fold-flat proofs were untouched: only the
+// in-wall hinge span (along e2, up the folding wall) changed, and an in-wall
+// span folds with the wall it is cut into.
+//
+// ROUND-3 (the user's "bigger structures moved by its spin"). The band widens
+// again to 0.18..0.94 — 0.76 of the loft wall, 0.1368 world — against the grown
+// bladeLen 0.128 in content.ts. Same argument as before for this half of the
+// growth: the span runs UP THE WALL, so it folds with the wall and buys the
+// board 36% more paper for no proof at all. The half that does cost a
+// re-measurement is bladeLen and the 86deg deploy, and those are gated by N4 /
+// N6 / N8 on the shipped numbers.
+const IRIS_R_LO = 0.18
+const IRIS_R_HI = 0.94
 
 /** The roost-mouth shutters — 2 rigid flaps hinged on the VERTICAL edges of
  *  each loft wall (wallL, wallR), covering the mouths when closed and swinging

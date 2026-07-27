@@ -13,10 +13,12 @@ import {
 import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
 import type { PanelQuad, Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
 import { PAGE_H, PAGE_W, easeTurnWeighted } from '@/components/labs/storybook/book/page-geometry'
+import { CHAPTERS } from '@/components/labs/storybook/content'
 import {
   S4_DIAL_ROUTES,
   S4_DIAL_SECTORS,
   dialRouteSignature,
+  s4StageForSector,
 } from '../../../scripts/storybook/s4-dial-routes.mjs'
 
 // VOLVELLE gates, ported in-engine from the source-of-truth bench
@@ -33,20 +35,15 @@ const REST = rad(176)
 const GLOBAL_CAP = 0.0497
 const TAU = Math.PI * 2
 
-// The shipped s4 dispatch dial (content.ts ch3-dispatch).
-const CFG: VolvelleGeom = {
-  mech: 'volvelle',
-  side: 'right',
-  hubD: 0.6,
-  hubZ: 0.36,
-  radius: 0.11,
-  sectors: 8,
-  windows: [
-    { psiDeg: 45, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-    { psiDeg: 90, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-    { psiDeg: 135, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.22 },
-  ],
-}
+// The shipped s4 route plate, READ FROM content.ts rather than transcribed. The
+// transcription is how this file spent a whole round gating a dial the book no
+// longer shipped: the geometry moved in content and every V-gate here went on
+// passing against the old numbers. Now it cannot.
+const CFG: VolvelleGeom = (() => {
+  const layer = CHAPTERS.flatMap((c) => c.layers).find((l) => l.id === 'ch3-dispatch')
+  if (!layer || layer.mech !== 'volvelle') throw new Error('ch3-dispatch is not a volvelle any more')
+  return layer
+})()
 const S = CFG.sectors
 const Delta = volvelleDetentStep(CFG)
 
@@ -198,83 +195,136 @@ describe('volvelle — dispatch dial gates (bench derive-volvelle.mjs, page-root
 
   it('the dial is a free-spinning hand-driven handle: THETA_MAX is a full revolution', () => {
     expect(volvelleThetaMax()).toBeCloseTo(TAU, 12)
-    expect(deg(Delta)).toBeCloseTo(45, 9)
+    expect(deg(Delta)).toBeCloseTo(360 / CFG.sectors, 9)
   })
 })
 
 /**
- * V11 — DETENT VISIBILITY (the art half of the s4 "dead handle" finding).
+ * V11 — DETENT VISIBILITY, and then CONSEQUENCE (the art half of the s4 "dead
+ * handle" finding, twice over).
  *
  * V5 above proves the MECHANISM has something to show: one detent step moves a
- * new sector index under every window. That gate passed the entire time the
+ * new sector index under the window. That gate passed the entire time the first
  * blind reader was reporting "the disc region changed by zero" after 450 degrees
  * of dragging, because an index changing is worth nothing if the two sectors are
- * painted the same picture. The dial's eight sectors were six near-identical
- * raven roundels plus two glyphs, so a detent step — exactly one sector — mostly
- * swapped a roundel for a roundel and rendered pixel-identically.
+ * painted the same picture. Round 2 answered that with eight distinct
+ * destinations, and the RE-review found it had fixed the wrong half: "the only
+ * changed pixels in the entire 1600x900 frame were four 32-px blocks on the dial
+ * itself." Eight badges in three 23 x 13 px windows is an INDEX; it reports a
+ * state, it cannot mean anything.
  *
- * So this gate is on the ART, and it reads the painter's own route table
- * (scripts/storybook/s4-dial-routes.mjs — the single source of truth the
- * `dispatchDial` painter builds from) rather than a luminance box measured off a
- * capture. Nothing here can pass unless a reader who clicks the dial one notch
- * sees a different destination in every window.
+ * So the wheel now carries FOUR CROSSINGS of the raven canyon behind one big
+ * die-cut arch, and this gate holds two things a picture-changing mechanism
+ * needs and a badge carousel does not:
+ *   THE PICTURE IS BIG ENOUGH TO BE A PICTURE — asserted in world units off the
+ *     shipped geometry, so a future shrink of the plate has to come through here.
+ *   THE PICTURE ACTUALLY CHANGES — asserted against the painter's own contract
+ *     (scripts/storybook/s4-dial-routes.mjs), never against a luminance box
+ *     measured off a capture, which is the house rule.
  */
-describe('V11 dial art — a detent step must LOOK different, not merely index differently', () => {
-  it('the route table matches the shipped sector count', () => {
+describe('V11 route plate — one click must change the PICTURE, not an index', () => {
+  it('the stage table matches the shipped sector count', () => {
     expect(S4_DIAL_SECTORS).toBe(CFG.sectors)
     expect(S4_DIAL_ROUTES.length).toBe(CFG.sectors)
   })
 
-  it('every sector carries a UNIQUE principal device — the thing that changes shape on a click', () => {
-    const marks = S4_DIAL_ROUTES.map((r) => r.mark)
-    expect(new Set(marks).size, `duplicate marks: ${marks.join(', ')}`).toBe(marks.length)
-    // and a unique destination legend, so the engraving differs too
-    const keys = S4_DIAL_ROUTES.map((r) => r.key)
-    expect(new Set(keys).size).toBe(keys.length)
+  it('THE APERTURE IS A PICTURE, not a slot: one window, and it owns most of the plate', () => {
+    // The reveal is now a single arch rather than three portholes.
+    expect(CFG.windows.length).toBe(1)
+    const win = CFG.windows[0]
+    // Its ANGULAR width, against the registration ceiling (180/S - margin). The
+    // old dial's 16deg half-width could not have been wider with eight sectors;
+    // this one takes nearly all of what four sectors allow.
+    expect(win.halfWidthDeg).toBeGreaterThanOrEqual(38)
+    // Its RADIAL run, as a fraction of the dial: the old band was 0.44R, this
+    // is 0.70R — the full legal span between the hub deadzone and the rim.
+    expect(win.rHalf * 2).toBeGreaterThanOrEqual(0.68)
+    // And the world size that follows, which is the number the reader feels.
+    // The arch's world extent is 2*rHalf*radius radially by
+    // 2*sin(halfWidth)*(rMid+rHalf)*radius across: both must clear the old
+    // dial's WHOLE 0.22-wide disc, i.e. the window is now bigger than the
+    // instrument it replaced.
+    const radial = 2 * win.rHalf * CFG.radius
+    const across = 2 * Math.sin(rad(win.halfWidthDeg)) * (win.rMid + win.rHalf) * CFG.radius
+    expect(radial).toBeGreaterThan(0.11)
+    expect(across).toBeGreaterThan(0.22)
   })
 
-  it('no two sectors share a silhouette signature, and adjacent ones differ in at least two ways', () => {
+  it('the crossing appears: exactly one stage has no span, and it is the one the wheel rests on', () => {
+    // "A bridge appeared over a river" is ONE BIT, and this is that bit. The
+    // untouched plate must show the empty gulf, so the reader's first click is
+    // the moment the route comes into existence.
+    const unspanned = S4_DIAL_ROUTES.filter((r) => r.span === 0)
+    expect(unspanned.length).toBe(1)
+    expect(S4_DIAL_ROUTES[0].span).toBe(0)
+    // and the UNTOUCHED plate frames it: the wheel rests on the empty gulf, so
+    // the reader's first click is the moment the route comes into existence.
+    expect(s4StageForSector(volvelleSectorSeen(CFG, CFG.windows[0], 0))).toBe(0)
+  })
+
+  it('no two stages share a silhouette signature, and adjacent ones differ in at least two ways', () => {
     const sigs = S4_DIAL_ROUTES.map((r) => dialRouteSignature(r).join('|'))
     expect(new Set(sigs).size, `duplicate signatures: ${sigs.join(' / ')}`).toBe(sigs.length)
+    const keys = S4_DIAL_ROUTES.map((r) => r.key)
+    expect(new Set(keys).size).toBe(keys.length)
     // Adjacency is the case the reader actually experiences — one click — so it
     // gets the stricter bar: two independent differences, not one.
     for (let k = 0; k < S4_DIAL_ROUTES.length; k++) {
       const a = S4_DIAL_ROUTES[k]
       const b = S4_DIAL_ROUTES[(k + 1) % S4_DIAL_ROUTES.length]
-      const diffs = [a.mark !== b.mark, a.ravens !== b.ravens, a.field !== b.field].filter(Boolean).length
-      expect(diffs, `sectors ${a.key} -> ${b.key} differ in only ${diffs} way(s)`).toBeGreaterThanOrEqual(2)
+      const diffs = [
+        a.span !== b.span,
+        a.taut !== b.taut,
+        a.lamps !== b.lamps,
+        a.ravens !== b.ravens,
+        a.carriers !== b.carriers,
+        a.glow !== b.glow,
+      ].filter(Boolean).length
+      expect(diffs, `stages ${a.key} -> ${b.key} differ in only ${diffs} way(s)`).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('the raven count and the traffic weight both vary, so difference survives 1x', () => {
-    // A count of birds is the one distinction that reads when a sector is 20px
-    // tall on a night page; tone alone was the old design's mistake.
-    expect(new Set(S4_DIAL_ROUTES.map((r) => r.ravens)).size).toBeGreaterThanOrEqual(3)
-    const weights = S4_DIAL_ROUTES.map((r) => r.weight)
-    expect(new Set(weights).size).toBe(weights.length)
-    for (const w of weights) expect(w).toBeGreaterThan(0)
+  it('the differences are COUNTS, which is what survives 70 x 62 screen px', () => {
+    // Tone alone was round 1's mistake and a badge silhouette was round 2's
+    // ceiling; what reads at this size is how many bright things there are.
+    for (const field of ['lamps', 'ravens', 'carriers', 'glow'] as const) {
+      const vals = S4_DIAL_ROUTES.map((r) => r[field])
+      expect(new Set(vals).size, `${field} never varies`).toBeGreaterThanOrEqual(2)
+      for (const v of vals) expect(v).toBeGreaterThanOrEqual(0)
+    }
+    // Two of them have to carry a real RANGE, not just an on/off: a picture
+    // whose every difference is binary is four pictures, not one that builds.
+    const wide = (['lamps', 'ravens', 'carriers', 'glow'] as const).filter(
+      (f) => new Set(S4_DIAL_ROUTES.map((r) => r[f])).size >= 3
+    )
+    expect(wide.length, `only ${wide.join(', ')} vary by more than on/off`).toBeGreaterThanOrEqual(2)
+    // and the picture BUILDS: light, birds and traffic are non-decreasing along
+    // the wheel, so a reader turning it one way is watching a route come alive
+    // rather than watching four unrelated pictures shuffle.
+    for (let k = 1; k < S4_DIAL_ROUTES.length; k++) {
+      const a = S4_DIAL_ROUTES[k - 1]
+      const b = S4_DIAL_ROUTES[k]
+      expect(b.glow).toBeGreaterThanOrEqual(a.glow)
+      expect(b.ravens).toBeGreaterThanOrEqual(a.ravens)
+      expect(b.lamps).toBeGreaterThanOrEqual(a.lamps)
+    }
   })
 
-  it('every bearing is distinct and lands on its own sector centre', () => {
-    const bearings = S4_DIAL_ROUTES.map((r) => r.bearingDeg)
-    expect(new Set(bearings).size).toBe(bearings.length)
-    S4_DIAL_ROUTES.forEach((r, k) => {
-      expect(r.bearingDeg).toBeCloseTo(k * deg(Delta), 9)
-    })
-  })
-
-  it('WHAT THE READER SEES: at every detent, every window frames a different destination than one click earlier', () => {
+  it('WHAT THE READER SEES: every click swaps the whole picture, in both directions', () => {
     for (let d = 0; d < S; d++) {
-      for (const w of CFG.windows) {
-        const before = S4_DIAL_ROUTES[volvelleSectorSeen(CFG, w, d * Delta)]
-        const after = S4_DIAL_ROUTES[volvelleSectorSeen(CFG, w, (d + 1) * Delta)]
+      for (const dir of [1, -1]) {
+        const before = S4_DIAL_ROUTES[s4StageForSector(volvelleSectorSeen(CFG, CFG.windows[0], d * Delta))]
+        const after = S4_DIAL_ROUTES[s4StageForSector(volvelleSectorSeen(CFG, CFG.windows[0], (d + dir) * Delta))]
         expect(before.key).not.toBe(after.key)
         expect(dialRouteSignature(before).join('|')).not.toBe(dialRouteSignature(after).join('|'))
       }
-      // and the three windows never show the same destination as each other, so
-      // the card reads as three slots of one sorting wall rather than a repeat.
-      const shown = CFG.windows.map((w) => S4_DIAL_ROUTES[volvelleSectorSeen(CFG, w, d * Delta)].key)
-      expect(new Set(shown).size).toBe(shown.length)
     }
+  })
+
+  it('the plate opts in to the honest crank read', () => {
+    // The systems patch fixed the winch's raw-atan2 sweep and left the volvelle
+    // carrying it, to be converted per piece. This is that conversion, gated so
+    // it cannot be lost in a merge.
+    expect(CFG.crank).toBe('tangential')
   })
 })

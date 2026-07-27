@@ -321,10 +321,29 @@ describe('paper-cue vocabulary — additive, no existing art changed', () => {
   // lanes. Until a lane does that, no painter may reference these helpers, so
   // every already-baked piece is byte-identical to what it was before.
   //
-  // WHEN THE FIRST SPREAD ADOPTS A CUE: add its painter's name to ADOPTERS.
-  // The list is the record of which pieces speak paper instead of printing a
-  // verb, and this test then guards that the machinery is only used there.
-  const ADOPTERS: readonly string[] = []
+  // WHEN A SPREAD ADOPTS A CUE: add its painter's name to ADOPTERS, and the
+  // number of call sites it makes. The table is the record of which pieces
+  // speak paper instead of printing a verb, and this test then guards that the
+  // machinery is used THERE and nowhere it was not declared — a cue that
+  // wanders into an unrelated piece is how a vocabulary turns into decoration.
+  //
+  // s4 ROUND-3 is the first adopter, converting all three of that spread's
+  // Wave-2 label plates in one pass:
+  //   dispatchCard  — the SPIN tag is retired; the arch gets a `cutShadow`, the
+  //                   thumb notch a `raisedEdgeShadow` pool AND lip, and the rim
+  //                   two sets of `cueArrow` chevrons.
+  //   crankWheel    — HOIST comes off the maker's plates (a winding-drum device
+  //                   replaces it, which also kills the mirror-reversed second
+  //                   copy a blind reader filed); the hand-rolled ink arrows
+  //                   become `cueArrow` chevrons, and the grip lobe gains a
+  //                   `raisedEdgeShadow` pool and lip.
+  //   dispatchCablePanel — the mast plate struck SEND carries a sealed-letter
+  //                   device and one `cueArrow` chevron set instead.
+  const ADOPTERS: Readonly<Record<string, number>> = {
+    cutShadow: 1, // dispatchCard: the arch
+    raisedEdgeShadow: 4, // dispatchCard notch (pool+lip), crankWheel lobe (pool+lip)
+    cueArrow: 3, // dispatchCard rim, crankWheel rim, the SEND mast plate
+  }
 
   const source = readFileSync(SCRIPT_PATH, 'utf8')
 
@@ -337,14 +356,18 @@ describe('paper-cue vocabulary — additive, no existing art changed', () => {
       const callSites = [...source.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
         (m) => m[1] !== 'function '
       )
-      expect(callSites.length).toBe(ADOPTERS.length)
+      expect(callSites.length).toBe(ADOPTERS[helper])
     })
   }
 
-  it('the transitional label plates are nobody else’s business here', () => {
-    // This lane must not have touched a spread's art. If a plate disappears it
-    // is because that spread's own pass replaced it with a cue, in its own
-    // commit — so this file makes no assertion about plate contents at all.
-    expect(ADOPTERS).toEqual([])
+  it('every retired label plate really has lost its word', () => {
+    // The three verbs s4 used to print. A painter may not quietly re-add one:
+    // this is the assertion that keeps the conversion from being cosmetic.
+    for (const verb of ['HOIST', 'SPIN', 'SEND']) {
+      expect(
+        source.includes(`engraveWord('${verb}'`),
+        `${verb} is being engraved again — the affordance law retired it`
+      ).toBe(false)
+    }
   })
 })

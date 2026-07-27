@@ -52,12 +52,19 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import {
   dispatchLineBasketQuad,
+  dispatchLineCableAt,
+  dispatchLineDockT,
   dispatchLinePanel,
+  dispatchLineRavenUV,
   dispatchLineRiderS,
+  dispatchLineSpriteQuad,
+  dispatchLineTravelFrame,
+  rotateQuadInPlane,
   type DispatchLineGeom,
 } from './popup-dispatchline'
+import { idleGate, idleOffset, idlePeak, idleSeed, idleClockPinned } from './idle-life'
 import { solveStagedChainPose, stagedChainBand, stagedChainNodeU } from './popup-stagedchain'
-import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad, type Vec3 } from './popup-mechanics'
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
@@ -71,7 +78,7 @@ import {
   writeUserDrive,
 } from '../user-drive'
 import { pointerLocalRay } from './user-drive-pointer'
-import { projectPageD } from './handle-projection'
+import { projectPlaneAlong } from './handle-projection'
 import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
@@ -197,7 +204,11 @@ export function DispatchLinePopupLayer({
   const panelRef = useRef<THREE.Mesh>(null)
   const riderRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const grabRef = useRef<{ sStart: number; dGrab: number } | null>(null)
+  const grabRef = useRef<{
+    sStart: number
+    dGrab: number
+    frame: { center: Vec3; n: Vec3; dir: Vec3; len: number }
+  } | null>(null)
   const sRef = useRef(0)
   const sendChannel = `${layer.id}~send`
   // A press that never sends the basket still gets an answer (BW-18). The
@@ -207,9 +218,15 @@ export function DispatchLinePopupLayer({
 
   const panelTexture = useLayerTexture(layer.id, layer.kind, accents)
   const riderTexture = useLayerTexture(`${layer.id}-basket`, layer.kind, accents)
+  // THE LANDING's two sprites share ONE texture, stacked as two rows: the
+  // taking-off raven on top, the roost lantern beneath. One art id, one upload,
+  // and the two pieces of the payoff cannot drift apart in style.
+  const landingTexture = useLayerTexture(`${layer.id}-landing`, layer.kind, accents)
 
   const panelGeometry = useMemo(() => makeQuads(layer.stages.length, panelUvs(layer)), [layer])
   const riderGeometry = useMemo(() => makeQuads(1, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
+  const ravenGeometry = useMemo(() => makeQuads(1, new Float32Array([0, 0.5, 1, 0.5, 1, 1, 0, 1])), [])
+  const lampGeometry = useMemo(() => makeQuads(1, new Float32Array([0, 0, 1, 0, 1, 0.5, 0, 0.5])), [])
   // The touch-slop surface never samples art — it is the shared invisible
   // raycast sentinel, so its UVs are a placeholder.
   const slopGeometry = useMemo(() => makeQuads(1, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
@@ -225,11 +242,24 @@ export function DispatchLinePopupLayer({
       new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, color: '#ffffff' }),
     []
   )
+  // The landing pieces fade UP out of nothing as the trolley arrives, so they
+  // carry no alphaTest (which would pop them in at a threshold) and are drawn
+  // last. At dock 0 they are fully transparent and invisible.
+  const ravenMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, color: '#ffffff', depthWrite: false }),
+    []
+  )
+  const lampMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, color: '#ffffff', depthWrite: false }),
+    []
+  )
 
   useEffect(() => {
     for (const [tex, mat] of [
       [panelTexture, panelMaterial],
       [riderTexture, riderMaterial],
+      [landingTexture, ravenMaterial],
+      [landingTexture, lampMaterial],
     ] as const) {
       if (!tex) continue
       tex.wrapS = THREE.ClampToEdgeWrapping
@@ -237,13 +267,35 @@ export function DispatchLinePopupLayer({
       mat.map = tex
       mat.needsUpdate = true
     }
-  }, [panelTexture, riderTexture, panelMaterial, riderMaterial])
+  }, [panelTexture, riderTexture, landingTexture, panelMaterial, riderMaterial, ravenMaterial, lampMaterial])
+
+  // THE SPREAD'S DRAUGHT (s4 round-3, item 5). GLINT ONLY, and on the PANEL
+  // only: this sheet is die-cut down to a wire, its masts and its lanterns, so
+  // a change in how much light the print catches lands on nothing but those
+  // lamps. The trolley is a grab handle and keeps the hover glow instead, so the
+  // two never write the same tint in one frame. An untagged line resolves to
+  // null and pays one null check.
+  const idle = useMemo(() => {
+    const tag = layer.idle
+    if (!tag || tag.kind !== 'glint') return null
+    return { seed: idleSeed(layer.id), peak: idlePeak('glint', tag.amp), pinned: idleClockPinned() }
+  }, [layer.idle, layer.id])
 
   // StrictMode-guarded (material-pool.ts): a bare `useEffect` cleanup disposes
   // the very objects the mount rehearsal hands straight back, which is what was
   // spraying `glGetProgramiv: Program object expected`. The shared handle
   // sentinel is module-lifetime and is deliberately NOT disposed here.
-  useGuardedDispose([panelGeometry, riderGeometry, slopGeometry, panelMaterial, riderMaterial])
+  useGuardedDispose([
+    panelGeometry,
+    riderGeometry,
+    ravenGeometry,
+    lampGeometry,
+    slopGeometry,
+    panelMaterial,
+    riderMaterial,
+    ravenMaterial,
+    lampMaterial,
+  ])
 
   const readAngles = () => {
     const f = frame.current
@@ -258,17 +310,24 @@ export function DispatchLinePopupLayer({
   }
 
   // --- the hand: drag the basket along the wire, release HOLDS -------------
-  // CLASS A projection (handle-projection.ts), shared with every other
-  // page-plane slide in the book: the rider travels within the standing sheet,
-  // but the sheet is rooted on the page, so the drag is still read off the
-  // carrying page's plane. Using the shared projector rather than a private copy
-  // is what lets the drag-regression gate drive this handle's REAL pipeline.
-  const projectPointerD = (e: ThreeEvent<PointerEvent>, theta: number): number | null =>
-    projectPageD(pointerLocalRay(e), theta)
-  // The basket's travel is measured in the page's own radial coordinate, so a
-  // drag of `w` world units across the sheet is a full send — the stroke IS the
-  // panel's width, which is what makes the gesture feel like the wire's length.
-  const stroke = Math.max(0.05, layer.w)
+  //
+  // CLASS A-P projection (handle-projection.ts). This handle used to take the
+  // plain page-plane read every tab in the book takes — and the gesture-axis
+  // gate measured what that cost: 64.9 degrees between the direction the reader
+  // must drag and the direction the paper under their finger goes, more than
+  // twice the book's bar, filed as a known failure with this file's name on it.
+  // The cause is that the trolley is NOT on the page: it rides an arc inside a
+  // sheet standing at rootDeg 82, and reading its travel off the page's fore
+  // axis throws away the whole climb. The s6 stall row's cylinder read does not
+  // transplant (that pathology is a rotation; this is a translation), so the fix
+  // is to measure the hand where the piece actually travels — on the SHEET's
+  // plane, along the CABLE's own tangent.
+  const travelFrame = (s: number, thetaL: number, thetaR: number) =>
+    dispatchLineTravelFrame(layer, s, thetaL, thetaR)
+  const projectPointerD = (
+    e: ThreeEvent<PointerEvent>,
+    f: { center: Vec3; n: Vec3; dir: Vec3 }
+  ): number | null => projectPlaneAlong(pointerLocalRay(e), f.center, f.n, f.dir)
 
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
@@ -288,12 +347,16 @@ export function DispatchLinePopupLayer({
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
     const { thetaL, thetaR } = readAngles()
-    const dGrab = projectPointerD(e, layer.side === 'left' ? thetaL : thetaR)
-    if (dGrab === null) return
     const sStart = clamp(readUserDrive(sendChannel) ?? sRef.current, 0, 1)
+    // The travel frame is frozen at the grab, like dGrab itself: one stable
+    // axis for the whole stroke, so the mapping cannot shift under the hand as
+    // the wire's tangent changes along the sag.
+    const frame0 = travelFrame(dispatchLineRiderS(layer, sStart), thetaL, thetaR)
+    const dGrab = projectPointerD(e, frame0)
+    if (dGrab === null) return
     st.beginGrab(layer.id, 'tab')
     if (useStorybookStore.getState().grab?.id !== layer.id) return
-    grabRef.current = { sStart, dGrab }
+    grabRef.current = { sStart, dGrab, frame: frame0 }
     writeUserDrive(sendChannel, sStart, [0, 1])
     tap.begin(sStart)
     beginGrabChannel(layer.id, releaseGrab)
@@ -309,10 +372,9 @@ export function DispatchLinePopupLayer({
       releaseGrab(e)
       return
     }
-    const { thetaL, thetaR } = readAngles()
-    const dNow = projectPointerD(e, layer.side === 'left' ? thetaL : thetaR)
+    const dNow = projectPointerD(e, grab.frame)
     if (dNow === null) return
-    const sUser = clamp(grab.sStart + (dNow - grab.dGrab) / stroke, 0, 1)
+    const sUser = clamp(grab.sStart + (dNow - grab.dGrab) / grab.frame.len, 0, 1)
     writeUserDrive(sendChannel, sUser, [0, 1])
     // The send stroke is normalised, so TAP_EPS is read as a thousandth of the
     // whole wire — a press that moves the basket less than that is a click.
@@ -327,7 +389,7 @@ export function DispatchLinePopupLayer({
     useStorybookStore.getState().clearHover(layer.id)
   }
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
     const { role, thetaL, thetaR, beta } = readAngles()
@@ -356,16 +418,68 @@ export function DispatchLinePopupLayer({
     sRef.current = drive
     if (override === null && channel === undefined && drive === 0) clearUserDrive(sendChannel)
 
+    // THE LANTERNS BREATHE (item 5). The sheet is die-cut down to a wire, its
+    // masts and its lamps, so a multiplicative tint on the print is light on
+    // those lamps and on nothing else. Panel only — the trolley above owns its
+    // own tint.
+    if (idle) {
+      panelMaterial.color.setScalar(
+        1 + idleOffset(idle.peak, idle.seed, state.clock.elapsedTime, beta, idle.pinned || frame.current !== null)
+      )
+    }
+
     writeQuads(panelGeometry, solveStagedChainPose(dispatchLinePanel(layer), thetaL, thetaR).panels)
     const shown = shownSend(sendChannel, drive, override !== null)
-    const rider = dispatchLineBasketQuad(layer, dispatchLineRiderS(layer, shown), thetaL, thetaR)
+    const s = dispatchLineRiderS(layer, shown)
+    // THE LANDING (S4R3-2). One number — how far into the last fifth of the
+    // wire the reader has pushed — drives all three parts of the payoff, so a
+    // basket parked half-way in keeps half an event and a page turn folds it
+    // flat with everything else on the sheet.
+    const dockT = dispatchLineDockT(layer, shown)
+    const tip = ((layer.dock?.tipDeg ?? 0) * Math.PI) / 180
+    const rider = rotateQuadInPlane(
+      dispatchLineBasketQuad(layer, s, thetaL, thetaR),
+      // The pannier tips the way the wire falls, so the letters go INTO the
+      // roost rather than back up the line. The sheet's own openness gates it,
+      // like every other excursion in the book: at book-close there is nothing
+      // to tip over.
+      tip * dockT * idleGate(beta, false)
+    )
     writeQuads(riderGeometry, [rider])
     writeQuads(slopGeometry, [enlargeQuad(rider, handleSlopFactor(rider, TOUCH_SLOP))])
+
+    if (layer.dock) {
+      const [ru, rv] = dispatchLineRavenUV(layer, dockT)
+      writeQuads(ravenGeometry, [
+        dispatchLineSpriteQuad(layer, ru, rv, layer.basketHalfU, layer.basketHalfV, thetaL, thetaR),
+      ])
+      const [lu, lv] = dispatchLineCableAt(layer, layer.dock.lampS)
+      writeQuads(lampGeometry, [
+        dispatchLineSpriteQuad(
+          layer,
+          lu,
+          lv,
+          layer.basketHalfU * 0.6,
+          layer.basketHalfV * 0.6,
+          thetaL,
+          thetaR
+        ),
+      ])
+      // The raven only exists once it is airborne; the lamp comes up first, so
+      // the light arrives ahead of the bird.
+      ravenMaterial.opacity = Math.max(0, dockT * dockT)
+      lampMaterial.opacity = Math.min(1, dockT * 1.6)
+    }
   })
 
   return (
     <group ref={groupRef} visible={false}>
       <mesh ref={panelRef} geometry={panelGeometry} material={panelMaterial} renderOrder={0} />
+      {/* THE LANDING — scenery, deliberately OUTSIDE the pointer group: the
+          payoff is something the reader's send causes, never something they can
+          grab and stage by hand. */}
+      {layer.dock ? <mesh geometry={lampGeometry} material={lampMaterial} renderOrder={1} /> : null}
+      {layer.dock ? <mesh geometry={ravenGeometry} material={ravenMaterial} renderOrder={3} /> : null}
       {/* The handle, and ONLY the handle, inside the pointer group: the panel is
           a wall the reader must be able to look past, and putting it under these
           handlers would also make it an "exact" surface that the slop defers to

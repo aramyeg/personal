@@ -32,6 +32,7 @@ import {
   projectHingeAngleCyl,
   projectHubAngle,
   projectPageD,
+  projectPlaneAlong,
 } from '@/components/labs/storybook/book/handle-projection'
 import {
   liveSpreadRole,
@@ -103,6 +104,7 @@ import {
 import {
   dispatchLineBasketQuad,
   dispatchLineRiderS,
+  dispatchLineTravelFrame,
   type DispatchLineGeom,
 } from '@/components/labs/storybook/book/popup-dispatchline'
 import { ROTOR_LIFT } from '@/components/labs/storybook/book/popup-rotor'
@@ -376,10 +378,12 @@ function keepsakeCase(id: string): HandleCase {
  * one thing on the page that behaves like a paper toy", which makes it the one
  * this gate can least afford to leave uncovered.
  *
- * It is a CLASS A page-plane slide like the pull tabs, even though the piece it
- * rides stands off the page: the rider translates in the standing sheet, but the
- * sheet is rooted on the page, so the layer reads the drag off the carrying
- * page's plane through `projectPageD` on its own side.
+ * It is a CLASS A-P slide (s4 round-3): the rider translates INSIDE a sheet
+ * standing at rootDeg 82, so the layer reads the drag off the SHEET's plane
+ * along the CABLE's own tangent through `projectPlaneAlong`, over the wire's
+ * world length. It used to take the plain page-plane read the pull tabs take,
+ * and the axis gate measured 64.9 degrees of mismatch for it — the reader had to
+ * drag one way to move paper that went another.
  *
  * REST is drive 0, which is NOT s = 0: drive is the send stroke and the rider's
  * arc parameter is `dispatchLineRiderS(geom, drive)`, so at rest the trolley sits
@@ -390,20 +394,19 @@ function dispatchLineCase(id: string): HandleCase {
   const { layer, spreadIndex } = locate(id)
   const geom = layer as SceneLayer & DispatchLineGeom
   const { thetaL, thetaR } = restAngles(spreadIndex)
-  const t = geom.side === 'left' ? thetaL : thetaR
-  // The layer's own stroke, verbatim: a drag of the panel's WIDTH across the
-  // sheet is a full send, which is what makes the gesture feel like the wire's
-  // length. The floor guards a degenerate geom against a division blow-up.
-  const stroke = Math.max(0.05, geom.w)
   const riderQuad = (drive: number): PanelQuad =>
     dispatchLineBasketQuad(geom, dispatchLineRiderS(geom, drive), thetaL, thetaR)
+  // The layer's own frame, from the shipped solver rather than a copy: a drag of
+  // the WIRE's world length is a full send, which is what makes the gesture feel
+  // like pushing a basket the length of the cable.
+  const frame = dispatchLineTravelFrame(geom, dispatchLineRiderS(geom, 0), thetaL, thetaR)
   return {
     name: id,
     // The reader grabs the trolley itself — there is no tab, the basket IS the
     // handle — so the aim point is its own centre at rest.
     grabPoint: centroid(riderQuad(0)),
-    project: (ray) => projectPageD(ray, t),
-    driveFrom: (g, n) => clamp(0 + (n - g) / stroke, 0, 1),
+    project: (ray) => projectPlaneAlong(ray, frame.center, frame.n, frame.dir),
+    driveFrom: (g, n) => clamp(0 + (n - g) / frame.len, 0, 1),
     restDrive: 0,
     // Deliberately the RIDER quad alone, not the panel: the panel is scenery and
     // is posed by the page angles, so including it would let a dead drive channel
