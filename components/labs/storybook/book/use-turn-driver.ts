@@ -112,6 +112,42 @@ export const isCoverTurn = (spread: number, dir: TurnDir): boolean =>
   (spread === 0 && dir === 'next') || (spread === 1 && dir === 'prev')
 
 /**
+ * THE SPREAD-EXIT RESET, AS ONE FUNCTION (S5R2-2).
+ *
+ * A blind reader of spread 5 reported the reset that BW-19 shipped simply not
+ * happening: "Turn the page away and back and the flattened tent is still
+ * flattened (measured: 660 changed px, i.e. identical). A real pop-up re-pops
+ * when you re-open it." Reproduced live on their own path
+ * (bench/s5r2-probe.mjs, `reset`): both s5 channels come back holding the exact
+ * values they were left at.
+ *
+ * ROOT CAUSE: the reset was armed by a top-of-frame comparison,
+ * `if (committedSpread.current !== state.spread)`, and the COMMIT BRANCH at the
+ * bottom of the same loop advanced `committedSpread.current` itself — it has to,
+ * so the sheet, the prints and the popup roles all swap inside one rAF (see the
+ * note there). So by the time the next frame ran the comparison, the two were
+ * already equal and the change had been consumed by the very code that made it.
+ * The guard could only ever fire for a spread change that arrived from OUTSIDE
+ * the driver (the ?sbpose effect), which is exactly the one case where nothing
+ * is held. Every real page turn — arrows, keys, wheel, swipe, corner tap, corner
+ * peel — went through the commit branch and reset nothing.
+ *
+ * The fix is to make advancing the committed spread and dropping the reader's
+ * held values THE SAME ACT, so no future edit can move one without the other.
+ * Both call sites go through here.
+ */
+export function commitSpread(committedSpread: { current: number }, next: number): void {
+  if (committedSpread.current === next) return
+  // The reader has LEFT a page: drop every held reader value and any pending tap
+  // pulse, because a reopened page is a fresh pop-up. (The drives live outside
+  // React entirely, and this ref moves in lockstep with the sheet — the same
+  // clock the pieces themselves are posed on.)
+  resetUserDrives()
+  resetNudgePulses()
+  committedSpread.current = next
+}
+
+/**
  * Returns a ref whose `.current` is `{t: 0..1, dir, isCover}` while turning,
  * `null` at rest. Starts when `store.turning` flips truthy; once the main
  * sweep and its settle tail have both run (or a queued turn cuts the tail
@@ -164,18 +200,10 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
 
   useFrame((_, delta) => {
     const state = useStorybookStore.getState()
-    // SPREAD-EXIT RESET (E3 BW-19). The committed spread has just changed, so
-    // the reader has LEFT a page: drop every held reader value and any pending
-    // tap pulse, because a reopened page is a fresh pop-up. (A blind reader
-    // turned away from spread 7 and back and found the vault lid still standing
-    // open.) Done here rather than in the store because the drives live outside
-    // React entirely, and this ref moves in lockstep with the sheet — the same
-    // clock the pieces themselves are posed on.
-    if (committedSpread.current !== state.spread) {
-      resetUserDrives()
-      resetNudgePulses()
-    }
-    committedSpread.current = state.spread
+    // SPREAD-EXIT RESET (E3 BW-19, repaired in S5R2-2 — see commitSpread above).
+    // This arm catches a spread change that arrives from outside the driver (the
+    // ?sbpose effect); the commit branch below catches every real page turn.
+    commitSpread(committedSpread, state.spread)
 
     // AFFORDANCE, third leg (BW-1): if the reader has touched nothing for a few
     // seconds, the spread's primary playable twitches once — the same nudge a
@@ -276,7 +304,7 @@ export function useTurnDriver(): { frame: RefObject<TurnFrame | null>; committed
       // (The settle has run the sheet to within 0.022deg of the static
       // landed page — 2.5% of the accepted hand-off residual — so hiding it
       // a frame "early" is indistinguishable, as it was at t=1 before.)
-      committedSpread.current = useStorybookStore.getState().spread
+      commitSpread(committedSpread, useStorybookStore.getState().spread)
       frame.current = null
       elapsedMs.current = 0
       armedFor.current = null

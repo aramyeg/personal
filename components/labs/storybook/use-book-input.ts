@@ -42,7 +42,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { accumulateWheel, useStorybookStore, type TurnDir, type WheelAcc } from './store'
 import { activeGrabId, forceEndGrabChannel } from './user-drive'
-import { cornerPeelProgress, cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
+import { cornerPeelProgress, cornerTurnFor, isCornerTap } from './overlay/corner-hotspot'
 
 // ---------------------------------------------------------------------------
 // THE SWIPE, AND WHY IT IS HORIZONTAL ONLY (N-1, the s6 re-re-review's blocker).
@@ -242,7 +242,16 @@ export function useBookInput(enabled: boolean): void {
       // page turn. "The paper wins" was already the corner's rule; it is the
       // whole pointer's rule now.
       if (st.grab !== null || st.hover !== null) return
-      const corner = cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
+      // S5R2-3: the SAME predicate the dog-ear is lit from, so the cue and the
+      // press can never disagree about who owns the pixel.
+      // (Both claims are known null on this line — the guard above returned —
+      // and an overlay press never reaches here either, so what this call really
+      // pins is that the press and the cue go through ONE function.)
+      const corner = cornerTurnFor(e.clientX, e.clientY, window.innerWidth, window.innerHeight, {
+        hover: null,
+        grab: null,
+        overlay: false,
+      })
       pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now(), corner }
     }
 
@@ -326,10 +335,18 @@ export function useBookInput(enabled: boolean): void {
         return
       }
       const st = useStorybookStore.getState()
-      const corner =
-        st.grab === null && st.hover === null
-          ? cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
-          : null
+      // S5R2-3: `overlay` is the leg that was missing. The canvas is never sent
+      // pointer events over the book's HTML text layer, so `hover` there is a
+      // stale reading of wherever the pointer last crossed the paper — and the
+      // press path already refused those pixels (`targetsOverlayPanel`, above)
+      // while this one lit the fold on them. On spread 5 the narration column's
+      // last lines run straight through the left corner rect, which is precisely
+      // "the dog-ear lights and clicking there fires neither".
+      const corner = cornerTurnFor(e.clientX, e.clientY, window.innerWidth, window.innerHeight, {
+        hover: st.hover,
+        grab: st.grab?.id ?? null,
+        overlay: targetsOverlayPanel(e.target),
+      })
       const value = corner === 'prev' ? 'left' : corner === 'next' ? 'right' : ''
       const root = document.documentElement
       if ((root.dataset.sbCorner ?? '') !== value) {

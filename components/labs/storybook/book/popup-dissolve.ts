@@ -47,7 +47,7 @@
  */
 
 import { PAGE_W } from './page-geometry'
-import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
+import { stationDetent, type DissolveGeom, type PanelQuad, type Vec3 } from './popup-mechanics'
 import { ROTOR_LIFT } from './popup-rotor'
 
 export type { DissolveGeom }
@@ -91,8 +91,115 @@ export function dissolveTabTip(geom: DissolveGeom, beta: number = TIP_REST): num
   if (tip === 0) return 0
   return tip * clamp(Math.sin(clamp(beta, 0, Math.PI) / 2) / Math.sin(TIP_REST / 2), 0, 1)
 }
-/** The two pure end states the release snaps to — a 2-detent dial. */
+/** The two pure end states — pure dunes and pure gold. */
 export const DISSOLVE_ENDS = [0, Math.PI] as const
+
+/**
+ * THE RACK LATCHES WHERE THE HAND LEFT IT (S5R2-4), AND THE CLOSING BOOK TAKES
+ * THE STRIP BACK IN.
+ *
+ * The release used to EASE TO THE NEAREST END, and a blind reader measured what
+ * that costs: "a 20px drag does nothing at all; a 35px drag produces the
+ * IDENTICAL final frame as a 250px drag. It is a threshold toggle wearing a
+ * drag's clothes — I never once felt I was turning the slats myself." Both
+ * halves are the snap: the travel under the hand was always continuous (probed
+ * live at 2.6 deg of flip per screen px), but every value the reader chose was
+ * thrown away at the instant they let go, so the only thing their stroke could
+ * express was which side of 90 degrees it ended on.
+ *
+ * So the flip is now HELD, like every other reader value in the book, and the
+ * fold-flat argument the snap used to provide is provided instead by the hold
+ * envelope — the lift-flap persistence law (a_shown = a_user * E(beta)) in this
+ * family's units, with the book's own shared cam shape as E.
+ *
+ * Two things fall out of pulling toward tau = 0 rather than toward the nearest
+ * end. The rack lies flat A-face up at book-closed for ANY held flip, so
+ * fold-flat needs no case analysis; and because the strip draw is tau's own
+ * linear image (dissolveTabOut), the closing book DRAWS THE STRIP BACK IN — the
+ * tongue's slack take-up (dissolveTabTip) and the strip's own draw now retire
+ * through the same gesture, and the closed book's containment is exact rather
+ * than the 0.14 overreach a latched-gold state used to carry past the trim.
+ * Reopening runs E back up and the reader's flip returns exactly: the book still
+ * remembers dunes-or-gold, it simply does not hold a half-open venetian shut
+ * inside itself.
+ */
+export function dissolveHoldEnvelope(beta: number): number {
+  const u = clamp(Math.sin(clamp(beta, 0, Math.PI) / 2) / Math.sin(TIP_REST / 2), 0, 1)
+  return Math.sin((u * Math.PI) / 2)
+}
+
+/** The flip actually DRAWN for a held reader flip at dihedral `beta`. */
+export const dissolveShownTau = (tauHeld: number, beta: number): number =>
+  clamp(tauHeld, 0, Math.PI) * dissolveHoldEnvelope(beta)
+
+/** Sticky band at each pure end, radians: the last few degrees where a real
+ *  venetian's own slats take over and close for you, so pure dunes and pure
+ *  gold are poses a reader lands ON rather than near. */
+export const DISSOLVE_DETENT = (13 * Math.PI) / 180
+
+/** The reader's requested flip, with both ends made clickable. Applied to the
+ *  DRIVE, so what latches is exactly 0 or exactly PI when the hand got close. */
+export const dissolveDetent = (tau: number): number =>
+  stationDetent(clamp(tau, 0, Math.PI), DISSOLVE_ENDS, DISSOLVE_DETENT)
+
+/**
+ * THE HINGE THE READER'S OWN SLAT TURNS ABOUT (S5R2-4).
+ *
+ * The tongue is a strip and its drag is the strip's draw, 1:1 — that is what
+ * pulling a paper tab is. The RACK is not: pressing a slat and pushing it does
+ * not translate anything, it TURNS the slat about its own hinge, which is how a
+ * person actually works a venetian blind. Reading the body grab as a strip draw
+ * was a convenience, and it is the convenience the reader named ("I never once
+ * felt I was turning the slats myself"). So the rack reads as a turn.
+ *
+ * WHICH TURN PROJECTOR, AND WHY NOT THE OBVIOUS ONE. Class B1 (the angle of the
+ * ray/swing-plane hit about the hinge) is well conditioned here — the hinges run
+ * along the spine, which points at the eye, so the view meets the swing plane at
+ * |cos| ~ 0.9, nothing like the edge-on collapse that forced s2's cylinder
+ * opt-in. It has the OTHER defect instead, the one the winch taught this book:
+ * unbounded gain at the centre. The swing radius is one slat pitch, 0.087 world
+ * ~ 43 screen px, and dtau/dpx = 1/r, so the outer half of a slat turns at a
+ * civilised 1.2-4.4 deg/px while the few px either side of the hinge line spin
+ * at 20. The cylinder projector is no help: this circle is seen at ~25 deg
+ * incidence, so its silhouette points are exactly where a reader's hand is.
+ *
+ * So the rack uses the winch's answer — the TANGENTIAL distance the hand dragged
+ * the paper, over a FIXED reference radius (crankTangentialDelta at the pitch
+ * circle). No centre singularity, gain bounded and near-constant, exactly
+ * antisymmetric so a return stroke costs what the outward one did, and pressing
+ * near the hinge turns the slat LESS — which is what pinching a slat by its
+ * hinge does to a real blind.
+ *
+ * Returns the hub the projector needs: the hinge's world centre, the plane
+ * normal (the spine direction — every slat in the rack is hinged parallel to
+ * it), and the in-plane basis (e1 = the page fore axis, where a shut slat lies;
+ * e2 = the page normal it swings toward), so a hub angle measured on it IS tau.
+ */
+export function dissolveSlatHinge(
+  geom: DissolveGeom,
+  k: number,
+  thetaL: number,
+  thetaR: number
+): { center: Vec3; axis: Vec3; e1: Vec3; e2: Vec3; radius: number } {
+  const { u, n, P } = dissolvePageFrame(geom, thetaL, thetaR)
+  const zc = (geom.z0 + geom.z1) / 2
+  return {
+    center: P(dissolveSlatHingeD(geom, k), DISSOLVE_BASE_LIFT, zc),
+    axis: [0, 0, 1],
+    e1: u,
+    e2: n,
+    radius: dissolvePitch(geom),
+  }
+}
+
+/** Which slat the hand landed on, from the fore-axis distance it pressed at:
+ *  the rack's slats are one pitch apart, so the nearest hinge is the honest
+ *  answer at any flip (a slat reaches fore of its hinge at tau < 90deg and
+ *  spine-ward of it past that). */
+export function dissolveSlatAt(geom: DissolveGeom, d: number): number {
+  const k = Math.round((d - geom.d0) / dissolvePitch(geom))
+  return Math.min(geom.slats - 1, Math.max(0, k))
+}
 
 /** Slat pitch p — one slat width, the placard d-extent split N ways. */
 export const dissolvePitch = (geom: DissolveGeom): number => (geom.d1 - geom.d0) / geom.slats
@@ -104,9 +211,19 @@ export const dissolveTabOut = (geom: DissolveGeom, tau: number): number =>
 /** Flip angle for a strip draw (the inverse): tau = PI * clamp(delta/stroke). */
 export const dissolveTauFromDraw = (geom: DissolveGeom, delta: number): number =>
   Math.PI * clamp(delta / dissolveStroke(geom), 0, 1)
-/** Snap a held flip to the nearest pure end {0, PI} — the 2-detent dial (bench
- *  D2: idempotent, exact on ends, moves at most PI/2). */
+/** Snap a held flip to the nearest pure end {0, PI} (bench D2: idempotent,
+ *  exact on ends, moves at most PI/2). */
 export const dissolveSnap = (tau: number): number => clamp(Math.round(tau / Math.PI) * Math.PI, 0, Math.PI)
+
+/**
+ * WHERE A TAP TAKES THE RACK (S5R2-3). "Clicking there fires neither" — the
+ * corner rightly yields to the paper, and the paper answered a press with a
+ * twitch. A dial with two pure faces has exactly one obvious meaning for a
+ * click, so a press that never drew the strip now SHOWS THE OTHER FACE: the
+ * reader who does not think to drag still gets the transmutation, and the drag
+ * keeps every value in between.
+ */
+export const dissolveTapTarget = (tau: number): number => (dissolveSnap(tau) === 0 ? Math.PI : 0)
 
 /** The page's own moving frame at the current dihedral, packaged for the rack:
  *  u along the page surface (gutter -> fore), n the page normal into the wedge,

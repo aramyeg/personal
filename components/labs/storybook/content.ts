@@ -1253,6 +1253,32 @@ const CH4_LAYERS: readonly SceneLayer[] = [
   // x in [-0.75, -0.44] (u <= 0.207) — the gallery's PORTAL mouth stands at
   // u ~ 0.21 and only the low kerb continues past it, so the dissolve placard
   // still reads through.
+  //
+  // S5R2-5, DELIBERATELY NOT MECHANIZED (the judgment call, recorded so the next
+  // pass inherits the reasoning rather than the conclusion). The blind
+  // re-reviewer swept 1,400 hover probes over the centrepiece and found "the
+  // entire glass arcade and every figure in it" inert, and it is the chapter's
+  // literal subject. Three answers were weighed:
+  //   (a) EXTEND THE DISSOLVE'S GRAB to this card's painted footprint. Rejected
+  //       on paper truth: the frieze is a separate v-fold standing downstage of
+  //       the rack, and a press on one piece of paper moving a different piece
+  //       behind it is the exact lie the book's direct-manipulation law exists
+  //       to forbid ("the fold is the thing the reader took hold of and the fold
+  //       is the thing that moves").
+  //   (b) A TUNNEL-BOOK DEPTH WELL (the user's own library note: a die-cut
+  //       aperture in the page hosting elevated layered papers). This is the
+  //       right idea and it is a NEW FAMILY — an aperture cut in the page, a
+  //       layered stack behind it, its own fold-flat and containment proofs, its
+  //       own derivation bench. That is a MECHANIZE lane, not a round-2 fix, and
+  //       shipping a half-derived one on the spread's foreground card would put
+  //       a new unproven mechanism in front of the two this round just repaired.
+  //   (c) NOTHING HERE, because the round's own repaint already moved the
+  //       subject from scenery into the payoff: the dissolve's revealed face IS
+  //       the inside of this passage now (lamplit bays, walkers carrying gold,
+  //       the dunes seen through the glazing), so the arcade is no longer a
+  //       picture the reader cannot touch — it is what the spread's one
+  //       invitation HANDS them. (c) ships; (b) is the recommendation for the
+  //       next s5 mechanize pass.
   { id: 'ch4-frieze', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.62, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.5, height: 0.16 },
 ]
 

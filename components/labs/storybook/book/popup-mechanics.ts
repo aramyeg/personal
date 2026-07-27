@@ -1411,6 +1411,48 @@ export function stripFlapDetent(a: number, lo: number, hi: number): number {
   return x
 }
 
+/**
+ * THE SAME DETENT, AT AN ARBITRARY LIST OF STATIONS (S5R2-4).
+ *
+ * `stripFlapDetent` above puts a sticky band at each HARD STOP, which is the
+ * whole answer for a flap whose only two meaningful poses are its two ends. Two
+ * of spread 5's findings are about a station that is NOT an end:
+ *
+ *   "no detent anywhere, INCLUDING AT THE POSE THE SCENE SHIPS IN, and dragging
+ *    back the same distance does not return it... The designed silhouette is
+ *    destroyed on first touch and cannot be recovered by feel."
+ *
+ * The gold pile's designed pose sits in the middle of its travel (55deg of an
+ * 87.8deg window), so its home is a station the reader has to be able to feel
+ * on the way past — and land on, exactly, so the latched value IS the shipped
+ * silhouette rather than a degree either side of it.
+ *
+ * Same grammar as the end detent, generalised: inside a band around each
+ * station, the innermost `hold` fraction of the band maps ONTO the station and
+ * the rest eases out, so arriving is a click and leaving takes a deliberate
+ * pull. Away from every band it is the identity. Applied to the DRIVE, never
+ * the render, so what latches is the detented value.
+ *
+ * `stops` need not be sorted and may include the travel ends; overlapping bands
+ * are resolved by taking the NEAREST station, so a caller can hand in three
+ * stations 20deg apart without the maths caring.
+ */
+export function stationDetent(
+  a: number,
+  stops: readonly number[],
+  band: number,
+  hold: number = DETENT_HOLD
+): number {
+  if (stops.length === 0 || band <= 0) return a
+  let best = stops[0]
+  for (const s of stops) if (Math.abs(s - a) < Math.abs(best - a)) best = s
+  const d = a - best
+  const ad = Math.abs(d)
+  if (ad >= band) return a
+  const t = clamp(ad / band - hold, 0, 1 - hold) / (1 - hold)
+  return best + Math.sign(d) * band * smooth01(t)
+}
+
 // --- THE RIPPLE (A-4). Two pure functions: one splits the rank's paper into
 // the cards it is printed as, the other says how far behind the rank each card
 // runs. Both are the identity for a flap that declares no ripple.

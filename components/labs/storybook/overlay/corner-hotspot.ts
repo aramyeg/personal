@@ -131,6 +131,62 @@ export function cornerTurnAt(x: number, y: number, vw: number, vh: number): Turn
   return null
 }
 
+/**
+ * THE PRIORITY RULE, AS ONE FUNCTION (S5R2-3).
+ *
+ * "The invisible page-turn corner hotspots overlap both movers. The left 'turn
+ * back' corner lies almost entirely on top of the slatted panel; the right
+ * corner lies on top of the tent. Consequence: hovering the panel SIMULTANEOUSLY
+ * lights up the dog-ear while the cursor shows a pinch grip — two contradictory
+ * promises at one pixel — and clicking there fires neither." (blind s5
+ * re-review, finding 6.) Derived, not eyeballed: the left rect is x 288-576,
+ * y 630-702 at 1600x900 and the dissolve placard's own rest box is
+ * x 319-599, y 610-726 — the corner is inside the paper, not beside it.
+ *
+ * THE LAW (R-4's, extended): the paper wins, and it wins for the CUE as well as
+ * for the press. A corner owns a pixel only when nothing in the scene does, and
+ * the same predicate answers both questions, so the dog-ear can never advertise
+ * a turn the press will refuse.
+ *
+ * THREE ways the scene can own a pixel, and the third is the one that was
+ * missing. `grab` and `hover` are the canvas's own claims. `overlay` is the
+ * book's HTML text layer: the canvas is never sent those pointer events at all,
+ * so `hover` there is a stale reading of wherever the pointer was last over the
+ * paper — and use-book-input's press path ALREADY refused those pixels while the
+ * hint path lit the fold on them. On this spread the left column's last lines
+ * run straight through the left corner rect, so the reader was being shown a
+ * dog-ear over the narration and getting nothing for pressing it.
+ */
+export type SceneClaim = {
+  /** The grabbable under the pointer, per the scene's own hit test. */
+  readonly hover: string | null
+  /** The grabbable in the reader's hand. */
+  readonly grab: string | null
+  /** Whether the pointer is over the book's HTML text layer. */
+  readonly overlay: boolean
+}
+
+/** Whether the scene (paper or text) has claimed this pointer. */
+export const sceneOwnsPointer = (claim: SceneClaim): boolean =>
+  claim.grab !== null || claim.hover !== null || claim.overlay
+
+/**
+ * Which page turn (x, y) offers, with the priority rule applied — null wherever
+ * the scene owns the pointer. The ONE entry point for both the cue and the
+ * press; `cornerTurnAt` below is the geometry alone and is used by the tests
+ * that pin the rects.
+ */
+export function cornerTurnFor(
+  x: number,
+  y: number,
+  vw: number,
+  vh: number,
+  claim: SceneClaim
+): TurnDir | null {
+  if (sceneOwnsPointer(claim)) return null
+  return cornerTurnAt(x, y, vw, vh)
+}
+
 /** Whether a press at (x0,y0,t0) released at (x1,y1,t1) counts as a corner tap
  *  rather than a drag that happened to end there. */
 export function isCornerTap(

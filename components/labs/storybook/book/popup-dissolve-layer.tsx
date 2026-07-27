@@ -6,28 +6,36 @@
  * transmute one picture into another (s5 dunes -> the dragon's gold hoard).
  * PAGE-ROOTED like the volvelle / tab piece — one page carries the whole rack.
  *
- * The tab is the grab handle. The drive is the LINEAR tab-piece idiom (law H3):
- * the pointer's projection onto the page's fore axis reads the strip draw
- * delta, mapped to the shared flip angle tau in [0,PI] (tab-piece pointer
- * projection). The HOLD + SNAP is the VOLVELLE idiom: release HOLDS tau in the
- * module scrub channel (the book remembers dunes-or-gold through page turns and
- * book close), then eases it to the nearest pure end {0,PI} — a 2-detent dial.
- * Both end states are coplanar, so — like the volvelle — the rack needs NO
- * fold-flat envelope: it rides the folding page. The high-frequency drive value
- * lives in the module scrub channel, never React state; zustand holds only the
- * grab identity.
+ * TWO HANDLES, TWO HONEST PROJECTORS, ONE SHARED TAU (S5R2-4).
+ *   the TONGUE  — a strip, so it drags 1:1 as a strip draw: the pointer's
+ *     projection onto the page's fore axis IS the draw, and the draw is the
+ *     protrusion exactly (law H3, the tab-piece idiom, class A).
+ *   the RACK    — pressing a slat and pushing it does not translate anything, it
+ *     TURNS the slat about its own hinge, which is how a person actually works a
+ *     venetian blind (about the spine-parallel hinge of the slat under the hand, geared off
+ *     its pitch circle). Reading a body grab as a strip draw was a convenience,
+ *     and it is the convenience a blind reader named: "I never once felt I was
+ *     turning the slats myself."
  *
- * THE RACK IS A HANDLE TOO (E3 Wave-2 S5-1, the tab-piece precedent from s6).
+ * RELEASE = LATCH, and the closing book puts it away. The rack keeps whatever
+ * flip the hand left it at — both ends detent so pure dunes and pure gold are
+ * poses you land ON — and the SHOWN flip is that held angle carried through the
+ * hold envelope (popup-dissolve.ts), which is the lift-flap persistence law in
+ * this family's units. That is what pays the fold-flat bill now that the old
+ * ease-to-the-nearest-end is gone, and it also draws the strip back inside the
+ * trim at book-closed, retiring the 0.14 a latched-gold state used to hang past
+ * the fore edge. A press that turned nothing is a CLICK, and a two-faced dial
+ * answers a click by showing the other face.
+ *
+ * The high-frequency drive value lives in the module scrub channel, never React
+ * state; zustand holds only the grab identity.
+ *
+ * THE RACK IS A HANDLE AT ALL (E3 Wave-2 S5-1, the tab-piece precedent from s6).
  * A blind reader met this family on spread 5 and reported the tab as "a ~14x25px
  * gold splinter hanging off the page edge... discovering it was luck: it took me
  * eight scripted attempts". The picture the tab transmutes, meanwhile, is 280x116
  * screen px of painted card sitting right there — and pressing it did nothing.
- * So the slats and the sand base now raycast into the SAME grab, with the same
- * page-fore projector and the same draw arithmetic. That is paper-true rather
- * than a shortcut: the rack has exactly one degree of freedom, and dragging a
- * slat fore draws the strip by the identical delta the tab would (the projection
- * is onto the page's fore axis, not onto the handle's own surface, so the sign
- * and the gearing are literally the same function).
+ * So the slats and the sand base raycast too.
  *
  * Art: TWO paintings per piece — `<id>-dunes` (up-face at tau=0) and
  * `<id>-gold` (under-face, revealed at tau=PI) — each sliced into N vertical
@@ -47,10 +55,13 @@ import { useGuardedDispose } from './material-pool'
 import type { DissolveGeom, PanelQuad, Vec3 } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
-  DISSOLVE_TAB_LIP,
-  dissolveSnap,
+  dissolveDetent,
+  dissolveShownTau,
+  dissolveSlatAt,
+  dissolveSlatHinge,
   dissolveStroke,
   dissolveTabOut,
+  dissolveTapTarget,
   dissolveTauFromDraw,
   solveDissolvePose,
   dissolveSlit,
@@ -76,7 +87,7 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
-import { projectPageD } from './handle-projection'
+import { crankTangentialDelta, projectHubAngle, projectPageD, type HubHit } from './handle-projection'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -84,10 +95,10 @@ const STRUCT_SHADOW_MAX = 0.2
 /** Page-flat handle: the reading camera foreshortens it hard, so it takes
  *  the generous pad (handle-hit.ts). */
 const TOUCH_SLOP = HANDLE_SLOP_FLAT
-/** Snap-to-end ease per frame while released and off a pure end (the volvelle
- *  detent ease). A soft exponential so the picture "clicks" to dunes or gold. */
-const SNAP_EASE = 0.3
-const SNAP_EPS = 1e-4
+/** Ease per frame while the rack is travelling to a TAP's target end. The drag
+ *  is direct manipulation and never eases; only the click's answer does. */
+const TAP_EASE = 0.22
+const TAP_ARRIVE_EPS = 1e-3
 /** Desert-floor sand under the slats — VAULT_NIGHT register (E3 s5): violet
  *  dune shadow, so the one-pitch band the flipped rack vacates reads as the
  *  night floor and the gaps between tilted slats mid-flip read as dark sand. */
@@ -106,12 +117,43 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
  * far->u=(k+1)/N; the LEFT page's d projects screen-LEFT, so it mirrors u
  * (hinge->1-k/N, far->1-(k+1)/N) — exactly the liftflap side-aware flip, banded.
  */
-function slatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
+export function slatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
   const a = k / n
   const b = (k + 1) / n
   return side === 'left'
     ? new Float32Array([1 - a, 1, 1 - a, 0, 1 - b, 0, 1 - b, 1])
     : new Float32Array([a, 1, a, 0, b, 0, b, 1])
+}
+
+/**
+ * ...AND THE SAME BAND WITH ITS ENDS SWAPPED, for the face revealed at tau = PI
+ * (S5R2-1).
+ *
+ * THE DEFECT, derived rather than eyeballed. The under-face used the very uvs
+ * above, and they are right for the pose they were written in and wrong for the
+ * pose they are seen in. Slat k reaches FORE of its hinge at tau = 0 and
+ * SPINE-WARD of it at tau = PI, so the two ends of every ribbon trade screen
+ * sides when the rack turns over. Projected through the reading camera (the
+ * printed check is in s5-round2.test.ts) the left page's rack reads:
+ *   tau=0    k=0: u 1.000 @ x575  ->  u 0.833 @ x532   (u climbs with screen x)
+ *   tau=PI   k=0: u 1.000 @ x575  ->  u 0.833 @ x617   (u FALLS with screen x)
+ * — the strip ORDER across the rack is preserved, but every strip is mirrored
+ * about its own centre. On the old under-face, a near-uniform field of gold
+ * coins, that was invisible, which is why it survived to here. On a picture with
+ * left-right structure it is fatal: composited offline, the passage's great lamp
+ * comes out sliced in half and printed twice, and the brass plate lands in the
+ * middle of the frame with its arrow reversed.
+ *
+ * The band each slat carries is unchanged — only which END of the ribbon holds
+ * which end of the band — so the fix is exactly "the dunes uvs, swapped", and
+ * the two faces still print the same slice of their respective paintings.
+ */
+export function flippedSlatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
+  const a = k / n
+  const b = (k + 1) / n
+  return side === 'left'
+    ? new Float32Array([1 - b, 1, 1 - b, 0, 1 - a, 0, 1 - a, 1])
+    : new Float32Array([b, 1, b, 0, a, 0, a, 1])
 }
 /** The full-placard uvs for the sand base (image spans the whole band). */
 function baseUvs(side: 'left' | 'right'): Float32Array {
@@ -195,7 +237,10 @@ export function DissolvePopupLayer({
   // One geometry pair per slat (dunes FrontSide uvs, gold BackSide uvs); both
   // share the per-frame slat quad. Plus the sand base and the tab.
   const dunesGeoms = useMemo(() => Array.from({ length: n }, (_, k) => makeQuadGeometry(slatUvs(layer.side, k, n))), [layer.side, n])
-  const goldGeoms = useMemo(() => Array.from({ length: n }, (_, k) => makeQuadGeometry(slatUvs(layer.side, k, n))), [layer.side, n])
+  const goldGeoms = useMemo(
+    () => Array.from({ length: n }, (_, k) => makeQuadGeometry(flippedSlatUvs(layer.side, k, n))),
+    [layer.side, n]
+  )
   const baseGeom = useMemo(() => makeQuadGeometry(baseUvs(layer.side)), [layer.side])
   const tabGeom = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const handleGeom = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
@@ -282,9 +327,20 @@ export function DissolvePopupLayer({
 
   const stroke = useMemo(() => dissolveStroke(layer), [layer])
 
-  // --- Grab lifecycle (laws H1-H3): the LINEAR tab drive (tab-piece idiom),
-  // held + snapped on release (volvelle idiom).
-  const grabRef = useRef<{ deltaStart: number; dGrab: number } | null>(null)
+  // --- Grab lifecycle (laws H1-H3). TWO honest projectors, one shared tau:
+  // the tongue is a strip and drags 1:1 as a strip draw (class A, the tab-piece
+  // idiom); the rack's own slats TURN about their hinge (class B1). Release
+  // LATCHES whatever the hand left, and the closing book folds it flat through
+  // the hold envelope (popup-dissolve.ts).
+  type DissolveGrab =
+    | { kind: 'tab'; deltaStart: number; dGrab: number }
+    // `tau` is the RAW accumulated angle: the detent is applied to what gets
+    // written, never fed back into the accumulator, or the sticky band would eat
+    // every small move and the reader could never leave a station by feel.
+    | { kind: 'slat'; k: number; last: HubHit; tau: number }
+  const grabRef = useRef<DissolveGrab | null>(null)
+  /** Where a TAP is carrying the rack, or null when nothing is in flight. */
+  const tapTargetRef = useRef<number | null>(null)
   const tap = useHandleTap()
 
   const restAnglesNow = (): { thetaL: number; thetaR: number } =>
@@ -303,9 +359,13 @@ export function DissolvePopupLayer({
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
-    tap.end(layer.id) // a press that never drew the strip answers with a nudge
+    // A press that never turned a slat is a CLICK, and a two-faced dial has one
+    // obvious answer to a click: show the other face (S5R2-3).
+    tap.end(layer.id, () => {
+      tapTargetRef.current = dissolveTapTarget(clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI))
+    })
     endGrabChannel(layer.id)
-    useStorybookStore.getState().endGrab() // tau HELD; the frame loop snaps it to a pure end
+    useStorybookStore.getState().endGrab() // tau LATCHES exactly where the hand left it
     try {
       if (e) (e.target as Element).releasePointerCapture(e.pointerId)
     } catch {
@@ -313,22 +373,52 @@ export function DissolvePopupLayer({
     }
   }
 
-  const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    if (!acceptsHandleHit(e, slopRef.current)) return
+  /** Shared opening of both grabs: the store hand-off, the tap seed and the
+   *  release hook. Returns false when the book refused the grab. */
+  const beginGrab = (e: ThreeEvent<PointerEvent>, tauStart: number): boolean => {
     const st = useStorybookStore.getState()
-    if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
-    const { thetaL, thetaR } = restAnglesNow()
-    const dGrab = projectPointerD(e, thetaL, thetaR)
-    if (dGrab === null) return
-    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
     st.beginGrab(layer.id, 'tab')
-    if (useStorybookStore.getState().grab?.id !== layer.id) return
-    grabRef.current = { deltaStart: dissolveTabOut(layer, tauStart), dGrab }
+    if (useStorybookStore.getState().grab?.id !== layer.id) return false
+    tapTargetRef.current = null // the hand overrides an answer still in flight
     writeUserDrive(layer.id, tauStart, [0, Math.PI])
     tap.begin(tauStart)
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
+    return true
+  }
+
+  const grabbable = (): boolean => {
+    const st = useStorybookStore.getState()
+    return st.booted && st.turning === null && st.spread === spreadIndex
+  }
+
+  /** THE TONGUE (class A): a strip, pulled 1:1 — draw IS protrusion. */
+  const onTabPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (!acceptsHandleHit(e, slopRef.current)) return
+    if (!grabbable()) return
+    const { thetaL, thetaR } = restAnglesNow()
+    const dGrab = projectPointerD(e, thetaL, thetaR)
+    if (dGrab === null) return
+    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+    if (!beginGrab(e, tauStart)) return
+    grabRef.current = { kind: 'tab', deltaStart: dissolveTabOut(layer, tauStart), dGrab }
+  }
+
+  /** THE RACK: the slat under the hand turns about its own hinge, geared off the
+   *  pitch circle (crankTangentialDelta — no centre singularity). */
+  const onSlatPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (!grabbable()) return
+    const { thetaL, thetaR } = restAnglesNow()
+    const dGrab = projectPointerD(e, thetaL, thetaR)
+    if (dGrab === null) return
+    const k = dissolveSlatAt(layer, dGrab)
+    const hinge = dissolveSlatHinge(layer, k, thetaL, thetaR)
+    const hit = projectHubAngle(pointerLocalRay(e), hinge.center, hinge.e1, hinge.e2, hinge.axis)
+    if (hit === null) return
+    const tauStart = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+    if (!beginGrab(e, tauStart)) return
+    grabRef.current = { kind: 'slat', k, last: hit, tau: tauStart }
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
@@ -340,10 +430,21 @@ export function DissolvePopupLayer({
       return
     }
     const { thetaL, thetaR } = restAnglesNow()
-    const dNow = projectPointerD(e, thetaL, thetaR)
-    if (dNow === null) return
-    const deltaNow = clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke)
-    const tauNow = dissolveTauFromDraw(layer, deltaNow)
+    let tauRaw: number | null = null
+    if (grab.kind === 'tab') {
+      const dNow = projectPointerD(e, thetaL, thetaR)
+      if (dNow === null) return
+      tauRaw = dissolveTauFromDraw(layer, clamp(grab.deltaStart + (dNow - grab.dGrab), 0, stroke))
+    } else {
+      const hinge = dissolveSlatHinge(layer, grab.k, thetaL, thetaR)
+      const hit = projectHubAngle(pointerLocalRay(e), hinge.center, hinge.e1, hinge.e2, hinge.axis)
+      if (hit === null) return
+      grab.tau = clamp(grab.tau + crankTangentialDelta(grab.last, hit, hinge.radius), 0, Math.PI)
+      grab.last = hit
+      tauRaw = grab.tau
+    }
+    // The detent runs on the DRIVE so the rack latches exactly on a pure face.
+    const tauNow = dissolveDetent(tauRaw)
     writeUserDrive(layer.id, tauNow, [0, Math.PI])
     tap.track(tauNow, TAP_EPS)
     e.stopPropagation()
@@ -402,27 +503,29 @@ export function DissolvePopupLayer({
       edgeMaterial.opacity = 0.9 * cull // its rest opacity, ramped
     }
 
-    // Snap-on-release: ease the held flip to the nearest pure end {0,PI} so the
-    // picture clicks to dunes or gold (no half-dissolve rest state).
-    if (!grabRef.current && !overrideActive(layer)) {
-      const held = readUserDrive(layer.id)
-      if (held !== undefined) {
-        const target = dissolveSnap(held)
-        const delta = target - held
-        if (Math.abs(delta) > SNAP_EPS) writeUserDrive(layer.id, held + delta * SNAP_EASE, [0, Math.PI])
-        else if (held !== target) {
-          if (target === 0) clearUserDrive(layer.id)
-          else writeUserDrive(layer.id, target, [0, Math.PI])
-        }
+    // THE CLICK'S ANSWER (S5R2-3): a tap set a target end and the rack walks to
+    // it. The DRAG never eases — this is the only autonomous travel the piece
+    // has, and a grab cancels it on the frame it starts.
+    const target = tapTargetRef.current
+    if (target !== null && !grabRef.current && !overrideActive(layer)) {
+      const held = clamp(readUserDrive(layer.id) ?? 0, 0, Math.PI)
+      if (Math.abs(target - held) <= TAP_ARRIVE_EPS) {
+        tapTargetRef.current = null
+        if (target === 0) clearUserDrive(layer.id)
+        else writeUserDrive(layer.id, target, [0, Math.PI])
+      } else {
+        writeUserDrive(layer.id, held + (target - held) * TAP_EASE, [0, Math.PI])
       }
     }
 
-    // Tap answer (BW-18): the slats twitch toward the reveal and settle back.
-    // Render-time only — the snap-on-release above still owns the channel.
+    // The reader's held flip, then the HOLD ENVELOPE: what is drawn is the held
+    // angle carried through the closing book's own take-up, so the rack lies
+    // flat A-face up at book-closed for any latched value and the strip is drawn
+    // back inside the trim with it (popup-dissolve.ts).
     const tauHeld = readDissolveTau(layer)
     const tau = Math.min(
       Math.PI,
-      Math.max(0, tauHeld + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
+      Math.max(0, dissolveShownTau(tauHeld, beta) + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
     )
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
@@ -466,7 +569,7 @@ export function DissolvePopupLayer({
         {/* Invisible grab handles (raycast targets): the tab exact for mouse/pen,
             1.5x for touch (laws H3/H6). */}
         <group
-          onPointerDown={onPointerDown}
+          onPointerDown={onTabPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={releaseGrab}
           onPointerCancel={releaseGrab}
@@ -476,9 +579,21 @@ export function DissolvePopupLayer({
         >
           <mesh ref={handleRef} geometry={handleGeom} material={handleMaterial} renderOrder={3} />
           <mesh ref={slopRef} geometry={slopGeom} material={handleMaterial} renderOrder={3} />
-          {/* The rack's own body (S5-1): the slats and the sand base borrow the
-              render geometries the frame loop already rewrites, so they cost one
-              draw-free mesh each and can never drift from the paper. */}
+        </group>
+        {/* The rack's own body (S5-1): the slats and the sand base borrow the
+            render geometries the frame loop already rewrites, so they cost one
+            draw-free mesh each and can never drift from the paper. Its own
+            pointerdown (S5R2-4) because a slat TURNS — the strip's 1:1 draw is
+            the tongue's law, not the rack's. */}
+        <group
+          onPointerDown={onSlatPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={releaseGrab}
+          onPointerCancel={releaseGrab}
+          onLostPointerCapture={releaseGrab}
+          onPointerOver={onPointerOver}
+          onPointerOut={onPointerOut}
+        >
           <mesh geometry={baseGeom} material={handleMaterial} renderOrder={3} />
           {dunesGeoms.map((g, k) => (
             <mesh key={k} geometry={g} material={handleMaterial} renderOrder={3} />

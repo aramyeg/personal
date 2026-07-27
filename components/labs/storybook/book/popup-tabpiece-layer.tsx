@@ -59,6 +59,7 @@ import { sharedHandleMaterial, sharedPaperTexture, sharedShadowTexture, sharedTa
 import { liveSpreadRole, spreadPageAnglesTilted, type TabPieceGeom, type Vec3 } from './popup-mechanics'
 import {
   tabPieceCamShape,
+  tabPieceDetent,
   solveTabPiecePose,
   solveTabPiecePoseAt,
   tabPieceCeiling,
@@ -462,7 +463,9 @@ export function TabPiecePopupLayer({
     const dNow = projectPointerD(e, thetaL, thetaR)
     if (dNow === null) return
     const sUser = clamp(grab.sGrabStart + (dNow - grab.dGrab), 0, sStop)
-    const aUser = tabPieceLiftFromSlide(layer, sUser)
+    // The detent runs on the DRIVE (S5R2-4), so a release inside the band
+    // latches the station exactly — flat, the shipped silhouette, or the stop.
+    const aUser = tabPieceDetent(layer, tabPieceLiftFromSlide(layer, sUser))
     writeUserDrive(layer.id, aUser, [0, aStop])
     tap.track(aUser, TAP_EPS)
     e.stopPropagation()
