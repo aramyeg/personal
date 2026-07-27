@@ -33,7 +33,7 @@ export async function acquireLock(tag, waitMs = 30 * 60 * 1000) {
       if (Date.now() - start > waitMs) {
         throw new Error(`capture lock held > ${Math.round(waitMs / 60000)}min`)
       }
-      await new Promise((r) => setTimeout(r, 5000))
+      await new Promise((r) => setTimeout(r, 700))
     }
   }
   try {

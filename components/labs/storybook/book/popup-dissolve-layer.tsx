@@ -117,12 +117,43 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
  * far->u=(k+1)/N; the LEFT page's d projects screen-LEFT, so it mirrors u
  * (hinge->1-k/N, far->1-(k+1)/N) — exactly the liftflap side-aware flip, banded.
  */
-function slatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
+export function slatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
   const a = k / n
   const b = (k + 1) / n
   return side === 'left'
     ? new Float32Array([1 - a, 1, 1 - a, 0, 1 - b, 0, 1 - b, 1])
     : new Float32Array([a, 1, a, 0, b, 0, b, 1])
+}
+
+/**
+ * ...AND THE SAME BAND WITH ITS ENDS SWAPPED, for the face revealed at tau = PI
+ * (S5R2-1).
+ *
+ * THE DEFECT, derived rather than eyeballed. The under-face used the very uvs
+ * above, and they are right for the pose they were written in and wrong for the
+ * pose they are seen in. Slat k reaches FORE of its hinge at tau = 0 and
+ * SPINE-WARD of it at tau = PI, so the two ends of every ribbon trade screen
+ * sides when the rack turns over. Projected through the reading camera (the
+ * printed check is in s5-round2.test.ts) the left page's rack reads:
+ *   tau=0    k=0: u 1.000 @ x575  ->  u 0.833 @ x532   (u climbs with screen x)
+ *   tau=PI   k=0: u 1.000 @ x575  ->  u 0.833 @ x617   (u FALLS with screen x)
+ * — the strip ORDER across the rack is preserved, but every strip is mirrored
+ * about its own centre. On the old under-face, a near-uniform field of gold
+ * coins, that was invisible, which is why it survived to here. On a picture with
+ * left-right structure it is fatal: composited offline, the passage's great lamp
+ * comes out sliced in half and printed twice, and the brass plate lands in the
+ * middle of the frame with its arrow reversed.
+ *
+ * The band each slat carries is unchanged — only which END of the ribbon holds
+ * which end of the band — so the fix is exactly "the dunes uvs, swapped", and
+ * the two faces still print the same slice of their respective paintings.
+ */
+export function flippedSlatUvs(side: 'left' | 'right', k: number, n: number): Float32Array {
+  const a = k / n
+  const b = (k + 1) / n
+  return side === 'left'
+    ? new Float32Array([1 - b, 1, 1 - b, 0, 1 - a, 0, 1 - a, 1])
+    : new Float32Array([b, 1, b, 0, a, 0, a, 1])
 }
 /** The full-placard uvs for the sand base (image spans the whole band). */
 function baseUvs(side: 'left' | 'right'): Float32Array {
@@ -206,7 +237,10 @@ export function DissolvePopupLayer({
   // One geometry pair per slat (dunes FrontSide uvs, gold BackSide uvs); both
   // share the per-frame slat quad. Plus the sand base and the tab.
   const dunesGeoms = useMemo(() => Array.from({ length: n }, (_, k) => makeQuadGeometry(slatUvs(layer.side, k, n))), [layer.side, n])
-  const goldGeoms = useMemo(() => Array.from({ length: n }, (_, k) => makeQuadGeometry(slatUvs(layer.side, k, n))), [layer.side, n])
+  const goldGeoms = useMemo(
+    () => Array.from({ length: n }, (_, k) => makeQuadGeometry(flippedSlatUvs(layer.side, k, n))),
+    [layer.side, n]
+  )
   const baseGeom = useMemo(() => makeQuadGeometry(baseUvs(layer.side)), [layer.side])
   const tabGeom = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
   const handleGeom = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])

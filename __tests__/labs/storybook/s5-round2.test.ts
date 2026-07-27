@@ -33,6 +33,7 @@ import {
   dissolveShownTau,
   dissolveSlatAt,
   dissolveSlatHinge,
+  dissolveSlatQuad,
   dissolveStroke,
   dissolveTabOut,
   dissolveTabQuad,
@@ -52,6 +53,7 @@ import {
 } from '@/components/labs/storybook/book/popup-tabpiece'
 import { spreadPageAnglesTilted, type Vec3 } from '@/components/labs/storybook/book/popup-mechanics'
 import { crankTangentialDelta } from '@/components/labs/storybook/book/handle-projection'
+import { flippedSlatUvs, slatUvs } from '@/components/labs/storybook/book/popup-dissolve-layer'
 import { PAGE_W } from '@/components/labs/storybook/book/page-geometry'
 import { commitSpread } from '@/components/labs/storybook/book/use-turn-driver'
 import { popupContentForSpread } from '@/components/labs/storybook/content'
@@ -311,6 +313,76 @@ describe('S5R2-4a — the rack turns about its own hinge, the tongue pulls as a 
     for (const tau of [0, 1, Math.PI]) {
       expect(dissolveTabOut(dissolve, tau)).toBeCloseTo((dissolveStroke(dissolve) * tau) / Math.PI, 12)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// S5R2-1 — THE REVEALED FACE PRINTS THE RIGHT WAY ROUND
+//
+// The chapter's payoff is a picture with left-right structure now (a colonnade,
+// a great lamp, walkers), so the under-face's print orientation stopped being
+// invisible. Slat k reaches FORE of its hinge at tau = 0 and SPINE-WARD of it at
+// tau = PI, so the two ends of every ribbon trade screen sides when the rack
+// turns over — and the under-face was using the up-face's uvs. Gate the property
+// the reader actually sees: image-x must climb monotonically across the WHOLE
+// rack, in the pose each face is seen in.
+
+const uOfCorner = (uvs: Float32Array, corner: number): number => uvs[corner * 2]
+
+/** Every (screen-x, u) sample the rack shows at `tau`, hinge and far edge of
+ *  each slat, in the given uv scheme. */
+const rackSamples = (tau: number, uvs: (k: number) => Float32Array): { x: number; u: number }[] => {
+  const out: { x: number; u: number }[] = []
+  for (let k = 0; k < dissolve.slats; k++) {
+    const q = dissolveSlatQuad(dissolve, k, tau, thetaL, thetaR)
+    out.push({ x: toScreen(q[0])[0], u: uOfCorner(uvs(k), 0) })
+    out.push({ x: toScreen(q[3])[0], u: uOfCorner(uvs(k), 3) })
+  }
+  return out.sort((a, b) => a.x - b.x)
+}
+const monotoneInU = (s: { x: number; u: number }[]): boolean =>
+  s.every((p, i) => i === 0 || p.u >= s[i - 1].u - 1e-9)
+
+describe('S5R2-1 — the passage of glass is not printed in sawtooth', () => {
+  it('the UP face reads left-to-right at rest, as it always did', () => {
+    expect(monotoneInU(rackSamples(0, (k) => slatUvs(dissolve.side, k, dissolve.slats)))).toBe(true)
+  })
+
+  it('the UNDER face reads left-to-right at the reveal', () => {
+    expect(
+      monotoneInU(rackSamples(Math.PI, (k) => flippedSlatUvs(dissolve.side, k, dissolve.slats)))
+    ).toBe(true)
+  })
+
+  it('...and the up-face uvs on the under face would NOT — the defect, pinned', () => {
+    // Without this the picture is a sawtooth: the strip ORDER survives but every
+    // strip is mirrored about its own centre, which sliced the great lamp in half
+    // and printed it twice.
+    expect(monotoneInU(rackSamples(Math.PI, (k) => slatUvs(dissolve.side, k, dissolve.slats)))).toBe(false)
+  })
+
+  it('both faces still carry the same slice of their own painting', () => {
+    for (let k = 0; k < dissolve.slats; k++) {
+      const up = slatUvs(dissolve.side, k, dissolve.slats)
+      const under = flippedSlatUvs(dissolve.side, k, dissolve.slats)
+      const band = (uvs: Float32Array) => [uOfCorner(uvs, 0), uOfCorner(uvs, 3)].sort((a, b) => a - b)
+      expect(band(under)).toEqual(band(up))
+    }
+  })
+
+  it('the same holds for a right-page rack (the family, not this one piece)', () => {
+    const mirrored = { ...dissolve, side: 'right' as const }
+    const samples = (tau: number, uvs: (k: number) => Float32Array) => {
+      const out: { x: number; u: number }[] = []
+      for (let k = 0; k < mirrored.slats; k++) {
+        const q = dissolveSlatQuad(mirrored, k, tau, thetaL, thetaR)
+        out.push({ x: toScreen(q[0])[0], u: uOfCorner(uvs(k), 0) })
+        out.push({ x: toScreen(q[3])[0], u: uOfCorner(uvs(k), 3) })
+      }
+      return out.sort((a, b) => a.x - b.x)
+    }
+    expect(monotoneInU(samples(0, (k) => slatUvs('right', k, mirrored.slats)))).toBe(true)
+    expect(monotoneInU(samples(Math.PI, (k) => flippedSlatUvs('right', k, mirrored.slats)))).toBe(true)
   })
 })
 
