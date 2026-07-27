@@ -44,8 +44,37 @@ import { accumulateWheel, useStorybookStore, type TurnDir, type WheelAcc } from 
 import { activeGrabId, forceEndGrabChannel } from './user-drive'
 import { cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
 
+// ---------------------------------------------------------------------------
+// THE SWIPE, AND WHY IT IS HORIZONTAL ONLY (N-1, the s6 re-re-review's blocker).
+//
+// "In a run of successive press-drags in the lower-left region the book advanced
+// from V · The Bazaar through VI · The Northern Treasury, The Hero's Satchel, to
+// The End and then to the closed cover, without me touching any nav control.
+// Losing your place mid-play is the worst possible failure here."
+//
+// ROOT CAUSE, reproduced live (scripts/storybook/bench/n1-probe.mjs against a
+// lane server at ?sbpose=6&sbidle=1): the swipe rule took the DOMINANT AXIS, so
+// a vertical press-drag of 60px in under 600ms turned the page — up for `next`,
+// down for `prev`. The reviewer's own method was "press-drag on 14 targets x 4
+// directions", and every UP drag that missed a grabbable paged the book FORWARD.
+// The lower left is where the stall kit lies, so it is precisely where a reader
+// makes that gesture over and over: raising a pop-up IS an up-drag. The corner
+// tap was never involved (isCornerTap already refuses anything over 12px/700ms)
+// and neither was the wheel; the miss simply fell through to the swipe.
+//
+// THE LAW: a book turns LEFT and RIGHT. Vertical is the MECHANISM axis in this
+// lab — every handle in it is pulled, raised or lowered — so a vertical drag can
+// never mean "turn the page", and a drag that misses a handle must cost the
+// reader nothing. This is the same argument SP-3(a) already made for
+// ArrowUp/ArrowDown a few lines below; it was simply never carried across to the
+// pointer. Three bars now, all of which a deliberate page swipe clears easily:
+// horizontal travel, the clock, and axis dominance.
 const SWIPE_MIN_PX = 60
 const SWIPE_MAX_MS = 600
+/** How much longer the horizontal leg must be than the vertical one for a drag
+ *  to read as a page swipe rather than a diagonal tug on a piece. A real swipe
+ *  across the paper is nearly flat; a hand working a mechanism is not. */
+const SWIPE_AXIS_RATIO = 2
 
 type PointerStart = { x: number; y: number; t: number; corner: TurnDir | null }
 
@@ -187,9 +216,14 @@ export function useBookInput(enabled: boolean): void {
       // press before the scene has decided (a handle that refused the press for
       // its own reasons still owns the pixel the reader aimed at).
       const st = useStorybookStore.getState()
-      if (st.grab !== null) return
-      const corner =
-        st.hover === null ? cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight) : null
+      // N-1: `hover` now suppresses the SWIPE too, not just the corner turn. A
+      // press the scene owns is a press on a piece — if the layer then declines
+      // the grab for its own reasons (outside its latch, mid-turn, past a stop),
+      // the reader's drag must answer nothing rather than falling through to a
+      // page turn. "The paper wins" was already the corner's rule; it is the
+      // whole pointer's rule now.
+      if (st.grab !== null || st.hover !== null) return
+      const corner = cornerTurnAt(e.clientX, e.clientY, window.innerWidth, window.innerHeight)
       pointerStart.current = { x: e.clientX, y: e.clientY, t: performance.now(), corner }
     }
 
@@ -215,14 +249,12 @@ export function useBookInput(enabled: boolean): void {
       const dy = e.clientY - start.y
       const absDx = Math.abs(dx)
       const absDy = Math.abs(dy)
-      if (absDx < SWIPE_MIN_PX && absDy < SWIPE_MIN_PX) return
-
-      // Dominant axis wins so a diagonal swipe fires exactly one turn.
-      if (absDx >= absDy) {
-        requestTurn(dx < 0 ? 'next' : 'prev')
-      } else {
-        requestTurn(dy < 0 ? 'next' : 'prev')
-      }
+      // HORIZONTAL ONLY, AND DECISIVELY SO (N-1 — see the header note above the
+      // constants). Vertical travel is the mechanism axis and now turns nothing
+      // at all, at any length or speed.
+      if (absDx < SWIPE_MIN_PX) return
+      if (absDx < SWIPE_AXIS_RATIO * absDy) return
+      requestTurn(dx < 0 ? 'next' : 'prev')
     }
 
     // THE RELEASE BACKSTOP (R-1, the re-review's blocker: "after pointerup the

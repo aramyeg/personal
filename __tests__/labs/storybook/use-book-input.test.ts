@@ -360,3 +360,121 @@ describe('useBookInput — corner page-turn taps (R-4)', () => {
     expect(s().turning).toBeNull()
   })
 })
+
+// ============================================================================
+// N-1 — THE PHANTOM PAGE-FORWARD (s6 blind re-re-review, finding 7, CRITICAL).
+//
+// "In a run of successive press-drags in the lower-left region the book advanced
+// from V · The Bazaar through VI · The Northern Treasury, The Hero's Satchel, to
+// The End and then to the closed cover, without me touching any nav control.
+// Reproducible as a sequence... Losing your place mid-play is the worst possible
+// failure here."
+//
+// ROOT CAUSE, reproduced live (scripts/storybook/bench/n1-probe.mjs, lane server
+// at ?sbpose=6&sbidle=1): the swipe rule took the DOMINANT AXIS, so a VERTICAL
+// press-drag of 60px inside 600ms turned the page — up 'next', down 'prev'. The
+// reviewer's method was "press-drag on 14 targets x 4 directions", and every UP
+// drag that missed a grabbable paged the book FORWARD. Raising a pop-up IS an
+// up-drag, and the lower left is where the stall kit lies, so that is exactly
+// where a reader repeats the gesture. Neither the corner tap (isCornerTap
+// already refuses >12px / >700ms) nor the wheel was involved.
+//
+// The fix is two rules, and this file pins both: vertical turns NOTHING, and a
+// press the scene owns is never a swipe at all.
+// ============================================================================
+
+describe('useBookInput — a vertical drag never turns the page (N-1)', () => {
+  beforeEach(() => useStorybookStore.setState(initial, true))
+  beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
+
+  for (const dy of [-400, -120, -61, 61, 120, 400]) {
+    it(`a ${dy < 0 ? 'up' : 'down'}-drag of ${Math.abs(dy)}px turns nothing`, () => {
+      renderHook(() => useBookInput(true))
+      swipe(0, dy)
+      expect(s().turning).toBeNull()
+      expect(s().spread).toBe(5)
+    })
+  }
+
+  it('a diagonal tug is not a swipe either — the horizontal leg must dominate', () => {
+    renderHook(() => useBookInput(true))
+    // 100px across, 100px up: over the travel bar, but a hand working a piece,
+    // not a hand sweeping the paper.
+    swipe(-100, -100)
+    expect(s().turning).toBeNull()
+  })
+
+  it('a flat horizontal sweep still turns — the idiom survives', () => {
+    renderHook(() => useBookInput(true))
+    swipe(-120, -20) // decisively horizontal
+    expect(s().turning).toBe('next')
+
+    useStorybookStore.setState({ turning: null, spread: 5 })
+    swipe(120, 20)
+    expect(s().turning).toBe('prev')
+  })
+
+  it('a press the scene owns is never a swipe, even a flat one', () => {
+    // The layer may decline the grab for its own reasons (outside its latch, a
+    // stop reached) and leave `grab` null — the drag must still cost nothing.
+    useStorybookStore.setState({ hover: 'ch5-raise-stall' })
+    renderHook(() => useBookInput(true))
+    swipe(-200)
+    expect(s().turning).toBeNull()
+    expect(s().spread).toBe(5)
+  })
+})
+
+describe('useBookInput — the reviewer’s own drag sequence turns zero pages (N-1)', () => {
+  beforeEach(() => useStorybookStore.setState(initial, true))
+  beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
+
+  /** One press-drag in the lower-left quadrant of a 1024x768 jsdom window. */
+  const pressDrag = (x0: number, y0: number, dx: number, dy: number) => {
+    window.dispatchEvent(new PointerEvent('pointerdown', { clientX: x0, clientY: y0 }))
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: x0 + dx, clientY: y0 + dy }))
+  }
+
+  it('raise-then-alternate: a long down-drag against short up-drags, repeated', () => {
+    renderHook(() => useBookInput(true))
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const x = Math.round(W * 0.2) // lower-LEFT quadrant, where the stall kit lies
+    const lo = Math.round(H * 0.85)
+    const hi = Math.round(H * 0.45)
+
+    // 1. The reader raises the stall.
+    pressDrag(x, lo, 0, hi - lo)
+    // 2..9. Then alternates, the way a hand re-grabbing a piece that has moved
+    // out from under it does — and misses, over and over.
+    for (let i = 0; i < 4; i++) {
+      pressDrag(x + 20, hi, 0, lo - hi) // long down-drag
+      pressDrag(x + 40, lo, 0, -100) // short up-drag
+      pressDrag(x + 40, lo, -30, -140) // a miss that drifts across as it climbs
+      pressDrag(x, lo - 60, 20, 120) // and back down
+    }
+
+    expect(s().turning, 'no gesture in the sequence may request a turn').toBeNull()
+    expect(s().spread, 'the reader must still be on the spread they were playing').toBe(5)
+  })
+
+  it('the same sweep across the whole lower-left grid turns nothing', () => {
+    renderHook(() => useBookInput(true))
+    const W = window.innerWidth
+    const H = window.innerHeight
+    for (let y = Math.round(H * 0.6); y <= Math.round(H * 0.95); y += 40) {
+      for (let x = Math.round(W * 0.08); x <= Math.round(W * 0.48); x += 40) {
+        for (const [dx, dy] of [
+          [0, -120],
+          [0, 120],
+          [-40, -160],
+          [40, 160],
+        ] as const) {
+          pressDrag(x, y, dx, dy)
+          expect(s().turning, `a drag (${dx},${dy}) from (${x},${y}) turned the page`).toBeNull()
+        }
+      }
+    }
+    expect(s().spread).toBe(5)
+  })
+})
