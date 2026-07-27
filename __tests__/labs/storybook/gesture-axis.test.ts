@@ -643,6 +643,12 @@ const CASES: AxisCase[] = [
  * reading camera very nearly lies in (the pathology class B1-C exists for;
  * ch1-rank already uses the cylinder read and is still inverted).
  *
+ * ch6-clerk CAME OFF THIS LIST (S7R2-5), the third time this has happened and
+ * the third time one flag did it: the s7 clerk is a frontal standing figure, a
+ * live hand probe had a leftward drag run him through his whole window in three
+ * 20 px sub-steps while rightward and downward drags sat pinned at his stop, and
+ * `grabProjection: 'cylinder'` turned his 51.3 deg mismatch honest.
+ *
  * ch5-throng CAME OFF THIS LIST (N-5), exactly as the paragraph above promised:
  * the s6 stall row was the blind reader's "six identical stall kits sit inert
  * beside the one that works", its plane read returned grab angles 140 degrees
@@ -653,7 +659,6 @@ const CASES: AxisCase[] = [
 const OTHER_LANE_AXIS_FAILURES: Record<string, string> = {
   'ch1-rank': '110.9 deg (drag DOWN raises it) — popup-stripflap-layer.tsx, stripflap lane',
   'ch5-tea': '71.8 deg — popup-stripflap-layer.tsx, stripflap lane',
-  'ch6-clerk': '51.3 deg — popup-stripflap-layer.tsx, stripflap lane',
   'ch3-dispatch-line': '64.9 deg (rides the wire, reads page-fore) — popup-dispatchline-layer.tsx',
 }
 

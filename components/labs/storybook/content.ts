@@ -1474,12 +1474,42 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // grip — the object the blind reader tried to press is now the thing the hand
   // turns — and the hub carries a plain gold rivet, which is what a hub is.
   //
-  // SEAT (all footprints from the pieces' own numbers): quad d 0.33..0.59,
-  // z 0.37..0.63. Clear of ch6-coffer (z <= 0.24, margin 0.13), of ch6-steps
-  // (z <= 0.32, margin 0.05) and of ch6-strongbox (right-page d <= 0.095,
-  // margin 0.235). Coplanar, so it needs no fold-flat envelope — it rides the
-  // folding page and the book's own close carries it down (the volvelle rule),
-  // and the reader's angle latches through page turns under the release law.
+  // ROUND-2 (S7R2-1). The blind re-reader turned this wheel two full
+  // revolutions each way and reported "no end-stop, no detents, no resistance"
+  // and "I could not find one thing in the scene it changes". Live decomposition
+  // (bench/s7r2-wheel-live.mjs, hi-res crops at three detents) settled which
+  // half was broken: the mechanism was RIGHT — the dial spins, the faceplate is
+  // static, the sectors under the vitrines really do change every 45 deg — and
+  // the change arrived at a size no reader resolves. The disc projected ~110 x
+  // 75 screen px at the reading camera, so each vitrine framed ~30 x 20 px of
+  // which the changing gold was ~12 x 10. (The detent bench had measured a
+  // SQUARE 144 px disc: it never applied the page-flat foreshortening, so it was
+  // reading ~2.5x the area the reader gets. Both were true; one was misleading.)
+  //
+  // So the round-2 fix is size and consequence, not plumbing:
+  //  - RADIUS 0.13 -> 0.165 (1.27x linear, 1.6x area) and the vitrines widen
+  //    (halfWidth 16 -> 18 deg, band 0.38..0.88R -> 0.35..0.91R): ~2.4x the
+  //    aperture the change has to happen inside.
+  //  - `crank: 'tangential'` — the syspatch's LATENT item. A live hand probe
+  //    (bench/s7r2-drag-live.mjs) had a 240 px stroke across the rim buying
+  //    17.4 deg and saturating, the same stroke reversed buying zero, and a
+  //    200 px vertical buying 3.1 deg. See popup-volvelle.ts's crank block.
+  //  - the art carries the transformation: eight strongrooms whose GOLD TALLY
+  //    runs 1..8 in order, so the three vitrines always frame three consecutive
+  //    rooms and one detent marches the whole staircase — the counting-house
+  //    counting, which is a shape a reader reads at 25 px where a swapped glyph
+  //    is not (generate-art.mjs ASSAY_VAULTS).
+  //
+  // SEAT re-derived at the new radius: quad d 0.305..0.635, z 0.34..0.67.
+  // Page edge |z| <= PAGE_H/2 = 0.75 (margin 0.08) and d <= PAGE_W = 1.15.
+  // Clear of ch6-coffer (z <= 0.24, margin 0.10). ch6-steps ends at z 0.32,
+  // margin 0.02 in z — but the dais sits at the SPINE (its struts glue at
+  // d 0.10..0.15) and this wheel starts at d 0.305, so the two never share a
+  // point; the z figure is a bound, not a contact. Clear of ch6-strongbox
+  // (right-page d <= 0.095, margin 0.21). Coplanar, so it needs no fold-flat
+  // envelope — it rides the folding page and the book's own close carries it
+  // down (the volvelle rule), and the reader's angle latches through page turns
+  // under the release law.
   {
     // `scenery`, like the s4 dial: the C1v2 anatomy census admits only assembly
     // mechs at `story` role, and art-overlap's pose solver has no volvelle case
@@ -1487,11 +1517,12 @@ const CH6_LAYERS: readonly SceneLayer[] = [
     // volvelle. The role is a census word, not a ranking; this piece is the
     // spread's headline all the same.
     id: 'ch6-assay', kind: 'foreground', role: 'scenery', mech: 'volvelle',
-    side: 'right', hubD: 0.46, hubZ: 0.5, radius: 0.13, sectors: 8,
+    side: 'right', hubD: 0.47, hubZ: 0.505, radius: 0.165, sectors: 8,
+    crank: 'tangential',
     windows: [
-      { psiDeg: 45, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
-      { psiDeg: 90, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
-      { psiDeg: 135, halfWidthDeg: 16, rMid: 0.62, rHalf: 0.24 },
+      { psiDeg: 45, halfWidthDeg: 18, rMid: 0.63, rHalf: 0.28 },
+      { psiDeg: 90, halfWidthDeg: 18, rMid: 0.63, rHalf: 0.28 },
+      { psiDeg: 135, halfWidthDeg: 18, rMid: 0.63, rHalf: 0.28 },
     ],
   },
   // PLAYABLE (E2.2 s7, charter gate G4): a lift-the-flap TREASURE COFFER out on
@@ -1546,7 +1577,41 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // pack calls it "a low wide BRIDGE just downstage of the mouth"); at half the
   // stand-proud slack the tents lie shallow, the deck sits down where a landing
   // belongs, and the piece stops competing with the strongbox in front of it.
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.055, spans: [[0.2, 0.32]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.055, spans: [[0.2, 0.32]] }, qA: 0.09, qB: 0.09, deckZ0: 0.2, deckZ1: 0.32 },
+  //
+  // ROUND-2 (S7R2-2), THE THIRD PASS, AND THIS TIME THE DECK. The blind
+  // re-reader called this "the tallest thing at the gutter and the most
+  // mechanism-shaped object on the page... a symmetric folded-paper canopy of
+  // 6-8 flat teal panels", could not name it, and pressed it in four directions.
+  // A layer-drop decomposition (bench/s7r2-decompose.sh: comment out this one
+  // entry and the canopy vanishes, the tan mass behind it does not) proved the
+  // canopy is THIS piece — and the arithmetic says which part of it. At rise
+  // 0.055 the two ridges land 0.1202 apart, so a deck of two 0.09 panels has to
+  // put its crease sqrt(0.09^2 - 0.0601^2) = 0.067 ABOVE the chord between them:
+  // a tent with 48 deg panels, standing on ridges already 0.13 up the bisector.
+  // Every previous pass tuned the STRUTS (four blades -> two, rise halved,
+  // repainted dark) and left the deck peak untouched, which is why the shape
+  // kept coming back as wings.
+  //  - qA/qB 0.09 -> 0.065: peak 0.067 -> 0.0247, panel slope 48 deg -> 22 deg.
+  //    A landing with a slight crown, which is what a bridge deck over a gutter
+  //    is. Deliberately NOT the degenerate q = sep/2 = 0.060, where the crease
+  //    is coplanar with the chord and the two panels become one flat sheet with
+  //    a fold line the solver has to disambiguate.
+  //  - the z span widens (struts 0.2..0.32 -> 0.19..0.33, deck 0.2..0.32 ->
+  //    0.18..0.34) so the piece is longer than it is wide and reads as a step
+  //    rather than a peak — and the deck overhangs its struts 0.01 each end,
+  //    which is the floating look the family exists for.
+  // THE WIDTH IS RATCHET-LIMITED, not chosen. D-G2's mid-turn ceiling for
+  // spread-7 is 122 illegal (pair, station) hits and ceilings only ever go
+  // DOWN. Measured on this gate: the wanted 0.15..0.37 deck costs 138 (the
+  // deck reaches across rank D's apex station at z 0.157 at one end and up to
+  // the strongbox's z 0.38 at the other, and brushes both as they sweep);
+  // 0.17..0.35 costs 126; 0.18..0.34 is the widest that stays inside the
+  // ratchet, and it is what ships. The q change carries the identity fix
+  // anyway — the peak is what made it a canopy.
+  // Clear of ch6-strongbox (z >= 0.38, margin 0.04 in z and the box sits at
+  // right-page d <= 0.095 against this deck's d <= 0.13) and of ch6-assay
+  // (d >= 0.305 against this piece's d <= 0.13).
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.055, spans: [[0.19, 0.33]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.055, spans: [[0.19, 0.33]] }, qA: 0.065, qB: 0.065, deckZ0: 0.18, deckZ1: 0.34 },
   // NEW: the intimate counterweight (T-COUNTERWEIGHT, ref 140028 Kristoff
   // corner) — a tiny clerk kneeling over his ledger by candlelight on the
   // left apron, already at prayer while the vaults are still rising around
@@ -1571,7 +1636,15 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   //  DELIBERATELY NOT DONE: an angle-keyed art payoff ("the quill writes a
   //  line"). This family prints ONE texture on a rigid die-cut, so a reveal
   //  that changes with the fold angle is a new mechanism, not a scene fix.
-  { id: 'ch6-clerk', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.44, slot: 0.3, slotZ: 0.44, hingeX: 0.55, hingeZ: 0.44, hingeDeg: 30, width: 0.21, height: 0.26, idle: { kind: 'glint' } },
+  //  ROUND-2 (S7R2-5), the ch1-rank precedent: `grabProjection: 'cylinder'`.
+  //  The clerk is a frontal standing figure, so his swing plane very nearly
+  //  contains the view direction and the plane read is ill-conditioned — class
+  //  B1-C exactly. Measured live (bench/s7r2-drag-live.mjs): a 160 px leftward
+  //  drag ran him 76.8 -> 33.7 -> 0 in three 20 px sub-steps and then sat dead,
+  //  and rightward and downward drags were both pinned at 90 for the whole
+  //  stroke. One flag, and the gesture-axis known-failure mark comes out with
+  //  the fix (gesture-axis.test.ts OTHER_LANE_AXIS_FAILURES).
+  { id: 'ch6-clerk', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.44, slot: 0.3, slotZ: 0.44, hingeX: 0.55, hingeZ: 0.44, hingeDeg: 30, width: 0.21, height: 0.26, grabProjection: 'cylinder', idle: { kind: 'glint' } },
 ]
 
 export const CHAPTERS: readonly Chapter[] = [
