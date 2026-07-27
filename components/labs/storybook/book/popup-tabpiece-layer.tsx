@@ -120,8 +120,15 @@ const isShaded = (face: TabPieceFace): boolean =>
   face === 'slopeOut' || face === 'legOut' || face === 'tab'
 
 /** Unfolded-die-cut v bands per face (arc length from inner hinge, over
- *  the flat span). The tab is raw kraft — identity uvs. */
-function tabFaceUvs(face: TabPieceFace, geom: TabPieceGeom): Float32Array {
+ *  the flat span). The tab is raw kraft — identity uvs.
+ *
+ *  EXPORTED for the s6 cartouche orientation gate (N-2), which re-projects
+ *  these very uvs through the reading camera to prove the stall's printed
+ *  legend still reads left-to-right at every lift the reader can latch. The
+ *  gate has to call the SHIPPED function — a copy in the test would keep
+ *  passing while this one drifted, which is exactly how the label ended up
+ *  turned a quarter-turn in the first place. */
+export function tabFaceUvs(face: TabPieceFace, geom: TabPieceGeom): Float32Array {
   const span = tabPieceFlatSpan(geom)
   const w = geom.legW / span
   const d = (geom.deckD ?? 0) / span

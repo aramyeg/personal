@@ -35,6 +35,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sharp from 'sharp'
 import { S4_DIAL_ROUTES } from './s4-dial-routes.mjs'
+import { S6_STALL_CARTOUCHE } from './s6-cartouche-orientation.mjs'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(SCRIPT_DIR, '..', '..')
@@ -13246,25 +13247,67 @@ function bazRaiseStallFace(w, h, seed) {
   s += `<rect x="0" y="${fx(dy0 + dh)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallGlowDown)"/>`
   s += `<rect x="0" y="${fx(dy0 - shadeH)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeUp)"/>`
   s += `<rect x="0" y="${fx(dy0 + dh)}" width="${w}" height="${fx(shadeH)}" fill="url(#stallShadeDown)"/>`
-  // the woodcut cartouche: walnut plate, cream field, engraved legend
-  const cw2 = w * 0.68
-  const chh = dh * 0.26
-  const cx0 = (w - cw2) / 2
-  const cy0 = dy0 + dh / 2 - chh / 2
-  s += `<rect x="${fx(cx0)}" y="${fx(cy0)}" width="${fx(cw2)}" height="${fx(chh)}" rx="10" fill="${INK}" opacity="0.92"/>`
-  s += `<rect x="${fx(cx0 + 5)}" y="${fx(cy0 + 5)}" width="${fx(cw2 - 10)}" height="${fx(chh - 10)}" rx="7" fill="${BAZ.cream}"/>`
-  s += `<rect x="${fx(cx0 + 11)}" y="${fx(cy0 + 11)}" width="${fx(cw2 - 22)}" height="${fx(chh - 22)}" rx="5" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
-  // ⟡ RAISE A STALL ⟡ — 12 glyph cells + flanking lozenges
-  const word = 'RAISE A STALL'
+  // ---- THE WOODCUT CARTOUCHE, TURNED A QUARTER-TURN CLOCKWISE.
+  //
+  // A blind reader on the re-re-review of this spread: "The 'RAISE A STALL'
+  // plaque is rendered rotated 180 degrees. At every stage of travel — flat,
+  // mid-raise, fully raised — the label reads upside-down to the reader. The
+  // single discovery cue on the page requires tilting your head to read."
+  //
+  // They were right about the defect and about a quarter of a turn out on the
+  // amount. This band's uv axes at the pinned reading camera, measured (bench
+  // n2-cartouche-capture.mjs, crop derived from the solver + reading-stage.ts,
+  // never eyeballed): +u projects to (20,-78) px at rest and (28,-74) fully
+  // raised — SCREEN-UP — while +v projects to (-100,-5) — SCREEN-LEFT. The
+  // legend ran bottom-to-top with its glyph tops facing the fore edge, a ~70-76
+  // degree turn, not 180. It is the lab's page-flat art failure class in its
+  // rotation flavour: this family's die-cut unfold puts image-x along the
+  // SPINE, and at this camera the spine is screen-vertical.
+  //
+  // Every other tab piece's face art is turned the same way and none of them
+  // cares, because posts, stripes and wares have no reading direction. This one
+  // carries the chapter's only sentence, so the fix lands HERE — on the mark
+  // that has to be read — and not in `tabFaceUvs`, which would spin the posts
+  // off the floor and the awning off its house stripe cadence on every piece in
+  // the book to straighten thirteen letters on one of them.
+  //
+  // The plate therefore runs along the deck's DEPTH (image y = page-fore d,
+  // screen-horizontal on the left page) with its glyph tops toward image RIGHT
+  // (= the spine axis, screen-up). Physically that is a signboard lying along
+  // the awning's slope rather than across its front — which is also what a
+  // sign on a raised table-top ought to do: at the 88-degree stop the deck IS a
+  // table top, and a legend on a table top faces the person standing at it.
+  //
+  // Sizes come from the shared contract (s6-cartouche-orientation.mjs), which
+  // the gate re-projects rather than re-guesses. The turn is not only legible,
+  // it is better PROPORTIONED: the camera magnifies the fore axis ~500 px/world
+  // against the spine's ~289, so glyphs that rendered ~3 px wide by ~9 px tall
+  // come out ~4.6 by ~5.6.
+  const cw2 = dh * S6_STALL_CARTOUCHE.lengthOfBandDepth
+  const chh = w * S6_STALL_CARTOUCHE.heightOfBandWidth
+  const ccx = w / 2
+  const ccy = dy0 + dh / 2
+  const cx0 = ccx - cw2 / 2
+  const cy0 = ccy - chh / 2
+  let cart = ''
+  cart += `<rect x="${fx(cx0)}" y="${fx(cy0)}" width="${fx(cw2)}" height="${fx(chh)}" rx="10" fill="${INK}" opacity="0.92"/>`
+  cart += `<rect x="${fx(cx0 + 5)}" y="${fx(cy0 + 5)}" width="${fx(cw2 - 10)}" height="${fx(chh - 10)}" rx="7" fill="${BAZ.cream}"/>`
+  cart += `<rect x="${fx(cx0 + 11)}" y="${fx(cy0 + 11)}" width="${fx(cw2 - 22)}" height="${fx(chh - 22)}" rx="5" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
+  // ⟡ RAISE A STALL ⟡ — 13 glyph cells + flanking lozenges
+  const word = S6_STALL_CARTOUCHE.legend
   const cells = word.length
   const gw = (cw2 - 96) / cells
   const gh = chh * 0.34
   const gy = cy0 + chh / 2 - gh / 2
-  s += engraveWord(word, cx0 + 48, gy, gw * 0.72, gh, gw * 0.28, INK, 3.4)
+  cart += engraveWord(word, cx0 + 48, gy, gw * 0.72, gh, gw * 0.28, INK, 3.4)
   for (const lx of [cx0 + 24, cx0 + cw2 - 24]) {
-    s += `<path d="M ${fx(lx)} ${fx(cy0 + chh / 2 - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="none" stroke="${INK}" stroke-width="2.4"/>`
-    s += `<circle cx="${fx(lx)}" cy="${fx(cy0 + chh / 2)}" r="2.4" fill="${INK}"/>`
+    cart += `<path d="M ${fx(lx)} ${fx(cy0 + chh / 2 - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="none" stroke="${INK}" stroke-width="2.4"/>`
+    cart += `<circle cx="${fx(lx)}" cy="${fx(cy0 + chh / 2)}" r="2.4" fill="${INK}"/>`
   }
+  // SVG's positive rotation is clockwise (y down), so this is the turn that
+  // sends the legend's baseline to image-DOWN and its glyph tops to image-RIGHT
+  // — `baselineUV` / `upUV` in the contract, which is what the gate asserts.
+  s += `<g transform="rotate(${fx(S6_STALL_CARTOUCHE.plateTurnDeg)} ${fx(ccx)} ${fx(ccy)})">${cart}</g>`
   void r
   // Deck-seam shadow ramps: darkest AT the seam, gone half a deck-height into
   // each leg band. `Up` runs off the deck's upper seam into legOut, `Down` off
