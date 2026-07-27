@@ -53,6 +53,25 @@ describe('acceptsHandleHit — one hit law for every handle family', () => {
     expect(acceptsHandleHit(evt(exactMesh, [onExact]), null)).toBe(true)
   })
 
+  it('does NOT defer to scenery that shares the handle group', () => {
+    // E3 s7 round-2 (S7R2-3). A lift flap's group is [board, door, door back,
+    // slop] and a volvelle's is [dial, card, slop]; the board and the card take
+    // no grab. Deferring to them meant the slop pad was rejected everywhere the
+    // scenery lay under the pointer — which is everywhere inside the piece — so
+    // an open door, whose own quad has swung off the pixels the reader presses,
+    // could not be shut. Measured live: 27 grabbable cells shut, zero at 95 deg.
+    const board = new THREE.Mesh()
+    board.userData = { handleInert: true }
+    group.add(board)
+    const e = evt(slopMesh, [{ object: board, eventObject: group }, onSlop])
+    expect(acceptsHandleHit(e, slopMesh)).toBe(true)
+    // and the exact die-cut still wins when it is genuinely under the pointer
+    expect(
+      acceptsHandleHit(evt(slopMesh, [{ object: board, eventObject: group }, onExact, onSlop]), slopMesh)
+    ).toBe(false)
+    group.remove(board)
+  })
+
   it('ignores hits that belong to a different handle', () => {
     const other = new THREE.Mesh()
     const otherGroup = new THREE.Group()

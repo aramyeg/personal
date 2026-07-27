@@ -172,6 +172,40 @@ export function liftFlapDoorQuad(
   return panel(P, geom.hingeD, LIFTFLAP_FLAP_LIFT, freeD, freeH, za, zb)
 }
 
+/**
+ * THE HAND'S FOOTPRINT ON A DOOR — the quad the layer actually raycasts (E3 s7
+ * round-2, S7R2-3: "the card flap is one-way. Once lifted it never closes").
+ *
+ * THE DEFECT, measured live (bench/s7r2-drag-live.mjs). With the coffer lid held
+ * open at 95 deg, a press anywhere in the piece's hover region returned
+ * `hover=ch6-coffer, grab=null` — every direction, every time. The lid was not
+ * unhittable in the sense the latch gate measures (its screen floor was doing
+ * its job on a 19 px sliver); it had simply SWUNG OFF the pixels the reader is
+ * looking at. What fills that region once a lid opens is the BOARD, which lights
+ * the whole piece's hover glow and carries no door index at all — so the reader
+ * sees the coffer answer their pointer and gets nothing when they press.
+ *
+ * The fix is the paper one: the surface a hand can put a lid back by is the lid
+ * AND the mouth it uncovered. So the hit quad LAGS the leaf — it is the door
+ * solved at a fraction of its shown angle, which spans the open aperture and the
+ * standing leaf together. A SHUT door is untouched (lag of 0 is 0), so every
+ * closed-state hit box, gate and golden is bit-identical; only a door a reader
+ * has actually opened grows a way back.
+ */
+export const LIFTFLAP_HIT_LAG = 0.45
+
+/** The hit-surface quad for door `doorIndex` at held angle `aUser`: the leaf,
+ *  dragged back down toward the aperture it opened (see LIFTFLAP_HIT_LAG). */
+export function liftFlapGrabQuad(
+  geom: LiftFlapGeom,
+  doorIndex: number,
+  aUser: number,
+  thetaL: number,
+  thetaR: number
+): PanelQuad {
+  return liftFlapDoorQuad(geom, doorIndex, clamp(aUser, 0, liftFlapMax(geom)) * LIFTFLAP_HIT_LAG, thetaL, thetaR)
+}
+
 /** The hinge frame for door `doorIndex`: the hinge centre (mid of the spine-ward
  *  edge), the flat direction `flat` (page-fore u — where the shut leaf lies) and
  *  the swing-up direction `n` (page normal). The reader's angle about the hinge
