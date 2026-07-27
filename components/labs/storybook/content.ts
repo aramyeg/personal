@@ -1286,7 +1286,27 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   //    is what makes six identical things read as six pairs of hands rather
   //    than one machine. Free mechanically — the phase map is bounded above by
   //    the rank's own progress at every point (popup-mechanics.ts).
-  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.52, slot: 0.3, slotZ: 0.52, hingeX: 0.62, hingeZ: 0.52, width: 0.6, height: 0.2, restDeg: 5, travelDeg: [5, 90], ripple: { count: 6, lag: 0.05 } },
+  //  - grabProjection 'cylinder' (N-5). "Six identical stall kits sit inert
+  //    beside the one that works, directly contradicting the paragraph they
+  //    illustrate. I press-dragged them up, down, left and right, individually
+  //    and as a row: nothing." The hit surface was never the problem — the row's
+  //    printed cards ARE its raycast meshes and a press engages on every one of
+  //    them (instrumented live on the lane server: `beginGrab` fires at all six
+  //    card centres). What failed is the DRIVE, and it failed exactly the way
+  //    handle-projection.ts's class B1-C note says it must. This is a frontal
+  //    standing rank: the hinge axis runs ACROSS the screen, so the pinned
+  //    camera's view direction LIES IN the swing plane, and the plane read is
+  //    ill-conditioned along it. Measured at the six card centres, the grab
+  //    angle came back -2.47, -2.45, -2.33, +0.40, +0.52, +0.58 rad — the left
+  //    half of the row reading a ray/plane crossing 140 degrees round the wrong
+  //    side of the hinge, where the drag delta is meaningless and the drive
+  //    clamps at the rest stop. Live before/after: a 240px up-drag moved the row
+  //    by 4.8 mean dRGB from card 3 and 0.8 (bare-paper noise is 0.09) from card
+  //    0. The cylinder read takes the angle off the flap's own tip circle
+  //    instead, conditioned by that circle's angular width from the camera
+  //    rather than by a vanishing dot product — the identical opt-in ch1-rank
+  //    took for the identical reason, and the whole printed row answers now.
+  { id: 'ch5-throng', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.24, anchorZ: 0.52, slot: 0.3, slotZ: 0.52, hingeX: 0.62, hingeZ: 0.52, width: 0.6, height: 0.2, restDeg: 5, travelDeg: [5, 90], ripple: { count: 6, lag: 0.05 }, grabProjection: 'cylinder' },
   // TEA CORNER — the intimate counterweight, right apron, over a painted rug.
   //
   // TRAVEL WINDOW (S6-3): "Drag it down or right and it rotates past flat and

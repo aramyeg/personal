@@ -40,6 +40,7 @@ import {
   stripFlapDetent,
   stripFlapFrame,
   stripFlapRestLift,
+  stripFlapRippleColumns,
   stripFlapTravel,
   type PanelQuad,
   type StripFlapGeom,
@@ -231,7 +232,27 @@ function liftFlapCases(id: string): HandleCase[] {
   })
 }
 
-function stripFlapCase(id: string): HandleCase {
+/**
+ * ONE CASE PER PRINTED CARD (N-5). "Six identical stall kits sit inert beside
+ * the one that works... I press-dragged them up, down, left and right,
+ * individually and as a row: nothing."
+ *
+ * This gate probed ONE point per piece — the centroid of the whole rank — and a
+ * rippled row is six independently hinged cards spread across 0.6 of hinge line.
+ * The s6 stall row passed here for months while its left half drove nothing at
+ * all: the centroid landed in the working half. A gate that samples the middle
+ * of a wide handle cannot see a hit surface that works at one end and not the
+ * other, which is precisely the defect a reader meets first, because a reader
+ * presses the card they are looking at.
+ *
+ * So a flap that declares a ripple now yields a case per COLUMN, each grabbed at
+ * its own card's centroid and each required to move paper on its own. Every
+ * future rippled rank is covered the day its content lands, and the un-rippled
+ * flaps are bit-identical (`stripFlapRippleColumns` returns the flap itself).
+ * The pose each case measures travel against is still the WHOLE rank's — the
+ * cards move together, and what the reader must see move is the row.
+ */
+function stripFlapCases(id: string): HandleCase[] {
   const { layer, spreadIndex } = locate(id)
   const geom = layer as SceneLayer & StripFlapGeom
   const { thetaL, thetaR } = restAngles(spreadIndex)
@@ -243,18 +264,31 @@ function stripFlapCase(id: string): HandleCase {
   const restA = stripFlapRestLift(geom, beta)
   const [lo, hi] = stripFlapTravel(geom)
   const fr = stripFlapFrame(geom, thetaL, thetaR)
-  const rest = solveStripFlapPoseAt(geom, restA, thetaL, thetaR)
-  return {
-    name: id,
-    grabPoint: centroid([...rest.right, ...rest.left]),
-    project: (ray) => projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n),
-    driveFrom: (g, n) => stripFlapDetent(restA + wrapDelta(n - g), lo, hi),
-    restDrive: restA,
-    vertsAt: (a) => {
-      const pose = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
-      return flatten([pose.right, pose.left])
-    },
+  const columns = stripFlapRippleColumns(geom)
+  // The projector the LAYER uses, chosen by the same flag the layer reads: a
+  // frontal rank whose swing plane the camera sees edge-on takes the cylinder
+  // read (handle-projection class B1-C). Re-deriving it here rather than
+  // hard-coding the plane read is the whole point — the s6 row's plane read came
+  // back 140 degrees round the wrong side of the hinge at its left cards.
+  const project = (ray: THREE.Ray): number | null =>
+    geom.grabProjection === 'cylinder'
+      ? projectHingeAngleCyl(ray, fr.center, fr.hinge, fr.flat, fr.n, geom.height)
+      : projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n)
+  const vertsAt = (a: number): number[] => {
+    const pose = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
+    return flatten([pose.right, pose.left])
   }
+  return columns.map((column, i) => {
+    const card = solveStripFlapPoseAt(column, restA, thetaL, thetaR)
+    return {
+      name: columns.length > 1 ? `${id}#card${i}` : id,
+      grabPoint: centroid([...card.right, ...card.left]),
+      project,
+      driveFrom: (g: number, n: number) => stripFlapDetent(restA + wrapDelta(n - g), lo, hi),
+      restDrive: restA,
+      vertsAt,
+    }
+  })
 }
 
 function tabPieceCase(id: string): HandleCase {
@@ -526,12 +560,12 @@ function bestTravel(c: HandleCase): { travel: number; dir: number; drive: number
 const CASES: HandleCase[] = [
   ...liftFlapCases('ch1-keyboard'),
   ...liftFlapCases('ch6-coffer'),
-  stripFlapCase('ch1-rank'),
+  ...stripFlapCases('ch1-rank'),
   // (ch3-ring-tower retired in ROUND-4 — the raven city's terraced roosts
   // replaced the gatehouse. Its dispatchline family is covered below.)
-  stripFlapCase('ch5-throng'),
-  stripFlapCase('ch5-tea'),
-  stripFlapCase('ch6-clerk'),
+  ...stripFlapCases('ch5-throng'),
+  ...stripFlapCases('ch5-tea'),
+  ...stripFlapCases('ch6-clerk'),
   tabPieceCase('ch4-goldpile'),
   tabPieceCase('ch5-raise-stall'),
   dissolveCase('ch4-dissolve'),
@@ -579,6 +613,79 @@ describe('handle drag regression — every grabbable must move paper', () => {
         best.travel,
         `${c.name}: no drag direction moved it (best ${best.travel.toFixed(4)} world units at ` +
           `drive ${best.drive.toFixed(4)}; the handle takes a grab and returns silence)`
+      ).toBeGreaterThan(MIN_TRAVEL)
+    })
+  }
+})
+
+/**
+ * ONE ROW, ONE GESTURE (N-5). "Six identical stall kits sit inert beside the one
+ * that works... I press-dragged them up, down, left and right, individually and
+ * as a row: nothing."
+ *
+ * THE HOLE THIS CLOSES, and it is the second one this file has had of exactly
+ * this shape. The gate above asks each handle whether SOME direction moves it,
+ * and lets every case pick its own. That is the right question for a piece a
+ * reader takes hold of at one place. It is the wrong question for a RANK — six
+ * printed cards the reader sees as one row and pulls as one object. The s6 stall
+ * row passed the per-card gate above with its left half answering a drag that
+ * was 140 degrees round the wrong side of its hinge: card 0 had a direction that
+ * moved it, card 3 had a direction that moved it, and they were not the same
+ * direction, so the reader who pulled the row upward saw half of it respond and
+ * called the other half dead. They were right to.
+ *
+ * So a rippled rank must have ONE screen direction that moves EVERY card. That
+ * is the reader's actual sentence — "I pulled the row and the row came up" — and
+ * it is the sentence the plane-read projector could not say for this piece
+ * (measured live: grab angles of -2.47, -2.45, -2.33, +0.40, +0.52, +0.58 rad
+ * across the six card centres). `grabProjection: 'cylinder'` says it.
+ */
+describe('a rank answers ONE gesture across every card it is printed as', () => {
+  const RIPPLED = ['ch5-throng'] as const
+
+  it('covers every rippled rank the book ships', () => {
+    const shipped: string[] = []
+    for (let s = 0; s < SPREAD_COUNT; s++) {
+      for (const layer of popupContentForSpread(s)?.layers ?? []) {
+        if ((layer as SceneLayer & StripFlapGeom).ripple !== undefined) shipped.push(layer.id)
+      }
+    }
+    expect(shipped.sort(), 'a new rippled rank must be listed here').toEqual([...RIPPLED].sort())
+  })
+
+  for (const id of RIPPLED) {
+    it(`${id}: one drag direction raises all six cards`, () => {
+      const cards = stripFlapCases(id)
+      expect(cards.length).toBeGreaterThan(1)
+      const grabs = cards.map((c) => {
+        const p = c.project(rayTo(c.grabPoint))
+        expect(p, `${c.name}: the projector missed its own card at rest`).not.toBeNull()
+        return p as number
+      })
+      const restVerts = cards.map((c) => c.vertsAt(c.restDrive))
+
+      // For each screen direction, the WORST card's travel — a row answers a
+      // gesture only as well as its most stubborn card does.
+      let bestCommon = { travel: 0, dir: -1 }
+      DIRECTIONS.forEach((d, i) => {
+        let worst = Infinity
+        cards.forEach((c, k) => {
+          const pNow = c.project(rayTo(c.grabPoint.clone().addScaledVector(d, STROKE)))
+          if (pNow === null) {
+            worst = 0
+            return
+          }
+          worst = Math.min(worst, worstTravel(restVerts[k], c.vertsAt(c.driveFrom(grabs[k], pNow))))
+        })
+        if (worst > bestCommon.travel) bestCommon = { travel: worst, dir: i }
+      })
+
+      expect(
+        bestCommon.travel,
+        `${id}: no single drag direction moves every card — the reader pulls the row and part of ` +
+          `it answers. Best common travel ${bestCommon.travel.toFixed(4)} world units (bar ` +
+          `${MIN_TRAVEL}). This is the ill-conditioned-projector signature: check whether the ` +
+          `piece needs grabProjection 'cylinder' (handle-projection.ts class B1-C).`
       ).toBeGreaterThan(MIN_TRAVEL)
     })
   }
