@@ -170,10 +170,20 @@ describe('idle beckon — one restrained invitation per spread', () => {
     for (let s = 0; s < SPREAD_COUNT; s++) {
       const channel = primaryPlayableChannel(s)
       const layers = popupContentForSpread(s)?.layers ?? []
+      // `dispatchline` joined this list when SP-1 ranked it: the trolley was a
+      // grabbable the beckon skipped, so a spread it headlines offered nothing.
       const handles = layers.filter((l) =>
-        ['liftflap', 'stripflap', 'tabpiece', 'dissolve', 'swarmarc', 'volvelle', 'keepwinch', 'knobtower'].includes(
-          l.mech
-        )
+        [
+          'liftflap',
+          'stripflap',
+          'tabpiece',
+          'dissolve',
+          'swarmarc',
+          'volvelle',
+          'keepwinch',
+          'knobtower',
+          'dispatchline',
+        ].includes(l.mech)
       )
       if (handles.length === 0) {
         expect(channel).toBeNull()

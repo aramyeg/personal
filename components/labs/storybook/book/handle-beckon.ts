@@ -28,15 +28,36 @@ import { popupContentForSpread } from '../content'
 import { pulseHandle } from './handle-nudge'
 
 /**
+ * Families that are grabbable and are still NEVER offered as an invitation.
+ *
+ * A keepsake is a one-way door: the card leaves the book and does not come
+ * back, so a spread must not open by beckoning it. This was an absence — the
+ * family simply had no entry in FAMILY_RANK — and an absence is indistinguishable
+ * from a family whose lane forgot to rank it, which is exactly how the dispatch
+ * line went a whole round with no invitation at all (SP-1). Stating the
+ * exclusion makes the completeness gate able to tell the two apart.
+ */
+export const BECKON_EXCLUDED_FAMILIES: ReadonlySet<string> = new Set(['keepsake'])
+
+/**
  * How playable a family reads, for picking a spread's headline mechanism. A
  * numbered door the reader lifts is the most self-explanatory thing in the
- * book; a dial's own affordance is its shape; a keepsake is a one-way door and
- * must never be the thing that invites a first touch.
+ * book; a dial's own affordance is its shape.
+ *
+ * EVERY grabbable family the book ships must appear here or in
+ * BECKON_EXCLUDED_FAMILIES — a family in neither gets no invitation on any
+ * spread it headlines, silently (affordance-completeness.test.ts).
  */
-const FAMILY_RANK: Readonly<Record<string, number>> = {
+export const FAMILY_RANK: Readonly<Record<string, number>> = {
   liftflap: 6,
   dissolve: 5,
   tabpiece: 5,
+  // A basket the reader pushes along a wire: the blind reader of s4 called it
+  // "the one thing on the page that behaves like a paper toy", so it invites a
+  // first touch better than a flap that must be discovered by its own edge. It
+  // sits under the lift flap, whose numbered doors say what to do without any
+  // invitation at all.
+  dispatchline: 5,
   swarmarc: 4,
   volvelle: 4,
   keepwinch: 4,
@@ -75,6 +96,7 @@ export function primaryPlayableChannel(spread: number): string | null {
   if (!layers) return null
   let best: { rank: number; id: string; mech: string } | null = null
   for (const layer of layers) {
+    if (BECKON_EXCLUDED_FAMILIES.has(layer.mech)) continue
     const rank = FAMILY_RANK[layer.mech]
     if (rank === undefined) continue
     if (best === null || rank > best.rank) best = { rank, id: layer.id, mech: layer.mech }
@@ -82,6 +104,7 @@ export function primaryPlayableChannel(spread: number): string | null {
   if (best === null) return null
   if (best.mech === 'liftflap') return `${best.id}~0` // the first door, nearest the reader's eye
   if (best.mech === 'swarmarc') return `${best.id}~stir`
+  if (best.mech === 'dispatchline') return `${best.id}~send`
   return best.id
 }
 

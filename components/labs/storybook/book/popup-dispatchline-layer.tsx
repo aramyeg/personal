@@ -33,6 +33,12 @@
  * than motion (handle-hover.ts), and reports hover through the store's single
  * cursor identity instead of writing `gl.domElement.style.cursor` itself.
  *
+ * It missed a fourth (SP-1): a CLICK on the trolley answered nothing, so the one
+ * gesture every blind reader tried first — press, release, look — said the wire
+ * was a picture. It now shares the book's tap detector (use-handle-tap.ts) and
+ * rocks the basket a fraction of the wire on a press that never sent it, which
+ * is also what makes it eligible for the idle invitation (handle-beckon.ts).
+ *
  * The reader's second finding — after one trip the handle is somewhere else with
  * no cue — is not addressed here: where the trolley IS after a send is true, and
  * the fix belongs to whatever draws the cue, not to the mechanism. What this file
@@ -68,11 +74,39 @@ import { pointerLocalRay } from './user-drive-pointer'
 import { projectPageD } from './handle-projection'
 import { HANDLE_SLOP_STANDING, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
+import { NUDGE_SPAN_STROKE_FRAC, TAP_EPS, nudgeOffset } from './handle-nudge'
+import { useHandleTap } from './use-handle-tap'
 import { sharedHandleMaterial } from './shared-procedural-textures'
 import { useGuardedDispose } from './material-pool'
 
 const FLAT_EPSILON = 0.02
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
+
+/**
+ * The tap answer's excursion, in the send stroke's own domain (SP-1). The stroke
+ * is NORMALISED — the whole wire is drive 0..1 — so the span is the family's
+ * slide fraction of that whole range rather than the angle span the flaps and
+ * dials use: a tapped basket creeps a fifth of the way down the wire and slides
+ * back, which is the same gesture at the same scale as the strip that answers a
+ * tap by creeping out of its slot.
+ */
+const NUDGE_SPAN_SEND = NUDGE_SPAN_STROKE_FRAC * 1
+
+/**
+ * The send stroke AS RENDERED: the held drive plus the tap/beckon excursion.
+ *
+ * Applied here, in the one reader every consumer of the drive shares (the rider
+ * quad and the touch-slop pad that must stay on it), so the basket and its grab
+ * surface travel as one piece — the readWinchTheta idiom. Render-time only: the
+ * excursion is never written back to the channel, so it cannot survive a page
+ * turn, compose with a held send, or leak into the hold. `frozen` is a dev
+ * capture pose (`?sbdrive=<id>~send:<s>`), which the nudge must leave exactly
+ * where the harness put it or the goldens stop being deterministic.
+ */
+function shownSend(channel: string, held: number, frozen: boolean): number {
+  if (frozen) return held
+  return clamp(held + nudgeOffset(channel, held, 0, 1, NUDGE_SPAN_SEND), 0, 1)
+}
 
 /**
  * STANDING, not page-flat. The trolley is an in-plane quad on a sheet that
@@ -166,6 +200,10 @@ export function DispatchLinePopupLayer({
   const grabRef = useRef<{ sStart: number; dGrab: number } | null>(null)
   const sRef = useRef(0)
   const sendChannel = `${layer.id}~send`
+  // A press that never sends the basket still gets an answer (BW-18). The
+  // trolley shipped without one, so the reader who called it the page's one
+  // paper toy had to guess that a CLICK was not the gesture.
+  const tap = useHandleTap()
 
   const panelTexture = useLayerTexture(layer.id, layer.kind, accents)
   const riderTexture = useLayerTexture(`${layer.id}-basket`, layer.kind, accents)
@@ -235,6 +273,7 @@ export function DispatchLinePopupLayer({
   const releaseGrab = (e?: ThreeEvent<PointerEvent> | null): void => {
     if (!grabRef.current) return
     grabRef.current = null
+    tap.end(sendChannel) // a press that never sent the basket answers with a nudge
     endGrabChannel(layer.id)
     useStorybookStore.getState().endGrab()
     try {
@@ -256,6 +295,7 @@ export function DispatchLinePopupLayer({
     if (useStorybookStore.getState().grab?.id !== layer.id) return
     grabRef.current = { sStart, dGrab }
     writeUserDrive(sendChannel, sStart, [0, 1])
+    tap.begin(sStart)
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -272,7 +312,11 @@ export function DispatchLinePopupLayer({
     const { thetaL, thetaR } = readAngles()
     const dNow = projectPointerD(e, layer.side === 'left' ? thetaL : thetaR)
     if (dNow === null) return
-    writeUserDrive(sendChannel, clamp(grab.sStart + (dNow - grab.dGrab) / stroke, 0, 1), [0, 1])
+    const sUser = clamp(grab.sStart + (dNow - grab.dGrab) / stroke, 0, 1)
+    writeUserDrive(sendChannel, sUser, [0, 1])
+    // The send stroke is normalised, so TAP_EPS is read as a thousandth of the
+    // whole wire — a press that moves the basket less than that is a click.
+    tap.track(sUser, TAP_EPS)
     e.stopPropagation()
   }
 
@@ -313,7 +357,8 @@ export function DispatchLinePopupLayer({
     if (override === null && channel === undefined && drive === 0) clearUserDrive(sendChannel)
 
     writeQuads(panelGeometry, solveStagedChainPose(dispatchLinePanel(layer), thetaL, thetaR).panels)
-    const rider = dispatchLineBasketQuad(layer, dispatchLineRiderS(layer, drive), thetaL, thetaR)
+    const shown = shownSend(sendChannel, drive, override !== null)
+    const rider = dispatchLineBasketQuad(layer, dispatchLineRiderS(layer, shown), thetaL, thetaR)
     writeQuads(riderGeometry, [rider])
     writeQuads(slopGeometry, [enlargeQuad(rider, handleSlopFactor(rider, TOUCH_SLOP))])
   })
