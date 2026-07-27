@@ -3180,25 +3180,11 @@ function vaultDragon(w, h, seed) {
   return svgPiece(w, h, s, defs)
 }
 
-/** Tiny stroke lettering for the engraved PULL (no fonts in the rasterizer
- *  path — librsvg text is host-font-dependent, and the bake must be
- *  byte-stable). Each glyph is polyline strokes in a 10x14 box at (x, y). */
-function strokeWord(word, x, y, gs, color, sw = 2.2) {
-  const G = {
-    P: [[0, 14, 0, 0], [0, 0, 8, 0], [8, 0, 8, 7], [8, 7, 0, 7]],
-    U: [[0, 0, 0, 12], [0, 12, 2, 14], [2, 14, 8, 14], [8, 14, 10, 12], [10, 12, 10, 0]],
-    L: [[0, 0, 0, 14], [0, 14, 9, 14]],
-  }
-  let s = ''
-  let cx = x
-  for (const ch of word) {
-    for (const [x0, y0, x1, y1] of G[ch] ?? []) {
-      s += `<line x1="${fx(cx + x0 * gs)}" y1="${fx(y + y0 * gs)}" x2="${fx(cx + x1 * gs)}" y2="${fx(y + y1 * gs)}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`
-    }
-    cx += 13 * gs
-  }
-  return s
-}
+// (RETIRED — strokeWord. It existed for exactly one mark, the engraved PULL
+//  down the s5 slot plate, and written action labels near a trigger are OUT
+//  book-wide: a trigger must speak PAPER. The plate now carries the ember
+//  chevrons and one head-and-shaft arrow that were already the book's approved
+//  reference style, and the letterforms have no other call site.)
 
 /**
  * THE PULL TONGUE (E3 W2 S5-1) — one painter, both of spread 5's handles.
@@ -3286,29 +3272,93 @@ function pullTongue(w, h, seed, opts) {
   return svgPiece(w, h, s, defs)
 }
 
-/** The engraved brass slot plate + giant ember chevrons + PULL, painted
- *  along the tab-exit edge of BOTH dissolve faces (the celebrated
- *  affordance — Frozen-theater ▼PULL▼ grammar; image-x = the page-fore
- *  axis, so the tab side is the image's RIGHT edge on either page side). */
+/** The slot plate's station on BOTH dissolve faces, exported so a raster gate
+ *  can hold the furniture out and measure the PICTURE. The plate is painted at
+ *  an identical station on the A and B faces precisely so it cannot flicker as
+ *  the venetian slats flip. */
+const S5_PLATE = { U0: 0.9, W: 0.1 }
+
+/**
+ * The engraved brass slot plate along the tab-exit edge of BOTH dissolve faces
+ * (image-x = the page-fore axis, so the tab side is the image's RIGHT edge on
+ * either page side).
+ *
+ * E3 s5 round 2 — the plate used to engrave the word PULL down its length,
+ * twice. Written action labels near a trigger are OUT book-wide: the trigger has
+ * to speak PAPER, and this spread's own ember arrows are the book's APPROVED
+ * reference style ("subtle and understandable"). So the letters are gone and
+ * what remains is strengthened rather than replaced:
+ *
+ *   - a pale engraved TRACK down the plate, so the ember marks read against bone
+ *     rather than against brass. It is also the honest picture: a strip runs in
+ *     a channel.
+ *   - SIX chevron pairs in an even rhythm down that track instead of two
+ *     chevrons huddled in its top half, so the direction survives the reading
+ *     camera cropping the plate to a ~28px-wide sliver.
+ *   - ONE head-and-shaft arrow at the track's centre. Chevrons alone flatten
+ *     into parallel bars under foreshortening (the lesson pullTongue already
+ *     recorded); a real head and shaft does not.
+ *   - a stepped cut penumbra at the slot the strip exits by, in place of the old
+ *     flat ink rectangle.
+ *
+ * On why these marks are written out here rather than delegated to `cueArrow`
+ * and `cutShadow`: this plate IS those helpers' reference — they were generalised
+ * FROM its chevrons and from pullTongue's arrow — and the vocabulary is still
+ * gated as unadopted machinery by __tests__/labs/storybook/paper-cues.test.ts,
+ * whose ADOPTERS list is empty and whose closing assertion is that it stays
+ * empty. The grammar below is the helpers' grammar to the letter (ember, round
+ * cap and join, the seven-vertex head and shaft, the white 0.22 sheen, a stepped
+ * penumbra in place of a blur). When a lane opens that list, these become calls.
+ */
 function brassPullPlate(w, h) {
-  const px = w * 0.9
-  const pw = w * 0.1
+  const px = w * S5_PLATE.U0
+  const pw = w * S5_PLATE.W
   let s = `<rect x="${fx(px)}" y="0" width="${fx(pw)}" height="${h}" fill="${VAULT.foil}"/>`
   s += `<rect x="${fx(px)}" y="0" width="${fx(pw * 0.18)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.6"/>`
   s += `<rect x="${fx(px + 3)}" y="3" width="${fx(pw - 6)}" height="${h - 6}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="2"/>`
   s += `<rect x="${fx(px + 7)}" y="7" width="${fx(pw - 14)}" height="${h - 14}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1" opacity="0.7"/>`
-  // giant ember chevrons pointing at the tab (image-right)
+  // ---- the engraved TRACK the strip runs in ----
   const cxm = px + pw * 0.5
-  for (const t of [0.2, 0.42]) {
+  const tw = pw * 0.62
+  s += `<rect x="${fx(cxm - tw / 2)}" y="${fx(h * 0.055)}" width="${fx(tw)}" height="${fx(h * 0.89)}" rx="${fx(pw * 0.1)}" fill="${VAULT.foilHi}" opacity="0.62"/>`
+  s += `<rect x="${fx(cxm - tw / 2)}" y="${fx(h * 0.055)}" width="${fx(tw)}" height="${fx(h * 0.89)}" rx="${fx(pw * 0.1)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(pw * 0.028)}" opacity="0.75"/>`
+  // ---- the rhythm: chevron pairs down the track, aimed image-right (the tab) ----
+  const chevArm = pw * 0.21
+  const chevHalf = h * 0.029
+  for (const t of [0.12, 0.26, 0.4, 0.6, 0.74, 0.88]) {
     const cy = h * t
-    s += `<path d="M ${fx(cxm - pw * 0.26)} ${fx(cy - h * 0.045)} L ${fx(cxm + pw * 0.2)} ${fx(cy)} L ${fx(cxm - pw * 0.26)} ${fx(cy + h * 0.045)}" fill="none" stroke="${VAULT.ember}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`
+    for (const dx of [-pw * 0.17, pw * 0.17]) {
+      s +=
+        `<path d="M ${fx(cxm + dx - chevArm)} ${fx(cy - chevHalf)} L ${fx(cxm + dx)} ${fx(cy)} ` +
+        `L ${fx(cxm + dx - chevArm)} ${fx(cy + chevHalf)}" fill="none" stroke="${VAULT.ember}" ` +
+        `stroke-width="${fx(pw * 0.075)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    }
   }
-  // engraved PULL reading down the plate
-  const gs = pw * 0.022
-  s += `<g transform="rotate(90 ${fx(cxm)} ${fx(h * 0.62)})">${strokeWord('PULL', cxm - 24 * gs, h * 0.62 - 7 * gs, gs, VAULT.ink, 2.6)}</g>`
-  s += `<g transform="rotate(90 ${fx(cxm)} ${fx(h * 0.62)})">${strokeWord('PULL', cxm - 24 * gs - 1, h * 0.62 - 7 * gs - 1, gs, VAULT.foilHi, 1.2)}</g>`
-  // slot shadow where the strip exits
-  s += `<rect x="${fx(w - 4)}" y="0" width="4" height="${h}" fill="${VAULT.ink}" opacity="0.5"/>`
+  // ---- and one arrow with a real head, at the track's centre ----
+  const ay = h * 0.5
+  const aTip = cxm + pw * 0.42
+  const aHead = cxm - pw * 0.06
+  const aTail = cxm - pw * 0.42
+  const hHalf = h * 0.04
+  const sHalf = hHalf * 0.42
+  s +=
+    `<path d="M ${fx(aTip)} ${fx(ay)} L ${fx(aHead)} ${fx(ay + hHalf)} L ${fx(aHead)} ${fx(ay + sHalf)} ` +
+    `L ${fx(aTail)} ${fx(ay + sHalf)} L ${fx(aTail)} ${fx(ay - sHalf)} L ${fx(aHead)} ${fx(ay - sHalf)} ` +
+    `L ${fx(aHead)} ${fx(ay - hHalf)} Z" fill="${VAULT.ember}" stroke="${VAULT.ink}" ` +
+    `stroke-width="${fx(pw * 0.024)}" stroke-opacity="0.45" stroke-linejoin="round"/>`
+  s += `<path d="M ${fx(aTip - pw * 0.1)} ${fx(ay)} L ${fx(aHead + pw * 0.03)} ${fx(ay + hHalf * 0.62)} L ${fx(aHead + pw * 0.03)} ${fx(ay - hHalf * 0.62)} Z" fill="#ffffff" opacity="0.22"/>`
+  // ---- the SLOT the strip exits by: a severed edge, not a painted line ----
+  // The face's image-x is the page-fore axis, which runs opposite to screen-x on
+  // the left page, so the spill is thrown image-LEFT: a rotation of the book's
+  // one lamp, not a second one — and it keeps the penumbra ON the plate instead
+  // of off the canvas edge, where it would say nothing at all.
+  const reach = pw * 0.2
+  for (let i = 5; i >= 1; i--) {
+    const t = i / 5
+    s += `<rect x="${fx(w - 2 - reach * t)}" y="0" width="${fx(Math.max(1, reach * t))}" height="${h}" fill="${VAULT.ink}" opacity="${(0.16 * (1 - 0.6 * t)).toFixed(2)}"/>`
+  }
+  s += `<rect x="${fx(w - 2.6)}" y="0" width="2.6" height="${h}" fill="${VAULT.ink}" opacity="0.5"/>`
+  s += `<rect x="${fx(w - 2.6 - reach * 0.3)}" y="0" width="1.6" height="${h}" fill="${VAULT.rim}" opacity="0.3"/>`
   return s
 }
 
