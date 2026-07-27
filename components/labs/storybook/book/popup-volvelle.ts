@@ -58,6 +58,110 @@ export function volvelleSnap(geom: VolvelleGeom, theta: number): number {
   return clamp(Math.round(theta / step) * step, 0, volvelleThetaMax())
 }
 
+// ---------------------------------------------------------------------------
+// THE CRANK — how a hand's stroke becomes disc rotation (E3 s7 round-2, S7R2-1a)
+//
+// The systems patch replaced the winch's raw atan2 hub sweep with the hand's own
+// TANGENTIAL drag (handle-projection.ts crankTangentialDelta) and flagged the
+// volvelle as still carrying the old read. A live probe of s7's counting wheel
+// (bench/s7r2-drag-live.mjs) reproduced every symptom the winch had:
+//
+//   240 px stroke across the rim  ->   2.3, 10.4, 13.2, ... 17.4 deg (asymptotic)
+//   the same stroke reversed      ->   0.0 at every sample
+//   200 px straight down          ->   3.1 deg
+//
+// A wheel of eight strongrooms whose whole travel is 360 deg answered a
+// deliberate two-thirds-of-the-page stroke with less than half of ONE detent,
+// and answered the return stroke with nothing. That is the atan2 defect exactly
+// — gain that vanishes at the rim, where a hand actually grips a wheel.
+//
+// Everything below is a pure function of (geom, theta, sweep) so the bench can
+// walk the mapping end to end (volvelle-crank.test.ts), and every piece of it is
+// OPT-IN behind `geom.crank === 'tangential'`: s4's dispatch dial keeps the
+// sweep read byte-for-byte until its own lane ports it.
+// ---------------------------------------------------------------------------
+
+/**
+ * THE GEAR — how much hand one turn of the wheel costs.
+ *
+ * Ungeared, a hand circling the rim turns the disc 1:1, so the whole 360 deg of
+ * travel is one turn of the wrist and eight strongrooms go past in a flick.
+ * At 0.5 the full revolution costs 720 deg of hand at the rim — two turns, i.e.
+ * 90 deg of hand per detent, which is a deliberate stroke per room. (The winch
+ * chose 0.42 for a 302 deg wind; this is the same bar restated for a 360 deg one.)
+ */
+export const VOLVELLE_CRANK_GEAR = 0.5
+
+/**
+ * THE DETENT, FELT IN THE HAND.
+ *
+ * `volvelleSnap` is what a detent LOOKS like after the reader lets go. This is
+ * what it feels like while they are still turning: a sprung ball riding a
+ * notched rim. The gear is modulated by where the wheel sits inside its current
+ * notch cell — heaviest ON a notch (the ball is seated and resists being lifted
+ * out), lightest at the crest halfway between two (the ball is over the top and
+ * falls into the next one). One period per detent step, so the reader feels
+ * exactly `sectors` clicks per revolution.
+ *
+ * Properties that matter and are gated:
+ *   - strictly positive everywhere (0 < 1-DEPTH <= g <= 1+DEPTH), so the wheel
+ *     never stalls and never runs backwards under a forward hand,
+ *   - even in theta about every notch, so a step costs the same to leave in
+ *     either direction — a detent, not a ratchet,
+ *   - independent of sweep sign, so reverse costs exactly what forward cost.
+ */
+const DETENT_DEPTH = 0.55
+
+export function volvelleDetentGear(geom: VolvelleGeom, theta: number): number {
+  const step = volvelleDetentStep(geom)
+  if (!(step > 0)) return 1
+  return 1 - DETENT_DEPTH * Math.cos((TAU * theta) / step)
+}
+
+/** Fraction of the travel over which the wheel stiffens into each end stop. */
+const END_BAND_FRAC = 0.09
+/** The gear left AT a stop — heavy enough to be unmistakable, never zero: a stop
+ *  a reader cannot reach is a bug, not a feel (the winch's RESIST_FLOOR rule). */
+const END_FLOOR = 0.3
+
+/**
+ * THE TWO END STOPS ("no end-stop, no detent, no resistance" — the blind
+ * reader). A riveted volvelle turns between stop pins: the wheel gets heavy over
+ * the last END_BAND_FRAC of travel, seats, and goes dead rather than spinning on
+ * forever. Applied to the direction that RUNS INTO the stop only (the layer
+ * passes the sweep's sign), so a reader who has wound the wheel to its pin can
+ * always back it off at the ordinary rate.
+ */
+export function volvelleEndResist(geom: VolvelleGeom, theta: number, sweep: number): number {
+  const max = volvelleThetaMax()
+  const band = Math.max(1e-6, max * END_BAND_FRAC)
+  const t = clamp(theta, 0, max)
+  // Distance into the band the hand is heading FOR — the far pin when winding
+  // forward, the near one when backing off. A sweep of exactly zero is not
+  // heading anywhere.
+  const u = sweep > 0 ? clamp((t - (max - band)) / band, 0, 1) : sweep < 0 ? clamp((band - t) / band, 0, 1) : 0
+  return 1 - (1 - END_FLOOR) * u * u
+}
+
+/**
+ * One pointer move's worth of wheel: the hand's own tangential crank
+ * (crankTangentialDelta), geared down, notched, and stiffened into whichever
+ * stop it is heading for. `sweep` is the UNGEARED disc rotation the hand just
+ * applied; `theta` the twist it is applied from.
+ */
+export function volvelleCrankStep(geom: VolvelleGeom, theta: number, sweep: number): number {
+  const gear = VOLVELLE_CRANK_GEAR * volvelleDetentGear(geom, theta) * volvelleEndResist(geom, theta, sweep)
+  return clamp(theta + sweep * gear, 0, volvelleThetaMax())
+}
+
+/** Which notch cell `theta` currently sits in — the layer clicks once per change
+ *  so the reader HEARS the ball drop into each room. */
+export function volvelleDetentCell(geom: VolvelleGeom, theta: number): number {
+  const step = volvelleDetentStep(geom)
+  if (!(step > 0)) return 0
+  return Math.round(clamp(theta, 0, volvelleThetaMax()) / step)
+}
+
 /** Which dial sector index a window at psi frames when the dial is at theta —
  *  exported for the registration tests (the reveal gate). */
 export function volvelleSectorSeen(geom: VolvelleGeom, window: VolvelleWindow, theta: number): number {

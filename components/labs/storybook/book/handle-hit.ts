@@ -101,6 +101,30 @@ export function hitQuadFor(quad: readonly Vec3[], base: number): PanelQuad {
 }
 
 /**
+ * Mark a mesh that lives inside a handle's group but is NOT a grab surface —
+ * a lift flap's key-board plaque, a volvelle's static window card. Put it in the
+ * mesh's `userData` and `acceptsHandleHit` will stop yielding to it.
+ *
+ * WHY IT EXISTS (E3 s7 round-2, S7R2-3: "the card flap is one-way. Once lifted
+ * it never closes"). The deferral rule below reads "defer to the EXACT surface",
+ * and every family's handlers are bound on the GROUP, so `eventObject` is the
+ * group and every sibling mesh in it looked like the exact surface. A lift
+ * flap's group is [board, door front, door back, slop] — so with the board under
+ * the pointer, which it is everywhere inside the piece, the slop pad was
+ * REJECTED and the door's own quad was the only live surface the family ever
+ * had. Shut, that quad is right where the reader presses and nobody noticed.
+ * Open at 95 deg it is a 19 px sliver somewhere else, and the pad that exists
+ * precisely to rescue it never got a vote: measured live
+ * (bench/s7r2-coffer-map.mjs), the coffer went from 27 grabbable cells shut to
+ * ZERO across a 360 x 320 px window at full open, in every direction.
+ *
+ * Marking the non-handle surfaces — rather than marking the handle ones — keeps
+ * every other family bit-identical: a layer that marks nothing behaves exactly
+ * as it did.
+ */
+export const HANDLE_INERT = { handleInert: true } as const
+
+/**
  * Whether this pointerdown should be consumed by the surface it landed on.
  * `slop` is the layer's coarse-pointer mesh (or null if it has none).
  */
@@ -111,5 +135,12 @@ export function acceptsHandleHit(
   if (!slop || e.object !== slop) return true
   // A slop-only hit engages; a slop hit that ALSO has the exact surface under
   // the pointer defers to the pass this same handler makes for that surface.
-  return !e.intersections.some((i) => i.eventObject === e.eventObject && i.object !== slop)
+  // Scenery inside the same group (HANDLE_INERT) is not a surface to defer to:
+  // it takes no grab, so yielding to it drops the press on the floor.
+  return !e.intersections.some(
+    (i) =>
+      i.eventObject === e.eventObject &&
+      i.object !== slop &&
+      i.object.userData?.handleInert !== true
+  )
 }

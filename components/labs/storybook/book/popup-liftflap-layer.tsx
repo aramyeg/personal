@@ -26,6 +26,7 @@ import type { LiftFlapGeom, PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   doorSlopFactors,
+  liftFlapGrabQuad,
   liftFlapHingeFrame,
   liftFlapMax,
   solveLiftFlapPose,
@@ -39,7 +40,7 @@ import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { acceptsHandleHit, hitQuadFor } from './handle-hit'
+import { HANDLE_INERT, acceptsHandleHit, hitQuadFor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { projectHingeAngle } from './handle-projection'
@@ -318,7 +319,14 @@ export function LiftFlapPopupLayer({
       // KEEPS that angle, so the leaf that is standing wide open would be the
       // one the reader can no longer shut. Stretched along the collapsing axis
       // only; a shut or half-open leaf is untouched.
-      writeQuad(slopGeometries[k], hitQuadFor(quad, slopFactors[k]))
+      //
+      // REVERSIBILITY (S7R2-3): and the surface is the LAGGING leaf, not the
+      // standing one — the open lid plus the mouth it uncovered, which is where
+      // a hand goes to put a lid back. See liftFlapGrabQuad.
+      writeQuad(
+        slopGeometries[k],
+        hitQuadFor(liftFlapGrabQuad(layer, k, held[k], thetaL, thetaR), slopFactors[k])
+      )
     })
   })
 
@@ -338,8 +346,10 @@ export function LiftFlapPopupLayer({
       {/* The key-board plaque beneath (renderOrder 0), its recesses painted in;
           then each door leaf over it (renderOrder 1) so a shut leaf composites
           above its recess. */}
-      <mesh geometry={boardGeometry} material={boardMaterials.front} renderOrder={0} />
-      <mesh geometry={boardGeometry} material={boardMaterials.back} renderOrder={0} />
+      {/* The plaque takes no grab, so it must not be a surface the door's slop
+          pad yields to (HANDLE_INERT — the S7R2-3 root cause). */}
+      <mesh geometry={boardGeometry} material={boardMaterials.front} renderOrder={0} userData={HANDLE_INERT} />
+      <mesh geometry={boardGeometry} material={boardMaterials.back} renderOrder={0} userData={HANDLE_INERT} />
       {layer.doors.map((_, k) => (
         <group key={k}>
           <mesh

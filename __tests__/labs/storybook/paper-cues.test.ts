@@ -315,34 +315,42 @@ describe('paper-cue vocabulary — subtlety ceilings', () => {
   })
 })
 
-describe('paper-cue vocabulary — additive, no existing art changed', () => {
+describe('paper-cue vocabulary — the register of who speaks paper', () => {
   // The vocabulary is MACHINERY. Adopting it — deleting a label plate and
   // painting a cue in its place — is per-spread scene work owned by the art
-  // lanes. Until a lane does that, no painter may reference these helpers, so
-  // every already-baked piece is byte-identical to what it was before.
+  // lanes, and this block is the REGISTER of who has done it. Every call site
+  // in the painter must be accounted for here, so a cue cannot spread quietly:
+  // adopting one means writing down which piece, and which mark, and why.
   //
-  // WHEN A SPREAD ADOPTS A CUE: add its painter's name to ADOPTERS, and the
-  // number of call sites it makes. The table is the record of which pieces
-  // speak paper instead of printing a verb, and this test then guards that the
-  // machinery is used THERE and nowhere it was not declared — a cue that
-  // wanders into an unrelated piece is how a vocabulary turns into decoration.
+  // WHEN A SPREAD ADOPTS A CUE: add one entry per call site — which piece,
+  // which mark, and why. The table is the record of which pieces speak paper
+  // instead of printing a verb; the test then guards that the machinery is used
+  // THERE and nowhere it was not declared — a cue that wanders into an
+  // unrelated piece is how a vocabulary turns into decoration.
   //
-  // s4 ROUND-3 is the first adopter, converting all three of that spread's
-  // Wave-2 label plates in one pass:
-  //   dispatchCard  — the SPIN tag is retired; the arch gets a `cutShadow`, the
-  //                   thumb notch a `raisedEdgeShadow` pool AND lip, and the rim
-  //                   two sets of `cueArrow` chevrons.
-  //   crankWheel    — HOIST comes off the maker's plates (a winding-drum device
-  //                   replaces it, which also kills the mirror-reversed second
-  //                   copy a blind reader filed); the hand-rolled ink arrows
-  //                   become `cueArrow` chevrons, and the grip lobe gains a
-  //                   `raisedEdgeShadow` pool and lip.
-  //   dispatchCablePanel — the mast plate struck SEND carries a sealed-letter
-  //                   device and one `cueArrow` chevron set instead.
-  const ADOPTERS: Readonly<Record<string, number>> = {
-    cutShadow: 1, // dispatchCard: the arch
-    raisedEdgeShadow: 4, // dispatchCard notch (pool+lip), crankWheel lobe (pool+lip)
-    cueArrow: 3, // dispatchCard rim, crankWheel rim, the SEND mast plate
+  // s4 round-3 and s7 round-2 adopted in the same round (SPIN/HOIST/SEND and
+  // TURN all retired).
+  const ADOPTERS: Readonly<Record<string, readonly string[]>> = {
+    cutShadow: [
+      'dispatchCard: the route-plate arch, die-cut into the yard paving',
+      'assayCard: the three vitrine apertures, die-cut through the faceplate',
+    ],
+    raisedEdgeShadow: [
+      'dispatchCard: the thumb notch pool',
+      'dispatchCard: the thumb notch lip',
+      'crankWheel: the grip lobe pool',
+      'crankWheel: the grip lobe lip',
+      'cofferLid: the shut lid, a loose ply sitting on its box',
+      'assayDial: the wax-seal thumb lobe standing proud of the plate',
+      'assayCard: the faceplate rim, a ply riveted over the wheel',
+    ],
+    cueArrow: [
+      'dispatchCard: the rim chevrons',
+      'crankWheel: the rim chevrons (the hand-rolled ink arrows converted)',
+      'dispatchCablePanel: the SEND-mast sealed-letter chevron set',
+      'cofferLid: one ember arrow at the hasp, along the free edge travel',
+      'assayDial: the two ember chevron sets flanking the thumb lobe',
+    ],
   }
 
   const source = readFileSync(SCRIPT_PATH, 'utf8')
@@ -356,12 +364,16 @@ describe('paper-cue vocabulary — additive, no existing art changed', () => {
       const callSites = [...source.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
         (m) => m[1] !== 'function '
       )
-      expect(callSites.length).toBe(ADOPTERS[helper])
+      expect(
+        callSites.length,
+        `${helper} has ${callSites.length} call sites and ${ADOPTERS[helper].length} declared — ` +
+          `a cue that spreads without being written down is a cue nobody reviewed`
+      ).toBe(ADOPTERS[helper].length)
     })
   }
 
   it('every retired label plate really has lost its word', () => {
-    // The three verbs s4 used to print. A painter may not quietly re-add one:
+    // The verbs s4 and s7 used to print. A painter may not quietly re-add one:
     // this is the assertion that keeps the conversion from being cosmetic.
     for (const verb of ['HOIST', 'SPIN', 'SEND']) {
       expect(
@@ -369,5 +381,15 @@ describe('paper-cue vocabulary — additive, no existing art changed', () => {
         `${verb} is being engraved again — the affordance law retired it`
       ).toBe(false)
     }
+    // s7's TURN, scoped to assayCard's own body so the other spreads' plates —
+    // which their own lanes will convert in their own commits — are none of
+    // this file's business. Sliced at the function's closing brace at column 0
+    // (CRLF-tolerant: an `\n}\n` search silently ran on to the NEXT function).
+    const body = source.slice(source.indexOf('function assayCard('))
+    const end = body.search(/\r?\n\}\r?\n/)
+    const card = body.slice(0, end < 0 ? body.length : end)
+    expect(card.length, 'assayCard body not found').toBeGreaterThan(200)
+    expect(card).not.toContain("'TURN'")
+    expect(card, 'assayCard is engraving words again').not.toContain('engraveWord')
   })
 })

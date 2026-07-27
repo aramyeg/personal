@@ -94,6 +94,7 @@ import {
 } from '@/components/labs/storybook/book/popup-knobtower'
 import {
   solveVolvellePose,
+  volvelleCrankStep,
   volvelleDetentStep,
   volvelleHubFrame,
   volvelleSectorSeen,
@@ -484,9 +485,21 @@ function volvelleCase(id: string): HandleCase {
     grabPoint,
     project: (ray) => {
       const hub = projectHubAngle(ray, fr.center, fr.e1, fr.e2, fr.n)
-      return hub && hub.r >= HUB_DEADZONE * geom.radius ? hub.angle : null
+      // The tangential crank has no centre singularity to guard, so a dial that
+      // has opted in raycasts its whole face (popup-volvelle-layer.tsx).
+      if (!hub) return null
+      return geom.crank === 'tangential' || hub.r >= HUB_DEADZONE * geom.radius ? hub.angle : null
     },
-    driveFrom: (g, n) => clamp(0 + wrapDelta(n - g), 0, thetaMax),
+    // The shipped drive arithmetic for whichever read this dial declares. At a
+    // rim grab the hand's tangential drag and its atan2 sweep agree to first
+    // order, so the sweep is the right scalar to gear through this one-scalar
+    // case; the two-dimensional properties of the mapping (a stroke across the
+    // hub turns nothing, reverse costs what forward cost, the detents are felt,
+    // the stops are reachable) are gated end to end in volvelle-crank.test.ts.
+    driveFrom: (g, n) =>
+      geom.crank === 'tangential'
+        ? volvelleCrankStep(geom, 0, wrapDelta(n - g))
+        : clamp(0 + wrapDelta(n - g), 0, thetaMax),
     restDrive: 0,
     vertsAt: (spin) => flatten([solveVolvellePose(geom, thetaL, thetaR, spin).dial]),
   }

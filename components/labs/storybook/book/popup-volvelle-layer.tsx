@@ -25,11 +25,14 @@ import type { PanelQuad } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted, type VolvelleGeom } from './popup-mechanics'
 import {
   solveVolvellePose,
+  volvelleCrankStep,
+  volvelleDetentCell,
   volvelleHubFrame,
   volvelleSnap,
   volvelleThetaMax,
   VOLVELLE_LIFT,
 } from './popup-volvelle'
+import { sbSound } from '../sound'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
 import { sharedHandleMaterial, sharedKnobTexture, sharedPaperTexture } from './shared-procedural-textures'
@@ -40,7 +43,7 @@ import { useStorybookStore } from '../store'
 import { beginGrabChannel, endGrabChannel, readDriveOverride, readUserDrive, writeUserDrive } from '../user-drive'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
-import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
+import { HANDLE_INERT, HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-hit'
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { crankTangentialDelta, projectHubAngle, type HubHit } from './handle-projection'
@@ -220,17 +223,15 @@ export function VolvellePopupLayer({
   // --- Twist handle (law H4). Accumulate per-frame pointer deltas about the hub
   // measured on the page's own e1/e2 axes (the knob-tower/winch disc idiom).
   //
-  // TWO READINGS OF THE SAME HAND, chosen per dial by `crank` (popup-mechanics
-  // .ts). The historical 'sweep' is the raw atan2 delta about the hub — the
-  // defect the systems patch measured on the keep winch and fixed there,
-  // deliberately leaving the other disc families to convert one at a time.
-  // 'tangential' is that fix, opted into by this spread's route plate: the
-  // honest quantity is how far the hand dragged the PAPER round, at a fixed
-  // reference radius, so the wheel cannot be spun by poking its middle and a
-  // deliberate rim stroke is worth exactly its own sweep. Nothing about the
-  // pose, the detents or the snap changes — only how much twist a given stroke
-  // is worth.
-  const grabRef = useRef<{ last: HubHit | null } | null>(null)
+  // TWO READS LIVE HERE (S7R2-1a + the s4 route plate, same round). `crank:
+  // 'tangential'` takes the hand's own tangential drag through volvelleCrankStep
+  // — geared, notched, stopped; the honest quantity is how far the hand dragged
+  // the PAPER round at a fixed reference radius, so the wheel cannot be spun by
+  // poking its middle. Every dial that has not opted in keeps the raw atan2
+  // accumulation it shipped with, unchanged to the last bit. `cell` remembers
+  // which detent the wheel was sitting in so the click sounds once per room,
+  // and re-arms.
+  const grabRef = useRef<{ lastAngle: number | null; last: HubHit | null; cell: number } | null>(null)
   const tap = useHandleTap()
   const tangential = layer.crank === 'tangential'
 
@@ -242,8 +243,10 @@ export function VolvellePopupLayer({
     const { center, e1, e2, n } = volvelleHubFrame(layer, thetaL, thetaR, VOLVELLE_LIFT)
     const hub = projectHubAngle(pointerLocalRay(e), center, e1, e2, n)
     if (!hub) return null
-    // The tangential read has no centre singularity to hide, so it keeps the
-    // whole disc live; the sweep read still needs its deadzone.
+    // The deadzone exists to hide the atan2 read's centre singularity. The
+    // tangential crank has none — a stroke through the hub simply turns nothing,
+    // which is what pushing a real wheel across its face does — so opting in
+    // also retires the gate that used to swallow those moves.
     return { hit: hub, stable: tangential || hub.r >= HUB_DEADZONE * layer.radius }
   }
 
@@ -277,7 +280,15 @@ export function VolvellePopupLayer({
     const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
     writeUserDrive(layer.id, seeded, [0, thetaMax])
     tap.begin(seeded)
+<<<<<<< HEAD
     grabRef.current = { last: hub && hub.stable ? hub.hit : null }
+=======
+    grabRef.current = {
+      lastAngle: hub && hub.stable ? hub.hit.angle : null,
+      last: hub && hub.stable ? hub.hit : null,
+      cell: volvelleDetentCell(layer, seeded),
+    }
+>>>>>>> e3/s7r2
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -294,12 +305,32 @@ export function VolvellePopupLayer({
     const { thetaL, thetaR } = readAngles()
     const hub = hubHit(e, thetaL, thetaR)
     if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
+<<<<<<< HEAD
     if (grab.last !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
       const next = clamp(cur + twistDelta(grab.last, hub.hit), 0, thetaMax)
+=======
+    if (grab.lastAngle !== null && grab.last !== null) {
+      const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
+      const next = tangential
+        ? volvelleCrankStep(layer, cur, crankTangentialDelta(grab.last, hub.hit, layer.radius))
+        : clamp(cur + wrapDelta(hub.hit.angle - grab.lastAngle), 0, thetaMax)
+>>>>>>> e3/s7r2
       writeUserDrive(layer.id, next, [0, thetaMax])
       tap.track(next, TAP_EPS)
+      // THE BALL DROPS INTO THE NEXT NOTCH. One dull click the moment the wheel
+      // crosses into a new detent cell — the sound a riveted volvelle makes, and
+      // the confirmation the blind reader never got that a room had changed.
+      if (tangential) {
+        const cell = volvelleDetentCell(layer, next)
+        if (cell !== grab.cell) sbSound.thump()
+        grab.cell = cell
+      }
     }
+<<<<<<< HEAD
+=======
+    grab.lastAngle = hub.hit.angle
+>>>>>>> e3/s7r2
     grab.last = hub.hit
     e.stopPropagation()
   }
@@ -380,8 +411,10 @@ export function VolvellePopupLayer({
           drawing after the dial so its alpha windows composite over it. */}
       <mesh geometry={dialGeometry} material={dialMaterials.front} renderOrder={0} />
       <mesh geometry={dialGeometry} material={dialMaterials.back} renderOrder={0} />
-      <mesh geometry={cardGeometry} material={cardMaterials.front} renderOrder={1} />
-      <mesh geometry={cardGeometry} material={cardMaterials.back} renderOrder={1} />
+      {/* The faceplate is static — it takes no twist, so the dial's slop pad
+          must not defer to it (HANDLE_INERT, handle-hit.ts). */}
+      <mesh geometry={cardGeometry} material={cardMaterials.front} renderOrder={1} userData={HANDLE_INERT} />
+      <mesh geometry={cardGeometry} material={cardMaterials.back} renderOrder={1} userData={HANDLE_INERT} />
       {/* Coarse-pointer slop (law H6): 1.5x the dial, touch only. */}
       <mesh ref={slopRef} geometry={slopGeometry} material={handleMaterial} renderOrder={2} />
     </group>
