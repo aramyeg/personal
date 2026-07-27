@@ -30,6 +30,7 @@ import {
 } from '@/components/labs/storybook/book/idle-life'
 import {
   SPREAD_COUNT,
+  chapterForSpread,
   heroForSpread,
   popupContentForSpread,
   type SceneLayer,
@@ -317,4 +318,98 @@ describe('idle clock pin — a capture freezes, a reader does not', () => {
     expect(at('?sbpose=2&sbidle=0')).toBe(true)
     expect(at('?sbpose=2&sbidle=yes')).toBe(true)
   })
+})
+
+/**
+ * EVERY CHAPTER BREATHES (E3 systems patch, SP-2).
+ *
+ * THE MEASUREMENT THIS ENCODES. Idle audibility was measured on the live page
+ * rather than argued about (bench/syspatch-idle-audibility.mjs): with the clock
+ * actually running (?sbidle=1 — every "the spread is frozen" finding this round
+ * was taken at a ?sbpose URL, which freezes it, so all of them were artefacts),
+ * idle pairs 1.5s / 3s / 6s apart on each spread differ by tens of thousands of
+ * pixels across dozens of busy tiles on the title spread, ch1, ch2, ch4, ch5 and
+ * ch6, against a diffuse renderer noise floor of ~0.9k changed px with NO busy
+ * tile at all. The book breathes.
+ *
+ * Except on ONE chapter. Spread 4 — the keep, the dispatch boards, the winch —
+ * measured 918 / 916 / 1083 changed px with zero busy tiles at every gap: the
+ * noise floor exactly, at every separation. It is not a gain problem and no
+ * amount of tuning would have found it, because the spread carries no idle tag
+ * at all. A reader parked on the book's most machinery-dense chapter is looking
+ * at a photograph.
+ *
+ * So the gate is a CENSUS, not an amplitude: every chapter spread must tag at
+ * least one accent. Amplitude is already gated above (the budget ceilings), and
+ * the front and end matter are exempt — a cover and a satchel of keepsakes are
+ * allowed to be still.
+ *
+ * Deliberately NOT gated here: how much a tag is worth in pixels. That is a
+ * function of the piece's size, its contrast and the phase the two idle sines
+ * happen to be in when a bench takes its pair — the first pass of that bench
+ * called ch5 nearly dead on one baseline and thoroughly alive on another, five
+ * minutes apart, with nothing changed. Perception belongs in the live bench,
+ * where it can be sampled at several separations; presence belongs here.
+ */
+describe('idle census — no chapter is a photograph', () => {
+  /** The spreads that carry a chapter of the tale (content.ts: spreads 2..7).
+   *  Derived, not listed, so a seventh chapter arrives already gated. */
+  const chapterSpreads = (): number[] => {
+    const out: number[] = []
+    for (let s = 0; s < SPREAD_COUNT; s++) {
+      if (chapterForSpread(s) !== undefined) out.push(s)
+    }
+    return out
+  }
+
+  /**
+   * THE ONE KNOWN GAP, and why the systems patch did not close it itself.
+   *
+   * Spread 4 is the measured photograph, and it has NO ELIGIBLE PIECE to tag.
+   * Its seven layers are: the keep (backdrop sheet — must be dead still), the
+   * tower and the terrace (stagedchain, a family the generic layer does not
+   * pose), the dispatch line (likewise), the winch (a grab handle AND the
+   * spread's hero — twice forbidden), the dial (a grab handle), and a 1.1-wide
+   * foreground v-fold that is the dispatch YARD WALL. Masonry does not sway and
+   * does not glint, and inventing an accent out of a wall to satisfy a gate is
+   * how a book gets a tic instead of a draught.
+   *
+   * What the spread needs is a small loose, lit or airborne thing that the art
+   * puts there on purpose — a raven settling on the wire, a lamp at the yard
+   * gate, a pennant on the mast. That is scene authoring, and it belongs to the
+   * lane that owns this spread's art.
+   *
+   * This marker RETIRES ITSELF: the moment spread 4 carries a tag the `.fails`
+   * stops failing, vitest reports it, and whoever added the tag moves it up into
+   * the census above.
+   */
+  const KNOWN_GAP = new Set([4])
+
+  it('finds the chapters', () => {
+    expect(chapterSpreads().length).toBeGreaterThanOrEqual(6)
+  })
+
+  const tagCount = (s: number): number =>
+    ((popupContentForSpread(s)?.layers ?? []) as readonly SceneLayer[]).filter(
+      (l) => l.idle !== undefined
+    ).length
+
+  const message = (s: number): string =>
+    `spread ${s} has ${(popupContentForSpread(s)?.layers ?? []).length} layers and not one ` +
+    `idle tag — measured at the renderer's own noise floor at 1.5s, 3s and 6s ` +
+    `(bench/syspatch-idle-audibility.mjs). Tag one accent the art already shows as ` +
+    `loose, lit or airborne.`
+
+  it.each(chapterSpreads().filter((s) => !KNOWN_GAP.has(s)))(
+    'spread %i tags at least one idle accent',
+    (s) => {
+      expect(tagCount(s), message(s)).toBeGreaterThan(0)
+    }
+  )
+
+  for (const s of chapterSpreads().filter((sp) => KNOWN_GAP.has(sp))) {
+    it.fails(`spread ${s} is the known idle gap — retire this marker when it is tagged`, () => {
+      expect(tagCount(s), message(s)).toBeGreaterThan(0)
+    })
+  }
 })
