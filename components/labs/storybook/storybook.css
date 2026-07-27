@@ -141,6 +141,40 @@
   }
 }
 
+/* SP-3(d): the first Escape spends itself on this line instead of on the
+   exit (use-book-input.ts). It is a whisper — the book murmuring at the foot
+   of the page, in the same small-caps voice as the kickers and the folio —
+   so it is deliberately quiet: no chip, no rule, no dim behind it, and
+   `pointer-events: none` so it never intercepts a tap meant for the nav row
+   under it. It stays mounted at `opacity: 0` (nav.tsx toggles
+   `data-sb-shown`) so the offer fades BOTH ways; unmounting it would let the
+   whisper vanish the instant the window closed. */
+.sb-escape-whisper {
+  position: fixed;
+  left: 50%;
+  bottom: 5.2rem;
+  z-index: 40;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-family: var(--font-sb-caps);
+  font-variant: small-caps;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--sb-gold) 58%, transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  transition: opacity 380ms ease;
+}
+.sb-escape-whisper[data-sb-shown='true'] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-escape-whisper {
+    transition: none;
+  }
+}
+
 /* BW-3 / BW-16: the corner hotspots were "completely invisible... no
    visual affordance... no page-curl preview." A dog-ear reads as paper, not
    as a UI widget, so it lives inside the (otherwise transparent) hotspot

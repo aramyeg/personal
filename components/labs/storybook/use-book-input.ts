@@ -20,16 +20,26 @@
  * /labs) — this file does not decide when the reader leaves the lab. But a
  * reader with a handle mid-grab who taps Escape to back out of the
  * interaction, not the whole book, was instead getting yanked out of the
- * lab entirely with no confirmation. So `onEscapeDuringGrab` below listens
- * in the CAPTURE phase (must win the race against GalleryChrome's
- * bubble-phase handler regardless of mount order — the same reason
- * snowpark's input.ts captures Escape) and, only while a grab is live,
- * calls `preventDefault()` and releases the grab instead of letting the
- * key reach GalleryChrome. With no grab active, it does nothing and the
- * key proceeds to GalleryChrome exactly as before.
+ * lab entirely with no confirmation. So `onEscape` below listens in the
+ * CAPTURE phase (must win the race against GalleryChrome's bubble-phase
+ * handler regardless of mount order — the same reason snowpark's input.ts
+ * captures Escape) and, while a grab is live, calls `preventDefault()` and
+ * releases the grab instead of letting the key reach GalleryChrome.
+ *
+ * SP-3(d): with no grab live, that same listener now spends the FIRST
+ * Escape on a warning instead of the exit ("Escape still ejects to /labs
+ * unannounced" — the reader loses the book to one stray key). It arms a
+ * whisper in the book's own voice (ESCAPE_WHISPER, rendered by nav.tsx) and
+ * swallows the key; a second Escape inside ESCAPE_CONFIRM_MS is let through
+ * untouched and GalleryChrome exits exactly as it always did. The window is
+ * one setTimeout, so the counter and the whisper can never disagree about
+ * whether the offer is still open. A grab-release Escape is not a step in
+ * that sequence — it belongs to the piece in the reader's hand, and
+ * counting it would let a reader lose the book while trying to let go of a
+ * flap.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { accumulateWheel, useStorybookStore, type TurnDir, type WheelAcc } from './store'
 import { activeGrabId, forceEndGrabChannel } from './user-drive'
 import { cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
@@ -51,9 +61,49 @@ type PointerStart = { x: number; y: number; t: number; corner: TurnDir | null }
 const targetsOverlayPanel = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.sb-overlay') !== null
 
+// ---------------------------------------------------------------------------
+// THE ESCAPE WHISPER (SP-3 d). The copy and the window are exported so the
+// gate pins the reader's actual grace period, not a number retyped in a test.
+
+/** How long the offer stays open after the first Escape. Long enough to read
+ *  six words, short enough that a reader who meant nothing by the key has
+ *  forgotten it before the next one. */
+export const ESCAPE_CONFIRM_MS = 2000
+/** The whisper itself — the book's voice (lowercase, no shouting), not a
+ *  dialog's. Rendered by nav.tsx in the plaque/kicker type. */
+export const ESCAPE_WHISPER = 'press escape again to close the book'
+
+let whisperShown = false
+const whisperListeners = new Set<() => void>()
+
+const setWhisper = (next: boolean): void => {
+  if (whisperShown === next) return
+  whisperShown = next
+  for (const listener of whisperListeners) listener()
+}
+
+const subscribeWhisper = (listener: () => void): (() => void) => {
+  whisperListeners.add(listener)
+  return () => {
+    whisperListeners.delete(listener)
+  }
+}
+
+/** Whether the "press escape again" whisper is currently offered. Module
+ *  state rather than store state: the guard is a property of the KEYBOARD
+ *  listener's own life, not of the book's position, and nothing outside this
+ *  file may arm or disarm it. */
+export const escapeWhisperShown = (): boolean => whisperShown
+
+/** Subscription for the chrome that draws the whisper (overlay/nav.tsx). */
+export function useEscapeWhisper(): boolean {
+  return useSyncExternalStore(subscribeWhisper, escapeWhisperShown, () => false)
+}
+
 export function useBookInput(enabled: boolean): void {
   const wheelAcc = useRef<WheelAcc>({ value: 0, lastMs: 0, lockUntilMs: 0, lockDir: null })
   const pointerStart = useRef<PointerStart | null>(null)
+  const escapeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!enabled) return
@@ -71,15 +121,20 @@ export function useBookInput(enabled: boolean): void {
     // a book, and a reader poking at the scene (the handles, the corner
     // hotspots) taps Space far more readily than a keyboard reader reaches
     // for it as "next page" — binding it cost readers their spread.
+    //
+    // SP-3(a): neither is ArrowUp/ArrowDown ("all four arrows turn pages" —
+    // blind reviewer). A book turns left and right; up and down belong to the
+    // narration the reader is scrolling in the drawer, and this listener sits
+    // on `window` where it would have taken them from any unfocused scroll.
+    // Nothing here calls preventDefault, so the two keys reach the drawer
+    // (and the page) with their native scrolling intact.
     const onKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowRight':
-        case 'ArrowDown':
         case 'PageDown':
           requestTurn('next')
           break
         case 'ArrowLeft':
-        case 'ArrowUp':
         case 'PageUp':
         case 'Home':
           requestTurn('prev')
@@ -89,14 +144,39 @@ export function useBookInput(enabled: boolean): void {
       }
     }
 
-    // See the file header: only intercepts Escape while a grab is live, and
-    // only to release that grab — GalleryChrome's own Escape handling is
-    // otherwise untouched.
-    const onEscapeDuringGrab = (e: KeyboardEvent) => {
+    const disarmEscape = () => {
+      if (escapeTimer.current !== null) clearTimeout(escapeTimer.current)
+      escapeTimer.current = null
+      setWhisper(false)
+    }
+
+    // See the file header. Two jobs, in priority order: release a live grab
+    // (the reader is backing out of a piece, not the book), and otherwise
+    // spend the first Escape on the whisper instead of the exit.
+    const onEscape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (useStorybookStore.getState().grab === null) return
+      if (useStorybookStore.getState().grab !== null) {
+        e.preventDefault()
+        useStorybookStore.getState().endGrab()
+        return
+      }
+      // Second press inside the window: this one is meant, so it goes through
+      // untouched — GalleryChrome sees a pristine Escape and exits.
+      if (escapeTimer.current !== null) {
+        disarmEscape()
+        return
+      }
+      // First press: swallow it. `stopPropagation` from the capture phase on
+      // `window` keeps the key from ever reaching GalleryChrome's own window
+      // listener; `preventDefault` is the belt for any other reader of the
+      // key (GalleryChrome bails on `defaultPrevented`).
       e.preventDefault()
-      useStorybookStore.getState().endGrab()
+      e.stopPropagation()
+      setWhisper(true)
+      escapeTimer.current = setTimeout(() => {
+        escapeTimer.current = null
+        setWhisper(false)
+      }, ESCAPE_CONFIRM_MS)
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -186,7 +266,7 @@ export function useBookInput(enabled: boolean): void {
     // handler regardless of which mounts first, or the endGrab()
     // preventDefault loses the race and Esc navigates away instead of
     // releasing the grab (mirrors snowpark's input.ts).
-    window.addEventListener('keydown', onEscapeDuringGrab, true)
+    window.addEventListener('keydown', onEscape, true)
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointermove', onCornerHint)
@@ -202,7 +282,7 @@ export function useBookInput(enabled: boolean): void {
     return () => {
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keydown', onEscapeDuringGrab, true)
+      window.removeEventListener('keydown', onEscape, true)
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('pointermove', onCornerHint)
@@ -210,6 +290,9 @@ export function useBookInput(enabled: boolean): void {
       window.removeEventListener('pointercancel', endAnyGrab)
       window.removeEventListener('lostpointercapture', endAnyGrab)
       window.removeEventListener('blur', endAnyGrab)
+      // An armed whisper must not outlive the listener that could honour it:
+      // with the hook gone, a second Escape would be a first press again.
+      disarmEscape()
       delete document.documentElement.dataset.sbCorner
     }
   }, [enabled])

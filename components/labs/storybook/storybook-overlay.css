@@ -464,6 +464,16 @@
   width: 21rem;
 }
 
+/* SP-3(c): the folio's own voice, now that the pill chrome is gone (see
+   nav.tsx). Without a chip behind it the label has to hold its own against
+   whatever the diorama puts under it, so it takes the brighter gold and a
+   printed drop shadow instead of a border and a backdrop blur — read as ink
+   on the scene, not as a control sitting over it. */
+.sb-nav-folio {
+  color: color-mix(in srgb, var(--sb-gold-bright) 85%, transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.55);
+}
+
 /* The story drawer's tab, sheet and scrim are compact-layout-only surfaces
    and live entirely in storybook-responsive.css. They used to be declared
    here too — a `display: none` shell that made `.sb-drawer-toggle` a real

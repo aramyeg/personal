@@ -1,6 +1,16 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useBookInput } from '@/components/labs/storybook/use-book-input'
+import {
+  ESCAPE_CONFIRM_MS,
+  escapeWhisperShown,
+  useBookInput,
+} from '@/components/labs/storybook/use-book-input'
+import {
+  CORNER_BOTTOM_PCT,
+  CORNER_H_PCT,
+  CORNER_SIDE_PCT,
+  CORNER_W_PCT,
+} from '@/components/labs/storybook/overlay/corner-hotspot'
 import { useStorybookStore } from '@/components/labs/storybook/store'
 import {
   activeGrabId,
@@ -80,6 +90,40 @@ describe('useBookInput — Space is not a page-turn idiom', () => {
   })
 })
 
+// ============================================================================
+// SP-3(a) — "all four arrows turn pages" (blind re-review). A book turns left
+// and right. Up and down belong to the narration column the reader scrolls,
+// and this listener sits on `window`, so binding them stole the keys from any
+// scroll that didn't happen to be focused.
+// ============================================================================
+
+describe('useBookInput — only the horizontal arrows are page keys', () => {
+  beforeEach(() => useStorybookStore.setState(initial, true))
+  beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
+
+  for (const key of ['ArrowUp', 'ArrowDown'] as const) {
+    it(`${key} does not turn the page, and stays free to scroll the drawer`, () => {
+      renderHook(() => useBookInput(true))
+      const notCancelled = window.dispatchEvent(
+        new KeyboardEvent('keydown', { key, cancelable: true })
+      )
+      expect(s().turning).toBeNull()
+      // Never preventDefault-ed: the browser's own scrolling must survive.
+      expect(notCancelled).toBe(true)
+    })
+  }
+
+  it('ArrowRight still turns on and ArrowLeft still turns back', () => {
+    renderHook(() => useBookInput(true))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    expect(s().turning).toBe('next')
+
+    useStorybookStore.setState({ turning: null, spread: 5 })
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    expect(s().turning).toBe('prev')
+  })
+})
+
 describe('useBookInput — Escape mid-grab releases the grab, not the lab (BW reviewer report)', () => {
   beforeEach(() => useStorybookStore.setState(initial, true))
   beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
@@ -99,12 +143,79 @@ describe('useBookInput — Escape mid-grab releases the grab, not the lab (BW re
     expect(s().spread).toBe(5) // still on the same spread — no navigation, no turn
   })
 
-  it('Escape with no active grab does not preventDefault, leaving GalleryChrome free to exit', () => {
-    renderHook(() => useBookInput(true))
-    const notCancelled = window.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
-    )
-    expect(notCancelled).toBe(true) // untouched — GalleryChrome's own handler decides
+  it('Escape while a grab is active never arms the exit whisper — it is about the piece, not the book', () => {
+    useStorybookStore.setState({ grab: { id: 'knob-1', kind: 'knob' } })
+    const { unmount } = renderHook(() => useBookInput(true))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+    expect(escapeWhisperShown()).toBe(false)
+    unmount()
+  })
+})
+
+// ============================================================================
+// SP-3(d) — THE EXIT ASKS TWICE. "Escape still ejects to /labs unannounced":
+// one stray key and the reader loses the book, mid-spread, with no warning and
+// nowhere to say no. The first Escape now buys a whisper in the book's own
+// voice; a second inside the window is let through to GalleryChrome untouched.
+// ============================================================================
+
+describe('useBookInput — Escape asks before it closes the book', () => {
+  beforeEach(() => useStorybookStore.setState(initial, true))
+  beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const esc = (): boolean =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+
+  it('spends the first Escape on the whisper, not on the exit', () => {
+    const { unmount } = renderHook(() => useBookInput(true))
+    // dispatchEvent returns false when preventDefault ran; stopPropagation in
+    // the same capture-phase listener is what actually keeps the key from
+    // GalleryChrome's window listener.
+    expect(esc()).toBe(false)
+    expect(escapeWhisperShown()).toBe(true)
+    expect(s().spread).toBe(5)
+    unmount()
+  })
+
+  it('lets a second Escape inside the window through, and drops the whisper', () => {
+    const { unmount } = renderHook(() => useBookInput(true))
+    esc()
+    vi.advanceTimersByTime(ESCAPE_CONFIRM_MS - 1)
+    expect(esc()).toBe(true) // untouched — GalleryChrome's own handler exits
+    expect(escapeWhisperShown()).toBe(false)
+    unmount()
+  })
+
+  it('closes the offer after the window and starts again from step one', () => {
+    const { unmount } = renderHook(() => useBookInput(true))
+    esc()
+    vi.advanceTimersByTime(ESCAPE_CONFIRM_MS)
+    expect(escapeWhisperShown()).toBe(false)
+    // A key pressed a beat too late is a first press, not a confirmation.
+    expect(esc()).toBe(false)
+    expect(escapeWhisperShown()).toBe(true)
+    unmount()
+  })
+
+  it('does not let a grab-release Escape count as either step', () => {
+    const { unmount } = renderHook(() => useBookInput(true))
+    esc()
+    expect(escapeWhisperShown()).toBe(true)
+
+    useStorybookStore.setState({ grab: { id: 'tab-1', kind: 'tab' } })
+    expect(esc()).toBe(false) // released the grab, exit untouched
+    expect(s().grab).toBeNull()
+    expect(escapeWhisperShown()).toBe(true) // the offer is still open
+    unmount()
+  })
+
+  it('disarms when the input layer goes away, so a stale press cannot exit', () => {
+    const { unmount } = renderHook(() => useBookInput(true))
+    esc()
+    unmount()
+    expect(escapeWhisperShown()).toBe(false)
   })
 })
 
@@ -186,10 +297,15 @@ describe('useBookInput — corner page-turn taps (R-4)', () => {
 
   const W = window.innerWidth
   const H = window.innerHeight
-  const inCorner = (side: 'left' | 'right'): { x: number; y: number } => ({
-    x: side === 'left' ? Math.round(W * 0.05) : Math.round(W * 0.95),
-    y: Math.round(H * 0.95),
-  })
+  // The middle of the derived box (corner-hotspot.ts), which sits on the
+  // page's own bottom-outer corner rather than the viewport's — SP-3(b).
+  const inCorner = (side: 'left' | 'right'): { x: number; y: number } => {
+    const outer = ((CORNER_SIDE_PCT + CORNER_W_PCT / 2) / 100) * W
+    return {
+      x: Math.round(side === 'left' ? outer : W - outer),
+      y: Math.round(H * (1 - (CORNER_BOTTOM_PCT + CORNER_H_PCT / 2) / 100)),
+    }
+  }
 
   const tap = (p: { x: number; y: number }, dx = 0, dy = 0) => {
     window.dispatchEvent(new PointerEvent('pointerdown', { clientX: p.x, clientY: p.y }))
@@ -232,6 +348,15 @@ describe('useBookInput — corner page-turn taps (R-4)', () => {
   it('a tap in the middle of the page turns nothing', () => {
     renderHook(() => useBookInput(true))
     tap({ x: Math.round(W / 2), y: Math.round(H / 2) })
+    expect(s().turning).toBeNull()
+  })
+
+  it('a tap on the desk in the viewport corner turns nothing (SP-3 b)', () => {
+    renderHook(() => useBookInput(true))
+    // Where the hotspot used to reach, and where the spread never does.
+    tap({ x: Math.round(W * 0.97), y: Math.round(H * 0.97) })
+    expect(s().turning).toBeNull()
+    tap({ x: Math.round(W * 0.03), y: Math.round(H * 0.97) })
     expect(s().turning).toBeNull()
   })
 })
