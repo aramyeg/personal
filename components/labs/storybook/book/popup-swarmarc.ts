@@ -286,6 +286,28 @@ export const SWARM_TAB_Z0 = 0.14
 export const SWARM_TAB_Z1 = 0.46
 export const SWARM_TAB_Y_LIFT = 0.003
 
+/**
+ * HAND-TO-STROKE GEARING — world units of stroke per world unit of pointer
+ * travel along the page's fore axis. The layer's drive line reads
+ * `sUser = sGrabStart + (dNow - dGrab) * SWARM_STIR_GEAR`.
+ *
+ * WHY IT IS NOT 1 (s3 round-2, "the stroke saturates in under 90px of hand
+ * motion; a satisfying pull should span ~200px+"). Ungeared, the projector's
+ * scalar IS the page-plane distance the pointer covers, so the whole 0.14 stroke
+ * was spent in a thumb-twitch — measured through the real projector at the
+ * pinned reading camera, 58 reference px along the axis of steepest response and
+ * 64 px along the axis the tab visibly slides. A pull strip that bottoms out
+ * that fast reads as a switch, not as something drawn out of a page.
+ *
+ * 0.26 buys 210 px / 248 px on those same two measurements (gesture-axis.test.ts
+ * benches both by bisecting the real pipeline, so the numbers cannot drift from
+ * the code), inside the 200-260 px window a full-arm pull wants. Nothing
+ * downstream sees it: the drive domain is still [0, stroke], so every solver
+ * proof, the fold-flat envelope and the `?sbdrive=<id>~stir:<s>` capture override
+ * are untouched — this only changes how much hand buys a given s.
+ */
+export const SWARM_STIR_GEAR = 0.26
+
 /** The STIR pull tab's quad at stroke `s`: it rides its page at the fore edge
  *  and slides out by exactly s·E(beta) (Birmingham 84 pull-strip grammar).
  *  Position-only — the quad lies IN the page plane, so fold-flat containment

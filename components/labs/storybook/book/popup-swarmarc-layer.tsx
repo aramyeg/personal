@@ -16,9 +16,11 @@
  * stalk swatches, and a 5x3 block from cell 32 for the STIR pull tab.
  *
  * STIR tab (H2/H3/H6 hand laws, tabpiece grab idiom): drive channel
- * `<id>~stir` holds the stroke s ∈ [0, stroke] while grabbed; release decays
- * overdamped (~300 ms, tau 80 ms) back to 0. Fold-flat is untouchable: the
- * solver multiplies BOTH the wave term and the ripple by E(beta).
+ * `<id>~stir` holds the stroke s ∈ [0, stroke] while grabbed, and LATCHES there
+ * on release (a pull strip stays where it is left). The hand-to-stroke ratio is
+ * SWARM_STIR_GEAR, so a full pull costs a full-arm drag rather than a twitch.
+ * Fold-flat is untouchable: the solver multiplies BOTH the wave term and the
+ * ripple by E(beta).
  */
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
@@ -28,6 +30,7 @@ import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
 import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
 import {
+  SWARM_STIR_GEAR,
   solveSwarmArcPose,
   swarmStirTabQuad,
   type SwarmArcGeom,
@@ -277,7 +280,18 @@ export function SwarmArcPopupLayer({
     const { thetaR } = restAnglesNow()
     const dNow = projectPointerD(e, thetaR)
     if (dNow === null) return
-    const sUser = clamp(grab.sGrabStart + (dNow - grab.dGrab), 0, layer.stir.stroke)
+    // Geared, not 1:1 — SWARM_STIR_GEAR carries the derivation. Ungeared the
+    // whole stroke was spent in 58 screen px, which is a switch rather than a
+    // pull (s3 round-2). The AXIS is deliberately untouched: d runs along the
+    // page's fore direction, which is the direction the tab itself slides, and
+    // the two agree to 22 deg — the tightest of the book's four page-plane
+    // slides (gesture-axis.test.ts benches all of them). The re-review read the
+    // saturation as an inverted control; the sign was never inverted.
+    const sUser = clamp(
+      grab.sGrabStart + (dNow - grab.dGrab) * SWARM_STIR_GEAR,
+      0,
+      layer.stir.stroke
+    )
     writeUserDrive(stirChannel, sUser, [0, layer.stir.stroke])
     tap.track(sUser, TAP_EPS)
     e.stopPropagation()
