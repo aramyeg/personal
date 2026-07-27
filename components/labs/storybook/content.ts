@@ -325,7 +325,39 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // moves the tip 2*0.21*sin(23deg) = 0.164 world; what a reader SEES of that
   // is the projection above, gated in handle-drag-regression.test.ts against
   // the 25 px visible-excursion floor.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.45, slot: 0.26, slotZ: 0.45, hingeX: 0.34, hingeZ: 0.45, hingeDeg: 30, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90], grabProjection: 'cylinder' },
+  //
+  // CUE-SWEEP: THE CYLINDER COMES OFF. (2) above was prescribed against the
+  // PRE-SKEW rank, and (1) of the same round then skewed the hinge — which is
+  // what actually cured the condition class B1-C exists for. On the SHIPPED
+  // piece |view . hinge| is 0.454, not the 0.10 the note quotes, and 120 probes
+  // out to +-0.5 world find the plane read live in every direction, so "the ray
+  // missed the infinite plane and the layer wrote nothing" is no longer true
+  // here. Both halves of the fix landed; only one of them was still needed.
+  //   What the opt-in left behind was the book's worst gesture-axis liar: 110.9
+  // degrees, the reader having to drag DOWN (0.28, -0.96) to raise paper that
+  // goes UP-RIGHT (0.80, 0.61). The mechanism is the radius. The cylinder read
+  // takes its angle where the ray crosses the TIP circle at `height`, but the
+  // reader grabs the flap's middle at height/2, so the ray enters that circle 71
+  // degrees round the arc from where the paper is (115deg against this rank's
+  // 44deg rest) and the projector's screen gradient is the tangent AT THAT WRONG
+  // ANGLE. The error IS the arc gap: near enough for a flap resting at the top
+  // of its window (ch6-clerk, same page side, same 30deg skew, rests at 90 and
+  // scores 26), hopeless for one resting mid-arc. It does not parameterise out —
+  // swept over every hingeDeg from 0 to 90 the cylinder runs 148.8 -> 50.2 and
+  // never crosses the 45 bar, and dropping the radius to the grab radius makes
+  // the ray near-TANGENT to its own circle (roots 64.9 and 44.0 astride a 54.4
+  // closest approach, gradient singular: 94.8 near, 84.8 far).
+  //   THE PLANE READ IS THE 1:1 ONE, which is the part the round-2 note read
+  // backwards. It points 17.9 degrees off the paper, and its "10 px of drag drove
+  // the piece to its far stop" is not a defect: the grabbed paper itself only
+  // travels 15 screen px across the whole window, so a handle that FOLLOWS the
+  // paper is over in 15 px by definition. The cylinder's 80 px stroke was bought
+  // by not following it — a 4.9x gearing wearing a projector's clothes, and the
+  // 111 degrees was the bill. Saturation here is the excursion finding restated,
+  // and its dial is hingeDeg, capped at 38 by the collision ratchet above (for
+  // whoever reopens it: 45deg reads 44 px of worst-vertex travel, 22 px under the
+  // grabbing finger, and 2.8 degrees of mismatch).
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.45, slot: 0.26, slotZ: 0.45, hingeX: 0.34, hingeZ: 0.45, hingeDeg: 30, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90] },
   // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
   // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
   // open mid-ground meadow (where loose brass keys are already printed) carries
@@ -1462,7 +1494,26 @@ const CH5_LAYERS: readonly SceneLayer[] = [
   // above its hinge, and the fold reads as a fold for its whole travel. That is
   // also the more paper-true bound: the hidden strip is inextensible and taut at
   // rest, so a real strip flap has almost no downward give to give.
-  { id: 'ch5-tea', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.5, anchorZ: 0.17, slot: 0.56, slotZ: 0.17, hingeX: 0.62, hingeZ: 0.17, width: 0.14, height: 0.16, travelDeg: [50, 90] },
+  //
+  // grabProjection 'cylinder' (E3 cue-sweep): the tea corner is the last flap on
+  // the throng's page still reading its hand off the swing plane, and it shares
+  // that page's geometry exactly — hingeDeg 0 on the RIGHT page, so the hinge
+  // axis runs across the screen and the pinned camera's view direction lies IN
+  // the swing plane (|view . hinge| = 0.021, against the 0.454 a skewed figure
+  // gets). Everything class B1-C predicts for that follows: the plane read
+  // answered a LEFTWARD drag (-1.00, 0.04) while the corner itself rises (-0.27,
+  // 0.96) — 71.8 degrees apart, over the 45 the gesture-axis law allows — and it
+  // spent the whole 40-degree window in 6 px of pointer, so any flick reached a
+  // stop before the reader could feel a direction. Off the tip circle instead:
+  // the read points (-0.04, 1.00), 13.5 degrees off the paper, and the window
+  // costs 46 px against the 19 px the corner's own paper travels — geared down,
+  // but geared down ALONG the way it goes, which is the whole difference between
+  // this opt-in and the one ch1-rank just gave up. The travel barely turns across
+  // this window (up at 50
+  // degrees, up at 90), which is why one fixed axis can serve all of it — the
+  // same reason the opt-in took on ch5-throng beside it and the reason it does
+  // NOT take on ch1-rank, whose paper swings through 95 degrees of screen.
+  { id: 'ch5-tea', kind: 'foreground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.5, anchorZ: 0.17, slot: 0.56, slotZ: 0.17, hingeX: 0.62, hingeZ: 0.17, width: 0.14, height: 0.16, travelDeg: [50, 90], grabProjection: 'cylinder' },
   // RAISE A STALL — the retained tabpiece, geometry verbatim, re-themed: legs
   // repainted as stall posts, deck a striped awning mid-raise, the fore-edge
   // tab a woodcut ⟡ RAISE A STALL ⟡ cartouche (B-MEANING: the playable IS the

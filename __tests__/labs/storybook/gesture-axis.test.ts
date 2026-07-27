@@ -635,17 +635,40 @@ const CASES: AxisCase[] = [
 
 // --- Findings this lane may not fix ------------------------------------------
 /**
- * Handles that FAIL the axis law today and whose layers belong to other lanes
- * (SP-4 owns only the swarm arc). They are marked `it.fails` rather than deleted
- * so the finding stays in the suite and cannot be lost: the moment the owning
- * lane fixes one, its `it.fails` starts failing and the mark comes out with the
- * fix. The measured mismatch at the time of writing is quoted so nobody has to
+ * Handles that FAIL the axis law and whose layers belong to other lanes (SP-4
+ * owns only the swarm arc). Such a handle is marked `it.fails` rather than
+ * deleted so the finding stays in the suite and cannot be lost: the moment the
+ * owning lane fixes one, its `it.fails` starts failing and the mark comes out
+ * with the fix. The measured mismatch is quoted with each entry so nobody has to
  * re-derive it to know whether they have moved the number.
  *
- * They share one shape: the piece travels along an axis its projector does not
- * read. The strip flaps read a swing plane the reading camera very nearly lies
- * in (the pathology class B1-C exists for; ch1-rank already uses the cylinder
- * read and is still inverted).
+ * Every entry so far shared one shape: the piece travels along an axis its
+ * projector does not read, because it swings in a plane the reading camera very
+ * nearly lies in (the pathology class B1-C exists for).
+ *
+ * THE LIST IS EMPTY AS OF THE E3 CUE-SWEEP. The last two entries were both strip
+ * flaps and they came off by OPPOSITE moves, which is the part worth keeping.
+ *
+ * ch5-tea (71.8 deg) took `grabProjection: 'cylinder'` for the same reason its
+ * page-mate ch5-throng did — hingeDeg 0 on the right page puts |view . hinge| at
+ * 0.021, so the camera lies in the swing plane and the plane read answered a
+ * LEFTWARD drag for a corner that rises. 13.5 deg after.
+ *
+ * ch1-rank (110.9 deg) came off by GIVING THAT OPT-IN UP, and it is the case
+ * that shows where the opt-in's edge is. The cylinder reads its angle on the TIP
+ * circle at `height` while a reader grabs the flap at height/2, so the ray meets
+ * that circle 71 deg round the arc from the paper and the projector's gradient
+ * is the tangent at the wrong angle. That error is tolerable for a flap resting
+ * at the top of its window, where the tangent has stopped turning (ch6-clerk,
+ * same page side and skew, rests at 90 and scores 26); it is fatal for one
+ * resting mid-arc, and no hingeDeg makes it honest (swept 0..90 the cylinder
+ * runs 148.8 -> 50.2, never under the bar). The plane read — well conditioned
+ * again since the same round's hinge skew, 0.454 not 0.10 — scores 17.9.
+ *
+ * SO THE RULE THE TWO OF THEM WRITE IS NOT "strip flaps take the cylinder". It
+ * is: the cylinder read has ONE fixed screen direction per (page side, hinge
+ * skew), so it is honest exactly for a flap whose paper travels that way AT ITS
+ * REST POSE. Check the rest pose, not the family.
  *
  * ch3-dispatch-line CAME OFF THIS LIST (s4 round-3). Its 64.9 deg was the
  * acute case on the list and it needed a projector nobody had written: the
@@ -668,10 +691,10 @@ const CASES: AxisCase[] = [
  * came out with the fix.
  */
 const OTHER_LANE_AXIS_FAILURES: Record<string, string> = {
-  'ch1-rank': '110.9 deg (drag DOWN raises it) — popup-stripflap-layer.tsx, stripflap lane',
-  'ch5-tea': '71.8 deg — popup-stripflap-layer.tsx, stripflap lane',
-  // (ch6-clerk cleared by the s7r2 cylinder opt-in; ch3-dispatch-line cleared
-  // by the s4r3 projectPlaneAlong travel frame — both fixed the same round.)
+  // EMPTY, and the guard below keeps it honest rather than decorative: every
+  // grabbable the book ships now answers the drag it looks like it takes.
+  // (ch6-clerk and ch3-dispatch-line cleared in s7r2/s4r3; ch5-tea and ch1-rank
+  // in the cue-sweep — see the note above for how each one came off.)
 }
 
 // --- The gate ----------------------------------------------------------------
