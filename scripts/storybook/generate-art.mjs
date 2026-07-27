@@ -2067,36 +2067,210 @@ function meadowFringe(w, h, seed) {
   return svgPiece(w, h, s)
 }
 
-// ---- THE GOLD HOARD MOUND (s5 ch4-goldpile-face, tabpiece face). Fills the
-// unfolded die-cut with a heap of coins, brightest along the centre ridge (the
-// mound's crest at v-mid) so the folded prism reads as a gleaming pile. ----
+/**
+ * THE HOARD'S own numbers, exported so the gates measure the painter.
+ *
+ * The mound is a tab-piece die-cut: image u runs across the spine, image v along
+ * the unrolled slide, with v = 0 and v = 1 the two hinges that lie flat on the
+ * deck and v = 0.5 the ridge the prism folds up on. Every value band and every
+ * coin size below is keyed to those fold stations, which is what makes the SAME
+ * sheet read as a lit crest over a shaded flank when it is stood up and as a
+ * raking light across a drift when the reader pulls it down flat.
+ */
+const S5_HOARD = {
+  /** The ridge (the fold the prism peaks on). */
+  V_CREST: 0.5,
+  /** Value stops down v, as [v, colour]. The crest carries the specular, the
+   *  two feet carry the deck shadow, and the two flanks are deliberately NOT
+   *  mirror images — a prism with two equally lit faces has no light on it. */
+  STOPS: [
+    [0, '#5f420e'],
+    [0.13, '#a8801f'],
+    [0.4, '#eac65f'],
+    [0.5, '#fff1bd'],
+    [0.6, '#e3bb52'],
+    [0.87, '#8f6415'],
+    [1, '#4d340a'],
+  ],
+  /** Banded shadow stations: the v-lines the pile's own depth is drawn on. */
+  BANDS: [0.13, 0.4, 0.6, 0.87],
+  /** Coin radius as a fraction of min(w,h): tight at the ridge, big and loose
+   *  where the pile spills onto the deck. Graded on |v - V_CREST| / V_CREST. */
+  COIN_R_CREST: 0.009,
+  COIN_R_FOOT: 0.028,
+  COINS: 470,
+  /** The named objects, at scene scale (the mound shows about 200x150 screen px
+   *  at the reading camera, so anything under ~0.1w is noise). [u, v, size]. */
+  PIECES: {
+    crown: [0.5, 0.37, 0.26],
+    goblet: [0.25, 0.68, 0.2],
+    torc: [0.75, 0.62, 0.17],
+    ingots: [0.6, 0.88, 0.3],
+  },
+}
+
+/**
+ * THE GOLD HOARD MOUND (s5 ch4-goldpile-face, the right-page tab-piece face).
+ *
+ * Blind finding 10: the reader can drag this mound right down flat, and flat it
+ * "resolves to a flat gold rectangle lying on the deck". The old painter is
+ * exactly why — 520 uniformly sized ellipses scattered at random over a flat
+ * #c99a30 ground, which at any scale averages to one colour. What was missing
+ * was not detail; it was STRUCTURE.
+ *
+ * This paint gives it four things the scatter could not:
+ *   - value bands keyed to the fold stations (S5_HOARD.STOPS), so the standing
+ *     prism reads as a lit crest over a shaded flank and the flat sheet reads as
+ *     a raking light across a drift;
+ *   - banded shadow on hand-cut (never ruler-straight) lines, so the pile has
+ *     depth instead of uniform fill;
+ *   - coin SIZE grading — small and tight along the ridge, big and loose where
+ *     the pile spills to the deck — which is what makes a heap read as a heap;
+ *   - four objects a reader can NAME at scene scale (crown, spilled goblet,
+ *     torc, stacked ingots) instead of one crown lost in noise.
+ *
+ * The rake: the dragon coils up-screen-left of this mound and the book's one
+ * lamp is on the same side (CUE_LIGHT casts down-right, so the lamp is up-left
+ * in image space), so a warm reflected wash comes off the beast's foil across
+ * the heap from the image's upper-left corner.
+ */
 function goldHeap(w, h, seed) {
   const r = mulberry32(seed)
-  // VAULT_NIGHT regrade (E3 s5): the mound keeps its high-key gleam (it is
-  // the declared spread hero growing out of the fore edge) but speaks the
-  // foil ramp — foilDeep shadows, foilHi speculars, thin-film gem accents.
-  let s = `<rect width="${w}" height="${h}" fill="#c99a30"/>`
-  s += `<rect x="0" y="${fx(h * 0.32)}" width="${w}" height="${fx(h * 0.36)}" fill="#f2cf6e" opacity="0.55"/>` // crest sheen
-  // a crown + goblet as centrepiece treasure
-  s += `<path d="M ${fx(w * 0.4)} ${fx(h * 0.5)} L ${fx(w * 0.4)} ${fx(h * 0.4)} L ${fx(w * 0.45)} ${fx(h * 0.46)} L ${fx(w * 0.5)} ${fx(h * 0.38)} L ${fx(w * 0.55)} ${fx(h * 0.46)} L ${fx(w * 0.6)} ${fx(h * 0.4)} L ${fx(w * 0.6)} ${fx(h * 0.5)} Z" fill="#fff1bd" stroke="${INK}" stroke-width="2" stroke-opacity="0.5"/>`
-  for (const jx of [0.45, 0.5, 0.55]) s += `<circle cx="${fx(w * jx)}" cy="${fx(h * 0.41)}" r="4" fill="#c04a54" stroke="${INK}" stroke-width="1" stroke-opacity="0.4"/>`
-  for (let i = 0; i < 520; i++) {
-    const x = rr(r, 0, w),
-      y = rr(r, 0, h)
-    const cr = rr(r, 7, 15)
-    const bright = r() < 0.55
-    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(cr)}" ry="${fx(cr * 0.72)}" fill="${bright ? '#f2cf6e' : '#c99a30'}" stroke="#8f6415" stroke-width="1"/>`
-    if (r() < 0.4) s += `<ellipse cx="${fx(x - cr * 0.22)}" cy="${fx(y - cr * 0.2)}" rx="${fx(cr * 0.32)}" ry="${fx(cr * 0.22)}" fill="#fff1bd" opacity="0.85"/>` // specular glint
+  const H = S5_HOARD
+  const m = Math.min(w, h)
+  const defs =
+    `<linearGradient id="ghBand" x1="0" y1="0" x2="0" y2="1">` +
+    H.STOPS.map(([v, c]) => `<stop offset="${v}" stop-color="${c}"/>`).join('') +
+    `</linearGradient>` +
+    // the dragon's reflected glow, raking in from the lamp's corner
+    `<linearGradient id="ghRake" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="${VAULT.ember}" stop-opacity="0.16"/>` +
+    `<stop offset="0.26" stop-color="${VAULT.foilHi}" stop-opacity="0.22"/>` +
+    `<stop offset="0.72" stop-color="${VAULT.foilHi}" stop-opacity="0"/></linearGradient>`
+
+  /** The band colour at v, so a coin is lit by the pile it sits in. */
+  const valueAt = (v) => {
+    for (let i = 0; i + 1 < H.STOPS.length; i++) {
+      if (v <= H.STOPS[i + 1][0]) return H.STOPS[i + 1][1]
+    }
+    return H.STOPS[H.STOPS.length - 1][1]
   }
-  // scattered gems catching light
-  for (let i = 0; i < 12; i++) {
-    const x = rr(r, w * 0.08, w * 0.92),
-      y = rr(r, h * 0.12, h * 0.92)
-    const g = ['#57a6cf', '#c8434e', '#5fb488', '#8a6fd6'][i % 4]
-    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="${g}" stroke="${INK}" stroke-width="1.2" stroke-opacity="0.45"/>`
-    s += `<path d="M ${fx(x)} ${fx(y - 9)} l 9 9 l -9 0 Z" fill="#ffffff" opacity="0.35"/>`
+  /** Distance from the ridge, 0 at the crest and 1 at either hinge. */
+  const fromCrest = (v) => Math.min(1, Math.abs(v - H.V_CREST) / H.V_CREST)
+
+  let s = `<rect width="${w}" height="${h}" fill="url(#ghBand)"/>`
+
+  // ---- banded shadow on the fold stations. Hand-cut, not ruled: a dead
+  // straight line across a page is the seam artifact a blind reader has already
+  // caught the book at once. ----
+  for (const [k, v] of H.BANDS.entries()) {
+    const y = h * v
+    const amp = h * (0.012 + 0.006 * (k % 2))
+    const d =
+      `M 0 ${fx(y)} Q ${fx(w * 0.27)} ${fx(y - amp)} ${fx(w * 0.5)} ${fx(y + amp * 0.4)} ` +
+      `T ${fx(w)} ${fx(y - amp * 0.3)}`
+    const dark = v > H.V_CREST
+    s += `<path d="${d}" fill="none" stroke="${dark ? VAULT.ink : VAULT.foilDeep}" stroke-width="${fx(h * 0.026)}" opacity="${dark ? 0.3 : 0.22}"/>`
+    s += `<path d="${d}" fill="none" stroke="${VAULT.foilHi}" stroke-width="${fx(h * 0.008)}" opacity="0.35" transform="translate(0 ${fx(-h * 0.016)})"/>`
   }
-  return svgPiece(w, h, s)
+
+  // ---- the drift of struck coins ----
+  const coins = []
+  for (let i = 0; i < H.COINS; i++) {
+    const x = rr(r, -0.02 * w, 1.02 * w)
+    const y = rr(r, -0.02 * h, 1.02 * h)
+    const t = fromCrest(y / h)
+    const cr = m * lerp(H.COIN_R_CREST, H.COIN_R_FOOT, t * t) * rr(r, 0.78, 1.28)
+    coins.push({ x, y, cr, tone: valueAt(y / h), lift: r() < 0.42, gleam: r() < 0.38 })
+  }
+  // back to front, so the drift overlaps the way a poured pile does
+  coins.sort((a, b) => a.y - b.y)
+  for (const c of coins) {
+    // the coin's own cast nub, thrown down-light like everything else on the page
+    s += `<ellipse cx="${fx(c.x + c.cr * 0.3)}" cy="${fx(c.y + c.cr * 0.26)}" rx="${fx(c.cr * 1.02)}" ry="${fx(c.cr * 0.74)}" fill="${VAULT.ink}" opacity="0.26"/>`
+    s += `<ellipse cx="${fx(c.x)}" cy="${fx(c.y)}" rx="${fx(c.cr)}" ry="${fx(c.cr * 0.72)}" fill="${c.lift ? VAULT.foilLit : c.tone}" stroke="${VAULT.foilDeep}" stroke-width="${fx(Math.max(0.9, c.cr * 0.12))}"/>`
+    // the struck rim: the inner ring that says minted, not pebble
+    if (c.cr > m * 0.014) {
+      s += `<ellipse cx="${fx(c.x)}" cy="${fx(c.y)}" rx="${fx(c.cr * 0.66)}" ry="${fx(c.cr * 0.47)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(Math.max(0.7, c.cr * 0.08))}" opacity="0.55"/>`
+    }
+    if (c.gleam) {
+      s += `<ellipse cx="${fx(c.x - c.cr * 0.3)}" cy="${fx(c.y - c.cr * 0.26)}" rx="${fx(c.cr * 0.34)}" ry="${fx(c.cr * 0.22)}" fill="${VAULT.foilHi}" opacity="0.9"/>`
+    }
+  }
+
+  // ---- the named treasure ----
+  const P = H.PIECES
+  {
+    // the crown, on the lit face just under the ridge
+    const [u, v, g] = P.crown
+    const cx = w * u
+    const cy = h * v
+    const gw = w * g
+    const gh = gw * 0.52
+    s += `<path d="M ${fx(cx - gw / 2)} ${fx(cy + gh * 0.5)} L ${fx(cx - gw / 2)} ${fx(cy - gh * 0.34)} L ${fx(cx - gw * 0.2)} ${fx(cy + gh * 0.06)} L ${fx(cx)} ${fx(cy - gh * 0.56)} L ${fx(cx + gw * 0.2)} ${fx(cy + gh * 0.06)} L ${fx(cx + gw / 2)} ${fx(cy - gh * 0.34)} L ${fx(cx + gw / 2)} ${fx(cy + gh * 0.5)} Z" fill="${VAULT.foilHi}" stroke="${VAULT.ink}" stroke-width="${fx(gw * 0.022)}" stroke-opacity="0.65" stroke-linejoin="round"/>`
+    s += `<rect x="${fx(cx - gw / 2)}" y="${fx(cy + gh * 0.16)}" width="${fx(gw)}" height="${fx(gh * 0.24)}" fill="${VAULT.foilLit}" stroke="${VAULT.ink}" stroke-width="${fx(gw * 0.018)}" stroke-opacity="0.6"/>`
+    for (const jx of [-0.26, 0, 0.26]) {
+      s += `<circle cx="${fx(cx + jx * gw)}" cy="${fx(cy + gh * 0.28)}" r="${fx(gw * 0.036)}" fill="${VAULT.film2}" stroke="${VAULT.ink}" stroke-width="${fx(gw * 0.012)}" stroke-opacity="0.5"/>`
+    }
+  }
+  {
+    // a goblet knocked over on the shaded flank, its bowl spilling coins
+    const [u, v, g] = P.goblet
+    const cx = w * u
+    const cy = h * v
+    const gs = w * g
+    s += `<g transform="rotate(-58 ${fx(cx)} ${fx(cy)})">`
+    // foot, stem, then the bowl on top — a cup, not a crescent
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy + gs * 0.5)}" rx="${fx(gs * 0.26)}" ry="${fx(gs * 0.075)}" fill="${VAULT.foil}" stroke="${VAULT.ink}" stroke-width="${fx(gs * 0.03)}" stroke-opacity="0.6"/>`
+    s += `<rect x="${fx(cx - gs * 0.055)}" y="${fx(cy + gs * 0.1)}" width="${fx(gs * 0.11)}" height="${fx(gs * 0.4)}" fill="${VAULT.foil}" stroke="${VAULT.ink}" stroke-width="${fx(gs * 0.028)}" stroke-opacity="0.55"/>`
+    s += `<path d="M ${fx(cx - gs * 0.36)} ${fx(cy - gs * 0.38)} L ${fx(cx + gs * 0.36)} ${fx(cy - gs * 0.38)} L ${fx(cx + gs * 0.17)} ${fx(cy + gs * 0.12)} L ${fx(cx - gs * 0.17)} ${fx(cy + gs * 0.12)} Z" fill="${VAULT.foilLit}" stroke="${VAULT.ink}" stroke-width="${fx(gs * 0.04)}" stroke-opacity="0.6" stroke-linejoin="round"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy - gs * 0.38)}" rx="${fx(gs * 0.36)}" ry="${fx(gs * 0.1)}" fill="${VAULT.foilHi}" stroke="${VAULT.ink}" stroke-width="${fx(gs * 0.034)}" stroke-opacity="0.6"/>`
+    s += `</g>`
+  }
+  {
+    // a torc — a heavy twisted neck-ring lying on its side, the one round mass
+    // in the pile. CLOSED, not the open C the first bake drew: an open ring at
+    // this scale reads as a letter, and this book prints no letters.
+    const [u, v, g] = P.torc
+    const cx = w * u
+    const cy = h * v
+    const R = w * g * 0.5
+    s += `<ellipse cx="${fx(cx + R * 0.12)}" cy="${fx(cy + R * 0.11)}" rx="${fx(R)}" ry="${fx(R * 0.6)}" fill="none" stroke="${VAULT.ink}" stroke-width="${fx(R * 0.34)}" stroke-opacity="0.42"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * 0.6)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="${fx(R * 0.3)}"/>`
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(R)}" ry="${fx(R * 0.6)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(R * 0.3)}" stroke-dasharray="${fx(R * 0.16)} ${fx(R * 0.2)}" opacity="0.55"/>`
+    s += `<ellipse cx="${fx(cx - R * 0.05)}" cy="${fx(cy - R * 0.05)}" rx="${fx(R)}" ry="${fx(R * 0.6)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="${fx(R * 0.07)}" opacity="0.75"/>`
+  }
+  {
+    // stacked ingots at the spill foot — the flat planes that give the drift a
+    // floor to be poured onto
+    const [u, v, g] = P.ingots
+    const bx = w * u
+    const by = h * v
+    const bw2 = w * g * 0.5
+    const bh = bw2 * 0.3
+    for (const [k, [ox, oy, sc]] of [[-0.28, 1.1, 1], [0.3, 0.95, 0.92], [0.02, 0.02, 1.04], [-0.14, -0.9, 0.86]].entries()) {
+      const x0 = bx + bw2 * ox
+      const y0 = by + bh * oy
+      const bwk = bw2 * sc
+      s += `<path d="M ${fx(x0 - bwk * 0.5)} ${fx(y0)} L ${fx(x0 - bwk * 0.38)} ${fx(y0 - bh * 0.78)} L ${fx(x0 + bwk * 0.5)} ${fx(y0 - bh * 0.78)} L ${fx(x0 + bwk * 0.38)} ${fx(y0)} Z" fill="${k % 2 ? VAULT.foilLit : VAULT.foilHi}" stroke="${VAULT.ink}" stroke-width="${fx(bh * 0.09)}" stroke-opacity="0.6" stroke-linejoin="round"/>`
+      s += `<path d="M ${fx(x0 - bwk * 0.38)} ${fx(y0 - bh * 0.78)} L ${fx(x0 + bwk * 0.5)} ${fx(y0 - bh * 0.78)} L ${fx(x0 + bwk * 0.44)} ${fx(y0 - bh * 0.98)} L ${fx(x0 - bwk * 0.3)} ${fx(y0 - bh * 0.98)} Z" fill="${VAULT.foil}" stroke="${VAULT.ink}" stroke-width="${fx(bh * 0.07)}" stroke-opacity="0.5"/>`
+    }
+  }
+
+  // ---- spilled gems, sized by where they landed ----
+  for (let i = 0; i < 11; i++) {
+    const x = rr(r, w * 0.05, w * 0.95)
+    const y = rr(r, h * 0.04, h * 0.96)
+    const g = m * lerp(0.012, 0.026, fromCrest(y / h)) * rr(r, 0.85, 1.2)
+    const col = [VAULT.film1, '#a53c46', VAULT.film2, '#6d58ab'][i % 4]
+    s += `<path d="M ${fx(x + g * 0.32)} ${fx(y + g * 0.3)} l ${fx(g)} ${fx(g)} l ${fx(-g)} ${fx(g)} l ${fx(-g)} ${fx(-g)} Z" fill="${VAULT.ink}" opacity="0.28"/>`
+    s += `<path d="M ${fx(x)} ${fx(y - g)} l ${fx(g)} ${fx(g)} l ${fx(-g)} ${fx(g)} l ${fx(-g)} ${fx(-g)} Z" fill="${col}" stroke="${VAULT.ink}" stroke-width="${fx(g * 0.14)}" stroke-opacity="0.5"/>`
+    s += `<path d="M ${fx(x)} ${fx(y - g)} l ${fx(g)} ${fx(g)} l ${fx(-g)} 0 Z" fill="#ffffff" opacity="0.38"/>`
+  }
+
+  // ---- and the beast's own glow over all of it ----
+  s += `<rect width="${w}" height="${h}" fill="url(#ghRake)"/>`
+  return svgPiece(w, h, s, defs)
 }
 
 // ============================================================================
@@ -16889,9 +17063,11 @@ export {
   S5_PLATE,
   S5_ARCADE,
   S5_DUNE_CAMEL,
+  S5_HOARD,
   dissolveScene,
   dissolveDunes,
   dissolveGold,
+  goldHeap,
   citadelStrip,
   dovecoteFacade,
   CITADEL,
