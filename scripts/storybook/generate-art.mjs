@@ -3446,16 +3446,60 @@ function pullTongue(w, h, seed, opts) {
   return svgPiece(w, h, s, defs)
 }
 
-/** The slot plate's station on BOTH dissolve faces, exported so a raster gate
- *  can hold the furniture out and measure the PICTURE. The plate is painted at
- *  an identical station on the A and B faces precisely so it cannot flicker as
- *  the venetian slats flip. */
-const S5_PLATE = { U0: 0.9, W: 0.1 }
+/**
+ * The slot plate's station on BOTH dissolve faces, exported so a raster gate
+ * can hold the furniture out and measure the PICTURE. The plate is painted at
+ * an identical station on the A and B faces precisely so it cannot flicker as
+ * the venetian slats flip.
+ *
+ * SIDE-AWARE, and it was not (the s5 round-2 lane queued this as the first item
+ * of the next art pass). The station used to be the bare literal `U0: 0.9` —
+ * the image's RIGHT tenth — on the reasoning that image-x is the page-fore axis
+ * and the tab exits by the fore edge. The first half of that is true and the
+ * second half is backwards for the page this piece actually ships on.
+ *
+ * DERIVED, from the layer's own uvs rather than from a screenshot. `slatUvs`
+ * (popup-dissolve.ts) maps the RIGHT page hinge->u=k/N, far->u=(k+1)/N, and
+ * MIRRORS the left page: hinge->1-k/N, far->1-(k+1)/N. So on the left page
+ * u=1 is the HINGE, at the spine, and u=0 is the FAR end, at the fore edge —
+ * and the fore edge is where the tongue comes out. The layer's own worked
+ * example says the same thing in screen pixels: "tau=0 k=0: u 1.000 @ x575 ->
+ * u 0.833 @ x532", i.e. u climbs with screen-x on the left page, toward the
+ * spine.
+ *
+ * ch4-dissolve is a LEFT-page piece. So the plate at u 0.9..1 was painted at
+ * the spine, a page-width away from the handle it belongs to, with its ember
+ * chevrons and its arrow all pointing image-right — up-page, toward the gutter,
+ * AWAY from the tab. The slot the strip "exits by" was cut along the spine edge
+ * of the picture, where no strip has ever exited.
+ *
+ * Everything below is therefore expressed per side and nothing is a bare
+ * literal. `SIDE` mirrors content.ts's ch4-dissolve and the gate holds the
+ * mirror honest, the same way CUE_LIGHT mirrors shadow-light.ts.
+ */
+const S5_PLATE = {
+  /** Plate width, as a fraction of the face's image width. */
+  W: 0.1,
+  /** The page ch4-dissolve ships on. Mirrored from content.ts; gated there. */
+  SIDE: 'left',
+  /** The image-u band the plate covers on a given page side. */
+  band(side) {
+    return side === 'left' ? { u0: 0, u1: this.W } : { u0: 1 - this.W, u1: 1 }
+  },
+  /** The image-u band left for the PICTURE — everything the plate does not
+   *  cover. This is the range a legibility gate must sample. */
+  picture(side) {
+    return side === 'left' ? { u0: this.W, u1: 1 } : { u0: 0, u1: 1 - this.W }
+  },
+  /** Which way image-x runs toward the tab: -1 on the left page (the fore edge
+   *  is u=0), +1 on the right. Every direction mark on the plate takes it. */
+  toTab(side) {
+    return side === 'left' ? -1 : 1
+  },
+}
 
 /**
- * The engraved brass slot plate along the tab-exit edge of BOTH dissolve faces
- * (image-x = the page-fore axis, so the tab side is the image's RIGHT edge on
- * either page side).
+ * The engraved brass slot plate along the tab-exit edge of BOTH dissolve faces.
  *
  * E3 s5 round 2 — the plate used to engrave the word PULL down its length,
  * twice. Written action labels near a trigger are OUT book-wide: the trigger has
@@ -3472,23 +3516,48 @@ const S5_PLATE = { U0: 0.9, W: 0.1 }
  *   - ONE head-and-shaft arrow at the track's centre. Chevrons alone flatten
  *     into parallel bars under foreshortening (the lesson pullTongue already
  *     recorded); a real head and shaft does not.
- *   - a stepped cut penumbra at the slot the strip exits by, in place of the old
- *     flat ink rectangle.
+ *   - a cut penumbra at the slot the strip exits by, in place of the old flat
+ *     ink rectangle.
  *
- * On why these marks are written out here rather than delegated to `cueArrow`
- * and `cutShadow`: this plate IS those helpers' reference — they were generalised
- * FROM its chevrons and from pullTongue's arrow — and the vocabulary is still
- * gated as unadopted machinery by __tests__/labs/storybook/paper-cues.test.ts,
- * whose ADOPTERS list is empty and whose closing assertion is that it stays
- * empty. The grammar below is the helpers' grammar to the letter (ember, round
- * cap and join, the seven-vertex head and shaft, the white 0.22 sheen, a stepped
- * penumbra in place of a blur). When a lane opens that list, these become calls.
+ * CUE-SWEEP, two changes.
+ *
+ * (1) THE PLATE WAS ON THE WRONG SIDE. It took no `side`, and its station was
+ * the literal image-right tenth. See S5_PLATE above for the derivation: on the
+ * LEFT page, which is the page this piece ships on, the layer mirrors u, so the
+ * fore edge — where the tongue comes out — is u=0 and the SPINE is u=1. Every
+ * ember mark on this plate was aimed up-page at the gutter, away from the
+ * handle, and the "slot the strip exits by" was cut along an edge no strip has
+ * ever crossed. The plate, its marks and its slot now all take `side`.
+ *
+ * (2) THE MARKS ARE CALLS NOW. They were written out longhand because the
+ * paper-cue vocabulary was still gated as unadopted machinery and this plate was
+ * its REFERENCE — the chevrons and pullTongue's arrow are what cueArrow was
+ * generalised from. The adopters list is open, so the reference joins it:
+ * chevrons and arrow are `cueArrow`, the slot is `cutShadow`. They are declared
+ * in __tests__/labs/storybook/paper-cues.test.ts like every other adopter.
+ *
+ * The one thing the helpers could not do for this plate at first was carry its
+ * WEIGHT: the marks here are solid ember, because the reading camera crops this
+ * plate to ~28 screen px and a half-transparent ember at that size is not a
+ * discreet mark, it is an absent one. That is now CUE_LIMITS' small-scale
+ * allowance, asked for by declaring the measured span (`screenPx`) rather than
+ * by turning a dial.
  */
-function brassPullPlate(w, h) {
-  const px = w * S5_PLATE.U0
+function brassPullPlate(w, h, side = S5_PLATE.SIDE) {
+  const { u0 } = S5_PLATE.band(side)
+  const toTab = S5_PLATE.toTab(side)
+  const px = w * u0
   const pw = w * S5_PLATE.W
+  /** The plate at the reader's eye. Measured during S7R2-class scale work: the
+   *  0.1-wide plate on a rack that projects ~280 px across comes out a ~28 px
+   *  sliver. This is what buys the ember its solid weight, and it is a
+   *  measurement, so it is written down where the marks can see it. */
+  const PLATE_SCREEN_PX = 28
   let s = `<rect x="${fx(px)}" y="0" width="${fx(pw)}" height="${h}" fill="${VAULT.foil}"/>`
-  s += `<rect x="${fx(px)}" y="0" width="${fx(pw * 0.18)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.6"/>`
+  // the lit chamfer rides the plate's SPINE-ward edge — the one turned into the
+  // page, away from the tab the strip runs out to
+  const chamferX = toTab > 0 ? px : px + pw * 0.82
+  s += `<rect x="${fx(chamferX)}" y="0" width="${fx(pw * 0.18)}" height="${h}" fill="${VAULT.foilLit}" opacity="0.6"/>`
   s += `<rect x="${fx(px + 3)}" y="3" width="${fx(pw - 6)}" height="${h - 6}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="2"/>`
   s += `<rect x="${fx(px + 7)}" y="7" width="${fx(pw - 14)}" height="${h - 14}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1" opacity="0.7"/>`
   // ---- the engraved TRACK the strip runs in ----
@@ -3496,43 +3565,48 @@ function brassPullPlate(w, h) {
   const tw = pw * 0.62
   s += `<rect x="${fx(cxm - tw / 2)}" y="${fx(h * 0.055)}" width="${fx(tw)}" height="${fx(h * 0.89)}" rx="${fx(pw * 0.1)}" fill="${VAULT.foilHi}" opacity="0.62"/>`
   s += `<rect x="${fx(cxm - tw / 2)}" y="${fx(h * 0.055)}" width="${fx(tw)}" height="${fx(h * 0.89)}" rx="${fx(pw * 0.1)}" fill="none" stroke="${VAULT.foilDeep}" stroke-width="${fx(pw * 0.028)}" opacity="0.75"/>`
-  // ---- the rhythm: chevron pairs down the track, aimed image-right (the tab) ----
-  const chevArm = pw * 0.21
-  const chevHalf = h * 0.029
+  // ---- the rhythm: chevron pairs down the track, aimed at the tab ----
+  // Box sized so cueArrow's own containment (every vertex inside size/2 of the
+  // centre, stroke included) lands the pair inside the plate: 0.95*pw gives a
+  // 0.475*pw radius against the plate's 0.5*pw half-width.
+  const chevDeg = toTab > 0 ? 0 : 180
   for (const t of [0.12, 0.26, 0.4, 0.6, 0.74, 0.88]) {
-    const cy = h * t
-    for (const dx of [-pw * 0.17, pw * 0.17]) {
-      s +=
-        `<path d="M ${fx(cxm + dx - chevArm)} ${fx(cy - chevHalf)} L ${fx(cxm + dx)} ${fx(cy)} ` +
-        `L ${fx(cxm + dx - chevArm)} ${fx(cy + chevHalf)}" fill="none" stroke="${VAULT.ember}" ` +
-        `stroke-width="${fx(pw * 0.075)}" stroke-linecap="round" stroke-linejoin="round"/>`
-    }
+    s += cueArrow(cxm, h * t, pw * 0.95, {
+      dir: chevDeg,
+      variant: 'chevrons',
+      count: 2,
+      weight: 1.08, // reproduces the reference's pw*0.075 stroke
+      opacity: 1,
+      hue: VAULT.ember,
+      screenPx: PLATE_SCREEN_PX,
+    })
   }
   // ---- and one arrow with a real head, at the track's centre ----
-  const ay = h * 0.5
-  const aTip = cxm + pw * 0.42
-  const aHead = cxm - pw * 0.06
-  const aTail = cxm - pw * 0.42
-  const hHalf = h * 0.04
-  const sHalf = hHalf * 0.42
-  s +=
-    `<path d="M ${fx(aTip)} ${fx(ay)} L ${fx(aHead)} ${fx(ay + hHalf)} L ${fx(aHead)} ${fx(ay + sHalf)} ` +
-    `L ${fx(aTail)} ${fx(ay + sHalf)} L ${fx(aTail)} ${fx(ay - sHalf)} L ${fx(aHead)} ${fx(ay - sHalf)} ` +
-    `L ${fx(aHead)} ${fx(ay - hHalf)} Z" fill="${VAULT.ember}" stroke="${VAULT.ink}" ` +
-    `stroke-width="${fx(pw * 0.024)}" stroke-opacity="0.45" stroke-linejoin="round"/>`
-  s += `<path d="M ${fx(aTip - pw * 0.1)} ${fx(ay)} L ${fx(aHead + pw * 0.03)} ${fx(ay + hHalf * 0.62)} L ${fx(aHead + pw * 0.03)} ${fx(ay - hHalf * 0.62)} Z" fill="#ffffff" opacity="0.22"/>`
+  s += cueArrow(cxm, h * 0.5, pw * 0.98, {
+    dir: chevDeg,
+    variant: 'arrow',
+    opacity: 1,
+    hue: VAULT.ember,
+    ink: VAULT.ink,
+    screenPx: PLATE_SCREEN_PX,
+  })
   // ---- the SLOT the strip exits by: a severed edge, not a painted line ----
-  // The face's image-x is the page-fore axis, which runs opposite to screen-x on
-  // the left page, so the spill is thrown image-LEFT: a rotation of the book's
-  // one lamp, not a second one — and it keeps the penumbra ON the plate instead
-  // of off the canvas edge, where it would say nothing at all.
-  const reach = pw * 0.2
-  for (let i = 5; i >= 1; i--) {
-    const t = i / 5
-    s += `<rect x="${fx(w - 2 - reach * t)}" y="0" width="${fx(Math.max(1, reach * t))}" height="${h}" fill="${VAULT.ink}" opacity="${(0.16 * (1 - 0.6 * t)).toFixed(2)}"/>`
-  }
-  s += `<rect x="${fx(w - 2.6)}" y="0" width="2.6" height="${h}" fill="${VAULT.ink}" opacity="0.5"/>`
-  s += `<rect x="${fx(w - 2.6 - reach * 0.3)}" y="0" width="1.6" height="${h}" fill="${VAULT.rim}" opacity="0.3"/>`
+  // It is cut along the plate's TAB-ward edge, which is the image's LEFT edge on
+  // the left page. The spill wants to land ON the plate rather than off the
+  // canvas, and on the left page the book's own lamp already does that: image-x
+  // runs WITH screen-x here (u climbs toward the spine), so down-light is
+  // image-right, which is inboard. A right-page dissolve would see the same lamp
+  // through a mirrored chart, so its light reflects in x — one lamp, read in the
+  // chart it is printed in.
+  const slotX = toTab > 0 ? w - 2.6 : 2.6
+  const slotLight = toTab > 0 ? { x: -CUE_LIGHT.x, y: CUE_LIGHT.y } : CUE_LIGHT
+  s += cutShadow(slotX, 0, slotX, h, {
+    spread: pw * 0.2,
+    hair: 2.6,
+    light: slotLight,
+    ink: VAULT.ink,
+    lip: VAULT.rim,
+  })
   return s
 }
 
@@ -3617,13 +3691,46 @@ const CUE_LIMITS = {
   penumbra: 2.2,
   /** Arrow/chevron stroke width, as a fraction of the arrow's declared size. */
   arrowStroke: 0.1,
+
+  // ---- THE SMALL-SCALE WEIGHT ALLOWANCE (queued by the s5 round-2 lane) ----
+  //
+  // The 0.5 ceiling above is calibrated for a mark the reader gets at a
+  // comfortable size. It is the WRONG ceiling for a mark riding a piece the
+  // reading camera crops to a sliver: the s5 brass plate projects to a ~28 px
+  // strip, and its hand-rolled ember chevrons are SOLID precisely because a
+  // half-transparent ember over brass at that scale is not a subtle mark, it is
+  // an absent one. Held to 0.5 the plate's converted marks would be quieter
+  // than the ones they replace — a conversion that loses the affordance.
+  //
+  // So the ceiling lifts, but only where the loss is real and only when the
+  // call site says out loud how big the piece actually is. `screenPx` is the
+  // MEASURED span of the piece at the reading camera, and it buys extra weight
+  // for the EMBER alone: ink shadows and the white sheen keep the ordinary
+  // ceiling, because a black outline at full opacity is exactly the UI badge
+  // this table exists to prevent, at any scale.
+  /** At or below this measured screen span, an ember mark may go solid. */
+  smallPx: 40,
+  /** The ceiling the ember gets there. Solid — that is the s5 reference. */
+  smallOpacity: 1,
 }
 
 const cueNum = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
 const cueClamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+/**
+ * The opacity ceiling in force for the EMBER of a mark, given what the call
+ * site declared about the piece's size at the reader's eye. Undeclared — and a
+ * hostile or non-finite declaration — means the ordinary ceiling: the
+ * allowance has to be asked for, in the open, with a number.
+ */
+const cueEmberCap = (screenPx) => {
+  const px = cueNum(screenPx, Number.POSITIVE_INFINITY)
+  return px <= CUE_LIMITS.smallPx ? CUE_LIMITS.smallOpacity : CUE_LIMITS.opacity
+}
 /** Opacity attribute value, clamped to the ceiling and fixed to 2dp so the
  *  fragment is byte-stable across platforms. */
 const cueOp = (v) => cueClamp(cueNum(v, 0), 0, CUE_LIMITS.opacity).toFixed(2)
+/** As cueOp, against an explicit ceiling (the small-scale ember allowance). */
+const cueOpTo = (v, cap) => cueClamp(cueNum(v, 0), 0, cap).toFixed(2)
 /** Unit cast direction, falling back to the shared light when a caller hands
  *  over a degenerate or non-finite vector (a NaN light must not reach a coord). */
 function cueUnit(light) {
@@ -3763,11 +3870,19 @@ function raisedEdgeShadow(d, opts = {}) {
  * CUE_LIMITS.opacity and the stroke to CUE_LIMITS.arrowStroke * size, so a call
  * site cannot grow it into a UI badge without editing the ceilings.
  *
+ * `screenPx` is the one way past that ember ceiling, and it is a MEASUREMENT,
+ * not a dial: the span the piece carrying this mark actually occupies at the
+ * reading camera. At or under CUE_LIMITS.smallPx the ember may go solid,
+ * because at that scale a half-transparent ember is an absent mark rather than
+ * a discreet one (the s5 brass plate, cropped to ~28 px, is the reference). The
+ * ink outline and the white sheen keep the ordinary ceiling at every scale.
+ *
  *   opts: { dir, variant: 'arrow' | 'chevrons', count, weight, opacity, hue,
- *           ink, sheen }
+ *           ink, sheen, screenPx }
  */
 function cueArrow(x, y, size, opts = {}) {
   const { variant = 'arrow', hue = VAULT.ember, ink = INK, sheen = true } = opts
+  const emberCap = cueEmberCap(opts.screenPx)
   const cx = cueNum(x, 0)
   const cy = cueNum(y, 0)
   const S = Math.max(1, cueNum(size, 1))
@@ -3795,7 +3910,7 @@ function cueArrow(x, y, size, opts = {}) {
       const a = span / 2 - i * step
       s +=
         `<path d="M ${P(a - chev, -half)} L ${P(a, 0)} L ${P(a - chev, half)}" fill="none" ` +
-        `stroke="${hue}" stroke-width="${fx(sw)}" opacity="${cueOp(k)}" stroke-linecap="round" stroke-linejoin="round"/>`
+        `stroke="${hue}" stroke-width="${fx(sw)}" opacity="${cueOpTo(k, emberCap)}" stroke-linecap="round" stroke-linejoin="round"/>`
     }
     return s
   }
@@ -3810,7 +3925,7 @@ function cueArrow(x, y, size, opts = {}) {
   let s =
     `<path d="M ${P(aTip, 0)} L ${P(aHead, headHalf)} L ${P(aHead, shaftHalf)} L ${P(aTail, shaftHalf)} ` +
     `L ${P(aTail, -shaftHalf)} L ${P(aHead, -shaftHalf)} L ${P(aHead, -headHalf)} Z" ` +
-    `fill="${hue}" fill-opacity="${cueOp(k)}" stroke="${ink}" stroke-width="${fx(sw * 0.4)}" ` +
+    `fill="${hue}" fill-opacity="${cueOpTo(k, emberCap)}" stroke="${ink}" stroke-width="${fx(sw * 0.4)}" ` +
     `stroke-opacity="${cueOp(0.45)}" stroke-linejoin="round"/>`
   if (sheen) {
     // The reference's white wash across the head — the ember catching the same
@@ -4148,9 +4263,9 @@ function dissolveDunes(w, h, seed) {
   // and a warm rim right around the rack's own edge — the shut hatch's halo
   s += `<rect x="1.5" y="1.5" width="${fx(w - 3)}" height="${fx(h - 3)}" fill="none" stroke="${VAULT.foilLit}" stroke-width="4" opacity="0.5"/>`
   s += `<rect x="4" y="4" width="${fx(w - 8)}" height="${fx(h - 8)}" fill="none" stroke="${VAULT.foilHi}" stroke-width="1.6" opacity="0.45"/>`
-  // the celebrated affordance: engraved brass slot plate + ember chevrons +
-  // PULL along the tab-exit edge (shared by both faces so the plate never
-  // flickers as the slats flip)
+  // the celebrated affordance: engraved brass slot plate, track and ember marks
+  // along the TAB-EXIT edge — which is the image's low-u end on this left-page
+  // piece (shared by both faces so the plate never flickers as the slats flip)
   s += brassPullPlate(w, h)
   return svgPiece(w, h, s, defs)
 }
@@ -5149,20 +5264,11 @@ function circledOne(cx, cy, rad, stroke, sw) {
   )
 }
 
-/** A printer's MANICULE ☞ — cuff, fist, thumb and a pointing index finger,
- *  nominally pointing +x. The affordance's "do this" mark. */
-function manicule(x, y, S, body, ink) {
-  const ax = (a) => x + S * a
-  const ay = (b) => y + S * b
-  let s = `<g>`
-  s += `<path d="M ${fx(ax(-1.1))} ${fx(ay(-0.5))} L ${fx(ax(-0.6))} ${fx(ay(-0.5))} L ${fx(ax(-0.6))} ${fx(ay(0.54))} L ${fx(ax(-1.1))} ${fx(ay(0.54))} L ${fx(ax(-0.94))} ${fx(ay(0.02))} Z" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}" stroke-linejoin="round"/>`
-  s += `<rect x="${fx(ax(-0.68))}" y="${fx(ay(-0.46))}" width="${fx(S * 0.76)}" height="${fx(S * 0.98)}" rx="${fx(S * 0.26)}" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}"/>`
-  s += `<path d="M ${fx(ax(-0.12))} ${fx(ay(-0.22))} L ${fx(ax(0.76))} ${fx(ay(-0.14))} L ${fx(ax(1.08))} ${fx(ay(0.0))} L ${fx(ax(0.76))} ${fx(ay(0.14))} L ${fx(ax(-0.12))} ${fx(ay(0.2))} Z" fill="${body}" stroke="${ink}" stroke-width="${fx(S * 0.07)}" stroke-linejoin="round"/>`
-  s += `<path d="M ${fx(ax(-0.5))} ${fx(ay(-0.44))} q ${fx(S * 0.34)} ${fx(-S * 0.26)} ${fx(S * 0.5)} ${fx(S * 0.06)}" fill="none" stroke="${body}" stroke-width="${fx(S * 0.24)}" stroke-linecap="round"/>`
-  s += `<path d="M ${fx(ax(-0.5))} ${fx(ay(-0.44))} q ${fx(S * 0.34)} ${fx(-S * 0.26)} ${fx(S * 0.5)} ${fx(S * 0.06)}" fill="none" stroke="${ink}" stroke-width="${fx(S * 0.06)}" stroke-linecap="round"/>`
-  s += `</g>`
-  return s
-}
+// (RETIRED — `manicule`. A printer's pointing hand is a written instruction
+//  drawn as a picture, and the user's affordance law retired the sentence it
+//  was drawing. Its one call site was the s2 key-board mark, now an ember
+//  arrow and a contact pool. Deleted rather than left unused: present, it is
+//  one edit away from being pointed at something again.)
 
 /** One raven-sigil roundel — a brass-rimmed disc with a slate raven banked to
  *  `bank` degrees. The dial's repeated mark: four billion ravens, one wheel. */
@@ -5813,6 +5919,13 @@ function keyboardDoor(w, h, seed, plate) {
   // warm timber edge (no cold pale rim)
   s += `<path d="${doorD}" fill="none" stroke="${WOOD_EDGE}" stroke-width="6" opacity="0.92" stroke-linejoin="round"/>`
   s += `<path d="${doorD}" fill="none" stroke="${WOOD_LIT}" stroke-width="1.4" opacity="0.5" stroke-linejoin="round"/>`
+  // THE RAISED EDGE (cue-sweep). This leaf is a loose ply lying on the plaque,
+  // and the mark that says so is the brightening along the edge that turns into
+  // the lamp — the same lamp the plaque's own contact pool on the page answers
+  // to, so board and leaf finally agree about where the light is. It is the
+  // per-piece half of the affordance the LIFT ribbon used to assert in words.
+  // Stands h*0.09 proud: a leaf's thickness at this canvas, no more.
+  s += raisedEdgeShadow(doorD, { lift: h * 0.09, part: 'lip', lip: '#e8d3a6' })
   s += `</g>`
   return svgPiece(w, h, s)
 }
@@ -9456,7 +9569,7 @@ function sashWeight(w, h, seed) {
 // planes (sleeping mountain > lamplit inn row > open gate), the linked welcome
 // rank, the key-sign + dormer + brass-key children on the inn row's crease,
 // the fore wall re-cut as a key-baluster frieze, and the T-FLOOR page print
-// (cobble fan / key trail / WELCOME mat / LIFT banner + manicule / geese).
+// (cobble fan / key trail / WELCOME mat / the key-board's paper cues / geese).
 // House rules as everywhere: standalone SVG on transparent ground (the ALPHA
 // is the die-cut), pale raw-paper rim on every cut edge (rimPath), walnut ink
 // linework, deterministic mulberry32 — no Math.random.
@@ -10335,8 +10448,8 @@ function friezeKeys(w, h, seed) {
 // gate through to the great door, a trail of scattered brass keys leading
 // from the fore edge past the KEY-BOARD to the door, warm window-light pools
 // under plane B, the WELCOME doormat, the goose family, guest footprints,
-// and the celebrated affordances (the LIFT ribbon + the woodcut manicule
-// aimed at door 1). ----
+// and the key-board's paper cues (the plaque's contact pool + one ember arrow
+// along the leaves' travel, where the LIFT ribbon and the manicule stood). ----
 function innCourtyardSpread(w, h, seed) {
   const r = mulberry32(seed)
   const PX = (f) => f * w
@@ -10500,65 +10613,46 @@ function innCourtyardSpread(w, h, seed) {
   for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
     s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.8">${strewnKey(h * 0.026)}</g>`
 
-  // ---- THE LIFT BANNER over the key-board.
+  // ---- THE KEY-BOARD'S PAPER CUES, where the LIFT banner and the manicule
+  // used to stand.
   //
-  // S2-1, second half. The blind reader: "the LIFT banner is dark red on brown
-  // and is physically overlapped by the board's own top-left corner so it reads
-  // as LIF + noise." Two separate defects, both fixed here.
+  // Round 1 answered "the reader cannot tell the board is a playable" with a
+  // parchment ribbon reading LIFT and a printer's manicule pointing at it. Both
+  // are retired by the user's affordance law: written action labels near a
+  // trigger are OUT, and the pointing hand was the same sentence drawn as a
+  // picture — a blind reader logged it as "one white blade-with-a-handle", so
+  // it was not even that. What replaces them is what a lifted flap actually
+  // does to a page, in the book's one light:
   //
-  // (1) COLLISION. The rescaled board now occupies image x 0.674..0.822 and y
-  // 0.44..0.88 (pageFX/pageFY of d 0.40..0.74, z -0.09..0.57), so the banner
-  // moves clear ABOVE it — its lowest ink sits at y 0.413, a clear 27px of
-  // image height above the board's top edge, and it now spans the board's full
-  // new width instead of starting inboard of it.
+  //   - THE PLAQUE'S CONTACT POOL. The key-board is a timber plaque standing
+  //     proud of the yard cobble; a piece that stands proud drops a pool
+  //     down-light of itself, deepest where it meets the page. That pool is the
+  //     whole of what the LIFT ribbon was claiming — "this is a separate thing
+  //     sitting on top" — and unlike the ribbon it is true whatever the reader
+  //     does next.
+  //   - ONE EMBER ARROW at the plaque's fore edge, aimed the way the leaves'
+  //     free edges travel. The doors hinge at their spine edge and swing their
+  //     ring handles fore, so fore is the direction of the gesture; the arrow
+  //     is the chapter-4/s5 ember mark, the user's named reference style.
   //
-  // (2) SIZE + CONTRAST. Derived: this print is 1024x683 over a 2.30 x 1.50
-  // world spread, so image-x runs ~1:1 to screen px while image-y renders at
-  // 0.54x (z is the foreshortened axis) — the old 0.026h caps were 17.8 art px
-  // = 9.5 SCREEN px, and squat with it. Caps go to 0.060h (41 art px = 22
-  // screen px) on a ribbon deep enough to hold them, and the value inverts:
-  // PARCHMENT ribbon with WALNUT letters, not walnut-red ribbon with parchment
-  // letters, because the ground it lies on is mid-value cobble.
-  //
-  // The word STAYS "LIFT" rather than being dropped now that click-nudge
-  // exists. The nudge cracks a leaf and says "this moves"; it does not say
-  // which way, and the gesture that gets the reveal is still a lift. The
-  // affordance system and the sign do different jobs.
-  const ribY = pageFY(-0.19)
-  const ribX0 = 0.664
-  const ribX1 = 0.832
-  const ribMid = (ribX0 + ribX1) / 2
-  const ribBand = h * 0.078
-  const ribD = `M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.02))} Q ${fx(PX(ribMid))} ${fx(PY(ribY - 0.034))} ${fx(PX(ribX1))} ${fx(PY(ribY + 0.02))}`
-  // ribbon tails (behind the band, brick red so the parchment reads as the sign)
-  s += `<path d="M ${fx(PX(ribX0))} ${fx(PY(ribY + 0.006))} l ${fx(-w * 0.026)} ${fx(h * 0.018)} l ${fx(w * 0.016)} ${fx(h * 0.016)} l ${fx(-w * 0.006)} ${fx(h * 0.018)} l ${fx(w * 0.022)} ${fx(-h * 0.018)} Z" fill="${INN.roofDim}" stroke="${WALNUT}" stroke-width="2"/>`
-  s += `<path d="M ${fx(PX(ribX1))} ${fx(PY(ribY + 0.006))} l ${fx(w * 0.026)} ${fx(h * 0.018)} l ${fx(-w * 0.016)} ${fx(h * 0.016)} l ${fx(w * 0.006)} ${fx(h * 0.018)} l ${fx(-w * 0.022)} ${fx(-h * 0.018)} Z" fill="${INN.roofDim}" stroke="${WALNUT}" stroke-width="2"/>`
-  s += `<path d="${ribD}" fill="none" stroke="${INK}" stroke-width="${fx(ribBand)}" opacity="0.3" transform="translate(3 ${fx(h * 0.008)})"/>` // cast shadow
-  s += `<path d="${ribD}" fill="none" stroke="${ROOK.parchLit}" stroke-width="${fx(ribBand)}" stroke-linecap="butt"/>`
-  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="4" transform="translate(0 ${fx(-ribBand / 2 + 3)})"/>` // brick-red edge banding
-  s += `<path d="${ribD}" fill="none" stroke="${INN.roofDim}" stroke-width="4" transform="translate(0 ${fx(ribBand / 2 - 3)})"/>`
+  // The board's footprint is DERIVED, not typed off a screenshot: it is
+  // content.ts's ch1-keyboard board box (d 0.40..0.74, z -0.09..0.57) run
+  // through this file's own pageFX/pageFY, the same mapping every other anchor
+  // on this page uses.
   {
-    const cw3 = PX(0.0132)
-    const gap3 = PX(0.0052)
-    const ch3 = PY(0.06)
-    const total3 = 4 * cw3 + 3 * gap3
-    s += engraveWord('LIFT', PX(ribMid) - total3 / 2, PY(ribY - 0.008) - ch3 / 2, cw3, ch3, gap3, WALNUT, 6.5, 'opacity="0.98"')
-  }
-
-  // ---- THE WOODCUT MANICULE on the floor, aimed at the board — the house
-  // helper (nominally +x), MIRRORED to point spine-ward at door 1.
-  //
-  // S2-6(e), second half: the reader logged "one white blade-with-a-handle on
-  // the right page" as an unidentifiable object. That was this hand — drawn in
-  // PARCHMENT on parchment-toned cobble at S = w*0.021 (21 art px), so the only
-  // thing that survived was its pale silhouette, which is a blade with a
-  // handle. A printer's manicule is BLACK INK on paper; it is now walnut-bodied
-  // with a parchment rim at S = w*0.036, and it sits on its own paper card so
-  // the fist has a light ground to read against.
-  {
-    const mx = PX(0.872), my = PY(pageFY(0.055)), MS = w * 0.036
-    s += `<rect x="${fx(mx - MS * 1.5)}" y="${fx(my - MS * 0.95)}" width="${fx(MS * 3)}" height="${fx(MS * 1.9)}" rx="${fx(MS * 0.2)}" fill="${ROOK.parchLit}" stroke="${WALNUT}" stroke-width="2.4" opacity="0.92" transform="rotate(-4 ${fx(mx)} ${fx(my)})"/>`
-    s += `<g transform="translate(${fx(mx)} ${fx(my)}) scale(-1 1)">${manicule(0, 0, MS, WALNUT, INK)}</g>`
+    const bx0 = PX(pageFX(0.4, 'right'))
+    const bx1 = PX(pageFX(0.74, 'right'))
+    const by0 = PY(pageFY(-0.09))
+    const by1 = PY(pageFY(0.57))
+    const boardD = `M ${fx(bx0)} ${fx(by0)} L ${fx(bx1)} ${fx(by0)} L ${fx(bx1)} ${fx(by1)} L ${fx(bx0)} ${fx(by1)} Z`
+    // A plaque hung on a post stands about a finger's thickness off the ground
+    // it shadows; at this print's scale that is h*0.014 = 9.6 art px, which
+    // throws a 5.7 px pool — a contact shadow, not a slab.
+    s += raisedEdgeShadow(boardD, { lift: h * 0.014, part: 'pool', ink: WALNUT })
+    // The arrow sits clear of the plaque mesh (which covers x 0.674..0.822) and
+    // clear of the yard clutter that starts at 0.86, on the cobble the reader's
+    // hand crosses to reach the ring handles.
+    s += cueArrow(PX(0.843), PY(pageFY(0.24)), w * 0.052, { dir: 0, ink: WALNUT })
   }
 
   // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate.
@@ -14067,13 +14161,48 @@ function bazRaiseStallFace(w, h, seed) {
   cart += `<rect x="${fx(cx0)}" y="${fx(cy0)}" width="${fx(cw2)}" height="${fx(chh)}" rx="10" fill="${INK}" opacity="0.92"/>`
   cart += `<rect x="${fx(cx0 + 5)}" y="${fx(cy0 + 5)}" width="${fx(cw2 - 10)}" height="${fx(chh - 10)}" rx="7" fill="${BAZ.cream}"/>`
   cart += `<rect x="${fx(cx0 + 11)}" y="${fx(cy0 + 11)}" width="${fx(cw2 - 22)}" height="${fx(chh - 22)}" rx="5" fill="none" stroke="${INK}" stroke-width="1.6" opacity="0.6"/>`
-  // ⟡ RAISE A STALL ⟡ — 13 glyph cells + flanking lozenges
-  const word = S6_STALL_CARTOUCHE.legend
-  const cells = word.length
-  const gw = (cw2 - 96) / cells
-  const gh = chh * 0.34
-  const gy = cy0 + chh / 2 - gh / 2
-  cart += engraveWord(word, cx0 + 48, gy, gw * 0.72, gh, gw * 0.28, INK, 3.4)
+  // ⟡ THE SETTING-OUT TRACK ⟡ — where ⟡ RAISE A STALL ⟡ was engraved.
+  //
+  // The card IS the handle on this piece now, and the user's affordance law
+  // retired the sentence: no written verb near a trigger. The signboard stays
+  // — it is the plate a market keeps its pitches on — but what is cut into it
+  // is a SETTING-OUT TRACK, the pale channel a stall is set out along, with
+  // ember chevrons marching down it toward the tab. Track and chevrons carry
+  // the invitation between them: one says "a thing runs along here", the other
+  // says which way.
+  //
+  // SIZE, derived from the contract's own measurement rather than chosen. The
+  // camera magnifies this band's fore axis ~500 px/world against the spine's
+  // ~289, and the contract records the consequence: a 0.72-of-cell glyph, 12.2
+  // art px wide, landed 4.6 screen px — so the plate's length maps at 0.377
+  // screen px per art px and its height at 0.159. This plate is therefore about
+  // 119 x 16.5 SCREEN px. Thirteen glyphs in 16.5 px of height were the mush
+  // the blind reader met; one chevron set that uses the whole height is not.
+  //
+  // cueArrow puts its arms at 0.17 of the box across the axis and 0.4 along it,
+  // so a 230 px box centred on the plate lands arms 39 px inside the inner rule
+  // (which is 41 px from the centre line) and tips 92 px along against 110 px of
+  // room. Nothing is eyeballed and nothing touches the border.
+  const trackH = chh * 0.46
+  const trackX0 = cx0 + 40
+  const trackX1 = cx0 + cw2 - 40
+  cart += `<rect x="${fx(trackX0)}" y="${fx(cy0 + chh / 2 - trackH / 2)}" width="${fx(trackX1 - trackX0)}" height="${fx(trackH)}" rx="${fx(trackH * 0.3)}" fill="${BAZ.sand}" opacity="0.85"/>`
+  cart += `<rect x="${fx(trackX0)}" y="${fx(cy0 + chh / 2 - trackH / 2)}" width="${fx(trackX1 - trackX0)}" height="${fx(trackH)}" rx="${fx(trackH * 0.3)}" fill="none" stroke="${INK}" stroke-width="2.2" opacity="0.55"/>`
+  // Aimed local-LEFT. The whole plate is turned a quarter CLOCKWISE below, so
+  // local-left comes out image-UP = uv +v, and the contract's gate proves that
+  // lands along the card's own screen travel — the direction the reader's hand
+  // has to go. `chevronUV` in s6-cartouche-orientation.mjs is that vector.
+  //
+  // Solid ember: the plate is 16.5 screen px tall, under CUE_LIMITS.smallPx, and
+  // a half-transparent ember on a 6 px arm is an absent mark, not a subtle one.
+  cart += cueArrow(cx0 + cw2 / 2, cy0 + chh / 2, 230, {
+    dir: 180,
+    variant: 'chevrons',
+    count: 3,
+    weight: 0.9,
+    opacity: 1,
+    screenPx: 17,
+  })
   for (const lx of [cx0 + 24, cx0 + cw2 - 24]) {
     cart += `<path d="M ${fx(lx)} ${fx(cy0 + chh / 2 - 9)} l 9 9 l -9 9 l -9 -9 Z" fill="none" stroke="${INK}" stroke-width="2.4"/>`
     cart += `<circle cx="${fx(lx)}" cy="${fx(cy0 + chh / 2)}" r="2.4" fill="${INK}"/>`
@@ -15487,17 +15616,20 @@ function swarmAtlas(w, h, seed) {
   // beside the swarm arm it drives, and THIS region is 640x384 (aspect 1.667
   // against the quad's 1.706, a 2.3% stretch), so letterforms come out true.
   //
-  // Measured: the region maps to screen at 0.2266x across and 0.2214x down, so
-  // the font-size 92 Georgia bold caps here are 63.7 px of art = 14.1 px of
-  // on-screen CAP HEIGHT (the brief's floor was 55 px of art / 12 px on screen).
+  // Measured: the region maps to screen at 0.2266x across and 0.2214x down. The
+  // block was rebuilt at this size to carry two lines of type; the type is gone
+  // (cue-sweep, the no-labels law) and the size stays, because what it now
+  // carries is a chevron set whose arms must survive the same mapping — 380 px
+  // of art across is 86 screen px of direction.
   //
   // Painted as a DIEGETIC pull tab per law BW-13, never an untextured plate: a
   // honey-gold die-cut card with a scored fold at the inboard end where it
   // leaves its slit, a cream rule, an INK ply shadow down its lower edge, and a
   // SCALLOPED GRIP with a finger notch at the OUTBOARD (fore-edge) side, which
   // is the RIGHT of the region — the direction the tab is pulled. The dashed
-  // amber bee-loop and its arrowhead point the same way; the red wax bow on the
-  // fold is wax accent 2 of 3.
+  // amber bee-loop and its arrowhead, and the ember chevron set that replaced
+  // the lettering, all point the same way; the red wax bow on the fold is wax
+  // accent 2 of 3.
   // ==========================================================================
   {
     const TX = 0 // cell 32 = row 4, col 0
@@ -15524,8 +15656,16 @@ function swarmAtlas(w, h, seed) {
     s += `<path d="${CARD}" fill="url(#s3tabFace)" stroke="${SWARM.amber}" stroke-width="5"/>`
     // cream rule, inset off the silhouette
     s += `<rect x="${fx(tu(0.082))}" y="${fx(tv(0.2))}" width="${fx(tu(0.79) - tu(0.082))}" height="${fx(tv(0.8) - tv(0.2))}" rx="16" fill="none" stroke="${SWARM.cream}" stroke-width="4.5" opacity="0.7"/>`
-    // the slit the tab comes out of, then the scored fold just outboard of it
-    s += `<path d="M ${fx(tu(0.045))} ${fx(tv(0.24))} L ${fx(tu(0.045))} ${fx(tv(0.76))}" stroke="${INK}" stroke-width="9" opacity="0.3"/>`
+    // THE SLIT the tab comes out of — a real cut now, not a painted grey line
+    // (cue-sweep). A die-cut slit is a dark hairline with the raw paper core
+    // showing on the lit lip and a soft spill down-light of it; that spill lands
+    // ON the card, which is exactly where a strip emerging from a slot throws
+    // it. Then the scored fold just outboard of it.
+    s += cutShadow(tu(0.045), tv(0.24), tu(0.045), tv(0.76), {
+      spread: 14,
+      ink: INK,
+      lip: SWARM.cream,
+    })
     s += `<path d="M ${fx(tu(0.077))} ${fx(tv(0.155))} L ${fx(tu(0.077))} ${fx(tv(0.845))}" stroke="${INK}" stroke-width="4" stroke-dasharray="14 11" opacity="0.42"/>`
     s += `<path d="M ${fx(tu(0.089))} ${fx(tv(0.16))} L ${fx(tu(0.089))} ${fx(tv(0.84))}" stroke="${SWARM.goldLit}" stroke-width="4" opacity="0.75"/>`
     // grip knurling: three short amber arcs echoing the scallops
@@ -15540,16 +15680,36 @@ function swarmAtlas(w, h, seed) {
     s += `<path d="M ${fx(tu(0.735))} ${fx(tv(0.27))} l ${fx(-TW * 0.026)} ${fx(-TH * 0.05)} l ${fx(TW * 0.042)} ${fx(TH * 0.038)} l ${fx(-TW * 0.04)} ${fx(TH * 0.045)} Z" fill="${SWARM.amber}"/>`
     s += swarmBee(tu(0.3), tv(0.235), cs * 0.3, 'wingsMid')
     s += swarmBee(tu(0.6), tv(0.225), cs * 0.26, 'scout')
-    // the label, two lines, centred on the interior between rule and grip
+    // WHERE "STIR THE SWARM" WAS SET, the card now speaks paper (cue-sweep).
+    //
+    // The two lines of Georgia bold were the transitional label style, and the
+    // user's affordance law retired it: a trigger has to read through shadow,
+    // elevation, a visible cut, and the chapter-4/s5 ember arrows. This card had
+    // already earned the rest of the sentence — it is a die-cut tab with a
+    // scored fold, a ply shadow, a scalloped grip and a finger notch, which is
+    // a HANDLE, unambiguously. What the words added was only the DIRECTION, and
+    // a direction is what a chevron set is for.
+    //
+    // Aimed image-right: outboard, toward the fore edge, which is the way the
+    // grip scallops face and the way the card travels.
+    //
+    // SIZE, off a live capture rather than off the space the type vacated. The
+    // first cut simply filled the old label's box (380 px) and came out reading
+    // as a badge stamped across the card — louder than the s5 reference the
+    // whole vocabulary answers to, which is a rhythm running down a track, not
+    // a mark shouting from the middle of a plate. At 300 px the set spans
+    // 240 px of the card's 435 px interior, its arms clear the cream rule at
+    // 0.2..0.8 by a comfortable margin (0.467..0.733), and its stroke comes out
+    // 3.2 SCREEN px on the shipped 145x85 quad — printed ornament, and the
+    // dashed bee-loop above it stays the busier mark.
     const lx = (tu(0.1) + tu(0.78)) / 2
-    const label = (v, txt) =>
-      `<text x="${fx(lx)}" y="${fx(tv(v))}" font-family="Georgia, 'Times New Roman', serif" font-size="84" font-weight="bold" text-anchor="middle" fill="${SWARM.slateDeep}">${txt}</text>`
-    // Baselines: measured at font-size 84 the caps are 61 px of art (13.5 px on
-    // screen) and "STIR THE" inks 428 px wide, so the pair is set at 0.52/0.775
-    // to keep every letter inside the cream rule (0.20..0.80) — at 0.83 the
-    // SWARM row crossed the rule's bottom edge.
-    s += label(0.52, 'STIR THE')
-    s += label(0.775, 'SWARM')
+    s += cueArrow(lx, tv(0.6), 300, {
+      dir: 0,
+      variant: 'chevrons',
+      count: 4,
+      weight: 0.62,
+      opacity: 0.45,
+    })
     // the red wax bow, seated ON the scored fold and kept clear of the S of STIR
     // (wax accent 2 of 3)
     const wx = tu(0.072)
@@ -15560,9 +15720,9 @@ function swarmAtlas(w, h, seed) {
   }
   s += `</g>`
   // Cells 17-22 and 25-26 are now deliberately TRANSPARENT: they held round 1's
-  // 2x2 STIR tab and the printed banner strip, and nothing samples either any
-  // more (the tab moved to the 5x3 block at cell 32, and the page print points
-  // at the tab instead of repeating its lettering).
+  // 2x2 tab and the printed banner strip, and nothing samples either any more
+  // (the tab moved to the 5x3 block at cell 32, and the page print points at
+  // the tab instead of repeating a legend neither of them prints now).
   const defs =
     `<linearGradient id="s3tabFace" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${SWARM.goldLit}"/>` +
@@ -16360,8 +16520,8 @@ function beeRoutesSpread(w, h, seed) {
       s += flatBee((kx + S * dx2) / w, (ky + S * dy2) / h, w * sz2, a2, 0.9)
   }
 
-  // ---- AFFORDANCE TRAIL to the STIR tab: the die-cut tab carries its own
-  // lettering, so the print POINTS — a dashed amber bee-loop curling out of the
+  // ---- AFFORDANCE TRAIL to the swarm tab: the die-cut tab carries its own
+  // cues, so the print POINTS — a dashed amber bee-loop curling out of the
   // compass yard and RUNNING OUT at the tab's inboard edge.
   //
   // ROUND 2 RE-AIM. The tab used to start at radial 1.0, so the trail put its

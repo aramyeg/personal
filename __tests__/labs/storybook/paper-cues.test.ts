@@ -305,6 +305,68 @@ describe('paper-cue vocabulary — subtlety ceilings', () => {
     expect(Math.min(...widths)).toBeLessThanOrEqual(spread * CUE_LIMITS.cutHair + 0.05)
   })
 
+  it('the small-scale allowance is asked for, and only buys the ember', () => {
+    // The s5 brass plate crops to ~28 screen px and its marks are SOLID: at
+    // that size a half-transparent ember is an absent mark, not a discreet one.
+    // The ceiling therefore lifts — but only when a call site declares the
+    // MEASURED span, and only for the ember. Everything else keeps 0.5, because
+    // a black outline at full opacity is the UI badge these ceilings exist to
+    // prevent, at any scale.
+    expect(CUE_LIMITS.smallPx).toBeLessThanOrEqual(40)
+    expect(CUE_LIMITS.smallOpacity).toBeLessThanOrEqual(1)
+    expect(CUE_LIMITS.smallOpacity).toBeGreaterThan(CUE_LIMITS.opacity)
+
+    const big = CUE_LIMITS.smallPx * 2
+    for (const variant of ['arrow', 'chevrons'] as const) {
+      // undeclared: the ordinary ceiling binds
+      for (const a of opacities(cueArrow(200, 200, 60, { variant, opacity: 9 }))) {
+        expect(a).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+      }
+      // declared BIG: the ordinary ceiling still binds — size is a
+      // qualification, not a switch
+      for (const a of opacities(cueArrow(200, 200, 60, { variant, opacity: 9, screenPx: big }))) {
+        expect(a).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+      }
+      // hostile declaration: not a number, so no allowance
+      const hostile = cueArrow(200, 200, 60, {
+        variant,
+        opacity: 9,
+        screenPx: Number.NaN,
+      })
+      expect(hostile).not.toContain('NaN')
+      for (const a of opacities(hostile)) expect(a).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+
+      // declared SMALL: the EMBER may go solid, and nothing else may
+      const small = cueArrow(200, 200, 60, {
+        variant,
+        opacity: 9,
+        screenPx: CUE_LIMITS.smallPx,
+      })
+      expect(small).not.toContain('NaN')
+      expect(parses(small)).toBe(true)
+      const lifted = opacities(small).filter((a) => a > CUE_LIMITS.opacity)
+      expect(lifted.length, 'the allowance bought nothing').toBeGreaterThan(0)
+      for (const a of lifted) expect(a).toBeLessThanOrEqual(CUE_LIMITS.smallOpacity)
+      // the arrow's ink outline and its white sheen are NOT the ember
+      if (variant === 'arrow') {
+        const inkOp = [...small.matchAll(/stroke-opacity="([\d.]+)"/g)].map((m) => Number(m[1]))
+        expect(inkOp.length).toBeGreaterThan(0)
+        for (const a of inkOp) expect(a).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+        const sheen = [...small.matchAll(/fill="#ffffff" opacity="([\d.]+)"/g)].map((m) => Number(m[1]))
+        expect(sheen.length).toBe(1)
+        expect(sheen[0]).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+      }
+    }
+
+    // and the shadows never take it: an ember allowance is not a shadow licence
+    for (const frag of [
+      cutShadow(20, 20, 200, 20, { spread: 8, strength: 50, screenPx: 1 } as never),
+      raisedEdgeShadow(OUTLINE, { lift: 12, strength: 50, screenPx: 1 } as never),
+    ]) {
+      for (const a of opacities(frag)) expect(a).toBeLessThanOrEqual(CUE_LIMITS.opacity)
+    }
+  })
+
   it('arrow strokes stay under the arrow ceiling', () => {
     const size = 60
     for (const variant of ['arrow', 'chevrons'] as const) {
@@ -329,31 +391,68 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
   // unrelated piece is how a vocabulary turns into decoration.
   //
   // s4 round-3 and s7 round-2 adopted in the same round (SPIN/HOIST/SEND and
-  // TURN all retired).
+  // TURN all retired). The CUE-SWEEP lane closed the book: s2's LIFT ribbon and
+  // manicule, s3's STIR THE SWARM lettering and s6's RAISE A STALL cartouche
+  // all became marks in the same round, and the s5 brass plate — the REFERENCE
+  // the whole vocabulary was generalised from — stopped being hand-rolled and
+  // became calls like everybody else.
   const ADOPTERS: Readonly<Record<string, readonly string[]>> = {
     cutShadow: [
+      'brassPullPlate: the slot the dissolve strip exits by, on its tab-side edge',
       'dispatchCard: the route-plate arch, die-cut into the yard paving',
       'assayCard: the three vitrine apertures, die-cut through the faceplate',
+      'swarmTab: the slit the STIR card comes out of (was a flat grey line)',
     ],
     raisedEdgeShadow: [
       'dispatchCard: the thumb notch pool',
       'dispatchCard: the thumb notch lip',
+      'keyboardDoor: the leaf lip, a loose ply lying on the key-board plaque',
+      'cofferLid: the shut lid, a loose ply sitting on its box',
       'crankWheel: the grip lobe pool',
       'crankWheel: the grip lobe lip',
-      'cofferLid: the shut lid, a loose ply sitting on its box',
+      'innCourtyardSpread: the key-board plaque pool, where the LIFT ribbon stood',
       'assayDial: the wax-seal thumb lobe standing proud of the plate',
       'assayCard: the faceplate rim, a ply riveted over the wheel',
     ],
     cueArrow: [
+      'brassPullPlate: the six chevron pairs down the engraved track',
+      'brassPullPlate: the one head-and-shaft arrow at the track centre',
       'dispatchCard: the rim chevrons',
-      'crankWheel: the rim chevrons (the hand-rolled ink arrows converted)',
-      'dispatchCablePanel: the SEND-mast sealed-letter chevron set',
       'cofferLid: one ember arrow at the hasp, along the free edge travel',
+      'dispatchCablePanel: the SEND-mast sealed-letter chevron set',
+      'crankWheel: the rim chevrons (the hand-rolled ink arrows converted)',
+      'innCourtyardSpread: one ember arrow along the key-board leaves\' travel',
       'assayDial: the two ember chevron sets flanking the thumb lobe',
+      'bazRaiseStallFace: the setting-out track chevrons, where the cartouche read',
+      'swarmTab: the pull-axis chevrons, where STIR THE SWARM was set',
     ],
   }
 
   const source = readFileSync(SCRIPT_PATH, 'utf8')
+
+  /**
+   * The painter with its comments taken out — block first, then line comments
+   * that are not the `//` of a `http://` (the SVG namespace is on more lines
+   * than one, and eating the rest of those lines would blind the gate to
+   * whatever else sat on them).
+   */
+  const CODE = source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+  /** Every phrase the book used to print AT a trigger, in the order it retired
+   *  them: s4 round-3, s7 round-2, s5 round-2, then the cue sweep. */
+  const RETIRED_PHRASES = [
+    'HOIST',
+    'SPIN',
+    'SEND',
+    'TURN',
+    'PULL',
+    'LIFT',
+    'STIR THE',
+    'SWARM SWARM',
+    'RAISE A STALL',
+  ]
 
   for (const helper of ['cutShadow', 'raisedEdgeShadow', 'cueArrow']) {
     it(`${helper} is defined and exported, and called only by declared adopters`, () => {
@@ -361,7 +460,7 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
       // reachable from the piece painters and from this test
       expect(source).toMatch(new RegExp(`\\n\\s*${helper},`))
 
-      const callSites = [...source.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
+      const callSites = [...CODE.matchAll(new RegExp(`(\\w+\\s+)?\\b${helper}\\(`, 'g'))].filter(
         (m) => m[1] !== 'function '
       )
       expect(
@@ -373,14 +472,45 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
   }
 
   it('every retired label plate really has lost its word', () => {
-    // The verbs s4 and s7 used to print. A painter may not quietly re-add one:
-    // this is the assertion that keeps the conversion from being cosmetic.
-    for (const verb of ['HOIST', 'SPIN', 'SEND']) {
+    // Every verb the book used to print at a trigger. A painter may not quietly
+    // re-add one: this is the assertion that keeps the conversions from being
+    // cosmetic. HOIST/SPIN/SEND went in s4 round-3 and TURN in s7 round-2;
+    // LIFT, STIR and RAISE went in the cue-sweep lane and join them here, which
+    // is the whole of the Wave-2 transitional label set retired.
+    for (const verb of ['HOIST', 'SPIN', 'SEND', 'LIFT', 'STIR', 'RAISE', 'PULL', 'TURN']) {
       expect(
         source.includes(`engraveWord('${verb}'`),
         `${verb} is being engraved again — the affordance law retired it`
       ).toBe(false)
     }
+    // STIR THE SWARM was SET IN TYPE, not engraved, so a verb gate watching
+    // only `engraveWord` would have missed it entirely — and the s6 legend came
+    // out of a CONTRACT constant, which such a gate would have missed twice.
+    // The rule is therefore about the STRING LITERAL: the moment a retired
+    // phrase appears inside quotes IN CODE it is about to be drawn.
+    //
+    // Prose is exempt, and has to be: this painter's notes quote every phrase
+    // they retired, including inside quotation marks ("The 'RAISE A STALL'
+    // plaque is rendered rotated 180 degrees" is a blind reader's own words,
+    // sitting in the comment that records why the plate was turned). A gate
+    // that forbade discussing the defect would be deleted by the next lane that
+    // needed to explain one. So the source is stripped of comments first — and
+    // that also stops a call site inside a commented-out block from being
+    // counted as an adopter above.
+    for (const phrase of RETIRED_PHRASES) {
+      for (const q of ["'", '"', '`']) {
+        expect(
+          CODE.includes(`${q}${phrase}${q}`),
+          `${phrase} is a string literal in the painter again — that is a label about to be drawn`
+        ).toBe(false)
+      }
+    }
+    // and the machinery that SET the type is gone from the swarm tab, the way
+    // s5 deleted strokeWord rather than leaving it one edit from being called
+    const tab = source.slice(source.indexOf('// --- cells 32-36 / 40-44 / 48-52'))
+    const tabEnd = tab.indexOf('Cells 17-22 and 25-26 are now deliberately TRANSPARENT')
+    expect(tabEnd, 'the swarm tab block not found').toBeGreaterThan(200)
+    expect(tab.slice(0, tabEnd), 'the swarm tab is setting type again').not.toContain('<text')
     // s7's TURN, scoped to assayCard's own body so the other spreads' plates —
     // which their own lanes will convert in their own commits — are none of
     // this file's business. Sliced at the function's closing brace at column 0
