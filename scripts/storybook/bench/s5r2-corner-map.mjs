@@ -19,7 +19,7 @@
  * Usage: node scripts/storybook/bench/s5r2-corner-map.mjs [port] [step]
  */
 import { chromium } from 'playwright'
-import { acquireLock, releaseLock } from '../../../../labs-storybook/.superpowers/sdd/bench/lock.mjs'
+import { acquireLock, releaseLock } from './capture-lock.mjs'
 
 const PORT = process.argv[2] ?? '3165'
 const STEP = Number(process.argv[3] ?? 24)

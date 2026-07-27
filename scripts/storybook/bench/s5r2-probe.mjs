@@ -18,7 +18,7 @@
  *   which in {all, reset, graded, drift, corner}
  */
 import { chromium } from 'playwright'
-import { acquireLock, releaseLock } from '../../../../labs-storybook/.superpowers/sdd/bench/lock.mjs'
+import { acquireLock, releaseLock } from './capture-lock.mjs'
 
 const PORT = process.argv[2] ?? '3165'
 const WHICH = process.argv[3] ?? 'all'

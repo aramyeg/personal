@@ -24,7 +24,7 @@ import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
-import { acquireLock, releaseLock } from '../../../../labs-storybook/.superpowers/sdd/bench/lock.mjs'
+import { acquireLock, releaseLock } from './capture-lock.mjs'
 
 const PORT = process.argv[2] ?? '3165'
 const TAG = process.argv[3] ?? 'after'
