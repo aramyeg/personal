@@ -1591,11 +1591,20 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // Every previous pass tuned the STRUTS (four blades -> two, rise halved,
   // repainted dark) and left the deck peak untouched, which is why the shape
   // kept coming back as wings.
-  //  - qA/qB 0.09 -> 0.065: peak 0.067 -> 0.0247, panel slope 48 deg -> 22 deg.
-  //    A landing with a slight crown, which is what a bridge deck over a gutter
-  //    is. Deliberately NOT the degenerate q = sep/2 = 0.060, where the crease
-  //    is coplanar with the chord and the two panels become one flat sheet with
-  //    a fold line the solver has to disambiguate.
+  //  - the DECK CREASE comes down: q is re-derived from the ridge separation
+  //    each time rather than left at 0.09, so the peak is ~0.022 instead of
+  //    0.067 and the panels lie at ~30 deg instead of 48. Deliberately NOT the
+  //    degenerate q = sep/2, where the crease is coplanar with the chord and
+  //    the two panels become one sheet with a fold line the solver has to
+  //    disambiguate.
+  //  - the piece comes IN, which is what finally killed the wings. Eye-tested
+  //    at the reading camera: lowering the deck alone still left four strut
+  //    faces fanning either side of the strongbox, because the dais reached
+  //    d 0.19 and the box in front of it only reaches d 0.095 — twice as wide,
+  //    so the blades stuck out past it whatever their rise. Glue lines 0.15/0.10
+  //    -> 0.09/0.06 put the whole dais inside the strongbox's own silhouette:
+  //    the wings are gone, the box is the gutter object again, and what is left
+  //    of the dais reads as the low step behind it. Rise 0.04, q 0.043.
   //  - the z span widens (struts 0.2..0.32 -> 0.19..0.33, deck 0.2..0.32 ->
   //    0.18..0.34) so the piece is longer than it is wide and reads as a step
   //    rather than a peak — and the deck overhangs its struts 0.01 each end,
@@ -1606,12 +1615,10 @@ const CH6_LAYERS: readonly SceneLayer[] = [
   // deck reaches across rank D's apex station at z 0.157 at one end and up to
   // the strongbox's z 0.38 at the other, and brushes both as they sweep);
   // 0.17..0.35 costs 126; 0.18..0.34 is the widest that stays inside the
-  // ratchet, and it is what ships. The q change carries the identity fix
-  // anyway — the peak is what made it a canopy.
-  // Clear of ch6-strongbox (z >= 0.38, margin 0.04 in z and the box sits at
-  // right-page d <= 0.095 against this deck's d <= 0.13) and of ch6-assay
-  // (d >= 0.305 against this piece's d <= 0.13).
-  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.15, glueR: 0.1, rise: 0.055, spans: [[0.19, 0.33]] }, strutB: { glueL: 0.1, glueR: 0.15, rise: 0.055, spans: [[0.19, 0.33]] }, qA: 0.065, qB: 0.065, deckZ0: 0.18, deckZ1: 0.34 },
+  // ratchet, and it is what ships.
+  // Clear of ch6-strongbox (z >= 0.38, margin 0.04 in z) and of ch6-assay
+  // (d >= 0.305 against this piece's d <= 0.086).
+  { id: 'ch6-steps', kind: 'midground', role: 'story', mech: 'platform', strutA: { glueL: 0.09, glueR: 0.06, rise: 0.04, spans: [[0.19, 0.33]] }, strutB: { glueL: 0.06, glueR: 0.09, rise: 0.04, spans: [[0.19, 0.33]] }, qA: 0.043, qB: 0.043, deckZ0: 0.18, deckZ1: 0.34 },
   // NEW: the intimate counterweight (T-COUNTERWEIGHT, ref 140028 Kristoff
   // corner) — a tiny clerk kneeling over his ledger by candlelight on the
   // left apron, already at prayer while the vaults are still rising around
