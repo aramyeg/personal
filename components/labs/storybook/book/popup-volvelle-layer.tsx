@@ -280,15 +280,11 @@ export function VolvellePopupLayer({
     const seeded = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
     writeUserDrive(layer.id, seeded, [0, thetaMax])
     tap.begin(seeded)
-<<<<<<< HEAD
-    grabRef.current = { last: hub && hub.stable ? hub.hit : null }
-=======
     grabRef.current = {
       lastAngle: hub && hub.stable ? hub.hit.angle : null,
       last: hub && hub.stable ? hub.hit : null,
       cell: volvelleDetentCell(layer, seeded),
     }
->>>>>>> e3/s7r2
     beginGrabChannel(layer.id, releaseGrab)
     ;(e.target as Element).setPointerCapture(e.pointerId)
     e.stopPropagation()
@@ -305,17 +301,11 @@ export function VolvellePopupLayer({
     const { thetaL, thetaR } = readAngles()
     const hub = hubHit(e, thetaL, thetaR)
     if (!hub || !hub.stable) return // discard deltas from the unstable centre — hold last
-<<<<<<< HEAD
-    if (grab.last !== null) {
-      const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
-      const next = clamp(cur + twistDelta(grab.last, hub.hit), 0, thetaMax)
-=======
     if (grab.lastAngle !== null && grab.last !== null) {
       const cur = clamp(readUserDrive(layer.id) ?? 0, 0, thetaMax)
       const next = tangential
         ? volvelleCrankStep(layer, cur, crankTangentialDelta(grab.last, hub.hit, layer.radius))
         : clamp(cur + wrapDelta(hub.hit.angle - grab.lastAngle), 0, thetaMax)
->>>>>>> e3/s7r2
       writeUserDrive(layer.id, next, [0, thetaMax])
       tap.track(next, TAP_EPS)
       // THE BALL DROPS INTO THE NEXT NOTCH. One dull click the moment the wheel
@@ -327,10 +317,7 @@ export function VolvellePopupLayer({
         grab.cell = cell
       }
     }
-<<<<<<< HEAD
-=======
     grab.lastAngle = hub.hit.angle
->>>>>>> e3/s7r2
     grab.last = hub.hit
     e.stopPropagation()
   }
