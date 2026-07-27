@@ -236,6 +236,46 @@
   transform: scale(1);
   filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 3px var(--sb-gold));
 }
+
+/* THE PEEL (N-4). "The triangle brightens on hover, which promises a peel;
+   dragging it 500px+ in any direction produces literally no visual change and no
+   page turn on release. Every reader who tries the natural gesture will conclude
+   the corner is broken." — blind s6 re-re-review, finding 4.
+
+   The fold now follows the hand. `use-book-input.ts` publishes the spineward
+   pull as `--sb-peel` (0..1, 1 = "let go now and the page turns") and stamps
+   `data-sb-peeling` for the duration; `data-sb-corner` still holds the corner
+   the press began in, so only that fold lifts. The gold rises with the pull, so
+   the moment the gesture is worth releasing is a thing the reader can SEE.
+
+   Dropping `data-sb-peeling` on release restores the transition below, and the
+   fold settles back down on its own — "a drag that falls short relaxes back" is
+   that one transition, not a second animation to keep in step with it. */
+:root[data-sb-peeling] .sb-dogear {
+  /* Tracking the hand must be exact: an eased fold lags the pointer it is
+     supposed to be held by, which is the "slider, not card stock" complaint one
+     level down. The ease comes back the instant the hand lets go. */
+  transition: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-sb-peeling][data-sb-corner='left'] .sb-dogear--left,
+  :root[data-sb-peeling][data-sb-corner='right'] .sb-dogear--right {
+    opacity: calc(0.82 + 0.18 * var(--sb-peel, 0));
+    transform: scale(calc(1 + 1.7 * var(--sb-peel, 0)));
+    filter: drop-shadow(0 -2px 7px rgba(0, 0, 0, 0.55))
+      drop-shadow(0 0 calc(3px + 7px * var(--sb-peel, 0)) var(--sb-gold));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The fold still tracks — it is direct manipulation, not decoration, and a
+     reader who has switched motion off still needs to see what their hand is
+     doing. Only the settle-back stops easing, which the rule above already
+     handles for the drag itself. */
+  :root[data-sb-peeling][data-sb-corner='left'] .sb-dogear--left,
+  :root[data-sb-peeling][data-sb-corner='right'] .sb-dogear--right {
+    transform: scale(calc(1 + 1.7 * var(--sb-peel, 0)));
+  }
+}
 /* Reduced motion: the fold still lifts on hover/focus, it just snaps
    instead of easing — same instant-swap rule storybook-overlay.css already
    applies to the page-turn text choreography. */

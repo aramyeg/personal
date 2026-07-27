@@ -42,7 +42,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { accumulateWheel, useStorybookStore, type TurnDir, type WheelAcc } from './store'
 import { activeGrabId, forceEndGrabChannel } from './user-drive'
-import { cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
+import { cornerPeelProgress, cornerTurnAt, isCornerTap } from './overlay/corner-hotspot'
 
 // ---------------------------------------------------------------------------
 // THE SWIPE, AND WHY IT IS HORIZONTAL ONLY (N-1, the s6 re-re-review's blocker).
@@ -89,6 +89,25 @@ type PointerStart = { x: number; y: number; t: number; corner: TurnDir | null }
  *  (outside the overlay) are unaffected. */
 const targetsOverlayPanel = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('.sb-overlay') !== null
+
+/**
+ * Publishes the live peel (N-4) to CSS: `--sb-peel` is how far the fold has
+ * been pulled, 0..1, and `data-sb-peeling` tells the fold to track the hand
+ * instead of easing (storybook.css). `null` ends the gesture, which drops the
+ * attribute and lets the fold's own transition settle it back down — so "a drag
+ * that falls short relaxes back" is the CSS transition that was already there,
+ * not a second animation to keep in step with it.
+ */
+const setPeel = (value: number | null): void => {
+  const root = document.documentElement
+  if (value === null) {
+    if (root.dataset.sbPeeling !== undefined) delete root.dataset.sbPeeling
+    root.style.removeProperty('--sb-peel')
+    return
+  }
+  root.dataset.sbPeeling = ''
+  root.style.setProperty('--sb-peel', value.toFixed(3))
+}
 
 // ---------------------------------------------------------------------------
 // THE ESCAPE WHISPER (SP-3 d). The copy and the window are exported so the
@@ -232,16 +251,25 @@ export function useBookInput(enabled: boolean): void {
       pointerStart.current = null
       if (!start) return
 
-      // CORNER TURN (R-4). The hotspots no longer take pointer events of their
-      // own — the paper under them has to be reachable — so the tap that turns
-      // the page is recognised here, and only if the scene had nothing to offer
-      // at the press. A press-drag through a corner falls through to the swipe
-      // rule below exactly like a press-drag anywhere else.
+      // CORNER TURN (R-4) AND CORNER PEEL (N-4). The hotspots no longer take
+      // pointer events of their own — the paper under them has to be reachable —
+      // so both corner gestures are recognised here, and only if the scene had
+      // nothing to offer at the press.
+      //
+      // A corner press OWNS its gesture from here on: it never falls through to
+      // the swipe rule. It used to, which would have made the peel threshold a
+      // fiction — a 60px spineward tug would have turned the page as a "swipe"
+      // long before the fold said it was ready. A corner drag that falls short
+      // is a corner drag that changed its mind, and the fold settling back down
+      // is the whole answer.
       if (start.corner !== null) {
+        setPeel(null)
         if (isCornerTap(start.x, start.y, start.t, e.clientX, e.clientY, performance.now())) {
           requestTurn(start.corner)
-          return
+        } else if (cornerPeelProgress(start.corner, start.x, e.clientX) >= 1) {
+          requestTurn(start.corner)
         }
+        return
       }
       if (performance.now() - start.t > SWIPE_MAX_MS) return
 
@@ -269,6 +297,12 @@ export function useBookInput(enabled: boolean): void {
     // nudge and the scrub channel behave exactly as on a normal release), then
     // the store, unconditionally.
     const endAnyGrab = () => {
+      // Whatever ended the pointer stream ended the corner gesture too (N-4). On
+      // a normal pointerup this has already happened in `onPointerUp` above; on
+      // a cancel, a lost capture or a blur it has NOT, and a fold left lifted
+      // with no hand on it is the possessed-page bug in miniature.
+      pointerStart.current = null
+      setPeel(null)
       if (useStorybookStore.getState().grab === null && activeGrabId() === null) return
       forceEndGrabChannel()
       useStorybookStore.getState().endGrab()
@@ -279,6 +313,18 @@ export function useBookInput(enabled: boolean): void {
     // the hint appears exactly where the tap would work and stays away when the
     // scene owns that pixel.
     const onCornerHint = (e: PointerEvent) => {
+      // THE PEEL TRACKS THE HAND (N-4). While a corner press is live the fold is
+      // the reader's, and it follows their pull spineward for as long as they
+      // hold it — no clock, because a peel is not a flick. The hint below is
+      // suppressed for the duration: the corner is already lifted, and
+      // recomputing which corner the pointer is *in* would drop the fold the
+      // moment the hand left the rect it started in, which is roughly one frame
+      // into every real peel.
+      const held = pointerStart.current
+      if (held?.corner != null) {
+        setPeel(cornerPeelProgress(held.corner, held.x, e.clientX))
+        return
+      }
       const st = useStorybookStore.getState()
       const corner =
         st.grab === null && st.hover === null
@@ -326,6 +372,9 @@ export function useBookInput(enabled: boolean): void {
       // with the hook gone, a second Escape would be a first press again.
       disarmEscape()
       delete document.documentElement.dataset.sbCorner
+      // A peel must not outlive the listener that would have finished it: the
+      // fold would stay lifted with nothing left to put it down.
+      setPeel(null)
     }
   }, [enabled])
 }

@@ -73,6 +73,48 @@ export const CORNER_TAP_MAX_PX = 12
 export const CORNER_TAP_MAX_MS = 700
 
 /**
+ * THE PEEL (N-4). "The corner page-turn affordance is drag-shaped but
+ * click-only. The triangle brightens on hover, which promises a peel; dragging
+ * it 500px+ in any direction produces literally no visual change and no page
+ * turn on release. Every reader who tries the natural gesture will conclude the
+ * corner is broken." (blind s6 re-re-review, finding 4.)
+ *
+ * The promise is now kept. A press that starts in a corner and pulls TOWARD THE
+ * SPINE lifts the dog-ear under the hand, further the further it travels; past
+ * `CORNER_PEEL_COMMIT_PX` the page goes, and short of it the fold settles back
+ * down. Nothing about the gesture is a guess: the fold is the thing the reader
+ * took hold of and the fold is the thing that moves.
+ *
+ * WHY THE FOLD AND NOT THE WHOLE SHEET. A curling page would be the grander
+ * answer, and it is not available honestly here: the turn driver
+ * (book/use-turn-driver.ts) is a one-way CLOCK — `elapsedMs += delta`, cue
+ * latches, `emitTurnStart` firing the outgoing text's exit as a one-shot — with
+ * no scrubbable progress to hand a reader and no way back for the overlay
+ * choreography once the words have begun to leave. Scrubbing it would be a
+ * rework of the book's turn state machine, and a half-scrubbed turn that cannot
+ * be un-started is a worse lie than the one being fixed. So the peel is exactly
+ * as big as the thing it can actually move, and it commits to the real turn.
+ *
+ * ONLY THE SPINEWARD COMPONENT COUNTS, for the same reason N-1 took vertical
+ * away from the swipe: up and down are the MECHANISM axis in this lab. A drag
+ * that leaves a corner upward, downward or out over the desk peels nothing and
+ * turns nothing.
+ */
+export const CORNER_PEEL_COMMIT_PX = 150
+
+/**
+ * How far a press that began at `x0` in the `dir` corner has peeled, in 0..1 —
+ * 1 meaning "let go now and the page turns". Only travel toward the spine
+ * counts, so backing out of the gesture unpeels the fold continuously.
+ */
+export function cornerPeelProgress(dir: TurnDir, x0: number, x1: number): number {
+  // The right corner turns 'next' and lies to the RIGHT of the spine, so its
+  // spineward pull is leftward (negative dx); the left corner's is the mirror.
+  const spineward = dir === 'next' ? x0 - x1 : x1 - x0
+  return Math.min(1, Math.max(0, spineward / CORNER_PEEL_COMMIT_PX))
+}
+
+/**
  * Which page turn the point (x, y) sits on, in a viewport of `vw` x `vh` — or
  * null anywhere else. Left corner turns back, right corner turns on, matching
  * the arrows a few pixels away. A point in the viewport's own bottom corner is

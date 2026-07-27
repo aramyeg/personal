@@ -8,8 +8,10 @@ import {
 import {
   CORNER_BOTTOM_PCT,
   CORNER_H_PCT,
+  CORNER_PEEL_COMMIT_PX,
   CORNER_SIDE_PCT,
   CORNER_W_PCT,
+  cornerPeelProgress,
 } from '@/components/labs/storybook/overlay/corner-hotspot'
 import { useStorybookStore } from '@/components/labs/storybook/store'
 import {
@@ -382,6 +384,160 @@ describe('useBookInput — corner page-turn taps (R-4)', () => {
 // The fix is two rules, and this file pins both: vertical turns NOTHING, and a
 // press the scene owns is never a swipe at all.
 // ============================================================================
+
+// ============================================================================
+// N-4 — THE CORNER KEEPS ITS PROMISE. "The corner page-turn affordance is
+// drag-shaped but click-only. The triangle brightens on hover, which promises a
+// peel; dragging it 500px+ in any direction produces literally no visual change
+// and no page turn on release. Every reader who tries the natural gesture will
+// conclude the corner is broken." (s6 blind re-re-review, finding 4.)
+//
+// A corner press now peels: the fold follows the hand spineward, and past
+// CORNER_PEEL_COMMIT_PX the page turns. Short of it, nothing — which is only
+// true if a corner press never falls through to the swipe rule, so that is
+// pinned here too.
+// ============================================================================
+
+describe('cornerPeelProgress — only the spineward pull counts (N-4)', () => {
+  it('the right corner peels when pulled LEFT, toward the spine', () => {
+    expect(cornerPeelProgress('next', 1400, 1400 - CORNER_PEEL_COMMIT_PX)).toBe(1)
+    expect(cornerPeelProgress('next', 1400, 1400 - CORNER_PEEL_COMMIT_PX / 2)).toBeCloseTo(0.5)
+    expect(cornerPeelProgress('next', 1400, 1400)).toBe(0)
+  })
+
+  it('the left corner peels when pulled RIGHT, toward the spine', () => {
+    expect(cornerPeelProgress('prev', 200, 200 + CORNER_PEEL_COMMIT_PX)).toBe(1)
+    expect(cornerPeelProgress('prev', 200, 200 + CORNER_PEEL_COMMIT_PX / 2)).toBeCloseTo(0.5)
+    expect(cornerPeelProgress('prev', 200, 200)).toBe(0)
+  })
+
+  it('pulling a corner OUTWARD peels nothing — it never goes negative', () => {
+    expect(cornerPeelProgress('next', 1400, 1400 + 400)).toBe(0)
+    expect(cornerPeelProgress('prev', 200, 200 - 400)).toBe(0)
+  })
+
+  it('is clamped at 1 — an over-pull is not extra credit', () => {
+    expect(cornerPeelProgress('next', 1400, 1400 - 4 * CORNER_PEEL_COMMIT_PX)).toBe(1)
+  })
+})
+
+describe('useBookInput — the corner peel (N-4)', () => {
+  beforeEach(() => useStorybookStore.setState(initial, true))
+  beforeEach(() => useStorybookStore.setState({ spread: 5, booted: true }))
+  afterEach(() => {
+    delete document.documentElement.dataset.sbPeeling
+    document.documentElement.style.removeProperty('--sb-peel')
+  })
+
+  const W = window.innerWidth
+  const H = window.innerHeight
+  const corner = (side: 'left' | 'right'): { x: number; y: number } => {
+    const outer = ((CORNER_SIDE_PCT + CORNER_W_PCT / 2) / 100) * W
+    return {
+      x: Math.round(side === 'left' ? outer : W - outer),
+      y: Math.round(H * (1 - (CORNER_BOTTOM_PCT + CORNER_H_PCT / 2) / 100)),
+    }
+  }
+
+  /** Press in a corner, drag by (dx,dy) through `steps` moves, release. */
+  const peelDrag = (p: { x: number; y: number }, dx: number, dy: number, steps = 5) => {
+    window.dispatchEvent(new PointerEvent('pointerdown', { clientX: p.x, clientY: p.y }))
+    for (let i = 1; i <= steps; i++) {
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: p.x + (dx * i) / steps,
+          clientY: p.y + (dy * i) / steps,
+        })
+      )
+    }
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: p.x + dx, clientY: p.y + dy }))
+  }
+
+  const peelVar = (): string => document.documentElement.style.getPropertyValue('--sb-peel')
+
+  it('a full spineward pull from the right corner turns the page on', () => {
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('right'), -CORNER_PEEL_COMMIT_PX, 0)
+    expect(s().turning).toBe('next')
+  })
+
+  it('a full spineward pull from the left corner turns the page back', () => {
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('left'), CORNER_PEEL_COMMIT_PX, 0)
+    expect(s().turning).toBe('prev')
+  })
+
+  it('a pull that falls short turns nothing — and the swipe rule may not rescue it', () => {
+    renderHook(() => useBookInput(true))
+    // Well past SWIPE_MIN_PX (60) and decisively horizontal, so the OLD swipe
+    // rule would have turned the page here and made the peel threshold a
+    // fiction. The corner owns its own gesture.
+    peelDrag(corner('right'), -(CORNER_PEEL_COMMIT_PX - 30), 0)
+    expect(s().turning).toBeNull()
+    expect(s().spread).toBe(5)
+  })
+
+  it('a pull AWAY from the spine turns nothing, however far it goes', () => {
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('right'), 400, 0)
+    expect(s().turning).toBeNull()
+  })
+
+  it('a vertical drag out of a corner turns nothing (N-1 holds inside the corner too)', () => {
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('right'), 0, -400)
+    expect(s().turning).toBeNull()
+    peelDrag(corner('left'), 0, 400)
+    expect(s().turning).toBeNull()
+  })
+
+  it('publishes the live pull to CSS while the hand is down, and clears it on release', () => {
+    renderHook(() => useBookInput(true))
+    const p = corner('right')
+    window.dispatchEvent(new PointerEvent('pointerdown', { clientX: p.x, clientY: p.y }))
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: p.x - CORNER_PEEL_COMMIT_PX / 2, clientY: p.y })
+    )
+    expect(document.documentElement.dataset.sbPeeling).toBe('')
+    expect(Number(peelVar())).toBeCloseTo(0.5, 2)
+
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: p.x - CORNER_PEEL_COMMIT_PX, clientY: p.y })
+    )
+    expect(Number(peelVar())).toBe(1)
+
+    window.dispatchEvent(
+      new PointerEvent('pointerup', { clientX: p.x - CORNER_PEEL_COMMIT_PX, clientY: p.y })
+    )
+    expect(document.documentElement.dataset.sbPeeling).toBeUndefined()
+    expect(peelVar()).toBe('')
+  })
+
+  it('a cancelled pointer puts the fold back down — no fold left lifted with no hand on it', () => {
+    renderHook(() => useBookInput(true))
+    const p = corner('right')
+    window.dispatchEvent(new PointerEvent('pointerdown', { clientX: p.x, clientY: p.y }))
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: p.x - 80, clientY: p.y }))
+    expect(document.documentElement.dataset.sbPeeling).toBe('')
+    window.dispatchEvent(new PointerEvent('pointercancel', { clientX: p.x - 80, clientY: p.y }))
+    expect(document.documentElement.dataset.sbPeeling).toBeUndefined()
+    expect(s().turning).toBeNull()
+  })
+
+  it('a press over a GRABBABLE in the corner peels nothing — the paper still wins', () => {
+    useStorybookStore.setState({ hover: 'ch5-throng' })
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('right'), -CORNER_PEEL_COMMIT_PX, 0)
+    expect(s().turning).toBeNull()
+    expect(document.documentElement.dataset.sbPeeling).toBeUndefined()
+  })
+
+  it('still turns on a plain tap — the peel did not cost the corner its click', () => {
+    renderHook(() => useBookInput(true))
+    peelDrag(corner('right'), 0, 0, 1)
+    expect(s().turning).toBe('next')
+  })
+})
 
 describe('useBookInput — a vertical drag never turns the page (N-1)', () => {
   beforeEach(() => useStorybookStore.setState(initial, true))
