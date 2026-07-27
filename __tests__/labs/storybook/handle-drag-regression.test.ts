@@ -274,7 +274,7 @@ function stripFlapCases(id: string): HandleCase[] {
     geom.grabProjection === 'cylinder'
       ? projectHingeAngleCyl(ray, fr.center, fr.hinge, fr.flat, fr.n, geom.height)
       : projectHingeAngle(ray, fr.center, fr.hinge, fr.flat, fr.n)
-  const vertsAt = (a: number): number[] => {
+  const vertsAt = (a: number): Vec3[] => {
     const pose = solveStripFlapPoseAt(geom, a, thetaL, thetaR)
     return flatten([pose.right, pose.left])
   }

@@ -636,16 +636,22 @@ const CASES: AxisCase[] = [
  * fix. The measured mismatch at the time of writing is quoted so nobody has to
  * re-derive it to know whether they have moved the number.
  *
- * All five share one shape: the piece travels along an axis its projector does
- * not read. The three plane-read strip flaps and the trolley are the acute
- * cases — the trolley rides an arc across the wire while `projectPageD` reads
- * only the page-fore component of the hand, and the strip flaps read a swing
- * plane the reading camera very nearly lies in (the pathology class B1-C exists
- * for; ch1-rank already uses the cylinder read and is still inverted).
+ * They share one shape: the piece travels along an axis its projector does not
+ * read. The plane-read strip flaps and the trolley are the acute cases — the
+ * trolley rides an arc across the wire while `projectPageD` reads only the
+ * page-fore component of the hand, and the strip flaps read a swing plane the
+ * reading camera very nearly lies in (the pathology class B1-C exists for;
+ * ch1-rank already uses the cylinder read and is still inverted).
+ *
+ * ch5-throng CAME OFF THIS LIST (N-5), exactly as the paragraph above promised:
+ * the s6 stall row was the blind reader's "six identical stall kits sit inert
+ * beside the one that works", its plane read returned grab angles 140 degrees
+ * round the wrong side of the hinge at the row's left cards, and giving it
+ * `grabProjection: 'cylinder'` turned its 73.1 deg mismatch honest. The mark
+ * came out with the fix.
  */
 const OTHER_LANE_AXIS_FAILURES: Record<string, string> = {
   'ch1-rank': '110.9 deg (drag DOWN raises it) — popup-stripflap-layer.tsx, stripflap lane',
-  'ch5-throng': '73.1 deg — popup-stripflap-layer.tsx, stripflap lane',
   'ch5-tea': '71.8 deg — popup-stripflap-layer.tsx, stripflap lane',
   'ch6-clerk': '51.3 deg — popup-stripflap-layer.tsx, stripflap lane',
   'ch3-dispatch-line': '64.9 deg (rides the wire, reads page-fore) — popup-dispatchline-layer.tsx',
