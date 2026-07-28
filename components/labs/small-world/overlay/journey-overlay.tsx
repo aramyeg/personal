@@ -1,6 +1,7 @@
 'use client'
 import type { MutableRefObject } from 'react'
 import { CHAPTER_COUNT, chapters } from '../chapters'
+import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
 import { EndPanel } from './end-panel'
 import { JourneyProgress } from './journey-progress'
@@ -21,6 +22,9 @@ export function JourneyOverlay({
   const ui = useJourneyUi(progressRef)
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
+          panel text can never be tinted by it (see biome-grade.tsx). */}
+      {SHOW_GRADE && <BiomeGrade progressRef={progressRef} />}
       <SpeedLines active={ui.burst} />
       {ui.panel && !ui.ended && (
         <ChapterPanels

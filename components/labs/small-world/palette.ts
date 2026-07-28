@@ -122,4 +122,32 @@ export const PALETTE = {
   // read as overlapping scales rather than one brown mass at corner scale
   yetiFur: '#EAF2F6', // winter yeti shag — brighter and bluer than the snow hare
   yetiMuzzle: '#B7CBD8', // yeti face patch / palms — cool grey-blue against the shag
+  // Task 55 — CINEMATIC BIOME GRADE: the mood each chapter casts over the whole page as the
+  // traveller arrives at its checkpoint. Three colours per biome, each read by a different layer:
+  //   *Sky  — the high backdrop is pulled toward this. It carries most of the mood, and it can be
+  //           saturated: it repaints the air behind the little world, nothing in front of it.
+  //   *Glow — the low horizon band. Authored per biome rather than derived, because a green or
+  //           teal mix into the pink horizon goes grey; every biome gets its own light instead.
+  //   *Cast — a PALE colour the scene's key + ambient light are tinted toward (and the faint
+  //           document haze above the canvas). This is the grade proper: it reaches the planet,
+  //           the girl and the mascots as LIGHT, so every clay figure keeps its own hue.
+  keyWarm: '#FFF2E0', // the scene's ungraded key light — warm daylight, the base every mood mixes from
+  gradeSpringSky: '#FFD7E4', // ch0 spring — soft blossom pink over the cream (the current feel)
+  gradeSpringGlow: '#FFCFE0', // blossom horizon
+  gradeSpringCast: '#FFE4D2', // warm blossom-cream light, barely there
+  gradeJungleSky: '#2E7D4F', // ch1 jungle — deep lush canopy green
+  gradeJungleGlow: '#D6E29A', // sunlit gap in the canopy: warm yellow-green at the horizon
+  gradeJungleCast: '#8FD69B', // pale fern-green light
+  gradeDeltaSky: '#2F7A70', // ch2 delta — humid teal, the swamp's damp air
+  gradeDeltaGlow: '#E2D8A6', // low silt-gold mist over the water
+  gradeDeltaCast: '#7FC9BC', // pale lagoon-teal light
+  gradeDesertSky: '#E9A03A', // ch3 desert — warm amber noon haze
+  gradeDesertGlow: '#FFEDBE', // bleached hot horizon
+  gradeDesertCast: '#FFCE84', // pale gold light
+  gradeCanyonSky: '#A64A22', // ch4 canyon — rust ember, low sun in the gorge
+  gradeCanyonGlow: '#FFC287', // ember light spilling along the rim
+  gradeCanyonCast: '#EE9A63', // pale ember light
+  gradeWinterSky: '#6E7FC2', // ch5 winter — cool blue-violet dusk
+  gradeWinterGlow: '#E6E1F5', // pale lilac light off the snow
+  gradeWinterCast: '#B3C2EE', // pale periwinkle light
 } as const

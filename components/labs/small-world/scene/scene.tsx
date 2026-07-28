@@ -3,7 +3,7 @@ import { Suspense, useCallback, useLayoutEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { hasArt } from '../art-manifest'
-import { Sky } from './sky'
+import { BiomeAtmosphere } from './biome-atmosphere'
 import { Planet } from './planet'
 import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
@@ -64,14 +64,8 @@ function SceneContents({
   return (
     <>
       <CameraRig />
-      <Sky />
-      {/* Lower ambient so the 4-step ramp actually bands across the form — high
-          fill washed the clay creases into a soft haze. */}
-      <ambientLight intensity={0.42} />
-      {/* Warm key raking from the upper-left, low enough that the terminator
-          crosses the visible face — shadow pools in the clay dents and reads the
-          toon bands as pinched facets. */}
-      <directionalLight position={[-6, 2, 3.2]} intensity={1.55} color="#fff2e0" />
+      {/* Backdrop + key/ambient light, both graded to the chapter's biome mood (Task 55). */}
+      <BiomeAtmosphere journeyRef={journeyRef} />
       <Planet journeyRef={journeyRef} onBakeReady={onBakeReady}>
         <GlobalDressing journeyRef={journeyRef} />
         <GlobalDressingAutumn journeyRef={journeyRef} />
