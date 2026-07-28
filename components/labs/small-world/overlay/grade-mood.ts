@@ -150,6 +150,14 @@ export const BIOME_MOODS: readonly BiomeMood[] = [
  * 0.65, so the mood starts moving on the last stretch of the approach and is fully in just after
  * the cards land — the arrival brings it, and nothing about it is abrupt (the window is 30% of a
  * chapter's scroll, ~72vh of travel).
+ *
+ * MOOD_IN_END CARRIES AN INVARIANT — it must stay at or below 1. The reveal gate below is a
+ * discontinuous input (a stale reveal is dropped the instant `chapter` flips), and `max` alone
+ * does not smooth that: it is only seamless because `scrolled` has already saturated at exactly 1
+ * by the time a chapter boundary is crossed, so the frame where the gate drops is a frame `max`
+ * was taking from the scroll term anyway. Push this window later and the boundary becomes a
+ * visible colour step at every checkpoint exit. Pinned by the boundary sweep in grade-mood.test.ts
+ * rather than left to this comment.
  */
 export const MOOD_IN_START = 0.42
 export const MOOD_IN_END = 0.72
@@ -227,6 +235,13 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
  * actually in. During a retraction it keeps naming the biome that is LEAVING even after the
  * journey has moved on, and letting that drive the mix would fade the wrong pair of moods; the
  * scroll window already holds the leaving mood correctly through that window, so it takes over.
+ *
+ * KNOWN, ACCEPTED EDGE. Scrub backwards hard enough to cross a whole segment boundary inside the
+ * 0.42s retraction (~2800px/s sustained at a 900px viewport, half-strength around 4400px/s) and
+ * the gate drops a still-live `arrived` term one chapter early, for a single frame. It is bounded
+ * and only reachable while the page is already rushing backwards. The tempting fix — also gating
+ * on `phase === 'in'` — is actively worse: it would drop `arrived` from 1 while `scrolled` is only
+ * ~0.43, stepping on every ordinary backward exit instead of only on a violent one.
  */
 export function moodBlendAt(progress: number, reveal?: RevealState | null): MoodBlend {
   const p = clamp01(progress)

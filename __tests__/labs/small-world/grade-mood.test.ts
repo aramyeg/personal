@@ -243,6 +243,35 @@ describe('moodBlendAt', () => {
     expect(worst).toBeLessThan(0.004)
   })
 
+  /**
+   * The reveal gate is a DISCONTINUOUS input: a stale reveal is dropped the instant `chapter`
+   * flips, and `max` cannot smooth a third term appearing and vanishing. It is seamless only
+   * because `scrolled` has saturated at exactly 1 by the boundary, so the frame the gate drops is
+   * a frame `max` was taking from the scroll term anyway. That safety is a property of
+   * MOOD_IN_END, not of the composition — this sweep is the tripwire on it, and it fails for any
+   * MOOD_IN_END above 1 (verified by construction: at local 1, `scrolled` = smoothstep((1 -
+   * MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START)), which stops reaching 1 exactly there).
+   */
+  it('crosses every chapter boundary seamlessly, even carrying a stale reveal', () => {
+    const eps = 1e-7
+    for (let c = 0; c < CHAPTER_COUNT - 1; c++) {
+      // A retraction still names the chapter being left, at whatever strength it has walked to.
+      for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+        const stale = { chapter: c, t, phase: 'out' as const }
+        const before = moodBlendAt(at(c, 1 - eps), stale)
+        const after = moodBlendAt(at(c + 1, eps), stale)
+        expect(Math.abs(after.skyMix - before.skyMix), `ch${c} t=${t} sky`).toBeLessThan(1e-3)
+        expect(Math.abs(after.lightMix - before.lightMix), `ch${c} t=${t} light`).toBeLessThan(1e-3)
+        expect(
+          Math.abs(after.vignetteAlpha - before.vignetteAlpha),
+          `ch${c} t=${t} vignette`
+        ).toBeLessThan(1e-3)
+        // …and the colour either side resolves to the same mood, from opposite ends of the blend.
+        expect(gradeAt(at(c, 1 - eps), stale).haze).toBe(gradeAt(at(c + 1, eps), stale).haze)
+      }
+    }
+  })
+
   it('retraces itself exactly when scrubbed backwards', () => {
     const forward = []
     for (let i = 0; i <= 600; i++) forward.push(moodBlendAt(i / 600))
