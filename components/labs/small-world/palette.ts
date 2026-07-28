@@ -118,6 +118,8 @@ export const PALETTE = {
   crocRidge: '#3F5A34', // scute ridges + brow bumps (the crocodile's deepest note)
   pangolinScale: '#A8794B', // canyon pangolin armour plate — warm earth-bronze over the rust gorge
   pangolinScaleDeep: '#70502F', // shaded plate underside / the ball's core
+  pangolinScaleLight: '#D9AC72', // sun-caught plate edge — the third tone that makes the armour
+  // read as overlapping scales rather than one brown mass at corner scale
   yetiFur: '#EAF2F6', // winter yeti shag — brighter and bluer than the snow hare
   yetiMuzzle: '#B7CBD8', // yeti face patch / palms — cool grey-blue against the shag
 } as const

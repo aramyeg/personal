@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
   PEEKER_SPECS,
+  facing,
+  peekerPieces,
+  peekerRootTilt,
   type PeekerDrive,
   type PeekerLimbs,
 } from '@/components/labs/small-world/scene/props/peeker-cast'
-import { peekerIdle, peekerUnroll, type PeekerKind } from '@/components/labs/small-world/scene/props/peeker-stage'
+import { buildMergedClay } from '@/components/labs/small-world/scene/props/clay-kit'
+import {
+  PEEKER_FIGURE_BOX,
+  PEEKER_MAX_SWAY,
+  peekerIdle,
+  peekerUnroll,
+  type PeekerKind,
+} from '@/components/labs/small-world/scene/props/peeker-stage'
 
 // Task 53 — the per-character idle gestures. They are written straight onto three Groups, so
 // these pins exercise the real objects: the gesture must be a pure function of the drive (scrub
@@ -124,5 +134,162 @@ describe('peeker gestures', () => {
       expect(open.b!.scale.x).toBeCloseTo(1, 10)
       expect(open.b!.rotation.z).toBeGreaterThan(rolled.b!.rotation.z)
     }
+  })
+})
+
+// --- the figure bounding radius, MEASURED ------------------------------------
+//
+// PEEKER_FIGURE_RADIUS is load-bearing: both clearance benches in peeker-stage.test.ts use it as
+// the figure's half-extent, and a figure that quietly outgrew it would make both of them
+// optimistic. So build the real merged geometry, reproduce the scene graph exactly (root tilt →
+// limb joint → limb transform), sweep the gesture range, and measure the true vertex extent.
+
+/** Mirrors the scene graph PeekerFigure builds, so the measurement includes joints and gestures. */
+function figureRig(kind: PeekerKind, dir: 1 | -1) {
+  const root = new THREE.Group()
+  root.rotation.z = peekerRootTilt(kind, dir)
+  const limbs: PeekerLimbs = { a: null, b: null, c: null }
+  const meshes: { obj: THREE.Object3D; geo: THREE.BufferGeometry }[] = []
+  for (const piece of peekerPieces(kind, dir)) {
+    const geo = buildMergedClay(piece.parts)
+    const holder = new THREE.Object3D()
+    if (piece.slot === 'body') {
+      holder.position.set(...piece.at)
+      root.add(holder)
+    } else {
+      const joint = new THREE.Group()
+      joint.position.set(...piece.at)
+      joint.add(holder)
+      root.add(joint)
+      limbs[piece.slot] = joint
+    }
+    meshes.push({ obj: holder, geo })
+  }
+  return { root, limbs, meshes }
+}
+
+type Box = { minX: number; maxX: number; minY: number; maxY: number; absZ: number }
+
+const EMPTY: Box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, absZ: 0 }
+
+/** Signed local bounding box over the whole gesture range — per axis, because a raised wingtip
+ *  and a downward reach are different questions for the clearance benches. */
+function measureBox(kind: PeekerKind, dir: 1 | -1): Box {
+  const { root, limbs, meshes } = figureRig(kind, dir)
+  const spec = PEEKER_SPECS[kind]
+  const v = new THREE.Vector3()
+  const box: Box = { ...EMPTY }
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12
+    for (const idle of [-1, 0, 1]) {
+      spec.apply(limbs, { idle, unroll: spec.rolls ? peekerUnroll(t) : 1 }, dir)
+      root.updateMatrixWorld(true)
+      for (const { obj, geo } of meshes) {
+        const pos = geo.attributes.position
+        for (let k = 0; k < pos.count; k++) {
+          v.fromBufferAttribute(pos, k).applyMatrix4(obj.matrixWorld)
+          box.minX = Math.min(box.minX, v.x)
+          box.maxX = Math.max(box.maxX, v.x)
+          box.minY = Math.min(box.minY, v.y)
+          box.maxY = Math.max(box.maxY, v.y)
+          box.absZ = Math.max(box.absZ, Math.abs(v.z))
+        }
+      }
+    }
+  }
+  for (const { geo } of meshes) geo.dispose()
+  return box
+}
+
+function unionBox(dir: 1 | -1): Box {
+  const out: Box = { ...EMPTY }
+  for (const kind of KINDS) {
+    const b = measureBox(kind, dir)
+    out.minX = Math.min(out.minX, b.minX)
+    out.maxX = Math.max(out.maxX, b.maxX)
+    out.minY = Math.min(out.minY, b.minY)
+    out.maxY = Math.max(out.maxY, b.maxY)
+    out.absZ = Math.max(out.absZ, b.absZ)
+  }
+  return out
+}
+
+describe('the figure bounding box the clearance benches rest on', () => {
+  it('every character fits inside PEEKER_FIGURE_BOX, in every pose, both facings', () => {
+    const b = PEEKER_FIGURE_BOX
+    for (const dir of [1, -1] as const) {
+      const u = unionBox(dir)
+      // the right-hand figure is the authored box mirrored, so compare against the mirror
+      const lo = dir === 1 ? b.minX : -b.maxX
+      const hi = dir === 1 ? b.maxX : -b.minX
+      expect(u.minX, `minX dir ${dir}`).toBeGreaterThanOrEqual(lo)
+      expect(u.maxX, `maxX dir ${dir}`).toBeLessThanOrEqual(hi)
+      expect(u.minY, `minY dir ${dir}`).toBeGreaterThanOrEqual(b.minY)
+      expect(u.maxY, `maxY dir ${dir}`).toBeLessThanOrEqual(b.maxY)
+      expect(u.absZ, `absZ dir ${dir}`).toBeLessThanOrEqual(b.absZ)
+    }
+  })
+
+  it('is tight — a box much larger than the figures would make the benches slack', () => {
+    const u = unionBox(1)
+    const b = PEEKER_FIGURE_BOX
+    expect(Math.abs(u.minX - b.minX)).toBeLessThan(0.05)
+    expect(Math.abs(u.maxX - b.maxX)).toBeLessThan(0.05)
+    expect(Math.abs(u.minY - b.minY)).toBeLessThan(0.05)
+    expect(Math.abs(u.maxY - b.maxY)).toBeLessThan(0.05)
+    expect(Math.abs(u.absZ - b.absZ)).toBeLessThan(0.05)
+  })
+
+  it('is facing-symmetric — a mirrored figure occupies the mirrored envelope', () => {
+    const l = unionBox(1)
+    const r = unionBox(-1)
+    expect(r.minX).toBeCloseTo(-l.maxX, 9)
+    expect(r.maxX).toBeCloseTo(-l.minX, 9)
+    expect(r.minY).toBeCloseTo(l.minY, 9)
+    expect(r.maxY).toBeCloseTo(l.maxY, 9)
+    expect(r.absZ).toBeCloseTo(l.absZ, 9)
+  })
+
+  it('no character asks for more sway than the benches sweep', () => {
+    for (const kind of KINDS) expect(PEEKER_SPECS[kind].sway, kind).toBeLessThanOrEqual(PEEKER_MAX_SWAY)
+  })
+})
+
+describe('facing() — the reflection the "no negative scale" claim rests on', () => {
+  const part = () => ({
+    geo: new THREE.BoxGeometry(1, 1, 1),
+    color: '#000000',
+    pos: [0.3, 0.4, 0.5] as [number, number, number],
+    rot: [0.1, 0.2, 0.3] as [number, number, number],
+    scl: [1.5, 1, 1] as [number, number, number],
+  })
+
+  it('is the identity for the left-hand facing', () => {
+    const p = part()
+    expect(facing(1, [p])[0]).toBe(p)
+  })
+
+  it('negates x offsets and the two Euler components that live in the reflected planes', () => {
+    const [m] = facing(-1, [part()])
+    expect(m.pos).toEqual([-0.3, 0.4, 0.5])
+    expect(m.rot).toEqual([0.1, -0.2, -0.3])
+  })
+
+  it('never introduces a negative scale — that would invert every normal', () => {
+    for (const kind of KINDS) {
+      for (const dir of [1, -1] as const) {
+        for (const piece of peekerPieces(kind, dir)) {
+          for (const p of piece.parts) {
+            for (const s of p.scl ?? [1, 1, 1]) expect(s, `${kind}/${dir}`).toBeGreaterThan(0)
+          }
+        }
+      }
+    }
+  })
+
+  it('round-trips: reflecting twice restores the original placement', () => {
+    const [back] = facing(-1, facing(-1, [part()]))
+    expect(back.pos).toEqual([0.3, 0.4, 0.5])
+    expect(back.rot).toEqual([0.1, 0.2, 0.3])
   })
 })

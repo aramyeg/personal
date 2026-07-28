@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo } from 'react'
-import type { MutableRefObject, ReactElement } from 'react'
+import type { MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { useClayRamp } from '../toon-ramp'
@@ -21,8 +21,9 @@ import type { PeekerKind } from './peeker-stage'
  * applying a negative scale keeps every normal outward-facing, so the toon bands never invert.
  *
  * Local space: +Y up, +Z toward the camera, origin at the figure's read centre. Everything is
- * authored ~1 unit tall inside PEEKER_FIGURE_RADIUS so the rig's single uniform scale is the
- * figure's world height and the clearance benches have a real bound to work with.
+ * authored ~1 unit tall so the rig's single uniform scale IS the figure's world height, and the
+ * envelope the clearance benches use (PEEKER_FIGURE_BOX) is measured back off this geometry
+ * rather than assumed — see the bounding-box suite in peeker-cast.test.ts.
  */
 
 // --- primitive helpers ------------------------------------------------------
@@ -57,7 +58,7 @@ const cyl = (rTop: number, rBot: number, h: number, color: string, pos: V3, rot?
  * a composition it holds whatever order the Euler is applied in. All the primitives used here are
  * themselves symmetric about YZ, so flipping the placement flips the figure.
  */
-function facing(d: 1 | -1, parts: ClayPart[]): ClayPart[] {
+export function facing(d: 1 | -1, parts: ClayPart[]): ClayPart[] {
   if (d === 1) return parts
   return parts.map((p) => ({
     ...p,
@@ -90,21 +91,17 @@ function alignY(dir: THREE.Vector3): V3 {
   return [_e.x, _e.y, _e.z]
 }
 
-/** Two ink eyes mirrored across the figure's centre plane. */
-function eyes(r: number, pos: V3, spread: number): ClayPart[] {
-  return [
-    sph(r, PALETTE.ink, [pos[0], pos[1], pos[2] + spread], undefined, 8),
-    sph(r, PALETTE.ink, [pos[0], pos[1], pos[2] - spread], undefined, 8),
-  ]
-}
-
 // --- jungle: exotic birds, wings open ---------------------------------------
 
 /** Scarlet macaw: hooked ink beak, bare cheek patch, a long open wing and streaming tail. */
 function macawBody(d: 1 | -1): ClayPart[] {
   return facing(d, [
-    // plump body + shoulders, sitting below and behind the head
+    // plump body + shoulders, sitting below and behind the head. The scarlet macaw's yellow and
+    // teal wing shoulder is doing real work here: an unbroken red mass is what the left-hand
+    // bird collapsed into at reading size, and these two blocks give it internal contrast.
     sph(0.25, PALETTE.parrotBody, [-0.11, -0.15, -0.02], [1, 1.15, 0.95], 12),
+    sph(0.15, PALETTE.honey, [-0.16, -0.04, 0.1], [1.15, 0.75, 0.7], 10),
+    sph(0.12, PALETTE.parrotWing, [-0.24, -0.17, 0.09], [1.1, 0.8, 0.6], 10),
     // long tail feathers streaming down and out of frame
     cone(0.055, 0.42, PALETTE.parrotWing, [-0.24, -0.4, -0.03], [0, 0, 0.45], [1, 1, 0.45]),
     cone(0.045, 0.34, PALETTE.honey, [-0.31, -0.36, 0.03], [0, 0, 0.62], [1, 1, 0.45]),
@@ -323,14 +320,26 @@ function camelJaw(d: 1 | -1, calf: boolean): ClayPart[] {
 function pangolinShell(r: number, n: number): ClayPart[] {
   const parts: ClayPart[] = [sph(r * 0.9, PALETTE.pangolinScaleDeep, [0, 0, 0], undefined, 14)]
   const dir = new THREE.Vector3()
+  // Three tones in rotation, not two: at corner scale a light/mid/deep cycle is what makes the
+  // plates read as overlapping armour instead of dissolving into one brown lump.
+  const tones = [PALETTE.pangolinScaleLight, PALETTE.pangolinScale, PALETTE.pangolinScaleDeep]
   for (let i = 0; i < n; i++) {
     const y = 1 - (2 * i + 1) / n
     const ring = Math.sqrt(Math.max(0, 1 - y * y))
     const phi = i * 2.399963229728653
     dir.set(ring * Math.cos(phi), y, ring * Math.sin(phi))
-    const shade = i % 3 === 0 ? PALETTE.pangolinScaleDeep : PALETTE.pangolinScale
+    // plates on the upper back are the ones on the skyline, so give them the extra size
+    const back = 0.9 + 0.25 * Math.max(0, y)
     parts.push(
-      cone(r * 0.56, r * 0.46, shade, [dir.x * r * 0.82, dir.y * r * 0.82, dir.z * r * 0.82], alignY(dir), [1, 1, 0.68], 5)
+      cone(
+        r * 0.6 * back,
+        r * 0.5 * back,
+        tones[i % 3],
+        [dir.x * r * 0.8, dir.y * r * 0.8, dir.z * r * 0.8],
+        alignY(dir),
+        [1, 1, 0.62],
+        5
+      )
     )
   }
   return parts
@@ -445,52 +454,10 @@ function yetiArm(d: 1 | -1, big: boolean): ClayPart[] {
  *  (only the pangolins use it, to swell their ball out into a body as they unfurl). */
 export type PeekerLimbs = { a: THREE.Group | null; b: THREE.Group | null; c?: THREE.Group | null }
 export type PeekerDrive = { idle: number; unroll: number }
+export type PeekerSlot = 'body' | 'a' | 'b' | 'c'
 
-type FigureProps = { limbs: MutableRefObject<PeekerLimbs>; dir: 1 | -1 }
-
-/** Builds a merged geometry once per (dir, kind) and disposes it when the figure goes away. */
-function useClayGeo(build: () => ClayPart[], deps: readonly unknown[]): THREE.BufferGeometry {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const geo = useMemo(() => buildMergedClay(build()), deps)
-  useEffect(() => () => geo.dispose(), [geo])
-  return geo
-}
-
-function ClayPiece({ geo }: { geo: THREE.BufferGeometry }) {
-  const ramp = useClayRamp()
-  return (
-    <mesh geometry={geo}>
-      <meshToonMaterial vertexColors gradientMap={ramp} />
-    </mesh>
-  )
-}
-
-/** Two-piece figure: a static body plus one hinged limb the rig animates. */
-function HingedFigure({
-  limbs,
-  body,
-  limb,
-  limbAt,
-}: {
-  limbs: MutableRefObject<PeekerLimbs>
-  body: THREE.BufferGeometry
-  limb: THREE.BufferGeometry
-  limbAt: V3
-}) {
-  return (
-    <group>
-      <ClayPiece geo={body} />
-      <group
-        position={limbAt}
-        ref={(g) => {
-          limbs.current.a = g
-        }}
-      >
-        <ClayPiece geo={limb} />
-      </group>
-    </group>
-  )
-}
+/** One merged mesh of a figure, and the joint it hangs from. */
+export type PeekerPiece = { slot: PeekerSlot; at: V3; parts: ClayPart[] }
 
 /**
  * Per-figure LIFT (in figure-heights). The frame's visible band for a peeker runs from roughly
@@ -499,96 +466,122 @@ function HingedFigure({
  */
 const LIFT = { macaw: 0.07, cockatoo: 0.05, croc: 0.11, camel: 0.02, pangolin: 0.06, yeti: -0.05 }
 
-function Macaw({ limbs, dir }: FigureProps) {
-  const body = useClayGeo(() => raise(LIFT.macaw, macawBody(dir)), [dir])
-  const wing = useClayGeo(() => macawWing(dir), [dir])
-  return <HingedFigure limbs={limbs} body={body} limb={wing} limbAt={[-0.12 * dir, 0.08 + LIFT.macaw, 0.06]} />
+/**
+ * Every figure's whole build, as DATA rather than as JSX.
+ *
+ * This is what lets `PEEKER_FIGURE_RADIUS` be a measured fact instead of a hopeful constant:
+ * peeker-cast.test.ts calls this, merges each piece, sweeps the gesture range, and asserts the
+ * real vertex extent fits inside the radius the clearance benches are built on. Both benches
+ * rest on that number, so it must not be taken on trust.
+ */
+export function peekerPieces(kind: PeekerKind, dir: 1 | -1): PeekerPiece[] {
+  switch (kind) {
+    case 'macaw':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.macaw, macawBody(dir)) },
+        { slot: 'a', at: [-0.12 * dir, 0.08 + LIFT.macaw, 0.06], parts: macawWing(dir) },
+      ]
+    case 'cockatoo':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.cockatoo, cockatooBody(dir)) },
+        { slot: 'a', at: [-0.11 * dir, 0.06 + LIFT.cockatoo, 0.06], parts: cockatooWing(dir) },
+      ]
+    case 'crocGape':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.croc, crocSkull(dir, true)) },
+        { slot: 'a', at: [-0.18 * dir, -0.02 + LIFT.croc, 0], parts: crocJaw(dir, true) },
+      ]
+    case 'crocPeek':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.croc, crocSkull(dir, false)) },
+        { slot: 'a', at: [-0.18 * dir, -0.02 + LIFT.croc, 0], parts: crocJaw(dir, false) },
+        { slot: 'b', at: [0.1 * dir, -0.12 + LIFT.croc, 0.14], parts: crocClaw(dir) },
+      ]
+    case 'camelAdult':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.camel, camelHead(dir, false)) },
+        { slot: 'a', at: [-0.02 * dir, 0.1 + LIFT.camel, 0], parts: camelJaw(dir, false) },
+      ]
+    case 'camelCalf':
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.camel, camelHead(dir, true)) },
+        { slot: 'a', at: [-0.02 * dir, 0.1 + LIFT.camel, 0], parts: camelJaw(dir, true) },
+      ]
+    case 'pangolinBig':
+    case 'pangolinSmall': {
+      const big = kind === 'pangolinBig'
+      const k = big ? 1 : 0.82
+      // The shell stays centred on the figure's origin so the roll-in spins about the ball's own
+      // middle; the lift rides on the whole figure via the ball, and the joints sit on its
+      // equator so the head and tail unfurl into the band the frame actually shows.
+      return [
+        { slot: 'c', at: [0, 0, 0], parts: raise(LIFT.pangolin, pangolinShell(0.36 * k, big ? 15 : 12)) },
+        { slot: 'a', at: [0.25 * k * dir, 0.03 * k + LIFT.pangolin, 0.08], parts: pangolinHead(dir, k) },
+        { slot: 'b', at: [-0.25 * k * dir, 0.02 * k + LIFT.pangolin, -0.02], parts: pangolinTail(dir, k) },
+      ]
+    }
+    case 'yetiBig':
+    case 'yetiSmall': {
+      const big = kind === 'yetiBig'
+      return [
+        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.yeti, yetiBody(dir, big)) },
+        { slot: 'a', at: [-0.18 * dir, -0.1 + LIFT.yeti, 0.14], parts: yetiArm(dir, big) },
+      ]
+    }
+  }
 }
 
-function Cockatoo({ limbs, dir }: FigureProps) {
-  const body = useClayGeo(() => raise(LIFT.cockatoo, cockatooBody(dir)), [dir])
-  const wing = useClayGeo(() => cockatooWing(dir), [dir])
-  return <HingedFigure limbs={limbs} body={body} limb={wing} limbAt={[-0.11 * dir, 0.06 + LIFT.cockatoo, 0.06]} />
+/**
+ * Static roll baked onto a figure's root. Only the small crocodile uses it: the two crocodiles
+ * share one build, so the cocked head (plus the barely-there chomp and the forefoot) is what
+ * keeps the pair from reading as one animal at two scales.
+ */
+export function peekerRootTilt(kind: PeekerKind, dir: 1 | -1): number {
+  return kind === 'crocPeek' ? -0.26 * dir : 0
 }
 
-function Croc({ limbs, dir, big }: FigureProps & { big: boolean }) {
-  const skull = useClayGeo(() => raise(LIFT.croc, crocSkull(dir, big)), [dir, big])
-  const jaw = useClayGeo(() => crocJaw(dir, big), [dir, big])
-  const claw = useClayGeo(() => crocClaw(dir), [dir])
-  // The little one cocks its head — the two crocodiles share a build, so the tilt (plus the
-  // barely-there chomp and the forefoot) is what keeps the pair from reading as a mirror.
+/**
+ * One figure: each piece merged to a single vertex-coloured draw under the shared toon ramp,
+ * with the hinged pieces wired into the rig's limb refs by slot. Geometries are built once per
+ * (kind, dir) and disposed when the figure goes away.
+ */
+export function PeekerFigure({
+  kind,
+  limbs,
+  dir,
+}: {
+  kind: PeekerKind
+  limbs: MutableRefObject<PeekerLimbs>
+  dir: 1 | -1
+}) {
+  const ramp = useClayRamp()
+  const pieces = useMemo(() => peekerPieces(kind, dir), [kind, dir])
+  const geos = useMemo(() => pieces.map((p) => buildMergedClay(p.parts)), [pieces])
+  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos])
+
   return (
-    <group rotation={[0, 0, big ? 0 : -0.26 * dir]}>
-      <ClayPiece geo={skull} />
-      <group
-        position={[-0.18 * dir, -0.02 + LIFT.croc, 0]}
-        ref={(g) => {
-          limbs.current.a = g
-        }}
-      >
-        <ClayPiece geo={jaw} />
-      </group>
-      {!big && (
-        <group
-          position={[0.1 * dir, -0.12 + LIFT.croc, 0.14]}
-          ref={(g) => {
-            limbs.current.b = g
-          }}
-        >
-          <ClayPiece geo={claw} />
-        </group>
+    <group rotation={[0, 0, peekerRootTilt(kind, dir)]}>
+      {pieces.map((piece, i) =>
+        piece.slot === 'body' ? (
+          <mesh key={piece.slot} geometry={geos[i]} position={piece.at}>
+            <meshToonMaterial vertexColors gradientMap={ramp} />
+          </mesh>
+        ) : (
+          <group
+            key={piece.slot}
+            position={piece.at}
+            ref={(g) => {
+              limbs.current[piece.slot as 'a' | 'b' | 'c'] = g
+            }}
+          >
+            <mesh geometry={geos[i]}>
+              <meshToonMaterial vertexColors gradientMap={ramp} />
+            </mesh>
+          </group>
+        )
       )}
     </group>
   )
-}
-
-function Camel({ limbs, dir, calf }: FigureProps & { calf: boolean }) {
-  const head = useClayGeo(() => raise(LIFT.camel, camelHead(dir, calf)), [dir, calf])
-  const jaw = useClayGeo(() => camelJaw(dir, calf), [dir, calf])
-  return <HingedFigure limbs={limbs} body={head} limb={jaw} limbAt={[-0.02 * dir, 0.1 + LIFT.camel, 0]} />
-}
-
-function Pangolin({ limbs, dir, big }: FigureProps & { big: boolean }) {
-  const k = big ? 1 : 0.82
-  // The shell stays centred on the figure's origin so the roll-in spins about the ball's own
-  // middle; the lift rides on the whole figure via the ball, and the joints sit on its equator
-  // so the head and tail unfurl into the band the frame actually shows.
-  const shell = useClayGeo(() => raise(LIFT.pangolin, pangolinShell(0.36 * k, big ? 15 : 12)), [k, big])
-  const head = useClayGeo(() => pangolinHead(dir, k), [dir, k])
-  const tail = useClayGeo(() => pangolinTail(dir, k), [dir, k])
-  return (
-    <group>
-      <group
-        ref={(g) => {
-          limbs.current.c = g
-        }}
-      >
-        <ClayPiece geo={shell} />
-      </group>
-      <group
-        position={[0.25 * k * dir, 0.03 * k + LIFT.pangolin, 0.08]}
-        ref={(g) => {
-          limbs.current.a = g
-        }}
-      >
-        <ClayPiece geo={head} />
-      </group>
-      <group
-        position={[-0.25 * k * dir, 0.02 * k + LIFT.pangolin, -0.02]}
-        ref={(g) => {
-          limbs.current.b = g
-        }}
-      >
-        <ClayPiece geo={tail} />
-      </group>
-    </group>
-  )
-}
-
-function Yeti({ limbs, dir, big }: FigureProps & { big: boolean }) {
-  const body = useClayGeo(() => raise(LIFT.yeti, yetiBody(dir, big)), [dir, big])
-  const arm = useClayGeo(() => yetiArm(dir, big), [dir, big])
-  return <HingedFigure limbs={limbs} body={body} limb={arm} limbAt={[-0.18 * dir, -0.1 + LIFT.yeti, 0.14]} />
 }
 
 // --- per-kind gesture + spec ------------------------------------------------
@@ -602,7 +595,6 @@ function Yeti({ limbs, dir, big }: FigureProps & { big: boolean }) {
  * swing the other way once the figure is reflected: rotations about Y and Z flip sign.
  */
 export type PeekerSpec = {
-  Figure: (props: FigureProps) => ReactElement
   apply: (limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1) => void
   /** Idle oscillations across the panel dwell. */
   cycles: number
@@ -633,7 +625,9 @@ function applyChomp(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
 function applyChew(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
   if (!limbs.a) return
   limbs.a.rotation.z = dir * 0.05 * (0.5 + 0.5 * drive.idle)
-  limbs.a.rotation.y = 0.09 * drive.idle
+  // dir applies to yaw as well as roll: reflecting a figure negates BOTH Euler y and z, so a
+  // yaw written without it leaves the right-hand animal chewing the wrong way round.
+  limbs.a.rotation.y = dir * 0.09 * drive.idle
 }
 
 /**
@@ -646,8 +640,8 @@ function applyUnroll(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void 
     limbs.a.rotation.z = dir * (2.5 - 2.62 * u)
     const s = 0.4 + 0.6 * u
     limbs.a.scale.set(s, s, s)
-    // once out, the snout noses gently up and down
-    limbs.a.rotation.y = 0.22 * drive.idle * u
+    // once out, the snout noses gently up and down (dir for the same reason as applyChew)
+    limbs.a.rotation.y = dir * 0.22 * drive.idle * u
   }
   if (limbs.b) {
     limbs.b.rotation.z = dir * (-2.5 + 2.1 * u)
@@ -663,14 +657,14 @@ function applyArm(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
 }
 
 export const PEEKER_SPECS: Record<PeekerKind, PeekerSpec> = {
-  macaw: { Figure: Macaw, apply: applyWing, cycles: 6, sway: 0.05 },
-  cockatoo: { Figure: Cockatoo, apply: applyWing, cycles: 5, sway: 0.055 },
-  crocGape: { Figure: (p) => <Croc {...p} big />, apply: applyJaw, cycles: 2, sway: 0.03 },
-  crocPeek: { Figure: (p) => <Croc {...p} big={false} />, apply: applyChomp, cycles: 2.5, sway: 0.035 },
-  camelAdult: { Figure: (p) => <Camel {...p} calf={false} />, apply: applyChew, cycles: 4, sway: 0.04 },
-  camelCalf: { Figure: (p) => <Camel {...p} calf />, apply: applyChew, cycles: 5, sway: 0.05 },
-  pangolinBig: { Figure: (p) => <Pangolin {...p} big />, apply: applyUnroll, cycles: 2.5, sway: 0.05, rolls: true },
-  pangolinSmall: { Figure: (p) => <Pangolin {...p} big={false} />, apply: applyUnroll, cycles: 3, sway: 0.06, rolls: true },
-  yetiBig: { Figure: (p) => <Yeti {...p} big />, apply: applyArm, cycles: 2, sway: 0.045 },
-  yetiSmall: { Figure: (p) => <Yeti {...p} big={false} />, apply: applyArm, cycles: 2.5, sway: 0.06 },
+  macaw: { apply: applyWing, cycles: 6, sway: 0.05 },
+  cockatoo: { apply: applyWing, cycles: 5, sway: 0.055 },
+  crocGape: { apply: applyJaw, cycles: 2, sway: 0.03 },
+  crocPeek: { apply: applyChomp, cycles: 2.5, sway: 0.035 },
+  camelAdult: { apply: applyChew, cycles: 4, sway: 0.04 },
+  camelCalf: { apply: applyChew, cycles: 5, sway: 0.05 },
+  pangolinBig: { apply: applyUnroll, cycles: 2.5, sway: 0.05, rolls: true },
+  pangolinSmall: { apply: applyUnroll, cycles: 3, sway: 0.06, rolls: true },
+  yetiBig: { apply: applyArm, cycles: 2, sway: 0.045 },
+  yetiSmall: { apply: applyArm, cycles: 2.5, sway: 0.06 },
 }

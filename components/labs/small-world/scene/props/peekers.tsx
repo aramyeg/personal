@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { JourneyRef } from '../use-journey'
-import { PEEKER_SPECS, type PeekerDrive, type PeekerLimbs } from './peeker-cast'
+import { PeekerFigure, PEEKER_SPECS, type PeekerDrive, type PeekerLimbs } from './peeker-cast'
 import {
   PEEKER_DEPTH,
   PEEKER_FACE_IN,
@@ -11,7 +11,9 @@ import {
   PEEKER_LEAN_EXTRA,
   PEEK_SIDE_STAGGER,
   PEEKER_CAST,
+  peekerHalfHeight,
   peekerIdle,
+  peekerParkedY,
   peekerPlacement,
   peekerPresence,
   peekerRollSpin,
@@ -75,12 +77,14 @@ function PeekerSide({
     const g = outer.current
     if (!g) return
     const panel = journeyRef.current.panel
-    if (!panel || panel.chapter !== chapter) {
+    // A narrow viewport has no top-left corner to peek from — the fixed-size navigation pill
+    // occupies it — so the left figure stands down entirely there.
+    if (!panel || panel.chapter !== chapter || (side === -1 && !place.leftVisible)) {
       g.visible = false
       return
     }
-    const t = panel.t - stagger
-    const p = peekerPresence(t, reduced)
+    const t = panel.t
+    const p = peekerPresence(t, reduced, stagger)
     if (p <= 0.0005) {
       g.visible = false
       return
@@ -90,11 +94,13 @@ function PeekerSide({
     // `p` is the hidden→parked lerp; its easeOutBack overshoot past 1 IS the settle.
     const hide = 1 - p
     const settled = Math.min(1, Math.max(0, p))
-    const idle = reduced ? 0 : peekerIdle(t, spec.cycles, side === 1 ? RIGHT_PHASE : 0) * settled
+    const parkedY = peekerParkedY(place, side)
+    const idle =
+      reduced ? 0 : peekerIdle(t - stagger, spec.cycles, side === 1 ? RIGHT_PHASE : 0) * settled
 
     g.position.set(
       side * (place.x + hide * place.hiddenOut),
-      place.y + hide * (place.hiddenY - place.y),
+      parkedY + hide * (place.hiddenY - parkedY),
       -PEEKER_DEPTH
     )
     g.rotation.set(
@@ -109,15 +115,14 @@ function PeekerSide({
     }
 
     drive.current.idle = idle
-    drive.current.unroll = spec.rolls && !reduced ? peekerUnroll(t) : 1
+    drive.current.unroll = spec.rolls && !reduced ? peekerUnroll(t - stagger) : 1
     spec.apply(limbs.current, drive.current, dir)
   })
 
-  const Figure = spec.Figure
   return (
     <group ref={outer} visible={false}>
       <group ref={spinner}>
-        <Figure limbs={limbs} dir={dir} />
+        <PeekerFigure kind={kind} limbs={limbs} dir={dir} />
       </group>
     </group>
   )
@@ -143,9 +148,9 @@ export function CheckpointPeekers({ journeyRef }: { journeyRef: JourneyRef }) {
   const reduced = usePrefersReducedMotion()
 
   const place = useMemo(() => {
-    const halfH = PEEKER_DEPTH * Math.tan((camera.fov * Math.PI) / 360)
-    return peekerPlacement(halfH, halfH * (size.width / size.height))
-  }, [camera.fov, size.width, size.height])
+    const halfH = peekerHalfHeight(camera.fov)
+    return peekerPlacement(halfH, (halfH * size.width) / size.height, size)
+  }, [camera.fov, size])
 
   // Priority −0.5 keeps this after the journey damp (−1) and before every peeker side (0), so a
   // side always reads a camera frame and a JourneyState from the same tick.
