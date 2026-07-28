@@ -25,6 +25,7 @@ import { AknaSet } from './props/set-akna'
 import { CanyonGeysers } from './props/canyon'
 import { WinterLife } from './props/winter'
 import { XdatagroupSet } from './props/set-xdatagroup'
+import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
 
 export type SceneProps = { progressRef: MutableRefObject<number> }
@@ -109,6 +110,9 @@ function SceneContents({
         <GirlProxy journeyRef={journeyRef} />
       )}
       <DiscoveryBurst journeyRef={journeyRef} />
+      {/* Sky-anchored corner characters for each checkpoint — a SIBLING of the planet, never a
+          child: they hold the frame's top corners while the world keeps spinning beneath them. */}
+      <CheckpointPeekers journeyRef={journeyRef} />
     </>
   )
 }

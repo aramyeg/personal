@@ -109,4 +109,15 @@ export const PALETTE = {
   owlFace: '#CBBBA0', // pale owl facial disc
   hareFur: '#DDE6EC', // cold white-grey snow hare
   hareShade: '#B8C6D0', // hare shadow / burrow-mouth rim
+  // Task 53 — CHECKPOINT PEEKERS: the corner characters that lean in over each chapter's
+  // panel. Each family borrows its wedge's existing accents where one already fits (the
+  // jungle birds reuse parrotBody/parrotWing, the camels reuse camelHide/camelSaddle) and
+  // only adds what the world had no colour for yet.
+  crocHide: '#5C7A4A', // delta crocodile back — swampy olive-green, darker than deltaMoss
+  crocBelly: '#C8CE9A', // pale under-jaw / throat
+  crocRidge: '#3F5A34', // scute ridges + brow bumps (the crocodile's deepest note)
+  pangolinScale: '#A8794B', // canyon pangolin armour plate — warm earth-bronze over the rust gorge
+  pangolinScaleDeep: '#70502F', // shaded plate underside / the ball's core
+  yetiFur: '#EAF2F6', // winter yeti shag — brighter and bluer than the snow hare
+  yetiMuzzle: '#B7CBD8', // yeti face patch / palms — cool grey-blue against the shag
 } as const

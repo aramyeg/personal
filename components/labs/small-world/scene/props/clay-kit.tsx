@@ -407,7 +407,7 @@ export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x
 // is already instanced). The merge bakes each primitive's local transform + accent into
 // per-vertex colour; the silhouette + shading are identical to the per-mesh build.
 
-type ClayPart = { geo: THREE.BufferGeometry; color: string; pos?: [number, number, number]; rot?: [number, number, number]; scl?: [number, number, number] }
+export type ClayPart = { geo: THREE.BufferGeometry; color: string; pos?: [number, number, number]; rot?: [number, number, number]; scl?: [number, number, number] }
 
 /** Local transform matrix for a part (Euler order XYZ, matching r3f's `rotation` prop). */
 function partMatrix(p: ClayPart): THREE.Matrix4 {
@@ -423,8 +423,10 @@ function partMatrix(p: ClayPart): THREE.Matrix4 {
 /** Bake a list of clay primitives into ONE vertex-coloured, non-indexed BufferGeometry:
  *  each part's local transform is applied to its geometry (positions + normals) and its
  *  accent colour is written per-vertex. Rendered with a single meshToonMaterial
- *  (vertexColors) so the whole figure is one draw call. The source geometries are disposed. */
-function buildMergedClay(parts: ClayPart[]): THREE.BufferGeometry {
+ *  (vertexColors) so the whole figure is one draw call. The source geometries are disposed.
+ *  Exported for the checkpoint peekers (Task 53), which are the same kind of figure staged in
+ *  the sky instead of on the terrain. */
+export function buildMergedClay(parts: ClayPart[]): THREE.BufferGeometry {
   const positions: number[] = []
   const normals: number[] = []
   const colors: number[] = []
