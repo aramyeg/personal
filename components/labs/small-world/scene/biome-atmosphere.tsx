@@ -39,7 +39,8 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
   const ambient = useRef<THREE.AmbientLight>(null)
 
   useFrame(() => {
-    const b = moodBlendAt(journeyRef.current.progress)
+    const j = journeyRef.current
+    const b = moodBlendAt(j.progress, j.reveal)
     const prev = Math.max(0, b.chapter - 1)
     if (key.current) {
       key.current.color

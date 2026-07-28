@@ -28,7 +28,7 @@ export function JourneyOverlay({
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
           panel text can never be tinted by it (see biome-grade.tsx). */}
-      {SHOW_GRADE && <BiomeGrade progressRef={progressRef} />}
+      {SHOW_GRADE && <BiomeGrade progressRef={progressRef} journey={journey} />}
       <SpeedLines active={ui.burst} />
       {ui.panel && !ui.ended && (
         <ChapterPanels

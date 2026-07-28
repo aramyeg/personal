@@ -76,6 +76,61 @@ describe('BiomeGrade', () => {
   })
 })
 
+/**
+ * A checkpoint rolls out with the visitor's hands off the wheel — zero scroll events — so the
+ * grade has to recompute on the arrival driver's frames or it freezes part-way through every
+ * entrance. These pin that path, and that it is released on unmount.
+ */
+describe('BiomeGrade on the arrival clock', () => {
+  const fakeJourney = () => {
+    const listeners = new Set<() => void>()
+    const arrivalRef = { current: { reveal: null as { chapter: number; t: number; phase: 'in' | 'out' } | null } }
+    return {
+      journey: {
+        progressRef: { current: 0 },
+        rawProgressRef: { current: 0 },
+        arrivalRef,
+        subscribe: (fn: () => void) => {
+          listeners.add(fn)
+          return () => listeners.delete(fn)
+        },
+      },
+      arrivalRef,
+      frame: () => act(() => listeners.forEach((fn) => fn())),
+      listenerCount: () => listeners.size,
+    }
+  }
+
+  it('completes the crossfade on driver frames with no scroll at all', () => {
+    const { journey, arrivalRef, frame } = fakeJourney()
+    // Parked where T54's absorption holds progress while chapter 5 (winter) rolls out.
+    const ref = { current: (5 + 0.56) / BIOME_MOODS.length }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render(<BiomeGrade progressRef={ref} journey={journey as any} />)
+    const el = screen.getByTestId('sw-biome-grade')
+    // Scroll alone leaves the mood part-way between the canyon and the winter.
+    const partway = vars(el)
+    expect(partway.haze).not.toBe(BIOME_MOODS[5].cast)
+    expect(partway.haze).not.toBe(BIOME_MOODS[4].cast)
+
+    arrivalRef.current.reveal = { chapter: 5, t: 1, phase: 'in' }
+    frame()
+    const arrived = vars(el)
+    expect(arrived.haze).toBe(BIOME_MOODS[5].cast)
+    expect(arrived.vignetteAlpha).toBeCloseTo(gradeAt(ref.current, arrivalRef.current.reveal).vignetteAlpha, 4)
+    expect(arrived.vignetteAlpha).not.toBeCloseTo(partway.vignetteAlpha, 4)
+  })
+
+  it('unsubscribes from the driver on unmount', () => {
+    const { journey, listenerCount } = fakeJourney()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { unmount } = render(<BiomeGrade progressRef={{ current: 0 }} journey={journey as any} />)
+    expect(listenerCount()).toBe(1)
+    unmount()
+    expect(listenerCount()).toBe(0)
+  })
+})
+
 describe('grade paint order', () => {
   beforeEach(() => {
     vi.useFakeTimers()

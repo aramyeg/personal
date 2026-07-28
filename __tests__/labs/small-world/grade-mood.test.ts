@@ -4,6 +4,7 @@ import { PALETTE } from '@/components/labs/small-world/palette'
 import {
   BIOME_MOODS,
   BLOOM_FLOOR,
+  GRADE_PHASE_END,
   HAZE_ALPHA_MAX,
   LIGHT_MIX_MAX,
   MOOD_IN_END,
@@ -153,16 +154,53 @@ describe('moodBlendAt', () => {
     expect(prev).toBe(1)
   })
 
-  it('takes the T54 reveal clock when one is handed in', () => {
-    const p = at(2, 0.5) // mid-window: the scroll-keyed mix would be partial
-    expect(moodBlendAt(p).mix).toBeGreaterThan(0)
-    expect(moodBlendAt(p).mix).toBeLessThan(1)
-    expect(moodBlendAt(p, 0).mix).toBe(0)
-    expect(moodBlendAt(p, 1).mix).toBe(1)
-    // The reveal clock drives the crossfade only; the bloom still rides the scroll position.
-    expect(moodBlendAt(p, 1).skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.5), 6)
-    expect(moodBlendAt(p, -5).mix).toBe(0)
-    expect(moodBlendAt(p, 5).mix).toBe(1)
+  // The regression the whole re-key exists for: T54's arrival absorbs scroll, so progress PARKS
+  // while the checkpoint rolls out. On scroll alone the crossfade would stop here and only finish
+  // when the visitor scrolled again — the mood would arrive after the mascots, not with them.
+  it('finishes the crossfade on the arrival clock while progress is parked', () => {
+    const parked = at(4, 0.56) // the girl has stopped; absorption holds progress here
+    const scrollOnly = moodBlendAt(parked).mix
+    expect(scrollOnly).toBeGreaterThan(0)
+    expect(scrollOnly).toBeLessThan(1)
+
+    const rolling = (t: number) => moodBlendAt(parked, { chapter: 4, t, phase: 'in' as const }).mix
+    expect(rolling(GRADE_PHASE_END)).toBe(1)
+    expect(rolling(1)).toBe(1)
+    // …and it gets there monotonically, without ever dipping below where scroll had it.
+    let prev = -1
+    for (let i = 0; i <= 100; i++) {
+      const mix = rolling(i / 100)
+      expect(mix).toBeGreaterThanOrEqual(prev)
+      expect(mix).toBeGreaterThanOrEqual(scrollOnly - 1e-9)
+      prev = mix
+    }
+  })
+
+  // `max` of two continuous inputs, so arming and nullifying the clock can never make the grade
+  // jump — whatever scroll position the absorption happens to park at.
+  it('cannot jump when the reveal arms or ends', () => {
+    for (const local of [0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
+      const p = at(3, local)
+      const idle = moodBlendAt(p).mix
+      const armed = moodBlendAt(p, { chapter: 3, t: 0, phase: 'in' }).mix
+      expect(armed).toBe(idle)
+    }
+  })
+
+  // During a retraction the reveal keeps naming the biome that is LEAVING even after the journey
+  // has moved into the next chapter. Letting that drive the mix would crossfade the wrong pair.
+  it('ignores a reveal that names a different chapter', () => {
+    const p = at(3, 0.1)
+    const stale = { chapter: 2, t: 1, phase: 'out' as const }
+    expect(moodBlendAt(p, stale).mix).toBe(moodBlendAt(p).mix)
+    expect(moodBlendAt(p, stale).to).toBe(BIOME_MOODS[3])
+  })
+
+  it('leaves the bloom on scroll — the swell is an envelope, not an entrance beat', () => {
+    const p = at(2, 0.5)
+    const full = moodBlendAt(p, { chapter: 2, t: 1, phase: 'in' })
+    expect(full.mix).toBe(1)
+    expect(full.skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.5), 6)
   })
 
   it('clamps outside the journey instead of running off the mood list', () => {

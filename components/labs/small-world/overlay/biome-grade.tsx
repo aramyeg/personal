@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
 import { PALETTE } from '../palette'
+import type { ArrivalJourney } from '../use-arrival-journey'
 import { gradeAt } from './grade-mood'
 
 export { SHOW_GRADE } from './grade-mood'
@@ -21,10 +22,16 @@ export { SHOW_GRADE } from './grade-mood'
  * WHY THE CARDS ARE SAFE. This mounts FIRST inside the overlay, so the panels and the progress
  * rail paint above it. Card legibility is a property of paint order, not of gentle numbers.
  *
- * CHEAP BY CONSTRUCTION, like the progress rail: the grade is a pure function of scroll progress,
- * so it is written straight to the DOM as three custom properties from one rAF-coalesced scroll
- * handler — zero React renders across the whole journey, and no CSS transition anywhere (scrubbing
- * back retraces the same values instead of chasing a stale animation).
+ * CHEAP BY CONSTRUCTION, like the progress rail: the grade is a pure function of its inputs, so it
+ * is written straight to the DOM as three custom properties — zero React renders across the whole
+ * journey, and no CSS transition anywhere (scrubbing back retraces the same values instead of
+ * chasing a stale animation).
+ *
+ * TWO TRIGGERS, and both are needed. Scroll events cover scrubbing. The arrival clock covers the
+ * entrance, which by design plays with the visitor's hands off the wheel: a checkpoint roll-out
+ * produces NO scroll events at all, so a scroll-only listener would freeze the grade part-way
+ * through every arrival. `journey.subscribe` fires once per driver frame and the driver idles
+ * whenever the journey is simply on the finger, so a still page still costs nothing.
  *
  * COMPOSITING. Two plain-alpha quads, no `filter` and no blend mode — free by construction, and
  * measured at a locked 60fps at both 1x and 2x device pixel ratio. A `filter` on the element
@@ -50,7 +57,14 @@ const VIGNETTE_LAYER: CSSProperties = {
   opacity: 'var(--sw-grade-vig-a)',
 }
 
-export function BiomeGrade({ progressRef }: { progressRef: MutableRefObject<number> }) {
+export function BiomeGrade({
+  progressRef,
+  journey,
+}: {
+  progressRef: MutableRefObject<number>
+  /** Supplies the arrival reveal clock; absent → the grade rides scroll alone (Task 54). */
+  journey?: ArrivalJourney
+}) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -58,7 +72,7 @@ export function BiomeGrade({ progressRef }: { progressRef: MutableRefObject<numb
     const apply = () => {
       const el = rootRef.current
       if (!el) return
-      const g = gradeAt(progressRef.current)
+      const g = gradeAt(progressRef.current, journey?.arrivalRef.current.reveal ?? null)
       el.style.setProperty('--sw-grade-haze', g.haze)
       el.style.setProperty('--sw-grade-haze-a', g.hazeAlpha.toFixed(4))
       el.style.setProperty('--sw-grade-vig-a', g.vignetteAlpha.toFixed(4))
@@ -71,11 +85,13 @@ export function BiomeGrade({ progressRef }: { progressRef: MutableRefObject<numb
     }
     apply()
     window.addEventListener('scroll', onScroll, { passive: true })
+    const unsubscribe = journey?.subscribe(apply)
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('scroll', onScroll)
+      unsubscribe?.()
     }
-  }, [progressRef])
+  }, [progressRef, journey])
 
   return (
     <div

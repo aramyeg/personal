@@ -32,7 +32,8 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
 
   useFrame(() => {
     if (!journeyRef) return
-    const b = moodBlendAt(journeyRef.current.progress)
+    const j = journeyRef.current
+    const b = moodBlendAt(j.progress, j.reveal)
     const prev = Math.max(0, b.chapter - 1)
     uniforms.uSky.value
       .copy(BASE_SKY)
