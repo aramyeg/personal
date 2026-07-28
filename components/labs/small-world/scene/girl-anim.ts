@@ -13,6 +13,10 @@
  * ALL locomotion, its cadence mapped from |speed| with a slow keep-alive floor
  * during dwell (no reversed playback, no parked frame — those were rejected).
  *
+ * The celebrate one-shot is INTERRUPTIBLE (T52): travel always outranks it, so a
+ * jump caught mid-air by resumed scrolling hands the mixer straight back to the
+ * locomotion clip instead of masking it for the clip's full 2.5-3.0s.
+ *
  * With Aram's girl-v2 export the canonical clips are all present:
  *   Skip_Forward   → forward travel (cadence-driven skip)
  *   Idle           → real happy-sway loop (natural rate)
@@ -92,6 +96,56 @@ export function shouldTriggerCelebrate(
   hasCelebrateClip: boolean
 ): boolean {
   return hasCelebrateClip && prevBurst === null && burst !== null
+}
+
+/**
+ * Travel outranks celebration (T52). The one-shot jump is INTERRUPTIBLE: it owns
+ * the mixer only while the world is still. The discovery burst is a position in
+ * the scroll timeline, not a pause — it fires whether the reader stops to read
+ * the panel or scrolls straight through — and the jump clips run 2.5–3.0s, far
+ * longer than the staged rotation freeze. Without this yield the jump keeps the
+ * mixer for its full length and the resumed skip is simply never seen (the bug:
+ * "the run animation is not shown but instead I see the jump animation").
+ *
+ * `loco` is the hysteretic state, so the dead band (restEps < moveEps) decides
+ * what counts as travel: a dwell's jitter can never abort the jump, while real
+ * scrolling reclaims the mixer on the frame it resumes.
+ */
+export function shouldYieldCelebrate(celebrating: boolean, loco: Locomotion): boolean {
+  return celebrating && loco !== 'idle'
+}
+
+/**
+ * Frame-rate independent exponential approach — the cadence easing, as a pure
+ * function (girl-anim imports no three, so the damp lives here rather than
+ * reaching for THREE.MathUtils). `lambda` is the approach rate per second.
+ */
+export function dampTimeScale(
+  current: number,
+  target: number,
+  lambda: number,
+  delta: number
+): number {
+  return current + (target - current) * (1 - Math.exp(-lambda * delta))
+}
+
+/**
+ * The skip cadence for this frame. Easing the timeScale is what makes a speed
+ * change read as acceleration rather than a snap — but on the FIRST frame of a
+ * locomotion stretch there is nothing to ease from: the held value is stale from
+ * whatever played before (an idle sway at 1, or a jump that owned the mixer for
+ * three seconds). Easing out of that stale value is exactly the sluggish restart
+ * Aram reported, so entering a state SEEDS the cadence at the demanded value and
+ * only subsequent frames ease.
+ */
+export function nextTimeScale(
+  current: number,
+  target: number,
+  entering: boolean,
+  lambda: number,
+  delta: number
+): number {
+  return entering ? target : dampTimeScale(current, target, lambda, delta)
 }
 
 /**

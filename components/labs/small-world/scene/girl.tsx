@@ -9,10 +9,12 @@ import { STANCE_Z, walkYAt } from './stage'
 import { useClayRamp } from './toon-ramp'
 import { toonifyGirl } from './girl-clay'
 import {
+  nextTimeScale,
   resolveClipPlan,
   resolveLocomotionHysteretic,
   selectCelebrateClip,
   shouldTriggerCelebrate,
+  shouldYieldCelebrate,
   speedToTimeScale,
   type ClipPlan,
   type Locomotion,
@@ -45,6 +47,10 @@ const IDLE_MOVE_EPS = 0.06
 /** AnimationMixer crossfade between distinct clips (Idle ↔ Skip_Forward ↔
  * Walk_Backward ↔ the jump celebrate). Same-clip transitions just re-drive params. */
 const CROSSFADE = 0.25
+/** Hand-back fade when travel interrupts a celebrate mid-air (T52). Shorter than
+ * CROSSFADE: the reader has just resumed scrolling and the world is already
+ * moving, so the skip has to be under her the moment it does. */
+const CELEBRATE_YIELD_FADE = 0.12
 /** Facet her toon surface to match the faceted clay world (lever 4). Off by
  *  default — capture-gated against face/hair readability; kept as a one-line
  *  dial. See task-24-report for the tried-and-rejected finding. */
@@ -62,6 +68,10 @@ const SHADOW_OPACITY = 0.26
  * skipping slowly in place instead of freezing. The action never stops → the
  * mixer always has an active clip (no T-pose). No reversed playback: a backward
  * scrub just plays the forward skip while the planet spins the other way.
+ *
+ * `entering` marks the first frame of a locomotion stretch — after an idle sway
+ * or an interrupted celebrate — where the cadence is seeded straight from the
+ * demanded speed instead of easing out of a stale held value.
  */
 function driveLocomotion(
   action: THREE.AnimationAction,
@@ -69,7 +79,8 @@ function driveLocomotion(
   slot: SlotPlan,
   signedSpeed: number,
   tsMagRef: { current: number },
-  delta: number
+  delta: number,
+  entering: boolean
 ): void {
   action.paused = false
   if (loco === 'idle' && !slot.fallback) {
@@ -83,7 +94,7 @@ function driveLocomotion(
     MIN_TIMESCALE,
     MAX_TIMESCALE
   )
-  tsMagRef.current = THREE.MathUtils.damp(tsMagRef.current, target, DAMP_LAMBDA, delta)
+  tsMagRef.current = nextTimeScale(tsMagRef.current, target, entering, DAMP_LAMBDA, delta)
   action.timeScale = tsMagRef.current
 }
 
@@ -110,10 +121,14 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const prevBurst = useRef<number | null>(null)
   const activeClip = useRef<string | null>(null)
   const celebrating = useRef(false)
-  /** Locomotion clip to fall back to when a celebrate one-shot finishes. */
-  const returnClip = useRef<string | null>(null)
-  /** Last resolved locomotion state — feeds the idle↔moving hysteresis band. */
+  /** Last resolved locomotion state — feeds the idle↔moving hysteresis band. It
+   * advances every frame, celebrate or not, so the machine is current the moment
+   * travel reclaims the mixer (and so a finishing jump returns to the state she
+   * is actually in, not the one she left three seconds ago). */
   const prevLoco = useRef<Locomotion>('idle')
+  /** Locomotion state currently driving the mixer — null while a celebrate owns
+   * it. A change here is the "entering" edge that seeds the skip cadence. */
+  const drivingLoco = useRef<Locomotion | null>(null)
   /** Ordinal of discoveries seen — alternates Jump_A/Jump_B on the celebrate cycle. */
   const celebrateIndex = useRef(0)
 
@@ -130,13 +145,13 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   // targets just (re)play the shared action — no fade, no interruption.
   const fadeTo = useMemo(
     () =>
-      (toClip: string): THREE.AnimationAction | null => {
+      (toClip: string, fade: number = CROSSFADE): THREE.AnimationAction | null => {
         const to = actions[toClip]
         if (!to) return null
         const from = activeClip.current ? actions[activeClip.current] : null
         if (from && from !== to) {
-          from.fadeOut(CROSSFADE)
-          to.reset().setEffectiveWeight(1).fadeIn(CROSSFADE).play()
+          from.fadeOut(fade)
+          to.reset().setEffectiveWeight(1).fadeIn(fade).play()
         } else {
           to.play()
         }
@@ -152,10 +167,12 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     fadeTo(plan.forward.clip)
     // Only the celebrate one-shot uses LoopOnce; locomotion clips loop forever
     // and never fire 'finished', so the celebrating guard is sufficient.
+    // A celebrate that runs to its end hands back to the state she is in NOW —
+    // after a panel dwell that is the idle sway, not the skip she arrived on.
     const onFinished = () => {
       if (!celebrating.current) return
       celebrating.current = false
-      fadeTo(returnClip.current ?? plan.forward.clip)
+      fadeTo(plan[prevLoco.current].clip)
     }
     mixer.addEventListener('finished', onFinished)
     return () => mixer.removeEventListener('finished', onFinished)
@@ -168,13 +185,32 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     lastRotation.current = rotation
     const signedSpeed = ((rotation - prev) * PLANET_RADIUS) / dt
 
+    // The locomotion state advances EVERY frame, celebrate or not — the machine
+    // has to be current the instant travel reclaims the mixer.
+    const loco: Locomotion = resolveLocomotionHysteretic(
+      signedSpeed,
+      prevLoco.current,
+      IDLE_REST_EPS,
+      IDLE_MOVE_EPS
+    )
+    prevLoco.current = loco
+
+    // Travel outranks celebration. A jump still in the air when the reader
+    // resumes scrolling gives the mixer straight back — checked BEFORE the
+    // trigger below, so a jump firing on a still-travelling frame keeps that
+    // first frame and only yields once the world is genuinely moving again.
+    let fade = CROSSFADE
+    if (shouldYieldCelebrate(celebrating.current, loco)) {
+      celebrating.current = false
+      fade = CELEBRATE_YIELD_FADE
+    }
+
     // Celebrate one-shot: fire on the burst's rising edge when a clip exists.
     // Each discovery advances the cycle so his two jumps alternate on parity.
     if (shouldTriggerCelebrate(prevBurst.current, burst, plan.celebrate !== null)) {
       const clip = selectCelebrateClip(plan.celebrate, celebrateIndex.current)
       celebrateIndex.current += 1
       if (clip) {
-        returnClip.current = activeClip.current
         const action = fadeTo(clip)
         if (action) {
           action.setLoop(THREE.LoopOnce, 1)
@@ -182,26 +218,20 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
           action.paused = false
           action.timeScale = 1
           celebrating.current = true
+          drivingLoco.current = null
         }
       }
     }
     prevBurst.current = burst
 
-    // While a celebrate clip plays out, leave the mixer to it (returns via the
-    // 'finished' listener) and freeze the locomotion state so it resumes from
-    // where it left off. Otherwise drive the hysteretic locomotion state machine.
+    // While a celebrate owns the mixer, leave it to the clip (it returns via the
+    // 'finished' listener, or by yielding above). Otherwise drive locomotion.
     if (!celebrating.current) {
-      const loco: Locomotion = resolveLocomotionHysteretic(
-        signedSpeed,
-        prevLoco.current,
-        IDLE_REST_EPS,
-        IDLE_MOVE_EPS
-      )
-      prevLoco.current = loco
       const slot = plan[loco]
-      const action = fadeTo(slot.clip)
+      const action = fadeTo(slot.clip, fade)
       if (action) {
-        driveLocomotion(action, loco, slot, signedSpeed, tsMag, dt)
+        driveLocomotion(action, loco, slot, signedSpeed, tsMag, dt, drivingLoco.current !== loco)
+        drivingLoco.current = loco
       }
     }
 

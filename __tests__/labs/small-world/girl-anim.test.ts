@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  dampTimeScale,
+  nextTimeScale,
   resolveLocomotion,
   resolveLocomotionHysteretic,
   shouldTriggerCelebrate,
+  shouldYieldCelebrate,
   resolveClipPlan,
   selectCelebrateClip,
   speedToTimeScale,
@@ -12,6 +15,7 @@ import {
   BACKWARD_SLOT,
   JUMP_A_SLOT,
   JUMP_B_SLOT,
+  type Locomotion,
 } from '@/components/labs/small-world/scene/girl-anim'
 
 describe('resolveLocomotion (instantaneous classifier)', () => {
@@ -85,6 +89,119 @@ describe('shouldTriggerCelebrate', () => {
   it('never fires without a celebrate clip (badge-only fallback)', () => {
     expect(shouldTriggerCelebrate(null, 0, false)).toBe(false)
     expect(shouldTriggerCelebrate(null, 0.5, false)).toBe(false)
+  })
+})
+
+describe('shouldYieldCelebrate — travel outranks the celebrate one-shot (T52)', () => {
+  it('yields the mixer back the moment forward travel resumes', () => {
+    expect(shouldYieldCelebrate(true, 'forward')).toBe(true)
+  })
+
+  it('yields on a backward scrub too — any travel outranks the jump', () => {
+    expect(shouldYieldCelebrate(true, 'backward')).toBe(true)
+  })
+
+  it('holds the jump while the world is still, so a dwell plays it in full', () => {
+    expect(shouldYieldCelebrate(true, 'idle')).toBe(false)
+  })
+
+  it('is inert when nothing is celebrating', () => {
+    expect(shouldYieldCelebrate(false, 'forward')).toBe(false)
+    expect(shouldYieldCelebrate(false, 'idle')).toBe(false)
+  })
+})
+
+describe('celebrate yield + hysteresis — the T52 repro as pure state', () => {
+  const REST = 0.03
+  const MOVE = 0.06
+  /**
+   * Replays the measured checkpoint trace: travel in, the staged rotation freeze
+   * (speed pinned at exactly 0 while the reader keeps scrolling through the
+   * burst + panel windows), then travel resuming. The jump fires on the frame the
+   * freeze begins. Returns the frame index the celebrate was released on.
+   */
+  const replay = (speeds: readonly number[], fireAt: number) => {
+    let loco: Locomotion = 'forward'
+    let celebrating = false
+    let releasedAt: number | null = null
+    speeds.forEach((speed, i) => {
+      loco = resolveLocomotionHysteretic(speed, loco, REST, MOVE)
+      if (shouldYieldCelebrate(celebrating, loco)) {
+        celebrating = false
+        releasedAt = i
+      }
+      if (i === fireAt) celebrating = true // burst rising edge
+    })
+    return { releasedAt, celebrating, loco }
+  }
+
+  it('never yields during the freeze — the jump owns the still world', () => {
+    // fires at index 2 (last moving frame before the freeze), then 10 still frames
+    const { releasedAt, celebrating } = replay([2.5, 2.5, 1.9, ...Array(10).fill(0)], 2)
+    expect(releasedAt).toBeNull()
+    expect(celebrating).toBe(true)
+  })
+
+  it('releases on the FIRST frame travel resumes, not when the clip ends', () => {
+    const speeds = [2.5, 1.9, ...Array(8).fill(0), 0.55, 2.5, 2.5]
+    const { releasedAt, celebrating } = replay(speeds, 1)
+    expect(releasedAt).toBe(10) // the 0.55 frame — the first past the move bar
+    expect(celebrating).toBe(false)
+  })
+
+  it('survives its own firing frame (the trigger frame still reads as travel)', () => {
+    // Speed at the burst edge is still the incoming travel; the yield is checked
+    // before the trigger, so the jump is not aborted on the frame it starts.
+    const { releasedAt, celebrating } = replay([2.5, 1.9, 0, 0, 0], 1)
+    expect(releasedAt).toBeNull()
+    expect(celebrating).toBe(true)
+  })
+
+  it('a fling straight through a checkpoint drops the jump within a frame', () => {
+    // No freeze sampled at all: the very next frame is still travelling.
+    const { releasedAt } = replay([2.5, 2.5, 2.5, 2.5], 1)
+    expect(releasedAt).toBe(2)
+  })
+
+  it('dwell jitter inside the hysteresis dead band cannot abort the jump', () => {
+    const jitter = [2.5, 1.9, 0, 0.04, 0.02, 0.05, 0.01]
+    const { releasedAt, celebrating } = replay(jitter, 1)
+    expect(releasedAt).toBeNull()
+    expect(celebrating).toBe(true)
+  })
+})
+
+describe('nextTimeScale / dampTimeScale — cadence easing and entry seeding', () => {
+  const LAMBDA = 6
+  const DT = 1 / 60
+
+  it('seeds the cadence at the demanded value when entering a state', () => {
+    expect(nextTimeScale(0.12, 2.1, true, LAMBDA, DT)).toBe(2.1)
+    // …including after a jump held a stale, far-too-fast cadence
+    expect(nextTimeScale(2.5, 0.4, true, LAMBDA, DT)).toBe(0.4)
+  })
+
+  it('eases toward the target on subsequent frames without overshooting', () => {
+    const stepped = nextTimeScale(1, 2, false, LAMBDA, DT)
+    expect(stepped).toBeGreaterThan(1)
+    expect(stepped).toBeLessThan(2)
+  })
+
+  it('converges to the target over many frames', () => {
+    let ts = 0.12
+    for (let i = 0; i < 240; i++) ts = nextTimeScale(ts, 2, false, LAMBDA, DT)
+    expect(ts).toBeCloseTo(2, 6)
+  })
+
+  it('is frame-rate independent: two half-steps equal one whole step', () => {
+    const whole = dampTimeScale(0.5, 2, LAMBDA, 0.1)
+    const half = dampTimeScale(dampTimeScale(0.5, 2, LAMBDA, 0.05), 2, LAMBDA, 0.05)
+    expect(half).toBeCloseTo(whole, 12)
+  })
+
+  it('holds still on a zero delta and is deterministic', () => {
+    expect(dampTimeScale(1.3, 2, LAMBDA, 0)).toBe(1.3)
+    expect(dampTimeScale(1.3, 2, LAMBDA, DT)).toBe(dampTimeScale(1.3, 2, LAMBDA, DT))
   })
 })
 
