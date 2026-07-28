@@ -159,48 +159,73 @@ describe('moodBlendAt', () => {
   // when the visitor scrolled again — the mood would arrive after the mascots, not with them.
   it('finishes the crossfade on the arrival clock while progress is parked', () => {
     const parked = at(4, 0.56) // the girl has stopped; absorption holds progress here
-    const scrollOnly = moodBlendAt(parked).mix
-    expect(scrollOnly).toBeGreaterThan(0)
-    expect(scrollOnly).toBeLessThan(1)
+    const scrollOnly = moodBlendAt(parked).skyMix
+    const landed = BIOME_MOODS[4].skyMix * bloomAt(0.56)
+    expect(scrollOnly).not.toBeCloseTo(landed, 4)
 
-    const rolling = (t: number) => moodBlendAt(parked, { chapter: 4, t, phase: 'in' as const }).mix
-    expect(rolling(GRADE_PHASE_END)).toBe(1)
-    expect(rolling(1)).toBe(1)
-    // …and it gets there monotonically, without ever dipping below where scroll had it.
-    let prev = -1
+    const rolling = (t: number) =>
+      moodBlendAt(parked, { chapter: 4, t, phase: 'in' as const }).skyMix
+    expect(rolling(GRADE_PHASE_END)).toBeCloseTo(landed, 6)
+    expect(rolling(1)).toBeCloseTo(landed, 6)
+    // …and it gets there monotonically, from exactly where scroll had left it.
+    expect(rolling(0)).toBeCloseTo(scrollOnly, 6)
+    let prev = -Infinity
     for (let i = 0; i <= 100; i++) {
-      const mix = rolling(i / 100)
-      expect(mix).toBeGreaterThanOrEqual(prev)
-      expect(mix).toBeGreaterThanOrEqual(scrollOnly - 1e-9)
-      prev = mix
+      const v = rolling(i / 100)
+      expect(v).toBeGreaterThanOrEqual(prev - 1e-9)
+      prev = v
     }
   })
 
-  // `max` of two continuous inputs, so arming and nullifying the clock can never make the grade
-  // jump — whatever scroll position the absorption happens to park at.
+  // The pull contributes exactly nothing at strength 0, so arming or nullifying the clock is a
+  // no-op frame whatever scroll position the absorption happens to park at.
   it('cannot jump when the reveal arms or ends', () => {
     for (const local of [0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
       const p = at(3, local)
-      const idle = moodBlendAt(p).mix
-      const armed = moodBlendAt(p, { chapter: 3, t: 0, phase: 'in' }).mix
-      expect(armed).toBe(idle)
+      for (const named of [2, 3, 4]) {
+        const armed = moodBlendAt(p, { chapter: named, t: 0, phase: 'in' })
+        expect(armed.skyMix, `ch${named} @${local}`).toBeCloseTo(moodBlendAt(p).skyMix, 9)
+        expect(gradeAt(p, { chapter: named, t: 0, phase: 'in' }).haze).toBe(gradeAt(p).haze)
+      }
     }
   })
 
   // During a retraction the reveal keeps naming the biome that is LEAVING even after the journey
-  // has moved into the next chapter. Letting that drive the mix would crossfade the wrong pair.
-  it('ignores a reveal that names a different chapter', () => {
+  // has moved on. That is exactly right for a pull: it holds the leaving mood and fades out.
+  it('pulls toward the mood the reveal names, not the chapter the journey is in', () => {
     const p = at(3, 0.1)
     const stale = { chapter: 2, t: 1, phase: 'out' as const }
-    expect(moodBlendAt(p, stale).mix).toBe(moodBlendAt(p).mix)
-    expect(moodBlendAt(p, stale).to).toBe(BIOME_MOODS[3])
+    expect(moodBlendAt(p, stale).revealChapter).toBe(2)
+    expect(moodBlendAt(p, stale).skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.1), 6)
+    expect(gradeAt(p, stale).haze).toBe(BIOME_MOODS[2].cast)
   })
 
   it('leaves the bloom on scroll — the swell is an envelope, not an entrance beat', () => {
     const p = at(2, 0.5)
     const full = moodBlendAt(p, { chapter: 2, t: 1, phase: 'in' })
-    expect(full.mix).toBe(1)
+    expect(full.revealPull).toBe(1)
     expect(full.skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.5), 6)
+  })
+
+  /**
+   * The backward fling that the previous `max`-in-the-journey's-basis formulation could not
+   * survive: scrub out of a dwell fast enough to cross a whole segment before the 0.42s retraction
+   * finishes, and the reveal still names the chapter being left while the journey has already
+   * moved to the one before it. That used to drop a live term in a single frame — measured at up
+   * to a whole mood swap (winter to canyon) at scrollbar-drag speeds. The pull has no gate.
+   */
+  it('crosses a boundary backwards mid-retraction without a step, at any residual strength', () => {
+    const eps = 1e-9
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      for (const t of [1, 0.75, 0.5, 0.35, 0.1, 0]) {
+        const live = { chapter: c, t, phase: 'out' as const }
+        const before = moodBlendAt(at(c, eps), live)
+        const after = moodBlendAt(at(c - 1, 1 - eps), live)
+        expect(Math.abs(after.skyMix - before.skyMix), `ch${c} t=${t} sky`).toBeLessThan(1e-6)
+        expect(Math.abs(after.lightMix - before.lightMix), `ch${c} t=${t} light`).toBeLessThan(1e-6)
+        expect(gradeAt(at(c, eps), live).haze).toBe(gradeAt(at(c - 1, 1 - eps), live).haze)
+      }
+    }
   })
 
   it('clamps outside the journey instead of running off the mood list', () => {

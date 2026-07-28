@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import { BIOME_MOODS, moodBlendAt } from '../overlay/grade-mood'
+import type { MoodBlend } from '../overlay/grade-mood'
 import type { JourneyRef } from './use-journey'
 
 /**
@@ -37,12 +38,12 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     const prev = Math.max(0, b.chapter - 1)
     uniforms.uSky.value
       .copy(BASE_SKY)
-      .lerp(crossfade(MOOD_SKY[prev], MOOD_SKY[b.chapter], b.mix), b.skyMix)
+      .lerp(target(MOOD_SKY, prev, b), b.skyMix)
     // The glow trails the sky a little: keeping more of the original light low in the frame stops
     // the horizon flattening out once a mood is fully in.
     uniforms.uGlow.value
       .copy(BASE_GLOW)
-      .lerp(crossfade(MOOD_GLOW[prev], MOOD_GLOW[b.chapter], b.mix), b.skyMix * GLOW_LAG)
+      .lerp(target(MOOD_GLOW, prev, b), b.skyMix * GLOW_LAG)
   })
 
   return (
@@ -82,6 +83,14 @@ const MOOD_SKY = BIOME_MOODS.map((m) => srgb(m.sky))
 const MOOD_GLOW = BIOME_MOODS.map((m) => srgb(m.glow))
 const SCRATCH = new THREE.Vector3()
 
-function crossfade(from: THREE.Vector3, to: THREE.Vector3, mix: number): THREE.Vector3 {
-  return SCRATCH.copy(from).lerp(to, mix)
+/**
+ * The colour the backdrop is heading for: the scroll crossfade between two neighbouring moods,
+ * then pulled onto the arriving chapter's mood (grade-mood.ts owns why it is a pull and not a
+ * gate). Writes into one module scratch — the frame loop allocates nothing.
+ */
+function target(table: THREE.Vector3[], prev: number, b: MoodBlend): THREE.Vector3 {
+  SCRATCH.copy(table[prev]).lerp(table[b.chapter], b.mix)
+  return b.revealChapter === null
+    ? SCRATCH
+    : SCRATCH.lerp(table[b.revealChapter], b.revealPull)
 }

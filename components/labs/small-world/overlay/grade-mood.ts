@@ -26,24 +26,32 @@ import { PALETTE } from '../palette'
  * than repainting material. Card text is never touched at all: the DOM layer mounts first in the
  * overlay, so the panels paint above it.
  *
- * TIMING — TWO CLOCKS, WHICHEVER IS FURTHER ALONG. The mood of chapter c crossfades in from the
- * previous chapter's over the local scroll window [MOOD_IN_START, MOOD_IN_END], starting on the
- * final approach. That alone would stall: T54's arrival absorbs scroll while the checkpoint rolls
- * out, so a purely scroll-keyed crossfade freezes part-way and only finishes when the visitor
- * scrolls again — the mood would arrive after the mascots instead of with them. So when the
- * arrival clock is running, the crossfade also rides it, and the two are combined with `max`.
+ * TIMING — A SCROLL CROSSFADE, PULLED THE REST OF THE WAY BY THE ARRIVAL. The mood of chapter c
+ * crossfades in from the previous chapter's over the local scroll window [MOOD_IN_START,
+ * MOOD_IN_END], starting on the final approach. That alone would stall: T54's arrival absorbs
+ * scroll while the checkpoint rolls out, so a purely scroll-keyed crossfade freezes part-way and
+ * only finishes when the visitor scrolls again — the mood would arrive after the mascots instead
+ * of with them.
  *
- * `max` rather than a handover is deliberate: both inputs are continuous and both end at 1, so
- * their maximum is continuous too — the grade cannot jump at the moment the reveal arms or
- * nullifies, whatever scroll position the absorption happens to park at. It also degrades
- * cleanly: with no clock supplied the scroll window is the whole story.
+ * So the reveal clock is applied ON TOP of the scroll blend, as a PULL toward the mood of the
+ * chapter the reveal names: `value = lerp(scrollBlend, revealedMood, pull)`. The shape matters
+ * more than it looks. The pull contributes exactly nothing at strength 0 and lands exactly on the
+ * revealed mood at 1, and — crucially — it does not care which pair of moods the scroll term
+ * happens to be blending. That makes the whole thing continuous across a chapter boundary
+ * unconditionally, in both directions and at any scrub speed, with no index gate anywhere.
+ *
+ * (The first cut instead took `max(scrolled, arrived)` in the journey's own chapter basis, which
+ * needed a `reveal.chapter === chapter` gate — and that gate was a third, DISCONTINUOUS input.
+ * Flinging backwards out of a dwell fast enough to cross a segment before the retraction finished
+ * dropped a live term in one frame: measured, a scrollbar drag could snap a whole mood over
+ * — winter to canyon — in a single frame. The pull has no gate to drop.)
  *
  * On top of the crossfade the whole grade BLOOMS: full strength through the checkpoint and its
  * dwell, settling back to BLOOM_FLOOR over the next chapter's early travel, so each arrival gets a
  * swell of its own. The bloom stays keyed to scroll — it is a slow envelope across a whole leg,
  * not an entrance beat.
  *
- * Scrubbing is still exactly symmetric in both directions whenever the arrival clock is idle, and
+ * Scrubbing is exactly symmetric in both directions whenever the arrival clock is idle, and
  * nothing here can step or flicker in either mode.
  */
 
@@ -151,13 +159,10 @@ export const BIOME_MOODS: readonly BiomeMood[] = [
  * the cards land — the arrival brings it, and nothing about it is abrupt (the window is 30% of a
  * chapter's scroll, ~72vh of travel).
  *
- * MOOD_IN_END CARRIES AN INVARIANT — it must stay at or below 1. The reveal gate below is a
- * discontinuous input (a stale reveal is dropped the instant `chapter` flips), and `max` alone
- * does not smooth that: it is only seamless because `scrolled` has already saturated at exactly 1
- * by the time a chapter boundary is crossed, so the frame where the gate drops is a frame `max`
- * was taking from the scroll term anyway. Push this window later and the boundary becomes a
- * visible colour step at every checkpoint exit. Pinned by the boundary sweep in grade-mood.test.ts
- * rather than left to this comment.
+ * MOOD_IN_END CARRIES AN INVARIANT — it must stay at or below 1, so that `scrolled` has saturated
+ * by the time a chapter boundary is crossed and the blend resolves to the same mood from either
+ * side of it. Push the window past the end of a chapter and every boundary becomes a visible
+ * colour step. Pinned by the boundary sweep in grade-mood.test.ts rather than left to this comment.
  */
 export const MOOD_IN_START = 0.42
 export const MOOD_IN_END = 0.72
@@ -208,17 +213,21 @@ export function bloomAt(local: number): number {
 }
 
 export type MoodBlend = {
-  /** Chapter whose mood is being moved toward. */
+  /** Chapter whose mood the scroll blend is moving toward. */
   chapter: number
   /** Mood being left behind (the chapter's own mood at the start of the journey). */
   from: BiomeMood
   /** Mood being moved toward. */
   to: BiomeMood
-  /** 0→1 crossfade between them. */
+  /** 0→1 scroll-derived crossfade between them. */
   mix: number
+  /** Chapter of the arrival being revealed, if any — what `revealPull` pulls toward. */
+  revealChapter: number | null
+  /** 0→1 pull from the scroll blend onto the revealed chapter's mood. */
+  revealPull: number
   /** Overall strength — 1 at a checkpoint, BLOOM_FLOOR between them, 0 with the grade off. */
   bloom: number
-  /** Applied strengths: the blended per-mood dial times `bloom`. All 0 with the grade off. */
+  /** Applied strengths: scroll blend, pulled by the arrival, times `bloom`. 0 with the grade off. */
   skyMix: number
   lightMix: number
   hazeAlpha: number
@@ -228,20 +237,14 @@ export type MoodBlend = {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
 /**
- * The grade at a scroll position, optionally carried the rest of the way by T54's arrival clock.
- * Total, and pure in both inputs: the same (progress, reveal) always yields the same numbers.
+ * The grade at a scroll position, carried the rest of the way by T54's arrival clock when one is
+ * running. Total, and pure in both inputs: the same (progress, reveal) always yields the same
+ * numbers.
  *
- * The reveal is only allowed to drive the crossfade while it names the chapter the journey is
- * actually in. During a retraction it keeps naming the biome that is LEAVING even after the
- * journey has moved on, and letting that drive the mix would fade the wrong pair of moods; the
- * scroll window already holds the leaving mood correctly through that window, so it takes over.
- *
- * KNOWN, ACCEPTED EDGE. Scrub backwards hard enough to cross a whole segment boundary inside the
- * 0.42s retraction (~2800px/s sustained at a 900px viewport, half-strength around 4400px/s) and
- * the gate drops a still-live `arrived` term one chapter early, for a single frame. It is bounded
- * and only reachable while the page is already rushing backwards. The tempting fix — also gating
- * on `phase === 'in'` — is actively worse: it would drop `arrived` from 1 while `scrolled` is only
- * ~0.43, stepping on every ordinary backward exit instead of only on a violent one.
+ * The reveal needs no chapter gate. During a retraction it keeps naming the biome that is LEAVING
+ * even after the journey has moved on — which is exactly right here, because the pull is toward
+ * that biome's mood and simply fades out as the retraction completes. Nothing in this function
+ * compares the reveal's chapter to the journey's, so nothing can be dropped in a single frame.
  */
 export function moodBlendAt(progress: number, reveal?: RevealState | null): MoodBlend {
   const p = clamp01(progress)
@@ -249,25 +252,36 @@ export function moodBlendAt(progress: number, reveal?: RevealState | null): Mood
   const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / segLen))
   const local = (p - chapter * segLen) / segLen
 
-  const scrolled = smoothstep((local - MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START))
-  const arrived =
-    reveal && reveal.chapter === chapter ? smoothstep(revealPhase(reveal.t, 0, GRADE_PHASE_END)) : 0
-  const mix = Math.max(scrolled, arrived)
+  const mix = smoothstep((local - MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START))
   const bloom = SHOW_GRADE ? bloomAt(local) : 0
 
   const to = BIOME_MOODS[chapter]
   const from = BIOME_MOODS[Math.max(0, chapter - 1)]
+
+  const revealChapter = reveal
+    ? Math.min(CHAPTER_COUNT - 1, Math.max(0, reveal.chapter))
+    : null
+  const revealPull = reveal ? smoothstep(revealPhase(reveal.t, 0, GRADE_PHASE_END)) : 0
+  const revealed = revealChapter === null ? null : BIOME_MOODS[revealChapter]
+
+  /** Scroll blend, then pulled onto the revealed mood, then scaled by the bloom. */
+  const dial = (pick: (m: BiomeMood) => number): number => {
+    const base = lerp(pick(from), pick(to), mix)
+    return (revealed === null ? base : lerp(base, pick(revealed), revealPull)) * bloom
+  }
 
   return {
     chapter,
     from,
     to,
     mix,
+    revealChapter,
+    revealPull,
     bloom,
-    skyMix: lerp(from.skyMix, to.skyMix, mix) * bloom,
-    lightMix: lerp(from.lightMix, to.lightMix, mix) * bloom,
-    hazeAlpha: lerp(from.hazeAlpha, to.hazeAlpha, mix) * bloom,
-    vignetteAlpha: lerp(from.vignetteAlpha, to.vignetteAlpha, mix) * bloom,
+    skyMix: dial((m) => m.skyMix),
+    lightMix: dial((m) => m.lightMix),
+    hazeAlpha: dial((m) => m.hazeAlpha),
+    vignetteAlpha: dial((m) => m.vignetteAlpha),
   }
 }
 
@@ -284,11 +298,15 @@ export type GradeSample = {
 /** The DOM half's view of the grade — the overlay needs colours as strings, once per frame. */
 export function gradeAt(progress: number, reveal?: RevealState | null): GradeSample {
   const b = moodBlendAt(progress, reveal)
+  const base = mixHex(b.from.cast, b.to.cast, b.mix)
   return {
     chapter: b.chapter,
     mix: b.mix,
     bloom: b.bloom,
-    haze: mixHex(b.from.cast, b.to.cast, b.mix),
+    haze:
+      b.revealChapter === null
+        ? base
+        : mixHex(base, BIOME_MOODS[b.revealChapter].cast, b.revealPull),
     hazeAlpha: b.hazeAlpha,
     vignetteAlpha: b.vignetteAlpha,
   }
