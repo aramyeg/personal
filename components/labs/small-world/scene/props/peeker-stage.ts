@@ -312,6 +312,16 @@ export function planetNdcRadius(fovDeg: number, cameraDistance: number, extent: 
  *
  * So this bench gates visual separation from the planet you see. The depth margin, not this, is
  * what makes "the planet is never covered" true.
+ *
+ * DELIBERATELY CONSERVATIVE, roughly 2x. `peekerReach` minimises the lowest y and the innermost x
+ * INDEPENDENTLY across the box corners, so what gets compared is a point the figure never actually
+ * occupies — lowest and innermost at the same time. It can therefore only ever UNDER-report
+ * separation, never over-report, which is the safe direction for a guard; peeker-stage.test.ts
+ * checks that property against a real surface sample. The cost is phantom alarms: at the shipped
+ * constants it reports +0.049 where the true separation is +0.090, and it goes NEGATIVE over a
+ * band around 575-730 x 640-840 px that no figure comes near. If you widen the swept viewport list
+ * and see red there, that is this approximation talking — measure the true separation before
+ * touching any staging constant, because re-tuning against a phantom would cost real readability.
  */
 export function peekerPlanetClearance(
   viewport: { width: number; height: number },

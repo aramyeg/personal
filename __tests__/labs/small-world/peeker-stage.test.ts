@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
 import {
   PEEKER_CAST,
   PEEKER_DEPTH,
@@ -70,6 +71,60 @@ const ALL = [...VIEWPORTS, ...NARROW_VIEWPORTS]
 const label = (v: { width: number; height: number }) => `${v.width}x${v.height}`
 const placeFor = (v: { width: number; height: number }) =>
   peekerPlacement(HALF_H, (HALF_H * v.width) / v.height, v)
+
+const _e = new THREE.Euler()
+const _m = new THREE.Matrix4()
+const _v = new THREE.Vector3()
+
+/**
+ * TRUE separation between the figures and the planet: samples the rotated bounding box's surface
+ * and measures each point against the planet's ellipse in that point's OWN column. This is what
+ * the shipped bench approximates conservatively — see the conservatism test below.
+ */
+function trueSeparation(v: { width: number; height: number }, extent: number): number {
+  const halfW = (HALF_H * v.width) / v.height
+  const p = peekerPlacement(HALF_H, halfW, v)
+  const ry = planetNdcRadius(CAMERA_FOV, CAMERA_DISTANCE, extent)
+  const rx = ry / (v.width / v.height)
+  const b = PEEKER_FIGURE_BOX
+  const N = 14
+  let worst = Infinity
+  for (const side of [-1, 1] as const) {
+    if (side === -1 && !p.leftVisible) continue
+    for (const hide of [-0.1, -0.05, 0, 0.1, 0.2, 0.35]) {
+      for (const sway of [-0.06, 0, 0.06]) {
+        _e.set(0, -side * 0.3, side * (0.2 + hide * 0.34) + sway, 'XYZ')
+        _m.makeRotationFromEuler(_e)
+        const parkedY = peekerParkedY(p, side)
+        const cx = side * (p.x + hide * p.hiddenOut)
+        const cy = parkedY + hide * (p.hiddenY - parkedY)
+        const xs = side === -1 ? [b.minX, b.maxX] : [-b.maxX, -b.minX]
+        for (let i = 0; i <= N; i++) {
+          for (let j = 0; j <= N; j++) {
+            const fx = xs[0] + ((xs[1] - xs[0]) * i) / N
+            const fy = b.minY + ((b.maxY - b.minY) * j) / N
+            const fz = -b.absZ + ((2 * b.absZ) * i) / N
+            for (const pt of [
+              [fx, fy, -b.absZ],
+              [fx, fy, b.absZ],
+              [xs[0], fy, fz],
+              [xs[1], fy, fz],
+              [fx, b.minY, fz],
+              [fx, b.maxY, fz],
+            ]) {
+              _v.set(pt[0], pt[1], pt[2]).applyMatrix4(_m).multiplyScalar(p.size)
+              const column = Math.abs(cx + _v.x) / halfW
+              if (column >= rx) continue
+              const ndcY = (cy + _v.y) / HALF_H
+              worst = Math.min(worst, ndcY - ry * Math.sqrt(1 - (column / rx) * (column / rx)))
+            }
+          }
+        }
+      }
+    }
+  }
+  return worst
+}
 
 describe('peekerPresence — dwell-driven entrance, scrub-exact', () => {
   it('is a pure function of the dwell fraction (scrubbing back replays it exactly)', () => {
@@ -283,6 +338,28 @@ describe('planet clearance', () => {
     ).toBeGreaterThan(0.045)
   })
 
+  it('is CONSERVATIVE: it never reports more separation than the figure really has', () => {
+    // peekerReach minimises lowest-y and innermost-x independently over the box corners, so the
+    // bench compares a point the figure never occupies — lowest AND innermost at once. That is
+    // deliberate and safe (it can only under-report), but "safe direction" is a claim, so it is
+    // checked here against a real surface sample: every point of the rotated box measured against
+    // the ellipse in its OWN column.
+    for (const v of ALL) {
+      const bench = peekerPlanetClearance(v, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)
+      expect(bench, label(v)).toBeLessThanOrEqual(trueSeparation(v, PLANET_RADIUS) + 1e-9)
+    }
+  })
+
+  it('warns the next engineer off a phantom alarm below the swept frames', () => {
+    // At 575x680 the bench reports a NEGATIVE gap while the true separation is comfortably
+    // positive — pure corner-pairing artefact. Pinned so that anyone who widens the viewport
+    // sweep and sees red here recognises it instead of re-tuning the staging against a figure
+    // that was never there. If this ever flips, the bench got tighter, not the staging worse.
+    const phantom = { width: 575, height: 680 }
+    expect(peekerPlanetClearance(phantom, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)).toBeLessThan(0)
+    expect(trueSeparation(phantom, PLANET_RADIUS)).toBeGreaterThan(0.05)
+  })
+
   it('pins the worst case over the whole sweep, so drift shows up as a failure', () => {
     let worstGap = Infinity
     let worstDepth = Infinity
@@ -290,10 +367,14 @@ describe('planet clearance', () => {
       worstGap = Math.min(worstGap, peekerPlanetClearance(v, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS))
       worstDepth = Math.min(worstDepth, peekerDepthMargin(v, CAMERA_FOV, CAMERA_DISTANCE, CEILING))
     }
-    // tightest visual separation: iPad portrait, ~0.049 NDC (≈25px of a 1024px-tall frame)
+    // Tightest visual separation as the (conservative) bench reports it: iPad portrait, ~0.049
+    // NDC. True separation there is ~0.090 — see the conservatism test above.
     expect(worstGap).toBeGreaterThan(0.045)
     expect(worstGap).toBeLessThan(0.09)
-    // tightest depth margin: a square frame, ~1.07 world units
+    // Tightest depth margin, ~1.07 world units on a square frame. NOTE the scope: this is over
+    // SETTLE_HIDES, which stops at hide = 0.35 — the poses where a figure is on frame. Sweeping
+    // the FULL entrance (out to hide = 1) it dips to ~1.03, while the figure is high above the
+    // top edge and invisible. A future wider sweep landing near 1.03 is that, not a regression.
     expect(worstDepth).toBeGreaterThan(1.05)
     expect(worstDepth).toBeLessThan(1.3)
   })

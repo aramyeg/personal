@@ -101,22 +101,48 @@ describe('peeker gestures', () => {
     }
   })
 
-  it('mirrors for the right-hand corner: every hinge swings the opposite way', () => {
+  it('mirrors for the right-hand corner: EVERY channel of EVERY limb', () => {
+    // Reflecting a figure across the YZ plane negates Euler y and z, leaves x, and leaves scale.
+    // All three slots and all three rotation axes are checked: an earlier version compared only
+    // rotation.z on limbs a and b, and so was blind to the two gestures that were writing an
+    // un-mirrored YAW (applyChew and applyUnroll). Sampled across the dwell because a gesture
+    // that happens to be at rest at one t would make any of this vacuous.
     for (const kind of KINDS) {
-      const left = freshLimbs()
-      const right = freshLimbs()
-      const drive = driveAt(kind, 0.62)
-      PEEKER_SPECS[kind].apply(left, drive, 1)
-      PEEKER_SPECS[kind].apply(right, drive, -1)
-      for (const [l, r] of [
-        [left.a, right.a],
-        [left.b, right.b],
-      ] as const) {
-        if (!l || !r) continue
-        expect(r.rotation.z, `${kind} hinge`).toBeCloseTo(-l.rotation.z, 10)
-        expect(r.scale.x).toBeCloseTo(l.scale.x, 10)
+      for (const t of [0.12, 0.29, 0.38, 0.5, 0.62, 0.77, 0.88]) {
+        const left = freshLimbs()
+        const right = freshLimbs()
+        const drive = driveAt(kind, t)
+        PEEKER_SPECS[kind].apply(left, drive, 1)
+        PEEKER_SPECS[kind].apply(right, drive, -1)
+        for (const slot of ['a', 'b', 'c'] as const) {
+          const l = left[slot]
+          const r = right[slot]
+          if (!l || !r) continue
+          const where = `${kind}.${slot} @ ${t}`
+          expect(r.rotation.x, `${where} pitch`).toBeCloseTo(l.rotation.x, 12)
+          expect(r.rotation.y, `${where} yaw`).toBeCloseTo(-l.rotation.y, 12)
+          expect(r.rotation.z, `${where} roll`).toBeCloseTo(-l.rotation.z, 12)
+          expect(r.scale.toArray(), `${where} scale`).toEqual(l.scale.toArray())
+        }
       }
     }
+  })
+
+  it('exercises a non-zero yaw and a limb c, so the mirror check cannot pass vacuously', () => {
+    // Guards the test above: if every yaw and every c-slot were always zero it would assert
+    // nothing about them. These are the exact channels that were previously uncovered.
+    let sawYaw = false
+    let sawSlotC = false
+    for (const kind of KINDS) {
+      for (const t of [0.12, 0.29, 0.38, 0.5, 0.62, 0.77, 0.88]) {
+        const limbs = freshLimbs()
+        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, t), 1)
+        if (limbs.a && Math.abs(limbs.a.rotation.y) > 1e-6) sawYaw = true
+        if (limbs.c && limbs.c.scale.x !== 1) sawSlotC = true
+      }
+    }
+    expect(sawYaw).toBe(true)
+    expect(sawSlotC).toBe(true)
   })
 
   it('tucks the pangolins into a ball before the unroll window and opens them after', () => {
@@ -137,12 +163,12 @@ describe('peeker gestures', () => {
   })
 })
 
-// --- the figure bounding radius, MEASURED ------------------------------------
+// --- the figure envelope, MEASURED -------------------------------------------
 //
-// PEEKER_FIGURE_RADIUS is load-bearing: both clearance benches in peeker-stage.test.ts use it as
-// the figure's half-extent, and a figure that quietly outgrew it would make both of them
-// optimistic. So build the real merged geometry, reproduce the scene graph exactly (root tilt →
-// limb joint → limb transform), sweep the gesture range, and measure the true vertex extent.
+// PEEKER_FIGURE_BOX is load-bearing: both clearance benches in peeker-stage.test.ts use it as the
+// figure's extent, and a figure that quietly outgrew it would make both of them optimistic. So
+// build the real merged geometry, reproduce the scene graph exactly (root tilt → limb joint →
+// limb transform), sweep the gesture range, and measure the true vertex extent.
 
 /** Mirrors the scene graph PeekerFigure builds, so the measurement includes joints and gestures. */
 function figureRig(kind: PeekerKind, dir: 1 | -1) {
