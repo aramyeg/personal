@@ -62,10 +62,13 @@ describe('BIOME_MOODS', () => {
   // The light tint must be a tint, not a repaint: mixing toward a DARK colour would drag the
   // whole scene down instead of colouring the daylight.
   it('tints the light toward pale colours only', () => {
+    // Rec. 709 weights, not a channel mean: green carries most of the perceived brightness, so an
+    // unweighted average would pass a cast that reads far darker than it measures.
+    const W = [0.2126, 0.7152, 0.0722]
     for (const mood of BIOME_MOODS) {
       const lum = [1, 3, 5]
-        .map((i) => parseInt(mood.cast.slice(i, i + 2), 16) / 255)
-        .reduce((a, b) => a + b, 0) / 3
+        .map((i, k) => (parseInt(mood.cast.slice(i, i + 2), 16) / 255) * W[k])
+        .reduce((a, b) => a + b, 0)
       expect(lum, `${mood.id} cast luminance`).toBeGreaterThan(0.6)
     }
   })
@@ -134,6 +137,17 @@ describe('moodBlendAt', () => {
       expect(b.skyMix).toBeCloseTo(BIOME_MOODS[c].skyMix, 6)
       expect(b.lightMix).toBeCloseTo(BIOME_MOODS[c].lightMix, 6)
       expect(b.vignetteAlpha).toBeCloseTo(BIOME_MOODS[c].vignetteAlpha, 6)
+    }
+  })
+
+  // The scene consumers keep parallel colour tables and index them with these, so if the pairing
+  // rule ever changes (open question 3 — follow the visible wedge instead of the chapter) the sky,
+  // the lights and the overlay all move together instead of silently crossfading different pairs.
+  it('publishes the indices its consumers index colour tables with', () => {
+    for (let i = 0; i <= 300; i++) {
+      const b = moodBlendAt(i / 300)
+      expect(BIOME_MOODS[b.fromIndex]).toBe(b.from)
+      expect(BIOME_MOODS[b.toIndex]).toBe(b.to)
     }
   })
 

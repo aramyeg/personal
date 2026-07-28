@@ -35,15 +35,10 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     if (!journeyRef) return
     const j = journeyRef.current
     const b = moodBlendAt(j.progress, j.reveal)
-    const prev = Math.max(0, b.chapter - 1)
-    uniforms.uSky.value
-      .copy(BASE_SKY)
-      .lerp(target(MOOD_SKY, prev, b), b.skyMix)
+    uniforms.uSky.value.copy(BASE_SKY).lerp(target(MOOD_SKY, b), b.skyMix)
     // The glow trails the sky a little: keeping more of the original light low in the frame stops
     // the horizon flattening out once a mood is fully in.
-    uniforms.uGlow.value
-      .copy(BASE_GLOW)
-      .lerp(target(MOOD_GLOW, prev, b), b.skyMix * GLOW_LAG)
+    uniforms.uGlow.value.copy(BASE_GLOW).lerp(target(MOOD_GLOW, b), b.skyMix * GLOW_LAG)
   })
 
   return (
@@ -86,10 +81,12 @@ const SCRATCH = new THREE.Vector3()
 /**
  * The colour the backdrop is heading for: the scroll crossfade between two neighbouring moods,
  * then pulled onto the arriving chapter's mood (grade-mood.ts owns why it is a pull and not a
- * gate). Writes into one module scratch — the frame loop allocates nothing.
+ * gate). Indexes with the blend's OWN `fromIndex`/`toIndex` rather than re-deriving the pairing,
+ * so this table can never crossfade a different pair than the overlay does. Writes into one module
+ * scratch — the frame loop allocates nothing.
  */
-function target(table: THREE.Vector3[], prev: number, b: MoodBlend): THREE.Vector3 {
-  SCRATCH.copy(table[prev]).lerp(table[b.chapter], b.mix)
+function target(table: THREE.Vector3[], b: MoodBlend): THREE.Vector3 {
+  SCRATCH.copy(table[b.fromIndex]).lerp(table[b.toIndex], b.mix)
   return b.revealChapter === null
     ? SCRATCH
     : SCRATCH.lerp(table[b.revealChapter], b.revealPull)

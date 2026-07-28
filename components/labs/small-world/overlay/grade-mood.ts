@@ -215,6 +215,14 @@ export function bloomAt(local: number): number {
 export type MoodBlend = {
   /** Chapter whose mood the scroll blend is moving toward. */
   chapter: number
+  /**
+   * Indices of `from` and `to` in BIOME_MOODS. Consumers that keep their own parallel colour
+   * tables (the scene ones do, to avoid per-frame allocation) MUST index with these rather than
+   * re-derive `chapter - 1` — otherwise a change to the pairing rule here silently leaves the sky
+   * and the lights crossfading a different pair than the overlay does.
+   */
+  fromIndex: number
+  toIndex: number
   /** Mood being left behind (the chapter's own mood at the start of the journey). */
   from: BiomeMood
   /** Mood being moved toward. */
@@ -255,8 +263,10 @@ export function moodBlendAt(progress: number, reveal?: RevealState | null): Mood
   const mix = smoothstep((local - MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START))
   const bloom = SHOW_GRADE ? bloomAt(local) : 0
 
-  const to = BIOME_MOODS[chapter]
-  const from = BIOME_MOODS[Math.max(0, chapter - 1)]
+  const toIndex = chapter
+  const fromIndex = Math.max(0, chapter - 1)
+  const to = BIOME_MOODS[toIndex]
+  const from = BIOME_MOODS[fromIndex]
 
   const revealChapter = reveal
     ? Math.min(CHAPTER_COUNT - 1, Math.max(0, reveal.chapter))
@@ -272,6 +282,8 @@ export function moodBlendAt(progress: number, reveal?: RevealState | null): Mood
 
   return {
     chapter,
+    fromIndex,
+    toIndex,
     from,
     to,
     mix,

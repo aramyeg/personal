@@ -28,17 +28,19 @@ import type { JourneyRef } from './use-journey'
 const AMBIENT_FOLLOW = 0.7
 
 const BASE_KEY = new THREE.Color(PALETTE.keyWarm)
-const BASE_AMBIENT = new THREE.Color('#FFFFFF')
+const BASE_AMBIENT = new THREE.Color(PALETTE.ambientBase)
 const MOOD_CAST = BIOME_MOODS.map((m) => new THREE.Color(m.cast))
 const SCRATCH = new THREE.Color()
 
 /**
  * The light colour the mood is heading for: the scroll crossfade between two neighbouring moods,
  * then pulled onto the arriving chapter's mood (grade-mood.ts owns why it is a pull and not a
- * gate). One module scratch — the frame loop allocates nothing.
+ * gate). Indexes with the blend's OWN `fromIndex`/`toIndex` rather than re-deriving the pairing,
+ * so the lights can never crossfade a different pair than the sky or the overlay. One module
+ * scratch — the frame loop allocates nothing.
  */
 function target(b: MoodBlend): THREE.Color {
-  SCRATCH.copy(MOOD_CAST[Math.max(0, b.chapter - 1)]).lerp(MOOD_CAST[b.chapter], b.mix)
+  SCRATCH.copy(MOOD_CAST[b.fromIndex]).lerp(MOOD_CAST[b.toIndex], b.mix)
   return b.revealChapter === null
     ? SCRATCH
     : SCRATCH.lerp(MOOD_CAST[b.revealChapter], b.revealPull)

@@ -132,6 +132,8 @@ export const PALETTE = {
   //           document haze above the canvas). This is the grade proper: it reaches the planet,
   //           the girl and the mascots as LIGHT, so every clay figure keeps its own hue.
   keyWarm: '#FFF2E0', // the scene's ungraded key light — warm daylight, the base every mood mixes from
+  ambientBase: '#FFFFFF', // the scene's ungraded ambient fill (three.js's own AmbientLight default),
+  // named so the grade's two base colours sit together and neither is a literal in the scene files
   gradeSpringSky: '#FFD7E4', // ch0 spring — soft blossom pink over the cream (the current feel)
   gradeSpringGlow: '#FFCFE0', // blossom horizon
   gradeSpringCast: '#FFE4D2', // warm blossom-cream light, barely there
