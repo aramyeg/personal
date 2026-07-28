@@ -36,19 +36,27 @@ const MOBILE_STYLES = `
   }
 `
 
-/** One chapter stop's spread: art panel + typeset data panel, comic-tilted. */
+/**
+ * One chapter stop's spread: art panel + typeset data panel, comic-tilted.
+ *
+ * `enter` is the entrance clock 0→1 — on arrival it is driven by the wall-clock
+ * reveal (the spread rolls in by itself, a beat behind the "!"), and it walks back
+ * down to 0 when the visitor leaves the checkpoint in either direction. The mapping
+ * from that clock lives in use-journey-ui; this component only eases what it gets,
+ * so it renders the same whatever drives it.
+ */
 export function ChapterPanels({
   chapter,
   index,
-  t,
+  enter: entrance,
   onAdvance,
 }: {
   chapter: Chapter
   index: number
-  t: number
+  enter: number
   onAdvance: () => void
 }) {
-  const enter = easeOutBack(Math.min(1, t * 2.2))
+  const enter = easeOutBack(entrance)
   const artSrc = panelArtSrc(chapter.id)
 
   const rootStyle: Record<string, string | number> = {

@@ -9,6 +9,9 @@ import {
   chapterStartRotation,
   easeOutBack,
   approachRevealGrow,
+  revealPhase,
+  BURST_PHASE_END,
+  CARD_PHASE_START,
 } from '@/components/labs/small-world/journey-timeline'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 
@@ -76,6 +79,68 @@ describe('journeyStateAt', () => {
     expect(settled.morph[3]).toBe(1)
     expect(settled.morph[2]).toBe(0)
     expect(settled.morph[4]).toBe(0)
+  })
+})
+
+// Round 15 / Task 54 — the arrival reveal clock. journeyStateAt stays pure: it
+// only passes the clock through and re-keys the "!" to it, so the entrance can
+// play with no scroll input. The clock itself is proven in arrival.test.ts.
+describe('reveal clock pass-through', () => {
+  const dwell = at(2, 0.75)
+
+  it('is null unless a driver supplies one', () => {
+    expect(journeyStateAt(dwell).reveal).toBeNull()
+  })
+
+  it('publishes exactly what the driver supplied', () => {
+    const reveal = { chapter: 2, t: 0.4, phase: 'in' as const }
+    expect(journeyStateAt(dwell, undefined, reveal).reveal).toBe(reveal)
+  })
+
+  it('re-keys the discovery burst to the reveal, so it pops on arrival', () => {
+    // Parked at the girl's stop with no further scrolling: the old scroll window
+    // would sit frozen at 0 forever; the clock pops it.
+    const arrival = at(2, TRAVEL_END + 1e-9)
+    expect(journeyStateAt(arrival).burst).toBeCloseTo(0, 6)
+    const popped = journeyStateAt(arrival, undefined, { chapter: 2, t: 0.21, phase: 'in' })
+    expect(popped.burst).toBeGreaterThan(0.4)
+    expect(popped.burst).toBeLessThan(0.6)
+  })
+
+  it('drops the burst once its beat is over, and never re-fires it on the way out', () => {
+    const rolled = journeyStateAt(dwell, undefined, { chapter: 2, t: 0.9, phase: 'in' })
+    expect(rolled.burst).toBeNull()
+    // Retracting back through the burst's own window must NOT pop it a second time.
+    const leaving = journeyStateAt(dwell, undefined, { chapter: 2, t: 0.2, phase: 'out' })
+    expect(leaving.burst).toBeNull()
+  })
+
+  it('leaves the burst scroll-keyed while another chapter retracts', () => {
+    const travelling = at(3, 0.2)
+    expect(journeyStateAt(travelling, undefined, { chapter: 2, t: 0.5, phase: 'out' }).burst).toBeNull()
+  })
+
+  it('never touches rotation, morph or the dwell panel', () => {
+    const bare = journeyStateAt(dwell)
+    const clocked = journeyStateAt(dwell, undefined, { chapter: 2, t: 0.33, phase: 'in' })
+    expect(clocked.rotation).toBe(bare.rotation)
+    expect(clocked.morph).toEqual(bare.morph)
+    expect(clocked.panel).toEqual(bare.panel)
+  })
+})
+
+describe('revealPhase', () => {
+  it('remaps a sub-window to its own 0→1 and clamps outside it', () => {
+    expect(revealPhase(0.2, 0.26, 1)).toBe(0)
+    expect(revealPhase(0.26, 0.26, 1)).toBe(0)
+    expect(revealPhase(0.63, 0.26, 1)).toBeCloseTo(0.5, 6)
+    expect(revealPhase(1, 0.26, 1)).toBe(1)
+    expect(revealPhase(1.4, 0.26, 1)).toBe(1)
+  })
+
+  it('starts the cards after the burst beat has begun, so the "!" leads', () => {
+    expect(CARD_PHASE_START).toBeGreaterThan(0)
+    expect(CARD_PHASE_START).toBeLessThan(BURST_PHASE_END)
   })
 })
 

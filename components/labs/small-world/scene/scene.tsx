@@ -27,8 +27,13 @@ import { WinterLife } from './props/winter'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
+import type { ArrivalJourney } from '../use-arrival-journey'
 
-export type SceneProps = { progressRef: MutableRefObject<number> }
+export type SceneProps = {
+  progressRef: MutableRefObject<number>
+  /** Supplies the arrival reveal clock; absent → the scene runs scroll-pure (Task 54). */
+  journey?: Pick<ArrivalJourney, 'arrivalRef'>
+}
 
 /**
  * Composition target (reference-language research): whole planet visible
@@ -58,9 +63,10 @@ function CameraRig() {
 
 function SceneContents({
   progressRef,
+  journey,
   onBakeReady,
 }: SceneProps & { onBakeReady?: () => void }) {
-  const journeyRef = useDampedJourney(progressRef)
+  const journeyRef = useDampedJourney(progressRef, journey?.arrivalRef)
   return (
     <>
       <CameraRig />
@@ -114,6 +120,7 @@ function SceneContents({
 /** Side-view stage: planet is a wheel spinning about z; girl pinned on top. */
 export function SmallWorldScene({
   progressRef,
+  journey,
   onLoadChange,
 }: SceneProps & { onLoadChange?: (progress: number, ready: boolean) => void }) {
   // Task 47 — the land bake is async (Web Worker), so "ready" must also wait for the first bake
@@ -126,7 +133,7 @@ export function SmallWorldScene({
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
       <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
         <ToonRampProvider>
-          <SceneContents progressRef={progressRef} onBakeReady={onBakeReady} />
+          <SceneContents progressRef={progressRef} journey={journey} onBakeReady={onBakeReady} />
         </ToonRampProvider>
         {/* Reports the girl-GLB load + the first land bake to the DOM planet loader. */}
         {onLoadChange && <LoadSignal onChange={onLoadChange} bakeReady={bakeReady} />}

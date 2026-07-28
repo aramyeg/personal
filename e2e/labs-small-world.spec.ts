@@ -11,6 +11,16 @@ async function webglAvailable(page: import('@playwright/test').Page): Promise<bo
   })
 }
 
+// Round 15 note (Task 54): checkpoint entrances are now played by a wall-clock
+// reveal, not by the scroll position alone. Both panel expectations below still
+// hold — the cards MOUNT on arrival (earlier than before, at the girl's stop
+// rather than at the dwell's panel window) and they UNMOUNT after a ~0.4s
+// retraction rather than instantly, which the auto-retrying matchers absorb. If
+// either becomes flaky, the fix is to wait for the retraction, not to loosen the
+// assertion. Note that this helper's scrollTo is ANIMATED (globals.css sets
+// scroll-behavior: smooth), so landing in a dwell can spend that checkpoint's one
+// absorption on the way in — the journey settles on the requested position either
+// way, it just may take up to a second longer than the scroll animation.
 async function scrollToProgress(page: import('@playwright/test').Page, progress: number) {
   await page.evaluate((p) => {
     const total = document.documentElement.scrollHeight - window.innerHeight

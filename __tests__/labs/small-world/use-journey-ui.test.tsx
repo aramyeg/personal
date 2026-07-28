@@ -1,9 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useJourneyUi } from '@/components/labs/small-world/overlay/use-journey-ui'
+import { initialArrival } from '@/components/labs/small-world/arrival'
+import type { RevealState } from '@/components/labs/small-world/journey-timeline'
+import type { ArrivalJourney } from '@/components/labs/small-world/use-arrival-journey'
 
 function refOf(value: number) {
   return { current: value }
+}
+
+/**
+ * Stands in for the arrival driver: holds a reveal the test can rewrite, and hands
+ * back a `tick()` that fires its subscribers the way a driver frame does — with no
+ * scroll event at all, which is the whole point of the clock.
+ */
+function fakeJourney(progress: number, reveal: RevealState | null) {
+  const listeners = new Set<() => void>()
+  const journey: ArrivalJourney = {
+    progressRef: refOf(progress),
+    rawProgressRef: refOf(progress),
+    arrivalRef: { current: { ...initialArrival(progress), reveal } },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
+  return {
+    journey,
+    set(next: RevealState | null, at = journey.progressRef.current) {
+      journey.progressRef.current = at
+      journey.arrivalRef.current = { ...journey.arrivalRef.current, reveal: next }
+    },
+    tick: () =>
+      act(() => {
+        listeners.forEach((l) => l())
+      }),
+  }
 }
 
 // compute() is deferred to a rAF (mocked as setTimeout(fn, 0) in
@@ -38,15 +72,15 @@ describe('useJourneyUi', () => {
     expect(result.current.panel).toBeNull()
   })
 
-  it('reports the panel window with quantized t', () => {
+  it('reports the panel window with a quantized entrance', () => {
     const ref = refOf(0)
     const { result } = renderHook(() => useJourneyUi(ref))
-    ref.current = 0.8 / 6 // chapter 0 local 0.8 — inside [0.65, 0.95)
+    ref.current = 0.72 / 6 // chapter 0 local 0.72 — inside [0.65, 0.95)
     fireScroll()
     expect(result.current.panel).not.toBeNull()
     expect(result.current.panel!.chapter).toBe(0)
-    expect(result.current.panel!.t).toBeCloseTo(0.5, 1)
-    expect((result.current.panel!.t * 40) % 1).toBeCloseTo(0, 6)
+    expect(result.current.panel!.enter).toBeCloseTo(0.51, 1)
+    expect((result.current.panel!.enter * 60) % 1).toBeCloseTo(0, 6)
   })
 
   it('reports the ending', () => {
@@ -63,5 +97,70 @@ describe('useJourneyUi', () => {
     const before = result.current
     fireScroll()
     expect(result.current).toBe(before)
+  })
+})
+
+// Round 15 / Task 54 — the arrival is a wall clock, so the cards must follow the
+// driver's frames, not scroll events. These are the DOM half of that contract.
+describe('useJourneyUi on the arrival clock', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('mounts the cards the moment the girl arrives, before the dwell panel exists', () => {
+    // chapter 0 local 0.56: she has stopped, the old panel window has not opened yet.
+    const driver = fakeJourney(0.56 / 6, { chapter: 0, t: 0, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    expect(result.current.panel).not.toBeNull()
+    expect(result.current.panel!.chapter).toBe(0)
+    expect(result.current.panel!.enter).toBe(0)
+  })
+
+  it('rolls the cards out on driver frames with no scroll input at all', () => {
+    const driver = fakeJourney(0.56 / 6, { chapter: 0, t: 0, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    const seen: number[] = []
+    for (const t of [0.4, 0.6, 0.8, 1]) {
+      driver.set({ chapter: 0, t, phase: 'in' })
+      driver.tick()
+      seen.push(result.current.panel!.enter)
+    }
+    expect(seen[seen.length - 1]).toBe(1)
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThan(seen[i - 1])
+  })
+
+  it('parks: lingering or scrubbing inside the dwell costs no re-render', () => {
+    const driver = fakeJourney(0.8 / 6, { chapter: 0, t: 1, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    const parked = result.current
+    expect(parked.panel!.enter).toBe(1)
+    driver.set({ chapter: 0, t: 1, phase: 'in' }, 0.9 / 6)
+    driver.tick()
+    expect(result.current).toBe(parked)
+  })
+
+  it('walks the cards back out on retraction, then unmounts them', () => {
+    const driver = fakeJourney(0.96 / 6, { chapter: 0, t: 1, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    driver.set({ chapter: 0, t: 0.5, phase: 'out' })
+    driver.tick()
+    expect(result.current.panel!.enter).toBeGreaterThan(0)
+    expect(result.current.panel!.enter).toBeLessThan(1)
+    driver.set(null)
+    driver.tick()
+    expect(result.current.panel).toBeNull()
+  })
+
+  it('keeps the burst on the clock, so the "!" pops without scrolling', () => {
+    const driver = fakeJourney(0.56 / 6, { chapter: 0, t: 0.2, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    expect(result.current.burst).toBe(true)
+    driver.set({ chapter: 0, t: 0.8, phase: 'in' })
+    driver.tick()
+    expect(result.current.burst).toBe(false)
   })
 })

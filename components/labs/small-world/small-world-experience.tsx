@@ -6,6 +6,7 @@ import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
 import { beginManualScrollRestoration, pinScrollToTop } from './scroll-reset'
+import { useArrivalJourney } from './use-arrival-journey'
 import { isTuneEnabled } from './scene/tunables'
 
 /** The ?tune=1 roughness panel is code-split behind the flag: absent → this chunk is
@@ -37,8 +38,12 @@ export function SmallWorldExperience({
 } = {}) {
   const [active, setActive] = useState(false)
   const [tune, setTune] = useState(false)
-  const progressRef = useRef(0)
   const trackRef = useRef<HTMLDivElement>(null)
+  // Owns scroll→progress AND the checkpoint arrival clock: progressRef is the
+  // absorbed journey progress, so a checkpoint entrance can hold the world still
+  // for a beat while its cards and mascots roll out (Task 54).
+  const journey = useArrivalJourney(trackRef, active)
+  const progressRef = journey.progressRef
 
   // BUG-fix: own scroll restoration for the lab's lifetime so a reload-while-deep
   // never lets the browser re-apply a stale scroll during load (which made the
@@ -72,19 +77,6 @@ export function SmallWorldExperience({
     setTune(isTuneEnabled(window.location.search))
   }, [])
 
-  useEffect(() => {
-    if (!active) return
-    const onScroll = () => {
-      const el = trackRef.current
-      if (!el) return
-      const total = el.scrollHeight - window.innerHeight
-      progressRef.current = total > 0 ? Math.min(1, Math.max(0, window.scrollY / total)) : 0
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [active])
-
   const advanceTo = (p: number) => {
     const el = trackRef.current
     if (!el) return
@@ -98,8 +90,8 @@ export function SmallWorldExperience({
   return (
     <div ref={trackRef} style={{ height: `${CHAPTER_COUNT * TRACK_VH_PER_CHAPTER}vh` }}>
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
-        <SmallWorldScene progressRef={progressRef} onLoadChange={onLoadChange} />
-        <JourneyOverlay progressRef={progressRef} onAdvance={advanceTo} />
+        <SmallWorldScene progressRef={progressRef} journey={journey} onLoadChange={onLoadChange} />
+        <JourneyOverlay progressRef={progressRef} journey={journey} onAdvance={advanceTo} />
         {tune && <TunePanel />}
       </div>
       {/* Collapse the now-pastel-styled fallback once the scene is live. Neutralises
