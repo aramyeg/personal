@@ -87,6 +87,63 @@ export const LIGHT_MIX_MAX = 0.42
 export const HAZE_ALPHA_MAX = 0.12
 export const VIGNETTE_ALPHA_MAX = 0.28
 
+/**
+ * The UNGRADED colours every mood is mixed out of — the backdrop's two gradient stops and the two
+ * lights, as they stand with the grade switched off. Named here rather than reached for out of the
+ * palette by each consumer so that there is exactly one place that says what the grade mixes FROM;
+ * `resolvedMood` below then resolves what a checkpoint actually puts on screen, and the
+ * distinctness gate can be written against that rather than against raw palette entries.
+ */
+export const GRADE_BASE = {
+  sky: PALETTE.sky,
+  glow: PALETTE.horizon,
+  key: PALETTE.keyWarm,
+  ambient: PALETTE.ambientBase,
+} as const
+
+/**
+ * ADJACENT-PAIR DISTINCTNESS (Task 57) — the rail that keeps every arrival an event.
+ *
+ * Round 16 opened on Aram's report that "the cinematic color change is not happening during each
+ * checkpoint, but rather during each 2 checkpoints". Nothing in the mechanism was broken: driven
+ * by real wheel events with hands off, every checkpoint landed byte-exactly on its own mood. The
+ * defect was in the COLOURS. Measured as CIEDE2000 between what consecutive parked checkpoints
+ * actually put on screen, the five adjacent transitions ran 33.6 / 7.3 / 29.8 / 18.4 / 29.7 — so
+ * arrivals 2, 4 and 6 announced themselves and arrivals 3 and 5 did not, which is exactly the
+ * every-other-checkpoint rhythm reported. Jungle and delta had both resolved to greenish teals
+ * and desert and canyon to two ambers, because a mood's distance from its neighbour is a property
+ * of the colour AFTER it has been mixed into the cream base, not of the palette hex.
+ *
+ * The thresholds are derived from that labelled evidence rather than from a textbook JND (which
+ * is about colours seen side by side; these are separated by seconds of scrolling). Each dial's
+ * accepted and rejected pairs bracket a decision boundary, and the gate sits inside the bracket:
+ *   sky   — rejected at 7.3 and 18.4, accepted at 29.7 / 29.8 / 33.6  → boundary in (18.4, 29.7)
+ *   light — rejected at 4.7 and 6.8,  accepted at 14.7 / 15.8 / 16.1  → boundary in (6.8, 14.7)
+ * The light's range is structurally narrower because LIGHT_MIX_MAX and the pale-cast rule keep
+ * every cast near the same cream; desert→canyon is the hardest pair on that dial, since both
+ * biomes are warm by identity, and ~11.8 is about all it can reach inside the rails.
+ *
+ * Tripwires, not targets: the shipped set clears them at 30.4 and 11.7. A retune that walks a mood
+ * back into its neighbour's family fails in grade-mood.test.ts, which also keeps the pre-Task-57
+ * colours as a fixture so the gate is proven to have teeth rather than merely asserted to.
+ */
+export const MOOD_SKY_MIN_DE = 24
+export const MOOD_LIGHT_MIN_DE = 10
+
+/**
+ * What a PARKED checkpoint puts on screen: the mood mixed into the ungraded base. At a checkpoint
+ * the bloom is 1 and the arrival pull is 1, so these are the exact values `scene/sky.tsx` writes
+ * into its high backdrop stop and `scene/biome-atmosphere.tsx` writes into the key light — both of
+ * them lerp from `GRADE_BASE` toward the mood by the same two dials, in the frame loop and in
+ * vector form so they never allocate.
+ */
+export function resolvedMood(mood: BiomeMood): { sky: string; key: string } {
+  return {
+    sky: mixHex(GRADE_BASE.sky, mood.sky, mood.skyMix),
+    key: mixHex(GRADE_BASE.key, mood.cast, mood.lightMix),
+  }
+}
+
 /** Journey-order moods. Chapter → wedge is fixed by the scene mounts (see peeker-stage.ts). */
 export const BIOME_MOODS: readonly BiomeMood[] = [
   // Spring opens the journey and has to feel like today's page: the mood is present but nearly
@@ -105,19 +162,22 @@ export const BIOME_MOODS: readonly BiomeMood[] = [
     id: 'jungle',
     sky: PALETTE.gradeJungleSky,
     glow: PALETTE.gradeJungleGlow,
-    skyMix: 0.64,
+    skyMix: 0.66,
     cast: PALETTE.gradeJungleCast,
-    lightMix: 0.34,
+    lightMix: 0.36,
     hazeAlpha: 0.06,
     vignetteAlpha: 0.24,
   },
+  // The delta is deliberately the LIGHT one between two darker neighbours. Reading it as a second
+  // dark teal is what made chapter 3 announce nothing after the jungle; out on open water the air
+  // is bright and hazy, which is both truer to the biome and the largest separation available.
   {
     id: 'delta',
     sky: PALETTE.gradeDeltaSky,
     glow: PALETTE.gradeDeltaGlow,
     skyMix: 0.6,
     cast: PALETTE.gradeDeltaCast,
-    lightMix: 0.32,
+    lightMix: 0.36,
     hazeAlpha: 0.07,
     vignetteAlpha: 0.22,
   },
@@ -131,13 +191,18 @@ export const BIOME_MOODS: readonly BiomeMood[] = [
     hazeAlpha: 0.06,
     vignetteAlpha: 0.18,
   },
+  // Canyon spends the light headroom deliberately. Desert and canyon are both warm by identity, so
+  // the pale-cast rail leaves their two lights closer together than any other adjacent pair can
+  // be; the sky and the horizon glow carry most of this arrival, and `lightMix` at 0.40 buys back
+  // what is left. Raising `skyMix` instead would only mix further into the cream base, which is
+  // what made the frame go gloomy rather than ember when this was first tried.
   {
     id: 'canyon',
     sky: PALETTE.gradeCanyonSky,
     glow: PALETTE.gradeCanyonGlow,
     skyMix: 0.62,
     cast: PALETTE.gradeCanyonCast,
-    lightMix: 0.34,
+    lightMix: 0.4,
     hazeAlpha: 0.07,
     vignetteAlpha: 0.26,
   },

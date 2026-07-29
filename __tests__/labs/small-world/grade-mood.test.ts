@@ -3,6 +3,7 @@ import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { PANEL_END, TRAVEL_END } from '@/components/labs/small-world/journey-timeline'
 import { initialArrival, stepArrival } from '@/components/labs/small-world/arrival'
 import { PALETTE } from '@/components/labs/small-world/palette'
+import type { BiomeMood } from '@/components/labs/small-world/overlay/grade-mood'
 import {
   BIOME_MOODS,
   BLOOM_FLOOR,
@@ -11,6 +12,8 @@ import {
   HAZE_ALPHA_MAX,
   LIGHT_MIX_MAX,
   MOOD_IN_END,
+  MOOD_LIGHT_MIN_DE,
+  MOOD_SKY_MIN_DE,
   REVEAL_NEAR,
   MOOD_IN_START,
   SHOW_GRADE,
@@ -20,6 +23,7 @@ import {
   gradeAt,
   mixHex,
   moodBlendAt,
+  resolvedMood,
 } from '@/components/labs/small-world/overlay/grade-mood'
 
 const SEG = 1 / CHAPTER_COUNT
@@ -102,6 +106,140 @@ describe('BIOME_MOODS', () => {
       expect(spring.skyMix).toBeLessThan(mood.skyMix)
       expect(spring.lightMix).toBeLessThan(mood.lightMix)
     }
+  })
+})
+
+/**
+ * Task 57 — EVERY ARRIVAL MUST ANNOUNCE ITSELF.
+ *
+ * Aram reported the grade changing "not during each checkpoint, but rather during each 2
+ * checkpoints". The mechanism was fine — driven by real wheel events with hands off, every
+ * checkpoint landed byte-exactly on its own mood — so the defect was that adjacent moods were too
+ * close to tell apart once each had been mixed into the same cream base.
+ *
+ * These assertions are therefore on the RESOLVED colours (`resolvedMood`), never on the palette
+ * hexes: the old jungle `#2E7D4F` and delta `#2F7A70` look like different colours and resolve to
+ * `#79A780` and `#82AA99`, which do not. Same lesson the T55 review closed on — for a visual
+ * property, assert on the pixel the visitor sees, not the parameter that produces it.
+ */
+describe('adjacent-mood distinctness', () => {
+  /**
+   * CIEDE2000. The question is whether a visitor REGISTERS a change of mood, which is a question
+   * about perceived difference; an RGB or per-channel distance answers a different one. Kept local
+   * to the test on purpose — it is a measuring instrument, not something the lab ships.
+   */
+  const toLab = (hex: string): [number, number, number] => {
+    const lin = (u: number) => (u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4)
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255))
+    const X = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    const Z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+    const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116)
+    const [fx, fy, fz] = [f(X), f(Y), f(Z)]
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
+  }
+
+  const deltaE = (h1: string, h2: string): number => {
+    const [L1, a1, b1] = toLab(h1)
+    const [L2, a2, b2] = toLab(h2)
+    const rad = Math.PI / 180
+    const Cb = (Math.hypot(a1, b1) + Math.hypot(a2, b2)) / 2
+    const G = 0.5 * (1 - Math.sqrt(Cb ** 7 / (Cb ** 7 + 25 ** 7)))
+    const [ap1, ap2] = [(1 + G) * a1, (1 + G) * a2]
+    const [Cp1, Cp2] = [Math.hypot(ap1, b1), Math.hypot(ap2, b2)]
+    const hue = (b: number, ap: number) => {
+      if (b === 0 && ap === 0) return 0
+      const h = Math.atan2(b, ap) / rad
+      return h >= 0 ? h : h + 360
+    }
+    const [hp1, hp2] = [hue(b1, ap1), hue(b2, ap2)]
+    const dL = L2 - L1
+    const dC = Cp2 - Cp1
+    let dh = 0
+    if (Cp1 * Cp2 !== 0) {
+      dh = hp2 - hp1
+      if (dh > 180) dh -= 360
+      else if (dh < -180) dh += 360
+    }
+    const dH = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin((dh * rad) / 2)
+    const Lb = (L1 + L2) / 2
+    const Cpb = (Cp1 + Cp2) / 2
+    let hb = hp1 + hp2
+    if (Cp1 * Cp2 !== 0) {
+      if (Math.abs(hp1 - hp2) > 180) hb += hb < 360 ? 360 : -360
+      hb /= 2
+    }
+    const T =
+      1 -
+      0.17 * Math.cos((hb - 30) * rad) +
+      0.24 * Math.cos(2 * hb * rad) +
+      0.32 * Math.cos((3 * hb + 6) * rad) -
+      0.2 * Math.cos((4 * hb - 63) * rad)
+    const Rt =
+      -Math.sin(2 * (30 * Math.exp(-(((hb - 275) / 25) ** 2))) * rad) *
+      (2 * Math.sqrt(Cpb ** 7 / (Cpb ** 7 + 25 ** 7)))
+    const Sl = 1 + (0.015 * (Lb - 50) ** 2) / Math.sqrt(20 + (Lb - 50) ** 2)
+    const Sc = 1 + 0.045 * Cpb
+    const Sh = 1 + 0.015 * Cpb * T
+    return Math.sqrt(
+      (dL / Sl) ** 2 + (dC / Sc) ** 2 + (dH / Sh) ** 2 + Rt * (dC / Sc) * (dH / Sh)
+    )
+  }
+
+  /** Adjacent-pair distances for an arbitrary mood set, in journey order. */
+  const pairs = (moods: readonly BiomeMood[]) =>
+    moods.slice(1).map((mood, i) => {
+      const [a, b] = [resolvedMood(moods[i]), resolvedMood(mood)]
+      return { name: `${moods[i].id}->${mood.id}`, sky: deltaE(a.sky, b.sky), key: deltaE(a.key, b.key) }
+    })
+
+  it('measures distance the way the eye does', () => {
+    // Self-consistency of the instrument, checked against values derivable by hand rather than
+    // remembered: a colour is zero from itself, the metric is symmetric, and a pure-lightness pair
+    // reduces to dL/Sl — for L* 50 vs 100 that is 50 / (1 + 0.015·25²/√(20+25²)) = 36.5.
+    expect(deltaE('#8FD69B', '#8FD69B')).toBe(0)
+    expect(deltaE('#2E7D4F', '#E9A03A')).toBeCloseTo(deltaE('#E9A03A', '#2E7D4F'), 12)
+    expect(deltaE('#777777', '#FFFFFF')).toBeCloseTo(36.5, 0)
+  })
+
+  it('separates every adjacent pair far enough to read at a glance', () => {
+    for (const p of pairs(BIOME_MOODS)) {
+      expect(p.sky, `${p.name} sky`).toBeGreaterThanOrEqual(MOOD_SKY_MIN_DE)
+      expect(p.key, `${p.name} light`).toBeGreaterThanOrEqual(MOOD_LIGHT_MIN_DE)
+    }
+  })
+
+  /**
+   * The gate has teeth, proven rather than asserted. This is the mood set as it shipped through
+   * round 15 — the one Aram saw and reported. Keeping it here means the gate can never be quietly
+   * loosened back to something that reads as "every 2 checkpoints"; if this fixture ever passes,
+   * the thresholds have stopped meaning anything.
+   */
+  it('rejects the round-15 colours that only announced every second checkpoint', () => {
+    const before: BiomeMood[] = [
+      { id: 'spring', sky: '#FFD7E4', glow: '#FFCFE0', skyMix: 0.34, cast: '#FFE4D2', lightMix: 0.12, hazeAlpha: 0.03, vignetteAlpha: 0.1 },
+      { id: 'jungle', sky: '#2E7D4F', glow: '#D6E29A', skyMix: 0.64, cast: '#8FD69B', lightMix: 0.34, hazeAlpha: 0.06, vignetteAlpha: 0.24 },
+      { id: 'delta', sky: '#2F7A70', glow: '#E2D8A6', skyMix: 0.6, cast: '#7FC9BC', lightMix: 0.32, hazeAlpha: 0.07, vignetteAlpha: 0.22 },
+      { id: 'desert', sky: '#E9A03A', glow: '#FFEDBE', skyMix: 0.58, cast: '#FFCE84', lightMix: 0.3, hazeAlpha: 0.06, vignetteAlpha: 0.18 },
+      { id: 'canyon', sky: '#A64A22', glow: '#FFC287', skyMix: 0.62, cast: '#EE9A63', lightMix: 0.34, hazeAlpha: 0.07, vignetteAlpha: 0.26 },
+      { id: 'winter', sky: '#6E7FC2', glow: '#E6E1F5', skyMix: 0.6, cast: '#B3C2EE', lightMix: 0.34, hazeAlpha: 0.06, vignetteAlpha: 0.2 },
+    ]
+    const was = pairs(before)
+    const failing = was.filter((p) => p.sky < MOOD_SKY_MIN_DE || p.key < MOOD_LIGHT_MIN_DE)
+    // The two the report named, and only those: chapters 3 and 5 were the silent arrivals.
+    expect(failing.map((p) => p.name)).toEqual(['jungle->delta', 'desert->canyon'])
+    // The measured before-values, so a future reader can see the size of the defect.
+    expect(was.map((p) => Math.round(p.sky * 10) / 10)).toEqual([33.6, 7.3, 29.8, 18.4, 29.7])
+  })
+
+  it('keeps the thresholds inside the bracket the evidence draws', () => {
+    // Derived, not picked: every pair Aram registered measured >= 29.7 on the sky and >= 14.7 on
+    // the light; every pair he did not measured <= 18.4 and <= 6.8. A gate above the rejected band
+    // and below the accepted one is the only defensible place for it.
+    expect(MOOD_SKY_MIN_DE).toBeGreaterThan(18.4)
+    expect(MOOD_SKY_MIN_DE).toBeLessThan(29.7)
+    expect(MOOD_LIGHT_MIN_DE).toBeGreaterThan(6.8)
+    expect(MOOD_LIGHT_MIN_DE).toBeLessThan(14.7)
   })
 })
 

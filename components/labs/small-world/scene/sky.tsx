@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PALETTE } from '../palette'
-import { BIOME_MOODS, moodBlendAt } from '../overlay/grade-mood'
+import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
 import type { JourneyRef } from './use-journey'
 
@@ -27,7 +26,7 @@ import type { JourneyRef } from './use-journey'
  */
 export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
   const uniforms = useMemo(
-    () => ({ uSky: { value: srgb(PALETTE.sky) }, uGlow: { value: srgb(PALETTE.horizon) } }),
+    () => ({ uSky: { value: srgb(GRADE_BASE.sky) }, uGlow: { value: srgb(GRADE_BASE.glow) } }),
     []
   )
 
@@ -71,9 +70,11 @@ function srgb(hex: string): THREE.Vector3 {
   return new THREE.Vector3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
 }
 
-// Every colour the backdrop can reach, parsed once. The frame loop only lerps.
-const BASE_SKY = srgb(PALETTE.sky)
-const BASE_GLOW = srgb(PALETTE.horizon)
+// Every colour the backdrop can reach, parsed once. The frame loop only lerps. The two ungraded
+// stops come from GRADE_BASE rather than straight out of the palette, so the grade's distinctness
+// gate resolves the same colours this shader will actually show.
+const BASE_SKY = srgb(GRADE_BASE.sky)
+const BASE_GLOW = srgb(GRADE_BASE.glow)
 const MOOD_SKY = BIOME_MOODS.map((m) => srgb(m.sky))
 const MOOD_GLOW = BIOME_MOODS.map((m) => srgb(m.glow))
 const SCRATCH = new THREE.Vector3()

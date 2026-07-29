@@ -1,8 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PALETTE } from '../palette'
-import { BIOME_MOODS, moodBlendAt } from '../overlay/grade-mood'
+import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
 import { Sky } from './sky'
 import type { JourneyRef } from './use-journey'
@@ -27,8 +26,8 @@ import type { JourneyRef } from './use-journey'
 /** How far the ambient fill follows the key light's tint — kept lower so shadows stay neutral. */
 const AMBIENT_FOLLOW = 0.7
 
-const BASE_KEY = new THREE.Color(PALETTE.keyWarm)
-const BASE_AMBIENT = new THREE.Color(PALETTE.ambientBase)
+const BASE_KEY = new THREE.Color(GRADE_BASE.key)
+const BASE_AMBIENT = new THREE.Color(GRADE_BASE.ambient)
 const MOOD_CAST = BIOME_MOODS.map((m) => new THREE.Color(m.cast))
 const SCRATCH = new THREE.Color()
 
@@ -68,7 +67,7 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
       {/* Warm key raking from the upper-left, low enough that the terminator
           crosses the visible face — shadow pools in the clay dents and reads the
           toon bands as pinched facets. */}
-      <directionalLight ref={key} position={[-6, 2, 3.2]} intensity={1.55} color={PALETTE.keyWarm} />
+      <directionalLight ref={key} position={[-6, 2, 3.2]} intensity={1.55} color={GRADE_BASE.key} />
     </>
   )
 }

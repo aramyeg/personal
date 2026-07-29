@@ -137,18 +137,23 @@ export const PALETTE = {
   gradeSpringSky: '#FFD7E4', // ch0 spring — soft blossom pink over the cream (the current feel)
   gradeSpringGlow: '#FFCFE0', // blossom horizon
   gradeSpringCast: '#FFE4D2', // warm blossom-cream light, barely there
-  gradeJungleSky: '#2E7D4F', // ch1 jungle — deep lush canopy green
-  gradeJungleGlow: '#D6E29A', // sunlit gap in the canopy: warm yellow-green at the horizon
-  gradeJungleCast: '#8FD69B', // pale fern-green light
-  gradeDeltaSky: '#2F7A70', // ch2 delta — humid teal, the swamp's damp air
-  gradeDeltaGlow: '#E2D8A6', // low silt-gold mist over the water
-  gradeDeltaCast: '#7FC9BC', // pale lagoon-teal light
-  gradeDesertSky: '#E9A03A', // ch3 desert — warm amber noon haze
+  // Task 57 — the four middle biomes were re-authored for ADJACENT-PAIR distinctness. Read as
+  // hexes the old set looked varied; read as what the consumers apply — each one mixed into the
+  // same cream base — jungle/delta and desert/canyon landed inside one hue family each, so half
+  // the arrivals announced nothing. The journey now alternates dark/light as well as hue:
+  // dark canopy, bright humid water, hot amber noon, deep ember, cool dusk.
+  gradeJungleSky: '#0D4522', // ch1 jungle — deep lush canopy green, the darkest sky of the six
+  gradeJungleGlow: '#CCDD8E', // sunlit gap in the canopy: warm yellow-green at the horizon
+  gradeJungleCast: '#A6DC8C', // pale sunlit-fern light, warmer than the canopy above it
+  gradeDeltaSky: '#35C8DE', // ch2 delta — humid cyan: out from under the canopy, bright hazy air
+  gradeDeltaGlow: '#EFCF92', // low silt-gold mist over the water
+  gradeDeltaCast: '#5EC4E2', // pale lagoon light, blue rather than green — the jungle's opposite
+  gradeDesertSky: '#FFBE33', // ch3 desert — warm amber noon haze
   gradeDesertGlow: '#FFEDBE', // bleached hot horizon
-  gradeDesertCast: '#FFCE84', // pale gold light
-  gradeCanyonSky: '#A64A22', // ch4 canyon — rust ember, low sun in the gorge
-  gradeCanyonGlow: '#FFC287', // ember light spilling along the rim
-  gradeCanyonCast: '#EE9A63', // pale ember light
+  gradeDesertCast: '#FFE0A6', // bleached noon gold — the palest cast after spring's
+  gradeCanyonSky: '#8A2409', // ch4 canyon — TRUE EMBER: deep rust, not the desert's amber family
+  gradeCanyonGlow: '#FF9A55', // hot ember light spilling along the rim
+  gradeCanyonCast: '#EF8F55', // ember light, the deepest cast the pale-light rail allows
   gradeWinterSky: '#6E7FC2', // ch5 winter — cool blue-violet dusk
   gradeWinterGlow: '#E6E1F5', // pale lilac light off the snow
   gradeWinterCast: '#B3C2EE', // pale periwinkle light
