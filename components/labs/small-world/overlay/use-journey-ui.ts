@@ -24,7 +24,10 @@ const END_AT = 0.985
  * entrance value rather than the raw t of either source.
  *
  * Quantizing `enter` caps re-renders at T_STEPS per entrance; parked at 1 it is a
- * constant, so lingering at a checkpoint costs no React work at all.
+ * constant, so lingering at a checkpoint costs no re-RENDERS. It is not free, though:
+ * the driver stays busy for the whole dwell (a parked reveal is still a reveal), so
+ * this recompute — including a fresh JourneyState and morph array — runs every frame
+ * while you read. Marginal against the canvas's own frame, but not nothing.
  */
 function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
   const reveal = journey?.arrivalRef.current.reveal ?? null

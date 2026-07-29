@@ -37,12 +37,22 @@ export type PanelState = { chapter: number; t: number }
  *   life INCLUDING its retraction, so a consumer animating out never has to guess
  *   which biome is leaving. While rising it equals `JourneyState.chapter`; during
  *   a retraction the journey may already have moved on to the next chapter.
+ *   PREEMPTION — the one way that stability ends early: arriving at a NEW checkpoint
+ *   while an old reveal is still retracting replaces it outright, so `chapter` changes
+ *   and `t` restarts at 0 in the SAME frame (measured: chapter 1 at t=0.762 → chapter 4
+ *   at t=0). One field cannot carry two reveals, so the outgoing one is cut, not
+ *   finished. Reachable by any teleport and by any fling crossing two checkpoints
+ *   inside RETRACT_SECONDS (>0.238 progress/s). A consumer that animates its exit off
+ *   `reveal.chapter` MUST treat a chapter change as a hard cut and snap its outgoing
+ *   element, or hold its own copy of what it was showing. The rule below — that `t`
+ *   never jumps — holds WITHIN one reveal's life; preemption ends that life.
  * `t` — 0 at the arrival instant, rising to 1 over REVEAL_SECONDS of wall clock
  *   once the girl reaches the stop (dwell entry, local >= TRAVEL_END). It then
  *   PARKS at exactly 1 for as long as the journey stays in that dwell, however
  *   long the visitor lingers or scrubs inside it. On leaving the dwell — either
  *   direction — it walks BACK DOWN to 0 over RETRACT_SECONDS and the whole field
- *   becomes null. Always in [0,1]; never jumps; monotone within a phase.
+ *   becomes null. Always in [0,1]; monotone within a phase; never jumps WITHIN one
+ *   reveal's life — preemption above is the one way a life ends early.
  * `phase` — 'in' while rolling out or parked, 'out' while retracting. Use it for
  *   one-shot beats that must not re-fire on the way out (the "!" burst does), and
  *   for staged exits. Entrances that simply reverse need only `t`.
@@ -60,7 +70,12 @@ export type PanelState = { chapter: number; t: number }
  *    t). Never derive geometry, rotation, renewal or any baked value from it —
  *    those stay scroll-pure. Screen-space entrance transforms only.
  *  - Re-entering a dwell RESUMES from the current t rather than restarting, so
- *    scrubbing across the window edge can never re-trigger a replay.
+ *    scrubbing across the window edge does not re-trigger a replay. Precisely: no
+ *    replay within ~RETRACT_SECONDS of NET time spent outside the window. Retract is
+ *    2.5x faster than the roll-out, so a thrash symmetric in frames drains t; once it
+ *    reaches 0 the reveal ends and the next entry is a fresh arrival, absorption and
+ *    all. That is correct — by then the visitor has genuinely been away — but it does
+ *    mean "never replays" is too strong a thing to build on.
  *  - Under prefers-reduced-motion t is 1 for the whole dwell and null outside it:
  *    an instant reveal with no animation and no scroll absorption.
  */
@@ -136,7 +151,8 @@ export function approachRevealGrow(
 export function journeyStateAt(
   rawProgress: number,
   morphOut?: number[],
-  reveal: RevealState | null = null
+  reveal: RevealState | null = null,
+  burstOverride?: number | null
 ): JourneyState {
   const progress = clamp01(rawProgress)
   const segLen = 1 / CHAPTER_COUNT
@@ -154,18 +170,25 @@ export function journeyStateAt(
     else morph[i] = 0
   }
 
-  // The "!" is the reveal's opening beat whenever a clock is driving this chapter's
-  // arrival: it must pop on arrival with no further scrolling, and it must NOT pop a
-  // second time on the way out (hence the 'in' gate). Without a clock it keeps its
-  // original scroll window.
+  // The "!" must pop on arrival with no further scrolling, and must NOT pop again on
+  // the way out (hence the 'in' gate). But WHOSE arrival? The girl's locomotion runs on
+  // the DAMPED timeline, and her celebrate jump is fired by this value's rising edge and
+  // reclaimed the moment she is still moving — so on the canvas the edge has to land on
+  // the frame the damped rotation clamps, not when the undamped clock starts. A caller
+  // that owns a timeline (useDampedJourney's latch) therefore passes its own value here
+  // and it is used verbatim, null included. Callers that pass nothing — the DOM, whose
+  // burst only drives the speed lines — get the clock-driven ramp, which is the same
+  // undamped timing the speed lines had before this clock existed.
   const burst =
-    reveal !== null && reveal.chapter === chapter
-      ? reveal.phase === 'in' && reveal.t < BURST_PHASE_END
-        ? reveal.t / BURST_PHASE_END
-        : null
-      : local >= TRAVEL_END && local < BURST_END
-        ? (local - TRAVEL_END) / (BURST_END - TRAVEL_END)
-        : null
+    burstOverride !== undefined
+      ? burstOverride
+      : reveal !== null && reveal.chapter === chapter
+        ? reveal.phase === 'in' && reveal.t < BURST_PHASE_END
+          ? reveal.t / BURST_PHASE_END
+          : null
+        : local >= TRAVEL_END && local < BURST_END
+          ? (local - TRAVEL_END) / (BURST_END - TRAVEL_END)
+          : null
 
   const panel: PanelState | null =
     local >= BURST_END && local < PANEL_END

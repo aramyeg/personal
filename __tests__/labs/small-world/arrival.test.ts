@@ -2,18 +2,25 @@ import { describe, expect, it } from 'vitest'
 import {
   ABSORB_MAX_LAG,
   ABSORB_MAX_SECONDS,
+  ARM_FROM_RELEASE_LAG,
   CATCHUP_MAX_SPEED,
+  HOLD_UNTIL_T,
   REVEAL_SECONDS,
   RETRACT_SECONDS,
+  burstFromLatch,
   dwellChapterAt,
   initialArrival,
   stepArrival,
+  stepBurstLatch,
   type ArrivalState,
+  type BurstLatch,
 } from '@/components/labs/small-world/arrival'
 import {
+  BURST_END,
   PANEL_END,
   TRAVEL_END,
   journeyStateAt,
+  type RevealState,
 } from '@/components/labs/small-world/journey-timeline'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 
@@ -211,20 +218,83 @@ describe('scroll absorption', () => {
     expect(back.progress).toBe(stopped)
   })
 
-  it('absorbs once per visit — edge thrash re-arms nothing', () => {
+  it('lets go at HOLD_UNTIL_T, not at a fully finished clock', () => {
+    // The spread is visually seated well before t = 1; holding to 1 was ~0.4s of dead
+    // stick per checkpoint. The clock still runs on to 1 — only absorption ends early.
+    const { state, raw } = arriveAt(0)
+    const run = drive(state, { frames: 240, scroll: () => raw })
+    const lastHold = run.filter((s) => s.mode === 'hold').pop()!
+    expect(lastHold.reveal!.t).toBeLessThan(HOLD_UNTIL_T + 2 / 60 / REVEAL_SECONDS)
+    expect(run.filter((s) => s.mode === 'hold').length * FRAME).toBeLessThan(
+      HOLD_UNTIL_T * REVEAL_SECONDS + 0.1
+    )
+    expect(run[run.length - 1].reveal!.t).toBe(1) // the entrance still completes
+  })
+
+  it('can still arm out of a nearly-converged release, so later checkpoints keep theirs', () => {
+    // `unwind` uses max(track, closing), so a finger that keeps out-running the closing
+    // rate parks the stretch on a fixed point that never reaches CATCHUP_SNAP. Without
+    // this the machine would sit in `release` and silently spend no absorption again.
+    const approaching = at(2, TRAVEL_END - 0.002)
+    const stuck: ArrivalState = {
+      ...initialArrival(approaching),
+      mode: 'release',
+      raw: approaching + ARM_FROM_RELEASE_LAG / 2,
+    }
+    const arrived = stepArrival(stuck, at(2, TRAVEL_END + 0.02), FRAME)
+    expect(dwellChapterAt(arrived.progress)).toBe(2) // it did reach the stop this frame
+    expect(arrived.mode).toBe('hold')
+  })
+
+  it('does not arm mid-catch-up, when the stretch is still real', () => {
+    const busy: ArrivalState = {
+      ...initialArrival(at(2, TRAVEL_END - 0.02)),
+      mode: 'release',
+      raw: at(2, TRAVEL_END - 0.02) + ABSORB_MAX_LAG,
+    }
+    expect(stepArrival(busy, at(2, TRAVEL_END + 0.01), FRAME).mode).toBe('release')
+  })
+
+  it('absorbs once per visit — edge thrash inside the drain time re-arms nothing', () => {
     const { state, raw } = arriveAt(1)
     const parked = drive(state, { frames: 120, scroll: () => raw }).pop()!
     const outside = at(1, TRAVEL_END - 0.02)
     let s = parked
     let holdFrames = 0
+    let netOutside = 0
     for (let cross = 0; cross < 10; cross++) {
       const target = cross % 2 === 1 ? outside : raw
       for (const step of drive(s, { frames: 4, scroll: () => target })) {
+        if (target === outside) netOutside += FRAME
         if (step.mode === 'hold') holdFrames++
         s = step
       }
     }
     expect(holdFrames).toBe(0)
+    // Deliberately inside the drain window — that is the scope of this guarantee.
+    expect(netOutside).toBeLessThan(RETRACT_SECONDS)
+  })
+
+  it('the real guarantee: no replay within ~RETRACT_SECONDS of NET time outside', () => {
+    // Retract (0.42s) is 2.5x faster than reveal (1.05s), so ANY thrash symmetric in
+    // frames drains `t` monotonically. Past the drain the reveal genuinely ends and the
+    // next entry is a fresh arrival WITH a fresh absorption — which is correct, not a
+    // bug: the visitor has spent that long away from the checkpoint.
+    const { state, raw } = arriveAt(1)
+    let s = drive(state, { frames: 120, scroll: () => raw }).pop()!
+    const outside = at(1, TRAVEL_END - 0.02)
+    let netOutside = 0
+    let drainedAt: number | null = null
+    for (let cross = 0; cross < 60 && drainedAt === null; cross++) {
+      const target = cross % 2 === 1 ? outside : raw
+      for (const step of drive(s, { frames: 3, scroll: () => target })) {
+        if (target === outside) netOutside += FRAME
+        if (step.reveal === null && drainedAt === null) drainedAt = netOutside
+        s = step
+      }
+    }
+    expect(drainedAt).not.toBeNull()
+    expect(drainedAt!).toBeGreaterThanOrEqual(RETRACT_SECONDS - FRAME * 2)
   })
 
   it('re-arms only after a genuine exit — coming back later absorbs again', () => {
@@ -275,6 +345,94 @@ describe('scroll absorption', () => {
     for (let f = 0; f < on.length; f++) {
       expect(on[f].progress).toBeCloseTo(inside + f * 0.001, 10)
     }
+  })
+})
+
+// R1/R2 — the "!" fires the girl's celebrate one-shot on its rising edge, and T52 hands
+// the mixer straight back if she still reads as travelling. Her locomotion comes off the
+// DAMPED rotation, so the edge has to land on the damped timeline, not the undamped clock
+// that starts up to v/lambda of a segment earlier.
+describe('the burst latch (the girl\'s discovery beat)', () => {
+  const rising = (chapter: number, t: number): RevealState => ({ chapter, t, phase: 'in' })
+
+  it('holds the "!" while the clock runs but the damped girl is still walking', () => {
+    // Clock already a third of the way in; damped timeline has not reached the stop.
+    const stillWalking = at(2, TRAVEL_END - 0.08)
+    const latch = stepBurstLatch(null, rising(2, 0.33), stillWalking, FRAME)
+    expect(latch).toBeNull()
+    expect(burstFromLatch(latch)).toBeNull()
+  })
+
+  it('fires on the frame the damped rotation clamps — so the next frame is exactly idle', () => {
+    const planted = at(2, TRAVEL_END + 1e-9)
+    const latch = stepBurstLatch(null, rising(2, 0.33), planted, FRAME)
+    expect(burstFromLatch(latch)).toBe(0)
+    // The reason this frame is the right one: rotation is already at the chapter's stop,
+    // so the NEXT frame's rotation delta is exactly 0 and she settles to idle before
+    // T52's yield is evaluated again. Anything earlier fires while she is still moving.
+    const deeper = at(2, 0.8)
+    expect(journeyStateAt(deeper).rotation).toBe(journeyStateAt(planted).rotation)
+  })
+
+  it('runs on the wall clock from there — the pop plays with no scrolling at all', () => {
+    const planted = at(2, TRAVEL_END + 0.01)
+    let latch = stepBurstLatch(null, rising(2, 0.2), planted, FRAME)
+    const seen: number[] = []
+    for (let f = 0; f < 40; f++) {
+      // progress frozen, clock frozen — only wall time moves
+      latch = stepBurstLatch(latch, rising(2, 0.2), planted, FRAME)
+      const b = burstFromLatch(latch)
+      if (b !== null) seen.push(b)
+    }
+    expect(seen.length).toBeGreaterThan(20)
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThan(seen[i - 1])
+    expect(burstFromLatch(latch)).toBeNull() // one pop, then done
+  })
+
+  it('gives exactly ONE rising edge per arrival, even while two timelines disagree', () => {
+    // A teleport: the undamped clock is already running while the damped value is still
+    // sliding in. Previously this produced two edges and two celebrate calls.
+    const planted = at(3, TRAVEL_END + 0.01)
+    let latch: BurstLatch = null
+    let prev: number | null = null
+    let edges = 0
+    const damped = [at(3, 0.2), at(3, 0.4), at(3, TRAVEL_END - 0.01), planted, at(3, 0.7), at(3, 0.9)]
+    for (const d of damped) {
+      for (let f = 0; f < 6; f++) {
+        latch = stepBurstLatch(latch, rising(3, 0.5), d, FRAME)
+        const b = burstFromLatch(latch)
+        if (prev === null && b !== null) edges++
+        prev = b
+      }
+    }
+    expect(edges).toBe(1)
+  })
+
+  it('never re-fires on the way out', () => {
+    const planted = at(2, TRAVEL_END + 0.01)
+    const latch = stepBurstLatch(null, { chapter: 2, t: 0.3, phase: 'out' }, planted, FRAME)
+    expect(latch).toBeNull()
+  })
+
+  it('gives the next checkpoint its own edge when one preempts another', () => {
+    const first = stepBurstLatch(null, rising(1, 0.4), at(1, 0.7), FRAME)
+    expect(first?.chapter).toBe(1)
+    const preempted = stepBurstLatch(first, rising(4, 0), at(4, TRAVEL_END + 0.01), FRAME)
+    expect(preempted?.chapter).toBe(4)
+    expect(burstFromLatch(preempted)).toBe(0) // a fresh pop for a genuinely new discovery
+  })
+
+  it('falls back to the original scroll window when no clock is driving', () => {
+    // journeyStateAt without an override keeps the pre-Task-54 behaviour intact.
+    const b = journeyStateAt(at(1, (TRAVEL_END + BURST_END) / 2)).burst
+    expect(b).toBeGreaterThan(0)
+    expect(b).toBeLessThan(1)
+  })
+
+  it('uses a supplied override verbatim, null included', () => {
+    const dwell = at(2, 0.75)
+    expect(journeyStateAt(dwell, undefined, rising(2, 0.1), null).burst).toBeNull()
+    expect(journeyStateAt(dwell, undefined, rising(2, 0.1), 0.5).burst).toBe(0.5)
   })
 })
 
