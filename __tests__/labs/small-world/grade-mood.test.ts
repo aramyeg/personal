@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { PANEL_END, TRAVEL_END } from '@/components/labs/small-world/journey-timeline'
 import { initialArrival, stepArrival } from '@/components/labs/small-world/arrival'
 import { PALETTE } from '@/components/labs/small-world/palette'
 import {
   BIOME_MOODS,
   BLOOM_FLOOR,
+  DWELL_HALF_WIDTH,
   GRADE_PHASE_END,
   HAZE_ALPHA_MAX,
   LIGHT_MIX_MAX,
   MOOD_IN_END,
+  REVEAL_NEAR,
   MOOD_IN_START,
   SHOW_GRADE,
   SKY_MIX_MAX,
@@ -74,6 +77,25 @@ describe('BIOME_MOODS', () => {
     }
   })
 
+  /**
+   * The rail the whole preemption fix stands on. A reveal only reaches full strength inside its
+   * own dwell, so the proximity weight must not begin to fade until the journey is outside it —
+   * otherwise the pull weakens while a checkpoint is parked and the arrival stops landing on its
+   * mood. Derived from the timeline, so moving TRAVEL_END or PANEL_END fails here rather than
+   * silently eating the margin (t54-reviewer's finding: the exposure is the coupling, not the
+   * margin — a 0.10 move in TRAVEL_END alone used to consume all of it).
+   */
+  it('holds the pull at full strength across the entire dwell', () => {
+    expect(REVEAL_NEAR).toBeGreaterThan(DWELL_HALF_WIDTH)
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      for (let k = 0; k <= 8; k++) {
+        const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 8
+        const b = moodBlendAt(at(c, local), { chapter: c, t: 1, phase: 'in' })
+        expect(b.revealPull, `ch${c} @${local.toFixed(3)}`).toBe(1)
+      }
+    }
+  })
+
   it('keeps spring the lightest touch — the journey opens looking like today', () => {
     const spring = BIOME_MOODS[0]
     for (const mood of BIOME_MOODS.slice(1)) {
@@ -130,9 +152,20 @@ describe('moodBlendAt', () => {
     expect(b.from).toBe(BIOME_MOODS[2])
   })
 
-  it('lands the new mood exactly by the dwell', () => {
+  // Sampled from the timeline's own bounds, not literals — after a TRAVEL_END or PANEL_END change
+  // this keeps testing the real dwell instead of quietly sampling where the old one used to be.
+  // The scroll crossfade completes at MOOD_IN_END, part-way INTO the dwell (the arrival clock
+  // carries it before that), so the scroll-only path is fully landed over [MOOD_IN_END, PANEL_END]
+  // — which requires the crossfade to finish before the dwell does.
+  it('lands the new mood exactly from the crossfade’s end to the dwell’s', () => {
+    expect(MOOD_IN_END).toBeLessThan(PANEL_END)
     for (let c = 0; c < CHAPTER_COUNT; c++) {
-      const b = moodBlendAt(at(c, 0.8))
+      for (let k = 0; k <= 8; k++) {
+        const local = MOOD_IN_END + ((PANEL_END - MOOD_IN_END) * k) / 8
+        const inDwell = moodBlendAt(at(c, local))
+        expect(inDwell.mix, `ch${c} @${local.toFixed(3)}`).toBe(1)
+      }
+      const b = moodBlendAt(at(c, (MOOD_IN_END + PANEL_END) / 2))
       expect(b.chapter).toBe(c)
       expect(b.mix).toBe(1)
       expect(b.skyMix).toBeCloseTo(BIOME_MOODS[c].skyMix, 6)

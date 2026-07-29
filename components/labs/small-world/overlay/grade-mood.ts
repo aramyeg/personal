@@ -1,5 +1,5 @@
 import { CHAPTER_COUNT } from '../chapters'
-import { revealPhase, smoothstep } from '../journey-timeline'
+import { PANEL_END, TRAVEL_END, revealPhase, smoothstep } from '../journey-timeline'
 import type { RevealState } from '../journey-timeline'
 import { PALETTE } from '../palette'
 
@@ -173,14 +173,25 @@ export const MOOD_IN_END = 0.72
  */
 export const GRADE_PHASE_END = 0.7
 /**
+ * The dwell a reveal belongs to, DERIVED from the timeline rather than remembered. Both numbers
+ * used to be literals here (0.75 and a comment saying "spans +-0.20"), which coupled the grade to
+ * two constants journey-timeline owns without saying so: moving TRAVEL_END would have shifted the
+ * dwell AND widened it while these stayed put, and the two errors add. A 0.10 move in TRAVEL_END
+ * alone was enough to consume the whole REVEAL_NEAR margin silently.
+ */
+const DWELL_CENTRE = (TRAVEL_END + PANEL_END) / 2
+export const DWELL_HALF_WIDTH = (PANEL_END - TRAVEL_END) / 2
+
+/**
  * The reveal's pull is full while the journey is within REVEAL_NEAR chapters of the revealed
- * chapter's dwell centre and fades to nothing by REVEAL_FAR. The dwell itself spans +-0.20, so
- * NEAR must stay above that or an arrival would not land on its own mood.
+ * chapter's dwell centre, and fades to nothing by REVEAL_FAR. REVEAL_NEAR MUST stay above
+ * DWELL_HALF_WIDTH — a reveal only reaches t = 1 inside its own dwell, so anything less would
+ * weaken the pull while the checkpoint is still parked and an arrival would not land on its own
+ * mood. Asserted against the derived half-width in grade-mood.test.ts, so a timeline change fails
+ * loudly instead of eroding the margin.
  */
 export const REVEAL_NEAR = 0.3
 export const REVEAL_FAR = 0.8
-/** Where the revealed chapter's dwell sits within its segment, in chapter units. */
-const DWELL_CENTRE = 0.75
 
 /** Strength the grade settles back to between checkpoints — the bloom's resting level. */
 export const BLOOM_FLOOR = 0.84
