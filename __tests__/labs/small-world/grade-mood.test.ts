@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { initialArrival, stepArrival } from '@/components/labs/small-world/arrival'
 import { PALETTE } from '@/components/labs/small-world/palette'
 import {
   BIOME_MOODS,
@@ -197,12 +198,12 @@ describe('moodBlendAt', () => {
    * it (t54-reviewer's request, and the reason this test sweeps every chapter rather than a few):
    *   - arming a reveal is a no-op frame, whatever scroll position the absorption parked at;
    *   - nullifying one is too, since `t` is already 0 by the time the field clears;
-   *   - PREEMPTION — a new arrival replacing an in-flight retraction changes `reveal.chapter` AND
-   *     restarts `t` at 0 in the same frame (T54 contract, corrected in f66a162). Because the new
-   *     reveal contributes nothing on that frame, the identity change adds no artefact of its own
-   *     on top of whatever jump the teleport itself caused.
+   * NOT preemption. A t=0 reveal matching the no-reveal frame says nothing about the frame BEFORE
+   * it, which under preemption carried a DIFFERENT reveal at high pull — that is what the machine
+   * test below covers, and reading this property as preemption safety is the mistake that shipped
+   * in bdcdcb3.
    */
-  it('is a no-op at strength 0 for every chapter — arm, nullify and preempt', () => {
+  it('is a no-op at strength 0 for every chapter — arming and nullifying', () => {
     for (const local of [0.05, 0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
       for (let journeyChapter = 0; journeyChapter < CHAPTER_COUNT; journeyChapter++) {
         const p = at(journeyChapter, local)
@@ -325,6 +326,46 @@ describe('moodBlendAt', () => {
         ).toBeLessThan(1e-3)
         // …and the colour either side resolves to the same mood, from opposite ends of the blend.
         expect(gradeAt(at(c, 1 - eps), stale).haze).toBe(gradeAt(at(c + 1, eps), stale).haze)
+      }
+    }
+  })
+
+  /**
+   * PREEMPTION, driven by the real arrival machine rather than a scripted retraction — the
+   * difference that hid this from the first fling sweep. Flinging backward out of a dwell lands in
+   * the PREVIOUS dwell, whose arrival preempts the in-flight retraction: `reveal` is replaced by a
+   * fresh one at t=0 in a single frame. Without the proximity weight the pull's stored displacement
+   * released all at once (94-117/255 haze channel at 6000px/s, against a 28-33/255 no-reveal
+   * control). Setting REVEAL_FAR <= REVEAL_NEAR, or removing the weight, fails this.
+   */
+  it('survives a preempting backward fling without exceeding ordinary motion', () => {
+    const H = 900
+    const scrollable = 240 * CHAPTER_COUNT * (H / 100) - H
+    const chan = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+
+    const fling = (chapter: number, pxPerSec: number, withReveal: boolean) => {
+      let s = initialArrival((chapter + 0.58) * SEG)
+      for (let f = 0; f < 180; f++) s = stepArrival(s, (chapter + 0.58) * SEG, 1 / 60)
+      const startY = scrollable * s.progress
+      let prev: number[] | null = null
+      let worst = 0
+      for (let f = 0; f < 200; f++) {
+        const y = startY - (pxPerSec * f) / 60
+        if (y < 0) break
+        s = stepArrival(s, y / scrollable, 1 / 60)
+        const c = chan(gradeAt(s.progress, withReveal ? s.reveal : null).haze)
+        if (prev) worst = Math.max(worst, ...c.map((x, i) => Math.abs(x - prev![i])))
+        prev = c
+      }
+      return worst
+    }
+
+    for (const chapter of [1, 3, 5]) {
+      for (const v of [3000, 4500, 6000, 9000]) {
+        const withReveal = fling(chapter, v, true)
+        const control = fling(chapter, v, false)
+        // The reveal may not make the frame move materially more than the scroll term alone does.
+        expect(withReveal, `ch${chapter} @${v}px/s`).toBeLessThanOrEqual(control + 6)
       }
     }
   })

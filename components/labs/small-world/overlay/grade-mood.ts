@@ -172,6 +172,16 @@ export const MOOD_IN_END = 0.72
  * after them — the mascots and the light arrive together and the cards land into a graded frame.
  */
 export const GRADE_PHASE_END = 0.7
+/**
+ * The reveal's pull is full while the journey is within REVEAL_NEAR chapters of the revealed
+ * chapter's dwell centre and fades to nothing by REVEAL_FAR. The dwell itself spans +-0.20, so
+ * NEAR must stay above that or an arrival would not land on its own mood.
+ */
+export const REVEAL_NEAR = 0.3
+export const REVEAL_FAR = 0.8
+/** Where the revealed chapter's dwell sits within its segment, in chapter units. */
+const DWELL_CENTRE = 0.75
+
 /** Strength the grade settles back to between checkpoints — the bloom's resting level. */
 export const BLOOM_FLOOR = 0.84
 /** Local progress by which the previous checkpoint's bloom has fully settled. */
@@ -249,15 +259,23 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
  * running. Total, and pure in both inputs: the same (progress, reveal) always yields the same
  * numbers.
  *
- * The reveal needs no chapter gate, and adding one back would reintroduce three separate hazards.
- * During a retraction it keeps naming the biome that is LEAVING even after the journey has moved
- * on — which is exactly right here, because the pull is toward that biome's mood and simply fades
- * out as the retraction completes. It also survives PREEMPTION: a new arrival replacing an
- * in-flight retraction changes `reveal.chapter` and restarts `t` at 0 in the same frame (T54's
- * corrected contract), and at t = 0 the pull contributes nothing, so the identity change adds no
- * artefact of its own. Nothing in this function compares the reveal's chapter to the journey's,
- * so there is nothing to drop in a single frame — pinned by the strength-0 sweep in
- * grade-mood.test.ts, which covers every chapter pairing rather than a sample.
+ * The reveal needs no chapter GATE — during a retraction it keeps naming the biome that is LEAVING
+ * even after the journey has moved on, which is exactly right, because the pull is toward that
+ * biome's mood and fades as the retraction completes.
+ *
+ * It does need a PROXIMITY WEIGHT, and this is the subtle one. The pull holds the revealed mood
+ * against a scroll blend that may be moving away from it, so it stores up displacement that has to
+ * be released. Released by the retraction it is smooth; but a reveal's life can END EARLY —
+ * flinging backward out of one dwell lands in the PREVIOUS dwell, whose arrival PREEMPTS the
+ * retraction, replacing `reveal` with a fresh one at t = 0 (T54's corrected contract). The stored
+ * displacement then releases in a single frame. Measured on the real `stepArrival`, that was a
+ * 94–117/255 haze channel step at 6000px/s against a 28–33/255 no-reveal control.
+ *
+ * So the pull is additionally weighted by how near the journey still is to the revealed chapter's
+ * own dwell: it is full throughout that dwell and fades to nothing as the journey leaves, which
+ * means there is never stored displacement left to snap when the field is reused. Position-keyed,
+ * so it stays scrub-symmetric. This drops the same measurement to 17–33/255, at or below the
+ * control, with every arrival still landing exactly on its mood.
  */
 export function moodBlendAt(progress: number, reveal?: RevealState | null): MoodBlend {
   const p = clamp01(progress)
@@ -276,7 +294,15 @@ export function moodBlendAt(progress: number, reveal?: RevealState | null): Mood
   const revealChapter = reveal
     ? Math.min(CHAPTER_COUNT - 1, Math.max(0, reveal.chapter))
     : null
-  const revealPull = reveal ? smoothstep(revealPhase(reveal.t, 0, GRADE_PHASE_END)) : 0
+  const revealPull =
+    revealChapter === null
+      ? 0
+      : smoothstep(revealPhase(reveal!.t, 0, GRADE_PHASE_END)) *
+        (1 -
+          smoothstep(
+            (Math.abs(p * CHAPTER_COUNT - (revealChapter + DWELL_CENTRE)) - REVEAL_NEAR) /
+              (REVEAL_FAR - REVEAL_NEAR)
+          ))
   const revealed = revealChapter === null ? null : BIOME_MOODS[revealChapter]
 
   /** Scroll blend, then pulled onto the revealed mood, then scaled by the bloom. */
