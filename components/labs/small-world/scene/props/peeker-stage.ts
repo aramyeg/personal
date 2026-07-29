@@ -456,6 +456,18 @@ export const PEEK_SIDE_STAGGER = 0.08
  * Prefers T54's arrival clock. Falls back to the panel's scroll dwell — mapped through the R14
  * entrance/exit windows — so the mascots still animate if no driver supplies a clock (a bare
  * `journeyStateAt` call, or any consumer that predates the arrival work).
+ *
+ * PREEMPTION, which the arrival clock's contract calls out explicitly: a reveal's life can END
+ * EARLY. Arriving at a new checkpoint while an old one is still retracting REPLACES it — `chapter`
+ * changes and `t` restarts at 0 in the same frame, so an outgoing biome is cut rather than
+ * finished. One field cannot carry two reveals. Reachable by any teleport (scrollbar drag,
+ * Home/End) and by a fling crossing two checkpoints inside RETRACT_SECONDS.
+ *
+ * Returning null for the chapter that no longer owns the clock is how this rig answers that, and
+ * it is deliberate rather than incidental: the caller drops the whole side on the same frame, so
+ * the departing composition SNAPS instead of animating an exit against a clock that is now
+ * describing somebody else's arrival. The visitor has left that checkpoint; a lingering half-
+ * retracted crocodile over the desert would be the worse artefact. Pinned in peeker-stage.test.ts.
  */
 export function peekerClock(
   state: {

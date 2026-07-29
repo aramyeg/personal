@@ -315,6 +315,28 @@ describe('the arrival clock', () => {
     expect(peekerClock(reveal(2, 0.4), 3)).toBeNull()
   })
 
+  it('drops the outgoing biome the frame a reveal is preempted', () => {
+    // Arriving at a new checkpoint while an old one is still retracting REPLACES it: `chapter`
+    // changes and `t` restarts at 0 in the same frame. The rig must not animate an exit against a
+    // clock that has started describing somebody else's arrival — the outgoing side snaps instead.
+    // (Measured by the T54 reviewer: chapter 1 at t=0.762 -> chapter 4 at t=0 in one frame.)
+    const retracting = { panel: null, reveal: { chapter: 1, t: 0.762, phase: 'out' as const } }
+    const preempted = { panel: null, reveal: { chapter: 4, t: 0, phase: 'in' as const } }
+    expect(peekerClock(retracting, 1)).toBe(0.762)
+    expect(peekerClock(preempted, 1)).toBeNull()
+    expect(peekerClock(preempted, 4)).toBe(0)
+  })
+
+  it('does not fall back to the panel while another chapter owns the clock', () => {
+    // The panel can still name the OLD chapter for a frame or two after a preemption. If the
+    // fallback fired then, a dropped biome would flicker back on top of the arriving one.
+    const state = {
+      panel: { chapter: 1, t: 0.5 },
+      reveal: { chapter: 4, t: 0.2, phase: 'in' as const },
+    }
+    expect(peekerClock(state, 1)).toBeNull()
+  })
+
   it('falls back to the panel dwell when no clock is supplied', () => {
     expect(peekerClock({ panel: { chapter: 1, t: 0.5 }, reveal: null }, 1)).toBe(1)
     expect(peekerClock({ panel: { chapter: 1, t: 0 }, reveal: null }, 1)).toBe(0)
