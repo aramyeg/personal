@@ -249,10 +249,15 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
  * running. Total, and pure in both inputs: the same (progress, reveal) always yields the same
  * numbers.
  *
- * The reveal needs no chapter gate. During a retraction it keeps naming the biome that is LEAVING
- * even after the journey has moved on — which is exactly right here, because the pull is toward
- * that biome's mood and simply fades out as the retraction completes. Nothing in this function
- * compares the reveal's chapter to the journey's, so nothing can be dropped in a single frame.
+ * The reveal needs no chapter gate, and adding one back would reintroduce three separate hazards.
+ * During a retraction it keeps naming the biome that is LEAVING even after the journey has moved
+ * on — which is exactly right here, because the pull is toward that biome's mood and simply fades
+ * out as the retraction completes. It also survives PREEMPTION: a new arrival replacing an
+ * in-flight retraction changes `reveal.chapter` and restarts `t` at 0 in the same frame (T54's
+ * corrected contract), and at t = 0 the pull contributes nothing, so the identity change adds no
+ * artefact of its own. Nothing in this function compares the reveal's chapter to the journey's,
+ * so there is nothing to drop in a single frame — pinned by the strength-0 sweep in
+ * grade-mood.test.ts, which covers every chapter pairing rather than a sample.
  */
 export function moodBlendAt(progress: number, reveal?: RevealState | null): MoodBlend {
   const p = clamp01(progress)

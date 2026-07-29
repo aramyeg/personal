@@ -191,15 +191,33 @@ describe('moodBlendAt', () => {
     }
   })
 
-  // The pull contributes exactly nothing at strength 0, so arming or nullifying the clock is a
-  // no-op frame whatever scroll position the absorption happens to park at.
-  it('cannot jump when the reveal arms or ends', () => {
-    for (const local of [0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
-      const p = at(3, local)
-      for (const named of [2, 3, 4]) {
-        const armed = moodBlendAt(p, { chapter: named, t: 0, phase: 'in' })
-        expect(armed.skyMix, `ch${named} @${local}`).toBeCloseTo(moodBlendAt(p).skyMix, 9)
-        expect(gradeAt(p, { chapter: named, t: 0, phase: 'in' }).haze).toBe(gradeAt(p).haze)
+  /**
+   * The pull contributes exactly nothing at strength 0, whatever chapter the reveal names. That
+   * one property covers three separate hazards, so DO NOT reintroduce a chapter gate to "simplify"
+   * it (t54-reviewer's request, and the reason this test sweeps every chapter rather than a few):
+   *   - arming a reveal is a no-op frame, whatever scroll position the absorption parked at;
+   *   - nullifying one is too, since `t` is already 0 by the time the field clears;
+   *   - PREEMPTION — a new arrival replacing an in-flight retraction changes `reveal.chapter` AND
+   *     restarts `t` at 0 in the same frame (T54 contract, corrected in f66a162). Because the new
+   *     reveal contributes nothing on that frame, the identity change adds no artefact of its own
+   *     on top of whatever jump the teleport itself caused.
+   */
+  it('is a no-op at strength 0 for every chapter — arm, nullify and preempt', () => {
+    for (const local of [0.05, 0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
+      for (let journeyChapter = 0; journeyChapter < CHAPTER_COUNT; journeyChapter++) {
+        const p = at(journeyChapter, local)
+        const bare = moodBlendAt(p)
+        for (let named = 0; named < CHAPTER_COUNT; named++) {
+          for (const phase of ['in', 'out'] as const) {
+            const armed = moodBlendAt(p, { chapter: named, t: 0, phase })
+            expect(armed.skyMix, `j${journeyChapter} r${named} ${phase} @${local}`).toBeCloseTo(
+              bare.skyMix,
+              9
+            )
+            expect(armed.lightMix).toBeCloseTo(bare.lightMix, 9)
+            expect(gradeAt(p, { chapter: named, t: 0, phase }).haze).toBe(gradeAt(p).haze)
+          }
+        }
       }
     }
   })
