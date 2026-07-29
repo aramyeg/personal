@@ -233,6 +233,17 @@ export const PEEKER_MIN_SIZE_FRAC = 0.22
  */
 export const DRESS_MIN_SIZE_FRAC = 0.13
 
+/**
+ * ...and below this viewport width even the dressing stands down.
+ *
+ * A phone corner has room for perhaps a hundred pixels of foliage, wedged between the progress
+ * rail and the nav pill. For the leafy biomes that still reads as leaves; for the rock biomes it
+ * is a small brown box with a stick in it, which reads as debris tangled in the chrome rather than
+ * as a biome. Nothing beats an ambiguous smudge, and the rule has to be a width rather than a
+ * per-biome judgement so a phone never shows one corner and not the other.
+ */
+export const DRESS_MIN_VIEWPORT = 575
+
 /** Parked inward lean (rad) and the extra tilt carried while still off-frame. */
 export const PEEKER_LEAN = 0.11
 export const PEEKER_LEAN_EXTRA = 0.3
@@ -408,7 +419,7 @@ export function peekerAnchor(
 
   let mode: PeekerMode = 'pair'
   let best = search('pair', PEEKER_MIN_SIZE_FRAC * halfH)
-  if (best.size <= 0) {
+  if (best.size <= 0 && viewport.width >= DRESS_MIN_VIEWPORT) {
     mode = 'dressing'
     best = search('dressing', DRESS_MIN_SIZE_FRAC * halfH)
   }

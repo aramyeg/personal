@@ -312,8 +312,67 @@ describe('mirroring', () => {
   })
 })
 
+describe('gesture directions', () => {
+  /** World-space position of a limb piece's far tip, at one point of the gesture range. */
+  function jawTip(kind: 'crocGape' | 'crocPeek', dir: 1 | -1, idle: number): THREE.Vector3 {
+    const pieces = peekerPieces('delta', kind, dir)
+    const jaw = pieces.find((p) => p.slot === 'a')!
+    const root = new THREE.Group()
+    root.rotation.z = peekerRootTilt(kind, dir)
+    const holder = new THREE.Group()
+    holder.position.set(jaw.at[0], jaw.at[1], jaw.at[2])
+    root.add(holder)
+    const limbs: PeekerLimbs = { a: holder, b: new THREE.Group(), c: new THREE.Group() }
+    PEEKER_SPECS[kind].apply(limbs, { idle, unroll: 1 }, dir)
+    root.updateMatrixWorld(true)
+
+    // the snout end of the mandible: its furthest vertex along the facing direction
+    const geo = buildMergedClay(jaw.parts.map((p) => ({ ...p, geo: p.geo.clone() })))
+    const pos = geo.attributes.position as THREE.BufferAttribute
+    const v = new THREE.Vector3()
+    let best = new THREE.Vector3()
+    let bestX = -Infinity
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(holder.matrixWorld)
+      const along = v.x * dir
+      if (along > bestX) {
+        bestX = along
+        best = v.clone()
+      }
+    }
+    geo.dispose()
+    return best
+  }
+
+  it('opens the crocodiles jaws DOWNWARD, not upward', () => {
+    // This pins the fix that made the delta corner work at all. The first build used a positive
+    // jaw rotation, which only swings a mandible clear of the skull when the snout points UP — so
+    // the whole animal had been reared vertical to make its mouth work, and it read as a green
+    // tube rather than a crocodile. A mirror test cannot see this: flipping the sign preserves
+    // mirror symmetry exactly, so it survived the R14-style suite. The direction the jaw travels
+    // in WORLD space is the thing that actually matters, so that is what is asserted.
+    for (const kind of ['crocGape', 'crocPeek'] as const) {
+      for (const dir of [1, -1] as const) {
+        const shut = jawTip(kind, dir, -1)
+        const open = jawTip(kind, dir, 1)
+        expect(open.y, `${kind} dir${dir} jaw must drop as it opens`).toBeLessThan(shut.y - 1e-4)
+      }
+    }
+  })
+
+  it('keeps both crocodiles snouts roughly level rather than reared', () => {
+    // The same defect, from the other side: a crocodile whose snout points upward is the failure
+    // mode. The mandible tip must stay well inside a shallow band around the figure's own centre.
+    for (const kind of ['crocGape', 'crocPeek'] as const) {
+      for (const idle of [-1, 0, 1]) {
+        expect(Math.abs(jawTip(kind, 1, idle).y), `${kind} snout height`).toBeLessThan(0.45)
+      }
+    }
+  })
+})
+
 describe('house rules', () => {
-  const artFiles = readdirSync(ART_DIR).filter((f) => /^peeker-/.test(f))
+  const artFiles = readdirSync(ART_DIR).filter((f) => /^peeker/.test(f))
 
   it('covers the whole cast with art and a gesture spec', () => {
     for (const { biome, kind } of KINDS) {
@@ -328,6 +387,9 @@ describe('house rules', () => {
   })
 
   it('uses no literal colours and no non-determinism anywhere in the peeker files', () => {
+    // The glob is /^peeker/ rather than /^peeker-/ on purpose: the earlier form skipped
+    // `peekers.tsx`, the rig itself — the one file in the family most likely to reach for a clock.
+    expect(artFiles).toContain('peekers.tsx')
     for (const file of artFiles) {
       const src = readFileSync(join(ART_DIR, file), 'utf8')
       expect(src, `${file} colour literal`).not.toMatch(/['"]#[0-9a-fA-F]{3,8}['"]/)
@@ -347,14 +409,21 @@ describe('house rules', () => {
     }
   })
 
-  it('inks the masses that carry a silhouette, within the draw budget', () => {
+  it('inks the masses that carry a silhouette, and never asks for one it will not get', () => {
     for (const { biome, kind } of KINDS) {
       const pieces = peekerPieces(biome, kind, 1)
       // the first piece is the character's main mass, and it always carries the contour
       expect(pieces[0].ink, `${kind}/${pieces[0].slot}`).toBe(true)
-      // ...but only INK_PIECE_LIMIT of them are actually drawn with one (see peeker-cast.tsx)
-      const inked = pieces.filter((p) => p.ink).slice(0, INK_PIECE_LIMIT).length
-      expect(inked, kind).toBeLessThanOrEqual(INK_PIECE_LIMIT)
+      // The runtime gates on ARRAY POSITION (`index < INK_PIECE_LIMIT` in peeker-cast.tsx), so an
+      // ink flag on a later piece is silently dropped. An earlier version of this test counted
+      // `filter(ink).slice(0, LIMIT).length <= LIMIT`, which cannot fail by construction — and
+      // three characters were in fact carrying a dead flag on their third piece while it passed.
+      // Asserting the flags match what the runtime will honour is what makes the claim real.
+      pieces.forEach((piece, i) => {
+        if (i >= INK_PIECE_LIMIT) {
+          expect(piece.ink, `${kind}/${piece.slot} asks for ink it will never be drawn`).not.toBe(true)
+        }
+      })
     }
   })
 

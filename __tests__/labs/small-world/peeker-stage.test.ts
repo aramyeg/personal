@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import {
   CARD_PAD,
   DRESS_MIN_SIZE_FRAC,
+  DRESS_MIN_VIEWPORT,
   DRESS_PHASE,
   DRESS_REACH,
   FACE_BOX,
@@ -230,13 +231,27 @@ describe('placement', () => {
     // A portrait frame has the world filling its width; the honest outcome is a smaller
     // composition, and below the character floor, dressing alone.
     const desktop = anchorAt(1600, 900, -1)
-    const phone = anchorAt(390, 844, -1)
+    const tablet = anchorAt(768, 1024, -1)
     expect(desktop.mode).toBe('pair')
-    expect(phone.mode).toBe('dressing')
-    expect(phone.size).toBeLessThan(desktop.size)
+    expect(tablet.mode).toBe('dressing')
+    expect(tablet.size).toBeLessThan(desktop.size)
     const halfH = peekerHalfHeight(FOV)
-    expect(phone.size / halfH).toBeGreaterThanOrEqual(DRESS_MIN_SIZE_FRAC - 1e-9)
-    expect(phone.size / halfH).toBeLessThan(PEEKER_MIN_SIZE_FRAC)
+    expect(tablet.size / halfH).toBeGreaterThanOrEqual(DRESS_MIN_SIZE_FRAC - 1e-9)
+    expect(tablet.size / halfH).toBeLessThan(PEEKER_MIN_SIZE_FRAC)
+  })
+
+  it('shows nothing at all on a phone, rather than a smudge', () => {
+    // A phone corner holds ~100px of foliage wedged between the progress rail and the nav pill:
+    // leaves survive that, a rock ledge becomes debris. The cutoff is a width so a phone never
+    // shows one corner and not the other.
+    for (const [w, h] of FRAMES) {
+      if (w >= DRESS_MIN_VIEWPORT) continue
+      for (const side of [-1, 1] as const) {
+        expect(anchorAt(w, h, side).mode, `${w}x${h}`).toBe('none')
+        expect(anchorAt(w, h, side).visible, `${w}x${h}`).toBe(false)
+      }
+    }
+    expect(anchorAt(575, 760, -1).mode).not.toBe('none')
   })
 
   it('shows a character on every landscape frame in the sweep', () => {

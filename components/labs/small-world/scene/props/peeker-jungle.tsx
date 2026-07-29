@@ -120,9 +120,17 @@ function macawBody(d: 1 | -1): ClayPart[] {
     sph(0.25, PALETTE.parrotBody, [-0.05, -0.02, -0.01], [1, 1.02, 0.92], 14),
     sph(0.275, PALETTE.parrotBody, [-0.13, -0.24, -0.02], [1.02, 1.06, 0.94], 14),
     sph(0.2, PALETTE.parrotShade, [-0.08, -0.4, 0.05], [1.15, 0.72, 0.6], 12),
-    // tail streaming down and out of frame
-    cone(0.07, 0.56, PALETTE.parrotWing, [-0.29, -0.51, -0.06], [0, 0, 0.4], [1, 1, 0.4]),
-    cone(0.056, 0.48, PALETTE.parrotBody, [-0.39, -0.46, 0.0], [0, 0, 0.58], [1, 1, 0.4]),
+    // Tail: three feathers of three lengths on three angles, rooted together under the rump and
+    // splaying down and out of frame. Two things matter here and both were wrong before. First
+    // the cones are turned POINT-DOWN, so the frame's bottom-left crop cuts a narrowing tip
+    // rather than a cone's wide base — a base-down cone crops to a rectangle and the tail read as
+    // a stack of flat colour bars. Second the fan is deliberately uneven: 0.36 / 0.40 / 0.48 long
+    // at 169° / 129° / 150°, so the tips land far apart across the corner and the feathers read as
+    // overlapping rather than as a bar chart. Tone carries the depth order — the shaded scarlet
+    // sits furthest back, the teal in front of it, the bright scarlet outermost.
+    cone(0.044, 0.36, PALETTE.parrotShade, [-0.094, -0.617, -0.11], [0, 0, 2.95], [1, 1, 0.3]),
+    cone(0.062, 0.48, PALETTE.parrotWing, [-0.239, -0.608, -0.07], [0, 0, 2.62], [1, 1, 0.38]),
+    cone(0.05, 0.4, PALETTE.parrotBody, [-0.326, -0.506, 0.0], [0, 0, 2.25], [1, 1, 0.34]),
     // head, set forward of the shoulders on a short neck
     sph(0.245, PALETTE.parrotBody, [0.07, 0.36, 0], [1, 1.03, 0.98], 14),
     // bare white face patch: the macaw's signature, kept to the FRONT of the head so the scarlet
@@ -186,8 +194,10 @@ function cockatooBody(d: 1 | -1): ClayPart[] {
     cone(0.062, 0.48, PALETTE.sky, [-0.28, -0.56, -0.04], [0, 0, 0.46], [1, 1, 0.44]),
     cone(0.05, 0.4, PALETTE.honey, [-0.39, -0.48, 0.02], [0, 0, 0.64], [1, 1, 0.44]),
     sph(0.24, PALETTE.sky, [0.07, 0.36, 0], [1, 1.02, 0.98], 14),
-    // blushing cheek, kept small and low so it reads as a blush and not an open mouth
-    sph(0.062, PALETTE.petal, [0.11, 0.24, 0.19], [1, 0.92, 0.22], 10),
+    // Blushing cheek, set HIGH and BACK — under and behind the eye, a clear head's-width off the
+    // bill. Sat low and forward it landed level with the beak's opening and read as a tongue
+    // lolling out; the softer blossom pink over the cream keeps it a blush rather than a marking.
+    sph(0.052, PALETTE.blossom, [0.03, 0.29, 0.213], [1, 0.86, 0.2], 10),
     ...eye([0.19, 0.38, 0.2], 0.05, { sclera: PALETTE.snow, iris: PALETTE.ink }),
     // stubby hooked bill, dark grey over a paler chin
     sph(0.11, PALETTE.stone, [0.26, 0.22, 0.04], [1, 1.05, 0.88], 12),

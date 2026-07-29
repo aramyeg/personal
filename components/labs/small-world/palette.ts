@@ -168,4 +168,11 @@ export const PALETTE = {
   strataDust: '#C98A5E', // canyon strata band, between hoodooRock and hoodooCap
   palmFrondDeep: '#5E7C39', // shaded olive-khaki palm frond — the desert canopy's recession tone
   bluebirdShade: '#6F62B8', // deep periwinkle under bluebell (the palette had nothing below it)
+  // Task 56 review — the winter grade (a pale lilac wash) sits at almost the same lightness as the
+  // near-white yeti fur, so that corner measured a median dL* of 20.7 against 40-52 everywhere
+  // else. The yeti's MASS now uses a mid blue-grey coat and keeps the near-whites for lit tops and
+  // the muzzle, which is what buys a silhouette back under the grade.
+  yetiCoat: '#93A9C0', // mid blue-grey yeti body — the value that separates it from a lilac sky
+  yetiCoatDeep: '#6F869F', // shadowed coat, under yetiCoat
+  strataShade: '#7C4A2E', // deep shadowed canyon rock, darker than rust — a backdrop for a pangolin
 } as const

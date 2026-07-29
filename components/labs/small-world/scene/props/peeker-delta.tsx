@@ -8,8 +8,8 @@ import type { PeekerPiece } from './peeker-cast'
  * CROCODILES lurking in it.
  *
  * Same corner grammar as `peeker-jungle.tsx` (which the look-dev gate was run against): woody
- * limbs sweeping in from the frame's outer edge, a dense canopy of ribbed leaves, strands dropping
- * off-frame, and the characters sitting IN the dressing rather than in front of it. What is delta
+ * limbs sweeping in from the frame's outer edge, a dense canopy of ribbed leaves, strands hanging
+ * off the bough, and the characters sitting IN the dressing rather than in front of it. What is delta
  * rather than jungle is the vocabulary: the limbs are mangrove ROOTS that arch out of the water on
  * both feet, the vines are hanging moss, and the understory is lily pads and reeds on a silt bank.
  * Aram asked for "jungle/amazon aesthetics to the swamp", so the greens are borrowed straight from
@@ -26,6 +26,13 @@ import type { PeekerPiece } from './peeker-cast'
  *
  * The arch also sits far higher than it did: the crocodiles lie along y ≈ −0.3…+0.4 now rather
  * than rearing up the middle of the frame, so the waterline has to cross their bodies to read.
+ *
+ * The band cuts the other way too, and that is the trap this corner fell into: an element authored
+ * to hang from a branch at x = −0.7, or to stand on a bank at y = −1.0, keeps its own body on
+ * screen while its ATTACHMENT is cropped away — and a moss chain or a reed with no visible footing
+ * reads as a rendering fault, not as swamp. So every strand here hangs off bark the reader can see,
+ * every reed and tuft is buried in a bank crest that clears y = −0.92, and the lotus is stemmed
+ * into a pad. That is the same rule the jungle's orchids are held to.
  */
 const ARCH_IN: readonly V3[] = [
   [-0.58, -1, -0.02],
@@ -60,10 +67,12 @@ export function deltaDressing(): ClayPart[] {
       0.03,
       PALETTE.mangroveBark
     ),
-    // the stilt root dropping across the outer edge, cropping at both ends
+    // A stilt root forking OFF the trunk and dropping past the bottom edge. Its top point is set
+    // inside the trunk's own radius rather than just short of it: a prop root that starts in clear
+    // sky beside the trunk is the same defect as a floating strand, only woodier.
     ...limb(
       [
-        [-0.6, -0.08, -0.06],
+        [-0.575, -0.1, -0.1],
         [-0.54, -0.36, -0.04],
         [-0.44, -0.6, -0.02],
         [-0.38, -0.96, 0],
@@ -84,44 +93,70 @@ export function deltaDressing(): ClayPart[] {
       0.026,
       PALETTE.mangroveBark
     ),
+    // The bough carrying the canopy, run all the way across to x = 0.3 so it ends OVER the animals
+    // rather than stopping above their shoulders. Everything that hangs — the two inward moss
+    // strands and the inward canopy fan — is seated on a span of this bark, so its attachment is on
+    // screen; anything hung past the old end at x = 0.04 had nothing above it but sky.
     ...limb(
       [
         [-0.5, 0.24, -0.12],
         [-0.26, 0.48, -0.13],
         [0.04, 0.6, -0.13],
+        [0.3, 0.56, -0.13],
       ],
       0.034,
-      0.02,
+      0.018,
       PALETTE.mangroveBark
     ),
     // wet moss collaring the joints — the tone break that stops the bark reading as one brown bar
     sph(0.074, PALETTE.deltaMoss, [-0.56, -0.66, 0.02], [1.2, 0.8, 0.5], 8),
-    sph(0.06, PALETTE.mossHang, [-0.5, 0.24, 0], [1.1, 0.9, 0.5], 8),
+    sph(0.06, PALETTE.mossHang, [-0.5, 0.24, -0.09], [1.1, 0.9, 0.5], 8),
     sph(0.068, PALETTE.deltaMoss, [-0.23, -0.32, 0.06], [1.3, 0.7, 0.5], 8),
   ]
 
   // Canopy: overlapping fans arcing over and BEHIND the crocodiles, at z ≈ −0.14. Density is the
   // point — sparse fans read as leaves on a stick. Each fan's spread stops short of π so no leaf
   // swings out past the frame edge; that is what the outward reach used to be spent on.
+  //
+  // Every fan origin is either on the trunk/bough or buried inside the leaves of the fan beside it,
+  // so the canopy is one connected mass. The inward fan used to originate at (0.36, 0.16) — behind
+  // the big crocodile's jaw, touching nothing — and read as a leaf spray hanging in the sky next to
+  // the animal's head; it now hangs off the end of the bough with the rest of the canopy.
   parts.push(
     ...leafFan([-0.36, 0.6, -0.14], 5, 0.42, [0.45, 2.15], greens, PALETTE.jungleDeep, 0.34),
     ...leafFan([-0.08, 0.74, -0.15], 5, 0.42, [0.3, 2], greens, PALETTE.jungleDeep, 0.32),
     ...leafFan([0.3, 0.62, -0.14], 4, 0.36, [0.1, 1.7], greens, PALETTE.jungleDeep, 0.3),
     ...leafFan([-0.34, 0.2, -0.12], 4, 0.28, [1.7, 2.7], greens, PALETTE.jungleDeep, 0.32),
-    ...leafFan([0.36, 0.16, -0.13], 4, 0.3, [0.05, 1.2], greens, PALETTE.jungleDeep, 0.28)
+    ...leafFan([0.28, 0.5, -0.14], 4, 0.34, [-0.7, 0.7], greens, PALETTE.jungleDeep, 0.28)
   )
 
-  // Hanging moss — the delta's answer to the jungle's vines. Three fall BEHIND the animals out of
-  // the canopy; the fourth hangs in FRONT at z 0.24, just inward of the big crocodile's snout, so
-  // there is one piece of set between the viewer and the character.
-  for (const [mx, my, mz, n, r, drift] of [
-    [-0.46, 0.36, -0.08, 6, 0.028, 0.01],
-    [-0.14, 0.62, -0.1, 5, 0.026, -0.01],
-    [0.3, 0.56, -0.1, 5, 0.024, 0.012],
+  // Hanging moss — the delta's answer to the jungle's vines. Each y is picked so the TOP BEAD sits
+  // inside the trunk or the bough at that height, which is stricter than starting near it: below
+  // the first bead the chain is free to drift and to disappear behind the animal, but the reader
+  // has to be able to see where it is caught.
+  //
+  // A fourth strand hung in FRONT at z 0.24 is gone rather than reseated. There is nothing overhead
+  // at that depth to catch it, and the lily pads already carry the front layer — they at least have
+  // a pad to sit on.
+  //
+  // WHY THE THIRD ONE IS SHORT, and it is the rule the whole corner is now held to. This dressing
+  // is MIRRORED for the right-hand corner but the two crocodiles are NOT the same build: crocGape
+  // lies low with its skull topping out around y ≈ 0.49, while crocPeek sits higher and further in
+  // (its brow reaches y ≈ 0.54 once the rig's root tilt is applied) and its snout crosses the bough
+  // tip. So a chain authored against the big crocodile hangs past the small one's head on the other
+  // side: the run it was caught on is covered, the beads that clear the snout are not, and what is
+  // left is three peas in open sky. `step` is per-strand for exactly that reason — the clear gap
+  // between the bark and the TALLER of the two skulls is what a strand is allowed to be, and at the
+  // bough's tip that gap is about 0.15 rather than the 0.4 the outer trunk has. A strand may still
+  // run out of sight behind an animal at its FREE end; what it may not do is lose its anchor, or
+  // vanish and re-appear below a head.
+  for (const [mx, my, mz, n, step, r, drift] of [
+    [-0.47, 0.34, -0.11, 5, 0.1, 0.028, 0.01],
+    [-0.14, 0.53, -0.13, 5, 0.1, 0.026, -0.01],
+    [0.25, 0.552, -0.13, 3, 0.068, 0.026, 0.014],
   ] as const) {
-    parts.push(...strand([mx, my, mz], n, 0.1, r, PALETTE.mossHang, drift, 0.86))
+    parts.push(...strand([mx, my, mz], n, step, r, PALETTE.mossHang, drift, 0.86))
   }
-  parts.push(...strand([0.5, 0.3, 0.24], 4, 0.09, 0.022, PALETTE.jungleVine, -0.014, 0.9))
 
   // LILY PADS, squashed hard in Y rather than drawn as circles: the water plane is being read at a
   // grazing angle, so a round pad reads as a floating ball and a flat ellipse reads as a pad lying
@@ -141,33 +176,47 @@ export function deltaDressing(): ClayPart[] {
     parts.push(...leaf([px, py, pz], len, wide, tilt, color, PALETTE.jungleDeep))
   }
 
-  // Reeds pushing up out of the shallows, and two seed heads that break their line. Reeds are the
-  // only vertical in the understory, so they carry the eye from the water back up to the canopy.
-  parts.push(
-    ...tufts([-0.3, -0.56, -0.06], 0.2, 6, PALETTE.reedGreen, 0.22, 0.78, 1.4),
-    ...tufts([0.22, -0.84, -0.08], 0.22, 5, PALETTE.deltaMoss, 0.24, 0.78, 1.35),
-    cyl(0.014, 0.018, 0.26, PALETTE.reedGreen, [0.46, -0.28, -0.06], [0, 0, -0.16]),
-    cyl(0.028, 0.024, 0.11, PALETTE.stiltRoof, [0.48, -0.14, -0.06], [0, 0, -0.14]),
-    cyl(0.012, 0.016, 0.22, PALETTE.reedGreen, [-0.5, -0.5, -0.08], [0, 0, 0.14]),
-    cyl(0.026, 0.022, 0.1, PALETTE.stiltRoof, [-0.52, -0.37, -0.08], [0, 0, 0.12])
-  )
-
   // The water itself: flat silt slabs crossing the bottom edge. Without them the pads and the roots
   // float in the sky, which is the one thing a swamp corner must not do.
+  //
+  // The last two are RAISED crests, one per half, and they are what the whole understory is rooted
+  // in. Each is set so its top edge (y ≈ −0.80 outward, −0.77 inward) clears the frame's bottom at
+  // y ≈ −0.92 by a readable margin: a bank that crops away entirely still holds a reed up in the
+  // geometry, but on screen the reed is standing on nothing. The outer crest is the new one — that
+  // half of the corner had no visible bed at all, which is how its reeds came to float.
   parts.push(
     sph(0.4, PALETTE.deltaSilt, [-0.14, -1, -0.06], [1.15, 0.38, 0.5], 10),
     sph(0.28, PALETTE.deltaSand, [0.34, -0.98, -0.04], [1.1, 0.4, 0.5], 10),
+    sph(0.26, PALETTE.deltaSand, [-0.3, -0.88, -0.09], [1.2, 0.34, 0.5], 10),
     sph(0.28, PALETTE.deltaSilt, [0.36, -0.86, -0.11], [1.2, 0.34, 0.5], 10)
   )
 
-  // A lotus, the one warm note in an olive corner. It sits ON a pad and on its own stem: an
-  // unattached bloom floats beside the crocodile's jaw and reads as a stray bubble.
+  // Reeds and tufts pushing up out of the shallows, and two seed heads that break their line. Reeds
+  // are the only vertical in the understory, so they carry the eye from the water back up to the
+  // canopy — but only if the eye can follow them DOWN to a footing. Every base here is set below
+  // the crest of the bank it stands in; the outer pair used to start a third of a figure-height
+  // clear of the silt, which at reading size is a green bar hanging in open water. Passing BEHIND a
+  // lily pad on the way up is fine — the base stays visible below the pad's lower edge — which is
+  // what the long inner reed is doing, and why it is long.
   parts.push(
-    cyl(0.012, 0.014, 0.12, PALETTE.reedGreen, [0.2, -0.56, 0.27], [0, 0, 0.1]),
-    sph(0.06, PALETTE.blossom, [0.21, -0.48, 0.28], [1, 0.9, 0.6], 8),
-    cone(0.034, 0.11, PALETTE.petal, [0.15, -0.45, 0.28], [0, 0, 0.6], [1, 1, 0.5], 6),
-    cone(0.032, 0.1, PALETTE.petal, [0.27, -0.45, 0.28], [0, 0, -0.6], [1, 1, 0.5], 6),
-    sph(0.024, PALETTE.honey, [0.21, -0.45, 0.31], undefined, 6)
+    ...tufts([-0.44, -0.84, -0.06], 0.17, 6, PALETTE.reedGreen, 0.28, 0.72, 1.3),
+    ...tufts([0.22, -0.84, -0.08], 0.22, 5, PALETTE.deltaMoss, 0.24, 0.78, 1.35),
+    cyl(0.012, 0.016, 0.3, PALETTE.reedGreen, [-0.441, -0.712, -0.08], [0, 0, 0.14]),
+    cyl(0.026, 0.022, 0.1, PALETTE.stiltRoof, [-0.47, -0.515, -0.08], [0, 0, 0.12]),
+    cyl(0.014, 0.018, 0.5, PALETTE.reedGreen, [0.55, -0.645, -0.06], [0, 0, -0.2]),
+    cyl(0.028, 0.024, 0.11, PALETTE.stiltRoof, [0.61, -0.352, -0.06], [0, 0, -0.18])
+  )
+
+  // A lotus, the one warm note in an olive corner. Its stem BRIDGES — lower end buried in the pad at
+  // (0.06, −0.44), upper end inside the bloom — so a visible length of stem connects the flower to
+  // the thing it grows out of. The stem used to hang BELOW the pad into open water, which anchors
+  // nothing and reads as a stray bubble on a stick.
+  parts.push(
+    cyl(0.012, 0.014, 0.1, PALETTE.reedGreen, [0.205, -0.36, 0.27], [0, 0, 0.08]),
+    sph(0.06, PALETTE.blossom, [0.21, -0.29, 0.28], [1, 0.9, 0.6], 8),
+    cone(0.034, 0.11, PALETTE.petal, [0.15, -0.26, 0.28], [0, 0, 0.6], [1, 1, 0.5], 6),
+    cone(0.032, 0.1, PALETTE.petal, [0.27, -0.26, 0.28], [0, 0, -0.6], [1, 1, 0.5], 6),
+    sph(0.024, PALETTE.honey, [0.21, -0.26, 0.31], undefined, 6)
   )
 
   return parts
@@ -418,6 +467,14 @@ function crocPeekBody(d: 1 | -1): ClayPart[] {
     ),
     sph(0.155, PALETTE.crocShade, [-0.4, 0.02, 0.06], [1.3, 0.62, 0.55], 12),
     sph(0.1, PALETTE.crocBelly, [-0.22, 0.14, 0.1], [1.3, 0.66, 0.5], 10),
+    // The SHOULDER the forefoot hangs off, and it is structural rather than decorative. The foot is
+    // a separately hinged piece pinned at (−0.16, −0.20) — which is outside the body's silhouette,
+    // so the arm used to start in clear sky about a fifth of a figure-height below the flank and
+    // read as a brown block floating over the lily pads. Its partner never showed the fault: on
+    // crocGape the foreleg is authored INSIDE the body piece and its top is buried in the barrel.
+    // This bridges the same gap on the hinged build — it sits on the body, so the whole of the
+    // arm's swing stays covered, and it is wide enough to still overlap at both ends of the chomp.
+    sph(0.105, PALETTE.crocHide, [-0.29, -0.13, 0.07], [1.05, 1, 0.9], 10),
     ...scutes([
       [-0.14, 0.4, 1.9, 0.05],
       [-0.28, 0.28, 2, 0.055],
@@ -469,6 +526,8 @@ export function deltaPieces(kind: 'crocGape' | 'crocPeek', dir: 1 | -1): PeekerP
     : [
         { slot: 'body', at: [0, 0, 0], parts: crocPeekBody(dir), ink: true },
         { slot: 'a', at: [PEEK_HINGE[0] * dir, PEEK_HINGE[1], 0.02], parts: crocPeekJaw(dir), ink: true },
-        { slot: 'b', at: [-0.16 * dir, -0.2, 0.14], parts: crocPeekFoot(dir), ink: true },
+        // no `ink` on the forefoot: only the first INK_PIECE_LIMIT pieces are ever drawn with a
+        // contour, so the flag would be inert here — and an inert flag reads as a live one.
+        { slot: 'b', at: [-0.16 * dir, -0.2, 0.14], parts: crocPeekFoot(dir) },
       ]
 }
