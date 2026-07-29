@@ -233,7 +233,8 @@ const HEAD_X = 0.08
  *
  * `lay` rakes the clumps off the radial direction. A ring of purely radial lobes is a sunburst;
  * hair lies along the body and hangs, so every ring below is raked and the rake is what reads as
- * weight. `thick` is the lobe's width as a fraction of its length.
+ * weight. `thick` is the lobe's width as a fraction of its length — every ring wants the same 0.5,
+ * so it is a default rather than seven repeated literals.
  *
  * Every ring is a SILHOUETTE device. The ink hull is inflated from the merged geometry, so a lobe
  * standing proud of the body draws its own outline — at the edge that is exactly the point, and
@@ -248,7 +249,7 @@ function shag(
   to: number,
   len: number,
   lay = 0,
-  thick = 0.58
+  thick = 0.5
 ): ClayPart[] {
   const out: ClayPart[] = []
   for (let i = 0; i < n; i++) {
@@ -432,27 +433,27 @@ function yetiBody(c: Coat): ClayPart[] {
     // it hangs UNDER a head that already has room below it. It stops at 1.78π rather than closing
     // the circle: past that the inward clumps run out of MASCOT_BOX.in, and the inward side is the
     // far side under the rig's yaw, so it is the cheapest arc to give up.
-    ...shag([HEAD_X, 0.47, -0.03], 0.245, 11, c.coat, 0.92, 1.78, 0.115, 0.22, 0.5),
+    ...shag([HEAD_X, 0.47, -0.03], 0.245, 11, c.coat, 0.92, 1.78, 0.115, 0.22),
     // The crown, shortest of all: anything standing off the top of a head reads as horns whatever
     // it is made of. Enough to break the dome, not enough to spike it.
-    ...shag([HEAD_X, 0.47, -0.06], 0.245, 7, c.coat, 0.2, 0.95, 0.085, 0.16, 0.5),
+    ...shag([HEAD_X, 0.47, -0.06], 0.245, 7, c.coat, 0.2, 0.95, 0.085, 0.16),
     // The shoulder ring starts past 0.62π rather than at the vertical: a clump standing on the
     // crest of a shoulder is a spike wherever it is on the animal, and the lit band is what that
     // edge is supposed to be carrying.
-    ...shag([-0.24, 0.0, -0.08], 0.25, 6, c.coat, 0.62, 1.16, 0.11, 0.2, 0.5),
+    ...shag([-0.24, 0.0, -0.08], 0.25, 6, c.coat, 0.62, 1.16, 0.11, 0.2),
     // The SHOULDER CREST. Everything else on this figure is fringed on the outward side, which is
     // the side the frame crops: at the parked pose the reader sees the inward contour and the tops
     // of the shoulders, and the inward one has almost no envelope left (MASCOT_BOX.in). So the top
     // of the yoke carries its own ruff, raked hard so it lies along the back instead of standing on
     // the crest, and that is the fur the composition actually shows.
-    ...shag([-0.14, 0.05, -0.05], 0.28, 5, c.coat, 0.35, 0.8, 0.1, 0.35, 0.5),
+    ...shag([-0.14, 0.05, -0.05], 0.28, 5, c.coat, 0.35, 0.8, 0.1, 0.35),
     ...tufts([0.18, -0.04, 0.02], 0.2, 3, c.coat, 0.05, 0.5, 0.24),
     // the flank ring is the widest thing on the figure, so its reach is set by MASCOT_BOX.out
     // rather than by taste
-    ...shag([-0.14, -0.16, -0.07], 0.33, 8, c.coat, 0.86, 1.42, 0.15, 0.25, 0.5),
+    ...shag([-0.14, -0.16, -0.07], 0.33, 8, c.coat, 0.86, 1.42, 0.15, 0.25),
     // the haunch ring is what MASCOT_BOX.down binds: the cub is the adult scaled 0.82 and dropped
     // 0.17, so every unit of fur hung off the adult's underside costs the cub 0.82 of it
-    ...shag([-0.24, -0.43, -0.04], 0.21, 6, c.coat, 1.12, 1.52, 0.1, 0.15, 0.5),
+    ...shag([-0.24, -0.43, -0.04], 0.21, 6, c.coat, 1.12, 1.52, 0.1, 0.15),
     // INTERIOR fur was tried here and REMOVED, which is worth recording so it is not tried again.
     // Rows of clumps laid over the chest read as petals or scales stuck onto the animal at every
     // depth I could seat them: proud, each one takes its own ink outline; flat and buried, the ones
@@ -521,7 +522,7 @@ function yetiArm(c: Coat): ClayPart[] {
     // Elbow feathering, hanging off the arm's outer edge — the longest fur on the animal, because a
     // forearm is where a shaggy creature's coat actually hangs. In `coat` over a `deep` limb: the
     // first pass drew this fringe in the arm's own tone, so it was texture nobody could see.
-    ...shag([-0.03, -0.24, 0.02], 0.13, 6, c.coat, 0.95, 1.46, 0.12, 0.3, 0.5),
+    ...shag([-0.03, -0.24, 0.02], 0.13, 6, c.coat, 0.95, 1.46, 0.12, 0.3),
     sph(0.055, PALETTE.boughSnow, [-0.05, -0.38, 0.115], [1.5, 0.42, 0.7], 8),
   ]
 }

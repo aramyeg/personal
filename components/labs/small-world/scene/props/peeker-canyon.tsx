@@ -366,9 +366,10 @@ const SMALL: Pangolin = {
 }
 
 /**
- * The muzzle's axis: forward and ~19° below horizontal, the tilt the whole snout chain shares.
- * Written out rather than left implicit in three rotation constants because the muzzle END and the
- * nostril are placed ALONG it — see `pangolinHead`.
+ * The axis of the muzzle's main wedge: forward and ~19° below horizontal. Written out rather than
+ * left implicit in a rotation constant because the muzzle END and the nostril are placed ALONG it —
+ * see `pangolinHead`. The two tone cones that split the wedge lengthwise keep their own −1.82 and
+ * −1.97 on purpose, so this is the wedge's axis rather than one the whole chain shares.
  */
 const SNOUT_TILT = -1.9
 const SNOUT_DX = -Math.sin(SNOUT_TILT)

@@ -563,27 +563,33 @@ function camelHead(pose: CamelPose): ClayPart[] {
 }
 
 /**
- * The halter: a noseband WRAPPING the muzzle, a cheekpiece running back off it across the cheek,
- * and a small keeper where the two meet. Worked stock only: the calf runs bare (it wears a collar
- * instead — see `calfCord`).
+ * The halter: a broad leather noseband PLATE lying across the muzzle, a short cheekpiece stub
+ * angling back off it, and a small dark keeper at the junction. Worked stock only: the calf runs
+ * bare (it wears a collar instead — see `calfCord`).
  *
  * THIS IS THE CIGARETTE FIX. The previous halter was a straight `camelSaddle` bar laid across the
  * muzzle with a `honey` bead at its outer end, and a thin cheekpiece pushed so far into +Z that the
  * skull swallowed it. What survived to the screen was therefore one warm-red horizontal stroke with
  * a bright yellow tip, sitting at the corner of a mouth: a lit cigarette, and the single loudest
- * misread left in the set. Three things change, and each answers one half of that read.
+ * misread left in the set. Three things change.
  *
  *  1. COLOUR. Leather is cool and low-chroma (`tackLeather`) where camelSaddle is a terracotta only
  *     a shade off the hide's own family. A cool strap on a warm animal is worked stock; a warm one
  *     is a marking. The brass is gone entirely — nothing on this animal is allowed to be a small
  *     bright spot at the end of a bar.
- *  2. SHAPE. The band is no longer a straight bar but an ARC, authored in the muzzle's own
- *     cross-section plane and swept from over the bridge round to under the jaw, so it visibly
- *     passes around a solid rather than lying on one. A strap that wraps cannot read as a cylinder
- *     held in a mouth.
- *  3. THE CHEEKPIECE CARRIES. It is nearly half again as thick, and it is pulled forward in Z to
- *     sit proud of the cheek instead of inside it, so the second strap — the thing that makes the
- *     first one tack rather than a painted stripe — actually draws.
+ *  2. AREA, NOT SHAPE. The band is a wide flat plate with a dark rim: a squashed ellipsoid rolled
+ *     square to the muzzle, not a strap of any kind. See the comment on the cuff below for why the
+ *     obvious fix does not work — a band that WRAPS the muzzle projects to a line from this camera,
+ *     and a line laid across a mouth is a stick whatever colour it is painted.
+ *  3. THE CHEEKPIECE IS SHORT, AND THAT IS THE POINT. It is thicker than the old one so it draws at
+ *     all, but it runs only about 0.17 before tucking BEHIND the cheek in Z, where the skull hides
+ *     it. A halter needs the second strap to exist and to leave at an angle; drawn long it lines up
+ *     with the noseband in projection and the two together redraw the stick.
+ *
+ * TWO ATTEMPTS ARE RECORDED IN THE COMMENTS BELOW rather than deleted — the arc that reads as a
+ * twig, and the pair of edge lines that spike the silhouette. Both were built, captured and thrown
+ * away; without the note the first instruction this docblock gives the next author is to build them
+ * again. (Same reason as the interior-fur note in `peeker-winter.tsx`.)
  */
 function halter(pose: CamelPose): ClayPart[] {
   // The muzzle's run, and the perpendicular the band is authored about. Derived from the pose's own
@@ -597,18 +603,21 @@ function halter(pose: CamelPose): ClayPart[] {
   const cy = 0.305
 
   /**
-   * A point on the band: `a` radians round the muzzle's own cross-section, where 0 is the top of the
-   * bridge and π/2 faces the camera, at radius `r` and slid `back` along the muzzle. The band's own
-   * radius has to be the muzzle's half-width at this station — a band wider than the solid it goes
-   * round stands off it at both ends, and a strap standing off a muzzle at both ends is a ROD
-   * passing through the animal's head, which is what the first attempt at this drew.
+   * A point on the muzzle's own cross-section: `a` radians round it, where 0 is the top of the
+   * bridge and π/2 faces the camera, at radius `r` and slid `back` along the muzzle. It survives
+   * from the arc attempt (see the docblock) and now just seats two pieces on the surface — the
+   * cheekpiece's root and the keeper.
+   *
+   * `r` has to be the muzzle's half-width at that station. Anything wider stands off the solid at
+   * both ends, and a strap standing off a muzzle at both ends is a ROD passing through the animal's
+   * head, which is what the first attempt at this drew.
    */
   const at = (a: number, r: number, back: number): V3 => {
     const along = r * Math.cos(a)
     return [
       cx + ux * along - (axX / axLen) * back,
       cy + uy * along - (axY / axLen) * back,
-      // the muzzle is flatter than it is tall, so the wrap is an ellipse rather than a circle
+      // the muzzle is flatter than it is tall, so its section is an ellipse, not a circle
       r * Math.sin(a) * 0.82,
     ]
   }
