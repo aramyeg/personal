@@ -275,6 +275,33 @@ export function strand(
   return out
 }
 
+// --- rock -------------------------------------------------------------------
+
+/**
+ * One LOZENGE of rock: an ellipsoid stretched along its bed and rolled to that bed's dip, from
+ * `[x, y, halfHeight, halfLength, dip, colour]`.
+ *
+ * Shared because it is the answer to the same defect in two biomes. A course drawn as one
+ * constant-section slab has two straight parallel edges and a butt joint at each end, which is
+ * exactly how a plank or a crate is drawn — the canyon's strata read as a wooden crate and the
+ * desert's ledge as stacked decking. What makes rock read as rock is that a bed THICKENS, THINS and
+ * PINCHES OUT along its length, so a course is built from a run of these with no two sharing a
+ * thickness, a dip or an end.
+ *
+ * `z` offsets the lozenge toward the camera, for a shelf whose top surface things are seated on.
+ */
+export function rockBed(
+  spec: readonly [number, number, number, number, number, string],
+  depth: number,
+  z = 0
+): ClayPart {
+  const [x, y, hy, hx, dip, color] = spec
+  return {
+    ...sph(hy, color, [x, y, z], [hx / hy, 1, depth / hy], 10),
+    rot: [0, 0, dip] as V3,
+  }
+}
+
 // --- ink outline ------------------------------------------------------------
 
 /**

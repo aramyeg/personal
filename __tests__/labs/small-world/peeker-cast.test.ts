@@ -427,6 +427,21 @@ describe('house rules', () => {
     }
   })
 
+  it('keeps the camels tack in the leather family, not the saddle-and-brass that read as a lit cigarette', () => {
+    // Task 58. The halter was a `camelSaddle` bar with a `honey` bead at the muzzle end, and at
+    // reading size a warm-red stroke with a bright yellow tip at the corner of a mouth is a
+    // cigarette — the single loudest misread left after the T56 rework. The fix is a COLOUR family
+    // as much as a shape, so the family is what is pinned: nothing warm-red and nothing brass may
+    // come back onto either animal, and both must actually be wearing something.
+    for (const kind of ['camelAdult', 'camelCalf'] as const) {
+      const parts = peekerPieces('desert', kind, 1).flatMap((p) => p.parts)
+      const colours = new Set(parts.map((p) => p.color))
+      expect(colours.has(PALETTE.honey), `${kind} brass`).toBe(false)
+      expect(colours.has(PALETTE.camelSaddle), `${kind} saddle red`).toBe(false)
+      expect(colours.has(PALETTE.tackLeather), `${kind} wears tack`).toBe(true)
+    }
+  })
+
   it('stays inside the per-checkpoint draw budget', () => {
     // Measured on a real server by bench/task56-drawcalls.mjs; this is the arithmetic that has to
     // agree with it, so a third inked piece or a fourth mesh cannot creep in unnoticed.

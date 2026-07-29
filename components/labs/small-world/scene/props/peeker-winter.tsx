@@ -138,19 +138,34 @@ export function winterDressing(): ClayPart[] {
 
   // The drift. It is authored FORWARD of the figure (z ≈ 0.12–0.22) rather than behind it, because
   // the point of a drift is that the yeti is standing in it up to the chest — banked behind, it
-  // would just be a white band under a floating character. Crests are `boughSnow` and the hollows
-  // between them `frostShadow`: on a pale sky the snow only has shape if it carries both.
+  // would just be a white band under a floating character.
+  //
+  // VALUE, and this is the fix for "the yeti shares its value with the boulder it sits on". The
+  // crests used to be `snow` with `frostShadow` hollows, and `frostShadow` sits about nine points of
+  // lightness from `yetiCoat` in nearly the same hue. Shaded by the ramp, the whole bank landed on
+  // the animal's own value — so it stopped reading as SNOW at all and became a grey boulder with a
+  // yeti of the same tone in front of it. The crests are now the palette's brightest whites and the
+  // hollows go to `driftShade`, a genuinely deep blue snow shadow. Snow that carries its own full
+  // range reads as snow, and it hands the figure a bright edge exactly where the two meet.
   parts.push(
-    sph(0.26, PALETTE.snow, [-0.33, -0.88, 0.12], [1.26, 0.6, 0.7], 12),
-    sph(0.28, PALETTE.snow, [0.06, -0.84, 0.16], [1.35, 0.62, 0.7], 12),
-    sph(0.26, PALETTE.snow, [0.41, -0.9, 0.12], [1.2, 0.6, 0.7], 12),
-    sph(0.22, PALETTE.snow, [-0.42, -1.0, 0.06], [1.15, 0.6, 0.7], 10),
-    sph(0.2, PALETTE.frostShadow, [-0.14, -1.0, 0.08], [1.3, 0.5, 0.7], 10),
-    sph(0.18, PALETTE.frostShadow, [0.28, -1.02, 0.08], [1.3, 0.5, 0.7], 10),
+    sph(0.26, PALETTE.boughSnow, [-0.33, -0.87, 0.14], [1.34, 0.46, 0.7], 12),
+    sph(0.28, PALETTE.boughSnow, [0.06, -0.83, 0.18], [1.42, 0.48, 0.7], 12),
+    sph(0.26, PALETTE.boughSnow, [0.41, -0.89, 0.14], [1.28, 0.46, 0.7], 12),
+    sph(0.22, PALETTE.snow, [-0.42, -0.99, 0.06], [1.18, 0.6, 0.7], 10),
+    // the wind hollows between the crests
+    sph(0.2, PALETTE.driftShade, [-0.14, -1.0, 0.08], [1.3, 0.5, 0.7], 10),
+    sph(0.18, PALETTE.driftShade, [0.28, -1.02, 0.08], [1.3, 0.5, 0.7], 10),
     sph(0.18, PALETTE.frostShadow, [-0.48, -0.98, 0.06], [1.0, 0.5, 0.7], 10),
-    sph(0.13, PALETTE.boughSnow, [-0.32, -0.8, 0.18], [1.4, 0.45, 0.6], 10),
-    sph(0.14, PALETTE.boughSnow, [0.08, -0.75, 0.22], [1.4, 0.42, 0.6], 10),
-    sph(0.12, PALETTE.boughSnow, [0.46, -0.82, 0.18], [1.3, 0.45, 0.6], 10)
+    // The CORNICE line: a thin shaded band riding just under each crest's top edge, forward of it.
+    // It does two jobs at once — it turns a soft dome into wind-cut snow, and it is exactly the
+    // edge the figure is seen against, so the animal's waterline gets a drawn contact instead of
+    // fading into the bank.
+    sph(0.26, PALETTE.driftShade, [-0.33, -0.815, 0.26], [1.34, 0.09, 0.34], 10),
+    sph(0.28, PALETTE.driftShade, [0.06, -0.775, 0.3], [1.4, 0.09, 0.34], 10),
+    sph(0.26, PALETTE.driftShade, [0.41, -0.835, 0.26], [1.28, 0.09, 0.34], 10),
+    sph(0.13, PALETTE.snow, [-0.32, -0.78, 0.2], [1.4, 0.45, 0.6], 10),
+    sph(0.14, PALETTE.snow, [0.08, -0.73, 0.24], [1.4, 0.42, 0.6], 10),
+    sph(0.12, PALETTE.snow, [0.46, -0.8, 0.2], [1.3, 0.45, 0.6], 10)
   )
 
   // Two ice shards breaking out of the drift crest — the one hard edge in a composition that is
@@ -200,6 +215,60 @@ const SMALL_COAT: Coat = {
 
 /** The head's own x centre. Every face feature is placed symmetrically about it — see `yetiBody`. */
 const HEAD_X = 0.08
+
+/**
+ * A ring of FUR CLUMPS around a mass — the shag, and the thing that makes this animal a yeti.
+ *
+ * The first pass carried the kit's `tufts`, whose cones are wider at the base than they are long at
+ * the lengths that are safe to use here (past about 0.3 they project from the outline as SPINES,
+ * which is the threat read the ear tufts were removed for). Clumps that wide overlap at the root
+ * and merge into the mass, so the outline came back as a faint wobble: the review's "a smooth
+ * faceted surface with no shag anywhere", and with round ears and a plush muzzle above it the
+ * corner read as a bear or a koala.
+ *
+ * What separates fur from spikes is not length, it is the NOTCH. Each clump here is a rounded lobe
+ * — never a point — rooted well INSIDE the mass at `root` and running out to `root + len`, so
+ * neighbours converge where they are buried and diverge where they are seen. The gap between two
+ * tips is the fur; the lobes themselves only have to be long enough to open it.
+ *
+ * `lay` rakes the clumps off the radial direction. A ring of purely radial lobes is a sunburst;
+ * hair lies along the body and hangs, so every ring below is raked and the rake is what reads as
+ * weight. `thick` is the lobe's width as a fraction of its length.
+ *
+ * Every ring is a SILHOUETTE device. The ink hull is inflated from the merged geometry, so a lobe
+ * standing proud of the body draws its own outline — at the edge that is exactly the point, and
+ * anywhere else it is a disaster (see the note in `yetiBody` about the interior rows this replaced).
+ */
+function shag(
+  center: V3,
+  root: number,
+  n: number,
+  color: string,
+  from: number,
+  to: number,
+  len: number,
+  lay = 0,
+  thick = 0.58
+): ClayPart[] {
+  const out: ClayPart[] = []
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI * (from + (to - from) * (i / Math.max(1, n - 1)))
+    // a ring of equal clumps reads as a scalloped border, which is a decorative edge rather than fur
+    const l = len * (0.82 + 0.3 * Math.sin(i * 2.3))
+    const d = root + l * 0.5
+    out.push({
+      ...sph(
+        l * 0.5,
+        color,
+        [center[0] + Math.cos(a) * d, center[1] + Math.sin(a) * d, center[2]],
+        [1, thick, 0.62],
+        8
+      ),
+      rot: [0, 0, a + lay] as V3,
+    })
+  }
+  return out
+}
 
 /**
  * One EYEBROW, as an arch whose high point sits over the pupil rather than as a tilted bar.
@@ -300,13 +369,15 @@ function yetiBody(c: Coat): ClayPart[] {
     sph(0.145, c.deep, [0.03, 0.2, 0.02], [1.0, 0.62, 0.85], 12),
     sph(0.28, c.coat, [HEAD_X, 0.47, -0.02], [1.0, 1.0, 0.94], 14),
 
-    // Round ears with a pale inner cup — the plush replacement for the spiked tufts, and still the
-    // asymmetry-proof silhouette break the spikes were there for: they read even when the yaw turns
-    // the far side of the head away.
-    sph(0.085, c.coat, [HEAD_X - 0.255, 0.545, -0.03], [1.0, 1.1, 0.7], 10),
-    sph(0.085, c.coat, [HEAD_X + 0.255, 0.545, -0.03], [1.0, 1.1, 0.7], 10),
-    sph(0.045, c.mask, [HEAD_X - 0.265, 0.535, 0.03], [1.0, 1.05, 0.6], 8),
-    sph(0.045, c.mask, [HEAD_X + 0.265, 0.535, 0.03], [1.0, 1.05, 0.6], 8),
+    // Round ears with a pale inner cup — the plush note, and still the asymmetry-proof silhouette
+    // break the removed spikes were there for: they read even when the yaw turns the far side of
+    // the head away. SMALLER and set back than the first pass, because a big round ear standing off
+    // a smooth dome is the loudest single bear cue on the animal; here they sit down in the ruff
+    // (see the face ring below), which is where a shaggy creature's ears are.
+    sph(0.068, c.coat, [HEAD_X - 0.25, 0.55, -0.05], [1.0, 1.1, 0.7], 10),
+    sph(0.068, c.coat, [HEAD_X + 0.25, 0.55, -0.05], [1.0, 1.1, 0.7], 10),
+    sph(0.036, c.mask, [HEAD_X - 0.258, 0.542, 0.01], [1.0, 1.05, 0.6], 8),
+    sph(0.036, c.mask, [HEAD_X + 0.258, 0.542, 0.01], [1.0, 1.05, 0.6], 8),
 
     // The MASK, as a peanut rather than a disc: a rounded muzzle ball with a second lobe rising
     // between the eyes. The ball is what the removed snout was not — it has a top that catches
@@ -356,22 +427,38 @@ function yetiBody(c: Coat): ClayPart[] {
     // is, so these are not surface texture — they ARE the silhouette, and a shaggy animal must
     // never be drawn with a smooth outline. All in `coat`: see the shoulder-line note above.
     //
-    // `len` is held near 0.24 on every ring, and that number is the difference between fur and a
-    // threat. The kit's tufts are cones, so `len` is their length as a fraction of the ring radius
-    // while their base is fixed at 0.32 of it: below about 0.3 each cone is wider than it is long
-    // and scallops the outline, above it they start projecting FROM the outline as spines — the
-    // same spiked read the ear tufts were removed for. The crown ring is the shortest of all,
-    // because anything standing off the top of a head reads as horns whatever it is made of.
-    ...tufts([HEAD_X, 0.47, -0.06], 0.28, 5, c.coat, 0.18, 0.98, 0.2),
-    // The shoulder ring starts past 0.62π rather than at the vertical: a tuft standing on the crest
-    // of a shoulder is a spike wherever it is on the animal, and the lit band is what that edge is
-    // supposed to be carrying.
-    ...tufts([-0.24, 0.0, -0.08], 0.29, 5, c.coat, 0.62, 1.16, 0.2),
+    // THE FACE RUFF is the one that buys the species. A bare face inside a collar of fur is the
+    // read every drawn yeti has and no bear or koala has, and it costs nothing in envelope because
+    // it hangs UNDER a head that already has room below it. It stops at 1.78π rather than closing
+    // the circle: past that the inward clumps run out of MASCOT_BOX.in, and the inward side is the
+    // far side under the rig's yaw, so it is the cheapest arc to give up.
+    ...shag([HEAD_X, 0.47, -0.03], 0.245, 11, c.coat, 0.92, 1.78, 0.115, 0.22, 0.5),
+    // The crown, shortest of all: anything standing off the top of a head reads as horns whatever
+    // it is made of. Enough to break the dome, not enough to spike it.
+    ...shag([HEAD_X, 0.47, -0.06], 0.245, 7, c.coat, 0.2, 0.95, 0.085, 0.16, 0.5),
+    // The shoulder ring starts past 0.62π rather than at the vertical: a clump standing on the
+    // crest of a shoulder is a spike wherever it is on the animal, and the lit band is what that
+    // edge is supposed to be carrying.
+    ...shag([-0.24, 0.0, -0.08], 0.25, 6, c.coat, 0.62, 1.16, 0.11, 0.2, 0.5),
+    // The SHOULDER CREST. Everything else on this figure is fringed on the outward side, which is
+    // the side the frame crops: at the parked pose the reader sees the inward contour and the tops
+    // of the shoulders, and the inward one has almost no envelope left (MASCOT_BOX.in). So the top
+    // of the yoke carries its own ruff, raked hard so it lies along the back instead of standing on
+    // the crest, and that is the fur the composition actually shows.
+    ...shag([-0.14, 0.05, -0.05], 0.28, 5, c.coat, 0.35, 0.8, 0.1, 0.35, 0.5),
     ...tufts([0.18, -0.04, 0.02], 0.2, 3, c.coat, 0.05, 0.5, 0.24),
-    // the flank ring is the widest thing on the figure, so its radius is set by MASCOT_BOX.out
+    // the flank ring is the widest thing on the figure, so its reach is set by MASCOT_BOX.out
     // rather than by taste
-    ...tufts([-0.14, -0.16, -0.07], 0.42, 6, c.coat, 0.86, 1.42, 0.2),
-    ...tufts([-0.24, -0.46, -0.04], 0.28, 4, c.coat, 1.12, 1.55, 0.26),
+    ...shag([-0.14, -0.16, -0.07], 0.33, 8, c.coat, 0.86, 1.42, 0.15, 0.25, 0.5),
+    // the haunch ring is what MASCOT_BOX.down binds: the cub is the adult scaled 0.82 and dropped
+    // 0.17, so every unit of fur hung off the adult's underside costs the cub 0.82 of it
+    ...shag([-0.24, -0.43, -0.04], 0.21, 6, c.coat, 1.12, 1.52, 0.1, 0.15, 0.5),
+    // INTERIOR fur was tried here and REMOVED, which is worth recording so it is not tried again.
+    // Rows of clumps laid over the chest read as petals or scales stuck onto the animal at every
+    // depth I could seat them: proud, each one takes its own ink outline; flat and buried, the ones
+    // that still draw are lit patches with an outline anyway. The renderer has no way to draw
+    // texture INSIDE a silhouette here — what it has is tone bands, which the shoulder line, the
+    // flank strip and the bib already spend. So the shag is a silhouette device only.
 
     // Snow knocked off the bough and caught on him — the detail that puts him IN the tree. It is
     // the brightest value on the figure and it is deliberately tiny: a crest on the crown and one
@@ -431,7 +518,10 @@ function yetiArm(c: Coat): ClayPart[] {
     cone(0.03, 0.14, c.coat, [-0.035, -0.585, 0.1], [0, 0, 3.42], [1, 1, 0.85], 6),
     // thumb hooked back over the top of the bough — the piece that closes the grip
     cone(0.03, 0.13, c.coat, [-0.005, -0.445, 0.12], [0, 0, -1.35], [1, 1, 0.85], 6),
-    ...tufts([-0.02, -0.22, -0.02], 0.19, 4, c.deep, 0.92, 1.5, 0.24),
+    // Elbow feathering, hanging off the arm's outer edge — the longest fur on the animal, because a
+    // forearm is where a shaggy creature's coat actually hangs. In `coat` over a `deep` limb: the
+    // first pass drew this fringe in the arm's own tone, so it was texture nobody could see.
+    ...shag([-0.03, -0.24, 0.02], 0.13, 6, c.coat, 0.95, 1.46, 0.12, 0.3, 0.5),
     sph(0.055, PALETTE.boughSnow, [-0.05, -0.38, 0.115], [1.5, 0.42, 0.7], 8),
   ]
 }

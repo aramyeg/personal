@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import type { ClayPart } from './clay-kit'
-import { alignY, cone, cyl, eye, facing, leafFan, limb, sph, tufts, type V3 } from './peeker-kit'
+import { alignY, cone, cyl, eye, facing, leafFan, limb, rockBed, sph, tufts, type V3 } from './peeker-kit'
 import type { PeekerPiece } from './peeker-cast'
 
 /**
@@ -39,25 +39,6 @@ import type { PeekerPiece } from './peeker-cast'
 
 /** Top surface of the shelf — the line every prop and both animals are seated on. */
 const LEDGE_TOP = -0.235
-
-/**
- * One lozenge of rock: an ellipsoid stretched along its bed and rolled to that bed's dip.
- *
- * Courses are built from a RUN of these rather than from one slab each, because the thing that
- * makes rock read as rock is that a bed thickens, thins and pinches out along its length. The
- * first pass used one constant-section slab per course with dark vertical bars between them, which
- * is precisely how a wooden crate is drawn.
- */
-function bed(
-  spec: readonly [number, number, number, number, number, string],
-  depth: number
-): ClayPart {
-  const [x, y, hy, hx, dip, color] = spec
-  return {
-    ...sph(hy, color, [x, y, 0], [hx / hy, 1, depth / hy], 10),
-    rot: [0, 0, dip] as V3,
-  }
-}
 
 /**
  * The shelf the pangolins stand on: `[x, y, halfHeight, halfLength, dip, colour]`.
@@ -171,8 +152,8 @@ export function canyonDressing(): ClayPart[] {
 
   // The shelf is given real depth in Z so it reads as a SURFACE the animals stand on rather than
   // as a line they stand behind; the beds below are shallow, since only their faces are ever seen.
-  for (const spec of SHELF) parts.push(bed(spec, 0.115))
-  for (const spec of BEDS) parts.push(bed(spec, 0.055))
+  for (const spec of SHELF) parts.push(rockBed(spec, 0.115))
+  for (const spec of BEDS) parts.push(rockBed(spec, 0.055))
 
   // The animal's own contact shadow, pooled into the shelf top. Without it a pale figure on dark
   // rock reads as pasted on rather than sitting in the corner.
@@ -341,15 +322,17 @@ type Pangolin = {
  * HEAD-TO-SHELL is set deliberately rather than anatomically. A real pangolin's head is a small
  * point on a large body; at 300px that reads as a pale lump with a bump on it, which is exactly
  * what the corner did — the skull used to be 0.58x the ball's radius and it disappeared. It is now
- * 0.82x on the adult and 0.90x on the juvenile, and the snout is as long again as the skull is
- * wide, because the SNOUT is what tells a reader this is a pangolin and not a generic brown
- * animal. Every unit spent on it is spent on the read; the ball gave up 0.01 to pay for it.
+ * 0.82x on the adult and 0.90x on the juvenile, because the head is what tells a reader this is a
+ * pangolin and not a generic brown animal.
  *
- * Inward reach is the binding constraint on all of it: MASCOT_BOX allows 0.46 toward the frame's
- * middle and the adult's nose, swept over the unroll, measures 0.4376. The snout is angled ~24°
- * below horizontal rather than ~9° partly for that reason — the length it gains goes into −y,
- * which has 0.55 of unused envelope, instead of +x, which has 0.02 — and partly because an animal
- * nosing down at the ledge it has just unrolled onto is the pose the beat is about.
+ * The SNOUT then went too far the other way: at 0.315 on a 0.155 skull it was as long again as the
+ * skull is wide and only 0.68·R at the base, which is an anteater's proportion rather than a
+ * pangolin's. It is now 0.235 (0.205 on the juvenile) on a wider base — see `pangolinHead`.
+ *
+ * The snout is angled ~19° below horizontal rather than level partly because the inward envelope is
+ * the binding constraint on this build — length spent in −y has 0.55 of unused envelope where +x
+ * has almost none — and partly because an animal nosing down at the ledge it has just unrolled onto
+ * is the pose the beat is about.
  */
 const BIG: Pangolin = {
   ball: 0.19,
@@ -364,7 +347,7 @@ const BIG: Pangolin = {
   tailLen: 1.05,
   skullAt: [0.118, 0.205, 0],
   skullR: 0.155,
-  snoutLen: 0.315,
+  snoutLen: 0.235,
   eyeR: 0.055,
 }
 
@@ -378,9 +361,18 @@ const SMALL: Pangolin = {
   tailLen: 0.88,
   skullAt: [0.122, 0.19, 0],
   skullR: 0.158,
-  snoutLen: 0.275,
+  snoutLen: 0.205,
   eyeR: 0.064,
 }
+
+/**
+ * The muzzle's axis: forward and ~19° below horizontal, the tilt the whole snout chain shares.
+ * Written out rather than left implicit in three rotation constants because the muzzle END and the
+ * nostril are placed ALONG it — see `pangolinHead`.
+ */
+const SNOUT_TILT = -1.9
+const SNOUT_DX = -Math.sin(SNOUT_TILT)
+const SNOUT_DY = Math.cos(SNOUT_TILT)
 
 /**
  * Slot 'c' — the SHELL, centred on the figure's origin because the arrival spins the whole rig
@@ -457,9 +449,14 @@ function pangolinHead(p: Pangolin, d: 1 | -1): ClayPart[] {
   const ex = sx + R * 0.33
   const ey = sy + R * 0.38
   const ez = 0.098
-  // Root of the muzzle, off the skull's lower front quarter.
+  // Root of the muzzle, off the skull's lower front quarter, and the point its axis ends at.
   const mx = sx + R * 0.82
   const my = sy - R * 0.8
+  const tipX = mx + SNOUT_DX * L * 0.5
+  const tipY = my + SNOUT_DY * L * 0.5
+  // the muzzle's own up-normal, for seating the nostril on TOP of the wedge rather than on its end
+  const upX = -SNOUT_DY
+  const upY = SNOUT_DX
   return facing(d, [
     ...limb([[-0.02, -0.115, 0], [0.05, 0.05, 0], [sx - 0.01, sy - 0.02, 0]], 0.115, 0.098, PALETTE.pangolinScaleLight),
     // the collar: the head is the lightest thing in the corner and the shell behind it is nearly
@@ -469,12 +466,31 @@ function pangolinHead(p: Pangolin, d: 1 | -1): ClayPart[] {
     // the shade step: a shadowed cheek under the brow, carrying the volume the four-band toon
     // ramp flattens out of a smooth skull at this size
     sph(R * 0.84, PALETTE.pangolinScale, [sx - 0.02, sy - R * 0.46, 0.03], [1.1, 0.8, 0.95], 10),
-    // Snout: one long wedge, and the whole silhouette read of the animal. The paler under-jaw and
-    // the deep bridge split it lengthwise so it does not collapse into a single blunt cone.
-    cone(R * 0.68, L, PALETTE.pangolinScaleLight, [mx, my, 0], [0, 0, -1.9], [1, 1, 0.84]),
-    cone(R * 0.45, L * 0.8, PALETTE.sinter, [mx - 0.008, my - 0.038, 0.03], [0, 0, -1.82], [1, 1, 0.8]),
-    cone(R * 0.34, L * 0.72, PALETTE.pangolinScale, [mx + 0.014, my + R * 0.32, -0.02], [0, 0, -1.97], [1, 1, 0.7]),
-    sph(0.048, PALETTE.ink, [mx + L * 0.474, my - L * 0.162, 0.005], [0.85, 1, 0.95], 8),
+    // Snout: one wedge, and the whole silhouette read of the animal. The paler under-jaw and the
+    // deep bridge split it lengthwise so it does not collapse into a single blunt cone.
+    //
+    // SHORT AND WIDE, and both halves of that matter. Drawn long and thin — snout as long again as
+    // the skull is wide, on a base of 0.68·R — the wedge became a stick, and the dark bead at its
+    // end became a bead ON a stick: the corner read as an ANTEATER, or as something stuck to the
+    // animal's face. A pangolin's muzzle is a stout cone continuous with the skull, so the base is
+    // now 0.88·R and the run is a third shorter, which also hands the inward envelope back the
+    // reach the old snout spent on being narrow.
+    cone(R * 0.88, L, PALETTE.pangolinScaleLight, [mx, my, 0], [0, 0, SNOUT_TILT], [1, 1, 0.84]),
+    cone(R * 0.58, L * 0.78, PALETTE.sinter, [mx - 0.008, my - 0.038, 0.03], [0, 0, -1.82], [1, 1, 0.8]),
+    cone(R * 0.44, L * 0.7, PALETTE.pangolinScale, [mx + 0.014, my + R * 0.32, -0.02], [0, 0, -1.97], [1, 1, 0.7]),
+    // The muzzle's blunt END, in the ANIMAL'S OWN tone. A cone tapers to a point, so whatever is
+    // put at its tip becomes the tip; with the nose there, the darkest thing in the corner was also
+    // its furthest-forward point. The tip is the pangolin's, and the nose sits back off it.
+    sph(R * 0.27, PALETTE.pangolinScaleLight, [tipX - SNOUT_DX * R * 0.12, tipY - SNOUT_DY * R * 0.12, 0.02], [0.94, 1, 0.9], 10),
+    // One small nostril, on TOP of the wedge and set back from its end — a third of the bead the
+    // first pass hung off the point, and read as part of a face rather than as a mounted object.
+    sph(
+      R * 0.105,
+      PALETTE.ink,
+      [tipX - SNOUT_DX * 0.012 + upX * R * 0.15, tipY - SNOUT_DY * 0.012 + upY * R * 0.15, 0.05],
+      [1.2, 0.85, 0.75],
+      8
+    ),
     // A wider pale bead behind the eye, centred a hair BEHIND the pupil. `eye()`'s own sclera is
     // sized for a songbird's head; on a skull this size the pupil lands hard against its rim and
     // the eye reads as a fixed sideways glance. Widening the pale and centring it on the pupil

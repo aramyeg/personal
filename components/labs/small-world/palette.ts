@@ -180,4 +180,18 @@ export const PALETTE = {
   yetiCoat: '#93A9C0', // mid blue-grey yeti body — the value that separates it from a lilac sky
   yetiCoatDeep: '#6F869F', // shadowed coat, under yetiCoat
   strataShade: '#7C4A2E', // deep shadowed canyon rock, darker than rust — a backdrop for a pangolin
+  // Task 58 — the four polish items.
+  //
+  // TACK is its own family rather than a reuse of camelSaddle. The halter was drawn in the
+  // terracotta saddle tone with a brass ring at the muzzle end, and at reading size a warm red bar
+  // with a bright yellow tip sitting at the corner of a mouth reads as a lit cigarette. Leather is
+  // COOL and low-chroma next to camelHide's warm tan, which is what makes a strap read as worked
+  // stock lying on an animal rather than as a marking painted into it.
+  tackLeather: '#736C60', // cool greyed harness leather — the halter and the calf's collar
+  tackLeatherDeep: '#464036', // the strap's own shadow line, and the keeper at the junction
+  // The winter drift's hollows were frostShadow, which sits about nine points of lightness off
+  // yetiCoat in nearly the same hue — so the snow the yetis stand in read as a grey BOULDER of the
+  // same value as the animal on it. The drift now runs bright, with this one deep tone kept for the
+  // wind hollows and the contact pocket directly under each figure.
+  driftShade: '#5E7488', // deep blue snow shadow, clearly below the yeti's coat
 } as const

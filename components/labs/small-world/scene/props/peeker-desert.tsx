@@ -1,6 +1,18 @@
 import { PALETTE } from '../../palette'
 import type { ClayPart } from './clay-kit'
-import { cone, cyl, eye, facing, leafFan, limb, sph, strand, tufts, type V3 } from './peeker-kit'
+import {
+  cone,
+  cyl,
+  eye,
+  facing,
+  leafFan,
+  limb,
+  rockBed,
+  sph,
+  strand,
+  tufts,
+  type V3,
+} from './peeker-kit'
 import type { PeekerPiece } from './peeker-cast'
 
 /**
@@ -27,8 +39,11 @@ import type { PeekerPiece } from './peeker-cast'
  *     eye line — with fronds that ARC rather than radiate, so they climb nearly vertically out of
  *     the crown and only turn inward once they are over the head. The band of open sky between the
  *     head's silhouette and the nearest blade is the whole fix; without it she wears a headdress.
- *  3. THE LEDGE IS A SHELF, NOT A CONTAINER. A flat top line, a front face, and nothing curling
- *     back toward the viewer. As a closed box with a lip all round it read as a trough she stood in.
+ *  3. THE LEDGE IS A SHELF, NOT A CONTAINER — and it is ROCK, not joinery. A level top line, a face
+ *     that falls away below it, and nothing curling back toward the viewer: as a closed box with a
+ *     lip all round it read as a trough she stood in, and as constant-section slabs it read as
+ *     stacked planks. It is built from irregular lozenges now (see `LEDGE`), the same rebuild that
+ *     took the canyon's strata off a wooden crate.
  *  4. THE TWO ANIMALS ARE DIFFERENT DRAWINGS. Same vocabulary, different pose — see `CALF`.
  */
 
@@ -99,24 +114,58 @@ function frond(
 // --- the ledge --------------------------------------------------------------
 
 /**
- * A flat-faced stone block: a four-sided prism running along X, rolled 45° about its own axis so it
- * presents a FLAT top and a FLAT front instead of the ridge a raw 4-segment cylinder gives. The
- * straight top line is the whole point — it is what separates a quarried shelf from one more dune,
- * and it is the line the drift and the grass are allowed to break.
- *
- * The roll couples the two cross-section axes, so `half` is the block's half-height AND half-depth.
- */
-function slab(w: number, half: number, color: string, at: V3): ClayPart {
-  const r = half * Math.SQRT2
-  return cyl(r, r, w, color, at, [Math.PI / 4, 0, Math.PI / 2], undefined, 4)
-}
-
-/**
  * Top of the shelf. Everything that stands on the stone is placed against this one number, and so
  * is everything BEHIND it: the shelf is what crops the camel's neck, so its height sets how much
  * neck is on screen at all. Raised from −0.62 for exactly that reason.
  */
 const LEDGE_TOP = -0.54
+
+/**
+ * The shelf's top course and the beds under it, as `[x, y, halfHeight, halfLength, dip, colour]` —
+ * the canyon's strata vocabulary, brought across because the desert had the canyon's exact defect.
+ *
+ * Both corners were first drawn as constant-section slabs: two straight parallel edges, a butt
+ * joint at each end and one dark bedding line ruled across the face. That is how DECKING is drawn,
+ * and both read as it — the canyon as a wooden crate, this as a stack of planks. Rock is irregular
+ * along its length, so each course here is a run of lozenges with no two sharing a thickness, a dip
+ * or an end, and the courses below the shelf each stop at a different x so the stack falls away
+ * toward the frame's outer corner instead of walling it.
+ *
+ * What does NOT vary is the shelf's TOP: every top-course lozenge is seated at `LEDGE_TOP − hy`, so
+ * the line the camel is cropped against and the props are seated on stays level. All of the
+ * irregularity is spent on the underside, which is the edge the eye actually reads.
+ */
+const LEDGE: readonly (readonly [number, number, number, number, number, string])[] = [
+  // the outer lozenge's run is set by DRESS_REACH.out, not by taste: it is the piece of the corner
+  // that reaches furthest toward the frame edge
+  [-0.545, LEDGE_TOP - 0.058, 0.058, 0.13, 0.05, PALETTE.sinter],
+  [-0.35, LEDGE_TOP - 0.075, 0.075, 0.155, -0.03, PALETTE.sinterDeep],
+  [-0.11, LEDGE_TOP - 0.086, 0.086, 0.175, 0.03, PALETTE.sinter],
+  [0.13, LEDGE_TOP - 0.066, 0.066, 0.15, -0.05, PALETTE.stone],
+  [0.36, LEDGE_TOP - 0.08, 0.08, 0.165, 0.04, PALETTE.dune],
+  [0.58, LEDGE_TOP - 0.052, 0.052, 0.13, -0.06, PALETTE.sinterDeep],
+]
+
+/**
+ * The bands cut into the shelf's FACE, laid on the shelf body as relief rather than stacked as free
+ * masses. That distinction is the whole difference between rock and rubble: the ink contour traces
+ * whatever the outermost primitive is, so a course of lozenges with sky between them is drawn as a
+ * row of separately outlined pebbles. Sat on a continuous body they are bedding planes on one wall.
+ */
+const LEDGE_BEDS: readonly (readonly [number, number, number, number, number, string])[] = [
+  [-0.5, -0.712, 0.055, 0.17, -0.04, PALETTE.stone],
+  [-0.2, -0.735, 0.07, 0.18, 0.04, PALETTE.sinterDeep],
+  [0.13, -0.716, 0.05, 0.16, -0.05, PALETTE.dune],
+  [0.42, -0.726, 0.06, 0.16, 0.05, PALETTE.stone],
+
+  [-0.48, -0.858, 0.062, 0.175, 0.05, PALETTE.sinterDeep],
+  // the one pale mineral band, low and well clear of the animal
+  [-0.14, -0.875, 0.05, 0.155, -0.03, PALETTE.goldSand],
+  [0.2, -0.855, 0.065, 0.185, 0.04, PALETTE.stone],
+
+  [-0.42, -0.998, 0.07, 0.185, -0.04, PALETTE.sinterDeep],
+  [-0.02, -1.012, 0.055, 0.17, 0.03, PALETTE.stone],
+]
 
 export function desertDressing(): ClayPart[] {
   const parts: ClayPart[] = [
@@ -161,16 +210,26 @@ export function desertDressing(): ClayPart[] {
   )
 
   // The ledge: a shelf, not a container. It runs off the outer edge, crops past the bottom of the
-  // frame, shows one lit top course over one shaded face, and crumbles away at its inner end — the
-  // camel stands BEHIND it, so it is also what crops her neck and hides her shoulder.
+  // frame, and crumbles away at its inner end — the camel stands BEHIND it, so it is also what
+  // crops her neck and hides her shoulder.
+  //
+  // The shelf's BODY: one continuous mass carrying the whole face, so the courses below the
+  // caprock are relief on a wall rather than a row of loose stones with sky between them.
+  // its reach is bounded on three sides at once: DRESS_REACH.out on the left and the bottom of the
+  // dressing envelope below, both with the ink hull's own 0.012 on top
+  parts.push(sph(0.34, PALETTE.sinterDeep, [-0.05, -0.865, 0.02], [1.85, 0.92, 0.42], 12))
+
+  // The top course is given real depth in Z and pushed forward, because it is a SURFACE: the drift,
+  // the grass and the camel's own crop line are all seated on it. It also stands PROUD of the body
+  // in Z, so the caprock overhangs the beds the way a resistant bed does.
+  for (const spec of LEDGE) parts.push(rockBed(spec, 0.26, 0.1))
+  for (const spec of LEDGE_BEDS) parts.push(rockBed(spec, 0.05, 0.2))
+
+  // Two fallen stones where the shelf breaks up at its inner end — the same job the canyon's talus
+  // does: a bare cut edge reads as a slice, stone along it reads as a slope.
   parts.push(
-    slab(1.04, 0.27, PALETTE.sinterDeep, [-0.15, LEDGE_TOP - 0.27, 0]),
-    // the sunlit top course, set proud of the face so IT owns the shelf's top line
-    slab(1.04, 0.08, PALETTE.sinter, [-0.15, LEDGE_TOP - 0.055, 0.22]),
-    // one bedding plane across the face; a second course would start reading as masonry
-    slab(1.0, 0.032, PALETTE.stone, [-0.17, LEDGE_TOP - 0.25, 0.26]),
-    slab(0.2, 0.12, PALETTE.sinterDeep, [0.44, LEDGE_TOP - 0.18, 0.1]),
-    slab(0.16, 0.085, PALETTE.sinter, [0.52, LEDGE_TOP - 0.32, 0.14])
+    sph(0.075, PALETTE.stone, [0.6, -0.73, 0.24], [1.25, 0.82, 0.9], 7),
+    sph(0.055, PALETTE.sinter, [0.46, -0.83, 0.22], [1.2, 0.85, 0.9], 6)
   )
 
   // Sand drifted ONTO the shelf and spilling over its front lip — the one thing allowed to break
@@ -504,16 +563,92 @@ function camelHead(pose: CamelPose): ClayPart[] {
 }
 
 /**
- * The halter: a noseband wrapping the muzzle, a cheekpiece running back off it and a brass ring at
- * the junction. The band alone reads as a painted stripe — it is the strap ANGLING away from it
- * that makes the thing tack rather than markings. Worked stock only: the calf runs bare.
+ * The halter: a noseband WRAPPING the muzzle, a cheekpiece running back off it across the cheek,
+ * and a small keeper where the two meet. Worked stock only: the calf runs bare (it wears a collar
+ * instead — see `calfCord`).
+ *
+ * THIS IS THE CIGARETTE FIX. The previous halter was a straight `camelSaddle` bar laid across the
+ * muzzle with a `honey` bead at its outer end, and a thin cheekpiece pushed so far into +Z that the
+ * skull swallowed it. What survived to the screen was therefore one warm-red horizontal stroke with
+ * a bright yellow tip, sitting at the corner of a mouth: a lit cigarette, and the single loudest
+ * misread left in the set. Three things change, and each answers one half of that read.
+ *
+ *  1. COLOUR. Leather is cool and low-chroma (`tackLeather`) where camelSaddle is a terracotta only
+ *     a shade off the hide's own family. A cool strap on a warm animal is worked stock; a warm one
+ *     is a marking. The brass is gone entirely — nothing on this animal is allowed to be a small
+ *     bright spot at the end of a bar.
+ *  2. SHAPE. The band is no longer a straight bar but an ARC, authored in the muzzle's own
+ *     cross-section plane and swept from over the bridge round to under the jaw, so it visibly
+ *     passes around a solid rather than lying on one. A strap that wraps cannot read as a cylinder
+ *     held in a mouth.
+ *  3. THE CHEEKPIECE CARRIES. It is nearly half again as thick, and it is pulled forward in Z to
+ *     sit proud of the cheek instead of inside it, so the second strap — the thing that makes the
+ *     first one tack rather than a painted stripe — actually draws.
  */
 function halter(pose: CamelPose): ClayPart[] {
-  const bandX = pose.bridgeX + 0.045
+  // The muzzle's run, and the perpendicular the band is authored about. Derived from the pose's own
+  // muzzle chain so a re-proportioned head carries its tack with it rather than shedding it.
+  const axX = pose.lipX - 0.11
+  const axY = 0.17 - 0.42
+  const axLen = Math.hypot(axX, axY)
+  const ux = -axY / axLen
+  const uy = axX / axLen
+  const cx = (pose.bridgeX + pose.noseX) / 2
+  const cy = 0.305
+
+  /**
+   * A point on the band: `a` radians round the muzzle's own cross-section, where 0 is the top of the
+   * bridge and π/2 faces the camera, at radius `r` and slid `back` along the muzzle. The band's own
+   * radius has to be the muzzle's half-width at this station — a band wider than the solid it goes
+   * round stands off it at both ends, and a strap standing off a muzzle at both ends is a ROD
+   * passing through the animal's head, which is what the first attempt at this drew.
+   */
+  const at = (a: number, r: number, back: number): V3 => {
+    const along = r * Math.cos(a)
+    return [
+      cx + ux * along - (axX / axLen) * back,
+      cy + uy * along - (axY / axLen) * back,
+      // the muzzle is flatter than it is tall, so the wrap is an ellipse rather than a circle
+      r * Math.sin(a) * 0.82,
+    ]
+  }
+  const roll: V3 = [0, 0, Math.atan2(axY, axX)]
+
   return [
-    cyl(0.026, 0.026, 0.28, PALETTE.camelSaddle, [bandX, 0.3, 0.02], [0, 0, -0.658], [1, 1, 0.8], 8),
-    cyl(0.019, 0.021, 0.3, PALETTE.camelSaddle, [0.205, 0.425, 0.11], [0, 0, 1.468], [1, 1, 0.8], 6),
-    sph(0.03, PALETTE.honey, [bandX + 0.065, 0.4, 0.09], [1, 1, 0.6], 8),
+    // The noseband, as a broad CUFF rather than a strap.
+    //
+    // This is the second thing the muzzle's geometry forces, after the radius. The band's plane is
+    // square to the muzzle, and the muzzle runs across the SCREEN — so that plane is nearly edge-on
+    // to the camera and a wrap of any radius projects to a line. A thin line laid across a mouth is
+    // a stick whatever colour it is painted, and drawn as a thin wrap this halter read as one. A
+    // camel's nosepiece is a wide flat plate of leather; drawn at its real width it projects as a
+    // BAND with area, which is a thing lying on the muzzle rather than a thing crossing it.
+    {
+      ...sph(0.145, PALETTE.tackLeather, [cx, cy, 0], [0.4, 1, 0.9], 12),
+      rot: roll,
+    },
+    // The band's own dark rim, set a hair behind it so it shows all round the plate rather than
+    // only at its ends — the pangolin's seam disc, borrowed. Drawn as two edge lines instead, the
+    // arcs ran past the plate at both poles and put a spike on the muzzle's silhouette.
+    {
+      ...sph(0.153, PALETTE.tackLeatherDeep, [cx, cy, -0.012], [0.46, 1, 0.88], 12),
+      rot: roll,
+    },
+    // The cheekpiece: a SHORT stub climbing off the band's upper-rear corner and tucking in behind
+    // the cheek, where the skull swallows it. Short on purpose — the previous one ran the width of
+    // the face and lined up with the band in projection, so the two together drew one long straight
+    // stroke from the eye to the mouth, which is the stick read this fix exists to remove. A halter
+    // needs the second strap to exist and to leave at an angle; it does not need to be followed.
+    ...limb(
+      [at(0.5, 0.142, -0.04), [0.28, 0.44, 0.1], [0.225, 0.5, 0.02]],
+      0.032,
+      0.026,
+      PALETTE.tackLeather,
+      7
+    ),
+    // the keeper: dark, flat and small, on the band's near face, where the old brass ring was
+    // bright, round and at the muzzle's end
+    sph(0.028, PALETTE.tackLeatherDeep, at(1.35, 0.15, -0.012), [1, 1.2, 0.5], 8),
   ]
 }
 
@@ -538,18 +673,24 @@ function camelJaw(pose: CamelPose): ClayPart[] {
 }
 
 /**
- * A woven cord low on the calf's neck: the pair's terracotta note without the mother's tack. The
+ * A woven collar low on the calf's neck — the young animal's answer to its mother's halter. The
  * band is rolled to sit SQUARE across the neck's centreline, since a collar cut at any other angle
  * reads as a stripe painted on the hide.
+ *
+ * In the same leather family as `halter`, and for the same reason: this was a `camelSaddle` band
+ * with a `honey` bead on it, which put the adult's exact red-bar-with-a-bright-tip signature onto
+ * the calf's neck. Two thin bands rather than one thick one is what reads as woven.
  */
 function calfCord(pose: CamelPose): ClayPart[] {
   // seated mid-neck, where the run is widest on screen and the band has something to wrap
   const at = pose.neck[pose.neck.length - 2]
   const below = pose.neck[pose.neck.length - 3]
   const roll = -Math.atan2(at[0] - below[0], at[1] - below[1])
+  const along = (d: number): V3 => [at[0] + (at[0] - below[0]) * d, at[1] + (at[1] - below[1]) * d, at[2]]
   return [
-    cyl(0.072, 0.074, 0.034, PALETTE.camelSaddle, at, [0, 0, roll], [1, 1, 0.86], 8),
-    sph(0.026, PALETTE.honey, [at[0] + 0.045, at[1] - 0.022, at[2] + 0.062], [1, 1, 0.6], 6),
+    cyl(0.073, 0.075, 0.026, PALETTE.tackLeather, along(-0.09), [0, 0, roll], [1, 1, 0.86], 8),
+    cyl(0.072, 0.074, 0.022, PALETTE.tackLeatherDeep, along(0.06), [0, 0, roll], [1, 1, 0.86], 8),
+    sph(0.024, PALETTE.tackLeatherDeep, [at[0] + 0.046, at[1] - 0.018, at[2] + 0.06], [1, 1.1, 0.5], 6),
   ]
 }
 
