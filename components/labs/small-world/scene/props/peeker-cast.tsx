@@ -5,61 +5,82 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { useClayRamp } from '../toon-ramp'
 import { buildMergedClay, type ClayPart } from './clay-kit'
-import type { PeekerKind } from './peeker-stage'
+import { INK_WIDTH, flipY, inflateClay, type V3 } from './peeker-kit'
+import { canyonDressing, canyonPieces } from './peeker-canyon'
+import { deltaDressing, deltaPieces } from './peeker-delta'
+import { desertDressing, desertPieces } from './peeker-desert'
+import { jungleDressing, junglePieces } from './peeker-jungle'
+import { springDressing, springPieces } from './peeker-spring'
+import { winterDressing, winterPieces } from './peeker-winter'
+import type { PeekerBiome, PeekerKind, Vdir } from './peeker-stage'
 
 /**
- * Task 53 — the CHECKPOINT PEEKER cast: ten clay characters, two per checkpoint, that lean
- * in from the top corners while a chapter's panel is up.
+ * Task 56 — assembly for the checkpoint mascots: which pieces a character is made of, how its one
+ * idle gesture moves them, and how a piece becomes a draw call.
  *
- * Same discipline as the terrain wildlife: every figure is a handful of clay primitives baked
- * into ONE merged vertex-coloured geometry per moving piece (buildMergedClay + the shared toon
- * ramp), so a whole character costs 1–3 draw calls and shades exactly like the world below.
- *
- * AUTHORING CONVENTION — all figures are written facing +X (toward the middle of the frame)
- * and are reflected for the right-hand corner by `facing(-1, …)`, which flips x offsets and the
- * two Euler components that live in the reflected planes. Reflecting the PLACEMENT rather than
- * applying a negative scale keeps every normal outward-facing, so the toon bands never invert.
- *
- * Local space: +Y up, +Z toward the camera, origin at the figure's read centre. Everything is
- * authored ~1 unit tall so the rig's single uniform scale IS the figure's world height, and the
- * envelope the clearance benches use (PEEKER_FIGURE_BOX) is measured back off this geometry
- * rather than assumed — see the bounding-box suite in peeker-cast.test.ts.
+ * The art itself lives one file per biome (`peeker-jungle.tsx` and friends) so each corner
+ * composition can be read and revised on its own; this module only knows how to put them on
+ * screen. Every piece is a handful of clay primitives baked into ONE merged vertex-coloured
+ * geometry under the shared toon ramp, so a whole character costs two or three draws and shades
+ * exactly like the world below it — plus, unlike the world, an ink contour (see `inflateClay`).
  */
 
-// --- primitive helpers ------------------------------------------------------
+export type PeekerSlot = 'body' | 'a' | 'b' | 'c'
 
-type V3 = [number, number, number]
+/** One merged mesh of a figure, the joint it hangs from, and whether it carries an ink contour. */
+export type PeekerPiece = { slot: PeekerSlot; at: V3; parts: ClayPart[]; ink?: boolean }
 
-const sph = (r: number, color: string, pos: V3, scl?: V3, seg = 10): ClayPart => ({
-  geo: new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)),
-  color,
-  pos,
-  scl,
-})
+/** `a`/`b` are hinged pieces (wing, jaw, tail); `c` is a whole-body deformer (the pangolin ball). */
+export type PeekerLimbs = { a: THREE.Group | null; b: THREE.Group | null; c?: THREE.Group | null }
+export type PeekerDrive = { idle: number; unroll: number }
 
-const cone = (r: number, h: number, color: string, pos: V3, rot?: V3, scl?: V3, seg = 8): ClayPart => ({
-  geo: new THREE.ConeGeometry(r, h, seg),
-  color,
-  pos,
-  rot,
-  scl,
-})
-
-const cyl = (rTop: number, rBot: number, h: number, color: string, pos: V3, rot?: V3, seg = 8): ClayPart => ({
-  geo: new THREE.CylinderGeometry(rTop, rBot, h, seg),
-  color,
-  pos,
-  rot,
-})
+/** Each biome's art: its two characters and the set dressing they are staged in. */
+type BiomeArt = {
+  pieces: (kind: PeekerKind, dir: 1 | -1) => PeekerPiece[]
+  dressing: () => ClayPart[]
+}
 
 /**
- * Reflect a part list across the YZ plane. A rotation R reflects to M·R·M with M = diag(-1,1,1),
- * which for every Euler component is (rx, −ry, −rz) — and because that identity distributes over
- * a composition it holds whatever order the Euler is applied in. All the primitives used here are
- * themselves symmetric about YZ, so flipping the placement flips the figure.
+ * One entry per biome. The cast in peeker-stage.ts guarantees a biome only ever asks for its own
+ * two kinds, so each `pieces` narrows to that pair.
  */
-export function facing(d: 1 | -1, parts: ClayPart[]): ClayPart[] {
-  if (d === 1) return parts
+const ART: Record<PeekerBiome, BiomeArt> = {
+  spring: {
+    pieces: (kind, dir) => springPieces(kind === 'robin' ? 'robin' : 'bluebird', dir),
+    dressing: springDressing,
+  },
+  jungle: {
+    pieces: (kind, dir) => junglePieces(kind === 'cockatoo' ? 'cockatoo' : 'macaw', dir),
+    dressing: jungleDressing,
+  },
+  delta: {
+    pieces: (kind, dir) => deltaPieces(kind === 'crocPeek' ? 'crocPeek' : 'crocGape', dir),
+    dressing: deltaDressing,
+  },
+  desert: {
+    pieces: (kind, dir) => desertPieces(kind === 'camelCalf' ? 'camelCalf' : 'camelAdult', dir),
+    dressing: desertDressing,
+  },
+  canyon: {
+    pieces: (kind, dir) => canyonPieces(kind === 'pangolinSmall' ? 'pangolinSmall' : 'pangolinBig', dir),
+    dressing: canyonDressing,
+  },
+  winter: {
+    pieces: (kind, dir) => winterPieces(kind === 'yetiSmall' ? 'yetiSmall' : 'yetiBig', dir),
+    dressing: winterDressing,
+  },
+}
+
+export function peekerPieces(biome: PeekerBiome, kind: PeekerKind, dir: 1 | -1): PeekerPiece[] {
+  return ART[biome].pieces(kind, dir)
+}
+
+export function peekerDressing(biome: PeekerBiome, dir: 1 | -1, vdir: Vdir): ClayPart[] {
+  const parts = ART[biome].dressing()
+  return flipY(vdir, dir === 1 ? parts : mirrorX(parts))
+}
+
+function mirrorX(parts: ClayPart[]): ClayPart[] {
   return parts.map((p) => ({
     ...p,
     pos: p.pos ? ([-p.pos[0], p.pos[1], p.pos[2]] as V3) : undefined,
@@ -67,505 +88,68 @@ export function facing(d: 1 | -1, parts: ClayPart[]): ClayPart[] {
   }))
 }
 
-/**
- * Shift a whole part list up in local space. The panel cards crop each figure at roughly its
- * own mid-height, so a character only reads if its FACE lives in the top band of its bounding
- * box — this is the per-figure trim that puts it there, paired with the same offset on the
- * figure's limb joint.
- */
-function raise(dy: number, parts: ClayPart[]): ClayPart[] {
-  return parts.map((p) => ({
-    ...p,
-    pos: [p.pos?.[0] ?? 0, (p.pos?.[1] ?? 0) + dy, p.pos?.[2] ?? 0] as V3,
-  }))
+// --- rendering --------------------------------------------------------------
+
+function useMerged(parts: ClayPart[]): THREE.BufferGeometry {
+  const geo = useMemo(() => buildMergedClay(parts), [parts])
+  useEffect(() => () => geo.dispose(), [geo])
+  return geo
 }
 
-const Y_UP = new THREE.Vector3(0, 1, 0)
-const _q = new THREE.Quaternion()
-const _e = new THREE.Euler()
-
-/** Euler that stands a +Y-axis primitive up along `dir` — used to lay scales over a sphere. */
-function alignY(dir: THREE.Vector3): V3 {
-  _q.setFromUnitVectors(Y_UP, dir)
-  _e.setFromQuaternion(_q, 'XYZ')
-  return [_e.x, _e.y, _e.z]
+function useInk(geo: THREE.BufferGeometry, on: boolean): THREE.BufferGeometry | null {
+  const ink = useMemo(() => (on ? inflateClay(geo, INK_WIDTH) : null), [geo, on])
+  useEffect(() => () => ink?.dispose(), [ink])
+  return ink
 }
 
-// --- jungle: exotic birds, wings open ---------------------------------------
+/** A merged clay mesh with its optional ink contour behind it. */
+function ClayPiece({ parts, ink }: { parts: ClayPart[]; ink?: boolean }) {
+  const ramp = useClayRamp()
+  const geo = useMerged(parts)
+  const inkGeo = useInk(geo, ink === true)
+  return (
+    <>
+      <mesh geometry={geo}>
+        <meshToonMaterial vertexColors gradientMap={ramp} />
+      </mesh>
+      {inkGeo ? (
+        <mesh geometry={inkGeo}>
+          <meshBasicMaterial color={PALETTE.ink} side={THREE.BackSide} />
+        </mesh>
+      ) : null}
+    </>
+  )
+}
 
-/** Scarlet macaw: hooked ink beak, bare cheek patch, a long open wing and streaming tail. */
-function macawBody(d: 1 | -1): ClayPart[] {
-  return facing(d, [
-    // plump body + shoulders, sitting below and behind the head. The scarlet macaw's yellow and
-    // teal wing shoulder is doing real work here: an unbroken red mass is what the left-hand
-    // bird collapsed into at reading size, and these two blocks give it internal contrast.
-    sph(0.25, PALETTE.parrotBody, [-0.11, -0.15, -0.02], [1, 1.15, 0.95], 12),
-    sph(0.15, PALETTE.honey, [-0.16, -0.04, 0.1], [1.15, 0.75, 0.7], 10),
-    sph(0.12, PALETTE.parrotWing, [-0.24, -0.17, 0.09], [1.1, 0.8, 0.6], 10),
-    // long tail feathers streaming down and out of frame
-    cone(0.055, 0.42, PALETTE.parrotWing, [-0.24, -0.4, -0.03], [0, 0, 0.45], [1, 1, 0.45]),
-    cone(0.045, 0.34, PALETTE.honey, [-0.31, -0.36, 0.03], [0, 0, 0.62], [1, 1, 0.45]),
-    // head
-    sph(0.19, PALETTE.parrotBody, [0.09, 0.2, 0], [1, 1.06, 0.98], 12),
-    // bare cheek patch — the macaw's signature pale face
-    sph(0.13, PALETTE.sky, [0.18, 0.18, 0.1], [0.8, 1, 0.55], 10),
-    sph(0.058, PALETTE.ink, [0.21, 0.21, 0.145], undefined, 8),
-    sph(0.018, PALETTE.sky, [0.24, 0.25, 0.17], undefined, 6),
-    // heavy hooked beak: dark upper mandible over a pale hook
-    cone(0.095, 0.24, PALETTE.ink, [0.25, 0.13, 0.02], [0, 0, -2.5], [1, 1, 0.8]),
-    sph(0.05, PALETTE.sky, [0.29, 0.03, 0.02], [1, 0.8, 0.9], 8),
-    // crest feathers fanning back off the crown
-    cone(0.04, 0.16, PALETTE.honey, [0.02, 0.35, 0.02], [0, 0, 0.25]),
-    cone(0.038, 0.2, PALETTE.parrotBody, [-0.06, 0.35, -0.01], [0, 0, 0.5]),
-    cone(0.032, 0.15, PALETTE.parrotWing, [-0.14, 0.3, 0.02], [0, 0, 0.8]),
-  ])
+/** A biome's set dressing: one merged draw (plus its contour), static under the rig's motion. */
+export function PeekerDressing({ biome, dir, vdir }: { biome: PeekerBiome; dir: 1 | -1; vdir: Vdir }) {
+  const parts = useMemo(() => peekerDressing(biome, dir, vdir), [biome, dir, vdir])
+  return <ClayPiece parts={parts} ink />
 }
 
 /**
- * The macaw's open wing, authored about its shoulder joint so the rig can flutter it. It arcs
- * steeply UP rather than straight out to the side: at the frame's corner a horizontal wing is
- * simply off-screen, while a raised one breaks the skyline above the bird's own head.
- */
-function macawWing(d: 1 | -1): ClayPart[] {
-  return facing(d, [
-    sph(0.2, PALETTE.parrotBody, [-0.08, 0.09, 0], [1.1, 0.65, 0.8], 10),
-    sph(0.18, PALETTE.parrotWing, [-0.19, 0.24, 0.01], [1.2, 0.5, 0.7], 10),
-    sph(0.15, PALETTE.honey, [-0.27, 0.4, 0.02], [1.1, 0.45, 0.6], 10),
-    cone(0.055, 0.3, PALETTE.parrotWing, [-0.33, 0.56, 0], [0, 0, -0.42], [1, 1, 0.4]),
-    cone(0.05, 0.26, PALETTE.parrotBody, [-0.24, 0.55, 0.03], [0, 0, -0.2], [1, 1, 0.4]),
-  ])
-}
-
-/** Cockatoo: pale cream plumage, a big fanned crest and a blushing cheek. */
-function cockatooBody(d: 1 | -1): ClayPart[] {
-  const crest: ClayPart[] = []
-  for (let i = 0; i < 5; i++) {
-    const f = i / 4
-    crest.push(
-      cone(0.036 - f * 0.008, 0.26 - f * 0.06, i % 2 === 0 ? PALETTE.petal : PALETTE.honey, [
-        0.08 - f * 0.24,
-        0.38 + (1 - Math.abs(f - 0.35) * 1.6) * 0.06,
-        0.02 - f * 0.02,
-      ], [0, 0, 0.15 + f * 0.85])
-    )
-  }
-  return facing(d, [
-    sph(0.24, PALETTE.sky, [-0.1, -0.16, -0.02], [1, 1.15, 0.95], 12),
-    // soft under-tail wisps
-    cone(0.05, 0.3, PALETTE.sky, [-0.22, -0.4, -0.02], [0, 0, 0.5], [1, 1, 0.5]),
-    cone(0.04, 0.24, PALETTE.honey, [-0.29, -0.35, 0.03], [0, 0, 0.7], [1, 1, 0.5]),
-    sph(0.185, PALETTE.sky, [0.09, 0.2, 0], [1, 1.04, 0.98], 12),
-    // blushing cheek + wide dark eye
-    sph(0.085, PALETTE.petal, [0.19, 0.15, 0.11], [0.9, 1, 0.4], 8),
-    sph(0.048, PALETTE.ink, [0.19, 0.23, 0.135], undefined, 8),
-    sph(0.016, PALETTE.sky, [0.21, 0.255, 0.16], undefined, 6),
-    // stubby hooked bill
-    cone(0.085, 0.19, PALETTE.stone, [0.24, 0.13, 0.02], [0, 0, -2.5], [1, 1, 0.85]),
-    ...crest,
-  ])
-}
-
-function cockatooWing(d: 1 | -1): ClayPart[] {
-  return facing(d, [
-    sph(0.19, PALETTE.sky, [-0.08, 0.08, 0], [1.1, 0.66, 0.8], 10),
-    sph(0.17, PALETTE.petal, [-0.18, 0.23, 0.01], [1.2, 0.5, 0.7], 10),
-    sph(0.14, PALETTE.bluebell, [-0.26, 0.38, 0.02], [1.1, 0.44, 0.6], 10),
-    cone(0.052, 0.28, PALETTE.honey, [-0.31, 0.54, 0], [0, 0, -0.45], [1, 1, 0.4]),
-    cone(0.046, 0.24, PALETTE.petal, [-0.22, 0.53, 0.03], [0, 0, -0.22], [1, 1, 0.4]),
-  ])
-}
-
-// --- delta: crocodiles ------------------------------------------------------
-
-/** Ridge of scutes marching along a snout. */
-function scutes(d: 1 | -1, from: number, to: number, n: number, y: number, color: string): ClayPart[] {
-  const out: ClayPart[] = []
-  for (let i = 0; i < n; i++) {
-    const f = i / (n - 1)
-    const x = from + (to - from) * f
-    const s = 0.05 - f * 0.016
-    out.push(cone(s, s * 1.5, color, [x * d, y - f * 0.012, 0.05], undefined, [1, 1, 0.7]))
-    out.push(cone(s, s * 1.5, color, [x * d, y - f * 0.012, -0.05], undefined, [1, 1, 0.7]))
-  }
-  return out
-}
-
-/** A row of little snow teeth along a jaw line. */
-function teeth(d: 1 | -1, from: number, to: number, n: number, y: number, down: boolean): ClayPart[] {
-  const out: ClayPart[] = []
-  for (let i = 0; i < n; i++) {
-    const f = i / (n - 1)
-    const x = (from + (to - from) * f) * d
-    const s = 0.026 - f * 0.008
-    const rot: V3 = down ? [Math.PI, 0, 0] : [0, 0, 0]
-    out.push(cone(s, s * 2.4, PALETTE.snow, [x, y, 0.062], rot, undefined, 6))
-    out.push(cone(s, s * 2.4, PALETTE.snow, [x, y, -0.062], rot, undefined, 6))
-  }
-  return out
-}
-
-/** The big croc: a long snout hooked over the corner with its jaws hanging open. */
-function crocSkull(d: 1 | -1, big: boolean): ClayPart[] {
-  const k = big ? 1 : 0.86
-  return [
-    ...facing(d, [
-      // cranial dome + brow
-      sph(0.2 * k, PALETTE.crocHide, [-0.16, 0.04, 0], [1.05, 0.8, 1.05], 12),
-      // long upper snout
-      sph(0.155 * k, PALETTE.crocHide, [0.14, 0.03, 0], [2.35, 0.62, 0.86], 12),
-      sph(0.1 * k, PALETTE.crocHide, [0.4, 0.015, 0], [1.1, 0.62, 0.82], 10),
-      // nostril bumps at the tip
-      sph(0.03, PALETTE.crocRidge, [0.46, 0.06, 0.04], undefined, 6),
-      sph(0.03, PALETTE.crocRidge, [0.46, 0.06, -0.04], undefined, 6),
-      // periscope eye turrets
-      sph(0.075 * k, PALETTE.crocHide, [-0.16, 0.16, 0.1], undefined, 10),
-      sph(0.075 * k, PALETTE.crocHide, [-0.16, 0.16, -0.1], undefined, 10),
-      sph(0.05, PALETTE.honey, [-0.15, 0.21, 0.105], [1, 0.85, 1], 8),
-      sph(0.05, PALETTE.honey, [-0.15, 0.21, -0.105], [1, 0.85, 1], 8),
-      sph(0.028, PALETTE.ink, [-0.13, 0.24, 0.115], [0.55, 1.5, 0.55], 6),
-      sph(0.028, PALETTE.ink, [-0.13, 0.24, -0.115], [0.55, 1.5, 0.55], 6),
-      // heavy shoulders trailing off the outer edge
-      sph(0.26 * k, PALETTE.crocHide, [-0.38, -0.14, 0], [1.05, 0.85, 1.05], 12),
-    ]),
-    ...scutes(d, -0.34, 0.34, 6, 0.16, PALETTE.crocRidge),
-    ...teeth(d, 0.0, 0.42, 5, -0.035, true),
-  ]
-}
-
-/** The matching lower jaw, authored about the hinge so the rig can work the gape. */
-function crocJaw(d: 1 | -1, big: boolean): ClayPart[] {
-  const k = big ? 1 : 0.86
-  return [
-    ...facing(d, [
-      sph(0.14 * k, PALETTE.crocHide, [0.3, -0.03, 0], [2.2, 0.5, 0.8], 12),
-      sph(0.11 * k, PALETTE.crocBelly, [0.3, -0.07, 0], [2.1, 0.34, 0.62], 10),
-      sph(0.09 * k, PALETTE.crocHide, [0.56, -0.035, 0], [1.1, 0.5, 0.75], 10),
-    ]),
-    ...teeth(d, 0.16, 0.56, 5, 0.02, false),
-  ]
-}
-
-/**
- * A clawed forefoot slung across the small croc's chest. Kept short and tucked against the
- * jaw: an earlier version reached down past the frame's visible band and read as a green post
- * rather than a foot.
- */
-function crocClaw(d: 1 | -1): ClayPart[] {
-  return facing(d, [
-    cyl(0.05, 0.062, 0.14, PALETTE.crocHide, [-0.02, -0.02, 0], [0, 0, 0.9]),
-    sph(0.075, PALETTE.crocHide, [0.06, -0.08, 0.02], [1.25, 0.65, 1], 10),
-    cone(0.02, 0.075, PALETTE.snow, [0.12, -0.1, 0.05], [0, 0, -2.1], undefined, 6),
-    cone(0.02, 0.075, PALETTE.snow, [0.13, -0.11, 0], [0, 0, -2.1], undefined, 6),
-    cone(0.02, 0.075, PALETTE.snow, [0.12, -0.1, -0.05], [0, 0, -2.1], undefined, 6),
-  ])
-}
-
-// --- desert: camels ---------------------------------------------------------
-
-/** Camel head on a long neck rising from the corner; the calf is the same build, rounder. */
-function camelHead(d: 1 | -1, calf: boolean): ClayPart[] {
-  const k = calf ? 0.86 : 1
-  const parts: ClayPart[] = [
-    // neck sweeping down and out of frame — the axis runs from the base UP to the jaw, so the
-    // z rotation is negative; the positive tilt read as a detached bar leaning the wrong way
-    cyl(0.11 * k, 0.17 * k, 0.62, PALETTE.camelHide, [-0.11, -0.16, -0.01], [0, 0, -0.5]),
-    // head + long muzzle
-    sph(0.16 * k, PALETTE.camelHide, [0.06, 0.16, 0], [1.35, 1, 0.95], 12),
-    sph(0.105 * k, PALETTE.camelHideDeep, [calf ? 0.24 : 0.29, 0.1, 0], [1.25, 0.9, 0.88], 10),
-    // a terracotta halter strap across the muzzle — the family's one warm accent, and the
-    // only place on a peeking camel where a saddle blanket would actually be in frame
-    cyl(0.115 * k, 0.115 * k, 0.05, PALETTE.camelSaddle, [calf ? 0.22 : 0.27, 0.11, 0], [0, 0, -1.45]),
-    sph(0.022, PALETTE.ink, [calf ? 0.31 : 0.36, 0.15, 0.045], undefined, 6),
-    sph(0.022, PALETTE.ink, [calf ? 0.31 : 0.36, 0.15, -0.045], undefined, 6),
-    // heavy-lidded eyes with lashes
-    sph(0.055 * k, PALETTE.camelHide, [0.13, 0.26, 0.1], [1, 0.9, 0.75], 8),
-    sph(0.055 * k, PALETTE.camelHide, [0.13, 0.26, -0.1], [1, 0.9, 0.75], 8),
-    sph(0.04, PALETTE.ink, [0.16, 0.26, 0.115], undefined, 8),
-    sph(0.04, PALETTE.ink, [0.16, 0.26, -0.115], undefined, 8),
-    sph(0.014, PALETTE.sky, [0.19, 0.29, 0.13], undefined, 6),
-    sph(0.014, PALETTE.sky, [0.19, 0.29, -0.1], undefined, 6),
-    cone(0.014, 0.07, PALETTE.ink, [0.18, 0.32, 0.115], [0, 0, -0.7], undefined, 5),
-    cone(0.014, 0.07, PALETTE.ink, [0.18, 0.32, -0.115], [0, 0, -0.7], undefined, 5),
-    // ears
-    cone(0.035, 0.09, PALETTE.camelHide, [-0.04, 0.32, 0.09], [0.4, 0, -0.25], undefined, 6),
-    cone(0.035, 0.09, PALETTE.camelHide, [-0.04, 0.32, -0.09], [-0.4, 0, -0.25], undefined, 6),
-  ]
-  // the calf keeps a scruffy forelock; the adult gets a smooth crown
-  if (calf) {
-    parts.push(
-      cone(0.03, 0.11, PALETTE.camelHideDeep, [0.04, 0.33, 0.03], [0, 0, -0.3], undefined, 6),
-      cone(0.028, 0.1, PALETTE.camelHideDeep, [-0.01, 0.34, -0.02], [0, 0, 0.25], undefined, 6),
-      cone(0.026, 0.09, PALETTE.camelHideDeep, [0.09, 0.31, -0.04], [0, 0, -0.6], undefined, 6)
-    )
-  }
-  return facing(d, parts)
-}
-
-/** Lower jaw, hinged at the back of the head so it can work side to side as a chew. */
-function camelJaw(d: 1 | -1, calf: boolean): ClayPart[] {
-  const k = calf ? 0.86 : 1
-  return facing(d, [
-    sph(0.09 * k, PALETTE.camelHide, [0.14, -0.02, 0], [1.9, 0.62, 0.85], 10),
-    sph(0.075 * k, PALETTE.camelHideDeep, [calf ? 0.26 : 0.31, -0.03, 0], [1.15, 0.6, 0.8], 10),
-  ])
-}
-
-// --- canyon: pangolins ------------------------------------------------------
-
-/**
- * An armoured ball: a core sphere under a golden-angle spiral of big overlapping scale plates.
- * Plate count stays low and plate size high so the silhouette reads as ARMOUR at corner scale —
- * a fine spiral just turns into fuzz.
- */
-function pangolinShell(r: number, n: number): ClayPart[] {
-  const parts: ClayPart[] = [sph(r * 0.9, PALETTE.pangolinScaleDeep, [0, 0, 0], undefined, 14)]
-  const dir = new THREE.Vector3()
-  // Three tones in rotation, not two: at corner scale a light/mid/deep cycle is what makes the
-  // plates read as overlapping armour instead of dissolving into one brown lump.
-  const tones = [PALETTE.pangolinScaleLight, PALETTE.pangolinScale, PALETTE.pangolinScaleDeep]
-  for (let i = 0; i < n; i++) {
-    const y = 1 - (2 * i + 1) / n
-    const ring = Math.sqrt(Math.max(0, 1 - y * y))
-    const phi = i * 2.399963229728653
-    dir.set(ring * Math.cos(phi), y, ring * Math.sin(phi))
-    // plates on the upper back are the ones on the skyline, so give them the extra size
-    const back = 0.9 + 0.25 * Math.max(0, y)
-    parts.push(
-      cone(
-        r * 0.6 * back,
-        r * 0.5 * back,
-        tones[i % 3],
-        [dir.x * r * 0.8, dir.y * r * 0.8, dir.z * r * 0.8],
-        alignY(dir),
-        [1, 1, 0.62],
-        5
-      )
-    )
-  }
-  return parts
-}
-
-/** Head + forelimb, authored about the neck joint: tucked inside the ball, out when unrolled. */
-function pangolinHead(d: 1 | -1, k: number): ClayPart[] {
-  return facing(d, [
-    cyl(0.09 * k, 0.12 * k, 0.18 * k, PALETTE.pangolinScale, [0.05 * k, 0.02 * k, 0], [0, 0, -1.15]),
-    // long wedge head — the snout is the whole silhouette read
-    sph(0.1 * k, PALETTE.clayPath, [0.2 * k, 0.05 * k, 0], [1.6, 0.85, 0.9], 10),
-    cone(0.06 * k, 0.2 * k, PALETTE.clayPath, [0.36 * k, 0.0 * k, 0], [0, 0, -1.72], undefined, 7),
-    sph(0.028, PALETTE.ink, [0.19 * k, 0.11 * k, 0.07 * k], undefined, 7),
-    sph(0.028, PALETTE.ink, [0.19 * k, 0.11 * k, -0.07 * k], undefined, 7),
-    sph(0.01, PALETTE.sky, [0.21 * k, 0.13 * k, 0.1 * k], undefined, 6),
-    // little ear flaps + a clawed forefoot slung underneath
-    sph(0.034, PALETTE.pangolinScaleDeep, [0.09 * k, 0.13 * k, 0.08 * k], [0.6, 1, 1], 6),
-    sph(0.034, PALETTE.pangolinScaleDeep, [0.09 * k, 0.13 * k, -0.08 * k], [0.6, 1, 1], 6),
-    cyl(0.045 * k, 0.055 * k, 0.17 * k, PALETTE.pangolinScale, [0.08 * k, -0.15 * k, 0.06 * k], [0, 0, 0.5]),
-    cone(0.024, 0.1, PALETTE.sinter, [0.16 * k, -0.23 * k, 0.06 * k], [0, 0, -2.2], undefined, 5),
-    cone(0.024, 0.1, PALETTE.sinter, [0.15 * k, -0.24 * k, 0.11 * k], [0, 0, -2.2], undefined, 5),
-  ])
-}
-
-/** Plated tail, authored about its root: curled over the ball, trailing out when unrolled. */
-function pangolinTail(d: 1 | -1, k: number): ClayPart[] {
-  const parts: ClayPart[] = []
-  for (let i = 0; i < 5; i++) {
-    const f = i / 4
-    const s = (0.11 - f * 0.055) * k
-    parts.push(sph(s, i % 2 === 0 ? PALETTE.pangolinScale : PALETTE.pangolinScaleDeep, [-(0.08 + f * 0.34) * k, -f * 0.06 * k, 0], [1, 0.72, 0.85], 8))
-  }
-  return facing(d, parts)
-}
-
-// --- winter: yetis ----------------------------------------------------------
-
-/**
- * Shaggy fur silhouette: a ring of big tufts breaking the outline of a head/shoulder mass.
- * Few and large on purpose — at corner scale a fine fringe turns to noise, while half a dozen
- * chunky spikes read as fur from across the room.
- */
-function shag(r: number, center: V3, n: number, color: string, from = 0.15, to = 1.0): ClayPart[] {
-  const parts: ClayPart[] = []
-  for (let i = 0; i < n; i++) {
-    const a = Math.PI * (from + (to - from) * (i / (n - 1)))
-    const len = r * (0.52 + 0.18 * Math.sin(i * 2.1))
-    parts.push(
-      cone(r * 0.34, len, color, [center[0] + Math.cos(a) * r * 0.98, center[1] + Math.sin(a) * r * 0.98, center[2] - 0.02], [0, 0, a - Math.PI / 2], [1, 1, 0.72], 6)
-    )
-  }
-  return parts
-}
-
-/**
- * The yeti: the face is the whole job at this size, so it is built like a mask — a wide pale
- * muzzle plate, a heavy brow, and eyes big enough to read as eyes rather than as two dots.
- */
-function yetiBody(d: 1 | -1, big: boolean): ClayPart[] {
-  const k = big ? 1 : 0.85
-  const fur = big ? PALETTE.yetiFur : PALETTE.hareFur
-  return facing(d, [
-    // shoulder mass sinking off the outer edge
-    sph(0.29 * k, fur, [-0.26, -0.3, -0.04], [1.2, 0.95, 1], 12),
-    ...shag(0.29 * k, [-0.26, -0.3, -0.04], 5, fur, 0.95, 1.8),
-    // head, slightly narrow so the shag reads as an outline rather than a fringe on a ball.
-    // The face is built SYMMETRICALLY about the head's x centre and pushed forward in +Z: the
-    // rig's inward yaw then turns the whole mask toward the middle of the frame.
-    sph(0.27 * k, fur, [0.05, 0.18, 0], [1, 1.04, 0.92], 14),
-    ...shag(0.28 * k, [0.05, 0.18, 0], 8, fur, 0.04, 1.22),
-    // two big ear tufts hooking off the sides — the silhouette's signature
-    cone(0.075 * k, 0.2 * k, fur, [-0.14, 0.35, 0.02], [0, 0, 0.6], undefined, 6),
-    cone(0.07 * k, 0.18 * k, fur, [0.24, 0.33, 0.02], [0, 0, -0.55], undefined, 6),
-    // wide cool muzzle plate across the lower face
-    sph(0.21 * k, PALETTE.yetiMuzzle, [0.05, 0.07, 0.14], [1.05, 0.85, 0.62], 12),
-    // heavy brow shelf over the eyes
-    sph(0.23 * k, fur, [0.05, 0.31, 0.08], [1, 0.44, 0.62], 10),
-    sph(0.05 * k, PALETTE.frostShadow, [-0.05, 0.26, 0.17], [1.6, 0.5, 0.6], 8),
-    sph(0.05 * k, PALETTE.frostShadow, [0.15, 0.26, 0.17], [1.6, 0.5, 0.6], 8),
-    // big dark eyes with a glint
-    sph(0.075 * k, PALETTE.ink, [-0.05, 0.19, 0.2], [0.9, 1, 0.85], 10),
-    sph(0.075 * k, PALETTE.ink, [0.15, 0.19, 0.2], [0.9, 1, 0.85], 10),
-    sph(0.026, PALETTE.sky, [-0.02, 0.23, 0.24], undefined, 6),
-    sph(0.026, PALETTE.sky, [0.18, 0.23, 0.24], undefined, 6),
-    // broad open grin with two blunt tusks
-    sph(0.11 * k, PALETTE.ink, [0.05, 0.0, 0.2], [1.2, 0.5, 0.45], 10),
-    cone(0.032, 0.09, PALETTE.snow, [-0.02, 0.04, 0.23], undefined, undefined, 6),
-    cone(0.032, 0.09, PALETTE.snow, [0.12, 0.04, 0.23], undefined, undefined, 6),
-    // snow crusted on the crown
-    sph(0.12 * k, PALETTE.snow, [0.05, 0.39, 0.03], [1.35, 0.4, 0.9], 10),
-  ])
-}
-
-/** A shaggy arm hooked over the frame edge, authored about the shoulder. */
-function yetiArm(d: 1 | -1, big: boolean): ClayPart[] {
-  const k = big ? 1 : 0.85
-  const fur = big ? PALETTE.yetiFur : PALETTE.hareFur
-  return facing(d, [
-    cyl(0.1 * k, 0.12 * k, 0.3 * k, fur, [0.03, -0.1, 0], [0, 0, -0.4]),
-    ...shag(0.13 * k, [0.06, -0.16, 0], 4, fur, 1.2, 2.0),
-    sph(0.13 * k, fur, [0.14, -0.26, 0.02], [1.05, 0.9, 1], 10),
-    sph(0.1 * k, PALETTE.yetiMuzzle, [0.18, -0.28, 0.08], [0.9, 0.9, 0.7], 8),
-    sph(0.04 * k, PALETTE.yetiMuzzle, [0.22, -0.19, 0.09], undefined, 6),
-    sph(0.04 * k, PALETTE.yetiMuzzle, [0.25, -0.25, 0.07], undefined, 6),
-    sph(0.04 * k, PALETTE.yetiMuzzle, [0.25, -0.32, 0.05], undefined, 6),
-  ])
-}
-
-// --- figure assembly --------------------------------------------------------
-
-/** `a` and `b` are the hinged pieces (wing/jaw/head, tail/claw); `c` is a whole-body deformer
- *  (only the pangolins use it, to swell their ball out into a body as they unfurl). */
-export type PeekerLimbs = { a: THREE.Group | null; b: THREE.Group | null; c?: THREE.Group | null }
-export type PeekerDrive = { idle: number; unroll: number }
-export type PeekerSlot = 'body' | 'a' | 'b' | 'c'
-
-/** One merged mesh of a figure, and the joint it hangs from. */
-export type PeekerPiece = { slot: PeekerSlot; at: V3; parts: ClayPart[] }
-
-/**
- * Per-figure LIFT (in figure-heights). The frame's visible band for a peeker runs from roughly
- * its own mid-height to a little past its crown, so every character is trimmed upward until its
- * face is inside that band. Tuned by capture — the camels needed none, the crocodiles most.
- */
-const LIFT = { macaw: 0.07, cockatoo: 0.05, croc: 0.11, camel: 0.02, pangolin: 0.06, yeti: -0.05 }
-
-/**
- * Every figure's whole build, as DATA rather than as JSX.
- *
- * This is what lets `PEEKER_FIGURE_RADIUS` be a measured fact instead of a hopeful constant:
- * peeker-cast.test.ts calls this, merges each piece, sweeps the gesture range, and asserts the
- * real vertex extent fits inside the radius the clearance benches are built on. Both benches
- * rest on that number, so it must not be taken on trust.
- */
-export function peekerPieces(kind: PeekerKind, dir: 1 | -1): PeekerPiece[] {
-  switch (kind) {
-    case 'macaw':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.macaw, macawBody(dir)) },
-        { slot: 'a', at: [-0.12 * dir, 0.08 + LIFT.macaw, 0.06], parts: macawWing(dir) },
-      ]
-    case 'cockatoo':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.cockatoo, cockatooBody(dir)) },
-        { slot: 'a', at: [-0.11 * dir, 0.06 + LIFT.cockatoo, 0.06], parts: cockatooWing(dir) },
-      ]
-    case 'crocGape':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.croc, crocSkull(dir, true)) },
-        { slot: 'a', at: [-0.18 * dir, -0.02 + LIFT.croc, 0], parts: crocJaw(dir, true) },
-      ]
-    case 'crocPeek':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.croc, crocSkull(dir, false)) },
-        { slot: 'a', at: [-0.18 * dir, -0.02 + LIFT.croc, 0], parts: crocJaw(dir, false) },
-        { slot: 'b', at: [0.1 * dir, -0.12 + LIFT.croc, 0.14], parts: crocClaw(dir) },
-      ]
-    case 'camelAdult':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.camel, camelHead(dir, false)) },
-        { slot: 'a', at: [-0.02 * dir, 0.1 + LIFT.camel, 0], parts: camelJaw(dir, false) },
-      ]
-    case 'camelCalf':
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.camel, camelHead(dir, true)) },
-        { slot: 'a', at: [-0.02 * dir, 0.1 + LIFT.camel, 0], parts: camelJaw(dir, true) },
-      ]
-    case 'pangolinBig':
-    case 'pangolinSmall': {
-      const big = kind === 'pangolinBig'
-      const k = big ? 1 : 0.82
-      // The shell stays centred on the figure's origin so the roll-in spins about the ball's own
-      // middle; the lift rides on the whole figure via the ball, and the joints sit on its
-      // equator so the head and tail unfurl into the band the frame actually shows.
-      return [
-        { slot: 'c', at: [0, 0, 0], parts: raise(LIFT.pangolin, pangolinShell(0.36 * k, big ? 15 : 12)) },
-        { slot: 'a', at: [0.25 * k * dir, 0.03 * k + LIFT.pangolin, 0.08], parts: pangolinHead(dir, k) },
-        { slot: 'b', at: [-0.25 * k * dir, 0.02 * k + LIFT.pangolin, -0.02], parts: pangolinTail(dir, k) },
-      ]
-    }
-    case 'yetiBig':
-    case 'yetiSmall': {
-      const big = kind === 'yetiBig'
-      return [
-        { slot: 'body', at: [0, 0, 0], parts: raise(LIFT.yeti, yetiBody(dir, big)) },
-        { slot: 'a', at: [-0.18 * dir, -0.1 + LIFT.yeti, 0.14], parts: yetiArm(dir, big) },
-      ]
-    }
-  }
-}
-
-/**
- * Static roll baked onto a figure's root. Only the small crocodile uses it: the two crocodiles
- * share one build, so the cocked head (plus the barely-there chomp and the forefoot) is what
- * keeps the pair from reading as one animal at two scales.
- */
-export function peekerRootTilt(kind: PeekerKind, dir: 1 | -1): number {
-  return kind === 'crocPeek' ? -0.26 * dir : 0
-}
-
-/**
- * One figure: each piece merged to a single vertex-coloured draw under the shared toon ramp,
- * with the hinged pieces wired into the rig's limb refs by slot. Geometries are built once per
- * (kind, dir) and disposed when the figure goes away.
+ * One character: each piece merged to a single draw, with the hinged pieces wired into the rig's
+ * limb refs by slot. Geometries are built once per (biome, kind, dir) and disposed with the figure.
  */
 export function PeekerFigure({
+  biome,
   kind,
   limbs,
   dir,
 }: {
+  biome: PeekerBiome
   kind: PeekerKind
   limbs: MutableRefObject<PeekerLimbs>
   dir: 1 | -1
 }) {
-  const ramp = useClayRamp()
-  const pieces = useMemo(() => peekerPieces(kind, dir), [kind, dir])
-  const geos = useMemo(() => pieces.map((p) => buildMergedClay(p.parts)), [pieces])
-  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos])
-
+  const pieces = useMemo(() => peekerPieces(biome, kind, dir), [biome, kind, dir])
   return (
     <group rotation={[0, 0, peekerRootTilt(kind, dir)]}>
       {pieces.map((piece, i) =>
         piece.slot === 'body' ? (
-          <mesh key={piece.slot} geometry={geos[i]} position={piece.at}>
-            <meshToonMaterial vertexColors gradientMap={ramp} />
-          </mesh>
+          <group key={piece.slot} position={piece.at}>
+            <ClayPiece parts={piece.parts} ink={inked(piece, i)} />
+          </group>
         ) : (
           <group
             key={piece.slot}
@@ -574,9 +158,7 @@ export function PeekerFigure({
               limbs.current[piece.slot as 'a' | 'b' | 'c'] = g
             }}
           >
-            <mesh geometry={geos[i]}>
-              <meshToonMaterial vertexColors gradientMap={ramp} />
-            </mesh>
+            <ClayPiece parts={piece.parts} ink={inked(piece, i)} />
           </group>
         )
       )}
@@ -584,15 +166,36 @@ export function PeekerFigure({
   )
 }
 
+/**
+ * How many of a figure's pieces carry an ink contour. Each one is a second draw call, and the
+ * three-piece characters (the crocodile with its forefoot, the pangolin with head and tail) would
+ * otherwise put a checkpoint at +16 against a +14 budget. Two is enough: the contour earns its
+ * cost on the masses that carry the silhouette, and a tail or a foot tucked against the body gains
+ * almost nothing from being outlined.
+ */
+export const INK_PIECE_LIMIT = 2
+
+function inked(piece: PeekerPiece, index: number): boolean {
+  return piece.ink === true && index < INK_PIECE_LIMIT
+}
+
+/**
+ * Static roll baked onto a figure's root — what keeps a pair that shares one build from reading as
+ * the same animal at two scales.
+ */
+export function peekerRootTilt(kind: PeekerKind, dir: 1 | -1): number {
+  return kind === 'crocPeek' ? -0.2 * dir : 0
+}
+
 // --- per-kind gesture + spec ------------------------------------------------
 
 /**
- * Every character owns exactly ONE idle gesture, driven by the dwell fraction (see
- * peeker-stage.ts) and scaled by presence so it eases in with the entrance and out with the
- * exit — smooth, continuous, and nothing in the flicker family.
+ * Every character owns exactly ONE idle gesture, driven by the panel's scroll dwell (NOT the
+ * arrival clock — what a character does while you read stays a pure function of scroll position)
+ * and scaled by presence so it eases in with the entrance and out with the exit.
  *
- * `dir` is threaded in because a hinge that swings a jaw open for a left-hand figure has to
- * swing the other way once the figure is reflected: rotations about Y and Z flip sign.
+ * `dir` is threaded in because a hinge that swings a wing up for a left-hand figure has to swing
+ * the other way once the figure is reflected: rotations about Y and Z both flip sign.
  */
 export type PeekerSpec = {
   apply: (limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1) => void
@@ -606,18 +209,26 @@ export type PeekerSpec = {
 
 /** Wings beat about the shoulder; the body sway does the rest. */
 function applyWing(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
-  if (limbs.a) limbs.a.rotation.z = dir * (0.12 + 0.34 * drive.idle)
+  if (limbs.a) limbs.a.rotation.z = dir * (0.1 + 0.3 * drive.idle)
 }
 
-/** A slow gape: the jaw hangs open and eases shut, never snapping. */
+/**
+ * A slow gape: the jaw hangs open and eases shut, never snapping.
+ *
+ * The sign is NEGATIVE, and that is load-bearing rather than arbitrary. A mandible hinged at the
+ * back of the skull only swings AWAY from the skull when the rotation opposes the direction the
+ * snout points, and these crocodiles lie horizontally with their snouts pointing into the frame.
+ * The first pass used a positive sign, which forced the whole animal to rear up vertically to make
+ * its jaw open at all — and a vertical crocodile reads as a green tube, not a crocodile.
+ */
 function applyJaw(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
-  if (limbs.a) limbs.a.rotation.z = dir * (0.16 + 0.15 * drive.idle)
+  if (limbs.a) limbs.a.rotation.z = -dir * (0.16 + 0.15 * drive.idle)
   if (limbs.b) limbs.b.rotation.z = dir * 0.12 * drive.idle
 }
 
 /** The small croc barely opens — it just works its jaw and taps a claw. */
 function applyChomp(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
-  if (limbs.a) limbs.a.rotation.z = dir * (0.06 + 0.07 * drive.idle)
+  if (limbs.a) limbs.a.rotation.z = -dir * (0.06 + 0.07 * drive.idle)
   if (limbs.b) limbs.b.rotation.z = dir * (-0.1 + 0.18 * drive.idle)
 }
 
@@ -625,8 +236,8 @@ function applyChomp(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
 function applyChew(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
   if (!limbs.a) return
   limbs.a.rotation.z = dir * 0.05 * (0.5 + 0.5 * drive.idle)
-  // dir applies to yaw as well as roll: reflecting a figure negates BOTH Euler y and z, so a
-  // yaw written without it leaves the right-hand animal chewing the wrong way round.
+  // dir applies to yaw as well as roll: reflecting a figure negates BOTH Euler y and z, so a yaw
+  // written without it leaves the right-hand animal chewing the wrong way round.
   limbs.a.rotation.y = dir * 0.09 * drive.idle
 }
 
@@ -640,7 +251,6 @@ function applyUnroll(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void 
     limbs.a.rotation.z = dir * (2.5 - 2.62 * u)
     const s = 0.4 + 0.6 * u
     limbs.a.scale.set(s, s, s)
-    // once out, the snout noses gently up and down (dir for the same reason as applyChew)
     limbs.a.rotation.y = dir * 0.22 * drive.idle * u
   }
   if (limbs.b) {
@@ -651,12 +261,14 @@ function applyUnroll(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void 
   if (limbs.c) limbs.c.scale.set(1 + 0.34 * u, 1 - 0.22 * u, 1 - 0.06 * u)
 }
 
-/** The yeti's arm rocks slowly where it grips the edge. */
+/** The yeti's arm rocks slowly where it grips the branch. */
 function applyArm(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
   if (limbs.a) limbs.a.rotation.z = dir * (-0.08 + 0.22 * drive.idle)
 }
 
 export const PEEKER_SPECS: Record<PeekerKind, PeekerSpec> = {
+  bluebird: { apply: applyWing, cycles: 6, sway: 0.05 },
+  robin: { apply: applyWing, cycles: 5, sway: 0.055 },
   macaw: { apply: applyWing, cycles: 6, sway: 0.05 },
   cockatoo: { apply: applyWing, cycles: 5, sway: 0.055 },
   crocGape: { apply: applyJaw, cycles: 2, sway: 0.03 },
@@ -664,7 +276,7 @@ export const PEEKER_SPECS: Record<PeekerKind, PeekerSpec> = {
   camelAdult: { apply: applyChew, cycles: 4, sway: 0.04 },
   camelCalf: { apply: applyChew, cycles: 5, sway: 0.05 },
   pangolinBig: { apply: applyUnroll, cycles: 2.5, sway: 0.05, rolls: true },
-  pangolinSmall: { apply: applyUnroll, cycles: 3, sway: 0.06, rolls: true },
+  pangolinSmall: { apply: applyUnroll, cycles: 3, sway: 0.055, rolls: true },
   yetiBig: { apply: applyArm, cycles: 2, sway: 0.045 },
-  yetiSmall: { apply: applyArm, cycles: 2.5, sway: 0.06 },
+  yetiSmall: { apply: applyArm, cycles: 2.5, sway: 0.055 },
 }

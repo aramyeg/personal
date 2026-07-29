@@ -152,4 +152,20 @@ export const PALETTE = {
   gradeWinterSky: '#6E7FC2', // ch5 winter — cool blue-violet dusk
   gradeWinterGlow: '#E6E1F5', // pale lilac light off the snow
   gradeWinterCast: '#B3C2EE', // pale periwinkle light
+  // Task 56 — CHECKPOINT MASCOTS. At roughly twice the R14 size the four-band toon ramp leaves a
+  // character's interior almost flat, so each family gets one deeper SHADE tone painted into the
+  // vertex colours (belly, underside, shadowed flank) to carry volume the lighting no longer does.
+  parrotShade: '#A82C22', // deep scarlet under-belly, below parrotBody
+  plumeShade: '#E3D3B4', // warm cream shadow under a cockatoo's pale plumage
+  crocShade: '#3E5733', // shadowed crocodile flank, below crocHide
+  camelShade: '#9A6C34', // shadowed camel underside, below camelHideDeep
+  yetiShade: '#C6D8E4', // shadowed yeti shag, below yetiFur
+  boughSnow: '#FBFDFF', // sunlit snow load on a winter bough (brighter than snow)
+  mangroveBark: '#5A4030', // wet delta mangrove root/trunk — darker than jungleBark
+  mossHang: '#93A86A', // pale hanging swamp moss
+  palmFrond: '#7FA24B', // dry desert palm frond green
+  palmTrunk: '#A9825A', // sun-bleached palm trunk
+  strataDust: '#C98A5E', // canyon strata band, between hoodooRock and hoodooCap
+  palmFrondDeep: '#5E7C39', // shaded olive-khaki palm frond — the desert canopy's recession tone
+  bluebirdShade: '#6F62B8', // deep periwinkle under bluebell (the palette had nothing below it)
 } as const

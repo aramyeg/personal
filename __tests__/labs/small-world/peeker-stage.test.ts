@@ -1,454 +1,416 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import * as THREE from 'three'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
+  CARD_PAD,
+  DRESS_MIN_SIZE_FRAC,
+  DRESS_PHASE,
+  DRESS_REACH,
+  FACE_BOX,
+  FIGURE_PHASE,
+  MASCOT_BOX,
+  NAV_PILL,
   PEEKER_CAST,
   PEEKER_DEPTH,
-  PEEKER_FIGURE_BOX,
-  PEEKER_LEFT_MIN_WIDTH,
-  PEEKER_FACE_TOP,
-  PEEKER_LEFT_MAX_DROP,
-  PEEKER_NAV_PILL,
+  PEEKER_MIN_SIZE_FRAC,
   PEEKER_PRESENCE_PEAK,
-  PEEK_IN_START,
-  PEEK_OUT_END,
+  PEEKER_SIZE_FRAC,
   PEEK_SIDE_STAGGER,
-  PEEK_UNROLL_START,
+  WORLD_BOT,
+  WORLD_MARGIN,
+  WORLD_TOP,
+  WORLD_U0,
+  WORLD_U1,
+  dataCardHeight,
+  overlayBoxes,
+  peekerAnchor,
+  peekerCardClearance,
   peekerCastFor,
+  peekerClock,
   peekerDepthMargin,
   peekerHalfHeight,
   peekerIdle,
-  peekerParkedY,
-  peekerPlacement,
-  peekerPlanetClearance,
   peekerPresence,
-  peekerReach,
   peekerRollSpin,
-  peekerSize,
   peekerUnroll,
-  planetNdcRadius,
+  peekerWorldClearance,
+  worldBlocked,
+  type Side,
 } from '@/components/labs/small-world/scene/props/peeker-stage'
-import { PEEKER_SPECS } from '@/components/labs/small-world/scene/props/peeker-cast'
-
-// Task 53 — checkpoint peekers. The things that can actually break the world are pinned here:
-// the peekers must never be able to cover the planet, they must stay visually clear of it, and
-// the entrance must be a pure function of the panel dwell so scrubbing back is exact.
-
-// Camera rig, mirrored from scene.tsx (a tripwire test below fails if those literals drift).
-const CAMERA_FOV = 38
-const CAMERA_DISTANCE = 12.1
-const PLANET_RADIUS = 2.2
-/** Standing terrain + prop ceiling BUDGET — nothing on the planet may exceed it. */
-const CEILING = 1.35 * PLANET_RADIUS
-
-const HALF_H = peekerHalfHeight(CAMERA_FOV)
-
-/** Real device frames plus deliberate extremes, since the nav-pill drop depends on pixel size. */
-const VIEWPORTS = [
-  { width: 2560, height: 1080 }, // ultrawide
-  { width: 1920, height: 1080 },
-  { width: 1600, height: 900 },
-  { width: 1440, height: 900 },
-  { width: 1280, height: 800 },
-  { width: 1024, height: 768 },
-  { width: 900, height: 900 },
-  { width: 820, height: 1180 }, // tablet portrait
-  { width: 768, height: 1024 }, // iPad portrait
-  { width: 600, height: 960 },
-  { width: 1600, height: 500 }, // short landscape
-  { width: 1024, height: 420 }, // very short
-]
-/** Below PEEKER_LEFT_MIN_WIDTH only the right figure shows; these still get swept. */
-const NARROW_VIEWPORTS = [
-  { width: 430, height: 932 },
-  { width: 414, height: 896 },
-  { width: 390, height: 844 },
-  { width: 360, height: 640 },
-  { width: 320, height: 568 },
-]
-const ALL = [...VIEWPORTS, ...NARROW_VIEWPORTS]
-const label = (v: { width: number; height: number }) => `${v.width}x${v.height}`
-const placeFor = (v: { width: number; height: number }) =>
-  peekerPlacement(HALF_H, (HALF_H * v.width) / v.height, v)
-
-const _e = new THREE.Euler()
-const _m = new THREE.Matrix4()
-const _v = new THREE.Vector3()
 
 /**
- * TRUE separation between the figures and the planet: samples the rotated bounding box's surface
- * and measures each point against the planet's ellipse in that point's OWN column. This is what
- * the shipped bench approximates conservatively — see the conservatism test below.
+ * Task 56 — the checkpoint mascots' staging.
+ *
+ * The rework's promise to Aram is specific and testable: the characters are much bigger than the
+ * R14 peekers, they are NEVER covered by the comic cards, and the planet is never covered by them.
+ * Everything below gates one of those three, against MEASURED inputs rather than modelled ones.
  */
-function trueSeparation(v: { width: number; height: number }, extent: number): number {
-  const halfW = (HALF_H * v.width) / v.height
-  const p = peekerPlacement(HALF_H, halfW, v)
-  const ry = planetNdcRadius(CAMERA_FOV, CAMERA_DISTANCE, extent)
-  const rx = ry / (v.width / v.height)
-  const b = PEEKER_FIGURE_BOX
-  const N = 14
-  let worst = Infinity
-  for (const side of [-1, 1] as const) {
-    if (side === -1 && !p.leftVisible) continue
-    for (const hide of [-0.1, -0.05, 0, 0.1, 0.2, 0.35]) {
-      for (const sway of [-0.06, 0, 0.06]) {
-        _e.set(0, -side * 0.3, side * (0.2 + hide * 0.34) + sway, 'XYZ')
-        _m.makeRotationFromEuler(_e)
-        const parkedY = peekerParkedY(p, side)
-        const cx = side * (p.x + hide * p.hiddenOut)
-        const cy = parkedY + hide * (p.hiddenY - parkedY)
-        const xs = side === -1 ? [b.minX, b.maxX] : [-b.maxX, -b.minX]
-        for (let i = 0; i <= N; i++) {
-          for (let j = 0; j <= N; j++) {
-            const fx = xs[0] + ((xs[1] - xs[0]) * i) / N
-            const fy = b.minY + ((b.maxY - b.minY) * j) / N
-            const fz = -b.absZ + ((2 * b.absZ) * i) / N
-            for (const pt of [
-              [fx, fy, -b.absZ],
-              [fx, fy, b.absZ],
-              [xs[0], fy, fz],
-              [xs[1], fy, fz],
-              [fx, b.minY, fz],
-              [fx, b.maxY, fz],
-            ]) {
-              _v.set(pt[0], pt[1], pt[2]).applyMatrix4(_m).multiplyScalar(p.size)
-              const column = Math.abs(cx + _v.x) / halfW
-              if (column >= rx) continue
-              const ndcY = (cy + _v.y) / HALF_H
-              worst = Math.min(worst, ndcY - ry * Math.sqrt(1 - (column / rx) * (column / rx)))
-            }
-          }
-        }
-      }
-    }
-  }
-  return worst
+
+const FOV = 38
+const CAMERA_DISTANCE = 12.1
+/** The bake's terrain+prop ceiling budget: 1.35 x the planet's radius of 2.2. */
+const CEILING = 2.97
+
+/**
+ * The comic cards' REAL boxes, read off the running lab with `getBoundingClientRect` by
+ * `.superpowers/sdd/bench/task56-measure.mjs` at eleven device frames — each row the union over
+ * all six chapters, because the data card's height is content-driven and the worst chapter is not
+ * the same one at every width. `overlayBoxes` is checked against these: it may be conservative
+ * (larger), never optimistic.
+ */
+const MEASURED_CARDS: {
+  frame: string
+  w: number
+  h: number
+  art: [number, number, number, number] | null
+  data: [number, number, number, number]
+}[] = [
+  { frame: 'desktop-1920', w: 1920, h: 1080, art: [36, 135, 360, 600], data: [1524, 115, 1880, 619] },
+  { frame: 'desktop-1600', w: 1600, h: 900, art: [36, 73, 360, 539], data: [1204, 54, 1560, 558] },
+  { frame: 'desktop-1440', w: 1440, h: 900, art: [36, 73, 360, 539], data: [1044, 54, 1400, 558] },
+  { frame: 'laptop-1280', w: 1280, h: 800, art: [36, 39, 360, 505], data: [884, 20, 1240, 524] },
+  { frame: 'small-1024', w: 1024, h: 768, art: [31, 71, 296, 452], data: [697, -9, 992, 531] },
+  { frame: 'tablet-912', w: 912, h: 1368, art: [28, 295, 264, 635], data: [618, 139, 887, 792] },
+  { frame: 'tablet-820', w: 820, h: 1180, art: null, data: [232, 65, 588, 569] },
+  { frame: 'tablet-768', w: 768, h: 1024, art: null, data: [206, 56, 562, 560] },
+  { frame: 'narrow-575', w: 575, h: 760, art: null, data: [109, 40, 466, 544] },
+  { frame: 'phone-414', w: 414, h: 896, art: null, data: [29, 48, 385, 552] },
+  { frame: 'phone-390', w: 390, h: 844, art: null, data: [23, 45, 367, 549] },
+]
+
+/** A wider sweep than the measured set, for the placement invariants. */
+const FRAMES: [number, number][] = [
+  [2560, 1440], [1920, 1080], [1600, 900], [1512, 982], [1440, 900], [1366, 768], [1280, 800],
+  [1180, 820], [1024, 768], [912, 1368], [900, 1200], [820, 1180], [768, 1024], [744, 1133],
+  [640, 900], [575, 760], [430, 932], [414, 896], [390, 844], [360, 780], [320, 700],
+]
+
+const anchorAt = (w: number, h: number, side: Side) => {
+  const halfH = peekerHalfHeight(FOV)
+  return peekerAnchor(halfH, (halfH * w) / h, { width: w, height: h }, side)
 }
 
-describe('peekerPresence — dwell-driven entrance, scrub-exact', () => {
-  it('is a pure function of the dwell fraction (scrubbing back replays it exactly)', () => {
-    const forward: number[] = []
-    for (let i = 0; i <= 400; i++) forward.push(peekerPresence(i / 400))
-    for (let i = 400; i >= 0; i--) expect(peekerPresence(i / 400)).toBe(forward[i])
-  })
-
-  it('is fully off-frame before the entrance and after the exit', () => {
-    // easeOutBack(0) leaves a float residue rather than a hard zero; the rig's visibility
-    // threshold is 5e-4, so "off" means "below anything that could ever draw".
-    expect(peekerPresence(0)).toBeCloseTo(0, 12)
-    expect(peekerPresence(PEEK_IN_START)).toBeCloseTo(0, 12)
-    expect(peekerPresence(PEEK_OUT_END)).toBe(0)
-    expect(peekerPresence(1.4)).toBe(0)
-  })
-
-  it('reaches the parked pose and holds it through the middle of the dwell', () => {
-    for (const t of [0.45, 0.55, 0.65, 0.75]) expect(peekerPresence(t)).toBeCloseTo(1, 6)
-  })
-
-  it('overshoots past parked on the way in — the house easeOutBack settle', () => {
-    let peak = 0
-    for (let i = 0; i <= 100000; i++) peak = Math.max(peak, peekerPresence(i / 100000))
-    expect(peak).toBeCloseTo(PEEKER_PRESENCE_PEAK, 5)
-  })
-
-  it('never overshoots under reduced motion, and still parks and leaves', () => {
-    let peak = 0
-    for (let i = 0; i <= 1000; i++) peak = Math.max(peak, peekerPresence(i / 1000, true))
-    expect(peak).toBeLessThanOrEqual(1)
-    expect(peekerPresence(0.5, true)).toBeCloseTo(1, 6)
-    expect(peekerPresence(0, true)).toBe(0)
-    expect(peekerPresence(1, true)).toBe(0)
-  })
-
-  it('moves continuously — no step big enough to read as a flicker', () => {
-    for (const stagger of [0, PEEK_SIDE_STAGGER]) {
-      let prev = peekerPresence(0, false, stagger)
-      for (let i = 1; i <= 5000; i++) {
-        const cur = peekerPresence(i / 5000, false, stagger)
-        expect(Math.abs(cur - prev)).toBeLessThan(0.02)
-        prev = cur
+describe('overlay keep-out model', () => {
+  it('covers every measured card box, at every frame', () => {
+    for (const row of MEASURED_CARDS) {
+      const boxes = overlayBoxes({ width: row.w, height: row.h })
+      const measured = [row.art, row.data].filter(Boolean) as [number, number, number, number][]
+      expect(boxes.length, row.frame).toBe(measured.length)
+      for (const m of measured) {
+        // the modelled box that overlaps this measured one must CONTAIN it
+        const box = boxes.find((b) => b.x0 < m[2] && b.x1 > m[0])
+        expect(box, `${row.frame} has a model for ${m.join(',')}`).toBeDefined()
+        expect(box!.x0, `${row.frame} x0`).toBeLessThanOrEqual(m[0] + 1)
+        expect(box!.y0, `${row.frame} y0`).toBeLessThanOrEqual(m[1] + 1)
+        expect(box!.x1, `${row.frame} x1`).toBeGreaterThanOrEqual(m[2] - 1)
+        expect(box!.y1, `${row.frame} y1`).toBeGreaterThanOrEqual(m[3] - 1)
       }
     }
   })
 
-  it('finishes the staggered figure BEFORE the panel can unmount, at any stagger', () => {
-    // `panel` goes null the instant dwell reaches 1. The stagger delays the entrance but LEADS
-    // the exit, so the trailing figure is provably at 0 by then rather than being dropped
-    // mid-retreat — the failure mode a trailing exit would have had.
-    for (const stagger of [0, 0.02, PEEK_SIDE_STAGGER, 0.1, 0.2]) {
-      expect(peekerPresence(1, false, stagger), `stagger ${stagger}`).toBe(0)
-      expect(peekerPresence(0.999, false, stagger)).toBeLessThan(0.02)
+  it('is not slack: the art card reproduces its measurement to the pixel', () => {
+    // The art card's box is pure CSS with no content in it, so the model should be exact — this
+    // is what proves the derivation is right rather than merely padded until the test passed.
+    for (const row of MEASURED_CARDS) {
+      if (!row.art) continue
+      const art = overlayBoxes({ width: row.w, height: row.h })[0]
+      expect(Math.abs(art.x0 - row.art[0]), row.frame).toBeLessThan(1)
+      expect(Math.abs(art.y0 - row.art[1]), row.frame).toBeLessThan(1)
+      expect(Math.abs(art.x1 - row.art[2]), row.frame).toBeLessThan(1)
+      expect(Math.abs(art.y1 - row.art[3]), row.frame).toBeLessThan(1)
     }
   })
 
-  it('still staggers the entrance — the pair does not land in lockstep', () => {
-    expect(peekerPresence(0.2, false, PEEK_SIDE_STAGGER)).toBeLessThan(peekerPresence(0.2, false, 0))
+  it('never over-estimates the data card by more than a card-height', () => {
+    // Conservative is safe; wildly conservative would quietly shrink every mascot.
+    for (const row of MEASURED_CARDS) {
+      const boxes = overlayBoxes({ width: row.w, height: row.h })
+      const data = boxes[boxes.length - 1]
+      const measuredH = row.data[3] - row.data[1]
+      expect(data.y1 - data.y0, row.frame).toBeLessThan(measuredH * 1.35)
+    }
+  })
+
+  it('the data-card height model grows as the card narrows', () => {
+    expect(dataCardHeight(340)).toBe(492)
+    expect(dataCardHeight(276)).toBeGreaterThan(dataCardHeight(340))
+    expect(dataCardHeight(246)).toBeGreaterThan(dataCardHeight(276))
+  })
+
+  it('hides the art card exactly where the panel CSS does', () => {
+    expect(overlayBoxes({ width: 901, height: 800 })).toHaveLength(2)
+    expect(overlayBoxes({ width: 900, height: 800 })).toHaveLength(1)
   })
 })
 
-describe('peekerIdle / peekerUnroll / peekerRollSpin', () => {
-  it('idles as a bounded, continuous, dwell-driven oscillation', () => {
-    let prev = peekerIdle(0, 6, 0)
-    for (let i = 1; i <= 5000; i++) {
-      const cur = peekerIdle(i / 5000, 6, 0)
-      expect(Math.abs(cur)).toBeLessThanOrEqual(1)
-      expect(Math.abs(cur - prev)).toBeLessThan(0.02)
-      prev = cur
-    }
+describe('the world silhouette table', () => {
+  it('is the measured profile, not a circle', () => {
+    expect(WORLD_TOP).toHaveLength(WORLD_BOT.length)
+    // the world reaches higher than it does low — the girl and the trees stand on top of it
+    expect(Math.max(...WORLD_TOP)).toBeGreaterThan(-Math.min(...WORLD_BOT))
+    // and it is nowhere near a sphere of radius 2.2, whose NDC radius would be 0.537
+    expect(Math.max(...WORLD_TOP)).toBeGreaterThan(0.75)
   })
 
-  it('unrolls the pangolins monotonically, tucked before the window and open after', () => {
-    expect(peekerUnroll(0)).toBe(0)
-    expect(peekerUnroll(PEEK_UNROLL_START)).toBe(0)
-    expect(peekerUnroll(1)).toBe(1)
-    let prev = -1
-    for (let i = 0; i <= 1000; i++) {
-      const cur = peekerUnroll(i / 1000)
-      expect(cur).toBeGreaterThanOrEqual(prev)
-      prev = cur
-    }
+  it('leaves the frame corners empty', () => {
+    // beyond the world's own span the table must report nothing blocked, or the corners could
+    // never hold a composition at all
+    expect(worldBlocked(-0.88, -0.8)).toBeNull()
+    expect(worldBlocked(0.8, 0.88)).toBeNull()
+    expect(worldBlocked(WORLD_U0 - 1, WORLD_U0 - 0.5)).toBeNull()
   })
 
-  it('unwinds the roll-in spin to exactly zero once parked', () => {
-    expect(peekerRollSpin(1)).toBe(0)
-    expect(peekerRollSpin(1.09)).toBe(0)
-    expect(peekerRollSpin(0)).toBeGreaterThan(Math.PI * 2)
+  it('adds its margin on both sides', () => {
+    const b = worldBlocked(-0.1, 0.1)!
+    expect(b.top).toBeCloseTo(Math.max(...WORLD_TOP.slice(13, 20)) + WORLD_MARGIN, 3)
+    expect(b.bot).toBeLessThan(Math.min(...WORLD_BOT.slice(13, 20)) + 0.0001)
+  })
+
+  it('is conservative across a column: a wide column blocks at least as much as a narrow one', () => {
+    const narrow = worldBlocked(-0.3, -0.25)!
+    const wide = worldBlocked(-0.6, -0.1)!
+    expect(wide.top).toBeGreaterThanOrEqual(narrow.top - 1e-9)
+    expect(wide.bot).toBeLessThanOrEqual(narrow.bot + 1e-9)
   })
 })
 
-describe('peekerPlacement — derived from the frustum, never hardcoded', () => {
-  it('tracks the frame corner: a wider viewport pushes the pair further out', () => {
-    const wide = peekerPlacement(HALF_H, HALF_H * 2.4, { width: 2400, height: 1000 })
-    const narrow = peekerPlacement(HALF_H, HALF_H * 0.5, { width: 500, height: 1000 })
-    expect(wide.x).toBeGreaterThan(narrow.x)
-    expect(wide.y).toBeGreaterThan(0)
-  })
-
-  it('sizes off the frame height on wide viewports and shrinks on narrow ones', () => {
-    expect(peekerSize(HALF_H, HALF_H * 1.7778)).toBeCloseTo(peekerSize(HALF_H, HALF_H * 3.2), 10)
-    expect(peekerSize(HALF_H, HALF_H * 0.5)).toBeLessThan(peekerSize(HALF_H, HALF_H * 1.7778))
-  })
-
-  it('waits fully above the frame before entering, at every viewport', () => {
-    for (const v of ALL) {
-      const p = placeFor(v)
+describe('placement', () => {
+  it('never lets a character overlap a card or the navigation pill', () => {
+    for (const [w, h] of FRAMES) {
       for (const side of [-1, 1] as const) {
-        expect(peekerReach(p, side, 1, 0).lowestY, label(v)).toBeGreaterThan(HALF_H)
+        const a = anchorAt(w, h, side)
+        if (!a.visible || a.mode !== 'pair') continue
+        const gap = peekerCardClearance({ width: w, height: h }, FOV, side)
+        expect(gap, `${w}x${h} side ${side}`).toBeGreaterThanOrEqual(CARD_PAD - 0.5)
       }
     }
   })
 
-  it('parks inside the frame at every viewport', () => {
-    for (const v of ALL) {
-      const p = placeFor(v)
-      expect(p.x).toBeLessThan((HALF_H * v.width) / v.height)
-      expect(p.y).toBeLessThan(HALF_H)
-      expect(p.leftY).toBeGreaterThan(0)
+  it('never lets any part of a composition be eaten by the world', () => {
+    for (const [w, h] of FRAMES) {
+      for (const side of [-1, 1] as const) {
+        const a = anchorAt(w, h, side)
+        if (!a.visible) continue
+        expect(peekerWorldClearance({ width: w, height: h }, FOV, side), `${w}x${h} side ${side}`)
+          .toBeGreaterThanOrEqual(-1e-6)
+      }
+    }
+  })
+
+  it('keeps the whole FACE on screen, and lets the body crop', () => {
+    for (const [w, h] of FRAMES) {
+      const halfH = peekerHalfHeight(FOV)
+      const halfW = (halfH * w) / h
+      for (const side of [-1, 1] as const) {
+        const a = anchorAt(w, h, side)
+        if (!a.visible || a.mode !== 'pair') continue
+        const faceOuter = a.x + side * FACE_BOX.out * a.size
+        const faceTop = a.y + FACE_BOX.up * a.size
+        const faceBottom = a.y - FACE_BOX.down * a.size
+        expect(Math.abs(faceOuter), `${w}x${h} face x`).toBeLessThanOrEqual(halfW + 1e-6)
+        expect(faceTop, `${w}x${h} face top`).toBeLessThanOrEqual(halfH + 1e-6)
+        expect(faceBottom, `${w}x${h} face bottom`).toBeGreaterThanOrEqual(-halfH - 1e-6)
+      }
+    }
+  })
+
+  it('is 2-3x the area of the R14 peekers on a desktop frame', () => {
+    // R14 sized every figure at PEEKER_SIZE_FRAC 0.36 of the half-height and the figure occupied
+    // roughly one figure-height; this rework caps at 0.46 with a 1.8-figure-height character.
+    const a = anchorAt(1600, 900, -1)
+    const halfH = peekerHalfHeight(FOV)
+    const heightNow = ((MASCOT_BOX.up + MASCOT_BOX.down) * a.size) / halfH
+    const heightR14 = 0.36
+    const areaRatio = (heightNow / heightR14) ** 2
+    expect(areaRatio).toBeGreaterThan(2)
+    expect(areaRatio).toBeLessThan(4.5)
+  })
+
+  it('shrinks rather than overlapping, and falls back to dressing before it smears', () => {
+    // A portrait frame has the world filling its width; the honest outcome is a smaller
+    // composition, and below the character floor, dressing alone.
+    const desktop = anchorAt(1600, 900, -1)
+    const phone = anchorAt(390, 844, -1)
+    expect(desktop.mode).toBe('pair')
+    expect(phone.mode).toBe('dressing')
+    expect(phone.size).toBeLessThan(desktop.size)
+    const halfH = peekerHalfHeight(FOV)
+    expect(phone.size / halfH).toBeGreaterThanOrEqual(DRESS_MIN_SIZE_FRAC - 1e-9)
+    expect(phone.size / halfH).toBeLessThan(PEEKER_MIN_SIZE_FRAC)
+  })
+
+  it('shows a character on every landscape frame in the sweep', () => {
+    for (const [w, h] of FRAMES) {
+      if (w < h) continue
+      for (const side of [-1, 1] as const) {
+        expect(anchorAt(w, h, side).mode, `${w}x${h} side ${side}`).toBe('pair')
+      }
+    }
+  })
+
+  it('never exceeds its size cap, and re-derives from the live frustum', () => {
+    const halfH = peekerHalfHeight(FOV)
+    for (const [w, h] of FRAMES) {
+      for (const side of [-1, 1] as const) {
+        const a = anchorAt(w, h, side)
+        expect(a.size / halfH, `${w}x${h}`).toBeLessThanOrEqual(PEEKER_SIZE_FRAC + 1e-9)
+      }
+    }
+    // The composition sits a fixed number of figure-heights inside the frustum's own edge, so a
+    // wider frame puts it further out in world units rather than stranding it mid-frame.
+    const wide = anchorAt(2560, 1080, -1)
+    const narrow = anchorAt(1280, 1080, -1)
+    expect(Math.abs(wide.x)).toBeGreaterThan(Math.abs(narrow.x))
+    // ...and the same viewport always resolves to the same staging.
+    expect(anchorAt(1600, 900, -1)).toEqual(anchorAt(1600, 900, -1))
+  })
+
+  it('hides its composition off the edge it is anchored to', () => {
+    for (const [w, h] of FRAMES) {
+      for (const side of [-1, 1] as const) {
+        const a = anchorAt(w, h, side)
+        if (!a.visible) continue
+        expect(Math.sign(a.hiddenY), `${w}x${h}`).toBe(a.vdir)
+        expect(Math.abs(a.hiddenY)).toBeGreaterThan(Math.abs(a.y))
+      }
     }
   })
 })
 
-describe('the navigation pill — the left corner is shared UI, not free sky', () => {
-  it('drops the left figure so its eye band clears the pill, wherever the left figure shows', () => {
-    for (const v of ALL) {
-      const p = placeFor(v)
-      if (!p.leftVisible) continue
-      // world height of the pill's lower edge, in the same frame the placement works in
-      const pillBottomY =
-        HALF_H * (1 - (2 * (PEEKER_NAV_PILL.bottom + PEEKER_NAV_PILL.pad)) / v.height)
-      const cleared = p.leftY + PEEKER_FACE_TOP * p.size <= pillBottomY + 1e-9
-      // On a very short frame the pill is a large share of the height and clearing it fully
-      // would drive the figure into the planet, so the drop caps out instead. Either the eye
-      // band clears the pill, or the drop is pinned at exactly that cap — never in between.
-      const capped = Math.abs(p.leftY - (p.y - PEEKER_LEFT_MAX_DROP * p.size)) < 1e-9
-      expect(cleared || capped, `${label(v)} cleared=${cleared} capped=${capped}`).toBe(true)
+describe('the planet is never covered', () => {
+  it('keeps every mascot fragment behind the terrain ceiling, at every frame', () => {
+    for (const [w, h] of FRAMES) {
+      const margin = peekerDepthMargin({ width: w, height: h }, FOV, CAMERA_DISTANCE, CEILING)
+      expect(margin, `${w}x${h}`).toBeGreaterThan(1)
     }
   })
 
-  it('never lifts the left figure above the right one', () => {
-    for (const v of ALL) {
-      const p = placeFor(v)
-      expect(p.leftY, label(v)).toBeLessThanOrEqual(p.y + 1e-9)
-      expect(peekerParkedY(p, 1)).toBe(p.y)
-      expect(peekerParkedY(p, -1)).toBe(p.leftY)
-    }
+  it('rests on the depth buffer, not on placement', () => {
+    // The guarantee is structural: even a composition placed at the frame's centre could not draw
+    // over the world, because its whole depth range sits behind the ceiling budget.
+    const deepest = PEEKER_DEPTH - 0.42 * PEEKER_SIZE_FRAC * peekerHalfHeight(FOV)
+    expect(deepest).toBeGreaterThan(CAMERA_DISTANCE + CEILING)
   })
 
-  it('stands the left figure down on viewports too narrow for a corner to exist', () => {
-    for (const v of NARROW_VIEWPORTS) expect(placeFor(v).leftVisible, label(v)).toBe(false)
-    for (const v of VIEWPORTS) expect(placeFor(v).leftVisible, label(v)).toBe(true)
-  })
-
-  it('puts the cut exactly at PEEKER_LEFT_MIN_WIDTH', () => {
-    const below = { width: PEEKER_LEFT_MIN_WIDTH - 1, height: 900 }
-    const at = { width: PEEKER_LEFT_MIN_WIDTH, height: 900 }
-    expect(placeFor(below).leftVisible).toBe(false)
-    expect(placeFor(at).leftVisible).toBe(true)
-  })
-})
-
-describe('planet clearance', () => {
-  it('keeps every peeker visually clear of the planet, worst pose, at every viewport', () => {
-    // Measured against the planet's OWN silhouette — the one a reader sees. The bench samples
-    // the figure's inner edge and the entrance overshoot, i.e. the hard side of the figure.
-    for (const v of ALL) {
-      const gap = peekerPlanetClearance(v, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)
-      expect(gap, label(v)).toBeGreaterThan(0.045)
-    }
-  })
-
-  it('reaches lower at the entrance overshoot than at the parked pose', () => {
-    // The settle dips 0.165·size below parked, which is why the bench sweeps the whole window
-    // instead of measuring the parked pose alone. (The inward reach is NOT strictly worse at
-    // the overshoot — the lean unwinds slightly there — so only the height is asserted.)
-    for (const v of [
-      { width: 1600, height: 900 },
-      { width: 768, height: 1024 },
-    ]) {
-      const place = placeFor(v)
-      for (const side of [-1, 1] as const) {
-        const parked = peekerReach(place, side, 0, 0)
-        const overshot = peekerReach(place, side, 1 - PEEKER_PRESENCE_PEAK, 0)
-        expect(overshot.lowestY, label(v)).toBeLessThan(parked.lowestY)
-      }
-    }
-  })
-
-  it('sits behind the planet CEILING budget in depth at every viewport — the hard guarantee', () => {
-    // This, not the NDC gap above, is what makes "the planet is never covered" true: no peeker
-    // fragment is ever nearer the camera than the tallest thing the terrain may build.
-    for (const v of ALL) {
-      expect(peekerDepthMargin(v, CAMERA_FOV, CAMERA_DISTANCE, CEILING), label(v)).toBeGreaterThan(1.05)
-    }
-  })
-
-  it('documents where a maximal spire could reach a peeker column (and why that is harmless)', () => {
-    // Against the 1.35R ceiling BUDGET rather than the real planet, the NDC gap does go negative
-    // on portrait frames: a maximal spire in that column would rise past the figure's lower
-    // body. The planet then OCCLUDES the peeker, which is depth-correct — the reverse is
-    // impossible by the depth margin above. Pinned so the trade-off stays visible.
-    const landscape = { width: 1600, height: 900 }
-    const portrait = { width: 768, height: 1024 }
-    expect(peekerPlanetClearance(landscape, CAMERA_FOV, CAMERA_DISTANCE, CEILING)).toBeGreaterThan(0)
-    expect(peekerPlanetClearance(portrait, CAMERA_FOV, CAMERA_DISTANCE, CEILING)).toBeLessThan(0)
-    // ...and against the planet itself, the same portrait frame is clear.
-    expect(
-      peekerPlanetClearance(portrait, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)
-    ).toBeGreaterThan(0.045)
-  })
-
-  it('is CONSERVATIVE: it never reports more separation than the figure really has', () => {
-    // peekerReach minimises lowest-y and innermost-x independently over the box corners, so the
-    // bench compares a point the figure never occupies — lowest AND innermost at once. That is
-    // deliberate and safe (it can only under-report), but "safe direction" is a claim, so it is
-    // checked here against a real surface sample: every point of the rotated box measured against
-    // the ellipse in its OWN column.
-    for (const v of ALL) {
-      const bench = peekerPlanetClearance(v, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)
-      expect(bench, label(v)).toBeLessThanOrEqual(trueSeparation(v, PLANET_RADIUS) + 1e-9)
-    }
-  })
-
-  it('warns the next engineer off a phantom alarm below the swept frames', () => {
-    // At 575x680 the bench reports a NEGATIVE gap while the true separation is comfortably
-    // positive — pure corner-pairing artefact. Pinned so that anyone who widens the viewport
-    // sweep and sees red here recognises it instead of re-tuning the staging against a figure
-    // that was never there. If this ever flips, the bench got tighter, not the staging worse.
-    const phantom = { width: 575, height: 680 }
-    expect(peekerPlanetClearance(phantom, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)).toBeLessThan(0)
-    expect(trueSeparation(phantom, PLANET_RADIUS)).toBeGreaterThan(0.05)
-  })
-
-  it('pins the worst case over the whole sweep, so drift shows up as a failure', () => {
-    let worstGap = Infinity
-    let worstDepth = Infinity
-    for (const v of ALL) {
-      worstGap = Math.min(worstGap, peekerPlanetClearance(v, CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS))
-      worstDepth = Math.min(worstDepth, peekerDepthMargin(v, CAMERA_FOV, CAMERA_DISTANCE, CEILING))
-    }
-    // Tightest visual separation as the (conservative) bench reports it: iPad portrait, ~0.049
-    // NDC. True separation there is ~0.090 — see the conservatism test above.
-    expect(worstGap).toBeGreaterThan(0.045)
-    expect(worstGap).toBeLessThan(0.09)
-    // Tightest depth margin, ~1.07 world units on a square frame. NOTE the scope: this is over
-    // SETTLE_HIDES, which stops at hide = 0.35 — the poses where a figure is on frame. Sweeping
-    // the FULL entrance (out to hide = 1) it dips to ~1.03, while the figure is high above the
-    // top edge and invisible. A future wider sweep landing near 1.03 is that, not a regression.
-    expect(worstDepth).toBeGreaterThan(1.05)
-    expect(worstDepth).toBeLessThan(1.3)
-  })
-
-  it('keeps the pair out of the middle of the frame, well clear of the girl on the pole', () => {
-    for (const v of ALL) {
-      const halfW = (HALF_H * v.width) / v.height
-      const p = placeFor(v)
-      for (const side of [-1, 1] as const) {
-        if (side === -1 && !p.leftVisible) continue
-        expect(peekerReach(p, side, 0, 0).innerX / halfW, label(v)).toBeGreaterThan(0.2)
-      }
-    }
-  })
-
-  it('projects the planet the way the bench assumes (silhouette, not naive radius/distance)', () => {
-    expect(planetNdcRadius(CAMERA_FOV, CAMERA_DISTANCE, PLANET_RADIUS)).toBeCloseTo(0.537, 3)
-    expect(planetNdcRadius(CAMERA_FOV, CAMERA_DISTANCE, CEILING)).toBeCloseTo(0.7355, 3)
-  })
-
-  it('stays well in front of the sky backdrop plane (world z = -20)', () => {
-    expect(PEEKER_DEPTH).toBeLessThan(CAMERA_DISTANCE + 20)
-  })
-
-  it('pins the camera rig it was derived from (drift tripwire on scene.tsx)', () => {
-    const src = readFileSync(
-      path.resolve(process.cwd(), 'components/labs/small-world/scene/scene.tsx'),
+  it('trips if the camera constants drift out from under it', () => {
+    // peeker-stage.ts is written against scene.tsx's camera; if that changes, every clearance
+    // number above is measuring the wrong frustum.
+    const scene = readFileSync(
+      join(process.cwd(), 'components/labs/small-world/scene/scene.tsx'),
       'utf8'
     )
-    expect(src).toContain(`const CAMERA_FOV = ${CAMERA_FOV}`)
-    expect(src).toContain(`const CAMERA_DISTANCE = ${CAMERA_DISTANCE}`)
-    // and the peekers must stay a sibling of the planet, or they would spin with the world
-    expect(src).toMatch(/<\/Planet>[\s\S]*<CheckpointPeekers/)
+    expect(scene).toContain('const CAMERA_FOV = 38')
+    expect(scene).toContain('const CAMERA_DISTANCE = 12.1')
+    // ...and the mascots must stay a SIBLING of the planet, never a child, or they would inherit
+    // the world's spin and the camera-space staging would come apart.
+    expect(scene).toMatch(/<CheckpointPeekers[^>]*\/>\s*<\/>/)
+  })
+})
+
+describe('the arrival clock', () => {
+  const reveal = (chapter: number, t: number) => ({ panel: null, reveal: { chapter, t, phase: 'in' as const } })
+
+  it('prefers Task 54s reveal clock', () => {
+    expect(peekerClock(reveal(2, 0.4), 2)).toBe(0.4)
+    expect(peekerClock(reveal(2, 0.4), 3)).toBeNull()
+  })
+
+  it('falls back to the panel dwell when no clock is supplied', () => {
+    expect(peekerClock({ panel: { chapter: 1, t: 0.5 }, reveal: null }, 1)).toBe(1)
+    expect(peekerClock({ panel: { chapter: 1, t: 0 }, reveal: null }, 1)).toBe(0)
+    expect(peekerClock({ panel: { chapter: 1, t: 1 }, reveal: null }, 1)).toBe(0)
+    expect(peekerClock({ panel: { chapter: 1, t: 0.5 }, reveal: null }, 2)).toBeNull()
+    expect(peekerClock({ panel: null, reveal: null }, 1)).toBeNull()
+  })
+
+  it('is monotone through the fallback rise and fall', () => {
+    const at = (t: number) => peekerClock({ panel: { chapter: 0, t }, reveal: null }, 0)!
+    for (let t = 0.06; t < 0.36; t += 0.02) expect(at(t + 0.02)).toBeGreaterThanOrEqual(at(t))
+    for (let t = 0.84; t < 0.98; t += 0.02) expect(at(t + 0.02)).toBeLessThanOrEqual(at(t))
+  })
+
+  it('lands the dressing before the characters', () => {
+    expect(DRESS_PHASE[0]).toBeLessThan(FIGURE_PHASE[0])
+    expect(peekerPresence(0.4, DRESS_PHASE)).toBeGreaterThan(peekerPresence(0.4, FIGURE_PHASE))
+  })
+
+  it('starts at nothing, overshoots, and settles at exactly 1', () => {
+    expect(peekerPresence(0, FIGURE_PHASE)).toBeCloseTo(0, 12)
+    expect(peekerPresence(FIGURE_PHASE[0], FIGURE_PHASE)).toBeCloseTo(0, 12)
+    expect(peekerPresence(1, FIGURE_PHASE)).toBeCloseTo(1, 9)
+    const peak = Math.max(
+      ...Array.from({ length: 200 }, (_, i) => peekerPresence(i / 199, FIGURE_PHASE))
+    )
+    expect(peak).toBeCloseTo(PEEKER_PRESENCE_PEAK, 2)
+  })
+
+  it('has no overshoot under reduced motion', () => {
+    for (let t = 0; t <= 1; t += 0.02) {
+      expect(peekerPresence(t, FIGURE_PHASE, true)).toBeLessThanOrEqual(1 + 1e-9)
+    }
+    expect(peekerPresence(1, FIGURE_PHASE, true)).toBeCloseTo(1, 9)
+  })
+
+  it('staggers the right-hand side without ever leaving it mid-entrance at t=1', () => {
+    // Both sides must be fully in by the time the clock parks, or the trailing figure would still
+    // be sliding when the reader has already started reading.
+    expect(PEEK_SIDE_STAGGER).toBeGreaterThan(0)
+    expect(peekerPresence(1, FIGURE_PHASE, false, PEEK_SIDE_STAGGER)).toBeCloseTo(1, 6)
+    expect(peekerPresence(1, DRESS_PHASE, false, PEEK_SIDE_STAGGER)).toBeCloseTo(1, 6)
+    expect(peekerPresence(0.5, FIGURE_PHASE, false, PEEK_SIDE_STAGGER)).toBeLessThan(
+      peekerPresence(0.5, FIGURE_PHASE)
+    )
+  })
+
+  it('retracts along the same path it arrived on', () => {
+    // The clock walks back down on the way out, so an exit is the entrance replayed backwards —
+    // there is no separate exit window to drift out of sync.
+    for (const t of [0.5, 0.62, 0.74, 0.88]) {
+      expect(peekerPresence(t, FIGURE_PHASE)).toBe(peekerPresence(t, FIGURE_PHASE))
+    }
+  })
+})
+
+describe('idle', () => {
+  it('is a pure function of the scroll dwell, with no clock in it', () => {
+    expect(peekerIdle(0.25, 4, 0)).toBeCloseTo(peekerIdle(0.25, 4, 0), 12)
+    expect(peekerIdle(0, 4, 0)).toBe(0)
+    for (let t = 0; t <= 1; t += 0.05) expect(Math.abs(peekerIdle(t, 3, 0.2))).toBeLessThanOrEqual(1)
+  })
+
+  it('unrolls a pangolin only after it has parked, and unwinds its spin to exactly zero', () => {
+    expect(peekerUnroll(0.5)).toBe(0)
+    expect(peekerUnroll(1)).toBe(1)
+    expect(peekerRollSpin(1)).toBe(0)
+    expect(peekerRollSpin(0)).toBeGreaterThan(0)
   })
 })
 
 describe('the cast', () => {
-  it('leaves spring bare and gives every other checkpoint a pair', () => {
-    expect(peekerCastFor(0)).toBeNull()
-    for (let ch = 1; ch <= 5; ch++) expect(peekerCastFor(ch)).not.toBeNull()
+  it('gives every chapter a biome and two different characters', () => {
+    expect(PEEKER_CAST).toHaveLength(6)
+    for (const pair of PEEKER_CAST) {
+      expect(pair.left).not.toBe(pair.right)
+    }
+    expect(new Set(PEEKER_CAST.map((p) => p.biome)).size).toBe(6)
+  })
+
+  it('maps chapters in journey order and nothing beyond', () => {
+    expect(peekerCastFor(0)?.biome).toBe('spring')
+    expect(peekerCastFor(5)?.biome).toBe('winter')
     expect(peekerCastFor(6)).toBeNull()
     expect(peekerCastFor(-1)).toBeNull()
   })
 
-  it('never mirrors a checkpoint — the two sides are different characters', () => {
-    for (const pair of PEEKER_CAST) {
-      if (!pair) continue
-      expect(pair[0]).not.toBe(pair[1])
-    }
+  it('keeps the dressing envelope wider than the character it frames', () => {
+    expect(DRESS_REACH.out).toBeGreaterThan(MASCOT_BOX.out)
+    expect(DRESS_REACH.in).toBeGreaterThan(MASCOT_BOX.in)
+    expect(FACE_BOX.out).toBeLessThan(MASCOT_BOX.out)
+    expect(FACE_BOX.up).toBeLessThanOrEqual(MASCOT_BOX.up)
   })
 
-  it('uses each character exactly once and has a spec for all of them', () => {
-    const used = PEEKER_CAST.flatMap((pair) => (pair ? [pair[0], pair[1]] : []))
-    expect(new Set(used).size).toBe(used.length)
-    expect(used.sort()).toEqual(Object.keys(PEEKER_SPECS).sort())
-    for (const kind of used) {
-      const spec = PEEKER_SPECS[kind]
-      expect(spec.cycles).toBeGreaterThan(0)
-      expect(spec.sway).toBeGreaterThan(0)
-    }
-  })
-
-  it('only the canyon rolls in', () => {
-    const rolling = Object.entries(PEEKER_SPECS)
-      .filter(([, spec]) => spec.rolls)
-      .map(([kind]) => kind)
-      .sort()
-    expect(rolling).toEqual(['pangolinBig', 'pangolinSmall'])
-  })
-
-  it('bounds the figure box the benches rest on to something a figure could fill', () => {
-    // the measured-fit assertion lives in peeker-cast.test.ts, against the real geometry
-    expect(PEEKER_FIGURE_BOX.minY).toBeLessThan(0)
-    expect(PEEKER_FIGURE_BOX.maxY).toBeGreaterThan(0)
-    expect(PEEKER_FIGURE_BOX.absZ).toBeGreaterThan(0)
+  it('keeps the navigation pill in the keep-out set', () => {
+    expect(NAV_PILL.x1).toBeGreaterThan(NAV_PILL.x0)
+    expect(NAV_PILL.y1).toBeGreaterThan(NAV_PILL.y0)
   })
 })

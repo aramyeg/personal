@@ -1,321 +1,375 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import * as THREE from 'three'
+import { PALETTE } from '@/components/labs/small-world/palette'
+import { buildMergedClay, type ClayPart } from '@/components/labs/small-world/scene/props/clay-kit'
 import {
+  INK_PIECE_LIMIT,
   PEEKER_SPECS,
-  facing,
+  peekerDressing,
   peekerPieces,
   peekerRootTilt,
-  type PeekerDrive,
   type PeekerLimbs,
 } from '@/components/labs/small-world/scene/props/peeker-cast'
-import { buildMergedClay } from '@/components/labs/small-world/scene/props/clay-kit'
 import {
-  PEEKER_FIGURE_BOX,
-  PEEKER_MAX_SWAY,
-  peekerIdle,
+  INK_WIDTH,
+  facing,
+  flipY,
+  inflateClay,
+} from '@/components/labs/small-world/scene/props/peeker-kit'
+import {
+  DRESS_REACH,
+  FACE_BOX,
+  MASCOT_BOX,
+  PEEKER_ABS_Z,
+  PEEKER_CAST,
   peekerUnroll,
-  type PeekerKind,
 } from '@/components/labs/small-world/scene/props/peeker-stage'
 
-// Task 53 — the per-character idle gestures. They are written straight onto three Groups, so
-// these pins exercise the real objects: the gesture must be a pure function of the drive (scrub
-// back and the pose comes back identical), bounded (nothing whips), and mirrored correctly for
-// the right-hand corner (a jaw that opens down on the left must not open up on the right).
+/**
+ * Task 56 — the mascot cast, measured rather than assumed.
+ *
+ * `MASCOT_BOX`, `FACE_BOX` and `DRESS_REACH` are what every clearance decision in peeker-stage.ts
+ * rests on. R14's equivalent constant was a guess that turned out to be 50% short, which quietly
+ * made both of its benches optimistic. So this file builds the REAL merged geometry for all twelve
+ * characters and all six dressings, reproduces the scene graph the rig renders (root tilt → joint →
+ * limb transform), sweeps the whole gesture range, adds the ink hull, and pins the envelopes TIGHT
+ * IN BOTH DIRECTIONS: nothing may outgrow a box, and no box may be left slack.
+ */
 
-const KINDS = Object.keys(PEEKER_SPECS) as PeekerKind[]
+const ART_DIR = join(process.cwd(), 'components/labs/small-world/scene/props')
+const KINDS = PEEKER_CAST.flatMap((p) => [
+  { biome: p.biome, kind: p.left },
+  { biome: p.biome, kind: p.right },
+]) as { biome: (typeof PEEKER_CAST)[number]['biome']; kind: keyof typeof PEEKER_SPECS }[]
 
-function freshLimbs(): PeekerLimbs {
-  return { a: new THREE.Group(), b: new THREE.Group(), c: new THREE.Group() }
-}
+type Box = { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }
+const EMPTY: Box = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity }
 
-function pose(limbs: PeekerLimbs): number[] {
-  return [limbs.a, limbs.b, limbs.c].flatMap((g) =>
-    g ? [g.rotation.x, g.rotation.y, g.rotation.z, g.scale.x, g.scale.y, g.scale.z] : []
-  )
-}
-
-function driveAt(kind: PeekerKind, t: number): PeekerDrive {
-  const spec = PEEKER_SPECS[kind]
-  return { idle: peekerIdle(t, spec.cycles, 0), unroll: spec.rolls ? peekerUnroll(t) : 1 }
-}
-
-describe('peeker gestures', () => {
-  it('poses purely from the drive — the same dwell fraction always rebuilds the same pose', () => {
-    for (const kind of KINDS) {
-      for (const t of [0.1, 0.37, 0.5, 0.63, 0.9]) {
-        const first = freshLimbs()
-        const second = freshLimbs()
-        PEEKER_SPECS[kind].apply(first, driveAt(kind, t), 1)
-        PEEKER_SPECS[kind].apply(second, driveAt(kind, t), 1)
-        expect(pose(first), `${kind} @ ${t}`).toEqual(pose(second))
-      }
-    }
-  })
-
-  it('replays exactly when the dwell is scrubbed backwards', () => {
-    for (const kind of KINDS) {
-      const limbs = freshLimbs()
-      const forward: number[][] = []
-      for (let i = 0; i <= 60; i++) {
-        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, i / 60), 1)
-        forward.push(pose(limbs))
-      }
-      for (let i = 60; i >= 0; i--) {
-        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, i / 60), 1)
-        expect(pose(limbs), `${kind} @ ${i}`).toEqual(forward[i])
-      }
-    }
-  })
-
-  it('stays inside a sane range — no limb spins away from its figure', () => {
-    for (const kind of KINDS) {
-      const limbs = freshLimbs()
-      for (let i = 0; i <= 400; i++) {
-        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, i / 400), 1)
-        for (const g of [limbs.a, limbs.b, limbs.c]) {
-          if (!g) continue
-          expect(Math.abs(g.rotation.x)).toBeLessThanOrEqual(Math.PI)
-          expect(Math.abs(g.rotation.y)).toBeLessThanOrEqual(Math.PI)
-          expect(Math.abs(g.rotation.z)).toBeLessThanOrEqual(Math.PI)
-          expect(g.scale.x).toBeGreaterThan(0.3)
-          // the pangolin shell stretches past 1 as it unfurls; nothing may balloon beyond that
-          expect(g.scale.x).toBeLessThanOrEqual(1.4)
-        }
-      }
-    }
-  })
-
-  it('moves smoothly across the dwell — nothing in the flicker family', () => {
-    const N = 2000
-    for (const kind of KINDS) {
-      const limbs = freshLimbs()
-      let prev: number[] | null = null
-      let worst = 0
-      for (let i = 0; i <= N; i++) {
-        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, i / N), 1)
-        const cur = pose(limbs)
-        if (prev) for (let k = 0; k < cur.length; k++) worst = Math.max(worst, Math.abs(cur[k] - prev[k]))
-        prev = cur
-      }
-      expect(worst, `${kind} worst per-sample step`).toBeLessThan(0.01)
-    }
-  })
-
-  it('mirrors for the right-hand corner: EVERY channel of EVERY limb', () => {
-    // Reflecting a figure across the YZ plane negates Euler y and z, leaves x, and leaves scale.
-    // All three slots and all three rotation axes are checked: an earlier version compared only
-    // rotation.z on limbs a and b, and so was blind to the two gestures that were writing an
-    // un-mirrored YAW (applyChew and applyUnroll). Sampled across the dwell because a gesture
-    // that happens to be at rest at one t would make any of this vacuous.
-    for (const kind of KINDS) {
-      for (const t of [0.12, 0.29, 0.38, 0.5, 0.62, 0.77, 0.88]) {
-        const left = freshLimbs()
-        const right = freshLimbs()
-        const drive = driveAt(kind, t)
-        PEEKER_SPECS[kind].apply(left, drive, 1)
-        PEEKER_SPECS[kind].apply(right, drive, -1)
-        for (const slot of ['a', 'b', 'c'] as const) {
-          const l = left[slot]
-          const r = right[slot]
-          if (!l || !r) continue
-          const where = `${kind}.${slot} @ ${t}`
-          expect(r.rotation.x, `${where} pitch`).toBeCloseTo(l.rotation.x, 12)
-          expect(r.rotation.y, `${where} yaw`).toBeCloseTo(-l.rotation.y, 12)
-          expect(r.rotation.z, `${where} roll`).toBeCloseTo(-l.rotation.z, 12)
-          expect(r.scale.toArray(), `${where} scale`).toEqual(l.scale.toArray())
-        }
-      }
-    }
-  })
-
-  it('exercises a non-zero yaw and a limb c, so the mirror check cannot pass vacuously', () => {
-    // Guards the test above: if every yaw and every c-slot were always zero it would assert
-    // nothing about them. These are the exact channels that were previously uncovered.
-    let sawYaw = false
-    let sawSlotC = false
-    for (const kind of KINDS) {
-      for (const t of [0.12, 0.29, 0.38, 0.5, 0.62, 0.77, 0.88]) {
-        const limbs = freshLimbs()
-        PEEKER_SPECS[kind].apply(limbs, driveAt(kind, t), 1)
-        if (limbs.a && Math.abs(limbs.a.rotation.y) > 1e-6) sawYaw = true
-        if (limbs.c && limbs.c.scale.x !== 1) sawSlotC = true
-      }
-    }
-    expect(sawYaw).toBe(true)
-    expect(sawSlotC).toBe(true)
-  })
-
-  it('tucks the pangolins into a ball before the unroll window and opens them after', () => {
-    for (const kind of ['pangolinBig', 'pangolinSmall'] as const) {
-      const rolled = freshLimbs()
-      const open = freshLimbs()
-      PEEKER_SPECS[kind].apply(rolled, { idle: 0, unroll: 0 }, 1)
-      PEEKER_SPECS[kind].apply(open, { idle: 0, unroll: 1 }, 1)
-      // tucked: head swung back into the shell and shrunk small enough to hide inside it
-      expect(rolled.a!.rotation.z).toBeGreaterThan(2)
-      expect(rolled.a!.scale.x).toBeLessThan(0.5)
-      // open: head out front at rest, tail trailing, both at full size
-      expect(Math.abs(open.a!.rotation.z)).toBeLessThan(0.3)
-      expect(open.a!.scale.x).toBeCloseTo(1, 10)
-      expect(open.b!.scale.x).toBeCloseTo(1, 10)
-      expect(open.b!.rotation.z).toBeGreaterThan(rolled.b!.rotation.z)
-    }
-  })
-})
-
-// --- the figure envelope, MEASURED -------------------------------------------
-//
-// PEEKER_FIGURE_BOX is load-bearing: both clearance benches in peeker-stage.test.ts use it as the
-// figure's extent, and a figure that quietly outgrew it would make both of them optimistic. So
-// build the real merged geometry, reproduce the scene graph exactly (root tilt → limb joint →
-// limb transform), sweep the gesture range, and measure the true vertex extent.
-
-/** Mirrors the scene graph PeekerFigure builds, so the measurement includes joints and gestures. */
-function figureRig(kind: PeekerKind, dir: 1 | -1) {
-  const root = new THREE.Group()
-  root.rotation.z = peekerRootTilt(kind, dir)
-  const limbs: PeekerLimbs = { a: null, b: null, c: null }
-  const meshes: { obj: THREE.Object3D; geo: THREE.BufferGeometry }[] = []
-  for (const piece of peekerPieces(kind, dir)) {
-    const geo = buildMergedClay(piece.parts)
-    const holder = new THREE.Object3D()
-    if (piece.slot === 'body') {
-      holder.position.set(...piece.at)
-      root.add(holder)
-    } else {
-      const joint = new THREE.Group()
-      joint.position.set(...piece.at)
-      joint.add(holder)
-      root.add(joint)
-      limbs[piece.slot] = joint
-    }
-    meshes.push({ obj: holder, geo })
+function union(a: Box, b: Box): Box {
+  return {
+    x0: Math.min(a.x0, b.x0),
+    x1: Math.max(a.x1, b.x1),
+    y0: Math.min(a.y0, b.y0),
+    y1: Math.max(a.y1, b.y1),
+    z0: Math.min(a.z0, b.z0),
+    z1: Math.max(a.z1, b.z1),
   }
-  return { root, limbs, meshes }
 }
 
-type Box = { minX: number; maxX: number; minY: number; maxY: number; absZ: number }
-
-const EMPTY: Box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, absZ: 0 }
-
-/** Signed local bounding box over the whole gesture range — per axis, because a raised wingtip
- *  and a downward reach are different questions for the clearance benches. */
-function measureBox(kind: PeekerKind, dir: 1 | -1): Box {
-  const { root, limbs, meshes } = figureRig(kind, dir)
-  const spec = PEEKER_SPECS[kind]
+/** Vertex bounds of a merged part list, with the ink hull, after `matrix`. */
+function boundsOf(parts: ClayPart[], matrix: THREE.Matrix4): Box {
+  const geo = buildMergedClay(parts.map((p) => ({ ...p, geo: p.geo.clone() })))
+  const ink = inflateClay(geo, INK_WIDTH)
+  const pos = ink.attributes.position as THREE.BufferAttribute
   const v = new THREE.Vector3()
-  const box: Box = { ...EMPTY }
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12
-    for (const idle of [-1, 0, 1]) {
-      spec.apply(limbs, { idle, unroll: spec.rolls ? peekerUnroll(t) : 1 }, dir)
-      root.updateMatrixWorld(true)
-      for (const { obj, geo } of meshes) {
-        const pos = geo.attributes.position
-        for (let k = 0; k < pos.count; k++) {
-          v.fromBufferAttribute(pos, k).applyMatrix4(obj.matrixWorld)
-          box.minX = Math.min(box.minX, v.x)
-          box.maxX = Math.max(box.maxX, v.x)
-          box.minY = Math.min(box.minY, v.y)
-          box.maxY = Math.max(box.maxY, v.y)
-          box.absZ = Math.max(box.absZ, Math.abs(v.z))
-        }
-      }
-    }
+  let out = { ...EMPTY }
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).applyMatrix4(matrix)
+    out = union(out, { x0: v.x, x1: v.x, y0: v.y, y1: v.y, z0: v.z, z1: v.z })
   }
-  for (const { geo } of meshes) geo.dispose()
-  return box
-}
-
-function unionBox(dir: 1 | -1): Box {
-  const out: Box = { ...EMPTY }
-  for (const kind of KINDS) {
-    const b = measureBox(kind, dir)
-    out.minX = Math.min(out.minX, b.minX)
-    out.maxX = Math.max(out.maxX, b.maxX)
-    out.minY = Math.min(out.minY, b.minY)
-    out.maxY = Math.max(out.maxY, b.maxY)
-    out.absZ = Math.max(out.absZ, b.absZ)
-  }
+  geo.dispose()
+  ink.dispose()
   return out
 }
 
-describe('the figure bounding box the clearance benches rest on', () => {
-  it('every character fits inside PEEKER_FIGURE_BOX, in every pose, both facings', () => {
-    const b = PEEKER_FIGURE_BOX
+/** The rig's own scene graph, at one point of the gesture range. */
+function figureBounds(
+  biome: (typeof PEEKER_CAST)[number]['biome'],
+  kind: keyof typeof PEEKER_SPECS,
+  dir: 1 | -1,
+  idle: number,
+  unroll: number
+): Box {
+  const spec = PEEKER_SPECS[kind]
+  const pieces = peekerPieces(biome, kind, dir)
+  const root = new THREE.Group()
+  root.rotation.z = peekerRootTilt(kind, dir)
+
+  const limbs: PeekerLimbs = { a: null, b: null, c: null }
+  const holders = pieces.map((piece) => {
+    const g = new THREE.Group()
+    g.position.set(piece.at[0], piece.at[1], piece.at[2])
+    root.add(g)
+    if (piece.slot !== 'body') limbs[piece.slot as 'a' | 'b' | 'c'] = g
+    return g
+  })
+  spec.apply(limbs, { idle, unroll }, dir)
+  root.updateMatrixWorld(true)
+
+  let out = { ...EMPTY }
+  pieces.forEach((piece, i) => {
+    out = union(out, boundsOf(piece.parts, holders[i].matrixWorld))
+  })
+  return out
+}
+
+const sweptCache = new Map<string, Box>()
+
+/**
+ * Union over the whole gesture range — 7 idle samples x the unroll sweep. Memoised because
+ * rebuilding twelve characters' merged geometry per assertion is by far the slowest thing here.
+ */
+function sweptBounds(
+  biome: (typeof PEEKER_CAST)[number]['biome'],
+  kind: keyof typeof PEEKER_SPECS,
+  dir: 1 | -1
+): Box {
+  const key = `${biome}:${kind}:${dir}`
+  const hit = sweptCache.get(key)
+  if (hit) return hit
+  let out = { ...EMPTY }
+  for (const idle of [-1, -0.6, -0.2, 0, 0.2, 0.6, 1]) {
+    for (const clock of [0.7, 0.8, 0.9, 1]) {
+      const unroll = PEEKER_SPECS[kind].rolls ? peekerUnroll(clock) : 1
+      out = union(out, figureBounds(biome, kind, dir, idle, unroll))
+    }
+  }
+  sweptCache.set(key, out)
+  return out
+}
+
+describe('the measured mascot envelope', () => {
+  const swept = new Map<string, Box>()
+  for (const { biome, kind } of KINDS) {
     for (const dir of [1, -1] as const) {
-      const u = unionBox(dir)
-      // the right-hand figure is the authored box mirrored, so compare against the mirror
-      const lo = dir === 1 ? b.minX : -b.maxX
-      const hi = dir === 1 ? b.maxX : -b.minX
-      expect(u.minX, `minX dir ${dir}`).toBeGreaterThanOrEqual(lo)
-      expect(u.maxX, `maxX dir ${dir}`).toBeLessThanOrEqual(hi)
-      expect(u.minY, `minY dir ${dir}`).toBeGreaterThanOrEqual(b.minY)
-      expect(u.maxY, `maxY dir ${dir}`).toBeLessThanOrEqual(b.maxY)
-      expect(u.absZ, `absZ dir ${dir}`).toBeLessThanOrEqual(b.absZ)
+      swept.set(`${kind}:${dir}`, sweptBounds(biome, kind, dir))
+    }
+  }
+
+  it('fits every character inside MASCOT_BOX, in both facings, across the gesture range', () => {
+    for (const [key, b] of swept) {
+      const dir = key.endsWith(':1') ? 1 : -1
+      // `out` is toward the frame's outer edge, which is −x for a left-hand (dir +1) figure
+      const outward = dir === 1 ? -b.x0 : b.x1
+      const inward = dir === 1 ? b.x1 : -b.x0
+      expect(outward, `${key} outward`).toBeLessThanOrEqual(MASCOT_BOX.out)
+      expect(inward, `${key} inward`).toBeLessThanOrEqual(MASCOT_BOX.in)
+      expect(b.y1, `${key} up`).toBeLessThanOrEqual(MASCOT_BOX.up)
+      expect(-b.y0, `${key} down`).toBeLessThanOrEqual(MASCOT_BOX.down)
+      expect(Math.max(b.z1, -b.z0), `${key} depth`).toBeLessThanOrEqual(PEEKER_ABS_Z)
     }
   })
 
-  it('is tight — a box much larger than the figures would make the benches slack', () => {
-    const u = unionBox(1)
-    const b = PEEKER_FIGURE_BOX
-    expect(Math.abs(u.minX - b.minX)).toBeLessThan(0.05)
-    expect(Math.abs(u.maxX - b.maxX)).toBeLessThan(0.05)
-    expect(Math.abs(u.minY - b.minY)).toBeLessThan(0.05)
-    expect(Math.abs(u.maxY - b.maxY)).toBeLessThan(0.05)
-    expect(Math.abs(u.absZ - b.absZ)).toBeLessThan(0.05)
+  it('leaves no face of MASCOT_BOX slack — some character reaches each one', () => {
+    // Without this the box could be inflated to make the fits-inside test vacuous, and every
+    // clearance number in peeker-stage.ts would be quietly pessimistic.
+    let out = -Infinity
+    let inward = -Infinity
+    let up = -Infinity
+    let down = -Infinity
+    for (const [key, b] of swept) {
+      const dir = key.endsWith(':1') ? 1 : -1
+      out = Math.max(out, dir === 1 ? -b.x0 : b.x1)
+      inward = Math.max(inward, dir === 1 ? b.x1 : -b.x0)
+      up = Math.max(up, b.y1)
+      down = Math.max(down, -b.y0)
+    }
+    expect(MASCOT_BOX.out - out).toBeLessThan(0.08)
+    expect(MASCOT_BOX.in - inward).toBeLessThan(0.08)
+    expect(MASCOT_BOX.up - up).toBeLessThan(0.08)
+    expect(MASCOT_BOX.down - down).toBeLessThan(0.08)
   })
 
-  it('is facing-symmetric — a mirrored figure occupies the mirrored envelope', () => {
-    const l = unionBox(1)
-    const r = unionBox(-1)
-    expect(r.minX).toBeCloseTo(-l.maxX, 9)
-    expect(r.maxX).toBeCloseTo(-l.minX, 9)
-    expect(r.minY).toBeCloseTo(l.minY, 9)
-    expect(r.maxY).toBeCloseTo(l.maxY, 9)
-    expect(r.absZ).toBeCloseTo(l.absZ, 9)
-  })
-
-  it('no character asks for more sway than the benches sweep', () => {
-    for (const kind of KINDS) expect(PEEKER_SPECS[kind].sway, kind).toBeLessThanOrEqual(PEEKER_MAX_SWAY)
-  })
-})
-
-describe('facing() — the reflection the "no negative scale" claim rests on', () => {
-  const part = () => ({
-    geo: new THREE.BoxGeometry(1, 1, 1),
-    color: '#000000',
-    pos: [0.3, 0.4, 0.5] as [number, number, number],
-    rot: [0.1, 0.2, 0.3] as [number, number, number],
-    scl: [1.5, 1, 1] as [number, number, number],
-  })
-
-  it('is the identity for the left-hand facing', () => {
-    const p = part()
-    expect(facing(1, [p])[0]).toBe(p)
-  })
-
-  it('negates x offsets and the two Euler components that live in the reflected planes', () => {
-    const [m] = facing(-1, [part()])
-    expect(m.pos).toEqual([-0.3, 0.4, 0.5])
-    expect(m.rot).toEqual([0.1, -0.2, -0.3])
-  })
-
-  it('never introduces a negative scale — that would invert every normal', () => {
-    for (const kind of KINDS) {
+  it('puts every dressing inside its own envelope', () => {
+    for (const pair of PEEKER_CAST) {
       for (const dir of [1, -1] as const) {
-        for (const piece of peekerPieces(kind, dir)) {
-          for (const p of piece.parts) {
-            for (const s of p.scl ?? [1, 1, 1]) expect(s, `${kind}/${dir}`).toBeGreaterThan(0)
-          }
+        for (const vdir of [1, -1] as const) {
+          const b = boundsOf(peekerDressing(pair.biome, dir, vdir), new THREE.Matrix4())
+          const outward = dir === 1 ? -b.x0 : b.x1
+          const inward = dir === 1 ? b.x1 : -b.x0
+          const label = `${pair.biome} dir${dir} vdir${vdir}`
+          expect(outward, `${label} outward`).toBeLessThanOrEqual(DRESS_REACH.out)
+          expect(inward, `${label} inward`).toBeLessThanOrEqual(DRESS_REACH.in)
+          // The dressing reaches FAR past the character on the side its composition is anchored
+          // to, and only NEAR past it on the other — the same asymmetry `compositionBox` encodes.
+          const upLimit = MASCOT_BOX.up + (vdir === 1 ? DRESS_REACH.far : DRESS_REACH.near)
+          const downLimit = MASCOT_BOX.down + (vdir === 1 ? DRESS_REACH.near : DRESS_REACH.far)
+          expect(b.y1, `${label} up`).toBeLessThanOrEqual(upLimit + 0.001)
+          expect(-b.y0, `${label} down`).toBeLessThanOrEqual(downLimit + 0.001)
         }
       }
     }
   })
 
-  it('round-trips: reflecting twice restores the original placement', () => {
-    const [back] = facing(-1, facing(-1, [part()]))
-    expect(back.pos).toEqual([0.3, 0.4, 0.5])
-    expect(back.rot).toEqual([0.1, 0.2, 0.3])
+  it('keeps every face inside FACE_BOX, which is what stays on screen', () => {
+    // The face box is an authoring contract: a character's eyes and muzzle live in it, so the
+    // staging can guarantee they are never cropped. Verified through the eye geometry, which is
+    // the one part every character shares and the one the reader looks for.
+    for (const { biome, kind } of KINDS) {
+      const pieces = peekerPieces(biome, kind, 1)
+      const eyes = pieces
+        .flatMap((piece) =>
+          piece.parts
+            .filter((p) => p.color === PALETTE.ink && (p.pos?.[2] ?? 0) > 0.05)
+            .map((p) => ({ piece, p }))
+        )
+        .map(({ piece, p }) => ({
+          x: (p.pos?.[0] ?? 0) + piece.at[0],
+          y: (p.pos?.[1] ?? 0) + piece.at[1],
+        }))
+      expect(eyes.length, `${kind} has ink facial features`).toBeGreaterThan(0)
+      for (const e of eyes) {
+        expect(e.x, `${kind} eye x`).toBeGreaterThanOrEqual(-FACE_BOX.out)
+        expect(e.x, `${kind} eye x`).toBeLessThanOrEqual(FACE_BOX.in)
+        expect(e.y, `${kind} eye y`).toBeGreaterThanOrEqual(-FACE_BOX.down)
+        expect(e.y, `${kind} eye y`).toBeLessThanOrEqual(FACE_BOX.up)
+      }
+    }
+  })
+})
+
+describe('mirroring', () => {
+  const sample: ClayPart[] = [
+    { geo: new THREE.BoxGeometry(1, 1, 1), color: PALETTE.ink, pos: [0.3, 0.4, 0.5], rot: [0.1, 0.2, 0.3] },
+    { geo: new THREE.BoxGeometry(1, 1, 1), color: PALETTE.snow, pos: [-0.2, 0.1, 0] },
+  ]
+
+  it('facing() is the identity one way and an exact YZ reflection the other', () => {
+    expect(facing(1, sample)).toBe(sample)
+    const m = facing(-1, sample)
+    expect(m[0].pos).toEqual([-0.3, 0.4, 0.5])
+    expect(m[0].rot).toEqual([0.1, -0.2, -0.3])
+    expect(m[1].pos).toEqual([0.2, 0.1, 0])
+    expect(m[1].rot).toBeUndefined()
+  })
+
+  it('flipY() is the identity one way and an exact XZ reflection the other', () => {
+    expect(flipY(-1, sample)).toBe(sample)
+    const m = flipY(1, sample)
+    expect(m[0].pos).toEqual([0.3, -0.4, 0.5])
+    expect(m[0].rot).toEqual([-0.1, 0.2, -0.3])
+  })
+
+  it('round-trips', () => {
+    const back = facing(-1, facing(-1, sample))
+    expect(back[0].pos).toEqual(sample[0].pos)
+    expect(back[0].rot).toEqual(sample[0].rot)
+  })
+
+  it('never applies a negative scale to any part of any character', () => {
+    // The whole reason the right-hand figure is a reflected PLACEMENT rather than a scale(-1) is
+    // that a mirrored scale inverts every normal and flips the toon bands. If a negative scale
+    // ever crept in, that argument would be false.
+    for (const { biome, kind } of KINDS) {
+      for (const dir of [1, -1] as const) {
+        for (const piece of peekerPieces(biome, kind, dir)) {
+          for (const part of piece.parts) {
+            for (const s of part.scl ?? [1, 1, 1]) {
+              expect(s, `${kind} dir${dir}`).toBeGreaterThan(0)
+            }
+          }
+        }
+      }
+      for (const dir of [1, -1] as const) {
+        for (const part of peekerDressing(biome, dir, -1)) {
+          for (const s of part.scl ?? [1, 1, 1]) expect(s, `${biome} dressing`).toBeGreaterThan(0)
+        }
+      }
+    }
+  })
+
+  it('mirrors the whole figure: the right-hand build occupies the mirrored envelope', () => {
+    for (const { biome, kind } of KINDS) {
+      const l = sweptBounds(biome, kind, 1)
+      const r = sweptBounds(biome, kind, -1)
+      expect(r.x0, `${kind} x0`).toBeCloseTo(-l.x1, 6)
+      expect(r.x1, `${kind} x1`).toBeCloseTo(-l.x0, 6)
+      expect(r.y0, `${kind} y0`).toBeCloseTo(l.y0, 6)
+      expect(r.y1, `${kind} y1`).toBeCloseTo(l.y1, 6)
+    }
+  })
+
+  it('mirrors every hinge, on every axis and every slot, across the gesture range', () => {
+    // R14's version of this test compared only rotation.z on limbs a and b, and stayed green when
+    // a `dir` factor was deleted from a yaw. This one compares all three rotation axes and the
+    // full scale, on every slot a character actually uses.
+    for (const { kind } of KINDS) {
+      const spec = PEEKER_SPECS[kind]
+      let exercised = 0
+      for (const idle of [-1, -0.5, 0, 0.25, 0.5, 0.75, 1]) {
+        for (const unroll of [0, 0.5, 1]) {
+          const mk = (): PeekerLimbs => ({ a: new THREE.Group(), b: new THREE.Group(), c: new THREE.Group() })
+          const left = mk()
+          const right = mk()
+          spec.apply(left, { idle, unroll }, 1)
+          spec.apply(right, { idle, unroll }, -1)
+          for (const slot of ['a', 'b', 'c'] as const) {
+            const l = left[slot]!
+            const r = right[slot]!
+            expect(r.rotation.x, `${kind}.${slot}.x`).toBeCloseTo(l.rotation.x, 9)
+            expect(r.rotation.y, `${kind}.${slot}.y`).toBeCloseTo(-l.rotation.y, 9)
+            expect(r.rotation.z, `${kind}.${slot}.z`).toBeCloseTo(-l.rotation.z, 9)
+            expect(r.scale.toArray(), `${kind}.${slot}.scale`).toEqual(l.scale.toArray())
+            if (Math.abs(l.rotation.y) > 1e-6 || Math.abs(l.rotation.z) > 1e-6) exercised++
+          }
+        }
+      }
+      // anti-vacuity: a spec that moved nothing would pass every assertion above
+      expect(exercised, `${kind} actually moves something`).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('house rules', () => {
+  const artFiles = readdirSync(ART_DIR).filter((f) => /^peeker-/.test(f))
+
+  it('covers the whole cast with art and a gesture spec', () => {
+    for (const { biome, kind } of KINDS) {
+      expect(PEEKER_SPECS[kind], kind).toBeDefined()
+      const pieces = peekerPieces(biome, kind, 1)
+      expect(pieces.length, kind).toBeGreaterThan(0)
+      expect(peekerDressing(biome, 1, -1).length, biome).toBeGreaterThan(20)
+    }
+    // every biome's dressing is distinct art, not the same corner recoloured
+    const sizes = PEEKER_CAST.map((p) => peekerDressing(p.biome, 1, -1).length)
+    expect(new Set(sizes).size).toBeGreaterThan(3)
+  })
+
+  it('uses no literal colours and no non-determinism anywhere in the peeker files', () => {
+    for (const file of artFiles) {
+      const src = readFileSync(join(ART_DIR, file), 'utf8')
+      expect(src, `${file} colour literal`).not.toMatch(/['"]#[0-9a-fA-F]{3,8}['"]/)
+      expect(src, `${file} console`).not.toMatch(/console\./)
+      expect(src, `${file} clock`).not.toMatch(/Date\.now|performance\.now|Math\.random/)
+    }
+  })
+
+  it('gives every character an eye with a catch-light', () => {
+    // The catch-light is what stops a clay animal reading as taxidermy, and it is the one facial
+    // part that is easy to lose when an art file is revised.
+    for (const { biome, kind } of KINDS) {
+      const snowBeads = peekerPieces(biome, kind, 1)
+        .flatMap((p) => p.parts)
+        .filter((p) => p.color === PALETTE.snow && (p.pos?.[2] ?? 0) > 0.08)
+      expect(snowBeads.length, `${kind} catch-light`).toBeGreaterThan(0)
+    }
+  })
+
+  it('inks the masses that carry a silhouette, within the draw budget', () => {
+    for (const { biome, kind } of KINDS) {
+      const pieces = peekerPieces(biome, kind, 1)
+      // the first piece is the character's main mass, and it always carries the contour
+      expect(pieces[0].ink, `${kind}/${pieces[0].slot}`).toBe(true)
+      // ...but only INK_PIECE_LIMIT of them are actually drawn with one (see peeker-cast.tsx)
+      const inked = pieces.filter((p) => p.ink).slice(0, INK_PIECE_LIMIT).length
+      expect(inked, kind).toBeLessThanOrEqual(INK_PIECE_LIMIT)
+    }
+  })
+
+  it('stays inside the per-checkpoint draw budget', () => {
+    // Measured on a real server by bench/task56-drawcalls.mjs; this is the arithmetic that has to
+    // agree with it, so a third inked piece or a fourth mesh cannot creep in unnoticed.
+    const BUDGET = 14
+    for (const pair of PEEKER_CAST) {
+      let draws = 0
+      for (const kind of [pair.left, pair.right]) {
+        const pieces = peekerPieces(pair.biome, kind, 1)
+        draws += pieces.length + Math.min(INK_PIECE_LIMIT, pieces.filter((p) => p.ink).length)
+        draws += 2 // the side's dressing: one merged mesh plus its contour
+      }
+      expect(draws, pair.biome).toBeLessThanOrEqual(BUDGET)
+    }
   })
 })

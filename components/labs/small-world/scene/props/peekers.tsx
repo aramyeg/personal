@@ -3,129 +3,149 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { JourneyRef } from '../use-journey'
-import { PeekerFigure, PEEKER_SPECS, type PeekerDrive, type PeekerLimbs } from './peeker-cast'
 import {
+  PeekerDressing,
+  PeekerFigure,
+  PEEKER_SPECS,
+  type PeekerDrive,
+  type PeekerLimbs,
+} from './peeker-cast'
+import {
+  DRESS_PHASE,
+  FIGURE_PHASE,
+  PEEKER_CAST,
   PEEKER_DEPTH,
   PEEKER_FACE_IN,
   PEEKER_LEAN,
   PEEKER_LEAN_EXTRA,
   PEEK_SIDE_STAGGER,
-  PEEKER_CAST,
+  peekerAnchor,
+  peekerClock,
   peekerHalfHeight,
   peekerIdle,
-  peekerParkedY,
-  peekerPlacement,
   peekerPresence,
   peekerRollSpin,
   peekerUnroll,
+  type PeekerAnchor,
+  type PeekerBiome,
   type PeekerKind,
-  type PeekerPlacement,
+  type Side,
 } from './peeker-stage'
 
 /**
- * Task 53 — the CHECKPOINT PEEKER rig.
+ * Task 56 — the CHECKPOINT MASCOT rig.
  *
  * The camera never moves (it is placed once and aimed at the planet's centre; the world spins
- * beneath it), so a single group that copies the camera's transform gives every peeker a stable
- * CAMERA-SPACE frame to live in. Children are then positioned in plain frustum coordinates,
- * which is what makes the staging aspect-correct for free: a resize re-derives the corner from
- * the live fov and viewport instead of stranding a hardcoded world position mid-frame.
+ * beneath it), so a single group that copies the camera's transform gives every mascot a stable
+ * CAMERA-SPACE frame to live in. Children are then positioned in plain frustum coordinates, which
+ * is what makes the staging aspect-correct for free: a resize re-derives the corner from the live
+ * fov and viewport instead of stranding a hardcoded world position mid-frame.
  *
- * Where they sit: PEEKER_DEPTH is behind the planet's whole ceiling budget, so the depth buffer
- * alone guarantees a peeker can never draw over the world — the "planet is never covered" rule
- * holds by construction, not by tuning. The corners themselves are pure sky at every aspect
- * (peeker-stage.test.ts pins the NDC clearance).
+ * Where they sit is `peekerAnchor`'s decision, not a constant — see peeker-stage.ts. What drives
+ * them is split deliberately:
  *
- * What drives them: the chapter's panel dwell fraction, the same JourneyState.panel the DOM
- * panels read. No wall clock anywhere, so scrubbing back up the page walks them out exactly the
- * way they walked in.
+ *  - ENTRANCE and EXIT ride Task 54's arrival clock (`JourneyState.reveal`), so a checkpoint rolls
+ *    its dressing and characters out on arrival with the visitor's hands off the wheel. Dressing
+ *    leads, characters follow, and the right-hand side trails its partner by a beat.
+ *  - IDLE stays on the panel's scroll dwell, so what a character DOES while you read is still a
+ *    pure function of scroll position — the determinism contract survives where it matters.
  *
- * Cost: all ten figures mount once (their merged geometries are built at mount and disposed on
- * unmount), but only the active chapter's pair is ever visible — an invisible group is pruned
- * from the render list, so the peekers add 4 draw calls at a checkpoint (6 at the canyon, where
- * each pangolin is a shell plus two unfurling pieces) and exactly 0 everywhere else.
+ * Cost: all twelve figures and six dressings mount once (their merged geometries are built at
+ * mount and disposed on unmount), but only the active chapter's pair is ever visible, and an
+ * invisible group is pruned from the render list.
  */
 
-/** Idle phase offset for the right-hand figure so the pair never beats in lockstep. */
+/** Idle phase offset for the right-hand figure so a pair never beats in lockstep. */
 const RIGHT_PHASE = 0.37
 
 function PeekerSide({
   journeyRef,
   chapter,
+  biome,
   kind,
   side,
-  place,
+  anchor,
   reduced,
 }: {
   journeyRef: JourneyRef
   chapter: number
+  biome: PeekerBiome
   kind: PeekerKind
-  side: -1 | 1
-  place: PeekerPlacement
+  side: Side
+  anchor: PeekerAnchor
   reduced: boolean
 }) {
   const spec = PEEKER_SPECS[kind]
-  // Figures are authored facing +X; the right-hand corner wants them turned the other way.
+  // Figures are authored facing +X (into the frame); the right-hand corner wants them turned.
   const dir: 1 | -1 = side === -1 ? 1 : -1
-  const outer = useRef<THREE.Group>(null)
+  const root = useRef<THREE.Group>(null)
+  const dress = useRef<THREE.Group>(null)
+  const figure = useRef<THREE.Group>(null)
   const spinner = useRef<THREE.Group>(null)
   const limbs = useRef<PeekerLimbs>({ a: null, b: null })
   const drive = useRef<PeekerDrive>({ idle: 0, unroll: 0 })
   const stagger = side === 1 ? PEEK_SIDE_STAGGER : 0
 
   useFrame(() => {
-    const g = outer.current
+    const g = root.current
     if (!g) return
-    const panel = journeyRef.current.panel
-    // A narrow viewport has no top-left corner to peek from — the fixed-size navigation pill
-    // occupies it — so the left figure stands down entirely there.
-    if (!panel || panel.chapter !== chapter || (side === -1 && !place.leftVisible)) {
+    const state = journeyRef.current
+    const clock = anchor.visible ? peekerClock(state, chapter) : null
+    if (clock === null) {
       g.visible = false
       return
     }
-    const t = panel.t
-    const p = peekerPresence(t, reduced, stagger)
-    if (p <= 0.0005) {
+
+    const dressP = peekerPresence(clock, DRESS_PHASE, reduced, stagger)
+    const figureP = peekerPresence(clock, FIGURE_PHASE, reduced, stagger)
+    if (dressP <= 0.0005 && figureP <= 0.0005) {
       g.visible = false
       return
     }
     g.visible = true
 
-    // `p` is the hidden→parked lerp; its easeOutBack overshoot past 1 IS the settle.
-    const hide = 1 - p
-    const settled = Math.min(1, Math.max(0, p))
-    const parkedY = peekerParkedY(place, side)
-    const idle =
-      reduced ? 0 : peekerIdle(t - stagger, spec.cycles, side === 1 ? RIGHT_PHASE : 0) * settled
+    // Idle is scroll-driven, so it settles when you stop scrolling and replays exactly on a scrub.
+    const panel = state.panel
+    const dwell = panel && panel.chapter === chapter ? panel.t : 0
+    const settled = Math.min(1, Math.max(0, figureP))
+    const idle = reduced ? 0 : peekerIdle(dwell, spec.cycles, side === 1 ? RIGHT_PHASE : 0) * settled
 
-    g.position.set(
-      side * (place.x + hide * place.hiddenOut),
-      parkedY + hide * (place.hiddenY - parkedY),
-      -PEEKER_DEPTH
-    )
-    g.rotation.set(
-      0,
-      -side * PEEKER_FACE_IN,
-      side * (PEEKER_LEAN + hide * PEEKER_LEAN_EXTRA) + spec.sway * idle
-    )
-    g.scale.setScalar(place.size)
+    // Each element rides its own presence from its hidden pose to the parked one; the easeOutBack
+    // overshoot past 1 IS the settle.
+    place(dress.current, anchor, side, dressP, 0)
+    place(figure.current, anchor, side, figureP, spec.sway * idle)
 
     if (spinner.current) {
-      spinner.current.rotation.z = spec.rolls && !reduced ? -side * peekerRollSpin(p) : 0
+      spinner.current.rotation.z = spec.rolls && !reduced ? -side * peekerRollSpin(figureP) : 0
     }
-
     drive.current.idle = idle
-    drive.current.unroll = spec.rolls && !reduced ? peekerUnroll(t - stagger) : 1
+    drive.current.unroll = spec.rolls && !reduced ? peekerUnroll(clock) : 1
     spec.apply(limbs.current, drive.current, dir)
   })
 
   return (
-    <group ref={outer} visible={false}>
-      <group ref={spinner}>
-        <PeekerFigure kind={kind} limbs={limbs} dir={dir} />
+    <group ref={root} visible={false} position={[0, 0, -PEEKER_DEPTH]}>
+      <group ref={dress}>
+        <PeekerDressing biome={biome} dir={dir} vdir={anchor.vdir} />
       </group>
+      {anchor.mode === 'pair' ? (
+        <group ref={figure}>
+          <group ref={spinner}>
+            <PeekerFigure biome={biome} kind={kind} limbs={limbs} dir={dir} />
+          </group>
+        </group>
+      ) : null}
     </group>
   )
+}
+
+/** Lerp one element of a composition from its hidden pose to its parked pose. */
+function place(g: THREE.Group | null, anchor: PeekerAnchor, side: Side, presence: number, sway: number): void {
+  if (!g) return
+  const hide = 1 - presence
+  g.position.set(anchor.x, anchor.y + hide * (anchor.hiddenY - anchor.y), 0)
+  g.rotation.set(0, -side * PEEKER_FACE_IN, side * (PEEKER_LEAN + hide * PEEKER_LEAN_EXTRA) + sway)
+  g.scale.setScalar(anchor.size)
 }
 
 /**
@@ -147,13 +167,17 @@ export function CheckpointPeekers({ journeyRef }: { journeyRef: JourneyRef }) {
   const size = useThree((s) => s.size)
   const reduced = usePrefersReducedMotion()
 
-  const place = useMemo(() => {
+  const anchors = useMemo(() => {
     const halfH = peekerHalfHeight(camera.fov)
-    return peekerPlacement(halfH, (halfH * size.width) / size.height, size)
+    const halfW = (halfH * size.width) / size.height
+    return {
+      [-1]: peekerAnchor(halfH, halfW, size, -1),
+      [1]: peekerAnchor(halfH, halfW, size, 1),
+    } as Record<number, PeekerAnchor>
   }, [camera.fov, size])
 
-  // Priority −0.5 keeps this after the journey damp (−1) and before every peeker side (0), so a
-  // side always reads a camera frame and a JourneyState from the same tick.
+  // Priority −0.5 keeps this after the journey damp (−1) and before every side (0), so a side
+  // always reads a camera frame and a JourneyState from the same tick.
   useFrame(() => {
     const g = frame.current
     if (!g) return
@@ -163,28 +187,28 @@ export function CheckpointPeekers({ journeyRef }: { journeyRef: JourneyRef }) {
 
   return (
     <group ref={frame}>
-      {PEEKER_CAST.map((pair, chapter) =>
-        pair === null ? null : (
-          <Fragment key={chapter}>
-            <PeekerSide
-              journeyRef={journeyRef}
-              chapter={chapter}
-              kind={pair[0]}
-              side={-1}
-              place={place}
-              reduced={reduced}
-            />
-            <PeekerSide
-              journeyRef={journeyRef}
-              chapter={chapter}
-              kind={pair[1]}
-              side={1}
-              place={place}
-              reduced={reduced}
-            />
-          </Fragment>
-        )
-      )}
+      {PEEKER_CAST.map((pair, chapter) => (
+        <Fragment key={pair.biome}>
+          <PeekerSide
+            journeyRef={journeyRef}
+            chapter={chapter}
+            biome={pair.biome}
+            kind={pair.left}
+            side={-1}
+            anchor={anchors[-1]}
+            reduced={reduced}
+          />
+          <PeekerSide
+            journeyRef={journeyRef}
+            chapter={chapter}
+            biome={pair.biome}
+            kind={pair.right}
+            side={1}
+            anchor={anchors[1]}
+            reduced={reduced}
+          />
+        </Fragment>
+      ))}
     </group>
   )
 }
