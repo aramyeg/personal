@@ -142,7 +142,9 @@ export const PALETTE = {
   // same cream base — jungle/delta and desert/canyon landed inside one hue family each, so half
   // the arrivals announced nothing. The journey now alternates dark/light as well as hue:
   // dark canopy, bright humid water, hot amber noon, deep ember, cool dusk.
-  gradeJungleSky: '#0D4522', // ch1 jungle — deep lush canopy green, the darkest sky of the six
+  gradeJungleSky: '#036B1E', // ch1 jungle — LUSH canopy green: saturation, not just darkness. A
+  // deeper green desaturates to olive-moss once it is mixed into the cream and reads dim rather
+  // than verdant, so the chroma has to survive the mix — this lands at C* 42 where #0D4522 gave 23.
   gradeJungleGlow: '#CCDD8E', // sunlit gap in the canopy: warm yellow-green at the horizon
   gradeJungleCast: '#A6DC8C', // pale sunlit-fern light, warmer than the canopy above it
   gradeDeltaSky: '#35C8DE', // ch2 delta — humid cyan: out from under the canopy, bright hazy air

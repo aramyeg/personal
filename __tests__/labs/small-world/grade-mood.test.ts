@@ -233,13 +233,15 @@ describe('adjacent-mood distinctness', () => {
   })
 
   it('keeps the thresholds inside the bracket the evidence draws', () => {
-    // Derived, not picked: every pair Aram registered measured >= 29.7 on the sky and >= 14.7 on
-    // the light; every pair he did not measured <= 18.4 and <= 6.8. A gate above the rejected band
-    // and below the accepted one is the only defensible place for it.
+    // Derived, not picked: every pair Aram registered measured >= 29.7 on the sky and >= 12.2 on
+    // the light; every pair he did not measured <= 18.4 and <= 5.8. A gate above the rejected band
+    // and below the accepted one is the only defensible place for it. The light's bracket sits
+    // lower than the sky's because its mix runs in LINEAR light between two pale colours, which
+    // compresses the range — see `mixHexLinear`.
     expect(MOOD_SKY_MIN_DE).toBeGreaterThan(18.4)
     expect(MOOD_SKY_MIN_DE).toBeLessThan(29.7)
-    expect(MOOD_LIGHT_MIN_DE).toBeGreaterThan(6.8)
-    expect(MOOD_LIGHT_MIN_DE).toBeLessThan(14.7)
+    expect(MOOD_LIGHT_MIN_DE).toBeGreaterThan(5.8)
+    expect(MOOD_LIGHT_MIN_DE).toBeLessThan(12.2)
   })
 })
 

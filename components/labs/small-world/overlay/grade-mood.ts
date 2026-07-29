@@ -92,7 +92,9 @@ export const VIGNETTE_ALPHA_MAX = 0.28
  * lights, as they stand with the grade switched off. Named here rather than reached for out of the
  * palette by each consumer so that there is exactly one place that says what the grade mixes FROM;
  * `resolvedMood` below then resolves what a checkpoint actually puts on screen, and the
- * distinctness gate can be written against that rather than against raw palette entries.
+ * distinctness gate can be written against that rather than against raw palette entries. For the
+ * SKY that resolution is exact — the shader shows those bytes; for the light it is the colour the
+ * renderer computes before the material and the toon ramp have their say.
  */
 export const GRADE_BASE = {
   sky: PALETTE.sky,
@@ -100,6 +102,39 @@ export const GRADE_BASE = {
   key: PALETTE.keyWarm,
   ambient: PALETTE.ambientBase,
 } as const
+
+/**
+ * sRGB transfer functions, matching three.js's own (`SRGBToLinear` / `LinearToSRGB` in Color.js)
+ * down to its 0.41666 exponent.
+ *
+ * They are here because THE TWO HALVES OF THE GRADE MIX IN DIFFERENT SPACES, and a gate that
+ * ignores that measures a colour the renderer never produces. `sky.tsx` carries its stops as bare
+ * `THREE.Vector3` components through a `ShaderMaterial` that writes `gl_FragColor` directly, with
+ * no output-encoding chunk — so the backdrop crossfades in GAMMA-encoded sRGB. The lights are
+ * `THREE.Color`, and with `ColorManagement` enabled (three.js's default since r152) a hex string
+ * is converted to linear working space on assignment, so `Color.lerp` interpolates LINEARLY.
+ */
+const srgbToLinear = (c: number): number =>
+  c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4)
+const linearToSrgb = (c: number): number =>
+  c < 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 0.41666) - 0.055
+
+/** Channel lerp in LINEAR light, returned as an `#RRGGBB` sRGB string — what `Color.lerp` gives. */
+export function mixHexLinear(from: string, to: string, t: number): string {
+  const k = clamp01(t)
+  const a = parseInt(from.slice(1), 16)
+  const b = parseInt(to.slice(1), 16)
+  let out = '#'
+  for (const shift of [16, 8, 0]) {
+    const ca = srgbToLinear(((a >> shift) & 255) / 255)
+    const cb = srgbToLinear(((b >> shift) & 255) / 255)
+    out += Math.round(linearToSrgb(ca + (cb - ca) * k) * 255)
+      .toString(16)
+      .padStart(2, '0')
+      .toUpperCase()
+  }
+  return out
+}
 
 /**
  * ADJACENT-PAIR DISTINCTNESS (Task 57) — the rail that keeps every arrival an event.
@@ -118,29 +153,35 @@ export const GRADE_BASE = {
  * is about colours seen side by side; these are separated by seconds of scrolling). Each dial's
  * accepted and rejected pairs bracket a decision boundary, and the gate sits inside the bracket:
  *   sky   — rejected at 7.3 and 18.4, accepted at 29.7 / 29.8 / 33.6  → boundary in (18.4, 29.7)
- *   light — rejected at 4.7 and 6.8,  accepted at 14.7 / 15.8 / 16.1  → boundary in (6.8, 14.7)
- * The light's range is structurally narrower because LIGHT_MIX_MAX and the pale-cast rule keep
- * every cast near the same cream; desert→canyon is the hardest pair on that dial, since both
- * biomes are warm by identity, and ~11.8 is about all it can reach inside the rails.
+ *   light — rejected at 4.2 and 5.8,  accepted at 12.2 / 12.5 / 12.7  → boundary in (5.8, 12.2)
+ * Each gate then sits at the middle of its own bracket, clear of both bands.
  *
- * Tripwires, not targets: the shipped set clears them at 30.4 and 11.7. A retune that walks a mood
+ * The light's numbers are SMALLER than the sky's for two compounding reasons, and both are
+ * structural rather than a sign the light is doing less: LIGHT_MIX_MAX and the pale-cast rule keep
+ * every cast near the same cream, and the lights interpolate in LINEAR light, which compresses
+ * differences between pale colours further still. desert→canyon is the hardest pair on that dial,
+ * since both biomes are warm by identity, and ~10 is about all it can reach inside the rails.
+ *
+ * Tripwires, not targets: the shipped set clears them at 30.4 and 10.0. A retune that walks a mood
  * back into its neighbour's family fails in grade-mood.test.ts, which also keeps the pre-Task-57
  * colours as a fixture so the gate is proven to have teeth rather than merely asserted to.
  */
 export const MOOD_SKY_MIN_DE = 24
-export const MOOD_LIGHT_MIN_DE = 10
+export const MOOD_LIGHT_MIN_DE = 9
 
 /**
  * What a PARKED checkpoint puts on screen: the mood mixed into the ungraded base. At a checkpoint
- * the bloom is 1 and the arrival pull is 1, so these are the exact values `scene/sky.tsx` writes
- * into its high backdrop stop and `scene/biome-atmosphere.tsx` writes into the key light — both of
- * them lerp from `GRADE_BASE` toward the mood by the same two dials, in the frame loop and in
- * vector form so they never allocate.
+ * the bloom is 1 and the arrival pull is 1, so these are the values `scene/sky.tsx` writes into its
+ * high backdrop stop and `scene/biome-atmosphere.tsx` writes into the key light — each mixed the
+ * way ITS OWN consumer mixes it, which is not the same way. The sky is a gamma-space lerp of raw
+ * components bound for a bare `gl_FragColor`; the key is a `THREE.Color.lerp`, and that runs in
+ * linear working space. Mixing both in gamma reads plausible and is wrong by up to ~5 bytes a
+ * channel on the light — enough to move an adjacent-pair distance by a whole point of dE.
  */
 export function resolvedMood(mood: BiomeMood): { sky: string; key: string } {
   return {
     sky: mixHex(GRADE_BASE.sky, mood.sky, mood.skyMix),
-    key: mixHex(GRADE_BASE.key, mood.cast, mood.lightMix),
+    key: mixHexLinear(GRADE_BASE.key, mood.cast, mood.lightMix),
   }
 }
 
