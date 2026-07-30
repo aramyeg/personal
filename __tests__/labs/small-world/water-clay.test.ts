@@ -267,6 +267,37 @@ describe('iceFootprint — the hard winter-pond mask (union of both B2 caps)', (
     expect(waterMask(SHELF[0], SHELF[1], SHELF[2], 1)).toBeGreaterThan(0.9)
   })
 
+  it('agrees with the live biomes water ACROSS THE RAMP, not just at the centre', () => {
+    // Task 61. The test above says both masks are high at a hardcoded pond centre, and its comment
+    // claims that guards the duplicated caps against drifting. It nearly does not: both sides sample
+    // the same hand-written point, so a pond that MOVES a little leaves that point deep inside
+    // itself and both masks stay above 0.9. Measured — shifting B2_SHELF from place(0.6, 5.72) to
+    // place(0.62, 5.72) in biomes.ts moves the centre 0.0252 rad against a 0.28 radius, and the
+    // whole of this file still passes.
+    //
+    // A centre sample cannot see drift because the centre is the least sensitive point of the mask.
+    // The RAMP is the sensitive part: between radius − feather and radius the value swings 1 → 0, so
+    // any disagreement between the two copies shows up there as a difference in value at the same
+    // point. Walking along the cap's own latitude keeps nx fixed, which keeps the lane, tide-limb and
+    // bridge exclusions constant across the sweep, so the only thing that can differ is the pond.
+    //
+    // The two agree EXACTLY today (measured: max |difference| 0.000 across the sweep), so the
+    // tolerance is tight on purpose rather than generous. This covers radius and feather drift as
+    // well as centre drift, and unlike a source-text match it cannot false-alarm on a reflow.
+    for (const [name, nx, theta] of [
+      ['B2_FROZEN', 0.34, 5.55],
+      ['B2_SHELF', 0.6, 5.72],
+    ] as const) {
+      for (let d = -0.55; d <= 0.55 + 1e-9; d += 0.025) {
+        const [px, py, pz] = place(nx, theta + d)
+        expect(
+          iceFootprint(px, py, pz),
+          `${name}: water-clay ICE_CAPS and biomes ${name} disagree at ${d.toFixed(3)} rad along the cap`
+        ).toBeCloseTo(waterMask(px, py, pz, 1), 6)
+      }
+    }
+  })
+
   it('is EXACTLY 0 at every bridge deck (centre + the full deck footprint band)', () => {
     for (const cx of ALL_X) {
       for (let dth = -0.17; dth <= 0.17 + 1e-9; dth += 0.02) {
