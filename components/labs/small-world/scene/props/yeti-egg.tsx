@@ -234,6 +234,27 @@ export function YetiEgg({ journeyRef }: { journeyRef: JourneyRef }) {
     setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   }, [])
 
+  /**
+   * RAYCAST GATING (Task 61 rail 2d). Now that the canvas takes pointer events, r3f raycasts its
+   * interaction list on pointer moves and clicks — and this egg is the only member of that list. A
+   * custom `raycast` that early-returns while the hotspot is disarmed means that outside winter's
+   * on-frame window the list is walked but no geometry is ever tested, so the per-event cost is a
+   * function call and nothing else. No state, no re-render: `armed` is a ref the frame loop already
+   * maintains.
+   *
+   * It also HARDENS the gate rather than merely speeding it up. The handlers still re-check `armed`
+   * (belt and braces, and the thing a reader should not have to infer), but with this in place an
+   * off-window pointer never reaches them at all.
+   */
+  const gatedRaycast = useMemo(
+    () =>
+      function (this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+        if (!armed.current) return
+        THREE.Mesh.prototype.raycast.call(this, raycaster, intersects)
+      },
+    []
+  )
+
   const tc = useMemo(() => canonicalTheta(EGG_THETA), [])
   const { position, quaternion } = useMemo(() => anchorTransform(EGG_THETA, EGG_X, 1), [])
   const body = useMemo(() => buildMergedClay(yetiParts()), [])
@@ -305,6 +326,7 @@ export function YetiEgg({ journeyRef }: { journeyRef: JourneyRef }) {
       <group ref={lean}>
         <mesh
           geometry={body}
+          raycast={gatedRaycast}
           onPointerOver={(e) => {
             if (!armed.current) return
             e.stopPropagation()

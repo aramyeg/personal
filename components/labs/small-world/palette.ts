@@ -235,8 +235,16 @@ export const PALETTE = {
   // roughly as much of the figure as `coat` and the median lands in the deep band, which buys the
   // coat itself the freedom to be a genuine cream. That is also how a white animal is actually
   // painted — a bright lit top over a deeply shaded underside, not one flat pale field.
+  //
+  // ...and the shadow half has to be COOL, which the first version of this split got wrong. Painted
+  // as a warm brown at the right lightness it hit the contrast target exactly and still read as a
+  // GRIZZLY: with `deep` covering most of the animal, the dominant impression was brown fur with a
+  // pale head. Warm lit over cool shadow is what says "white thing in cold light" — it is how snow
+  // itself is painted three inches away in this same corner, and how a polar bear photographs. The
+  // lightness is held (51.8 against the old 52.1, dL* 51.7 against 51.4) so nothing measured moves;
+  // only the hue crosses from +40 red-minus-blue to −14.
   bearCoat: '#D6C7A8', // warm ivory bear mass — reads white against a blue-white drift, not with it
-  bearDeep: '#8A7A62', // its underside and far flank; this tone is what carries the median
+  bearDeep: '#767C84', // its underside and far flank; this tone is what carries the median
   penguinBack: '#39434F', // penguin head/back — blue-charcoal rather than ink, so it is not a hole
   penguinFlash: '#EE8F33', // bill, feet and ear patch — the corner's one warm note, as the fox is
 

@@ -1,9 +1,11 @@
 'use client'
+import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 import { panelArtSrc } from '../art-manifest'
 import type { Chapter } from '../chapters'
 import { easeOutBack } from '../journey-timeline'
 import { PALETTE } from '../palette'
+import { setPanelAdvance } from '../panel-tap'
 
 const INK_BORDER = `4px solid ${PALETTE.ink}`
 const HALFTONE = `radial-gradient(circle, ${PALETTE.ink}18 1px, transparent 1.5px)`
@@ -59,11 +61,32 @@ export function ChapterPanels({
   const enter = easeOutBack(entrance)
   const artSrc = panelArtSrc(chapter.id)
 
+  // The registration's LIFETIME is this component's, which is what makes "no advance during travel"
+  // structural rather than a flag: this panel only renders while it is up, so a missed click with no
+  // panel mounted has nothing to fire — including a scrub across the dwell edge that lands between
+  // pointerdown and pointerup.
+  useEffect(() => setPanelAdvance(onAdvance), [onAdvance])
+
+  /**
+   * THE ROOT NO LONGER TAKES POINTER EVENTS, and that is the whole of Task 61's fix here.
+   *
+   * It used to be `pointer-events: auto` with an `onClick` on a full-viewport `inset: 0` div — a
+   * blanket over the canvas whenever a panel was up. Measured at a checkpoint dwell,
+   * `elementFromPoint` at the yeti egg's hotspot returned THIS div and the canvas received no
+   * trusted click at all, so the lab's first canvas interaction was unreachable exactly where a
+   * visitor is most likely to try it.
+   *
+   * Advance now comes from the other side: the canvas takes the click and r3f's `onPointerMissed`
+   * fires the registration below when nothing interactive was hit (see `panel-tap.ts`). Clicking ON
+   * an object does that object's thing; clicking anywhere else advances, which is what
+   * tap-to-advance always meant. `inset: 0` stays — the panel is a full-frame stage and its cards
+   * are positioned within it — and the `cursor: pointer` goes with the handler, since a cursor that
+   * promises a click this element no longer takes is a lie.
+   */
   const rootStyle: Record<string, string | number> = {
     position: 'absolute',
     inset: 0,
-    pointerEvents: 'auto',
-    cursor: 'pointer',
+    pointerEvents: 'none',
     '--sw-enter': enter,
   }
 
@@ -104,7 +127,7 @@ export function ChapterPanels({
   }
 
   return (
-    <div data-testid="sw-panel-tap" onClick={onAdvance} style={rootStyle as CSSProperties}>
+    <div data-testid="sw-panel-tap" style={rootStyle as CSSProperties}>
       <style>{MOBILE_STYLES}</style>
       <div className="sw-panel-art" style={artStyle as CSSProperties}>
         {artSrc ? (

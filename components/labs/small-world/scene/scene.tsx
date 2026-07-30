@@ -29,6 +29,7 @@ import { EpilogueSet } from './props/epilogue'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
+import { firePanelAdvance } from '../panel-tap'
 import type { ArrivalJourney } from '../use-arrival-journey'
 
 export type SceneProps = {
@@ -137,7 +138,16 @@ export function SmallWorldScene({
   const onBakeReady = useCallback(() => setBakeReady(true), [])
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
-      <Canvas camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }} gl={{ antialias: true }} dpr={[1, 2]}>
+      {/* TAP-TO-ADVANCE, as the FALLBACK it should always have been (Task 61). r3f calls this only
+          when a click hit no interactive object, so clicking the yeti egg peeks and clicking
+          anywhere else advances the journey. During travel no panel is registered and this is a
+          no-op — see panel-tap.ts, where the registration's lifetime does that work structurally. */}
+      <Canvas
+        camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
+        gl={{ antialias: true }}
+        dpr={[1, 2]}
+        onPointerMissed={firePanelAdvance}
+      >
         <ToonRampProvider>
           <SceneContents progressRef={progressRef} journey={journey} onBakeReady={onBakeReady} />
         </ToonRampProvider>
