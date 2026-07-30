@@ -448,25 +448,31 @@ describe('house rules', () => {
     }
   })
 
-  it('keeps the polar bear off the near-whites that cost the yeti its silhouette', () => {
-    // Task 61, and it is the same shape of pin as the camel's tack above: the defect is a COLOUR
-    // FAMILY, so the family is what is guarded rather than any one shape.
+  it('gives the polar bear a DOCUMENTED carve-out from the median band, and the devices that replace it', () => {
+    // READ THIS BEFORE "FIXING" THE BEAR BACK TO A MID TONE.
     //
-    // The winter corner's backdrop measures L* 85.6. The toon ramp scales a figure's albedo down
-    // while leaving that backdrop alone, so a near-white animal renders at about 66 and lands ~20
-    // points off its own sky — which is what the first yeti measured (20.7) and was rebuilt over.
-    // A polar bear is the obvious candidate to make that mistake a second time, because the animal
-    // is called white. Its MASS must therefore stay off the palette's three brightest tones; the
-    // near-whites it does carry are `foxBelly` accents, budgeted by area rather than by taste.
-    // Measured by AREA, not by presence, because that is what the contrast bench measures. A
-    // near-white is not forbidden outright — the bear needs a few lit notes to read as white at all,
-    // and `eye()` puts a catch-light on every character in the cast — it is forbidden from being
-    // most of the animal. So each primitive contributes its own projected footprint.
-    const bear = peekerPieces('winter', 'polarBear', 1).flatMap((p) => p.parts)
+    // Every other figure in this cast is held to a 40-52 median dL* against its corner's backdrop.
+    // The bear is not, and the exemption is arithmetic rather than taste: the winter backdrop
+    // measures L* 85.6, so a 40-52 median forces a figure median of L* 33.6-45.6 — a BROWN animal.
+    // No white animal has a median in that band against this sky. It was painted to the metric
+    // twice, once cool and once warm, and came back as grey-lilac stone and then as a grizzly.
+    // Aram asked for a white bear; whiteness wins and the median was the wrong statistic.
+    //
+    // What replaces it is measured on the EDGE rather than the middle, in bench/task61-edge.mjs:
+    // (1) the median |dL*| across the silhouette boundary, inside-vs-outside, against a floor
+    // derived from the figures that already read well, and (2) a darkest-quartile floor, so the
+    // shadow and ink quartile must separate even where the median cannot. This test pins the
+    // STRUCTURE those two assertions depend on — the devices that do the separating, none of which
+    // a median can see.
+    const parts = peekerPieces('winter', 'polarBear', 1).flatMap((p) => p.parts)
+    const worn = new Set(parts.map((p) => p.color))
+
+    // the mass really is white — this is the carve-out being USED, not merely allowed
+    expect(worn.has(PALETTE.bearCoat), 'bear wears its white coat').toBe(true)
     const share = (test: (c: string) => boolean): number => {
       let hit = 0
       let all = 0
-      for (const p of bear) {
+      for (const p of parts) {
         p.geo.computeBoundingBox()
         const b = p.geo.boundingBox!
         const s = p.scl ?? [1, 1, 1]
@@ -476,20 +482,38 @@ describe('house rules', () => {
       }
       return hit / all
     }
-    // typed as string[] rather than inferred: PALETTE is `as const`, so the inferred tuple is a
-    // union of literals and `.includes(someString)` will not typecheck against it
-    const NEAR_WHITE: string[] = [PALETTE.boughSnow, PALETTE.snow, PALETTE.yetiFur, PALETTE.foxBelly]
-    expect(share((c) => NEAR_WHITE.includes(c)), 'near-white area budget').toBeLessThan(0.18)
-    // ...and the two tones that carry the median have to be most of the animal
+    expect(share((c) => c === PALETTE.bearCoat), 'white is the MASS, not an accent').toBeGreaterThan(0.5)
+    // ...and the shade step stays subtle. A white animal modelled in greys reads as a dirty one.
+    // The property that actually prevents that is the VALUE GAP, not the area — a shallow step over
+    // a lot of the body is plush, while a deep step over a little of it is a stain. So the gap is
+    // what is pinned tightly and the area only loosely. (An area-only bound was tried first at 0.22
+    // and the honest shade landed at 0.227, which said more about the threshold than the art.)
+    const srgb = (v: number): number => {
+      const c = v / 255
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
+    const lstar = (hex: string): number => {
+      const n = parseInt(hex.slice(1), 16)
+      const y =
+        0.2126 * srgb((n >> 16) & 255) + 0.7152 * srgb((n >> 8) & 255) + 0.0722 * srgb(n & 255)
+      return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y
+    }
     expect(
-      share((c) => c === PALETTE.bearCoat || c === PALETTE.bearDeep),
-      'mass tones'
-    ).toBeGreaterThan(0.55)
-    expect(share((c) => c === PALETTE.bearDeep), 'deep tone').toBeGreaterThan(0.12)
+      lstar(PALETTE.bearCoat) - lstar(PALETTE.bearDeep),
+      'one stop of shade, not a grey modelling scheme'
+    ).toBeLessThan(15)
+    expect(share((c) => c === PALETTE.bearDeep), 'shade is a step, not the figure').toBeLessThan(0.32)
+    // it keeps its ink contour, which is separation device (a)
+    expect(peekerPieces('winter', 'polarBear', 1).filter((p) => p.ink).length).toBeGreaterThan(0)
 
-    // The penguin's other half of the lesson: its back is a blue-charcoal, never the ink the
-    // contour is drawn in. A bird painted in the outline colour has no interior and reads as a
-    // hole cut in the sky — and it leaves the contour with nothing to contour.
+    // Devices (b) and (c) live in the DRESSING, because they are what the figure is seen against:
+    // a cast shadow thrown into the drift beneath it, and dark spruce massed behind its silhouette.
+    // Without these the carve-out is just an unmeasured white blob on white snow.
+    const dressing = new Set(peekerDressing('winter', 1, -1).map((p) => p.color))
+    expect(dressing.has(PALETTE.bearCast), 'the bear casts a shadow into the drift').toBe(true)
+    expect(dressing.has(PALETTE.spruceDeep), 'dark backing behind the silhouette').toBe(true)
+
+    // The penguin keeps its own scheme and is NOT part of the carve-out.
     const penguin = new Set(
       peekerPieces('winter', 'penguin', 1).flatMap((p) => p.parts.map((q) => q.color))
     )

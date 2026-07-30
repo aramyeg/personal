@@ -172,6 +172,27 @@ export function winterDressing(): ClayPart[] {
     sph(0.12, PALETTE.snow, [0.46, -0.8, 0.2], [1.3, 0.45, 0.6], 10)
   )
 
+  // WHAT THE FIGURE IS SEEN AGAINST (Task 61, the white-bear ruling). A white animal cannot
+  // separate itself by its own value — the separation has to be put BEHIND and BENEATH it, which is
+  // exactly where it lives in life and is the one thing a median dL* of the figure cannot see.
+  //
+  // The dark backing is spruce massed behind the shoulder and head line, low and wide, at the depth
+  // the boughs already occupy. It costs one merged blob and it turns the most valuable part of the
+  // outline — the head, which is what a reader looks for — from white-on-pale-sky into
+  // white-on-near-black.
+  parts.push(
+    sph(0.34, PALETTE.spruceDeep, [-0.16, 0.12, -0.22], [1.25, 0.72, 0.16], 10),
+    sph(0.24, PALETTE.spruceDeep, [0.22, 0.3, -0.22], [1.0, 0.8, 0.14], 10),
+    sph(0.2, PALETTE.pineDeep, [-0.42, 0.02, -0.21], [1.0, 0.66, 0.13], 9)
+  )
+  // The CAST SHADOW, thrown forward-left into the drift the way a low winter sun throws one. It is
+  // deliberately the deepest value in the corner: the contact edge under a white animal is what
+  // stops it floating, and a pale contact reads as a figure hovering over snow.
+  parts.push(
+    sph(0.3, PALETTE.bearCast, [-0.12, -0.795, 0.2], [1.3, 0.16, 0.4], 12),
+    sph(0.19, PALETTE.bearCast, [-0.4, -0.83, 0.16], [1.1, 0.13, 0.36], 10)
+  )
+
   // Two ice shards breaking out of the drift crest — the one hard edge in a composition that is
   // otherwise all round white masses, and the thing that stops the drift reading as fog.
   parts.push(
@@ -277,26 +298,26 @@ function bearBody(): ClayPart[] {
     // the lit back, a coat-tone cap laid over the shadowed body from nape to rump
     sph(0.2, PALETTE.bearCoat, [-0.36, -0.14, -0.03], [1.15, 0.72, 0.9], 14),
     sph(0.17, PALETTE.bearCoat, [-0.19, -0.12, 0.08], [1.0, 0.86, 0.7], 12),
-    sph(0.185, PALETTE.bearDeep, [-0.43, -0.26, -0.03], [1.0, 1.0, 0.88], 14),
-    sph(0.245, PALETTE.bearDeep, [-0.19, -0.22, 0.0], [1.08, 1.02, 0.94], 14),
-    sph(0.23, PALETTE.bearDeep, [-0.27, -0.48, -0.02], [1.06, 0.96, 0.9], 14),
+    sph(0.185, PALETTE.bearCoat, [-0.43, -0.26, -0.03], [1.0, 1.0, 0.88], 14),
+    sph(0.245, PALETTE.bearCoat, [-0.19, -0.22, 0.0], [1.08, 1.02, 0.94], 14),
+    sph(0.23, PALETTE.bearCoat, [-0.27, -0.48, -0.02], [1.06, 0.96, 0.9], 14),
 
     // THE SHOULDER EDGE — the single fix for "a shapeless pale mass". A narrow band of near-white
     // riding the top of the shoulder with `deep` immediately under it puts a hard tonal step
     // straight across the figure at y ~ 0.14, which is where a shoulder is. Both sit INSIDE the
     // silhouette: a bright rim on the OUTLINE would hand the sky back the separation this whole
     // scheme exists to win.
-    sph(0.22, PALETTE.foxBelly, [-0.22, 0.2, 0.02], [1.1, 0.085, 0.42], 12),
+    sph(0.22, PALETTE.bearDeep, [-0.22, 0.16, 0.02], [1.1, 0.07, 0.42], 12),
     sph(0.26, PALETTE.bearDeep, [-0.21, 0.0, 0.12], [1.02, 0.2, 0.42], 12),
     // The lit back line, riding the level spine out to the rump. It is the largest single piece of
     // the white budget and it is spent on the one surface actually pointing at the sky — but it has
     // to sit ON the top contour, not across the body. Drawn wider and lower it came back as a white
     // BELT strapped round the animal, which is the painted-stripe defect the camel's noseband and
     // the pangolin's strata both had to be redrawn out of.
-    sph(0.2, PALETTE.foxBelly, [-0.37, -0.055, -0.03], [1.05, 0.075, 0.4], 12),
+    sph(0.2, PALETTE.bearDeep, [-0.37, -0.09, -0.03], [1.05, 0.06, 0.4], 12),
     // the shaded underline along the belly, and the far flank falling away
-    sph(0.24, PALETTE.bearDeep, [-0.25, -0.58, 0.06], [1.15, 0.34, 0.5], 12),
-    sph(0.19, PALETTE.bearDeep, [-0.45, -0.34, 0.04], [0.6, 1.15, 0.45], 12),
+    sph(0.24, PALETTE.bearDeep, [-0.25, -0.6, 0.06], [1.15, 0.26, 0.5], 12),
+    sph(0.17, PALETTE.bearDeep, [-0.47, -0.34, 0.04], [0.5, 1.1, 0.45], 12),
 
     // NECK: long, and deliberately the narrowest thing between the head and the shoulders.
     ...limb(
@@ -329,7 +350,7 @@ function bearBody(): ClayPart[] {
     sph(0.08, PALETTE.bearCoat, [0.362, 0.497, 0.15], [0.92, 0.95, 0.92], 12),
     // the lit bridge — one of the four places the near-white is spent, and the one that most makes
     // the reader call the animal white, because it is the surface pointing at the sky
-    sph(0.07, PALETTE.foxBelly, [0.25, 0.565, 0.16], [1.9, 0.34, 0.6], 10),
+    sph(0.07, PALETTE.bearDeep, [0.25, 0.53, 0.16], [1.9, 0.2, 0.6], 10),
     // the jaw's shaded underside, which is what gives the muzzle a depth as well as a length
     sph(0.075, PALETTE.bearDeep, [0.245, 0.452, 0.16], [1.7, 0.44, 0.55], 10),
 
@@ -356,7 +377,7 @@ function bearBody(): ClayPart[] {
     ...eye([0.02, 0.63, 0.08], 0.038, { bare: true, iris: PALETTE.ink }),
     // a near-white brow over the near eye — the second lit note, and what stops the eye reading as
     // a hole punched in a flat mass
-    sph(0.055, PALETTE.foxBelly, [0.185, 0.665, 0.12], [1.35, 0.4, 0.6], 10),
+    sph(0.05, PALETTE.bearDeep, [0.185, 0.648, 0.12], [1.35, 0.24, 0.6], 10),
 
     // EARS: small, round, LOW and set back. Their smallness is the cue — an ear big enough to
     // notice turns the animal into a bear cub or a dog.
@@ -376,7 +397,7 @@ function bearBody(): ClayPart[] {
     // sweep rather than assumed, after a first pass that put them at 0.743 and 0.900.
     ...shag([-0.26, 0.06, -0.06], 0.24, 5, PALETTE.bearCoat, 0.36, 0.82, 0.1, 0.35),
     ...shag([-0.26, -0.24, -0.06], 0.26, 6, PALETTE.bearDeep, 0.9, 1.36, 0.075, 0.42, 0.34),
-    ...shag([-0.28, -0.5, -0.04], 0.2, 4, PALETTE.bearDeep, 1.12, 1.48, 0.07, 0.3, 0.34),
+    ...shag([-0.28, -0.5, -0.04], 0.2, 4, PALETTE.bearCoat, 1.12, 1.48, 0.07, 0.3, 0.34),
   ]
 }
 
@@ -395,26 +416,28 @@ function bearBody(): ClayPart[] {
  */
 function bearArm(): ClayPart[] {
   return [
-    sph(0.14, PALETTE.bearDeep, [0, 0, 0], [1.05, 1.0, 0.88], 12),
+    sph(0.14, PALETTE.bearCoat, [0, 0, 0], [1.05, 1.0, 0.88], 12),
     // the lit cap where the body's shoulder edge hands off onto the limb
-    sph(0.12, PALETTE.foxBelly, [-0.005, 0.062, 0.05], [1.0, 0.2, 0.45], 10),
+    sph(0.12, PALETTE.bearDeep, [-0.005, 0.05, 0.05], [1.0, 0.16, 0.45], 10),
     ...limb(
       [
         [0, -0.04, 0.01],
         [0.01, -0.3, 0.02],
         [0.02, -0.52, 0.04],
       ],
-      0.115,
-      0.098,
-      PALETTE.bearDeep
+      0.105,
+      0.09,
+      PALETTE.bearCoat
     ),
+    // one shade edge down the limb's inboard side, so it still turns against the chest behind it
+    sph(0.08, PALETTE.bearDeep, [0.06, -0.28, 0.04], [0.42, 1.5, 0.5], 10),
     // a coat-tone sliver down the limb's outer edge, so a leg drawn in one flat dark tone still turns
-    sph(0.075, PALETTE.bearCoat, [-0.062, -0.24, 0.075], [0.42, 1.4, 0.5], 10),
+    sph(0.075, PALETTE.bearDeep, [-0.062, -0.24, 0.075], [0.42, 1.4, 0.5], 10),
     // THE PAW: big and blunt, which is the polar bear's own proportion, stepping back up to the
     // coat tone so the limb ends on a bright note rather than fading into the drift.
     sph(0.135, PALETTE.bearCoat, [0.03, -0.63, 0.07], [1.3, 0.72, 1.0], 12),
-    sph(0.11, PALETTE.bearDeep, [0.02, -0.665, 0.03], [1.3, 0.5, 0.9], 10),
-    sph(0.085, PALETTE.foxBelly, [0.03, -0.575, 0.13], [1.4, 0.22, 0.6], 10),
+    sph(0.11, PALETTE.bearDeep, [0.02, -0.675, 0.03], [1.3, 0.36, 0.9], 10),
+    sph(0.085, PALETTE.bearDeep, [0.03, -0.588, 0.13], [1.4, 0.16, 0.6], 10),
     // four short ink claws along its front edge — small, because a polar bear's claws are short and
     // because anything longer turns a resting paw into a raised one
     ...[-0.06, -0.005, 0.05, 0.1].map((dx, i) =>

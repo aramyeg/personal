@@ -220,31 +220,23 @@ export const PALETTE = {
   eagleWing: '#66523F', // canyon eagle — a COLD umber, so it never joins the rust rock it perches on
   eagleDeep: '#3E3227', // primaries, tail bars and the wing's shadowed underside
   eagleNape: '#AD8A4A', // tawny-gold hackles on head and nape — the raptor cue, kept off the sky edge
-  // THE POLAR BEAR IS THE TRAP THIS TASK WAS WARNED ABOUT, and the answer is not a whiter white.
-  // A near-white albedo renders at L* ~63–66, which is barely twenty points off a winter sky at
-  // 85.6 — the exact failure the yeti earned its rebuild over. So the bear's MASS is a warm ivory
-  // at the top of the winter window and the near-whites are demoted to lit accents (it reuses
-  // foxBelly for those rather than adding one). It still reads white, because everything it is seen
-  // against is COOLER and brighter: the drift is boughSnow at L* 99, the sky is lilac. A polar bear
-  // on sunlit snow is a cream animal in a blue-white field, which is what this is.
-  // ...and the split between the two tones is not what the single-tone arithmetic first suggested.
-  // Painted at the value the formula gives for the whole figure, the coat came back as grey-lilac
-  // stone and then, warmed, as a brown bear — because the animal is ALSO lit through the winter
-  // grade's own cool cast, and unlike the sky that cast lands ON it. The way out is that the median
-  // is carried by whichever tone crosses 50% of the AREA, not by the dominant one: give `deep`
-  // roughly as much of the figure as `coat` and the median lands in the deep band, which buys the
-  // coat itself the freedom to be a genuine cream. That is also how a white animal is actually
-  // painted — a bright lit top over a deeply shaded underside, not one flat pale field.
+  // THE POLAR BEAR IS WHITE. That is a ruling, and it overturns two earlier passes of mine.
   //
-  // ...and the shadow half has to be COOL, which the first version of this split got wrong. Painted
-  // as a warm brown at the right lightness it hit the contrast target exactly and still read as a
-  // GRIZZLY: with `deep` covering most of the animal, the dominant impression was brown fur with a
-  // pale head. Warm lit over cool shadow is what says "white thing in cold light" — it is how snow
-  // itself is painted three inches away in this same corner, and how a polar bear photographs. The
-  // lightness is held (51.8 against the old 52.1, dL* 51.7 against 51.4) so nothing measured moves;
-  // only the hue crosses from +40 red-minus-blue to −14.
-  bearCoat: '#D6C7A8', // warm ivory bear mass — reads white against a blue-white drift, not with it
-  bearDeep: '#767C84', // its underside and far flank; this tone is what carries the median
+  // The 40-52 median dL* band this cast is otherwise held to CANNOT be met by a white animal here:
+  // against a winter sky measured at L* 85.6 the band forces a figure median of L* 33.6-45.6, which
+  // is a brown animal by arithmetic. I painted it to the metric twice — once cool, once warm — and
+  // got grey-lilac stone and then a grizzly. The metric was simply the wrong statistic for a
+  // white-on-light figure, and Aram asked for a white bear.
+  //
+  // So the mass is genuinely white and the SEPARATION is carried where white-on-snow carries it in
+  // life, none of which a median can see: the ink contour the figure already has, a deep contact
+  // shadow cast into the drift beneath it, and dark spruce massed behind the silhouette. The body's
+  // own shade steps stay subtle — plush, not grey — because a white animal modelled in greys reads
+  // as a dirty one. See the per-figure carve-out and its two edge-aware assertions in
+  // peeker-cast.test.ts, which replace the median gate for this figure ALONE.
+  bearCoat: '#F2EDE2', // warm near-white bear mass — white, and allowed to be
+  bearDeep: '#DCD2C2', // its shade step: one stop, warm, deliberately shallow
+  bearCast: '#4E6076', // the shadow it throws into the drift — this is what does the separating
   penguinBack: '#39434F', // penguin head/back — blue-charcoal rather than ink, so it is not a hole
   penguinFlash: '#EE8F33', // bill, feet and ear patch — the corner's one warm note, as the fox is
 

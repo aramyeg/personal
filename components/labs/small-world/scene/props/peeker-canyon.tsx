@@ -685,51 +685,86 @@ function eagleBody(d: 1 | -1): ClayPart[] {
       cone(0.009, 0.04, PALETTE.ink, [x + 0.072 * s, PERCH_Y - 0.028, z + 0.02], [0, 0, -2.5 * s], undefined, 6),
     ]),
 
-    // NECK AND HEAD, in the tawny gold. The hackles are drawn as a ruff standing off the neck's
-    // narrower run, which is the same head-pinch-shoulders reading order the yeti's rebuild needed
-    // to stop being one boulder.
-    sph(0.095, PALETTE.eagleNape, [-0.01, 0.29, 0.06], [0.9, 1.1, 0.85], 12),
-    ...tufts([-0.015, 0.29, 0.02], 0.12, 6, PALETTE.eagleNape, 0.5, 1.5, 0.52),
-    sph(0.145, PALETTE.eagleNape, [0.06, 0.475, 0.06], [1.05, 0.98, 0.94], 14),
-    // the crown, a shade darker so the skull has a top
-    sph(0.1, PALETTE.eagleWing, [0.035, 0.552, 0.02], [1.15, 0.5, 0.75], 10),
+    // NECK AND HEAD. It read as a DODO on the first two passes and the three reasons were all here,
+    // so they are all named:
+    //
+    //  1. THE BEAK WAS A CHAIN OF SPHERES. A raptor's bill is a WEDGE with a hook — a deep base
+    //     narrowing to a point that swings down BELOW the jaw line. Rounded blobs in a warm tone
+    //     make a dodo's bulbous bill however big they are drawn, which is precisely what happened.
+    //     It is now a tapered wedge plus a separate down-curved hook, and the hook overhangs.
+    //  2. THE SKULL WAS A DOME. Raptors are FLAT-CROWNED — the brow ridge runs back level with the
+    //     top of the head, and that flat line over a hooked bill is most of the read. A dome over a
+    //     round body is a pigeon.
+    //  3. THE HEAD SAT ON TOP OF THE BODY. A perched raptor MANTLES: the shoulders carry above the
+    //     neck's base so the head is set forward and DOWN between them. That hunch is the raptor
+    //     silhouette; a head balanced on a round body is a dodo's.
+    sph(0.09, PALETTE.eagleNape, [0.01, 0.27, 0.06], [0.85, 1.0, 0.85], 12),
+    ...tufts([0.0, 0.27, 0.02], 0.12, 6, PALETTE.eagleNape, 0.45, 1.45, 0.5),
+    // the shoulders MANTLING above the neck's base — the hunch, in two dark masses that crest
+    // higher than the nape does
+    sph(0.14, PALETTE.eagleWing, [-0.13, 0.33, 0.0], [1.1, 0.72, 0.7], 12),
+    sph(0.1, PALETTE.eagleDeep, [-0.2, 0.29, 0.06], [1.05, 0.66, 0.55], 10),
+    // the skull, wider than tall and set FORWARD of the neck
+    sph(0.13, PALETTE.eagleNape, [0.1, 0.44, 0.07], [1.15, 0.9, 0.94], 14),
+    // THE FLAT CROWN, in the dark tone: a low slab across the top of the skull, running BACK past
+    // the nape. The straight line is the point — it is what a dome cannot give.
+    { ...sph(0.115, PALETTE.eagleWing, [0.075, 0.5, 0.05], [1.1, 0.22, 0.7], 12), rot: [0, 0, 0.13] as V3 },
 
-    // THE BROW — the single most important piece on the head. A raptor's supraorbital ridge
-    // overhangs the eye and throws it into shadow, and that shelf is what makes the expression
-    // fierce instead of owlish. Drawn in ink so it is a line rather than a form: at reading size a
-    // shaded ridge is invisible and a drawn one is not.
+    // THE BROW, heavier and further forward than the first pass: a raptor's supraorbital ridge
+    // OVERHANGS the eye and throws it into shadow, and that shelf is the glare. Drawn in ink
+    // because at reading size a shaded ridge is invisible and a drawn one is not.
     ...limb(
       [
-        [0.185, 0.485, 0.13],
-        [0.115, 0.508, 0.15],
-        [0.03, 0.5, 0.13],
+        [0.215, 0.487, 0.135],
+        [0.13, 0.508, 0.155],
+        [0.03, 0.495, 0.13],
       ],
-      0.019,
-      0.024,
+      0.021,
+      0.027,
       PALETTE.ink
     ),
-    // the eye, set under it and forward — honey, the cast's shared warm eye
-    ...eye([0.125, 0.443, 0.145], 0.05, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+    // A pale orbital patch for the eye to be read AGAINST. Without it the eye is a dark bead under
+    // a dark brow on a dark head — three darks in a row, and the glare disappears into them. This
+    // is the same device the penguin's face patch does in the winter corner.
+    { ...sph(0.062, PALETTE.eagleNape, [0.14, 0.44, 0.135], [1.15, 0.85, 0.6], 10), rot: [0, 0, 0.1] as V3 },
+    // The eye, set UNDER the shelf and forward. Small and hard: a big round eye is an owl's, and a
+    // small one tucked under a brow is what reads as a glare.
+    ...eye([0.135, 0.436, 0.15], 0.042, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+    // a dark cheek stripe running back from the eye, which is what stops the face reading as blank
+    { ...sph(0.06, PALETTE.eagleWing, [0.055, 0.415, 0.12], [1.5, 0.34, 0.6], 8), rot: [0, 0, 0.12] as V3 },
 
-    // THE HOOKED BEAK, in three pieces: the cere at the base, a deep hooked upper mandible and a
-    // short lower one. The hook is the cue — a straight cone is a songbird's bill however big it is
-    // drawn — so the tip is a separate mass swung down BELOW the line of the culmen.
-    sph(0.05, PALETTE.goldSand, [0.185, 0.425, 0.145], [1.0, 0.9, 0.85], 10),
-    sph(0.056, PALETTE.goldSand, [0.235, 0.4, 0.14], [1.15, 0.85, 0.8], 10),
-    sph(0.036, PALETTE.goldSand, [0.275, 0.345, 0.135], [0.85, 1.25, 0.75], 10),
-    cone(0.026, 0.075, PALETTE.goldSand, [0.278, 0.303, 0.135], [0, 0, 3.35], [1, 1, 0.8], 8),
-    // the gape line, and one ink nostril on the cere
+    // THE BEAK: a WEDGE and a HOOK, not a chain of beads.
+    // The cere first — a stepped base in the dark tone, which is what makes the bill look SET INTO
+    // the face rather than stuck on it.
+    { ...sph(0.055, PALETTE.eagleDeep, [0.185, 0.418, 0.14], [0.8, 1.0, 0.85], 10), rot: [0, 0, 0.2] as V3 },
+    // the upper mandible, tapering forward and down
     ...limb(
       [
-        [0.265, 0.372, 0.16],
-        [0.2, 0.375, 0.175],
-        [0.15, 0.386, 0.16],
+        [0.19, 0.412, 0.145],
+        [0.255, 0.392, 0.145],
+        [0.3, 0.368, 0.14],
+      ],
+      0.052,
+      0.03,
+      PALETTE.goldSand
+    ),
+    // THE HOOK — a separate cone swung down BELOW the jaw line and coming to a point. This is the
+    // single piece that decides raptor or dodo, so it is drawn long enough to overhang.
+    cone(0.03, 0.115, PALETTE.goldSand, [0.312, 0.318, 0.138], [0, 0, 3.32], [1, 1, 0.85], 8),
+    // the short lower mandible, tucked under the hook's overhang
+    { ...sph(0.036, PALETTE.goldSand, [0.245, 0.352, 0.15], [1.35, 0.5, 0.8], 10), rot: [0, 0, 0.14] as V3 },
+    // the gape line and one ink nostril on the cere
+    ...limb(
+      [
+        [0.29, 0.355, 0.16],
+        [0.215, 0.372, 0.17],
+        [0.155, 0.386, 0.155],
       ],
       0.008,
-      0.011,
+      0.012,
       PALETTE.ink
     ),
-    sph(0.011, PALETTE.ink, [0.19, 0.432, 0.185], undefined, 6),
+    sph(0.011, PALETTE.ink, [0.195, 0.424, 0.185], undefined, 6),
   ])
 }
 

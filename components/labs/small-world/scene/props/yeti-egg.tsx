@@ -80,7 +80,17 @@ export const EGG_X = 0.8
  * Chapter 5 owns progress [5/6, 1], and the approach begins a little before that.
  */
 const EGG_FROM = 4.72 / 6
-const EGG_TO = 1
+/**
+ * ...and it stops BEFORE the journey's end panel appears, which is a design invariant rather than a
+ * tuning choice: the hotspot may only be armed where a click will actually reach it.
+ *
+ * `use-journey-ui` flips `ended` at progress 0.985 and `EndPanel` is then a full-viewport
+ * `pointer-events: auto` scrim — a deliberate one, with links in it, at a point where advancing is
+ * meaningless. A click cannot reach the canvas through it. Leaving the egg armed under that scrim
+ * would be a promise-shaped affordance the page does not honour, which is the same fault in
+ * miniature as the tap blanket this round removed. So the window closes a hair earlier.
+ */
+const EGG_TO = 0.98
 
 // --- the peek ---------------------------------------------------------------
 
