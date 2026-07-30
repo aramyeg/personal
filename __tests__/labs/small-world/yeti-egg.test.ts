@@ -165,10 +165,53 @@ describe('where the egg hides', () => {
     // that owns the terrain warned about it. The numbers are duplicated here rather than imported
     // so that a change to the pond in biomes.ts fails this test instead of silently moving the
     // limit under it — the point is to be told when the two stop agreeing.
-    const FROZEN = { c: norm(place(0.34, 5.55)), limit: 0.14 + 0.1 }
-    const SHELF = { c: norm(place(0.6, 5.72)), limit: 0.28 + 0.13 }
-    expect(ang(egg, FROZEN.c), 'clear of B2_FROZEN').toBeGreaterThan(FROZEN.limit + 0.03)
-    expect(ang(egg, SHELF.c), 'clear of B2_SHELF').toBeGreaterThan(SHELF.limit + 0.03)
+    // ↓↓ DO NOT REPLACE THESE WITH AN IMPORT. ↓↓
+    //
+    // They are duplicated ON PURPOSE, and the duplication IS the test. An imported constant makes
+    // this file track a moved pond silently, which is precisely the failure mode where nobody finds
+    // out the yeti is standing in water again. A duplicated one makes the disagreement itself the
+    // failing assertion.
+    //
+    // These literals already exist in THREE places: `biomes.ts` (B2_FROZEN / B2_SHELF, the source of
+    // truth), `water-clay.ts` (ICE_CAPS, which renders them), and here. Until now nothing asserted
+    // that any two of them agreed — `water-clay.ts`'s copy was logged as a drift risk for exactly
+    // that reason. `the three copies of the pond agree` below is that missing assertion, so this
+    // block is now the tripwire for the whole set rather than a fourth thing to keep in step.
+    const FROZEN = { nx: 0.34, theta: 5.55, radius: 0.14, feather: 0.1 }
+    const SHELF = { nx: 0.6, theta: 5.72, radius: 0.28, feather: 0.13 }
+    const capOf = (p: typeof FROZEN) => ({ c: norm(place(p.nx, p.theta)), limit: p.radius + p.feather })
+    for (const [name, p] of [['B2_FROZEN', FROZEN], ['B2_SHELF', SHELF]] as const) {
+      const cap = capOf(p)
+      expect(ang(egg, cap.c), `clear of ${name}`).toBeGreaterThan(cap.limit + 0.03)
+    }
+  })
+
+  it('the three copies of the pond agree', () => {
+    // The assertion `water-clay.ts`'s duplicate was missing. If someone moves a pond in biomes.ts,
+    // this fails and names the file that did not follow — instead of the ice quietly rendering in
+    // the wrong place and the egg quietly standing in water.
+    //
+    // Matched on collapsed-whitespace SUBSTRINGS rather than regexes: the thing being pinned is a
+    // handful of literals, and a pattern with escapes in it is one more thing that can silently
+    // stop matching what it names.
+    const squash = (s: string): string => s.replace(/\s+/g, ' ')
+    const read = (f: string): string =>
+      squash(readFileSync(join(process.cwd(), 'components/labs/small-world/scene', f), 'utf8'))
+    const biomes = read('biomes.ts')
+    const water = read('water-clay.ts')
+    for (const [name, nx, theta, radius, feather] of [
+      ['B2_FROZEN', 0.34, 5.55, 0.14, 0.1],
+      ['B2_SHELF', 0.6, 5.72, 0.28, 0.13],
+    ] as const) {
+      expect(
+        biomes,
+        `${name} moved in biomes.ts — update this test AND water-clay.ts's ICE_CAPS`
+      ).toContain(`const ${name}: WaterBody = { dir: norm3(place(${nx}, ${theta})), radius: ${radius}, feather: ${feather},`)
+      expect(
+        water,
+        `water-clay.ts ICE_CAPS no longer matches ${name} in biomes.ts`
+      ).toContain(`{ dir: iceDir(${nx}, ${theta}), radius: ${radius}, feather: ${feather} }`)
+    }
   })
 
   it('stays in the winter wood, which is the whole point of hiding there', () => {
