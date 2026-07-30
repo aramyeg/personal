@@ -20,10 +20,13 @@ import {
 } from '@/components/labs/small-world/scene/props/peeker-kit'
 import {
   DRESS_REACH,
+  DRIFT_ROLL,
   FACE_BOX,
   MASCOT_BOX,
   PEEKER_ABS_Z,
   PEEKER_CAST,
+  PEEKER_SIZE_FRAC,
+  WORLD_MARGIN,
   peekerUnroll,
 } from '@/components/labs/small-world/scene/props/peeker-stage'
 
@@ -39,6 +42,11 @@ import {
  */
 
 const ART_DIR = join(process.cwd(), 'components/labs/small-world/scene/props')
+/**
+ * How close to a face of `MASCOT_BOX` some figure has to come before the box counts as honestly
+ * sized. Used in BOTH directions — see the anti-slack test and the fennec's ear floor.
+ */
+const BOX_SLACK = 0.08
 const KINDS = PEEKER_CAST.flatMap((p) => [
   { biome: p.biome, kind: p.left },
   { biome: p.biome, kind: p.right },
@@ -166,10 +174,32 @@ describe('the measured mascot envelope', () => {
       up = Math.max(up, b.y1)
       down = Math.max(down, -b.y0)
     }
-    expect(MASCOT_BOX.out - out).toBeLessThan(0.08)
-    expect(MASCOT_BOX.in - inward).toBeLessThan(0.08)
-    expect(MASCOT_BOX.up - up).toBeLessThan(0.08)
-    expect(MASCOT_BOX.down - down).toBeLessThan(0.08)
+    expect(MASCOT_BOX.out - out).toBeLessThan(BOX_SLACK)
+    expect(MASCOT_BOX.in - inward).toBeLessThan(BOX_SLACK)
+    expect(MASCOT_BOX.up - up).toBeLessThan(BOX_SLACK)
+    expect(MASCOT_BOX.down - down).toBeLessThan(BOX_SLACK)
+  })
+
+  it('keeps the fennec TALL — the ears are the silhouette, so they get a floor and not just a lid', () => {
+    // EVERY OTHER ENVELOPE ASSERTION IN THIS FILE IS AN UPPER BOUND. That is the right shape for a
+    // staging contract — nothing may outgrow its box — but it means a figure can shrink to nothing
+    // and the suite stays green. The anti-slack test above is the only floor in the file and it is
+    // a floor on the CAST as a whole: `up` is bound by the camel at 0.8245, so it is satisfied
+    // whatever the fennec does.
+    //
+    // That gap is not hypothetical. Task 62 re-seated these ears and, in doing so, shortened them
+    // from 0.788 to 0.725 — a loss on the one figure whose stated design is "the ears are the
+    // silhouette", caught only because I happened to dump the envelope table by hand. Reverting the
+    // fix for it left the entire small-world suite green.
+    //
+    // So the fennec gets its own floor, and it is the anti-slack rule turned around rather than a
+    // number of my own: an animal whose silhouette IS its ears should be one of the figures the
+    // up-face is nearly bound by, to within the same slack the test above allows the cast. Same
+    // constant, opposite direction.
+    for (const dir of [1, -1] as const) {
+      const b = swept.get(`fennec:${dir}`)!
+      expect(MASCOT_BOX.up - b.y1, `fennec dir${dir} ear reach`).toBeLessThan(BOX_SLACK)
+    }
   })
 
   it('puts every dressing inside its own envelope', () => {
@@ -194,6 +224,42 @@ describe('the measured mascot envelope', () => {
         }
       }
     }
+  })
+
+  it('keeps a DRIFTING dressing roll inside the margin that covers idle motion', () => {
+    // The heave has a pin in peeker-stage.test.ts; this is its other half, and it lives here
+    // because it needs the geometry rather than the constants.
+    //
+    // `peekerAnchor` bisects for the largest composition that clears the world, so at the binding
+    // viewports the clearance is exactly zero — anything the rig does afterwards has to fit inside
+    // `WORLD_MARGIN`. The drift is the first thing in this rig to roll the DRESSING group, which
+    // reaches much further from the composition's origin than the figure does, so it could not
+    // inherit the sway's precedent: it needed its own number.
+    //
+    // The radius is MEASURED from the shipped part lists rather than written down, which is the
+    // point — a floe that grew would move this, and a constant would not.
+    let exercised = 0
+    for (const { biome, kind } of KINDS) {
+      if (!PEEKER_SPECS[kind].drifts) continue
+      for (const dir of [1, -1] as const) {
+        for (const vdir of [1, -1] as const) {
+          const b = boundsOf(peekerDressing(biome, kind, dir, vdir), new THREE.Matrix4())
+          const radius = Math.max(
+            Math.hypot(b.x0, b.y0),
+            Math.hypot(b.x0, b.y1),
+            Math.hypot(b.x1, b.y0),
+            Math.hypot(b.x1, b.y1)
+          )
+          // exact chord of the roll, not the small-angle approximation, so the bound does not rest
+          // on an unstated assumption about how small DRIFT_ROLL is allowed to get
+          const displaced = 2 * radius * Math.sin(DRIFT_ROLL / 2) * PEEKER_SIZE_FRAC
+          expect(displaced, `${biome}/${kind} dir${dir} vdir${vdir} roll`).toBeLessThan(WORLD_MARGIN)
+          exercised++
+        }
+      }
+    }
+    // anti-vacuity: a cast with no `drifts` kind would pass every assertion above by running none
+    expect(exercised, 'some kind actually drifts').toBeGreaterThan(0)
   })
 
   it('keeps every face inside FACE_BOX, which is what stays on screen', () => {

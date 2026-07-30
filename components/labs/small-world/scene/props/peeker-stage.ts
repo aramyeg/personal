@@ -562,14 +562,25 @@ export function peekerDrift(dwell: number, phase: number): { roll: number; bob: 
  *
  * WHY THIS DOES NOT NEED ITS OWN CLEARANCE PASS, stated rather than assumed. `peekerAnchor`
  * bisects for the largest composition that CLEARS the world and the cards, so at the binding
- * viewports the clearance is exactly zero and any extra motion would eat into it. The rig already
- * moves compositions after that decision, though — `PEEKER_MAX_SWAY` rolls them by up to 0.055 rad
- * — and what covers that is `WORLD_MARGIN`, whose own docblock names "the props' idle motion" as
- * one of the three things it is for. The heave is smaller than the sway it sits beside: at the
- * largest mascot (`PEEKER_SIZE_FRAC` of the half-height) it displaces
- * `DRIFT_BOB · PEEKER_SIZE_FRAC` = 0.0064 half-heights, against a 0.045 margin. The equivalent
- * card bound is `CARD_PAD`, and peeker-stage.test.ts pins both in the units they are expressed in
- * rather than restating this paragraph.
+ * viewports the clearance is exactly zero and any extra motion would eat into it. What covers
+ * motion applied AFTER that decision is `WORLD_MARGIN`, whose own docblock names "the props' idle
+ * motion" as one of the three things it is for.
+ *
+ * TWO SEPARATE MOTIONS FIT IN THAT MARGIN, and an earlier version of this note ran them together —
+ * it justified the heave by pointing at `PEEKER_MAX_SWAY` as something the rig "already" does to
+ * compositions. It does not: the sway rolls the FIGURE group only, and the figure is bounded by
+ * `MASCOT_BOX`. The drift is the first thing in this rig to roll the DRESSING, which reaches
+ * considerably further from the composition's origin — so it is a genuinely new displacement and
+ * deserved its own arithmetic rather than a borrowed precedent.
+ *
+ * Both are small, and both are pinned rather than asserted here:
+ *
+ *  - the HEAVE displaces `DRIFT_BOB · PEEKER_SIZE_FRAC` = 0.0064 half-heights at the largest
+ *    mascot, against a 0.045 margin. Its card-side equivalent is `CARD_PAD`, checked at the tallest
+ *    frame in the suite (peeker-stage.test.ts).
+ *  - the DRESSING ROLL displaces the chord of `DRIFT_ROLL` at the dressing's own worst radius,
+ *    which peeker-cast.test.ts measures from the shipped part lists rather than taking on trust —
+ *    about 0.016 half-heights today, so a floe that grew by half again would still fit.
  */
 export const PEEKER_MAX_BOB = DRIFT_BOB
 

@@ -737,26 +737,29 @@ const FOX_SEAT = LEDGE_TOP
  *     growing out of the neck. It is now seated at 1.0x on the upper-rear quadrant, which is where
  *     the far ear of a head turned three-quarters to the reader is.
  *
- * THE FIX FOR (1) IS THE SHAPE OF THE BLADE, AND THE FIRST ATTEMPT MADE IT WORSE. I tried adding a
- * narrow PEDICLE frustum under the cone so the flat base would be buried. Captured, that was a
- * clear regression: the frustum's own straight sides and the hard shoulder where the blade's wider
- * base met its narrower top turned each ear into a folded-paper hat, and the pair read as an
- * origami crown. Burying one flat edge by adding two more is not a fix.
+ * THE FIX FOR (1) TOOK THREE GOES, AND THE FIRST TWO ARE HERE BECAUSE EACH LOST THE ANIMAL:
  *
- * What the ear is now is a broad flattened ELLIPSOID with a CONE growing out of the top of it, and
- * the argument for each half is separate:
+ *  a. A NARROW PEDICLE FRUSTUM under the cone, so the flat base would be buried. Captured, a clear
+ *     regression: the frustum's own straight sides, plus the hard shoulder where the blade's wider
+ *     base met its narrower top, turned each ear into a folded-paper hat and the pair into an
+ *     origami crown. Burying one flat edge by adding two more is not a fix.
+ *  b. A BROAD ELLIPSOID with a cone on top of it. This did answer the join — an ellipsoid has no
+ *     edges, so its silhouette is a closed curve and it can emerge from a skull at any depth with a
+ *     smooth tangent. But measured, the plate came out 0.384 tall by 0.380 wide with the cone adding
+ *     only a quarter above it: a near-CIRCLE with a small point, which is a big ROUND ear and a
+ *     different animal from a big POINTED one. The review caught it, and the paragraph four above —
+ *     "an ellipsoid gives a rounded oval, which is a rabbit" — had already warned me.
  *
- *  - the ellipsoid HAS NO EDGES. Its silhouette is a closed curve, so it can emerge from a skull at
- *    any depth and the join is a smooth tangent rather than a chord. That answers (1).
- *  - the cone is what stops it being the rounded oval this docblock warns is a rabbit — and a
- *    capture proved that warning exact. My first version of this shape gave the cone only a quarter
- *    of the ear's height, so it barely cleared the oval's own top, and the pair came back reading
- *    as MOUSE ears: two near-circles on a small head. The cone now runs from halfway up the plate
- *    to well past its top, and the ear has a point again.
+ * WHAT IT IS NOW: the original CONE is back, because the flare from a broad base to a point is the
+ * fennec's whole outline and only a cone draws it. The base's two corners are answered instead by a
+ * flat rounded LOBE centred exactly on them — semi-width `wide`, so its widest point coincides with
+ * each corner and its curve rounds them off in both directions. The silhouette runs: skull, then the
+ * lobe's curve out to the ear's widest point, then the cone's straight side to the tip. The corner
+ * at the widest point stays, and it should: that is the turn of the conch's outer margin, which is a
+ * feature of an ear rather than an artefact of a primitive.
  *
- * The cone's own base is seated INSIDE the ellipsoid, at about 60% of the plate's width there, so
- * the one flat face in the shape is never drawn. Every straight edge here is interior to some other
- * part, which is the property the whole rebuild is for.
+ * The lobe also flares a little past the skull's own outline at the attachment, which is true of the
+ * animal — a fennec's ear conch is wider than its braincase where it joins.
  */
 function fennecEar(at: V3, len: number, wide: number, lean: number, tipIn: number): ClayPart[] {
   const c = Math.cos(lean)
@@ -767,40 +770,42 @@ function fennecEar(at: V3, len: number, wide: number, lean: number, tipIn: numbe
     at[1] + c * t + s * o,
     at[2] + z,
   ]
-  /** Half-height of the ellipsoid, in the ear's own axis units. The cone carries the rest. */
-  const plate = len * 0.4
   return [
-    // THE PLATE: a broad flattened ellipsoid. Its lowest point is a pole rather than an edge, and it
-    // sits below the root — so the ear rises out of the skull with nothing straight at the join.
+    // THE BASE LOBE, first and buried: a flat rounded mass whose half-width is exactly `wide`, so
+    // its widest point sits ON each of the cone's base corners and its curve rounds them off. It is
+    // the whole answer to the flat-disc fault, and it costs one primitive rather than a new shape
+    // language. Flat (0.42 of its width in height) so it reads as the ear's own base rather than as
+    // a jowl running down the side of the head.
     {
-      ...sph(plate, PALETTE.fennecCoat, up(len * 0.34, 0, -0.01), [wide / plate, 1, (0.3 * len) / (2 * plate)], 12),
+      ...sph(wide, PALETTE.fennecCoat, up(0, 0, -0.01), [1, 0.42, 0.3], 12),
       rot: [0, 0, lean] as V3,
     },
-    // ...and the TIP, running from halfway up the plate to `len`. Its length is the difference
-    // between an ear and a mouse's ear, which is not a figure of speech — see the docblock.
-    // (0.72 rather than a narrower base on purpose: the cone's side and the plate's curve cross at
-    // whatever radius makes them equal, and a narrow cone crosses low and steeply — which draws a
-    // visible SHOULDER in the outline. At 0.72 they meet near the plate's own top, where the two
-    // tangents are close, and the ear runs from oval to point without a kink.)
-    cone(wide * 0.72, len * 0.5, PALETTE.fennecCoat, up(len * 0.75, 0, -0.01), [0, 0, lean], [1, 1, 0.3], 9),
+    // THE BLADE: the cone is back, because the flare from a broad base to a point is the fennec's
+    // whole outline and only a cone draws it. Its base sits at the root, inside the lobe.
+    cone(wide, len, PALETTE.fennecCoat, up(len * 0.5, 0, -0.01), [0, 0, lean], [1, 1, 0.3], 9),
+    // THERE IS NO ROUNDING SPHERE ON THE TIP, and its absence is a result rather than an omission.
+    //
+    // T61 put one at 0.8 of the length at a third of the ear's width. A 5x crop shows what that
+    // actually draws: the cone is only 0.2 of `wide` at that height, so the sphere stands 0.027
+    // proud of it and reads as a KNOB partway down the blade — the same pom-pom the docblock above
+    // warns about, smaller. Moving it up to cap the apex was worse: against a cone that is 0.008
+    // wide there, any sphere is a ball on a stick, and the capture came back with two of them.
+    //
+    // A cone's apex is already the shape an ear tip wants, and `inflateClay` blunts it for free —
+    // the ink hull pushes every vertex out along its own normal, so the drawn outline is rounded by
+    // the contour width even where the clay comes to a point. That is enough, and it is the only
+    // version of this tip that has ever survived a crop.
     // the back of the ear, as ONE crescent along the outer edge rather than a second full triangle
     {
-      ...sph(len * 0.36, PALETTE.fennecDeep, up(len * 0.44, -wide * 0.5, -0.028), [0.2, 1, 0.16], 10),
+      ...sph(len * 0.42, PALETTE.fennecDeep, up(len * 0.46, -wide * 0.52, -0.028), [0.2, 1, 0.16], 10),
       rot: [0, 0, lean] as V3,
     },
-    // The inner dish, forward in Z so it wins the depth test against its own backing, and built to
-    // the same two-part recipe so the pink follows the ear's own outline instead of sitting in it
-    // as a disc.
-    {
-      ...sph(plate * 0.84, PALETTE.fennecEar, up(len * 0.34, tipIn, 0.035), [(wide * 0.72) / (plate * 0.84), 1, 0.2], 12),
-      rot: [0, 0, lean] as V3,
-    },
-    // narrower than the coat's tip at every height, or the pink crosses the outline it is lining —
-    // which it did at 0.46, by about a hundredth of a figure-height at the ear's shoulder
-    cone(wide * 0.38, len * 0.36, PALETTE.fennecEar, up(len * 0.6, tipIn, 0.04), [0, 0, lean], [1, 1, 0.24], 8),
+    // The inner dish, forward in Z so it wins the depth test against its own backing, and stopping
+    // short of the tip so the coat's edge frames it. Its own base disc is interior to the lobe.
+    cone(wide * 0.72, len * 0.78, PALETTE.fennecEar, up(len * 0.43, tipIn, 0.035), [0, 0, lean], [1, 1, 0.24], 9),
     // two soft ear-fur lobes, seated inside the dish
-    ...[0.3, 0.5].map((t) => ({
-      ...sph(len * 0.12, PALETTE.fennecCream, up(len * t, wide * 0.24, 0.055), [0.42, 1, 0.2], 8),
+    ...[0.3, 0.52].map((t) => ({
+      ...sph(len * 0.15, PALETTE.fennecCream, up(len * t, wide * 0.24, 0.055), [0.42, 1, 0.2], 8),
       rot: [0, 0, lean + 0.24] as V3,
     })),
   ]
@@ -824,7 +829,7 @@ function fennecBody(): ClayPart[] {
     // FAR EAR first so everything else draws over its base. Its root is ON the skull's upper-rear
     // quadrant (1.0x the skull's own radius from its centre, measured against the ellipsoid's three
     // semi-axes rather than eyeballed) — the previous 1.9x put it out over the neck.
-    ...fennecEar([-0.075, 0.268, -0.055], 0.4, 0.16, 0.34, -0.012),
+    ...fennecEar([-0.075, 0.268, -0.055], 0.46, 0.165, 0.34, -0.012),
 
     // Haunch and rump, seated on the shelf. The rump is the figure's outward mass and it is what
     // crops at the frame — a seated fox is widest at the hip, so that is the honest place to spend
@@ -989,11 +994,11 @@ export function desertPieces(kind: 'camelAdult' | 'fennec', dir: 1 | -1): Peeker
         at: [FOX_EAR_AT[0] * dir, FOX_EAR_AT[1], FOX_EAR_AT[2]],
         // the near ear earns the second contour ahead of the tail: it is the silhouette, and the
         // tail is tucked against the body where an outline gains almost nothing
-        // 0.48 rather than the 0.43 the cone version used: the two-part ear spends some of its
-        // length inside the skull, so the same number gave a SHORTER silhouette — measured, the
-        // swept `up` reach fell from 0.788 to 0.725 against a 0.87 box. On a figure whose whole
-        // design is "the ears are the silhouette" that is a real loss, and it is bought back here.
-        parts: facing(dir, fennecEar([0, 0, 0], 0.48, 0.19, -0.16, 0.014)),
+        // 0.48 rather than the 0.43 the T61 cone used, because the root moved DOWN into the skull
+        // by 0.02 when the ear was re-seated and the ear has to earn that back before it earns
+        // anything. `peeker-cast.test.ts` now holds a FLOOR on this reach, so a future shortening
+        // fails instead of passing quietly — which is what happened to the first attempt at it.
+        parts: facing(dir, fennecEar([0, 0, 0], 0.53, 0.19, -0.16, 0.014)),
         ink: true,
       },
       // no `ink` on the tail: only the first INK_PIECE_LIMIT pieces are ever drawn with a contour,
