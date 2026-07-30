@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { EGG_THETA, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
+import { EGG_THETA, EGG_TO, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
+import { END_AT } from '@/components/labs/small-world/overlay/use-journey-ui'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import { waterMask } from '@/components/labs/small-world/scene/biomes'
 
@@ -111,6 +112,19 @@ describe('the egg house rules', () => {
     // Either alone arms a target the visitor cannot see: the variant gate is true while the ground
     // is round the back of the planet, and progress alone ignores which paint that ground carries.
     expect(src).toMatch(/activeVariantAt\([\s\S]{0,80}&&[\s\S]{0,120}progress >= EGG_FROM/)
+  })
+
+  it('closes its window before the end panel covers the canvas', () => {
+    // Task 62, and it closes the R18 review's last open item: `EGG_TO` was unpinned, so raising it
+    // back to 1 would have re-armed the hotspot underneath `EndPanel` — a full-viewport
+    // `pointer-events: auto` scrim — and nothing in the suite would have failed. The design
+    // invariant is that the egg may only be armed where a click can actually reach it, which is
+    // the same rule the tap-blanket fix established for the whole lab.
+    //
+    // The pin is a RELATION between the two modules' own constants, not a literal restated here. A
+    // frozen copy of 0.985 would go stale the moment the end panel moved, and this lane spent two
+    // commits earlier in the same round unwinding exactly that mistake in the yeti's pond test.
+    expect(EGG_TO, 'the hotspot must disarm before EndPanel goes up').toBeLessThan(END_AT)
   })
 
   it('cancels the one-shot when the gate closes, in the same frame', () => {

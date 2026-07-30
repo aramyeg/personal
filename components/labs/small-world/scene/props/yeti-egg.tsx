@@ -84,13 +84,19 @@ const EGG_FROM = 4.72 / 6
  * ...and it stops BEFORE the journey's end panel appears, which is a design invariant rather than a
  * tuning choice: the hotspot may only be armed where a click will actually reach it.
  *
- * `use-journey-ui` flips `ended` at progress 0.985 and `EndPanel` is then a full-viewport
+ * `use-journey-ui` flips `ended` at `END_AT` and `EndPanel` is then a full-viewport
  * `pointer-events: auto` scrim — a deliberate one, with links in it, at a point where advancing is
  * meaningless. A click cannot reach the canvas through it. Leaving the egg armed under that scrim
  * would be a promise-shaped affordance the page does not honour, which is the same fault in
  * miniature as the tap blanket this round removed. So the window closes a hair earlier.
+ *
+ * EXPORTED for the pin (Task 62). The R18 review closed with this constant unguarded: raising it
+ * back to 1 would re-arm the hotspot under the scrim and nothing in the suite would fail. The pin
+ * is a RELATION between this number and `END_AT` rather than a literal restated in a test, because
+ * a frozen copy of 0.985 would go stale the moment the end panel moved — which is exactly the
+ * failure the yeti's own pond test was rebuilt out of two commits earlier in the same round.
  */
-const EGG_TO = 0.98
+export const EGG_TO = 0.98
 
 // --- the peek ---------------------------------------------------------------
 

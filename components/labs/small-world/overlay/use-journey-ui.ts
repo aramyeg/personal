@@ -13,7 +13,15 @@ export type JourneyUi = {
 }
 
 const T_STEPS = 60
-const END_AT = 0.985
+/**
+ * Progress at which the journey is over and `EndPanel` goes up.
+ *
+ * EXPORTED because something else depends on it: `EndPanel` is a full-viewport `pointer-events:
+ * auto` scrim, so nothing on the canvas may still be armed as a click target past this point. The
+ * yeti easter egg closes its own window before this one opens, and the test that pins that reads
+ * BOTH constants rather than restating either — see `EGG_TO`.
+ */
+export const END_AT = 0.985
 
 /**
  * Cards mount and roll out on the ARRIVAL CLOCK when one is driving (Task 54): the
