@@ -24,6 +24,7 @@ import { AccentureSet, DesertLife } from './props/set-accenture'
 import { AknaSet } from './props/set-akna'
 import { CanyonGeysers } from './props/canyon'
 import { WinterLife } from './props/winter'
+import { YetiEgg } from './props/yeti-egg'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
@@ -81,6 +82,9 @@ function SceneContents({
         <DesertLife journeyRef={journeyRef} />
         <CanyonGeysers journeyRef={journeyRef} />
         <WinterLife journeyRef={journeyRef} />
+        {/* The retired yeti, hiding in the winter wedge's right-hand conifers. The lab's one click
+            interaction — its hotspot arms only while that ground is on frame (Task 61). */}
+        <YetiEgg journeyRef={journeyRef} />
         <Bridges journeyRef={journeyRef} />
         <Delights journeyRef={journeyRef} />
         <ChapterSet index={0} journeyRef={journeyRef}>
