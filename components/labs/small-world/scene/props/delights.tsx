@@ -1,7 +1,9 @@
 'use client'
-import { useSyncExternalStore } from 'react'
+import { useRef, useSyncExternalStore } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
+import { BERG_MIN_SCALE, bergGrow } from './berg-reveal'
 import { POLAR_L, WATER_LEVEL } from '../biomes'
 import { PLANET_RADIUS } from '../planet'
 import { DIALS, subscribe, revisionSnapshot } from '../tunables'
@@ -53,8 +55,7 @@ const FLOES_L: Array<[number, number, number]> = [
  * that flips has to flip while occluded, and renewal-scan.mjs models a WET cell's silhouette as
  * exactly the waterline with NO prop margin — the grazing limb is the one place the Task-19 work
  * proved tall things cannot be hidden at all. So a berg that appeared with the epilogue would be a
- * berg that pops on camera. Permanent ice on a polar ocean is also simply truer to the world: the
- * floes beside them have been there since Round 6.
+ * berg that pops on camera.
  *
  * Placed at |nx| ≈ 0.84-0.88 and spread across the world angles the ocean occupies at the final
  * dwell, so they sit ON the visible blue rather than silhouetted on the rim (the first placement
@@ -74,13 +75,35 @@ const BERGS_L: Array<[number, number, number, number]> = [
 /** Icebergs seated on the ocean surface, sharing PolarFloes' float math. The seat sits BELOW the
  *  nominal waterline (the floes' +0.012 is a hair less than the water's own relief crest, ~0.021
  *  world at default dials), so a berg's dark shelf is always cut by the surface instead of
- *  hovering over a swell. */
-function PolarBergs({ cap, spec }: { cap: { dir: readonly [number, number, number] }; spec: Array<[number, number, number, number]> }) {
+ *  hovering over a swell — and it is also what makes the WINTER REVEAL read: the group scales about
+ *  a point UNDER the water, so a berg rises out of the sea rather than materialising above it. See
+ *  `berg-reveal.ts` for when, and why growing them in plain view is the honest answer here. */
+function PolarBergs({
+  cap,
+  spec,
+  journeyRef,
+}: {
+  cap: { dir: readonly [number, number, number] }
+  spec: Array<[number, number, number, number]>
+  journeyRef: JourneyRef
+}) {
   useSyncExternalStore(subscribe, revisionSnapshot, revisionSnapshot)
+  const bergs = useRef<Array<THREE.Group | null>>([])
   const waterR = PLANET_RADIUS * (WATER_LEVEL + DIALS.waterRise.value)
   const c = new THREE.Vector3(cap.dir[0], cap.dir[1], cap.dir[2]).normalize()
   const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
   const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
+
+  useFrame(() => {
+    const grow = bergGrow(journeyRef.current.rotation)
+    const on = grow > BERG_MIN_SCALE
+    for (const g of bergs.current) {
+      if (!g) continue
+      g.visible = on
+      if (on) g.scale.setScalar(grow)
+    }
+  })
+
   return (
     <>
       {spec.map(([a, b, r, spin], i) => {
@@ -91,7 +114,14 @@ function PolarBergs({ cap, spec }: { cap: { dir: readonly [number, number, numbe
           .multiply(new THREE.Quaternion().setFromAxisAngle(Y_UP, spin))
         return (
           <group key={i} position={pos} quaternion={quat}>
-            <ClayIceberg r={r} />
+            <group
+              ref={(g) => {
+                bergs.current[i] = g
+              }}
+              visible={false}
+            >
+              <ClayIceberg r={r} />
+            </group>
           </group>
         )
       })}
@@ -110,9 +140,12 @@ export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   return (
     <>
-      {/* permanent ice on the one great left ocean */}
+      {/* The FLOES are permanent — flat discs a few hundredths thick, lying in the water rather
+          than standing out of it, and at reading size they are a couple of pale slivers on the
+          limb. They are also simply true: a polar ocean has ice in it all year, and it was the
+          BERGS Aram saw from the desert. The bergs now arrive with the winter (see PolarBergs). */}
       <PolarFloes cap={POLAR_L} spec={FLOES_L} />
-      <PolarBergs cap={POLAR_L} spec={BERGS_L} />
+      <PolarBergs cap={POLAR_L} spec={BERGS_L} journeyRef={journeyRef} />
 
       {/* A0 spring pond: lily blossoms on the near bank */}
       {([[1.22, 0.62], [1.34, 0.9], [1.28, 0.72]] as const).map(([t, x], i) => (
