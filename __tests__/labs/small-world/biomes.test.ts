@@ -32,7 +32,11 @@ import {
   CROSSINGS_B,
   B_CROSSING_BY_BAND,
   channelDist,
+  biomeTint,
+  epilogueRegion,
+  EPILOGUE_END,
 } from '@/components/labs/small-world/scene/biomes'
+import { EPILOGUE_END as RENEWAL_EPILOGUE_END } from '@/components/labs/small-world/scene/renewal'
 import {
   terrainBump,
   terrainBumpB,
@@ -816,6 +820,131 @@ describe('Task 38 — the pressed-clay boundary lip is invariant + EXACTLY 0 on 
         const ny = ring * Math.cos(m)
         const nz = ring * Math.sin(m)
         expect(biomeBumpB(nx, ny, nz)).toBe(biomeBump(nx, ny, nz))
+      }
+    }
+  })
+})
+
+describe('Task 60 — the epilogue snow field', () => {
+  const R = 2.2
+  const STANCE_ALPHA_LOCAL = Math.asin(0.75 / R)
+  const dirAt = (thetaC: number, nx: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(thetaC), ring * Math.sin(thetaC)]
+  }
+
+  it('mirrors EPILOGUE_END exactly between the geography and the gate', () => {
+    // biomes.ts is a zero-import leaf for the Node benches, so renewal.ts carries its own copy.
+    // If these ever drift, props would appear at a longitude the ground does not repaint.
+    expect(EPILOGUE_END).toBe(RENEWAL_EPILOGUE_END)
+  })
+
+  it('covers the whole face the visitor sees at the final dwell', () => {
+    // task60-vista.mjs measures the last visible longitude at rotation 4π as thetaC = 2.609
+    // (the equatorial limb; every other latitude's limb falls short of it).
+    const LAST_VISIBLE = 2.609
+    for (let nx = -0.85; nx <= 0.85; nx += 0.05) {
+      for (let thetaC = STANCE_ALPHA_LOCAL; thetaC <= LAST_VISIBLE; thetaC += 0.02) {
+        expect(epilogueRegion(thetaC, nx)).toBe(1)
+      }
+    }
+  })
+
+  it('begins at the wrap seam, so the join under the girl needs no boundary', () => {
+    for (let nx = -0.9; nx <= 0.9; nx += 0.1) {
+      expect(epilogueRegion(STANCE_ALPHA_LOCAL, nx)).toBe(1)
+    }
+  })
+
+  it('hands back to the canyon within the wander band, and is out well before it', () => {
+    for (let nx = -0.9; nx <= 0.9; nx += 0.05) {
+      expect(epilogueRegion(EPILOGUE_END - BOUNDARY_WANDER - 1e-6, nx)).toBe(1)
+      expect(epilogueRegion(EPILOGUE_END + BOUNDARY_WANDER + 1e-6, nx)).toBe(0)
+    }
+  })
+
+  it('tears its far edge instead of cutting it straight', () => {
+    // the edge must actually MOVE with latitude — a straight edge would be a seam, which is the
+    // thing Round 12 rejected. Probe at the wander amplitude: some latitudes in, some out.
+    let inside = 0
+    let outside = 0
+    for (let nx = -0.8; nx <= 0.8; nx += 0.02) {
+      if (epilogueRegion(EPILOGUE_END, nx) === 1) inside++
+      else outside++
+    }
+    expect(inside).toBeGreaterThan(0)
+    expect(outside).toBeGreaterThan(0)
+  })
+
+  it('is variant-invariant and rotation-independent (it is geography, not timing)', () => {
+    // the signature takes no variant and no rotation at all; this pins that it stays that way
+    expect(epilogueRegion.length).toBeLessThanOrEqual(3)
+  })
+})
+
+describe('Task 60 — biomeTint under the epilogue band override', () => {
+  const R = 2.2
+  const dirAt = (thetaC: number, nx: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(thetaC), ring * Math.sin(thetaC)]
+  }
+
+  it('leaves the A and B bakes untouched when no override is passed', () => {
+    for (const thetaC of [1.0, 2.0, 3.3, 5.5]) {
+      for (const nx of [-0.5, -0.2, 0.2, 0.5]) {
+        const [x, y, z] = dirAt(thetaC, nx)
+        const bump = biomeBumpB(x, y, z)
+        expect(biomeTint(x, y, z, bump, 1, BOUNDARY_WANDER, undefined)).toEqual(
+          biomeTint(x, y, z, bump, 1)
+        )
+      }
+    }
+  })
+
+  it('reads open desert ground as SNOW once the band is overridden to winter', () => {
+    // band-0 open ground at mid latitude: gold dunes as variant B, snow under the override
+    let snowCount = 0
+    let meadowCount = 0
+    for (let thetaC = 0.6; thetaC <= 2.3; thetaC += 0.05) {
+      for (const nx of [-0.45, -0.25, 0.25, 0.45]) {
+        const [x, y, z] = dirAt(thetaC, nx)
+        const bump = biomeBumpB(x, y, z)
+        const asB = biomeTint(x, y, z, bump, 1)
+        const asEpi = biomeTint(x, y, z, bump, 1, BOUNDARY_WANDER, 2)
+        if (asB.kind === 'meadow') {
+          meadowCount++
+          if (asEpi.kind === 'snow') snowCount++
+        }
+      }
+    }
+    expect(meadowCount).toBeGreaterThan(20)
+    // every open-ground sample must convert; a partial conversion would be a patchy snow field
+    expect(snowCount).toBe(meadowCount)
+  })
+
+  it('leaves water alone — the override is a LAND reading, not a repaint of the ocean', () => {
+    for (let thetaC = 0.5; thetaC <= 2.5; thetaC += 0.1) {
+      for (const nx of [-0.95, -0.9, -0.85]) {
+        const [x, y, z] = dirAt(thetaC, nx)
+        const bump = biomeBumpB(x, y, z)
+        const asB = biomeTint(x, y, z, bump, 1)
+        if (asB.kind === 'underwater') {
+          expect(biomeTint(x, y, z, bump, 1, BOUNDARY_WANDER, 2)).toEqual(asB)
+        }
+      }
+    }
+  })
+
+  it('changes nothing at the grazing limbs, where nothing can be hidden', () => {
+    // accentLatGate is 0 by |nx| = 0.86 and the snow/canyon kinds are gated by it, so the
+    // epilogue delta dies before the pole exactly as the A/B accent delta does.
+    for (let thetaC = 0.5; thetaC <= 2.5; thetaC += 0.05) {
+      for (const nx of [-0.97, -0.9, 0.9, 0.97]) {
+        const [x, y, z] = dirAt(thetaC, nx)
+        const bump = biomeBumpB(x, y, z)
+        expect(biomeTint(x, y, z, bump, 1, BOUNDARY_WANDER, 2)).toEqual(
+          biomeTint(x, y, z, bump, 1)
+        )
       }
     }
   })

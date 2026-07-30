@@ -219,6 +219,51 @@ export function boundaryWander(nx: number, i: number, amp: number): number {
   return amp * boundaryWanderShape(nx, i)
 }
 
+/**
+ * THE EPILOGUE SNOW FIELD (Task 60) — how far the winter reaches past its own wedge.
+ *
+ * At the final dwell the girl stands exactly on the band-2/band-0 meridian, and the face ahead of
+ * her is not winter at all: measured through the shipped camera by bench/task60-vista.mjs, the
+ * on-screen planet is 79.8% band-0 desert, 12.3% band-2 winter and 7.9% band-1 canyon (desktop;
+ * 81.1/12.7/6.2 on a phone). So the snow has to cover ALL of band 0 and reach past the far
+ * meridian into band 1.
+ *
+ * How far exactly is set by the horizon, not by taste. At rotation 4π a vertex is visible only
+ * while `rotation − thetaC` sits outside the hidden band, which puts the last visible longitude at
+ * thetaC = 2.609 (the equatorial limb; every other latitude's limb is nearer). Anything beyond
+ * that is never seen after it flips. EPILOGUE_END = 3.0 clears the visible limb by 0.39 rad and
+ * still completes its flip 0.85 rad of rotation before the journey ends (a vertex finishes at
+ * rotation = thetaC + EPILOGUE_START + EPILOGUE_WIDTH; worst case 3.035 + 8.6832 = 11.72 < 4π).
+ *
+ * The NEAR edge needs no constant: canonical thetaC starts at the band-2/band-0 meridian, so the
+ * epilogue simply begins at the wrap seam. Both sides of that meridian then paint band-2 winter,
+ * which is the point — the join under the girl's feet reads as one continuous snow field rather
+ * than as a boundary.
+ *
+ * The FAR edge is torn like every other biome boundary (Task 38): a fourth differently-phased
+ * wander curve on the same dial, so the handoff back to the canyon is a hard rough change with no
+ * seam. It is variant-invariant and a pure function of position — the TIMING is what renewal owns,
+ * so a latitude-wandering edge costs nothing: each vertex still flips inside its own hidden window.
+ */
+export const EPILOGUE_END = 3.0
+// (Mirrored in renewal.ts, which needs it for the prop-side `sceneVariantAt` and is kept a
+//  zero-import leaf. biomes.test pins the two equal, the same way STANCE_ALPHA is handled.)
+
+/** Unit wander shape for the epilogue's far edge — the same 3-octave sine fBm the meridian
+ *  boundaries use, continuing the golden-angle phase series at i = 3 so it tears differently
+ *  from all three of them. |shape| ≤ 1. */
+function epilogueWanderShape(nx: number): number {
+  return boundaryWanderShape(nx, 3)
+}
+
+/**
+ * 1 inside the epilogue snow field, 0 outside — a hard, torn membership test (no soft edge, per
+ * the Round-12 verdict against seams). Pure, variant-invariant, independent of rotation.
+ */
+export function epilogueRegion(thetaC: number, nx: number, amp: number = BOUNDARY_WANDER): 0 | 1 {
+  return thetaC < EPILOGUE_END + amp * epilogueWanderShape(nx) ? 1 : 0
+}
+
 /** Signed longitude offset (rad, wrapped to (−π,π]) of a canonical longitude from its
  *  nearest meridian. Shared by paintBand + boundaryDist. */
 function signedMeridianDelta(thetaC: number, i: number): number {
@@ -1288,7 +1333,11 @@ export function biomeTint(
   nz: number,
   currentBump: number,
   variant: 0 | 1,
-  wanderAmp: number = BOUNDARY_WANDER
+  wanderAmp: number = BOUNDARY_WANDER,
+  /** Task 60 — the epilogue bake passes 2 here to classify band-0/band-1 ground as the WINTER
+   *  wedge without moving a single vertex: same relief, winter reading. Undefined everywhere
+   *  else, so the A and B bakes are byte-identical to before. */
+  pbandOverride?: 0 | 1 | 2
 ): { kind: BiomeKind; t: number } {
   const radius = 1 + currentBump
   if (radius < WATER_LEVEL) {
@@ -1309,7 +1358,7 @@ export function biomeTint(
   // Task 38: band membership follows the HARD torn boundary, not the straight meridian,
   // so the canyon/snow scenes abut their neighbours at the same pressed-clay curve the
   // accents do — no soft meridian fade.
-  const pband = paintBand(thetaC, nx, wanderAmp)
+  const pband = pbandOverride ?? paintBand(thetaC, nx, wanderAmp)
   // B1 canyon: the rich-brown gorge (near the creek) + standalone badland buttes
   // read as clay added onto the pink-warm surround. `t` runs 1 in the creek floor
   // (deepest brown) to 0 on the upper banks/rims (lightened terracotta) so the

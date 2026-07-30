@@ -1,5 +1,12 @@
 import * as THREE from 'three'
-import { FLIP_START, FLIP_WIDTH, STANCE_ALPHA, renewalGate } from './renewal'
+import {
+  EPILOGUE_START,
+  FLIP_START,
+  FLIP_WIDTH,
+  STANCE_ALPHA,
+  epilogueGate,
+  renewalGate,
+} from './renewal'
 
 /**
  * The traveling-front renderer. Replaces the old whole-buffer applyWorldBlend: a
@@ -53,6 +60,10 @@ export type MorphTarget = {
   buckets: Buckets
   colorsA: Float32Array
   colorsB: Float32Array
+  /** Task 60 — the epilogue colours (colour only; the epilogue moves no vertex). Equal to
+   *  `colorsB` outside the snow field, so supplying it is a no-op there. Omit it entirely and
+   *  the target behaves exactly as it did before the epilogue existed. */
+  colorsC?: Float32Array
   positionsA?: Float32Array
   positionsB?: Float32Array
   normalsA?: Float32Array
@@ -63,17 +74,29 @@ export type MorphTarget = {
  *  re-lerps only the buckets swept since then. */
 export function makeRenewalMorph(t: MorphTarget): { update: (rotation: number) => void } {
   const colArr = t.geo.attributes.color.array as Float32Array
+  const cC = t.colorsC ?? null
   const posArr = t.positionsA ? (t.geo.attributes.position.array as Float32Array) : null
   const norArr = t.normalsA ? (t.geo.attributes.normal.array as Float32Array) : null
   const { starts, verts } = t.buckets
   const thetaC = t.thetaC
   let last = Number.NaN
 
-  const writeVertex = (i: number, gate: number): void => {
+  const writeVertex = (i: number, gate: number, epi: number): void => {
     const j = i * 3
-    colArr[j] = t.colorsA[j] + (t.colorsB[j] - t.colorsA[j]) * gate
-    colArr[j + 1] = t.colorsA[j + 1] + (t.colorsB[j + 1] - t.colorsA[j + 1]) * gate
-    colArr[j + 2] = t.colorsA[j + 2] + (t.colorsB[j + 2] - t.colorsA[j + 2]) * gate
+    let r = t.colorsA[j] + (t.colorsB[j] - t.colorsA[j]) * gate
+    let g = t.colorsA[j + 1] + (t.colorsB[j + 1] - t.colorsA[j + 1]) * gate
+    let b = t.colorsA[j + 2] + (t.colorsB[j + 2] - t.colorsA[j + 2]) * gate
+    // Task 60 — the epilogue lerp, layered on top of the A→B blend. The two windows are 2π
+    // apart, so `epi > 0` implies `gate === 1` and the base below is exactly colorsB: the
+    // states hand over cleanly and a vertex is never blending two of them at once.
+    if (cC !== null && epi > 0) {
+      r += (cC[j] - r) * epi
+      g += (cC[j + 1] - g) * epi
+      b += (cC[j + 2] - b) * epi
+    }
+    colArr[j] = r
+    colArr[j + 1] = g
+    colArr[j + 2] = b
     if (posArr && t.positionsA && t.positionsB) {
       posArr[j] = t.positionsA[j] + (t.positionsB[j] - t.positionsA[j]) * gate
       posArr[j + 1] = t.positionsA[j + 1] + (t.positionsB[j + 1] - t.positionsA[j + 1]) * gate
@@ -91,9 +114,14 @@ export function makeRenewalMorph(t: MorphTarget): { update: (rotation: number) =
   }
 
   const applyBucket = (b: number, rotation: number): void => {
+    // No vertex can be in the epilogue before this rotation (the earliest possible longitude is
+    // the seam), so for the whole of chapters 1-4 the second gate costs one scalar compare per
+    // BUCKET instead of a smoothstep per vertex.
+    const epiPossible = cC !== null && rotation >= SEAM + EPILOGUE_START
     for (let k = starts[b]; k < starts[b + 1]; k++) {
       const i = verts[k]
-      writeVertex(i, renewalGate(thetaC[i], rotation))
+      const tc = thetaC[i]
+      writeVertex(i, renewalGate(tc, rotation), epiPossible ? epilogueGate(tc, rotation) : 0)
     }
   }
 
@@ -119,6 +147,13 @@ export function makeRenewalMorph(t: MorphTarget): { update: (rotation: number) =
     // so the thetaC swept between last and now is [minRot−FS−FW, maxRot−FS]. Reduce
     // to buckets over the thetaC period (bucketOf handles the offset; the ±1 pad
     // and wrap-modulo cover rounding and the seam).
+    //
+    // Task 60 — this sweep ALREADY covers the epilogue window, and it is worth saying why
+    // rather than leaving it to be rediscovered: the epilogue window sits at FLIP_START + 2π,
+    // so its swept thetaC range is this one shifted by exactly −2π. Buckets partition a 2π
+    // period and `bucketOf` is linear with BUCKET_COUNT samples per turn, so that shift moves
+    // every index by exactly −BUCKET_COUNT — which the wrap-modulo below undoes. The two
+    // windows therefore dirty the SAME buckets, and a second sweep would be redundant work.
     const lo = Math.min(rotation, last) - FLIP_START - FLIP_WIDTH
     const hi = Math.max(rotation, last) - FLIP_START
     const b0 = bucketOf(lo)

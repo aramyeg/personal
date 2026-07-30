@@ -67,6 +67,8 @@ const ALL_CROSSINGS = [...CROSSINGS_A, ...CROSSINGS_B] as const
 type MorphBake = {
   positionsA: Float32Array; positionsB: Float32Array
   colorsA: Float32Array; colorsB: Float32Array
+  /** Task 60 — the epilogue colours (=== colorsB outside the epilogue snow field). */
+  colorsC: Float32Array
   normalsA: Float32Array; normalsB: Float32Array
   thetaC: Float32Array; buckets: Buckets
   // Round 7 tide: the flooded-limb target + the static right-cap vertex bucket the
@@ -92,7 +94,7 @@ function assembleLand(b: LandBake): LandResult {
     geometry: geo,
     bake: {
       positionsA: b.positionsA, positionsB: b.positionsB,
-      colorsA: b.colorsA, colorsB: b.colorsB,
+      colorsA: b.colorsA, colorsB: b.colorsB, colorsC: b.colorsC,
       normalsA: b.normalsA, normalsB: b.normalsB,
       thetaC: b.thetaC, buckets: buildBuckets(b.thetaC),
       floodedPositions: b.floodedPositions, floodedColors: b.floodedColors, floodedNormals: b.floodedNormals,
@@ -532,7 +534,7 @@ export function Planet({
       geometry && bake
         ? makeRenewalMorph({
             geo: geometry, thetaC: bake.thetaC, buckets: bake.buckets,
-            colorsA: bake.colorsA, colorsB: bake.colorsB,
+            colorsA: bake.colorsA, colorsB: bake.colorsB, colorsC: bake.colorsC,
             positionsA: bake.positionsA, positionsB: bake.positionsB,
             normalsA: bake.normalsA, normalsB: bake.normalsB,
           })

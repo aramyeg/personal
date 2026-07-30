@@ -26,6 +26,7 @@ import {
   polarLatGate,
   canyonCreekDist,
   tideCarve,
+  epilogueRegion,
   TIDE_LAT_LO,
   TIDE_DEPTH,
 } from './biomes'
@@ -511,7 +512,10 @@ export function paintVertex(
   bump: number,
   isB: boolean,
   pre?: PaintPrecomp,
-  dials?: LandDials
+  dials?: LandDials,
+  /** Task 60 — the epilogue pass paints the SAME variant-B relief with band 2's winter reading
+   *  (see biomes.EPILOGUE_END). Omitted by the A and B bakes, which are unchanged. */
+  pbandOverride?: 0 | 1 | 2
 ): void {
   const variant: 0 | 1 = isB ? 1 : 0
   // Task 47 — by-value dial snapshot for the worker/coalesced bake (the bake ALWAYS passes
@@ -524,7 +528,7 @@ export function paintVertex(
   if (t < 0.5) c.lerpColors(pal.leaf, pal.meadow, t * 2)
   else c.lerpColors(pal.meadow, pal.sprout, (t - 0.5) * 2)
 
-  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, variant, wanderAmp)
+  const { kind, t: kt } = biomeTint(nx, ny, nz, bump, variant, wanderAmp, pbandOverride)
   switch (kind) {
     case 'underwater':
       c.lerp(pal.deep, 0.55 + 0.35 * kt)
@@ -538,7 +542,7 @@ export function paintVertex(
       // inside the 0.80 invariance line), so the variant-specific hint only ever exists
       // in the proven-hidden mid-latitudes and never pops at the pole.
       const bthetaC = canonicalTheta(Math.atan2(nz, ny))
-      const pband = paintBand(bthetaC, nx, wanderAmp)
+      const pband = pbandOverride ?? paintBand(bthetaC, nx, wanderAmp)
       const latG = polarLatGate(nx)
       if (variant === 1 && pband === 2) c.lerp(pal.ice, 0.4 * kt * latG)
       else if (variant === 1 && pband === 1) c.lerp(pal.rust, 0.3 * kt * latG)
@@ -578,7 +582,7 @@ export function paintVertex(
       // is now variant-dependent (spring vs winter at full strength); it is renewal-safe
       // because every such vertex flips A→B only inside the occlusion-proven-hidden window
       // (proven by the paint-delta pass in bench/renewal-scan.mjs).
-      const pband = paintBand(thetaC, nx, wanderAmp)
+      const pband = pbandOverride ?? paintBand(thetaC, nx, wanderAmp)
       accentMeadow(c, pal, pband, variant, nx, ny, nz, accentLatGate(nx))
     }
   }
@@ -701,6 +705,11 @@ export function buildPal(): Pal {
 export type LandBake = {
   positionsA: Float32Array; positionsB: Float32Array
   colorsA: Float32Array; colorsB: Float32Array
+  /** Task 60 — the epilogue colours: variant B's world repainted as winter inside the epilogue
+   *  region, and EXACTLY colorsB everywhere else (so the per-frame epilogue lerp is a no-op
+   *  outside the snow field and needs no mask uploaded to the renderer). Colour only: the
+   *  epilogue moves no vertex, which is why the contact/ceiling budgets are untouched by it. */
+  colorsC: Float32Array
   normalsA: Float32Array; normalsB: Float32Array
   floodedPositions: Float32Array; floodedColors: Float32Array; floodedNormals: Float32Array
   thetaC: Float32Array
@@ -726,6 +735,7 @@ export function bakeLandArrays(
   const positionsB = new Float32Array(count * 3)
   const colorsA = new Float32Array(count * 3)
   const colorsB = new Float32Array(count * 3)
+  const colorsC = new Float32Array(count * 3)
   // Round 7 tide targets: the flooded state of the right grazing limb + its verts.
   const floodedPositions = new Float32Array(count * 3)
   const floodedColors = new Float32Array(count * 3)
@@ -832,6 +842,18 @@ export function bakeLandArrays(
     colorsA[i * 3] = c.r; colorsA[i * 3 + 1] = c.g; colorsA[i * 3 + 2] = c.b
     paintVertex(c, pal, nx, ny, nz, bumpB, true, preB, dials)
     colorsB[i * 3] = c.r; colorsB[i * 3 + 1] = c.g; colorsB[i * 3 + 2] = c.b
+    // Task 60 — the epilogue paint. Only the snow field pays for a third paint call (~a third of
+    // the sphere); everywhere else colorsC is a copy of colorsB, which makes the runtime lerp an
+    // exact no-op there. preB is reused verbatim: the epilogue rides variant B's relief, so its
+    // signature/dents/gradient/dimple are the same numbers, not merely similar ones.
+    if (epilogueRegion(thetaC[i], nx, wanderAmp) === 1) {
+      paintVertex(c, pal, nx, ny, nz, bumpB, true, preB, dials, 2)
+      colorsC[i * 3] = c.r; colorsC[i * 3 + 1] = c.g; colorsC[i * 3 + 2] = c.b
+    } else {
+      colorsC[i * 3] = colorsB[i * 3]
+      colorsC[i * 3 + 1] = colorsB[i * 3 + 1]
+      colorsC[i * 3 + 2] = colorsB[i * 3 + 2]
+    }
 
     // Round 7 tide: bake the FLOODED target for the +x grazing limb (nx > LO). rA
     // === rB there (grazing-limb invariant), so A is the base; the flooded radius
@@ -881,7 +903,7 @@ export function bakeLandArrays(
   applyFaceDither(floodedNormals)
 
   return {
-    positionsA, positionsB, colorsA, colorsB, normalsA, normalsB,
+    positionsA, positionsB, colorsA, colorsB, colorsC, normalsA, normalsB,
     thetaC,
     floodedPositions, floodedColors, floodedNormals,
     capIdx: Int32Array.from(capIdx),

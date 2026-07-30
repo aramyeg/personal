@@ -25,7 +25,7 @@ type BakeRequest = {
 function transferables(b: LandBake): Transferable[] {
   return [
     b.positionsA.buffer, b.positionsB.buffer,
-    b.colorsA.buffer, b.colorsB.buffer,
+    b.colorsA.buffer, b.colorsB.buffer, b.colorsC.buffer,
     b.normalsA.buffer, b.normalsB.buffer,
     b.floodedPositions.buffer, b.floodedColors.buffer, b.floodedNormals.buffer,
     b.thetaC.buffer,

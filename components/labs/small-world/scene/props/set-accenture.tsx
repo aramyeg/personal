@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { approachRevealGrow } from '../../journey-timeline'
 import { anchorTransform, chapterTheta } from '../stage'
-import { activeVariantAt, canonicalTheta } from '../renewal'
+import { canonicalTheta, sceneVariantAt } from '../renewal'
 import { PropAnchor } from './prop-anchor'
 import { ClayBlock, ClayCamel, ClayMound, ClayPalm, ClayPyramid, ClayReeds, ClayRock } from './clay-kit'
 import type { JourneyRef } from '../use-journey'
@@ -107,7 +107,10 @@ function DesertReveal({
     const gi = inner.current
     if (!g || !gi) return
     const rot = journeyRef.current.rotation
-    const active = activeVariantAt(tc, rot) === 1
+    // Task 60 — sceneVariantAt, not activeVariantAt: the whole desert stands inside the epilogue
+    // snow field, so the camels and the oasis palms hand themselves back behind the horizon when
+    // the snow takes over. Without this the ending would be camels in a snowdrift.
+    const active = sceneVariantAt(tc, rot) === 1
     g.visible = active
     if (active) {
       const grow = approachRevealGrow(DESERT_CHAPTER, rot, REVEAL_START_FRAC, REVEAL_SPAN_FRAC)
