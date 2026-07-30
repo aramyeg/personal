@@ -824,7 +824,7 @@ function fennecBody(): ClayPart[] {
     // FAR EAR first so everything else draws over its base. Its root is ON the skull's upper-rear
     // quadrant (1.0x the skull's own radius from its centre, measured against the ellipsoid's three
     // semi-axes rather than eyeballed) — the previous 1.9x put it out over the neck.
-    ...fennecEar([-0.075, 0.268, -0.055], 0.36, 0.16, 0.34, -0.012),
+    ...fennecEar([-0.075, 0.268, -0.055], 0.4, 0.16, 0.34, -0.012),
 
     // Haunch and rump, seated on the shelf. The rump is the figure's outward mass and it is what
     // crops at the frame — a seated fox is widest at the hip, so that is the honest place to spend
@@ -989,7 +989,11 @@ export function desertPieces(kind: 'camelAdult' | 'fennec', dir: 1 | -1): Peeker
         at: [FOX_EAR_AT[0] * dir, FOX_EAR_AT[1], FOX_EAR_AT[2]],
         // the near ear earns the second contour ahead of the tail: it is the silhouette, and the
         // tail is tucked against the body where an outline gains almost nothing
-        parts: facing(dir, fennecEar([0, 0, 0], 0.44, 0.19, -0.16, 0.014)),
+        // 0.48 rather than the 0.43 the cone version used: the two-part ear spends some of its
+        // length inside the skull, so the same number gave a SHORTER silhouette — measured, the
+        // swept `up` reach fell from 0.788 to 0.725 against a 0.87 box. On a figure whose whole
+        // design is "the ears are the silhouette" that is a real loss, and it is bought back here.
+        parts: facing(dir, fennecEar([0, 0, 0], 0.48, 0.19, -0.16, 0.014)),
         ink: true,
       },
       // no `ink` on the tail: only the first INK_PIECE_LIMIT pieces are ever drawn with a contour,
