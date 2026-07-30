@@ -46,8 +46,31 @@ function VaultDoor(props: { position?: [number, number, number]; rotation?: [num
 export function XdatagroupSet() {
   return (
     <>
-      {/* the summit itself — snow-packed now, same silhouette */}
-      <PropAnchor theta={T(0.7)} x={0}><ClayMound r={0.55} squash={0.5} color={PALETTE.snow} /></PropAnchor>
+      {/* THE SUMMIT. Painting the mound PALETTE.snow was the obvious move and the wrong one for the
+          same reason the igloos were: a white dome on a white field has nothing to be lighter than,
+          and from the chapter-6 travelling angles it read as one featureless pale bulge with no
+          form at all — an outline, not a hill.
+          So the mass takes the MID tone and the white is demoted to a cap that sits on top and
+          back, leaving the camera-facing flank in shadow; rock breaks through that flank to give
+          the dome a surface rather than a silhouette. Same correction, applied to terrain instead
+          of to architecture. The vault door keeps its anchor — it is set INTO this hillside and is
+          the chapter's own object. */}
+      <PropAnchor theta={T(0.7)} x={0}>
+        <ClayMound r={0.55} squash={0.5} color={PALETTE.frostShadow} />
+      </PropAnchor>
+      <PropAnchor theta={T(0.73)} x={0}>
+        <ClayMound r={0.43} squash={0.46} color={PALETTE.snow} position={[0, 0.1, 0]} />
+      </PropAnchor>
+      {/* outcrops seated ON the dome (lifted to its surface), not beside it */}
+      <PropAnchor theta={T(0.655)} x={-0.1}>
+        <ClayBoulder color={PALETTE.stone} r={0.15} position={[0, 0.2, 0]} />
+      </PropAnchor>
+      <PropAnchor theta={T(0.68)} x={0.26}>
+        <ClayBoulder color={PALETTE.driftShade} r={0.1} position={[0, 0.17, 0]} />
+      </PropAnchor>
+      {/* drift rubble round the foot, so the hill meets the field instead of being placed on it */}
+      <PropAnchor theta={T(0.6)} x={-0.3}><ClayBoulder color={PALETTE.stone} r={0.13} /></PropAnchor>
+      <PropAnchor theta={T(0.64)} x={-0.42}><ClayBoulder color={PALETTE.driftShade} r={0.11} /></PropAnchor>
       {/* Vault door lies on the mound's camera-facing slope */}
       <PropAnchor theta={T(0.62)} x={0.12}><VaultDoor position={[0, 0.16, 0]} rotation={[0.5, 0, 0]} /></PropAnchor>
       {/* snow conifers where the blossom trees stood, same anchors and heights */}

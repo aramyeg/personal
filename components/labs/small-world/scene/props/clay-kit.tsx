@@ -1035,20 +1035,28 @@ export function ClayIgloo({
     // Three courses of blocks, offset from each other so the wall reads as LAID. This camera looks
     // DOWN at anything on the planet's face, so the courses are what the visitor actually sees:
     // from above they are concentric rings of light blocks on a darker dome.
+    //
+    // The blocks are INSCRIBED into the dome, not stood off it. The first version placed each block
+    // at the dome's own radius with its own thickness on top, so every one of them stuck out along
+    // its normal and the hut read as a sea urchin. Seating them at 0.93 of the radius sinks each
+    // block most of the way in, leaving a shallow raised face — which is what a snow block laid
+    // into a wall looks like, and it keeps the silhouette a dome.
     const courses = [
       { t: 0.22, ring: 0.99, n: 9, phase: 0 },
       { t: 0.5, ring: 0.9, n: 7, phase: Math.PI / 7 },
       { t: 0.75, ring: 0.68, n: 5, phase: Math.PI / 5 },
     ]
+    const SEAT = 0.93 // fraction of the dome radius the block centre sits at
     for (const c of courses) {
       const up = Math.sin(c.t * Math.PI * 0.5)
-      const rad = r * c.ring * Math.cos(c.t * Math.PI * 0.5)
+      const rad = r * c.ring * Math.cos(c.t * Math.PI * 0.5) * SEAT
       for (let i = 0; i < c.n; i++) {
         const a = c.phase + (i / c.n) * Math.PI * 2
         parts.push({
-          geo: new THREE.BoxGeometry(r * 0.34, r * 0.13, r * 0.17),
+          // flatter and wider than before: a course of masonry, not a stud
+          geo: new THREE.BoxGeometry(r * 0.36, r * 0.075, r * 0.19),
           color: i % 3 === 2 ? seam : block,
-          pos: [Math.cos(a) * rad, r * 0.83 * up, Math.sin(a) * rad],
+          pos: [Math.cos(a) * rad, r * 0.83 * up * SEAT, Math.sin(a) * rad],
           rot: [0, -a, 0],
         })
       }

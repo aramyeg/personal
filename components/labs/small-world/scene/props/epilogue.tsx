@@ -60,7 +60,7 @@ export function EpilogueSet({ journeyRef }: { journeyRef: JourneyRef }) {
       </GatedProp>
 
       {/* a snow hare near the camp, the small life that says the place is lived in */}
-      <GatedProp theta={0.94} x={-0.6} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={0.85} x={-0.59} variant={2} journeyRef={journeyRef}>
         <ClaySnowHare rotation={[0, 1.1, 0]} scale={0.9} />
       </GatedProp>
 
@@ -68,7 +68,7 @@ export function EpilogueSet({ journeyRef }: { journeyRef: JourneyRef }) {
       <GatedProp theta={0.64} x={0.7} variant={2} journeyRef={journeyRef}>
         <ClaySnowConifer height={0.46} />
       </GatedProp>
-      <GatedProp theta={1.58} x={0.62} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={1.43} x={0.59} variant={2} journeyRef={journeyRef}>
         <ClaySnowConifer height={0.38} rotation={[0, 1.3, 0]} />
       </GatedProp>
       <GatedProp theta={2.34} x={0.64} variant={2} journeyRef={journeyRef}>
@@ -91,13 +91,13 @@ export function EpilogueSet({ journeyRef }: { journeyRef: JourneyRef }) {
       </GatedProp>
 
       {/* wind-scoured drift boulders and ice rubble, so the open field is not empty */}
-      <GatedProp theta={0.74} x={-1.02} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={0.82} x={0.58} variant={2} journeyRef={journeyRef}>
         <ClayBoulder color={PALETTE.snow} r={0.12} />
       </GatedProp>
-      <GatedProp theta={1.5} x={-0.88} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={1.5} x={-0.9} variant={2} journeyRef={journeyRef}>
         <ClayRock color={PALETTE.ice} r={0.09} />
       </GatedProp>
-      <GatedProp theta={1.94} x={0.6} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={2.48} x={0.58} variant={2} journeyRef={journeyRef}>
         <ClayBoulder color={PALETTE.frostShadow} r={0.085} />
       </GatedProp>
       <GatedProp theta={2.22} x={0.94} variant={2} journeyRef={journeyRef}>
@@ -120,10 +120,10 @@ export function EpilogueSet({ journeyRef }: { journeyRef: JourneyRef }) {
       <GatedProp theta={1.16} x={0.98} variant={2} journeyRef={journeyRef}>
         <ClaySnowConifer height={0.42} rotation={[0, 0.3, 0]} />
       </GatedProp>
-      <GatedProp theta={1.44} x={1.0} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={1.2} x={0.67} variant={2} journeyRef={journeyRef}>
         <ClayBoulder color={PALETTE.ice} r={0.11} />
       </GatedProp>
-      <GatedProp theta={1.66} x={-0.98} variant={2} journeyRef={journeyRef}>
+      <GatedProp theta={2.16} x={-0.78} variant={2} journeyRef={journeyRef}>
         <ClaySnowConifer height={0.4} rotation={[0, 2.2, 0]} />
       </GatedProp>
       <GatedProp theta={1.86} x={-0.62} variant={2} journeyRef={journeyRef}>
