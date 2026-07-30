@@ -10,6 +10,7 @@ import {
   easeOutBack,
   approachRevealGrow,
   revealPhase,
+  rotationAt,
   BURST_PHASE_END,
   CARD_PHASE_START,
 } from '@/components/labs/small-world/journey-timeline'
@@ -85,6 +86,46 @@ describe('journeyStateAt', () => {
 // Round 15 / Task 54 — the arrival reveal clock. journeyStateAt stays pure: it
 // only passes the clock through and re-keys the "!" to it, so the entrance can
 // play with no scroll input. The clock itself is proven in arrival.test.ts.
+/**
+ * Task 59 — `rotationAt` is the same rule `journeyStateAt` renders with, lifted out so a consumer
+ * that only wants the angle (the biome grade keys its crossfade to it) does not have to build a
+ * whole JourneyState or, worse, restate the formula. These pin the extraction rather than the
+ * value: if the two ever disagree, something has been changed in one place and not the other.
+ */
+describe('rotationAt', () => {
+  it('is exactly the rotation journeyStateAt renders', () => {
+    for (let i = 0; i <= 2000; i++) {
+      const p = i / 2000
+      expect(rotationAt(p), `p=${p}`).toBe(journeyStateAt(p).rotation)
+    }
+    for (const p of [-1, -0.001, 1.001, 5]) {
+      expect(rotationAt(p), `p=${p}`).toBe(journeyStateAt(p).rotation)
+    }
+  })
+
+  // The property the grade leans on: rotation advances only over a chapter's TRAVEL and is frozen
+  // for the whole dwell, so anything keyed to it cannot move while a checkpoint is parked.
+  it('freezes for the whole of every dwell, at the next chapter’s start', () => {
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const parked = chapterStartRotation(c + 1)
+      for (let k = 0; k <= 10; k++) {
+        const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 10
+        expect(rotationAt(at(c, local)), `ch${c} @${local.toFixed(2)}`).toBeCloseTo(parked, 12)
+      }
+    }
+  })
+
+  it('is monotone non-decreasing across the whole journey', () => {
+    let prev = -Infinity
+    for (let i = 0; i <= 5000; i++) {
+      const r = rotationAt(i / 5000)
+      expect(r).toBeGreaterThanOrEqual(prev)
+      prev = r
+    }
+    expect(prev).toBeCloseTo(ROTATION_TOTAL, 10)
+  })
+})
+
 describe('reveal clock pass-through', () => {
   const dwell = at(2, 0.75)
 

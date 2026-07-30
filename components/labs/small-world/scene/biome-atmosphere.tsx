@@ -8,7 +8,7 @@ import type { JourneyRef } from './use-journey'
 
 /**
  * Task 55 — the scene half of the CINEMATIC BIOME GRADE: the backdrop and the light the little
- * world is lit by, both keyed to the chapter the traveller is arriving at (grade-mood.ts owns the
+ * world is lit by, both keyed to the wedge under the traveller's feet (grade-mood.ts owns the
  * moods and the timing).
  *
  * The light is the part that makes it read as a grade rather than a filter. Tinting the key and
@@ -32,17 +32,14 @@ const MOOD_CAST = BIOME_MOODS.map((m) => new THREE.Color(m.cast))
 const SCRATCH = new THREE.Color()
 
 /**
- * The light colour the mood is heading for: the scroll crossfade between two neighbouring moods,
- * then pulled onto the arriving chapter's mood (grade-mood.ts owns why it is a pull and not a
- * gate). Indexes with the blend's OWN `fromIndex`/`toIndex` rather than re-deriving the pairing,
- * so the lights can never crossfade a different pair than the sky or the overlay. One module
- * scratch — the frame loop allocates nothing.
+ * The light colour the mood is heading for: the crossfade between the wedge she has left and the
+ * one under her feet (grade-mood.ts owns where that boundary is). Indexes with the blend's OWN
+ * `fromIndex`/`toIndex` rather than re-deriving the pairing, so the lights can never crossfade a
+ * different pair than the sky or the overlay. One module scratch — the frame loop allocates
+ * nothing.
  */
 function target(b: MoodBlend): THREE.Color {
-  SCRATCH.copy(MOOD_CAST[b.fromIndex]).lerp(MOOD_CAST[b.toIndex], b.mix)
-  return b.revealChapter === null
-    ? SCRATCH
-    : SCRATCH.lerp(MOOD_CAST[b.revealChapter], b.revealPull)
+  return SCRATCH.copy(MOOD_CAST[b.fromIndex]).lerp(MOOD_CAST[b.toIndex], b.mix)
 }
 
 export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
@@ -51,7 +48,7 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
 
   useFrame(() => {
     const j = journeyRef.current
-    const b = moodBlendAt(j.progress, j.reveal)
+    const b = moodBlendAt(j.progress)
     if (key.current) key.current.color.copy(BASE_KEY).lerp(target(b), b.lightMix)
     if (ambient.current) {
       ambient.current.color.copy(BASE_AMBIENT).lerp(target(b), b.lightMix * AMBIENT_FOLLOW)

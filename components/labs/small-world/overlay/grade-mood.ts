@@ -1,7 +1,8 @@
 import { CHAPTER_COUNT } from '../chapters'
-import { PANEL_END, TRAVEL_END, revealPhase, smoothstep } from '../journey-timeline'
-import type { RevealState } from '../journey-timeline'
+import { CHAPTER_SLICE, rotationAt, smoothstep } from '../journey-timeline'
 import { PALETTE } from '../palette'
+import { BOUNDARY_WANDER, MERIDIANS, boundaryWander } from '../scene/biomes'
+import { STANCE_ALPHA } from '../scene/renewal'
 
 /**
  * Task 55 — CINEMATIC BIOME GRADE (the numbers).
@@ -26,33 +27,42 @@ import { PALETTE } from '../palette'
  * than repainting material. Card text is never touched at all: the DOM layer mounts first in the
  * overlay, so the panels paint above it.
  *
- * TIMING — A SCROLL CROSSFADE, PULLED THE REST OF THE WAY BY THE ARRIVAL. The mood of chapter c
- * crossfades in from the previous chapter's over the local scroll window [MOOD_IN_START,
- * MOOD_IN_END], starting on the final approach. That alone would stall: T54's arrival absorbs
- * scroll while the checkpoint rolls out, so a purely scroll-keyed crossfade freezes part-way and
- * only finishes when the visitor scrolls again — the mood would arrive after the mascots instead
- * of with them.
+ * TIMING — THE SKY CHANGES WITH THE GROUND UNDER HER FEET (Task 59). Aram: "right when scrolling
+ * and our girl passes to the new biome, the mood shift should happen there and carry on towards
+ * the next checkpoint when the cards are shown."
  *
- * So the reveal clock is applied ON TOP of the scroll blend, as a PULL toward the mood of the
- * chapter the reveal names: `value = lerp(scrollBlend, revealedMood, pull)`. The shape matters
- * more than it looks. The pull contributes exactly nothing at strength 0 and lands exactly on the
- * revealed mood at 1, and — crucially — it does not care which pair of moods the scroll term
- * happens to be blending. That makes the whole thing continuous across a chapter boundary
- * unconditionally, in both directions and at any scrub speed, with no index gate anywhere.
+ * So the crossfade is keyed to the moment the girl's lane crosses the painted boundary onto the
+ * new wedge — see LANE_CROSSINGS for how those six rotations are derived — and it runs over a
+ * fixed span of ROTATION from there. Rotation, not scroll progress, is the keying variable, and
+ * that one choice buys three things that used to need machinery:
  *
- * (The first cut instead took `max(scrolled, arrived)` in the journey's own chapter basis, which
- * needed a `reveal.chapter === chapter` gate — and that gate was a third, DISCONTINUOUS input.
- * Flinging backwards out of a dwell fast enough to cross a segment before the retraction finished
- * dropped a live term in one frame: measured, a scrollbar drag could snap a whole mood over
- * — winter to canyon — in a single frame. The pull has no gate to drop.)
+ *   1. The mood cannot move while a checkpoint is parked. `rotationAt` freezes rotation for the
+ *      whole dwell, so the cards, the mascots and the "!" all land under a mood that is not only
+ *      already arrived but provably STILL. No arrival clock is needed to carry the crossfade over
+ *      T54's scroll absorption, because there is nothing left to carry.
+ *   2. Before her lane reaches the boundary the mood is EXACTLY the old biome's, to the byte (the
+ *      previous crossfade has long since saturated). Girl on old terrain ⇒ old mood, with no
+ *      tolerance in the claim.
+ *   3. It is a pure function of one number. Forward and backward scrubs are bit-identical by
+ *      construction and preemption is not expressible.
+ *
+ * WHAT THIS REPLACED, AND WHY NONE OF IT SURVIVES. Until Task 59 the crossfade sat on the FINAL
+ * APPROACH to each checkpoint (a local-progress window ending inside the dwell), which meant it
+ * had to survive T54's absorption: the arrival clock was folded in as a PULL toward the revealed
+ * chapter's mood, that pull needed a proximity weight to stop preemption releasing its stored
+ * displacement in one frame, and the weight needed the dwell geometry derived from the timeline.
+ * Three layers of correction, all of them consequences of keying the mood to an event (the
+ * arrival) that scroll alone cannot finish. Keyed to the boundary the crossfade is over long
+ * before the absorption starts, so `moodBlendAt` takes no reveal at all now and the pull,
+ * the proximity weight and the dwell derivation are deleted rather than fixed.
  *
  * On top of the crossfade the whole grade BLOOMS: full strength through the checkpoint and its
  * dwell, settling back to BLOOM_FLOOR over the next chapter's early travel, so each arrival gets a
- * swell of its own. The bloom stays keyed to scroll — it is a slow envelope across a whole leg,
- * not an entrance beat.
- *
- * Scrubbing is exactly symmetric in both directions whenever the arrival clock is idle, and
- * nothing here can step or flicker in either mode.
+ * swell of its own. The bloom is unchanged, and stays keyed to local PROGRESS — it is a slow
+ * envelope across a whole leg rather than a thing that happens at a place, and it deliberately
+ * keeps swelling through the stretch where rotation is frozen, which is exactly the swell under
+ * the cards. So the new mood arrives at the boundary at the bloom's resting strength and then
+ * deepens into the checkpoint.
  */
 
 /** Kill switch for the entire grade — sky, lights and overlay — for a clean A/B. */
@@ -259,50 +269,82 @@ export const BIOME_MOODS: readonly BiomeMood[] = [
   },
 ]
 
-/**
- * Crossfade window in a chapter's local progress. Travel ends at 0.55 and the panel opens at
- * 0.65, so the mood starts moving on the last stretch of the approach and is fully in just after
- * the cards land — the arrival brings it, and nothing about it is abrupt (the window is 30% of a
- * chapter's scroll, ~72vh of travel).
- *
- * MOOD_IN_END CARRIES AN INVARIANT — it must stay at or below 1, so that `scrolled` has saturated
- * by the time a chapter boundary is crossed and the blend resolves to the same mood from either
- * side of it. Push the window past the end of a chapter and every boundary becomes a visible
- * colour step. Pinned by the boundary sweep in grade-mood.test.ts rather than left to this comment.
- */
-export const MOOD_IN_START = 0.42
-export const MOOD_IN_END = 0.72
-/**
- * Where in the arrival clock the grade's crossfade completes. The cards start sliding at
- * CARD_PHASE_START (0.26) and land at 1, so finishing at 0.7 puts the mood UNDER them rather than
- * after them — the mascots and the light arrive together and the cards land into a graded frame.
- */
-export const GRADE_PHASE_END = 0.7
-/**
- * The dwell a reveal belongs to, DERIVED from the timeline rather than remembered. Both numbers
- * used to be literals here (0.75 and a comment saying "spans +-0.20"), which coupled the grade to
- * two constants journey-timeline owns without saying so: moving TRAVEL_END would have shifted the
- * dwell AND widened it while these stayed put, and the two errors add. A 0.10 move in TRAVEL_END
- * alone was enough to consume the whole REVEAL_NEAR margin silently.
- */
-const DWELL_CENTRE = (TRAVEL_END + PANEL_END) / 2
-export const DWELL_HALF_WIDTH = (PANEL_END - TRAVEL_END) / 2
+const TWO_PI = Math.PI * 2
 
 /**
- * The reveal's pull is full while the journey is within REVEAL_NEAR chapters of the revealed
- * chapter's dwell centre, and fades to nothing by REVEAL_FAR. REVEAL_NEAR MUST stay above
- * DWELL_HALF_WIDTH — a reveal only reaches t = 1 inside its own dwell, so anything less would
- * weaken the pull while the checkpoint is still parked and an arrival would not land on its own
- * mood. Asserted against the derived half-width in grade-mood.test.ts, so a timeline change fails
- * loudly instead of eroding the margin.
+ * THE SIX LANE CROSSINGS — the rotations at which the ground under the girl's feet becomes the
+ * next biome's. Derived here from the geometry that owns each piece, never restated:
+ *
+ *  • WHERE SHE IS. The girl is fixed at the stance; the planet turns under her. The planet-local
+ *    longitude beneath her feet is `rotation + STANCE_ALPHA` (stage.chapterTheta), and she walks
+ *    the great circle at latitude nx = 0 (biomes.ts's coordinate note).
+ *  • WHERE THE PAINT CHANGES. Abutting wedges meet at a TORN curve, not at the ruled meridian:
+ *    `paintBand` hard-switches at `MERIDIANS[i] + boundaryWander(nx, i, BOUNDARY_WANDER)`. At her
+ *    lane that offset is `boundaryWander(0, i, …)` — small (|·| ≤ 0.018 rad) but SIGNED, and the
+ *    sign is what makes this worth deriving instead of eyeballing: meridians 0 and 2 lean one way
+ *    and meridian 1 leans the other, so four crossings fall a hair AFTER their chapter's start
+ *    rotation and TWO fall before it — before the checkpoint that precedes them, in fact, since
+ *    rotation stops at exactly that meridian for the dwell. The crossfade-window suite measures
+ *    what that costs (5.1e-4 of one crossfade, frozen) and why it is not a margin problem.
+ *  • WHICH LAP. A band carries a different scene on each lap, so chapter c needs band c % 3 AND
+ *    variant floor(c / 3). Under the lane the variant flips exactly as the unwrapped rotation
+ *    passes a multiple of 2π: `canonicalTheta` wraps there, which sends `rotation − thetaC`
+ *    straight past renewalGate's window in one step. Hence the max: chapter 3 is only reached
+ *    once BOTH the lap and the paint have turned over. (Today the paint term wins by 12.9 mrad,
+ *    so there is a sliver of B2 winter paint under her between the delta and the desert; if the
+ *    band-0 wander ever went negative the max would correctly pick the lap instead.)
+ *
+ * `chapterStartRotation(c) + STANCE_ALPHA` lands on `MERIDIANS[c % 3]` only because the chapter
+ * slice and the band span are the same angle. That is a real coupling between the timeline and the
+ * biome map, so it is asserted in grade-mood.test.ts rather than assumed here.
  */
-export const REVEAL_NEAR = 0.3
-export const REVEAL_FAR = 0.8
+export function crossingRotation(chapter: number): number {
+  const bands = MERIDIANS.length
+  const i = ((chapter % bands) + bands) % bands
+  const lap = Math.floor(chapter / bands)
+  const paint =
+    MERIDIANS[i] - STANCE_ALPHA + lap * TWO_PI + boundaryWander(0, i, BOUNDARY_WANDER)
+  return Math.max(lap * TWO_PI, paint)
+}
+
+/** The six crossings, resolved once. Strictly increasing (pinned in the tests). */
+export const LANE_CROSSINGS: readonly number[] = Array.from({ length: CHAPTER_COUNT }, (_, c) =>
+  crossingRotation(c)
+)
+
+/**
+ * How much of a chapter's ROTATION slice the crossfade takes, measured from that chapter's
+ * crossing. The two rails it sits between:
+ *
+ *  • It must SATURATE before the next crossing, or a boundary would arrive while the previous
+ *    blend was still moving and the pair being crossfaded would swap under it — a visible step.
+ *    The crossings are almost exactly one slice apart (the tightest gap is 0.985 slices, the
+ *    wander pulling one end toward the other), so anything below ~0.98 is safe; 0.65 has room.
+ *  • It must COMPLETE well before she stops. Travel ends at TRAVEL_END and the cards open at
+ *    BURST_END, so at 0.65 the mood is fully in around 36% of the way along the leg — roughly a
+ *    fifth of a chapter's scroll before she even reaches the checkpoint, and a third before the
+ *    cards. Both margins are asserted, not eyeballed.
+ *
+ * At 0.65 the crossfade spans ~36% of a chapter's scroll against the 30% of the approach window it
+ * replaces — a fifth wider, but the size was never the problem. What changed is WHERE: the shift
+ * now has the open road to happen on instead of the last few metres before a stop.
+ */
+export const MOOD_SPAN_FRAC = 0.65
+export const MOOD_SPAN_ROT = MOOD_SPAN_FRAC * CHAPTER_SLICE
 
 /** Strength the grade settles back to between checkpoints — the bloom's resting level. */
 export const BLOOM_FLOOR = 0.84
 /** Local progress by which the previous checkpoint's bloom has fully settled. */
 export const BLOOM_SETTLE_END = 0.3
+/**
+ * The bloom's swell window, in a chapter's LOCAL PROGRESS. Unchanged from Task 55 (these two
+ * numbers used to be MOOD_IN_START / MOOD_IN_END, when the mood rode the same window); renamed
+ * because the mood no longer does, and the envelope is the only thing left that wants to be keyed
+ * to the approach rather than to a place on the ground. It deliberately keeps rising past
+ * TRAVEL_END, where rotation is frozen — that is the swell under the cards.
+ */
+export const BLOOM_RISE_START = 0.42
+export const BLOOM_RISE_END = 0.72
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
@@ -335,13 +377,16 @@ export function mixHex(from: string, to: string, t: number): string {
 export function bloomAt(local: number): number {
   const l = clamp01(local)
   if (l < BLOOM_SETTLE_END) return 1 - (1 - BLOOM_FLOOR) * smoothstep(l / BLOOM_SETTLE_END)
-  const rise = smoothstep((l - MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START))
+  const rise = smoothstep((l - BLOOM_RISE_START) / (BLOOM_RISE_END - BLOOM_RISE_START))
   return BLOOM_FLOOR + (1 - BLOOM_FLOOR) * rise
 }
 
 export type MoodBlend = {
-  /** Chapter whose mood the scroll blend is moving toward. */
+  /** Chapter the JOURNEY is in — the bloom's basis. Not necessarily the wedge she is standing on:
+   *  around a crossing those differ, which is the whole point of Task 59. Use `toIndex` for that. */
   chapter: number
+  /** The planet's unwrapped rotation here — what the crossfade is actually keyed to. */
+  rotation: number
   /**
    * Indices of `from` and `to` in BIOME_MOODS. Consumers that keep their own parallel colour
    * tables (the scene ones do, to avoid per-frame allocation) MUST index with these rather than
@@ -350,19 +395,15 @@ export type MoodBlend = {
    */
   fromIndex: number
   toIndex: number
-  /** Mood being left behind (the chapter's own mood at the start of the journey). */
+  /** Mood being left behind — the wedge she has just walked off. */
   from: BiomeMood
-  /** Mood being moved toward. */
+  /** Mood of the wedge she is standing on now. */
   to: BiomeMood
-  /** 0→1 scroll-derived crossfade between them. */
+  /** 0→1 crossfade between them, keyed to rotation past `LANE_CROSSINGS[toIndex]`. */
   mix: number
-  /** Chapter of the arrival being revealed, if any — what `revealPull` pulls toward. */
-  revealChapter: number | null
-  /** 0→1 pull from the scroll blend onto the revealed chapter's mood. */
-  revealPull: number
   /** Overall strength — 1 at a checkpoint, BLOOM_FLOOR between them, 0 with the grade off. */
   bloom: number
-  /** Applied strengths: scroll blend, pulled by the arrival, times `bloom`. 0 with the grade off. */
+  /** Applied strengths: the crossfade times `bloom`. 0 with the grade off. */
   skyMix: number
   lightMix: number
   hazeAlpha: number
@@ -372,71 +413,56 @@ export type MoodBlend = {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
 /**
- * The grade at a scroll position, carried the rest of the way by T54's arrival clock when one is
- * running. Total, and pure in both inputs: the same (progress, reveal) always yields the same
- * numbers.
+ * Which wedge the girl's lane is standing on at an unwrapped rotation — the index into
+ * BIOME_MOODS the crossfade is heading for. A scan rather than arithmetic because the crossings
+ * are not evenly spaced (the torn boundary leans differently at each meridian) and six is six.
  *
- * The reveal needs no chapter GATE — during a retraction it keeps naming the biome that is LEAVING
- * even after the journey has moved on, which is exactly right, because the pull is toward that
- * biome's mood and fades as the retraction completes.
- *
- * It does need a PROXIMITY WEIGHT, and this is the subtle one. The pull holds the revealed mood
- * against a scroll blend that may be moving away from it, so it stores up displacement that has to
- * be released. Released by the retraction it is smooth; but a reveal's life can END EARLY —
- * flinging backward out of one dwell lands in the PREVIOUS dwell, whose arrival PREEMPTS the
- * retraction, replacing `reveal` with a fresh one at t = 0 (T54's corrected contract). The stored
- * displacement then releases in a single frame. Measured on the real `stepArrival`, that was a
- * 94–117/255 haze channel step at 6000px/s against a 28–33/255 no-reveal control.
- *
- * So the pull is additionally weighted by how near the journey still is to the revealed chapter's
- * own dwell: it is full throughout that dwell and fades to nothing as the journey leaves, which
- * means there is never stored displacement left to snap when the field is reused. Position-keyed,
- * so it stays scrub-symmetric. This drops the same measurement to 17–33/255, at or below the
- * control, with every arrival still landing exactly on its mood.
+ * Before the first crossing she is technically still on the tail of band 2's paint, for 12.9 mrad
+ * of rotation at the very start of the journey. That resolves to chapter 0 anyway: there is no
+ * mood before spring, and the page must open wearing it.
  */
-export function moodBlendAt(progress: number, reveal?: RevealState | null): MoodBlend {
+function wedgeIndexAt(rotation: number): number {
+  let c = 0
+  while (c + 1 < CHAPTER_COUNT && rotation >= LANE_CROSSINGS[c + 1]) c++
+  return c
+}
+
+/**
+ * The grade at a scroll position. Total and pure in ONE input, which is the whole safety argument:
+ * the same progress always yields the same numbers, so scrubbing backwards retraces them exactly
+ * and there is no clocked term that could be preempted, dropped or gated.
+ *
+ * Two different views of "where we are" are in play here and they are not the same number:
+ * `chapter`/`local` come from PROGRESS and drive the bloom envelope, while the mood pairing and
+ * the crossfade come from ROTATION and the lane crossings. They agree in the middle of a leg and
+ * deliberately disagree near a boundary — progress steps at the chapter line, the ground does not.
+ */
+export function moodBlendAt(progress: number): MoodBlend {
   const p = clamp01(progress)
   const segLen = 1 / CHAPTER_COUNT
   const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / segLen))
   const local = (p - chapter * segLen) / segLen
+  const rotation = rotationAt(p)
 
-  const mix = smoothstep((local - MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START))
-  const bloom = SHOW_GRADE ? bloomAt(local) : 0
-
-  const toIndex = chapter
-  const fromIndex = Math.max(0, chapter - 1)
+  const toIndex = wedgeIndexAt(rotation)
+  const fromIndex = Math.max(0, toIndex - 1)
   const to = BIOME_MOODS[toIndex]
   const from = BIOME_MOODS[fromIndex]
 
-  const revealChapter = reveal
-    ? Math.min(CHAPTER_COUNT - 1, Math.max(0, reveal.chapter))
-    : null
-  const revealPull =
-    revealChapter === null
-      ? 0
-      : smoothstep(revealPhase(reveal!.t, 0, GRADE_PHASE_END)) *
-        (1 -
-          smoothstep(
-            (Math.abs(p * CHAPTER_COUNT - (revealChapter + DWELL_CENTRE)) - REVEAL_NEAR) /
-              (REVEAL_FAR - REVEAL_NEAR)
-          ))
-  const revealed = revealChapter === null ? null : BIOME_MOODS[revealChapter]
+  const mix = smoothstep((rotation - LANE_CROSSINGS[toIndex]) / MOOD_SPAN_ROT)
+  const bloom = SHOW_GRADE ? bloomAt(local) : 0
 
-  /** Scroll blend, then pulled onto the revealed mood, then scaled by the bloom. */
-  const dial = (pick: (m: BiomeMood) => number): number => {
-    const base = lerp(pick(from), pick(to), mix)
-    return (revealed === null ? base : lerp(base, pick(revealed), revealPull)) * bloom
-  }
+  const dial = (pick: (m: BiomeMood) => number): number =>
+    lerp(pick(from), pick(to), mix) * bloom
 
   return {
     chapter,
+    rotation,
     fromIndex,
     toIndex,
     from,
     to,
     mix,
-    revealChapter,
-    revealPull,
     bloom,
     skyMix: dial((m) => m.skyMix),
     lightMix: dial((m) => m.lightMix),
@@ -456,17 +482,13 @@ export type GradeSample = {
 }
 
 /** The DOM half's view of the grade — the overlay needs colours as strings, once per frame. */
-export function gradeAt(progress: number, reveal?: RevealState | null): GradeSample {
-  const b = moodBlendAt(progress, reveal)
-  const base = mixHex(b.from.cast, b.to.cast, b.mix)
+export function gradeAt(progress: number): GradeSample {
+  const b = moodBlendAt(progress)
   return {
     chapter: b.chapter,
     mix: b.mix,
     bloom: b.bloom,
-    haze:
-      b.revealChapter === null
-        ? base
-        : mixHex(base, BIOME_MOODS[b.revealChapter].cast, b.revealPull),
+    haze: mixHex(b.from.cast, b.to.cast, b.mix),
     hazeAlpha: b.hazeAlpha,
     vignetteAlpha: b.vignetteAlpha,
   }

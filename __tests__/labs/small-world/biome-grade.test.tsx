@@ -77,11 +77,13 @@ describe('BiomeGrade', () => {
 })
 
 /**
- * A checkpoint rolls out with the visitor's hands off the wheel — zero scroll events — so the
- * grade has to recompute on the arrival driver's frames or it freezes part-way through every
- * entrance. These pin that path, and that it is released on unmount.
+ * `progressRef` IS the arrival driver's progress, and the driver moves it on its own frames while
+ * it absorbs and then releases the scroll a checkpoint swallows — no scroll events are fired for
+ * any of it. So the grade has to recompute on driver frames or it reads a stale progress across
+ * every arrival. Task 59 removed the grade's reveal input but not this: the trigger is about who
+ * writes `progressRef`, not about what the grade reads out of the journey.
  */
-describe('BiomeGrade on the arrival clock', () => {
+describe('BiomeGrade on the driver’s frames', () => {
   const fakeJourney = () => {
     const listeners = new Set<() => void>()
     const arrivalRef = { current: { reveal: null as { chapter: number; t: number; phase: 'in' | 'out' } | null } }
@@ -95,29 +97,28 @@ describe('BiomeGrade on the arrival clock', () => {
           return () => listeners.delete(fn)
         },
       },
-      arrivalRef,
       frame: () => act(() => listeners.forEach((fn) => fn())),
       listenerCount: () => listeners.size,
     }
   }
 
-  it('completes the crossfade on driver frames with no scroll at all', () => {
-    const { journey, arrivalRef, frame } = fakeJourney()
-    // Parked where T54's absorption holds progress while chapter 5 (winter) rolls out.
-    const ref = { current: (5 + 0.56) / BIOME_MOODS.length }
+  it('tracks progress the driver moves with no scroll at all', () => {
+    const { journey, frame } = fakeJourney()
+    // Mid-crossfade onto the canyon, where the driver is still releasing absorbed scroll.
+    const ref = { current: (4 + 0.16) / BIOME_MOODS.length }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render(<BiomeGrade progressRef={ref} journey={journey as any} />)
     const el = screen.getByTestId('sw-biome-grade')
-    // Scroll alone leaves the mood part-way between the canyon and the winter.
     const partway = vars(el)
-    expect(partway.haze).not.toBe(BIOME_MOODS[5].cast)
     expect(partway.haze).not.toBe(BIOME_MOODS[4].cast)
+    expect(partway.haze).not.toBe(BIOME_MOODS[3].cast)
 
-    arrivalRef.current.reveal = { chapter: 5, t: 1, phase: 'in' }
+    // The driver advances progress into the canyon's dwell. No scroll event is dispatched.
+    ref.current = (4 + 0.8) / BIOME_MOODS.length
     frame()
     const arrived = vars(el)
-    expect(arrived.haze).toBe(BIOME_MOODS[5].cast)
-    expect(arrived.vignetteAlpha).toBeCloseTo(gradeAt(ref.current, arrivalRef.current.reveal).vignetteAlpha, 4)
+    expect(arrived.haze).toBe(BIOME_MOODS[4].cast)
+    expect(arrived.vignetteAlpha).toBeCloseTo(gradeAt(ref.current).vignetteAlpha, 4)
     expect(arrived.vignetteAlpha).not.toBeCloseTo(partway.vignetteAlpha, 4)
   })
 

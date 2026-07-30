@@ -18,6 +18,25 @@ export function chapterStartRotation(chapter: number): number {
   return chapter * CHAPTER_SLICE
 }
 
+/**
+ * The planet's unwrapped rotation at a scroll position — `journeyStateAt(p).rotation` without
+ * building a whole JourneyState. Read-only extraction (Task 59): `journeyStateAt` now calls THIS
+ * rather than restating the formula, so there is exactly one rule for how scroll turns the world
+ * and a consumer that needs the angle alone cannot drift from the one the scene renders.
+ *
+ * Note the shape rather than just the value: rotation advances only over a chapter's TRAVEL
+ * segment and is FROZEN at the next chapter's start for the whole of the dwell. Anything keyed to
+ * rotation therefore cannot move while a checkpoint is parked — which is what Task 59's boundary-
+ * keyed grade rests on.
+ */
+export function rotationAt(progress: number): number {
+  const p = clamp01(progress)
+  const segLen = 1 / CHAPTER_COUNT
+  const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / segLen))
+  const local = (p - chapter * segLen) / segLen
+  return chapterStartRotation(chapter) + clamp01(local / TRAVEL_END) * CHAPTER_SLICE
+}
+
 export const TRAVEL_END = 0.55
 export const BURST_END = 0.65
 export const PANEL_END = 0.95
@@ -159,7 +178,7 @@ export function journeyStateAt(
   const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(progress / segLen))
   const local = (progress - chapter * segLen) / segLen
 
-  const rotation = chapterStartRotation(chapter) + clamp01(local / TRAVEL_END) * CHAPTER_SLICE
+  const rotation = rotationAt(progress)
 
   const morph =
     morphOut && morphOut.length === CHAPTER_COUNT ? morphOut : new Array<number>(CHAPTER_COUNT)

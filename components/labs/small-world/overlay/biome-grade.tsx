@@ -27,11 +27,13 @@ export { SHOW_GRADE } from './grade-mood'
  * journey, and no CSS transition anywhere (scrubbing back retraces the same values instead of
  * chasing a stale animation).
  *
- * TWO TRIGGERS, and both are needed. Scroll events cover scrubbing. The arrival clock covers the
- * entrance, which by design plays with the visitor's hands off the wheel: a checkpoint roll-out
- * produces NO scroll events at all, so a scroll-only listener would freeze the grade part-way
- * through every arrival. `journey.subscribe` fires once per driver frame and the driver idles
- * whenever the journey is simply on the finger, so a still page still costs nothing.
+ * TWO TRIGGERS, and both are still needed after Task 59 removed the grade's reveal input. Scroll
+ * events cover scrubbing. Driver frames cover the rest: `progressRef` IS the arrival driver's own
+ * progress (small-world-experience wires them together), and the driver moves it with no scroll
+ * events at all while it absorbs and then releases the scroll a checkpoint swallows. A scroll-only
+ * listener would therefore read a stale progress across every arrival. `journey.subscribe` fires
+ * once per driver frame and the driver idles whenever the journey is simply on the finger, so a
+ * still page still costs nothing.
  *
  * COMPOSITING. Two plain-alpha quads, no `filter` and no blend mode — free by construction, and
  * measured at a locked 60fps at both 1x and 2x device pixel ratio. A `filter` on the element
@@ -62,7 +64,7 @@ export function BiomeGrade({
   journey,
 }: {
   progressRef: MutableRefObject<number>
-  /** Supplies the arrival reveal clock; absent → the grade rides scroll alone (Task 54). */
+  /** Supplies the driver's per-frame tick; absent → the grade recomputes on scroll events alone. */
   journey?: ArrivalJourney
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -72,7 +74,7 @@ export function BiomeGrade({
     const apply = () => {
       const el = rootRef.current
       if (!el) return
-      const g = gradeAt(progressRef.current, journey?.arrivalRef.current.reveal ?? null)
+      const g = gradeAt(progressRef.current)
       el.style.setProperty('--sw-grade-haze', g.haze)
       el.style.setProperty('--sw-grade-haze-a', g.hazeAlpha.toFixed(4))
       el.style.setProperty('--sw-grade-vig-a', g.vignetteAlpha.toFixed(4))

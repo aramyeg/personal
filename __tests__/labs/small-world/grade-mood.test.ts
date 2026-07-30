@@ -1,25 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
-import { PANEL_END, TRAVEL_END } from '@/components/labs/small-world/journey-timeline'
+import {
+  BURST_END,
+  CHAPTER_SLICE,
+  PANEL_END,
+  ROTATION_TOTAL,
+  TRAVEL_END,
+  chapterStartRotation,
+  journeyStateAt,
+  rotationAt,
+} from '@/components/labs/small-world/journey-timeline'
 import { initialArrival, stepArrival } from '@/components/labs/small-world/arrival'
 import { PALETTE } from '@/components/labs/small-world/palette'
+import {
+  BOUNDARY_WANDER,
+  MERIDIANS,
+  boundaryWander,
+  paintBand,
+} from '@/components/labs/small-world/scene/biomes'
+import {
+  STANCE_ALPHA,
+  activeVariantAt,
+  canonicalTheta,
+} from '@/components/labs/small-world/scene/renewal'
 import type { BiomeMood } from '@/components/labs/small-world/overlay/grade-mood'
 import {
   BIOME_MOODS,
   BLOOM_FLOOR,
-  DWELL_HALF_WIDTH,
-  GRADE_PHASE_END,
+  BLOOM_RISE_END,
+  BLOOM_RISE_START,
   HAZE_ALPHA_MAX,
+  LANE_CROSSINGS,
   LIGHT_MIX_MAX,
-  MOOD_IN_END,
   MOOD_LIGHT_MIN_DE,
   MOOD_SKY_MIN_DE,
-  REVEAL_NEAR,
-  MOOD_IN_START,
+  MOOD_SPAN_ROT,
   SHOW_GRADE,
   SKY_MIX_MAX,
   VIGNETTE_ALPHA_MAX,
   bloomAt,
+  crossingRotation,
   gradeAt,
   mixHex,
   moodBlendAt,
@@ -29,6 +49,19 @@ import {
 const SEG = 1 / CHAPTER_COUNT
 /** Global progress at a given chapter's local position. */
 const at = (chapter: number, local: number) => (chapter + local) * SEG
+/**
+ * Progress at which a rotation is reached — the inverse of `rotationAt` over a chapter's travel.
+ * Only defined there, which is the point: rotation is frozen through every dwell.
+ */
+const progressOfRotation = (rot: number) => {
+  const c = Math.min(CHAPTER_COUNT - 1, Math.floor(rot / CHAPTER_SLICE))
+  return (c + (TRAVEL_END * (rot - c * CHAPTER_SLICE)) / CHAPTER_SLICE) / CHAPTER_COUNT
+}
+/** The wedge index actually painted under the girl's lane, straight from the biome map. */
+const wedgeUnderLane = (rot: number) => {
+  const thetaC = canonicalTheta(rot + STANCE_ALPHA)
+  return activeVariantAt(thetaC, rot) * MERIDIANS.length + paintBand(thetaC, 0)
+}
 
 describe('BIOME_MOODS', () => {
   it('names one mood per chapter in journey order', () => {
@@ -78,25 +111,6 @@ describe('BIOME_MOODS', () => {
         .map((i, k) => (parseInt(mood.cast.slice(i, i + 2), 16) / 255) * W[k])
         .reduce((a, b) => a + b, 0)
       expect(lum, `${mood.id} cast luminance`).toBeGreaterThan(0.6)
-    }
-  })
-
-  /**
-   * The rail the whole preemption fix stands on. A reveal only reaches full strength inside its
-   * own dwell, so the proximity weight must not begin to fade until the journey is outside it —
-   * otherwise the pull weakens while a checkpoint is parked and the arrival stops landing on its
-   * mood. Derived from the timeline, so moving TRAVEL_END or PANEL_END fails here rather than
-   * silently eating the margin (t54-reviewer's finding: the exposure is the coupling, not the
-   * margin — a 0.10 move in TRAVEL_END alone used to consume all of it).
-   */
-  it('holds the pull at full strength across the entire dwell', () => {
-    expect(REVEAL_NEAR).toBeGreaterThan(DWELL_HALF_WIDTH)
-    for (let c = 0; c < CHAPTER_COUNT; c++) {
-      for (let k = 0; k <= 8; k++) {
-        const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 8
-        const b = moodBlendAt(at(c, local), { chapter: c, t: 1, phase: 'in' })
-        expect(b.revealPull, `ch${c} @${local.toFixed(3)}`).toBe(1)
-      }
     }
   })
 
@@ -262,6 +276,219 @@ describe('mixHex', () => {
   })
 })
 
+/**
+ * Task 59 — THE SIX LANE CROSSINGS.
+ *
+ * The mood is keyed to the moment the ground under the girl's feet becomes the next biome's, so
+ * these assertions are against the BIOME MAP'S OWN painters (`paintBand`, `activeVariantAt`) and
+ * not against a remembered table of angles. If the torn boundary is re-torn, the stance moves or
+ * the renewal window shifts, the derivation follows and these tests keep testing the real thing.
+ */
+describe('lane crossings', () => {
+  /**
+   * The coupling the whole derivation rests on, and the one thing that could silently break it:
+   * `chapterStartRotation(c) + STANCE_ALPHA` only lands on meridian c % 3 because a chapter's
+   * rotation slice and a band's longitude span are the same angle. ROTATION_TOTAL is the spec's
+   * documented tuning knob ("the parked >360° question changes THIS constant"), so if it ever
+   * moves, chapter c stops travelling band c % 3 and this fails loudly rather than leaving the
+   * grade keyed to boundaries the girl no longer crosses.
+   */
+  it('travels exactly one band per chapter', () => {
+    const BAND_SPAN = (Math.PI * 2) / MERIDIANS.length
+    expect(CHAPTER_SLICE).toBeCloseTo(BAND_SPAN, 12)
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const theta = chapterStartRotation(c) + STANCE_ALPHA
+      expect(canonicalTheta(theta), `chapter ${c} starts on its meridian`).toBeCloseTo(
+        MERIDIANS[c % MERIDIANS.length],
+        12
+      )
+    }
+  })
+
+  it('names one crossing per chapter, strictly increasing, inside the journey', () => {
+    expect(LANE_CROSSINGS).toHaveLength(CHAPTER_COUNT)
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      expect(LANE_CROSSINGS[c], `crossing ${c}`).toBeGreaterThan(LANE_CROSSINGS[c - 1])
+    }
+    expect(LANE_CROSSINGS[0]).toBeGreaterThanOrEqual(0)
+    expect(LANE_CROSSINGS[CHAPTER_COUNT - 1] + MOOD_SPAN_ROT).toBeLessThan(ROTATION_TOTAL)
+  })
+
+  /**
+   * The load-bearing one: each derived crossing is exactly where the painters change their mind
+   * about which wedge the lane is standing on. Bracketed to a microradian either side, which is
+   * ~7 orders of magnitude finer than the 0.035 rad the boundary wanders — no eyeballing survives
+   * that.
+   */
+  it('lands exactly where the biome map repaints the lane', () => {
+    const eps = 1e-6
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      expect(wedgeUnderLane(LANE_CROSSINGS[c] + eps), `just past crossing ${c}`).toBe(c)
+      expect(wedgeUnderLane(LANE_CROSSINGS[c] - eps), `just before crossing ${c}`).not.toBe(c)
+    }
+  })
+
+  /**
+   * ...and between two crossings the lane stays on that wedge — but for TWO slivers, pinned here
+   * rather than left to be rediscovered, because both are places where the paint underfoot and the
+   * mood on screen deliberately disagree:
+   *
+   *   1. The journey OPENS 12.9 mrad short of the spring boundary, so the first eighth of a degree
+   *      of turn is still band 2's paint. The grade opens on spring regardless — there is no mood
+   *      before the first one, and the page has to open wearing it.
+   *   2. Between the delta and the desert the variant flips at exactly 2π while band 0's torn
+   *      boundary sits 12.9 mrad past it, so a hairline of B2 (winter) paint passes under her. The
+   *      grade rides it out on the delta mood.
+   *
+   * Both are ~0.7° of planet turn. Anything WIDER than that appearing here is a real defect.
+   */
+  it('holds one wedge between crossings, but for the two slivers the geometry leaves', () => {
+    const N = 120000
+    const step = ROTATION_TOTAL / N
+    const runs: { from: number; to: number }[] = []
+    for (let i = 0; i <= N; i++) {
+      const rot = step * i
+      let expected = 0
+      while (expected + 1 < CHAPTER_COUNT && rot >= LANE_CROSSINGS[expected + 1]) expected++
+      if (wedgeUnderLane(rot) === expected) continue
+      const last = runs[runs.length - 1]
+      if (last && rot - last.to <= step * 1.5) last.to = rot
+      else runs.push({ from: rot, to: rot })
+    }
+    expect(runs).toHaveLength(2)
+    for (const r of runs) expect(r.to - r.from).toBeLessThan(0.02)
+    expect(runs[0].from).toBe(0)
+    expect(runs[0].to).toBeCloseTo(LANE_CROSSINGS[0], 3)
+    expect(runs[1].from).toBeCloseTo(Math.PI * 2, 3)
+    expect(runs[1].to).toBeCloseTo(LANE_CROSSINGS[3], 3)
+  })
+
+  it('is the paint boundary and the lap flip, not the bare meridian', () => {
+    // Every crossing carries its meridian's own signed wander — three different offsets, two
+    // positive and one negative. A derivation that quietly dropped the wander would put all six
+    // exactly on chapterStartRotation, so this is the tripwire on that.
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const i = c % MERIDIANS.length
+      const offset = LANE_CROSSINGS[c] - chapterStartRotation(c)
+      if (c === 3) continue // the lap flip governs there; covered by the sliver test above
+      expect(offset, `chapter ${c} wander`).toBeCloseTo(boundaryWander(0, i, BOUNDARY_WANDER), 12)
+    }
+    expect(boundaryWander(0, 1, BOUNDARY_WANDER)).toBeLessThan(0)
+    expect(crossingRotation(3)).toBeGreaterThanOrEqual(Math.PI * 2)
+  })
+
+  /**
+   * The saturation rail — the descendant of Task 55's `MOOD_IN_END <= 1`. If the crossfade span
+   * ever exceeded the tightest gap between crossings, a boundary would arrive while the previous
+   * blend was still moving, the pair being crossfaded would swap underneath it, and every one of
+   * those boundaries would become a visible colour step.
+   */
+  it('saturates before the next crossing arrives', () => {
+    const gaps = LANE_CROSSINGS.slice(1).map((r, i) => r - LANE_CROSSINGS[i])
+    expect(MOOD_SPAN_ROT).toBeLessThan(Math.min(...gaps))
+    // ...and the consequence, measured: the mood is exactly the old one right up to the crossing.
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      const b = moodBlendAt(progressOfRotation(LANE_CROSSINGS[c] - 1e-9))
+      expect(b.mix, `approach to crossing ${c}`).toBe(1)
+      expect(b.to, `approach to crossing ${c}`).toBe(BIOME_MOODS[c - 1])
+    }
+  })
+})
+
+/**
+ * Task 59 — WINDOW GEOMETRY. Where the crossfade starts is the ground's business (above); how
+ * long it takes has to answer to the timeline, and these are the two margins it must keep.
+ */
+describe('crossfade window', () => {
+  const windowEnd = (c: number) => progressOfRotation(LANE_CROSSINGS[c] + MOOD_SPAN_ROT)
+
+  it('is fully in well before she stops, and well before the cards open', () => {
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      const end = windowEnd(c)
+      // Measured in legs, so the claim survives a change to the track height.
+      const toStop = (at(c, TRAVEL_END) - end) * CHAPTER_COUNT
+      const toCards = (at(c, BURST_END) - end) * CHAPTER_COUNT
+      expect(toStop, `chapter ${c} margin to the stop`).toBeGreaterThan(0.15)
+      expect(toCards, `chapter ${c} margin to the cards`).toBeGreaterThan(0.25)
+      expect(moodBlendAt(end).mix, `chapter ${c} landed`).toBeCloseTo(1, 9)
+    }
+  })
+
+  it('spans enough of a leg to read as a move rather than a switch', () => {
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      const start = progressOfRotation(LANE_CROSSINGS[c])
+      // The moving part of the window, in legs. For the two chapters whose boundary sits just
+      // before the previous stop this measures the whole span including the frozen dwell, which is
+      // why the freeze is asserted separately below rather than folded in here.
+      expect((windowEnd(c) - start) * CHAPTER_COUNT, `chapter ${c} span`).toBeGreaterThan(0.3)
+    }
+  })
+
+  /**
+   * THE GUARANTEE THAT REPLACES A MARGIN. The brief's requirement was that the mood must never
+   * shift while the previous chapter's cards are still on screen. Two of the six boundaries make
+   * that impossible to satisfy by margin alone: the checkpoint stop sits exactly ON the meridian,
+   * and meridian 1's torn boundary leans 17.9 mrad to the LOW side of it, so the girl steps onto
+   * the jungle (and later the canyon) a hair BEFORE she arrives at the spring (desert) checkpoint.
+   *
+   * Keying to rotation answers it structurally instead. `rotationAt` freezes rotation for the
+   * whole dwell, so the crossfade cannot advance by so much as a float while a checkpoint is
+   * parked — however long the visitor lingers, whatever the arrival clock is doing, and at any
+   * scrub speed inside the dwell. What leaks in before the freeze is `smoothstep(0.0179 / span)`,
+   * which the cubic crushes to 5.1e-4 of one crossfade.
+   */
+  it('freezes the mood for the whole of every dwell', () => {
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const ref = moodBlendAt(at(c, (TRAVEL_END + PANEL_END) / 2))
+      for (let k = 0; k <= 40; k++) {
+        const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 40
+        const b = moodBlendAt(at(c, local))
+        // Bit-identical everywhere inside. The k = 0 sample is the dwell's opening instant, whose
+        // local reconstructs a half-ulp BELOW TRAVEL_END and so lands one ulp short of the frozen
+        // angle — hence the near-check for it and exact equality for the rest.
+        expect(b.rotation, `ch${c} @${local.toFixed(3)} rotation`).toBeCloseTo(ref.rotation, 12)
+        expect(b.mix, `ch${c} @${local.toFixed(3)} mix`).toBeCloseTo(ref.mix, 12)
+        if (k > 0) {
+          expect(b.rotation, `ch${c} @${local.toFixed(3)} rotation`).toBe(ref.rotation)
+          expect(b.mix, `ch${c} @${local.toFixed(3)} mix`).toBe(ref.mix)
+        }
+        expect(b.fromIndex).toBe(ref.fromIndex)
+        expect(b.toIndex).toBe(ref.toIndex)
+        // Only the bloom envelope may still be moving in here — that is the swell under the cards.
+        expect(b.skyMix).toBeCloseTo(ref.skyMix * (b.bloom / ref.bloom), 12)
+      }
+    }
+  })
+
+  /**
+   * ...and what the visitor sees for it: every checkpoint wears its own mood, to the byte, for the
+   * whole dwell. This is the assertion the two-negative-wander chapters have to survive, and they
+   * do — 5.1e-4 of a crossfade is under a quarter of one 8-bit code on every channel.
+   */
+  it('shows each checkpoint its own mood, byte-exact, across the whole dwell', () => {
+    let worst = 0
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const own = BIOME_MOODS[c]
+      for (let k = 0; k <= 20; k++) {
+        const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 20
+        const b = moodBlendAt(at(c, local))
+        const bl = bloomAt(local)
+        expect(gradeAt(at(c, local)).haze, `${own.id} @${local.toFixed(3)}`).toBe(own.cast)
+        worst = Math.max(
+          worst,
+          Math.abs(b.skyMix - own.skyMix * bl),
+          Math.abs(b.lightMix - own.lightMix * bl),
+          Math.abs(b.hazeAlpha - own.hazeAlpha * bl),
+          Math.abs(b.vignetteAlpha - own.vignetteAlpha * bl)
+        )
+      }
+    }
+    // 1/255 of the weakest dial in play (hazeAlpha, 0.03) is 1.2e-4; this is the same order and
+    // reached only on the two chapters the wander leans against.
+    expect(worst).toBeLessThan(2e-4)
+  })
+})
+
 describe('bloomAt', () => {
   it('is full at both chapter ends, so boundaries are invisible', () => {
     expect(bloomAt(0)).toBeCloseTo(1, 6)
@@ -278,39 +505,50 @@ describe('bloomAt', () => {
   })
 
   it('is back to full by the time the panel is up', () => {
-    expect(bloomAt(MOOD_IN_END)).toBeCloseTo(1, 6)
+    expect(bloomAt(BLOOM_RISE_END)).toBeCloseTo(1, 6)
     expect(bloomAt(0.8)).toBeCloseTo(1, 6)
+  })
+
+  // The swell is the one part of the grade that deliberately keeps moving after rotation freezes:
+  // it rises through the stop and lands under the cards. If its window ever retreated below
+  // TRAVEL_END the arrival would stop swelling and the checkpoint would lose its beat.
+  it('keeps swelling past the stop, so the cards land into a rising frame', () => {
+    expect(BLOOM_RISE_END).toBeGreaterThan(TRAVEL_END)
+    expect(BLOOM_RISE_START).toBeLessThan(TRAVEL_END)
+    expect(bloomAt(TRAVEL_END)).toBeLessThan(bloomAt(BLOOM_RISE_END))
   })
 })
 
 describe('moodBlendAt', () => {
-  it('holds the previous chapter’s mood through the travel', () => {
-    const b = moodBlendAt(at(3, 0.2))
-    expect(b.chapter).toBe(3)
-    expect(b.mix).toBe(0)
+  /**
+   * The behaviour change Task 59 exists for, stated as the before/after it is. Mid-leg the mood is
+   * the biome she is WALKING ON, fully in — under Task 55's approach-keyed window this same
+   * sample still wore the previous chapter's mood, which is what Aram reported as "we also show
+   * the mood of the past biome".
+   */
+  it('wears the mood of the ground she is on, from early in the leg', () => {
+    // Well before the halfway mark of the desert leg, and long before its checkpoint.
+    const b = moodBlendAt(at(3, 0.45))
     expect(b.to).toBe(BIOME_MOODS[3])
-    expect(b.from).toBe(BIOME_MOODS[2])
+    expect(b.mix).toBeCloseTo(1, 12)
+    expect(b.skyMix).toBeCloseTo(BIOME_MOODS[3].skyMix * bloomAt(0.45), 12)
+    // …and the sample Task 55 would have shown wearing the DELTA's mood here is already moving.
+    expect(moodBlendAt(at(3, 0.2)).toIndex).toBe(3)
+    expect(moodBlendAt(at(3, 0.2)).mix).toBeGreaterThan(0.5)
   })
 
-  // Sampled from the timeline's own bounds, not literals — after a TRAVEL_END or PANEL_END change
-  // this keeps testing the real dwell instead of quietly sampling where the old one used to be.
-  // The scroll crossfade completes at MOOD_IN_END, part-way INTO the dwell (the arrival clock
-  // carries it before that), so the scroll-only path is fully landed over [MOOD_IN_END, PANEL_END]
-  // — which requires the crossfade to finish before the dwell does.
-  it('lands the new mood exactly from the crossfade’s end to the dwell’s', () => {
-    expect(MOOD_IN_END).toBeLessThan(PANEL_END)
-    for (let c = 0; c < CHAPTER_COUNT; c++) {
-      for (let k = 0; k <= 8; k++) {
-        const local = MOOD_IN_END + ((PANEL_END - MOOD_IN_END) * k) / 8
-        const inDwell = moodBlendAt(at(c, local))
-        expect(inDwell.mix, `ch${c} @${local.toFixed(3)}`).toBe(1)
-      }
-      const b = moodBlendAt(at(c, (MOOD_IN_END + PANEL_END) / 2))
-      expect(b.chapter).toBe(c)
-      expect(b.mix).toBe(1)
-      expect(b.skyMix).toBeCloseTo(BIOME_MOODS[c].skyMix, 6)
-      expect(b.lightMix).toBeCloseTo(BIOME_MOODS[c].lightMix, 6)
-      expect(b.vignetteAlpha).toBeCloseTo(BIOME_MOODS[c].vignetteAlpha, 6)
+  it('still wears the old biome while she is still on it', () => {
+    // Just inside the previous chapter's release, before her lane reaches the torn boundary.
+    const b = moodBlendAt(progressOfRotation(LANE_CROSSINGS[2] - 1e-6))
+    expect(b.to).toBe(BIOME_MOODS[1])
+    expect(b.mix).toBe(1)
+  })
+
+  it('reports the rotation it is keyed to, and it is the timeline’s', () => {
+    for (let i = 0; i <= 200; i++) {
+      const p = i / 200
+      expect(moodBlendAt(p).rotation).toBe(journeyStateAt(p).rotation)
+      expect(rotationAt(p)).toBe(journeyStateAt(p).rotation)
     }
   })
 
@@ -331,107 +569,38 @@ describe('moodBlendAt', () => {
     expect(b.skyMix).toBeCloseTo(BIOME_MOODS[0].skyMix, 6)
   })
 
-  it('crossfades monotonically across the arrival window', () => {
-    let prev = -1
-    for (let i = 0; i <= 200; i++) {
-      const local = MOOD_IN_START + ((MOOD_IN_END - MOOD_IN_START) * i) / 200
-      const mix = moodBlendAt(at(4, local)).mix
-      expect(mix).toBeGreaterThanOrEqual(prev)
-      prev = mix
-    }
-    expect(prev).toBe(1)
-  })
-
-  // The regression the whole re-key exists for: T54's arrival absorbs scroll, so progress PARKS
-  // while the checkpoint rolls out. On scroll alone the crossfade would stop here and only finish
-  // when the visitor scrolled again — the mood would arrive after the mascots, not with them.
-  it('finishes the crossfade on the arrival clock while progress is parked', () => {
-    const parked = at(4, 0.56) // the girl has stopped; absorption holds progress here
-    const scrollOnly = moodBlendAt(parked).skyMix
-    const landed = BIOME_MOODS[4].skyMix * bloomAt(0.56)
-    expect(scrollOnly).not.toBeCloseTo(landed, 4)
-
-    const rolling = (t: number) =>
-      moodBlendAt(parked, { chapter: 4, t, phase: 'in' as const }).skyMix
-    expect(rolling(GRADE_PHASE_END)).toBeCloseTo(landed, 6)
-    expect(rolling(1)).toBeCloseTo(landed, 6)
-    // …and it gets there monotonically, from exactly where scroll had left it.
-    expect(rolling(0)).toBeCloseTo(scrollOnly, 6)
-    let prev = -Infinity
-    for (let i = 0; i <= 100; i++) {
-      const v = rolling(i / 100)
-      expect(v).toBeGreaterThanOrEqual(prev - 1e-9)
-      prev = v
-    }
-  })
-
-  /**
-   * The pull contributes exactly nothing at strength 0, whatever chapter the reveal names. That
-   * one property covers three separate hazards, so DO NOT reintroduce a chapter gate to "simplify"
-   * it (t54-reviewer's request, and the reason this test sweeps every chapter rather than a few):
-   *   - arming a reveal is a no-op frame, whatever scroll position the absorption parked at;
-   *   - nullifying one is too, since `t` is already 0 by the time the field clears;
-   * NOT preemption. A t=0 reveal matching the no-reveal frame says nothing about the frame BEFORE
-   * it, which under preemption carried a DIFFERENT reveal at high pull — that is what the machine
-   * test below covers, and reading this property as preemption safety is the mistake that shipped
-   * in bdcdcb3.
-   */
-  it('is a no-op at strength 0 for every chapter — arming and nullifying', () => {
-    for (const local of [0.05, 0.42, 0.5, 0.55, 0.6, 0.7, 0.95]) {
-      for (let journeyChapter = 0; journeyChapter < CHAPTER_COUNT; journeyChapter++) {
-        const p = at(journeyChapter, local)
-        const bare = moodBlendAt(p)
-        for (let named = 0; named < CHAPTER_COUNT; named++) {
-          for (const phase of ['in', 'out'] as const) {
-            const armed = moodBlendAt(p, { chapter: named, t: 0, phase })
-            expect(armed.skyMix, `j${journeyChapter} r${named} ${phase} @${local}`).toBeCloseTo(
-              bare.skyMix,
-              9
-            )
-            expect(armed.lightMix).toBeCloseTo(bare.lightMix, 9)
-            expect(gradeAt(p, { chapter: named, t: 0, phase }).haze).toBe(gradeAt(p).haze)
-          }
-        }
-      }
-    }
-  })
-
-  // During a retraction the reveal keeps naming the biome that is LEAVING even after the journey
-  // has moved on. That is exactly right for a pull: it holds the leaving mood and fades out.
-  it('pulls toward the mood the reveal names, not the chapter the journey is in', () => {
-    const p = at(3, 0.1)
-    const stale = { chapter: 2, t: 1, phase: 'out' as const }
-    expect(moodBlendAt(p, stale).revealChapter).toBe(2)
-    expect(moodBlendAt(p, stale).skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.1), 6)
-    expect(gradeAt(p, stale).haze).toBe(BIOME_MOODS[2].cast)
-  })
-
-  it('leaves the bloom on scroll — the swell is an envelope, not an entrance beat', () => {
-    const p = at(2, 0.5)
-    const full = moodBlendAt(p, { chapter: 2, t: 1, phase: 'in' })
-    expect(full.revealPull).toBe(1)
-    expect(full.skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.5), 6)
-  })
-
-  /**
-   * The backward fling that the previous `max`-in-the-journey's-basis formulation could not
-   * survive: scrub out of a dwell fast enough to cross a whole segment before the 0.42s retraction
-   * finishes, and the reveal still names the chapter being left while the journey has already
-   * moved to the one before it. That used to drop a live term in a single frame — measured at up
-   * to a whole mood swap (winter to canyon) at scrollbar-drag speeds. The pull has no gate.
-   */
-  it('crosses a boundary backwards mid-retraction without a step, at any residual strength', () => {
-    const eps = 1e-9
+  it('crossfades monotonically from the crossing to the end of the window', () => {
     for (let c = 1; c < CHAPTER_COUNT; c++) {
-      for (const t of [1, 0.75, 0.5, 0.35, 0.1, 0]) {
-        const live = { chapter: c, t, phase: 'out' as const }
-        const before = moodBlendAt(at(c, eps), live)
-        const after = moodBlendAt(at(c - 1, 1 - eps), live)
-        expect(Math.abs(after.skyMix - before.skyMix), `ch${c} t=${t} sky`).toBeLessThan(1e-6)
-        expect(Math.abs(after.lightMix - before.lightMix), `ch${c} t=${t} light`).toBeLessThan(1e-6)
-        expect(gradeAt(at(c, eps), live).haze).toBe(gradeAt(at(c - 1, 1 - eps), live).haze)
+      let prev = -1
+      for (let i = 0; i <= 200; i++) {
+        const rot = LANE_CROSSINGS[c] + (MOOD_SPAN_ROT * i) / 200
+        const b = moodBlendAt(progressOfRotation(rot))
+        expect(b.toIndex, `chapter ${c} pair`).toBe(c)
+        expect(b.mix, `chapter ${c} step ${i}`).toBeGreaterThanOrEqual(prev)
+        prev = b.mix
       }
+      expect(prev, `chapter ${c} lands`).toBeCloseTo(1, 9)
     }
+  })
+
+  /**
+   * The shift is visibly UNDERWAY as she steps across — the capture pair the task is proved by.
+   * A tenth of the way along the window (a few vh of scroll past the boundary) the frame has
+   * already left the old mood by more than an 8-bit code on the haze, so "girl stepping onto the
+   * new terrain = mood shifting" is a claim about pixels, not about intent.
+   */
+  it('has visibly moved a short way past each crossing', () => {
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      const atCrossing = gradeAt(progressOfRotation(LANE_CROSSINGS[c]))
+      const justPast = gradeAt(progressOfRotation(LANE_CROSSINGS[c] + MOOD_SPAN_ROT * 0.1))
+      expect(atCrossing.haze, `crossing ${c} starts on the old mood`).toBe(BIOME_MOODS[c - 1].cast)
+      expect(justPast.haze, `crossing ${c} has moved`).not.toBe(BIOME_MOODS[c - 1].cast)
+    }
+  })
+
+  it('leaves the bloom on progress — the swell is an envelope, not a place', () => {
+    const p = at(2, 0.5)
+    expect(moodBlendAt(p).skyMix).toBeCloseTo(BIOME_MOODS[2].skyMix * bloomAt(0.5), 12)
   })
 
   it('clamps outside the journey instead of running off the mood list', () => {
@@ -453,7 +622,8 @@ describe('moodBlendAt', () => {
   })
 
   // The flicker-family veto, made mechanical: across the WHOLE journey no single scroll step may
-  // jump the grade. Any stepping, snap, or chapter-boundary discontinuity fails here.
+  // jump the grade. Any stepping, snap, or boundary discontinuity fails here. The bound is a
+  // third of Task 55's, because the clocked term that used to need headroom is gone.
   it('moves continuously across the whole journey — no steps, no seams', () => {
     const N = 4000
     let prev = moodBlendAt(0)
@@ -467,78 +637,104 @@ describe('moodBlendAt', () => {
         Math.abs(b.hazeAlpha - prev.hazeAlpha),
         Math.abs(b.vignetteAlpha - prev.vignetteAlpha)
       )
-      // A chapter boundary swaps which pair of moods is being crossfaded; the strengths either
-      // side must still agree, which is what this bound proves.
       prev = b
     }
-    expect(worst).toBeLessThan(0.004)
+    expect(worst).toBeLessThan(0.0015)
   })
 
   /**
-   * The reveal gate is a DISCONTINUOUS input: a stale reveal is dropped the instant `chapter`
-   * flips, and `max` cannot smooth a third term appearing and vanishing. It is seamless only
-   * because `scrolled` has saturated at exactly 1 by the boundary, so the frame the gate drops is
-   * a frame `max` was taking from the scroll term anyway. That safety is a property of
-   * MOOD_IN_END, not of the composition — this sweep is the tripwire on it, and it fails for any
-   * MOOD_IN_END above 1 (verified by construction: at local 1, `scrolled` = smoothstep((1 -
-   * MOOD_IN_START) / (MOOD_IN_END - MOOD_IN_START)), which stops reaching 1 exactly there).
+   * ...and the reason a sample-rate bound is not the whole story: a fixed 4000-sample sweep only
+   * proves the function is smooth AT THAT RESOLUTION. What actually bounds a real scrub is the
+   * Lipschitz constant — the most any dial can move per unit of progress — because a step at any
+   * speed is that constant times the progress the frame covered. Measured at 50x the sweep's
+   * resolution it does not grow, which is what tells you the sweep was measuring the constant and
+   * not missing a spike between its samples.
    */
-  it('crosses every chapter boundary seamlessly, even carrying a stale reveal', () => {
-    const eps = 1e-7
-    for (let c = 0; c < CHAPTER_COUNT - 1; c++) {
-      // A retraction still names the chapter being left, at whatever strength it has walked to.
-      for (const t of [0, 0.25, 0.5, 0.75, 1]) {
-        const stale = { chapter: c, t, phase: 'out' as const }
-        const before = moodBlendAt(at(c, 1 - eps), stale)
-        const after = moodBlendAt(at(c + 1, eps), stale)
-        expect(Math.abs(after.skyMix - before.skyMix), `ch${c} t=${t} sky`).toBeLessThan(1e-3)
-        expect(Math.abs(after.lightMix - before.lightMix), `ch${c} t=${t} light`).toBeLessThan(1e-3)
-        expect(
-          Math.abs(after.vignetteAlpha - before.vignetteAlpha),
-          `ch${c} t=${t} vignette`
-        ).toBeLessThan(1e-3)
-        // …and the colour either side resolves to the same mood, from opposite ends of the blend.
-        expect(gradeAt(at(c, 1 - eps), stale).haze).toBe(gradeAt(at(c + 1, eps), stale).haze)
-      }
+  it('has a bounded rate of change, so no scrub speed can produce a step', () => {
+    const N = 200000
+    let prev = moodBlendAt(0)
+    let worst = 0
+    for (let i = 1; i <= N; i++) {
+      const b = moodBlendAt(i / N)
+      worst = Math.max(
+        worst,
+        Math.abs(b.skyMix - prev.skyMix),
+        Math.abs(b.lightMix - prev.lightMix),
+        Math.abs(b.hazeAlpha - prev.hazeAlpha),
+        Math.abs(b.vignetteAlpha - prev.vignetteAlpha)
+      )
+      prev = b
+    }
+    expect(worst * N).toBeLessThan(5.2)
+  })
+
+  /** Each lane crossing swaps which PAIR is being crossfaded. Both sides must resolve alike. */
+  it('crosses every lane boundary seamlessly, in both directions', () => {
+    const eps = 1e-9
+    for (let c = 1; c < CHAPTER_COUNT; c++) {
+      const before = moodBlendAt(progressOfRotation(LANE_CROSSINGS[c] - eps))
+      const after = moodBlendAt(progressOfRotation(LANE_CROSSINGS[c] + eps))
+      expect(before.toIndex, `crossing ${c} swaps the pair`).toBe(c - 1)
+      expect(after.toIndex).toBe(c)
+      expect(Math.abs(after.skyMix - before.skyMix), `crossing ${c} sky`).toBeLessThan(1e-9)
+      expect(Math.abs(after.lightMix - before.lightMix), `crossing ${c} light`).toBeLessThan(1e-9)
+      expect(
+        Math.abs(after.vignetteAlpha - before.vignetteAlpha),
+        `crossing ${c} vignette`
+      ).toBeLessThan(1e-9)
+      expect(gradeAt(progressOfRotation(LANE_CROSSINGS[c] - eps)).haze).toBe(
+        gradeAt(progressOfRotation(LANE_CROSSINGS[c] + eps)).haze
+      )
     }
   })
 
   /**
-   * PREEMPTION, driven by the real arrival machine rather than a scripted retraction — the
-   * difference that hid this from the first fling sweep. Flinging backward out of a dwell lands in
-   * the PREVIOUS dwell, whose arrival preempts the in-flight retraction: `reveal` is replaced by a
-   * fresh one at t=0 in a single frame. Without the proximity weight the pull's stored displacement
-   * released all at once (94-117/255 haze channel at 6000px/s, against a 28-33/255 no-reveal
-   * control). Setting REVEAL_FAR <= REVEAL_NEAR, or removing the weight, fails this.
+   * DRIVEN BY THE REAL ARRIVAL MACHINE, not a scripted trajectory — the distinction that hid a
+   * whole class of defect from Task 55's first fling sweep, and the reason this survives the
+   * removal of the machinery it was written to police. Flinging backward out of a dwell lands in
+   * the PREVIOUS dwell, whose arrival preempts the in-flight retraction; under the old pull
+   * formulation that released stored displacement in one frame (94-117/255 on a haze channel at
+   * 6000px/s). The grade no longer reads the reveal at all, so it cannot happen — but the guard
+   * that proves it belongs on the SHIPPED path, driven by `stepArrival`, not on a claim about the
+   * signature.
+   *
+   * The metric has to be chosen carefully (Task 55's lesson): raw per-frame colour deltas grow
+   * with speed even for a perfectly smooth function, so they prove nothing. What marks a
+   * discontinuity is a frame where the grade moved a lot while the PAGE barely did — channels per
+   * 1000px of scroll. For a continuous function that is bounded by the Lipschitz constant above
+   * and stays flat as speed rises; a step would spike it.
    */
-  it('survives a preempting backward fling without exceeding ordinary motion', () => {
+  it('keeps the grade’s rate flat under real flings, forwards and backwards', () => {
     const H = 900
     const scrollable = 240 * CHAPTER_COUNT * (H / 100) - H
     const chan = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
 
-    const fling = (chapter: number, pxPerSec: number, withReveal: boolean) => {
+    const fling = (chapter: number, pxPerSec: number) => {
       let s = initialArrival((chapter + 0.58) * SEG)
       for (let f = 0; f < 180; f++) s = stepArrival(s, (chapter + 0.58) * SEG, 1 / 60)
       const startY = scrollable * s.progress
-      let prev: number[] | null = null
+      let prev: { c: number[]; y: number } | null = null
       let worst = 0
-      for (let f = 0; f < 200; f++) {
-        const y = startY - (pxPerSec * f) / 60
-        if (y < 0) break
+      for (let f = 0; f < 240; f++) {
+        const y = Math.min(scrollable, Math.max(0, startY + (pxPerSec * f) / 60))
         s = stepArrival(s, y / scrollable, 1 / 60)
-        const c = chan(gradeAt(s.progress, withReveal ? s.reveal : null).haze)
-        if (prev) worst = Math.max(worst, ...c.map((x, i) => Math.abs(x - prev![i])))
-        prev = c
+        const c = chan(gradeAt(s.progress).haze)
+        const yy = s.progress * scrollable
+        // Frames where the page barely moved are quantisation-dominated (a 1/255 rounding over a
+        // 2px scroll reads as 500) and say nothing about continuity, so they are skipped.
+        if (prev && Math.abs(yy - prev.y) > 2) {
+          const step = Math.max(...c.map((x, i) => Math.abs(x - prev!.c[i])))
+          worst = Math.max(worst, (step / Math.abs(yy - prev.y)) * 1000)
+        }
+        prev = { c, y: yy }
       }
       return worst
     }
 
     for (const chapter of [1, 3, 5]) {
-      for (const v of [3000, 4500, 6000, 9000]) {
-        const withReveal = fling(chapter, v, true)
-        const control = fling(chapter, v, false)
-        // The reveal may not make the frame move materially more than the scroll term alone does.
-        expect(withReveal, `ch${chapter} @${v}px/s`).toBeLessThanOrEqual(control + 6)
+      for (const v of [2000, 3200, 4500, 6000, 9000, 12000]) {
+        expect(fling(chapter, -v), `ch${chapter} back @${v}px/s`).toBeLessThan(420)
+        expect(fling(chapter, v), `ch${chapter} fwd @${v}px/s`).toBeLessThan(420)
       }
     }
   })
@@ -565,10 +761,16 @@ describe('moodBlendAt', () => {
 describe('gradeAt', () => {
   it('hands the overlay the blended haze colour and its two opacities', () => {
     for (let c = 0; c < CHAPTER_COUNT; c++) {
-      const g = gradeAt(at(c, 0.8))
-      expect(g.haze).toBe(BIOME_MOODS[c].cast)
-      expect(g.hazeAlpha).toBeCloseTo(BIOME_MOODS[c].hazeAlpha, 6)
-      expect(g.vignetteAlpha).toBeCloseTo(BIOME_MOODS[c].vignetteAlpha, 6)
+      const p = at(c, 0.8)
+      const g = gradeAt(p)
+      const b = moodBlendAt(p)
+      expect(g.haze, BIOME_MOODS[c].id).toBe(BIOME_MOODS[c].cast)
+      expect(g.hazeAlpha).toBe(b.hazeAlpha)
+      expect(g.vignetteAlpha).toBe(b.vignetteAlpha)
+      // …and those are the chapter's own numbers, to well inside one 8-bit code. Not exactly, on
+      // two of the six: see the crossfade-window suite for the 5.1e-4 the torn boundary leaks.
+      expect(g.hazeAlpha).toBeCloseTo(BIOME_MOODS[c].hazeAlpha, 3)
+      expect(g.vignetteAlpha).toBeCloseTo(BIOME_MOODS[c].vignetteAlpha, 3)
     }
   })
 

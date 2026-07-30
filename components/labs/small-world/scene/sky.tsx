@@ -14,11 +14,11 @@ import type { JourneyRef } from './use-journey'
  * The gradient band is mapped to the slice of the plane the camera actually
  * frames, so the horizon glow sits low in the composition.
  *
- * Task 55 — the two gradient stops are now uniforms, pulled toward the current chapter's mood as
- * the traveller arrives at its checkpoint (grade-mood.ts). This is the "whole background changes
- * colour" half of the cinematic grade: it repaints the air behind the little world and cannot
- * touch anything drawn in front of it. Without a `journeyRef` — and whenever the grade is switched
- * off — the uniforms hold the base palette exactly, so the backdrop is identical to its old self.
+ * Task 55 — the two gradient stops are now uniforms, pulled toward the mood of the wedge the girl
+ * is walking on (grade-mood.ts). This is the "whole background changes colour" half of the
+ * cinematic grade: it repaints the air behind the little world and cannot touch anything drawn in
+ * front of it. Without a `journeyRef` — and whenever the grade is switched off — the uniforms hold
+ * the base palette exactly, so the backdrop is identical to its old self.
  *
  * The uniforms carry RAW sRGB components rather than THREE.Color: this is a bare ShaderMaterial
  * writing gl_FragColor directly, with no output-encoding chunk, so the palette hex has to reach
@@ -33,7 +33,7 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
   useFrame(() => {
     if (!journeyRef) return
     const j = journeyRef.current
-    const b = moodBlendAt(j.progress, j.reveal)
+    const b = moodBlendAt(j.progress)
     uniforms.uSky.value.copy(BASE_SKY).lerp(target(MOOD_SKY, b), b.skyMix)
     // The glow trails the sky a little: keeping more of the original light low in the frame stops
     // the horizon flattening out once a mood is fully in.
@@ -80,15 +80,12 @@ const MOOD_GLOW = BIOME_MOODS.map((m) => srgb(m.glow))
 const SCRATCH = new THREE.Vector3()
 
 /**
- * The colour the backdrop is heading for: the scroll crossfade between two neighbouring moods,
- * then pulled onto the arriving chapter's mood (grade-mood.ts owns why it is a pull and not a
- * gate). Indexes with the blend's OWN `fromIndex`/`toIndex` rather than re-deriving the pairing,
- * so this table can never crossfade a different pair than the overlay does. Writes into one module
- * scratch — the frame loop allocates nothing.
+ * The colour the backdrop is heading for: the crossfade between the wedge she has left and the one
+ * under her feet (grade-mood.ts owns where that boundary is). Indexes with the blend's OWN
+ * `fromIndex`/`toIndex` rather than re-deriving the pairing, so this table can never crossfade a
+ * different pair than the overlay does. Writes into one module scratch — the frame loop allocates
+ * nothing.
  */
 function target(table: THREE.Vector3[], b: MoodBlend): THREE.Vector3 {
-  SCRATCH.copy(table[b.fromIndex]).lerp(table[b.toIndex], b.mix)
-  return b.revealChapter === null
-    ? SCRATCH
-    : SCRATCH.lerp(table[b.revealChapter], b.revealPull)
+  return SCRATCH.copy(table[b.fromIndex]).lerp(table[b.toIndex], b.mix)
 }
