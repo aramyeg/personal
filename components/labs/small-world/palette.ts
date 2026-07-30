@@ -240,4 +240,15 @@ export const PALETTE = {
   penguinBack: '#39434F', // penguin head/back — blue-charcoal rather than ink, so it is not a hole
   penguinFlash: '#EE8F33', // bill, feet and ear patch — the corner's one warm note, as the fox is
 
+  // Task 60 — THE WINTER ENDING SET. The epilogue snow field is a very bright, very cold field,
+  // so everything standing in it is chosen for CONTRAST against snow (L* ~95) rather than for
+  // being wintry in itself: the mammoth is the darkest mass on the planet's ending face, and the
+  // igloo earns its read from a shadowed doorway rather than from being whiter than the ground.
+  mammothFur: '#6E4A34', // deep warm brown shag — the one dark mass in the ending vista
+  mammothShag: '#523524', // its underside and the overlapping tufts that break the silhouette
+  mammothTusk: '#EFE4CB', // ivory tusks; warmer than snow so the curve reads against the drift
+  iglooShell: '#AFC3D2', // the igloo's DOME. Deliberately not snow: a white hut on a white field
+  // has nothing to be lighter than, and the blocks laid over it are what read. Same lesson the
+  // polar bear above is built on, applied to architecture instead of fur.
+  iglooDoor: '#6B4A2E', // shadowed doorway and smoke hole — warm ochre PAINT, not a light
 } as const

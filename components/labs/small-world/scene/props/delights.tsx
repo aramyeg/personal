@@ -6,7 +6,7 @@ import { POLAR_L, WATER_LEVEL } from '../biomes'
 import { PLANET_RADIUS } from '../planet'
 import { DIALS, subscribe, revisionSnapshot } from '../tunables'
 import { GatedProp } from './gated-prop'
-import { ClayBlossom, ClayBoulder, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
+import { ClayBlossom, ClayBoulder, ClayIceberg, ClayPalm, ClayRock, ClaySprout } from './clay-kit'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 
@@ -47,6 +47,59 @@ const FLOES_L: Array<[number, number, number]> = [
 ]
 
 /**
+ * Icebergs on the great left ocean (Task 60 — Aram asked for them with the winter ending set).
+ *
+ * They are VARIANT-INVARIANT on purpose, and that is a contract rather than a convenience. A prop
+ * that flips has to flip while occluded, and renewal-scan.mjs models a WET cell's silhouette as
+ * exactly the waterline with NO prop margin — the grazing limb is the one place the Task-19 work
+ * proved tall things cannot be hidden at all. So a berg that appeared with the epilogue would be a
+ * berg that pops on camera. Permanent ice on a polar ocean is also simply truer to the world: the
+ * floes beside them have been there since Round 6.
+ *
+ * Placed at |nx| ≈ 0.84-0.88 and spread across the world angles the ocean occupies at the final
+ * dwell, so they sit ON the visible blue rather than silhouetted on the rim (the first placement
+ * put them at |nx| ≈ 0.93, which is 93% of the way to the limb — they read as spurs off the
+ * planet's edge). That latitude still clears the coastline's divergence, which renewal-scan
+ * measures topping out at |nx| = 0.745: below that the shore differs between variants and a berg
+ * could find itself aground on one lap and afloat on the other.
+ * [tangent a, tangent b, size, spin]
+ */
+const BERGS_L: Array<[number, number, number, number]> = [
+  [-0.3954, -0.4244, 0.155, 0.7], // |nx| 0.865, world angle 0.75
+  [-0.6263, -0.2081, 0.125, 2.3], // |nx| 0.835, world angle 1.25
+  [-0.6038, 0.1409, 0.185, 4.1], // |nx| 0.850, world angle 1.80
+  [-0.4447, 0.3237, 0.100, 5.2], // |nx| 0.876, world angle 2.20
+]
+
+/** Icebergs seated on the ocean surface, sharing PolarFloes' float math. The seat sits BELOW the
+ *  nominal waterline (the floes' +0.012 is a hair less than the water's own relief crest, ~0.021
+ *  world at default dials), so a berg's dark shelf is always cut by the surface instead of
+ *  hovering over a swell. */
+function PolarBergs({ cap, spec }: { cap: { dir: readonly [number, number, number] }; spec: Array<[number, number, number, number]> }) {
+  useSyncExternalStore(subscribe, revisionSnapshot, revisionSnapshot)
+  const waterR = PLANET_RADIUS * (WATER_LEVEL + DIALS.waterRise.value)
+  const c = new THREE.Vector3(cap.dir[0], cap.dir[1], cap.dir[2]).normalize()
+  const t1 = new THREE.Vector3().crossVectors(c, Y_UP).normalize()
+  const t2 = new THREE.Vector3().crossVectors(c, t1).normalize()
+  return (
+    <>
+      {spec.map(([a, b, r, spin], i) => {
+        const dir = c.clone().addScaledVector(t1, a).addScaledVector(t2, b).normalize()
+        const pos = dir.clone().multiplyScalar(waterR - 0.022)
+        const quat = new THREE.Quaternion()
+          .setFromUnitVectors(Y_UP, dir)
+          .multiply(new THREE.Quaternion().setFromAxisAngle(Y_UP, spin))
+        return (
+          <group key={i} position={pos} quaternion={quat}>
+            <ClayIceberg r={r} />
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
+/**
  * Curated water-side delights the flank scatter leaves out: lilies on the A0
  * spring pond, palms on the A2 delta islets, oasis palms in B0, ice floes on the
  * winter B2 pond, and floes on the one great left ocean (Round 6: the right limb
@@ -59,6 +112,7 @@ export function Delights({ journeyRef }: { journeyRef: JourneyRef }) {
     <>
       {/* permanent ice on the one great left ocean */}
       <PolarFloes cap={POLAR_L} spec={FLOES_L} />
+      <PolarBergs cap={POLAR_L} spec={BERGS_L} />
 
       {/* A0 spring pond: lily blossoms on the near bank */}
       {([[1.22, 0.62], [1.34, 0.9], [1.28, 0.72]] as const).map(([t, x], i) => (

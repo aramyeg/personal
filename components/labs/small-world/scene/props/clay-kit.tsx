@@ -1007,3 +1007,172 @@ export function ClaySnowConifer({ needle = PALETTE.spruceDeep, snow = PALETTE.sn
   }, [needle, snow, height])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
+
+/**
+ * A snow-block igloo (Task 60 — the winter ending set). Built rather than moulded: the read has
+ * to survive at reading size, where a bare hemisphere is just a white lump indistinguishable from
+ * a drift. Three things carry it — courses of blocks laid around the dome, a stubby entrance
+ * tunnel breaking the silhouette, and a dark doorway mouth. The doorway is PAINT (a recessed
+ * ochre disc); this lab has no lights to put inside one.
+ */
+export function ClayIgloo({
+  shell = PALETTE.iglooShell,
+  block = PALETTE.snow,
+  seam = PALETTE.ice,
+  door = PALETTE.iglooDoor,
+  r = 0.24,
+  ...x
+}: Xform & { shell?: string; block?: string; seam?: string; door?: string; r?: number }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const parts: ClayPart[] = [
+      // The dome takes the MID tone and the blocks take the near-whites. Painting the whole hut
+      // snow-white is the obvious move and it is the wrong one: on a snow field the figure then
+      // has nothing to be lighter than, which is exactly how the Round-15 yeti earned its rebuild.
+      { geo: new THREE.SphereGeometry(r, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), color: shell, scl: [1, 0.82, 1] },
+      { geo: new THREE.CylinderGeometry(r * 1.06, r * 1.16, r * 0.16, 14), color: block, pos: [0, r * 0.06, 0] },
+    ]
+    // Three courses of blocks, offset from each other so the wall reads as LAID. This camera looks
+    // DOWN at anything on the planet's face, so the courses are what the visitor actually sees:
+    // from above they are concentric rings of light blocks on a darker dome.
+    const courses = [
+      { t: 0.22, ring: 0.99, n: 9, phase: 0 },
+      { t: 0.5, ring: 0.9, n: 7, phase: Math.PI / 7 },
+      { t: 0.75, ring: 0.68, n: 5, phase: Math.PI / 5 },
+    ]
+    for (const c of courses) {
+      const up = Math.sin(c.t * Math.PI * 0.5)
+      const rad = r * c.ring * Math.cos(c.t * Math.PI * 0.5)
+      for (let i = 0; i < c.n; i++) {
+        const a = c.phase + (i / c.n) * Math.PI * 2
+        parts.push({
+          geo: new THREE.BoxGeometry(r * 0.34, r * 0.13, r * 0.17),
+          color: i % 3 === 2 ? seam : block,
+          pos: [Math.cos(a) * rad, r * 0.83 * up, Math.sin(a) * rad],
+          rot: [0, -a, 0],
+        })
+      }
+    }
+    // The smoke hole. A doorway on a vertical wall is invisible from directly overhead, so the
+    // opening that carries the read at this camera is the one in the ROOF — which is also where a
+    // real snow house puts it. Ringed by a raised collar so it is a hole, not a smudge.
+    parts.push({ geo: new THREE.TorusGeometry(r * 0.17, r * 0.045, 6, 14), color: block, pos: [0, r * 0.8, 0], rot: [Math.PI / 2, 0, 0] })
+    parts.push({ geo: new THREE.CircleGeometry(r * 0.16, 12), color: door, pos: [0, r * 0.845, 0], rot: [-Math.PI / 2, 0, 0] })
+    // entrance tunnel + its shadowed mouth, breaking the circle in plan view
+    parts.push({ geo: new THREE.CylinderGeometry(r * 0.36, r * 0.4, r * 0.72, 10), color: block, pos: [0, r * 0.28, r * 0.82], rot: [Math.PI / 2, 0, 0] })
+    parts.push({ geo: new THREE.SphereGeometry(r * 0.38, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), color: shell, pos: [0, r * 0.28, r * 0.82], rot: [Math.PI / 2, 0, 0], scl: [1, 0.9, 1] })
+    parts.push({ geo: new THREE.CircleGeometry(r * 0.28, 12), color: door, pos: [0, r * 0.3, r * 1.16], rot: [-0.5, 0, 0] })
+    return buildMergedClay(parts)
+  }, [shell, block, seam, door, r])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/**
+ * A woolly mammoth (Task 60). Lurking-wildlife scale, like the fox and the hare — not a monument.
+ *
+ * Both identifying features are built for the reading camera, which looks DOWN on anything
+ * standing on the planet's face. Tusks that curve UP are the picture-book pose and they foreshorten
+ * to two dots from overhead, so these sweep OUT and FORWARD in the horizontal plane instead, hooking
+ * back at the tips — a shape read in plan, which is the view that exists. The SHAG is likewise
+ * structural: eight tufts wide enough to break the body's outline from above, alternating tone so
+ * the break survives the toon ramp flattening the lot into one band.
+ */
+export function ClayMammoth({
+  fur = PALETTE.mammothFur,
+  shag = PALETTE.mammothShag,
+  tusk = PALETTE.mammothTusk,
+  ...x
+}: Xform & { fur?: string; shag?: string; tusk?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const parts: ClayPart[] = [
+      { geo: new THREE.SphereGeometry(0.115, 16, 14), color: fur, pos: [0, 0.135, 0], scl: [1.45, 1.05, 1] },
+      // shoulder hump — the profile cue, and from above it is the lighter ridge down the back
+      { geo: new THREE.SphereGeometry(0.066, 12, 10), color: fur, pos: [0.045, 0.215, 0], scl: [1.5, 0.8, 0.85] },
+    ]
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2
+      parts.push({
+        geo: new THREE.SphereGeometry(0.062, 8, 7),
+        color: i % 2 === 0 ? shag : fur,
+        pos: [Math.cos(a) * 0.132, 0.086 + (i % 3) * 0.014, Math.sin(a) * 0.098],
+        scl: [0.95, 1.35, 0.95],
+        rot: [0, 0, Math.cos(a) * 0.32],
+      })
+    }
+    const legs: Array<[number, number]> = [[0.085, 0.052], [0.085, -0.052], [-0.075, 0.052], [-0.075, -0.052]]
+    for (const [lx, lz] of legs) {
+      parts.push({ geo: new THREE.CylinderGeometry(0.031, 0.026, 0.076, 7), color: shag, pos: [lx, 0.038, lz] })
+    }
+    parts.push({ geo: new THREE.SphereGeometry(0.068, 12, 12), color: fur, pos: [0.168, 0.15, 0], scl: [1, 1.05, 0.95] })
+    parts.push({ geo: new THREE.SphereGeometry(0.032, 8, 8), color: shag, pos: [0.15, 0.212, 0], scl: [1.3, 0.7, 1.2] })
+    const trunk: Array<[number, number, number, number]> = [
+      [0.218, 0.112, 0, 0.028],
+      [0.248, 0.076, 0, 0.023],
+      [0.268, 0.04, 0, 0.018],
+      [0.258, 0.014, 0, 0.014],
+    ]
+    for (const [tx, ty, tz, tr] of trunk) {
+      parts.push({ geo: new THREE.SphereGeometry(tr, 8, 8), color: fur, pos: [tx, ty, tz] })
+    }
+    for (const sz of [1, -1]) {
+      parts.push({ geo: new THREE.SphereGeometry(0.034, 8, 8), color: shag, pos: [0.138, 0.163, 0.058 * sz], scl: [0.5, 1, 1.1] })
+    }
+    // THE TUSKS — built as an explicit curve in the horizontal plane rather than a rotated arc,
+    // so the shape read from overhead is the shape authored, with no orientation guesswork.
+    // Sampled densely enough that consecutive beads OVERLAP — at five points the spacing
+    // exceeded the diameter and the tusk read as a string of pearls under magnification.
+    const curve: Array<[number, number, number, number]> = [
+      [0.202, 0.102, 0.05, 0.018],
+      [0.225, 0.1, 0.064, 0.017],
+      [0.248, 0.098, 0.076, 0.0155],
+      [0.271, 0.097, 0.084, 0.0145],
+      [0.292, 0.098, 0.088, 0.0135],
+      [0.313, 0.1, 0.085, 0.0125],
+      [0.332, 0.104, 0.078, 0.0115],
+      [0.348, 0.109, 0.066, 0.0105],
+      [0.36, 0.114, 0.052, 0.0095],
+    ]
+    for (const sz of [1, -1]) {
+      for (const [cx, cy, cz, cr] of curve) {
+        parts.push({ geo: new THREE.SphereGeometry(cr, 7, 7), color: tusk, pos: [cx, cy, cz * sz] })
+      }
+    }
+    parts.push({ geo: new THREE.SphereGeometry(0.009, 6, 6), color: PALETTE.ink, pos: [0.211, 0.172, 0.045] })
+    return buildMergedClay(parts)
+  }, [fur, shag, tusk])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/**
+ * An iceberg for the left ocean (Task 60). Faceted rather than moulded: after merging, the whole
+ * figure takes flat per-face normals (the merged buffer is non-indexed, so computeVertexNormals
+ * gives exactly that) — the same trick the pyramids use, and the reason a berg reads as CUT ice
+ * beside the planet's pressed-clay everything-else. A wider, darker shelf sits at the waterline so
+ * the mass looks like it continues below the surface rather than resting on it.
+ */
+export function ClayIceberg({
+  ice = PALETTE.ice,
+  deep = PALETTE.iceDeep,
+  crest = PALETTE.snow,
+  r = 0.15,
+  ...x
+}: Xform & { ice?: string; deep?: string; crest?: string; r?: number }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(() => {
+    const g = buildMergedClay([
+      // the waterline shelf: wide, low and darker — it is what stops the berg looking perched
+      { geo: new THREE.DodecahedronGeometry(r * 0.95, 0), color: deep, pos: [0, -r * 0.16, 0], scl: [1.15, 0.34, 1.05] },
+      // main peak, tilted off vertical
+      { geo: new THREE.ConeGeometry(r * 0.72, r * 1.72, 5), color: ice, pos: [r * 0.04, r * 0.72, 0], rot: [0.12, 0.6, -0.16] },
+      // two subsidiary crags, so the silhouette is bergy rather than one cone
+      { geo: new THREE.ConeGeometry(r * 0.42, r * 0.92, 5), color: ice, pos: [-r * 0.56, r * 0.3, r * 0.3], rot: [-0.2, 1.4, 0.28] },
+      { geo: new THREE.OctahedronGeometry(r * 0.4, 0), color: ice, pos: [r * 0.5, r * 0.26, -r * 0.34], rot: [0.3, 0.4, 0.2], scl: [1, 0.85, 1] },
+      // a snow crest catching the light on the tallest face
+      { geo: new THREE.ConeGeometry(r * 0.3, r * 0.44, 5), color: crest, pos: [r * 0.02, r * 1.42, 0], rot: [0.12, 0.6, -0.16] },
+    ])
+    g.computeVertexNormals() // per-face flat normals → cut ice, not a moulded lump
+    return g
+  }, [ice, deep, crest, r])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
