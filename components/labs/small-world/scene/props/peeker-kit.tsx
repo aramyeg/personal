@@ -117,7 +117,9 @@ export function eye(
 ): ClayPart[] {
   const [x, y, z] = at
   const iris = opts.iris ?? PALETTE.ink
-  return [
+  // Every piece an eye emits is tagged, so the FACE_BOX suite can find a character's face by name
+  // instead of inferring it from colour — see the note on `ClayPart.tag`.
+  return tagged('eye', [
     // `bare` skips the sclera for a character whose face is already pale — a white bead on a white
     // face patch reads as a goggle, and the face itself is the better sclera.
     ...(opts.bare ? [] : [sph(r, opts.sclera ?? PALETTE.snow, [x, y, z], [1, 1.02, 0.55], 12)]),
@@ -138,7 +140,64 @@ export function eye(
           ]),
         ]
       : []),
-  ]
+  ])
+}
+
+/** Stamp a `tag` on every part of a list, so a test can locate the feature it names. */
+export function tagged(tag: string, parts: ClayPart[]): ClayPart[] {
+  return parts.map((p) => ({ ...p, tag }))
+}
+
+/**
+ * A ring of FUR CLUMPS around a mass — the device that turns a smooth blob into an animal with a
+ * coat. Written for the yeti in Task 58 and moved here in Task 61, because the polar bear needs the
+ * same guard hair on its shoulder and haunch and the retired yeti needs it out on the planet.
+ *
+ * What separates fur from spikes is not length, it is the NOTCH. Each clump is a rounded lobe —
+ * never a point — rooted well INSIDE the mass at `root` and running out to `root + len`, so
+ * neighbours converge where they are buried and diverge where they are seen: the gap between two
+ * tips is the fur, and the lobes only have to be long enough to open it. (`tufts` above is the
+ * older cone version; past about 0.3 its clumps project from the outline as spines, which is a
+ * threat read, so anything that has to look soft uses this instead.)
+ *
+ * `lay` rakes the clumps off the radial direction. A ring of purely radial lobes is a sunburst;
+ * hair lies along the body and hangs, so a raked ring is what reads as weight. `thick` is the
+ * lobe's width as a fraction of its length.
+ *
+ * Every ring is a SILHOUETTE device. The ink hull is inflated from the merged geometry, so a lobe
+ * standing proud of the body draws its own outline — at the edge that is exactly the point, and
+ * anywhere else it is a disaster (rows of clumps laid over a chest read as petals or scales at
+ * every depth they can be seated at; this renderer has no way to draw texture INSIDE a silhouette).
+ */
+export function shag(
+  center: V3,
+  root: number,
+  n: number,
+  color: string,
+  from: number,
+  to: number,
+  len: number,
+  lay = 0,
+  thick = 0.5
+): ClayPart[] {
+  const out: ClayPart[] = []
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI * (from + (to - from) * (i / Math.max(1, n - 1)))
+    // a ring of equal clumps reads as a scalloped border, which is a decorative edge rather than fur
+    const l = len * (0.82 + 0.3 * Math.sin(i * 2.3))
+    const d = root + l * 0.5
+    out.push({
+      ...sph(
+        l * 0.5,
+        color,
+        [center[0] + Math.cos(a) * d, center[1] + Math.sin(a) * d, center[2]],
+        [1, thick, 0.62],
+        8
+      ),
+      rot: [0, 0, a + lay] as V3,
+    })
+  }
+  return out
 }
 
 /** A ring of blunt tufts breaking a round mass into a shaggy silhouette. */

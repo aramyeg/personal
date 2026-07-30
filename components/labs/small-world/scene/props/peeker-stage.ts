@@ -651,19 +651,29 @@ export function peekerCardClearance(
 
 // --- the cast ---------------------------------------------------------------
 
+/**
+ * Task 61 — the cast is DEDUPLICATED. Four checkpoints used to field the same animal twice at two
+ * sizes, and a pair built from one construction reads as one asset repeated however much its pose
+ * and tack differ. Each of those corners now fields two SPECIES: the crocodile keeps the delta but
+ * loses its small copy to a snake, the camel keeps the desert but loses its calf to a fennec fox,
+ * one pangolin keeps the canyon (and the roll-in beat, which is the most charming thing in the set)
+ * and the other becomes an eagle, and both yetis leave the winter to a polar bear and a penguin.
+ *
+ * The yeti is not retired — it moves onto the planet as a hidden easter egg (`yeti-egg.tsx`).
+ */
 export type PeekerKind =
   | 'bluebird'
   | 'robin'
   | 'macaw'
   | 'cockatoo'
   | 'crocGape'
-  | 'crocPeek'
+  | 'snake'
   | 'camelAdult'
-  | 'camelCalf'
+  | 'fennec'
   | 'pangolinBig'
-  | 'pangolinSmall'
-  | 'yetiBig'
-  | 'yetiSmall'
+  | 'eagle'
+  | 'polarBear'
+  | 'penguin'
 
 export type PeekerBiome = 'spring' | 'jungle' | 'delta' | 'desert' | 'canyon' | 'winter'
 
@@ -677,16 +687,23 @@ export type PeekerPair = {
  * Journey-order cast. Chapter → wedge is fixed by the scene mounts: 0 = A0 spring, 1 = A1 jungle,
  * 2 = A2 delta, 3 = B0 desert, 4 = B1 canyon, 5 = B2 winter.
  *
- * The two sides are always DIFFERENT characters from the same family, and each pair sits inside
- * its biome's own set dressing (see `peekerDressing`).
+ * The two sides are always DIFFERENT SPECIES, and each pair sits inside its biome's own set
+ * dressing (see `peekerDressing`).
+ *
+ * WHICH SIDE, and it is the same judgement everywhere: the animal that was already authored for its
+ * corner keeps it, and the newcomer takes the other. That leaves the big crocodile, the adult camel
+ * and the rolling pangolin exactly where their dressing was built around them, so the recast is a
+ * change of cast rather than a re-staging. Winter is the exception because it loses both figures;
+ * there the bear takes the left, where the drift is banked widest and a long low animal fits, and
+ * the penguin takes the right, which is the narrower corner an upright bird suits.
  */
 export const PEEKER_CAST: readonly PeekerPair[] = [
   { biome: 'spring', left: 'bluebird', right: 'robin' },
   { biome: 'jungle', left: 'macaw', right: 'cockatoo' },
-  { biome: 'delta', left: 'crocGape', right: 'crocPeek' },
-  { biome: 'desert', left: 'camelAdult', right: 'camelCalf' },
-  { biome: 'canyon', left: 'pangolinBig', right: 'pangolinSmall' },
-  { biome: 'winter', left: 'yetiBig', right: 'yetiSmall' },
+  { biome: 'delta', left: 'crocGape', right: 'snake' },
+  { biome: 'desert', left: 'camelAdult', right: 'fennec' },
+  { biome: 'canyon', left: 'pangolinBig', right: 'eagle' },
+  { biome: 'winter', left: 'polarBear', right: 'penguin' },
 ]
 
 export function peekerCastFor(chapter: number): PeekerPair | null {

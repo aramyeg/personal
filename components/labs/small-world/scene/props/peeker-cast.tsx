@@ -54,19 +54,19 @@ const ART: Record<PeekerBiome, BiomeArt> = {
     dressing: jungleDressing,
   },
   delta: {
-    pieces: (kind, dir) => deltaPieces(kind === 'crocPeek' ? 'crocPeek' : 'crocGape', dir),
+    pieces: (kind, dir) => deltaPieces(kind === 'snake' ? 'snake' : 'crocGape', dir),
     dressing: deltaDressing,
   },
   desert: {
-    pieces: (kind, dir) => desertPieces(kind === 'camelCalf' ? 'camelCalf' : 'camelAdult', dir),
+    pieces: (kind, dir) => desertPieces(kind === 'fennec' ? 'fennec' : 'camelAdult', dir),
     dressing: desertDressing,
   },
   canyon: {
-    pieces: (kind, dir) => canyonPieces(kind === 'pangolinSmall' ? 'pangolinSmall' : 'pangolinBig', dir),
+    pieces: (kind, dir) => canyonPieces(kind === 'eagle' ? 'eagle' : 'pangolinBig', dir),
     dressing: canyonDressing,
   },
   winter: {
-    pieces: (kind, dir) => winterPieces(kind === 'yetiSmall' ? 'yetiSmall' : 'yetiBig', dir),
+    pieces: (kind, dir) => winterPieces(kind === 'penguin' ? 'penguin' : 'polarBear', dir),
     dressing: winterDressing,
   },
 }
@@ -180,11 +180,16 @@ function inked(piece: PeekerPiece, index: number): boolean {
 }
 
 /**
- * Static roll baked onto a figure's root — what keeps a pair that shares one build from reading as
- * the same animal at two scales.
+ * Static roll baked onto a figure's root.
+ *
+ * It used to exist to keep a pair that shares ONE build from reading as the same animal at two
+ * scales; Task 61's recast removed every such pair, so the only tilt left is one that is doing
+ * character work rather than disambiguation. A fox cocks its whole body when it is listening, and
+ * the fennec is standing beside an animal whose defining line is a long vertical neck — so the tilt
+ * buys a diagonal in a corner that would otherwise be two uprights.
  */
 export function peekerRootTilt(kind: PeekerKind, dir: 1 | -1): number {
-  return kind === 'crocPeek' ? -0.2 * dir : 0
+  return kind === 'fennec' ? -0.12 * dir : 0
 }
 
 // --- per-kind gesture + spec ------------------------------------------------
@@ -226,10 +231,79 @@ function applyJaw(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
   if (limbs.b) limbs.b.rotation.z = dir * 0.12 * drive.idle
 }
 
-/** The small croc barely opens — it just works its jaw and taps a claw. */
-function applyChomp(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
-  if (limbs.a) limbs.a.rotation.z = -dir * (0.06 + 0.07 * drive.idle)
-  if (limbs.b) limbs.b.rotation.z = dir * (-0.1 + 0.18 * drive.idle)
+/**
+ * The snake: the raised head sways over its coil, and the tongue FLICKS.
+ *
+ * The sway is the ordinary smooth channel, but a tongue that eases in and out over the whole dwell
+ * is a slug rather than a flick — the one thing a reader knows about a snake's tongue is that it is
+ * quick. So the tongue is driven by a SHAPED idle: `2·idle − 1` clamped at zero leaves it retracted
+ * for half the cycle and shoots it out over the other half, which is fast enough to read as a flick
+ * while still being a pure function of scroll position. It is a scale rather than a rotation because
+ * the tongue has to appear from inside a closed mouth, and a hinge would swing it out through the
+ * jaw.
+ */
+function applyFlick(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
+  if (limbs.a) {
+    limbs.a.rotation.z = dir * (-0.05 + 0.14 * drive.idle)
+    limbs.a.rotation.y = dir * 0.16 * drive.idle
+  }
+  if (limbs.b) {
+    const out = Math.max(0, 2 * drive.idle - 1)
+    limbs.b.scale.set(0.24 + 0.76 * out, 1, 1)
+  }
+}
+
+/**
+ * The fennec: one huge ear swivels, and the brush tail sweeps behind it.
+ *
+ * The ear is the whole character — it is most of the silhouette and it is the only part of a fox
+ * that moves while the animal holds still. Swivelling it about its BASE (a yaw, so the dish turns
+ * toward and away from the reader, plus a little roll) is what reads as listening; rocking the whole
+ * head would just nod it.
+ */
+function applyEar(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
+  if (limbs.a) {
+    limbs.a.rotation.y = dir * (-0.12 + 0.34 * drive.idle)
+    limbs.a.rotation.z = dir * 0.09 * drive.idle
+  }
+  if (limbs.b) limbs.b.rotation.z = dir * (0.06 - 0.2 * drive.idle)
+}
+
+/**
+ * The eagle MANTLES: the near wing lifts and half-opens, then folds back down.
+ *
+ * Deliberately a wider swing than `applyWing`'s beat and on a much slower cycle. A small fast beat
+ * on a corner bird reads as a sparrow fluttering; a raptor's shoulder movement is one big slow
+ * gesture, and the wing's own shape is what has to be read rather than its speed. The yaw opens the
+ * wing away from the body as it lifts so the primaries separate from the flank instead of sliding
+ * along it.
+ *
+ * The roll is NEGATIVE where `applyWing`'s is positive, and that is geometry rather than taste. The
+ * wing is authored folded, reaching out and DOWN toward the frame edge; a positive z rotation
+ * sweeps an outward-pointing vector further downward, which closes the wing tighter against the
+ * flank. Only the negative sense lifts the tip, and lifting is the whole gesture.
+ */
+function applyMantle(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
+  if (limbs.a) {
+    limbs.a.rotation.z = -dir * (0.06 + 0.46 * drive.idle)
+    limbs.a.rotation.y = dir * 0.2 * drive.idle
+  }
+}
+
+/** The bear's near foreleg rocks where it is planted in the drift — a big animal shifting its weight. */
+function applyPaw(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
+  if (limbs.a) limbs.a.rotation.z = dir * (-0.05 + 0.16 * drive.idle)
+}
+
+/**
+ * The penguin's flipper waggles — a big amplitude on a stiff limb, which is the whole joke.
+ *
+ * Negative for the same reason `applyMantle` is: the flipper hangs DOWN at rest, and only the
+ * negative sense swings it outward into a wave. The positive sense folds it in across the white
+ * front, which both hides the limb and cuts the one shape that makes the bird a penguin.
+ */
+function applyFlipper(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
+  if (limbs.a) limbs.a.rotation.z = -dir * (-0.16 + 0.62 * drive.idle)
 }
 
 /** Camels chew sideways — a yaw on the jaw reads far more camel than a hinge. */
@@ -261,22 +335,22 @@ function applyUnroll(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void 
   if (limbs.c) limbs.c.scale.set(1 + 0.34 * u, 1 - 0.22 * u, 1 - 0.06 * u)
 }
 
-/** The yeti's arm rocks slowly where it grips the branch. */
-function applyArm(limbs: PeekerLimbs, drive: PeekerDrive, dir: 1 | -1): void {
-  if (limbs.a) limbs.a.rotation.z = dir * (-0.08 + 0.22 * drive.idle)
-}
-
 export const PEEKER_SPECS: Record<PeekerKind, PeekerSpec> = {
   bluebird: { apply: applyWing, cycles: 6, sway: 0.05 },
   robin: { apply: applyWing, cycles: 5, sway: 0.055 },
   macaw: { apply: applyWing, cycles: 6, sway: 0.05 },
   cockatoo: { apply: applyWing, cycles: 5, sway: 0.055 },
   crocGape: { apply: applyJaw, cycles: 2, sway: 0.03 },
-  crocPeek: { apply: applyChomp, cycles: 2.5, sway: 0.035 },
+  // A snake watching from a limb barely moves; the tongue is what carries the cycle, so it is a
+  // touch quicker than its partner rather than slower.
+  snake: { apply: applyFlick, cycles: 3, sway: 0.03 },
   camelAdult: { apply: applyChew, cycles: 4, sway: 0.04 },
-  camelCalf: { apply: applyChew, cycles: 5, sway: 0.05 },
+  // The quickest thing in the whole cast, and it should be: a fennec is a small nervous animal
+  // standing next to the slowest one in the set.
+  fennec: { apply: applyEar, cycles: 6, sway: 0.055 },
   pangolinBig: { apply: applyUnroll, cycles: 2.5, sway: 0.05, rolls: true },
-  pangolinSmall: { apply: applyUnroll, cycles: 3, sway: 0.055, rolls: true },
-  yetiBig: { apply: applyArm, cycles: 2, sway: 0.045 },
-  yetiSmall: { apply: applyArm, cycles: 2.5, sway: 0.055 },
+  // The slowest, for the same reason in reverse — one big mantle across the whole dwell.
+  eagle: { apply: applyMantle, cycles: 1.5, sway: 0.04 },
+  polarBear: { apply: applyPaw, cycles: 2, sway: 0.045 },
+  penguin: { apply: applyFlipper, cycles: 3.5, sway: 0.055 },
 }

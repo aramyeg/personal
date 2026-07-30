@@ -436,98 +436,243 @@ function crocGapeJaw(d: 1 | -1): ClayPart[] {
   ])
 }
 
-const PEEK_HINGE: V3 = [-0.02, 0.36, 0]
-/** 15°, which the rig's −0.2 rad root tilt lays back down to about 3° on screen. */
-const PEEK_UPPER = 0.26
-/** 3°: this one only works its jaw, so the gape stays between 12° and 19°. */
-const PEEK_LOWER = 0.05
+// --- the snake --------------------------------------------------------------
 
 /**
- * The smaller crocodile: mostly skull, with just enough shoulder behind it to crop at the frame.
- * It is authored HIGHER and further into the frame than its partner, and the rig's −0.2 rad root
- * tilt cocks the whole animal, so a pair built from one construction reads as two creatures doing
- * two different things rather than as the same animal at two scales.
+ * Task 61 — the small crocodile is replaced by a SNAKE, coiled on the mangrove with its head
+ * raised. Aram: "instead of 2 crocs we can show 1 crocodile and 1 snake."
+ *
+ * WHY IT IS AMBER AND NOT GREEN, which is the first thing anyone will ask. A green snake is the
+ * obvious swamp animal, and it is the wrong call here for a reason this cast has already been
+ * burned by once: the canyon's first pangolin was drawn in the same brown family as the ledge and
+ * the hoodoo behind it, and the review's verdict was that the animal "camouflages into its own
+ * dressing". This corner is already crowded with green — `jungleCanopy`, `jungleDeep`,
+ * `jungleMoss`, `deltaMoss`, `reedGreen` in the leaves, and a crocodile in `crocHide` olive right
+ * beside it. Another green animal there is a green shape on a green shape.
+ *
+ * So the snake is a warm amber constrictor with dark saddles. It separates from every green in the
+ * corner by HUE rather than by value, it separates from the mangrove's `mangroveBark` by being four
+ * times lighter, and it puts a second warm note in an olive corner next to the lotus. It is also a
+ * real animal drawn plainly — a boa's saddled back is one of the most recognisable patterns there
+ * is, which matters more at corner size than species accuracy to a river delta.
+ *
+ * CLAY-CUTE, NOT MENACING, per the brief. Everything that would make a snake threatening is
+ * deliberately absent: no fangs, no slit pupil, no open strike pose, no rearing S. The head is
+ * blunt rather than wedge-sharp, the eye is a big round honey bead, and the mouth line curves UP at
+ * the corner. What is left is a curious animal watching the reader over its own coils.
  */
-function crocPeekBody(d: 1 | -1): ClayPart[] {
-  const H = PEEK_HINGE
-  const A = PEEK_UPPER
+
+/** The body's tone at a point along its length — dark on top, amber on the side, pale beneath. */
+const COIL_TOP = PALETTE.boaSaddle
+const COIL_SIDE = PALETTE.boaCoil
+const COIL_UNDER = PALETTE.boaBelly
+
+/**
+ * The coil, as three overlapping runs rather than one tapering limb.
+ *
+ * `limb` tapers linearly from end to end, which is exactly wrong for a snake: a snake is thin at
+ * the tail, thickest about a third of the way up the body, and narrows again into the neck. Drawn
+ * as a single taper it reads as a rope or a root — and this corner is FULL of mangrove roots, which
+ * is the one thing the animal must not be mistaken for. Three runs with their own end radii give it
+ * a real girth curve, and the joins are hidden inside the loops.
+ *
+ * The path is set by the dressing, not by taste. It enters behind the mangrove arch's outward
+ * descent, crosses the crown (which `deltaDressing` describes as sitting at the animals' own
+ * waistline and which the crocodile also hooks a foot over), loops OUT and down toward the trunk
+ * climbing the frame edge, comes back up inside it, and rises into the neck. Every part of it is
+ * either lying on bark the reader can see or passing behind a lily pad — the corner's standing rule
+ * is that nothing may be caught on something off-screen.
+ */
+const COIL_TAIL: readonly V3[] = [
+  [0.34, -0.5, -0.05],
+  [0.2, -0.4, -0.02],
+  [0.06, -0.34, 0.02],
+]
+const COIL_MID: readonly V3[] = [
+  [0.06, -0.34, 0.02],
+  [-0.16, -0.42, 0.06],
+  [-0.4, -0.4, 0.08],
+  [-0.55, -0.24, 0.07],
+]
+const COIL_NECK: readonly V3[] = [
+  [-0.55, -0.24, 0.07],
+  [-0.5, -0.02, 0.08],
+  [-0.28, 0.06, 0.11],
+  [-0.06, 0.06, 0.12],
+  [0.03, 0.2, 0.1],
+]
+
+/**
+ * One dark SADDLE straddling the body: a squashed ellipsoid rolled to the body's local direction
+ * and set proud of it, so it draws over the amber rather than being swallowed by it.
+ *
+ * These are the pattern, and the pattern is the species. Without them an amber tube is a tube; the
+ * saddles are what make the eye follow the body around its own loops and read the overlap as a
+ * coil rather than as a knot of separate sausages. Each is a little wider than the body it sits on
+ * for the same reason the yeti's tone patches are authored proud of their host — a patch level with
+ * its surface loses the depth test and never draws at all.
+ */
+function saddle(at: V3, r: number, a: number, wide = 1.05): ClayPart {
+  return { ...sph(r, COIL_TOP, at, [0.46, wide, 0.86], 8), rot: [0, 0, a] as V3 }
+}
+
+/**
+ * The coiled body: the run, its belly bands, its saddles, and the neck rising out of the front loop.
+ *
+ * The OUTWARD reach is deliberate rather than incidental. The retired small crocodile was what held
+ * `MASCOT_BOX.out` honest — the envelope suite fails a box left slack by more than 0.08 — so the
+ * outer loop is run to the same band the crocodile's flank used to occupy. A snake is the right
+ * animal to spend that reach on: a coil naturally runs out toward the frame edge and crops there,
+ * where a compact animal would have had to be stretched to hold the number.
+ */
+function snakeBody(d: 1 | -1): ClayPart[] {
   return facing(d, [
-    sph(0.145, PALETTE.crocHide, [-0.2, 0.26, -0.01], [1.05, 1, 0.95], 12),
-    sph(0.165, PALETTE.crocHide, [-0.36, 0.1, -0.01], [1.05, 1, 0.95], 12),
-    sph(0.145, PALETTE.crocHide, [-0.5, -0.06, -0.01], [1.02, 1, 0.95], 12),
+    // The three runs. Radii step 0.052 → 0.086 → 0.062 → 0.038: thin tail, heavy mid-body, neck
+    // narrowing into the skull.
+    ...limb(COIL_TAIL, 0.07, 0.03, COIL_SIDE, 9),
+    ...limb(COIL_MID, 0.086, 0.072, COIL_SIDE, 9),
+    ...limb(COIL_NECK, 0.062, 0.036, COIL_SIDE, 9),
+    // The front loop's near face, pushed toward the camera so the coil OVERLAPS itself. A coil
+    // drawn all at one depth is a flat spiral; the overlap is the whole illusion of a wound body,
+    // and it needs a z step bigger than the body's own radius to survive the toon ramp.
+    sph(0.088, COIL_SIDE, [-0.3, -0.38, 0.16], [1.5, 0.92, 0.7], 10),
+    sph(0.082, COIL_SIDE, [-0.09, -0.3, 0.17], [1.4, 0.9, 0.7], 10),
+    // BELLY BANDS along the underside of the near loop — a snake's ventral scutes are one wide pale
+    // band per scale row, and they are the only place the pale tone is allowed to spend area. They
+    // sit on the loop's lower edge, which is the surface a reader looking slightly down actually
+    // sees.
+    ...[
+      [-0.44, -0.45, 0.13, 0.055, 0.26],
+      [-0.28, -0.47, 0.17, 0.06, 0.1],
+      [-0.11, -0.4, 0.18, 0.056, -0.12],
+      [0.04, -0.4, 0.12, 0.05, -0.3],
+      [0.19, -0.45, 0.06, 0.042, -0.5],
+    ].map(([x, y, z, r, a]) => ({
+      ...sph(r, COIL_UNDER, [x, y, z], [1.7, 0.44, 0.6], 8),
+      rot: [0, 0, a] as V3,
+    })),
+    // Saddles down the back, following the loops. They crowd where the body is thick and thin out
+    // toward the tail, which is what a real pattern does and what keeps the row from reading as a
+    // ladder painted on a hose.
+    saddle([0.29, -0.46, -0.01], 0.05, 0.6),
+    saddle([0.145, -0.355, 0.04], 0.078, 0.3, 1.25),
+    saddle([0.055, -0.335, 0.07], 0.045, 0.1, 0.8),
+    saddle([-0.055, -0.36, 0.09], 0.086, -0.1, 1.3),
+    saddle([-0.155, -0.42, 0.1], 0.048, 0.2, 0.75),
+    saddle([-0.265, -0.445, 0.11], 0.09, 0.34, 1.28),
+    saddle([-0.43, -0.42, 0.11], 0.082, -0.16, 1.2),
+    // This one is the figure's outermost primitive and therefore what holds `MASCOT_BOX.out`
+    // honest for the whole cast now that the small crocodile is gone. Its x is set from the box
+    // rather than from the curve: a saddle is an ellipsoid ROLLED to the body's direction, so at
+    // this angle its long axis contributes most of its reach and it costs 0.11 outward rather than
+    // the 0.04 its own half-width suggests.
+    saddle([-0.545, -0.28, 0.1], 0.078, 1.2),
+    saddle([-0.53, -0.06, 0.11], 0.066, 1.5, 1.2),
+    saddle([-0.415, 0.03, 0.13], 0.038, 0.9, 0.8),
+    saddle([-0.31, 0.07, 0.14], 0.062, 0.2, 1.25),
+    saddle([-0.19, 0.055, 0.15], 0.036, 0.0, 0.8),
+    saddle([-0.085, 0.075, 0.15], 0.056, -0.1, 1.2),
+    saddle([0.01, 0.17, 0.13], 0.05, 1.1, 1.3),
+    // A shaded strip along the coil's underside where it meets the mangrove — the drawn contact
+    // that stops a heavy body hovering over the bark it is supposed to be resting its weight on.
+    // In the snake's OWN dark tone rather than the crocodile's `crocShade`, which is what it was
+    // first drawn in: the two animals share a corner, and every tone they share is a step back
+    // toward the one-species pair this recast exists to break up.
+    sph(0.1, PALETTE.boaSaddle, [-0.34, -0.5, 0.02], [1.9, 0.34, 0.5], 10),
+    sph(0.09, PALETTE.boaSaddle, [0.1, -0.44, -0.02], [1.6, 0.32, 0.5], 10),
+  ])
+}
+
+/**
+ * The raised head, hinged at the base of the SKULL rather than at the base of the neck.
+ *
+ * That choice is forced by the scene graph. The rig gives a figure three sibling limb groups, not a
+ * chain — so the tongue (slot `b`) cannot be parented to the head (slot `a`), and every degree the
+ * head swings drags the mouth out from under a tongue pinned in the figure's own frame. Hinging at
+ * the skull base keeps the lever arm to about 0.18, so `applyFlick`'s widest yaw moves the lip by
+ * roughly 0.03 — less than the depth the tongue's root is buried at, which is what makes the cheat
+ * invisible. Hinging at the neck base would have tripled that and torn the tongue off the face.
+ */
+function snakeHead(d: 1 | -1): ClayPart[] {
+  return facing(d, [
+    // The skull: a BLUNT wedge. A sharply tapered head is the whole difference between a viper and
+    // a constrictor, and between menacing and cute — the brief asks for the second.
+    sph(0.085, COIL_SIDE, [0.02, 0.0, 0.0], [1.15, 0.95, 0.92], 12),
+    sph(0.075, COIL_SIDE, [0.13, -0.01, 0.01], [1.2, 0.82, 0.9], 12),
+    sph(0.055, COIL_SIDE, [0.215, -0.025, 0.015], [1.15, 0.7, 0.85], 10),
+    // the snout's rounded end, kept in the body tone: a cone tapers to a point, and whatever is put
+    // at a cone's tip becomes the tip — the canyon's pangolin lost its snout to exactly that
+    sph(0.04, COIL_SIDE, [0.255, -0.035, 0.015], [0.9, 0.72, 0.85], 10),
+    // pale throat and chin, the underside tone carried up onto the head so the two rhyme
+    sph(0.05, COIL_UNDER, [0.11, -0.045, 0.06], [1.7, 0.3, 0.5], 10),
+    // The crown saddle and a dark temporal stripe running back from the eye. The stripe is the
+    // second-strongest snake cue after the pattern itself, and it also does a job: it separates the
+    // eye bead from the jaw line so the head does not read as one amber lozenge with a dot on it.
+    saddle([0.03, 0.045, 0.02], 0.055, 0.1, 1.25),
+    { ...sph(0.05, COIL_TOP, [0.1, 0.012, 0.06], [1.6, 0.3, 0.5], 8), rot: [0, 0, -0.12] as V3 },
+    // The MOUTH: a fine dark line along the jaw, curving UP at its rear corner. The lift is the
+    // entire difference between a neutral reptile and a friendly one, and it is the same device the
+    // yeti's two ink ticks use at the corners of its smile.
     ...limb(
       [
-        [-0.48, -0.08, -0.01],
-        [-0.54, -0.18, -0.02],
-        [-0.56, -0.28, -0.03],
+        [0.255, -0.042, 0.05],
+        [0.15, -0.052, 0.07],
+        [0.05, -0.038, 0.06],
+        [-0.02, 0.005, 0.04],
       ],
-      0.1,
-      0.042,
-      PALETTE.crocHide
+      0.01,
+      0.012,
+      PALETTE.ink
     ),
-    sph(0.155, PALETTE.crocShade, [-0.4, 0.02, 0.06], [1.3, 0.62, 0.55], 12),
-    sph(0.1, PALETTE.crocBelly, [-0.22, 0.14, 0.1], [1.3, 0.66, 0.5], 10),
-    // The SHOULDER the forefoot hangs off, and it is structural rather than decorative. The foot is
-    // a separately hinged piece pinned at (−0.16, −0.20) — which is outside the body's silhouette,
-    // so the arm used to start in clear sky about a fifth of a figure-height below the flank and
-    // read as a brown block floating over the lily pads. Its partner never showed the fault: on
-    // crocGape the foreleg is authored INSIDE the body piece and its top is buried in the barrel.
-    // This bridges the same gap on the hinged build — it sits on the body, so the whole of the
-    // arm's swing stays covered, and it is wide enough to still overlap at both ends of the chomp.
-    sph(0.105, PALETTE.crocHide, [-0.29, -0.13, 0.07], [1.05, 1, 0.9], 10),
-    ...scutes([
-      [-0.14, 0.4, 1.9, 0.05],
-      [-0.28, 0.28, 2, 0.055],
-      [-0.42, 0.13, 2.1, 0.05],
-      [-0.52, -0.03, 2.2, 0.04],
-      [-0.57, -0.2, 2.3, 0.032],
-    ]),
-    ...crocSkull(H, A, 0.86, [0.03, 0.5, 0.13]),
-    ...toothRow(H, A, -1, 5, 0.05, 0.27, 0.066, 0.062, 0.02, 0.026),
-  ])
-}
-
-/** Its mandible, barely parted: the rig only works this one through a few degrees. */
-function crocPeekJaw(d: 1 | -1): ClayPart[] {
-  const O: V3 = [0, 0, 0]
-  const A = PEEK_LOWER
-  return facing(d, [
-    ...limb(
-      [jawPoint(O, A, -0.02, 0), jawPoint(O, A, 0.13, 0.004), jawPoint(O, A, 0.25, 0.008)],
-      0.082,
-      0.046,
-      PALETTE.crocHide
-    ),
-    sph(0.046, PALETTE.crocHide, jawPoint(O, A, 0.26, 0.008), [1, 0.95, 0.95], 10),
-    sph(0.062, PALETTE.crocBelly, jawPoint(O, A, 0.12, -0.045, 0.02), [1.5, 0.7, 0.5], 10),
-    ...toothRow(O, A, 1, 4, 0.05, 0.22, 0.05, 0.048, 0.019, 0.085),
+    // two nostril ticks on the snout's top corner
+    sph(0.011, PALETTE.ink, [0.255, 0.0, 0.045], undefined, 6),
+    // The eye: big, round and forward. `honey` is the cast's warm-eye tone — the crocodile beside it
+    // and the retired yeti both wear it — so the two delta animals look at the reader with the same
+    // eye, which is what makes them a pair rather than two unrelated props.
+    ...eye([0.13, 0.035, 0.075], 0.05, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+    // A brow ridge over it, in the crown's dark tone. Snakes have no brow; this one has a suggestion
+    // of one because without it the eye sits on a smooth curve and reads as a bead stuck on the
+    // side of a tube rather than as an eye set into a skull.
+    { ...sph(0.042, COIL_TOP, [0.14, 0.078, 0.05], [1.5, 0.42, 0.6], 8), rot: [0, 0, 0.16] as V3 },
   ])
 }
 
 /**
- * The forefoot hooked over the mangrove crown. Hinged separately so the rig's second channel can
- * rock it — a crocodile shifting its grip is the whole read of "waiting", and it is also what ties
- * the character to the dressing instead of leaving it floating beside it.
+ * The forked tongue, driven by a SCALE rather than a hinge.
+ *
+ * A tongue has to appear from inside a closed mouth. Swung on a hinge it would sweep out THROUGH
+ * the jaw, which is visible from this camera; scaled along its own axis it grows out of the lip,
+ * which is what a real flick looks like. `applyFlick` holds it at 0.24 for half the idle cycle and
+ * shoots it to full over the other half — retracted, the whole thing collapses to under 0.04 and
+ * disappears inside the mouth it is rooted in.
+ *
+ * It is authored from x = −0.02 (INSIDE the lip) so that even at full extension its root is buried,
+ * and so the head's own small swing cannot pull the join into the open.
  */
-function crocPeekFoot(d: 1 | -1): ClayPart[] {
+function snakeTongue(d: 1 | -1): ClayPart[] {
   return facing(d, [
-    cyl(0.048, 0.06, 0.18, PALETTE.crocHide, [-0.03, -0.06, 0.02], [0, 0, 0.5]),
-    sph(0.056, PALETTE.crocShade, [-0.06, -0.11, 0.05], [1.2, 0.8, 0.8], 8),
-    ...foot(-0.1, -0.16, 0.3),
+    cyl(0.008, 0.011, 0.09, PALETTE.petal, [0.025, 0, 0], [0, 0, Math.PI / 2]),
+    cone(0.008, 0.055, PALETTE.petal, [0.093, 0.016, 0], [0, 0, -1.28], [1, 1, 0.8], 6),
+    cone(0.008, 0.055, PALETTE.petal, [0.093, -0.016, 0], [0, 0, -1.86], [1, 1, 0.8], 6),
   ])
 }
 
-export function deltaPieces(kind: 'crocGape' | 'crocPeek', dir: 1 | -1): PeekerPiece[] {
+/** Where the skull hinges off the neck, and where the tongue is pinned at the lip. */
+const SNAKE_HEAD_AT: V3 = [0.03, 0.28, 0.1]
+const SNAKE_TONGUE_AT: V3 = [0.28, 0.245, 0.115]
+
+export function deltaPieces(kind: 'crocGape' | 'snake', dir: 1 | -1): PeekerPiece[] {
   return kind === 'crocGape'
     ? [
         { slot: 'body', at: [0, 0, 0], parts: crocGapeBody(dir), ink: true },
         { slot: 'a', at: [GAPE_HINGE[0] * dir, GAPE_HINGE[1], 0.02], parts: crocGapeJaw(dir), ink: true },
       ]
     : [
-        { slot: 'body', at: [0, 0, 0], parts: crocPeekBody(dir), ink: true },
-        { slot: 'a', at: [PEEK_HINGE[0] * dir, PEEK_HINGE[1], 0.02], parts: crocPeekJaw(dir), ink: true },
-        // no `ink` on the forefoot: only the first INK_PIECE_LIMIT pieces are ever drawn with a
-        // contour, so the flag would be inert here — and an inert flag reads as a live one.
-        { slot: 'b', at: [-0.16 * dir, -0.2, 0.14], parts: crocPeekFoot(dir) },
+        { slot: 'body', at: [0, 0, 0], parts: snakeBody(dir), ink: true },
+        { slot: 'a', at: [SNAKE_HEAD_AT[0] * dir, SNAKE_HEAD_AT[1], SNAKE_HEAD_AT[2]], parts: snakeHead(dir), ink: true },
+        // no `ink` on the tongue: only the first INK_PIECE_LIMIT pieces are ever drawn with a
+        // contour, so the flag would be inert here — and an inert flag reads as a live one. It is
+        // also much too small to want one; an outlined tongue would be a black stroke.
+        { slot: 'b', at: [SNAKE_TONGUE_AT[0] * dir, SNAKE_TONGUE_AT[1], SNAKE_TONGUE_AT[2]], parts: snakeTongue(dir) },
       ]
 }

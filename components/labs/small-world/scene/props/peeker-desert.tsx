@@ -328,44 +328,6 @@ const ADULT: CamelPose = {
   fringe: 3,
 }
 
-/**
- * The calf, drawn rather than scaled. Every field below differs from her mother's on purpose:
- *
- *  - the head is TIPPED DOWN, nosing at the grass on the shelf while the adult holds hers level;
- *  - the muzzle is short and the nose block round, which is what makes a young animal's face;
- *  - the eye is barely smaller in a head that is a tenth smaller again, so it reads oversized —
- *    the one proportion that says "young" before any other detail is legible;
- *  - the ears are splayed out off the skull instead of carried upright;
- *  - the forelock is long and untidy where hers is a neat tuft;
- *  - the neck is a single forward bow rather than a long S, and thinner along its whole run.
- */
-const CALF: CamelPose = {
-  tilt: -0.15,
-  scale: 0.96,
-  bridgeX: 0.19,
-  noseX: 0.25,
-  lipX: 0.285,
-  noseR: 0.122,
-  eyeR: 0.07,
-  earAt: [
-    [-0.02, 0.66, 0.08],
-    [-0.16, 0.63, -0.1],
-  ],
-  earSplay: 0.62,
-  lock: [5, 1.05],
-  // Her mother's line is an S that crosses over near the top. This one is a single bow held FORWARD
-  // of its own chord the whole way — a young animal reaching up, not one standing easy.
-  neck: [
-    [-0.44, -0.68, -0.18],
-    [-0.37, -0.47, -0.165],
-    [-0.255, -0.25, -0.14],
-    [-0.155, -0.02, -0.1],
-    [-0.078, 0.19, -0.055],
-  ],
-  neckR: [0.076, 0.042],
-  fringe: 2,
-}
-
 /** Uniformly scale a part list about a pivot. */
 function scaledAbout(pivot: V3, s: number, parts: ClayPart[]): ClayPart[] {
   if (s === 1) return parts
@@ -681,42 +643,299 @@ function camelJaw(pose: CamelPose): ClayPart[] {
   ]
 }
 
+// --- the fennec fox ---------------------------------------------------------
+
 /**
- * A woven collar low on the calf's neck — the young animal's answer to its mother's halter. The
- * band is rolled to sit SQUARE across the neck's centreline, since a collar cut at any other angle
- * reads as a stripe painted on the hide.
+ * Task 61 — the camel calf is replaced by a FENNEC FOX. Aram: "in desert biome it can be a camel
+ * and a fennec fox."
  *
- * In the same leather family as `halter`, and for the same reason: this was a `camelSaddle` band
- * with a `honey` bead on it, which put the adult's exact red-bar-with-a-bright-tip signature onto
- * the calf's neck. Two thin bands rather than one thick one is what reads as woven.
+ * THE EARS ARE THE SILHOUETTE. That is the brief's own phrase and it is the entire design: the ears
+ * are as tall as the skull and nearly as wide, they stand clear enough that sky shows between them,
+ * and everything else on the animal — a small pointed muzzle, a big dark eye, a compact seated body
+ * — is drawn subordinate to them. If the outline alone does not name the animal, the figure has
+ * failed, and on a fennec the outline is two enormous parabolas over a small round head.
+ *
+ * SCALE IS A PROPORTION, NOT A SIZE. A fennec is a tiny animal and the contrast with the camel is
+ * the charm, but the figure still has to FILL its corner box — a small animal drawn small in a big
+ * frame just reads as a distant one. So this is a portrait: the fox occupies the same box the calf
+ * did, and the "tiny" read is carried by proportion (ears bigger than the head, eye bigger than the
+ * muzzle, paws small and neat) rather than by scale against its neighbour.
+ *
+ * IT WEARS NOTHING. The camel is a worked animal and wears a halter; the calf wore a collar. A
+ * fennec is wild. That also keeps the corner clear of the family of defects the tack has already
+ * produced twice — a warm band with a bright bead on it, at the corner of a mouth or across a
+ * throat, read as a lit cigarette and then as a painted stripe.
  */
-function calfCord(pose: CamelPose): ClayPart[] {
-  // seated mid-neck, where the run is widest on screen and the band has something to wrap
-  const at = pose.neck[pose.neck.length - 2]
-  const below = pose.neck[pose.neck.length - 3]
-  const roll = -Math.atan2(at[0] - below[0], at[1] - below[1])
-  const along = (d: number): V3 => [at[0] + (at[0] - below[0]) * d, at[1] + (at[1] - below[1]) * d, at[2]]
+
+/**
+ * The fox sits ON the shelf. `LEDGE_TOP` is the level the whole corner is built around — the line
+ * that crops the camel's neck and seats the grass and the props — so the haunch, both forefeet and
+ * the tail's resting length are all placed against it rather than near it. The corner's standing
+ * rule is that nothing floats, and an animal hovering a few hundredths above its own ledge is the
+ * loudest version of that fault.
+ */
+const FOX_SEAT = LEDGE_TOP
+
+/**
+ * ONE EAR, and this is the piece of geometry the whole figure turns on.
+ *
+ * An ear is a thin dish, and a thin dish is exactly the shape this camera destroys. The `halter`
+ * docblock above records the same lesson from the other end of the corner: the noseband's plane is
+ * square to the muzzle, the muzzle runs across the screen, so a wrap of any radius PROJECTS TO A
+ * LINE — and a line laid across a mouth is a stick whatever colour it is painted. An ear authored
+ * as a plate standing square to the skull has the identical problem, and what you get is two
+ * spikes, which is a threat display rather than a fox.
+ *
+ * What gives an ear AREA is that its dish faces roughly toward the CAMERA. So each ear here is
+ * built flat in the XY plane (`scl` z about 0.3) and only tipped a little out of it: the reader is
+ * looking almost straight into the cup. Four layers, back to front —
+ *
+ *  1. a `fennecCoat` cone, the ear's own back, standing widest;
+ *  2. a `fennecDeep` rim inset behind its outer edge, which is what stops a flat plate from reading
+ *     as a paper cut-out — an ear has a thickness and the rim is the only place to show it;
+ *  3. the `fennecEar` inner dish, smaller and pushed forward in Z so it wins the depth test against
+ *     its own backing (a patch level with its host simply never draws — that bug has shipped in
+ *     this cast before);
+ *  4. `fennecCream` fringe hairs along the inner edge, because a fennec's ear opening is furred and
+ *     because the fringe breaks an otherwise perfectly smooth parabola.
+ *
+ * A cone rather than an ellipsoid: an ellipsoid gives a rounded oval, which is a rabbit. A fennec's
+ * ear is a broad triangle that flares from a narrow base, and the flare is what the cone draws.
+ *
+ * THREE THINGS THE FIRST BUILD GOT WRONG, all visible at reading size and worth recording because
+ * each of them turned the ear into a different object:
+ *
+ *  1. A ROUNDING SPHERE STANDING PROUD OF THE TIP IS A POM-POM. The cone was capped with a sphere
+ *     at `len·0.96` and 0.42 of the ear's width, which put a ball on top of a triangle — the whole
+ *     thing read as a party hat. A cone does need its point taken off, but the sphere has to be
+ *     seated INSIDE the outline (here at 0.8 of the length and a third of the width) so it softens
+ *     the tip from within instead of sitting on it.
+ *  2. A SEPARATE BACKING CONE DRAWS A SECOND EDGE. The `fennecDeep` rim was a near-identical cone
+ *     offset behind the first, and at this scale two nested triangles read as a brim. The back of
+ *     the ear is now one narrow crescent along the outer edge only.
+ *  3. FRINGE CONES ON THE INNER EDGE READ AS TICKS. Three little pale spikes at right angles to the
+ *     ear looked like whiskers stuck on the wrong part of the animal. Fennec ear fur is now two
+ *     soft lobes seated INSIDE the dish, which is the same distinction `shag` draws in
+ *     `peeker-kit.tsx`: a rounded lobe rooted in the mass is fur, a cone standing off it is a spine.
+ *
+ * The ear is also WIDER than the first pass — a fennec's ear is nearly as broad as it is long, and
+ * drawn narrow it becomes a jackal's.
+ */
+function fennecEar(at: V3, len: number, wide: number, lean: number, tipIn: number): ClayPart[] {
+  const c = Math.cos(lean)
+  const s = Math.sin(lean)
+  /** A point `t` of the way up the ear's own axis, `o` across it. */
+  const up = (t: number, o: number, z: number): V3 => [
+    at[0] - s * t + c * o,
+    at[1] + c * t + s * o,
+    at[2] + z,
+  ]
   return [
-    cyl(0.073, 0.075, 0.026, PALETTE.tackLeather, along(-0.09), [0, 0, roll], [1, 1, 0.86], 8),
-    cyl(0.072, 0.074, 0.022, PALETTE.tackLeatherDeep, along(0.06), [0, 0, roll], [1, 1, 0.86], 8),
-    sph(0.024, PALETTE.tackLeatherDeep, [at[0] + 0.046, at[1] - 0.018, at[2] + 0.06], [1, 1.1, 0.5], 6),
+    // the plate, and the tip softened from INSIDE it
+    cone(wide, len, PALETTE.fennecCoat, up(len * 0.5, 0, -0.01), [0, 0, lean], [1, 1, 0.3], 9),
+    sph(wide * 0.34, PALETTE.fennecCoat, up(len * 0.8, 0, -0.01), [1, 0.85, 0.3], 10),
+    // the back of the ear, as ONE crescent along the outer edge rather than a second full triangle
+    {
+      ...sph(len * 0.42, PALETTE.fennecDeep, up(len * 0.46, -wide * 0.52, -0.028), [0.2, 1, 0.16], 10),
+      rot: [0, 0, lean] as V3,
+    },
+    // the inner dish, forward in Z so it wins the depth test against its own backing, and stopping
+    // short of the tip so the coat's edge frames it
+    cone(wide * 0.72, len * 0.78, PALETTE.fennecEar, up(len * 0.43, tipIn, 0.035), [0, 0, lean], [1, 1, 0.24], 9),
+    // two soft ear-fur lobes, seated inside the dish
+    ...[0.3, 0.52].map((t) => ({
+      ...sph(len * 0.15, PALETTE.fennecCream, up(len * t, wide * 0.24, 0.055), [0.42, 1, 0.2], 8),
+      rot: [0, 0, lean + 0.24] as V3,
+    })),
   ]
 }
 
-export function desertPieces(kind: 'camelAdult' | 'camelCalf', dir: 1 | -1): PeekerPiece[] {
-  const calf = kind === 'camelCalf'
-  const pose = calf ? CALF : ADULT
+/**
+ * Head, body and the FAR ear.
+ *
+ * The far ear lives here rather than on its own hinge, and it is drawn flatter, darker and a size
+ * down. Two identical ears at one depth read as a single flat cut-out with a notch in it; the pair
+ * only reads as a head with ears ON it when one of them is clearly behind the other.
+ *
+ * THE ONE-OVAL TRAP. A small round animal drawn as a stack of spheres becomes one oval under the
+ * four-band ramp — the yeti's whole history is this defect and the fixes that worked were a drawn
+ * break between the masses and a limb given its own value. Here the break is the CHEEK RUFF: a
+ * `fennecCream` collar standing proud of a narrower neck, so the outline runs head → pinch → chest
+ * instead of one continuous egg. The second break is the shaded flank down the outward side.
+ */
+function fennecBody(): ClayPart[] {
+  return [
+    // FAR EAR first so everything else draws over its base
+    ...fennecEar([-0.2, 0.29, -0.11], 0.38, 0.175, 0.36, -0.012),
+
+    // Haunch and rump, seated on the shelf. The rump is the figure's outward mass and it is what
+    // crops at the frame — a seated fox is widest at the hip, so that is the honest place to spend
+    // the outward reach.
+    sph(0.2, PALETTE.fennecCoat, [-0.27, -0.32, -0.02], [1.1, 1.0, 0.9], 14),
+    sph(0.15, PALETTE.fennecDeep, [-0.33, -0.44, 0.02], [1.15, 0.72, 0.75], 12),
+    // the thigh's own mass, forward of the rump so the hind leg reads as a separate limb
+    sph(0.13, PALETTE.fennecCoat, [-0.17, -0.42, 0.12], [1.05, 0.92, 0.7], 12),
+
+    // Chest and shoulders, narrowing upward. A seated fox is a triangle: heavy at the base, narrow
+    // at the neck, and that taper is most of what says "sitting".
+    sph(0.19, PALETTE.fennecCoat, [-0.06, -0.26, 0.04], [1.05, 1.05, 0.92], 14),
+    sph(0.145, PALETTE.fennecCoat, [-0.02, -0.06, 0.06], [1.0, 0.95, 0.9], 12),
+    // the shaded outward flank — the tone break that stops the body meeting the sky at full coat
+    // value, and the same device the yeti's flank strip uses
+    sph(0.15, PALETTE.fennecDeep, [-0.21, -0.2, 0.02], [0.62, 1.2, 0.5], 12),
+
+    // FORELEGS: two neat columns dropping to the shelf, with the near one forward in Z. Small and
+    // straight, because a fennec's legs are slight and because anything thicker turns the seated
+    // triangle into a squat.
+    ...limb(
+      [
+        [0.02, -0.14, 0.16],
+        [0.045, -0.36, 0.18],
+        [0.05, FOX_SEAT + 0.03, 0.18],
+      ],
+      0.042,
+      0.034,
+      PALETTE.fennecCoat
+    ),
+    ...limb(
+      [
+        [-0.09, -0.16, 0.08],
+        [-0.075, -0.36, 0.09],
+        [-0.07, FOX_SEAT + 0.03, 0.09],
+      ],
+      0.04,
+      0.032,
+      PALETTE.fennecDeep
+    ),
+    // the paws, sat ON the shelf rather than above it
+    sph(0.045, PALETTE.fennecCream, [0.055, FOX_SEAT + 0.022, 0.2], [1.25, 0.72, 0.9], 10),
+    sph(0.042, PALETTE.fennecCream, [-0.068, FOX_SEAT + 0.022, 0.11], [1.2, 0.7, 0.9], 10),
+
+    // THE CHEEK RUFF — the drawn break, and the largest single piece of the cream budget. It stands
+    // proud of the neck on both sides so the head is a separate mass from the chest.
+    sph(0.1, PALETTE.fennecCream, [0.02, 0.09, 0.14], [1.0, 0.72, 0.55], 12),
+    sph(0.085, PALETTE.fennecCream, [-0.12, 0.06, 0.08], [0.78, 1.05, 0.5], 10),
+
+    // SKULL. Small, round and set forward — a fennec's braincase is tiny under those ears.
+    sph(0.155, PALETTE.fennecCoat, [0.04, 0.21, 0.04], [1.02, 0.95, 0.94], 14),
+    // the muzzle: a short wedge, not a snout. It ends in the fox's own tone with the nose seated on
+    // TOP of it, which is the fix the canyon pangolin's anteater nose needed — put a dark bead at
+    // the tip of a taper and the bead becomes the tip.
+    ...limb(
+      [
+        [0.09, 0.185, 0.13],
+        [0.2, 0.15, 0.16],
+        [0.27, 0.13, 0.15],
+      ],
+      0.062,
+      0.038,
+      PALETTE.fennecCream
+    ),
+    sph(0.038, PALETTE.fennecCream, [0.285, 0.128, 0.15], [0.95, 0.9, 0.9], 10),
+    sph(0.024, PALETTE.ink, [0.3, 0.148, 0.17], [0.9, 0.8, 0.8], 8),
+    // the mouth, a short ink tick turning up at its rear end
+    ...limb(
+      [
+        [0.29, 0.098, 0.16],
+        [0.235, 0.086, 0.17],
+        [0.185, 0.096, 0.15],
+      ],
+      0.009,
+      0.011,
+      PALETTE.ink
+    ),
+    // The pale brow flash over each eye, and the faint dark line from eye to nose that every small
+    // desert fox carries. The line is doing structural work as well as marking: it separates the
+    // muzzle's cream from the skull's coat, which otherwise meet at a value step too small to read.
+    sph(0.055, PALETTE.fennecCream, [0.09, 0.315, 0.12], [1.2, 0.5, 0.6], 10),
+    ...limb(
+      [
+        [0.115, 0.245, 0.145],
+        [0.19, 0.185, 0.155],
+        [0.25, 0.155, 0.155],
+      ],
+      0.012,
+      0.008,
+      PALETTE.fennecDeep
+    ),
+    // THE EYE: big, forward and dark-centred, in the cast's own warm-eye treatment — the camel
+    // beside it, the crocodile and the snake in the delta all wear a honey ring, so the animals look
+    // at the reader with one eye rather than five.
+    ...eye([0.135, 0.245, 0.155], 0.058, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+    // whisker ticks, three short ink strokes off the muzzle's near side
+    ...[0.0, 0.045, 0.088].map((dy, i) =>
+      cyl(
+        0.006,
+        0.008,
+        0.1 - 0.014 * i,
+        PALETTE.ink,
+        [0.265 + 0.012 * i, 0.108 + dy, 0.185],
+        [0, 0, 1.28 - 0.24 * i]
+      )
+    ),
+  ]
+}
+
+/**
+ * The BRUSH TAIL, hinged at the haunch so `applyEar`'s second channel sweeps it.
+ *
+ * A fennec's tail is nearly as long as its body and it is carried curled forward around the feet
+ * when the animal is sitting — which is useful here as well as true, because it puts a soft
+ * horizontal mass along the shelf and ties the figure to the surface it is sitting on. The tip is
+ * `fennecDeep`: a dark tail tip is the fox's own marking, and it is also the one thing that stops a
+ * pale brush dissolving into a bright desert sky at exactly the point where it is thinnest.
+ */
+function fennecTail(): ClayPart[] {
+  return [
+    ...limb(
+      [
+        [0.0, 0.0, 0],
+        [-0.11, -0.09, 0.04],
+        [-0.16, -0.19, 0.1],
+        [-0.11, -0.26, 0.16],
+        [0.0, -0.28, 0.2],
+      ],
+      0.075,
+      0.058,
+      PALETTE.fennecCoat
+    ),
+    // the brush's own shadow along its underside, so a fat cylinder still turns
+    sph(0.06, PALETTE.fennecDeep, [-0.14, -0.24, 0.06], [1.4, 0.6, 0.6], 10),
+    sph(0.06, PALETTE.fennecCoat, [0.03, -0.275, 0.21], [1.1, 0.9, 0.9], 10),
+    sph(0.05, PALETTE.fennecDeep, [0.1, -0.265, 0.21], [1.1, 0.95, 0.9], 10),
+  ]
+}
+
+/** Where the near ear hinges off the skull, and where the tail hinges off the haunch. */
+const FOX_EAR_AT: V3 = [0.0, 0.31, 0.09]
+const FOX_TAIL_AT: V3 = [-0.28, -0.4, 0.08]
+
+export function desertPieces(kind: 'camelAdult' | 'fennec', dir: 1 | -1): PeekerPiece[] {
+  if (kind === 'fennec') {
+    return [
+      { slot: 'body', at: [0, 0, 0], parts: facing(dir, fennecBody()), ink: true },
+      {
+        slot: 'a',
+        at: [FOX_EAR_AT[0] * dir, FOX_EAR_AT[1], FOX_EAR_AT[2]],
+        // the near ear earns the second contour ahead of the tail: it is the silhouette, and the
+        // tail is tucked against the body where an outline gains almost nothing
+        parts: facing(dir, fennecEar([0, 0, 0], 0.43, 0.2, -0.14, 0.014)),
+        ink: true,
+      },
+      // no `ink` on the tail: only the first INK_PIECE_LIMIT pieces are ever drawn with a contour,
+      // so the flag would be inert here — and an inert flag reads as a live one.
+      { slot: 'b', at: [FOX_TAIL_AT[0] * dir, FOX_TAIL_AT[1], FOX_TAIL_AT[2]], parts: facing(dir, fennecTail()) },
+    ]
+  }
+  const pose = ADULT
   const hinge = posedPoint(pose, JAW_HINGE)
-  // the worked animal wears the tack; the calf runs bare
-  const head = calf ? camelHead(pose) : [...camelHead(pose), ...halter(pose)]
   return [
     {
       slot: 'body',
       at: [0, 0, 0],
       parts: facing(dir, [
         ...camelNeck(pose),
-        ...(calf ? calfCord(pose) : []),
-        ...scaledAbout(HEAD_PIVOT, pose.scale, rotatedAbout(HEAD_PIVOT, pose.tilt, head)),
+        ...scaledAbout(HEAD_PIVOT, pose.scale, rotatedAbout(HEAD_PIVOT, pose.tilt, [...camelHead(pose), ...halter(pose)])),
       ]),
       ink: true,
     },

@@ -1,24 +1,28 @@
 import { PALETTE } from '../../palette'
 import type { ClayPart } from './clay-kit'
-import { cone, eye, facing, leafFan, limb, sph, tufts, type V3 } from './peeker-kit'
+import { cone, eye, facing, leafFan, limb, shag, sph, type V3 } from './peeker-kit'
 import type { PeekerPiece } from './peeker-cast'
 
 /**
  * Task 56 — the WINTER checkpoint: snow-laden pine boughs arcing in from the frame edge with a
- * fringe of icicles under them, a drift banked across the bottom, and two yetis standing IN it.
+ * fringe of icicles under them, a drift banked across the bottom, and the cast standing IN it.
  *
  * Same corner grammar as `peeker-jungle.tsx` (the file the look-dev gate was run against): a limb
  * sweeping in from the outer edge, foliage dense enough that the character sits INSIDE it, and
  * something dropping past the bottom crop.
  *
- * THE VALUE SCHEME IS INVERTED FROM THE FIRST PASS, and that is the whole point of this revision.
- * Winter's grade is a pale lilac wash (`gradeWinterGlow`, L* ≈ 90); the near-white shag the yetis
- * used to be built from sits at L* ≈ 95, so figure and sky were the same value and the corner
- * measured a median dL* of 20.7 where every other biome measures 40–52. A white animal cannot hold
- * a silhouette against a white sky. So the MASS is now `yetiCoat` (a mid blue-grey, L* ≈ 68)
- * shading to `yetiCoatDeep` (L* ≈ 55), and the near-whites are demoted to ACCENTS — the lit band on
- * the shoulders, the face mask, the chest bib, snow caught on the crown. That is better than a stop
- * of albedo separation, spent where it draws a shape rather than smeared over the whole animal.
+ * Task 61 recast the pair — the two yetis are gone and a POLAR BEAR and a PENGUIN stand in the same
+ * drift. The dressing below is unchanged; it was built for a figure buried to the chest in snow and
+ * both new animals want exactly that. See the polar-bear section for what the value scheme has to
+ * survive, which is the same wall the yetis hit and is if anything harder for an animal that has to
+ * read as white.
+ *
+ * THE VALUE SCHEME IS INVERTED FROM THE FIRST PASS, and it is the constant this corner is built on.
+ * Winter's grade is a pale lilac wash and the corner's measured backdrop sits at L* 85.6; a
+ * near-white figure renders at about 66 and lands 20 points off it, which is what the original
+ * yetis measured (20.7) and were rebuilt over. Every figure that stands here is therefore painted
+ * MID and keeps its near-whites as small lit accents. A white animal cannot hold a silhouette
+ * against a white sky, and painting it whiter makes it worse rather than better.
  */
 
 /**
@@ -178,401 +182,392 @@ export function winterDressing(): ClayPart[] {
   return parts
 }
 
-// --- the yetis --------------------------------------------------------------
+// --- the polar bear ---------------------------------------------------------
 
 /**
- * A yeti's four tones, in the order the reader meets them.
+ * Task 61 — both yetis leave this corner. Aram: "the snowy biome can host a white bear and a
+ * penguin instead of the yeti." The yeti is not retired, it is HIDDEN: it now lives in the snowy
+ * trees out on the planet as a clickable easter egg (`yeti-egg.tsx`), which is also why the
+ * `yetiCoat` family stays in the palette.
  *
- * `coat` is the dominant mass and the whole silhouette; `deep` is its shadow; `lit` and `mask` are
- * the two near-white accents — one for the surfaces that face the light, one for the bare face.
- * NOTHING that touches the sky may be a near-white: see the header.
+ * THE WHITE-ON-LILAC TRAP, AND WHY THE BEAR IS NOT PAINTED WHITE.
+ *
+ * This corner's backdrop was measured under the real grade at a median L\* of 85.6 — a pale lilac
+ * wash, almost flat across the whole box. The toon ramp scales a figure's albedo DOWNWARD while
+ * leaving that backdrop untouched, and most of a corner figure sits in the ramp's darkest band, so
+ * a pixel lands at roughly `L*(0.40 · Y_albedo)`. Run the palette's whites through it:
+ *
+ *   snow      albedo L* 95.5 → renders 66.2 → dL* 19.4
+ *   boughSnow albedo L* 99.2 → renders 68.9 → dL* 16.7
+ *
+ * Those are FAILING numbers, and they are not hypothetical: they are within a point of the 20.7
+ * the first yeti measured, which is what it was rejected and rebuilt over. The brighter the paint,
+ * the closer the figure lands to the sky. A white bear painted white is invisible.
+ *
+ * So the mass is `bearCoat`, a warm ivory at albedo L* 69.4 (predicted dL* 38.6), carried by
+ * `bearDeep` at 55.0 (predicted 49.3) over the underside and the far flank. Together with the ink
+ * notes that lands the figure where the retired yeti landed, which measured 41.3.
+ *
+ * IT STILL READS WHITE, and this is the argument the art is built on rather than a hope. Every
+ * single thing this animal is seen against is COOLER and BRIGHTER than it is: the drift it stands
+ * in is `boughSnow`, the brightest value in the palette; the icicles are pale blue; the sky is
+ * lilac. A warm cream mass in a blue-white field is read as white fur in cold light — which is
+ * exactly what a polar bear on sunlit snow looks like, and photographs as. The near-whites are then
+ * spent as a small AREA BUDGET (`foxBelly`, a warm near-white already in the palette, reused rather
+ * than added) on the surfaces that face the sky: the bridge of the muzzle, the brow, the crest of
+ * the shoulder, the top of the working paw. Those few bright notes are what say "this animal is
+ * white"; a field of them would say nothing at all.
+ *
+ * WHAT MAKES IT A POLAR BEAR AND NOT A BROWN ONE, since at this size the colour cannot do it alone:
+ *
+ *  - a long straight ROMAN profile — skull running into muzzle in nearly one line, where a brown
+ *    bear's face is dished;
+ *  - a small BLACK nose pad, which is the single strongest cue on the animal;
+ *  - small black eyes set wide apart;
+ *  - small round ears set LOW and FAR BACK, where a brown bear's are larger and higher;
+ *  - NO SHOULDER HUMP. A grizzly's hump is its most recognisable line and drawing one here would
+ *    lose the species outright, so the back runs level from the nape to the rump;
+ *  - a long neck, which is the proportion that actually separates the two species at a glance.
  */
-type Coat = { coat: string; deep: string; lit: string; mask: string }
-
-const BIG_COAT: Coat = {
-  coat: PALETTE.yetiCoat,
-  deep: PALETTE.yetiCoatDeep,
-  lit: PALETTE.yetiFur,
-  mask: PALETTE.yetiMuzzle,
-}
-/**
- * The cub shares the adult's coat, because they are one animal at two ages and a recoloured mass
- * would just read as a second species standing in the same drift. What separates them is the pair
- * of accents: the colder, greyer hare tones against the adult's brighter yeti ones.
- *
- * They are also the better-measuring pair, and the reason is worth recording because it inverts
- * the obvious guess. The toon ramp scales a figure's albedo; the sky behind it is a flat backdrop
- * that the ramp never touches. So contrast against the grade tracks albedo DOWNWARD — the brighter
- * the accent, the closer it lands to the sky once it is lit. `boughSnow`, the brightest white in
- * the palette, is the worst mask a figure can wear here.
- */
-const SMALL_COAT: Coat = {
-  coat: PALETTE.yetiCoat,
-  deep: PALETTE.yetiCoatDeep,
-  lit: PALETTE.hareFur,
-  mask: PALETTE.hareShade,
-}
-
-/** The head's own x centre. Every face feature is placed symmetrically about it — see `yetiBody`. */
-const HEAD_X = 0.08
-
-/**
- * A ring of FUR CLUMPS around a mass — the shag, and the thing that makes this animal a yeti.
- *
- * The first pass carried the kit's `tufts`, whose cones are wider at the base than they are long at
- * the lengths that are safe to use here (past about 0.3 they project from the outline as SPINES,
- * which is the threat read the ear tufts were removed for). Clumps that wide overlap at the root
- * and merge into the mass, so the outline came back as a faint wobble: the review's "a smooth
- * faceted surface with no shag anywhere", and with round ears and a plush muzzle above it the
- * corner read as a bear or a koala.
- *
- * What separates fur from spikes is not length, it is the NOTCH. Each clump here is a rounded lobe
- * — never a point — rooted well INSIDE the mass at `root` and running out to `root + len`, so
- * neighbours converge where they are buried and diverge where they are seen. The gap between two
- * tips is the fur; the lobes themselves only have to be long enough to open it.
- *
- * `lay` rakes the clumps off the radial direction. A ring of purely radial lobes is a sunburst;
- * hair lies along the body and hangs, so every ring below is raked and the rake is what reads as
- * weight. `thick` is the lobe's width as a fraction of its length — every ring wants the same 0.5,
- * so it is a default rather than seven repeated literals.
- *
- * Every ring is a SILHOUETTE device. The ink hull is inflated from the merged geometry, so a lobe
- * standing proud of the body draws its own outline — at the edge that is exactly the point, and
- * anywhere else it is a disaster (see the note in `yetiBody` about the interior rows this replaced).
- */
-function shag(
-  center: V3,
-  root: number,
-  n: number,
-  color: string,
-  from: number,
-  to: number,
-  len: number,
-  lay = 0,
-  thick = 0.5
-): ClayPart[] {
-  const out: ClayPart[] = []
-  for (let i = 0; i < n; i++) {
-    const a = Math.PI * (from + (to - from) * (i / Math.max(1, n - 1)))
-    // a ring of equal clumps reads as a scalloped border, which is a decorative edge rather than fur
-    const l = len * (0.82 + 0.3 * Math.sin(i * 2.3))
-    const d = root + l * 0.5
-    out.push({
-      ...sph(
-        l * 0.5,
-        color,
-        [center[0] + Math.cos(a) * d, center[1] + Math.sin(a) * d, center[2]],
-        [1, thick, 0.62],
-        8
-      ),
-      rot: [0, 0, a + lay] as V3,
-    })
-  }
-  return out
-}
 
 /**
- * One EYEBROW, as an arch whose high point sits over the pupil rather than as a tilted bar.
+ * Where the working foreleg hinges off the shoulder.
  *
- * A straight bar can only slant, and both slants carry a mood this cast is not allowed to have:
- * dropping toward the nose is a scowl, rising toward the nose is a plea. Only an arch — ends low,
- * apex over the eye — reads as the raised, delighted brow, and it keeps reading that way under the
- * rig's inward yaw, where a slant would foreshorten into whichever mood the near end suggests.
+ * Moved OUTBOARD onto the chest's own front edge after the first capture, and it is the same fix
+ * the yeti's arm needed for the same reason: hung from the middle of the body, a limb has nothing
+ * to be seen against, and the reviewer's verdict on that version was simply that they could not
+ * find an arm. On the contour it is read against sky on one side and against the body on the other.
  *
- * `s` is +1 for the brow on the +X (inward) eye and −1 for the other, so the pair is symmetric
- * about HEAD_X and the outer end of each arch is the lower one.
+ * Its Z is also what binds `PEEKER_ABS_Z` on this figure — the paw is the furthest-forward thing on
+ * the bear, ahead even of the nose.
  */
-function brow(s: 1 | -1, x: number, y: number, z: number): ClayPart[] {
-  return limb(
-    [
-      [x + s * 0.095, y - 0.04, z],
-      [x + s * 0.02, y + 0.022, z + 0.012],
-      [x - s * 0.07, y - 0.008, z + 0.006],
-    ],
-    0.026,
-    0.02,
-    PALETTE.ink
-  )
-}
+const BEAR_ARM_AT: V3 = [0.05, 0.05, 0.16]
 
 /**
- * Head, shoulder mass and the face.
+ * Head, neck, body, far foreleg.
  *
- * THE FACE IS A PLUSH APE, NOT A MONSTER. The first pass gave it a flat disc snout with a pair of
- * round nostrils, tusks at the corners of the mouth and spiked ear tufts, and it read as a boar or
- * a gargoyle. All three are gone. What replaces them is the toy vocabulary: a rounded muzzle BALL
- * that catches its own light, one small dark nose, an open smile with a tongue in it, big amber
- * eyes and round ears. None of that is decoration — a friendly read is the requirement, and every
- * one of those three removed features was reading as a threat display.
- *
- * SYMMETRY. The R14 yeti "read as a grey rock" because its features were nudged toward the frame's
- * middle, which put one eye almost on the head's centre line where it vanished round the side of
- * the skull. The mask here is strictly SYMMETRIC about HEAD_X and pushed forward in +Z; the turning
- * is left entirely to the rig, which yaws the whole figure inward by PEEKER_FACE_IN.
- *
- * DEPTH IS THE TONE BUDGET. Every accent below is a painted patch that has to WIN the depth test
- * against the mass it sits on, so each one is authored proud of the surface underneath it at the
- * point where they meet. A patch placed level with its host simply never draws.
+ * THE ONE-MASS TRAP, which this corner has fallen into twice. A pale animal built as a stack of
+ * spheres comes back from the four-band ramp as a single shapeless blob — the reviewer's words on
+ * the first yeti were "at reading size you cannot find a shoulder, an arm or a chest". The three
+ * devices that fixed it are all used here: a hard light/dark EDGE laid straight across the figure
+ * where the shoulder is, a limb drawn in its OWN value against the mass it crosses, and a narrow
+ * pinch so head and body are two shapes rather than one egg. On this animal the pinch is the neck,
+ * and it is doing double duty because a long neck is also the species cue.
  */
-function yetiBody(c: Coat): ClayPart[] {
-  const eyeOpts = { sclera: PALETTE.honey, iris: PALETTE.ink }
+function bearBody(): ClayPart[] {
   return [
-    // FAR side first, all in `deep` so it recedes: the off shoulder and the arm hanging past the
-    // body's inward edge. It is a static counterweight to the near arm the rig rocks, and its
-    // diagonal is what stops the belly reading as a slab.
-    sph(0.16, c.deep, [0.21, -0.04, -0.02], [1.0, 1.05, 0.85], 12),
+    // FAR FORELEG first, in `deep` so it recedes behind everything the body draws over it.
     ...limb(
       [
-        [0.235, -0.1, 0.02],
-        [0.225, -0.28, 0.03],
-        [0.19, -0.44, 0.04],
+        [-0.14, -0.1, -0.07],
+        [-0.13, -0.34, -0.06],
+        [-0.14, -0.56, -0.05],
       ],
-      0.09,
+      0.088,
       0.078,
-      c.deep
+      PALETTE.bearDeep
     ),
+    sph(0.1, PALETTE.bearDeep, [-0.145, -0.61, -0.03], [1.25, 0.78, 0.9], 10),
 
-    // TORSO, built as a shoulder line rather than a stack of eggs: a shallow yoke with a flat top,
-    // a round cap at its outer end, the near shoulder ball carried forward OVER THE ARM HINGE, a
-    // chest barrel and a narrower belly. What the ink contour has to draw is head (0.56 wide) →
-    // neck pinch (0.29) → yoke (0.85), because a continuous head-into-body oval is exactly the
-    // boulder-with-a-face the R14 render was.
-    //
-    // The yoke's width is set by the ARM, not by how broad a yeti ought to be. The first pass gave
-    // it a 0.96 span with the shoulder joint at x = −0.10, which put the whole limb down the middle
-    // of the belly where it had nothing to be seen against; the reviewer could not find it. The
-    // joint now sits at −0.24, out where the body's own edge is, so the arm hangs along the outer
-    // contour with the lit chest behind it.
-    sph(0.3, c.coat, [-0.1, 0.02, -0.04], [1.42, 0.54, 0.95], 14),
-    sph(0.165, c.coat, [-0.38, -0.01, -0.02], [1.0, 1.0, 0.9], 12),
-    sph(0.185, c.coat, [-0.24, 0.05, 0.15], [1.05, 1.0, 0.9], 12),
-    sph(0.3, c.coat, [-0.15, -0.28, -0.04], [1.12, 1.0, 0.92], 14),
-    sph(0.245, c.deep, [-0.21, -0.58, -0.03], [1.08, 0.74, 0.82], 12),
+    // BODY. The back line runs LEVEL from the nape out to the rump and then falls away — no hump.
+    // The rump is the figure's outward mass and it is what crops at the frame edge; the retired
+    // small crocodile in the delta used to be what held `MASCOT_BOX.out` honest, so a long low
+    // animal reaching out toward its own edge is doing an engineering job as well as a drawn one.
+    sph(0.22, PALETTE.bearCoat, [-0.25, 0.04, -0.02], [1.05, 1.0, 0.92], 14),
+    // the lit back, a coat-tone cap laid over the shadowed body from nape to rump
+    sph(0.2, PALETTE.bearCoat, [-0.36, -0.14, -0.03], [1.15, 0.72, 0.9], 14),
+    sph(0.17, PALETTE.bearCoat, [-0.19, -0.12, 0.08], [1.0, 0.86, 0.7], 12),
+    sph(0.185, PALETTE.bearDeep, [-0.43, -0.26, -0.03], [1.0, 1.0, 0.88], 14),
+    sph(0.245, PALETTE.bearDeep, [-0.19, -0.22, 0.0], [1.08, 1.02, 0.94], 14),
+    sph(0.23, PALETTE.bearDeep, [-0.27, -0.48, -0.02], [1.06, 0.96, 0.9], 14),
 
-    // THE SHOULDER LINE — the single fix for "a shapeless pale mass". A narrow band of `lit` riding
-    // the top of the yoke with a band of `deep` immediately under it puts a hard light/dark edge
-    // straight across the figure at y ≈ 0.05, which is where a shoulder is. Both are set INSIDE the
-    // silhouette (the tufts below are wider): a near-white rim on the OUTLINE would hand the sky
-    // back the contrast this whole revision exists to win.
-    sph(0.3, c.lit, [-0.14, 0.12, 0.06], [1.12, 0.13, 0.5], 12),
-    sph(0.16, c.lit, [-0.24, 0.19, 0.2], [1.05, 0.11, 0.5], 10),
-    sph(0.3, c.deep, [-0.14, -0.02, 0.14], [0.98, 0.21, 0.42], 12),
-    // a strip down the outer flank, so the body does not meet the sky at full coat value
-    sph(0.22, c.deep, [-0.36, -0.3, 0.06], [0.62, 1.2, 0.45], 12),
-    // Chest bib, hung directly off the shaded band above it so it reads as the chest catching the
-    // same light as the shoulders rather than as a lozenge floating on a belly. Kept INBOARD of the
-    // swinging arm so the arm never buries it, and NARROW: every near-white pixel is spent against
-    // a near-white sky, so the accents are budgeted by area rather than drawn to taste.
-    sph(0.2, c.lit, [0.03, -0.19, 0.21], [0.62, 0.78, 0.34], 12),
+    // THE SHOULDER EDGE — the single fix for "a shapeless pale mass". A narrow band of near-white
+    // riding the top of the shoulder with `deep` immediately under it puts a hard tonal step
+    // straight across the figure at y ~ 0.14, which is where a shoulder is. Both sit INSIDE the
+    // silhouette: a bright rim on the OUTLINE would hand the sky back the separation this whole
+    // scheme exists to win.
+    sph(0.22, PALETTE.foxBelly, [-0.22, 0.2, 0.02], [1.1, 0.085, 0.42], 12),
+    sph(0.26, PALETTE.bearDeep, [-0.21, 0.0, 0.12], [1.02, 0.2, 0.42], 12),
+    // The lit back line, riding the level spine out to the rump. It is the largest single piece of
+    // the white budget and it is spent on the one surface actually pointing at the sky — but it has
+    // to sit ON the top contour, not across the body. Drawn wider and lower it came back as a white
+    // BELT strapped round the animal, which is the painted-stripe defect the camel's noseband and
+    // the pangolin's strata both had to be redrawn out of.
+    sph(0.2, PALETTE.foxBelly, [-0.37, -0.055, -0.03], [1.05, 0.075, 0.4], 12),
+    // the shaded underline along the belly, and the far flank falling away
+    sph(0.24, PALETTE.bearDeep, [-0.25, -0.58, 0.06], [1.15, 0.34, 0.5], 12),
+    sph(0.19, PALETTE.bearDeep, [-0.45, -0.34, 0.04], [0.6, 1.15, 0.45], 12),
 
-    // The neck, deliberately the narrowest thing on the figure: it is what turns the head and the
-    // shoulders into two masses instead of one.
-    sph(0.145, c.deep, [0.03, 0.2, 0.02], [1.0, 0.62, 0.85], 12),
-    sph(0.28, c.coat, [HEAD_X, 0.47, -0.02], [1.0, 1.0, 0.94], 14),
-
-    // Round ears with a pale inner cup — the plush note, and still the asymmetry-proof silhouette
-    // break the removed spikes were there for: they read even when the yaw turns the far side of
-    // the head away. SMALLER and set back than the first pass, because a big round ear standing off
-    // a smooth dome is the loudest single bear cue on the animal; here they sit down in the ruff
-    // (see the face ring below), which is where a shaggy creature's ears are.
-    sph(0.068, c.coat, [HEAD_X - 0.25, 0.55, -0.05], [1.0, 1.1, 0.7], 10),
-    sph(0.068, c.coat, [HEAD_X + 0.25, 0.55, -0.05], [1.0, 1.1, 0.7], 10),
-    sph(0.036, c.mask, [HEAD_X - 0.258, 0.542, 0.01], [1.0, 1.05, 0.6], 8),
-    sph(0.036, c.mask, [HEAD_X + 0.258, 0.542, 0.01], [1.0, 1.05, 0.6], 8),
-
-    // The MASK, as a peanut rather than a disc: a rounded muzzle ball with a second lobe rising
-    // between the eyes. The ball is what the removed snout was not — it has a top that catches
-    // light and an underside that falls away, which is the whole difference between a muzzle and a
-    // plate stuck on a face. Its upper lobe is narrower than the eye spacing, so the eyes sit proud
-    // at its corners instead of being swallowed by it.
-    sph(0.155, c.mask, [HEAD_X, 0.335, 0.17], [1.05, 0.84, 0.86], 14),
-    sph(0.105, c.mask, [HEAD_X, 0.435, 0.215], [1.2, 0.62, 0.55], 12),
-
-    // one small dark nose, high on the muzzle ball
-    sph(0.042, PALETTE.ink, [HEAD_X, 0.385, 0.3], [1.25, 0.85, 0.7], 8),
-    // The OPEN smile: a wide dark lens with a tongue in it, and two ink ticks lifting the corners
-    // past its ends. The corners are the smile — a dark lens on its own is just an open mouth, and
-    // the lift is what makes it a warm one.
-    sph(0.072, PALETTE.ink, [HEAD_X, 0.252, 0.275], [1.5, 0.6, 0.42], 10),
-    sph(0.036, PALETTE.petal, [HEAD_X, 0.222, 0.298], [1.2, 0.72, 0.4], 8),
+    // NECK: long, and deliberately the narrowest thing between the head and the shoulders.
     ...limb(
       [
-        [HEAD_X - 0.1, 0.262, 0.28],
-        [HEAD_X - 0.145, 0.297, 0.255],
+        [-0.2, 0.14, 0.02],
+        [-0.08, 0.3, 0.04],
+        [0.04, 0.44, 0.05],
       ],
-      0.014,
-      0.012,
-      PALETTE.ink
+      0.135,
+      0.115,
+      PALETTE.bearCoat
     ),
+    // a shaded throat under it, so the neck is a cylinder rather than a flat strap
+    sph(0.1, PALETTE.bearDeep, [-0.03, 0.31, 0.14], [1.35, 0.7, 0.5], 10),
+
+    // SKULL and the ROMAN MUZZLE, run as one straight chain from the brow to the nose. That
+    // unbroken line is the polar bear's profile; breaking it with a dished stop would draw a
+    // grizzly, and rounding it into a ball would draw the plush ape this corner used to hold.
+    sph(0.155, PALETTE.bearCoat, [0.1, 0.565, 0.02], [1.05, 0.98, 0.94], 14),
     ...limb(
       [
-        [HEAD_X + 0.1, 0.262, 0.28],
-        [HEAD_X + 0.145, 0.297, 0.255],
+        [0.14, 0.545, 0.1],
+        [0.26, 0.52, 0.14],
+        [0.35, 0.5, 0.15],
       ],
+      0.105,
+      0.078,
+      PALETTE.bearCoat
+    ),
+    sph(0.08, PALETTE.bearCoat, [0.362, 0.497, 0.15], [0.92, 0.95, 0.92], 12),
+    // the lit bridge — one of the four places the near-white is spent, and the one that most makes
+    // the reader call the animal white, because it is the surface pointing at the sky
+    sph(0.07, PALETTE.foxBelly, [0.25, 0.565, 0.16], [1.9, 0.34, 0.6], 10),
+    // the jaw's shaded underside, which is what gives the muzzle a depth as well as a length
+    sph(0.075, PALETTE.bearDeep, [0.245, 0.452, 0.16], [1.7, 0.44, 0.55], 10),
+
+    // THE BLACK NOSE PAD. Small, and set on TOP of the muzzle's end rather than capping it: a
+    // taper's tip becomes whatever is placed at it, which is how the canyon pangolin's snout turned
+    // into an anteater's. Here the muzzle ends in the bear's own tone and the nose sits back on it.
+    sph(0.048, PALETTE.ink, [0.352, 0.53, 0.19], [1.15, 0.85, 0.75], 10),
+    // the mouth: one fine dark line along the jaw, dropping slightly at its rear
+    ...limb(
+      [
+        [0.372, 0.462, 0.16],
+        [0.28, 0.448, 0.185],
+        [0.19, 0.462, 0.16],
+      ],
+      0.011,
       0.014,
-      0.012,
       PALETTE.ink
     ),
 
-    // Big amber eyes. The mid-tone coat is what buys these back: on the old near-white head a pale
-    // sclera was invisible, and the ring had to carry the colour by itself. Here the honey ring
-    // reads against both the coat and the mask, and it is still the only warm note in the corner.
-    ...eye([HEAD_X - 0.115, 0.505, 0.215], 0.078, eyeOpts),
-    ...eye([HEAD_X + 0.115, 0.505, 0.215], 0.078, eyeOpts),
-    // Brows in INK and high, with a clear gap over each eye — that gap is what makes the pair read
-    // as raised rather than as a frown, and ink puts them in the same drawn language as the nose.
-    ...brow(-1, HEAD_X - 0.115, 0.615, 0.19),
-    ...brow(1, HEAD_X + 0.115, 0.615, 0.19),
+    // EYES: small, black, set WIDE. A bear's eye is a dark bead with no visible sclera, so `bare`
+    // is right here — the kit's note is that a white bead on a pale face reads as a goggle, and
+    // this face is as pale as they come. The catch-light inside `eye()` is what keeps them alive.
+    ...eye([0.185, 0.612, 0.13], 0.042, { bare: true, iris: PALETTE.ink }),
+    ...eye([0.02, 0.63, 0.08], 0.038, { bare: true, iris: PALETTE.ink }),
+    // a near-white brow over the near eye — the second lit note, and what stops the eye reading as
+    // a hole punched in a flat mass
+    sph(0.055, PALETTE.foxBelly, [0.185, 0.665, 0.12], [1.35, 0.4, 0.6], 10),
 
-    // SHAG, on every edge that meets sky. The ink contour traces whatever the outermost primitive
-    // is, so these are not surface texture — they ARE the silhouette, and a shaggy animal must
-    // never be drawn with a smooth outline. All in `coat`: see the shoulder-line note above.
-    //
-    // THE FACE RUFF is the one that buys the species. A bare face inside a collar of fur is the
-    // read every drawn yeti has and no bear or koala has, and it costs nothing in envelope because
-    // it hangs UNDER a head that already has room below it. It stops at 1.78π rather than closing
-    // the circle: past that the inward clumps run out of MASCOT_BOX.in, and the inward side is the
-    // far side under the rig's yaw, so it is the cheapest arc to give up.
-    ...shag([HEAD_X, 0.47, -0.03], 0.245, 11, c.coat, 0.92, 1.78, 0.115, 0.22),
-    // The crown, shortest of all: anything standing off the top of a head reads as horns whatever
-    // it is made of. Enough to break the dome, not enough to spike it.
-    ...shag([HEAD_X, 0.47, -0.06], 0.245, 7, c.coat, 0.2, 0.95, 0.085, 0.16),
-    // The shoulder ring starts past 0.62π rather than at the vertical: a clump standing on the
-    // crest of a shoulder is a spike wherever it is on the animal, and the lit band is what that
-    // edge is supposed to be carrying.
-    ...shag([-0.24, 0.0, -0.08], 0.25, 6, c.coat, 0.62, 1.16, 0.11, 0.2),
-    // The SHOULDER CREST. Everything else on this figure is fringed on the outward side, which is
-    // the side the frame crops: at the parked pose the reader sees the inward contour and the tops
-    // of the shoulders, and the inward one has almost no envelope left (MASCOT_BOX.in). So the top
-    // of the yoke carries its own ruff, raked hard so it lies along the back instead of standing on
-    // the crest, and that is the fur the composition actually shows.
-    ...shag([-0.14, 0.05, -0.05], 0.28, 5, c.coat, 0.35, 0.8, 0.1, 0.35),
-    ...tufts([0.18, -0.04, 0.02], 0.2, 3, c.coat, 0.05, 0.5, 0.24),
-    // the flank ring is the widest thing on the figure, so its reach is set by MASCOT_BOX.out
-    // rather than by taste
-    ...shag([-0.14, -0.16, -0.07], 0.33, 8, c.coat, 0.86, 1.42, 0.15, 0.25),
-    // the haunch ring is what MASCOT_BOX.down binds: the cub is the adult scaled 0.82 and dropped
-    // 0.17, so every unit of fur hung off the adult's underside costs the cub 0.82 of it
-    ...shag([-0.24, -0.43, -0.04], 0.21, 6, c.coat, 1.12, 1.52, 0.1, 0.15),
-    // INTERIOR fur was tried here and REMOVED, which is worth recording so it is not tried again.
-    // Rows of clumps laid over the chest read as petals or scales stuck onto the animal at every
-    // depth I could seat them: proud, each one takes its own ink outline; flat and buried, the ones
-    // that still draw are lit patches with an outline anyway. The renderer has no way to draw
-    // texture INSIDE a silhouette here — what it has is tone bands, which the shoulder line, the
-    // flank strip and the bib already spend. So the shag is a silhouette device only.
+    // EARS: small, round, LOW and set back. Their smallness is the cue — an ear big enough to
+    // notice turns the animal into a bear cub or a dog.
+    sph(0.058, PALETTE.bearCoat, [-0.02, 0.655, 0.02], [1.0, 1.05, 0.75], 10),
+    sph(0.052, PALETTE.bearDeep, [0.11, 0.685, -0.08], [1.0, 1.05, 0.7], 10),
+    sph(0.028, PALETTE.bearDeep, [-0.026, 0.652, 0.07], [1.0, 1.0, 0.6], 8),
 
-    // Snow knocked off the bough and caught on him — the detail that puts him IN the tree. It is
-    // the brightest value on the figure and it is deliberately tiny: a crest on the crown and one
-    // dab on the outer shoulder, both sitting on surfaces that face the sky.
-    sph(0.075, PALETTE.boughSnow, [HEAD_X + 0.02, 0.71, 0.06], [1.5, 0.42, 0.9], 8),
-    sph(0.07, PALETTE.boughSnow, [-0.38, 0.105, 0.04], [1.4, 0.4, 0.85], 8),
+    // GUARD HAIR. Split between the two tones ON PURPOSE, and it is a change from how the yeti's
+    // fur was handled. Its rings were all in the coat tone, which meant the outline met the sky at
+    // full coat value; here the rings the reader sees against SKY at the top of the figure stay in
+    // `bearCoat` (they are lit, and they carry the white read), while the flank and haunch rings —
+    // which run down the frame-edge side and against the drift — go to `bearDeep`, so the
+    // silhouette's longest edge is drawn at dL* ~49 instead of ~39.
+    // The reaches are set by the box, not by how shaggy a bear ought to be. A ring costs
+    // `root + len·0.66` outward from its centre and then a further half-lobe beyond that, so the
+    // flank ring binds `MASCOT_BOX.out` and the haunch ring binds `down` — both measured over the
+    // sweep rather than assumed, after a first pass that put them at 0.743 and 0.900.
+    ...shag([-0.26, 0.06, -0.06], 0.24, 5, PALETTE.bearCoat, 0.36, 0.82, 0.1, 0.35),
+    ...shag([-0.26, -0.24, -0.06], 0.26, 6, PALETTE.bearDeep, 0.9, 1.36, 0.075, 0.42, 0.34),
+    ...shag([-0.28, -0.5, -0.04], 0.2, 4, PALETTE.bearDeep, 1.12, 1.48, 0.07, 0.3, 0.34),
   ]
 }
 
 /**
- * The near arm, hooked over the low bough — authored about the SHOULDER so the rig's slow rock
- * swings the whole limb where it grips.
+ * The working foreleg, hinged at the shoulder and planted in the drift's crest.
  *
- * The reviewer could not find an arm on the last pass, and the reason it went missing is that it
- * was the same tone as the chest it crosses. So the arm is now its OWN value: `deep` from the
- * shoulder down, over a `coat` body — the device the spring bluebird's folded wing uses, and the
- * one thing that survives the toon ramp flattening two overlapping masses into one silhouette. The
- * `lit` cap at the top is where the body's shoulder line hands off onto the limb, so the eye reads
- * bright shoulder → dark arm → pale palm and lands on the grip.
+ * Drawn in `bearDeep` over a `bearCoat` body for the reason the yeti's arm had to be: the reviewer
+ * could not find the last one because it was the same tone as the chest it crosses, and two
+ * overlapping masses at one value come back from the ramp as a single silhouette. The paw then
+ * steps BACK up to the coat tone with a near-white top, so the eye reads shoulder → dark limb →
+ * bright paw and lands on the contact.
  *
- * The paw straddles the bough (knuckles above it, fingers curling below and forward) rather than
- * resting on top of it: a hand laid flat on a branch reads as a hand floating near a branch once
- * the silhouettes flatten. The fingers step back UP to `coat` so they separate from the dark paw
- * they hang off.
+ * It ends BELOW the drift's visible crest rather than on top of it. A foot resting exactly on a
+ * surface reads as a foot floating near it once the silhouettes flatten; a foot sunk a little into
+ * snow reads as weight.
  */
-function yetiArm(c: Coat): ClayPart[] {
+function bearArm(): ClayPart[] {
   return [
-    sph(0.15, c.deep, [0, 0, 0], [1.02, 1.0, 0.86], 12),
-    sph(0.13, c.lit, [-0.01, 0.06, 0.06], [1.0, 0.3, 0.5], 10),
+    sph(0.14, PALETTE.bearDeep, [0, 0, 0], [1.05, 1.0, 0.88], 12),
+    // the lit cap where the body's shoulder edge hands off onto the limb
+    sph(0.12, PALETTE.foxBelly, [-0.005, 0.062, 0.05], [1.0, 0.2, 0.45], 10),
     ...limb(
       [
-        [0, -0.03, 0],
-        [-0.03, -0.2, 0.01],
-        [-0.055, -0.31, 0.02],
+        [0, -0.04, 0.01],
+        [0.01, -0.3, 0.02],
+        [0.02, -0.52, 0.04],
       ],
       0.115,
-      0.092,
-      c.deep
+      0.098,
+      PALETTE.bearDeep
     ),
+    // a coat-tone sliver down the limb's outer edge, so a leg drawn in one flat dark tone still turns
+    sph(0.075, PALETTE.bearCoat, [-0.062, -0.24, 0.075], [0.42, 1.4, 0.5], 10),
+    // THE PAW: big and blunt, which is the polar bear's own proportion, stepping back up to the
+    // coat tone so the limb ends on a bright note rather than fading into the drift.
+    sph(0.135, PALETTE.bearCoat, [0.03, -0.63, 0.07], [1.3, 0.72, 1.0], 12),
+    sph(0.11, PALETTE.bearDeep, [0.02, -0.665, 0.03], [1.3, 0.5, 0.9], 10),
+    sph(0.085, PALETTE.foxBelly, [0.03, -0.575, 0.13], [1.4, 0.22, 0.6], 10),
+    // four short ink claws along its front edge — small, because a polar bear's claws are short and
+    // because anything longer turns a resting paw into a raised one
+    ...[-0.06, -0.005, 0.05, 0.1].map((dx, i) =>
+      cone(0.016, 0.05 + 0.006 * i, PALETTE.ink, [0.03 + dx, -0.688, 0.13], [0, 0, 3.14 + dx * 1.2], undefined, 6)
+    ),
+    // guard hair hanging off the back of the leg — the one place a polar bear is visibly shaggy
+    ...shag([-0.04, -0.3, 0.0], 0.1, 5, PALETTE.bearCoat, 0.98, 1.42, 0.1, 0.3),
+  ]
+}
+
+// --- the penguin ------------------------------------------------------------
+
+/**
+ * The other half of the winter recast, and the brief's own "easy win" — because a penguin is a
+ * naturally high-contrast animal, so unlike the bear it does not have to fight its own colour.
+ *
+ * Its back is `penguinBack`, a blue-charcoal rather than `ink`. That is deliberate: a bird painted
+ * in the outline colour has no interior at all and reads as a hole cut in the sky, and it also
+ * leaves the ink contour with nothing to contour. A charcoal with a value of its own measures dL*
+ * ~69 against this sky, which is more separation than anything else in the cast.
+ *
+ * The white front is `foxBelly` and it measures dL* ~22 — a low number, and the one place in this
+ * task where a pale field is allowed to be large. It is legible anyway because it is not being read
+ * against the sky at all: it is bounded on every side by charcoal and by the ink contour, so it
+ * reads by ADJACENCY. That is the honest distinction from the yeti's failure, where the near-white
+ * was the OUTLINE and had nothing but sky beyond it.
+ *
+ * `penguinFlash` on the bill and feet is the corner's one warm note — the same role the red fox
+ * plays in the winter set out on the planet, and it is spent nowhere else.
+ */
+
+/** Where the near flipper hinges off the shoulder. */
+const FLIPPER_AT: V3 = [-0.14, 0.12, 0.1]
+
+function penguinBody(): ClayPart[] {
+  return [
+    // FAR FLIPPER first, behind everything, in the back tone and a size down
     ...limb(
       [
-        [-0.055, -0.31, 0.02],
-        [-0.075, -0.4, 0.04],
-        [-0.09, -0.48, 0.05],
+        [0.05, 0.06, -0.14],
+        [0.1, -0.14, -0.15],
+        [0.11, -0.32, -0.14],
       ],
-      0.098,
-      0.082,
-      c.deep
+      0.06,
+      0.038,
+      PALETTE.penguinBack
     ),
-    sph(0.115, c.deep, [-0.1, -0.515, 0.06], [1.05, 0.94, 0.9], 12),
-    // a `coat` sliver down the arm's OUTER edge, so a limb drawn in one flat dark tone still turns
-    sph(0.085, c.coat, [-0.075, -0.24, 0.08], [0.5, 1.5, 0.55], 10),
-    // bare palm, the same mask tone as the face so the two bare notes rhyme
-    sph(0.062, c.mask, [-0.09, -0.555, 0.13], [1.15, 0.9, 0.5], 10),
-    cone(0.032, 0.15, c.coat, [-0.175, -0.57, 0.09], [0, 0, 2.75], [1, 1, 0.85], 6),
-    cone(0.032, 0.15, c.coat, [-0.105, -0.6, 0.11], [0, 0, 3.05], [1, 1, 0.85], 6),
-    cone(0.03, 0.14, c.coat, [-0.035, -0.585, 0.1], [0, 0, 3.42], [1, 1, 0.85], 6),
-    // thumb hooked back over the top of the bough — the piece that closes the grip
-    cone(0.03, 0.13, c.coat, [-0.005, -0.445, 0.12], [0, 0, -1.35], [1, 1, 0.85], 6),
-    // Elbow feathering, hanging off the arm's outer edge — the longest fur on the animal, because a
-    // forearm is where a shaggy creature's coat actually hangs. In `coat` over a `deep` limb: the
-    // first pass drew this fringe in the arm's own tone, so it was texture nobody could see.
-    ...shag([-0.03, -0.24, 0.02], 0.13, 6, c.coat, 0.95, 1.46, 0.12, 0.3),
-    sph(0.055, PALETTE.boughSnow, [-0.05, -0.38, 0.115], [1.5, 0.42, 0.7], 8),
+
+    // BODY: one tall rounded teardrop. A penguin is a single mass and that is the whole shape —
+    // trying to give it a shoulder or a waist would only make it a bird-shaped person.
+    sph(0.27, PALETTE.penguinBack, [-0.08, -0.12, -0.02], [1.0, 1.38, 0.92], 16),
+    sph(0.235, PALETTE.penguinBack, [-0.1, -0.46, -0.02], [1.02, 0.94, 0.88], 14),
+
+    // THE WHITE FRONT, forward in Z so it wins the depth test against the back it sits on, and cut
+    // as a clean rounded shield rather than a soft gradient. The hard boundary IS the animal: a
+    // penguin blurred at the waterline between its dark and pale halves is a generic bird.
+    sph(0.2, PALETTE.foxBelly, [0.0, -0.14, 0.19], [0.92, 1.5, 0.5], 14),
+    sph(0.155, PALETTE.foxBelly, [-0.02, -0.44, 0.16], [1.0, 0.86, 0.45], 12),
+    // a shaded edge down the front's outward side, so the shield is a curved chest and not a decal
+    sph(0.11, PALETTE.hareShade, [-0.19, -0.22, 0.13], [0.55, 1.7, 0.4], 12),
+
+    // FEET: splayed forward and out onto the drift, which is what stops an upright egg from
+    // hovering. Toes forward in Z as well as down, because a penguin stands on its heels with the
+    // feet pointing at the viewer.
+    ...[-0.19, 0.0].map((x) =>
+      sph(0.075, PALETTE.penguinFlash, [x, -0.655, 0.2], [1.35, 0.42, 1.5], 10)
+    ),
+    ...[-0.235, -0.15, -0.045, 0.045].map((x) =>
+      cone(0.022, 0.09, PALETTE.penguinFlash, [x, -0.672, 0.3], [0, 0, 3.14], [1, 1, 0.8], 6)
+    ),
+
+    // HEAD: small and round, set straight on the body with almost no neck — the proportion that
+    // makes a penguin comic rather than stately.
+    sph(0.155, PALETTE.penguinBack, [0.04, 0.4, 0.0], [1.02, 1.0, 0.94], 14),
+    // THE FACE PATCH, sweeping up from the throat past the eye. A dark head with a dark eye on it
+    // has no face at all at reading size; this is what the eye is read against.
+    sph(0.115, PALETTE.foxBelly, [0.09, 0.325, 0.11], [1.05, 0.9, 0.6], 12),
+    sph(0.06, PALETTE.foxBelly, [0.12, 0.44, 0.11], [1.1, 0.85, 0.5], 10),
+    // the eye, an ink bead on the pale patch with the kit's catch-light
+    ...eye([0.135, 0.435, 0.14], 0.038, { bare: true, iris: PALETTE.ink }),
+
+    // THE BILL: long, straight and slightly drooped, in the warm note. Two masses with an ink line
+    // between them, because a single cone reads as a beak-shaped lump and the line is what makes it
+    // a bill that opens.
+    ...limb(
+      [
+        [0.15, 0.375, 0.11],
+        [0.26, 0.355, 0.12],
+        [0.35, 0.325, 0.11],
+      ],
+      0.042,
+      0.024,
+      PALETTE.penguinFlash
+    ),
+    sph(0.026, PALETTE.penguinFlash, [0.358, 0.322, 0.11], [0.9, 0.95, 0.9], 8),
+    ...limb(
+      [
+        [0.345, 0.318, 0.14],
+        [0.25, 0.345, 0.15],
+        [0.16, 0.365, 0.14],
+      ],
+      0.007,
+      0.01,
+      PALETTE.ink
+    ),
   ]
 }
 
 /**
- * Scale a part list uniformly and offset it. A primitive's radius is baked into its geometry, so
- * the only way to shrink a whole figure in place is to scale its positions AND fold the factor into
- * each part's own `scl` — safe because a uniform scale commutes with the part's rotation. The
- * offset is applied AFTER the scale, so it reads in final figure units.
- */
-function placed(s: number, off: V3, parts: ClayPart[]): ClayPart[] {
-  return parts.map((p) => ({
-    ...p,
-    pos: [
-      (p.pos?.[0] ?? 0) * s + off[0],
-      (p.pos?.[1] ?? 0) * s + off[1],
-      (p.pos?.[2] ?? 0) * s + off[2],
-    ] as V3,
-    scl: [(p.scl?.[0] ?? 1) * s, (p.scl?.[1] ?? 1) * s, (p.scl?.[2] ?? 1) * s] as V3,
-  }))
-}
-
-/**
- * The cub is not a shrunk copy parked at the same address: it sits further OUT toward the frame
- * edge, further FORWARD toward the camera and lower in the drift, so the two outlines separate and
- * the near figure OVERLAPS the far one rather than abutting it.
+ * The near flipper: one stiff blade, hinged at the shoulder and hanging down at rest.
  *
- * The step is capped by the staging, not by taste: every part of the cub lands at `scale × the
- * adult's position + this offset`, so the offset walks its FACE toward the frame edge as well as
- * its body. The OUTWARD step is the one that runs out first — the outer end of the outer eyebrow
- * hits FACE_BOX at x = −0.19, well before the body reaches MASCOT_BOX.out — so most of the
- * separation is bought DOWNWARD and FORWARD instead, which is also where it does more good: the two
- * heads have to clear each other, and a cub in front of its parent overlaps rather than abuts. The
- * forward step is capped in turn by the paw, which reaches PEEKER_ABS_Z a hair before the nose does.
+ * Stiff is the point — a penguin's flipper does not fold, and `applyFlipper` swings the whole thing
+ * through the widest arc in the cast for exactly that reason. Drawn in `penguinBack` with a pale
+ * leading edge, so that when it swings out over the sky the reader still gets an interior rather
+ * than a black stroke.
  */
-const SMALL_OFFSET: V3 = [-0.115, -0.17, 0.11]
-
-export function winterPieces(kind: 'yetiBig' | 'yetiSmall', dir: 1 | -1): PeekerPiece[] {
-  const big = kind === 'yetiBig'
-  const coat = big ? BIG_COAT : SMALL_COAT
-  const s = big ? 1 : 0.82
-  const off: V3 = big ? [0, 0, 0] : SMALL_OFFSET
+function penguinFlipper(): ClayPart[] {
   return [
-    { slot: 'body', at: [0, 0, 0], parts: facing(dir, placed(s, off, yetiBody(coat))), ink: true },
-    {
-      slot: 'a',
-      // the shoulder joint moves with the figure, so the arm hinges where the shoulder actually is
-      at: [(-0.24 * s + off[0]) * dir, 0.05 * s + off[1], 0.18 * s + off[2]],
-      parts: facing(dir, placed(s, [0, 0, 0], yetiArm(coat))),
-      ink: true,
-    },
+    sph(0.085, PALETTE.penguinBack, [0, 0, 0], [1.0, 1.0, 0.7], 10),
+    ...limb(
+      [
+        [0, -0.04, 0.01],
+        [-0.035, -0.24, 0.02],
+        [-0.06, -0.42, 0.02],
+      ],
+      0.072,
+      0.04,
+      PALETTE.penguinBack
+    ),
+    sph(0.045, PALETTE.penguinBack, [-0.065, -0.44, 0.02], [1.0, 1.0, 0.8], 10),
+    // the pale leading edge, inboard of the blade's own contour
+    sph(0.05, PALETTE.hareShade, [0.008, -0.2, 0.06], [0.42, 1.7, 0.5], 10),
   ]
+}
+
+export function winterPieces(kind: 'polarBear' | 'penguin', dir: 1 | -1): PeekerPiece[] {
+  return kind === 'polarBear'
+    ? [
+        { slot: 'body', at: [0, 0, 0], parts: facing(dir, bearBody()), ink: true },
+        {
+          slot: 'a',
+          at: [BEAR_ARM_AT[0] * dir, BEAR_ARM_AT[1], BEAR_ARM_AT[2]],
+          parts: facing(dir, bearArm()),
+          ink: true,
+        },
+      ]
+    : [
+        { slot: 'body', at: [0, 0, 0], parts: facing(dir, penguinBody()), ink: true },
+        {
+          slot: 'a',
+          at: [FLIPPER_AT[0] * dir, FLIPPER_AT[1], FLIPPER_AT[2]],
+          parts: facing(dir, penguinFlipper()),
+          ink: true,
+        },
+      ]
 }

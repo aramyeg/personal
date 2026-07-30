@@ -197,19 +197,22 @@ describe('the measured mascot envelope', () => {
     // The face box is an authoring contract: a character's eyes and muzzle live in it, so the
     // staging can guarantee they are never cropped. Verified through the eye geometry, which is
     // the one part every character shares and the one the reader looks for.
+    //
+    // The eye is found by its `tag`, not by its colour. Task 61 had to change this: the old locator
+    // was "any `ink` part sitting forward in Z", which was only ever a proxy for "a face", and it
+    // stopped being one the moment the recast put ink on an eagle's talons and a polar bear's
+    // claws. It did not go quiet — it started measuring a foot at y = −0.263 and failing — but a
+    // version of the same drift that landed a few hundredths the other way would have passed while
+    // measuring nothing, which is the defect this suite has already been bitten by twice.
     for (const { biome, kind } of KINDS) {
       const pieces = peekerPieces(biome, kind, 1)
       const eyes = pieces
-        .flatMap((piece) =>
-          piece.parts
-            .filter((p) => p.color === PALETTE.ink && (p.pos?.[2] ?? 0) > 0.05)
-            .map((p) => ({ piece, p }))
-        )
+        .flatMap((piece) => piece.parts.filter((p) => p.tag === 'eye').map((p) => ({ piece, p })))
         .map(({ piece, p }) => ({
           x: (p.pos?.[0] ?? 0) + piece.at[0],
           y: (p.pos?.[1] ?? 0) + piece.at[1],
         }))
-      expect(eyes.length, `${kind} has ink facial features`).toBeGreaterThan(0)
+      expect(eyes.length, `${kind} has an authored eye`).toBeGreaterThan(0)
       for (const e of eyes) {
         expect(e.x, `${kind} eye x`).toBeGreaterThanOrEqual(-FACE_BOX.out)
         expect(e.x, `${kind} eye x`).toBeLessThanOrEqual(FACE_BOX.in)
@@ -314,7 +317,7 @@ describe('mirroring', () => {
 
 describe('gesture directions', () => {
   /** World-space position of a limb piece's far tip, at one point of the gesture range. */
-  function jawTip(kind: 'crocGape' | 'crocPeek', dir: 1 | -1, idle: number): THREE.Vector3 {
+  function jawTip(kind: 'crocGape', dir: 1 | -1, idle: number): THREE.Vector3 {
     const pieces = peekerPieces('delta', kind, dir)
     const jaw = pieces.find((p) => p.slot === 'a')!
     const root = new THREE.Group()
@@ -344,29 +347,25 @@ describe('gesture directions', () => {
     return best
   }
 
-  it('opens the crocodiles jaws DOWNWARD, not upward', () => {
+  it('opens the crocodile jaw DOWNWARD, not upward', () => {
     // This pins the fix that made the delta corner work at all. The first build used a positive
     // jaw rotation, which only swings a mandible clear of the skull when the snout points UP — so
     // the whole animal had been reared vertical to make its mouth work, and it read as a green
     // tube rather than a crocodile. A mirror test cannot see this: flipping the sign preserves
     // mirror symmetry exactly, so it survived the R14-style suite. The direction the jaw travels
     // in WORLD space is the thing that actually matters, so that is what is asserted.
-    for (const kind of ['crocGape', 'crocPeek'] as const) {
-      for (const dir of [1, -1] as const) {
-        const shut = jawTip(kind, dir, -1)
-        const open = jawTip(kind, dir, 1)
-        expect(open.y, `${kind} dir${dir} jaw must drop as it opens`).toBeLessThan(shut.y - 1e-4)
-      }
+    for (const dir of [1, -1] as const) {
+      const shut = jawTip('crocGape', dir, -1)
+      const open = jawTip('crocGape', dir, 1)
+      expect(open.y, `crocGape dir${dir} jaw must drop as it opens`).toBeLessThan(shut.y - 1e-4)
     }
   })
 
-  it('keeps both crocodiles snouts roughly level rather than reared', () => {
+  it('keeps the crocodile snout roughly level rather than reared', () => {
     // The same defect, from the other side: a crocodile whose snout points upward is the failure
     // mode. The mandible tip must stay well inside a shallow band around the figure's own centre.
-    for (const kind of ['crocGape', 'crocPeek'] as const) {
-      for (const idle of [-1, 0, 1]) {
-        expect(Math.abs(jawTip(kind, 1, idle).y), `${kind} snout height`).toBeLessThan(0.45)
-      }
+    for (const idle of [-1, 0, 1]) {
+      expect(Math.abs(jawTip('crocGape', 1, idle).y), 'crocGape snout height').toBeLessThan(0.45)
     }
   })
 })
@@ -432,14 +431,101 @@ describe('house rules', () => {
     // reading size a warm-red stroke with a bright yellow tip at the corner of a mouth is a
     // cigarette — the single loudest misread left after the T56 rework. The fix is a COLOUR family
     // as much as a shape, so the family is what is pinned: nothing warm-red and nothing brass may
-    // come back onto either animal, and both must actually be wearing something.
-    for (const kind of ['camelAdult', 'camelCalf'] as const) {
-      const parts = peekerPieces('desert', kind, 1).flatMap((p) => p.parts)
-      const colours = new Set(parts.map((p) => p.color))
-      expect(colours.has(PALETTE.honey), `${kind} brass`).toBe(false)
-      expect(colours.has(PALETTE.camelSaddle), `${kind} saddle red`).toBe(false)
-      expect(colours.has(PALETTE.tackLeather), `${kind} wears tack`).toBe(true)
+    // come back onto the worked animal, and it must actually be wearing something.
+    const camel = new Set(peekerPieces('desert', 'camelAdult', 1).flatMap((p) => p.parts.map((q) => q.color)))
+    expect(camel.has(PALETTE.honey), 'camel brass').toBe(false)
+    expect(camel.has(PALETTE.camelSaddle), 'camel saddle red').toBe(false)
+    expect(camel.has(PALETTE.tackLeather), 'camel wears tack').toBe(true)
+
+    // Task 61 keeps the other half of the rule by removing the wearer rather than re-colouring it:
+    // the calf that wore the collar is gone and the fennec that replaced it is a WILD animal, so
+    // the pin is that it carries no tack of any family at all. (It does wear `honey`, as the
+    // crocodile, the snake and the eagle do — that is the cast's shared warm eye ring, and the
+    // defect this test exists for was a bright bead at the END OF A STRAP, not a colour.)
+    const fox = new Set(peekerPieces('desert', 'fennec', 1).flatMap((p) => p.parts.map((q) => q.color)))
+    for (const tack of [PALETTE.tackLeather, PALETTE.tackLeatherDeep, PALETTE.camelSaddle]) {
+      expect(fox.has(tack), 'the fennec runs bare').toBe(false)
     }
+  })
+
+  it('keeps the polar bear off the near-whites that cost the yeti its silhouette', () => {
+    // Task 61, and it is the same shape of pin as the camel's tack above: the defect is a COLOUR
+    // FAMILY, so the family is what is guarded rather than any one shape.
+    //
+    // The winter corner's backdrop measures L* 85.6. The toon ramp scales a figure's albedo down
+    // while leaving that backdrop alone, so a near-white animal renders at about 66 and lands ~20
+    // points off its own sky — which is what the first yeti measured (20.7) and was rebuilt over.
+    // A polar bear is the obvious candidate to make that mistake a second time, because the animal
+    // is called white. Its MASS must therefore stay off the palette's three brightest tones; the
+    // near-whites it does carry are `foxBelly` accents, budgeted by area rather than by taste.
+    // Measured by AREA, not by presence, because that is what the contrast bench measures. A
+    // near-white is not forbidden outright — the bear needs a few lit notes to read as white at all,
+    // and `eye()` puts a catch-light on every character in the cast — it is forbidden from being
+    // most of the animal. So each primitive contributes its own projected footprint.
+    const bear = peekerPieces('winter', 'polarBear', 1).flatMap((p) => p.parts)
+    const share = (test: (c: string) => boolean): number => {
+      let hit = 0
+      let all = 0
+      for (const p of bear) {
+        p.geo.computeBoundingBox()
+        const b = p.geo.boundingBox!
+        const s = p.scl ?? [1, 1, 1]
+        const a = (b.max.x - b.min.x) * s[0] * (b.max.y - b.min.y) * s[1]
+        all += a
+        if (test(p.color)) hit += a
+      }
+      return hit / all
+    }
+    const NEAR_WHITE = [PALETTE.boughSnow, PALETTE.snow, PALETTE.yetiFur, PALETTE.foxBelly]
+    expect(share((c) => NEAR_WHITE.includes(c)), 'near-white area budget').toBeLessThan(0.18)
+    // ...and the two tones that carry the median have to be most of the animal
+    expect(
+      share((c) => c === PALETTE.bearCoat || c === PALETTE.bearDeep),
+      'mass tones'
+    ).toBeGreaterThan(0.55)
+    expect(share((c) => c === PALETTE.bearDeep), 'deep tone').toBeGreaterThan(0.12)
+
+    // The penguin's other half of the lesson: its back is a blue-charcoal, never the ink the
+    // contour is drawn in. A bird painted in the outline colour has no interior and reads as a
+    // hole cut in the sky — and it leaves the contour with nothing to contour.
+    const penguin = new Set(
+      peekerPieces('winter', 'penguin', 1).flatMap((p) => p.parts.map((q) => q.color))
+    )
+    expect(penguin.has(PALETTE.penguinBack), 'penguin back tone').toBe(true)
+    expect(penguin.has(PALETTE.penguinFlash), 'penguin keeps the corner one warm note').toBe(true)
+  })
+
+  it('fields two different species at every checkpoint', () => {
+    // Task 61's whole point. Four corners used to field one animal twice at two sizes, and however
+    // much the poses and the tack differed the pair read as one asset repeated — which is the tell
+    // the R14 review called "low quality" and the thing the recast removes.
+    //
+    // The pin is on TONE OVERLAP, and the threshold is calibrated against the defect rather than
+    // chosen. The mechanism that produced the repeated-asset read was that both halves of a pair
+    // came out of ONE build — `placed(0.82, …)` over a single yeti part list, or one shared pose
+    // type for the camels and the pangolins — and a shared build necessarily means a shared palette.
+    // Measured, the retired winter pair used 7 of its 11 tones on both animals: a Jaccard of 0.64.
+    // The recast's worst corner is the delta at 0.40, and the untouched approved pairs sit at 0.18
+    // (spring) and 0.36 (jungle), so 0.5 separates the fix from the defect with real margin on both
+    // sides.
+    //
+    // Two cheaper pins were tried first and BOTH were coincidences rather than measurements: a 6%
+    // part-count margin failed the spring pair, whose two genuinely different birds land within 5%
+    // of each other, and plain count inequality failed the desert, where the camel and the fennec
+    // happen to use 53 primitives each. Neither was measuring the property it named.
+    for (const pair of PEEKER_CAST) {
+      expect(pair.left, `${pair.biome} pair`).not.toBe(pair.right)
+      const tones = (k: (typeof pair)['left']): Set<string> =>
+        new Set(peekerPieces(pair.biome, k, 1).flatMap((p) => p.parts.map((q) => q.color)))
+      const l = tones(pair.left)
+      const r = tones(pair.right)
+      const shared = [...l].filter((c) => r.has(c)).length
+      const union = new Set([...l, ...r]).size
+      expect(shared / union, `${pair.biome} is two species, not one twice`).toBeLessThan(0.5)
+    }
+    // and the retired kinds really are gone from the type's inhabitants, not merely unused
+    const live = new Set(PEEKER_CAST.flatMap((p) => [p.left, p.right]))
+    expect(live.size, 'twelve distinct species').toBe(12)
   })
 
   it('stays inside the per-checkpoint draw budget', () => {

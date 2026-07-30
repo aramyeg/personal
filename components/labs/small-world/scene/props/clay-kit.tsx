@@ -407,7 +407,24 @@ export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x
 // is already instanced). The merge bakes each primitive's local transform + accent into
 // per-vertex colour; the silhouette + shading are identical to the per-mesh build.
 
-export type ClayPart = { geo: THREE.BufferGeometry; color: string; pos?: [number, number, number]; rot?: [number, number, number]; scl?: [number, number, number] }
+/**
+ * `tag` carries no render meaning at all — `buildMergedClay` never reads it — and exists so a test
+ * can find a named feature in a merged figure EXACTLY rather than by guessing from colour.
+ *
+ * Task 61 added it because the guess had broken. The mascot suite located every character's face by
+ * "any `ink` part sitting forward in Z", which held only while ink was used on faces alone; the
+ * moment a raptor got talons and a bear got claws, the face test started measuring a foot and
+ * failing. A probe that silently changes what it measures is the failure mode this cast has been
+ * bitten by twice, so the feature says what it is instead.
+ */
+export type ClayPart = {
+  geo: THREE.BufferGeometry
+  color: string
+  pos?: [number, number, number]
+  rot?: [number, number, number]
+  scl?: [number, number, number]
+  tag?: string
+}
 
 /** Local transform matrix for a part (Euler order XYZ, matching r3f's `rotation` prop). */
 function partMatrix(p: ClayPart): THREE.Matrix4 {

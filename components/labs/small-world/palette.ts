@@ -196,4 +196,48 @@ export const PALETTE = {
   // same value as the animal on it. The drift now runs bright, with this one deep tone kept for the
   // wind hollows and the contact pocket directly under each figure.
   driftShade: '#5E7488', // deep blue snow shadow, clearly below the yeti's coat
+  // Task 61 — the recast cast (snake, fennec, eagle, polar bear, penguin).
+  //
+  // EVERY VALUE BELOW IS DERIVED, NOT PICKED. The four checkpoint backdrops were measured with the
+  // rig unmounted under the real grade (bench/task61-backdrop.mjs) and each corner turns out to be
+  // an almost flat wash — delta L* 82.5, desert 89.1, canyon 74.5, winter 85.6, all with under four
+  // points of spread. A mascot pixel's contrast against it is therefore just
+  // `backdrop − rendered`, and the toon ramp's darkest band (96/255) is what most of a corner
+  // figure sits in, so `rendered ≈ L*(0.40 · Y_albedo)`. That model predicts the three shipped
+  // corners to within about three points of what they measure (crocHide → 51.4 against a measured
+  // 51.1; yetiCoat → 39.5 against 41.3), which makes it good enough to author against.
+  //
+  // Inverting it for the 40–52 band gives the albedo window each corner's DOMINANT mass has to
+  // live in: delta 47–64, desert 55–73, canyon 39–53, winter 51–68. Pale accents are then a budget
+  // spent by AREA rather than by taste, exactly as the yeti's near-whites were.
+  boaCoil: '#B3833F', // delta snake — warm amber, deliberately OUT of the crocodile's olive family
+  boaSaddle: '#6B4526', // its dark dorsal saddles, and the one thing that says "snake" in silhouette
+  boaBelly: '#D8BE84', // pale banded underside, seen only where the coil turns over
+  fennecCoat: '#C89055', // desert fennec — a redder, five points darker sand than camelHide
+  fennecDeep: '#8F5C36', // its shadow side and the backs of the ears
+  fennecCream: '#EBD6B2', // cheek ruff, chest and brow — the fox's pale notes, budgeted small
+  fennecEar: '#DDA087', // warm inner ear; the ears ARE the silhouette, so they get their own tone
+  eagleWing: '#66523F', // canyon eagle — a COLD umber, so it never joins the rust rock it perches on
+  eagleDeep: '#3E3227', // primaries, tail bars and the wing's shadowed underside
+  eagleNape: '#AD8A4A', // tawny-gold hackles on head and nape — the raptor cue, kept off the sky edge
+  // THE POLAR BEAR IS THE TRAP THIS TASK WAS WARNED ABOUT, and the answer is not a whiter white.
+  // A near-white albedo renders at L* ~63–66, which is barely twenty points off a winter sky at
+  // 85.6 — the exact failure the yeti earned its rebuild over. So the bear's MASS is a warm ivory
+  // at the top of the winter window and the near-whites are demoted to lit accents (it reuses
+  // foxBelly for those rather than adding one). It still reads white, because everything it is seen
+  // against is COOLER and brighter: the drift is boughSnow at L* 99, the sky is lilac. A polar bear
+  // on sunlit snow is a cream animal in a blue-white field, which is what this is.
+  // ...and the split between the two tones is not what the single-tone arithmetic first suggested.
+  // Painted at the value the formula gives for the whole figure, the coat came back as grey-lilac
+  // stone and then, warmed, as a brown bear — because the animal is ALSO lit through the winter
+  // grade's own cool cast, and unlike the sky that cast lands ON it. The way out is that the median
+  // is carried by whichever tone crosses 50% of the AREA, not by the dominant one: give `deep`
+  // roughly as much of the figure as `coat` and the median lands in the deep band, which buys the
+  // coat itself the freedom to be a genuine cream. That is also how a white animal is actually
+  // painted — a bright lit top over a deeply shaded underside, not one flat pale field.
+  bearCoat: '#D6C7A8', // warm ivory bear mass — reads white against a blue-white drift, not with it
+  bearDeep: '#8A7A62', // its underside and far flank; this tone is what carries the median
+  penguinBack: '#39434F', // penguin head/back — blue-charcoal rather than ink, so it is not a hole
+  penguinFlash: '#EE8F33', // bill, feet and ear patch — the corner's one warm note, as the fox is
+
 } as const

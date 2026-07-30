@@ -351,20 +351,6 @@ const BIG: Pangolin = {
   eyeR: 0.055,
 }
 
-const SMALL: Pangolin = {
-  ball: 0.176,
-  spiral: 17,
-  plateLo: 0.11,
-  plateHi: 0.172,
-  neck: [-0.01, 0.29, 0.1],
-  tailAt: [-0.165, -0.083, 0],
-  tailLen: 0.88,
-  skullAt: [0.122, 0.19, 0],
-  skullR: 0.158,
-  snoutLen: 0.205,
-  eyeR: 0.064,
-}
-
 /**
  * The axis of the muzzle's main wedge: forward and ~19° below horizontal. Written out rather than
  * left implicit in a rotation constant because the muzzle END and the nostril are placed ALONG it —
@@ -568,8 +554,224 @@ function pangolinTail(p: Pangolin, d: 1 | -1): ClayPart[] {
   ])
 }
 
-export function canyonPieces(kind: 'pangolinBig' | 'pangolinSmall', dir: 1 | -1): PeekerPiece[] {
-  const p = kind === 'pangolinBig' ? BIG : SMALL
+// --- the eagle --------------------------------------------------------------
+
+/**
+ * Task 61 — the second pangolin is replaced by an EAGLE. Aram: "We can have an eagle with
+ * pangolin." The roll-in beat stays with the animal that owns it; what this corner gains is a
+ * second species and a vertical.
+ *
+ * WHERE IT PERCHES, and it is not where the brief's first suggestion pointed. The obvious staging
+ * is the hoodoo — a raptor on a spire is the picture everybody has in their head. It is illegal
+ * here: the spire stands at x ≈ −0.46…−0.52 and `FACE_BOX` stops the head at −0.20, because a
+ * cropped face is the defect this whole rework exists to remove. An eagle perched out there would
+ * have to crane its head back inboard by a third of a figure-height, which is a contortion, not a
+ * pose. So it stands on the SHELF — the one course that still runs the corner's full width, the
+ * surface both animals were already seated on — with the hoodoo behind its shoulder where a spire
+ * belongs in a composition rather than under a bird.
+ *
+ * WHY IT IS A COLD BROWN. The canyon's own review finding was that the first pangolin "camouflages
+ * into its own dressing" because animal and rock shared a family, and the fix was to put a light
+ * tan animal on deep rust rock. A dark eagle inverts that trick rather than repeating it: it sits
+ * BELOW the rock's value instead of above it. But that only works if the hue separates too, so
+ * `eagleWing` is a low-chroma cold umber where every rock tone here (`rust`, `hoodooRock`,
+ * `strataDust`) is a saturated orange. The head then goes the other way again into `eagleNape`'s
+ * tawny gold, which is the golden eagle's own marking and, more to the point, the only reason the
+ * head does not vanish into the body — a raptor drawn in one brown is a lump with a beak.
+ *
+ * READS RAPTOR AT CORNER SCALE. Four cues, in the order a reader gets them: the MANTLED WING
+ * breaking the outline, the HOOKED beak, the heavy overhanging BROW (the thing that makes an
+ * eagle's eye fierce rather than owlish), and the TALONS gripping the rock. Everything else is
+ * subordinate.
+ */
+
+/** Where the wing hinges off the shoulder, and where the eagle's feet meet the shelf. */
+const WING_AT: V3 = [-0.1, 0.24, 0.14]
+const PERCH_Y = LEDGE_TOP
+
+/**
+ * One row of PRIMARIES: long, separately drawn feathers fanning off the wing's trailing edge.
+ *
+ * Drawn as individual blades rather than as one mass because separation is the whole read. A wing
+ * painted as a single lozenge is a fin; what says "bird" is that the outer feathers are distinct
+ * fingers with sky between them, and at this size that has to be built rather than shaded — the
+ * four-band ramp will not draw a feather edge inside a silhouette.
+ */
+function primaries(
+  at: V3,
+  n: number,
+  from: number,
+  to: number,
+  len: number,
+  color: string
+): ClayPart[] {
+  const out: ClayPart[] = []
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1)
+    const a = from + (to - from) * f
+    // the outermost feathers are the longest — a wing's tip is its point, and an even row reads as
+    // a comb the same way the winter icicles did before their lengths were staggered
+    const l = len * (0.72 + 0.42 * f)
+    out.push(
+      cone(
+        0.03,
+        l,
+        color,
+        [at[0] + Math.cos(a) * l * 0.5, at[1] + Math.sin(a) * l * 0.5, at[2] - 0.012 * i],
+        [0, 0, a - Math.PI / 2],
+        [1, 1, 0.34],
+        6
+      )
+    )
+  }
+  return out
+}
+
+/**
+ * Body, tail, far wing and the head.
+ *
+ * The FAR wing lives here rather than on a hinge and is drawn a size down, darker and further back
+ * in Z. Two identical wings at one depth read as one flat shape with a notch; the pair only reads
+ * as a bird with wings ON it when one is clearly behind the other — the same rule the fennec's ears
+ * are built to in the desert corner.
+ */
+function eagleBody(d: 1 | -1): ClayPart[] {
+  return facing(d, [
+    // FAR WING first, so the body draws over its root. Its reach is set by `MASCOT_BOX.out` rather
+    // than by taste: a feather is placed at its own half-length and then runs a full length beyond,
+    // so the origin has to sit a whole feather clear of the limit, not half of one. The first pass
+    // put it at x = −0.40 and the tip measured −0.769 against a 0.68 box.
+    ...primaries([-0.3, 0.08, -0.16], 5, 3.35, 3.95, 0.24, PALETTE.eagleDeep),
+    sph(0.15, PALETTE.eagleDeep, [-0.24, 0.14, -0.14], [1.25, 0.78, 0.4], 12),
+
+    // TAIL: a squared fan swept back and down, banded at its end. A raptor's tail is short and
+    // broad, and squaring it off is what keeps it from reading as a pheasant's.
+    ...primaries([-0.3, -0.1, -0.06], 5, 3.25, 3.62, 0.34, PALETTE.eagleWing),
+    sph(0.1, PALETTE.eagleDeep, [-0.44, -0.2, -0.07], [1.5, 0.5, 0.4], 10),
+
+    // BODY: a heavy upright teardrop — broad at the shoulders, narrowing to the vent. Set upright
+    // rather than horizontal because a perched bird stands, and because the corner's other animal
+    // is a low round ball and the pair needs one vertical between them.
+    sph(0.2, PALETTE.eagleWing, [-0.09, 0.08, 0.0], [0.92, 1.2, 0.9], 14),
+    sph(0.145, PALETTE.eagleWing, [-0.135, -0.12, -0.01], [0.95, 0.95, 0.88], 12),
+    // the breast, forward and a touch lighter, so the bird has a front as well as an outline
+    sph(0.13, PALETTE.eagleWing, [0.015, 0.05, 0.14], [0.72, 1.1, 0.45], 12),
+    sph(0.13, PALETTE.eagleDeep, [-0.16, -0.02, 0.1], [0.62, 1.25, 0.45], 12),
+    // scapular coverts stepping down the back — the drawn break that stops the body being one egg
+    ...[
+      [-0.2, 0.17, 0.055],
+      [-0.25, 0.05, 0.05],
+      [-0.27, -0.07, 0.045],
+    ].map(([x, y, r]) => ({
+      ...sph(r, PALETTE.eagleDeep, [x, y, 0.06], [1.5, 0.66, 0.5], 8),
+      rot: [0, 0, 0.5] as V3,
+    })),
+
+    // LEGS AND TALONS. Feathered to the ankle (a golden eagle's "trousers", and a real cue), then
+    // bare yellow tarsi and four toes wrapped OVER the shelf's edge. Toes that end on top of a
+    // surface read as feet resting near it; toes that curl down its front read as a grip, and the
+    // grip is what ties the bird to the rock.
+    sph(0.1, PALETTE.eagleWing, [-0.05, -0.16, 0.14], [0.9, 1.1, 0.7], 10),
+    cyl(0.028, 0.032, 0.09, PALETTE.goldSand, [-0.035, PERCH_Y + 0.08, 0.17], [0, 0, 0.06]),
+    cyl(0.026, 0.03, 0.08, PALETTE.goldSand, [-0.145, PERCH_Y + 0.075, 0.1], [0, 0, 0.09]),
+    ...[
+      [-0.035, 0.17, 1],
+      [-0.145, 0.1, -1],
+    ].flatMap(([x, z, s]) => [
+      sph(0.036, PALETTE.goldSand, [x, PERCH_Y + 0.028, z], [1.3, 0.8, 1.0], 8),
+      cone(0.014, 0.062, PALETTE.goldSand, [x + 0.045 * s, PERCH_Y + 0.012, z + 0.02], [0, 0, -1.9 * s], undefined, 6),
+      cone(0.013, 0.055, PALETTE.goldSand, [x - 0.04 * s, PERCH_Y + 0.012, z + 0.01], [0, 0, 1.9 * s], undefined, 6),
+      // one ink talon per foot, hooked under the shelf's lip
+      cone(0.009, 0.04, PALETTE.ink, [x + 0.072 * s, PERCH_Y - 0.028, z + 0.02], [0, 0, -2.5 * s], undefined, 6),
+    ]),
+
+    // NECK AND HEAD, in the tawny gold. The hackles are drawn as a ruff standing off the neck's
+    // narrower run, which is the same head-pinch-shoulders reading order the yeti's rebuild needed
+    // to stop being one boulder.
+    sph(0.095, PALETTE.eagleNape, [-0.01, 0.29, 0.06], [0.9, 1.1, 0.85], 12),
+    ...tufts([-0.015, 0.29, 0.02], 0.12, 6, PALETTE.eagleNape, 0.5, 1.5, 0.52),
+    sph(0.145, PALETTE.eagleNape, [0.06, 0.475, 0.06], [1.05, 0.98, 0.94], 14),
+    // the crown, a shade darker so the skull has a top
+    sph(0.1, PALETTE.eagleWing, [0.035, 0.552, 0.02], [1.15, 0.5, 0.75], 10),
+
+    // THE BROW — the single most important piece on the head. A raptor's supraorbital ridge
+    // overhangs the eye and throws it into shadow, and that shelf is what makes the expression
+    // fierce instead of owlish. Drawn in ink so it is a line rather than a form: at reading size a
+    // shaded ridge is invisible and a drawn one is not.
+    ...limb(
+      [
+        [0.185, 0.485, 0.13],
+        [0.115, 0.508, 0.15],
+        [0.03, 0.5, 0.13],
+      ],
+      0.019,
+      0.024,
+      PALETTE.ink
+    ),
+    // the eye, set under it and forward — honey, the cast's shared warm eye
+    ...eye([0.125, 0.443, 0.145], 0.05, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+
+    // THE HOOKED BEAK, in three pieces: the cere at the base, a deep hooked upper mandible and a
+    // short lower one. The hook is the cue — a straight cone is a songbird's bill however big it is
+    // drawn — so the tip is a separate mass swung down BELOW the line of the culmen.
+    sph(0.05, PALETTE.goldSand, [0.185, 0.425, 0.145], [1.0, 0.9, 0.85], 10),
+    sph(0.056, PALETTE.goldSand, [0.235, 0.4, 0.14], [1.15, 0.85, 0.8], 10),
+    sph(0.036, PALETTE.goldSand, [0.275, 0.345, 0.135], [0.85, 1.25, 0.75], 10),
+    cone(0.026, 0.075, PALETTE.goldSand, [0.278, 0.303, 0.135], [0, 0, 3.35], [1, 1, 0.8], 8),
+    // the gape line, and one ink nostril on the cere
+    ...limb(
+      [
+        [0.265, 0.372, 0.16],
+        [0.2, 0.375, 0.175],
+        [0.15, 0.386, 0.16],
+      ],
+      0.008,
+      0.011,
+      PALETTE.ink
+    ),
+    sph(0.011, PALETTE.ink, [0.19, 0.432, 0.185], undefined, 6),
+  ])
+}
+
+/**
+ * The near wing, hinged at the shoulder and authored FOLDED — reaching out and down along the
+ * flank. `applyMantle` lifts it from there.
+ *
+ * Built in three bands back to front: the shoulder's covert mass, a row of secondaries, and the
+ * long primaries at the tip. The bands step DARKER outward (`eagleWing` → `eagleDeep`), which is
+ * both what a real wing does and what stops the whole limb reading as one flat paddle once the ramp
+ * has flattened its interior.
+ */
+function eagleWing(d: 1 | -1): ClayPart[] {
+  return facing(d, [
+    // The coverts are `eagleNape`, NOT the body tone, and that is the whole fix for the first
+    // pass's vulture. A limb drawn in the same value as the mass it crosses comes back from the
+    // four-band ramp as one silhouette — the yeti's arm went missing for exactly this reason and
+    // the fix there was the same one: give the limb its own value. A golden eagle's wing coverts
+    // really are paler than its back, so the honest drawing and the legible one agree here.
+    sph(0.14, PALETTE.eagleNape, [-0.02, -0.02, 0.06], [1.1, 1.0, 0.6], 12),
+    sph(0.115, PALETTE.eagleNape, [-0.16, -0.075, 0.07], [1.35, 0.8, 0.55], 12),
+    // the covert row's lower edge, drawn dark so the wing has a trailing line rather than a fade
+    sph(0.075, PALETTE.eagleDeep, [-0.13, -0.135, 0.09], [1.7, 0.5, 0.5], 10),
+    // The wing tip is what binds `MASCOT_BOX.out` on this figure, and it binds it at the TOP of the
+    // mantle rather than at rest: lifting the blade also swings its tip further outward. Measured
+    // over the full gesture sweep, not at the parked pose — the first pass was authored against the
+    // rest pose and measured 0.769 against a 0.68 box once the mantle was included.
+    ...primaries([-0.2, -0.12, 0.05], 6, 3.28, 3.78, 0.26, PALETTE.eagleDeep),
+    // the shoulder's own dark edge, so the pale coverts have a top line and do not simply run into
+    // the neck's hackles
+    sph(0.06, PALETTE.eagleDeep, [0.0, 0.055, 0.08], [1.5, 0.4, 0.5], 10),
+  ])
+}
+
+export function canyonPieces(kind: 'pangolinBig' | 'eagle', dir: 1 | -1): PeekerPiece[] {
+  if (kind === 'eagle') {
+    return [
+      { slot: 'body', at: [0, 0, 0], parts: eagleBody(dir), ink: true },
+      { slot: 'a', at: [WING_AT[0] * dir, WING_AT[1], WING_AT[2]], parts: eagleWing(dir), ink: true },
+    ]
+  }
+  const p = BIG
   return [
     // 'c' is the whole-body deformer the unfurl stretches; 'a' and 'b' are its siblings, hinged at
     // joints that sit INSIDE the ball so both are hidden by the shell while the figure is rolled.
