@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
+import { EGG_THETA, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
+import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 
 /**
  * Task 61 — the yeti easter egg's one-shot.
@@ -134,5 +135,58 @@ describe('the egg house rules', () => {
     expect(src).toMatch(/A11Y/)
     expect(src).toMatch(/reduced motion|REDUCED MOTION/i)
     expect(src).toMatch(/prefers-reduced-motion/)
+  })
+})
+
+describe('where the egg hides', () => {
+  /** Unit direction at latitude nx and longitude theta — `biomes.ts`'s own `place`. */
+  const place = (nx: number, theta: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(theta), ring * Math.sin(theta)]
+  }
+  const norm = (v: [number, number, number]): [number, number, number] => {
+    const m = Math.hypot(v[0], v[1], v[2])
+    return [v[0] / m, v[1] / m, v[2] / m]
+  }
+  const ang = (a: [number, number, number], b: [number, number, number]): number =>
+    Math.acos(Math.min(1, Math.max(-1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])))
+
+  const egg = norm(place(EGG_X / PLANET_RADIUS, EGG_THETA))
+
+  it('does not stand in the icy lake', () => {
+    // THIS TEST EXISTS BECAUSE THE BUG SHIPPED PAST EVERY OTHER ONE. The winter wedge's only water
+    // is the icy lake, and it is sacred: B2_FROZEN (r 0.14, feather 0.10) and B2_SHELF (r 0.28,
+    // feather 0.13) in biomes.ts. The Forest's INSTANCED scatter rejects underwater candidates for
+    // itself — which is a trap, because it means "there are conifers around here" is not evidence
+    // that a HAND-PLACED prop is on dry land. A hand-placed one has no such check.
+    //
+    // The first shipped anchor sat 0.4016 rad from B2_SHELF's centre against a 0.410 limit: eight
+    // thousandths inside the water, invisible to the whole suite, and found only because the lane
+    // that owns the terrain warned about it. The numbers are duplicated here rather than imported
+    // so that a change to the pond in biomes.ts fails this test instead of silently moving the
+    // limit under it — the point is to be told when the two stop agreeing.
+    const FROZEN = { c: norm(place(0.34, 5.55)), limit: 0.14 + 0.1 }
+    const SHELF = { c: norm(place(0.6, 5.72)), limit: 0.28 + 0.13 }
+    expect(ang(egg, FROZEN.c), 'clear of B2_FROZEN').toBeGreaterThan(FROZEN.limit + 0.03)
+    expect(ang(egg, SHELF.c), 'clear of B2_SHELF').toBeGreaterThan(SHELF.limit + 0.03)
+  })
+
+  it('stays in the winter wood, which is the whole point of hiding there', () => {
+    // ...and the other half of the vice: pushed clear of the water it must not end up standing in
+    // open snow. SNOW_CAP is Forest's own conifer scatter (radius 0.55, feather 0.16).
+    const cap = norm([0.5, Math.cos(5.55) * 0.866, Math.sin(5.55) * 0.866])
+    expect(ang(egg, cap), 'within the conifer cap').toBeLessThan(0.55 + 0.16)
+  })
+
+  it('is on the hemisphere facing the camera at the winter dwell', () => {
+    // Rotation is clamped at 4pi through the dwell, so the planet's local frame is unrotated there
+    // and the anchor's own camera distance is the whole test. The centre plane is at 12.1; anything
+    // beyond it is behind the horizon, which is exactly how the first anchor was lost.
+    const DIST = 12.1
+    const PITCH = (20 * Math.PI) / 180
+    const cam = [0, DIST * Math.sin(PITCH), DIST * Math.cos(PITCH)]
+    const p = egg.map((c) => c * PLANET_RADIUS)
+    const camDist = Math.hypot(p[0] - cam[0], p[1] - cam[1], p[2] - cam[2])
+    expect(camDist, 'in front of the planet centre plane').toBeLessThan(12.0)
   })
 })

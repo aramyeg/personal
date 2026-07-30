@@ -41,24 +41,34 @@ import type { JourneyRef } from '../use-journey'
 // --- where it hides ---------------------------------------------------------
 
 /**
- * Band-2 longitude and lateral offset, inside the SNOW_CAP the `Forest` component scatters the
- * winter conifers over (centre dir [0.5, cos 5.55, sin 5.55]·0.866, radius 0.55 rad). This point
- * sits 0.535 rad off that centre, so it is inside the scatter and there is timber around it.
+ * Band-2 longitude and lateral offset, on the winter wedge's right-hand flank.
  *
- * BOTH NUMBERS ARE MEASURED, and the first guess was wrong in a way worth recording. A longitude
- * chosen to sit between two named `WinterLife` conifers (5.66, +0.62) put the yeti on the FAR
- * hemisphere at the parked dwell: it projected to a perfectly reasonable screen position, 864 x
- * 240, while sitting 12.67 units from a camera whose planet centre is at 12.1 — i.e. behind the
- * horizon. On a spinning planet "in the forest" and "on the visible face" are different questions,
- * and only the second one can be answered by looking at where the camera is.
+ * THREE CONSTRAINTS, all measured, and the first two versions each violated one of them.
  *
- * So this is fitted against both: inside the tree scatter AND at camera depth 11.7 (in front of the
- * 12.1 centre plane) for the whole of the winter dwell, which is where the reader actually lingers.
- * It lands around screen 913 x 234 on a 1600x900 frame and moves only about seven pixels across the
- * entire dwell, because rotation is clamped there.
+ *  1. IN THE TREES. `Forest`'s SNOW_CAP scatters the winter conifers about
+ *     [0.5, cos 5.55, sin 5.55]·0.866 with an angular radius of 0.55 and a 0.16 feather. This sits
+ *     0.559 rad off that centre — at the edge of the instanced scatter, with trees immediately
+ *     inboard of it, which is what a creature hiding at the wood's margin should have.
+ *
+ *  2. ON THE VISIBLE FACE. A first anchor chosen purely to sit between two named `WinterLife`
+ *     conifers (5.66, +0.62) put the yeti on the FAR hemisphere at the parked dwell: a perfectly
+ *     reasonable screen position, 864 x 240, at 12.67 units from a camera whose planet centre is
+ *     12.1 — i.e. behind the horizon. On a spinning planet "in the forest" and "on the visible
+ *     face" are different questions, and only the second one can be answered by looking at where
+ *     the camera is. This sits at camera distance 11.86, in front of the centre plane.
+ *
+ *  3. NOT IN THE LAKE, which is the one this file would have shipped wrong. The winter wedge's
+ *     only water is the icy lake — `B2_FROZEN` (r 0.14 + 0.10 feather) and `B2_SHELF` (r 0.28 +
+ *     0.13) in `biomes.ts` — and it is sacred. The INSTANCED scatter rejects underwater candidates
+ *     for itself, so "there are trees near here" is NOT evidence that a hand-placed prop is on dry
+ *     land; a hand-placed one has no such check and will happily stand in the pond. The previous
+ *     anchor (6.15, +1.0) measured 0.4016 rad from B2_SHELF's centre against a 0.410 limit — eight
+ *     thousandths INSIDE the water, invisible to every test in this repo and caught only because
+ *     the lane that owns the terrain said to check. This one clears the shelf by 0.051 and the
+ *     frozen pond by 0.321.
  */
-const EGG_THETA = 6.15
-const EGG_X = 1.0
+export const EGG_THETA = 6.15
+export const EGG_X = 0.8
 
 /**
  * How much of the winter wedge counts as "on frame".
