@@ -7,12 +7,17 @@ import {
   DRESS_MIN_VIEWPORT,
   DRESS_PHASE,
   DRESS_REACH,
+  DRIFT_BOB,
+  DRIFT_CYCLES,
+  DRIFT_ROLL,
   FACE_BOX,
   FIGURE_PHASE,
   MASCOT_BOX,
   NAV_PILL,
   PEEKER_CAST,
   PEEKER_DEPTH,
+  PEEKER_MAX_BOB,
+  PEEKER_MAX_SWAY,
   PEEKER_MIN_SIZE_FRAC,
   PEEKER_PRESENCE_PEAK,
   PEEKER_SIZE_FRAC,
@@ -29,6 +34,7 @@ import {
   peekerCastFor,
   peekerClock,
   peekerDepthMargin,
+  peekerDrift,
   peekerHalfHeight,
   peekerIdle,
   peekerPresence,
@@ -38,6 +44,7 @@ import {
   worldBlocked,
   type Side,
 } from '@/components/labs/small-world/scene/props/peeker-stage'
+import { PEEKER_SPECS } from '@/components/labs/small-world/scene/props/peeker-cast'
 
 /**
  * Task 56 — the checkpoint mascots' staging.
@@ -420,6 +427,78 @@ describe('idle', () => {
     expect(peekerUnroll(1)).toBe(1)
     expect(peekerRollSpin(1)).toBe(0)
     expect(peekerRollSpin(0)).toBeGreaterThan(0)
+  })
+})
+
+describe('the drift', () => {
+  // Task 62 — the penguin stands on an ice floe, and a floe drifts. This is the one motion in the
+  // rig that belongs to a COMPOSITION rather than to a character: the raft and the bird on it have
+  // to move as one object, so `peekers.tsx` gives both groups the same roll and the same heave.
+
+  it('is a pure function of the scroll dwell, like every other idle here', () => {
+    for (const t of [0, 0.13, 0.5, 0.77, 1]) {
+      expect(peekerDrift(t, 0)).toEqual(peekerDrift(t, 0))
+    }
+    expect(peekerDrift(0, 0).roll).toBe(0)
+    for (let t = 0; t <= 1; t += 0.02) {
+      const d = peekerDrift(t, 0.37)
+      expect(Math.abs(d.roll)).toBeLessThanOrEqual(DRIFT_ROLL + 1e-12)
+      expect(Math.abs(d.bob)).toBeLessThanOrEqual(DRIFT_BOB + 1e-12)
+    }
+  })
+
+  it('heaves and rolls out of phase, so it reads as water rather than as a mechanism', () => {
+    // A float that rolls and heaves on ONE sine is rigidly correlated and the eye reads that as a
+    // machine. The quarter-cycle lead is what a body on a passing swell does. Measured as the
+    // correlation between the two channels across a dwell: in lockstep it would be ±1.
+    let sum = 0
+    let n = 0
+    for (let t = 0; t <= 1; t += 0.002) {
+      const d = peekerDrift(t, 0)
+      sum += (d.roll / DRIFT_ROLL) * (d.bob / DRIFT_BOB)
+      n++
+    }
+    expect(Math.abs(sum / n), 'roll/heave correlation').toBeLessThan(0.2)
+  })
+
+  it('is slower than any character gesture, which is what makes it a raft and not a wobble', () => {
+    for (const spec of Object.values(PEEKER_SPECS)) {
+      expect(DRIFT_CYCLES, 'the raft outlasts every gesture on it').toBeLessThan(spec.cycles)
+    }
+  })
+
+  it('leaves the drifting figure inside the sway budget the envelope benches sweep', () => {
+    // The raft's roll ADDS to its passenger's own sway on the figure group, and `PEEKER_MAX_SWAY`
+    // is the amplitude `peekerNearestDepth` sweeps and `peeker-cast.test.ts` measures the envelopes
+    // at. So a kind that floats has to pay for the raft out of its own sway rather than on top of
+    // it — which is why the penguin's came down when it gained the floe. Without this pin the
+    // measured envelopes would quietly stop describing the poses the rig can actually produce.
+    for (const [kind, spec] of Object.entries(PEEKER_SPECS)) {
+      const total = spec.drifts ? spec.sway + DRIFT_ROLL : spec.sway
+      expect(total, `${kind} total roll`).toBeLessThanOrEqual(PEEKER_MAX_SWAY + 1e-12)
+    }
+    // ...and the budget is not slack: somebody still reaches it, or the sweep is pessimistic.
+    const reached = Math.max(
+      ...Object.values(PEEKER_SPECS).map((s) => (s.drifts ? s.sway + DRIFT_ROLL : s.sway))
+    )
+    expect(PEEKER_MAX_SWAY - reached).toBeLessThan(0.01)
+  })
+
+  it('keeps the heave inside the margins that already cover idle motion', () => {
+    // `peekerAnchor` bisects for the largest composition that CLEARS the world and the cards, so at
+    // the binding viewports the clearance is exactly zero — anything the rig does afterwards has to
+    // fit in a margin rather than in slack. Two margins cover it, and both are asserted in their
+    // own units rather than by restating the reasoning:
+    //
+    //  - the world's, `WORLD_MARGIN`, whose docblock names "the props' idle motion" as one of the
+    //    three things it exists for (the 0.055 rad sway lives there too, and is larger);
+    //  - the cards', `CARD_PAD`, which is in CSS pixels and therefore has to be checked at the
+    //    TALLEST frame, where a fraction of the half-height buys the most pixels.
+    const bobHalfHeights = PEEKER_MAX_BOB * PEEKER_SIZE_FRAC
+    expect(bobHalfHeights, 'heave against the world margin').toBeLessThan(WORLD_MARGIN)
+
+    const tallest = Math.max(...FRAMES.map(([, h]) => h))
+    expect(bobHalfHeights * (tallest / 2), 'heave in px against the card pad').toBeLessThan(CARD_PAD)
   })
 })
 

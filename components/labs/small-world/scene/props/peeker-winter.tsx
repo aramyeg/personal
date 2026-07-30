@@ -1,6 +1,6 @@
 import { PALETTE } from '../../palette'
 import type { ClayPart } from './clay-kit'
-import { cone, eye, facing, leafFan, limb, shag, sph, type V3 } from './peeker-kit'
+import { cone, cyl, eye, facing, leafFan, limb, shag, sph, type V3 } from './peeker-kit'
 import type { PeekerPiece } from './peeker-cast'
 
 /**
@@ -82,7 +82,17 @@ function icicle(at: V3, r: number, len: number, tone: string): ClayPart[] {
   ]
 }
 
-export function winterDressing(): ClayPart[] {
+/**
+ * THE BEAR'S HALF of the corner — snow-laden boughs, an icicle fringe and the drift it stands in.
+ *
+ * Unchanged in Task 62 except for its name. That is deliberate and it is worth stating: the whole
+ * white-bear carve-out (T61's B2 ruling) rests on two devices that live in THIS list — the cast
+ * shadow thrown forward into the drift and the dark spruce massed behind the head — and their
+ * measured numbers are the gate the figure ships under. Splitting the corner's dressing in two was
+ * an opportunity to "tidy" them; leaving them byte-identical is what keeps the bear's edge bench
+ * comparable across the round instead of re-opening a settled question.
+ */
+function bearDrift(): ClayPart[] {
   const parts: ClayPart[] = [
     ...limb(LOW_BOUGH, 0.055, 0.028, PALETTE.earth),
     ...limb(HIGH_BOUGH, 0.046, 0.02, PALETTE.earth),
@@ -201,6 +211,169 @@ export function winterDressing(): ClayPart[] {
   )
 
   return parts
+}
+
+// --- the penguin's floe -----------------------------------------------------
+
+/**
+ * THE PENGUIN'S HALF (Task 62). Aram: the penguin should be on a DRIFTING piece of ice, not under a
+ * pine like the bear.
+ *
+ * Until this round the two sides of this corner were one composition mirrored, so the bird stood in
+ * the bear's drift under the bear's boughs — the "same asset twice" read that T61's recast removed
+ * from the CAST, still fully intact in the SETTING. A floe fixes it with more than variety: it is
+ * the one staging in the whole set where the ground itself moves, which is what the drift signal in
+ * peeker-stage.ts is for.
+ *
+ * THREE THINGS THIS CORNER HAS TO DO THAT THE BEAR'S DOES NOT.
+ *
+ *  1. GIVE A CHARCOAL BIRD SOMETHING TO BE READ AGAINST. The bear is white and needs darkness
+ *     behind it; the penguin is the darkest figure in the winter cast and needs the opposite. So
+ *     there are no spruce masses here and no boughs — the raft under the bird is the palest thing
+ *     in the corner and the sky above it is left empty. Its warm bill and feet then have nothing
+ *     competing with them, which is the whole reason that note is spent here.
+ *  2. SHOW A WATERLINE. A raft is only a raft if you can see what it is floating in, and a pale
+ *     slab on a pale sky is a step. The sea is `polarSea`, deliberately the deepest value in the
+ *     corner: the ice reads because the water is dark, exactly as the drift's crests read because
+ *     `driftShade` sits under them.
+ *  3. CROP AT THE BOTTOM EDGE. `mascotCentre` pushes the character clear of the anchored edge by
+ *     the dressing's own reach, so a short raft would leave a band of sky between the ice and the
+ *     frame. The water runs off the bottom crop for that reason as much as for the picture.
+ *
+ * WHAT MAKES IT READ AS FLOATING RATHER THAN AS A WHITE ROCK: the slab is UNDERCUT. Its lit top is
+ * a wide flat cap, its waterline is a hard dark notch, and what shows below that notch is narrower
+ * than what shows above — a rock in water is wider at the bottom and ice is not. The two brash
+ * chunks beside it are the same shape at two smaller sizes, which is what says "this piece broke
+ * off something and so did those".
+ */
+const FLOE_TOP = -0.72
+/**
+ * Where the sea surface cuts the raft.
+ *
+ * WHY IT IS ONLY 0.08 BELOW THE ICE'S TOP, which is the number the first version of this corner got
+ * wrong. The composition is anchored to the frame's bottom edge, and the arithmetic in
+ * `mascotCentre` puts that edge at local y = −0.94: everything below that is thrown away. The
+ * penguin's feet are fixed at −0.69…−0.72, so the ice it stands on cannot move. That leaves 0.22 of
+ * frame between the ice and the crop to divide between ICE and WATER — and the first pass spent
+ * 0.14 of it on ice and 0.08 on sea, which came back from the capture as a snowdrift with a blue
+ * corner. It is now the other way round: a thin raft above a real band of water.
+ */
+const WATERLINE = -0.8
+
+/** One free-floating chunk of brash ice: a lit cap over a wet shelf, cut by the same waterline. */
+function brash(x: number, z: number, r: number, tilt: number): ClayPart[] {
+  return [
+    sph(r, PALETTE.snow, [x, WATERLINE - r * 0.5, z], [1.5, 0.7, 0.9], 8),
+    { ...sph(r * 0.6, PALETTE.frostShadow, [x - r * 0.5, WATERLINE - r * 0.35, z + r * 0.3], [1.2, 0.5, 0.8], 7), rot: [0, 0, tilt] as V3 },
+  ]
+}
+
+function penguinFloe(): ClayPart[] {
+  const parts: ClayPart[] = []
+
+  // THE FAR WATER, and this is what makes the corner a seascape rather than a strip.
+  //
+  // The anchor arithmetic leaves only 0.22 of a figure-height between the bird's feet and the frame
+  // crop — about 29 rendered pixels at 1600x900 — so a sea drawn only BELOW the ice is a sliver
+  // whatever else is done to it, which is exactly what the first two captures showed. But water
+  // further from the viewer sits HIGHER in frame, so the horizon does not have to obey the ice's
+  // waterline at all: it can run across behind the bird, and then the whole lower half of the
+  // corner is sea. Lighter than the near water, because distance washes a surface toward the sky.
+  const surfaceBand = (r: number, h: number, y: number, z: number, tone: string, seg = 8): ClayPart =>
+    cyl(r, r, h, tone, [0, y, z], [0, 0, Math.PI / 2], [1, 1, 0.5], seg)
+  parts.push(
+    surfaceBand(0.28, 1.34, -0.88, -0.3, PALETTE.iceDeep),
+    // the horizon's own bright rule
+    surfaceBand(0.014, 1.3, -0.607, -0.28, PALETTE.frostShadow, 6)
+  )
+
+  // ONE DISTANT BERG, standing on that horizon. It is the corner's only vertical, and it ties this
+  // staging to the icebergs the journey's own ending is now full of — the same ice, seen from the
+  // deck instead of from orbit.
+  parts.push(
+    cone(0.15, 0.28, PALETTE.ice, [-0.5, -0.6, -0.26], [0, 0, 0.12], [1, 1, 0.5], 7),
+    cone(0.1, 0.19, PALETTE.boughSnow, [-0.38, -0.63, -0.24], [0, 0, -0.14], [1, 1, 0.45], 6),
+    sph(0.16, PALETTE.frostShadow, [-0.47, -0.73, -0.24], [1.2, 0.2, 0.5], 9),
+    // and a second, much smaller and further along the same line, so the horizon has depth in it
+    cone(0.07, 0.13, PALETTE.ice, [0.42, -0.62, -0.26], [0, 0, -0.1], [1, 1, 0.5], 6)
+  )
+
+  // THE RAFT. A thin slab: its top is the line the bird stands on and its underside runs on down
+  // past the waterline, where the NEAR sea draws over it — see below.
+  parts.push(
+    sph(0.34, PALETTE.snow, [-0.02, -0.8, 0.08], [1.2, 0.26, 0.88], 12),
+    // the flat lit top, and the shaded far end so the cap is a plane with a far edge
+    sph(0.28, PALETTE.boughSnow, [0.0, -0.755, 0.14], [1.35, 0.14, 0.8], 12),
+    sph(0.16, PALETTE.frostShadow, [-0.34, -0.765, 0.02], [1.1, 0.2, 0.7], 10),
+    // THE BIRD'S CONTACT. A cast shadow pooled on the ice under the feet — the same device the bear
+    // gets, and needed for the same reason: without it a figure hovers over what it stands on. Kept
+    // in `driftShade` rather than the bear's deeper `bearCast`, because a charcoal bird already has
+    // its own value and does not need the corner's darkest note spent underneath it.
+    sph(0.22, PALETTE.driftShade, [-0.04, -0.735, 0.2], [1.2, 0.09, 0.34], 10)
+  )
+
+  // A pressure ridge and two shards breaking the raft's top line — the same job the bear's drift
+  // gives its ice shards, which is to stop an all-round-white mass reading as fog. They also give
+  // the floe a profile: a slab with nothing on it is a plate.
+  parts.push(
+    { ...sph(0.14, PALETTE.boughSnow, [-0.3, FLOE_TOP + 0.03, 0.02], [1.1, 0.4, 0.6], 9), rot: [0, 0, 0.16] as V3 },
+    cone(0.05, 0.2, PALETTE.ice, [-0.44, FLOE_TOP + 0.07, 0.06], [0, 0, 0.26], [1, 1, 0.7], 6),
+    cone(0.04, 0.15, PALETTE.iceDeep, [0.44, FLOE_TOP + 0.03, 0.08], [0, 0, -0.22], [1, 1, 0.7], 6)
+  )
+
+  // THE NEAR WATER, drawn FORWARD of everything above it, with its surface AT the raft's waterline.
+  // That is the whole trick, and it is the fix for the first version of this corner: water behind a
+  // raft is a backdrop the ice sits in front of, and the raft then has no draught at all. Water in
+  // FRONT of it occludes the submerged half, which is what a waterline IS — the ice is cut by the
+  // surface instead of resting on it.
+  //
+  // Fitted to the dressing envelope rather than drawn and then trimmed: `DRESS_REACH` allows 0.70
+  // outward, 0.76 inward and 1.20 below the mascot's origin, and an early pass at the water
+  // measured 0.78 and 1.54. Water is the easiest thing in a corner to draw too big, because it has
+  // no shape of its own to argue with.
+  //
+  // BOTH BANDS ARE SIDE-LAID CYLINDERS, NOT ELLIPSOIDS, and that is the other thing a capture
+  // corrected. An ellipsoid wide enough to span the corner still curves down at both ends, so its
+  // top edge is an arc — and an arc-topped blue mass beside a white one reads as a second floe
+  // rather than as water. A cylinder laid along X has a genuinely FLAT silhouette edge for its
+  // whole length (the extreme in the view direction runs parallel to the axis), which is the one
+  // thing a water surface has to have. Its ends crop against the frame, where a real horizon does.
+  parts.push(
+    surfaceBand(0.18, 1.3, -0.98, 0.26, PALETTE.polarSea),
+    // nearer water is darker: a second band in front and lower, so the surface has depth in it
+    surfaceBand(0.1, 1.24, -1.06, 0.3, PALETTE.polarSeaDeep),
+    // and the bright rule right at the waterline — the water's own edge against the ice
+    surfaceBand(0.012, 1.28, -0.792, 0.32, PALETTE.frostShadow, 6)
+  )
+
+  // Swell: four low crests riding the surface, each a different length and none parallel to its
+  // neighbour. An even row of wavelets is a knitted pattern rather than water.
+  for (const [x, y, z, r, w, tilt] of [
+    [-0.3, -0.85, 0.34, 0.14, 1.9, 0.06],
+    [0.28, -0.88, 0.34, 0.11, 2.2, -0.05],
+    [-0.02, -0.93, 0.34, 0.1, 1.7, 0.09],
+    [0.44, -0.83, 0.33, 0.08, 1.8, 0.04],
+  ] as const) {
+    parts.push({ ...sph(r, PALETTE.frostShadow, [x, y, z], [w, 0.1, 0.4], 9), rot: [0, 0, tilt] as V3 })
+  }
+
+  // Brash ice ON the water, in front of it, so the floe reads as one piece among many rather than
+  // as an island. Three sizes, none of them touching the raft.
+  parts.push(
+    ...brash(-0.5, 0.36, 0.11, 0.12),
+    ...brash(0.44, 0.36, 0.09, -0.1),
+    ...brash(0.1, 0.38, 0.07, 0.2)
+  )
+
+  return parts
+}
+
+/**
+ * The winter corner's dressing, per figure — a drift under a pine for the bear, an ice floe for the
+ * penguin. See `penguinFloe` for why the two sides could not stay one mirrored composition.
+ */
+export function winterDressing(kind: 'polarBear' | 'penguin'): ClayPart[] {
+  return kind === 'penguin' ? penguinFloe() : bearDrift()
 }
 
 // --- the polar bear ---------------------------------------------------------

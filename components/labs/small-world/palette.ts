@@ -251,4 +251,19 @@ export const PALETTE = {
   // has nothing to be lighter than, and the blocks laid over it are what read. Same lesson the
   // polar bear above is built on, applied to architecture instead of fur.
   iglooDoor: '#6B4A2E', // shadowed doorway and smoke hole — warm ochre PAINT, not a light
+
+  // Task 62 — the two corners whose SEATS were rebuilt, and the rule both were fitted to.
+  //
+  // A checkpoint corner is a figure read against its own dressing, and T61's own canyon finding was
+  // that an animal drawn in its setting's colour family camouflages into it. The two seats below are
+  // therefore chosen against their occupants rather than against their biomes: the eagle is the
+  // cast's DARKEST figure and was sitting on the darkest rock in the lab, so its nest is bleached
+  // mid-tone dead wood; the penguin's charcoal back wants water DEEPER than itself under it, so the
+  // floe's sea is the coldest, darkest note in the winter corner.
+  nestStick: '#9C8A6E', // eagle eyrie — sun-bleached grey-tan dead branch, deliberately OUT of the
+  // canyon's rust family so a stack of sticks never reads as one more course of strata
+  nestStickDeep: '#6B5B45', // the shadowed sticks inside the bowl, and the twig ends in its lee
+  polarSea: '#2F6C8C', // penguin floe — cold open polar water, well below iceDeep so a pale raft
+  // has something to sit ON rather than a band of the same value to dissolve into
+  polarSeaDeep: '#1E4E68', // the trough shadow under the floe's waterline and between the swells
 } as const

@@ -519,6 +519,60 @@ export function peekerIdle(t: number, cycles: number, phase: number): number {
   return Math.sin(TAU * (t * cycles + phase))
 }
 
+// --- the drift (Task 62) ----------------------------------------------------
+//
+// Aram asked for the penguin to stand on a DRIFTING piece of ice rather than in the bear's drift.
+// "Drifting" is a motion, and it is the only motion in this rig that belongs to a COMPOSITION
+// rather than to a character: the raft and the bird on it have to move as one object, or the bird
+// is skating on its own ice. So the drift is applied to the dressing group and the figure group
+// alike, and it is the only reason `place` takes a bob at all.
+//
+// It rides the panel dwell like every other idle, so it is a pure function of scroll position and
+// a scrub replays it exactly. Reduced motion drops it with the rest.
+
+/** Oscillations of the raft across the panel dwell — far slower than any character's gesture. */
+export const DRIFT_CYCLES = 1.25
+/** Roll amplitude (rad) of the raft, laid on top of its passenger's own sway. */
+export const DRIFT_ROLL = 0.024
+/** Heave amplitude, in figure-heights. */
+export const DRIFT_BOB = 0.014
+/**
+ * The heave leads the roll by a quarter cycle.
+ *
+ * Not decoration: a float that rolls and heaves on ONE sine is rigidly correlated, and the eye
+ * reads a rigid correlation as a mechanism rather than as water. A quarter-cycle offset is what a
+ * body on a passing swell actually does — it is highest as it crosses the crest, and rolling
+ * hardest a beat later on the face.
+ */
+export const DRIFT_HEAVE_LEAD = 0.25
+
+/**
+ * The raft's pose at a point in the dwell: a roll and a heave, both signed −1…1 amplitudes applied.
+ * Pure, so the drift is bit-reproducible in both scrub directions.
+ */
+export function peekerDrift(dwell: number, phase: number): { roll: number; bob: number } {
+  return {
+    roll: DRIFT_ROLL * peekerIdle(dwell, DRIFT_CYCLES, phase),
+    bob: DRIFT_BOB * peekerIdle(dwell, DRIFT_CYCLES, phase + DRIFT_HEAVE_LEAD),
+  }
+}
+
+/**
+ * Largest heave the rig will ever apply to a whole composition, in figure-heights.
+ *
+ * WHY THIS DOES NOT NEED ITS OWN CLEARANCE PASS, stated rather than assumed. `peekerAnchor`
+ * bisects for the largest composition that CLEARS the world and the cards, so at the binding
+ * viewports the clearance is exactly zero and any extra motion would eat into it. The rig already
+ * moves compositions after that decision, though — `PEEKER_MAX_SWAY` rolls them by up to 0.055 rad
+ * — and what covers that is `WORLD_MARGIN`, whose own docblock names "the props' idle motion" as
+ * one of the three things it is for. The heave is smaller than the sway it sits beside: at the
+ * largest mascot (`PEEKER_SIZE_FRAC` of the half-height) it displaces
+ * `DRIFT_BOB · PEEKER_SIZE_FRAC` = 0.0064 half-heights, against a 0.045 margin. The equivalent
+ * card bound is `CARD_PAD`, and peeker-stage.test.ts pins both in the units they are expressed in
+ * rather than restating this paragraph.
+ */
+export const PEEKER_MAX_BOB = DRIFT_BOB
+
 // --- pangolin roll ----------------------------------------------------------
 /** Reveal window over which a pangolin unfurls from its ball, just after it parks. */
 export const PEEK_UNROLL_START = 0.72

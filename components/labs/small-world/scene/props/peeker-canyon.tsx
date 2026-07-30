@@ -112,7 +112,12 @@ const SPIRE: readonly (readonly [number, number, number, string])[] = [
 /** Two dusty greens — a canyon scrub is never the jungle's saturated leaf. */
 const SCRUB = [PALETTE.reedGreen, PALETTE.palmFrond, PALETTE.reedGreen]
 
-export function canyonDressing(): ClayPart[] {
+/**
+ * THE PANGOLIN'S HALF of the corner — the banded shelf under the hoodoo. Unchanged in Task 62
+ * apart from its name: it is the composition the light-figure pass was tuned against (33% rock to
+ * 18% animal, measured), and the animal it was tuned FOR still stands on it.
+ */
+function pangolinLedge(): ClayPart[] {
   const parts: ClayPart[] = []
 
   // The shadowed recess the figure is read against: a MOUND behind the animal's body, cresting
@@ -234,6 +239,232 @@ export function canyonDressing(): ClayPart[] {
   )
 
   return parts
+}
+
+// --- the eagle's eyrie ------------------------------------------------------
+
+/**
+ * THE EAGLE'S HALF (Task 62). Aram: the eagle should have a NEST, not the same cliff as the
+ * pangolin.
+ *
+ * The corner used to be one composition mirrored, so the raptor perched on the pangolin's shelf
+ * with the pangolin's hoodoo behind it — the setting repeated even after T61 stopped the cast from
+ * repeating. What replaces it is a STACK NEST on a crag, and three of its decisions are corrections
+ * rather than choices:
+ *
+ *  1. THE VALUE SCHEME IS INVERTED. The ledge is built as "a LIGHT figure on a DARK field", which
+ *     is right for a pale armoured animal and exactly wrong for the darkest figure in the cast. The
+ *     eagle was a cold umber bird on `strataShade`/`earthDeep` rock — dark on dark, which is a
+ *     large part of why the review kept reading it as a hunched lump. So the shadow mound behind
+ *     the body is gone, the rock under it runs in the LIGHTER half of the canyon family, and the
+ *     nest itself is bleached wood: the bird is now the darkest thing in its own corner and its
+ *     outline is drawn by the contrast rather than by the ink alone.
+ *  2. THE VERTICAL IS THE CRAG, NOT A HOODOO. A spire behind the shoulder AND a tower under the
+ *     nest would be two verticals fighting; and a hoodoo here would be the pangolin's own prop,
+ *     reflected, which is the read this split exists to remove. The crag rises off the bottom crop
+ *     to the nest, so the eyrie is HIGH — which is the one thing everybody knows about an eagle's.
+ *  3. THE STICKS POKE OUT. A nest drawn as a bowl is a bowl; what makes it a nest is that its
+ *     construction is visible at the edges, so the rim twigs project past the silhouette on every
+ *     side and a few of them stick out well beyond it. This renderer cannot draw texture INSIDE a
+ *     silhouette (the standing lesson in `shag`), so the nest has to be built out of its material.
+ *
+ * The eggs are the corner's one soft note, and they sit outboard of the bird where its own body
+ * never covers them.
+ */
+
+/** Top of the nest's rim — the line the eagle's talons grip, and the level everything is placed at. */
+const NEST_RIM = LEDGE_TOP
+
+/**
+ * A ring of laid twigs around an ellipse: each one a short cylinder rolled to the local TANGENT, so
+ * the sticks lie the way a bird weaves them rather than radiating like a sunburst.
+ *
+ * Lengths and radii step through a fixed trig sequence rather than a random one — deterministic,
+ * and it also stops the ring reading as a machined collar, which a run of identical sticks does.
+ */
+function twigRing(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  z: number,
+  n: number,
+  from: number,
+  to: number,
+  len: number,
+  tones: readonly string[]
+): ClayPart[] {
+  const out: ClayPart[] = []
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1)
+    const a = from + (to - from) * f
+    const l = len * (0.78 + 0.34 * Math.sin(i * 2.2 + 0.7))
+    const thick = 0.019 + 0.009 * Math.sin(i * 1.6)
+    // the tangent of the ellipse at angle a, which is what a laid stick lies along
+    const tangent = Math.atan2(ry * Math.cos(a), -rx * Math.sin(a))
+    out.push(
+      cyl(
+        thick,
+        thick * (0.8 + 0.3 * Math.sin(i * 3.1)),
+        l,
+        tones[i % tones.length],
+        [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, z + 0.02 * Math.sin(i * 1.9)],
+        [0, 0, tangent + Math.PI / 2 + 0.12 * Math.sin(i * 2.7)],
+        undefined,
+        6
+      )
+    )
+  }
+  return out
+}
+
+function eagleEyrie(): ClayPart[] {
+  const parts: ClayPart[] = []
+
+  // THE CRAG, bottom-up. It narrows as it rises and each mass steps a little inboard of the one
+  // below, so the tower leans into the frame instead of standing as a straight post at the edge.
+  // Tones climb OUT of shadow with height, which is what a stack in a gorge at low sun does and
+  // what leaves the pale rock right under the nest, where it does the most work.
+  //
+  // Every mass below is fitted to the dressing envelope rather than drawn and then trimmed:
+  // `DRESS_REACH.out` is 0.7 outward and the composition may reach 1.20 below the mascot's origin,
+  // and a first pass at this crag measured 0.94 and 1.44.
+  //
+  // The crag is also SHORTER than the first sketch, and that was a capture's verdict rather than
+  // the envelope's: at full height it disappeared entirely behind the nest, so the eyrie sat on
+  // nothing. It now tops out well below the nest's underside, which is what lets the nest OVERHANG
+  // it — the read that says a bird built this on a crag rather than that a crag grew a bowl.
+  parts.push(
+    sph(0.34, PALETTE.strataShade, [-0.18, -1.02, -0.1], [1.1, 0.44, 0.42], 11),
+    sph(0.32, PALETTE.hoodooRock, [-0.18, -0.93, -0.09], [1.1, 0.4, 0.42], 10),
+    sph(0.28, PALETTE.rust, [-0.16, -0.8, -0.08], [1.15, 0.42, 0.42], 10),
+    sph(0.24, PALETTE.strataDust, [-0.14, -0.66, -0.07], [1.1, 0.4, 0.42], 10),
+    // the crag's shadowed inner face, so the tower turns instead of reading as a flat card
+    sph(0.18, PALETTE.earthDeep, [0.04, -0.86, -0.14], [0.6, 1.3, 0.3], 9),
+    // and its sunlit outer edge, the one light line, kept OUTBOARD of the bird's own outline
+    sph(0.12, PALETTE.hoodooCap, [-0.42, -0.82, -0.05], [0.45, 1.9, 0.35], 9)
+  )
+
+  // Two bedding courses cut across the crag — the canyon's own vocabulary, kept to the pale end and
+  // low enough that they never run behind the bird.
+  parts.push(
+    rockBed([-0.22, -0.98, 0.045, 0.22, 0.05, PALETTE.strataDust], 0.07, 0.02),
+    rockBed([-0.2, -0.72, 0.036, 0.18, -0.04, PALETTE.hoodooCap], 0.06, 0.03)
+  )
+
+  // THE NEST IS BUILT OUT OF STICKS, and it took two failed captures to accept how literally that
+  // has to be meant. Both earlier passes gave it a MASS — first a wide flattened bowl, then a
+  // lumpier mound — with twigs laid round the top. Both came back as a brown TABLE with a bird
+  // standing on it, and for the same reason each time: a smooth ellipsoid under a four-band ramp
+  // is one flat field of colour, this camera is straight-on, and a flat field with a curved edge is
+  // a tabletop no matter what is scattered on it.
+  //
+  // So there is almost no mass here now. What there is is a small dark CORE, mostly covered, and
+  // three rings of twigs at three depths that ARE the nest: the front ring crosses in front of the
+  // core, the back ring stands behind it, and between them there is the dip. The silhouette is
+  // consequently made of stick ends, which is the read — a nest is recognised by its edges.
+  parts.push(
+    sph(0.3, PALETTE.nestStickDeep, [-0.05, -0.42, 0.0], [1.15, 0.5, 0.55], 10),
+    sph(0.24, PALETTE.earthDeep, [-0.05, -0.5, -0.02], [1.2, 0.4, 0.5], 9)
+  )
+
+  // The BACK ring, standing behind the core: these are the twigs seen over the far rim.
+  parts.push(
+    ...twigRing(-0.05, -0.42, 0.4, 0.13, -0.16, 10, Math.PI - 0.35, 2 * Math.PI + 0.35, 0.22, [
+      PALETTE.nestStickDeep,
+      PALETTE.nestStick,
+    ])
+  )
+
+  // THE DIP: a shallow dark crescent along the top, set back in z. It is the whole of the bowl, and
+  // being a LINE rather than a field is what keeps it from becoming a tabletop again.
+  parts.push(
+    sph(0.28, PALETTE.earthDeep, [-0.1, NEST_RIM - 0.015, -0.05], [1.2, 0.12, 0.45], 10),
+    // the soft lining banked where the eggs sit, just catching the light over the dark
+    sph(0.15, PALETTE.sinter, [-0.3, NEST_RIM - 0.05, -0.01], [1.2, 0.2, 0.55], 9)
+  )
+
+  // TWO EGGS, outboard of the bird so its own body never covers them, and sitting high enough in the
+  // dip to break the rim line — an egg wholly inside a nest is an egg nobody sees. Dull ivory with a
+  // rust speckle each: an eagle's egg is not white, and the speckle stops them reading as pebbles.
+  for (const [x, y, z, r] of [
+    [-0.3, -0.255, 0.0, 0.058],
+    [-0.41, -0.268, -0.04, 0.05],
+  ] as const) {
+    parts.push(
+      sph(r, PALETTE.mammothTusk, [x, y, z], [0.86, 1.0, 0.86], 10),
+      sph(r * 0.3, PALETTE.rust, [x + r * 0.36, y + r * 0.3, z + r * 0.7], [1.2, 0.9, 0.5], 7)
+    )
+  }
+
+  // The MIDDLE and FRONT rings. The front one is laid lower than the perch line so the bird's feet
+  // and the eggs both show over it, and it is what turns the dip into an opening with a lip.
+  parts.push(
+    ...twigRing(-0.05, -0.44, 0.38, 0.15, 0.04, 12, Math.PI - 0.4, 2 * Math.PI + 0.4, 0.26, [
+      PALETTE.nestStick,
+      PALETTE.nestStickDeep,
+      PALETTE.sinter,
+    ]),
+    ...twigRing(-0.04, -0.46, 0.34, 0.14, 0.22, 9, Math.PI - 0.15, 2 * Math.PI + 0.15, 0.24, [
+      PALETTE.nestStick,
+      PALETTE.nestStickDeep,
+    ])
+  )
+
+  // Sticks laid ACROSS the rim, nearly horizontal — the weave, and the only place the nest's own
+  // construction crosses the bird's own outline.
+  for (const [x, y, z, len, ang, tone] of [
+    [-0.16, -0.3, 0.28, 0.34, -0.14, PALETTE.nestStick],
+    [0.14, -0.33, 0.26, 0.28, 0.16, PALETTE.nestStickDeep],
+    [-0.34, -0.34, 0.24, 0.26, 0.1, PALETTE.nestStick],
+  ] as const) {
+    parts.push(cyl(0.021, 0.016, len, tone, [x, y, z], [0, 0, ang + Math.PI / 2], undefined, 6))
+  }
+
+  // STICKS BREAKING THE SILHOUETTE — long, chunky and angled every which way, several jutting well
+  // past the mass where there is sky behind them.
+  for (const [x, y, z, len, ang, tone] of [
+    [-0.44, -0.36, 0.14, 0.32, 0.3, PALETTE.nestStick],
+    [-0.5, -0.5, 0.04, 0.26, -0.24, PALETTE.nestStickDeep],
+    [0.4, -0.34, 0.12, 0.28, -0.42, PALETTE.nestStick],
+    [0.46, -0.5, 0.02, 0.22, 0.2, PALETTE.nestStickDeep],
+    [0.2, -0.6, 0.16, 0.24, 1.26, PALETTE.nestStick],
+    [-0.28, -0.62, 0.14, 0.22, 1.44, PALETTE.nestStickDeep],
+    [0.06, -0.64, 0.1, 0.26, 0.42, PALETTE.nestStick],
+    [-0.42, -0.56, 0.16, 0.24, -0.5, PALETTE.nestStick],
+  ] as const) {
+    parts.push(cyl(0.023, 0.017, len, tone, [x, y, z], [0, 0, ang + Math.PI / 2], undefined, 6))
+  }
+
+  // The bird's own contact shadow, pooled into the rim it grips. Same job as the pangolin's on the
+  // shelf: without it a figure is pasted onto its perch rather than standing on it.
+  parts.push(sph(0.24, PALETTE.earthDeep, [-0.05, NEST_RIM - 0.015, 0.15], [1.15, 0.1, 0.34], 9))
+
+  // Dry scrub rooted in the crag's cracks — the canyon note, and it breaks the tower's long edge.
+  parts.push(
+    ...limb([[-0.34, -0.95, 0.08], [-0.39, -0.88, 0.08], [-0.42, -0.8, 0.09]], 0.02, 0.011, PALETTE.clayPath),
+    ...leafFan([-0.42, -0.78, 0.09], 5, 0.18, [1.4, 3.2], SCRUB, undefined, 0.26),
+    ...limb([[0.16, -0.98, 0.06], [0.22, -0.92, 0.06], [0.25, -0.86, 0.07]], 0.018, 0.01, PALETTE.clayPath),
+    ...leafFan([0.25, -0.84, 0.07], 4, 0.16, [0.1, 1.5], SCRUB, undefined, 0.26)
+  )
+
+  // A couple of fallen stones at the crag's foot, low-segment so they facet like the ledge's do.
+  parts.push(
+    sph(0.075, PALETTE.stone, [0.3, -1.02, 0.12], [1.2, 0.8, 1], 7),
+    sph(0.05, PALETTE.sinterDeep, [0.44, -1.08, 0.1], [1.1, 0.85, 1], 6),
+    sph(0.06, PALETTE.hoodooRock, [-0.52, -1.04, 0.08], [1.15, 0.85, 1], 7)
+  )
+
+  return parts
+}
+
+/**
+ * The canyon corner's dressing, per figure — the banded shelf for the pangolin that was drawn on
+ * it, a stick eyrie on a crag for the eagle. See `eagleEyrie` for why one mirrored composition
+ * could not serve both.
+ */
+export function canyonDressing(kind: 'pangolinBig' | 'eagle'): ClayPart[] {
+  return kind === 'eagle' ? eagleEyrie() : pangolinLedge()
 }
 
 // --- pangolins --------------------------------------------------------------
@@ -561,14 +792,18 @@ function pangolinTail(p: Pangolin, d: 1 | -1): ClayPart[] {
  * pangolin." The roll-in beat stays with the animal that owns it; what this corner gains is a
  * second species and a vertical.
  *
- * WHERE IT PERCHES, and it is not where the brief's first suggestion pointed. The obvious staging
- * is the hoodoo — a raptor on a spire is the picture everybody has in their head. It is illegal
- * here: the spire stands at x ≈ −0.46…−0.52 and `FACE_BOX` stops the head at −0.20, because a
- * cropped face is the defect this whole rework exists to remove. An eagle perched out there would
- * have to crane its head back inboard by a third of a figure-height, which is a contortion, not a
- * pose. So it stands on the SHELF — the one course that still runs the corner's full width, the
- * surface both animals were already seated on — with the hoodoo behind its shoulder where a spire
- * belongs in a composition rather than under a bird.
+ * WHERE IT PERCHES (Task 62): its own NEST, on its own crag — see `eagleEyrie`. It used to stand on
+ * the pangolin's shelf, which was the only surface the corner had, and that made the pair one
+ * composition mirrored.
+ *
+ * The one thing that did NOT change with the seat is the level: `PERCH_Y` is still `LEDGE_TOP`, so
+ * the talons grip the nest's rim exactly where they used to grip the shelf's lip. Keeping the
+ * contact line put the whole rebuild below into the dressing where it belongs, and left the figure
+ * free to be judged on its own proportions — which is the other half of this round's work.
+ *
+ * (The hoodoo remains illegal as a perch, for the record, and for the same reason it always was:
+ * the spire stands at x ≈ −0.46…−0.52 while `FACE_BOX` stops the head at −0.20, so a bird up there
+ * would have to crane a third of a figure-height back inboard. That is a contortion, not a pose.)
  *
  * WHY IT IS A COLD BROWN. The canyon's own review finding was that the first pangolin "camouflages
  * into its own dressing" because animal and rock shared a family, and the fix was to put a light
@@ -583,6 +818,31 @@ function pangolinTail(p: Pangolin, d: 1 | -1): ClayPart[] {
  * breaking the outline, the HOOKED beak, the heavy overhanging BROW (the thing that makes an
  * eagle's eye fierce rather than owlish), and the TALONS gripping the rock. Everything else is
  * subordinate.
+ *
+ * ...AND FOR TWO ROUNDS IT DID NOT, WHICH IS WHAT TASK 62 IS FOR. The R18 review's verdict after
+ * the head was rebuilt was that "the dodo is gone; it now reads VULTURE", and it diagnosed the
+ * remaining fault precisely: the head was correct and the SILHOUETTE was still two large round
+ * lobes — the body and the folded wing — which no head fix can overcome. It named the lever as
+ * `eagleBody`'s proportions and required a follow-up rather than a third head tweak.
+ *
+ * THE REBALANCE, and it is three separate moves because the fault was three things at once:
+ *
+ *  1. THE BODY IS NARROWER, NOT SMALLER. Simply shrinking it would have made a small fat bird. The
+ *     main mass loses about a quarter of its WIDTH and only a seventh of its height, and the mass
+ *     under it tapers harder to the vent, so the outline is an upright teardrop instead of a ball.
+ *     Width is what read as bulk; height is what reads as a perched raptor standing tall.
+ *  2. THE HEAD AND SHOULDERS WIN. The skull is about a fifth larger in every dimension and the
+ *     mantling shoulders crest higher over the nape. Together with (1) the head goes from roughly
+ *     half the body's height to about two thirds of it, which is the proportion that reads as a
+ *     raptor rather than as a pigeon — a real eagle's head is smaller than this, and drawing it
+ *     honestly at 300px is what produced the lump.
+ *  3. THE TAIL IS LONGER AND IT HANGS. A raptor perched has a long tail behind and below the feet;
+ *     the first build's was a short squared fan sticking straight out, which read as another lobe
+ *     rather than as a counterweight. It is now six feathers on a wider sweep, angled down, with
+ *     the dark terminal band at its end — and the extra length is spent DOWNWARD, where the
+ *     envelope has 0.57 of unused reach, rather than outward where it has almost none.
+ *
+ * The wing's own share of the fix is in `eagleWing`.
  */
 
 /** Where the wing hinges off the shoulder, and where the eagle's feet meet the shelf. */
@@ -641,29 +901,31 @@ function eagleBody(d: 1 | -1): ClayPart[] {
     // than by taste: a feather is placed at its own half-length and then runs a full length beyond,
     // so the origin has to sit a whole feather clear of the limit, not half of one. The first pass
     // put it at x = −0.40 and the tip measured −0.769 against a 0.68 box.
-    ...primaries([-0.3, 0.08, -0.16], 5, 3.35, 3.95, 0.24, PALETTE.eagleDeep),
-    sph(0.15, PALETTE.eagleDeep, [-0.24, 0.14, -0.14], [1.25, 0.78, 0.4], 12),
+    ...primaries([-0.26, 0.09, -0.16], 5, 3.38, 3.9, 0.22, PALETTE.eagleDeep),
+    sph(0.13, PALETTE.eagleDeep, [-0.21, 0.15, -0.14], [1.2, 0.66, 0.36], 12),
 
-    // TAIL: a squared fan swept back and down, banded at its end. A raptor's tail is short and
-    // broad, and squaring it off is what keeps it from reading as a pheasant's.
-    ...primaries([-0.3, -0.1, -0.06], 5, 3.25, 3.62, 0.34, PALETTE.eagleWing),
-    sph(0.1, PALETTE.eagleDeep, [-0.44, -0.2, -0.07], [1.5, 0.5, 0.4], 10),
+    // TAIL: six feathers on a wide sweep, angled back and DOWN past the feet, with a dark terminal
+    // band across the end. Long rather than square — see (3) above; the short fan the first build
+    // used read as a second body lobe, and the length is what turns it into a counterweight.
+    ...primaries([-0.15, -0.16, -0.07], 6, 3.45, 3.85, 0.42, PALETTE.eagleWing),
+    { ...sph(0.09, PALETTE.eagleDeep, [-0.46, -0.44, -0.08], [1.7, 0.4, 0.4], 10), rot: [0, 0, 0.55] as V3 },
 
-    // BODY: a heavy upright teardrop — broad at the shoulders, narrowing to the vent. Set upright
+    // BODY: an upright teardrop, NARROW at the shoulders and tapering to the vent. Set upright
     // rather than horizontal because a perched bird stands, and because the corner's other animal
-    // is a low round ball and the pair needs one vertical between them.
-    sph(0.2, PALETTE.eagleWing, [-0.09, 0.08, 0.0], [0.92, 1.2, 0.9], 14),
-    sph(0.145, PALETTE.eagleWing, [-0.135, -0.12, -0.01], [0.95, 0.95, 0.88], 12),
+    // is a low round ball and the pair needs one vertical between them. The width is the whole
+    // argument — see (1) in the docblock.
+    sph(0.175, PALETTE.eagleWing, [-0.075, 0.06, 0.0], [0.8, 1.16, 0.86], 14),
+    sph(0.118, PALETTE.eagleWing, [-0.115, -0.135, -0.01], [0.86, 0.95, 0.85], 12),
     // the breast, forward and a touch lighter, so the bird has a front as well as an outline
-    sph(0.13, PALETTE.eagleWing, [0.015, 0.05, 0.14], [0.72, 1.1, 0.45], 12),
-    sph(0.13, PALETTE.eagleDeep, [-0.16, -0.02, 0.1], [0.62, 1.25, 0.45], 12),
+    sph(0.115, PALETTE.eagleWing, [0.01, 0.045, 0.13], [0.66, 1.12, 0.44], 12),
+    sph(0.115, PALETTE.eagleDeep, [-0.135, -0.03, 0.09], [0.6, 1.25, 0.44], 12),
     // scapular coverts stepping down the back — the drawn break that stops the body being one egg
     ...[
-      [-0.2, 0.17, 0.055],
-      [-0.25, 0.05, 0.05],
-      [-0.27, -0.07, 0.045],
+      [-0.165, 0.16, 0.05],
+      [-0.2, 0.045, 0.045],
+      [-0.215, -0.06, 0.038],
     ].map(([x, y, r]) => ({
-      ...sph(r, PALETTE.eagleDeep, [x, y, 0.06], [1.5, 0.66, 0.5], 8),
+      ...sph(r, PALETTE.eagleDeep, [x, y, 0.055], [1.5, 0.66, 0.5], 8),
       rot: [0, 0, 0.5] as V3,
     })),
 
@@ -671,7 +933,7 @@ function eagleBody(d: 1 | -1): ClayPart[] {
     // bare yellow tarsi and four toes wrapped OVER the shelf's edge. Toes that end on top of a
     // surface read as feet resting near it; toes that curl down its front read as a grip, and the
     // grip is what ties the bird to the rock.
-    sph(0.1, PALETTE.eagleWing, [-0.05, -0.16, 0.14], [0.9, 1.1, 0.7], 10),
+    sph(0.095, PALETTE.eagleWing, [-0.045, -0.175, 0.13], [0.86, 1.06, 0.68], 10),
     cyl(0.028, 0.032, 0.09, PALETTE.goldSand, [-0.035, PERCH_Y + 0.08, 0.17], [0, 0, 0.06]),
     cyl(0.026, 0.03, 0.08, PALETTE.goldSand, [-0.145, PERCH_Y + 0.075, 0.1], [0, 0, 0.09]),
     ...[
@@ -698,73 +960,81 @@ function eagleBody(d: 1 | -1): ClayPart[] {
     //  3. THE HEAD SAT ON TOP OF THE BODY. A perched raptor MANTLES: the shoulders carry above the
     //     neck's base so the head is set forward and DOWN between them. That hunch is the raptor
     //     silhouette; a head balanced on a round body is a dodo's.
-    sph(0.09, PALETTE.eagleNape, [0.01, 0.27, 0.06], [0.85, 1.0, 0.85], 12),
-    ...tufts([0.0, 0.27, 0.02], 0.12, 6, PALETTE.eagleNape, 0.45, 1.45, 0.5),
+    sph(0.088, PALETTE.eagleNape, [0.02, 0.3, 0.06], [0.85, 1.0, 0.85], 12),
+    ...tufts([0.01, 0.3, 0.02], 0.12, 6, PALETTE.eagleNape, 0.45, 1.45, 0.5),
     // the shoulders MANTLING above the neck's base — the hunch, in two dark masses that crest
-    // higher than the nape does
-    sph(0.14, PALETTE.eagleWing, [-0.13, 0.33, 0.0], [1.1, 0.72, 0.7], 12),
-    sph(0.1, PALETTE.eagleDeep, [-0.2, 0.29, 0.06], [1.05, 0.66, 0.55], 10),
-    // the skull, wider than tall and set FORWARD of the neck
-    sph(0.13, PALETTE.eagleNape, [0.1, 0.44, 0.07], [1.15, 0.9, 0.94], 14),
+    // higher than the nape does. Raised in T62: over a narrower body the mantle has to carry more
+    // of the figure's width, or the bird reads as narrow-shouldered rather than as hunched.
+    sph(0.145, PALETTE.eagleWing, [-0.115, 0.355, 0.0], [1.12, 0.7, 0.68], 12),
+    sph(0.1, PALETTE.eagleDeep, [-0.185, 0.315, 0.055], [1.05, 0.66, 0.55], 10),
+    // the skull, wider than tall and set FORWARD of the neck — about a fifth larger than the first
+    // build's, which is the other half of the head-to-body rebalance
+    sph(0.15, PALETTE.eagleNape, [0.11, 0.465, 0.07], [1.16, 0.92, 0.94], 14),
     // THE FLAT CROWN, in the dark tone: a low slab across the top of the skull, running BACK past
     // the nape. The straight line is the point — it is what a dome cannot give.
-    { ...sph(0.115, PALETTE.eagleWing, [0.075, 0.5, 0.05], [1.1, 0.22, 0.7], 12), rot: [0, 0, 0.13] as V3 },
+    { ...sph(0.128, PALETTE.eagleWing, [0.085, 0.535, 0.05], [1.1, 0.22, 0.7], 12), rot: [0, 0, 0.13] as V3 },
 
     // THE BROW, heavier and further forward than the first pass: a raptor's supraorbital ridge
     // OVERHANGS the eye and throws it into shadow, and that shelf is the glare. Drawn in ink
     // because at reading size a shaded ridge is invisible and a drawn one is not.
+    //
+    // EVERY FEATURE BELOW MOVED WITH THE SKULL, and it moved by ARITHMETIC rather than by eye: the
+    // whole face is the old placement scaled 1.17 about the skull's own centre, which is the ratio
+    // the skull itself grew by. Nudging a brow and a beak into a bigger head one part at a time is
+    // how a face drifts out of proportion with itself — the pangolin's two builds are documented
+    // next door as deriving from `skullR` and `snoutLen` for exactly this reason.
     ...limb(
       [
-        [0.215, 0.487, 0.135],
-        [0.13, 0.508, 0.155],
-        [0.03, 0.495, 0.13],
+        [0.2446, 0.52, 0.135],
+        [0.1451, 0.5446, 0.155],
+        [0.0281, 0.5294, 0.13],
       ],
-      0.021,
-      0.027,
+      0.024,
+      0.031,
       PALETTE.ink
     ),
     // A pale orbital patch for the eye to be read AGAINST. Without it the eye is a dark bead under
     // a dark brow on a dark head — three darks in a row, and the glare disappears into them. This
     // is the same device the penguin's face patch does in the winter corner.
-    { ...sph(0.062, PALETTE.eagleNape, [0.14, 0.44, 0.135], [1.15, 0.85, 0.6], 10), rot: [0, 0, 0.1] as V3 },
+    { ...sph(0.072, PALETTE.eagleNape, [0.157, 0.465, 0.135], [1.15, 0.85, 0.6], 10), rot: [0, 0, 0.1] as V3 },
     // The eye, set UNDER the shelf and forward. Small and hard: a big round eye is an owl's, and a
     // small one tucked under a brow is what reads as a glare.
-    ...eye([0.135, 0.436, 0.15], 0.042, { sclera: PALETTE.honey, iris: PALETTE.ink }),
+    ...eye([0.151, 0.46, 0.15], 0.049, { sclera: PALETTE.honey, iris: PALETTE.ink }),
     // a dark cheek stripe running back from the eye, which is what stops the face reading as blank
-    { ...sph(0.06, PALETTE.eagleWing, [0.055, 0.415, 0.12], [1.5, 0.34, 0.6], 8), rot: [0, 0, 0.12] as V3 },
+    { ...sph(0.07, PALETTE.eagleWing, [0.057, 0.436, 0.12], [1.5, 0.34, 0.6], 8), rot: [0, 0, 0.12] as V3 },
 
     // THE BEAK: a WEDGE and a HOOK, not a chain of beads.
     // The cere first — a stepped base in the dark tone, which is what makes the bill look SET INTO
     // the face rather than stuck on it.
-    { ...sph(0.055, PALETTE.eagleDeep, [0.185, 0.418, 0.14], [0.8, 1.0, 0.85], 10), rot: [0, 0, 0.2] as V3 },
+    { ...sph(0.064, PALETTE.eagleDeep, [0.2095, 0.439, 0.14], [0.8, 1.0, 0.85], 10), rot: [0, 0, 0.2] as V3 },
     // the upper mandible, tapering forward and down
     ...limb(
       [
-        [0.19, 0.412, 0.145],
-        [0.255, 0.392, 0.145],
-        [0.3, 0.368, 0.14],
+        [0.2153, 0.4322, 0.145],
+        [0.2914, 0.4088, 0.145],
+        [0.344, 0.3808, 0.14],
       ],
-      0.052,
-      0.03,
+      0.061,
+      0.035,
       PALETTE.goldSand
     ),
     // THE HOOK — a separate cone swung down BELOW the jaw line and coming to a point. This is the
     // single piece that decides raptor or dodo, so it is drawn long enough to overhang.
-    cone(0.03, 0.115, PALETTE.goldSand, [0.312, 0.318, 0.138], [0, 0, 3.32], [1, 1, 0.85], 8),
+    cone(0.035, 0.135, PALETTE.goldSand, [0.358, 0.322, 0.138], [0, 0, 3.32], [1, 1, 0.85], 8),
     // the short lower mandible, tucked under the hook's overhang
-    { ...sph(0.036, PALETTE.goldSand, [0.245, 0.352, 0.15], [1.35, 0.5, 0.8], 10), rot: [0, 0, 0.14] as V3 },
+    { ...sph(0.042, PALETTE.goldSand, [0.28, 0.362, 0.15], [1.35, 0.5, 0.8], 10), rot: [0, 0, 0.14] as V3 },
     // the gape line and one ink nostril on the cere
     ...limb(
       [
-        [0.29, 0.355, 0.16],
-        [0.215, 0.372, 0.17],
-        [0.155, 0.386, 0.155],
+        [0.3323, 0.3655, 0.16],
+        [0.2446, 0.3854, 0.17],
+        [0.1744, 0.4018, 0.155],
       ],
-      0.008,
-      0.012,
+      0.009,
+      0.014,
       PALETTE.ink
     ),
-    sph(0.011, PALETTE.ink, [0.195, 0.424, 0.185], undefined, 6),
+    sph(0.013, PALETTE.ink, [0.2212, 0.4463, 0.185], undefined, 6),
   ])
 }
 
@@ -776,6 +1046,21 @@ function eagleBody(d: 1 | -1): ClayPart[] {
  * long primaries at the tip. The bands step DARKER outward (`eagleWing` → `eagleDeep`), which is
  * both what a real wing does and what stops the whole limb reading as one flat paddle once the ramp
  * has flattened its interior.
+ *
+ * TASK 62 — IT HANGS DOWN THE FLANK NOW, AND THAT IS THE WHOLE FIX. The R18 review's blocking
+ * finding was that the outline was "two large round lobes, body and folded wing". I first answered
+ * only the roundness — flattening the coverts into a plane with a drawn leading edge — and the
+ * capture showed why that was half the problem: the blade still ran OUTWARD from the shoulder,
+ * roughly horizontally, so a flatter version of it read as a stiff plank sticking out of the bird
+ * at both ends of the gesture. A wing that leaves the body at right angles is an open wing however
+ * it is shaded.
+ *
+ * A folded wing lies ALONG the flank, pointing down and slightly back, with the primaries carrying
+ * on past the vent. So the blade is now authored nearly vertical (its long axis rolled ~1.3 rad off
+ * horizontal) and `applyMantle` opens it outward from there — which is also a better gesture, since
+ * a mantle is a wing OPENING rather than a wing waving. It is bounded by a drawn leading edge on
+ * the breast side and a dark trailing edge on the flank side, because the four-band ramp will not
+ * shade a plane into existence at this size.
  */
 function eagleWing(d: 1 | -1): ClayPart[] {
   return facing(d, [
@@ -784,18 +1069,21 @@ function eagleWing(d: 1 | -1): ClayPart[] {
     // four-band ramp as one silhouette — the yeti's arm went missing for exactly this reason and
     // the fix there was the same one: give the limb its own value. A golden eagle's wing coverts
     // really are paler than its back, so the honest drawing and the legible one agree here.
-    sph(0.14, PALETTE.eagleNape, [-0.02, -0.02, 0.06], [1.1, 1.0, 0.6], 12),
-    sph(0.115, PALETTE.eagleNape, [-0.16, -0.075, 0.07], [1.35, 0.8, 0.55], 12),
-    // the covert row's lower edge, drawn dark so the wing has a trailing line rather than a fade
-    sph(0.075, PALETTE.eagleDeep, [-0.13, -0.135, 0.09], [1.7, 0.5, 0.5], 10),
+    { ...sph(0.13, PALETTE.eagleNape, [-0.035, -0.11, 0.05], [1.5, 0.6, 0.4], 12), rot: [0, 0, 1.28] as V3 },
+    { ...sph(0.1, PALETTE.eagleNape, [-0.075, -0.28, 0.04], [1.45, 0.58, 0.38], 12), rot: [0, 0, 1.34] as V3 },
+    // THE LEADING EDGE — a drawn line down the blade's breast side. This is the piece that decides
+    // plane or lobe: a rounded mass with no margin line is a bulge whatever tone it carries.
+    { ...sph(0.15, PALETTE.eagleDeep, [0.015, -0.14, 0.07], [1.5, 0.1, 0.3], 10), rot: [0, 0, 1.34] as V3 },
+    // ...and the trailing edge on the flank side, so the blade is bounded on both rather than fading
+    { ...sph(0.13, PALETTE.eagleDeep, [-0.1, -0.2, 0.05], [1.5, 0.12, 0.32], 10), rot: [0, 0, 1.28] as V3 },
     // The wing tip is what binds `MASCOT_BOX.out` on this figure, and it binds it at the TOP of the
-    // mantle rather than at rest: lifting the blade also swings its tip further outward. Measured
-    // over the full gesture sweep, not at the parked pose — the first pass was authored against the
-    // rest pose and measured 0.769 against a 0.68 box once the mantle was included.
-    ...primaries([-0.2, -0.12, 0.05], 6, 3.28, 3.78, 0.26, PALETTE.eagleDeep),
-    // the shoulder's own dark edge, so the pale coverts have a top line and do not simply run into
+    // mantle rather than at rest: opening the blade swings its tip outward. Measured over the full
+    // gesture sweep, not at the parked pose — an earlier pass was authored against the rest pose
+    // and measured 0.769 against a 0.68 box once the mantle was included.
+    ...primaries([-0.09, -0.34, -0.02], 6, 3.9, 4.45, 0.24, PALETTE.eagleDeep),
+    // the shoulder's own dark cap, so the pale coverts have a top line and do not simply run into
     // the neck's hackles
-    sph(0.06, PALETTE.eagleDeep, [0.0, 0.055, 0.08], [1.5, 0.4, 0.5], 10),
+    { ...sph(0.06, PALETTE.eagleDeep, [0.0, 0.02, 0.06], [1.3, 0.4, 0.45], 10), rot: [0, 0, 0.3] as V3 },
   ])
 }
 

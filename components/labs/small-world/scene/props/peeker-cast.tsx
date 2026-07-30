@@ -34,10 +34,22 @@ export type PeekerPiece = { slot: PeekerSlot; at: V3; parts: ClayPart[]; ink?: b
 export type PeekerLimbs = { a: THREE.Group | null; b: THREE.Group | null; c?: THREE.Group | null }
 export type PeekerDrive = { idle: number; unroll: number }
 
-/** Each biome's art: its two characters and the set dressing they are staged in. */
+/**
+ * Each biome's art: its two characters and the set dressing they are staged in.
+ *
+ * `dressing` TAKES THE KIND (Task 62), and the reason is a correction rather than a feature. One
+ * dressing per biome meant a pair was two animals in one composition mirrored — which is exactly
+ * the "same asset twice" read T61's recast existed to remove, applied to the setting instead of to
+ * the cast. Aram's own words on the two corners that showed it worst: the eagle should have a NEST,
+ * not the pangolin's cliff, and the penguin should be on drifting ice rather than under the bear's
+ * pine. Four biomes still answer the same art for both sides, and that is a judgement per corner,
+ * not a limit of the shape.
+ *
+ * A dressing is still ONE merged draw per side, so nothing about the cost changes.
+ */
 type BiomeArt = {
   pieces: (kind: PeekerKind, dir: 1 | -1) => PeekerPiece[]
-  dressing: () => ClayPart[]
+  dressing: (kind: PeekerKind) => ClayPart[]
 }
 
 /**
@@ -63,11 +75,11 @@ const ART: Record<PeekerBiome, BiomeArt> = {
   },
   canyon: {
     pieces: (kind, dir) => canyonPieces(kind === 'eagle' ? 'eagle' : 'pangolinBig', dir),
-    dressing: canyonDressing,
+    dressing: (kind) => canyonDressing(kind === 'eagle' ? 'eagle' : 'pangolinBig'),
   },
   winter: {
     pieces: (kind, dir) => winterPieces(kind === 'penguin' ? 'penguin' : 'polarBear', dir),
-    dressing: winterDressing,
+    dressing: (kind) => winterDressing(kind === 'penguin' ? 'penguin' : 'polarBear'),
   },
 }
 
@@ -75,8 +87,13 @@ export function peekerPieces(biome: PeekerBiome, kind: PeekerKind, dir: 1 | -1):
   return ART[biome].pieces(kind, dir)
 }
 
-export function peekerDressing(biome: PeekerBiome, dir: 1 | -1, vdir: Vdir): ClayPart[] {
-  const parts = ART[biome].dressing()
+export function peekerDressing(
+  biome: PeekerBiome,
+  kind: PeekerKind,
+  dir: 1 | -1,
+  vdir: Vdir
+): ClayPart[] {
+  const parts = ART[biome].dressing(kind)
   return flipY(vdir, dir === 1 ? parts : mirrorX(parts))
 }
 
@@ -121,9 +138,23 @@ function ClayPiece({ parts, ink }: { parts: ClayPart[]; ink?: boolean }) {
   )
 }
 
-/** A biome's set dressing: one merged draw (plus its contour), static under the rig's motion. */
-export function PeekerDressing({ biome, dir, vdir }: { biome: PeekerBiome; dir: 1 | -1; vdir: Vdir }) {
-  const parts = useMemo(() => peekerDressing(biome, dir, vdir), [biome, dir, vdir])
+/**
+ * One side's set dressing: one merged draw (plus its contour). Static under the rig's motion, with
+ * the single exception of a `drifts` kind — see `peekerDrift`, where the raft and its passenger are
+ * moved together because they are one floating object.
+ */
+export function PeekerDressing({
+  biome,
+  kind,
+  dir,
+  vdir,
+}: {
+  biome: PeekerBiome
+  kind: PeekerKind
+  dir: 1 | -1
+  vdir: Vdir
+}) {
+  const parts = useMemo(() => peekerDressing(biome, kind, dir, vdir), [biome, kind, dir, vdir])
   return <ClayPiece parts={parts} ink />
 }
 
@@ -210,6 +241,15 @@ export type PeekerSpec = {
   sway: number
   /** Pangolins arrive as a spinning ball and unfurl once parked. */
   rolls?: boolean
+  /**
+   * The composition FLOATS: dressing and figure share a slow roll and heave, so the raft and its
+   * passenger move as one object (Task 62 — the penguin's ice floe).
+   *
+   * A kind that sets this must leave room for the raft's roll inside `PEEKER_MAX_SWAY`, since the
+   * two add on the figure. That is why the penguin's own `sway` came down when it gained the floe:
+   * the total is what the envelope benches sweep, and it may not grow.
+   */
+  drifts?: boolean
 }
 
 /** Wings beat about the shoulder; the body sway does the rest. */
@@ -352,5 +392,8 @@ export const PEEKER_SPECS: Record<PeekerKind, PeekerSpec> = {
   // The slowest, for the same reason in reverse — one big mantle across the whole dwell.
   eagle: { apply: applyMantle, cycles: 1.5, sway: 0.04 },
   polarBear: { apply: applyPaw, cycles: 2, sway: 0.045 },
-  penguin: { apply: applyFlipper, cycles: 3.5, sway: 0.055 },
+  // Its own sway is down from 0.055 because the floe under it now rolls: the bird's body sway and
+  // the raft's roll add, and `PEEKER_MAX_SWAY` is what the envelope benches sweep. 0.03 + the
+  // raft's 0.024 lands at 0.054, so the total the rig can produce did not grow — which is the point.
+  penguin: { apply: applyFlipper, cycles: 3.5, sway: 0.03, drifts: true },
 }

@@ -173,13 +173,16 @@ describe('the measured mascot envelope', () => {
   })
 
   it('puts every dressing inside its own envelope', () => {
-    for (const pair of PEEKER_CAST) {
+    // Per KIND rather than per biome since Task 62: two corners now field a different composition
+    // on each side (the eagle's eyrie, the penguin's floe), and a per-biome loop would have gated
+    // only whichever one the ART table happened to answer for the pair's first kind.
+    for (const { biome, kind } of KINDS) {
       for (const dir of [1, -1] as const) {
         for (const vdir of [1, -1] as const) {
-          const b = boundsOf(peekerDressing(pair.biome, dir, vdir), new THREE.Matrix4())
+          const b = boundsOf(peekerDressing(biome, kind, dir, vdir), new THREE.Matrix4())
           const outward = dir === 1 ? -b.x0 : b.x1
           const inward = dir === 1 ? b.x1 : -b.x0
-          const label = `${pair.biome} dir${dir} vdir${vdir}`
+          const label = `${biome}/${kind} dir${dir} vdir${vdir}`
           expect(outward, `${label} outward`).toBeLessThanOrEqual(DRESS_REACH.out)
           expect(inward, `${label} inward`).toBeLessThanOrEqual(DRESS_REACH.in)
           // The dressing reaches FAR past the character on the side its composition is anchored
@@ -266,8 +269,8 @@ describe('mirroring', () => {
         }
       }
       for (const dir of [1, -1] as const) {
-        for (const part of peekerDressing(biome, dir, -1)) {
-          for (const s of part.scl ?? [1, 1, 1]) expect(s, `${biome} dressing`).toBeGreaterThan(0)
+        for (const part of peekerDressing(biome, kind, dir, -1)) {
+          for (const s of part.scl ?? [1, 1, 1]) expect(s, `${biome}/${kind} dressing`).toBeGreaterThan(0)
         }
       }
     }
@@ -378,11 +381,70 @@ describe('house rules', () => {
       expect(PEEKER_SPECS[kind], kind).toBeDefined()
       const pieces = peekerPieces(biome, kind, 1)
       expect(pieces.length, kind).toBeGreaterThan(0)
-      expect(peekerDressing(biome, 1, -1).length, biome).toBeGreaterThan(20)
+      expect(peekerDressing(biome, kind, 1, -1).length, `${biome}/${kind}`).toBeGreaterThan(20)
     }
     // every biome's dressing is distinct art, not the same corner recoloured
-    const sizes = PEEKER_CAST.map((p) => peekerDressing(p.biome, 1, -1).length)
+    const sizes = KINDS.map(({ biome, kind }) => peekerDressing(biome, kind, 1, -1).length)
     expect(new Set(sizes).size).toBeGreaterThan(3)
+  })
+
+  it('gives the two corners Aram split their OWN dressing, not one composition mirrored', () => {
+    // Task 62. The recast stopped a pair reading as one animal twice; this is the same defect one
+    // layer out, and it is the one he actually saw: "the eagle should have a NEST, not the same
+    // cliff as the pangolin", "the penguin on a drifting ice piece, not under a pine like the bear".
+    //
+    // The pin is on the ART, not on the plumbing — a `dressing(kind)` signature that returned the
+    // same list for both kinds would satisfy the types and change nothing on screen. So each split
+    // corner must answer genuinely different geometry, and each seat must be MADE of its own
+    // material: the eagle's nest of dead wood, the penguin's raft of sea. Meanwhile the four
+    // corners that were never in question must still answer the SAME list for both sides — a split
+    // there would be unasked-for churn, and this is what would catch it.
+    //
+    // NOT the cast's tone-overlap statistic, deliberately. Two SPECIES sharing a palette is the
+    // defect that test exists for; two seats in one canyon sharing the canyon's rock family is
+    // correct, and the eyrie and the ledge measure 0.71 overlap for exactly that honest reason.
+    // Reusing the threshold here would have been a number doing the wrong job — the same class of
+    // mistake as the part-count pins T61 tried and threw away.
+    const dress = (biome: (typeof KINDS)[number]['biome'], kind: (typeof KINDS)[number]['kind']) =>
+      peekerDressing(biome, kind, 1, -1)
+    const tones = (biome: (typeof KINDS)[number]['biome'], kind: (typeof KINDS)[number]['kind']) =>
+      new Set(dress(biome, kind).map((p) => p.color))
+
+    for (const { biome, split, kept, madeOf } of [
+      {
+        biome: 'canyon',
+        split: 'eagle',
+        kept: 'pangolinBig',
+        madeOf: [PALETTE.nestStick, PALETTE.nestStickDeep],
+      },
+      {
+        biome: 'winter',
+        split: 'penguin',
+        kept: 'polarBear',
+        madeOf: [PALETTE.polarSea, PALETTE.polarSeaDeep],
+      },
+    ] as const) {
+      // Not a part COUNT: the eyrie and the ledge happen to use 75 primitives each, which is the
+      // same coincidence T61's discarded count pin hit in the desert. The colour SEQUENCE is the
+      // cheap thing that cannot collide by accident — two lists of 75 tones in the same order are
+      // the same art, and anything else is not.
+      const seq = (kind: (typeof KINDS)[number]['kind']) => dress(biome, kind).map((p) => p.color)
+      expect(seq(split), `${biome} really is two compositions`).not.toEqual(seq(kept))
+      const newSeat = tones(biome, split)
+      const oldSeat = tones(biome, kept)
+      for (const tone of madeOf) {
+        expect(newSeat.has(tone), `${biome}/${split} is made of its own material`).toBe(true)
+        expect(oldSeat.has(tone), `${biome}/${kept} did not inherit it`).toBe(false)
+      }
+    }
+
+    for (const pair of PEEKER_CAST) {
+      if (pair.biome === 'canyon' || pair.biome === 'winter') continue
+      expect(
+        dress(pair.biome, pair.left).map((p) => p.color),
+        `${pair.biome} was not asked to split`
+      ).toEqual(dress(pair.biome, pair.right).map((p) => p.color))
+    }
   })
 
   it('uses no literal colours and no non-determinism anywhere in the peeker files', () => {
@@ -509,7 +571,10 @@ describe('house rules', () => {
     // Devices (b) and (c) live in the DRESSING, because they are what the figure is seen against:
     // a cast shadow thrown into the drift beneath it, and dark spruce massed behind its silhouette.
     // Without these the carve-out is just an unmeasured white blob on white snow.
-    const dressing = new Set(peekerDressing('winter', 1, -1).map((p) => p.color))
+    // ...and they belong to the BEAR'S dressing specifically, which is the thing Task 62's split
+    // made possible to get wrong: the penguin's floe is a different composition on the same corner,
+    // so asking the biome rather than the figure would let the bear lose its own backing silently.
+    const dressing = new Set(peekerDressing('winter', 'polarBear', 1, -1).map((p) => p.color))
     expect(dressing.has(PALETTE.bearCast), 'the bear casts a shadow into the drift').toBe(true)
     expect(dressing.has(PALETTE.spruceDeep), 'dark backing behind the silhouette').toBe(true)
 

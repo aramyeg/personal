@@ -21,6 +21,7 @@ import {
   PEEK_SIDE_STAGGER,
   peekerAnchor,
   peekerClock,
+  peekerDrift,
   peekerHalfHeight,
   peekerIdle,
   peekerPresence,
@@ -57,6 +58,9 @@ import {
 
 /** Idle phase offset for the right-hand figure so a pair never beats in lockstep. */
 const RIGHT_PHASE = 0.37
+
+/** What a composition that does not float gets — allocation-free, and identical to the old path. */
+const ZERO_DRIFT = { roll: 0, bob: 0 } as const
 
 function PeekerSide({
   journeyRef,
@@ -108,12 +112,22 @@ function PeekerSide({
     const panel = state.panel
     const dwell = panel && panel.chapter === chapter ? panel.t : 0
     const settled = Math.min(1, Math.max(0, figureP))
-    const idle = reduced ? 0 : peekerIdle(dwell, spec.cycles, side === 1 ? RIGHT_PHASE : 0) * settled
+    const phase = side === 1 ? RIGHT_PHASE : 0
+    const idle = reduced ? 0 : peekerIdle(dwell, spec.cycles, phase) * settled
+
+    // THE RAFT (Task 62). A drifting composition is the one case where the dressing is not static:
+    // the floe and the bird standing on it are a single floating object, so both groups take the
+    // same roll and the same heave. Scaled by the FIGURE's presence rather than the dressing's, so
+    // an entrance is still the entrance — the raft settles into its drift instead of arriving
+    // already at sea.
+    const raft = spec.drifts && !reduced ? peekerDrift(dwell, phase) : ZERO_DRIFT
+    const roll = raft.roll * settled
+    const bob = raft.bob * settled
 
     // Each element rides its own presence from its hidden pose to the parked one; the easeOutBack
     // overshoot past 1 IS the settle.
-    place(dress.current, anchor, side, dressP, 0)
-    place(figure.current, anchor, side, figureP, spec.sway * idle)
+    place(dress.current, anchor, side, dressP, roll, bob)
+    place(figure.current, anchor, side, figureP, spec.sway * idle + roll, bob)
 
     if (spinner.current) {
       spinner.current.rotation.z = spec.rolls && !reduced ? -side * peekerRollSpin(figureP) : 0
@@ -126,7 +140,7 @@ function PeekerSide({
   return (
     <group ref={root} visible={false} position={[0, 0, -PEEKER_DEPTH]}>
       <group ref={dress}>
-        <PeekerDressing biome={biome} dir={dir} vdir={anchor.vdir} />
+        <PeekerDressing biome={biome} kind={kind} dir={dir} vdir={anchor.vdir} />
       </group>
       {anchor.mode === 'pair' ? (
         <group ref={figure}>
@@ -139,11 +153,25 @@ function PeekerSide({
   )
 }
 
-/** Lerp one element of a composition from its hidden pose to its parked pose. */
-function place(g: THREE.Group | null, anchor: PeekerAnchor, side: Side, presence: number, sway: number): void {
+/**
+ * Lerp one element of a composition from its hidden pose to its parked pose.
+ *
+ * `bob` is in FIGURE-HEIGHTS and is scaled by the anchor like everything else, so a heave is the
+ * same fraction of the mascot at every viewport rather than a fixed world offset that would swamp a
+ * small one. It is applied in the parent frame, after the roll, so it is a pure vertical translate
+ * and cannot move any fragment in Z — which is what leaves the depth guarantee untouched.
+ */
+function place(
+  g: THREE.Group | null,
+  anchor: PeekerAnchor,
+  side: Side,
+  presence: number,
+  sway: number,
+  bob = 0
+): void {
   if (!g) return
   const hide = 1 - presence
-  g.position.set(anchor.x, anchor.y + hide * (anchor.hiddenY - anchor.y), 0)
+  g.position.set(anchor.x, anchor.y + hide * (anchor.hiddenY - anchor.y) + bob * anchor.size, 0)
   g.rotation.set(0, -side * PEEKER_FACE_IN, side * (PEEKER_LEAN + hide * PEEKER_LEAN_EXTRA) + sway)
   g.scale.setScalar(anchor.size)
 }
