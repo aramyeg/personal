@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { EGG_THETA, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
+import { waterMask } from '@/components/labs/small-world/scene/biomes'
 
 /**
  * Task 61 — the yeti easter egg's one-shot.
@@ -155,37 +156,46 @@ describe('where the egg hides', () => {
 
   it('does not stand in the icy lake', () => {
     // THIS TEST EXISTS BECAUSE THE BUG SHIPPED PAST EVERY OTHER ONE. The winter wedge's only water
-    // is the icy lake, and it is sacred: B2_FROZEN (r 0.14, feather 0.10) and B2_SHELF (r 0.28,
-    // feather 0.13) in biomes.ts. The Forest's INSTANCED scatter rejects underwater candidates for
-    // itself — which is a trap, because it means "there are conifers around here" is not evidence
-    // that a HAND-PLACED prop is on dry land. A hand-placed one has no such check.
+    // is the icy lake, and it is sacred. The Forest's INSTANCED scatter rejects underwater
+    // candidates for itself — which is a trap, because it means "there are conifers around here" is
+    // not evidence that a HAND-PLACED prop is on dry land. A hand-placed one has no such check. The
+    // first shipped anchor sat eight thousandths of a radian inside B2_SHELF, invisible to the whole
+    // suite, and was found only because the lane that owns the terrain warned about it.
     //
-    // The first shipped anchor sat 0.4016 rad from B2_SHELF's centre against a 0.410 limit: eight
-    // thousandths inside the water, invisible to the whole suite, and found only because the lane
-    // that owns the terrain warned about it. The numbers are duplicated here rather than imported
-    // so that a change to the pond in biomes.ts fails this test instead of silently moving the
-    // limit under it — the point is to be told when the two stop agreeing.
-    // ↓↓ DO NOT REPLACE THESE WITH AN IMPORT. ↓↓
+    // ASKED OF THE LIVE MAP, not of copied literals, and that is a correction. This test first
+    // duplicated the pond constants and compared angular distances, with a comment arguing the
+    // duplication WAS the tripwire. It was not: measured, dragging B2_SHELF onto the egg's anchor in
+    // both biomes.ts and water-clay.ts left this file green 14/14 with the yeti standing in the
+    // relocated lake. Frozen literals cannot fail when the thing they describe moves — they just
+    // quietly keep testing the old position, which is the exact failure the duplication was supposed
+    // to prevent.
     //
-    // They are duplicated ON PURPOSE, and the duplication IS the test. An imported constant makes
-    // this file track a moved pond silently, which is precisely the failure mode where nobody finds
-    // out the yeti is standing in water again. A duplicated one makes the disagreement itself the
-    // failing assertion.
-    //
-    // These literals also exist in `biomes.ts` (B2_FROZEN / B2_SHELF, the source of truth) and in
-    // `water-clay.ts` (ICE_CAPS, which renders them). Those two are pinned AGAINST EACH OTHER by
-    // `agrees with the live biomes water ACROSS THE RAMP` in water-clay.test.ts — behaviourally,
-    // by sampling the mask along its own ramp — so this copy does not have to police them. What it
-    // guards is only what it says: that the yeti is not standing in the water.
-    const FROZEN = { nx: 0.34, theta: 5.55, radius: 0.14, feather: 0.1 }
-    const SHELF = { nx: 0.6, theta: 5.72, radius: 0.28, feather: 0.13 }
-    const capOf = (p: typeof FROZEN) => ({ c: norm(place(p.nx, p.theta)), limit: p.radius + p.feather })
-    for (const [name, p] of [['B2_FROZEN', FROZEN], ['B2_SHELF', SHELF]] as const) {
-      const cap = capOf(p)
-      expect(ang(egg, cap.c), `clear of ${name}`).toBeGreaterThan(cap.limit + 0.03)
+    // `waterMask` is the biome map's own answer to "is this point water", so it moves when the pond
+    // moves and there is nothing to keep in step. Sampled over a small disc rather than at the
+    // anchor alone, because the yeti has a footprint and a shoreline is a gradient — the mask ramps
+    // to 0 at the cap edge, so a figure standing on the ramp is standing in the shallows.
+    for (let d = 0; d <= 0.06 + 1e-9; d += 0.02) {
+      for (let a = 0; a < 2 * Math.PI - 1e-9; a += Math.PI / 4) {
+        // walk a small circle around the anchor in the tangent plane
+        const t1 = norm([0, -egg[2], egg[1]])
+        const t2 = norm([
+          egg[1] * t1[2] - egg[2] * t1[1],
+          egg[2] * t1[0] - egg[0] * t1[2],
+          egg[0] * t1[1] - egg[1] * t1[0],
+        ])
+        const p = norm([
+          egg[0] + (Math.cos(a) * t1[0] + Math.sin(a) * t2[0]) * d,
+          egg[1] + (Math.cos(a) * t1[1] + Math.sin(a) * t2[1]) * d,
+          egg[2] + (Math.cos(a) * t1[2] + Math.sin(a) * t2[2]) * d,
+        ])
+        expect(
+          waterMask(p[0], p[1], p[2], 1),
+          `the yeti is standing in water ${d.toFixed(2)} rad from its anchor`
+        ).toBe(0)
+        if (d === 0) break
+      }
     }
   })
-
 
   it('stays in the winter wood, which is the whole point of hiding there', () => {
     // ...and the other half of the vice: pushed clear of the water it must not end up standing in
