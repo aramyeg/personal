@@ -32,6 +32,11 @@ import {
  *    tip margin at all, on the grounds that the dressing skips such ground; a dune crest is
  *    exactly that case.
  *
+ * AND ONE TRAP, learned next door (Task 61, whose yeti was found standing in the icy lake): the
+ * instanced scatters reject underwater candidates for THEMSELVES, so "there are trees around here"
+ * is not evidence that a hand-placed prop is on dry land. A hand-placed anchor gets none of the
+ * scatter's checks — it is checked here, by the bench, or not at all.
+ *
  * Longitudes run 0.6 → 2.35, which is the face on screen at the final dwell (thetaC 0.348 up to
  * the limb at 2.609) with room at both ends — the camp reads as a place, not as a row.
  */
