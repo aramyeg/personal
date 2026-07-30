@@ -476,7 +476,9 @@ describe('house rules', () => {
       }
       return hit / all
     }
-    const NEAR_WHITE = [PALETTE.boughSnow, PALETTE.snow, PALETTE.yetiFur, PALETTE.foxBelly]
+    // typed as string[] rather than inferred: PALETTE is `as const`, so the inferred tuple is a
+    // union of literals and `.includes(someString)` will not typecheck against it
+    const NEAR_WHITE: string[] = [PALETTE.boughSnow, PALETTE.snow, PALETTE.yetiFur, PALETTE.foxBelly]
     expect(share((c) => NEAR_WHITE.includes(c)), 'near-white area budget').toBeLessThan(0.18)
     // ...and the two tones that carry the median have to be most of the animal
     expect(
