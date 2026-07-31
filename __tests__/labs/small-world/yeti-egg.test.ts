@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { EGG_THETA, EGG_TO, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
+import {
+  EGG_FROM,
+  EGG_THETA,
+  EGG_TO,
+  EGG_X,
+  peekPose,
+} from '@/components/labs/small-world/scene/props/yeti-egg'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { ENDING_SPAN } from '@/components/labs/small-world/ending-timeline'
 import { PANEL_END, journeyStateAt } from '@/components/labs/small-world/journey-timeline'
@@ -120,31 +126,47 @@ describe('the egg house rules', () => {
     // Task 62 pinned this against `END_AT`, the progress at which the retired `EndPanel` raised a
     // full-viewport scrim. Task 63 removed that panel, so the pin is re-derived rather than
     // deleted: the window now runs to the exact progress at which chapter 6's dwell releases.
-    //
-    // The lower half matters as much as the upper. `EGG_TO` used to be 0.98, cut 0.0117 short of
-    // the dwell's own end by a panel that no longer exists — and nothing on screen changed over
-    // that sliver, because `rotationAt` freezes rotation for the whole dwell. The egg was visible
-    // and dead. It is now armed for exactly the ground it stands on.
     const lastDwellEnd = (CHAPTER_COUNT - 1 + PANEL_END) / CHAPTER_COUNT
     expect(EGG_TO, 'the hotspot must stay armed for the whole winter dwell').toBe(lastDwellEnd)
   })
 
-  it('is disarmed for the whole ending, twice over', () => {
+  it('separates being DRAWN from being CLICKABLE', () => {
+    // These were one boolean, and the first version of this pin certified the widening from 0.98
+    // with "it cannot change a pixel — rotation is frozen across the dwell". True about rotation,
+    // and beside the point: visibility was gated on the same expression, so under 0.98 the yeti
+    // VANISHED at 0.98 and the widening drew it where it previously was not drawn.
+    //
+    // The split is what makes that reasoning true rather than merely harmless. Visibility has no
+    // upper bound now, so the yeti cannot pop out of existence in a frame where rotation is frozen
+    // and nothing else moves — the most conspicuous place in the lab to do it.
+    expect(src).toMatch(/const visible =[\s\S]{0,140}progress >= EGG_FROM\s*$/m)
+    expect(src).toMatch(/const nowArmed = visible && j\.progress <= EGG_TO/)
+    expect(src).toMatch(/g\.visible = visible/)
+    // ...and the one-shot is cancelled on VISIBILITY, so a peek already in flight plays out across
+    // the boundary instead of snapping back — the pop this split exists to remove.
+    expect(src).toMatch(/if \(!visible\)[\s\S]{0,900}clock\.current = null/)
+  })
+
+  it('stays drawn for the whole ending, and clickable in none of it', () => {
     // Once by design: the window closes strictly before the ending's first frame, so the curtain
     // call and the pull-back never have a live click target from the journey underneath them.
     expect(EGG_TO, 'the hotspot must disarm before the ending begins').toBeLessThan(1)
 
     // And once by construction, which is the half a future edit cannot undo by moving a number:
-    // `JourneyState.progress` is CLAMPED, so it reads exactly 1 across the entire ending domain,
-    // and the gate's `progress <= EGG_TO` is therefore false however far the visitor scrolls.
+    // `JourneyState.progress` is CLAMPED, so it reads exactly 1 across the entire ending domain.
+    // The same clamp does the opposite for VISIBILITY, whose gate has no upper bound: the yeti
+    // stays drawn all the way through the pull-back, receding with the world as part of the
+    // diorama instead of blinking out 11 vh of scroll before the curtain call.
     for (let i = 0; i <= 500; i++) {
       const p = 1 + (i / 500) * ENDING_SPAN
-      expect(journeyStateAt(p).progress).toBeGreaterThan(EGG_TO)
+      const progress = journeyStateAt(p).progress
+      expect(progress, 'the hotspot must be disarmed').toBeGreaterThan(EGG_TO)
+      expect(progress, 'the yeti must stay drawn').toBeGreaterThanOrEqual(EGG_FROM)
     }
   })
 
   it('cancels the one-shot when the gate closes, in the same frame', () => {
-    expect(src).toMatch(/if \(!live\)[\s\S]{0,400}clock\.current = null/)
+    expect(src).toMatch(/if \(!visible\)[\s\S]{0,900}clock\.current = null/)
   })
 
   it('sets the pointer cursor imperatively, and always clears its own', () => {

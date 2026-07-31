@@ -102,7 +102,10 @@ export type ArrivalMode = 'pass' | 'hold' | 'release'
 
 export type ArrivalState = {
   mode: ArrivalMode
-  /** Journey progress the whole experience reads (0..1). */
+  /** Journey progress the whole experience reads. Domain [0, TRACK_END] since Task 63 — the
+   *  journey is [0, 1] and the ending segment owns the rest (see ending-timeline.ts). Nothing in
+   *  this file changes for it: every threshold here is in progress units, and the ending sits
+   *  outside every dwell, so no hold can arm there. */
   progress: number
   /** Raw scroll progress from the last step, kept to measure teleports. */
   raw: number

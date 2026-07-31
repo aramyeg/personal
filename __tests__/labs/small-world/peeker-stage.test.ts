@@ -50,6 +50,7 @@ import {
   CAMERA_FOV as SHIPPED_FOV,
   ZOOM_FACTOR,
 } from '@/components/labs/small-world/scene/camera'
+import { initialArrival, stepArrival } from '@/components/labs/small-world/arrival'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { TRACK_END } from '@/components/labs/small-world/ending-timeline'
 import { journeyStateAt } from '@/components/labs/small-world/journey-timeline'
@@ -349,11 +350,24 @@ describe('the planet is never covered', () => {
     // arrival reveal clock, and no reveal can exist past the last dwell, so the whole rig is
     // invisible for every frame of the ending. T64's curtain call cannot inherit that for free —
     // see the ending contract.
-    for (const p of [1.0001, 1.1, TRACK_END]) {
-      const state = journeyStateAt(p)
-      expect(state.reveal).toBeNull()
-      for (let c = 0; c < CHAPTER_COUNT; c++) expect(peekerClock(state, c)).toBeNull()
+    //
+    // Driven through the REAL state machine rather than asserted off a hand-built state. The first
+    // version of this guard opened with `expect(journeyStateAt(p).reveal).toBeNull()`, which is
+    // vacuous — that parameter defaults to null at any progress, so it passed at 0.5 too. Here the
+    // reveal is whatever `stepArrival` actually produces on the way out of chapter 6's dwell.
+    let arrival = initialArrival(0.99)
+    let checked = 0
+    for (let i = 1; i <= 300; i++) {
+      const raw = Math.min(TRACK_END, 0.99 + i * 0.002)
+      arrival = stepArrival(arrival, raw, 1 / 60)
+      if (raw <= 1) continue
+      const state = journeyStateAt(raw, undefined, arrival.reveal)
+      for (let c = 0; c < CHAPTER_COUNT; c++) {
+        expect(peekerClock(state, c), `chapter ${c} at progress ${raw}`).toBeNull()
+      }
+      checked++
     }
+    expect(checked).toBeGreaterThan(100)
   })
 })
 

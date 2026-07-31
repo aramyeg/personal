@@ -80,11 +80,17 @@ export const EGG_X = 0.8
  * round the back of the planet — so on its own it would arm a click target the visitor cannot see.
  * This is the second half: the journey's own progress has to be inside winter's approach and dwell.
  * Chapter 5 owns progress [5/6, 1], and the approach begins a little before that.
+ *
+ * EXPORTED since Task 63's fix round: it is now the WHOLE of the visibility gate's progress half
+ * (the upper bound governs the click only), so the test that pins the yeti as drawn through the
+ * ending has to read this number rather than restate it.
  */
-const EGG_FROM = 4.72 / 6
+export const EGG_FROM = 4.72 / 6
 /**
- * ...and it stops when the LAST CHECKPOINT RELEASES — the exact progress at which chapter 6's
- * dwell ends and the ending segment takes the frame.
+ * ...and the CLICK stops when the last checkpoint releases — the exact progress at which chapter
+ * 6's dwell ends and the ending segment takes the frame. Note what this bound no longer does: it
+ * does not hide the yeti. Arming and visibility were one boolean until Task 63's fix round; the
+ * frame loop below now splits them, and this constant governs only the click.
  *
  * RE-DERIVED for Task 63, because the thing it used to be a relation to is gone. It was 0.98,
  * chosen to close just under `END_AT` = 0.985, where the retired `EndPanel` raised a full-viewport
@@ -92,17 +98,17 @@ const EGG_FROM = 4.72 / 6
  * the ending is scroll real estate past progress 1, and the overlay slot that marks it takes no
  * pointer events at all. The invariant survives its old justification intact, though — the hotspot
  * may only be armed where a click will actually reach it AND where the egg is actually on frame —
- * so it is re-anchored to the geometry that still exists:
+ * so it is re-anchored to the geometry that still exists: it closes strictly BEFORE the ending
+ * (which begins at progress 1), so the curtain call and the pull-back never have a live click
+ * target from the journey underneath them. Past that the clamp enforces it a second time for free:
+ * `JourneyState.progress` reads exactly 1 for the whole ending, which is greater than this value,
+ * so the arming gate below cannot re-open however far the visitor scrolls.
  *
- *  - It now runs to the END of the winter dwell instead of being cut 0.005 short of it by a panel
- *    that no longer exists. Nothing on screen changes over that sliver: `rotationAt` freezes
- *    rotation for the whole dwell (from 0.925 on), so the frame at 0.98 and the frame at the
- *    release are identical — the egg was always visible there, it was simply disarmed.
- *  - It closes strictly BEFORE the ending (`ENDING` begins at progress 1), so the curtain call and
- *    the pull-back never have a live click target from the journey underneath them. Past that the
- *    clamp enforces it a second time for free: `JourneyState.progress` reads exactly 1 for the
- *    whole ending, which is greater than this value, so the gate below cannot re-open however far
- *    the visitor scrolls.
+ * WHAT MOVING IT FROM 0.98 ACTUALLY DID, corrected from the claim this comment first carried. The
+ * first version said the widening "cannot change a pixel" because rotation is frozen across the
+ * dwell — true about rotation, and irrelevant, because visibility was gated on this same bound.
+ * Under 0.98 the yeti VANISHED at 0.98 and the widening draws it through the dwell tail where it
+ * previously was not drawn. That was a real pixel change, mis-certified as none.
  *
  * Still a RELATION rather than a literal, for the reason Task 62 made it one: a frozen copy goes
  * stale the moment the thing it mirrors moves. `yeti-egg.test.ts` pins both halves.
@@ -315,25 +321,45 @@ export function YetiEgg({ journeyRef }: { journeyRef: JourneyRef }) {
     const g = outer.current
     if (!g) return
     const j = journeyRef.current
-    // BOTH gates. The variant gate says this ground is currently painted winter; the progress gate
-    // says the visitor is actually looking at it. Either alone arms a target that is off screen.
-    const live = activeVariantAt(tc, j.rotation) === 1 && j.progress >= EGG_FROM && j.progress <= EGG_TO
-    g.visible = live
-    if (!live) {
+
+    // VISIBILITY AND ARMING ARE SEPARATE GATES (Task 63 fix round). They were one boolean, and
+    // that made the click's upper bound double as a vanishing act: the yeti blinked out of
+    // existence at `EGG_TO` in a frame where rotation is frozen and nothing else moves at all —
+    // the single most conspicuous place in the whole lab to pop something.
+    //
+    // VISIBLE has no upper bound. Both gates below still apply — the variant gate says this ground
+    // is currently painted winter, the progress gate says the visitor is actually looking at it —
+    // and past the journey the clamp holds `j.progress` at exactly 1, so the yeti simply stays
+    // drawn in the frozen frame and recedes with the world through the pull-back, as part of the
+    // diorama rather than as a thing that left before the ending started.
+    const visible = activeVariantAt(tc, j.rotation) === 1 && j.progress >= EGG_FROM
+    // ARMED adds the click's own bound. `gatedRaycast` early-returns while this is false, so a
+    // drawn-but-disarmed yeti contributes no intersection and a click through it still reaches
+    // `onPointerMissed` — being visible costs the canvas-first model nothing.
+    const nowArmed = visible && j.progress <= EGG_TO
+    g.visible = visible
+
+    if (armed.current !== nowArmed) {
+      armed.current = nowArmed
+      // A cursor that promises a click the mesh no longer takes is a lie, so it goes with the arming.
+      if (!nowArmed) setCursor(false)
+    }
+
+    if (!visible) {
       // SCROLL-AWAY, and this is the whole cancellation story: drop the clock and put the figure
       // back on its resting pose in the same frame. There is no unwind to run and no pose to
       // interpolate out of, so a peek interrupted at any point cannot leave a stuck figure behind.
+      //
+      // Keyed to VISIBILITY rather than to arming, deliberately. Snapping a peek back the instant
+      // the click closes would reintroduce the pop this split exists to remove; a one-shot already
+      // in flight instead plays out and ends on its own resting pose, exactly as chapter 6's card
+      // spread finishes its retraction across the same boundary. Neither can START past it.
       if (clock.current !== null) {
         clock.current = null
         applyPose(lean.current, arm.current, 0)
       }
-      if (armed.current) {
-        armed.current = false
-        setCursor(false)
-      }
       return
     }
-    armed.current = true
 
     if (clock.current === null) return
     // Reduced motion holds the peeked pose for the same duration instead of animating through it,
