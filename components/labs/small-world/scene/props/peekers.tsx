@@ -18,6 +18,7 @@ import {
   PEEKER_FACE_IN,
   PEEKER_LEAN,
   PEEKER_LEAN_EXTRA,
+  PEEKER_RIG_PRIORITY,
   PEEK_SIDE_STAGGER,
   peekerAnchor,
   peekerClock,
@@ -204,14 +205,14 @@ export function CheckpointPeekers({ journeyRef }: { journeyRef: JourneyRef }) {
     } as Record<number, PeekerAnchor>
   }, [camera.fov, size])
 
-  // Priority −0.5 keeps this after the journey damp (−1) and before every side (0), so a side
-  // always reads a camera frame and a JourneyState from the same tick.
+  // See PEEKER_RIG_PRIORITY: after the journey damp and after the CAMERA rig (which writes the
+  // transform this copies), before every side.
   useFrame(() => {
     const g = frame.current
     if (!g) return
     g.position.copy(camera.position)
     g.quaternion.copy(camera.quaternion)
-  }, -0.5)
+  }, PEEKER_RIG_PRIORITY)
 
   return (
     <group ref={frame}>

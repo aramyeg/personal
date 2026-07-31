@@ -774,3 +774,18 @@ export const PEEKER_CAST: readonly PeekerPair[] = [
 export function peekerCastFor(chapter: number): PeekerPair | null {
   return PEEKER_CAST[chapter] ?? null
 }
+
+/**
+ * Frame-loop priority of the rig that copies the camera's transform (peekers.tsx).
+ *
+ * Named and exported for one reason: it is the FOLLOWER in an ordering rule the camera now depends
+ * on. r3f sorts `useFrame` subscribers ascending and its sort is stable, so a rig that reads the
+ * camera must sit strictly ABOVE whatever writes it — otherwise a tie resolves by mount order,
+ * which is not a rule anyone can build against. `ending-camera.test.ts` asserts
+ * `CAMERA_RIG_PRIORITY < PEEKER_RIG_PRIORITY`; before Task 63's fix round the two were both −0.5
+ * and that assertion would have failed.
+ *
+ * −0.5 also keeps this after the journey damp (−1) and before every side (0), so a side always
+ * reads a camera frame and a JourneyState from the same tick.
+ */
+export const PEEKER_RIG_PRIORITY = -0.5

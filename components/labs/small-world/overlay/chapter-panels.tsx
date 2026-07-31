@@ -56,7 +56,12 @@ export function ChapterPanels({
   chapter: Chapter
   index: number
   enter: number
-  onAdvance: () => void
+  /**
+   * `null` renders the spread WITHOUT arming tap-to-advance (Task 63 fix round). The two used to be
+   * the same thing because the spread's lifetime was the registration's lifetime — see below — and
+   * that stopped being true the moment the ending let a retracting spread outlive the journey.
+   */
+  onAdvance: (() => void) | null
 }) {
   const enter = easeOutBack(entrance)
   const artSrc = panelArtSrc(chapter.id)
@@ -65,7 +70,13 @@ export function ChapterPanels({
   // structural rather than a flag: this panel only renders while it is up, so a missed click with no
   // panel mounted has nothing to fire — including a scrub across the dwell edge that lands between
   // pointerdown and pointerup.
-  useEffect(() => setPanelAdvance(onAdvance), [onAdvance])
+  //
+  // ONE CASE BREAKS THAT EQUIVALENCE and it is why `onAdvance` is nullable. Chapter 6's spread
+  // retracts on a wall clock, so it can still be mounted after progress has crossed into the
+  // ending — and there `advanceTo` would smooth-scroll the visitor BACKWARDS out of the curtain
+  // call. Registering nothing (rather than hiding the spread, which would hard-cut a retraction
+  // mid-way) keeps the exit visible and leaves no live click target behind it.
+  useEffect(() => (onAdvance ? setPanelAdvance(onAdvance) : undefined), [onAdvance])
 
   /**
    * THE ROOT NO LONGER TAKES POINTER EVENTS, and that is the whole of Task 61's fix here.

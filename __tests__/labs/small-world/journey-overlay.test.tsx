@@ -1,10 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { JourneyOverlay } from '@/components/labs/small-world/overlay/journey-overlay'
-import { firePanelAdvance } from '@/components/labs/small-world/panel-tap'
+import { firePanelAdvance, panelTapArmed } from '@/components/labs/small-world/panel-tap'
+import { initialArrival } from '@/components/labs/small-world/arrival'
 import { CHAPTER_COUNT, chapters } from '@/components/labs/small-world/chapters'
 import { ENDING_SPAN, TRACK_END } from '@/components/labs/small-world/ending-timeline'
+import type { RevealState } from '@/components/labs/small-world/journey-timeline'
 import { BURST_END, PANEL_END } from '@/components/labs/small-world/journey-timeline'
+import type { ArrivalJourney } from '@/components/labs/small-world/use-arrival-journey'
+
+/** A driver holding one reveal, so a RETRACTING spread can be rendered at a chosen progress. */
+function fakeJourney(progress: number, reveal: RevealState): ArrivalJourney {
+  return {
+    progressRef: { current: progress },
+    rawProgressRef: { current: progress },
+    arrivalRef: { current: { ...initialArrival(progress), reveal } },
+    subscribe: () => () => {},
+  }
+}
 
 // compute() is deferred to a rAF (mocked as setTimeout(fn, 0) in
 // vitest.setup.ts) so it always reads progressRef after every scroll
@@ -97,6 +110,50 @@ describe('JourneyOverlay', () => {
     const slot = screen.getByTestId('sw-ending')
     expect(slot.style.pointerEvents).toBe('')
     expect(slot.parentElement!.style.pointerEvents).toBe('none')
+  })
+
+  it('un-arms tap-to-advance while a spread retracts INTO the ending', () => {
+    // The trap this closes: chapter 6's spread retracts on a wall clock, so it can still be mounted
+    // a fraction of a second after progress crosses 1 — and `ChapterPanels` registers tap-to-advance
+    // for as long as it is mounted. A canvas click there fired `advanceTo(1)` and smooth-scrolled
+    // the visitor BACKWARDS out of the curtain call, to 77.4% of the track.
+    //
+    // Reachable without any hurry, too: an End key or a scrollbar drag from the last dwell to the
+    // bottom of the track is a teleport, which `stepArrival` passes through at 1:1 — so the visitor
+    // lands at full pull-back with the registration live for the whole RETRACT_SECONDS.
+    const progress = 1 + 0.02 * ENDING_SPAN
+    const journey = fakeJourney(progress, { chapter: CHAPTER_COUNT - 1, t: 0.6, phase: 'out' })
+    const onAdvance = vi.fn()
+    render(
+      <JourneyOverlay
+        progressRef={journey.progressRef}
+        journey={journey}
+        onAdvance={onAdvance}
+      />
+    )
+
+    // The retraction is still on screen — the fix is to the REGISTRATION, not to the render.
+    // Hard-cutting a retracting spread would be the worse trade.
+    expect(screen.getByTestId('sw-panel-data')).not.toBeNull()
+    expect(screen.getByTestId('sw-ending')).not.toBeNull()
+
+    expect(panelTapArmed(), 'no click target may survive into the ending').toBe(false)
+    firePanelAdvance()
+    expect(onAdvance).not.toHaveBeenCalled()
+  })
+
+  it('still arms tap-to-advance for the same spread one frame before the ending', () => {
+    // The control for the test above: the ONLY thing that changed is which side of progress 1 the
+    // retraction is on. At 1 exactly — the journey's last frame — the tap is live as always.
+    const journey = fakeJourney(1, { chapter: CHAPTER_COUNT - 1, t: 0.6, phase: 'out' })
+    const onAdvance = vi.fn()
+    render(
+      <JourneyOverlay progressRef={journey.progressRef} journey={journey} onAdvance={onAdvance} />
+    )
+    expect(screen.queryByTestId('sw-ending')).toBeNull()
+    expect(panelTapArmed()).toBe(true)
+    firePanelAdvance()
+    expect(onAdvance).toHaveBeenCalledWith(1)
   })
 
   it('lets chapter 6 finish its dwell — the ending no longer truncates the last cards', () => {

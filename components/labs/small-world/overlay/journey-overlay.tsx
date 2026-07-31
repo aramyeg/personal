@@ -32,13 +32,23 @@ export function JourneyOverlay({
       {/* No `ended` gate any more (Task 63). It existed to clear the stage for the retired
           `EndPanel`, and at END_AT = 0.985 it cut chapter 6's dwell short — the cards were
           yanked mid-read at 0.985 while the dwell ran to 0.9917. The cards now retract the
-          way every other chapter's do, on their own clock, and the ending begins after. */}
+          way every other chapter's do, on their own clock, and the ending begins after.
+
+          TAP-TO-ADVANCE IS GATED INSTEAD OF THE RENDER (fix round). Chapter 6's retraction is a
+          wall clock, so the spread can still be mounted a fraction of a second into the ending —
+          and `advanceTo` there would smooth-scroll the visitor back out of the curtain call to
+          progress 1. Passing `null` un-arms the tap while the exit animation finishes, which is
+          the half that has to change: hard-cutting a retracting spread is worse than letting it
+          play, and a live click target under the ending is the trap the canvas-first model
+          (aa399f6) exists to forbid. */}
       {ui.panel && (
         <ChapterPanels
           chapter={chapters[ui.panel.chapter]}
           index={ui.panel.chapter}
           enter={ui.panel.enter}
-          onAdvance={() => onAdvance((ui.panel!.chapter + 1) / CHAPTER_COUNT)}
+          onAdvance={
+            ui.ending ? null : () => onAdvance((ui.panel!.chapter + 1) / CHAPTER_COUNT)
+          }
         />
       )}
       {/* THE ENDING SLOT — mounted for the whole ending segment, empty on purpose. T64 hangs the

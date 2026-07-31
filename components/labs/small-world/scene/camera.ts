@@ -118,8 +118,13 @@ export function cameraPositionAt(progress: number): [number, number, number] {
  * only hands rendering to a subscriber whose priority is > 0, so a negative
  * priority is purely an ordering key. The camera rig must run AFTER
  * `useDampedJourney` (−1) writes the frame's JourneyState, and BEFORE every
- * default-priority consumer — the peeker rig copies the camera's transform every
- * frame, and would trail the pull-back by one frame if it read a stale pose.
- * T64's curtain-call rig inherits that requirement.
+ * camera-FOLLOWING consumer — the peeker rig copies the camera's transform every
+ * frame (peekers.tsx), and would trail the pull-back by one frame if it read a
+ * stale pose. T64's curtain-call rig inherits that requirement.
+ *
+ * −0.75 rather than −0.5, and the difference is the whole point: the peeker rig
+ * ALREADY subscribes at −0.5, and r3f's sort is stable, so a tie would resolve by
+ * subscription order — i.e. by which component happens to mount first. That is not
+ * a rule anyone can build against. Strictly below every follower makes it one.
  */
-export const CAMERA_RIG_PRIORITY = -0.5
+export const CAMERA_RIG_PRIORITY = -0.75

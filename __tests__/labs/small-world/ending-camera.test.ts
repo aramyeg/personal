@@ -18,6 +18,7 @@ import {
 } from '@/components/labs/small-world/ending-timeline'
 import { ROTATION_TOTAL, rotationAt } from '@/components/labs/small-world/journey-timeline'
 import { STANCE_ALPHA, epilogueGate, renewalGate } from '@/components/labs/small-world/scene/renewal'
+import { PEEKER_RIG_PRIORITY } from '@/components/labs/small-world/scene/props/peeker-stage'
 import {
   BOUNDARY_WANDER,
   EPILOGUE_END,
@@ -83,10 +84,20 @@ describe('the camera invariant', () => {
     }
   })
 
-  it('runs after the journey ref and before every default-priority consumer', () => {
-    // r3f sorts subscribers ascending by priority and only hands over rendering above 0.
+  it('runs after the journey ref and STRICTLY before every rig that follows the camera', () => {
+    // r3f sorts subscribers ascending by priority and only hands over rendering above 0, so a
+    // negative priority is purely an ordering key.
     expect(CAMERA_RIG_PRIORITY).toBeGreaterThan(-1)
     expect(CAMERA_RIG_PRIORITY).toBeLessThan(0)
+
+    // The half that actually needed pinning. The peeker rig copies the camera's transform every
+    // frame, and both rigs sat at −0.5 — r3f's sort is stable, so the tie resolved by MOUNT order
+    // (CameraRig happens to be the first child of SceneContents and CheckpointPeekers the last).
+    // The contract handed to T64 claimed this ordering was structural; it was sibling order.
+    expect(
+      CAMERA_RIG_PRIORITY,
+      'a camera follower must never tie with the rig that writes the camera'
+    ).toBeLessThan(PEEKER_RIG_PRIORITY)
   })
 })
 
