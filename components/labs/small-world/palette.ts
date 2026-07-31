@@ -266,4 +266,27 @@ export const PALETTE = {
   polarSea: '#2F6C8C', // penguin floe — cold open polar water, well below iceDeep so a pale raft
   // has something to sit ON rather than a band of the same value to dissolve into
   polarSeaDeep: '#1E4E68', // the trough shadow under the floe's waterline and between the swells
+
+  // Task 65 — THE DESK. Four colours, and all four are chosen against what they are seen NEXT TO
+  // rather than against what a desk is: at full pull-back the slab fills the bottom two fifths of
+  // the frame, and everything above it is the sky's own low glow, which the winter mood holds at a
+  // pale lilac-pink. A warm mid tan is the one family that reads as a made object against that (a
+  // grey slab joins the sky, a saturated terracotta fights the world's snow) — and the slab is lit
+  // almost flat, its horizontal face taking dot(N,L) = 0.28 from the one key, so its albedo is very
+  // nearly what ships to the eye. Hence a value chosen dark enough to survive being multiplied up.
+  //
+  // The VALUES are measured, not picked. A first pass authored the slab at #C39468 — a reasonable
+  // hex for birch — and it rendered rgb(155,118,67): a mustard brown filling two fifths of the
+  // money shot. The scene's one key rakes from the upper left, so a horizontal face takes
+  // dot(N,L) = 0.28 and lands two bands down the four-step clay ramp, which costs about a fifth of
+  // the albedo before the sRGB round trip. The slab and the note therefore carry AUTHORED normals
+  // tilted into the key (see `tiltTowardKey`), which puts them on the ramp's top band, and their
+  // albedos are then chosen against a ~0.94 render ratio instead of a ~0.79 one.
+  deskTop: '#E0C3A0', // the slab — warm pale oak; renders near rgb(211,183,150)
+  deskGrain: '#C09A70', // pressed grain, the hand-formed back edge, and the slab's own recession
+  notePaper: '#F6EEDB', // the note sheet. Warmer than `snow` so paper never reads as one more drift
+  deskShade: '#8A6242', // contact pockets under the props, and the dish's own shadowed interior
+  deskMat: '#AFC0CB', // the blotter under the note and the stand. The frame's one COOL surface: the
+  // desk is warm oak and the sky is a lilac-pink wash, and without a third note between them the
+  // bottom of the composition is one unbroken field of tan
 } as const

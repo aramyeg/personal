@@ -26,6 +26,15 @@ import type { JourneyRef } from './use-journey'
 /** How far the ambient fill follows the key light's tint — kept lower so shadows stay neutral. */
 const AMBIENT_FOLLOW = 0.7
 
+/**
+ * Where the one key light stands. Exported because the desk's big flat surfaces author their own
+ * normals against it (Task 65) — a horizontal plane takes only dot(N,L) = 0.28 from here and lands
+ * two bands down the clay ramp, which is a fifth of the albedo lost on the largest surface in the
+ * ending. Importing the position rather than restating it means a lighting retune cannot silently
+ * leave the desk shading toward a light that has moved.
+ */
+export const KEY_LIGHT_POSITION: readonly [number, number, number] = [-6, 2, 3.2]
+
 const BASE_KEY = new THREE.Color(GRADE_BASE.key)
 const BASE_AMBIENT = new THREE.Color(GRADE_BASE.ambient)
 const MOOD_CAST = BIOME_MOODS.map((m) => new THREE.Color(m.cast))
@@ -64,7 +73,7 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
       {/* Warm key raking from the upper-left, low enough that the terminator
           crosses the visible face — shadow pools in the clay dents and reads the
           toon bands as pinched facets. */}
-      <directionalLight ref={key} position={[-6, 2, 3.2]} intensity={1.55} color={GRADE_BASE.key} />
+      <directionalLight ref={key} position={KEY_LIGHT_POSITION} intensity={1.55} color={GRADE_BASE.key} />
     </>
   )
 }
