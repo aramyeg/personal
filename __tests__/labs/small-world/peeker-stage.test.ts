@@ -333,11 +333,20 @@ describe('the planet is never covered', () => {
     expect(SHIPPED_DISTANCE).toBe(CAMERA_DISTANCE)
     // ...and the mascots must stay a SIBLING of the planet, never a child, or they would inherit
     // the world's spin and the camera-space staging would come apart.
+    //
+    // Asserted as that PROPERTY rather than as adjacency to the fragment's closing tag, which is
+    // what this used to check. Adjacency was a positional accident: Task 64's curtain call mounts
+    // after the peekers, and the moment it did the guard failed without anything moving inside
+    // `<Planet>`. Same defect class as the grep this comment already describes — the guard has to
+    // fail on the drift it names, not on the next line someone adds below it.
     const scene = readFileSync(
       join(process.cwd(), 'components/labs/small-world/scene/scene.tsx'),
       'utf8'
     )
-    expect(scene).toMatch(/<CheckpointPeekers[^>]*\/>\s*<\/>/)
+    expect(scene).toMatch(/<CheckpointPeekers[^>]*\/>/)
+    const inPlanet = scene.slice(scene.indexOf('<Planet'), scene.indexOf('</Planet>'))
+    expect(inPlanet.length).toBeGreaterThan(100)
+    expect(inPlanet).not.toContain('CheckpointPeekers')
   })
 
   it('is out of the frame entirely before the ending can move the camera (Task 63)', () => {
