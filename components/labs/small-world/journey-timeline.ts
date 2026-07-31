@@ -1,4 +1,5 @@
 import { CHAPTER_COUNT } from './chapters'
+import { endingStateAt, type EndingState } from './ending-timeline'
 
 /**
  * Pure scroll→scene math. One scroll lap = TWO planet laps (720°, 120° per
@@ -101,6 +102,12 @@ export type PanelState = { chapter: number; t: number }
 export type RevealState = { chapter: number; t: number; phase: 'in' | 'out' }
 
 export type JourneyState = {
+  /**
+   * CLAMPED to [0, 1]. Every consumer of this field has always been able to rely on
+   * that, which is exactly why the ending could be bolted on past 1 without touching
+   * any of them — but it also means this field CANNOT tell you the journey is over.
+   * It reads 1 for the whole ending. Use `ending.active` (Task 63).
+   */
   progress: number
   rotation: number
   chapter: number
@@ -109,6 +116,15 @@ export type JourneyState = {
   panel: PanelState | null
   /** See RevealState. Non-null only when a driver supplies it (see use-arrival-journey). */
   reveal: RevealState | null
+  /**
+   * The ONE field derived from the UN-clamped progress: the ending's own timeline
+   * (see EndingState in ending-timeline.ts). Idle — a shared frozen object — for the
+   * whole journey. Carried here rather than plumbed separately so the camera rig and
+   * the scene read the ending from the SAME progress value the rotation was built
+   * from; that single-source property is what makes the camera invariant a statement
+   * about one scalar instead of two that could drift.
+   */
+  ending: EndingState
 }
 
 /** The reveal's first beat: the "!" discovery pop owns t in [0, this). */
@@ -166,6 +182,11 @@ export function approachRevealGrow(
  * drives it, this function only passes it through and re-keys the discovery burst
  * to it). Callers that do not drive a clock pass nothing and get `reveal: null` —
  * the burst then falls back to its original scroll window.
+ *
+ * `rawProgress` may now run past 1 (Task 63 — the scroll track has an ending segment
+ * after the journey). Everything below the clamp on the next line is therefore frozen
+ * at its end state for the whole ending, which is the ending's entire safety argument;
+ * only `ending` sees the un-clamped value. See ending-timeline.ts.
  */
 export function journeyStateAt(
   rawProgress: number,
@@ -217,5 +238,8 @@ export function journeyStateAt(
   // Round 5: the world no longer morphs on a lap-boundary panel. Each surface
   // point restages itself per-vertex behind the horizon (renewal.ts / planet.tsx),
   // so there is no global worldBlend — the render reads rotation directly.
-  return { progress, rotation, chapter, morph, burst, panel, reveal }
+  //
+  // Task 63: `ending` reads `rawProgress`, NOT the clamped `progress` — it is the one
+  // consumer that wants what the clamp throws away.
+  return { progress, rotation, chapter, morph, burst, panel, reveal, ending: endingStateAt(rawProgress) }
 }

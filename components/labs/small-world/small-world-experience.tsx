@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CHAPTER_COUNT } from './chapters'
+import { TRACK_END, trackOffsetFor } from './ending-timeline'
 import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
@@ -27,9 +28,21 @@ function detectWebGL(): boolean {
 const TRACK_VH_PER_CHAPTER = 240
 
 /**
- * Owns the tall scroll track and turns document scroll into a 0..1 progress
- * ref for the scene. Falls back to the server timeline when WebGL is missing
- * or the visitor prefers reduced motion.
+ * The track carries the six chapters AND the ending segment after them, in one
+ * continuous scroll (Task 63). The split is a RATIO of the measured scrollable
+ * height rather than a pixel subtraction — see `readRaw` in use-arrival-journey —
+ * so the sticky viewport's own height never has to be reconciled against `vh`
+ * units, which differ from `window.innerHeight` on mobile browsers with a
+ * collapsing toolbar. The journey's own scroll therefore stretches by
+ * ENDING_SPAN/TRACK_END ≈ 1.7% per chapter; at 223vh per chapter that is 4vh, and
+ * every progress-keyed number in the lab is unchanged.
+ */
+const TRACK_VH = CHAPTER_COUNT * TRACK_VH_PER_CHAPTER * TRACK_END
+
+/**
+ * Owns the tall scroll track and turns document scroll into a progress ref for
+ * the scene: [0, 1] is the journey, (1, TRACK_END] is the ending. Falls back to
+ * the server timeline when WebGL is missing or the visitor prefers reduced motion.
  */
 export function SmallWorldExperience({
   onLoadChange,
@@ -77,18 +90,20 @@ export function SmallWorldExperience({
     setTune(isTuneEnabled(window.location.search))
   }, [])
 
+  // `p` is JOURNEY progress (a chapter boundary), so it has to be mapped back through the
+  // track's full domain — the track runs to TRACK_END now, not to 1.
   const advanceTo = (p: number) => {
     const el = trackRef.current
     if (!el) return
     const total = el.scrollHeight - window.innerHeight
     const top = el.getBoundingClientRect().top + window.scrollY
-    window.scrollTo({ top: top + p * total, behavior: 'smooth' })
+    window.scrollTo({ top: top + trackOffsetFor(p, total), behavior: 'smooth' })
   }
 
   if (!active) return null
 
   return (
-    <div ref={trackRef} style={{ height: `${CHAPTER_COUNT * TRACK_VH_PER_CHAPTER}vh` }}>
+    <div ref={trackRef} style={{ height: `${TRACK_VH}vh` }}>
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} journey={journey} onLoadChange={onLoadChange} />
         <JourneyOverlay progressRef={progressRef} journey={journey} onAdvance={advanceTo} />

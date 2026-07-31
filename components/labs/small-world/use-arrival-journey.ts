@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
 import { initialArrival, stepArrival, type ArrivalState } from './arrival'
+import { trackProgressAt } from './ending-timeline'
 
 /**
  * The journey's input pipeline: document scroll in, journey progress + the arrival
@@ -19,7 +20,7 @@ import { initialArrival, stepArrival, type ArrivalState } from './arrival'
  * costs nothing.
  */
 export type ArrivalJourney = {
-  /** Journey progress every consumer renders from (absorbed). */
+  /** Journey progress every consumer renders from (absorbed). Domain [0, TRACK_END]. */
   progressRef: MutableRefObject<number>
   /** Unfiltered scroll progress — for affordances that must track the finger even while absorbing. */
   rawProgressRef: MutableRefObject<number>
@@ -58,11 +59,14 @@ export function useArrivalJourney(
     let raf = 0
     let last = 0
 
+    // The track's domain is [0, TRACK_END]: the journey occupies [0, 1] and the ending
+    // the rest (Task 63 — `trackProgressAt` owns the mapping and why it is a ratio).
+    // Everything downstream of `journeyStateAt` clamps at 1 and is therefore frozen for
+    // the whole ending, by construction.
     const readRaw = () => {
       const el = trackRef.current
       if (!el) return rawProgressRef.current
-      const total = el.scrollHeight - window.innerHeight
-      return total > 0 ? Math.min(1, Math.max(0, window.scrollY / total)) : 0
+      return trackProgressAt(window.scrollY, el.scrollHeight - window.innerHeight)
     }
 
     const busy = () =>
