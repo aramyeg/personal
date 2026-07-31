@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { TRACK_END } from '../components/labs/small-world/ending-timeline'
 
 async function webglAvailable(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -21,11 +22,15 @@ async function webglAvailable(page: import('@playwright/test').Page): Promise<bo
 // scroll-behavior: smooth), so landing in a dwell can spend that checkpoint's one
 // absorption on the way in — the journey settles on the requested position either
 // way, it just may take up to a second longer than the scroll animation.
+// Round 20 (Task 63): the scroll track now runs past the journey — JOURNEY
+// progress [0, 1] plus an ending segment up to TRACK_END. `progress` here stays
+// in journey units (chapter N's stop is still near (N + 0.8)/6), so the raw
+// track fraction is progress / TRACK_END. Values past 1 scrub the ending.
 async function scrollToProgress(page: import('@playwright/test').Page, progress: number) {
-  await page.evaluate((p) => {
+  await page.evaluate((frac) => {
     const total = document.documentElement.scrollHeight - window.innerHeight
-    window.scrollTo(0, total * p)
-  }, progress)
+    window.scrollTo(0, total * frac)
+  }, progress / TRACK_END)
 }
 
 // SmallWorldExperience renders `null` until a mount effect confirms WebGL and
@@ -86,14 +91,19 @@ test.describe('Small World lab', () => {
     await expect(page.getByTestId('sw-panel-data')).toBeHidden()
   })
 
-  test('the journey ends on to-be-continued with contact links', async ({ page }) => {
+  // Task 63: the to-be-continued panel is retired; past the journey the ending
+  // owns the track — curtain call first, then the zoom-out pull-back. T65's
+  // connect note will give the zoom phase real content (and this test its
+  // contact-link assertions back).
+  test('past the journey the ending runs curtain call into zoom-out', async ({ page }) => {
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
-    await scrollToProgress(page, 1)
-    const end = page.getByTestId('sw-panel-end')
-    await expect(end).toBeVisible({ timeout: 10_000 })
-    await expect(end).toContainText(/to be continued/i)
-    await expect(end.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', /github\.com/)
+    await scrollToProgress(page, 1.02)
+    const ending = page.getByTestId('sw-ending')
+    await expect(ending).toBeAttached({ timeout: 10_000 })
+    await expect(ending).toHaveAttribute('data-phase', 'curtain')
+    await scrollToProgress(page, TRACK_END)
+    await expect(ending).toHaveAttribute('data-phase', 'zoom')
   })
 })
