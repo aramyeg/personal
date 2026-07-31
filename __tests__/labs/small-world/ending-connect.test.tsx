@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { EndingConnect, connectReveal } from '@/components/labs/small-world/overlay/ending-connect'
-import { railOpacity } from '@/components/labs/small-world/overlay/journey-progress'
+import { railDismissLive, railOpacity } from '@/components/labs/small-world/overlay/journey-progress'
 import { FallbackTimeline } from '@/components/labs/small-world/fallback-timeline'
 import {
   ENDING_SPAN,
@@ -72,6 +72,46 @@ describe('the connect block', () => {
     for (const c of CONTROLS) {
       const el = container.querySelector<HTMLElement>(`[data-testid="sw-connect-${c}"]`)!
       expect(el.style.pointerEvents).toBe('auto')
+    }
+  })
+
+  it('never arms a control below the RENDERED opacity it calls legible', () => {
+    // The nit this closes: `restart` was drawn at reveal x 0.82 and armed on reveal, so it became
+    // clickable at 0.697 on screen — under the bar the component itself sets. One rule now, and it
+    // is about what is on the screen rather than about the parameter behind it.
+    //
+    // Sampled AT each control's own crossing rather than by brute force. A first cut rendered 601
+    // times and turned out to be a five-second timeout waiting to happen on a loaded machine — a
+    // flaky guard is worse than no guard, and the crossings are where the rule can actually break.
+    const crossing = (index: number) => {
+      let lo = 0
+      let hi = 1
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2
+        if (connectReveal(mid, index) >= 0.85) hi = mid
+        else lo = mid
+      }
+      return hi
+    }
+    const stops = new Set<number>()
+    CONTROLS.forEach((_, i) => {
+      const t = crossing(i)
+      for (const d of [-1e-6, 0, 1e-6, -0.01, 0.01]) stops.add(Math.min(1, Math.max(0, t + d)))
+    })
+    for (let i = 0; i <= 20; i++) stops.add(i / 20)
+
+    for (const t of stops) {
+      const { container, unmount } = render(<EndingConnect t={t} onRestart={() => {}} />)
+      for (const c of CONTROLS) {
+        const el = container.querySelector<HTMLElement>(`[data-testid="sw-connect-${c}"]`)!
+        if (el.style.pointerEvents === 'auto') {
+          expect(
+            Number(el.style.opacity),
+            `${c} armed at rendered opacity ${el.style.opacity} (t=${t})`
+          ).toBeGreaterThanOrEqual(0.85)
+        }
+      }
+      unmount()
     }
   })
 
@@ -197,5 +237,45 @@ describe('the fallback page carries the same contact story', () => {
       const a = [...container.querySelectorAll('a')].find((el) => el.getAttribute('href') === l.url)!
       expect(a.getAttribute('rel')).toContain('noopener')
     }
+  })
+})
+
+/**
+ * THE RAIL'S DISMISS CONTROL (fix round, review finding 2).
+ *
+ * It used to be `pointer-events: auto` unconditionally, with the whole rail only hidden at exactly
+ * `opacity === 0` — so through the tail of the fade it was a topmost, focusable target at an
+ * effective alpha of 0.0099. That is the trap the connect block refuses three files over, and it now
+ * refuses it on the same terms: legible or inert.
+ */
+describe("the rail's dismiss control is live only while it is legible", () => {
+  it('is live for the whole journey and the whole curtain call', () => {
+    for (const p of [0, 0.5, 0.99, 1, 1 + ZOOM_START * ENDING_SPAN]) {
+      expect(railDismissLive(p)).toBe(true)
+    }
+  })
+
+  it('goes inert while the rail is still faintly visible, not once it has vanished', () => {
+    // the interesting property: there is a stretch where the rail can still be seen and the button
+    // is already dead. Without it, "invisible live button" is answered at the endpoint only.
+    let inertButVisible = 0
+    for (let i = 0; i <= 4000; i++) {
+      const p = 1 + (i / 4000) * ENDING_SPAN
+      const o = railOpacity(p)
+      if (!railDismissLive(p) && o > 0) inertButVisible++
+      // and the invariant itself: never live below the legibility bar
+      if (railDismissLive(p)) expect(o).toBeGreaterThanOrEqual(0.85)
+    }
+    expect(inertButVisible).toBeGreaterThan(0)
+  })
+
+  it('never revives once it has gone', () => {
+    let seenDead = false
+    for (let i = 0; i <= 4000; i++) {
+      const p = 1 + (i / 4000) * ENDING_SPAN
+      if (!railDismissLive(p)) seenDead = true
+      else expect(seenDead).toBe(false)
+    }
+    expect(seenDead).toBe(true)
   })
 })

@@ -38,10 +38,17 @@ import { PALETTE } from '../palette'
  * by itself, and the counter becomes chrome over the portfolio's contact page.
  *
  * So the fade is keyed to `zoom`, not to the ending, and it is gone by the time
- * there is a composition to sit on top of. When it is gone it is `visibility:
- * hidden` as well as transparent — the dismiss control is the one thing in this
- * component that takes pointer events, and an invisible live button over the
- * desk is exactly the trap the canvas-first model forbids.
+ * there is a composition to sit on top of. When it is gone the whole rail is
+ * `visibility: hidden` as well as transparent.
+ *
+ * THE DISMISS CONTROL LEAVES FIRST, and on a LEGIBILITY threshold rather than on
+ * a non-zero one. Hiding the rail only at exactly `opacity === 0` answered the
+ * trap at its endpoint and not on its approach: review swept real frames and
+ * found the button still topmost at its own centre, and still focusable, with
+ * the wrapper at 0.0247 — an effective alpha of 0.0099 once its own 0.4 is
+ * applied. A ~43 px window on a 15840 px track, and bounded in consequence, but
+ * it is the same defect `ending-connect.tsx` refuses three files over. It now
+ * uses that file's standard: a control is live only while it is legible.
  */
 
 const DOT = 9
@@ -49,6 +56,17 @@ const DOT_ACTIVE = 14
 
 /** The rail is fully gone by this much of the pull-back — well before the desk is readable. */
 const RAIL_GONE_AT = 0.28
+
+/**
+ * How much of the rail has to be up for its dismiss control to be honest about being clickable.
+ * The same number `ending-connect.tsx` uses, applied to the same question.
+ */
+const DISMISS_LIVE_AT = 0.85
+
+/** Whether the dismiss control may take a pointer or the keyboard at a scroll position. */
+export function railDismissLive(progress: number): boolean {
+  return railOpacity(progress) >= DISMISS_LIVE_AT
+}
 
 /** Its opacity at a scroll position, from the ending's own zoom parameter. */
 export function railOpacity(progress: number): number {
@@ -67,6 +85,7 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
   const [dismissed, setDismissed] = useState(false)
   const fillRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const dismissRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (dismissed) return
@@ -79,8 +98,14 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
       if (wrapRef.current) {
         const o = railOpacity(raw)
         wrapRef.current.style.opacity = `${o}`
-        // not merely transparent: the dismiss button is a live target, and it must not survive
         wrapRef.current.style.visibility = o === 0 ? 'hidden' : 'visible'
+      }
+      if (dismissRef.current) {
+        // `visibility` and not just `pointerEvents`: the second stops a click, the first is what
+        // takes the control out of sequential focus as well
+        const live = railDismissLive(raw)
+        dismissRef.current.style.pointerEvents = live ? 'auto' : 'none'
+        dismissRef.current.style.visibility = live ? 'visible' : 'hidden'
       }
       const c = chapterAt(p)
       setChapter((prev) => (prev === c ? prev : c))
@@ -190,6 +215,7 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
       </div>
 
       <button
+        ref={dismissRef}
         type="button"
         onClick={() => setDismissed(true)}
         aria-label="Hide journey progress"
@@ -197,7 +223,9 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
           position: 'absolute',
           right: 'max(12px, env(safe-area-inset-right))',
           bottom: 2,
-          pointerEvents: 'auto',
+          // inert until the first compute says otherwise — the safe direction to be wrong in
+          pointerEvents: 'none',
+          visibility: 'hidden',
           appearance: 'none',
           border: 'none',
           background: 'transparent',

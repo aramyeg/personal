@@ -37,7 +37,16 @@ const FIRST_IN = 0.5
 const FADE = 0.34
 const STAGGER = 0.055
 
-/** Below this the control is not legible enough to be honest about being clickable. */
+/**
+ * Below this RENDERED opacity a control is not legible enough to be honest about being clickable.
+ *
+ * It is rendered opacity and not reveal, which is a distinction the first cut got wrong: `restart`
+ * was drawn at `reveal * 0.82` and armed at `reveal >= 0.85`, so it became clickable at 0.697 on
+ * screen — under the bar this very constant defines. The dim is gone rather than the threshold
+ * lowered, because a control that must be dimmer than the legibility bar to look secondary is being
+ * asked to carry with alpha what type should carry: `restart` is smaller, borderless, dashed and in
+ * the hand, and that is what makes it the quiet one.
+ */
 const LIVE_AT = 0.85
 
 const smoothstep = (t: number): number => {
@@ -71,7 +80,9 @@ function controls(): Control[] {
 
 function tabStyle(reveal: number, tint: string): CSSProperties {
   return {
-    // NEVER 'auto' on a control nobody can read yet — see the click model above
+    // NEVER 'auto' on a control nobody can read yet — see the click model above. `opacity` below is
+    // the reveal itself, so this threshold and the rendered one are the same number for all four
+    // controls; that is the point of dropping the restart's dim.
     pointerEvents: reveal >= LIVE_AT ? 'auto' : 'none',
     opacity: reveal,
     transform: `translateY(${(1 - reveal) * 16}px)`,
@@ -151,7 +162,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
         onClick={onRestart}
         style={{
           pointerEvents: revealOf(items.length) >= LIVE_AT ? 'auto' : 'none',
-          opacity: revealOf(items.length) * 0.82,
+          opacity: revealOf(items.length),
           transform: `translateY(${(1 - revealOf(items.length)) * 16}px)`,
           appearance: 'none',
           border: 'none',
