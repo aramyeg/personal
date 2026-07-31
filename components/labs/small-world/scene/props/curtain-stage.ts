@@ -1,6 +1,17 @@
 import * as THREE from 'three'
 import { revealPhase, smoothstep } from '../../journey-timeline'
-import { CAMERA_DISTANCE, CAMERA_POSITION, CAMERA_TARGET } from '../camera'
+import {
+  CAMERA_DISTANCE,
+  CAMERA_FOV,
+  CAMERA_PITCH_DEG,
+  CAMERA_POSITION,
+  CAMERA_TARGET,
+  ZOOM_FACTOR,
+} from '../camera'
+// READ-ONLY across the lane boundary: T65 owns the desk's composition, this lane owns staying out
+// from under it. Importing the geometry rather than copying the numbers means a desk that moves
+// takes the cast's floor with it instead of silently starting to slice it.
+import { DESK_BACK_Z, DESK_TOP_Y } from '../desk-stage'
 import {
   DRESS_REACH,
   FACE_BOX,
@@ -216,6 +227,17 @@ const _v = new THREE.Vector3()
  * (yaw group → roll group → fold pivot). Composing them through a single Euler instead would make
  * the envelope depend on an order convention that the component does not share, and a sweep that
  * describes a different pose than the one that renders is worse than no sweep at all.
+ *
+ * THE PIVOT TRANSLATION IS NOT IN THE SAME FRAME, and that is a recorded approximation rather than
+ * an oversight. Here the foot offset is added back as a plain y-translation OUTSIDE the rotation
+ * product; in the graph the pivot group is a CHILD of the lean group, so its offset is carried
+ * through the yaw and the lean. The two differ by `f·(Ry·Rz(lean)·y - y)`, which over the settle
+ * poses the layout actually uses is at most 0.0405 figure-heights — 0.0078 half-heights at desktop
+ * size, about 3.5 px on a 900 px frame. That is comfortably inside `CURTAIN_WORLD_MARGIN` (0.055),
+ * which is where the world clearance absorbs it; it is NOT inside the frame-edge and crown checks,
+ * which carry no margin of their own, so those are the two that can sit a few pixels from where
+ * the envelope says. Aligning it would make this function know the graph's NESTING as well as its
+ * order, for a fifth of the ink line's own width.
  */
 function sweep(
   box: { out: number; in: number; up: number; down: number },
@@ -384,6 +406,16 @@ export const CURTAIN_SIZE_MAX = 0.3
  * everything else on standing CLOSE to the world.
  */
 export const CURTAIN_SIZE_GOOD = 0.175
+
+/**
+ * ...and the size below which a figure has stopped being a character.
+ *
+ * 0.11 puts a figure at 0.19 half-heights — about 85 px on a 900 px frame, roughly half the size
+ * Aram rejected the Round-14 corners at, and the point where these figures stop reading as species
+ * and start reading as coloured blobs. It is used for exactly one decision: whether honouring the
+ * desk's floor is worth what it costs on a frame that cannot afford it.
+ */
+export const CURTAIN_SIZE_LEGIBLE = 0.11
 /** ...and the smallest worth showing. Below this the layout has failed and the report says so. */
 export const CURTAIN_SIZE_MIN = 0.05
 
@@ -480,6 +512,8 @@ export type CurtainSlot = {
   angle: number
   /** 0 = the front row; each row back is one `CURTAIN_ROW_GAP` further and that much smaller. */
   row: number
+  /** Which braid of the crowd this composition stands in — 0 hugs the world, 1 stands out past it. */
+  lane: number
 }
 
 /**
@@ -497,8 +531,18 @@ function stageable(
   side: Side,
   halfW: number,
   fig: Rect & { z: number },
-  face: Rect
+  face: Rect,
+  comp: Rect,
+  deskFloor: readonly number[]
 ): boolean {
+  // THE DESK'S BACK EDGE (Task 65). The desk is nearer the camera than the cast at every point, so
+  // wherever a composition projects below the edge's screen line the desk simply draws over it —
+  // and the edge CLIMBS as the camera pulls back while the cast shrinks toward the centre, so a
+  // slot that is clear at the bow can be sliced at the bottom of the track. Checked against every
+  // row, because a row further back shrinks LESS and therefore sits lower on screen.
+  for (let row = 0; row < deskFloor.length; row++) {
+    if (v + comp.y0 * size * curtainRowScale(row) < deskFloor[row]) return false
+  }
   // Checked at the slot AND at the arrival's OVERSHOOT: the gather travels radially out from the
   // centre of the ring and easeOutBack peaks past 1, so a figure momentarily stands further out
   // than where it parks — away from the world (harmless) and toward the frame edge (not).
@@ -530,6 +574,76 @@ function stageable(
   return true
 }
 
+// --- the desk the cast must stay above (Task 65) -----------------------------
+//
+// The desk is a sibling of the world, parked outside the journey camera's frustum, and it comes
+// into frame as the camera pulls back. Its BACK EDGE — the line `y = DESK_TOP_Y`, `z = DESK_BACK_Z`
+// — is nearer the camera than every part of this cast (the stage plane is BEHIND the world, the
+// desk is well in front of it), so the depth buffer gives the desk everything below that line.
+//
+// TWO PROPERTIES MAKE THIS CHEAP TO ENFORCE, and both are consequences of the camera translating
+// along its own view axis rather than orbiting:
+//
+//  1. The back edge projects to a HORIZONTAL line. For a fixed (y, z) and varying x, the camera-
+//     space height and depth are both constant, so its screen v does not depend on x at all — one
+//     scalar per zoom stop bounds the whole width of the frame.
+//  2. Camera-space height is INVARIANT under the pull-back. Moving the camera along its own +Z
+//     cannot change a point's component along the camera's +Y, so only the DEPTH changes with the
+//     zoom. The edge therefore climbs monotonically as a simple 1/depth, and so does the cast.
+//
+// Which is why this is a per-row constant rather than a per-frame test: see `CURTAIN_DESK_FLOOR`.
+
+const PITCH_RAD = (CAMERA_PITCH_DEG * Math.PI) / 180
+const HALF_FOV_RAD = (CAMERA_FOV * Math.PI) / 360
+
+/**
+ * Screen v of the desk's back edge at a camera distance, in half-heights. Derived from T65's own
+ * exported geometry rather than from a number copied across the lane boundary, so a desk that moves
+ * takes this lane's floor with it.
+ */
+export function deskEdgeV(distance: number): number {
+  const s = Math.sin(PITCH_RAD)
+  const c = Math.cos(PITCH_RAD)
+  const height = DESK_TOP_Y * c - DESK_BACK_Z * s
+  const depth = distance - DESK_TOP_Y * s - DESK_BACK_Z * c
+  return height / (depth * Math.tan(HALF_FOV_RAD))
+}
+
+/**
+ * Screen v of a stage-frame v on a given row, at a camera distance. The cast is world-space and
+ * static, so only the depth changes: `v` is measured at the row's own rest half-height and shrinks
+ * as `restDistance / distance`.
+ */
+export function curtainScreenV(v: number, row: number, distance: number): number {
+  return (v * curtainRowDistance(row)) / (distance + curtainRowOffset(row))
+}
+
+/** Camera distances sampled across the pull-back — the whole range `endingCameraDistance` attains. */
+const ZOOM_SAMPLES: readonly number[] = Array.from(
+  { length: 25 },
+  (_, i) => CAMERA_DISTANCE * (1 + (i / 24) * (ZOOM_FACTOR - 1))
+)
+
+/**
+ * The lowest stage-frame v a composition's BOTTOM may occupy on each row, for the desk's back edge
+ * never to cut it at any zoom stop.
+ *
+ * A constant rather than a per-frame test because of the two properties above: the edge's screen v
+ * and the cast's screen v are both pure functions of the camera distance, so the binding stop can
+ * be found once. It is the FULL pull-back on every row — the edge climbs faster than the cast
+ * shrinks — but the maximum is taken over the sampled range rather than assumed, so a retuned
+ * `ZOOM_FACTOR` or a desk that moves cannot quietly relocate the worst case.
+ */
+export const CURTAIN_DESK_FLOOR: readonly number[] = Array.from({ length: CURTAIN_ROWS }, (_, row) => {
+  let floor = -Infinity
+  for (const d of ZOOM_SAMPLES) {
+    // the stage-frame v whose screen v lands exactly on the edge at this stop
+    const v = (deskEdgeV(d) * (d + curtainRowOffset(row))) / curtainRowDistance(row)
+    if (v > floor) floor = v
+  }
+  return floor
+})
+
 /**
  * Resolution of the two searches. Both are as coarse as the eye allows on purpose: the whole
  * layout runs at mount and on every resize, on the main thread, in a scene that is already loading
@@ -553,7 +667,9 @@ export function curtainRadiusBand(
   size: number,
   halfW: number,
   fig: Rect & { z: number },
-  face: Rect
+  face: Rect,
+  comp: Rect,
+  deskFloor: readonly number[]
 ): { lo: number; hi: number } | null {
   const c = Math.cos(angle)
   const s = Math.sin(angle)
@@ -562,7 +678,7 @@ export function curtainRadiusBand(
   let hi = -1
   for (let i = 0; i <= RADIUS_STEPS; i++) {
     const r = RADIUS_MIN + ((RADIUS_MAX - RADIUS_MIN) * i) / RADIUS_STEPS
-    if (stageable(r * c, r * s, size, side, halfW, fig, face)) {
+    if (stageable(r * c, r * s, size, side, halfW, fig, face, comp, deskFloor)) {
       if (lo < 0) lo = r
       hi = r
     } else if (lo >= 0) break
@@ -575,51 +691,113 @@ export const CURTAIN_RING_START = 0.35
 
 const ANGLE_STEPS = 168
 
+/**
+ * The company does not stand in single file — it stands in two braided LANES.
+ *
+ * A wing is nearly VERTICAL, so a single file spends the frame's height and none of its width, and
+ * the height is exactly what the desk's back edge took away. Two lanes spend the width instead: the
+ * same wing seats three out-and-back pairs rather than six stacked figures, at roughly twice the
+ * size. It also puts each biome's two members at neighbouring bearings on opposite lanes, so the
+ * partners stand together with one a little further out.
+ *
+ * The gap between them is not a constant: it is the figure envelope's own support along the RADIAL
+ * at each bearing (`footprintAlong`), times this margin. That is exactly the separating-axis
+ * distance, so the lanes provably cannot overlap — and it is as small as it can be, which matters
+ * because a constant sized for the worst bearing would charge every frame for the worst case. A
+ * fixed 2.0 figure-heights cost 1024x768 a quarter of its figure size for nothing.
+ */
+export const CURTAIN_LANE_PACK = 1.02
+export const CURTAIN_LANES = 2
+
 type RingPoint = { angle: number; u: number; v: number }
-type Run = { pts: RingPoint[]; len: number }
+type Run = { pts: RingPoint[] }
 
 /**
- * The ring at a given size and STAND-OFF: every stageable bearing, placed at `standoff` of the way
- * from where it clears the world to where it runs out of frame, collected into runs of consecutive
- * bearings with their arc lengths.
+ * How much of the packing budget one composition spends at a point where the ring runs along `t`.
+ *
+ * THIS IS THE FIX FOR THE STAIRCASE. The budget used to be spent in figure WIDTHS everywhere,
+ * which is right along a horizontal stretch of ring and wrong along a vertical one — and both
+ * wings are nearly vertical, so consecutive slots were separated mostly in `v` while being charged
+ * for their `u`. The swept figure box is about 1.95 figure-heights tall against 1.5 wide, so every
+ * adjacent pair in a wing overlapped, the depth-row fan fired on every frame the lab ships to, and
+ * the company rendered as a 1.89x staircase instead of a line of equals.
+ *
+ * The support of an axis-aligned box along a unit direction is `|tx|·width + |ty|·height`, which is
+ * exactly what two neighbours have to be separated by along that direction for the separating-axis
+ * theorem to keep them apart. Spending the budget in THAT is what makes the spacing mean what it
+ * says at every bearing.
+ */
+function footprintAlong(tx: number, ty: number, box: Rect, size: number): number {
+  return (Math.abs(tx) * (box.x1 - box.x0) + Math.abs(ty) * (box.y1 - box.y0)) * size
+}
+
+/**
+ * One lane of the ring at a given size and stand-off: every stageable bearing, placed at `standoff`
+ * of the way from where it clears the world to where it runs out of frame and then pushed out by
+ * the lane's own radial offset, collected into runs of consecutive bearings.
+ *
+ * Each run carries both its arc length and its CAPACITY — how many compositions fit along it, which
+ * is the arc integrated against the local footprint rather than divided by a constant width.
  *
  * Parameterised from just left of the crown and running COUNTER-CLOCKWISE, so the company reads
- * down the left wing, across whatever floor is left and up the right — which is the order the
- * journey was walked in, and therefore the order the gather and the bow ripple in.
+ * down the left wing and up the right — the order the journey was walked in, and therefore the
+ * order the gather and the bow ripple in.
  */
 function ringAt(
   size: number,
   standoff: number,
+  lane: number,
   halfW: number,
   figL: Rect & { z: number },
   figR: Rect & { z: number },
   faceL: Rect,
-  faceR: Rect
+  faceR: Rect,
+  compL: Rect,
+  compR: Rect,
+  deskFloor: readonly number[]
 ): Run[] {
   const runs: Run[] = []
   let cur: Run | null = null
-  // Start just left of the crown and run counter-clockwise, so the company reads down the
-  // left wing and up the right — the order the journey was walked in.
   const start = Math.PI / 2 + CURTAIN_RING_START
   for (let i = 0; i <= ANGLE_STEPS; i++) {
     const angle = start + (TAU * i) / ANGLE_STEPS
     let pt: RingPoint | null = null
     const side: Side = Math.cos(angle) < 0 ? -1 : 1
+    const fig = side === -1 ? figL : figR
     const band = curtainRadiusBand(
       angle,
       size,
       halfW,
-      side === -1 ? figL : figR,
-      side === -1 ? faceL : faceR
+      fig,
+      side === -1 ? faceL : faceR,
+      side === -1 ? compL : compR,
+      deskFloor
     )
     if (band) {
-      const r = band.lo + standoff * (band.hi - band.lo)
-      pt = { angle, u: r * Math.cos(angle), v: r * Math.sin(angle) }
+      // the lane's own offset, measured along the radial at THIS bearing
+      const push =
+        lane * CURTAIN_LANE_PACK * footprintAlong(Math.cos(angle), Math.sin(angle), fig, size)
+      const r = band.lo + standoff * (band.hi - band.lo) + push
+      // the outer lane has to be stageable where it actually stands, not where the inner one does
+      if (
+        lane === 0 ||
+        stageable(
+          r * Math.cos(angle),
+          r * Math.sin(angle),
+          size,
+          side,
+          halfW,
+          fig,
+          side === -1 ? faceL : faceR,
+          side === -1 ? compL : compR,
+          deskFloor
+        )
+      ) {
+        pt = { angle, u: r * Math.cos(angle), v: r * Math.sin(angle) }
+      }
     }
     if (pt) {
-      if (!cur) cur = { pts: [], len: 0 }
-      const last = cur.pts[cur.pts.length - 1]
-      if (last) cur.len += Math.hypot(pt.u - last.u, pt.v - last.v)
+      if (!cur) cur = { pts: [] }
       cur.pts.push(pt)
     } else if (cur) {
       if (cur.pts.length > 1) runs.push(cur)
@@ -630,8 +808,91 @@ function ringAt(
   return runs
 }
 
-/** Widest a composition gets, in figure-heights — what the packing budget is spent in. */
-const compWidth = (comp: Rect): number => comp.x1 - comp.x0
+/**
+ * Walk one lane's runs and drop a composition wherever the last one is far enough behind.
+ *
+ * CONSTRUCTIVE, and that is the whole point. The first version of this spent an arc-length budget
+ * and then trusted the arithmetic — but the ring's radius jumps from bearing to bearing as a
+ * composition's u-span crosses the world silhouette's bins, so the PATH between two neighbours is
+ * far longer than the straight line between them. An arc budget therefore pays for travel the eye
+ * never sees, and delivered neighbours less than half a figure apart while reporting them clear.
+ * (That is the same defect the depth-row fan was written to paper over, one level further down.)
+ *
+ * So nothing is integrated: each candidate is accepted only if its CHORD from the last accepted one
+ * clears the separating-axis distance along that chord, which is precisely the condition for the
+ * two boxes to miss. `spread` scales that requirement up when a run has room to spare, so the
+ * company distributes across the wing instead of bunching at the end it was walked from.
+ */
+function clears(
+  pt: RingPoint,
+  other: RingPoint,
+  size: number,
+  figL: Rect,
+  figR: Rect,
+  spread: number
+): boolean {
+  const dx = pt.u - other.u
+  const dy = pt.v - other.v
+  const chord = Math.hypot(dx, dy)
+  if (chord <= 0) return false
+  const box = pt.u < 0 ? figL : figR
+  return chord >= spread * footprintAlong(dx / chord, dy / chord, box, size)
+}
+
+function packRun(
+  run: Run,
+  size: number,
+  figL: Rect,
+  figR: Rect,
+  spread: number,
+  avoid: readonly RingPoint[]
+): RingPoint[] {
+  const out: RingPoint[] = []
+  for (const pt of run.pts) {
+    // Checked against EVERY composition already standing, not just the one before it — in this lane
+    // and in the other. Neither shortcut is safe here: the ring's radius jumps from bearing to
+    // bearing, so a path that has moved on can fold back beside something it passed several samples
+    // ago, and the lane offset only separates the two braids where they sit at the same bearing.
+    let blocked = false
+    for (const a of out) {
+      if (!clears(pt, a, size, figL, figR, spread)) {
+        blocked = true
+        break
+      }
+    }
+    for (let i = 0; i < avoid.length && !blocked; i++) {
+      if (!clears(pt, avoid[i], size, figL, figR, spread)) blocked = true
+    }
+    if (blocked) continue
+    out.push(pt)
+  }
+  return out
+}
+
+/** ...and across every run of a lane, in ring order. */
+function packLane(
+  runs: Run[],
+  size: number,
+  figL: Rect,
+  figR: Rect,
+  spread: number,
+  avoid: readonly RingPoint[] = []
+): RingPoint[] {
+  const out: RingPoint[] = []
+  for (const run of runs) out.push(...packRun(run, size, figL, figR, spread, [...avoid, ...out]))
+  return out
+}
+
+/**
+ * Which of a lane's packed positions the `n`-th of `of` compositions takes.
+ *
+ * When the packing found more room than the company needs, the extra shows up as SPACING rather
+ * than as a gap at whichever end the ring was walked from.
+ */
+function pick(placed: readonly RingPoint[], n: number, of: number): RingPoint {
+  const i = Math.round(((placed.length - 1) * n) / Math.max(1, of - 1))
+  return placed[Math.min(placed.length - 1, Math.max(0, i))]
+}
 
 /** Standoffs tried, nearest the world first: the company stands as close in as it can fit. */
 const STANDOFFS = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]
@@ -639,117 +900,178 @@ const STANDOFFS = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]
 /**
  * The staging decision for the whole cast: where twelve compositions stand and how big they are.
  *
- * Two nested searches, and the nesting is the composition rule rather than an implementation
- * detail. The OUTER one bisects for the largest figure the frame can seat — size is what the eye
- * judges first, and Aram rejected the Round-14 corner heads for being small. The INNER one then
- * takes the SMALLEST stand-off that still seats the whole company, so the cast crowds in as close
- * to the world as twelve of them can fit rather than spreading out to the frame edges.
+ * Three nested searches, and the nesting is the composition rule rather than an implementation
+ * detail. The OUTER one relaxes the SPACING only when it must. The MIDDLE one walks the stand-offs
+ * outward and stops at the first that reaches a size worth showing, so the company crowds in around
+ * the world instead of spreading to the frame edges where the longest arc happens to be. The INNER
+ * one bisects for the largest figure that stand-off can seat.
  *
- * The slots are distributed evenly BY ARC LENGTH over the stageable runs, so a wide frame with two
- * clear flanks seats six a side and a portrait frame that only clears the world above and below
- * seats them there instead — neither case is written down anywhere, they both fall out.
+ * The slots are distributed evenly BY CAPACITY over the stageable runs of two braided lanes, so a
+ * wide frame seats three pairs a side and a portrait frame — where the world fills the width and
+ * the desk takes the floor — seats what it can where it can. Neither case is written down anywhere.
  */
 export function curtainLayout(halfW: number, count = CURTAIN_CAST.length): CurtainSlot[] {
+  return curtainLayoutInfo(halfW, count).slots
+}
+
+/** No floor at all — what a frame falls back to when the desk's leaves it nowhere to stand. */
+const NO_DESK_FLOOR: readonly number[] = []
+
+/**
+ * The layout, plus whether it was reached WITH the desk's floor honoured.
+ *
+ * `deskClear === false` is a real, visible defect and not a soft mode: it means the desk's back edge
+ * cuts into the company somewhere in the pull-back on that frame. It is reported rather than
+ * silently absorbed, and `curtain-stage.test.ts` pins exactly which frame classes are which, because
+ * the alternative on those frames is seating nobody at all — which is worse than the defect and
+ * would also hide it.
+ */
+export function curtainLayoutInfo(
+  halfW: number,
+  count = CURTAIN_CAST.length
+): { slots: CurtainSlot[]; deskClear: boolean } {
+  const clear = solveLayout(halfW, count, CURTAIN_DESK_FLOOR)
+  // Honouring the floor is worth having only if what is left is still a company the reader can
+  // see. On a frame whose world fills the width, the only clear sky is UNDER the horizon and the
+  // desk owns all of it, so the floor is satisfiable — at 45 px a figure, which is not a curtain
+  // call. There the honest answer is the visible defect plus a report, not an invisible cast.
+  if (clear.length > 0 && clear[0].size >= CURTAIN_SIZE_LEGIBLE) {
+    return { slots: clear, deskClear: true }
+  }
+  return { slots: solveLayout(halfW, count, NO_DESK_FLOOR), deskClear: false }
+}
+
+function solveLayout(
+  halfW: number,
+  count: number,
+  deskFloor: readonly number[]
+): CurtainSlot[] {
   const figL = curtainFigureBox(-1)
   const figR = curtainFigureBox(1)
   const faceL = curtainFaceBox(-1)
   const faceR = curtainFaceBox(1)
-  // Packed on the FIGURE's width, not the composition's: two neighbouring dressings interleaving
-  // reads as one continuous piece of ground the company is standing on, which is what a crowd
-  // looks like. Two figures overlapping does not.
-  const width = Math.max(compWidth(figL), compWidth(figR))
+  const compL = curtainCompositionBox(-1)
+  const compR = curtainCompositionBox(1)
+  const perLane = Math.ceil(count / CURTAIN_LANES)
 
-  /** The ring at one stand-off, or null if it cannot seat the company at this size and spacing. */
-  const seatAt = (standoff: number, size: number, pack: number): Run[] | null => {
-    const runs = ringAt(size, standoff, halfW, figL, figR, faceL, faceR)
-    const total = runs.reduce((a, r) => a + r.len, 0)
-    return total >= count * width * size * pack ? runs : null
+  /** The lanes at one stand-off, or null if they cannot seat the company at this size and spacing. */
+  /**
+   * The company's twelve positions at one stand-off, size and spacing — or null.
+   *
+   * Every candidate is VERIFIED as the thing that would ship: the lanes are packed, the company is
+   * picked out of them, and then the picked twelve are checked pairwise. Checking the packing
+   * instead would be checking an intermediate — and an earlier version of this did exactly that,
+   * accepted a size whose packed points were provably clear, and still shipped overlapping slots,
+   * because what reaches the screen is the SUBSET the picker takes and not the list it takes it
+   * from. The rule is the T56 one: gate the artefact, not the working.
+   */
+  const seatAt = (standoff: number, size: number, pack: number): RingPoint[] | null => {
+    const lanes: RingPoint[][] = []
+    for (let lane = 0; lane < CURTAIN_LANES; lane++) {
+      const runs = ringAt(size, standoff, lane, halfW, figL, figR, faceL, faceR, compL, compR, deskFloor)
+      // Each lane carries its own half of the company, so each has to seat it on its own — and
+      // "seat" means a real packing, not a budget: `packRun` returns the compositions it actually
+      // managed to place without touching.
+      const taken = lanes.flat()
+      let placed = packLane(runs, size, figL, figR, pack, taken)
+      if (placed.length < perLane) return null
+      // Room to spare: widen the requirement until only the company fits, so it spreads across the
+      // wing rather than bunching at the end the ring was walked from.
+      let lo = pack
+      let hi = pack * 6
+      for (let i = 0; i < 9; i++) {
+        const mid = (lo + hi) / 2
+        const got = packLane(runs, size, figL, figR, mid, taken)
+        if (got.length >= perLane) {
+          lo = mid
+          placed = got
+        } else hi = mid
+      }
+      lanes.push(placed)
+    }
+
+    const picked: RingPoint[] = []
+    for (let k = 0; k < count; k++) {
+      const lane = lanes[k % CURTAIN_LANES]
+      picked.push(pick(lane, Math.floor(k / CURTAIN_LANES), perLane))
+    }
+    for (let i = 0; i < picked.length; i++) {
+      for (let j = i + 1; j < picked.length; j++) {
+        if (!clears(picked[j], picked[i], size, figL, figR, pack)) return null
+      }
+    }
+    return picked
   }
 
-  /** The largest size this stand-off can seat the company at, and its ring. */
+  /** The largest size this stand-off can seat the company at, and its lanes. */
   const largestAt = (standoff: number, pack: number) => {
     if (!seatAt(standoff, CURTAIN_SIZE_MIN, pack)) return null
+    const capped = seatAt(standoff, CURTAIN_SIZE_MAX, pack)
+    if (capped) return { picked: capped, size: CURTAIN_SIZE_MAX }
     let lo = CURTAIN_SIZE_MIN
     let hi = CURTAIN_SIZE_MAX
-    let runs = seatAt(standoff, CURTAIN_SIZE_MAX, pack)
-    if (runs) return { runs, size: CURTAIN_SIZE_MAX }
-    runs = seatAt(standoff, lo, pack)
+    let picked = seatAt(standoff, lo, pack)
     let size = lo
     for (let i = 0; i < 10; i++) {
       const mid = (lo + hi) / 2
       const r = seatAt(standoff, mid, pack)
       if (r) {
         lo = mid
-        runs = r
+        picked = r
         size = mid
       } else hi = mid
     }
-    return runs ? { runs, size } : null
+    return picked ? { picked, size } : null
   }
 
   /** The best the company can do at one spacing: nearest stand-off that reaches a size worth showing. */
   const atPack = (pack: number) => {
-    let found: { runs: Run[]; size: number } | null = null
+    let found: { picked: RingPoint[]; size: number } | null = null
     for (const standoff of STANDOFFS) {
       const got = largestAt(standoff, pack)
       if (!got) continue
       if (!found || got.size > found.size) found = got
-      // NEAREST FIRST: stop as soon as a stand-off reaches a size worth showing, so the company
-      // crowds in around the world instead of spreading out to the frame edges where the longest
-      // stageable arc happens to be.
       if (got.size >= CURTAIN_SIZE_GOOD) break
     }
     return found
   }
 
-  // LOOSEST FIRST. Shoulder-to-shoulder spacing is tried before anything else and kept unless a
-  // tighter one buys a REAL gain in size — a frame that has to choose gives up spacing before it
-  // gives up size, but not for a few percent, because a crowd that overlaps has to earn it.
+  // UNIFORM FIRST, and this is the rule the review's first finding is about. Shoulder-to-shoulder
+  // spacing is tried before anything else and KEPT whenever what it produces is a company the
+  // reader can see — a tighter spacing is not an upgrade you buy with size, it is a fallback for a
+  // frame that has no other option.
+  //
+  // The rule used to be "keep it unless a tighter spacing buys 25% more size", and that is how a
+  // 1920x1080 frame ended up crowded: 0.78 spacing bought it 40% and won, the overlaps went into
+  // the depth rows, and twelve figures shipped as a 1.89x staircase down each wing on every frame
+  // class in the lab. Size is what the eye judges first, but not at the price of the company no
+  // longer looking like one.
   let best = atPack(CURTAIN_PACK)
-  if (!best || best.size < CURTAIN_SIZE_GOOD) {
+  if (!best || best.size < CURTAIN_SIZE_LEGIBLE) {
     for (const pack of CURTAIN_PACK_FALLBACK) {
       const got = atPack(pack)
       if (got && (!best || got.size > best.size * CURTAIN_CROWD_GAIN)) best = got
-      if (best && best.size >= CURTAIN_SIZE_GOOD) break
+      if (best && best.size >= CURTAIN_SIZE_LEGIBLE) break
     }
   }
 
   if (!best) return []
   const size = best.size
 
-  const runs = best.runs
-  const total = runs.reduce((a, r) => a + r.len, 0)
   const slots: CurtainSlot[] = []
   for (let k = 0; k < count; k++) {
-    const want = (total * (k + 0.5)) / count
-    let acc = 0
-    for (const run of runs) {
-      if (slots.length > k) break
-      if (acc + run.len >= want) {
-        let d = want - acc
-        for (let i = 1; i < run.pts.length; i++) {
-          const a = run.pts[i - 1]
-          const b = run.pts[i]
-          const seg = Math.hypot(b.u - a.u, b.v - a.v)
-          if (d <= seg || i === run.pts.length - 1) {
-            const f = seg > 0 ? clamp01(d / seg) : 0
-            const u = a.u + (b.u - a.u) * f
-            const v = a.v + (b.v - a.v) * f
-            slots.push({
-              u,
-              v,
-              size,
-              side: u < 0 ? -1 : 1,
-              angle: a.angle + (b.angle - a.angle) * f,
-              row: 0,
-            })
-            break
-          }
-          d -= seg
-        }
-      }
-      acc += run.len
-    }
+    const lane = k % CURTAIN_LANES
+    const pt = best.picked[k]
+    if (!pt) return []
+    slots.push({
+      u: pt.u,
+      v: pt.v,
+      size,
+      side: pt.u < 0 ? -1 : 1,
+      angle: pt.angle,
+      row: 0,
+      lane,
+    })
   }
   return rowed(slots, figL, figR)
 }

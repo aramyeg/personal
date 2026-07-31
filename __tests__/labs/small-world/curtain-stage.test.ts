@@ -7,7 +7,9 @@ import {
   CURTAIN_BOW_STAGGER,
   CURTAIN_CAST,
   CURTAIN_CROWN,
+  CURTAIN_DESK_FLOOR,
   CURTAIN_FOOT_Y,
+  CURTAIN_LANES,
   CURTAIN_GATHER_DONE,
   CURTAIN_OVERSHOOT,
   CURTAIN_PACK,
@@ -15,6 +17,7 @@ import {
   CURTAIN_ROWS,
   CURTAIN_SET_BACK,
   CURTAIN_SIZE_GOOD,
+  CURTAIN_SIZE_LEGIBLE,
   CURTAIN_SIZE_MAX,
   CURTAIN_V_FLOOR,
   CURTAIN_WORLD_MARGIN,
@@ -31,6 +34,9 @@ import {
   curtainHalfHeight,
   curtainIdle,
   curtainLayout,
+  curtainLayoutInfo,
+  curtainScreenV,
+  deskEdgeV,
   curtainNearestDepth,
   curtainPhase,
   curtainRowDistance,
@@ -41,6 +47,11 @@ import {
   curtainWorldReach,
   type CurtainSlot,
 } from '@/components/labs/small-world/scene/props/curtain-stage'
+import {
+  DESK_BACK_Z,
+  DESK_TOP_Y,
+} from '@/components/labs/small-world/scene/desk-stage'
+import { ZOOM_FACTOR } from '@/components/labs/small-world/scene/camera'
 import {
   DRIFT_ROLL,
   MASCOT_BOX,
@@ -88,6 +99,15 @@ const FRAMES: [string, number, number][] = [
 ]
 
 const layouts = FRAMES.map(([name, w, h]) => [name, w, h, curtainLayout(w / h)] as const)
+const infos = FRAMES.map(([name, w, h]) => [name, w, h, curtainLayoutInfo(w / h)] as const)
+
+/**
+ * The frames whose world does NOT fill their width, i.e. the ones with clear sky on the flanks. On
+ * everything else the only stageable band was under the horizon, and T65's desk now owns it — see
+ * the desk block below, which is the one place this lane ships a known defect rather than a fix.
+ */
+const LANDSCAPE = ['wide', 'desktop', 'laptop', 'small']
+const isLandscape = (name: string) => LANDSCAPE.some((n) => name.startsWith(n))
 
 /** A swept envelope placed at a slot and scaled, in half-heights. */
 function rect(box: { x0: number; y0: number; x1: number; y1: number }, s: CurtainSlot, k = 1) {
@@ -107,6 +127,16 @@ describe('the stage frame', () => {
    * the same target, so its orientation never changes and a static group can carry it. If T65's
    * re-aim ever breaks that, this fails — which is the intended alarm, and is why it is checked
    * against `cameraPositionAt` rather than against a pitch written down twice.
+   */
+  /**
+   * WHAT THIS DOES AND DOES NOT PIN, corrected after review. It proves the camera's orientation is
+   * constant for the whole ending GIVEN the target it is aimed at — which is the property the stage
+   * frame rests on, and it does fail on a camera that rotates. It does NOT catch a T65 change that
+   * makes the target a function of progress: the reference below reads the same module constant the
+   * shipped rig does, so both would move together and the comparison would stay green while the
+   * real camera swung (measured: a target at y = -1.5 is a 0.111 rad error this would not see).
+   * The report's handover to T65 says exactly that rather than promising a guard that does not
+   * exist; widening it needs a `cameraTargetAt`-shaped hook that camera.ts does not have.
    */
   it('carries the camera orientation, and that orientation is constant for the whole ending', () => {
     const rest = curtainStageQuaternion()
@@ -292,6 +322,34 @@ describe('the layout', () => {
    * allowed to overlap, and the alternating stage rows are what make that legible: an overlapping
    * pair is then genuinely at two depths and occludes cleanly.
    */
+  /**
+   * THE REVIEW'S FIRST FINDING. The depth-row fan used to fire on every frame class the lab ships
+   * to, so twelve figures rendered as a 1.89x staircase down each wing while the report advertised
+   * one size per frame. Two things had to be true for that to stop, and both are checked here
+   * rather than described: a frame with room seats the company at ONE size in ONE row, and the
+   * fan is confined to the frames that genuinely have no other option.
+   */
+  it('seats the company at one size in one row wherever the frame has room', () => {
+    for (const [name, , , slots] of layouts) {
+      if (!isLandscape(name)) continue
+      expect(new Set(slots.map((s) => s.row)).size, `${name} rows`).toBe(1)
+      expect(new Set(slots.map((s) => s.size)).size, `${name} sizes`).toBe(1)
+      // ...and the rendered size is the slot size, because nothing is scaled down by a row
+      for (const slot of slots) expect(curtainRowScale(slot.row)).toBe(1)
+    }
+  })
+
+  it('braids the company into two lanes, and puts each biome pair together', () => {
+    for (const [name, , , slots] of layouts) {
+      const lanes = new Set(slots.map((s) => s.lane))
+      expect(lanes.size, name).toBe(CURTAIN_LANES)
+      // slot k takes lane k % lanes, so a biome's two members are on opposite lanes
+      for (let c = 0; c < slots.length; c += 2) {
+        expect(slots[c].lane, `${name} pair ${c}`).not.toBe(slots[c + 1].lane)
+      }
+    }
+  })
+
   it('resolves every figure overlap in DEPTH, and leaves none inside one row', () => {
     for (const [name, , , slots] of layouts) {
       for (let i = 0; i < slots.length; i++) {
@@ -312,9 +370,14 @@ describe('the layout', () => {
 
   it('reads the company around the ring in journey order, splitting the two wings', () => {
     for (const [name, , , slots] of layouts) {
-      // The parameterisation runs counter-clockwise from the crown, so the angle is monotone.
-      for (let i = 1; i < slots.length; i++) {
-        expect(slots[i].angle, `${name} ${i}`).toBeGreaterThan(slots[i - 1].angle)
+      // The parameterisation runs counter-clockwise from the crown, so the angle is monotone
+      // WITHIN a lane. Across lanes it interleaves — that is the braid, and it is why each biome's
+      // two members end up at neighbouring bearings rather than one behind the other.
+      for (let lane = 0; lane < CURTAIN_LANES; lane++) {
+        const inLane = slots.filter((s) => s.lane === lane)
+        for (let i = 1; i < inLane.length; i++) {
+          expect(inLane[i].angle, `${name} lane ${lane} ${i}`).toBeGreaterThan(inLane[i - 1].angle)
+        }
       }
     }
     // ...and on any frame with room on both flanks, the journey's first half is on the left.
@@ -331,11 +394,14 @@ describe('the layout', () => {
    */
   it('reaches the size worth showing wherever the frame has room for it', () => {
     const size = (n: string) => layouts.find(([x]) => x.startsWith(n))![3][0].size
-    for (const frame of ['wide', 'desktop', 'laptop', 'small']) {
-      expect(size(frame), frame).toBeGreaterThanOrEqual(CURTAIN_SIZE_GOOD)
+    // Every frame with clear flanks reaches a size the reader can name the animals at. Not
+    // CURTAIN_SIZE_GOOD any more: the desk took the floor of the ring, and buying that size back
+    // would mean the crowded spacing the first finding was about.
+    for (const frame of LANDSCAPE) {
+      expect(size(frame), frame).toBeGreaterThanOrEqual(CURTAIN_SIZE_LEGIBLE)
     }
     // portrait cannot, and says so by coming out smaller rather than by seating nobody
-    expect(size('phone')).toBeLessThan(CURTAIN_SIZE_GOOD)
+    expect(size('phone')).toBeLessThan(CURTAIN_SIZE_LEGIBLE)
     for (const [name, , , slots] of layouts) {
       expect(slots[0].size, name).toBeLessThanOrEqual(CURTAIN_SIZE_MAX)
     }
@@ -352,11 +418,95 @@ describe('the layout', () => {
     for (const [name, , , slots] of layouts) {
       for (const slot of slots) {
         expect(Math.abs(curtainArrival(0, 0))).toBeLessThan(1e-12)
+        // The CORNER, not the larger axis extent. A rectangle is inside a circle when its
+        // corner is, and at the size this test itself permits the two metrics disagree: the
+        // corner is 0.568 against a projected radius of 0.537, so the axis version passed a case
+        // its own claim does not cover. It is true as shipped either way — the worst measured
+        // corner across the frame table is well inside — but the metric now matches the claim.
         const box = curtainCompositionBox(slot.side)
-        const half = Math.max(-box.x0, box.x1, -box.y0, box.y1) * slot.size
-        // the composition is centred on the ring's origin, so its whole extent is `half`
-        expect(half, `${name} ${slot.size}`).toBeLessThan(ndc)
+        const corner =
+          Math.hypot(Math.max(-box.x0, box.x1), Math.max(-box.y0, box.y1)) * slot.size
+        expect(corner, `${name} ${slot.size}`).toBeLessThan(ndc)
       }
+    }
+  })
+})
+
+describe('the desk the cast has to stay above', () => {
+  /**
+   * The whole constraint in one line of geometry, checked against T65's own exported numbers rather
+   * than against anything restated here: the desk's back edge is a HORIZONTAL screen line whose
+   * height depends only on the camera distance, and the cast is world-space so its screen height
+   * depends only on the same. If either stops being true this arithmetic stops being a bound.
+   */
+  it('reads the edge as a horizontal line that climbs with the pull-back', () => {
+    const rest = deskEdgeV(CAMERA_DISTANCE)
+    const full = deskEdgeV(CAMERA_DISTANCE * ZOOM_FACTOR)
+    // off the bottom of the frame at rest — which is why the desk is invisible during the journey
+    expect(rest).toBeLessThan(-1)
+    // ...and well inside it at the end
+    expect(full).toBeGreaterThan(-0.5)
+    expect(full).toBeLessThan(0)
+    let previous = rest
+    for (let i = 1; i <= 24; i++) {
+      const d = CAMERA_DISTANCE * (1 + (i / 24) * (ZOOM_FACTOR - 1))
+      const v = deskEdgeV(d)
+      expect(v).toBeGreaterThan(previous)
+      previous = v
+    }
+    // and it is derived, not typed: moving the desk moves the line
+    expect(DESK_BACK_Z).toBeGreaterThan(0)
+    expect(DESK_TOP_Y).toBeDefined()
+  })
+
+  it('places the floor where a slot at it lands exactly on the edge', () => {
+    for (let row = 0; row < CURTAIN_DESK_FLOOR.length; row++) {
+      let tightest = Infinity
+      for (let i = 0; i <= 24; i++) {
+        const d = CAMERA_DISTANCE * (1 + (i / 24) * (ZOOM_FACTOR - 1))
+        const gap = curtainScreenV(CURTAIN_DESK_FLOOR[row], row, d) - deskEdgeV(d)
+        // never below the edge at ANY stop — that is what makes one constant a bound
+        expect(gap, `row ${row} at distance ${d.toFixed(1)}`).toBeGreaterThanOrEqual(-1e-9)
+        tightest = Math.min(tightest, gap)
+      }
+      // ...and it TOUCHES at the binding stop, so the floor is the tightest bound and not a
+      // conservative guess that quietly costs the company its size.
+      expect(tightest, `row ${row}`).toBeLessThan(1e-6)
+    }
+  })
+
+  /**
+   * THE ONE THAT MATTERS: no composition is ever cut by the desk, at any zoom stop, on any frame
+   * where the layout could honour it. The dressing counts — a sliced island is as wrong as a
+   * sliced animal, and the review's evidence was the camel's and fennec's island bottoms.
+   */
+  it('never lets the desk cut a composition, on every frame that can afford it', () => {
+    for (const [name, , , info] of infos) {
+      if (!info.deskClear) continue
+      for (const slot of info.slots) {
+        const box = curtainCompositionBox(slot.side)
+        const bottom = slot.v + box.y0 * slot.size * curtainRowScale(slot.row)
+        for (let i = 0; i <= 24; i++) {
+          const d = CAMERA_DISTANCE * (1 + (i / 24) * (ZOOM_FACTOR - 1))
+          expect(
+            curtainScreenV(bottom, slot.row, d),
+            `${name} ${slot.u.toFixed(2)},${slot.v.toFixed(2)} at distance ${d.toFixed(1)}`
+          ).toBeGreaterThanOrEqual(deskEdgeV(d) - 1e-9)
+        }
+      }
+    }
+  })
+
+  /**
+   * ...and the frames that CANNOT afford it are named, not hidden. On a portrait frame the world
+   * fills the width, so the only sky a face can clear is under the horizon — and that is exactly
+   * what the desk takes. The layout ships the cast anyway (an invisible company is worse than a
+   * cut one) and says so through `deskClear`, which is what the report escalates.
+   */
+  it('reports honestly which frames it could not keep clear of the desk', () => {
+    for (const [name, , , info] of infos) {
+      expect(info.slots.length, name).toBe(CURTAIN_CAST.length)
+      expect(info.deskClear, name).toBe(isLandscape(name))
     }
   })
 })

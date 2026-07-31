@@ -71,6 +71,9 @@ type MemberRefs = {
 /** Allocation-free stand-in for a composition that does not float. */
 const ZERO_DRIFT = { roll: 0, bob: 0 } as const
 
+/** How long a resize has to settle before the layout is re-solved. */
+const CURTAIN_RESOLVE_MS = 180
+
 /**
  * Read once at mount, matching the rest of the lab. The whole canvas is swapped for the static
  * fallback page under `prefers-reduced-motion`, so this is a guarantee rather than the gate.
@@ -89,7 +92,22 @@ export function CurtainCall({ journeyRef }: { journeyRef: JourneyRef }) {
   const size = useThree((s) => s.size)
   const reduced = usePrefersReducedMotion()
 
-  const slots = useMemo(() => curtainLayout(size.width / size.height), [size.width, size.height])
+  // DEBOUNCED, because the solve is 40-165 ms on the main thread and `size` ticks continuously
+  // through a resize drag. Undebounced, a drag that crosses square-ish aspects re-solved at every
+  // frame of the drag; now it solves once the frame has settled. The first solve is NOT deferred —
+  // `useState`'s initialiser runs it inline at mount, so nothing pops in a frame late.
+  const aspect = size.width / size.height
+  const [staged, setStaged] = useState(() => curtainLayout(aspect))
+  const lastAspect = useRef(aspect)
+  useEffect(() => {
+    if (aspect === lastAspect.current) return
+    const id = window.setTimeout(() => {
+      lastAspect.current = aspect
+      setStaged(curtainLayout(aspect))
+    }, CURTAIN_RESOLVE_MS)
+    return () => window.clearTimeout(id)
+  }, [aspect])
+  const slots = staged
 
   /**
    * World units per half-height at each row's own stage plane. A back row is further from the
@@ -150,6 +168,11 @@ export function CurtainCall({ journeyRef }: { journeyRef: JourneyRef }) {
       // be pulled away from.
       const phase = curtainPhase(i)
       const idle = reduced ? 0 : curtainIdle(ending.t, spec.cycles, phase) * settled
+      // THE RAFT's heave is applied to the slot's `v` below and is deliberately NOT swept: at
+      // `PEEKER_MAX_BOB` (0.014 figure-heights) it displaces 0.0027 half-heights at desktop size,
+      // an order of magnitude inside `CURTAIN_WORLD_MARGIN`, which exists for exactly this class of
+      // motion applied after the placement decision. Its ROLL is a different matter and IS
+      // accounted for — the test pins `sway + DRIFT_ROLL` per kind against `CURTAIN_MAX_SWAY`.
       const raft = spec.drifts && !reduced ? peekerDrift(ending.t, phase) : ZERO_DRIFT
       const bow = curtainBow(ending.curtain, i)
 
