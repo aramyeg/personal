@@ -45,6 +45,14 @@ import {
   type Side,
 } from '@/components/labs/small-world/scene/props/peeker-stage'
 import { PEEKER_SPECS } from '@/components/labs/small-world/scene/props/peeker-cast'
+import {
+  CAMERA_DISTANCE as SHIPPED_DISTANCE,
+  CAMERA_FOV as SHIPPED_FOV,
+  ZOOM_FACTOR,
+} from '@/components/labs/small-world/scene/camera'
+import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { TRACK_END } from '@/components/labs/small-world/ending-timeline'
+import { journeyStateAt } from '@/components/labs/small-world/journey-timeline'
 
 /**
  * Task 56 — the checkpoint mascots' staging.
@@ -315,17 +323,37 @@ describe('the planet is never covered', () => {
   })
 
   it('trips if the camera constants drift out from under it', () => {
-    // peeker-stage.ts is written against scene.tsx's camera; if that changes, every clearance
-    // number above is measuring the wrong frustum.
+    // peeker-stage.ts is written against the shipped camera; if that changes, every clearance
+    // number above is measuring the wrong frustum. This used to grep scene.tsx for the two
+    // declarations, which Task 63 broke by moving them into scene/camera.ts — a guard that
+    // tripped on a RENAME rather than on the drift it was written to catch. It now compares the
+    // values themselves, so it survives the next move and still fails on the next retune.
+    expect(SHIPPED_FOV).toBe(FOV)
+    expect(SHIPPED_DISTANCE).toBe(CAMERA_DISTANCE)
+    // ...and the mascots must stay a SIBLING of the planet, never a child, or they would inherit
+    // the world's spin and the camera-space staging would come apart.
     const scene = readFileSync(
       join(process.cwd(), 'components/labs/small-world/scene/scene.tsx'),
       'utf8'
     )
-    expect(scene).toContain('const CAMERA_FOV = 38')
-    expect(scene).toContain('const CAMERA_DISTANCE = 12.1')
-    // ...and the mascots must stay a SIBLING of the planet, never a child, or they would inherit
-    // the world's spin and the camera-space staging would come apart.
     expect(scene).toMatch(/<CheckpointPeekers[^>]*\/>\s*<\/>/)
+  })
+
+  it('is out of the frame entirely before the ending can move the camera (Task 63)', () => {
+    // The rig lives at a FIXED camera-space depth and copies the camera every frame, so the
+    // clearance above is a statement about ONE camera distance. Pull the camera back far enough
+    // and the planet's near point overtakes PEEKER_DEPTH and the mascots would draw in front of
+    // the world — at a distance the ending's pull-back does reach.
+    expect(PEEKER_DEPTH + CEILING).toBeLessThan(CAMERA_DISTANCE * ZOOM_FACTOR)
+    // What makes that harmless TODAY is structural, not a margin: a peeker is driven by the
+    // arrival reveal clock, and no reveal can exist past the last dwell, so the whole rig is
+    // invisible for every frame of the ending. T64's curtain call cannot inherit that for free —
+    // see the ending contract.
+    for (const p of [1.0001, 1.1, TRACK_END]) {
+      const state = journeyStateAt(p)
+      expect(state.reveal).toBeNull()
+      for (let c = 0; c < CHAPTER_COUNT; c++) expect(peekerClock(state, c)).toBeNull()
+    }
   })
 })
 

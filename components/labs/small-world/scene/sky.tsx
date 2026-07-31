@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
+import { cameraZoomScale } from './camera'
 import type { JourneyRef } from './use-journey'
 
 /**
@@ -23,12 +24,37 @@ import type { JourneyRef } from './use-journey'
  * The uniforms carry RAW sRGB components rather than THREE.Color: this is a bare ShaderMaterial
  * writing gl_FragColor directly, with no output-encoding chunk, so the palette hex has to reach
  * the framebuffer unconverted — which is exactly what the old inlined constants did.
+ *
+ * TASK 63 — THE SKY SURVIVES THE PULL-BACK BY BEING SCALED, NOT RESIZED.
+ * The "generous margin" above was measured for ONE camera distance, and the ending's zoom-out
+ * moves the camera to 3× that. Two things go wrong if the plane just sits there: the frustum
+ * eventually walks off its edges, and — long before that — it sweeps a much bigger slice of the
+ * gradient, so the horizon band shrinks into the middle of the frame and the composition the
+ * stops were tuned for comes apart (measured: the framed vUv.y band widens from [0.374, 0.651] to
+ * [0.262, 0.738], while the ramp stays at [0.42, 0.66]).
+ *
+ * Both are fixed by one multiply. The camera travels ALONG the view ray, i.e. its position is
+ * `k · P0` for the same k this scales by, and it keeps aiming at the origin — so scaling the sky
+ * about the origin by k is a uniform scale of a camera-plus-subject pair, and a uniform scale
+ * about the projection's own centre leaves the projection EXACTLY unchanged. The sky therefore
+ * renders identically at every zoom, which is also what an infinitely-far backdrop should do,
+ * and the no-edges property is inherited rather than re-tuned. The planet does NOT scale — it
+ * shrinking in frame is the whole reveal.
  */
+
+/** Rest pose of the backdrop plane. Everything is a multiple of these, so one number moves it. */
+const SKY_POSITION: readonly [number, number, number] = [0, -10, -20]
+const SKY_SCALE: readonly [number, number] = [140, 90]
+
 export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
   const uniforms = useMemo(
     () => ({ uSky: { value: srgb(GRADE_BASE.sky) }, uGlow: { value: srgb(GRADE_BASE.glow) } }),
     []
   )
+  const mesh = useRef<THREE.Mesh>(null)
+  // NaN so the mount frame always applies once (NaN !== NaN) — a write of the same values the
+  // JSX props carry — and every frame after it costs one float compare until the pull-back starts.
+  const lastScale = useRef(Number.NaN)
 
   useFrame(() => {
     if (!journeyRef) return
@@ -38,10 +64,17 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     // The glow trails the sky a little: keeping more of the original light low in the frame stops
     // the horizon flattening out once a mood is fully in.
     uniforms.uGlow.value.copy(BASE_GLOW).lerp(target(MOOD_GLOW, b), b.skyMix * GLOW_LAG)
+
+    const k = cameraZoomScale(j.ending)
+    if (k !== lastScale.current && mesh.current) {
+      lastScale.current = k
+      mesh.current.position.set(SKY_POSITION[0] * k, SKY_POSITION[1] * k, SKY_POSITION[2] * k)
+      mesh.current.scale.set(SKY_SCALE[0] * k, SKY_SCALE[1] * k, 1)
+    }
   })
 
   return (
-    <mesh position={[0, -10, -20]} scale={[140, 90, 1]}>
+    <mesh ref={mesh} position={[...SKY_POSITION]} scale={[SKY_SCALE[0], SKY_SCALE[1], 1]}>
       <planeGeometry />
       <shaderMaterial
         depthWrite={false}

@@ -1,14 +1,21 @@
 'use client'
-import { Suspense, useCallback, useLayoutEffect, useState } from 'react'
+import { Suspense, useCallback, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { hasArt } from '../art-manifest'
 import { BiomeAtmosphere } from './biome-atmosphere'
+import {
+  CAMERA_FOV,
+  CAMERA_POSITION,
+  CAMERA_RIG_PRIORITY,
+  CAMERA_TARGET,
+  cameraPositionInto,
+} from './camera'
 import { Planet } from './planet'
 import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
 import { DiscoveryBurst } from './discovery-burst'
-import { useDampedJourney } from './use-journey'
+import { useDampedJourney, type JourneyRef } from './use-journey'
 import { ToonRampProvider } from './toon-ramp'
 import { ChapterSet } from './props/chapter-set'
 import { GlobalDressing, GlobalDressingAutumn } from './props/global-dressing'
@@ -39,28 +46,31 @@ export type SceneProps = {
 }
 
 /**
- * Composition target (reference-language research): whole planet visible
- * with void margin, filling ~55% of the viewport's shorter axis; camera
- * above the planet's center height, looking down ~20°.
+ * Places the camera every frame from the ending's pull-back path (scene/camera.ts
+ * owns the pose; ending-timeline.ts owns the invariant that makes it safe).
+ *
+ * It was a one-shot `lookAt` for nineteen rounds and it has to stay EXACTLY that
+ * for the whole journey — the renewal proofs rest on the camera never moving while
+ * rotation can. So the rig SKIPS on an unchanged zoom rather than re-deriving a
+ * pose it knows is identical: across all six chapters this costs one float compare
+ * per frame and touches nothing, and the first write happens only once the ending's
+ * pull-back has begun. `lastZoom` starts at NaN so the mount frame always applies
+ * once (NaN !== NaN), which is what supplies the initial `lookAt` — the elevated
+ * position plus that aim IS the downward pitch.
  */
-const CAMERA_FOV = 38
-const CAMERA_PITCH_DEG = 20
-/** World units from the planet's center — tuned against CAMERA_FOV for the fill target above. */
-const CAMERA_DISTANCE = 12.1
-
-const PITCH = (CAMERA_PITCH_DEG * Math.PI) / 180
-const CAMERA_POSITION: [number, number, number] = [
-  0,
-  CAMERA_DISTANCE * Math.sin(PITCH),
-  CAMERA_DISTANCE * Math.cos(PITCH),
-]
-
-/** Aims the camera at the planet's center once — the elevated position + this look-at is the downward pitch. */
-function CameraRig() {
+function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
   const camera = useThree((s) => s.camera)
-  useLayoutEffect(() => {
-    camera.lookAt(0, 0, 0)
-  }, [camera])
+  const scratch = useRef<[number, number, number]>([0, 0, 0])
+  const lastZoom = useRef(Number.NaN)
+
+  useFrame(() => {
+    const { ending } = journeyRef.current
+    if (ending.zoom === lastZoom.current) return
+    lastZoom.current = ending.zoom
+    camera.position.fromArray(cameraPositionInto(ending, scratch.current))
+    camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
+  }, CAMERA_RIG_PRIORITY)
+
   return null
 }
 
@@ -72,7 +82,7 @@ function SceneContents({
   const journeyRef = useDampedJourney(progressRef, journey?.arrivalRef)
   return (
     <>
-      <CameraRig />
+      <CameraRig journeyRef={journeyRef} />
       {/* Backdrop + key/ambient light, both graded to the chapter's biome mood (Task 55). */}
       <BiomeAtmosphere journeyRef={journeyRef} />
       <Planet journeyRef={journeyRef} onBakeReady={onBakeReady}>
