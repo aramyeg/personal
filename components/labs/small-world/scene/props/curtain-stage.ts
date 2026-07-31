@@ -7,20 +7,26 @@ import {
   CAMERA_POSITION,
   CAMERA_TARGET,
   ZOOM_FACTOR,
+  endingCameraDistance,
 } from '../camera'
+import { ZOOM_START } from '../../ending-timeline'
 // READ-ONLY across the lane boundary: T65 owns the desk's composition, this lane owns staying out
 // from under it. Importing the geometry rather than copying the numbers means a desk that moves
 // takes the cast's floor with it instead of silently starting to slice it.
 import { DESK_BACK_Z, DESK_TOP_Y } from '../desk-stage'
 import {
+  CARD_PAD,
   DRESS_REACH,
   FACE_BOX,
   MASCOT_BOX,
+  NAV_PILL,
   PEEKER_ABS_Z,
   PEEKER_CAST,
   PEEKER_FACE_IN,
+  boxToFrustum,
   type PeekerBiome,
   type PeekerKind,
+  type PxBox,
   type Side,
 } from './peeker-stage'
 
@@ -533,7 +539,8 @@ function stageable(
   fig: Rect & { z: number },
   face: Rect,
   comp: Rect,
-  deskFloor: readonly number[]
+  deskFloor: readonly number[],
+  pill: Rect
 ): boolean {
   // THE DESK'S BACK EDGE (Task 65). The desk is nearer the camera than the cast at every point, so
   // wherever a composition projects below the edge's screen line the desk simply draws over it —
@@ -562,6 +569,12 @@ function stageable(
     // deleting the only clear sky there is.
     const crown = Math.min(CURTAIN_CROWN.u, 0.65 * halfW)
     if (body.x0 < crown && body.x1 > -crown && body.y1 > CURTAIN_CROWN.v) return false
+    // ...and the labs chrome's "back to gallery" pill, which is shared UI this lab does not own.
+    // Parity with the checkpoint rig, which has kept its face out from behind that pill since T56;
+    // this layout did not, and on a phone it put a composition straight behind it.
+    if (body.x0 < pill.x1 && body.x1 > pill.x0 && body.y0 < pill.y1 && body.y1 > pill.y0) {
+      return false
+    }
   }
 
   // CLEAR OF THE WORLD — the FACE, at the slot. A body may be behind the world (the stage plane is
@@ -644,6 +657,119 @@ export const CURTAIN_DESK_FLOOR: readonly number[] = Array.from({ length: CURTAI
   return floor
 })
 
+// --- the portrait exit -------------------------------------------------------
+//
+// On a frame the desk leaves nowhere to stand (see `CURTAIN_DESK_FLOOR` and `deskClear`), the
+// company holds its bow through the still beat and then TAKES ITS LEAVE: it sinks out of the bottom
+// of the frame across an early-zoom window, and the window closes before the desk's back edge has
+// reached the frame at all.
+//
+// That last clause is the whole safety argument and it is stronger than "before the first slice".
+// While the edge is still below `v = -1` the desk is not on screen, so the band the company sinks
+// through is sky — there is no frame in which an edge crosses a composition, rather than a brief
+// one that we hope nobody scrubs to. `curtain-stage.test.ts` asserts the invariant directly: at
+// every zoom stop, every composition is either wholly above the edge or wholly off the frame.
+//
+// Landscape frames do not do this. Aram's "the bow becomes the thing pulled away from" is the
+// design, and it ships unchanged wherever the desk allows it.
+
+/** The camera distance at which the desk's back edge first reaches the bottom of the frame. */
+export const CURTAIN_DESK_ONSCREEN_D = (() => {
+  let lo = CAMERA_DISTANCE
+  let hi = CAMERA_DISTANCE * ZOOM_FACTOR
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (deskEdgeV(mid) < -1) lo = mid
+    else hi = mid
+  }
+  return hi
+})()
+
+/** ...and the ending `t` that reaches it, inverted off the shipped camera path rather than modelled. */
+export const CURTAIN_DESK_ONSCREEN_T = (() => {
+  const at = (t: number) =>
+    endingCameraDistance({
+      active: true,
+      t,
+      phase: 'zoom',
+      curtain: 1,
+      zoom: (t - ZOOM_START) / (1 - ZOOM_START),
+    })
+  let lo = ZOOM_START
+  let hi = 1
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (at(mid) < CURTAIN_DESK_ONSCREEN_D) lo = mid
+    else hi = mid
+  }
+  return lo
+})()
+
+/** A hair after the still beat ends — the bow lands and holds before anyone moves. */
+export const CURTAIN_EXIT_FROM = ZOOM_START + 0.015
+/** ...and safely inside the window, so the last figure is gone before the desk arrives. */
+export const CURTAIN_EXIT_TO = CURTAIN_DESK_ONSCREEN_T - 0.015
+/**
+ * How the window is split between the stagger and each figure's own travel. The company leaves in
+ * the order it arrived in, and the wave is worth a little under half the window — enough to read as
+ * twelve exits rather than one, with the rest spent on the movement itself.
+ */
+export const CURTAIN_EXIT_WAVE = 0.45
+
+/**
+ * Where a composition sinks to, in stage-frame v.
+ *
+ * Deep enough to STAY gone: the cast is world-space, so the pull-back drags everything back toward
+ * the centre of the frame, and a figure parked just past the bottom edge would sail back into shot
+ * as the camera withdrew. At full pull-back a stage v shrinks to `restDistance / distance` of
+ * itself, so this is the frame's own bottom divided by the deepest row's worst contraction, with a
+ * margin. Sunk to here, nothing returns at any stop.
+ */
+export const CURTAIN_EXIT_V = (() => {
+  let worst = 0
+  for (let row = 0; row < CURTAIN_ROWS; row++) {
+    const contraction = curtainRowDistance(row) / (CAMERA_DISTANCE * ZOOM_FACTOR + curtainRowOffset(row))
+    worst = Math.max(worst, 1 / contraction)
+  }
+  return -(worst * 1.12)
+})()
+
+/**
+ * How far a figure has taken its leave, 0 (still bowing) → 1 (gone), on the ending's own `t`.
+ *
+ * Eased IN rather than out: a departure that starts fast and settles reads as a slip, where one that
+ * gathers pace reads as sinking away, which is the beat. Pure in `t`, so scrubbing back brings the
+ * company straight back up to its bow.
+ */
+export function curtainExit(
+  t: number,
+  index: number,
+  deskClear: boolean,
+  count = CURTAIN_CAST.length
+): number {
+  // THE GATE IS THE FLAG, never an aspect. A frame the desk allows keeps the design exactly as it
+  // was signed off, and this returns 0 for the whole ending there — which is what makes "landscape
+  // is unaffected" a property a test can hold rather than a claim about a call site.
+  if (deskClear) return 0
+  const window = CURTAIN_EXIT_TO - CURTAIN_EXIT_FROM
+  const stagger = (window * CURTAIN_EXIT_WAVE) / Math.max(1, count - 1)
+  const from = CURTAIN_EXIT_FROM + index * stagger
+  const p = revealPhase(t, from, from + window * (1 - CURTAIN_EXIT_WAVE))
+  return p * p
+}
+
+/** The stage-frame v a composition occupies at `t`, exit included. One rule, shared by both. */
+export function curtainSlotV(
+  v: number,
+  t: number,
+  index: number,
+  deskClear: boolean,
+  count = CURTAIN_CAST.length
+): number {
+  const gone = curtainExit(t, index, deskClear, count)
+  return v + (CURTAIN_EXIT_V - v) * gone
+}
+
 /**
  * Resolution of the two searches. Both are as coarse as the eye allows on purpose: the whole
  * layout runs at mount and on every resize, on the main thread, in a scene that is already loading
@@ -669,7 +795,8 @@ export function curtainRadiusBand(
   fig: Rect & { z: number },
   face: Rect,
   comp: Rect,
-  deskFloor: readonly number[]
+  deskFloor: readonly number[],
+  pill: Rect
 ): { lo: number; hi: number } | null {
   const c = Math.cos(angle)
   const s = Math.sin(angle)
@@ -678,7 +805,7 @@ export function curtainRadiusBand(
   let hi = -1
   for (let i = 0; i <= RADIUS_STEPS; i++) {
     const r = RADIUS_MIN + ((RADIUS_MAX - RADIUS_MIN) * i) / RADIUS_STEPS
-    if (stageable(r * c, r * s, size, side, halfW, fig, face, comp, deskFloor)) {
+    if (stageable(r * c, r * s, size, side, halfW, fig, face, comp, deskFloor, pill)) {
       if (lo < 0) lo = r
       hi = r
     } else if (lo >= 0) break
@@ -754,7 +881,8 @@ function ringAt(
   faceR: Rect,
   compL: Rect,
   compR: Rect,
-  deskFloor: readonly number[]
+  deskFloor: readonly number[],
+  pill: Rect
 ): Run[] {
   const runs: Run[] = []
   let cur: Run | null = null
@@ -771,7 +899,8 @@ function ringAt(
       fig,
       side === -1 ? faceL : faceR,
       side === -1 ? compL : compR,
-      deskFloor
+      deskFloor,
+      pill
     )
     if (band) {
       // the lane's own offset, measured along the radial at THIS bearing
@@ -790,7 +919,8 @@ function ringAt(
           fig,
           side === -1 ? faceL : faceR,
           side === -1 ? compL : compR,
-          deskFloor
+          deskFloor,
+          pill
         )
       ) {
         pt = { angle, u: r * Math.cos(angle), v: r * Math.sin(angle) }
@@ -910,8 +1040,30 @@ const STANDOFFS = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]
  * wide frame seats three pairs a side and a portrait frame — where the world fills the width and
  * the desk takes the floor — seats what it can where it can. Neither case is written down anywhere.
  */
-export function curtainLayout(halfW: number, count = CURTAIN_CAST.length): CurtainSlot[] {
-  return curtainLayoutInfo(halfW, count).slots
+export type CurtainViewport = { width: number; height: number }
+
+export function curtainLayout(
+  viewport: CurtainViewport,
+  count = CURTAIN_CAST.length
+): CurtainSlot[] {
+  return curtainLayoutInfo(viewport, count).slots
+}
+
+/**
+ * The nav pill's keep-out, in frustum half-heights. It is a FIXED PIXEL box, so unlike everything
+ * else here it depends on the viewport's real size rather than only on its aspect — which is why
+ * the layout takes a viewport now instead of a half-width.
+ */
+function pillKeepOut(viewport: CurtainViewport, halfW: number): Rect {
+  const p = CARD_PAD
+  const box: PxBox = {
+    x0: NAV_PILL.x0 - p,
+    y0: NAV_PILL.y0 - p,
+    x1: NAV_PILL.x1 + p,
+    y1: NAV_PILL.y1 + p,
+  }
+  const r = boxToFrustum(box, viewport, halfW, 1)
+  return { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 }
 }
 
 /** No floor at all — what a frame falls back to when the desk's leaves it nowhere to stand. */
@@ -927,10 +1079,12 @@ const NO_DESK_FLOOR: readonly number[] = []
  * would also hide it.
  */
 export function curtainLayoutInfo(
-  halfW: number,
+  viewport: CurtainViewport,
   count = CURTAIN_CAST.length
 ): { slots: CurtainSlot[]; deskClear: boolean } {
-  const clear = solveLayout(halfW, count, CURTAIN_DESK_FLOOR)
+  const halfW = viewport.width / viewport.height
+  const pill = pillKeepOut(viewport, halfW)
+  const clear = solveLayout(halfW, count, CURTAIN_DESK_FLOOR, pill)
   // Honouring the floor is worth having only if what is left is still a company the reader can
   // see. On a frame whose world fills the width, the only clear sky is UNDER the horizon and the
   // desk owns all of it, so the floor is satisfiable — at 45 px a figure, which is not a curtain
@@ -938,13 +1092,14 @@ export function curtainLayoutInfo(
   if (clear.length > 0 && clear[0].size >= CURTAIN_SIZE_LEGIBLE) {
     return { slots: clear, deskClear: true }
   }
-  return { slots: solveLayout(halfW, count, NO_DESK_FLOOR), deskClear: false }
+  return { slots: solveLayout(halfW, count, NO_DESK_FLOOR, pill), deskClear: false }
 }
 
 function solveLayout(
   halfW: number,
   count: number,
-  deskFloor: readonly number[]
+  deskFloor: readonly number[],
+  pill: Rect
 ): CurtainSlot[] {
   const figL = curtainFigureBox(-1)
   const figR = curtainFigureBox(1)
@@ -968,7 +1123,7 @@ function solveLayout(
   const seatAt = (standoff: number, size: number, pack: number): RingPoint[] | null => {
     const lanes: RingPoint[][] = []
     for (let lane = 0; lane < CURTAIN_LANES; lane++) {
-      const runs = ringAt(size, standoff, lane, halfW, figL, figR, faceL, faceR, compL, compR, deskFloor)
+      const runs = ringAt(size, standoff, lane, halfW, figL, figR, faceL, faceR, compL, compR, deskFloor, pill)
       // Each lane carries its own half of the company, so each has to seat it on its own — and
       // "seat" means a real packing, not a budget: `packRun` returns the compositions it actually
       // managed to place without touching.
@@ -1255,7 +1410,7 @@ export function curtainWorldReach(
   halfW: number,
   fovDeg: number
 ): { minY: number; maxY: number; radius: number } | null {
-  const slots = curtainLayout(halfW)
+  const slots = curtainLayout({ width: halfW * 1000, height: 1000 })
   if (slots.length === 0) return null
   const q = curtainStageQuaternion()
   const compL = curtainCompositionBox(-1)

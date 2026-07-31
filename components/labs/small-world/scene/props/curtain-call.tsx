@@ -27,7 +27,8 @@ import {
   curtainBow,
   curtainHalfHeight,
   curtainIdle,
-  curtainLayout,
+  curtainSlotV,
+  curtainLayoutInfo,
   curtainPhase,
   curtainRowDistance,
   curtainRowOffset,
@@ -96,18 +97,25 @@ export function CurtainCall({ journeyRef }: { journeyRef: JourneyRef }) {
   // through a resize drag. Undebounced, a drag that crosses square-ish aspects re-solved at every
   // frame of the drag; now it solves once the frame has settled. The first solve is NOT deferred —
   // `useState`'s initialiser runs it inline at mount, so nothing pops in a frame late.
-  const aspect = size.width / size.height
-  const [staged, setStaged] = useState(() => curtainLayout(aspect))
-  const lastAspect = useRef(aspect)
+  const { width, height } = size
+  const [staged, setStaged] = useState(() => curtainLayoutInfo({ width, height }))
+  const last = useRef({ width, height })
   useEffect(() => {
-    if (aspect === lastAspect.current) return
+    if (last.current.width === width && last.current.height === height) return
     const id = window.setTimeout(() => {
-      lastAspect.current = aspect
-      setStaged(curtainLayout(aspect))
+      last.current = { width, height }
+      setStaged(curtainLayoutInfo({ width, height }))
     }, CURTAIN_RESOLVE_MS)
     return () => window.clearTimeout(id)
-  }, [aspect])
-  const slots = staged
+  }, [width, height])
+  const slots = staged.slots
+  /**
+   * THE PORTRAIT EXIT (fix round). On a frame where the desk leaves the company nowhere to stand,
+   * it holds the bow through the still beat and then takes its leave — see `curtainExit`. On every
+   * frame the desk allows, this is 0 for the whole ending and the pose is bit-identical to the
+   * design Aram signed off: the bow becomes the thing the camera pulls away from.
+   */
+  const deskClear = staged.deskClear
 
   /**
    * World units per half-height at each row's own stage plane. A back row is further from the
@@ -175,10 +183,12 @@ export function CurtainCall({ journeyRef }: { journeyRef: JourneyRef }) {
       // accounted for — the test pins `sway + DRIFT_ROLL` per kind against `CURTAIN_MAX_SWAY`.
       const raft = spec.drifts && !reduced ? peekerDrift(ending.t, phase) : ZERO_DRIFT
       const bow = curtainBow(ending.curtain, i)
+      // ...and, where the desk forces it, how far this one has already sunk out of frame.
+      const vAt = curtainSlotV(slot.v, ending.t, i, deskClear)
 
       m.root.position.set(
         slot.u * arrival * halfH,
-        (slot.v * arrival + raft.bob * settled * slot.size) * halfH,
+        (vAt * arrival + raft.bob * settled * slot.size) * halfH,
         -curtainRowOffset(slot.row)
       )
       m.root.scale.setScalar(slot.size * curtainRowScale(slot.row) * halfH)

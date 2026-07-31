@@ -8,6 +8,10 @@ import {
   CURTAIN_CAST,
   CURTAIN_CROWN,
   CURTAIN_DESK_FLOOR,
+  CURTAIN_DESK_ONSCREEN_T,
+  CURTAIN_EXIT_FROM,
+  CURTAIN_EXIT_TO,
+  CURTAIN_EXIT_V,
   CURTAIN_FOOT_Y,
   CURTAIN_LANES,
   CURTAIN_GATHER_DONE,
@@ -36,6 +40,8 @@ import {
   curtainLayout,
   curtainLayoutInfo,
   curtainScreenV,
+  curtainSlotV,
+  curtainExit,
   deskEdgeV,
   curtainNearestDepth,
   curtainPhase,
@@ -51,10 +57,14 @@ import {
   DESK_BACK_Z,
   DESK_TOP_Y,
 } from '@/components/labs/small-world/scene/desk-stage'
-import { ZOOM_FACTOR } from '@/components/labs/small-world/scene/camera'
+import {
+  ZOOM_FACTOR,
+  endingCameraDistance,
+} from '@/components/labs/small-world/scene/camera'
 import {
   DRIFT_ROLL,
   MASCOT_BOX,
+  NAV_PILL,
   PEEKER_CAST,
   WORLD_BOT,
   WORLD_TOP,
@@ -98,8 +108,12 @@ const FRAMES: [string, number, number][] = [
   ['phone 390x844', 390, 844],
 ]
 
-const layouts = FRAMES.map(([name, w, h]) => [name, w, h, curtainLayout(w / h)] as const)
-const infos = FRAMES.map(([name, w, h]) => [name, w, h, curtainLayoutInfo(w / h)] as const)
+const layouts = FRAMES.map(
+  ([name, w, h]) => [name, w, h, curtainLayout({ width: w, height: h })] as const
+)
+const infos = FRAMES.map(
+  ([name, w, h]) => [name, w, h, curtainLayoutInfo({ width: w, height: h })] as const
+)
 
 /**
  * The frames whose world does NOT fill their width, i.e. the ones with clear sky on the flanks. On
@@ -305,6 +319,29 @@ describe('the layout', () => {
     }
   })
 
+  it('keeps every figure out from behind the gallery pill', () => {
+    // Parity with the checkpoint rig, which has had this keep-out since Task 56. The pill is a
+    // FIXED PIXEL box, so it is the one constraint here that depends on the viewport's real size
+    // rather than only on its aspect — which is why the layout takes a viewport.
+    const pad = 10
+    for (const [name, w, h, slots] of layouts) {
+      const halfW = w / h
+      const r = {
+        x0: ((2 * (NAV_PILL.x0 - pad)) / w - 1) * halfW,
+        x1: ((2 * (NAV_PILL.x1 + pad)) / w - 1) * halfW,
+        y0: 1 - (2 * (NAV_PILL.y1 + pad)) / h,
+        y1: 1 - (2 * (NAV_PILL.y0 - pad)) / h,
+      }
+      for (const slot of slots) {
+        for (const k of [1, CURTAIN_OVERSHOOT]) {
+          const b = figureOf(slot, k)
+          const hit = b.x0 < r.x1 && b.x1 > r.x0 && b.y0 < r.y1 && b.y1 > r.y0
+          expect(hit, `${name} at u=${slot.u.toFixed(2)} v=${slot.v.toFixed(2)}`).toBe(false)
+        }
+      }
+    }
+  })
+
   it('stays above the floor reserved for the desk', () => {
     for (const [name, , , slots] of layouts) {
       for (const slot of slots) {
@@ -503,6 +540,115 @@ describe('the desk the cast has to stay above', () => {
    * what the desk takes. The layout ships the cast anyway (an invisible company is worse than a
    * cut one) and says so through `deskClear`, which is what the report escalates.
    */
+  /**
+   * THE INVARIANT THE EXIT EXISTS FOR, and it is stated once for every frame class rather than
+   * twice: at every stop of the pull-back, a composition is either wholly ABOVE the desk's back
+   * edge or wholly OFF the frame. Nothing is ever crossed by the edge.
+   *
+   * On a frame the desk allows, the first branch holds for the whole ending and the company never
+   * moves — that is Aram's design, unchanged. On a frame it does not, the second branch takes over
+   * before the first can fail, because the company has taken its leave by then.
+   */
+  it('never lets the desk edge cross a composition, on any frame, at any stop', () => {
+    for (const [name, , , info] of infos) {
+      for (let i = 0; i < info.slots.length; i++) {
+        const slot = info.slots[i]
+        const box = curtainCompositionBox(slot.side)
+        const scale = slot.size * curtainRowScale(slot.row)
+        for (let k = 0; k <= 60; k++) {
+          const t = ZOOM_START + (k / 60) * (1 - ZOOM_START)
+          const d = endingCameraDistance({
+            active: true,
+            t,
+            phase: 'zoom',
+            curtain: 1,
+            zoom: (t - ZOOM_START) / (1 - ZOOM_START),
+          })
+          const v = curtainSlotV(slot.v, t, i, info.deskClear)
+          const bottom = curtainScreenV(v + box.y0 * scale, slot.row, d)
+          const top = curtainScreenV(v + box.y1 * scale, slot.row, d)
+          // What matters is the part of the composition INSIDE the frame. An overhang below the
+          // bottom edge is not something the desk can cut — it is already not on screen — and the
+          // first version of this check treated it as one, which failed a sinking figure whose
+          // visible remainder was entirely clear.
+          const visibleBottom = Math.max(bottom, -1)
+          const visibleTop = Math.min(top, 1)
+          if (visibleBottom > visibleTop) continue // wholly off frame
+          expect(
+            visibleBottom >= deskEdgeV(d) - 1e-9,
+            `${name} #${i} at t ${t.toFixed(3)}: visible bottom ${visibleBottom.toFixed(
+              3
+            )}, edge ${deskEdgeV(d).toFixed(3)}`
+          ).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('finishes the exit before the desk edge reaches the frame at all', () => {
+    // Stronger than "before the first slice": while the edge is below the frame there is no frame
+    // in which it could cross anything, so the company sinks through sky.
+    expect(CURTAIN_EXIT_TO).toBeLessThan(CURTAIN_DESK_ONSCREEN_T)
+    expect(CURTAIN_EXIT_FROM).toBeGreaterThan(ZOOM_START)
+    for (let i = 0; i < CURTAIN_CAST.length; i++) {
+      expect(curtainExit(CURTAIN_EXIT_TO, i, false), `#${i}`).toBeCloseTo(1, 6)
+      expect(curtainExit(ZOOM_START, i, false), `#${i}`).toBe(0)
+    }
+  })
+
+  it('holds the bow through the still beat, then leaves in the order it arrived', () => {
+    const mid = CURTAIN_EXIT_FROM + (CURTAIN_EXIT_TO - CURTAIN_EXIT_FROM) * 0.5
+    const first = curtainExit(mid, 0, false)
+    const last = curtainExit(mid, CURTAIN_CAST.length - 1, false)
+    expect(first).toBeGreaterThan(last)
+    expect(first).toBeGreaterThan(0)
+    expect(last).toBeLessThan(1)
+    // ...and nobody has moved before the still beat is over
+    for (let i = 0; i < CURTAIN_CAST.length; i++) {
+      expect(curtainSlotV(-0.8, CURTAIN_END, i, false)).toBe(-0.8)
+      expect(curtainSlotV(-0.8, ZOOM_START, i, false)).toBe(-0.8)
+    }
+  })
+
+  it('sinks deep enough that nothing sails back into shot', () => {
+    // The cast is world-space, so the pull-back drags everything toward the centre of the frame.
+    // A figure parked just past the bottom edge would return; this one may not, at any stop.
+    for (let row = 0; row < CURTAIN_DESK_FLOOR.length; row++) {
+      for (let k = 0; k <= 40; k++) {
+        const d = CAMERA_DISTANCE * (1 + (k / 40) * (ZOOM_FACTOR - 1))
+        expect(curtainScreenV(CURTAIN_EXIT_V, row, d), `row ${row}`).toBeLessThan(-1)
+      }
+    }
+  })
+
+  /**
+   * LANDSCAPE IS UNTOUCHED, as a property rather than as a claim about a call site: the gate is the
+   * `deskClear` FLAG, and with it set the exit is exactly 0 for the whole ending, so the pose is
+   * bit-identical to the code path that shipped before the exit existed.
+   */
+  it('does not move the company at all on a frame the desk allows', () => {
+    for (const [name, , , info] of infos) {
+      if (!info.deskClear) continue
+      for (let i = 0; i < info.slots.length; i++) {
+        for (let k = 0; k <= 40; k++) {
+          const t = k / 40
+          expect(curtainExit(t, i, true), `${name} #${i} at ${t}`).toBe(0)
+          expect(curtainSlotV(info.slots[i].v, t, i, true)).toBe(info.slots[i].v)
+        }
+      }
+    }
+  })
+
+  it('scrubs the exit backwards to the same pose, bit for bit', () => {
+    const pose = (t: number) =>
+      CURTAIN_CAST.map((_, i) => curtainSlotV(-0.82, t, i, false))
+    const stops: number[] = []
+    for (let i = 0; i <= 120; i++) stops.push(i / 120)
+    const forward = stops.map(pose)
+    const backward = [...stops].reverse().map(pose).reverse()
+    expect(backward).toEqual(forward)
+  })
+
   it('reports honestly which frames it could not keep clear of the desk', () => {
     for (const [name, , , info] of infos) {
       expect(info.slots.length, name).toBe(CURTAIN_CAST.length)
