@@ -132,7 +132,7 @@ function SceneContents({
       {/* THE DESK (Task 65) — a sibling of the planet and permanently mounted: it is parked outside
           the journey camera's frustum rather than gated, so there is no entrance to scrub. See
           scene/desk-stage.ts for the containment proof the placement rests on. */}
-      <DeskSet />
+      <DeskSet journeyRef={journeyRef} />
       {/* Sky-anchored corner characters for each checkpoint — a SIBLING of the planet, never a
           child: they hold the frame's top corners while the world keeps spinning beneath them. */}
       <CheckpointPeekers journeyRef={journeyRef} />

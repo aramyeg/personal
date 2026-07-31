@@ -11,6 +11,7 @@ import {
   DESK_TOP_Y,
 } from '../desk-stage'
 import { useClayRamp } from '../toon-ramp'
+import type { JourneyRef } from '../use-journey'
 import { buildMergedClay } from './clay-kit'
 import { deskNoteShadowPart, deskPropParts, tiltTowardKey } from './desk-kit'
 import { DeskNote } from './desk-note'
@@ -39,15 +40,22 @@ import { DeskNote } from './desk-note'
 /** How far the hand-formed back edge may wander FORWARD of DESK_BACK_Z. Never backward: back is
  *  where the journey camera lives, so the wobble is authored as a one-sided offset rather than as
  *  a symmetric one that would eat half the clearance. */
-const EDGE_WOBBLE = 0.55
+export const EDGE_WOBBLE = 0.55
 
 /** Columns across the slab. The back edge is the only line of it anyone ever sees, so the grid is
  *  spent on x — 96 columns puts a wobble sample every ~0.9 world units at the width the slab is. */
 const SLAB_NX = 96
 const SLAB_NZ = 10
 
-/** Deterministic hand-formed edge. Three incommensurable sines, so it never visibly repeats. */
-function edgeOffset(x: number): number {
+/**
+ * Deterministic hand-formed edge. Three incommensurable sines, so it never visibly repeats.
+ *
+ * The one-sidedness is the load-bearing property and it rests on the three amplitudes summing to
+ * exactly 1, which is the sort of fact that survives until someone retunes one of them. Exported so
+ * `desk-kit.test.ts` can hold it to `[0, EDGE_WOBBLE]` directly, rather than leaving the slab as the
+ * one piece of geometry in the set whose emitted vertices nothing measures.
+ */
+export function edgeOffset(x: number): number {
   const w =
     0.42 * Math.sin(x * 0.31 + 1.1) + 0.34 * Math.sin(x * 0.87 + 0.35) + 0.24 * Math.sin(x * 2.13)
   return ((w + 1) / 2) * EDGE_WOBBLE
@@ -63,7 +71,7 @@ function mottle(x: number, z: number): number {
   )
 }
 
-function buildSlab(): THREE.BufferGeometry {
+export function buildSlab(): THREE.BufferGeometry {
   const base = new THREE.Color(PALETTE.deskTop)
   const grain = new THREE.Color(PALETTE.deskGrain)
   const c = new THREE.Color()
@@ -112,7 +120,12 @@ function buildSlab(): THREE.BufferGeometry {
   return geo
 }
 
-export function DeskSet() {
+/**
+ * `journeyRef` is a pass-through for the NOTE alone (see desk-note.tsx): the sheet reads it at one
+ * instant, to decide whether a late webfont may still be swapped in unseen. Nothing else in the set
+ * reads it and nothing here subscribes to a frame loop.
+ */
+export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   const slab = useMemo(buildSlab, [])
   const props = useMemo(
@@ -134,7 +147,7 @@ export function DeskSet() {
       <mesh geometry={props}>
         <meshToonMaterial vertexColors gradientMap={ramp} />
       </mesh>
-      <DeskNote />
+      <DeskNote journeyRef={journeyRef} />
     </group>
   )
 }

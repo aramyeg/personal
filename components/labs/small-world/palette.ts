@@ -286,6 +286,9 @@ export const PALETTE = {
   deskGrain: '#C09A70', // pressed grain, the hand-formed back edge, and the slab's own recession
   notePaper: '#F6EEDB', // the note sheet. Warmer than `snow` so paper never reads as one more drift
   deskShade: '#8A6242', // contact pockets under the props, and the dish's own shadowed interior
+  notePaperLit: '#FFFFFF', // the lit corner of the note's paper wash, and
+  notePaperTint: '#BE9669', // its warm shaded corner — the sheet's own lighting cue, painted into
+  // the texture rather than asked of the scene, which has exactly one key light and no second
   deskMat: '#AFC0CB', // the blotter under the note and the stand. The frame's one COOL surface: the
   // desk is warm oak and the sky is a lilac-pink wash, and without a third note between them the
   // bottom of the composition is one unbroken field of tan

@@ -2,8 +2,10 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
+import type { EndingState } from '../../ending-timeline'
 import { DESK_NOTE, DESK_TOP_Y } from '../desk-stage'
 import { useClayRamp } from '../toon-ramp'
+import type { JourneyRef } from '../use-journey'
 import { tiltTowardKey } from './desk-kit'
 
 /**
@@ -16,14 +18,35 @@ import { tiltTowardKey } from './desk-kit'
  * 1024 × 544 and the mip chain does the rest.
  *
  * The font is the lab's own — `--sw-font-hand`, resolved off the element that carries the lab's
- * font variables rather than hard-coded, so the note cannot drift from the page's typography. It is
- * drawn twice: once immediately with whatever the system offers, and again on `document.fonts.ready`
- * once the webfont has actually arrived. Both draws happen while the visitor is still at the top of
- * a 1600 vh track, hundreds of viewport-heights from the ending, so there is nothing here that can
- * pop during the reveal.
+ * font variables rather than hard-coded, so the note cannot drift from the page's typography.
  *
- * Deterministic: the texture is a pure function of its own module constants, and the mesh never
- * moves. Nothing in this file reads scroll, and nothing here subscribes to a frame loop.
+ * ============================================================================
+ * WHY THERE IS A SECOND PAINT, AND WHY IT CANNOT BE SEEN
+ * ============================================================================
+ * The sheet is painted once at mount with whatever hand the browser has. If the webfont has not
+ * landed yet that is `Caveat Fallback` — metric-matched, so the layout is identical and only the
+ * letterforms differ (measured: 7.69% of the texture's pixels; advance widths 736.0 vs 721.1 px).
+ * A second paint on `document.fonts.ready` upgrades it.
+ *
+ * The first version of this file claimed that second paint could not land during the reveal because
+ * the visitor is "at the top of a 1600 vh track". That was wrong twice over. It is one keypress to
+ * the bottom of a track — review measured `fonts.ready` resolving at 10056 ms with the visitor
+ * already at scrollY 15840, i.e. a glyph swap on the largest readable object in frame — and the
+ * thing that actually makes the RELOAD path safe is `beginManualScrollRestoration` in
+ * `scroll-reset.ts`, not the distance.
+ *
+ * So the repaint is GATED rather than assumed safe, and the gate is exact rather than generous: it
+ * happens only while `ending.zoom === 0`. Two proofs this round already owns compose to make that
+ * airtight — at `zoom === 0` the camera pose is bit-identical to the static pose
+ * (`ending-camera.test.ts`), and at the static pose every vertex of this sheet is below the bottom
+ * frustum plane (`desk-stage.test.ts`). The note is therefore not merely unlikely to be on screen
+ * when it changes; it is provably off it. If the font arrives after the pull-back has begun the
+ * upgrade is skipped for good and the fallback hand stands — a difference nobody can see without an
+ * A/B, which is a better trade than a swap somebody can.
+ *
+ * Deterministic: the texture is a pure function of its own module constants and the mesh never
+ * moves. The journey ref is read at exactly one instant — the moment the font resolves — and never
+ * per frame; nothing here subscribes to a frame loop.
  */
 
 const TEX_W = 1024
@@ -41,6 +64,12 @@ function handFamily(): string {
   const family = getComputedStyle(probe).fontFamily
   host.removeChild(probe)
   return family || 'cursive'
+}
+
+/** `#RRGGBB` + alpha to a canvas fill string, so the palette owns the colour and this file the alpha. */
+function rgba(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
 }
 
 /** A hand-drawn rule: one stroke that wobbles, because a straight one reads as a border. */
@@ -62,10 +91,12 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.fillRect(0, 0, TEX_W, TEX_H)
 
   // paper is never one flat cream: a faint warmer wash down the right-hand side gives the sheet a
-  // side to be lit from without asking the scene for another light
+  // side to be lit from without asking the scene for another light. Both stops are palette entries
+  // now — the ALPHAS are a drawing parameter and stay here, the COLOURS are a palette decision and
+  // do not. These were the only rgba() literals under scene/.
   const wash = ctx.createLinearGradient(0, 0, TEX_W, TEX_H)
-  wash.addColorStop(0, 'rgba(255,255,255,0.35)')
-  wash.addColorStop(1, 'rgba(190,150,105,0.16)')
+  wash.addColorStop(0, rgba(PALETTE.notePaperLit, 0.35))
+  wash.addColorStop(1, rgba(PALETTE.notePaperTint, 0.16))
   ctx.fillStyle = wash
   ctx.fillRect(0, 0, TEX_W, TEX_H)
 
@@ -117,40 +148,58 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.restore()
 }
 
-function useNoteTexture(): THREE.CanvasTexture | null {
-  const texture = useMemo(() => {
+/**
+ * Whether the deferred upgrade may still be applied. Every vertex of the sheet is below the bottom
+ * frustum plane for the one pose the camera holds while `zoom` is 0, so this is the exact boundary
+ * rather than a margin around one.
+ */
+export function noteRepaintAllowed(ending: EndingState): boolean {
+  return ending.zoom === 0
+}
+
+/** The font shorthand the headline is drawn at — what `fonts.check` has to answer for. */
+const handProbe = (family: string) => `700 158px ${family}`
+
+function useNoteTexture(journeyRef: JourneyRef): THREE.CanvasTexture | null {
+  const built = useMemo(() => {
     if (typeof document === 'undefined') return null
     const canvas = document.createElement('canvas')
     canvas.width = TEX_W
     canvas.height = TEX_H
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    paint(ctx, handFamily())
+    const family = handFamily()
+    paint(ctx, family)
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.anisotropy = 8
-    return tex
+    // if the hand was already loaded, this paint IS the final one and there is nothing deferred
+    return { tex, needsUpgrade: !(document.fonts?.check(handProbe(family)) ?? true) }
   }, [])
 
   useEffect(() => {
-    if (!texture) return
+    if (!built?.needsUpgrade) return
     let live = true
     document.fonts?.ready.then(() => {
       if (!live) return
-      const ctx = (texture.image as HTMLCanvasElement).getContext('2d')
+      // THE GATE. Past this the camera has moved and the sheet is on screen; a better hand is not
+      // worth a visible swap, so the fallback stands.
+      if (!noteRepaintAllowed(journeyRef.current.ending)) return
+      const ctx = (built.tex.image as HTMLCanvasElement).getContext('2d')
       if (!ctx) return
       // r3f runs a continuous loop, so flagging the texture is the whole of the update — there is
       // nothing to re-render in React and no state here to make stale.
       paint(ctx, handFamily())
-      texture.needsUpdate = true
+      built.tex.needsUpdate = true
     })
     return () => {
       live = false
-      texture.dispose()
     }
-  }, [texture])
+  }, [built, journeyRef])
 
-  return texture
+  useEffect(() => () => built?.tex.dispose(), [built])
+
+  return built?.tex ?? null
 }
 
 /**
@@ -206,9 +255,9 @@ function buildSheet(): THREE.BufferGeometry {
   return geo
 }
 
-export function DeskNote() {
+export function DeskNote({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
-  const texture = useNoteTexture()
+  const texture = useNoteTexture(journeyRef)
   const sheet = useMemo(buildSheet, [])
   useEffect(() => () => sheet.dispose(), [sheet])
 
