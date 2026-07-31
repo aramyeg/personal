@@ -4,7 +4,6 @@ import { CHAPTER_COUNT, chapters } from '../chapters'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
-import { EndPanel } from './end-panel'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
 import { useJourneyUi } from './use-journey-ui'
@@ -30,7 +29,11 @@ export function JourneyOverlay({
           panel text can never be tinted by it (see biome-grade.tsx). */}
       {SHOW_GRADE && <BiomeGrade progressRef={progressRef} journey={journey} />}
       <SpeedLines active={ui.burst} />
-      {ui.panel && !ui.ended && (
+      {/* No `ended` gate any more (Task 63). It existed to clear the stage for the retired
+          `EndPanel`, and at END_AT = 0.985 it cut chapter 6's dwell short — the cards were
+          yanked mid-read at 0.985 while the dwell ran to 0.9917. The cards now retract the
+          way every other chapter's do, on their own clock, and the ending begins after. */}
+      {ui.panel && (
         <ChapterPanels
           chapter={chapters[ui.panel.chapter]}
           index={ui.panel.chapter}
@@ -38,7 +41,20 @@ export function JourneyOverlay({
           onAdvance={() => onAdvance((ui.panel!.chapter + 1) / CHAPTER_COUNT)}
         />
       )}
-      {ui.ended && <EndPanel />}
+      {/* THE ENDING SLOT — mounted for the whole ending segment, empty on purpose. T64 hangs the
+          curtain call's DOM (if it needs any) here and T65 the connect note; the phase attribute
+          is the ending's own timeline, so a consumer can style off it without re-deriving it.
+          `pointerEvents: none` is inherited from the overlay root and must STAY that way until
+          something in here is genuinely clickable: the click model is canvas-first
+          (onPointerMissed advances panels), and a transparent full-viewport catcher is exactly
+          the tap blanket Task 61 removed. */}
+      {ui.ending && (
+        <div
+          data-testid="sw-ending"
+          data-phase={ui.ending.phase}
+          style={{ position: 'absolute', inset: 0 }}
+        />
+      )}
       {/* The rail reads RAW scroll: it is the "your input registered" affordance, so it must
           keep creeping even while an arrival absorbs the journey's own progress (Task 54). */}
       {SHOW_PROGRESS_RAIL && <JourneyProgress progressRef={journey?.rawProgressRef ?? progressRef} />}

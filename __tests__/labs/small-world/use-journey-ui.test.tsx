@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useJourneyUi } from '@/components/labs/small-world/overlay/use-journey-ui'
 import { initialArrival } from '@/components/labs/small-world/arrival'
+import { ENDING_SPAN, TRACK_END } from '@/components/labs/small-world/ending-timeline'
 import type { RevealState } from '@/components/labs/small-world/journey-timeline'
 import type { ArrivalJourney } from '@/components/labs/small-world/use-arrival-journey'
 
@@ -60,7 +61,7 @@ describe('useJourneyUi', () => {
 
   it('starts in chapter 0 with no panel', () => {
     const { result } = renderHook(() => useJourneyUi(refOf(0)))
-    expect(result.current).toEqual({ chapter: 0, burst: false, panel: null, ended: false })
+    expect(result.current).toEqual({ chapter: 0, burst: false, panel: null, ending: null })
   })
 
   it('reports the burst window', () => {
@@ -83,12 +84,39 @@ describe('useJourneyUi', () => {
     expect((result.current.panel!.enter * 60) % 1).toBeCloseTo(0, 6)
   })
 
-  it('reports the ending', () => {
+  // Task 63: the ending is scroll real estate PAST progress 1, not a flag at 0.985. The old
+  // threshold landed inside chapter 6's dwell and truncated its cards; progress 1 is now the
+  // journey's last frame and belongs to the journey.
+  it('reports no ending at the journey\'s last frame', () => {
     const ref = refOf(0)
     const { result } = renderHook(() => useJourneyUi(ref))
     ref.current = 1
     fireScroll()
-    expect(result.current.ended).toBe(true)
+    expect(result.current.ending).toBeNull()
+  })
+
+  it('reports the ending, with its phase, once the track runs past the journey', () => {
+    const ref = refOf(0)
+    const { result } = renderHook(() => useJourneyUi(ref))
+    ref.current = 1 + 0.1 * ENDING_SPAN
+    fireScroll()
+    expect(result.current.ending).not.toBeNull()
+    expect(result.current.ending!.phase).toBe('curtain')
+    expect(result.current.ending!.t).toBeCloseTo(0.1, 6)
+
+    ref.current = TRACK_END
+    fireScroll()
+    expect(result.current.ending!.phase).toBe('zoom')
+    expect(result.current.ending!.t).toBe(1)
+  })
+
+  it('quantizes the ending clock, so scrubbing it does not re-render every frame', () => {
+    const ref = refOf(1 + 0.5 * ENDING_SPAN)
+    const { result } = renderHook(() => useJourneyUi(ref))
+    const before = result.current
+    ref.current += ENDING_SPAN / 1000
+    fireScroll()
+    expect(result.current).toBe(before)
   })
 
   it('keeps referential stability when nothing changed', () => {

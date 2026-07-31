@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
+import { CHAPTER_COUNT } from '../../chapters'
+import { PANEL_END } from '../../journey-timeline'
 import { PALETTE } from '../../palette'
 import { anchorTransform } from '../stage'
 import { activeVariantAt, canonicalTheta } from '../renewal'
@@ -81,22 +83,31 @@ export const EGG_X = 0.8
  */
 const EGG_FROM = 4.72 / 6
 /**
- * ...and it stops BEFORE the journey's end panel appears, which is a design invariant rather than a
- * tuning choice: the hotspot may only be armed where a click will actually reach it.
+ * ...and it stops when the LAST CHECKPOINT RELEASES — the exact progress at which chapter 6's
+ * dwell ends and the ending segment takes the frame.
  *
- * `use-journey-ui` flips `ended` at `END_AT` and `EndPanel` is then a full-viewport
- * `pointer-events: auto` scrim — a deliberate one, with links in it, at a point where advancing is
- * meaningless. A click cannot reach the canvas through it. Leaving the egg armed under that scrim
- * would be a promise-shaped affordance the page does not honour, which is the same fault in
- * miniature as the tap blanket this round removed. So the window closes a hair earlier.
+ * RE-DERIVED for Task 63, because the thing it used to be a relation to is gone. It was 0.98,
+ * chosen to close just under `END_AT` = 0.985, where the retired `EndPanel` raised a full-viewport
+ * `pointer-events: auto` scrim a click could not reach the canvas through. There is no scrim now:
+ * the ending is scroll real estate past progress 1, and the overlay slot that marks it takes no
+ * pointer events at all. The invariant survives its old justification intact, though — the hotspot
+ * may only be armed where a click will actually reach it AND where the egg is actually on frame —
+ * so it is re-anchored to the geometry that still exists:
  *
- * EXPORTED for the pin (Task 62). The R18 review closed with this constant unguarded: raising it
- * back to 1 would re-arm the hotspot under the scrim and nothing in the suite would fail. The pin
- * is a RELATION between this number and `END_AT` rather than a literal restated in a test, because
- * a frozen copy of 0.985 would go stale the moment the end panel moved — which is exactly the
- * failure the yeti's own pond test was rebuilt out of two commits earlier in the same round.
+ *  - It now runs to the END of the winter dwell instead of being cut 0.005 short of it by a panel
+ *    that no longer exists. Nothing on screen changes over that sliver: `rotationAt` freezes
+ *    rotation for the whole dwell (from 0.925 on), so the frame at 0.98 and the frame at the
+ *    release are identical — the egg was always visible there, it was simply disarmed.
+ *  - It closes strictly BEFORE the ending (`ENDING` begins at progress 1), so the curtain call and
+ *    the pull-back never have a live click target from the journey underneath them. Past that the
+ *    clamp enforces it a second time for free: `JourneyState.progress` reads exactly 1 for the
+ *    whole ending, which is greater than this value, so the gate below cannot re-open however far
+ *    the visitor scrolls.
+ *
+ * Still a RELATION rather than a literal, for the reason Task 62 made it one: a frozen copy goes
+ * stale the moment the thing it mirrors moves. `yeti-egg.test.ts` pins both halves.
  */
-export const EGG_TO = 0.98
+export const EGG_TO = (CHAPTER_COUNT - 1 + PANEL_END) / CHAPTER_COUNT
 
 // --- the peek ---------------------------------------------------------------
 

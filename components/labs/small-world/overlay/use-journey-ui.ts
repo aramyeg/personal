@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
+import type { EndingPhase } from '../ending-timeline'
 import { CARD_PHASE_START, journeyStateAt, revealPhase } from '../journey-timeline'
 import type { ArrivalJourney } from '../use-arrival-journey'
 
@@ -9,19 +10,20 @@ export type JourneyUi = {
   burst: boolean
   /** `enter` is the cards' entrance progress 0→1, NOT a dwell fraction — see below. */
   panel: { chapter: number; enter: number } | null
-  ended: boolean
+  /**
+   * The ending's DOM-side view (Task 63) — null for the whole journey, then the ending's
+   * own timeline. `t` is quantized like `panel.enter`, so scrubbing the ending costs at
+   * most T_STEPS re-renders rather than one per frame; a consumer that needs the exact
+   * value (or the curtain/zoom sub-windows) should read `endingStateAt` itself.
+   *
+   * This replaces the old `ended` flag, which was a boolean because the only thing past
+   * the journey was one full-viewport panel. `EndPanel` is retired: the ending is now
+   * scroll real estate, and T64/T65 fill it.
+   */
+  ending: { t: number; phase: EndingPhase } | null
 }
 
 const T_STEPS = 60
-/**
- * Progress at which the journey is over and `EndPanel` goes up.
- *
- * EXPORTED because something else depends on it: `EndPanel` is a full-viewport `pointer-events:
- * auto` scrim, so nothing on the canvas may still be armed as a click target past this point. The
- * yeti easter egg closes its own window before this one opens, and the test that pins that reads
- * BOTH constants rather than restating either — see `EGG_TO`.
- */
-export const END_AT = 0.985
 
 /**
  * Cards mount and roll out on the ARRIVAL CLOCK when one is driving (Task 54): the
@@ -53,7 +55,11 @@ function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
       chapter === undefined
         ? null
         : { chapter, enter: Math.round(enter * T_STEPS) / T_STEPS },
-    ended: s.progress >= END_AT,
+    // `s.progress` is clamped and reads 1 for the whole ending, so it cannot answer this —
+    // `s.ending` is the field built from the un-clamped value. See ending-timeline.ts.
+    ending: s.ending.active
+      ? { t: Math.round(s.ending.t * T_STEPS) / T_STEPS, phase: s.ending.phase }
+      : null,
   }
 }
 
@@ -61,7 +67,11 @@ function same(a: JourneyUi, b: JourneyUi): boolean {
   return (
     a.chapter === b.chapter &&
     a.burst === b.burst &&
-    a.ended === b.ended &&
+    (a.ending === b.ending ||
+      (a.ending !== null &&
+        b.ending !== null &&
+        a.ending.t === b.ending.t &&
+        a.ending.phase === b.ending.phase)) &&
     (a.panel === b.panel ||
       (a.panel !== null &&
         b.panel !== null &&

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { EGG_THETA, EGG_TO, EGG_X, peekPose } from '@/components/labs/small-world/scene/props/yeti-egg'
-import { END_AT } from '@/components/labs/small-world/overlay/use-journey-ui'
+import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { ENDING_SPAN } from '@/components/labs/small-world/ending-timeline'
+import { PANEL_END, journeyStateAt } from '@/components/labs/small-world/journey-timeline'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import { waterMask } from '@/components/labs/small-world/scene/biomes'
 
@@ -114,17 +116,31 @@ describe('the egg house rules', () => {
     expect(src).toMatch(/activeVariantAt\([\s\S]{0,80}&&[\s\S]{0,120}progress >= EGG_FROM/)
   })
 
-  it('closes its window before the end panel covers the canvas', () => {
-    // Task 62, and it closes the R18 review's last open item: `EGG_TO` was unpinned, so raising it
-    // back to 1 would have re-armed the hotspot underneath `EndPanel` — a full-viewport
-    // `pointer-events: auto` scrim — and nothing in the suite would have failed. The design
-    // invariant is that the egg may only be armed where a click can actually reach it, which is
-    // the same rule the tap-blanket fix established for the whole lab.
+  it('stays armed for the whole of the last dwell, and closes when it releases', () => {
+    // Task 62 pinned this against `END_AT`, the progress at which the retired `EndPanel` raised a
+    // full-viewport scrim. Task 63 removed that panel, so the pin is re-derived rather than
+    // deleted: the window now runs to the exact progress at which chapter 6's dwell releases.
     //
-    // The pin is a RELATION between the two modules' own constants, not a literal restated here. A
-    // frozen copy of 0.985 would go stale the moment the end panel moved, and this lane spent two
-    // commits earlier in the same round unwinding exactly that mistake in the yeti's pond test.
-    expect(EGG_TO, 'the hotspot must disarm before EndPanel goes up').toBeLessThan(END_AT)
+    // The lower half matters as much as the upper. `EGG_TO` used to be 0.98, cut 0.0117 short of
+    // the dwell's own end by a panel that no longer exists — and nothing on screen changed over
+    // that sliver, because `rotationAt` freezes rotation for the whole dwell. The egg was visible
+    // and dead. It is now armed for exactly the ground it stands on.
+    const lastDwellEnd = (CHAPTER_COUNT - 1 + PANEL_END) / CHAPTER_COUNT
+    expect(EGG_TO, 'the hotspot must stay armed for the whole winter dwell').toBe(lastDwellEnd)
+  })
+
+  it('is disarmed for the whole ending, twice over', () => {
+    // Once by design: the window closes strictly before the ending's first frame, so the curtain
+    // call and the pull-back never have a live click target from the journey underneath them.
+    expect(EGG_TO, 'the hotspot must disarm before the ending begins').toBeLessThan(1)
+
+    // And once by construction, which is the half a future edit cannot undo by moving a number:
+    // `JourneyState.progress` is CLAMPED, so it reads exactly 1 across the entire ending domain,
+    // and the gate's `progress <= EGG_TO` is therefore false however far the visitor scrolls.
+    for (let i = 0; i <= 500; i++) {
+      const p = 1 + (i / 500) * ENDING_SPAN
+      expect(journeyStateAt(p).progress).toBeGreaterThan(EGG_TO)
+    }
   })
 
   it('cancels the one-shot when the gate closes, in the same frame', () => {
