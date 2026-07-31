@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { CHAPTER_COUNT } from '../chapters'
 import { chapters } from '../chapters'
+import { endingStateAt } from '../ending-timeline'
 import { PALETTE } from '../palette'
 
 /**
@@ -24,10 +25,37 @@ import { PALETTE } from '../palette'
  * Cheap by construction: the fill width is written straight to the DOM every
  * scroll frame (no React churn); state updates only when the integer chapter
  * changes — at most CHAPTER_COUNT times across the whole journey.
+ *
+ * TASK 65 — IT LEAVES WHEN THE WORLD DOES.
+ * Task 63 left the rail flagged rather than decided: it clamps, so through the
+ * whole ending it reads a truthful "6 / 6" with a full bar — floating over a
+ * desk, a hand-written note and three contact links. Truthful and wrong. The
+ * decision here is to FADE it rather than to kill it (`SHOW_PROGRESS_RAIL` is
+ * still the whole-cloth revert): through the curtain call the rail is still
+ * doing its original job, which is to answer "did my scroll register" while the
+ * world stands still — and the curtain call is the stillest the lab ever gets.
+ * It is only once the camera starts moving that the frame answers that question
+ * by itself, and the counter becomes chrome over the portfolio's contact page.
+ *
+ * So the fade is keyed to `zoom`, not to the ending, and it is gone by the time
+ * there is a composition to sit on top of. When it is gone it is `visibility:
+ * hidden` as well as transparent — the dismiss control is the one thing in this
+ * component that takes pointer events, and an invisible live button over the
+ * desk is exactly the trap the canvas-first model forbids.
  */
 
 const DOT = 9
 const DOT_ACTIVE = 14
+
+/** The rail is fully gone by this much of the pull-back — well before the desk is readable. */
+const RAIL_GONE_AT = 0.28
+
+/** Its opacity at a scroll position, from the ending's own zoom parameter. */
+export function railOpacity(progress: number): number {
+  const { zoom } = endingStateAt(progress)
+  const v = 1 - zoom / RAIL_GONE_AT
+  return v < 0 ? 0 : v > 1 ? 1 : v
+}
 
 function chapterAt(progress: number): number {
   const p = Math.min(1, Math.max(0, progress))
@@ -38,13 +66,22 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
   const [chapter, setChapter] = useState(() => chapterAt(progressRef.current))
   const [dismissed, setDismissed] = useState(false)
   const fillRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (dismissed) return
     let raf = 0
     const compute = () => {
-      const p = Math.min(1, Math.max(0, progressRef.current))
+      // the RAW value, unclamped: `railOpacity` reads the ending, and the clamp is what hides it
+      const raw = progressRef.current
+      const p = Math.min(1, Math.max(0, raw))
       if (fillRef.current) fillRef.current.style.width = `${p * 100}%`
+      if (wrapRef.current) {
+        const o = railOpacity(raw)
+        wrapRef.current.style.opacity = `${o}`
+        // not merely transparent: the dismiss button is a live target, and it must not survive
+        wrapRef.current.style.visibility = o === 0 ? 'hidden' : 'visible'
+      }
       const c = chapterAt(p)
       setChapter((prev) => (prev === c ? prev : c))
     }
@@ -64,6 +101,7 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
 
   return (
     <div
+      ref={wrapRef}
       role="group"
       aria-label={`Journey progress: chapter ${chapter + 1} of ${CHAPTER_COUNT}`}
       style={{

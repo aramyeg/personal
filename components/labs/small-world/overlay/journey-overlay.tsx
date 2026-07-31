@@ -4,6 +4,7 @@ import { CHAPTER_COUNT, chapters } from '../chapters'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
+import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
 import { useJourneyUi } from './use-journey-ui'
@@ -63,7 +64,9 @@ export function JourneyOverlay({
           data-testid="sw-ending"
           data-phase={ui.ending.phase}
           style={{ position: 'absolute', inset: 0 }}
-        />
+        >
+          <EndingConnect t={ui.ending.t} onRestart={() => onAdvance(0)} />
+        </div>
       )}
       {/* The rail reads RAW scroll: it is the "your input registered" affordance, so it must
           keep creeping even while an arrival absorbs the journey's own progress (Task 54). */}

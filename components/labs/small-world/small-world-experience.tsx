@@ -111,8 +111,20 @@ export function SmallWorldExperience({
       </div>
       {/* Collapse the now-pastel-styled fallback once the scene is live. Neutralises
           the fallback's own min-height/padding/background so it fully visually hides
-          (this rule renders after the fallback's style block, so it wins on tie). */}
-      <style>{`.${FALLBACK_CLASS}{position:absolute!important;width:1px;height:1px;min-height:0;padding:0;margin:0;overflow:hidden;clip-path:inset(50%)}`}</style>
+          (this rule renders after the fallback's style block, so it wins on tie).
+
+          `visibility:hidden` is load-bearing, not belt-and-braces (Task 65). The clip
+          alone hides the fallback from the EYE and leaves it in the tab order, which
+          cost nothing while the fallback was only prose — and became a trap the moment
+          it grew contact links: three invisible tab stops at document offset 0, each of
+          which scrolls the visitor to the top of a 1600 vh track to "reveal" a 1 px box.
+          A keyboard visitor reading the ending was thrown back to chapter one, and the
+          ending unmounted under them. Hidden visibility takes the whole subtree out of
+          sequential focus and out of the accessibility tree, which is the right
+          semantics anyway: once the canvas is live, the static page is not a second
+          interface running alongside it — the ending's own connect block is the way
+          through, and it is real DOM. */}
+      <style>{`.${FALLBACK_CLASS}{position:absolute!important;width:1px;height:1px;min-height:0;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);visibility:hidden}`}</style>
     </div>
   )
 }

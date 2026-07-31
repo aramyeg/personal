@@ -84,4 +84,34 @@ ${S} > ol > li > p:last-child{
   color:${PALETTE.leaf};
   font-weight:600;
 }
+${S} > footer{
+  max-width:56rem;
+  margin:clamp(2rem,5vh,3rem) auto 0;
+  padding:clamp(1.1rem,3vw,1.75rem) clamp(1.25rem,3.5vw,2rem);
+  border-radius:1rem;
+  background:${PALETTE.snow}cc;
+  box-shadow:0 6px 20px -12px ${PALETTE.ink}55;
+}
+${S} > footer > h2{
+  margin:0 0 0.35rem;
+  font-family:var(--sw-font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight:700;
+  font-size:clamp(1.15rem,2.6vw,1.5rem);
+  color:${PALETTE.leaf};
+}
+${S} > footer > p{margin:0 0 0.85rem;}
+${S} > footer > ul{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.6rem 1.1rem;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+${S} > footer a{
+  color:${PALETTE.riverDeep};
+  font-weight:700;
+  text-decoration:underline;
+  text-underline-offset:0.18em;
+}
 `

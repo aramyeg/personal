@@ -1,3 +1,4 @@
+import { siteConfig, socialLinks } from '@/lib/constants'
 import { chapters } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
 import { FALLBACK_STYLE } from './fallback-timeline-style'
@@ -7,6 +8,16 @@ import { FALLBACK_STYLE } from './fallback-timeline-style'
  * path. Carries the lab's pastel skin (FALLBACK_STYLE) so the pre-scene state
  * reads as Small World, not the site's dark theme; the client shell collapses it
  * once the 3D scene takes over.
+ *
+ * TASK 65 — IT HAS TO END WHERE THE SCENE DOES. Until now this page stopped at
+ * the last job, because the lab's "say hi" lived in a panel the scene owned.
+ * Task 65 moves the contact story into the ending's desk reveal, which a
+ * reduced-motion or no-WebGL visitor never sees — the canvas is not merely
+ * hidden for them, `SmallWorldExperience` returns null and never mounts it. So
+ * the ONE route to Aram would have disappeared for exactly the visitors least
+ * able to go looking for it. The block below is that route, in plain markup:
+ * same address, same two profiles, no JavaScript, and it ships in the initial
+ * HTML so a crawler reads it too.
  */
 export function FallbackTimeline() {
   return (
@@ -32,6 +43,22 @@ export function FallbackTimeline() {
           </li>
         ))}
       </ol>
+      <footer>
+        <h2>Connect with me</h2>
+        <p>The next chapter is unwritten — say hi.</p>
+        <ul>
+          <li>
+            <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>
+          </li>
+          {socialLinks.map((l) => (
+            <li key={l.name}>
+              <a href={l.url} target="_blank" rel="noopener noreferrer">
+                {l.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </footer>
     </section>
   )
 }
