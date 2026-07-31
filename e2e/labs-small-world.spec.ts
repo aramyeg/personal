@@ -92,10 +92,9 @@ test.describe('Small World lab', () => {
   })
 
   // Task 63: the to-be-continued panel is retired; past the journey the ending
-  // owns the track — curtain call first, then the zoom-out pull-back. T65's
-  // connect note will give the zoom phase real content (and this test its
-  // contact-link assertions back).
-  test('past the journey the ending runs curtain call into zoom-out', async ({ page }) => {
+  // owns the track — curtain call first, then the zoom-out desk reveal, which
+  // doubles as the contact page (Task 65: real anchors in the sw-ending slot).
+  test('the ending runs curtain call into zoom-out and lands on contact links', async ({ page }) => {
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
@@ -105,5 +104,10 @@ test.describe('Small World lab', () => {
     await expect(ending).toHaveAttribute('data-phase', 'curtain')
     await scrollToProgress(page, TRACK_END)
     await expect(ending).toHaveAttribute('data-phase', 'zoom')
+    await expect(ending.getByTestId('sw-connect-email')).toBeVisible({ timeout: 10_000 })
+    await expect(ending.getByTestId('sw-connect-email')).toHaveAttribute('href', /^mailto:/)
+    await expect(ending.getByTestId('sw-connect-github')).toHaveAttribute('href', /github\.com/)
+    await expect(ending.getByTestId('sw-connect-linkedin')).toHaveAttribute('href', /linkedin\.com/)
+    await expect(ending.getByTestId('sw-connect-restart')).toBeVisible()
   })
 })
