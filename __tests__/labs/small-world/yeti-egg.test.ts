@@ -137,8 +137,12 @@ describe('the egg house rules', () => {
     // VANISHED at 0.98 and the widening drew it where it previously was not drawn.
     //
     // The split is what makes that reasoning true rather than merely harmless. Visibility has no
-    // upper bound now, so the yeti cannot pop out of existence in a frame where rotation is frozen
-    // and nothing else moves — the most conspicuous place in the lab to do it.
+    // upper bound now, so the yeti stays in the world the pull-back is about to reveal as an object
+    // on a desk, instead of leaving just before it. (Measured, so the correction does not repeat
+    // the original error in the other direction: the old exit was NOT a pop in a still frame —
+    // EGG_TO is the dwell's release, where the cards and both mascots retract and 32.7% of the
+    // frame changes regardless. bench/task63-fix-ab.mjs; the yeti itself is 444 px,
+    // bench/task63-yeti-crop.mjs.)
     expect(src).toMatch(/const visible =[\s\S]{0,140}progress >= EGG_FROM\s*$/m)
     expect(src).toMatch(/const nowArmed = visible && j\.progress <= EGG_TO/)
     expect(src).toMatch(/g\.visible = visible/)

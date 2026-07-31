@@ -108,7 +108,8 @@ export const EGG_FROM = 4.72 / 6
  * first version said the widening "cannot change a pixel" because rotation is frozen across the
  * dwell — true about rotation, and irrelevant, because visibility was gated on this same bound.
  * Under 0.98 the yeti VANISHED at 0.98 and the widening draws it through the dwell tail where it
- * previously was not drawn. That was a real pixel change, mis-certified as none.
+ * previously was not drawn. That was a real pixel change, mis-certified as none. Measured at 444
+ * pixels inside its own crop, against a floor of 0 (`bench/task63-yeti-crop.mjs`).
  *
  * Still a RELATION rather than a literal, for the reason Task 62 made it one: a frozen copy goes
  * stale the moment the thing it mirrors moves. `yeti-egg.test.ts` pins both halves.
@@ -322,10 +323,16 @@ export function YetiEgg({ journeyRef }: { journeyRef: JourneyRef }) {
     if (!g) return
     const j = journeyRef.current
 
-    // VISIBILITY AND ARMING ARE SEPARATE GATES (Task 63 fix round). They were one boolean, and
-    // that made the click's upper bound double as a vanishing act: the yeti blinked out of
-    // existence at `EGG_TO` in a frame where rotation is frozen and nothing else moves at all —
-    // the single most conspicuous place in the whole lab to pop something.
+    // VISIBILITY AND ARMING ARE SEPARATE GATES (Task 63 fix round). They were one boolean, so the
+    // click's upper bound doubled as a vanishing act — the yeti left the world at `EGG_TO`.
+    //
+    // What that cost, measured rather than assumed (bench/task63-fix-ab.mjs). It is NOT a pop in a
+    // motionless frame: `EGG_TO` is the chapter-6 dwell's release, so the card spread and both
+    // corner mascots retract on the same boundary and 32.7% of the frame changes there anyway —
+    // the yeti's exit was masked, not conspicuous. (It WAS conspicuous under the old 0.98, which
+    // sat mid-dwell where nothing else moved.) The reason to split is what the ending needs: the
+    // yeti is part of the little world, and the pull-back reveals that world as an object on a
+    // desk. Anything that belongs to it should still be standing there when it recedes.
     //
     // VISIBLE has no upper bound. Both gates below still apply — the variant gate says this ground
     // is currently painted winter, the progress gate says the visitor is actually looking at it —
