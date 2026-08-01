@@ -14,6 +14,7 @@ import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 import { buildMergedClay } from './clay-kit'
 import { deskNoteShadowPart, deskPropParts, tiltTowardKey } from './desk-kit'
+import { DeskFigurines } from './desk-figurines'
 import { DeskNote } from './desk-note'
 
 /**
@@ -32,9 +33,10 @@ import { DeskNote } from './desk-note'
  * there" look different in a way no amount of easing fixes. Parked geometry has no entrance to get
  * wrong, forwards or backwards, at any scrub speed.
  *
- * DRAW CALLS: three. The slab, every prop merged into one vertex-coloured geometry, and the note
- * (its own material, because it carries a texture). Per frame: nothing at all — this component
- * subscribes to no frame loop and allocates nothing after mount.
+ * DRAW CALLS: five. The slab, every prop merged into one vertex-coloured geometry, the note (its own
+ * material, because it carries a texture) and the two figurines (one merged clay mesh plus one
+ * merged ink contour for the pair). Per frame: nothing at all — this component subscribes to no
+ * frame loop and allocates nothing after mount.
  */
 
 /** How far the hand-formed back edge may wander FORWARD of DESK_BACK_Z. Never backward: back is
@@ -148,6 +150,9 @@ export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
         <meshToonMaterial vertexColors gradientMap={ramp} />
       </mesh>
       <DeskNote journeyRef={journeyRef} />
+      {/* Two souvenirs of the journey, at desk-toy scale (Task 66). Static clay, like everything
+          else here — see desk-figurines.tsx. */}
+      <DeskFigurines />
     </group>
   )
 }
