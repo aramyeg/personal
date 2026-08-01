@@ -335,7 +335,7 @@ describe('the planet is never covered', () => {
     // the world's spin and the camera-space staging would come apart.
     //
     // Asserted as that PROPERTY rather than as adjacency to the fragment's closing tag, which is
-    // what this used to check. Adjacency was a positional accident: Task 64's curtain call mounts
+    // what this used to check. Adjacency was a positional accident: Task 64's since-deleted curtain call mounted
     // after the peekers, and the moment it did the guard failed without anything moving inside
     // `<Planet>`. Same defect class as the grep this comment already describes — the guard has to
     // fail on the drift it names, not on the next line someone adds below it.
@@ -364,10 +364,8 @@ describe('the planet is never covered', () => {
     // and read this paragraph rather than inheriting a guard that silently started passing again.
     expect(PEEKER_DEPTH + CEILING).toBeGreaterThan(CAMERA_DISTANCE * ZOOM_FACTOR)
     // What makes that harmless is therefore ENTIRELY structural, with no margin behind it: a peeker
-    // is driven by the
-    // arrival reveal clock, and no reveal can exist past the last dwell, so the whole rig is
-    // invisible for every frame of the ending. T64's curtain call cannot inherit that for free —
-    // see the ending contract.
+    // is driven by the arrival reveal clock, and no reveal can exist past the last dwell, so the
+    // whole rig is invisible for every frame of the ending.
     //
     // Driven through the REAL state machine rather than asserted off a hand-built state. The first
     // version of this guard opened with `expect(journeyStateAt(p).reveal).toBeNull()`, which is

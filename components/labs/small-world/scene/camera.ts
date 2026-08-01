@@ -186,7 +186,7 @@ export function globeEdgesAt(k: number, aimDrop: number): { top: number; bot: nu
  * while `DESK_TOP_Y` (desk-stage.ts) sets the gap — so the solve is monotone and a
  * bisection is honest. It runs once, at module load, and never again.
  *
- * At the shipped targets it comes out at 1.885 world units, which is 5.0° of extra
+ * At the shipped targets it comes out at 1.8857 world units, which is 5.391° of extra
  * downward pitch by the bottom of the track. Task 65 considered a re-aim and declined
  * it, correctly, on the grounds that 3× already split the frame evenly; at 1.5× it no
  * longer does, and the same option is now the thing that makes the composition work.

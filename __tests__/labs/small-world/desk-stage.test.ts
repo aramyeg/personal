@@ -9,6 +9,7 @@ import {
   GLOBE_FRAME,
   STAND_GAP,
   ZOOM_FACTOR,
+  endingRig,
   globeEdgesAt,
   ndcYAt,
 } from '@/components/labs/small-world/scene/camera'
@@ -20,6 +21,7 @@ import {
   DESK_MAX_ASPECT,
   DESK_NEAR_Z,
   EDGE_WOBBLE,
+  deskFrameHalfW,
   DESK_STAGE_EXIT_Z,
   DESK_NOTE,
   DESK_PROPS,
@@ -200,14 +202,28 @@ describe('the desk is derived from the camera, not typed next to it', () => {
   })
 
   it('is wide enough that no aspect up to DESK_MAX_ASPECT can see a side edge', () => {
+    // Measured against the camera that SHIPS, aim included. The local `ndc` helper above models the
+    // journey camera — origin-aimed — which is correct for the containment suite and wrong here: the
+    // aim drop deepens the back edge by 1.1% and the near edge by 6.9%, so the un-aimed helper was
+    // checking a slightly WIDER frame than the money shot actually has.
     for (const [name, aspect] of ASPECTS) {
       expect(aspect).toBeLessThan(DESK_MAX_ASPECT)
-      for (const k of [1, 1.5, 2, 2.5, ZOOM_FACTOR]) {
+      for (let j = 0; j <= 12; j++) {
+        const zoomT = j / 12
+        const s = zoomT * zoomT * (3 - 2 * zoomT)
+        const k = Math.exp(Math.log(ZOOM_FACTOR) * s)
+        const aim = ENDING_AIM_DROP * s
+        const r = endingRig(k, aim)
         for (let i = 0; i <= 40; i++) {
           const z = DESK_BACK_Z + (i / 40) * (DESK_NEAR_Z - DESK_BACK_Z)
-          const n = ndc([DESK_HALF_W, DESK_TOP_Y, z], k, aspect)
-          if (n.depth <= 0 || n.y > -1) continue // off the bottom of the frame: no edge to see
-          expect(n.x, `${name} sees the desk's side edge at k=${k} z=${z.toFixed(1)}`).toBeGreaterThan(1)
+          const depth = (DESK_TOP_Y - r.cam[1]) * r.fwd[1] + (z - r.cam[2]) * r.fwd[2]
+          if (depth <= 0) continue
+          if (ndcYAt([0, DESK_TOP_Y, z], k, aim) > -1) continue // on frame: an edge could show
+          const ndcX = DESK_HALF_W / (depth * TAN_HALF * aspect)
+          expect(
+            ndcX,
+            `${name} sees the desk's side edge at k=${k.toFixed(2)} z=${z.toFixed(1)}`
+          ).toBeGreaterThan(1)
         }
       }
     }
@@ -316,10 +332,16 @@ describe('the note', () => {
   })
 
   it('is readable on the narrowest frame — it fills most of it rather than most of a desktop', () => {
-    const aspect = 430 / 932
-    const halfFrame = ndc([0, DESK_TOP_Y, DESK_NOTE.z], ZOOM_FACTOR, aspect)
-    const fraction = DESK_NOTE.width / 2 / (halfFrame.depth * TAN_HALF * aspect)
-    expect(fraction).toBeGreaterThan(0.6)
-    expect(fraction).toBeLessThan(1)
+    // Against the shipping camera: `deskFrameHalfW` carries the aim, where the local origin-aimed
+    // helper reported the sheet at 96% of a 430x932 frame when it is really 93.5%.
+    const narrow = DESK_NOTE.width / (2 * deskFrameHalfW(DESK_NOTE.z, 430 / 932))
+    expect(narrow).toBeGreaterThan(0.85)
+    expect(narrow).toBeLessThan(1)
+    // ...and the desktop share it lands at is a CONSEQUENCE of that, not a second choice: the ratio
+    // between the two frames is a property of the two aspects, so the sheet cannot be sized for both
+    const desktop = DESK_NOTE.width / (2 * deskFrameHalfW(DESK_NOTE.z, 1440 / 900))
+    expect(desktop).toBeGreaterThan(0.24)
+    expect(desktop).toBeLessThan(0.32)
+    expect(narrow / desktop).toBeCloseTo(1440 / 900 / (430 / 932), 6)
   })
 })

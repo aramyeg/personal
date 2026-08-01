@@ -52,9 +52,9 @@ export function JourneyOverlay({
           }
         />
       )}
-      {/* THE ENDING SLOT — mounted for the whole ending segment, empty on purpose. T64 hangs the
-          curtain call's DOM (if it needs any) here and T65 the connect note; the phase attribute
-          is the ending's own timeline, so a consumer can style off it without re-deriving it.
+      {/* THE ENDING SLOT — mounted for the whole ending segment. T65's connect note is what hangs
+          here; the phase attribute is the ending's own timeline, so a consumer can style off it
+          without re-deriving it.
           `pointerEvents: none` is inherited from the overlay root and must STAY that way until
           something in here is genuinely clickable: the click model is canvas-first
           (onPointerMissed advances panels), and a transparent full-viewport catcher is exactly

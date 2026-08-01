@@ -72,12 +72,8 @@ export const CRADLE_DROP = 1.75
 /** Tube radius. Thin enough to read as a turned ring rather than as a tyre. */
 export const CRADLE_TUBE = 0.15
 
-/** The closest the ring's surface comes to the world's centre — what the clearance is measured on. */
+/** The closest the ring's surface comes to the world's centre. */
 export const CRADLE_INNER_REACH = Math.hypot(CRADLE_RADIUS, CRADLE_DROP) - CRADLE_TUBE
-
-/** True when the ring cannot be speared by terrain at the bake's ceiling. */
-export const cradleClearsTerrain = (): boolean =>
-  CRADLE_INNER_REACH - WORLD_CEILING >= CRADLE_TERRAIN_CLEAR
 
 // --- the column below it ----------------------------------------------------
 
@@ -105,14 +101,33 @@ export const cradleClearsTerrain = (): boolean =>
  */
 export const STAND_FOOT_Y = -7.5
 
-/** Where the column's collar meets the struts, clear of the world's bottom at −R. */
-export const STAND_COLLAR_Y = -3.15
+/**
+ * Where the column's collar meets the struts — and it is a WIDE, LOW collar for a reason that only
+ * shows up when you measure the strut instead of its endpoints.
+ *
+ * A strut is a straight line from the collar to the ring, and both of its ENDS are comfortably
+ * outside the bake's ceiling: the collar at 3.77 from the world's centre, the ring at 3.26. The
+ * CHORD between them is not. A line between two points outside a sphere dips toward it, and the
+ * first cut's narrow collar (r = 0.68 at y = −3.15) put the deepest point of that dip at 2.8522 —
+ * INSIDE the 2.97 ceiling by 0.118, in a stand whose whole documented safety property is that it
+ * stands outside it. Nothing was visibly wrong (the struts stay 0.128 ndc clear of the silhouette on
+ * screen, and the planet is parked so nothing can rotate into them) which is exactly why it survived
+ * a capture pass: the module was claiming something the geometry did not do.
+ *
+ * Widening the collar and dropping it makes the chord's dip shallower than its ends. At (1.4, −3.5)
+ * the deepest point is 3.1083, clear of the ceiling by 0.138. `globe-stand.test.ts` now measures
+ * EVERY authored primitive rather than the ring alone, which is what would have caught this.
+ */
+export const STAND_COLLAR_Y = -3.5
 
-/** Radius of the collar the three struts land on. */
-export const STAND_COLLAR_R = 0.68
+/** Radius of the collar the three struts land on. See STAND_COLLAR_Y for why it is this wide. */
+export const STAND_COLLAR_R = 1.4
 
-/** ...and of the foot at the bottom of the column. */
-export const STAND_FOOT_R = 0.95
+/** ...and of the foot at the bottom of the column. Wider than the collar, so the column reads as
+ *  standing on something rather than balancing on it — the widened collar overtook the old 0.95.
+ *  Never visible (the foot is cropped by the frame at rest and occluded by the desk after), so this
+ *  is a shape decision rather than a composition one. */
+export const STAND_FOOT_R = 1.55
 
 /** How many struts carry the ring. Three: the fewest that cannot rock. */
 export const STAND_STRUTS = 3
@@ -120,7 +135,65 @@ export const STAND_STRUTS = 3
 /** Bearing of the first strut, so none of them stands dead centre in front of the world. */
 export const STAND_STRUT_PHASE = Math.PI / 6
 
+/** The strut's own tube, tapering from the ring down to the collar. Owned here rather than in the
+ *  renderer because the clearance below is measured against it. */
+export const STRUT_TUBE_TOP = CRADLE_TUBE * 0.7
+export const STRUT_TUBE_BOTTOM = CRADLE_TUBE * 0.92
+
+/** How thick the collar ring is, and how tall the foot. Both feed the clearances below. */
+export const STAND_COLLAR_H = CRADLE_TUBE * 2.4
+export const STAND_FOOT_H = 0.34
+
+/**
+ * Closest approach to the world's CENTRE of every authored primitive, in world units.
+ *
+ * This is the whole of the stand's terrain-safety claim, and it covers the whole stand because the
+ * version that covered only the ring was WRONG about the struts by 0.118 (see STAND_COLLAR_Y). The
+ * shapes are solids of revolution about the y axis, so each one's closest point is found in the
+ * (radial, y) half-plane:
+ *  - the CRADLE is a torus, so its closest point is its centreline distance less the tube;
+ *  - a STRUT is a segment between two (radial, y) points, so it is a point-to-segment distance less
+ *    its widest tube — the case the first cut got wrong, because both ENDS are clear and the middle
+ *    is not;
+ *  - the COLLAR, STEM and FOOT are solid cylinders on the axis, so their closest point is the centre
+ *    of the top face, i.e. the height of that face.
+ */
+export function standPrimitiveReaches(): { part: string; reach: number }[] {
+  const segmentReach = (ar: number, ay: number, br: number, by: number): number => {
+    const dr = br - ar
+    const dy = by - ay
+    const len2 = dr * dr + dy * dy
+    const t = Math.min(1, Math.max(0, -(ar * dr + ay * dy) / len2))
+    return Math.hypot(ar + t * dr, ay + t * dy)
+  }
+  return [
+    { part: 'cradle', reach: CRADLE_INNER_REACH },
+    {
+      part: 'strut',
+      reach:
+        segmentReach(STAND_COLLAR_R, STAND_COLLAR_Y, CRADLE_RADIUS, -CRADLE_DROP) -
+        Math.max(STRUT_TUBE_TOP, STRUT_TUBE_BOTTOM),
+    },
+    { part: 'collar', reach: Math.abs(STAND_COLLAR_Y + STAND_COLLAR_H / 2) },
+    { part: 'stem', reach: Math.abs(STAND_COLLAR_Y) },
+    { part: 'foot', reach: Math.abs(STAND_FOOT_Y + STAND_FOOT_H) },
+  ]
+}
+
+/** ...and the binding one. */
+export const standTerrainClearance = (): number =>
+  Math.min(...standPrimitiveReaches().map((p) => p.reach)) - WORLD_CEILING
+
+/** True when NO part of the stand can be speared by anything inside the bake's ceiling budget. */
+export const standClearsTerrain = (): boolean => standTerrainClearance() >= CRADLE_TERRAIN_CLEAR
+
 // --- the rise ---------------------------------------------------------------
+
+/**
+ * The rearmost z any part of the stand reaches — where its containment is decided, exactly as a
+ * desk prop's is decided at its own back.
+ */
+export const STAND_BACK_REACH = CRADLE_RADIUS + CRADLE_TUBE
 
 /**
  * How far the whole stand drops when it is parked — SOLVED against the journey's own containment
@@ -128,11 +201,18 @@ export const STAND_STRUT_PHASE = Math.PI / 6
  *
  * The binding point is the ring's crown at its REARMOST bearing: `journeyFloorY` climbs with z, so
  * the frustum's floor is lowest behind the world, and the topmost parked vertex there is
- * `CRADLE_TUBE` above the ring's plane at `z = −CRADLE_RADIUS`. Everything else on the stand is
- * below the ring and in front of that point, so one evaluation bounds the whole object.
+ * `CRADLE_TUBE` above the ring's plane. Everything else on the stand is below the ring and in front
+ * of that point, so one evaluation bounds the whole object — verified by sweeping every authored
+ * primitive in `globe-stand.test.ts`, which finds the true worst margin at the cradle.
+ *
+ * Evaluated at `−STAND_BACK_REACH` rather than at `−CRADLE_RADIUS`, which is the same point the GATE
+ * uses. The two disagreed by the tube's width: the solve gave the crown a clearance of exactly
+ * DESK_CLEARANCE at the ring's CENTRELINE while the gate measured it a tube further back, where the
+ * frustum floor is lower, so the shipped margin was 0.2285 and the docblock said 0.35. Solving at
+ * the gate's own point makes the sentence true instead of nearly true.
  */
 export const STAND_PARK_DROP =
-  -CRADLE_DROP + CRADLE_TUBE - (journeyFloorY(-CRADLE_RADIUS) - DESK_CLEARANCE)
+  -CRADLE_DROP + CRADLE_TUBE - (journeyFloorY(-STAND_BACK_REACH) - DESK_CLEARANCE)
 
 /**
  * The stand's vertical offset at an ending state's `stand` value: `−STAND_PARK_DROP` parked,
@@ -141,7 +221,7 @@ export const STAND_PARK_DROP =
  * Eased with smootherstep rather than smoothstep, and that is the whole choreography: this is a
  * REVEAL, not a transition, so it has to leave the bottom of the frame without a visible start and
  * arrive under the world without a visible stop. Smoothstep's ends have non-zero curvature and at
- * this travel (6.4 world units) you can see the arrival snap. Smootherstep is zero in both the
+ * this travel (6.2 world units) you can see the arrival snap. Smootherstep is zero in both the
  * first and second derivative at each end.
  *
  * `smootherstep(0)` is exactly 0 and `smootherstep(1)` is exactly 1 (1·1·1·(6−15+10)), so both the
@@ -163,11 +243,6 @@ export function standYRange(stand: number): { top: number; bottom: number } {
   return { top: -CRADLE_DROP + CRADLE_TUBE + dy, bottom: STAND_FOOT_Y + dy }
 }
 
-/**
- * The rearmost z any part of the stand reaches — where its containment is decided, exactly as a
- * desk prop's is decided at its own back.
- */
-export const STAND_BACK_REACH = CRADLE_RADIUS + CRADLE_TUBE
 
 /** True when the stand at this `stand` value is wholly below the journey camera's bottom edge. */
 export function standBelowJourneyFrame(stand: number): boolean {

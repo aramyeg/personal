@@ -92,13 +92,21 @@ const FIGURE_REACH = FIGURINE_HEIGHT - FIGURINE_BASE_HEIGHT
 export const FIGURINE_BASE_R = 0.17
 
 /**
- * Inset from centre — kept off x = 0, where the globe stand's own column lands on screen, and
- * pulled in from the 1.4 the first cut used: at 1.4 a 430x932 frame (whose desk plane is only
- * +-1.4 wide at this depth) sliced both figurines in half against its own edges. The core band's
- * |x| <= 1.5 cap was the wrong gate — it is the NARROW frame's half-width at the figurine's own z
- * that binds, and it is tighter.
+ * Inset from centre — kept off x = 0, where the globe stand's own column lands on screen, and the
+ * number this file got wrong TWICE before it was measured properly.
+ *
+ * 1.4 sliced both figurines against the edges of a 430x932 frame, which a capture caught. 1.05
+ * replaced it and was still 0.1% over at 360x800 — the common Android floor, which was outside the
+ * tested aspect list entirely. Both survived review because the only assertion was |x| <= 1.5, a cap
+ * on the ANCHOR: these figures reach 0.30 further out than the point they are placed at, and the
+ * desk plane is only +-1.38 wide at their depth on the narrowest frame.
+ *
+ * The gate is now per VERTEX against the frame's half-width AT THAT VERTEX'S OWN DEPTH
+ * (`desk-figurines.test.ts`), because the plane narrows toward the viewer and a figurine's nearest
+ * vertices sit in a tighter frame than its centre does. 0.9 clears it by 12% on the narrowest frame
+ * this lab supports.
  */
-export const FIGURINE_X = 1.05
+export const FIGURINE_X = 0.9
 /** Shared depth for both figurines — see the docblock for the note/back-clearance derivation. */
 export const FIGURINE_Z = 9.5
 /** Inward yaw (rad): the left bird turns toward +x, the right toward -x, both toward the middle of

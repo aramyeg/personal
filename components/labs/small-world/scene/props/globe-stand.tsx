@@ -11,8 +11,12 @@ import {
   STAND_COLLAR_Y,
   STAND_FOOT_R,
   STAND_FOOT_Y,
+  STAND_COLLAR_H,
+  STAND_FOOT_H,
   STAND_STRUTS,
   STAND_STRUT_PHASE,
+  STRUT_TUBE_BOTTOM,
+  STRUT_TUBE_TOP,
   standOffsetY,
 } from '../globe-stand'
 import { useClayRamp } from '../toon-ramp'
@@ -43,7 +47,7 @@ import { buildMergedClay, type ClayPart } from './clay-kit'
  */
 
 /** A turned ring, three struts, a waisted column and a foot — the pieces, in world space. */
-function standParts(): ClayPart[] {
+export function standParts(): ClayPart[] {
   const parts: ClayPart[] = [
     // THE CRADLE. Its far arc is behind the world and hidden by it; its near arc hangs below the
     // silhouette. That pair is the whole "sitting in" read — see the module header.
@@ -76,7 +80,7 @@ function standParts(): ClayPart[] {
       Math.cos(yaw) * CRADLE_RADIUS
     )
     const span = head.clone().sub(foot)
-    const geo = new THREE.CylinderGeometry(CRADLE_TUBE * 0.7, CRADLE_TUBE * 0.92, span.length(), 8)
+    const geo = new THREE.CylinderGeometry(STRUT_TUBE_TOP, STRUT_TUBE_BOTTOM, span.length(), 8)
     geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, span.clone().normalize()))
     const mid = foot.clone().add(head).multiplyScalar(0.5)
     geo.translate(mid.x, mid.y, mid.z)
@@ -86,7 +90,7 @@ function standParts(): ClayPart[] {
   const columnH = STAND_COLLAR_Y - STAND_FOOT_Y
   parts.push(
     {
-      geo: new THREE.CylinderGeometry(STAND_COLLAR_R, STAND_COLLAR_R * 0.82, CRADLE_TUBE * 2.4, 20),
+      geo: new THREE.CylinderGeometry(STAND_COLLAR_R, STAND_COLLAR_R * 0.82, STAND_COLLAR_H, 20),
       color: PALETTE.clayPath,
       pos: [0, STAND_COLLAR_Y, 0],
       tag: 'collar',
@@ -99,19 +103,25 @@ function standParts(): ClayPart[] {
       tag: 'stem',
     },
     {
-      geo: new THREE.CylinderGeometry(STAND_FOOT_R * 0.88, STAND_FOOT_R, 0.34, 24),
+      geo: new THREE.CylinderGeometry(STAND_FOOT_R * 0.88, STAND_FOOT_R, STAND_FOOT_H, 24),
       color: PALETTE.clayPath,
-      pos: [0, STAND_FOOT_Y + 0.17, 0],
+      pos: [0, STAND_FOOT_Y + STAND_FOOT_H / 2, 0],
       tag: 'foot',
     }
   )
   return parts
 }
 
+/** The whole stand as ONE geometry, in its SEATED pose. Exported so a test can measure the vertices
+ *  the renderer actually emits rather than the constants they were authored from. */
+export function buildGlobeStand(): THREE.BufferGeometry {
+  return buildMergedClay(standParts())
+}
+
 export function GlobeStand({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   const group = useRef<THREE.Group>(null)
-  const geo = useMemo(() => buildMergedClay(standParts()), [])
+  const geo = useMemo(buildGlobeStand, [])
   useEffect(() => () => geo.dispose(), [geo])
 
   // NaN so the mount frame always applies once (NaN !== NaN) and the stand starts parked rather

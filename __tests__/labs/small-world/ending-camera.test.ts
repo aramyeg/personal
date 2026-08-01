@@ -5,9 +5,12 @@ import {
   CAMERA_POSITION,
   CAMERA_RAY,
   CAMERA_RIG_PRIORITY,
+  CAMERA_TARGET,
+  ENDING_AIM_DROP,
   WORLD_RADIUS,
   ZOOM_FACTOR,
   cameraPositionAt,
+  cameraTargetAt,
   cameraZoomScale,
   endingAimDrop,
   endingCameraDistance,
@@ -54,6 +57,15 @@ describe('the camera invariant', () => {
       expect(Object.is(pose[0], CAMERA_POSITION[0])).toBe(true)
       expect(Object.is(pose[1], CAMERA_POSITION[1])).toBe(true)
       expect(Object.is(pose[2], CAMERA_POSITION[2])).toBe(true)
+      // A POSE IS AN EYE AND AN AIM, and Task 66 gave the ending both. Sweeping only the eye left
+      // the half this round introduced ungated: a +1e-9 injected into `endingAimDrop` aims the
+      // camera a nanometre below the origin for all six chapters — breaking exactly the bit-identity
+      // the renewal proofs rest on — and the suite stayed green. `Object.is` rather than equality so
+      // a −0 cannot pass as a 0 either.
+      const aim = cameraTargetAt(p)
+      expect(Object.is(aim[0], CAMERA_TARGET[0])).toBe(true)
+      expect(Object.is(aim[1], CAMERA_TARGET[1])).toBe(true)
+      expect(Object.is(aim[2], CAMERA_TARGET[2])).toBe(true)
     }
   })
 
@@ -63,8 +75,10 @@ describe('the camera invariant', () => {
     for (let i = 0; i <= SWEEP; i++) {
       const p = (i / SWEEP) * ZOOM_FIRST_MOVE
       expect(cameraPositionAt(p)).toEqual([...CAMERA_POSITION])
+      expect(cameraTargetAt(p)).toEqual([...CAMERA_TARGET])
     }
     expect(endingCameraDistance(endingStateAt(ZOOM_FIRST_MOVE))).toBe(CAMERA_DISTANCE)
+    expect(endingAimDrop(endingStateAt(ZOOM_FIRST_MOVE))).toBe(0)
   })
 
   it('leaves a whole still beat between the last moving rotation and the first moving camera', () => {
@@ -80,13 +94,20 @@ describe('the camera invariant', () => {
   it('DOES move just past that boundary — the invariant is a boundary, not a freeze', () => {
     const moved = cameraPositionAt(ZOOM_FIRST_MOVE + 1e-3)
     expect(moved[2]).toBeGreaterThan(CAMERA_POSITION[2])
+    // ...and so does the aim, or the sweeps above would be satisfied by a target that never moves
+    expect(cameraTargetAt(ZOOM_FIRST_MOVE + 1e-3)[1]).toBeLessThan(CAMERA_TARGET[1])
+    expect(cameraTargetAt(TRACK_END)[1]).toBeCloseTo(-ENDING_AIM_DROP, 12)
   })
 
   it('rewinds through the identical function — scrub-back cannot strand the zoom', () => {
     const forward: number[][] = []
-    for (let i = 0; i <= 4000; i++) forward.push(cameraPositionAt((i / 4000) * TRACK_END))
+    for (let i = 0; i <= 4000; i++) {
+      const p = (i / 4000) * TRACK_END
+      forward.push([...cameraPositionAt(p), ...cameraTargetAt(p)])
+    }
     for (let i = 4000; i >= 0; i--) {
-      expect(cameraPositionAt((i / 4000) * TRACK_END)).toEqual(forward[i])
+      const p = (i / 4000) * TRACK_END
+      expect([...cameraPositionAt(p), ...cameraTargetAt(p)]).toEqual(forward[i])
     }
   })
 

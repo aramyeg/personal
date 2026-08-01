@@ -10,6 +10,7 @@ import {
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import {
   DESK_BACK_Z,
+  DESK_CLEARANCE,
   DESK_TOP_Y,
   EDGE_WOBBLE,
   journeyFloorY,
@@ -20,6 +21,7 @@ import {
   CRADLE_RADIUS,
   CRADLE_TERRAIN_CLEAR,
   CRADLE_TUBE,
+  STRUT_TUBE_BOTTOM,
   STAND_BACK_REACH,
   STAND_COLLAR_R,
   STAND_COLLAR_Y,
@@ -27,11 +29,13 @@ import {
   STAND_FOOT_Y,
   STAND_PARK_DROP,
   WORLD_CEILING,
-  cradleClearsTerrain,
   standBelowJourneyFrame,
+  standClearsTerrain,
+  standPrimitiveReaches,
   standOffsetY,
   standYRange,
 } from '@/components/labs/small-world/scene/globe-stand'
+import { buildGlobeStand } from '@/components/labs/small-world/scene/props/globe-stand'
 import {
   ENDING_SPAN,
   STAND_END,
@@ -128,12 +132,56 @@ describe('the stand does not exist during the journey', () => {
 })
 
 describe('the cradle is a cradle', () => {
-  it('cannot be speared by terrain at the bake ceiling', () => {
+  it('cannot be speared by terrain at the bake ceiling — EVERY part, not just the ring', () => {
     expect(WORLD_CEILING).toBeCloseTo(1.35 * PLANET_RADIUS, 12)
-    expect(cradleClearsTerrain()).toBe(true)
-    expect(CRADLE_INNER_REACH - WORLD_CEILING).toBeGreaterThanOrEqual(CRADLE_TERRAIN_CLEAR)
+    expect(standClearsTerrain()).toBe(true)
+    for (const { part, reach } of standPrimitiveReaches()) {
+      expect(reach - WORLD_CEILING, `${part} reaches inside the ceiling`).toBeGreaterThanOrEqual(
+        CRADLE_TERRAIN_CLEAR
+      )
+    }
     // ...and it is not clearing it by being enormous: the ring is within half a radius of the world
     expect(CRADLE_RADIUS).toBeLessThan(PLANET_RADIUS * 1.3)
+  })
+
+  it('would FAIL for the narrow collar the first cut shipped — the STRUT is the binding part', () => {
+    // The version of this gate that shipped checked `CRADLE_INNER_REACH` alone and was true; the
+    // struts reached 2.8522, inside the ceiling by 0.118, and nothing said so. A strut's two ENDS
+    // are both clear — the chord between them is what dips. Reproduced here from the first cut's
+    // own constants so the gate is shown to discriminate rather than merely to pass.
+    const chordReach = (ar: number, ay: number, br: number, by: number): number => {
+      const dr = br - ar
+      const dy = by - ay
+      const t = Math.min(1, Math.max(0, -(ar * dr + ay * dy) / (dr * dr + dy * dy)))
+      return Math.hypot(ar + t * dr, ay + t * dy)
+    }
+    const firstCut = chordReach(0.68, -3.15, CRADLE_RADIUS, -CRADLE_DROP) - STRUT_TUBE_BOTTOM
+    expect(firstCut).toBeLessThan(WORLD_CEILING)
+    expect(firstCut).toBeCloseTo(2.8522, 3)
+    // both of ITS endpoints were clear, which is exactly why endpoint checks missed it
+    expect(Math.hypot(0.68, 3.15)).toBeGreaterThan(WORLD_CEILING)
+    expect(Math.hypot(CRADLE_RADIUS, CRADLE_DROP)).toBeGreaterThan(WORLD_CEILING)
+  })
+
+  it('holds that clearance in the geometry it actually EMITS, per vertex', () => {
+    // The desk-kit discipline: `standPrimitiveReaches` is a statement about authored constants, and
+    // this is the same claim made against the vertices the renderer hands to three.js. Without it the
+    // module would be checking itself.
+    const geo = buildGlobeStand()
+    const pos = geo.attributes.position.array as ArrayLike<number>
+    expect(pos.length).toBeGreaterThan(0)
+    let worst = Infinity
+    for (let i = 0; i < pos.length; i += 3) {
+      worst = Math.min(worst, Math.hypot(pos[i], pos[i + 1], pos[i + 2]))
+    }
+    expect(worst - WORLD_CEILING, 'an emitted vertex reaches inside the ceiling').toBeGreaterThanOrEqual(
+      CRADLE_TERRAIN_CLEAR
+    )
+    // and the authored bound is CONSERVATIVE against what is drawn, not optimistic
+    expect(worst).toBeGreaterThanOrEqual(
+      Math.min(...standPrimitiveReaches().map((p) => p.reach)) - 1e-9
+    )
+    geo.dispose()
   })
 
   it('hangs its NEAR arc below the world and hides its FAR arc behind it, at every stop', () => {
@@ -259,9 +307,12 @@ describe('the seated read is the same read at rest and at the money shot', () =>
     // STAND_PARK_DROP is solved off journeyFloorY; a different camera moves it. Re-derived here
     // rather than restated, which is what stops this becoming a number typed in two places.
     expect(STAND_PARK_DROP).toBeCloseTo(
-      -CRADLE_DROP + CRADLE_TUBE - (journeyFloorY(-CRADLE_RADIUS) - 0.35),
+      -CRADLE_DROP + CRADLE_TUBE - (journeyFloorY(-STAND_BACK_REACH) - DESK_CLEARANCE),
       12
     )
+    // ...and the point it is solved at is the point the GATE measures, so the parked crown really
+    // does clear the journey frame by exactly DESK_CLEARANCE rather than by 0.2285 of it
+    expect(journeyFloorY(-STAND_BACK_REACH) - standYRange(0).top).toBeCloseTo(DESK_CLEARANCE, 12)
     expect(STAND_PARK_DROP).toBeGreaterThan(0)
     expect(CAMERA_DISTANCE).toBeGreaterThan(0)
   })
