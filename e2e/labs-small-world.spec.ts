@@ -91,17 +91,17 @@ test.describe('Small World lab', () => {
     await expect(page.getByTestId('sw-panel-data')).toBeHidden()
   })
 
-  // Task 63: the to-be-continued panel is retired; past the journey the ending
-  // owns the track — curtain call first, then the zoom-out desk reveal, which
-  // doubles as the contact page (Task 65: real anchors in the sw-ending slot).
-  test('the ending runs curtain call into zoom-out and lands on contact links', async ({ page }) => {
+  // Task 63/66: past the journey the ending owns the track — the still beat
+  // (the stand rises and seats the world) and then the zoom-out desk reveal,
+  // which doubles as the contact page (real anchors in the sw-ending slot).
+  test('the ending settles the world on its stand, then pulls back to the contact links', async ({ page }) => {
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
     await scrollToProgress(page, 1.02)
     const ending = page.getByTestId('sw-ending')
     await expect(ending).toBeAttached({ timeout: 10_000 })
-    await expect(ending).toHaveAttribute('data-phase', 'curtain')
+    await expect(ending).toHaveAttribute('data-phase', 'still')
     await scrollToProgress(page, TRACK_END)
     await expect(ending).toHaveAttribute('data-phase', 'zoom')
     await expect(ending.getByTestId('sw-connect-email')).toBeVisible({ timeout: 10_000 })
