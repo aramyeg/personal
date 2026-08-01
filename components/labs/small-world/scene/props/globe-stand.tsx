@@ -29,11 +29,17 @@ import { buildMergedClay, type ClayPart } from './clay-kit'
  * whole journey `stand` is exactly 0, so the callback compares one float, finds the group already
  * parked, and returns.
  *
- * WHY IT IS NOT HIDDEN DURING THE JOURNEY. An invisible group is pruned from the render list, which
- * would be one draw call cheaper — and it would also make the containment proof depend on a flag
- * instead of on geometry. The parked pose is BELOW the journey camera's frustum by construction
- * (`standBelowJourneyFrame`, gated in `globe-stand.test.ts`), exactly as the desk is, and that is a
- * property the scene cannot get wrong later. One draw call is the right price for it.
+ * WHY IT IS NOT HIDDEN DURING THE JOURNEY. The parked pose is BELOW the journey camera's frustum by
+ * construction (`standBelowJourneyFrame`, gated in `globe-stand.test.ts`), exactly as the desk is,
+ * and that is a property the scene cannot get wrong later — where a `visible` flag is a property a
+ * later edit can.
+ *
+ * The first version of this paragraph went on to say that the honesty cost one draw call. It costs
+ * ZERO, and the correction is worth keeping because it was found by measuring rather than by
+ * reasoning: `bench/task66-drawcalls` reads 146 draws at the journey's end both with this component
+ * mounted and with it removed. three.js frustum-culls on the merged geometry's bounding sphere, and
+ * the parked stand is six world units below the frame — far enough that the conservative sphere test
+ * settles it without ever reaching the vertices. It starts costing its one draw when it rises.
  */
 
 /** A turned ring, three struts, a waisted column and a foot — the pieces, in world space. */
