@@ -91,8 +91,14 @@ const FIGURE_REACH = FIGURINE_HEIGHT - FIGURINE_BASE_HEIGHT
  *  plinth. */
 export const FIGURINE_BASE_R = 0.17
 
-/** Inset from centre — kept off x = 0, where the globe stand's own column lands on screen. */
-export const FIGURINE_X = 1.4
+/**
+ * Inset from centre — kept off x = 0, where the globe stand's own column lands on screen, and
+ * pulled in from the 1.4 the first cut used: at 1.4 a 430x932 frame (whose desk plane is only
+ * +-1.4 wide at this depth) sliced both figurines in half against its own edges. The core band's
+ * |x| <= 1.5 cap was the wrong gate — it is the NARROW frame's half-width at the figurine's own z
+ * that binds, and it is tighter.
+ */
+export const FIGURINE_X = 1.05
 /** Shared depth for both figurines — see the docblock for the note/back-clearance derivation. */
 export const FIGURINE_Z = 9.5
 /** Inward yaw (rad): the left bird turns toward +x, the right toward -x, both toward the middle of

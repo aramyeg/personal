@@ -94,6 +94,24 @@ export function journeyFloorY(z: number): number {
   return CAM_Y - FLOOR_SLOPE * (CAM_Z - z)
 }
 
+/**
+ * How far the hand-formed back edge may wander FORWARD of DESK_BACK_Z. Never backward: back is where
+ * the journey camera lives, so the wobble is authored as a one-sided offset rather than as a
+ * symmetric one that would eat half the clearance.
+ *
+ * It lives HERE rather than with the geometry that draws it because the DRAWN edge, not DESK_BACK_Z,
+ * is what the globe stand has to hide its column behind — a capture at the shipped constants showed
+ * the column clearing the solved line while standing proud of the wobbled one, and
+ * `globe-stand.test.ts` now gates on `DESK_BACK_Z + EDGE_WOBBLE` because of it.
+ *
+ * DESK_TOP_Y is deliberately NOT solved against the wobbled edge. Doing so raises the desk plane by
+ * half a world unit to buy back 1.5% of frame height, and half a unit is more headroom than the
+ * pencil cup and the two figurines have between them: it fails their containment outright. So the
+ * money shot lands the DRAWN edge at 38.5% of the frame rather than the 40% DESK_FRAME asks for, and
+ * that difference is smaller than the wobble it comes from.
+ */
+export const EDGE_WOBBLE = 0.55
+
 /** How far below the journey's bottom edge the desk's own surface is parked, in world units. */
 export const DESK_CLEARANCE = 0.35
 

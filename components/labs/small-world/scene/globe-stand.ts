@@ -91,13 +91,19 @@ export const cradleClearsTerrain = (): boolean =>
  * desk occludes it. In between there is a window where the frame has released the foot and the desk
  * has not yet caught it, and the foot has to be low enough to clear that window entirely.
  *
- * −6.5 does it with room: the worst case over the whole pull-back leaves the foot 0.134 of the
+ * −7.5 does it with room: the worst case over the whole pull-back leaves the foot 0.151 of the
  * frame's half-height BELOW whichever of the two is holding it. `globe-stand.test.ts` sweeps the
  * shipped camera path and gates it rather than trusting this paragraph, and a foot at −5.5 (the
  * first cut) fails that sweep by 0.012 at zoom scale 1.04 — a one-percent-of-frame sliver of sky
  * under the stand, for about two percent of the pull-back. Visible if you look for it.
+ *
+ * The SECOND cut, −6.5, passed that same sweep by 0.134 and was still wrong, because the sweep ran
+ * against `DESK_BACK_Z` rather than against the edge the slab actually draws. The hand-formed wobble
+ * carries that edge up to `EDGE_WOBBLE` forward, i.e. 0.06 of the frame LOWER, and against the real
+ * boundary −6.5 clears by 0.009 — a hundredth of the frame, which is not a margin, it is a
+ * coincidence. Gating on the line nobody can see is how a defect ships twice.
  */
-export const STAND_FOOT_Y = -6.5
+export const STAND_FOOT_Y = -7.5
 
 /** Where the column's collar meets the struts, clear of the world's bottom at −R. */
 export const STAND_COLLAR_Y = -3.15

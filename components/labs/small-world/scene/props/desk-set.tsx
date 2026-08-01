@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import {
   DESK_BACK_Z,
+  EDGE_WOBBLE,
   DESK_HALF_W,
   DESK_NEAR_Z,
   DESK_NOTE,
@@ -38,11 +39,6 @@ import { DeskNote } from './desk-note'
  * merged ink contour for the pair). Per frame: nothing at all — this component subscribes to no
  * frame loop and allocates nothing after mount.
  */
-
-/** How far the hand-formed back edge may wander FORWARD of DESK_BACK_Z. Never backward: back is
- *  where the journey camera lives, so the wobble is authored as a one-sided offset rather than as
- *  a symmetric one that would eat half the clearance. */
-export const EDGE_WOBBLE = 0.55
 
 /** Columns across the slab. The back edge is the only line of it anyone ever sees, so the grid is
  *  spent on x — 96 columns puts a wobble sample every ~0.9 world units at the width the slab is. */

@@ -19,6 +19,7 @@ import {
   DESK_HALF_W,
   DESK_MAX_ASPECT,
   DESK_NEAR_Z,
+  EDGE_WOBBLE,
   DESK_STAGE_EXIT_Z,
   DESK_NOTE,
   DESK_PROPS,
@@ -233,6 +234,20 @@ describe('the money shot, as the three targets it is solved from', () => {
     expect((1 + edge) / 2).toBeCloseTo(DESK_FRAME, 6)
     // the band the stand stands in is exactly what was asked for, not what was left over
     expect(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot - edge).toBeCloseTo(STAND_GAP, 6)
+  })
+
+  it('records what the DRAWN edge does, which is not quite what the solved one does', () => {
+    // The slab's back edge is hand formed and wanders forward, so the boundary the eye sees is
+    // below the boundary DESK_TOP_Y was solved against — by half the wobble on average and by the
+    // whole of it at worst. The composition is NOT re-solved against it (that costs half a world
+    // unit of prop headroom, which the pencil cup and the figurines do not have); the difference is
+    // recorded here instead, so the shortfall is a number in a test rather than a surprise.
+    const mean = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE / 2], ZOOM_FACTOR, ENDING_AIM_DROP)
+    const worst = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE], ZOOM_FACTOR, ENDING_AIM_DROP)
+    expect((1 + mean) / 2).toBeGreaterThan(DESK_FRAME - 0.025)
+    expect((1 + mean) / 2).toBeLessThan(DESK_FRAME)
+    // ...and even at its lowest the drawn edge stays below the world, so nothing cuts the sphere
+    expect(worst).toBeLessThan(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot)
   })
 
   it('is the AIM that spends the white space, which is why the zoom alone could not', () => {

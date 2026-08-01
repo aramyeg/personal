@@ -6,13 +6,10 @@ import {
   DESK_PROPS,
   DESK_HALF_W,
   DESK_TOP_Y,
+  EDGE_WOBBLE,
   journeyFloorY,
 } from '@/components/labs/small-world/scene/desk-stage'
-import {
-  EDGE_WOBBLE,
-  buildSlab,
-  edgeOffset,
-} from '@/components/labs/small-world/scene/props/desk-set'
+import { buildSlab, edgeOffset } from '@/components/labs/small-world/scene/props/desk-set'
 import { deskNoteShadowPart, deskPropParts } from '@/components/labs/small-world/scene/props/desk-kit'
 import { buildMergedClay } from '@/components/labs/small-world/scene/props/clay-kit'
 import { noteRepaintAllowed } from '@/components/labs/small-world/scene/props/desk-note'
