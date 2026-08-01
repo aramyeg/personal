@@ -102,8 +102,8 @@ export const CRADLE_INNER_REACH = Math.hypot(CRADLE_RADIUS, CRADLE_DROP) - CRADL
 export const STAND_FOOT_Y = -7.5
 
 /**
- * Where the column's collar meets the struts — and it is a WIDE, LOW collar for a reason that only
- * shows up when you measure the strut instead of its endpoints.
+ * Where the column's collar meets the struts — and it is a LOW one for a reason that only shows up
+ * when you measure the strut instead of its endpoints.
  *
  * A strut is a straight line from the collar to the ring, and both of its ENDS are comfortably
  * outside the bake's ceiling: the collar at 3.77 from the world's centre, the ring at 3.26. The
@@ -114,20 +114,26 @@ export const STAND_FOOT_Y = -7.5
  * screen, and the planet is parked so nothing can rotate into them) which is exactly why it survived
  * a capture pass: the module was claiming something the geometry did not do.
  *
- * Widening the collar and dropping it makes the chord's dip shallower than its ends. At (1.4, −3.5)
- * the deepest point is 3.1083, clear of the ceiling by 0.138. `globe-stand.test.ts` now measures
- * EVERY authored primitive rather than the ring alone, which is what would have caught this.
+ * The fix has to come from the chord's GEOMETRY, and there are two ways to get it. WIDENING the
+ * collar works arithmetically and was the first attempt — at (1.4, −3.5) the dip clears by 0.138 —
+ * and it was reverted after a capture: a wide collar landing on a wide foot collapses the open
+ * tripod into one bulbous silhouette. That is exactly the "a wide flared cup at close range is a
+ * mushroom" failure Task 65 recorded about its own dish, reintroduced from the other direction.
+ *
+ * DROPPING a narrow collar does the same work and costs nothing. The lower the strut's bottom end,
+ * the more upright the chord and the shallower its dip: at (0.75, −4.5) the deepest point is 3.1153,
+ * clear by 0.145 — a better margin than the wide collar bought — with struts that are longer, more
+ * slender and 36° off vertical. `globe-stand.test.ts` measures EVERY authored primitive rather than
+ * the ring alone, which is what would have caught the original in the first place.
  */
-export const STAND_COLLAR_Y = -3.5
+export const STAND_COLLAR_Y = -4.5
 
-/** Radius of the collar the three struts land on. See STAND_COLLAR_Y for why it is this wide. */
-export const STAND_COLLAR_R = 1.4
+/** Radius of the collar the three struts land on. See STAND_COLLAR_Y for why it stayed narrow. */
+export const STAND_COLLAR_R = 0.75
 
-/** ...and of the foot at the bottom of the column. Wider than the collar, so the column reads as
- *  standing on something rather than balancing on it — the widened collar overtook the old 0.95.
- *  Never visible (the foot is cropped by the frame at rest and occluded by the desk after), so this
- *  is a shape decision rather than a composition one. */
-export const STAND_FOOT_R = 1.55
+/** ...and of the foot at the bottom of the column. Never visible (cropped by the frame at rest,
+ *  occluded by the desk after), so this only has to keep the turned profile honest. */
+export const STAND_FOOT_R = 0.95
 
 /** How many struts carry the ring. Three: the fewest that cannot rock. */
 export const STAND_STRUTS = 3
