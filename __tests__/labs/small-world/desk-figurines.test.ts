@@ -36,11 +36,11 @@ const FIGURINE_ASPECTS: readonly (readonly [string, number])[] = [
   ['tablet 820x1180', 820 / 1180],
 ]
 
-function boundsOfGeometry(geo: { attributes: { position: { array: ArrayLike<number> } } }) {
+function highestY(geo: { attributes: { position: { array: ArrayLike<number> } } }): number {
   const pos = geo.attributes.position.array
   let maxY = -Infinity
   for (let i = 1; i < pos.length; i += 3) maxY = Math.max(maxY, pos[i])
-  return { maxY }
+  return maxY
 }
 
 /**
@@ -284,9 +284,9 @@ describe('what it costs to draw', () => {
     expect(ink.attributes.position.count).toBeLessThan(all.attributes.position.count)
     // ...and it is genuinely INFLATED — every vertex pushed off the surface it outlines, or it
     // would render exactly inside the clay and show nothing
-    const inkBounds = boundsOfGeometry(ink)
-    const clayBounds = boundsOfGeometry(all)
-    expect(inkBounds.maxY).toBeGreaterThan(clayBounds.maxY - FIGURINE_HEIGHT)
+    expect(highestY(ink as unknown as { attributes: { position: { array: ArrayLike<number> } } })).toBeGreaterThan(
+      highestY(all as unknown as { attributes: { position: { array: ArrayLike<number> } } }) - FIGURINE_HEIGHT
+    )
     all.dispose()
     ink.dispose()
   })
