@@ -14,7 +14,7 @@ export type JourneyUi = {
    * The ending's DOM-side view (Task 63) — null for the whole journey, then the ending's
    * own timeline. `t` is quantized like `panel.enter`, so scrubbing the ending costs at
    * most T_STEPS re-renders rather than one per frame; a consumer that needs the exact
-   * value (or the curtain/zoom sub-windows) should read `endingStateAt` itself.
+   * value (or the stand/zoom sub-windows) should read `endingStateAt` itself.
    *
    * This replaces the old `ended` flag, which was a boolean because the only thing past
    * the journey was one full-viewport panel. `EndPanel` is retired: the ending is now

@@ -73,7 +73,7 @@ export function ChapterPanels({
   //
   // ONE CASE BREAKS THAT EQUIVALENCE and it is why `onAdvance` is nullable. Chapter 6's spread
   // retracts on a wall clock, so it can still be mounted after progress has crossed into the
-  // ending — and there `advanceTo` would smooth-scroll the visitor BACKWARDS out of the curtain
+  // ending — and there `advanceTo` would smooth-scroll the visitor BACKWARDS out of the still beat
   // call. Registering nothing (rather than hiding the spread, which would hard-cut a retraction
   // mid-way) keeps the exit visible and leaves no live click target behind it.
   useEffect(() => (onAdvance ? setPanelAdvance(onAdvance) : undefined), [onAdvance])

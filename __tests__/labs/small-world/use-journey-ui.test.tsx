@@ -101,7 +101,7 @@ describe('useJourneyUi', () => {
     ref.current = 1 + 0.1 * ENDING_SPAN
     fireScroll()
     expect(result.current.ending).not.toBeNull()
-    expect(result.current.ending!.phase).toBe('curtain')
+    expect(result.current.ending!.phase).toBe('still')
     expect(result.current.ending!.t).toBeCloseTo(0.1, 6)
 
     ref.current = TRACK_END

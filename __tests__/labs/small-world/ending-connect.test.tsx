@@ -55,7 +55,7 @@ describe('the connect block', () => {
     expect(email.style.pointerEvents).toBe('none')
   })
 
-  it('is invisible and inert for the whole curtain call', () => {
+  it('is invisible and inert for the whole still beat', () => {
     for (const t of [0, 0.1, ZOOM_START]) {
       const { container, unmount } = render(<EndingConnect t={t} onRestart={() => {}} />)
       for (const c of CONTROLS) {
@@ -179,7 +179,7 @@ describe('the connect block', () => {
 })
 
 describe('the progress rail leaves before the composition arrives', () => {
-  it('is fully up for the whole journey and the whole curtain call', () => {
+  it('is fully up for the whole journey and the whole still beat', () => {
     for (const p of [0, 0.5, 0.99, 1, 1 + 0.2 * ENDING_SPAN, 1 + ZOOM_START * ENDING_SPAN]) {
       expect(railOpacity(p)).toBe(1)
     }
@@ -249,7 +249,7 @@ describe('the fallback page carries the same contact story', () => {
  * refuses it on the same terms: legible or inert.
  */
 describe("the rail's dismiss control is live only while it is legible", () => {
-  it('is live for the whole journey and the whole curtain call', () => {
+  it('is live for the whole journey and the whole still beat', () => {
     for (const p of [0, 0.5, 0.99, 1, 1 + ZOOM_START * ENDING_SPAN]) {
       expect(railDismissLive(p)).toBe(true)
     }

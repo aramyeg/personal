@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import {
-  CURTAIN_END,
+  STAND_END,
   ENDING_IDLE,
   ENDING_SPAN,
   TRACK_END,
@@ -43,23 +43,23 @@ describe('the ending segment', () => {
 
   it('names the phases in order, with the still beat between them', () => {
     expect(endingStateAt(0.5).phase).toBe('journey')
-    expect(endingStateAt(endingAt(CURTAIN_END / 2)).phase).toBe('curtain')
-    expect(endingStateAt(endingAt(ZOOM_START - 1e-6)).phase).toBe('curtain')
+    expect(endingStateAt(endingAt(STAND_END / 2)).phase).toBe('still')
+    expect(endingStateAt(endingAt(ZOOM_START - 1e-6)).phase).toBe('still')
     expect(endingStateAt(endingAt(ZOOM_START + 1e-6)).phase).toBe('zoom')
     expect(endingStateAt(TRACK_END).phase).toBe('zoom')
   })
 
-  it('gathers the curtain first and PARKS it, then pulls back', () => {
-    const gathered = endingStateAt(endingAt(CURTAIN_END))
-    expect(gathered.curtain).toBe(1)
+  it('raises the stand first and PARKS it, then pulls back', () => {
+    const gathered = endingStateAt(endingAt(STAND_END))
+    expect(gathered.stand).toBe(1)
     expect(gathered.zoom).toBe(0)
-    // Parked for the rest of the ending: the bow does not pack up when the camera moves.
-    expect(endingStateAt(TRACK_END).curtain).toBe(1)
+    // Parked for the rest of the ending: the world stays seated while the camera withdraws.
+    expect(endingStateAt(TRACK_END).stand).toBe(1)
 
-    // The still beat: curtain finished, zoom not started.
-    expect(CURTAIN_END).toBeLessThan(ZOOM_START)
-    const still = endingStateAt(endingAt((CURTAIN_END + ZOOM_START) / 2))
-    expect(still.curtain).toBe(1)
+    // The HELD part of the still beat: the stand has landed, the zoom has not started.
+    expect(STAND_END).toBeLessThan(ZOOM_START)
+    const still = endingStateAt(endingAt((STAND_END + ZOOM_START) / 2))
+    expect(still.stand).toBe(1)
     expect(still.zoom).toBe(0)
 
     expect(endingStateAt(TRACK_END).zoom).toBe(1)
@@ -69,11 +69,11 @@ describe('the ending segment', () => {
     const forward: number[][] = []
     for (let i = 0; i <= SWEEP; i++) {
       const s = endingStateAt((i / SWEEP) * TRACK_END)
-      forward.push([s.t, s.curtain, s.zoom])
+      forward.push([s.t, s.stand, s.zoom])
     }
     for (let i = SWEEP; i >= 0; i--) {
       const s = endingStateAt((i / SWEEP) * TRACK_END)
-      expect([s.t, s.curtain, s.zoom]).toEqual(forward[i])
+      expect([s.t, s.stand, s.zoom]).toEqual(forward[i])
     }
   })
 
@@ -81,12 +81,12 @@ describe('the ending segment', () => {
     const steps = 20_000
     let prev = endingStateAt(0)
     let maxT = 0
-    let maxCurtain = 0
+    let maxStand = 0
     let maxZoom = 0
     for (let i = 1; i <= steps; i++) {
       const s = endingStateAt((i / steps) * TRACK_END)
       maxT = Math.max(maxT, Math.abs(s.t - prev.t))
-      maxCurtain = Math.max(maxCurtain, Math.abs(s.curtain - prev.curtain))
+      maxStand = Math.max(maxStand, Math.abs(s.stand - prev.stand))
       maxZoom = Math.max(maxZoom, Math.abs(s.zoom - prev.zoom))
       prev = s
     }
@@ -94,7 +94,7 @@ describe('the ending segment', () => {
     // and nothing else. Any jump would show here as a value orders of magnitude larger.
     const dp = TRACK_END / steps
     expect(maxT).toBeLessThan((dp / ENDING_SPAN) * 1.001)
-    expect(maxCurtain).toBeLessThan((dp / (ENDING_SPAN * CURTAIN_END)) * 1.001)
+    expect(maxStand).toBeLessThan((dp / (ENDING_SPAN * STAND_END)) * 1.001)
     expect(maxZoom).toBeLessThan((dp / (ENDING_SPAN * (1 - ZOOM_START))) * 1.001)
   })
 })
@@ -197,7 +197,7 @@ describe('the scroll track mapping', () => {
 describe('the invariant boundary', () => {
   it('separates the last progress rotation can move at from the first the camera can', () => {
     // Derived from the timeline, not restated: the camera's first possible move sits a whole
-    // curtain call after the last progress at which rotation is still a function of scroll.
+    // still beat after the last progress at which rotation is still a function of scroll.
     expect(ZOOM_FIRST_MOVE).toBe(1 + ZOOM_START * ENDING_SPAN)
     expect(ZOOM_FIRST_MOVE).toBeGreaterThan(1)
     expect(endingStateAt(ZOOM_FIRST_MOVE).zoom).toBe(0)

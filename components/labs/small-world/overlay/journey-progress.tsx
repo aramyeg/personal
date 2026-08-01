@@ -31,9 +31,9 @@ import { PALETTE } from '../palette'
  * whole ending it reads a truthful "6 / 6" with a full bar — floating over a
  * desk, a hand-written note and three contact links. Truthful and wrong. The
  * decision here is to FADE it rather than to kill it (`SHOW_PROGRESS_RAIL` is
- * still the whole-cloth revert): through the curtain call the rail is still
+ * still the whole-cloth revert): through the still beat the rail is still
  * doing its original job, which is to answer "did my scroll register" while the
- * world stands still — and the curtain call is the stillest the lab ever gets.
+ * world stands still — and the ending's first beat is the stillest the lab ever gets.
  * It is only once the camera starts moving that the frame answers that question
  * by itself, and the counter becomes chrome over the portfolio's contact page.
  *

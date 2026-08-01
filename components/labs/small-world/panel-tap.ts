@@ -12,7 +12,7 @@
  * THE RULING (round 18) was to invert it: the canvas takes the click, and panel-advance becomes the
  * FALLBACK via r3f's `onPointerMissed`, which fires only when a click hit no interactive object. So
  * clicking ON the egg peeks and clicking anywhere else advances — which is what tap-to-advance
- * always meant, and it fixes the class rather than the instance (the curtain-call ending will want
+ * always meant, and it fixes the class rather than the instance (the ending will want
  * canvas interactivity too).
  *
  * WHY A REGISTRY RATHER THAN A PROP. The two halves live on opposite sides of the tree:

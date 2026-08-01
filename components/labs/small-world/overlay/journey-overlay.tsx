@@ -37,7 +37,7 @@ export function JourneyOverlay({
 
           TAP-TO-ADVANCE IS GATED INSTEAD OF THE RENDER (fix round). Chapter 6's retraction is a
           wall clock, so the spread can still be mounted a fraction of a second into the ending —
-          and `advanceTo` there would smooth-scroll the visitor back out of the curtain call to
+          and `advanceTo` there would smooth-scroll the visitor back out of the still beat to
           progress 1. Passing `null` un-arms the tap while the exit animation finishes, which is
           the half that has to change: hard-cutting a retracting spread is worse than letting it
           play, and a live click target under the ending is the trap the canvas-first model

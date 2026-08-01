@@ -79,7 +79,7 @@ describe('JourneyOverlay', () => {
 
   // Task 63 — the "To be continued…" panel is retired. What was one full-viewport scrim at
   // progress 0.985 is now a scroll segment past progress 1, and the overlay's only job in it is
-  // to hold a mount point for T64's curtain call and T65's desk reveal.
+  // to hold a mount point for T64's still beat and T65's desk reveal.
   it('shows no ending overlay anywhere in the journey', () => {
     const ref = { current: 0 }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
@@ -96,7 +96,7 @@ describe('JourneyOverlay', () => {
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
     ref.current = 1 + 0.1 * ENDING_SPAN
     fireScroll()
-    expect(screen.getByTestId('sw-ending').dataset.phase).toBe('curtain')
+    expect(screen.getByTestId('sw-ending').dataset.phase).toBe('still')
     ref.current = TRACK_END
     fireScroll()
     expect(screen.getByTestId('sw-ending').dataset.phase).toBe('zoom')
@@ -116,7 +116,7 @@ describe('JourneyOverlay', () => {
     // The trap this closes: chapter 6's spread retracts on a wall clock, so it can still be mounted
     // a fraction of a second after progress crosses 1 — and `ChapterPanels` registers tap-to-advance
     // for as long as it is mounted. A canvas click there fired `advanceTo(1)` and smooth-scrolled
-    // the visitor BACKWARDS out of the curtain call, to 77.4% of the track.
+    // the visitor BACKWARDS out of the still beat, to 77.4% of the track.
     //
     // Reachable without any hurry, too: an End key or a scrollbar drag from the last dwell to the
     // bottom of the track is a teleport, which `stepArrival` passes through at 1:1 — so the visitor

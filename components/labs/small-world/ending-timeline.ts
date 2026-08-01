@@ -33,7 +33,7 @@ import { CHAPTER_COUNT } from './chapters'
  *                                                      chapter-6 stop, 0.925)
  *   camera can move       ⇐  progress >  ZOOM_FIRST_MOVE = 1 + ZOOM_START·ENDING_SPAN
  *
- * The two sets are disjoint with the whole CURTAIN window between them, and the
+ * The two sets are disjoint with the whole STILL BEAT between them, and the
  * camera pose is a PURE FUNCTION of progress (scene/camera.ts), so scrubbing
  * backwards rewinds the zoom through the identical function before progress can
  * re-enter the journey domain. There is no reverse case to prove and no state
@@ -49,7 +49,7 @@ import { CHAPTER_COUNT } from './chapters'
  * 86.5° at full pull-back — 7° more surface, all of it in its final state.
  *
  * ============================================================================
- * THE TIMELINE — what T64 (curtain call) and T65 (desk reveal) build against
+ * THE TIMELINE — the quiet ending (Round 21, Task 66)
  * ============================================================================
  * Read it the way `RevealState` is read: windows, `t` semantics, phase names.
  * Everything here is a pure function of scroll with no wall clock anywhere, so
@@ -58,22 +58,30 @@ import { CHAPTER_COUNT } from './chapters'
  * extend to the ending — a checkpoint reveal cannot even exist past PANEL_END of
  * the last chapter, so the ending is outside every dwell and every absorption).
  *
+ * Round 20 spent the first beat on a CURTAIN CALL — the whole cast gathered
+ * around the world and bowed. It is gone: the company read as decals pinned in
+ * the sky beside the world rather than as anything standing anywhere, and the
+ * frame it occupied is the frame this ending needs. What replaces it is not
+ * another event but the ABSENCE of one: the world simply settles onto its stand
+ * and the camera withdraws. Two figurines stay on the desk (desk-set.tsx) as the
+ * only survivors of the cast, and they are props, not performers.
+ *
  * `t`       — the ending's OWN 0→1, linear in scroll. 0 at progress = 1 (the last
  *             frame of the journey), 1 at progress = TRACK_END (the bottom of the
  *             track). Consumers ease it themselves — `t` stays linear so a
  *             consumer can pick its own curve, exactly as `RevealState.t` does.
- * `phase`   — 'journey' before the ending, then 'curtain', then 'zoom'. The name
+ * `phase`   — 'journey' before the ending, then 'still', then 'zoom'. The name
  *             of the beat, for staging one-shots; the windows below are the truth.
- * `curtain` — 0→1 across t ∈ [0, CURTAIN_END], then PARKED at 1 for the rest of
- *             the ending. The mascots gather and BOW here, and they stay bowed
- *             through the pull-back — the curtain call does not pack up when the
- *             camera starts moving, it becomes the thing being pulled away from.
- *             T64 owns what gathers; this is only when.
+ * `stand`   — 0→1 across t ∈ [0, STAND_END], then PARKED at 1 for the rest of the
+ *             ending. The globe stand's rise: it comes up from below the frame
+ *             and the world ends up sitting in its cradle. The PLANET never moves
+ *             — the stand travels to it. globe-stand.ts owns the geometry and the
+ *             easing; this is only when.
  * `zoom`    — 0 through t ∈ [0, ZOOM_START], then 0→1 across [ZOOM_START, 1].
  *             The camera's pull-back parameter and nothing else's. The gap
- *             between CURTAIN_END and ZOOM_START is a deliberate STILL BEAT:
- *             the bow lands, the frame holds, and only then does the world start
- *             to recede. It is also the invariant's margin.
+ *             between STAND_END and ZOOM_START is a deliberate STILL BEAT: the
+ *             stand lands, the frame holds, and only then does the world start to
+ *             recede. It is also the invariant's margin.
  * `active`  — false for progress <= 1 (the journey owns that domain, boundary
  *             included), true after. `JourneyState.ending.active` is the correct
  *             "the journey is over" test; `JourneyState.progress` CANNOT tell you
@@ -94,13 +102,19 @@ import { CHAPTER_COUNT } from './chapters'
  */
 
 /**
- * How long the ending is, in CHAPTER-WIDTHS of scroll. 1.75 chapters ≈ 400vh: a
- * gather-and-bow beat you can read without hurrying (≈103vh), a still beat
- * (≈32vh), and a long smooth pull-back (≈262vh) that never feels like it is
- * being yanked. Raising this lengthens every phase proportionally, because the
+ * How long the ending is, in CHAPTER-WIDTHS of scroll.
+ *
+ * 1.0 chapters ≈ 240vh, down from 1.75 (≈420vh) when a twelve-mascot gather-and-bow
+ * had to be readable inside it. With no company to assemble the first beat is one
+ * object moving a short distance, and the pull-back travels 1.5× rather than 3×, so
+ * the old length would have spent two thirds of it on a camera that had already
+ * arrived. The split: a stand-rise you can watch (≈72vh), a held still beat (≈19vh),
+ * and a pull-back (≈149vh) that is GENTLER than Round 20's despite being shorter —
+ * the apparent-shrink rate falls from log(3)/262vh to log(1.5)/149vh, i.e. 0.0042 to
+ * 0.0027 per vh. Raising this lengthens every phase proportionally, because the
  * windows below are fractions of the span rather than absolute progress.
  */
-export const ENDING_CHAPTERS = 1.75
+export const ENDING_CHAPTERS = 1.0
 
 /** The ending's length in JOURNEY PROGRESS units — the journey is [0, 1], the ending (1, TRACK_END]. */
 export const ENDING_SPAN = ENDING_CHAPTERS / CHAPTER_COUNT
@@ -108,17 +122,17 @@ export const ENDING_SPAN = ENDING_CHAPTERS / CHAPTER_COUNT
 /** The largest progress the scroll track can produce. The driver's domain is [0, TRACK_END]. */
 export const TRACK_END = 1 + ENDING_SPAN
 
-/** `curtain` reaches 1 here (fraction of the ending's own t). */
-export const CURTAIN_END = 0.26
+/** `stand` reaches 1 here (fraction of the ending's own t) — the world is seated. */
+export const STAND_END = 0.3
 
-/** `zoom` leaves 0 here. The still beat is [CURTAIN_END, ZOOM_START]. */
-export const ZOOM_START = 0.34
+/** `zoom` leaves 0 here. The still beat is [0, ZOOM_START]; the HELD part is [STAND_END, ZOOM_START]. */
+export const ZOOM_START = 0.38
 
 /**
  * The first progress at which the camera may differ from its static pose —
  * DERIVED, so a test can compare the invariant's boundary against the timeline
  * rather than against a number someone typed twice. Everything below it is the
- * journey's frozen-camera domain, which starts a whole curtain-call earlier than
+ * journey's frozen-camera domain, which starts a whole still beat earlier than
  * the last progress at which rotation can move (1).
  */
 export const ZOOM_FIRST_MOVE = 1 + ZOOM_START * ENDING_SPAN
@@ -140,13 +154,13 @@ export function trackOffsetFor(progress: number, total: number): number {
   return (progress / TRACK_END) * total
 }
 
-export type EndingPhase = 'journey' | 'curtain' | 'zoom'
+export type EndingPhase = 'journey' | 'still' | 'zoom'
 
 export type EndingState = {
   active: boolean
   t: number
   phase: EndingPhase
-  curtain: number
+  stand: number
   zoom: number
 }
 
@@ -160,7 +174,7 @@ export const ENDING_IDLE: EndingState = Object.freeze({
   active: false,
   t: 0,
   phase: 'journey',
-  curtain: 0,
+  stand: 0,
   zoom: 0,
 })
 
@@ -177,8 +191,8 @@ export function endingStateAt(progress: number): EndingState {
   return {
     active: true,
     t,
-    phase: t < ZOOM_START ? 'curtain' : 'zoom',
-    curtain: clamp01(t / CURTAIN_END),
+    phase: t < ZOOM_START ? 'still' : 'zoom',
+    stand: clamp01(t / STAND_END),
     zoom: clamp01((t - ZOOM_START) / (1 - ZOOM_START)),
   }
 }

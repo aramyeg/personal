@@ -207,7 +207,7 @@ describe("the note's late-font upgrade can only happen off camera", () => {
     }
   })
 
-  it('is open for the whole journey and the whole curtain call, and shut after', () => {
+  it('is open for the whole journey and the whole still beat, and shut after', () => {
     expect(noteRepaintAllowed(endingStateAt(0))).toBe(true)
     expect(noteRepaintAllowed(endingStateAt(1))).toBe(true)
     expect(noteRepaintAllowed(endingStateAt(ZOOM_FIRST_MOVE))).toBe(true)

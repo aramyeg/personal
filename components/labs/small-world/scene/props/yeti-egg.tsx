@@ -99,7 +99,7 @@ export const EGG_FROM = 4.72 / 6
  * pointer events at all. The invariant survives its old justification intact, though — the hotspot
  * may only be armed where a click will actually reach it AND where the egg is actually on frame —
  * so it is re-anchored to the geometry that still exists: it closes strictly BEFORE the ending
- * (which begins at progress 1), so the curtain call and the pull-back never have a live click
+ * (which begins at progress 1), so the still beat and the pull-back never have a live click
  * target from the journey underneath them. Past that the clamp enforces it a second time for free:
  * `JourneyState.progress` reads exactly 1 for the whole ending, which is greater than this value,
  * so the arming gate below cannot re-open however far the visitor scrolls.
