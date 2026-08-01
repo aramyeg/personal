@@ -8,8 +8,8 @@ import {
   CAMERA_FOV,
   CAMERA_POSITION,
   CAMERA_RIG_PRIORITY,
-  CAMERA_TARGET,
   cameraPositionInto,
+  cameraTargetInto,
 } from './camera'
 import { Planet } from './planet'
 import { Girl } from './girl'
@@ -34,6 +34,7 @@ import { WinterLife } from './props/winter'
 import { YetiEgg } from './props/yeti-egg'
 import { EpilogueSet } from './props/epilogue'
 import { DeskSet } from './props/desk-set'
+import { GlobeStand } from './props/globe-stand'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
@@ -61,15 +62,20 @@ export type SceneProps = {
  */
 function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
   const camera = useThree((s) => s.camera)
-  const scratch = useRef<[number, number, number]>([0, 0, 0])
+  const eye = useRef<[number, number, number]>([0, 0, 0])
+  const aim = useRef<[number, number, number]>([0, 0, 0])
   const lastZoom = useRef(Number.NaN)
 
   useFrame(() => {
     const { ending } = journeyRef.current
     if (ending.zoom === lastZoom.current) return
     lastZoom.current = ending.zoom
-    camera.position.fromArray(cameraPositionInto(ending, scratch.current))
-    camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
+    camera.position.fromArray(cameraPositionInto(ending, eye.current))
+    // The ending withdraws AND re-aims (Task 66): both halves are pure functions of the same
+    // `zoom`, and both are bit-identical to the static pose while it is 0, so the skip above still
+    // covers the whole journey. At zoom 0 this target is exactly CAMERA_TARGET.
+    const t = cameraTargetInto(ending, aim.current)
+    camera.lookAt(t[0], t[1], t[2])
   }, CAMERA_RIG_PRIORITY)
 
   return null
@@ -132,6 +138,10 @@ function SceneContents({
           the journey camera's frustum rather than gated, so there is no entrance to scrub. See
           scene/desk-stage.ts for the containment proof the placement rests on. */}
       <DeskSet journeyRef={journeyRef} />
+      {/* THE GLOBE STAND (Task 66) — the one thing in the ending that ARRIVES. It rises from below
+          the journey frame during the still beat and the world ends up sitting in its cradle; see
+          scene/globe-stand.ts for why this and not the desk is allowed an entrance. */}
+      <GlobeStand journeyRef={journeyRef} />
       {/* Sky-anchored corner characters for each checkpoint — a SIBLING of the planet, never a
           child: they hold the frame's top corners while the world keeps spinning beneath them. */}
       <CheckpointPeekers journeyRef={journeyRef} />

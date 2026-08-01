@@ -51,7 +51,7 @@ describe('the camera invariant', () => {
     }
   })
 
-  it('holds through the curtain call too, up to a boundary DERIVED from the timeline', () => {
+  it('holds through the still beat too, up to a boundary DERIVED from the timeline', () => {
     // Not a restated number: the first progress the camera may move at is the ending's own
     // zoom-window start, and this walks the whole domain below it.
     for (let i = 0; i <= SWEEP; i++) {
@@ -61,12 +61,12 @@ describe('the camera invariant', () => {
     expect(endingCameraDistance(endingStateAt(ZOOM_FIRST_MOVE))).toBe(CAMERA_DISTANCE)
   })
 
-  it('leaves a whole curtain call between the last moving rotation and the first moving camera', () => {
+  it('leaves a whole still beat between the last moving rotation and the first moving camera', () => {
     // rotation is a function of scroll only below 1 (`rotationAt` clamps there)...
     expect(rotationAt(1)).toBeCloseTo(ROTATION_TOTAL, 12)
     expect(rotationAt(TRACK_END)).toBe(rotationAt(1))
     // ...and the camera cannot move below ZOOM_FIRST_MOVE. The sets are disjoint, and the
-    // margin between them is the curtain window, in progress units.
+    // margin between them is the still beat, in progress units.
     expect(ZOOM_FIRST_MOVE).toBeGreaterThan(1)
     expect(ZOOM_FIRST_MOVE - 1).toBeCloseTo(ZOOM_START * ENDING_SPAN, 12)
   })
@@ -115,7 +115,7 @@ describe('the pull-back path', () => {
     }
   })
 
-  it('travels along the view ray, so the aim never changes', () => {
+  it('travels along the view ray, and drops its aim on the same curve', () => {
     for (const p of [1.05, 1.15, TRACK_END]) {
       const pose = cameraPositionAt(p)
       const d = endingCameraDistance(endingStateAt(p))
@@ -132,12 +132,17 @@ describe('the pull-back path', () => {
     // crawls. The geometric ramp's signature, stated without restating the implementation:
     // halfway through the eased pull-back the camera sits at the GEOMETRIC mean of the two end
     // distances, not the arithmetic one. (`smoothstep(0.5)` is exactly 0.5, so zoom = 0.5 is the
-    // eased midpoint.) The two differ by 3.2 world units here — far past any rounding.
+    // eased midpoint.) How far apart the two means are is DERIVED below rather than restated:
+    // it is a pure function of ZOOM_FACTOR, so the shorter Task 66 pull-back moves it (3.20 world
+    // units at 3x, 0.30 at 1.4985) without weakening what is being claimed.
     const at = (zoom: number) => endingCameraDistance({ ...endingStateAt(TRACK_END), zoom })
     const geometric = Math.sqrt(at(0) * at(1))
     const arithmetic = (at(0) + at(1)) / 2
     expect(at(0.5)).toBeCloseTo(geometric, 10)
-    expect(Math.abs(arithmetic - geometric)).toBeGreaterThan(3)
+    const meanGap = CAMERA_DISTANCE * ((1 + ZOOM_FACTOR) / 2 - Math.sqrt(ZOOM_FACTOR))
+    expect(Math.abs(arithmetic - geometric)).toBeCloseTo(meanGap, 10)
+    // ...and it is a real separation rather than a rounding artefact at this zoom
+    expect(meanGap).toBeGreaterThan(0.2)
   })
 
   it('scales the sky by the same factor it moved the camera', () => {

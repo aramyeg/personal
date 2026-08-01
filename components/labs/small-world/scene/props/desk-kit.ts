@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { KEY_LIGHT_POSITION } from '../biome-atmosphere'
 import type { ClayPart } from './clay-kit'
-import type { DeskProp } from '../desk-stage'
+import { DESK_TOP_Y, type DeskProp } from '../desk-stage'
 
 /**
  * THE THINGS ON THE DESK (Task 65) — clay primitives, in the lab's own vocabulary.
@@ -26,62 +26,6 @@ import type { DeskProp } from '../desk-stage'
  * only correct when they commute, and half of these parts are tilted. The matrices are multiplied
  * in the honest order here, once, and what the measurement reads is what the scene draws.
  */
-
-/**
- * THE STAND the little world sits on — a turned globe stand: low foot, waisted stem, cradle ring.
- *
- * Two earlier cuts are worth knowing about, because each was fixed by looking at a different frame.
- *
- * The FIRST was a shallow dish authored to stop just SHORT of the planet's silhouette, on the
- * theory that a prop crossing the world would read as a mistake. At full pull-back it read as a
- * life ring with a ball hovering over it: ten pixels between two objects is not contact, it is a
- * gap. What sells contact is OCCLUSION, and occlusion is available here — the stand is nine world
- * units in front of the planet, so a top that rises past the planet's silhouette is hidden by it
- * exactly as a stand holding a ball would be.
- *
- * The SECOND was that dish made tall enough to do it, and it was fine at full pull-back and awful
- * halfway there: a wide flared cup at close range is a mushroom, and it was the loudest thing in
- * the lower frame for the whole middle of the reveal. The money shot is not the only frame anyone
- * sees. Hence a narrow silhouette that stays quiet while the camera travels and disappears under
- * the world when it arrives.
- */
-function pedestal(top: number, r: number): ClayPart[] {
-  // `r` is the prop's WIDEST radius, not a scale factor — the base is the widest part, and the
-  // published `backReach` is what the containment gate is made against, so the two have to be the
-  // same number. An earlier cut used `r` as the ring radius and flared the base to 1.22 r, which
-  // put the foot 0.25 world units behind where the data said the prop ended. `desk-kit.test.ts`
-  // caught it by measuring; nothing else would have.
-  const baseH = top * 0.075
-  const tube = top * 0.055
-  const ringY = top - tube
-  const stemLowH = top * 0.34
-  return [
-    // a wide low foot, then a waisted stem: the profile of a turned globe stand
-    { geo: new THREE.CylinderGeometry(r * 0.86, r, baseH, 26), color: PALETTE.clayPath, pos: [0, baseH / 2, 0] },
-    {
-      geo: new THREE.CylinderGeometry(r * 0.3, r * 0.55, stemLowH, 18),
-      color: PALETTE.clayPath,
-      pos: [0, baseH + stemLowH / 2, 0],
-      tag: 'stem-lower',
-    },
-    {
-      geo: new THREE.CylinderGeometry(r * 0.44, r * 0.3, ringY - baseH - stemLowH, 18),
-      color: PALETTE.clayPath,
-      pos: [0, (ringY + baseH + stemLowH) / 2, 0],
-      tag: 'stem-upper',
-    },
-    // the cradle ring. NARROWER than the world it holds, on purpose: the ring's own rim ends up
-    // behind the sphere's silhouette, so what the eye reads at full pull-back is a ball resting on
-    // a stand whose top disappears under it — contact by occlusion, with no seam to get wrong.
-    {
-      geo: new THREE.TorusGeometry(r * 0.62 - tube, tube, 8, 24),
-      color: PALETTE.clayPath,
-      pos: [0, ringY, 0],
-      rot: [Math.PI / 2, 0, 0],
-      tag: 'cradle',
-    },
-  ]
-}
 
 /** The blotter: a rounded slab of mat, flat enough that containment is never a question. */
 function mat(top: number, halfW: number, halfD: number): ClayPart[] {
@@ -347,7 +291,7 @@ export function deskNoteShadowPart(note: {
     .rotateX(-Math.PI / 2)
     .rotateY(note.rot)
     // just above the blotter the sheet lies on, not above the bare desk
-    .translate(note.x + 0.07, note.lift - 0.012, note.z + 0.13)
+    .translate(note.x + 0.07, DESK_TOP_Y + note.lift - 0.012, note.z + 0.13)
   // slate rather than the desk's warm shade: this shadow falls on the BLOTTER, and a brown pocket
   // on a blue-grey mat reads as a mounted frame around the sheet instead of as shade under it
   return { geo, color: PALETTE.heronWing, tag: 'note-shadow' }
@@ -355,8 +299,6 @@ export function deskNoteShadowPart(note: {
 
 function localParts(p: DeskProp): ClayPart[] {
   switch (p.kind) {
-    case 'stand':
-      return pedestal(p.top, p.backReach)
     case 'mat':
       return mat(p.top, p.halfW ?? p.backReach, p.backReach)
     case 'mug':
@@ -389,7 +331,7 @@ export function deskPropParts(p: DeskProp): ClayPart[] {
     : [contact(p.backReach * 0.8), ...localParts(p)]
 
   const place = new THREE.Matrix4()
-    .makeTranslation(p.x, 0, p.z)
+    .makeTranslation(p.x, DESK_TOP_Y, p.z)
     .multiply(new THREE.Matrix4().makeRotationY(p.rot ?? 0))
 
   return local.map((part) => {

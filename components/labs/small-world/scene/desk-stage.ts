@@ -1,4 +1,13 @@
-import { CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, ZOOM_FACTOR } from './camera'
+import {
+  CAMERA_DISTANCE,
+  CAMERA_FOV,
+  CAMERA_PITCH_DEG,
+  DESK_EDGE_V,
+  ENDING_AIM_DROP,
+  ZOOM_FACTOR,
+  endingRig,
+  ndcYAt,
+} from './camera'
 
 /**
  * THE DESK'S STAGE (Task 65) — where a permanently-mounted desk is allowed to exist.
@@ -44,11 +53,26 @@ import { CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, ZOOM_FACTOR } from './ca
  * The desk therefore does not hold the world up — it sits IN FRONT of it, and the reveal resolves
  * in perspective instead of in contact. `DESK_TOP_Y` is the free parameter that buys that: raising
  * the desk plane pushes its back edge FORWARD (the line above is climbing), which at full pull-back
- * lifts the back edge on screen until it closes on the planet's silhouette. At the shipped values
- * the back edge lands 2.3% of the frame height below the planet's bottom, and the stand prop
- * (`DESK_PROPS`, kind 'stand') closes the last two thirds of that: its rim is authored to sit just
- * under the world, so the eye reads a sphere resting in a dish rather than a sphere hanging over a
- * table. The remaining sliver is the 8.524° wedge, and it is not removable.
+ * lifts the back edge on screen.
+ *
+ * ============================================================================
+ * WHAT TASK 66 CHANGED ABOUT THE ANSWER (not about the theorem)
+ * ============================================================================
+ * The wedge stands; it is a fact about this camera. What Task 65 did with it was close the gap by
+ * OCCLUSION — a stand prop nine units in front of the world whose rim rose past the planet's
+ * silhouette at full pull-back. Aram's verdict on that was "make so the globe is sitting on the
+ * stand not hovering behind it", and he was reading the geometry correctly: a prop at z = 9.9
+ * standing under a sphere at z = 0 is the wrong size to be holding it, and at every zoom stop
+ * before the last one there is visible sky between the two.
+ *
+ * The resolution is the one the theorem itself points at. The wedge forbids STATIC geometry from
+ * touching the world; it says nothing about geometry that arrives after the journey is over. So the
+ * stand left this file: it is now real geometry AT the world — a cradle ring the sphere sits in,
+ * whose far arc is genuinely behind the sphere and hidden by it — that rises from below the frame
+ * during the ending's still beat. `scene/globe-stand.ts` carries it, and its REST pose is held to
+ * exactly the containment rule this module publishes, so the journey still cannot see it.
+ *
+ * What is left here is the desk, which never touched the world and never will.
  */
 
 const PITCH = (CAMERA_PITCH_DEG * Math.PI) / 180
@@ -73,25 +97,63 @@ export function journeyFloorY(z: number): number {
 /** How far below the journey's bottom edge the desk's own surface is parked, in world units. */
 export const DESK_CLEARANCE = 0.35
 
-/** The desk plane's height. THE free parameter — see the header for what moving it does. */
-export const DESK_TOP_Y = 0
+/** The desk's far edge for a given plane height: the first z at which a surface there is still
+ *  DESK_CLEARANCE below the journey's bottom edge. */
+const backZFor = (topY: number): number => CAM_Z - (CAM_Y - topY - DESK_CLEARANCE) / FLOOR_SLOPE
 
 /**
- * The desk's far edge: the first z at which a surface at DESK_TOP_Y is still DESK_CLEARANCE below
- * the journey's bottom edge. Solved rather than typed, so retuning the fov, the pitch, the distance
- * or the clearance walks the desk to wherever it is legal instead of quietly opening a leak.
+ * The desk plane's height — SOLVED from the composition (Task 66), where Task 65 authored it as 0.
+ *
+ * It was always THE free parameter, and what it actually buys is now written down as a target
+ * rather than as a paragraph: raising the plane pushes the back edge FORWARD (the frustum floor
+ * climbs with z), which lifts the edge on screen at full pull-back. `DESK_EDGE_V` says where that
+ * edge has to land; this bisects for the plane that puts it there. Monotone, so the bisection is
+ * honest: a higher plane is a nearer edge is a higher screen line, with no turning point.
+ *
+ * At the shipped targets it lands at 1.26 — the plane sits ABOVE the world's centre height, which
+ * looks alarming written down and is not: the desk begins 8.2 units in FRONT of the world and the
+ * two never share a z. What it means is that the visitor is looking at a near table edge with the
+ * world beyond it, which is the geometry that reads as "on the desk" from this camera. The honest
+ * limit of that reading is the 8.5° wedge (see the header) and it is why the world needs a STAND
+ * that arrives with the ending rather than a taller desk.
  */
-export const DESK_BACK_Z = CAM_Z - (CAM_Y - DESK_TOP_Y - DESK_CLEARANCE) / FLOOR_SLOPE
+export const DESK_TOP_Y = (() => {
+  let lo = -6
+  let hi = 6
+  for (let i = 0; i < 90; i++) {
+    const mid = (lo + hi) / 2
+    if (ndcYAt([0, mid, backZFor(mid)], ZOOM_FACTOR, ENDING_AIM_DROP) < DESK_EDGE_V) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+})()
 
 /**
- * The desk's near edge, derived from the OTHER end of the same geometry: the same bottom-frustum
- * line, drawn for the camera pulled back by ZOOM_FACTOR, crosses DESK_TOP_Y somewhere in front of
- * the world — that is where the surface leaves the bottom of the money shot. The slab runs past it,
- * so the desk reaches the bottom of the frame instead of ending in a visible near edge with sky
- * underneath.
+ * The desk's far edge. Solved rather than typed, so retuning the fov, the pitch, the distance or
+ * the clearance walks the desk to wherever it is legal instead of quietly opening a leak.
  */
-export const DESK_NEAR_Z =
-  CAM_Z * ZOOM_FACTOR - (CAM_Y * ZOOM_FACTOR - DESK_TOP_Y) / FLOOR_SLOPE + 2.2
+export const DESK_BACK_Z = backZFor(DESK_TOP_Y)
+
+/**
+ * Where the desk surface LEAVES the bottom of the money shot: the z at which the plane crosses
+ * ndc −1 at full pull-back, aim included. Solved against the real projection rather than against
+ * the un-aimed frustum line Task 65 could use, because the aim drop moves this by 2.6 units and a
+ * slab that stopped short of it would show sky under its own near edge.
+ */
+const DESK_EXIT_Z = (() => {
+  // Closed form, and deliberately NOT a bisection on `ndcYAt`: ndc y is not monotone in z along
+  // this plane — it dives to −∞ where the plane crosses the camera's own depth and reappears
+  // positive behind it, so a bisection over any range wide enough to be safe brackets the WRONG
+  // root and returns a desk 56 units long. Intersecting the bottom frustum ray with the plane has
+  // no such branch.
+  const r = endingRig(ZOOM_FACTOR, ENDING_AIM_DROP)
+  const dy = r.fwd[1] - TAN_HALF_FOV * r.up[1]
+  const dz = r.fwd[2] - TAN_HALF_FOV * r.up[2]
+  return r.cam[2] + ((DESK_TOP_Y - r.cam[1]) / dy) * dz
+})()
+
+/** ...and the slab runs past it, so the desk reaches the bottom of the frame. */
+export const DESK_NEAR_Z = DESK_EXIT_Z + 2.2
 
 /**
  * The widest viewport the slab is sized for. 4 is not a hedge — 5120×1440 is 3.556 and the desk
@@ -106,14 +168,39 @@ export const DESK_MAX_ASPECT = 4
  * moves the camera and every nearer point is nearer. So one evaluation there bounds every zoom and
  * every aspect at once.
  */
-export const DESK_HALF_W = (() => {
-  const camY = CAM_Y * ZOOM_FACTOR
-  const camZ = CAM_Z * ZOOM_FACTOR
-  // depth of the back edge along the view axis
-  const depth =
-    Math.sin(PITCH) * (camY - DESK_TOP_Y) + Math.cos(PITCH) * (camZ - DESK_BACK_Z)
-  return depth * TAN_HALF_FOV * DESK_MAX_ASPECT * 1.05
-})()
+export const DESK_HALF_W = deskAxialDepth(DESK_BACK_Z) * TAN_HALF_FOV * DESK_MAX_ASPECT * 1.05
+
+/**
+ * How far a point on the desk plane at `z` sits along the money shot's VIEW AXIS.
+ *
+ * Every width question about the money shot goes through this, and it takes the aim into account —
+ * `Math.cos(PITCH)` was the right projection while the camera looked at the origin and is simply a
+ * different axis now. Exported because the prop composition below is authored against the frame it
+ * produces rather than against world units someone eyeballed.
+ */
+export function deskAxialDepth(z: number, topY = DESK_TOP_Y): number {
+  const r = endingRig(ZOOM_FACTOR, ENDING_AIM_DROP)
+  return (topY - r.cam[1]) * r.fwd[1] + (z - r.cam[2]) * r.fwd[2]
+}
+
+/** Half the frame's WIDTH in world units, on the desk plane at `z`, at full pull-back. */
+export function deskFrameHalfW(z: number, aspect: number): number {
+  return deskAxialDepth(z) * TAN_HALF_FOV * aspect
+}
+
+/**
+ * THE VISIBLE STAGE (Task 66), and why the prop rings had to be rebuilt rather than nudged.
+ *
+ * Round 20 pulled back 3× aiming at the origin; the desk's back edge stood ±16.5 world units wide
+ * on a 1440×900 frame and the surface stayed on screen out to z ≈ 21. The composition spread three
+ * rings across that, out to |x| = 10.6. At 1.5× with the aim drop, the same frame is ±5.6 at the
+ * back edge, ±3.7 by z = 12, and the surface leaves the bottom of the frame at z = 12.0 — a stage
+ * roughly a NINTH of the area. Every prop Task 65 placed outside |x| ≈ 5, and everything behind
+ * z ≈ 12, is now off screen at the money shot; the 'far' ring is entirely gone and 'wing' means
+ * something different. Keeping the old table would have shipped ten props nobody can see and a
+ * note below the bottom edge.
+ */
+export const DESK_STAGE_EXIT_Z = DESK_EXIT_Z
 
 /**
  * How tall a prop standing at `z` may be, measured from the desk surface.
@@ -128,9 +215,11 @@ export function propCeiling(z: number): number {
   return journeyFloorY(z) - DESK_TOP_Y
 }
 
-/** Every desk prop, as data, so a test can check the shipped composition rather than a sample. */
+/** Every desk prop, as data, so a test can check the shipped composition rather than a sample.
+ *  'stand' is gone: the world's stand is no longer a desk prop nine units in front of it that
+ *  closes a gap by perspective — it is real geometry at the world, arriving with the ending.
+ *  See scene/globe-stand.ts. */
 export type DeskPropKind =
-  | 'stand'
   | 'mat'
   | 'mug'
   | 'cup'
@@ -163,47 +252,48 @@ export function deskPropFits(p: DeskProp): boolean {
 }
 
 /**
- * THE COMPOSITION, as numbers.
+ * THE COMPOSITION, as numbers — rebuilt for the Task 66 frame.
  *
- * Three rings, because the desk's visible WIDTH collapses on a phone while its visible height does
- * not: at full pull-back the back edge spans ±16.5 world units on 1440×900 and ±4.8 on 430×932.
- * A single arrangement authored for the desktop frame puts most of itself off a phone's edges, and
- * one authored for the phone leaves a desktop desk empty either side of a small huddle.
+ * Three rings still, because the desk's visible WIDTH collapses on a phone while its visible
+ * height does not, and one arrangement cannot serve both. What changed is every number in them:
+ * the stage is now z ∈ [8.26, 12.0] and |x| ≲ 5.5 falling to 3.6, where Task 65 composed against
+ * z out to 21 and |x| out to 16.5. See DESK_STAGE_EXIT_Z above for why.
  *
- *   core — |x| ≤ 3.4. On screen at every viewport. The stand and the note live here, and nothing
- *          else does: this is the band the DOM connect block sits over, and clay under type is
- *          clutter.
- *   wing — |x| 5…9. The desk's own life: what you'd actually reach for. Off a phone's frame.
- *   far  — |x| ≥ 10. Desktop and ultrawide only, and deliberately the tallest pieces, because they
- *          are the ones with headroom to spare and the ones that stop a wide frame reading empty.
+ *   core — |x| ≤ 1.5. On screen at every viewport, phone included. The note and the two figurines
+ *          live here and nothing else does: this is the band the DOM connect block sits over, and
+ *          clay under type is clutter.
+ *   wing — |x| 1.9…4.5. The desk's own life: what you'd actually reach for. Off a phone's frame.
+ *   far  — |x| ≥ 5.5. Ultrawide only, and only enough of it to stop 3440×1440 reading as an empty
+ *          plain either side of the blotter.
  *
- * Every `top` here was chosen against `propCeiling(z - radius)`, and `desk-stage.test.ts` re-checks
- * all of them — the whole point of authoring the set as data is that the gate reads the shipped
- * arrangement instead of a sample of it.
+ * FEWER AND CLOSER, which is the brief's instruction and also what the frame can now hold: eleven
+ * pieces against Task 65's thirteen, none of them further out than the frame's own edge. The lamp
+ * and the tall plant are gone — they were the 'far' ring's tallest pieces, chosen when 'far' meant
+ * |x| = 10 with headroom to spare, and at this distance they would stand in front of the world.
+ *
+ * Every `top` here was chosen against `propCeiling(z - backReach)`, and `desk-stage.test.ts`
+ * re-checks all of them against the SHIPPED geometry — the whole point of authoring the set as
+ * data is that the gate reads the arrangement instead of a sample of it.
  */
 export const DESK_PROPS: readonly DeskProp[] = [
-  // THE BLOTTER, first because everything else stands on it. It is the piece that stops the bottom
-  // two fifths of the money shot being one unbroken field of tan, and it groups the stand and the
-  // note into one object instead of two things on a plain.
-  { kind: 'mat', x: 0, z: 11.9, top: 0.05, backReach: 3.6, halfW: 5.6, rot: 0, ring: 'core' },
+  // THE BLOTTER, first because everything else lies on it. It is the piece that stops the bottom
+  // two fifths of the money shot being one unbroken field of tan, and it gives the note an object
+  // to sit on instead of a plain. Sized to run off the bottom of the frame and to leave bare desk
+  // either side of it on a wide frame.
+  { kind: 'mat', x: 0, z: 10.5, top: 0.03, backReach: 1.75, halfW: 3.15, rot: 0, ring: 'core' },
 
-  // THE STAND. Its saucer rim is authored hard against the ceiling: it is the only prop whose job
-  // is a SCREEN-SPACE relationship rather than a desk-space one, and every millimetre it can keep
-  // is more of the world's lower edge it takes a bite out of at full pull-back.
-  { kind: 'stand', x: 0, z: 9.9, top: 1.95, backReach: 0.95, rot: 0, ring: 'core' },
+  { kind: 'clip', x: -1.15, z: 9.35, top: 0.07, backReach: 0.24, rot: 0.9, ring: 'core' },
 
-  { kind: 'mug', x: -6.1, z: 11.4, top: 1.05, backReach: 0.75, rot: 0.5, ring: 'wing' },
-  { kind: 'cup', x: 6.4, z: 10.9, top: 1.62, backReach: 0.72, rot: -0.3, ring: 'wing' },
-  { kind: 'books', x: -7.4, z: 14.2, top: 0.72, backReach: 1.5, rot: 0.18, ring: 'wing' },
-  { kind: 'pencil', x: 5.2, z: 13.8, top: 0.13, backReach: 1.5, rot: -0.42, ring: 'wing' },
-  { kind: 'clip', x: -4.9, z: 9.9, top: 0.1, backReach: 0.35, rot: 0.9, ring: 'wing' },
-  { kind: 'pencil', x: -5.6, z: 16.1, top: 0.13, backReach: 1.5, rot: 0.22, ring: 'wing' },
+  { kind: 'mug', x: -3.05, z: 10.95, top: 0.86, backReach: 0.62, rot: 0.5, ring: 'wing' },
+  { kind: 'cup', x: 3.25, z: 10.7, top: 1.55, backReach: 0.58, rot: -0.3, ring: 'wing' },
+  { kind: 'books', x: 4.35, z: 11.65, top: 0.58, backReach: 1.0, rot: -0.25, ring: 'wing' },
+  { kind: 'plant', x: -4.25, z: 11.55, top: 1.5, backReach: 0.7, rot: 0.4, ring: 'wing' },
+  { kind: 'pencil', x: -1.95, z: 11.75, top: 0.09, backReach: 0.85, rot: -0.42, ring: 'wing' },
+  { kind: 'pencil', x: 2.25, z: 11.95, top: 0.09, backReach: 0.85, rot: 0.22, ring: 'wing' },
 
-  { kind: 'plant', x: -9.7, z: 10.2, top: 2.05, backReach: 0.95, rot: 0.4, ring: 'far' },
-  { kind: 'lamp', x: 10.3, z: 10.9, top: 2.35, backReach: 1.35, rot: -0.55, ring: 'far' },
-  { kind: 'books', x: 10.6, z: 14.6, top: 0.98, backReach: 1.6, rot: -0.25, ring: 'far' },
-  { kind: 'mug', x: -10.4, z: 15.6, top: 1.05, backReach: 0.75, rot: -0.8, ring: 'far' },
-  { kind: 'clip', x: 7.9, z: 15.0, top: 0.1, backReach: 0.35, rot: -0.4, ring: 'far' },
+  { kind: 'books', x: -6.0, z: 10.7, top: 0.72, backReach: 1.05, rot: 0.18, ring: 'far' },
+  { kind: 'mug', x: 6.15, z: 11.2, top: 0.9, backReach: 0.62, rot: -0.8, ring: 'far' },
+  { kind: 'clip', x: 5.45, z: 9.8, top: 0.07, backReach: 0.24, rot: -0.4, ring: 'far' },
 ]
 
 /**
@@ -213,20 +303,32 @@ export const DESK_PROPS: readonly DeskProp[] = [
  * (half the diagonal), so the gate holds for any rotation rather than for the one authored.
  */
 export const DESK_NOTE = {
-  x: 0.15,
-  z: 13.1,
-  /** Along the desk's x before yaw. */
-  width: 6.4,
-  /** Along the desk's z before yaw. */
-  depth: 3.4,
+  x: 0.06,
+  z: 10.55,
+  /**
+   * Along the desk's x before yaw.
+   *
+   * THE BRIEF'S ONE INVERTED ASSUMPTION, and it is worth the paragraph. "The note is bigger in
+   * frame now" reads as a consequence of pulling back less; it is the opposite. The sheet is a
+   * fixed world object, so halving the camera's distance nearly TRIPLES its share of the frame —
+   * left at 6.4 it would have spanned 77% of a desktop frame and 265% of a phone's. What actually
+   * pins its size is the NARROW frame: the desk plane is only ±1.3 world units wide at the note's
+   * depth on 430×932, and the ratio between a phone's frame width and a desktop's is a property of
+   * the two aspects (3.47×), not something the composition gets to choose. So the sheet is sized to
+   * very nearly fill the phone and lands where it lands on desktop — 2.37 gives 96% and 28%, against
+   * Task 65's 84% and 24%. Bigger, but by a sixth, not by the third anyone expected.
+   */
+  width: 2.37,
+  /** Along the desk's z before yaw. Task 65's 1.88 sheet aspect, kept. */
+  depth: 1.26,
   rot: -0.13,
   /**
    * How high the sheet's flat part rides. It has to clear the blotter it is lying ON — a first cut
-   * parked the sheet at 0.02 and the mat's 0.05 swallowed every part of it except the curled corner.
+   * parked the sheet at 0.02 and the mat swallowed every part of it except the curled corner.
    */
-  lift: 0.075,
+  lift: 0.05,
   /** The sheet's highest point above the desk: the lift plus the lifted corner of the curl. */
-  top: 0.26,
+  top: 0.14,
 } as const
 
 /** The note's own containment, made the same way a prop's is. */

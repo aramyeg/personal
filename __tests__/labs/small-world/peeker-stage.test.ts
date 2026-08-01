@@ -354,8 +354,17 @@ describe('the planet is never covered', () => {
     // clearance above is a statement about ONE camera distance. Pull the camera back far enough
     // and the planet's near point overtakes PEEKER_DEPTH and the mascots would draw in front of
     // the world — at a distance the ending's pull-back does reach.
-    expect(PEEKER_DEPTH + CEILING).toBeLessThan(CAMERA_DISTANCE * ZOOM_FACTOR)
-    // What makes that harmless TODAY is structural, not a margin: a peeker is driven by the
+    //
+    // TASK 66 TURNED THIS FROM BELT-AND-BRACES INTO THE ONLY BRACE, and that is worth pinning
+    // rather than quietly deleting. At Round 20's 3× the pull-back stopped at 36.3, comfortably
+    // short of the rig's own reach, so the depth argument held on its own. The quiet ending pulls
+    // back to 18.13 and the rig reaches 21.57 — the planet's near point now OVERTAKES the peeker
+    // plane before the bottom of the track. Asserted in the direction it is actually true in, so
+    // that a future round which raises ZOOM_FACTOR back above the reach fails here and has to come
+    // and read this paragraph rather than inheriting a guard that silently started passing again.
+    expect(PEEKER_DEPTH + CEILING).toBeGreaterThan(CAMERA_DISTANCE * ZOOM_FACTOR)
+    // What makes that harmless is therefore ENTIRELY structural, with no margin behind it: a peeker
+    // is driven by the
     // arrival reveal clock, and no reveal can exist past the last dwell, so the whole rig is
     // invisible for every frame of the ending. T64's curtain call cannot inherit that for free —
     // see the ending contract.

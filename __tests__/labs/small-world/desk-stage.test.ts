@@ -3,7 +3,14 @@ import {
   CAMERA_DISTANCE,
   CAMERA_FOV,
   CAMERA_PITCH_DEG,
+  DESK_EDGE_V,
+  DESK_FRAME,
+  ENDING_AIM_DROP,
+  GLOBE_FRAME,
+  STAND_GAP,
   ZOOM_FACTOR,
+  globeEdgesAt,
+  ndcYAt,
 } from '@/components/labs/small-world/scene/camera'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import {
@@ -12,6 +19,7 @@ import {
   DESK_HALF_W,
   DESK_MAX_ASPECT,
   DESK_NEAR_Z,
+  DESK_STAGE_EXIT_Z,
   DESK_NOTE,
   DESK_PROPS,
   DESK_TOP_Y,
@@ -34,6 +42,8 @@ import {
  */
 
 const PITCH = (CAMERA_PITCH_DEG * Math.PI) / 180
+const CAM_Y = CAMERA_DISTANCE * Math.sin(PITCH)
+const CAM_Z = CAMERA_DISTANCE * Math.cos(PITCH)
 const TAN_HALF = Math.tan((CAMERA_FOV * Math.PI) / 360)
 
 /** Every aspect the lab is plausibly read at, plus two nobody has. */
@@ -146,10 +156,18 @@ describe('the journey camera cannot see the desk', () => {
   })
 
   it('leaves NO room over the props it authored — the ceiling is really the binding constraint', () => {
-    // If every prop could be twice as tall the gate would be decoration. The two pieces that were
-    // authored against the ceiling (the dish and the lamp) must fail when raised to it.
-    const tight = DESK_PROPS.filter((p) => p.kind === 'stand' || p.kind === 'lamp')
-    expect(tight).toHaveLength(2)
+    // If every prop could be twice as tall the gate would be decoration. Found by MEASUREMENT
+    // rather than by naming kinds: Task 65 named the dish and the lamp, and when Task 66 deleted
+    // one and dropped the other the filter went empty and the test passed on nothing. Whichever
+    // pieces are currently closest to their own ceiling are the ones that have to fail when raised
+    // to it.
+    const byHeadroom = [...DESK_PROPS].sort(
+      (a, b) => propCeiling(a.z - a.backReach) - a.top - (propCeiling(b.z - b.backReach) - b.top)
+    )
+    // ONE piece has to be genuinely against it — the claim is that the ceiling binds SOMEWHERE,
+    // not that every prop is a near-miss, and a set where several crowd the line is a set with no
+    // composition left in it.
+    const tight = byHeadroom.slice(0, 1)
     for (const p of tight) {
       const ceiling = propCeiling(p.z - p.backReach)
       expect(p.top).toBeLessThan(ceiling)
@@ -195,66 +213,56 @@ describe('the desk is derived from the camera, not typed next to it', () => {
   })
 })
 
-describe('the composition claim the dish exists to make', () => {
-  /** The planet's silhouette bottom, in ndc — it is a sphere at the origin, so this is exact. */
-  const planetBottomNdc = (k: number) =>
-    -Math.sin(Math.asin(PLANET_RADIUS / (CAMERA_DISTANCE * k))) /
-    (TAN_HALF * Math.cos(Math.asin(PLANET_RADIUS / (CAMERA_DISTANCE * k))))
+describe('the money shot, as the three targets it is solved from', () => {
+  it('stands the world at GLOBE_FRAME of the frame height', () => {
+    const g = globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP)
+    // The solve for ZOOM_FACTOR is closed-form and ON AXIS; the aim drop puts the world off axis,
+    // which inflates a rectilinear projection slightly. Both the target and the realised value are
+    // checked, and the realised one is what has to sit inside Aram's band.
+    expect((g.top - g.bot) / 2).toBeGreaterThan(0.33)
+    expect((g.top - g.bot) / 2).toBeLessThan(0.4)
+    expect((g.top - g.bot) / 2).toBeCloseTo(GLOBE_FRAME, 2)
+    // ...and at rest it is the size it always was — the pull-back is the only thing that shrinks it
+    const rest = globeEdgesAt(1, 0)
+    expect((rest.top - rest.bot) / 2).toBeCloseTo(0.537, 3)
+  })
 
-  const stand = DESK_PROPS.find((p) => p.kind === 'stand')!
+  it('gives the desk DESK_FRAME of the frame, with the stand band between them', () => {
+    const edge = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], ZOOM_FACTOR, ENDING_AIM_DROP)
+    expect(edge).toBeCloseTo(DESK_EDGE_V, 6)
+    expect((1 + edge) / 2).toBeCloseTo(DESK_FRAME, 6)
+    // the band the stand stands in is exactly what was asked for, not what was left over
+    expect(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot - edge).toBeCloseTo(STAND_GAP, 6)
+  })
 
-  /** Screen height between the stand's rim and the world's silhouette bottom; negative = overlap. */
-  const gapAt = (k: number) => {
-    const rim = ndc([0, DESK_TOP_Y + stand.top, stand.z - stand.backReach], k, 16 / 10)
-    return (planetBottomNdc(k) - rim.y) / 2 // ndc spans 2 over the frame height
-  }
-
-  it('rises to MEET the world exactly once, and never backs off on the way', () => {
-    // The stand is nine world units in front of the planet, so the pull-back closes the two
-    // together in screen space. What must not happen is a rim that oscillates, or one that arrives
-    // in a jump: either would read as a prop appearing rather than as perspective resolving.
-    //
-    // The bound is 1e-4 of the frame height rather than zero because the curve genuinely turns over
-    // near the very end — two projections of different depths do not close monotonically forever —
-    // and the honest claim is that nothing REOPENS by anything an eye could see. A tenth of a
-    // thousandth of the frame is a hundredth of a pixel at 1080p.
-    let prev = Infinity
-    let deepest = Infinity
-    let crossings = 0
-    for (let i = 0; i <= 600; i++) {
-      const k = 1 + (i / 600) * (ZOOM_FACTOR - 1)
-      const gap = gapAt(k)
-      expect(gap, `the gap reopens at k=${k.toFixed(3)}`).toBeLessThanOrEqual(prev + 1e-4)
-      deepest = Math.min(deepest, gap)
-      if (i > 0 && Math.sign(gap) !== Math.sign(prev)) crossings++
-      prev = gap
+  it('is the AIM that spends the white space, which is why the zoom alone could not', () => {
+    // Aram's complaint measured: the share of the centre column that is neither world nor desk.
+    const skyAt = (zoom: number, aim: number, topY: number) => {
+      const back = CAM_Z - (CAM_Y - topY - DESK_CLEARANCE) / Math.tan(PITCH + (CAMERA_FOV * Math.PI) / 360)
+      const g = globeEdgesAt(zoom, aim)
+      const edge = ndcYAt([0, topY, back], zoom, aim)
+      return (2 - (g.top - g.bot) - (edge + 1)) / 2
     }
-    expect(crossings).toBe(1)
-    // and it ENDS at its deepest, so the money shot is the frame with the firmest contact
-    expect(gapAt(ZOOM_FACTOR) - deepest).toBeLessThan(1e-3)
+    // Round 20's geometry, and the same geometry with only the zoom reduced: no improvement.
+    expect(skyAt(3, 0, 0)).toBeCloseTo(0.435, 2)
+    expect(skyAt(ZOOM_FACTOR, 0, 0)).toBeGreaterThan(0.4)
+    // ...and the shipped composition, which is the thing that actually answers the note.
+    expect(skyAt(ZOOM_FACTOR, ENDING_AIM_DROP, DESK_TOP_Y)).toBeLessThan(0.28)
   })
 
-  it('is still clear of the world when the pull-back starts, and biting into it when it ends', () => {
-    expect(gapAt(1)).toBeGreaterThan(0.1)
-    // the bite: enough to read as a cup holding a ball, not so much that it eats the world
-    expect(gapAt(ZOOM_FACTOR)).toBeLessThan(-0.01)
-    expect(gapAt(ZOOM_FACTOR)).toBeGreaterThan(-0.04)
-  })
-
-  it('never climbs past the world it is holding', () => {
-    // the planet's centre projects to ndc 0 at every zoom (the camera aims at the origin), so this
-    // is the whole "the stand must not cover the world" rule in one comparison
+  it('holds the desk BELOW the world rather than cutting into it', () => {
+    // A desk edge above the world's bottom would slice the silhouette — the world would read as
+    // sunk into the table rather than standing on it, and it would hide the cradle completely.
     for (let i = 0; i <= 200; i++) {
-      const k = 1 + (i / 200) * (ZOOM_FACTOR - 1)
-      const rim = ndc([0, DESK_TOP_Y + stand.top, stand.z - stand.backReach], k, 16 / 10)
-      expect(rim.y).toBeLessThan(-0.06)
+      const zoom = i / 200
+      const s = zoom * zoom * (3 - 2 * zoom)
+      const k = Math.exp(Math.log(ZOOM_FACTOR) * s)
+      const aim = ENDING_AIM_DROP * s
+      const edge = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], k, aim)
+      expect(edge, `the desk cuts the world at k=${k.toFixed(3)}`).toBeLessThan(
+        globeEdgesAt(k, aim).bot
+      )
     }
-  })
-
-  it('needs the stand: the bare desk edge never gets there on its own', () => {
-    const edge = ndc([0, DESK_TOP_Y, DESK_BACK_Z], ZOOM_FACTOR, 16 / 10)
-    const bare = (planetBottomNdc(ZOOM_FACTOR) - edge.y) / 2
-    expect(bare).toBeGreaterThan(0.02)
   })
 })
 
@@ -276,11 +284,20 @@ describe('the wedge nothing can cross', () => {
 
 describe('the note', () => {
   it('sits in the core band, clear of the dish, and inside the desk', () => {
-    expect(Math.abs(DESK_NOTE.x)).toBeLessThan(3.4)
-    const stand = DESK_PROPS.find((p) => p.kind === 'stand')!
-    expect(DESK_NOTE.z - DESK_NOTE.depth / 2).toBeGreaterThan(stand.z + stand.backReach)
+    expect(Math.abs(DESK_NOTE.x)).toBeLessThan(1.5)
+    // it lies ON the blotter rather than beside it — the mat is what groups the ending's core
+    const mat = DESK_PROPS.find((p) => p.kind === 'mat')!
+    expect(DESK_NOTE.z - DESK_NOTE.depth / 2).toBeGreaterThan(mat.z - mat.backReach)
+    expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(mat.z + mat.backReach)
+    expect(DESK_NOTE.width / 2).toBeLessThan(mat.halfW!)
     expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(DESK_NEAR_Z)
     expect(DESK_NOTE.width / 2).toBeLessThan(DESK_HALF_W)
+  })
+
+  it('stays inside the money shot instead of falling off its bottom edge', () => {
+    // Task 65 parked the sheet at z = 13.1, which the Task 66 frame leaves a whole world unit
+    // BELOW the bottom of the screen. Gated against the shipped exit rather than eyeballed.
+    expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(DESK_STAGE_EXIT_Z)
   })
 
   it('is readable on the narrowest frame — it fills most of it rather than most of a desktop', () => {
