@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   CAMERA_DISTANCE,
+  CAMERA_FOV,
   CAMERA_POSITION,
   CAMERA_RAY,
   CAMERA_RIG_PRIORITY,
+  WORLD_RADIUS,
   ZOOM_FACTOR,
   cameraPositionAt,
   cameraZoomScale,
+  endingAimDrop,
   endingCameraDistance,
+  endingRig,
 } from '@/components/labs/small-world/scene/camera'
 import {
   ENDING_SPAN,
@@ -19,6 +23,8 @@ import {
 import { ROTATION_TOTAL, rotationAt } from '@/components/labs/small-world/journey-timeline'
 import { STANCE_ALPHA, epilogueGate, renewalGate } from '@/components/labs/small-world/scene/renewal'
 import { PEEKER_RIG_PRIORITY } from '@/components/labs/small-world/scene/props/peeker-stage'
+import { DESK_MAX_ASPECT } from '@/components/labs/small-world/scene/desk-stage'
+import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import {
   BOUNDARY_WANDER,
   EPILOGUE_END,
@@ -102,6 +108,14 @@ describe('the camera invariant', () => {
 })
 
 describe('the pull-back path', () => {
+  it('measures the world with the same radius the bake builds it at', () => {
+    // camera.ts restates PLANET_RADIUS rather than importing land-bake (which would drag the whole
+    // bake module into every consumer of the camera, overlay included). A relation pin is what
+    // stops the copy drifting — the same form T63 had to adopt after a RANGE pin let the
+    // camera/peeker priority tie survive review.
+    expect(WORLD_RADIUS).toBe(PLANET_RADIUS)
+  })
+
   it('reaches exactly ZOOM_FACTOR at the bottom of the track, monotonically', () => {
     expect(endingCameraDistance(endingStateAt(TRACK_END))).toBeCloseTo(
       CAMERA_DISTANCE * ZOOM_FACTOR,
@@ -157,6 +171,48 @@ describe('the pull-back path', () => {
     // why the backdrop cannot show an edge however far the camera pulls back.
     expect(cameraZoomScale(endingStateAt(0.7))).toBe(1)
     expect(cameraZoomScale(endingStateAt(TRACK_END))).toBeCloseTo(ZOOM_FACTOR, 10)
+  })
+
+  it('still cannot show the backdrop an edge once the ending RE-AIMS as well as withdraws', () => {
+    // Task 65 declined a camera re-aim partly on this ground, and it was right to name it: the sky's
+    // invariance argument is `Rᵀ(k·X₀ − k·P₀) = k·v₀` with the SAME R, so scaling survives an aim
+    // change but the FRAMED BAND does not — pitching down walks the frustum across the plane, and a
+    // plane sized for one aim can run out. Task 66 takes the re-aim anyway (it is what spends the
+    // white space), so the claim it weakens has to be re-proved rather than inherited.
+    //
+    // Done against the plane sky.tsx actually mounts, at the aspect nothing exceeds, by walking the
+    // real corner rays to the plane's own depth.
+    const SKY_POSITION = [0, -10, -20]
+    const SKY_SCALE = [140, 90]
+    for (let i = 0; i <= 60; i++) {
+      const zoom = i / 60
+      const ending = { ...endingStateAt(TRACK_END), zoom }
+      const k = cameraZoomScale(ending)
+      const aim = endingAimDrop(ending)
+      const r = endingRig(k, aim)
+      const planeZ = SKY_POSITION[2] * k
+      const halfW = (SKY_SCALE[0] / 2) * k
+      const midY = SKY_POSITION[1] * k
+      const halfH = (SKY_SCALE[1] / 2) * k
+      const tanHalf = Math.tan((CAMERA_FOV * Math.PI) / 360)
+      for (const vSign of [-1, 1]) {
+        for (const hSign of [-1, 1]) {
+          // corner ray = fwd + tanHalf·(vSign·up + hSign·aspect·right), right = +x
+          const d = [
+            hSign * tanHalf * DESK_MAX_ASPECT,
+            r.fwd[1] + vSign * tanHalf * r.up[1],
+            r.fwd[2] + vSign * tanHalf * r.up[2],
+          ]
+          const t = (planeZ - r.cam[2]) / d[2]
+          expect(t).toBeGreaterThan(0)
+          const y = r.cam[1] + t * d[1]
+          const x = t * d[0]
+          expect(Math.abs(x), `sky side edge at zoom ${zoom.toFixed(2)}`).toBeLessThan(halfW)
+          expect(y, `sky bottom edge at zoom ${zoom.toFixed(2)}`).toBeGreaterThan(midY - halfH)
+          expect(y, `sky top edge at zoom ${zoom.toFixed(2)}`).toBeLessThan(midY + halfH)
+        }
+      }
+    }
   })
 })
 
