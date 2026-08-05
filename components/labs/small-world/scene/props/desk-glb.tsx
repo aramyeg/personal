@@ -194,17 +194,19 @@ const DESK_METAL_LEVEL = 1.0
 /**
  * ...and the desk metal's TINT correction, for the same reason the stand's tint is render-tuned.
  *
- * The three desk metals carry `#E3A995` and `#D6CFCC` in the GLB's vertex colours, baked from T67's
- * albedos. An albedo is not what a metal renders: at metalness 1 the surface multiplies the room,
- * and using the albedo straight made the trinket dish 1.77x the reference's chroma and the rose-gold
- * pen 1.52x. `MeshStandardMaterial` multiplies `color` by the vertex colour, so this rebalances the
- * baked tints toward what the reference renders WITHOUT a re-bake — the ratio between the shipped
- * albedo and the solved one, applied per channel.
+ * WHITE, and that is the end of a short story. It was briefly a per-channel correction applied here,
+ * because the three desk metals shipped with T67's ALBEDOS in their vertex colours and an albedo is
+ * not what a metal renders — the dish measured 1.77x the reference's chroma and the pen 1.52x.
  *
- * Values above 1 are deliberate and legal: this is a correction, not a level, and the green and blue
- * channels are being brought UP relative to a red that was too dominant.
+ * One correction cannot serve three tints. Tuned for the rose gold, it turned the sculpting tool's
+ * NEUTRAL steel blue: hue 152 degrees off the reference, chroma 3.26x. Exactly the shape of mistake
+ * as tuning one room level for two differently-curved reflectors, one scale down.
+ *
+ * So the tints are solved per material in the EXPORT (`t68_export.py`, `METAL_TINT`) where each one
+ * can differ, and nothing is corrected here. Kept as a hook in case the desk's metals ever need to
+ * differ from the stand's as a group.
  */
-const DESK_METAL_TINT = new THREE.Color(0.72, 1.06, 1.20)
+const DESK_METAL_TINT = new THREE.Color(1, 1, 1)
 
 function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
