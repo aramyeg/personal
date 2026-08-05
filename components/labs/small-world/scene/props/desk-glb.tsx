@@ -143,9 +143,28 @@ function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
  * otherwise unlit, and the export splits its hard edges already, so recomputing them at load gives
  * exactly the smooth-within-island normals the file would have carried.
  */
+/**
+ * How much of the room the DESK's metal reflects, against the stand's full share.
+ *
+ * The two metal objects in this ending need different levels, and that is geometry rather than
+ * taste. The globe stand's ring is a torus whose normals sweep the whole room, so it reads the
+ * room's general LEVEL — at the shipped environment it measures +1.6% against the approved render.
+ * The trinket dish is a shallow bowl aimed almost straight back at the camera, so it throws the
+ * key's hot CORE into frame, and at that same environment it clips its red channel at 255 and
+ * measures +36.6%. A clipped highlight is exactly what stops rose gold reading as metal: there is
+ * no shape left in it.
+ *
+ * Tuning the room to suit the dish is what the first two attempts did, and it drags the ring with
+ * it — 0.62 of the room took the dish to −19.7% and the ring to −41.1%. `MeshStandardMaterial`
+ * multiplies `color` by the vertex colour, so this scales the desk's three metal props alone and
+ * leaves the stand where it already measures right.
+ */
+const DESK_METAL_LEVEL = 0.70
+
 function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     vertexColors: true,
+    color: new THREE.Color(DESK_METAL_LEVEL, DESK_METAL_LEVEL, DESK_METAL_LEVEL),
     metalness: 1,
     roughness: 0.33,
     envMap: env,
