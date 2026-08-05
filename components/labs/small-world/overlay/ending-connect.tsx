@@ -64,21 +64,30 @@ export function connectReveal(t: number, index: number): number {
   return smoothstep((zoom - (FIRST_IN + index * STAGGER)) / FADE)
 }
 
-type Control = { key: string; label: string; href?: string; tint: string }
+type Control = { key: string; label: string; href?: string }
 
 function controls(): Control[] {
   return [
-    { key: 'email', label: 'Email', href: `mailto:${siteConfig.email}`, tint: PALETTE.honey },
-    ...socialLinks.map((l) => ({
-      key: l.name.toLowerCase(),
-      label: l.name,
-      href: l.url,
-      tint: l.icon === 'github' ? PALETTE.blossom : PALETTE.river,
-    })),
+    { key: 'email', label: 'Email', href: `mailto:${siteConfig.email}` },
+    ...socialLinks.map((l) => ({ key: l.name.toLowerCase(), label: l.name, href: l.url })),
   ]
 }
 
-function tabStyle(reveal: number, tint: string): CSSProperties {
+/**
+ * THE SURFACE THESE SIT ON, measured rather than assumed (Task 68).
+ *
+ * The block lies over the desk pad, which is now a baked texture rather than a palette hex — so the
+ * background every contrast ratio below is against is a MEASUREMENT of the shipped money shot
+ * (`shots5/desktop-money.png`, region `pad_pink_back`), not a colour anyone chose. Quoting a palette
+ * entry here would be measuring the contrast of a surface that is no longer drawn.
+ */
+export const STUDIO_PAD_RENDERED = '#E7D8DB'
+
+/** How the pill separates itself from the pad. Soft and blurred, not the hard offset stamp Task 65
+ *  used: that was a sticker on a clay world, and this is a card on a matte studio desk. */
+const PILL_SHADOW = '0 2px 7px rgba(43, 43, 51, 0.16)'
+
+function tabStyle(reveal: number, isFocused: boolean): CSSProperties {
   return {
     // NEVER 'auto' on a control nobody can read yet — see the click model above. `opacity` below is
     // the reveal itself, so this threshold and the rendered one are the same number for all four
@@ -95,15 +104,34 @@ function tabStyle(reveal: number, tint: string): CSSProperties {
     textDecoration: 'none',
     padding: '9px 20px',
     borderRadius: 999,
-    border: `3px solid ${PALETTE.ink}`,
-    background: tint,
-    boxShadow: `3px 3px 0 ${PALETTE.ink}`,
+    border: `2px solid ${PALETTE.studioRoseDeep}`,
+    background: PALETTE.studioPaper,
+    boxShadow: isFocused ? FOCUS_RING : PILL_SHADOW,
     cursor: 'pointer',
   }
 }
 
+/**
+ * The focus ring: INK, and that is a measurement rather than a preference.
+ *
+ * A focus indicator has to clear 3:1 against everything it can fall on, and it falls on two
+ * surfaces here — the pill's own near-white card and the pink pad beyond it. NOTHING in candidate
+ * B's family does: the best of its roses is `studioRoseDeep` at 2.84:1 against the pad, and the
+ * rest run down to 1.40. A rose ring was the first cut and this file's own test failed it. Ink
+ * clears both by a wide margin (13.59:1 on the card, 10.19:1 on the pad).
+ *
+ * Drawn as a double box-shadow rather than an `outline` for two reasons: it follows the pill's
+ * `borderRadius` everywhere, and it needs no stylesheet, which this component does not have. The
+ * near-white inner stop is what keeps the ring readable where it sits directly on the rose border.
+ */
+const FOCUS_RING = `0 0 0 2px ${PALETTE.studioPaper}, 0 0 0 5px ${PALETTE.ink}, ${PILL_SHADOW}`
+
 export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => void }) {
   const [focused, setFocused] = useState(false)
+  // WHICH control has focus, alongside WHETHER anything does. The container's flag drives the
+  // reveal (a focused control that cannot be seen is worse than one that cannot be reached); this
+  // one only decides where the ring is drawn, and adds no branch to the reveal arithmetic.
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const items = controls()
   const revealOf = (i: number) => (focused ? 1 : connectReveal(t, i))
 
@@ -113,6 +141,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
+        setFocusedKey(null)
       }}
       style={{
         position: 'absolute',
@@ -143,7 +172,8 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
             data-testid={`sw-connect-${c.key}`}
             href={c.href}
             {...(c.key === 'email' ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
-            style={tabStyle(revealOf(i), c.tint)}
+            onFocus={() => setFocusedKey(c.key)}
+            style={tabStyle(revealOf(i), focusedKey === c.key)}
           >
             {c.label}
           </a>
@@ -160,6 +190,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
         type="button"
         data-testid="sw-connect-restart"
         onClick={onRestart}
+        onFocus={() => setFocusedKey('restart')}
         style={{
           pointerEvents: revealOf(items.length) >= LIVE_AT ? 'auto' : 'none',
           opacity: revealOf(items.length),
@@ -171,8 +202,12 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
           fontSize: 21,
           lineHeight: 1.1,
           color: PALETTE.ink,
-          borderBottom: `2px dashed ${PALETTE.ink}`,
+          // still the quiet sibling, and still by TYPE rather than by alpha: smaller, borderless,
+          // dashed, in the hand. Only the rule's colour moves into the studio's family.
+          borderBottom: `2px dashed ${PALETTE.studioRoseDeep}`,
           padding: '1px 2px 2px',
+          borderRadius: 3,
+          boxShadow: focusedKey === 'restart' ? FOCUS_RING : undefined,
           cursor: 'pointer',
         }}
       >

@@ -297,4 +297,20 @@ export const PALETTE = {
   // scene/props/desk-glb-contract.ts), so almost none of its palette needs naming here; what does
   // is the one surface the lab still builds itself and the DOM that sits over it.
   standRoseGold: '#E3A995', // the globe stand's turned metal, and the desk's dish, pen and tool tip
+
+  // The DOM that sits ON the studio: the connect pills and the restart.
+  //
+  // Task 65 gave the three pills three tints from the clay palette (honey, blossom, river) — three
+  // genuinely different hues, which is what let colour carry which link was which. Candidate B has
+  // no such spread: its whole family is rose. Measured, ink on the three roses that would fit here
+  // reads 4.72, 3.98 and 3.59 against a 4.5 floor for 15px bold — so ONE of the three could carry
+  // the type and two could not, and a row where colour means something cannot be built out of one
+  // usable colour.
+  //
+  // So the pill is a near-white card with ink type (13.59:1) and ONE border colour, and the label
+  // is what says which link it is — which it always was. `ending-connect.test.tsx` measures every
+  // one of these ratios against the pad the block actually sits on rather than against a hex
+  // someone hoped was the background.
+  studioPaper: '#FDFBF8', // the pill's own card — candidate B's PAPER
+  studioRoseDeep: '#C95C87', // its border, its focus ring, and the restart's rule — B's BOX_PRINT
 } as const

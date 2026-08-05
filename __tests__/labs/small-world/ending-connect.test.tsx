@@ -1,7 +1,12 @@
+import { PALETTE } from '@/components/labs/small-world/palette'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { siteConfig, socialLinks } from '@/lib/constants'
-import { EndingConnect, connectReveal } from '@/components/labs/small-world/overlay/ending-connect'
+import {
+  STUDIO_PAD_RENDERED,
+  EndingConnect,
+  connectReveal,
+} from '@/components/labs/small-world/overlay/ending-connect'
 import { railDismissLive, railOpacity } from '@/components/labs/small-world/overlay/journey-progress'
 import { FallbackTimeline } from '@/components/labs/small-world/fallback-timeline'
 import {
@@ -277,5 +282,64 @@ describe("the rail's dismiss control is live only while it is legible", () => {
       else expect(seenDead).toBe(false)
     }
     expect(seenDead).toBe(true)
+  })
+})
+
+/**
+ * THE BLOCK'S CONTRAST, ON THE SURFACE IT ACTUALLY SITS ON (Task 68).
+ *
+ * WCAG relative luminance and the `(L1+0.05)/(L2+0.05)` ratio, and the background is the pad's
+ * MEASURED rendered colour from the shipped money shot rather than a palette hex — the pad is a
+ * baked texture now, so quoting `PALETTE.deskMat` here would be measuring a surface the lab no
+ * longer draws.
+ *
+ * The floors are the real ones: 4.5:1 for the 15px bold pill type (it is not WCAG "large", which
+ * starts at 18.66px bold), and 3:1 for the non-text things a sighted keyboard user has to be able
+ * to find — the focus ring, and the pill's own edge against the desk.
+ */
+const lum = (hex: string): number => {
+  const n = parseInt(hex.slice(1), 16)
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const s = v / 255
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+const ratio = (a: string, b: string): number => {
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+describe('the connect block is legible on the studio pad', () => {
+  it('carries its type at full AA, which a row of candidate-B fills could not', () => {
+    // Why the pills are one near-white card rather than three tinted ones, as numbers. Candidate B
+    // is all rose, and against a 4.5 floor for 15px bold, exactly ONE of the three roses that would
+    // fit could hold ink type. A row where colour means something cannot be built out of one
+    // usable colour — so the label carries identity and the card carries legibility.
+    expect(ratio(PALETTE.ink, '#D9779B')).toBeGreaterThan(4.5) // 4.72 — the one that works
+    expect(ratio(PALETTE.ink, '#CF6690')).toBeLessThan(4.5) // 3.98
+    expect(ratio(PALETTE.ink, PALETTE.studioRoseDeep)).toBeLessThan(4.5) // 3.59
+    // ...and what shipped clears it for all three at once
+    expect(ratio(PALETTE.ink, PALETTE.studioPaper)).toBeGreaterThan(12)
+  })
+
+  it('separates its own edge from the pad, so a pale card is still an object', () => {
+    // the card itself is barely lighter than the pad — the BORDER is what makes it read
+    expect(ratio(PALETTE.studioPaper, STUDIO_PAD_RENDERED)).toBeLessThan(1.5)
+    expect(ratio(PALETTE.studioRoseDeep, STUDIO_PAD_RENDERED)).toBeGreaterThan(2.5)
+  })
+
+  it('draws a focus ring that clears 3:1 against BOTH surfaces it can fall on', () => {
+    // The ring falls on the card and on the pad, and has to clear both. NOTHING in candidate B's
+    // family does — its best rose is 2.84 against the pad — which is why the ring is ink.
+    expect(ratio(PALETTE.studioRoseDeep, STUDIO_PAD_RENDERED)).toBeLessThan(3)
+    expect(ratio(PALETTE.ink, PALETTE.studioPaper)).toBeGreaterThan(3)
+    expect(ratio(PALETTE.ink, STUDIO_PAD_RENDERED)).toBeGreaterThan(3)
+  })
+
+  it('keeps the restart readable as the quiet sibling rather than the invisible one', () => {
+    // it is quiet by TYPE — smaller, borderless, dashed, in the hand — never by being dimmer than
+    // the legibility bar, which is the mistake LIVE_AT exists to record
+    expect(ratio(PALETTE.ink, STUDIO_PAD_RENDERED)).toBeGreaterThan(4.5)
   })
 })

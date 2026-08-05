@@ -41,6 +41,22 @@ const FLOOR = new THREE.Color('#F7DEE6')
 const CEIL = new THREE.Color('#FFF7F8')
 
 /**
+ * Overall level of the room, and the reason it is not 1.
+ *
+ * The rig above is written in the shape of the T67 lights — a big key high on one side, a weak fill,
+ * a broad ceiling wash — but their RELATIVE gains say nothing about how bright the room should be,
+ * and a metal at metalness 1 has no diffuse term to hide an error in that: it shows the room and
+ * nothing else. Left at 1 the trinket dish measured +24.4% against the approved render with its RED
+ * CHANNEL CLIPPED at 254, which is the failure mode that flattens rose gold into a pink blob — the
+ * highlight stops having any shape left to read.
+ *
+ * 0.62 is solved from that measurement rather than nudged: the reflection is linear in this number,
+ * the dish's unclipped luminance ratio was ~1.6 against the reference, and 1/1.6 is 0.62.
+ * `task68-compare.mjs` re-measures both metal regions against the reference at every capture.
+ */
+const ENV_EXPOSURE = 0.62
+
+/**
  * The raw equirectangular studio. `HalfFloatType` because the key is six times over white and an
  * 8-bit texture would clip it flat — a clipped highlight is exactly the part of a reflection that
  * makes metal read as metal.
@@ -62,9 +78,10 @@ export function buildStudioEquirect(): THREE.DataTexture {
         gain += l.gain * Math.exp(-d * d * 2.4)
       }
       const i = (y * W + x) * 4
-      data[i] = THREE.DataUtils.toHalfFloat(c.r * gain)
-      data[i + 1] = THREE.DataUtils.toHalfFloat(c.g * gain)
-      data[i + 2] = THREE.DataUtils.toHalfFloat(c.b * gain)
+      const e = gain * ENV_EXPOSURE
+      data[i] = THREE.DataUtils.toHalfFloat(c.r * e)
+      data[i + 1] = THREE.DataUtils.toHalfFloat(c.g * e)
+      data[i + 2] = THREE.DataUtils.toHalfFloat(c.b * e)
       data[i + 3] = THREE.DataUtils.toHalfFloat(1)
     }
   }
