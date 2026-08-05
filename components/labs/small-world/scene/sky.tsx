@@ -88,18 +88,22 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
         uniforms={uniforms}
         vertexShader={`
           varying vec2 vUv;
-          varying vec2 vNdc;
+          varying vec4 vClip;
           void main(){
             vUv = uv;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            vNdc = gl_Position.xy / gl_Position.w;
+            // CLIP space, divided in the FRAGMENT shader. Dividing here instead and interpolating
+            // the result gives the wrong answer everywhere but the vertices: varyings are
+            // perspective-corrected, so interpolating x/w un-does the division. The first cut did
+            // exactly that and the studio backdrop simply never appeared.
+            vClip = gl_Position;
           }`}
         fragmentShader={`
           uniform vec3 uSky;
           uniform vec3 uGlow;
           uniform float uStudio;
           varying vec2 vUv;
-          varying vec2 vNdc;
+          varying vec4 vClip;
           void main(){
             vec3 col = mix(uGlow, uSky, smoothstep(0.42, 0.66, vUv.y));
             float vig = smoothstep(0.55, 0.28, distance(vUv, vec2(0.5, 0.55)));
@@ -107,7 +111,8 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
             if (uStudio > 0.0) {
               // sx across, sy DOWN from the top — the frame's own coordinates, which is what a
               // seamless cyc's wash is a function of. See the STUDIO MODE note for the fit.
-              vec2 s = vec2(vNdc.x, -vNdc.y) * 0.5 + 0.5;
+              vec2 ndc = vClip.xy / vClip.w;
+              vec2 s = vec2(ndc.x, -ndc.y) * 0.5 + 0.5;
               vec3 studio = ${STUDIO_A} + ${STUDIO_B} * s.y + ${STUDIO_C1} * s.x + ${STUDIO_C2} * s.x * s.x;
               col = mix(col, studio, uStudio);
             }
