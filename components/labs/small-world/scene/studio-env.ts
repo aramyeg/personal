@@ -11,9 +11,9 @@ import * as THREE from 'three'
  * That something is built here rather than downloaded. An HDRI would be a few hundred kilobytes for
  * a room nobody ever sees directly, and it would have to be tinted to match candidate B anyway;
  * what the props actually need is the shape of the T67 rig — a big soft key high on one side, a
- * dimmer fill on the other, a bright ceiling and a pink-white floor bounce — which is four numbers
- * and a gradient. The result is a 64×32 equirectangular texture, about 8 kB of memory and nothing
- * at all over the wire.
+ * dimmer fill on the other, a bright ceiling and a floor that falls away — which is a handful of
+ * numbers and a gradient. The result is the 128×64 equirectangular texture below: about 32 kB of
+ * memory and nothing at all over the wire.
  *
  * IT CANNOT REACH THE CLAY. This is the scoping the round's one lighting rule asks for, and it is
  * structural rather than careful: the texture is assigned to ONE material's `envMap`. It is never
@@ -116,8 +116,9 @@ const smoothstep = (t: number): number => {
 }
 
 /**
- * The raw equirectangular studio. `HalfFloatType` because the key's core is over 3× white and the
- * floor is under 0.05 — an 8-bit texture cannot hold both ends, and both ends are the point.
+ * The raw equirectangular studio. `HalfFloatType` because the room spans roughly 0.3 to 3.6 in
+ * linear radiance — an 8-bit texture cannot hold a specular core over white AND a shaded floor at
+ * the same time, and both ends are the point.
  */
 export function buildStudioEquirect(): THREE.DataTexture {
   const data = new Uint16Array(W * H * 4)
@@ -168,7 +169,7 @@ export function buildStudioEquirect(): THREE.DataTexture {
  *
  * `MeshStandardMaterial` picks its environment mip from the material's roughness, so an unprocessed
  * equirect gives a mirror at every roughness. PMREM builds the pre-convolved chain once, at mount,
- * from a 64×32 source — a few milliseconds, during the journey, on geometry nobody can see yet.
+ * from the 128×64 source — a few milliseconds, during the journey, on geometry nobody can see yet.
  */
 export function buildStudioEnv(renderer: THREE.WebGLRenderer): THREE.Texture {
   const src = buildStudioEquirect()

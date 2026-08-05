@@ -56,7 +56,7 @@ export const DESK_PAD = {
 /**
  * What the whole desk set is allowed to weigh, uncompressed.
  *
- * The shipped file is 1,202,552 bytes and gzips to 737,646 — the number a browser actually pays.
+ * The shipped file is 1,211,748 bytes and gzips to 763,854 — the number a browser actually pays.
  * Draco was measured and DECLINED: it would take the geometry to roughly a third of its size, but
  * it costs a ~260 kB decoder (wasm plus wrapper), a second request, and a WASM instantiation on the
  * path to an ending that is already 1600vh of scrolling away from the loader. At 0.70 MB over the

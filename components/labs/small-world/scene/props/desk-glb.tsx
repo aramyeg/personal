@@ -123,7 +123,9 @@ function findMesh(root: THREE.Object3D, name: DeskMeshName): THREE.Mesh | null {
 
 /** The slab and the pad: two baked atlases, mixed. The dim one rides in the emissive slot (see
  *  `desk-glb-contract.ts`), so it is pulled off the loaded material rather than fetched again. */
-function surfaceMaterial(
+/** Exported for `desk-glb-remount.test.ts`, which drives THIS function rather than a local copy
+ *  of it — see that file for why its first version proved nothing. */
+export function surfaceMaterial(
   litMap: THREE.Texture | null,
   dimMap: THREE.Texture | null,
   lights: { value: number }
@@ -147,7 +149,7 @@ function surfaceMaterial(
 /** Every matte prop: two vertex-colour sets, mixed. glTF's COLOR_1 arrives as the `color_1`
  *  attribute (three lower-cases any attribute it has no name for), which is why the varying below
  *  can be declared against it directly. */
-function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights

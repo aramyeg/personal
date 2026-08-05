@@ -307,7 +307,7 @@ export const PALETTE = {
   // So the tint is solved backwards from the render: reference RGB divided by the environment the
   // ring actually samples (mean linear ~1.20, 1.03, 1.08). `ending-connect`-style: the value is a
   // measurement, and `task68-compare.mjs` re-checks the chroma of both metal regions every capture.
-  standRoseGold: '#C4B0A6', // the globe stand's turned metal
+  standRoseGold: '#CBBDAF', // the globe stand's turned metal
 
   // The DOM that sits ON the studio: the connect pills and the restart.
   //

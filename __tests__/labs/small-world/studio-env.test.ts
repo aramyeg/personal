@@ -16,6 +16,18 @@ import { PALETTE } from '@/components/labs/small-world/palette'
  * Nothing downstream could have caught that. The frame bench measured the ring's MEAN luminance at
  * +1.6% — a pass — because a room with no dark end produces the right average and the wrong shape.
  * The defect is a property of this function, so this is where it is gated.
+ *
+ * WHAT THESE FOUR GATES ARE, HONESTLY. They are DESCRIPTIVE PINS on the shipped room, not bounds
+ * derived from the reference. Their margins say so: p05/median sits at 0.436 against a 0.45 bound,
+ * half a percent of room, and the railing bound has two orders of magnitude of slack. They will
+ * catch a regression that removes the room's range — which is the defect that shipped, and the only
+ * one this file has evidence about — and they will not tell anyone what the range OUGHT to be.
+ *
+ * That distinction is deliberate. Two gates that used to stand here were invented bounds, and both
+ * failed the moment the room was corrected toward the reference; inventing tighter ones now would
+ * repeat exactly that. A derived bound would have to come from the reference render's own
+ * environment, which is not recoverable from a PNG of a scene lit by it — so the numbers that ARE
+ * derived live where they can be: per region, on the capture, against the approved render.
  */
 
 /** Decode the half-float texels back to linear radiance. */

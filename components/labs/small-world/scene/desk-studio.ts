@@ -10,8 +10,10 @@ import type { EndingState } from '../ending-timeline'
  * ambient only partly down (`dim`), and the studio as the approved render has it (`lit`). Not one
  * bake and a multiplier — a dimmer scales every light equally and gives you the same picture
  * darker, where lights COMING UP adds directional modelling and shadows to a flat room. The two
- * ends measured a per-vertex `dim/lit` ratio spanning 0.05 to 0.25, which is the number that says
- * they are different light distributions rather than one scaled.
+ * ends measured a per-vertex `dim/lit` ratio spanning 0.008 to 0.436 — measured on the SHIPPED
+ * COLOR_0/COLOR_1, not on an intermediate bake — which is the number that says they are different
+ * light distributions rather than one scaled. (A fifty-fold span, not the five-fold an earlier
+ * draft of this line claimed; the argument is stronger than the number that was standing here.)
  *
  * ============================================================================
  * WHY IT IS KEYED ON `zoom` AND NOT ON `t`
