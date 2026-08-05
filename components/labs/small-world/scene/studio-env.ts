@@ -29,7 +29,7 @@ const H = 32
 /** The rig, as it reads in a reflection. Positions are (azimuth turns, elevation 0..1). */
 const LIGHTS: readonly { az: number; el: number; size: number; gain: number }[] = [
   // KEY_softbox — high and to the viewer's left, the T67 rig's dominant source
-  { az: 0.62, el: 0.82, size: 0.30, gain: 6.2 },
+  { az: 0.62, el: 0.82, size: 0.34, gain: 2.6 },
   // FILL_bounce — opposite side, low and weak
   { az: 0.13, el: 0.55, size: 0.42, gain: 1.1 },
   // TOP_wash — straight overhead, broad
@@ -41,20 +41,25 @@ const FLOOR = new THREE.Color('#F7DEE6')
 const CEIL = new THREE.Color('#FFF7F8')
 
 /**
- * Overall level of the room, and the reason it is not 1.
+ * Overall level of the room — and the reason tuning it ALONE could not work.
  *
- * The rig above is written in the shape of the T67 lights — a big key high on one side, a weak fill,
- * a broad ceiling wash — but their RELATIVE gains say nothing about how bright the room should be,
- * and a metal at metalness 1 has no diffuse term to hide an error in that: it shows the room and
- * nothing else. Left at 1 the trinket dish measured +24.4% against the approved render with its RED
- * CHANNEL CLIPPED at 254, which is the failure mode that flattens rose gold into a pink blob — the
- * highlight stops having any shape left to read.
+ * A metal at metalness 1 has no diffuse term to hide an error in this: it shows the room and nothing
+ * else. At 1.0 the trinket dish measured +24.4% against the approved render with its RED CHANNEL
+ * CLIPPED at 254, which is the failure that flattens rose gold into a pink blob.
  *
- * 0.62 is solved from that measurement rather than nudged: the reflection is linear in this number,
- * the dish's unclipped luminance ratio was ~1.6 against the reference, and 1/1.6 is 0.62.
- * `task68-compare.mjs` re-measures both metal regions against the reference at every capture.
+ * The first correction scaled the whole room to 0.62 and made things worse, in a way worth writing
+ * down: it took the dish to −19.7% and dragged the CRADLE RING from −9.0% to −41.1%. The two
+ * reflectors are not sampling the same thing. The dish is a shallow bowl that throws the key's hot
+ * CORE straight back at the camera; the ring is a torus whose normals sweep the whole room, so it
+ * reads the room's general LEVEL. Scaling the room moves both together, and they needed to move in
+ * opposite directions.
+ *
+ * So the room's level goes UP (the ring wants more) and the key's peak comes DOWN and spreads (the
+ * dish wants less core, and a wider softbox is what a real one would be anyway). Two numbers for
+ * two behaviours, rather than one number fighting itself. `task68-compare.mjs` measures both regions
+ * against the reference at every capture.
  */
-const ENV_EXPOSURE = 0.62
+const ENV_EXPOSURE = 1.15
 
 /**
  * The raw equirectangular studio. `HalfFloatType` because the key is six times over white and an
