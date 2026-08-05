@@ -47,8 +47,13 @@ type Gltf = {
     max?: number[]
   }[]
   bufferViews: { byteOffset?: number; byteLength: number; byteStride?: number }[]
-  materials: { name: string }[]
-  images?: unknown[]
+  materials: {
+    name: string
+    pbrMetallicRoughness?: { baseColorTexture?: { index: number }; baseColorFactor?: number[] }
+    emissiveTexture?: { index: number }
+  }[]
+  textures?: { source: number }[]
+  images?: { name: string }[]
 }
 
 const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 }
@@ -223,11 +228,18 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     expect(lit).toBeGreaterThan(dim * 2)
   })
 
-  it('carries both studio atlases on the surface mesh', () => {
+  it('carries both studio atlases on the surface mesh, in the right SLOTS', () => {
     // The dim atlas rides in the emissive slot because core glTF has exactly one base-colour
     // texture and this ending needs two. Both images have to be present or the crossfade has
-    // nothing to fade to.
+    // nothing to fade to — and WHICH slot holds which is what makes the surface's lights-up run
+    // forwards. A swapped export would fade the slab and pad backwards and pass every other test
+    // here, which is precisely the failure that already happened once on `render_color_index`.
     expect(glb.json.images).toHaveLength(2)
+    const mat = glb.json.materials.find((m) => m.name === 'T68_SURFACE')!
+    const nameOfSlot = (texIndex: number) =>
+      glb.json.images![glb.json.textures![texIndex].source].name
+    expect(nameOfSlot(mat.pbrMetallicRoughness!.baseColorTexture!.index)).toContain('lit')
+    expect(nameOfSlot(mat.emissiveTexture!.index)).toContain('dim')
   })
 
   it('gives the metal props one tint attribute and no baked lighting', () => {

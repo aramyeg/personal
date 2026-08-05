@@ -40,26 +40,53 @@ import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
  * frame, not a broken one, and it is worth more than a permanent second copy of the set.
  */
 
+/**
+ * What one load yields, and why the two atlases are captured HERE rather than read where they are
+ * used.
+ *
+ * The scene Group is cached for the lifetime of the tab — one request, however many times the lab
+ * is mounted. That cache is what made reading `surface.material.map` at build time a bug: this
+ * component REPLACES `surface.material` with its own MeshBasicMaterial, which has no `emissiveMap`
+ * property at all, so a SECOND mount read the maps off the material the FIRST mount installed and
+ * got undefined for the dim atlas. The slab and the pad then sampled an empty texture through the
+ * whole dim end of the pull-back and rendered black — reachable by ordinary SPA navigation
+ * (gallery to lab to gallery to lab), and invisible to this round's captures because r3f's Canvas
+ * root does not inherit Next's reactStrictMode.
+ *
+ * Capturing them once, off the glTF's own material, makes the second mount identical to the first
+ * by construction rather than by the first mount having been careful.
+ */
+export type DeskAssets = { scene: THREE.Group; lit: THREE.Texture | null; dim: THREE.Texture | null }
+
 /** One manager, one request, shared by every mount — and NOT the default one. See the header. */
 const manager = new THREE.LoadingManager()
-let pending: Promise<THREE.Group> | null = null
+let pending: Promise<DeskAssets> | null = null
 
-function loadDeskScene(): Promise<THREE.Group> {
-  pending ??= new Promise<THREE.Group>((resolve, reject) => {
-    new GLTFLoader(manager).load(DESK_GLB_URL, (gltf) => resolve(gltf.scene), undefined, reject)
+function loadDeskScene(): Promise<DeskAssets> {
+  pending ??= new Promise<DeskAssets>((resolve, reject) => {
+    new GLTFLoader(manager).load(
+      DESK_GLB_URL,
+      (gltf) => {
+        const surface = findMesh(gltf.scene, 'DeskSurface')
+        const src = surface?.material as THREE.MeshStandardMaterial | undefined
+        resolve({ scene: gltf.scene, lit: src?.map ?? null, dim: src?.emissiveMap ?? null })
+      },
+      undefined,
+      reject
+    )
   })
   return pending
 }
 
-/** The GLB's scene once it has arrived, or null. Never suspends, never throws into the tree: a
- *  failed desk leaves the ending bare rather than taking the canvas down with it. */
-export function useDeskScene(): THREE.Group | null {
-  const [scene, setScene] = useState<THREE.Group | null>(null)
+/** The GLB's meshes and its two atlases once they have arrived, or null. Never suspends, never
+ *  throws into the tree: a failed desk leaves the ending bare rather than taking the canvas down. */
+export function useDeskAssets(): DeskAssets | null {
+  const [assets, setAssets] = useState<DeskAssets | null>(null)
   useEffect(() => {
     let live = true
     loadDeskScene().then(
-      (s) => {
-        if (live) setScene(s)
+      (a) => {
+        if (live) setAssets(a)
       },
       () => {}
     )
@@ -67,7 +94,7 @@ export function useDeskScene(): THREE.Group | null {
       live = false
     }
   }, [])
-  return scene
+  return assets
 }
 
 function findMesh(root: THREE.Object3D, name: DeskMeshName): THREE.Mesh | null {
@@ -96,10 +123,13 @@ function findMesh(root: THREE.Object3D, name: DeskMeshName): THREE.Mesh | null {
 
 /** The slab and the pad: two baked atlases, mixed. The dim one rides in the emissive slot (see
  *  `desk-glb-contract.ts`), so it is pulled off the loaded material rather than fetched again. */
-function surfaceMaterial(src: THREE.Mesh, lights: { value: number }): THREE.MeshBasicMaterial {
-  const from = src.material as THREE.MeshStandardMaterial
-  const mat = new THREE.MeshBasicMaterial({ map: from.map, toneMapped: false })
-  const dim = { value: from.emissiveMap }
+function surfaceMaterial(
+  litMap: THREE.Texture | null,
+  dimMap: THREE.Texture | null,
+  lights: { value: number }
+): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ map: litMap, toneMapped: false })
+  const dim = { value: dimMap }
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
     shader.uniforms.uDimMap = dim
@@ -159,7 +189,7 @@ function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
  * multiplies `color` by the vertex colour, so this scales the desk's three metal props alone and
  * leaves the stand where it already measures right.
  */
-const DESK_METAL_LEVEL = 0.70
+const DESK_METAL_LEVEL = 1.0
 
 function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
@@ -173,7 +203,7 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
 }
 
 export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
-  const scene = useDeskScene()
+  const assets = useDeskAssets()
   const renderer = useThree((s) => s.gl)
   // ONE uniform object, shared by both matte materials, so the pair can never disagree about how
   // lit the ending is and the frame loop writes a single number.
@@ -182,17 +212,18 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   const env = useMemo(() => studioEnvFor(renderer), [renderer])
 
   const built = useMemo(() => {
-    if (!scene) return null
+    if (!assets) return null
+    const { scene } = assets
     const surface = findMesh(scene, 'DeskSurface')
     const baked = findMesh(scene, 'DeskBaked')
     const metal = findMesh(scene, 'DeskMetal')
     if (!surface || !baked || !metal) return null
-    surface.material = surfaceMaterial(surface, lights.current)
+    surface.material = surfaceMaterial(assets.lit, assets.dim, lights.current)
     baked.material = bakedMaterial(lights.current)
     metal.geometry.computeVertexNormals()
     metal.material = metalMaterial(env)
     return { surface, baked, metal, metalMat: metal.material as THREE.MeshStandardMaterial }
-  }, [scene, env])
+  }, [assets, env])
 
   useEffect(() => {
     if (!built) return

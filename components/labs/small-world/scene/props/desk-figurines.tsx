@@ -2,7 +2,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { DESK_TOP_Y } from '../desk-stage'
 import { DESK_PAD } from './desk-glb-contract'
 import { useClayRamp } from '../toon-ramp'
 import { buildMergedClay, type ClayPart } from './clay-kit'

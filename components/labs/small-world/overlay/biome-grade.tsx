@@ -85,8 +85,22 @@ export function BiomeGrade({
       // holds winter's. Over the studio that is simply wrong, and measurably so: with it standing,
       // the shipped money shot read 14-16% under the approved render at the frame's EDGES (the pad's
       // near corner, the desk's white sliver, the top of the backdrop) while the centre read over.
-      // That signature is the vignette's, not the bake's. So both alphas fall to zero on exactly the
-      // curve the studio lights come up on — one number owns the ending's look.
+      // That signature is the vignette's, not the bake's. So both alphas fall to zero on the same
+      // curve the studio lights come up on.
+      //
+      // ON THE CLOCK, precisely, because a first draft of this comment overclaimed it. The same
+      // FUNCTION drives all four consumers, but not the same INPUT: the three scene consumers read
+      // `journeyRef.current.ending`, derived from progress that `useDampedJourney` smooths at
+      // lambda 4, and this reads raw scroll. During the pull-back the DOM lens therefore releases
+      // roughly 1/lambda ~ 0.25s of scroll AHEAD of the scene, converging to exact agreement
+      // wherever the scroll rests — so the money shot is unaffected and the transition is a
+      // quarter-second out of step.
+      //
+      // It is left that way deliberately. This is a DOM lens, and every DOM consumer in this lab
+      // (the panels, the progress rail, this) reads `progressRef` directly; the damped value lives
+      // inside the Canvas. Making this one read a scene-owned ref would make it the only DOM
+      // consumer that freezes if the canvas never mounts, which is a worse failure than a quarter
+      // second of lead on a fade.
       const held = 1 - studioLightsFor(endingStateAt(progress))
       el.style.setProperty('--sw-grade-haze', g.haze)
       el.style.setProperty('--sw-grade-haze-a', (g.hazeAlpha * held).toFixed(4))

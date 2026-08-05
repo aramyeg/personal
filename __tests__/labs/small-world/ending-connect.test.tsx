@@ -294,8 +294,17 @@ describe("the rail's dismiss control is live only while it is legible", () => {
  * longer draws.
  *
  * The floors are the real ones: 4.5:1 for the 15px bold pill type (it is not WCAG "large", which
- * starts at 18.66px bold), and 3:1 for the non-text things a sighted keyboard user has to be able
- * to find — the focus ring, and the pill's own edge against the desk.
+ * starts at 18.66px bold), and 3:1 for the FOCUS RING, which a sighted keyboard user has to be able
+ * to find.
+ *
+ * THE PILL'S EDGE IS A STATED CONCESSION, not a pass. It ships at 2.84:1 against the pad — the same
+ * number for which rose was rejected as a focus ring two paragraphs down. WCAG 1.4.11 asks for 3:1
+ * on "visual information required to identify user interface components", and the thing that
+ * identifies these components is their LABEL, which clears 10.19:1 against the pad and 13.59:1
+ * against its own card. The border is separation, not identification, and no rose in candidate B
+ * reaches 3:1 against this pad (the best is this one). Darkening it far enough would mean leaving
+ * B's family for the pill's outline alone. Recorded here rather than gated at a floor it does not
+ * meet.
  */
 const lum = (hex: string): number => {
   const n = parseInt(hex.slice(1), 16)
@@ -323,10 +332,15 @@ describe('the connect block is legible on the studio pad', () => {
     expect(ratio(PALETTE.ink, PALETTE.studioPaper)).toBeGreaterThan(12)
   })
 
-  it('separates its own edge from the pad, so a pale card is still an object', () => {
+  it('separates its own edge from the pad, at the 2.84:1 the docblock concedes', () => {
     // the card itself is barely lighter than the pad — the BORDER is what makes it read
     expect(ratio(PALETTE.studioPaper, STUDIO_PAD_RENDERED)).toBeLessThan(1.5)
-    expect(ratio(PALETTE.studioRoseDeep, STUDIO_PAD_RENDERED)).toBeGreaterThan(2.5)
+    // pinned as a RANGE, not a floor, so the concession cannot be quietly widened later
+    const edge = ratio(PALETTE.studioRoseDeep, STUDIO_PAD_RENDERED)
+    expect(edge).toBeGreaterThan(2.8)
+    expect(edge).toBeLessThan(3)
+    // ...and what actually identifies the control clears 1.4.11 comfortably
+    expect(ratio(PALETTE.ink, STUDIO_PAD_RENDERED)).toBeGreaterThan(3)
   })
 
   it('draws a focus ring that clears 3:1 against BOTH surfaces it can fall on', () => {
