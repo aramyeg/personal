@@ -36,41 +36,54 @@ const all = texels()
 const lums = all.map((t) => t.lum).sort((a, b) => a - b)
 const at = (q: number) => lums[Math.round(q * (lums.length - 1))]
 
-describe('the studio has darkness in it', () => {
-  it('reaches genuinely dark, not merely dimmer', () => {
-    // the studio floor beyond the light pool — what the ring's underside reflects
-    expect(at(0)).toBeLessThan(0.12)
+describe('the studio has RANGE in it', () => {
+  const median = at(0.5)
+
+  it('has a dark end well below its own middle', () => {
+    // Ratios, not absolute floors, and that is a correction. The first gate here asked for a
+    // minimum below linear 0.12, which a room CAN satisfy while still being wrong in either
+    // direction: the original near-white room failed it, and the over-corrected room passed it and
+    // rendered every metal 83% under the reference. What actually makes a metal read is the SPREAD
+    // the room offers, and the approved render's own dark end is not dark in absolute terms — its
+    // ring bottoms out around environment 0.58, a shaded white cyc rather than a black floor.
+    expect(at(0.05) / median).toBeLessThan(0.45)
   })
 
-  it('spends a real share of the sphere below half, so a metal has somewhere dark to look', () => {
-    const belowHalf = lums.filter((l) => l < 0.5).length / lums.length
-    expect(belowHalf).toBeGreaterThan(0.35)
+  it('spends a real share of the sphere below half its middle', () => {
+    // the original room: 0% below half the median, in every direction
+    expect(lums.filter((l) => l < median * 0.5).length / lums.length).toBeGreaterThan(0.2)
   })
 
-  it('lets EVERY channel fall dark, not just the average', () => {
-    // the previous room's red never dropped below 1.071 in any direction, so rose gold could not
-    // have a dark side even where its luminance did fall
-    expect(Math.min(...all.map((t) => t.r))).toBeLessThan(0.12)
-    expect(Math.min(...all.map((t) => t.g))).toBeLessThan(0.12)
-    expect(Math.min(...all.map((t) => t.b))).toBeLessThan(0.12)
+  it('lets EVERY channel fall well below its own middle, not just the average', () => {
+    // the original room's red never dropped below 1.071 against a median of 1.721 — a ratio of
+    // 0.62, so rose gold could not have a dark side even where luminance did fall
+    for (const ch of ['r', 'g', 'b'] as const) {
+      const vals = all.map((t) => t[ch]).sort((a, b) => a - b)
+      const mid = vals[Math.round(0.5 * (vals.length - 1))]
+      expect(vals[Math.round(0.05 * (vals.length - 1))] / mid).toBeLessThan(0.45)
+    }
   })
 
-  it('still carries a specular core well over white, so a highlight is a highlight', () => {
-    expect(at(1)).toBeGreaterThan(1.8)
+  it('still carries a specular core well above its middle, so a highlight is a highlight', () => {
+    expect(at(1) / median).toBeGreaterThan(2.5)
   })
 
-  it('has a range wide enough to model a curved surface', () => {
-    // p05..p95 rather than the extremes: this is the band a torus's normals actually sweep
-    expect(at(0.95) / Math.max(at(0.05), 1e-4)).toBeGreaterThan(8)
-  })
-
-  it('keeps the bright core to a small share of the sphere, so a metal is not mostly highlight', () => {
-    expect(lums.filter((l) => l > 1.5).length / lums.length).toBeLessThan(0.06)
+  it('rails rose gold in only a small share of directions, so a metal is not mostly highlight', () => {
+    // Measured as the thing that actually goes wrong rather than as a percentile. Clipping is
+    // ABSOLUTE — rose gold's red channel is linear 0.757, so it rails wherever the room's red
+    // exceeds 1/0.757 = 1.32 — and a ratio against the median cannot see that, because the median
+    // here is dragged down by the room's dark half and "2.5x the median" catches the whole lit
+    // ceiling rather than the specular core.
+    //
+    // The approved render's ring is 4.2% clipped: some, not none, and nowhere near the 36.8% the
+    // near-white room produced.
+    const rails = all.filter((t) => t.r > 1 / 0.757).length / all.length
+    expect(rails).toBeGreaterThan(0.005)
+    expect(rails).toBeLessThan(0.14)
   })
 
   it('keeps the pink cast of candidate B in the room rather than going neutral grey', () => {
-    // the lit half should still be warmer in red than in blue, which is what makes it B's studio
-    const lit = all.filter((t) => t.lum > 0.25)
+    const lit = all.filter((t) => t.lum > median)
     const meanR = lit.reduce((s, t) => s + t.r, 0) / lit.length
     const meanB = lit.reduce((s, t) => s + t.b, 0) / lit.length
     expect(meanR).toBeGreaterThan(meanB)

@@ -73,11 +73,11 @@ const ROOM_CEIL = new THREE.Color(0.760, 0.690, 0.712)
 const LIGHTS: readonly { az: number; el: number; sizeAz: number; sizeEl: number; gain: number }[] = [
   // KEY_softbox — high and to the viewer's left, the T67 rig's dominant source and the one the
   // ring's upper surface catches as a band
-  { az: 0.62, el: 0.80, sizeAz: 0.115, sizeEl: 0.150, gain: 3.30 },
+  { az: 0.62, el: 0.80, sizeAz: 0.105, sizeEl: 0.135, gain: 1.55 },
   // FILL_bounce — opposite side, low and weak; it opens the shadow without filling it
-  { az: 0.13, el: 0.52, sizeAz: 0.190, sizeEl: 0.220, gain: 0.55 },
+  { az: 0.13, el: 0.52, sizeAz: 0.190, sizeEl: 0.220, gain: 0.30 },
   // TOP_wash — a broad strip across the ceiling
-  { az: 0.0, el: 0.98, sizeAz: 0.360, sizeEl: 0.130, gain: 0.62 },
+  { az: 0.0, el: 0.98, sizeAz: 0.360, sizeEl: 0.130, gain: 0.34 },
 ]
 
 /**
@@ -89,15 +89,26 @@ const LIGHTS: readonly { az: number; el: number; sizeAz: number; sizeEl: number;
 const SHADE_SIDE = 0.34
 
 /**
- * One re-derivable knob for the whole room's level.
+ * The room's overall level — SOLVED from the reference, once the range was right.
  *
- * It stays at 1.0 because the radiances above are now absolute and were solved against the shipped
- * capture rather than against a tint. It survives as the single place to move the room if the
- * reference ever changes — but note the history: two previous rounds used a knob like this one to
- * compensate for the missing dark end, and both made the picture worse, because a level cannot fix
- * a RANGE problem. If the metal looks wrong, look at the range first.
+ * Order matters here and it is the whole lesson of this file. Two earlier rounds moved a knob like
+ * this one to compensate for a room with no dark end, and both made the picture worse: a level
+ * cannot fix a RANGE problem. So the range was fixed first (the radiances above), and only then was
+ * the level derived — and derived rather than nudged.
+ *
+ * The arithmetic: a metal's reflected luminance is the environment's luminance times the tint's
+ * (rose gold is 0.465). At exposure 1.0 the cradle ring measured 0.089 mean against the approved
+ * render's 0.517, so the room was 5.8x under. That is a pure scale on a distribution whose SHAPE
+ * already measured right — the ring's coefficient of variation was 0.48 against the reference's
+ * 0.34, i.e. slightly over-contrasty, which is the correct direction to be scaling from.
+ *
+ * Worth writing down because it contradicts the intuition the previous fix was built on: the
+ * reference's dark end is NOT dark in absolute terms. Its ring bottoms out at luminance 0.27, which
+ * back through the tint is an environment around 0.58 — a shaded part of a white cyc, not a black
+ * floor. What the first room lacked was not darkness, it was RANGE, and a floor at linear 0.05 under
+ * a level of 1.0 overshot in the other direction just as badly.
  */
-const ENV_EXPOSURE = 1.0
+const ENV_EXPOSURE = 5.8
 
 const smoothstep = (t: number): number => {
   const x = t < 0 ? 0 : t > 1 ? 1 : t
