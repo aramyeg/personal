@@ -30,6 +30,30 @@ export const DESK_MESHES = ['DeskSurface', 'DeskBaked', 'DeskMetal'] as const
 export type DeskMeshName = (typeof DESK_MESHES)[number]
 
 /**
+ * THE PAD'S FOOTPRINT, published because the lab still places things ON it.
+ *
+ * Task 65's blotter was a `DESK_PROPS` entry, so `desk-stage.test.ts` could check that the note lay
+ * on it by reading the same table the renderer built from. The pad is now inside the asset and that
+ * table is gone, but the claim is not: the note and both figurines are still positioned by the lab
+ * and still have to land on the pink rather than beside it.
+ *
+ * These four numbers therefore mirror the Blender source (archived under
+ * `.superpowers/sdd/blender/`), and `desk-glb.test.ts` re-derives them from the SHIPPED mesh rather
+ * than taking them on trust — the pad is the only part of `DeskSurface` standing above the slab's
+ * own plane, so its extent is recoverable from the vertices that do.
+ */
+export const DESK_PAD = {
+  /** Half-width along x. */
+  halfW: 3.3,
+  /** Rearmost z — the edge nearest the journey camera's world. */
+  backZ: 8.65,
+  /** ...and the near edge, toward the viewer. */
+  nearZ: 12.35,
+  /** Its top surface's height, i.e. how far it stands proud of the slab. */
+  top: 1.303,
+} as const
+
+/**
  * What the whole desk set is allowed to weigh, uncompressed.
  *
  * The shipped file is 1,202,552 bytes and gzips to 737,646 — the number a browser actually pays.

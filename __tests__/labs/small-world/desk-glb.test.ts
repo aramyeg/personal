@@ -11,7 +11,12 @@ import {
   journeyFloorY,
 } from '@/components/labs/small-world/scene/desk-stage'
 import { CAMERA_FOV } from '@/components/labs/small-world/scene/camera'
-import { DESK_GLB_URL, DESK_MESHES, DESK_PAYLOAD_BUDGET } from '@/components/labs/small-world/scene/props/desk-glb-contract'
+import {
+  DESK_GLB_URL,
+  DESK_MESHES,
+  DESK_PAD,
+  DESK_PAYLOAD_BUDGET,
+} from '@/components/labs/small-world/scene/props/desk-glb-contract'
 
 /**
  * THE SHIPPED DESK ASSET (Task 68), held to the same standard as the geometry the lab builds itself.
@@ -138,6 +143,28 @@ describe('desk GLB — the export landed in the LAB frame', () => {
     expect(pos.max![0]).toBeCloseTo(DESK_HALF_W, 3)
     expect(pos.min![2]).toBeCloseTo(DESK_BACK_Z, 3)
     expect(pos.max![2]).toBeCloseTo(DESK_NEAR_Z, 3)
+  })
+
+  it('carries the pad where the contract publishes it', () => {
+    // The pad is the only part of DeskSurface standing above the slab's plane, so its footprint is
+    // recoverable from the vertices that do — which is what makes DESK_PAD a measurement of the
+    // shipped asset rather than four numbers copied out of Blender and hoped for.
+    const p3 = readAccessor(glb.json, glb.bin, surface.attributes.POSITION)
+    let maxX = 0
+    let minZ = Infinity
+    let maxZ = -Infinity
+    let top = -Infinity
+    for (let i = 0; i < p3.length; i += 3) {
+      if (p3[i + 1] <= DESK_TOP_Y + 0.005) continue
+      maxX = Math.max(maxX, Math.abs(p3[i]))
+      minZ = Math.min(minZ, p3[i + 2])
+      maxZ = Math.max(maxZ, p3[i + 2])
+      top = Math.max(top, p3[i + 1])
+    }
+    expect(maxX).toBeCloseTo(DESK_PAD.halfW, 2)
+    expect(minZ).toBeCloseTo(DESK_PAD.backZ, 2)
+    expect(maxZ).toBeCloseTo(DESK_PAD.nearZ, 2)
+    expect(top).toBeCloseTo(DESK_PAD.top, 2)
   })
 
   it('is wide enough to fill the frame at the widest supported viewport', () => {

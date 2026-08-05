@@ -110,7 +110,7 @@ export const FIGURINE_X = 0.9
 /** Shared depth for both figurines — see the docblock for the note/back-clearance derivation. */
 export const FIGURINE_Z = 9.5
 /** Inward yaw (rad): the left bird turns toward +x, the right toward -x, both toward the middle of
- *  the frame. Verified against the actual rotation convention `deskPropParts` composes with. */
+ *  the frame. Verified against the rotation convention the desk set composes with. */
 export const FIGURINE_YAW = 0.35
 
 export type DeskFigurine = {
@@ -171,7 +171,7 @@ function boundsOf(geo: THREE.BufferGeometry): Bounds {
 }
 
 /** Bake a part's own local transform, then `place`, into its geometry — the same order
- *  `deskPropParts` composes in (`place · local`), so the composition is honest matrix
+ *  Task 65's `deskPropParts` composed in (`place · local`), so the composition is honest matrix
  *  multiplication rather than two Euler triples that would not commute. */
 function bakePart(part: ClayPart, place: THREE.Matrix4): ClayPart {
   const local = new THREE.Matrix4().compose(
@@ -186,23 +186,17 @@ function bakePart(part: ClayPart, place: THREE.Matrix4): ClayPart {
 }
 
 /**
- * The turned base + its contact shadow: a dark ink rim under a warm wood-tone disc (see the
- * docblock's contrast section for why the rim is `ink`), plus a soft shadow pocket on the desk —
- * the same trick `contact()` in desk-kit.ts uses for every other prop's footing.
+ * The turned base: a dark ink rim under a warm wood-tone disc (see the docblock's contrast
+ * section for why the rim is `ink`). Its shadow on the pad is baked, not drawn — see below.
  */
 function baseParts(fig: DeskFigurine): ClayPart[] {
   const r = FIGURINE_BASE_R
   const h = FIGURINE_BASE_HEIGHT
   const place = new THREE.Matrix4().makeTranslation(fig.x, DESK_TOP_Y, fig.z)
   const local: ClayPart[] = [
-    {
-      geo: new THREE.CircleGeometry(r * 1.55, 20),
-      color: PALETTE.deskShade,
-      pos: [0, 0.005, r * 0.22],
-      rot: [-Math.PI / 2, 0, 0],
-      scl: [1.15, 0.72, 1],
-      tag: 'contact',
-    },
+    // NO painted contact pocket (Task 68). Both figurines stood on the pad while it was baked in
+    // Blender, so the pink under them is already dark in the shipped texture; drawing one here
+    // would put a second shadow on top of a real one.
     // dark turned rim — the foot doing the contrast work
     {
       geo: new THREE.CylinderGeometry(r, r * 1.08, h * 0.42, 20),

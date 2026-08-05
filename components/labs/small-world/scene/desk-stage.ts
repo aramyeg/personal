@@ -95,22 +95,21 @@ export function journeyFloorY(z: number): number {
 }
 
 /**
- * How far the hand-formed back edge may wander FORWARD of DESK_BACK_Z. Never backward: back is where
- * the journey camera lives, so the wobble is authored as a one-sided offset rather than as a
- * symmetric one that would eat half the clearance.
+ * THE DRAWN EDGE IS NOW THE SOLVED EDGE (Task 68), and `EDGE_WOBBLE` is gone with the slab it
+ * described.
  *
- * It lives HERE rather than with the geometry that draws it because the DRAWN edge, not DESK_BACK_Z,
- * is what the globe stand has to hide its column behind — a capture at the shipped constants showed
- * the column clearing the solved line while standing proud of the wobbled one, and
- * `globe-stand.test.ts` now gates on `DESK_BACK_Z + EDGE_WOBBLE` because of it.
+ * Task 65's slab had a hand-formed back edge that wandered up to 0.55 FORWARD of `DESK_BACK_Z`, and
+ * that mattered to more than the slab: forward is nearer, nearer is LOWER on screen, so the drawn
+ * boundary sat as much as 0.06 of the frame below the solved one and the globe stand had to hide its
+ * column behind the lower of the two. `globe-stand.test.ts` gated on `DESK_BACK_Z + EDGE_WOBBLE`
+ * because a capture caught the column standing proud of the wobbled edge while clearing the solved
+ * one — the round's sharpest lesson about gating on the line nobody can see.
  *
- * DESK_TOP_Y is deliberately NOT solved against the wobbled edge. Doing so raises the desk plane by
- * half a world unit to buy back 1.5% of frame height, and half a unit is more headroom than the
- * pencil cup and the two figurines have between them: it fails their containment outright. So the
- * money shot lands the DRAWN edge at 38.5% of the frame rather than the 40% DESK_FRAME asks for, and
- * that difference is smaller than the wobble it comes from.
+ * Task 68's slab is baked in Blender and its back edge is straight. `desk-glb.test.ts` reads the
+ * shipped asset's own accessor bounds and pins `min z === DESK_BACK_Z`, so the drawn edge and the
+ * solved edge are now the same line and the stand's gate is on the real boundary by being on this
+ * one. The lesson stands; what changed is that there is no longer a second line to prefer.
  */
-export const EDGE_WOBBLE = 0.55
 
 /** How far below the journey's bottom edge the desk's own surface is parked, in world units. */
 export const DESK_CLEARANCE = 0.35
@@ -233,86 +232,24 @@ export function propCeiling(z: number): number {
   return journeyFloorY(z) - DESK_TOP_Y
 }
 
-/** Every desk prop, as data, so a test can check the shipped composition rather than a sample.
- *  'stand' is gone: the world's stand is no longer a desk prop nine units in front of it that
- *  closes a gap by perspective — it is real geometry at the world, arriving with the ending.
- *  See scene/globe-stand.ts. */
-export type DeskPropKind =
-  | 'mat'
-  | 'mug'
-  | 'cup'
-  | 'books'
-  | 'plant'
-  | 'lamp'
-  | 'pencil'
-  | 'clip'
-
-export type DeskProp = {
-  kind: DeskPropKind
-  /** Centre on the desk surface. */
-  x: number
-  z: number
-  /** Height above the desk surface of the prop's highest point. The renderer BUILDS to this. */
-  top: number
-  /** Distance from the centre to the prop's REARMOST point — where its containment is decided. */
-  backReach: number
-  /** Half-extent along x, for the pieces that are not roughly square. Defaults to `backReach`. */
-  halfW?: number
-  /** Yaw, radians. */
-  rot?: number
-  /** Which of the three composition rings it belongs to — see DESK_PROPS. */
-  ring: 'core' | 'wing' | 'far'
-}
-
-/** True when a prop's highest point is below the journey camera's bottom edge at its own back. */
-export function deskPropFits(p: DeskProp): boolean {
-  return DESK_TOP_Y + p.top < journeyFloorY(p.z - p.backReach)
-}
-
 /**
- * THE COMPOSITION, as numbers — rebuilt for the Task 66 frame.
+ * THE PROPS ARE NO LONGER DATA HERE (Task 68).
  *
- * Three rings still, because the desk's visible WIDTH collapses on a phone while its visible
- * height does not, and one arrangement cannot serve both. What changed is every number in them:
- * the stage is now z ∈ [8.26, 12.0] and |x| ≲ 5.5 falling to 3.6, where Task 65 composed against
- * z out to 21 and |x| out to 16.5. See DESK_STAGE_EXIT_Z above for why.
+ * `DESK_PROPS` published eleven props as a table — kind, position, published height, rear reach —
+ * so that `desk-stage.test.ts` could prove the arrangement rather than a sample of it, and
+ * `desk-kit.test.ts` could close the loop by measuring what the builders actually emitted against
+ * what the table promised. Both halves were necessary because the geometry and the claim were
+ * separate artefacts that could drift apart.
  *
- *   core — |x| ≤ 1.5. On screen at every viewport, phone included. The note and the two figurines
- *          live here and nothing else does: this is the band the DOM connect block sits over, and
- *          clay under type is clutter.
- *   wing — |x| 1.9…4.5. The desk's own life: what you'd actually reach for. Off a phone's frame.
- *   far  — |x| ≥ 5.5. Ultrawide only, and only enough of it to stop 3440×1440 reading as an empty
- *          plain either side of the blotter.
+ * They cannot drift apart any more, because there is no longer a claim: the props are baked into
+ * `desk.glb` and the containment proof reads the SHIPPED VERTICES directly (`desk-glb.test.ts`).
+ * That is strictly stronger than the table was — it covers every vertex of every prop rather than
+ * each prop's published bounding height, and it cannot be satisfied by a data file that the
+ * renderer has stopped agreeing with. So the table, the `DeskProp` type and `deskPropFits` are
+ * retired rather than left standing as a description of a set nothing draws.
  *
- * FEWER AND CLOSER, which is the brief's instruction and also what the frame can now hold: eleven
- * pieces against Task 65's thirteen, none of them further out than the frame's own edge. The lamp
- * and the tall plant are gone — they were the 'far' ring's tallest pieces, chosen when 'far' meant
- * |x| = 10 with headroom to spare, and at this distance they would stand in front of the world.
- *
- * Every `top` here was chosen against `propCeiling(z - backReach)`, and `desk-stage.test.ts`
- * re-checks all of them against the SHIPPED geometry — the whole point of authoring the set as
- * data is that the gate reads the arrangement instead of a sample of it.
+ * What stays here is what the LAB still owns and still places: the note.
  */
-export const DESK_PROPS: readonly DeskProp[] = [
-  // THE BLOTTER, first because everything else lies on it. It is the piece that stops the bottom
-  // two fifths of the money shot being one unbroken field of tan, and it gives the note an object
-  // to sit on instead of a plain. Sized to run off the bottom of the frame and to leave bare desk
-  // either side of it on a wide frame.
-  { kind: 'mat', x: 0, z: 10.5, top: 0.03, backReach: 1.75, halfW: 3.15, rot: 0, ring: 'core' },
-
-  { kind: 'clip', x: -1.15, z: 9.35, top: 0.07, backReach: 0.24, rot: 0.9, ring: 'core' },
-
-  { kind: 'mug', x: -3.05, z: 10.95, top: 0.86, backReach: 0.62, rot: 0.5, ring: 'wing' },
-  { kind: 'cup', x: 3.25, z: 10.7, top: 1.55, backReach: 0.58, rot: -0.3, ring: 'wing' },
-  { kind: 'books', x: 4.35, z: 11.65, top: 0.58, backReach: 1.0, rot: -0.25, ring: 'wing' },
-  { kind: 'plant', x: -4.25, z: 11.55, top: 1.5, backReach: 0.7, rot: 0.4, ring: 'wing' },
-  { kind: 'pencil', x: -1.95, z: 11.75, top: 0.09, backReach: 0.85, rot: -0.42, ring: 'wing' },
-  { kind: 'pencil', x: 2.25, z: 11.95, top: 0.09, backReach: 0.85, rot: 0.22, ring: 'wing' },
-
-  { kind: 'books', x: -6.0, z: 10.7, top: 0.72, backReach: 1.05, rot: 0.18, ring: 'far' },
-  { kind: 'mug', x: 6.15, z: 11.2, top: 0.9, backReach: 0.62, rot: -0.8, ring: 'far' },
-  { kind: 'clip', x: 5.45, z: 9.8, top: 0.07, backReach: 0.24, rot: -0.4, ring: 'far' },
-]
 
 /**
  * The note sheet: centre, size and yaw. Kept here rather than in the renderer so the containment

@@ -5,7 +5,6 @@ import {
   DESK_BACK_Z,
   DESK_NOTE,
   DESK_TOP_Y,
-  EDGE_WOBBLE,
   deskFrameHalfW,
   journeyFloorY,
 } from '@/components/labs/small-world/scene/desk-stage'
@@ -212,7 +211,14 @@ describe('the two desk figurines stay under the journey camera', () => {
     const ratioAt = (anchor: number) =>
       (anchor + overhang) / deskFrameHalfW(DESK_FIGURINES[0].z, narrowest)
     expect(ratioAt(1.4)).toBeGreaterThan(1)
-    expect(ratioAt(1.05)).toBeGreaterThan(0.94)
+    // 1.05 used to be over here too, and it no longer is. That is a real change rather than a
+    // weakened gate: the widest thing on a figurine WAS its painted contact pocket, which reached
+    // ~0.30 past the anchor, and Task 68 moved that shadow into the bake. So the discriminator is
+    // now DERIVED — the largest anchor whose art still fits the narrowest frame — which cannot rot
+    // the way a remembered number does.
+    const limit = deskFrameHalfW(DESK_FIGURINES[0].z, narrowest) - overhang
+    expect(ratioAt(limit + 1e-9)).toBeGreaterThan(1)
+    expect(FIGURINE_X).toBeLessThan(limit - 0.15)
     expect(ratioAt(FIGURINE_X)).toBeLessThan(0.94)
     geo.dispose()
   })
@@ -265,10 +271,13 @@ describe('what it costs to draw', () => {
     geo.dispose()
   })
 
-  it('carries exactly the mascot parts plus three base parts, and nothing more', () => {
+  it('carries exactly the mascot parts plus TWO base parts, and nothing more', () => {
+    // Two, not three: Task 65 painted a contact pocket under each figurine, and Task 68 retired it.
+    // Both figurines stood on the pad while it was baked in Blender, so their shadows are already
+    // in the shipped texture and a painted one would be a second shadow over a real one.
     for (const fig of DESK_FIGURINES) {
       const rawPartCount = peekerPieces(fig.biome, fig.kind, 1).reduce((n, piece) => n + piece.parts.length, 0)
-      expect(deskFigurineParts(fig).length).toBe(rawPartCount + 3)
+      expect(deskFigurineParts(fig).length).toBe(rawPartCount + 2)
     }
   })
 
@@ -305,7 +314,7 @@ describe('what it costs to draw', () => {
 })
 
 describe('contrast against the desk it mostly stands against, and the sky band above it', () => {
-  it('crosses the desk edge near its TOP — the desk owns four fifths of each figure', () => {
+  it('crosses the desk edge at its very TOP — the desk owns almost all of each figure', () => {
     // Review asked for this to be re-measured on the premise that the desk's back edge cuts each
     // figure about a third of the way up, leaving two thirds against the sky. The measurement says
     // the opposite and this test is the record of it: the edge crosses at 79% of the figure's screen
@@ -317,7 +326,8 @@ describe('contrast against the desk it mostly stands against, and the sky band a
     // with only their crowns near it.
     const geo = buildDeskFigurines()
     const pos = geo.attributes.position.array as ArrayLike<number>
-    const edge = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE / 2], ZOOM_FACTOR, ENDING_AIM_DROP)
+    // the drawn edge IS DESK_BACK_Z since Task 68 baked the slab — no hand-formed wobble to allow for
+    const edge = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], ZOOM_FACTOR, ENDING_AIM_DROP)
     let lo = Infinity
     let hi = -Infinity
     for (let i = 0; i < pos.length; i += 3) {
@@ -332,8 +342,14 @@ describe('contrast against the desk it mostly stands against, and the sky band a
     // mascot's tessellation is densest in its base and body, so counting vertices reports a
     // different number (24%) for a different question.
     const aboveEdge = (hi - edge) / (hi - lo)
-    expect(aboveEdge).toBeGreaterThan(0.1) // a real band, so the sky measurement is not academic
-    expect(aboveEdge).toBeLessThan(0.35) // ...but a minority one
+    //
+    // Task 66 measured this band at 21% and Task 68 measures 5.6%, and the move is the SLAB's
+    // rather than the figurines'. The hand-formed back edge wandered FORWARD, i.e. nearer, i.e.
+    // lower on screen; the baked slab's edge is straight at DESK_BACK_Z, and a higher edge covers
+    // more of each figure. The band is now a crown rather than a head, which makes the desk
+    // contrast measured below the dominant question and the background contrast a sliver's worth.
+    expect(aboveEdge).toBeGreaterThan(0.02) // still a real band, so the next test is not academic
+    expect(aboveEdge).toBeLessThan(0.12)
     geo.dispose()
   })
 

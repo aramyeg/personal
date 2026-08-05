@@ -13,6 +13,7 @@ import {
   globeEdgesAt,
   ndcYAt,
 } from '@/components/labs/small-world/scene/camera'
+import { DESK_PAD } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import {
   DESK_BACK_Z,
@@ -20,14 +21,11 @@ import {
   DESK_HALF_W,
   DESK_MAX_ASPECT,
   DESK_NEAR_Z,
-  EDGE_WOBBLE,
   deskFrameHalfW,
   DESK_STAGE_EXIT_Z,
   DESK_NOTE,
-  DESK_PROPS,
   DESK_TOP_Y,
   deskNoteFits,
-  deskPropFits,
   journeyFloorY,
   propCeiling,
 } from '@/components/labs/small-world/scene/desk-stage'
@@ -133,51 +131,26 @@ describe('the journey camera cannot see the desk', () => {
     expect(ndc([0, DESK_TOP_Y + 0.4, DESK_BACK_Z], 1, 16 / 10).y).toBeGreaterThan(-1)
   })
 
-  it('contains every authored prop, and the note, at its own back', () => {
-    for (const p of DESK_PROPS) {
-      expect(deskPropFits(p), `${p.kind} at x=${p.x} z=${p.z} tops out above the frame`).toBe(true)
-    }
+  /**
+   * THE PROP SWEEPS RETIRED WITH THE PROPS (Task 68).
+   *
+   * Three tests stood here: every `DESK_PROPS` entry fits at its own back, the same claim made the
+   * expensive way by sweeping each prop's solid against ndc, and a proof that the ceiling was really
+   * binding (raise any prop by an epsilon and it fails). All three read a data table that described
+   * geometry a builder in this repo produced.
+   *
+   * The props are now baked into `desk.glb`, so there is no table to read and no builder to hold to
+   * it. What replaced them is STRONGER rather than equivalent: `desk-glb.test.ts` walks every vertex
+   * the shipped file actually contains and requires `y < journeyFloorY(z)` at each one. The old
+   * sweeps checked each prop's PUBLISHED height at its rearmost point; the new one cannot be
+   * satisfied by a prop whose geometry has quietly outgrown what was published for it, because
+   * nothing is published any more.
+   *
+   * The note and the two figurines are still the lab's own, and their containment is still proved
+   * here and in `desk-figurines.test.ts`.
+   */
+  it('contains the note at its own back', () => {
     expect(deskNoteFits()).toBe(true)
-  })
-
-  it('holds every prop below ndc_y = -1 as a SOLID, not as a point', () => {
-    // deskPropFits is a scalar rule; this is the same claim made the expensive way — sweep each
-    // prop's whole bounding box through the real projection at every aspect.
-    for (const [name, aspect] of ASPECTS) {
-      for (const p of DESK_PROPS) {
-        for (const dz of [-p.backReach, 0, p.backReach]) {
-          for (const dx of [-p.backReach, 0, p.backReach]) {
-            for (const y of [DESK_TOP_Y, DESK_TOP_Y + p.top]) {
-              const n = ndc([p.x + dx, y, p.z + dz], 1, aspect)
-              if (n.depth <= 0) continue
-              expect(n.y, `${name}: ${p.kind} at z=${p.z} leaks`).toBeLessThan(-1)
-            }
-          }
-        }
-      }
-    }
-  })
-
-  it('leaves NO room over the props it authored — the ceiling is really the binding constraint', () => {
-    // If every prop could be twice as tall the gate would be decoration. Found by MEASUREMENT
-    // rather than by naming kinds: Task 65 named the dish and the lamp, and when Task 66 deleted
-    // one and dropped the other the filter went empty and the test passed on nothing. Whichever
-    // pieces are currently closest to their own ceiling are the ones that have to fail when raised
-    // to it.
-    const byHeadroom = [...DESK_PROPS].sort(
-      (a, b) => propCeiling(a.z - a.backReach) - a.top - (propCeiling(b.z - b.backReach) - b.top)
-    )
-    // ONE piece has to be genuinely against it — the claim is that the ceiling binds SOMEWHERE,
-    // not that every prop is a near-miss, and a set where several crowd the line is a set with no
-    // composition left in it.
-    const tight = byHeadroom.slice(0, 1)
-    for (const p of tight) {
-      const ceiling = propCeiling(p.z - p.backReach)
-      expect(p.top).toBeLessThan(ceiling)
-      expect(deskPropFits({ ...p, top: ceiling + 1e-6 })).toBe(false)
-      // and they are genuinely near it, rather than near it by accident of being short
-      expect(ceiling - p.top).toBeLessThan(0.45)
-    }
   })
 })
 
@@ -252,18 +225,16 @@ describe('the money shot, as the three targets it is solved from', () => {
     expect(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot - edge).toBeCloseTo(STAND_GAP, 6)
   })
 
-  it('records what the DRAWN edge does, which is not quite what the solved one does', () => {
-    // The slab's back edge is hand formed and wanders forward, so the boundary the eye sees is
-    // below the boundary DESK_TOP_Y was solved against — by half the wobble on average and by the
-    // whole of it at worst. The composition is NOT re-solved against it (that costs half a world
-    // unit of prop headroom, which the pencil cup and the figurines do not have); the difference is
-    // recorded here instead, so the shortfall is a number in a test rather than a surprise.
-    const mean = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE / 2], ZOOM_FACTOR, ENDING_AIM_DROP)
-    const worst = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE], ZOOM_FACTOR, ENDING_AIM_DROP)
-    expect((1 + mean) / 2).toBeGreaterThan(DESK_FRAME - 0.025)
-    expect((1 + mean) / 2).toBeLessThan(DESK_FRAME)
-    // ...and even at its lowest the drawn edge stays below the world, so nothing cuts the sphere
-    expect(worst).toBeLessThan(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot)
+  it('draws its back edge exactly where DESK_FRAME asked for it', () => {
+    // Task 66 could only claim 38.5% here rather than the 40% DESK_FRAME asks for, because the
+    // slab's hand-formed edge wandered forward of the line DESK_TOP_Y was solved against and the
+    // composition was not re-solved for it (that costs half a world unit of prop headroom, which
+    // the pencil cup and the figurines did not have). Task 68's slab is baked with a straight back
+    // edge, so the shortfall is gone and the drawn edge IS the solved one.
+    const edge = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], ZOOM_FACTOR, ENDING_AIM_DROP)
+    expect((1 + edge) / 2).toBeCloseTo(DESK_FRAME, 3)
+    // ...and it stays below the world, so nothing cuts the sphere
+    expect(edge).toBeLessThan(globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP).bot)
   })
 
   it('is the AIM that spends the white space, which is why the zoom alone could not', () => {
@@ -316,11 +287,12 @@ describe('the wedge nothing can cross', () => {
 describe('the note', () => {
   it('sits in the core band, clear of the dish, and inside the desk', () => {
     expect(Math.abs(DESK_NOTE.x)).toBeLessThan(1.5)
-    // it lies ON the blotter rather than beside it — the mat is what groups the ending's core
-    const mat = DESK_PROPS.find((p) => p.kind === 'mat')!
-    expect(DESK_NOTE.z - DESK_NOTE.depth / 2).toBeGreaterThan(mat.z - mat.backReach)
-    expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(mat.z + mat.backReach)
-    expect(DESK_NOTE.width / 2).toBeLessThan(mat.halfW!)
+    // it lies ON the pad rather than beside it — the pad is what groups the ending's core. Task 65
+    // read the blotter out of DESK_PROPS; the pad is baked now, so this reads the contract that
+    // `desk-glb.test.ts` holds the shipped asset to.
+    expect(DESK_NOTE.z - DESK_NOTE.depth / 2).toBeGreaterThan(DESK_PAD.backZ)
+    expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(DESK_PAD.nearZ)
+    expect(DESK_NOTE.width / 2).toBeLessThan(DESK_PAD.halfW)
     expect(DESK_NOTE.z + DESK_NOTE.depth / 2).toBeLessThan(DESK_NEAR_Z)
     expect(DESK_NOTE.width / 2).toBeLessThan(DESK_HALF_W)
   })

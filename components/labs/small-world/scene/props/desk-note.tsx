@@ -6,7 +6,34 @@ import type { EndingState } from '../../ending-timeline'
 import { DESK_NOTE, DESK_TOP_Y } from '../desk-stage'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
-import { tiltTowardKey } from './desk-kit'
+import { KEY_LIGHT_POSITION } from '../biome-atmosphere'
+
+/**
+ * Rotate a surface's normals toward the key light.
+ *
+ * The sheet is horizontal, and a horizontal face takes dot(N, L) = 0.28 from the lab's one key. On
+ * a four-step ramp that is the third band down, about a fifth of the albedo — which is why the
+ * desk's first pass rendered as mustard. Tilting the authored normal into the key puts the paper on
+ * the ramp's top band.
+ *
+ * This is a lie the eye cannot catch, and only because of what this surface IS: it is flat, so
+ * there is no shading gradient across it for a wrong normal to distort — a constant normal on a
+ * plane produces exactly the constant tone a plane should have. `mix` keeps some of the true normal
+ * so the curled corner still bends its own light. It would be wrong on anything curved.
+ *
+ * It lived in `desk-kit.ts` until Task 68, alongside the thirteen procedural props that retired with
+ * the bake. The sheet is the last surface in the lab that needs it, so it lives with the sheet.
+ */
+export function tiltTowardKey(geo: THREE.BufferGeometry, mix: number) {
+  const key = new THREE.Vector3(...KEY_LIGHT_POSITION).normalize()
+  const normals = geo.attributes.normal
+  const n = new THREE.Vector3()
+  for (let i = 0; i < normals.count; i++) {
+    n.fromBufferAttribute(normals, i).multiplyScalar(mix).addScaledVector(key, 1 - mix).normalize()
+    normals.setXYZ(i, n.x, n.y, n.z)
+  }
+  normals.needsUpdate = true
+}
 
 /**
  * THE NOTE (Task 65) — the hand-written half of the ending, lying on the desk.

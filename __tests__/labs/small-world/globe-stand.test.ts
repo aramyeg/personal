@@ -12,7 +12,6 @@ import {
   DESK_BACK_Z,
   DESK_CLEARANCE,
   DESK_TOP_Y,
-  EDGE_WOBBLE,
   journeyFloorY,
 } from '@/components/labs/small-world/scene/desk-stage'
 import {
@@ -243,8 +242,8 @@ describe('nothing shows sky under the stand', () => {
     // the foot's near rim projects lower still, so a centre that clears the line means the whole
     // disc does.
     //
-    // The desk edge is taken at its WORST WOBBLE, not at DESK_BACK_Z. The slab's back edge is hand
-    // formed and wanders up to EDGE_WOBBLE forward, which puts the drawn boundary as much as 0.06
+    // The desk edge is taken at DESK_BACK_Z, which since Task 68 IS the drawn edge: the slab is
+    // baked and its back edge is straight, and `desk-glb.test.ts` pins the shipped mesh's own min z
     // of the frame BELOW the solved one — and a capture at the shipped constants showed the column
     // clearing the solved line while standing 0.006 proud of the drawn one. Gating on the line
     // nobody can see is how that gets shipped twice.
@@ -252,7 +251,7 @@ describe('nothing shows sky under the stand', () => {
     let worstAt = ''
     for (const { k, aim, label } of stops(400)) {
       const foot = ndcYAt([0, STAND_FOOT_Y, 0], k, aim)
-      const desk = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE], k, aim)
+      const desk = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], k, aim)
       // whichever of the two is currently holding it — the frame while the desk is still off screen,
       // the desk's own edge once it has climbed into view
       const held = Math.max(-1, desk)
@@ -272,7 +271,7 @@ describe('nothing shows sky under the stand', () => {
     let worst = -Infinity
     for (const { k, aim } of stops(400)) {
       const foot = ndcYAt([0, shallow, 0], k, aim)
-      const desk = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z + EDGE_WOBBLE], k, aim)
+      const desk = ndcYAt([0, DESK_TOP_Y, DESK_BACK_Z], k, aim)
       worst = Math.max(worst, foot - Math.max(-1, desk))
     }
     expect(worst).toBeGreaterThan(0)
