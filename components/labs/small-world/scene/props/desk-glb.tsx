@@ -191,10 +191,25 @@ function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
  */
 const DESK_METAL_LEVEL = 1.0
 
+/**
+ * ...and the desk metal's TINT correction, for the same reason the stand's tint is render-tuned.
+ *
+ * The three desk metals carry `#E3A995` and `#D6CFCC` in the GLB's vertex colours, baked from T67's
+ * albedos. An albedo is not what a metal renders: at metalness 1 the surface multiplies the room,
+ * and using the albedo straight made the trinket dish 1.77x the reference's chroma and the rose-gold
+ * pen 1.52x. `MeshStandardMaterial` multiplies `color` by the vertex colour, so this rebalances the
+ * baked tints toward what the reference renders WITHOUT a re-bake — the ratio between the shipped
+ * albedo and the solved one, applied per channel.
+ *
+ * Values above 1 are deliberate and legal: this is a correction, not a level, and the green and blue
+ * channels are being brought UP relative to a red that was too dominant.
+ */
+const DESK_METAL_TINT = new THREE.Color(0.72, 1.06, 1.20)
+
 function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     vertexColors: true,
-    color: new THREE.Color(DESK_METAL_LEVEL, DESK_METAL_LEVEL, DESK_METAL_LEVEL),
+    color: DESK_METAL_TINT.clone().multiplyScalar(DESK_METAL_LEVEL),
     metalness: 1,
     roughness: 0.33,
     envMap: env,

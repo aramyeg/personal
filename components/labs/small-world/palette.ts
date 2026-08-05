@@ -296,7 +296,18 @@ export const PALETTE = {
   // Task 68 — ALWINA'S DESK, candidate B. The room the little world was made in is BAKED (see
   // scene/props/desk-glb-contract.ts), so almost none of its palette needs naming here; what does
   // is the one surface the lab still builds itself and the DOM that sits over it.
-  standRoseGold: '#E3A995', // the globe stand's turned metal, and the desk's dish, pen and tool tip
+  // THE STAND'S METAL, and it is a RENDER-tuned value rather than the albedo hex.
+  //
+  // T67's material is `#E3A995` at metallic 0.88, and that hex is what a rose-gold albedo looks
+  // like in a swatch. It is not what the approved render's ring shows: measured, the ring renders
+  // (210, 182, 173) — a soft warm grey-pink, because a metal at this metalness has no diffuse term
+  // and simply multiplies the room, and the room is a pale pink cyc. Using the albedo directly made
+  // the ring 2.42x the reference's chroma and railed its red channel across a third of its area.
+  //
+  // So the tint is solved backwards from the render: reference RGB divided by the environment the
+  // ring actually samples (mean linear ~1.20, 1.03, 1.08). `ending-connect`-style: the value is a
+  // measurement, and `task68-compare.mjs` re-checks the chroma of both metal regions every capture.
+  standRoseGold: '#C4B0A6', // the globe stand's turned metal
 
   // The DOM that sits ON the studio: the connect pills and the restart.
   //

@@ -58,9 +58,9 @@ const H = 64
  * All three keep candidate B's pink cast in their RATIOS while sitting far below 1, which is the
  * part the first version had backwards.
  */
-const ROOM_FLOOR = new THREE.Color(0.052, 0.041, 0.046)
-const ROOM_HORIZON = new THREE.Color(0.310, 0.258, 0.274)
-const ROOM_CEIL = new THREE.Color(0.760, 0.690, 0.712)
+const ROOM_FLOOR = new THREE.Color(0.55, 0.46, 0.50)
+const ROOM_HORIZON = new THREE.Color(1.34, 1.15, 1.21)
+const ROOM_CEIL = new THREE.Color(1.12, 0.99, 1.03)
 
 /**
  * The softboxes, as they read in a reflection: position in (azimuth turns, elevation 0..1), an
@@ -73,11 +73,11 @@ const ROOM_CEIL = new THREE.Color(0.760, 0.690, 0.712)
 const LIGHTS: readonly { az: number; el: number; sizeAz: number; sizeEl: number; gain: number }[] = [
   // KEY_softbox — high and to the viewer's left, the T67 rig's dominant source and the one the
   // ring's upper surface catches as a band
-  { az: 0.62, el: 0.80, sizeAz: 0.105, sizeEl: 0.135, gain: 1.55 },
+  { az: 0.62, el: 0.80, sizeAz: 0.105, sizeEl: 0.135, gain: 1.90 },
   // FILL_bounce — opposite side, low and weak; it opens the shadow without filling it
-  { az: 0.13, el: 0.52, sizeAz: 0.190, sizeEl: 0.220, gain: 0.30 },
+  { az: 0.13, el: 0.52, sizeAz: 0.190, sizeEl: 0.220, gain: 0.34 },
   // TOP_wash — a broad strip across the ceiling
-  { az: 0.0, el: 0.98, sizeAz: 0.360, sizeEl: 0.130, gain: 0.34 },
+  { az: 0.0, el: 0.98, sizeAz: 0.360, sizeEl: 0.130, gain: 0.30 },
 ]
 
 /**
@@ -86,7 +86,7 @@ const LIGHTS: readonly { az: number; el: number; sizeAz: number; sizeEl: number;
  * A cyc lit from one side falls off across its width, and that falloff is the second source of dark
  * content after the floor — it is what gives the ring a shaded FLANK as well as a shaded underside.
  */
-const SHADE_SIDE = 0.34
+const SHADE_SIDE = 0.55
 
 /**
  * The room's overall level — SOLVED from the reference, once the range was right.
@@ -108,7 +108,7 @@ const SHADE_SIDE = 0.34
  * floor. What the first room lacked was not darkness, it was RANGE, and a floor at linear 0.05 under
  * a level of 1.0 overshot in the other direction just as badly.
  */
-const ENV_EXPOSURE = 5.8
+const ENV_EXPOSURE = 1.24
 
 const smoothstep = (t: number): number => {
   const x = t < 0 ? 0 : t > 1 ? 1 : t
