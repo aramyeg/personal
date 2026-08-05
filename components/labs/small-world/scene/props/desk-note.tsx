@@ -3,7 +3,8 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import type { EndingState } from '../../ending-timeline'
-import { DESK_NOTE, DESK_TOP_Y } from '../desk-stage'
+import { DESK_NOTE } from '../desk-stage'
+import { DESK_PAD } from './desk-glb-contract'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 import { KEY_LIGHT_POSITION } from '../biome-atmosphere'
@@ -257,7 +258,9 @@ function buildSheet(): THREE.BufferGeometry {
       const curl = (DESK_NOTE.top - DESK_NOTE.lift) * ramp(u) * ramp(v)
       positions.push(
         DESK_NOTE.x + lx * cos + lz * sin,
-        DESK_TOP_Y + DESK_NOTE.lift + curl,
+        // the sheet lies on the PAD, which stands 0.0355 proud of the slab — seating it on
+        // DESK_TOP_Y buried its near edge in the pink (Task 68)
+        DESK_PAD.top + DESK_NOTE.lift + curl,
         DESK_NOTE.z - lx * sin + lz * cos
       )
       uvs.push(u, v)

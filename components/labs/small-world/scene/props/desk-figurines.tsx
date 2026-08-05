@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { DESK_TOP_Y } from '../desk-stage'
+import { DESK_PAD } from './desk-glb-contract'
 import { useClayRamp } from '../toon-ramp'
 import { buildMergedClay, type ClayPart } from './clay-kit'
 import { peekerPieces } from './peeker-cast'
@@ -79,6 +80,17 @@ import type { PeekerBiome, PeekerKind } from './peeker-stage'
  * INK: KEPT, as ONE merged contour for the pair — see FIGURINE_INK_GAIN for the width and for
  * why dropping it was the wrong economy.
  */
+
+/**
+ * THE HEIGHT THE FIGURINES ACTUALLY STAND ON (Task 68).
+ *
+ * Not `DESK_TOP_Y`. Both of them stand on the desk PAD, and the pad is 0.0355 proud of the slab —
+ * so seating them on the slab's plane sank them 0.0355 into the pink, which is more than half the
+ * height of the turned base they are supposed to be standing on. It went unnoticed for two rounds
+ * because Task 65's blotter was drawn by the lab at the same `DESK_TOP_Y` everything else used; the
+ * baked pad has a real thickness and the mistake became visible immediately.
+ */
+export const FIGURINE_SEAT_Y = DESK_PAD.top
 
 /** Total figurine height (base + figure), world units — see the docblock for why this is 0.72 and
  *  not the brief's first-guess 0.62. */
@@ -192,7 +204,7 @@ function bakePart(part: ClayPart, place: THREE.Matrix4): ClayPart {
 function baseParts(fig: DeskFigurine): ClayPart[] {
   const r = FIGURINE_BASE_R
   const h = FIGURINE_BASE_HEIGHT
-  const place = new THREE.Matrix4().makeTranslation(fig.x, DESK_TOP_Y, fig.z)
+  const place = new THREE.Matrix4().makeTranslation(fig.x, FIGURINE_SEAT_Y, fig.z)
   const local: ClayPart[] = [
     // NO painted contact pocket (Task 68). Both figurines stood on the pad while it was baked in
     // Blender, so the pink under them is already dark in the shipped texture; drawing one here
@@ -238,7 +250,7 @@ export function deskFigurineParts(fig: DeskFigurine): ClayPart[] {
     new THREE.Vector3(scale, scale, scale)
   )
   const place = new THREE.Matrix4()
-    .makeTranslation(fig.x, DESK_TOP_Y, fig.z)
+    .makeTranslation(fig.x, FIGURINE_SEAT_Y, fig.z)
     .multiply(new THREE.Matrix4().makeRotationY(fig.yaw))
     .multiply(figureLocal)
 

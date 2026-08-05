@@ -14,6 +14,7 @@ import {
   DESK_FIGURINES,
   FIGURINE_BASE_HEIGHT,
   FIGURINE_HEIGHT,
+  FIGURINE_SEAT_Y,
   FIGURINE_INK_GAIN,
   FIGURINE_X,
   buildDeskFigurineInk,
@@ -238,13 +239,20 @@ describe('the two desk figurines stay under the journey camera', () => {
 })
 
 describe('the height that ships is measured, not the brief\'s first guess', () => {
-  it('reaches its published total height and rests its base on the desk surface', () => {
+  it('reaches its published total height and rests its base on the PAD, not the slab', () => {
+    // Task 68: they stand on the desk pad, which the baked asset gives a real thickness — 0.0355
+    // proud of the slab. Seated at DESK_TOP_Y they were sunk into the pink by more than half the
+    // height of the turned base they stand on, which went unnoticed while the blotter was drawn by
+    // the lab at the same height as everything else.
+    expect(FIGURINE_SEAT_Y).toBeGreaterThan(DESK_TOP_Y)
     for (const fig of DESK_FIGURINES) {
       const b = bounds(deskFigurineParts(fig))
-      expect(b.maxY).toBeCloseTo(DESK_TOP_Y + FIGURINE_HEIGHT, 4)
-      // the contact shadow is the lowest thing (just off the desk surface); nothing sinks through it
-      expect(b.minY).toBeGreaterThanOrEqual(DESK_TOP_Y)
-      expect(b.minY).toBeLessThan(DESK_TOP_Y + FIGURINE_BASE_HEIGHT)
+      expect(b.maxY).toBeCloseTo(FIGURINE_SEAT_Y + FIGURINE_HEIGHT, 4)
+      // nothing sinks through the surface it stands on. The epsilon is Float32 attribute rounding,
+      // not slack: the positions are read back out of a Float32BufferAttribute, so a base authored
+      // at exactly 1.303 measures 1.3029999732971191.
+      expect(b.minY).toBeGreaterThan(FIGURINE_SEAT_Y - 1e-5)
+      expect(b.minY).toBeLessThan(FIGURINE_SEAT_Y + FIGURINE_BASE_HEIGHT)
     }
   })
 
