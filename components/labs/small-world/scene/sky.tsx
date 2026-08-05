@@ -57,6 +57,7 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     []
   )
   const mesh = useRef<THREE.Mesh>(null)
+  const material = useRef<THREE.ShaderMaterial>(null)
   // NaN so the mount frame always applies once (NaN !== NaN) — a write of the same values the
   // JSX props carry — and every frame after it costs one float compare until the pull-back starts.
   const lastScale = useRef(Number.NaN)
@@ -70,7 +71,13 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     // the horizon flattening out once a mood is fully in.
     uniforms.uGlow.value.copy(BASE_GLOW).lerp(target(MOOD_GLOW, b), b.skyMix * GLOW_LAG)
 
-    uniforms.uStudio.value = studioLightsFor(j.ending)
+    // Written through the MATERIAL rather than through the `uniforms` object this component owns.
+    // r3f copies the uniform wrappers when it applies the prop, so `uniforms.uStudio` here and
+    // `material.uniforms.uStudio` there are different objects — and assigning a NUMBER to the local
+    // one changes nothing on the GPU. The two colour uniforms above survive that because their
+    // values are THREE.Vector3 instances mutated in place: the wrapper is copied, the Vector3 is
+    // shared. A float has no such indirection, and the studio backdrop simply never appeared.
+    if (material.current) material.current.uniforms.uStudio.value = studioLightsFor(j.ending)
 
     const k = cameraZoomScale(j.ending)
     if (k !== lastScale.current && mesh.current) {
@@ -84,6 +91,7 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     <mesh ref={mesh} position={[...SKY_POSITION]} scale={[SKY_SCALE[0], SKY_SCALE[1], 1]}>
       <planeGeometry />
       <shaderMaterial
+        ref={material}
         depthWrite={false}
         uniforms={uniforms}
         vertexShader={`
