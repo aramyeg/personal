@@ -90,3 +90,22 @@ export function buildStudioEnv(renderer: THREE.WebGLRenderer): THREE.Texture {
   src.dispose()
   return target.texture
 }
+
+/**
+ * One environment per renderer, shared by everything metallic.
+ *
+ * Two components reflect this studio — the desk's three rose-gold props and the globe stand — and
+ * they must reflect the SAME room or the stand's ring and the trinket dish beside it are lit by
+ * different studios. A WeakMap on the renderer rather than a module-level singleton, so a second
+ * canvas (Storybook mounts several) gets its own and nothing leaks when one goes away.
+ */
+const cache = new WeakMap<THREE.WebGLRenderer, THREE.Texture>()
+
+export function studioEnvFor(renderer: THREE.WebGLRenderer): THREE.Texture {
+  let tex = cache.get(renderer)
+  if (!tex) {
+    tex = buildStudioEnv(renderer)
+    cache.set(renderer, tex)
+  }
+  return tex
+}

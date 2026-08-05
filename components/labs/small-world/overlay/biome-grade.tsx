@@ -4,6 +4,8 @@ import type { CSSProperties, MutableRefObject } from 'react'
 import { PALETTE } from '../palette'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { gradeAt } from './grade-mood'
+import { endingStateAt } from '../ending-timeline'
+import { studioLightsFor } from '../scene/desk-studio'
 
 export { SHOW_GRADE } from './grade-mood'
 
@@ -74,10 +76,21 @@ export function BiomeGrade({
     const apply = () => {
       const el = rootRef.current
       if (!el) return
-      const g = gradeAt(progressRef.current)
+      const progress = progressRef.current
+      const g = gradeAt(progress)
+      // THE GRADE LETS GO OF THE FRAME AS THE STUDIO ARRIVES (Task 68).
+      //
+      // This lens is a JOURNEY device — a per-biome vignette and a whisper of haze, both keyed to
+      // the wedge under the traveller's feet — and `gradeAt` clamps, so through the whole ending it
+      // holds winter's. Over the studio that is simply wrong, and measurably so: with it standing,
+      // the shipped money shot read 14-16% under the approved render at the frame's EDGES (the pad's
+      // near corner, the desk's white sliver, the top of the backdrop) while the centre read over.
+      // That signature is the vignette's, not the bake's. So both alphas fall to zero on exactly the
+      // curve the studio lights come up on — one number owns the ending's look.
+      const held = 1 - studioLightsFor(endingStateAt(progress))
       el.style.setProperty('--sw-grade-haze', g.haze)
-      el.style.setProperty('--sw-grade-haze-a', g.hazeAlpha.toFixed(4))
-      el.style.setProperty('--sw-grade-vig-a', g.vignetteAlpha.toFixed(4))
+      el.style.setProperty('--sw-grade-haze-a', (g.hazeAlpha * held).toFixed(4))
+      el.style.setProperty('--sw-grade-vig-a', (g.vignetteAlpha * held).toFixed(4))
     }
     // Deferred to rAF for the same reason the panels defer: this has to read the progress ref
     // AFTER the experience's own scroll listener has written it for this event.

@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
-import { buildStudioEnv } from '../studio-env'
+import { studioEnvFor } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 
@@ -159,7 +159,8 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   // ONE uniform object, shared by both matte materials, so the pair can never disagree about how
   // lit the ending is and the frame loop writes a single number.
   const lights = useRef({ value: 0 })
-  const env = useMemo(() => buildStudioEnv(renderer), [renderer])
+  // shared with the globe stand — the ring and the dish beside it must reflect one room
+  const env = useMemo(() => studioEnvFor(renderer), [renderer])
 
   const built = useMemo(() => {
     if (!scene) return null
@@ -174,10 +175,6 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     return { surface, baked, metal, metalMat: metal.material as THREE.MeshStandardMaterial }
   }, [scene, env])
 
-  // The env outlives every rebuild of `built` (it is what `built` is built AGAINST), so it is
-  // disposed on unmount alone; disposing it alongside the materials would free the texture the
-  // next metal material is about to be handed.
-  useEffect(() => () => env.dispose(), [env])
   useEffect(() => {
     if (!built) return
     return () => {

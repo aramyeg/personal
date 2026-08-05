@@ -292,4 +292,9 @@ export const PALETTE = {
   deskMat: '#AFC0CB', // the blotter under the note and the stand. The frame's one COOL surface: the
   // desk is warm oak and the sky is a lilac-pink wash, and without a third note between them the
   // bottom of the composition is one unbroken field of tan
+
+  // Task 68 — ALWINA'S DESK, candidate B. The room the little world was made in is BAKED (see
+  // scene/props/desk-glb-contract.ts), so almost none of its palette needs naming here; what does
+  // is the one surface the lab still builds itself and the DOM that sits over it.
+  standRoseGold: '#E3A995', // the globe stand's turned metal, and the desk's dish, pen and tool tip
 } as const

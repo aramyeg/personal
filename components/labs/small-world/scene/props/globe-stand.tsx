@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PALETTE } from '../../palette'
 import {
   CRADLE_DROP,
   CRADLE_RADIUS,
@@ -19,7 +18,10 @@ import {
   STRUT_TUBE_TOP,
   standOffsetY,
 } from '../globe-stand'
-import { useClayRamp } from '../toon-ramp'
+import { useThree } from '@react-three/fiber'
+import { PALETTE } from '../../palette'
+import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
+import { studioEnvFor } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { buildMergedClay, type ClayPart } from './clay-kit'
 
@@ -119,28 +121,56 @@ export function buildGlobeStand(): THREE.BufferGeometry {
 }
 
 export function GlobeStand({ journeyRef }: { journeyRef: JourneyRef }) {
-  const ramp = useClayRamp()
   const group = useRef<THREE.Group>(null)
   const geo = useMemo(buildGlobeStand, [])
-  useEffect(() => () => geo.dispose(), [geo])
+  const renderer = useThree((s) => s.gl)
+  // THE STAND IS ROSE GOLD (Task 68), and it is the ONE piece of the ending's metal the lab still
+  // builds itself. The look-dev's stand was measured against this one and does not match it — T67
+  // splayed its struts DOWN from the collar toward the foot instead of UP to the ring, and gave the
+  // ring a thin central post where the lab has a waisted stem — so what shipped is this geometry,
+  // whose terrain clearance and containment are proved in `globe-stand.test.ts`, wearing the
+  // approved finish. Same environment as the desk's three metal props, so the ring and the trinket
+  // dish beside it are lit by the same room.
+  const material = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: PALETTE.standRoseGold,
+        metalness: 1,
+        roughness: 0.32,
+        envMap: studioEnvFor(renderer),
+        toneMapped: false,
+      }),
+    [renderer]
+  )
+  useEffect(() => {
+    return () => {
+      geo.dispose()
+      material.dispose()
+    }
+  }, [geo, material])
 
   // NaN so the mount frame always applies once (NaN !== NaN) and the stand starts parked rather
   // than seated for one frame; every frame of the journey after it costs one float compare.
   const last = useRef(Number.NaN)
+  const lastLights = useRef(Number.NaN)
   useFrame(() => {
     const g = group.current
     if (!g) return
-    const { stand } = journeyRef.current.ending
-    if (stand === last.current) return
-    last.current = stand
-    g.position.y = standOffsetY(stand)
+    const { ending } = journeyRef.current
+    if (ending.stand !== last.current) {
+      last.current = ending.stand
+      g.position.y = standOffsetY(ending.stand)
+    }
+    const u = studioLightsFor(ending)
+    if (u !== lastLights.current) {
+      lastLights.current = u
+      material.envMapIntensity = studioEnvIntensity(u)
+    }
   })
 
   return (
     <group ref={group} position={[0, standOffsetY(0), 0]}>
-      <mesh geometry={geo}>
-        <meshToonMaterial vertexColors gradientMap={ramp} />
-      </mesh>
+      <mesh geometry={geo} material={material} />
     </group>
   )
 }
