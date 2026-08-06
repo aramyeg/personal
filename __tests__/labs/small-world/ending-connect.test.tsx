@@ -8,9 +8,15 @@ import {
   connectReveal,
 } from '@/components/labs/small-world/overlay/ending-connect'
 import { railDismissLive, railOpacity } from '@/components/labs/small-world/overlay/journey-progress'
+import {
+  NOTE_SETTLE_REMAINING,
+  noteEdgeNdcY,
+} from '@/components/labs/small-world/overlay/note-settle'
+import { standBelowJourneyFrame } from '@/components/labs/small-world/scene/globe-stand'
 import { FallbackTimeline } from '@/components/labs/small-world/fallback-timeline'
 import {
   ENDING_SPAN,
+  STAND_END,
   TRACK_END,
   ZOOM_START,
   endingStateAt,
@@ -53,7 +59,11 @@ describe('the connect block', () => {
   it('refuses to be clickable while it is still fading in', () => {
     // The trap this closes: a control at 30% opacity that still eats the click meant for the
     // canvas. Half-legible is not clickable.
-    render(<EndingConnect t={tAt(1 + 0.72 * ENDING_SPAN)} onRestart={() => {}} />)
+    //
+    // Sampled at t = 0.93 rather than Task 65's 0.72: the entrance is solved from the note's own
+    // settling now (Task 72) and 0.72 of the ending is before it starts, where the honest reading
+    // is a flat zero rather than a partial fade.
+    render(<EndingConnect t={tAt(1 + 0.93 * ENDING_SPAN)} onRestart={() => {}} />)
     const email = screen.getByTestId('sw-connect-email')
     expect(Number(email.style.opacity)).toBeGreaterThan(0)
     expect(Number(email.style.opacity)).toBeLessThan(0.85)
@@ -121,7 +131,7 @@ describe('the connect block', () => {
   })
 
   it('arrives in reading order rather than all at once', () => {
-    const t = tAt(1 + 0.83 * ENDING_SPAN)
+    const t = tAt(1 + 0.93 * ENDING_SPAN)
     const reveals = CONTROLS.map((_, i) => connectReveal(t, i))
     for (let i = 1; i < reveals.length; i++) {
       expect(reveals[i]).toBeLessThan(reveals[i - 1])
@@ -183,35 +193,94 @@ describe('the connect block', () => {
   })
 })
 
-describe('the progress rail leaves before the composition arrives', () => {
-  it('is fully up for the whole journey and the whole still beat', () => {
-    for (const p of [0, 0.5, 0.99, 1, 1 + 0.2 * ENDING_SPAN, 1 + ZOOM_START * ENDING_SPAN]) {
-      expect(railOpacity(p)).toBe(1)
-    }
+/**
+ * THE RAIL LEAVES BEFORE THE PEDESTAL ARRIVES (Task 72, review finding C1).
+ *
+ * Task 65 keyed the fade to `zoom`, which is 0 for the whole still beat — and the still beat is
+ * exactly when the globe stand rises. A blind playthrough caught the rail drawn dark-on-dark across
+ * the stand's column at ~90% of the track, with the old fade not finishing until 93.6%.
+ *
+ * The beat is RE-DERIVED here rather than restated, and from the shipped predicate: the binding
+ * event is the stand's crown crossing the journey camera's bottom frame edge, which is precisely
+ * what `standBelowJourneyFrame` decides. If someone retunes the cradle or the park drop, this test
+ * follows them and the component follows them, independently — which is the point of deriving it
+ * twice instead of sharing a constant.
+ */
+const standEntersFrame = (): number => {
+  // monotone: `standOffsetY` eases the stand upward on a smootherstep that never reverses, so the
+  // predicate is true then false, exactly once
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2
+    if (standBelowJourneyFrame(mid)) lo = mid
+    else hi = mid
+  }
+  return hi
+}
+
+/** ...mapped back through the timeline: `stand` is `t / STAND_END`, and `t` is `(p − 1) / SPAN`. */
+const STAND_ENTRY_PROGRESS = 1 + standEntersFrame() * STAND_END * ENDING_SPAN
+
+describe('the progress rail leaves before the pedestal arrives', () => {
+  it('brackets the real crossing, so the beat below is the stand and not a number', () => {
+    // the guard on the derivation itself: the predicate must actually flip here
+    const s = standEntersFrame()
+    expect(standBelowJourneyFrame(s - 1e-6)).toBe(true)
+    expect(standBelowJourneyFrame(s + 1e-6)).toBe(false)
+    // ...and it happens during the RISE, well before the still beat hands over to the pull-back
+    expect(s).toBeGreaterThan(0)
+    expect(s).toBeLessThan(1)
+    expect(STAND_ENTRY_PROGRESS).toBeLessThan(1 + ZOOM_START * ENDING_SPAN)
   })
 
-  it('is completely gone well before the connect block is legible', () => {
+  it('is EXACTLY gone by the frame the stand can first be seen in, and stays gone', () => {
+    expect(railOpacity(STAND_ENTRY_PROGRESS)).toBe(0)
+    for (let i = 0; i <= 400; i++) {
+      const p = STAND_ENTRY_PROGRESS + (i / 400) * (TRACK_END - STAND_ENTRY_PROGRESS)
+      expect(railOpacity(p), `rail still drawn at progress ${p}`).toBe(0)
+    }
     expect(railOpacity(TRACK_END)).toBe(0)
-    // the crossing point: the rail must be out before anything it could sit on top of arrives
+  })
+
+  it('is fully up for the whole journey, boundary included', () => {
+    // the ending owns (1, TRACK_END]; progress = 1 is the journey's last frame and the rail is whole
+    for (const p of [0, 0.25, 0.5, 0.9, 0.99, 1]) expect(railOpacity(p)).toBe(1)
+    for (let i = 0; i <= 500; i++) expect(railOpacity(i / 500)).toBe(1)
+  })
+
+  it('is still completely gone before the connect block is legible', () => {
+    // Task 65's property, kept: whatever else moved, the rail must be out before anything it could
+    // sit on top of arrives. It is now a far wider margin than it was.
     let railGoneAt = TRACK_END
-    for (let i = 0; i <= 2000; i++) {
-      const p = 1 + (i / 2000) * ENDING_SPAN
+    for (let i = 0; i <= 4000; i++) {
+      const p = 1 + (i / 4000) * ENDING_SPAN
       if (railOpacity(p) === 0) {
         railGoneAt = p
         break
       }
     }
     expect(connectReveal(tAt(railGoneAt), 0)).toBe(0)
+    expect(railGoneAt).toBeLessThanOrEqual(STAND_ENTRY_PROGRESS)
   })
 
-  it('fades monotonically, and rewinds through the same values', () => {
+  it('fades monotonically across the whole track', () => {
     let prev = Infinity
-    for (let i = 0; i <= 1000; i++) {
-      const v = railOpacity(1 + (i / 1000) * ENDING_SPAN)
+    for (let i = 0; i <= 4000; i++) {
+      const v = railOpacity((i / 4000) * TRACK_END)
       expect(v).toBeLessThanOrEqual(prev)
       prev = v
     }
-    expect(railOpacity(1.2)).toBe(railOpacity(1.2))
+  })
+
+  it('is scrubbed, not animated: retracing is bit-identical', () => {
+    // Object.is rather than toBe on a tolerance — the claim is that scrubbing back runs the SAME
+    // arithmetic, and "same to within an epsilon" is a different and weaker claim.
+    const forward: number[] = []
+    for (let i = 0; i <= 2000; i++) forward.push(railOpacity((i / 2000) * TRACK_END))
+    for (let i = 2000; i >= 0; i--) {
+      expect(Object.is(railOpacity((i / 2000) * TRACK_END), forward[i])).toBe(true)
+    }
   })
 })
 
@@ -254,9 +323,16 @@ describe('the fallback page carries the same contact story', () => {
  * refuses it on the same terms: legible or inert.
  */
 describe("the rail's dismiss control is live only while it is legible", () => {
-  it('is live for the whole journey and the whole still beat', () => {
-    for (const p of [0, 0.5, 0.99, 1, 1 + ZOOM_START * ENDING_SPAN]) {
-      expect(railDismissLive(p)).toBe(true)
+  it('is live for the whole journey, boundary included', () => {
+    // it no longer survives the still beat, because the rail no longer does — the fade now starts
+    // on the ending's first frame rather than on the pull-back's
+    for (const p of [0, 0.5, 0.99, 1]) expect(railDismissLive(p)).toBe(true)
+  })
+
+  it('goes with the rail: never live once the stand can be seen', () => {
+    for (let i = 0; i <= 400; i++) {
+      const p = STAND_ENTRY_PROGRESS + (i / 400) * (TRACK_END - STAND_ENTRY_PROGRESS)
+      expect(railDismissLive(p)).toBe(false)
     }
   })
 
@@ -264,8 +340,8 @@ describe("the rail's dismiss control is live only while it is legible", () => {
     // the interesting property: there is a stretch where the rail can still be seen and the button
     // is already dead. Without it, "invisible live button" is answered at the endpoint only.
     let inertButVisible = 0
-    for (let i = 0; i <= 4000; i++) {
-      const p = 1 + (i / 4000) * ENDING_SPAN
+    for (let i = 0; i <= 8000; i++) {
+      const p = 1 + (i / 8000) * ENDING_SPAN
       const o = railOpacity(p)
       if (!railDismissLive(p) && o > 0) inertButVisible++
       // and the invariant itself: never live below the legibility bar
@@ -276,12 +352,99 @@ describe("the rail's dismiss control is live only while it is legible", () => {
 
   it('never revives once it has gone', () => {
     let seenDead = false
-    for (let i = 0; i <= 4000; i++) {
-      const p = 1 + (i / 4000) * ENDING_SPAN
+    for (let i = 0; i <= 8000; i++) {
+      const p = (i / 8000) * TRACK_END
       if (!railDismissLive(p)) seenDead = true
       else expect(seenDead).toBe(false)
     }
     expect(seenDead).toBe(true)
+  })
+})
+
+/**
+ * THE PILLS WAIT FOR THE NOTE (Task 72, review finding C2).
+ *
+ * The review found the connect pills printed across the note's second line through ~96–98% of the
+ * track. The note is a static mesh and never moves; the CAMERA sweeps it up the frame, straight
+ * through the pills' band, while the pills were already at up to 0.93 opacity.
+ *
+ * The pure predicate the fix is built on is `note-settle.ts`'s: how much of the note's total screen
+ * travel is still ahead of it. These pin that no control is drawn AT ALL while that is above the
+ * threshold — which is the whole of the crossing — rather than pinning a pixel gap, because the
+ * pixel gap is viewport-dependent and this is not. The pixels were measured separately, on the
+ * running build at 1440x900 and 390x844.
+ */
+const noteRemaining = (zoom: number): number =>
+  (noteEdgeNdcY(1) - noteEdgeNdcY(zoom)) / (noteEdgeNdcY(1) - noteEdgeNdcY(0))
+
+const zoomAt = (t: number): number => (t - ZOOM_START) / (1 - ZOOM_START)
+
+describe('the connect block enters only after the note has settled', () => {
+  it('draws nothing at all while the note is still travelling', () => {
+    let stillTravelling = 0
+    for (let i = 0; i <= 4000; i++) {
+      const t = i / 4000
+      if (noteRemaining(zoomAt(t)) <= NOTE_SETTLE_REMAINING) continue
+      stillTravelling++
+      for (let k = 0; k < CONTROLS.length; k++) {
+        expect(connectReveal(t, k), `${CONTROLS[k]} drawn while the note is still moving (t=${t})`).toBe(0)
+      }
+    }
+    // the guard on the guard: if the predicate were never true this would pass vacuously
+    expect(stillTravelling).toBeGreaterThan(3000)
+  })
+
+  it('starts the first control exactly where the note settles, not before or long after', () => {
+    // the entrance must USE the room it has: opening late enough to be safe and then leaving a
+    // third of the window empty would be a different defect
+    let firstDraw = 1
+    for (let i = 0; i <= 20000; i++) {
+      const t = i / 20000
+      if (connectReveal(t, 0) > 0) {
+        firstDraw = t
+        break
+      }
+    }
+    expect(noteRemaining(zoomAt(firstDraw))).toBeLessThanOrEqual(NOTE_SETTLE_REMAINING)
+    // ...and within a hair of the boundary rather than idling past it
+    expect(noteRemaining(zoomAt(firstDraw))).toBeGreaterThan(NOTE_SETTLE_REMAINING * 0.99)
+  })
+
+  it('lands EVERY control at exactly 1 at the bottom of the track', () => {
+    // The wart this closes: `restart` is index 3 and its window used to close at zoom 1.005, so it
+    // rested at 0.99937 — a control that never finished its entrance, in the one frame of the lab
+    // that is meant to be finished. `toBe(1)` and not `toBeCloseTo`: the window is solved to close
+    // on 1, and smoothstep(1) is exactly 1, so the exactness is the claim.
+    for (let k = 0; k < CONTROLS.length; k++) {
+      expect(connectReveal(1, k), `${CONTROLS[k]} does not finish its entrance`).toBe(1)
+      expect(connectReveal(tAt(TRACK_END), k)).toBe(1)
+    }
+  })
+
+  it('still arrives in reading order, one control at a time', () => {
+    // the stagger survived being solved: no two controls share a start
+    const starts = CONTROLS.map((_, k) => {
+      for (let i = 0; i <= 20000; i++) if (connectReveal(i / 20000, k) > 0) return i / 20000
+      return 1
+    })
+    for (let k = 1; k < starts.length; k++) expect(starts[k]).toBeGreaterThan(starts[k - 1])
+  })
+
+  it('is monotone in t and retraces bit-identically', () => {
+    const forward: number[][] = []
+    for (let i = 0; i <= 2000; i++) forward.push(CONTROLS.map((_, k) => connectReveal(i / 2000, k)))
+    for (let k = 0; k < CONTROLS.length; k++) {
+      let prev = -Infinity
+      for (let i = 0; i <= 2000; i++) {
+        expect(forward[i][k]).toBeGreaterThanOrEqual(prev)
+        prev = forward[i][k]
+      }
+    }
+    for (let i = 2000; i >= 0; i--) {
+      for (let k = 0; k < CONTROLS.length; k++) {
+        expect(Object.is(connectReveal(i / 2000, k), forward[i][k])).toBe(true)
+      }
+    }
   })
 })
 

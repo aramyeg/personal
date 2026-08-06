@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { CHAPTER_COUNT } from '../chapters'
 import { chapters } from '../chapters'
-import { endingStateAt } from '../ending-timeline'
+import { STAND_END, endingStateAt } from '../ending-timeline'
+import { standBelowJourneyFrame } from '../scene/globe-stand'
 import { PALETTE } from '../palette'
 
 /**
@@ -30,16 +31,53 @@ import { PALETTE } from '../palette'
  * Task 63 left the rail flagged rather than decided: it clamps, so through the
  * whole ending it reads a truthful "6 / 6" with a full bar — floating over a
  * desk, a hand-written note and three contact links. Truthful and wrong. The
- * decision here is to FADE it rather than to kill it (`SHOW_PROGRESS_RAIL` is
- * still the whole-cloth revert): through the still beat the rail is still
- * doing its original job, which is to answer "did my scroll register" while the
- * world stands still — and the ending's first beat is the stillest the lab ever gets.
- * It is only once the camera starts moving that the frame answers that question
- * by itself, and the counter becomes chrome over the portfolio's contact page.
+ * decision there was to FADE it rather than to kill it (`SHOW_PROGRESS_RAIL` is
+ * still the whole-cloth revert), and that decision stands. What moved is WHEN.
  *
- * So the fade is keyed to `zoom`, not to the ending, and it is gone by the time
- * there is a composition to sit on top of. When it is gone the whole rail is
- * `visibility: hidden` as well as transparent.
+ * ============================================================================
+ * TASK 72 — THE BEAT MOVED, AND THE OLD ARGUMENT IS KEPT BECAUSE HALF OF IT WAS RIGHT
+ * ============================================================================
+ * Task 65 keyed the fade to `zoom` and reasoned: through the still beat the rail
+ * is still doing its original job, which is to answer "did my scroll register"
+ * while the world stands still — and the ending's first beat is the stillest the
+ * lab ever gets. Only once the camera starts moving does the frame answer that
+ * question by itself. Every sentence of that is true, and it is why this file
+ * does not simply cut the rail off at progress = 1.
+ *
+ * What it missed is that the still beat is not empty. The camera holds, but the
+ * GLOBE STAND is rising through it — that is the whole point of the beat
+ * (`scene/globe-stand.ts`: "the still beat used to hold a bow; now it holds
+ * this"). Keying the fade to `zoom` meant the rail was still at full opacity for
+ * the entire rise and most of the way into the pull-back. A blind playthrough of
+ * the shipped build caught the consequence at ~90% of the track: the pink fill
+ * line and the "6 / 6" counter drawn dark-on-dark across the stand's column and
+ * struts, which is a legibility failure on top of a composition one.
+ *
+ * Aram's call: fade it out as the ending phase begins, and pick the beat so it
+ * never overlaps the pedestal. So the fade is keyed to the ending's own `t` and
+ * not to `zoom`, and it starts on the ending's first frame.
+ *
+ * THE BEAT IS SOLVED, NOT PICKED. The binding event is the moment the stand's
+ * crown crosses the journey camera's bottom frame edge — before that the stand
+ * is geometrically incapable of touching the rail, and after it the two share
+ * pixels. `standBelowJourneyFrame` is exactly that predicate and it already
+ * ships, so the beat is a bisection on it rather than a number in this file. It
+ * comes out at stand = 0.1985, i.e. t = 0.0595 (86.56% of the track), against
+ * the old fade which did not finish until 93.6%.
+ *
+ * THE WINDOW IS SHORT AND THAT IS THE GEOMETRY'S DOING. 0.0595 of a 240vh ending
+ * is about 14vh of scroll, and the fade takes three quarters of it. That is one
+ * wheel notch, which is fast for a fade and is all the room there is: the stand
+ * clears the frame edge a fifteenth of the way into its own rise. The
+ * alternatives were to start the fade during chapter six (Aram said "as the
+ * ending phase begins", and dimming the counter while the traveller is still
+ * using it is the one thing the Task 65 argument correctly forbids) or to cut it
+ * dead at progress = 1, which reads as a glitch on the exact frame the journey
+ * lands. A short eased fade is the honest third option, and it is eased on
+ * SMOOTHERSTEP rather than linearly for that reason — over a window this short a
+ * linear ramp's start and stop are both visible events.
+ *
+ * When it is gone the whole rail is `visibility: hidden` as well as transparent.
  *
  * THE DISMISS CONTROL LEAVES FIRST, and on a LEGIBILITY threshold rather than on
  * a non-zero one. Hiding the rail only at exactly `opacity === 0` answered the
@@ -54,8 +92,49 @@ import { PALETTE } from '../palette'
 const DOT = 9
 const DOT_ACTIVE = 14
 
-/** The rail is fully gone by this much of the pull-back — well before the desk is readable. */
-const RAIL_GONE_AT = 0.28
+/**
+ * The `stand` value at which the globe stand's crown first enters the journey camera's frame —
+ * SOLVED against `globe-stand.ts`'s own containment predicate rather than restated, so retuning the
+ * cradle, the park drop or the camera walks this beat instead of stranding it.
+ *
+ * The bisection is honest because the predicate is monotone: `standOffsetY` eases the whole stand
+ * upward on a smootherstep that never reverses, so the crown's height climbs without a turning
+ * point and `standBelowJourneyFrame` is true then false, exactly once.
+ *
+ * It lands at 0.19847. In closed form the crossing is where the rise has spent `DESK_CLEARANCE` of
+ * its travel — the parked pose is defined as exactly that far below the frame edge — which is a
+ * useful check on the number but not a substitute for asking the shipped predicate.
+ */
+const STAND_ENTERS_FRAME = (() => {
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2
+    if (standBelowJourneyFrame(mid)) lo = mid
+    else hi = mid
+  }
+  return hi
+})()
+
+/**
+ * How much of the stand's approach the rail leaves clear behind it.
+ *
+ * Three quarters: the rail is gone by 0.75 of the way from "parked below the frame" to "first pixel
+ * on screen", so the last quarter of the approach is empty of chrome before anything arrives in it.
+ * A margin rather than a coincidence — gating exactly ON the crossing would put the rail's last
+ * visible frame and the stand's first on the same scroll position, which is the kind of boundary
+ * that is true in arithmetic and wrong on a screen that renders at 60 discrete stops.
+ */
+const RAIL_LEAD = 0.75
+
+/**
+ * The rail is fully gone by this much of the ENDING'S OWN `t` — 0.04466, about 10.7vh of scroll.
+ *
+ * `t` and not `zoom`: the whole of Task 72's finding is that `zoom` is 0 for the entire still beat,
+ * which is precisely the beat the stand arrives on. `stand` is `t / STAND_END` clamped, so the
+ * crossing above maps back through the timeline rather than through a second copy of it.
+ */
+const RAIL_GONE_AT = STAND_ENTERS_FRAME * STAND_END * RAIL_LEAD
 
 /**
  * How much of the rail has to be up for its dismiss control to be honest about being clickable.
@@ -68,11 +147,20 @@ export function railDismissLive(progress: number): boolean {
   return railOpacity(progress) >= DISMISS_LIVE_AT
 }
 
-/** Its opacity at a scroll position, from the ending's own zoom parameter. */
+/**
+ * Its opacity at a scroll position, from the ending's own clock.
+ *
+ * Exact at both ends, which is what lets the rest of the file compare against 0 and 1 rather than
+ * against an epsilon: the journey's whole domain gives `t = 0` (`endingStateAt` returns the shared
+ * idle state for every progress <= 1), and `smootherstep(1)` is exactly 1 · 1 · 1 · (6 − 15 + 10);
+ * past RAIL_GONE_AT the clamp gives exactly 0 and `smootherstep(0)` is exactly 0. Pure in one
+ * input, so a scrub backwards rewinds it bit for bit.
+ */
 export function railOpacity(progress: number): number {
-  const { zoom } = endingStateAt(progress)
-  const v = 1 - zoom / RAIL_GONE_AT
-  return v < 0 ? 0 : v > 1 ? 1 : v
+  const { t } = endingStateAt(progress)
+  const x = 1 - t / RAIL_GONE_AT
+  const v = x < 0 ? 0 : x > 1 ? 1 : x
+  return v * v * v * (v * (v * 6 - 15) + 10)
 }
 
 function chapterAt(progress: number): number {

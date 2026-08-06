@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { ZOOM_START } from '../ending-timeline'
+import { NOTE_SETTLED_ZOOM } from './note-settle'
 import { PALETTE } from '../palette'
 
 /**
@@ -32,10 +33,61 @@ import { PALETTE } from '../palette'
  * visible and fully live, whatever the scroll says. That is why the reveal is state and not CSS.
  */
 
-/** Where each control's own fade sits inside the pull-back. */
-const FIRST_IN = 0.5
-const FADE = 0.34
-const STAGGER = 0.055
+type Control = { key: string; label: string; href?: string }
+
+function controls(): Control[] {
+  return [
+    { key: 'email', label: 'Email', href: `mailto:${siteConfig.email}` },
+    ...socialLinks.map((l) => ({ key: l.name.toLowerCase(), label: l.name, href: l.url })),
+  ]
+}
+
+/** Every control the block stages, the anchors plus the restart. Derived so the schedule below
+ *  cannot fall out of step with the list it is scheduling. */
+const CONTROL_COUNT = controls().length + 1
+
+/**
+ * ── WHEN THE ENTRANCE MAY START (Task 72, review finding C2) ───────────────────────────────────
+ *
+ * The window used to open at 0.5 of the pull-back with a 0.34 fade, and a blind playthrough caught
+ * what that costs: through roughly 96–98% of the track the pills were printed across the note's
+ * second line at up to 0.93 opacity. The reason is in `note-settle.ts` — the note is a static mesh
+ * and it is the CAMERA that moves, sweeping the note up the frame and straight through the pills'
+ * band before the pills have finished arriving.
+ *
+ * So the entrance is no longer authored, it is SOLVED: it starts where the note has stopped
+ * travelling, and everything else is a share of what is left. Aram's instruction was "pills enter
+ * AFTER the note settles"; `NOTE_SETTLED_ZOOM` is what "settles" means as arithmetic, and this is
+ * that instruction with nothing typed in between.
+ *
+ * THE OTHER OPTION HE OFFERED, AND WHY IT IS NOT WHAT SHIPPED. "Or slide with an offset that never
+ * intersects it" is buildable and was worked out: the pills would enter from below the frame's edge
+ * and ride up underneath the note, which needs about 180 px of travel — the offset has to keep a
+ * half-revealed pill below an edge that is still 175 px lower at 97% of the track. It works, and it
+ * turns a 16 px lift into a full slide-in, which is a far louder gesture than the frame Aram
+ * approved contains. Staging late buys the same freedom from the note and leaves the block's
+ * character alone, so the lift stays at 16 px.
+ *
+ * WHAT THE SHAPE OF THE WINDOW PRESERVES. The old numbers spent roughly two parts of the window on
+ * one control's own fade to one part on the spread between controls (0.34 against 3 x 0.055). That
+ * ratio is what makes the arrival read as reading order rather than as a ripple, so it is kept
+ * exactly and the window it is measured against is the only thing that changed. The last control's
+ * fade now closes EXACTLY at 1 by construction rather than 0.0006 short of it — see the note on the
+ * restart's resting reveal below.
+ */
+const FADE_SHARE = 2 / 3
+
+/** What is left of the pull-back once the note has stopped moving: 0.188 of it, about 30vh. */
+const WINDOW = 1 - NOTE_SETTLED_ZOOM
+
+/** Where the first control's fade begins. */
+const FIRST_IN = NOTE_SETTLED_ZOOM
+
+/** How long one control takes to arrive... */
+const FADE = WINDOW * FADE_SHARE
+
+/** ...and how far apart their starts are, so the last one lands exactly as the pull-back ends. */
+const STAGGER = (WINDOW - FADE) / (CONTROL_COUNT - 1)
 
 /**
  * Below this RENDERED opacity a control is not legible enough to be honest about being clickable.
@@ -58,19 +110,18 @@ const smoothstep = (t: number): number => {
  * The ending's own `t` → this control's reveal. `t` is what `JourneyUi.ending` publishes (quantized
  * to 1/60, so the whole scrub costs at most sixty re-renders); the zoom window is re-derived from
  * the timeline's own `ZOOM_START` rather than restated.
+ *
+ * THE LAST CONTROL NOW LANDS AT EXACTLY 1, which the old schedule did not. `restart` is index 3
+ * (there are four controls: the mail anchor, two social anchors, and it), and its window used to
+ * close at zoom 1.005 — so at the bottom of the track it rested at reveal 0.99937, i.e. 99.94%
+ * opacity and 0.0101 px of leftover translate. Nobody could see that, which is exactly why it
+ * survived: it is a control that never finishes its entrance, sitting in the one frame of the lab
+ * that is meant to be finished. The window is solved from `CONTROL_COUNT` now, so the arithmetic
+ * closes on 1 for whatever the list holds rather than for the list it held when someone typed 0.055.
  */
 export function connectReveal(t: number, index: number): number {
   const zoom = (t - ZOOM_START) / (1 - ZOOM_START)
   return smoothstep((zoom - (FIRST_IN + index * STAGGER)) / FADE)
-}
-
-type Control = { key: string; label: string; href?: string }
-
-function controls(): Control[] {
-  return [
-    { key: 'email', label: 'Email', href: `mailto:${siteConfig.email}` },
-    ...socialLinks.map((l) => ({ key: l.name.toLowerCase(), label: l.name, href: l.url })),
-  ]
 }
 
 /**
