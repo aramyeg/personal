@@ -63,7 +63,7 @@ const NARROW_PAGE_STYLES = `
  *
  * The mechanism is deleted rather than left inert, because code in a render path
  * that looks live and never runs is the most expensive kind to keep. It is in git
- * history and the measurements are in task-76-report.md if the question reopens.
+ * history and the measurements are in task-74-report.md if the question reopens.
  */
 
 export function MangaPageArt({

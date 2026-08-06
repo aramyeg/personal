@@ -24,7 +24,7 @@ import { MangaPageArt } from './manga-page'
  * a panel torn out of it reads as damaged, whichever way the remainder is pasted —
  * so every story page renders WHOLE, and the info leaf gets its own generated
  * anchor art instead (`manga/anchors.ts`). The measurements that killed it are in
- * task-76-report.md; the mechanism is in git history if the question ever reopens.
+ * task-74-report.md; the mechanism is in git history if the question ever reopens.
  *
  *  - `scene/props/peeker-stage.ts` keeps the checkpoint mascots clear of these
  *    boxes, and it did so by transcribing the numbers from this file. Task 73's

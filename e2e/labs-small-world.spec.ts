@@ -8,6 +8,13 @@ import {
   chapterDwellProgress,
   chapterTravelProgress,
 } from '../components/labs/small-world/journey-timeline'
+// ...and the words come from the leaf's own spec for the same reason. This test
+// used to assert the literals 'The Pull' and 'Chapter 1', which lived on the data
+// card's eyebrow; Task 76 rebuilt the right leaf as a four-beat manga page in
+// Alwina's FIRST PERSON and that eyebrow — a third-person chapter label — was the
+// thing the rebuild existed to remove. Literals would have gone on failing (or,
+// worse, been "fixed" back to strings the page no longer has a reason to print).
+import { INFO_PAGES } from '../components/labs/small-world/overlay/info-page-spec'
 
 async function webglAvailable(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -86,8 +93,13 @@ test.describe('Small World lab', () => {
     await scrollToProgress(page, chapterDwellProgress(0))
     const panel = page.getByTestId('sw-panel-data')
     await expect(panel).toBeVisible({ timeout: 10_000 })
-    await expect(panel).toContainText('The Pull')
-    await expect(panel).toContainText('Chapter 1')
+    // The leaf IS the info page, and it is chapter 1's. Both halves matter: the
+    // first is structural (the spread mounted the right component), the second is
+    // that it mounted the right CHAPTER — a spread showing chapter 4 at chapter
+    // 1's stop would satisfy the first on its own.
+    await expect(panel.getByTestId('sw-info-page')).toBeVisible({ timeout: 10_000 })
+    await expect(panel).toContainText(INFO_PAGES[0].footer.org, { timeout: 10_000 })
+    await expect(panel).toContainText(INFO_PAGES[0].ketsu.line, { timeout: 10_000 })
   })
 
   test('panel dismisses when scrolling on', async ({ page }) => {
