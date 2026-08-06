@@ -1,5 +1,15 @@
 import * as THREE from 'three'
 import { easeOutBack, revealPhase, smoothstep } from '../../journey-timeline'
+import {
+  BOOK_MOBILE_MAX,
+  PAGE_ASPECT,
+  PAGE_CENTRE_VH,
+  PAGE_INSET_MAX,
+  PAGE_INSET_VW,
+  PAGE_TILT_LEFT_DEG,
+  PAGE_TILT_RIGHT_DEG,
+  pageWidth,
+} from '../../book'
 
 /**
  * Task 56 — staging math for the CHECKPOINT MASCOTS: a per-biome set-dressing frame with its
@@ -19,10 +29,16 @@ import { easeOutBack, revealPhase, smoothstep } from '../../journey-timeline'
  *     understates it by a third; the bake's 1.35·R ceiling budget is the wrong shape. Because
  *     both profile axes are in units of the frustum HALF-HEIGHT, the table is a property of the
  *     world and the camera alone and holds at every viewport.
- *  2. THE COMIC CARDS. `overlayBoxes` reproduces their CSS box exactly (the art card) or
- *     conservatively (the data card, whose height is content-driven), pinned in the tests against
- *     `bench/out-task56-boxes.json` — the real `getBoundingClientRect` of both cards at every
- *     chapter and eleven device frames.
+ *  2. THE OVERLAY. On desktop that is the open book's two leaves and `overlayBoxes` reproduces
+ *     them EXACTLY, from the same constants `chapter-panels.tsx` lays them out with (`../../book`).
+ *     On the phone the spread folds into a stack whose data card is content-driven, and there the
+ *     model stays a conservative over-estimate pinned against `bench/out-task56-boxes.json` — the
+ *     real `getBoundingClientRect` at every chapter and device frame below the breakpoint.
+ *
+ *     This keep-out is the one that has actually bitten. It used to transcribe the card CSS by
+ *     hand, Task 73 grew the art card and moved it down, and nobody re-transcribed: the model
+ *     believed a band was empty that the shipped card covered 47%–61% of. Importing the geometry
+ *     rather than restating it is what makes that class of drift impossible rather than unlikely.
  *  3. THE FRAME EDGES. A composition is anchored to a corner and may crop against its own two
  *     edges; the character's face may not.
  *
@@ -109,19 +125,31 @@ export function worldBlocked(u0: number, u1: number): { top: number; bot: number
   return { top: top + WORLD_MARGIN, bot: bot - WORLD_MARGIN }
 }
 
-// --- the comic cards --------------------------------------------------------
+// --- the overlay: the book's two leaves, and the phone's stack ---------------
 
 export type PxBox = { x0: number; y0: number; x1: number; y1: number }
 
-/** Below this viewport width `chapter-panels.tsx` hides the art card and centres the data card. */
-export const CARD_MOBILE_MAX = 900
-/** Both cards are vertically centred on this fraction of the viewport height (`top: 34vh`). */
-export const CARD_CENTRE_VH = 0.34
+/**
+ * Below this viewport width `chapter-panels.tsx` folds the spread into the phone's stack.
+ *
+ * Re-exported from `book.ts` rather than restated. It was a second copy of 900 and a second copy is
+ * exactly how the last drift happened.
+ */
+export const CARD_MOBILE_MAX = BOOK_MOBILE_MAX
+/**
+ * The fraction of the viewport height the DESKTOP overlay is vertically centred on — which is now
+ * the book's own `PAGE_CENTRE_VH`, because the desktop overlay IS the book.
+ *
+ * It read 0.34 with a comment claiming `top: 34vh` long after Task 73 moved the art card to 50vh.
+ * Kept as a name because it is what this module means by "the cards' centre"; kept honest by being
+ * an alias rather than a number.
+ */
+export const CARD_CENTRE_VH = PAGE_CENTRE_VH
 /** Below the breakpoint the data card instead HANGS from this fraction (`top: 6vh`, no centring). */
 export const CARD_MOBILE_TOP_VH = 0.06
 
 const DEG = Math.PI / 180
-const ART_TILT = 3 * DEG
+/** The phone stack's data card carries its own small tilt; the book's two leaves use `book.ts`. */
 const DATA_TILT = 2 * DEG
 
 /** Axis-aligned bounds of a `w × h` rectangle rotated by `tilt` — what the browser lays out. */
@@ -132,11 +160,18 @@ function tiltedBounds(w: number, h: number, tilt: number): { w: number; h: numbe
 }
 
 /**
- * The data card's CSS height. Content-driven — the copy, the highlight list and the tech chips
- * all vary by chapter — so this is a conservative UPPER bound fitted to the measured set: 492px
- * at the card's full 340px width, growing as the card narrows and the text wraps harder. The
- * tests assert it covers every real measurement in `bench/out-task56-boxes.json` (11 frames x 6
- * chapters) with margin to spare, and being too tall only ever costs a mascot a little size.
+ * The PHONE STACK's data card CSS height. Content-driven — the copy, the highlight list and the
+ * tech chips all vary by chapter — so this is a conservative UPPER bound fitted to the measured
+ * set: 492px at the card's full 340px width, growing as the card narrows and the text wraps
+ * harder. The tests assert it covers every real measurement in `bench/out-task56-boxes.json` below
+ * the breakpoint, and being too tall only ever costs a mascot a little size.
+ *
+ * MOBILE ONLY, and that is a change worth naming. It existed because the old right-hand data card
+ * was content-driven at every width, so its desktop box had to be over-estimated too. The right
+ * LEAF is a fixed 2:3 page, so the desktop branch of `overlayBoxes` is now exact and no longer
+ * calls this at all. It is kept rather than narrowed further because the stack below
+ * `CARD_MOBILE_MAX` really is still content-driven, and mascots do not show there anyway
+ * (`DRESS_MIN_VIEWPORT`) — but the model has to stay honest for the tablet band that does.
  */
 export function dataCardHeight(cardWidth: number): number {
   return 492 + Math.max(0, 340 - cardWidth) * 1.75
@@ -144,33 +179,47 @@ export function dataCardHeight(cardWidth: number): number {
 
 /**
  * The overlay boxes a mascot must stay clear of, in CSS pixels — derived from the panel CSS, not
- * from a screenshot, so they follow a resize. The art card's box is exact (it reproduces the
- * measured rects to within a pixel); the data card's is conservative in height only.
+ * from a screenshot, so they follow a resize.
+ *
+ * Above `CARD_MOBILE_MAX` this is EXACT: both leaves of the open book, computed from the same
+ * `book.ts` constants the stylesheet is generated from, so the model cannot describe a layout the
+ * browser is not drawing. Below it the spread folds into the phone's stack, whose data card is
+ * content-driven; there the box stays a conservative over-estimate.
  */
 export function overlayBoxes(viewport: { width: number; height: number }): PxBox[] {
   const { width: W, height: H } = viewport
-  const cy = CARD_CENTRE_VH * H
-  const out: PxBox[] = []
 
   if (W > CARD_MOBILE_MAX) {
-    const w = Math.min(0.24 * W, 300)
-    const b = tiltedBounds(w, w * 1.5, ART_TILT)
-    const left = Math.min(0.04 * W, 48) - (b.w - w) / 2
-    out.push({ x0: left, y0: cy - b.h / 2, x1: left + b.w, y1: cy + b.h / 2 })
+    // Two leaves of one book: identical 2:3 pages, each inset from ITS OWN frame edge, both
+    // centred on PAGE_CENTRE_VH, splayed by unequal tilts. Nothing here is a number — every term
+    // comes from `book.ts`, which is also what `chapter-panels.tsx` lays out with.
+    const w = pageWidth(viewport)
+    const h = w * PAGE_ASPECT
+    const cy = PAGE_CENTRE_VH * H
+    const inset = Math.min(PAGE_INSET_VW * W, PAGE_INSET_MAX)
+    const leaves: readonly (readonly [Side, number])[] = [
+      [-1, PAGE_TILT_LEFT_DEG],
+      [1, PAGE_TILT_RIGHT_DEG],
+    ]
+    return leaves.map(([side, tiltDeg]) => {
+      // A rotation grows the laid-out box about the element's own centre, so the tilt's overhang
+      // splits evenly either side of where the untilted page sits.
+      const b = tiltedBounds(w, h, tiltDeg * DEG)
+      const x0 = (side < 0 ? inset : W - inset - w) - (b.w - w) / 2
+      return { x0, y0: cy - b.h / 2, x1: x0 + b.w, y1: cy + b.h / 2 }
+    })
   }
 
   // Below the breakpoint the panel's mobile rules re-anchor the data card entirely: it centres
   // horizontally and hangs from `top: 6vh` with no vertical centring at all. Modelling it as
-  // 34vh-centred there put it ~85px too low at 820x1180 and would have let a mascot sit under a
-  // card that is actually still above it.
-  const mobile = W <= CARD_MOBILE_MAX
-  const dw = mobile ? Math.min(0.84 * W, 340) : Math.min(0.27 * W, 340)
-  const db = tiltedBounds(dw, dataCardHeight(dw), DATA_TILT)
-  const dx0 = mobile ? (W - db.w) / 2 : W - Math.min(0.04 * W, 48) - dw - (db.w - dw) / 2
-  const dy0 = mobile ? CARD_MOBILE_TOP_VH * H - (db.h - dataCardHeight(dw)) / 2 : cy - db.h / 2
-  out.push({ x0: dx0, y0: dy0, x1: dx0 + db.w, y1: dy0 + db.h })
-
-  return out
+  // centred on the desktop fraction put it ~85px too low at 820x1180 and would have let a mascot
+  // sit under a card that is actually still above it.
+  const dw = Math.min(0.84 * W, 340)
+  const dh = dataCardHeight(dw)
+  const db = tiltedBounds(dw, dh, DATA_TILT)
+  const dx0 = (W - db.w) / 2
+  const dy0 = CARD_MOBILE_TOP_VH * H - (db.h - dh) / 2
+  return [{ x0: dx0, y0: dy0, x1: dx0 + db.w, y1: dy0 + db.h }]
 }
 
 /**
@@ -391,9 +440,15 @@ export function peekerAnchor(
   halfH: number,
   halfW: number,
   viewport: { width: number; height: number },
-  side: Side
+  side: Side,
+  /**
+   * The overlay boxes to stage around. Defaults to what the panel CSS produces, which is what the
+   * scene passes; it is a parameter so a bench can ask "how big a mascot would this candidate page
+   * geometry leave?" without mutating the module. `peekerCardClearance` already took the same
+   * override for the same reason.
+   */
+  cards: PxBox[] = overlayBoxes(viewport)
 ): PeekerAnchor {
-  const cards = overlayBoxes(viewport)
   const cap = PEEKER_SIZE_FRAC * halfH
 
   const search = (mode: 'pair' | 'dressing', floor: number) => {
@@ -683,8 +738,14 @@ export function peekerWorldClearance(
 }
 
 /**
- * Smallest gap (CSS px) between a side's MASCOT box and any overlay card, at its parked pose.
- * Positive means the character is fully clear of both cards — the rework's headline requirement.
+ * Smallest gap (CSS px) between a side's MASCOT box and any overlay box, at its parked pose.
+ * Positive means the character is fully clear of both leaves — the rework's headline requirement.
+ *
+ * `cards` overrides the overlay for both halves of the question — the staging AND the measurement.
+ * It used to override only the measurement, so asking "how would this candidate page geometry do?"
+ * silently measured a candidate spread against a mascot staged around the SHIPPED one, and could
+ * report a negative gap for a corner the rig would in fact have shrunk or stood down. That is the
+ * same class of half-applied model this whole task exists to remove.
  */
 export function peekerCardClearance(
   viewport: { width: number; height: number },
@@ -694,7 +755,7 @@ export function peekerCardClearance(
 ): number {
   const halfH = peekerHalfHeight(fovDeg)
   const halfW = (halfH * viewport.width) / viewport.height
-  const anchor = peekerAnchor(halfH, halfW, viewport, side)
+  const anchor = peekerAnchor(halfH, halfW, viewport, side, cards)
   if (!anchor.visible) return Infinity
   const m = rectFor(anchor.size, side, anchor.x, anchor.y, MASCOT_BOX)
   // back to pixels

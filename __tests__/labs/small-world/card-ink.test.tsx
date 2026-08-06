@@ -16,6 +16,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { ChapterPanels } from '@/components/labs/small-world/overlay/chapter-panels'
 import { chapters } from '@/components/labs/small-world/chapters'
+import { INFO_PAGES } from '@/components/labs/small-world/overlay/info-page-spec'
 import { PALETTE } from '@/components/labs/small-world/palette'
 
 afterEach(cleanup)
@@ -56,7 +57,7 @@ function hexesIn(root: HTMLElement): string[] {
 }
 
 const spread = (index: number) =>
-  render(<ChapterPanels chapter={chapters[index]} index={index} enter={1} onAdvance={null} />)
+  render(<ChapterPanels index={index} enter={1} onAdvance={null} />)
 
 describe('the spread is printed in one ink', () => {
   it.each(chapters.map((c, i) => [i + 1, c.theme] as const))(
@@ -94,22 +95,43 @@ describe('the spread is printed in one ink', () => {
     expect(screen.getByTestId('sw-panel-data').style.background).toContain(rgb(PALETTE.pagePaper))
   })
 
-  it('gives the figures pink ink and the tech labels none', () => {
-    spread(3) // qiibee: three stamps and three labels, the busiest record panel
-    for (const stamp of screen.getAllByTestId('sw-story-stamp')) {
+  it('gives the figures pink ink, and the tools none', () => {
+    spread(3) // qiibee: the busiest page — stamps, a thirteen-flag tally and a full rail
+    for (const stamp of screen.getAllByTestId('sw-info-stamp')) {
+      // The NUMERAL is pink; its label is ink. A stamp whose label was also pink
+      // read as a pink block rather than as a figure with a caption.
       expect(stamp.style.color).toBe(rgb(PALETTE.blossomDeep))
-      // Ink over tone, not a chip laid on top of it.
-      expect(stamp.style.background).toBe('transparent')
+    }
+    for (const tool of screen.getAllByTestId('sw-info-tool')) {
+      expect(tool.style.color).toBe(rgb(PALETTE.ink))
+      expect(tool.style.background).toContain(rgb(PALETTE.pagePaper))
     }
   })
 
-  it('rests the stamps off square, so a row of figures never squares up like buttons', () => {
+  it('draws the count instead of writing it', () => {
+    // Thirteen brands is the claim of chapter 4, and the page has to make it
+    // WITHOUT being read: thirteen pennants, drawn, that can be counted at a
+    // glance and take no sentence to explain.
     spread(3)
-    const angles = screen
-      .getAllByTestId('sw-story-stamp')
-      .map((s) => Number(/rotate\((-?[\d.]+)deg\)/.exec(s.style.transform)?.[1]))
-    expect(angles.every((a) => Number.isFinite(a) && a !== 0)).toBe(true)
-    // ...and they do not all lean the same way either.
-    expect(new Set(angles.map(Math.sign)).size).toBeGreaterThan(1)
+    const tally = screen.getByTestId('sw-info-tally')
+    expect(tally.dataset.count).toBe('13')
+    expect(tally.querySelectorAll('svg')).toHaveLength(13)
+  })
+
+  it('says it once, in her own voice', () => {
+    // The premise: minimal reading. One sentence per page, first person. A page
+    // that grew a second paragraph would be the old data card coming back.
+    for (let i = 0; i < INFO_PAGES.length; i++) {
+      const captions = INFO_PAGES[i].rows
+        .flatMap((r) => r.cells)
+        .filter((c) => c.panel.kind === 'caption')
+      expect(captions, `chapter ${i + 1} has exactly one sentence`).toHaveLength(1)
+      const text = (captions[0].panel as { text: string }).text
+      expect(text.length, `chapter ${i + 1}'s line stays short enough to be looked at`).toBeLessThan(75)
+      // First person, and never the third: "she"/"her" as a subject is the voice
+      // the old card had and the reason this one exists.
+      expect(/\b(I|my|me|mine|myself)\b/i.test(text), `chapter ${i + 1} speaks as herself`).toBe(true)
+      expect(/\bshe\b/i.test(text), `chapter ${i + 1} avoids the third person`).toBe(false)
+    }
   })
 })

@@ -3,7 +3,8 @@ import { act, render, screen } from '@testing-library/react'
 import { JourneyOverlay } from '@/components/labs/small-world/overlay/journey-overlay'
 import { firePanelAdvance, panelTapArmed } from '@/components/labs/small-world/panel-tap'
 import { initialArrival } from '@/components/labs/small-world/arrival'
-import { CHAPTER_COUNT, chapters } from '@/components/labs/small-world/chapters'
+import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { INFO_PAGES } from '@/components/labs/small-world/overlay/info-page-spec'
 import { ENDING_SPAN, TRACK_END } from '@/components/labs/small-world/ending-timeline'
 import type { RevealState } from '@/components/labs/small-world/journey-timeline'
 import {
@@ -57,9 +58,12 @@ describe('JourneyOverlay', () => {
     ref.current = chapterDwellProgress(0)
     fireScroll()
     const panel = screen.getByTestId('sw-panel-data')
-    expect(panel.textContent).toContain(chapters[0].theme)
-    expect(panel.textContent).toContain(chapters[0].hook)
-    expect(panel.textContent).toContain(chapters[0].caption)
+    // TASK 75: the right leaf is a manga page in Alwina's own voice with its own
+    // copy, not a projection of the narrator's `chapters` data, so it is asserted
+    // against the page it actually prints.
+    expect(panel.textContent).toContain(INFO_PAGES[0].footer.org)
+    expect(panel.textContent).toContain(INFO_PAGES[0].footer.role)
+    expect(panel.textContent).toContain(INFO_PAGES[0].footer.period)
   })
 
   it('advances to the next chapter on tap', () => {
@@ -190,7 +194,7 @@ describe('JourneyOverlay', () => {
     const ref = { current: lastDwell }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
     expect(screen.getByTestId('sw-panel-data').textContent).toContain(
-      chapters[CHAPTER_COUNT - 1].hook
+      INFO_PAGES[CHAPTER_COUNT - 1].footer.org
     )
   })
 })

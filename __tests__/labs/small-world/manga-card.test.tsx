@@ -3,7 +3,8 @@ import { act, fireEvent, render, screen, cleanup } from '@testing-library/react'
 import { ChapterPanels } from '@/components/labs/small-world/overlay/chapter-panels'
 import { chapters } from '@/components/labs/small-world/chapters'
 import { panelTapArmed, setPanelAdvance } from '@/components/labs/small-world/panel-tap'
-import { pressAt } from '@/components/labs/small-world/overlay/story-card'
+import { pressAt } from '@/components/labs/small-world/overlay/info-page'
+import { INFO_PAGES } from '@/components/labs/small-world/overlay/info-page-spec'
 
 afterEach(() => {
   cleanup()
@@ -11,7 +12,7 @@ afterEach(() => {
 })
 
 const spread = (onAdvance: (() => void) | null = vi.fn()) => {
-  render(<ChapterPanels chapter={chapters[2]} index={2} enter={1} onAdvance={onAdvance} />)
+  render(<ChapterPanels index={2} enter={1} onAdvance={onAdvance} />)
   return { card: screen.getByTestId('sw-manga-card'), root: screen.getByTestId('sw-panel-tap') }
 }
 
@@ -76,37 +77,50 @@ describe('the art card', () => {
   })
 })
 
-describe('the story card', () => {
-  it('leads with the hook and closes with the credit', () => {
+describe('the info leaf', () => {
+  // RESTATED IN TASK 75, and the restatement is the round rather than a
+  // concession to it. These used to assert the right-hand card echoed
+  // `chapters[2]` — its hook, its lines, its caption — because the card was a
+  // projection of the story data in the THIRD PERSON. The right leaf is now a
+  // manga page in Alwina's own voice with its own copy (`info-page-spec.ts`), so
+  // asserting it repeats the narrator's sentences would be asserting the defect.
+  it('speaks in the first person, from its own spec', () => {
     spread()
-    const data = screen.getByTestId('sw-panel-data')
-    expect(data.textContent).toContain(chapters[2].theme)
-    expect(data.textContent).toContain(chapters[2].hook)
-    expect(data.textContent).toContain(chapters[2].caption)
-    for (const stamp of chapters[2].stamps) expect(data.textContent).toContain(stamp)
+    const leaf = screen.getByTestId('sw-panel-data')
+    const spec = INFO_PAGES[2]
+    const caption = spec.rows.flatMap((r) => r.cells).find((c) => c.panel.kind === 'caption')!.panel
+    expect(caption.kind).toBe('caption')
+    expect(leaf.textContent).toContain(caption.kind === 'caption' ? caption.text : '')
+    expect(leaf.textContent).toContain(spec.footer.org)
+    expect(leaf.textContent).toContain(spec.footer.period)
+    // ...and it does NOT carry the narrator's third-person hook any more.
+    expect(leaf.textContent).not.toContain(chapters[2].hook)
   })
 
-  it('renders one stamp per figure', () => {
+  it('stamps every figure its page claims', () => {
     spread()
-    expect(screen.getAllByTestId('sw-story-stamp')).toHaveLength(chapters[2].stamps.length)
+    const figures = INFO_PAGES[2].rows
+      .flatMap((r) => r.cells)
+      .flatMap((c) => (c.panel.kind === 'stamps' ? c.panel.figures : []))
+    expect(figures.length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('sw-info-stamp')).toHaveLength(figures.length)
+    for (const f of figures) expect(screen.getByTestId('sw-panel-data').textContent).toContain(f.value)
   })
 
   it('presses the stamps last, and one after another', () => {
-    // The figures are the claim the rest of the card has just earned, so they
+    // The figures are the claim the rest of the page has just earned, so they
     // land after it. Asserted on the timing function rather than on a rendered
     // opacity, because the spread's entrance runs through easeOutBack — which
     // OVERSHOOTS past 1, so a mid-entrance `enter` prop does not mean a
-    // mid-entrance card and a render-level assertion would be measuring the
+    // mid-entrance page and a render-level assertion would be measuring the
     // easing rather than the staging.
-    expect(pressAt(0.4, 0, 3)).toBe(0)
-    expect(pressAt(0.6, 0, 3)).toBe(0)
-    expect(pressAt(0.8, 0, 3)).toBeGreaterThan(0)
-    expect(pressAt(0.8, 0, 3)).toBeGreaterThan(pressAt(0.8, 1, 3))
-    expect(pressAt(0.8, 1, 3)).toBeGreaterThan(pressAt(0.8, 2, 3))
-    // AND EVERY STAMP IS FULLY PRESSED WHEN THE ENTRANCE ENDS. `enter` parks at
-    // 1 for the whole dwell, so a last stamp whose window ran past 1 would sit
-    // over-sized and crooked for as long as the reader looked at it — which is
-    // exactly what a fixed stagger did to the two three-figure chapters.
+    expect(pressAt(0, 0, 3)).toBe(0)
+    expect(pressAt(0.3, 0, 3)).toBeGreaterThan(0)
+    expect(pressAt(0.3, 0, 3)).toBeGreaterThan(pressAt(0.3, 1, 3))
+    expect(pressAt(0.5, 1, 3)).toBeGreaterThan(pressAt(0.5, 2, 3))
+    // AND EVERY STAMP IS FULLY PRESSED WHEN THE ENTRANCE ENDS. The clock parks
+    // at 1 for the whole dwell, so a last stamp whose window ran past 1 would
+    // sit over-sized and crooked for as long as the reader looked at it.
     for (const count of [1, 2, 3, 4]) {
       for (let i = 0; i < count; i++) expect(pressAt(1, i, count), `${i + 1} of ${count}`).toBe(1)
     }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  CARD_CENTRE_VH,
+  CARD_MOBILE_MAX,
   CARD_PAD,
   DRESS_MIN_SIZE_FRAC,
   DRESS_MIN_VIEWPORT,
@@ -46,6 +48,16 @@ import {
 } from '@/components/labs/small-world/scene/props/peeker-stage'
 import { PEEKER_SPECS } from '@/components/labs/small-world/scene/props/peeker-cast'
 import {
+  BOOK_MOBILE_MAX,
+  PAGE_ASPECT,
+  PAGE_CENTRE_VH,
+  PAGE_INSET_MAX,
+  PAGE_INSET_VW,
+  PAGE_TILT_LEFT_DEG,
+  PAGE_TILT_RIGHT_DEG,
+  pageWidth,
+} from '@/components/labs/small-world/book'
+import {
   CAMERA_DISTANCE as SHIPPED_DISTANCE,
   CAMERA_FOV as SHIPPED_FOV,
   ZOOM_FACTOR,
@@ -69,11 +81,23 @@ const CAMERA_DISTANCE = 12.1
 const CEILING = 2.97
 
 /**
- * The comic cards' REAL boxes, read off the running lab with `getBoundingClientRect` by
+ * The overlay's REAL boxes, read off the running lab with `getBoundingClientRect` by
  * `.superpowers/sdd/bench/task56-measure.mjs` at eleven device frames — each row the union over
  * all six chapters, because the data card's height is content-driven and the worst chapter is not
  * the same one at every width. `overlayBoxes` is checked against these: it may be conservative
  * (larger), never optimistic.
+ *
+ * SUPERSEDED ABOVE THE BREAKPOINT, and deliberately kept rather than deleted so the supersession
+ * is visible. These rows describe the TWO COMIC CARDS — an art card at `min(24vw, 300px)` and a
+ * content-driven data card — and the desktop overlay is no longer that: it is the open book's two
+ * equal 2:3 leaves, whose geometry lives in `components/labs/small-world/book.ts`.
+ *
+ * The rows are still the truth BELOW the breakpoint, where the phone's stack is unchanged and its
+ * card's height is still content-driven, so that is the only band they are asserted over now. The
+ * desktop band is checked against `book.ts` instead — exactly, not conservatively, because a page
+ * has no content in it to over-estimate. Re-measuring the desktop rows would be re-measuring a
+ * layout that has been replaced; pinning the model to its own source of truth is what actually
+ * prevents the recurrence (the original defect was a stale transcription passing a stale fixture).
  */
 const MEASURED_CARDS: {
   frame: string
@@ -107,56 +131,85 @@ const anchorAt = (w: number, h: number, side: Side) => {
   return peekerAnchor(halfH, (halfH * w) / h, { width: w, height: h }, side)
 }
 
+/** The rows the phone-stack model is still the model for. */
+const MOBILE_MEASURED = MEASURED_CARDS.filter((r) => r.w <= BOOK_MOBILE_MAX)
+
 describe('overlay keep-out model', () => {
-  it('covers every measured card box, at every frame', () => {
-    for (const row of MEASURED_CARDS) {
+  it('covers every measured card box below the breakpoint', () => {
+    // Restated from "at every frame". Above the breakpoint the fixture describes the two comic
+    // cards, which no longer exist; the desktop band is gated against `book.ts` in the next test
+    // and, end to end, in `book-staging.test.ts`.
+    expect(MOBILE_MEASURED.length, 'the fixture still covers the phone band').toBeGreaterThan(3)
+    for (const row of MOBILE_MEASURED) {
       const boxes = overlayBoxes({ width: row.w, height: row.h })
-      const measured = [row.art, row.data].filter(Boolean) as [number, number, number, number][]
-      expect(boxes.length, row.frame).toBe(measured.length)
-      for (const m of measured) {
-        // the modelled box that overlaps this measured one must CONTAIN it
-        const box = boxes.find((b) => b.x0 < m[2] && b.x1 > m[0])
-        expect(box, `${row.frame} has a model for ${m.join(',')}`).toBeDefined()
-        expect(box!.x0, `${row.frame} x0`).toBeLessThanOrEqual(m[0] + 1)
-        expect(box!.y0, `${row.frame} y0`).toBeLessThanOrEqual(m[1] + 1)
-        expect(box!.x1, `${row.frame} x1`).toBeGreaterThanOrEqual(m[2] - 1)
-        expect(box!.y1, `${row.frame} y1`).toBeGreaterThanOrEqual(m[3] - 1)
+      expect(row.art, `${row.frame} is below the breakpoint, so there is no second card`).toBeNull()
+      expect(boxes.length, row.frame).toBe(1)
+      const m = row.data
+      const box = boxes[0]
+      expect(box.x0, `${row.frame} x0`).toBeLessThanOrEqual(m[0] + 1)
+      expect(box.y0, `${row.frame} y0`).toBeLessThanOrEqual(m[1] + 1)
+      expect(box.x1, `${row.frame} x1`).toBeGreaterThanOrEqual(m[2] - 1)
+      expect(box.y1, `${row.frame} y1`).toBeGreaterThanOrEqual(m[3] - 1)
+    }
+  })
+
+  it('is not slack: each leaf reproduces the book geometry exactly', () => {
+    // Restated from "the art card reproduces its measurement to the pixel". Same property, new
+    // source of truth: a page is pure CSS with no content in it, so the model must be EXACT rather
+    // than padded — and now it is exact against the constants the stylesheet is built from instead
+    // of against a screenshot, which is the part that had gone stale.
+    for (const [w, h] of [[1440, 900], [1920, 1080], [1024, 768]] as const) {
+      const [left, right] = overlayBoxes({ width: w, height: h })
+      const pw = pageWidth({ width: w, height: h })
+      const ph = pw * PAGE_ASPECT
+      const inset = Math.min(PAGE_INSET_VW * w, PAGE_INSET_MAX)
+      const cy = PAGE_CENTRE_VH * h
+      for (const [box, tilt, untiltedX0] of [
+        [left, PAGE_TILT_LEFT_DEG, inset],
+        [right, PAGE_TILT_RIGHT_DEG, w - inset - pw],
+      ] as const) {
+        const c = Math.abs(Math.cos((tilt * Math.PI) / 180))
+        const s = Math.abs(Math.sin((tilt * Math.PI) / 180))
+        const bw = pw * c + ph * s
+        const bh = pw * s + ph * c
+        expect(box.x1 - box.x0, `${w}x${h} leaf width`).toBeCloseTo(bw, 6)
+        expect(box.y1 - box.y0, `${w}x${h} leaf height`).toBeCloseTo(bh, 6)
+        expect(box.x0, `${w}x${h} leaf x0`).toBeCloseTo(untiltedX0 - (bw - pw) / 2, 6)
+        expect((box.y0 + box.y1) / 2, `${w}x${h} leaf centre`).toBeCloseTo(cy, 6)
       }
     }
   })
 
-  it('is not slack: the art card reproduces its measurement to the pixel', () => {
-    // The art card's box is pure CSS with no content in it, so the model should be exact — this
-    // is what proves the derivation is right rather than merely padded until the test passed.
-    for (const row of MEASURED_CARDS) {
-      if (!row.art) continue
-      const art = overlayBoxes({ width: row.w, height: row.h })[0]
-      expect(Math.abs(art.x0 - row.art[0]), row.frame).toBeLessThan(1)
-      expect(Math.abs(art.y0 - row.art[1]), row.frame).toBeLessThan(1)
-      expect(Math.abs(art.x1 - row.art[2]), row.frame).toBeLessThan(1)
-      expect(Math.abs(art.y1 - row.art[3]), row.frame).toBeLessThan(1)
-    }
-  })
-
-  it('never over-estimates the data card by more than a card-height', () => {
-    // Conservative is safe; wildly conservative would quietly shrink every mascot.
-    for (const row of MEASURED_CARDS) {
-      const boxes = overlayBoxes({ width: row.w, height: row.h })
-      const data = boxes[boxes.length - 1]
+  it('never over-estimates the phone card by more than a card-height', () => {
+    // Conservative is safe; wildly conservative would quietly shrink every mascot. Scoped to the
+    // phone band for the same reason as above — on desktop there is nothing left to over-estimate,
+    // so the ratio there is exactly 1 by construction.
+    for (const row of MOBILE_MEASURED) {
+      const data = overlayBoxes({ width: row.w, height: row.h })[0]
       const measuredH = row.data[3] - row.data[1]
       expect(data.y1 - data.y0, row.frame).toBeLessThan(measuredH * 1.35)
     }
   })
 
-  it('the data-card height model grows as the card narrows', () => {
+  it('the phone card height model grows as the card narrows', () => {
+    // Unchanged and still true: `dataCardHeight` is now reached only from the mobile branch, and
+    // the stack it models is content-driven exactly as it was.
     expect(dataCardHeight(340)).toBe(492)
     expect(dataCardHeight(276)).toBeGreaterThan(dataCardHeight(340))
     expect(dataCardHeight(246)).toBeGreaterThan(dataCardHeight(276))
   })
 
-  it('hides the art card exactly where the panel CSS does', () => {
-    expect(overlayBoxes({ width: 901, height: 800 })).toHaveLength(2)
-    expect(overlayBoxes({ width: 900, height: 800 })).toHaveLength(1)
+  it('folds the spread into one card exactly where the panel CSS does', () => {
+    // Restated only in name: above the breakpoint there are two boxes, below it one. What the two
+    // boxes ARE changed (an art card plus a data card became two leaves of a book); that the count
+    // flips at `BOOK_MOBILE_MAX` did not, and it is the same behaviour being pinned.
+    expect(overlayBoxes({ width: BOOK_MOBILE_MAX + 1, height: 800 })).toHaveLength(2)
+    expect(overlayBoxes({ width: BOOK_MOBILE_MAX, height: 800 })).toHaveLength(1)
+    expect(CARD_MOBILE_MAX, 'one breakpoint, not two copies of 900').toBe(BOOK_MOBILE_MAX)
+    // ...and the desktop centre is the book's, not a transcription of it. This equality is the
+    // whole fix: the old value was 0.34 with a comment claiming `top: 34vh` months after Task 73
+    // had moved the card to 50vh.
+    expect(CARD_CENTRE_VH).toBe(PAGE_CENTRE_VH)
   })
 })
 

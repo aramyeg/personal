@@ -1,6 +1,5 @@
 'use client'
 import type { MutableRefObject } from 'react'
-import { chapters } from '../chapters'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
@@ -51,7 +50,6 @@ export function JourneyOverlay({
           (aa399f6) exists to forbid. */}
       {ui.panel && (
         <ChapterPanels
-          chapter={chapters[ui.panel.chapter]}
           index={ui.panel.chapter}
           enter={ui.panel.enter}
           onAdvance={
