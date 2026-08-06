@@ -27,6 +27,10 @@ import { StoryCard } from './story-card'
  * `--sw-enter` (set once on the root, inherited) drives the entrance through
  * calc()/var(); `!important` is required to beat the desktop inline transforms,
  * which are more specific than any rule here.
+ *
+ * THIS IS A TEMPLATE LITERAL, so nothing between the backticks below may contain
+ * one — a backtick in a CSS comment ends the string and the file stops parsing.
+ * Quote identifiers in these comments plainly, not in code ticks.
  */
 const MOBILE_STYLES = `
   @media (max-width: 900px) {
@@ -50,14 +54,41 @@ const MOBILE_STYLES = `
       max-height: 52vh !important;
       overflow: hidden !important;
     }
-    /* The card's padding lives on its two PANELS now (Task 74 made it a page:
-       story panel, ink gutter, record panel), so the phone tightens those rather
-       than the frame — padding on the frame would push the gutter rule in off the
-       ink it is supposed to meet. The side gutter is one variable because the
-       narrator label's bleed is negated from it. */
+    /* ------------------------------------------------------------------
+       THE PHONE CARD HAS TO FIT INSIDE ITS OWN FRAME.
+       ------------------------------------------------------------------
+       The cap above is a hard clip, and the card's last line is the CREDIT —
+       who the chapter is actually about. Measured at 390x844 (the widest the
+       stack ever is, so the worst case), chapter 5 overflowed by 32px BEFORE
+       this round: its credit's second line was already being cut, silently.
+       Task 74's two panels and narrator label added 22px more.
+       Growing the box is not the answer. The data card is capped at 52vh = 439px
+       and the comic card beside it is min(108vw, 450px, 87vh) = 421px tall on
+       this viewport — they are deliberately the same size, which is what makes
+       the stack read as a stack, and 4vh + 52vh is also what leaves the top of
+       the screen to the girl (T71's finding). So the CONTENT gives instead, and
+       it gives from the two places a phone has slack: the leading between the
+       card's blocks, and a hook set at desktop size in a 270px column.
+       The numbers below are solved against bench/task74-overflow.mjs, which
+       reports scrollHeight − clientHeight per chapter; the round is not done
+       until all six read 0. The card's padding lives on its two PANELS now, so
+       the phone tightens those rather than the frame — padding on the frame
+       would push the gutter rule in off the ink it is meant to meet — and the
+       side gutter is one variable because the narrator label's bleed is negated
+       from it. */
     .sw-panel-data { --sw-card-pad: 15px !important; }
-    .sw-panel-data .sw-card-story { padding-top: 13px !important; padding-bottom: 11px !important; }
-    .sw-panel-data .sw-card-record { padding-top: 11px !important; padding-bottom: 10px !important; }
+    .sw-panel-data .sw-card-story { padding-top: 11px !important; padding-bottom: 9px !important; }
+    .sw-panel-data .sw-card-record { padding-top: 9px !important; padding-bottom: 8px !important; }
+    .sw-panel-data .sw-card-eyebrow { margin-bottom: 7px !important; padding-top: 3px !important; padding-bottom: 3px !important; }
+    /* 18px, not 21. Hierarchy is a RATIO and it survives: against the 13.5px
+       body this is still 1.33, and on chapter 5 it is the difference between a
+       four-line hook and a three-line one. Nothing here goes anywhere near the
+       11px floor T73 fought for — that was 6px captions, a different problem in
+       the opposite direction. */
+    .sw-panel-data .sw-card-hook { font-size: 18px !important; margin-bottom: 8px !important; }
+    .sw-panel-data .sw-card-line { margin-bottom: 5px !important; }
+    .sw-panel-data .sw-card-stamps { margin-top: 10px !important; }
+    .sw-panel-data .sw-card-credit { margin-top: 9px !important; }
     /* The one behind: lifted and turned so its shoulder shows, and dimmed so
        the front card keeps the contrast. */
     [data-front='comic'] .sw-panel-data,
@@ -74,6 +105,49 @@ const MOBILE_STYLES = `
     [data-front='comic'] .sw-panel-art,
     [data-front='details'] .sw-panel-data { z-index: 2 !important; }
     [data-front='details'] .sw-panel-art { pointer-events: none !important; }
+  }
+
+  /* ------------------------------------------------------------------
+     AND THE SMALL PHONE PAYS MORE, BECAUSE IT HAS LESS.
+     ------------------------------------------------------------------
+     390x844 is not the worst case, and assuming it was is what nearly
+     shipped this. Two axes squeeze the card and only one of them is width:
+
+     WIDTH. At 360 the card is 251px against 281, so on chapter 5 every body
+     sentence takes a second line, the tech labels take a third row and the
+     stamps take a third. Measured, content that fits at 390 with 9px to
+     spare overflowed 360 by 53px.
+
+     HEIGHT, which is the one a max-width rule cannot see at all. The cap
+     is 52vh and the content is in px, so a SHORT phone is squeezed without
+     being narrow: at 390x700 the cap is 364px and stage one's chapter 5
+     needs 422. Hence the second half of the query.
+
+     Every rule below gives up something CHEAPER at this size than a cut
+     credit line: the hand-pressed baseline scatter under the stamps (a
+     desktop delight that costs a whole row here), the leading, and the
+     label metrics. Everything that carries meaning stays above 11px.
+
+     THIS DOES NOT FULLY CLOSE THE SHORT-PHONE CASE and the report says so
+     with numbers — under about 780px of viewport height chapters 4-6 still
+     clip, though by roughly half what they clipped before this round. Fixing
+     it outright means either raising the 52vh cap (which is T71's "leave the
+     top of the screen to the girl", not this round's to overrule) or the
+     proper answer: size the card's type in cqw against the CARD, the way the
+     comic page next to it already sizes its lettering. Both are written up in
+     task-74-report.md. */
+  @media (max-width: 380px), (max-width: 900px) and (max-height: 800px) {
+    .sw-panel-data .sw-card-story { padding-top: 9px !important; padding-bottom: 6px !important; }
+    .sw-panel-data .sw-card-record { padding-top: 7px !important; padding-bottom: 6px !important; }
+    .sw-panel-data .sw-card-eyebrow { margin-bottom: 5px !important; padding-top: 2px !important; padding-bottom: 2px !important; }
+    .sw-panel-data .sw-card-hook { font-size: 16px !important; margin-bottom: 6px !important; }
+    .sw-panel-data .sw-card-line { line-height: 1.3 !important; margin-bottom: 4px !important; }
+    .sw-panel-data .sw-card-record span { font-size: 11.5px !important; padding-left: 7px !important; padding-right: 7px !important; }
+    /* The scatter goes, not the tilt: a stamp still lands off square, it just
+       stops carrying its neighbours' rows down with it. */
+    .sw-panel-data .sw-card-stamps > span { margin-top: 0 !important; }
+    .sw-panel-data .sw-card-stamps { margin-top: 6px !important; gap: 6px !important; }
+    .sw-panel-data .sw-card-credit { margin-top: 6px !important; }
   }
 `
 

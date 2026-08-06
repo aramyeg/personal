@@ -127,6 +127,7 @@ export function StoryCard({ chapter, index, enter }: { chapter: Chapter; index: 
             The bleed is the panel's OWN padding negated, so the phone's tighter
             padding moves the label with it instead of past the frame. */}
         <p
+          className="sw-card-eyebrow"
           data-sw-text="card-caption"
           style={{
             display: 'inline-block',
@@ -145,12 +146,15 @@ export function StoryCard({ chapter, index, enter }: { chapter: Chapter; index: 
           Chapter {index + 1} · {chapter.theme}
         </p>
 
-        <h2 style={{ fontFamily: 'var(--sw-font-display)', fontSize: 21, lineHeight: 1.2, margin: '0 0 10px' }}>
+        <h2
+          className="sw-card-hook"
+          style={{ fontFamily: 'var(--sw-font-display)', fontSize: 21, lineHeight: 1.2, margin: '0 0 10px' }}
+        >
           {chapter.hook}
         </h2>
 
         {chapter.lines.map((line) => (
-          <p key={line} style={{ fontSize: 13.5, lineHeight: 1.45, margin: '0 0 6px' }}>
+          <p key={line} className="sw-card-line" style={{ fontSize: 13.5, lineHeight: 1.45, margin: '0 0 6px' }}>
             {line}
           </p>
         ))}
@@ -184,13 +188,17 @@ export function StoryCard({ chapter, index, enter }: { chapter: Chapter; index: 
           ))}
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 8, margin: '14px 0 0' }}>
+        <div
+          className="sw-card-stamps"
+          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 8, margin: '14px 0 0' }}
+        >
           {chapter.stamps.map((stamp, i) => (
             <Stamp key={stamp} label={stamp} index={i} press={pressAt(enter, i, chapter.stamps.length)} />
           ))}
         </div>
 
         <p
+          className="sw-card-credit"
           data-sw-text="card-credit"
           // Slightly firmer than the 0.72 it carried on plain cream: the tone under
           // it costs the smallest type on the card some of its contrast, and the
