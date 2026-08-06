@@ -65,20 +65,27 @@ function arriveAt(ch: number): { state: ArrivalState; raw: number } {
 
 describe('dwellChapterAt', () => {
   it('is null while travelling and names the chapter across its whole dwell', () => {
-    expect(dwellChapterAt(at(2, 0.2))).toBeNull()
+    expect(dwellChapterAt(at(2, TRAVEL_END / 2))).toBeNull()
     expect(dwellChapterAt(at(2, TRAVEL_END - 1e-6))).toBeNull()
     // (a hair past the boundary: `at` rounds the segment arithmetic, so the exact
     // edge lands either side of TRAVEL_END by ~1e-16 — the window is not a beat)
     expect(dwellChapterAt(at(2, TRAVEL_END + 1e-9))).toBe(2)
-    expect(dwellChapterAt(at(2, 0.8))).toBe(2)
-    expect(dwellChapterAt(at(2, PANEL_END))).toBeNull()
+    expect(dwellChapterAt(at(2, (TRAVEL_END + PANEL_END) / 2))).toBe(2)
+    // (same 1e-9 nudge, same reason, at the other edge: `at` rounds the segment arithmetic, so
+    // the exact PANEL_END lands a float below it and reads as still inside the dwell)
+    expect(dwellChapterAt(at(2, PANEL_END + 1e-9))).toBeNull()
   })
 
   it('opens exactly where rotation freezes, so absorption can never move the world', () => {
     // The renewal/tide proofs are functions of ROTATION. Absorption only ever runs
     // inside this window — and rotation is constant across all of it.
     const start = journeyStateAt(at(3, TRAVEL_END)).rotation
-    for (const local of [TRAVEL_END, 0.7, 0.85, PANEL_END - 1e-6]) {
+    for (const local of [
+      TRAVEL_END,
+      TRAVEL_END + (PANEL_END - TRAVEL_END) * 0.4,
+      TRAVEL_END + (PANEL_END - TRAVEL_END) * 0.8,
+      PANEL_END - 1e-6,
+    ]) {
       expect(journeyStateAt(at(3, local)).rotation).toBeCloseTo(start, 12)
     }
   })
@@ -301,7 +308,7 @@ describe('scroll absorption', () => {
     const { state, raw } = arriveAt(1)
     const parked = drive(state, { frames: 120, scroll: () => raw }).pop()!
     // Leave for long enough that the reveal fully retracts: the visit is over.
-    const away = drive(parked, { frames: 90, scroll: () => at(1, 0.2) }).pop()!
+    const away = drive(parked, { frames: 90, scroll: () => at(1, TRAVEL_END / 2) }).pop()!
     expect(away.reveal).toBeNull()
     expect(away.held).toBe(false)
     const again = drive(away, {
@@ -370,7 +377,7 @@ describe('the burst latch (the girl\'s discovery beat)', () => {
     // The reason this frame is the right one: rotation is already at the chapter's stop,
     // so the NEXT frame's rotation delta is exactly 0 and she settles to idle before
     // T52's yield is evaluated again. Anything earlier fires while she is still moving.
-    const deeper = at(2, 0.8)
+    const deeper = at(2, (TRAVEL_END + PANEL_END) / 2)
     expect(journeyStateAt(deeper).rotation).toBe(journeyStateAt(planted).rotation)
   })
 
@@ -396,7 +403,14 @@ describe('the burst latch (the girl\'s discovery beat)', () => {
     let latch: BurstLatch = null
     let prev: number | null = null
     let edges = 0
-    const damped = [at(3, 0.2), at(3, 0.4), at(3, TRAVEL_END - 0.01), planted, at(3, 0.7), at(3, 0.9)]
+    const damped = [
+      at(3, TRAVEL_END * 0.3),
+      at(3, TRAVEL_END * 0.6),
+      at(3, TRAVEL_END - 0.01),
+      planted,
+      at(3, (TRAVEL_END + PANEL_END) / 2),
+      at(3, PANEL_END - 0.01),
+    ]
     for (const d of damped) {
       for (let f = 0; f < 6; f++) {
         latch = stepBurstLatch(latch, rising(3, 0.5), d, FRAME)
@@ -415,7 +429,7 @@ describe('the burst latch (the girl\'s discovery beat)', () => {
   })
 
   it('gives the next checkpoint its own edge when one preempts another', () => {
-    const first = stepBurstLatch(null, rising(1, 0.4), at(1, 0.7), FRAME)
+    const first = stepBurstLatch(null, rising(1, 0.4), at(1, (TRAVEL_END + PANEL_END) / 2), FRAME)
     expect(first?.chapter).toBe(1)
     const preempted = stepBurstLatch(first, rising(4, 0), at(4, TRAVEL_END + 0.01), FRAME)
     expect(preempted?.chapter).toBe(4)

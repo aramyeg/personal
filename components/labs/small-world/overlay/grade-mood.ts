@@ -1,5 +1,13 @@
 import { CHAPTER_COUNT } from '../chapters'
-import { CHAPTER_SLICE, rotationAt, smoothstep } from '../journey-timeline'
+import {
+  BURST_END,
+  CHAPTER_SLICE,
+  PANEL_END,
+  PARK_FRAC,
+  chapterStartRotation,
+  rotationAt,
+  smoothstep,
+} from '../journey-timeline'
 import { PALETTE } from '../palette'
 import { BOUNDARY_WANDER, MERIDIANS, boundaryWander } from '../scene/biomes'
 import { STANCE_ALPHA } from '../scene/renewal'
@@ -57,12 +65,18 @@ import { STANCE_ALPHA } from '../scene/renewal'
  * the proximity weight and the dwell derivation are deleted rather than fixed.
  *
  * On top of the crossfade the whole grade BLOOMS: full strength through the checkpoint and its
- * dwell, settling back to BLOOM_FLOOR over the next chapter's early travel, so each arrival gets a
- * swell of its own. The bloom is unchanged, and stays keyed to local PROGRESS — it is a slow
- * envelope across a whole leg rather than a thing that happens at a place, and it deliberately
- * keeps swelling through the stretch where rotation is frozen, which is exactly the swell under
- * the cards. So the new mood arrives at the boundary at the bloom's resting strength and then
- * deepens into the checkpoint.
+ * dwell, resting at BLOOM_FLOOR between them, so each arrival gets a swell of its own. It stays
+ * keyed to local PROGRESS — a slow envelope across a whole leg rather than a thing that happens at
+ * a place.
+ *
+ * TASK 73 MOVED THE CHECKPOINT, AND BOTH HALVES HAD TO FOLLOW. The stop used to be at the END of a
+ * chapter's rotation slice, which put the card over the NEXT biome; it is at `PARK_FRAC` of the
+ * slice now. That change alone would have traded a scenery mismatch for a colour one — the
+ * crossfade had a whole slice to finish in and now has 21% of one, so a card would have opened
+ * three quarters of the way back at the previous chapter's grade. So `MOOD_SPAN_FRAC` is solved
+ * from `PARK_FRAC` rather than chosen (see below), and the bloom's window is re-tied to the beats
+ * it exists for rather than to the numbers it used to sit at. Every card opening under its own
+ * chapter's fully-arrived mood is asserted per chapter, not on average.
  */
 
 /** Kill switch for the entire grade — sky, lights and overlay — for a clean A/B. */
@@ -313,38 +327,78 @@ export const LANE_CROSSINGS: readonly number[] = Array.from({ length: CHAPTER_CO
 )
 
 /**
- * How much of a chapter's ROTATION slice the crossfade takes, measured from that chapter's
- * crossing. The two rails it sits between:
- *
- *  • It must SATURATE before the next crossing, or a boundary would arrive while the previous
- *    blend was still moving and the pair being crossfaded would swap under it — a visible step.
- *    The crossings are almost exactly one slice apart (the tightest gap is 0.985 slices, the
- *    wander pulling one end toward the other), so anything below ~0.98 is safe; 0.65 has room.
- *  • It must COMPLETE well before she stops. Travel ends at TRAVEL_END and the cards open at
- *    BURST_END, so at 0.65 the mood is fully in around 36% of the way along the leg — roughly a
- *    fifth of a chapter's scroll before she even reaches the checkpoint, and a third before the
- *    cards. Both margins are asserted, not eyeballed.
- *
- * At 0.65 the crossfade spans ~36% of a chapter's scroll against the 30% of the approach window it
- * replaces — a fifth wider, but the size was never the problem. What changed is WHERE: the shift
- * now has the open road to happen on instead of the last few metres before a stop.
+ * How far the crossfade LEADS its chapter's start, in slice units — the wander on the torn
+ * boundary, which is signed and differs per meridian. Taken as the WORST case across the six so
+ * the span below is safe for all of them rather than for the average.
  */
-export const MOOD_SPAN_FRAC = 0.65
+const MAX_CROSSING_LEAD = Math.max(
+  0,
+  ...Array.from(
+    { length: CHAPTER_COUNT },
+    (_, c) => (crossingRotation(c) - chapterStartRotation(c)) / CHAPTER_SLICE
+  )
+)
+
+/**
+ * Fraction of the approach the crossfade is allowed to use.
+ *
+ * Spent generously ON PURPOSE, because the stillness margin does not have to come out of here.
+ * Rotation freezes at `TRAVEL_END` and the cards do not open until `BURST_END`, so there is a
+ * whole BURST_SPAN of leg — 0.10, nearly half the approach again — in which the mood is frozen at
+ * whatever it reached, before the reader ever sees a card. The approach is therefore better spent
+ * making the crossfade as gradual as the geometry allows than on a second margin behind the one
+ * the burst already provides. The 15% left over is the arrival's own headroom against the wander.
+ */
+const MOOD_SATURATION_MARGIN = 0.85
+
+/**
+ * How much of a chapter's ROTATION slice the crossfade takes, measured from that chapter's
+ * crossing — SOLVED, since Task 73, rather than chosen.
+ *
+ * The rails have not changed but one of them got much tighter. It must still saturate before the
+ * next crossing (trivially true now). And it must still COMPLETE before she stops — except that
+ * she now stops at `PARK_FRAC` of the slice rather than at the end of it, so the whole crossfade
+ * has to fit inside the approach instead of having a whole slice to play with. At the old 0.65 the
+ * card would have opened at mix ≈ 0.246, i.e. three quarters of the way back at the PREVIOUS
+ * chapter's grade: a card describing the canyon, read under the desert's light. That is the trade
+ * the framing fix would have made if this number had been left alone — scenery mismatch swapped
+ * for a colour one — which is why the two had to ship together.
+ *
+ * So: the approach is `PARK_FRAC`, the crossing can lead it by `MAX_CROSSING_LEAD`, and the
+ * crossfade takes `MOOD_SATURATION_MARGIN` of what is left. Every card then opens at mix exactly
+ * 1, asserted per chapter in grade-mood.test.ts.
+ *
+ * WHAT THIS COSTS, stated plainly: the shift is a faster beat than it was — about 1.4% of the
+ * scroll track against 5.9%. That is structural, not a regression to tune away. The law it obeys
+ * is Aram's ("right when scrolling and our girl passes to the new biome, the mood shift should
+ * happen there"), the approach is short by design now, and the only way to make the crossfade long
+ * again would be to start it BEFORE she crosses — which is the one thing that law forbids.
+ */
+export const MOOD_SPAN_FRAC = (PARK_FRAC - MAX_CROSSING_LEAD) * MOOD_SATURATION_MARGIN
 export const MOOD_SPAN_ROT = MOOD_SPAN_FRAC * CHAPTER_SLICE
 
 /** Strength the grade settles back to between checkpoints — the bloom's resting level. */
 export const BLOOM_FLOOR = 0.84
-/** Local progress by which the previous checkpoint's bloom has fully settled. */
-export const BLOOM_SETTLE_END = 0.3
 /**
- * The bloom's swell window, in a chapter's LOCAL PROGRESS. Unchanged from Task 55 (these two
- * numbers used to be MOOD_IN_START / MOOD_IN_END, when the mood rode the same window); renamed
- * because the mood no longer does, and the envelope is the only thing left that wants to be keyed
- * to the approach rather than to a place on the ground. It deliberately keeps rising past
- * TRAVEL_END, where rotation is frozen — that is the swell under the cards.
+ * The bloom's window, in a chapter's LOCAL PROGRESS, RE-DERIVED for Task 73's segment shape.
+ *
+ * The envelope's job never changed: full strength through the checkpoint and its dwell, resting at
+ * BLOOM_FLOOR between them, so each arrival gets a swell of its own. What changed is where the
+ * checkpoint IS. It used to sit at the END of a segment, so the bloom rose across [0.42, 0.72] and
+ * settled over the next chapter's first 0.3. The dwell is now at [0.226, 0.526] — near the front —
+ * and that old window would have swelled the grade AFTER the cards had gone.
+ *
+ * So both ends are tied to the beats they exist for rather than to numbers: full by the moment the
+ * "!" pops, held for exactly as long as the cards are up, then released across the long walk out.
+ * The fall completes with 30% of the release leg to spare, so the grade is provably resting before
+ * the next boundary hands it a new pair to crossfade.
+ *
+ * Continuity across the segment seam is what makes chapter boundaries invisible, and it still
+ * holds by construction: `bloomAt(1)` and `bloomAt(0)` are both exactly BLOOM_FLOOR.
  */
-export const BLOOM_RISE_START = 0.42
-export const BLOOM_RISE_END = 0.72
+export const BLOOM_RISE_END = BURST_END
+export const BLOOM_FALL_START = PANEL_END
+export const BLOOM_FALL_END = PANEL_END + (1 - PANEL_END) * 0.7
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
@@ -369,16 +423,17 @@ export function mixHex(from: string, to: string, t: number): string {
 }
 
 /**
- * Strength envelope across one chapter: holds 1 from the previous checkpoint, settles to
- * BLOOM_FLOOR over the first BLOOM_SETTLE_END of the travel, sits there through the middle of the
- * leg, then swells back to 1 across the same window the mood crossfades in. Continuous at both
- * ends (1 at local 0 and at local 1), so chapter boundaries are invisible.
+ * Strength envelope across one chapter: rises from BLOOM_FLOOR as she walks into the biome, is
+ * fully in by the "!", holds for the whole dwell, then releases back to the floor across the walk
+ * out. Continuous at both ends (BLOOM_FLOOR at local 0 and at local 1), so chapter boundaries are
+ * invisible.
  */
 export function bloomAt(local: number): number {
   const l = clamp01(local)
-  if (l < BLOOM_SETTLE_END) return 1 - (1 - BLOOM_FLOOR) * smoothstep(l / BLOOM_SETTLE_END)
-  const rise = smoothstep((l - BLOOM_RISE_START) / (BLOOM_RISE_END - BLOOM_RISE_START))
-  return BLOOM_FLOOR + (1 - BLOOM_FLOOR) * rise
+  if (l < BLOOM_RISE_END) return BLOOM_FLOOR + (1 - BLOOM_FLOOR) * smoothstep(l / BLOOM_RISE_END)
+  if (l < BLOOM_FALL_START) return 1
+  const fall = smoothstep((l - BLOOM_FALL_START) / (BLOOM_FALL_END - BLOOM_FALL_START))
+  return 1 - (1 - BLOOM_FLOOR) * fall
 }
 
 export type MoodBlend = {

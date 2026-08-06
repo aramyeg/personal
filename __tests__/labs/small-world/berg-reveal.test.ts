@@ -9,12 +9,13 @@ import {
 import {
   CHAPTER_SLICE,
   PANEL_END,
+  PARK_FRAC,
   TRAVEL_END,
   chapterStartRotation,
   rotationAt,
 } from '@/components/labs/small-world/journey-timeline'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
-import { LANE_CROSSINGS, MOOD_SPAN_FRAC } from '@/components/labs/small-world/overlay/grade-mood'
+import { LANE_CROSSINGS } from '@/components/labs/small-world/overlay/grade-mood'
 
 /**
  * Task 62 — the icebergs arrive with the winter.
@@ -92,7 +93,12 @@ describe('the iceberg reveal', () => {
       }
       return to - from
     })()
-    expect(span, 'scroll the growth occupies').toBeGreaterThan(0.01)
+    // Task 73 shortened the approach from 0.55 of a leg to 0.126, and this reveal may only run
+    // inside it (the ice has to be standing before the card opens). The growth therefore occupies
+    // ~0.006 of the track rather than ~0.019, even after taking the whole approach. The floor here
+    // is what is left of the guarantee; whether it still reads as an event rather than a pop is an
+    // EYE-TEST item, captured on the limb, not something this number can settle.
+    expect(span, 'scroll the growth occupies').toBeGreaterThan(0.004)
 
     // and it starts from nothing rather than from a visible size — a berg that appears at 30% and
     // then grows is still a pop, just a smaller one
@@ -117,12 +123,12 @@ describe('the iceberg reveal', () => {
     // are reading. Worth pinning here because it is a property of the KEYING CHOICE — a reveal
     // keyed to progress instead of rotation would fail this and nothing else in the suite.
     const parked = bergGrow(rotationAt(at(WINTER_CHAPTER, TRAVEL_END)))
-    for (const local of [TRAVEL_END, 0.7, 0.85, PANEL_END]) {
+    for (const local of [TRAVEL_END, (TRAVEL_END + PANEL_END) / 2, PANEL_END]) {
       expect(bergGrow(rotationAt(at(WINTER_CHAPTER, local)))).toBe(parked)
     }
   })
 
-  it('takes its window from the lane crossing and the mood span, not from literals', () => {
+  it('takes its window from the lane crossing and the approach, not from literals', () => {
     // The derivation, asserted against the two constants it is derived FROM. If either moves the
     // ice follows it; if somebody replaces the expression with the number it happens to equal
     // today, this is what fails.
@@ -130,7 +136,12 @@ describe('the iceberg reveal', () => {
       (LANE_CROSSINGS[WINTER_CHAPTER] - chapterStartRotation(WINTER_CHAPTER)) / CHAPTER_SLICE,
       12
     )
-    expect(BERG_REVEAL_SPAN_FRAC).toBe(MOOD_SPAN_FRAC)
+    // Task 73: the span is no longer borrowed from the mood crossfade. The two used to want the
+    // same number and stopped agreeing when the approach shrank — the crossfade spends only part
+    // of it on purpose, the bergs want all of it because they grow in plain sight.
+    expect(BERG_REVEAL_SPAN_FRAC).toBe((PARK_FRAC - BERG_REVEAL_START_FRAC) * 0.9)
+    // ...and the thing that actually matters: the ice is fully grown BEFORE the card opens.
+    expect(BERG_REVEAL_START_FRAC + BERG_REVEAL_SPAN_FRAC).toBeLessThan(PARK_FRAC)
 
     // ...and the derived window really does open AT the crossing: nothing a hair before, something
     // a hair after. This is the behavioural half, and it is what would catch a start frac that was
@@ -139,11 +150,10 @@ describe('the iceberg reveal', () => {
     expect(bergGrow(start - 1e-4)).toBeLessThanOrEqual(BERG_MIN_SCALE)
     expect(bergGrow(start + 0.02)).toBeGreaterThan(BERG_MIN_SCALE)
 
-    // The whole growth fits inside the chapter's rotation slice — rotation runs the slice over the
-    // TRAVEL segment and then freezes, so a window ending under 1 is a window that closes before
-    // the girl stops. That is the same rail T59 set for the mood crossfade, and it is the reason
-    // `MOOD_SPAN_FRAC` is the right span to borrow rather than a number of my own.
-    expect(BERG_REVEAL_START_FRAC + BERG_REVEAL_SPAN_FRAC).toBeLessThan(1)
+    // The whole growth fits inside the APPROACH — rotation covers PARK_FRAC of the slice before
+    // the stop and then freezes, so a window ending under PARK_FRAC is one that closes before the
+    // girl stops. That rail is asserted above, against PARK_FRAC rather than against 1: before
+    // Task 73 the approach WAS the whole slice and the two tests were the same test.
     expect(bergGrow(rotationAt(at(WINTER_CHAPTER, TRAVEL_END * 0.98)))).toBeGreaterThanOrEqual(1)
   })
 })

@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { TRACK_END } from '../components/labs/small-world/ending-timeline'
+// Scroll targets come from the timeline's own constants, never from a fraction typed here: Task 73
+// moved every checkpoint (chapter 1's card used to be at 0.8/6 and is now at 0.376/6), and a
+// hard-coded literal would have gone on passing while pointing at empty travel.
+import {
+  chapterDwellProgress,
+  chapterTravelProgress,
+} from '../components/labs/small-world/journey-timeline'
 
 async function webglAvailable(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -75,7 +82,7 @@ test.describe('Small World lab', () => {
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
-    await scrollToProgress(page, 0.8 / 6)
+    await scrollToProgress(page, chapterDwellProgress(0))
     const panel = page.getByTestId('sw-panel-data')
     await expect(panel).toBeVisible({ timeout: 10_000 })
     await expect(panel).toContainText('The Pull')
@@ -86,9 +93,9 @@ test.describe('Small World lab', () => {
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
-    await scrollToProgress(page, 0.8 / 6)
+    await scrollToProgress(page, chapterDwellProgress(0))
     await expect(page.getByTestId('sw-panel-data')).toBeVisible({ timeout: 10_000 })
-    await scrollToProgress(page, 1.2 / 6)
+    await scrollToProgress(page, chapterTravelProgress(1))
     await expect(page.getByTestId('sw-panel-data')).toBeHidden()
   })
 

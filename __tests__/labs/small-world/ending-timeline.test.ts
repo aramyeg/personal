@@ -108,6 +108,11 @@ describe('the domain extension: everything else is saturated past 1', () => {
     // so it is the value the ending must hold, exactly.
     const parked = rotationAt(1)
     expect(parked).toBeCloseTo(ROTATION_TOTAL, 12)
+    // Task 73 rewrote `rotationAt` around a park fraction. The ending holds whatever that function
+    // returns at 1, so the reshape had to leave THAT value untouched to the bit — the release leg
+    // is written as a lerp to `chapterStartRotation(c) + CHAPTER_SLICE` for exactly this reason,
+    // and this literal is the value the ending held before the reshape.
+    expect(parked).toBe(12.56637061435917)
     for (let i = 0; i <= SWEEP; i++) {
       const p = 1 + (i / SWEEP) * ENDING_SPAN
       expect(rotationAt(p)).toBe(parked)
@@ -201,9 +206,24 @@ describe('the invariant boundary', () => {
     expect(ZOOM_FIRST_MOVE).toBe(1 + ZOOM_START * ENDING_SPAN)
     expect(ZOOM_FIRST_MOVE).toBeGreaterThan(1)
     expect(endingStateAt(ZOOM_FIRST_MOVE).zoom).toBe(0)
-    // ...and rotation is in fact frozen well before 1: the chapter-6 stop, at 0.925.
-    const lastMovingRotation = (CHAPTER_COUNT - 1 + TRAVEL_END) / CHAPTER_COUNT
+
+    // TASK 73 SHORTENED THIS BEAT, DELIBERATELY AND WITH SIGN-OFF, and the change is worth stating
+    // precisely because the invariant it sits inside is unchanged.
+    //
+    // Rotation used to be frozen from the chapter-6 stop at 0.925, because the stop was at the END
+    // of the last slice — which was also why every card was up over the wrong biome. The stop is
+    // now at PARK_FRAC of the slice (0.855) and the release leg carries the remaining 0.79 of a
+    // slice, so the world keeps turning until progress 1.0 and the visitor walks out across the
+    // epilogue face before the ending begins. The still beat is therefore ZOOM_FIRST_MOVE - 1
+    // (0.063) rather than ZOOM_FIRST_MOVE - 0.925 (0.138): less than half of what it was, and
+    // still a whole beat in which nothing moves at all.
+    //
+    // What has NOT changed is the disjointness that makes the ending safe: rotation is a function
+    // of scroll only BELOW 1, the camera cannot move below ZOOM_FIRST_MOVE > 1, and the two sets
+    // do not touch.
+    const lastMovingRotation = 1
     expect(rotationAt(lastMovingRotation)).toBe(rotationAt(1))
     expect(lastMovingRotation).toBeLessThan(ZOOM_FIRST_MOVE)
+    expect(rotationAt(1 - 1e-9)).toBeLessThan(rotationAt(1))
   })
 })

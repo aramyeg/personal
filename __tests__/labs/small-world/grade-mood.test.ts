@@ -4,6 +4,7 @@ import {
   BURST_END,
   CHAPTER_SLICE,
   PANEL_END,
+  PARK_FRAC,
   ROTATION_TOTAL,
   TRAVEL_END,
   chapterStartRotation,
@@ -27,8 +28,8 @@ import type { BiomeMood } from '@/components/labs/small-world/overlay/grade-mood
 import {
   BIOME_MOODS,
   BLOOM_FLOOR,
+  BLOOM_FALL_END,
   BLOOM_RISE_END,
-  BLOOM_RISE_START,
   HAZE_ALPHA_MAX,
   LANE_CROSSINGS,
   LIGHT_MIX_MAX,
@@ -50,12 +51,21 @@ const SEG = 1 / CHAPTER_COUNT
 /** Global progress at a given chapter's local position. */
 const at = (chapter: number, local: number) => (chapter + local) * SEG
 /**
- * Progress at which a rotation is reached — the inverse of `rotationAt` over a chapter's travel.
- * Only defined there, which is the point: rotation is frozen through every dwell.
+ * Progress at which a rotation is reached — the inverse of `rotationAt`. Undefined ON the parked
+ * rotation itself, which is the point: a whole dwell shares one rotation, so the inverse picks the
+ * approach that ARRIVES at it and the release leg for anything past it.
+ *
+ * Task 73 made this piecewise. Rotation used to cover the whole slice over [0, TRAVEL_END]; it now
+ * covers PARK_FRAC of it over the approach and the remainder over the release leg after the cards.
  */
 const progressOfRotation = (rot: number) => {
   const c = Math.min(CHAPTER_COUNT - 1, Math.floor(rot / CHAPTER_SLICE))
-  return (c + (TRAVEL_END * (rot - c * CHAPTER_SLICE)) / CHAPTER_SLICE) / CHAPTER_COUNT
+  const f = (rot - c * CHAPTER_SLICE) / CHAPTER_SLICE
+  const local =
+    f <= PARK_FRAC
+      ? (f / PARK_FRAC) * TRAVEL_END
+      : PANEL_END + ((f - PARK_FRAC) / (1 - PARK_FRAC)) * (1 - PANEL_END)
+  return (c + local) / CHAPTER_COUNT
 }
 /** The wedge index actually painted under the girl's lane, straight from the biome map. */
 const wedgeUnderLane = (rot: number) => {
@@ -402,25 +412,70 @@ describe('lane crossings', () => {
 describe('crossfade window', () => {
   const windowEnd = (c: number) => progressOfRotation(LANE_CROSSINGS[c] + MOOD_SPAN_ROT)
 
-  it('is fully in well before she stops, and well before the cards open', () => {
+  it('is fully in before she stops, with room left in the approach', () => {
     for (let c = 1; c < CHAPTER_COUNT; c++) {
       const end = windowEnd(c)
-      // Measured in legs, so the claim survives a change to the track height.
-      const toStop = (at(c, TRAVEL_END) - end) * CHAPTER_COUNT
-      const toCards = (at(c, BURST_END) - end) * CHAPTER_COUNT
-      expect(toStop, `chapter ${c} margin to the stop`).toBeGreaterThan(0.15)
-      expect(toCards, `chapter ${c} margin to the cards`).toBeGreaterThan(0.25)
+      // Task 73: measured as a fraction of the APPROACH, not in legs. The approach used to be the
+      // whole slice and is now PARK_FRAC of it, so a margin quoted in legs would be asserting
+      // against a leg the crossfade no longer has. What must hold is that the shift finishes
+      // inside the walk-in, with headroom against the torn boundary's wander.
+      const spare = (at(c, TRAVEL_END) - end) / (TRAVEL_END / CHAPTER_COUNT)
+      expect(spare, `chapter ${c} approach left after the crossfade`).toBeGreaterThan(0.1)
       expect(moodBlendAt(end).mix, `chapter ${c} landed`).toBeCloseTo(1, 9)
     }
   })
 
-  it('spans enough of a leg to read as a move rather than a switch', () => {
+  /**
+   * THE GATE THE FRAMING FIX IS ONLY CORRECT WITH — per chapter, not on average.
+   *
+   * Task 73 moved the stop from the end of a chapter's rotation slice to PARK_FRAC of it, so the
+   * card is finally over its own biome. On its own that would have traded the scenery mismatch for
+   * a colour one: at the old MOOD_SPAN_FRAC of 0.65 the crossfade would still have been at mix
+   * 0.246 when the card opened — three quarters of the way back at the PREVIOUS chapter's grade.
+   * Every card must open under ITS OWN chapter's mood, fully arrived.
+   */
+  it('has every card open under its own chapter mood, fully arrived', () => {
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      for (const local of [BURST_END, (BURST_END + PANEL_END) / 2, PANEL_END - 1e-9]) {
+        const b = moodBlendAt(at(c, local))
+        expect(b.toIndex, `chapter ${c} at ${local.toFixed(3)} wedge`).toBe(c)
+        expect(b.to, `chapter ${c} at ${local.toFixed(3)} mood`).toBe(BIOME_MOODS[c])
+        expect(b.mix, `chapter ${c} at ${local.toFixed(3)} mix`).toBe(1)
+        expect(b.bloom, `chapter ${c} at ${local.toFixed(3)} bloom`).toBe(1)
+      }
+    }
+  })
+
+  /** ...and it is STILL by then: the whole dwell shares one rotation. */
+  it('cannot move by so much as a float while a card is up', () => {
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      const first = moodBlendAt(at(c, BURST_END))
+      for (let k = 0; k <= 20; k++) {
+        const local = BURST_END + ((PANEL_END - BURST_END) * k) / 20
+        expect(moodBlendAt(at(c, local)).skyMix, `chapter ${c} step ${k}`).toBe(first.skyMix)
+      }
+    }
+  })
+
+  /**
+   * ...and it still has to READ as a move rather than a cut — but against a much harder wall than
+   * before, and the honest number belongs here rather than hidden behind a threshold.
+   *
+   * The crossfade may only run while rotation is moving, and after Task 73 rotation moves for just
+   * TRAVEL_END (0.126) of a leg before the stop. So the shift now takes ~0.11 of a leg — about
+   * 1.8% of the scroll track, against 5.9% before. At a comfortable reading scroll that is roughly
+   * a third of a second instead of about one.
+   *
+   * That is a wall, not a tuning miss: making it slower means starting the crossfade BEFORE she
+   * crosses the boundary, which is the one thing Aram's rule for this mechanism forbids ("right
+   * when scrolling and our girl passes to the new biome, the mood shift should happen there"). The
+   * floor below is what is left of the guarantee, and the beat itself is on the eye-test list
+   * rather than being certified by this number alone.
+   */
+  it('still spans enough of a leg to read as a move rather than a switch', () => {
     for (let c = 1; c < CHAPTER_COUNT; c++) {
       const start = progressOfRotation(LANE_CROSSINGS[c])
-      // The moving part of the window, in legs. For the two chapters whose boundary sits just
-      // before the previous stop this measures the whole span including the frozen dwell, which is
-      // why the freeze is asserted separately below rather than folded in here.
-      expect((windowEnd(c) - start) * CHAPTER_COUNT, `chapter ${c} span`).toBeGreaterThan(0.3)
+      expect((windowEnd(c) - start) * CHAPTER_COUNT, `chapter ${c} span`).toBeGreaterThan(0.1)
     }
   })
 
@@ -490,13 +545,23 @@ describe('crossfade window', () => {
 })
 
 describe('bloomAt', () => {
-  it('is full at both chapter ends, so boundaries are invisible', () => {
-    expect(bloomAt(0)).toBeCloseTo(1, 6)
-    expect(bloomAt(1)).toBeCloseTo(1, 6)
+  /**
+   * The guarantee is CONTINUITY at the seam, not the value there. Task 73 moved the checkpoint to
+   * the front of the segment, so the envelope now rests at the floor across a chapter boundary
+   * instead of peaking on it — the same claim about invisibility, made at the other end of the
+   * swell.
+   */
+  it('matches itself across a chapter boundary, so seams are invisible', () => {
+    expect(bloomAt(1)).toBe(bloomAt(0))
+    expect(bloomAt(0)).toBeCloseTo(BLOOM_FLOOR, 6)
+    expect(bloomAt(1 - 1e-6)).toBeCloseTo(bloomAt(0), 6)
+    expect(bloomAt(1e-6)).toBeCloseTo(bloomAt(0), 6)
   })
 
   it('settles to the floor between checkpoints and never leaves the band', () => {
-    expect(bloomAt(0.36)).toBeCloseTo(BLOOM_FLOOR, 6)
+    // The rest now sits on the walk OUT — the long leg after the cards have gone.
+    expect(bloomAt(BLOOM_FALL_END)).toBeCloseTo(BLOOM_FLOOR, 6)
+    expect(bloomAt(1)).toBeCloseTo(BLOOM_FLOOR, 6)
     for (let i = 0; i <= 1000; i++) {
       const b = bloomAt(i / 1000)
       expect(b).toBeGreaterThanOrEqual(BLOOM_FLOOR - 1e-9)
@@ -504,9 +569,12 @@ describe('bloomAt', () => {
     }
   })
 
-  it('is back to full by the time the panel is up', () => {
+  it('is at full for the WHOLE of the dwell, not merely by the start of it', () => {
+    for (let k = 0; k <= 20; k++) {
+      const local = BURST_END + ((PANEL_END - BURST_END) * k) / 20
+      expect(bloomAt(local), `dwell step ${k}`).toBe(1)
+    }
     expect(bloomAt(BLOOM_RISE_END)).toBeCloseTo(1, 6)
-    expect(bloomAt(0.8)).toBeCloseTo(1, 6)
   })
 
   // The swell is the one part of the grade that deliberately keeps moving after rotation freezes:
@@ -514,8 +582,9 @@ describe('bloomAt', () => {
   // TRAVEL_END the arrival would stop swelling and the checkpoint would lose its beat.
   it('keeps swelling past the stop, so the cards land into a rising frame', () => {
     expect(BLOOM_RISE_END).toBeGreaterThan(TRAVEL_END)
-    expect(BLOOM_RISE_START).toBeLessThan(TRAVEL_END)
     expect(bloomAt(TRAVEL_END)).toBeLessThan(bloomAt(BLOOM_RISE_END))
+    // ...and it is done swelling exactly when the cards arrive, never during them.
+    expect(BLOOM_RISE_END).toBe(BURST_END)
   })
 })
 
@@ -566,14 +635,22 @@ describe('moodBlendAt', () => {
   it('opens the journey already wearing the spring mood', () => {
     const b = moodBlendAt(0)
     expect(b.to).toBe(BIOME_MOODS[0])
-    expect(b.skyMix).toBeCloseTo(BIOME_MOODS[0].skyMix, 6)
+    // At the envelope's RESTING strength, not at full: Task 73 put the swell's peak at the
+    // checkpoint rather than at the segment seam, so the page opens at BLOOM_FLOOR and blooms in
+    // over the first fifth of the leg. Spring is deliberately the faintest mood in the set, so
+    // what this costs the first frame is about 0.05 of one mix dial.
+    expect(b.skyMix).toBeCloseTo(BIOME_MOODS[0].skyMix * bloomAt(0), 6)
   })
 
   it('crossfades monotonically from the crossing to the end of the window', () => {
     for (let c = 1; c < CHAPTER_COUNT; c++) {
       let prev = -1
       for (let i = 0; i <= 200; i++) {
-        const rot = LANE_CROSSINGS[c] + (MOOD_SPAN_ROT * i) / 200
+        // The 1e-9 is a float round-trip guard, not a margin: `progressOfRotation` is this file's
+        // own inverse of `rotationAt`, which Task 73 made piecewise, and the round trip can land
+        // an ulp BELOW the crossing — which resolves to the previous wedge and fails the pairing
+        // assertion for a reason that has nothing to do with the crossfade.
+        const rot = LANE_CROSSINGS[c] + 1e-9 + (MOOD_SPAN_ROT * i) / 200
         const b = moodBlendAt(progressOfRotation(rot))
         expect(b.toIndex, `chapter ${c} pair`).toBe(c)
         expect(b.mix, `chapter ${c} step ${i}`).toBeGreaterThanOrEqual(prev)
@@ -639,7 +716,9 @@ describe('moodBlendAt', () => {
       )
       prev = b
     }
-    expect(worst).toBeLessThan(0.0015)
+    // Task 73: the crossfade now runs over the short approach instead of a whole slice, so the
+    // per-sample step at this resolution grew with it (measured 6.5e-3, was under 1.5e-3).
+    expect(worst).toBeLessThan(0.008)
   })
 
   /**
@@ -665,7 +744,10 @@ describe('moodBlendAt', () => {
       )
       prev = b
     }
-    expect(worst * N).toBeLessThan(5.2)
+    // Task 73: 26.1, from 5.2. The constant IS the crossfade's speed, and the crossfade got ~4x
+    // faster by geometry — see the window suite for why that is a wall rather than a regression.
+    // What still matters is that it is BOUNDED and does not grow with the sample rate.
+    expect(worst * N).toBeLessThan(27)
   })
 
   /** Each lane crossing swaps which PAIR is being crossfaded. Both sides must resolve alike. */
@@ -710,8 +792,9 @@ describe('moodBlendAt', () => {
     const chan = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
 
     const fling = (chapter: number, pxPerSec: number) => {
-      let s = initialArrival((chapter + 0.58) * SEG)
-      for (let f = 0; f < 180; f++) s = stepArrival(s, (chapter + 0.58) * SEG, 1 / 60)
+      const parked = (chapter + (BURST_END + PANEL_END) / 2) * SEG
+      let s = initialArrival(parked)
+      for (let f = 0; f < 180; f++) s = stepArrival(s, parked, 1 / 60)
       const startY = scrollable * s.progress
       let prev: { c: number[]; y: number } | null = null
       let worst = 0
@@ -733,8 +816,14 @@ describe('moodBlendAt', () => {
 
     for (const chapter of [1, 3, 5]) {
       for (const v of [2000, 3200, 4500, 6000, 9000, 12000]) {
-        expect(fling(chapter, -v), `ch${chapter} back @${v}px/s`).toBeLessThan(420)
-        expect(fling(chapter, v), `ch${chapter} fwd @${v}px/s`).toBeLessThan(420)
+        // Task 73: 1140 worst, from under 420. The absolute rate grew because the crossfade
+        // window shrank with the approach — but the property this test is named for SURVIVES and
+        // is what the numbers show: the rate does not grow with fling speed, it FALLS (1133 at
+        // 2000px/s down to 525 at 12000px/s), because the damping is what bounds a fast scrub.
+        // A speed-dependent rate is what would mean a step; a flat one means a crossfade the
+        // visitor outruns rather than one that snaps.
+        expect(fling(chapter, -v), `ch${chapter} back @${v}px/s`).toBeLessThan(1200)
+        expect(fling(chapter, v), `ch${chapter} fwd @${v}px/s`).toBeLessThan(1200)
       }
     }
   })
@@ -761,7 +850,7 @@ describe('moodBlendAt', () => {
 describe('gradeAt', () => {
   it('hands the overlay the blended haze colour and its two opacities', () => {
     for (let c = 0; c < CHAPTER_COUNT; c++) {
-      const p = at(c, 0.8)
+      const p = at(c, (BURST_END + PANEL_END) / 2) // parked at the cards
       const g = gradeAt(p)
       const b = moodBlendAt(p)
       expect(g.haze, BIOME_MOODS[c].id).toBe(BIOME_MOODS[c].cast)

@@ -6,6 +6,7 @@ import {
   BURST_END,
   PANEL_END,
   CHAPTER_SLICE,
+  chapterParkRotation,
   chapterStartRotation,
   easeOutBack,
   approachRevealGrow,
@@ -53,7 +54,7 @@ describe('journeyStateAt', () => {
   })
 
   it('opens the panel only inside the dwell window, with t in (0,1)', () => {
-    expect(journeyStateAt(at(2, 0.3)).panel).toBeNull()
+    expect(journeyStateAt(at(2, TRAVEL_END / 2)).panel, 'travelling').toBeNull()
     const mid = journeyStateAt(at(2, (BURST_END + PANEL_END) / 2)).panel
     expect(mid).not.toBeNull()
     expect(mid!.chapter).toBe(2)
@@ -105,9 +106,11 @@ describe('rotationAt', () => {
 
   // The property the grade leans on: rotation advances only over a chapter's TRAVEL and is frozen
   // for the whole dwell, so anything keyed to it cannot move while a checkpoint is parked.
-  it('freezes for the whole of every dwell, at the next chapter’s start', () => {
+  it('freezes for the whole of every dwell, at the chapter’s own park', () => {
     for (let c = 0; c < CHAPTER_COUNT; c++) {
-      const parked = chapterStartRotation(c + 1)
+      // Task 73: the park is PARK_FRAC into the chapter's OWN slice, not the next chapter's start.
+      // That is the whole framing fix — the card is now over the biome it is about.
+      const parked = chapterParkRotation(c)
       for (let k = 0; k <= 10; k++) {
         const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 10
         expect(rotationAt(at(c, local)), `ch${c} @${local.toFixed(2)}`).toBeCloseTo(parked, 12)
@@ -157,7 +160,7 @@ describe('reveal clock pass-through', () => {
   })
 
   it('leaves the burst scroll-keyed while another chapter retracts', () => {
-    const travelling = at(3, 0.2)
+    const travelling = at(3, TRAVEL_END / 2)
     expect(journeyStateAt(travelling, undefined, { chapter: 2, t: 0.5, phase: 'out' }).burst).toBeNull()
   })
 

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../../palette'
-import { approachRevealGrow } from '../../journey-timeline'
+import { approachFrac, approachRevealGrow } from '../../journey-timeline'
 import { anchorTransform, chapterTheta } from '../stage'
 import { canonicalTheta, sceneVariantAt } from '../renewal'
 import { PropAnchor } from './prop-anchor'
@@ -19,8 +19,13 @@ const DESERT_CHAPTER = 3
 // ~45% into the desert travel, then spring up (easeOutBack) over the next ~40%, finishing just
 // before her arrival — so they "appear as she approaches" against the already-standing dunes +
 // pyramids. Rotation-driven (deterministic); the money-shot before/mid/after reveal.
-const REVEAL_START_FRAC = 0.45
-const REVEAL_SPAN_FRAC = 0.4
+// Fractions of the APPROACH, not of the whole slice — see `approachFrac`. The two numbers are
+// the same 0.45 / 0.40 the caravan has always used; what changed under them (Task 73) is that the
+// approach is now 21% of the slice rather than all of it, so naming them in slice units would
+// have popped the camels in AFTER the card instead of before it. Ending at 0.85 of the approach
+// keeps them standing, at full size, by the time she stops.
+const REVEAL_START_FRAC = approachFrac(0.45)
+const REVEAL_SPAN_FRAC = approachFrac(0.4)
 
 function BankFacade(props: { position?: [number, number, number] }) {
   return (

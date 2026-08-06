@@ -6,7 +6,11 @@ import { initialArrival } from '@/components/labs/small-world/arrival'
 import { CHAPTER_COUNT, chapters } from '@/components/labs/small-world/chapters'
 import { ENDING_SPAN, TRACK_END } from '@/components/labs/small-world/ending-timeline'
 import type { RevealState } from '@/components/labs/small-world/journey-timeline'
-import { BURST_END, PANEL_END } from '@/components/labs/small-world/journey-timeline'
+import {
+  BURST_END,
+  PANEL_END,
+  chapterDwellProgress,
+} from '@/components/labs/small-world/journey-timeline'
 import type { ArrivalJourney } from '@/components/labs/small-world/use-arrival-journey'
 
 /** A driver holding one reveal, so a RETRACTING spread can be rendered at a chosen progress. */
@@ -46,7 +50,7 @@ describe('JourneyOverlay', () => {
   it('shows the chapter data panel inside the panel window', () => {
     const ref = { current: 0 }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
-    ref.current = 0.8 / 6
+    ref.current = chapterDwellProgress(0)
     fireScroll()
     const panel = screen.getByTestId('sw-panel-data')
     expect(panel.textContent).toContain(chapters[0].theme)
@@ -60,7 +64,7 @@ describe('JourneyOverlay', () => {
     // unclickable at every dwell. Advance now fires from the canvas via r3f's `onPointerMissed` —
     // i.e. on a click that hit no interactive object — so this exercises that path instead. The
     // assertion is unchanged: a tap while chapter 1's panel is up advances to chapter 2.
-    const ref = { current: 0.8 / 6 }
+    const ref = { current: chapterDwellProgress(0) }
     const onAdvance = vi.fn()
     render(<JourneyOverlay progressRef={ref} onAdvance={onAdvance} />)
     firePanelAdvance()
@@ -68,7 +72,7 @@ describe('JourneyOverlay', () => {
   })
 
   it('does NOT advance from a DOM click on the panel — the canvas owns the pointer now', () => {
-    const ref = { current: 0.8 / 6 }
+    const ref = { current: chapterDwellProgress(0) }
     const onAdvance = vi.fn()
     render(<JourneyOverlay progressRef={ref} onAdvance={onAdvance} />)
     const tap = screen.getByTestId('sw-panel-tap')
@@ -163,7 +167,11 @@ describe('JourneyOverlay', () => {
     // still inside the dwell.
     const lastDwell =
       (CHAPTER_COUNT - 1 + BURST_END + 0.9 * (PANEL_END - BURST_END)) / CHAPTER_COUNT
-    expect(lastDwell).toBeGreaterThan(0.985)
+    // Task 73 moved the last card from 0.9917 back to the 0.855-0.9217 window, so the old 0.985
+    // landmark (the retired EndPanel's cut-off) now sits PAST the dwell rather than inside it.
+    // What the test is about is unchanged: chapter 6's cards run their full dwell, untruncated.
+    expect(lastDwell).toBeLessThan(1)
+    expect(lastDwell).toBeGreaterThan((CHAPTER_COUNT - 1 + BURST_END) / CHAPTER_COUNT)
     const ref = { current: lastDwell }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
     expect(screen.getByTestId('sw-panel-data').textContent).toContain(

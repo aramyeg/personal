@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { BiomeGrade, SHOW_GRADE } from '@/components/labs/small-world/overlay/biome-grade'
 import { JourneyOverlay } from '@/components/labs/small-world/overlay/journey-overlay'
-import { BIOME_MOODS, gradeAt } from '@/components/labs/small-world/overlay/grade-mood'
+import { BIOME_MOODS, bloomAt, gradeAt } from '@/components/labs/small-world/overlay/grade-mood'
+import {
+  TRAVEL_END,
+  chapterDwellProgress,
+} from '@/components/labs/small-world/journey-timeline'
 import { PALETTE } from '@/components/labs/small-world/palette'
 
 // The grade defers its scroll compute to a rAF (mocked as setTimeout(fn, 0) in vitest.setup.ts),
@@ -35,7 +39,10 @@ describe('BiomeGrade', () => {
     render(<BiomeGrade progressRef={{ current: 0 }} />)
     const v = vars(screen.getByTestId('sw-biome-grade'))
     expect(v.haze).toBe(BIOME_MOODS[0].cast)
-    expect(v.hazeAlpha).toBeCloseTo(BIOME_MOODS[0].hazeAlpha, 3)
+    // At the bloom's RESTING strength: Task 73 put the swell's peak at the checkpoint rather than
+    // at the segment seam, so the page opens at BLOOM_FLOOR and blooms in over the walk to the
+    // first card. The mood identity — which is what this test is about — is unchanged.
+    expect(v.hazeAlpha).toBeCloseTo(BIOME_MOODS[0].hazeAlpha * bloomAt(0), 3)
   })
 
   it('never takes pointer events — it can not swallow a scroll or a panel tap', () => {
@@ -47,7 +54,7 @@ describe('BiomeGrade', () => {
     const ref = { current: 0 }
     render(<BiomeGrade progressRef={ref} />)
     for (let c = 1; c < BIOME_MOODS.length; c++) {
-      ref.current = (c + 0.8) / BIOME_MOODS.length
+      ref.current = chapterDwellProgress(c)
       fireScroll()
       const v = vars(screen.getByTestId('sw-biome-grade'))
       expect(v.haze, BIOME_MOODS[c].id).toBe(BIOME_MOODS[c].cast)
@@ -105,7 +112,7 @@ describe('BiomeGrade on the driver’s frames', () => {
   it('tracks progress the driver moves with no scroll at all', () => {
     const { journey, frame } = fakeJourney()
     // Mid-crossfade onto the canyon, where the driver is still releasing absorbed scroll.
-    const ref = { current: (4 + 0.16) / BIOME_MOODS.length }
+    const ref = { current: (4 + TRAVEL_END * 0.35) / BIOME_MOODS.length }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render(<BiomeGrade progressRef={ref} journey={journey as any} />)
     const el = screen.getByTestId('sw-biome-grade')
@@ -114,7 +121,7 @@ describe('BiomeGrade on the driver’s frames', () => {
     expect(partway.haze).not.toBe(BIOME_MOODS[3].cast)
 
     // The driver advances progress into the canyon's dwell. No scroll event is dispatched.
-    ref.current = (4 + 0.8) / BIOME_MOODS.length
+    ref.current = chapterDwellProgress(4)
     frame()
     const arrived = vars(el)
     expect(arrived.haze).toBe(BIOME_MOODS[4].cast)
@@ -143,7 +150,7 @@ describe('grade paint order', () => {
   // Card legibility is guaranteed by paint order, not by gentle numbers: positioned siblings with
   // no z-index paint in DOM order, so the grade preceding the panel means the panel is on top.
   it('puts the grade under the chapter cards', () => {
-    const ref = { current: 0.8 / 6 }
+    const ref = { current: chapterDwellProgress(0) }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
     const grade = screen.getByTestId('sw-biome-grade')
     const panel = screen.getByTestId('sw-panel-tap')
