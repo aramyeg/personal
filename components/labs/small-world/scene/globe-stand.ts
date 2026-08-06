@@ -151,6 +151,36 @@ export const STAND_COLLAR_H = CRADLE_TUBE * 2.4
 export const STAND_FOOT_H = 0.34
 
 /**
+ * HOW MUCH OF THE COLLAR'S HEIGHT IS CROWN (Task 72) — and why a flat disc had to go.
+ *
+ * The collar shipped as a plain cylinder, so the surface the camera sees of it is a FLAT TOP: one
+ * constant normal, and therefore — on a material at metalness 1, which has no diffuse term to
+ * carry shape — one constant value. Task 71's blind review called it "flat dark brown against a
+ * polished rose-gold stand" and it was reading the geometry exactly right.
+ *
+ * Measured on the shipped build at 94% of the track, through the stand's own per-part mask rather
+ * than through a hand-drawn box: the collar's coefficient of variation is **0.189** against the
+ * cradle ring's **0.600**, and its brightest pixel reaches linear luminance **0.236** where the
+ * ring reaches **0.973**. The ring is not brighter because it is nearer or better lit — it is a
+ * torus, so its normals sweep the whole room and one band of them finds the key softbox. The
+ * collar's never point anywhere but up. It is not a dark metal; it is a metal with no highlight
+ * available to it.
+ *
+ * So the collar becomes a TURNED BEAD: an elliptical crown lathed about the axis, which is what a
+ * collar on a real stand is anyway. The fix is available for free because of a fact about
+ * ellipsoids — the normal at an ellipsoid's equator is horizontal however flat the ellipsoid is —
+ * so a crown only 0.18 units tall on a 0.75 radius still sweeps its normal through the full
+ * quarter turn from +y to the horizon, and the reflection of a fixed view direction sweeps twice
+ * that. A highlight is then guaranteed rather than hoped for.
+ *
+ * Half the height, because the other half is the cove that returns to the stem. NOTHING ELSE MOVES:
+ * the crown's apex is still `STAND_COLLAR_H / 2` above `STAND_COLLAR_Y` and the widest radius is
+ * still `STAND_COLLAR_R`, so the collar occupies exactly the interval it always did and every
+ * clearance below is evaluated on the same numbers.
+ */
+export const STAND_COLLAR_CROWN = 0.5
+
+/**
  * Closest approach to the world's CENTRE of every authored primitive, in world units.
  *
  * This is the whole of the stand's terrain-safety claim, and it covers the whole stand because the

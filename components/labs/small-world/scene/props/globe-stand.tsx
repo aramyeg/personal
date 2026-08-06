@@ -6,6 +6,7 @@ import {
   CRADLE_DROP,
   CRADLE_RADIUS,
   CRADLE_TUBE,
+  STAND_COLLAR_CROWN,
   STAND_COLLAR_R,
   STAND_COLLAR_Y,
   STAND_FOOT_R,
@@ -47,6 +48,32 @@ import { buildMergedClay, type ClayPart } from './clay-kit'
  * the parked stand is six world units below the frame — far enough that the conservative sphere test
  * settles it without ever reaching the vertices. It starts costing its one draw when it rises.
  */
+
+/**
+ * The collar's lathed profile, in its own local frame (the merge translates it into place).
+ *
+ * Read as a turner would cut it, from the axis outward: a quarter ellipse from the apex out to the
+ * widest point, then a short cove back in to meet the stem. `CROWN_STEPS` is what decides whether
+ * the highlight is a band or a facet — eight segments over a quarter turn puts a normal every
+ * 11°, which at this radius is a 0.1-unit chord and well under the shading's own softness.
+ *
+ * The apex sits exactly `STAND_COLLAR_H / 2` above the origin and the widest radius is exactly
+ * `STAND_COLLAR_R`, so this occupies the same interval the cylinder did and `standPrimitiveReaches`
+ * measures the same collar it always measured.
+ */
+const CROWN_STEPS = 8
+
+function collarProfile(): THREE.BufferGeometry {
+  const crown = STAND_COLLAR_H * STAND_COLLAR_CROWN
+  const points: THREE.Vector2[] = []
+  for (let i = 0; i <= CROWN_STEPS; i++) {
+    const a = (i / CROWN_STEPS) * (Math.PI / 2)
+    points.push(new THREE.Vector2(STAND_COLLAR_R * Math.sin(a), crown * Math.cos(a)))
+  }
+  // the cove: in and down to where the stem takes over, at the taper the cylinder already had
+  points.push(new THREE.Vector2(STAND_COLLAR_R * 0.82, -(STAND_COLLAR_H - crown)))
+  return new THREE.LatheGeometry(points, 20)
+}
 
 /** A turned ring, three struts, a waisted column and a foot — the pieces, in world space. */
 export function standParts(): ClayPart[] {
@@ -92,7 +119,11 @@ export function standParts(): ClayPart[] {
   const columnH = STAND_COLLAR_Y - STAND_FOOT_Y
   parts.push(
     {
-      geo: new THREE.CylinderGeometry(STAND_COLLAR_R, STAND_COLLAR_R * 0.82, STAND_COLLAR_H, 20),
+      // THE TURNED BEAD (Task 72). A cylinder here gave the camera a flat top disc, and a flat
+      // disc on a metal is one normal, one reflection, one value — measured at a third of the
+      // ring's relative variation with a peak a quarter of the ring's. `globe-stand.ts` carries
+      // the numbers and the ellipsoid argument; this is the profile they ask for.
+      geo: collarProfile(),
       color: PALETTE.clayPath,
       pos: [0, STAND_COLLAR_Y, 0],
       tag: 'collar',
