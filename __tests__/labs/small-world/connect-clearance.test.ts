@@ -161,6 +161,42 @@ describe('every pill clears the note at rest on a phone', () => {
     }
   })
 
+  /**
+   * THE ROUND TRIP, which is the bug the fixtures above cannot see.
+   *
+   * The hook applies the lift, which MOVES the row, and then measures again — a resize, or the hand
+   * font landing. The second measurement therefore sees the LIFTED rectangle and has to recover the
+   * unlifted one before asking the geometry anything. Feeding fixtures straight in never exercises
+   * that step, and the first cut had its sign backwards: the re-measure computed a negative
+   * requirement, returned the base layout, and undid the fix on the very next frame. It cost
+   * nothing at the type level and nothing in these tests until this one existed.
+   */
+  it('is a FIXED POINT: re-measuring the lifted row asks for the same lift again', () => {
+    for (const key of ['phone390', 'phone360'] as const) {
+      const f = FIXTURES[key]
+      const first = connectSpacingFor(f)
+      expect(first.lift).toBeGreaterThan(0)
+
+      // what the DOM reports once the lift is applied, and what the hook must hand back in
+      const measuredTop = f.navTop + first.lift
+      const second = connectSpacingFor({ ...f, navTop: measuredTop - first.lift })
+
+      expect(second.gap, `${key} gap drifted on re-measure`).toBe(first.gap)
+      expect(second.inset, `${key} inset drifted on re-measure`).toBe(first.inset)
+      expect(second.lift, `${key} lift drifted on re-measure`).toBe(first.lift)
+    }
+  })
+
+  it('would COLLAPSE if the round trip forgot to undo the lift', () => {
+    // the mutation: hand the lifted rectangle in raw. The row now looks like it already clears, so
+    // the solver asks for nothing and the layout snaps back — which is the defect, not a pass.
+    const f = FIXTURES.phone390
+    const first = connectSpacingFor(f)
+    const naive = connectSpacingFor({ ...f, navTop: f.navTop + first.lift })
+    expect(naive.lift).toBe(0)
+    expect(naive.gap).toBe(GAP_BASE)
+  })
+
   it('spends the gap before the inset', () => {
     const s = connectSpacingFor(FIXTURES.phone390)
     // the inset is only touched once the gap has hit its floor

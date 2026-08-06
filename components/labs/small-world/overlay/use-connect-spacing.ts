@@ -59,8 +59,13 @@ export function useConnectSpacing() {
     const next = connectSpacingFor({
       width: window.innerWidth,
       height: window.innerHeight,
-      // the row's position WITHOUT whatever this hook already applied — see the header
-      navTop: r.top + applied.current.lift,
+      // The row's position WITHOUT whatever this hook already applied. The lift moves the row DOWN,
+      // so the measured top is the unlifted one PLUS the lift, and recovering it subtracts. Getting
+      // this sign backwards does not throw and does not fail a fixture-fed unit test — it makes the
+      // third measurement compute a negative requirement, hand back the base layout, and undo the
+      // fix on the frame after it landed. `connect-clearance.test.ts` walks the round trip for
+      // exactly that reason; the render is what caught it.
+      navTop: r.top - applied.current.lift,
       navLeft: r.left,
       navRight: r.right,
     })
