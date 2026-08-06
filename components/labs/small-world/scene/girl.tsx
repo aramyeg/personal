@@ -5,9 +5,17 @@ import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { PALETTE } from '../palette'
 import { PLANET_RADIUS } from './planet'
-import { STANCE_Z, walkYAt } from './stage'
+import { STANCE_ALPHA, STANCE_Z, walkYAt } from './stage'
 import { useClayRamp } from './toon-ramp'
 import { toonifyGirl } from './girl-clay'
+import {
+  GIRL_DESK_SEAT_Y,
+  GIRL_GLOBE_SCALE,
+  girlPoseAt,
+  strideAt,
+  type GirlPose,
+} from './girl-exit'
+import { usePrefersReducedMotion } from './use-reduced-motion'
 import {
   nextTimeScale,
   resolveClipPlan,
@@ -24,8 +32,9 @@ import type { JourneyRef } from './use-journey'
 
 const GIRL_URL = '/labs/small-world/girl.glb'
 /** Mesh is 1.7 units tall. 0.53 matched the old ~0.9u proxy; raised per
- * Aram's Gate-2 note — she should command the planet, not decorate it. */
-const GIRL_SCALE = 0.7
+ * Aram's Gate-2 note — she should command the planet, not decorate it.
+ * Lives in `girl-exit.ts` now that the ending gives her a second one. */
+const GIRL_SCALE = GIRL_GLOBE_SCALE
 /** Surface distance one skip-cycle covers at timeScale 1 — tune to the clip. */
 const CLIP_STRIDE = 1.0
 /** Damping rate for the skip cadence timeScale so it eases rather than snaps to
@@ -59,6 +68,85 @@ const GIRL_FLAT_SHADING = false
  * ink) at the darkest-band feel, sized so she sits grounded like the props. */
 const SHADOW_RADIUS = 0.32
 const SHADOW_OPACITY = 0.26
+/** How far the contact pool floats off the ground it is drawn on, along that
+ *  ground's own normal — enough to beat z-fighting on the planet's facets and on
+ *  the desk pad, small enough to read as contact. */
+const SHADOW_LIFT = 0.015
+/**
+ * THE DESK NEEDS A DIFFERENT CONTACT POOL FROM THE PLANET (Task 76).
+ *
+ * The planet's pool is a hard-edged disc at 0.26, and on faceted snow at journey
+ * scale it is invisible as an edge. On the desk it is not: the pad is a smooth,
+ * evenly lit baked surface, the studio fill has just come up, and a flat grey
+ * ellipse under her reads as a plate she is standing on. Her two neighbours do not
+ * have the problem because THEIR shadows are painted into the pad's bake — she is
+ * the only figure on that desk that moves, so she is the only one that has to draw
+ * its own.
+ *
+ * So the desk gets its own pool, with a radial falloff and a tighter radius, and the
+ * planet's is left EXACTLY as it was — one mesh each rather than one mesh with a
+ * property that changes, because swapping an `alphaMap` on a live material forces a
+ * shader recompile mid-scroll. The second mesh costs one draw call and only while
+ * she is on the desk; `visible = false` keeps it out of the render list otherwise.
+ *
+ * THE SIZE AND THE DEPTH ARE BOTH MEASURED, and the first cut got both wrong in a
+ * way only a derived sample could show. A pool at 0.26 is SMALLER THAN SHE IS — she
+ * is about 0.21 across at the shoes — so every part of it that carried any alpha was
+ * underneath her, and a ring sampled just outside her silhouette read 4.9% BRIGHTER
+ * than bare pad. (A hand-placed pixel box read brighter too, for the different and
+ * worse reason that it was sitting on her white trainers. Both numbers are in the
+ * report as the wrong ones.)
+ *
+ * The target is the pool her neighbours already have. Measured on the shipped bake
+ * through a ring derived from the penguin's own base radius, its painted shadow
+ * runs **27.8% darker** than bare pad over r ∈ [1.05, 1.5] of that base. So hers is
+ * sized to reach past her feet the same way and levelled to land in the same place.
+ * `bench/shadow` re-measures both from the render.
+ */
+const DESK_SHADOW_RADIUS = 0.4
+const DESK_SHADOW_OPACITY = 0.38
+/** How much of the pool is solid core before the rim starts to fall away. A pure
+ *  peak-at-the-centre ramp puts all its darkness where her body already hides it. */
+const DESK_SHADOW_CORE = 0.45
+/** Resolution of the falloff. 64 is already past the ~40 px the pool ever occupies. */
+const FALLOFF_N = 64
+
+/** A radial alpha ramp — solid to `DESK_SHADOW_CORE`, then smoothstepped to nothing
+ *  at the rim. Shared by every instance. three's `alphamap_fragment` reads the GREEN
+ *  channel, so the ramp is written to all four rather than to red alone: a
+ *  `RedFormat` texture samples green as 0 and erases the pool entirely. */
+function buildShadowFalloff(): THREE.DataTexture {
+  const data = new Uint8Array(FALLOFF_N * FALLOFF_N * 4)
+  for (let y = 0; y < FALLOFF_N; y++) {
+    for (let x = 0; x < FALLOFF_N; x++) {
+      const r = Math.min(
+        1,
+        2 * Math.hypot((x + 0.5) / FALLOFF_N - 0.5, (y + 0.5) / FALLOFF_N - 0.5)
+      )
+      const u =
+        r <= DESK_SHADOW_CORE ? 1 : 1 - (r - DESK_SHADOW_CORE) / (1 - DESK_SHADOW_CORE)
+      const v = Math.round(255 * u * u * (3 - 2 * u))
+      const i = (y * FALLOFF_N + x) * 4
+      data[i] = v
+      data[i + 1] = v
+      data[i + 2] = v
+      data[i + 3] = v
+    }
+  }
+  const tex = new THREE.DataTexture(data, FALLOFF_N, FALLOFF_N, THREE.RGBAFormat)
+  tex.needsUpdate = true
+  return tex
+}
+
+/**
+ * How many idle cycles her settled sway spends over the whole ending.
+ *
+ * She is scroll-driven from progress = 1 onward, so a settled idle CANNOT loop on
+ * a clock without reopening the wall-clock exception the steam holds alone. Low
+ * enough that the last stretch of scroll reads as breathing rather than as a
+ * second walk.
+ */
+const ENDING_IDLE_CYCLES = 1.5
 
 /**
  * Drive the active locomotion action. A real Idle clip (a resolved, non-fallback
@@ -113,6 +201,7 @@ function driveLocomotion(
 export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const group = useRef<THREE.Group>(null)
   const shadow = useRef<THREE.Mesh>(null)
+  const deskShadow = useRef<THREE.Mesh>(null)
   const ramp = useClayRamp()
   const { scene, animations } = useGLTF(GIRL_URL)
   const { actions, mixer } = useAnimations(animations, group)
@@ -131,6 +220,32 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const drivingLoco = useRef<Locomotion | null>(null)
   /** Ordinal of discoveries seen — alternates Jump_A/Jump_B on the celebrate cycle. */
   const celebrateIndex = useRef(0)
+  const reduced = usePrefersReducedMotion()
+  /** True while the ENDING owns the mixer: both locomotion actions paused, their
+   *  times written from scroll and their weights blended by hand. */
+  const endingOwned = useRef(false)
+  /**
+   * The clip phase the mixer happened to be on when the ending took over.
+   *
+   * Her stride is a pure function of distance walked, which starts at 0 — so
+   * without this her legs would jump to the top of the cycle on the frame the
+   * scroll crosses progress = 1. Latched once per entry and constant for the whole
+   * visit, so scrubbing INSIDE the ending is still exactly reversible, which is the
+   * property the ending's purity claim is actually about.
+   */
+  const phaseSeed = useRef(0)
+  /** One scratch set for the frame path; nothing here allocates after mount. */
+  const scratch = useMemo(
+    () => ({
+      tilt: new THREE.Quaternion(),
+      spin: new THREE.Quaternion(),
+      flat: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2),
+      xAxis: new THREE.Vector3(1, 0, 0),
+      yAxis: new THREE.Vector3(0, 1, 0),
+      up: new THREE.Vector3(),
+    }),
+    []
+  )
 
   const plan: ClipPlan = useMemo(
     () => resolveClipPlan(animations.map((a) => a.name)),
@@ -140,6 +255,9 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   // Blend her into the clay world once, before first paint: shared toon ramp +
   // pastel texture grade, dropping the GLB's fullbright emissive. Idempotent.
   useMemo(() => toonifyGirl(scene, ramp, GIRL_FLAT_SHADING), [scene, ramp])
+
+  const falloff = useMemo(buildShadowFalloff, [])
+  useEffect(() => () => falloff.dispose(), [falloff])
 
   // Crossfade to a target clip's action, fading the current one out. Same-clip
   // targets just (re)play the shared action — no fade, no interruption.
@@ -178,8 +296,104 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     return () => mixer.removeEventListener('finished', onFinished)
   }, [fadeTo, mixer, plan])
 
+  /**
+   * THE ENDING DRIVES THE MIXER FROM SCROLL (Task 76).
+   *
+   * Both locomotion actions play at once, paused, with their times written from
+   * `pose.walked` and `ending.t` and their weights blended by `pose.moving`. A
+   * `crossFadeTo` could not be used: its blend is a wall clock, so a reader who
+   * scrubbed back through the settle would find her half-faded into a pose she was
+   * on her way out of. Weights that are a function of scroll un-blend exactly.
+   */
+  const driveEnding = (pose: GirlPose, t: number) => {
+    const fwd = actions[plan.forward.clip] ?? null
+    const idle = actions[plan.idle.clip] ?? null
+    const paired = idle !== null && idle !== fwd
+    if (!endingOwned.current) {
+      const dur = fwd ? fwd.getClip().duration : 0
+      phaseSeed.current = fwd && dur > 0 ? fwd.time / dur : 0
+      celebrating.current = false
+      for (const name of Object.keys(actions)) actions[name]?.stop()
+      fwd?.reset().play()
+      if (paired) idle.reset().play()
+      endingOwned.current = true
+    }
+    if (fwd) {
+      const dur = fwd.getClip().duration
+      const phase = phaseSeed.current + pose.walked / strideAt(pose.scale)
+      fwd.paused = true
+      fwd.time = (((phase % 1) + 1) % 1) * dur
+      fwd.setEffectiveWeight(paired ? pose.moving : 1)
+    }
+    if (paired) {
+      const dur = idle.getClip().duration
+      idle.paused = true
+      idle.time = (((t * ENDING_IDLE_CYCLES) % 1 + 1) % 1) * dur
+      idle.setEffectiveWeight(1 - pose.moving)
+    }
+  }
+
+  /** Hand the mixer back to the journey's own machine, exactly as it found it. */
+  const releaseEnding = () => {
+    for (const name of Object.keys(actions)) {
+      const action = actions[name]
+      if (!action) continue
+      action.paused = false
+      action.setEffectiveWeight(1)
+      action.stop()
+    }
+    activeClip.current = null
+    drivingLoco.current = null
+    prevLoco.current = 'idle'
+    tsMag.current = MIN_TIMESCALE
+    endingOwned.current = false
+  }
+
   useFrame((_, delta) => {
-    const { rotation, burst } = journeyRef.current
+    const { rotation, burst, ending } = journeyRef.current
+    const pose = girlPoseAt(ending, reduced)
+
+    // ---- the ending: she walks off the world and onto the desk --------------
+    if (pose.stage !== 'journey') {
+      driveEnding(pose, ending.t)
+      if (group.current) {
+        if (pose.stage === 'globe') {
+          const zw = PLANET_RADIUS * Math.sin(pose.theta)
+          const y = walkYAt(zw, rotation)
+          group.current.position.set(0, y, zw)
+          // Relative to the pose she holds on the planet, never absolute: she stands
+          // UPRIGHT at STANCE_ALPHA today, so tilting to the surface normal would
+          // move her on the ending's very first frame. This is exactly identity there.
+          scratch.tilt.setFromAxisAngle(scratch.xAxis, pose.theta - STANCE_ALPHA)
+          scratch.up.set(0, y, zw).normalize()
+        } else {
+          group.current.position.set(pose.x, GIRL_DESK_SEAT_Y, pose.z)
+          scratch.tilt.identity()
+          scratch.up.set(0, 1, 0)
+        }
+        scratch.spin.setFromAxisAngle(scratch.yAxis, pose.yaw)
+        group.current.quaternion.copy(scratch.tilt).multiply(scratch.spin)
+        group.current.scale.setScalar(pose.scale / GIRL_SCALE)
+        group.current.visible = pose.visible
+        const onDesk = pose.stage === 'desk'
+        // Two pools, one job each — see DESK_SHADOW_RADIUS. Exactly one is ever drawn.
+        for (const [mesh, mine] of [
+          [shadow.current, !onDesk],
+          [deskShadow.current, onDesk],
+        ] as const) {
+          if (!mesh) continue
+          mesh.visible = pose.visible && mine
+          if (!mesh.visible) continue
+          mesh.position.copy(group.current.position).addScaledVector(scratch.up, SHADOW_LIFT)
+          mesh.quaternion.copy(scratch.tilt).multiply(scratch.flat)
+          mesh.scale.setScalar(pose.scale / GIRL_SCALE)
+        }
+      }
+      return
+    }
+    if (deskShadow.current) deskShadow.current.visible = false
+    if (endingOwned.current) releaseEnding()
+
     const dt = Math.max(delta, 1e-6)
     const prev = lastRotation.current ?? rotation
     lastRotation.current = rotation
@@ -235,12 +449,21 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       }
     }
 
+    // Ground contact. Written in FULL rather than as `position.y` alone, because a
+    // scrub back out of the ending has to undo everything the ending wrote — an
+    // ending that only moved her y would leave her standing on the desk's x.
     const groundY = walkYAt(STANCE_Z, rotation)
     if (group.current) {
-      group.current.position.y = groundY
+      group.current.position.set(0, groundY, STANCE_Z)
+      group.current.quaternion.identity()
+      group.current.scale.setScalar(1)
+      group.current.visible = true
     }
     if (shadow.current) {
-      shadow.current.position.y = groundY + 0.015
+      shadow.current.position.set(0, groundY + SHADOW_LIFT, STANCE_Z)
+      shadow.current.quaternion.copy(scratch.flat)
+      shadow.current.scale.setScalar(1)
+      shadow.current.visible = true
     }
   })
 
@@ -252,6 +475,18 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       <mesh ref={shadow} position={[0, PLANET_RADIUS, STANCE_Z]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[SHADOW_RADIUS, 24]} />
         <meshBasicMaterial color={PALETTE.shadowClay} transparent opacity={SHADOW_OPACITY} depthWrite={false} />
+      </mesh>
+      {/* Her contact pool ON THE DESK: softer, tighter, and never drawn during the
+          journey — see DESK_SHADOW_RADIUS for why the planet's cannot just be reused. */}
+      <mesh ref={deskShadow} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[DESK_SHADOW_RADIUS, 32]} />
+        <meshBasicMaterial
+          color={PALETTE.shadowClay}
+          alphaMap={falloff}
+          transparent
+          opacity={DESK_SHADOW_OPACITY}
+          depthWrite={false}
+        />
       </mesh>
     </>
   )
