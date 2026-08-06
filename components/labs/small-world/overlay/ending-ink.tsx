@@ -1,5 +1,5 @@
 'use client'
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { EPILOGUE } from '../manga'
 import { MangaPageArt } from './manga-page'
 import { INK_PLACEMENT, INK_PRELOAD_T, inkArrivalAt } from './ink-arrival'
@@ -31,10 +31,33 @@ import { INK_PLACEMENT, INK_PRELOAD_T, inkArrivalAt } from './ink-arrival'
  * half-drawn on a slow connection, and fetching it any earlier would put it on a
  * route the manga pipeline spent a round keeping it off.
  */
+/**
+ * Whether the viewport is taller than it is wide, watched rather than read once.
+ *
+ * `usePrefersReducedMotion` reads its query a single time and argues that a
+ * visitor who flips the OS setting mid-scroll is not worth a listener. Aspect is
+ * different in kind: rotating a phone is a thing readers DO, it happens in a
+ * second, and the two compositions here are genuinely different beats. The
+ * listener fires on rotation only, so it costs a render per rotate.
+ */
+function useIsPortrait(): boolean {
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    const q = window.matchMedia('(max-aspect-ratio: 1/1)')
+    const read = () => setPortrait(q.matches)
+    read()
+    q.addEventListener('change', read)
+    return () => q.removeEventListener('change', read)
+  }, [])
+  return portrait
+}
+
 export function EndingInk({ t, reduced }: { t: number; reduced: boolean }) {
-  const mounted = t >= INK_PRELOAD_T && t < INK_PLACEMENT.outTo
+  const portrait = useIsPortrait()
+  const lastT = portrait && INK_PLACEMENT.portraitOut ? INK_PLACEMENT.portraitOut.to : INK_PLACEMENT.outTo
+  const mounted = t >= INK_PRELOAD_T && t < lastT
   if (!mounted) return null
-  const ink = inkArrivalAt(t, reduced)
+  const ink = inkArrivalAt(t, reduced, portrait)
 
   const wrap: CSSProperties = {
     position: 'absolute',

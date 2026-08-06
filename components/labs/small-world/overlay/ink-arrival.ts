@@ -43,7 +43,17 @@
  */
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
-const across = (t: number, a: number, b: number): number => clamp01((t - a) / (b - a))
+/**
+ * Linear ramp across a window, clamped — and TOTAL on a degenerate one.
+ *
+ * `b <= a` is not hypothetical here: a placement that never leaves says so by
+ * setting `outFrom = outTo = 2`, which makes the fade window zero-wide. Without
+ * this branch that divides by zero, `clamp01(NaN)` returns NaN (NaN fails both
+ * comparisons), and the page's opacity becomes NaN — invisible in a picture,
+ * caught immediately by a gate.
+ */
+const across = (t: number, a: number, b: number): number =>
+  b <= a ? (t >= b ? 1 : 0) : clamp01((t - a) / (b - a))
 const mix = (a: number, b: number, s: number): number => (1 - s) * a + s * b
 
 /** Zero in the first and second derivative at both ends — a page should not be
@@ -71,10 +81,23 @@ export type InkPlacement = {
   /** ...and goes out again. `outFrom >= 1` means it never leaves. */
   readonly outFrom: number
   readonly outTo: number
-  /** How far below its pose it starts, in fractions of the viewport height. */
+  /**
+   * How far below its pose it starts, in fractions of the viewport height —
+   * FAR ENOUGH TO BE OFF THE FRAME, and that is a correctness requirement rather
+   * than a taste one. See `INK_OPACITY_SHARE`.
+   */
   readonly rise: number
   /** The pose it arrives in. */
   readonly pose: InkPose
+  /**
+   * PORTRAIT DOES NOT HANG IT. A phone's ending frame has no wall: the globe
+   * fills the middle and the desk owns the bottom, so a settled page lands ON the
+   * globe and reads as a sticker rather than as a print in the room. Where a
+   * placement gives portrait its own exit, the phone keeps the HELD beat — the
+   * page is still the story's last page, held up in the gap — and then it leaves,
+   * which is the honest answer for a frame with nothing to hang it on.
+   */
+  readonly portraitOut?: { readonly from: number; readonly to: number }
   /**
    * ...and an OPTIONAL second pose it travels to. This is what lets one placement
    * be a beat AND a fixture: the page is held up while there is nothing else in
@@ -113,11 +136,32 @@ export const INK_PLACEMENTS: readonly InkPlacement[] = [
     inTo: 0.44,
     outFrom: 2,
     outTo: 2,
-    rise: 0.09,
+    rise: 0.95,
     pose: { height: 0.62, at: [0.5, 0.46], tilt: -1.6 },
     settle: { from: 0.52, to: 0.68, pose: { height: 0.3, at: [0.175, 0.33], tilt: -3.2 } },
+    portraitOut: { from: 0.55, to: 0.66 },
   },
 ]
+
+/**
+ * WHAT SHARE OF THE ENTRY WINDOW THE OPACITY SPENDS — and the defect it fixes.
+ *
+ * The page is a DOM overlay, so the canvas CANNOT occlude it. At any partial
+ * opacity it is therefore an X-ray: the first cut faded in over 10% of the ending
+ * and a capture caught the page at ~6% opacity showing her face THROUGH the
+ * planet's snow, mid-globe, on the phone. It read as a rendering artefact, which
+ * is exactly what it was.
+ *
+ * The fix is the one paper itself suggests: **paper does not fade, it moves.** The
+ * opacity is spent in the first third of the entry while `rise` still has the page
+ * entirely BELOW the frame, so by the time any of it crosses the bottom edge it is
+ * fully opaque and simply slides up. Nothing is ever seen through it.
+ *
+ * That is why `rise` has to clear the frame rather than merely suggest a lift: at
+ * 0.95 of viewport height the page's top edge starts below the bottom edge at both
+ * aspects (it needs 0.85 on a 1440×900 laptop and 0.68 on a 390×844 phone).
+ */
+export const INK_OPACITY_SHARE = 0.22
 
 /**
  * The placement in force: `hang`, and the captures are why.
@@ -169,27 +213,51 @@ const HIDDEN: InkState = Object.freeze({
   tilt: 0,
 })
 
-export function inkArrivalAt(t: number, reduced: boolean, place = INK_PLACEMENT): InkState {
-  if (t <= place.inFrom || t >= place.outTo) return HIDDEN
+export function inkArrivalAt(
+  t: number,
+  reduced: boolean,
+  portrait = false,
+  place = INK_PLACEMENT
+): InkState {
+  const out = portrait && place.portraitOut ? place.portraitOut : { from: place.outFrom, to: place.outTo }
+  if (t <= place.inFrom || t >= out.to) return HIDDEN
   const rising = smootherstep(across(t, place.inFrom, place.inTo))
-  const leaving = smootherstep(across(t, place.outFrom, place.outTo))
-  const present = rising * (1 - leaving)
+  const leaving = smootherstep(across(t, out.from, out.to))
+  // OPACITY IS NOT THE TRAVEL. It is spent in the first third of the entry, while
+  // the page is still below the frame — see INK_OPACITY_SHARE for the X-ray this
+  // exists to prevent.
+  const opaqueIn = smootherstep(
+    across(t, place.inFrom, place.inFrom + (place.inTo - place.inFrom) * INK_OPACITY_SHARE)
+  )
+  // ...and symmetrically on the way out: it slides fully off and only then lets go
+  // of its opacity, so an exit is no more of an X-ray than an entrance was.
+  const fadeOut = smootherstep(
+    across(t, out.to - (out.to - out.from) * INK_OPACITY_SHARE, out.to)
+  )
+  // CLAMPED, because it is an opacity and the arithmetic can overshoot by an ulp:
+  // smootherstep's `x³·(6x²−15x+10)` rounds to 1.000000000000001 for x a hair
+  // under 1, and a gate that says "an opacity is an opacity" should not have to
+  // accept that.
+  const present = clamp01(opaqueIn * (1 - fadeOut))
   if (present <= 0) return HIDDEN
-  const settling = place.settle
-    ? smootherstep(across(t, place.settle.from, place.settle.to))
-    : 0
+  // A portrait placement that leaves never settles: it holds the pose it was held
+  // up in and goes, so the phone gets the beat and keeps its money shot clear.
+  const settling =
+    place.settle && !(portrait && place.portraitOut)
+      ? smootherstep(across(t, place.settle.from, place.settle.to))
+      : 0
   const to = place.settle?.pose ?? place.pose
   return {
     shown: true,
     present,
-    lift: reduced ? 0 : mix(place.rise, 0, rising) + mix(0, place.rise * 0.45, leaving),
-    scale: reduced ? 1 : mix(0.965, 1, rising),
+    lift: reduced ? 0 : mix(place.rise, 0, rising) + place.rise * leaving,
+    scale: reduced ? 1 : mix(0.985, 1, rising),
     height: mix(place.pose.height, to.height, settling),
     x: mix(place.pose.at[0], to.at[0], settling),
     y: mix(place.pose.at[1], to.at[1], settling),
     tilt: reduced
       ? mix(place.pose.tilt, to.tilt, settling)
-      : mix(mix(place.pose.tilt * 2.1, place.pose.tilt, rising), to.tilt, settling),
+      : mix(mix(place.pose.tilt * 1.9, place.pose.tilt, rising), to.tilt, settling),
   }
 }
 
