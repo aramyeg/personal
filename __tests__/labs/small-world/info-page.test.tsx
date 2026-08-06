@@ -124,6 +124,23 @@ describe('the info leaf’s laws', () => {
     }
   })
 
+  it('never says the same thing twice on one page', () => {
+    // Caught by capture on chapter 1: the hero became the SELF-TAUGHT SFX and the
+    // beat-2 note still read "Self-taught", so the page made its one claim twice
+    // in two sizes. On a leaf whose whole argument is minimal reading, saying a
+    // thing twice is worse than saying it small.
+    for (const [i, spec] of INFO_PAGES.entries()) {
+      const hero = spec.ten.hero
+      const heroText = (hero.kind === 'sfx' ? hero.text : hero.label).toLowerCase()
+      if (spec.sho.note) {
+        expect(
+          spec.sho.note.toLowerCase().includes(heroText) || heroText.includes(spec.sho.note.toLowerCase()),
+          `chapter ${i + 1}: note "${spec.sho.note}" repeats the hero`
+        ).toBe(false)
+      }
+    }
+  })
+
   it('speaks as herself on every page, and never in the third person', () => {
     for (const [i, spec] of INFO_PAGES.entries()) {
       const line = spec.ketsu.line
@@ -132,11 +149,15 @@ describe('the info leaf’s laws', () => {
     }
   })
 
-  it('inverts at most one page in the whole book', () => {
-    // The research allows the single biggest claim in the set to print white on
-    // black. Two inverted pages is a style; one is an emphasis.
+  it('inverts some pages and not every page', () => {
+    // The research's rule is "at most one per chapter, NOT every chapter" — the
+    // inverted panel is an emphasis, and an emphasis every reader meets six times
+    // is a style. Two of six is emphasis; the gate is that it never becomes the
+    // default. (An earlier reading of this held it to one in the whole book, which
+    // was tighter than the research and would have blocked ch1's SFX hero.)
     const inverted = INFO_PAGES.filter((p) => p.ten.inverted)
-    expect(inverted.length).toBeLessThanOrEqual(1)
+    expect(inverted.length).toBeGreaterThan(0)
+    expect(inverted.length).toBeLessThanOrEqual(Math.floor(INFO_PAGES.length / 2))
   })
 
   it('declares a donated panel for every chapter, and each one exists', () => {

@@ -3,7 +3,6 @@ import { mangaPageFor } from '../manga'
 import { mangaPageSrc, type MangaPage } from '../manga/types'
 import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 import { BookLeaf } from './book-leaf'
-import { donatedPanelFor } from './info-page-spec'
 import { MangaPageArt } from './manga-page'
 
 /**
@@ -20,6 +19,13 @@ import { MangaPageArt } from './manga-page'
  *  - This leaf and the info leaf beside it are two pages of ONE book, so their
  *    size, stock, binding weight and shadow have to be the same thing rather
  *    than two things that agree today.
+ * REDISTRIBUTION IS DEAD (Task 77). For one round this leaf rendered all but one
+ * panel, the donated one having moved to the info leaf. Aram's ruling: a page with
+ * a panel torn out of it reads as damaged, whichever way the remainder is pasted —
+ * so every story page renders WHOLE, and the info leaf gets its own generated
+ * anchor art instead (`manga/anchors.ts`). The measurements that killed it are in
+ * task-76-report.md; the mechanism is in git history if the question ever reopens.
+ *
  *  - `scene/props/peeker-stage.ts` keeps the checkpoint mascots clear of these
  *    boxes, and it did so by transcribing the numbers from this file. Task 73's
  *    growth here was never transcribed there, and the shipped card ended up
@@ -75,7 +81,6 @@ export function MangaCard({
         page={page}
         running={enter > 0.55}
         instant={reduced}
-        omitPanel={donatedPanelFor(chapterNumber - 1)}
       />
     </BookLeaf>
   )

@@ -177,19 +177,24 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // SHIPPED: "I studied why people choose — then taught myself to build it."
   // OPEN — Aram's call; the draft is warmer, mine is tighter and rhymes with the
   // seedling above it.
-  // The HERO here is a count, because this chapter has no percentage to its name:
-  // four languages, planted one flag at a time.
+  // THE HERO IS SFX. This chapter has no percentage to its name, and a four-mark
+  // tally was carrying the beat-3 slot on sufficiency rather than on force. The
+  // pivot IS the claim, so it is hand-lettered in the chapter's one inverted panel
+  // and the four languages step down to the aside where a fact of that size
+  // belongs. Aram vetoes on capture if he disagrees.
   {
     ki: { alt: 'Her cupped hands holding a seedling', crop: { page: 0, x: 0.0117, y: 0.7271, w: 0.9766, h: 0.2657 } },
     sho: {
       alt: 'The seedling itself, close',
       crop: { page: 0, x: 0.2999, y: 0.8204, w: 0.4102, h: 0.1272 },
-      note: 'Self-taught',
+      // NO NOTE. It read "Self-taught" until the hero became the SELF-TAUGHT SFX,
+      // and the page then made its one claim twice in two sizes. A beat that has
+      // nothing new to add is better silent — the picture is doing the work.
     },
-    ten: { hero: { kind: 'count', count: 4, label: 'languages' } },
+    ten: { hero: { kind: 'sfx', text: 'Self-taught', label: 'and it stuck' }, inverted: true },
     ketsu: {
       line: 'I studied why people choose — then taught myself to build it.',
-      tools: ['Marketing', 'Business', 'Code'],
+      tools: ['Four languages', 'Marketing', 'Business', 'Code'],
     },
     footer: {
       role: 'Master of Marketing & Business',

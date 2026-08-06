@@ -2,10 +2,18 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { MANGA_PAGES, mangaPageSrc } from '../manga'
+import {
+  ZOOM,
+  anchorFor,
+  anchorSrc,
+  reactionCell,
+  REACTION_SHEET,
+  type ReactionName,
+} from '../manga/anchors'
+import { ClothDrag } from './cloth-drag'
 import { PALETTE } from '../palette'
 import {
   KETSU_INK,
-  KETSU_LINE,
   KETSU_TAIL,
   KI_ART,
   KI_INK,
@@ -197,25 +205,94 @@ const cropAspect = (crop: SpotCrop): number => {
   return page ? (crop.w * page.size.w) / (crop.h * page.size.h) : 1.6
 }
 
-/** Beat 1: a wide shot cut from the panel this chapter's story page gave up. */
-function KiPanel({ crop, alt, t }: { crop: SpotCrop; alt: string; t: number }) {
+/**
+ * Beat 1: the chapter's own generated anchor panel.
+ *
+ * FALLBACK, and it is deliberate rather than temporary scaffolding left in: while
+ * the v3 art is being generated the leaf shows a crop of the chapter's printed
+ * page instead, so the whole mechanism — the beats, the zoom, the cloth, the
+ * motion states — is reviewable and capturable now. `ANCHORS[n].ready` is the one
+ * switch, and nothing about the layout moves when it flips.
+ */
+function KiPanel({ chapter, crop, alt, t }: { chapter: number; crop: SpotCrop; alt: string; t: number }) {
+  const anchor = anchorFor(chapter)
+  const reveal = easeOut(phase(t, KI_ART))
+  if (anchor?.ready) {
+    return (
+      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: '1.5' }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={anchorSrc(anchor.id)}
+            alt={alt}
+            decoding="async"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+              clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
+            }}
+          />
+        </div>
+      </InkedPanel>
+    )
+  }
   return (
     <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${cropAspect(crop)}` }}>
-      <Spot crop={crop} alt={alt} reveal={easeOut(phase(t, KI_ART))} />
+      <Spot crop={crop} alt={alt} reveal={reveal} />
     </InkedPanel>
   )
 }
 
 /** Beat 2: the same art, closer, with at most one supporting figure printed on it. */
-function ShoPanel({ crop, alt, note, t }: { crop: SpotCrop; alt: string; note?: string; t: number }) {
+function ShoPanel({
+  chapter,
+  crop,
+  alt,
+  note,
+  t,
+}: {
+  chapter: number
+  crop: SpotCrop
+  alt: string
+  note?: string
+  t: number
+}) {
   const shown = phase(t, SHO_NOTE)
+  const anchor = anchorFor(chapter)
+  const reveal = easeOut(phase(t, SHO_ART))
+  // THE ZOOM IS DERIVED, not authored: the pack composes every anchor so its
+  // centre holds a close-up at exactly this magnification, so restating the
+  // rectangle here would be a second place for the agreement to drift.
+  const inset = ((1 - 1 / ZOOM) / 2) * 100
   return (
     <InkedPanel
       ink={inkOf(t, SHO_INK)}
       tone="context"
-      style={{ flex: '0 0 auto', aspectRatio: `${cropAspect(crop)}` }}
+      style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? '1.5' : `${cropAspect(crop)}` }}
     >
-      <Spot crop={crop} alt={alt} reveal={easeOut(phase(t, SHO_ART))} />
+      {anchor?.ready ? (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={anchorSrc(anchor.id)}
+            alt={alt}
+            decoding="async"
+            style={{
+              position: 'absolute',
+              inset: `-${inset}%`,
+              width: `${ZOOM * 100}%`,
+              height: `${ZOOM * 100}%`,
+              objectFit: 'cover',
+              display: 'block',
+              clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
+            }}
+          />
+        </div>
+      ) : (
+        <Spot crop={crop} alt={alt} reveal={reveal} />
+      )}
       {note ? (
         <span
           data-testid="sw-info-note"
@@ -340,7 +417,75 @@ function TenPanel({ hero, inverted, t }: { hero: Hero; inverted?: boolean; t: nu
       ) : (
         <HeroCount count={hero.count} label={hero.label} t={t} fg={fg} />
       )}
+      <Chaser face="stunned" t={t} fg={fg} />
     </InkedPanel>
+  )
+}
+
+
+/**
+ * THE CHASER — a small reaction bust under the hero, the sports-manga event-sell.
+ *
+ * When a number lands in a sports manga, the next panel is somebody's FACE. The
+ * cut to a reaction is what tells the reader the thing that just happened was
+ * worth reacting to; without it a big number is an assertion, and with it the page
+ * has told you how to feel about it before you have finished reading it.
+ *
+ * It arrives AFTER the burst — it is a reaction, so it cannot precede the event —
+ * and it is small, because a chaser that competes with the hero is a second hero.
+ *
+ * PLACEHOLDER UNTIL `reactions` LANDS, on the same terms as the runner: the slot,
+ * the timing and the size are built and captured now, and the sheet swap changes
+ * only what is drawn inside the frame.
+ */
+function Chaser({ face, t, fg }: { face: ReactionName; t: number; fg: string }) {
+  const shown = easeOut(phase(t, [TEN_BURST[1] - 120, TEN_BURST[1] + 200]))
+  if (shown <= 0) return null
+  const cell = reactionCell(face)
+  return (
+    <div
+      data-testid="sw-info-chaser"
+      data-reaction={face}
+      style={{
+        position: 'absolute',
+        right: '2.4cqw',
+        bottom: '2.4cqw',
+        width: '19%',
+        aspectRatio: '1',
+        border: `${RULE_CQW}cqw solid ${fg}`,
+        background: PALETTE.pagePaper,
+        overflow: 'hidden',
+        opacity: shown,
+        // It snaps in slightly over-size, the way a cut-in panel is pasted on.
+        transform: `rotate(3deg) scale(${0.86 + 0.14 * shown})`,
+      }}
+    >
+      {REACTION_SHEET.ready ? (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundImage: `url(${anchorSrc(REACTION_SHEET.id)})`,
+            backgroundSize: `${REACTION_SHEET.cols * 100}% ${REACTION_SHEET.rows * 100}%`,
+            backgroundPosition: `${cell.x}% ${cell.y}%`,
+          }}
+        />
+      ) : (
+        <svg viewBox="0 0 20 20" style={{ width: '100%', height: '100%' }} aria-hidden>
+          <g stroke={PALETTE.ink} strokeWidth={1.1} fill="none" strokeLinecap="round">
+            <circle cx="10" cy="9" r="6.4" fill={PALETTE.pagePaper} />
+            {/* stunned: huge eyes, small gasp */}
+            <circle cx="7.6" cy="8.6" r="1.7" fill={PALETTE.ink} stroke="none" />
+            <circle cx="12.4" cy="8.6" r="1.7" fill={PALETTE.ink} stroke="none" />
+            <circle cx="8.1" cy="8" r="0.55" fill={PALETTE.pagePaper} stroke="none" />
+            <circle cx="12.9" cy="8" r="0.55" fill={PALETTE.pagePaper} stroke="none" />
+            <ellipse cx="10" cy="13" rx="1.1" ry="1.5" />
+            {/* goggles pushed up */}
+            <path d="M3.9 4.6 L16.1 4.6" strokeWidth={1.8} />
+          </g>
+        </svg>
+      )}
+    </div>
   )
 }
 
@@ -562,9 +707,13 @@ function HeroCount({
 }
 
 /** Beat 4: quiet. Her line, then the colophon and the stack as an aside. */
-function KetsuPanel({ line, tools, footer, t }: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number }) {
-  const typed = phase(t, KETSU_LINE)
-  const shown = Math.round(line.length * typed)
+function KetsuPanel({
+  line,
+  tools,
+  footer,
+  t,
+  reduced,
+}: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number; reduced: boolean }) {
   const tail = phase(t, KETSU_TAIL)
   return (
     <InkedPanel
@@ -572,20 +721,10 @@ function KetsuPanel({ line, tools, footer, t }: InfoPageSpec['ketsu'] & { footer
       tone="aside"
       style={{ flex: '0 0 auto', flexDirection: 'column', padding: '2cqw 0' }}
     >
-      <span
-        data-sw-text="info-line"
-        style={{
-          fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(5),
-          letterSpacing: '0.02em',
-          lineHeight: 1.2,
-          color: PALETTE.ink,
-          textAlign: 'center',
-          padding: '0 1.8cqw',
-        }}
-      >
-        {line.slice(0, shown)}
-      </span>
+      {/* SHE DRAGS THE LINE IN. See cloth-drag.tsx — the sentence is the banner. */}
+      <div style={{ position: 'relative', width: '100%', height: '38%', minHeight: '9cqw' }}>
+        <ClothDrag line={line} t={t} reduced={reduced} />
+      </div>
       <span
         data-sw-text="info-footer"
         style={{
@@ -692,10 +831,10 @@ export function InfoPage({
         overflow: 'hidden',
       }}
     >
-      <KiPanel crop={spec.ki.crop} alt={spec.ki.alt} t={t} />
-      <ShoPanel crop={spec.sho.crop} alt={spec.sho.alt} note={spec.sho.note} t={t} />
+      <KiPanel chapter={chapter} crop={spec.ki.crop} alt={spec.ki.alt} t={t} />
+      <ShoPanel chapter={chapter} crop={spec.sho.crop} alt={spec.sho.alt} note={spec.sho.note} t={t} />
       <TenPanel hero={spec.ten.hero} inverted={spec.ten.inverted} t={t} />
-      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} />
+      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} reduced={instant} />
     </div>
   )
 }
