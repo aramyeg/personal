@@ -50,6 +50,19 @@ describe('small-world chapters', () => {
     })
   })
 
+  it('never prints the same word as both a pill and a stamp', () => {
+    // The two rows sit one above the other on the card. A word in both reads as
+    // a mistake, not as emphasis — chapter 6 shipped "real-time" twice until a
+    // capture caught it.
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+    for (const c of chapters) {
+      const pills = new Set(c.tech.map(norm))
+      for (const stamp of c.stamps) {
+        expect(pills.has(norm(stamp)), `${c.id}: "${stamp}" is also a tech pill`).toBe(false)
+      }
+    }
+  })
+
   it('palette anchors match the spec', () => {
     expect(PALETTE.meadow).toBe('#7BC47F')
     expect(PALETTE.blossom).toBe('#F7A8C4')
