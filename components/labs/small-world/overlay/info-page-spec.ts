@@ -6,154 +6,172 @@ import type { Rect } from '../manga/types'
  * ============================================================================
  * THE PREMISE
  * ============================================================================
- * This lab is Alwina's CV. The contrast is the whole idea: a playful colour clay
- * world with clay creatures leaning into it, and — printed in black and white —
- * the book where the facts live. So the right leaf is not a card describing her
- * from outside. It is a MANGA PAGE, in the same ink as the leaf beside it, and
- * it speaks in her own voice.
- *
- * TWO RULES GOVERN EVERYTHING BELOW.
- *
- * 1. FIRST PERSON. Every word on this page is hers. The old data card said "She
- *    learned that flow is a craft"; a CV that talks about its author in the
- *    third person is a bio someone else wrote.
- *
- * 2. IT IS LOOKED AT, NOT READ. Nobody reads a CV — they scan it, and the ones
- *    that work are the ones that survive scanning. So a figure is a STAMPED
- *    NUMERAL, a count is that many DRAWN FLAGS (you can see there are thirteen
- *    without counting, and counting them is a pleasure rather than a task), a
- *    stack is TOOLS HANGING ON A RAIL, and there is exactly ONE sentence per
- *    page. If a panel needs a paragraph to work, it is the wrong panel.
+ * This lab is Alwina's CV. The contrast is the idea: a playful colour clay world
+ * with clay creatures leaning into it, and — printed in black and white — the book
+ * where the facts live. The right leaf is not a card describing her from outside.
+ * It is a manga page, in the same ink as the leaf beside it, in her own voice.
  *
  * ============================================================================
- * WHY A SPEC RATHER THAN SIX COMPONENTS
+ * THE PAGE IS FOUR BEATS, AND THAT IS A RESEARCH RESULT RATHER THAN A TASTE
  * ============================================================================
- * Six hand-built pages is six things to restyle every time the ink changes, and
- * it makes chapter seven a design project. A page is therefore a list of PANELS
- * from a closed set of kinds, and `info-page.tsx` knows how to ink each kind.
- * Designing chapters 1 and 3 designed all six; the rest are data.
+ * Two independent research passes converged on Bach et al. (CHI 2019): DATA COMICS
+ * beat infographics on comprehension, recall (~23%) and enjoyment — and the win
+ * conditions are specific. An EXPLICIT READING ORDER, and TEXT FUSED INTO PICTURES
+ * rather than set beside them. A poster of panels has neither: the eye enters
+ * wherever the contrast is highest and leaves without a sequence.
+ *
+ * So the page is KISHOTENKETSU, four beats, top to bottom:
+ *
+ *   1. KI (setup) — the donated story panel. The chapter's own art, carried over
+ *      from the left leaf, which is what makes the spread read as one page flow.
+ *   2. SHO (development) — the work itself: a TIGHTER CROP OF THE SAME ART. The
+ *      "zoom-in triad" (wide, tight, number-inside) glues the fact to the story
+ *      with no new art at all, and it is the cheapest way to obey "fuse the text
+ *      into the picture".
+ *   3. TEN (the twist) — THE METRIC, and it is the hero: half the page, the number
+ *      oversized and tilted and BREAKING its own panel border, speed lines aiming
+ *      at it, and it is the only pink on the page.
+ *   4. KETSU (resolution) — quiet. One first-person line, and the printed colophon.
  *
  * ============================================================================
- * THE SPOT ART IS NOT NEW ART
+ * THE LAWS THAT CONSTRAIN EVERY ENTRY BELOW
  * ============================================================================
- * `spot` panels are CROPS OF THE PRINTED PAGES — the manifest carries every
- * panel rect, so a close-up of her hands is a rectangle rather than a drawing.
- * That costs no new asset, no new request, and it cannot drift in style from the
- * page beside it, because it IS that page. The crops are authored against the
- * shipped webps and cut by eye (`scratchpad/t74/crop.mjs` renders a candidate so
- * it can be looked at before it is committed to).
+ *  - FIRST PERSON. Always. The old data card said "She learned that flow is a
+ *    craft"; a CV that talks about its author in the third person is a bio someone
+ *    else wrote.
+ *  - ONE HERO NUMBER PER PAGE. A second figure is not a second hero — it rides
+ *    inside beat 2 as a note, at a fraction of the size. Two numbers competing is
+ *    two numbers ignored.
+ *  - SEVEN WORDS. No caption or note runs longer. The test enforces it.
+ *  - THE TEXT GUARD: if a beat's meaning survives deleting its text, it passes. If
+ *    it does not, the answer is to redraw the beat, never to add words.
+ *  - PINK IS A SEMANTIC CHANNEL, not decoration: it appears on the beat-3 number
+ *    and its impact burst and NOWHERE else. The moment pink decorates, numbers
+ *    stop reading as numbers. (This retired the pink caption rule and the pink
+ *    stamp outlines the first draft of this page had.)
+ *
+ * ============================================================================
+ * THE SPOT ART IS NOT NEW ART, AND IT IS NOT DUPLICATED EITHER
+ * ============================================================================
+ * Beats 1 and 2 are CROPS OF THE CHAPTER'S OWN PRINTED PAGE — the manifest carries
+ * every panel rect, so a close-up of her hands is a rectangle rather than a
+ * drawing. It costs no new asset and cannot drift in style, because it IS that
+ * page. And per Aram's correction the panel it comes from is REMOVED from the left
+ * leaf (`DONATED_PANEL` below), so no panel is ever printed twice on one spread.
  */
 
-/** A crop of a printed page, in page fractions — the same coordinate space the manifest uses. */
+/** A crop of a printed page, in page fractions — the manifest's own coordinate space. */
 export type SpotCrop = Rect & {
   /** Page index in `MANGA_PAGES`. */
   page: number
 }
 
-export type InfoPanel =
-  /** A close-up cut from the chapter's own printed page. */
-  | { kind: 'spot'; crop: SpotCrop; alt: string }
-  /**
-   * Figures, pressed. One to three per panel — past three a stamp row stops
-   * being a claim and becomes a table, which is the thing this page exists to
-   * avoid. `value` carries its own sign and unit; `label` is what it counts.
-   */
-  | { kind: 'stamps'; figures: { value: string; label: string }[] }
-  /**
-   * A word pressed like a rubber stamp — APPROVED, PAID, SELF-TAUGHT. For the
-   * chapters whose claim is not a number.
-   */
-  | { kind: 'mark'; text: string }
-  /** `count` drawn flags and what they are. Seen, not read. */
-  | { kind: 'tally'; count: number; label: string }
-  /** The tools of the trade, hanging from a rail. */
-  | { kind: 'shelf'; tools: string[] }
-  /** THE one sentence. Her voice, in a narrator box. */
-  | { kind: 'caption'; text: string }
-
-/** One row of the page: panels side by side, with relative widths. */
-export type InfoRow = {
-  /** Relative height of the row. `auto` lets a spot panel keep its crop's aspect. */
-  h: number | 'auto'
-  cells: { panel: InfoPanel; w: number }[]
-}
+/**
+ * Beat 3's claim.
+ *
+ * A `number` ticks up from zero; a `count` plants that many marks one at a time.
+ * Both exist because they answer different questions — "how much did it move" and
+ * "how many were there" — and an Isotype row of thirteen marks says the second one
+ * in a way the numeral 13 cannot.
+ */
+export type Hero =
+  | {
+      kind: 'number'
+      /** The magnitude. It counts up from 0, so it has to be a number and not a string. */
+      value: number
+      /** Sign or symbol printed before the digits, and never animated. */
+      prefix?: string
+      /** Unit, which lands LATE, as its own beat. */
+      suffix?: string
+      label: string
+    }
+  | { kind: 'count'; count: number; label: string }
 
 export type InfoPageSpec = {
-  rows: InfoRow[]
-  /** The printed colophon: what she was, where, when. Small type — it is a reference, not a claim. */
+  /**
+   * Beat 1: a WIDE crop of the donated panel.
+   *
+   * Not the whole panel, and that is geometry rather than taste: a vertical
+   * four-beat stack needs a landscape establishing shot, and three of the six
+   * donated panels are square or portrait. Filling a wide slot with a portrait
+   * panel shows an arbitrary top-strip of it — captured on chapter 3, where beat 1
+   * came out as hair and an empty balloon. The crop must lie INSIDE the donated
+   * panel (asserted), so the no-duplicate rule still holds.
+   */
+  ki: { crop: SpotCrop; alt: string }
+  /** Beat 2: a tighter crop of the same art, and at most one supporting figure. */
+  sho: { crop: SpotCrop; alt: string; note?: string }
+  /** Beat 3: the hero. `inverted` prints it white-on-black — at most one chapter may. */
+  ten: { hero: Hero; inverted?: boolean }
+  /** Beat 4: her line, the colophon, and the stack as a quiet aside. */
+  ketsu: { line: string; tools: string[] }
   footer: { role: string; org: string; period: string }
 }
 
 /**
+ * WHICH PANEL EACH CHAPTER DONATES TO ITS INFO PAGE — the no-duplicate rule.
+ *
+ * The panel beat 1 shows is REMOVED from the left leaf's render, so the spread
+ * reads as one page flow: the story's panels on the left, its closing panel
+ * carried over to anchor the data on the right. One source of that fact — the info
+ * page reads it for its art, the story page reads it for what to leave out.
+ *
+ * THREE OF THESE WERE WRONG IN THE FIRST DRAFT and the bench caught it: the panel
+ * being removed was not the panel the info leaf showed, so a panel was deleted for
+ * nothing AND the duplication survived. `info-page.test.tsx` now asserts beat 1
+ * and beat 2 both lie inside the donated panel, which makes that class of mistake
+ * impossible rather than unlikely.
+ *
+ * NOT EVERY PAGE SURVIVES THE OPERATION. Measured (`bench/task76-redistribute.mjs`):
+ * a page of full-width strips gives up an END strip cleanly but loses a lot of
+ * leaf; a splash with insets gives up an inset for free; a stacked column leaves a
+ * HOLE in the middle of the composition. Per-chapter verdicts are in the report —
+ * the ones that fight it are routed to newly generated art rather than forced.
+ */
+export const DONATED_PANEL: readonly number[] = [
+  2, // ch1 Lyon (page-0): the closing strip, her hands and the seedling. CLEAN — 72% leaf, 0.8% hole.
+  0, // ch2 IU Networks (page-1): the opening strip. Clean remainder but only 56.7% leaf — the worst letterbox.
+  1, // ch3 Sportion (page-2): the chisel. INTERIOR of a tall-left layout — opens a 26% hole. Route to new art.
+  1, // ch4 qiibee (page-3): the painted chest, an inset drawn ON the splash. CLEANEST — 99% leaf, 0% hole.
+  1, // ch5 Wooskill (page-4): the foundation panel. Interior of the right column — 27% hole. Route to new art.
+  0, // ch6 Sync Design (page-5): the observatory strip. Clean remainder, 61% leaf.
+]
+
+export const donatedPanelFor = (chapterIndex: number): number | undefined => DONATED_PANEL[chapterIndex]
+
+/**
  * The six pages.
  *
- * ============================================================================
- * COPY PROVENANCE — these are a real person's words about her own career
- * ============================================================================
- * Two sources, and every line below is one of them distilled, never invented:
+ * COPY PROVENANCE, because these are a real person's words about her own career:
+ * every fact is already in `alwina-story.ts` (transcribed from the approved pack)
+ * or in Aram's own first-person drafts. What changed is PERSON and LENGTH. No
+ * claim is added anywhere. Each chapter records its draft beside what shipped, so
+ * his line-edit can pick either without reconstructing anything from a diff.
  *
- *  - THE PACK, via `alwina-story.ts` (transcribed from the approved story pack).
- *  - ARAM'S DRAFTS, a set of first-person lines he has been shown but has not yet
- *    line-edited. They set the REGISTER this page is written in: first person,
- *    humble, specific, no sermons.
- *
- * What changed from the pack is PERSON and LENGTH — third to first, three lines
- * to one. No claim is added anywhere.
- *
- * EACH CHAPTER BELOW RECORDS ITS DRAFT AND ITS SHIPPED LINE as a pair, because
- * Aram line-edits from captures and the useful question is "which of these two".
- * Where the draft is what ships, it says so; where a tighter line won, the draft
- * is kept underneath it so nothing has to be reconstructed from a diff. Two are
- * flagged as genuinely open (chapters 1 and 3) — the drafts and mine say the same
- * thing at different temperatures and that is his call, not mine.
- *
- * STILL UNCONFIRMED WITH HER: the tech rows, and the one formatting liberty
- * (`+30% smoother`, which the pack writes unsigned). Chapter 5's rail now names
- * React / PHP / AWS because Aram's own draft names them — better provenance than
- * the stack I had inferred from the company.
+ * STILL UNCONFIRMED WITH HER: the tool rows, and the one formatting liberty
+ * (`+30% smoother`, which the pack writes unsigned).
  */
 export const INFO_PAGES: readonly InfoPageSpec[] = [
-  // ── 1 · The Pull ────────────────────────────────────────────────────────────
+  // ── 1 · The Pull — Lyon ─────────────────────────────────────────────────────
   // DRAFT:   "I studied marketing in Lyon. Somewhere between the lectures, I
   //           started building things — and it stuck."
   // SHIPPED: "I studied why people choose — then taught myself to build it."
-  // OPEN — Aram's call. The draft is warmer and names Lyon (which the footer
-  // already carries); mine is tighter and rhymes with the seedling above it.
-  // Her hands and the seedling, cut out of her own first page: the chapter is a
-  // beginning she made herself, and the picture says that without a word.
+  // OPEN — Aram's call; the draft is warmer, mine is tighter and rhymes with the
+  // seedling above it.
+  // The HERO here is a count, because this chapter has no percentage to its name:
+  // four languages, planted one flag at a time.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'Her cupped hands holding a seedling',
-              crop: { page: 0, x: 0.28, y: 0.8, w: 0.42, h: 0.193 },
-            },
-          },
-        ],
-      },
-      {
-        h: 1,
-        cells: [
-          { w: 0.46, panel: { kind: 'mark', text: 'Self-taught' } },
-          { w: 0.54, panel: { kind: 'tally', count: 4, label: 'languages' } },
-        ],
-      },
-      { h: 0.95, cells: [{ w: 1, panel: { kind: 'shelf', tools: ['Marketing', 'Business', 'Code'] } }] },
-      {
-        h: 0.72,
-        cells: [
-          {
-            w: 1,
-            panel: { kind: 'caption', text: 'I studied why people choose — then taught myself to build it.' },
-          },
-        ],
-      },
-    ],
+    ki: { alt: 'Her cupped hands holding a seedling', crop: { page: 0, x: 0.0117, y: 0.7271, w: 0.9766, h: 0.2657 } },
+    sho: {
+      alt: 'The seedling itself, close',
+      crop: { page: 0, x: 0.2999, y: 0.8204, w: 0.4102, h: 0.1272 },
+      note: 'Self-taught',
+    },
+    ten: { hero: { kind: 'count', count: 4, label: 'languages' } },
+    ketsu: {
+      line: 'I studied why people choose — then taught myself to build it.',
+      tools: ['Marketing', 'Business', 'Code'],
+    },
     footer: {
       role: 'Master of Marketing & Business',
       org: 'Université Jean Moulin Lyon III',
@@ -161,236 +179,107 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     },
   },
 
-  // ── 2 · First Tools ─────────────────────────────────────────────────────────
+  // ── 2 · First Tools — IU Networks ───────────────────────────────────────────
   // DRAFT:   "My first job: a drag-and-drop page builder, so the team didn't need
   //           a developer for every small change."
-  // SHIPPED: the draft, distilled to one line. "A small change" keeps the humility
-  // the long version has and that my earlier "I built the builder" had lost.
+  // SHIPPED: the draft, distilled twice — the first cut ran 13 words and the text
+  // guard caught it. "No developer for small changes" keeps the humility and the fact.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'Her hands stacking a small block tower',
-              crop: { page: 1, x: 0.3, y: 0.13, w: 0.42, h: 0.185 },
-            },
-          },
-        ],
-      },
-      {
-        h: 1,
-        cells: [
-          { w: 0.5, panel: { kind: 'mark', text: 'No code needed' } },
-          { w: 0.5, panel: { kind: 'mark', text: 'Every browser' } },
-        ],
-      },
-      {
-        h: 0.95,
-        cells: [{ w: 1, panel: { kind: 'shelf', tools: ['Frontend', 'Drag-and-drop', 'Cross-browser'] } }],
-      },
-      {
-        h: 0.72,
-        cells: [
-          { w: 1, panel: { kind: 'caption', text: 'My first job: a page builder, so a small change didn’t need a developer.' } },
-        ],
-      },
-    ],
+    ki: { alt: 'She sets a block on a growing tower', crop: { page: 1, x: 0.0059, y: 0.0559, w: 0.9873, h: 0.2682 } },
+    sho: {
+      alt: 'The block in her fingers',
+      crop: { page: 1, x: 0.2527, y: 0.1208, w: 0.4147, h: 0.1284 },
+      note: 'Every browser',
+    },
+    ten: { hero: { kind: 'count', count: 1, label: 'builder, no code' } },
+    ketsu: {
+      line: 'My first job: a page builder — no developer for small changes.',
+      tools: ['Frontend', 'Drag-and-drop', 'Cross-browser'],
+    },
     footer: { role: 'Frontend Developer', org: 'IU Networks', period: '2020–2021' },
   },
 
-  // ── 3 · Taste ───────────────────────────────────────────────────────────────
+  // ── 3 · Taste — Sportion ────────────────────────────────────────────────────
   // DRAFT:   "At a sports platform I learned how much the small stuff matters."
   // SHIPPED: "I polish the stones people step on."
-  // OPEN — Aram's call. Mine is a metaphor and the art beside it is literally
-  // that stone, which is the argument for it; the draft is plainer and says
-  // where she was. The stamps carry the claim either way.
-  // The chisel. This is the chapter where the figures carry the page, so the
-  // stamps get a row to themselves and the picture is the reason to believe them.
-  // The chisel. This is the chapter where the figures carry the page, so the
-  // stamps get a row to themselves and the picture is the reason to believe them.
+  // OPEN — Aram's call.
+  // TWO figures, ONE hero: +30% is the bigger claim and takes beat 3; +15% rides
+  // inside beat 2 at a fraction of the size. Two heroes would be no hero.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'Her hands working a stepping stone with a hammer and chisel',
-              crop: { page: 2, x: 0.6, y: 0.26, w: 0.31, h: 0.14 },
-            },
-          },
-        ],
-      },
-      {
-        h: 1.05,
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'stamps',
-              figures: [
-                { value: '+15%', label: 'session' },
-                { value: '+30%', label: 'smoother' },
-              ],
-            },
-          },
-        ],
-      },
-      { h: 0.95, cells: [{ w: 1, panel: { kind: 'shelf', tools: ['UI', 'UX', 'Interaction'] } }] },
-      { h: 0.78, cells: [{ w: 1, panel: { kind: 'caption', text: 'I polish the stones people step on.' } }] },
-    ],
+    ki: {
+      alt: 'Her hands working a stepping stone with a hammer and chisel',
+      crop: { page: 2, x: 0.5068, y: 0.2644, w: 0.4824, h: 0.1313 },
+    },
+    sho: {
+      alt: 'The chisel’s edge on the stone',
+      crop: { page: 2, x: 0.6887, y: 0.3036, w: 0.2026, h: 0.0628 },
+      note: '+15% session',
+    },
+    ten: { hero: { kind: 'number', value: 30, prefix: '+', suffix: '%', label: 'smoother' } },
+    ketsu: { line: 'I polish the stones people step on.', tools: ['UI', 'UX', 'Interaction'] },
     footer: { role: 'UI/UX Engineer', org: 'Sportion', period: '2021' },
   },
 
-  // ── 4 · One Craft, Many Colors ──────────────────────────────────────────────
+  // ── 4 · One Craft, Many Colors — qiibee ─────────────────────────────────────
   // DRAFT:   "One loyalty app, thirteen clients, each with their own colors — the
   //           same craft underneath."
-  // SHIPPED: the draft, distilled; the flags carry "thirteen" so the sentence
-  // does not have to — a first cut kept the numeral and the panel above it said
-  // the same thing twice, which is the exact redundancy this page is against.
-  // CLIENTS, not "brands" — his word, and the more accurate one.
-  // Thirteen flags. The count IS the claim, and thirteen drawn pennants say it
-  // faster than the numeral does — and reward the reader who stops to count.
-  // Thirteen flags. The count IS the claim, and thirteen drawn pennants say it
-  // faster than the numeral does — and reward the reader who stops to count.
+  // SHIPPED: the draft, distilled; the marks carry "thirteen" so the sentence does
+  // not have to. CLIENTS, his word and the accurate one.
+  // THE ONE INVERTED PAGE. Thirteen is the set's biggest single claim and the
+  // research allows exactly one chapter to print white-on-black; this is it.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'A caravan carrying identical patterned chests',
-              crop: { page: 3, x: 0.24, y: 0.42, w: 0.46, h: 0.2 },
-            },
-          },
-        ],
-      },
-      { h: 0.78, cells: [{ w: 1, panel: { kind: 'tally', count: 13, label: 'clients' } }] },
-      {
-        h: 1.15,
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'stamps',
-              figures: [
-                { value: '−40%', label: 'build time' },
-                { value: '+42%', label: 'revenue' },
-              ],
-            },
-          },
-        ],
-      },
-      { h: 0.82, cells: [{ w: 1, panel: { kind: 'shelf', tools: ['React', 'Component library', 'Design system'] } }] },
-      {
-        h: 0.72,
-        cells: [
-          { w: 1, panel: { kind: 'caption', text: 'One loyalty app I built — each client in their own colors.' } },
-        ],
-      },
-    ],
+    ki: { alt: 'She paints the lid of a patterned chest', crop: { page: 3, x: 0.0205, y: 0.8002, w: 0.4395, h: 0.1196 } },
+    sho: {
+      alt: 'The brush on the pattern',
+      crop: { page: 3, x: 0.0927, y: 0.7974, w: 0.1846, h: 0.0572 },
+      note: '−40% build time',
+    },
+    ten: { hero: { kind: 'count', count: 13, label: 'clients' }, inverted: true },
+    ketsu: {
+      line: 'One loyalty app I built — each client in their own colors.',
+      tools: ['React', 'Component library', 'Design system'],
+    },
     footer: { role: 'React Developer', org: 'qiibee', period: '2021–2023' },
   },
 
-  // ── 5 · Deeper ──────────────────────────────────────────────────────────────
+  // ── 5 · Deeper — Wooskill ───────────────────────────────────────────────────
   // DRAFT:   "At Wooskill I went full-stack — React on top, PHP underneath, AWS
   //           holding it all up."
-  // SHIPPED: the draft, distilled (the footer already says Wooskill). The RAIL
-  // now hangs React / PHP / AWS rather than the Frontend / Backend / Infrastructure
-  // I had inferred — his draft names the real stack, which is better provenance
-  // and a far better line on a CV.
+  // SHIPPED: the draft, distilled (the colophon already says Wooskill). The rail
+  // names React / PHP / AWS because his draft does — better provenance than the
+  // stack I had inferred from the company name.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'Her hands setting a foundation stone by lamplight',
-              crop: { page: 4, x: 0.55, y: 0.24, w: 0.4, h: 0.18 },
-            },
-          },
-        ],
-      },
-      {
-        h: 1.05,
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'stamps',
-              figures: [
-                { value: '−20%', label: 'load' },
-                { value: '+19%', label: 'conversion' },
-                { value: '+15%', label: 'retention' },
-              ],
-            },
-          },
-        ],
-      },
-      {
-        h: 0.95,
-        cells: [{ w: 1, panel: { kind: 'shelf', tools: ['React', 'PHP', 'AWS'] } }],
-      },
-      {
-        h: 0.72,
-        cells: [
-          { w: 1, panel: { kind: 'caption', text: 'I went full-stack — React on top, PHP underneath, AWS holding it up.' } },
-        ],
-      },
-    ],
+    ki: { alt: 'She sets a foundation stone by lamplight', crop: { page: 4, x: 0.4727, y: 0.2688, w: 0.5234, h: 0.1424 } },
+    sho: {
+      alt: 'Her hands on the stone',
+      crop: { page: 4, x: 0.5901, y: 0.2709, w: 0.2198, h: 0.0682 },
+      note: '+19% conversion',
+    },
+    ten: { hero: { kind: 'number', value: 20, prefix: '−', suffix: '%', label: 'load' } },
+    ketsu: {
+      line: 'I went full-stack — React on top, PHP underneath, AWS holding it up.',
+      tools: ['React', 'PHP', 'AWS'],
+    },
     footer: { role: 'Full-stack Software Engineer', org: 'Wooskill', period: '2023–2024' },
   },
 
-  // ── 6 · The Observatory ─────────────────────────────────────────────────────
+  // ── 6 · The Observatory — Sync Design Tech ──────────────────────────────────
   // DRAFT:   "Now I build dashboards full of live maps, camera feeds and data that
   //           never sits still — and the infrastructure underneath them."
   // SHIPPED: the draft, distilled. "Data that never sits still" is the best phrase
-  // in the set and it is the one thing the cut loses — worth his second look.
+  // in the set and the cut loses it — worth his second look.
   {
-    rows: [
-      {
-        h: 'auto',
-        cells: [
-          {
-            w: 1,
-            panel: {
-              kind: 'spot',
-              alt: 'Her hands over a lit map at the observatory glass',
-              crop: { page: 5, x: 0.3, y: 0.45, w: 0.42, h: 0.19 },
-            },
-          },
-        ],
-      },
-      {
-        h: 1,
-        cells: [
-          { w: 0.46, panel: { kind: 'mark', text: 'Live data' } },
-          { w: 0.54, panel: { kind: 'tally', count: 3, label: 'stacks' } },
-        ],
-      },
-      {
-        h: 0.95,
-        cells: [{ w: 1, panel: { kind: 'shelf', tools: ['Real-time', 'Maps', 'Infra as code'] } }],
-      },
-      {
-        h: 0.72,
-        cells: [
-          { w: 1, panel: { kind: 'caption', text: 'I build live maps and camera feeds — and the infrastructure under them.' } },
-        ],
-      },
-    ],
+    ki: { alt: 'She watches the observatory glass at dawn', crop: { page: 5, x: 0.0039, y: 0.0452, w: 0.9922, h: 0.2695 } },
+    sho: {
+      alt: 'The lit charts in the glass',
+      crop: { page: 5, x: 0.3916, y: 0.0705, w: 0.4167, h: 0.129 },
+      note: 'Live data',
+    },
+    ten: { hero: { kind: 'count', count: 3, label: 'stacks' } },
+    ketsu: {
+      line: 'I build live maps and camera feeds — and what holds them up.',
+      tools: ['Real-time', 'Maps', 'Infra as code'],
+    },
     footer: { role: 'Frontend Engineer', org: 'Sync Design Tech', period: '2025–now' },
   },
 ]

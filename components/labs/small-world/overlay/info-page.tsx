@@ -1,92 +1,168 @@
 'use client'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { MANGA_PAGES, mangaPageSrc } from '../manga'
 import { PALETTE } from '../palette'
-import { infoPageFor, type InfoPanel, type InfoPageSpec, type SpotCrop } from './info-page-spec'
+import {
+  KETSU_INK,
+  KETSU_LINE,
+  KETSU_TAIL,
+  KI_ART,
+  KI_INK,
+  PAGE_DONE,
+  SHO_ART,
+  SHO_INK,
+  SHO_NOTE,
+  TEN_BURST,
+  TEN_INK,
+  TEN_NUMBER,
+  TEN_SPEED,
+  TEN_SUFFIX,
+  easeOut,
+  inkOf,
+  markWindow,
+  phase,
+} from './info-beats'
+import {
+  infoPageFor,
+  type Hero,
+  type InfoPageSpec,
+  type SpotCrop,
+} from './info-page-spec'
 
 /**
- * THE RIGHT-HAND LEAF, INKED.
+ * THE RIGHT-HAND LEAF, INKED — four beats, drawn in reading order.
  *
- * `info-page-spec.ts` says what each chapter's page contains; this file knows how
- * to print it. Everything here is the vocabulary the printed pages already use —
- * ink rules, screentone, one pink — applied to information instead of to story.
+ * `info-page-spec.ts` says what each chapter's page contains and why; `info-beats.ts`
+ * says when each part of it arrives; this file draws it.
  *
  * ============================================================================
  * IT SIZES ITSELF AGAINST THE PAGE, NOT THE VIEWPORT
  * ============================================================================
- * Every measurement below is in `cqw` against the page's own inline size, which
- * is what the printed pages next to it already do for their lettering. That is
- * not tidiness: the same page is drawn at ~378px in the desktop spread and
- * ~300px in the phone's stack, and a layout in px is then correct at one of
- * them. Sizing against the container makes the phone case free instead of a
- * second stylesheet — the lesson Task 74's fit round paid for.
+ * Every measurement is in `cqw` against the leaf's own inline size, which is what
+ * the printed page beside it already does for its lettering. The same page is drawn
+ * at ~378px in the spread and ~300px in the phone's stack, and a layout in px is
+ * correct at one of them. Sizing against the container makes the phone free rather
+ * than a second stylesheet — the lesson Task 74's fit round paid for. Type keeps a
+ * px FLOOR through `type()`, because a ratio right at 378px is unreadable at 300.
  *
- * Type still gets a FLOOR, via `max(Npx, Mcqw)`, because a ratio that is right
- * at 378px is unreadable at 300px. The floors are 11px, which is where T73's
- * lettering work landed.
+ * ============================================================================
+ * THREE TONES, AND ONE PINK
+ * ============================================================================
+ * In black and white, TONE IS THE HIERARCHY, so there are exactly three densities
+ * and each means something: PRIMARY (the hero's ground), CONTEXT (a supporting
+ * panel), ASIDE (the colophon's strip). A fourth density would stop being a rank
+ * and start being a texture.
+ *
+ * PINK IS A SEMANTIC CHANNEL. It appears on the beat-3 number and its impact burst
+ * and nowhere else on this page. The first draft of this leaf spent pink on caption
+ * rules and stamp outlines; measured against the research's own rule, that is
+ * exactly what stops a number reading as the point.
  */
 
 /** The page is 2:3, like the printed pages it is bound with. */
 export const INFO_PAGE_ASPECT = 1.5
 
-/** Ink weights, in page-relative units so a rule is the same rule at any size. */
-const RULE = '0.85cqw'
-const PANEL_GAP = '1.5cqw'
+const RULE_CQW = 0.85
+const GAP = '1.6cqw'
 
-/** Type that never falls below a floor, however small the page gets. */
+/** Type that never falls below a floor, however small the leaf gets. */
 const type = (cqw: number, floorPx = 11) => `max(${floorPx}px, ${cqw}cqw)`
 
-const SCREENTONE = `radial-gradient(circle at center, ${PALETTE.ink}33 0.6px, transparent 0.95px)`
+/** The three densities, and nothing between them. */
+const TONE = {
+  primary: `${PALETTE.ink}3D`,
+  context: `${PALETTE.ink}26`,
+  aside: `${PALETTE.ink}14`,
+} as const
 
-/** A panel: paper, an ink border, and whatever it holds. */
-function Panel({ children, tone = false, pad = true }: { children: ReactNode; tone?: boolean; pad?: boolean }) {
-  const style: CSSProperties = {
-    position: 'relative',
-    flex: '1 1 0',
-    minWidth: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: `${RULE} solid ${PALETTE.ink}`,
-    background: PALETTE.pagePaper,
-    ...(tone
-      ? {
-          backgroundImage: `${SCREENTONE}, ${SCREENTONE}`,
-          backgroundSize: '5px 5px, 5px 5px',
-          backgroundPosition: '0 0, 2.5px 2.5px',
-        }
-      : null),
-    padding: pad ? '1.2cqw 1.3cqw' : 0,
-    overflow: 'hidden',
+function toneStyle(density: keyof typeof TONE | 'none'): CSSProperties {
+  if (density === 'none') return { backgroundColor: PALETTE.pagePaper }
+  const dot = `radial-gradient(circle at center, ${TONE[density]} 0.6px, transparent 0.95px)`
+  return {
+    backgroundColor: PALETTE.pagePaper,
+    backgroundImage: `${dot}, ${dot}`,
+    backgroundSize: '5px 5px, 5px 5px',
+    backgroundPosition: '0 0, 2.5px 2.5px',
   }
-  return <div style={style}>{children}</div>
+}
+
+/**
+ * A panel whose border DRAWS ITSELF ON.
+ *
+ * The rule is an SVG rect with `pathLength=1`, so one dashoffset from 1 to 0 inks
+ * the whole frame at a constant rate regardless of its proportions — which is what
+ * lets every panel on the page share one progress number without a per-panel
+ * length calculation. `vectorEffect: non-scaling-stroke` keeps the weight honest
+ * while the rect stretches to the panel.
+ */
+function InkedPanel({
+  ink,
+  tone = 'none',
+  inverted = false,
+  children,
+  style,
+}: {
+  ink: number
+  tone?: keyof typeof TONE | 'none'
+  inverted?: boolean
+  children?: ReactNode
+  style?: CSSProperties
+}) {
+  const ground = inverted ? PALETTE.ink : undefined
+  return (
+    <div
+      style={{
+        position: 'relative',
+        flex: '1 1 0',
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'visible',
+        ...(inverted ? { backgroundColor: ground } : toneStyle(tone)),
+        ...style,
+      }}
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      >
+        <rect
+          x="0.5"
+          y="0.5"
+          width="99"
+          height="99"
+          pathLength={1}
+          fill="none"
+          stroke={inverted ? PALETTE.pagePaper : PALETTE.ink}
+          strokeWidth={RULE_CQW}
+          strokeDasharray={1}
+          strokeDashoffset={1 - ink}
+          vectorEffect="non-scaling-stroke"
+          style={{ strokeWidth: `${RULE_CQW}cqw` }}
+        />
+      </svg>
+      {children}
+    </div>
+  )
 }
 
 /**
  * A close-up cut out of a printed page.
  *
- * The crop is a rectangle in page fractions, so the image is scaled until the
- * crop's WIDTH fills the panel and then translated by the crop's own origin —
- * percentages in a transform are of the element, which is what makes this one
- * expression rather than a computation in pixels the component cannot do. The
- * panel takes the crop's true aspect, so nothing is ever letterboxed or
- * stretched: the art arrives at the proportions it was drawn in.
+ * The crop is a rectangle in page fractions: the image is scaled until the crop's
+ * WIDTH fills the panel, then translated by the crop's own origin. Transform
+ * percentages are of the element, which is what makes this one expression rather
+ * than a pixel computation the component cannot do.
  */
-function Spot({ crop, alt }: { crop: SpotCrop; alt: string }) {
+function Spot({ crop, alt, reveal }: { crop: SpotCrop; alt: string; reveal: number }) {
   const page = MANGA_PAGES[crop.page]
   if (!page) return null
-  const aspect = (crop.w * page.size.w) / (crop.h * page.size.h)
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        aspectRatio: `${aspect}`,
-        border: `${RULE} solid ${PALETTE.ink}`,
-        background: PALETTE.pagePaper,
-        overflow: 'hidden',
-      }}
-    >
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={mangaPageSrc(page.id)}
@@ -100,6 +176,9 @@ function Spot({ crop, alt }: { crop: SpotCrop; alt: string }) {
           width: `${100 / crop.w}%`,
           transform: `translate(${-crop.x * 100}%, ${-crop.y * 100}%)`,
           display: 'block',
+          // The art arrives with the ink rather than after it: a wipe from the
+          // leading edge, which reads as the panel being filled in.
+          clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
         }}
       />
     </div>
@@ -107,137 +186,279 @@ function Spot({ crop, alt }: { crop: SpotCrop; alt: string }) {
 }
 
 /**
- * A figure, pressed.
+ * An art beat sizes itself to its CROP, never the other way round.
  *
- * The NUMERAL is the whole point — it is set large enough to be legible across a
- * room, because a recruiter's eye lands on the number and decides from there
- * whether to read the label under it. `press` runs the existing entrance: it
- * arrives oversized and slightly turned and slams to size, and it rests a degree
- * or two off square, the way a hand-pressed stamp lands.
+ * `Spot` scales the source until the crop's WIDTH fills the panel, so a panel with
+ * any other aspect shows an arbitrary strip of it. Giving the panel the crop's own
+ * aspect makes the fit exact and nothing is ever cropped by accident or letterboxed.
  */
-function Stamp({ value, label, press, index }: { value: string; label: string; press: number; index: number }) {
-  const settled = 1 - (1 - press) * (1 - press)
-  const rest = [-2.4, 1.8, -1.4][index % 3]
+const cropAspect = (crop: SpotCrop): number => {
+  const page = MANGA_PAGES[crop.page]
+  return page ? (crop.w * page.size.w) / (crop.h * page.size.h) : 1.6
+}
+
+/** Beat 1: a wide shot cut from the panel this chapter's story page gave up. */
+function KiPanel({ crop, alt, t }: { crop: SpotCrop; alt: string; t: number }) {
+  return (
+    <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${cropAspect(crop)}` }}>
+      <Spot crop={crop} alt={alt} reveal={easeOut(phase(t, KI_ART))} />
+    </InkedPanel>
+  )
+}
+
+/** Beat 2: the same art, closer, with at most one supporting figure printed on it. */
+function ShoPanel({ crop, alt, note, t }: { crop: SpotCrop; alt: string; note?: string; t: number }) {
+  const shown = phase(t, SHO_NOTE)
+  return (
+    <InkedPanel
+      ink={inkOf(t, SHO_INK)}
+      tone="context"
+      style={{ flex: '0 0 auto', aspectRatio: `${cropAspect(crop)}` }}
+    >
+      <Spot crop={crop} alt={alt} reveal={easeOut(phase(t, SHO_ART))} />
+      {note ? (
+        <span
+          data-testid="sw-info-note"
+          style={{
+            position: 'absolute',
+            right: '2.4cqw',
+            bottom: '2cqw',
+            fontFamily: 'var(--sw-font-panel)',
+            fontSize: type(4.4),
+            letterSpacing: '0.03em',
+            lineHeight: 1,
+            color: PALETTE.ink,
+            background: PALETTE.pagePaper,
+            border: `${RULE_CQW}cqw solid ${PALETTE.ink}`,
+            padding: '0.6cqw 1.2cqw',
+            // The note is a caption ON the picture, so it arrives after the art —
+            // and it is INK, not pink: it is not the hero.
+            opacity: shown,
+            transform: `translateY(${(1 - shown) * 30}%)`,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {note}
+        </span>
+      ) : null}
+    </InkedPanel>
+  )
+}
+
+/**
+ * Beat 3: THE HERO.
+ *
+ * Half the page, and everything in it points at one number. Speed lines rake in
+ * from the frame; the number counts up from zero into an already-drawn empty panel;
+ * the unit lands after the digits stop; a single pink burst marks the impact.
+ *
+ * THE NUMBER BREAKS THE BORDER on purpose. Hand-lettered SFX in manga is not
+ * contained by its panel — it is drawn over it — and that is the one device that
+ * says "this is the sound the panel makes" rather than "this is a label inside a
+ * box". `overflow: visible` on the panel and a negative inset on the type are the
+ * whole trick.
+ */
+function TenPanel({ hero, inverted, t }: { hero: Hero; inverted?: boolean; t: number }) {
+  const ink = inkOf(t, TEN_INK)
+  const speed = phase(t, TEN_SPEED)
+  const burst = phase(t, TEN_BURST)
+  const fg = inverted ? PALETTE.pagePaper : PALETTE.ink
+  return (
+    <InkedPanel
+      ink={ink}
+      tone={inverted ? 'none' : 'primary'}
+      inverted={inverted}
+      style={{ flex: '1 1 0', minHeight: 0 }}
+    >
+      {/* SPEED LINES — they aim AT the number, so they are drawn from the frame
+          inward and they arrive BEFORE it. Their job is to have already pointed
+          the eye at an empty space by the time it fills. */}
+      <svg
+        aria-hidden
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      >
+        {Array.from({ length: 22 }, (_, i) => {
+          const a = (i / 22) * Math.PI * 2 + 0.31
+          const x = 50 + Math.cos(a) * 70
+          const y = 50 + Math.sin(a) * 70
+          const own = Math.min(1, Math.max(0, (speed * 1.6 - (i % 7) * 0.06) / 0.8))
+          // Each line is drawn from the rim toward the centre and stops short.
+          const k = 0.42 + 0.16 * ((i * 37) % 5) * 0.1
+          return (
+            <line
+              key={i}
+              x1={x}
+              y1={y}
+              x2={x + (50 - x) * k}
+              y2={y + (50 - y) * k}
+              stroke={fg}
+              strokeWidth={0.5}
+              opacity={own * (inverted ? 0.5 : 0.34)}
+              pathLength={1}
+              strokeDasharray={1}
+              strokeDashoffset={1 - own}
+            />
+          )
+        })}
+      </svg>
+
+      {/* THE IMPACT BURST — one pink radial flash at the landing, gone in 300ms. */}
+      {burst > 0 && burst < 1 ? (
+        <svg
+          aria-hidden
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        >
+          {Array.from({ length: 16 }, (_, i) => {
+            const a = (i / 16) * Math.PI * 2
+            const r0 = 14 + burst * 26
+            const r1 = r0 + 9 + burst * 14
+            return (
+              <line
+                key={i}
+                x1={50 + Math.cos(a) * r0}
+                y1={50 + Math.sin(a) * r0}
+                x2={50 + Math.cos(a) * r1}
+                y2={50 + Math.sin(a) * r1}
+                stroke={PALETTE.blossomDeep}
+                strokeWidth={1.4}
+                strokeLinecap="round"
+                opacity={1 - burst}
+              />
+            )
+          })}
+        </svg>
+      ) : null}
+
+      {hero.kind === 'number' ? (
+        <HeroNumber hero={hero} t={t} fg={fg} />
+      ) : (
+        <HeroCount hero={hero} t={t} fg={fg} />
+      )}
+    </InkedPanel>
+  )
+}
+
+function HeroNumber({
+  hero,
+  t,
+  fg,
+}: {
+  hero: Extract<Hero, { kind: 'number' }>
+  t: number
+  fg: string
+}) {
+  const p = phase(t, TEN_NUMBER)
+  const eased = easeOut(p)
+  const shown = Math.round(hero.value * eased)
+  const suffix = phase(t, TEN_SUFFIX)
+  // Anticipation, overshoot, settle — the stamp's own curve, ridden by the whole
+  // numeral so the impact reads as a press rather than as a zoom.
+  const settle = p < 1 ? 1 + 0.08 * Math.sin(Math.PI * p) : 1
   return (
     <div
-      data-testid="sw-info-stamp"
+      data-testid="sw-info-hero"
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '0.2cqw',
-        color: PALETTE.blossomDeep,
-        border: `0.7cqw solid ${PALETTE.blossomDeep}`,
-        borderRadius: '0.5cqw',
-        padding: '0.9cqw 1.6cqw',
-        opacity: Math.min(1, press * 2.2),
-        transform: `scale(${1 + 0.7 * (1 - settled)}) rotate(${-4 + (4 + rest) * settled}deg)`,
-        whiteSpace: 'nowrap',
+        // BREAKING THE FRAME: the numeral is allowed wider than its panel.
+        margin: '0 -3cqw',
+        opacity: p > 0 ? 1 : 0,
       }}
     >
-      <span style={{ fontFamily: 'var(--sw-font-panel)', fontSize: type(13.5, 26), lineHeight: 0.92 }}>{value}</span>
       <span
         style={{
           fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(3.5),
-          letterSpacing: '0.08em',
-          lineHeight: 1,
-          color: PALETTE.ink,
+          fontSize: type(26, 44),
+          lineHeight: 0.86,
+          color: PALETTE.blossomDeep,
+          letterSpacing: '-0.01em',
+          whiteSpace: 'nowrap',
+          transform: `rotate(-4deg) scale(${settle})`,
+          // A hand-lettered number sits ON the art, so it carries the paper's own
+          // outline rather than sitting in a box.
+          WebkitTextStroke: `0.5cqw ${PALETTE.pagePaper}`,
+          paintOrder: 'stroke fill',
         }}
       >
-        {label}
+        {hero.prefix}
+        {shown}
+        <span style={{ opacity: suffix, marginLeft: '0.4cqw' }}>{hero.suffix}</span>
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--sw-font-panel)',
+          fontSize: type(4.6),
+          letterSpacing: '0.1em',
+          lineHeight: 1,
+          color: fg,
+          opacity: suffix,
+          marginTop: '0.6cqw',
+        }}
+      >
+        {hero.label}
       </span>
     </div>
   )
 }
 
-/** A word pressed like a rubber stamp, for the chapters whose claim is not a number. */
-function Mark({ text, press }: { text: string; press: number }) {
-  const settled = 1 - (1 - press) * (1 - press)
+/**
+ * The Isotype hero: `count` repeated marks, planted one at a time.
+ *
+ * NEVER one big mark scaled up — that is the Isotype rule and it is the whole
+ * reason this reads faster than the numeral would. Thirteen pennants say "a lot,
+ * and exactly this many" in one look, and counting them is a pleasure.
+ */
+function HeroCount({ hero, t, fg }: { hero: Extract<Hero, { kind: 'count' }>; t: number; fg: string }) {
+  const { count, label } = hero
+  // A mark's size is a function of how many there are: thirteen at the four-mark
+  // size overflow the panel and wrap, which reads as a ruler rather than a tally.
+  const w = Math.min(9, 62 / count)
+  const done = phase(t, [markWindow(count - 1, count)[0], markWindow(count - 1, count)[1]])
   return (
-    <span
-      data-testid="sw-info-mark"
+    <div
+      data-testid="sw-info-hero"
       style={{
-        fontFamily: 'var(--sw-font-panel)',
-        fontSize: type(7),
-        letterSpacing: '0.05em',
-        lineHeight: 1.05,
-        textAlign: 'center',
-        color: PALETTE.blossomDeep,
-        border: `0.7cqw solid ${PALETTE.blossomDeep}`,
-        borderRadius: '0.5cqw',
-        padding: '0.9cqw 1.4cqw',
-        opacity: Math.min(1, press * 2.2),
-        transform: `scale(${1 + 0.7 * (1 - settled)}) rotate(${-4 + 1.4 * settled}deg)`,
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '1.4cqw',
+        margin: '0 -2cqw',
       }}
     >
-      {text}
-    </span>
-  )
-}
-
-/**
- * `count` drawn flags.
- *
- * The count is the claim, so it is DRAWN rather than written: thirteen pennants
- * on a line read as "a lot, and exactly this many" in one look, and counting them
- * is a small pleasure rather than a task. Pink cloth, ink pole — the flags are
- * one of the three places the page spends its only colour.
- */
-function Tally({ count, label, press }: { count: number; label: string; press: number }) {
-  const flags = Array.from({ length: count }, (_, i) => i)
-  // A FLAG'S SIZE IS A FUNCTION OF HOW MANY THERE ARE. Four pennants can be
-  // generous; thirteen at the same size are 390px of flag in a 330px panel, which
-  // wraps to a second row the panel then clips — captured, and it read as a ruler
-  // with one flag on it. 52cqw of total flag width, shared out, keeps any count on
-  // one line without making the small counts mean.
-  const w = Math.min(7, 52 / count)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.9cqw', width: '100%' }}>
       <div
         data-testid="sw-info-tally"
         data-count={count}
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          // `center`, not the flex default `stretch`: a stretched <svg> is a
-          // DISTORTED svg, and these are drawings.
-          alignItems: 'center',
-          gap: '0.6cqw 1.1cqw',
-        }}
+        style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '0.8cqw 1.2cqw' }}
       >
-        {flags.map((i) => {
-          // Each flag lands in turn, left to right, across the back half of the
-          // entrance — a row that appears all at once reads as an icon, and the
-          // point of drawing thirteen of them is that they arrive as thirteen.
-          const own = Math.min(1, Math.max(0, (press * count - i) / 0.9))
+        {Array.from({ length: count }, (_, i) => {
+          const own = easeOut(phase(t, markWindow(i, count)))
           return (
             <svg
               key={i}
               viewBox="0 0 12 20"
-              // The size goes in the STYLE, not in the width/height attributes:
-              // `cqw` is a CSS unit and an SVG geometry attribute is not required
-              // to understand it. The aspect is declared here too, so the flag is
-              // never sized by whatever the flex line happens to be.
+              aria-hidden
               style={{
                 display: 'block',
                 flex: '0 0 auto',
                 width: `${w}cqw`,
                 height: `${(w * 20) / 12}cqw`,
-                overflow: 'visible',
                 opacity: own,
-                transform: `translateY(${(1 - own) * -25}%)`,
+                // planted: it drops onto the line rather than fading in
+                transform: `translateY(${(1 - own) * -34}%) scale(${0.9 + 0.1 * own})`,
               }}
-              aria-hidden
             >
-              {/* the pole */}
-              <path d="M1.4 0.6 L1.4 19.4" stroke={PALETTE.ink} strokeWidth="1.5" strokeLinecap="round" fill="none" />
-              {/* the cloth, with a swallowtail so it reads as a pennant at 16px */}
+              <path d="M1.4 0.6 L1.4 19.4" stroke={fg} strokeWidth="1.5" strokeLinecap="round" fill="none" />
               <path
                 d="M1.4 1.6 L11.2 4.6 L8.4 7.2 L11.2 9.8 L1.4 12.8 Z"
                 fill={PALETTE.blossomDeep}
-                stroke={PALETTE.ink}
+                stroke={fg}
                 strokeWidth="1.1"
                 strokeLinejoin="round"
               />
@@ -248,10 +469,11 @@ function Tally({ count, label, press }: { count: number; label: string; press: n
       <span
         style={{
           fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(4),
+          fontSize: type(5),
           letterSpacing: '0.1em',
           lineHeight: 1,
-          color: PALETTE.ink,
+          color: fg,
+          opacity: done,
         }}
       >
         {label}
@@ -260,241 +482,141 @@ function Tally({ count, label, press }: { count: number; label: string; press: n
   )
 }
 
-/**
- * The tools of the trade, hanging from a rail.
- *
- * A row of pills is a UI control; a row of tags on a rail is a workbench. Same
- * words, and the second one belongs on a printed page — which is the whole
- * argument of this round in miniature.
- */
-function Shelf({ tools }: { tools: string[] }) {
+/** Beat 4: quiet. Her line, then the colophon and the stack as an aside. */
+function KetsuPanel({ line, tools, footer, t }: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number }) {
+  const typed = phase(t, KETSU_LINE)
+  const shown = Math.round(line.length * typed)
+  const tail = phase(t, KETSU_TAIL)
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'stretch',
-        // Top-aligned: things hang DOWN from a rail. Centred in the panel, the
-        // rail floated in the middle of the box and the whole thing read as a
-        // labelled diagram rather than as a wall with tools on it.
-        justifyContent: 'flex-start',
-        paddingTop: '1.4cqw',
-      }}
+    <InkedPanel
+      ink={inkOf(t, KETSU_INK)}
+      tone="aside"
+      style={{ flex: '0 0 auto', flexDirection: 'column', padding: '2cqw 0' }}
     >
-      {/* the rail, running the full width of the panel and out to its ink */}
-      <div style={{ height: RULE, background: PALETTE.ink, width: '100%', flex: '0 0 auto' }} />
-      <div
+      <span
+        data-sw-text="info-line"
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-          gap: '0 2.4cqw',
+          fontFamily: 'var(--sw-font-panel)',
+          fontSize: type(5),
+          letterSpacing: '0.02em',
+          lineHeight: 1.2,
+          color: PALETTE.ink,
+          textAlign: 'center',
+          padding: '0 1.8cqw',
         }}
       >
-        {tools.map((tool) => (
-          <span key={tool} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {/* the hook it hangs by */}
-            <span style={{ width: RULE, height: '2.6cqw', background: PALETTE.ink, flex: '0 0 auto' }} />
-            <span
-              data-testid="sw-info-tool"
-              style={{
-                fontFamily: 'var(--sw-font-panel)',
-                fontSize: type(4.1),
-                letterSpacing: '0.05em',
-                lineHeight: 1.05,
-                whiteSpace: 'nowrap',
-                color: PALETTE.ink,
-                border: `${RULE} solid ${PALETTE.ink}`,
-                background: PALETTE.pagePaper,
-                // The hard shadow is what makes a tag an OBJECT hanging off a
-                // rail rather than a word in a box.
-                boxShadow: `0.5cqw 0.6cqw 0 ${PALETTE.ink}`,
-                padding: '0.7cqw 1.4cqw',
-              }}
-            >
-              {tool}
-            </span>
-          </span>
-        ))}
-      </div>
-    </div>
+        {line.slice(0, shown)}
+      </span>
+      <span
+        data-sw-text="info-footer"
+        style={{
+          fontFamily: 'var(--sw-font-body)',
+          fontSize: type(3),
+          lineHeight: 1.24,
+          color: PALETTE.ink,
+          opacity: tail * 0.82,
+          textAlign: 'center',
+          marginTop: '1.4cqw',
+          padding: '0 1.4cqw',
+        }}
+      >
+        {footer.role} · {footer.org} · {footer.period}
+        <br />
+        {tools.join(' · ')}
+      </span>
+    </InkedPanel>
   )
 }
-
-/** THE one sentence, in the narrator box the printed pages use for narration. */
-function CaptionPanel({ text }: { text: string }) {
-  return (
-    <span
-      data-sw-text="info-caption"
-      style={{
-        fontFamily: 'var(--sw-font-panel)',
-        fontSize: type(5.1),
-        letterSpacing: '0.02em',
-        lineHeight: 1.2,
-        color: PALETTE.ink,
-        textAlign: 'center',
-      }}
-    >
-      {text}
-    </span>
-  )
-}
-
-function PanelBody({ panel, press }: { panel: InfoPanel; press: number }) {
-  switch (panel.kind) {
-    case 'spot':
-      return <Spot crop={panel.crop} alt={panel.alt} />
-    case 'stamps':
-      return (
-        <Panel tone>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1.2cqw 2.6cqw' }}>
-            {panel.figures.map((f, i) => (
-              <Stamp
-                key={f.value + f.label}
-                value={f.value}
-                label={f.label}
-                index={i}
-                press={pressAt(press, i, panel.figures.length)}
-              />
-            ))}
-          </div>
-        </Panel>
-      )
-    case 'mark':
-      return (
-        <Panel tone>
-          <Mark text={panel.text} press={press} />
-        </Panel>
-      )
-    case 'tally':
-      return (
-        <Panel>
-          <Tally count={panel.count} label={panel.label} press={press} />
-        </Panel>
-      )
-    case 'shelf':
-      return (
-        <Panel pad={false}>
-          <Shelf tools={panel.tools} />
-        </Panel>
-      )
-    case 'caption':
-      // THE PINK LEADING EDGE is the printed pages' own narrator device
-      // (`manga-lettering.tsx` rules its caption boxes the same way), and this
-      // panel holds the same thing they do: the voice speaking over the picture.
-      // Borrowing the rule rather than inventing one is what ties the two leaves
-      // together at the level a reader notices without noticing.
-      return (
-        <div
-          style={{
-            flex: '1 1 0',
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: `${RULE} solid ${PALETTE.ink}`,
-            borderLeft: `2.6cqw solid ${PALETTE.blossomDeep}`,
-            background: PALETTE.pagePaper,
-            padding: '1.2cqw 1.4cqw',
-            overflow: 'hidden',
-          }}
-        >
-          <CaptionPanel text={panel.text} />
-        </div>
-      )
-  }
-}
-
-/** How much of the press one stamp's own landing takes. */
-const STAMP_SPAN = 0.55
 
 /**
- * 0→1 for stamp `i` of `count`: nothing, then a fast press.
+ * Milliseconds since the page started inking.
  *
- * The stagger is DERIVED from the count rather than fixed, so the last stamp
- * always finishes exactly as the entrance does. With a fixed stagger a
- * three-figure chapter (qiibee, Wooskill) ran its last press past the end of the
- * clock — the clock parks at 1, so that stamp sat permanently two-thirds
- * pressed: over-sized and crooked, for the whole dwell, on the two pages with
- * the most figures to show. Carried over from the card this page replaces,
- * because the trap is a property of the staging and not of the old layout.
+ * Ticks on rAF only while unfinished, then stops — a parked checkpoint costs
+ * nothing. `instant` (reduced motion) skips the clock rather than fast-forwarding
+ * it, so no frame is scheduled at all.
+ *
+ * `?swInk=<ms>` PINS the clock, and exists so a capture harness can photograph a
+ * named moment — mid-ink, the empty frame before the number, the burst — rather
+ * than racing it. Development only: it is a camera, not a feature.
  */
-export function pressAt(press: number, i: number, count: number): number {
-  const stagger = count > 1 ? (1 - STAMP_SPAN) / (count - 1) : 0
-  return Math.min(1, Math.max(0, (press - i * stagger) / STAMP_SPAN))
+function useInkClock(running: boolean, instant: boolean): number {
+  const [elapsed, setElapsed] = useState(instant ? PAGE_DONE : 0)
+  const startRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+      const pinned = new URLSearchParams(window.location.search).get('swInk')
+      if (pinned !== null) {
+        setElapsed(Number(pinned))
+        return
+      }
+    }
+    if (instant) {
+      setElapsed(PAGE_DONE)
+      return
+    }
+    if (!running) {
+      startRef.current = null
+      setElapsed(0)
+      return
+    }
+    let raf = 0
+    let stopped = false
+    const tick = (now: number) => {
+      if (stopped) return
+      if (startRef.current === null) startRef.current = now
+      const next = now - startRef.current
+      setElapsed(next)
+      if (next < PAGE_DONE) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      stopped = true
+      cancelAnimationFrame(raf)
+    }
+  }, [running, instant])
+
+  return elapsed
 }
 
 /**
  * The whole leaf.
  *
- * `enter` is the spread's entrance clock, already eased. The marks and stamps
- * ride it so the page's figures land as it settles, rather than running a second
- * clock the reader has no reason to expect.
+ * `enter` is the spread's entrance clock; the page starts inking once the leaf has
+ * essentially arrived, so the beats land on a page that has stopped moving.
  */
-export function InfoPage({ chapter, enter }: { chapter: number; enter: number }) {
+export function InfoPage({
+  chapter,
+  enter,
+  instant = false,
+}: {
+  chapter: number
+  enter: number
+  instant?: boolean
+}) {
   const spec = infoPageFor(chapter)
+  const t = useInkClock(enter > 0.55, instant)
   if (!spec) return null
-  // The figures begin once the page has essentially arrived.
-  const press = Math.min(1, Math.max(0, (enter - 0.55) / 0.45))
-  return <InfoPageBody spec={spec} press={press} />
-}
-
-export function InfoPageBody({ spec, press }: { spec: InfoPageSpec; press: number }) {
   return (
     <div
       data-testid="sw-info-page"
       style={{
-        // The page is the container everything inside it is measured against.
         containerType: 'inline-size',
         width: '100%',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: PANEL_GAP,
+        gap: GAP,
         padding: '2.2cqw',
         boxSizing: 'border-box',
         background: PALETTE.pagePaper,
         overflow: 'hidden',
       }}
     >
-      {spec.rows.map((row, r) => (
-        <div
-          key={r}
-          style={{
-            display: 'flex',
-            gap: PANEL_GAP,
-            ...(row.h === 'auto' ? { flex: '0 0 auto' } : { flex: `${row.h} 1 0`, minHeight: 0 }),
-          }}
-        >
-          {row.cells.map((cell, c) => (
-            <div key={c} style={{ flex: `${cell.w} 1 0`, minWidth: 0, display: 'flex' }}>
-              <PanelBody panel={cell.panel} press={press} />
-            </div>
-          ))}
-        </div>
-      ))}
-
-      {/* The colophon. Not a panel — printed matter sits outside the frames, the
-          way a page number does. */}
-      <p
-        data-sw-text="info-footer"
-        style={{
-          margin: 0,
-          flex: '0 0 auto',
-          fontFamily: 'var(--sw-font-body)',
-          fontSize: type(3.2),
-          lineHeight: 1.22,
-          letterSpacing: '0.01em',
-          color: PALETTE.ink,
-          opacity: 0.82,
-          textAlign: 'center',
-        }}
-      >
-        {spec.footer.role} · {spec.footer.org} · {spec.footer.period}
-      </p>
+      <KiPanel crop={spec.ki.crop} alt={spec.ki.alt} t={t} />
+      <ShoPanel crop={spec.sho.crop} alt={spec.sho.alt} note={spec.sho.note} t={t} />
+      <TenPanel hero={spec.ten.hero} inverted={spec.ten.inverted} t={t} />
+      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} />
     </div>
   )
 }

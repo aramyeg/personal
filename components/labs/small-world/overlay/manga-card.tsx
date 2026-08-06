@@ -3,6 +3,7 @@ import { mangaPageFor } from '../manga'
 import { mangaPageSrc, type MangaPage } from '../manga/types'
 import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 import { BookLeaf } from './book-leaf'
+import { donatedPanelFor } from './info-page-spec'
 import { MangaPageArt } from './manga-page'
 
 /**
@@ -59,8 +60,23 @@ export function MangaCard({
       ariaLabel={`Open chapter ${chapterNumber}'s comic page full size`}
     >
       {/* The page starts inking once the leaf is most of the way in, so the
-          frames land on a page that has stopped moving. */}
-      <MangaPageArt page={page} running={enter > 0.55} instant={reduced} />
+          frames land on a page that has stopped moving.
+
+          NO PANEL ON BOTH LEAVES. The info page beside this one opens on a panel
+          of this very page (`DONATED_PANEL`), so the story leaf leaves it out and
+          re-pastes the remainder. `chapterNumber` counts from one, the spec's
+          index from zero — the whole reason that subtraction is spelled out here
+          rather than hidden behind another helper.
+
+          THE LIGHTBOX IS DELIBERATELY NOT GIVEN THIS. Opened full size the page
+          is the artefact itself and prints complete; the spread avoids the
+          duplication, the artefact does not pretend the panel was never drawn. */}
+      <MangaPageArt
+        page={page}
+        running={enter > 0.55}
+        instant={reduced}
+        omitPanel={donatedPanelFor(chapterNumber - 1)}
+      />
     </BookLeaf>
   )
 }

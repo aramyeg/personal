@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { mangaPageSrc, type MangaPage } from '../manga/types'
+import { mangaPageSrc, type MangaPage, type Point, type Rect } from '../manga/types'
 import { FINISHED, panelInk, typedLength } from '../manga/reveal'
 import { PALETTE } from '../palette'
 import { BalloonText, CaptionBox } from './manga-lettering'
@@ -48,6 +48,83 @@ const NARROW_PAGE_STYLES = `
   }
 `
 
+/**
+ * THE DONATED PANEL, AND WHAT THE LEAF DOES WITH THE HOLE IT LEAVES.
+ *
+ * The right-hand leaf anchors itself on one panel of the chapter's own printed
+ * page (`info-page-spec.ts` → `DONATED_PANEL`). Aram's rule is that no panel may
+ * appear on BOTH leaves, so the story leaf leaves that panel out — and a page
+ * with a panel simply missing is a page with a hole in it, which is worse than
+ * the duplication was.
+ *
+ * So the remainder is RE-PASTED: the surviving panels' shared bounding box is
+ * mapped onto the leaf with a UNIFORM scale and centred. Uniform is the whole
+ * point — a stretch to fill both axes would print her at a different aspect on
+ * every chapter, which is the one thing a page of ink may never do. Whatever the
+ * uniform fit does not cover stays blank paper, which is what a manga page's own
+ * margin is anyway.
+ *
+ * Because the root box carries the PAGE's aspect, one scale factor in page
+ * fractions is one scale factor in pixels on both axes — no per-axis correction,
+ * and no chance of a silent squash creeping in through the aspect mismatch.
+ */
+export type LeafFit = {
+  /** The surviving panels' shared bounding box, in page fractions. */
+  bbox: Rect
+  /** Uniform page-fraction scale that fits `bbox` inside the leaf. */
+  scale: number
+  /** Where the scaled bbox's top-left lands, in leaf fractions. */
+  offset: Point
+}
+
+const boundingBox = (rects: readonly Rect[]): Rect => {
+  const x = Math.min(...rects.map((r) => r.x))
+  const y = Math.min(...rects.map((r) => r.y))
+  const right = Math.max(...rects.map((r) => r.x + r.w))
+  const bottom = Math.max(...rects.map((r) => r.y + r.h))
+  return { x, y, w: right - x, h: bottom - y }
+}
+
+/**
+ * The transform the leaf applies when a panel has been donated away.
+ *
+ * `null` means "print the page as it is": no omission asked for, an index that
+ * is not a panel, or nothing left to paste. That null is what keeps the
+ * un-omitted leaf and the lightbox on exactly today's code path.
+ */
+export function redistributeFit(panels: readonly Rect[], omit: number | undefined): LeafFit | null {
+  if (omit === undefined || !Number.isInteger(omit) || omit < 0 || omit >= panels.length) return null
+  const kept = panels.filter((_, i) => i !== omit)
+  if (kept.length === 0) return null
+  const bbox = boundingBox(kept)
+  if (bbox.w <= 0 || bbox.h <= 0) return null
+  const scale = Math.min(1 / bbox.w, 1 / bbox.h)
+  return {
+    bbox,
+    scale,
+    offset: { x: (1 - scale * bbox.w) / 2, y: (1 - scale * bbox.h) / 2 },
+  }
+}
+
+/**
+ * A page-fraction point as the reader sees it, in leaf fractions.
+ *
+ * Everything on the leaf — panel rects, balloon boxes, caption corners — moves
+ * through this one map, which is the registration guarantee: the lettering
+ * cannot drift off its balloon because it is not transformed separately, it is
+ * carried by the same wrapper the art is.
+ */
+export const fitPoint = (fit: LeafFit | null, p: Point): Point =>
+  fit
+    ? { x: fit.offset.x + (p.x - fit.bbox.x) * fit.scale, y: fit.offset.y + (p.y - fit.bbox.y) * fit.scale }
+    : p
+
+/** ...and a rect through the same map. */
+export const fitRect = (fit: LeafFit | null, r: Rect): Rect => {
+  const { x, y } = fitPoint(fit, r)
+  return fit ? { x, y, w: r.w * fit.scale, h: r.h * fit.scale } : { ...r }
+}
+
 export function MangaPageArt({
   page,
   /** Held at 0 until the card is most of the way in, then released. */
@@ -55,13 +132,22 @@ export function MangaPageArt({
   /** Reduced motion, or a page shown in the lightbox: skip straight to finished. */
   instant = false,
   priority = false,
+  /**
+   * The panel this chapter has donated to the info leaf, if any. Left undefined
+   * — as the lightbox deliberately leaves it — the page prints complete.
+   */
+  omitPanel,
 }: {
   page: MangaPage
   running: boolean
   instant?: boolean
   priority?: boolean
+  omitPanel?: number
 }) {
   const elapsed = useRevealClock(running, instant)
+  const fit = redistributeFit(page.panels, omitPanel)
+  /** Normalised: an index the fit rejected omits nothing. */
+  const omitted = fit ? omitPanel : undefined
 
   const rootStyle: CSSProperties = {
     position: 'relative',
@@ -79,10 +165,10 @@ export function MangaPageArt({
     overflow: 'hidden',
   }
 
-  return (
-    <div style={rootStyle} data-testid="sw-manga-page" data-manga-page={page.id}>
-      <style>{NARROW_PAGE_STYLES}</style>
+  const body = (
+    <>
       {page.panels.map((rect, i) => {
+        if (i === omitted) return null
         const ink = panelInk(i, elapsed)
         if (ink <= 0) return null
         const inset = `${rect.y * 100}% ${(1 - rect.x - rect.w) * 100}% ${(1 - rect.y - rect.h) * 100}% ${rect.x * 100}%`
@@ -131,6 +217,7 @@ export function MangaPageArt({
       })}
 
       {page.balloons.map((balloon, i) => {
+        if (balloon.panel === omitted) return null
         if (panelInk(balloon.panel, elapsed) <= 0) return null
         const shown = typedLength(balloon.text, balloon.panel, elapsed)
         if (shown <= 0 && !balloon.drawn) return null
@@ -138,12 +225,47 @@ export function MangaPageArt({
       })}
 
       {page.captions.map((caption, i) => {
+        if (caption.panel === omitted) return null
         const shown = typedLength(caption.text, caption.panel, elapsed)
         if (shown <= 0) return null
         return <CaptionBox key={`${page.id}-c${i}`} caption={caption} shown={shown} />
       })}
+    </>
+  )
+
+  return (
+    <div style={rootStyle} data-testid="sw-manga-page" data-manga-page={page.id}>
+      <style>{NARROW_PAGE_STYLES}</style>
+      {/* ART, LETTERING AND TRIM MOVE TOGETHER OR NOT AT ALL. With no donated
+          panel there is no wrapper at all, so the complete page — the lightbox's
+          case — renders through exactly the markup it always did. */}
+      {fit ? (
+        <div data-testid="sw-manga-fit" data-manga-fit={omitted} style={fitStyle(fit)}>
+          {body}
+        </div>
+      ) : (
+        body
+      )}
     </div>
   )
+}
+
+/**
+ * The re-paste, as one CSS transform.
+ *
+ * Read right to left, the way the browser composes it: put the bbox's corner at
+ * the origin, scale uniformly, then drop the result at its centred offset. The
+ * percentages resolve against the wrapper's own box — which is the leaf — so
+ * `-bbox.x * 100%` is exactly `-bbox.x` of a page width, and the same for y.
+ */
+function fitStyle(fit: LeafFit): CSSProperties {
+  const { bbox, scale, offset } = fit
+  return {
+    position: 'absolute',
+    inset: 0,
+    transformOrigin: '0 0',
+    transform: `translate(${offset.x * 100}%, ${offset.y * 100}%) scale(${scale}) translate(${-bbox.x * 100}%, ${-bbox.y * 100}%)`,
+  }
 }
 
 /**
