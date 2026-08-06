@@ -2,6 +2,7 @@
 import { DeskFigurines } from './desk-figurines'
 import { DeskGlb } from './desk-glb'
 import { DeskNote } from './desk-note'
+import { DeskSteam } from './desk-steam'
 import type { JourneyRef } from '../use-journey'
 
 /**
@@ -56,6 +57,11 @@ export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
       {/* Two souvenirs of the journey, at desk-toy scale (Task 66). Still clay, still toon-shaded —
           see the header for why they were not baked with the rest. */}
       <DeskFigurines />
+      {/* Wisps off the coffee (Task 72), hung on the GLB's `CoffeeAnchor` empty. One draw call while
+          the studio is up and NONE at all before it — the plume is gated on `studioLightsFor`, so it
+          is not drawn, not lit and not clocked anywhere in the journey. See `desk-steam.tsx` for the
+          ENDING's first wall clock, and the scoping that costs it nothing. */}
+      <DeskSteam journeyRef={journeyRef} />
     </group>
   )
 }
