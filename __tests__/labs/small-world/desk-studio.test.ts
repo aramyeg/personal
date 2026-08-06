@@ -8,7 +8,14 @@ import {
   studioLightsAt,
   studioLightsFor,
 } from '@/components/labs/small-world/scene/desk-studio'
-import { releasedLightMix } from '@/components/labs/small-world/scene/biome-atmosphere'
+import {
+  AMBIENT_INTENSITY,
+  KEY_INTENSITY,
+  STUDIO_AMBIENT_INTENSITY,
+  STUDIO_KEY_INTENSITY,
+  releasedLightMix,
+  studioLitIntensity,
+} from '@/components/labs/small-world/scene/biome-atmosphere'
 import { BIOME_MOODS, LIGHT_MIX_MAX } from '@/components/labs/small-world/overlay/grade-mood'
 import {
   ENDING_IDLE,
@@ -170,6 +177,105 @@ describe("the winter tint's release rides the same number, inverted (Task 71)", 
     // colours the lab opens on — rather than some studio-specific light invented for the ending.
     for (const mood of BIOME_MOODS) {
       expect(Object.is(releasedLightMix(mood.lightMix, gradeHoldFor(endingStateAt(TRACK_END))), 0)).toBe(true)
+    }
+  })
+})
+
+/**
+ * THE STUDIO REACHES THE CLAY (Task 76) — the revised law, gated.
+ *
+ * Task 68's law was "the studio never touches clay". Task 76 replaces it with "the
+ * studio reaches clay ONLY through the scroll-gated ending grade", which is a
+ * narrower promise and therefore one that has to be kept precisely: the whole
+ * journey must render through the numbers it always did, not through numbers that
+ * happen to be very close to them.
+ *
+ * The pixel half of this gate is a capture-diff against tip 74a3f50: outside a box
+ * around the girl herself (whose AnimationMixer has run on a wall clock since she
+ * was first mounted, and which differs between two loads of the SAME build), the
+ * journey frame is 100.0000% bit-identical, 0 pixels differing, max channel delta 0.
+ * The control — the same build captured twice — differs inside that box by the same
+ * order. Numbers in task-76-report.md.
+ */
+describe('the studio lift reaches the clay and nothing before it', () => {
+  it('holds both intensities at EXACTLY their journey values for the whole journey', () => {
+    for (let i = 0; i <= 4000; i++) {
+      const lights = studioLightsFor(endingStateAt((i / 4000) * ZOOM_FIRST_MOVE))
+      expect(
+        Object.is(studioLitIntensity(KEY_INTENSITY, STUDIO_KEY_INTENSITY, lights), KEY_INTENSITY)
+      ).toBe(true)
+      expect(
+        Object.is(
+          studioLitIntensity(AMBIENT_INTENSITY, STUDIO_AMBIENT_INTENSITY, lights),
+          AMBIENT_INTENSITY
+        )
+      ).toBe(true)
+    }
+  })
+
+  it('lands on EXACTLY the studio values at the money shot', () => {
+    const lights = studioLightsFor(endingStateAt(TRACK_END))
+    expect(Object.is(lights, 1)).toBe(true)
+    expect(
+      Object.is(studioLitIntensity(AMBIENT_INTENSITY, STUDIO_AMBIENT_INTENSITY, lights), STUDIO_AMBIENT_INTENSITY)
+    ).toBe(true)
+  })
+
+  it('only ever brightens: the ending cannot make the clay darker than the journey', () => {
+    // The grade's standing rail, inherited. A fill that could dip below the
+    // journey's would be a mood change wearing a studio's clothes.
+    expect(STUDIO_AMBIENT_INTENSITY).toBeGreaterThan(AMBIENT_INTENSITY)
+    expect(STUDIO_KEY_INTENSITY).toBeGreaterThanOrEqual(KEY_INTENSITY)
+    for (let i = 0; i <= 2000; i++) {
+      const lights = studioLightsFor(endingStateAt((i / 2000) * TRACK_END))
+      expect(studioLitIntensity(AMBIENT_INTENSITY, STUDIO_AMBIENT_INTENSITY, lights)).toBeGreaterThanOrEqual(
+        AMBIENT_INTENSITY
+      )
+    }
+  })
+
+  it('is monotone, so the lights never dip on their way up', () => {
+    let prev = -Infinity
+    for (let i = 0; i <= 4000; i++) {
+      const v = studioLitIntensity(
+        AMBIENT_INTENSITY,
+        STUDIO_AMBIENT_INTENSITY,
+        studioLightsFor(endingStateAt((i / 4000) * TRACK_END))
+      )
+      expect(v).toBeGreaterThanOrEqual(prev)
+      prev = v
+    }
+  })
+
+  it('retraces bit-identically when the reader scrubs back', () => {
+    const forward: number[] = []
+    for (let i = 0; i <= 3000; i++) {
+      forward.push(
+        studioLitIntensity(
+          AMBIENT_INTENSITY,
+          STUDIO_AMBIENT_INTENSITY,
+          studioLightsFor(endingStateAt((i / 3000) * TRACK_END))
+        )
+      )
+    }
+    for (let i = 3000; i >= 0; i--) {
+      const back = studioLitIntensity(
+        AMBIENT_INTENSITY,
+        STUDIO_AMBIENT_INTENSITY,
+        studioLightsFor(endingStateAt((i / 3000) * TRACK_END))
+      )
+      expect(Object.is(back, forward[i])).toBe(true)
+    }
+  })
+
+  it('rides studioLightsAt itself rather than a second curve', () => {
+    // Four consumers already read that number. A fifth clock in this ending is how
+    // two of them end up disagreeing about how lit it is.
+    for (let i = 0; i <= 500; i++) {
+      const ending = endingStateAt(1 + (i / 500) * (TRACK_END - 1))
+      const lights = studioLightsFor(ending)
+      const want = AMBIENT_INTENSITY + (STUDIO_AMBIENT_INTENSITY - AMBIENT_INTENSITY) * lights
+      expect(studioLitIntensity(AMBIENT_INTENSITY, STUDIO_AMBIENT_INTENSITY, lights)).toBeCloseTo(want, 12)
     }
   })
 })
