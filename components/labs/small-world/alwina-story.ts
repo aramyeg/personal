@@ -32,7 +32,16 @@ export type StoryChapter = {
   lines: string[]
   /** The footer credit, exactly as the pack writes it. */
   caption: string
-  /** Short badges that land last, like a stamp press. Figures from `lines`. */
+  /**
+   * Short badges that land last, like a stamp press. Every figure here appears in `lines`.
+   *
+   * ONE EDITORIAL LIBERTY, recorded because these are a real person's numbers. The pack writes
+   * "Operations 30% smoother." with no sign, and chapter 3 shipped it that way — sitting next to
+   * "+15% session", which read as one of the two figures having lost its sign. The stamps carry
+   * "+30% smoother" now for shape consistency with every other chapter. It is a formatting change
+   * and not a claim change (30% smoother IS an improvement of 30%), but it is OURS rather than the
+   * pack's, and Aram should confirm it with her along with the tech rows.
+   */
   stamps: string[]
   /**
    * Pill row. Every entry is a word the pack itself uses for that chapter's
@@ -74,7 +83,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
     hook: 'She learned that flow is a craft — polish every stone people step on.',
     lines: ['Session time up 15%.', 'Operations 30% smoother.', 'Details are the product.'],
     caption: 'UI/UX Engineer · Sportion · 2021',
-    stamps: ['+15% session', '30% smoother'],
+    stamps: ['+15% session', '+30% smoother'],
     tech: ['UI', 'UX', 'Interaction'],
     accent: PALETTE.river,
   },

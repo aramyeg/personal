@@ -53,8 +53,8 @@ const MOBILE_STYLES = `
     }
     /* The one behind: lifted and turned so its shoulder shows, and dimmed so
        the front card keeps the contrast. */
-    [data-front='art'] .sw-panel-data,
-    [data-front='story'] .sw-panel-art {
+    [data-front='comic'] .sw-panel-data,
+    [data-front='details'] .sw-panel-art {
       z-index: 1 !important;
       filter: brightness(0.93) !important;
       transform:
@@ -64,9 +64,9 @@ const MOBILE_STYLES = `
         scale(calc(0.86 + 0.11 * var(--sw-enter)))
         !important;
     }
-    [data-front='art'] .sw-panel-art,
-    [data-front='story'] .sw-panel-data { z-index: 2 !important; }
-    [data-front='story'] .sw-panel-art { pointer-events: none !important; }
+    [data-front='comic'] .sw-panel-art,
+    [data-front='details'] .sw-panel-data { z-index: 2 !important; }
+    [data-front='details'] .sw-panel-art { pointer-events: none !important; }
   }
 `
 
@@ -102,7 +102,11 @@ export function ChapterPanels({
   const enter = easeOutBack(entrance)
   const page = mangaPageFor(index)
   const [expanded, setExpanded] = useState(false)
-  const [front, setFront] = useState<'art' | 'story'>('art')
+  // 'comic' | 'details', not 'art' | 'story'. THE COMIC IS THE STORY — the stack
+  // used to label the manga "Page" and the CV card "Story", which told the reader
+  // the pictures were the packaging and the bullet points were the substance.
+  // Exactly backwards, and the blind review caught it.
+  const [front, setFront] = useState<'comic' | 'details'>('comic')
 
   // The registration's LIFETIME is this component's, which is what makes "no advance during travel"
   // structural rather than a flag: this panel only renders while it is up, so a missed click with no
@@ -158,8 +162,9 @@ export function ChapterPanels({
       {page ? (
         <MangaCard
           page={page}
+          chapterNumber={index + 1}
           enter={enter}
-          onExpand={() => (front === 'art' ? setExpanded(true) : setFront('art'))}
+          onExpand={() => (front === 'comic' ? setExpanded(true) : setFront('comic'))}
         />
       ) : null}
 
@@ -171,7 +176,7 @@ export function ChapterPanels({
       <button
         type="button"
         className="sw-stack-tab"
-        onClick={() => setFront((f) => (f === 'art' ? 'story' : 'art'))}
+        onClick={() => setFront((f) => (f === 'comic' ? 'details' : 'comic'))}
         style={{
           display: 'none',
           position: 'absolute',
@@ -195,10 +200,12 @@ export function ChapterPanels({
           opacity: enter,
         }}
       >
-        {front === 'art' ? 'Story' : 'Page'}
+        {front === 'comic' ? 'Details' : 'Comic'}
       </button>
 
-      {expanded && page ? <MangaLightbox page={page} onClose={() => setExpanded(false)} /> : null}
+      {expanded && page ? (
+        <MangaLightbox page={page} chapterNumber={index + 1} onClose={() => setExpanded(false)} />
+      ) : null}
     </div>
   )
 }

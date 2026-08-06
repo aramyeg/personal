@@ -1,6 +1,12 @@
 'use client'
 import type { CSSProperties } from 'react'
-import { balloonFontCqw, DRAWN_INK_MARGIN, LINE_STEP, pageAspect } from '../manga/lettering'
+import {
+  balloonFontCqw,
+  cqwWithFloor,
+  DRAWN_INK_MARGIN,
+  LINE_STEP,
+  pageAspect,
+} from '../manga/lettering'
 import type { Balloon, Caption, MangaPage } from '../manga/types'
 import { PALETTE } from '../palette'
 
@@ -139,6 +145,12 @@ export function BalloonText({
     fontFamily: 'var(--sw-font-body)',
     fontWeight: balloon.voice === 'thought' ? 600 : 700,
     fontStyle: balloon.voice === 'thought' ? 'italic' : 'normal',
+    // NO FLOOR HERE, and it is the one place in this file that goes without one.
+    // A balloon's size is not ours to raise: the blank interior is PRINTED ART, so
+    // lettering set larger than the box was solved for runs onto the ink. The
+    // floor is achievable for captions (site-drawn boxes, free to grow downward)
+    // and provably not for balloons on a phone — see MIN_TEXT_PX and the wall
+    // recorded in task-73-report.md.
     fontSize: `${font}cqw`,
     lineHeight: LINE_STEP,
     color: PALETTE.ink,
@@ -150,7 +162,7 @@ export function BalloonText({
   return (
     <>
       {balloon.drawn ? <DrawnBalloon balloon={balloon} aspect={aspect} /> : null}
-      <span style={style}>
+      <span data-sw-text="balloon" style={style}>
         <span>
           <Typed text={balloon.text} shown={shown} />
         </span>
@@ -168,27 +180,35 @@ export function BalloonText({
 export function CaptionBox({ caption, shown }: { caption: Caption; shown: number }) {
   // Sized from the line's LENGTH rather than from its box: unlike a balloon,
   // this box has no ceiling — it is drawn by the site, so a long caption simply
-  // makes it taller instead of having to fit inside someone else's ink.
+  // makes it taller instead of having to fit inside someone else's ink. That is
+  // exactly what buys the 11px floor its room on a phone.
   const font = Math.min(3.1, Math.max(2.2, 26 / caption.text.length + 1.5))
-  const style: CSSProperties = {
+  const style: Record<string, string | number> = {
+    // Read by the narrow-page rule in manga-page.tsx, which widens the box when
+    // the floor has forced the type up relative to the page. BOTH are needed: a
+    // width without its left edge is how the first attempt at that rule pushed
+    // page-2's caption — which starts halfway across — off the page and clipped
+    // its last word.
+    '--sw-cap-w': `${caption.width * 100}%`,
+    '--sw-cap-x': `${caption.at.x * 100}%`,
     position: 'absolute',
     left: `${caption.at.x * 100}%`,
     top: `${caption.at.y * 100}%`,
-    width: `${caption.width * 100}%`,
+    width: 'var(--sw-cap-w)',
     boxSizing: 'border-box',
     background: PALETTE.sky,
     border: `0.32cqw solid ${PALETTE.ink}`,
     borderLeft: `1.1cqw solid ${PALETTE.blossomDeep}`,
     padding: '0.9cqw 1.1cqw',
     fontFamily: 'var(--sw-font-panel)',
-    fontSize: `${font}cqw`,
+    fontSize: cqwWithFloor(font),
     letterSpacing: '0.06em',
     lineHeight: 1.16,
     color: PALETTE.ink,
     pointerEvents: 'none',
   }
   return (
-    <span style={style}>
+    <span data-sw-text="caption" className="sw-manga-caption" style={style as CSSProperties}>
       <Typed text={caption.text} shown={shown} />
     </span>
   )

@@ -23,10 +23,49 @@ import type { Balloon, MangaPage, Point } from './types'
 const AVG_GLYPH = 0.52
 const LINE_STEP = 1.18
 
-/** Never smaller than this, or the lettering stops reading as lettering. */
+/** Never smaller than this SHARE of the page, or the lettering stops reading as lettering. */
 export const MIN_FONT_CQW = 2.15
 /** Never larger than this, or a three-word line looks shouted. */
 export const MAX_FONT_CQW = 4.2
+
+/**
+ * THE FLOOR THAT IS NOT A RATIO — and the one that actually mattered.
+ *
+ * Everything else in this file is proportional, which is right for a page that has to serve a
+ * 444px card, a 557px lightbox and a 294px phone from one set of fractions. But a ratio has no
+ * opinion about eyes. On the phone stack the page is 294px wide, and 2.15cqw of that is **6.0px** —
+ * measured, not estimated. The blind review's words for the result were "unreadable, still a smear
+ * magnified", and it was right: proportional fidelity had quietly become the enemy of the text
+ * being text.
+ *
+ * So CAPTIONS are `max(MIN_TEXT_PX, <ratio>)`. Below the floor a caption stops scaling and starts
+ * running an extra line instead, which is the correct trade — a caption that grows downward is
+ * legible, a caption at 6px is decoration. It can make that trade because the site draws its box.
+ *
+ * BALLOONS CANNOT, and that asymmetry is the whole reason this is a constant and not a rule.
+ * A balloon's interior is PRINTED ART: type set larger than the interior was solved for does not
+ * reflow, it runs onto the ink. Measured across the seven pages, the smallest fitted balloon is
+ * 6.78px on the 360 stack and 7.36px on the 390 stack, and reaching 11px there would need 2.2x the
+ * interior AREA the drawing provides. So the phone card cannot legibly letter these balloons at
+ * any size, and no constant in this file can change that — it is a property of the art at that
+ * display size. `manga-lettering.tsx` says so at the point of use, and task-73-report.md records
+ * it as a wall with the panel-at-a-time reader as the way through.
+ *
+ * 11px is the floor the round agreed. It is not a comfortable reading size and is not meant to be;
+ * it is the size below which this lettering stops being worth drawing at all.
+ */
+export const MIN_TEXT_PX = 11
+
+/** `max(11px, N cqw)` — the one expression every piece of lettering sizes itself with. */
+export const cqwWithFloor = (cqw: number): string => `max(${MIN_TEXT_PX}px, ${cqw}cqw)`
+
+/**
+ * Effective px size of a `cqwWithFloor` at a given page width — what the floor actually does,
+ * available to tests so the gate measures the shipped expression rather than a restatement of it.
+ */
+export function effectiveTextPx(cqw: number, pageWidthPx: number): number {
+  return Math.max(MIN_TEXT_PX, (cqw / 100) * pageWidthPx)
+}
 
 /**
  * Font size in `cqw` for `text` inside a box of `box` page-fractions, on a page

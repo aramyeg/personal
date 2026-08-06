@@ -21,10 +21,13 @@ const INK_BORDER = `4px solid ${PALETTE.ink}`
 
 export function MangaCard({
   page,
+  chapterNumber,
   enter,
   onExpand,
 }: {
   page: MangaPage
+  /** 1-based. The label is read aloud, so it counts the way a reader counts. */
+  chapterNumber: number
   /** The spread's entrance clock, 0→1, already eased. */
   enter: number
   onExpand: () => void
@@ -70,7 +73,9 @@ export function MangaCard({
       className="sw-panel-art"
       style={style as CSSProperties}
       onClick={onExpand}
-      aria-label={`Open page ${page.id.replace('page-', '')} full size`}
+      // Was "Open page 0 full size" — the file's own 0-based stem, read out as if
+      // the reader were counting from zero.
+      aria-label={`Open chapter ${chapterNumber}'s comic page full size`}
       data-testid="sw-manga-card"
     >
       {/* The page starts inking once the card is most of the way in, so the

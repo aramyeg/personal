@@ -21,6 +21,33 @@ import { BalloonText, CaptionBox } from './manga-lettering'
  * only mounts when its checkpoint is close (see `manga-card.tsx`), so the
  * request is the point at which the page enters the payload at all.
  */
+/**
+ * WHAT THE 11px FLOOR COSTS, AND WHERE IT IS PAID BACK.
+ *
+ * Below ~340px of page the floor stops the lettering scaling down with the art, so the type is
+ * suddenly LARGE relative to its box — and a caption box sized as a fraction of the page becomes a
+ * tall thin column of two-word lines. So on a narrow page the narrator boxes get most of their
+ * panel's width instead of their manifest fraction.
+ *
+ * A container query rather than a viewport one, because the page — not the window — is what the
+ * lettering is sized against: the same rule then covers the phone stack AND the phone lightbox AND
+ * any future small mount, and leaves the desktop card and its lightbox at the geometry the round
+ * already verified.
+ */
+const NARROW_PAGE_STYLES = `
+  @container (max-width: 340px) {
+    .sw-manga-caption {
+      /* Twice its authored width, but never past the page: a caption that starts
+         halfway across has only the remainder to grow into, and 3% of trailing
+         margin keeps it off the page's own edge. */
+      width: min(calc(var(--sw-cap-w) * 2), calc(97% - var(--sw-cap-x))) !important;
+      padding: 1.6cqw 1.8cqw !important;
+      border-width: 0.5cqw !important;
+      border-left-width: 1.8cqw !important;
+    }
+  }
+`
+
 export function MangaPageArt({
   page,
   /** Held at 0 until the card is most of the way in, then released. */
@@ -50,6 +77,7 @@ export function MangaPageArt({
 
   return (
     <div style={rootStyle} data-testid="sw-manga-page" data-manga-page={page.id}>
+      <style>{NARROW_PAGE_STYLES}</style>
       {page.panels.map((rect, i) => {
         const ink = panelInk(i, elapsed)
         if (ink <= 0) return null
