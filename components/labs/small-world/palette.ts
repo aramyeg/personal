@@ -332,4 +332,22 @@ export const PALETTE = {
   // someone hoped was the background.
   studioPaper: '#FDFBF8', // the pill's own card — candidate B's PAPER
   studioRoseDeep: '#C95C87', // its border, its focus ring, and the restart's rule — B's BOX_PRINT
+
+  // Task 74 — THE SHEET THE COMIC IS PRINTED ON, and it is a MEASUREMENT.
+  //
+  // The chapter spread is a manga page beside a data card, and the data card was
+  // built on `sky` (#FFF3D6) — a warm cream that was the right paper when the art
+  // slot held a pastel placeholder. Against the finished black-and-white pages it
+  // is simply a different sheet: read off all seven shipped webps
+  // (`bench/task74-paper.mjs`), the printed paper's near-white mode measures
+  // 247–252 and is ACHROMATIC to within a point, mean rgb(250,250,250). The cream
+  // sits 36 points of blue below that, which is why the two cards never looked
+  // like they came out of the same printer however the borders matched.
+  //
+  // So the card, the pills and the mobile tab are all printed on this instead, and
+  // the cream keeps exactly one job on the spread: the narrator CAPTION BOX, which
+  // is a label stuck to the page rather than the page (`manga-lettering.tsx` draws
+  // the comic's own captions in `sky` for the same reason, and the card's eyebrow
+  // is now that same object).
+  pagePaper: '#FAFAFA', // the printed sheet — the mean paper of the seven shipped pages
 } as const

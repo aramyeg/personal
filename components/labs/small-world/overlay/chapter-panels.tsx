@@ -49,8 +49,15 @@ const MOBILE_STYLES = `
     .sw-panel-data {
       max-height: 52vh !important;
       overflow: hidden !important;
-      padding: 14px 16px !important;
     }
+    /* The card's padding lives on its two PANELS now (Task 74 made it a page:
+       story panel, ink gutter, record panel), so the phone tightens those rather
+       than the frame — padding on the frame would push the gutter rule in off the
+       ink it is supposed to meet. The side gutter is one variable because the
+       narrator label's bleed is negated from it. */
+    .sw-panel-data { --sw-card-pad: 15px !important; }
+    .sw-panel-data .sw-card-story { padding-top: 13px !important; padding-bottom: 11px !important; }
+    .sw-panel-data .sw-card-record { padding-top: 11px !important; padding-bottom: 10px !important; }
     /* The one behind: lifted and turned so its shoulder shows, and dimmed so
        the front card keeps the contrast. */
     [data-front='comic'] .sw-panel-data,
@@ -190,10 +197,17 @@ export function ChapterPanels({
           transform: 'translateX(calc(-50% + min(36vw, 150px, 29vh) - 46px))',
           pointerEvents: 'auto',
           padding: '5px 12px',
-          borderRadius: 999,
+          // A PRINTED TAB, not a pastel pill (Task 74). Same stock and the same
+          // hard shadow as the two cards it swaps between, hard-cornered, with
+          // the lab pink carried by the LETTERING — which is the sanctioned use
+          // (stamp ink, caption trim, the active tab) and also the readable one:
+          // pink type on paper measures 4.0:1 where ink on the old pastel fill
+          // was the only thing holding that row together.
+          borderRadius: 3,
           border: `2.5px solid ${PALETTE.ink}`,
-          background: PALETTE.blossom,
-          color: PALETTE.ink,
+          background: PALETTE.pagePaper,
+          boxShadow: `2px 3px 0 ${PALETTE.ink}`,
+          color: PALETTE.blossomDeep,
           fontFamily: 'var(--sw-font-panel)',
           fontSize: 13,
           letterSpacing: 0.8,

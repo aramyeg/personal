@@ -291,7 +291,13 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
                     height: size,
                     borderRadius: '50%',
                     border: `2px solid ${PALETTE.ink}`,
-                    background: isActive ? ch.accent : isPassed ? PALETTE.ink : PALETTE.sky,
+                    // TASK 74 — the rail was the last biome tint left on the chrome.
+                    // The active dot took `ch.accent`, so the bar under a black-and-
+                    // white spread cycled honey, river, dune, tuff while its own fill
+                    // line was already the lab pink. One ink for "here" (the pink the
+                    // fill is drawn in), ink for "passed", paper for "ahead" — which
+                    // is also the only reading the rail ever needed.
+                    background: isActive ? PALETTE.blossomDeep : isPassed ? PALETTE.ink : PALETTE.pagePaper,
                     boxShadow: isActive ? `2px 2px 0 ${PALETTE.ink}` : 'none',
                     transition: 'width 180ms ease, height 180ms ease, background 180ms ease',
                   }}

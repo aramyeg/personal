@@ -52,7 +52,7 @@ export function MangaCard({
     border: INK_BORDER,
     borderRadius: 6,
     boxShadow: `10px 12px 0 ${PALETTE.ink}`,
-    background: PALETTE.sky,
+    background: PALETTE.pagePaper,
     overflow: 'hidden',
     transform: `translateY(-50%) translateX(calc(-120% * (1 - ${enter}))) rotate(${-3 * enter}deg) scale(${0.85 + 0.15 * enter})`,
     // THE ONE PLACE ON THE SPREAD THAT TAKES A CLICK. The overlay root stays

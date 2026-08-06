@@ -91,7 +91,7 @@ export function MangaLightbox({
     border: `${border}px solid ${PALETTE.ink}`,
     borderRadius: 6,
     boxShadow: `0 24px 60px rgba(0,0,0,0.5)`,
-    background: PALETTE.sky,
+    background: PALETTE.pagePaper,
     overflow: 'hidden',
     cursor: 'default',
     lineHeight: 0, // no inline-descender strip under the page
@@ -130,7 +130,7 @@ export function MangaLightbox({
           padding: 0,
           borderRadius: 999,
           border: `3px solid ${PALETTE.ink}`,
-          background: PALETTE.sky,
+          background: PALETTE.pagePaper,
           color: PALETTE.ink,
           cursor: 'pointer',
         }}

@@ -71,7 +71,11 @@ export function MangaPageArt({
     // (`cqw` in manga-lettering), which is what lets one manifest serve the
     // card, the lightbox and the phone from a single set of fractions.
     containerType: 'inline-size',
-    background: PALETTE.sky,
+    // The BLANK PAPER the panels ink onto, and it has to be the paper the pages
+    // are actually printed on — `pagePaper`, measured. It was `sky`, so the first
+    // second of every reveal showed a warm cream sheet that the arriving art then
+    // covered with a near-white one (Task 74).
+    background: PALETTE.pagePaper,
     overflow: 'hidden',
   }
 
