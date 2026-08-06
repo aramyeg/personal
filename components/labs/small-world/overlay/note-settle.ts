@@ -1,5 +1,6 @@
 import { ENDING_AIM_DROP, ZOOM_FACTOR, ndcYAt } from '../scene/camera'
-import { DESK_NOTE, DESK_TOP_Y } from '../scene/desk-stage'
+import { DESK_NOTE } from '../scene/desk-stage'
+import { DESK_PAD } from '../scene/props/desk-glb-contract'
 
 /**
  * WHERE THE NOTE IS IN THE FRAME, AND WHEN IT HAS STOPPED GOING THERE (Task 72, review finding C2).
@@ -41,10 +42,14 @@ import { DESK_NOTE, DESK_TOP_Y } from '../scene/desk-stage'
  * ============================================================================
  * The pills sit below the note, so the binding edge is the note's NEAR one — its lowest line on
  * screen. The sheet is yawed by `DESK_NOTE.rot`, so that edge is not at a constant z: it runs from
- * one corner to the other, and its lowest point is a corner far to the right of the pills. Sampling
- * the corner would therefore describe a part of the note the pills cannot reach. This samples the
- * near edge where the pills actually are — at world x = 0, the frame's centre line — by solving the
- * yawed edge for the u that lands there.
+ * one corner to the other, and it falls to the RIGHT — measured, 775 px under the Email pill against
+ * 794 under LinkedIn at 1440x900. This module samples it at world x = 0, the frame's centre line,
+ * which is the right sample for the question it answers (WHEN has the note stopped travelling) and
+ * the wrong one for the question `connect-clearance.ts` answers (WHERE is it under each control).
+ * That file takes the whole edge; this one takes the centre, and both read `noteNearEdgePoint`.
+ *
+ * The earlier note here claimed the low corner sat "far to the right of the pills", which the
+ * corrected geometry falsifies: the pill row reaches into exactly the part of the edge that dips.
  *
  * The model was checked against pixels rather than trusted: it predicts the near edge at 787.7 px on
  * a 900 px frame at full pull-back where the rendered mask measures 783, and it holds that ~5 px
@@ -60,23 +65,46 @@ const smoothstep = (t: number): number => {
 const LOG_ZOOM = Math.log(ZOOM_FACTOR)
 
 /**
- * The z of the note's near edge where it crosses the frame's centre line.
+ * A point on the note's near edge, in world space — SPELLED THE WAY `desk-note.tsx` SPELLS IT.
  *
- * The sheet's local near edge is the set of points (u, +depth/2) for u across its width; the yaw
- * turns that into world (x, z). Solving x(u) = 0 and substituting gives the z below. With the
- * shipped yaw of −0.13 rad it lands at 11.193, a little nearer than the un-yawed 11.180.
+ * ── A CORRECTION, TASK 72 ADDENDUM ────────────────────────────────────────────────────────────
+ * This file originally wrote the yaw as `x = lx·c − hd·s`, `z = lx·s + hd·c`. The mesh writes
+ * `x = x₀ + lx·c + lz·s`, `z = z₀ − lx·s + lz·c` (`desk-note.tsx`, the sheet's vertex loop), and it
+ * seats the sheet on `DESK_PAD.top` rather than on `DESK_TOP_Y`. Two errors, both small at the one
+ * place this file used to look: 0.016 world units of z and 0.036 of y at the frame's centre line,
+ * which is why the ±5 px pixel check below passed and why `NOTE_SETTLED_ZOOM` barely moves.
+ *
+ * They are NOT small away from the centre. The z sign flips the edge's SLOPE across the note's
+ * width — the old spelling has the sheet rising to the right where the render has it falling — so
+ * anything asking where the note is under a control at some x got the mirror image of the truth.
+ * `connect-clearance.ts` asks exactly that, which is how this surfaced. Corrected here rather than
+ * worked around there, so there is one spelling of the note's geometry and it is the mesh's.
+ *
+ * `lx` runs across the sheet's width, −width/2 at its left edge; the near edge is `lz = +depth/2`.
  */
+export function noteNearEdgePoint(lx: number): [number, number, number] {
+  const s = Math.sin(DESK_NOTE.rot)
+  const c = Math.cos(DESK_NOTE.rot)
+  const lz = DESK_NOTE.depth / 2
+  return [
+    DESK_NOTE.x + lx * c + lz * s,
+    // the flat sheet rather than the curled corner, seated on the PAD the figurines also sit on
+    DESK_PAD.top + DESK_NOTE.lift,
+    DESK_NOTE.z - lx * s + lz * c,
+  ]
+}
+
+/** Where that edge crosses the frame's centre line — the sample the settle beat is solved on. */
 export const NOTE_NEAR_Z = (() => {
   const s = Math.sin(DESK_NOTE.rot)
   const c = Math.cos(DESK_NOTE.rot)
-  const halfDepth = DESK_NOTE.depth / 2
-  // x(u) = u·c − halfDepth·s + DESK_NOTE.x  =  0
-  const u = (halfDepth * s - DESK_NOTE.x) / c
-  return u * s + halfDepth * c + DESK_NOTE.z
+  const lz = DESK_NOTE.depth / 2
+  // x(lx) = DESK_NOTE.x + lx·c + lz·s = 0
+  const lx = (-DESK_NOTE.x - lz * s) / c
+  return noteNearEdgePoint(lx)[2]
 })()
 
-/** ...and how high that edge rides, which is the flat sheet rather than the curled corner. */
-const NOTE_EDGE_Y = DESK_TOP_Y + DESK_NOTE.lift
+const NOTE_EDGE_Y = noteNearEdgePoint(0)[1]
 
 /**
  * The note's near edge in ndc y at a point in the pull-back. −1 is the bottom of the frame, so the
@@ -106,16 +134,20 @@ export function noteEdgeNdcY(zoom: number): number {
  * range is zero. Tightening further buys nothing measurable and costs entrance length, which is the
  * one thing this window has none of to spare.
  *
- * ── TWO THINGS THIS CANNOT FIX, RECORDED RATHER THAN HIDDEN ───────────────────────────────────
- * FIRST: the approved money shot clears the LinkedIn pill by 2.4 px at 1440x900. There is no
- * threshold that buys a comfortable margin, because the resting composition does not have one.
+ * ── WHAT A THRESHOLD CANNOT REACH, RECORDED RATHER THAN HIDDEN ────────────────────────────────
+ * FIRST: the approved money shot clears the LinkedIn pill by 1.7 px of model (3.4 rendered) at
+ * 1440x900. There is no threshold that buys a comfortable margin, because the approved resting
+ * composition does not have one. Left alone deliberately, and pinned by a test so it cannot quietly
+ * get worse.
  *
- * SECOND, and it is the one worth escalating: at 390x844 the resting frame does not clear it at
- * all. The LinkedIn pill overlaps the note by 217 px at full opacity AT THE BOTTOM OF THE TRACK,
- * on the shipped build, before and after this change alike — the block is px-anchored to the
- * bottom edge while the note's height in the frame is aspect-free, so the narrow viewport hands the
- * same rest position less room. Scheduling cannot reach it: it is where the pills REST, and the
- * resting layout is approved. Fixing it means moving a resting position, which is a separate call.
+ * SECOND: every number in this file was measured at 1440x900, and the phone did not inherit the
+ * result — at 390x844 the resting frame put the LinkedIn pill ON the sheet, and the approach was
+ * worse than the rest (Email drawn over the note until 82% revealed, GitHub until 98%, LinkedIn
+ * never clearing). A resting collision is not a scheduling problem, so it is not solved here:
+ * `connect-clearance.ts` moves the ROW on narrow frames, by a derived amount, and this window is
+ * left exactly as it was. The residue that neither file fixes — the note still crossing a partly
+ * revealed row on the way up, now at 0.34/0.41/0.61 instead of 0.82/0.98/never — is in that file's
+ * header and in task-72-report.md, because closing it needs a second, narrow-specific beat.
  */
 export const NOTE_SETTLE_REMAINING = 0.02
 

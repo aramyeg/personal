@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import { ZOOM_START } from '../ending-timeline'
 import { NOTE_SETTLED_ZOOM } from './note-settle'
+import { useConnectSpacing } from './use-connect-spacing'
 import { PALETTE } from '../palette'
 
 /**
@@ -185,6 +186,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const items = controls()
   const revealOf = (i: number) => (focused ? 1 : connectReveal(t, i))
+  const { navRef, spacing } = useConnectSpacing()
 
   return (
     <div
@@ -198,16 +200,20 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
         position: 'absolute',
         left: 0,
         right: 0,
-        bottom: 'max(20px, env(safe-area-inset-bottom))',
+        // The inset is the authored 20 on every wide frame and a DERIVED, smaller number on narrow
+        // ones, where the note hangs into the row (`connect-clearance.ts`). `env()` still wins
+        // through the same `max()`, so a notched phone is untouched by that arithmetic.
+        bottom: `max(${spacing.inset}px, env(safe-area-inset-bottom))`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 12,
+        gap: spacing.gap,
         // inherited from the overlay root, restated so a later edit has to mean it
         pointerEvents: 'none',
       }}
     >
       <nav
+        ref={navRef}
         aria-label="Connect with Aram"
         style={{
           display: 'flex',
