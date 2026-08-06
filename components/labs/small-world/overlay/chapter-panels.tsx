@@ -36,7 +36,9 @@ const MOBILE_STYLES = `
       right: auto !important;
       top: auto !important;
       bottom: 4vh !important;
-      width: min(72vw, 300px) !important;
+      /* Height-capped for the same reason the desktop card is: a 2:3 page at
+         72vw is taller than a landscape phone, which also matches this query. */
+      width: min(72vw, 300px, 58vh) !important;
       transform:
         translateX(-50%)
         translateY(calc((1 - var(--sw-enter)) * 26px))
@@ -174,8 +176,13 @@ export function ChapterPanels({
           display: 'none',
           position: 'absolute',
           left: '50%',
-          bottom: 'calc(4vh + min(108vw, 450px))',
-          transform: 'translateX(calc(-50% + min(36vw, 150px) - 44px))',
+          // Clear of the stack's top edge (the card is 1.5x its own width) with
+          // a few pixels of air, and ABOVE both cards: the mobile rule gives
+          // them z-index 1 and 2, so a tab left on the default layer paints
+          // behind the very stack it controls (captured).
+          bottom: 'calc(4vh + min(108vw, 450px, 87vh) + 6px)',
+          zIndex: 3,
+          transform: 'translateX(calc(-50% + min(36vw, 150px, 29vh) - 46px))',
           pointerEvents: 'auto',
           padding: '5px 12px',
           borderRadius: 999,

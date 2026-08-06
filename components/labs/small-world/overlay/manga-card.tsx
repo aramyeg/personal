@@ -38,8 +38,14 @@ export function MangaCard({
     '--sw-rotate': '-3deg',
     position: 'absolute',
     left: 'min(4vw, 48px)',
-    top: '34vh',
-    width: `min(30vw, ${CARD_MAX_PX}px)`,
+    // CENTRED, AND CAPPED BY HEIGHT. The old card was 300px wide and 450 tall,
+    // which fitted comfortably hung from 34vh. A 420px page is 630 tall — at
+    // 34vh of a 900px viewport that put its top edge at -9px, so page-1's
+    // drawn thought balloon was clipped by the top of the screen and collided
+    // with the Gallery chip (captured). A 2:3 card is height-limited, so the
+    // 60vh term is what actually decides the size on any short viewport.
+    top: '50vh',
+    width: `min(30vw, ${CARD_MAX_PX}px, 60vh)`,
     border: INK_BORDER,
     borderRadius: 6,
     boxShadow: `10px 12px 0 ${PALETTE.ink}`,
