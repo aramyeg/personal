@@ -77,9 +77,9 @@ describe('the segment shape is solved, not typed in', () => {
 
   it('derives the windows from PARK_FRAC rather than restating them', () => {
     expect(TRAVEL_END).toBeCloseTo(PARK_FRAC * (1 - BURST_SPAN - DWELL_SPAN), 12)
-    expect(TRAVEL_END).toBeCloseTo(0.126, 12)
-    expect(BURST_END).toBeCloseTo(0.226, 12)
-    expect(PANEL_END).toBeCloseTo(0.526, 12)
+    expect(TRAVEL_END).toBeCloseTo(0.24, 12)
+    expect(BURST_END).toBeCloseTo(0.34, 12)
+    expect(PANEL_END).toBeCloseTo(0.64, 12)
   })
 
   it('names the dwell so probes and e2e stop hard-coding fractions of it', () => {
@@ -111,11 +111,74 @@ describe('the ending is untouched by the reshape', () => {
   })
 
   it('adds the walk-out beat before the ending, and it is real scroll', () => {
-    // The new beat: card 6 releases at 0.855+ and rotation keeps turning to 1.0.
+    // The beat: card 6 releases before the journey ends and rotation keeps turning to 1.0, so she
+    // walks out across the epilogue face rather than cutting straight to the ending. Task 75's
+    // later park shortens it — 0.940 to 1.0, i.e. 0.060 of the track against Task 73's 0.078 —
+    // which is the shorter walk-out Aram asked for, and it is still a walk and not a cut.
     const lastCard = (CHAPTER_COUNT - 1 + PANEL_END) / CHAPTER_COUNT
-    expect(lastCard).toBeLessThan(1)
-    expect(1 - lastCard).toBeGreaterThan(0.07)
+    expect(lastCard).toBeCloseTo(0.94, 12)
+    expect(1 - lastCard).toBeGreaterThan(0.05)
     expect(rotationAt(lastCard)).toBeLessThan(rotationAt(1))
+  })
+})
+
+/**
+ * TASK 75 — HOW LATE THE PARK MAY BE, as arithmetic.
+ *
+ * Task 73 proved the stop had to move to the FRONT of a chapter's slice. Aram's verdict on what
+ * shipped was that 0.21 displaced the scroll: a 13% walk-in and a 47% walk-out is not the rhythm.
+ * So the park is taken as late as the framing allows, and "clearly dominant" is written down.
+ *
+ * The rows below are the projected-area census (the `task60-vista` extension, swept over
+ * PARK_FRAC), minimum across the six chapters — chapter 3, the desert, binds every row, and
+ * 1440x900 binds 390x844 by about 0.4 pt, so these are the desktop numbers. They are a FIXTURE:
+ * a future retune of the park cannot re-measure them from a unit test, but it can and must
+ * confront the two thresholds they imply.
+ */
+describe('the park is as late as the framing allows', () => {
+  const CENSUS: readonly (readonly [park: number, own: number, next: number])[] = [
+    [0.21, 78.07, 15.89],
+    [0.3, 72.95, 21.61],
+    [0.34, 70.2, 24.86],
+    [0.38, 67.13, 28.55],
+    [0.395, 65.76, 30.24],
+    [0.4, 65.29, 30.8],
+    [0.405, 64.83, 31.35],
+    [0.41, 64.36, 31.9],
+    [0.415, 63.9, 32.44],
+    [0.42, 63.43, 32.98],
+    [0.5, 55.83, 41.96],
+  ]
+
+  /** Linear interpolation of the measured curve at the shipped park — both rows bracket it. */
+  const measuredAt = (park: number, pick: (row: (typeof CENSUS)[number]) => number): number => {
+    const hi = CENSUS.findIndex((r) => r[0] >= park)
+    if (hi <= 0) return pick(CENSUS[Math.max(0, hi)])
+    const [a, b] = [CENSUS[hi - 1], CENSUS[hi]]
+    const u = (park - a[0]) / (b[0] - a[0])
+    return pick(a) + (pick(b) - pick(a)) * u
+  }
+
+  it('keeps the chapter’s own biome across at least 65% of the frame', () => {
+    expect(measuredAt(PARK_FRAC, (r) => r[1])).toBeGreaterThanOrEqual(65)
+  })
+
+  it('keeps it at least twice whatever the next biome holds', () => {
+    expect(measuredAt(PARK_FRAC, (r) => r[1]) / measuredAt(PARK_FRAC, (r) => r[2])).toBeGreaterThanOrEqual(2)
+  })
+
+  it('is nonetheless LATE — the rhythm Task 73 spent is bought back', () => {
+    // Both halves of Aram's verdict, as one assertion each: the walk-in is no longer a token one,
+    // and the walk-out is no longer most of the chapter.
+    expect(PARK_FRAC).toBeGreaterThan(0.21 * 1.5)
+    expect(1 - PANEL_END).toBeLessThan(0.4)
+  })
+
+  it('leaves the census monotone, so the thresholds bracket a single crossing', () => {
+    for (let i = 1; i < CENSUS.length; i++) {
+      expect(CENSUS[i][1]).toBeLessThan(CENSUS[i - 1][1])
+      expect(CENSUS[i][2]).toBeGreaterThan(CENSUS[i - 1][2])
+    }
   })
 })
 

@@ -461,10 +461,11 @@ describe('crossfade window', () => {
    * ...and it still has to READ as a move rather than a cut — but against a much harder wall than
    * before, and the honest number belongs here rather than hidden behind a threshold.
    *
-   * The crossfade may only run while rotation is moving, and after Task 73 rotation moves for just
-   * TRAVEL_END (0.126) of a leg before the stop. So the shift now takes ~0.11 of a leg — about
-   * 1.8% of the scroll track, against 5.9% before. At a comfortable reading scroll that is roughly
-   * a third of a second instead of about one.
+   * The crossfade may only run while rotation is moving, i.e. for TRAVEL_END of a leg before the
+   * stop. Task 73's park left that at 0.126 and the shift took ~0.10 of a leg — 1.7% of the scroll
+   * track against 5.9% before it. Task 75's later park makes the approach 0.24, so the shift now
+   * takes ~0.20 of a leg, 3.3% of the track: most of the way back, and the remaining gap is the
+   * part that is structural rather than tunable.
    *
    * That is a wall, not a tuning miss: making it slower means starting the crossfade BEFORE she
    * crosses the boundary, which is the one thing Aram's rule for this mechanism forbids ("right
@@ -498,12 +499,18 @@ describe('crossfade window', () => {
       for (let k = 0; k <= 40; k++) {
         const local = TRAVEL_END + ((PANEL_END - TRAVEL_END) * k) / 40
         const b = moodBlendAt(at(c, local))
-        // Bit-identical everywhere inside. The k = 0 sample is the dwell's opening instant, whose
-        // local reconstructs a half-ulp BELOW TRAVEL_END and so lands one ulp short of the frozen
-        // angle — hence the near-check for it and exact equality for the rest.
+        // Bit-identical everywhere inside. The two END samples are the dwell's own instants of
+        // opening and release: `(c + local) / CHAPTER_COUNT` reconstructs a half-ulp either side
+        // of the branch edge, so one of them can take the moving branch with u = ±1 ulp and land
+        // one ulp off the frozen angle. Which one does it is pure float luck of the window
+        // constants (Task 73 saw it at TRAVEL_END, Task 75's park moves it to PANEL_END at
+        // chapter 4), so both edges get the near-check and everything strictly inside is exact.
+        // Neither edge is a moment a card is up — the panel window is local < PANEL_END, and the
+        // stricter card-window gate above ('cannot move by so much as a float while a card is
+        // up') is where that promise is actually kept.
         expect(b.rotation, `ch${c} @${local.toFixed(3)} rotation`).toBeCloseTo(ref.rotation, 12)
         expect(b.mix, `ch${c} @${local.toFixed(3)} mix`).toBeCloseTo(ref.mix, 12)
-        if (k > 0) {
+        if (k > 0 && k < 40) {
           expect(b.rotation, `ch${c} @${local.toFixed(3)} rotation`).toBe(ref.rotation)
           expect(b.mix, `ch${c} @${local.toFixed(3)} mix`).toBe(ref.mix)
         }

@@ -167,7 +167,7 @@ describe('JourneyOverlay', () => {
     // still inside the dwell.
     const lastDwell =
       (CHAPTER_COUNT - 1 + BURST_END + 0.9 * (PANEL_END - BURST_END)) / CHAPTER_COUNT
-    // Task 73 moved the last card from 0.9917 back to the 0.855-0.9217 window, so the old 0.985
+    // Task 73 moved the last card off 0.9917 and Task 75 settled it on the 0.873-0.940 window, so 0.985
     // landmark (the retired EndPanel's cut-off) now sits PAST the dwell rather than inside it.
     // What the test is about is unchanged: chapter 6's cards run their full dwell, untruncated.
     expect(lastDwell).toBeLessThan(1)

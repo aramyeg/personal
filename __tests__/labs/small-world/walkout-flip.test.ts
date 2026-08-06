@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import {
+  CHAPTER_SLICE,
   PANEL_END,
+  PARK_FRAC,
   ROTATION_TOTAL,
   chapterParkRotation,
   rotationAt,
@@ -18,9 +20,10 @@ import {
  * THE WALK-OUT BEAT CANNOT SHOW A HALF-FINISHED FLIP.
  *
  * Task 73 moved the last checkpoint from the end of chapter 6's rotation slice to `PARK_FRAC` of
- * it, which means the visitor now WATCHES the world turn through the last 0.79 of a slice — from
- * rotation 10.912 to 4pi — instead of arriving with it already parked there. That stretch is
- * exactly where the epilogue flip happens (band 0's desert repainting as snow one turn later), so
+ * it, which means the visitor now WATCHES the world turn through the last (1 − PARK_FRAC) of a
+ * slice — 0.60 of one since Task 75 took the park later, rotation 11.310 to 4pi — instead of
+ * arriving with it already parked there. That stretch is exactly where the epilogue flip happens
+ * (band 0's desert repainting as snow one turn later), so
  * it is the one thing the new beat could plausibly expose that the old timeline hid by never
  * showing it moving.
  *
@@ -54,9 +57,12 @@ describe('the walk-out beat never shows a renewal mid-flip', () => {
   const WALK_TO = rotationAt(1)
 
   it('covers the stretch the new beat actually added', () => {
-    // Card 6 releases here and the world keeps turning to 4pi — 0.79 of a slice the visitor used
-    // not to watch. If this ever shrinks to nothing the rest of the file is vacuous.
-    expect(WALK_TO - WALK_FROM).toBeGreaterThan(1.6)
+    // Card 6 releases here and the world keeps turning to 4pi. The stretch is exactly the release
+    // leg's own rotation — (1 − PARK_FRAC) of a slice, 0.60 of one since Task 75 moved the park
+    // later, 0.79 before it — and the floor keeps the rest of the file from going vacuous if a
+    // future park ever walks it back toward nothing.
+    expect(WALK_TO - WALK_FROM).toBeCloseTo((1 - PARK_FRAC) * CHAPTER_SLICE, 12)
+    expect(WALK_TO - WALK_FROM).toBeGreaterThan(CHAPTER_SLICE / 2)
     expect(rotationAt((CHAPTER_COUNT - 1 + PANEL_END) / CHAPTER_COUNT)).toBeCloseTo(WALK_FROM, 12)
     expect(WALK_TO).toBeCloseTo(ROTATION_TOTAL, 12)
   })

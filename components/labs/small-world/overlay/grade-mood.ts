@@ -72,11 +72,16 @@ import { STANCE_ALPHA } from '../scene/renewal'
  * TASK 73 MOVED THE CHECKPOINT, AND BOTH HALVES HAD TO FOLLOW. The stop used to be at the END of a
  * chapter's rotation slice, which put the card over the NEXT biome; it is at `PARK_FRAC` of the
  * slice now. That change alone would have traded a scenery mismatch for a colour one — the
- * crossfade had a whole slice to finish in and now has 21% of one, so a card would have opened
+ * crossfade had a whole slice to finish in and suddenly had 21% of one, so a card would have opened
  * three quarters of the way back at the previous chapter's grade. So `MOOD_SPAN_FRAC` is solved
  * from `PARK_FRAC` rather than chosen (see below), and the bloom's window is re-tied to the beats
  * it exists for rather than to the numbers it used to sit at. Every card opening under its own
  * chapter's fully-arrived mood is asserted per chapter, not on average.
+ *
+ * TASK 75 TOOK THE PARK LATER (0.21 → 0.40) and every one of those solves simply followed, which is
+ * the point of having written them as solves: the crossfade gets 40% of a slice to run in instead
+ * of 21%, the bloom's window slides with the beats it is tied to, and nothing here was re-tuned by
+ * hand. The per-chapter gates were re-run rather than assumed.
  */
 
 /** Kill switch for the entire grade — sky, lights and overlay — for a clean A/B. */
@@ -368,11 +373,12 @@ const MOOD_SATURATION_MARGIN = 0.85
  * crossfade takes `MOOD_SATURATION_MARGIN` of what is left. Every card then opens at mix exactly
  * 1, asserted per chapter in grade-mood.test.ts.
  *
- * WHAT THIS COSTS, stated plainly: the shift is a faster beat than it was — about 1.4% of the
- * scroll track against 5.9%. That is structural, not a regression to tune away. The law it obeys
- * is Aram's ("right when scrolling and our girl passes to the new biome, the mood shift should
- * happen there"), the approach is short by design now, and the only way to make the crossfade long
- * again would be to start it BEFORE she crosses — which is the one thing that law forbids.
+ * WHAT THIS COSTS, stated plainly: the shift is still a faster beat than it was before the framing
+ * fix — 3.3% of the scroll track against 5.9% originally, up from 1.7% at Task 73's park. The
+ * remainder is structural, not a regression to tune away. The law it obeys is Aram's ("right when
+ * scrolling and our girl passes to the new biome, the mood shift should happen there"), the
+ * approach is a fraction of a leg by design, and the only way to make the crossfade long again
+ * would be to start it BEFORE she crosses — which is the one thing that law forbids.
  */
 export const MOOD_SPAN_FRAC = (PARK_FRAC - MAX_CROSSING_LEAD) * MOOD_SATURATION_MARGIN
 export const MOOD_SPAN_ROT = MOOD_SPAN_FRAC * CHAPTER_SLICE
@@ -385,8 +391,9 @@ export const BLOOM_FLOOR = 0.84
  * The envelope's job never changed: full strength through the checkpoint and its dwell, resting at
  * BLOOM_FLOOR between them, so each arrival gets a swell of its own. What changed is where the
  * checkpoint IS. It used to sit at the END of a segment, so the bloom rose across [0.42, 0.72] and
- * settled over the next chapter's first 0.3. The dwell is now at [0.226, 0.526] — near the front —
- * and that old window would have swelled the grade AFTER the cards had gone.
+ * settled over the next chapter's first 0.3. The dwell is nearer the front now — [0.34, 0.64] at
+ * Task 75's park, [0.226, 0.526] at Task 73's — and that old window would have swelled the grade
+ * AFTER the cards had gone.
  *
  * So both ends are tied to the beats they exist for rather than to numbers: full by the moment the
  * "!" pops, held for exactly as long as the cards are up, then released across the long walk out.

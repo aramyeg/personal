@@ -33,14 +33,32 @@ export function chapterStartRotation(chapter: number): number {
  * It could not be fixed by moving the windows below — rotation reached the full slice by
  * `TRAVEL_END` whatever `TRAVEL_END` was — so the fix is here, in the rule itself.
  *
- * 0.21 is a solve, not a taste: the camera looks AHEAD of the girl (she stands at world angle
+ * It is a solve, not a taste: the camera looks AHEAD of the girl (she stands at world angle
  * STANCE_ALPHA = 0.348, the screen centre is at π/2 − 20° = 1.222), so stopping EARLY in a slice
- * is what puts the slice's own scenery across the frame. Sweeping the same projected-area census
- * that `bench/task60-vista.mjs` uses: 0.083 → ~85% (the theoretical best, she barely moves),
- * 0.21 → 78.5–83.3% per chapter, 0.36 → ~70%, 0.50 → ~56%, 1.00 → ~10% (what it was). 0.21 buys
- * essentially all of the available framing while still leaving her a walk into the biome.
+ * is what puts the slice's own scenery across the frame. The projected-area census that
+ * `bench/task60-vista.mjs` uses, swept over this constant (min across the six chapters; chapter 3,
+ * the desert, binds every row, and 1440x900 binds 390x844 by ~0.4 pt):
+ *
+ *   park        0.21   0.30   0.34   0.38   0.40   0.42   0.46   0.50
+ *   own %       78.1   73.0   70.2   67.1   65.3   63.4   59.7   55.8
+ *   own : next  4.9    3.4    2.8    2.4    2.1    1.9    1.6    1.3
+ *
+ * TASK 75 MOVED IT LATER, and the move is why the two-part rule below exists. Aram's verdict on
+ * Task 73's shipped 0.21 was that the SCROLL had been displaced: a chapter became a 13% walk-in
+ * and a 47% walk-out, which is not the rhythm he signed off. The framing fix is kept and the park
+ * is taken as LATE as the framing allows, which needs "clearly dominant" written as arithmetic.
+ * Two independent readings of it, and they converge:
+ *
+ *   • the chapter's own scene holds at least 65% of the on-screen planet  → park ≤ 0.403
+ *   • ...and at least TWICE whatever the runner-up biome holds            → park ≤ 0.412
+ *
+ * 0.40 is the round number below both, and it is confirmed by capture at all six checkpoints on
+ * desktop and phone rather than by the census alone. What it buys back: the approach nearly
+ * doubles (0.126 → 0.24 of a segment), the walk-out shortens from 0.474 to 0.36, and everything
+ * solved from this constant — the mood crossfade, the berg growth, the desert caravan — gets the
+ * same 90% more room, which is the beat Task 73 had to file as "not tunable back".
  */
-export const PARK_FRAC = 0.21
+export const PARK_FRAC = 0.4
 
 /**
  * The two spans the reshape below PRESERVES exactly, rather than letting them fall out of the
@@ -58,7 +76,9 @@ export const DWELL_SPAN = 0.3
  * scrolling at a steady speed must not feel the planet change gear across a dwell. Writing that
  * out — `TRAVEL_END / PARK_FRAC === (1 − PANEL_END) / (1 − PARK_FRAC)` with
  * `PANEL_END = TRAVEL_END + BURST_SPAN + DWELL_SPAN` — has exactly one solution, and it is the
- * line below. (0.126 / 0.226 / 0.526, from 0.55 / 0.65 / 0.95.)
+ * line below. (0.24 / 0.34 / 0.64 at Task 75's park, from 0.126 / 0.226 / 0.526 at Task 73's and
+ * 0.55 / 0.65 / 0.95 before either.) Solving it is what preserves the burst and the dwell: the
+ * audit's own hand-picked triples shortened one or both every time it was tried.
  *
  * The shape of a chapter is now: cross onto the new biome at local 0, walk a short approach into
  * it, stop while its own scenery fills the frame, read — then walk the long way out across it to
@@ -125,8 +145,9 @@ export function chapterTravelProgress(chapter: number): number {
  *
  * Props that must be standing BEFORE the cards open (the desert's camels and palms, the winter
  * bergs) used to name their windows as fractions of the whole slice, which was the same thing back
- * when the approach WAS the whole slice. It is 21% of it now, so a window written as 0.45 of a
- * slice would fire after the card rather than before it. Saying "0.45 of the approach" instead is
+ * when the approach WAS the whole slice. It is PARK_FRAC of it now — 40%, and 21% between Tasks 73
+ * and 75 — so a window written as 0.45 of a slice can fire after the card rather than before it,
+ * and moves under every retune of the park. Saying "0.45 of the approach" instead is
  * both what those windows always meant and structurally safe: anything ending at or below 1 of the
  * approach is finished before she stops.
  */

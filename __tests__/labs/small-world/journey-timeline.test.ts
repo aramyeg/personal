@@ -64,7 +64,9 @@ describe('journeyStateAt', () => {
   })
 
   it('exposes the discovery burst window between travel and panel', () => {
-    expect(journeyStateAt(at(1, 0.3)).burst).toBeNull()
+    // Named off the windows rather than typed: a literal picked as "past the burst" under one
+    // park (0.3 was, under Task 73's) lands INSIDE it under the next one.
+    expect(journeyStateAt(at(1, (BURST_END + PANEL_END) / 2)).burst).toBeNull()
     const b = journeyStateAt(at(1, (TRAVEL_END + BURST_END) / 2)).burst
     expect(b).toBeGreaterThan(0)
     expect(b).toBeLessThan(1)

@@ -212,9 +212,9 @@ describe('the invariant boundary', () => {
     //
     // Rotation used to be frozen from the chapter-6 stop at 0.925, because the stop was at the END
     // of the last slice — which was also why every card was up over the wrong biome. The stop is
-    // now at PARK_FRAC of the slice (0.855) and the release leg carries the remaining 0.79 of a
-    // slice, so the world keeps turning until progress 1.0 and the visitor walks out across the
-    // epilogue face before the ending begins. The still beat is therefore ZOOM_FIRST_MOVE - 1
+    // now at PARK_FRAC of the slice (0.873 at Task 75's park, 0.855 at Task 73's) and the release
+    // leg carries the remaining 0.60 of a slice, so the world keeps turning until progress 1.0 and
+    // the visitor walks out across the epilogue face before the ending begins. The still beat is therefore ZOOM_FIRST_MOVE - 1
     // (0.063) rather than ZOOM_FIRST_MOVE - 0.925 (0.138): less than half of what it was, and
     // still a whole beat in which nothing moves at all.
     //

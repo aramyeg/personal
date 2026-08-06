@@ -32,9 +32,9 @@ import { LANE_CROSSINGS } from '../../overlay/grade-mood'
  *    See BERG_REVEAL_SPAN_FRAC.
  *
  * Measured against the shipped constants that is progress 0.834 — the chapter-5 boundary is
- * 0.8333 — to 0.855, with the winter checkpoint now at 0.855 too (Task 73 moved the stop to
- * PARK_FRAC of the slice). `easeOutBack` is past 1 well before the end of that, so what a reader
- * sees is a beat rather than a slow inflate — a QUICKER beat than before, see the span below.
+ * 0.8333 — to 0.873, with the winter checkpoint now at 0.873 too (the stop is at PARK_FRAC of the
+ * slice since Task 73, and Task 75 took PARK_FRAC from 0.21 to 0.40). `easeOutBack` is past 1 well
+ * before the end of that, so what a reader sees is a beat rather than a slow inflate.
  *
  * BOTH SCRUB DIRECTIONS COME FREE. This is a pure function of the unwrapped rotation, so scrubbing
  * back shrinks the bergs along exactly the curve they grew on and no state can strand one at half
@@ -63,12 +63,12 @@ export const BERG_REVEAL_START_FRAC =
  * CAMERA on the always-visible limb and want every pixel of scroll they can get. So this is now
  * derived from the thing it actually cares about — the room between the crossing and the stop.
  *
- * Even at the maximum this is a much faster beat than it was: the whole approach is 0.126 of a leg
- * now against 0.55 before, so the visible part of the growth occupies about 0.006 of the scroll
- * track rather than 0.019. That is the same wall the mood crossfade hit and it has the same cause;
- * it is on the eye-test list, and if it reads as a pop the answer is to let the ice start growing
- * on the PREVIOUS chapter's walk-out rather than at the crossing — a change to what the reveal is
- * keyed to, not a number to tune.
+ * This is still a faster beat than it was before the framing fix, but Task 75 bought most of it
+ * back: the approach is 0.24 of a leg now (0.126 at Task 73's park, 0.55 before either), so the
+ * visible part of the growth occupies about 0.013 of the scroll track against 0.019 originally and
+ * 0.006 at the tightest. It stays on the eye-test list, and if it still reads as a pop the answer
+ * is to let the ice start growing on the PREVIOUS chapter's walk-out rather than at the crossing —
+ * a change to what the reveal is keyed to, not a number to tune.
  */
 export const BERG_REVEAL_SPAN_FRAC = (PARK_FRAC - BERG_REVEAL_START_FRAC) * 0.9
 

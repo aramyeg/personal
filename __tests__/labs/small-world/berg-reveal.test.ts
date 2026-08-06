@@ -93,11 +93,12 @@ describe('the iceberg reveal', () => {
       }
       return to - from
     })()
-    // Task 73 shortened the approach from 0.55 of a leg to 0.126, and this reveal may only run
-    // inside it (the ice has to be standing before the card opens). The growth therefore occupies
-    // ~0.006 of the track rather than ~0.019, even after taking the whole approach. The floor here
-    // is what is left of the guarantee; whether it still reads as an event rather than a pop is an
-    // EYE-TEST item, captured on the limb, not something this number can settle.
+    // This reveal may only run inside the APPROACH (the ice has to be standing before the card
+    // opens), so it is worth exactly what the approach is worth: 0.55 of a leg originally, 0.126
+    // after Task 73's framing fix, 0.24 after Task 75 took the park later. The growth therefore
+    // occupies ~0.013 of the track, against ~0.019 originally and ~0.006 at the tightest. The
+    // floor here is what is left of the guarantee; whether it reads as an event rather than a pop
+    // is an EYE-TEST item, captured on the limb, not something this number can settle.
     expect(span, 'scroll the growth occupies').toBeGreaterThan(0.004)
 
     // and it starts from nothing rather than from a visible size — a berg that appears at 30% and

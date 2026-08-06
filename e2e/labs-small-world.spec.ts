@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { TRACK_END } from '../components/labs/small-world/ending-timeline'
 // Scroll targets come from the timeline's own constants, never from a fraction typed here: Task 73
-// moved every checkpoint (chapter 1's card used to be at 0.8/6 and is now at 0.376/6), and a
-// hard-coded literal would have gone on passing while pointing at empty travel.
+// moved every checkpoint and Task 75 moved them again (chapter 1's card was at 0.8/6, then 0.376/6,
+// and is now at 0.49/6), and a hard-coded literal would have gone on passing while pointing at
+// empty travel.
 import {
   chapterDwellProgress,
   chapterTravelProgress,
