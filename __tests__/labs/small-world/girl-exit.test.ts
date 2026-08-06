@@ -30,10 +30,14 @@ import {
   GIRL_GLOBE_HEIGHT,
   GIRL_GLOBE_SCALE,
   GIRL_TRANSFER,
+  GIRL_TURN_END,
   GIRL_TURN_START,
   GIRL_WALK_END,
   deskFloatFor,
+  exitSinkShare,
+  feetHiddenAt,
   girlPoseAt,
+  headHiddenAt,
   strideAt,
 } from '@/components/labs/small-world/scene/girl-exit'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
@@ -365,5 +369,73 @@ describe('reduced motion gets the ending without the performance', () => {
     for (let i = 0; i <= 500; i++) {
       expect(girlPoseAt(endingStateAt((i / 500) * 1), true).stage).toBe('journey')
     }
+  })
+})
+
+/**
+ * THE EXIT BEAT IS THE PIECE, so it gets its own gate (orchestrator's polish
+ * order 4). Aram's redirect discarded where she ARRIVES; it kept, unchanged, the
+ * walk over the crest and the head going down behind it. That beat is not one
+ * number — it is a relation between three constants and the camera's own horizon,
+ * and any of them could be retuned by someone who never looked at the frames.
+ *
+ * What these hold: she is on the planet and drawn for the whole walk; the ground
+ * leaves her feet BEFORE the horizon takes her head, so there is a real sinking;
+ * that sinking is a substantial share of the walk rather than a rounding error;
+ * and she is gone before the transfer, at every camera stop the ending can reach.
+ */
+describe('the walk over the crest cannot be clipped by a retune', () => {
+  const REST = CAMERA_DISTANCE
+  const FULL = CAMERA_DISTANCE * ZOOM_FACTOR
+
+  it('keeps her on the planet, and drawn, for the whole exit walk', () => {
+    for (let i = 0; i <= 600; i++) {
+      const t = GIRL_TURN_START + ((GIRL_WALK_END - GIRL_TURN_START) * i) / 600
+      const pose = poseAtT(t)
+      expect(pose.stage).toBe('globe')
+      expect(pose.visible).toBe(true)
+    }
+  })
+
+  it('takes her ground away BEFORE her head, which is what "over the hill" means', () => {
+    // If these two coincided she would blink out at the horizon instead of sinking.
+    let feetGone = -1
+    let headGone = -1
+    for (let i = 0; i <= 2000; i++) {
+      const theta = STANCE_ALPHA + ((GIRL_EXIT_THETA - STANCE_ALPHA) * i) / 2000
+      if (feetGone < 0 && feetHiddenAt(theta, REST)) feetGone = i / 2000
+      if (headGone < 0 && headHiddenAt(theta, REST)) headGone = i / 2000
+    }
+    expect(feetGone).toBeGreaterThan(0)
+    expect(headGone).toBeGreaterThan(feetGone)
+  })
+
+  it('spends a real share of the walk sinking, not a frame of it', () => {
+    // Measured at the rest camera, which is the one the still beat renders through.
+    expect(exitSinkShare(REST)).toBeGreaterThan(0.5)
+    // ...and it survives the pull-back, where the horizon sits further round.
+    expect(exitSinkShare(FULL)).toBeGreaterThan(0.45)
+  })
+
+  it('has her fully hidden by the end of the walk at EVERY camera stop', () => {
+    for (const d of [REST, FULL, (REST + FULL) / 2]) {
+      expect(headHiddenAt(GIRL_EXIT_THETA, d)).toBe(true)
+    }
+  })
+
+  it('is still visible at the start of the walk — she does not vanish early', () => {
+    expect(headHiddenAt(STANCE_ALPHA, CAMERA_DISTANCE)).toBe(false)
+    expect(feetHiddenAt(STANCE_ALPHA, CAMERA_DISTANCE)).toBe(false)
+  })
+
+  it('finishes the walk before the transfer takes her off the planet', () => {
+    expect(GIRL_WALK_END).toBeLessThanOrEqual(GIRL_TRANSFER)
+    expect(headHiddenAt(poseAtT(GIRL_TRANSFER - 1e-4).theta, CAMERA_DISTANCE)).toBe(true)
+  })
+
+  it('turns her round before she walks, so the exit is not a moonwalk', () => {
+    expect(GIRL_TURN_END).toBeLessThanOrEqual(GIRL_WALK_END)
+    expect(atExactly(GIRL_TURN_END).yaw).toBeCloseTo(Math.PI, 9)
+    expect(Object.is(atExactly(GIRL_TURN_END).theta, STANCE_ALPHA)).toBe(true)
   })
 })

@@ -148,6 +148,45 @@ export const GIRL_EXIT_THETA =
 /** How far she walks on the planet, along the surface, in world units. */
 export const GIRL_EXIT_ARC = (STANCE_ALPHA - GIRL_EXIT_THETA) * PLANET_RADIUS
 
+/**
+ * Is the top of her head behind the planet, from a camera at distance `d`?
+ *
+ * The same two-horizon condition the exit angle is solved from, exposed as a
+ * predicate so the BEAT can be gated rather than only the endpoint. What it
+ * protects is the part of this ending that does the emotional work: she does not
+ * blink out at the horizon, she goes down BY THE HEAD over a stretch of scroll, and
+ * that stretch is a consequence of three constants (`GIRL_TURN_END`,
+ * `GIRL_WALK_END`, `GIRL_EXIT_THETA`) that a future retune could quietly collapse.
+ * `girl-exit.test.ts` measures the stretch and holds it to a floor.
+ */
+export function headHiddenAt(theta: number, cameraDistance: number): boolean {
+  const horizon =
+    Math.acos(Math.min(1, PLANET_RADIUS / cameraDistance)) +
+    Math.acos(Math.min(1, PLANET_RADIUS / (PLANET_RADIUS + GIRL_GLOBE_HEIGHT)))
+  return Math.abs(theta - CAMERA_THETA) > horizon
+}
+
+/**
+ * ...and where her FEET go under, which is the first half of the same beat: the
+ * ground leaves before she does, so for a stretch she is a figure walking on a
+ * horizon with nothing under her feet. That is the picture, and it is why the walk
+ * runs well past the surface's own tangent.
+ */
+export function feetHiddenAt(theta: number, cameraDistance: number): boolean {
+  return Math.abs(theta - CAMERA_THETA) > Math.acos(Math.min(1, PLANET_RADIUS / cameraDistance))
+}
+
+/** The fraction of the exit walk she spends sinking — feet under, head still up. */
+export function exitSinkShare(cameraDistance: number): number {
+  const N = 2000
+  let sinking = 0
+  for (let i = 0; i <= N; i++) {
+    const theta = STANCE_ALPHA + ((GIRL_EXIT_THETA - STANCE_ALPHA) * i) / N
+    if (feetHiddenAt(theta, cameraDistance) && !headHiddenAt(theta, cameraDistance)) sinking++
+  }
+  return sinking / (N + 1)
+}
+
 // ---------------------------------------------------------------------------
 // THE BEATS, in the ending's own t
 // ---------------------------------------------------------------------------
