@@ -8,8 +8,8 @@ import {
   CAMERA_FOV,
   CAMERA_POSITION,
   CAMERA_RIG_PRIORITY,
-  cameraPositionInto,
-  cameraTargetInto,
+  cameraPositionIntoFor,
+  cameraTargetIntoFor,
 } from './camera'
 import {
   PARALLAX_LAMBDA,
@@ -101,6 +101,7 @@ function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
   const lastZoom = useRef(Number.NaN)
   const lastYaw = useRef(Number.NaN)
   const lastPitch = useRef(Number.NaN)
+  const lastAspect = useRef(Number.NaN)
   const input = usePointerParallax()
 
   useFrame((state, dt) => {
@@ -129,16 +130,34 @@ function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
     const y = yaw.current * gain
     const p = pitch.current * gain
 
-    if (ending.zoom === lastZoom.current && y === lastYaw.current && p === lastPitch.current) return
+    // THE ASPECT IS PART OF THE POSE NOW (Task 76), so it is part of the skip key. A resize that
+    // crosses the portrait band has to re-place the camera even at a frozen scroll position, and
+    // without this line it would not — the rig would hold a pose solved for the old viewport until
+    // the visitor scrolled. It costs one more float compare per frame and it changes nothing during
+    // the journey, where every aspect gives the same pose.
+    if (
+      ending.zoom === lastZoom.current &&
+      y === lastYaw.current &&
+      p === lastPitch.current &&
+      aspect === lastAspect.current
+    )
+      return
     lastZoom.current = ending.zoom
     lastYaw.current = y
     lastPitch.current = p
+    lastAspect.current = aspect
 
     // The ending withdraws AND re-aims (Task 66): both halves are pure functions of the same
     // `zoom`, and both are bit-identical to the static pose while it is 0, so the skip above still
     // covers the whole journey. At zoom 0 this target is exactly CAMERA_TARGET.
-    const t = cameraTargetInto(ending, aim.current)
-    const base = cameraPositionInto(ending, eye.current)
+    //
+    // Task 76 gives both halves the ASPECT as a second input — a phone gets its own pull-back and
+    // its own aim, because ndc y is aspect-free but the world WIDTH the frame covers is not (see
+    // camera.ts, THE PHONE'S FRAME). It is read here, once per frame, off the same `state.size` the
+    // parallax already reads: a pure input like the pointer's reduced-motion flag, never a clock.
+    // At any landscape aspect both functions return the Task 66 pose bit for bit.
+    const t = cameraTargetIntoFor(ending, aspect, aim.current)
+    const base = cameraPositionIntoFor(ending, aspect, eye.current)
     const posed = orbitEyeInto(base, t, y, p, orbited.current)
     camera.position.fromArray(posed)
     camera.lookAt(t[0], t[1], t[2])

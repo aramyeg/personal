@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
-import { cameraZoomScale } from './camera'
+import { cameraZoomScaleFor } from './camera'
 import { studioLightsFor } from './desk-studio'
 import type { JourneyRef } from './use-journey'
 
@@ -62,7 +62,7 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
   // JSX props carry — and every frame after it costs one float compare until the pull-back starts.
   const lastScale = useRef(Number.NaN)
 
-  useFrame(() => {
+  useFrame((state) => {
     if (!journeyRef) return
     const j = journeyRef.current
     const b = moodBlendAt(j.progress)
@@ -79,7 +79,14 @@ export function Sky({ journeyRef }: { journeyRef?: JourneyRef }) {
     // shared. A float has no such indirection, and the studio backdrop simply never appeared.
     if (material.current) material.current.uniforms.uStudio.value = studioLightsFor(j.ending)
 
-    const k = cameraZoomScale(j.ending)
+    // THE ASPECT'S OWN FACTOR, NOT THE LAPTOP'S (Task 76). The invariance argument above is
+    // `uniform scale of a camera-plus-subject pair`, and it holds only while the plane is scaled by
+    // exactly the k the camera moved by. The ending's pull-back now forks by aspect, so a sky scaled
+    // by the landscape factor under a phone's longer pull-back would stop being invariant — the
+    // frustum would sweep a wider slice of the gradient and, far enough out, its edge. Read off
+    // r3f's own `size` rather than subscribed to, so a resize costs nothing and never re-registers
+    // this callback (the camera rig reads it the same way).
+    const k = cameraZoomScaleFor(j.ending, state.size.width / state.size.height)
     if (k !== lastScale.current && mesh.current) {
       lastScale.current = k
       mesh.current.position.set(SKY_POSITION[0] * k, SKY_POSITION[1] * k, SKY_POSITION[2] * k)

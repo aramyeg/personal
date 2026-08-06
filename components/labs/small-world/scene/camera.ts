@@ -28,6 +28,13 @@ import { endingStateAt, type EndingState } from '../ending-timeline'
  *     epsilon a future edit could quietly widen.
  * There is no branch doing this work; the identity falls out of the arithmetic,
  * and `ending-camera.test.ts` samples the whole journey domain to prove it.
+ *
+ * TASK 76 WIDENS IT RATHER THAN WEAKENING IT. The ending's pose now forks by ASPECT
+ * (see THE PHONE'S FRAME, below), so "the camera is static" has to hold at every
+ * aspect, not just at the one the sweep used to run at. It does, and by the same
+ * arithmetic: both zoom targets are positive and both aim targets are positive, so
+ * `Math.exp(x·0)` is 1 and `y·0` is +0 whatever the viewport. The sweep now walks
+ * the journey domain crossed with a set of aspects from 0.30 to 4.
  */
 
 export const CAMERA_FOV = 38
@@ -124,10 +131,12 @@ export const DESK_EDGE_V = DESK_FRAME * 2 - 1
  * since every gate is saturated at ROTATION_TOTAL. The sky follows the zoom for
  * free (see `cameraZoomScale`).
  */
-export const ZOOM_FACTOR = (() => {
-  const u = GLOBE_FRAME * TAN_HALF_FOV
+const zoomForGlobeFrame = (globeFrame: number): number => {
+  const u = globeFrame * TAN_HALF_FOV
   return WORLD_RADIUS * Math.sqrt(1 + u * u) / (CAMERA_DISTANCE * u)
-})()
+}
+
+export const ZOOM_FACTOR = zoomForGlobeFrame(GLOBE_FRAME)
 
 // ---------------------------------------------------------------------------
 // THE PROJECTION, in the plane the whole ending lives in
@@ -203,61 +212,254 @@ export const ENDING_AIM_DROP = (() => {
   return (lo + hi) / 2
 })()
 
-/**
- * The pull-back is GEOMETRIC in distance, not linear: apparent size goes as 1/D,
- * so a linear ramp shrinks the world fast and then crawls. Interpolating the
- * LOGARITHM makes the rate of apparent shrink constant, which is what a pull-back
- * is supposed to feel like. exp(0) = 1 exactly, so the identity above survives it.
- */
-const LOG_ZOOM = Math.log(ZOOM_FACTOR)
-
 const smoothstep = (t: number): number => {
   const x = t < 0 ? 0 : t > 1 ? 1 : t
   return x * x * (3 - 2 * x)
 }
 
 /**
- * The camera's distance from the planet's centre. Exactly CAMERA_DISTANCE for the
- * whole journey and the whole still beat; geometric from there to
- * CAMERA_DISTANCE · ZOOM_FACTOR at the bottom of the track.
+ * Interpolate so BOTH ends are EXACT, which `a + (b − a)·s` is not — the same form
+ * `girl-exit.ts` adopted, and for a sharper reason here. At s = 0 this is
+ * `1·a + 0·b`: `1·a` is bit-identically a (IEEE-754), `0·b` is +0 for every positive
+ * b, and `a + (+0)` is bit-identically a. That single line is what makes the whole
+ * portrait fork below invisible to a landscape viewport — not a branch that happens
+ * to agree, but arithmetic that cannot disagree.
  */
-export function endingCameraDistance(ending: EndingState): number {
-  return CAMERA_DISTANCE * Math.exp(LOG_ZOOM * smoothstep(ending.zoom))
-}
+const mix = (a: number, b: number, s: number): number => (1 - s) * a + s * b
 
 /**
- * How far below the origin the camera is aiming — 0 for the whole journey and the
- * whole still beat, then eased to ENDING_AIM_DROP on the SAME curve the distance
- * uses, so the pull-back and the re-aim are one gesture rather than two.
+ * ============================================================================
+ * THE PHONE'S FRAME (Task 76) — the one fork this ending is allowed
+ * ============================================================================
+ * At 390×844 the money shot crops the entire desk payoff. That is not a tuning
+ * miss, it is the aperture argument's other half. three.js holds the VERTICAL fov
+ * fixed and widens the horizontal one, so ndc Y is aspect-free — every composition
+ * claim above holds on a phone — but the WORLD WIDTH the frame covers is not. At
+ * the figurine row the frame spans ±4.92 world units on 1440×900 and ±1.42 on
+ * 390×844. Measured off the shipped `desk.glb` by connected components, the mug
+ * stands at x ∈ [−3.16, −2.25] and the donut at [−2.18, −1.38]. Neither can be in a
+ * portrait frame at this pull-back, at any aim, ever.
  *
- * The invariant survives it for the same reason the distance does: `smoothstep(0)`
- * is exactly 0, and `x · 0` is exactly +0, so the aim is bit-identically
- * CAMERA_TARGET everywhere the camera is required not to have moved.
+ * ============================================================================
+ * WHAT MAY MOVE, AND WHAT MAY NOT
+ * ============================================================================
+ * `DESK_TOP_Y` CANNOT FORK. The desk is one static mesh baked in Blender; its height
+ * is a property of the asset, not of the viewport. Only the CAMERA may fork.
+ *
+ * That single fact collapses the design. On landscape three targets are authored and
+ * everything else is solved (see THE MONEY SHOT, ABOVE). On portrait the desk plane
+ * is ALREADY SPENT, so:
+ *
+ *   GLOBE_FRAME_PORTRAIT  is authored. It solves ZOOM_FACTOR_PORTRAIT in the same
+ *                         closed form, because that solve never mentioned the desk.
+ *   DESK_FRAME            is REUSED, not re-authored. The desk owns the same 40% of
+ *                         a phone's frame that it owns of a laptop's, and the aim
+ *                         that puts it there is solved against the desk's real back
+ *                         edge rather than against the globe.
+ *   STAND_GAP             is no longer authorable at all. With the desk plane fixed,
+ *                         the gap between the world's bottom and the desk's edge is
+ *                         a function of the ZOOM alone — it moves by 0.0002 across
+ *                         the whole usable aim range — so a bisection on it would be
+ *                         solving a singular equation. It becomes a CONSEQUENCE,
+ *                         `STAND_GAP_PORTRAIT`, reported and gated rather than set.
+ *
+ * So the phone's composition is ONE authored number. What it buys, at 390×844: the
+ * frame at the figurine row goes ±1.42 → ±1.93, Aram's note stops being cropped
+ * (95% of it was in frame; 100% is now), and the trinket dish, the donut, the
+ * sculpting tool and the plasticine box's near corner come into the picture.
+ *
+ * ============================================================================
+ * THE WALL, STATED RATHER THAN WORKED AROUND
+ * ============================================================================
+ * 0.30 is not where the picture stops improving; it is where the DESK RUNS OUT.
+ * `camera-parallax.test.ts` gates that no bottom corner ray reaches the desk plane
+ * beyond `DESK_NEAR_Z` — the slab's own baked end at z = 14.198 — because past it
+ * the frame shows a void under the table. Pulling back moves that crossing out fast:
+ * at GLOBE_FRAME_PORTRAIT 0.30 the worst corner lands at 13.81 (0.39 of headroom),
+ * at 0.29 it lands at 14.195 (0.003), and at 0.28 it is 0.36 units PAST the slab.
+ * Reaching the mug needs 0.185, which lands 5.8 units past it.
+ *
+ * The remedy is therefore not in this file: either the slab is re-baked longer, or
+ * the T69 prop set is re-laid-out so the payoff is not spread to |x| = 4.4. Both are
+ * Blender work. This module goes exactly as far as the shipped asset allows and no
+ * further, and the test named below is what stops a later edit from going past it
+ * without noticing.
  */
-export function endingAimDrop(ending: EndingState): number {
-  return ENDING_AIM_DROP * smoothstep(ending.zoom)
+
+/** The aspect at and above which the ending's pose is EXACTLY the approved landscape one. */
+export const LANDSCAPE_ASPECT = 1
+
+/**
+ * ...and at and below which the portrait composition is in force in full.
+ *
+ * Every phone the lab is captured at sits under it (360×800 = 0.450, 390×844 = 0.462,
+ * 430×932 = 0.461, 375×667 = 0.562 is the one close call and still lands at 96% of
+ * the fork). A portrait tablet at 0.75 takes half of it, which is right: its frame is
+ * 47% of a laptop's width and it has half the problem.
+ */
+export const PORTRAIT_ASPECT = 0.5
+
+/**
+ * How much of the portrait composition is in force at an aspect — the ONE quantity
+ * the fork is expressed through.
+ *
+ * Smoothstepped rather than switched, so rotating a device walks the pose instead of
+ * snapping it, and so the derivative is zero at both ends. Exactly 0 at and above
+ * `LANDSCAPE_ASPECT` (`smoothstep` clamps, and `0·0·(3−0)` is exactly 0) and exactly
+ * 1 at and below `PORTRAIT_ASPECT`. The guard is `yawMaxFor`'s: a viewport that has
+ * not measured itself yet reports 0 or NaN, and the landscape pose is the safe
+ * answer for both.
+ */
+export function portraitWeight(aspect: number): number {
+  if (!(aspect > 0)) return 0
+  return smoothstep((LANDSCAPE_ASPECT - aspect) / (LANDSCAPE_ASPECT - PORTRAIT_ASPECT))
+}
+
+/** The world's silhouette as a fraction of the viewport HEIGHT at full pull-back, ON A PHONE. */
+export const GLOBE_FRAME_PORTRAIT = 0.3
+
+/** ...which solves the portrait pull-back in the same closed form GLOBE_FRAME does. */
+export const ZOOM_FACTOR_PORTRAIT = zoomForGlobeFrame(GLOBE_FRAME_PORTRAIT)
+
+/**
+ * THE DESK'S BACK EDGE, RESTATED — the one point the portrait aim solve needs and the
+ * one point this module is not allowed to import.
+ *
+ * `desk-stage.ts` solves `DESK_TOP_Y` and `DESK_BACK_Z` from `DESK_EDGE_V` at the
+ * landscape pose, and it imports THIS module to do it; importing it back would be a
+ * cycle whose module-evaluation order decides whether a const is in its temporal dead
+ * zone. So the solve is restated — the same bisection, on the same predicate, over the
+ * same bracket, which makes it bit-identical rather than merely close — and
+ * `ending-camera.test.ts` pins `DESK_EDGE_POINT` against desk-stage's own pair with
+ * `Object.is`. That is the WORLD_RADIUS treatment, for the same reason and with the
+ * same relation pin: a copy that cannot drift because a test compares it, not because
+ * a comment asks it not to.
+ *
+ * `DESK_CLEARANCE` comes with it. It is the only desk number this file has to know.
+ */
+const DESK_CLEARANCE = 0.35
+const HALF_FOV = (CAMERA_FOV * Math.PI) / 360
+const FLOOR_SLOPE = Math.tan(PITCH + HALF_FOV)
+/** The first z at which a surface at `topY` is still DESK_CLEARANCE below the journey's bottom edge. */
+const backZFor = (topY: number): number =>
+  CAMERA_POSITION[2] - (CAMERA_POSITION[1] - topY - DESK_CLEARANCE) / FLOOR_SLOPE
+
+export const DESK_EDGE_POINT: readonly [number, number, number] = (() => {
+  let lo = -6
+  let hi = 6
+  for (let i = 0; i < 90; i++) {
+    const mid = (lo + hi) / 2
+    if (ndcYAt([0, mid, backZFor(mid)], ZOOM_FACTOR, ENDING_AIM_DROP) < DESK_EDGE_V) lo = mid
+    else hi = mid
+  }
+  const topY = (lo + hi) / 2
+  return [0, topY, backZFor(topY)]
+})()
+
+/**
+ * How far below the origin the PORTRAIT ending aims — solved, like its landscape
+ * sibling, but against the other end of the same relation.
+ *
+ * Landscape solves the aim from the GLOBE (put the world's bottom `STAND_GAP` above
+ * `DESK_EDGE_V`) and then lets `DESK_TOP_Y` place the desk to match. Portrait cannot:
+ * the desk is already placed. So it solves the aim from the DESK (put the real back
+ * edge back on `DESK_EDGE_V`) and lets the gap fall where the zoom leaves it. Same
+ * composition, read from the end that is still free.
+ *
+ * Monotone over the bracket — aiming lower carries every point in front of the camera
+ * UP the frame, with no turning point anywhere in [0, 12] at any zoom the blend can
+ * produce — so the bisection is honest. It runs once, at module load.
+ */
+export const ENDING_AIM_DROP_PORTRAIT = (() => {
+  let lo = 0
+  let hi = 12
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2
+    if (ndcYAt(DESK_EDGE_POINT, ZOOM_FACTOR_PORTRAIT, mid) < DESK_EDGE_V) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+})()
+
+/**
+ * The band the stand stands in ON A PHONE — a CONSEQUENCE, not a target (see the
+ * header). It comes out at 0.058 against the laptop's authored 0.120: the phone's
+ * world sits nearer its desk because it is further away, which is the price the one
+ * authored number pays. Positive is the claim that matters, and it is gated.
+ */
+export const STAND_GAP_PORTRAIT =
+  globeEdgesAt(ZOOM_FACTOR_PORTRAIT, ENDING_AIM_DROP_PORTRAIT).bot - DESK_EDGE_V
+
+/**
+ * The pull-back's two targets at an aspect. Everything below is a pure function of
+ * these plus `ending.zoom`, which is what keeps the fork a change of INPUT rather
+ * than a second code path: at any landscape aspect `zoomFactorFor` returns
+ * `ZOOM_FACTOR` and `endingAimTargetFor` returns `ENDING_AIM_DROP`, bit for bit, so
+ * every expression below reduces to the one Task 66 shipped.
+ */
+export function zoomFactorFor(aspect: number): number {
+  return mix(ZOOM_FACTOR, ZOOM_FACTOR_PORTRAIT, portraitWeight(aspect))
+}
+
+/** ...and how far below the origin that aspect's ending ends up aiming. */
+export function endingAimTargetFor(aspect: number): number {
+  return mix(ENDING_AIM_DROP, ENDING_AIM_DROP_PORTRAIT, portraitWeight(aspect))
 }
 
 /**
  * How far the world has receded, as a plain multiplier on the rest distance
- * (1 → ZOOM_FACTOR). The sky uses it to scale itself about the origin, which
- * keeps its projection EXACTLY invariant while everything else shrinks — see
- * sky.tsx.
+ * (1 → the aspect's own zoom factor). The sky uses it to scale itself about the
+ * origin, which keeps its projection EXACTLY invariant while everything else
+ * shrinks — see sky.tsx, which now reads the ASPECT'S factor, because a sky scaled
+ * by the laptop's factor under a phone's pull-back would stop being invariant and
+ * could show its edge.
+ *
+ * The pull-back is GEOMETRIC in distance, not linear: apparent size goes as 1/D, so
+ * a linear ramp shrinks the world fast and then crawls. Interpolating the LOGARITHM
+ * makes the rate of apparent shrink constant, which is what a pull-back is supposed
+ * to feel like. `exp(x·0)` is exactly 1 (ECMAScript: exp(+0) → 1), so the identity
+ * at the top of this file survives it — AT EVERY ASPECT, which is stronger than what
+ * Task 63 needed and is exactly what a forkable pose has to promise.
  */
-export function cameraZoomScale(ending: EndingState): number {
-  return Math.exp(LOG_ZOOM * smoothstep(ending.zoom))
+export function cameraZoomScaleFor(ending: EndingState, aspect: number): number {
+  return Math.exp(Math.log(zoomFactorFor(aspect)) * smoothstep(ending.zoom))
 }
 
 /**
- * The camera's position at an ending state, written into `out` — the rig owns one
- * scratch tuple, so the per-frame path allocates nothing. Returns `out` so tests
- * can pass a fresh tuple and read it back.
+ * The camera's distance from the planet's centre. Exactly CAMERA_DISTANCE for the
+ * whole journey and the whole still beat AT EVERY ASPECT; geometric from there to
+ * CAMERA_DISTANCE · `zoomFactorFor(aspect)` at the bottom of the track.
  */
-export function cameraPositionInto(
+export function endingCameraDistanceFor(ending: EndingState, aspect: number): number {
+  return CAMERA_DISTANCE * cameraZoomScaleFor(ending, aspect)
+}
+
+/**
+ * How far below the origin the camera is aiming — 0 for the whole journey and the
+ * whole still beat, then eased to the aspect's target on the SAME curve the distance
+ * uses, so the pull-back and the re-aim are one gesture rather than two.
+ *
+ * The invariant survives it for the same reason the distance does: `smoothstep(0)`
+ * is exactly 0, and `x · 0` is exactly +0, so the aim is bit-identically
+ * CAMERA_TARGET everywhere the camera is required not to have moved — on a phone as
+ * much as on a laptop, since both targets are positive and both are multiplied by
+ * the same exact zero.
+ */
+export function endingAimDropFor(ending: EndingState, aspect: number): number {
+  return endingAimTargetFor(aspect) * smoothstep(ending.zoom)
+}
+
+/**
+ * The camera's position at an ending state and an aspect, written into `out` — the
+ * rig owns one scratch tuple, so the per-frame path allocates nothing. Returns `out`
+ * so tests can pass a fresh tuple and read it back.
+ */
+export function cameraPositionIntoFor(
   ending: EndingState,
+  aspect: number,
   out: [number, number, number]
 ): [number, number, number] {
-  const d = endingCameraDistance(ending)
+  const d = endingCameraDistanceFor(ending, aspect)
   out[0] = CAMERA_RAY[0] * d
   out[1] = CAMERA_RAY[1] * d
   out[2] = CAMERA_RAY[2] * d
@@ -265,14 +467,55 @@ export function cameraPositionInto(
 }
 
 /** ...and what it aims at, written into `out` on the same allocation-free terms. */
+export function cameraTargetIntoFor(
+  ending: EndingState,
+  aspect: number,
+  out: [number, number, number]
+): [number, number, number] {
+  out[0] = CAMERA_TARGET[0]
+  out[1] = CAMERA_TARGET[1] - endingAimDropFor(ending, aspect)
+  out[2] = CAMERA_TARGET[2]
+  return out
+}
+
+/**
+ * THE LANDSCAPE PATH, which is the aspect-free special case rather than a copy.
+ *
+ * `girl-exit.ts`, `sky.tsx` and the overlay's two clearance modules were all written
+ * against these signatures and against a pose that had no aspect in it. They keep
+ * both. Each is the aspect-taking function evaluated at `LANDSCAPE_ASPECT`, where
+ * `portraitWeight` is exactly 0 and `mix` is exactly the identity — so there is no
+ * second implementation that could drift, and `ending-camera.test.ts` sweeps the
+ * pair with `Object.is` at every landscape aspect it can name.
+ */
+export function endingCameraDistance(ending: EndingState): number {
+  return endingCameraDistanceFor(ending, LANDSCAPE_ASPECT)
+}
+
+/** @see endingCameraDistance for why this is not a second implementation. */
+export function endingAimDrop(ending: EndingState): number {
+  return endingAimDropFor(ending, LANDSCAPE_ASPECT)
+}
+
+/** @see endingCameraDistance for why this is not a second implementation. */
+export function cameraZoomScale(ending: EndingState): number {
+  return cameraZoomScaleFor(ending, LANDSCAPE_ASPECT)
+}
+
+/** @see endingCameraDistance for why this is not a second implementation. */
+export function cameraPositionInto(
+  ending: EndingState,
+  out: [number, number, number]
+): [number, number, number] {
+  return cameraPositionIntoFor(ending, LANDSCAPE_ASPECT, out)
+}
+
+/** @see endingCameraDistance for why this is not a second implementation. */
 export function cameraTargetInto(
   ending: EndingState,
   out: [number, number, number]
 ): [number, number, number] {
-  out[0] = CAMERA_TARGET[0]
-  out[1] = CAMERA_TARGET[1] - endingAimDrop(ending)
-  out[2] = CAMERA_TARGET[2]
-  return out
+  return cameraTargetIntoFor(ending, LANDSCAPE_ASPECT, out)
 }
 
 /** The camera's position at a scroll position. Allocates — for tests and benches, not the frame loop. */
@@ -283,6 +526,16 @@ export function cameraPositionAt(progress: number): [number, number, number] {
 /** ...and its aim. Same terms. */
 export function cameraTargetAt(progress: number): [number, number, number] {
   return cameraTargetInto(endingStateAt(progress), [0, 0, 0])
+}
+
+/** The same pair at an aspect, for the sweeps and the benches. */
+export function cameraPositionAtFor(progress: number, aspect: number): [number, number, number] {
+  return cameraPositionIntoFor(endingStateAt(progress), aspect, [0, 0, 0])
+}
+
+/** ...and its aim. Same terms. */
+export function cameraTargetAtFor(progress: number, aspect: number): [number, number, number] {
+  return cameraTargetIntoFor(endingStateAt(progress), aspect, [0, 0, 0])
 }
 
 /**
