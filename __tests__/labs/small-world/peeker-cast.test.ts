@@ -224,7 +224,12 @@ describe('the measured mascot envelope', () => {
         }
       }
     }
-  })
+    // 30s, not 5: this builds every dressing for every kind in four orientations, which is 2.7s on
+    // an idle machine and 5.8-9.7s whenever anything else is using the CPU (a capture run, a
+    // build) — so the default timeout made a green suite a question of what else was running.
+    // Nothing here is timing-sensitive by nature; `peeker-stage.ts` takes only easeOutBack,
+    // revealPhase and smoothstep from the timeline, so no journey reshape can reach it.
+  }, 30_000)
 
   it('keeps a DRIFTING dressing roll inside the margin that covers idle motion', () => {
     // The heave has a pin in peeker-stage.test.ts; this is its other half, and it lives here
