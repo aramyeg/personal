@@ -38,9 +38,11 @@ describe('FallbackTimeline (server-rendered, crawlable)', () => {
     const section = screen.getByTestId('small-world-fallback')
     expect(section).toHaveClass(FALLBACK_CLASS)
     // Crawler-facing content still present (mirrors the e2e crawler assertions).
-    expect(section).toHaveTextContent('xDataGroup')
-    expect(section).toHaveTextContent('Senior Frontend Engineer')
-    expect(section).toHaveTextContent('BlueNet')
+    // The lab tells Alwina's story now, so this is HER career — the same six
+    // chapters the scene tells, in markup a crawler and a no-WebGL visitor read.
+    expect(section).toHaveTextContent('The Observatory')
+    expect(section).toHaveTextContent('Frontend Engineer · Sync Design Tech · 2025–now')
+    expect(section).toHaveTextContent('The Pull')
     // The pastel skin ships inline with the markup.
     expect(section.querySelector('style')?.textContent).toContain('linear-gradient')
   })

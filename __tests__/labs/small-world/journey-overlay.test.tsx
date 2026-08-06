@@ -49,9 +49,9 @@ describe('JourneyOverlay', () => {
     ref.current = 0.8 / 6
     fireScroll()
     const panel = screen.getByTestId('sw-panel-data')
-    expect(panel.textContent).toContain(chapters[0].company)
-    expect(panel.textContent).toContain(chapters[0].role)
-    expect(panel.textContent).toContain(chapters[0].period)
+    expect(panel.textContent).toContain(chapters[0].theme)
+    expect(panel.textContent).toContain(chapters[0].hook)
+    expect(panel.textContent).toContain(chapters[0].caption)
   })
 
   it('advances to the next chapter on tap', () => {
@@ -167,7 +167,7 @@ describe('JourneyOverlay', () => {
     const ref = { current: lastDwell }
     render(<JourneyOverlay progressRef={ref} onAdvance={() => {}} />)
     expect(screen.getByTestId('sw-panel-data').textContent).toContain(
-      chapters[CHAPTER_COUNT - 1].company
+      chapters[CHAPTER_COUNT - 1].hook
     )
   })
 })

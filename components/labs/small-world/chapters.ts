@@ -1,43 +1,24 @@
-import { experiences } from '@/data/experience'
-import { PALETTE } from './palette'
+import { ALWINA_STORY, type StoryChapter } from './alwina-story'
 
 export const CHAPTER_COUNT = 6
 
-export type Chapter = {
-  id: string
-  company: string
-  role: string
-  period: string
-  location: string
-  description: string
-  highlights: string[]
-  technologies: string[]
-  /** One-line staging direction for the chapter's planet region */
-  theme: string
-  accent: string
+/**
+ * A chapter as the lab renders it.
+ *
+ * This used to be a projection of `@/data/experience` — Aram's CV — with a
+ * per-chapter staging direction bolted on. The lab tells ALWINA's story now, so
+ * the shape follows her card layout (hook, lines, stamps, caption) and the
+ * words come from `alwina-story.ts`. `data/experience.ts` is untouched and is
+ * no longer imported here: the portfolio's own Experience section still renders
+ * Aram's career from it, and the two stories must not learn about each other.
+ *
+ * The mapping is deliberately thin — one source of story words, and the only
+ * thing added is the chapter's position, which is also the biome it is told
+ * over (chapter 0 spring … chapter 5 winter).
+ */
+export type Chapter = StoryChapter & {
+  /** 0-based position in the journey; also the index of the biome it is told over. */
+  index: number
 }
 
-type ChapterStaging = { theme: string; accent: string }
-
-/** Per-chapter staging: theme + accent, keyed by experience id. */
-const STAGING = {
-  bluenet: { theme: 'First shoots of spring — seedlings and a small clay hotel with a reception bell', accent: PALETTE.sprout },
-  flyerbee: { theme: 'Beehive and fat clay bees over pink flowers along a winding delivery path', accent: PALETTE.honey },
-  '360dialog': { theme: 'A wide blue river delta with message-pebble stepping stones and carrier birds', accent: PALETTE.river },
-  accenture: { theme: 'Golden dunes rising from the green, a palm, a geometric bank facade', accent: PALETTE.dune },
-  akna: { theme: 'A clay market street of stacked component-block buildings in pink tuff', accent: PALETTE.tuff },
-  xdatagroup: { theme: 'Blossom summit at present day — pink trees in bloom, a vault door in the hillside', accent: PALETTE.blossomDeep },
-} satisfies Record<string, ChapterStaging>
-
-/** The journey runs the career chronologically: oldest experience first. */
-export const chapters: Chapter[] = [...experiences].reverse().map((e) => ({
-  id: e.id,
-  company: e.company,
-  role: e.role,
-  period: e.period,
-  location: e.location,
-  description: e.description,
-  highlights: e.highlights,
-  technologies: e.technologies,
-  ...STAGING[e.id as keyof typeof STAGING],
-}))
+export const chapters: Chapter[] = ALWINA_STORY.map((c, index) => ({ ...c, index }))

@@ -4,6 +4,7 @@ import { CHAPTER_COUNT, chapters } from '../chapters'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
+import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
@@ -30,6 +31,11 @@ export function JourneyOverlay({
           panel text can never be tinted by it (see biome-grade.tsx). */}
       {SHOW_GRADE && <BiomeGrade progressRef={progressRef} journey={journey} />}
       <SpeedLines active={ui.burst} />
+      {/* Fetches the CURRENT chapter's page while the girl is still walking to it,
+          so the card opens on a decoded image. Keyed to the journey's chapter, which
+          means nothing is requested until the visitor has actually started moving —
+          the seven pages must never be on the first-paint route. */}
+      {ui.started && <MangaPreload chapter={ui.chapter} />}
       {/* No `ended` gate any more (Task 63). It existed to clear the stage for the retired
           `EndPanel`, and at END_AT = 0.985 it cut chapter 6's dwell short — the cards were
           yanked mid-read at 0.985 while the dwell ran to 0.9917. The cards now retract the

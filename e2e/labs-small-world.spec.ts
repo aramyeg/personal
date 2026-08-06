@@ -50,9 +50,10 @@ test.describe('Small World lab', () => {
     await page.goto('/labs/small-world')
     const fallback = page.getByTestId('small-world-fallback')
     await expect(fallback).toBeAttached()
-    await expect(fallback).toContainText('xDataGroup')
-    await expect(fallback).toContainText('Senior Frontend Engineer')
-    await expect(fallback).toContainText('BlueNet')
+    // The lab tells Alwina's story now (T73), so the crawlable mirror is hers.
+    await expect(fallback).toContainText('The Pull')
+    await expect(fallback).toContainText('Frontend Engineer · Sync Design Tech · 2025–now')
+    await expect(fallback).toContainText('The Observatory')
   })
 
   test('Esc returns to the museum', async ({ page }) => {
@@ -65,9 +66,9 @@ test.describe('Small World lab', () => {
   test('career timeline is server-rendered for crawlers', async ({ request }) => {
     const res = await request.get('/labs/small-world')
     const html = await res.text()
-    expect(html).toContain('xDataGroup')
-    expect(html).toContain('Senior Frontend Engineer')
-    expect(html).toContain('BlueNet')
+    expect(html).toContain('The Pull')
+    expect(html).toContain('Sync Design Tech')
+    expect(html).toContain('The Observatory')
   })
 
   test('comic panel opens at the first discovery stop', async ({ page }) => {
@@ -77,7 +78,7 @@ test.describe('Small World lab', () => {
     await scrollToProgress(page, 0.8 / 6)
     const panel = page.getByTestId('sw-panel-data')
     await expect(panel).toBeVisible({ timeout: 10_000 })
-    await expect(panel).toContainText('BlueNet')
+    await expect(panel).toContainText('The Pull')
     await expect(panel).toContainText('Chapter 1')
   })
 

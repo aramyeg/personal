@@ -61,7 +61,16 @@ describe('useJourneyUi', () => {
 
   it('starts in chapter 0 with no panel', () => {
     const { result } = renderHook(() => useJourneyUi(refOf(0)))
-    expect(result.current).toEqual({ chapter: 0, burst: false, panel: null, ending: null })
+    // `started` is false at rest and is what keeps the ~250KB manga page for
+    // chapter 0 off the first-paint route (chapter alone cannot tell "not yet
+    // moved" from "walking the first leg").
+    expect(result.current).toEqual({
+      chapter: 0,
+      burst: false,
+      started: false,
+      panel: null,
+      ending: null,
+    })
   })
 
   it('reports the burst window', () => {

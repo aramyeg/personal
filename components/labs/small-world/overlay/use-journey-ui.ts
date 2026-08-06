@@ -8,6 +8,16 @@ import type { ArrivalJourney } from '../use-arrival-journey'
 export type JourneyUi = {
   chapter: number
   burst: boolean
+  /**
+   * Has the visitor moved at all?
+   *
+   * The one thing this answers that `chapter` cannot: chapter is 0 both before
+   * the journey starts and during its first leg, and the manga preloader needs
+   * to tell those apart — page 0 is ~250KB and must not be on the first-paint
+   * route. A tiny threshold rather than `> 0` so a browser restoring a scroll
+   * position of a few pixels does not count as a start.
+   */
+  started: boolean
   /** `enter` is the cards' entrance progress 0→1, NOT a dwell fraction — see below. */
   panel: { chapter: number; enter: number } | null
   /**
@@ -24,6 +34,9 @@ export type JourneyUi = {
 }
 
 const T_STEPS = 60
+
+/** Below this the journey counts as not yet begun. ~0.3% of the track. */
+const START_EPSILON = 0.003
 
 /**
  * Cards mount and roll out on the ARRIVAL CLOCK when one is driving (Task 54): the
@@ -51,6 +64,7 @@ function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
   return {
     chapter: s.chapter,
     burst: s.burst !== null,
+    started: s.progress > START_EPSILON,
     panel:
       chapter === undefined
         ? null
@@ -67,6 +81,7 @@ function same(a: JourneyUi, b: JourneyUi): boolean {
   return (
     a.chapter === b.chapter &&
     a.burst === b.burst &&
+    a.started === b.started &&
     (a.ending === b.ending ||
       (a.ending !== null &&
         b.ending !== null &&

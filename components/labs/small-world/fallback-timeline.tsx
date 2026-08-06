@@ -24,22 +24,22 @@ export function FallbackTimeline() {
     <section data-testid="small-world-fallback" className={FALLBACK_CLASS} aria-label="Career journey">
       <style>{FALLBACK_STYLE}</style>
       <h1>Small World — a career in one lap of a tiny planet</h1>
+      {/* The same six chapters the scene tells, in plain markup. The manga pages
+          carry no information this list does not, so a visitor who never sees a
+          canvas loses the pictures and none of the story. */}
       <ol>
         {chapters.map((c) => (
           <li key={c.id}>
-            <h2>
-              {c.role} — {c.company}
-            </h2>
-            <p>
-              {c.period} · {c.location}
-            </p>
-            <p>{c.description}</p>
+            <h2>{c.theme}</h2>
+            <p>{c.caption}</p>
+            <p>{c.hook}</p>
             <ul>
-              {c.highlights.map((h) => (
-                <li key={h}>{h}</li>
+              {c.lines.map((line) => (
+                <li key={line}>{line}</li>
               ))}
             </ul>
-            <p>{c.technologies.join(', ')}</p>
+            <p>{c.stamps.join(' · ')}</p>
+            <p>{c.tech.join(', ')}</p>
           </li>
         ))}
       </ol>
