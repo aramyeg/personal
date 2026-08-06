@@ -99,8 +99,19 @@ describe('the lettering floor', () => {
       }
     }
     expect(worstPx).toBeLessThan(MIN_TEXT_PX)
-    expect(worstPx).toBeGreaterThan(6) // 6.78 today; a drop below 6 is a different problem
-    expect(worstAreaRatio).toBeGreaterThan(2)
+    expect(worstPx).toBeGreaterThan(6) // a drop below 6 is a different problem
+    // THE WALL IS STILL THERE AND IT MOVED, which is worth recording rather than
+    // re-baselining silently. It read 6.78px / 2.63x area when T73 measured it.
+    // Task 75's dialogue revision shortens several lines, and a shorter line fits
+    // the same printed interior at a LARGER size — so the worst balloon is now
+    // ~8.0px and needs ~1.88x the area rather than 2.63x. The phone still cannot
+    // reach 11px inside drawn ink (the first assertion above is the wall), but the
+    // gap the panel-at-a-time reader has to close got materially smaller, and it
+    // got smaller as a side effect of writing shorter dialogue rather than of any
+    // change to the type system. Anyone flooring these balloons is still trading
+    // away drawn ink; this is how much.
+    expect(worstAreaRatio).toBeGreaterThan(1.5)
+    expect(worstAreaRatio).toBeLessThan(2.8)
   })
 })
 

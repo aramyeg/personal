@@ -186,12 +186,26 @@ function Mark({ text, press }: { text: string; press: number }) {
  */
 function Tally({ count, label, press }: { count: number; label: string; press: number }) {
   const flags = Array.from({ length: count }, (_, i) => i)
+  // A FLAG'S SIZE IS A FUNCTION OF HOW MANY THERE ARE. Four pennants can be
+  // generous; thirteen at the same size are 390px of flag in a 330px panel, which
+  // wraps to a second row the panel then clips — captured, and it read as a ruler
+  // with one flag on it. 52cqw of total flag width, shared out, keeps any count on
+  // one line without making the small counts mean.
+  const w = Math.min(7, 52 / count)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.9cqw', width: '100%' }}>
       <div
         data-testid="sw-info-tally"
         data-count={count}
-        style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.6cqw 1.1cqw' }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          // `center`, not the flex default `stretch`: a stretched <svg> is a
+          // DISTORTED svg, and these are drawings.
+          alignItems: 'center',
+          gap: '0.6cqw 1.1cqw',
+        }}
       >
         {flags.map((i) => {
           // Each flag lands in turn, left to right, across the back half of the
@@ -202,9 +216,15 @@ function Tally({ count, label, press }: { count: number; label: string; press: n
             <svg
               key={i}
               viewBox="0 0 12 20"
-              width="7cqw"
+              // The size goes in the STYLE, not in the width/height attributes:
+              // `cqw` is a CSS unit and an SVG geometry attribute is not required
+              // to understand it. The aspect is declared here too, so the flag is
+              // never sized by whatever the flex line happens to be.
               style={{
                 display: 'block',
+                flex: '0 0 auto',
+                width: `${w}cqw`,
+                height: `${(w * 20) / 12}cqw`,
                 overflow: 'visible',
                 opacity: own,
                 transform: `translateY(${(1 - own) * -25}%)`,

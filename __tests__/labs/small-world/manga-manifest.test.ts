@@ -9,6 +9,16 @@ import {
   pageAspect,
 } from '@/components/labs/small-world/manga/lettering'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { withRevision } from '@/components/labs/small-world/manga/dialogue-revision'
+import { PAGE_0 } from '@/components/labs/small-world/manga/page-0'
+import { PAGE_1 } from '@/components/labs/small-world/manga/page-1'
+import { PAGE_2 } from '@/components/labs/small-world/manga/page-2'
+import { PAGE_3 } from '@/components/labs/small-world/manga/page-3'
+import { PAGE_4 } from '@/components/labs/small-world/manga/page-4'
+import { PAGE_5 } from '@/components/labs/small-world/manga/page-5'
+
+/** The manifests as AUTHORED — the pack's own lettering, before any revision layer. */
+const SOURCE: MangaPage[] = [PAGE_0, PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5]
 
 /**
  * The manifests place typeset words inside blank balloons that were DRAWN BY A
@@ -104,7 +114,20 @@ describe('manga page manifests', () => {
   })
 
   it('carries the story pack’s dialogue, and only the story pack’s dialogue', () => {
-    const lines = ALL.flatMap((p) => p.balloons.map((b) => b.text))
+    // THE GATE STILL HAS ITS TEETH, and it is now pointed at the right object.
+    //
+    // This asserts PROVENANCE: no line invented about a real person may reach her
+    // page. It used to read `MANGA_PAGES`, which was the same thing as the source
+    // manifests until Task 75 put Aram's proposed dialogue revision between them
+    // (`manga/dialogue-revision.ts` — a staged layer he judges from captures, with
+    // one flag back to the shipped wording).
+    //
+    // So provenance is asserted where it lives: the MANIFESTS still carry the pack
+    // verbatim, and every revision entry names the pack line it replaces and is
+    // checked against it in `dialogue-revision.test.ts`. Reading the composed
+    // pages here instead would have let this test do nothing but restate whatever
+    // the revision happened to say.
+    const lines = SOURCE.flatMap((p) => p.balloons.map((b) => b.text))
     expect(lines).toContain('Charts can tell me what people want…')
     expect(lines).toContain('It should be as easy as stacking blocks.')
     expect(lines).toContain('You can now.')
@@ -113,13 +136,26 @@ describe('manga page manifests', () => {
     expect(lines).toContain('There. Now it holds.')
     expect(lines).toContain('Look how far the meadow is from here.')
     expect(lines).toHaveLength(13)
-    const captions = ALL.flatMap((p) => p.captions.map((c) => c.text))
+    const captions = SOURCE.flatMap((p) => p.captions.map((c) => c.text))
     expect(captions).toEqual([
       'Her favorite thing to make: makers.',
       'Nobody notices a perfect stone. Everybody feels it.',
       'One design. Thirteen colors.',
       'These days, she watches everything at once.',
     ])
+  })
+
+  it('differs from the manifests by the revision and by nothing else', () => {
+    // The other half of the same guarantee: whatever the composed pages say, the
+    // ONLY thing standing between them and the pack is the reviewed list.
+    for (const [i, page] of SOURCE.entries()) {
+      expect(MANGA_PAGES[i].balloons.map((b) => b.text)).toEqual(
+        withRevision(page).balloons.map((b) => b.text)
+      )
+      expect(MANGA_PAGES[i].captions.map((c) => c.text)).toEqual(
+        withRevision(page).captions.map((c) => c.text)
+      )
+    }
   })
 
   it('sizes every line to something a reader can actually read', () => {

@@ -87,15 +87,38 @@ export type InfoPageSpec = {
 /**
  * The six pages.
  *
- * COPY PROVENANCE, because these are a real person's words about her own career:
- * every fact below is already in `alwina-story.ts`, which is transcribed from the
- * approved pack. What changed is PERSON and LENGTH — third to first, three lines
- * to one. No claim is added. The tech rows and the one formatting liberty
- * (`+30% smoother`, which the pack writes unsigned) are still on Aram's list to
- * confirm with her.
+ * ============================================================================
+ * COPY PROVENANCE — these are a real person's words about her own career
+ * ============================================================================
+ * Two sources, and every line below is one of them distilled, never invented:
+ *
+ *  - THE PACK, via `alwina-story.ts` (transcribed from the approved story pack).
+ *  - ARAM'S DRAFTS, a set of first-person lines he has been shown but has not yet
+ *    line-edited. They set the REGISTER this page is written in: first person,
+ *    humble, specific, no sermons.
+ *
+ * What changed from the pack is PERSON and LENGTH — third to first, three lines
+ * to one. No claim is added anywhere.
+ *
+ * EACH CHAPTER BELOW RECORDS ITS DRAFT AND ITS SHIPPED LINE as a pair, because
+ * Aram line-edits from captures and the useful question is "which of these two".
+ * Where the draft is what ships, it says so; where a tighter line won, the draft
+ * is kept underneath it so nothing has to be reconstructed from a diff. Two are
+ * flagged as genuinely open (chapters 1 and 3) — the drafts and mine say the same
+ * thing at different temperatures and that is his call, not mine.
+ *
+ * STILL UNCONFIRMED WITH HER: the tech rows, and the one formatting liberty
+ * (`+30% smoother`, which the pack writes unsigned). Chapter 5's rail now names
+ * React / PHP / AWS because Aram's own draft names them — better provenance than
+ * the stack I had inferred from the company.
  */
 export const INFO_PAGES: readonly InfoPageSpec[] = [
   // ── 1 · The Pull ────────────────────────────────────────────────────────────
+  // DRAFT:   "I studied marketing in Lyon. Somewhere between the lectures, I
+  //           started building things — and it stuck."
+  // SHIPPED: "I studied why people choose — then taught myself to build it."
+  // OPEN — Aram's call. The draft is warmer and names Lyon (which the footer
+  // already carries); mine is tighter and rhymes with the seedling above it.
   // Her hands and the seedling, cut out of her own first page: the chapter is a
   // beginning she made herself, and the picture says that without a word.
   {
@@ -139,6 +162,10 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   },
 
   // ── 2 · First Tools ─────────────────────────────────────────────────────────
+  // DRAFT:   "My first job: a drag-and-drop page builder, so the team didn't need
+  //           a developer for every small change."
+  // SHIPPED: the draft, distilled to one line. "A small change" keeps the humility
+  // the long version has and that my earlier "I built the builder" had lost.
   {
     rows: [
       {
@@ -168,7 +195,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       {
         h: 0.72,
         cells: [
-          { w: 1, panel: { kind: 'caption', text: 'I built the builder — so nobody else had to write the code.' } },
+          { w: 1, panel: { kind: 'caption', text: 'My first job: a page builder, so a small change didn’t need a developer.' } },
         ],
       },
     ],
@@ -176,6 +203,13 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   },
 
   // ── 3 · Taste ───────────────────────────────────────────────────────────────
+  // DRAFT:   "At a sports platform I learned how much the small stuff matters."
+  // SHIPPED: "I polish the stones people step on."
+  // OPEN — Aram's call. Mine is a metaphor and the art beside it is literally
+  // that stone, which is the argument for it; the draft is plainer and says
+  // where she was. The stamps carry the claim either way.
+  // The chisel. This is the chapter where the figures carry the page, so the
+  // stamps get a row to themselves and the picture is the reason to believe them.
   // The chisel. This is the chapter where the figures carry the page, so the
   // stamps get a row to themselves and the picture is the reason to believe them.
   {
@@ -215,6 +249,14 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   },
 
   // ── 4 · One Craft, Many Colors ──────────────────────────────────────────────
+  // DRAFT:   "One loyalty app, thirteen clients, each with their own colors — the
+  //           same craft underneath."
+  // SHIPPED: the draft, distilled; the flags carry "thirteen" so the sentence
+  // does not have to — a first cut kept the numeral and the panel above it said
+  // the same thing twice, which is the exact redundancy this page is against.
+  // CLIENTS, not "brands" — his word, and the more accurate one.
+  // Thirteen flags. The count IS the claim, and thirteen drawn pennants say it
+  // faster than the numeral does — and reward the reader who stops to count.
   // Thirteen flags. The count IS the claim, and thirteen drawn pennants say it
   // faster than the numeral does — and reward the reader who stops to count.
   {
@@ -232,9 +274,9 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
           },
         ],
       },
-      { h: 0.9, cells: [{ w: 1, panel: { kind: 'tally', count: 13, label: 'brands' } }] },
+      { h: 0.78, cells: [{ w: 1, panel: { kind: 'tally', count: 13, label: 'clients' } }] },
       {
-        h: 0.95,
+        h: 1.15,
         cells: [
           {
             w: 1,
@@ -248,11 +290,11 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
           },
         ],
       },
-      { h: 0.95, cells: [{ w: 1, panel: { kind: 'shelf', tools: ['React', 'Component library', 'Design system'] } }] },
+      { h: 0.82, cells: [{ w: 1, panel: { kind: 'shelf', tools: ['React', 'Component library', 'Design system'] } }] },
       {
         h: 0.72,
         cells: [
-          { w: 1, panel: { kind: 'caption', text: 'One library, thirteen brands — I gave each the same care.' } },
+          { w: 1, panel: { kind: 'caption', text: 'One loyalty app I built — each client in their own colors.' } },
         ],
       },
     ],
@@ -260,6 +302,12 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   },
 
   // ── 5 · Deeper ──────────────────────────────────────────────────────────────
+  // DRAFT:   "At Wooskill I went full-stack — React on top, PHP underneath, AWS
+  //           holding it all up."
+  // SHIPPED: the draft, distilled (the footer already says Wooskill). The RAIL
+  // now hangs React / PHP / AWS rather than the Frontend / Backend / Infrastructure
+  // I had inferred — his draft names the real stack, which is better provenance
+  // and a far better line on a CV.
   {
     rows: [
       {
@@ -293,12 +341,12 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       },
       {
         h: 0.95,
-        cells: [{ w: 1, panel: { kind: 'shelf', tools: ['Frontend', 'Backend', 'Infrastructure', 'Page builder'] } }],
+        cells: [{ w: 1, panel: { kind: 'shelf', tools: ['React', 'PHP', 'AWS'] } }],
       },
       {
         h: 0.72,
         cells: [
-          { w: 1, panel: { kind: 'caption', text: 'I went down to the foundations — and handed over the keys.' } },
+          { w: 1, panel: { kind: 'caption', text: 'I went full-stack — React on top, PHP underneath, AWS holding it up.' } },
         ],
       },
     ],
@@ -306,6 +354,10 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   },
 
   // ── 6 · The Observatory ─────────────────────────────────────────────────────
+  // DRAFT:   "Now I build dashboards full of live maps, camera feeds and data that
+  //           never sits still — and the infrastructure underneath them."
+  // SHIPPED: the draft, distilled. "Data that never sits still" is the best phrase
+  // in the set and it is the one thing the cut loses — worth his second look.
   {
     rows: [
       {
@@ -335,7 +387,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       {
         h: 0.72,
         cells: [
-          { w: 1, panel: { kind: 'caption', text: 'Live maps, live cameras — the whole picture is mine to keep.' } },
+          { w: 1, panel: { kind: 'caption', text: 'I build live maps and camera feeds — and the infrastructure under them.' } },
         ],
       },
     ],
