@@ -122,6 +122,24 @@ export function stopOffsets(total: number): number[] {
   return STORY_STOP_PROGRESS.map((p) => trackOffsetFor(p, total))
 }
 
+/**
+ * Where a tap on chapter `c`'s card should land — the SAME place a fling from there lands.
+ *
+ * Tap-to-advance used to aim at the next chapter's BOUNDARY, which was right while a checkpoint
+ * sat at the end of a slice and merely inherited afterwards: it drops the reader at local 0 of the
+ * next biome, with the whole approach still to scroll and no card up. Once a fling settles on a
+ * story stop, a tap that lands somewhere else makes the stops look arbitrary — two affordances for
+ * "go on" with two different destinations. So both use this.
+ *
+ * PAST THE LAST CHECKPOINT IT IS THE JOURNEY'S END, not a seventh stop. There is no stop in the
+ * walk-out and none in the ending — the same rule the snap areas obey — so a tap on the last card
+ * hands the reader to the ending's first frame exactly as it always did.
+ */
+export function advanceTargetFrom(chapter: number): number {
+  const next = chapter + 1
+  return next < CHAPTER_COUNT ? STORY_STOP_PROGRESS[next] : 1
+}
+
 /** Whether the mechanism may exist at all on this device. */
 export function storyStopsAvailable(coarsePointer: boolean, reducedMotion: boolean): boolean {
   return coarsePointer && !reducedMotion

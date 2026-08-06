@@ -11,6 +11,10 @@ import {
   PANEL_END,
   chapterDwellProgress,
 } from '@/components/labs/small-world/journey-timeline'
+import {
+  STORY_STOP_PROGRESS,
+  advanceTargetFrom,
+} from '@/components/labs/small-world/story-stops'
 import type { ArrivalJourney } from '@/components/labs/small-world/use-arrival-journey'
 
 /** A driver holding one reveal, so a RETRACTING spread can be rendered at a chosen progress. */
@@ -64,11 +68,17 @@ describe('JourneyOverlay', () => {
     // unclickable at every dwell. Advance now fires from the canvas via r3f's `onPointerMissed` —
     // i.e. on a click that hit no interactive object — so this exercises that path instead. The
     // assertion is unchanged: a tap while chapter 1's panel is up advances to chapter 2.
+    //
+    // Task 75 moved WHERE it advances to, and the reason is the story stops: a fling settles on
+    // chapter 2's checkpoint, so a tap has to land there too rather than at the boundary before
+    // it, which left the reader with a whole approach still to scroll and no card up.
     const ref = { current: chapterDwellProgress(0) }
     const onAdvance = vi.fn()
     render(<JourneyOverlay progressRef={ref} onAdvance={onAdvance} />)
     firePanelAdvance()
-    expect(onAdvance).toHaveBeenCalledWith(1 / 6)
+    expect(onAdvance).toHaveBeenCalledWith(chapterDwellProgress(1))
+    expect(onAdvance).toHaveBeenCalledWith(advanceTargetFrom(0))
+    expect(onAdvance).toHaveBeenCalledWith(STORY_STOP_PROGRESS[1])
   })
 
   it('does NOT advance from a DOM click on the panel — the canvas owns the pointer now', () => {
@@ -149,6 +159,10 @@ describe('JourneyOverlay', () => {
   it('still arms tap-to-advance for the same spread one frame before the ending', () => {
     // The control for the test above: the ONLY thing that changed is which side of progress 1 the
     // retraction is on. At 1 exactly — the journey's last frame — the tap is live as always.
+    //
+    // And it still advances to 1, not to a seventh story stop: there is no stop in the walk-out or
+    // the ending, so the last card hands the reader to the ending's first frame exactly as before
+    // (`advanceTargetFrom` carries that rule for both the tap and the snap areas).
     const journey = fakeJourney(1, { chapter: CHAPTER_COUNT - 1, t: 0.6, phase: 'out' })
     const onAdvance = vi.fn()
     render(
@@ -158,6 +172,7 @@ describe('JourneyOverlay', () => {
     expect(panelTapArmed()).toBe(true)
     firePanelAdvance()
     expect(onAdvance).toHaveBeenCalledWith(1)
+    expect(advanceTargetFrom(CHAPTER_COUNT - 1)).toBe(1)
   })
 
   it('lets chapter 6 finish its dwell — the ending no longer truncates the last cards', () => {

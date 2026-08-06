@@ -1,6 +1,6 @@
 'use client'
 import type { MutableRefObject } from 'react'
-import { CHAPTER_COUNT, chapters } from '../chapters'
+import { chapters } from '../chapters'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
@@ -8,6 +8,7 @@ import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
+import { advanceTargetFrom } from '../story-stops'
 import { useJourneyUi } from './use-journey-ui'
 
 /** Set false to remove the bottom progress rail entirely (one-line revert). */
@@ -54,7 +55,10 @@ export function JourneyOverlay({
           index={ui.panel.chapter}
           enter={ui.panel.enter}
           onAdvance={
-            ui.ending ? null : () => onAdvance((ui.panel!.chapter + 1) / CHAPTER_COUNT)
+            /* The next STORY STOP, not the next chapter's boundary (Task 75): a tap and a fling
+               have to land in the same place or the stops read as arbitrary. `advanceTargetFrom`
+               owns both that and the last card's hand-off to the ending. */
+            ui.ending ? null : () => onAdvance(advanceTargetFrom(ui.panel!.chapter))
           }
         />
       )}

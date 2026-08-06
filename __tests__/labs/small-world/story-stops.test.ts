@@ -13,6 +13,7 @@ import {
 import {
   FLING_VELOCITY,
   STORY_STOP_PROGRESS,
+  advanceTargetFrom,
   flingArmed,
   stopOffsets,
   storyStopsAvailable,
@@ -79,6 +80,22 @@ describe('where the stops are', () => {
       expect(offsets[0]).toBeGreaterThan(0)
       expect(offsets[CHAPTER_COUNT - 1]).toBeLessThan(total / TRACK_END)
     }
+  })
+})
+
+describe('a tap goes where a fling goes', () => {
+  it('sends a tap to the NEXT story stop, not to the boundary before it', () => {
+    for (let c = 0; c < CHAPTER_COUNT - 1; c++) {
+      expect(advanceTargetFrom(c)).toBe(STORY_STOP_PROGRESS[c + 1])
+      // The old target — local 0 of the next chapter — left the reader with the whole approach
+      // still to scroll and no card up. It is strictly earlier than the stop, every chapter.
+      expect(advanceTargetFrom(c)).toBeGreaterThan((c + 1) / CHAPTER_COUNT)
+    }
+  })
+
+  it('hands the last card to the ending rather than inventing a seventh stop', () => {
+    expect(advanceTargetFrom(CHAPTER_COUNT - 1)).toBe(1)
+    expect(STORY_STOP_PROGRESS).toHaveLength(CHAPTER_COUNT)
   })
 })
 
