@@ -34,6 +34,9 @@ import {
   ndcYAt,
   portraitWeight,
   zoomFactorFor,
+  zoomForGlobeFrame,
+  aimForZoom,
+  endingAimTargetFor,
 } from '@/components/labs/small-world/scene/camera'
 import {
   PARALLAX_PITCH_MAX,
@@ -428,7 +431,7 @@ describe('the portrait fork leaves the approved frame exactly where it was', () 
   it('reaches exactly the portrait zoom at the bottom of the track, monotonically', () => {
     for (const a of PHONE_ASPECTS) {
       expect(endingCameraDistanceFor(endingStateAt(TRACK_END), a)).toBeCloseTo(
-        CAMERA_DISTANCE * ZOOM_FACTOR_PORTRAIT,
+        CAMERA_DISTANCE * zoomFactorFor(a),
         10
       )
     }
@@ -440,8 +443,61 @@ describe('the portrait fork leaves the approved frame exactly where it was', () 
         prev = d
       }
     }
-    // ...and it is a REAL divergence rather than a rounding one
-    expect(ZOOM_FACTOR_PORTRAIT / ZOOM_FACTOR).toBeGreaterThan(1.15)
+    // ...and the solve that would diverge still does — see the identity block above.
+    expect(CANDIDATE_ZOOM / ZOOM_FACTOR).toBeGreaterThan(1.15)
+  })
+})
+
+/**
+ * PHASE 1 SHIPS PORTRAIT EQUAL TO LANDSCAPE, ON PURPOSE.
+ *
+ * `GLOBE_FRAME_PORTRAIT = GLOBE_FRAME`: the 0.30 that was measured and captured is
+ * a real trade (36% more frame width for 45% of Aram's note's lettering) and it is
+ * a taste call NOBODY MADE — Aram's redirect puts a human-scale Alwina behind the
+ * desk in phase 2, which changes what a portrait frame anchors to, so the call was
+ * held and the branch must not carry it.
+ *
+ * Withdrawing the number must not withdraw the GATES on the arithmetic under it.
+ * So every assertion that proves the fork actually composes now evaluates a
+ * CANDIDATE pose built from the same exported solvers the shipped one uses. They
+ * keep their full force, they keep the measured numbers on the record, and phase 2
+ * makes them describe the shipped pose again by changing one constant.
+ */
+const CANDIDATE_GLOBE_FRAME = 0.3
+const CANDIDATE_ZOOM = zoomForGlobeFrame(CANDIDATE_GLOBE_FRAME)
+const CANDIDATE_AIM = aimForZoom(CANDIDATE_ZOOM)
+
+describe('the portrait fork is currently an IDENTITY, deliberately', () => {
+  it('ships the landscape ZOOM at every aspect, bit for bit', () => {
+    // The zoom is a closed form, so equal targets give equal values exactly.
+    for (const a of [...PHONE_ASPECTS, ...BAND_ASPECTS, 1.6, 16 / 9, 4]) {
+      expect(Object.is(zoomFactorFor(a), ZOOM_FACTOR)).toBe(true)
+    }
+    expect(Object.is(ZOOM_FACTOR_PORTRAIT, ZOOM_FACTOR)).toBe(true)
+  })
+
+  it('ships the landscape AIM to the solvers` own resolution, and exactly on desktop', () => {
+    // THE TWO AIMS ARE NOT THE SAME EQUATION, which is worth knowing rather than
+    // hiding: the landscape aim bisects on the GLOBE's lower tangent sitting
+    // STAND_GAP above the desk edge, the portrait aim bisects on the DESK EDGE
+    // landing at DESK_EDGE_V. They agree in intent and to about 1e-9 in value,
+    // but not in the last bits, so equal targets do not make them `Object.is`.
+    //
+    // What DOES have to be exact is the desktop path, and it is: `portraitWeight`
+    // is exactly 0 at and above LANDSCAPE_ASPECT and `mix(a, b, 0)` is `1·a + 0·b`.
+    for (const a of [1, 1.6, 16 / 9, 4]) {
+      expect(Object.is(endingAimTargetFor(a), ENDING_AIM_DROP)).toBe(true)
+    }
+    for (const a of [...PHONE_ASPECTS, ...BAND_ASPECTS]) {
+      expect(Math.abs(endingAimTargetFor(a) - ENDING_AIM_DROP)).toBeLessThan(1e-6)
+    }
+    expect(Math.abs(ENDING_AIM_DROP_PORTRAIT - ENDING_AIM_DROP)).toBeLessThan(1e-6)
+  })
+
+  it('still solves a DIFFERENT pose the moment a portrait target is authored', () => {
+    // The machinery is live, not commented out: give it a real target and it moves.
+    expect(CANDIDATE_ZOOM / ZOOM_FACTOR).toBeGreaterThan(1.15)
+    expect(CANDIDATE_AIM).toBeLessThan(ENDING_AIM_DROP)
   })
 })
 
@@ -461,16 +517,16 @@ describe('the portrait composition is SOLVED from its one authored number', () =
     // 0.355 on a laptop, 0.301 against 0.300 on a phone. That is the same 0.8% at both, which is
     // the claim worth making: the two poses realise their targets to the SAME fidelity, so the
     // portrait solve is the landscape solve at a different number rather than a looser one.
-    const g = globeEdgesAt(ZOOM_FACTOR_PORTRAIT, ENDING_AIM_DROP_PORTRAIT)
+    const g = globeEdgesAt(CANDIDATE_ZOOM, CANDIDATE_AIM)
     const l = globeEdgesAt(ZOOM_FACTOR, ENDING_AIM_DROP)
-    expect((g.top - g.bot) / 2).toBeCloseTo(GLOBE_FRAME_PORTRAIT, 2)
+    expect((g.top - g.bot) / 2).toBeCloseTo(CANDIDATE_GLOBE_FRAME, 2)
     expect((l.top - l.bot) / 2).toBeCloseTo(GLOBE_FRAME, 2)
     // both overshoot, and by under a percent
-    expect((g.top - g.bot) / 2 / GLOBE_FRAME_PORTRAIT).toBeLessThan(1.01)
+    expect((g.top - g.bot) / 2 / CANDIDATE_GLOBE_FRAME).toBeLessThan(1.01)
     expect((l.top - l.bot) / 2 / GLOBE_FRAME).toBeLessThan(1.01)
-    // The phone's world is SMALLER in the frame. That is the price of the whole fork and it is
-    // the only thing the phone spends.
-    expect(GLOBE_FRAME_PORTRAIT).toBeLessThan(GLOBE_FRAME)
+    // The phone's world would be SMALLER in the frame. That is the price of the whole fork and
+    // the only thing the phone spends — held, not spent, in phase 1.
+    expect(CANDIDATE_GLOBE_FRAME).toBeLessThan(GLOBE_FRAME)
   })
 
   it('gives the desk the SAME share of a phone`s frame it owns of a laptop`s', () => {
@@ -508,14 +564,12 @@ describe('the portrait composition is SOLVED from its one authored number', () =
     // less than 0.0003 across the entire usable aim range, so a bisection on it would be solving
     // a singular equation. It is reported instead — and gated positive, which is the part that
     // means "the world is seated on its stand rather than sinking behind the desk".
-    expect(STAND_GAP_PORTRAIT).toBeGreaterThan(0.04)
-    expect(STAND_GAP_PORTRAIT).toBeLessThan(STAND_GAP)
-    const g = globeEdgesAt(ZOOM_FACTOR_PORTRAIT, ENDING_AIM_DROP_PORTRAIT)
-    expect(STAND_GAP_PORTRAIT).toBeCloseTo(g.bot - DESK_EDGE_V, 12)
+    const candidateGap = globeEdgesAt(CANDIDATE_ZOOM, CANDIDATE_AIM).bot - DESK_EDGE_V
+    expect(candidateGap).toBeGreaterThan(0.04)
+    expect(candidateGap).toBeLessThan(STAND_GAP)
     // the singularity itself, measured rather than asserted
     const gapAt = (aim: number) =>
-      globeEdgesAt(ZOOM_FACTOR_PORTRAIT, aim).bot -
-      ndcYAt(DESK_EDGE_POINT, ZOOM_FACTOR_PORTRAIT, aim)
+      globeEdgesAt(CANDIDATE_ZOOM, aim).bot - ndcYAt(DESK_EDGE_POINT, CANDIDATE_ZOOM, aim)
     expect(Math.abs(gapAt(0.5) - gapAt(4))).toBeLessThan(0.0005)
   })
 
@@ -532,16 +586,12 @@ describe('the portrait composition is SOLVED from its one authored number', () =
     ]) {
       const a = w / h
       const before = halfWidthAt(9.5, a, ZOOM_FACTOR, ENDING_AIM_DROP)
-      const after = halfWidthAt(9.5, a, cameraZoomScaleFor(e, a), endingAimDropFor(e, a))
+      const after = halfWidthAt(9.5, a, CANDIDATE_ZOOM, CANDIDATE_AIM)
       expect(after / before, `frame width gain at ${w}×${h}`).toBeGreaterThan(1.3)
       // the donut and the tool are in the picture, at their own depths
-      expect(halfWidthAt(11.4, a, cameraZoomScaleFor(e, a), endingAimDropFor(e, a))).toBeGreaterThan(
-        1.46
-      )
+      expect(halfWidthAt(11.4, a, CANDIDATE_ZOOM, CANDIDATE_AIM)).toBeGreaterThan(1.46)
       // ...and Aram's note stops being cropped: it is 2.37 wide, yawed, centred at x = 0.06
-      expect(
-        halfWidthAt(10.55, a, cameraZoomScaleFor(e, a), endingAimDropFor(e, a))
-      ).toBeGreaterThan(1.31)
+      expect(halfWidthAt(10.55, a, CANDIDATE_ZOOM, CANDIDATE_AIM)).toBeGreaterThan(1.31)
     }
     // ...while the laptop's frame is exactly the one it was
     expect(

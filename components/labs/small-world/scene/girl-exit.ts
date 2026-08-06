@@ -13,8 +13,18 @@ import { STANCE_ALPHA } from './renewal'
 import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline'
 
 /**
- * ALWINA LEAVES THE WORLD (Task 76) — the girl walks off the clay planet and ends
- * up ON THE DESK, a third figure among her own figurines.
+ * ALWINA LEAVES THE WORLD (Task 76) — the girl walks off the clay planet, over its
+ * far crest, and is gone.
+ *
+ * WHAT PHASE 1 SHIPS, AND WHAT THIS MODULE STILL CONTAINS. The exit is live and
+ * gated. The ARRIVAL is not: `GIRL_DESK_MOUNTED` is false, because Aram's ruling
+ * is that she belongs BEHIND the desk at human scale rather than on it at
+ * figurine scale, and two measurements say the GLB cannot yet be that person. She
+ * arrives in ink instead (`overlay/ink-arrival.ts`). Everything the desk arrival
+ * needed is kept, gated and re-enabled by one flag — see `GIRL_DESK_MOUNTED`.
+ *
+ * The rest of this header describes both halves, because the exit's derivation
+ * only makes sense next to the transfer it was solved for.
  *
  * ============================================================================
  * WHY SHE CANNOT SIMPLY BE MOVED
@@ -273,6 +283,30 @@ export const DESK_STAGINGS: readonly DeskStaging[] = [
 export const GIRL_DESK_STAGING: DeskStaging = DESK_STAGINGS[0]
 
 /**
+ * WHETHER SHE IS DRAWN ON THE DESK AT ALL — false, and the reason is a ruling
+ * rather than a defect.
+ *
+ * The desk-scale arrival below was built, captured and approved on craft, and
+ * then rejected at the vision level: Aram's note is "Alwi is the one that should
+ * be actually behind the desk, it is her office" — she is the HUMAN the desk
+ * belongs to, not a third figurine among her own keepsakes. Two measurements then
+ * showed the 3D girl cannot yet be that human (no face at the pixel density a
+ * behind-desk head demands; and 0.36 m of frame headroom against the 0.90 m a
+ * standing adult needs — `task-76-report.md` carries both with captures).
+ *
+ * So phase 1 ships the half that is not in doubt: she LEAVES the world, over the
+ * crest, exactly as staged and gated — and she arrives in INK instead, on the
+ * epilogue page (`overlay/ink-arrival.ts`). She simply does not reappear in three
+ * dimensions.
+ *
+ * Everything the arrival needed is kept and still gated: the free-lane map, the
+ * float solve, the scale ratios, the two candidate paths. Phase 2 re-enables this
+ * with one flag when Aram's re-export lands and the reframe has been priced —
+ * which is exactly why it is a flag and not a deletion.
+ */
+export const GIRL_DESK_MOUNTED = false
+
+/**
  * WHERE SHE IS ALLOWED TO STAND, and why it is such a small place.
  *
  * The desk's free floor was MEASURED rather than assumed: `bench/clearance` walks
@@ -437,7 +471,7 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
   if (reduced) {
     return {
       stage: 'desk',
-      visible: true,
+      visible: GIRL_DESK_MOUNTED,
       theta: STANCE_ALPHA,
       x: stg.to[0],
       z: stg.to[1],
@@ -475,7 +509,7 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
   const turn = smootherstep(across(t, GIRL_DESK_SETTLED - GIRL_DESK_TURN, GIRL_DESK_SETTLED))
   return {
     stage: 'desk',
-    visible: t >= GIRL_DESK_REVEAL,
+    visible: GIRL_DESK_MOUNTED && t >= GIRL_DESK_REVEAL,
     theta: STANCE_ALPHA,
     x,
     z,

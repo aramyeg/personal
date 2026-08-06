@@ -131,7 +131,14 @@ export const DESK_EDGE_V = DESK_FRAME * 2 - 1
  * since every gate is saturated at ROTATION_TOTAL. The sky follows the zoom for
  * free (see `cameraZoomScale`).
  */
-const zoomForGlobeFrame = (globeFrame: number): number => {
+/**
+ * Exported so a gate can build a CANDIDATE portrait pose without re-deriving the
+ * solve. Phase 1 ships portrait equal to landscape (see GLOBE_FRAME_PORTRAIT), so
+ * the tests that prove the fork actually composes have to evaluate it at a target
+ * nothing currently ships — otherwise withdrawing the taste call would silently
+ * withdraw the gates that check the arithmetic under it.
+ */
+export const zoomForGlobeFrame = (globeFrame: number): number => {
   const u = globeFrame * TAN_HALF_FOV
   return WORLD_RADIUS * Math.sqrt(1 + u * u) / (CAMERA_DISTANCE * u)
 }
@@ -315,8 +322,25 @@ export function portraitWeight(aspect: number): number {
   return smoothstep((LANDSCAPE_ASPECT - aspect) / (LANDSCAPE_ASPECT - PORTRAIT_ASPECT))
 }
 
-/** The world's silhouette as a fraction of the viewport HEIGHT at full pull-back, ON A PHONE. */
-export const GLOBE_FRAME_PORTRAIT = 0.3
+/**
+ * The world's silhouette as a fraction of the viewport HEIGHT at full pull-back,
+ * ON A PHONE — and it is deliberately the LANDSCAPE target, so the fork below is
+ * live machinery carrying no opinion.
+ *
+ * 0.30 was measured, captured and priced (see `task-76-report.md`): it widens the
+ * phone's frame 36% and brings the dish, donut, tool and the plasticine box's
+ * corner in, at the cost of 45% of Aram's note's lettering. It is a real trade
+ * with numbers on both sides — and it is a TASTE CALL NOBODY HAS MADE. Aram's
+ * redirect put a human-scale Alwina behind the desk in phase 2, which changes
+ * what a portrait frame should anchor to, so the call was explicitly held.
+ *
+ * A branch must not carry an opinion nobody formed. Set equal to `GLOBE_FRAME`,
+ * `zoomFactorFor` and `endingAimTargetFor` return the landscape values at EVERY
+ * aspect — `mix(a, a, w)` is `(1−w)·a + w·a` — so the portrait pose is the
+ * landscape pose exactly, the sweeps below still gate the fork's arithmetic, and
+ * restoring the trade is one number when the phase-2 reframe is priced.
+ */
+export const GLOBE_FRAME_PORTRAIT = GLOBE_FRAME
 
 /** ...which solves the portrait pull-back in the same closed form GLOBE_FRAME does. */
 export const ZOOM_FACTOR_PORTRAIT = zoomForGlobeFrame(GLOBE_FRAME_PORTRAIT)
@@ -370,6 +394,19 @@ export const DESK_EDGE_POINT: readonly [number, number, number] = (() => {
  * UP the frame, with no turning point anywhere in [0, 12] at any zoom the blend can
  * produce — so the bisection is honest. It runs once, at module load.
  */
+/** The aim that seats the desk's back edge at DESK_FRAME for any zoom — the
+ *  portrait solve, exposed for the same reason `zoomForGlobeFrame` is. */
+export function aimForZoom(k: number): number {
+  let lo = 0
+  let hi = 12
+  for (let i = 0; i < 90; i++) {
+    const mid = (lo + hi) / 2
+    if (ndcYAt(DESK_EDGE_POINT, k, mid) < DESK_EDGE_V) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+}
+
 export const ENDING_AIM_DROP_PORTRAIT = (() => {
   let lo = 0
   let hi = 12

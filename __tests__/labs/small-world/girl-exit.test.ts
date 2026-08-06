@@ -19,6 +19,7 @@ import {
   CAMERA_THETA,
   DESK_STAGINGS,
   GIRL_DESK_HEIGHT,
+  GIRL_DESK_MOUNTED,
   GIRL_DESK_REVEAL,
   GIRL_DESK_SCALE,
   GIRL_DESK_SEAT_Y,
@@ -357,7 +358,10 @@ describe('reduced motion gets the ending without the performance', () => {
     for (let i = 1; i <= 1000; i++) {
       const pose = girlPoseAt(endingStateAt(1 + (i / 1000) * ENDING_SPAN), true)
       expect(pose.stage).toBe('desk')
-      expect(pose.visible).toBe(true)
+      // Drawn only while the desk arrival is MOUNTED. Phase 1 ships it off (she
+      // arrives in ink instead) and the flag is what phase 2 flips — so this
+      // follows the flag rather than restating a literal that would then lie.
+      expect(pose.visible).toBe(GIRL_DESK_MOUNTED)
       expect(Object.is(pose.moving, 0)).toBe(true)
       expect(Object.is(pose.walked, 0)).toBe(true)
       expect(Object.is(pose.x, GIRL_DESK_STAGING.to[0])).toBe(true)
@@ -437,5 +441,42 @@ describe('the walk over the crest cannot be clipped by a retune', () => {
     expect(GIRL_TURN_END).toBeLessThanOrEqual(GIRL_WALK_END)
     expect(atExactly(GIRL_TURN_END).yaw).toBeCloseTo(Math.PI, 9)
     expect(Object.is(atExactly(GIRL_TURN_END).theta, STANCE_ALPHA)).toBe(true)
+  })
+})
+
+/**
+ * PHASE 1 SHIPS THE EXIT WITHOUT THE ARRIVAL (Aram's redirect). She leaves the
+ * world and does not come back in three dimensions; the epilogue page carries her
+ * return (`overlay/ink-arrival.ts`). Everything the arrival needed is still
+ * derived and still gated above — these hold the SHIPPED state, so that neither
+ * half can drift while the other waits.
+ */
+describe('the desk arrival is built, gated, and not mounted', () => {
+  it('draws nothing on the desk at any point in the ending', () => {
+    for (let i = 0; i <= 1500; i++) {
+      const pose = poseAtT(i / 1500)
+      if (pose.stage === 'desk') expect(pose.visible).toBe(false)
+    }
+  })
+
+  it('still leaves her ON the planet, and drawn, for the whole exit', () => {
+    // The half that ships. If a future edit disabled the girl wholesale rather
+    // than only her arrival, this is what would catch it.
+    let globeFrames = 0
+    for (let i = 0; i <= 1500; i++) {
+      const pose = poseAtT(i / 1500)
+      if (pose.stage === 'globe') {
+        expect(pose.visible).toBe(true)
+        globeFrames++
+      }
+    }
+    expect(globeFrames).toBeGreaterThan(300)
+  })
+
+  it('keeps every number the arrival was solved from, so phase 2 is one flag', () => {
+    expect(GIRL_DESK_MOUNTED).toBe(false)
+    expect(GIRL_DESK_HEIGHT).toBeGreaterThan(0)
+    expect(GIRL_DESK_REVEAL).toBeGreaterThan(GIRL_TRANSFER)
+    expect(deskFloatFor(GIRL_DESK_STAGING)).toBeLessThanOrEqual(0)
   })
 })

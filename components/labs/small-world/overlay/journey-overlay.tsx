@@ -5,10 +5,12 @@ import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
 import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
+import { EndingInk } from './ending-ink'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
 import { advanceTargetFrom } from '../story-stops'
 import { useJourneyUi } from './use-journey-ui'
+import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 
 /** Set false to remove the bottom progress rail entirely (one-line revert). */
 const SHOW_PROGRESS_RAIL = true
@@ -25,6 +27,7 @@ export function JourneyOverlay({
   onAdvance: (targetProgress: number) => void
 }) {
   const ui = useJourneyUi(progressRef, journey)
+  const reduced = usePrefersReducedMotion()
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
@@ -73,6 +76,13 @@ export function JourneyOverlay({
           data-phase={ui.ending.phase}
           style={{ position: 'absolute', inset: 0 }}
         >
+          {/* THE INK ARRIVAL (Task 76). The last page of the book the chapters were,
+              and the one place in this story where her face is right — the 3D girl
+              leaves the world over the crest and does not come back in three
+              dimensions. `ending-ink.tsx` carries the DOM, `ink-arrival.ts` the
+              argument and the staging. It is drawn BEFORE the connect note so the
+              note and the pills always sit on top of it. */}
+          <EndingInk t={ui.ending.t} reduced={reduced} />
           <EndingConnect t={ui.ending.t} onRestart={() => onAdvance(0)} />
         </div>
       )}
