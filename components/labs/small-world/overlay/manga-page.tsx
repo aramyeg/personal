@@ -108,7 +108,7 @@ export function MangaPageArt({
       {page.captions.map((caption, i) => {
         const shown = typedLength(caption.text, caption.panel, elapsed)
         if (shown <= 0) return null
-        return <CaptionBox key={`${page.id}-c${i}`} caption={caption} page={page} shown={shown} />
+        return <CaptionBox key={`${page.id}-c${i}`} caption={caption} shown={shown} />
       })}
     </div>
   )

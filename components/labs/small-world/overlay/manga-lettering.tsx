@@ -165,7 +165,10 @@ export function BalloonText({
  * the three places the pink is allowed on a page (trim, stamp ink, caption
  * rule), and never baked into the artwork.
  */
-export function CaptionBox({ caption, page, shown }: { caption: Caption; page: MangaPage; shown: number }) {
+export function CaptionBox({ caption, shown }: { caption: Caption; shown: number }) {
+  // Sized from the line's LENGTH rather than from its box: unlike a balloon,
+  // this box has no ceiling — it is drawn by the site, so a long caption simply
+  // makes it taller instead of having to fit inside someone else's ink.
   const font = Math.min(3.1, Math.max(2.2, 26 / caption.text.length + 1.5))
   const style: CSSProperties = {
     position: 'absolute',
