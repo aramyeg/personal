@@ -3,10 +3,13 @@ import {
   STUDIO_ENV_FLOOR,
   STUDIO_LIGHTS_FULL,
   STUDIO_LIGHTS_START,
+  gradeHoldFor,
   studioEnvIntensity,
   studioLightsAt,
   studioLightsFor,
 } from '@/components/labs/small-world/scene/desk-studio'
+import { releasedLightMix } from '@/components/labs/small-world/scene/biome-atmosphere'
+import { BIOME_MOODS, LIGHT_MIX_MAX } from '@/components/labs/small-world/overlay/grade-mood'
 import {
   ENDING_IDLE,
   TRACK_END,
@@ -105,6 +108,68 @@ describe("the metal's environment follows the same number", () => {
     for (let i = 0; i <= 100; i++) {
       const u = i / 100
       expect(studioEnvIntensity(u)).toBeCloseTo(STUDIO_ENV_FLOOR + (1 - STUDIO_ENV_FLOOR) * u, 12)
+    }
+  })
+})
+
+
+describe("the winter tint's release rides the same number, inverted (Task 71)", () => {
+  it('is EXACTLY 1 for the whole journey and the whole still beat', () => {
+    // The graded world has to be bit-for-bit what it was before this existed, everywhere the
+    // journey owns. `Object.is` rather than a tolerance, for the same reason the camera gate uses
+    // it: "close to unchanged" is not unchanged.
+    for (let i = 0; i <= 4000; i++) {
+      const p = (i / 4000) * ZOOM_FIRST_MOVE
+      expect(Object.is(gradeHoldFor(endingStateAt(p)), 1)).toBe(true)
+    }
+    expect(Object.is(gradeHoldFor(ENDING_IDLE), 1)).toBe(true)
+  })
+
+  it('is EXACTLY 0 at the money shot, so the last frame is a settled one', () => {
+    expect(Object.is(gradeHoldFor(endingStateAt(TRACK_END)), 0)).toBe(true)
+  })
+
+  it('is the studio lights and nothing else — one clock, not a second curve', () => {
+    for (let i = 0; i <= 2000; i++) {
+      const e = endingStateAt((i / 2000) * TRACK_END)
+      expect(gradeHoldFor(e)).toBe(1 - studioLightsFor(e))
+    }
+  })
+
+  it('lets go monotonically and retraces itself exactly backwards', () => {
+    const down: number[] = []
+    let prev = 2
+    for (let i = 0; i <= 3000; i++) {
+      const v = gradeHoldFor(endingStateAt((i / 3000) * TRACK_END))
+      expect(v).toBeLessThanOrEqual(prev)
+      prev = v
+      down.push(v)
+    }
+    for (let i = 3000; i >= 0; i--) {
+      expect(Object.is(gradeHoldFor(endingStateAt((i / 3000) * TRACK_END)), down[i])).toBe(true)
+    }
+  })
+
+  it('relaxes the MIX and can never push it past the grade rail', () => {
+    // The release scales how far the lights travel toward a pale cast. It cannot raise that mix,
+    // and it cannot touch the intensities — so nothing about the ending can make the scene darker
+    // or push a mood past LIGHT_MIX_MAX, which is what keeps the clay reading as its own clay.
+    for (const mood of BIOME_MOODS) {
+      for (let i = 0; i <= 200; i++) {
+        const hold = gradeHoldFor(endingStateAt((i / 200) * TRACK_END))
+        const mix = releasedLightMix(mood.lightMix, hold)
+        expect(mix).toBeLessThanOrEqual(mood.lightMix)
+        expect(mix).toBeLessThanOrEqual(LIGHT_MIX_MAX)
+        expect(mix).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('ends on the UNGRADED light, not on a new one nobody has judged', () => {
+    // At the money shot the mix is exactly 0, so the key and the ambient are GRADE_BASE — the
+    // colours the lab opens on — rather than some studio-specific light invented for the ending.
+    for (const mood of BIOME_MOODS) {
+      expect(Object.is(releasedLightMix(mood.lightMix, gradeHoldFor(endingStateAt(TRACK_END))), 0)).toBe(true)
     }
   })
 })

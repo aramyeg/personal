@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
+import { gradeHoldFor } from './desk-studio'
 import { Sky } from './sky'
 import type { JourneyRef } from './use-journey'
 
@@ -51,6 +52,26 @@ function target(b: MoodBlend): THREE.Color {
   return SCRATCH.copy(MOOD_CAST[b.fromIndex]).lerp(MOOD_CAST[b.toIndex], b.mix)
 }
 
+/**
+ * THE GRADE LETS GO OF THE LIGHT AS THE STUDIO ARRIVES (Task 71).
+ *
+ * `moodBlendAt` clamps at progress 1, so through the whole ending it holds WINTER's cold pale cast —
+ * correct for a girl walking a snow wedge, wrong for a clay figurine standing on a desk in a lit
+ * studio, and measured at 39-53% under the approved render on the note, the bluebird and the planet.
+ * Aram's decision was BRIGHTEN, so the tint is scaled by how much of the journey is still on the
+ * frame: exactly 1 through the journey and the still beat, exactly 0 at the money shot.
+ *
+ * A MIX, NOT AN INTENSITY. What relaxes is how far the lights travel toward the mood's pale cast;
+ * the two intensities are untouched, exactly as the grade's own rail requires. So the ending's light
+ * returns to `GRADE_BASE` — the ungraded key and ambient the lab opens on — rather than to some new
+ * studio-specific light nobody has judged. Nothing here can make the scene darker, and the toon ramp
+ * keeps banding at the same thresholds.
+ *
+ * Exported as a pure function of the two inputs so `biome-grade.test.tsx` can hold the release to
+ * the same ends the grade itself is held to, without a canvas.
+ */
+export const releasedLightMix = (lightMix: number, hold: number): number => lightMix * hold
+
 export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
   const key = useRef<THREE.DirectionalLight>(null)
   const ambient = useRef<THREE.AmbientLight>(null)
@@ -58,9 +79,10 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
   useFrame(() => {
     const j = journeyRef.current
     const b = moodBlendAt(j.progress)
-    if (key.current) key.current.color.copy(BASE_KEY).lerp(target(b), b.lightMix)
+    const mix = releasedLightMix(b.lightMix, gradeHoldFor(j.ending))
+    if (key.current) key.current.color.copy(BASE_KEY).lerp(target(b), mix)
     if (ambient.current) {
-      ambient.current.color.copy(BASE_AMBIENT).lerp(target(b), b.lightMix * AMBIENT_FOLLOW)
+      ambient.current.color.copy(BASE_AMBIENT).lerp(target(b), mix * AMBIENT_FOLLOW)
     }
   })
 

@@ -5,7 +5,7 @@ import { PALETTE } from '../palette'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { gradeAt } from './grade-mood'
 import { endingStateAt } from '../ending-timeline'
-import { studioLightsFor } from '../scene/desk-studio'
+import { gradeHoldFor } from '../scene/desk-studio'
 
 export { SHOW_GRADE } from './grade-mood'
 
@@ -101,7 +101,7 @@ export function BiomeGrade({
       // inside the Canvas. Making this one read a scene-owned ref would make it the only DOM
       // consumer that freezes if the canvas never mounts, which is a worse failure than a quarter
       // second of lead on a fade.
-      const held = 1 - studioLightsFor(endingStateAt(progress))
+      const held = gradeHoldFor(endingStateAt(progress))
       el.style.setProperty('--sw-grade-haze', g.haze)
       el.style.setProperty('--sw-grade-haze-a', (g.hazeAlpha * held).toFixed(4))
       el.style.setProperty('--sw-grade-vig-a', (g.vignetteAlpha * held).toFixed(4))

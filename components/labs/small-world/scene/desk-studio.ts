@@ -86,3 +86,40 @@ export const STUDIO_ENV_FLOOR = 0.12
 /** The environment intensity for the metal props at a given lights-up. */
 export const studioEnvIntensity = (lights: number): number =>
   STUDIO_ENV_FLOOR + (1 - STUDIO_ENV_FLOOR) * lights
+
+/**
+ * HOW MUCH OF THE JOURNEY'S GRADE IS STILL ON THE FRAME (Task 71) — the winter tint's release.
+ *
+ * ============================================================================
+ * WHAT WAS WRONG, AND WHOSE DECISION THIS IS
+ * ============================================================================
+ * The biome grade is a JOURNEY device: `gradeAt`/`moodBlendAt` clamp at progress 1, so through the
+ * whole ending they hold WINTER — a cold pale cast on the key and the ambient, and a vignette over
+ * the frame. That is right for a girl walking a snow wedge and wrong the moment she is a clay
+ * figurine on a desk in a lit studio. T68 measured what it cost and reported it rather than quietly
+ * fixing it, because the fix is a look decision and not a defect: against the approved render the
+ * lab's clay read 39% dark on the note, 53% on the bluebird and 42% on the planet.
+ *
+ * Aram's answer was BRIGHTEN — the grade lets go as the studio arrives, so the girl, the planet and
+ * the figurines bloom into their own colours instead of staying under winter's light.
+ *
+ * ============================================================================
+ * WHY IT IS THIS FUNCTION AND NOT A SECOND CURVE
+ * ============================================================================
+ * The release rides `studioLightsAt` exactly, inverted. Anything else would be a fifth clock in an
+ * ending that has spent two rounds getting down to one: the desk's two bakes, the metal's
+ * environment, the backdrop's studio mix and the DOM lens all read that number, and the whole
+ * argument for keying it on `zoom` (the desk does not exist, as far as anyone can see, until the
+ * camera withdraws) applies unchanged to the light the desk's neighbours stand in.
+ *
+ * It inherits the determinism with the arithmetic: `smootherstep(0)` is exactly 0 and
+ * `smootherstep(1)` exactly 1, so this is exactly 1 for the entire journey and the entire still
+ * beat — the graded world is bit-for-bit what it was before this existed — and exactly 0 at the
+ * money shot. Scrubbing backwards runs the identical subtraction.
+ *
+ * TWO CONSUMERS, one each side of the canvas: `scene/biome-atmosphere.tsx` scales the key and
+ * ambient tint, and `overlay/biome-grade.tsx` scales the haze and the vignette. They take the same
+ * function on different INPUTS (damped ending vs raw scroll) for the reason recorded in
+ * `biome-grade.tsx`, and agree exactly wherever the scroll rests.
+ */
+export const gradeHoldFor = (ending: EndingState): number => 1 - studioLightsFor(ending)
