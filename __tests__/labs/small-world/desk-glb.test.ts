@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -12,10 +13,12 @@ import {
 } from '@/components/labs/small-world/scene/desk-stage'
 import { CAMERA_FOV } from '@/components/labs/small-world/scene/camera'
 import {
+  COFFEE_ANCHOR,
   DESK_GLB_URL,
   DESK_MESHES,
   DESK_PAD,
   DESK_PAYLOAD_BUDGET,
+  DESK_RAW_CEILING,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 
 /**
@@ -35,6 +38,7 @@ import {
 const glbPath = path.join(process.cwd(), 'public', DESK_GLB_URL.replace(/^\//, ''))
 
 type Gltf = {
+  nodes: { name: string; mesh?: number; translation?: number[]; scale?: number[] }[]
   meshes: { name: string; primitives: { attributes: Record<string, number>; indices?: number }[] }[]
   accessors: {
     bufferView: number
@@ -115,20 +119,32 @@ const meshOf = (name: string) => {
 }
 
 describe('desk GLB — payload and draw cost', () => {
-  it('fits the round budget, and the report can state the number', () => {
-    expect(glb.bytes).toBeLessThanOrEqual(DESK_PAYLOAD_BUDGET)
+  it('fits the round budget IN THE BYTES A BROWSER DOWNLOADS', () => {
+    // The budget is a WIRE budget and this is the wire measurement: the server sends this file
+    // gzipped, and zlib's default level reproduces the transferred length exactly. Gating on the
+    // raw length instead — which is what T68 did while arguing in transferred bytes — measures a
+    // number nobody pays.
+    const wire = gzipSync(readFileSync(glbPath)).length
+    expect(wire, `wire ${wire} B`).toBeLessThanOrEqual(DESK_PAYLOAD_BUDGET)
   })
 
-  it('costs three draw calls, not one per prop colour', () => {
+  it('has not changed category uncompressed either', () => {
+    // A loose ceiling on the parsed size, to catch an accidental texture or a duplicated attribute
+    // that happens to compress well. Not a bound on the art.
+    expect(glb.bytes).toBeLessThanOrEqual(DESK_RAW_CEILING)
+  })
+
+  it('costs four draw calls, not one per prop colour', () => {
     // glTF splits a mesh into one primitive per material and three.js draws one primitive per call.
-    // The Blender set carries 22 prop tints; they live in the vertex attribute, so one material per
-    // mesh is enough and the whole desk is three draws.
+    // The Blender set carries ~40 prop tints; they live in the vertex attribute, so one material per
+    // mesh is enough. FOUR rather than T68's three: the donut glaze cannot share the unlit material
+    // the matte set uses (see DESK_MESHES), and that draw call is the price of the exception.
     const primitives = glb.json.meshes.reduce((s, m) => s + m.primitives.length, 0)
-    expect(primitives).toBe(3)
-    expect(glb.json.materials).toHaveLength(3)
+    expect(primitives).toBe(4)
+    expect(glb.json.materials).toHaveLength(4)
   })
 
-  it('ships exactly the three meshes the lab looks up by name', () => {
+  it('ships exactly the four meshes the lab looks up by name', () => {
     expect(glb.json.meshes.map((m) => m.name).sort()).toEqual([...DESK_MESHES].sort())
   })
 })
@@ -235,7 +251,7 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     // forwards. A swapped export would fade the slab and pad backwards and pass every other test
     // here, which is precisely the failure that already happened once on `render_color_index`.
     expect(glb.json.images).toHaveLength(2)
-    const mat = glb.json.materials.find((m) => m.name === 'T68_SURFACE')!
+    const mat = glb.json.materials.find((m) => m.name === 'T71_SURFACE')!
     const nameOfSlot = (texIndex: number) =>
       glb.json.images![glb.json.textures![texIndex].source].name
     expect(nameOfSlot(mat.pbrMetallicRoughness!.baseColorTexture!.index)).toContain('lit')
@@ -246,5 +262,62 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     const prim = meshOf('DeskMetal').primitives[0]
     expect(prim.attributes.COLOR_0).toBeDefined()
     expect(prim.attributes.COLOR_1).toBeUndefined()
+  })
+
+  it('keeps a DISTINCT tint per metal, which is what one correction could not do', () => {
+    // T68 learned this twice: a single multiplier tuned for the rose gold turned the sculpting
+    // tool's neutral steel blue by 152 degrees of hue. So each metal's tint is solved from its own
+    // measurement and written per material at export, and what proves it survived the collapse to
+    // one material is that the shipped attribute still holds several different colours. Four
+    // materials go in (dish, pen, tool, foil), so at least four distinct tints must come out.
+    const prim = meshOf('DeskMetal').primitives[0]
+    const v = readAccessor(glb.json, glb.bin, prim.attributes.COLOR_0)
+    const seen = new Set<string>()
+    for (let i = 0; i < v.length; i += 4) {
+      seen.add([v[i], v[i + 1], v[i + 2]].map((c) => c.toFixed(4)).join(','))
+    }
+    expect(seen.size, [...seen].join(' | ')).toBeGreaterThanOrEqual(4)
+  })
+
+  it('carries the gloss mesh PER-SURFACE specular level in COLOR_1 alpha', () => {
+    // The glaze and the coffee share one material and one draw call, and they need levels a factor
+    // of 2.1 apart — so the level rides per-vertex in an alpha channel the dim bake would otherwise
+    // leave at a constant 1.0. If that packing were ever dropped, every value here would be 1 and
+    // the coffee would silently lose half its reflection.
+    const prim = meshOf('DeskGloss').primitives[0]
+    const v = readAccessor(glb.json, glb.bin, prim.attributes.COLOR_1)
+    const alphas = new Set<string>()
+    for (let i = 3; i < v.length; i += 4) alphas.add(v[i].toFixed(3))
+    expect(alphas.size, [...alphas].join(' | ')).toBe(2)
+    // ...and the larger of the two is the scale itself, i.e. exactly 1
+    expect(Math.max(...[...alphas].map(Number))).toBeCloseTo(1, 3)
+  })
+})
+
+describe('desk GLB — the coffee is addressable without being a draw call', () => {
+  it('ships a named anchor node at the coffee surface, scaled to its radius', () => {
+    // Task 72 hangs steam off this. The coffee itself is inside the joined matte mesh, so the node
+    // is an EMPTY: no mesh, no vertices, no draw. Its transform is the whole contract — position at
+    // the centre of the liquid's top surface, uniform scale equal to its radius.
+    const node = glb.json.nodes.find((n) => n.name === COFFEE_ANCHOR)
+    expect(node, `nodes: ${glb.json.nodes.map((n) => n.name).join(', ')}`).toBeDefined()
+    expect(node!.mesh).toBeUndefined()
+    const [x, y, z] = node!.translation!
+    // inside the mug's footprint, standing on the pad rather than in it
+    expect(y).toBeGreaterThan(DESK_PAD.top)
+    expect(z).toBeGreaterThan(DESK_PAD.backZ)
+    expect(z).toBeLessThan(DESK_PAD.nearZ)
+    expect(Math.abs(x)).toBeLessThan(DESK_PAD.halfW)
+    // a real radius, uniform on all three axes
+    const s = node!.scale!
+    expect(s[0]).toBeGreaterThan(0.05)
+    expect(s[1]).toBeCloseTo(s[0], 6)
+    expect(s[2]).toBeCloseTo(s[0], 6)
+  })
+
+  it('leaves the anchor OUT of the containment walk it has no vertices for', () => {
+    // Stated rather than assumed: the anchor is not a mesh node, so `DESK_MESHES` does not name it
+    // and the per-vertex containment tests above never see it.
+    expect(DESK_MESHES).not.toContain(COFFEE_ANCHOR as never)
   })
 })

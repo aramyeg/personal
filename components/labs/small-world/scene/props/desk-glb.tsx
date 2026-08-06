@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
-import { studioEnvFor } from '../studio-env'
+import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 
@@ -12,8 +12,8 @@ import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
  * THE BAKED DESK, AS IT REACHES THE SCREEN (Task 68).
  *
  * `desk-glb-contract.ts` says what is in the file and why; this is only how it is loaded, shaded
- * and driven. Three meshes, three draw calls, and one number written per frame — and only on the
- * frames where that number has changed, which during the whole journey is none of them.
+ * and driven. Four meshes, four draw calls, and two numbers written per frame — and only on the
+ * frames where they have changed, which during the whole journey is none of them.
  *
  * ============================================================================
  * WHY IT DOES NOT USE `useGLTF`
@@ -167,6 +167,133 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
 }
 
 /**
+ * THE DONUT GLAZE — the one dielectric that could not be baked (Task 71).
+ *
+ * ============================================================================
+ * WHY IT IS NOT IN THE MATTE MESH
+ * ============================================================================
+ * The studio's material discipline has a 0.28 roughness floor and exactly one object below it: the
+ * glaze, at roughness 0.12 under a 0.30 coat. That exception was granted deliberately — the matte
+ * rule is for studio props, and food reads appetizing through sheen — and it is what makes the
+ * glaze unbakeable for the same reason the rose gold is. A bake stores one colour per vertex, i.e.
+ * a view-INDEPENDENT surface, and a sheen is a fact about where the viewer is standing. Baked, the
+ * highlight is written into every vertex whose normal happens to face the key, which is a surface
+ * with a bright patch in the wrong place and no dark side — the cradle ring's failure, one round on.
+ *
+ * So the glaze is DECOMPOSED, exactly as the round before decomposed the metals. Cycles bakes its
+ * DIFFUSE (t71_bake.py) into the same two colour sets everything else carries, and the specular is
+ * added here as a reflection of the same generated studio.
+ *
+ * ============================================================================
+ * WHY THE REFLECTION IS SAMPLED BY HAND
+ * ============================================================================
+ * Not for control — because three's own path does not exist for this material. `envmap_fragment` in
+ * three 0.185 resolves an environment colour under `#ifdef ENVMAP_TYPE_CUBE` and under no other
+ * branch, so the PMREM texture the metals use (`CubeUVReflectionMapping`) assigned to a
+ * `MeshBasicMaterial`'s `envMap` compiles cleanly, sets `USE_ENVMAP`, runs every frame and
+ * contributes nothing at all. This is read out of the shipped chunk, not assumed.
+ *
+ * The alternative — `MeshStandardMaterial`, where PMREM works — would light the glaze twice: its
+ * environment contributes DIFFUSE irradiance as well as specular, and the diffuse is already in the
+ * bake. So the material stays unlit and the specular is one explicit term, sampled out of
+ * `studioEquirectShared()` with three's own `equirectUv` arithmetic so it is the same room the
+ * metals reflect.
+ *
+ * The clay-scoping law is untouched and still structural: this is a texture on ONE material,
+ * `scene.environment` is never assigned anywhere in the lab, and `MeshToonMaterial` has no
+ * environment input to reach even if it were.
+ */
+
+/** Fresnel at normal incidence for a clear coat at IOR 1.5 — the physical value, not a dial. */
+const GLAZE_F0 = 0.04
+
+/**
+ * THE SHAPE OF THE REFLECTION, and why it is not simply the room as the metals see it.
+ *
+ * `studio-env.ts` is a room, not a set of lights: it runs from a floor at linear 0.33 to a softbox
+ * core at 4.05, because that range is what a metal at roughness 0.33 needs — PMREM blurs it, and
+ * what the ring reads off it is the room's general LEVEL. A surface at roughness 0.12 does not read
+ * a level; it reads the LIGHTS. In the reference render the glaze's brightest pixel is 0.676 against
+ * a mean of 0.149, which is Cycles showing a 78,000 W softbox through AgX; four percent of an
+ * environment whose ceiling is 4.05 tops out at 0.16, so no amount of level can put that highlight
+ * on the glaze — raising it just makes the whole surface paler.
+ *
+ * That was measured before it was believed. Levelling alone, the sweep ran mean +2.8% at 43% of the
+ * reference's variation, and reaching the reference's variation cost +85% mean and a failed chroma.
+ * A level cannot fix a shape — the same sentence `studio-env.ts` had to learn one round ago, from
+ * the opposite side.
+ *
+ * So the sample is EXPANDED before it is levelled: raising the room to a power stretches the
+ * distance between the softbox core and the room around it, which is exactly what makes a specular
+ * band a band. It is scoped to this one material, so nothing the metals or the clay see moves.
+ */
+const GLAZE_ENV_GAMMA = 2.0
+
+/**
+ * ...and then the level — which is PER SURFACE, because one number could not serve both.
+ *
+ * This material draws two dark liquids, and solved separately against the reference they want levels
+ * a factor of 2.1 apart: the glaze 1.34, the coffee 2.80. Forced to share, both land about 17% out.
+ * The reason is not slack in the tuning. The glaze is curved and catches the softbox out of the room
+ * proper; the coffee is a flat disc at the bottom of a mug, and most of what the reference shows in
+ * it is a reflection of the mug's own brightly lit inner wall — which a single global room does not
+ * contain at any level.
+ *
+ * So this constant is the LARGEST of the two, and each vertex carries its own share of it in
+ * COLOR_1's alpha, which the dim bake leaves at a constant 1.0 and nothing else reads
+ * (`t71_export.py`, `GLOSS_LEVEL`). One material, one draw call, no extra bytes — COLOR_1 was
+ * already VEC4 — and each surface solved from its own measurement, which is the standing lesson of
+ * the round before this one.
+ */
+const GLAZE_ENV = 2.8
+
+export function glossMaterial(
+  env: THREE.Texture,
+  lights: { value: number },
+  gloss: { value: number }
+): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    shader.uniforms.uGloss = gloss
+    shader.uniforms.uGlossEnv = { value: env }
+    shader.vertexShader = (
+      'attribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
+      shader.vertexShader
+    )
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1;')
+      .replace(
+        '#include <project_vertex>',
+        `vGlossN = normalize( mat3( modelMatrix ) * normal );
+         vGlossW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+         #include <project_vertex>`
+      )
+    shader.fragmentShader = (
+      'uniform float uLights;\nuniform float uGloss;\nuniform sampler2D uGlossEnv;\n' +
+      'varying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
+      shader.fragmentShader
+    )
+      .replace('#include <color_fragment>', 'diffuseColor.rgb *= mix( vDimColor.rgb, vColor.rgb, uLights );')
+      .replace(
+        '#include <opaque_fragment>',
+        `vec3 gN = normalize( vGlossN );
+         vec3 gV = normalize( vGlossW - cameraPosition );
+         vec3 gR = reflect( gV, gN );
+         // three's own equirectUv, so this samples the room PMREM builds the metals' from
+         vec2 gUv = vec2( atan( gR.z, gR.x ) * 0.15915494309 + 0.5,
+                          asin( clamp( gR.y, -1.0, 1.0 ) ) * 0.31830988618 + 0.5 );
+         float gF = ${GLAZE_F0} + ( 1.0 - ${GLAZE_F0} ) * pow( clamp( 1.0 + dot( gV, gN ), 0.0, 1.0 ), 5.0 );
+         vec3 gEnv = pow( max( texture2D( uGlossEnv, gUv ).rgb, vec3( 0.0 ) ), vec3( ${GLAZE_ENV_GAMMA.toFixed(1)} ) );
+         // vDimColor.a is this surface's own share of the level — see GLAZE_ENV
+         outgoingLight += gEnv * gF * uGloss * vDimColor.a;
+         #include <opaque_fragment>`
+      )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-gloss'
+  return mat
+}
+
+/**
  * The three rose-gold props. A real metallic material, and the ONLY thing in this round that takes
  * a light — an environment map assigned to this material alone (see `studio-env.ts` for why that
  * cannot reach the clay).
@@ -224,11 +351,15 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
 export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   const assets = useDeskAssets()
   const renderer = useThree((s) => s.gl)
-  // ONE uniform object, shared by both matte materials, so the pair can never disagree about how
+  // ONE uniform object, shared by all three baked materials, so they can never disagree about how
   // lit the ending is and the frame loop writes a single number.
   const lights = useRef({ value: 0 })
+  // ...and one for the two things that reflect the room rather than carrying a bake, for the same
+  // reason: the glaze's sheen and the metal's environment come up on one curve or on none.
+  const gloss = useRef({ value: 0 })
   // shared with the globe stand — the ring and the dish beside it must reflect one room
   const env = useMemo(() => studioEnvFor(renderer), [renderer])
+  const equirect = useMemo(() => studioEquirectShared(), [])
 
   const built = useMemo(() => {
     if (!assets) return null
@@ -236,18 +367,24 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     const surface = findMesh(scene, 'DeskSurface')
     const baked = findMesh(scene, 'DeskBaked')
     const metal = findMesh(scene, 'DeskMetal')
-    if (!surface || !baked || !metal) return null
+    const glaze = findMesh(scene, 'DeskGloss')
+    if (!surface || !baked || !metal || !glaze) return null
     surface.material = surfaceMaterial(assets.lit, assets.dim, lights.current)
     baked.material = bakedMaterial(lights.current)
     metal.geometry.computeVertexNormals()
     metal.material = metalMaterial(env)
-    return { surface, baked, metal, metalMat: metal.material as THREE.MeshStandardMaterial }
-  }, [assets, env])
+    // The export ships no normals (they are 12 bytes a vertex for a set that is otherwise unlit),
+    // and both of the meshes that reflect anything need them. The exporter splits hard edges
+    // already, so recomputing gives exactly the smooth-within-island normals the file would carry.
+    glaze.geometry.computeVertexNormals()
+    glaze.material = glossMaterial(equirect, lights.current, gloss.current)
+    return { surface, baked, metal, glaze, metalMat: metal.material as THREE.MeshStandardMaterial }
+  }, [assets, env, equirect])
 
   useEffect(() => {
     if (!built) return
     return () => {
-      for (const m of [built.surface, built.baked, built.metal]) {
+      for (const m of [built.surface, built.baked, built.metal, built.glaze]) {
         ;(m.material as THREE.Material).dispose()
       }
     }
@@ -260,6 +397,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     if (u === last.current) return
     last.current = u
     lights.current.value = u
+    gloss.current.value = GLAZE_ENV * studioEnvIntensity(u)
     built.metalMat.envMapIntensity = studioEnvIntensity(u)
   })
 
@@ -269,6 +407,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       <primitive object={built.surface} />
       <primitive object={built.baked} />
       <primitive object={built.metal} />
+      <primitive object={built.glaze} />
     </group>
   )
 }

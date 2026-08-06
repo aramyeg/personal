@@ -181,6 +181,33 @@ export function buildStudioEnv(renderer: THREE.WebGLRenderer): THREE.Texture {
 }
 
 /**
+ * ...and the SAME room, unprocessed, for a material that has to sample it by hand (Task 71).
+ *
+ * The donut glaze needs a reflection and it is not a metal, so it is drawn with an unlit material
+ * plus an explicit specular term. It cannot use three's own `envMap` path to get there, and that is
+ * a fact about the library rather than a preference: `envmap_fragment` in three 0.185 resolves an
+ * environment colour under `#ifdef ENVMAP_TYPE_CUBE` and NOWHERE ELSE, so a PMREM texture (which is
+ * `CubeUVReflectionMapping`) assigned to a `MeshBasicMaterial` compiles, runs, and adds exactly
+ * nothing. Checked in the shipped chunk rather than inferred from the docs — this is precisely the
+ * shape of thing that looks like it works.
+ *
+ * So `desk-glb.tsx` samples THIS texture directly with three's own `equirectUv` arithmetic, which is
+ * the same arithmetic `PMREMGenerator.fromEquirectangular` uses on the very same data. The glaze and
+ * the metals therefore reflect one room by construction: same source, same projection, one blurred
+ * by PMREM for roughness 0.33 and one taken at the 128x64 source's own softness for roughness 0.12.
+ *
+ * A module-level singleton rather than a per-renderer one, because unlike the PMREM target this is
+ * plain data with no GL resources of its own until a renderer uploads it — and three's own texture
+ * cache is per renderer, so two canvases sharing it is already correct.
+ */
+let equirect: THREE.DataTexture | null = null
+
+export function studioEquirectShared(): THREE.DataTexture {
+  equirect ??= buildStudioEquirect()
+  return equirect
+}
+
+/**
  * One environment per renderer, shared by everything metallic.
  *
  * Two components reflect this studio — the desk's three rose-gold props and the globe stand — and

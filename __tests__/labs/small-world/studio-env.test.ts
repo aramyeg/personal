@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { buildStudioEquirect } from '@/components/labs/small-world/scene/studio-env'
+import { buildStudioEquirect, studioEquirectShared } from '@/components/labs/small-world/scene/studio-env'
 import { PALETTE } from '@/components/labs/small-world/palette'
 
 /**
@@ -109,5 +109,36 @@ describe('the studio has RANGE in it', () => {
     const meanB = lit.reduce((s, t) => s + t.b, 0) / lit.length
     expect(meanR).toBeGreaterThan(meanB)
     expect(meanR / meanB).toBeLessThan(1.35)
+  })
+})
+
+
+describe('the glaze reflects the SAME room the metals do (Task 71)', () => {
+  it('shares one texture rather than building a second studio', () => {
+    // Two surfaces reflecting two different rooms is the defect this shape of bug always takes —
+    // the ring and the dish beside it were given a `WeakMap` for exactly that reason. The glaze
+    // cannot use the PMREM target (three 0.185 resolves an environment colour for a basic material
+    // under `ENVMAP_TYPE_CUBE` only), so it samples the raw equirect by hand — and it has to be the
+    // raw equirect PMREM is built FROM, not another one built the same way.
+    expect(studioEquirectShared()).toBe(studioEquirectShared())
+  })
+
+  it('carries the room as linear radiance, which is what an unlit shader can add', () => {
+    const tex = studioEquirectShared()
+    expect(tex.mapping).toBe(THREE.EquirectangularReflectionMapping)
+    expect(tex.colorSpace).toBe(THREE.LinearSRGBColorSpace)
+    expect(tex.type).toBe(THREE.HalfFloatType)
+  })
+
+  it('is bit-identical to a freshly built one, so the shared copy is not a stale variant', () => {
+    const fresh = buildStudioEquirect()
+    const shared = studioEquirectShared()
+    const a = fresh.image.data as Uint16Array
+    const b = shared.image.data as Uint16Array
+    expect(a.length).toBe(b.length)
+    let same = true
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { same = false; break }
+    expect(same).toBe(true)
+    fresh.dispose()
   })
 })
