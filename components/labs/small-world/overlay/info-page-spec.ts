@@ -84,8 +84,27 @@ export type Hero =
       /** Unit, which lands LATE, as its own beat. */
       suffix?: string
       label: string
+      /**
+       * A SUPPORTING count, planted under the number in INK.
+       *
+       * For the chapter whose claim is "thirteen clients, and revenue up 42%": the
+       * number is the fact and the marks are what earned it, so they share the hero
+       * panel and the number keeps the pink. Two separate pink claims would be two
+       * claims ignored — this is how a count rides along without competing.
+       */
+      marks?: { count: number; label: string }
     }
   | { kind: 'count'; count: number; label: string }
+  /**
+   * A hand-lettered WORD, given the number's treatment.
+   *
+   * Not every chapter has a percentage, and a beat-3 that is a metric-shaped hole is
+   * worse than one that is honest. Manga's own answer to "this is the loud part" is
+   * SFX — oversized, tilted, breaking the frame — and a word can carry that as well
+   * as a numeral. A count of ONE is not an Isotype row; it is a flag on its own,
+   * which is what this replaces.
+   */
+  | { kind: 'sfx'; text: string; label: string }
 
 export type InfoPageSpec = {
   /**
@@ -191,7 +210,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       crop: { page: 1, x: 0.2527, y: 0.1208, w: 0.4147, h: 0.1284 },
       note: 'Every browser',
     },
-    ten: { hero: { kind: 'count', count: 1, label: 'builder, no code' } },
+    ten: { hero: { kind: 'sfx', text: 'No code', label: 'for small changes' } },
     ketsu: {
       line: 'My first job: a page builder — no developer for small changes.',
       tools: ['Frontend', 'Drag-and-drop', 'Cross-browser'],
@@ -234,7 +253,17 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       crop: { page: 3, x: 0.0927, y: 0.7974, w: 0.1846, h: 0.0572 },
       note: '−40% build time',
     },
-    ten: { hero: { kind: 'count', count: 13, label: 'clients' }, inverted: true },
+    ten: {
+      hero: {
+        kind: 'number',
+        value: 42,
+        prefix: '+',
+        suffix: '%',
+        label: 'revenue',
+        marks: { count: 13, label: 'clients' },
+      },
+      inverted: true,
+    },
     ketsu: {
       line: 'One loyalty app I built — each client in their own colors.',
       tools: ['React', 'Component library', 'Design system'],

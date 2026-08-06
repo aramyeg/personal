@@ -333,10 +333,12 @@ function TenPanel({ hero, inverted, t }: { hero: Hero; inverted?: boolean; t: nu
         </svg>
       ) : null}
 
-      {hero.kind === 'number' ? (
+      {hero.kind === 'sfx' ? (
+        <HeroSfx hero={hero} t={t} fg={fg} />
+      ) : hero.kind === 'number' ? (
         <HeroNumber hero={hero} t={t} fg={fg} />
       ) : (
-        <HeroCount hero={hero} t={t} fg={fg} />
+        <HeroCount count={hero.count} label={hero.label} t={t} fg={fg} />
       )}
     </InkedPanel>
   )
@@ -403,6 +405,63 @@ function HeroNumber({
       >
         {hero.label}
       </span>
+      {hero.marks ? (
+        <div style={{ marginTop: '1.6cqw', opacity: suffix }}>
+          <HeroCount
+            count={hero.marks.count}
+            label={hero.marks.label}
+            t={t}
+            fg={fg}
+            pink={false}
+            scale={0.62}
+            isHero={false}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * A word given the number's treatment: hand-lettered SFX, oversized and tilted and
+ * breaking the frame. For the chapters whose biggest claim is not a quantity.
+ */
+function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: number; fg: string }) {
+  const p = phase(t, TEN_NUMBER)
+  const settle = p < 1 ? 1 + 0.08 * Math.sin(Math.PI * p) : 1
+  const tail = phase(t, TEN_SUFFIX)
+  return (
+    <div
+      data-testid="sw-info-hero"
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 -3cqw', opacity: p > 0 ? 1 : 0 }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--sw-font-panel)',
+          fontSize: type(19, 34),
+          lineHeight: 0.9,
+          color: PALETTE.blossomDeep,
+          whiteSpace: 'nowrap',
+          transform: `rotate(-4deg) scale(${settle})`,
+          WebkitTextStroke: `0.5cqw ${PALETTE.pagePaper}`,
+          paintOrder: 'stroke fill',
+        }}
+      >
+        {hero.text}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--sw-font-panel)',
+          fontSize: type(4.6),
+          letterSpacing: '0.1em',
+          lineHeight: 1,
+          color: fg,
+          opacity: tail,
+          marginTop: '0.6cqw',
+        }}
+      >
+        {hero.label}
+      </span>
     </div>
   )
 }
@@ -414,15 +473,35 @@ function HeroNumber({
  * reason this reads faster than the numeral would. Thirteen pennants say "a lot,
  * and exactly this many" in one look, and counting them is a pleasure.
  */
-function HeroCount({ hero, t, fg }: { hero: Extract<Hero, { kind: 'count' }>; t: number; fg: string }) {
-  const { count, label } = hero
+function HeroCount({
+  count,
+  label,
+  t,
+  fg,
+  pink = true,
+  scale = 1,
+  isHero = true,
+}: {
+  count: number
+  label: string
+  t: number
+  fg: string
+  /** Pink only when the count IS the fact. A supporting row is ink. */
+  pink?: boolean
+  scale?: number
+  /**
+   * Whether this row IS the page's hero. A supporting count under a number is not
+   * a second hero and must not answer to the one-hero gate — it rides along.
+   */
+  isHero?: boolean
+}) {
   // A mark's size is a function of how many there are: thirteen at the four-mark
   // size overflow the panel and wrap, which reads as a ruler rather than a tally.
-  const w = Math.min(9, 62 / count)
+  const w = Math.min(9, 62 / count) * scale
   const done = phase(t, [markWindow(count - 1, count)[0], markWindow(count - 1, count)[1]])
   return (
     <div
-      data-testid="sw-info-hero"
+      {...(isHero ? { 'data-testid': 'sw-info-hero' } : {})}
       style={{
         position: 'relative',
         display: 'flex',
@@ -457,7 +536,7 @@ function HeroCount({ hero, t, fg }: { hero: Extract<Hero, { kind: 'count' }>; t:
               <path d="M1.4 0.6 L1.4 19.4" stroke={fg} strokeWidth="1.5" strokeLinecap="round" fill="none" />
               <path
                 d="M1.4 1.6 L11.2 4.6 L8.4 7.2 L11.2 9.8 L1.4 12.8 Z"
-                fill={PALETTE.blossomDeep}
+                fill={pink ? PALETTE.blossomDeep : 'none'}
                 stroke={fg}
                 strokeWidth="1.1"
                 strokeLinejoin="round"
