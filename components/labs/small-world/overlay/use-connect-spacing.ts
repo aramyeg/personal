@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { connectSpacingFor, GAP_BASE, INSET_BASE, type ConnectSpacing } from './connect-clearance'
+import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 
 /**
  * MEASURES THE PILL ROW, ASKS THE GEOMETRY, AND HANDS BACK THE SPACINGS (Task 72 addendum).
@@ -45,11 +46,17 @@ const same = (a: ConnectSpacing, b: ConnectSpacing): boolean =>
   a.gap === b.gap && a.inset === b.inset && a.lift === b.lift
 
 export function useConnectSpacing() {
+  // No breath under the preference, so the envelope term must not charge for one — the row keeps
+  // the zero-input solve and a reduced-motion visitor pays nothing for a motion they never see.
+  const reduced = usePrefersReducedMotion()
   const navRef = useRef<HTMLElement | null>(null)
   const [spacing, setSpacing] = useState<ConnectSpacing>(BASE)
   // read inside the measurement rather than through the closure, so the callback never goes stale
   const applied = useRef(BASE)
   applied.current = spacing
+  // read through a ref for the same reason as `applied`: the callback is stable by design
+  const reducedRef = useRef(reduced)
+  reducedRef.current = reduced
 
   const measure = useCallback(() => {
     const nav = navRef.current
@@ -68,7 +75,7 @@ export function useConnectSpacing() {
       navTop: r.top - applied.current.lift,
       navLeft: r.left,
       navRight: r.right,
-    })
+    }, { parallax: !reducedRef.current })
     if (!same(next, applied.current)) setSpacing(next)
   }, [])
 
@@ -82,7 +89,7 @@ export function useConnectSpacing() {
       window.removeEventListener('resize', measure)
       ro?.disconnect()
     }
-  }, [measure])
+  }, [measure, reduced])
 
   return { navRef, spacing }
 }

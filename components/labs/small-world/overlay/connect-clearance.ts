@@ -1,5 +1,15 @@
-import { CAMERA_FOV, ENDING_AIM_DROP, ZOOM_FACTOR, endingRig } from '../scene/camera'
+import { TRACK_END } from '../ending-timeline'
+import {
+  CAMERA_FOV,
+  ENDING_AIM_DROP,
+  ZOOM_FACTOR,
+  cameraPositionAt,
+  cameraTargetAt,
+  endingRig,
+} from '../scene/camera'
 import { DESK_NOTE } from '../scene/desk-stage'
+import { PARALLAX_PITCH_MAX, orbitEyeInto, orbitRig, yawMaxFor } from '../scene/camera-parallax'
+import { noteShiftBetween } from '../scene/note-parallax-shift'
 import { noteNearEdgePoint } from './note-settle'
 
 /**
@@ -46,6 +56,23 @@ import { noteNearEdgePoint } from './note-settle'
  * available layout and the test suite fails loudly on the number.
  *
  * ============================================================================
+ * AND THEN THE BREATH MOVED THE NOTE (second addendum)
+ * ============================================================================
+ * Everything above solves the layout at ZERO pointer input. Task 72's parallax orbits the camera at
+ * the money shot, which slides the note in the frame while this block stays bolted to the viewport;
+ * a blind review caught the LinkedIn pill cutting through the "Aram" signature.
+ *
+ * Solving the clearance across the whole envelope INSTEAD is impossible, and the numbers are in
+ * `note-parallax-shift.ts`: the worst pose asks the row to sit 57.9 px lower at 1440x900, which puts
+ * the restart link off the bottom of the viewport. So the block RIDES the note instead, and what is
+ * left for this file is the residual that tracking cannot remove — the sheet's own perspective
+ * shear, because a flat quad seen at an angle does not translate rigidly on screen.
+ *
+ * That residual is real: at 1440x900 it turns a 2.3 px resting clearance into −5.99 px at the
+ * pitched-up corner. So the solve now takes the WORSE of two requirements, and the second one
+ * reaches wide frames that the first deliberately does not.
+ *
+ * ============================================================================
  * WHAT THIS DOES NOT FIX, AND THE NUMBERS THAT SAY SO
  * ============================================================================
  * Moving the row down fixes the resting frame and IMPROVES the approach, but does not clear it: the
@@ -57,8 +84,11 @@ import { noteNearEdgePoint } from './note-settle'
  * task-72-report.md rather than half-built here.
  */
 
-/** Below this viewport width the row is re-solved. At and above it NOTHING changes — see the tests,
- *  which assert the desktop numbers are the base constants to the bit. */
+/**
+ * Below this viewport width the RESTING term applies. At and above it, the resting layout is the
+ * approved desktop composition with its own thin margin and Aram's call was to leave it — so only
+ * the envelope term below can move a wide frame, and only when a breath can actually happen.
+ */
 export const NARROW_MAX_WIDTH = 900
 
 /** How far below the note's lowest point under the row the pills' top edge must sit.
@@ -67,6 +97,22 @@ export const NARROW_MAX_WIDTH = 900
  *  which is exactly the margin that made the phone's inherited version collide the moment the frame
  *  changed shape. A margin that survives a re-bake nudging the note is the point. */
 export const CLEARANCE_MARGIN = 8
+
+/**
+ * ...and how far it must clear at the EXTREMES of the breath, which is a different question.
+ *
+ * Smaller than the resting margin on purpose. `CLEARANCE_MARGIN` protects the frame everybody sees
+ * and screenshots — the settled money shot — and it is sized to survive a re-bake nudging the note
+ * or a font changing the row's height. This one guards a pose a visitor can only hold by keeping
+ * the pointer jammed in a corner, where the requirement is that the row is VISIBLY off the sheet
+ * rather than comfortably clear of it. 4 px is still wider than the 3.4 px the approved desktop
+ * resting composition shipped with for four rounds.
+ *
+ * It is a judgement, and it is the one number in this file that is not solved from geometry. What
+ * keeps it honest is that both shipped viewports are gated against it with no shortfall, and the
+ * report prints where each lands.
+ */
+export const ENVELOPE_MARGIN = 4
 
 /** The block's authored spacings — the desktop layout, unchanged and load-bearing as the baseline. */
 export const GAP_BASE = 12
@@ -77,24 +123,38 @@ export const INSET_FLOOR = 10
 
 const TAN_HALF_FOV = Math.tan((CAMERA_FOV * Math.PI) / 360)
 
-/**
- * The note's near edge at the money shot, projected to viewport pixels.
- *
- * The camera sits on the x = 0 plane with `fwd.x = 0` and no roll (`camera.ts`'s `endingRig`), so
- * world x IS the camera's right axis and the horizontal projection needs no basis of its own — the
- * same fact `camera-parallax.ts` builds its turntable on. `endingRig` is called at the fully
- * pulled-back pose because this is a question about the RESTING layout.
- */
-function nearEdgePx(lx: number, width: number, height: number): { x: number; y: number } {
-  const rig = endingRig(ZOOM_FACTOR, ENDING_AIM_DROP)
+/** A camera basis, spelled the way `lookAt` builds one. */
+type Basis = { cam: readonly number[]; right: readonly number[]; up: readonly number[]; fwd: readonly number[] }
+
+/** A point on the note's near edge, projected to viewport pixels through a given pose. */
+function nearEdgePxAt(lx: number, rig: Basis, width: number, height: number): { x: number; y: number } {
   const p = noteNearEdgePoint(lx)
   const v = [p[0] - rig.cam[0], p[1] - rig.cam[1], p[2] - rig.cam[2]]
   const depth = v[0] * rig.fwd[0] + v[1] * rig.fwd[1] + v[2] * rig.fwd[2]
   const up = v[0] * rig.up[0] + v[1] * rig.up[1] + v[2] * rig.up[2]
+  const right = v[0] * rig.right[0] + v[1] * rig.right[1] + v[2] * rig.right[2]
   const aspect = width / height
-  const ndcX = v[0] / (depth * TAN_HALF_FOV * aspect)
+  const ndcX = right / (depth * TAN_HALF_FOV * aspect)
   const ndcY = up / (depth * TAN_HALF_FOV)
   return { x: ((ndcX + 1) / 2) * width, y: ((1 - ndcY) / 2) * height }
+}
+
+/**
+ * The un-orbited money-shot pose.
+ *
+ * The camera sits on the x = 0 plane with `fwd.x = 0` and no roll (`camera.ts`'s `endingRig`), so
+ * world x IS the camera's right axis — the same fact `camera-parallax.ts` builds its turntable on.
+ * `endingRig` is called at the fully pulled-back pose because this is a question about the RESTING
+ * layout; `noteLowestPxAtPose` below is the same question at a pose the breath has moved.
+ */
+function restingBasis(): Basis {
+  const rig = endingRig(ZOOM_FACTOR, ENDING_AIM_DROP)
+  // the base rig sits on x = 0 with fwd.x = 0 and no roll, so world x IS its right axis
+  return { cam: rig.cam, right: [1, 0, 0], up: rig.up, fwd: rig.fwd }
+}
+
+function nearEdgePx(lx: number, width: number, height: number): { x: number; y: number } {
+  return nearEdgePxAt(lx, restingBasis(), width, height)
 }
 
 /** How finely the edge is walked. 600 samples across 2.37 world units is under a tenth of a pixel
@@ -124,6 +184,83 @@ export function noteLowestPxBetween(
     if (lowest === null || p.y > lowest) lowest = p.y
   }
   return lowest
+}
+
+/**
+ * The same, at an ARBITRARY camera pose — what the parallax envelope is gated with.
+ *
+ * The resting solve above is the special case where the eye is the un-orbited one. This exists so
+ * the gate can ask the question at the poses the breath actually reaches, through the same
+ * projection and the same edge walk rather than through a second copy of them.
+ */
+export function noteLowestPxAtPose(
+  x0: number,
+  x1: number,
+  width: number,
+  height: number,
+  eye: readonly [number, number, number],
+  aim: readonly [number, number, number]
+): number | null {
+  const rig = orbitRig(eye, aim)
+  let lowest: number | null = null
+  const half = DESK_NOTE.width / 2
+  for (let i = 0; i <= EDGE_SAMPLES; i++) {
+    const lx = -half + (i / EDGE_SAMPLES) * DESK_NOTE.width
+    const p = nearEdgePxAt(lx, rig, width, height)
+    if (p.x < x0 || p.x > x1) continue
+    if (lowest === null || p.y > lowest) lowest = p.y
+  }
+  return lowest
+}
+
+/** The five pointer deflections the breath can reach: centred, and each corner at full throw. */
+const ENVELOPE: [number, number][] = [
+  [0, 0],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+]
+
+/**
+ * The worst clearance the row has anywhere in the parallax envelope, WITH the block's tracking
+ * applied — i.e. the number the visitor can actually produce by shoving the pointer into a corner.
+ *
+ * Tracking makes the note's motion and the block's motion cancel to first order, so what is left is
+ * the sheet's own perspective shear: it is a flat quad seen at an angle, and it does not translate
+ * rigidly on screen. That residual is what this measures, and it is the whole reason the envelope
+ * needs its own term rather than inheriting the resting one — at 1440x900 it eats 8.3 px, which is
+ * five times the resting margin the approved composition happens to have.
+ */
+export function worstClearanceOverEnvelope(
+  navTop: number,
+  navLeft: number,
+  navRight: number,
+  width: number,
+  height: number
+): number {
+  const base = cameraPositionAt(TRACK_END)
+  const aim = cameraTargetAt(TRACK_END)
+  const aspect = width / height
+  let worst = Infinity
+  for (const [cx, cy] of ENVELOPE) {
+    const eye = orbitEyeInto(
+      base,
+      aim,
+      cx * yawMaxFor(aspect),
+      cy * PARALLAX_PITCH_MAX,
+      [0, 0, 0]
+    )
+    const d = noteShiftBetween(base, eye, aim, aspect)
+    // the block rides the note, so its rectangle moves by the same amount the note does
+    const dx = (d.x * width) / 2
+    const dy = (-d.y * height) / 2
+    const low = noteLowestPxAtPose(navLeft + dx, navRight + dx, width, height, eye, aim)
+    if (low === null) continue
+    const clearance = navTop + dy - low
+    if (clearance < worst) worst = clearance
+  }
+  return worst === Infinity ? Number.POSITIVE_INFINITY : worst
 }
 
 export type ConnectSpacing = {
@@ -160,21 +297,35 @@ const BASE: ConnectSpacing = {
  * Wide frames return the authored constants by IDENTITY, not by arithmetic that happens to agree:
  * the desktop resting layout is approved and this may not perturb it by a float.
  */
-export function connectSpacingFor(rect: {
-  width: number
-  height: number
-  navTop: number
-  navLeft: number
-  navRight: number
-}): ConnectSpacing {
+export function connectSpacingFor(
+  rect: {
+    width: number
+    height: number
+    navTop: number
+    navLeft: number
+    navRight: number
+  },
+  opts: { parallax?: boolean } = {}
+): ConnectSpacing {
   const { width, height, navTop, navLeft, navRight } = rect
   if (!(width > 0) || !(height > 0) || !(navRight > navLeft)) return BASE
-  if (width >= NARROW_MAX_WIDTH) return BASE
 
   const lowest = noteLowestPxBetween(navLeft, navRight, width, height)
   if (lowest === null) return BASE
 
-  const wanted = lowest + CLEARANCE_MARGIN - navTop
+  // THE RESTING TERM. Narrow frames only: the desktop resting composition is approved with its own
+  // thin margin and Aram's call was to leave it, so this term does not reach it.
+  const restWanted =
+    width >= NARROW_MAX_WIDTH ? 0 : lowest + CLEARANCE_MARGIN - navTop
+
+  // THE ENVELOPE TERM. Every frame, but only when a breath can actually happen — a reduced-motion
+  // visitor has no parallax and must not pay a pixel for one.
+  const envelopeWanted =
+    opts.parallax === false
+      ? 0
+      : ENVELOPE_MARGIN - worstClearanceOverEnvelope(navTop, navLeft, navRight, width, height)
+
+  const wanted = Math.max(restWanted, envelopeWanted)
   if (!(wanted > 0)) return { ...BASE, clearance: navTop - lowest }
 
   const fromGap = Math.min(wanted, GAP_BASE - GAP_FLOOR)

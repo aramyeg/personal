@@ -20,6 +20,7 @@ import {
   pointerAnglesInto,
 } from './camera-parallax'
 import { usePointerParallax } from './use-pointer-parallax'
+import { writeNoteParallaxShift } from './note-parallax-shift'
 import { Planet } from './planet'
 import { Girl } from './girl'
 import { GirlProxy } from './girl-proxy'
@@ -138,8 +139,15 @@ function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
     // covers the whole journey. At zoom 0 this target is exactly CAMERA_TARGET.
     const t = cameraTargetInto(ending, aim.current)
     const base = cameraPositionInto(ending, eye.current)
-    camera.position.fromArray(orbitEyeInto(base, t, y, p, orbited.current))
+    const posed = orbitEyeInto(base, t, y, p, orbited.current)
+    camera.position.fromArray(posed)
     camera.lookAt(t[0], t[1], t[2])
+
+    // The connect block is DOM anchored to the viewport, so the orbit would slide the note out from
+    // under it — see `note-parallax-shift.ts` for the collision this closes and for why no amount of
+    // extra clearance can. Published as a difference, so it is a hard +0 at zero input and the
+    // overlay is untouched for the whole journey.
+    writeNoteParallaxShift(base, posed, t, aspect, y !== 0 || p !== 0)
   }, CAMERA_RIG_PRIORITY)
 
   return null

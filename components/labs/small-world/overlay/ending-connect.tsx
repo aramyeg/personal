@@ -5,6 +5,7 @@ import { siteConfig, socialLinks } from '@/lib/constants'
 import { ZOOM_START } from '../ending-timeline'
 import { NOTE_SETTLED_ZOOM } from './note-settle'
 import { useConnectSpacing } from './use-connect-spacing'
+import { useNoteTracking } from './use-note-tracking'
 import { PALETTE } from '../palette'
 
 /**
@@ -187,9 +188,13 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
   const items = controls()
   const revealOf = (i: number) => (focused ? 1 : connectReveal(t, i))
   const { navRef, spacing } = useConnectSpacing()
+  // rides the camera's breath so the note never slides out from under the pills — see
+  // `note-parallax-shift.ts` for why this is tracking rather than more clearance
+  const trackRef = useNoteTracking()
 
   return (
     <div
+      ref={trackRef}
       data-testid="sw-connect"
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
