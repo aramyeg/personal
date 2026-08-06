@@ -305,9 +305,17 @@ export const PALETTE = {
   // the ring 2.42x the reference's chroma and railed its red channel across a third of its area.
   //
   // So the tint is solved backwards from the render: reference RGB divided by the environment the
-  // ring actually samples (mean linear ~1.20, 1.03, 1.08). `ending-connect`-style: the value is a
-  // measurement, and `task68-compare.mjs` re-checks the chroma of both metal regions every capture.
-  standRoseGold: '#CBBDAF', // the globe stand's turned metal
+  // ring actually samples. `ending-connect`-style: the value is a measurement, and the compare bench
+  // re-checks the chroma of every metal region on every capture.
+  //
+  // RE-SOLVED IN TASK 71, AND THE REFERENCE DID NOT MOVE — the instrument did. The ring is the one
+  // metal T69 did not rebuild, and it measures (198,165,155) in the old approved render and in the
+  // new one alike. What changed is the sample: T68 read the ring through the largest rectangle that
+  // fits inside it, which on a torus is a 98x11 strip of its BRIGHT TOP ARC, and matched the mean
+  // there. Read over every pixel of the ring instead — the mask the whole bench now uses — that tint
+  // rendered +23% hot with 5.7% of the ring railed at R >= 254 against a reference that rails 1.7%.
+  // Both numbers were true of their own sample; only one of them is a statement about the ring.
+  standRoseGold: '#BDA799', // the globe stand's turned metal
 
   // The DOM that sits ON the studio: the connect pills and the restart.
   //
