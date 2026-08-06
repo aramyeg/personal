@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { EPILOGUE, MANGA_PAGES, mangaPageFor, mangaPageSrc } from '@/components/labs/small-world/manga'
 import type { MangaPage, Rect } from '@/components/labs/small-world/manga/types'
-import { balloonFontCqw, MAX_FONT_CQW, MIN_FONT_CQW, pageAspect } from '@/components/labs/small-world/manga/lettering'
+import {
+  balloonFontCqw,
+  drawnInkBox,
+  MAX_FONT_CQW,
+  MIN_FONT_CQW,
+  pageAspect,
+} from '@/components/labs/small-world/manga/lettering'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 
 /**
@@ -85,6 +91,14 @@ describe('manga page manifests', () => {
       for (const b of page.balloons.filter((x) => x.drawn)) {
         const tail = b.drawn!.tail
         expect(contains(page.panels[b.panel], { x: tail.x, y: tail.y, w: 0, h: 0 })).toBe(true)
+        // The INK, not just the words. The site draws an ellipse around the text
+        // box with a margin past sqrt(2) (it has to contain the box's corners),
+        // and that ellipse is what the reader sees leave the panel — page-1's
+        // hung off the top of the page until its centre was nudged down.
+        expect(
+          contains(page.panels[b.panel], drawnInkBox(b)),
+          `${page.id}: the drawn balloon's ink is inside its panel`
+        ).toBe(true)
       }
     }
   })

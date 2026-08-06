@@ -18,7 +18,7 @@
  * Solving `chars_per_line * lines >= length` for the font size that exactly
  * fills the box area gives the square root below.
  */
-import type { Balloon, MangaPage } from './types'
+import type { Balloon, MangaPage, Point } from './types'
 
 const AVG_GLYPH = 0.52
 const LINE_STEP = 1.18
@@ -50,3 +50,30 @@ export function balloonFontCqw(balloon: Balloon, page: MangaPage): number {
 }
 
 export { LINE_STEP }
+
+/**
+ * How far outside its readable box the ink of a DRAWN balloon reaches.
+ *
+ * An ellipse with semi-axes (rx, ry) contains a rectangle of half-extents
+ * (a, b) only when (a/rx)² + (b/ry)² ≤ 1, so a balloon that has to hold its
+ * whole text box needs a margin past √2 ≈ 1.414 — not the "looks like enough"
+ * 1.22 this started at, which let the corners of a two-line balloon fall
+ * outside the ink.
+ *
+ * It lives here rather than in the component because the manifest has to
+ * respect it too: a drawn balloon's ELLIPSE, not just its text box, must fit
+ * inside its panel. `manga-manifest.test.ts` asserts exactly that.
+ */
+export const DRAWN_INK_MARGIN = 1.46
+
+/** The full inked footprint of a drawn balloon, in page fractions. */
+export function drawnInkBox(balloon: { at: Point; box: { w: number; h: number } }): {
+  x: number
+  y: number
+  w: number
+  h: number
+} {
+  const w = balloon.box.w * DRAWN_INK_MARGIN
+  const h = balloon.box.h * DRAWN_INK_MARGIN
+  return { x: balloon.at.x - w / 2, y: balloon.at.y - h / 2, w, h }
+}

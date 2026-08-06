@@ -1,6 +1,6 @@
 'use client'
 import type { CSSProperties } from 'react'
-import { balloonFontCqw, LINE_STEP, pageAspect } from '../manga/lettering'
+import { balloonFontCqw, DRAWN_INK_MARGIN, LINE_STEP, pageAspect } from '../manga/lettering'
 import type { Balloon, Caption, MangaPage } from '../manga/types'
 import { PALETTE } from '../palette'
 
@@ -31,25 +31,39 @@ function Typed({ text, shown }: { text: string; shown: number }) {
  * the printed ones, with a tail toward the speaker — a cloud scallop with two
  * trailing bubbles for a thought, a straight spike for speech.
  *
- * The shape is drawn in the PAGE's coordinate space (viewBox 0→100 on both
- * axes, so `x`/`y` are the manifest's own fractions times 100) and stretched
- * with the page, which is what keeps it registered to its tail target.
+ * The shape is drawn in the page's own coordinate space and stretched with it,
+ * which is what keeps the balloon registered to the head its tail points at.
  */
 function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number }) {
   if (!balloon.drawn) return null
   const { at, box, voice, drawn } = balloon
-  // The interior box is the readable area; the ink sits a margin outside it.
-  const rx = (box.w / 2) * 100 * 1.22
-  const ry = (box.h / 2) * 100 * 1.22
-  const cx = at.x * 100
-  const cy = at.y * 100
-  const tail = { x: drawn.tail.x * 100, y: drawn.tail.y * 100 }
 
-  // Where the tail leaves the balloon: the point on the ellipse toward the speaker.
+  // COORDINATES. The viewBox is 100 wide by 100*aspect tall — the page's own
+  // proportions — so one unit is the same distance on both axes and the ink
+  // strokes stay circular rather than being squashed. That makes X and Y
+  // DIFFERENT conversions from a page fraction, which is the trap: an unscaled
+  // y put page-4's balloon a fifteenth of a page above its own words, with
+  // "Now it holds." printed on the rock below it (captured).
+  const X = (v: number) => v * 100
+  const Y = (v: number) => v * 100 * aspect
+
+  // The ink sits outside the readable box. An ellipse with semi-axes (rx, ry)
+  // contains a rectangle of half-extents (a, b) only when (a/rx)² + (b/ry)² ≤ 1,
+  // so the margin has to clear √2 — at the 1.22 this started with, the box's
+  // corners stuck out and the last line of a two-line balloon fell outside it.
+  const MARGIN = DRAWN_INK_MARGIN
+  const rx = X(box.w / 2) * MARGIN
+  const ry = Y(box.h / 2) * MARGIN
+  const cx = X(at.x)
+  const cy = Y(at.y)
+  const tail = { x: X(drawn.tail.x), y: Y(drawn.tail.y) }
+
+  // Where the tail leaves the balloon: the point on the ellipse toward the
+  // speaker, found by normalising the direction in the ellipse's own units.
   const dx = tail.x - cx
-  const dy = (tail.y - cy) / aspect
-  const len = Math.hypot(dx, dy) || 1
-  const edge = { x: cx + (dx / len) * rx, y: cy + ((dy / len) * ry * aspect) / aspect }
+  const dy = tail.y - cy
+  const k = 1 / (Math.hypot(dx / rx, dy / ry) || 1)
+  const edge = { x: cx + k * dx, y: cy + k * dy }
 
   const ink = PALETTE.ink
   return (
@@ -59,7 +73,7 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
       aria-hidden
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     >
-      <g vectorEffect="non-scaling-stroke">
+      <g>
         {voice === 'thought' ? (
           <>
             {/* two trailing bubbles, shrinking toward the thinker */}
@@ -67,7 +81,7 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
               cx={edge.x + (tail.x - edge.x) * 0.45}
               cy={edge.y + (tail.y - edge.y) * 0.45}
               rx={rx * 0.16}
-              ry={ry * 0.16 * aspect}
+              ry={ry * 0.16}
               fill="#fff"
               stroke={ink}
               strokeWidth={0.45}
@@ -76,7 +90,7 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
               cx={edge.x + (tail.x - edge.x) * 0.78}
               cy={edge.y + (tail.y - edge.y) * 0.78}
               rx={rx * 0.09}
-              ry={ry * 0.09 * aspect}
+              ry={ry * 0.09}
               fill="#fff"
               stroke={ink}
               strokeWidth={0.45}
@@ -84,14 +98,16 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
           </>
         ) : (
           <polygon
-            points={`${edge.x - rx * 0.22},${edge.y - ry * 0.16 * aspect} ${edge.x + rx * 0.22},${edge.y + ry * 0.2 * aspect} ${tail.x},${tail.y}`}
+            points={`${edge.x - rx * 0.22},${edge.y - ry * 0.16} ${edge.x + rx * 0.22},${edge.y + ry * 0.2} ${tail.x},${tail.y}`}
             fill="#fff"
             stroke={ink}
             strokeWidth={0.5}
             strokeLinejoin="round"
           />
         )}
-        <ellipse cx={cx} cy={cy} rx={rx} ry={ry * aspect} fill="#fff" stroke={ink} strokeWidth={0.6} />
+        {/* Drawn LAST so its fill covers where the tail meets it, the way an
+            inked balloon reads — one closed shape, not a shape plus a spike. */}
+        <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#fff" stroke={ink} strokeWidth={0.6} />
       </g>
     </svg>
   )
