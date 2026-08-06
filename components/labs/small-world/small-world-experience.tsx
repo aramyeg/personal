@@ -7,6 +7,7 @@ import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
 import { beginManualScrollRestoration, pinScrollToTop } from './scroll-reset'
+import { StoryStopSnap } from './story-stop-snap'
 import { useArrivalJourney } from './use-arrival-journey'
 import { isTuneEnabled } from './scene/tunables'
 
@@ -103,7 +104,13 @@ export function SmallWorldExperience({
   if (!active) return null
 
   return (
-    <div ref={trackRef} style={{ height: `${TRACK_VH}vh` }}>
+    <div ref={trackRef} style={{ height: `${TRACK_VH}vh`, position: 'relative' }}>
+      {/* On a touch device the track carries one snap area per checkpoint, so a FLING settles at
+          the next story stop instead of sailing past two biomes (Task 75). Desktop mounts nothing
+          at all and slow scrolling never arms it — see story-stops.ts for the mechanism and its
+          rails. `position: relative` above is what the areas are placed against; it changes no
+          layout on its own. */}
+      <StoryStopSnap trackRef={trackRef} />
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} journey={journey} onLoadChange={onLoadChange} />
         <JourneyOverlay progressRef={progressRef} journey={journey} onAdvance={advanceTo} />
