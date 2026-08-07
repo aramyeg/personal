@@ -17,14 +17,14 @@ export const PAGE_5: MangaPage = {
   balloons: [
     {
       panel: 1,
-      text: 'The best parts are the ones nobody sees.',
+      text: 'Still running. Good.',
       at: { x: 0.7155, y: 0.4665 },
       box: { w: 0.2405, h: 0.1054 },
       voice: 'speech',
     },
     {
       panel: 2,
-      text: 'Look how far the meadow is from here.',
+      text: 'The meadow’s still there.',
       at: { x: 0.6588, y: 0.7398 },
       box: { w: 0.1975, h: 0.082 },
       voice: 'thought',
@@ -33,7 +33,7 @@ export const PAGE_5: MangaPage = {
   captions: [
     {
       panel: 0,
-      text: 'These days, she watches everything at once.',
+      text: '2025 — present. Still building.',
       at: { x: 0.0293, y: 0.026 },
       width: 0.2786,
     },

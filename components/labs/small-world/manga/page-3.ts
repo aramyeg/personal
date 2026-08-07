@@ -19,7 +19,7 @@ export const PAGE_3: MangaPage = {
   balloons: [
     {
       panel: 1,
-      text: 'Build it once. Build it right.',
+      text: 'Same box. New paint.',
       at: { x: 0.1108, y: 0.7546 },
       box: { w: 0.1201, h: 0.0677 },
       voice: 'speech',

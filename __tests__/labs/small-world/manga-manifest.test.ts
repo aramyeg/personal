@@ -9,7 +9,6 @@ import {
   pageAspect,
 } from '@/components/labs/small-world/manga/lettering'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
-import { withRevision } from '@/components/labs/small-world/manga/dialogue-revision'
 import { PAGE_0 } from '@/components/labs/small-world/manga/page-0'
 import { PAGE_1 } from '@/components/labs/small-world/manga/page-1'
 import { PAGE_2 } from '@/components/labs/small-world/manga/page-2'
@@ -113,48 +112,50 @@ describe('manga page manifests', () => {
     }
   })
 
-  it('carries the story pack’s dialogue, and only the story pack’s dialogue', () => {
-    // THE GATE STILL HAS ITS TEETH, and it is now pointed at the right object.
+  it('carries the approved dialogue, and only the approved dialogue', () => {
+    // THE GATE STILL HAS ITS TEETH: no line invented about a real person may reach
+    // her page. What it points AT moved twice, and the second move is Task 82's.
     //
-    // This asserts PROVENANCE: no line invented about a real person may reach her
-    // page. It used to read `MANGA_PAGES`, which was the same thing as the source
-    // manifests until Task 75 put Aram's proposed dialogue revision between them
-    // (`manga/dialogue-revision.ts` — a staged layer he judges from captures, with
-    // one flag back to the shipped wording).
+    // Task 75 put a staged revision layer between the manifests and the pages so
+    // Aram could rule on seven swaps from captures with both wordings reachable,
+    // and this test read the MANIFESTS so it could not be fooled by whatever the
+    // layer happened to say. He has ruled: all seven are adopted, the winning text
+    // is IN the manifests, and the layer is deleted. So the manifests are the
+    // composed pages again, and this reads them directly.
     //
-    // So provenance is asserted where it lives: the MANIFESTS still carry the pack
-    // verbatim, and every revision entry names the pack line it replaces and is
-    // checked against it in `dialogue-revision.test.ts`. Reading the composed
-    // pages here instead would have let this test do nothing but restate whatever
-    // the revision happened to say.
-    const lines = SOURCE.flatMap((p) => p.balloons.map((b) => b.text))
+    // PROVENANCE FOR THE SWAPPED LINES lives in `.superpowers/sdd/task-80-report.md`
+    // and in the diff that folded them; the pack line each one replaced is recorded
+    // there. Nothing below is a sentence anyone made up in this repo.
+    const lines = MANGA_PAGES.flatMap((p) => p.balloons.map((b) => b.text))
+    // Untouched pack dialogue — the majority, and the reason the register is hers.
     expect(lines).toContain('Charts can tell me what people want…')
     expect(lines).toContain('It should be as easy as stacking blocks.')
-    expect(lines).toContain('You can now.')
-    expect(lines).toContain('If they can feel the seam, it isn’t done.')
-    expect(lines).toContain('Build it once. Build it right.')
     expect(lines).toContain('There. Now it holds.')
-    expect(lines).toContain('Look how far the meadow is from here.')
+    // Adopted swaps, pinned so a re-edit has to come back through this file.
+    expect(lines).toContain('Try dragging that one.')
+    expect(lines).toContain('Almost… there.')
+    expect(lines).toContain('Same box. New paint.')
+    expect(lines).toContain('Careful — heavier than it looks.')
     expect(lines).toHaveLength(13)
-    const captions = SOURCE.flatMap((p) => p.captions.map((c) => c.text))
+    const captions = MANGA_PAGES.flatMap((p) => p.captions.map((c) => c.text))
     expect(captions).toEqual([
-      'Her favorite thing to make: makers.',
-      'Nobody notices a perfect stone. Everybody feels it.',
+      'It worked in every browser. Eventually.',
+      'Most of this work is invisible. That’s fine by me.',
       'One design. Thirteen colors.',
-      'These days, she watches everything at once.',
+      '2025 — present. Still building.',
     ])
   })
 
-  it('differs from the manifests by the revision and by nothing else', () => {
-    // The other half of the same guarantee: whatever the composed pages say, the
-    // ONLY thing standing between them and the pack is the reviewed list.
-    for (const [i, page] of SOURCE.entries()) {
-      expect(MANGA_PAGES[i].balloons.map((b) => b.text)).toEqual(
-        withRevision(page).balloons.map((b) => b.text)
-      )
-      expect(MANGA_PAGES[i].captions.map((c) => c.text)).toEqual(
-        withRevision(page).captions.map((c) => c.text)
-      )
+  it('never lets the narrator back in', () => {
+    // THREE OF THE SEVEN SWAPS EXISTED FOR THIS: "Her favorite thing to make:
+    // makers.", "These days, she watches everything at once." — a narrator
+    // describing her in the third person, printed on her own page, in a piece whose
+    // every other word is hers. Stated as a rule rather than as four literals, so
+    // it holds for lines nobody has written yet.
+    for (const page of MANGA_PAGES) {
+      for (const text of [...page.balloons.map((b) => b.text), ...page.captions.map((c) => c.text)]) {
+        expect(/(she|her|hers|herself)/i.test(text), `"${text}" is third person`).toBe(false)
+      }
     }
   })
 

@@ -278,10 +278,12 @@ export function ClothDrag({
     ...(intro
       ? [
           { key: 'name', text: intro.name, kind: 'name' as const },
+          { key: 'says', text: intro.says, kind: 'says' as const },
           { key: 'role', text: `${currentRole()} · ${yearsWorking()}+ years`, kind: 'role' as const },
         ]
       : []),
     ...sheetLines(line).map((text, i) => ({ key: `l${i}`, text, kind: 'line' as const })),
+    ...(intro ? [{ key: 'contact', text: intro.contact, kind: 'contact' as const }] : []),
   ]
 
   const edge = lay * 100
@@ -429,15 +431,28 @@ const BASE_ROW: CSSProperties = {
  * The sheet's three registers. NO PINK anywhere on it: pink is the hero number's
  * semantic channel and the moment it decorates, numbers stop reading as the point.
  */
-const ROW_STYLE: Record<'name' | 'role' | 'line', CSSProperties> = {
+const ROW_STYLE: Record<'name' | 'says' | 'role' | 'line' | 'contact', CSSProperties> = {
   name: { ...BASE_ROW, fontSize: 'max(13px, 6.6cqw)', lineHeight: 1.06 },
+  says: {
+    ...BASE_ROW,
+    fontFamily: 'var(--sw-font-body)',
+    fontSize: 'max(10px, 3.6cqw)',
+    opacity: 0.9,
+  },
   role: {
     ...BASE_ROW,
     fontFamily: 'var(--sw-font-body)',
-    fontSize: 'max(10px, 3.4cqw)',
+    fontSize: 'max(10px, 3.2cqw)',
     letterSpacing: '0.08em',
-    opacity: 0.78,
+    opacity: 0.72,
     marginBottom: '0.8cqw',
   },
   line: { ...BASE_ROW, fontSize: 'max(11px, 5cqw)' },
+  contact: {
+    ...BASE_ROW,
+    fontFamily: 'var(--sw-font-body)',
+    fontSize: 'max(10px, 3.4cqw)',
+    opacity: 0.82,
+    marginTop: '0.9cqw',
+  },
 }

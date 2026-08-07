@@ -211,5 +211,15 @@ export const marksEnd = (count: number): number => markWindow(count - 1, count)[
  * than to write more.
  */
 export const MAX_CAPTION_WORDS = 12
-/** ...and a NOTE or a label is a phrase, not a caption. */
+/** ...and a NOTE printed on the art is a phrase, not a caption. */
 export const MAX_NOTE_WORDS = 3
+
+/**
+ * A hero's LABEL gets one more word than a note does, and the difference is real
+ * rather than a fudge to admit a string: a note is set small ON a picture and
+ * competes with it, while a label sits directly under type four times its size
+ * and has the whole width of the panel. The approved pack's "eight months of it"
+ * is four short words that read as one phrase, and shortening approved copy to
+ * satisfy a proxy for "phrase, not caption" would be the tail wagging the dog.
+ */
+export const MAX_LABEL_WORDS = 4

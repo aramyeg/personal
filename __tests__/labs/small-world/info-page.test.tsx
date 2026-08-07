@@ -26,7 +26,11 @@ import {
   donatedPanelFor,
 } from '@/components/labs/small-world/overlay/info-page-spec'
 import { MANGA_PAGES } from '@/components/labs/small-world/manga'
-import { MAX_CAPTION_WORDS, MAX_NOTE_WORDS } from '@/components/labs/small-world/overlay/info-beats'
+import {
+  MAX_CAPTION_WORDS,
+  MAX_LABEL_WORDS,
+  MAX_NOTE_WORDS,
+} from '@/components/labs/small-world/overlay/info-beats'
 import { PALETTE } from '@/components/labs/small-world/palette'
 
 afterEach(cleanup)
@@ -121,7 +125,7 @@ describe('the info leaf’s laws', () => {
       if (spec.ki.note) {
         expect(words(spec.ki.note), `chapter ${i + 1}'s note`).toBeLessThanOrEqual(MAX_NOTE_WORDS)
       }
-      expect(words(spec.ten.hero.label), `chapter ${i + 1}'s hero label`).toBeLessThanOrEqual(MAX_NOTE_WORDS)
+      expect(words(spec.ten.hero.label), `chapter ${i + 1}'s hero label`).toBeLessThanOrEqual(MAX_LABEL_WORDS)
     }
   })
 
@@ -142,11 +146,31 @@ describe('the info leaf’s laws', () => {
     }
   })
 
-  it('speaks as herself on every page, and never in the third person', () => {
+  it('never describes her from outside, on any surface of the page', () => {
+    // THE LAW: her CV in her voice, so a line that talks ABOUT her is a bio
+    // someone else wrote.
+    //
+    // BROADER AND WEAKER, both deliberate, and the same change `chapters.test.ts`
+    // records. Broader: it read the sheet's line only, and now sweeps the picture
+    // caption and the hero's own words too. Weaker: it also demanded an explicit
+    // first-person PRONOUN, and the approved round-3 copy elides the subject on
+    // three stops ("Eight months on a sports platform. All the small stuff."),
+    // which is still first person and is how a CV line is normally written.
+    // Requiring a pronoun would reject approved copy; the half with teeth stays.
     for (const [i, spec] of INFO_PAGES.entries()) {
-      const line = spec.ketsu.line
-      expect(/\b(I|my|me|mine|myself)\b/i.test(line), `chapter ${i + 1} speaks as herself`).toBe(true)
-      expect(/\bshe\b/i.test(line), `chapter ${i + 1} avoids the third person`).toBe(false)
+      const hero = spec.ten.hero
+      const surfaces = [
+        spec.ketsu.line,
+        spec.ki.note ?? '',
+        hero.kind === 'sfx' ? hero.text : '',
+        hero.label,
+      ]
+      for (const text of surfaces) {
+        expect(
+          /(she|her|hers|herself)/i.test(text),
+          `chapter ${i + 1}: "${text}" is third person`
+        ).toBe(false)
+      }
     }
   })
 
@@ -235,7 +259,9 @@ describe('the page is drawn by the SCROLL, and by nothing else', () => {
     // complete on the FIRST render, with no rAF and no timer.
     const raf = vi.spyOn(window, 'requestAnimationFrame')
     render(<InfoPage chapter={3} page={1} />)
-    expect(screen.getByTestId('sw-info-hero').textContent).toContain('42')
+    // Chapter 4's hero is the Isotype tally: thirteen marks, all planted.
+    expect(screen.getByTestId('sw-info-tally').getAttribute('data-count')).toBe('13')
+    expect(screen.getByTestId('sw-info-tally').children).toHaveLength(13)
     expect(raf).not.toHaveBeenCalled()
     raf.mockRestore()
   })
@@ -311,10 +337,12 @@ describe('the reveal is staged, one idea at a time', () => {
     // The "delayed earned reveal": a number that appears with its frame is a label;
     // a number that arrives into a frame the eye has accepted is an event. Asserted
     // through the pinned-clock camera the capture harness uses.
-    const { rerender } = render(<InfoPage chapter={2} page={1} instant />)
-    rerender(<InfoPage chapter={2} page={1} instant />)
+    // Chapter 5 is the one that still carries a NUMBER hero — the others became
+    // SFX or tallies when the dead metrics were filtered out (Task 82 Part E).
+    const { rerender } = render(<InfoPage chapter={4} page={1} instant />)
+    rerender(<InfoPage chapter={4} page={1} instant />)
     // instant renders the settled page: the hero is present and its digits final.
-    expect(screen.getByTestId('sw-info-hero').textContent).toContain('30')
+    expect(screen.getByTestId('sw-info-hero').textContent).toContain('20')
   })
 })
 

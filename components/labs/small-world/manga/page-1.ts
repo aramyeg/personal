@@ -40,7 +40,7 @@ export const PAGE_1: MangaPage = {
     },
     {
       panel: 1,
-      text: 'You can now.',
+      text: 'Try dragging that one.',
       at: { x: 0.8456, y: 0.5527 },
       box: { w: 0.1799, h: 0.1451 },
       voice: 'speech',
@@ -49,7 +49,7 @@ export const PAGE_1: MangaPage = {
   captions: [
     {
       panel: 2,
-      text: 'Her favorite thing to make: makers.',
+      text: 'It worked in every browser. Eventually.',
       at: { x: 0.0391, y: 0.7807 },
       width: 0.2933,
     },

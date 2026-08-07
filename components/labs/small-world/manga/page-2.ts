@@ -24,7 +24,7 @@ export const PAGE_2: MangaPage = {
     },
     {
       panel: 1,
-      text: 'If they can feel the seam, it isn’t done.',
+      text: 'Almost… there.',
       at: { x: 0.8877, y: 0.0892 },
       box: { w: 0.1172, h: 0.0898 },
       voice: 'speech',
@@ -33,7 +33,7 @@ export const PAGE_2: MangaPage = {
   captions: [
     {
       panel: 2,
-      text: 'Nobody notices a perfect stone. Everybody feels it.',
+      text: 'Most of this work is invisible. That’s fine by me.',
       at: { x: 0.5322, y: 0.5247 },
       width: 0.293,
     },

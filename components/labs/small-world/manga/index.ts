@@ -1,4 +1,3 @@
-import { withRevision } from './dialogue-revision'
 import { EPILOGUE } from './epilogue'
 import { PAGE_0 } from './page-0'
 import { PAGE_1 } from './page-1'
@@ -11,15 +10,16 @@ import type { MangaPage } from './types'
 /**
  * One page per chapter stop, in journey order.
  *
- * The lettering runs through `withRevision`, which is where Aram's proposed
- * dialogue swaps live while he judges them (`dialogue-revision.ts` — one flag
- * reverts every page to the wording that shipped). The ART is untouched by it:
- * the pages carry blank balloons and the site typesets them, so a swap is a
- * string and never a re-render.
+ * THE REVISION LAYER IS GONE (Task 82). `dialogue-revision.ts` staged Aram's
+ * proposed dialogue swaps as data so he could rule on them from captures with
+ * both versions reachable; he has ruled, all seven are adopted, and the winning
+ * text now lives in the manifests where the previous wording survives in the
+ * diff. It was scaffolding with a known end, and this is the end.
+ *
+ * The ART is untouched by any of it: the pages carry blank balloons and the site
+ * typesets them, so a line change is a string and never a re-render.
  */
-export const MANGA_PAGES: readonly MangaPage[] = [PAGE_0, PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5].map(
-  withRevision
-)
+export const MANGA_PAGES: readonly MangaPage[] = [PAGE_0, PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5]
 
 /**
  * The wordless closing page. It has no chapter stop of its own — the pack hands

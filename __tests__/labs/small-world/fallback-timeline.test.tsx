@@ -4,6 +4,7 @@ import { FallbackTimeline } from '@/components/labs/small-world/fallback-timelin
 import { FALLBACK_STYLE } from '@/components/labs/small-world/fallback-timeline-style'
 import { FALLBACK_CLASS } from '@/components/labs/small-world/fallback-class'
 import { PALETTE } from '@/components/labs/small-world/palette'
+import { ALWINA_STORY } from '@/components/labs/small-world/alwina-story'
 
 describe('FALLBACK_STYLE (pre-scene pastel identity)', () => {
   it('ships an OPAQUE pastel background so the dark site theme never shows through', () => {
@@ -40,9 +41,13 @@ describe('FallbackTimeline (server-rendered, crawlable)', () => {
     // Crawler-facing content still present (mirrors the e2e crawler assertions).
     // The lab tells Alwina's story now, so this is HER career — the same six
     // chapters the scene tells, in markup a crawler and a no-WebGL visitor read.
-    expect(section).toHaveTextContent('The Observatory')
-    expect(section).toHaveTextContent('Frontend Engineer · Sync Design Tech · 2025–now')
-    expect(section).toHaveTextContent('The Pull')
+    // READ FROM THE STORY, never pinned as strings: Task 82 wired the approved
+    // round-3 pack and all three of these literals moved. As literals they would
+    // have failed as a copy edit rather than as a crawlable-content defect, which
+    // is the only thing this assertion is here to catch.
+    expect(section).toHaveTextContent(ALWINA_STORY[ALWINA_STORY.length - 1].theme)
+    expect(section).toHaveTextContent(ALWINA_STORY[ALWINA_STORY.length - 1].caption)
+    expect(section).toHaveTextContent(ALWINA_STORY[0].theme)
     // The pastel skin ships inline with the markup.
     expect(section.querySelector('style')?.textContent).toContain('linear-gradient')
   })

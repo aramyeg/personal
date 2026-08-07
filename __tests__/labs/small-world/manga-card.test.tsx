@@ -89,7 +89,15 @@ describe('the info leaf', () => {
     const spec = INFO_PAGES[2]
     expect(screen.getByTestId('sw-info-page')).toBeTruthy()
     expect(leaf.textContent).toContain(spec.footer.org)
-    expect(leaf.textContent).not.toContain(chapters[2].hook)
+    expect(leaf.textContent).toContain(spec.ketsu.line)
+    // IT USED TO ASSERT THE OPPOSITE of the line below — that the leaf did NOT
+    // repeat the chapter's hook — because the hook was a narrator's third-person
+    // sentence and echoing it would have been asserting the defect. The approved
+    // round-3 pack makes the leaf's line and the stop's headline the SAME sentence
+    // on purpose: one claim per stop, said once, in her voice. So the gate flips,
+    // and what it protects now is that the spread mounted the right CHAPTER.
+    expect(leaf.textContent).toContain(chapters[2].hook)
+    expect(leaf.textContent).not.toContain(INFO_PAGES[0].ketsu.line)
   })
 
   it('gives the page exactly one hero', () => {

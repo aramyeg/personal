@@ -10,33 +10,56 @@ describe('small-world chapters', () => {
     expect(chapters[CHAPTER_COUNT - 1].id).toBe('sync-design')
   })
 
-  it('carries the story pack through verbatim, except for the one recorded edit', () => {
-    // THE PACK IS STILL THE SOURCE. Themes and captions are its words untouched,
-    // and this is the gate that stops anyone quietly rewriting a real person's CV.
+  it('carries the round-3 pack through verbatim', () => {
+    // THE PACK IS THE SOURCE, and this is the gate that stops anyone quietly
+    // rewriting a real person's CV. Pinned on the LAST stop because it is the one
+    // a careless edit reaches for first — it is her current job.
     const last = chapters[CHAPTER_COUNT - 1]
-    expect(last.theme).toBe('The Observatory')
-    expect(last.caption).toBe('Frontend Engineer · Sync Design Tech · 2025–now')
-
-    // THE HOOKS CHANGED PERSON, and only person. The pack wrote them for a
-    // narrator — "Now she owns the glass" — and the lab has no narrator any more:
-    // every other word in it is hers. They also rendered NOWHERE until the blind
-    // audit found them (their only consumer was the no-WebGL fallback), so the
-    // third person had never been seen to be wrong. Recorded here rather than
-    // silently updated, alongside the pack's own line for comparison.
-    //
-    //   pack:    "Now she owns the glass — and the foundations under the snow."
-    //   shipped: "Now I keep the glass — and the foundations under the snow."
-    expect(last.hook).toBe('Now I keep the glass — and the foundations under the snow.')
-    expect(last.hook).toContain('the foundations under the snow')
+    expect(last.theme).toBe('The dashboards')
+    expect(last.caption).toBe('Frontend Engineer — Sync Design Tech, 2025–now')
+    expect(last.hook).toBe('Now I build dashboards where the data never sits still.')
   })
 
-  it('speaks every hook in the first person', () => {
-    // The law the audit's inversion made explicit: the piece is her CV in her
-    // voice, so a hook that talks ABOUT her is a bio someone else wrote. Cheap to
-    // assert, and it is the thing that went unnoticed for four rounds.
+  it('keeps the dead metrics dead', () => {
+    // FILTERED ON ATTRIBUTABILITY, which is a truthfulness question and not an
+    // editing one: these are numbers she cannot personally stand behind. A future
+    // round adding "impact" back is exactly how they return, so the gate is on the
+    // strings rather than on anyone's memory. `+15% session` is deliberately NOT
+    // here — it survives, as a body line.
+    const words = JSON.stringify(chapters)
+    for (const dead of ['42%', '19%', 'retention', '30% smoother']) {
+      expect(words, `"${dead}" came back`).not.toContain(dead)
+    }
+  })
+
+  it('spends stamps scarcely: three in the whole walk, on two stops', () => {
+    // A STAMP ROW ON EVERY CHAPTER was the loudest generated-copy tell the research
+    // round found, and the fix is scarcity rather than wording: a badge means "this
+    // one is the number", and six of them mean nothing. Asserted as a census, so
+    // helpfully filling an empty array fails loudly.
+    expect(chapters.filter((c) => c.stamps.length > 0)).toHaveLength(2)
+    expect(chapters.reduce((n, c) => n + c.stamps.length, 0)).toBe(3)
+  })
+
+  it('never describes her from outside — hooks AND body lines', () => {
+    // THE LAW: the piece is her CV in her voice, so a line that talks ABOUT her is
+    // a bio someone else wrote.
+    //
+    // IT IS BROADER THAN IT WAS, AND WEAKER IN ONE PLACE, both deliberately.
+    // Broader: it checked hooks only, and the body lines were shipping "no code
+    // needed by anyone but her" and "The whole picture, hers." — third person,
+    // rendered, unnoticed for four rounds. Weaker: it also required an explicit
+    // first-person PRONOUN, and the approved round-3 copy elides the subject on
+    // three stops ("Eight months on a sports platform. All the small stuff."),
+    // which is still first person and is how a CV line is normally written.
+    // Requiring a pronoun would reject approved copy, so what is kept is the half
+    // of the gate with teeth.
     for (const c of chapters) {
-      expect(/\b(I|my|me|mine|myself)\b/i.test(c.hook), `${c.id} speaks as herself`).toBe(true)
-      expect(/\b(she|her|herself)\b/i.test(c.hook), `${c.id} avoids the third person`).toBe(false)
+      for (const text of [c.hook, ...c.lines]) {
+        expect(/(she|her|hers|herself)/i.test(text), `${c.id}: "${text}" is third person`).toBe(
+          false
+        )
+      }
     }
   })
 
@@ -55,9 +78,10 @@ describe('small-world chapters', () => {
       expect(c.index).toBe(i)
       expect(c.theme.length).toBeGreaterThan(0)
       expect(c.hook.length).toBeGreaterThan(0)
-      expect(c.caption).toContain('·')
+      // A wall label names the years. The separator is the pack's em dash now, so
+      // asserting a middot would only have been pinning the punctuation.
+      expect(c.caption).toMatch(/\d{4}/)
       expect(c.lines.length).toBeGreaterThan(0)
-      expect(c.stamps.length).toBeGreaterThan(0)
       expect(c.tech.length).toBeGreaterThan(0)
       expect(c.accent).toMatch(/^#[0-9A-Fa-f]{6}$/)
     })

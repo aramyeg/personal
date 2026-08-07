@@ -34,7 +34,7 @@ export const PAGE_4: MangaPage = {
     },
     {
       panel: 2,
-      text: 'Your turn — carve your own door.',
+      text: 'Careful — heavier than it looks.',
       at: { x: 0.8599, y: 0.5993 },
       box: { w: 0.1338, h: 0.1035 },
       voice: 'speech',

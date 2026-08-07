@@ -15,6 +15,12 @@ import {
 // thing the rebuild existed to remove. Literals would have gone on failing (or,
 // worse, been "fixed" back to strings the page no longer has a reason to print).
 import { INFO_PAGES } from '../components/labs/small-world/overlay/info-page-spec'
+// ...and the story's own words from the story, for the same reason. Task 82 wired
+// the approved round-3 pack and every one of these literals moved: "The Pull"
+// became "Marketing, then code", "The Observatory" became "The dashboards", and
+// the caption separator went from a middot to the pack's em dash. Pinned as
+// strings they would have failed as a copy edit rather than as a defect.
+import { ALWINA_STORY } from '../components/labs/small-world/alwina-story'
 
 async function webglAvailable(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -66,9 +72,9 @@ test.describe('Small World lab', () => {
     const fallback = page.getByTestId('small-world-fallback')
     await expect(fallback).toBeAttached()
     // The lab tells Alwina's story now (T73), so the crawlable mirror is hers.
-    await expect(fallback).toContainText('The Pull')
-    await expect(fallback).toContainText('Frontend Engineer · Sync Design Tech · 2025–now')
-    await expect(fallback).toContainText('The Observatory')
+    await expect(fallback).toContainText(ALWINA_STORY[0].theme)
+    await expect(fallback).toContainText(ALWINA_STORY[ALWINA_STORY.length - 1].caption)
+    await expect(fallback).toContainText(ALWINA_STORY[ALWINA_STORY.length - 1].theme)
   })
 
   test('Esc returns to the museum', async ({ page }) => {
@@ -81,9 +87,9 @@ test.describe('Small World lab', () => {
   test('career timeline is server-rendered for crawlers', async ({ request }) => {
     const res = await request.get('/labs/small-world')
     const html = await res.text()
-    expect(html).toContain('The Pull')
+    expect(html).toContain(ALWINA_STORY[0].theme)
     expect(html).toContain('Sync Design Tech')
-    expect(html).toContain('The Observatory')
+    expect(html).toContain(ALWINA_STORY[ALWINA_STORY.length - 1].theme)
   })
 
   test('comic panel opens at the first discovery stop', async ({ page }) => {

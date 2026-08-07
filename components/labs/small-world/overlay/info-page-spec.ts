@@ -154,7 +154,18 @@ export type InfoPageSpec = {
      *
      * ONE CHAPTER CARRIES IT. A name reprinted on all six sheets is a watermark.
      */
-    intro?: { name: string }
+    intro?: {
+      name: string
+      /** The identity line — the one that gets quoted. */
+      says: string
+      /**
+       * How to reach her. LINKEDIN, NOT AN EMAIL: her real address is not known
+       * to this repo, and a plausible-looking invented one on a real person's CV
+       * is the worst possible failure here. Swap it when Aram supplies the real
+       * one; do not guess.
+       */
+      contact: string
+    }
   }
   footer: { role: string; org: string; period: string }
 }
@@ -221,12 +232,17 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     ki: { alt: 'Her cupped hands holding a seedling', crop: { page: 0, x: 0.0117, y: 0.7271, w: 0.9766, h: 0.2657 } },
     ten: { hero: { kind: 'sfx', text: 'Self-taught', label: 'and it stuck' }, inverted: true },
     ketsu: {
-      // Her name, carried over verbatim from the retired title card. What she IS
-      // is not typed here — `currentRole()` reads it off the last chapter, so a
-      // new job moves it and a stale role cannot survive an edit.
-      intro: { name: 'Alwina Harutyunyan' },
-      line: 'I studied why people choose — then taught myself to build it.',
-      tools: ['Four languages', 'Marketing', 'Business', 'Code'],
+      // Her name, carried over verbatim from the retired title card, plus the
+      // pack's identity line. What she IS is not typed here — `currentRole()`
+      // reads it off the last chapter, so a new job moves it and a stale role
+      // cannot survive an edit.
+      intro: {
+        name: 'Alwina Harutyunyan',
+        says: 'Frontend engineer with opinions about spacing.',
+        contact: 'linkedin.com/in/alwina-harutyunyan',
+      },
+      line: 'A marketing degree, then code. Better order than it sounds.',
+      tools: ['Marketing', 'Self-taught code'],
     },
     footer: {
       role: 'Master of Marketing & Business',
@@ -248,7 +264,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     },
     ten: { hero: { kind: 'sfx', text: 'No code', label: 'for small changes' } },
     ketsu: {
-      line: 'My first job: a page builder — no developer for small changes.',
+      line: 'My first job was a drag-and-drop builder people actually used.',
       tools: ['Frontend', 'Drag-and-drop', 'Cross-browser'],
     },
     footer: { role: 'Frontend Developer', org: 'IU Networks', period: '2020–2021' },
@@ -266,8 +282,17 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       crop: { page: 2, x: 0.5068, y: 0.2644, w: 0.4824, h: 0.1313 },
       note: '+15% session',
     },
-    ten: { hero: { kind: 'number', value: 30, prefix: '+', suffix: '%', label: 'smoother' } },
-    ketsu: { line: 'I polish the stones people step on.', tools: ['UI', 'UX', 'Interaction'] },
+    // THE +30% IS GONE and is not coming back: it was filtered out on
+    // ATTRIBUTABILITY with the rest of the dead metrics. A beat-3 that is a
+    // metric-shaped hole is worse than one that is honest, so the stop's own
+    // claim — that the invisible work is the work — takes the SFX treatment,
+    // and `+15% session` stays as the picture's caption where a supporting
+    // figure belongs.
+    ten: { hero: { kind: 'sfx', text: 'The small stuff', label: 'eight months of it' } },
+    ketsu: {
+      line: 'Eight months on a sports platform. All the small stuff.',
+      tools: ['UI', 'UX', 'Interaction'],
+    },
     footer: { role: 'UI/UX Engineer', org: 'Sportion', period: '2021' },
   },
 
@@ -284,19 +309,14 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       crop: { page: 3, x: 0.0205, y: 0.8002, w: 0.4395, h: 0.1196 },
       note: '−40% build time',
     },
-    ten: {
-      hero: {
-        kind: 'number',
-        value: 42,
-        prefix: '+',
-        suffix: '%',
-        label: 'revenue',
-        marks: { count: 13, label: 'clients' },
-      },
-      inverted: true,
-    },
+    // THE +42% REVENUE IS GONE (dead metric), and losing it improves the beat:
+    // the thirteen clients were always the fact, and they were riding along as a
+    // supporting row under a number she cannot personally stand behind. The
+    // Isotype tally IS the hero now — thirteen marks say "a lot, and exactly this
+    // many" in one look, which the numeral 13 cannot. Still the one inverted page.
+    ten: { hero: { kind: 'count', count: 13, label: 'clients' }, inverted: true },
     ketsu: {
-      line: 'One loyalty app I built — each client in their own colors.',
+      line: 'Thirteen brands on one library — none of them looked bolted-on.',
       tools: ['React', 'Component library', 'Design system'],
     },
     footer: { role: 'React Developer', org: 'qiibee', period: '2021–2023' },
@@ -312,11 +332,15 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     ki: {
       alt: 'She sets a foundation stone by lamplight',
       crop: { page: 4, x: 0.4727, y: 0.2688, w: 0.5234, h: 0.1424 },
-      note: '+19% conversion',
+      // NO CAPTION. It read "+19% conversion" until that metric was filtered out
+      // on attributability. The pack offers `React · PHP · AWS` as the
+      // replacement or silence; silence wins, because the tools row directly
+      // below already says exactly those three words and a page may not say one
+      // thing twice.
     },
     ten: { hero: { kind: 'number', value: 20, prefix: '−', suffix: '%', label: 'load' } },
     ketsu: {
-      line: 'I went full-stack — React on top, PHP underneath, AWS holding it up.',
+      line: 'I went full-stack: React up top, PHP and AWS underneath.',
       tools: ['React', 'PHP', 'AWS'],
     },
     footer: { role: 'Full-stack Software Engineer', org: 'Wooskill', period: '2023–2024' },
@@ -335,7 +359,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     },
     ten: { hero: { kind: 'count', count: 3, label: 'stacks' } },
     ketsu: {
-      line: 'I build live maps and camera feeds — and what holds them up.',
+      line: 'Now I build dashboards where the data never sits still.',
       tools: ['Real-time', 'Maps', 'Infra as code'],
     },
     footer: { role: 'Frontend Engineer', org: 'Sync Design Tech', period: '2025–now' },
