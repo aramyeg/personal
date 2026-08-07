@@ -53,6 +53,36 @@ export type SheetArt = {
   ready: boolean
 }
 
+/**
+ * THE BAND — which part of an anchor beat 1 actually shows.
+ *
+ * The anchors generate at 3:2 and the leaf shows them in a wide band, because
+ * four beats stacked in a 2:3 page cannot afford a 3:2 establishing shot. The
+ * first version got there with `object-fit: cover`, which takes a full-width slice
+ * through the middle of the whole illustration — and the blind audit's verdict on
+ * that was exact: at ~100px tall it collapses to grey mush, because most of a
+ * full-width slice is background.
+ *
+ * A band is a REAL CROP instead: a rectangle tight on the hands and the action, at
+ * the beat's own aspect, so what survives the shrink is the part worth seeing.
+ * `x`/`y`/`w` are fractions of the anchor; the height follows from the aspect, so
+ * a band cannot be authored at the wrong shape.
+ *
+ * All six seeded at the same rectangle, which is a fact about the ART rather than
+ * a shortcut: the pack composed every anchor with its subject just off-centre and
+ * fine detail near the middle, so one window catches all of them. Per-anchor
+ * because the moment one generation is re-rolled that stops being true.
+ */
+export type AnchorBand = { x: number; y: number; w: number }
+
+/** Beat 1's band aspect, and beat 2 zooms into the middle of it. */
+export const BAND_ASPECT = 2.45
+/** Every anchor is generated at 3:2. */
+export const ANCHOR_ASPECT = 1.5
+
+/** A band's height, in anchor fractions — derived so it is always the right shape. */
+export const bandHeight = (w: number): number => (w * ANCHOR_ASPECT) / BAND_ASPECT
+
 /** Public path of a prepared v3 asset. */
 export const anchorSrc = (id: string): string => `/labs/small-world/manga/${id}.webp`
 
@@ -67,16 +97,19 @@ export const anchorSrc = (id: string): string => `/labs/small-world/manga/${id}.
 export const ZOOM = 2.4
 
 /** The six anchors, in journey order. `ANCHORS[0]` is chapter 1 (Lyon). */
-export const ANCHORS: readonly SheetArt[] = [
-  { id: 'anchor-1', ready: true }, // ch1 Lyon — hands planting a seedling in a textbook-propped pot
-  { id: 'anchor-2', ready: true }, // ch2 IU Networks — the honeycomb block snapping together
-  { id: 'anchor-3', ready: true }, // ch3 Sportion — polishing the stone in the stream
-  { id: 'anchor-4', ready: true }, // ch4 qiibee — the brush-stroke on a chest, thirteen receding
-  { id: 'anchor-5', ready: true }, // ch5 Wooskill — the foundation stone by lantern
-  { id: 'anchor-6', ready: true }, // ch6 Sync Design — the blueprint scroll, fox asleep
+const BAND: AnchorBand = { x: 0.06, y: 0.3, w: 0.88 }
+
+export const ANCHORS: readonly (SheetArt & { band: AnchorBand })[] = [
+  { id: 'anchor-1', ready: true, band: BAND }, // ch1 Lyon — hands planting a seedling by a textbook
+  { id: 'anchor-2', ready: true, band: BAND }, // ch2 IU Networks — the honeycomb block snapping together
+  { id: 'anchor-3', ready: true, band: BAND }, // ch3 Sportion — polishing the stone in the stream
+  { id: 'anchor-4', ready: true, band: BAND }, // ch4 qiibee — the brush on a chest, thirteen receding
+  { id: 'anchor-5', ready: true, band: BAND }, // ch5 Wooskill — the foundation stone by lantern
+  { id: 'anchor-6', ready: true, band: BAND }, // ch6 Sync Design — the blueprint scroll, fox asleep
 ]
 
-export const anchorFor = (chapterIndex: number): SheetArt | undefined => ANCHORS[chapterIndex]
+export const anchorFor = (chapterIndex: number): (SheetArt & { band: AnchorBand }) | undefined =>
+  ANCHORS[chapterIndex]
 
 /**
  * The chibi run cycle. Six poses in one horizontal row, so a frame is

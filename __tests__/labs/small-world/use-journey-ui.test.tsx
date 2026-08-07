@@ -76,7 +76,24 @@ describe('useJourneyUi', () => {
       started: false,
       panel: null,
       ending: null,
+      // The title card holds the frame at rest — her name is the first thing the
+      // piece says now (blind audit: it appeared nowhere at all).
+      title: 1,
     })
+  })
+
+  it('fades the title out on the visitor’s own first scroll', () => {
+    // IT MUST LIVE IN THIS STATE, not in a ref read at render: the hook only
+    // re-renders when its quantized state CHANGES, and across the journey's
+    // opening nothing else about it moves — a title driven by the raw ref would
+    // render once at 1 and never fade.
+    expect(useJourneyUi ? true : false).toBe(true)
+    const { result, rerender } = renderHook(({ p }: { p: number }) => useJourneyUi(refOf(p)), {
+      initialProps: { p: 0 },
+    })
+    expect(result.current.title).toBe(1)
+    rerender({ p: 0.03 })
+    expect(result.current.title).toBe(0)
   })
 
   it('reports the burst window', () => {

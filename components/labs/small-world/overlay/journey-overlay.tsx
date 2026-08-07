@@ -4,6 +4,7 @@ import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
 import { ChapterStrip } from './chapter-strip'
+import { TitleCard } from './title-card'
 import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { EndingInk } from './ending-ink'
@@ -15,6 +16,7 @@ import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 
 /** Set false to remove the bottom progress rail entirely (one-line revert). */
 const SHOW_PROGRESS_RAIL = true
+
 
 /** Everything DOM above the canvas: speed lines, chapter panels, ending. */
 export function JourneyOverlay({
@@ -52,6 +54,13 @@ export function JourneyOverlay({
           the half that has to change: hard-cutting a retracting spread is worse than letting it
           play, and a live click target under the ending is the trap the canvas-first model
           (aa399f6) exists to forbid. */}
+      {/* HER NAME, at the top of her own book. The audit's plainest finding was
+          that it appeared NOWHERE in the piece — a recruiter could read the whole
+          thing without learning whose CV it was. It holds the frame before she
+          starts walking and is gone by the time she does: `progress` here is the
+          raw journey clock, so the card fades on the visitor's own first scroll
+          rather than on a timer. */}
+      <TitleCard present={ui.title} />
       {/* THE FACTS, for the WHOLE chapter and not just its dwell. The spread is up
           for about a third of a chapter's scroll; this is up for all of it, so a
           visitor who flicks still leaves with the role, the company, the years and

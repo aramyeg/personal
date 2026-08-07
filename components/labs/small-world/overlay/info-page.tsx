@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { MANGA_PAGES, mangaPageSrc } from '../manga'
 import {
+  BAND_ASPECT,
   ZOOM,
   anchorFor,
   anchorSrc,
@@ -95,18 +96,6 @@ import {
 
 /** The page is 2:3, like the printed pages it is bound with. */
 export const INFO_PAGE_ASPECT = 1.5
-
-/**
- * The aspect the two art beats are shown at.
- *
- * WIDE, and it is arithmetic rather than taste: four beats stacked in a 2:3 leaf
- * leave the art about 45% of the height between them, so an establishing shot at
- * the anchors' own 3:2 eats the hero's room and the colophon falls off the page.
- * These are the same proportions the hand-cut fallback crops were derived to, so
- * the layout does not move when an anchor goes live.
- */
-export const KI_BAND = 2.45
-export const SHO_BAND = 2.15
 
 const RULE_CQW = 0.85
 const GAP = '1.6cqw'
@@ -258,6 +247,62 @@ const cropAspect = (crop: SpotCrop): number => {
 }
 
 /**
+ * A rectangle of an anchor, drawn to fill its panel — and optionally zoomed into
+ * its own centre for beat 2.
+ *
+ * Same technique `Spot` uses on the printed pages: scale until the crop's WIDTH
+ * fills the box, then translate by the crop's origin. `object-fit: cover` was
+ * what the blind audit called grey mush — it takes a full-width slice of the
+ * whole illustration, and most of a full-width slice is background.
+ */
+function AnchorCrop({
+  id,
+  band,
+  alt,
+  reveal,
+  zoom = 1,
+}: {
+  id: string
+  band: { x: number; y: number; w: number }
+  alt: string
+  reveal: number
+  zoom?: number
+}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        overflow: 'hidden',
+        transform: `scale(${zoom})`,
+        transformOrigin: 'center',
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={anchorSrc(id)}
+        alt={alt}
+        decoding="async"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          maxWidth: 'none',
+          width: `${100 / band.w}%`,
+          // Percentages in a transform are of the ELEMENT, per axis — so the band's
+          // origin in image fractions IS the shift, on both axes, with no
+          // conversion. (A first version invented one and produced nonsense.)
+          transform: `translate(${-band.x * 100}%, ${-band.y * 100}%)`,
+          display: 'block',
+          clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
+        }}
+      />
+    </div>
+  )
+}
+
+
+/**
  * Beat 1: the chapter's own generated anchor panel.
  *
  * FALLBACK, and it is deliberate rather than temporary scaffolding left in: while
@@ -279,22 +324,8 @@ function KiPanel({ chapter, crop, alt, t }: { chapter: number; crop: SpotCrop; a
     // the pack put the air: every anchor's subject is composed at its centre,
     // because beat 2 zooms there.
     return (
-      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${KI_BAND}` }}>
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={anchorSrc(anchor.id)}
-            alt={alt}
-            decoding="async"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
-            }}
-          />
-        </div>
+      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${BAND_ASPECT}` }}>
+        <AnchorCrop id={anchor.id} band={anchor.band} alt={alt} reveal={reveal} />
       </InkedPanel>
     )
   }
@@ -331,7 +362,7 @@ function ShoPanel({
     <InkedPanel
       ink={inkOf(t, SHO_INK)}
       tone="context"
-      style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? `${SHO_BAND}` : `${cropAspect(crop)}` }}
+      style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? `${BAND_ASPECT}` : `${cropAspect(crop)}` }}
     >
       {anchor?.ready ? (
         // THE ZOOM IS A TRANSFORM, not a percentage offset. An earlier version
