@@ -324,15 +324,38 @@ test.describe('Small World lab', () => {
     for (const text of [ALWINA.name, ALWINA.says]) {
       const node = leaf.getByText(text, { exact: true }).first()
       await expect(node, `"${text}" is on the page`).toBeVisible({ timeout: 10_000 })
-      // TOPMOST AT ITS OWN CENTRE. Visibility alone is what the audit found to be
-      // true and useless: the name was painted at full opacity underneath an
-      // opaque manga page.
-      const occluded = await node.evaluate((el) => {
-        const r = el.getBoundingClientRect()
-        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
-        return top ? !(top === el || el.contains(top) || top.contains(el)) : true
-      })
-      expect(occluded, `"${text}" is covered by something`).toBe(false)
+      // TOPMOST AT ITS OWN CENTRE, AND THE TOPMOST THING BELONGS TO THIS LEAF.
+      // Visibility alone is what the audit found to be true and useless: the name
+      // was painted at full opacity underneath an opaque manga page, in the OTHER
+      // leaf of the stack. So the question is whether anything from outside this
+      // leaf covers it.
+      //
+      // NOT "is the hit-test result an ancestor of the text". That was the first
+      // form and webkit fails it while rendering the name perfectly: the sheet
+      // gives each line its own `rotateX`/`translateZ` wrapper, and those stacking
+      // contexts make a transparent SIBLING the topmost element at that point.
+      // Hit-test order is not paint occlusion, and the defect this exists for is
+      // the other card being in front — which this still catches exactly.
+      //
+      // POLLED, because the leaf ARRIVES: it enters on `translateX(120% * (1 -
+      // enter))` driven by the wall clock, and a hit-test taken mid-entrance
+      // reads the canvas behind it. Captured on webkit against the pre-fix build:
+      // the frame under test still had the "!" burst up and no cards at all, so
+      // the check "failed" on a chapter that had not started yet. Polling makes
+      // this an assertion about the RESTING state, which is the state the finding
+      // is about, without weakening what is asserted.
+      await expect
+        .poll(
+          async () =>
+            node.evaluate((el) => {
+              const r = el.getBoundingClientRect()
+              const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+              if (!top) return 'nothing hit-tests there'
+              return top.closest('[data-testid="sw-panel-data"]') ? null : `covered by ${top.tagName}`
+            }),
+          { message: `"${text}" is covered from outside its own leaf`, timeout: 15_000 }
+        )
+        .toBeNull()
     }
     // ...and the escape hatch is on the same face, which is the other half of the
     // finding: the plain CV was not findable on a phone either.
