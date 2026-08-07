@@ -98,6 +98,90 @@ export const DESK_FIGURINES = [
 export const FIGURINE_HEIGHT = Math.max(...DESK_FIGURINES.map((f) => f.height))
 
 /**
+ * THE NUDGE ZONES (Task 89) — the five props that answer the pointer, as boxes over the MERGED bake.
+ *
+ * The desk ships as four joined meshes (see `DESK_MESHES`), so "the mug" is not an object anyone can
+ * rotate — it is a run of vertices inside `DeskBaked` plus its foil print inside `DeskMetal`. The
+ * pointer interactions therefore select by REST POSITION: a vertex belongs to a zone iff its
+ * authored position lies inside the zone's box, and the zone's motion is applied in the vertex
+ * shader (`desk-nudge.ts` owns the motion; this table owns only the geometry facts).
+ *
+ * That makes the boxes load-bearing in a way an eyeballed hitbox never is: a box that CUTS an
+ * object tears it — half a mug rocks and half stays — and a box that swallows a neighbour's
+ * vertices rocks the neighbour. So every bound below is derived from the shipped file, not typed
+ * from taste: a union-find over the GLB's triangles (plus co-located split vertices) gives each
+ * physical object as a connected component with an exact AABB, and each zone is the union of its
+ * own components padded to the midpoint of the measured gap to the nearest foreign component. The
+ * tightest of those gaps are real constraints — the sculpting tool's rod ends at x 2.5506 and the
+ * pen cup begins at 2.5650, the mug's body ends at x −2.2507 and the donut's cake begins at
+ * −2.1700 — which is why some pads are 0.01 where others are 0.05.
+ *
+ * `desk-nudge-zones.test.ts` re-derives the components from the shipped bytes and holds every zone
+ * to the no-tear condition (each component entirely inside or entirely outside each zone box, per
+ * mesh the zone is registered in), so a re-bake that moves a prop cannot silently shear it.
+ *
+ * `pivot` is the centre of the object's contact with the desk and `baseR` its contact radius: the
+ * shader rocks the object about a horizontal axis through the pivot and lifts it by baseR·|angle|,
+ * which is exactly (to first order) a rock about the base's EDGE — the far rim stays seated instead
+ * of sinking through the desk.
+ */
+export type DeskNudgeKind = 'mug' | 'donut' | 'pencup' | 'bird' | 'penguin'
+export const DESK_NUDGE_ZONES: readonly {
+  kind: DeskNudgeKind
+  min: readonly [number, number, number]
+  max: readonly [number, number, number]
+  pivot: readonly [number, number, number]
+  baseR: number
+  meshes: readonly DeskMeshName[]
+}[] = [
+  /** Body + handle in the bake, foil print in the metal. The coffee disc (DeskGloss) is
+   *  DELIBERATELY not registered: the liquid stays level while the cup rocks around it. */
+  {
+    kind: 'mug',
+    min: [-3.2, 1.26, 10.92],
+    max: [-2.21, 2.08, 11.68],
+    pivot: [-2.595, 1.303, 11.3],
+    baseR: 0.3,
+    meshes: ['DeskBaked', 'DeskMetal'],
+  },
+  /** Cake + all sprinkles in the bake, icing in the gloss — one rigid wobble. */
+  {
+    kind: 'donut',
+    min: [-2.2, 1.26, 10.92],
+    max: [-1.34, 1.62, 11.83],
+    pivot: [-1.78, 1.303, 11.36],
+    baseR: 0.26,
+    meshes: ['DeskBaked', 'DeskGloss'],
+  },
+  /** The cup and every pen standing in it; the rose-gold pen and the cup's foil print are metal. */
+  {
+    kind: 'pencup',
+    min: [2.558, 1.26, 11.42],
+    max: [3.27, 2.76, 12.23],
+    pivot: [2.875, 1.303, 11.855],
+    baseR: 0.31,
+    meshes: ['DeskBaked', 'DeskMetal'],
+  },
+  /** The two souvenirs — same boxes DESK_FIGURINES publishes, grown to cover beak/tail/wings. */
+  {
+    kind: 'bird',
+    min: [-1.22, 1.24, 8.98],
+    max: [-0.62, 1.96, 9.96],
+    pivot: [-0.92, 1.2653, 9.471],
+    baseR: 0.18,
+    meshes: ['DeskBaked'],
+  },
+  {
+    kind: 'penguin',
+    min: [0.55, 1.23, 9.2],
+    max: [1.11, 2.07, 9.79],
+    pivot: [0.83, 1.2625, 9.494],
+    baseR: 0.16,
+    meshes: ['DeskBaked'],
+  },
+] as const
+
+/**
  * What the whole desk set is allowed to weigh OVER THE WIRE — and the correction that word is.
  *
  * T68 wrote this budget against the file's UNCOMPRESSED length while its own docblock argued in

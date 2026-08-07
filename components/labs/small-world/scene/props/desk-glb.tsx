@@ -7,6 +7,27 @@ import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
 import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
+import { NUDGE_UNIFORMS, nudgeNormalChunk, nudgeVertexChunk, zonesForMesh } from './desk-nudge'
+
+/**
+ * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
+ * pointer rock "its" props — a rest-position box select and a rigid rotation, boxes and pivots as
+ * compile-time literals, one shared vec4 per zone at runtime (see `desk-nudge.ts` for the law and
+ * `DESK_NUDGE_ZONES` for the no-tear derivation). Behind `angle != 0.0` guards the rest path is the
+ * untouched path, so a pointerless frame is bit-identical to a build without the feature; the
+ * chunks are static strings, so no cache key changes per frame and no second program is compiled.
+ */
+function wireNudge(
+  shader: { uniforms: Record<string, unknown>; vertexShader: string },
+  mesh: DeskMeshName,
+  chunk: { decl: string; body: string }
+): void {
+  for (const z of zonesForMesh(mesh)) shader.uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
+  shader.vertexShader = (chunk.decl + '\n' + shader.vertexShader).replace(
+    '#include <begin_vertex>',
+    '#include <begin_vertex>\n' + chunk.body
+  )
+}
 
 /**
  * THE BAKED DESK, AS IT REACHES THE SCREEN (Task 68).
@@ -151,12 +172,15 @@ export function surfaceMaterial(
  *  can be declared against it directly. */
 export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  const nudge = nudgeVertexChunk('DeskBaked')
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
     shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
       '#include <color_vertex>',
       '#include <color_vertex>\n vDimColor = color_1.rgb;'
     )
+    // unlit, so only positions rock — there is no normal for the nudge to keep honest here
+    wireNudge(shader, 'DeskBaked', nudge)
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
@@ -253,18 +277,25 @@ export function glossMaterial(
   gloss: { value: number }
 ): THREE.MeshBasicMaterial {
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  const nudge = nudgeVertexChunk('DeskGloss', 'swNrm')
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
     shader.uniforms.uGloss = gloss
     shader.uniforms.uGlossEnv = { value: env }
+    for (const z of zonesForMesh('DeskGloss')) shader.uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
     shader.vertexShader = (
-      'attribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
+      nudge.decl +
+      '\nattribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
       shader.vertexShader
     )
       .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1;')
+      // The icing rocks with the donut, and its SHEEN has to rock too: `swNrm` is the normal the
+      // nudge may have rotated, and the reflection reads it instead of the rest-pose attribute —
+      // a highlight that stayed pinned while the glaze tipped would un-sell the whole motion.
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vec3 swNrm = normal;\n' + nudge.body)
       .replace(
         '#include <project_vertex>',
-        `vGlossN = normalize( mat3( modelMatrix ) * normal );
+        `vGlossN = normalize( mat3( modelMatrix ) * swNrm );
          vGlossW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
          #include <project_vertex>`
       )
@@ -338,7 +369,7 @@ const DESK_METAL_LEVEL = 1.0
 const DESK_METAL_TINT = new THREE.Color(1, 1, 1)
 
 function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     color: DESK_METAL_TINT.clone().multiplyScalar(DESK_METAL_LEVEL),
     metalness: 1,
@@ -346,6 +377,23 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
     envMap: env,
     toneMapped: false,
   })
+  // The mug's and the cup's foil prints rock with their hosts (Task 89). `objectNormal` is rotated
+  // with the positions — a metal is nothing but its reflection, and the sweep of that reflection as
+  // the print tips is most of what the eye gets paid. The rotation lands in `beginnormal_vertex`
+  // because the standard material has consumed `objectNormal` before `begin_vertex` runs.
+  const nudge = nudgeVertexChunk('DeskMetal')
+  const nudgeNormal = nudgeNormalChunk('DeskMetal', 'objectNormal')
+  mat.onBeforeCompile = (shader) => {
+    wireNudge(shader, 'DeskMetal', nudge)
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <beginnormal_vertex>',
+      '#include <beginnormal_vertex>\n' + nudgeNormal
+    )
+  }
+  // Distinct key, because the stand's cradle uses the same MeshStandardMaterial signature and three
+  // caches programs by it — without this the two would silently share one program.
+  mat.customProgramCacheKey = () => 'sw-desk-metal'
+  return mat
 }
 
 export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {

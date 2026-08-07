@@ -25,6 +25,7 @@ import {
   steamGateFor,
   steamPuffSeeds,
 } from './desk-steam-field'
+import { KICK_DECAY, KICK_FREQ, KICK_LAG, KICK_SWAY, steamKickMail } from './desk-nudge'
 
 /**
  * THE COFFEE STEAM (Task 72) — the last thing the ending grows, and the first thing in the ENDING
@@ -174,6 +175,7 @@ attribute vec2 aCorner;
 attribute vec4 aSeed;   // x: phase offset, y: cycles per second, z: wander phase, w: wobble
 uniform float uTime;
 uniform float uR;
+uniform vec4 uKick;
 varying vec2 vCorner;
 varying float vFade;
 
@@ -188,6 +190,18 @@ void main() {
     p * ${f(STEAM_RISE)},
     cos( aSeed.z * 1.61 + p * aSeed.w * 0.77 ) * wander * ${f(STEAM_DRIFT_Z)}
   );
+
+  // THE CLINK'S WAFT (Task 89): a stamped impulse on this shader's own clock. The disturbance
+  // starts at the liquid and travels up (kT is delayed by height), each puff leans with the poke
+  // and swings back, and the whole term is guarded so a mug nobody touches costs nothing. uKick is
+  // (dir.x, dir.z, stamp, amp) — see desk-nudge.ts for the mailbox that fills it.
+  if ( uKick.w != 0.0 ) {
+    float kT = ( uTime - uKick.z ) - p * ${f(KICK_LAG)};
+    if ( kT > 0.0 ) {
+      float kSway = exp( -kT * ${f(KICK_DECAY)} ) * sin( kT * ${f(KICK_FREQ)} ) * uKick.w * p * ${f(KICK_SWAY)};
+      centre.xz += vec2( uKick.x, uKick.y ) * kSway;
+    }
+  }
 
   // THE BILLBOARD. Place the centre through the model-view, then push the corner along the camera's
   // own x and y — which is what makes it face the camera at any pose, for no CPU work.
@@ -224,6 +238,8 @@ export type SteamUniforms = {
   uGate: { value: number }
   uR: { value: number }
   uColor: { value: THREE.Color }
+  /** (dir.x, dir.z, stamp on THIS clock, amp) — the mug's clink, 0 until one happens (Task 89). */
+  uKick: { value: Float32Array }
 }
 
 /** The plume's one material. Unlit by construction — see the header on clay scoping. */
@@ -235,6 +251,7 @@ export function steamMaterial(radius: number): { material: THREE.ShaderMaterial;
     // sRGB in, decoded to the renderer's linear working space by ColorManagement exactly as every
     // other authored colour in the lab is; the fragment shader re-encodes on the way out
     uColor: { value: new THREE.Color(STEAM_COLOR) },
+    uKick: { value: new Float32Array(4) },
   }
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -288,6 +305,8 @@ export function DeskSteam({ journeyRef }: { journeyRef: JourneyRef }) {
   // NaN so the mount frame always applies once (NaN !== NaN) and the plume starts in whatever state
   // the scroll says rather than in the one the JSX guessed.
   const lastGate = useRef(Number.NaN)
+  /** The last clink consumed from the interactions' mailbox (Task 89). */
+  const lastKick = useRef(steamKickMail.seq)
 
   useFrame((_, delta) => {
     const m = mesh.current
@@ -303,6 +322,18 @@ export function DeskSteam({ journeyRef }: { journeyRef: JourneyRef }) {
     if (t !== elapsed.current) {
       elapsed.current = t
       steam.uniforms.uTime.value = t
+    }
+    // THE CLINK, stamped onto this component's own accumulator the frame it is noticed — the mug's
+    // response rides the ending's one existing wall clock instead of bringing a second one. The
+    // interactions are armed only while the gate is fully open, so there is no mail to miss while
+    // it is shut; under reduced motion the mailbox never fills (the module is inert).
+    if (steamKickMail.seq !== lastKick.current) {
+      lastKick.current = steamKickMail.seq
+      const k = steam.uniforms.uKick.value
+      k[0] = steamKickMail.dirX
+      k[1] = steamKickMail.dirZ
+      k[2] = elapsed.current
+      k[3] = steamKickMail.amp
     }
   })
 

@@ -1,5 +1,6 @@
 'use client'
 import { DeskGlb } from './desk-glb'
+import { DeskInteractions } from './desk-interactions'
 import { DeskNote } from './desk-note'
 import { DeskSteam } from './desk-steam'
 import type { JourneyRef } from '../use-journey'
@@ -86,6 +87,11 @@ export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
           is not drawn, not lit and not clocked anywhere in the journey. See `desk-steam.tsx` for the
           ENDING's first wall clock, and the scoping that costs it nothing. */}
       <DeskSteam journeyRef={journeyRef} />
+      {/* The desk answers the pointer (Task 89): five props rock about their contact with the desk
+          and the note's corner can be pressed flat, armed only once the studio is fully lit. Renders
+          nothing — it drives uniforms in the materials above. `desk-nudge.ts` carries the law this
+          feature creates (pointer-driven micro-animations, deterministic, always decaying to rest). */}
+      <DeskInteractions journeyRef={journeyRef} />
     </group>
   )
 }

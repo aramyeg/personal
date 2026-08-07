@@ -8,6 +8,7 @@ import { DESK_PAD } from './desk-glb-contract'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
 import { KEY_LIGHT_POSITION } from '../biome-atmosphere'
+import { NOTE_CURL_MAX, NOTE_CURL_UNIFORM } from './desk-nudge'
 
 /**
  * Rotate a surface's normals toward the key light.
@@ -286,6 +287,32 @@ function buildSheet(): THREE.BufferGeometry {
   return geo
 }
 
+/**
+ * THE CORNER CAN BE PRESSED (Task 89). The curl is authored into the geometry; this shader patch
+ * lets the visitor press it FLAT and watch it spring back — `uCurl` scales the same
+ * `(top − lift)·ramp(u)·ramp(v)` term `buildSheet` bakes, reconstructed from the uv attribute, so
+ * the pressed sheet is exactly the sheet a smaller curl would have authored. Downward-only by
+ * construction: `desk-nudge.ts` clamps uCurl to (0, 1], so the sheet never rises above the
+ * published `DESK_NOTE.top` ceiling the containment and connect-clearance gates were solved
+ * against, and mid-press the clearance can only grow. At exact 1 the guard takes the untouched
+ * path — a visitor who never presses renders the note bit-identically to a build without this.
+ */
+const noteCurlPatch = (shader: { uniforms: Record<string, unknown>; vertexShader: string }): void => {
+  shader.uniforms.uCurl = NOTE_CURL_UNIFORM
+  shader.vertexShader = (
+    'uniform float uCurl;\n' +
+    'float swRamp( float t ) { float x = clamp( ( t - 0.58 ) / 0.42, 0.0, 1.0 ); return x * x * ( 3.0 - 2.0 * x ); }\n' +
+    shader.vertexShader
+  ).replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>
+if ( uCurl != 1.0 ) {
+  transformed.y -= ( 1.0 - uCurl ) * ${NOTE_CURL_MAX.toFixed(5)} * swRamp( uv.x ) * swRamp( uv.y );
+}`
+  )
+}
+const noteCurlKey = () => 'sw-desk-note'
+
 export function DeskNote({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   const texture = useNoteTexture(journeyRef)
@@ -294,7 +321,13 @@ export function DeskNote({ journeyRef }: { journeyRef: JourneyRef }) {
 
   return (
     <mesh geometry={sheet}>
-      <meshToonMaterial map={texture} color={texture ? '#ffffff' : PALETTE.notePaper} gradientMap={ramp} />
+      <meshToonMaterial
+        map={texture}
+        color={texture ? '#ffffff' : PALETTE.notePaper}
+        gradientMap={ramp}
+        onBeforeCompile={noteCurlPatch}
+        customProgramCacheKey={noteCurlKey}
+      />
     </mesh>
   )
 }
