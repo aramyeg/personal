@@ -4,6 +4,7 @@ import type { MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { hasArt } from '../art-manifest'
 import { BiomeAtmosphere } from './biome-atmosphere'
+import { endingDprFor } from './ending-dpr'
 import {
   CAMERA_FOV,
   CAMERA_POSITION,
@@ -172,6 +173,29 @@ function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
   return null
 }
 
+/**
+ * Raises the render's pixel ratio for the ENDING and nothing else (Task 81).
+ *
+ * `ending-dpr.ts` carries the whole argument — why a ceiling with no floor left a 1080p monitor
+ * rendering the ending at 1440x900, why the journey deliberately does not get this, and why the
+ * decision latches rather than being taken per frame. All this does is read the zoom and write when
+ * the answer changes, at the same priority as the rig so the buffer is never resized between the
+ * camera being placed and the frame being drawn.
+ */
+function EndingDpr({ journeyRef }: { journeyRef: JourneyRef }) {
+  const setDpr = useThree((s) => s.setDpr)
+  const viewport = useThree((s) => s.viewport)
+  const current = useRef(viewport.dpr)
+  useFrame(() => {
+    const device = typeof window === 'undefined' ? 1 : window.devicePixelRatio
+    const next = endingDprFor(journeyRef.current.ending.zoom, device, current.current)
+    if (next === null) return
+    current.current = next
+    setDpr(next)
+  }, CAMERA_RIG_PRIORITY)
+  return null
+}
+
 function SceneContents({
   progressRef,
   journey,
@@ -181,6 +205,7 @@ function SceneContents({
   return (
     <>
       <CameraRig journeyRef={journeyRef} />
+      <EndingDpr journeyRef={journeyRef} />
       {/* Backdrop + key/ambient light, both graded to the chapter's biome mood (Task 55). */}
       <BiomeAtmosphere journeyRef={journeyRef} />
       <Planet journeyRef={journeyRef} onBakeReady={onBakeReady}>
@@ -261,6 +286,11 @@ export function SmallWorldScene({
       <Canvas
         camera={{ position: CAMERA_POSITION, fov: CAMERA_FOV }}
         gl={{ antialias: true }}
+        /* A RANGE, not a setting: r3f clamps window.devicePixelRatio into it. The 2 is a CEILING
+           (above it this lab renders no extra pixels — T79 proved a dsf6 capture was the browser
+           upscaling a 2× render), and the 1 is a floor only for the journey. The ENDING raises its
+           own floor to 2 — see `ending-dpr.ts`, and `<EndingDpr>` above, for why a 1080p monitor
+           was rendering the closing frame at 1440×900 and why the journey deliberately keeps 1. */
         dpr={[1, 2]}
         onPointerMissed={firePanelAdvance}
       >
