@@ -7,6 +7,12 @@ import {
   EndingConnect,
   connectReveal,
 } from '@/components/labs/small-world/overlay/ending-connect'
+import {
+  CV_ENDING_LINK_TESTID,
+  CV_LABEL,
+  cvArmed,
+  setCvOpener,
+} from '@/components/labs/small-world/overlay/cv-open'
 import { railDismissLive, railOpacity } from '@/components/labs/small-world/overlay/journey-progress'
 import {
   NOTE_SETTLE_REMAINING,
@@ -44,16 +50,83 @@ describe('the connect block', () => {
     expect(screen.getByTestId('sw-connect-email')).not.toHaveAttribute('target')
   })
 
-  it('puts pointer events on the four controls and on NOTHING else', () => {
+  it('puts pointer events on the controls and on NOTHING else', () => {
+    // THE CENSUS, and it grew by one in Task 83: the plain CV's second door lives on the
+    // restart's line. `CONTROLS` above stays the four SCHEDULED controls — it is what the
+    // entrance arithmetic is indexed by — and the CV link is listed here because this test
+    // is about the click model rather than about the schedule. It shares the restart's
+    // reveal window, so it adds a clickable element and not a stage.
     const { container } = render(<EndingConnect t={1} onRestart={() => {}} />)
     const live = [...container.querySelectorAll<HTMLElement>('*')].filter(
       (el) => el.style.pointerEvents === 'auto'
     )
     expect(live.map((el) => el.dataset.testid).sort()).toEqual(
-      CONTROLS.map((c) => `sw-connect-${c}`).sort()
+      [...CONTROLS.map((c) => `sw-connect-${c}`), CV_ENDING_LINK_TESTID].sort()
     )
     // the block's own container restates the inherited `none` rather than relying on it
     expect(screen.getByTestId('sw-connect').style.pointerEvents).toBe('none')
+  })
+
+  describe('the plain CV, the escape hatch’s second door (Task 83)', () => {
+    it('offers it in WORDS, beside the restart', () => {
+      // Task 77's finding about this surface across the genre is that the plain view is
+      // hidden rather than missing — linked nowhere, or behind an unlabelled printer icon.
+      // A readable label is the whole remedy, so it is the thing asserted.
+      render(<EndingConnect t={1} onRestart={() => {}} />)
+      const cv = screen.getByTestId(CV_ENDING_LINK_TESTID)
+      expect(cv).toHaveTextContent(CV_LABEL)
+      expect(cv.tagName).toBe('BUTTON')
+    })
+
+    it('rides the restart’s reveal window rather than adding a fifth stage', () => {
+      // THE SCHEDULE MAY NOT MOVE. `CONTROL_COUNT` is what the entrance is solved from and
+      // the last control is required to land at exactly 1; a fifth staged control would
+      // re-space all four. Sharing the restart's index is what keeps the approved entrance
+      // bit-identical, and this is the assertion that says so rather than the comment.
+      for (const t of [0, ZOOM_START, tAt(1 + 0.93 * ENDING_SPAN), tAt(TRACK_END)]) {
+        const { container, unmount } = render(<EndingConnect t={t} onRestart={() => {}} />)
+        const cv = container.querySelector<HTMLElement>(`[data-testid="${CV_ENDING_LINK_TESTID}"]`)!
+        const restart = container.querySelector<HTMLElement>('[data-testid="sw-connect-restart"]')!
+        expect(cv.style.opacity, `t=${t}`).toBe(restart.style.opacity)
+        expect(cv.style.pointerEvents, `t=${t}`).toBe(restart.style.pointerEvents)
+        unmount()
+      }
+    })
+
+    it('is inert through the still beat and live at the bottom of the track', () => {
+      const early = render(<EndingConnect t={ZOOM_START} onRestart={() => {}} />)
+      expect(Number(screen.getByTestId(CV_ENDING_LINK_TESTID).style.opacity)).toBe(0)
+      expect(screen.getByTestId(CV_ENDING_LINK_TESTID).style.pointerEvents).toBe('none')
+      early.unmount()
+
+      render(<EndingConnect t={tAt(TRACK_END)} onRestart={() => {}} />)
+      expect(screen.getByTestId(CV_ENDING_LINK_TESTID).style.pointerEvents).toBe('auto')
+      expect(Number(screen.getByTestId(CV_ENDING_LINK_TESTID).style.opacity)).toBe(1)
+    })
+
+    it('opens the surface through the seam, and restarts nothing', () => {
+      const onRestart = vi.fn()
+      const open = vi.fn()
+      const retract = setCvOpener(open)
+      render(<EndingConnect t={1} onRestart={onRestart} />)
+      fireEvent.click(screen.getByTestId(CV_ENDING_LINK_TESTID))
+      expect(open).toHaveBeenCalledTimes(1)
+      expect(onRestart).not.toHaveBeenCalled()
+      retract()
+      expect(cvArmed()).toBe(false)
+    })
+
+    it('keeps the hand-written line on ONE line', () => {
+      // A wrapped line is a taller block, and the block is anchored to the bottom edge — so
+      // a wrap pushes the pill row UP, into the note `connect-clearance.ts` just cleared it
+      // of. jsdom cannot lay text out, so what is asserted is the property that forbids the
+      // wrap rather than the absence of one; the 320/360/390 captures are the measurement.
+      const { container } = render(<EndingConnect t={1} onRestart={() => {}} />)
+      const row = container.querySelector<HTMLElement>(`[data-testid="${CV_ENDING_LINK_TESTID}"]`)!
+        .parentElement!
+      expect(row.style.flexWrap).toBe('nowrap')
+      expect(row.style.whiteSpace).toBe('nowrap')
+    })
   })
 
   it('refuses to be clickable while it is still fading in', () => {

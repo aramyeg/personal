@@ -21,6 +21,24 @@ import { INFO_PAGES } from '../components/labs/small-world/overlay/info-page-spe
 // the caption separator went from a middot to the pack's em dash. Pinned as
 // strings they would have failed as a copy edit rather than as a defect.
 import { ALWINA_STORY } from '../components/labs/small-world/alwina-story'
+// The escape hatch's words and ids come from their own owners for the same reason:
+// `alwina-cv.ts` is the single source of her roles and dates, and `cv-open.ts` owns
+// the label both doors say. A literal here would be a fourth copy of her CV.
+import {
+  ALWINA,
+  DEGREE,
+  LANGUAGES,
+  ROLES_NEWEST_FIRST,
+  STACK,
+  creditLine,
+} from '../components/labs/small-world/alwina-cv'
+import {
+  CV_CLOSE_TESTID,
+  CV_ENDING_LINK_TESTID,
+  CV_LABEL,
+  CV_SHEET_LINK_TESTID,
+  CV_TESTID,
+} from '../components/labs/small-world/overlay/cv-open'
 
 async function webglAvailable(page: import('@playwright/test').Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -52,6 +70,27 @@ async function scrollToProgress(page: import('@playwright/test').Page, progress:
     const total = document.documentElement.scrollHeight - window.innerHeight
     window.scrollTo(0, total * frac)
   }, progress / TRACK_END)
+}
+
+/**
+ * The scroll position once it has STOPPED moving.
+ *
+ * `globals.css` sets `scroll-behavior: smooth`, so `window.scrollTo` starts an
+ * animation and a `scrollY` read taken straight afterwards is a frame of it rather
+ * than where the reader ends up. Any test that compares a position before an
+ * interaction with the position after it is otherwise comparing two arbitrary
+ * points on a curve — which passes and fails for reasons that have nothing to do
+ * with what it is testing.
+ */
+async function settledScrollY(page: import('@playwright/test').Page): Promise<number> {
+  let last = -1
+  for (let i = 0; i < 40; i++) {
+    const y = await page.evaluate(() => window.scrollY)
+    if (Math.abs(y - last) < 0.5) return y
+    last = y
+    await page.waitForTimeout(50)
+  }
+  return last
 }
 
 // SmallWorldExperience renders `null` until a mount effect confirms WebGL and
@@ -135,6 +174,77 @@ test.describe('Small World lab', () => {
     await expect(ending.getByTestId('sw-connect-email')).toHaveAttribute('href', /^mailto:/)
     await expect(ending.getByTestId('sw-connect-github')).toHaveAttribute('href', /github\.com/)
     await expect(ending.getByTestId('sw-connect-linkedin')).toHaveAttribute('href', /linkedin\.com/)
+    await expect(ending.getByTestId('sw-connect-restart')).toBeVisible()
+  })
+
+  /**
+   * TASK 83 — THE ESCAPE HATCH. Task 77's N1: one plain dense readable view of her
+   * CV, reachable EARLY, made of real text. The genre-wide failure is hiding it, so
+   * what is tested is that a reader who has done nothing but arrive at the first
+   * story stop can reach it in ONE interaction — and get the world back unmoved.
+   */
+  test('the plain CV opens from the first story stop, and hands the scroll back untouched', async ({
+    page,
+  }) => {
+    await page.goto('/labs/small-world')
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    await scrollToProgress(page, chapterDwellProgress(0))
+    await expect(page.getByTestId('sw-panel-data')).toBeVisible({ timeout: 10_000 })
+    // On a phone the spread is a stack and the comic is in front; the details leaf is
+    // one documented tap behind it. The tab is display:none on desktop, so this is the
+    // same journey on both without a viewport branch.
+    const tab = page.locator('.sw-stack-tab')
+    if (await tab.isVisible()) await tab.click()
+
+    const link = page.getByTestId(CV_SHEET_LINK_TESTID)
+    await expect(link).toBeVisible({ timeout: 10_000 })
+    // A WORD, not an icon — the whole remedy for the pattern the research found.
+    await expect(link).toHaveText(CV_LABEL)
+
+    // The page's own smooth scroll is still easing after `scrollTo`; read the resting
+    // position rather than a frame of the animation, or the comparison at the end is
+    // against a number that was never where the reader was.
+    const before = await settledScrollY(page)
+    await link.click()
+
+    const cv = page.getByTestId(CV_TESTID)
+    await expect(cv).toBeVisible({ timeout: 10_000 })
+    // REAL TEXT, and the dense block the sheet could not carry: her name, every role
+    // with its employer and dates, the degree, the languages and the stack.
+    await expect(cv).toContainText(ALWINA.name)
+    for (const c of ROLES_NEWEST_FIRST) await expect(cv).toContainText(creditLine(c))
+    await expect(cv).toContainText(creditLine(DEGREE))
+    await expect(cv).toContainText(LANGUAGES.join(', '))
+    await expect(cv).toContainText(STACK.join(', '))
+    await expect(cv).toContainText(ALWINA.contact)
+
+    // ESCAPE CLOSES THE CV AND NOT THE LAB — the lab's own Escape handler navigates to
+    // the museum, and this page claims the key in the capture phase to stop it.
+    await page.keyboard.press('Escape')
+    await expect(cv).toBeHidden({ timeout: 10_000 })
+    await expect(page).toHaveURL(/small-world/)
+    // SCROLL PURITY: returning must not move the world.
+    expect(await settledScrollY(page)).toBeCloseTo(before, 0)
+    await expect(page.getByTestId('sw-panel-data')).toBeVisible()
+  })
+
+  test('the plain CV is offered again at the ending, beside the restart', async ({ page }) => {
+    await page.goto('/labs/small-world')
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    await scrollToProgress(page, TRACK_END)
+    const ending = page.getByTestId('sw-ending')
+    await expect(ending.getByTestId('sw-connect-restart')).toBeVisible({ timeout: 10_000 })
+    const link = ending.getByTestId(CV_ENDING_LINK_TESTID)
+    await expect(link).toHaveText(CV_LABEL)
+    await link.click()
+    const cv = page.getByTestId(CV_TESTID)
+    await expect(cv).toBeVisible({ timeout: 10_000 })
+    await expect(cv).toContainText(creditLine(ROLES_NEWEST_FIRST[0]))
+    // ...and the close is a word too.
+    await page.getByTestId(CV_CLOSE_TESTID).click()
+    await expect(cv).toBeHidden()
     await expect(ending.getByTestId('sw-connect-restart')).toBeVisible()
   })
 })

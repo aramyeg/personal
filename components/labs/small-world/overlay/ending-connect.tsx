@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { siteConfig, socialLinks } from '@/lib/constants'
+import { CV_ENDING_LINK_TESTID, CV_LABEL, openCv } from './cv-open'
 import { ZOOM_START } from '../ending-timeline'
 import { NOTE_SETTLED_ZOOM } from './note-settle'
 import { useConnectSpacing } from './use-connect-spacing'
@@ -242,39 +243,113 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
         ))}
       </nav>
 
-      {/* THE RESTART AFFORDANCE. Aram's own idea ("start the story over"), built in the DOM rather
-          than as a canvas prop: a hotspot in the scene would need arming, an elementFromPoint-honest
-          probe and a cursor state, and it would buy a control that a keyboard cannot reach. This
-          rewinds through the SAME `advanceTo` the chapter panels use, so the track's own smooth
-          scroll carries the visitor back and every scroll-keyed thing in the lab plays backwards on
-          the way — the story really does run in reverse, rather than the page cutting to the top. */}
-      <button
-        type="button"
-        data-testid="sw-connect-restart"
-        onClick={onRestart}
-        onFocus={() => setFocusedKey('restart')}
+      {/* THE HAND-WRITTEN ROW: the plain CV, then the restart.
+          ============================================================================
+          THE ESCAPE HATCH'S SECOND DOOR LIVES IN EXISTING CHROME (Task 83)
+          ============================================================================
+          It is on this line and not in the pill row above, and that is a clearance
+          decision rather than a compositional one. `connect-clearance.ts` solves the whole
+          block's layout from the NAV's measured rectangle, and a fourth pill widens that
+          rectangle — which changes which part of the note's falling edge sits under it, and
+          on a phone wraps the row outright. This line is below the nav, so adding to it
+          leaves `navTop`, `navLeft` and `navRight` exactly as they were and the approved
+          solve is untouched by construction.
+
+          IT SHARES THE RESTART'S REVEAL INDEX for the same kind of reason: `CONTROL_COUNT`
+          is what the entrance schedule is solved from, and a fifth staged control would
+          re-space all of them. Two things on one line arriving together is also what the
+          line looks like.
+
+          IT IS THE SOLID RULE AND THE RESTART IS THE DASHED ONE. Same size, same hand —
+          they are siblings — but one goes somewhere and one replays what you just saw, and
+          the underline is where a reader already reads that difference. */}
+      <div
         style={{
-          pointerEvents: revealOf(items.length) >= LIVE_AT ? 'auto' : 'none',
-          opacity: revealOf(items.length),
-          transform: `translateY(${(1 - revealOf(items.length)) * 16}px)`,
-          appearance: 'none',
-          border: 'none',
-          background: 'transparent',
-          fontFamily: 'var(--sw-font-hand)',
-          fontSize: 21,
-          lineHeight: 1.1,
-          color: PALETTE.ink,
-          // still the quiet sibling, and still by TYPE rather than by alpha: smaller, borderless,
-          // dashed, in the hand. Only the rule's colour moves into the studio's family.
-          borderBottom: `2px dashed ${PALETTE.studioRoseDeep}`,
-          padding: '1px 2px 2px',
-          borderRadius: 3,
-          boxShadow: focusedKey === 'restart' ? FOCUS_RING : undefined,
-          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'center',
+          // NOWRAP IS LOAD-BEARING: a wrapped line is a taller block, and because the block
+          // is anchored to the bottom edge a taller block pushes the pill row UP into the
+          // note it was just cleared of. Measured at 320/360/390 — see the report.
+          flexWrap: 'nowrap',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
         }}
       >
-        start the story over
-      </button>
+        <button
+          type="button"
+          data-testid={CV_ENDING_LINK_TESTID}
+          onClick={openCv}
+          onFocus={() => setFocusedKey('cv')}
+          style={{
+            ...handStyle(revealOf(items.length)),
+            borderBottom: `2px solid ${PALETTE.studioRoseDeep}`,
+            boxShadow: focusedKey === 'cv' ? FOCUS_RING : undefined,
+          }}
+        >
+          {CV_LABEL}
+        </button>
+        <span
+          aria-hidden
+          style={{
+            opacity: revealOf(items.length),
+            fontFamily: 'var(--sw-font-hand)',
+            fontSize: 21,
+            lineHeight: 1.1,
+            color: PALETTE.ink,
+            padding: '0 9px',
+          }}
+        >
+          ·
+        </span>
+        {/* THE RESTART AFFORDANCE. Aram's own idea ("start the story over"), built in the DOM rather
+            than as a canvas prop: a hotspot in the scene would need arming, an elementFromPoint-honest
+            probe and a cursor state, and it would buy a control that a keyboard cannot reach. This
+            rewinds through the SAME `advanceTo` the chapter panels use, so the track's own smooth
+            scroll carries the visitor back and every scroll-keyed thing in the lab plays backwards on
+            the way — the story really does run in reverse, rather than the page cutting to the top. */}
+        <button
+          type="button"
+          data-testid="sw-connect-restart"
+          onClick={onRestart}
+          onFocus={() => setFocusedKey('restart')}
+          style={{
+            ...handStyle(revealOf(items.length)),
+            // still the quiet sibling, and still by TYPE rather than by alpha: smaller, borderless,
+            // dashed, in the hand. Only the rule's colour moves into the studio's family.
+            borderBottom: `2px dashed ${PALETTE.studioRoseDeep}`,
+            boxShadow: focusedKey === 'restart' ? FOCUS_RING : undefined,
+          }}
+        >
+          start the story over
+        </button>
+      </div>
     </div>
   )
+}
+
+/**
+ * The hand-written line's shared register — everything the CV link and the restart
+ * agree about, which is everything except which rule they carry underneath.
+ *
+ * Stated once because the pair only reads as a pair while they match: the moment
+ * one of them is a different size or a different alpha, the line becomes a control
+ * and an afterthought.
+ */
+function handStyle(reveal: number): CSSProperties {
+  return {
+    pointerEvents: reveal >= LIVE_AT ? 'auto' : 'none',
+    opacity: reveal,
+    transform: `translateY(${(1 - reveal) * 16}px)`,
+    appearance: 'none',
+    border: 'none',
+    background: 'transparent',
+    fontFamily: 'var(--sw-font-hand)',
+    fontSize: 21,
+    lineHeight: 1.1,
+    color: PALETTE.ink,
+    padding: '1px 2px 2px',
+    borderRadius: 3,
+    cursor: 'pointer',
+  }
 }

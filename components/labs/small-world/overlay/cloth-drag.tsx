@@ -1,7 +1,8 @@
 'use client'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { CHIBI_SHEET, anchorSrc } from '../manga/anchors'
 import { PALETTE } from '../palette'
+import { CvSheetLink } from './cv-sheet-link'
 import type { InfoPageSpec } from './info-page-spec'
 import { KETSU_LINE, easeOut, phase } from './info-beats'
 
@@ -293,7 +294,17 @@ export function ClothDrag({
   // not spare: the sheet is `0 0 auto` and the hero takes what is left, so every
   // line here is a line off chapter 1's SELF-TAUGHT — captured, with the wordmark
   // climbing out of its panel onto the photograph above.
-  const rows = [
+  // THE ESCAPE HATCH RIDES THE CONTACT ROW (Task 83) rather than taking one of its
+  // own, for exactly the budget reason in the note above: the first sheet is the
+  // tallest and every row here is a row off chapter 1's hero panel. `after` is a
+  // node so the middot stays a REAL TEXT NODE inside the row's own inline flow —
+  // see the separator note further down, which is the same defect twice.
+  const rows: {
+    key: string
+    text: string
+    kind: keyof typeof ROW_STYLE
+    after?: ReactNode
+  }[] = [
     ...(intro
       ? [
           { key: 'name', text: intro.name, kind: 'name' as const },
@@ -301,7 +312,21 @@ export function ClothDrag({
         ]
       : []),
     ...sheetLines(line).map((text, i) => ({ key: `l${i}`, text, kind: 'line' as const })),
-    ...(intro ? [{ key: 'contact', text: intro.contact, kind: 'contact' as const }] : []),
+    ...(intro
+      ? [
+          {
+            key: 'contact',
+            text: intro.contact,
+            kind: 'contact' as const,
+            after: (
+              <>
+                {' · '}
+                <CvSheetLink />
+              </>
+            ),
+          },
+        ]
+      : []),
   ]
 
   const edge = lay * 100
@@ -400,6 +425,7 @@ export function ClothDrag({
                 }}
               >
                 {row.text}
+                {row.after}
                 {/* THE SEPARATOR IS A REAL TEXT NODE, and it is not decoration.
                     Splitting the sentence into block elements splits its TEXT
                     CONTENT too, and without this the line reads "…choose — then

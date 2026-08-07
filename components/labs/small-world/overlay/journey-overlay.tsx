@@ -1,8 +1,11 @@
 'use client'
+import { useEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
+import { CvOverlay } from './cv-overlay'
+import { setCvOpener } from './cv-open'
 import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
@@ -26,6 +29,18 @@ export function JourneyOverlay({
   onAdvance: (targetProgress: number) => void
 }) {
   const ui = useJourneyUi(progressRef, journey)
+  /**
+   * THE PLAIN CV (Task 83) is owned here and nowhere else, because its two doors
+   * are on opposite sides of this tree: one is printed on the first sheet, four
+   * components down inside `ChapterPanels`; the other is beside the restart in
+   * `EndingConnect`. `cv-open.ts` is the seam, on the same terms as `panel-tap.ts`.
+   *
+   * It is mounted OUTSIDE the `ui.ending` gate and outside the panel, so the
+   * surface survives whatever the scroll does while it is open — and it does not
+   * unmount the world, which is the whole reason it is a lightbox and not a route.
+   */
+  const [cvOpen, setCvOpen] = useState(false)
+  useEffect(() => setCvOpener(() => setCvOpen(true)), [])
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
@@ -97,6 +112,7 @@ export function JourneyOverlay({
       {/* The rail reads RAW scroll: it is the "your input registered" affordance, so it must
           keep creeping even while an arrival absorbs the journey's own progress (Task 54). */}
       {SHOW_PROGRESS_RAIL && <JourneyProgress progressRef={journey?.rawProgressRef ?? progressRef} />}
+      {cvOpen && <CvOverlay onClose={() => setCvOpen(false)} />}
     </div>
   )
 }
