@@ -1370,7 +1370,13 @@ export function biomeTint(
     const nearCreek = cd < CANYON_REACH
     const butte = currentBump > 0.045 // a raised mesa/butte of clay
     if (nearCreek || butte) {
-      const t = nearCreek ? clamp01((CANYON_REACH - cd) / CANYON_REACH) : 0.35
+      // Task 88 — a butte used to paint at one flat t (0.35), a featureless brown smear
+      // from the reading camera. Grade it by its own height instead: dark earth at the
+      // skirt, lightened terracotta at the crown (paintVertex lightens as t falls), so a
+      // mesa reads carved with a lit rim, exactly like the creek's floor-dark/rim-light.
+      const t = nearCreek
+        ? clamp01((CANYON_REACH - cd) / CANYON_REACH)
+        : clamp01(0.55 - 2.2 * (currentBump - 0.045))
       return { kind: 'canyon', t }
     }
   }

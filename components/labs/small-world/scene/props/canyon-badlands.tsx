@@ -172,9 +172,11 @@ const LEDGE_B: ClusterSpec = {
 // (6-12 members, the brief's own count) of a tiny merged pebble/gravel/scrub clast, confined to
 // the |x| in [0.50, 1.15] band the capture called out. Two cluster groups so the cover doesn't
 // read as one uniform band across the whole width.
+// Task 88: one more cluster group and a lifted floor — the centre band still carried lone
+// small clasts between the groups at the checkpoint's reading distance.
 const GROUND_COVER_B: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_MID_X,
-  clusters: 5, perCluster: [6, 12], spreadT: 0.055, spreadX: 0.12, scale: [0.4, 1.0], seed: 337.9,
+  clusters: 6, perCluster: [8, 12], spreadT: 0.055, spreadX: 0.12, scale: [0.5, 1.0], seed: 337.9,
 }
 
 /** A local-only clone of clay-kit's merge idiom (position + normal, NO vertex colour) — the
