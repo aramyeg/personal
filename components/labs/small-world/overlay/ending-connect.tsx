@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { siteConfig, socialLinks } from '@/lib/constants'
+import { ALWINA, CONTACT_HREF } from '../alwina-cv'
 import { CV_ENDING_LINK_TESTID, CV_LABEL, openCv } from './cv-open'
 import { ZOOM_START } from '../ending-timeline'
 import { NOTE_SETTLED_ZOOM } from './note-settle'
@@ -20,7 +20,7 @@ import { PALETTE } from '../palette'
  *
  * ── THE CLICK MODEL (aa399f6, and Task 61's tap blanket) ──────────────────────────────────────
  * The slot inherits `pointer-events: none` from the overlay root and this component NEVER puts it
- * back on a container. Only the four controls take pointer events, and only once they are actually
+ * back on a container. Only the controls take pointer events, and only once they are actually
  * legible — a transparent element that swallows a click is the exact failure the canvas-first model
  * exists to forbid, and the ending is the one place in the lab where the canvas underneath still
  * has to receive `onPointerMissed`.
@@ -38,11 +38,33 @@ import { PALETTE } from '../palette'
 
 type Control = { key: string; label: string; href?: string }
 
+/**
+ * ============================================================================
+ * WHOSE ADDRESSES THESE ARE (Task 85, finding 1 — the audit's CRITICAL)
+ * ============================================================================
+ * They were ARAM'S. This block mapped `siteConfig.email` and `socialLinks`, so
+ * the three pills at the end of Alwina's CV resolved to `aramyeg96@gmail.com`,
+ * `github.com/aramyeg` and `linkedin.com/in/aramyeg` — while the CV overlay on
+ * the same page printed `linkedin.com/in/alwina-harutyunyan`. The page shipped
+ * two people's LinkedIn profiles and the prominent one was wrong. The audit's
+ * verdict: "a recruiter who does the intended thing — read the story, click
+ * Email — reaches somebody else." Every other finding cost polish; this one
+ * cost the introduction.
+ *
+ * ONE PILL, AND THE OTHER TWO ARE NOT COMING BACK UNTIL THEY ARE REAL. Her
+ * LinkedIn is the one address this repo actually knows. An email pill would
+ * need an address nobody has given us, and a plausible-looking invented one on
+ * a real person's CV is the worst available failure on a surface whose entire
+ * job is being trustworthy — the same rule `cv-document.tsx` has kept since
+ * T83, now applied to the loud copy of the same fact.
+ *
+ * IT READS FROM `alwina-cv.ts`, which is already the one owner of her contact:
+ * the sheet's contact row, the plain CV and this pill are now three renderings
+ * of one string. The lab no longer imports identity from `lib/constants` at
+ * all — that file is the main portfolio's and stays Aram's.
+ */
 function controls(): Control[] {
-  return [
-    { key: 'email', label: 'Email', href: `mailto:${siteConfig.email}` },
-    ...socialLinks.map((l) => ({ key: l.name.toLowerCase(), label: l.name, href: l.url })),
-  ]
+  return [{ key: 'linkedin', label: 'LinkedIn', href: CONTACT_HREF }]
 }
 
 /** Every control the block stages, the anchors plus the restart. Derived so the schedule below
@@ -114,9 +136,10 @@ const smoothstep = (t: number): number => {
  * to 1/60, so the whole scrub costs at most sixty re-renders); the zoom window is re-derived from
  * the timeline's own `ZOOM_START` rather than restated.
  *
- * THE LAST CONTROL NOW LANDS AT EXACTLY 1, which the old schedule did not. `restart` is index 3
- * (there are four controls: the mail anchor, two social anchors, and it), and its window used to
- * close at zoom 1.005 — so at the bottom of the track it rested at reveal 0.99937, i.e. 99.94%
+ * THE LAST CONTROL NOW LANDS AT EXACTLY 1, which the old schedule did not. `restart` is the last
+ * index (Task 85 took the list from four controls to two — one anchor and it — and the arithmetic
+ * absorbed that without a number changing here, which is what solving from `CONTROL_COUNT` bought).
+ * Its window used to close at zoom 1.005 — so at the bottom of the track it rested at reveal 0.99937, i.e. 99.94%
  * opacity and 0.0101 px of leftover translate. Nobody could see that, which is exactly why it
  * survived: it is a control that never finishes its entrance, sitting in the one frame of the lab
  * that is meant to be finished. The window is solved from `CONTROL_COUNT` now, so the arithmetic
@@ -220,7 +243,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
     >
       <nav
         ref={navRef}
-        aria-label="Connect with Aram"
+        aria-label={`Connect with ${ALWINA.name.split(' ')[0]}`}
         style={{
           display: 'flex',
           gap: 10,
@@ -234,7 +257,10 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
             key={c.key}
             data-testid={`sw-connect-${c.key}`}
             href={c.href}
-            {...(c.key === 'email' ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+            // Every control here is an external profile now that the mail pill is
+            // gone — the branch that used to exempt `mailto:` went with it.
+            target="_blank"
+            rel="noopener noreferrer"
             onFocus={() => setFocusedKey(c.key)}
             style={tabStyle(revealOf(i), focusedKey === c.key)}
           >

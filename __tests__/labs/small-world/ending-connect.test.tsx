@@ -1,7 +1,17 @@
 import { PALETTE } from '@/components/labs/small-world/palette'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { siteConfig, socialLinks } from '@/lib/constants'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+// The lab route's own metadata is the assertion below; importing the page pulls
+// `next/font/google`, which needs a build. Four loaders, stubbed to what the page
+// uses them for — a `variable` string — so the module evaluates in jsdom.
+vi.mock('next/font/google', () => {
+  const font = () => ({ variable: 'sw-font-stub', className: 'sw-font-stub' })
+  return { Baloo_2: font, Bangers: font, Caveat: font, Nunito_Sans: font }
+})
+import { metadata } from '@/app/labs/small-world/page'
+import { ALWINA, CONTACT_HREF } from '@/components/labs/small-world/alwina-cv'
 import {
   STUDIO_PAD_RENDERED,
   EndingConnect,
@@ -30,24 +40,40 @@ import {
 
 /** The ending's own t at a journey progress — the value `JourneyUi.ending` publishes. */
 const tAt = (progress: number) => endingStateAt(progress).t
-const CONTROLS = ['email', 'github', 'linkedin', 'restart'] as const
+// TASK 85, FINDING 1 — two, not four. The email and GitHub pills carried ARAM'S
+// addresses and are gone until real ones exist for her; see `ending-connect.tsx`.
+const CONTROLS = ['linkedin', 'restart'] as const
 
 describe('the connect block', () => {
-  it('offers REAL anchors, with the addresses the rest of the site uses', () => {
+  it('offers a REAL anchor, at HER address', () => {
+    // THE AUDIT'S CRITICAL. These pills mapped `siteConfig`/`socialLinks`, so the
+    // three buttons at the end of Alwina's CV reached Aram — while the CV overlay
+    // on the same page printed her LinkedIn. Two people's profiles on one page,
+    // and the prominent one was wrong.
     render(<EndingConnect t={1} onRestart={() => {}} />)
-    expect(screen.getByTestId('sw-connect-email')).toHaveAttribute(
-      'href',
-      `mailto:${siteConfig.email}`
-    )
-    for (const l of socialLinks) {
-      const a = screen.getByTestId(`sw-connect-${l.name.toLowerCase()}`)
-      expect(a).toHaveAttribute('href', l.url)
-      // an external target without the opener guard is a tab-nabbing hole, not a style choice
-      expect(a).toHaveAttribute('target', '_blank')
-      expect(a).toHaveAttribute('rel', expect.stringContaining('noopener'))
-    }
-    // mail is not a new tab: a blank window that immediately hands off to a mail client is litter
-    expect(screen.getByTestId('sw-connect-email')).not.toHaveAttribute('target')
+    const a = screen.getByTestId('sw-connect-linkedin')
+    expect(a).toHaveAttribute('href', CONTACT_HREF)
+    expect(a.getAttribute('href')).toContain('alwina')
+    // an external target without the opener guard is a tab-nabbing hole, not a style choice
+    expect(a).toHaveAttribute('target', '_blank')
+    expect(a).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('invents no address it does not have', () => {
+    // Her LinkedIn is the one address this repo knows. A plausible-looking email
+    // on a real person's CV is the worst available failure here, so the pill does
+    // not exist rather than guessing — the rule `cv-document.tsx` has kept since
+    // T83, applied to the loud copy of the same fact.
+    const { container } = render(<EndingConnect t={1} onRestart={() => {}} />)
+    expect(container.querySelector('[href^="mailto:"]')).toBeNull()
+    expect(container.textContent).not.toContain('@')
+  })
+
+  it('names HER in the row’s own label', () => {
+    render(<EndingConnect t={1} onRestart={() => {}} />)
+    const nav = screen.getByRole('navigation')
+    expect(nav.getAttribute('aria-label')).toMatch(/alwina/i)
+    expect(nav.getAttribute('aria-label')).not.toMatch(/aram/i)
   })
 
   it('puts pointer events on the controls and on NOTHING else', () => {
@@ -137,7 +163,7 @@ describe('the connect block', () => {
     // settling now (Task 72) and 0.72 of the ending is before it starts, where the honest reading
     // is a flat zero rather than a partial fade.
     render(<EndingConnect t={tAt(1 + 0.93 * ENDING_SPAN)} onRestart={() => {}} />)
-    const email = screen.getByTestId('sw-connect-email')
+    const email = screen.getByTestId('sw-connect-linkedin')
     expect(Number(email.style.opacity)).toBeGreaterThan(0)
     expect(Number(email.style.opacity)).toBeLessThan(0.85)
     expect(email.style.pointerEvents).toBe('none')
@@ -238,7 +264,7 @@ describe('the connect block', () => {
     // The scroll says invisible; the keyboard says otherwise. A focused control that cannot be
     // seen is the worse of the two failures, so focus wins.
     render(<EndingConnect t={0.05} onRestart={() => {}} />)
-    const email = screen.getByTestId('sw-connect-email')
+    const email = screen.getByTestId('sw-connect-linkedin')
     expect(Number(email.style.opacity)).toBe(0)
 
     fireEvent.focus(email)
@@ -246,16 +272,16 @@ describe('the connect block', () => {
     expect(email.style.pointerEvents).toBe('auto')
 
     fireEvent.blur(email, { relatedTarget: document.body })
-    expect(Number(screen.getByTestId('sw-connect-email').style.opacity)).toBe(0)
+    expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(0)
   })
 
   it('keeps the block up while focus moves BETWEEN its own controls', () => {
     render(<EndingConnect t={0.05} onRestart={() => {}} />)
-    const email = screen.getByTestId('sw-connect-email')
+    const email = screen.getByTestId('sw-connect-linkedin')
     const restart = screen.getByTestId('sw-connect-restart')
     fireEvent.focus(email)
     fireEvent.blur(email, { relatedTarget: restart })
-    expect(Number(screen.getByTestId('sw-connect-email').style.opacity)).toBe(1)
+    expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(1)
   })
 
   it('restarts the story through the track rather than by jumping', () => {
@@ -366,8 +392,12 @@ describe('the fallback page carries the same contact story', () => {
     const hrefs = new Set(
       [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'))
     )
-    expect(hrefs.has(`mailto:${siteConfig.email}`)).toBe(true)
-    for (const l of socialLinks) expect(hrefs.has(l.url)).toBe(true)
+    expect(hrefs.has(CONTACT_HREF)).toBe(true)
+    // ...and NOT the other person's. This page printed his email and both his
+    // profiles until Task 85, to the crawler and the screen-reader visitor alike.
+    for (const h of hrefs) {
+      expect(h ?? '', 'the fallback carries no Aram address').not.toMatch(/aramyeg|mailto:/i)
+    }
   })
 
   it('matches the ending link-for-link, so neither can drift', () => {
@@ -378,12 +408,12 @@ describe('the fallback page carries the same contact story', () => {
     expect(hrefs(ending)).toEqual(hrefs(fallback))
   })
 
-  it('opens its outbound profiles safely', () => {
+  it('opens its outbound profile safely', () => {
     const { container } = render(<FallbackTimeline />)
-    for (const l of socialLinks) {
-      const a = [...container.querySelectorAll('a')].find((el) => el.getAttribute('href') === l.url)!
-      expect(a.getAttribute('rel')).toContain('noopener')
-    }
+    const a = [...container.querySelectorAll('a')].find(
+      (el) => el.getAttribute('href') === CONTACT_HREF
+    )!
+    expect(a.getAttribute('rel')).toContain('noopener')
   })
 })
 
@@ -591,5 +621,85 @@ describe('the connect block is legible on the studio pad', () => {
     // it is quiet by TYPE — smaller, borderless, dashed, in the hand — never by being dimmer than
     // the legibility bar, which is the mistake LIVE_AT exists to record
     expect(ratio(PALETTE.ink, STUDIO_PAD_RENDERED)).toBeGreaterThan(4.5)
+  })
+})
+
+describe('the lab route carries ONE person’s identity, and it is hers', () => {
+  /**
+   * TASK 85, FINDING 1 — THE AUDIT'S CRITICAL, AS A STANDING GATE.
+   *
+   * The lab is Alwina's CV and it shipped Aram's addresses in its loudest slot:
+   * the three ending pills resolved to `aramyeg96@gmail.com`,
+   * `github.com/aramyeg` and `linkedin.com/in/aramyeg`, while the CV overlay on
+   * the same page printed `linkedin.com/in/alwina-harutyunyan`. Two people's
+   * LinkedIn profiles on one page, and the prominent one was wrong. The document
+   * title named him too, so the browser tab and every link preview did as well.
+   *
+   * WRITTEN AS A RULE OVER SURFACES rather than as three fixed assertions,
+   * because the failure mode is a NEW surface reaching into `lib/constants` —
+   * which is exactly how this happened: the lab inherited the site's contact
+   * block when the ending was built, and nobody re-asked whose CV it was.
+   *
+   * `lib/constants` itself is untouched and stays Aram's: it belongs to the main
+   * portfolio, which is his. What changed is that the lab stopped importing
+   * identity from it.
+   */
+  const ARAM = /aramyeg|aram\.?yeghiazaryan|Aram Yeghiazaryan/i
+
+  it('renders no address or profile of his on any surface a visitor can see', () => {
+    for (const [name, ui] of [
+      ['the ending connect block', <EndingConnect key="e" t={1} onRestart={() => {}} />],
+      ['the crawlable fallback', <FallbackTimeline key="f" />],
+    ] as const) {
+      const { container, unmount } = render(ui)
+      for (const a of container.querySelectorAll('a')) {
+        expect(a.getAttribute('href') ?? '', `${name}: href`).not.toMatch(ARAM)
+      }
+      expect(container.textContent ?? '', `${name}: rendered text`).not.toMatch(ARAM)
+      unmount()
+    }
+  })
+
+  it('invents no email anywhere, on either surface', () => {
+    // The same rule the plain CV has kept since T83. Her real address is not
+    // known to this repo and a plausible-looking invented one on a real person's
+    // CV is the worst available failure.
+    for (const ui of [<EndingConnect key="e" t={1} onRestart={() => {}} />, <FallbackTimeline key="f" />]) {
+      const { container, unmount } = render(ui)
+      expect(container.querySelector('[href^="mailto:"]')).toBeNull()
+      expect(container.textContent ?? '').not.toContain('@')
+      unmount()
+    }
+  })
+
+  it('titles the route with her name, not his', () => {
+    // The one thing a recruiter sees before the page paints, and the one thing
+    // that travels when the URL is pasted anywhere.
+    expect(metadata.title).toContain(ALWINA.name)
+    expect(String(metadata.title)).not.toMatch(ARAM)
+    expect(String(metadata.openGraph?.title ?? '')).toContain(ALWINA.name)
+    expect(String(metadata.openGraph?.title ?? '')).not.toMatch(ARAM)
+    expect(String(metadata.description ?? '')).not.toMatch(ARAM)
+  })
+
+  it('keeps the lab from importing identity out of the portfolio at all', () => {
+    // THE ROUTE THE DEFECT TOOK. Stated against the source because it is the only
+    // form that catches the NEXT surface to reach for it — a rendered-output gate
+    // only sees the surfaces someone remembered to add above.
+    const root = join(process.cwd(), 'components', 'labs', 'small-world')
+    const offenders: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name)
+        if (e.isDirectory()) walk(full)
+        else if (/\.tsx?$/.test(e.name)) {
+          const src = readFileSync(full, 'utf8')
+          // imports only — the prose in these files discusses the decision by name
+          if (/^\s*import[^;]*from\s+['"][^'"]*lib\/constants['"]/m.test(src)) offenders.push(full)
+        }
+      }
+    }
+    walk(root)
+    expect(offenders, 'lab files importing site identity').toEqual([])
   })
 })

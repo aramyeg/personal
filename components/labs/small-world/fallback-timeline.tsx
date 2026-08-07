@@ -1,4 +1,4 @@
-import { siteConfig, socialLinks } from '@/lib/constants'
+import { ALWINA, CONTACT_HREF } from './alwina-cv'
 import { SMALL_WORLD_PREMISE } from './alwina-story'
 import { chapters } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
@@ -17,8 +17,10 @@ import { FALLBACK_STYLE } from './fallback-timeline-style'
  * hidden for them, `SmallWorldExperience` returns null and never mounts it. So
  * the ONE route to Aram would have disappeared for exactly the visitors least
  * able to go looking for it. The block below is that route, in plain markup:
- * same address, same two profiles, no JavaScript, and it ships in the initial
- * HTML so a crawler reads it too.
+ * no JavaScript, and it ships in the initial HTML so a crawler reads it too.
+ *
+ * TASK 85 — IT IS HER ROUTE, NOT HIS. It printed Aram's email and his two
+ * profiles until finding 1; see the note on the footer itself.
  */
 export function FallbackTimeline() {
   return (
@@ -48,20 +50,31 @@ export function FallbackTimeline() {
           </li>
         ))}
       </ol>
+      {/* ============================================================================
+          WHOSE ADDRESSES THESE ARE (Task 85, finding 1)
+          ============================================================================
+          They were ARAM'S — `siteConfig.email` plus his GitHub and LinkedIn — on
+          a page telling Alwina's story, which is the same defect the ending's
+          pills carried and reached the crawler and the screen-reader visitor
+          besides. This is HER one known address now, from the same owner
+          (`alwina-cv.ts`) the ending pill and the plain CV read.
+
+          NO EMAIL, and that is the standing rule rather than an omission: her
+          real address is not known to this repo, and a plausible-looking
+          invented one on a real person's CV is the worst available failure.
+
+          THE LAB NO LONGER IMPORTS IDENTITY FROM `lib/constants`. That file is
+          the main portfolio's and stays Aram's; the fix is that this page stops
+          reaching into it, not that anything there changes. */}
       <footer>
         <h2>Come say hi</h2>
         <p>That&apos;s my whole world so far — I&apos;d love to hear from you.</p>
         <ul>
           <li>
-            <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>
+            <a href={CONTACT_HREF} target="_blank" rel="noopener noreferrer">
+              {ALWINA.contact}
+            </a>
           </li>
-          {socialLinks.map((l) => (
-            <li key={l.name}>
-              <a href={l.url} target="_blank" rel="noopener noreferrer">
-                {l.name}
-              </a>
-            </li>
-          ))}
         </ul>
       </footer>
     </section>

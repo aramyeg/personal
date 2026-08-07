@@ -29,6 +29,7 @@ import { ALWINA_STORY } from '../components/labs/small-world/alwina-story'
 // the label both doors say. A literal here would be a fourth copy of her CV.
 import {
   ALWINA,
+  CONTACT_HREF,
   DEGREE,
   LANGUAGES,
   ROLES_NEWEST_FIRST,
@@ -192,11 +193,53 @@ test.describe('Small World lab', () => {
     await expect(ending).toHaveAttribute('data-phase', 'still')
     await scrollToProgress(page, TRACK_END)
     await expect(ending).toHaveAttribute('data-phase', 'zoom')
-    await expect(ending.getByTestId('sw-connect-email')).toBeVisible({ timeout: 10_000 })
-    await expect(ending.getByTestId('sw-connect-email')).toHaveAttribute('href', /^mailto:/)
-    await expect(ending.getByTestId('sw-connect-github')).toHaveAttribute('href', /github\.com/)
-    await expect(ending.getByTestId('sw-connect-linkedin')).toHaveAttribute('href', /linkedin\.com/)
+    // ONE PILL, AND IT IS HERS (Task 85, finding 1). The email and GitHub pills
+    // carried Aram's addresses on a page that is Alwina's CV; they are gone until
+    // real ones exist for her, so this asserts what remains rather than three.
+    await expect(ending.getByTestId('sw-connect-linkedin')).toBeVisible({ timeout: 10_000 })
+    await expect(ending.getByTestId('sw-connect-linkedin')).toHaveAttribute('href', CONTACT_HREF)
+    await expect(ending.getByTestId('sw-connect-email')).toHaveCount(0)
+    await expect(ending.getByTestId('sw-connect-github')).toHaveCount(0)
     await expect(ending.getByTestId('sw-connect-restart')).toBeVisible()
+  })
+
+  /**
+   * TASK 85, FINDING 1 — the audit's CRITICAL, measured on the SHIPPED ROUTE.
+   *
+   * The unit gate reads components; this reads the page a recruiter actually
+   * loads, which is where the defect was found: three pills resolving to
+   * `aramyeg96@gmail.com`, `github.com/aramyeg` and `linkedin.com/in/aramyeg`,
+   * a document title naming him, and a CV overlay on the same page printing her
+   * LinkedIn. It sweeps the ending (where the pills are), the crawlable fallback
+   * that ships in the initial HTML, and the document title.
+   */
+  test('no address, profile or title on the lab route belongs to anyone but her', async ({ page }) => {
+    test.setTimeout(120_000)
+    await page.goto('/labs/small-world')
+
+    // The initial HTML first — this is what a crawler and a link preview get, and
+    // the fallback footer printed his three addresses into it.
+    const html = await (await page.request.get('/labs/small-world')).text()
+    expect(html, 'server-rendered HTML').not.toMatch(/aramyeg/i)
+
+    await expect(page).toHaveTitle(new RegExp(ALWINA.name))
+    expect(await page.title()).not.toMatch(/aram/i)
+
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    await scrollToProgress(page, TRACK_END)
+    const ending = page.getByTestId('sw-ending')
+    await expect(ending).toBeAttached({ timeout: 10_000 })
+    await expect(ending.getByTestId('sw-connect-linkedin')).toBeVisible({ timeout: 10_000 })
+
+    // Every anchor the ending offers, and every one on the page besides.
+    const hrefs = await page.evaluate(() =>
+      [...document.querySelectorAll('a')].map((a) => a.getAttribute('href') ?? '')
+    )
+    for (const h of hrefs) expect(h, 'a link on the lab route').not.toMatch(/aramyeg/i)
+    // ...and no invented address for her either: the rule the plain CV has kept
+    // since T83, now true of the whole route.
+    for (const h of hrefs) expect(h, 'a link on the lab route').not.toMatch(/^mailto:/)
   })
 
   /**
