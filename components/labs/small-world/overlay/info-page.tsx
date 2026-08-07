@@ -71,6 +71,18 @@ import {
 /** The page is 2:3, like the printed pages it is bound with. */
 export const INFO_PAGE_ASPECT = 1.5
 
+/**
+ * The aspect the two art beats are shown at.
+ *
+ * WIDE, and it is arithmetic rather than taste: four beats stacked in a 2:3 leaf
+ * leave the art about 45% of the height between them, so an establishing shot at
+ * the anchors' own 3:2 eats the hero's room and the colophon falls off the page.
+ * These are the same proportions the hand-cut fallback crops were derived to, so
+ * the layout does not move when an anchor goes live.
+ */
+export const KI_BAND = 2.45
+export const SHO_BAND = 2.15
+
 const RULE_CQW = 0.85
 const GAP = '1.6cqw'
 
@@ -218,8 +230,16 @@ function KiPanel({ chapter, crop, alt, t }: { chapter: number; crop: SpotCrop; a
   const anchor = anchorFor(chapter)
   const reveal = easeOut(phase(t, KI_ART))
   if (anchor?.ready) {
+    // A BAND THROUGH THE ANCHOR, not the whole 3:2 panel.
+    //
+    // The anchors are generated at 3:2 and a four-beat vertical stack cannot
+    // afford two panels that tall — captured the moment the art went live: beats
+    // 1 and 2 took 504px of the leaf's 567 and pushed the hero and the colophon
+    // off the bottom. `cover` on a wider box crops top and bottom, which is where
+    // the pack put the air: every anchor's subject is composed at its centre,
+    // because beat 2 zooms there.
     return (
-      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: '1.5' }}>
+      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${KI_BAND}` }}>
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -264,15 +284,21 @@ function ShoPanel({
   const reveal = easeOut(phase(t, SHO_ART))
   // THE ZOOM IS DERIVED, not authored: the pack composes every anchor so its
   // centre holds a close-up at exactly this magnification, so restating the
-  // rectangle here would be a second place for the agreement to drift.
-  const inset = ((1 - 1 / ZOOM) / 2) * 100
+  // rectangle would be a second place for one agreement to drift. Scaling to
+  // ZOOM and offsetting by half the overflow is what centres it.
   return (
     <InkedPanel
       ink={inkOf(t, SHO_INK)}
       tone="context"
-      style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? '1.5' : `${cropAspect(crop)}` }}
+      style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? `${SHO_BAND}` : `${cropAspect(crop)}` }}
     >
       {anchor?.ready ? (
+        // THE ZOOM IS A TRANSFORM, not a percentage offset. An earlier version
+        // sized the image to 240% and shifted it by -70% of the parent, which is
+        // correct arithmetic and rendered as a third of a picture with white
+        // beside it — too many percentages resolving against too many boxes.
+        // Scaling about the centre says the same thing in one operation that
+        // cannot be misread.
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -280,12 +306,12 @@ function ShoPanel({
             alt={alt}
             decoding="async"
             style={{
-              position: 'absolute',
-              inset: `-${inset}%`,
-              width: `${ZOOM * 100}%`,
-              height: `${ZOOM * 100}%`,
+              width: '100%',
+              height: '100%',
               objectFit: 'cover',
               display: 'block',
+              transform: `scale(${ZOOM})`,
+              transformOrigin: 'center',
               clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
             }}
           />

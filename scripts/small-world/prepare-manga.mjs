@@ -50,16 +50,83 @@ const sharp = loadSharp()
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(SCRIPT_DIR, '..', '..')
-const SRC_DIR = path.join(REPO_ROOT, '.superpowers', 'manga')
+/**
+ * TWO SOURCE SETS, ONE PIPELINE.
+ *
+ * The story pages live in `.superpowers/manga`; Task 77's info-leaf anchors and
+ * sprite sheets live in `.superpowers/manga/v3`. They want different widths and
+ * different weight budgets — an anchor is zoomed 2.4x by beat 2, a page never is —
+ * but they must go through the SAME greyscale, the same lanczos3, the same
+ * encoder and above all the same hatching-energy gate, which is the thing that
+ * already caught one encoder eating a tenth of the screentone off her face.
+ *
+ * So the set is a flag rather than a fork:
+ *     node scripts/small-world/prepare-manga.mjs            # the story pages
+ *     node scripts/small-world/prepare-manga.mjs --set v3   # the anchors + sheets
+ */
+const SETS = {
+  pages: {
+    src: ['.superpowers', 'manga'],
+    /** Twice the leaf's max CSS width. Keep in step with CARD_MAX_PX. */
+    width: 840,
+    meanKbBudget: 250,
+    quality: 70,
+  },
+  v3: {
+    src: ['.superpowers', 'manga', 'v3'],
+    /**
+     * Source-limited. Beat 1 shows an anchor at 378 CSS px (756 at 2x) and beat 2
+     * shows its centre at 2.4x, which would want 1814px to stay sharp on a retina
+     * phone — more than the generations carry. 1512 is what the source can give,
+     * so beat 1 is oversampled and beat 2 lands a little soft at 2x. Recorded
+     * rather than hidden: the fix is a larger generation, not a bigger resize.
+     */
+    width: 1512,
+    /** Anchors are 3.2x the area of a page, so the per-file budget is scaled with it. */
+    meanKbBudget: 700,
+    /**
+     * q86, NOT the pages' q70, and the GATE chose it — swept, not guessed.
+     *
+     * anchor-2 is the binding image: the honeycomb is almost entirely fine speckle
+     * and hatched shadow, and it is where the encoder spends its budget worst. The
+     * pages pass at q70 because their ink is mostly line; an anchor at 1512px
+     * carries far more high-frequency detail per byte. Measured on that image
+     * (`scratchpad/t74/q-sweep.mjs`):
+     *
+     *     q70  208 KB  92.0%      q90  418 KB  97.9%
+     *     q80  266 KB  94.3%      q93  486 KB  98.8%
+     *     q86  337 KB  96.5%      q96  560 KB  99.1%
+     *
+     * So 86 is the first step clear of the 95% floor with real margin, and the
+     * curve is flat enough above it that paying for q93 buys 2.3 points of ink for
+     * 44% more bytes. Lowering the floor would have been the fix that hides the
+     * problem.
+     */
+    quality: 86,
+    /**
+     * The chibi COLOUR reference is not shipped art — it is Aram's record of the
+     * character. Greyscaling it is meaningless and it fails the hatching gate at
+     * 65% because a soft colour render has almost no high-frequency ink to keep.
+     * Excluded rather than exempted: an exemption would have to be remembered.
+     */
+    exclude: ['chibi-color-ref.png'],
+  },
+}
+const SET = (() => {
+  const i = process.argv.indexOf('--set')
+  const name = i >= 0 ? process.argv[i + 1] : 'pages'
+  if (!SETS[name]) throw new Error(`unknown --set ${name}; expected one of ${Object.keys(SETS).join(', ')}`)
+  return SETS[name]
+})()
+
+const SRC_DIR = path.join(REPO_ROOT, ...SET.src)
 const OUT_DIR = path.join(REPO_ROOT, 'public', 'labs', 'small-world', 'manga')
 
-/** Twice the card's max CSS width — see decision 2 above. Keep in step with
- *  CARD_MAX_PX in components/labs/small-world/overlay/manga-card.tsx. */
-const ART_WIDTH = 840
-const QUALITY = 70
+const ART_WIDTH = SET.width
+const QUALITY = SET.quality
 
 /** Gates. Both are budgets the round agreed to, asserted rather than hoped. */
-const MEAN_KB_BUDGET = 250
+const MEAN_KB_BUDGET = SET.meanKbBudget
 const MIN_HATCH_RETAINED = 0.95
 
 /**
@@ -162,7 +229,11 @@ function printTable(rows) {
 async function main() {
   let files
   try {
-    files = (await readdir(SRC_DIR)).filter((f) => f.toLowerCase().endsWith('.png')).sort()
+    files = (await readdir(SRC_DIR, { withFileTypes: true }))
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.png'))
+      .map((e) => e.name)
+      .filter((n) => !(SET.exclude ?? []).includes(n))
+      .sort()
   } catch (err) {
     if (err.code !== 'ENOENT') throw err
     files = []

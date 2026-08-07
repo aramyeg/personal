@@ -68,12 +68,12 @@ export const ZOOM = 2.4
 
 /** The six anchors, in journey order. `ANCHORS[0]` is chapter 1 (Lyon). */
 export const ANCHORS: readonly SheetArt[] = [
-  { id: 'anchor-1', ready: false }, // ch1 Lyon — hands planting a seedling in a pot
-  { id: 'anchor-2', ready: false }, // ch2 IU Networks — the block tower
-  { id: 'anchor-3', ready: false }, // ch3 Sportion — the chisel on the stone
-  { id: 'anchor-4', ready: false }, // ch4 qiibee — the painted chests
-  { id: 'anchor-5', ready: false }, // ch5 Wooskill — the foundation by lamplight
-  { id: 'anchor-6', ready: false }, // ch6 Sync Design — the observatory glass
+  { id: 'anchor-1', ready: true }, // ch1 Lyon — hands planting a seedling in a textbook-propped pot
+  { id: 'anchor-2', ready: true }, // ch2 IU Networks — the honeycomb block snapping together
+  { id: 'anchor-3', ready: true }, // ch3 Sportion — polishing the stone in the stream
+  { id: 'anchor-4', ready: true }, // ch4 qiibee — the brush-stroke on a chest, thirteen receding
+  { id: 'anchor-5', ready: true }, // ch5 Wooskill — the foundation stone by lantern
+  { id: 'anchor-6', ready: true }, // ch6 Sync Design — the blueprint scroll, fox asleep
 ]
 
 export const anchorFor = (chapterIndex: number): SheetArt | undefined => ANCHORS[chapterIndex]
@@ -82,16 +82,33 @@ export const anchorFor = (chapterIndex: number): SheetArt | undefined => ANCHORS
  * The chibi run cycle. Six poses in one horizontal row, so a frame is
  * `100 / FRAMES` percent of the sheet and the sprite is a background-position step.
  */
+/**
+ * THE RUN CYCLE, PRE-RENDERED FROM THE RIG.
+ *
+ * The 2D run sheet the prompt pack asked for was cancelled: Aram delivered a
+ * RIGGED 3D chibi instead. It cannot ship as it stands — `chibi-run.glb` is
+ * 11,289,816 bytes, almost all of it one PNG texture, on a route that already
+ * carries a WebGL scene. So the cycle is baked to sprite frames offline
+ * (`scratchpad/t74/render-chibi.mjs` + `ink-frames.mjs` + `sheet.mjs`): ten poses
+ * over the clip's 0.667s, side-on, orthographic, toon-shaded, then inked to a
+ * hard contour and three flat bands.
+ *
+ *     11,289,816 B  ->  34,666 B      326x smaller, and it is the ONLY thing on
+ *                                      the wire; the GLB stays in .superpowers.
+ *
+ * TEN, not the pack's six: the rig's cycle is one full stride and sampling it at
+ * six left a visible skip at the foot plant.
+ */
 export const CHIBI_SHEET: SheetArt & { frames: number } = {
   id: 'chibi-run',
-  ready: false,
-  frames: 6,
+  ready: true,
+  frames: 10,
 }
 
 /** The reaction busts: a 3x2 grid, indexed row-major in the pack's own order. */
 export const REACTION_SHEET: SheetArt & { cols: number; rows: number } = {
   id: 'reactions',
-  ready: false,
+  ready: true,
   cols: 3,
   rows: 2,
 }
