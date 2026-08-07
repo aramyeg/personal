@@ -14,7 +14,6 @@ import { ClothDrag } from './cloth-drag'
 import { PALETTE } from '../palette'
 import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 import {
-  KETSU_INK,
   KI_ART,
   KI_INK,
   KI_NOTE,
@@ -36,7 +35,8 @@ import {
 } from './info-page-spec'
 
 /**
- * THE RIGHT-HAND LEAF, INKED — four beats, drawn in reading order.
+ * THE RIGHT-HAND LEAF, INKED — the picture, the hero, and the sheet, in reading
+ * order.
  *
  * `info-page-spec.ts` says what each chapter's page contains and why; `info-beats.ts`
  * says when each part of it arrives; this file draws it.
@@ -56,8 +56,8 @@ import {
  * ============================================================================
  * In black and white, TONE IS THE HIERARCHY, so there are exactly three densities
  * and each means something: PRIMARY (the hero's ground), CONTEXT (a supporting
- * panel), ASIDE (the colophon's strip). A fourth density would stop being a rank
- * and start being a texture.
+ * panel), ASIDE (a quiet strip). A fourth density would stop being a rank and
+ * start being a texture.
  *
  * PINK IS A SEMANTIC CHANNEL. It appears on the beat-3 number and its impact burst
  * and nowhere else on this page. The first draft of this leaf spent pink on caption
@@ -844,10 +844,19 @@ function KetsuPanel({
   reduced,
 }: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number; reduced: boolean }) {
   return (
-    <InkedPanel
-      ink={inkOf(t, KETSU_INK)}
-      tone="aside"
-      style={{ flex: '0 0 auto', flexDirection: 'column', padding: '2cqw 0' }}
+    // NOT AN `InkedPanel`, and that is the point. It wore a panel border for one
+    // capture and the sheet inside it made two nested boxes and no sheet — a
+    // drawn frame says "this is a panel of the comic", and this is a piece of
+    // paper lying on the page. The sheet's own outline is the only edge here.
+    <div
+      style={{
+        position: 'relative',
+        flex: '0 0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1cqw 0 0',
+      }}
     >
       <div style={{ position: 'relative', width: '100%', flex: '0 0 auto', alignSelf: 'stretch' }}>
         <ClothDrag line={line} intro={intro} t={t} reduced={reduced} />
@@ -869,7 +878,7 @@ function KetsuPanel({
         <br />
         {tools.join(' · ')}
       </span>
-    </InkedPanel>
+    </div>
   )
 }
 

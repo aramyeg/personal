@@ -115,7 +115,7 @@ export const TEN_NUMBER: Window = [TEN_INK[1] + TEN_PAUSE, TEN_INK[1] + TEN_PAUS
  * The blind audit's law is that a fact may not be gated on watching, and a "%"
  * that arrives late is a fact arriving late: a card caught early read "+30"
  * rather than "+30%". The suffix is printed with its digits now. The window
- * stays here because `TEN_BURST` and `KETSU_INK` are expressed against the
+ * stays here because `TEN_BURST` and `KETSU_TAIL` are expressed against the
  * numbers around it, and deleting it would silently move them.
  */
 export const TEN_SUFFIX: Window = [TEN_NUMBER[1], TEN_NUMBER[1] + 150]
@@ -128,8 +128,13 @@ export const TEN_SPEED: Window = [TEN_INK[1], TEN_NUMBER[0] + 220]
 export const MARK_STEP = 60
 export const MARK_SPAN = 170
 
-/** KETSU — quiet: her line, the colophon, the stack as an aside. */
-export const KETSU_INK: Window = [TEN_BURST[1] - 40, TEN_BURST[1] + 380]
+/**
+ * KETSU — the sheet.
+ *
+ * There is no `KETSU_INK` any more: the sheet stopped being an `InkedPanel` when
+ * a capture showed its own outline nested inside a drawn panel border, which is
+ * two boxes and no sheet. Its unfurl IS its ink.
+ */
 export const KETSU_LINE: Window = [TEN_BURST[1] + 120, TEN_BURST[1] + 900]
 /**
  * Where the colophon used to fade in — RETIRED BY THE INVERSION for the same

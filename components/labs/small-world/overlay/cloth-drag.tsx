@@ -102,18 +102,35 @@ export function layAt(t: number): number {
   return Math.max(0, Math.min(1, (runnerAt(t) - HAND_LAG) / (1 - HAND_LAG)))
 }
 
-/** Amplitude of the trailing wave, which decays to nothing as the sheet rests. */
+/**
+ * Amplitude of the trailing wave, which decays to nothing as the sheet rests.
+ *
+ * 2.1 of the path's 20 units — about a tenth of the band. The first pass used 0.9
+ * and it measured as nothing: captured mid-unfurl the edges were straight, so the
+ * sheet read as a rectangle sliding out rather than as cloth being pulled.
+ */
 function waveAmp(run: number): number {
   // Full while she is moving, gone by the time she is off the edge — the settle IS
   // the wave dying, so there is no second animation to keep in step with this one.
-  return run >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, run / 0.92)) * 0.9 + (1 - run) * 0.1
+  return run >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, run / 0.92)) * 2.1 + (1 - run) * 0.2
 }
 
+/** How far the leading edge bulges past her hand, in path units — the roll's girth. */
+const LEAD_BULGE = 3
+
 /**
- * The sheet's outline for a given sweep: a rectangle whose long edges ripple.
+ * The sheet's outline for a given sweep: a band whose long edges ripple and whose
+ * LEADING EDGE IS A CURVE.
  *
  * Drawn in a 100 x 20 space so the wave's wavelength is expressed in the same
  * units at any leaf size, and stretched with `preserveAspectRatio: none`.
+ *
+ * The leading edge was a straight vertical line in the first pass and captured as
+ * exactly what it was: a box clipped by a ruler. Paper coming off a roll in
+ * somebody's hand is round there, so the two long edges are joined by a quadratic
+ * that bulges past her grip. It is 3 units — about 1.5% of the band's width, six
+ * pixels on a desktop leaf — because the job is to stop the cut reading as a cut,
+ * not to draw a cylinder.
  */
 function clothPath(sweep: number, amp: number, phaseShift: number): string {
   const right = sweep * 100
@@ -130,7 +147,10 @@ function clothPath(sweep: number, amp: number, phaseShift: number): string {
     bottom.unshift(`${x.toFixed(2)},${(18.6 + w).toFixed(2)}`)
   }
   if (top.length === 0) return ''
-  return `M ${top.join(' L ')} L ${bottom.join(' L ')} Z`
+  const bulge = amp > 0 ? LEAD_BULGE : 0
+  return `M ${top.join(' L ')} Q ${(right + bulge).toFixed(2)},10 ${bottom[0]} L ${bottom
+    .slice(1)
+    .join(' L ')} Z`
 }
 
 /**
@@ -290,8 +310,28 @@ export function ClothDrag({
           viewBox="0 0 100 20"
           preserveAspectRatio="none"
           aria-hidden
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            // The sheet is allowed past its own box: the leading edge bulges, and
+            // clipping the bulge would put the ruler back.
+            overflow: 'visible',
+          }}
         >
+          {/* A SHADOW, because at rest the sheet is a rectangle of paper on paper.
+              Captured without one, the settled state read as a bordered text box
+              inside a bordered panel — two boxes, no sheet. An offset copy is what
+              says "this is lying ON the page" in one shape and no filter. */}
+          <path
+            d={path}
+            transform="translate(0.35 0.55)"
+            fill={PALETTE.ink}
+            opacity={0.17}
+            strokeLinejoin="round"
+          />
           <path
             d={path}
             fill={PALETTE.pagePaper}
