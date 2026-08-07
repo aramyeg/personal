@@ -76,16 +76,30 @@ export const PARALLAX_IN_AT = STUDIO_LIGHTS_FULL
  * composition that was solved to three targets (`camera.ts`), and the parallax is not allowed to
  * re-open that solve.
  *
- * PITCH IS HALF OF YAW, and that asymmetry is the geometry rather than a preference. The frame's
- * vertical budget is spent: the desk's back edge is pinned at `DESK_EDGE_V`, the world's lower
- * silhouette sits `STAND_GAP` above it, and the globe stand's foot has 0.151 of the frame's
- * half-height of clearance under whichever edge is holding it. Horizontally the slab is sized for
- * an aspect of 4 and the backdrop plane is 140 units wide, so yaw has room that pitch does not.
- * `camera-parallax.test.ts` gates both directions against the real frustum instead of trusting
- * this paragraph, and the numbers are in task-72-report.md.
+ * PITCH USED TO BE HALF OF YAW, on an argument that was measured and found to be false.
+ *
+ * The old paragraph here said the asymmetry was "the geometry rather than a preference": that the
+ * frame's vertical budget was spent, because the desk's back edge is pinned at `DESK_EDGE_V`, the
+ * world's lower silhouette sits `STAND_GAP` above it, and the globe stand's foot has 0.151 of the
+ * frame's half-height of clearance. Every one of those facts is still true. The inference was not.
+ *
+ * That argument rests entirely on the STAND GATE, and T79 swept the whole suite across seventeen
+ * rungs and found the stand gate is not sensitive to this at all: the shipped sweep composes with
+ * `parallaxGainFor`, which is ~0 at the pull-back position where the stand margin is worst (p≈1.085,
+ * a zoom well under `PARALLAX_IN_AT`). The shipped stand margin is −0.285 — bit-for-bit the
+ * un-orbited baseline. The gate that was said to be binding has never been touched by this number.
+ *
+ * The gate that IS binding is `overlay/connect-clearance.ts` — a 16 px lift budget. Measured per
+ * degree, yaw and pitch buy the SAME breathe (near/far NDC separation 0.0953 against 0.0944) and
+ * pitch costs 2.14× LESS of that budget (0.966 px of lift per degree against 2.092). So the 2:1
+ * ratio was not merely unjustified, it was backwards: it spent the expensive axis first.
+ *
+ * At 3.0/3.0 the breathe is 1.76× the shipped one and the lift demand is 13.29 of 16 px on desktop,
+ * 15.59 on phone390. `camera-parallax.test.ts` gates both directions against the real frustum
+ * rather than trusting this paragraph, and `connect-clearance.test.ts` gates the lift.
  */
-export const PARALLAX_YAW_DEG = 2.4
-export const PARALLAX_PITCH_DEG = 1.2
+export const PARALLAX_YAW_DEG = 3.0
+export const PARALLAX_PITCH_DEG = 3.0
 
 const DEG = Math.PI / 180
 
@@ -131,15 +145,25 @@ export function yawMaxFor(aspect: number): number {
  *
  * Heavily damped on purpose. The pointer is a discontinuous input — it teleports across the window
  * between two frames if the visitor flicks — and a camera that tracked it exactly would be a
- * judder, not a breath. At 2.2 the camera covers 90% of a jump in about a second, which reads as
- * the frame LEANING rather than following.
+ * judder, not a breath.
  *
  * Frame-rate independent by construction: the step is `1 − exp(−λ·dt)`, so a 30 Hz visitor and a
  * 120 Hz visitor see the same motion in wall-clock terms rather than the same motion per frame.
- * `useDampedJourney` uses the identical form at λ = 4 for the scroll itself; this is deliberately
- * slower than the thing it rides on.
+ *
+ * RAISED 2.2 → 4.0 in Task 81, and this is the cheapest lever in the file: λ costs NOTHING at any
+ * gate, because it changes how fast the camera reaches a pose and not which poses it reaches — the
+ * clearance gates all run at full deflection, which is the endpoint of the ramp either way. T79 ran
+ * the full suite at λ = 4.0 and again at 6.0 and both passed 950/950.
+ *
+ * It is also the lever that most changes how ALIVE the ending feels per unit of amplitude, which is
+ * what Aram was asking for when he called the breathe "sort of lacking": at 2.2 the camera covered
+ * 90% of a jump in about a second, which reads as the frame drifting some time after the visitor
+ * moved. At 4.0 it is a little over half a second and the lean reads as an ANSWER to the pointer.
+ * It now matches `useDampedJourney`'s λ for the scroll itself rather than lagging behind it — the
+ * argument for being slower than the thing it rides on was about amplitude, and amplitude is set
+ * by the degrees above.
  */
-export const PARALLAX_LAMBDA = 2.2
+export const PARALLAX_LAMBDA = 4.0
 
 /**
  * Below this much of a remaining gap, the damper LANDS instead of approaching.
@@ -169,13 +193,20 @@ export const PARALLAX_SNAP = 1e-5
  * answered — and it may be as large as the composition allows. An autonomous one is ambient, and
  * an ambient motion at the same amplitude is the frame drifting off its marks by itself.
  *
+ * 0.55 → 0.80 in Task 81. Like λ, this is free at every gate and free BY CONSTRUCTION rather than
+ * by measurement: every clearance gate in the suite runs at full deflection ±1, which is the pose
+ * this scales toward and not past. It stays below 1.0 because the paragraph above is still the
+ * argument — ambient is not the same as responsive — but on a phone the drift IS the whole
+ * mechanism, and at 0.55 of an amplitude that was itself the small end of "a few degrees", it was
+ * the one Aram was most likely to be calling lacking.
+ *
  * The clock is the one impurity in this file and it is scoped to nothing: the drift is multiplied
  * by the same envelope every other consumer reads, so outside the money shot it contributes
  * exactly ±0 and the camera is a pure function of scroll again. Two touch visitors who sit at the
  * bottom of the track for different lengths of time see different frames; nothing else differs,
  * and nothing that is proved about this lab is proved about the bottom of the track.
  */
-export const DRIFT_SCALE = 0.55
+export const DRIFT_SCALE = 0.8
 export const DRIFT_YAW_PERIOD = 19
 export const DRIFT_PITCH_PERIOD = 27
 

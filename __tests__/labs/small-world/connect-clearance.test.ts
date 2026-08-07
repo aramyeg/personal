@@ -344,9 +344,15 @@ describe('the note stays under the row across the whole parallax envelope', () =
         aim
       ) as number
       // After tracking, the note's line under the row is where it was, to within the sheet's own
-      // perspective shear. That residual is 6.29px at this viewport and 2.5px on a phone — pinned
-      // rather than rounded away, because it is exactly what the ENVELOPE term in the solve pays for.
-      expect(Math.abs(atPose - dy - at0)).toBeLessThan(7)
+      // perspective shear. This bound is A RECORDED MEASUREMENT, not a tolerance anyone chose: it
+      // is what the ENVELOPE term in the solve pays for, so it moves whenever the envelope does.
+      //
+      // Task 81 widened the envelope (yaw 2.4 -> 3.0, pitch 1.2 -> 3.0) and re-derived it. Measured
+      // per corner, desktop: 0.000, 4.498, 9.593, 7.454, 2.575 — was 6.29 worst. On phone390 the
+      // same corners give 0.000, 0.330, 4.437, 4.030, 1.122, so the desktop frame remains the
+      // binding one and is what this pins. 11 keeps the same ~11% margin over the worst corner that
+      // the old 7 kept over its own 6.29; it is NOT slack to grow into.
+      expect(Math.abs(atPose - dy - at0)).toBeLessThan(11)
     }
   })
 })
