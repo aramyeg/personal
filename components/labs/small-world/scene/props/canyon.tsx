@@ -24,6 +24,45 @@ const CANYON_CHAPTER = 4
  *  cone mouth, so the plume erupts from the vent. */
 const VENT_Y = 0.25
 
+/** Wrap a signed angle into (−π, π]. */
+const wrapPi = (a: number): number => {
+  const TWO_PI = Math.PI * 2
+  let d = a % TWO_PI
+  if (d <= -Math.PI) d += TWO_PI
+  if (d > Math.PI) d -= TWO_PI
+  return d
+}
+
+/**
+ * THE LIMB REST (Task 86) — how tall the plume is allowed to grow at the world angle it
+ * currently occupies.
+ *
+ * A geyser rides from the bottom of the frame to the top over its wedge's approach: the
+ * camera is static and the planet turns under it, so a prop's world angle is
+ * `theta − rotation`, running from about 160° (the grazing bottom limb) up to about −20°
+ * (the top). The plume is a tall thing — the vent sits 0.25 above the ground and the column
+ * reaches 0.62 beyond that, so a full eruption is nearly 0.4 of a planet RADIUS. Anywhere in
+ * the upper frame that is the point. At the bottom limb it is the defect the T84 audit found
+ * at chapter 4: "a tan dome with grey drips dangling from the bottom edge" — two plumes
+ * projecting past the silhouette into empty background, seen end-on, reading as drips
+ * because at that grazing angle nothing around them reads as ground.
+ *
+ * So the eruption rests while the vent is on the limb and climbs as the vent does. This is
+ * not a fade or a cheat: geyser.ts already gives every vent a dormant phase, and a dormant
+ * vent is what the reader sees — the sinter cone and its bubbling pool are drawn either way.
+ * It is a pure function of rotation like everything else here, so scrubbing back and forth
+ * reproduces it exactly, and at the canyon's OWN checkpoint every geyser sits at 28°–58°,
+ * far inside the full-eruption band, so chapter 5's frame is unchanged.
+ */
+const REST_LO = 95
+const REST_SPAN = 35
+function limbRest(theta: number, rotation: number): number {
+  const deg = (wrapPi(theta - rotation) * 180) / Math.PI
+  const t = (deg - REST_LO) / REST_SPAN
+  const x = t < 0 ? 0 : t > 1 ? 1 : t
+  return 1 - x * x * (3 - 2 * x)
+}
+
 /**
  * One geyser: the mineral cone/pool (always present while variant B is active) plus the erupting
  * plume, which the render GROWS and SHRINKS by the rotation-driven cycle (geyser.ts) scaled by the
@@ -53,7 +92,10 @@ function Geyser({
     const active = activeVariantAt(tc, rot) === 1
     g.visible = active
     if (active && plume.current) {
-      const amp = geyserPlume(rot, phase, DIALS.geyserPeriod.value) * DIALS.geyserAmp.value
+      const amp =
+        geyserPlume(rot, phase, DIALS.geyserPeriod.value) *
+        DIALS.geyserAmp.value *
+        limbRest(theta, rot)
       plume.current.scale.setScalar(Math.max(amp, 0.0001))
     }
   })
