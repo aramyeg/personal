@@ -117,13 +117,43 @@ export const FIGURINE_HEIGHT = Math.max(...DESK_FIGURINES.map((f) => f.height))
  * third, but it costs a ~260 kB decoder (wasm plus wrapper), a second request, and a WASM
  * instantiation on the path to an ending 1600vh of scrolling away from the loader. At 1.25 MB
  * transferred inside a 1.5 MB budget it still buys nothing.
+ *
+ * ============================================================================
+ * RAISED ONCE, IN TASK 81, BY THE MEASURED COST OF A SCOPE CHANGE — AND NOT BY MORE
+ * ============================================================================
+ * 1,500,000 was set against an asset that was MISSING two of its objects. The bird and the penguin
+ * had never been exported (see `DESK_FIGURINES`), Aram asked for them twice, and shipping them is
+ * not discretionary. They cost **+182,997 B gzipped, measured** — which lands the pre-existing
+ * asset at 1,500,106, six figures of coincidence and 106 bytes over.
+ *
+ * So the raise is +200,000, which is that measurement rounded, and NOTHING ELSE. Everything the
+ * round spent on quality was paid for out of savings inside the old number first:
+ *
+ *   * −211,444 B raw of colour alpha no shader reads (`t81_trim.py`);
+ *   * −1,886 vertices below one screen pixel, the new floor under `PROP_EDGE_MAX`'s cap;
+ *   * the atlas moved PNG → lossless WebP, −40% for bit-identical texels.
+ *
+ * THE ATLAS DOES NOT SET THIS NUMBER. It fills whatever geometry leaves and shrinks to fit — which
+ * is why it ships at 1408² and not the 2048² that measures better, and why the lossy WebP rungs
+ * were refused rather than used to buy a bigger sheet. That ordering is the whole discipline here,
+ * because the atlas has no natural stopping point: even 2048² leaves one texel covering 2.6 DEVICE
+ * pixels at the ending's dpr floor, so "bigger looks better" will be true at every size and is
+ * therefore not evidence for anything.
+ *
+ * The next quality lever is a COMPRESSION one, not another raise: `KHR_mesh_quantization` on
+ * POSITION (12 B float → 6 B short) is worth roughly −220 kB gzipped and would fit 2048² inside
+ * this same budget. It is deferred because several tests re-derive world-space facts straight from
+ * the POSITION accessors and would all have to learn the node transform first.
  */
-export const DESK_PAYLOAD_BUDGET = 1_500_000
+export const DESK_PAYLOAD_BUDGET = 1_700_000
 
 /**
  * ...and a ceiling on the uncompressed length, which is what the GPU and the parser pay.
  *
  * Deliberately loose — it exists to catch a category change (an accidental texture, a duplicated
- * attribute, modifiers baked on export), not to bound the art. The shipped file is 1,946,492.
+ * attribute, modifiers baked on export), not to bound the art. The shipped file is 2,289,376:
+ * the figurines added ~10,000 vertices and the atlas quadrupled its texels, while the alpha trim
+ * gave 211,444 B back. Raised with the wire budget and for the same reason, and kept loose —
+ * the ratio it wants to catch is a sudden one, not the 18% this round's contents grew by.
  */
-export const DESK_RAW_CEILING = 2_400_000
+export const DESK_RAW_CEILING = 2_600_000

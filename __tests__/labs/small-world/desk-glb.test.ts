@@ -57,8 +57,10 @@ type Gltf = {
     pbrMetallicRoughness?: { baseColorTexture?: { index: number }; baseColorFactor?: number[] }
     emissiveTexture?: { index: number }
   }[]
-  textures?: { source: number }[]
-  images?: { name: string }[]
+  textures?: { source?: number; extensions?: { EXT_texture_webp?: { source: number } } }[]
+  images?: { name: string; mimeType?: string }[]
+  extensionsRequired?: string[]
+  extensionsUsed?: string[]
 }
 
 const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 }
@@ -326,11 +328,38 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     // forwards. A swapped export would fade the slab and pad backwards and pass every other test
     // here, which is precisely the failure that already happened once on `render_color_index`.
     expect(glb.json.images).toHaveLength(2)
-    const mat = glb.json.materials.find((m) => m.name === 'T71_SURFACE')!
-    const nameOfSlot = (texIndex: number) =>
-      glb.json.images![glb.json.textures![texIndex].source].name
+    // Found by ROLE, not by name: it is the one material carrying both a base-colour and an
+    // emissive texture, which is what "holds the two atlases" means. Naming it was how this test
+    // used to find it, and the name is a pipeline detail that has already drifted once.
+    const mat = glb.json.materials.find(
+      (m) => m.pbrMetallicRoughness?.baseColorTexture && m.emissiveTexture
+    )!
+    expect(mat, 'a material carrying both atlases').toBeDefined()
+    // Task 81: the atlases are WEBP, so the image index moved. A WebP texture carries no core
+    // `source` at all — it lives under the extension — and reading `textures[i].source` on this
+    // file yields undefined, which is why this resolves through both.
+    const nameOfSlot = (texIndex: number) => {
+      const tex = glb.json.textures![texIndex]
+      const source = tex.extensions?.EXT_texture_webp?.source ?? tex.source
+      expect(source, `texture ${texIndex} resolves to an image`).toBeDefined()
+      return glb.json.images![source!].name
+    }
     expect(nameOfSlot(mat.pbrMetallicRoughness!.baseColorTexture!.index)).toContain('lit')
     expect(nameOfSlot(mat.emissiveTexture!.index)).toContain('dim')
+  })
+
+  it('ships the atlases as LOSSLESS webp, and declares the extension that needs', () => {
+    // PNG is the wrong codec for a baked lighting sheet: measured on the real 2048 atlas it cost
+    // 930,397 B against WebP-lossless's 556,952 for bit-identical texels (decode-and-diff, mean
+    // 0.000 / max 0 sRGB steps). The lossy rungs were cheaper again and REFUSED — masked to the
+    // texels the mesh samples, q95 leaves 1.1-2.4% of them more than two steps out with a maximum
+    // of 81, and it spends that error on the hard contact edges this round exists to sharpen.
+    //
+    // Blender writes the extension to extensionsREQUIRED because no PNG fallback is embedded (a
+    // fallback would put every saved byte back). three.js registers GLTFTextureWebPExtension, so
+    // that costs nothing here — but it is a real constraint on any other tool reading this file.
+    expect(glb.json.extensionsRequired).toContain('EXT_texture_webp')
+    expect(glb.json.images!.every((i) => i.mimeType === 'image/webp')).toBe(true)
   })
 
   it('gives the metal props one tint attribute and no baked lighting', () => {
