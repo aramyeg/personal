@@ -82,7 +82,13 @@ export const CV_TYPE_FLOOR_PX = {
 
 const size = (floor: number, vw: number, cap: number) => `clamp(${floor}px, ${vw}vw, ${cap}px)`
 
-/** The measure a body line is allowed to run to. Longer than this and the eye loses the return. */
+/**
+ * The measure the one PROSE line is allowed to run to.
+ *
+ * It applies to the identity line and to nothing else. The credit rows are single
+ * facts rather than sentences, and holding them to a reading measure is what put
+ * "2019" alone on a line under the degree — captured, at 1440.
+ */
 const MEASURE = '34em'
 
 const doc: CSSProperties = {
@@ -137,7 +143,6 @@ const line: CSSProperties = {
   fontSize: size(CV_TYPE_FLOOR_PX.line, 3.4, 16),
   lineHeight: 1.5,
   margin: '0 0 4px',
-  maxWidth: MEASURE,
   breakInside: 'avoid',
 }
 
@@ -145,7 +150,6 @@ const meta: CSSProperties = {
   fontSize: size(CV_TYPE_FLOOR_PX.meta, 3.2, 15),
   lineHeight: 1.55,
   margin: '0 0 6px',
-  maxWidth: MEASURE,
   opacity: 0.9,
   breakInside: 'avoid',
 }
@@ -178,7 +182,10 @@ function CreditLine({ credit, style }: { credit: Credit; style: CSSProperties })
       {' — '}
       {credit.org}
       {' · '}
-      {periodLong(credit)}
+      {/* THE DATE NEVER BREAKS. Captured on the phone: `IU Networks · 2020–` sat at the
+          end of one line with `2021` alone on the next, which reads as two facts. The
+          line may wrap — a phone gives it no choice — but not through a range. */}
+      <span style={{ whiteSpace: 'nowrap' }}>{periodLong(credit)}</span>
     </li>
   )
 }

@@ -268,7 +268,11 @@ const backdrop: CSSProperties = {
 
 const panel: CSSProperties = {
   width: '100%',
-  maxWidth: 660,
+  // WIDE ENOUGH FOR THE LONGEST FACT, which is the degree: at 660 it ran 640px and
+  // wrapped, leaving "2019" alone under it. This is a page of single-line records
+  // rather than of prose, so the column is sized to the records — 780 less the
+  // document's own 52px margins is 676, and the degree measures 640.
+  maxWidth: 780,
   margin: 'auto',
   background: PALETTE.pagePaper,
   borderRadius: 4,
