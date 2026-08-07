@@ -87,7 +87,6 @@ describe('useJourneyUi', () => {
     // re-renders when its quantized state CHANGES, and across the journey's
     // opening nothing else about it moves — a title driven by the raw ref would
     // render once at 1 and never fade.
-    expect(useJourneyUi ? true : false).toBe(true)
     const { result, rerender } = renderHook(({ p }: { p: number }) => useJourneyUi(refOf(p)), {
       initialProps: { p: 0 },
     })
