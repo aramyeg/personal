@@ -5,6 +5,7 @@ import { PALETTE } from '../palette'
 import { CvSheetLink } from './cv-sheet-link'
 import type { InfoPageSpec } from './info-page-spec'
 import { KETSU_LINE, easeOut, phase } from './info-beats'
+import { leadingEdgeMask } from './leading-edge'
 
 /**
  * THE CLOTH-DRAG — a chibi runs across the leaf unrolling a sheet, AND THE WORDS
@@ -253,10 +254,10 @@ function Runner({ frame }: { frame: number }) {
   )
 }
 
-/** How far ahead of the paper's edge a word is dimmed to. It never reaches zero. */
-const AHEAD_ALPHA = 0.42
-/** The feather's width, as a percentage of the band. Short: it is an edge, not a fade. */
-const FEATHER = 9
+// AHEAD_ALPHA AND FEATHER MOVED TO `leading-edge.ts`, and the move is the fix
+// rather than tidying: the ART on the same leaf was arriving on a `clip-path`
+// that removed rather than dimmed, and could park permanently on a blank panel.
+// Both now read one law from one file. See that file for the audit's repro.
 /** How far each line hinges out of the page before it settles flat. */
 const TILT_DEG = 17
 /** Stagger between one line settling and the next, as a fraction of the unfurl. */
@@ -329,16 +330,9 @@ export function ClothDrag({
       : []),
   ]
 
-  const edge = lay * 100
   // Dropped entirely once the sheet is open: a mask is a compositing layer, and
   // the settled page is the one that has to be crisp.
-  const mask =
-    lay >= 1
-      ? undefined
-      : `linear-gradient(to right, #000 0%, #000 ${edge}%, rgba(0,0,0,${AHEAD_ALPHA}) ${Math.min(
-          100,
-          edge + FEATHER
-        )}%, rgba(0,0,0,${AHEAD_ALPHA}) 100%)`
+  const mask = leadingEdgeMask(lay)
 
   return (
     <div
