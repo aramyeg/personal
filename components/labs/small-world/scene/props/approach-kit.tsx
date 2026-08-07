@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLANET_RADIUS, WATER_LEVEL, terrainBump, terrainBumpB } from '../planet'
 import { channelDist } from '../biomes'
-import { activeVariantAt, canonicalTheta } from '../renewal'
+import { canonicalTheta, sceneVariantAt } from '../renewal'
 import { chapterTheta } from '../stage'
 import { useClayRamp } from '../toon-ramp'
 import type { JourneyRef } from '../use-journey'
@@ -80,6 +80,13 @@ export type ClusterSpec = {
   dry?: boolean
   /** reject members within this angular distance of a river channel (default 0.08) */
   channelClear?: number
+  /**
+   * Hard lane guard, in world x. A member is dropped outright if it lands inside it,
+   * AFTER the cluster jitter — the window's own `x[0]` only bounds cluster CENTRES, and
+   * a spreadX of 0.2 around a centre at 0.5 reaches 0.3, which is inside the girl's path.
+   * Defaults to the 0.45 every wedge file is written against.
+   */
+  laneMin?: number
 }
 
 /**
@@ -93,7 +100,7 @@ export function clusterPlacements(spec: ClusterSpec): Placed[] {
   const {
     chapter, variant, t: [t0, t1], x: [x0, x1], side = 0,
     clusters, perCluster: [pcLo, pcHi], spreadT, spreadX, scale: [sLo, sHi], seed,
-    dry = true, channelClear = 0.08,
+    dry = true, channelClear = 0.08, laneMin = 0.45,
   } = spec
   const bumpFn = variant === 0 ? terrainBump : terrainBumpB
   const out: Placed[] = []
@@ -111,6 +118,7 @@ export function clusterPlacements(spec: ClusterSpec): Placed[] {
       const tt = ct + Math.cos(a) * rad * spreadT
       const xx = cx + Math.sin(a) * rad * spreadX
       if (Math.abs(xx) > PLANET_RADIUS * 0.95) continue
+      if (Math.abs(xx) < laneMin) continue
       const theta = chapterTheta(chapter, tt)
       const xN = xx / PLANET_RADIUS
       const ring = Math.sqrt(Math.max(0, 1 - xN * xN))
@@ -151,6 +159,14 @@ export type FamilySpec = {
  * exactly the Forest/Jungle contract, restated here so a dressing file is one draw call per
  * family however dense it is. An instance that is not its variant's is scaled to zero rather
  * than removed, and the flip always happens behind the horizon, so nothing pops on camera.
+ *
+ * The gate is `sceneVariantAt`, not `activeVariantAt`, and the difference matters at exactly
+ * one moment: the epilogue repaints band 0 and band 1 as winter one turn after the journey
+ * ends, and `activeVariantAt` knows nothing about it. Gating on the two-state front would
+ * therefore leave the desert's palms and the canyon's talus standing in the closing snow —
+ * the ground under them turns white and the props do not — which is the same reason
+ * set-accenture's DesertReveal takes the three-state answer. A dressing family belongs to
+ * exactly one scene variant, so anything not ours (including state 2) hides.
  */
 export function InstancedFamilies({
   families,
@@ -209,13 +225,21 @@ export function InstancedFamilies({
       const { mesh, real, thetaC } = built[li]
       const st = states.current[li]
       let changed = false
+      let live = 0
       for (let i = 0; i < thetaC.length; i++) {
-        const on = activeVariantAt(thetaC[i], rot) === variant ? 1 : 0
+        const on = sceneVariantAt(thetaC[i], rot) === variant ? 1 : 0
+        if (on) live++
         if (st[i] === on) continue
         st[i] = on
         mesh.setMatrixAt(i, on ? tmp.copy(real[i]) : ZERO)
         changed = true
       }
+      // A family spans ONE wedge, so for most of the journey every one of its instances is
+      // zero-scaled and the draw is a whole InstancedMesh's worth of vertex work that can only
+      // produce degenerate triangles. `frustumCulled` cannot save it — these meshes disable it
+      // (the instances move under the renewal front, so three.js's static bounding sphere would
+      // cull them wrongly), so the cheap and exact test is whether any instance is live at all.
+      mesh.visible = live > 0
       if (changed) mesh.instanceMatrix.needsUpdate = true
     }
   })
