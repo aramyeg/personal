@@ -10,6 +10,7 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { InfoPage } from '@/components/labs/small-world/overlay/info-page'
+import { sheetLines } from '@/components/labs/small-world/overlay/cloth-drag'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { DWELL_MID } from '@/components/labs/small-world/journey-timeline'
 import { STORY_STOP_PROGRESS } from '@/components/labs/small-world/story-stops'
@@ -252,6 +253,56 @@ describe('the page is drawn by the SCROLL, and by nothing else', () => {
     expect(done.every((v) => v > 0.999)).toBe(true)
     expect(early.some((v) => v < 0.999)).toBe(true)
     expect(early.reduce((a, b) => a + b, 0)).toBeLessThan(done.reduce((a, b) => a + b, 0))
+  })
+})
+
+describe('the sheet carries the words, and they survive being on it', () => {
+  it.each(chapters)('chapter %i: the line reconstitutes exactly from the sheet', (i) => {
+    // THE DEFECT THIS EXISTS FOR, caught by e2e rather than by looking: the line
+    // is split into block elements so each can carry its own curl, and splitting
+    // the sentence split its TEXT CONTENT with it. On screen it read "…choose —
+    // then taught myself…"; concatenated it was "thentaught". That is what a
+    // copy-paste, a page search and a screen reader all receive, and no capture
+    // would ever have shown it.
+    render(<InfoPage chapter={i} page={1} />)
+    const sheet = screen.getByTestId('sw-cloth-line')
+    const text = sheet.textContent!.replace(/\s+/g, ' ').trim()
+    expect(text, `chapter ${i + 1}`).toContain(INFO_PAGES[i].ketsu.line)
+  })
+
+  it('prints every word from the first frame, before the sheet has moved', () => {
+    // The audit's law, stated where it can fail. `page={0}` is the sheet fully
+    // rolled up: every word must already be in the DOM, because the mask DIMS
+    // what is ahead of the paper's edge and never removes it.
+    render(<InfoPage chapter={4} page={0} />)
+    const text = screen.getByTestId('sw-cloth-line').textContent!.replace(/\s+/g, ' ').trim()
+    expect(text).toContain(INFO_PAGES[4].ketsu.line)
+  })
+
+  it('says whose CV it is on the FIRST sheet, and only there', () => {
+    // The title card's job, moved somewhere a reader is already looking. A name
+    // reprinted on all six sheets would be a watermark, so the gate is both halves.
+    render(<InfoPage chapter={0} page={1} />)
+    expect(screen.getByTestId('sw-cloth-line').textContent).toContain('Alwina')
+    cleanup()
+    for (const i of chapters.slice(1)) {
+      render(<InfoPage chapter={i} page={1} />)
+      expect(screen.getByTestId('sw-cloth-line').textContent, `chapter ${i + 1}`).not.toContain('Alwina')
+      cleanup()
+    }
+  })
+
+  it('splits into two to four lines, and never strands one word', () => {
+    for (const [i, spec] of INFO_PAGES.entries()) {
+      const lines = sheetLines(spec.ketsu.line)
+      expect(lines.length, `chapter ${i + 1} line count`).toBeGreaterThanOrEqual(2)
+      expect(lines.length, `chapter ${i + 1} line count`).toBeLessThanOrEqual(4)
+      expect(lines.join(' '), `chapter ${i + 1} round-trips`).toBe(spec.ketsu.line.trim())
+      for (const l of lines) {
+        expect(l.trim().split(/\s+/).length, `chapter ${i + 1}: "${l}" is not one stranded word`)
+          .toBeGreaterThan(1)
+      }
+    }
   })
 })
 

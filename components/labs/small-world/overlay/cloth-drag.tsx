@@ -380,6 +380,14 @@ export function ClothDrag({
                 }}
               >
                 {row.text}
+                {/* THE SEPARATOR IS A REAL TEXT NODE, and it is not decoration.
+                    Splitting the sentence into block elements splits its TEXT
+                    CONTENT too, and without this the line reads "…choose — then
+                    taught…" on screen but concatenates as "thentaught" — which is
+                    what a copy-paste, a page search and an assistive reader all
+                    get. Caught by e2e asserting the leaf contains `ketsu.line`.
+                    A trailing space collapses visually, so it costs nothing. */}
+                {i < rows.length - 1 ? ' ' : ''}
               </div>
             )
           })}
