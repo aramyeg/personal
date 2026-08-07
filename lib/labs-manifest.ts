@@ -73,6 +73,14 @@ export const labs: LabEntry[] = [
       'The portfolio as enterprise SaaS — a navy-and-white operations console where the museum itself is the managed asset. Every ritual played straight; the pagination paginates six rows.',
     status: 'live',
   },
+  {
+    slug: 'cloth-pull',
+    title: 'Cloth Pull',
+    date: '2026-08-08',
+    thesis:
+      'A chibi hauls a cloth banner along a real rope and the message is written on the cloth — one simulated line, one analytic sheet, text that bends with the surface. Drag to pull; everything answers through a spring.',
+    status: 'live',
+  },
 ]
 
 /** What hangs in the main hall — everything not retired to the attic. */
