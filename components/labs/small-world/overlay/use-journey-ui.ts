@@ -31,15 +31,6 @@ export type JourneyUi = {
    */
   panel: { chapter: number; enter: number; page: number } | null
   /**
-   * The title card's presence, 1 → 0 across the journey's opening.
-   *
-   * IT LIVES IN THE UI STATE and not in a ref read at render time, because this
-   * hook only re-renders when its QUANTIZED state changes — and across the first
-   * two percent of the track nothing else about that state moves, so a card
-   * driven by `progressRef.current` would render once and never fade.
-   */
-  title: number
-  /**
    * The ending's DOM-side view (Task 63) — null for the whole journey, then the ending's
    * own timeline. `t` is quantized like `panel.enter`, so scrubbing the ending costs at
    * most T_STEPS re-renders rather than one per frame; a consumer that needs the exact
@@ -56,14 +47,6 @@ const T_STEPS = 60
 
 /** Below this the journey counts as not yet begun. ~0.3% of the track. */
 const START_EPSILON = 0.003
-
-/**
- * How far into the track the title card has faded out completely — the book's
- * cover, so it is a fraction of the JOURNEY rather than of a chapter. About one
- * screen of scroll at the shipped length: long enough to read at rest, short
- * enough never to compete with chapter one's arrival.
- */
-const TITLE_FADE = 0.02
 
 /**
  * Cards mount and roll out on the ARRIVAL CLOCK when one is driving (Task 54): the
@@ -104,7 +87,6 @@ function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
             // 400px span, and the beats ease within a step anyway.
             page: Math.round(pageProgressAt(progress) * T_STEPS) / T_STEPS,
           },
-    title: Math.round(Math.max(0, 1 - s.progress / TITLE_FADE) * T_STEPS) / T_STEPS,
     // `s.progress` is clamped and reads 1 for the whole ending, so it cannot answer this —
     // `s.ending` is the field built from the un-clamped value. See ending-timeline.ts.
     ending: s.ending.active

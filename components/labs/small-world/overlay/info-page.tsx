@@ -4,7 +4,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import { MANGA_PAGES, mangaPageSrc } from '../manga'
 import {
   BAND_ASPECT,
-  ZOOM,
   anchorFor,
   anchorSrc,
   reactionCell,
@@ -18,10 +17,8 @@ import {
   KETSU_INK,
   KI_ART,
   KI_INK,
+  KI_NOTE,
   PAGE_DONE,
-  SHO_ART,
-  SHO_INK,
-  SHO_NOTE,
   TEN_BURST,
   TEN_INK,
   TEN_NUMBER,
@@ -340,41 +337,20 @@ function AnchorCrop({
 
 
 /**
- * Beat 1: the chapter's own generated anchor panel.
+ * THE PICTURE — the chapter's own generated anchor panel, shown ONCE.
  *
- * FALLBACK, and it is deliberate rather than temporary scaffolding left in: while
- * the v3 art is being generated the leaf shows a crop of the chapter's printed
- * page instead, so the whole mechanism — the beats, the zoom, the cloth, the
- * motion states — is reviewable and capturable now. `ANCHORS[n].ready` is the one
- * switch, and nothing about the layout moves when it flips.
+ * It used to be a narrow band because it had a twin: the zoomed duplicate below it
+ * meant two panels shared the top of the leaf, and captured the moment the art
+ * went live the pair took 504px of the leaf's 567 and pushed the hero and the
+ * colophon off the bottom. With the duplicate gone (see `info-beats.ts`) the one
+ * surviving picture takes the room both were fighting over, and `BAND_ASPECT` is
+ * a genuine crop of the drawing rather than a slot it had to be squeezed into.
+ *
+ * The CROP path is the fallback and it is deliberate rather than scaffolding left
+ * in: `ANCHORS[n].ready` is the one switch, and nothing about the layout moves
+ * when it flips.
  */
-function KiPanel({ chapter, crop, alt, t }: { chapter: number; crop: SpotCrop; alt: string; t: number }) {
-  const anchor = anchorFor(chapter)
-  const reveal = easeOut(phase(t, KI_ART))
-  if (anchor?.ready) {
-    // A BAND THROUGH THE ANCHOR, not the whole 3:2 panel.
-    //
-    // The anchors are generated at 3:2 and a four-beat vertical stack cannot
-    // afford two panels that tall — captured the moment the art went live: beats
-    // 1 and 2 took 504px of the leaf's 567 and pushed the hero and the colophon
-    // off the bottom. `cover` on a wider box crops top and bottom, which is where
-    // the pack put the air: every anchor's subject is composed at its centre,
-    // because beat 2 zooms there.
-    return (
-      <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${BAND_ASPECT}` }}>
-        <AnchorCrop id={anchor.id} band={anchor.band} alt={alt} reveal={reveal} />
-      </InkedPanel>
-    )
-  }
-  return (
-    <InkedPanel ink={inkOf(t, KI_INK)} style={{ flex: '0 0 auto', aspectRatio: `${cropAspect(crop)}` }}>
-      <Spot crop={crop} alt={alt} reveal={reveal} />
-    </InkedPanel>
-  )
-}
-
-/** Beat 2: the same art, closer, with at most one supporting figure printed on it. */
-function ShoPanel({
+function KiPanel({
   chapter,
   crop,
   alt,
@@ -387,73 +363,53 @@ function ShoPanel({
   note?: string
   t: number
 }) {
-  const shown = 1
-  const nudge = phase(t, SHO_NOTE)
   const anchor = anchorFor(chapter)
-  const reveal = easeOut(phase(t, SHO_ART))
-  // THE ZOOM IS DERIVED, not authored: the pack composes every anchor so its
-  // centre holds a close-up at exactly this magnification, so restating the
-  // rectangle would be a second place for one agreement to drift. Scaling to
-  // ZOOM and offsetting by half the overflow is what centres it.
+  const reveal = easeOut(phase(t, KI_ART))
   return (
     <InkedPanel
-      ink={inkOf(t, SHO_INK)}
-      tone="context"
+      ink={inkOf(t, KI_INK)}
       style={{ flex: '0 0 auto', aspectRatio: anchor?.ready ? `${BAND_ASPECT}` : `${cropAspect(crop)}` }}
     >
       {anchor?.ready ? (
-        // THE ZOOM IS A TRANSFORM, not a percentage offset. An earlier version
-        // sized the image to 240% and shifted it by -70% of the parent, which is
-        // correct arithmetic and rendered as a third of a picture with white
-        // beside it — too many percentages resolving against too many boxes.
-        // Scaling about the centre says the same thing in one operation that
-        // cannot be misread.
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={anchorSrc(anchor.id)}
-            alt={alt}
-            decoding="async"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              transform: `scale(${ZOOM})`,
-              transformOrigin: 'center',
-              clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
-            }}
-          />
-        </div>
+        <AnchorCrop id={anchor.id} band={anchor.band} alt={alt} reveal={reveal} />
       ) : (
         <Spot crop={crop} alt={alt} reveal={reveal} />
       )}
-      {note ? (
-        <span
-          data-testid="sw-info-note"
-          style={{
-            position: 'absolute',
-            right: '2.4cqw',
-            bottom: '2cqw',
-            fontFamily: 'var(--sw-font-panel)',
-            fontSize: type(4.4),
-            letterSpacing: '0.03em',
-            lineHeight: 1,
-            color: PALETTE.ink,
-            background: PALETTE.pagePaper,
-            border: `${RULE_CQW}cqw solid ${PALETTE.ink}`,
-            padding: '0.6cqw 1.2cqw',
-            // The note is a caption ON the picture, so it arrives after the art —
-            // and it is INK, not pink: it is not the hero.
-            opacity: shown,
-            transform: `translateY(${(1 - nudge) * 12}%)`,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {note}
-        </span>
-      ) : null}
+      {note ? <PanelNote note={note} t={t} /> : null}
     </InkedPanel>
+  )
+}
+
+/**
+ * The supporting figure, printed ON the picture.
+ *
+ * It is INK, not pink: it is not the hero. It rode beat 2 until beat 2 was the
+ * same drawing twice; the caption was never what was wrong with that beat, so it
+ * moved here rather than being deleted with it.
+ */
+function PanelNote({ note, t }: { note: string; t: number }) {
+  const nudge = phase(t, KI_NOTE)
+  return (
+    <span
+      data-testid="sw-info-note"
+      style={{
+        position: 'absolute',
+        right: '2.4cqw',
+        bottom: '2cqw',
+        fontFamily: 'var(--sw-font-panel)',
+        fontSize: type(4.4),
+        letterSpacing: '0.03em',
+        lineHeight: 1,
+        color: PALETTE.ink,
+        background: PALETTE.pagePaper,
+        border: `${RULE_CQW}cqw solid ${PALETTE.ink}`,
+        padding: '0.6cqw 1.2cqw',
+        transform: `translateY(${(1 - nudge) * 12}%)`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {note}
+    </span>
   )
 }
 
@@ -868,10 +824,21 @@ function HeroCount({
   )
 }
 
-/** Beat 4: quiet. Her line, then the colophon and the stack as an aside. */
+/**
+ * THE SHEET — the page's fact surface, and the last thing it says.
+ *
+ * She runs the width of the panel unrolling it, and the words are PRINTED ON IT.
+ * `cloth-drag.tsx` owns the mechanism and the argument; this only gives it the
+ * room and puts the colophon underneath.
+ *
+ * The band sizes itself to its own text rather than to a fraction of the panel:
+ * the first sheet carries her name as well as her line, and a fixed height would
+ * have to be tall enough for that everywhere or clip it on chapter one.
+ */
 function KetsuPanel({
   line,
   tools,
+  intro,
   footer,
   t,
   reduced,
@@ -882,9 +849,8 @@ function KetsuPanel({
       tone="aside"
       style={{ flex: '0 0 auto', flexDirection: 'column', padding: '2cqw 0' }}
     >
-      {/* SHE DRAGS THE LINE IN. See cloth-drag.tsx — the sentence is the banner. */}
-      <div style={{ position: 'relative', width: '100%', height: '38%', minHeight: '9cqw' }}>
-        <ClothDrag line={line} t={t} reduced={reduced} />
+      <div style={{ position: 'relative', width: '100%', flex: '0 0 auto', alignSelf: 'stretch' }}>
+        <ClothDrag line={line} intro={intro} t={t} reduced={reduced} />
       </div>
       <span
         data-sw-text="info-footer"
@@ -971,10 +937,16 @@ export function InfoPage({
         overflow: 'hidden',
       }}
     >
-      <KiPanel chapter={chapter} crop={spec.ki.crop} alt={spec.ki.alt} t={t} />
-      <ShoPanel chapter={chapter} crop={spec.sho.crop} alt={spec.sho.alt} note={spec.sho.note} t={t} />
+      <KiPanel chapter={chapter} crop={spec.ki.crop} alt={spec.ki.alt} note={spec.ki.note} t={t} />
       <TenPanel hero={spec.ten.hero} inverted={spec.ten.inverted} t={t} />
-      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} reduced={still} />
+      <KetsuPanel
+        line={spec.ketsu.line}
+        tools={spec.ketsu.tools}
+        intro={spec.ketsu.intro}
+        footer={spec.footer}
+        t={t}
+        reduced={still}
+      />
     </div>
   )
 }

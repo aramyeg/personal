@@ -21,10 +21,10 @@
  *
  *  - SIX ANCHORS, `anchor-1` … `anchor-6`, one per chapter in journey order. Each
  *    is a SINGLE landscape panel at roughly 3:2 with one black border, and its
- *    subject sits just off-centre with fine detail near the middle — because the
- *    leaf zooms `ZOOM` into the centre of it for beat 2. The zoom is the reason
- *    the pack specifies the composition, so the two are one agreement and the
- *    number lives here rather than in both places.
+ *    subject sits just off-centre with fine detail near the middle. The pack asked
+ *    for that composition because the leaf used to ZOOM 2.4x into the centre for a
+ *    second beat; that beat is gone (Task 82 — one drawing printed twice), and the
+ *    composition is what still makes `BAND` below catch all six with one window.
  *  - CHIBI RUN SHEET, `chibi-run`: six side-view poses in a horizontal row, her
  *    trailing hand gripping a BLANK banner. The banner is blank because the site
  *    draws the cloth and the words on it (`cloth-drag.tsx`).
@@ -54,17 +54,16 @@ export type SheetArt = {
 }
 
 /**
- * THE BAND — which part of an anchor beat 1 actually shows.
+ * THE BAND — which part of an anchor the leaf's picture actually shows.
  *
- * The anchors generate at 3:2 and the leaf shows them in a wide band, because
- * four beats stacked in a 2:3 page cannot afford a 3:2 establishing shot. The
- * first version got there with `object-fit: cover`, which takes a full-width slice
- * through the middle of the whole illustration — and the blind audit's verdict on
- * that was exact: at ~100px tall it collapses to grey mush, because most of a
- * full-width slice is background.
+ * The anchors generate at 3:2 and the leaf cannot spend a 3:2 establishing shot on
+ * a 2:3 page. The first version got there with `object-fit: cover`, which takes a
+ * full-width slice through the middle of the whole illustration — and the blind
+ * audit's verdict on that was exact: at ~100px tall it collapses to grey mush,
+ * because most of a full-width slice is background.
  *
  * A band is a REAL CROP instead: a rectangle tight on the hands and the action, at
- * the beat's own aspect, so what survives the shrink is the part worth seeing.
+ * the panel's own aspect, so what survives the shrink is the part worth seeing.
  * `x`/`y`/`w` are fractions of the anchor; the height follows from the aspect, so
  * a band cannot be authored at the wrong shape.
  *
@@ -75,8 +74,17 @@ export type SheetArt = {
  */
 export type AnchorBand = { x: number; y: number; w: number }
 
-/** Beat 1's band aspect, and beat 2 zooms into the middle of it. */
-export const BAND_ASPECT = 2.45
+/**
+ * The picture panel's aspect.
+ *
+ * 2.45 while there were TWO of these stacked — the wide shot and its zoomed twin —
+ * because a leaf 145cqw tall could not carry two pictures any taller than that and
+ * still hold a hero. Task 82 killed the twin (one drawing printed twice is not a
+ * beat), so the survivor gets the room both were squeezed into and reads as a
+ * panel rather than a letterbox. 1.9 rather than the anchor's native 1.5: the
+ * page still owes half its height to the hero and the sheet.
+ */
+export const BAND_ASPECT = 1.9
 /** Every anchor is generated at 3:2. */
 export const ANCHOR_ASPECT = 1.5
 
@@ -87,17 +95,13 @@ export const bandHeight = (w: number): number => (w * ANCHOR_ASPECT) / BAND_ASPE
 export const anchorSrc = (id: string): string => `/labs/small-world/manga/${id}.webp`
 
 /**
- * How far beat 2 zooms into the anchor's centre.
+ * The six anchors, in journey order. `ANCHORS[0]` is chapter 1 (Lyon).
  *
- * 2.4x, and it is the same 2.4 the pack was written against — an establishing
- * shot and a detail that is obviously the SAME picture closer in. Below about 2x
- * the two beats read as one shot printed twice; far above it the detail stops
- * being locatable in the wide shot and the triad breaks.
+ * `y` is 0.19 rather than 0.3 because the band grew: at BAND_ASPECT 1.9 the window
+ * is 0.695 of the anchor tall, and it is centred on the composition the pack put
+ * the subject in. (At 2.45 it was 0.539 tall and 0.3 centred it.)
  */
-export const ZOOM = 2.4
-
-/** The six anchors, in journey order. `ANCHORS[0]` is chapter 1 (Lyon). */
-const BAND: AnchorBand = { x: 0.06, y: 0.3, w: 0.88 }
+const BAND: AnchorBand = { x: 0.06, y: 0.19, w: 0.88 }
 
 export const ANCHORS: readonly (SheetArt & { band: AnchorBand })[] = [
   { id: 'anchor-1', ready: true, band: BAND }, // ch1 Lyon — hands planting a seedling by a textbook

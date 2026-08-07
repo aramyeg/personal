@@ -20,18 +20,24 @@ import type { Rect } from '../manga/types'
  * rather than set beside them. A poster of panels has neither: the eye enters
  * wherever the contrast is highest and leaves without a sequence.
  *
- * So the page is KISHOTENKETSU, four beats, top to bottom:
+ * So the page has an explicit reading order, top to bottom:
  *
- *   1. KI (setup) — the donated story panel. The chapter's own art, carried over
- *      from the left leaf, which is what makes the spread read as one page flow.
- *   2. SHO (development) — the work itself: a TIGHTER CROP OF THE SAME ART. The
- *      "zoom-in triad" (wide, tight, number-inside) glues the fact to the story
- *      with no new art at all, and it is the cheapest way to obey "fuse the text
- *      into the picture".
- *   3. TEN (the twist) — THE METRIC, and it is the hero: half the page, the number
+ *   1. KI (setup) — the chapter's anchor panel, its own art, with at most one
+ *      supporting figure captioned on it.
+ *   2. TEN (the twist) — THE METRIC, and it is the hero: half the page, the number
  *      oversized and tilted and BREAKING its own panel border, speed lines aiming
  *      at it, and it is the only pink on the page.
- *   4. KETSU (resolution) — quiet. One first-person line, and the printed colophon.
+ *   3. KETSU (resolution) — quiet. The sheet she unrolls, carrying her line, and
+ *      the printed colophon beneath it.
+ *
+ * IT WAS FOUR (Task 82). Between KI and TEN sat SHO: the same art again, zoomed
+ * into its own centre — the "zoom-in triad", wide then tight then number-inside.
+ * The argument for it was sound on paper (a close-up fuses the fact to the story
+ * and costs no new asset) and it did not survive being looked at: on a leaf 378px
+ * wide it is one picture printed twice, one above the other. What a reader needs
+ * stopped is the MEDIUM, not the camera, and a second crop stops neither; the
+ * sheet unrolling at the story stop is the medium-stop this page actually has.
+ * The picture is now shown ONCE, and its supporting figure became KI's caption.
  *
  * ============================================================================
  * THE LAWS THAT CONSTRAIN EVERY ENTRY BELOW
@@ -53,11 +59,13 @@ import type { Rect } from '../manga/types'
  * ============================================================================
  * THE SPOT ART IS NOT NEW ART, AND IT IS NOT DUPLICATED EITHER
  * ============================================================================
- * Beats 1 and 2 are CROPS OF THE CHAPTER'S OWN PRINTED PAGE — the manifest carries
- * every panel rect, so a close-up of her hands is a rectangle rather than a
+ * `ki.crop` is a rectangle of the chapter's own printed page — the manifest
+ * carries every panel rect, so a close-up of her hands is a crop rather than a
  * drawing. It costs no new asset and cannot drift in style, because it IS that
- * page. And per Aram's correction the panel it comes from is REMOVED from the left
- * leaf (`DONATED_PANEL` below), so no panel is ever printed twice on one spread.
+ * page. It is now only the FALLBACK: all six generated anchors are `ready`, so
+ * the leaf shows its own art and reaches for the crop only if one is pulled.
+ * `DONATED_PANEL` below still records which panel each crop lies inside, which is
+ * what keeps the fallback from ever printing a panel twice on one spread.
  */
 
 /** A crop of a printed page, in page fractions — the manifest's own coordinate space. */
@@ -117,13 +125,37 @@ export type InfoPageSpec = {
    * came out as hair and an empty balloon. The crop must lie INSIDE the donated
    * panel (asserted), so the no-duplicate rule still holds.
    */
-  ki: { crop: SpotCrop; alt: string }
-  /** Beat 2: a tighter crop of the same art, and at most one supporting figure. */
-  sho: { crop: SpotCrop; alt: string; note?: string }
+  ki: {
+    crop: SpotCrop
+    alt: string
+    /**
+     * At most one supporting figure, printed as a caption ON the picture.
+     *
+     * It used to hang on beat 2 — the zoomed duplicate of this same art — and it
+     * outlived that beat because the FIGURE was never the problem. A second crop
+     * of one drawing was.
+     */
+    note?: string
+  }
   /** Beat 3: the hero. `inverted` prints it white-on-black — at most one chapter may. */
   ten: { hero: Hero; inverted?: boolean }
-  /** Beat 4: her line, the colophon, and the stack as a quiet aside. */
-  ketsu: { line: string; tools: string[] }
+  /** The sheet she unrolls: her line, and the colophon and stack beneath it. */
+  ketsu: {
+    line: string
+    tools: string[]
+    /**
+     * WHOSE CV THIS IS, printed on the FIRST sheet only.
+     *
+     * The blind audit's plainest finding was that her name appeared nowhere in the
+     * piece. Task 76's answer was a title card floating on the planet at load;
+     * Aram killed it as a splash screen in front of the world. This is the same
+     * fact in a place a reader is already looking — the first thing the first
+     * sheet says, on the surface the whole page treats as where facts live.
+     *
+     * ONE CHAPTER CARRIES IT. A name reprinted on all six sheets is a watermark.
+     */
+    intro?: { name: string }
+  }
   footer: { role: string; org: string; period: string }
 }
 
@@ -183,16 +215,16 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // and the four languages step down to the aside where a fact of that size
   // belongs. Aram vetoes on capture if he disagrees.
   {
+    // NO NOTE. It read "Self-taught" until the hero became the SELF-TAUGHT SFX,
+    // and the page then made its one claim twice in two sizes. A caption that has
+    // nothing new to add is better silent — the picture is doing the work.
     ki: { alt: 'Her cupped hands holding a seedling', crop: { page: 0, x: 0.0117, y: 0.7271, w: 0.9766, h: 0.2657 } },
-    sho: {
-      alt: 'The seedling itself, close',
-      crop: { page: 0, x: 0.2999, y: 0.8204, w: 0.4102, h: 0.1272 },
-      // NO NOTE. It read "Self-taught" until the hero became the SELF-TAUGHT SFX,
-      // and the page then made its one claim twice in two sizes. A beat that has
-      // nothing new to add is better silent — the picture is doing the work.
-    },
     ten: { hero: { kind: 'sfx', text: 'Self-taught', label: 'and it stuck' }, inverted: true },
     ketsu: {
+      // Her name, carried over verbatim from the retired title card. What she IS
+      // is not typed here — `currentRole()` reads it off the last chapter, so a
+      // new job moves it and a stale role cannot survive an edit.
+      intro: { name: 'Alwina Harutyunyan' },
       line: 'I studied why people choose — then taught myself to build it.',
       tools: ['Four languages', 'Marketing', 'Business', 'Code'],
     },
@@ -209,10 +241,9 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // SHIPPED: the draft, distilled twice — the first cut ran 13 words and the text
   // guard caught it. "No developer for small changes" keeps the humility and the fact.
   {
-    ki: { alt: 'She sets a block on a growing tower', crop: { page: 1, x: 0.0059, y: 0.0559, w: 0.9873, h: 0.2682 } },
-    sho: {
-      alt: 'The block in her fingers',
-      crop: { page: 1, x: 0.2527, y: 0.1208, w: 0.4147, h: 0.1284 },
+    ki: {
+      alt: 'She sets a block on a growing tower',
+      crop: { page: 1, x: 0.0059, y: 0.0559, w: 0.9873, h: 0.2682 },
       note: 'Every browser',
     },
     ten: { hero: { kind: 'sfx', text: 'No code', label: 'for small changes' } },
@@ -233,10 +264,6 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     ki: {
       alt: 'Her hands working a stepping stone with a hammer and chisel',
       crop: { page: 2, x: 0.5068, y: 0.2644, w: 0.4824, h: 0.1313 },
-    },
-    sho: {
-      alt: 'The chisel’s edge on the stone',
-      crop: { page: 2, x: 0.6887, y: 0.3036, w: 0.2026, h: 0.0628 },
       note: '+15% session',
     },
     ten: { hero: { kind: 'number', value: 30, prefix: '+', suffix: '%', label: 'smoother' } },
@@ -252,10 +279,9 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // THE ONE INVERTED PAGE. Thirteen is the set's biggest single claim and the
   // research allows exactly one chapter to print white-on-black; this is it.
   {
-    ki: { alt: 'She paints the lid of a patterned chest', crop: { page: 3, x: 0.0205, y: 0.8002, w: 0.4395, h: 0.1196 } },
-    sho: {
-      alt: 'The brush on the pattern',
-      crop: { page: 3, x: 0.0927, y: 0.7974, w: 0.1846, h: 0.0572 },
+    ki: {
+      alt: 'She paints the lid of a patterned chest',
+      crop: { page: 3, x: 0.0205, y: 0.8002, w: 0.4395, h: 0.1196 },
       note: '−40% build time',
     },
     ten: {
@@ -283,10 +309,9 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // names React / PHP / AWS because his draft does — better provenance than the
   // stack I had inferred from the company name.
   {
-    ki: { alt: 'She sets a foundation stone by lamplight', crop: { page: 4, x: 0.4727, y: 0.2688, w: 0.5234, h: 0.1424 } },
-    sho: {
-      alt: 'Her hands on the stone',
-      crop: { page: 4, x: 0.5901, y: 0.2709, w: 0.2198, h: 0.0682 },
+    ki: {
+      alt: 'She sets a foundation stone by lamplight',
+      crop: { page: 4, x: 0.4727, y: 0.2688, w: 0.5234, h: 0.1424 },
       note: '+19% conversion',
     },
     ten: { hero: { kind: 'number', value: 20, prefix: '−', suffix: '%', label: 'load' } },
@@ -303,10 +328,9 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
   // SHIPPED: the draft, distilled. "Data that never sits still" is the best phrase
   // in the set and the cut loses it — worth his second look.
   {
-    ki: { alt: 'She watches the observatory glass at dawn', crop: { page: 5, x: 0.0039, y: 0.0452, w: 0.9922, h: 0.2695 } },
-    sho: {
-      alt: 'The lit charts in the glass',
-      crop: { page: 5, x: 0.3916, y: 0.0705, w: 0.4167, h: 0.129 },
+    ki: {
+      alt: 'She watches the observatory glass at dawn',
+      crop: { page: 5, x: 0.0039, y: 0.0452, w: 0.9922, h: 0.2695 },
       note: 'Live data',
     },
     ten: { hero: { kind: 'count', count: 3, label: 'stacks' } },
@@ -319,3 +343,28 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
 ]
 
 export const infoPageFor = (chapterIndex: number): InfoPageSpec | undefined => INFO_PAGES[chapterIndex]
+
+/**
+ * What she is NOW — the LATEST chapter's role, not the first one's.
+ *
+ * Derived rather than typed, which is the one property the retired title card had
+ * that was worth keeping: "Frontend Engineer" is what she is, and a hard-coded
+ * copy of it would go stale the first time a chapter is added.
+ */
+export const currentRole = (): string => INFO_PAGES[INFO_PAGES.length - 1].footer.role
+
+/**
+ * Years of PROFESSIONAL work — from the first JOB, not the first chapter.
+ *
+ * Chapter 1 is her degree, and counting a Master's as experience is the kind of
+ * inflation this piece has no reason to reach for. Both ends are parsed out of the
+ * periods below, so an edit to the story moves the number.
+ */
+export function yearsWorking(): number {
+  const firstJob = Number(/\d{4}/.exec(INFO_PAGES[1].footer.period)?.[0] ?? '0')
+  const last = INFO_PAGES[INFO_PAGES.length - 1].footer.period
+  const end = /now|present/i.test(last)
+    ? new Date().getFullYear()
+    : Number(/(\d{4})\s*$/.exec(last)?.[1] ?? new Date().getFullYear())
+  return Math.max(1, end - firstJob)
+}

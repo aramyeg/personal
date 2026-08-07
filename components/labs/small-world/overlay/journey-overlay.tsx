@@ -3,16 +3,12 @@ import type { MutableRefObject } from 'react'
 import type { ArrivalJourney } from '../use-arrival-journey'
 import { BiomeGrade, SHOW_GRADE } from './biome-grade'
 import { ChapterPanels } from './chapter-panels'
-import { ChapterStrip } from './chapter-strip'
-import { TitleCard } from './title-card'
 import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
-import { EndingInk } from './ending-ink'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
 import { advanceTargetFrom } from '../story-stops'
 import { useJourneyUi } from './use-journey-ui'
-import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 
 /** Set false to remove the bottom progress rail entirely (one-line revert). */
 const SHOW_PROGRESS_RAIL = true
@@ -30,7 +26,6 @@ export function JourneyOverlay({
   onAdvance: (targetProgress: number) => void
 }) {
   const ui = useJourneyUi(progressRef, journey)
-  const reduced = usePrefersReducedMotion()
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
@@ -54,18 +49,15 @@ export function JourneyOverlay({
           the half that has to change: hard-cutting a retracting spread is worse than letting it
           play, and a live click target under the ending is the trap the canvas-first model
           (aa399f6) exists to forbid. */}
-      {/* HER NAME, at the top of her own book. The audit's plainest finding was
-          that it appeared NOWHERE in the piece — a recruiter could read the whole
-          thing without learning whose CV it was. It holds the frame before she
-          starts walking and is gone by the time she does: `progress` here is the
-          raw journey clock, so the card fades on the visitor's own first scroll
-          rather than on a timer. */}
-      <TitleCard present={ui.title} />
-      {/* THE FACTS, for the WHOLE chapter and not just its dwell. The spread is up
-          for about a third of a chapter's scroll; this is up for all of it, so a
-          visitor who flicks still leaves with the role, the company, the years and
-          her hook. See chapter-strip.tsx — it is the audit's headline fix. */}
-      {ui.started && !ui.ending && <ChapterStrip chapter={ui.chapter} present={1} />}
+      {/* NO TITLE CARD, AND NO BOTTOM STRIP (Task 82).
+          Both were the audit's answers to "her name appears nowhere" and "a flick
+          leaves with nothing", and Aram's verdict is that the cure was worse: a
+          card floating on the planet at load is a splash screen in front of the
+          world, and a persistent box pinned across the bottom of every chapter is
+          the shape readers have spent twenty years learning not to look at.
+          The facts they carried have not been dropped — they moved onto the SHEET
+          the chibi unrolls (`cloth-drag.tsx`), which is diegetic, is where a
+          reader is already looking, and carries her name on the first one. */}
       {ui.panel && (
         <ChapterPanels
           index={ui.panel.chapter}
@@ -92,13 +84,13 @@ export function JourneyOverlay({
           data-phase={ui.ending.phase}
           style={{ position: 'absolute', inset: 0 }}
         >
-          {/* THE INK ARRIVAL (Task 76). The last page of the book the chapters were,
-              and the one place in this story where her face is right — the 3D girl
-              leaves the world over the crest and does not come back in three
-              dimensions. `ending-ink.tsx` carries the DOM, `ink-arrival.ts` the
-              argument and the staging. It is drawn BEFORE the connect note so the
-              note and the pills always sit on top of it. */}
-          <EndingInk t={ui.ending.t} reduced={reduced} />
+          {/* THE INK ARRIVAL IS GONE (Task 82). Task 76 hung the epilogue page in
+              the ending as a full-frame drawing; Aram's verdict is that it reads
+              as a poster dropped over the last shot and stops the pull-back being
+              the ending. The ending is the clean pull-back and the crest exit
+              again, with the connect note the only thing that hangs here.
+              `EndingConnect` never keyed off the page — it runs on `ui.ending.t`
+              directly — so removing it leaves no hole to close. */}
           <EndingConnect t={ui.ending.t} onRestart={() => onAdvance(0)} />
         </div>
       )}

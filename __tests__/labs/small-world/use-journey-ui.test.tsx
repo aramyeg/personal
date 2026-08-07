@@ -76,24 +76,13 @@ describe('useJourneyUi', () => {
       started: false,
       panel: null,
       ending: null,
-      // The title card holds the frame at rest — her name is the first thing the
-      // piece says now (blind audit: it appeared nowhere at all).
-      title: 1,
     })
   })
 
-  it('fades the title out on the visitor’s own first scroll', () => {
-    // IT MUST LIVE IN THIS STATE, not in a ref read at render: the hook only
-    // re-renders when its quantized state CHANGES, and across the journey's
-    // opening nothing else about it moves — a title driven by the raw ref would
-    // render once at 1 and never fade.
-    const { result, rerender } = renderHook(({ p }: { p: number }) => useJourneyUi(refOf(p)), {
-      initialProps: { p: 0 },
-    })
-    expect(result.current.title).toBe(1)
-    rerender({ p: 0.03 })
-    expect(result.current.title).toBe(0)
-  })
+  // THE TITLE CARD IS GONE (Task 82), and with it the `title` field this hook used
+  // to carry. Her name is not lost — it is printed on the sheet the chibi unrolls
+  // at the first checkpoint (`cloth-drag.tsx`), which is diegetic rather than a
+  // splash screen laid over the planet at load.
 
   it('reports the burst window', () => {
     const ref = refOf(0)
@@ -113,6 +102,16 @@ describe('useJourneyUi', () => {
     expect(result.current.panel!.chapter).toBe(0)
     expect(result.current.panel!.enter).toBeGreaterThan(0)
     expect((result.current.panel!.enter * 60) % 1).toBeCloseTo(0, 6)
+  })
+
+  it('hands the leaf a FINISHED page at the story stop, on scroll alone', () => {
+    // Task 82: the info leaf's ink is `panel.page`, a pure function of scroll, and
+    // the story stop is where a fling lands. Asserted here as well as in
+    // info-page.test.tsx because this is the seam the number crosses — a quantizer
+    // that rounded 0.9917 down would strand a reader on a half-drawn page.
+    const ref = refOf(chapterDwellProgress(2))
+    const { result } = renderHook(() => useJourneyUi(ref))
+    expect(result.current.panel!.page).toBe(1)
   })
 
   // Task 63: the ending is scroll real estate PAST progress 1, not a flag at 0.985. The old

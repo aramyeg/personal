@@ -74,21 +74,30 @@ export const inkOf = (t: number, w: Window): number => phase(t, w)
 
 // ── the timeline ────────────────────────────────────────────────────────────────
 //
-// Four beats. Each inks its frame, fills, and hands over. The whole page is done in
-// a little under four seconds — long enough that the hero lands as an event, short
-// enough that a reader who scrolled here on purpose is not kept waiting.
+// THREE beats now, not four. Each inks its frame, fills, and hands over.
+//
+// SHO IS GONE (Task 82). It was the "zoom-in triad": beat 1 wide, beat 2 the SAME
+// art at ZOOM into its own centre, and the argument for it was that a close-up
+// fuses the fact to the story with no new asset. Measured against the reading, it
+// bought a duplicate: two panels of one picture, stacked, in a leaf 378px wide.
+// T77's finding is the one that binds — what a reader needs stopped is the MEDIUM,
+// not the camera, and a second crop of the same drawing stops neither. The unfurl
+// at the story stop IS the medium-stop, so the fact surface is the sheet in
+// `cloth-drag.tsx` and the picture is shown once. Beat 2's supporting NOTE was a
+// real fact and it survives — it is a caption on beat 1's panel, which is what it
+// always was.
+//
+// The windows below close the gap rather than leaving a hole where SHO used to be:
+// every beat gets more of the scroll span, not the same amount with a pause in it.
 
-/** KI — the donated story panel. */
+/** KI — the chapter's anchor panel, and its supporting note. */
 export const KI_INK: Window = [0, 420]
 export const KI_ART: Window = [180, 760]
-
-/** SHO — the tighter crop, and its supporting note. */
-export const SHO_INK: Window = [620, 1010]
-export const SHO_ART: Window = [800, 1320]
-export const SHO_NOTE: Window = [1180, 1480]
+/** The note is a caption ON the picture, so it lands after the art it annotates. */
+export const KI_NOTE: Window = [760, 1000]
 
 /** TEN — the hero. Its frame inks, and then the panel sits EMPTY for a beat. */
-export const TEN_INK: Window = [1340, 1800]
+export const TEN_INK: Window = [1040, 1500]
 /**
  * THE PAUSE. 200ms of drawn, empty panel before anything arrives in it.
  *

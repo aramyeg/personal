@@ -45,47 +45,38 @@ function inside(outer: { x: number; y: number; w: number; h: number }, inner: ty
 }
 
 describe('the info leaf’s laws', () => {
-  it.each(chapters)('chapter %i: beat 2 crops the panel the chapter actually donated', (i) => {
+  it.each(chapters)('chapter %i: the fallback crop lies inside the donated panel', (i) => {
     // THE BUG THIS EXISTS FOR, and it shipped in the first draft on three of six
     // chapters: the panel being REMOVED from the story leaf was not the panel the
     // info leaf SHOWED. So a panel was deleted from the left page for nothing, and
     // the duplication Aram asked us to remove survived on the right. Nothing about
     // either page looks wrong when that happens — both still render art.
+    //
+    // It guards the FALLBACK now (every anchor is `ready`, so the crop only draws
+    // if one is pulled), and it is worth keeping for exactly that reason: a
+    // fallback nobody looks at is where this class of mistake would live.
     const panel = donatedPanelFor(i)!
     const rect = MANGA_PAGES[i].panels[panel]
     expect(rect, `chapter ${i + 1} donates a panel that exists`).toBeTruthy()
-    for (const [beat, crop] of [
-      ['beat 1', INFO_PAGES[i].ki.crop],
-      ['beat 2', INFO_PAGES[i].sho.crop],
-    ] as const) {
-      expect(crop.page, `chapter ${i + 1} ${beat} crops its OWN page`).toBe(i)
-      expect(inside(rect, crop), `chapter ${i + 1}: ${beat} is inside donated panel ${panel}`).toBe(true)
-    }
+    const crop = INFO_PAGES[i].ki.crop
+    expect(crop.page, `chapter ${i + 1} crops its OWN page`).toBe(i)
+    expect(inside(rect, crop), `chapter ${i + 1}: the crop is inside donated panel ${panel}`).toBe(true)
   })
 
-  it('keeps the art beats WIDE, and beat 2 genuinely tighter than beat 1', () => {
-    // TWO LAWS, both learned by capture rather than by argument.
+  it('keeps the picture LANDSCAPE', () => {
+    // Learned by capture rather than by argument: an art panel takes its crop's own
+    // aspect, so a tall crop makes a tall panel — and a tall panel pushes the hero
+    // and the colophon off the bottom of the leaf. Captured: chapter 3's +30% was
+    // cut in half by the page edge and the sheet was gone entirely. An establishing
+    // shot on this page is LANDSCAPE, and that is geometry rather than taste.
     //
-    // WIDE: an art panel takes its crop's own aspect, so a tall crop makes a tall
-    // panel — and a vertical four-beat stack of tall panels pushes the hero and the
-    // colophon off the bottom of the leaf. Captured: chapter 3's +30% was cut in
-    // half by the page edge and beat 4 was gone entirely. An establishing shot on
-    // this page is LANDSCAPE, and that is geometry rather than taste.
-    //
-    // TIGHTER: the zoom-in triad only works if beat 2 is actually a zoom. A first
-    // derivation maximised both crops' width and produced two nearly identical
-    // shots, which reads as the same picture printed twice.
+    // The COMPANION law — "beat 2 is genuinely tighter than beat 1" — is gone with
+    // beat 2 (Task 82). It only ever protected the zoom triad from collapsing into
+    // one picture printed twice, which is the failure the triad was deleted for.
     for (const [i, spec] of INFO_PAGES.entries()) {
-      const a = (c: { w: number; h: number; page: number }) => {
-        const page = MANGA_PAGES[c.page]
-        return (c.w * page.size.w) / (c.h * page.size.h)
-      }
-      expect(a(spec.ki.crop), `chapter ${i + 1} beat 1 is landscape`).toBeGreaterThan(2)
-      expect(a(spec.sho.crop), `chapter ${i + 1} beat 2 is landscape`).toBeGreaterThan(1.8)
-      expect(
-        spec.ki.crop.w / spec.sho.crop.w,
-        `chapter ${i + 1} beat 2 zooms in on beat 1`
-      ).toBeGreaterThan(1.6)
+      const c = spec.ki.crop
+      const page = MANGA_PAGES[c.page]
+      expect((c.w * page.size.w) / (c.h * page.size.h), `chapter ${i + 1} is landscape`).toBeGreaterThan(2)
     }
   })
 
@@ -126,8 +117,8 @@ describe('the info leaf’s laws', () => {
   it('keeps the text guard: one short line per page, phrases for notes', () => {
     for (const [i, spec] of INFO_PAGES.entries()) {
       expect(words(spec.ketsu.line), `chapter ${i + 1}'s line`).toBeLessThanOrEqual(MAX_CAPTION_WORDS)
-      if (spec.sho.note) {
-        expect(words(spec.sho.note), `chapter ${i + 1}'s note`).toBeLessThanOrEqual(MAX_NOTE_WORDS)
+      if (spec.ki.note) {
+        expect(words(spec.ki.note), `chapter ${i + 1}'s note`).toBeLessThanOrEqual(MAX_NOTE_WORDS)
       }
       expect(words(spec.ten.hero.label), `chapter ${i + 1}'s hero label`).toBeLessThanOrEqual(MAX_NOTE_WORDS)
     }
@@ -141,10 +132,10 @@ describe('the info leaf’s laws', () => {
     for (const [i, spec] of INFO_PAGES.entries()) {
       const hero = spec.ten.hero
       const heroText = (hero.kind === 'sfx' ? hero.text : hero.label).toLowerCase()
-      if (spec.sho.note) {
+      if (spec.ki.note) {
         expect(
-          spec.sho.note.toLowerCase().includes(heroText) || heroText.includes(spec.sho.note.toLowerCase()),
-          `chapter ${i + 1}: note "${spec.sho.note}" repeats the hero`
+          spec.ki.note.toLowerCase().includes(heroText) || heroText.includes(spec.ki.note.toLowerCase()),
+          `chapter ${i + 1}: note "${spec.ki.note}" repeats the hero`
         ).toBe(false)
       }
     }
