@@ -160,11 +160,21 @@ export function CvOverlay({ onClose }: { onClose: () => void }) {
     const opener = document.activeElement as HTMLElement | null
     // The document itself, so a screen reader starts at her name rather than at
     // the close button, and so the first Tab moves forward through the page.
-    panelRef.current?.focus()
+    //
+    // `preventScroll` ON BOTH CALLS, and it is not belt-and-braces — it is the fix
+    // for a measured defect. `focus()` scrolls the element's ancestors to reveal
+    // it, so handing focus back to the sheet's link scrolled the track under the
+    // reader: e2e caught the return landing 222px away from where Escape was
+    // pressed, on a page whose whole promise is that it does not move the world.
+    panelRef.current?.focus({ preventScroll: true })
     return () => {
+      // FOCUS FIRST, THEN THE GUARD. The restore used to run before the focus,
+      // which is exactly why it absorbed nothing: it corrected a scroll and then
+      // the focus call moved it again. Whatever still shifts the page is now
+      // upstream of the thing that puts it back.
+      if (opener?.isConnected) opener.focus({ preventScroll: true })
       const back = scrollRestoreTarget(savedScroll, window.scrollY)
       if (back !== null) window.scrollTo({ top: back, behavior: 'instant' as ScrollBehavior })
-      if (opener?.isConnected) opener.focus()
     }
   }, [])
 

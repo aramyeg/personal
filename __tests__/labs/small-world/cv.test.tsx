@@ -231,15 +231,22 @@ describe('the surface stops the medium, and gives it back', () => {
     expect(dialog).toHaveAccessibleName(ALWINA.name)
   })
 
-  it('returns focus to the door it came through', () => {
+  it('returns focus to the door it came through, WITHOUT scrolling to it', () => {
+    // THE DEFECT THIS PINS, found by e2e and invisible to every capture: `focus()`
+    // scrolls the element's ancestors to reveal it, so handing focus back to the
+    // sheet's link dragged the track 222px out from under the reader. `preventScroll`
+    // is the fix, and asserting the OPTION rather than the resulting scroll is what
+    // makes it testable in jsdom, which has no layout to scroll.
     const opener = document.createElement('button')
     document.body.appendChild(opener)
     opener.focus()
-    expect(document.activeElement).toBe(opener)
+    const spy = vi.spyOn(opener, 'focus')
     const { unmount } = render(<CvOverlay onClose={() => {}} />)
     expect(document.activeElement).not.toBe(opener)
     unmount()
     expect(document.activeElement).toBe(opener)
+    expect(spy).toHaveBeenCalledWith({ preventScroll: true })
+    spy.mockRestore()
     opener.remove()
   })
 
