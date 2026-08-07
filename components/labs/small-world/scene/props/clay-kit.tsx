@@ -786,14 +786,30 @@ export function ClayGeyserPlume({ steam = PALETTE.geyserPlume, base = PALETTE.ge
       pos: [dx, y, dz],
       scl: [1, 1.15, 1],
     })
+    // Task 86 — the column WIDENS as it rises, and its puffs intersect.
+    //
+    // It used to taper: nine-ish beads getting smaller toward the top, each clear of its
+    // neighbours. That is the silhouette of a cairn, not of a jet, and it is what the T84
+    // audit was looking at when it listed chapter 5's contents as "two beige bell shapes, a
+    // stack of white pebbles that reads as nothing" — the bells are the sinter cones and the
+    // pebbles are this. Steam reads by getting wider and looser as it leaves the vent, so the
+    // jet is now tight at the mouth and billows into a crown, and every puff overlaps its
+    // neighbour (each gap is smaller than the sum of the two radii) so the column merges into
+    // one mass instead of resolving into countable spheres.
+    //
+    // Still opaque sculpted clay, no transparency and no flicker — the standing veto — and
+    // the tip reaches 0.61, within a hundredth of the old 0.60, so the limb-rest gate in
+    // canyon.tsx keeps the margin it was solved against.
     return buildMergedClay([
-      puff(0.05, 0.085, base),
-      puff(0.15, 0.078, base, 0.02),
-      puff(0.26, 0.072, steam, -0.015),
-      puff(0.34, 0.05, steam, 0.05, 0.02), // a side billow
-      puff(0.37, 0.066, steam, 0.015),
-      puff(0.47, 0.055, steam, -0.03),
-      puff(0.56, 0.042, steam, 0.02),
+      puff(0.04, 0.045, base), // the jet, tight at the vent mouth
+      puff(0.11, 0.055, base, 0.01),
+      puff(0.19, 0.07, steam, -0.012),
+      puff(0.27, 0.086, steam, 0.015),
+      puff(0.34, 0.079, steam, 0.045, 0.02), // a side billow
+      puff(0.36, 0.095, steam, -0.01), // the crown, the widest point
+      puff(0.45, 0.088, steam, -0.04),
+      puff(0.5, 0.075, steam, 0.03, -0.015),
+      puff(0.55, 0.06, steam, 0.01),
     ])
   }, [steam, base])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
