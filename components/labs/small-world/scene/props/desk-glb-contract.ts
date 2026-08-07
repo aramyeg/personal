@@ -72,6 +72,32 @@ export const DESK_PAD = {
 } as const
 
 /**
+ * THE TWO SOUVENIRS, NOW INSIDE THE ASSET (Task 81) — published because other things stand beside
+ * them and have to keep out of their way.
+ *
+ * Until this round the bird and the penguin were drawn by the lab, out of the same toon clay the
+ * journey's mascots are made of, and `desk-figurines.tsx` owned their placement. They are baked
+ * props now (see `desk-set.tsx` for the law that changed and why), joined into `DeskBaked` and
+ * therefore no longer addressable by name — so the placement moves here, where the pad's footprint
+ * already lives.
+ *
+ * These are MEASUREMENTS of the Blender models, in the lab frame, taken from the master blend at
+ * `.superpowers/sdd/blender/` (`gltf = (bx, bz, −by)`, which is why the height is the blend's z).
+ * `desk-glb.test.ts` checks that the shipped `DeskBaked` really does carry vertices inside these
+ * boxes, so the export cannot quietly drop them again — which is exactly what happened for three
+ * rounds and is the whole reason this round exists.
+ */
+export const DESK_FIGURINES = [
+  /** The bluebird, on her left. */
+  { kind: 'bluebird', x: -0.92, z: 9.471, halfW: 0.2532, halfD: 0.4486, seatY: 1.2653, height: 0.6549 },
+  /** ...and the penguin, on her right — the taller of the two. */
+  { kind: 'penguin', x: 0.83, z: 9.494, halfW: 0.2313, halfD: 0.243, seatY: 1.2625, height: 0.7652 },
+] as const
+
+/** The taller souvenir, which is what anything standing among them is measured against. */
+export const FIGURINE_HEIGHT = Math.max(...DESK_FIGURINES.map((f) => f.height))
+
+/**
  * What the whole desk set is allowed to weigh OVER THE WIRE — and the correction that word is.
  *
  * T68 wrote this budget against the file's UNCOMPRESSED length while its own docblock argued in

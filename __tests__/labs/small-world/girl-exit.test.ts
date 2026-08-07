@@ -42,12 +42,11 @@ import {
   strideAt,
 } from '@/components/labs/small-world/scene/girl-exit'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
-import { DESK_PAD } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import {
+  DESK_FIGURINES,
+  DESK_PAD,
   FIGURINE_HEIGHT,
-  FIGURINE_X,
-  FIGURINE_Z,
-} from '@/components/labs/small-world/scene/props/desk-figurines'
+} from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { STANCE_ALPHA } from '@/components/labs/small-world/scene/renewal'
 
 /**
@@ -309,12 +308,13 @@ describe('her mark is somewhere the desk and the phone both allow', () => {
   const TAN_HALF = Math.tan((38 * Math.PI) / 360)
 
   it('clears the two souvenirs it stands between', () => {
-    for (const fig of [
-      { x: -FIGURINE_X, z: FIGURINE_Z },
-      { x: FIGURINE_X, z: FIGURINE_Z },
-    ]) {
+    // Task 81: the souvenirs are baked into the asset now, so their places come from the contract
+    // that measures the shipped models rather than from a builder the lab no longer has. They are
+    // NOT symmetric about x — the bird sits at −0.92 and the penguin at +0.83 — so this reads both
+    // rather than mirroring one, and it clears each figurine's own half-width instead of its anchor.
+    for (const fig of DESK_FIGURINES) {
       const gap = Math.hypot(GIRL_DESK_STAGING.to[0] - fig.x, GIRL_DESK_STAGING.to[1] - fig.z)
-      expect(gap).toBeGreaterThan(0.45)
+      expect(gap, fig.kind).toBeGreaterThan(0.45 + fig.halfW)
     }
   })
 

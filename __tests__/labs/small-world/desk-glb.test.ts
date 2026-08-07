@@ -14,6 +14,7 @@ import {
 import { CAMERA_FOV } from '@/components/labs/small-world/scene/camera'
 import {
   COFFEE_ANCHOR,
+  DESK_FIGURINES,
   DESK_GLB_URL,
   DESK_MESHES,
   DESK_PAD,
@@ -134,6 +135,23 @@ describe('desk GLB — payload and draw cost', () => {
     expect(glb.bytes).toBeLessThanOrEqual(DESK_RAW_CEILING)
   })
 
+  it('ships no colour alpha that nothing reads', () => {
+    // Blender writes every colour attribute VEC4, because that is what a Blender colour attribute
+    // is. Three of the four carry a constant 1.0 in the fourth component and no shader looks at it —
+    // 211 kB, 8.4% of the file — so `t81_trim.py` rewrites them VEC3 after export. The ONE that
+    // must stay VEC4 is the gloss mesh's COLOR_1, whose alpha carries each surface's own specular
+    // level (the glaze wants 1.34 and the coffee 2.80, and one material cannot serve both).
+    const width = (mesh: string, attr: string) => {
+      const a = meshOf(mesh).primitives[0].attributes[attr]
+      return a === undefined ? null : glb.json.accessors[a].type
+    }
+    expect(width('DeskBaked', 'COLOR_0')).toBe('VEC3')
+    expect(width('DeskBaked', 'COLOR_1')).toBe('VEC3')
+    expect(width('DeskMetal', 'COLOR_0')).toBe('VEC3')
+    expect(width('DeskGloss', 'COLOR_0')).toBe('VEC3')
+    expect(width('DeskGloss', 'COLOR_1')).toBe('VEC4')
+  })
+
   it('costs four draw calls, not one per prop colour', () => {
     // glTF splits a mesh into one primitive per material and three.js draws one primitive per call.
     // The Blender set carries ~40 prop tints; they live in the vertex attribute, so one material per
@@ -223,6 +241,59 @@ describe('desk GLB — containment, measured on the emitted vertices', () => {
   })
 })
 
+/**
+ * THE GATE THAT SHOULD HAVE EXISTED THREE ROUNDS AGO (Task 81).
+ *
+ * The bird and the penguin sat finished in the blend from Task 68 and were never once exported: the
+ * export selected five objects by name, the figurines were not among them, and nothing anywhere
+ * checked. Aram had to notice twice, and Task 79 had to measure an NCC of 0.131 against the approved
+ * render, before anyone looked at the export list.
+ *
+ * A comment saying "the figurines are exported" would have been just as true and just as useless.
+ * This reads the shipped file: `DeskBaked` must carry vertices inside each souvenir's own box, and
+ * the box must be filled to its corners rather than merely intersected, so a figurine that arrived
+ * half-scale or seated on the wrong plane fails too.
+ */
+describe('desk GLB — the souvenirs are actually in the file', () => {
+  const baked = readAccessor(glb.json, glb.bin, meshOf('DeskBaked').primitives[0].attributes.POSITION)
+
+  for (const fig of DESK_FIGURINES) {
+    it(`carries the ${fig.kind} where the contract publishes it`, () => {
+      let n = 0
+      let minX = Infinity
+      let maxX = -Infinity
+      let minY = Infinity
+      let maxY = -Infinity
+      for (let i = 0; i < baked.length; i += 3) {
+        const [x, y, z] = [baked[i], baked[i + 1], baked[i + 2]]
+        if (Math.abs(x - fig.x) > fig.halfW + 0.02) continue
+        if (Math.abs(z - fig.z) > fig.halfD + 0.02) continue
+        if (y < fig.seatY - 0.02 || y > fig.seatY + fig.height + 0.02) continue
+        n++
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+      // ~5,000 vertices each in the shipped export; a floor an empty or decimated-to-nothing
+      // figurine cannot clear, and loose enough that re-tessellation is not a failure.
+      expect(n, `${fig.kind} vertices found`).toBeGreaterThan(2000)
+      // ...and it fills its box, so a half-scale stand-in does not pass by sitting inside one.
+      expect(maxY - minY).toBeGreaterThan(fig.height * 0.9)
+      expect(maxX - minX).toBeGreaterThan(fig.halfW * 1.6)
+      expect(minY).toBeCloseTo(fig.seatY, 1)
+    })
+  }
+
+  it('draws them with the baked set, so they take the studio rather than a second tone map', () => {
+    // The old procedural pair mounted MeshToonMaterial/MeshBasicMaterial with no `toneMapped` flag,
+    // so they went through r3f's default ACES while every baked material opts out — two view
+    // transforms in one frame. Being inside DeskBaked is what ends that, and DeskBaked is one
+    // primitive with one material, so there is nowhere else for them to be.
+    expect(meshOf('DeskBaked').primitives).toHaveLength(1)
+  })
+})
+
 describe('desk GLB — the lights-up channels are the right way round', () => {
   it('carries two colour sets on the baked mesh, lit at COLOR_0', () => {
     const prim = meshOf('DeskBaked').primitives[0]
@@ -233,11 +304,15 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     // the exporter takes COLOR_0 from the mesh's `render_color_index`, and an export that left that
     // on the last-baked attribute shipped the lights-up running backwards. The one property that
     // cannot be got backwards is brightness.
+    // Strides by the accessor's OWN component count rather than by 4. Task 81 trimmed the baked
+    // colour sets from VEC4 to VEC3 — their alpha was a constant 1.0 that no shader reads, 211 kB
+    // of it — and a hardcoded 4 would have walked off the end of every vertex silently.
     const mean = (a: number) => {
+      const n = TYPE_COUNT[glb.json.accessors[a].type]
       const v = readAccessor(glb.json, glb.bin, a)
       let s = 0
-      for (let i = 0; i < v.length; i += 4) s += v[i] + v[i + 1] + v[i + 2]
-      return (s * 4) / (v.length * 3)
+      for (let i = 0; i < v.length; i += n) s += v[i] + v[i + 1] + v[i + 2]
+      return (s * n) / (v.length * 3)
     }
     const lit = mean(prim.attributes.COLOR_0)
     const dim = mean(prim.attributes.COLOR_1)
@@ -271,9 +346,10 @@ describe('desk GLB — the lights-up channels are the right way round', () => {
     // one material is that the shipped attribute still holds several different colours. Four
     // materials go in (dish, pen, tool, foil), so at least four distinct tints must come out.
     const prim = meshOf('DeskMetal').primitives[0]
+    const n = TYPE_COUNT[glb.json.accessors[prim.attributes.COLOR_0].type]
     const v = readAccessor(glb.json, glb.bin, prim.attributes.COLOR_0)
     const seen = new Set<string>()
-    for (let i = 0; i < v.length; i += 4) {
+    for (let i = 0; i < v.length; i += n) {
       seen.add([v[i], v[i + 1], v[i + 2]].map((c) => c.toFixed(4)).join(','))
     }
     expect(seen.size, [...seen].join(' | ')).toBeGreaterThanOrEqual(4)

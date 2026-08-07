@@ -1,5 +1,4 @@
 'use client'
-import { DeskFigurines } from './desk-figurines'
 import { DeskGlb } from './desk-glb'
 import { DeskNote } from './desk-note'
 import { DeskSteam } from './desk-steam'
@@ -26,22 +25,47 @@ import type { JourneyRef } from '../use-journey'
  * the whole `desk-kit.ts` vocabulary retired with it.
  *
  * What did NOT change is the rule the round was given: CLAY IS THE MADE THINGS. The planet is
- * untouched, and the two survivors on this desk stay exactly as they were —
+ * untouched, and the NOTE keeps its canvas-texture handwriting, because it is hers and a baked
+ * photograph of a letter is not a letter.
  *
- *  - the NOTE keeps its canvas-texture handwriting, because it is hers and a baked photograph of a
- *    letter is not a letter;
- *  - the FIGURINES keep their toon shading and their ink contours, because they are souvenirs of
- *    the journey and the whole point of the ending is that they do not match the room.
+ * ============================================================================
+ * ...AND THE HALF OF THAT RULE TASK 81 OVERTURNED
+ * ============================================================================
+ * This block used to carry a second survivor and an argument for it:
  *
- * Their contact shadows moved into the bake rather than being drawn: the pad was baked in Blender
- * with stand-ins for the note and both figurines standing on it, so the pink under them is already
- * dark in the texture. That is why `deskNoteShadowPart` is gone — it would now be a second shadow
- * painted on top of a real one.
+ *   > the FIGURINES keep their toon shading and their ink contours, because they are souvenirs of
+ *   > the journey and the whole point of the ending is that they do not match the room.
  *
- * DRAW CALLS: six. Three from the asset (the surface, every matte prop, the metal), the note (its
- * own material, because it carries a texture) and the two figurines (one merged clay mesh plus one
- * merged ink contour for the pair). Per frame: one float compare in `desk-glb.tsx`, and nothing at
- * all anywhere else — no component here allocates after mount.
+ * It was a real argument and it is now REVERSED, by the only authority that could reverse it.
+ * Aram asked twice for the bird and penguin he had approved in Blender — "we had other penguin and
+ * bird figurines, now again I see the threejs generated ones" — and Task 79 found why he kept
+ * seeing the wrong ones: the approved models had NEVER been exported. They sat in the blend so
+ * their shadows would fall on the pad, excluded from the export set by name
+ * (`t68_prep.py`, `t71_export.py`), and the exclusion outlived the approval it was contradicting.
+ * Measured against the approved render, every other object on this desk registered at NCC 0.73–0.84
+ * and the figurines at 0.131 — not a degraded version of the same asset, a different asset.
+ *
+ * So they are baked props now, exported through the same pipeline as everything else
+ * (`t81_prep.py`) and joined into `DeskBaked`. Three consequences worth stating:
+ *
+ *  - THE COST IS NEGATIVE. Two draw calls go away — the merged clay mesh and its ink contour — and
+ *    the ~10,000 vertices they become cost none, because they join a mesh that was already drawn.
+ *  - THE TONE-MAPPING SPLIT CLOSES WHERE IT SHOWED. The clay path runs through r3f's default ACES
+ *    while every baked material opts out with `toneMapped: false`, so the old figurines were the
+ *    one place two view transforms met in one frame. The journey's clay still runs through ACES,
+ *    deliberately and untouched; it is only these two that changed sides.
+ *  - THE PRICE, STATED: the souvenirs no longer resemble the checkpoint mascots they are souvenirs
+ *    of. That was the old law's real point, and it is what was traded away.
+ *
+ * Their contact shadows still live in the bake — the pad is baked with them standing on it, so the
+ * pink under them is already dark in the texture. What changed is that it is now baked with the
+ * figurines THEMSELVES rather than with 85% stand-ins for them. That is also why
+ * `deskNoteShadowPart` is gone: it would be a second shadow painted on top of a real one.
+ *
+ * DRAW CALLS: five, down from seven. Four from the asset (the surface, every matte prop, the metal,
+ * the donut glaze) and the note, which has its own material because it carries a texture — plus the
+ * steam's one while the studio is up, and none before. Per frame: one float compare in
+ * `desk-glb.tsx`, and nothing at all anywhere else — no component here allocates after mount.
  */
 
 /**
@@ -54,9 +78,9 @@ export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
     <group>
       <DeskGlb journeyRef={journeyRef} />
       <DeskNote journeyRef={journeyRef} />
-      {/* Two souvenirs of the journey, at desk-toy scale (Task 66). Still clay, still toon-shaded —
-          see the header for why they were not baked with the rest. */}
-      <DeskFigurines />
+      {/* The two souvenirs are inside <DeskGlb> now — see the header for the law that changed.
+          Their placement is published as DESK_FIGURINES in `desk-glb-contract.ts`, because the
+          girl still has to stand between them without treading on either. */}
       {/* Wisps off the coffee (Task 72), hung on the GLB's `CoffeeAnchor` empty. One draw call while
           the studio is up and NONE at all before it — the plume is gated on `studioLightsFor`, so it
           is not drawn, not lit and not clocked anywhere in the journey. See `desk-steam.tsx` for the
