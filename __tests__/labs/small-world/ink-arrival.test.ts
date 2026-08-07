@@ -4,7 +4,13 @@ import {
   INK_PLACEMENTS,
   INK_PRELOAD_T,
   INK_OPACITY_SHARE,
+  INK_CLEAR_MARGIN,
+  INK_EDGE_INSET,
+  INK_HELD_MAX,
+  INK_HELD_MIN,
   inkArrivalAt,
+  inkCoversWorld,
+  worldSilhouetteLeft,
 } from '@/components/labs/small-world/overlay/ink-arrival'
 import {
   GIRL_TRANSFER,
@@ -21,7 +27,9 @@ import { EPILOGUE } from '@/components/labs/small-world/manga'
  * land on top of the CREST WALK, which is the beat this round exists to protect.
  */
 
-const at = (t: number) => inkArrivalAt(t, false)
+const LAND = 1440 / 900
+const PHONE = 390 / 844
+const at = (t: number) => inkArrivalAt(t, false, LAND)
 
 describe('the page is a function of scroll and nothing else', () => {
   it('is not on screen for the whole journey or the first of the ending', () => {
@@ -80,10 +88,11 @@ describe('the page settles into the room rather than sitting on it', () => {
   it('is held large before the desk arrives and small once it has', () => {
     const held = at(0.5)
     const hung = at(1)
-    expect(held.height).toBeGreaterThan(hung.height * 1.7)
-    // ...and it moves out of the middle to do it
-    expect(Math.abs(held.x - 0.5)).toBeLessThan(0.05)
-    expect(hung.x).toBeLessThan(0.3)
+    expect(held.height).toBeGreaterThan(hung.height * 1.5)
+    // It is held BESIDE the world, not on it (see INK_CLEAR_MARGIN), so both poses
+    // live in the frame's left band and the travel is short.
+    expect(held.x).toBeLessThan(0.35)
+    expect(hung.x).toBeLessThan(0.35)
   })
 
   it('is still on screen at the money shot — it is a fixture, not a flash', () => {
@@ -95,20 +104,23 @@ describe('the page settles into the room rather than sitting on it', () => {
     const settle = INK_PLACEMENT.settle!
     const s = at(settle.to)
     expect(Object.is(s.height, settle.pose.height)).toBe(true)
-    expect(Object.is(s.x, settle.pose.at[0])).toBe(true)
     expect(Object.is(s.y, settle.pose.at[1])).toBe(true)
+    // x is DERIVED now, not authored: the settled page hangs on the same left
+    // inset the held one did, so the two share an edge and the travel keeps it.
+    const settledW = (settle.pose.height * (1024 / 1536)) / LAND
+    expect(Object.is(s.x, INK_EDGE_INSET + settledW / 2)).toBe(true)
   })
 })
 
 describe('reduced motion still gets the beat, without the movement', () => {
   it('fades the page in and out and never travels or scales it', () => {
     for (let i = 0; i <= 500; i++) {
-      const s = inkArrivalAt(i / 500, true)
+      const s = inkArrivalAt(i / 500, true, LAND)
       if (!s.shown) continue
       expect(Object.is(s.lift, 0)).toBe(true)
       expect(Object.is(s.scale, 1)).toBe(true)
     }
-    expect(inkArrivalAt(1, true).shown).toBe(true)
+    expect(inkArrivalAt(1, true, LAND).shown).toBe(true)
   })
 })
 
@@ -193,7 +205,7 @@ describe('the page is never translucent over the scene', () => {
 })
 
 describe('portrait keeps the beat and clears its own money shot', () => {
-  const port = (t: number) => inkArrivalAt(t, false, true)
+  const port = (t: number) => inkArrivalAt(t, false, PHONE)
 
   it('holds the page up on a phone, exactly as it does on a laptop', () => {
     expect(port(0.5).shown).toBe(true)
@@ -218,7 +230,7 @@ describe('portrait keeps the beat and clears its own money shot', () => {
   it('leaves the LANDSCAPE composition completely alone', () => {
     for (let i = 0; i <= 1000; i++) {
       const t = i / 1000
-      const a = inkArrivalAt(t, false, false)
+      const a = inkArrivalAt(t, false, LAND)
       const b = at(t)
       for (const k of ['present', 'lift', 'scale', 'height', 'x', 'y', 'tilt'] as const) {
         expect(Object.is(a[k], b[k])).toBe(true)
@@ -235,5 +247,82 @@ describe('portrait keeps the beat and clears its own money shot', () => {
         expect(Object.is(back[k], forward[i][k])).toBe(true)
       }
     }
+  })
+})
+
+/**
+ * THE PAGE MAY NOT STAND ON THE WORLD (blind-audit fix, and the gate that keeps it).
+ *
+ * The audit caught the held page intersecting the globe and its cradle — the ring
+ * crossing its lower third, its right edge lost against the sphere. The earlier
+ * gate did not catch it because it was written for a DIFFERENT failure class (a
+ * partially TRANSPARENT page). This one is about an opaque page's BOX.
+ *
+ * The invariant is the simplest one that admits the beat: the page is either
+ * entirely clear of the globe-plus-cradle box, or — on portrait, where there is no
+ * gap beside the globe at all — it covers it outright. Standing half-on is the
+ * failure.
+ */
+describe('the page never stands half-on the world', () => {
+  const PAGE_AR = 1024 / 1536
+
+  const box = (t: number, aspect: number) => {
+    const s = inkArrivalAt(t, false, aspect)
+    if (!s.shown) return null
+    const halfW = (s.height * PAGE_AR) / aspect / 2
+    const halfH = (s.height * (aspect >= 1 ? 1 : aspect)) / 2
+    return { l: s.x - halfW, r: s.x + halfW, t: s.y + s.lift - halfH, b: s.y + s.lift + halfH }
+  }
+
+  it('clears the globe and the cradle at every landscape aspect, at every t', () => {
+    for (const aspect of [1.0, 1.25, 1.6, 16 / 9, 2.0, 2.4, 3.5]) {
+      // A frame with no room beside the globe COVERS it instead — the other legal
+      // answer, checked separately below.
+      if (inkCoversWorld(INK_PLACEMENT, aspect)) continue
+      for (let i = 0; i <= 400; i++) {
+        const t = i / 400
+        const p = box(t, aspect)
+        if (!p) continue
+        const left = worldSilhouetteLeft(t, aspect)
+        expect(
+          p.r,
+          `page overlaps the world at aspect ${aspect}, t=${t.toFixed(3)}`
+        ).toBeLessThanOrEqual(left - INK_CLEAR_MARGIN + 1e-9)
+      }
+    }
+  })
+
+  it('stays inside the frame while it does it', () => {
+    for (const aspect of [1.6, 16 / 9, 3.5]) {
+      for (let i = 0; i <= 300; i++) {
+        const p = box(i / 300, aspect)
+        if (!p) continue
+        expect(p.l).toBeGreaterThanOrEqual(INK_EDGE_INSET - 1e-9)
+        expect(p.r).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('takes what the aspect actually offers — bigger where there is room', () => {
+    // The gap scales with 1/aspect, so a wide monitor gets a bigger page and a
+    // nearly-square window a smaller one. One authored number could only be right
+    // at one of them.
+    const wide = inkArrivalAt(0.5, false, 2.4).height
+    const narrow = inkArrivalAt(0.5, false, 1.45).height
+    expect(wide).toBeGreaterThan(narrow)
+    expect(wide).toBeLessThanOrEqual(INK_HELD_MAX)
+    expect(narrow).toBeGreaterThanOrEqual(INK_HELD_MIN)
+    // ...and below the threshold it stops trying and covers the world instead.
+    expect(inkCoversWorld(INK_PLACEMENT, 1.0)).toBe(true)
+    expect(inkCoversWorld(INK_PLACEMENT, 1.6)).toBe(false)
+  })
+
+  it('PORTRAIT covers the world instead, which is the other legal answer', () => {
+    // A phone has no gap beside the globe, so the page is held centred and covers
+    // it outright, then leaves. Covering is not the failure; standing half-on is.
+    const s = inkArrivalAt(0.5, false, PHONE)
+    expect(s.shown).toBe(true)
+    expect(Math.abs(s.x - 0.5)).toBeLessThan(0.02)
+    expect(inkArrivalAt(1, false, PHONE).shown).toBe(false)
   })
 })

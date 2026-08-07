@@ -32,32 +32,33 @@ import { INK_PLACEMENT, INK_PRELOAD_T, inkArrivalAt } from './ink-arrival'
  * route the manga pipeline spent a round keeping it off.
  */
 /**
- * Whether the viewport is taller than it is wide, watched rather than read once.
+ * The viewport's aspect, watched rather than read once.
  *
  * `usePrefersReducedMotion` reads its query a single time and argues that a
  * visitor who flips the OS setting mid-scroll is not worth a listener. Aspect is
- * different in kind: rotating a phone is a thing readers DO, it happens in a
- * second, and the two compositions here are genuinely different beats. The
- * listener fires on rotation only, so it costs a render per rotate.
+ * different in kind, and after the audit fix it is different again: it does not
+ * only choose between two beats, it SIZES the page, because the gap beside the
+ * globe scales with 1/aspect. A page laid out for a ratio the window no longer has
+ * is the very defect this listener exists to prevent.
  */
-function useIsPortrait(): boolean {
-  const [portrait, setPortrait] = useState(false)
+function useViewportAspect(): number {
+  const [aspect, setAspect] = useState(16 / 9)
   useEffect(() => {
-    const q = window.matchMedia('(max-aspect-ratio: 1/1)')
-    const read = () => setPortrait(q.matches)
+    const read = () => setAspect(window.innerWidth / Math.max(1, window.innerHeight))
     read()
-    q.addEventListener('change', read)
-    return () => q.removeEventListener('change', read)
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
   }, [])
-  return portrait
+  return aspect
 }
 
 export function EndingInk({ t, reduced }: { t: number; reduced: boolean }) {
-  const portrait = useIsPortrait()
-  const lastT = portrait && INK_PLACEMENT.portraitOut ? INK_PLACEMENT.portraitOut.to : INK_PLACEMENT.outTo
+  const aspect = useViewportAspect()
+  const lastT =
+    aspect < 1 && INK_PLACEMENT.portraitOut ? INK_PLACEMENT.portraitOut.to : INK_PLACEMENT.outTo
   const mounted = t >= INK_PRELOAD_T && t < lastT
   if (!mounted) return null
-  const ink = inkArrivalAt(t, reduced, portrait)
+  const ink = inkArrivalAt(t, reduced, aspect)
 
   const wrap: CSSProperties = {
     position: 'absolute',

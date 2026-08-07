@@ -42,6 +42,16 @@
  * reader who scrubs back un-arrives the page through the identical arithmetic.
  */
 
+import {
+  CAMERA_FOV,
+  cameraZoomScale,
+  endingAimDrop,
+  endingRig,
+  globeEdgesAt,
+} from '../scene/camera'
+import { ENDING_SPAN, endingStateAt } from '../ending-timeline'
+import { CRADLE_DROP, CRADLE_RADIUS, CRADLE_TUBE } from '../scene/globe-stand'
+
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 /**
  * Linear ramp across a window, clamped — and TOTAL on a degenerate one.
@@ -163,6 +173,105 @@ export const INK_PLACEMENTS: readonly InkPlacement[] = [
  */
 export const INK_OPACITY_SHARE = 0.22
 
+// ---------------------------------------------------------------------------
+// THE PAGE MAY NOT STAND ON THE WORLD (audit fix)
+// ---------------------------------------------------------------------------
+/**
+ * The blind audit caught the held page INTERSECTING the globe and its armature:
+ * the cradle ring crossed its lower third and its right edge vanished against the
+ * sphere. My own "no partially transparent page in frame" gate passed it, because
+ * this is a different failure class — an OPAQUE page overlapping a 3D silhouette.
+ *
+ * MEASURED, and the cause is arithmetic rather than taste. At 1.6 the page held at
+ * 0.62 is **0.258 of the viewport wide**; the globe is **0.336** and the cradle ring
+ * **0.415**. The page is NARROWER THAN BOTH, so held centred it cannot cover them —
+ * it can only sit on them and leave slivers of ocean either side, which is exactly
+ * what the audit shot shows. Overlap ran t ≈ 0.40 → 0.62, the whole hold and most
+ * of the travel. Covering them instead is not available: a 2:3 sheet wide enough to
+ * clear the ring is 1.06 of the viewport TALL.
+ *
+ * So the page stands BESIDE the world rather than on it, and the invariant is
+ * simply: **the page's box never intersects the globe+cradle box.** That also
+ * happens to mirror the epilogue art it is a page of — her to one side, the little
+ * world to the other.
+ *
+ * The size cannot be one number, because the gap cannot be: the silhouette's width
+ * in viewport fractions scales with 1/aspect, so a 21:9 monitor has room to spare
+ * and a nearly-square window has almost none. `inkHeldPoseFor` solves the largest
+ * page that fits the gap at the aspect it is actually being drawn at.
+ */
+
+/** Clear space between the page's right edge and the silhouette, in viewport widths. */
+export const INK_CLEAR_MARGIN = 0.028
+/** ...and between the page's left edge and the frame. */
+export const INK_EDGE_INSET = 0.035
+/** The page never grows past this, however much room a wide monitor offers. */
+export const INK_HELD_MAX = 0.62
+/** ...nor shrinks below it: under this the face stops being the point. */
+export const INK_HELD_MIN = 0.3
+
+const PAGE_ASPECT = 1024 / 1536
+
+/**
+ * The left edge of the globe-plus-cradle silhouette, in fractions of the viewport
+ * width, at an ending `t`. The globe is a circle on screen so its half-width in
+ * viewport fractions is its ndc-y half-height over 2·aspect; the RING is wider and
+ * is what the page actually collides with, so its extreme world point is projected
+ * directly rather than inferred.
+ */
+export function worldSilhouetteLeft(t: number, aspect: number): number {
+  const e = endingStateAt(1 + t * ENDING_SPAN)
+  const k = cameraZoomScale(e)
+  const drop = endingAimDrop(e)
+  const tanHalf = Math.tan((CAMERA_FOV * Math.PI) / 360)
+  const g = globeEdgesAt(k, drop)
+  const globeHalf = (g.top - g.bot) / 2 / 2 / aspect
+  const r = endingRig(k, drop)
+  const p: [number, number, number] = [CRADLE_RADIUS + CRADLE_TUBE, -CRADLE_DROP, 0]
+  const v = [p[0] - r.cam[0], p[1] - r.cam[1], p[2] - r.cam[2]]
+  const depth = v[0] * r.fwd[0] + v[1] * r.fwd[1] + v[2] * r.fwd[2]
+  const ringHalf = Math.abs(v[0] / (depth * tanHalf * aspect)) / 2
+  return 0.5 - Math.max(globeHalf, ringHalf)
+}
+
+/** ...its narrowest over the whole window the page can be on screen for. The world
+ *  only shrinks during the pull-back, so this is the earliest moment — but it is
+ *  swept rather than assumed, because the aim moves too. */
+export function narrowestGap(place: InkPlacement, aspect: number): number {
+  let min = Infinity
+  for (let i = 0; i <= 200; i++) {
+    const t = place.inFrom + ((1 - place.inFrom) * i) / 200
+    const l = worldSilhouetteLeft(t, aspect)
+    if (l < min) min = l
+  }
+  return min
+}
+
+/**
+ * The held pose that fits beside the world at this aspect: as large as the gap
+ * allows, pinned to the frame's left inset, clamped at both ends.
+ */
+export function inkHeldPoseFor(place: InkPlacement, aspect: number): { height: number; x: number } {
+  const room = narrowestGap(place, aspect) - INK_CLEAR_MARGIN - INK_EDGE_INSET
+  const height = Math.min(INK_HELD_MAX, (room * aspect) / PAGE_ASPECT)
+  return { height, x: INK_EDGE_INSET + (height * PAGE_ASPECT) / aspect / 2 }
+}
+
+/**
+ * Whether this aspect has to COVER the world instead of standing beside it.
+ *
+ * Below about 1.25 the gap beside the globe cannot hold a page big enough to be
+ * worth showing — at a square window it affords 0.157 of the viewport, half the
+ * floor. Rather than clamp to the floor and go back to standing half-on (which is
+ * exactly how the audit's defect would have crept back), narrow frames take the
+ * PORTRAIT answer: the page is held centred, covers the world outright, and
+ * leaves. Two compositions, one rule deciding between them, and the rule is
+ * whether the room exists.
+ */
+export function inkCoversWorld(place: InkPlacement, aspect: number): boolean {
+  return aspect < 1 || inkHeldPoseFor(place, aspect).height < INK_HELD_MIN
+}
+
 /**
  * The placement in force: `hang`, and the captures are why.
  *
@@ -216,10 +325,11 @@ const HIDDEN: InkState = Object.freeze({
 export function inkArrivalAt(
   t: number,
   reduced: boolean,
-  portrait = false,
+  aspect = 16 / 9,
   place = INK_PLACEMENT
 ): InkState {
-  const out = portrait && place.portraitOut ? place.portraitOut : { from: place.outFrom, to: place.outTo }
+  const covering = inkCoversWorld(place, aspect)
+  const out = covering && place.portraitOut ? place.portraitOut : { from: place.outFrom, to: place.outTo }
   if (t <= place.inFrom || t >= out.to) return HIDDEN
   const rising = smootherstep(across(t, place.inFrom, place.inTo))
   const leaving = smootherstep(across(t, out.from, out.to))
@@ -243,21 +353,35 @@ export function inkArrivalAt(
   // A portrait placement that leaves never settles: it holds the pose it was held
   // up in and goes, so the phone gets the beat and keeps its money shot clear.
   const settling =
-    place.settle && !(portrait && place.portraitOut)
+    place.settle && !(covering && place.portraitOut)
       ? smootherstep(across(t, place.settle.from, place.settle.to))
       : 0
-  const to = place.settle?.pose ?? place.pose
+
+  // BOTH POSES ARE SOLVED AGAINST THE WORLD'S SILHOUETTE, not authored against a
+  // frame nobody measured — and both are pinned to the SAME left inset, so the
+  // page's left edge is constant through the travel (`left = x − w/2` is linear in
+  // the mix, so equal endpoints make it invariant) and its right edge can only
+  // move left. That is what makes "never half-on" true by construction rather than
+  // by a sweep that happens to pass.
+  const held = covering
+    ? { height: place.pose.height, x: place.pose.at[0] }
+    : inkHeldPoseFor(place, aspect)
+  const settledPose = place.settle?.pose ?? place.pose
+  const settledX = covering
+    ? settledPose.at[0]
+    : INK_EDGE_INSET + (settledPose.height * PAGE_ASPECT) / aspect / 2
+
   return {
     shown: true,
     present,
     lift: reduced ? 0 : mix(place.rise, 0, rising) + place.rise * leaving,
     scale: reduced ? 1 : mix(0.985, 1, rising),
-    height: mix(place.pose.height, to.height, settling),
-    x: mix(place.pose.at[0], to.at[0], settling),
-    y: mix(place.pose.at[1], to.at[1], settling),
+    height: mix(held.height, settledPose.height, settling),
+    x: mix(held.x, settledX, settling),
+    y: mix(place.pose.at[1], settledPose.at[1], settling),
     tilt: reduced
-      ? mix(place.pose.tilt, to.tilt, settling)
-      : mix(mix(place.pose.tilt * 1.9, place.pose.tilt, rising), to.tilt, settling),
+      ? mix(place.pose.tilt, settledPose.tilt, settling)
+      : mix(mix(place.pose.tilt * 1.9, place.pose.tilt, rising), settledPose.tilt, settling),
   }
 }
 
