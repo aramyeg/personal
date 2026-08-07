@@ -93,6 +93,25 @@ async function settledScrollY(page: import('@playwright/test').Page): Promise<nu
   return last
 }
 
+/**
+ * Wait until an element has STOPPED MOVING.
+ *
+ * The chapter spread rolls in on a wall-clock entrance, so "visible" and "where it
+ * is going to be" are two different moments. Anything that measures a position — or
+ * that must not have its position measured for it, which is what Playwright's own
+ * scroll-into-view does — has to wait for the second one.
+ */
+async function awaitStable(locator: import('@playwright/test').Locator) {
+  let last: { x: number; y: number } | null = null
+  for (let i = 0; i < 40; i++) {
+    const box = await locator.boundingBox()
+    if (box && last && Math.abs(box.x - last.x) < 0.5 && Math.abs(box.y - last.y) < 0.5) return box
+    last = box
+    await locator.page().waitForTimeout(100)
+  }
+  return last
+}
+
 // SmallWorldExperience renders `null` until a mount effect confirms WebGL and
 // checks prefers-reduced-motion, then swaps in the tall scroll track. Scrolling
 // before that swap computes progress against the short fallback page height, so
@@ -202,11 +221,26 @@ test.describe('Small World lab', () => {
     // A WORD, not an icon — the whole remedy for the pattern the research found.
     await expect(link).toHaveText(CV_LABEL)
 
+    // LET THE LEAF LAND, AND DO THE HARNESS'S SCROLLING BEFORE THE CLOCK STARTS.
+    // The leaf enters on `translateX(120% * (1-enter))`, so while it is arriving the
+    // link is still travelling — and Playwright's click does `scrollIntoViewIfNeeded`
+    // first, which chased it and eased the track 794 → 481. The overlay's own restore
+    // then put it back, so the assertion at the end was measuring the harness scrolling
+    // and the product undoing it: a pass that proved nothing, and a fail that blamed
+    // the wrong thing. Waiting for the leaf to stop moving and scrolling it into view
+    // HERE means the position sampled below is the one the reader clicks from.
+    await awaitStable(link)
+    await link.scrollIntoViewIfNeeded()
+
     // The page's own smooth scroll is still easing after `scrollTo`; read the resting
     // position rather than a frame of the animation, or the comparison at the end is
     // against a number that was never where the reader was.
     const before = await settledScrollY(page)
     await link.click()
+    // The click itself must not have moved the world either — this is what makes the
+    // final comparison a statement about the CV rather than about the two scrolls
+    // cancelling.
+    expect(await page.evaluate(() => window.scrollY)).toBeCloseTo(before, 0)
 
     const cv = page.getByTestId(CV_TESTID)
     await expect(cv).toBeVisible({ timeout: 10_000 })
@@ -238,7 +272,26 @@ test.describe('Small World lab', () => {
     await expect(ending.getByTestId('sw-connect-restart')).toBeVisible({ timeout: 10_000 })
     const link = ending.getByTestId(CV_ENDING_LINK_TESTID)
     await expect(link).toHaveText(CV_LABEL)
-    await link.click()
+    await settledScrollY(page)
+    // THE CONNECT BLOCK NEVER HOLDS STILL, and that is T72 rather than this lane: it
+    // RIDES THE NOTE through `use-note-tracking`, a rAF that writes the block's own
+    // transform every frame the camera breathes. Measured on Pixel 5 with the scroll
+    // parked at 11487, the block swept translate3d(-17.29, -67.12) → (1.45, -51.74)
+    // over three seconds and kept going, so Playwright's "two identical frames" check
+    // can never pass for anything inside it. (The pre-existing ending test only ever
+    // asserts visibility, which is why nothing had met this before.)
+    //
+    // So the actionability check is replaced rather than waived: assert the link is the
+    // TOPMOST element at its own centre — which is the thing `force` gives up, and the
+    // only thing a stability wait was buying here — and then click. A 91x28 target
+    // drifting ~2px per 300ms is not a hit-testing risk for a finger or for this.
+    const hittable = await link.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      return top === el || el.contains(top)
+    })
+    expect(hittable, 'the ending CV link is topmost at its own centre').toBe(true)
+    await link.click({ force: true })
     const cv = page.getByTestId(CV_TESTID)
     await expect(cv).toBeVisible({ timeout: 10_000 })
     await expect(cv).toContainText(creditLine(ROLES_NEWEST_FIRST[0]))
