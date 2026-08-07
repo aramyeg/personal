@@ -6,7 +6,7 @@
  * ============================================================================
  * Aram's direction was that Alwina should be behind the desk, human-scale: "it is
  * her office." Two measurements said the 3D girl cannot carry that, and both are
- * in `task-76-report.md` with captures:
+ * in `task-76-ending-report.md` with captures:
  *
  *  - the GLB HAS NO FACE. Rendered at the pixel density a behind-desk head would
  *    demand (~100 px), she is hair, a blank oval and a white band. At 93 px total

@@ -327,7 +327,7 @@ export function portraitWeight(aspect: number): number {
  * ON A PHONE — and it is deliberately the LANDSCAPE target, so the fork below is
  * live machinery carrying no opinion.
  *
- * 0.30 was measured, captured and priced (see `task-76-report.md`): it widens the
+ * 0.30 was measured, captured and priced (see `task-76-ending-report.md`): it widens the
  * phone's frame 36% and brings the dish, donut, tool and the plasticine box's
  * corner in, at the cost of 45% of Aram's note's lettering. It is a real trade
  * with numbers on both sides — and it is a TASTE CALL NOBODY HAS MADE. Aram's

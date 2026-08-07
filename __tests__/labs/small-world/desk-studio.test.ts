@@ -195,7 +195,7 @@ describe("the winter tint's release rides the same number, inverted (Task 71)", 
  * was first mounted, and which differs between two loads of the SAME build), the
  * journey frame is 100.0000% bit-identical, 0 pixels differing, max channel delta 0.
  * The control — the same build captured twice — differs inside that box by the same
- * order. Numbers in task-76-report.md.
+ * order. Numbers in task-76-ending-report.md.
  */
 describe('the studio lift reaches the clay and nothing before it', () => {
   it('holds both intensities at EXACTLY their journey values for the whole journey', () => {

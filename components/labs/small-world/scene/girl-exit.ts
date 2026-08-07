@@ -292,7 +292,7 @@ export const GIRL_DESK_STAGING: DeskStaging = DESK_STAGINGS[0]
  * belongs to, not a third figurine among her own keepsakes. Two measurements then
  * showed the 3D girl cannot yet be that human (no face at the pixel density a
  * behind-desk head demands; and 0.36 m of frame headroom against the 0.90 m a
- * standing adult needs — `task-76-report.md` carries both with captures).
+ * standing adult needs — `task-76-ending-report.md` carries both with captures).
  *
  * So phase 1 ships the half that is not in doubt: she LEAVES the world, over the
  * crest, exactly as staged and gated — and she arrives in INK instead, on the
