@@ -4,6 +4,7 @@ import type { MutableRefObject } from 'react'
 import type { EndingPhase } from '../ending-timeline'
 import { CARD_PHASE_START, journeyStateAt, revealPhase } from '../journey-timeline'
 import type { ArrivalJourney } from '../use-arrival-journey'
+import { pageProgressAt } from './info-beats'
 
 export type JourneyUi = {
   chapter: number
@@ -18,8 +19,17 @@ export type JourneyUi = {
    * position of a few pixels does not count as a start.
    */
   started: boolean
-  /** `enter` is the cards' entrance progress 0→1, NOT a dwell fraction — see below. */
-  panel: { chapter: number; enter: number } | null
+  /**
+   * `enter` is the cards' entrance progress 0→1, NOT a dwell fraction — see below.
+   *
+   * `page` is the RIGHT LEAF's own ink progress, and it is a different kind of
+   * number from `enter` on purpose: `enter` is the screen-space entrance and is
+   * allowed to ride the arrival wall clock, `page` is a pure function of scroll
+   * (`pageProgressAt`) and may never ride anything else. The info leaf's four
+   * beats are drawn from it, so a settled card cannot be caught mid-draw and a
+   * scrub backwards re-derives rather than replays. See `info-beats.ts`.
+   */
+  panel: { chapter: number; enter: number; page: number } | null
   /**
    * The title card's presence, 1 → 0 across the journey's opening.
    *
@@ -85,7 +95,15 @@ function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
     panel:
       chapter === undefined
         ? null
-        : { chapter, enter: Math.round(enter * T_STEPS) / T_STEPS },
+        : {
+            chapter,
+            enter: Math.round(enter * T_STEPS) / T_STEPS,
+            // Quantized on the same ladder as `enter`, and for the same reason:
+            // parked at 1 it is a constant, so lingering on a finished page costs
+            // no re-renders at all. T_STEPS steps is finer than the eye across a
+            // 400px span, and the beats ease within a step anyway.
+            page: Math.round(pageProgressAt(progress) * T_STEPS) / T_STEPS,
+          },
     title: Math.round(Math.max(0, 1 - s.progress / TITLE_FADE) * T_STEPS) / T_STEPS,
     // `s.progress` is clamped and reads 1 for the whole ending, so it cannot answer this —
     // `s.ending` is the field built from the un-clamped value. See ending-timeline.ts.
@@ -109,7 +127,8 @@ function same(a: JourneyUi, b: JourneyUi): boolean {
       (a.panel !== null &&
         b.panel !== null &&
         a.panel.chapter === b.panel.chapter &&
-        a.panel.enter === b.panel.enter))
+        a.panel.enter === b.panel.enter &&
+        a.panel.page === b.panel.page))
   )
 }
 

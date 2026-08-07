@@ -70,6 +70,7 @@ export function JourneyOverlay({
         <ChapterPanels
           index={ui.panel.chapter}
           enter={ui.panel.enter}
+          page={ui.panel.page}
           onAdvance={
             /* The next STORY STOP, not the next chapter's boundary (Task 75): a tap and a fling
                have to land in the same place or the stops read as arbitrary. `advanceTargetFrom`

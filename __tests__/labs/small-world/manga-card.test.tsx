@@ -11,7 +11,7 @@ afterEach(() => {
 })
 
 const spread = (onAdvance: (() => void) | null = vi.fn()) => {
-  render(<ChapterPanels index={2} enter={1} onAdvance={onAdvance} />)
+  render(<ChapterPanels index={2} enter={1} page={1} onAdvance={onAdvance} />)
   return { card: screen.getByTestId('sw-manga-card'), root: screen.getByTestId('sw-panel-tap') }
 }
 

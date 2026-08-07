@@ -7,9 +7,18 @@
  * PROPERTY OF THE DATA rather than of a render, so most of this file reads the spec
  * — a page that quietly grew a second hero or a paragraph would still render fine.
  */
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { InfoPage } from '@/components/labs/small-world/overlay/info-page'
+import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import { DWELL_MID } from '@/components/labs/small-world/journey-timeline'
+import { STORY_STOP_PROGRESS } from '@/components/labs/small-world/story-stops'
+import {
+  PAGE_CLOSES_BEFORE_STOP,
+  PAGE_SPAN_END,
+  PAGE_SPAN_START,
+  pageProgressAt,
+} from '@/components/labs/small-world/overlay/info-beats'
 import {
   DONATED_PANEL,
   INFO_PAGES,
@@ -84,7 +93,7 @@ describe('the info leaf’s laws', () => {
     // PINK IS A SEMANTIC CHANNEL. The moment it decorates, numbers stop reading as
     // the point — which is why the first draft's pink caption rule and pink stamp
     // outlines are gone. Asserted on the rendered tree rather than on the source.
-    render(<InfoPage chapter={2} enter={1} instant />)
+    render(<InfoPage chapter={2} page={1} instant />)
     const page = screen.getByTestId('sw-info-page')
     const hero = screen.getByTestId('sw-info-hero')
     // React writes styles through the CSSOM, so `getAttribute('style')` hands back
@@ -110,7 +119,7 @@ describe('the info leaf’s laws', () => {
   })
 
   it.each(chapters)('chapter %i: one hero, and it is the only one', (i) => {
-    render(<InfoPage chapter={i} enter={1} instant />)
+    render(<InfoPage chapter={i} page={1} instant />)
     expect(screen.getAllByTestId('sw-info-hero')).toHaveLength(1)
   })
 
@@ -168,13 +177,100 @@ describe('the info leaf’s laws', () => {
   })
 })
 
+describe('the page is drawn by the SCROLL, and by nothing else', () => {
+  // Task 82 Part A. `useInkClock` was a requestAnimationFrame timer counting real
+  // milliseconds since the leaf arrived, which broke the lab's scroll-purity law
+  // and — concretely — let a reader stop and read a page that was still drawing
+  // itself. Everything below is the replacement's contract.
+
+  it('closes the page BEFORE the story stop a fling snaps to', () => {
+    // THE ONE INEQUALITY THE WHOLE FIX RESTS ON. `story-stops.ts` snaps every
+    // fling to DWELL_MID, so if the page's span reached past that number a
+    // visitor's most common landing would be a half-drawn page — the exact
+    // failure the wall clock was removed for, re-introduced as a tuning value.
+    expect(PAGE_CLOSES_BEFORE_STOP).toBe(true)
+    expect(PAGE_SPAN_END).toBeLessThan(DWELL_MID)
+    expect(PAGE_SPAN_START).toBeLessThan(PAGE_SPAN_END)
+  })
+
+  it('is finished at every chapter’s story stop', () => {
+    // Stated over the real stops rather than over the constants, so a reshape of
+    // the segment that moved the stops without moving the span would be caught.
+    for (const [c, stop] of STORY_STOP_PROGRESS.entries()) {
+      expect(pageProgressAt(stop), `chapter ${c + 1}'s stop`).toBe(1)
+    }
+  })
+
+  it('is a pure function: the same scroll position always gives the same page', () => {
+    // The wall clock's defining defect was that it was NOT this — the same
+    // position could show any state depending on how long you had been there.
+    for (const p of [0, 0.07, 0.19, 0.34, 0.5, 0.66, 0.83, 1]) {
+      expect(pageProgressAt(p)).toBe(pageProgressAt(p))
+    }
+  })
+
+  it('scrubs backwards exactly, and never runs past its own ends', () => {
+    const forward: number[] = []
+    for (let i = 0; i <= 400; i++) forward.push(pageProgressAt(i / 400))
+    const backward: number[] = []
+    for (let i = 400; i >= 0; i--) backward.push(pageProgressAt(i / 400))
+    expect(backward.reverse()).toEqual(forward)
+    for (const v of forward) {
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('rises monotonically across a chapter’s own span, and holds at each end', () => {
+    const local = (c: number, l: number) => (c + l) / CHAPTER_COUNT
+    expect(pageProgressAt(local(2, PAGE_SPAN_START - 0.01))).toBe(0)
+    expect(pageProgressAt(local(2, PAGE_SPAN_END + 0.01))).toBe(1)
+    // ...and it STAYS 1 for the rest of the chapter, so walking out of a
+    // checkpoint never un-draws the page behind you.
+    expect(pageProgressAt(local(2, 0.99))).toBe(1)
+    let prev = -1
+    for (let i = 0; i <= 100; i++) {
+      const v = pageProgressAt(local(2, PAGE_SPAN_START + (i / 100) * (PAGE_SPAN_END - PAGE_SPAN_START)))
+      expect(v).toBeGreaterThanOrEqual(prev)
+      prev = v
+    }
+  })
+
+  it('schedules no frame at all: the leaf renders settled with no clock running', () => {
+    // A regression gate with teeth. If a clock ever comes back, SOMETHING has to
+    // ask for a frame; asserting that nothing does is what a "no wall clock"
+    // claim actually means. `page={1}` is the settled page and it must be
+    // complete on the FIRST render, with no rAF and no timer.
+    const raf = vi.spyOn(window, 'requestAnimationFrame')
+    render(<InfoPage chapter={3} page={1} />)
+    expect(screen.getByTestId('sw-info-hero').textContent).toContain('42')
+    expect(raf).not.toHaveBeenCalled()
+    raf.mockRestore()
+  })
+
+  it('draws less at a smaller page value, and everything at 1', () => {
+    // The beats still stage — the fix changed the CLOCK, not the choreography.
+    const inkAt = (page: number) => {
+      cleanup()
+      render(<InfoPage chapter={3} page={page} />)
+      const rects = Array.from(screen.getByTestId('sw-info-page').querySelectorAll('rect[stroke-dasharray]'))
+      return rects.map((r) => 1 - Number(r.getAttribute('stroke-dashoffset')))
+    }
+    const early = inkAt(0.1)
+    const done = inkAt(1)
+    expect(done.every((v) => v > 0.999)).toBe(true)
+    expect(early.some((v) => v < 0.999)).toBe(true)
+    expect(early.reduce((a, b) => a + b, 0)).toBeLessThan(done.reduce((a, b) => a + b, 0))
+  })
+})
+
 describe('the reveal is staged, one idea at a time', () => {
   it('draws an empty hero frame before the number arrives in it', async () => {
     // The "delayed earned reveal": a number that appears with its frame is a label;
     // a number that arrives into a frame the eye has accepted is an event. Asserted
     // through the pinned-clock camera the capture harness uses.
-    const { rerender } = render(<InfoPage chapter={2} enter={1} instant />)
-    rerender(<InfoPage chapter={2} enter={1} instant />)
+    const { rerender } = render(<InfoPage chapter={2} page={1} instant />)
+    rerender(<InfoPage chapter={2} page={1} instant />)
     // instant renders the settled page: the hero is present and its digits final.
     expect(screen.getByTestId('sw-info-hero').textContent).toContain('30')
   })
@@ -187,7 +283,7 @@ describe('the stat leaf takes its own clicks', () => {
     // advances — right for the world, wrong for a page full of facts, and
     // especially wrong beside a comic page that opens when you click it.
     const { InfoLeaf } = await import('@/components/labs/small-world/overlay/info-leaf')
-    render(<InfoLeaf chapter={0} enter={1} />)
+    render(<InfoLeaf chapter={0} enter={1} page={1} />)
     const leaf = screen.getByTestId('sw-panel-data')
     expect(leaf.style.pointerEvents).toBe('auto')
     // ...and it is NOT a button: nothing happens, and announcing an action that

@@ -84,10 +84,17 @@ const MOBILE_STYLES = `
 export function ChapterPanels({
   index,
   enter: entrance,
+  page: pageInk,
   onAdvance,
 }: {
   index: number
   enter: number
+  /**
+   * The right leaf's ink progress 0→1 — a PURE FUNCTION OF SCROLL, unlike `enter`.
+   * Passed straight through; this component neither eases nor gates it, because
+   * the whole point of the number is that one owner derives it (`info-beats.ts`).
+   */
+  page: number
   /**
    * `null` renders the spread WITHOUT arming tap-to-advance (Task 63 fix round). The two used to be
    * the same thing because the spread's lifetime was the registration's lifetime — see below — and
@@ -164,7 +171,7 @@ export function ChapterPanels({
         />
       ) : null}
 
-      <InfoLeaf chapter={index} enter={enter} />
+      <InfoLeaf chapter={index} enter={enter} page={pageInk} />
 
       {/* Phone only (the media query switches it on): the stack's swap. A real
           button rather than a tap zone, so it is reachable by keyboard and

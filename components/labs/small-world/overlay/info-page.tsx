@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { MANGA_PAGES, mangaPageSrc } from '../manga'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../manga/anchors'
 import { ClothDrag } from './cloth-drag'
 import { PALETTE } from '../palette'
+import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 import {
   KETSU_INK,
   KI_ART,
@@ -92,6 +93,23 @@ import {
  * at 200ms reads "+0%". So the numeral is always final and the flourish is a
  * scale punch instead of a counting one. The research's "delayed earned reveal"
  * is what was given up; being right at every scroll position is what was bought.
+ *
+ * ============================================================================
+ * AND THE CLOCK THAT CAUSED IT IS GONE (Task 82)
+ * ============================================================================
+ * The audit was right about the law and wrong about the cause. A fact was
+ * reachable-but-undrawn not because it was on a reveal, but because the reveal
+ * ran on a WALL CLOCK — rAF milliseconds since the leaf arrived — which could
+ * still be counting after the reader had stopped and started reading.
+ *
+ * `t` is now `page * PAGE_DONE`, and `page` is a pure function of scroll
+ * (`pageProgressAt`). The span closes before the story stop a fling snaps to, so
+ * a settled card is a finished card by construction rather than by timing. The
+ * inversion above SURVIVES this — facts still print at full strength from the
+ * first frame, and nothing below is allowed to gate one on `t`. What the fix
+ * bought is that `cloth-drag.tsx` may put the words back on the sheet without
+ * re-opening the hole: "the sheet is open" and "the reader is here" are now the
+ * same statement.
  */
 
 /** The page is 2:3, like the printed pages it is bound with. */
@@ -890,73 +908,52 @@ function KetsuPanel({
 }
 
 /**
- * Milliseconds since the page started inking.
+ * `?swInk=<ms>` PINS the clock, so a capture harness can photograph a named
+ * moment — mid-ink, the empty frame before the number, the burst — rather than
+ * scrolling to it. Development only: it is a camera, not a feature.
  *
- * Ticks on rAF only while unfinished, then stops — a parked checkpoint costs
- * nothing. `instant` (reduced motion) skips the clock rather than fast-forwarding
- * it, so no frame is scheduled at all.
- *
- * `?swInk=<ms>` PINS the clock, and exists so a capture harness can photograph a
- * named moment — mid-ink, the empty frame before the number, the burst — rather
- * than racing it. Development only: it is a camera, not a feature.
+ * It reads the query in an effect rather than during render because the server
+ * has no `location` and a value read during render would not survive hydration.
  */
-function useInkClock(running: boolean, instant: boolean): number {
-  const [elapsed, setElapsed] = useState(instant ? PAGE_DONE : 0)
-  const startRef = useRef<number | null>(null)
-
+function usePinnedInk(): number | null {
+  const [pinned, setPinned] = useState<number | null>(null)
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
-      const pinned = new URLSearchParams(window.location.search).get('swInk')
-      if (pinned !== null) {
-        setElapsed(Number(pinned))
-        return
-      }
-    }
-    if (instant) {
-      setElapsed(PAGE_DONE)
-      return
-    }
-    if (!running) {
-      startRef.current = null
-      setElapsed(0)
-      return
-    }
-    let raf = 0
-    let stopped = false
-    const tick = (now: number) => {
-      if (stopped) return
-      if (startRef.current === null) startRef.current = now
-      const next = now - startRef.current
-      setElapsed(next)
-      if (next < PAGE_DONE) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => {
-      stopped = true
-      cancelAnimationFrame(raf)
-    }
-  }, [running, instant])
-
-  return elapsed
+    if (process.env.NODE_ENV === 'production') return
+    const v = new URLSearchParams(window.location.search).get('swInk')
+    if (v !== null) setPinned(Number(v))
+  }, [])
+  return pinned
 }
 
 /**
  * The whole leaf.
  *
- * `enter` is the spread's entrance clock; the page starts inking once the leaf has
- * essentially arrived, so the beats land on a page that has stopped moving.
+ * `page` is the leaf's ink progress 0→1 and it is A PURE FUNCTION OF SCROLL —
+ * `pageProgressAt` in `info-beats.ts` owns it. There is no clock in this file any
+ * more and no frame is ever scheduled from it: the beats' millisecond windows are
+ * read at `page * PAGE_DONE`, which keeps every ratio the research fixed while
+ * making the whole page scrub with the reader in both directions.
+ *
+ * `instant` short-circuits to the finished page. It is set by the reduced-motion
+ * preference and may also be passed directly by a test or a story.
  */
 export function InfoPage({
   chapter,
-  enter,
+  page,
   instant = false,
 }: {
   chapter: number
-  enter: number
+  page: number
   instant?: boolean
 }) {
   const spec = infoPageFor(chapter)
-  const t = useInkClock(enter > 0.55, instant)
+  const pinned = usePinnedInk()
+  // Belt and braces: `small-world-experience.tsx` already swaps the whole 3D
+  // journey for the static timeline under the preference, so this normally never
+  // fires. It is the guarantee for the paths that can still reach a canvas.
+  const reduced = usePrefersReducedMotion()
+  const still = instant || reduced
+  const t = pinned ?? (still ? PAGE_DONE : page * PAGE_DONE)
   if (!spec) return null
   return (
     <div
@@ -977,7 +974,7 @@ export function InfoPage({
       <KiPanel chapter={chapter} crop={spec.ki.crop} alt={spec.ki.alt} t={t} />
       <ShoPanel chapter={chapter} crop={spec.sho.crop} alt={spec.sho.alt} note={spec.sho.note} t={t} />
       <TenPanel hero={spec.ten.hero} inverted={spec.ten.inverted} t={t} />
-      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} reduced={instant} />
+      <KetsuPanel line={spec.ketsu.line} tools={spec.ketsu.tools} footer={spec.footer} t={t} reduced={still} />
     </div>
   )
 }

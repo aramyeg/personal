@@ -20,10 +20,25 @@ import { InfoPage } from './info-page'
  * tests and the phone stack's CSS all reach for, and renaming it would be churn
  * in six files to say the same thing.
  */
-export function InfoLeaf({ chapter, enter }: { chapter: number; enter: number }) {
+export function InfoLeaf({
+  chapter,
+  enter,
+  page,
+}: {
+  chapter: number
+  enter: number
+  /**
+   * The page's ink progress 0→1, scroll-pure. TWO CLOCKS ARRIVE HERE AND THEY ARE
+   * NOT THE SAME KIND: `enter` is the leaf's screen-space entrance and may ride
+   * the arrival wall clock; `page` is what the page inside is DRAWN from and may
+   * only ever be a function of scroll. Keeping them separate at the boundary is
+   * what stops the second one quietly becoming the first again.
+   */
+  page: number
+}) {
   return (
     <BookLeaf side="right" enter={enter} className="sw-panel-data" testId="sw-panel-data" swallowClicks>
-      <InfoPage chapter={chapter} enter={enter} />
+      <InfoPage chapter={chapter} page={page} />
     </BookLeaf>
   )
 }

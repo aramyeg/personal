@@ -57,7 +57,7 @@ function hexesIn(root: HTMLElement): string[] {
 }
 
 const spread = (index: number) =>
-  render(<ChapterPanels index={index} enter={1} onAdvance={null} />)
+  render(<ChapterPanels index={index} enter={1} page={1} onAdvance={null} />)
 
 describe('the spread is printed in one ink', () => {
   it.each(chapters.map((c, i) => [i + 1, c.theme] as const))(

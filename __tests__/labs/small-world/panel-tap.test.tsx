@@ -58,7 +58,7 @@ describe('the panel-advance registry', () => {
 
 describe('the chapter panel no longer blankets the canvas', () => {
   const renderPanel = (onAdvance = vi.fn()) => {
-    render(<ChapterPanels index={5} enter={1} onAdvance={onAdvance} />)
+    render(<ChapterPanels index={5} enter={1} page={1} onAdvance={onAdvance} />)
     return { root: screen.getByTestId('sw-panel-tap'), onAdvance }
   }
 
@@ -82,7 +82,7 @@ describe('the chapter panel no longer blankets the canvas', () => {
     setPanelAdvance(null)
     const onAdvance = vi.fn()
     const view = render(
-      <ChapterPanels index={5} enter={1} onAdvance={onAdvance} />
+      <ChapterPanels index={5} enter={1} page={1} onAdvance={onAdvance} />
     )
     expect(panelTapArmed(), 'armed while the panel is up').toBe(true)
     firePanelAdvance()

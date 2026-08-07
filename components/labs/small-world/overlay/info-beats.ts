@@ -1,18 +1,40 @@
 /**
- * THE INFO PAGE'S CLOCK — one timeline, in milliseconds, for the whole four-beat page.
+ * THE INFO PAGE'S CLOCK — one timeline for the whole four-beat page, and it is
+ * THE SCROLL.
  *
  * ============================================================================
- * WHY MILLISECONDS AND NOT THE ENTRANCE CLOCK
+ * IT USED TO BE A WALL CLOCK, AND THAT WAS THE BUG UNDER THE BUG
  * ============================================================================
- * The research spec is written in time — a 200ms empty-panel pause, a ~700ms
- * count-up, marks planted one per 60ms, a 300ms burst — because those durations
- * are what the empirical results are about. The spread's `enter` clock is a 0→1
- * ramp whose real duration depends on the arrival, so mapping "700ms" onto it
- * would be a guess that changes with the scroll.
+ * The numbers below are still written in milliseconds because the research spec
+ * is written in time — a 200ms empty-panel pause, a ~700ms count-up, marks
+ * planted one per 60ms, a 300ms burst — and those durations are what the
+ * empirical results are about. What changed is what feeds them: `t` is no longer
+ * elapsed real time. It is `pageProgressAt(scroll) * PAGE_DONE`, so the ms are
+ * now PROPORTIONS of the page's scroll span and every ratio the research fixed
+ * survives untouched.
  *
- * So the page runs its own reveal clock, exactly as `manga-page.tsx` already does
- * for the printed page beside it, released once the leaf has essentially arrived.
- * Same pattern, same reason.
+ * Why it had to change. The old `useInkClock` was a `requestAnimationFrame`
+ * timer started when the leaf arrived, and it broke the lab's own scroll-purity
+ * law ("scroll position fully determines every visual"). It also broke something
+ * concrete: a wall clock can still be mid-count while the reader has already
+ * stopped and is reading, so a settled card could be caught mid-draw. The blind
+ * audit blamed text-on-a-reveal for that and inverted the page; the cause was
+ * the clock. With the clock scroll-pure, "the page is drawn" and "the reader has
+ * arrived at this page" stop being two facts that can disagree, which is what
+ * lets the words go back onto the cloth in `cloth-drag.tsx` without re-opening
+ * the hole.
+ *
+ * Three properties fall out by construction rather than by care:
+ *  - SCRUB BACK IS EXACT. `t` is a pure function evaluated at a smaller argument.
+ *  - A FLICK CANNOT STRAND IT. The span closes before the story stop a fling
+ *    snaps to (asserted below), so a landing is always a landing on a finished
+ *    page.
+ *  - REDUCED MOTION IS ONE BRANCH. `p = 1`, nothing scheduled, no frames.
+ *
+ * The facts themselves still do not ride this clock at all — see the inversion
+ * note in `info-page.tsx`. Colophon, stack, hero value and her line render at
+ * full strength from the first frame, and `t` drives only the border ink, the
+ * art wipe, the stamp punch, the burst, the sheet and the runner.
  *
  * ============================================================================
  * STAGING: ONE IDEA AT A TIME
@@ -27,6 +49,9 @@
  * empirical result in the set: better retention AND lower mental load than a
  * static or fading presentation. `inkOf` is what every border consumes.
  */
+
+import { CHAPTER_COUNT } from '../chapters'
+import { BURST_END, DWELL_MID, DWELL_SPAN, TRAVEL_END } from '../journey-timeline'
 
 /** A window in ms: [start, end]. */
 export type Window = readonly [number, number]
@@ -103,8 +128,48 @@ export const KETSU_LINE: Window = [TEN_BURST[1] + 120, TEN_BURST[1] + 900]
  */
 export const KETSU_TAIL: Window = [TEN_BURST[1] + 700, TEN_BURST[1] + 1050]
 
-/** Past this the page is finished and the clock stops being scheduled. */
+/** Past this the page is finished. `pageProgressAt` maps 1 onto it. */
 export const PAGE_DONE = KETSU_TAIL[1] + 120
+
+// ── the scroll span the whole timeline above is stretched across ────────────────
+
+/**
+ * WHERE IN A CHAPTER THE PAGE DRAWS ITSELF, in the same local-chapter units
+ * `journey-timeline.ts` states its own segment shape in.
+ *
+ * It OPENS at `TRAVEL_END` — the instant she stops and the "!" pops, which is
+ * also when the leaf begins to arrive — so the page inks itself ON THE WAY IN
+ * rather than starting blank once the card has landed. It CLOSES inside the
+ * dwell and deliberately early: `PAGE_SPAN_END < DWELL_MID`, and `DWELL_MID` is
+ * where `story-stops.ts` snaps a fling. That inequality is the whole safety
+ * argument and `info-page.test.tsx` asserts it, because it is the one number
+ * that could be tuned into a page a reader can land on half-drawn.
+ *
+ * The span is 0.19 of a chapter — about 400px of scroll at the shipped track
+ * length, four wheel notches — which is long enough for four beats to read as
+ * choreography and short enough that a reader who is scrolling to read is not
+ * made to work for the page.
+ */
+export const PAGE_SPAN_START = TRAVEL_END
+export const PAGE_SPAN_END = BURST_END + 0.3 * DWELL_SPAN
+
+/**
+ * The page's own progress, 0→1, at a journey position. Pure: no clock, no state,
+ * no frame. This is the function the whole file exists to be driven by.
+ *
+ * Chapter-local, so every chapter's page draws itself over its own approach and
+ * the answer does not depend on which chapter you are in.
+ */
+export function pageProgressAt(progress: number): number {
+  const p = progress < 0 ? 0 : progress > 1 ? 1 : progress
+  const segLen = 1 / CHAPTER_COUNT
+  const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / segLen))
+  const local = (p - chapter * segLen) / segLen
+  return phase(local, [PAGE_SPAN_START, PAGE_SPAN_END])
+}
+
+/** Guards the one inequality the page's correctness rests on. */
+export const PAGE_CLOSES_BEFORE_STOP = PAGE_SPAN_END < DWELL_MID
 
 /**
  * When mark `i` of `count` is fully planted.
