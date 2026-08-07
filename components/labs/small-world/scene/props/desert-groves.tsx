@@ -95,9 +95,12 @@ const DUNE_RUNS_A: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_A_T, x: [0.75, 1.65],
   clusters: 2, perCluster: [4, 6], spreadT: 0.04, spreadX: 0.09, scale: [0.7, 1.0], seed: 11.3,
 }
+// Task 88: Zone B is the desert's OWN money band and it still read as confetti — the ridges
+// were too few/small to register once the checkpoint foreshortening took its cut. One more
+// run, and the scale floor lifted, so the echelon reads back across the horizon.
 const DUNE_RUNS_B: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X,
-  clusters: 2, perCluster: [4, 6], spreadT: 0.03, spreadX: 0.065, scale: [0.45, 0.7], seed: 29.7,
+  clusters: 3, perCluster: [4, 6], spreadT: 0.03, spreadX: 0.065, scale: [0.55, 0.85], seed: 29.7,
 }
 
 // ---- 2. OASIS GROVES: mound + palms + rocks + scrub sharing cluster centres ----
@@ -107,7 +110,8 @@ const DUNE_RUNS_B: ClusterSpec = {
 // 4 groves in zone A (the priority) + 1 in zone B tail + 1 forced-side RESCUE grove (below, for
 // the lone global-dressing palm the revision round found still standing alone) = 6 total.
 const GROVES_A_BASE = { chapter: CHAPTER, variant: VARIANT, t: ZONE_A_T, x: ZONE_A_X, clusters: 4, seed: 53.1 } as const
-const GROVES_B_BASE = { chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X, clusters: 1, seed: 67.9 } as const
+// Task 88: 1 → 2 — a single tail grove left the money band's centre with one green rosette.
+const GROVES_B_BASE = { chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X, clusters: 2, seed: 67.9 } as const
 
 // RESCUE grove — not part of the brief's original 3-5, added in the revision round. The audit
 // found ONE global-dressing ClayPalm still standing alone (not ours; the flank scatter's own
@@ -140,7 +144,7 @@ const FIELD_ROCKS_A: ClusterSpec = {
 }
 const FIELD_ROCKS_B: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X,
-  clusters: 2, perCluster: [4, 6], spreadT: 0.04, spreadX: 0.15, scale: [0.4, 0.8], seed: 97.2,
+  clusters: 3, perCluster: [5, 8], spreadT: 0.04, spreadX: 0.15, scale: [0.4, 0.8], seed: 97.2,
 }
 const FIELD_SCRUB_A: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_A_T, x: ZONE_A_X,
@@ -148,13 +152,15 @@ const FIELD_SCRUB_A: ClusterSpec = {
 }
 const FIELD_SCRUB_B: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X,
-  clusters: 2, perCluster: [2, 3], spreadT: 0.04, spreadX: 0.13, scale: [0.5, 0.85], seed: 121.8,
+  clusters: 3, perCluster: [3, 5], spreadT: 0.04, spreadX: 0.13, scale: [0.6, 1.0], seed: 121.8,
 }
 
 // ---- 4. ZONE B ONLY: mid-scale waymarks -------------------------------------
+// Task 88: two groups instead of one, and the waymark itself is now the money band's DARK
+// note (see makeWaymark) — the frame previously had no anchoring mass anywhere.
 const ZONE_B_MIDOBJECTS: ClusterSpec = {
   chapter: CHAPTER, variant: VARIANT, t: ZONE_B_T, x: ZONE_B_X,
-  clusters: 1, perCluster: [2, 3], spreadT: 0.08, spreadX: 0.28, scale: [0.8, 1.4], seed: 139.4,
+  clusters: 2, perCluster: [2, 4], spreadT: 0.06, spreadX: 0.2, scale: [0.9, 1.5], seed: 139.4,
 }
 
 // ---- 5. GROUND COVER (round 3): the untextured mid-face band -----------------
@@ -199,14 +205,18 @@ function makeScrubTuft(): THREE.BufferGeometry {
   return buildMergedClay(parts)
 }
 
-/** A half-buried block topped with two stacked stones — the zone-B "half-buried block / cairn /
- *  wind-carved stone" waymark, collapsed into ONE merged geometry (draw-budget forced the three
- *  flavours in the brief into one silhouette; per-instance scale still buys "distinct sizes"). */
+/** A wind-carved stone outcrop — a squashed base slab under two stacked stones, ONE merged
+ *  geometry. Task 88: the old base was a BoxGeometry that read as a shipping crate in the
+ *  money frame (the exact geometry language T86 banned — soft merged forms, never boxes);
+ *  it is now a low squashed icosahedron, and the family wears the desert's DARK stone tones
+ *  (see the family spec) so these groups double as the zone's anchoring dark note. */
 function makeWaymark(): THREE.BufferGeometry {
+  // Calibration: at the spec's top scale (1.5) the slab spans ~0.40 across (ground-hugging,
+  // the T86 mesa envelope) and the stack tops out ~0.30 tall — inside the 0.35 canopy cap.
   return buildMergedClay([
-    { geo: new THREE.BoxGeometry(0.22, 0.1, 0.18), color: PALETTE.sand, pos: [0, 0.05, 0], rot: [0.05, 0.4, 0.02] },
-    { geo: new THREE.IcosahedronGeometry(0.075, 0), color: PALETTE.dune, pos: [0.02, 0.13, -0.01], scl: [1, 0.85, 1] },
-    { geo: new THREE.IcosahedronGeometry(0.05, 0), color: PALETTE.sand, pos: [-0.01, 0.2, 0.015] },
+    { geo: new THREE.IcosahedronGeometry(0.1, 0), color: PALETTE.stone, pos: [0, 0.035, 0], scl: [1.35, 0.5, 1], rot: [0.05, 0.4, 0.02] },
+    { geo: new THREE.IcosahedronGeometry(0.065, 0), color: PALETTE.earth, pos: [0.02, 0.1, -0.01], scl: [1, 0.8, 1] },
+    { geo: new THREE.IcosahedronGeometry(0.04, 0), color: PALETTE.stone, pos: [-0.01, 0.16, 0.015] },
   ])
 }
 
@@ -319,12 +329,14 @@ export function DesertGroves({ journeyRef }: { journeyRef: JourneyRef }) {
       { placed: palmPlaced, geometry: trunkGeo, color: PALETTE.palmTrunk, local: trunkLocal },
       // 3: palm crowns
       { placed: palmPlaced, geometry: crownGeo, color: PALETTE.palmFrond, colorDeep: PALETTE.palmFrondDeep, local: crownLocal },
-      // 4: rocks (grove skirts + stone fields)
-      { placed: rockPlaced, geometry: rockGeo, color: PALETTE.dune, colorDeep: PALETTE.sand, local: rockLocal },
+      // 4: rocks (grove skirts + stone fields). Task 88: dune/sand read as scattered WHITE
+      // pebbles against the gold — the tones step DOWN from the ground now (camelHide bulk,
+      // dune minority), so a stone field reads as stones, not spilled rice.
+      { placed: rockPlaced, geometry: rockGeo, color: PALETTE.camelHide, colorDeep: PALETTE.dune, local: rockLocal },
       // 5: scrub tufts (grove skirts + scrub fields)
       { placed: scrubPlaced, geometry: scrubGeo, color: PALETTE.reedGreen, colorDeep: PALETTE.palmFrondDeep, local: scrubLocal },
-      // 6: zone-B mid-scale waymarks
-      { placed: midPlaced, geometry: midGeo, color: PALETTE.sand, colorDeep: PALETTE.dune, local: midLocal },
+      // 6: zone-B waymark outcrops — the money band's dark note (stone bulk, earth minority)
+      { placed: midPlaced, geometry: midGeo, color: PALETTE.stone, colorDeep: PALETTE.earth, local: midLocal },
     ]
   }, [])
 
