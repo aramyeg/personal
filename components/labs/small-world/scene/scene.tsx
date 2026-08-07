@@ -41,6 +41,7 @@ import { Dialog360Set } from './props/set-360dialog'
 import { AccentureSet, DesertLife } from './props/set-accenture'
 import { AknaSet } from './props/set-akna'
 import { CanyonGeysers } from './props/canyon'
+import { ApproachDressing } from './props/approach-dressing'
 import { WinterLife } from './props/winter'
 import { YetiEgg } from './props/yeti-egg'
 import { EpilogueSet } from './props/epilogue'
@@ -217,6 +218,9 @@ function SceneContents({
         <DesertLife journeyRef={journeyRef} />
         <CanyonGeysers journeyRef={journeyRef} />
         <WinterLife journeyRef={journeyRef} />
+        {/* Task 86 — the four wedges' approach + tail ground, which is what the reader is
+            actually looking at below the middle of every checkpoint frame. */}
+        <ApproachDressing journeyRef={journeyRef} />
         {/* The retired yeti, hiding in the winter wedge's right-hand conifers. The lab's one click
             interaction — its hotspot arms only while that ground is on frame (Task 61). */}
         <YetiEgg journeyRef={journeyRef} />
