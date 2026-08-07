@@ -348,6 +348,11 @@ test.describe('Small World lab', () => {
    * thing that can catch a string whose real metrics beat the estimate.
    */
   test('no chapter sets its headline wider than its own leaf', async ({ page }) => {
+    // SIX CHAPTERS, EACH WAITED UNTIL ITS LEAF STOPS MOVING. That is a minute of
+    // real work on a loaded machine and it is not a hang, so it gets a budget
+    // rather than the default 30s — a sweep timed out mid-chapter would report a
+    // clipped headline that was never measured.
+    test.setTimeout(150_000)
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
@@ -388,14 +393,21 @@ test.describe('Small World lab', () => {
    * starts arriving, to PANEL_END — rather than the story stops alone.
    */
   test('nothing on the leaf is hidden at any position a reader can park at', async ({ page }) => {
+    // THIRTY PARKED POSITIONS, each of which has to settle before it is read.
+    // Same reason as the headline sweep above.
+    test.setTimeout(240_000)
     await page.goto('/labs/small-world')
     test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
     await waitForSceneReady(page)
     for (let c = 0; c < CHAPTER_COUNT; c++) {
       for (const local of [TRAVEL_END + 0.01, 0.28, 0.34, DWELL_MID, 0.6]) {
         await scrollToProgress(page, (c + local) / CHAPTER_COUNT)
+        // `scrollToProgress` returns before the page's own smooth scroll has
+        // finished, and the leaf's entrance is a wall clock on top of that. Read
+        // a frame of either and the measurement is of the animation.
         const leaf = page.getByTestId('sw-info-page')
-        if (!(await leaf.isVisible().catch(() => false))) continue
+        if (!(await leaf.isVisible({ timeout: 4_000 }).catch(() => false))) continue
+        await awaitStable(leaf)
         const worst = await leaf.evaluate((el) => {
           let hidden = 0
           for (const img of el.querySelectorAll('img')) {
