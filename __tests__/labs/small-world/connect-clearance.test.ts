@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CLEARANCE_MARGIN,
+  ENVELOPE_MARGIN,
   GAP_BASE,
   GAP_FLOOR,
   INSET_BASE,
@@ -9,6 +10,7 @@ import {
   connectSpacingFor,
   noteLowestPxAtPose,
   noteLowestPxBetween,
+  worstClearanceOverEnvelope,
 } from '@/components/labs/small-world/overlay/connect-clearance'
 import { cameraPositionAt, cameraTargetAt } from '@/components/labs/small-world/scene/camera'
 import {
@@ -30,62 +32,111 @@ import { DESK_PAD } from '@/components/labs/small-world/scene/props/desk-glb-con
  * addendum was written against (`scratchpad/t72d/geom-before`, `app/geom.mjs`). Every fixture below
  * is a rendered number, and the test that guards them from drifting is the capture in the report.
  *
- *   1440x900   nav top 795.4, x 554.1..885.9   (pill row 331.8 wide, 44.5 tall)
- *    390x844   nav top 739.4, x  29.1..360.9
- *    360x844   nav top 739.4, x  14.1..345.9
+ * RE-MEASURED AT TASK 85, and the re-measure is the point rather than an update.
+ * Finding 1 took the row from three pills to one — the Email and GitHub pills
+ * carried Aram's addresses on a page that is Alwina's CV — so the rectangle these
+ * fixtures describe stopped existing. A clearance solved against the OLD row
+ * would have gone on passing while describing a span the note is no longer under:
+ * the row is 136.4 px wide now against 331.8, and it is centred, so it sits over
+ * a completely different stretch of the note's falling edge.
+ *
+ * Measured on the shipped build at commit b3244e0, production server, headed
+ * Playwright, at the bottom of the track (`scratchpad/t85/checkout-after/geom.mjs`):
+ *
+ *   1440x900   nav top 795.4, x 646.8..783.2   (pill row 136.4 wide, 44.5 tall)
+ *    390x844   nav top 739.4, x 121.8..258.2
+ *    360x844   nav top 739.4, x 106.8..243.2
+ *
+ * THESE ARE THE UNLIFTED POSITIONS, which is what this file's arithmetic is
+ * written in — the live DOM shows the row 6.3 px lower on a phone because the
+ * solve has already moved it, and feeding that number back in would be asking
+ * the geometry a question about a row that has already been answered (the round
+ * trip the FIXED POINT test below exists for). Reduced by the lift the shipped
+ * build actually applies, read off the block's own computed gap and inset:
+ * 0.0 px at desktop, 6.3 px at both phones.
+ *
+ * The row's VERTICAL position is unchanged by finding 1 — one row of pills is
+ * one row of pills. Only the span moved.
  */
 const FIXTURES = {
-  desktop: { width: 1440, height: 900, navTop: 795.4, navLeft: 554.1, navRight: 885.9 },
-  phone390: { width: 390, height: 844, navTop: 739.4, navLeft: 29.1, navRight: 360.9 },
-  phone360: { width: 360, height: 844, navTop: 739.4, navLeft: 14.1, navRight: 345.9 },
+  desktop: { width: 1440, height: 900, navTop: 795.4, navLeft: 646.8, navRight: 783.2 },
+  phone390: { width: 390, height: 844, navTop: 739.4, navLeft: 121.8, navRight: 258.2 },
+  phone360: { width: 360, height: 844, navTop: 739.4, navLeft: 106.8, navRight: 243.2 },
 }
 
-/** The three pills' own spans at each viewport, measured the same way. */
+/** The pill's own span at each viewport, measured the same way. One, now. */
 const PILLS = {
-  desktop: [
-    ['Email', 570, 652],
-    ['GitHub', 663, 756],
-    ['LinkedIn', 765, 869],
-  ],
-  phone390: [
-    ['Email', 45, 127],
-    ['GitHub', 138, 231],
-    ['LinkedIn', 240, 344],
-  ],
-  phone360: [
-    ['Email', 30, 112],
-    ['GitHub', 123, 216],
-    ['LinkedIn', 225, 329],
-  ],
+  desktop: [['LinkedIn', 662.8, 767.2]],
+  phone390: [['LinkedIn', 137.8, 242.2]],
+  phone360: [['LinkedIn', 122.8, 227.2]],
 } as Record<string, [string, number, number][]>
 
 describe('the note-edge model agrees with the render', () => {
   /**
-   * The model is only worth gating a layout on if it describes the pixels. These are the rendered
-   * note-mask lows under each pill's own rectangle, taken from a clean plate with the overlay hidden
-   * (`app/geom.mjs`). The model is expected to sit a pixel or so BELOW the mask — the sheet's
+   * The model is only worth gating a layout on if it describes the pixels. These are rendered
+   * note-mask lows under three known spans, taken from a clean plate with the overlay hidden
+   * (T72's `app/geom.mjs`). The model is expected to sit a pixel or so BELOW the mask — the sheet's
    * anti-aliased lip, the same bias `note-settle.ts` records against its own centre-line check.
+   *
+   * THESE ARE SPANS, NOT PILLS, and Task 85 is why the distinction now matters. They used to be
+   * keyed to the pill row because the row happened to be what had been measured; finding 1 removed
+   * two pills, and a fixture keyed to a pill list would have had to be either deleted or re-measured
+   * to say the same thing about the same geometry.
+   *
+   * NOTHING HERE NEEDED RE-MEASURING, and that is a claim about what changed rather than an
+   * assumption. This validates `noteLowestPxBetween` — the note's seat, the camera, the projection —
+   * and finding 1 touched none of them. The three spans below still span x 570..869 at desktop and
+   * 45..344 on the phones, so the surviving pill's own span (662.8..767.2 desktop, 137.8..242.2 at
+   * 390) lies INSIDE an already-validated range. Re-shooting a plate to confirm a model that did not
+   * move would be a new number pretending to be evidence.
    */
-  const RENDERED: Record<string, Record<string, number>> = {
-    desktop: { Email: 774, GitHub: 783, LinkedIn: 792 },
-    phone390: { Email: 725, GitHub: 734, LinkedIn: 744 },
-    phone360: { Email: 725, GitHub: 734, LinkedIn: 744 },
+  const VALIDATED_SPANS: Record<string, [string, number, number, number][]> = {
+    // name, x0, x1, rendered low
+    desktop: [
+      ['left', 570, 652, 774],
+      ['middle', 663, 756, 783],
+      ['right', 765, 869, 792],
+    ],
+    phone390: [
+      ['left', 45, 127, 725],
+      ['middle', 138, 231, 734],
+      ['right', 240, 344, 744],
+    ],
+    phone360: [
+      ['left', 30, 112, 725],
+      ['middle', 123, 216, 734],
+      ['right', 225, 329, 744],
+    ],
   }
 
   for (const key of ['desktop', 'phone390', 'phone360'] as const) {
-    it(`tracks the rendered mask under every pill at ${key}`, () => {
+    it(`tracks the rendered mask across the note's whole width at ${key}`, () => {
       const f = FIXTURES[key]
-      for (const [name, x0, x1] of PILLS[key]) {
+      for (const [name, x0, x1, rendered] of VALIDATED_SPANS[key]) {
         const model = noteLowestPxBetween(x0, x1, f.width, f.height)
         expect(model, `${name} span must cross the note`).not.toBeNull()
-        const delta = (model as number) - RENDERED[key][name]
+        const delta = (model as number) - rendered
         expect(
           Math.abs(delta),
-          `${key} ${name}: model ${(model as number).toFixed(1)} vs rendered ${RENDERED[key][name]}`
+          `${key} ${name}: model ${(model as number).toFixed(1)} vs rendered ${rendered}`
         ).toBeLessThan(3)
       }
     })
   }
+
+  it('validates the span the shipped pill actually occupies', () => {
+    // The point of the note above, asserted rather than promised: the surviving
+    // pill sits inside the range the plate covers, at every shipped viewport.
+    for (const key of ['desktop', 'phone390', 'phone360'] as const) {
+      const spans = VALIDATED_SPANS[key]
+      const lo = Math.min(...spans.map(([, x0]) => x0))
+      const hi = Math.max(...spans.map(([, , x1]) => x1))
+      for (const [name, x0, x1] of PILLS[key]) {
+        expect(x0, `${key} ${name} left is inside the validated plate`).toBeGreaterThanOrEqual(lo)
+        expect(x1, `${key} ${name} right is inside the validated plate`).toBeLessThanOrEqual(hi)
+      }
+    }
+  })
 
   it('has the edge FALLING to the right, which is what the correction fixed', () => {
     // the old spelling had this backwards; it is the whole reason the phone collided
@@ -136,22 +187,62 @@ describe('the desktop resting layout is untouched WHERE NOTHING FORCES IT', () =
     expect(withOut.lift).toBeLessThanOrEqual(withIn.lift)
   })
 
-  it('DOES move desktop once a breath is possible, and only by what the envelope demands', () => {
+  it('no longer has to move desktop at all, because the row got narrower', () => {
+    // TASK 85 CHANGED THIS OUTCOME, and the number is the reason rather than the
+    // edit. Finding 1 took the pill row from 331.8 px to 136.4 and centred it, so
+    // it now sits over a HIGHER part of the note's falling edge — the edge falls
+    // to the right, and the old row's right-hand pill was the one hanging over
+    // the low end. Measured, desktop:
+    //
+    //             resting clearance   worst clearance over the envelope   lift
+    //   3 pills          1.71 px                    -6.91 px            10.91 px
+    //   1 pill           9.07 px                    +5.32 px             0.00 px
+    //
+    // So the envelope term asks for nothing here now. That is a real improvement
+    // and not a gate going quiet: the assertion below is that the row CLEARS by
+    // more than the margin, which is why no lift is owed.
     const s = connectSpacingFor(FIXTURES.desktop, { parallax: true })
-    expect(s.lift).toBeGreaterThan(1)
+    expect(s.lift).toBe(0)
     expect(s.shortfall).toBe(0)
-    // and the resting term alone would not have moved it at all
-    expect(connectSpacingFor(FIXTURES.desktop, { parallax: false }).lift).toBe(0)
+    const [, x0, x1] = PILLS.desktop[0]
+    const worst = worstClearanceOverEnvelope(
+      FIXTURES.desktop.navTop,
+      x0,
+      x1,
+      FIXTURES.desktop.width,
+      FIXTURES.desktop.height
+    )
+    expect(worst, 'desktop clears the whole breath unaided').toBeGreaterThanOrEqual(ENVELOPE_MARGIN)
   })
 
-  it('records what desktop`s own worst clearance is, rather than quietly fixing it', () => {
-    // Left alone deliberately: closing this means moving an APPROVED resting position. The number is
-    // here so a future change cannot make it worse without a test saying so.
+  it('would STILL move desktop for a row wide enough to need it', () => {
+    // The envelope term is the only one that reaches a wide frame, and desktop no
+    // longer exercises it — so it is exercised with the row that used to ship.
+    // Without this, restoring an email pill could re-open T72's finding C2 with
+    // nothing failing.
+    const wide = { ...FIXTURES.desktop, navLeft: 554.1, navRight: 885.9 }
+    const s = connectSpacingFor(wide, { parallax: true })
+    expect(s.lift).toBeGreaterThan(1)
+    expect(s.shortfall).toBe(0)
+    // ...and the resting term alone would still not have moved it: desktop's
+    // resting composition is approved and only the breath may disturb it.
+    expect(connectSpacingFor(wide, { parallax: false }).lift).toBe(0)
+  })
+
+  it('records what desktop`s own resting clearance is, rather than quietly fixing it', () => {
+    // T72 left desktop's resting margin alone deliberately — closing it meant moving an APPROVED
+    // composition — and recorded it at under 4 px so a future change could not make it worse
+    // silently. Task 85 made it better without touching the composition: the pill row narrowed from
+    // 331.8 px to 136.4 and centred, so it stopped hanging over the low end of the falling edge.
+    // 1.71 px then, 9.07 px now. The record stays, with the bar where the measurement is.
     const f = FIXTURES.desktop
-    const worst = noteLowestPxBetween(765, 869, f.width, f.height) as number
+    // THE PILL THAT SHIPS, not the span the old right-hand pill used to occupy.
+    const [, x0, x1] = PILLS.desktop[0]
+    const worst = noteLowestPxBetween(x0, x1, f.width, f.height) as number
     const clearance = f.navTop - worst
-    expect(clearance).toBeGreaterThan(0)
-    expect(clearance).toBeLessThan(4)
+    expect(clearance).toBeGreaterThan(CLEARANCE_MARGIN)
+    // and it is a RECORD, so it fails if it drifts either way
+    expect(clearance).toBeLessThan(12)
   })
 })
 
@@ -178,9 +269,11 @@ describe('every pill clears the note at rest on a phone', () => {
 
     it(`FAILED before the lift at ${key} — the gate can tell the difference`, () => {
       const f = FIXTURES[key]
-      const worst = noteLowestPxBetween(240, 344, f.width, f.height) as number
-      // the shipped-before layout put the row's top ABOVE the note's low point, i.e. on the sheet
-      expect(f.navTop - worst).toBeLessThan(0)
+      const [, x0, x1] = PILLS[key][0]
+      const worst = noteLowestPxBetween(x0, x1, f.width, f.height) as number
+      // the measured row is the LIFTED one, so the unlifted top is what the note is asked about
+      const unlifted = f.navTop - connectSpacingFor(f, { parallax: false }).lift
+      expect(unlifted - worst).toBeLessThan(0)
     })
   }
 
