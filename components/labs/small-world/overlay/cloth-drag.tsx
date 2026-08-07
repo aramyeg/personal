@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'react'
 import { CHIBI_SHEET, anchorSrc } from '../manga/anchors'
 import { PALETTE } from '../palette'
-import { currentRole, yearsWorking, type InfoPageSpec } from './info-page-spec'
+import type { InfoPageSpec } from './info-page-spec'
 import { KETSU_LINE, easeOut, phase } from './info-beats'
 
 /**
@@ -119,6 +119,19 @@ function waveAmp(run: number): number {
 const LEAD_BULGE = 3
 
 /**
+ * Where the sheet's long edges sit in the 0–20 path space, and therefore how much
+ * air the words must keep from them.
+ *
+ * IT IS SHARED WITH THE TEXT'S PADDING ON PURPOSE. The first version drew the
+ * edges at 1.4/18.6 (7% and 93% of the band) while the text wrapper padded by
+ * about 4%, and captured on chapter 1 the contact line ran straight through the
+ * paper's own outline. One number, converted once, so the two cannot drift.
+ */
+const EDGE_Y = 1.0
+/** The same inset as a percentage of the band, for the text that sits on it. */
+const TEXT_INSET_PCT = (EDGE_Y / 20) * 100 + 3
+
+/**
  * The sheet's outline for a given sweep: a band whose long edges ripple and whose
  * LEADING EDGE IS A CURVE.
  *
@@ -143,8 +156,8 @@ function clothPath(sweep: number, amp: number, phaseShift: number): string {
     // the sheet is taut where she holds it and loose where it has been dropped.
     const slack = right > 0 ? 1 - x / right : 0
     const w = Math.sin((x / 100) * Math.PI * 3.2 + phaseShift) * amp * slack
-    top.push(`${x.toFixed(2)},${(1.4 + w).toFixed(2)}`)
-    bottom.unshift(`${x.toFixed(2)},${(18.6 + w).toFixed(2)}`)
+    top.push(`${x.toFixed(2)},${(EDGE_Y + w).toFixed(2)}`)
+    bottom.unshift(`${x.toFixed(2)},${(20 - EDGE_Y + w).toFixed(2)}`)
   }
   if (top.length === 0) return ''
   const bulge = amp > 0 ? LEAD_BULGE : 0
@@ -274,12 +287,17 @@ export function ClothDrag({
   const frame = Math.min(CHIBI_SHEET.frames - 1, Math.floor(run * 14) % CHIBI_SHEET.frames)
   const path = clothPath(lay, amp, run * 9)
 
+  // NO ROLE-AND-YEARS ROW. It came over from the retired title card, it is not in
+  // the approved sheet copy, and it said a third time what the identity line above
+  // it and the colophon below it already say. It also cost a row the hero could
+  // not spare: the sheet is `0 0 auto` and the hero takes what is left, so every
+  // line here is a line off chapter 1's SELF-TAUGHT — captured, with the wordmark
+  // climbing out of its panel onto the photograph above.
   const rows = [
     ...(intro
       ? [
           { key: 'name', text: intro.name, kind: 'name' as const },
           { key: 'says', text: intro.says, kind: 'says' as const },
-          { key: 'role', text: `${currentRole()} · ${yearsWorking()}+ years`, kind: 'role' as const },
         ]
       : []),
     ...sheetLines(line).map((text, i) => ({ key: `l${i}`, text, kind: 'line' as const })),
@@ -354,7 +372,7 @@ export function ClothDrag({
         style={{
           position: 'relative',
           width: '100%',
-          padding: '1.6cqw 2.2cqw',
+          padding: `${TEXT_INSET_PCT}% 2.2cqw`,
           boxSizing: 'border-box',
           textAlign: 'center',
           perspective: '46cqw',
@@ -431,21 +449,14 @@ const BASE_ROW: CSSProperties = {
  * The sheet's three registers. NO PINK anywhere on it: pink is the hero number's
  * semantic channel and the moment it decorates, numbers stop reading as the point.
  */
-const ROW_STYLE: Record<'name' | 'says' | 'role' | 'line' | 'contact', CSSProperties> = {
+const ROW_STYLE: Record<'name' | 'says' | 'line' | 'contact', CSSProperties> = {
   name: { ...BASE_ROW, fontSize: 'max(13px, 6.6cqw)', lineHeight: 1.06 },
   says: {
     ...BASE_ROW,
     fontFamily: 'var(--sw-font-body)',
-    fontSize: 'max(10px, 3.6cqw)',
+    fontSize: 'max(10px, 3.5cqw)',
     opacity: 0.9,
-  },
-  role: {
-    ...BASE_ROW,
-    fontFamily: 'var(--sw-font-body)',
-    fontSize: 'max(10px, 3.2cqw)',
-    letterSpacing: '0.08em',
-    opacity: 0.72,
-    marginBottom: '0.8cqw',
+    marginBottom: '0.6cqw',
   },
   line: { ...BASE_ROW, fontSize: 'max(11px, 5cqw)' },
   contact: {

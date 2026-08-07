@@ -109,6 +109,25 @@ import {
  * same statement.
  */
 
+/**
+ * THE CHASER'S FOOTPRINT, as a fraction of the panel's width. The bust is square,
+ * so this is its height too.
+ *
+ * It is stated once and consumed by both the bust and the column the three hero
+ * shapes keep clear for it — previously a `19%` and three copies of `20%` that
+ * only agreed by luck.
+ *
+ * IT RESERVES A COLUMN AND NOT A ROW, and that was re-learned the expensive way.
+ * A capped hero panel (since reverted) let the bust rise into chapter 1's
+ * SELF-TAUGHT, so a bottom reservation was added too — and on chapter 1, whose
+ * sheet carries her name and is therefore the tallest, that reservation was 81px
+ * of a 112px panel and pushed the wordmark up onto the photograph. Measured, both
+ * ways round. The hero is centred in what is left of its panel and the bust sits
+ * in the corner of the same box; keeping them apart is the column's job.
+ */
+const CHASER_W_PCT = 19
+const CHASER_CLEAR = `${CHASER_W_PCT + 3}%`
+
 /** The page is 2:3, like the printed pages it is bound with. */
 export const INFO_PAGE_ASPECT = 1.5
 
@@ -436,6 +455,15 @@ function TenPanel({ hero, inverted, t }: { hero: Hero; inverted?: boolean; t: nu
       ink={ink}
       tone={inverted ? 'none' : 'primary'}
       inverted={inverted}
+      // IT TAKES WHAT THE PAGE HAS LEFT, and a capture round says leave it alone.
+      // Chapter 4's tally looked lost in the taller panel the dead second picture
+      // freed up, so this was capped at 48cqw — and the cap broke the two heroes
+      // that DO fill their panel: the bust rose into chapter 1's SELF-TAUGHT, and
+      // once the bust was given its own row the wordmark climbed out of the panel
+      // and sat on the photograph above it. Two regressions for one nit. The real
+      // answer to a sparse tally was the tally's own width (see MARK_ROW_CQW), and
+      // with the marks sized to their row the air here reads as a manga panel's
+      // air rather than as a hole.
       style={{ flex: '1 1 0', minHeight: 0 }}
     >
       {/* SPEED LINES — they aim AT the number, so they are drawn from the frame
@@ -545,7 +573,7 @@ function Chaser({ face, t, fg }: { face: ReactionName; t: number; fg: string }) 
         position: 'absolute',
         right: '2.4cqw',
         bottom: '2.4cqw',
-        width: '19%',
+        width: `${CHASER_W_PCT}%`,
         aspectRatio: '1',
         border: `${RULE_CQW}cqw solid ${fg}`,
         background: PALETTE.pagePaper,
@@ -611,7 +639,7 @@ function HeroNumber({
         // BREAKS THE FRAME on the LEFT; the right-hand column belongs to the
         // chaser, which used to land on top of the numeral.
         marginLeft: '-3cqw',
-        paddingRight: '20%',
+        paddingRight: CHASER_CLEAR,
       }}
     >
       <span
@@ -689,7 +717,7 @@ function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: num
         alignItems: 'center',
         // Breaks the frame on the LEFT only; the right is the chaser's.
         marginLeft: '-3cqw',
-        paddingRight: '20%',
+        paddingRight: CHASER_CLEAR,
       }}
     >
       <span
@@ -722,6 +750,10 @@ function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: num
     </div>
   )
 }
+
+/** The usable width of the tally's row, in cqw, and the gap between two marks. */
+const MARK_ROW_CQW = 70
+const MARK_GAP_CQW = 1.2
 
 /**
  * The Isotype hero: `count` repeated marks, planted one at a time.
@@ -757,7 +789,18 @@ function HeroCount({
   // 52, not 62: the audit caught thirteen marks running past the hero panel's
   // own border. The budget is the TOTAL width the row may occupy, shared out, so
   // a bigger count makes smaller marks rather than a wider row.
-  const w = Math.min(9, 52 / count) * scale
+  // DERIVED FROM THE ROW IT HAS TO FIT IN, not from a budget number.
+  //
+  // It was a flat `52 / count` for two rounds, and 52 was itself a patch: the
+  // audit caught thirteen marks running past the hero panel's border at 62, so it
+  // was walked down until they fit. Task 82 widened it to 72 to fill the taller
+  // panel and reintroduced the exact same defect one row lower — captured on
+  // chapter 4, twelve marks and a thirteenth orphaned underneath them.
+  //
+  // So the constraint is written out instead: the marks and the gaps between them
+  // together may not exceed the row's usable width, and the cap keeps a count of
+  // three from becoming a banner. A number nobody has to re-walk.
+  const w = Math.min(9, (MARK_ROW_CQW - (count - 1) * MARK_GAP_CQW) / count) * scale
   const done = 1
   return (
     <div
@@ -769,13 +812,23 @@ function HeroCount({
         alignItems: 'center',
         gap: '1.4cqw',
         marginLeft: '-2cqw',
-        paddingRight: isHero ? '20%' : 0,
+        paddingRight: isHero ? CHASER_CLEAR : 0,
       }}
     >
       <div
         data-testid="sw-info-tally"
         data-count={count}
-        style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '0.8cqw 1.2cqw' }}
+        style={{
+          display: 'flex',
+          // NO WRAPPING. A tally that wraps has stopped being a tally — the whole
+          // Isotype argument is that the eye takes the row in at once — so the
+          // width above is solved to fit and this makes a miscalculation visible
+          // as an overflow instead of hiding it as a second row.
+          flexWrap: 'nowrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: `0.8cqw ${MARK_GAP_CQW}cqw`,
+        }}
       >
         {Array.from({ length: count }, (_, i) => {
           // Present from the first frame; the plant is a small drop on top of a

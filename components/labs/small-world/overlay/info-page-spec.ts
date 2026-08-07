@@ -367,28 +367,3 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
 ]
 
 export const infoPageFor = (chapterIndex: number): InfoPageSpec | undefined => INFO_PAGES[chapterIndex]
-
-/**
- * What she is NOW — the LATEST chapter's role, not the first one's.
- *
- * Derived rather than typed, which is the one property the retired title card had
- * that was worth keeping: "Frontend Engineer" is what she is, and a hard-coded
- * copy of it would go stale the first time a chapter is added.
- */
-export const currentRole = (): string => INFO_PAGES[INFO_PAGES.length - 1].footer.role
-
-/**
- * Years of PROFESSIONAL work — from the first JOB, not the first chapter.
- *
- * Chapter 1 is her degree, and counting a Master's as experience is the kind of
- * inflation this piece has no reason to reach for. Both ends are parsed out of the
- * periods below, so an edit to the story moves the number.
- */
-export function yearsWorking(): number {
-  const firstJob = Number(/\d{4}/.exec(INFO_PAGES[1].footer.period)?.[0] ?? '0')
-  const last = INFO_PAGES[INFO_PAGES.length - 1].footer.period
-  const end = /now|present/i.test(last)
-    ? new Date().getFullYear()
-    : Number(/(\d{4})\s*$/.exec(last)?.[1] ?? new Date().getFullYear())
-  return Math.max(1, end - firstJob)
-}
