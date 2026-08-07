@@ -6,46 +6,62 @@ import type { JourneyRef } from '../use-journey'
 import { useFinePointer, usePrefersReducedMotion } from '../use-reduced-motion'
 import { DESK_NUDGE_ZONES, type DeskNudgeKind } from './desk-glb-contract'
 import {
+  BEND_UNIFORM,
   HOVER_SCALE,
   NOTE_CORNER_ZONE,
   NOTE_CURL_UNIFORM,
   NUDGE_UNIFORMS,
   PRESS_CLICK,
   PRESS_HOVER,
+  RATTLE_UNIFORM,
+  ROCK_PARAMS,
   hitPadFor,
   nudgeArmedFor,
   rayBoxHit,
+  restingPeck,
   restingPress,
+  restingRattle,
   restingSpring,
+  restingSquash,
+  samplePeck,
   samplePress,
-  sampleNudge,
+  sampleRattle,
+  sampleRock,
+  sampleSquash,
   steamKickMail,
   tipDirFrom,
-  triggerNudge,
+  triggerPeck,
   triggerPress,
+  triggerRattle,
+  triggerRock,
+  triggerSquash,
   type NotePressState,
   type NudgeSpring,
+  type PeckState,
+  type RattleState,
+  type SquashSpring,
 } from './desk-nudge'
 
 /**
- * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the nudges
- * `desk-nudge.ts` defines. That module carries the law and every number; this file only listens,
- * raycasts and writes uniforms. Nothing here allocates after mount and nothing renders: the
- * component returns null and the desk's own materials do the moving.
+ * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
+ * `desk-nudge.ts` defines. That module carries the law, the six signatures and every number; this
+ * file only listens, raycasts, dispatches per kind and writes uniforms. Nothing here allocates
+ * after mount and nothing renders: the component returns null and the desk's own materials do the
+ * moving.
  *
  * HIT-TESTING is analytic — the zone boxes from the contract against the camera ray, six slab
  * tests once per frame on the latest pointer position — because the desk is a merged bake with no
  * per-object meshes to raycast (see `DESK_NUDGE_ZONES`), and because an interaction list of
  * invisible colliders would be six scene objects doing the job of one function. The same boxes
- * are inflated to a 44 px minimum effective target at their own depth, which is the phone's tap
- * floor and a no-op on desktop.
+ * are inflated to a 44 px minimum effective target at their own depth, the phone's tap floor and
+ * a no-op on desktop.
  *
  * ARMING follows the yeti's discipline: the gate is checked in the frame loop, a disarm resets
- * every spring to exact rest in the same frame (there is no unwind to run — rest is the closed
- * form's own destination), and the cursor can never promise a click the desk will not answer.
- * Hover triggers only for a genuinely hovering pointer (`pointerType` filtered exactly as
- * `use-pointer-parallax.ts` does, and for the same reason: a touch drag is a scroll, not a hover);
- * taps come through `click`, which the browser already suppresses for drags on every input kind.
+ * every signature to exact rest in the same frame (there is no unwind to run — rest is each
+ * closed form's own destination), and the cursor can never promise a click the desk will not
+ * answer. Hover triggers only for a genuinely hovering pointer (`pointerType` filtered exactly as
+ * `use-pointer-parallax.ts` does, and for the same reason: a touch drag is a scroll, not a
+ * hover); taps come through `click`, which the browser already suppresses for drags.
  *
  * A11Y, honestly: same stance as the yeti — the canvas is decorative and `aria-hidden`, the lab's
  * real content lives in the DOM, and reduced-motion visitors get the static timeline upstream.
@@ -89,13 +105,16 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
   /** One pending tap per frame is plenty — a double-click lands as two frames' taps anyway. */
   const tap = useRef<{ x: number; y: number } | null>(null)
 
-  const springs = useRef<Record<DeskNudgeKind, NudgeSpring>>({
+  /** One state per signature; the rockers share a machine, the rest have their own. */
+  const rocks = useRef<Record<'mug' | 'pencup' | 'bird' | 'penguin', NudgeSpring>>({
     mug: restingSpring(),
-    donut: restingSpring(),
     pencup: restingSpring(),
     bird: restingSpring(),
     penguin: restingSpring(),
   })
+  const squash = useRef<SquashSpring>(restingSquash())
+  const rattle = useRef<RattleState>(restingRattle())
+  const peck = useRef<PeckState>(restingPeck())
   const press = useRef<NotePressState>(restingPress())
   /** The module's own clock: advances only while armed, so a response is a pure function of the
    *  input sequence and never of how long the journey took (the law's determinism clause). */
@@ -159,11 +178,16 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
       armed.current = nowArmed
       if (!nowArmed) {
         // Scroll-away, yeti-style: rest in the same frame, no unwind, and a fresh clock next time.
-        for (const k of Object.keys(springs.current) as DeskNudgeKind[]) {
-          springs.current[k] = restingSpring()
-          NUDGE_UNIFORMS[k].value.fill(0)
+        for (const k of Object.keys(rocks.current) as (keyof typeof rocks.current)[]) {
+          rocks.current[k] = restingSpring()
         }
+        for (const k of Object.keys(NUDGE_UNIFORMS) as DeskNudgeKind[]) NUDGE_UNIFORMS[k].value.fill(0)
+        squash.current = restingSquash()
+        rattle.current = restingRattle()
+        peck.current = restingPeck()
         press.current = restingPress()
+        RATTLE_UNIFORM.value.fill(0)
+        BEND_UNIFORM.value.fill(0)
         NOTE_CURL_UNIFORM.value = 1
         clock.current = 0
         hovered.current = null
@@ -198,25 +222,40 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
       return best
     }
 
+    /** Each object answers in its own voice — the dispatch IS the signature list. */
     const fwd: [number, number] = [0, 0]
     const dirTmp = raycaster.current.ray.direction
     const fire = (hit: Hit, strength: number) => {
-      if (hit.id === 'note') {
-        triggerPress(press.current, now, strength >= 1 ? PRESS_CLICK : PRESS_HOVER)
-        return
-      }
-      const zone = ZONES.find((z) => z.id === hit.id)
-      if (!zone) return
-      fwd[0] = dirTmp.x
-      fwd[1] = dirTmp.z
-      const [dx, dz] = tipDirFrom(hit.point, zone.center as unknown as [number, number, number], fwd)
-      triggerNudge(springs.current[hit.id as DeskNudgeKind], hit.id as DeskNudgeKind, now, dx, dz, strength)
-      if (hit.id === 'mug') {
-        // the clink reaches the plume — a stamped impulse on the steam's own clock, never a new one
-        steamKickMail.seq += 1
-        steamKickMail.dirX = dx
-        steamKickMail.dirZ = dz
-        steamKickMail.amp = strength
+      switch (hit.id) {
+        case 'note':
+          triggerPress(press.current, now, strength >= 1 ? PRESS_CLICK : PRESS_HOVER)
+          return
+        case 'donut':
+          // jelly: direction ignored, it squashes the same for every finger
+          triggerSquash(squash.current, now, strength)
+          return
+        case 'bird':
+          // a bird pecks the way it faces; the body takes a whisper of recoil
+          triggerPeck(peck.current, now, strength)
+          triggerRock(rocks.current.bird, ROCK_PARAMS.bird!, now, 0, 1, strength)
+          return
+        default: {
+          const zone = ZONES.find((z) => z.id === hit.id)
+          if (!zone) return
+          fwd[0] = dirTmp.x
+          fwd[1] = dirTmp.z
+          const [dx, dz] = tipDirFrom(hit.point, zone.center as unknown as [number, number, number], fwd)
+          const kind = hit.id as 'mug' | 'pencup' | 'penguin'
+          triggerRock(rocks.current[kind], ROCK_PARAMS[kind]!, now, dx, dz, strength)
+          if (kind === 'pencup') triggerRattle(rattle.current, now, strength)
+          if (kind === 'mug') {
+            // the clink reaches the plume — a stamped impulse on the steam's own clock
+            steamKickMail.seq += 1
+            steamKickMail.dirX = dx
+            steamKickMail.dirZ = dz
+            steamKickMail.amp = strength
+          }
+        }
       }
     }
 
@@ -234,17 +273,21 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
       setCursor(false)
     }
 
-    // TAP/CLICK — the full nudge, any pointer kind.
+    // TAP/CLICK — the full response, any pointer kind.
     if (tap.current) {
       const hit = pick(tap.current.x, tap.current.y)
       tap.current = null
       if (hit) fire(hit, 1)
     }
 
-    // Drive every live spring; each settles to exact +0 on its own (see sampleNudge).
-    for (const k of Object.keys(springs.current) as DeskNudgeKind[]) {
-      sampleNudge(springs.current[k], k, now, NUDGE_UNIFORMS[k].value)
+    // Drive every signature; each settles to its own exact rest (see desk-nudge.ts samplers).
+    for (const k of ['mug', 'pencup', 'bird', 'penguin'] as const) {
+      sampleRock(rocks.current[k], ROCK_PARAMS[k]!, now, NUDGE_UNIFORMS[k].value)
     }
+    NUDGE_UNIFORMS.donut.value[3] = sampleSquash(squash.current, now)
+    RATTLE_UNIFORM.value[0] = sampleRattle(rattle.current, now)
+    RATTLE_UNIFORM.value[1] = now
+    BEND_UNIFORM.value[0] = samplePeck(peck.current, now)
     NOTE_CURL_UNIFORM.value = samplePress(press.current, now)
   })
 

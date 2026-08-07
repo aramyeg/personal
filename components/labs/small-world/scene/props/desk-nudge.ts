@@ -24,70 +24,86 @@ import type { EndingState } from '../../ending-timeline'
  *    or a click/tap on it. The same exception class as the yeti's peek (Task 61) and the arrival
  *    reveal (Task 54) — user-initiated, so determinism-under-scrub survives: no pointer, no motion,
  *    and a scrub with the pointer parked is bit-identical to a build without this feature (the
- *    shader guards every zone behind `angle != 0.0`, so the rest path is the untouched path — the
- *    same IEEE lesson as `orbitEyeInto`: (v − p) + p is not v, so at rest we never compute it).
+ *    shader guards every zone behind an exact-zero test, so the rest path is the untouched path —
+ *    the same IEEE lesson as `orbitEyeInto`: (v − p) + p is not v, so at rest we never compute it).
  *  - DETERMINISTIC: the same input sequence produces the same frames. Every response is a CLOSED
  *    FORM of (trigger time, direction, strength) — no integration drift, no Math.random anywhere,
  *    every constant authored. The module's clock advances only while the interactions are armed.
- *  - ALWAYS DECAYING BACK TO THE AUTHORED REST STATE. Rest is exact: springs snap to +0 below
- *    REST_EPS and the note's curl returns to exactly 1, so "settled" is `Object.is`-testable, not
- *    asymptotic. Nothing here has an autonomous life — the steam's wall clock (Task 72) remains the
- *    ending's ONLY autonomous motion, and the mug's steam response rides THAT clock as a stamped
- *    impulse rather than adding a second one.
+ *    The pen rattle's oscillation is evaluated in-shader, but from a CPU-stamped time and envelope,
+ *    so it is the same closed form one multiplication later.
+ *  - ALWAYS DECAYING BACK TO THE AUTHORED REST STATE. Rest is exact: every envelope snaps to +0
+ *    below its epsilon and the note's curl returns to exactly 1, so "settled" is
+ *    `Object.is`-testable, not asymptotic. Nothing here has an autonomous life — the steam's wall
+ *    clock (Task 72) remains the ending's ONLY autonomous motion, and the mug's steam response
+ *    rides THAT clock as a stamped impulse rather than adding a second one.
  *  - REDUCED MOTION: an interaction's end state IS its rest state, so the honest rendering of
  *    "produce the end state" is to produce nothing: the module is inert, no listener, no cursor.
  *
  * ============================================================================
- * ONE GRAMMAR, SIX VOICES
+ * ONE PHYSICS, SIX SIGNATURES (the Aram redirect: "each one unique and special to the item")
  * ============================================================================
- * Every response is the same physical sentence — the object rocks about its real contact with the
- * desk and settles — spoken with object-appropriate mass. The mug is heavy and brief; the donut is
- * light and springy; the pen cup is tall and slow; the bird is quick; the penguin, taller, swings
- * lower and longer. The note is paper, so its verb differs: its curled corner can be pressed FLAT
- * and springs back. All responses are under 700 ms, and all are RIGID rotations of baked vertices
- * (see `DESK_NUDGE_ZONES` for why boxes over the merged mesh, and the no-tear gate that makes them
- * safe) — zero new meshes, zero new draw calls, zero added GLB bytes.
+ * Every response is still an honest, small disturbance that settles — but each object answers in
+ * its own material's voice, not as a scaled copy of its neighbour's:
  *
- * The note's press is DOWNWARD-ONLY by construction: uCurl ≤ 1 always, so the sheet never rises
- * above the published `DESK_NOTE.top` ceiling the containment and connect-clearance gates are made
- * against. Mid-interaction the clearance can only grow.
+ *  - the MUG is heavy ceramic: a brief 3° rock about its base edge, the COFFEE STAYS LEVEL inside
+ *    it, and the steam flinches;
+ *  - the DONUT is soft: it does not rock at all — it SQUASHES toward the pad, bulges, overshoots
+ *    into a stretch and jiggles out, icing and sprinkles riding the jelly;
+ *  - the PEN CUP barely moves — the signature is the PENS, levering about the rim line with
+ *    per-pen phases: a rattle, not a body;
+ *  - the BLUEBIRD is a bird: a quick peck-peck bow — a clay bend at the neck, head and beak
+ *    dipping forward twice — with a whisper of body recoil;
+ *  - the PENGUIN is a roly-poly toy: a deep, slow weeble whose axis PRECESSES as it settles, and
+ *    which takes visibly longer than anything else — that contrast is the character (the 700 ms
+ *    budget flexes for it by sanction; everything else keeps it);
+ *  - the NOTE is paper: its curled corner presses FLAT and springs back, downward-only, so the
+ *    sheet never rises above the published `DESK_NOTE.top` ceiling and the connect-clearance
+ *    envelope can only grow mid-press.
+ *
+ * All of it is rendered by fields over REST POSITION inside the contract's zone boxes (see
+ * `DESK_NUDGE_ZONES` for the no-tear derivation): rigid rotations for the rockers, a scale field
+ * for the jelly, a rim-lever field for the rattle, a smooth neck-weighted bend for the peck. The
+ * fields are continuous in rest position and vanish at their own boundaries, so they introduce no
+ * new tear class. Zero new meshes, zero new draw calls, zero added GLB bytes.
+ *
+ * Shading under motion, for the record: `DeskBaked` ships no normals and is unlit — its shading is
+ * baked into vertex colours that travel WITH the vertices, so a rocked mug's modelling rocks with
+ * it by construction. The two view-dependent materials rotate (metal) or correct (gloss squash)
+ * their normals under the same guards. There is no shadow pass in this lab to desync — every
+ * shadow is baked into the pad's atlas, and the baked contact shadow staying put under a rocking
+ * base is the visual budget the "micro" in micro-animation buys.
  */
 
-// --- the springs ------------------------------------------------------------
+// --- the rockers ------------------------------------------------------------
 
 /**
- * Per-object mass, as a damped oscillator. `hz` is the rock's natural frequency, `zeta` its damping
- * ratio, `peakDeg` the first crest of a full click (hover crossings use HOVER_SCALE of it).
- *
- * The settle bound is arithmetic, not hope: the envelope decays as e^(−ζωt), so the slowest of
- * these (bird: ζω = 5.7/s) is at 1.9% of its peak by 700 ms. `desk-nudge.test.ts` sweeps it.
+ * A rock: two damped angular axes about the base pivot. `hzZ` may be DETUNED from `hzX` — with a
+ * quadrature impulse (`quad`) the two axes trace a slowly rotating ellipse, which is the roly-poly
+ * precession; everyone but the penguin runs both at the same frequency and quad 0.
  */
-export const NUDGE_PARAMS: Record<
-  DeskNudgeKind,
-  { hz: number; zeta: number; peakDeg: number }
-> = {
-  mug: { hz: 3.4, zeta: 0.32, peakDeg: 3.0 },
-  donut: { hz: 5.0, zeta: 0.2, peakDeg: 5.0 },
-  pencup: { hz: 4.2, zeta: 0.26, peakDeg: 2.8 },
-  bird: { hz: 5.8, zeta: 0.157, peakDeg: 6.0 },
-  penguin: { hz: 4.6, zeta: 0.19, peakDeg: 4.5 },
+export type RockParams = { hzX: number; hzZ: number; zeta: number; peakDeg: number; quad: number }
+
+export const ROCK_PARAMS: Partial<Record<DeskNudgeKind, RockParams>> = {
+  mug: { hzX: 3.4, hzZ: 3.4, zeta: 0.32, peakDeg: 3.0, quad: 0 },
+  /** A whisper — the cup's job is to hold still while its pens rattle. */
+  pencup: { hzX: 4.2, hzZ: 4.2, zeta: 0.26, peakDeg: 0.8, quad: 0 },
+  /** The peck's body recoil only; the peck itself is the bend below. */
+  bird: { hzX: 5.8, hzZ: 5.8, zeta: 0.157, peakDeg: 2.0, quad: 0 },
+  /** The weeble: deep, slow, lightly damped. The z axis runs 8.3% fast and the impulse sends a
+   *  45% quadrature share — together the wobble traces a rotating ellipse (~0.5 rad of axis turn
+   *  over the visible life), which is the roly-poly's circling settle. */
+  penguin: { hzX: 1.8, hzZ: 1.95, zeta: 0.12, peakDeg: 7.0, quad: 0.45 },
 }
 
-/** A hover crossing is a brush, not a tap. */
+/** A hover crossing is a brush, not a tap — every signature scales by this on hover. */
 export const HOVER_SCALE = 0.35
 
-/** Below this combined envelope (radians) a spring is DONE and writes exact +0. ~0.02°. */
+/** Below this combined envelope (radians) a rock is DONE and writes exact +0. ~0.02°. */
 export const REST_EPS = 0.0004
 
 /** No pile-up: impulses that would swing past this multiple of the authored peak are clamped. */
 export const AMP_CAP = 1.75
 
-/**
- * One axis of a rock: closed-form underdamped oscillator from initial conditions. Two of these per
- * zone (rotation about world x and world z) compose any horizontal tipping direction, because
- * micro-angles commute. Closed form is what makes the law's determinism clause cheap to keep:
- * the state is (x0, v0, t0) and every frame is a pure function of it.
- */
 export type SpringAxis = { x0: number; v0: number }
 export type NudgeSpring = { t0: number; x: SpringAxis; z: SpringAxis; active: boolean }
 
@@ -98,9 +114,8 @@ export const restingSpring = (): NudgeSpring => ({
   active: false,
 })
 
-const omegaOf = (kind: DeskNudgeKind): number => NUDGE_PARAMS[kind].hz * Math.PI * 2
-
-/** Position and velocity of one axis at `tau` seconds after its initial conditions. */
+/** Position and velocity of one axis at `tau` seconds after its initial conditions — the closed
+ *  form that makes the determinism clause cheap to keep. */
 export function sampleAxis(
   s: SpringAxis,
   omega: number,
@@ -118,88 +133,85 @@ export function sampleAxis(
   }
 }
 
-/**
- * The impulse velocity that makes a from-rest response crest at exactly `peakDeg`. The impulse
- * response (V/ωd)·e^(−ζωτ)·sin(ωd τ) peaks at τp = atan2(ωd, ζω)/ωd; divide the wanted peak by
- * that factor and the crest is authored rather than tuned.
- */
-export function impulseFor(kind: DeskNudgeKind): number {
-  const { zeta, peakDeg } = NUDGE_PARAMS[kind]
-  const omega = omegaOf(kind)
-  const wd = omega * Math.sqrt(1 - zeta * zeta)
-  const tp = Math.atan2(wd, zeta * omega) / wd
-  const factor = (Math.exp(-zeta * omega * tp) * Math.sin(wd * tp)) / wd
-  return (peakDeg * Math.PI) / 180 / factor
+const TAU = Math.PI * 2
+
+/** The impulse velocity that makes a from-rest response crest at exactly `peakDeg` (on the x-tuned
+ *  axis; the quadrature share rides on top for the one kind that has it). */
+export function impulseFor(p: RockParams): number {
+  const omega = p.hzX * TAU
+  const wd = omega * Math.sqrt(1 - p.zeta * p.zeta)
+  const tp = Math.atan2(wd, p.zeta * omega) / wd
+  const factor = (Math.exp(-p.zeta * omega * tp) * Math.sin(wd * tp)) / wd
+  return (p.peakDeg * Math.PI) / 180 / factor
+}
+
+const envelopeOf = (s: NudgeSpring, p: RockParams, now: number): number => {
+  const tau = now - s.t0
+  const wx = p.hzX * TAU
+  const wz = p.hzZ * TAU
+  const ax = sampleAxis(s.x, wx, p.zeta, tau)
+  const az = sampleAxis(s.z, wz, p.zeta, tau)
+  const wdx = wx * Math.sqrt(1 - p.zeta * p.zeta)
+  const wdz = wz * Math.sqrt(1 - p.zeta * p.zeta)
+  return Math.hypot(
+    Math.hypot(ax.x, (ax.v + p.zeta * wx * ax.x) / wdx),
+    Math.hypot(az.x, (az.v + p.zeta * wz * az.x) / wdz)
+  )
 }
 
 /**
- * Kick a zone: tip direction `d` (unit, xz), strength 1 for a click, HOVER_SCALE for a hover.
- *
- * VELOCITY-CONTINUOUS: the current state is sampled first and the impulse is ADDED to it, so a
- * re-poke mid-swing stirs the motion instead of restarting it — wandering the pointer across the
- * desk reads as running a finger along it, not as resetting five metronomes. The energy cap keeps
- * spam from winding it up: past AMP_CAP× the authored peak, extra impulse is discarded.
+ * Kick a rock: tip direction `d` (unit, xz), strength 1 for a click, HOVER_SCALE for a hover.
+ * VELOCITY-CONTINUOUS: the current state is sampled and the impulse ADDED, so a re-poke stirs the
+ * motion instead of restarting it. `quad` sends a share of the impulse to the perpendicular axis a
+ * quarter-turn out of phase — with detuned axes that is what makes a weeble circle. Energy-capped.
  */
-export function triggerNudge(
+export function triggerRock(
   s: NudgeSpring,
-  kind: DeskNudgeKind,
+  p: RockParams,
   now: number,
   dx: number,
   dz: number,
   strength: number
 ): void {
-  const { zeta } = NUDGE_PARAMS[kind]
-  const omega = omegaOf(kind)
   const tau = now - s.t0
-  const cx = s.active ? sampleAxis(s.x, omega, zeta, tau) : { x: 0, v: 0 }
-  const cz = s.active ? sampleAxis(s.z, omega, zeta, tau) : { x: 0, v: 0 }
-  // rotation about a = up × d tips the top toward d; a = (dz, 0, −dx) — impulse lands on (x, z)
-  const v = impulseFor(kind) * strength
-  let vx = cx.v + v * dz
-  let vz = cz.v - v * dx
-  const wd = omega * Math.sqrt(1 - zeta * zeta)
-  const env = Math.hypot(
-    Math.hypot(cx.x, (vx + zeta * omega * cx.x) / wd),
-    Math.hypot(cz.x, (vz + zeta * omega * cz.x) / wd)
-  )
-  const cap = ((NUDGE_PARAMS[kind].peakDeg * Math.PI) / 180) * AMP_CAP
-  if (env > cap) {
-    const k = cap / env
-    vx = cx.v + (vx - cx.v) * k
-    vz = cz.v + (vz - cz.v) * k
-  }
+  const wx = p.hzX * TAU
+  const wz = p.hzZ * TAU
+  const cx = s.active ? sampleAxis(s.x, wx, p.zeta, tau) : { x: 0, v: 0 }
+  const cz = s.active ? sampleAxis(s.z, wz, p.zeta, tau) : { x: 0, v: 0 }
+  // rotation about a = up × d tips the top toward d; a = (dz, 0, −dx)
+  const v = impulseFor(p) * strength
+  let vx = cx.v + v * dz - v * p.quad * dx
+  let vz = cz.v - v * dx - v * p.quad * dz
   s.t0 = now
   s.x = { x0: cx.x, v0: vx }
   s.z = { x0: cz.x, v0: vz }
   s.active = true
+  const cap = ((p.peakDeg * Math.PI) / 180) * AMP_CAP
+  const env = envelopeOf(s, p, now)
+  if (env > cap) {
+    const k = cap / env
+    vx = cx.v + (vx - cx.v) * k
+    vz = cz.v + (vz - cz.v) * k
+    s.x = { x0: cx.x, v0: vx }
+    s.z = { x0: cz.x, v0: vz }
+  }
 }
 
 /**
- * The zone's uniform for this frame: (axis.x, axis.y, axis.z, angle), angle ≥ 0, axis unit — or
- * exact rest. Writes into `out` (length 4) and returns whether the spring is still live; a spring
- * whose envelope has fallen under REST_EPS is snapped to +0 and deactivated, which is the law's
- * "always decays back to the authored rest state" made `Object.is`-checkable.
+ * The rock's uniform for this frame: (axis.x, axis.y, axis.z, angle), angle ≥ 0, axis unit — or
+ * exact rest. A spring whose envelope has fallen under REST_EPS is snapped to +0 and deactivated —
+ * the law's "always decays back to the authored rest state" made `Object.is`-checkable.
  */
-export function sampleNudge(s: NudgeSpring, kind: DeskNudgeKind, now: number, out: Float32Array): boolean {
+export function sampleRock(s: NudgeSpring, p: RockParams, now: number, out: Float32Array): boolean {
   if (!s.active) return false
-  const { zeta } = NUDGE_PARAMS[kind]
-  const omega = omegaOf(kind)
-  const wd = omega * Math.sqrt(1 - zeta * zeta)
-  const tau = now - s.t0
-  const ax = sampleAxis(s.x, omega, zeta, tau)
-  const az = sampleAxis(s.z, omega, zeta, tau)
-  const env = Math.hypot(
-    Math.hypot(ax.x, (ax.v + zeta * omega * ax.x) / wd),
-    Math.hypot(az.x, (az.v + zeta * omega * az.x) / wd)
-  )
-  if (env < REST_EPS) {
+  if (envelopeOf(s, p, now) < REST_EPS) {
     s.active = false
-    out[0] = 0
-    out[1] = 0
-    out[2] = 0
-    out[3] = 0
+    out.fill(0)
     return false
   }
+  const tau = now - s.t0
+  const ax = sampleAxis(s.x, p.hzX * TAU, p.zeta, tau)
+  const az = sampleAxis(s.z, p.hzZ * TAU, p.zeta, tau)
   const m = Math.hypot(ax.x, az.x)
   if (m > 0) {
     out[0] = ax.x / m
@@ -207,30 +219,179 @@ export function sampleNudge(s: NudgeSpring, kind: DeskNudgeKind, now: number, ou
     out[2] = az.x / m
     out[3] = m
   } else {
-    // at a zero crossing the rock is passing flat through rest — angle exactly 0 this frame
-    out[0] = 0
-    out[1] = 0
-    out[2] = 0
-    out[3] = 0
+    out.fill(0)
   }
   return true
+}
+
+// --- the donut's squish -----------------------------------------------------
+
+/**
+ * Jelly, not a solid: a 1-D underdamped spring on a SQUASH scalar. Positive squashes the donut
+ * toward the pad and bulges it radially (half as much — sugary, not incompressible); the overshoot
+ * swings negative, which is the stretch-tall half of the classic squash-and-stretch jiggle. The
+ * poke's direction is deliberately ignored — jelly answers every finger the same way.
+ */
+export const SQUASH_PARAMS = { hz: 6.0, zeta: 0.13, peak: 0.16 }
+export const SQUASH_EPS = 0.002
+
+export type SquashSpring = { t0: number; x0: number; v0: number; active: boolean }
+export const restingSquash = (): SquashSpring => ({ t0: 0, x0: 0, v0: 0, active: false })
+
+const squashImpulse = (() => {
+  const { hz, zeta, peak } = SQUASH_PARAMS
+  const omega = hz * TAU
+  const wd = omega * Math.sqrt(1 - zeta * zeta)
+  const tp = Math.atan2(wd, zeta * omega) / wd
+  return peak / ((Math.exp(-zeta * omega * tp) * Math.sin(wd * tp)) / wd)
+})()
+
+export function triggerSquash(s: SquashSpring, now: number, strength: number): void {
+  const { hz, zeta } = SQUASH_PARAMS
+  const omega = hz * TAU
+  const cur = s.active ? sampleAxis({ x0: s.x0, v0: s.v0 }, omega, zeta, now - s.t0) : { x: 0, v: 0 }
+  s.t0 = now
+  s.x0 = cur.x
+  s.v0 = Math.min(cur.v + squashImpulse * strength, squashImpulse * AMP_CAP)
+  s.active = true
+}
+
+/** The squash scalar for this frame, snapped to exact 0 at rest. */
+export function sampleSquash(s: SquashSpring, now: number): number {
+  if (!s.active) return 0
+  const { hz, zeta } = SQUASH_PARAMS
+  const omega = hz * TAU
+  const wd = omega * Math.sqrt(1 - zeta * zeta)
+  const cur = sampleAxis({ x0: s.x0, v0: s.v0 }, omega, zeta, now - s.t0)
+  if (Math.hypot(cur.x, (cur.v + zeta * omega * cur.x) / wd) < SQUASH_EPS) {
+    s.active = false
+    return 0
+  }
+  return cur.x
+}
+
+// --- the pens' rattle -------------------------------------------------------
+
+/**
+ * The cup's signature lives ABOVE ITS RIM: every vertex there sways laterally in proportion to its
+ * height over the rim — a lever about the rim contact, which is exactly how real pens rattle in a
+ * real cup — with a per-pen phase read off rest position (the pens stand at different (x, z), so a
+ * gentle spatial phase gives each its own beat; across ONE pen's width the phase varies < 0.4 rad,
+ * sub-pixel shear at these amplitudes). The factor reaches zero exactly at the rim, so the field
+ * is continuous and the cup itself — whose highest vertex IS the rim — never feels it. The foil
+ * print sits below the rim and rides the cup.
+ *
+ * The oscillation is evaluated in-shader from a CPU-stamped envelope and the module's own clock:
+ * still a closed form of the trigger sequence, still exact +0 when the envelope snaps.
+ */
+export const RATTLE = {
+  /** Lateral sway per unit lever height, world units, at envelope 1. */
+  amp: 0.045,
+  cap: 0.08,
+  decay: 5.0,
+  /** rad/s of the two sway components; detuned so the jitter is elliptical, not a metronome. */
+  wx: 44.0,
+  wz: 49.7,
+  /** The static spatial phase: gentle enough to keep one pen coherent, steep enough to split pens. */
+  kx: 3.4,
+  kz: 2.6,
+  /** The rim line — `PenCup`'s measured top, where the lever factor reaches zero. */
+  rimY: 1.9626,
+}
+export const RATTLE_EPS = 0.0008
+
+export type RattleState = { amp: number; tA: number }
+export const restingRattle = (): RattleState => ({ amp: 0, tA: 0 })
+
+export function triggerRattle(s: RattleState, now: number, strength: number): void {
+  const cur = s.amp * Math.exp(-RATTLE.decay * (now - s.tA))
+  s.amp = Math.min(cur + RATTLE.amp * strength, RATTLE.cap)
+  s.tA = now
+}
+
+/** The rattle envelope for this frame — the shader multiplies it by the per-pen sine. */
+export function sampleRattle(s: RattleState, now: number): number {
+  if (s.amp === 0) return 0
+  const a = s.amp * Math.exp(-RATTLE.decay * (now - s.tA))
+  if (a < RATTLE_EPS) {
+    s.amp = 0
+    return 0
+  }
+  return a
+}
+
+// --- the bird's peck --------------------------------------------------------
+
+/**
+ * A bird pecks the way it faces, twice, quickly. The motion is a CLAY BEND, not a head sub-zone —
+ * the body's dome overlaps any head box (the no-tear condition forbids a rigid split), and a
+ * smooth neck-weighted bend is the more honest motion for a clay figurine anyway. The bend angle
+ * runs a fast double pulse (peck, lighter peck), and the body takes a 30% recoil on its rock
+ * spring so the whole figure answers.
+ */
+export const PECK = {
+  /** Full bend at the first peck's bottom, radians (~13.7°). */
+  depth: 0.24,
+  attack: 0.035,
+  release: 0.09,
+  /** The second, lighter peck. */
+  gap: 0.16,
+  second: 0.65,
+  /** The neck band: bend weight ramps 0 → 1 across these rest heights. */
+  neckLo: 1.48,
+  neckHi: 1.7,
+  /** The neck pivot line (rotation about world x through this y, z). */
+  pivotY: 1.6,
+  pivotZ: 9.55,
+  recoil: 0.3,
+}
+export const PECK_EPS = 0.0015
+
+const peckNorm = (() => {
+  const t = (Math.log(PECK.release / PECK.attack) * PECK.attack * PECK.release) / (PECK.release - PECK.attack)
+  return 1 / (Math.exp(-t / PECK.release) - Math.exp(-t / PECK.attack))
+})()
+
+const peckPulse = (tau: number): number =>
+  tau <= 0 ? 0 : peckNorm * (Math.exp(-tau / PECK.release) - Math.exp(-tau / PECK.attack))
+
+export type PeckState = { slots: [{ t0: number; amp: number }, { t0: number; amp: number }] }
+export const restingPeck = (): PeckState => ({
+  slots: [
+    { t0: -1e9, amp: 0 },
+    { t0: -1e9, amp: 0 },
+  ],
+})
+
+const peckOf = (slot: { t0: number; amp: number }, now: number): number =>
+  slot.amp * (peckPulse(now - slot.t0) + PECK.second * peckPulse(now - slot.t0 - PECK.gap))
+
+/** Two slots overlapped by max(), like the note's press: a re-peck mid-peck deepens, never pops. */
+export function triggerPeck(s: PeckState, now: number, strength: number): void {
+  const d0 = peckOf(s.slots[0], now)
+  const d1 = peckOf(s.slots[1], now)
+  s.slots[d0 <= d1 ? 0 : 1] = { t0: now, amp: PECK.depth * strength }
+}
+
+/** The bend angle for this frame, snapped to exact 0 once both pulses are spent. */
+export function samplePeck(s: PeckState, now: number): number {
+  const d = Math.max(peckOf(s.slots[0], now), peckOf(s.slots[1], now))
+  if (d < PECK_EPS) return 0
+  return d
 }
 
 // --- the note's press -------------------------------------------------------
 
 /**
- * Paper is not a rocking solid, so the note's verb is different: press the curled corner flat and
- * it springs back to its authored curl. A double exponential — fast attack, slower release —
- * normalised so its crest is exactly the requested depth; two slots overlap by max() so a re-press
- * mid-release deepens instead of popping.
+ * Paper: press the curled corner flat and it springs back. A double exponential — fast attack,
+ * slower release — normalised so its crest is exactly the requested depth; two slots overlap by
+ * max() so a re-press mid-release deepens instead of popping.
  */
 export const PRESS_ATTACK = 0.045
-/** 0.14 rather than 0.16 so the release's exponential tail is under 2% of the press by the 700 ms
- *  budget — the same arithmetic bound the rocks are held to. */
+/** 0.14 so the release's exponential tail is under 2% of the press by the 700 ms budget. */
 export const PRESS_RELEASE = 0.14
 export const PRESS_CLICK = 0.7
 export const PRESS_HOVER = 0.28
-/** Below this depth the press is DONE and uCurl is exactly 1 again. */
 export const PRESS_EPS = 0.001
 
 const PRESS_PEAK_T =
@@ -255,14 +416,13 @@ const pressDepth = (p: NotePress, now: number): number => {
 }
 
 export function triggerPress(s: NotePressState, now: number, amp: number): void {
-  // replace the deader slot, keep the livelier one so max() carries continuity across the re-press
   const d0 = pressDepth(s.slots[0], now)
   const d1 = pressDepth(s.slots[1], now)
   s.slots[d0 <= d1 ? 0 : 1] = { t0: now, amp }
 }
 
-/** uCurl for this frame: 1 at rest (exactly), dipping toward 1 − depth under a press. Never > 1
- *  and never < 1 − PRESS_CLICK — the corner can only move DOWN from its authored curl. */
+/** uCurl for this frame: 1 at rest (exactly), dipping toward 1 − depth under a press. Never > 1 —
+ *  the corner only ever moves DOWN from its authored curl. */
 export function samplePress(s: NotePressState, now: number): number {
   const d = Math.max(pressDepth(s.slots[0], now), pressDepth(s.slots[1], now))
   if (d < PRESS_EPS) return 1
@@ -276,7 +436,7 @@ export function samplePress(s: NotePressState, now: number): number {
  * direction and strength, and `desk-steam.tsx` stamps the kick onto its OWN accumulator the frame
  * it notices. The sway is then a closed form of (steam time − stamp) inside the steam's existing
  * deviation — no second wall clock enters the ending, and a kick that never happens costs the
- * shader nothing (`uKick.w` stays 0 behind the same `!= 0` discipline as the zones).
+ * shader nothing (`uKick.w` stays 0 behind the same exact-zero discipline as the zones).
  */
 export type SteamKickMail = { seq: number; dirX: number; dirZ: number; amp: number }
 export const steamKickMail: SteamKickMail = { seq: 0, dirX: 0, dirZ: 0, amp: 0 }
@@ -293,9 +453,8 @@ export const KICK_LAG = 0.35
 
 /**
  * Interactions arm when the studio is FULLY lit — the same beat the dpr floor latches and the
- * parallax reaches full gain, i.e. when the desk has become the subject. Before that the pointer
- * is watching a journey, and a desk that flinches while receding would be an event in someone
- * else's shot. A relation, not a literal, for the reason every gate here is one.
+ * parallax reaches full gain, i.e. when the desk has become the subject. A relation, not a
+ * literal, for the reason every gate here is one.
  */
 export const nudgeArmedFor = (ending: EndingState): boolean => ending.zoom >= STUDIO_LIGHTS_FULL
 
@@ -340,10 +499,8 @@ export function rayBoxHit(
 
 /**
  * The phone's 44 px: how far to grow a zone's box so its screen target is never smaller.
- *
  * `worldPerPx` at the zone's depth is 2·dist·tan(fov/2)/frameHeightPx; a box whose extent projects
- * under `minPx` is padded by half the shortfall on both sides. Desktop boxes come back untouched —
- * the mug is ~130 px tall at the money shot — so this is a floor, never a resize.
+ * under `minPx` is padded by half the shortfall on both sides. Desktop boxes come back untouched.
  */
 export function hitPadFor(extent: number, dist: number, fovDeg: number, heightPx: number, minPx = 44): number {
   const worldPerPx = (2 * dist * Math.tan((fovDeg * Math.PI) / 360)) / heightPx
@@ -352,8 +509,7 @@ export function hitPadFor(extent: number, dist: number, fovDeg: number, heightPx
 }
 
 /** Tip direction for a poke at `hit`: away from the poked side, i.e. from the hit point through
- *  the zone's centre, flattened to the desk plane. A dead-centre poke falls back to `fb` (the
- *  camera's forward, so a top poke pushes the object away from the viewer). */
+ *  the zone's centre, flattened to the desk plane; `fb` (the camera's forward) for dead-centre. */
 export function tipDirFrom(
   hit: readonly [number, number, number],
   center: readonly [number, number, number],
@@ -406,8 +562,9 @@ export const NOTE_CURL_MAX = DESK_NOTE.top - DESK_NOTE.lift
 
 // --- the shader chunks ------------------------------------------------------
 
-/** One shared vec4 per zone — (axis, angle) — written once by the driver and read by every
- *  material the zone is registered in, so the bake and the metal can never disagree mid-rock. */
+/** One shared vec4 per zone, written once by the driver and read by every material the zone is
+ *  registered in, so the bake and the metal can never disagree mid-motion. Semantics per kind:
+ *  rockers carry (axis.xyz, angle); the donut carries its squash scalar in w. */
 export const NUDGE_UNIFORMS: Record<DeskNudgeKind, { value: Float32Array }> = {
   mug: { value: new Float32Array(4) },
   donut: { value: new Float32Array(4) },
@@ -416,6 +573,10 @@ export const NUDGE_UNIFORMS: Record<DeskNudgeKind, { value: Float32Array }> = {
   penguin: { value: new Float32Array(4) },
 }
 
+/** The pens' rattle: (envelope, module clock, 0, 0). */
+export const RATTLE_UNIFORM = { value: new Float32Array(4) }
+/** The bird's bend angle: (θ, 0, 0, 0). */
+export const BEND_UNIFORM = { value: new Float32Array(4) }
 /** ...and the note's one scalar. 1 is the authored curl; a press dips below it, never above. */
 export const NOTE_CURL_UNIFORM = { value: 1 }
 
@@ -424,28 +585,22 @@ const f = (v: number): string => v.toFixed(5)
 export const zonesForMesh = (mesh: DeskMeshName) =>
   DESK_NUDGE_ZONES.filter((z) => z.meshes.includes(mesh))
 
-/**
- * The vertex-shader block for one mesh: per zone, a rest-position box test and a Rodrigues
- * rotation about the pivot plus the edge-rock lift. Boxes, pivots and radii are compile-time
- * literals (they are measurements — see the contract); only (axis, angle) crosses per frame.
- *
- * `transformed` is displaced; when `normalVar` is given the same rotation is applied to it, for
- * the two meshes whose materials actually read normals. THE GUARD IS THE LAW: at angle exactly 0
- * the vertex takes the untouched path, so a pointerless scrub is bit-identical by construction.
- */
-export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): { decl: string; body: string } {
-  const zones = zonesForMesh(mesh)
-  const decl = zones.map((z) => `uniform vec4 uNudge_${z.kind};`).join('\n')
-  const body = zones
-    .map((z) => {
-      const [px, py, pz] = z.pivot
-      const rot = normalVar
-        ? `${normalVar} = ${normalVar} * swC + cross( swAx, ${normalVar} ) * swS + swAx * dot( swAx, ${normalVar} ) * ( 1.0 - swC );`
-        : ''
-      return `if ( uNudge_${z.kind}.w != 0.0 &&
-     position.x >= ${f(z.min[0])} && position.x <= ${f(z.max[0])} &&
+type Zone = (typeof DESK_NUDGE_ZONES)[number]
+
+const boxTest = (z: Zone): string =>
+  `position.x >= ${f(z.min[0])} && position.x <= ${f(z.max[0])} &&
      position.y >= ${f(z.min[1])} && position.y <= ${f(z.max[1])} &&
-     position.z >= ${f(z.min[2])} && position.z <= ${f(z.max[2])} ) {
+     position.z >= ${f(z.min[2])} && position.z <= ${f(z.max[2])}`
+
+/** Rigid rock about the base pivot plus the edge-rock lift (lift = baseR·angle IS the first-order
+ *  rock about the base's edge — the far rim stays seated instead of sinking through the desk). */
+const rockBlock = (z: Zone, normalVar?: string): string => {
+  const [px, py, pz] = z.pivot
+  const rot = normalVar
+    ? `${normalVar} = ${normalVar} * swC + cross( swAx, ${normalVar} ) * swS + swAx * dot( swAx, ${normalVar} ) * ( 1.0 - swC );`
+    : ''
+  return `if ( uNudge_${z.kind}.w != 0.0 &&
+     ${boxTest(z)} ) {
   vec3 swAx = uNudge_${z.kind}.xyz;
   float swC = cos( uNudge_${z.kind}.w );
   float swS = sin( uNudge_${z.kind}.w );
@@ -455,24 +610,115 @@ export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): { decl
     + vec3( 0.0, ${f(z.baseR)} * uNudge_${z.kind}.w, 0.0 );
   ${rot}
 }`
-    })
-    .join('\n')
-  return { decl, body }
+}
+
+/** The donut's jelly: squash about the base pivot — y compresses, the radius bulges half as much.
+ *  The normal takes the inverse-transpose of the scale so the icing's sheen flattens with it. */
+const squashBlock = (z: Zone, normalVar?: string): string => {
+  const [px, py, pz] = z.pivot
+  const nrm = normalVar
+    ? `${normalVar} = normalize( vec3( ${normalVar}.x / swR, ${normalVar}.y / swY, ${normalVar}.z / swR ) );`
+    : ''
+  return `if ( uNudge_${z.kind}.w != 0.0 &&
+     ${boxTest(z)} ) {
+  float swY = 1.0 - uNudge_${z.kind}.w;
+  float swR = 1.0 + 0.5 * uNudge_${z.kind}.w;
+  transformed.y = ${f(py)} + ( transformed.y - ${f(py)} ) * swY;
+  transformed.xz = vec2( ${f(px)}, ${f(pz)} ) + ( transformed.xz - vec2( ${f(px)}, ${f(pz)} ) ) * swR;
+  ${nrm}
+}`
+}
+
+/** The pens' rattle: lateral sway ∝ height above the rim, phase from rest position. Zero exactly
+ *  at the rim, so the cup — whose highest vertex IS the rim — never feels it. Purely a
+ *  translation, so normals are untouched (the gold pen's reflection travels, it does not turn). */
+const rattleBlock = (z: Zone): string =>
+  `if ( uRattle_pencup.x != 0.0 &&
+     ${boxTest(z)} ) {
+  float swLever = max( 0.0, position.y - ${f(RATTLE.rimY)} );
+  if ( swLever > 0.0 ) {
+    float swPh = position.x * ${f(RATTLE.kx)} + position.z * ${f(RATTLE.kz)};
+    transformed.x += uRattle_pencup.x * swLever * sin( ${f(RATTLE.wx)} * uRattle_pencup.y + swPh );
+    transformed.z += uRattle_pencup.x * swLever * 0.62 * cos( ${f(RATTLE.wz)} * uRattle_pencup.y + swPh * 1.31 );
+  }
+}`
+
+/** The bird's peck: a clay bend about the neck line, weight ramping smoothly over the neck band —
+ *  no rigid split of a merged body, no tear possible from a continuous field. */
+const bendBlock = (z: Zone): string =>
+  `if ( uBend_bird.x != 0.0 &&
+     ${boxTest(z)} ) {
+  float swW = smoothstep( ${f(PECK.neckLo)}, ${f(PECK.neckHi)}, position.y );
+  if ( swW > 0.0 ) {
+    float swTh = uBend_bird.x * swW;
+    float swC = cos( swTh );
+    float swS = sin( swTh );
+    vec2 swYZ = transformed.yz - vec2( ${f(PECK.pivotY)}, ${f(PECK.pivotZ)} );
+    transformed.yz = vec2( ${f(PECK.pivotY)}, ${f(PECK.pivotZ)} ) + vec2( swYZ.x * swC - swYZ.y * swS, swYZ.x * swS + swYZ.y * swC );
+  }
+}`
+
+const blocksFor = (z: Zone, normalVar?: string): string => {
+  switch (z.kind) {
+    case 'donut':
+      return squashBlock(z, normalVar)
+    case 'pencup':
+      return rockBlock(z, normalVar) + '\n' + rattleBlock(z)
+    case 'bird':
+      return rockBlock(z, normalVar) + '\n' + bendBlock(z)
+    default:
+      return rockBlock(z, normalVar)
+  }
+}
+
+export type NudgeChunk = {
+  decl: string
+  body: string
+  uniforms: Record<string, { value: Float32Array }>
+}
+
+/**
+ * The vertex-shader block for one mesh: per zone, a rest-position box test and that object's OWN
+ * field — rock, squash, rattle or bend. Boxes, pivots and field constants are compile-time
+ * literals (they are measurements — see the contract); only the per-frame scalars cross as
+ * uniforms. THE GUARD IS THE LAW: at exact zero every vertex takes the untouched path, so a
+ * pointerless scrub is bit-identical by construction.
+ */
+export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): NudgeChunk {
+  const zones = zonesForMesh(mesh)
+  const uniforms: Record<string, { value: Float32Array }> = {}
+  const decls: string[] = []
+  for (const z of zones) {
+    uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
+    decls.push(`uniform vec4 uNudge_${z.kind};`)
+    if (z.kind === 'pencup') {
+      uniforms.uRattle_pencup = RATTLE_UNIFORM
+      decls.push('uniform vec4 uRattle_pencup;')
+    }
+    if (z.kind === 'bird') {
+      uniforms.uBend_bird = BEND_UNIFORM
+      decls.push('uniform vec4 uBend_bird;')
+    }
+  }
+  return {
+    decl: decls.join('\n'),
+    body: zones.map((z) => blocksFor(z, normalVar)).join('\n'),
+    uniforms,
+  }
 }
 
 /**
  * The normal-only twin, for `MeshStandardMaterial`: its chunk order consumes `objectNormal` in
  * `defaultnormal_vertex` BEFORE `begin_vertex` runs, so the rotation has to land in
- * `beginnormal_vertex` where the variable is born — patching it later rotates a value nobody
- * reads. Same guards, same literals, no translation (normals have no pivot).
+ * `beginnormal_vertex` where the variable is born. Only the ROCKERS turn normals — the rattle is
+ * a translation and the squash's hosts are not in the metal mesh.
  */
 export function nudgeNormalChunk(mesh: DeskMeshName, normalVar: string): string {
   return zonesForMesh(mesh)
+    .filter((z) => z.kind !== 'donut')
     .map(
       (z) => `if ( uNudge_${z.kind}.w != 0.0 &&
-     position.x >= ${f(z.min[0])} && position.x <= ${f(z.max[0])} &&
-     position.y >= ${f(z.min[1])} && position.y <= ${f(z.max[1])} &&
-     position.z >= ${f(z.min[2])} && position.z <= ${f(z.max[2])} ) {
+     ${boxTest(z)} ) {
   vec3 swNAx = uNudge_${z.kind}.xyz;
   float swNC = cos( uNudge_${z.kind}.w );
   float swNS = sin( uNudge_${z.kind}.w );

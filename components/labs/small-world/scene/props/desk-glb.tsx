@@ -7,22 +7,23 @@ import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
 import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
-import { NUDGE_UNIFORMS, nudgeNormalChunk, nudgeVertexChunk, zonesForMesh } from './desk-nudge'
+import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 
 /**
  * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
- * pointer rock "its" props — a rest-position box select and a rigid rotation, boxes and pivots as
- * compile-time literals, one shared vec4 per zone at runtime (see `desk-nudge.ts` for the law and
- * `DESK_NUDGE_ZONES` for the no-tear derivation). Behind `angle != 0.0` guards the rest path is the
- * untouched path, so a pointerless frame is bit-identical to a build without the feature; the
- * chunks are static strings, so no cache key changes per frame and no second program is compiled.
+ * pointer move "its" props — a rest-position box select and that object's OWN field: a rigid rock,
+ * the donut's jelly squash, the pens' rim-lever rattle, the bird's neck bend. Boxes, pivots and
+ * field constants are compile-time literals; only per-frame scalars cross as uniforms (see
+ * `desk-nudge.ts` for the law and `DESK_NUDGE_ZONES` for the no-tear derivation). Behind
+ * exact-zero guards the rest path is the untouched path, so a pointerless frame is bit-identical
+ * to a build without the feature; the chunks are static strings, so no cache key changes per
+ * frame and no second program is compiled.
  */
 function wireNudge(
   shader: { uniforms: Record<string, unknown>; vertexShader: string },
-  mesh: DeskMeshName,
-  chunk: { decl: string; body: string }
+  chunk: NudgeChunk
 ): void {
-  for (const z of zonesForMesh(mesh)) shader.uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
+  for (const [name, u] of Object.entries(chunk.uniforms)) shader.uniforms[name] = u
   shader.vertexShader = (chunk.decl + '\n' + shader.vertexShader).replace(
     '#include <begin_vertex>',
     '#include <begin_vertex>\n' + chunk.body
@@ -179,8 +180,9 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
       '#include <color_vertex>',
       '#include <color_vertex>\n vDimColor = color_1.rgb;'
     )
-    // unlit, so only positions rock — there is no normal for the nudge to keep honest here
-    wireNudge(shader, 'DeskBaked', nudge)
+    // unlit, so only positions move — there is no normal for the nudge to keep honest here: the
+    // shading is baked into vertex colours, which travel with the vertices by construction
+    wireNudge(shader, nudge)
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
@@ -282,7 +284,7 @@ export function glossMaterial(
     shader.uniforms.uLights = lights
     shader.uniforms.uGloss = gloss
     shader.uniforms.uGlossEnv = { value: env }
-    for (const z of zonesForMesh('DeskGloss')) shader.uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
+    for (const [name, u] of Object.entries(nudge.uniforms)) shader.uniforms[name] = u
     shader.vertexShader = (
       nudge.decl +
       '\nattribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
@@ -384,7 +386,7 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   const nudge = nudgeVertexChunk('DeskMetal')
   const nudgeNormal = nudgeNormalChunk('DeskMetal', 'objectNormal')
   mat.onBeforeCompile = (shader) => {
-    wireNudge(shader, 'DeskMetal', nudge)
+    wireNudge(shader, nudge)
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
       '#include <beginnormal_vertex>\n' + nudgeNormal
