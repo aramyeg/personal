@@ -19,9 +19,11 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * WHAT PHASE 1 SHIPS, AND WHAT THIS MODULE STILL CONTAINS. The exit is live and
  * gated. The ARRIVAL is not: `GIRL_DESK_MOUNTED` is false, because Aram's ruling
  * is that she belongs BEHIND the desk at human scale rather than on it at
- * figurine scale, and two measurements say the GLB cannot yet be that person. She
- * arrives in ink instead (`overlay/ink-arrival.ts`). Everything the desk arrival
- * needed is kept, gated and re-enabled by one flag — see `GIRL_DESK_MOUNTED`.
+ * figurine scale, and two measurements say the GLB cannot yet be that person. The
+ * ink epilogue that briefly carried her return was itself killed in the T82
+ * rework (Aram: it didn't fit), so for now she leaves and does not come back.
+ * Everything the desk arrival needed is kept, gated and re-enabled by one flag —
+ * see `GIRL_DESK_MOUNTED`.
  *
  * The rest of this header describes both halves, because the exit's derivation
  * only makes sense next to the transfer it was solved for.
@@ -295,9 +297,9 @@ export const GIRL_DESK_STAGING: DeskStaging = DESK_STAGINGS[0]
  * standing adult needs — `task-76-ending-report.md` carries both with captures).
  *
  * So phase 1 ships the half that is not in doubt: she LEAVES the world, over the
- * crest, exactly as staged and gated — and she arrives in INK instead, on the
- * epilogue page (`overlay/ink-arrival.ts`). She simply does not reappear in three
- * dimensions.
+ * crest, exactly as staged and gated. The ink epilogue that briefly carried her
+ * return is gone too (T82 kill list) — she simply does not reappear, in any
+ * medium, until phase 2.
  *
  * Everything the arrival needed is kept and still gated: the free-lane map, the
  * float solve, the scale ratios, the two candidate paths. Phase 2 re-enables this

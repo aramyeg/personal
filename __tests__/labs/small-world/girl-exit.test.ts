@@ -446,8 +446,8 @@ describe('the walk over the crest cannot be clipped by a retune', () => {
 
 /**
  * PHASE 1 SHIPS THE EXIT WITHOUT THE ARRIVAL (Aram's redirect). She leaves the
- * world and does not come back in three dimensions; the epilogue page carries her
- * return (`overlay/ink-arrival.ts`). Everything the arrival needed is still
+ * world and does not come back — the ink epilogue that once carried her return
+ * was itself removed in the T82 kill list. Everything the arrival needed is still
  * derived and still gated above — these hold the SHIPPED state, so that neither
  * half can drift while the other waits.
  */

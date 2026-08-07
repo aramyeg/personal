@@ -44,8 +44,8 @@ export function FallbackTimeline() {
         ))}
       </ol>
       <footer>
-        <h2>Connect with me</h2>
-        <p>The next chapter is unwritten — say hi.</p>
+        <h2>Come say hi</h2>
+        <p>That&apos;s my whole world so far — I&apos;d love to hear from you.</p>
         <ul>
           <li>
             <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>

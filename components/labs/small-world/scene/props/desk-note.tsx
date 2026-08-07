@@ -138,9 +138,10 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.rotate(-0.018)
   ctx.font = `700 158px ${family}`
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText('connect with me', 0, 208)
+  ctx.fillText('come say hi', 0, 208)
   ctx.lineWidth = 7
-  squiggle(ctx, 6, 742, 244, 5)
+  // the rule underlines what was written, however wide the hand happens to set it
+  squiggle(ctx, 6, 6 + ctx.measureText('come say hi').width, 244, 5)
   ctx.restore()
 
   ctx.save()
@@ -149,8 +150,8 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.font = `400 68px ${family}`
   ctx.fillStyle = PALETTE.ink
   ctx.globalAlpha = 0.82
-  ctx.fillText('the next chapter is unwritten —', 0, 348)
-  ctx.fillText('say hi', 0, 424)
+  ctx.fillText("that's my whole world so far —", 0, 348)
+  ctx.fillText("I'd love to hear from you", 0, 424)
   ctx.restore()
 
   // the signature, and a doodle of the thing the visitor has just spent six chapters walking around
@@ -159,7 +160,7 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.rotate(-0.06)
   ctx.font = `700 92px ${family}`
   ctx.textAlign = 'right'
-  ctx.fillText('Aram', 0, 476)
+  ctx.fillText('Alwina', 0, 476)
   ctx.restore()
 
   ctx.save()
