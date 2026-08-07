@@ -179,3 +179,19 @@ describe('the reveal is staged, one idea at a time', () => {
     expect(screen.getByTestId('sw-info-hero').textContent).toContain('30')
   })
 })
+
+describe('the stat leaf takes its own clicks', () => {
+  it('does not let a click on the facts advance the chapter', async () => {
+    // AUDIT ITEM 10, least surprise. The overlay root is pointer-events:none so
+    // the canvas takes every click that is not on a leaf and tap-anywhere
+    // advances — right for the world, wrong for a page full of facts, and
+    // especially wrong beside a comic page that opens when you click it.
+    const { InfoLeaf } = await import('@/components/labs/small-world/overlay/info-leaf')
+    render(<InfoLeaf chapter={0} enter={1} />)
+    const leaf = screen.getByTestId('sw-panel-data')
+    expect(leaf.style.pointerEvents).toBe('auto')
+    // ...and it is NOT a button: nothing happens, and announcing an action that
+    // does not exist would be worse than the misfire it replaces.
+    expect(leaf.tagName.toLowerCase()).toBe('article')
+  })
+})

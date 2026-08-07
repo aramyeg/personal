@@ -36,6 +36,7 @@ export function BookLeaf({
   children,
   onClick,
   ariaLabel,
+  swallowClicks = false,
 }: {
   side: 'left' | 'right'
   /** The spread's entrance clock, 0→1, already eased. */
@@ -46,6 +47,22 @@ export function BookLeaf({
   /** Present only on the leaf that opens full size. */
   onClick?: () => void
   ariaLabel?: string
+  /**
+   * Take clicks and do nothing with them.
+   *
+   * LEAST SURPRISE, and the blind audit's item 10. The overlay root is
+   * `pointer-events: none` so the canvas can take every click that is not on a
+   * leaf, and tap-anywhere advances the chapter. That is right for the world and
+   * wrong for a printed page: clicking a card full of facts and being scrolled to
+   * the NEXT chapter reads as a misfire, especially beside a comic page that
+   * responds to a click by opening.
+   *
+   * So this leaf's own footprint absorbs the click. It is not a button — nothing
+   * happens, and announcing an action that does not exist would be worse than the
+   * misfire. If the stat page ever earns a lightbox of its own, this becomes an
+   * `onClick` and the prop goes.
+   */
+  swallowClicks?: boolean
 }) {
   const left = side === 'left'
   const tilt = left ? PAGE_TILT_LEFT_DEG : PAGE_TILT_RIGHT_DEG
@@ -72,7 +89,7 @@ export function BookLeaf({
     textAlign: 'left',
     // The overlay root stays `pointer-events: none` so the canvas keeps every
     // click that is not on a leaf; a leaf that does something takes its own.
-    pointerEvents: onClick ? 'auto' : 'none',
+    pointerEvents: onClick || swallowClicks ? 'auto' : 'none',
     ...(onClick ? { cursor: 'zoom-in' } : null),
   }
 
@@ -91,7 +108,12 @@ export function BookLeaf({
     )
   }
   return (
-    <article className={className} data-testid={testId} style={style as CSSProperties}>
+    <article
+      className={className}
+      data-testid={testId}
+      style={style as CSSProperties}
+      onClick={swallowClicks ? (e) => e.stopPropagation() : undefined}
+    >
       {children}
     </article>
   )

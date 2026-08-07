@@ -22,7 +22,7 @@ import { InfoPage } from './info-page'
  */
 export function InfoLeaf({ chapter, enter }: { chapter: number; enter: number }) {
   return (
-    <BookLeaf side="right" enter={enter} className="sw-panel-data" testId="sw-panel-data">
+    <BookLeaf side="right" enter={enter} className="sw-panel-data" testId="sw-panel-data" swallowClicks>
       <InfoPage chapter={chapter} enter={enter} />
     </BookLeaf>
   )

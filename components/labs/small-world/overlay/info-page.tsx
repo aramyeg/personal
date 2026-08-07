@@ -143,7 +143,6 @@ function InkedPanel({
   children?: ReactNode
   style?: CSSProperties
 }) {
-  const ground = inverted ? PALETTE.ink : undefined
   return (
     <div
       style={{
@@ -154,10 +153,30 @@ function InkedPanel({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'visible',
-        ...(inverted ? { backgroundColor: ground } : toneStyle(tone)),
+        // An inverted panel's PAPER is always underneath — see the ground layer
+        // below, which is what actually darkens.
+        ...toneStyle(inverted ? 'none' : tone),
         ...style,
       }}
     >
+      {/* AN INVERTED PANEL ARRIVES FROM PAPER RATHER THAN STARTING BLACK.
+          The audit found the pre-ink state reading as a solid black slab — a
+          rectangle of pure ink with nothing in it looks like a failed image, not
+          a panel waiting to be drawn. A separate ground layer washes in with the
+          frame, so the first frame of every panel on this page is a SHEET. The
+          contents sit above it and are never faded: they are facts. */}
+      {inverted ? (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: PALETTE.ink,
+            opacity: 0.15 + 0.85 * ink,
+            pointerEvents: 'none',
+          }}
+        />
+      ) : null}
       <svg
         aria-hidden
         viewBox="0 0 100 100"
@@ -508,6 +527,10 @@ function TenPanel({ hero, inverted, t }: { hero: Hero; inverted?: boolean; t: nu
         </svg>
       ) : null}
 
+      {/* Above the ground layer — the panel darkens, the facts do not.
+          THE CHASER OWNS THE RIGHT-HAND COLUMN, so the hero is inset away from
+          it: the audit caught the reaction portrait sitting on top of chapter 1's
+          SELF-TAUGHT title, which is the one word that page exists to say. */}
       {hero.kind === 'sfx' ? (
         <HeroSfx hero={hero} t={t} fg={fg} />
       ) : hero.kind === 'number' ? (
@@ -611,14 +634,19 @@ function HeroNumber({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        // BREAKING THE FRAME: the numeral is allowed wider than its panel.
-        margin: '0 -3cqw',
+        // BREAKS THE FRAME on the LEFT; the right-hand column belongs to the
+        // chaser, which used to land on top of the numeral.
+        marginLeft: '-3cqw',
+        paddingRight: '20%',
       }}
     >
       <span
         style={{
           fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(26, 44),
+          // A HERO THAT CARRIES A SUPPORTING ROW MAKES ROOM FOR IT. At full size
+          // the numeral plus thirteen marks plus two labels overran the panel and
+          // the marks were cut in half with their label gone — captured.
+          fontSize: type(hero.marks ? 19 : 26, hero.marks ? 32 : 44),
           lineHeight: 0.86,
           color: PALETTE.blossomDeep,
           letterSpacing: '-0.01em',
@@ -648,14 +676,19 @@ function HeroNumber({
         {hero.label}
       </span>
       {hero.marks ? (
-        <div style={{ marginTop: '1.6cqw', opacity: suffix }}>
+        // THE SUPPORTING ROW SITS BESIDE THE NUMBER, not under it, and it keeps
+        // its label. The audit found thirteen unlabelled pennants overflowing the
+        // number's band — a count nobody can name is decoration, and a row wide
+        // enough to run past the panel reads as a ruler. Narrower marks, and the
+        // label that chapter 6's own tally already had.
+        <div style={{ marginTop: '1.2cqw' }}>
           <HeroCount
             count={hero.marks.count}
             label={hero.marks.label}
             t={t}
             fg={fg}
             pink={false}
-            scale={0.62}
+            scale={0.5}
             isHero={false}
           />
         </div>
@@ -675,7 +708,15 @@ function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: num
   return (
     <div
       data-testid="sw-info-hero"
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 -3cqw' }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        // Breaks the frame on the LEFT only; the right is the chaser's.
+        marginLeft: '-3cqw',
+        paddingRight: '20%',
+      }}
     >
       <span
         style={{
@@ -739,7 +780,10 @@ function HeroCount({
 }) {
   // A mark's size is a function of how many there are: thirteen at the four-mark
   // size overflow the panel and wrap, which reads as a ruler rather than a tally.
-  const w = Math.min(9, 62 / count) * scale
+  // 52, not 62: the audit caught thirteen marks running past the hero panel's
+  // own border. The budget is the TOTAL width the row may occupy, shared out, so
+  // a bigger count makes smaller marks rather than a wider row.
+  const w = Math.min(9, 52 / count) * scale
   const done = 1
   return (
     <div
@@ -750,7 +794,8 @@ function HeroCount({
         flexDirection: 'column',
         alignItems: 'center',
         gap: '1.4cqw',
-        margin: '0 -2cqw',
+        marginLeft: '-2cqw',
+        paddingRight: isHero ? '20%' : 0,
       }}
     >
       <div
@@ -792,7 +837,7 @@ function HeroCount({
       <span
         style={{
           fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(5),
+          fontSize: type(isHero ? 5 : 3.4),
           letterSpacing: '0.1em',
           lineHeight: 1,
           color: fg,
