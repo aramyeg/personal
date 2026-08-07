@@ -224,6 +224,10 @@ describe('resolveClipPlan — current GLB (skip clip only)', () => {
     expect(plan.celebrate).toBeNull()
   })
 
+  it('the exit jump is absent (T87) — the ending keeps her on the skip/idle blend', () => {
+    expect(plan.exitJump).toBeNull()
+  })
+
   it('every slot resolves to a real clip (no T-pose possible)', () => {
     expect(plan.forward.clip).toBeTruthy()
     expect(plan.idle.clip).toBeTruthy()
@@ -249,6 +253,15 @@ describe('resolveClipPlan — girl v2 delivery (his real clips)', () => {
   it('forward stays the Skip_Forward clip', () => {
     expect(plan.forward.clip).toBe(SKIP_CLIP)
     expect(plan.forward.fallback).toBe(false)
+  })
+
+  it('the exit jump rides Jump_B — the cleaner launch and the higher apex (T87)', () => {
+    expect(plan.exitJump).toEqual({ clip: JUMP_B_SLOT, fallback: false })
+  })
+
+  it('the exit jump degrades to Jump_A when only it exists', () => {
+    const partial = resolveClipPlan([SKIP_CLIP, JUMP_A_SLOT])
+    expect(partial.exitJump).toEqual({ clip: JUMP_A_SLOT, fallback: false })
   })
 })
 

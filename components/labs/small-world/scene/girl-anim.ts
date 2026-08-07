@@ -46,6 +46,16 @@ export const JUMP_B_SLOT = 'Jump_B'
  */
 export const CELEBRATE_SLOTS = [JUMP_A_SLOT, JUMP_B_SLOT, 'Wave', 'Celebrate'] as const
 
+/**
+ * The ENDING's exit jump (T87) — the clip the scroll scrubs by hand when she
+ * leaps off the planet. Jump_B leads: its launch ramps from the first frame
+ * (Jump_A holds four dead frames then snaps) and its apex rides higher
+ * (+0.27 u against +0.15 in the hips channel — t87 clip inventory). A GLB with
+ * neither degrades to no jump action at all, and the ending keeps her on the
+ * skip/idle blend through the arc rather than showing a T-pose.
+ */
+export const EXIT_JUMP_SLOTS = [JUMP_B_SLOT, JUMP_A_SLOT] as const
+
 /** Locomotion state derived from signed surface speed. */
 export type Locomotion = 'forward' | 'backward' | 'idle'
 
@@ -173,6 +183,8 @@ export type ClipPlan = {
   readonly idle: SlotPlan
   readonly backward: SlotPlan
   readonly celebrate: CelebratePlan
+  /** The ending's exit jump, or null when the GLB carries no jump clip at all. */
+  readonly exitJump: SlotPlan | null
 }
 
 const has = (available: readonly string[], name: string): boolean => available.includes(name)
@@ -200,7 +212,10 @@ export function resolveClipPlan(available: readonly string[]): ClipPlan {
   const celebrateClips = CELEBRATE_SLOTS.filter((n) => has(available, n))
   const celebrate: CelebratePlan = celebrateClips.length ? { clips: celebrateClips } : null
 
-  return { forward, idle, backward, celebrate }
+  const exitClip = EXIT_JUMP_SLOTS.find((n) => has(available, n))
+  const exitJump: SlotPlan | null = exitClip ? { clip: exitClip, fallback: false } : null
+
+  return { forward, idle, backward, celebrate, exitJump }
 }
 
 /**

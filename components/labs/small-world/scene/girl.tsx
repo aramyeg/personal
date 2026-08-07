@@ -12,6 +12,8 @@ import {
   GIRL_DESK_SEAT_Y,
   GIRL_GLOBE_SCALE,
   girlPoseAt,
+  jumpBlendAt,
+  jumpClipFracAt,
   strideAt,
   type GirlPose,
 } from './girl-exit'
@@ -68,6 +70,9 @@ const GIRL_FLAT_SHADING = false
  * ink) at the darkest-band feel, sized so she sits grounded like the props. */
 const SHADOW_RADIUS = 0.32
 const SHADOW_OPACITY = 0.26
+/** How much flight lift fully thins her contact pool (T87) — about a body length
+ * of air under her feet and the pool is gone, the way a jump shadow dies. */
+const SHADOW_FADE_LIFT = 0.9
 /** How far the contact pool floats off the ground it is drawn on, along that
  *  ground's own normal — enough to beat z-fighting on the planet's facets and on
  *  the desk pad, small enough to read as contact. */
@@ -243,6 +248,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       xAxis: new THREE.Vector3(1, 0, 0),
       yAxis: new THREE.Vector3(0, 1, 0),
       up: new THREE.Vector3(),
+      ground: new THREE.Vector3(),
     }),
     []
   )
@@ -308,6 +314,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const driveEnding = (pose: GirlPose, t: number) => {
     const fwd = actions[plan.forward.clip] ?? null
     const idle = actions[plan.idle.clip] ?? null
+    const jump = plan.exitJump ? (actions[plan.exitJump.clip] ?? null) : null
     const paired = idle !== null && idle !== fwd
     if (!endingOwned.current) {
       const dur = fwd ? fwd.getClip().duration : 0
@@ -316,20 +323,32 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       for (const name of Object.keys(actions)) actions[name]?.stop()
       fwd?.reset().play()
       if (paired) idle.reset().play()
+      jump?.reset().play()
       endingOwned.current = true
     }
+    // The exit jump owns the mixer for the flight (T87), on the same scroll-pure
+    // terms as everything else here: its TIME is written from the flight phase
+    // through `jumpClipFracAt` and its WEIGHT is `jumpBlendAt` — both pure in t,
+    // so a backward scrub un-jumps her exactly. A GLB with no jump clip leaves
+    // jw at 0 and she rides the skip/idle blend through the arc instead.
+    const jw = jump ? jumpBlendAt(pose.jump) : 0
     if (fwd) {
       const dur = fwd.getClip().duration
       const phase = phaseSeed.current + pose.walked / strideAt(pose.scale)
       fwd.paused = true
       fwd.time = (((phase % 1) + 1) % 1) * dur
-      fwd.setEffectiveWeight(paired ? pose.moving : 1)
+      fwd.setEffectiveWeight((paired ? pose.moving : 1) * (1 - jw))
     }
     if (paired) {
       const dur = idle.getClip().duration
       idle.paused = true
       idle.time = (((t * ENDING_IDLE_CYCLES) % 1 + 1) % 1) * dur
-      idle.setEffectiveWeight(1 - pose.moving)
+      idle.setEffectiveWeight((1 - pose.moving) * (1 - jw))
+    }
+    if (jump) {
+      jump.paused = true
+      jump.time = jumpClipFracAt(pose.jump) * jump.getClip().duration
+      jump.setEffectiveWeight(jw)
     }
   }
 
@@ -360,7 +379,13 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
         if (pose.stage === 'globe') {
           const zw = PLANET_RADIUS * Math.sin(pose.theta)
           const y = walkYAt(zw, rotation)
-          group.current.position.set(0, y, zw)
+          // The flight's lift rides the surface normal at her bearing. `lift · c`
+          // is +0 while she is grounded, so every walking frame is bit-identical
+          // to what it was before the jump existed.
+          const ny = Math.cos(pose.theta)
+          const nz = Math.sin(pose.theta)
+          group.current.position.set(0, y + pose.lift * ny, zw + pose.lift * nz)
+          scratch.ground.set(0, y, zw)
           // Relative to the pose she holds on the planet, never absolute: she stands
           // UPRIGHT at STANCE_ALPHA today, so tilting to the surface normal would
           // move her on the ending's very first frame. This is exactly identity there.
@@ -368,6 +393,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
           scratch.up.set(0, y, zw).normalize()
         } else {
           group.current.position.set(pose.x, GIRL_DESK_SEAT_Y, pose.z)
+          scratch.ground.set(pose.x, GIRL_DESK_SEAT_Y, pose.z)
           scratch.tilt.identity()
           scratch.up.set(0, 1, 0)
         }
@@ -376,6 +402,15 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
         group.current.scale.setScalar(pose.scale / GIRL_SCALE)
         group.current.visible = pose.visible
         const onDesk = pose.stage === 'desk'
+        // Her contact pool stays ON THE GROUND while she flies — a jump shadow —
+        // and thins with height (pure in pose.lift, so a scrub restores it). It
+        // follows the surface point under her arc, which the planet itself
+        // occludes once that point passes the crest.
+        if (shadow.current) {
+          const mat = shadow.current.material as THREE.MeshBasicMaterial
+          mat.opacity =
+            SHADOW_OPACITY * (1 - Math.min(1, Math.abs(pose.lift) / SHADOW_FADE_LIFT))
+        }
         // Two pools, one job each — see DESK_SHADOW_RADIUS. Exactly one is ever drawn.
         for (const [mesh, mine] of [
           [shadow.current, !onDesk],
@@ -384,7 +419,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
           if (!mesh) continue
           mesh.visible = pose.visible && mine
           if (!mesh.visible) continue
-          mesh.position.copy(group.current.position).addScaledVector(scratch.up, SHADOW_LIFT)
+          mesh.position.copy(scratch.ground).addScaledVector(scratch.up, SHADOW_LIFT)
           mesh.quaternion.copy(scratch.tilt).multiply(scratch.flat)
           mesh.scale.setScalar(pose.scale / GIRL_SCALE)
         }
@@ -464,6 +499,8 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       shadow.current.quaternion.copy(scratch.flat)
       shadow.current.scale.setScalar(1)
       shadow.current.visible = true
+      // Undo the flight's thinning on the way back into the journey.
+      ;(shadow.current.material as THREE.MeshBasicMaterial).opacity = SHADOW_OPACITY
     }
   })
 

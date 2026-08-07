@@ -9,14 +9,15 @@ import {
 import {
   ENDING_IDLE,
   ENDING_SPAN,
-  STAND_END,
   TRACK_END,
   ZOOM_FIRST_MOVE,
+  ZOOM_START,
   endingStateAt,
 } from '@/components/labs/small-world/ending-timeline'
 import { DESK_BACK_Z, DESK_TOP_Y, propCeiling } from '@/components/labs/small-world/scene/desk-stage'
 import {
   CAMERA_THETA,
+  CREST_THETA,
   DESK_STAGINGS,
   GIRL_DESK_HEIGHT,
   GIRL_DESK_MOUNTED,
@@ -26,19 +27,34 @@ import {
   GIRL_DESK_SETTLED,
   GIRL_DESK_STAGING,
   GIRL_DESK_WALK_START,
-  GIRL_EXIT_ARC,
-  GIRL_EXIT_THETA,
   GIRL_GLOBE_HEIGHT,
   GIRL_GLOBE_SCALE,
+  GIRL_JUMP_APEX,
+  GIRL_JUMP_END,
+  GIRL_JUMP_END_THETA,
+  GIRL_JUMP_FALL,
+  GIRL_JUMP_RISE,
+  GIRL_JUMP_START,
+  GIRL_LOOK_END,
+  GIRL_LOOK_START,
+  GIRL_STOP_THETA,
   GIRL_TRANSFER,
   GIRL_TURN_END,
   GIRL_TURN_START,
+  GIRL_WALK_ARC,
   GIRL_WALK_END,
+  JUMP_BLEND_IN,
+  JUMP_CLIP_APEX,
+  JUMP_CLIP_HOLD,
   deskFloatFor,
   exitSinkShare,
   feetHiddenAt,
   girlPoseAt,
   headHiddenAt,
+  jumpBlendAt,
+  jumpClipFracAt,
+  jumpLiftAt,
+  pointHiddenAt,
   strideAt,
 } from '@/components/labs/small-world/scene/girl-exit'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
@@ -50,8 +66,8 @@ import {
 import { STANCE_ALPHA } from '@/components/labs/small-world/scene/renewal'
 
 /**
- * ALWINA LEAVES THE WORLD (Task 76) — held to the ending's own two standing
- * obligations, plus the one this beat adds.
+ * ALWINA LEAVES THE WORLD (Task 76, restaged by Task 87) — held to the ending's
+ * two standing obligations, plus the one this beat adds.
  *
  * The two standing ones: nothing may move while the journey can still turn the
  * planet, and everything must scrub backwards bit-identically. `Object.is`
@@ -64,6 +80,13 @@ import { STANCE_ALPHA } from '@/components/labs/small-world/scene/renewal'
  * the whole gap between the two. The tests below prove the two hiding windows
  * OVERLAP rather than merely both existing, which is the difference between a cut
  * and a blink.
+ *
+ * Task 87 re-derives the exit-beat family for the new staging — stop at the
+ * crest, turn back for the goodbye, JUMP off the world — without weakening any
+ * of it: the sinking beat survives as the plunge, the hidden-at-every-camera-stop
+ * claim gets STRONGER (she ends inside the planet's own ball, which no outside
+ * camera can see into), and two beats gain gates the walk never needed (whole at
+ * the goodbye, whole at the apex).
  */
 
 const poseAtT = (t: number) => girlPoseAt(endingStateAt(1 + t * ENDING_SPAN), false)
@@ -72,6 +95,15 @@ const poseAtT = (t: number) => girlPoseAt(endingStateAt(1 + t * ENDING_SPAN), fa
  *  scroll round trip cannot supply one. */
 const atExactly = (t: number) =>
   girlPoseAt({ active: true, t, phase: t < 0.38 ? 'still' : 'zoom', stand: 1, zoom: 0 }, false)
+
+const REST = CAMERA_DISTANCE
+const FULL = CAMERA_DISTANCE * ZOOM_FACTOR
+
+/** Her bearing and lift at a flight phase — the arc the module authors. */
+const flightAt = (p: number) => ({
+  theta: (1 - p) * GIRL_STOP_THETA + p * GIRL_JUMP_END_THETA,
+  lift: jumpLiftAt(p),
+})
 
 describe('the journey does not know she is going anywhere', () => {
   it('returns the SHARED frozen journey pose for every progress the journey owns', () => {
@@ -95,6 +127,8 @@ describe('the journey does not know she is going anywhere', () => {
     expect(Object.is(pose.scale, GIRL_GLOBE_SCALE)).toBe(true)
     expect(Object.is(pose.yaw, 0)).toBe(true)
     expect(Object.is(pose.walked, 0)).toBe(true)
+    expect(Object.is(pose.lift, 0)).toBe(true)
+    expect(Object.is(pose.jump, 0)).toBe(true)
   })
 
   it('has not begun to turn or walk on the ending’s own first frames either', () => {
@@ -104,57 +138,56 @@ describe('the journey does not know she is going anywhere', () => {
       const pose = poseAtT((i / 200) * GIRL_TURN_START)
       expect(Object.is(pose.yaw, 0)).toBe(true)
       expect(Object.is(pose.theta, STANCE_ALPHA)).toBe(true)
+      expect(Object.is(pose.lift, 0)).toBe(true)
     }
   })
 })
 
-describe('the exit angle is solved, not chosen', () => {
-  /**
-   * A point at radius rho is hidden from a camera at distance d by a sphere of
-   * radius R exactly when its angular separation from the camera exceeds
-   * acos(R/d) + acos(R/rho) — the two horizon half-angles. Her HEAD is the binding
-   * point, and the tangent that hides a point ON the surface does not hide it.
-   */
-  const hiddenPast = (d: number, rho: number) =>
-    CAMERA_THETA - (Math.acos(PLANET_RADIUS / d) + Math.acos(PLANET_RADIUS / rho))
-
-  it('hides the top of her head at the REST camera', () => {
-    expect(GIRL_EXIT_THETA).toBeLessThan(hiddenPast(CAMERA_DISTANCE, PLANET_RADIUS + GIRL_GLOBE_HEIGHT))
+describe('the stop is at the crest, and it is solved, not chosen', () => {
+  it('derives the crest from the rest camera, which renders every airborne frame', () => {
+    // The camera cannot leave its rest pose before ZOOM_START, and the whole
+    // performance is over before GIRL_TRANSFER < ZOOM_START — so the crest the
+    // reader sees is the rest camera's tangent and no other.
+    expect(GIRL_TRANSFER).toBeLessThan(ZOOM_START)
+    expect(Object.is(CREST_THETA, CAMERA_THETA - Math.acos(PLANET_RADIUS / CAMERA_DISTANCE))).toBe(
+      true
+    )
   })
 
-  it('...and at the FULL PULL-BACK, which is the binding one', () => {
-    // A camera further away sees further round the sphere, so the pulled-back
-    // horizon is the deeper requirement. One angle has to satisfy both.
-    const rest = hiddenPast(CAMERA_DISTANCE, PLANET_RADIUS + GIRL_GLOBE_HEIGHT)
-    const full = hiddenPast(CAMERA_DISTANCE * ZOOM_FACTOR, PLANET_RADIUS + GIRL_GLOBE_HEIGHT)
-    expect(full).toBeLessThan(rest)
-    expect(GIRL_EXIT_THETA).toBeLessThan(full)
-  })
-
-  it('is much further than the angle that would hide a point on the ground she walks on', () => {
-    // The whole reason the solve exists: the surface's own horizon is 29.5 degrees
-    // away and would leave her head standing over it like a hill walker.
-    const surfaceHorizon = CAMERA_THETA - Math.acos(PLANET_RADIUS / CAMERA_DISTANCE)
-    expect(GIRL_EXIT_THETA).toBeLessThan(surfaceHorizon - 0.7)
+  it('stops her a real step short of the crest, on the visible side of it', () => {
+    expect(GIRL_STOP_THETA).toBeGreaterThan(CREST_THETA)
+    expect(GIRL_STOP_THETA).toBeLessThan(STANCE_ALPHA)
   })
 
   it('walks her the far way round rather than the way she faces', () => {
-    expect(GIRL_EXIT_THETA).toBeLessThan(STANCE_ALPHA)
-    expect(GIRL_EXIT_ARC).toBeCloseTo((STANCE_ALPHA - GIRL_EXIT_THETA) * PLANET_RADIUS, 12)
+    expect(GIRL_WALK_ARC).toBeCloseTo((STANCE_ALPHA - GIRL_STOP_THETA) * PLANET_RADIUS, 12)
+    expect(GIRL_WALK_ARC).toBeGreaterThan(0)
   })
 
-  it('reaches that angle before the stand has finished rising, EXACTLY', () => {
-    // Exactly, because `a + (b − a) · 1` is not b in IEEE-754 and "she has all but
-    // arrived at the angle that hides her" is not the claim this module makes. The
-    // interpolation is written `(1 − s)·a + s·b` for precisely this.
-    //
-    // Fed an EndingState directly rather than through `endingStateAt`: the round
-    // trip progress → t re-rounds (`(1 + k·SPAN − 1) / SPAN` is not k), so no real
-    // scroll position lands on the boundary exactly. The exactness is a property of
-    // the function, and that is the property worth pinning — the frames either side
-    // are covered by the sweep above.
-    expect(GIRL_WALK_END).toBeLessThanOrEqual(STAND_END + 0.02)
-    expect(Object.is(atExactly(GIRL_WALK_END).theta, GIRL_EXIT_THETA)).toBe(true)
+  it('keeps her WHOLE for the entire walk — the goodbye cannot be delivered half-sunk', () => {
+    // The Task 76 walk sank her on purpose; this walk must NOT — she stops while
+    // both feet and head are safely inside the visible cap, at both camera stops.
+    for (let i = 0; i <= 400; i++) {
+      const theta = STANCE_ALPHA + ((GIRL_STOP_THETA - STANCE_ALPHA) * i) / 400
+      for (const d of [REST, FULL]) {
+        expect(feetHiddenAt(theta, 0, d)).toBe(false)
+        expect(headHiddenAt(theta, 0, d)).toBe(false)
+      }
+    }
+  })
+
+  it('arrives at the stop EXACTLY, and holds it through the whole goodbye', () => {
+    // Exactly, because `a + (b − a) · 1` is not b in IEEE-754, and the goodbye
+    // beat is staged at a bearing, not near one. Fed an EndingState directly:
+    // the round trip progress → t re-rounds, so no real scroll position lands on
+    // the boundary exactly — the exactness is a property of the function.
+    expect(Object.is(atExactly(GIRL_WALK_END).theta, GIRL_STOP_THETA)).toBe(true)
+    expect(Object.is(atExactly(GIRL_JUMP_START).theta, GIRL_STOP_THETA)).toBe(true)
+    for (let i = 0; i <= 200; i++) {
+      const t = GIRL_WALK_END + ((GIRL_JUMP_START - GIRL_WALK_END) * i) / 200
+      expect(Object.is(atExactly(t).theta, GIRL_STOP_THETA)).toBe(true)
+      expect(Object.is(atExactly(t).lift, 0)).toBe(true)
+    }
   })
 
   it('leaves her stance EXACTLY at the other end of the same interpolation', () => {
@@ -163,11 +196,176 @@ describe('the exit angle is solved, not chosen', () => {
   })
 })
 
+describe('the goodbye: she turns her back to leave, and turns back to say it', () => {
+  it('turns her round before she walks, so the exit is not a moonwalk', () => {
+    expect(GIRL_TURN_END).toBeLessThanOrEqual(GIRL_WALK_END)
+    expect(atExactly(GIRL_TURN_END).yaw).toBeCloseTo(Math.PI, 9)
+    expect(Object.is(atExactly(GIRL_TURN_END).theta, STANCE_ALPHA)).toBe(true)
+  })
+
+  it('turns her BACK to face the reader after the walk and before the jump', () => {
+    expect(GIRL_LOOK_START).toBeGreaterThanOrEqual(GIRL_WALK_END)
+    expect(GIRL_LOOK_END).toBeLessThanOrEqual(GIRL_JUMP_START)
+    // mix(x, 0, 1) is exactly +0 — from the look's end she faces the reader
+    // without residue, and stays facing them through the launch.
+    for (let i = 0; i <= 200; i++) {
+      const t = GIRL_LOOK_END + ((GIRL_JUMP_END - GIRL_LOOK_END) * i) / 200
+      expect(Object.is(atExactly(t).yaw, 0)).toBe(true)
+    }
+  })
+
+  it('holds a real beat between the turn-back and the launch — a goodbye, not a bounce', () => {
+    expect(GIRL_JUMP_START - GIRL_LOOK_END).toBeGreaterThanOrEqual(0.015)
+  })
+
+  it('walks facing away — the turn-back has not begun anywhere in the walk', () => {
+    for (let i = 0; i <= 200; i++) {
+      const t = GIRL_TURN_END + ((GIRL_LOOK_START - GIRL_TURN_END) * i) / 200
+      expect(atExactly(t).yaw).toBeCloseTo(Math.PI, 9)
+    }
+  })
+})
+
+describe('the jump: the ballistics are authored, the hiding is solved', () => {
+  it('leaves the ground EXACTLY at zero lift, so the takeoff frame has no seam', () => {
+    expect(Object.is(jumpLiftAt(0), 0)).toBe(true)
+    expect(Object.is(atExactly(GIRL_JUMP_START).lift, 0)).toBe(true)
+  })
+
+  it('crests at the authored rise, at the apex the fall ratio dictates', () => {
+    expect(jumpLiftAt(GIRL_JUMP_APEX)).toBeCloseTo(GIRL_JUMP_RISE, 12)
+    // The apex is a maximum: nothing on either side of it stands higher. The
+    // grid cannot land on the apex exactly, so the grid max is bounded rather
+    // than matched — the exact value is pinned at GIRL_JUMP_APEX above.
+    let max = -Infinity
+    for (let i = 0; i <= 2000; i++) max = Math.max(max, jumpLiftAt(i / 2000))
+    expect(max).toBeLessThanOrEqual(GIRL_JUMP_RISE + 1e-12)
+    expect(max).toBeGreaterThan(GIRL_JUMP_RISE - 1e-6)
+    // Rise short, fall long — the shape a jump off an edge has.
+    expect(GIRL_JUMP_APEX).toBeGreaterThan(0.1)
+    expect(GIRL_JUMP_APEX).toBeLessThan(0.5)
+  })
+
+  it('ends the flight at the authored fall depth', () => {
+    expect(jumpLiftAt(1)).toBeCloseTo(-GIRL_JUMP_FALL, 9)
+  })
+
+  it('is WHOLE at the apex — the leap must read before the fall takes her', () => {
+    const { theta, lift } = flightAt(GIRL_JUMP_APEX)
+    expect(feetHiddenAt(theta, lift, REST)).toBe(false)
+    expect(headHiddenAt(theta, lift, REST)).toBe(false)
+  })
+
+  it('parks her head INSIDE the planet’s ball, with real slack', () => {
+    // The strongest hiding there is: a camera outside a convex body cannot see a
+    // point inside it, from any distance. The slack keeps a retuned rise/fall
+    // from quietly walking her back out.
+    const headRadius = PLANET_RADIUS + jumpLiftAt(1) + GIRL_GLOBE_HEIGHT
+    expect(headRadius).toBeLessThan(PLANET_RADIUS - 0.4)
+  })
+
+  it('is fully hidden at the end of the flight at EVERY camera stop', () => {
+    for (const d of [REST, FULL, (REST + FULL) / 2]) {
+      expect(headHiddenAt(GIRL_JUMP_END_THETA, jumpLiftAt(1), d)).toBe(true)
+      expect(feetHiddenAt(GIRL_JUMP_END_THETA, jumpLiftAt(1), d)).toBe(true)
+    }
+  })
+
+  it('...and was already hidden with slack to spare before the flight window closed', () => {
+    // The hiding must complete INSIDE the flight, not on its last frame — a
+    // margin a retune of the sweep or the fall would eat visibly here first.
+    const { theta, lift } = flightAt(0.95)
+    for (const d of [REST, FULL]) expect(headHiddenAt(theta, lift, d)).toBe(true)
+  })
+
+  it('takes her feet BEFORE her head, which is what "off the edge" means', () => {
+    let feetGone = -1
+    let headGone = -1
+    for (let i = 0; i <= 2000; i++) {
+      const p = i / 2000
+      const { theta, lift } = flightAt(p)
+      if (feetGone < 0 && feetHiddenAt(theta, lift, REST)) feetGone = p
+      if (headGone < 0 && headHiddenAt(theta, lift, REST)) headGone = p
+    }
+    expect(feetGone).toBeGreaterThan(0)
+    expect(headGone).toBeGreaterThan(feetGone)
+  })
+
+  it('spends a real share of the flight sinking behind the crest, not a frame of it', () => {
+    // The plunge is the beat: she goes down behind the world by the head. The
+    // inside-ball conditions dominate both ends of the window, so the share
+    // holds at the pull-back too, where the tangent sits further round.
+    expect(exitSinkShare(REST)).toBeGreaterThan(0.25)
+    expect(exitSinkShare(FULL)).toBeGreaterThan(0.25)
+  })
+
+  it('keeps her on the planet, and drawn, for the whole performance', () => {
+    for (let i = 0; i <= 600; i++) {
+      const t = GIRL_TURN_START + ((GIRL_JUMP_END - GIRL_TURN_START) * i) / 600
+      const pose = poseAtT(t)
+      expect(pose.stage).toBe('globe')
+      expect(pose.visible).toBe(true)
+    }
+  })
+
+  it('never un-walks: her bearing is monotone over the whole globe stage', () => {
+    let prev = Infinity
+    for (let i = 0; i <= 2000; i++) {
+      const t = (GIRL_TRANSFER * i) / 2000
+      const theta = poseAtT(Math.min(t, GIRL_TRANSFER - 1e-9)).theta
+      expect(theta).toBeLessThanOrEqual(prev + 1e-12)
+      prev = theta
+    }
+  })
+})
+
+describe('the jump clip mapping never reaches ground she no longer has', () => {
+  it('is zero at takeoff and monotone through the flight', () => {
+    expect(Object.is(jumpClipFracAt(0), 0)).toBe(true)
+    let prev = -Infinity
+    for (let i = 0; i <= 1000; i++) {
+      const f = jumpClipFracAt(i / 1000)
+      expect(f).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = f
+    }
+  })
+
+  it('plays the clip’s own apex frame exactly at the arc’s apex', () => {
+    expect(jumpClipFracAt(GIRL_JUMP_APEX)).toBeCloseTo(JUMP_CLIP_APEX, 12)
+  })
+
+  it('stops before the clip’s landing absorb — she never lands', () => {
+    // Jump_B's hips cross rest at ~0.32 of the clip and the landing squat is in
+    // full absorb by ~0.36 (t87 clip inventory). The hold must stay clear of it.
+    expect(JUMP_CLIP_HOLD).toBeLessThan(0.36)
+    expect(jumpClipFracAt(1)).toBeCloseTo(JUMP_CLIP_HOLD, 12)
+  })
+
+  it('blends in fast, exactly, and stays there', () => {
+    expect(Object.is(jumpBlendAt(0), 0)).toBe(true)
+    expect(Object.is(jumpBlendAt(-1), 0)).toBe(true)
+    expect(jumpBlendAt(JUMP_BLEND_IN)).toBe(1)
+    expect(jumpBlendAt(1)).toBe(1)
+    let prev = -Infinity
+    for (let i = 0; i <= 500; i++) {
+      const w = jumpBlendAt(i / 500)
+      expect(w).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = w
+    }
+  })
+})
+
 describe('the cut is covered at both ends', () => {
-  it('is already hidden behind the planet when she stops being on it', () => {
-    expect(GIRL_TRANSFER).toBeGreaterThanOrEqual(GIRL_WALK_END)
+  it('has finished the flight before she stops being on the planet', () => {
+    expect(GIRL_JUMP_END).toBeLessThanOrEqual(GIRL_TRANSFER)
     expect(poseAtT(GIRL_TRANSFER - 1e-6).stage).toBe('globe')
     expect(poseAtT(GIRL_TRANSFER).stage).toBe('desk')
+  })
+
+  it('is already hidden behind the planet when she stops being on it', () => {
+    const pose = poseAtT(GIRL_TRANSFER - 1e-6)
+    expect(headHiddenAt(pose.theta, pose.lift, REST)).toBe(true)
+    expect(headHiddenAt(pose.theta, pose.lift, FULL)).toBe(true)
   })
 
   it('is not drawn at all between the transfer and her reveal', () => {
@@ -222,7 +420,7 @@ describe('she scrubs backwards exactly', () => {
     for (let i = 3000; i >= 0; i--) {
       const back = poseAtT(i / 3000)
       const fwd = forward[i]
-      for (const k of ['theta', 'x', 'z', 'yaw', 'scale', 'walked', 'moving'] as const) {
+      for (const k of ['theta', 'lift', 'jump', 'x', 'z', 'yaw', 'scale', 'walked', 'moving'] as const) {
         expect(Object.is(back[k], fwd[k])).toBe(true)
       }
       expect(back.stage).toBe(fwd.stage)
@@ -245,6 +443,14 @@ describe('she scrubs backwards exactly', () => {
     }
   })
 
+  it('freezes the walked distance for the goodbye and the flight — the skip clip is weightless there', () => {
+    const atStop = poseAtT(GIRL_WALK_END + 1e-6).walked
+    for (let i = 0; i <= 400; i++) {
+      const t = GIRL_WALK_END + ((GIRL_TRANSFER - 1e-6 - GIRL_WALK_END) * i) / 400
+      expect(poseAtT(t).walked).toBeCloseTo(atStop, 9)
+    }
+  })
+
   it('holds the driver’s whole domain without leaving the ending’s vocabulary', () => {
     for (let i = 0; i <= 2000; i++) {
       const pose = girlPoseAt(endingStateAt((i / 2000) * TRACK_END), false)
@@ -252,15 +458,39 @@ describe('she scrubs backwards exactly', () => {
       expect(Number.isFinite(pose.x)).toBe(true)
       expect(Number.isFinite(pose.z)).toBe(true)
       expect(Number.isFinite(pose.yaw)).toBe(true)
+      expect(Number.isFinite(pose.lift)).toBe(true)
+      expect(pose.jump).toBeGreaterThanOrEqual(0)
+      expect(pose.jump).toBeLessThanOrEqual(1)
       expect(pose.scale).toBeGreaterThan(0)
     }
   })
 
   it('leaves the camera invariant’s domain completely alone', () => {
-    // Her whole performance lives past ZOOM_FIRST_MOVE's own still beat; nothing
-    // here may be read as licence for the camera to move earlier.
+    // Her whole performance lives before ZOOM_START's own still-beat boundary;
+    // nothing here may be read as licence for the camera to move earlier.
     expect(1 + GIRL_TURN_START * ENDING_SPAN).toBeGreaterThan(1)
     expect(ZOOM_FIRST_MOVE).toBeGreaterThan(1)
+    expect(GIRL_JUMP_END).toBeLessThan(ZOOM_START)
+  })
+})
+
+describe('the hiding predicate is honest at its seams', () => {
+  it('hides any point inside the ball from any distance at all', () => {
+    expect(pointHiddenAt(CAMERA_THETA, PLANET_RADIUS - 0.01, 1e9)).toBe(true)
+    expect(pointHiddenAt(0, PLANET_RADIUS * 0.5, REST)).toBe(true)
+  })
+
+  it('keeps the Task 76 two-horizon behaviour for raised points', () => {
+    // A raised point stays visible far past the surface horizon — the finding
+    // the whole Task 76 exit was solved around.
+    const surfaceHorizon = CAMERA_THETA - Math.acos(PLANET_RADIUS / REST)
+    expect(pointHiddenAt(surfaceHorizon - 0.2, PLANET_RADIUS + GIRL_GLOBE_HEIGHT, REST)).toBe(false)
+    expect(pointHiddenAt(surfaceHorizon - 0.01, PLANET_RADIUS, REST)).toBe(true)
+  })
+
+  it('is still visible at the start of the walk — she does not vanish early', () => {
+    expect(headHiddenAt(STANCE_ALPHA, 0, REST)).toBe(false)
+    expect(feetHiddenAt(STANCE_ALPHA, 0, REST)).toBe(false)
   })
 })
 
@@ -364,6 +594,7 @@ describe('reduced motion gets the ending without the performance', () => {
       expect(pose.visible).toBe(GIRL_DESK_MOUNTED)
       expect(Object.is(pose.moving, 0)).toBe(true)
       expect(Object.is(pose.walked, 0)).toBe(true)
+      expect(Object.is(pose.jump, 0)).toBe(true)
       expect(Object.is(pose.x, GIRL_DESK_STAGING.to[0])).toBe(true)
       expect(Object.is(pose.z, GIRL_DESK_STAGING.to[1])).toBe(true)
     }
@@ -373,74 +604,6 @@ describe('reduced motion gets the ending without the performance', () => {
     for (let i = 0; i <= 500; i++) {
       expect(girlPoseAt(endingStateAt((i / 500) * 1), true).stage).toBe('journey')
     }
-  })
-})
-
-/**
- * THE EXIT BEAT IS THE PIECE, so it gets its own gate (orchestrator's polish
- * order 4). Aram's redirect discarded where she ARRIVES; it kept, unchanged, the
- * walk over the crest and the head going down behind it. That beat is not one
- * number — it is a relation between three constants and the camera's own horizon,
- * and any of them could be retuned by someone who never looked at the frames.
- *
- * What these hold: she is on the planet and drawn for the whole walk; the ground
- * leaves her feet BEFORE the horizon takes her head, so there is a real sinking;
- * that sinking is a substantial share of the walk rather than a rounding error;
- * and she is gone before the transfer, at every camera stop the ending can reach.
- */
-describe('the walk over the crest cannot be clipped by a retune', () => {
-  const REST = CAMERA_DISTANCE
-  const FULL = CAMERA_DISTANCE * ZOOM_FACTOR
-
-  it('keeps her on the planet, and drawn, for the whole exit walk', () => {
-    for (let i = 0; i <= 600; i++) {
-      const t = GIRL_TURN_START + ((GIRL_WALK_END - GIRL_TURN_START) * i) / 600
-      const pose = poseAtT(t)
-      expect(pose.stage).toBe('globe')
-      expect(pose.visible).toBe(true)
-    }
-  })
-
-  it('takes her ground away BEFORE her head, which is what "over the hill" means', () => {
-    // If these two coincided she would blink out at the horizon instead of sinking.
-    let feetGone = -1
-    let headGone = -1
-    for (let i = 0; i <= 2000; i++) {
-      const theta = STANCE_ALPHA + ((GIRL_EXIT_THETA - STANCE_ALPHA) * i) / 2000
-      if (feetGone < 0 && feetHiddenAt(theta, REST)) feetGone = i / 2000
-      if (headGone < 0 && headHiddenAt(theta, REST)) headGone = i / 2000
-    }
-    expect(feetGone).toBeGreaterThan(0)
-    expect(headGone).toBeGreaterThan(feetGone)
-  })
-
-  it('spends a real share of the walk sinking, not a frame of it', () => {
-    // Measured at the rest camera, which is the one the still beat renders through.
-    expect(exitSinkShare(REST)).toBeGreaterThan(0.5)
-    // ...and it survives the pull-back, where the horizon sits further round.
-    expect(exitSinkShare(FULL)).toBeGreaterThan(0.45)
-  })
-
-  it('has her fully hidden by the end of the walk at EVERY camera stop', () => {
-    for (const d of [REST, FULL, (REST + FULL) / 2]) {
-      expect(headHiddenAt(GIRL_EXIT_THETA, d)).toBe(true)
-    }
-  })
-
-  it('is still visible at the start of the walk — she does not vanish early', () => {
-    expect(headHiddenAt(STANCE_ALPHA, CAMERA_DISTANCE)).toBe(false)
-    expect(feetHiddenAt(STANCE_ALPHA, CAMERA_DISTANCE)).toBe(false)
-  })
-
-  it('finishes the walk before the transfer takes her off the planet', () => {
-    expect(GIRL_WALK_END).toBeLessThanOrEqual(GIRL_TRANSFER)
-    expect(headHiddenAt(poseAtT(GIRL_TRANSFER - 1e-4).theta, CAMERA_DISTANCE)).toBe(true)
-  })
-
-  it('turns her round before she walks, so the exit is not a moonwalk', () => {
-    expect(GIRL_TURN_END).toBeLessThanOrEqual(GIRL_WALK_END)
-    expect(atExactly(GIRL_TURN_END).yaw).toBeCloseTo(Math.PI, 9)
-    expect(Object.is(atExactly(GIRL_TURN_END).theta, STANCE_ALPHA)).toBe(true)
   })
 })
 

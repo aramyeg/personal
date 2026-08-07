@@ -13,20 +13,17 @@ import { STANCE_ALPHA } from './renewal'
 import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline'
 
 /**
- * ALWINA LEAVES THE WORLD (Task 76) — the girl walks off the clay planet, over its
- * far crest, and is gone.
+ * ALWINA LEAVES THE WORLD (Task 76, restaged in Task 87) — the girl walks to the
+ * world's far crest, turns back for a goodbye, and JUMPS off the planet.
  *
- * WHAT PHASE 1 SHIPS, AND WHAT THIS MODULE STILL CONTAINS. The exit is live and
- * gated. The ARRIVAL is not: `GIRL_DESK_MOUNTED` is false, because Aram's ruling
- * is that she belongs BEHIND the desk at human scale rather than on it at
- * figurine scale, and two measurements say the GLB cannot yet be that person. The
- * ink epilogue that briefly carried her return was itself killed in the T82
- * rework (Aram: it didn't fit), so for now she leaves and does not come back.
- * Everything the desk arrival needed is kept, gated and re-enabled by one flag —
- * see `GIRL_DESK_MOUNTED`.
- *
- * The rest of this header describes both halves, because the exit's derivation
- * only makes sense next to the transfer it was solved for.
+ * WHAT THIS MODULE SHIPS, AND WHAT IT STILL CONTAINS. The exit is live and gated.
+ * The ARRIVAL is not: `GIRL_DESK_MOUNTED` is false, because Aram's ruling is that
+ * she belongs BEHIND the desk at human scale rather than on it at figurine scale,
+ * and two measurements say the GLB cannot yet be that person. The ink epilogue
+ * that briefly carried her return was itself killed in the T82 rework (Aram: it
+ * didn't fit), so for now she leaves and does not come back. Everything the desk
+ * arrival needed is kept, gated and re-enabled by one flag — see
+ * `GIRL_DESK_MOUNTED`.
  *
  * ============================================================================
  * WHY SHE CANNOT SIMPLY BE MOVED
@@ -43,54 +40,79 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * planet is a sphere with a horizon, so it supplies the occluder for free.
  *
  * ============================================================================
- * THE EXIT IS OVER THE FAR CREST, AND THAT IS FORCED
+ * THE EXIT IS OVER THE FAR CREST, AND THAT IS FORCED (Task 76's derivation)
  * ============================================================================
  * She stands at `STANCE_ALPHA` (19.93° from the pole, measured the way
  * `anchorTransform` measures it: dir = (0, cos θ, sin θ)). The journey camera sits
- * at θ = 90° − pitch = 70°, so the surface is visible over
- * θ ∈ [−9.52°, 149.52°] and she has two ways out.
+ * at θ = 90° − pitch = 70°, so the surface is visible over θ ∈ [−9.52°, 149.52°]
+ * and she has two ways out.
  *
  *   TOWARD THE VIEWER (+θ, which is the way she already faces) she would have to
  *   reach θ = 149.52° to lose the surface — 130° of travel, on which she rotates
  *   with the surface normal until she is lying on her back pointing at the camera.
- *   Her HEAD (see below) does not clear until θ = 199°. Not a walk; a somersault.
+ *   Not a walk; a somersault. And there is nothing on that side to hide her: an
+ *   exit toward the lens has no occluder at all.
  *
- *   AWAY OVER THE POLE (−θ) she loses the surface after 29.5°, and everything
- *   after that is the oldest picture there is: someone walking over a hill, going
- *   down by the head. She has to turn round first, which is a beat rather than a
- *   cost — she turns her back on the world and goes.
- *
- * `GIRL_EXIT_THETA` is where she is GONE, and it is solved rather than eyeballed,
- * because the answer is much further than the horizon: the tangent at
- * θ = −9.52° hides a point ON the surface, and she is 1.19 units tall. A point at
- * radius ρ is hidden from a camera at distance d by a sphere of radius R exactly
- * when its angular separation from the camera exceeds
- * `acos(R/d) + acos(R/ρ)` — the two horizon half-angles — which for her head is
- * 132.6°, not 79.5°. Solved against the FULL PULL-BACK distance (the larger of the
- * two, since a camera further away sees further round) so the same angle hides her
- * at every stop the ending can reach, and against the bare `PLANET_RADIUS` rather
- * than the terrain that actually stands there, which can only hide her sooner.
+ *   AWAY OVER THE POLE (−θ) the surface's own crest is 29.5° away, and everything
+ *   past it is hidden ground. The far side is the only place in the frame that
+ *   something can disappear behind.
  *
  * ============================================================================
- * SCROLL PURITY — AND ONE WALL CLOCK REMOVED
+ * THE RESTAGING (Task 87) — she does not run off; she jumps
  * ============================================================================
- * Every number here is a pure function of `EndingState.t`. That includes her WALK
- * PHASE: `walked` is the cumulative surface distance she has covered, so
- * `girl.tsx` can set the skip clip's time from it instead of advancing the mixer
- * by a frame delta. Scrubbing backwards therefore un-walks her, foot for foot,
- * rather than playing a forward skip while she slides backwards.
+ * Aram: "when the story is finished maybe it makes more sense that Alwi turns
+ * back and jumps off the planet, not runs off of it."
  *
- * That is a wall clock REMOVED from the ending, not added: the AnimationMixer has
- * been running on `delta` since the girl was first mounted, and Task 71 recorded
- * that it is why the ending's forward/backward captures could not be compared bit
- * for bit. Inside the ending it now runs on scroll. The coffee steam (Task 72)
- * stays the ending's one wall-clock exception.
+ * Task 76 walked her from her stance to −65.43° — far past the crest, because a
+ * WALKING girl keeps her head 1.19 units above the surface and the angle that
+ * hides a raised point is the sum of two horizon half-angles, 132.6° from the
+ * camera. The new staging replaces most of that walk with a beat, and the beat
+ * with a fall:
+ *
+ *   1. she turns her back on the world and walks — but only to `GIRL_STOP_THETA`,
+ *      a step short of the crest, where she is still whole in the frame;
+ *   2. she TURNS BACK toward the reader — the goodbye. The camera cannot move to
+ *      meet her (the frozen-camera invariant owns every t below ZOOM_START), so
+ *      the beat is staged to read at the shipped distance: she stands on the
+ *      world's upper silhouette, the idle sway breathing under her;
+ *   3. she JUMPS: a ballistic arc — up `GIRL_JUMP_RISE`, over the crest, and then
+ *      DOWN `GIRL_JUMP_FALL` — off the edge of the world, facing the reader as
+ *      she goes.
+ *
+ * THE FALL IS WHAT HIDES HER, and it is a strictly stronger hiding than Task
+ * 76's. The walk needed the two-horizon solve because her head stayed raised; the
+ * jump ends with her head at radius `PLANET_RADIUS + jumpLiftAt(1) +
+ * GIRL_GLOBE_HEIGHT` — INSIDE the planet's own ball. A camera outside a convex
+ * body cannot see a point inside it from ANY distance (every sightline to it
+ * crosses the surface), so the parked end state needs no margin arithmetic
+ * against the pull-back at all. `girl-exit.test.ts` gates the radius with real
+ * slack and ALSO keeps the two-horizon predicate for the beats on the way down.
+ *
+ * The gate family is re-derived, not weakened: she is on the planet and drawn
+ * for the whole performance; at the goodbye she is WHOLE (feet visible — the
+ * beat cannot be delivered by a half-sunk figure); at the apex of the jump she
+ * is still whole (the leap must read before the fall takes her); her feet drop
+ * behind the crest BEFORE her head (the sinking that made the walk work is now
+ * the plunge); that sinking is a real share of the flight; and she is hidden at
+ * every camera stop from the end of the flight through the bottom of the track.
+ *
+ * ============================================================================
+ * SCROLL PURITY — AND THE JUMP CLIP ON THE SAME TERMS
+ * ============================================================================
+ * Every number here is a pure function of `EndingState.t`. That includes the
+ * jump: `GirlPose.jump` is the flight's own 0→1, `jumpLiftAt` is its authored
+ * ballistics, and `jumpClipFracAt` maps it onto the Jump_B clip so `girl.tsx`
+ * can write the action's TIME from scroll exactly as it writes the skip's from
+ * `walked`. Scrubbing backwards un-jumps her, frame for frame. The
+ * AnimationMixer stays off the frame delta for the whole ending (the Task 76
+ * removal); the coffee steam stays the ending's one wall-clock exception.
  *
  * ============================================================================
  * THE TRANSFER, AND WHY NOTHING POPS
  * ============================================================================
  * Two occluders hand her over, and there is a window where BOTH hold:
- *   - from `GIRL_EXIT_END` she is behind the planet (the solve above);
+ *   - from `GIRL_JUMP_END` she is inside the planet's occlusion ball (the solve
+ *     above);
  *   - from `GIRL_DESK_REVEAL` backwards she is below the frame's bottom edge,
  *     because the desk is revealed BACK-TO-FRONT by the pull-back and her whole
  *     silhouette is under the bottom edge until then.
@@ -114,7 +136,7 @@ export const GIRL_MESH_HEIGHT = 1.7
  */
 export const GIRL_GLOBE_SCALE = 0.7
 
-/** ...and how tall that makes her, which is what the exit solve needs. */
+/** ...and how tall that makes her, which is what the hiding solves need. */
 export const GIRL_GLOBE_HEIGHT = GIRL_MESH_HEIGHT * GIRL_GLOBE_SCALE
 
 /**
@@ -138,63 +160,171 @@ export const CLIP_STRIDE = 1.0
 /** ...and at any other scale. A smaller girl takes proportionally smaller steps. */
 export const strideAt = (scale: number): number => (CLIP_STRIDE * scale) / GIRL_GLOBE_SCALE
 
-/** Half-angle of the horizon seen from distance `d` past a sphere of PLANET_RADIUS. */
-const horizonAt = (d: number): number => Math.acos(Math.min(1, PLANET_RADIUS / d))
+/**
+ * The surface's own crest as seen from the REST camera — the tangent bearing,
+ * which is the line the whole performance is staged against. The camera cannot
+ * leave its rest pose before ZOOM_START (0.38), and the flight is over by
+ * GIRL_JUMP_END (0.35), so every airborne frame renders through this horizon
+ * and no other.
+ */
+export const CREST_THETA = CAMERA_THETA - Math.acos(PLANET_RADIUS / CAMERA_DISTANCE)
 
 /**
- * Slack past the solved angle, in radians. The camera is not quite fixed: Task 72's
- * pointer parallax orbits it ±1.2° in pitch about the solved aim, which walks the
- * horizon by the same amount. 0.05 rad (2.86°) covers that twice over.
+ * How far short of the crest she stops for the goodbye, in radians of surface.
+ *
+ * Far enough that her FEET are safely inside the visible cap (a goodbye delivered
+ * by a half-sunk figure is not a goodbye — the test gates feet visible at the
+ * stop), close enough that she reads as standing on the edge of the world, which
+ * is the picture the jump needs to launch from.
  */
-export const GIRL_EXIT_MARGIN = 0.05
+export const GIRL_STOP_MARGIN = 0.06
 
-/**
- * Where she is GONE — see the header for the two-horizon derivation. Negative:
- * she walks against the way she faces, over the pole and down the far side.
- */
-export const GIRL_EXIT_THETA =
-  CAMERA_THETA -
-  (horizonAt(CAMERA_DISTANCE * ZOOM_FACTOR) + horizonAt(PLANET_RADIUS + GIRL_GLOBE_HEIGHT)) -
-  GIRL_EXIT_MARGIN
+/** Where she stands for the goodbye: a step before the crest, whole in the frame. */
+export const GIRL_STOP_THETA = CREST_THETA + GIRL_STOP_MARGIN
 
 /** How far she walks on the planet, along the surface, in world units. */
-export const GIRL_EXIT_ARC = (STANCE_ALPHA - GIRL_EXIT_THETA) * PLANET_RADIUS
+export const GIRL_WALK_ARC = (STANCE_ALPHA - GIRL_STOP_THETA) * PLANET_RADIUS
+
+// ---------------------------------------------------------------------------
+// THE JUMP — authored as two look numbers, everything else solved
+// ---------------------------------------------------------------------------
+
+/** How high the leap carries her above the surface at its apex, in world units.
+ *  About half her own height: a toy-world bound, not a launch. */
+export const GIRL_JUMP_RISE = 0.35
 
 /**
- * Is the top of her head behind the planet, from a camera at distance `d`?
- *
- * The same two-horizon condition the exit angle is solved from, exposed as a
- * predicate so the BEAT can be gated rather than only the endpoint. What it
- * protects is the part of this ending that does the emotional work: she does not
- * blink out at the horizon, she goes down BY THE HEAD over a stretch of scroll, and
- * that stretch is a consequence of three constants (`GIRL_TURN_END`,
- * `GIRL_WALK_END`, `GIRL_EXIT_THETA`) that a future retune could quietly collapse.
- * `girl-exit.test.ts` measures the stretch and holds it to a floor.
+ * ...and how far BELOW the surface line the flight ends. This is the hiding
+ * solve: her head rides `GIRL_GLOBE_HEIGHT` above her feet, so a fall of 1.8
+ * parks her head at radius 2.2 − 1.8 + 1.19 = 1.59 — 0.61 units INSIDE the
+ * planet's ball, from which no camera outside a convex body can retrieve her.
+ * The test holds the slack at ≥ 0.4 so a retune cannot walk her back out.
  */
-export function headHiddenAt(theta: number, cameraDistance: number): boolean {
+export const GIRL_JUMP_FALL = 1.8
+
+/**
+ * How far round the sphere the leap carries her, in radians. Enough that the
+ * plunge happens BEHIND the crest (the fall crosses the silhouette going down,
+ * which is the beat), small enough that the arc reads as a jump rather than a
+ * flight — 0.14 rad is 0.31 u of surface, about a body-length-and-a-half.
+ */
+export const GIRL_JUMP_SWEEP = 0.14
+
+/** Where the flight ends, in θ. Past the rest crest, behind the silhouette. */
+export const GIRL_JUMP_END_THETA = GIRL_STOP_THETA - GIRL_JUMP_SWEEP
+
+/**
+ * When in the flight she crests — SOLVED from the two authored numbers by the
+ * ballistics themselves. A parabola through lift(0) = 0 with apex `RISE` and
+ * lift(1) = −FALL has its apex at the root of (FALL/RISE)·A² + 2A − 1 = 0:
+ * gravity is constant, so the rise is short and the fall is long, exactly the
+ * shape a jump off an edge has. 0.35/1.8 lands it at 0.288.
+ */
+export const GIRL_JUMP_APEX = (() => {
+  const r = GIRL_JUMP_FALL / GIRL_JUMP_RISE
+  return (Math.sqrt(1 + r) - 1) / r
+})()
+
+/** The parabola's gravity, in lift units per unit flight² — from apex height. */
+const JUMP_G = (2 * GIRL_JUMP_RISE) / (GIRL_JUMP_APEX * GIRL_JUMP_APEX)
+
+/**
+ * Her radial offset from the surface at flight phase `p` — the authored
+ * ballistics. Exactly +0 at p = 0 (`G·(A·0 − 0)`), so the takeoff frame is
+ * bit-identical to the standing one, which is what lets the flight join the
+ * goodbye without a seam a scrub could catch.
+ */
+export function jumpLiftAt(p: number): number {
+  const x = clamp01(p)
+  return JUMP_G * (GIRL_JUMP_APEX * x - (x * x) / 2)
+}
+
+/**
+ * Where in the Jump_B CLIP a flight phase lands — the map `girl.tsx` writes the
+ * action's time through.
+ *
+ * The clip is a full jump that lands and recovers; she never lands. So the map
+ * uses only the clip's airborne stretch, measured from the GLB itself (t87 clip
+ * inventory, hips channel): the clip's own apex sits at 0.243 of its length and
+ * its landing absorb begins at ~0.36. The rise plays the clip up to its apex in
+ * step with the arc's rise; the fall stretches the clip's airborne descent
+ * [0.243, JUMP_CLIP_HOLD] over the rest of the flight, so she is still slowly
+ * extending into the drop as the crest takes her, and the clip never reaches the
+ * frames where it lands on ground she no longer has.
+ */
+export const JUMP_CLIP_APEX = 0.243
+export const JUMP_CLIP_HOLD = 0.3
+
+export function jumpClipFracAt(p: number): number {
+  const x = clamp01(p)
+  if (x <= GIRL_JUMP_APEX) return (x / GIRL_JUMP_APEX) * JUMP_CLIP_APEX
+  return (
+    JUMP_CLIP_APEX +
+    ((x - GIRL_JUMP_APEX) / (1 - GIRL_JUMP_APEX)) * (JUMP_CLIP_HOLD - JUMP_CLIP_APEX)
+  )
+}
+
+/**
+ * The jump action's mixer weight at a flight phase — a short scroll-pure ramp
+ * out of the idle sway, because Jump_B's first frames are near the rest pose but
+ * the sway's are not (its hips wander 0.24 u laterally), and a snap between the
+ * two is a visible pop on the takeoff frame. Exactly 0 at p ≤ 0 and exactly 1
+ * from `JUMP_BLEND_IN` on, so the flight's body language is wholly the clip's
+ * for everything past its first instants.
+ */
+export const JUMP_BLEND_IN = 0.12
+
+export function jumpBlendAt(p: number): number {
+  if (p <= 0) return 0
+  return smootherstep(Math.min(1, p / JUMP_BLEND_IN))
+}
+
+/**
+ * Is a point at bearing `theta` and radius `radius` hidden behind the planet,
+ * from a camera at distance `cameraDistance`?
+ *
+ * Two regimes, one truth:
+ *   - radius < PLANET_RADIUS: the point is inside the ball. The camera is
+ *     outside a convex body, so EVERY sightline to the point crosses the
+ *     surface first — hidden from any distance, no arithmetic.
+ *   - radius ≥ PLANET_RADIUS: the Task 76 two-horizon condition — hidden when
+ *     the angular separation from the camera exceeds acos(R/d) + acos(R/ρ).
+ * This is the predicate the whole exit is gated through; the walk, the goodbye,
+ * the apex and the plunge are all claims about it.
+ */
+export function pointHiddenAt(theta: number, radius: number, cameraDistance: number): boolean {
+  if (radius < PLANET_RADIUS) return true
   const horizon =
     Math.acos(Math.min(1, PLANET_RADIUS / cameraDistance)) +
-    Math.acos(Math.min(1, PLANET_RADIUS / (PLANET_RADIUS + GIRL_GLOBE_HEIGHT)))
+    Math.acos(Math.min(1, PLANET_RADIUS / radius))
   return Math.abs(theta - CAMERA_THETA) > horizon
 }
 
-/**
- * ...and where her FEET go under, which is the first half of the same beat: the
- * ground leaves before she does, so for a stretch she is a figure walking on a
- * horizon with nothing under her feet. That is the picture, and it is why the walk
- * runs well past the surface's own tangent.
- */
-export function feetHiddenAt(theta: number, cameraDistance: number): boolean {
-  return Math.abs(theta - CAMERA_THETA) > Math.acos(Math.min(1, PLANET_RADIUS / cameraDistance))
+/** Is the top of her head hidden, standing (or flying) at `theta` with radial offset `lift`? */
+export function headHiddenAt(theta: number, lift: number, cameraDistance: number): boolean {
+  return pointHiddenAt(theta, PLANET_RADIUS + lift + GIRL_GLOBE_HEIGHT, cameraDistance)
 }
 
-/** The fraction of the exit walk she spends sinking — feet under, head still up. */
+/** ...and her feet, which the crest takes first — the sinking that makes the beat. */
+export function feetHiddenAt(theta: number, lift: number, cameraDistance: number): boolean {
+  return pointHiddenAt(theta, PLANET_RADIUS + lift, cameraDistance)
+}
+
+/**
+ * The fraction of the FLIGHT she spends sinking — feet behind the crest, head
+ * still up. The walk's version of this beat was the whole picture of Task 76's
+ * exit; the jump keeps it as the plunge: she drops behind the world going down
+ * by the head, and this measures that stretch so a retune cannot collapse it.
+ */
 export function exitSinkShare(cameraDistance: number): number {
   const N = 2000
   let sinking = 0
   for (let i = 0; i <= N; i++) {
-    const theta = STANCE_ALPHA + ((GIRL_EXIT_THETA - STANCE_ALPHA) * i) / N
-    if (feetHiddenAt(theta, cameraDistance) && !headHiddenAt(theta, cameraDistance)) sinking++
+    const p = i / N
+    const theta = mix(GIRL_STOP_THETA, GIRL_JUMP_END_THETA, p)
+    const lift = jumpLiftAt(p)
+    if (feetHiddenAt(theta, lift, cameraDistance) && !headHiddenAt(theta, lift, cameraDistance))
+      sinking++
   }
   return sinking / (N + 1)
 }
@@ -206,14 +336,29 @@ export function exitSinkShare(cameraDistance: number): number {
 /** She turns her back on the world over this window. Starts after 0 so the first
  *  frames of the ending are bit-identically the journey's last one. */
 export const GIRL_TURN_START = 0.03
-export const GIRL_TURN_END = 0.11
+export const GIRL_TURN_END = 0.1
 
-/** ...and walks to `GIRL_EXIT_THETA` by here, inside the stand's rise (STAND_END 0.3). */
-export const GIRL_WALK_END = 0.32
+/** ...and walks to `GIRL_STOP_THETA` by here — a short walk to the edge. */
+export const GIRL_WALK_END = 0.19
+
+/** She turns back toward the reader over this window — the goodbye. */
+export const GIRL_LOOK_START = 0.21
+export const GIRL_LOOK_END = 0.27
+
+/**
+ * The flight. It launches out of the goodbye's held beat and lands nowhere:
+ * the window ends with her parked inside the planet's occlusion ball. It runs
+ * PAST the stand's seating (STAND_END 0.3) on purpose — the still beat used to
+ * hold nothing, and now it holds the one thing the whole ending is about — but
+ * it ends before `GIRL_TRANSFER`, and the camera cannot move until ZOOM_START
+ * (0.38), so every airborne frame renders through the rest camera.
+ */
+export const GIRL_JUMP_START = 0.29
+export const GIRL_JUMP_END = 0.35
 
 /**
  * When she stops being on the planet and starts being on the desk. Anywhere in
- * [GIRL_WALK_END, GIRL_DESK_REVEAL] is equivalent — she is drawn in neither place
+ * [GIRL_JUMP_END, GIRL_DESK_REVEAL] is equivalent — she is drawn in neither place
  * — so it sits in the still beat, where the camera has not started to move.
  */
 export const GIRL_TRANSFER = 0.36
@@ -296,10 +441,10 @@ export const GIRL_DESK_STAGING: DeskStaging = DESK_STAGINGS[0]
  * behind-desk head demands; and 0.36 m of frame headroom against the 0.90 m a
  * standing adult needs — `task-76-ending-report.md` carries both with captures).
  *
- * So phase 1 ships the half that is not in doubt: she LEAVES the world, over the
- * crest, exactly as staged and gated. The ink epilogue that briefly carried her
- * return is gone too (T82 kill list) — she simply does not reappear, in any
- * medium, until phase 2.
+ * So phase 1 ships the half that is not in doubt: she LEAVES the world, exactly
+ * as staged and gated. The ink epilogue that briefly carried her return is gone
+ * too (T82 kill list) — she simply does not reappear, in any medium, until
+ * phase 2.
  *
  * Everything the arrival needed is kept and still gated: the free-lane map, the
  * float solve, the scale ratios, the two candidate paths. Phase 2 re-enables this
@@ -430,6 +575,10 @@ export type GirlPose = {
   readonly visible: boolean
   /** Surface bearing on the planet (rad). Meaningless off the globe. */
   readonly theta: number
+  /** Radial offset from the surface (world u) — the flight's lift. 0 on the ground. */
+  readonly lift: number
+  /** The flight's own 0→1, 0 outside the jump window. Drives the Jump_B action. */
+  readonly jump: number
   /** Desk-plane position. Meaningless on the globe. */
   readonly x: number
   readonly z: number
@@ -447,6 +596,8 @@ const JOURNEY_POSE: GirlPose = Object.freeze({
   stage: 'journey' as const,
   visible: true,
   theta: STANCE_ALPHA,
+  lift: 0,
+  jump: 0,
   x: 0,
   z: 0,
   yaw: 0,
@@ -475,6 +626,8 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
       stage: 'desk',
       visible: GIRL_DESK_MOUNTED,
       theta: STANCE_ALPHA,
+      lift: 0,
+      jump: 0,
       x: stg.to[0],
       z: stg.to[1],
       yaw: stg.restYaw,
@@ -486,17 +639,29 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
 
   if (t < GIRL_TRANSFER) {
     const walk = smootherstep(across(t, GIRL_TURN_END, GIRL_WALK_END))
-    const theta = mix(STANCE_ALPHA, GIRL_EXIT_THETA, walk)
+    const walkTheta = mix(STANCE_ALPHA, GIRL_STOP_THETA, walk)
+    // The flight's clock is LINEAR in scroll — ballistics happen in time, and the
+    // scroll is the ending's time. Easing it would bend gravity.
+    const jump = across(t, GIRL_JUMP_START, GIRL_JUMP_END)
+    const theta = mix(walkTheta, GIRL_JUMP_END_THETA, jump)
+    // She turns away to walk, and turns back for the goodbye. `mix(x, 0, 1)` is
+    // exactly +0, so from GIRL_LOOK_END on she faces the reader without residue.
+    const turnAway = Math.PI * smootherstep(across(t, GIRL_TURN_START, GIRL_TURN_END))
+    const yaw = mix(turnAway, 0, smootherstep(across(t, GIRL_LOOK_START, GIRL_LOOK_END)))
     return {
       stage: 'globe',
       visible: true,
       theta,
+      lift: jumpLiftAt(jump),
+      jump,
       x: 0,
       z: 0,
-      yaw: Math.PI * smootherstep(across(t, GIRL_TURN_START, GIRL_TURN_END)),
+      yaw,
       scale: GIRL_GLOBE_SCALE,
-      walked: (STANCE_ALPHA - theta) * PLANET_RADIUS,
-      moving: across(t, GIRL_TURN_START, GIRL_TURN_END) * (1 - across(t, GIRL_WALK_END - 0.02, GIRL_WALK_END)),
+      walked: (STANCE_ALPHA - walkTheta) * PLANET_RADIUS,
+      moving:
+        across(t, GIRL_TURN_START, GIRL_TURN_END) *
+        (1 - across(t, GIRL_WALK_END - 0.02, GIRL_WALK_END)),
     }
   }
 
@@ -513,6 +678,8 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
     stage: 'desk',
     visible: GIRL_DESK_MOUNTED && t >= GIRL_DESK_REVEAL,
     theta: STANCE_ALPHA,
+    lift: 0,
+    jump: 0,
     x,
     z,
     yaw: mix(travelYaw, stg.restYaw, turn),
