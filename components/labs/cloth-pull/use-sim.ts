@@ -48,9 +48,9 @@ export interface SimWorld {
   travel: number
 }
 
-/** fist height above the feet as a fraction of body height (measured GLB);
- * hands-behind-back sits a bit lower than the haul grip */
-const FIST_FRAC = 0.52
+/** fist-cluster height above the feet as a fraction of body height
+ * (clasped hands sit at ~0.48 of the 0.90-unit model) */
+const FIST_FRAC = 0.53
 
 export function createSimWorld(
   w: number,

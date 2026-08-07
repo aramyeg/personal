@@ -21,11 +21,11 @@ import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { CFG } from '@/lib/labs/cloth-pull/config'
 
-export const CHIBI_URL = '/labs/cloth-pull/chibi-walk.glb'
+export const CHIBI_URL = '/labs/cloth-pull/chibi.glb'
 /** measured from the exported GLB (bbox height in model units) */
-const MODEL_HEIGHT = 0.8648
-/** fist-cluster anchor relative to the Hips bone, in body heights:
- * behind the tailbone (hands clasped behind the back) */
+const MODEL_HEIGHT = 0.9007
+/** fallback anchor relative to the Hips bone, in body heights, used only
+ * when a stand-in clip set without clasped hands is loaded */
 const ANCHOR_BACK = 0.12
 const ANCHOR_DOWN = 0.02
 
@@ -58,7 +58,7 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
   const group = useRef<THREE.Group>(null)
   const scale = heightPx / MODEL_HEIGHT
 
-  const { mixer, walk, strain, hold, spineBones, hips, hand } = useMemo(() => {
+  const { mixer, walk, strain, hold, spineBones, hips, hand, hand2 } = useMemo(() => {
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         obj.castShadow = true
@@ -89,6 +89,7 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
       spineBones: spines,
       hips: scene.getObjectByName('Hips') ?? scene,
       hand: scene.getObjectByName('RightHand'),
+      hand2: scene.getObjectByName('LeftHand'),
     }
   }, [scene, animations])
 
@@ -156,17 +157,20 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
         }
       },
       getFist(out: THREE.Vector3) {
-        if (authored && hand) {
-          return hand.getWorldPosition(out)
+        if (authored && hand && hand2) {
+          // hands are clasped behind the back — pin to the fist cluster
+          hand.getWorldPosition(out)
+          hand2.getWorldPosition(tmpAxis.current)
+          return out.add(tmpAxis.current).multiplyScalar(0.5)
         }
-        // stand-in walk clip swings its arms — anchor to the tailbone instead
+        // stand-in clip set swings its arms — anchor to the tailbone instead
         hips.getWorldPosition(out)
         out.x -= ANCHOR_BACK * heightPx
         out.y -= ANCHOR_DOWN * heightPx
         return out
       },
     }),
-    [mixer, walk, strain, hold, spineBones, hips, hand, authored, reduced, heightPx]
+    [mixer, walk, strain, hold, spineBones, hips, hand, hand2, authored, reduced, heightPx]
   )
 
   return (

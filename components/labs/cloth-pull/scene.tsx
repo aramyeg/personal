@@ -30,8 +30,8 @@ import {
   tryGrab,
 } from './use-sim'
 
-/** the stand-in walk GLB faces +Z (camera); yaw it to face +X (screen right) */
-const WALK_YAW = Math.PI / 2
+/** the authored tow GLB already faces +X (screen right) */
+const WALK_YAW = 0
 
 function FloorMarks({
   w,
