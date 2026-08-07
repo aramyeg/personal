@@ -501,6 +501,10 @@ const ROW_STYLE: Record<'premise' | 'name' | 'says' | 'line' | 'contact', CSSPro
     letterSpacing: '0.06em',
     opacity: 0.66,
     marginBottom: '0.5cqw',
+    // BALANCED, because captured at 390 it broke as "…one lap of a tiny" /
+    // "planet" — a one-word last line, directly above her name, on the row whose
+    // whole job is to be read past. Two even lines or one; never an orphan.
+    textWrap: 'balance',
   },
   name: { ...BASE_ROW, fontSize: 'max(13px, 6.6cqw)', lineHeight: 1.06 },
   says: {
