@@ -967,8 +967,9 @@ const DUNE_CURVE = 2.3
 /** Fraction of each dune period spent on the gentle windward back (the rest = steep slip face). */
 const DUNE_BACK = 0.72
 /** Peak dune height (fraction of R). Task 46: raised toward the verified ~0.1R headroom (was
- *  0.075) so the dunes carry a stable, grounded mass — still well under the 1.35R ceiling. */
-const DUNE_AMP = 0.095
+ *  0.075) so the dunes carry a stable, grounded mass — still well under the 1.35R ceiling.
+ *  Task 88: exported — the paint pass normalizes crest shading by it (one source of truth). */
+export const DUNE_AMP = 0.095
 
 /** One asymmetric dune wave from a phase p∈[0,1): a gentle windward rise to the crest at
  *  DUNE_BACK, then a steep leeward slip-face drop. The slip face is compressed into the

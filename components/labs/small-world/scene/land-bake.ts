@@ -27,6 +27,8 @@ import {
   canyonCreekDist,
   tideCarve,
   epilogueRegion,
+  duneField,
+  DUNE_AMP,
   TIDE_LAT_LO,
   TIDE_DEPTH,
 } from './biomes'
@@ -475,6 +477,25 @@ function accentMeadow(
       dot(pal.goldSand, 0.82)
       if (hi) dot(pal.honey, 0.5)
       else if (lo) dot(pal.dune, 0.55)
+      // Task 88 — paint the dune FORM the relief already carries. The wash was
+      // position-independent gold, so at reading distance the crescents vanished into
+      // one flat smear. Sample duneField itself: pale sand on the crests, and a value
+      // drop on the leeward slip faces (the forward-theta downslope), so the echelon
+      // reads as ridge lines with shadowed slip faces — structure tied to the landform,
+      // in the wedge's own golds. Bake-time only; duneField is already 0 on the lane,
+      // at the limbs, across the oasis basin and by the ocean shore.
+      const hDune = duneField(nx, ny, nz)
+      if (hDune > 0) {
+        const E = 0.02
+        const cosE = Math.cos(E)
+        const sinE = Math.sin(E)
+        const fwd = duneField(nx, ny * cosE - nz * sinE, ny * sinE + nz * cosE)
+        const slope = (fwd - hDune) / E
+        const crest = THREE.MathUtils.smoothstep(hDune / DUNE_AMP, 0.5, 0.9)
+        if (crest > 0) dot(pal.sand, 0.5 * crest)
+        const lee = THREE.MathUtils.smoothstep(-slope, 0.2, 0.9)
+        if (lee > 0) c.multiplyScalar(1 - 0.16 * lee * g)
+      }
     } else if (band === 1) {
       // B1 AKNA: warm tuff-pink meadow SURROUND, so the rich-brown canyon (painted
       // by the biomeTint 'canyon' kind) reads as clay ADDED onto pink-warm ground —
