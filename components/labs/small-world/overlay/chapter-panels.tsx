@@ -68,6 +68,56 @@ const MOBILE_STYLES = `
   }
 `
 
+type Front = 'comic' | 'details'
+
+/**
+ * THE CHAPTER THAT INTRODUCES HER LEADS WITH WHO SHE IS.
+ *
+ * ============================================================================
+ * THE DEFECT (blind audit, finding 2)
+ * ============================================================================
+ * On a phone the two leaves share one box and the comic is in front, so the
+ * identity leaf is the hidden face of the stack in ALL SIX chapters. Measured:
+ * `document.elementFromPoint` over the centre of the "Alwina Harutyunyan" text
+ * node returns the manga `IMG` — the name is painted and fully occluded, and so
+ * are her one-line role description, her LinkedIn and the "the plain CV" door.
+ * The auditor completed an entire phone playthrough, flings and ending
+ * included, without once seeing her name, and did not find the plain CV at all.
+ *
+ * ============================================================================
+ * WHY THE DEFAULT AND NOT A NEW SURFACE
+ * ============================================================================
+ * The obvious repairs are a persistent identity strip or a redesigned tab, and
+ * both add chrome to the one band of a 390px screen that is not already spoken
+ * for — which is the band the checkpoint mascots stand in, and keeping the cards
+ * off them is a standing law with its own model (`peeker-stage.ts`). Captured at
+ * chapter 1, a strip carrying her name, her line and the CV door needs ~68px of
+ * that band and reaches up into the easel.
+ *
+ * The stack already has a front and a back and a control that swaps them. What
+ * was wrong was never that the mechanism was missing; it was that chapter 1
+ * pointed it at the wrong face. So chapter 1 — the introduction, and the only
+ * chapter whose sheet carries the intro block at all — opens on the details,
+ * and the story takes the front from chapter 2 on.
+ *
+ * IT ALSO FIXES THE AFFORDANCE, which is the half a strip would not have. The
+ * audit's words for the tab were "a decorative sticker, not a control", and the
+ * reason is that nothing in the piece ever demonstrated it: it read "+ Details"
+ * over a comic that was already there. Landing on chapter 1 with the comic
+ * peeking behind and the tab reading "← Comic" demonstrates the swap on the
+ * first stop, which is what makes chapters 2 through 6 navigable.
+ *
+ * DESKTOP IS UNTOUCHED BY CONSTRUCTION, not by care: every rule that reads
+ * `data-front` lives inside the `max-width: 900px` query, so above it the two
+ * leaves are flanked side by side and this value has no effect. The one place
+ * it leaked was the manga card's own click handler — see `onExpand`.
+ *
+ * ONE CHAPTER, for the reason `info-page-spec.ts` gives for printing her name on
+ * one sheet: repeated on all six it stops being an introduction and becomes a
+ * watermark.
+ */
+const defaultFront = (chapter: number): Front => (chapter === 0 ? 'details' : 'comic')
+
 /**
  * One chapter stop's spread: her manga page on the left, her words on the right.
  *
@@ -109,7 +159,17 @@ export function ChapterPanels({
   // used to label the manga "Page" and the CV card "Story", which told the reader
   // the pictures were the packaging and the bullet points were the substance.
   // Exactly backwards, and the blind review caught it.
-  const [front, setFront] = useState<'comic' | 'details'>('comic')
+  //
+  // A CHOICE BELONGS TO THE CHAPTER IT WAS MADE IN. This component is mounted
+  // ONCE for the whole journey and re-fed a new `index`, so a `useState` default
+  // would apply to chapter 1 and then never again — the reader's flip on chapter
+  // 2 would ride along to chapters 3 through 6. Storing which chapter the choice
+  // was made for, and falling back to the chapter's own default otherwise, keeps
+  // both halves: the default follows the chapter, the flip stays put while you
+  // are in it.
+  const [chosen, setChosen] = useState<{ chapter: number; front: Front } | null>(null)
+  const front: Front = chosen?.chapter === index ? chosen.front : defaultFront(index)
+  const setFront = (f: Front) => setChosen({ chapter: index, front: f })
 
   // The registration's LIFETIME is this component's, which is what makes "no advance during travel"
   // structural rather than a flag: this panel only renders while it is up, so a missed click with no
@@ -167,7 +227,16 @@ export function ChapterPanels({
           page={page}
           chapterNumber={index + 1}
           enter={enter}
-          onExpand={() => (front === 'comic' ? setExpanded(true) : setFront('comic'))}
+          // A CLICK THAT REACHES THIS CARD ALWAYS MEANS "OPEN IT". It used to
+          // branch on `front` and swap the stack instead when the details were
+          // up — dead code, because the mobile rule gives the art card
+          // `pointer-events: none !important` in exactly that state, so the
+          // branch was unreachable on the only viewport that could produce it.
+          // It stopped being dead the moment chapter 1 defaulted to details:
+          // on DESKTOP, where no `data-front` rule applies, chapter 1's card
+          // would have swapped a stack that is not stacked instead of opening
+          // the lightbox.
+          onExpand={() => setExpanded(true)}
         />
       ) : null}
 
@@ -179,7 +248,9 @@ export function ChapterPanels({
       <button
         type="button"
         className="sw-stack-tab"
-        onClick={() => setFront((f) => (f === 'comic' ? 'details' : 'comic'))}
+        // Not an updater: `front` is derived from the chapter, so the current
+        // value is the one rendered above rather than one React holds.
+        onClick={() => setFront(front === 'comic' ? 'details' : 'comic')}
         // AN AFFORDANCE, not a word. The audit found every fact on the phone
         // behind this control and nothing about it saying there was anything
         // behind it — a bare noun reads as a label for what you are looking at.

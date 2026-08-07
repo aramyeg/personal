@@ -5,9 +5,12 @@ import { TRACK_END } from '../components/labs/small-world/ending-timeline'
 // and is now at 0.49/6), and a hard-coded literal would have gone on passing while pointing at
 // empty travel.
 import {
+  DWELL_MID,
+  TRAVEL_END,
   chapterDwellProgress,
   chapterTravelProgress,
 } from '../components/labs/small-world/journey-timeline'
+import { CHAPTER_COUNT } from '../components/labs/small-world/chapters'
 // ...and the words come from the leaf's own spec for the same reason. This test
 // used to assert the literals 'The Pull' and 'Chapter 1', which lived on the data
 // card's eyebrow; Task 76 rebuilt the right leaf as a four-beat manga page in
@@ -210,12 +213,11 @@ test.describe('Small World lab', () => {
     await waitForSceneReady(page)
     await scrollToProgress(page, chapterDwellProgress(0))
     await expect(page.getByTestId('sw-panel-data')).toBeVisible({ timeout: 10_000 })
-    // On a phone the spread is a stack and the comic is in front; the details leaf is
-    // one documented tap behind it. The tab is display:none on desktop, so this is the
-    // same journey on both without a viewport branch.
-    const tab = page.locator('.sw-stack-tab')
-    if (await tab.isVisible()) await tab.click()
-
+    // NO TAP HERE ANY MORE, and its absence is the assertion (Task 85, finding 2).
+    // The stack used to put the comic in front on every chapter, so on a phone this
+    // door was behind the manga page and the audit did not find it at all. Chapter 1
+    // now opens on the details, which means "one interaction" is the CLICK BELOW on
+    // both form factors rather than a tap to find the door and then a click on it.
     const link = page.getByTestId(CV_SHEET_LINK_TESTID)
     await expect(link).toBeVisible({ timeout: 10_000 })
     // A WORD, not an icon — the whole remedy for the pattern the research found.
@@ -299,5 +301,119 @@ test.describe('Small World lab', () => {
     await page.getByTestId(CV_CLOSE_TESTID).click()
     await expect(cv).toBeHidden()
     await expect(ending.getByTestId('sw-connect-restart')).toBeVisible()
+  })
+  /**
+   * TASK 85, FINDING 2 — a phone visitor who taps NOTHING still learns who she is.
+   *
+   * The audit completed an entire phone playthrough without once seeing her name:
+   * the identity leaf was the hidden face of the stack in all six chapters, and
+   * `elementFromPoint` over the centre of the name node returned the manga IMG.
+   * This asserts the remedy in the audit's own terms — painted AND hit-testable at
+   * chapter 1's stop with no interaction at all — because "rendered" was already
+   * true when it was broken.
+   */
+  test('the first stop shows her name and her line without being touched', async ({ page }) => {
+    await page.goto('/labs/small-world')
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    await scrollToProgress(page, chapterDwellProgress(0))
+    const leaf = page.getByTestId('sw-panel-data')
+    await expect(leaf).toBeVisible({ timeout: 10_000 })
+    await awaitStable(leaf)
+
+    for (const text of [ALWINA.name, ALWINA.says]) {
+      const node = leaf.getByText(text, { exact: true }).first()
+      await expect(node, `"${text}" is on the page`).toBeVisible({ timeout: 10_000 })
+      // TOPMOST AT ITS OWN CENTRE. Visibility alone is what the audit found to be
+      // true and useless: the name was painted at full opacity underneath an
+      // opaque manga page.
+      const occluded = await node.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        return top ? !(top === el || el.contains(top) || top.contains(el)) : true
+      })
+      expect(occluded, `"${text}" is covered by something`).toBe(false)
+    }
+    // ...and the escape hatch is on the same face, which is the other half of the
+    // finding: the plain CV was not findable on a phone either.
+    await expect(page.getByTestId(CV_SHEET_LINK_TESTID)).toBeVisible({ timeout: 10_000 })
+  })
+
+  /**
+   * TASK 85, FINDING 4 — a headline may not be set wider than the card that holds it.
+   *
+   * Chapter 3's "THE SMALL STUFF" had its initial T cut off by the leaf's left edge
+   * and hung STUFF over the right border, at 1440, 1024, 390 and 360 alike. The unit
+   * gate holds the arithmetic; THIS measures the rendered box, which is the only
+   * thing that can catch a string whose real metrics beat the estimate.
+   */
+  test('no chapter sets its headline wider than its own leaf', async ({ page }) => {
+    await page.goto('/labs/small-world')
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      await scrollToProgress(page, chapterDwellProgress(c))
+      const leaf = page.getByTestId('sw-info-page')
+      await expect(leaf).toBeVisible({ timeout: 10_000 })
+      await awaitStable(leaf)
+      const box = await leaf.evaluate((el) => {
+        const hero = el.querySelector('[data-testid="sw-info-hero"]')
+        const span = hero?.querySelector('span')
+        if (!span) return null
+        const lb = el.getBoundingClientRect()
+        const hb = span.getBoundingClientRect()
+        return {
+          text: span.textContent,
+          overflowLeft: lb.left - hb.left,
+          overflowRight: hb.right - lb.right,
+        }
+      })
+      if (!box) continue
+      expect(box.overflowLeft, `chapter ${c + 1} "${box.text}" is cut on the left`).toBeLessThanOrEqual(0)
+      expect(box.overflowRight, `chapter ${c + 1} "${box.text}" overhangs the right`).toBeLessThanOrEqual(0)
+    }
+  })
+
+  /**
+   * TASK 85, FINDING 6 — a reader who stops anywhere gets a whole picture.
+   *
+   * The photo reveal was a scroll-bound `clip-path` with no completion, so parking
+   * at local 0.25 of any chapter left the panel 93.18% blank — permanently, since
+   * the page's clock is the scroll. The T82 inequality (`PAGE_SPAN_END < DWELL_MID`)
+   * held the whole time and did not prevent it, because a reader does not only rest
+   * where a fling snaps: the card's entrance rides the arrival wall clock and always
+   * completes while the page's ink rides scroll.
+   *
+   * So this sweeps the whole band in which a card is up — TRAVEL_END, where the leaf
+   * starts arriving, to PANEL_END — rather than the story stops alone.
+   */
+  test('nothing on the leaf is hidden at any position a reader can park at', async ({ page }) => {
+    await page.goto('/labs/small-world')
+    test.skip(!(await webglAvailable(page)), 'no WebGL in this browser build')
+    await waitForSceneReady(page)
+    for (let c = 0; c < CHAPTER_COUNT; c++) {
+      for (const local of [TRAVEL_END + 0.01, 0.28, 0.34, DWELL_MID, 0.6]) {
+        await scrollToProgress(page, (c + local) / CHAPTER_COUNT)
+        const leaf = page.getByTestId('sw-info-page')
+        if (!(await leaf.isVisible().catch(() => false))) continue
+        const worst = await leaf.evaluate((el) => {
+          let hidden = 0
+          for (const img of el.querySelectorAll('img')) {
+            const cs = getComputedStyle(img)
+            // A clip is what could remove; a mask is what may only dim.
+            const m = /inset\(([^)]*)\)/.exec(cs.clipPath)
+            if (m) {
+              const right = m[1].trim().split(/\s+/)[1] ?? '0px'
+              if (right.endsWith('%')) hidden = Math.max(hidden, parseFloat(right))
+            }
+          }
+          return hidden
+        })
+        expect(
+          worst,
+          `chapter ${c + 1} at local ${local}: art ${worst}% removed by a clip`
+        ).toBeLessThanOrEqual(0)
+      }
+    }
   })
 })

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -115,5 +115,79 @@ describe('the canvas is wired to advance on a miss', () => {
     )
     expect(src).toMatch(/onPointerMissed=\{firePanelAdvance\}/)
     expect(src).toMatch(/from '\.\.\/panel-tap'/)
+  })
+})
+
+describe('the phone stack introduces her before it tells the story', () => {
+  /**
+   * TASK 85, FINDING 2 — ON A PHONE HER NAME WAS NEVER SHOWN.
+   *
+   * At 390x844 the two leaves share one box and the comic was in front in all
+   * six chapters, so the identity leaf was permanently the hidden face:
+   * `elementFromPoint` over the centre of the "Alwina Harutyunyan" node returned
+   * the manga IMG. Her name, her role line, her LinkedIn and the "the plain CV"
+   * door all lived there. A whole phone playthrough never surfaced any of them.
+   *
+   * Chapter 1 — the introduction, and the only chapter whose sheet carries the
+   * intro block — now opens on the details. Everything after it leads with the
+   * story, so the name is an introduction rather than a watermark.
+   *
+   * The tab is queried by CLASS and not by role: it is `display: none` inline
+   * until the phone media query switches it on, and a hidden element is out of
+   * testing-library's accessibility tree, so a role query finds nothing here
+   * whatever the label says.
+   */
+  afterEach(cleanup)
+  const front = () => screen.getByTestId('sw-panel-tap').getAttribute('data-front')
+  const tab = () => document.querySelector('.sw-stack-tab') as HTMLButtonElement
+
+  it('opens chapter 1 on the details and every other chapter on the comic', () => {
+    for (const [i] of chapters.entries()) {
+      const { unmount } = render(<ChapterPanels index={i} enter={1} page={1} onAdvance={null} />)
+      expect(front(), `chapter ${i + 1}`).toBe(i === 0 ? 'details' : 'comic')
+      unmount()
+    }
+  })
+
+  it('keeps the reader’s flip inside the chapter it was made in', () => {
+    // THE MOUNT IS ONE INSTANCE FOR THE WHOLE JOURNEY — `journey-overlay` re-feeds
+    // `index` rather than remounting — so a default held in `useState` would apply
+    // to chapter 1 and never again, and a flip made on chapter 2 would ride along
+    // to chapters 3 through 6.
+    const { rerender } = render(<ChapterPanels index={1} enter={1} page={1} onAdvance={null} />)
+    expect(front()).toBe('comic')
+    fireEvent.click(tab())
+    expect(front()).toBe('details')
+    // ...moving on drops it: chapter 3 is the story again.
+    rerender(<ChapterPanels index={2} enter={1} page={1} onAdvance={null} />)
+    expect(front()).toBe('comic')
+    // ...and coming back to chapter 1 still gets chapter 1’s own default.
+    rerender(<ChapterPanels index={0} enter={1} page={1} onAdvance={null} />)
+    expect(front()).toBe('details')
+  })
+
+  it('names the direction the tab goes in, in both states', () => {
+    // "A bare noun reads as a label for what you are looking at" — the tab’s own
+    // note. Landing on chapter 1 with it offering the comic is what teaches the
+    // control, which is the half of the audit’s "decorative sticker" finding
+    // that a persistent identity strip would not have fixed.
+    render(<ChapterPanels index={0} enter={1} page={1} onAdvance={null} />)
+    expect(tab().getAttribute('aria-label')).toMatch(/back to the comic/i)
+    expect(tab().textContent).toMatch(/comic/i)
+    fireEvent.click(tab())
+    expect(tab().getAttribute('aria-label')).toMatch(/show the details/i)
+  })
+
+  it('always opens the lightbox when a click reaches the comic card', () => {
+    // The handler used to branch on `front` and swap the stack when the details
+    // were up. That branch was unreachable — the mobile rule gives the art card
+    // `pointer-events: none !important` in exactly that state — until chapter 1
+    // defaulted to details, at which point DESKTOP chapter 1 (where no
+    // `data-front` rule applies at all) would have swapped a stack that is not
+    // stacked instead of opening the lightbox.
+    render(<ChapterPanels index={0} enter={1} page={1} onAdvance={null} />)
+    expect(front()).toBe('details')
+    fireEvent.click(screen.getByTestId('sw-manga-card'))
+    expect(screen.getByTestId('sw-manga-lightbox')).toBeTruthy()
   })
 })
