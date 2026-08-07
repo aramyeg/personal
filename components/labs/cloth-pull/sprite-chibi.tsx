@@ -67,32 +67,33 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
       }
     }, [announcedReady, onReady])
 
-    const px = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.h
-    const pw = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.w
-
-    const applyFrame = (idx: number, bob: number) => {
-      const st = state.current
-      const f = SPRITE_FRAMES[idx]
-      const m = mesh.current
-      if (!m) return
-      if (st.frame !== idx) {
-        st.frame = idx
-        const tex = textures[idx]
-        if (material.current) {
-          material.current.map = tex
-          material.current.needsUpdate = true
+    const applyFrame = useMemo(() => {
+      const px = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.h
+      const pw = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.w
+      return (idx: number, bob: number) => {
+        const st = state.current
+        const f = SPRITE_FRAMES[idx]
+        const m = mesh.current
+        if (!m) return
+        if (st.frame !== idx) {
+          st.frame = idx
+          const tex = textures[idx]
+          if (material.current) {
+            material.current.map = tex
+            material.current.needsUpdate = true
+          }
+          depthMaterial.map = tex
+          depthMaterial.needsUpdate = true
+          m.scale.set(pw(f), px(f), 1)
         }
-        depthMaterial.map = tex
-        depthMaterial.needsUpdate = true
-        m.scale.set(pw(f), px(f), 1)
+        // feet line at the group origin; frame centered horizontally
+        m.position.set(position[0], position[1] + px(f) / 2 + bob, position[2])
+        // fist anchor in GROUP-LOCAL px (getFist lifts it to world space)
+        const ax = position[0] + (f.anchorX / f.w - 0.5) * pw(f)
+        const ay = position[1] + px(f) - (f.anchorY / f.h) * px(f) + bob
+        state.current.fist.set(ax, ay, position[2] + 6)
       }
-      // feet line at the group origin; frame centered horizontally
-      m.position.set(position[0], position[1] + px(f) / 2 + bob, position[2])
-      // fist anchor in GROUP-LOCAL px (getFist lifts it to world space)
-      const ax = position[0] + (f.anchorX / f.w - 0.5) * pw(f)
-      const ay = position[1] + px(f) - (f.anchorY / f.h) * px(f) + bob
-      state.current.fist.set(ax, ay, position[2] + 6)
-    }
+    }, [textures, depthMaterial, heightPx, position])
 
     useImperativeHandle(
       ref,
@@ -143,7 +144,7 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
           return out
         },
       }),
-      [textures, heightPx, reduced, position]
+      [applyFrame, heightPx, reduced]
     )
 
     return (
