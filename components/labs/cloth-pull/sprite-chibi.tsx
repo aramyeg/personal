@@ -114,7 +114,9 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
             if (effort < backEdge) st.strainLevel = target
           }
 
-          if (!reduced && st.strainLevel > 0 && speedN < 0.55) {
+          // strain frames only when she is genuinely stopped by a pull —
+          // transient effort spikes at cruise must not pop the strain face
+          if (!reduced && st.strainLevel > 0 && speedN < 0.45 && effort > 0.4) {
             applyFrame(8 + (st.strainLevel - 1), 0)
             return
           }
