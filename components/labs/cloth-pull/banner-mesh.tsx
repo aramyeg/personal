@@ -36,9 +36,11 @@ export const BannerMesh = forwardRef<
     const pos = new Float32Array(nx * ny * 3)
     const uv = new Float32Array(nx * ny * 2)
     const idx: number[] = []
+    // u = 0 is the cloth's LEADING edge (screen right, nearest her); the
+    // painted texture reads left-to-right, so u maps mirrored into uv.x
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
-        uv[(j * nx + i) * 2] = i / dims.segX
+        uv[(j * nx + i) * 2] = 1 - i / dims.segX
         uv[(j * nx + i) * 2 + 1] = 1 - j / dims.segY
       }
     }

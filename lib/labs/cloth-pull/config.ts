@@ -1,58 +1,64 @@
 /**
- * Every tunable for /labs/cloth-pull in one object, jerry-style.
- * Numbers seeded from the task-01 proof; tuned by capture afterwards.
+ * Every tunable for /labs/cloth-pull in one object.
  *
- * World convention: SIM runs in y-DOWN pixel space (like the proof);
- * the render layer flips to three's y-up at write time.
+ * Staging (Aram's restage, 2026-08-08): the chibi walks FORWARD (screen
+ * right) with her hands behind her back, towing the cloth banner behind her
+ * on two strings. One verlet chain — pinned only at her fists, free at the
+ * far end — carries a short string run and then the cloth's top hem; the
+ * banner poses analytically off that chain. The stage is a treadmill: she
+ * walks in place, floor marks scroll, a travel-drag force streams the cloth.
+ *
+ * World convention: SIM runs in y-DOWN pixel space; the render layer flips
+ * to three's y-up at write time.
  */
 
 export const CFG = {
-  rope: {
-    /** verlet points along the line */
-    n: 52,
-    /** designed sag as a fraction of viewport height */
-    sag: 0.045,
-    /** spring stiffness pulling each point toward the art-directed baseline */
-    baselineStiffness: 110,
-    gravity: 180,
-    damping: 0.978,
+  chain: {
+    /** verlet points along string + top hem */
+    n: 44,
+    /** spring stiffness toward the art-directed trailing baseline */
+    baselineStiffness: 90,
+    gravity: 210,
+    damping: 0.975,
     /** Jacobi distance-constraint iterations per step */
-    iterations: 6,
+    iterations: 8,
     /** Laplacian smoothing factor applied after constraints */
-    smooth: 0.16,
-    /** rest-length shortening per unit of tension (pull tautens the line) */
-    tensionShorten: 0.022,
-    /** slack multiplier on the initial segment length */
-    slack: 1.01,
-    /** ambient wind force amplitudes (x, y) */
-    windX: 120,
-    windY: 60,
+    smooth: 0.14,
+    /** slack multiplier on the segment rest length */
+    slack: 1.005,
+    /** designed droop of the trailing baseline at zero speed, frac of vh */
+    droop: 0.06,
+    /** droop shrinks toward this fraction at full cruise */
+    droopMovingFrac: 0.45,
+    /** travel drag: leftward force per px/s of speed, per point */
+    travelDrag: 0.9,
+    /** ambient wind force amplitudes */
+    windX: 90,
+    windY: 70,
+    /** string run between fists and the cloth's leading corner, frac of vw */
+    stringFrac: 0.055,
+    stringMin: 44,
   },
 
   banner: {
-    /** cloth grid resolution (desktop) */
+    /** cloth grid resolution (desktop / low-power) */
     segX: 24,
     segY: 10,
-    /** cloth grid resolution (low-power / mobile) */
     segXLow: 16,
     segYLow: 8,
-    /** hanging loops sampling the rope curve */
-    loops: 5,
     /** banner width cap, px */
     widthMax: 860,
-    /** loop thread length, px */
-    threadLen: 26,
+    /** sewn channel between the chain and the painted cloth top, px */
+    hemChannel: 6,
     /** hem pushed back in z: rake * v^rakePow */
     rake: -70,
     rakePow: 0.85,
     /** wave amplitude clamps: min(height * ampH, width * ampW) */
     ampH: 0.21,
     ampW: 0.085,
-    /** wave phase field */
     waveLenU: 11.5,
     waveLenV: 2.6,
     waveSpeed: 4.0,
-    /** corner furl strength */
     curl: 0.5,
     /** swing spring on the rigid-body angle DOF */
     swingK: 30,
@@ -60,11 +66,13 @@ export const CFG = {
     swingAccGain: 0.0009,
     swingWindGain: 1.4,
     swingMax: 0.12,
-    /** weight fed back into the rope, split across loops (px/s^2 kernel force) */
-    weight: 900,
-    /** legibility: wave-amp dip over the type region (0..1 = full calm) */
+    /** hem trails backward with speed: radians per px/s */
+    speedTilt: 0.0011,
+    speedTiltMax: 0.38,
+    /** cloth weight fed back into the chain along the hem span */
+    weight: 760,
+    /** legibility: wave-amp dip over the type region */
     textCalm: 0.55,
-    /** type region in uv space, softened by smoothstep margins */
     textU0: 0.16,
     textU1: 0.84,
     textV0: 0.14,
@@ -74,112 +82,98 @@ export const CFG = {
   },
 
   paint: {
-    /** oversample multiplier on top of min(dpr, dprCap) */
     oversample: 1.35,
     dprCap: 2,
-    /** hard guard on texture width, px */
     maxTexWidth: 4096,
     maxLines: 3,
     fontFamily:
       '"Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif',
-    /** fraction of banner height the biggest line may take */
     maxFontFrac: 0.34,
     minFontPx: 18,
     lineHeight: 1.16,
-    /** horizontal padding fraction kept clear of type */
     padX: 0.1,
   },
 
-  drive: {
-    /** release spring toward the rest haul distance */
-    springK: 120,
-    springDamp: 19,
-    /** flick: velocity (px/s) beyond which release keeps momentum */
-    flickVel: 520,
-    /** effort smoothing: effort tracks |velocity| / effortVelRef */
-    effortVelRef: 900,
-    effortRise: 7,
-    effortFall: 2.4,
-    /** haul distance the intro travels (fraction of viewport width) */
-    introFrac: 0.62,
-    introDuration: 2.5,
-    /** soft clamp range around rest, fractions of viewport width */
-    overhaulFrac: 0.1,
-    underhaulFrac: 0.85,
-    /** keyboard nudge, px */
-    keyStep: 140,
-    /** idle inviting tug: period (s) and impulse (px/s) */
-    tugPeriod: 4.6,
-    tugImpulse: 260,
+  motion: {
+    /** cruise walking speed, px/s of ground scroll */
+    cruise: 110,
+    /** spring pulling speed toward its target */
+    speedK: 3.2,
+    /** stretch the chain always carries (weight + drag) — braking ignores it */
+    stretchIdle: 0.022,
+    /** braking beyond the idle stretch, px/s per unit stretch */
+    brakePerStretch: 1700,
+    /** flick boost decay, 1/s */
+    boostDecay: 1.8,
+    /** keyboard nudge boost, px/s */
+    keyBoost: 160,
+    /** intro walk-in speed, frac of vw per second */
+    introSpeedFrac: 0.3,
+    /** effort springs (jerry's posture feel) */
+    effortRise: 6,
+    effortFall: 2.2,
+    /** effort from chain stretch: stretch fraction at which effort = 1 */
+    stretchRef: 0.06,
+    /** effort from speed deficit under cruise */
+    deficitGain: 0.6,
+    /** max pointer pull distance from the grab point, px */
+    grabRange: 520,
   },
 
   chibi: {
-    /** effort spring on the lean overlay (jerry's posture numbers) */
+    /** spring on the forward-lean overlay */
     leanK: 150,
     leanDamp: 16,
-    /** max lean overlay, radians, spread over the spine chain */
-    leanMax: 0.42,
-    /** extra effort fed to the pose while the user holds the line */
-    gripEffort: 0.3,
+    /** max forward lean overlay, radians, spread over the spine chain */
+    leanMax: 0.32,
     leanSpread: [1.0, 0.85, 0.6] as const,
-    /** haul clip playback rate range mapped from effort */
-    rateMin: 0.55,
-    rateMax: 1.75,
-    /** crossfade time between hold and haul clips, s */
+    /** walk clip playback rate range mapped from speed/cruise */
+    rateMin: 0.5,
+    rateMax: 1.9,
     fade: 0.25,
   },
 
   scene: {
-    /** rope endpoints, fractions of viewport (anchor far enough right that
-     * the banner can start fully off-screen while still riding the rope) */
-    anchorXFrac: 1.65,
-    handXFrac: 0.2,
-    /** fixed sim timestep and clamp */
     fixedDt: 1 / 60,
     maxDt: 1 / 20,
     dprCap: 2,
-    /** rope tube radius px and radial segments */
-    ropeRadius: 3.2,
-    ropeSides: 6,
-    ropeSamples: 96,
-    /** braid stripe lay length, px per twist (texture scroll ties to haul) */
-    ropeLay: 26,
+    /** string tube radius px */
+    stringRadius: 1.7,
+    stringSides: 5,
+    stringSamples: 28,
+    /** floor scroll marks */
+    markSpacing: 170,
   },
 } as const
 
 export type ClothPullConfig = typeof CFG
 
-/** Per-viewport composition: how the stage is divided between chibi and cloth. */
+/** Per-viewport composition. She stands right-of-center; cloth trails left. */
 export interface StageLayout {
   chibiHeightFrac: number
+  /** her standing x, fraction of viewport width */
   chibiXFrac: number
   bannerWidthFrac: number
   bannerAspect: number
-  /** where the banner center rests on the rope once hauled in */
-  restCenterFrac: number
   /** chibi feet line, fraction of viewport height */
   floorFrac: number
 }
 
 export function layoutFor(w: number): StageLayout {
   if (w < 760) {
-    // phone: smaller chibi tucked left, taller banner owning the width,
-    // whole stage lifted so it doesn't sit in the bottom third
     return {
       chibiHeightFrac: 0.3,
-      chibiXFrac: 0.12,
-      bannerWidthFrac: 0.62,
+      chibiXFrac: 0.78,
+      bannerWidthFrac: 0.6,
       bannerAspect: 0.52,
-      restCenterFrac: 0.65,
       floorFrac: 0.72,
     }
   }
   return {
     chibiHeightFrac: 0.52,
-    chibiXFrac: 0.17,
-    bannerWidthFrac: 0.5,
+    chibiXFrac: 0.76,
+    bannerWidthFrac: 0.48,
     bannerAspect: 0.36,
-    restCenterFrac: 0.63,
     floorFrac: 0.79,
   }
 }

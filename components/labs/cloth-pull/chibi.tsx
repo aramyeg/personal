@@ -1,11 +1,12 @@
 'use client'
 
 /**
- * The chibi: meshopt-compressed rigged GLB with two Blender-baked clips
- * ("haul" tug-of-war stroke, "hold" breathing). Effort crossfades the clips,
- * scales the stroke rate, and drives a spring-damped lean overlay spread
- * over the spine chain. The rope is pinned to the RightHand bone — the
- * parent reads its world position every frame; there is no runtime IK.
+ * The chibi walker: rigged GLB, clips found by name — "walk"/"strain"/"hold"
+ * when the authored set is present, any walking clip as the temporary
+ * restage stand-in. Speed drives the stride rate, effort drives a
+ * spring-damped FORWARD lean spread over the spine chain (she tows the
+ * cloth), and the parent reads the fist-cluster anchor every frame to pin
+ * the chain — no runtime IK.
  */
 
 import {
@@ -20,18 +21,22 @@ import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import { CFG } from '@/lib/labs/cloth-pull/config'
 
-export const CHIBI_URL = '/labs/cloth-pull/chibi.glb'
+export const CHIBI_URL = '/labs/cloth-pull/chibi-walk.glb'
 /** measured from the exported GLB (bbox height in model units) */
 const MODEL_HEIGHT = 0.8648
+/** fist-cluster anchor relative to the Hips bone, in body heights:
+ * behind the tailbone (hands clasped behind the back) */
+const ANCHOR_BACK = 0.12
+const ANCHOR_DOWN = 0.02
 
 export interface ChibiHandle {
   /** advance mixer + overlays; call once per rendered frame, before getFist */
-  frame(dt: number, effort: number, hauling: boolean): void
-  /** world position of the leading fist (rope pin), after frame() */
+  frame(dt: number, effort: number, speedN: number): void
+  /** world position of the fist-cluster anchor (chain pin), after frame() */
   getFist(out: THREE.Vector3): THREE.Vector3
   ready: boolean
-  /** debug/e2e: current haul clip weight */
-  debugHaulWeight: number
+  /** debug/e2e: current walk clip weight/rate */
+  debugRate: number
 }
 
 export interface ChibiProps {
@@ -39,19 +44,21 @@ export interface ChibiProps {
   position: [number, number, number]
   /** desired character height in world px */
   heightPx: number
+  /** extra yaw, radians, to face screen-right if the source faces elsewhere */
+  yaw?: number
   reduced: boolean
   onReady?: () => void
 }
 
 export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
-  { position, heightPx, reduced, onReady },
+  { position, heightPx, yaw = 0, reduced, onReady },
   ref
 ) {
   const { scene, animations } = useGLTF(CHIBI_URL)
   const group = useRef<THREE.Group>(null)
   const scale = heightPx / MODEL_HEIGHT
 
-  const { mixer, haul, hold, spineBones, fist } = useMemo(() => {
+  const { mixer, walk, strain, hold, spineBones, hips, hand } = useMemo(() => {
     scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         obj.castShadow = true
@@ -59,30 +66,38 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
       }
     })
     const mx = new THREE.AnimationMixer(scene)
-    const haulClip = THREE.AnimationClip.findByName(animations, 'haul')
-    const holdClip = THREE.AnimationClip.findByName(animations, 'hold')
-    const haulAction = haulClip ? mx.clipAction(haulClip) : null
-    const holdAction = holdClip ? mx.clipAction(holdClip) : null
-    for (const a of [haulAction, holdAction]) {
-      if (a) {
-        a.setLoop(THREE.LoopRepeat, Infinity)
-        a.play()
-      }
+    const byName = (re: RegExp) =>
+      animations.find((a) => re.test(a.name)) ?? null
+    const walkClip = byName(/walk/i) ?? animations[0] ?? null
+    const strainClip = byName(/strain/i)
+    const holdClip = byName(/hold/i)
+    const mk = (c: THREE.AnimationClip | null) => {
+      if (!c) return null
+      const a = mx.clipAction(c)
+      a.setLoop(THREE.LoopRepeat, Infinity)
+      a.play()
+      return a
     }
     const spines = ['Spine', 'Spine01', 'Spine02']
       .map((n) => scene.getObjectByName(n))
       .filter((b): b is THREE.Object3D => Boolean(b))
     return {
       mixer: mx,
-      haul: haulAction,
-      hold: holdAction,
+      walk: mk(walkClip),
+      strain: mk(strainClip),
+      hold: mk(holdClip),
       spineBones: spines,
-      fist: scene.getObjectByName('RightHand') ?? scene,
+      hips: scene.getObjectByName('Hips') ?? scene,
+      hand: scene.getObjectByName('RightHand'),
     }
   }, [scene, animations])
 
+  /** true once the authored hands-behind-back clips are in the asset */
+  const authored = strain !== null
+
   const lean = useRef({ x: 0, v: 0 })
-  const haulWeight = useRef(0)
+  const strainWeight = useRef(0)
+  const rate = useRef(1)
   const tmpQ = useRef(new THREE.Quaternion())
   const tmpQ2 = useRef(new THREE.Quaternion())
   const tmpAxis = useRef(new THREE.Vector3())
@@ -99,23 +114,27 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
     ref,
     () => ({
       ready: true,
-      get debugHaulWeight() {
-        return haulWeight.current
+      get debugRate() {
+        return rate.current
       },
-      frame(dt: number, effort: number, hauling: boolean) {
+      frame(dt: number, effort: number, speedN: number) {
         const C = CFG.chibi
-        const wantHaul = reduced ? 0 : hauling ? 1 : 0
-        haulWeight.current +=
-          (wantHaul - haulWeight.current) * Math.min(1, dt / C.fade)
-        if (haul) {
-          haul.setEffectiveWeight(haulWeight.current)
-          haul.timeScale =
-            C.rateMin + Math.min(1, effort) * (C.rateMax - C.rateMin)
+        rate.current = C.rateMin + Math.min(1.2, speedN) * (C.rateMax - C.rateMin)
+        const wantStrain = reduced ? 0 : Math.min(1, Math.max(0, effort - 0.15) * 1.6)
+        strainWeight.current +=
+          (wantStrain - strainWeight.current) * Math.min(1, dt / C.fade)
+
+        if (walk) {
+          walk.timeScale = reduced ? 0 : rate.current
+          walk.setEffectiveWeight(
+            (strain ? 1 - strainWeight.current : 1) * (hold && reduced ? 0 : 1)
+          )
         }
-        if (hold) hold.setEffectiveWeight(1 - haulWeight.current)
+        if (strain) strain.setEffectiveWeight(strainWeight.current)
+        if (hold) hold.setEffectiveWeight(reduced ? 1 : 0)
         mixer.update(dt)
 
-        // spring-damped lean overlay: the body overshoots its mark and settles
+        // spring-damped FORWARD lean: she tows weight behind her
         const target = Math.min(1.2, effort) * C.leanMax
         const st = lean.current
         st.v += (C.leanK * (target - st.x) - C.leanDamp * st.v) * dt
@@ -123,7 +142,8 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
         if (st.x > 0.0005 && spineBones.length) {
           for (let i = 0; i < spineBones.length; i++) {
             const bone = spineBones[i]
-            const angle = st.x * C.leanSpread[i] * (1 / spineBones.length) * 1.6
+            const angle =
+              -st.x * C.leanSpread[i] * (1 / spineBones.length) * 1.6
             const parent = bone.parent
             if (!parent) continue
             parent.getWorldQuaternion(tmpQ.current)
@@ -136,14 +156,21 @@ export const Chibi = forwardRef<ChibiHandle, ChibiProps>(function Chibi(
         }
       },
       getFist(out: THREE.Vector3) {
-        return fist.getWorldPosition(out)
+        if (authored && hand) {
+          return hand.getWorldPosition(out)
+        }
+        // stand-in walk clip swings its arms — anchor to the tailbone instead
+        hips.getWorldPosition(out)
+        out.x -= ANCHOR_BACK * heightPx
+        out.y -= ANCHOR_DOWN * heightPx
+        return out
       },
     }),
-    [mixer, haul, hold, spineBones, fist, reduced]
+    [mixer, walk, strain, hold, spineBones, hips, hand, authored, reduced, heightPx]
   )
 
   return (
-    <group ref={group} position={position} scale={scale}>
+    <group ref={group} position={position} scale={scale} rotation={[0, yaw, 0]}>
       <primitive object={scene} />
     </group>
   )

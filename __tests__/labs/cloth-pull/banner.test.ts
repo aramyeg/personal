@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bottomLeadingCorner,
   createSwing,
   poseBanner,
   stepSwing,
@@ -7,13 +8,13 @@ import {
   type BannerDims,
 } from '@/lib/labs/cloth-pull/banner'
 import { CFG } from '@/lib/labs/cloth-pull/config'
-import { atLength, createRope, ropeLength, stepRope } from '@/lib/labs/cloth-pull/rope'
+import { atLength, createChain, stepChain } from '@/lib/labs/cloth-pull/chain'
 
-const ROPE_OPTS = {
-  handX: 288,
-  handY: 360,
-  anchorX: 1555,
-  anchorY: 270,
+const CHAIN_OPTS = {
+  fistX: 1080,
+  fistY: 420,
+  stringLen: 80,
+  hemLen: 620,
   viewportH: 900,
 }
 
@@ -21,45 +22,43 @@ const DIMS: BannerDims = { width: 600, height: 216, segX: 24, segY: 10 }
 const NX = DIMS.segX + 1
 const NY = DIMS.segY + 1
 
-function settledRope() {
-  const rope = createRope(ROPE_OPTS)
-  for (let f = 0; f < 240; f++) {
-    stepRope(rope, 1 / 60, { time: 0, tension: 0, wind: 0 })
+function settledChain() {
+  const chain = createChain(CHAIN_OPTS)
+  for (let f = 0; f < 300; f++) {
+    stepChain(chain, 1 / 60, { time: 0, speed: 0, wind: 0 })
   }
-  return rope
+  return chain
 }
 
-function pose(time = 0, energy = 0.4) {
-  const rope = settledRope()
+function pose(time = 0, energy = 0.4, speed = 0) {
+  const chain = settledChain()
   const sw = createSwing()
   const out = new Float32Array(NX * NY * 3)
-  poseBanner(out, rope, sw, DIMS, {
-    sMid: ropeLength(rope) * 0.55,
-    time,
-    energy,
-    dt: 1 / 60,
-  })
-  return { rope, out }
+  poseBanner(out, chain, sw, DIMS, { time, energy, speed, dt: 1 / 60 })
+  return { chain, out }
 }
 
 describe('poseBanner', () => {
-  it('hangs the top edge from the sampled rope curve (thread length below it)', () => {
-    const { rope, out } = pose()
-    const sMid = ropeLength(rope) * 0.55
+  it('hangs the top edge just below the chain hem span', () => {
+    const { chain, out } = pose()
     for (const i of [0, NX >> 1, NX - 1]) {
       const u = i / DIMS.segX
-      const top = atLength(rope, sMid - DIMS.width / 2 + u * DIMS.width)
+      const top = atLength(chain, CHAIN_OPTS.stringLen + u * DIMS.width)
       const o = i * 3
-      const dx = out[o] - top.x
-      const dy = out[o + 1] - top.y
-      const dist = Math.hypot(dx, dy)
-      expect(dist).toBeGreaterThan(CFG.banner.threadLen * 0.5)
-      expect(dist).toBeLessThan(CFG.banner.threadLen * 2.2)
-      expect(dy).toBeGreaterThan(0)
+      const dist = Math.hypot(out[o] - top.x, out[o + 1] - top.y)
+      expect(dist).toBeLessThan(CFG.banner.hemChannel * 3 + 8)
+      expect(out[o + 1]).toBeGreaterThan(top.y - 2)
     }
   })
 
-  it('rows hang progressively lower (y-down) and rake pushes the hem back', () => {
+  it('the leading column (u=0) sits nearest her; trailing column far left', () => {
+    const { out } = pose()
+    const lead = out[0]
+    const trail = out[(NX - 1) * 3]
+    expect(lead).toBeGreaterThan(trail + DIMS.width * 0.8)
+  })
+
+  it('rows hang progressively lower and rake pushes the hem back in z', () => {
     const { out } = pose()
     const col = NX >> 1
     let prevY = -Infinity
@@ -73,46 +72,46 @@ describe('poseBanner', () => {
     expect(zHem).toBeLessThan(zTop - 30)
   })
 
-  it('wave displacement is near zero at the pinned top corners', () => {
-    const { rope, out } = pose(3.7, 1.0)
-    const sMid = ropeLength(rope) * 0.55
-    for (const i of [0, NX - 1]) {
-      const u = i / DIMS.segX
-      const top = atLength(rope, sMid - DIMS.width / 2 + u * DIMS.width)
-      const o = i * 3
-      const off = Math.hypot(out[o] - top.x, out[o + 1] - top.y)
-      expect(off).toBeLessThan(CFG.banner.threadLen * 1.6)
-      expect(Math.abs(out[o + 2])).toBeLessThan(8)
-    }
+  it('speed tilts the hang backward (toward -x, the trailing side)', () => {
+    const still = pose(0, 0.4, 0)
+    const moving = pose(0, 0.4, CFG.motion.cruise)
+    const col = NX >> 1
+    const hemO = ((NY - 1) * NX + col) * 3
+    const topO = (0 * NX + col) * 3
+    const stillLean = still.out[hemO] - still.out[topO]
+    const movingLean = moving.out[hemO] - moving.out[topO]
+    expect(movingLean).toBeLessThan(stillLean - 20)
   })
 
-  it('feeds the banner weight back into the rope at the loop points', () => {
-    const rope = settledRope()
+  it('feeds the cloth weight back into the chain along the hem span', () => {
+    const chain = settledChain()
     const sw = createSwing()
     const out = new Float32Array(NX * NY * 3)
-    poseBanner(out, rope, sw, DIMS, {
-      sMid: ropeLength(rope) * 0.55,
-      time: 0,
-      energy: 0,
-      dt: 1 / 60,
-    })
+    poseBanner(out, chain, sw, DIMS, { time: 0, energy: 0, speed: 0, dt: 1 / 60 })
     let totalFy = 0
-    let loadedPts = 0
-    for (const q of rope.pts) {
-      totalFy += q.fy
-      if (q.fy > 0) loadedPts++
-    }
+    for (const q of chain.pts) totalFy += q.fy
     expect(totalFy).toBeCloseTo(CFG.banner.weight, 0)
-    expect(loadedPts).toBeGreaterThanOrEqual(CFG.banner.loops)
-    expect(rope.pts[0].fy).toBe(0)
-    expect(rope.pts[rope.n - 1].fy).toBe(0)
+    expect(chain.pts[0].fy).toBe(0)
   })
 
-  it('produces only finite values at violent energy', () => {
-    const { out } = pose(12.3, 1.2)
+  it('produces only finite values at violent energy and speed', () => {
+    const { out } = pose(12.3, 1.2, 300)
     for (let i = 0; i < out.length; i++) {
       expect(Number.isFinite(out[i])).toBe(true)
     }
+  })
+})
+
+describe('bottomLeadingCorner', () => {
+  it('returns the bottom row, leading column vertex', () => {
+    const { out } = pose()
+    const c = bottomLeadingCorner(out, DIMS)
+    const o = DIMS.segY * NX * 3
+    expect(c.x).toBe(out[o])
+    expect(c.y).toBe(out[o + 1])
+    expect(c.z).toBe(out[o + 2])
+    // bottom-leading: right of the trailing bottom corner, below the top row
+    expect(c.y).toBeGreaterThan(out[1])
   })
 })
 
