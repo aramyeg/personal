@@ -42,6 +42,7 @@
  * Chapter order is the journey order, and it is also the biome order: chapter i
  * is told over biome i (spring, meadow, delta, desert, canyon, winter).
  */
+import { captionFor } from './alwina-cv'
 import { PALETTE } from './palette'
 
 export type StoryChapter = {
@@ -61,7 +62,15 @@ export type StoryChapter = {
   hook: string
   /** The body: short sentences, in the pack's order. Opinion first, receipt last. */
   lines: string[]
-  /** The museum wall label — role, employer, years, exactly as the pack writes it. */
+  /**
+   * The museum wall label — role, employer, years, exactly as the pack writes it.
+   *
+   * NOT TYPED HERE. `alwina-cv.ts` owns the credits as data and `captionFor`
+   * renders this house style off them, because the same five jobs are also
+   * printed by the leaf's colophon and by the plain CV — and before that file
+   * existed the three transcriptions had already drifted on how a year is
+   * abbreviated. One source, three renderings.
+   */
   caption: string
   /**
    * Short badges that land like a stamp press — and MOST STOPS HAVE NONE.
@@ -90,7 +99,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
       'Marketing is four years of studying why people click things.',
       "So I taught myself to code — I'd rather build than brief.",
     ],
-    caption: 'Master of Marketing & Business — Université Jean Moulin Lyon III, 2013–19',
+    caption: captionFor(0),
     stamps: [],
     tech: ['Marketing', 'Self-taught code'],
     accent: PALETTE.sprout,
@@ -104,7 +113,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
       'Anyone could change a page without waiting on a developer.',
       'Making it behave in every browser took longer than building it.',
     ],
-    caption: 'Frontend Developer — IU Networks, 2020–21',
+    caption: captionFor(1),
     stamps: [],
     tech: ['Frontend', 'Drag-and-drop', 'Cross-browser'],
     accent: PALETTE.honey,
@@ -114,7 +123,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
     theme: 'The small stuff',
     hook: 'Eight months on a sports platform. All the small stuff.',
     lines: ['The kind of work nobody screenshots.', 'Session time went up 15% anyway.'],
-    caption: 'UI/UX Engineer — Sportion, 2021',
+    caption: captionFor(2),
     stamps: [],
     tech: ['UI', 'UX', 'Interaction'],
     accent: PALETTE.river,
@@ -133,7 +142,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
       'Each brand got its own look, not a recolored template.',
       'And new brands still launched 40% faster.',
     ],
-    caption: 'React Developer — qiibee, 2021–23',
+    caption: captionFor(3),
     stamps: ['13 clients', '−40% build time'],
     tech: ['React', 'Component library', 'Design system'],
     accent: PALETTE.dune,
@@ -147,7 +156,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
       'Non-technical teams shipped their own pages with it.',
       'Page load dropped 20% while I was down there.',
     ],
-    caption: 'Full-stack Software Engineer — Wooskill, 2023–24',
+    caption: captionFor(4),
     stamps: ['−20% load'],
     tech: ['React', 'PHP', 'AWS'],
     accent: PALETTE.tuff,
@@ -160,7 +169,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
       'Real-time is a different discipline — nothing on screen waits for you.',
       'I keep the infrastructure under it too: code, three stacks.',
     ],
-    caption: 'Frontend Engineer — Sync Design Tech, 2025–now',
+    caption: captionFor(5),
     stamps: [],
     tech: ['Real-time', 'Maps', 'Infra as code'],
     accent: PALETTE.blossomDeep,

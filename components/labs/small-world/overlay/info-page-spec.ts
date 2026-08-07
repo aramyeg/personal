@@ -1,3 +1,4 @@
+import { ALWINA, footerFor } from '../alwina-cv'
 import type { Rect } from '../manga/types'
 
 /**
@@ -161,8 +162,9 @@ export type InfoPageSpec = {
       /**
        * How to reach her. LINKEDIN, NOT AN EMAIL: her real address is not known
        * to this repo, and a plausible-looking invented one on a real person's CV
-       * is the worst possible failure here. Swap it when Aram supplies the real
-       * one; do not guess.
+       * is the worst possible failure here. It lives in `alwina-cv.ts` — swap it
+       * there when Aram supplies the real one, and both this sheet and the plain
+       * CV move together. Do not guess.
        */
       contact: string
     }
@@ -233,22 +235,14 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
     ten: { hero: { kind: 'sfx', text: 'Self-taught', label: 'and it stuck' }, inverted: true },
     ketsu: {
       // Her name, carried over verbatim from the retired title card, plus the
-      // pack's identity line. What she IS is not typed here — `currentRole()`
-      // reads it off the last chapter, so a new job moves it and a stale role
-      // cannot survive an edit.
-      intro: {
-        name: 'Alwina Harutyunyan',
-        says: 'Frontend engineer with opinions about spacing.',
-        contact: 'linkedin.com/in/alwina-harutyunyan',
-      },
+      // pack's identity line and her LinkedIn — and all three are `alwina-cv.ts`'s
+      // now rather than three literals, because the plain CV the escape hatch
+      // opens prints exactly the same three at the top of its own page.
+      intro: ALWINA,
       line: 'A marketing degree, then code. Better order than it sounds.',
       tools: ['Marketing', 'Self-taught code'],
     },
-    footer: {
-      role: 'Master of Marketing & Business',
-      org: 'Université Jean Moulin Lyon III',
-      period: '2013–2019',
-    },
+    footer: footerFor(0),
   },
 
   // ── 2 · First Tools — IU Networks ───────────────────────────────────────────
@@ -267,7 +261,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       line: 'My first job was a drag-and-drop builder people actually used.',
       tools: ['Frontend', 'Drag-and-drop', 'Cross-browser'],
     },
-    footer: { role: 'Frontend Developer', org: 'IU Networks', period: '2020–2021' },
+    footer: footerFor(1),
   },
 
   // ── 3 · Taste — Sportion ────────────────────────────────────────────────────
@@ -293,7 +287,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       line: 'Eight months on a sports platform. All the small stuff.',
       tools: ['UI', 'UX', 'Interaction'],
     },
-    footer: { role: 'UI/UX Engineer', org: 'Sportion', period: '2021' },
+    footer: footerFor(2),
   },
 
   // ── 4 · One Craft, Many Colors — qiibee ─────────────────────────────────────
@@ -319,7 +313,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       line: 'Thirteen brands on one library — none of them looked bolted-on.',
       tools: ['React', 'Component library', 'Design system'],
     },
-    footer: { role: 'React Developer', org: 'qiibee', period: '2021–2023' },
+    footer: footerFor(3),
   },
 
   // ── 5 · Deeper — Wooskill ───────────────────────────────────────────────────
@@ -343,7 +337,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       line: 'I went full-stack: React up top, PHP and AWS underneath.',
       tools: ['React', 'PHP', 'AWS'],
     },
-    footer: { role: 'Full-stack Software Engineer', org: 'Wooskill', period: '2023–2024' },
+    footer: footerFor(4),
   },
 
   // ── 6 · The Observatory — Sync Design Tech ──────────────────────────────────
@@ -362,7 +356,7 @@ export const INFO_PAGES: readonly InfoPageSpec[] = [
       line: 'Now I build dashboards where the data never sits still.',
       tools: ['Real-time', 'Maps', 'Infra as code'],
     },
-    footer: { role: 'Frontend Engineer', org: 'Sync Design Tech', period: '2025–now' },
+    footer: footerFor(5),
   },
 ]
 
