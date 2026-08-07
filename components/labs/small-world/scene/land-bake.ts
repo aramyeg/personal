@@ -31,6 +31,7 @@ import {
   DUNE_AMP,
   TIDE_LAT_LO,
   TIDE_DEPTH,
+  WATER_LEVEL,
 } from './biomes'
 import { canonicalTheta, renewalGate } from './renewal'
 import { fieldDents, applyFieldMottle, type Pal } from './field-clay'
@@ -521,6 +522,27 @@ function accentMeadow(
 }
 
 /**
+ * Task 88 — the +x cap's own ground identity (pairs with biomes.capeBump). The cap sat
+ * outside every wedge's accent (accentLatGate → 0 by 0.86), so it wore the raw green
+ * height-ramp fallback — an unclaimed green scrap against the gold/canyon/snow wedges,
+ * which is a large part of why the right coast read amputated. Dry coastal grass with
+ * sand crests and terracotta rock pockets, faded in past nx 0.76: a headland palette
+ * that sits between every wedge's ground and the sea. A pure function of position and
+ * IDENTICAL in both variants (called by both bakes and the epilogue pass), so the
+ * grazing-limb A===B pin is untouched.
+ */
+function capCoastPaint(c: THREE.Color, pal: Pal, nx: number, ny: number, nz: number): void {
+  // Fade IN across exactly the band the wedge accent fades OUT (accentLatGate: 0.74 → 0.86),
+  // so no ring of unclaimed fallback green survives between a wedge's ground and the cap's.
+  const g = THREE.MathUtils.smoothstep(nx, 0.74, 0.86)
+  if (g <= 0) return
+  c.lerp(pal.meadowDry, 0.62 * g)
+  const spk = Math.sin(41.3 * nx + 2.1) * Math.sin(37.7 * ny - 1.3) * Math.sin(43.1 * nz + 0.6)
+  if (spk > 0.68) c.lerp(pal.sand, 0.42 * g)
+  else if (spk < -0.72) c.lerp(pal.clay, 0.32 * g)
+}
+
+/**
  * Paints one vertex from the biome map into `c`. `isB` selects the lap-2 (variant
  * B) scenes. The base meadow read is the fallback; biomeTint classifies water /
  * beach / canyon / snow, and accentMeadow lays each wedge's saturated identity on
@@ -574,6 +596,9 @@ export function paintVertex(
       // Painting the accent first makes the ring continuous with the land it leaves at
       // kt = 0 and land on the same sand at kt = 1, so the coast is a fade, not a seam.
       accentMeadow(c, pal, pband, variant, nx, ny, nz, accentLatGate(nx))
+      // Task 88 — the cap's beach ring starts from the cap's OWN dry-grass ground, not
+      // the green fallback (the same continuity rule T86 established for the wedges).
+      capCoastPaint(c, pal, nx, ny, nz)
       c.lerp(pal.sand, 0.85 * kt)
       // shore takes a hint of its wedge (icy by the winter pond, earthy by the canyon)
       // so the beach ring isn't a uniform sand stripe. Task 38: the hint switches HARD
@@ -640,6 +665,8 @@ export function paintVertex(
           }
         }
       }
+      // Task 88 — the +x cap wears its own headland ground (see capCoastPaint).
+      capCoastPaint(c, pal, nx, ny, nz)
     }
   }
   // Task 29 lever 1 (headline) — multi-scale field colour mottling. Variance WITHIN
@@ -921,9 +948,16 @@ export function bakeLandArrays(
       floodedPositions[i * 3] = nx * PLANET_RADIUS * floodedR
       floodedPositions[i * 3 + 1] = ny * PLANET_RADIUS * floodedR
       floodedPositions[i * 3 + 2] = nz * PLANET_RADIUS * floodedR
-      floodedColors[i * 3] = pal.deep.r
-      floodedColors[i * 3 + 1] = pal.deep.g
-      floodedColors[i * 3 + 2] = pal.deep.b
+      // Task 88 — the flooded COLOUR respects the waterline. The old bake sent every cap
+      // vertex to deep-blue, which was fine while the whole cap sank below WATER_LEVEL;
+      // the cape's headland crowns (capeBump) now stay ABOVE it at full tide, and painting
+      // dry rock ocean-blue would read as a drowned ghost. A vertex's flooded colour is
+      // deep water only as far as it actually sinks under the line (soft 0.024R shoulder
+      // at the flood shoreline so the new coast is a fade, not a hard ring).
+      const sink = 1 - THREE.MathUtils.smoothstep(floodedR, WATER_LEVEL - 0.012, WATER_LEVEL + 0.012)
+      floodedColors[i * 3] = colorsA[i * 3] + (pal.deep.r - colorsA[i * 3]) * sink
+      floodedColors[i * 3 + 1] = colorsA[i * 3 + 1] + (pal.deep.g - colorsA[i * 3 + 1]) * sink
+      floodedColors[i * 3 + 2] = colorsA[i * 3 + 2] + (pal.deep.b - colorsA[i * 3 + 2]) * sink
       capIdx.push(i); capNxL.push(nx); capNyL.push(ny); capNzL.push(nz)
     } else {
       floodedPositions[i * 3] = positionsA[i * 3]

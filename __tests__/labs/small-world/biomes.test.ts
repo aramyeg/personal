@@ -35,6 +35,7 @@ import {
   biomeTint,
   epilogueRegion,
   EPILOGUE_END,
+  capeBump,
 } from '@/components/labs/small-world/scene/biomes'
 import { EPILOGUE_END as RENEWAL_EPILOGUE_END } from '@/components/labs/small-world/scene/renewal'
 import {
@@ -947,5 +948,47 @@ describe('Task 60 — biomeTint under the epilogue band override', () => {
         )
       }
     }
+  })
+})
+
+// Task 88 — the +x cape: authored geography on the right polar cap (the "cut-off
+// peninsula" fix). The contract that keeps it safe: hard-gated to 0 below nx = 0.72
+// (lane + wedge interiors untouched), summed identically into BOTH variants (the
+// grazing-limb A===B pin is preserved by construction), and modest enough that the
+// rendered tip keeps clear ceiling headroom.
+describe('Task 88 — the +x cape is invariant, off-lane and modest', () => {
+  const at = (nx: number, th: number): [number, number, number] => {
+    const ring = Math.sqrt(Math.max(0, 1 - nx * nx))
+    return [nx, ring * Math.cos(th), ring * Math.sin(th)]
+  }
+
+  it('is EXACTLY 0 for nx < 0.72 — the lane, every wedge interior and the −x hemisphere', () => {
+    for (let th = 0; th < TWO_PI; th += 0.1) {
+      for (const nx of [-0.97, -0.5, 0, 0.3, 0.45, 0.6, 0.71]) {
+        expect(capeBump(...at(nx, th))).toBe(0)
+      }
+    }
+  })
+
+  it('keeps bumpA === bumpB wherever the cape is non-zero (grazing-limb invariance)', () => {
+    for (let th = 0; th < TWO_PI; th += 0.07) {
+      for (const nx of [0.75, 0.82, 0.88, 0.93, 0.97]) {
+        const [x, y, z] = at(nx, th)
+        if (capeBump(x, y, z) > 0) {
+          expect(biomeBumpB(x, y, z)).toBe(biomeBump(x, y, z))
+        }
+      }
+    }
+  })
+
+  it('raises real relief on the cap, and its tallest rise stays under 0.12R (ceiling headroom)', () => {
+    let peak = 0
+    for (let th = 0; th < TWO_PI; th += 0.03) {
+      for (let nx = 0.72; nx <= 0.99; nx += 0.01) {
+        peak = Math.max(peak, capeBump(...at(nx, th)))
+      }
+    }
+    expect(peak).toBeGreaterThan(0.06) // presence, not a smear
+    expect(peak).toBeLessThan(0.12) // far under the 1.35R ceiling with every other term added
   })
 })

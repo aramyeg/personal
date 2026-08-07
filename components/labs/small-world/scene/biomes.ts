@@ -781,6 +781,45 @@ const OCEAN_ISLANDS: readonly Peak[] = [
   { dir: norm3(place(-0.55, 4.35)), h: 0.09, r: 0.075 },
 ]
 
+// --- The +x cape (Task 88) ---------------------------------------------------
+//
+// Aram: the right part of the planet sat "like an island or peninsula just cut off."
+// Diagnosed by capture: the +x polar cap is a no-man's-land — wedge relief is gated to 0
+// by |nx| = 0.75, accent paint fades out by 0.86, and from chapter 4 on the per-wedge
+// shelf seas plus the advancing tide draw a continuous sea band down the right limb, so
+// the bare leftover beyond it (fallback green + beach sand, featureless) reads amputated.
+//
+// The fix is to make the cap AUTHORED GEOGRAPHY: a few modest headland rises spread
+// around the cap (one per band longitude, so the coast has presence at every checkpoint
+// as the planet turns) and a pole-crown islet. Because the flooded bake target is simply
+// rA − TIDE_DEPTH, raised ground keeps its shape under the tide: the headlands become a
+// tapering cape early in the journey and a crowned islet chain standing above the water
+// late — "an island with presence", not a cut-off scrap. The paint side lives in
+// land-bake's capCoastPaint (dry coastal grass + rock, variant-independent).
+//
+// INVARIANT by construction: summed into BOTH biomeBump and biomeBumpB outside the wedge
+// gate (same term, both laps), so bumpA === bumpB everywhere it is non-zero — the grazing
+// limb stays bit-identical across variants and the renewal front never flips it. Gated
+// hard to 0 below nx = 0.72 (an early return well off the lane; the girl and every prop
+// anchor live at |nx| ≤ ~0.6), and its peaks (h ≤ 0.1) keep the rendered tip far under
+// the 1.35R ceiling.
+const CAPE_PEAKS: readonly Peak[] = [
+  { dir: norm3(place(0.86, 1.25)), h: 0.08, r: 0.1 }, // band-0 headland
+  { dir: norm3(place(0.87, 3.4)), h: 0.075, r: 0.09 }, // band-1 headland
+  { dir: norm3(place(0.85, 5.5)), h: 0.07, r: 0.09 }, // band-2 headland
+  { dir: norm3(place(0.965, 2.4)), h: 0.1, r: 0.075 }, // pole-crown islet — outlasts the full tide
+]
+
+/** Invariant +x cape relief. Pure; EXACTLY 0 for nx < 0.72 (hard gate), so the lane,
+ *  every wedge's interior and the whole −x hemisphere are untouched. Exported for the
+ *  unit pins (invariance, gate, ceiling). */
+export function capeBump(nx: number, ny: number, nz: number): number {
+  if (nx < 0.72) return 0
+  let h = 0
+  for (let i = 0; i < CAPE_PEAKS.length; i++) h += peakBump(nx, ny, nz, CAPE_PEAKS[i])
+  return h
+}
+
 // --- Scene relief (positive swells), per variant per band -------------------
 
 const A_PEAKS: readonly (readonly Peak[])[] = [
@@ -1294,14 +1333,14 @@ export function wedgeDelta(nx: number, ny: number, nz: number, variant: 0 | 1): 
 
 /** Variant-A authored displacement (lap 1). */
 export function biomeBump(nx: number, ny: number, nz: number): number {
-  return oceanCarve(nx, ny, nz, 0) + wedgeDelta(nx, ny, nz, 0)
+  return oceanCarve(nx, ny, nz, 0) + wedgeDelta(nx, ny, nz, 0) + capeBump(nx, ny, nz)
 }
 /** Variant-B authored displacement (lap 2). Equals biomeBump on every meridian and
  *  at the GRAZING limbs by construction (wedgeGate = 0 there; capDivGate = 0 there,
  *  so the divergent left coastline collapses back to the invariant ocean). Between
  *  those seams — including the mid-latitude left coastline — B genuinely differs. */
 export function biomeBumpB(nx: number, ny: number, nz: number): number {
-  return oceanCarve(nx, ny, nz, 1) + wedgeDelta(nx, ny, nz, 1)
+  return oceanCarve(nx, ny, nz, 1) + wedgeDelta(nx, ny, nz, 1) + capeBump(nx, ny, nz)
 }
 
 // --- Classification for the colour pass -------------------------------------
