@@ -33,6 +33,7 @@ import {
   type InfoPageSpec,
   type SpotCrop,
 } from './info-page-spec'
+import { leadingEdgeMask } from './leading-edge'
 
 /**
  * THE RIGHT-HAND LEAF, INKED — the picture, the hero, and the sheet, in reading
@@ -136,6 +137,86 @@ const GAP = '1.6cqw'
 
 /** Type that never falls below a floor, however small the leaf gets. */
 const type = (cqw: number, floorPx = 11) => `max(${floorPx}px, ${cqw}cqw)`
+
+/**
+ * ============================================================================
+ * A HEADLINE IS SIZED BY ITS ROW, NOT BY THE LEAF ALONE
+ * ============================================================================
+ * The hero's type used to be `type(19, 34)` flat: a function of the LEAF'S WIDTH
+ * and of nothing else. Every SFX chapter therefore got the same 58.26px at 1440
+ * whether it had seven characters to set or fifteen, and `whiteSpace: nowrap`
+ * meant the extra characters had nowhere to go. Chapter 3 has fifteen, so
+ * "The small stuff" was set 322.8px wide inside a 389.3px leaf whose hero box is
+ * already inset by the chaser's column — its initial T fell off the leaf's left
+ * edge and STUFF hung over the right border. Measured at 1440, 1024, 390 and
+ * 360: clipped at all four, so it was never a one-viewport nit. It was the one
+ * string long enough to expose that the size rule had no opinion about length.
+ *
+ * THE ROW, MEASURED. Sweeping the shipped layout at those four viewports and
+ * solving each chapter's hero box for the width at which it just touches the
+ * leaf's edge gives 83.6 / 83.4 / 82.1 / 82.0 cqw — one number, because every
+ * length in this file is already container-relative. `HEAD_ROW_CQW` is that
+ * number with a margin, and it is what a headline may occupy.
+ *
+ * THE ADVANCE IS MEASURED TOO, and there are two of them because Bangers is not
+ * one metric. Driving the shipped span through the pack's own strings: prose
+ * runs 0.356–0.427 em per character ("The interface builder" is the narrowest,
+ * "stacks" the widest) while numerals and their signs run 0.476–0.523 ("−20%" is
+ * the widest thing this page can print). One constant covering both would either
+ * be unsafe for a number or crush every word, so each kind carries its own,
+ * taken above the widest string measured for it.
+ *
+ * IT IS AN ESTIMATE WITH A GATE, which is the same architecture `manga/
+ * lettering.ts` runs on and for the same reason: a real measurement means laying
+ * the text out, reading it back and re-rendering. This is one multiply, it is
+ * deterministic, it survives SSR, and `info-page.test.tsx` asserts the ESTIMATE
+ * against every shipped string while the e2e measures the RENDERED BOX against
+ * the leaf at four viewports. A future headline that beats the estimate fails
+ * the gate rather than shipping clipped.
+ *
+ * WHAT IT COSTS: chapter 3 drops from 19 to 11.9cqw and chapter 1 from 19 to
+ * 16.5. That is not a regression, it is what fitting means — a fifteen-character
+ * display line cannot be set at a seven-character line's size in a fixed measure.
+ * If chapter 3's beat should be louder the answer is fewer characters, which
+ * `info-page-spec.ts` already flags as open (the chapter says "the small stuff"
+ * twice, in the SFX and in the headline).
+ */
+export const HEAD_ROW_CQW = 78
+/** Prose. Above the widest word string measured (0.427, "stacks"). */
+export const HEAD_ADVANCE_WORD = 0.44
+/** Digits and their signs, which are wider. Above the widest measured (0.523, "−20%"). */
+export const HEAD_ADVANCE_NUM = 0.54
+
+/**
+ * The size a headline may be set at, in cqw: its nominal, or whatever fits its
+ * row, whichever is smaller. Exported so the test asks the shipped rule rather
+ * than restating it.
+ */
+export function headlineCqw(text: string, nominalCqw: number, advance: number): number {
+  const chars = Math.max(1, text.length)
+  return Math.min(nominalCqw, HEAD_ROW_CQW / (chars * advance))
+}
+
+/**
+ * The headline's `font-size`, as the CSS the hero actually wears.
+ *
+ * THE FIT IS THE OUTER `min()` AND THAT ORDER IS THE POINT. `type()` puts the px
+ * floor on the OUTSIDE — `max(34px, 19cqw)` — which is right for body type and
+ * would silently undo this: at 360px the fitted 11.8cqw is 26.6px, the floor
+ * would raise it back to 34px, and the headline would clip again on exactly the
+ * narrow viewport the fit was for. So the floor still lifts a small leaf's type,
+ * and the row still caps it, and the cap is applied last.
+ *
+ * The floor is not lost, it is subordinated. A headline that has to come down to
+ * 26px to fit its card is a small headline; a headline held at 34px in a card
+ * that cannot hold it is a broken one. (The lettering floor is never in play
+ * here: 11px would need a leaf under 93cqw-px, and the phone's own cap keeps
+ * the leaf above 255px.)
+ */
+export function headType(text: string, nominalCqw: number, floorPx: number, advance: number): string {
+  const fit = headlineCqw(text, nominalCqw, advance)
+  return `min(max(${floorPx}px, ${nominalCqw}cqw), ${fit.toFixed(3)}cqw)`
+}
 
 /** The three densities, and nothing between them. */
 const TONE = {
@@ -279,8 +360,11 @@ function Spot({ crop, alt, reveal }: { crop: SpotCrop; alt: string; reveal: numb
           transform: `translate(${-crop.x * 100}%, ${-crop.y * 100}%)`,
           display: 'block',
           // The art arrives with the ink rather than after it: a wipe from the
-          // leading edge, which reads as the panel being filled in.
-          clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
+          // leading edge, which reads as the panel being filled in. IT DIMS AND
+          // NEVER REMOVES — see `leading-edge.ts`. This was a `clip-path: inset`
+          // and could park permanently at 93% hidden.
+          maskImage: leadingEdgeMask(reveal),
+          WebkitMaskImage: leadingEdgeMask(reveal),
         }}
       />
     </div>
@@ -347,7 +431,11 @@ function AnchorCrop({
           // conversion. (A first version invented one and produced nonsense.)
           transform: `translate(${-band.x * 100}%, ${-band.y * 100}%)`,
           display: 'block',
-          clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)`,
+          // Same law as `Spot` above and as the sheet below: it dims, it never
+          // removes. All six chapters ship `ready`, so THIS is the path the
+          // audit's blank panel was on.
+          maskImage: leadingEdgeMask(reveal),
+          WebkitMaskImage: leadingEdgeMask(reveal),
         }}
       />
     </div>
@@ -648,7 +736,14 @@ function HeroNumber({
           // A HERO THAT CARRIES A SUPPORTING ROW MAKES ROOM FOR IT. At full size
           // the numeral plus thirteen marks plus two labels overran the panel and
           // the marks were cut in half with their label gone — captured.
-          fontSize: type(hero.marks ? 19 : 26, hero.marks ? 32 : 44),
+          // FITTED TO ITS ROW. The numeral, its sign and its unit are one
+          // nowrap run, so the string that has to fit is all three.
+          fontSize: headType(
+            `${hero.prefix ?? ''}${shown}${hero.suffix ?? ''}`,
+            hero.marks ? 19 : 26,
+            hero.marks ? 32 : 44,
+            HEAD_ADVANCE_NUM
+          ),
           lineHeight: 0.86,
           color: PALETTE.blossomDeep,
           letterSpacing: '-0.01em',
@@ -723,7 +818,9 @@ function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: num
       <span
         style={{
           fontFamily: 'var(--sw-font-panel)',
-          fontSize: type(19, 34),
+          // FITTED TO ITS ROW — see HEAD_ROW_CQW. This is the line that was
+          // clipped by its own card at every viewport measured.
+          fontSize: headType(hero.text, 19, 34, HEAD_ADVANCE_WORD),
           lineHeight: 0.9,
           color: PALETTE.blossomDeep,
           whiteSpace: 'nowrap',

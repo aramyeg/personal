@@ -9,7 +9,18 @@
  */
 import { describe, expect, it, afterEach, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { InfoPage } from '@/components/labs/small-world/overlay/info-page'
+import {
+  HEAD_ADVANCE_NUM,
+  HEAD_ADVANCE_WORD,
+  HEAD_ROW_CQW,
+  InfoPage,
+  headType,
+  headlineCqw,
+} from '@/components/labs/small-world/overlay/info-page'
+import {
+  MIN_VISIBLE_ALPHA,
+  leadingEdgeMask,
+} from '@/components/labs/small-world/overlay/leading-edge'
 import { sheetLines } from '@/components/labs/small-world/overlay/cloth-drag'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { DWELL_MID } from '@/components/labs/small-world/journey-timeline'
@@ -359,5 +370,143 @@ describe('the stat leaf takes its own clicks', () => {
     // ...and it is NOT a button: nothing happens, and announcing an action that
     // does not exist would be worse than the misfire it replaces.
     expect(leaf.tagName.toLowerCase()).toBe('article')
+  })
+})
+
+describe('a headline fits the row it is set in', () => {
+  /**
+   * TASK 85, FINDING 4 — "THE SMALL STUFF" WAS SET WIDER THAN ITS OWN CARD.
+   *
+   * The cause was that the hero's size was a function of the LEAF'S WIDTH and of
+   * nothing else, so a fifteen-character SFX got the same 58.26px at 1440 that a
+   * seven-character one did, with `white-space: nowrap` leaving it nowhere to go.
+   * Measured on the shipped build at 1440, 1024, 390 and 360, chapter 3's initial
+   * T fell off the left edge and STUFF hung over the right border at ALL FOUR — so
+   * it was the string, not a viewport.
+   *
+   * This asserts the SHIPPED RULE against every shipped string. The rendered box
+   * is measured in the e2e, which is the gate the brief asks for and the one that
+   * catches a string whose real metrics beat the estimate; this one catches the
+   * arithmetic without a browser, and pins the two constants so a retune has to
+   * come back through here.
+   */
+  const advanceFor = (h: (typeof INFO_PAGES)[number]['ten']['hero']) =>
+    h.kind === 'sfx' ? HEAD_ADVANCE_WORD : HEAD_ADVANCE_NUM
+
+  const headlineString = (h: (typeof INFO_PAGES)[number]['ten']['hero']): string | null => {
+    if (h.kind === 'sfx') return h.text
+    if (h.kind === 'number') return `${h.prefix ?? ''}${h.value}${h.suffix ?? ''}`
+    // A tally has no set headline — its marks are solved by MARK_ROW_CQW instead.
+    return null
+  }
+
+  it('never lets a headline claim more of the row than there is', () => {
+    for (const [i, spec] of INFO_PAGES.entries()) {
+      const text = headlineString(spec.ten.hero)
+      if (text === null) continue
+      const nominal = spec.ten.hero.kind === 'number' && spec.ten.hero.marks ? 19 : spec.ten.hero.kind === 'number' ? 26 : 19
+      const advance = advanceFor(spec.ten.hero)
+      const cqw = headlineCqw(text, nominal, advance)
+      const widthCqw = text.length * advance * cqw
+      expect(widthCqw, `chapter ${i + 1} headline "${text}" overruns the row`).toBeLessThanOrEqual(
+        HEAD_ROW_CQW + 1e-9
+      )
+    }
+  })
+
+  it('shrinks only the headlines that need it, and leaves the rest at nominal', () => {
+    // The fit is a cap, not a rescale: a headline short enough to fit must come
+    // out at exactly its nominal size, or every chapter pays for chapter 3.
+    expect(headlineCqw('No code', 19, HEAD_ADVANCE_WORD)).toBe(19)
+    expect(headlineCqw('−20%', 26, HEAD_ADVANCE_NUM)).toBe(26)
+    // ...and the two that bind are genuinely capped below it.
+    expect(headlineCqw('The small stuff', 19, HEAD_ADVANCE_WORD)).toBeLessThan(19)
+    expect(headlineCqw('Self-taught', 19, HEAD_ADVANCE_WORD)).toBeLessThan(19)
+  })
+
+  it('holds the row and the advances at their measured values', () => {
+    // Swept on the shipped layout at four viewports, solving each chapter's hero
+    // box for the width at which it just touches the leaf edge: 83.6 / 83.4 /
+    // 82.1 / 82.0 cqw. The row below is that minimum with a margin.
+    expect(HEAD_ROW_CQW).toBeLessThan(82)
+    // Driving the shipped span through the pack's strings: prose tops out at
+    // 0.427 em/char ("stacks"), numerals at 0.523 ("−20%"). Each constant must
+    // stay above its own measurement or the estimate stops being conservative.
+    expect(HEAD_ADVANCE_WORD).toBeGreaterThan(0.427)
+    expect(HEAD_ADVANCE_NUM).toBeGreaterThan(0.523)
+  })
+
+  it('puts the fit outside the px floor, so a narrow leaf cannot re-clip', () => {
+    // `type()` floors on the OUTSIDE (`max(34px, 19cqw)`), which at 360px would
+    // raise the fitted 11.8cqw back to 34px and clip chapter 3 again on exactly
+    // the viewport the fit exists for. The rendered rule must apply the cap LAST.
+    //
+    // ASSERTED ON THE EXPRESSION, not on the DOM: jsdom's CSS parser does not
+    // understand a nested `min(max(...))` and drops the declaration outright, so
+    // reading `style.fontSize` back here would test the parser rather than the
+    // page. The browser keeps it — the e2e measures the resulting box.
+    const fs = headType('The small stuff', 19, 34, HEAD_ADVANCE_WORD)
+    expect(fs.startsWith('min(')).toBe(true)
+    expect(fs).toContain('max(34px, 19cqw)')
+    // and the cap is the last term, so it wins wherever the floor would bite
+    expect(fs.endsWith(`${headlineCqw('The small stuff', 19, HEAD_ADVANCE_WORD).toFixed(3)}cqw)`)).toBe(
+      true
+    )
+  })
+})
+
+describe('a reveal on the leaf dims and never removes', () => {
+  /**
+   * TASK 85, FINDING 6 — THE PHOTO REVEAL COULD PARK BLANK, PERMANENTLY.
+   *
+   * `Spot` and `AnchorCrop` wiped in on `clip-path: inset(0 N% 0 0)`. Swept on
+   * the shipped build across all six chapters at nine parked positions each, the
+   * art sat 93.18% hidden at local 0.25 in EVERY chapter — a blank white panel
+   * with the metric stamp floating in it — and held there unchanged through an
+   * eight-second wait, because the page's clock is pure scroll and a reader who
+   * stops scrolling stops it.
+   *
+   * The T82 inequality (`PAGE_SPAN_END < DWELL_MID`) held throughout and did not
+   * prevent it, because a reader does not only rest where a fling snaps: the
+   * card's entrance rides the arrival wall clock and always completes, while the
+   * page's ink rides scroll. See `leading-edge.ts` for why no inequality on the
+   * span can close that gap.
+   */
+  it('leaves nothing below the floor at any progress, including zero', () => {
+    for (const p of [0, 0.01, 0.05, 0.25, 0.5, 0.9, 0.999]) {
+      const mask = leadingEdgeMask(p)
+      expect(mask, `p=${p} must still carry a mask`).toBeDefined()
+      // Every stop in the gradient is either full ink or the floor — never
+      // transparent, which is what `clip-path` amounted to.
+      const alphas = [...mask!.matchAll(/rgba\(0,0,0,([\d.]+)\)/g)].map((m) => Number(m[1]))
+      expect(alphas.length).toBeGreaterThan(0)
+      for (const a of alphas) expect(a).toBeGreaterThanOrEqual(MIN_VISIBLE_ALPHA)
+    }
+  })
+
+  it('drops the mask entirely once the reveal is open', () => {
+    // A mask is a compositing layer and the settled page has to be crisp.
+    expect(leadingEdgeMask(1)).toBeUndefined()
+    expect(leadingEdgeMask(1.5)).toBeUndefined()
+  })
+
+  it('renders the art masked rather than clipped, at the worst parked progress', () => {
+    // The audit's own state: the leaf up, the page barely inked. 0.05 of the page
+    // span is where the sweep found 93% hidden.
+    render(<InfoPage chapter={3} page={0.05} />)
+    const leaf = screen.getByTestId('sw-info-page')
+    for (const img of leaf.querySelectorAll('img')) {
+      const style = (img as HTMLElement).style
+      expect(style.clipPath, 'the art may not be clipped').toBeFalsy()
+      expect(style.maskImage || style.webkitMaskImage).toBeTruthy()
+    }
+  })
+
+  it('shares one law with the sheet beside it', () => {
+    // The sheet has kept this rule since Task 82 and the art did not. Two files
+    // agreeing today is not the same as one law, so `cloth-drag` reads the same
+    // function — asserted here so a future edit cannot fork them again.
+    expect(MIN_VISIBLE_ALPHA).toBe(0.42)
+    expect(leadingEdgeMask(0.4)).toContain('rgba(0,0,0,0.42)')
   })
 })
