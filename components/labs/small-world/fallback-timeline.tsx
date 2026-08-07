@@ -1,4 +1,5 @@
 import { siteConfig, socialLinks } from '@/lib/constants'
+import { SMALL_WORLD_PREMISE } from './alwina-story'
 import { chapters } from './chapters'
 import { FALLBACK_CLASS } from './fallback-class'
 import { FALLBACK_STYLE } from './fallback-timeline-style'
@@ -23,7 +24,11 @@ export function FallbackTimeline() {
   return (
     <section data-testid="small-world-fallback" className={FALLBACK_CLASS} aria-label="Career journey">
       <style>{FALLBACK_STYLE}</style>
-      <h1>Small World — a career in one lap of a tiny planet</h1>
+      {/* ONE OWNER (Task 85). This sentence lived here as a literal and nowhere
+          else, so the only stated premise in the product reached only the
+          visitors who had asked for less motion. The first sheet prints it too
+          now, from the same constant. */}
+      <h1>{SMALL_WORLD_PREMISE}</h1>
       {/* The same six chapters the scene tells, in plain markup. The manga pages
           carry no information this list does not, so a visitor who never sees a
           canvas loses the pictures and none of the story. */}

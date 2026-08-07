@@ -4,6 +4,7 @@ import { CHIBI_SHEET, anchorSrc } from '../manga/anchors'
 import { PALETTE } from '../palette'
 import { CvSheetLink } from './cv-sheet-link'
 import type { InfoPageSpec } from './info-page-spec'
+import { SMALL_WORLD_PREMISE } from '../alwina-story'
 import { KETSU_LINE, easeOut, phase } from './info-beats'
 import { leadingEdgeMask } from './leading-edge'
 
@@ -308,6 +309,20 @@ export function ClothDrag({
   }[] = [
     ...(intro
       ? [
+          // THE PREMISE, ABOVE HER NAME, ON THE FIRST SHEET ONLY (Task 85).
+          //
+          // "Small World — a career in one lap of a tiny planet" was a literal in
+          // the reduced-motion fallback's `<h1>` and nowhere else, so the best
+          // sentence in the product was served only to visitors who asked for
+          // less motion. The blind audit's one STORY ding was that the premise
+          // has no opening line, so chapter 1 does the work a title should.
+          //
+          // IT IS AN EYEBROW, which is the cheapest row this sheet can carry and
+          // also the right shape: a title page states what the document is above
+          // whose it is. The budget note below is real — the sheet is `0 0 auto`
+          // and every row here is a row off chapter 1's SELF-TAUGHT — so this
+          // takes the smallest register on the page rather than a heading's.
+          { key: 'premise', text: SMALL_WORLD_PREMISE, kind: 'premise' as const },
           { key: 'name', text: intro.name, kind: 'name' as const },
           { key: 'says', text: intro.says, kind: 'says' as const },
         ]
@@ -469,7 +484,24 @@ const BASE_ROW: CSSProperties = {
  * The sheet's three registers. NO PINK anywhere on it: pink is the hero number's
  * semantic channel and the moment it decorates, numbers stop reading as the point.
  */
-const ROW_STYLE: Record<'name' | 'says' | 'line' | 'contact', CSSProperties> = {
+const ROW_STYLE: Record<'premise' | 'name' | 'says' | 'line' | 'contact', CSSProperties> = {
+  /**
+   * The eyebrow: what the document IS, above whose it is.
+   *
+   * The smallest register on the sheet, and 10px rather than the lab's 11px
+   * lettering floor because that floor governs type set inside PRINTED INK — a
+   * balloon interior cannot reflow — while this is set on paper the site draws
+   * and may wrap. `says` and `contact` have sat at 10px since Task 82 for the
+   * same reason; a fourth number here would be a fourth rule.
+   */
+  premise: {
+    ...BASE_ROW,
+    fontFamily: 'var(--sw-font-body)',
+    fontSize: 'max(10px, 3cqw)',
+    letterSpacing: '0.06em',
+    opacity: 0.66,
+    marginBottom: '0.5cqw',
+  },
   name: { ...BASE_ROW, fontSize: 'max(13px, 6.6cqw)', lineHeight: 1.06 },
   says: {
     ...BASE_ROW,

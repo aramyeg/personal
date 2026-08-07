@@ -145,9 +145,15 @@ describe('the plain CV page', () => {
     // capture would ever have shown it. Every separator here is a real text node.
     render(<CvDocument />)
     const lines = [...ROLES_NEWEST_FIRST, DEGREE].map(creditLine)
-    const items = [...screen.getByTestId(CV_DOC_TESTID).querySelectorAll('li')].map((li) =>
-      li.textContent!.replace(/\s+/g, ' ').trim()
+    // Read the credit's OWN inline flow, not its `li`: Task 85 nests each role's
+    // claims inside that list item so a page break cannot land between a job and
+    // what she did there, and an `li` query would then be checking the credit plus
+    // three sentences against a one-line expectation and passing for the wrong
+    // reason — or failing for one.
+    const items = [...screen.getByTestId(CV_DOC_TESTID).querySelectorAll('[data-sw-credit]')].map(
+      (el) => el.textContent!.replace(/\s+/g, ' ').trim()
     )
+    expect(items).toHaveLength(lines.length)
     for (const line of lines) expect(items).toContain(line)
   })
 

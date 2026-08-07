@@ -229,6 +229,35 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
         pointerEvents: 'none',
       }}
     >
+      {/* THE CHAPTER'S TITLE, and it is a PARITY FIX rather than decoration
+          (Task 85, finding 10). `theme` — "The page builder", "The dashboards",
+          "The small stuff" — reached only the reduced-motion fallback, so the
+          animated build was a strict subset of the static one on the six facts
+          a reader is most likely to repeat.
+          THE RAIL IS WHERE IT COSTS NOTHING AND EARNS MOST. It is already
+          mounted for the whole journey, it already knows the chapter, and it is
+          the one piece of chrome that is up during the long travel stretches —
+          the audit measured text visible at 7 of 24 sampled positions, so a
+          title here is also the only words in about eight screens of scrolling.
+          Not aria-hidden, unlike the counter beside it: the counter restates
+          the group's own label, this does not. */}
+      <span
+        style={{
+          fontFamily: 'var(--sw-font-panel)',
+          fontSize: 15,
+          letterSpacing: 1,
+          color: PALETTE.ink,
+          opacity: 0.86,
+          lineHeight: 1,
+          maxWidth: 'min(86vw, 420px)',
+          textAlign: 'center',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {chapters[chapter]?.theme}
+      </span>
       <span
         aria-hidden="true"
         style={{

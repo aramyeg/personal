@@ -1,8 +1,10 @@
 'use client'
 import type { CSSProperties } from 'react'
+import { ALWINA_STORY } from '../alwina-story'
 import {
   ALWINA,
   CONTACT_HREF,
+  CREDITS,
   DEGREE,
   LANGUAGES,
   ROLES_NEWEST_FIRST,
@@ -175,19 +177,104 @@ const link: CSSProperties = {
  * text node inside one inline flow, so `textContent` is the pack's own line and
  * the test asserts it against `creditLine`.
  */
-function CreditLine({ credit, style }: { credit: Credit; style: CSSProperties }) {
+function CreditLine({
+  credit,
+  style,
+  claims,
+}: {
+  credit: Credit
+  style: CSSProperties
+  /** What she did there, in her own approved words. See `claimsFor`. */
+  claims?: readonly string[]
+}) {
   return (
     <li style={style}>
-      <strong style={{ fontWeight: 700 }}>{credit.title}</strong>
-      {' — '}
-      {credit.org}
-      {' · '}
-      {/* THE DATE NEVER BREAKS. Captured on the phone: `IU Networks · 2020–` sat at the
-          end of one line with `2021` alone on the next, which reads as two facts. The
-          line may wrap — a phone gives it no choice — but not through a range. */}
-      <span style={{ whiteSpace: 'nowrap' }}>{periodLong(credit)}</span>
+      {/* THE CREDIT'S OWN INLINE FLOW IS ADDRESSABLE, and that is the copy-paste
+          law made precise rather than incidental. It used to be the whole `li`,
+          which stopped being the same thing the moment the claims below nested
+          inside it — the gate would then have been reading the credit plus three
+          sentences and calling it one line. */}
+      <span data-sw-credit="">
+        <strong style={{ fontWeight: 700 }}>{credit.title}</strong>
+        {' — '}
+        {credit.org}
+        {' · '}
+        {/* THE DATE NEVER BREAKS. Captured on the phone: `IU Networks · 2020–` sat at the
+            end of one line with `2021` alone on the next, which reads as two facts. The
+            line may wrap — a phone gives it no choice — but not through a range. */}
+        <span style={{ whiteSpace: 'nowrap' }}>{periodLong(credit)}</span>
+      </span>
+      {claims && claims.length > 0 ? (
+        <ul style={claimList}>
+          {claims.map((c) => (
+            <li key={c} style={claim}>
+              {'— '}
+              {c}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </li>
   )
+}
+
+/**
+ * WHAT SHE DID THERE — the fallback's own claims, on the default's dense surface.
+ *
+ * ============================================================================
+ * THE DEFECT (blind audit, finding 10)
+ * ============================================================================
+ * `prefers-reduced-motion: reduce` served three substantive claims per role —
+ * "Non-technical teams shipped their own pages with it", "Each brand got its own
+ * look, not a recolored template", "Page load dropped 20% while I was down
+ * there" — and the animated build served a strict SUBSET of them. The reduced
+ * build was the better CV. Whichever way that is resolved the two may not
+ * disagree about what the facts are, and the direction is obvious on an INFO
+ * score of 4/10: the default gains them, the fallback loses nothing.
+ *
+ * ============================================================================
+ * WHY HERE AND NOT ON THE LEAF
+ * ============================================================================
+ * The info leaf is a four-beat manga page with a seven-word text guard and a
+ * sheet that is `0 0 auto` against a hero that takes what is left; three
+ * sentences per chapter is the thing that page exists NOT to be. This page is
+ * the opposite by design — "a recruiter who came here came for the facts" — and
+ * bullets under a role is simply what a CV is. It is in the DEFAULT experience,
+ * behind two doors that the audit found unprompted on desktop and that finding 2
+ * has now opened on the phone.
+ *
+ * NO NEW COPY. Every string is `alwina-story.ts`, which is the approved round-3
+ * pack verbatim — the same array the fallback prints. One owner, two renderings,
+ * so the parity cannot rot: `cv.test.tsx` asserts this page carries every claim
+ * the fallback does.
+ *
+ * THE HEADINGS RULE STILL HOLDS. The file's own law is that there are no section
+ * headings, because the pack's structure is four blank-line-separated groups and
+ * inventing "Experience" over them would be writing copy nobody approved. A
+ * bullet under the role it belongs to invents no words at all.
+ */
+function claimsFor(credit: Credit): readonly string[] {
+  const chapter = CREDITS.indexOf(credit)
+  return ALWINA_STORY[chapter]?.lines ?? []
+}
+
+/** The claims sit UNDER their role and indented, so the credit line stays scannable. */
+const claimList: CSSProperties = {
+  margin: '3px 0 10px',
+  padding: '0 0 0 1.1em',
+  listStyle: 'none',
+  breakInside: 'avoid',
+}
+
+const claim: CSSProperties = {
+  fontSize: size(CV_TYPE_FLOOR_PX.meta, 3.2, 15),
+  lineHeight: 1.5,
+  margin: '0 0 2px',
+  opacity: 0.86,
+  breakInside: 'avoid',
+  // A dash rather than a bullet glyph: the page has one pink hairline and no
+  // other furniture, and a disc list would be the second piece.
+  textIndent: '-1.1em',
 }
 
 /** A labelled fact row: `Languages — English, Russian, …`, one inline flow. */
@@ -215,12 +302,18 @@ export function CvDocument() {
 
       <ul style={group}>
         {ROLES_NEWEST_FIRST.map((c) => (
-          <CreditLine key={`${c.org}-${c.from}`} credit={c} style={line} />
+          <CreditLine key={`${c.org}-${c.from}`} credit={c} style={line} claims={claimsFor(c)} />
         ))}
       </ul>
 
       <ul style={group}>
-        <CreditLine credit={DEGREE} style={line} />
+        {/* THE DEGREE CARRIES ITS CLAIMS TOO. They are the pivot — "Marketing is
+            four years of studying why people click things" / "So I taught myself
+            to code — I'd rather build than brief" — which is the one thing on
+            this page that explains the shape of the career above it. The parity
+            gate caught them as the only two facts the fallback still had to
+            itself. */}
+        <CreditLine credit={DEGREE} style={line} claims={claimsFor(DEGREE)} />
       </ul>
 
       <ul style={group}>

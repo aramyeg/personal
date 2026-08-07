@@ -90,6 +90,21 @@ export type StoryChapter = {
   accent: string
 }
 
+/**
+ * THE PREMISE — the one sentence that says what this is.
+ *
+ * It was a literal in `fallback-timeline.tsx`'s `<h1>` and NOWHERE ELSE, which
+ * meant the best sentence in the product was served only to visitors who asked
+ * for less motion. The blind audit's single STORY ding was exactly that: "the
+ * premise has no opening line, so chapter 1 does the work a title should."
+ *
+ * One owner now, and both openings render it: the crawlable timeline's heading,
+ * and the first sheet — above her name, where a title page puts it. NOT a
+ * floating card at load: that was Task 76's answer and Aram killed it as a
+ * splash screen in front of the world, and the kill stands.
+ */
+export const SMALL_WORLD_PREMISE = 'Small World — a career in one lap of a tiny planet'
+
 export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'lyon',
