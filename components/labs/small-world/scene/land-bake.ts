@@ -479,11 +479,14 @@ function accentMeadow(
       // B1 AKNA: warm tuff-pink meadow SURROUND, so the rich-brown canyon (painted
       // by the biomeTint 'canyon' kind) reads as clay ADDED onto pink-warm ground —
       // a brown gorge winding through pink countryside. Tuff echoes the Yerevan set.
+      // Task 88 — the speckle is the gorge's OWN strata family (light terracotta
+      // flecks, rust pockets, sparse deep-earth grains), not blossom/petal: pink dots
+      // on the pink surround read as blotches, and the money frame is mostly surround.
       dot(pal.meadow, 0.18)
       dot(pal.tuff, 0.62)
-      if (hi) dot(pal.blossom, 0.45)
-      else if (lo) dot(pal.petal, 0.45)
-      if (hi2) dot(pal.tuff, 0.45)
+      if (hi) dot(pal.clay, 0.42)
+      else if (lo) dot(pal.rust, 0.38)
+      if (hi2) dot(pal.earth, 0.2)
     } else {
       // B2 winter (Task 50): cold blue-white drift ground — a pale ice base, bright snow crests,
       // frost-blue scoured hollows and sparse deep-spruce flecks. NO blossom pink (cold-palette
@@ -597,6 +600,25 @@ export function paintVertex(
       // (proven by the paint-delta pass in bench/renewal-scan.mjs).
       const pband = pbandOverride ?? paintBand(thetaC, nx, wanderAmp)
       accentMeadow(c, pal, pband, variant, nx, ny, nz, accentLatGate(nx))
+      // Task 88 — contour strata on the B1 canyon SURROUND. The biome's identity (the
+      // brown gorge) hugs the creek + buttes, so the money frame's centre was one pale
+      // tuff dome. Quantize the local relief into steps and pull each step's upper
+      // fraction toward the gorge's rust, so the surround reads as layered rock country
+      // following its own terrain — structure tied to the landform, not added noise.
+      // Colour-only; fades with the accent toward the limbs; variant/band-gated, so the
+      // A1 jungle, the epilogue override (pband 2) and every other wedge are untouched.
+      if (variant === 1 && pband === 1) {
+        const g = accentLatGate(nx)
+        if (g > 0) {
+          const STRATA_STEP = 0.014
+          const frac = bump / STRATA_STEP - Math.floor(bump / STRATA_STEP)
+          const riser = THREE.MathUtils.smoothstep(frac, 0.55, 0.95)
+          if (riser > 0) {
+            c.lerp(pal.rust, 0.34 * riser * g)
+            c.multiplyScalar(1 - 0.07 * riser * g)
+          }
+        }
+      }
     }
   }
   // Task 29 lever 1 (headline) — multi-scale field colour mottling. Variance WITHIN
