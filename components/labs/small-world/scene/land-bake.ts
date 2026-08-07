@@ -534,6 +534,22 @@ export function paintVertex(
       c.lerp(pal.deep, 0.55 + 0.35 * kt)
       break
     case 'beach': {
+      const bthetaC = canonicalTheta(Math.atan2(nz, ny))
+      const pband = pbandOverride ?? paintBand(bthetaC, nx, wanderAmp)
+      const latG = polarLatGate(nx)
+      // Task 86 — the beach ring starts from THE WEDGE'S OWN GROUND, not from the
+      // universal green height ramp above.
+      //
+      // `kt` is 0 at the ring's LAND edge (radius 0.982) and 1 at the water's, so
+      // seeding from the green fallback made every non-green wedge snap to raw
+      // meadow-green for the outermost ring of beach vertices and only then fade to
+      // sand. Against brown canyon / gold desert / olive delta ground that reads as a
+      // saturated green-teal piping drawn along every coastline — the fringe the T84
+      // audit found on the B1 canyon, and the same defect (invisible) on spring and
+      // jungle, where the discarded fallback happened to match the land beside it.
+      // Painting the accent first makes the ring continuous with the land it leaves at
+      // kt = 0 and land on the same sand at kt = 1, so the coast is a fade, not a seam.
+      accentMeadow(c, pal, pband, variant, nx, ny, nz, accentLatGate(nx))
       c.lerp(pal.sand, 0.85 * kt)
       // shore takes a hint of its wedge (icy by the winter pond, earthy by the canyon)
       // so the beach ring isn't a uniform sand stripe. Task 38: the hint switches HARD
@@ -541,9 +557,6 @@ export function paintVertex(
       // It is faded to 0 before the grazing limb (polarLatGate → 0 by |nx|=0.75, well
       // inside the 0.80 invariance line), so the variant-specific hint only ever exists
       // in the proven-hidden mid-latitudes and never pops at the pole.
-      const bthetaC = canonicalTheta(Math.atan2(nz, ny))
-      const pband = pbandOverride ?? paintBand(bthetaC, nx, wanderAmp)
-      const latG = polarLatGate(nx)
       if (variant === 1 && pband === 2) c.lerp(pal.ice, 0.4 * kt * latG)
       else if (variant === 1 && pband === 1) c.lerp(pal.rust, 0.3 * kt * latG)
       // Task 48 — the A2 delta's braided shallows are WET silt, not dry desert sand:
