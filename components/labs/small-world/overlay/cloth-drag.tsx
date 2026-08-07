@@ -5,8 +5,21 @@ import { PALETTE } from '../palette'
 import { KETSU_LINE, easeOut, phase } from './info-beats'
 
 /**
- * THE CLOTH-DRAG — a chibi runs across the leaf and drags the chapter's line in
- * behind her, on a cloth.
+ * THE CLOTH-DRAG — a chibi runs across the leaf, and the chapter's line is on the
+ * cloth she trails.
+ *
+ * ============================================================================
+ * THE INVERSION CHANGED WHAT THIS IS (blind audit)
+ * ============================================================================
+ * It used to REVEAL the line: the words were clipped to the region the cloth had
+ * swept, so until she had run the sentence did not exist. That is precisely the
+ * failure the audit named — a fact gated on watching — and on a flick the line
+ * was simply never there.
+ *
+ * So the sentence is now PRINTED FROM THE FIRST FRAME, and she runs across it.
+ * The cloth passes over the words rather than delivering them: where it covers
+ * them they read light-on-ink for a moment, and when she is gone the line is what
+ * it always was. The gesture survives; the dependency does not.
  *
  * ============================================================================
  * WHAT IT IS
@@ -204,7 +217,10 @@ export function ClothDrag({
         >
           <path
             d={path}
+            // Semi-transparent now that it passes OVER the sentence rather than
+            // carrying it: the words stay readable through the cloth.
             fill={PALETTE.pagePaper}
+            fillOpacity={0.66}
             stroke={PALETTE.ink}
             strokeWidth={0.6}
             strokeLinejoin="round"
@@ -217,17 +233,8 @@ export function ClothDrag({
         </svg>
       ) : null}
 
-      {/* THE WORDS, clipped to exactly the swept region — never visible ahead of
-          the cloth that is carrying them. */}
-      <span
-        data-sw-text="info-line"
-        data-testid="sw-cloth-line"
-        style={{
-          ...LINE_STYLE,
-          position: 'relative',
-          clipPath: `inset(-30% ${(1 - lay) * 100}% -30% -2%)`,
-        }}
-      >
+      {/* THE WORDS. Printed, complete, from the first frame — see the note above. */}
+      <span data-sw-text="info-line" data-testid="sw-cloth-line" style={{ ...LINE_STYLE, position: 'relative' }}>
         {line}
       </span>
 

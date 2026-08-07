@@ -14,7 +14,6 @@ import { ClothDrag } from './cloth-drag'
 import { PALETTE } from '../palette'
 import {
   KETSU_INK,
-  KETSU_TAIL,
   KI_ART,
   KI_INK,
   PAGE_DONE,
@@ -25,7 +24,6 @@ import {
   TEN_INK,
   TEN_NUMBER,
   TEN_SPEED,
-  TEN_SUFFIX,
   easeOut,
   inkOf,
   markWindow,
@@ -66,6 +64,33 @@ import {
  * and nowhere else on this page. The first draft of this leaf spent pink on caption
  * rules and stamp outlines; measured against the research's own rule, that is
  * exactly what stops a number reading as the point.
+ */
+
+/**
+ * ============================================================================
+ * THE INVERSION (blind audit, information conveyance 3/10)
+ * ============================================================================
+ * INFORMATION IS PRESENT INSTANTLY. ANIMATION EMBELLISHES. Never gate a fact on
+ * watching.
+ *
+ * This page was built the other way round and the audit measured the cost: at a
+ * fixed dwell it said NOTHING for the first half-second and carried no colophon
+ * until 3.0s, inside a caption window about 700px wide on a 2133px chapter. A
+ * visitor who flicks — which is most of them — saw a blank card with some ink
+ * borders drawing themselves. The progressive-drawing research is real and it
+ * still holds, but it holds FOR PEOPLE WHO WATCH, and a CV may not be legible
+ * only to them.
+ *
+ * So every FACT — the colophon, the stack, her line, the hero's value — renders
+ * at full strength from the first frame, and the clock now drives only things
+ * whose absence costs nothing: the border ink, the art wipe, the stamp punch, the
+ * burst, the runner.
+ *
+ * THE HERO NUMBER IS THE HARD CASE and the trade is recorded rather than hidden.
+ * A count-up from zero is not a delayed fact, it is a WRONG one — a card caught
+ * at 200ms reads "+0%". So the numeral is always final and the flourish is a
+ * scale punch instead of a counting one. The research's "delayed earned reveal"
+ * is what was given up; being right at every scroll position is what was bought.
  */
 
 /** The page is 2:3, like the printed pages it is bound with. */
@@ -150,6 +175,22 @@ function InkedPanel({
         preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
       >
+        {/* THE FRAME IS ALWAYS THERE, faintly, and the ink draws ON TOP of it.
+            A dashoffset alone means no frame at all at t=0 — the panel structure,
+            which is itself information, would be gated on watching exactly like
+            the words were. Two strokes: a light one that never animates, and the
+            drawn one over it. */}
+        <rect
+          x="0.5"
+          y="0.5"
+          width="99"
+          height="99"
+          fill="none"
+          stroke={inverted ? PALETTE.pagePaper : PALETTE.ink}
+          opacity={0.28}
+          vectorEffect="non-scaling-stroke"
+          style={{ strokeWidth: `${RULE_CQW}cqw` }}
+        />
         <rect
           x="0.5"
           y="0.5"
@@ -158,7 +199,6 @@ function InkedPanel({
           pathLength={1}
           fill="none"
           stroke={inverted ? PALETTE.pagePaper : PALETTE.ink}
-          strokeWidth={RULE_CQW}
           strokeDasharray={1}
           strokeDashoffset={1 - ink}
           vectorEffect="non-scaling-stroke"
@@ -279,7 +319,8 @@ function ShoPanel({
   note?: string
   t: number
 }) {
-  const shown = phase(t, SHO_NOTE)
+  const shown = 1
+  const nudge = phase(t, SHO_NOTE)
   const anchor = anchorFor(chapter)
   const reveal = easeOut(phase(t, SHO_ART))
   // THE ZOOM IS DERIVED, not authored: the pack composes every anchor so its
@@ -337,7 +378,7 @@ function ShoPanel({
             // The note is a caption ON the picture, so it arrives after the art —
             // and it is INK, not pink: it is not the hero.
             opacity: shown,
-            transform: `translateY(${(1 - shown) * 30}%)`,
+            transform: `translateY(${(1 - nudge) * 12}%)`,
             whiteSpace: 'nowrap',
           }}
         >
@@ -525,9 +566,9 @@ function HeroNumber({
   fg: string
 }) {
   const p = phase(t, TEN_NUMBER)
-  const eased = easeOut(p)
-  const shown = Math.round(hero.value * eased)
-  const suffix = phase(t, TEN_SUFFIX)
+  // ALWAYS THE REAL NUMBER. See the inversion note at the top of this file.
+  const shown = hero.value
+  const suffix = 1
   // Anticipation, overshoot, settle — the stamp's own curve, ridden by the whole
   // numeral so the impact reads as a press rather than as a zoom.
   const settle = p < 1 ? 1 + 0.08 * Math.sin(Math.PI * p) : 1
@@ -541,7 +582,6 @@ function HeroNumber({
         alignItems: 'center',
         // BREAKING THE FRAME: the numeral is allowed wider than its panel.
         margin: '0 -3cqw',
-        opacity: p > 0 ? 1 : 0,
       }}
     >
       <span
@@ -600,11 +640,11 @@ function HeroNumber({
 function HeroSfx({ hero, t, fg }: { hero: Extract<Hero, { kind: 'sfx' }>; t: number; fg: string }) {
   const p = phase(t, TEN_NUMBER)
   const settle = p < 1 ? 1 + 0.08 * Math.sin(Math.PI * p) : 1
-  const tail = phase(t, TEN_SUFFIX)
+  const tail = 1
   return (
     <div
       data-testid="sw-info-hero"
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 -3cqw', opacity: p > 0 ? 1 : 0 }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 -3cqw' }}
     >
       <span
         style={{
@@ -669,7 +709,7 @@ function HeroCount({
   // A mark's size is a function of how many there are: thirteen at the four-mark
   // size overflow the panel and wrap, which reads as a ruler rather than a tally.
   const w = Math.min(9, 62 / count) * scale
-  const done = phase(t, [markWindow(count - 1, count)[0], markWindow(count - 1, count)[1]])
+  const done = 1
   return (
     <div
       {...(isHero ? { 'data-testid': 'sw-info-hero' } : {})}
@@ -688,7 +728,9 @@ function HeroCount({
         style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '0.8cqw 1.2cqw' }}
       >
         {Array.from({ length: count }, (_, i) => {
-          const own = easeOut(phase(t, markWindow(i, count)))
+          // Present from the first frame; the plant is a small drop on top of a
+          // mark that is already countable.
+          const own = 0.55 + 0.45 * easeOut(phase(t, markWindow(i, count)))
           return (
             <svg
               key={i}
@@ -740,7 +782,6 @@ function KetsuPanel({
   t,
   reduced,
 }: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number; reduced: boolean }) {
-  const tail = phase(t, KETSU_TAIL)
   return (
     <InkedPanel
       ink={inkOf(t, KETSU_INK)}
@@ -758,7 +799,7 @@ function KetsuPanel({
           fontSize: type(3),
           lineHeight: 1.24,
           color: PALETTE.ink,
-          opacity: tail * 0.82,
+          opacity: 0.82,
           textAlign: 'center',
           marginTop: '1.4cqw',
           padding: '0 1.4cqw',

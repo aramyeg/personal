@@ -74,7 +74,16 @@ export const TEN_INK: Window = [1340, 1800]
 export const TEN_PAUSE = 200
 /** The count-up: 0 → value. */
 export const TEN_NUMBER: Window = [TEN_INK[1] + TEN_PAUSE, TEN_INK[1] + TEN_PAUSE + 700]
-/** The unit lands after the digits have stopped — its own small beat. */
+/**
+ * The unit's own small beat — RETIRED BY THE INVERSION, kept as the timeline's
+ * record of where it sat.
+ *
+ * The blind audit's law is that a fact may not be gated on watching, and a "%"
+ * that arrives late is a fact arriving late: a card caught early read "+30"
+ * rather than "+30%". The suffix is printed with its digits now. The window
+ * stays here because `TEN_BURST` and `KETSU_INK` are expressed against the
+ * numbers around it, and deleting it would silently move them.
+ */
 export const TEN_SUFFIX: Window = [TEN_NUMBER[1], TEN_NUMBER[1] + 150]
 /** One pink radial burst at the impact, gone in 300ms. */
 export const TEN_BURST: Window = [TEN_NUMBER[1] - 40, TEN_NUMBER[1] + 300]
@@ -88,6 +97,10 @@ export const MARK_SPAN = 170
 /** KETSU — quiet: her line, the colophon, the stack as an aside. */
 export const KETSU_INK: Window = [TEN_BURST[1] - 40, TEN_BURST[1] + 380]
 export const KETSU_LINE: Window = [TEN_BURST[1] + 120, TEN_BURST[1] + 900]
+/**
+ * Where the colophon used to fade in — RETIRED BY THE INVERSION for the same
+ * reason as `TEN_SUFFIX`. It is what `PAGE_DONE` is measured from, so it stays.
+ */
 export const KETSU_TAIL: Window = [TEN_BURST[1] + 700, TEN_BURST[1] + 1050]
 
 /** Past this the page is finished and the clock stops being scheduled. */

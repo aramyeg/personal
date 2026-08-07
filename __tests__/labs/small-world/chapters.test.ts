@@ -10,11 +10,34 @@ describe('small-world chapters', () => {
     expect(chapters[CHAPTER_COUNT - 1].id).toBe('sync-design')
   })
 
-  it('carries the story pack through verbatim', () => {
+  it('carries the story pack through verbatim, except for the one recorded edit', () => {
+    // THE PACK IS STILL THE SOURCE. Themes and captions are its words untouched,
+    // and this is the gate that stops anyone quietly rewriting a real person's CV.
     const last = chapters[CHAPTER_COUNT - 1]
     expect(last.theme).toBe('The Observatory')
     expect(last.caption).toBe('Frontend Engineer · Sync Design Tech · 2025–now')
-    expect(last.hook).toBe('Now she owns the glass — and the foundations under the snow.')
+
+    // THE HOOKS CHANGED PERSON, and only person. The pack wrote them for a
+    // narrator — "Now she owns the glass" — and the lab has no narrator any more:
+    // every other word in it is hers. They also rendered NOWHERE until the blind
+    // audit found them (their only consumer was the no-WebGL fallback), so the
+    // third person had never been seen to be wrong. Recorded here rather than
+    // silently updated, alongside the pack's own line for comparison.
+    //
+    //   pack:    "Now she owns the glass — and the foundations under the snow."
+    //   shipped: "Now I keep the glass — and the foundations under the snow."
+    expect(last.hook).toBe('Now I keep the glass — and the foundations under the snow.')
+    expect(last.hook).toContain('the foundations under the snow')
+  })
+
+  it('speaks every hook in the first person', () => {
+    // The law the audit's inversion made explicit: the piece is her CV in her
+    // voice, so a hook that talks ABOUT her is a bio someone else wrote. Cheap to
+    // assert, and it is the thing that went unnoticed for four rounds.
+    for (const c of chapters) {
+      expect(/\b(I|my|me|mine|myself)\b/i.test(c.hook), `${c.id} speaks as herself`).toBe(true)
+      expect(/\b(she|her|herself)\b/i.test(c.hook), `${c.id} avoids the third person`).toBe(false)
+    }
   })
 
   it('tells ALWINA’s story, not the portfolio’s', () => {

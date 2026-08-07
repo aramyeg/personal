@@ -26,7 +26,16 @@ export type StoryChapter = {
   id: string
   /** The pack's chapter title. Also the staging direction's name. */
   theme: string
-  /** The opening line, set in display type. */
+  /**
+   * The opening line — the most scannable sentence a chapter has.
+   *
+   * FIRST PERSON, like everything else she says. These were written in the third
+   * person for a narrator that no longer exists, and for a long time nobody
+   * noticed because THEY DID NOT RENDER: the only consumer was the no-WebGL
+   * fallback timeline. The blind audit found both at once. They now carry the
+   * chapter strip (`overlay/chapter-strip.tsx`), which is up for a whole chapter
+   * rather than just its dwell.
+   */
   hook: string
   /** The body: short sentences, in the pack's order. */
   lines: string[]
@@ -57,7 +66,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'lyon',
     theme: 'The Pull',
-    hook: 'She studied how people choose — then taught herself to build the things they choose.',
+    hook: 'I studied how people choose — then taught myself to build what they choose.',
     lines: ['Master of Marketing & Business, Lyon.', 'Four languages.', 'One self-taught pivot.'],
     caption: 'Université Jean Moulin Lyon III · 2013–2019',
     stamps: ['4 languages', '1 pivot'],
@@ -67,7 +76,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'iu-networks',
     theme: 'First Tools',
-    hook: 'Her first job set the lifelong theme: build the tool that lets everyone else build.',
+    hook: 'My first job set the theme: build the tool that lets everyone else build.',
     lines: [
       'A drag-and-drop interface builder — no code needed by anyone but her.',
       'Rock-solid in every browser.',
@@ -80,7 +89,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'sportion',
     theme: 'Taste',
-    hook: 'She learned that flow is a craft — polish every stone people step on.',
+    hook: 'Flow is a craft — I polish every stone people step on.',
     lines: ['Session time up 15%.', 'Operations 30% smoother.', 'Details are the product.'],
     caption: 'UI/UX Engineer · Sportion · 2021',
     stamps: ['+15% session', '+30% smoother'],
@@ -90,7 +99,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'qiibee',
     theme: 'One Craft, Many Colors',
-    hook: 'One well-made system — thirteen brands around the world.',
+    hook: 'One system I made well — thirteen clients around the world.',
     lines: [
       'A component library that cut build time 40%.',
       'Revenue up 42%.',
@@ -104,7 +113,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'wooskill',
     theme: 'Deeper',
-    hook: 'She went full-stack — down to the foundations — and still handed the tools over.',
+    hook: 'I went full-stack, down to the foundations — and still handed the tools over.',
     lines: [
       'Frontend to backend to infrastructure.',
       'A page builder for non-technical teams.',
@@ -118,7 +127,7 @@ export const ALWINA_STORY: readonly StoryChapter[] = [
   {
     id: 'sync-design',
     theme: 'The Observatory',
-    hook: 'Now she owns the glass — and the foundations under the snow.',
+    hook: 'Now I keep the glass — and the foundations under the snow.',
     lines: [
       'Real-time maps, camera feeds, living data.',
       'Infrastructure as code across three stacks.',

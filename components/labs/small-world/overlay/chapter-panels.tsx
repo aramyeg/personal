@@ -173,6 +173,11 @@ export function ChapterPanels({
         type="button"
         className="sw-stack-tab"
         onClick={() => setFront((f) => (f === 'comic' ? 'details' : 'comic'))}
+        // AN AFFORDANCE, not a word. The audit found every fact on the phone
+        // behind this control and nothing about it saying there was anything
+        // behind it — a bare noun reads as a label for what you are looking at.
+        // The sign says which way it goes.
+        aria-label={front === 'comic' ? 'Show the details page' : 'Back to the comic page'}
         style={{
           display: 'none',
           position: 'absolute',
@@ -203,7 +208,7 @@ export function ChapterPanels({
           opacity: enter,
         }}
       >
-        {front === 'comic' ? 'Details' : 'Comic'}
+        {front === 'comic' ? '+ Details' : '← Comic'}
       </button>
 
       {expanded && page ? (
