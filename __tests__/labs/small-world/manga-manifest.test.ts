@@ -132,7 +132,9 @@ describe('manga page manifests', () => {
     expect(lines).toContain('It should be as easy as stacking blocks.')
     expect(lines).toContain('There. Now it holds.')
     // Adopted swaps, pinned so a re-edit has to come back through this file.
-    expect(lines).toContain('Try dragging that one.')
+    // Task 85 replaced 'Try dragging that one.' here — it promised an interaction
+    // the canvas does not have. See the dead-invitation gate below.
+    expect(lines).toContain('You already are.')
     expect(lines).toContain('Almost… there.')
     expect(lines).toContain('Same box. New paint.')
     expect(lines).toContain('Careful — heavier than it looks.')
@@ -144,6 +146,35 @@ describe('manga page manifests', () => {
       'One design. Thirteen colors.',
       '2025 — present. Still building.',
     ])
+  })
+
+  it('never invites the reader to do something the page cannot do', () => {
+    // THE DEAD INVITATION (blind audit, finding 3). Chapter 2's balloon read
+    // "Try dragging that one." and the auditor did exactly that: two drags,
+    // 25 moves, ~200px, from the planet body and from the block cluster. The
+    // scene came back pixel-identical and the canvas reports `cursor: auto`
+    // everywhere, so there was not even an affordance to have found.
+    //
+    // The cost is not the missing feature. This is the ONE moment the piece
+    // explicitly claims to be interactive, which makes it the moment a sceptical
+    // reader tests whether any of the rest is real — and the answer was no.
+    //
+    // Stated as a RULE and not as one banned string, because the next person to
+    // write dialogue for these pages will not have read the audit. Dialogue is
+    // between two characters; the moment it addresses the reader in the
+    // imperative it is a promise the lab has to keep.
+    //
+    // 'Careful — heavier than it looks.' is deliberately NOT caught: it is an
+    // imperative, but it warns a character about a prop in the fiction and names
+    // no page affordance. The gate is about verbs the reader could try.
+    const INTERACTION = /\b(drag|dragging|click|tap|press|swipe|scroll|hover|pull|grab|touch)\b/i
+    for (const page of MANGA_PAGES) {
+      for (const text of [...page.balloons.map((b) => b.text), ...page.captions.map((c) => c.text)]) {
+        expect(INTERACTION.test(text), `"${text}" invites an interaction the page does not have`).toBe(
+          false
+        )
+      }
+    }
   })
 
   it('never lets the narrator back in', () => {

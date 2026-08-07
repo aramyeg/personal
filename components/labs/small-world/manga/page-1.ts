@@ -40,7 +40,23 @@ export const PAGE_1: MangaPage = {
     },
     {
       panel: 1,
-      text: 'Try dragging that one.',
+      // IT MAY NOT ASK THE READER TO DO ANYTHING. This read "Try dragging that
+      // one." for four rounds, and the blind audit did exactly what it said:
+      // pressed the canvas, dragged 200px from the planet and from the blocks,
+      // and got a pixel-identical frame back. The canvas reports `cursor: auto`
+      // everywhere, so there was no affordance to find either.
+      //
+      // The cost is not the missed feature. It is that this is the one moment
+      // the piece explicitly claims to be interactive, so it is the moment a
+      // sceptical reader tests whether any of it is real — and the answer came
+      // back no. A line that promises nothing cannot break that promise.
+      //
+      // The beat is preserved: she says she cannot build, and someone tells her
+      // she is already doing it. Same speaker, same encouragement, no imperative
+      // and no second person doing anything. 16 characters against the old 22,
+      // so the balloon's fitted size cannot fall (see `fitFontCqw` — shorter
+      // text solves LARGER) and the lettering floor is safe by construction.
+      text: 'You already are.',
       at: { x: 0.8456, y: 0.5527 },
       box: { w: 0.1799, h: 0.1451 },
       voice: 'speech',
