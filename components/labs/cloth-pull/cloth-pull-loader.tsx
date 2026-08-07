@@ -40,7 +40,13 @@ export function StaticBanner({ message }: { message: string }) {
   )
 }
 
-export function ClothPullLoader({ message }: { message: string }) {
+export function ClothPullLoader({
+  message,
+  character = '3d',
+}: {
+  message: string
+  character?: '3d' | 'sprite'
+}) {
   const [state, setState] = useState<'probing' | 'webgl' | 'fallback'>(
     'probing'
   )
@@ -67,7 +73,7 @@ export function ClothPullLoader({ message }: { message: string }) {
       role="img"
       aria-label={`A chibi character hauls a cloth banner along a rope. The banner reads: ${message}. Drag horizontally or use the arrow keys to pull the rope.`}
     >
-      <ClothPullScene message={message} reduced={reduced} />
+      <ClothPullScene message={message} reduced={reduced} character={character} />
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { fistStretch } from '@/lib/labs/cloth-pull/chain'
 import { bottomLeadingCorner } from '@/lib/labs/cloth-pull/banner'
 import { BannerMesh, type BannerMeshHandle } from './banner-mesh'
 import { Chibi, ChibiSprite, type ChibiHandle } from './chibi'
+import { SpriteChibi } from './sprite-chibi'
 import { StringsMesh, type StringsMeshHandle } from './strings-mesh'
 import {
   createSimWorld,
@@ -79,7 +80,17 @@ function FloorMarks({
   )
 }
 
-function Stage({ message, reduced }: { message: string; reduced: boolean }) {
+export type CharacterVariant = '3d' | 'sprite'
+
+function Stage({
+  message,
+  reduced,
+  character,
+}: {
+  message: string
+  reduced: boolean
+  character: CharacterVariant
+}) {
   const { size, gl } = useThree()
   const w = size.width
   const h = size.height
@@ -282,14 +293,24 @@ function Stage({ message, reduced }: { message: string; reduced: boolean }) {
         <Suspense
           fallback={<ChibiSprite position={chibiPos} heightPx={chibiH} />}
         >
-          <Chibi
-            ref={chibiRef}
-            position={chibiPos}
-            heightPx={chibiH}
-            yaw={WALK_YAW}
-            reduced={reduced}
-            onReady={() => setChibiReady(true)}
-          />
+          {character === 'sprite' ? (
+            <SpriteChibi
+              ref={chibiRef}
+              position={chibiPos}
+              heightPx={chibiH}
+              reduced={reduced}
+              onReady={() => setChibiReady(true)}
+            />
+          ) : (
+            <Chibi
+              ref={chibiRef}
+              position={chibiPos}
+              heightPx={chibiH}
+              yaw={WALK_YAW}
+              reduced={reduced}
+              onReady={() => setChibiReady(true)}
+            />
+          )}
         </Suspense>
       </group>
 
@@ -302,9 +323,11 @@ function Stage({ message, reduced }: { message: string; reduced: boolean }) {
 export function ClothPullScene({
   message,
   reduced,
+  character = '3d',
 }: {
   message: string
   reduced: boolean
+  character?: CharacterVariant
 }) {
   return (
     <Canvas
@@ -314,7 +337,7 @@ export function ClothPullScene({
       camera={{ position: [0, 0, 600], zoom: 1, near: 0.1, far: 3000 }}
       gl={{ antialias: true }}
     >
-      <Stage message={message} reduced={reduced} />
+      <Stage message={message} reduced={reduced} character={character} />
     </Canvas>
   )
 }

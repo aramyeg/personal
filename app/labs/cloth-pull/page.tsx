@@ -15,14 +15,16 @@ export const metadata: Metadata = {
   },
 }
 
-/** Message is swappable data: /labs/cloth-pull?m=Any+copy+you+like */
+/** Message is swappable data: /labs/cloth-pull?m=Any+copy+you+like
+ * Character A/B: ?c=sprite for the 2.5D image-based Alwi (default 3d). */
 export default async function ClothPullPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>
+  searchParams: Promise<{ m?: string; c?: string }>
 }) {
-  const { m } = await searchParams
+  const { m, c } = await searchParams
   const message = (m ?? DEFAULT_MESSAGE).slice(0, 90).trim() || DEFAULT_MESSAGE
+  const character = c === 'sprite' ? ('sprite' as const) : ('3d' as const)
 
   return (
     <GalleryChrome>
@@ -35,7 +37,7 @@ export default async function ClothPullPage({
           banner in; releasing lets it spring back. The left and right arrow
           keys nudge the rope.
         </p>
-        <ClothPullLoader message={message} />
+        <ClothPullLoader message={message} character={character} />
       </main>
     </GalleryChrome>
   )
