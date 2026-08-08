@@ -32,7 +32,21 @@ import {
 } from './girl-anim'
 import type { JourneyRef } from './use-journey'
 
-const GIRL_URL = '/labs/small-world/girl.glb'
+import { GIRL_URL } from './girl-url'
+import { girlGlbHandoff } from '../loader/glb-handoff'
+
+/** Prime three's cache with the loader shell's prefetched bytes BEFORE useGLTF
+ *  ever asks, so the GLB crosses the wire exactly once (HTTP revalidation
+ *  measurably re-downloads it — see glb-handoff.ts). Runs at chunk eval, which
+ *  precedes any render of <Girl/>. FileLoader keys its cache as `file:${url}`
+ *  (three r185) and wants the raw ArrayBuffer. Released in an effect below once
+ *  the mesh is parsed, so the cache never grows past this one entry and the 8MB
+ *  buffer is freed. */
+if (girlGlbHandoff.buffer) {
+  THREE.Cache.enabled = true
+  THREE.Cache.add(`file:${GIRL_URL}`, girlGlbHandoff.buffer)
+}
+
 /** Mesh is 1.7 units tall. 0.53 matched the old ~0.9u proxy; raised per
  * Aram's Gate-2 note — she should command the planet, not decorate it.
  * Lives in `girl-exit.ts` now that the ending gives her a second one. */
@@ -210,6 +224,15 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const ramp = useClayRamp()
   const { scene, animations } = useGLTF(GIRL_URL)
   const { actions, mixer } = useAnimations(animations, group)
+  // The mesh is parsed (useGLTF resolved above), so release the prefetch
+  // handoff: drop the cache entry, switch the global cache back off before any
+  // later asset (desk.glb) could accumulate in it, and free the 8MB buffer.
+  useEffect(() => {
+    if (!girlGlbHandoff.buffer) return
+    THREE.Cache.remove(`file:${GIRL_URL}`)
+    THREE.Cache.enabled = false
+    girlGlbHandoff.buffer = null
+  }, [])
   const lastRotation = useRef<number | null>(null)
   const tsMag = useRef(MIN_TIMESCALE)
   const prevBurst = useRef<number | null>(null)

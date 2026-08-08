@@ -1,9 +1,12 @@
-/* Small World themed loader. Palette arrives as --swl-* custom properties from
-   planet-loader.tsx (palette.ts is the single source of truth); everything here
-   is procedural (radial/conic gradients + box-shadows) — no images. */
+/* THE WORLD COLOURS IN — Small World loader plate. Palette arrives as --swl-*
+   custom properties from planet-loader.tsx (palette.ts is the single source of
+   truth); the world/bird SVG fills are palette presentation attributes so the
+   sketch pass's line-art override below can win over them. Ported from the
+   approved lookdev (t95/lookdev/d.html). */
 
-/* Registered so the clay ring's fill can ease between progress values instead of
-   snapping. Unsupported engines simply jump — still correct, just less smooth. */
+/* Registered so the colour wipe / road / bird can EASE between progress values
+   instead of snapping — every consumer derives from this one number via calc().
+   Unsupported engines simply jump; still correct, just less smooth. */
 @property --swl-progress {
   syntax: '<number>';
   inherits: true;
@@ -16,253 +19,252 @@
   z-index: 70;
   display: grid;
   place-items: center;
-  /* Matches the scene's Sky shader: cream up top, pink glow low, so the reveal
-     is seamless (Sky mixes horizon→sky around vUv.y 0.42–0.66). */
-  background: linear-gradient(180deg, var(--swl-sky) 0%, var(--swl-sky) 42%, var(--swl-horizon) 100%);
+  background-color: var(--swl-paper);
+  transition: --swl-progress 0.45s ease-out;
+}
+
+/* Halftone paper grain, pushed out to the edges by a radial mask so the plate
+   itself sits on clean paper. */
+.loader::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--swl-ink) 9%, transparent) 1px,
+    transparent 1.3px
+  );
+  background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 46%, transparent 40%, #000 85%);
+  mask-image: radial-gradient(120% 90% at 50% 46%, transparent 40%, #000 85%);
   opacity: 1;
-  /* The overlay fades whole (gradient included) so the backdrop ends transparent
-     over the live scene; the ring fill eases via the registered property. */
-  transition: opacity 0.4s ease, --swl-progress 0.45s ease-out;
+  transition: opacity 0.3s ease;
 }
 
+/* Exit: plate + halftone fade 300ms; the paper background hands over to the iris
+   sheet's box-shadow exactly when its grow starts (0s flip, 200ms delay), so the
+   scene is never exposed outside the iris. */
 .revealing {
-  opacity: 0;
   pointer-events: none;
+  background-color: transparent;
+  transition:
+    --swl-progress 0.45s ease-out,
+    background-color 0s linear 0.2s;
 }
 
-.stage {
+.revealing::before {
+  opacity: 0;
+}
+
+.plate {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: clamp(0.7rem, 2vh, 1.15rem);
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
-.system {
+.revealing .plate {
+  opacity: 0;
+}
+
+.title {
+  font-family: var(--sw-font-panel), 'Bangers', cursive;
+  font-size: clamp(2.4rem, 6.5vw, 4.4rem);
+  letter-spacing: 0.06em;
+  color: var(--swl-ink);
+  transform: rotate(-2deg);
+  text-shadow: 3px 3px 0 color-mix(in srgb, var(--swl-clay) 55%, transparent);
+}
+
+.sub {
+  font-family: var(--sw-font-hand), 'Caveat', cursive;
+  font-size: clamp(1.25rem, 2.6vw, 1.7rem);
+  color: color-mix(in srgb, var(--swl-ink) 72%, transparent);
+  margin-top: -0.55rem;
+  transform: rotate(-1deg);
+}
+
+.world {
   position: relative;
-  width: 200px;
-  height: 200px;
-  transition: transform 0.4s ease;
+  width: min(46vh, 74vw, 350px);
+  aspect-ratio: 1;
 }
 
-.revealing .system {
-  transform: translateY(-10px) scale(1.04);
-}
-
-/* Clay progress ring — a conic wedge of clay path "rolls up" around the planet
-   as progress climbs; the untravelled arc is a faint clay track. */
-.ring {
+.art {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 168px;
-  height: 168px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: conic-gradient(
-    from -90deg,
-    var(--swl-clay) calc(var(--swl-progress) * 1%),
-    color-mix(in srgb, var(--swl-clay) 26%, transparent) 0
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+  inset: 0;
 }
 
-/* Tiny clay world: a lit green sphere with blobby mottling and clay dents. */
-.planet {
+.art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* sketch pass: line art only, faint — the uncoloured page. The .fill elements
+   are the colour shapes; strip their fills and give them a thin ink contour. */
+.sketch {
+  opacity: 0.3;
+}
+
+.sketch svg :global(.fill) {
+  fill-opacity: 0;
+  stroke: color-mix(in srgb, var(--swl-ink) 55%, transparent);
+  stroke-width: 0.7;
+}
+
+/* colour pass, wiped in radially by progress — the angle is derived from the one
+   registered number, so the wipe inherits its easing. */
+.color {
+  -webkit-mask: conic-gradient(from 0deg, #000 calc(var(--swl-progress) * 3.6deg), transparent 0);
+  mask: conic-gradient(from 0deg, #000 calc(var(--swl-progress) * 3.6deg), transparent 0);
+}
+
+.road {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 128px;
-  height: 128px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background:
-    /* terminator pooling lower-right */
-    radial-gradient(circle at 64% 72%, rgba(43, 43, 51, 0.16), transparent 48%),
-    /* clay dents / patches of growth */
-    radial-gradient(10px 10px at 39% 41%, var(--swl-sprout), transparent 62%),
-    radial-gradient(12px 12px at 66% 57%, var(--swl-foliage), transparent 64%),
-    radial-gradient(8px 8px at 52% 29%, var(--swl-meadow-dry), transparent 62%),
-    /* a pink blossom patch + a small pond */
-    radial-gradient(5px 5px at 31% 63%, var(--swl-blossom-deep), transparent 62%),
-    radial-gradient(6px 6px at 44% 74%, color-mix(in srgb, var(--swl-blossom) 80%, white), transparent 64%),
-    /* base sphere: light green highlight → deep green shade */
-    radial-gradient(circle at 34% 30%, var(--swl-sprout) 0%, var(--swl-meadow) 40%, var(--swl-leaf) 76%, var(--swl-pine) 100%);
-  box-shadow:
-    inset -10px -12px 22px rgba(43, 43, 51, 0.26),
-    inset 8px 10px 18px rgba(255, 255, 255, 0.32),
-    0 14px 26px -8px rgba(43, 43, 51, 0.32);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-/* Orbit ring carries the bird all the way around the little world; at the bottom
-   of the lap it reads inverted — the tiny-planet gravity that sells the loop.
-   Because the bird lives inside this rotating frame, its fixed heading tracks the
-   orbit tangent automatically: it always banks into its direction of travel. */
-.orbit {
+/* dotted plan of the route, drawn in full from the start */
+.roadPlan {
+  fill: none;
+  stroke: color-mix(in srgb, var(--swl-ink) 16%, transparent);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-dasharray: 0.2 2.9;
+}
+
+/* the laid road: ink casing + clay centre, both drawn by dashoffset from the
+   same eased progress number */
+.roadInk,
+.roadClay {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--swl-road-len);
+  stroke-dashoffset: calc(((100 - var(--swl-progress)) / 100) * var(--swl-road-len));
+}
+
+.roadInk {
+  stroke: var(--swl-ink);
+  stroke-width: 3.4;
+}
+
+.roadClay {
+  stroke: var(--swl-clay);
+  stroke-width: 1.9;
+}
+
+/* the bird rides the road tip: its wrapper rotates by the same eased angle the
+   colour wipe uses, so beak and wipe edge stay in lockstep */
+.birdBox {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 150px;
-  height: 150px;
-  transform: translate(-50%, -50%);
-  animation: swl-orbit 6s linear infinite;
+  inset: 0;
+  transform: rotate(calc(var(--swl-progress) * 3.6deg));
 }
 
-/* Bird box centred on the 12 o'clock orbit point (75px above centre). It faces
-   the direction of travel (nose right, tail left) and glides with a soft bob +
-   bank; the clockwise orbit then rotates that heading around the whole lap. */
 .bird {
   position: absolute;
-  top: 0;
   left: 50%;
-  width: 32px;
-  height: 24px;
-  margin-left: -16px;
-  margin-top: -12px;
-  transform-origin: 50% 50%;
-  animation: swl-glide 2.6s ease-in-out infinite;
+  top: -7.5%;
+  width: 15%;
+  margin-left: -7.5%;
+  overflow: visible;
+  transform: rotate(8deg);
 }
 
-/* Plump clay body: blossom highlight rolling into a blossom-deep underside. */
-.body {
-  position: absolute;
-  left: 3px;
-  top: 6px;
-  width: 22px;
-  height: 15px;
-  border-radius: 60% 55% 55% 60% / 62% 62% 58% 58%;
-  background: radial-gradient(
-    circle at 34% 30%,
-    color-mix(in srgb, var(--swl-blossom) 86%, white) 0%,
-    var(--swl-blossom) 46%,
-    var(--swl-blossom-deep) 100%
-  );
-  box-shadow:
-    inset -3px -3px 5px rgba(43, 43, 51, 0.18),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.5),
-    0 3px 5px -2px rgba(43, 43, 51, 0.28);
-}
-
-/* Round head riding the front-right shoulder of the body. */
-.head {
-  position: absolute;
-  left: 17px;
-  top: 1px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 38% 32%,
-    color-mix(in srgb, var(--swl-blossom) 88%, white) 0%,
-    var(--swl-blossom) 54%,
-    var(--swl-blossom-deep) 100%
-  );
-  box-shadow:
-    inset -2px -2px 4px rgba(43, 43, 51, 0.16),
-    inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.5);
-}
-
-/* Tiny clay beak, a triangle pointing forward off the head. */
-.beak {
-  position: absolute;
-  left: 29px;
-  top: 6px;
-  width: 0;
-  height: 0;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  border-left: 6px solid var(--swl-clay);
-}
-
-/* A single ink dot for the eye. */
-.eye {
-  position: absolute;
-  left: 24px;
-  top: 4px;
-  width: 2.4px;
-  height: 2.4px;
-  border-radius: 50%;
-  background: var(--swl-ink);
-}
-
-/* Trailing tail feather off the back, angled up a touch. */
-.tail {
-  position: absolute;
-  left: -3px;
-  top: 8px;
-  width: 12px;
-  height: 8px;
-  border-radius: 50% 20% 40% 60% / 60% 40% 40% 60%;
-  transform: rotate(-12deg);
-  background: linear-gradient(120deg, var(--swl-blossom) 0%, var(--swl-blossom-deep) 100%);
-}
-
-/* Deep-pink wing hinged at the shoulder; it beats up and down for the flap. */
-.wing {
-  position: absolute;
-  left: 8px;
-  top: 4px;
-  width: 15px;
-  height: 11px;
-  border-radius: 62% 72% 42% 50% / 70% 80% 42% 42%;
-  transform-origin: 30% 88%;
-  background: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--swl-blossom-deep) 84%, white) 0%,
-    var(--swl-blossom-deep) 100%
-  );
-  box-shadow: inset -2px -2px 3px rgba(43, 43, 51, 0.2);
-  animation: swl-flap 0.8s ease-in-out infinite;
-}
-
-.caption {
-  margin: 0.4rem 0 0;
-  font-family: var(--sw-font-display), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 600;
-  font-size: clamp(1rem, 2.6vw, 1.35rem);
-  letter-spacing: 0.01em;
-  color: var(--swl-leaf);
-  text-align: center;
-}
-
-@keyframes swl-orbit {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
+/* very subtle wing-bob glide — motion-permitting contexts only */
+@media (prefers-reduced-motion: no-preference) {
+  .bird {
+    animation: swl-bob 2.8s ease-in-out infinite;
   }
 }
 
-/* Gentle glide: a soft vertical bob plus a small bank so the bird rocks into its
-   heading. Combined with the orbit rotation this reads as banking with the tangent. */
-@keyframes swl-glide {
+@keyframes swl-bob {
   0%,
   100% {
-    transform: translateY(0) rotate(-6deg);
+    transform: rotate(8deg) translateY(0);
   }
   50% {
-    transform: translateY(-2px) rotate(-2deg);
+    transform: rotate(5deg) translateY(-3px);
   }
 }
 
-/* Wing beat: the wing swings from raised to lowered about its shoulder hinge. */
-@keyframes swl-flap {
-  0%,
-  100% {
-    transform: rotate(-26deg);
-  }
-  50% {
-    transform: rotate(15deg);
-  }
+.chip {
+  background: var(--swl-cream);
+  border: 2px solid var(--swl-ink);
+  border-radius: 3px;
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--swl-ink) 90%, transparent);
+  padding: 0.45rem 0.95rem;
+  font-family: var(--sw-font-body), 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.8rem, 1.7vw, 0.95rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--swl-ink);
+  transform: rotate(-1deg);
 }
 
-/* Reduced motion: a static frame — the bird rests atop the planet, no orbit and
-   no flap — that still reveals. */
+.pct {
+  font-family: var(--sw-font-panel), 'Bangers', cursive;
+  font-size: 1.15em;
+  margin-left: 0.45em;
+  letter-spacing: 0.08em;
+}
+
+/* the iris sheet: a round hole that grows; box-shadow paints the paper around
+   it. At scale(0) it paints nothing, so it can sit in the DOM from the start. */
+.iris {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  box-shadow: 0 0 0 300vmax var(--swl-paper);
+  pointer-events: none;
+  transition: transform 0.65s ease-in 0.2s;
+}
+
+.revealing .iris {
+  transform: translate(-50%, -50%) scale(90);
+}
+
+/* Reduced motion: a fully legible static plate at the current arc — no wipes,
+   no bob, no iris theatre — and the exit is a plain 200ms fade of the whole
+   overlay over its own paper. */
 @media (prefers-reduced-motion: reduce) {
-  .orbit,
-  .bird,
-  .wing {
-    animation: none;
-  }
   .loader {
     transition: opacity 0.2s ease;
+  }
+  .loader::before,
+  .plate,
+  .birdBox,
+  .color {
+    transition: none;
+  }
+  .bird {
+    animation: none;
+  }
+  .iris {
+    display: none;
+  }
+  .revealing {
+    opacity: 0;
+    background-color: var(--swl-paper);
+    transition: opacity 0.2s ease;
+  }
+  .revealing::before {
+    opacity: 1;
+  }
+  .revealing .plate {
+    opacity: 1;
   }
 }
