@@ -35,14 +35,18 @@ import {
   GIRL_JUMP_FALL,
   GIRL_JUMP_RISE,
   GIRL_JUMP_START,
-  GIRL_LOOK_END,
-  GIRL_LOOK_START,
+  GIRL_JUMP_SWEEP,
+  GIRL_JUMP_TAKEOFF_DEG,
   GIRL_STOP_THETA,
   GIRL_TRANSFER,
   GIRL_TURN_END,
   GIRL_TURN_START,
+  GIRL_BRINK,
   GIRL_WALK_ARC,
   GIRL_WALK_END,
+  GIRL_WALK_SETTLE,
+  GIRL_WALK_SPAN,
+  JOURNEY_SURFACE_RATE,
   JUMP_BLEND_IN,
   JUMP_CLIP_APEX,
   JUMP_CLIP_HOLD,
@@ -56,7 +60,16 @@ import {
   jumpLiftAt,
   pointHiddenAt,
   strideAt,
+  walkEaseAt,
+  LEAP_PACE,
+  WALK_RAMP,
 } from '@/components/labs/small-world/scene/girl-exit'
+import {
+  CHAPTER_SLICE,
+  PARK_FRAC,
+  TRAVEL_END,
+} from '@/components/labs/small-world/journey-timeline'
+import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
 import { PLANET_RADIUS } from '@/components/labs/small-world/scene/land-bake'
 import {
   DESK_FIGURINES,
@@ -81,12 +94,17 @@ import { STANCE_ALPHA } from '@/components/labs/small-world/scene/renewal'
  * OVERLAP rather than merely both existing, which is the difference between a cut
  * and a blink.
  *
- * Task 87 re-derives the exit-beat family for the new staging — stop at the
- * crest, turn back for the goodbye, JUMP off the world — without weakening any
- * of it: the sinking beat survives as the plunge, the hidden-at-every-camera-stop
- * claim gets STRONGER (she ends inside the planet's own ball, which no outside
- * camera can see into), and two beats gain gates the walk never needed (whole at
- * the goodbye, whole at the apex).
+ * Task 87 re-derived the exit-beat family for a stop at the crest, a turn back
+ * for a goodbye, and a jump. TASK 101 RESTAGES IT AGAIN on Aram's note ("she runs
+ * too fast to the back and I don't know why turns back to the viewer before
+ * jumping off, she should jump off towards the wall") and the family is
+ * re-established for the new staging with nothing weakened: the sinking beat
+ * survives as the plunge at 29.2% of the flight (the gate has always asked 25%);
+ * the hidden-at-every-camera-stop claim is untouched, because it is a claim about
+ * a RADIUS and the fall depth did not move; whole-at-the-apex survives a sweep
+ * 5.4× longer with 0.39 rad of horizon margin; and three gates are NEW — her peak
+ * walking speed may not exceed the journey's own travelling rate, her yaw may
+ * never return to the reader, and her lean may not rotate once she is airborne.
  */
 
 const poseAtT = (t: number) => girlPoseAt(endingStateAt(1 + t * ENDING_SPAN), false)
@@ -164,7 +182,7 @@ describe('the stop is at the crest, and it is solved, not chosen', () => {
     expect(GIRL_WALK_ARC).toBeGreaterThan(0)
   })
 
-  it('keeps her WHOLE for the entire walk — the goodbye cannot be delivered half-sunk', () => {
+  it('keeps her WHOLE for the entire walk — the launch cannot come from a half-sunk figure', () => {
     // The Task 76 walk sank her on purpose; this walk must NOT — she stops while
     // both feet and head are safely inside the visible cap, at both camera stops.
     for (let i = 0; i <= 400; i++) {
@@ -176,8 +194,8 @@ describe('the stop is at the crest, and it is solved, not chosen', () => {
     }
   })
 
-  it('arrives at the stop EXACTLY, and holds it through the whole goodbye', () => {
-    // Exactly, because `a + (b − a) · 1` is not b in IEEE-754, and the goodbye
+  it('arrives at the stop EXACTLY, and holds it through the whole brink', () => {
+    // Exactly, because `a + (b − a) · 1` is not b in IEEE-754, and the brink
     // beat is staged at a bearing, not near one. Fed an EndingState directly:
     // the round trip progress → t re-rounds, so no real scroll position lands on
     // the boundary exactly — the exactness is a property of the function.
@@ -196,33 +214,131 @@ describe('the stop is at the crest, and it is solved, not chosen', () => {
   })
 })
 
-describe('the goodbye: she turns her back to leave, and turns back to say it', () => {
+describe('she turns her back on the world once, and never turns round again', () => {
   it('turns her round before she walks, so the exit is not a moonwalk', () => {
     expect(GIRL_TURN_END).toBeLessThanOrEqual(GIRL_WALK_END)
     expect(atExactly(GIRL_TURN_END).yaw).toBeCloseTo(Math.PI, 9)
     expect(Object.is(atExactly(GIRL_TURN_END).theta, STANCE_ALPHA)).toBe(true)
   })
 
-  it('turns her BACK to face the reader after the walk and before the jump', () => {
-    expect(GIRL_LOOK_START).toBeGreaterThanOrEqual(GIRL_WALK_END)
-    expect(GIRL_LOOK_END).toBeLessThanOrEqual(GIRL_JUMP_START)
-    // mix(x, 0, 1) is exactly +0 — from the look's end she faces the reader
-    // without residue, and stays facing them through the launch.
-    for (let i = 0; i <= 200; i++) {
-      const t = GIRL_LOOK_END + ((GIRL_JUMP_END - GIRL_LOOK_END) * i) / 200
-      expect(Object.is(atExactly(t).yaw, 0)).toBe(true)
+  it('NEVER faces the reader again — no about-face anywhere after the turn (T101)', () => {
+    // Aram's complaint was the unmotivated turn toward camera. This is the gate
+    // that stops it coming back: from the end of the turn to the end of the
+    // flight her yaw is π and does not move, so the leap goes the way she faces.
+    for (let i = 0; i <= 1200; i++) {
+      const t = GIRL_TURN_END + ((GIRL_TRANSFER - GIRL_TURN_END) * i) / 1200
+      const pose = atExactly(t)
+      if (pose.stage !== 'globe') continue
+      expect(pose.yaw).toBeCloseTo(Math.PI, 12)
     }
   })
 
-  it('holds a real beat between the turn-back and the launch — a goodbye, not a bounce', () => {
-    expect(GIRL_JUMP_START - GIRL_LOOK_END).toBeGreaterThanOrEqual(0.015)
+  it('is monotone in yaw over the whole globe stage — she turns one way, once', () => {
+    let prev = -Infinity
+    for (let i = 0; i <= 2000; i++) {
+      const t = (GIRL_TRANSFER * i) / 2000
+      const pose = atExactly(Math.min(t, GIRL_TRANSFER - 1e-9))
+      if (pose.stage !== 'globe') continue
+      expect(pose.yaw).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = pose.yaw
+    }
+    expect(prev).toBeCloseTo(Math.PI, 12)
   })
 
-  it('walks facing away — the turn-back has not begun anywhere in the walk', () => {
-    for (let i = 0; i <= 200; i++) {
-      const t = GIRL_TURN_END + ((GIRL_LOOK_START - GIRL_TURN_END) * i) / 200
-      expect(atExactly(t).yaw).toBeCloseTo(Math.PI, 9)
+  it('holds a real beat on the BRINK before the launch — a decision, not a bounce', () => {
+    // What replaces the held goodbye: she stands on the edge, still facing away.
+    expect(GIRL_BRINK).toBeGreaterThanOrEqual(0.015)
+    expect(Object.is(GIRL_JUMP_START, GIRL_WALK_END + GIRL_BRINK)).toBe(true)
+    // ...and she is WHOLE on it — a launch delivered by a half-sunk figure is not
+    // a launch. Both camera stops, feet and head.
+    for (const d of [REST, FULL]) {
+      expect(feetHiddenAt(GIRL_STOP_THETA, 0, d)).toBe(false)
+      expect(headHiddenAt(GIRL_STOP_THETA, 0, d)).toBe(false)
     }
+  })
+})
+
+describe('the pace: she walks at the speed the world has walked her all journey', () => {
+  /** Her surface speed in world units per unit of JOURNEY progress, sampled off
+   *  the pose itself rather than off the profile — the number the reader sees. */
+  const walkRateAt = (t: number, h = 1e-6) =>
+    (atExactly(t + h).walked - atExactly(t - h).walked) / (2 * h * ENDING_SPAN)
+
+  it('derives the journey rate from the journey, not from a number typed twice', () => {
+    expect(
+      Object.is(
+        JOURNEY_SURFACE_RATE,
+        ((PARK_FRAC * CHAPTER_SLICE) / TRAVEL_END) * CHAPTER_COUNT * PLANET_RADIUS
+      )
+    ).toBe(true)
+    // The world only ever turns at this one rate — that is what journey-timeline
+    // solves its segment shape for, and it is why this is a legitimate target.
+    expect(JOURNEY_SURFACE_RATE).toBeGreaterThan(0)
+  })
+
+  it('never exceeds the journey’s own travelling rate — the "runs too fast" gate', () => {
+    let peak = 0
+    for (let i = 0; i <= 4000; i++) {
+      const t = GIRL_TURN_END + (GIRL_WALK_SPAN * i) / 4000
+      peak = Math.max(peak, walkRateAt(t))
+    }
+    // In family, and specifically NOT above it: the walk's own peak IS the rate.
+    expect(peak / JOURNEY_SURFACE_RATE).toBeLessThanOrEqual(1.02)
+    expect(peak / JOURNEY_SURFACE_RATE).toBeGreaterThan(0.95)
+    // The staging this replaced: a smootherstep across 0.09 of the ending peaks
+    // at 1.875× its mean. Kept as arithmetic so the regression is legible.
+    const shipped87 = (1.875 * GIRL_WALK_ARC) / (0.09 * ENDING_SPAN)
+    expect(shipped87 / JOURNEY_SURFACE_RATE).toBeGreaterThan(2.6)
+  })
+
+  it('spends most of the walk CRUISING, which is what a walk is', () => {
+    let cruise = 0
+    const N = 4000
+    for (let i = 0; i <= N; i++) {
+      const t = GIRL_TURN_END + (GIRL_WALK_SPAN * i) / N
+      if (walkRateAt(t) > 0.99 * JOURNEY_SURFACE_RATE) cruise++
+    }
+    // A smootherstep's speed is at its peak for an instant; a walk's is at it for
+    // most of the way. Two thirds, by construction (1 − 2·WALK_RAMP).
+    expect(cruise / (N + 1)).toBeGreaterThan(0.6)
+  })
+
+  it('solves the window from the gait rather than restating it', () => {
+    expect(
+      Object.is(
+        GIRL_WALK_SPAN,
+        GIRL_WALK_ARC / (JOURNEY_SURFACE_RATE * ENDING_SPAN * (1 - WALK_RAMP))
+      )
+    ).toBe(true)
+    expect(Object.is(GIRL_WALK_END, GIRL_TURN_END + GIRL_WALK_SPAN)).toBe(true)
+    // Nearly twice the window T87 gave it — the complaint, expressed as scroll.
+    expect(GIRL_WALK_SPAN).toBeGreaterThan(0.15)
+    expect(GIRL_WALK_SPAN / 0.09).toBeGreaterThan(1.7)
+  })
+
+  it('has exact ends and a monotone profile, so the stop is a stop', () => {
+    expect(Object.is(walkEaseAt(0), 0)).toBe(true)
+    expect(Object.is(walkEaseAt(-1), 0)).toBe(true)
+    expect(walkEaseAt(1)).toBe(1)
+    expect(walkEaseAt(2)).toBe(1)
+    let prev = -Infinity
+    for (let i = 0; i <= 4000; i++) {
+      const v = walkEaseAt(i / 4000)
+      expect(v).toBeGreaterThanOrEqual(prev - 1e-15)
+      prev = v
+    }
+    // Symmetric: the ramp down mirrors the ramp up, so she does not sprint out of
+    // one end of a beat she strolled into.
+    for (let i = 0; i <= 200; i++) {
+      const u = i / 200
+      expect(walkEaseAt(u) + walkEaseAt(1 - u)).toBeCloseTo(1, 9)
+    }
+  })
+
+  it('lets go of the skip clip exactly as her feet slow down', () => {
+    expect(Object.is(GIRL_WALK_SETTLE, WALK_RAMP * GIRL_WALK_SPAN)).toBe(true)
+    expect(atExactly(GIRL_WALK_END).moving).toBeCloseTo(0, 12)
+    expect(atExactly(GIRL_WALK_END - GIRL_WALK_SETTLE).moving).toBeCloseTo(1, 12)
   })
 })
 
@@ -254,6 +370,65 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
     const { theta, lift } = flightAt(GIRL_JUMP_APEX)
     expect(feetHiddenAt(theta, lift, REST)).toBe(false)
     expect(headHiddenAt(theta, lift, REST)).toBe(false)
+  })
+
+  it('carries her AWAY FROM THE READER, at a pace a leap could produce (T101)', () => {
+    // The sweep is solved from the same currency as the walk, so the two beats
+    // cannot drift: a leap covers ground LEAP_PACE times as fast as a walk.
+    expect(
+      Object.is(
+        GIRL_JUMP_SWEEP,
+        (LEAP_PACE * JOURNEY_SURFACE_RATE * ENDING_SPAN * (GIRL_JUMP_END - GIRL_JUMP_START)) /
+          PLANET_RADIUS
+      )
+    ).toBe(true)
+    expect(LEAP_PACE).toBeGreaterThan(1.5)
+    expect(LEAP_PACE).toBeLessThan(3)
+    // −θ is away from the camera (CAMERA_THETA is positive and she starts below
+    // it), so a positive sweep IS the wall-ward direction. Stated as a claim
+    // about the camera rather than about a sign someone remembered.
+    expect(GIRL_JUMP_END_THETA).toBeLessThan(GIRL_STOP_THETA)
+    expect(Math.abs(GIRL_JUMP_END_THETA - CAMERA_THETA)).toBeGreaterThan(
+      Math.abs(GIRL_STOP_THETA - CAMERA_THETA)
+    )
+    // ...and it is a real leap, not T87's 0.14-rad trapdoor: by the apex she has
+    // put most of a body length of ground between herself and where she stood.
+    const reachAtApex = GIRL_JUMP_APEX * GIRL_JUMP_SWEEP * PLANET_RADIUS
+    expect(reachAtApex).toBeGreaterThan(0.35 * GIRL_GLOBE_HEIGHT)
+    expect(reachAtApex / (GIRL_JUMP_APEX * 0.14 * PLANET_RADIUS)).toBeGreaterThan(4)
+  })
+
+  it('leaves the ground at an angle a body could leave it at', () => {
+    // Derived from rise-over-run, and only a sanity check on LEAP_PACE. Steeper
+    // than a long jump (she is not jumping for distance), far shallower than
+    // T87's 83°, which is a hop with a trapdoor under it rather than a leap.
+    expect(
+      Object.is(
+        GIRL_JUMP_TAKEOFF_DEG,
+        (Math.atan2(2 * GIRL_JUMP_RISE, GIRL_JUMP_APEX * GIRL_JUMP_SWEEP * PLANET_RADIUS) * 180) /
+          Math.PI
+      )
+    ).toBe(true)
+    expect(GIRL_JUMP_TAKEOFF_DEG).toBeGreaterThan(40)
+    expect(GIRL_JUMP_TAKEOFF_DEG).toBeLessThan(65)
+  })
+
+  it('does not TUMBLE: her lean is the ground’s while she is on it, and frozen after', () => {
+    // A body in the air carries no torque. Without the freeze the sweep rotates
+    // her with ground she has already left — 0.43 rad between takeoff and the
+    // last frame the reader sees, which reads as a somersault.
+    for (let i = 0; i <= 800; i++) {
+      const t = (GIRL_TRANSFER * i) / 800
+      const pose = atExactly(t)
+      if (pose.stage !== 'globe') continue
+      if (pose.jump > 0) expect(Object.is(pose.tilt, GIRL_STOP_THETA)).toBe(true)
+      else expect(Object.is(pose.tilt, pose.theta)).toBe(true)
+    }
+    // The seam is exact: the last grounded frame and the first airborne one lean
+    // the same way, so a scrub across the takeoff cannot catch a snap.
+    expect(Object.is(atExactly(GIRL_JUMP_START).tilt, GIRL_STOP_THETA)).toBe(true)
+    // ...and the rotation it suppresses is real, not a rounding argument.
+    expect(Math.abs(GIRL_JUMP_END_THETA - GIRL_STOP_THETA)).toBeGreaterThan(0.4)
   })
 
   it('parks her head INSIDE the planet’s ball, with real slack', () => {
@@ -420,7 +595,7 @@ describe('she scrubs backwards exactly', () => {
     for (let i = 3000; i >= 0; i--) {
       const back = poseAtT(i / 3000)
       const fwd = forward[i]
-      for (const k of ['theta', 'lift', 'jump', 'x', 'z', 'yaw', 'scale', 'walked', 'moving'] as const) {
+      for (const k of ['theta', 'tilt', 'lift', 'jump', 'x', 'z', 'yaw', 'scale', 'walked', 'moving'] as const) {
         expect(Object.is(back[k], fwd[k])).toBe(true)
       }
       expect(back.stage).toBe(fwd.stage)
@@ -443,7 +618,7 @@ describe('she scrubs backwards exactly', () => {
     }
   })
 
-  it('freezes the walked distance for the goodbye and the flight — the skip clip is weightless there', () => {
+  it('freezes the walked distance for the brink and the flight — the skip clip is weightless there', () => {
     const atStop = poseAtT(GIRL_WALK_END + 1e-6).walked
     for (let i = 0; i <= 400; i++) {
       const t = GIRL_WALK_END + ((GIRL_TRANSFER - 1e-6 - GIRL_WALK_END) * i) / 400

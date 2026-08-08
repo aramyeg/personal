@@ -10,11 +10,14 @@ import { DESK_BACK_Z, DESK_TOP_Y } from './desk-stage'
 import { PLANET_RADIUS } from './land-bake'
 import { DESK_PAD } from './props/desk-glb-contract'
 import { STANCE_ALPHA } from './renewal'
+import { CHAPTER_COUNT } from '../chapters'
+import { CHAPTER_SLICE, PARK_FRAC, TRAVEL_END } from '../journey-timeline'
 import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline'
 
 /**
- * ALWINA LEAVES THE WORLD (Task 76, restaged in Task 87) — the girl walks to the
- * world's far crest, turns back for a goodbye, and JUMPS off the planet.
+ * ALWINA LEAVES THE WORLD (Task 76, restaged in Task 87, RESTAGED AGAIN in Task
+ * 101) — the girl walks to the world's far crest at her own travelling pace and
+ * LEAPS OFF IT, away from the reader, without ever turning round.
  *
  * WHAT THIS MODULE SHIPS, AND WHAT IT STILL CONTAINS. The exit is live and gated.
  * The ARRIVAL is not: `GIRL_DESK_MOUNTED` is false, because Aram's ruling is that
@@ -66,18 +69,63 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * Task 76 walked her from her stance to −65.43° — far past the crest, because a
  * WALKING girl keeps her head 1.19 units above the surface and the angle that
  * hides a raised point is the sum of two horizon half-angles, 132.6° from the
- * camera. The new staging replaces most of that walk with a beat, and the beat
- * with a fall:
+ * camera. Task 87 replaced most of that walk with a beat, and the beat with a
+ * fall: she stopped a step short of the crest, TURNED BACK to the reader for a
+ * goodbye, and dropped off the edge facing the lens.
  *
- *   1. she turns her back on the world and walks — but only to `GIRL_STOP_THETA`,
- *      a step short of the crest, where she is still whole in the frame;
- *   2. she TURNS BACK toward the reader — the goodbye. The camera cannot move to
- *      meet her (the frozen-camera invariant owns every t below ZOOM_START), so
- *      the beat is staged to read at the shipped distance: she stands on the
- *      world's upper silhouette, the idle sway breathing under her;
- *   3. she JUMPS: a ballistic arc — up `GIRL_JUMP_RISE`, over the crest, and then
- *      DOWN `GIRL_JUMP_FALL` — off the edge of the world, facing the reader as
- *      she goes.
+ * ============================================================================
+ * THE SECOND RESTAGING (Task 101) — no about-face, and a walk at walking pace
+ * ============================================================================
+ * Aram, on the shipped Task 87 exit: "she runs too fast to the back and I don't
+ * know why turns back to the viewer before jumping off, she should jump off
+ * towards the wall." Three separate defects, and each one has a number under it.
+ *
+ * 1. THE PACE WAS 2.71× HER OWN GAIT, and it was measurable rather than felt.
+ *    The world turns at exactly ONE rate whenever it turns at all — the journey
+ *    timeline is solved for that (`journey-timeline.ts`, PARK_FRAC), and the rate
+ *    is `JOURNEY_SURFACE_RATE` below: 46.08 world units of surface per unit of
+ *    journey progress. Task 87 crossed `GIRL_WALK_ARC` (0.999 u) in Δt = 0.09 of
+ *    the ending, smootherstepped end to end — and a smootherstep's peak is 1.875×
+ *    its mean, so the middle of that walk ran at 124.9 u/progress. She covered
+ *    ground nearly three times faster than the world has ever moved under her,
+ *    which is exactly what "runs" looks like next to six chapters of walking.
+ *
+ *    The fix is a re-mapping, not a clock: the scroll-scrub law holds, so pacing
+ *    is where the progress goes. `GIRL_WALK_SPAN` is now SOLVED from the gait —
+ *    the window is whatever makes her PEAK surface speed equal the journey's own
+ *    travelling rate — and the easing is a walk's profile rather than a bell:
+ *    `walkEaseAt` ramps out of standing, CRUISES at a constant pace for two
+ *    thirds of the window, and ramps down to the stop. Constant cruise is also
+ *    what makes her legs read right: the skip clip's cadence is driven by
+ *    `walked`, so a constant surface speed is a constant stride, which is what
+ *    the journey has been showing for six chapters.
+ *
+ * 2. THE ABOUT-FACE IS GONE. She turns her back on the world at the top of the
+ *    ending and never turns round again — `yaw` is the turn-away and nothing
+ *    else. The farewell survives where Task 87 found it by accident and Aram
+ *    asked us not to fix: Jump_B's own crest frame reads as a raised arm, so the
+ *    goodbye is a wave thrown mid-leap, from a girl already on her way out. What
+ *    replaces the held goodbye beat is `GIRL_BRINK` — a short stand on the edge,
+ *    still facing away, which motivates the leap instead of interrupting it.
+ *
+ * 3. THE LEAP GOES TOWARD THE WALL. Task 87's `GIRL_JUMP_SWEEP` was 0.14 rad —
+ *    0.09 u of ground covered by the apex against 0.35 u of rise, i.e. an 83°
+ *    takeoff. That is not a jump off an edge, it is a hop straight up with a
+ *    trapdoor under it. The sweep is now solved from the same pace law as the
+ *    walk (`LEAP_PACE`: a bounding leap covers ground about 2.2× as fast as a
+ *    walk), which lands the takeoff at 55° and carries her 0.48 u away from the
+ *    reader by the apex and 0.87 u — three quarters of her own height — before
+ *    the crest takes her feet. She leaves in the −θ direction, which is the
+ *    direction she is FACING and the direction of the ending room's back wall:
+ *    away from the lens, over the rim, down behind the world.
+ *
+ *    Her body no longer rotates with the ground it left. On the planet she is
+ *    tilted to the surface normal at her bearing; in flight that would spin her
+ *    43° between takeoff and the last frame the reader sees, which is a tumble,
+ *    not a leap. `GirlPose.tilt` is therefore the bearing whose normal she stands
+ *    on — equal to `theta` for every grounded frame, FROZEN at `GIRL_STOP_THETA`
+ *    for the flight. A body in the air carries no torque; it keeps the lean the
+ *    edge gave it.
  *
  * THE FALL IS WHAT HIDES HER, and it is a strictly stronger hiding than Task
  * 76's. The walk needed the two-horizon solve because her head stayed raised; the
@@ -85,16 +133,24 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * GIRL_GLOBE_HEIGHT` — INSIDE the planet's own ball. A camera outside a convex
  * body cannot see a point inside it from ANY distance (every sightline to it
  * crosses the surface), so the parked end state needs no margin arithmetic
- * against the pull-back at all. `girl-exit.test.ts` gates the radius with real
- * slack and ALSO keeps the two-horizon predicate for the beats on the way down.
+ * against the pull-back at all. THAT ARGUMENT IS INDIFFERENT TO THE SWEEP: it is
+ * a claim about a radius, and `GIRL_JUMP_FALL` is unchanged, so a wall-ward
+ * trajectory inherits it whole. What the longer sweep DOES move is the two-horizon
+ * beats on the way down, and they are re-measured rather than assumed: her feet
+ * go behind the crest at 51.7% of the flight (was 57.5%), her head at 80.9% (was
+ * 89.0%), and the plunge — feet gone, head still up — is 29.2% of the flight at
+ * the rest camera and 29.1% at full pull-back, both COMFORTABLY above the 25%
+ * the gate has always demanded. The apex clears the horizon with 0.39 rad to
+ * spare, so the leap reads whole before the world takes her.
  *
  * The gate family is re-derived, not weakened: she is on the planet and drawn
- * for the whole performance; at the goodbye she is WHOLE (feet visible — the
- * beat cannot be delivered by a half-sunk figure); at the apex of the jump she
- * is still whole (the leap must read before the fall takes her); her feet drop
- * behind the crest BEFORE her head (the sinking that made the walk work is now
- * the plunge); that sinking is a real share of the flight; and she is hidden at
- * every camera stop from the end of the flight through the bottom of the track.
+ * for the whole performance; she is WHOLE for the whole walk and on the brink;
+ * at the apex of the jump she is still whole (the leap must read before the fall
+ * takes her); her feet drop behind the crest BEFORE her head; that sinking is a
+ * real share of the flight; she is hidden at every camera stop from the end of
+ * the flight through the bottom of the track; and two gates are NEW — her peak
+ * walking speed is in family with the journey's own rate, and her yaw never
+ * leaves the turn-away once she has taken it.
  *
  * ============================================================================
  * SCROLL PURITY — AND THE JUMP CLIP ON THE SAME TERMS
@@ -164,29 +220,145 @@ export const strideAt = (scale: number): number => (CLIP_STRIDE * scale) / GIRL_
  * The surface's own crest as seen from the REST camera — the tangent bearing,
  * which is the line the whole performance is staged against. The camera cannot
  * leave its rest pose before ZOOM_START (0.38), and the flight is over by
- * GIRL_JUMP_END (0.35), so every airborne frame renders through this horizon
+ * GIRL_JUMP_END (0.37), so every airborne frame renders through this horizon
  * and no other.
  */
 export const CREST_THETA = CAMERA_THETA - Math.acos(PLANET_RADIUS / CAMERA_DISTANCE)
 
 /**
- * How far short of the crest she stops for the goodbye, in radians of surface.
+ * How far short of the crest she stops, in radians of surface.
  *
- * Far enough that her FEET are safely inside the visible cap (a goodbye delivered
- * by a half-sunk figure is not a goodbye — the test gates feet visible at the
- * stop), close enough that she reads as standing on the edge of the world, which
- * is the picture the jump needs to launch from.
+ * Far enough that her FEET are safely inside the visible cap (a launch delivered
+ * by a half-sunk figure is not a launch — the test gates feet visible for the
+ * whole walk and on the brink), close enough that she reads as standing on the
+ * edge of the world, which is the picture the jump needs to launch from.
  */
 export const GIRL_STOP_MARGIN = 0.06
 
-/** Where she stands for the goodbye: a step before the crest, whole in the frame. */
+/** Where she stands on the brink: a step before the crest, whole in the frame. */
 export const GIRL_STOP_THETA = CREST_THETA + GIRL_STOP_MARGIN
 
 /** How far she walks on the planet, along the surface, in world units. */
 export const GIRL_WALK_ARC = (STANCE_ALPHA - GIRL_STOP_THETA) * PLANET_RADIUS
 
+/**
+ * HOW FAST THE WORLD HAS EVER MOVED UNDER HER, in world units of surface per unit
+ * of JOURNEY progress — the rate her exit is paced against, and the reason the
+ * pacing is a derivation rather than a taste.
+ *
+ * The journey turns the planet at exactly one rate whenever it is turning at all:
+ * `journey-timeline.ts` SOLVES its segment shape for that, so a visitor scrolling
+ * steadily never feels the world change gear across a dwell. A chapter's approach
+ * leg carries `PARK_FRAC` of `CHAPTER_SLICE` over `TRAVEL_END` of a segment, and a
+ * segment is `1 / CHAPTER_COUNT` of progress — so the rate is that slope, taken
+ * out to progress and multiplied by the radius the surface is measured at. 46.08.
+ *
+ * She never translates during the journey (the planet spins beneath her), so this
+ * IS her gait: her skip cadence is driven from surface distance through
+ * `CLIP_STRIDE`, in the ending exactly as in the journey. Matching this rate is
+ * matching her stride, frame for frame.
+ */
+export const JOURNEY_SURFACE_RATE =
+  ((PARK_FRAC * CHAPTER_SLICE) / TRAVEL_END) * CHAPTER_COUNT * PLANET_RADIUS
+
+/**
+ * How much of the walk's window is spent getting up to speed (and, again, coming
+ * down from it). The rest is CRUISE — a constant pace, which is what a walk is.
+ *
+ * Task 87 eased the whole window with a smootherstep, whose peak is 1.875× its
+ * mean; at 0.09 of the ending that put her middle stretch at 2.71× the journey's
+ * own rate, and that is the "runs too fast" Aram saw. A trapezoid's peak is
+ * 1/(1 − ramp) × its mean — 1.22 here — and the plateau is 66% of the window, so
+ * two thirds of the walk is literally her journey stride.
+ */
+export const WALK_RAMP = 0.18
+
+/**
+ * The walk's displacement profile: 0 at 0, 1 at 1, and a constant-speed plateau
+ * in between. Its velocity is a smoothstep up over the first `WALK_RAMP`, exactly
+ * 1 across the middle, and a smoothstep down over the last `WALK_RAMP`; each ramp
+ * integrates to half its width, so the raw area is `1 − WALK_RAMP` and dividing by
+ * that normalises the profile without disturbing either end.
+ *
+ * BOTH ENDS ARE EXACT BY BRANCH rather than by arithmetic — `u ≤ 0` returns +0 and
+ * `u ≥ 1` returns 1 — because "she has arrived at the stop" is asserted with
+ * `Object.is` a few tests down, and a normalised quartic does not land on 1.
+ */
+export function walkEaseAt(u: number): number {
+  if (!(u > 0)) return 0
+  if (u >= 1) return 1
+  const r = WALK_RAMP
+  const ramp = (x: number): number => x * x * x - (x * x * x * x) / 2
+  const area =
+    u < r
+      ? r * ramp(u / r)
+      : u <= 1 - r
+        ? r / 2 + (u - r)
+        : r / 2 + (1 - 2 * r) + r * (0.5 - ramp((1 - u) / r))
+  return area / (1 - r)
+}
+
 // ---------------------------------------------------------------------------
-// THE JUMP — authored as two look numbers, everything else solved
+// THE BEATS, in the ending's own t — and the pacing lives HERE, not in a clock
+// ---------------------------------------------------------------------------
+
+/** She turns her back on the world over this window, standing still. Starts after
+ *  0 so the first frames of the ending are bit-identically the journey's last one. */
+export const GIRL_TURN_START = 0.03
+export const GIRL_TURN_END = 0.09
+
+/**
+ * How much of the ending the walk takes — SOLVED from her gait, not chosen.
+ *
+ * The requirement is one line: her PEAK surface speed equals `JOURNEY_SURFACE_RATE`.
+ * Peak is mean × 1/(1 − `WALK_RAMP`), mean is `GIRL_WALK_ARC` over the window in
+ * PROGRESS units (the ending's t is `ENDING_SPAN` of progress), so inverting it is
+ * the line below. It lands at 0.1587 — nearly twice Task 87's 0.09, which is the
+ * whole of Aram's first complaint expressed as scroll.
+ */
+export const GIRL_WALK_SPAN =
+  GIRL_WALK_ARC / (JOURNEY_SURFACE_RATE * ENDING_SPAN * (1 - WALK_RAMP))
+
+/** ...and she has arrived at the brink by here. */
+export const GIRL_WALK_END = GIRL_TURN_END + GIRL_WALK_SPAN
+
+/** The tail of the walk she spends slowing to the stop — the profile's own ramp,
+ *  reused so the skip↔idle blend lets go exactly as her feet do. */
+export const GIRL_WALK_SETTLE = WALK_RAMP * GIRL_WALK_SPAN
+
+/**
+ * The brink: she stands on the edge of her world, still facing away from the
+ * reader, before she goes. This is what replaces Task 87's turn-back — the beat
+ * survives, the about-face does not. Long enough to read as a decision rather
+ * than a stumble; short enough that it never becomes a pose.
+ */
+export const GIRL_BRINK = 0.022
+
+/** The flight launches out of the brink... */
+export const GIRL_JUMP_START = GIRL_WALK_END + GIRL_BRINK
+
+/**
+ * ...and lands nowhere: the window ends with her parked inside the planet's
+ * occlusion ball. It runs PAST the stand's seating (STAND_END 0.3) on purpose —
+ * the still beat used to hold nothing, and now it holds the one thing the whole
+ * ending is about — but it ends before ZOOM_START (0.38), so every airborne frame
+ * renders through the rest camera and the crest is the one this module solves.
+ *
+ * This is the LAST authored number in the exit's timeline, and it is the budget:
+ * everything from the turn to here is spent at a derived pace, so lengthening the
+ * walk to her real gait is paid for out of the goodbye that is no longer staged.
+ */
+export const GIRL_JUMP_END = 0.37
+
+/**
+ * When she stops being on the planet and starts being on the desk. Anywhere in
+ * [GIRL_JUMP_END, GIRL_DESK_REVEAL] is equivalent — she is drawn in neither place
+ * — so it sits in the still beat, where the camera has not started to move.
+ */
+export const GIRL_TRANSFER = 0.375
+
+// ---------------------------------------------------------------------------
+// THE JUMP — authored as two look numbers and a pace, everything else solved
 // ---------------------------------------------------------------------------
 
 /** How high the leap carries her above the surface at its apex, in world units.
@@ -203,17 +375,6 @@ export const GIRL_JUMP_RISE = 0.35
 export const GIRL_JUMP_FALL = 1.8
 
 /**
- * How far round the sphere the leap carries her, in radians. Enough that the
- * plunge happens BEHIND the crest (the fall crosses the silhouette going down,
- * which is the beat), small enough that the arc reads as a jump rather than a
- * flight — 0.14 rad is 0.31 u of surface, about a body-length-and-a-half.
- */
-export const GIRL_JUMP_SWEEP = 0.14
-
-/** Where the flight ends, in θ. Past the rest crest, behind the silhouette. */
-export const GIRL_JUMP_END_THETA = GIRL_STOP_THETA - GIRL_JUMP_SWEEP
-
-/**
  * When in the flight she crests — SOLVED from the two authored numbers by the
  * ballistics themselves. A parabola through lift(0) = 0 with apex `RISE` and
  * lift(1) = −FALL has its apex at the root of (FALL/RISE)·A² + 2A − 1 = 0:
@@ -225,6 +386,52 @@ export const GIRL_JUMP_APEX = (() => {
   return (Math.sqrt(1 + r) - 1) / r
 })()
 
+/**
+ * How much faster a bounding leap covers ground than a walk does. The one
+ * authored number in the wall-ward trajectory, and it is authored in the same
+ * currency as the walk so the two beats cannot drift apart: everything about the
+ * exit's pace is now a multiple of `JOURNEY_SURFACE_RATE`.
+ *
+ * A standing leap moves a body about twice as fast as walking does — and it must
+ * be faster, or the launch reads as a step off a kerb. 2.2 is that, with the
+ * takeoff angle it implies (below) as the check: the number is only defensible if
+ * the arc it produces is one a body could make.
+ */
+export const LEAP_PACE = 2.2
+
+/**
+ * How far round the sphere the leap carries her, in radians — SOLVED from the
+ * pace and the window, exactly as the walk's window was solved from the pace and
+ * the distance. The flight owns `GIRL_JUMP_END − GIRL_JUMP_START` of the ending,
+ * and travels at `LEAP_PACE ×` the journey's rate through it. 0.763 rad — 1.68 u
+ * of surface, against Task 87's 0.31.
+ *
+ * The bearing is LINEAR in flight phase, which makes the tangential speed constant
+ * at the surface's own radius; she is above it on the way up, so her true ground
+ * speed peaks about 15% over this near the apex, and collapses once she is falling
+ * inside the ball, where nothing can see her anyway.
+ */
+export const GIRL_JUMP_SWEEP =
+  (LEAP_PACE * JOURNEY_SURFACE_RATE * ENDING_SPAN * (GIRL_JUMP_END - GIRL_JUMP_START)) /
+  PLANET_RADIUS
+
+/** Where the flight ends, in θ. Past the rest crest, behind the silhouette. */
+export const GIRL_JUMP_END_THETA = GIRL_STOP_THETA - GIRL_JUMP_SWEEP
+
+/**
+ * THE TAKEOFF ANGLE THE PACE IMPLIES, in degrees — derived and asserted rather
+ * than authored, because it is the sanity check on `LEAP_PACE` and not a dial.
+ *
+ * A parabola that rises `GIRL_JUMP_RISE` and covers `apex × sweep × R` of ground
+ * getting there leaves the ground at `atan(2 · rise / run)`. 55.4°: steeper than a
+ * long jump (45°, because she is not jumping for distance) and far shallower than
+ * Task 87's 83° (which is not a leap at all — it is a hop with a trapdoor under
+ * it). The test pins it into the band a body can produce.
+ */
+export const GIRL_JUMP_TAKEOFF_DEG =
+  (Math.atan2(2 * GIRL_JUMP_RISE, GIRL_JUMP_APEX * GIRL_JUMP_SWEEP * PLANET_RADIUS) * 180) /
+  Math.PI
+
 /** The parabola's gravity, in lift units per unit flight² — from apex height. */
 const JUMP_G = (2 * GIRL_JUMP_RISE) / (GIRL_JUMP_APEX * GIRL_JUMP_APEX)
 
@@ -232,7 +439,7 @@ const JUMP_G = (2 * GIRL_JUMP_RISE) / (GIRL_JUMP_APEX * GIRL_JUMP_APEX)
  * Her radial offset from the surface at flight phase `p` — the authored
  * ballistics. Exactly +0 at p = 0 (`G·(A·0 − 0)`), so the takeoff frame is
  * bit-identical to the standing one, which is what lets the flight join the
- * goodbye without a seam a scrub could catch.
+ * brink without a seam a scrub could catch.
  */
 export function jumpLiftAt(p: number): number {
   const x = clamp01(p)
@@ -289,7 +496,7 @@ export function jumpBlendAt(p: number): number {
  *     surface first — hidden from any distance, no arithmetic.
  *   - radius ≥ PLANET_RADIUS: the Task 76 two-horizon condition — hidden when
  *     the angular separation from the camera exceeds acos(R/d) + acos(R/ρ).
- * This is the predicate the whole exit is gated through; the walk, the goodbye,
+ * This is the predicate the whole exit is gated through; the walk, the brink,
  * the apex and the plunge are all claims about it.
  */
 export function pointHiddenAt(theta: number, radius: number, cameraDistance: number): boolean {
@@ -328,40 +535,6 @@ export function exitSinkShare(cameraDistance: number): number {
   }
   return sinking / (N + 1)
 }
-
-// ---------------------------------------------------------------------------
-// THE BEATS, in the ending's own t
-// ---------------------------------------------------------------------------
-
-/** She turns her back on the world over this window. Starts after 0 so the first
- *  frames of the ending are bit-identically the journey's last one. */
-export const GIRL_TURN_START = 0.03
-export const GIRL_TURN_END = 0.1
-
-/** ...and walks to `GIRL_STOP_THETA` by here — a short walk to the edge. */
-export const GIRL_WALK_END = 0.19
-
-/** She turns back toward the reader over this window — the goodbye. */
-export const GIRL_LOOK_START = 0.21
-export const GIRL_LOOK_END = 0.27
-
-/**
- * The flight. It launches out of the goodbye's held beat and lands nowhere:
- * the window ends with her parked inside the planet's occlusion ball. It runs
- * PAST the stand's seating (STAND_END 0.3) on purpose — the still beat used to
- * hold nothing, and now it holds the one thing the whole ending is about — but
- * it ends before `GIRL_TRANSFER`, and the camera cannot move until ZOOM_START
- * (0.38), so every airborne frame renders through the rest camera.
- */
-export const GIRL_JUMP_START = 0.29
-export const GIRL_JUMP_END = 0.35
-
-/**
- * When she stops being on the planet and starts being on the desk. Anywhere in
- * [GIRL_JUMP_END, GIRL_DESK_REVEAL] is equivalent — she is drawn in neither place
- * — so it sits in the still beat, where the camera has not started to move.
- */
-export const GIRL_TRANSFER = 0.36
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 
@@ -575,6 +748,13 @@ export type GirlPose = {
   readonly visible: boolean
   /** Surface bearing on the planet (rad). Meaningless off the globe. */
   readonly theta: number
+  /**
+   * The bearing whose surface normal she is STANDING ALONG — equal to `theta` for
+   * every grounded frame, and frozen at the takeoff bearing for the flight. A body
+   * in the air carries no torque; without this she rotates 43° with the ground she
+   * has already left, which is a tumble rather than a leap (T101).
+   */
+  readonly tilt: number
   /** Radial offset from the surface (world u) — the flight's lift. 0 on the ground. */
   readonly lift: number
   /** The flight's own 0→1, 0 outside the jump window. Drives the Jump_B action. */
@@ -596,6 +776,7 @@ const JOURNEY_POSE: GirlPose = Object.freeze({
   stage: 'journey' as const,
   visible: true,
   theta: STANCE_ALPHA,
+  tilt: STANCE_ALPHA,
   lift: 0,
   jump: 0,
   x: 0,
@@ -626,6 +807,7 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
       stage: 'desk',
       visible: GIRL_DESK_MOUNTED,
       theta: STANCE_ALPHA,
+      tilt: STANCE_ALPHA,
       lift: 0,
       jump: 0,
       x: stg.to[0],
@@ -638,20 +820,27 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
   }
 
   if (t < GIRL_TRANSFER) {
-    const walk = smootherstep(across(t, GIRL_TURN_END, GIRL_WALK_END))
+    // A WALK's profile, not a bell: ramp out of standing, cruise at the journey's
+    // own rate, ramp down to the brink. See WALK_RAMP for the 2.71× this replaces.
+    const walk = walkEaseAt(across(t, GIRL_TURN_END, GIRL_WALK_END))
     const walkTheta = mix(STANCE_ALPHA, GIRL_STOP_THETA, walk)
     // The flight's clock is LINEAR in scroll — ballistics happen in time, and the
     // scroll is the ending's time. Easing it would bend gravity.
     const jump = across(t, GIRL_JUMP_START, GIRL_JUMP_END)
     const theta = mix(walkTheta, GIRL_JUMP_END_THETA, jump)
-    // She turns away to walk, and turns back for the goodbye. `mix(x, 0, 1)` is
-    // exactly +0, so from GIRL_LOOK_END on she faces the reader without residue.
-    const turnAway = Math.PI * smootherstep(across(t, GIRL_TURN_START, GIRL_TURN_END))
-    const yaw = mix(turnAway, 0, smootherstep(across(t, GIRL_LOOK_START, GIRL_LOOK_END)))
+    // She turns her back on the world and NEVER TURNS ROUND (T101). `yaw` is the
+    // turn-away and nothing else, so the leap goes the way she is already facing:
+    // away from the reader, toward the room's back wall.
+    const yaw = Math.PI * smootherstep(across(t, GIRL_TURN_START, GIRL_TURN_END))
     return {
       stage: 'globe',
       visible: true,
       theta,
+      // Grounded, she stands along the normal at her own bearing; airborne, she
+      // keeps the lean the edge gave her. The two agree EXACTLY at the seam — the
+      // walk has already arrived at GIRL_STOP_THETA before the flight opens — so
+      // every grounded frame is bit-identically what it was before it existed.
+      tilt: jump > 0 ? GIRL_STOP_THETA : walkTheta,
       lift: jumpLiftAt(jump),
       jump,
       x: 0,
@@ -661,7 +850,7 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
       walked: (STANCE_ALPHA - walkTheta) * PLANET_RADIUS,
       moving:
         across(t, GIRL_TURN_START, GIRL_TURN_END) *
-        (1 - across(t, GIRL_WALK_END - 0.02, GIRL_WALK_END)),
+        (1 - across(t, GIRL_WALK_END - GIRL_WALK_SETTLE, GIRL_WALK_END)),
     }
   }
 
@@ -678,6 +867,7 @@ export function girlPoseAt(ending: EndingState, reduced: boolean): GirlPose {
     stage: 'desk',
     visible: GIRL_DESK_MOUNTED && t >= GIRL_DESK_REVEAL,
     theta: STANCE_ALPHA,
+    tilt: STANCE_ALPHA,
     lift: 0,
     jump: 0,
     x,

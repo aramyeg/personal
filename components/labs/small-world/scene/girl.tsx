@@ -266,6 +266,10 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const scratch = useMemo(
     () => ({
       tilt: new THREE.Quaternion(),
+      /** The GROUND's own tilt at her bearing — the same thing as `tilt` for every
+       *  grounded frame, and the thing her contact pool keeps following while the
+       *  flight freezes hers (T101). */
+      groundTilt: new THREE.Quaternion(),
       spin: new THREE.Quaternion(),
       flat: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2),
       xAxis: new THREE.Vector3(1, 0, 0),
@@ -412,12 +416,18 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
           // Relative to the pose she holds on the planet, never absolute: she stands
           // UPRIGHT at STANCE_ALPHA today, so tilting to the surface normal would
           // move her on the ending's very first frame. This is exactly identity there.
-          scratch.tilt.setFromAxisAngle(scratch.xAxis, pose.theta - STANCE_ALPHA)
+          // HER lean is `pose.tilt` — frozen at the takeoff bearing once she is in
+          // the air, because a body in flight carries no torque — while the ground
+          // under her keeps turning with `pose.theta`, which is what her contact
+          // pool lies on. The two are the same number for every grounded frame.
+          scratch.tilt.setFromAxisAngle(scratch.xAxis, pose.tilt - STANCE_ALPHA)
+          scratch.groundTilt.setFromAxisAngle(scratch.xAxis, pose.theta - STANCE_ALPHA)
           scratch.up.set(0, y, zw).normalize()
         } else {
           group.current.position.set(pose.x, GIRL_DESK_SEAT_Y, pose.z)
           scratch.ground.set(pose.x, GIRL_DESK_SEAT_Y, pose.z)
           scratch.tilt.identity()
+          scratch.groundTilt.identity()
           scratch.up.set(0, 1, 0)
         }
         scratch.spin.setFromAxisAngle(scratch.yAxis, pose.yaw)
@@ -443,7 +453,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
           mesh.visible = pose.visible && mine
           if (!mesh.visible) continue
           mesh.position.copy(scratch.ground).addScaledVector(scratch.up, SHADOW_LIFT)
-          mesh.quaternion.copy(scratch.tilt).multiply(scratch.flat)
+          mesh.quaternion.copy(scratch.groundTilt).multiply(scratch.flat)
           mesh.scale.setScalar(pose.scale / GIRL_SCALE)
         }
       }
