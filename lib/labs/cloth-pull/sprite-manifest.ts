@@ -18,94 +18,94 @@ export const SPRITE_STAND_H = 900
 export const SPRITE_FRAMES: readonly SpriteFrame[] = [
   {
     "name": "walk_01",
-    "w": 788,
+    "w": 790,
     "h": 900,
     "anchorX": 159,
-    "anchorY": 545
+    "anchorY": 547
   },
   {
     "name": "walk_02",
-    "w": 781,
-    "h": 900,
-    "anchorX": 177,
+    "w": 773,
+    "h": 893,
+    "anchorX": 175,
     "anchorY": 558
   },
   {
     "name": "walk_03",
-    "w": 870,
-    "h": 900,
-    "anchorX": 229,
-    "anchorY": 546
+    "w": 811,
+    "h": 883,
+    "anchorX": 183,
+    "anchorY": 529
   },
   {
     "name": "walk_04",
-    "w": 910,
-    "h": 900,
-    "anchorX": 243,
-    "anchorY": 528
+    "w": 810,
+    "h": 851,
+    "anchorX": 180,
+    "anchorY": 495
   },
   {
     "name": "walk_05",
-    "w": 791,
-    "h": 900,
-    "anchorX": 169,
-    "anchorY": 504
-  },
-  {
-    "name": "walk_06",
-    "w": 814,
-    "h": 900,
-    "anchorX": 181,
-    "anchorY": 540
-  },
-  {
-    "name": "walk_07",
-    "w": 876,
-    "h": 900,
-    "anchorX": 261,
-    "anchorY": 509
-  },
-  {
-    "name": "walk_08",
-    "w": 867,
-    "h": 900,
-    "anchorX": 228,
+    "w": 811,
+    "h": 930,
+    "anchorX": 159,
     "anchorY": 526
   },
   {
+    "name": "walk_06",
+    "w": 803,
+    "h": 908,
+    "anchorX": 169,
+    "anchorY": 543
+  },
+  {
+    "name": "walk_07",
+    "w": 837,
+    "h": 906,
+    "anchorX": 219,
+    "anchorY": 514
+  },
+  {
+    "name": "walk_08",
+    "w": 822,
+    "h": 886,
+    "anchorX": 185,
+    "anchorY": 514
+  },
+  {
     "name": "strain_01",
-    "w": 956,
+    "w": 932,
     "h": 780,
-    "anchorX": 253,
-    "anchorY": 415
+    "anchorX": 233,
+    "anchorY": 413
   },
   {
     "name": "strain_02",
-    "w": 966,
-    "h": 780,
-    "anchorX": 251,
-    "anchorY": 407
+    "w": 949,
+    "h": 776,
+    "anchorX": 240,
+    "anchorY": 402
   },
   {
     "name": "strain_03",
-    "w": 927,
-    "h": 780,
-    "anchorX": 275,
-    "anchorY": 414
+    "w": 978,
+    "h": 840,
+    "anchorX": 278,
+    "anchorY": 442
   },
   {
     "name": "hold_01",
-    "w": 617,
+    "w": 537,
     "h": 930,
-    "anchorX": 44,
-    "anchorY": 550
+    "anchorX": 37,
+    "anchorY": 486
   },
   {
     "name": "hold_02",
-    "w": 522,
-    "h": 930,
+    "w": 536,
+    "h": 960,
     "anchorX": 55,
-    "anchorY": 525
+    "anchorY": 540
   }
 ] as const
 
