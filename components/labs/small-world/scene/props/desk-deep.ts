@@ -371,6 +371,196 @@ export const VERSO_VERTEX_BODY = (() => {
 }`
 })()
 
+// --- the watering ------------------------------------------------------------
+
+/**
+ * Click the watering can and it waters the plant: the can lifts clear of the foliage (it is
+ * shorter than the pot — the lift IS the story beat), tips 44°, and lays a ribbon of seven
+ * authored beads onto the rosette; the succulent answers by PERKING — every leaf pivots 6.5° up
+ * about the rosette centre and swells 4.5%, then eases back as the drink soaks in, and the soil
+ * darkens on the same envelope. The pour is the arm's baked clip (48 frames, LINEAR, every bead a
+ * closed form of its own phase — no particles), scrubbed from a PAUSED action whose `.time` is
+ * written from this state and never from the frame delta (the T89/T91 law, the `girl.tsx`
+ * contract). The eight exported actions were merged into ONE animation at splice time
+ * (`WaterAction`), so one written number drives the can and all seven beads — they cannot
+ * desynchronise even in principle.
+ *
+ * The PLANT'S RESPONSE ships as a shader chunk, not a clip (the arm's own redirect): the 30
+ * leaves live inside the `DeskBaked` join with no nodes of their own, and all 30 leaf origins
+ * coincide at the rosette centre, so the perk is a closed form over rest position vs one point —
+ * zero bytes, zero nodes, zero draws.
+ */
+export const WATER = {
+  /** The pour clip's length, seconds — 48 frames at 24 fps, measured off the exported samplers. */
+  duration: 2.0,
+  /** When the first bead reaches the rosette (frame 22): the perk cannot start before the water. */
+  land: 22 / 24,
+  /** The perk's envelope: up over 0.5 s as the drink arrives... */
+  perkRise: 0.5,
+  /** ...held while the can finishes and settles... */
+  perkHold: 0.9,
+  /** ...and eased back over 1.1 s — the plant relaxes rather than snapping. */
+  perkFall: 1.1,
+  /** Leaf pivot at full perk, radians (6.5° — amplitude MEASURED by the arm: 16.9% of the plant's
+   *  crop changes by more than 8/255, max delta 204/255; unmistakable, not subtle). */
+  perkAngle: 0.1134464,
+  /** ...with a 4.5% swell about the same centre. */
+  swell: 0.045,
+  /** How far the soil's baked colour is pulled down at full drink. */
+  soilDark: 0.22,
+} as const
+
+/** The whole watering arc, after which the state snaps to exact rest. */
+export const WATER_TOTAL = WATER.land + WATER.perkRise + WATER.perkHold + WATER.perkFall
+
+/**
+ * The can's click zone: its measured rest footprint (the mesh AABB of the spliced `Can_B` under
+ * its authored node TRS — behind the pot at (−3.72, 10.03), yaw −119°), grown 0.001 for float
+ * slack. `desk-deep.test.ts` re-derives the box from the shipped bytes.
+ */
+export const CAN_ZONE = {
+  min: [-4.079, 1.299, 9.695],
+  max: [-3.447, 1.705, 10.52],
+} as const
+
+/**
+ * The plant, as the shader sees it. The leaves and the soil are runs of vertices inside
+ * `DeskBaked`, and no box or cylinder can cut them free: the pot's rim interpenetrates the
+ * rosette's own envelope (560 pot vertices sit inside the measured leaf cylinder), and two
+ * leaves reach past the arm's 0.393 radius. What IS exact is the accessor itself — the T81 join
+ * wrote each object contiguously, so the leaves and the soil are contiguous `gl_VertexID`
+ * ranges, and an index-range select cannot tear a neighbour BY CONSTRUCTION. Derived by
+ * union-find over the shipped triangles; held by `desk-deep.test.ts` the same way.
+ */
+export const PLANT = {
+  /** All 30 leaf origins coincide here — the rosette centre (glTF frame). */
+  origin: [-4.05, 1.6705, 10.6],
+  /** The 30 leaves: 5,028 vertices, one contiguous run. */
+  leaves: [5408, 10435],
+  /** The soil disc: 278 vertices. */
+  soil: [21526, 21803],
+} as const
+
+export type WaterState = { t0: number; active: boolean }
+export const restingWater = (): WaterState => ({ t0: 0, active: false })
+
+/** A click starts the pour; clicks mid-arc are absorbed (the set piece finishes its sentence). */
+export function triggerWater(s: WaterState, now: number): void {
+  if (s.active) return
+  s.t0 = now
+  s.active = true
+}
+
+const smooth01 = (x: number): number => {
+  const t = Math.min(Math.max(x, 0), 1)
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * The watering frame: writes the perk envelope into `out[0]` and returns the pour clip's time —
+ * both pure in (now − t0), scrub-safe, deterministic. Past the whole arc everything snaps to
+ * exact +0 and the state disarms, so a watered plant is `Object.is`-identical to one never
+ * watered.
+ */
+export function sampleWater(s: WaterState, now: number, out: Float32Array): number {
+  if (!s.active) return 0
+  const tau = now - s.t0
+  if (tau <= 0) return 0
+  if (tau >= WATER_TOTAL) {
+    s.active = false
+    out[0] = 0
+    return 0
+  }
+  const clip = Math.min(tau, WATER.duration)
+  const drink = tau - WATER.land
+  const w =
+    drink <= 0
+      ? 0
+      : drink < WATER.perkRise + WATER.perkHold
+        ? smooth01(drink / WATER.perkRise)
+        : 1 - smooth01((drink - WATER.perkRise - WATER.perkHold) / WATER.perkFall)
+  out[0] = w
+  return clip
+}
+
+/** The watering uniform: (perk w, 0, 0, 0). One writer (the deep frame loop), two readers (the
+ *  leaf chunk and the soil tint), so they cannot disagree. */
+export const WATER_UNIFORM = { value: new Float32Array(4) }
+
+/**
+ * The mail slot the deep tier writes CLIP TIMES into and `desk-glb.tsx` stamps onto the paused
+ * actions (the mixer lives with the meshes; the state lives with the pointer — the `mugStirMail`
+ * pattern, one frame of pickup latency at most, order fixed by mount order in `desk-set.tsx`).
+ */
+export const deepClipMail = { water: 0, bird: 0 }
+
+/** The can's claim — same shape as the book's: x/z inflated to the 44 px floor, y as authored. */
+export function canRayHit(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  fovDeg: number,
+  heightPx: number
+): { t: number; point: [number, number, number] } | null {
+  const z = CAN_ZONE
+  const cx = (z.min[0] + z.max[0]) / 2
+  const cy = (z.min[1] + z.max[1]) / 2
+  const cz = (z.min[2] + z.max[2]) / 2
+  const dist = Math.hypot(cx - ox, cy - oy, cz - oz)
+  const extent = Math.min(z.max[0] - z.min[0], z.max[2] - z.min[2])
+  const pad = hitPadFor(extent, dist, fovDeg, heightPx)
+  const t = rayBoxHit(
+    ox,
+    oy,
+    oz,
+    dx,
+    dy,
+    dz,
+    [z.min[0] - pad, z.min[1], z.min[2] - pad],
+    [z.max[0] + pad, z.max[1], z.max[2] + pad]
+  )
+  return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
+}
+
+// --- the watering's shader chunks (DeskBaked) --------------------------------
+
+/**
+ * The vertex half: the leaf perk and the soil's varying. Selection is by `gl_VertexID` range
+ * (see PLANT for why nothing geometric can do it), the motion is the arm's closed form — rotate
+ * the vertex's offset from the rosette centre about the horizontal axis perpendicular to its own
+ * radial direction (every leaf pivots up in its own plane), plus the swell. Applied as a DELTA to
+ * `transformed`, and guarded to exact zero: a dry plant takes the untouched path.
+ */
+export const WATER_VERTEX_DECL = 'uniform vec4 uWater;\nvarying float vWaterDark;'
+export const WATER_VERTEX_BODY = (() => {
+  const p = PLANT
+  return `vWaterDark = 1.0;
+if ( uWater.x != 0.0 ) {
+  if ( gl_VertexID >= ${p.leaves[0]} && gl_VertexID <= ${p.leaves[1]} ) {
+    vec3 wpD = position - vec3( ${f(p.origin[0])}, ${f(p.origin[1])}, ${f(p.origin[2])} );
+    float wpL = length( wpD.xz );
+    if ( wpL > 1e-4 ) {
+      vec3 wpAx = vec3( -wpD.z, 0.0, wpD.x ) / wpL;
+      float wpTh = ${f(WATER.perkAngle)} * uWater.x;
+      float wpC = cos( wpTh );
+      float wpS = sin( wpTh );
+      vec3 wpQ = wpD * wpC + cross( wpAx, wpD ) * wpS + wpAx * dot( wpAx, wpD ) * ( 1.0 - wpC );
+      transformed += wpQ * ( 1.0 + ${f(WATER.swell)} * uWater.x ) - wpD;
+    }
+  }
+  if ( gl_VertexID >= ${p.soil[0]} && gl_VertexID <= ${p.soil[1]} ) {
+    vWaterDark = 1.0 - ${f(WATER.soilDark)} * uWater.x;
+  }
+}`
+})()
+
+/** The fragment half: the soil drinks — its baked colour pulled down by the same envelope. */
+export const WATER_FRAGMENT_DECL = 'uniform vec4 uWater;\nvarying float vWaterDark;'
+export const WATER_FRAGMENT_BODY = `if ( uWater.x != 0.0 ) diffuseColor.rgb *= vWaterDark;`
+
 /**
  * The vertex half: the vortex dip, a paraboloid-squared of rest radius — C1 at the rim, so the
  * liquid meets the mug's inner wall with no crease and NO tear (the rim ring moves exactly zero).

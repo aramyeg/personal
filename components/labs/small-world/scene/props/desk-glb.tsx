@@ -19,6 +19,12 @@ import {
   STIR_UNIFORM,
   STIR_VERTEX_BODY,
   STIR_VERTEX_DECL,
+  WATER_FRAGMENT_BODY,
+  WATER_FRAGMENT_DECL,
+  WATER_UNIFORM,
+  WATER_VERTEX_BODY,
+  WATER_VERTEX_DECL,
+  deepClipMail,
 } from './desk-deep'
 
 /**
@@ -90,7 +96,13 @@ function wireNudge(
  * Capturing them once, off the glTF's own material, makes the second mount identical to the first
  * by construction rather than by the first mount having been careful.
  */
-export type DeskAssets = { scene: THREE.Group; lit: THREE.Texture | null; dim: THREE.Texture | null }
+export type DeskAssets = {
+  scene: THREE.Group
+  lit: THREE.Texture | null
+  dim: THREE.Texture | null
+  /** The spliced set-piece clips (Task 92): `WaterAction` today, `BirdAction` beside it. */
+  animations: THREE.AnimationClip[]
+}
 
 /** One manager, one request, shared by every mount — and NOT the default one. See the header. */
 const manager = new THREE.LoadingManager()
@@ -103,7 +115,12 @@ function loadDeskScene(): Promise<DeskAssets> {
       (gltf) => {
         const surface = findMesh(gltf.scene, 'DeskSurface')
         const src = surface?.material as THREE.MeshStandardMaterial | undefined
-        resolve({ scene: gltf.scene, lit: src?.map ?? null, dim: src?.emissiveMap ?? null })
+        resolve({
+          scene: gltf.scene,
+          lit: src?.map ?? null,
+          dim: src?.emissiveMap ?? null,
+          animations: gltf.animations,
+        })
       },
       undefined,
       reject
@@ -191,8 +208,13 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     // The notebook's cover hinge (Task 92): the slab's shipped bytes stay in this mesh and the
     // open is a weighted spine rotation, guarded to exact zero like every nudge field.
     shader.uniforms.uBookHinge = BOOK_UNIFORM
+    // ...and the plant's answer to the watering (Task 92): leaf perk + soil drink, gl_VertexID
+    // range selects over the same shipped bytes, guarded to exact zero the same way.
+    shader.uniforms.uWater = WATER_UNIFORM
     shader.vertexShader = (
       BOOK_VERTEX_DECL +
+      '\n' +
+      WATER_VERTEX_DECL +
       '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
       shader.vertexShader
     ).replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
@@ -201,14 +223,55 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     wireNudge(shader, nudge)
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\n' + BOOK_VERTEX_BODY
+      '#include <begin_vertex>\n' + BOOK_VERTEX_BODY + '\n' + WATER_VERTEX_BODY
+    )
+    shader.fragmentShader = (
+      'uniform float uLights;\nvarying vec3 vDimColor;\n' +
+      WATER_FRAGMENT_DECL +
+      '\n' +
+      shader.fragmentShader
+    ).replace(
+      '#include <color_fragment>',
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + WATER_FRAGMENT_BODY
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-baked'
+  return mat
+}
+
+/**
+ * THE WATERING CAN (Task 92) — a real new prop, the first since the desk was baked, so it plays
+ * by the bake's rules: two colour sets Cycles-baked in situ (behind the pot, frame 1 of the pour
+ * clip), mixed exactly as every other matte prop. Its own mesh because it MOVES — the pour clip
+ * drives its node. DoubleSide because the export ships it so and the spout's bore is visible at
+ * the tilt. No nudge, no hinge: the can's only verb is the pour.
+ */
+export function canMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
+      '#include <color_vertex>',
+      '#include <color_vertex>\n vDimColor = color_1.rgb;'
     )
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
     )
   }
-  mat.customProgramCacheKey = () => 'sw-desk-baked'
+  mat.customProgramCacheKey = () => 'sw-desk-can'
+  return mat
+}
+
+/**
+ * The seven beads: flat water-blue, unlit, UNBAKED — they exist only mid-pour (authored scale 0
+ * at rest) and a baked studio gradient pinned to a flying bead is wrong everywhere except the
+ * frame it was baked in. One shared material; visibility is gated by the frame loop so a resting
+ * desk spends zero draws on them.
+ */
+export function dropMaterial(): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.7, 0.86), toneMapped: false })
+  mat.customProgramCacheKey = () => 'sw-desk-drop'
   return mat
 }
 
@@ -497,21 +560,96 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     // desk without a deep book, not a broken desk.
     const verso = findMesh(scene, 'BookVerso')
     if (verso) verso.material = versoMaterial(lights.current)
-    return { surface, baked, metal, glaze, verso, metalMat: metal.material as THREE.MeshStandardMaterial }
+    // The watering piece (Task 92): the can and its seven beads, driven by ONE paused action whose
+    // .time the deep tier mails in (`deepClipMail`) — the mixer never reads the frame delta. The
+    // same absence rule as the verso: no can, no pour, still a desk.
+    const can = findMesh(scene, 'Can_B')
+    const drops: THREE.Mesh[] = []
+    let waterGroup: THREE.Group | null = null
+    let mixer: THREE.AnimationMixer | null = null
+    let waterAction: THREE.AnimationAction | null = null
+    if (can) {
+      can.material = canMaterial(lights.current)
+      const dropMat = dropMaterial()
+      for (let i = 0; i < 7; i++) {
+        const d = findMesh(scene, `Water_Drop0${i}` as DeskMeshName)
+        if (d) {
+          d.material = dropMat
+          d.visible = false
+          drops.push(d)
+        }
+      }
+      // The animated nodes live under ONE group and the mixer roots THERE, not at the glTF scene:
+      // rendering through <primitive> re-parents objects out of the loaded scene, and a mixer
+      // rooted above the re-parenting line would find nothing to bind. The group survives the
+      // tab-lifetime scene cache, so a second mount reuses it (get-or-create by name).
+      waterGroup = (scene.getObjectByName('WaterRig') as THREE.Group) ?? new THREE.Group()
+      if (waterGroup.name !== 'WaterRig') {
+        waterGroup.name = 'WaterRig'
+        waterGroup.add(can, ...drops)
+        scene.add(waterGroup)
+      }
+      const waterClip = assets.animations.find((c) => c.name === 'WaterAction')
+      if (waterClip) {
+        mixer = new THREE.AnimationMixer(waterGroup)
+        waterAction = mixer.clipAction(waterClip)
+        waterAction.play()
+        waterAction.paused = true
+        waterAction.time = 0
+        // One evaluation at rest so a remount mid-pour (the scene Group is cached for the tab)
+        // can never leave the previous mount's pose standing.
+        mixer.update(0)
+      }
+    }
+    return {
+      surface,
+      baked,
+      metal,
+      glaze,
+      verso,
+      can,
+      drops,
+      waterGroup,
+      mixer,
+      waterAction,
+      metalMat: metal.material as THREE.MeshStandardMaterial,
+    }
   }, [assets, env, equirect])
 
   useEffect(() => {
     if (!built) return
     return () => {
-      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso]) {
+      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso, built.can]) {
         if (m) (m.material as THREE.Material).dispose()
+      }
+      if (built.drops[0]) (built.drops[0].material as THREE.Material).dispose()
+      if (built.mixer) {
+        // Park the clip at rest before letting go, so the cached scene the NEXT mount receives
+        // holds the authored TRS — then release the mixer's bindings entirely.
+        if (built.waterAction) built.waterAction.time = 0
+        built.mixer.update(0)
+        built.mixer.stopAllAction()
+        built.mixer.uncacheRoot(built.mixer.getRoot())
       }
     }
   }, [built])
 
   const last = useRef(Number.NaN)
+  const lastWater = useRef(0)
   useFrame(() => {
     if (!built) return
+    // The set-piece clips (Task 92): the deep tier mails clip TIMES (never deltas); this stamps
+    // them onto the paused actions and evaluates the mixer with a zero step — scroll-pure, and a
+    // resting desk pays one number compare. Drop visibility rides the same write, so the seven
+    // beads cost draws only while a pour is actually in flight.
+    if (built.waterAction && deepClipMail.water !== lastWater.current) {
+      const active = deepClipMail.water !== 0
+      const wasActive = lastWater.current !== 0
+      lastWater.current = deepClipMail.water
+      built.waterAction.time = deepClipMail.water
+      built.mixer!.update(0)
+      if (active !== wasActive) for (const d of built.drops) d.visible = active
+    }
     // The verso needs no per-frame transform: it opens in its own vertex shader, off the same
     // BOOK_UNIFORM the cover's chunk reads (see versoMaterial).
     const u = studioLightsFor(journeyRef.current.ending)
@@ -530,6 +668,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       <primitive object={built.metal} />
       <primitive object={built.glaze} />
       {built.verso ? <primitive object={built.verso} /> : null}
+      {built.waterGroup ? <primitive object={built.waterGroup} /> : null}
     </group>
   )
 }

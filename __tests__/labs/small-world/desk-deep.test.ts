@@ -10,18 +10,28 @@ import {
   BOOK_HINGE,
   BOOK_VERTEX_BODY,
   BOOK_ZONE,
+  CAN_ZONE,
   COFFEE_ZONE,
+  PLANT,
   STIR,
   STIR_FRAGMENT_BODY,
   STIR_VERTEX_BODY,
+  WATER,
+  WATER_FRAGMENT_BODY,
+  WATER_TOTAL,
+  WATER_VERTEX_BODY,
   bookRayHit,
+  canRayHit,
   coffeeRayHit,
   restingBook,
   restingStir,
+  restingWater,
   sampleBook,
   sampleStir,
+  sampleWater,
   triggerBook,
   triggerStir,
+  triggerWater,
 } from '@/components/labs/small-world/scene/props/desk-deep'
 
 /**
@@ -34,10 +44,23 @@ import {
 const glbPath = path.join(process.cwd(), 'public', DESK_GLB_URL.replace(/^\//, ''))
 
 type Gltf = {
-  nodes: { name?: string; translation?: number[]; scale?: number[] }[]
+  nodes: { name?: string; mesh?: number; translation?: number[]; rotation?: number[]; scale?: number[] }[]
   meshes: { name: string; primitives: { attributes: Record<string, number>; indices?: number }[] }[]
-  accessors: { bufferView: number; byteOffset?: number; componentType: number; count: number; type: string }[]
+  accessors: {
+    bufferView: number
+    byteOffset?: number
+    componentType: number
+    count: number
+    type: string
+    min?: number[]
+    max?: number[]
+  }[]
   bufferViews: { byteOffset?: number; byteLength: number; byteStride?: number }[]
+  animations?: {
+    name: string
+    channels: { sampler: number; target: { node: number; path: string } }[]
+    samplers: { input: number; output: number; interpolation?: string }[]
+  }[]
 }
 
 function readGlb(file: string): { json: Gltf; bin: Buffer } {
@@ -253,6 +276,240 @@ describe("the notebook's hinge, held to the shipped desk", () => {
         BOOK_ZONE.min[2] <= z.max[2] && BOOK_ZONE.max[2] >= z.min[2]
       expect(overlaps, `the book zone overlaps the ${z.kind} micro zone`).toBe(false)
     }
+  })
+})
+
+describe('the watering, held to the shipped desk', () => {
+  const pos = positionsOf(json, bin, 'DeskBaked')
+  const n = pos.length / 3
+
+  // Union-find over the shipped triangles plus co-located split vertices — the same derivation
+  // the nudge zones use, because the claim is the same shape: a chunk that selects a vertex RANGE
+  // must select whole physical objects, never parts of them.
+  const comp = (() => {
+    const mesh = json.meshes.find((m) => m.name.startsWith('DeskBaked'))!
+    const a = json.accessors[mesh.primitives[0].indices!]
+    const bv = json.bufferViews[a.bufferView]
+    const start = (bv.byteOffset ?? 0) + (a.byteOffset ?? 0)
+    const parent = new Int32Array(n)
+    for (let i = 0; i < n; i++) parent[i] = i
+    const find = (i: number): number => {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+      }
+      return i
+    }
+    const uni = (x: number, y: number): void => {
+      const rx = find(x)
+      const ry = find(y)
+      if (rx !== ry) parent[rx] = ry
+    }
+    for (let k = 0; k < a.count; k += 3) {
+      const i0 = bin.readUInt16LE(start + k * 2)
+      const i1 = bin.readUInt16LE(start + k * 2 + 2)
+      const i2 = bin.readUInt16LE(start + k * 2 + 4)
+      uni(i0, i1)
+      uni(i1, i2)
+    }
+    const byKey = new Map<string, number>()
+    for (let i = 0; i < n; i++) {
+      const key = `${pos[i * 3].toFixed(5)},${pos[i * 3 + 1].toFixed(5)},${pos[i * 3 + 2].toFixed(5)}`
+      const j = byKey.get(key)
+      if (j === undefined) byKey.set(key, i)
+      else uni(i, j)
+    }
+    const out = new Int32Array(n)
+    for (let i = 0; i < n; i++) out[i] = find(i)
+    return out
+  })()
+
+  /** Every vertex of every component that intersects [lo, hi] must itself lie in [lo, hi]. */
+  const wholeComponents = (lo: number, hi: number): { comps: Set<number>; torn: number } => {
+    const comps = new Set<number>()
+    for (let i = lo; i <= hi; i++) comps.add(comp[i])
+    let torn = 0
+    for (let i = 0; i < n; i++) if (comps.has(comp[i]) && (i < lo || i > hi)) torn++
+    return { comps, torn }
+  }
+
+  it('the leaf range is thirty whole components — an index select cannot tear a leaf or a neighbour', () => {
+    const { comps, torn } = wholeComponents(PLANT.leaves[0], PLANT.leaves[1])
+    expect(comps.size).toBe(30)
+    expect(torn, 'vertices of leaf components outside the selected range').toBe(0)
+    // and they are geometrically the rosette: every selected vertex near the published origin
+    for (let i = PLANT.leaves[0]; i <= PLANT.leaves[1]; i++) {
+      const d = Math.hypot(pos[i * 3] - PLANT.origin[0], pos[i * 3 + 2] - PLANT.origin[2])
+      expect(d).toBeLessThan(0.45)
+      expect(pos[i * 3 + 1]).toBeGreaterThan(1.6)
+      expect(pos[i * 3 + 1]).toBeLessThan(2.06)
+    }
+  })
+
+  it('the soil range is one whole component, the disc inside the pot', () => {
+    const { comps, torn } = wholeComponents(PLANT.soil[0], PLANT.soil[1])
+    expect(comps.size).toBe(1)
+    expect(torn).toBe(0)
+    for (let i = PLANT.soil[0]; i <= PLANT.soil[1]; i++) {
+      const d = Math.hypot(pos[i * 3] - PLANT.origin[0], pos[i * 3 + 2] - PLANT.origin[2])
+      expect(d).toBeLessThan(0.3)
+      expect(pos[i * 3 + 1]).toBeGreaterThan(1.62)
+      expect(pos[i * 3 + 1]).toBeLessThan(1.7)
+    }
+  })
+
+  it("the can zone is the spliced can's own measured footprint", () => {
+    const mi = json.meshes.findIndex((m) => m.name === 'Can_B')
+    expect(mi).toBeGreaterThanOrEqual(0)
+    const node = json.nodes.find((nd) => nd.mesh === mi)!
+    const a = json.accessors[json.meshes[mi].primitives[0].attributes.POSITION]
+    const t = node.translation!
+    const [qx, qy, qz, qw] = node.rotation!
+    const rot = (x: number, y: number, z: number): number[] => {
+      const uvx = qy * z - qz * y
+      const uvy = qz * x - qx * z
+      const uvz = qx * y - qy * x
+      const uux = qy * uvz - qz * uvy
+      const uuy = qz * uvx - qx * uvz
+      const uuz = qx * uvy - qy * uvx
+      return [x + 2 * (qw * uvx + uux) + t[0], y + 2 * (qw * uvy + uuy) + t[1], z + 2 * (qw * uvz + uuz) + t[2]]
+    }
+    const lo = [Infinity, Infinity, Infinity]
+    const hi = [-Infinity, -Infinity, -Infinity]
+    for (const x of [a.min![0], a.max![0]])
+      for (const y of [a.min![1], a.max![1]])
+        for (const z of [a.min![2], a.max![2]]) {
+          const w = rot(x, y, z)
+          for (let c = 0; c < 3; c++) {
+            lo[c] = Math.min(lo[c], w[c])
+            hi[c] = Math.max(hi[c], w[c])
+          }
+        }
+    for (let c = 0; c < 3; c++) {
+      // the zone contains the can's rotated AABB and hugs it to a hundredth
+      expect(CAN_ZONE.min[c]).toBeLessThanOrEqual(lo[c])
+      expect(CAN_ZONE.min[c]).toBeGreaterThan(lo[c] - 0.01)
+      expect(CAN_ZONE.max[c]).toBeGreaterThanOrEqual(hi[c])
+      expect(CAN_ZONE.max[c]).toBeLessThan(hi[c] + 0.01)
+    }
+  })
+
+  it('claims a click through the can, and stays out of every other claim', () => {
+    const cx = (CAN_ZONE.min[0] + CAN_ZONE.max[0]) / 2
+    const cz = (CAN_ZONE.min[2] + CAN_ZONE.max[2]) / 2
+    expect(canRayHit(cx, 5, cz, 0, -1, 0, 40, 900)).not.toBeNull()
+    expect(canRayHit(-2.595, 5, 11.3, 0, -1, 0, 40, 900)).toBeNull()
+    for (const z of DESK_NUDGE_ZONES) {
+      const overlaps =
+        CAN_ZONE.min[0] <= z.max[0] &&
+        CAN_ZONE.max[0] >= z.min[0] &&
+        CAN_ZONE.min[2] <= z.max[2] &&
+        CAN_ZONE.max[2] >= z.min[2]
+      expect(overlaps, `the can zone overlaps the ${z.kind} micro zone`).toBe(false)
+    }
+    const bookOverlap =
+      CAN_ZONE.min[0] <= BOOK_ZONE.max[0] &&
+      CAN_ZONE.max[0] >= BOOK_ZONE.min[0] &&
+      CAN_ZONE.min[2] <= BOOK_ZONE.max[2] &&
+      CAN_ZONE.max[2] >= BOOK_ZONE.min[2]
+    expect(bookOverlap).toBe(false)
+  })
+
+  it('ships ONE merged clip that drives every watering node from one span and returns exactly to rest', () => {
+    const anims = json.animations!.filter((an) => an.name === 'WaterAction')
+    expect(anims).toHaveLength(1)
+    const anim = anims[0]
+    // can translation+rotation, 7 drops translation+scale
+    expect(anim.channels).toHaveLength(16)
+    const floats = (idx: number): number[] => {
+      const a = json.accessors[idx]
+      const bv = json.bufferViews[a.bufferView]
+      const start = (bv.byteOffset ?? 0) + (a.byteOffset ?? 0)
+      const comps = { SCALAR: 1, VEC3: 3, VEC4: 4 }[a.type]!
+      const out: number[] = []
+      for (let k = 0; k < a.count * comps; k++) out.push(bin.readFloatLE(start + k * 4))
+      return out
+    }
+    for (const ch of anim.channels) {
+      const s = anim.samplers[ch.sampler]
+      const input = json.accessors[s.input]
+      // one span for every channel — the scrub writes ONE number
+      expect(input.max![0]).toBeCloseTo(WATER.duration, 5)
+      expect(s.interpolation ?? 'LINEAR').toBe('LINEAR')
+      // rest-returning: first key equals last key AND equals the node's own authored rest
+      const v = floats(s.output)
+      const comps = v.length / input.count
+      const node = json.nodes[ch.target.node]
+      const rest =
+        ch.target.path === 'translation'
+          ? node.translation!
+          : ch.target.path === 'rotation'
+            ? node.rotation!
+            : (node.scale ?? [1, 1, 1])
+      for (let c = 0; c < comps; c++) {
+        expect(v[c]).toBeCloseTo(v[v.length - comps + c], 6)
+        expect(v[c]).toBeCloseTo(rest[c], 6)
+      }
+    }
+  })
+})
+
+describe("the watering's closed forms", () => {
+  const out = new Float32Array(4)
+
+  it('holds the perk back until the water lands, crests at 1, and eases home', () => {
+    const s = restingWater()
+    triggerWater(s, 2)
+    // before landing: clip advances, no perk
+    expect(sampleWater(s, 2 + WATER.land * 0.5, out)).toBeCloseTo(WATER.land * 0.5, 6)
+    expect(Object.is(out[0], 0)).toBe(true)
+    // at full drink: perk crests at exactly 1
+    sampleWater(s, 2 + WATER.land + WATER.perkRise + 0.01, out)
+    expect(out[0]).toBeCloseTo(1, 6)
+    // the clip clamps at its own end while the plant still holds its drink
+    expect(sampleWater(s, 2 + WATER.duration + 0.5, out)).toBe(WATER.duration)
+    expect(out[0]).toBeGreaterThan(0.9)
+  })
+
+  it('settles to EXACT rest and disarms — a watered plant is one never watered', () => {
+    const s = restingWater()
+    triggerWater(s, 0)
+    expect(sampleWater(s, WATER_TOTAL + 0.001, out)).toBe(0)
+    expect(s.active).toBe(false)
+    expect(Object.is(out[0], 0)).toBe(true)
+  })
+
+  it('is pure in (now − t0): the same instant scrubs to the same frame', () => {
+    const a = restingWater()
+    const b = restingWater()
+    triggerWater(a, 1)
+    triggerWater(b, 5)
+    const oa = new Float32Array(4)
+    const ob = new Float32Array(4)
+    for (const tau of [0.3, WATER.land + 0.2, 1.7, 2.4, 3.1]) {
+      const ca = sampleWater(a, 1 + tau, oa)
+      const cb = sampleWater(b, 5 + tau, ob)
+      // 12 digits, not toBe: (1+τ)−1 and (5+τ)−5 differ by IEEE addition, which is the CALLER's
+      // rounding, not the closed form's — the form itself is a pure function of its τ
+      expect(ca).toBeCloseTo(cb, 12)
+      expect(oa[0]).toBeCloseTo(ob[0], 6)
+    }
+  })
+
+  it('absorbs clicks mid-arc — the set piece finishes its sentence', () => {
+    const s = restingWater()
+    triggerWater(s, 5)
+    triggerWater(s, 5.5)
+    expect(s.t0).toBe(5)
+    expect(sampleWater(restingWater(), 100, out)).toBe(0)
+  })
+
+  it('keeps the guards and the derived index ranges in the chunks', () => {
+    expect(WATER_VERTEX_BODY).toContain('uWater.x != 0.0')
+    expect(WATER_FRAGMENT_BODY).toContain('uWater.x != 0.0')
+    expect(WATER_VERTEX_BODY).toContain(`gl_VertexID >= ${PLANT.leaves[0]}`)
+    expect(WATER_VERTEX_BODY).toContain(`gl_VertexID <= ${PLANT.leaves[1]}`)
+    expect(WATER_VERTEX_BODY).toContain(`gl_VertexID >= ${PLANT.soil[0]}`)
   })
 })
 

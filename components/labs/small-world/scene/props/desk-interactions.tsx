@@ -41,7 +41,7 @@ import {
   type RattleState,
   type SquashSpring,
 } from './desk-nudge'
-import { bookRayHit, coffeeRayHit, mugStirMail } from './desk-deep'
+import { bookRayHit, canRayHit, coffeeRayHit, mugStirMail } from './desk-deep'
 
 /**
  * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
@@ -272,14 +272,16 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         hovered.current = id
         if (hit) fire(hit, HOVER_SCALE)
       }
-      // The notebook has no micro zone — its click belongs to the deep tier (Task 92) — but the
-      // cursor's promise is this component's to keep, so the book counts toward it.
+      // The notebook and the watering can have no micro zones — their clicks belong to the deep
+      // tier (Task 92) — but the cursor's promise is this component's to keep, so both count.
       const o = raycaster.current.ray.origin
       const d = raycaster.current.ray.direction
-      const overBook =
+      const fovNow = (cam as THREE.PerspectiveCamera).fov
+      const overDeep =
         id === null &&
-        bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, (cam as THREE.PerspectiveCamera).fov, heightPx) !== null
-      setCursor(id !== null || overBook)
+        (bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
+          canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null)
+      setCursor(id !== null || overDeep)
     } else {
       hovered.current = null
       setCursor(false)

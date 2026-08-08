@@ -10,17 +10,24 @@ import {
   COFFEE_ZONE,
   STIR,
   STIR_UNIFORM,
+  WATER_UNIFORM,
   bookRayHit,
+  canRayHit,
   coffeeRayHit,
+  deepClipMail,
   mugStirMail,
   restingBook,
   restingStir,
+  restingWater,
   sampleBook,
   sampleStir,
+  sampleWater,
   triggerBook,
   triggerStir,
+  triggerWater,
   type BookState,
   type StirState,
+  type WaterState,
 } from './desk-deep'
 
 /**
@@ -45,6 +52,7 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
   const tap = useRef<{ x: number; y: number } | null>(null)
   const stir = useRef<StirState>(restingStir())
   const book = useRef<BookState>(restingBook())
+  const water = useRef<WaterState>(restingWater())
   const clock = useRef(0)
   const armed = useRef(false)
 
@@ -74,8 +82,11 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
         // Scroll-away: rest in the same frame — closed forms have no unwind to run.
         stir.current = restingStir()
         book.current = restingBook()
+        water.current = restingWater()
         STIR_UNIFORM.value.fill(0)
         BOOK_UNIFORM.value.fill(0)
+        WATER_UNIFORM.value.fill(0)
+        deepClipMail.water = 0
         clock.current = 0
         tap.current = null
       }
@@ -97,6 +108,10 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
       if (bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
         // the notebook: the cover opens on its spring; mid-arc clicks are absorbed
         triggerBook(book.current, now)
+      }
+      if (canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
+        // the watering: the can lifts, tips, and the plant answers; mid-arc clicks are absorbed
+        triggerWater(water.current, now)
       }
       if (hit) {
         triggerStir(stir.current, now, 1)
@@ -121,6 +136,9 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
 
     sampleStir(stir.current, now, STIR_UNIFORM.value)
     BOOK_UNIFORM.value[0] = sampleBook(book.current, now)
+    // The pour's clip time goes out by MAIL rather than uniform — the paused action lives with
+    // the meshes in desk-glb.tsx; the perk envelope rides the uniform like every other field.
+    deepClipMail.water = sampleWater(water.current, now, WATER_UNIFORM.value)
   })
 
   return null

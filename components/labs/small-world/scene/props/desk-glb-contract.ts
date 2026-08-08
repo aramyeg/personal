@@ -43,7 +43,31 @@ export const DESK_GLB_URL = '/labs/small-world/desk.glb'
  * Measured cost of the whole interior (page + gutter appended to `DeskBaked`, plus this mesh):
  * +25,971 B gzipped on the file on disk, inside the standing budget below.
  */
-export const DESK_MESHES = ['DeskSurface', 'DeskBaked', 'DeskMetal', 'DeskGloss', 'BookVerso'] as const
+/**
+ * ...and the WATERING PIECE, from Task 92's second half: `Can_B` (the sage-mint can, 1,500 v —
+ * the arm's facet-audit floor — carrying the same two baked colour sets as every matte prop) and
+ * seven `Water_Drop##` beads (unbaked: they exist only mid-pour, scale 0 at rest, and a studio
+ * gradient pinned to a flying bead is wrong everywhere except the frame it was baked in). All
+ * eight ride ONE spliced animation (`WaterAction`) scrubbed from interaction progress. Spliced
+ * surgically (`t92_set_splice.mjs`) — these pieces touch no existing accessor at all, so the
+ * rest bytes are verbatim by construction, not by care. Measured cost: +53,717 B gzipped on the
+ * file on disk (including the rose's shadow-floor lift — see the bake script's docblock).
+ */
+export const DESK_MESHES = [
+  'DeskSurface',
+  'DeskBaked',
+  'DeskMetal',
+  'DeskGloss',
+  'BookVerso',
+  'Can_B',
+  'Water_Drop00',
+  'Water_Drop01',
+  'Water_Drop02',
+  'Water_Drop03',
+  'Water_Drop04',
+  'Water_Drop05',
+  'Water_Drop06',
+] as const
 export type DeskMeshName = (typeof DESK_MESHES)[number]
 
 /**
@@ -240,7 +264,17 @@ export const DESK_NUDGE_ZONES: readonly {
  * this same budget. It is deferred because several tests re-derive world-space facts straight from
  * the POSITION accessors and would all have to learn the node transform first.
  */
-export const DESK_PAYLOAD_BUDGET = 1_700_000
+/**
+ * ============================================================================
+ * RAISED AGAIN IN TASK 92, BY THE MEASURED COST OF THE WATERING PIECE — AND NOT BY MORE
+ * ============================================================================
+ * Aram approved the watering resurrection (T92 spikes §4: can B, sage-mint, behind-pot staging,
+ * accepted narrow-crop risk). The piece measures +53,717 B gzipped on the file on disk — can at
+ * the arm's 1,500-vertex facet-audit floor (the 1,000-vertex rung FAILS the 2x-crop audit),
+ * seven beads, both clips, two baked colour sets. The raise is exactly that measurement. The
+ * plant's response and the soil darkening cost 0 B (shader chunks over bytes already shipped).
+ */
+export const DESK_PAYLOAD_BUDGET = 1_753_717
 
 /**
  * ...and a ceiling on the uncompressed length, which is what the GPU and the parser pay.
