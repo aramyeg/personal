@@ -45,8 +45,8 @@ import type { EndingState } from '../../ending-timeline'
  * Every response is still an honest, small disturbance that settles — but each object answers in
  * its own material's voice, not as a scaled copy of its neighbour's:
  *
- *  - the MUG is heavy ceramic: a brief 3° rock about its base edge, the COFFEE STAYS LEVEL inside
- *    it, and the steam flinches;
+ *  - the MUG is heavy ceramic: a brief 4.5° rock about its base edge, the COFFEE STAYS LEVEL
+ *    inside it, and the steam flinches;
  *  - the DONUT is soft: it does not rock at all — it SQUASHES toward the pad, bulges, overshoots
  *    into a stretch and jiggles out, icing and sprinkles riding the jelly;
  *  - the PEN CUP barely moves — the signature is the PENS, levering about the rim line with
@@ -84,7 +84,11 @@ import type { EndingState } from '../../ending-timeline'
 export type RockParams = { hzX: number; hzZ: number; zeta: number; peakDeg: number; quad: number }
 
 export const ROCK_PARAMS: Partial<Record<DeskNudgeKind, RockParams>> = {
-  mug: { hzX: 3.4, hzZ: 3.4, zeta: 0.32, peakDeg: 3.0, quad: 0 },
+  /** 4.5° at 2.9 Hz, up from 3° at 3.4 Hz (T97 S5): measured on the composed frame, the 3° rock
+   *  moved the rim ~4 px and crested inside 4 frames — the blind review read it as a one-frame
+   *  glitch. Slower and deeper is the same heavy-ceramic voice made legible; the visible life
+   *  stays under ~0.5 s (decay ζω = 5.5/s), inside the micro budget. */
+  mug: { hzX: 2.9, hzZ: 2.9, zeta: 0.3, peakDeg: 4.5, quad: 0 },
   /** A whisper — the cup's job is to hold still while its pens rattle. */
   pencup: { hzX: 4.2, hzZ: 4.2, zeta: 0.26, peakDeg: 0.8, quad: 0 },
   /** The peck's body recoil only; the peck itself is the bend below. */
@@ -330,12 +334,15 @@ export function sampleRattle(s: RattleState, now: number): number {
  * spring so the whole figure answers.
  */
 export const PECK = {
-  /** Full bend at the first peck's bottom, radians (~13.7°). */
-  depth: 0.24,
-  attack: 0.035,
-  release: 0.09,
+  /** Full bend at the first peck's bottom, radians (~19.5°). 0.24 → 0.34 with a slower attack and
+   *  release (T97 S5): the shipped double-pulse lived ~0.3 s and read as a flat twitch beside the
+   *  penguin's weeble. Deeper, a beat slower, and with a wider gap it reads as peck-peck; the
+   *  whole figure is still settled inside the 700 ms budget (pinned by desk-nudge.test.ts). */
+  depth: 0.34,
+  attack: 0.05,
+  release: 0.12,
   /** The second, lighter peck. */
-  gap: 0.16,
+  gap: 0.2,
   second: 0.65,
   /** The neck band: bend weight ramps 0 → 1 across these rest heights. */
   neckLo: 1.48,

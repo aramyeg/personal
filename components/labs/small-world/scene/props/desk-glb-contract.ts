@@ -32,7 +32,58 @@ export const DESK_GLB_URL = '/labs/small-world/desk.glb'
  *    ships DIFFUSE-baked with its specular added at runtime. One extra draw call, bought with the
  *    measurement in task-71-report.md rather than with a preference.
  */
-export const DESK_MESHES = ['DeskSurface', 'DeskBaked', 'DeskMetal', 'DeskGloss'] as const
+/**
+ * ...and a FIFTH, from Task 92: `BookVerso` — the paper glued to the notebook cover's underside,
+ * carrying the pencil sketch the deep tier's open reveals. It could not join `DeskBaked`, because
+ * it MOVES: the runtime rotates it about the spine axis by the same angle the cover's shader
+ * chunk reads (`desk-deep.ts`). It was spliced into the shipped file SURGICALLY
+ * (`t92_book_splice.mjs`) rather than re-exported through the pipeline, because a pipeline re-run
+ * re-bakes every vertex colour a little and the T92 rest gate is pixel-diff ZERO against the
+ * previous ship — every pre-existing byte of every pre-existing accessor is copied verbatim.
+ * Measured cost of the whole interior (page + gutter appended to `DeskBaked`, plus this mesh):
+ * +25,971 B gzipped on the file on disk, inside the standing budget below.
+ */
+/**
+ * ...and the WATERING PIECE, from Task 92's second half: `Can_B` (the sage-mint can, 1,500 v —
+ * the arm's facet-audit floor — carrying the same two baked colour sets as every matte prop) and
+ * seven `Water_Drop##` beads (unbaked: they exist only mid-pour, scale 0 at rest, and a studio
+ * gradient pinned to a flying bead is wrong everywhere except the frame it was baked in). All
+ * eight ride ONE spliced animation (`WaterAction`) scrubbed from interaction progress. Spliced
+ * surgically (`t92_set_splice.mjs`) — these pieces touch no existing accessor at all, so the
+ * rest bytes are verbatim by construction, not by care. Measured cost: +53,717 B gzipped on the
+ * file on disk (including the rose's shadow-floor lift — see the bake script's docblock).
+ */
+/**
+ * ...and the BIRD, the deep tier's centrepiece (Task 92, final piece): `Bar_river` — a skinned,
+ * morph-targeted DUPLICATE of the clay lane that is baked into `DeskBaked`. It is authored at the
+ * ORIGIN (the inverse-bind identity holds to 3e-8 there; a parent node inside the GLB would walk
+ * the error straight back in) and placed by a runtime wrapper (`BIRD_WRAPPER` in `desk-deep.ts`).
+ * Its colours were TRANSFERRED from the shipped lane's own baked bytes at splice time; normals and
+ * morph normals were dropped (dead wire bytes under an unlit bake — the fallback, if the hold beat
+ * reads dead, is to restore them with a lit material and re-measure). One merged `BirdAction`
+ * (bones + morph weights, one span) scrubbed from interaction progress, exactly like the water.
+ * Spliced append-only by the same tool; every pre-existing bufferView byte-identical, gated.
+ * The clip is the arm's SEAT-LOCKED re-key (first cut buried the coil under the tray and floated
+ * the bird 0.13 above it — authored at the origin, never gated against the desk seat; the re-key
+ * proves 0/98 frames below seat, 0/98 outside the bar's own footprint, feet ON the seat at hold).
+ * Measured cost: +37,919 B gzipped on the file on disk.
+ */
+export const DESK_MESHES = [
+  'DeskSurface',
+  'DeskBaked',
+  'DeskMetal',
+  'DeskGloss',
+  'BookVerso',
+  'Can_B',
+  'Water_Drop00',
+  'Water_Drop01',
+  'Water_Drop02',
+  'Water_Drop03',
+  'Water_Drop04',
+  'Water_Drop05',
+  'Water_Drop06',
+  'Bar_river',
+] as const
 export type DeskMeshName = (typeof DESK_MESHES)[number]
 
 /**
@@ -229,7 +280,25 @@ export const DESK_NUDGE_ZONES: readonly {
  * this same budget. It is deferred because several tests re-derive world-space facts straight from
  * the POSITION accessors and would all have to learn the node transform first.
  */
-export const DESK_PAYLOAD_BUDGET = 1_700_000
+/**
+ * ============================================================================
+ * RAISED AGAIN IN TASK 92, BY THE MEASURED COST OF THE WATERING PIECE — AND NOT BY MORE
+ * ============================================================================
+ * Aram approved the watering resurrection (T92 spikes §4: can B, sage-mint, behind-pot staging,
+ * accepted narrow-crop risk). The piece measures +53,717 B gzipped on the file on disk — can at
+ * the arm's 1,500-vertex facet-audit floor (the 1,000-vertex rung FAILS the 2x-crop audit),
+ * seven beads, both clips, two baked colour sets. The raise is exactly that measurement. The
+ * plant's response and the soil darkening cost 0 B (shader chunks over bytes already shipped).
+ *
+ * ...and once more for the BIRD, by its own measurement: +37,919 B gzipped on the file on disk
+ * (742-vertex densified lane twin + morph target + 8-joint skin + the merged SEAT-LOCKED clip;
+ * normals and morph normals dropped — unlit baked family — and COLOR_0/1 transferred rather than
+ * re-baked; the seat-lock curves cost ~2.3 KB of sampler entropy over the first, desk-blind cut,
+ * and buying the centrepiece's feet on the desk with them is the whole point of measuring).
+ * The whole T92 set lands at +91,636 B over the pre-set ship, inside the spikes' +80–105 KB
+ * target. The lane-hide, like the plant's perk, costs 0 B (a chunk over bytes already shipped).
+ */
+export const DESK_PAYLOAD_BUDGET = 1_791_636
 
 /**
  * ...and a ceiling on the uncompressed length, which is what the GPU and the parser pay.

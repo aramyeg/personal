@@ -260,28 +260,82 @@ describe('the connect block', () => {
     }
   })
 
+  /** The setup's matchMedia answers `matches: false` to everything, i.e. a COARSE pointer.
+   *  These helpers flip `(pointer: fine)` on for the keyboard cases and put the default back,
+   *  because the focus force is now a fine-pointer promise (T97 S4 — see the component). */
+  const finePointerOn = () => {
+    ;(window.matchMedia as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (query: string) => ({
+        matches: query === '(pointer: fine)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })
+    )
+  }
+  const finePointerOff = () => {
+    ;(window.matchMedia as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })
+    )
+  }
+
   it('shows itself when a keyboard reaches it early, and hides again on the way out', () => {
     // The scroll says invisible; the keyboard says otherwise. A focused control that cannot be
-    // seen is the worse of the two failures, so focus wins.
-    render(<EndingConnect t={0.05} onRestart={() => {}} />)
-    const email = screen.getByTestId('sw-connect-linkedin')
-    expect(Number(email.style.opacity)).toBe(0)
+    // seen is the worse of the two failures, so focus wins — on the pointer that HAS a keyboard.
+    finePointerOn()
+    try {
+      render(<EndingConnect t={0.05} onRestart={() => {}} />)
+      const email = screen.getByTestId('sw-connect-linkedin')
+      expect(Number(email.style.opacity)).toBe(0)
 
-    fireEvent.focus(email)
-    expect(Number(email.style.opacity)).toBe(1)
-    expect(email.style.pointerEvents).toBe('auto')
+      fireEvent.focus(email)
+      expect(Number(email.style.opacity)).toBe(1)
+      expect(email.style.pointerEvents).toBe('auto')
 
-    fireEvent.blur(email, { relatedTarget: document.body })
-    expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(0)
+      fireEvent.blur(email, { relatedTarget: document.body })
+      expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(0)
+    } finally {
+      finePointerOff()
+    }
   })
 
   it('keeps the block up while focus moves BETWEEN its own controls', () => {
-    render(<EndingConnect t={0.05} onRestart={() => {}} />)
-    const email = screen.getByTestId('sw-connect-linkedin')
-    const restart = screen.getByTestId('sw-connect-restart')
-    fireEvent.focus(email)
-    fireEvent.blur(email, { relatedTarget: restart })
-    expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(1)
+    finePointerOn()
+    try {
+      render(<EndingConnect t={0.05} onRestart={() => {}} />)
+      const email = screen.getByTestId('sw-connect-linkedin')
+      const restart = screen.getByTestId('sw-connect-restart')
+      fireEvent.focus(email)
+      fireEvent.blur(email, { relatedTarget: restart })
+      expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(1)
+    } finally {
+      finePointerOff()
+    }
+  })
+
+  it('never lets a lingering TOUCH focus pin the row over the farewell (T97 S4)', () => {
+    // The measured leak: tap LinkedIn at the end (the intended act), come back from the new tab,
+    // swipe up to re-watch — touch scrolling never blurs, so the whole row rode at full opacity
+    // over the farewell for the entire ending segment. On a coarse pointer the scroll schedule is
+    // the only reveal: it completes exactly with the arrival, which is the ordered gate.
+    render(<EndingConnect t={0.05} onRestart={() => {}} />) // default mock = coarse pointer
+    const pill = screen.getByTestId('sw-connect-linkedin')
+    fireEvent.focus(pill)
+    expect(Number(screen.getByTestId('sw-connect-linkedin').style.opacity)).toBe(0)
+    expect(screen.getByTestId('sw-connect-linkedin').style.pointerEvents).toBe('none')
   })
 
   it('restarts the story through the track rather than by jumping', () => {
@@ -289,6 +343,17 @@ describe('the connect block', () => {
     render(<EndingConnect t={1} onRestart={onRestart} />)
     fireEvent.click(screen.getByTestId('sw-connect-restart'))
     expect(onRestart).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets go of focus when restart fires, so the rewind is not ridden by a forced row', () => {
+    // The fine-pointer half of the same leak: restart rewinds the whole track under this row, and
+    // a still-focused restart button kept the row forced visible over every beat on the way back.
+    render(<EndingConnect t={1} onRestart={() => {}} />)
+    const restart = screen.getByTestId('sw-connect-restart')
+    restart.focus()
+    expect(document.activeElement).toBe(restart)
+    fireEvent.click(restart)
+    expect(document.activeElement).not.toBe(restart)
   })
 })
 

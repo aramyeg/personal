@@ -9,6 +9,40 @@ import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
+import {
+  BIRD_LIFT_FRAGMENT_BODY,
+  BIRD_LIFT_FRAGMENT_DECL,
+  BIRD_LIFT_VERTEX_BODY,
+  BIRD_LIFT_VERTEX_DECL,
+  BIRD_UNIFORM,
+  BIRD_VERTEX_BODY,
+  BIRD_VERTEX_DECL,
+  BIRD_WRAPPER,
+  BOOK_UNIFORM,
+  BOOK_VERTEX_BODY,
+  BOOK_VERTEX_DECL,
+  VERSO_VERTEX_BODY,
+  VERSO_VERTEX_DECL,
+  STIR_FRAGMENT_BODY,
+  STIR_FRAGMENT_DECL,
+  STIR_UNIFORM,
+  STIR_VERTEX_BODY,
+  STIR_VERTEX_DECL,
+  WATER_FRAGMENT_BODY,
+  WATER_FRAGMENT_DECL,
+  WATER_UNIFORM,
+  WATER_VERTEX_BODY,
+  WATER_VERTEX_DECL,
+  deepClipMail,
+} from './desk-deep'
+import {
+  STATION_METAL_BODY,
+  STATION_METAL_DECL,
+  STATION_METAL_NORMAL_BODY,
+  STATION_UNIFORMS,
+  STATION_VERTEX_BODY,
+  STATION_VERTEX_DECL,
+} from './desk-station'
 
 /**
  * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
@@ -79,7 +113,13 @@ function wireNudge(
  * Capturing them once, off the glTF's own material, makes the second mount identical to the first
  * by construction rather than by the first mount having been careful.
  */
-export type DeskAssets = { scene: THREE.Group; lit: THREE.Texture | null; dim: THREE.Texture | null }
+export type DeskAssets = {
+  scene: THREE.Group
+  lit: THREE.Texture | null
+  dim: THREE.Texture | null
+  /** The spliced set-piece clips (Task 92): `WaterAction` today, `BirdAction` beside it. */
+  animations: THREE.AnimationClip[]
+}
 
 /** One manager, one request, shared by every mount — and NOT the default one. See the header. */
 const manager = new THREE.LoadingManager()
@@ -92,7 +132,12 @@ function loadDeskScene(): Promise<DeskAssets> {
       (gltf) => {
         const surface = findMesh(gltf.scene, 'DeskSurface')
         const src = surface?.material as THREE.MeshStandardMaterial | undefined
-        resolve({ scene: gltf.scene, lit: src?.map ?? null, dim: src?.emissiveMap ?? null })
+        resolve({
+          scene: gltf.scene,
+          lit: src?.map ?? null,
+          dim: src?.emissiveMap ?? null,
+          animations: gltf.animations,
+        })
       },
       undefined,
       reject
@@ -183,19 +228,166 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
   const nudge = nudgeVertexChunk('DeskBaked')
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
+    // The notebook's cover hinge (Task 92): the slab's shipped bytes stay in this mesh and the
+    // open is a weighted spine rotation, guarded to exact zero like every nudge field.
+    shader.uniforms.uBookHinge = BOOK_UNIFORM
+    // ...and the plant's answer to the watering (Task 92): leaf perk + soil drink, gl_VertexID
+    // range selects over the same shipped bytes, guarded to exact zero the same way.
+    shader.uniforms.uWater = WATER_UNIFORM
+    // ...and the bird swap's lane-hide (Task 92): while the skinned twin performs, the baked
+    // lane collapses to a point — an index-range select, because the pad's lanes interleave
+    // diagonally and no box can cut this one free.
+    shader.uniforms.uBird = BIRD_UNIFORM
+    // ...and the sculpting station's five voices (T97 S2/S3): the same id-range discipline as
+    // the lane-hide, seven uniforms, every one exact-zero guarded.
+    for (const [name, u] of Object.entries(STATION_UNIFORMS)) shader.uniforms[name] = u
+    shader.vertexShader = (
+      STATION_VERTEX_DECL +
+      '\n' +
+      BIRD_VERTEX_DECL +
+      '\n' +
+      BOOK_VERTEX_DECL +
+      '\n' +
+      WATER_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
+    ).replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
+    // unlit, so only positions move — there is no normal for the nudge to keep honest here: the
+    // shading is baked into vertex colours, which travel with the vertices by construction
+    wireNudge(shader, nudge)
+    // STATION runs FIRST after begin_vertex — before BIRD's lane-hide overwrite — so a lane that
+    // is mid-roll stays hidden even if its hover shiver is still settling: the scoot moves the
+    // lane's vertices, then the hide collapses them to the point regardless.
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n' +
+        STATION_VERTEX_BODY +
+        '\n' +
+        BIRD_VERTEX_BODY +
+        '\n' +
+        BOOK_VERTEX_BODY +
+        '\n' +
+        WATER_VERTEX_BODY
+    )
+    shader.fragmentShader = (
+      'uniform float uLights;\nvarying vec3 vDimColor;\n' +
+      WATER_FRAGMENT_DECL +
+      '\n' +
+      shader.fragmentShader
+    ).replace(
+      '#include <color_fragment>',
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + WATER_FRAGMENT_BODY
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-baked'
+  return mat
+}
+
+/**
+ * THE WATERING CAN (Task 92) — a real new prop, the first since the desk was baked, so it plays
+ * by the bake's rules: two colour sets Cycles-baked in situ (behind the pot, frame 1 of the pour
+ * clip), mixed exactly as every other matte prop. Its own mesh because it MOVES — the pour clip
+ * drives its node. DoubleSide because the export ships it so and the spout's bore is visible at
+ * the tilt. No nudge, no hinge: the can's only verb is the pour.
+ */
+export function canMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
     shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
       '#include <color_vertex>',
       '#include <color_vertex>\n vDimColor = color_1.rgb;'
     )
-    // unlit, so only positions move — there is no normal for the nudge to keep honest here: the
-    // shading is baked into vertex colours, which travel with the vertices by construction
-    wireNudge(shader, nudge)
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
     )
   }
-  mat.customProgramCacheKey = () => 'sw-desk-baked'
+  mat.customProgramCacheKey = () => 'sw-desk-can'
+  return mat
+}
+
+/**
+ * THE BIRD'S TWIN (Task 92) — the skinned duplicate of the clay lane that performs the deep
+ * tier's centrepiece. Same two-set bake mix as every matte prop (its colours were TRANSFERRED
+ * from the shipped lane's own baked bytes at splice time, so rest frame 1 is the lane,
+ * bit-for-bit); `MeshBasicMaterial`, because the family is unlit and the export deliberately
+ * ships no normals (dead wire bytes under a bake). Skinning and the morph target are enabled by
+ * three automatically off the mesh and geometry — nothing to declare here. FrontSide: the lane
+ * is a closed swept tube (0 boundary edges, measured) and stays one through the whole clip.
+ */
+export function birdMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    shader.vertexShader = (
+      BIRD_LIFT_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
+    )
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
+      // The shadow-floor lift's weight (T97 P6) is measured HERE, after <skinning_vertex>: at that
+      // point `transformed` holds the fully morphed+skinned position while `position` still holds
+      // the rest attribute, so the difference is exactly how far the roll has moved this vertex —
+      // and at the rest pose it is the 3e-8 skinning residual, which the smoothstep floors to +0.
+      .replace('#include <skinning_vertex>', '#include <skinning_vertex>\n' + BIRD_LIFT_VERTEX_BODY)
+    shader.fragmentShader = (
+      'uniform float uLights;\nvarying vec3 vDimColor;\n' +
+      BIRD_LIFT_FRAGMENT_DECL +
+      '\n' +
+      shader.fragmentShader
+    ).replace(
+      '#include <color_fragment>',
+      // The lift operates on the final mixed lit/dim colour — the same value the seam gate sees.
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + BIRD_LIFT_FRAGMENT_BODY
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-bird'
+  return mat
+}
+
+/**
+ * The seven beads: flat water-blue, unlit, UNBAKED — they exist only mid-pour (authored scale 0
+ * at rest) and a baked studio gradient pinned to a flying bead is wrong everywhere except the
+ * frame it was baked in. One shared material; visibility is gated by the frame loop so a resting
+ * desk spends zero draws on them.
+ */
+export function dropMaterial(): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.7, 0.86), toneMapped: false })
+  mat.customProgramCacheKey = () => 'sw-desk-drop'
+  return mat
+}
+
+/**
+ * THE VERSO (Task 92) — the paper glued to the notebook cover's underside, with the pencil sketch
+ * of the two souvenirs. Its own small mesh, because it MOVES as a rigid body (the component
+ * rotates the object about the spine axis by the same angle the cover's shader chunk reads —
+ * `BOOK_UNIFORM`, one writer). Same two-set bake mix as everything matte; deliberately NO nudge
+ * and NO hinge chunk — a shader hinge on top of the object rotation would open the book twice.
+ */
+export function versoMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  // DoubleSide, deliberately: paper is visible from both faces, and during the opening spring's
+  // brief overshoot past ~112° the camera catches the sheet's back — single-sided that was a
+  // black flash (first capture round), double-sided it is the drawing seen through thin paper.
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    // The verso opens IN THE SHADER, with the cover's exact field (see VERSO_VERTEX_BODY for why
+    // the first, rigid-object version was wrong).
+    shader.uniforms.uBookHinge = BOOK_UNIFORM
+    shader.vertexShader = (
+      VERSO_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
+    )
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + VERSO_VERTEX_BODY)
+    shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
+      '#include <color_fragment>',
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-verso'
   return mat
 }
 
@@ -291,9 +483,14 @@ export function glossMaterial(
     shader.uniforms.uLights = lights
     shader.uniforms.uGloss = gloss
     shader.uniforms.uGlossEnv = { value: env }
+    // The coffee stir (Task 92): the liquid disc lives in THIS mesh, so its vortex dip rides the
+    // same chain as the nudge — after `swNrm` is born, guarded behind its own exact zero.
+    shader.uniforms.uStir = STIR_UNIFORM
     for (const [name, u] of Object.entries(nudge.uniforms)) shader.uniforms[name] = u
     shader.vertexShader = (
       nudge.decl +
+      '\n' +
+      STIR_VERTEX_DECL +
       '\nattribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
       shader.vertexShader
     )
@@ -301,7 +498,10 @@ export function glossMaterial(
       // The icing rocks with the donut, and its SHEEN has to rock too: `swNrm` is the normal the
       // nudge may have rotated, and the reflection reads it instead of the rest-pose attribute —
       // a highlight that stayed pinned while the glaze tipped would un-sell the whole motion.
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vec3 swNrm = normal;\n' + nudge.body)
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n vec3 swNrm = normal;\n' + nudge.body + '\n' + STIR_VERTEX_BODY
+      )
       .replace(
         '#include <project_vertex>',
         `vGlossN = normalize( mat3( modelMatrix ) * swNrm );
@@ -310,10 +510,14 @@ export function glossMaterial(
       )
     shader.fragmentShader = (
       'uniform float uLights;\nuniform float uGloss;\nuniform sampler2D uGlossEnv;\n' +
-      'varying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
+      STIR_FRAGMENT_DECL +
+      '\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
       shader.fragmentShader
     )
       .replace('#include <color_fragment>', 'diffuseColor.rgb *= mix( vDimColor.rgb, vColor.rgb, uLights );')
+      // The cream spiral inserts FIRST so the sheen's replace below finds the one remaining
+      // `opaque_fragment` token — both terms are additive, so their order carries no meaning.
+      .replace('#include <opaque_fragment>', STIR_FRAGMENT_BODY + '\n#include <opaque_fragment>')
       .replace(
         '#include <opaque_fragment>',
         `vec3 gN = normalize( vGlossN );
@@ -394,10 +598,17 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   const nudgeNormal = nudgeNormalChunk('DeskMetal', 'objectNormal')
   mat.onBeforeCompile = (shader) => {
     wireNudge(shader, nudge)
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <beginnormal_vertex>',
-      '#include <beginnormal_vertex>\n' + nudgeNormal
-    )
+    // The carving knife's metal blade (T97 S2/S3): the see-saw teeter + clatter hop, composed
+    // with the nudge wiring above — the blade's padded box and the foil-print zones are disjoint
+    // (measured: nearest foreign metal is the pen at x > 2.74; the blade ends at 1.83), so the
+    // two fields can never both claim a vertex and their order after begin_vertex is free.
+    shader.uniforms.uStKnife = STATION_UNIFORMS.uStKnife
+    shader.vertexShader = (STATION_METAL_DECL + '\n' + shader.vertexShader)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + STATION_METAL_BODY)
+      .replace(
+        '#include <beginnormal_vertex>',
+        '#include <beginnormal_vertex>\n' + nudgeNormal + '\n' + STATION_METAL_NORMAL_BODY
+      )
   }
   // Distinct key, because the stand's cradle uses the same MeshStandardMaterial signature and three
   // caches programs by it — without this the two would silently share one program.
@@ -408,6 +619,7 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
 export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   const assets = useDeskAssets()
   const renderer = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
   // ONE uniform object, shared by all three baked materials, so they can never disagree about how
   // lit the ending is and the frame loop writes a single number.
   const lights = useRef({ value: 0 })
@@ -435,21 +647,175 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     // already, so recomputing gives exactly the smooth-within-island normals the file would carry.
     glaze.geometry.computeVertexNormals()
     glaze.material = glossMaterial(equirect, lights.current, gloss.current)
-    return { surface, baked, metal, glaze, metalMat: metal.material as THREE.MeshStandardMaterial }
+    // The notebook's verso (Task 92): present once the interior ships in the GLB; its absence is a
+    // desk without a deep book, not a broken desk.
+    const verso = findMesh(scene, 'BookVerso')
+    if (verso) verso.material = versoMaterial(lights.current)
+    // The watering piece (Task 92): the can and its seven beads, driven by ONE paused action whose
+    // .time the deep tier mails in (`deepClipMail`) — the mixer never reads the frame delta. The
+    // same absence rule as the verso: no can, no pour, still a desk.
+    const can = findMesh(scene, 'Can_B')
+    const drops: THREE.Mesh[] = []
+    let waterGroup: THREE.Group | null = null
+    let mixer: THREE.AnimationMixer | null = null
+    let waterAction: THREE.AnimationAction | null = null
+    if (can) {
+      can.material = canMaterial(lights.current)
+      const dropMat = dropMaterial()
+      for (let i = 0; i < 7; i++) {
+        const d = findMesh(scene, `Water_Drop0${i}` as DeskMeshName)
+        if (d) {
+          d.material = dropMat
+          d.visible = false
+          drops.push(d)
+        }
+      }
+      // The animated nodes live under ONE group and the mixer roots THERE, not at the glTF scene:
+      // rendering through <primitive> re-parents objects out of the loaded scene, and a mixer
+      // rooted above the re-parenting line would find nothing to bind. The group survives the
+      // tab-lifetime scene cache, so a second mount reuses it (get-or-create by name).
+      waterGroup = (scene.getObjectByName('WaterRig') as THREE.Group) ?? new THREE.Group()
+      if (waterGroup.name !== 'WaterRig') {
+        waterGroup.name = 'WaterRig'
+        waterGroup.add(can, ...drops)
+        scene.add(waterGroup)
+      }
+      const waterClip = assets.animations.find((c) => c.name === 'WaterAction')
+      if (waterClip) {
+        mixer = new THREE.AnimationMixer(waterGroup)
+        waterAction = mixer.clipAction(waterClip)
+        waterAction.play()
+        waterAction.paused = true
+        waterAction.time = 0
+        // One evaluation at rest so a remount mid-pour (the scene Group is cached for the tab)
+        // can never leave the previous mount's pose standing.
+        mixer.update(0)
+      }
+    }
+    // The bird (Task 92): the skinned lane twin + its 8-bone rig, wrapped in ONE runtime
+    // Object3D. The rig is authored at the ORIGIN — a parent node inside the GLB would put the
+    // bind-arithmetic error straight back (globalBind walks to the scene root), so the placement
+    // is a RUNTIME wrapper, whose matrix applies after skinning and never enters the bind. Same
+    // get-or-create-by-name pattern as WaterRig: the scene Group is cached for the tab.
+    const bird = findMesh(scene, 'Bar_river')
+    let birdGroup: THREE.Group | null = null
+    let birdMixer: THREE.AnimationMixer | null = null
+    let birdAction: THREE.AnimationAction | null = null
+    if (bird) {
+      bird.material = birdMaterial(lights.current)
+      // Invisible at rest — the baked lane in DeskBaked is the resting statement; the twin costs
+      // zero draws until a click. Culling off: the morph reaches 0.58 units above the base
+      // geometry's own bounding sphere mid-clip, and 742 vertices are cheaper than a wrong cull.
+      bird.visible = false
+      bird.frustumCulled = false
+      birdGroup = (scene.getObjectByName('BirdRig') as THREE.Group) ?? new THREE.Group()
+      if (birdGroup.name !== 'BirdRig') {
+        birdGroup.name = 'BirdRig'
+        const rig = scene.getObjectByName('Lane_Rig')
+        if (rig) birdGroup.add(rig)
+        birdGroup.add(bird)
+        birdGroup.position.fromArray(BIRD_WRAPPER.position as unknown as number[])
+        birdGroup.quaternion.fromArray(BIRD_WRAPPER.quaternion as unknown as number[]).normalize()
+        birdGroup.scale.setScalar(BIRD_WRAPPER.scale)
+        scene.add(birdGroup)
+      }
+      const birdClip = assets.animations.find((c) => c.name === 'BirdAction')
+      if (birdClip) {
+        birdMixer = new THREE.AnimationMixer(birdGroup)
+        birdAction = birdMixer.clipAction(birdClip)
+        birdAction.play()
+        birdAction.paused = true
+        birdAction.time = 0
+        birdMixer.update(0)
+      }
+      // A remount must not inherit the previous mount's swap state: the uniform is module-scope
+      // and would otherwise hold uBird=1 with no frame-loop change to clear it — a desk with a
+      // hidden lane and no bird.
+      BIRD_UNIFORM.value.fill(0)
+    }
+    return {
+      surface,
+      baked,
+      metal,
+      glaze,
+      verso,
+      can,
+      drops,
+      waterGroup,
+      mixer,
+      waterAction,
+      bird,
+      birdGroup,
+      birdMixer,
+      birdAction,
+      metalMat: metal.material as THREE.MeshStandardMaterial,
+    }
   }, [assets, env, equirect])
 
   useEffect(() => {
     if (!built) return
+    // Warm-compile the bird's program while the studio is still dark: `compile` initialises
+    // materials with a plain traverse (visibility is not consulted), so the invisible twin's
+    // skinned+morphed program is on the GPU before the first click ever needs it.
+    if (built.birdGroup) renderer.compile(built.birdGroup, camera)
     return () => {
-      for (const m of [built.surface, built.baked, built.metal, built.glaze]) {
-        ;(m.material as THREE.Material).dispose()
+      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso, built.can, built.bird]) {
+        if (m) (m.material as THREE.Material).dispose()
+      }
+      if (built.drops[0]) (built.drops[0].material as THREE.Material).dispose()
+      if (built.mixer) {
+        // Park the clip at rest before letting go, so the cached scene the NEXT mount receives
+        // holds the authored TRS — then release the mixer's bindings entirely.
+        if (built.waterAction) built.waterAction.time = 0
+        built.mixer.update(0)
+        built.mixer.stopAllAction()
+        built.mixer.uncacheRoot(built.mixer.getRoot())
+      }
+      if (built.birdMixer) {
+        // The bird parks the same way — and the swap parks with it: lane shown, twin hidden.
+        if (built.birdAction) built.birdAction.time = 0
+        built.birdMixer.update(0)
+        built.birdMixer.stopAllAction()
+        built.birdMixer.uncacheRoot(built.birdMixer.getRoot())
+        if (built.bird) built.bird.visible = false
+        BIRD_UNIFORM.value.fill(0)
       }
     }
-  }, [built])
+  }, [built, renderer, camera])
 
   const last = useRef(Number.NaN)
+  const lastWater = useRef(0)
+  const lastBird = useRef(0)
   useFrame(() => {
     if (!built) return
+    // The set-piece clips (Task 92): the deep tier mails clip TIMES (never deltas); this stamps
+    // them onto the paused actions and evaluates the mixer with a zero step — scroll-pure, and a
+    // resting desk pays one number compare. Drop visibility rides the same write, so the seven
+    // beads cost draws only while a pour is actually in flight.
+    if (built.waterAction && deepClipMail.water !== lastWater.current) {
+      const active = deepClipMail.water !== 0
+      const wasActive = lastWater.current !== 0
+      lastWater.current = deepClipMail.water
+      built.waterAction.time = deepClipMail.water
+      built.mixer!.update(0)
+      if (active !== wasActive) for (const d of built.drops) d.visible = active
+    }
+    // The bird's swap rides the same mail pattern, with BOTH halves flipped in one place: the
+    // skinned twin's visibility AND the baked lane's hide uniform change in the same statement,
+    // so no rendered frame can ever hold two lanes or none.
+    if (built.birdAction && deepClipMail.bird !== lastBird.current) {
+      const active = deepClipMail.bird !== 0
+      const wasActive = lastBird.current !== 0
+      lastBird.current = deepClipMail.bird
+      built.birdAction.time = deepClipMail.bird
+      built.birdMixer!.update(0)
+      if (active !== wasActive) {
+        built.bird!.visible = active
+        BIRD_UNIFORM.value[0] = active ? 1 : 0
+      }
+    }
+    // The verso needs no per-frame transform: it opens in its own vertex shader, off the same
+    // BOOK_UNIFORM the cover's chunk reads (see versoMaterial).
     const u = studioLightsFor(journeyRef.current.ending)
     if (u === last.current) return
     last.current = u
@@ -465,6 +831,9 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       <primitive object={built.baked} />
       <primitive object={built.metal} />
       <primitive object={built.glaze} />
+      {built.verso ? <primitive object={built.verso} /> : null}
+      {built.waterGroup ? <primitive object={built.waterGroup} /> : null}
+      {built.birdGroup ? <primitive object={built.birdGroup} /> : null}
     </group>
   )
 }

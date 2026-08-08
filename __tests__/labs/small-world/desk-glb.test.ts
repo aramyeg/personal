@@ -21,6 +21,7 @@ import {
   DESK_PAYLOAD_BUDGET,
   DESK_RAW_CEILING,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
+import { BIRD_WRAPPER } from '@/components/labs/small-world/scene/props/desk-deep'
 
 /**
  * THE SHIPPED DESK ASSET (Task 68), held to the same standard as the geometry the lab builds itself.
@@ -154,17 +155,20 @@ describe('desk GLB — payload and draw cost', () => {
     expect(width('DeskGloss', 'COLOR_1')).toBe('VEC4')
   })
 
-  it('costs four draw calls, not one per prop colour', () => {
+  it('costs one draw call per contract mesh, not one per prop colour', () => {
     // glTF splits a mesh into one primitive per material and three.js draws one primitive per call.
     // The Blender set carries ~40 prop tints; they live in the vertex attribute, so one material per
-    // mesh is enough. FOUR rather than T68's three: the donut glaze cannot share the unlit material
-    // the matte set uses (see DESK_MESHES), and that draw call is the price of the exception.
+    // mesh is enough. FOUR from T71/T81 (the donut glaze cannot share the unlit material the matte
+    // set uses — see DESK_MESHES) plus ONE from T92: the notebook's verso, which moves and so
+    // cannot live inside the joined bake. The count is the contract's length, not a literal, so a
+    // sanctioned mesh cannot fail this gate while an accidental primitive split still does.
     const primitives = glb.json.meshes.reduce((s, m) => s + m.primitives.length, 0)
-    expect(primitives).toBe(4)
+    expect(primitives).toBe(DESK_MESHES.length)
+    // the verso shares T81_BAKED rather than adding a material — the runtime replaces materials
     expect(glb.json.materials).toHaveLength(4)
   })
 
-  it('ships exactly the four meshes the lab looks up by name', () => {
+  it('ships exactly the meshes the lab looks up by name — no more, no fewer', () => {
     expect(glb.json.meshes.map((m) => m.name).sort()).toEqual([...DESK_MESHES].sort())
   })
 })
@@ -221,17 +225,51 @@ describe('desk GLB — containment, measured on the emitted vertices', () => {
   // The journey camera's bottom frustum plane contains the world x axis, so a point is off the
   // bottom of the frame exactly when `y < journeyFloorY(z)`. That is a per-POINT test and it is
   // applied here to every vertex the file actually ships, not to a published bounding box.
+  // The original bake ships world-space vertices on TRS-less nodes; the T92 watering piece ships
+  // LOCAL vertices under an authored node TRS (its meshes move), so the per-point test transforms
+  // by the node the mesh hangs on — the same arithmetic the GPU runs.
+  // The bird's twin is the one mesh whose placement is NOT in the file: it is authored at the
+  // origin (the inverse-bind identity demands it — see BIRD_WRAPPER) and placed by a runtime
+  // wrapper. The containment claim is about where it RENDERS, so this test applies the same TRS
+  // the runtime applies, read from the same constant — one owner, imported not copied.
+  const nodeTrs = (meshName: string) => {
+    const mi = glb.json.meshes.findIndex((m) => m.name === meshName)
+    const node = (glb.json.nodes as { mesh?: number; translation?: number[]; rotation?: number[]; scale?: number[] }[]).find(
+      (n) => n.mesh === mi
+    )
+    const runtime = meshName === 'Bar_river'
+    const qLen = Math.hypot(...BIRD_WRAPPER.quaternion)
+    const t = runtime ? [...BIRD_WRAPPER.position] : (node?.translation ?? [0, 0, 0])
+    const q = runtime ? BIRD_WRAPPER.quaternion.map((c) => c / qLen) : (node?.rotation ?? [0, 0, 0, 1])
+    const s = runtime
+      ? [BIRD_WRAPPER.scale, BIRD_WRAPPER.scale, BIRD_WRAPPER.scale]
+      : (node?.scale ?? [1, 1, 1])
+    return (p: number[]): number[] => {
+      const [x, y, z] = [p[0] * s[0], p[1] * s[1], p[2] * s[2]]
+      const [qx, qy, qz, qw] = q
+      const uvx = qy * z - qz * y
+      const uvy = qz * x - qx * z
+      const uvz = qx * y - qy * x
+      const uux = qy * uvz - qz * uvy
+      const uuy = qz * uvx - qx * uvz
+      const uuz = qx * uvy - qy * uvx
+      return [x + 2 * (qw * uvx + uux) + t[0], y + 2 * (qw * uvy + uuy) + t[1], z + 2 * (qw * uvz + uuz) + t[2]]
+    }
+  }
+
   for (const name of DESK_MESHES) {
     it(`${name} is wholly below the journey camera's bottom edge`, () => {
       const prim = meshOf(name).primitives[0]
       const p = readAccessor(glb.json, glb.bin, prim.attributes.POSITION)
+      const toWorld = nodeTrs(name)
       let worst = Infinity
       let worstAt: number[] = []
       for (let i = 0; i < p.length; i += 3) {
-        const margin = journeyFloorY(p[i + 2]) - p[i + 1]
+        const [wx, wy, wz] = toWorld([p[i], p[i + 1], p[i + 2]])
+        const margin = journeyFloorY(wz) - wy
         if (margin < worst) {
           worst = margin
-          worstAt = [p[i], p[i + 1], p[i + 2]]
+          worstAt = [wx, wy, wz]
         }
       }
       expect(worst, `worst margin at [${worstAt.map((v) => v.toFixed(3))}]`).toBeGreaterThan(0)
