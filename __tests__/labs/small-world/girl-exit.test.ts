@@ -102,7 +102,7 @@ import { STANCE_ALPHA } from '@/components/labs/small-world/scene/renewal'
  * survives as the plunge at 29.2% of the flight (the gate has always asked 25%);
  * the hidden-at-every-camera-stop claim is untouched, because it is a claim about
  * a RADIUS and the fall depth did not move; whole-at-the-apex survives a sweep
- * 5.4× longer with 0.39 rad of horizon margin; and three gates are NEW — her peak
+ * 5.4× longer with 0.371 rad of horizon margin; and three gates are NEW — her peak
  * walking speed may not exceed the journey's own travelling rate, her yaw may
  * never return to the reader, and her lean may not rotate once she is airborne.
  */
@@ -415,8 +415,8 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
 
   it('does not TUMBLE: her lean is the ground’s while she is on it, and frozen after', () => {
     // A body in the air carries no torque. Without the freeze the sweep rotates
-    // her with ground she has already left — 0.43 rad between takeoff and the
-    // last frame the reader sees, which reads as a somersault.
+    // her with ground she has already left — 0.763 rad over the arc, 0.617 of it
+    // before the world takes her head, which reads as a somersault.
     for (let i = 0; i <= 800; i++) {
       const t = (GIRL_TRANSFER * i) / 800
       const pose = atExactly(t)

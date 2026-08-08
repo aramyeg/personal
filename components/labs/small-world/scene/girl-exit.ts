@@ -121,8 +121,8 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  *
  *    Her body no longer rotates with the ground it left. On the planet she is
  *    tilted to the surface normal at her bearing; in flight that would spin her
- *    43° between takeoff and the last frame the reader sees, which is a tumble,
- *    not a leap. `GirlPose.tilt` is therefore the bearing whose normal she stands
+ *    43.7° over the arc — 35.4° of it before the world takes her head — which is
+ *    a tumble, not a leap. `GirlPose.tilt` is therefore the bearing whose normal she stands
  *    on — equal to `theta` for every grounded frame, FROZEN at `GIRL_STOP_THETA`
  *    for the flight. A body in the air carries no torque; it keeps the lean the
  *    edge gave it.
@@ -140,7 +140,7 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * go behind the crest at 51.7% of the flight (was 57.5%), her head at 80.9% (was
  * 89.0%), and the plunge — feet gone, head still up — is 29.2% of the flight at
  * the rest camera and 29.1% at full pull-back, both COMFORTABLY above the 25%
- * the gate has always demanded. The apex clears the horizon with 0.39 rad to
+ * the gate has always demanded. The apex clears the horizon with 0.371 rad to
  * spare, so the leap reads whole before the world takes her.
  *
  * The gate family is re-derived, not weakened: she is on the planet and drawn
@@ -751,8 +751,8 @@ export type GirlPose = {
   /**
    * The bearing whose surface normal she is STANDING ALONG — equal to `theta` for
    * every grounded frame, and frozen at the takeoff bearing for the flight. A body
-   * in the air carries no torque; without this she rotates 43° with the ground she
-   * has already left, which is a tumble rather than a leap (T101).
+   * in the air carries no torque; without this she rotates 0.763 rad with the
+   * ground she has already left, which is a tumble rather than a leap (T101).
    */
   readonly tilt: number
   /** Radial offset from the surface (world u) — the flight's lift. 0 on the ground. */
