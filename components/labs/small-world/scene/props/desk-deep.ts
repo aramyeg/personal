@@ -595,7 +595,21 @@ export const BIRD = {
   /** The clip's length, seconds — 98 frames at 24 fps, measured off the exported samplers
    *  (span 0.0417..4.0833; `.time` below the first key clamps to the flat rest pose). */
   duration: 4.083333333333333,
+  /**
+   * THE PERCH HOLD, AUTHORED AT RUNTIME (T97 P5). The clip's own hold — the standing bird,
+   * f46–65, 1.92..2.71 s — lasts 0.79 s, and the blind review called the signature moment
+   * blink-and-miss. The re-key is the arm's; the HOLD is ours: `sampleBird` plays `.time` 1:1
+   * to `holdAt`, PARKS the clip there for `holdExtra` seconds (a paused action holding one time
+   * is exactly the standing pose, bit-stable by construction), and resumes 1:1. Still a pure
+   * closed form of τ — deterministic, scrub-safe, and past `duration + holdExtra` the state
+   * disarms to the same exact rest as before. Zero GLB bytes, zero re-key.
+   */
+  holdAt: 2.3,
+  holdExtra: 1.6,
 } as const
+
+/** The whole arc the visitor sees — the clip plus the authored perch. */
+export const BIRD_TOTAL = BIRD.duration + BIRD.holdExtra
 
 /**
  * The runtime wrapper's TRS — read off a real desk-positioned export, NOT hand-converted (the
@@ -645,20 +659,24 @@ export function triggerBird(s: BirdState, now: number): void {
 }
 
 /**
- * The bird's clip time: `.time` = τ, 1:1 — the clip IS the closed form (LINEAR keys, every frame
- * a pure function of its phase, scrub-backwards lands on the numbers it came from). Pure in
- * (now − t0). Past the clip's end the state disarms and returns exact 0, so a lane that has
- * been a bird is `Object.is`-identical to one that never was.
+ * The bird's clip time: `.time` = τ 1:1, except across the authored perch — τ inside
+ * [holdAt, holdAt + holdExtra] parks the clip at `holdAt` (the standing pose), and everything
+ * after resumes shifted by `holdExtra`. Piecewise in τ but still PURE in (now − t0): the clip IS
+ * the closed form (LINEAR keys, scrub-backwards lands on the numbers it came from), and a paused
+ * action fed one constant time is one constant pose. Past the whole arc the state disarms and
+ * returns exact 0, so a lane that has been a bird is `Object.is`-identical to one that never was.
  */
 export function sampleBird(s: BirdState, now: number): number {
   if (!s.active) return 0
   const tau = now - s.t0
   if (tau <= 0) return 0
-  if (tau >= BIRD.duration) {
+  if (tau >= BIRD_TOTAL) {
     s.active = false
     return 0
   }
-  return tau
+  if (tau < BIRD.holdAt) return tau
+  if (tau < BIRD.holdAt + BIRD.holdExtra) return BIRD.holdAt
+  return tau - BIRD.holdExtra
 }
 
 /** The bird uniform: (active, 0, 0, 0). ONE writer — the desk-glb frame loop, which flips it in

@@ -6,6 +6,8 @@ import {
   DESK_NUDGE_ZONES,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import {
+  BIRD,
+  BIRD_TOTAL,
   BOOK,
   BOOK_HINGE,
   BOOK_VERTEX_BODY,
@@ -23,12 +25,15 @@ import {
   bookRayHit,
   canRayHit,
   coffeeRayHit,
+  restingBird,
   restingBook,
   restingStir,
   restingWater,
+  sampleBird,
   sampleBook,
   sampleStir,
   sampleWater,
+  triggerBird,
   triggerBook,
   triggerStir,
   triggerWater,
@@ -575,3 +580,47 @@ describe("the notebook's arc", () => {
   })
 })
 
+describe("the bird's perch hold (T97 P5)", () => {
+  it('parks the clip at the standing pose for holdExtra seconds, then resumes 1:1', () => {
+    const s = restingBird()
+    triggerBird(s, 10)
+    // 1:1 before the hold
+    expect(sampleBird(s, 10 + 1.0)).toBeCloseTo(1.0, 9)
+    expect(sampleBird(s, 10 + BIRD.holdAt - 1e-6)).toBeCloseTo(BIRD.holdAt - 1e-6, 6)
+    // parked — one constant clip time is one constant pose
+    expect(sampleBird(s, 10 + BIRD.holdAt + 0.01)).toBe(BIRD.holdAt)
+    expect(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra - 0.01)).toBe(BIRD.holdAt)
+    // resumed, shifted by exactly the hold — the unroll plays every one of its own frames
+    expect(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra + 0.25)).toBeCloseTo(BIRD.holdAt + 0.25, 9)
+    expect(sampleBird(s, 10 + BIRD_TOTAL - 0.01)).toBeCloseTo(BIRD.duration - 0.01, 6)
+  })
+
+  it('holds INSIDE the clip’s own standing beat (f46–65 = 1.92..2.71 s)', () => {
+    expect(BIRD.holdAt).toBeGreaterThan(46 / 24)
+    expect(BIRD.holdAt).toBeLessThan(65 / 24)
+  })
+
+  it('is monotone and continuous across both seams — no frame can play twice or skip', () => {
+    const s = restingBird()
+    triggerBird(s, 0)
+    let prev = 0
+    for (let t = 0.001; t < BIRD_TOTAL; t += 0.008) {
+      const v = sampleBird(s, t)
+      expect(v).toBeGreaterThanOrEqual(prev)
+      expect(v - prev).toBeLessThanOrEqual(0.009)
+      prev = v
+    }
+  })
+
+  it('disarms to exact rest past the whole arc, exactly as before the hold existed', () => {
+    const s = restingBird()
+    triggerBird(s, 5)
+    expect(sampleBird(s, 5 + BIRD_TOTAL - 1e-6)).toBeGreaterThan(0)
+    expect(Object.is(sampleBird(s, 5 + BIRD_TOTAL), 0)).toBe(true)
+    expect(s.active).toBe(false)
+    // ...and a re-trigger after rest starts a fresh arc (mid-arc clicks stay absorbed)
+    triggerBird(s, 20)
+    expect(s.active).toBe(true)
+    expect(sampleBird(s, 20.5)).toBeCloseTo(0.5, 9)
+  })
+})
