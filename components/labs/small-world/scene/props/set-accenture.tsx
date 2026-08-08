@@ -59,16 +59,18 @@ function RuinBlock({ tilt = 0.12, sink = 0.12 }: { tilt?: number; sink?: number 
 export function AccentureSet() {
   return (
     <>
-      {/* Pyramids — the desert's monuments (Task 41; grounded on stepped plinths + upsized in
-          Task 46): one large + two smaller, off-lane on the dunes, sunken/tilted for charm. */}
+      {/* Pyramids — the desert's monuments (Task 41; grounded in Task 46; CLAIMED BY THE SAND
+          in Task 94): one large + two smaller, off-lane on the dunes, sunken/tilted for charm.
+          Each stands in a windblown goldSand skirt with a leeward drift tail; the wind bears
+          the same general way across all three (one desert, one wind) with a small scatter. */}
       <PropAnchor theta={T(0.5)} x={-0.55}>
-        <ClayPyramid size={0.82} color={PALETTE.sand} base={PALETTE.dune} sink={0.05} spin={0.5} />
+        <ClayPyramid size={0.82} color={PALETTE.sand} sink={0.05} spin={0.5} windDir={0.9} />
       </PropAnchor>
       <PropAnchor theta={T(0.38)} x={0.5}>
-        <ClayPyramid size={0.5} color={PALETTE.dune} base={PALETTE.clayPath} tilt={0.05} sink={0.035} spin={-0.4} />
+        <ClayPyramid size={0.5} color={PALETTE.dune} tilt={0.05} sink={0.035} spin={-0.4} windDir={1.05} />
       </PropAnchor>
       <PropAnchor theta={T(0.68)} x={0.44}>
-        <ClayPyramid size={0.4} color={PALETTE.sand} base={PALETTE.dune} tilt={-0.04} sink={0.03} spin={1.1} />
+        <ClayPyramid size={0.4} color={PALETTE.sand} tilt={-0.04} sink={0.03} spin={1.1} windDir={0.75} />
       </PropAnchor>
 
       {/* half-buried ruins — settled monuments in the sand */}

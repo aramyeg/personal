@@ -329,58 +329,83 @@ export function ClayBridge({ rise = DECK_RISE, ...x }: Xform & { rise?: number }
  * band — a lit face + a shaded face at a glance, without the material `flatShading` flag (which
  * meshToonMaterial doesn't type).
  *
- * Task 46 (Aram — "make the dunes and pyramids more of a stable structures"): the pyramid now
- * sits on a STEPPED two-tier pressed-clay plinth (a wide grounding step + a narrower seat step)
- * so it reads as a seated monument, not a cone dropped on the sand. `tilt` leans it a touch and
- * `sink` buries the seat for hand-made claymation charm; `spin` turns which faces front the
- * camera. `size` is the square base edge (world units).
+ * Task 94 (Aram — "the pyramids should be blended with the desert better"): the T46 plinth was
+ * two BOXES in pale dune tan — crisp rectangular slabs and a ruler-straight base line, so the
+ * monument sat ON the gold dune field like an unpainted prop on a painted ground (the banned
+ * box-geometry language, the same read T88 killed on the desert waymark). The ground claims it
+ * now, three ways, all in the dune paint's own family (land-bake B0: goldSand body, sand
+ * crests, value-dropped lee):
+ *   1. a WINDBLOWN SAND SKIRT — an irregular low cone of goldSand climbing the lower courses;
+ *   2. a LEEWARD DRIFT TAIL — one low dune tongue running downwind (`windDir`);
+ *   3. a TONAL PULL — the pyramid's own base courses lerp per-vertex toward the skirt gold and
+ *      fade to the monument colour by mid-height, so no contour line separates clay from sand.
+ * The silhouette identity stays: crisp faceted apex (flat normals), `tilt`/`spin` charm intact.
+ * The whole figure is now ONE merged vertex-coloured draw (was three meshes).
  */
 export function ClayPyramid({
   color = PALETTE.sand,
-  base = PALETTE.dune,
+  skirt = PALETTE.goldSand,
   size = 0.5,
   height,
   tilt = 0,
   sink = 0,
   spin = Math.PI / 4,
+  windDir = 0.9,
   ...x
 }: Xform & {
   color?: string
-  base?: string
+  skirt?: string
   size?: number
   height?: number
   tilt?: number
   sink?: number
   spin?: number
+  windDir?: number
 }) {
   const ramp = useClayRamp()
   const h = height ?? size
   const r = size / Math.SQRT2 // cone radius whose square base has edge = size
-  const plinthH = size * 0.1 // one plinth step height, scaled to the pyramid
   const geo = useMemo(() => {
-    const g = new THREE.ConeGeometry(r, h, 4).toNonIndexed()
-    g.computeVertexNormals() // per-face flat normals → crisp faceted sun/shade faces
+    const s = size
+    const py = new THREE.ConeGeometry(r, h, 4).toNonIndexed()
+    py.computeVertexNormals() // per-face flat normals → crisp faceted sun/shade faces
+    const wx = Math.cos(windDir)
+    const wz = Math.sin(windDir)
+    const g = buildMergedClay([
+      // the windblown skirt — 9 segments so its rim is never a perfect circle
+      { geo: new THREE.ConeGeometry(s * 0.85, s * 0.2, 9), color: skirt, pos: [0, s * 0.1, 0], rot: [0, 0.4, 0] },
+      // two small drifts climbing opposite base corners (one pale crest for variety)
+      { geo: new THREE.SphereGeometry(s * 0.2, 10, 8), color: skirt, pos: [s * 0.42, s * 0.05, s * 0.3], rot: [0, 0.7, 0], scl: [1.6, 0.45, 1] },
+      { geo: new THREE.SphereGeometry(s * 0.17, 10, 8), color: PALETTE.sand, pos: [-s * 0.38, s * 0.04, -s * 0.34], rot: [0, -0.5, 0], scl: [1.5, 0.4, 1] },
+      // the leeward tail — ONE low dune tongue running downwind. (An earlier cut stacked a
+      // second, value-dropped sphere on its tip as a painted-style slip face; as geometry the
+      // two-tone pair read as a separate curved object, so the value drop stays a paint idea.)
+      { geo: new THREE.SphereGeometry(s * 0.22, 12, 10), color: skirt, pos: [wx * s * 0.58, s * 0.035, wz * s * 0.58], rot: [0, -windDir, 0], scl: [1.6, 0.3, 0.7] },
+      // the monument itself, LAST — the gradient below indexes it from the tail of the buffer
+      { geo: py, color, pos: [0, h / 2 - sink + s * 0.02, 0], rot: [tilt, spin, 0] },
+    ])
+    // THE TONAL PULL: the pyramid's base courses take the skirt's gold and hand it back to the
+    // monument colour by ~30% height, per-vertex, so the sand visibly climbs the lower courses.
+    // The pull bottoms out at 0.15 self-colour (never pure ground gold), and stops at 0.30 h —
+    // the first cut ran it to 0.42 h at full strength and the monument read as a sand hill
+    // with a pale tip; the clay-toy silhouette must keep its bone-pale identity above the sand.
+    const pos = g.attributes.position
+    const col = g.attributes.color
+    const pyCount = py.attributes.position.count
+    const start = pos.count - pyCount
+    const cSkirt = new THREE.Color(skirt)
+    const cSelf = new THREE.Color(color)
+    const y0 = s * 0.05
+    const y1 = h * 0.3
+    const c = new THREE.Color()
+    for (let i = start; i < pos.count; i++) {
+      const t = 0.15 + 0.85 * THREE.MathUtils.smoothstep(pos.getY(i), y0, y1)
+      c.copy(cSkirt).lerp(cSelf, t)
+      col.setXYZ(i, c.r, c.g, c.b)
+    }
     return g
-  }, [r, h])
-  return (
-    <group {...x}>
-      {/* stepped pressed-clay plinth — a wide grounding step seated into the sand + a narrower
-          seat step, so the pyramid reads as a grounded STRUCTURE (Task 46 stability). */}
-      <mesh position={[0, plinthH * 0.5, 0]}>
-        <boxGeometry args={[size * 1.2, plinthH, size * 1.2]} />
-        <meshToonMaterial color={base} gradientMap={ramp} />
-      </mesh>
-      <mesh position={[0, plinthH * 1.4, 0]}>
-        <boxGeometry args={[size * 1.0, plinthH * 0.8, size * 1.0]} />
-        <meshToonMaterial color={base} gradientMap={ramp} />
-      </mesh>
-      <group rotation={[tilt, spin, 0]} position={[0, plinthH * 1.8 - sink, 0]}>
-        <mesh geometry={geo} position={[0, h / 2, 0]}>
-          <meshToonMaterial color={color} gradientMap={ramp} />
-        </mesh>
-      </group>
-    </group>
-  )
+  }, [r, h, size, color, skirt, tilt, sink, spin, windDir])
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
 
 export function ClayMound({ r = 0.5, color = PALETTE.meadow, squash = 0.55, ...x }: Xform & { r?: number; color?: string; squash?: number }) {
