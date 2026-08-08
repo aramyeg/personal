@@ -160,19 +160,42 @@ describe('JourneyOverlay', () => {
     expect(onAdvance).not.toHaveBeenCalled()
   })
 
-  it('still arms tap-to-advance for the same spread one frame before the ending', () => {
-    // The control for the test above: the ONLY thing that changed is which side of progress 1 the
-    // retraction is on. At 1 exactly — the journey's last frame — the tap is live as always.
+  it('un-arms tap-to-advance for ANY retracting spread — mid-journey, not just into the ending', () => {
+    // T93, bug A — this test used to assert the OPPOSITE for the journey side of the boundary
+    // ("one frame before the ending the tap is live as always"), and that pinned the defect Aram
+    // reported as "the scroll being controlled by the click". A retracting spread stays mounted
+    // for up to RETRACT_SECONDS after the visitor scrolls off a checkpoint, so the registration's
+    // lifetime was longer than the visit: measured against the production build (headed browser,
+    // scratchpad/t93/a-evidence), a click ~200ms after leaving chapter 3's dwell — a third of a
+    // segment into free travel, no card readable — fired `onAdvance` and smooth-scrolled the page
+    // 1057px to chapter 4's stop, out of the visitor's hands.
     //
-    // And it still advances to 1, not to a seventh story stop: there is no stop in the walk-out or
-    // the ending, so the last card hands the reader to the ending's first frame exactly as before
-    // (`advanceTargetFrom` carries that rule for both the tap and the snap areas).
+    // The rule is now the visit, not the mount: `atStop` is false the moment the reveal flips to
+    // its walk-out, in either scroll direction, on both sides of progress 1. The ending-specific
+    // gate above still exists (it also covers the teleport path), this is its generalisation.
     const journey = fakeJourney(1, { chapter: CHAPTER_COUNT - 1, t: 0.6, phase: 'out' })
     const onAdvance = vi.fn()
     render(
       <JourneyOverlay progressRef={journey.progressRef} journey={journey} onAdvance={onAdvance} />
     )
-    expect(screen.queryByTestId('sw-ending')).toBeNull()
+    // The retraction still RENDERS — hard-cutting the walk-out animation would be the worse trade.
+    expect(screen.getByTestId('sw-panel-data')).not.toBeNull()
+    expect(panelTapArmed(), 'a spread the visitor has left is not a click target').toBe(false)
+    firePanelAdvance()
+    expect(onAdvance).not.toHaveBeenCalled()
+  })
+
+  it('keeps the tap live while the reveal is rolling out or parked at the stop', () => {
+    // The control for the retraction tests: `atStop` follows the reveal's PHASE, not its t. A
+    // spread still rolling IN (t mid-way, phase 'in') is a visit in progress and taps must work —
+    // and the last chapter's tap still hands the reader to the ending's first frame, not to a
+    // seventh story stop (`advanceTargetFrom` carries that rule for the tap and the snap alike).
+    const progress = chapterDwellProgress(CHAPTER_COUNT - 1)
+    const journey = fakeJourney(progress, { chapter: CHAPTER_COUNT - 1, t: 0.6, phase: 'in' })
+    const onAdvance = vi.fn()
+    render(
+      <JourneyOverlay progressRef={journey.progressRef} journey={journey} onAdvance={onAdvance} />
+    )
     expect(panelTapArmed()).toBe(true)
     firePanelAdvance()
     expect(onAdvance).toHaveBeenCalledWith(1)

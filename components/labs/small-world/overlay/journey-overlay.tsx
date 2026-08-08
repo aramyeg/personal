@@ -81,8 +81,18 @@ export function JourneyOverlay({
           onAdvance={
             /* The next STORY STOP, not the next chapter's boundary (Task 75): a tap and a fling
                have to land in the same place or the stops read as arbitrary. `advanceTargetFrom`
-               owns both that and the last card's hand-off to the ending. */
-            ui.ending ? null : () => onAdvance(advanceTargetFrom(ui.panel!.chapter))
+               owns both that and the last card's hand-off to the ending.
+
+               ARMED ONLY AT THE STOP (T93, bug A). A retracting spread stays mounted for up to
+               RETRACT_SECONDS after the visitor scrolls away, and with the tap armed through it a
+               click landing in that window seized a scroll already in the visitor's hands —
+               measured mid-travel, a whole chapter's smooth-scroll from a single click. `atStop`
+               is false for the entire walk-out (either direction, ending included, which is what
+               the `ui.ending` gate caught before this generalised it), so the click target's
+               lifetime is the visit, not the mount. */
+            ui.ending || !ui.panel.atStop
+              ? null
+              : () => onAdvance(advanceTargetFrom(ui.panel!.chapter))
           }
         />
       )}

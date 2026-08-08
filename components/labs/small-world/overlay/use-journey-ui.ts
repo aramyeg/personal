@@ -28,8 +28,20 @@ export type JourneyUi = {
    * (`pageProgressAt`) and may never ride anything else. The info leaf's four
    * beats are drawn from it, so a settled card cannot be caught mid-draw and a
    * scrub backwards re-derives rather than replays. See `info-beats.ts`.
+   *
+   * `atStop` — the visitor is genuinely AT this spread's checkpoint (the reveal is
+   * rolling out or parked, or the scroll-pure dwell window contains the scroll).
+   * FALSE while the spread is only RETRACTING: the visitor has already left and is
+   * free-scrolling, but the wall-clock walk-out keeps the component mounted for up
+   * to RETRACT_SECONDS more. Tap-to-advance must read this, not the mount (T93,
+   * bug A): with the registration alive through a retraction, a click landing
+   * within ~0.4s of leaving a checkpoint seized the scroll mid-travel and
+   * smooth-scrolled the visitor a whole chapter (measured: a click a third of a
+   * segment past chapter 3's dwell yanked the page 1057px to chapter 4's stop —
+   * scratchpad/t93/a-evidence). The spread may keep animating out; only the click
+   * arming follows the visitor.
    */
-  panel: { chapter: number; enter: number; page: number } | null
+  panel: { chapter: number; enter: number; page: number; atStop: boolean } | null
   /**
    * The ending's DOM-side view (Task 63) — null for the whole journey, then the ending's
    * own timeline. `t` is quantized like `panel.enter`, so scrubbing the ending costs at
@@ -86,6 +98,9 @@ function uiAt(progress: number, journey?: ArrivalJourney): JourneyUi {
             // no re-renders at all. T_STEPS steps is finer than the eye across a
             // 400px span, and the beats ease within a step anyway.
             page: Math.round(pageProgressAt(progress) * T_STEPS) / T_STEPS,
+            // Without a reveal driver the panel exists only inside the dwell
+            // window itself, so a mounted spread IS an at-stop spread there.
+            atStop: reveal ? reveal.phase === 'in' : true,
           },
     // `s.progress` is clamped and reads 1 for the whole ending, so it cannot answer this —
     // `s.ending` is the field built from the un-clamped value. See ending-timeline.ts.
@@ -110,7 +125,8 @@ function same(a: JourneyUi, b: JourneyUi): boolean {
         b.panel !== null &&
         a.panel.chapter === b.panel.chapter &&
         a.panel.enter === b.panel.enter &&
-        a.panel.page === b.panel.page))
+        a.panel.page === b.panel.page &&
+        a.panel.atStop === b.panel.atStop))
   )
 }
 

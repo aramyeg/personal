@@ -213,6 +213,27 @@ describe('useJourneyUi on the arrival clock', () => {
     expect(result.current.panel).toBeNull()
   })
 
+  it('atStop follows the visit, not the mount (T93 bug A)', () => {
+    // While the reveal rolls out or parks the visitor is AT the checkpoint; the moment it flips
+    // to its walk-out they have left, and the still-mounted spread must stop being a click
+    // target — a click during the ~0.4s retraction seized a scroll already in the visitor's
+    // hands (measured: one click mid-travel smooth-scrolled a whole chapter). The scroll-pure
+    // fallback has no retraction — its panel exists only inside the dwell — so it is always true.
+    const driver = fakeJourney((TRAVEL_END + 1e-9) / 6, { chapter: 0, t: 0.3, phase: 'in' })
+    const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
+    expect(result.current.panel!.atStop).toBe(true)
+    driver.set({ chapter: 0, t: 1, phase: 'in' }, chapterDwellProgress(0))
+    driver.tick()
+    expect(result.current.panel!.atStop).toBe(true)
+    driver.set({ chapter: 0, t: 0.5, phase: 'out' }, (PANEL_END + 0.05) / 6)
+    driver.tick()
+    expect(result.current.panel, 'the retracting spread still renders').not.toBeNull()
+    expect(result.current.panel!.atStop).toBe(false)
+    // scroll-pure fallback: inside the dwell window with no driver at all
+    const { result: pure } = renderHook(() => useJourneyUi(refOf(chapterDwellProgress(0))))
+    expect(pure.current.panel!.atStop).toBe(true)
+  })
+
   it('keeps the burst on the clock, so the "!" pops without scrolling', () => {
     const driver = fakeJourney((TRAVEL_END + 1e-9) / 6, { chapter: 0, t: 0.2, phase: 'in' })
     const { result } = renderHook(() => useJourneyUi(driver.journey.progressRef, driver.journey))
