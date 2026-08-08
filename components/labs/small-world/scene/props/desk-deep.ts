@@ -1,4 +1,5 @@
 import { hitPadFor, rayBoxHit } from './desk-nudge'
+import { canLift } from './desk-water-look'
 
 /** Compile-time literal formatting for every chunk in this file (measurements → GLSL). */
 const f = (v: number): string => v.toFixed(5)
@@ -478,6 +479,7 @@ export function sampleWater(s: WaterState, now: number, out: Float32Array): numb
   if (tau >= WATER_TOTAL) {
     s.active = false
     out[0] = 0
+    out[1] = 0
     return 0
   }
   const clip = Math.min(tau, WATER.duration)
@@ -489,11 +491,15 @@ export function sampleWater(s: WaterState, now: number, out: Float32Array): numb
         ? smooth01(drink / WATER.perkRise)
         : 1 - smooth01((drink - WATER.perkRise - WATER.perkHold) / WATER.perkFall)
   out[0] = w
+  // ...and the can's height over the desk (T100), for the contact shadow that now sits under it:
+  // one writer, so the pool and the caster cannot disagree about whether the can is up.
+  out[1] = canLift(clip)
   return clip
 }
 
-/** The watering uniform: (perk w, 0, 0, 0). One writer (the deep frame loop), two readers (the
- *  leaf chunk and the soil tint), so they cannot disagree. */
+/** The watering uniform: (perk w, can lift, 0, 0). One writer (the deep frame loop), three
+ *  readers (the leaf chunk, the soil tint, and the desk surface's contact shadow), so they
+ *  cannot disagree. */
 export const WATER_UNIFORM = { value: new Float32Array(4) }
 
 /**
@@ -606,10 +612,40 @@ export const BIRD = {
    */
   holdAt: 2.3,
   holdExtra: 1.6,
+  /**
+   * STOP MOTION (T100). The clip was baked at 24 fps and scrubbed continuously, so it played like
+   * CG: smooth, weightless, and — the client's word — not what clay does. Real clay animation is
+   * shot ON TWOS: the animator moves the figure, exposes two frames, moves it again. So the scrub
+   * is QUANTISED to 12 held poses per second of clip time, which is exactly on-twos for a 24 fps
+   * bake — every held pose is a real baked key, never an interpolation, and the plateau between
+   * them is the thumb going back in.
+   *
+   * The arithmetic lands on the clip's own boundaries by construction: 98 frames at 24 fps is
+   * exactly 49 steps at 12, so the last step IS `duration`, and step 0 IS the flat lane. Nothing
+   * is rounded off the ends, which is what keeps the return exact.
+   */
+  stopFps: 12,
+  /**
+   * ...and the step is not a teleport. A stop-motion frame change on a 60 Hz screen is a hard cut;
+   * the armature it photographs still had to be pushed there. So each new pose arrives over the
+   * first `settle` of its step — ~18 ms, one display frame — and then HOLDS for the remaining
+   * ~65 ms. Small enough that the read is still "snap", large enough that the snap has a hand
+   * behind it. Exactly 0 would be the pure cut; this is the thumb.
+   */
+  settle: 0.22,
 } as const
 
-/** The whole arc the visitor sees — the clip plus the authored perch. */
-export const BIRD_TOTAL = BIRD.duration + BIRD.holdExtra
+/** One held pose, in seconds of clip time. */
+export const BIRD_STEP = 1 / BIRD.stopFps
+
+/**
+ * The whole arc the visitor sees — the clip, the authored perch, and ONE stop-motion step past the
+ * clip's end. That last step is not padding: the quantiser holds pose k through step k, so without
+ * it the final pose the visitor sees would be step 48 (clip 4.0 s) and the disarm to exact rest
+ * would skip the unroll's last two baked frames — a pop, at the one moment the piece is claiming
+ * it returned to exactly where it started.
+ */
+export const BIRD_TOTAL = BIRD.duration + BIRD.holdExtra + BIRD_STEP
 
 /**
  * The runtime wrapper's TRS — read off a real desk-positioned export, NOT hand-converted (the
@@ -674,9 +710,36 @@ export function sampleBird(s: BirdState, now: number): number {
     s.active = false
     return 0
   }
-  if (tau < BIRD.holdAt) return tau
-  if (tau < BIRD.holdAt + BIRD.holdExtra) return BIRD.holdAt
-  return tau - BIRD.holdExtra
+  const t = tau < BIRD.holdAt ? tau : tau < BIRD.holdAt + BIRD.holdExtra ? BIRD.holdAt : tau - BIRD.holdExtra
+  return stopMotion(t)
+}
+
+/**
+ * The stop-motion quantiser: continuous clip time in, a HELD baked pose out. Step k is entered
+ * with a one-display-frame push (`BIRD.settle`) and then held flat for the rest of its 83 ms.
+ *
+ * Pure in its argument, so everything the scrub law asks for survives: the same τ gives the same
+ * pose on every machine, a paused action fed one constant time is one constant pose (so the perch
+ * hold is bit-stable, and so is every plateau between steps), and both ends land on real clip
+ * boundaries — `stopMotion(0) === 0` exactly, and the last step is exactly `BIRD.duration`. The
+ * two halves of the merged `BirdAction` — the 8 roll bones and the form morph — read this ONE
+ * number, so they step in lockstep by construction rather than by care.
+ */
+export function stopMotion(t: number): number {
+  if (t <= 0) return 0
+  // the top edge, explicitly: `duration * stopFps` is 48.99999999999999 in float64, so a floor()
+  // on it would hold the second-to-last pose and quietly drop the unroll's last two baked frames
+  if (t >= BIRD.duration) return BIRD.duration
+  const u = t * BIRD.stopFps
+  const k = Math.floor(u)
+  const into = u - k
+  // the push into pose k, from the pose before it — smoothstep, so velocity is zero at both ends
+  const e = into >= BIRD.settle ? 1 : (() => {
+    const x = into / BIRD.settle
+    return x * x * (3 - 2 * x)
+  })()
+  const q = (k - 1 + e) * BIRD_STEP
+  return q <= 0 ? 0 : q >= BIRD.duration ? BIRD.duration : q
 }
 
 /** The bird uniform: (active, 0, 0, 0). ONE writer — the desk-glb frame loop, which flips it in

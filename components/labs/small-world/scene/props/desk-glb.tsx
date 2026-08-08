@@ -10,6 +10,17 @@ import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
+  BEAD_FRAGMENT_BODY,
+  BEAD_FRAGMENT_DECL,
+  BEAD_VERTEX_BODY,
+  BEAD_VERTEX_DECL,
+  CAN_FRAGMENT_BODY,
+  SURFACE_SHADOW_FRAGMENT_BODY,
+  SURFACE_SHADOW_FRAGMENT_DECL,
+  SURFACE_SHADOW_VERTEX_BODY,
+  SURFACE_SHADOW_VERTEX_DECL,
+} from './desk-water-look'
+import {
   BIRD_LIFT_FRAGMENT_BODY,
   BIRD_LIFT_FRAGMENT_DECL,
   BIRD_LIFT_VERTEX_BODY,
@@ -209,12 +220,25 @@ export function surfaceMaterial(
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
     shader.uniforms.uDimMap = dim
-    shader.fragmentShader = ('uniform float uLights;\nuniform sampler2D uDimMap;\n' + shader.fragmentShader)
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-         diffuseColor.rgb = mix( texture2D( uDimMap, vMapUv ).rgb, diffuseColor.rgb, uLights );`
-      )
+    // The watering can's SEAT (T100): a soft ellipse pressed into the baked desk under the can,
+    // widening and fading as the can lifts through its own pour. The can shipped with no contact
+    // shadow at all and read as floating — see desk-water-look.ts for the measured diagnosis.
+    shader.uniforms.uWater = WATER_UNIFORM
+    shader.vertexShader = (SURFACE_SHADOW_VERTEX_DECL + '\n' + shader.vertexShader).replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n' + SURFACE_SHADOW_VERTEX_BODY
+    )
+    shader.fragmentShader = (
+      'uniform float uLights;\nuniform sampler2D uDimMap;\n' +
+      SURFACE_SHADOW_FRAGMENT_DECL +
+      '\n' +
+      shader.fragmentShader
+    ).replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+         diffuseColor.rgb = mix( texture2D( uDimMap, vMapUv ).rgb, diffuseColor.rgb, uLights );\n` +
+        SURFACE_SHADOW_FRAGMENT_BODY
+    )
   }
   mat.customProgramCacheKey = () => 'sw-desk-surface'
   return mat
@@ -300,7 +324,11 @@ export function canMaterial(lights: { value: number }): THREE.MeshBasicMaterial 
     )
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
-      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
+      // ...then GRADED (T100). The concave bake crushed the spout's throat to near-black and blew
+      // the body to white against a white desk and a white paper stack, so the can had neither a
+      // clean spout nor a silhouette. The remap lifts one end and tints the other; the form the
+      // bake found is untouched. desk-water-look.ts holds the measurements and the argument.
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + CAN_FRAGMENT_BODY
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-can'
@@ -352,8 +380,22 @@ export function birdMaterial(lights: { value: number }): THREE.MeshBasicMaterial
  * frame it was baked in. One shared material; visibility is gated by the frame loop so a resting
  * desk spends zero draws on them.
  */
-export function dropMaterial(): THREE.MeshBasicMaterial {
-  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.7, 0.86), toneMapped: false })
+export function dropMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1), toneMapped: false })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    // The mesh ships POSITION only, so the bead's normal is DERIVED from its own local position
+    // (squashed back toward a sphere — the teardrop is taller than it is wide). See
+    // desk-water-look.ts for why a flat fill could not work on a convex body.
+    shader.vertexShader = (BEAD_VERTEX_DECL + '\n' + shader.vertexShader).replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n' + BEAD_VERTEX_BODY
+    )
+    shader.fragmentShader = (BEAD_FRAGMENT_DECL + '\n' + shader.fragmentShader).replace(
+      '#include <color_fragment>',
+      '#include <color_fragment>\n' + BEAD_FRAGMENT_BODY
+    )
+  }
   mat.customProgramCacheKey = () => 'sw-desk-drop'
   return mat
 }
@@ -661,7 +703,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     let waterAction: THREE.AnimationAction | null = null
     if (can) {
       can.material = canMaterial(lights.current)
-      const dropMat = dropMaterial()
+      const dropMat = dropMaterial(lights.current)
       for (let i = 0; i < 7; i++) {
         const d = findMesh(scene, `Water_Drop0${i}` as DeskMeshName)
         if (d) {

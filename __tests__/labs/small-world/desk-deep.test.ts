@@ -10,6 +10,7 @@ import {
   BIRD_LIFT,
   BIRD_LIFT_FRAGMENT_BODY,
   BIRD_LIFT_VERTEX_BODY,
+  BIRD_STEP,
   BIRD_TOTAL,
   BOOK,
   BOOK_HINGE,
@@ -33,6 +34,7 @@ import {
   restingStir,
   restingWater,
   sampleBird,
+  stopMotion,
   sampleBook,
   sampleStir,
   sampleWater,
@@ -583,19 +585,22 @@ describe("the notebook's arc", () => {
   })
 })
 
-describe("the bird's perch hold (T97 P5)", () => {
+describe("the bird's perch hold (T97 P5) and its stop-motion scrub (T100)", () => {
+  const step = BIRD_STEP
+
   it('parks the clip at the standing pose for holdExtra seconds, then resumes 1:1', () => {
     const s = restingBird()
     triggerBird(s, 10)
-    // 1:1 before the hold
-    expect(sampleBird(s, 10 + 1.0)).toBeCloseTo(1.0, 9)
-    expect(sampleBird(s, 10 + BIRD.holdAt - 1e-6)).toBeCloseTo(BIRD.holdAt - 1e-6, 6)
-    // parked — one constant clip time is one constant pose
-    expect(sampleBird(s, 10 + BIRD.holdAt + 0.01)).toBe(BIRD.holdAt)
-    expect(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra - 0.01)).toBe(BIRD.holdAt)
-    // resumed, shifted by exactly the hold — the unroll plays every one of its own frames
-    expect(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra + 0.25)).toBeCloseTo(BIRD.holdAt + 0.25, 9)
-    expect(sampleBird(s, 10 + BIRD_TOTAL - 0.01)).toBeCloseTo(BIRD.duration - 0.01, 6)
+    // 1:1 before the hold — up to the quantiser, which never lags by more than one step
+    expect(Math.abs(sampleBird(s, 10 + 1.0) - 1.0)).toBeLessThanOrEqual(step * 1.001)
+    // parked — one constant clip time is one constant POSE, bit-stable across the whole hold
+    const held = sampleBird(s, 10 + BIRD.holdAt + 0.01)
+    expect(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra - 0.01)).toBe(held)
+    expect(Math.abs(held - BIRD.holdAt)).toBeLessThanOrEqual(step * 1.001)
+    // resumed, shifted by exactly the hold
+    expect(Math.abs(sampleBird(s, 10 + BIRD.holdAt + BIRD.holdExtra + 0.25) - (BIRD.holdAt + 0.25))).toBeLessThanOrEqual(step * 1.001)
+    // ...and the arc's LAST held pose is the clip's own last frame, not one step short of it
+    expect(sampleBird(s, 10 + BIRD_TOTAL - 1e-4)).toBe(BIRD.duration)
   })
 
   it('holds INSIDE the clip’s own standing beat (f46–65 = 1.92..2.71 s)', () => {
@@ -603,28 +608,64 @@ describe("the bird's perch hold (T97 P5)", () => {
     expect(BIRD.holdAt).toBeLessThan(65 / 24)
   })
 
-  it('is monotone and continuous across both seams — no frame can play twice or skip', () => {
+  it('is monotone across both seams — no frame can play twice or run backwards', () => {
     const s = restingBird()
     triggerBird(s, 0)
     let prev = 0
-    for (let t = 0.001; t < BIRD_TOTAL; t += 0.008) {
+    for (let t = 0.001; t < BIRD_TOTAL; t += 0.004) {
       const v = sampleBird(s, t)
       expect(v).toBeGreaterThanOrEqual(prev)
-      expect(v - prev).toBeLessThanOrEqual(0.009)
       prev = v
     }
+  })
+
+  it('STOP MOTION: the scrub is a staircase of held baked poses, on twos', () => {
+    // 12 steps per second of clip is exactly on-twos for the 24 fps bake, so every held value
+    // is a real key: k/12 s == 2k/24 frames.
+    expect(BIRD.stopFps * 2).toBe(24)
+    expect(BIRD.duration / step).toBeCloseTo(49, 9)
+    // the plateaus: sampled at 240 Hz across the roll, the DISTINCT clip times are step multiples
+    const s = restingBird()
+    triggerBird(s, 0)
+    const seen = new Set<number>()
+    let moving = 0
+    let total = 0
+    let prev = sampleBird(s, 0.001)
+    for (let t = 0.001; t < BIRD.holdAt; t += 1 / 240) {
+      const v = sampleBird(s, t)
+      total++
+      if (v !== prev) moving++
+      prev = v
+      // once a pose has settled it sits exactly on a step
+      const k = v / step
+      if (Math.abs(k - Math.round(k)) < 1e-9) seen.add(Math.round(k))
+    }
+    // ~12 distinct poses per second over the pre-hold stretch, not 240
+    expect(seen.size).toBeGreaterThan(BIRD.holdAt * BIRD.stopFps - 2)
+    expect(seen.size).toBeLessThan(BIRD.holdAt * BIRD.stopFps + 2)
+    // ...and the clip is HELD most of the time: the push into each pose costs ~settle of a step
+    expect(moving / total).toBeLessThan(BIRD.settle + 0.1)
+  })
+
+  it('the ends are exact: step 0 is the flat lane and the last step is the clip’s last frame', () => {
+    expect(Object.is(stopMotion(0), 0)).toBe(true)
+    expect(stopMotion(-1)).toBe(0)
+    expect(stopMotion(BIRD.duration)).toBe(BIRD.duration)
+    expect(stopMotion(BIRD.duration + 1)).toBe(BIRD.duration)
+    // deterministic: the same clip time is the same pose, always
+    for (const t of [0.37, 1.0, 2.3, 3.9]) expect(stopMotion(t)).toBe(stopMotion(t))
   })
 
   it('disarms to exact rest past the whole arc, exactly as before the hold existed', () => {
     const s = restingBird()
     triggerBird(s, 5)
     expect(sampleBird(s, 5 + BIRD_TOTAL - 1e-6)).toBeGreaterThan(0)
-    expect(Object.is(sampleBird(s, 5 + BIRD_TOTAL), 0)).toBe(true)
+    expect(Object.is(sampleBird(s, 5 + BIRD_TOTAL + 1e-9), 0)).toBe(true)
     expect(s.active).toBe(false)
     // ...and a re-trigger after rest starts a fresh arc (mid-arc clicks stay absorbed)
     triggerBird(s, 20)
     expect(s.active).toBe(true)
-    expect(sampleBird(s, 20.5)).toBeCloseTo(0.5, 9)
+    expect(Math.abs(sampleBird(s, 20.5) - 0.5)).toBeLessThanOrEqual(step * 1.001)
   })
 })
 
