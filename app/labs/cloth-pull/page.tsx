@@ -16,7 +16,8 @@ export const metadata: Metadata = {
 }
 
 /** Message is swappable data: /labs/cloth-pull?m=Any+copy+you+like
- * Character A/B: ?c=sprite for the 2.5D image-based Alwi (default 3d). */
+ * Character A/B (Aram's pick 2026-08-08): 2.5D sprite Alwi is the DEFAULT;
+ * the 3D chibi stays reachable behind ?c=3d. */
 export default async function ClothPullPage({
   searchParams,
 }: {
@@ -24,7 +25,7 @@ export default async function ClothPullPage({
 }) {
   const { m, c } = await searchParams
   const message = (m ?? DEFAULT_MESSAGE).slice(0, 90).trim() || DEFAULT_MESSAGE
-  const character = c === 'sprite' ? ('sprite' as const) : ('3d' as const)
+  const character = c === '3d' ? ('3d' as const) : ('sprite' as const)
 
   return (
     <GalleryChrome>
