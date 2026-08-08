@@ -9,6 +9,10 @@ import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
+  BIRD_LIFT_FRAGMENT_BODY,
+  BIRD_LIFT_FRAGMENT_DECL,
+  BIRD_LIFT_VERTEX_BODY,
+  BIRD_LIFT_VERTEX_DECL,
   BIRD_UNIFORM,
   BIRD_VERTEX_BODY,
   BIRD_VERTEX_DECL,
@@ -30,6 +34,14 @@ import {
   WATER_VERTEX_DECL,
   deepClipMail,
 } from './desk-deep'
+import {
+  STATION_METAL_BODY,
+  STATION_METAL_DECL,
+  STATION_METAL_NORMAL_BODY,
+  STATION_UNIFORMS,
+  STATION_VERTEX_BODY,
+  STATION_VERTEX_DECL,
+} from './desk-station'
 
 /**
  * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
@@ -219,7 +231,12 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     // lane collapses to a point — an index-range select, because the pad's lanes interleave
     // diagonally and no box can cut this one free.
     shader.uniforms.uBird = BIRD_UNIFORM
+    // ...and the sculpting station's five voices (T97 S2/S3): the same id-range discipline as
+    // the lane-hide, seven uniforms, every one exact-zero guarded.
+    for (const [name, u] of Object.entries(STATION_UNIFORMS)) shader.uniforms[name] = u
     shader.vertexShader = (
+      STATION_VERTEX_DECL +
+      '\n' +
       BIRD_VERTEX_DECL +
       '\n' +
       BOOK_VERTEX_DECL +
@@ -231,9 +248,19 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     // unlit, so only positions move — there is no normal for the nudge to keep honest here: the
     // shading is baked into vertex colours, which travel with the vertices by construction
     wireNudge(shader, nudge)
+    // STATION runs FIRST after begin_vertex — before BIRD's lane-hide overwrite — so a lane that
+    // is mid-roll stays hidden even if its hover shiver is still settling: the scoot moves the
+    // lane's vertices, then the hide collapses them to the point regardless.
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\n' + BIRD_VERTEX_BODY + '\n' + BOOK_VERTEX_BODY + '\n' + WATER_VERTEX_BODY
+      '#include <begin_vertex>\n' +
+        STATION_VERTEX_BODY +
+        '\n' +
+        BIRD_VERTEX_BODY +
+        '\n' +
+        BOOK_VERTEX_BODY +
+        '\n' +
+        WATER_VERTEX_BODY
     )
     shader.fragmentShader = (
       'uniform float uLights;\nvarying vec3 vDimColor;\n' +
@@ -286,13 +313,26 @@ export function birdMaterial(lights: { value: number }): THREE.MeshBasicMaterial
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
-    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
-      '#include <color_vertex>',
-      '#include <color_vertex>\n vDimColor = color_1.rgb;'
+    shader.vertexShader = (
+      BIRD_LIFT_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
     )
-    shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
+      // The shadow-floor lift's weight (T97 P6) is measured HERE, after <skinning_vertex>: at that
+      // point `transformed` holds the fully morphed+skinned position while `position` still holds
+      // the rest attribute, so the difference is exactly how far the roll has moved this vertex —
+      // and at the rest pose it is the 3e-8 skinning residual, which the smoothstep floors to +0.
+      .replace('#include <skinning_vertex>', '#include <skinning_vertex>\n' + BIRD_LIFT_VERTEX_BODY)
+    shader.fragmentShader = (
+      'uniform float uLights;\nvarying vec3 vDimColor;\n' +
+      BIRD_LIFT_FRAGMENT_DECL +
+      '\n' +
+      shader.fragmentShader
+    ).replace(
       '#include <color_fragment>',
-      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
+      // The lift operates on the final mixed lit/dim colour — the same value the seam gate sees.
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + BIRD_LIFT_FRAGMENT_BODY
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-bird'
@@ -551,10 +591,17 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
   const nudgeNormal = nudgeNormalChunk('DeskMetal', 'objectNormal')
   mat.onBeforeCompile = (shader) => {
     wireNudge(shader, nudge)
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <beginnormal_vertex>',
-      '#include <beginnormal_vertex>\n' + nudgeNormal
-    )
+    // The carving knife's metal blade (T97 S2/S3): the see-saw teeter + clatter hop, composed
+    // with the nudge wiring above — the blade's padded box and the foil-print zones are disjoint
+    // (measured: nearest foreign metal is the pen at x > 2.74; the blade ends at 1.83), so the
+    // two fields can never both claim a vertex and their order after begin_vertex is free.
+    shader.uniforms.uStKnife = STATION_UNIFORMS.uStKnife
+    shader.vertexShader = (STATION_METAL_DECL + '\n' + shader.vertexShader)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + STATION_METAL_BODY)
+      .replace(
+        '#include <beginnormal_vertex>',
+        '#include <beginnormal_vertex>\n' + nudgeNormal + '\n' + STATION_METAL_NORMAL_BODY
+      )
   }
   // Distinct key, because the stand's cradle uses the same MeshStandardMaterial signature and three
   // caches programs by it — without this the two would silently share one program.

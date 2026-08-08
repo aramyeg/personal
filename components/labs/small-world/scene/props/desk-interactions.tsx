@@ -8,16 +8,13 @@ import { DESK_NUDGE_ZONES, type DeskNudgeKind } from './desk-glb-contract'
 import {
   BEND_UNIFORM,
   HOVER_SCALE,
-  NOTE_CORNER_ZONE,
   NOTE_CURL_UNIFORM,
   NUDGE_UNIFORMS,
   PRESS_CLICK,
   PRESS_HOVER,
   RATTLE_UNIFORM,
   ROCK_PARAMS,
-  hitPadFor,
   nudgeArmedFor,
-  rayBoxHit,
   restingPeck,
   restingPress,
   restingRattle,
@@ -41,7 +38,39 @@ import {
   type RattleState,
   type SquashSpring,
 } from './desk-nudge'
+import { GLOBE_ROCK, GLOBE_UNIFORM, triggerGlobeRock } from '../globe-nudge'
 import { bookRayHit, canRayHit, coffeeRayHit, laneRayHit, mugStirMail } from './desk-deep'
+import {
+  LANE_BAR_INDEX,
+  PENCUP_BODY,
+  STATION_BARS,
+  STATION_CLAIMS,
+  STATION_TREE,
+  STATION_UNIFORMS,
+  resolveDeskPick,
+  restingCasePop,
+  restingChipPress,
+  restingScoot,
+  restingTeeter,
+  restingTreeSway,
+  sampleCasePop,
+  sampleChipPress,
+  sampleScoot,
+  sampleTeeter,
+  sampleTreeSway,
+  scootSignFrom,
+  teeterSignFrom,
+  triggerCasePop,
+  triggerChipPress,
+  triggerScoot,
+  triggerTeeter,
+  triggerTreeSway,
+  type CasePopState,
+  type ChipPressState,
+  type ScootState,
+  type StationKind,
+  type TeeterState,
+} from './desk-station'
 
 /**
  * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
@@ -50,12 +79,15 @@ import { bookRayHit, canRayHit, coffeeRayHit, laneRayHit, mugStirMail } from './
  * after mount and nothing renders: the component returns null and the desk's own materials do the
  * moving.
  *
- * HIT-TESTING is analytic — the zone boxes from the contract against the camera ray, six slab
- * tests once per frame on the latest pointer position — because the desk is a merged bake with no
- * per-object meshes to raycast (see `DESK_NUDGE_ZONES`), and because an interaction list of
- * invisible colliders would be six scene objects doing the job of one function. The same boxes
- * are inflated to a 44 px minimum effective target at their own depth, the phone's tap floor and
- * a no-op on desktop.
+ * HIT-TESTING is analytic and owned by `resolveDeskPick` (desk-station.ts, T97 round 3): every
+ * claim on the desk — the T89 boxes, the note's corner, the station's capsules and spheres, the
+ * pens, the cup's cylinder, the globe, the lane's precedence — against one camera ray, once per
+ * frame on the latest pointer position. One pure function, because the desk is a merged bake
+ * with no per-object meshes to raycast (see `DESK_NUDGE_ZONES`), because an interaction list of
+ * invisible colliders would be dozens of scene objects doing the job of one function, and
+ * because the claim-resolution sweep in desk-station.test.ts must drive the EXACT function this
+ * component uses — a replica would drift. Sub-44 px targets are grown to the phone's tap floor
+ * at their own depth, but a floor is never a shield: see the resolver's surface-beats-pad rule.
  *
  * ARMING follows the yeti's discipline: the gate is checked in the frame loop, a disarm resets
  * every signature to exact rest in the same frame (there is no unwind to run — rest is each
@@ -69,33 +101,34 @@ import { bookRayHit, canRayHit, coffeeRayHit, laneRayHit, mugStirMail } from './
  * These are toys on a desk, not controls; no tab stops are added inside a hidden canvas.
  */
 
-type ZoneId = DeskNudgeKind | 'note'
+type ZoneId = DeskNudgeKind | 'note' | 'globe' | `station-${string}`
 
 type Hit = { id: ZoneId; t: number; point: [number, number, number] }
 
-const ZONES = DESK_NUDGE_ZONES.map((z) => ({
-  id: z.kind as ZoneId,
-  min: z.min,
-  max: z.max,
-  center: [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2, (z.min[2] + z.max[2]) / 2] as const,
-  minExtent: Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1], z.max[2] - z.min[2]),
-}))
-const NOTE_ZONE = {
-  id: 'note' as ZoneId,
-  min: NOTE_CORNER_ZONE.min,
-  max: NOTE_CORNER_ZONE.max,
-  center: [
-    (NOTE_CORNER_ZONE.min[0] + NOTE_CORNER_ZONE.max[0]) / 2,
-    (NOTE_CORNER_ZONE.min[1] + NOTE_CORNER_ZONE.max[1]) / 2,
-    (NOTE_CORNER_ZONE.min[2] + NOTE_CORNER_ZONE.max[2]) / 2,
-  ] as const,
-  minExtent: Math.min(
-    NOTE_CORNER_ZONE.max[0] - NOTE_CORNER_ZONE.min[0],
-    NOTE_CORNER_ZONE.max[1] - NOTE_CORNER_ZONE.min[1],
-    NOTE_CORNER_ZONE.max[2] - NOTE_CORNER_ZONE.min[2]
+/** id → (kind, index) for the station dispatch — geometry lives with the resolver. */
+const STATION_LOOKUP = new Map<ZoneId, { kind: StationKind; index: number }>(
+  STATION_CLAIMS.map((c) => [`station-${c.kind}-${c.index}` as ZoneId, { kind: c.kind, index: c.index }])
+)
+/** The rocker dispatch's tip-direction reference points: box centres for the chunky T89 props,
+ *  the cup's own axis for the pen cup (whichever pen or wall was tapped, the cup answers about
+ *  its axis — its claims are a cylinder and five capsules now, not one box with a centre). */
+const ROCKER_CENTERS = new Map<ZoneId, readonly [number, number, number]>([
+  ...DESK_NUDGE_ZONES.filter((z) => z.kind !== 'pencup').map(
+    (z) =>
+      [
+        z.kind as ZoneId,
+        [
+          (z.min[0] + z.max[0]) / 2,
+          (z.min[1] + z.max[1]) / 2,
+          (z.min[2] + z.max[2]) / 2,
+        ] as const,
+      ] as const
   ),
-}
-const ALL_ZONES = [...ZONES, NOTE_ZONE]
+  [
+    'pencup' as ZoneId,
+    [PENCUP_BODY.centre[0], (PENCUP_BODY.yMin + PENCUP_BODY.yMax) / 2, PENCUP_BODY.centre[1]] as const,
+  ] as const,
+])
 
 export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
   const reduced = usePrefersReducedMotion()
@@ -113,10 +146,19 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
     bird: restingSpring(),
     penguin: restingSpring(),
   })
+  /** The ending's globe (T97 S1): the same rocker machine, the heaviest voice — see globe-nudge. */
+  const globeSpring = useRef<NudgeSpring>(restingSpring())
   const squash = useRef<SquashSpring>(restingSquash())
   const rattle = useRef<RattleState>(restingRattle())
   const peck = useRef<PeckState>(restingPeck())
   const press = useRef<NotePressState>(restingPress())
+  /** The sculpting station's five voices (T97 S2/S3): two bar slots, two chip slots, the tree's
+   *  sway, the knife's teeter, the case's pop — all closed forms in desk-station.ts. */
+  const scoots = useRef<ScootState>(restingScoot())
+  const chips = useRef<ChipPressState>(restingChipPress())
+  const treeSway = useRef<NudgeSpring>(restingTreeSway())
+  const teeter = useRef<TeeterState>(restingTeeter())
+  const casePop = useRef<CasePopState>(restingCasePop())
   /** The module's own clock: advances only while armed, so a response is a pure function of the
    *  input sequence and never of how long the journey took (the law's determinism clause). */
   const clock = useRef(0)
@@ -185,6 +227,8 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
           rocks.current[k] = restingSpring()
         }
         for (const k of Object.keys(NUDGE_UNIFORMS) as DeskNudgeKind[]) NUDGE_UNIFORMS[k].value.fill(0)
+        globeSpring.current = restingSpring()
+        GLOBE_UNIFORM.value.fill(0)
         squash.current = restingSquash()
         rattle.current = restingRattle()
         peck.current = restingPeck()
@@ -192,6 +236,14 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         RATTLE_UNIFORM.value.fill(0)
         BEND_UNIFORM.value.fill(0)
         NOTE_CURL_UNIFORM.value = 1
+        // ...and the station: all five voices to their resting constructors, all seven uniforms
+        // to exact zero, in this same frame — the T89 disarm clause.
+        scoots.current = restingScoot()
+        chips.current = restingChipPress()
+        treeSway.current = restingTreeSway()
+        teeter.current = restingTeeter()
+        casePop.current = restingCasePop()
+        for (const u of Object.values(STATION_UNIFORMS)) u.value.fill(0)
         clock.current = 0
         hovered.current = null
         tap.current = null
@@ -207,30 +259,59 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
     const cam = state.camera
     const heightPx = state.size.height
 
-    /** The nearest zone under an NDC position, boxes inflated to the 44 px floor. */
+    /** One resolver owns every claim (desk-station's `resolveDeskPick` — T89 boxes, note,
+     *  station primitives, pens, cup cylinder, globe, lane precedence, surface-beats-pad).
+     *  This wrapper only builds the ray from the camera and narrows the id. */
     const pick = (x: number, y: number): Hit | null => {
       ndc.current.set(x, y)
       raycaster.current.setFromCamera(ndc.current, cam)
       const o = raycaster.current.ray.origin
       const d = raycaster.current.ray.direction
-      let best: Hit | null = null
-      for (const z of ALL_ZONES) {
-        const dist = Math.hypot(z.center[0] - o.x, z.center[1] - o.y, z.center[2] - o.z)
-        const pad = hitPadFor(z.minExtent, dist, (cam as THREE.PerspectiveCamera).fov, heightPx)
-        const min: [number, number, number] = [z.min[0] - pad, z.min[1] - pad, z.min[2] - pad]
-        const max: [number, number, number] = [z.max[0] + pad, z.max[1] + pad, z.max[2] + pad]
-        const t = rayBoxHit(o.x, o.y, o.z, d.x, d.y, d.z, min, max)
-        if (t !== null && (best === null || t < best.t)) {
-          best = { id: z.id, t, point: [o.x + d.x * t, o.y + d.y * t, o.z + d.z * t] }
-        }
-      }
-      return best
+      const best = resolveDeskPick(
+        o.x, o.y, o.z, d.x, d.y, d.z,
+        (cam as THREE.PerspectiveCamera).fov, heightPx
+      )
+      return best === null ? null : { id: best.id as ZoneId, t: best.t, point: best.point }
     }
 
     /** Each object answers in its own voice — the dispatch IS the signature list. */
     const fwd: [number, number] = [0, 0]
     const dirTmp = raycaster.current.ray.direction
     const fire = (hit: Hit, strength: number) => {
+      const station = STATION_LOOKUP.get(hit.id)
+      if (station) {
+        // The station's five voices (T97 S2/S3) — one distinct mechanism per sibling.
+        switch (station.kind) {
+          case 'bar': {
+            // The LANE bar's CLICK is the deep tier's (the roll); its hover still scoots — the
+            // shiver that advertises the set piece. Every other bar answers both.
+            if (station.index === LANE_BAR_INDEX && strength >= 1) return
+            const sign = scootSignFrom(hit.point, STATION_BARS[station.index].centre)
+            triggerScoot(scoots.current, now, station.index, sign, strength)
+            return
+          }
+          case 'chip':
+            triggerChipPress(chips.current, now, station.index, strength)
+            return
+          case 'tree': {
+            fwd[0] = dirTmp.x
+            fwd[1] = dirTmp.z
+            const [dx, dz] = tipDirFrom(
+              hit.point,
+              [STATION_TREE.base[0], 0, STATION_TREE.base[1]],
+              fwd
+            )
+            triggerTreeSway(treeSway.current, now, dx, dz, strength)
+            return
+          }
+          case 'knife':
+            triggerTeeter(teeter.current, now, teeterSignFrom(hit.point), strength)
+            return
+          case 'case':
+            triggerCasePop(casePop.current, now, strength)
+            return
+        }
+      }
       switch (hit.id) {
         case 'note':
           triggerPress(press.current, now, strength >= 1 ? PRESS_CLICK : PRESS_HOVER)
@@ -244,12 +325,23 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
           triggerPeck(peck.current, now, strength)
           triggerRock(rocks.current.bird, ROCK_PARAMS.bird!, now, 0, 1, strength)
           return
-        default: {
-          const zone = ZONES.find((z) => z.id === hit.id)
-          if (!zone) return
+        case 'globe': {
+          // the ending's centrepiece, nudged in its cradle (T97 S1) — the rocker convention
+          // exactly, about the world's own centre, through the globe's hard-capped trigger
+          // (the T90 shading ceiling — see globe-nudge.ts). Its own case: the default arm
+          // indexes ROCK_PARAMS/NUDGE_UNIFORMS by kind, and 'globe' is not a desk kind.
           fwd[0] = dirTmp.x
           fwd[1] = dirTmp.z
-          const [dx, dz] = tipDirFrom(hit.point, zone.center as unknown as [number, number, number], fwd)
+          const [dx, dz] = tipDirFrom(hit.point, [0, 0, 0], fwd)
+          triggerGlobeRock(globeSpring.current, now, dx, dz, strength)
+          return
+        }
+        default: {
+          const center = ROCKER_CENTERS.get(hit.id)
+          if (!center) return
+          fwd[0] = dirTmp.x
+          fwd[1] = dirTmp.z
+          const [dx, dz] = tipDirFrom(hit.point, center, fwd)
           const kind = hit.id as 'mug' | 'pencup' | 'penguin'
           triggerRock(rocks.current[kind], ROCK_PARAMS[kind]!, now, dx, dz, strength)
           if (kind === 'pencup') triggerRattle(rattle.current, now, strength)
@@ -302,7 +394,14 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         const deepClaimed =
           hit.id === 'mug' &&
           coffeeRayHit(o.x, o.y, o.z, d.x, d.y, d.z, (cam as THREE.PerspectiveCamera).fov, heightPx) !== null
-        if (!deepClaimed) fire(hit, 1)
+        // ...and the lane's twin rule (T97 S2/S3): a click whose ray crosses the lane's claim
+        // belongs to the deep tier's roll even when the nearest STATION zone is a neighbouring
+        // bar (the red bar's box overlaps the lane's) — suppress the scoot, let the roll answer.
+        // Both tiers ask the same `laneRayHit`, so they cannot disagree about whose click it was.
+        const laneClaimed =
+          STATION_LOOKUP.get(hit.id)?.kind === 'bar' &&
+          laneRayHit(o.x, o.y, o.z, d.x, d.y, d.z, (cam as THREE.PerspectiveCamera).fov, heightPx) !== null
+        if (!deepClaimed && !laneClaimed) fire(hit, 1)
       }
     }
 
@@ -317,11 +416,18 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
     for (const k of ['mug', 'pencup', 'bird', 'penguin'] as const) {
       sampleRock(rocks.current[k], ROCK_PARAMS[k]!, now, NUDGE_UNIFORMS[k].value)
     }
+    sampleRock(globeSpring.current, GLOBE_ROCK, now, GLOBE_UNIFORM.value)
     NUDGE_UNIFORMS.donut.value[3] = sampleSquash(squash.current, now)
     RATTLE_UNIFORM.value[0] = sampleRattle(rattle.current, now)
     RATTLE_UNIFORM.value[1] = now
     BEND_UNIFORM.value[0] = samplePeck(peck.current, now)
     NOTE_CURL_UNIFORM.value = samplePress(press.current, now)
+    // ...and the station's seven uniforms, each sampler snapping its own exact +0 at rest.
+    sampleScoot(scoots.current, now, STATION_UNIFORMS.uStBar0.value, STATION_UNIFORMS.uStBar1.value)
+    sampleChipPress(chips.current, now, STATION_UNIFORMS.uStChip0.value, STATION_UNIFORMS.uStChip1.value)
+    sampleTreeSway(treeSway.current, now, STATION_UNIFORMS.uStTree.value)
+    sampleTeeter(teeter.current, now, STATION_UNIFORMS.uStKnife.value)
+    sampleCasePop(casePop.current, now, STATION_UNIFORMS.uStCase.value)
   })
 
   return null

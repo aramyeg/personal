@@ -727,6 +727,62 @@ export const BIRD_VERTEX_BODY = `if ( uBird.x != 0.0 && gl_VertexID >= ${LANE.ra
   transformed = vec3( ${f(LANE.hidePoint[0])}, ${f(LANE.hidePoint[1])}, ${f(LANE.hidePoint[2])} );
 }`
 
+// --- the bird's shadow-floor lift (T97 P6) -----------------------------------
+
+/**
+ * THE ROLL'S COLOUR DISCONTINUITY, and the lift that closes it. The blind review saw the chip go
+ * pale → near-black/navy → mid-blue across the roll, and the diagnosis (measured on the shipped
+ * bytes) is not a broken transfer — the per-vertex bake is bit-equal to the lane's — but a steep
+ * vertical gradient IN that bake: top band lum 0.543, bottom band lum 0.104 with true black at
+ * y≈1.31. At rest only the pale top band faces the camera; the coil rotates the baked UNDERSIDE
+ * into view — the concave-bake near-black, the same failure class as the watering can's rose one
+ * round earlier. Same mesh, honest bytes, wrong read.
+ *
+ * The fix is a DISPLACEMENT-weighted lift: while skinning + the morph have moved a vertex off its
+ * rest pose, its near-black baked colour is pulled toward the lane family's own mid-blue; the
+ * weight is computed AFTER `skinning_vertex`, off `transformed - position`, so at the rest pose —
+ * where the skinning residual is 3e-8, five orders of magnitude under `dispLo` — the smoothstep
+ * returns a true +0 and the frame-1 swap seam with the baked lane stays bit-identical
+ * STRUCTURALLY (that seam is gated by rest pixel-diff; it is the load-bearing property). The
+ * luminance band scopes the lift to the underside's darks and fades it out by the family's mid
+ * tones, so the approved hold-beat modelling — light belly, darker back — keeps its shape.
+ *
+ * Runtime-only, deliberately: a floor-lift of the spliced bytes would be a GLB change — forbidden
+ * this round — and would also brighten the RESTING lane through the transfer identity, trading
+ * one seam for another.
+ */
+export const BIRD_LIFT = {
+  /** Displacement (world units, in the rig's local frame) below which the lift is EXACTLY 0. The
+   *  rest-pose skinning residual is 3e-8 (measured, the splice validator's number) — five orders
+   *  of magnitude under this edge, so smoothstep returns a true +0 and the swap seam stays
+   *  bit-identical structurally. */
+  dispLo: 0.02,
+  /** ...and the displacement at which the lift reaches full weight — inside the first quarter of
+   *  the roll's curl (the coil's underside is showing well before any vertex has moved 0.25). */
+  dispHi: 0.25,
+  /** The luminance band the lift acts on: full at the baked underside's 0.104, fading to nothing
+   *  by the family's mid tones, so the approved hold-beat modelling (light belly, darker back)
+   *  keeps its shape. */
+  lumLo: 0.12,
+  lumHi: 0.42,
+  /** Where lifted verts head: the lane family's own mid-blue (between the measured top band
+   *  0.42,0.57,0.67 and the mid tones the formed bird shows). */
+  target: [0.3, 0.44, 0.57],
+  /** How far a fully dark, fully displaced vertex travels toward the target. */
+  k: 0.85,
+} as const
+
+export const BIRD_LIFT_VERTEX_DECL = 'varying float vBirdLift;'
+export const BIRD_LIFT_VERTEX_BODY = `float blD = length( transformed - position );
+vBirdLift = smoothstep( ${f(BIRD_LIFT.dispLo)}, ${f(BIRD_LIFT.dispHi)}, blD );`
+
+export const BIRD_LIFT_FRAGMENT_DECL = 'varying float vBirdLift;'
+export const BIRD_LIFT_FRAGMENT_BODY = `if ( vBirdLift != 0.0 ) {
+  float blL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+  float blS = 1.0 - smoothstep( ${f(BIRD_LIFT.lumLo)}, ${f(BIRD_LIFT.lumHi)}, blL );
+  diffuseColor.rgb = mix( diffuseColor.rgb, vec3( ${f(BIRD_LIFT.target[0])}, ${f(BIRD_LIFT.target[1])}, ${f(BIRD_LIFT.target[2])} ), vBirdLift * blS * ${f(BIRD_LIFT.k)} );
+}`
+
 /**
  * The vertex half: the vortex dip, a paraboloid-squared of rest radius — C1 at the rim, so the
  * liquid meets the mug's inner wall with no crease and NO tear (the rim ring moves exactly zero).

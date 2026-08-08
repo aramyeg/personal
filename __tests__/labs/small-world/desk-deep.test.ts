@@ -7,6 +7,9 @@ import {
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import {
   BIRD,
+  BIRD_LIFT,
+  BIRD_LIFT_FRAGMENT_BODY,
+  BIRD_LIFT_VERTEX_BODY,
   BIRD_TOTAL,
   BOOK,
   BOOK_HINGE,
@@ -622,5 +625,64 @@ describe("the bird's perch hold (T97 P5)", () => {
     triggerBird(s, 20)
     expect(s.active).toBe(true)
     expect(sampleBird(s, 20.5)).toBeCloseTo(0.5, 9)
+  })
+})
+
+describe("the bird's shadow-floor lift (T97 P6)", () => {
+  // GLSL's clamped hermite, verbatim — the JS twin of what the chunk evaluates on the GPU.
+  const smoothstep = (lo: number, hi: number, x: number): number => {
+    const t = Math.min(Math.max((x - lo) / (hi - lo), 0), 1)
+    return t * t * (3 - 2 * t)
+  }
+  const f = (v: number): string => v.toFixed(5)
+
+  it('the rest exemption is STRUCTURAL: the 3e-8 skinning residual maps to a true zero', () => {
+    // the splice validator's measured rest residual, five orders of magnitude under the edge
+    const restResidual = 3e-8
+    expect(smoothstep(BIRD_LIFT.dispLo, BIRD_LIFT.dispHi, restResidual)).toBe(0)
+    expect(Object.is(smoothstep(BIRD_LIFT.dispLo, BIRD_LIFT.dispHi, restResidual), 0)).toBe(true)
+    expect(BIRD_LIFT.dispLo).toBeGreaterThanOrEqual(1e4 * restResidual)
+  })
+
+  it('keeps the guard and computes the weight off the displacement, not the pose', () => {
+    expect(BIRD_LIFT_FRAGMENT_BODY).toContain('vBirdLift != 0.0')
+    expect(BIRD_LIFT_VERTEX_BODY).toContain('transformed - position')
+    // the vertex body's literals are the published constants, formatted by the module's own f()
+    expect(BIRD_LIFT_VERTEX_BODY).toContain(`smoothstep( ${f(BIRD_LIFT.dispLo)}, ${f(BIRD_LIFT.dispHi)}`)
+  })
+
+  it("the luminance band spares the family's top and fully lifts the concave-bake underside", () => {
+    const lum = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b
+    const lift = (r: number, g: number, b: number): number =>
+      1 - smoothstep(BIRD_LIFT.lumLo, BIRD_LIFT.lumHi, lum(r, g, b))
+    // the measured top band — the pale clay the chip shows at rest — sits above the band entirely
+    const top = lum(0.42, 0.57, 0.67)
+    expect(top).toBeGreaterThan(BIRD_LIFT.lumHi)
+    expect(lift(0.42, 0.57, 0.67)).toBe(0)
+    // ...and the measured underside — the near-black the roll rotates into view — takes full lift
+    const under = lum(0.05, 0.11, 0.2)
+    expect(under).toBeLessThan(BIRD_LIFT.lumLo)
+    expect(lift(0.05, 0.11, 0.2)).toBe(1)
+  })
+
+  it('is wired into birdMaterial and only there, after <skinning_vertex>', () => {
+    const src = readFileSync(
+      path.join(process.cwd(), 'components', 'labs', 'small-world', 'scene', 'props', 'desk-glb.tsx'),
+      'utf8'
+    )
+    const start = src.indexOf('export function birdMaterial')
+    expect(start).toBeGreaterThanOrEqual(0)
+    const end = src.indexOf('export function', start + 1)
+    const body = src.slice(start, end === -1 ? undefined : end)
+    expect(body).toContain('BIRD_LIFT_VERTEX_DECL')
+    expect(body).toContain('BIRD_LIFT_VERTEX_BODY')
+    expect(body).toContain('BIRD_LIFT_FRAGMENT_DECL')
+    expect(body).toContain('BIRD_LIFT_FRAGMENT_BODY')
+    // injected at the one point where `transformed` is skinned+morphed and `position` is rest
+    expect(body).toContain("'#include <skinning_vertex>\\n' + BIRD_LIFT_VERTEX_BODY")
+    // ...and no other material picks the lift up
+    const rest = src.slice(0, start) + (end === -1 ? '' : src.slice(end))
+    const wiring = rest.replace(/^import[\s\S]*?from '\.\/desk-deep'/m, '')
+    expect(wiring).not.toContain('BIRD_LIFT')
   })
 })
