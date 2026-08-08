@@ -166,7 +166,7 @@ export function PlanetLoader({ ready, progress }: { ready: boolean; progress: nu
     >
       <div className={styles.plate}>
         <div className={styles.title}>{'SMALL WORLD'}</div>
-        <div className={styles.sub}>{'Alwina’s journey, chapter by chapter'}</div>
+        <div className={styles.sub}>{'Alwi’s journey, chapter by chapter'}</div>
         <div className={styles.world}>
           <div className={`${styles.art} ${styles.sketch}`}>
             <WorldArt clipSuffix="sketch" />

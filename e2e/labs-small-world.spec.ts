@@ -364,7 +364,9 @@ test.describe('Small World lab', () => {
     await expect(leaf).toBeVisible({ timeout: 10_000 })
     await awaitStable(leaf)
 
-    for (const text of [ALWINA.name, ALWINA.says]) {
+    // `display`, not `name`: the sheet inside the world calls her Alwi (Task 103).
+    // The legal name is still gated — on the plain CV and on the tab title.
+    for (const text of [ALWINA.display, ALWINA.says]) {
       const node = leaf.getByText(text, { exact: true }).first()
       await expect(node, `"${text}" is on the page`).toBeVisible({ timeout: 10_000 })
       // TOPMOST AT ITS OWN CENTRE, AND THE TOPMOST THING BELONGS TO THIS LEAF.

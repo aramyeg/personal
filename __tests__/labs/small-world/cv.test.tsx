@@ -115,6 +115,24 @@ describe('one owner of her credits', () => {
 })
 
 describe('the plain CV page', () => {
+  /**
+   * TASK 103 — THE NICKNAME STOPS AT THE CV'S DOOR.
+   *
+   * Aram asked for "Alwina" to read "Alwi" wherever the lab shows it. The plain CV
+   * is the one surface that does not follow, and this is the gate that says so out
+   * loud rather than leaving it to whoever edits `alwina-cv.ts` next: a document a
+   * recruiter prints, saves or searches for has to carry the legal name. (The
+   * route's `<title>` is the other exception, gated in `ending-connect.test.tsx`.)
+   */
+  it('carries her LEGAL name, not the name the world calls her', () => {
+    render(<CvDocument />)
+    const text = docText()
+    expect(ALWINA.name).toBe('Alwina Harutyunyan')
+    expect(ALWINA.display).not.toBe(ALWINA.name)
+    expect(text).toContain(ALWINA.name)
+    expect(text).not.toContain(ALWINA.display)
+  })
+
   it('prints the approved sheet block, in full and in order', () => {
     render(<CvDocument />)
     const text = docText()

@@ -43,6 +43,7 @@ import {
   MAX_NOTE_WORDS,
 } from '@/components/labs/small-world/overlay/info-beats'
 import { PALETTE } from '@/components/labs/small-world/palette'
+import { ALWINA } from '@/components/labs/small-world/alwina-cv'
 
 afterEach(cleanup)
 
@@ -319,12 +320,20 @@ describe('the sheet carries the words, and they survive being on it', () => {
   it('says whose CV it is on the FIRST sheet, and only there', () => {
     // The title card's job, moved somewhere a reader is already looking. A name
     // reprinted on all six sheets would be a watermark, so the gate is both halves.
+    //
+    // TASK 103: the sheet prints `display` ("Alwi Harutyunyan"), not the legal name
+    // — inside the world she is Alwi, and the legal name is kept for the plain CV
+    // and the tab title alone. Both halves are asserted against the token so the
+    // negative half cannot rot into a substring match.
     render(<InfoPage chapter={0} page={1} />)
-    expect(screen.getByTestId('sw-cloth-line').textContent).toContain('Alwina')
+    expect(screen.getByTestId('sw-cloth-line').textContent).toContain(ALWINA.display)
+    expect(screen.getByTestId('sw-cloth-line').textContent).not.toContain(ALWINA.name)
     cleanup()
     for (const i of chapters.slice(1)) {
       render(<InfoPage chapter={i} page={1} />)
-      expect(screen.getByTestId('sw-cloth-line').textContent, `chapter ${i + 1}`).not.toContain('Alwina')
+      expect(screen.getByTestId('sw-cloth-line').textContent, `chapter ${i + 1}`).not.toContain(
+        ALWINA.short
+      )
       cleanup()
     }
   })

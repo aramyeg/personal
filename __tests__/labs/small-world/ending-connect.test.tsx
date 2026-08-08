@@ -70,9 +70,11 @@ describe('the connect block', () => {
   })
 
   it('names HER in the row’s own label', () => {
+    // TASK 103: the label addresses her, so it uses the name the world calls her
+    // ("Alwi") rather than the legal one the plain CV and the tab keep.
     render(<EndingConnect t={1} onRestart={() => {}} />)
     const nav = screen.getByRole('navigation')
-    expect(nav.getAttribute('aria-label')).toMatch(/alwina/i)
+    expect(nav.getAttribute('aria-label')).toBe(`Connect with ${ALWINA.short}`)
     expect(nav.getAttribute('aria-label')).not.toMatch(/aram/i)
   })
 

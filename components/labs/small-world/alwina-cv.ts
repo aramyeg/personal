@@ -113,9 +113,31 @@ export const DEGREE: Credit = CREDITS.filter((c) => c.kind === 'education')[0]
  * `says` is the approved voice-C identity line — the one that gets quoted. It is
  * first person with the subject elided, which is how a CV line is normally
  * written and is what the no-third-person gate is written against.
+ *
+ * TWO NAMES, AND THE SPLIT IS DELIBERATE (Task 103).
+ *
+ * Aram asked for "Alwina" to read "Alwi" wherever the lab shows it — it is what
+ * she is called, and the experience should call her that. Two surfaces do not
+ * follow, and the exception was flagged to him rather than assumed:
+ *
+ *   `name`    — the LEGAL name, and it is used in exactly two places: the plain
+ *               CV document (`overlay/cv-document.tsx`, the thing a recruiter
+ *               prints or saves) and the route's `<title>`/OpenGraph, which is
+ *               the string that travels when the URL is pasted anywhere. A CV
+ *               and a link preview that name someone by a nickname are worse
+ *               than formal — they are unsearchable.
+ *   `display` — what the experience calls her: the chapter-1 sheet's identity
+ *               line, and anything else inside the world.
+ *   `short`   — the first name alone, for labels that address her.
+ *
+ * The surname is untouched everywhere it appears. Adding a field rather than
+ * flipping `name` is what keeps the exception legible: a future edit that wants
+ * the friendly name has to say so.
  */
 export const ALWINA = {
   name: 'Alwina Harutyunyan',
+  display: 'Alwi Harutyunyan',
+  short: 'Alwi',
   says: 'Frontend engineer with opinions about spacing.',
   contact: 'linkedin.com/in/alwina-harutyunyan',
 } as const

@@ -156,7 +156,10 @@ export type InfoPageSpec = {
      * ONE CHAPTER CARRIES IT. A name reprinted on all six sheets is a watermark.
      */
     intro?: {
+      /** Her LEGAL name. NOT what this sheet prints — see `display`, and `alwina-cv.ts`. */
       name: string
+      /** What the world calls her, and what the sheet prints: "Alwi Harutyunyan" (Task 103). */
+      display: string
       /** The identity line — the one that gets quoted. */
       says: string
       /**

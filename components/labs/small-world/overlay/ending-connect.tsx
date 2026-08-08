@@ -258,7 +258,7 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
     >
       <nav
         ref={navRef}
-        aria-label={`Connect with ${ALWINA.name.split(' ')[0]}`}
+        aria-label={`Connect with ${ALWINA.short}`}
         style={{
           display: 'flex',
           gap: 10,

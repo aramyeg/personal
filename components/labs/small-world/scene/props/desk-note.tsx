@@ -161,7 +161,7 @@ function paint(ctx: CanvasRenderingContext2D, family: string) {
   ctx.rotate(-0.06)
   ctx.font = `700 92px ${family}`
   ctx.textAlign = 'right'
-  ctx.fillText('Alwina', 0, 476)
+  ctx.fillText('Alwi', 0, 476)
   ctx.restore()
 
   ctx.save()

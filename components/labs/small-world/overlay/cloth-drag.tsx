@@ -323,7 +323,9 @@ export function ClothDrag({
           // and every row here is a row off chapter 1's SELF-TAUGHT — so this
           // takes the smallest register on the page rather than a heading's.
           { key: 'premise', text: SMALL_WORLD_PREMISE, kind: 'premise' as const },
-          { key: 'name', text: intro.name, kind: 'name' as const },
+          // `display`, not `name`: inside the world she is Alwi. The legal name is
+          // the plain CV's and the tab's — see `alwina-cv.ts`.
+          { key: 'name', text: intro.display, kind: 'name' as const },
           { key: 'says', text: intro.says, kind: 'says' as const },
         ]
       : []),
