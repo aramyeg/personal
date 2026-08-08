@@ -262,8 +262,9 @@ export const BOOK = {
  */
 export const BOOK_HINGE = {
   /** Mid-thickness point on the spine line, derived in Blender off Book2's own mesh
-   *  (t92_book_build.py, T92_BOOK_AXIS) — the first provisional pivot sat 7 mm off the line. */
-  p0: [-3.366668, 1.649, 8.887815],
+   *  (t92_book_build.py, T92_BOOK_AXIS) — the first provisional pivot sat 7 mm off the line.
+   *  y re-derived at +0.036 with the T102 re-seat below: the slab now runs 1.6770..1.6930. */
+  p0: [-3.366668, 1.685, 8.887815],
   /** Points spine-long, SIGNED so that +θ about it lifts the front edge (right-hand rule; the
    *  first capture round shipped the mirror and the cover dove through the stack). */
   dir: [-0.995003, 0, -0.099841],
@@ -272,15 +273,27 @@ export const BOOK_HINGE = {
    *  way cardstock does instead of shearing (the slab's 48 attachment triangles live at u < 0.1). */
   rampLo: 0.02,
   rampHi: 0.15,
-  /** The shader box: the cover slab and ONLY it. Floor 1.63995 sits between the spliced interior
-   *  (PageR 1.6398, gutter 1.6399 — static) and the slab's own bottom face (1.6410). */
-  box: { min: [-3.99, 1.63995, 8.8, 0], max: [-2.81, 1.68, 9.69, 0] },
+  /** The shader box: the cover slab and ONLY it. Floor 1.67595 sits between the spliced interior
+   *  (PageR 1.6758, gutter 1.6759 — static) and the slab's own bottom face (1.6770); the roof
+   *  1.716 clears the slab's top at 1.6930. It holds exactly the same 260 slab vertices it always
+   *  did — gated.
+   *
+   *  EVERY NUMBER HERE ROSE 0.036 IN T102, AND THE GLB IS WHERE IT CAME FROM. The notebooks were
+   *  seated on the desk SLAB plane (1.2670) while straddling the pink pad, whose top measures
+   *  1.3030 — the exact seat the mug, the donut and the pen cup all sit on — so 204 vertices sank
+   *  through the pad, worst penetration 0.0360. The fix re-seats the whole book assembly onto the
+   *  pad's own top plane: the three DeskBaked book runs and `BookVerso` translated +0.0360 as one
+   *  body, spliced into `desk.glb`. The literals and those bytes MUST ship together — against the
+   *  risen bytes the old floor cut through the spliced interior instead of under the slab, tearing
+   *  the cover and dragging the static page open with it. */
+  box: { min: [-3.99, 1.67595, 8.8, 0], max: [-2.81, 1.716, 9.69, 0] },
 } as const
 
-/** The whole notebook is the click target — its measured footprint, grown a little. */
+/** The whole notebook is the click target — its measured footprint, grown a little (y +0.036 with
+ *  the T102 re-seat onto the pad, like every other book number here). */
 export const BOOK_ZONE = {
-  min: [-3.99, 1.54, 8.75],
-  max: [-2.81, 1.68, 9.69],
+  min: [-3.99, 1.576, 8.75],
+  max: [-2.81, 1.716, 9.69],
 } as const
 
 export type BookState = { t0: number; active: boolean }

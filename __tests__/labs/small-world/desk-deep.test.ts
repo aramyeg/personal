@@ -250,8 +250,10 @@ describe("the notebook's hinge, held to the shipped desk", () => {
 
   it('selects the cover slab, the whole cover slab, and nothing but the cover slab', () => {
     // Three layers meet under the hinge floor and the box must cut BETWEEN them: the slab's own
-    // bottom face at 1.6410 (moves), the spliced interior at 1.6398..1.6399 (static, Task 92's
-    // page + gutter), the pages block at 1.6390 and below (static). The floor 1.63995 is the cut.
+    // bottom face at 1.6770 (moves), the spliced interior at 1.6758..1.6759 (static, Task 92's
+    // page + gutter), the pages block at 1.6750 and below (static). The floor 1.67595 is the cut.
+    // All four rose 0.036 in T102 when the books were re-seated off the slab plane onto the pink
+    // pad's own top (1.3030) — the levels are re-derived from the shipped bytes, not shifted here.
     let slab = 0
     let boxed = 0
     let disagree = 0
@@ -268,7 +270,7 @@ describe("the notebook's hinge, held to the shipped desk", () => {
       if (b) boxed++
       if (isSlab !== b) disagree++
       // the revealed page + gutter: strictly between the pages block and the hinge floor
-      if (inBook && y > 1.6392 && y < hb.min[1]) interior++
+      if (inBook && y > 1.6752 && y < hb.min[1]) interior++
     }
     expect(slab).toBeGreaterThanOrEqual(250)
     expect(disagree, 'vertices the hinge box tears off the slab (or steals from the shell)').toBe(0)
