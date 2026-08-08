@@ -38,8 +38,10 @@ export const STIR = {
    *  at full click triples it, and the paraboloid is zero AT the rim so the join to the mug's
    *  inner wall never opens. */
   dipMax: 0.032,
-  /** The cream band's strength at ω0 — an additive highlight, so it fades with ω by construction. */
-  cream: 0.3,
+  /** The cream band's strength at ω0 — an additive highlight, so it fades with ω by construction.
+   *  0.5 because the money-shot camera sees the disc at a 25° grazing angle: the first capture
+   *  round proved 0.3 with thin arms vanishes entirely into the foreshortening. */
+  cream: 0.5,
   /** No pile-up: re-stirs top ω out at this multiple of ω0 (the micro tier's AMP_CAP stance). */
   cap: 1.75,
   /** The stir hands the MUG a low-strength micro rock — the cup answers the spoon. */
@@ -204,8 +206,10 @@ export const STIR_FRAGMENT_BODY = `if ( uStir.z != 0.0 &&
   float sfR = length( sfD ) * ${f(1 / COFFEE_ZONE.radius)};
   if ( sfR < 1.0 ) {
     float sfPhi = atan( sfD.y, sfD.x );
-    float sfArm = pow( 0.5 + 0.5 * sin( 2.0 * sfPhi - uStir.y * ( 1.35 - 0.85 * sfR ) ), 6.0 );
-    float sfMask = smoothstep( 1.0, 0.82, sfR ) * smoothstep( 0.04, 0.22, sfR );
+    // wide arms (pow 3.5), because the camera squashes the disc to 0.42 of its height — the
+    // capture round showed pow-6 arms thinner than the pixels left to draw them in
+    float sfArm = pow( 0.5 + 0.5 * sin( 2.0 * sfPhi - uStir.y * ( 1.35 - 0.85 * sfR ) ), 3.5 );
+    float sfMask = smoothstep( 1.0, 0.88, sfR ) * smoothstep( 0.03, 0.15, sfR );
     outgoingLight += vec3( 0.62, 0.51, 0.38 ) * ( uStir.z * sfArm * sfMask );
   }
 }`
