@@ -33,18 +33,24 @@ const f = (v: number): string => v.toFixed(5)
  * material the disc already ships in.
  */
 export const STIR = {
-  /** rad/s the liquid picks up from one full click — 9.4 rad ≈ 1.5 turns over the whole settle. */
+  /** rad/s the liquid picks up from one full click — ≈1.7 turns over the whole settle. */
   omega0: 15.0,
-  /** 1/s. Dip (∝ ω²) is under 2% by 1.4 s — the T91 arc — while the cream lingers a beat longer. */
-  lambda: 1.6,
+  /** 1/s. Dip (∝ ω²) is under 2% by 1.4 s — the T91 arc — while the cream lingers a beat longer.
+   *  1.4, down from 1.6 (T97 S5): the blind review never SAW the stir, and the cream — the only
+   *  half legible at the money shot's 25° grazing angle — died with ω in under a second. The dip
+   *  still meets the 1.4 s arc exactly at the bound (e^(−2·1.4·1.4) = 0.0198); the spiral now
+   *  winds visibly for ~2.5 s instead of ~1.8. */
+  lambda: 1.4,
   /** The vortex's centre depth at ω0, world units. The disc's own bowl is 0.0165 deep; the stir
    *  at full click triples it, and the paraboloid is zero AT the rim so the join to the mug's
    *  inner wall never opens. */
   dipMax: 0.032,
   /** The cream band's strength at ω0 — an additive highlight, so it fades with ω by construction.
    *  0.5 because the money-shot camera sees the disc at a 25° grazing angle: the first capture
-   *  round proved 0.3 with thin arms vanishes entirely into the foreshortening. */
-  cream: 0.5,
+   *  round proved 0.3 with thin arms vanishes entirely into the foreshortening. 0.75 after the
+   *  blind review still catalogued the stir unseen (T97 S5) — the same foreshortening argument,
+   *  measured a second time on the composed frame with the steam crossing the disc. */
+  cream: 0.75,
   /** No pile-up: re-stirs top ω out at this multiple of ω0 (the micro tier's AMP_CAP stance). */
   cap: 1.75,
   /** The stir hands the MUG a low-strength micro rock — the cup answers the spoon. */
@@ -69,19 +75,28 @@ export const COFFEE_ZONE = {
   /** The vortex axis and rim, straight from the anchor. */
   center: [-2.595, 11.3],
   radius: 0.2995,
+  /** The liquid's own top, unpadded (the disc AABB's y max — the min/max above carry ±0.05). The
+   *  RAY claim tests against this plane, not the box: see `coffeeRayHit`. */
+  surfaceY: 1.8945,
 } as const
 
 /**
  * PRECEDENCE with the micro tier (the one overlap in the whole deep set): the disc's zone sits
  * INSIDE the mug's micro box, so a tap on the liquid would otherwise fire a full-strength mug
  * rock over the stir. The rule — checked by both tiers against the same geometry, so they cannot
- * disagree — is that a tap whose ray crosses the liquid's slab belongs to the DEEP tier, which
- * answers with the stir plus a low-strength mug nudge of its own (`mugStirMail`). Hovers stay
- * micro: a brush over the rim is the mug's, and the cursor it raises promises a click the desk
- * answers either way.
+ * disagree — is that a tap whose ray crosses the liquid's own SURFACE belongs to the DEEP tier,
+ * which answers with the stir plus a low-strength mug nudge of its own (`mugStirMail`). Hovers
+ * stay micro: a brush over the rim is the mug's, and the cursor it raises promises a click the
+ * desk answers either way.
  *
- * The 44 px floor inflates x and z only: the slab is thin in y by nature, and growing it there
- * would swallow taps meant for the mug's body above the rim.
+ * THE CLAIM IS A DISC, NOT A BOX (T97 S5, measured). The first cut tested the padded slab AABB,
+ * and at the money shot's 25° grazing pitch that box's screen footprint has nothing to do with
+ * the visible liquid: simulated on the ending rig, clicks on the mug's front body and even its
+ * HANDLE crossed the slab band and were claimed (the deliberate full clink became unreachable —
+ * the review's "one-frame flicker"), while a ray at the visible liquid's centre crossed the band
+ * a few millimetres past the box's z edge and was NOT claimed. So the claim is now the disc the
+ * visitor actually sees: the ray's crossing of the liquid's top plane, inside the disc's own
+ * radius. The 44 px floor grows the radius, never the plane — the slab is thin in y by nature.
  */
 export function coffeeRayHit(
   ox: number,
@@ -94,23 +109,17 @@ export function coffeeRayHit(
   heightPx: number
 ): { t: number; point: [number, number, number] } | null {
   const z = COFFEE_ZONE
-  const cx = (z.min[0] + z.max[0]) / 2
-  const cy = (z.min[1] + z.max[1]) / 2
-  const cz = (z.min[2] + z.max[2]) / 2
-  const dist = Math.hypot(cx - ox, cy - oy, cz - oz)
-  const extent = Math.min(z.max[0] - z.min[0], z.max[2] - z.min[2])
-  const pad = hitPadFor(extent, dist, fovDeg, heightPx)
-  const t = rayBoxHit(
-    ox,
-    oy,
-    oz,
-    dx,
-    dy,
-    dz,
-    [z.min[0] - pad, z.min[1], z.min[2] - pad],
-    [z.max[0] + pad, z.max[1], z.max[2] + pad]
-  )
-  return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
+  if (Math.abs(dy) < 1e-9) return null
+  const t = (z.surfaceY - oy) / dy
+  if (t < 0) return null
+  const px = ox + dx * t
+  const pz = oz + dz * t
+  const dist = Math.hypot(z.center[0] - ox, z.surfaceY - oy, z.center[1] - oz)
+  // hitPadFor returns the HALF-shortfall of an extent; fed the diameter and added to the radius,
+  // it grows the diameter by exactly the shortfall — the same 44 px floor as every box zone.
+  const pad = hitPadFor(z.radius * 2, dist, fovDeg, heightPx)
+  if (Math.hypot(px - z.center[0], pz - z.center[1]) > z.radius + pad) return null
+  return { t, point: [px, z.surfaceY, pz] }
 }
 
 /** The book's claim, same shape as the coffee's: x/z inflated to the 44 px floor, y as authored.

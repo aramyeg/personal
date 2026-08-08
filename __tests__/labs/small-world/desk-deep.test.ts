@@ -141,8 +141,24 @@ describe("the coffee's zone, held to the shipped desk", () => {
   it('is claimed by a ray straight down its axis, and not by one down the donut', () => {
     const hit = coffeeRayHit(COFFEE_ZONE.center[0], 5, COFFEE_ZONE.center[1], 0, -1, 0, 40, 900)
     expect(hit).not.toBeNull()
-    expect(hit!.point[1]).toBeCloseTo(COFFEE_ZONE.max[1], 5)
+    // the claim lands on the liquid's own top plane — the disc, not the padded slab box (T97 S5)
+    expect(hit!.point[1]).toBeCloseTo(COFFEE_ZONE.surfaceY, 5)
     expect(coffeeRayHit(-1.78, 5, 11.36, 0, -1, 0, 40, 900)).toBeNull()
+  })
+
+  it('claims the VISIBLE disc and nothing else at the money shot (T97 S5)', () => {
+    // The disc's surface sits between the zone's authored y bounds...
+    expect(COFFEE_ZONE.surfaceY).toBeGreaterThan(COFFEE_ZONE.min[1])
+    expect(COFFEE_ZONE.surfaceY).toBeLessThan(COFFEE_ZONE.max[1])
+    // ...and a grazing ray that crosses the surface plane OUTSIDE the disc's radius — the mug's
+    // front body and handle, where the shipped box claimed the click — is refused, so the full
+    // clink is reachable again. Ray aimed at the rim's front, 0.05 past the radius:
+    const gx = COFFEE_ZONE.center[0]
+    const gz = COFFEE_ZONE.center[1] + COFFEE_ZONE.radius + 0.05
+    const miss = coffeeRayHit(gx, COFFEE_ZONE.surfaceY + 2, gz, 0, -1, 0, 40, 900)
+    expect(miss).toBeNull()
+    // paranoia: a ray that never crosses the plane cannot claim
+    expect(coffeeRayHit(gx, COFFEE_ZONE.surfaceY - 1, 13, 0, -1, 0, 40, 900)).toBeNull()
   })
 })
 
@@ -558,3 +574,4 @@ describe("the notebook's arc", () => {
     expect(BOOK_VERTEX_BODY).toContain('smoothstep')
   })
 })
+
