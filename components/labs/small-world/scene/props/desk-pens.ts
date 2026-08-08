@@ -57,10 +57,27 @@ const f = (v: number): string => v.toFixed(5)
 const TAU = Math.PI * 2
 
 /**
- * The five pens, as the shipped bytes hold them: contiguous `gl_VertexID` runs (the T81 join
- * wrote each object contiguously — the same fact the plant perk and the lane hide stand on) and
- * fitted CAPSULES for the pick (banded-mean endpoints; fitted max vert-to-segment 0.1026 incl.
- * the clips → r 0.13). `a` is the end that sits in the cup, `b` the tip.
+ * The five pens, as the shipped bytes hold them. Each pen's SHAFT is one contiguous `gl_VertexID`
+ * run — but three of the five also wear a CAP, and the T81 join wrote those caps as their own
+ * blocks AFTER all four baked shafts, so a pen is not always one run. `range` is the shaft,
+ * `cap` the cap block or null; `a` is the end that sits in the cup, `b` the tip; the CAPSULE is
+ * fitted for the pick (banded-mean endpoints; max vert-to-segment 0.1026 → r 0.13).
+ *
+ * Union-find over the shipped triangles (`desk-pens.test.ts` re-derives every number below) finds
+ * exactly this in the pen-cup neighbourhood: five shaft components, three 324-vertex cap
+ * assemblies, and the cup body at 17240..19081 — which must never be claimed, because the pens
+ * pass through it and an index range that swallowed it would tear the cup off the desk. The caps
+ * are one model instanced three times, and each sits coaxially on ONE pen: 0.0719 max distance to
+ * its own pen's axis against 0.224 to the next-nearest, with that pen's own vertex colour.
+ * darkRed and white2 wear theirs at the tip; roseGold stands cap-down, so its cap is below the
+ * rim. white1 and pink have none.
+ *
+ * THE CAPS WERE THE T100 BUG: they are separate connected components lying outside every pen's
+ * range, so the shader levered each shaft about its rim while the cap stayed at rest in mid-air.
+ * Claiming the cap block is the whole fix, and it disturbs nothing else — each cap lies strictly
+ * INSIDE its own shaft's axial extent (darkRed's spans s 0.753..1.043 of a shaft that runs
+ * -0.091..1.082), so `b` stays where it was measured and the leans do not re-solve; and it reaches
+ * only 0.0719 from the segment against the shaft's own 0.1026, so the pick capsule is untouched.
  *
  * The pick reads the capsules; the clatter reads the ranges and the axis. Both from here.
  */
@@ -68,15 +85,16 @@ export const PENCUP_PENS: readonly {
   readonly id: string
   readonly mesh: 'DeskBaked' | 'DeskMetal'
   readonly range: readonly [number, number]
+  readonly cap: readonly [number, number] | null
   readonly a: readonly [number, number, number]
   readonly b: readonly [number, number, number]
   readonly r: number
 }[] = [
-  { id: 'darkRed', mesh: 'DeskBaked', range: [14348, 14928], a: [2.8033, 1.4615, 11.7933], b: [2.62, 2.5645, 11.6655], r: 0.13 },
-  { id: 'white1', mesh: 'DeskBaked', range: [14929, 15489], a: [2.9657, 1.4613, 11.8292], b: [3.1764, 2.4835, 11.7702], r: 0.13 },
-  { id: 'pink', mesh: 'DeskBaked', range: [15490, 16030], a: [2.9849, 1.4352, 11.8973], b: [3.166, 2.3957, 11.9857], r: 0.13 },
-  { id: 'white2', mesh: 'DeskBaked', range: [16031, 16591], a: [2.8766, 1.4615, 11.7367], b: [2.8936, 2.5345, 11.5203], r: 0.13 },
-  { id: 'roseGold', mesh: 'DeskMetal', range: [1106, 1686], a: [2.85, 1.452, 11.9415], b: [2.7856, 2.6162, 12.1518], r: 0.13 },
+  { id: 'darkRed', mesh: 'DeskBaked', range: [14348, 14928], cap: [16592, 16915], a: [2.8033, 1.4615, 11.7933], b: [2.62, 2.5645, 11.6655], r: 0.13 },
+  { id: 'white1', mesh: 'DeskBaked', range: [14929, 15489], cap: null, a: [2.9657, 1.4613, 11.8292], b: [3.1764, 2.4835, 11.7702], r: 0.13 },
+  { id: 'pink', mesh: 'DeskBaked', range: [15490, 16030], cap: null, a: [2.9849, 1.4352, 11.8973], b: [3.166, 2.3957, 11.9857], r: 0.13 },
+  { id: 'white2', mesh: 'DeskBaked', range: [16031, 16591], cap: [16916, 17239], a: [2.8766, 1.4615, 11.7367], b: [2.8936, 2.5345, 11.5203], r: 0.13 },
+  { id: 'roseGold', mesh: 'DeskMetal', range: [1106, 1686], cap: [1687, 2010], a: [2.85, 1.452, 11.9415], b: [2.7856, 2.6162, 12.1518], r: 0.13 },
 ] as const
 
 /** The cup's vertical axis, xz — the T89 pivot's own footprint centre. The lean directions are
@@ -134,6 +152,8 @@ export type PenGeom = {
   id: string
   mesh: 'DeskBaked' | 'DeskMetal'
   range: readonly [number, number]
+  /** The pen's cap block, where the bytes carry one — it moves with the shaft or it is not a pen. */
+  cap: readonly [number, number] | null
   /** Where the pen's axis crosses the rim plane — its lever point. */
   pivot: readonly [number, number, number]
   /** Unit horizontal lean direction (outward from the cup axis, with the tangential share). */
@@ -173,6 +193,7 @@ export const PEN_GEOM: readonly PenGeom[] = PENCUP_PENS.map((p) => {
     id: p.id,
     mesh: p.mesh,
     range: p.range,
+    cap: p.cap,
     pivot,
     dir: [mx / ml, mz / ml] as const,
     tipArm,
@@ -282,8 +303,16 @@ export const RATTLE_UNIFORM = { value: new Float32Array(4) }
 
 // --- the shader chunks --------------------------------------------------------
 
+/** One pen's id test: its shaft run, plus its cap's run where it has one. The two runs are
+ *  disjoint and neither touches a neighbour, so the cascade below stays exclusive. */
+const penIds = (g: PenGeom): string => {
+  const run = (r: readonly [number, number]): string =>
+    `gl_VertexID >= ${r[0]} && gl_VertexID <= ${r[1]}`
+  return g.cap ? `( ${run(g.range)} ) || ( ${run(g.cap)} )` : run(g.range)
+}
+
 const penBranch = (g: PenGeom, first: boolean): string =>
-  `${first ? '' : 'else '}if ( gl_VertexID >= ${g.range[0]} && gl_VertexID <= ${g.range[1]} ) {
+  `${first ? '' : 'else '}if ( ${penIds(g)} ) {
     pnP = vec3( ${f(g.pivot[0])}, ${f(g.pivot[1])}, ${f(g.pivot[2])} );
     pnD = vec2( ${f(g.dir[0])}, ${f(g.dir[1])} );
     pnM = ${f(g.lean)} * ( ${f(g.fast)} * uPenClatter.x + ${f(g.slow)} * uPenClatter.y );
@@ -294,11 +323,12 @@ const pensIn = (mesh: 'DeskBaked' | 'DeskMetal'): readonly PenGeom[] =>
   PEN_GEOM.filter((g) => g.mesh === mesh)
 
 /**
- * The clatter's vertex block for one mesh. Each pen is selected by its own `gl_VertexID` range —
- * no box can do this (the shafts lean through each other's AABBs, and a box that caught one pen
- * whole would catch its neighbour's clip), and an index range cannot tear a neighbour BY
- * CONSTRUCTION. The motion is a rigid rotation about the pen's own rim crossing plus a hop, so
- * the pen keeps its length: it is displaced, not bent.
+ * The clatter's vertex block for one mesh. Each pen is selected by its own `gl_VertexID` runs —
+ * shaft and cap — because no box can do this (the shafts lean through each other's AABBs, and a
+ * box that caught one pen whole would catch its neighbour's cap), and index runs cannot tear a
+ * neighbour BY CONSTRUCTION: no triangle in the file straddles a cap block's edge. The motion is
+ * a rigid rotation about the pen's own rim crossing plus a hop, so the pen keeps its length AND
+ * its cap: it is displaced, not bent, and not shed.
  *
  * COMPOSITION with the cup's rock: the rock runs first and moves `transformed`; this block then
  * turns the already-rocked pen about its REST-space pivot. The cup's rock peaks at 0.8°, so the
@@ -342,7 +372,7 @@ export function penClatterNormalBlock(mesh: 'DeskBaked' | 'DeskMetal', normalVar
   float pnNSeen = 0.0;
   ${pens
     .map(
-      (g, i) => `${i === 0 ? '' : 'else '}if ( gl_VertexID >= ${g.range[0]} && gl_VertexID <= ${g.range[1]} ) {
+      (g, i) => `${i === 0 ? '' : 'else '}if ( ${penIds(g)} ) {
     pnND = vec2( ${f(g.dir[0])}, ${f(g.dir[1])} );
     pnNM = ${f(g.lean)} * ( ${f(g.fast)} * uPenClatter.x + ${f(g.slow)} * uPenClatter.y );
     pnNSeen = 1.0;
