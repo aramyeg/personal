@@ -357,4 +357,14 @@ export const PALETTE = {
   // the comic's own captions in `sky` for the same reason, and the card's eyebrow
   // is now that same object).
   pagePaper: '#FAFAFA', // the printed sheet — the mean paper of the seven shipped pages
+
+  // Task 99 — THE "LET'S CREATE" NEON, and why it is ROSE and not a new hue.
+  //
+  // The look-dev ran four colourways over the real money shot (blossom pink, honey gold, dusk
+  // blue, and an arc variant): blue fights the warmth of the lights-up beat, gold introduces a
+  // large field of a hue the room only carries in centimetre accents, and rose is the room's own
+  // accent voice — studioRoseDeep already borders the connect pill and underlines the CV links,
+  // so the sign and the row beneath it read as one hand. Two tones, the classic tube pair:
+  neonTube: '#FFE9F2', // the glass core — near-white with the gas's blush, what the tube renders
+  neonRose: '#F272A8', // the gas colour — the halo's rose, between blossom and blossomDeep
 } as const

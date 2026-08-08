@@ -47,6 +47,7 @@ import { YetiEgg } from './props/yeti-egg'
 import { EpilogueSet } from './props/epilogue'
 import { DeskSet } from './props/desk-set'
 import { GlobeStand } from './props/globe-stand'
+import { NeonSign } from './props/neon-sign'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
@@ -267,6 +268,11 @@ function SceneContents({
           the journey frame during the still beat and the world ends up sitting in its cradle; see
           scene/globe-stand.ts for why this and not the desk is allowed an entrance. */}
       <GlobeStand journeyRef={journeyRef} />
+      {/* THE "LET'S CREATE" NEON (Task 99) — the money shot's flanking sign. It cannot be parked
+          below the journey frame (it lives at globe height), so its containment is the studio
+          lights themselves: the strike envelope is exactly 0 wherever the lights are, which is
+          the whole journey and the whole still beat. See scene/neon-sign.ts. */}
+      <NeonSign journeyRef={journeyRef} />
       {/* Sky-anchored corner characters for each checkpoint — a SIBLING of the planet, never a
           child: they hold the frame's top corners while the world keeps spinning beneath them. */}
       <CheckpointPeekers journeyRef={journeyRef} />
