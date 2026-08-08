@@ -561,6 +561,145 @@ if ( uWater.x != 0.0 ) {
 export const WATER_FRAGMENT_DECL = 'uniform vec4 uWater;\nvarying float vWaterDark;'
 export const WATER_FRAGMENT_BODY = `if ( uWater.x != 0.0 ) diffuseColor.rgb *= vWaterDark;`
 
+// --- the bird ---------------------------------------------------------------
+
+/**
+ * Click the clay lane and it becomes the bird — the deep tier's centrepiece. The flat lane on the
+ * desk rolls into a ball, kneads, forms a standing bird facing the camera's 3/4, holds the pose,
+ * and unrolls back to exactly the flat lane it was. The whole arc is the arm's baked clip: 8 roll
+ * bones + one morph target (`BirdForm`, the entire standing bird — glTF applies morphs BEFORE
+ * skinning, so the roll bones are back at identity by the time the form weight reaches 1, and the
+ * crossfade between them IS the reshape). The two exported actions (bones + morph weights) were
+ * merged into ONE `BirdAction` at splice time — 25 channels, one span, one `.time` — so the
+ * two-actions desync trap is closed structurally, not by care.
+ *
+ * THE SWAP: the lane the visitor sees at rest is baked into `DeskBaked` (no node, unreachable).
+ * The skinned `Bar_river` mesh is a DUPLICATE of it, authored at the ORIGIN (the inverse-bind
+ * identity holds to 3e-8 there; a desk-positioned rig is 160x worse) and placed by a runtime
+ * wrapper. While the clip runs, the baked lane's vertices collapse behind `uBird.x` (an index-
+ * range select — the lanes interleave diagonally, so no box can cut this one free) and the skinned
+ * twin renders in its place; at rest the swap runs backwards. Rest frame 1 equals the shipped lane
+ * bit-for-bit in colour (transferred from the lane's own baked bytes at splice) and to 3e-8 in
+ * position, so the handover is invisible by measurement, not by hope.
+ */
+export const BIRD = {
+  /** The clip's length, seconds — 98 frames at 24 fps, measured off the exported samplers
+   *  (span 0.0417..4.0833; `.time` below the first key clamps to the flat rest pose). */
+  duration: 4.083333333333333,
+} as const
+
+/**
+ * The runtime wrapper's TRS — read off a real desk-positioned export, NOT hand-converted (the
+ * arm's recipe §1.5/§2). It maps the origin-authored rig onto the shipped lane's desk position;
+ * in three the mesh's matrixWorld applies after skinning, so the wrapper never enters the bind
+ * arithmetic and the 3e-8 rest identity survives. One owner: the runtime wrapper AND the
+ * containment gate in `desk-glb.test.ts` both read these numbers.
+ */
+export const BIRD_WRAPPER = {
+  position: [2.2072, 1.3727, 9.8122],
+  /** Normalize before use — four printed decimals do not make a unit quaternion. */
+  quaternion: [0, 0.1692, 0, 0.9856],
+  scale: 0.9,
+} as const
+
+/**
+ * The baked lane inside `DeskBaked`, as the hide chunk selects it: a contiguous `gl_VertexID`
+ * run (the T81 join wrote objects contiguously — same fact the plant perk stands on), because no
+ * AABB can work here: the pad's lanes are diagonal bars and any box around this one passes
+ * through the floor sheet (measured, not assumed). `desk-deep.test.ts` re-derives the range as
+ * one whole connected component of the shipped bytes.
+ */
+export const LANE = {
+  /** The lane's vertices in DeskBaked, inclusive. */
+  range: [29107, 29536],
+  /** Where hidden vertices collapse to — inside the bird's own body, so even a stray fragment
+   *  of a degenerate triangle would be occluded by the thing replacing it. */
+  hidePoint: [2.2072, 1.3727, 9.8122],
+} as const
+
+/** The lane's click zone — the lane component's own measured AABB, fine for the RAY box even
+ *  though the shader select must be index-range (a ray claim may be generous; a vertex select
+ *  may not tear). */
+export const LANE_ZONE = {
+  min: [1.8015, 1.3031, 9.6367],
+  max: [2.5661, 1.4375, 10.0016],
+} as const
+
+export type BirdState = { t0: number; active: boolean }
+export const restingBird = (): BirdState => ({ t0: 0, active: false })
+
+/** A click starts the arc; clicks mid-arc are absorbed (the set piece finishes its sentence). */
+export function triggerBird(s: BirdState, now: number): void {
+  if (s.active) return
+  s.t0 = now
+  s.active = true
+}
+
+/**
+ * The bird's clip time: `.time` = τ, 1:1 — the clip IS the closed form (LINEAR keys, every frame
+ * a pure function of its phase, scrub-backwards lands on the numbers it came from). Pure in
+ * (now − t0). Past the clip's end the state disarms and returns exact 0, so a lane that has
+ * been a bird is `Object.is`-identical to one that never was.
+ */
+export function sampleBird(s: BirdState, now: number): number {
+  if (!s.active) return 0
+  const tau = now - s.t0
+  if (tau <= 0) return 0
+  if (tau >= BIRD.duration) {
+    s.active = false
+    return 0
+  }
+  return tau
+}
+
+/** The bird uniform: (active, 0, 0, 0). ONE writer — the desk-glb frame loop, which flips it in
+ *  the same statement that toggles the skinned mesh's visibility, so the two halves of the swap
+ *  cannot disagree for even a frame. */
+export const BIRD_UNIFORM = { value: new Float32Array(4) }
+
+/** The claim — same shape as the can's: x/z inflated to the 44 px floor, y as authored. */
+export function laneRayHit(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  fovDeg: number,
+  heightPx: number
+): { t: number; point: [number, number, number] } | null {
+  const z = LANE_ZONE
+  const cx = (z.min[0] + z.max[0]) / 2
+  const cy = (z.min[1] + z.max[1]) / 2
+  const cz = (z.min[2] + z.max[2]) / 2
+  const dist = Math.hypot(cx - ox, cy - oy, cz - oz)
+  const extent = Math.min(z.max[0] - z.min[0], z.max[2] - z.min[2])
+  const pad = hitPadFor(extent, dist, fovDeg, heightPx)
+  const t = rayBoxHit(
+    ox,
+    oy,
+    oz,
+    dx,
+    dy,
+    dz,
+    [z.min[0] - pad, z.min[1], z.min[2] - pad],
+    [z.max[0] + pad, z.max[1], z.max[2] + pad]
+  )
+  return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
+}
+
+// --- the bird's shader chunk (DeskBaked) -------------------------------------
+
+/**
+ * The lane-hide half of the swap: while the skinned twin is active, the baked lane's vertices
+ * collapse to one point — zero-area triangles emit no fragments. Behind the exact-zero guard the
+ * rest path is the untouched path over unchanged bytes, so rest pixel-diff-0 is STRUCTURAL.
+ */
+export const BIRD_VERTEX_DECL = 'uniform vec4 uBird;'
+export const BIRD_VERTEX_BODY = `if ( uBird.x != 0.0 && gl_VertexID >= ${LANE.range[0]} && gl_VertexID <= ${LANE.range[1]} ) {
+  transformed = vec3( ${f(LANE.hidePoint[0])}, ${f(LANE.hidePoint[1])}, ${f(LANE.hidePoint[2])} );
+}`
+
 /**
  * The vertex half: the vortex dip, a paraboloid-squared of rest radius — C1 at the rim, so the
  * liquid meets the mug's inner wall with no crease and NO tear (the rim ring moves exactly zero).

@@ -15,16 +15,21 @@ import {
   canRayHit,
   coffeeRayHit,
   deepClipMail,
+  laneRayHit,
   mugStirMail,
+  restingBird,
   restingBook,
   restingStir,
   restingWater,
+  sampleBird,
   sampleBook,
   sampleStir,
   sampleWater,
+  triggerBird,
   triggerBook,
   triggerStir,
   triggerWater,
+  type BirdState,
   type BookState,
   type StirState,
   type WaterState,
@@ -53,6 +58,7 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
   const stir = useRef<StirState>(restingStir())
   const book = useRef<BookState>(restingBook())
   const water = useRef<WaterState>(restingWater())
+  const bird = useRef<BirdState>(restingBird())
   const clock = useRef(0)
   const armed = useRef(false)
 
@@ -83,10 +89,14 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
         stir.current = restingStir()
         book.current = restingBook()
         water.current = restingWater()
+        bird.current = restingBird()
         STIR_UNIFORM.value.fill(0)
         BOOK_UNIFORM.value.fill(0)
         WATER_UNIFORM.value.fill(0)
         deepClipMail.water = 0
+        // The bird's uniform is desk-glb's to write (it flips with the twin's visibility); the
+        // mail going to zero is what tells it to run the swap backwards this same frame.
+        deepClipMail.bird = 0
         clock.current = 0
         tap.current = null
       }
@@ -112,6 +122,10 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
       if (canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
         // the watering: the can lifts, tips, and the plant answers; mid-arc clicks are absorbed
         triggerWater(water.current, now)
+      }
+      if (laneRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
+        // the bird: the clay lane rolls up, forms, holds, and unrolls; mid-arc clicks are absorbed
+        triggerBird(bird.current, now)
       }
       if (hit) {
         triggerStir(stir.current, now, 1)
@@ -139,6 +153,8 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
     // The pour's clip time goes out by MAIL rather than uniform — the paused action lives with
     // the meshes in desk-glb.tsx; the perk envelope rides the uniform like every other field.
     deepClipMail.water = sampleWater(water.current, now, WATER_UNIFORM.value)
+    // The bird too: .time = τ, 1:1 — the merged clip is the whole closed form.
+    deepClipMail.bird = sampleBird(bird.current, now)
   })
 
   return null

@@ -9,6 +9,10 @@ import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
+  BIRD_UNIFORM,
+  BIRD_VERTEX_BODY,
+  BIRD_VERTEX_DECL,
+  BIRD_WRAPPER,
   BOOK_UNIFORM,
   BOOK_VERTEX_BODY,
   BOOK_VERTEX_DECL,
@@ -211,7 +215,13 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     // ...and the plant's answer to the watering (Task 92): leaf perk + soil drink, gl_VertexID
     // range selects over the same shipped bytes, guarded to exact zero the same way.
     shader.uniforms.uWater = WATER_UNIFORM
+    // ...and the bird swap's lane-hide (Task 92): while the skinned twin performs, the baked
+    // lane collapses to a point — an index-range select, because the pad's lanes interleave
+    // diagonally and no box can cut this one free.
+    shader.uniforms.uBird = BIRD_UNIFORM
     shader.vertexShader = (
+      BIRD_VERTEX_DECL +
+      '\n' +
       BOOK_VERTEX_DECL +
       '\n' +
       WATER_VERTEX_DECL +
@@ -223,7 +233,7 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
     wireNudge(shader, nudge)
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\n' + BOOK_VERTEX_BODY + '\n' + WATER_VERTEX_BODY
+      '#include <begin_vertex>\n' + BIRD_VERTEX_BODY + '\n' + BOOK_VERTEX_BODY + '\n' + WATER_VERTEX_BODY
     )
     shader.fragmentShader = (
       'uniform float uLights;\nvarying vec3 vDimColor;\n' +
@@ -260,6 +270,32 @@ export function canMaterial(lights: { value: number }): THREE.MeshBasicMaterial 
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-can'
+  return mat
+}
+
+/**
+ * THE BIRD'S TWIN (Task 92) — the skinned duplicate of the clay lane that performs the deep
+ * tier's centrepiece. Same two-set bake mix as every matte prop (its colours were TRANSFERRED
+ * from the shipped lane's own baked bytes at splice time, so rest frame 1 is the lane,
+ * bit-for-bit); `MeshBasicMaterial`, because the family is unlit and the export deliberately
+ * ships no normals (dead wire bytes under a bake). Skinning and the morph target are enabled by
+ * three automatically off the mesh and geometry — nothing to declare here. FrontSide: the lane
+ * is a closed swept tube (0 boundary edges, measured) and stays one through the whole clip.
+ */
+export function birdMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
+      '#include <color_vertex>',
+      '#include <color_vertex>\n vDimColor = color_1.rgb;'
+    )
+    shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
+      '#include <color_fragment>',
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-bird'
   return mat
 }
 
@@ -529,6 +565,7 @@ function metalMaterial(env: THREE.Texture): THREE.MeshStandardMaterial {
 export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   const assets = useDeskAssets()
   const renderer = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
   // ONE uniform object, shared by all three baked materials, so they can never disagree about how
   // lit the ending is and the frame loop writes a single number.
   const lights = useRef({ value: 0 })
@@ -601,6 +638,47 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
         mixer.update(0)
       }
     }
+    // The bird (Task 92): the skinned lane twin + its 8-bone rig, wrapped in ONE runtime
+    // Object3D. The rig is authored at the ORIGIN — a parent node inside the GLB would put the
+    // bind-arithmetic error straight back (globalBind walks to the scene root), so the placement
+    // is a RUNTIME wrapper, whose matrix applies after skinning and never enters the bind. Same
+    // get-or-create-by-name pattern as WaterRig: the scene Group is cached for the tab.
+    const bird = findMesh(scene, 'Bar_river')
+    let birdGroup: THREE.Group | null = null
+    let birdMixer: THREE.AnimationMixer | null = null
+    let birdAction: THREE.AnimationAction | null = null
+    if (bird) {
+      bird.material = birdMaterial(lights.current)
+      // Invisible at rest — the baked lane in DeskBaked is the resting statement; the twin costs
+      // zero draws until a click. Culling off: the morph reaches 0.58 units above the base
+      // geometry's own bounding sphere mid-clip, and 742 vertices are cheaper than a wrong cull.
+      bird.visible = false
+      bird.frustumCulled = false
+      birdGroup = (scene.getObjectByName('BirdRig') as THREE.Group) ?? new THREE.Group()
+      if (birdGroup.name !== 'BirdRig') {
+        birdGroup.name = 'BirdRig'
+        const rig = scene.getObjectByName('Lane_Rig')
+        if (rig) birdGroup.add(rig)
+        birdGroup.add(bird)
+        birdGroup.position.fromArray(BIRD_WRAPPER.position as unknown as number[])
+        birdGroup.quaternion.fromArray(BIRD_WRAPPER.quaternion as unknown as number[]).normalize()
+        birdGroup.scale.setScalar(BIRD_WRAPPER.scale)
+        scene.add(birdGroup)
+      }
+      const birdClip = assets.animations.find((c) => c.name === 'BirdAction')
+      if (birdClip) {
+        birdMixer = new THREE.AnimationMixer(birdGroup)
+        birdAction = birdMixer.clipAction(birdClip)
+        birdAction.play()
+        birdAction.paused = true
+        birdAction.time = 0
+        birdMixer.update(0)
+      }
+      // A remount must not inherit the previous mount's swap state: the uniform is module-scope
+      // and would otherwise hold uBird=1 with no frame-loop change to clear it — a desk with a
+      // hidden lane and no bird.
+      BIRD_UNIFORM.value.fill(0)
+    }
     return {
       surface,
       baked,
@@ -612,14 +690,22 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       waterGroup,
       mixer,
       waterAction,
+      bird,
+      birdGroup,
+      birdMixer,
+      birdAction,
       metalMat: metal.material as THREE.MeshStandardMaterial,
     }
   }, [assets, env, equirect])
 
   useEffect(() => {
     if (!built) return
+    // Warm-compile the bird's program while the studio is still dark: `compile` initialises
+    // materials with a plain traverse (visibility is not consulted), so the invisible twin's
+    // skinned+morphed program is on the GPU before the first click ever needs it.
+    if (built.birdGroup) renderer.compile(built.birdGroup, camera)
     return () => {
-      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso, built.can]) {
+      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso, built.can, built.bird]) {
         if (m) (m.material as THREE.Material).dispose()
       }
       if (built.drops[0]) (built.drops[0].material as THREE.Material).dispose()
@@ -631,11 +717,21 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
         built.mixer.stopAllAction()
         built.mixer.uncacheRoot(built.mixer.getRoot())
       }
+      if (built.birdMixer) {
+        // The bird parks the same way — and the swap parks with it: lane shown, twin hidden.
+        if (built.birdAction) built.birdAction.time = 0
+        built.birdMixer.update(0)
+        built.birdMixer.stopAllAction()
+        built.birdMixer.uncacheRoot(built.birdMixer.getRoot())
+        if (built.bird) built.bird.visible = false
+        BIRD_UNIFORM.value.fill(0)
+      }
     }
-  }, [built])
+  }, [built, renderer, camera])
 
   const last = useRef(Number.NaN)
   const lastWater = useRef(0)
+  const lastBird = useRef(0)
   useFrame(() => {
     if (!built) return
     // The set-piece clips (Task 92): the deep tier mails clip TIMES (never deltas); this stamps
@@ -649,6 +745,20 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       built.waterAction.time = deepClipMail.water
       built.mixer!.update(0)
       if (active !== wasActive) for (const d of built.drops) d.visible = active
+    }
+    // The bird's swap rides the same mail pattern, with BOTH halves flipped in one place: the
+    // skinned twin's visibility AND the baked lane's hide uniform change in the same statement,
+    // so no rendered frame can ever hold two lanes or none.
+    if (built.birdAction && deepClipMail.bird !== lastBird.current) {
+      const active = deepClipMail.bird !== 0
+      const wasActive = lastBird.current !== 0
+      lastBird.current = deepClipMail.bird
+      built.birdAction.time = deepClipMail.bird
+      built.birdMixer!.update(0)
+      if (active !== wasActive) {
+        built.bird!.visible = active
+        BIRD_UNIFORM.value[0] = active ? 1 : 0
+      }
     }
     // The verso needs no per-frame transform: it opens in its own vertex shader, off the same
     // BOOK_UNIFORM the cover's chunk reads (see versoMaterial).
@@ -669,6 +779,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       <primitive object={built.glaze} />
       {built.verso ? <primitive object={built.verso} /> : null}
       {built.waterGroup ? <primitive object={built.waterGroup} /> : null}
+      {built.birdGroup ? <primitive object={built.birdGroup} /> : null}
     </group>
   )
 }

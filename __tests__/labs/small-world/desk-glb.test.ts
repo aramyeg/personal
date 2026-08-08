@@ -21,6 +21,7 @@ import {
   DESK_PAYLOAD_BUDGET,
   DESK_RAW_CEILING,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
+import { BIRD_WRAPPER } from '@/components/labs/small-world/scene/props/desk-deep'
 
 /**
  * THE SHIPPED DESK ASSET (Task 68), held to the same standard as the geometry the lab builds itself.
@@ -227,14 +228,22 @@ describe('desk GLB — containment, measured on the emitted vertices', () => {
   // The original bake ships world-space vertices on TRS-less nodes; the T92 watering piece ships
   // LOCAL vertices under an authored node TRS (its meshes move), so the per-point test transforms
   // by the node the mesh hangs on — the same arithmetic the GPU runs.
+  // The bird's twin is the one mesh whose placement is NOT in the file: it is authored at the
+  // origin (the inverse-bind identity demands it — see BIRD_WRAPPER) and placed by a runtime
+  // wrapper. The containment claim is about where it RENDERS, so this test applies the same TRS
+  // the runtime applies, read from the same constant — one owner, imported not copied.
   const nodeTrs = (meshName: string) => {
     const mi = glb.json.meshes.findIndex((m) => m.name === meshName)
     const node = (glb.json.nodes as { mesh?: number; translation?: number[]; rotation?: number[]; scale?: number[] }[]).find(
       (n) => n.mesh === mi
     )
-    const t = node?.translation ?? [0, 0, 0]
-    const q = node?.rotation ?? [0, 0, 0, 1]
-    const s = node?.scale ?? [1, 1, 1]
+    const runtime = meshName === 'Bar_river'
+    const qLen = Math.hypot(...BIRD_WRAPPER.quaternion)
+    const t = runtime ? [...BIRD_WRAPPER.position] : (node?.translation ?? [0, 0, 0])
+    const q = runtime ? BIRD_WRAPPER.quaternion.map((c) => c / qLen) : (node?.rotation ?? [0, 0, 0, 1])
+    const s = runtime
+      ? [BIRD_WRAPPER.scale, BIRD_WRAPPER.scale, BIRD_WRAPPER.scale]
+      : (node?.scale ?? [1, 1, 1])
     return (p: number[]): number[] => {
       const [x, y, z] = [p[0] * s[0], p[1] * s[1], p[2] * s[2]]
       const [qx, qy, qz, qw] = q

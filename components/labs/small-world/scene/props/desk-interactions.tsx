@@ -41,7 +41,7 @@ import {
   type RattleState,
   type SquashSpring,
 } from './desk-nudge'
-import { bookRayHit, canRayHit, coffeeRayHit, mugStirMail } from './desk-deep'
+import { bookRayHit, canRayHit, coffeeRayHit, laneRayHit, mugStirMail } from './desk-deep'
 
 /**
  * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
@@ -280,7 +280,8 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
       const overDeep =
         id === null &&
         (bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
-          canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null)
+          canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
+          laneRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null)
       setCursor(id !== null || overDeep)
     } else {
       hovered.current = null

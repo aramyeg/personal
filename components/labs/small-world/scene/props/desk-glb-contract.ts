@@ -53,6 +53,21 @@ export const DESK_GLB_URL = '/labs/small-world/desk.glb'
  * rest bytes are verbatim by construction, not by care. Measured cost: +53,717 B gzipped on the
  * file on disk (including the rose's shadow-floor lift — see the bake script's docblock).
  */
+/**
+ * ...and the BIRD, the deep tier's centrepiece (Task 92, final piece): `Bar_river` — a skinned,
+ * morph-targeted DUPLICATE of the clay lane that is baked into `DeskBaked`. It is authored at the
+ * ORIGIN (the inverse-bind identity holds to 3e-8 there; a parent node inside the GLB would walk
+ * the error straight back in) and placed by a runtime wrapper (`BIRD_WRAPPER` in `desk-deep.ts`).
+ * Its colours were TRANSFERRED from the shipped lane's own baked bytes at splice time; normals and
+ * morph normals were dropped (dead wire bytes under an unlit bake — the fallback, if the hold beat
+ * reads dead, is to restore them with a lit material and re-measure). One merged `BirdAction`
+ * (bones + morph weights, one span) scrubbed from interaction progress, exactly like the water.
+ * Spliced append-only by the same tool; every pre-existing bufferView byte-identical, gated.
+ * The clip is the arm's SEAT-LOCKED re-key (first cut buried the coil under the tray and floated
+ * the bird 0.13 above it — authored at the origin, never gated against the desk seat; the re-key
+ * proves 0/98 frames below seat, 0/98 outside the bar's own footprint, feet ON the seat at hold).
+ * Measured cost: +37,919 B gzipped on the file on disk.
+ */
 export const DESK_MESHES = [
   'DeskSurface',
   'DeskBaked',
@@ -67,6 +82,7 @@ export const DESK_MESHES = [
   'Water_Drop04',
   'Water_Drop05',
   'Water_Drop06',
+  'Bar_river',
 ] as const
 export type DeskMeshName = (typeof DESK_MESHES)[number]
 
@@ -273,8 +289,16 @@ export const DESK_NUDGE_ZONES: readonly {
  * the arm's 1,500-vertex facet-audit floor (the 1,000-vertex rung FAILS the 2x-crop audit),
  * seven beads, both clips, two baked colour sets. The raise is exactly that measurement. The
  * plant's response and the soil darkening cost 0 B (shader chunks over bytes already shipped).
+ *
+ * ...and once more for the BIRD, by its own measurement: +37,919 B gzipped on the file on disk
+ * (742-vertex densified lane twin + morph target + 8-joint skin + the merged SEAT-LOCKED clip;
+ * normals and morph normals dropped — unlit baked family — and COLOR_0/1 transferred rather than
+ * re-baked; the seat-lock curves cost ~2.3 KB of sampler entropy over the first, desk-blind cut,
+ * and buying the centrepiece's feet on the desk with them is the whole point of measuring).
+ * The whole T92 set lands at +91,636 B over the pre-set ship, inside the spikes' +80–105 KB
+ * target. The lane-hide, like the plant's perk, costs 0 B (a chunk over bytes already shipped).
  */
-export const DESK_PAYLOAD_BUDGET = 1_753_717
+export const DESK_PAYLOAD_BUDGET = 1_791_636
 
 /**
  * ...and a ceiling on the uncompressed length, which is what the GPU and the parser pay.
