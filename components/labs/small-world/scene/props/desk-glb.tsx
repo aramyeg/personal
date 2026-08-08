@@ -8,6 +8,13 @@ import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
+import {
+  STIR_FRAGMENT_BODY,
+  STIR_FRAGMENT_DECL,
+  STIR_UNIFORM,
+  STIR_VERTEX_BODY,
+  STIR_VERTEX_DECL,
+} from './desk-deep'
 
 /**
  * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
@@ -284,9 +291,14 @@ export function glossMaterial(
     shader.uniforms.uLights = lights
     shader.uniforms.uGloss = gloss
     shader.uniforms.uGlossEnv = { value: env }
+    // The coffee stir (Task 92): the liquid disc lives in THIS mesh, so its vortex dip rides the
+    // same chain as the nudge — after `swNrm` is born, guarded behind its own exact zero.
+    shader.uniforms.uStir = STIR_UNIFORM
     for (const [name, u] of Object.entries(nudge.uniforms)) shader.uniforms[name] = u
     shader.vertexShader = (
       nudge.decl +
+      '\n' +
+      STIR_VERTEX_DECL +
       '\nattribute vec4 color_1;\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
       shader.vertexShader
     )
@@ -294,7 +306,10 @@ export function glossMaterial(
       // The icing rocks with the donut, and its SHEEN has to rock too: `swNrm` is the normal the
       // nudge may have rotated, and the reflection reads it instead of the rest-pose attribute —
       // a highlight that stayed pinned while the glaze tipped would un-sell the whole motion.
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vec3 swNrm = normal;\n' + nudge.body)
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n vec3 swNrm = normal;\n' + nudge.body + '\n' + STIR_VERTEX_BODY
+      )
       .replace(
         '#include <project_vertex>',
         `vGlossN = normalize( mat3( modelMatrix ) * swNrm );
@@ -303,10 +318,14 @@ export function glossMaterial(
       )
     shader.fragmentShader = (
       'uniform float uLights;\nuniform float uGloss;\nuniform sampler2D uGlossEnv;\n' +
-      'varying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
+      STIR_FRAGMENT_DECL +
+      '\nvarying vec4 vDimColor;\nvarying vec3 vGlossN;\nvarying vec3 vGlossW;\n' +
       shader.fragmentShader
     )
       .replace('#include <color_fragment>', 'diffuseColor.rgb *= mix( vDimColor.rgb, vColor.rgb, uLights );')
+      // The cream spiral inserts FIRST so the sheen's replace below finds the one remaining
+      // `opaque_fragment` token — both terms are additive, so their order carries no meaning.
+      .replace('#include <opaque_fragment>', STIR_FRAGMENT_BODY + '\n#include <opaque_fragment>')
       .replace(
         '#include <opaque_fragment>',
         `vec3 gN = normalize( vGlossN );

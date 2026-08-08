@@ -41,6 +41,7 @@ import {
   type RattleState,
   type SquashSpring,
 } from './desk-nudge'
+import { coffeeRayHit, mugStirMail } from './desk-deep'
 
 /**
  * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
@@ -122,6 +123,8 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
   const armed = useRef(false)
   const hovered = useRef<ZoneId | null>(null)
   const cursorOwned = useRef(false)
+  /** The last stir nudge consumed from the deep tier's mailbox (Task 92). */
+  const lastStir = useRef(mugStirMail.seq)
 
   const raycaster = useRef(new THREE.Raycaster())
   const ndc = useRef(new THREE.Vector2())
@@ -192,6 +195,8 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         clock.current = 0
         hovered.current = null
         tap.current = null
+        // a stir posted the frame the gate shut must not fire as a phantom nudge on re-arm
+        lastStir.current = mugStirMail.seq
         setCursor(false)
       }
     }
@@ -273,11 +278,29 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
       setCursor(false)
     }
 
-    // TAP/CLICK — the full response, any pointer kind.
+    // TAP/CLICK — the full response, any pointer kind. ONE precedence rule with the deep tier
+    // (Task 92): a tap whose ray crosses the coffee's slab belongs to the stir, not the mug —
+    // both tiers ask the same `coffeeRayHit`, so they cannot disagree about whose click it was.
+    // The mug still answers (a low-strength nudge arrives through `mugStirMail` below); it just
+    // does not full-rock over the set piece.
     if (tap.current) {
       const hit = pick(tap.current.x, tap.current.y)
       tap.current = null
-      if (hit) fire(hit, 1)
+      if (hit) {
+        const o = raycaster.current.ray.origin
+        const d = raycaster.current.ray.direction
+        const deepClaimed =
+          hit.id === 'mug' &&
+          coffeeRayHit(o.x, o.y, o.z, d.x, d.y, d.z, (cam as THREE.PerspectiveCamera).fov, heightPx) !== null
+        if (!deepClaimed) fire(hit, 1)
+      }
+    }
+
+    // The stir's mug nudge (Task 92): posted by the deep tier, stamped here where the mug's
+    // spring lives — the steam mailbox pattern, one tier's clock never reaching the other's.
+    if (mugStirMail.seq !== lastStir.current) {
+      lastStir.current = mugStirMail.seq
+      triggerRock(rocks.current.mug, ROCK_PARAMS.mug!, now, mugStirMail.dirX, mugStirMail.dirZ, mugStirMail.amp)
     }
 
     // Drive every signature; each settles to its own exact rest (see desk-nudge.ts samplers).

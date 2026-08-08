@@ -1,5 +1,6 @@
 'use client'
 import { DeskGlb } from './desk-glb'
+import { DeskDeepInteractions } from './desk-deep-interactions'
 import { DeskInteractions } from './desk-interactions'
 import { DeskNote } from './desk-note'
 import { DeskSteam } from './desk-steam'
@@ -92,6 +93,11 @@ export function DeskSet({ journeyRef }: { journeyRef: JourneyRef }) {
           nothing — it drives uniforms in the materials above. `desk-nudge.ts` carries the law this
           feature creates (pointer-driven micro-animations, deterministic, always decaying to rest). */}
       <DeskInteractions journeyRef={journeyRef} />
+      {/* The desk's deep tier (Task 92): set-piece interactions — the coffee stirs into a vortex
+          under a click. Mounted AFTER the micro tier deliberately: the stir's mug nudge is posted
+          this frame and stamped by the micro loop next frame, a fixed, deterministic order.
+          `desk-deep.ts` carries the closed forms; renders nothing, costs rest frames nothing. */}
+      <DeskDeepInteractions journeyRef={journeyRef} />
     </group>
   )
 }
