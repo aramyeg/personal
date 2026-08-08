@@ -21,6 +21,7 @@ import { makeBoilMaterial, boilAmplitude } from './boil-material'
 import { DIALS, subscribe, bakeVersion, readLandDials } from './tunables'
 import { PLANET_RADIUS, terrainBump, terrainBumpB, type LandBake } from './land-bake'
 import { createLandBakeClient, type LandBakeClient } from './land-bake-client'
+import { GLOBE_UNIFORM } from './globe-nudge'
 import {
   type WaterParams,
   waterDeepGate,
@@ -61,6 +62,11 @@ export { WATER_LEVEL }
 /** Union of BOTH variants' bridge crossings — the water geometry is shared across laps,
  *  so relief is zeroed under every deck of either lap (see waterFootprintClear). */
 const ALL_CROSSINGS = [...CROSSINGS_A, ...CROSSINGS_B] as const
+
+/** T97 S1 — scratch for the globe's pointer rock: one axis + quaternion, reused every frame,
+ *  so the wobble costs the frame loop zero allocation. */
+const globeRockAxis = new THREE.Vector3()
+const globeRockQ = new THREE.Quaternion()
 
 /** The two baked worlds + per-vertex thetaC buckets the per-frame traveling front
  *  lerps between. */
@@ -566,7 +572,25 @@ export function Planet({
 
   useFrame((state) => {
     const j = journeyRef.current
-    if (group.current) group.current.rotation.x = -j.rotation
+    if (group.current) {
+      // ALL THREE euler components, not `.x` alone. The wobble below premultiplies the
+      // QUATERNION, and three's linked-euler back-write then stores the wobbled pose's y/z in
+      // the euler — a `.x`-only write would keep re-baking that residual tilt into every later
+      // frame (measured: a permanently shifted globe after one click, the exact failure the
+      // "always decays to the authored rest" clause forbids). `set` restores the pure spin pose
+      // absolutely each frame, so the wobble owns no state outside its own uniform.
+      group.current.rotation.set(-j.rotation, 0, 0)
+      // T97 S1 — the ending's cradle nudge (see globe-nudge.ts): a small rock-with-precession
+      // premultiplied over the spin, re-derived from the pure pose every frame so it never
+      // accumulates; and THE GUARD IS THE LAW — at exact zero the group's pose arithmetic is
+      // bit-identical to a build without this feature.
+      const u = GLOBE_UNIFORM.value
+      if (u[3] !== 0) {
+        globeRockAxis.set(u[0], u[1], u[2])
+        globeRockQ.setFromAxisAngle(globeRockAxis, u[3])
+        group.current.quaternion.premultiply(globeRockQ)
+      }
+    }
     planetMorph?.update(j.rotation)
     waterMorph.update(j.rotation)
     tideMorph?.update(j.rotation)
