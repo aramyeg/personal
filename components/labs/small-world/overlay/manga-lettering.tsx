@@ -17,13 +17,35 @@ import { PALETTE } from '../palette'
  * types itself, and is in the lab's own font.
  */
 
-/** Trailing block cursor while a line is still arriving. */
+/**
+ * Trailing block cursor while a line is still arriving.
+ *
+ * THE CURSOR IS OUT OF FLOW, and that is a bug fix, not a flourish (T93). In flow it
+ * has an advance width, so a typed prefix that lands near the end of a line measures
+ * WIDER than the same words will once the cursor is gone — and the browser wraps the
+ * last word to the next line for exactly as long as the cursor stands after it, then
+ * snaps it back. Measured frame-by-frame on a settled card (probe under
+ * scratchpad/t93/b-evidence): chapter 6's balloon held 3 lines through the whole
+ * typing run, jumped to 4 on the final character (cursor still mounted), and reset
+ * to 3 one frame later when the cursor unmounted — Aram's "flickering to the next
+ * line then resetting", frame-exact, with the webfont long since loaded.
+ *
+ * `position: absolute` removes the cursor from inline layout entirely: it
+ * contributes no width, so the prefix wraps exactly as the finished text will, and
+ * its static position still paints it right where the next glyph would go. At a
+ * line's very edge it may overhang the ink by a fraction of an em for a beat, which
+ * is what a caret does — a whole word diving to the next line and back is not.
+ */
 function Typed({ text, shown }: { text: string; shown: number }) {
   const done = shown >= text.length
   return (
     <>
       {text.slice(0, shown)}
-      {!done && shown > 0 ? <span style={{ opacity: 0.45 }}>▍</span> : null}
+      {!done && shown > 0 ? (
+        <span aria-hidden style={{ position: 'absolute', opacity: 0.45 }}>
+          ▍
+        </span>
+      ) : null}
     </>
   )
 }
