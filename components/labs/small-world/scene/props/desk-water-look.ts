@@ -56,25 +56,30 @@ const KEY = (() => {
 
 export const BEAD = {
   /** The three tones a clay-room water bead is made of: a lit crown, the body, and the turned-away
-   *  side. Banded, not blended — this room quantises its lighting into steps everywhere else, and
-   *  a smoothly-shaded bead would be the foreign object instead. */
+   *  side. THE FIRST CUT BANDED THEM HARD — this room quantises its lighting into steps
+   *  everywhere else — and the capture killed it: the teardrop is 86 vertices, so a derived
+   *  normal varies almost per-triangle, and hard thresholds turned that into a sawtooth mosaic
+   *  of white and blue chips. A bead that reads as cut glass is not better than one that reads
+   *  as a sticker. The steps are kept but given a soft shoulder wide enough to swallow the
+   *  faceting: still three tones, still stepped, no longer crystalline. */
   crown: [0.86, 0.95, 1.0],
   body: [0.44, 0.72, 0.88],
   shade: [0.2, 0.44, 0.63],
-  /** Where the bands break, in N·L. */
-  bandHi: 0.55,
-  bandLo: 0.02,
+  /** Where the bands break, in N·L, and how wide their shoulders are. */
+  bandHi: 0.5,
+  bandLo: 0.0,
+  bandSoft: 0.3,
   /** THE SEPARATOR. The silhouette sinks toward this tone, so two overlapping beads always have a
    *  dark seam between them and never fuse into one blob — the single failure the capture made
    *  loudest. It is also just true: a water bead is darkest where you look through the most of it. */
   edge: [0.15, 0.36, 0.56],
-  edgeLo: 0.5,
+  edgeLo: 0.42,
   edgeHi: 1.0,
-  edgeK: 0.8,
+  edgeK: 0.72,
   /** The wet dot: a small near-white specular where the key hits square on. A bead without one
    *  is a pebble. */
-  specLo: 0.9,
-  specHi: 0.995,
+  specLo: 0.86,
+  specHi: 0.99,
   specK: 0.85,
   /** The teardrop is taller than it is wide (local bounds −0.057..0.088 in y against ±0.057 in
    *  xz), so the direction that behaves like its normal is the position squashed back toward a
@@ -102,7 +107,8 @@ vBeadV = normalize( cameraPosition - ( modelMatrix * vec4( position, 1.0 ) ).xyz
 
 export const BEAD_FRAGMENT_DECL = 'uniform float uLights;\nvarying vec3 vBeadN;\nvarying vec3 vBeadV;'
 export const BEAD_FRAGMENT_BODY = `float bdK = dot( normalize( vBeadN ), vec3( ${f(KEY[0])}, ${f(KEY[1])}, ${f(KEY[2])} ) );
-vec3 bdC = bdK > ${f(BEAD.bandHi)} ? ${v3(BEAD.crown)} : ( bdK > ${f(BEAD.bandLo)} ? ${v3(BEAD.body)} : ${v3(BEAD.shade)} );
+vec3 bdC = mix( ${v3(BEAD.shade)}, ${v3(BEAD.body)}, smoothstep( ${f(BEAD.bandLo - BEAD.bandSoft)}, ${f(BEAD.bandLo + BEAD.bandSoft)}, bdK ) );
+bdC = mix( bdC, ${v3(BEAD.crown)}, smoothstep( ${f(BEAD.bandHi - BEAD.bandSoft)}, ${f(BEAD.bandHi + BEAD.bandSoft)}, bdK ) );
 float bdE = smoothstep( ${f(BEAD.edgeLo)}, ${f(BEAD.edgeHi)}, 1.0 - abs( dot( normalize( vBeadN ), normalize( vBeadV ) ) ) );
 bdC = mix( bdC, ${v3(BEAD.edge)}, bdE * ${f(BEAD.edgeK)} );
 bdC = mix( bdC, vec3( 1.0 ), smoothstep( ${f(BEAD.specLo)}, ${f(BEAD.specHi)}, bdK ) * ${f(BEAD.specK)} );
