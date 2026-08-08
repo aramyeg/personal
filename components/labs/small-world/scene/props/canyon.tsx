@@ -7,7 +7,7 @@ import { chapterTheta, anchorTransform } from '../stage'
 import { activeVariantAt, canonicalTheta } from '../renewal'
 import { geyserPlume } from '../geyser'
 import { DIALS } from '../tunables'
-import { ClayGeyser, ClayGeyserPlume, ClayHoodoo } from './clay-kit'
+import { ClayGeyser, ClayGeyserPlume, ClayGeyserWisp, ClayHoodoo } from './clay-kit'
 import type { JourneyRef } from '../use-journey'
 
 // The B1 AKNA wedge (band 1, variant B) is the CANYON (Task 49). These geysers + hoodoos are
@@ -85,23 +85,29 @@ function Geyser({
   const { position, quaternion } = useMemo(() => anchorTransform(theta, x, 1), [theta, x])
   const outer = useRef<THREE.Group>(null)
   const plume = useRef<THREE.Group>(null)
+  const wisp = useRef<THREE.Group>(null)
   useFrame(() => {
     const g = outer.current
     if (!g) return
     const rot = journeyRef.current.rotation
     const active = activeVariantAt(tc, rot) === 1
     g.visible = active
-    if (active && plume.current) {
-      const amp =
-        geyserPlume(rot, phase, DIALS.geyserPeriod.value) *
-        DIALS.geyserAmp.value *
-        limbRest(theta, rot)
+    if (active && plume.current && wisp.current) {
+      const rest = limbRest(theta, rot)
+      const amp = geyserPlume(rot, phase, DIALS.geyserPeriod.value) * DIALS.geyserAmp.value * rest
       plume.current.scale.setScalar(Math.max(amp, 0.0001))
+      // Task 94 — the resting vent's steam curl rides the SAME limb rest as the plume: at the
+      // grazing bottom limb an always-on white curl dangles past the silhouette (the T84
+      // "drips" defect, re-found by capture at chapter 4's frame), so it rests there too.
+      wisp.current.scale.setScalar(Math.max(rest, 0.0001))
     }
   })
   return (
     <group ref={outer} position={position} quaternion={quaternion}>
       <ClayGeyser />
+      <group ref={wisp} position={[0, VENT_Y + 0.01, 0]}>
+        <ClayGeyserWisp />
+      </group>
       <group ref={plume} position={[0, VENT_Y, 0]}>
         <ClayGeyserPlume />
       </group>

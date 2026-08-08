@@ -783,10 +783,10 @@ export function ClayStiltHut({ wall = PALETTE.stiltWall, roof = PALETTE.stiltRoo
  *  of the three vents were resting and read as anthills. What says "thermal" from every
  *  angle is WATER COLOUR AND A CRUST RIM: a wide aqua terrace sheet around the cone, a
  *  raised sinter lip ringing it (a flat torus — the crusted terrace edge), a bigger aqua
- *  vent pool, and a small permanent steam curl above the mouth. The curl is merged clay
- *  (no clock, no extra draw): dormant vents visibly steam, and during an eruption the jet
- *  simply engulfs it. */
-export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep, pool = PALETTE.geyserPool, terrace = PALETTE.geyserTerrace, steam = PALETTE.geyserPlume, ...x }: Xform & { crust?: string; shade?: string; pool?: string; terrace?: string; steam?: string }) {
+ *  vent pool, and a small steam curl above the mouth (`ClayGeyserWisp`, separate so the
+ *  canyon can rest it on the limb): dormant vents visibly steam, and during an eruption
+ *  the jet simply engulfs the curl. */
+export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep, pool = PALETTE.geyserPool, terrace = PALETTE.geyserTerrace, ...x }: Xform & { crust?: string; shade?: string; pool?: string; terrace?: string }) {
   const ramp = useClayRamp()
   const geo = useMemo(
     () =>
@@ -805,12 +805,28 @@ export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep,
         { geo: new THREE.CylinderGeometry(0.058, 0.07, 0.04, 14), color: shade, pos: [0, 0.21, 0] },
         // the bubbling mineral pool sitting in the vent mouth — wider and truly aqua now
         { geo: new THREE.CylinderGeometry(0.062, 0.062, 0.025, 14), color: pool, pos: [0, 0.235, 0] },
-        // the permanent steam curl — three small stretched puffs leaning off the mouth
-        { geo: new THREE.SphereGeometry(0.026, 10, 10), color: steam, pos: [0.008, 0.29, 0], scl: [1, 1.35, 1] },
-        { geo: new THREE.SphereGeometry(0.032, 10, 10), color: steam, pos: [0.024, 0.35, 0.01], scl: [1, 1.3, 1] },
-        { geo: new THREE.SphereGeometry(0.027, 10, 10), color: steam, pos: [0.046, 0.41, 0.02], scl: [1, 1.25, 1] },
       ]),
-    [crust, shade, pool, terrace, steam]
+    [crust, shade, pool, terrace]
+  )
+  return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
+}
+
+/** The resting vent's steam curl — three small stretched puffs leaning off the mouth, base at
+ *  y=0 AT THE VENT so the canyon component can scale it about the mouth. Its own tiny draw
+ *  rather than part of the merged base, and deliberately so: a first cut baked it into
+ *  `ClayGeyser`, and at chapter 4's bottom limb the always-present white curls dangled below
+ *  the silhouette — the exact T84 "grey drips" defect the plume's limb-rest exists to prevent.
+ *  The canyon component scales this by the SAME limb-rest, so the wisp rests on the limb too. */
+export function ClayGeyserWisp({ steam = PALETTE.geyserPlume, ...x }: Xform & { steam?: string }) {
+  const ramp = useClayRamp()
+  const geo = useMemo(
+    () =>
+      buildMergedClay([
+        { geo: new THREE.SphereGeometry(0.026, 10, 10), color: steam, pos: [0.008, 0.04, 0], scl: [1, 1.35, 1] },
+        { geo: new THREE.SphereGeometry(0.032, 10, 10), color: steam, pos: [0.024, 0.1, 0.01], scl: [1, 1.3, 1] },
+        { geo: new THREE.SphereGeometry(0.027, 10, 10), color: steam, pos: [0.046, 0.16, 0.02], scl: [1, 1.25, 1] },
+      ]),
+    [steam]
   )
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
@@ -896,8 +912,9 @@ export function ClayHoodoo({ rock = PALETTE.hoodooRock, cap = PALETTE.hoodooCap,
         const rHi = s.r * (1 - 0.12 * (d + 1))
         parts.push({ geo: new THREE.CylinderGeometry(rHi, rLo, seg, 8), color: rock, pos: [s.px, y0 + seg / 2, s.pz] })
       }
-      // caprock crown
-      parts.push({ geo: new THREE.SphereGeometry(s.r * 1.35, 10, 8), color: cap, pos: [s.px, s.h, s.pz], scl: [1.1, 0.6, 1.1] })
+      // caprock crown — Task 94 sweep: was r*1.35 at 0.6 squash, a domed blob that read as a
+      // marshmallow hat; a caprock is a flat slab barely prouder than the spire under it
+      parts.push({ geo: new THREE.SphereGeometry(s.r * 1.18, 10, 8), color: cap, pos: [s.px, s.h, s.pz], scl: [1.05, 0.42, 1.05] })
     }
     return buildMergedClay(parts)
   }, [rock, cap])

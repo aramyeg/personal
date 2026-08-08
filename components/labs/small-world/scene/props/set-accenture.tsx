@@ -79,7 +79,10 @@ export function AccentureSet() {
 
       <PropAnchor theta={T(0.3)} x={0.45}><ClayMound r={0.35} color={PALETTE.dune} squash={0.4} /></PropAnchor>
       <PropAnchor theta={T(0.45)} x={-0.5}><ClayMound r={0.45} color={PALETTE.dune} squash={0.35} /></PropAnchor>
-      <PropAnchor theta={T(0.6)} x={0.3}><ClayMound r={0.3} color={PALETTE.honey} squash={0.3} /></PropAnchor>
+      {/* Task 94 sweep — this was honey at squash 0.3: a flat saturated-yellow COIN stamped on
+          the money band (the paint already carries honey on the crests; a honey clay disc on
+          top read as spilled paint). goldSand + a real dome profile folds it into the dunes. */}
+      <PropAnchor theta={T(0.6)} x={0.3}><ClayMound r={0.32} color={PALETTE.goldSand} squash={0.45} /></PropAnchor>
       <PropAnchor theta={T(0.78)} x={-0.4}><BankFacade /></PropAnchor>
       <PropAnchor theta={T(0.85)} x={0.35}><ClayRock color={PALETTE.dune} r={0.1} /></PropAnchor>
       <PropAnchor theta={T(0.2)} x={-0.3}><ClayRock color={PALETTE.dune} r={0.07} /></PropAnchor>
