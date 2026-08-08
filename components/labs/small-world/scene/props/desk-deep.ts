@@ -576,17 +576,25 @@ if ( uWater.x != 0.0 ) {
 export const WATER_FRAGMENT_DECL = 'uniform vec4 uWater;\nvarying float vWaterDark;'
 export const WATER_FRAGMENT_BODY = `if ( uWater.x != 0.0 ) diffuseColor.rgb *= vWaterDark;`
 
-// --- the bird ---------------------------------------------------------------
+// --- the little traveler -----------------------------------------------------
 
 /**
- * Click the clay lane and it becomes the bird — the deep tier's centrepiece. The flat lane on the
- * desk rolls into a ball, kneads, forms a standing bird facing the camera's 3/4, holds the pose,
- * and unrolls back to exactly the flat lane it was. The whole arc is the arm's baked clip: 8 roll
- * bones + one morph target (`BirdForm`, the entire standing bird — glTF applies morphs BEFORE
- * skinning, so the roll bones are back at identity by the time the form weight reaches 1, and the
- * crossfade between them IS the reshape). The two exported actions (bones + morph weights) were
- * merged into ONE `BirdAction` at splice time — 25 channels, one span, one `.time` — so the
- * two-actions desync trap is closed structurally, not by care.
+ * Click the clay lane and it becomes HER — the deep tier's centrepiece. The flat lane on the desk
+ * rolls into a ball, kneads, forms a little clay traveler — a chibi of the girl whose journey the
+ * visitor just finished — standing at the camera's 3/4, holds the pose, and unrolls back to
+ * exactly the flat lane it was. The whole arc is the arm's baked clip: 8 roll bones + one morph
+ * target (`BirdForm`, the entire standing figure — glTF applies morphs BEFORE skinning, so the
+ * roll bones are back at identity by the time the form weight reaches 1, and the crossfade between
+ * them IS the reshape). The two exported actions (bones + morph weights) were merged into ONE
+ * `BirdAction` at splice time — 25 channels, one span, one `.time` — so the two-actions desync
+ * trap is closed structurally, not by care.
+ *
+ * THE `BIRD` NAMES ARE DELIBERATE ARCHAEOLOGY. Every `BIRD*` identifier here, the `bird` mail
+ * slot, and `BirdForm`/`BirdAction` inside the GLB itself date from the round when the clay formed
+ * a bluebird. The traveler splice re-baked the morph target and NOTHING else — same names, same
+ * 25 channels, same duration, same rest bytes — so a rename would be a wide diff across the one
+ * file whose job is to stay cheaply verifiable, and would break the GLB↔code name identity the
+ * splice validator leans on. Read `BIRD` as "the clay figure".
  *
  * THE SWAP: the lane the visitor sees at rest is baked into `DeskBaked` (no node, unreachable).
  * The skinned `Bar_river` mesh is a DUPLICATE of it, authored at the ORIGIN (the inverse-bind
@@ -602,7 +610,7 @@ export const BIRD = {
    *  (span 0.0417..4.0833; `.time` below the first key clamps to the flat rest pose). */
   duration: 4.083333333333333,
   /**
-   * THE PERCH HOLD, AUTHORED AT RUNTIME (T97 P5). The clip's own hold — the standing bird,
+   * THE HOLD BEAT, AUTHORED AT RUNTIME (T97 P5). The clip's own hold — the standing figure,
    * f46–65, 1.92..2.71 s — lasts 0.79 s, and the blind review called the signature moment
    * blink-and-miss. The re-key is the arm's; the HOLD is ours: `sampleBird` plays `.time` 1:1
    * to `holdAt`, PARKS the clip there for `holdExtra` seconds (a paused action holding one time
@@ -639,7 +647,7 @@ export const BIRD = {
 export const BIRD_STEP = 1 / BIRD.stopFps
 
 /**
- * The whole arc the visitor sees — the clip, the authored perch, and ONE stop-motion step past the
+ * The whole arc the visitor sees — the clip, the authored hold, and ONE stop-motion step past the
  * clip's end. That last step is not padding: the quantiser holds pose k through step k, so without
  * it the final pose the visitor sees would be step 48 (clip 4.0 s) and the disarm to exact rest
  * would skip the unroll's last two baked frames — a pop, at the one moment the piece is claiming
@@ -671,7 +679,7 @@ export const BIRD_WRAPPER = {
 export const LANE = {
   /** The lane's vertices in DeskBaked, inclusive. */
   range: [29107, 29536],
-  /** Where hidden vertices collapse to — inside the bird's own body, so even a stray fragment
+  /** Where hidden vertices collapse to — inside the figure's own body, so even a stray fragment
    *  of a degenerate triangle would be occluded by the thing replacing it. */
   hidePoint: [2.2072, 1.3727, 9.8122],
 } as const
@@ -695,12 +703,12 @@ export function triggerBird(s: BirdState, now: number): void {
 }
 
 /**
- * The bird's clip time: `.time` = τ 1:1, except across the authored perch — τ inside
+ * The figure's clip time: `.time` = τ 1:1, except across the authored hold — τ inside
  * [holdAt, holdAt + holdExtra] parks the clip at `holdAt` (the standing pose), and everything
  * after resumes shifted by `holdExtra`. Piecewise in τ but still PURE in (now − t0): the clip IS
  * the closed form (LINEAR keys, scrub-backwards lands on the numbers it came from), and a paused
  * action fed one constant time is one constant pose. Past the whole arc the state disarms and
- * returns exact 0, so a lane that has been a bird is `Object.is`-identical to one that never was.
+ * returns exact 0, so a lane that has been her is `Object.is`-identical to one that never was.
  */
 export function sampleBird(s: BirdState, now: number): number {
   if (!s.active) return 0
@@ -719,8 +727,8 @@ export function sampleBird(s: BirdState, now: number): number {
  * with a one-display-frame push (`BIRD.settle`) and then held flat for the rest of its 83 ms.
  *
  * Pure in its argument, so everything the scrub law asks for survives: the same τ gives the same
- * pose on every machine, a paused action fed one constant time is one constant pose (so the perch
- * hold is bit-stable, and so is every plateau between steps), and both ends land on real clip
+ * pose on every machine, a paused action fed one constant time is one constant pose (so the hold
+ * beat is bit-stable, and so is every plateau between steps), and both ends land on real clip
  * boundaries — `stopMotion(0) === 0` exactly, and the last step is exactly `BIRD.duration`. The
  * two halves of the merged `BirdAction` — the 8 roll bones and the form morph — read this ONE
  * number, so they step in lockstep by construction rather than by care.
@@ -742,7 +750,7 @@ export function stopMotion(t: number): number {
   return q <= 0 ? 0 : q >= BIRD.duration ? BIRD.duration : q
 }
 
-/** The bird uniform: (active, 0, 0, 0). ONE writer — the desk-glb frame loop, which flips it in
+/** The traveler uniform: (active, 0, 0, 0). ONE writer — the desk-glb frame loop, which flips it in
  *  the same statement that toggles the skinned mesh's visibility, so the two halves of the swap
  *  cannot disagree for even a frame. */
 export const BIRD_UNIFORM = { value: new Float32Array(4) }
@@ -778,7 +786,7 @@ export function laneRayHit(
   return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
 }
 
-// --- the bird's shader chunk (DeskBaked) -------------------------------------
+// --- the traveler's shader chunk (DeskBaked) ---------------------------------
 
 /**
  * The lane-hide half of the swap: while the skinned twin is active, the baked lane's vertices
@@ -790,7 +798,7 @@ export const BIRD_VERTEX_BODY = `if ( uBird.x != 0.0 && gl_VertexID >= ${LANE.ra
   transformed = vec3( ${f(LANE.hidePoint[0])}, ${f(LANE.hidePoint[1])}, ${f(LANE.hidePoint[2])} );
 }`
 
-// --- the bird's shadow-floor lift (T97 P6) -----------------------------------
+// --- the traveler's shadow-floor lift (T97 P6) -------------------------------
 
 /**
  * THE ROLL'S COLOUR DISCONTINUITY, and the lift that closes it. The blind review saw the chip go
@@ -808,7 +816,14 @@ export const BIRD_VERTEX_BODY = `if ( uBird.x != 0.0 && gl_VertexID >= ${LANE.ra
  * returns a true +0 and the frame-1 swap seam with the baked lane stays bit-identical
  * STRUCTURALLY (that seam is gated by rest pixel-diff; it is the load-bearing property). The
  * luminance band scopes the lift to the underside's darks and fades it out by the family's mid
- * tones, so the approved hold-beat modelling — light belly, darker back — keeps its shape.
+ * tones, so the approved hold-beat modelling — lit front, shaded back — keeps its shape.
+ *
+ * THE TRAVELER SPLICE DID NOT WIDEN THIS. Measured on the two morph targets (742 verts each, same
+ * accessor shape): the bluebird form peaked at 0.8975 local with 93.7% of its verts past `dispHi`;
+ * the traveler form peaks at 0.7764 with 89.8% past it. The displacement ramp is therefore
+ * saturated in BOTH forms — it always was — and the term that actually scopes the lift is the
+ * luminance band below, not `dispLo/dispHi`. The constants are unchanged because the input they
+ * gate moved slightly INWARD, not outward.
  *
  * Runtime-only, deliberately: a floor-lift of the spliced bytes would be a GLB change — forbidden
  * this round — and would also brighten the RESTING lane through the transfer identity, trading
@@ -824,12 +839,13 @@ export const BIRD_LIFT = {
    *  the roll's curl (the coil's underside is showing well before any vertex has moved 0.25). */
   dispHi: 0.25,
   /** The luminance band the lift acts on: full at the baked underside's 0.104, fading to nothing
-   *  by the family's mid tones, so the approved hold-beat modelling (light belly, darker back)
-   *  keeps its shape. */
+   *  by the family's mid tones, so the approved hold-beat modelling (lit front, shaded back)
+   *  keeps its shape. This — not the displacement ramp, which both the bluebird and the traveler
+   *  forms saturate — is the term that actually scopes the lift. */
   lumLo: 0.12,
   lumHi: 0.42,
   /** Where lifted verts head: the lane family's own mid-blue (between the measured top band
-   *  0.42,0.57,0.67 and the mid tones the formed bird shows). */
+   *  0.42,0.57,0.67 and the mid tones the formed figure shows). */
   target: [0.3, 0.44, 0.57],
   /** How far a fully dark, fully displaced vertex travels toward the target. */
   k: 0.85,
