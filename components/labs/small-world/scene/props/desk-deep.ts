@@ -229,8 +229,9 @@ const INV_R2 = 1 / (COFFEE_ZONE.radius * COFFEE_ZONE.radius)
 export const BOOK = {
   /** Open pose, radians (108° — the spike's legibility verdict: the cover stands like a screen). */
   open: 1.8849555921538759,
-  /** The opening spring: ζ 0.55 overshoots ~12% (paper-on-board mass), ω settles it in ~0.55 s. */
-  zetaOpen: 0.55,
+  /** The opening spring: ζ 0.7 overshoots ~4% (paper-on-board mass, but calm — past ~112° the
+   *  camera sees the sheet's back, so the overshoot stays under it), ω settles in ~0.55 s. */
+  zetaOpen: 0.7,
   omegaOpen: 13.2,
   /** The cover starts falling shut this long after the click — open + the reading hold. */
   holdUntil: 1.8,
@@ -250,9 +251,13 @@ export const BOOK = {
  * front edge — the coordinate the flex ramp reads.
  */
 export const BOOK_HINGE = {
-  p0: [-3.4, 1.649, 8.8914],
-  dir: [0.99506, 0, 0.09932],
-  across: [-0.09932, 0, 0.99506],
+  /** Mid-thickness point on the spine line, derived in Blender off Book2's own mesh
+   *  (t92_book_build.py, T92_BOOK_AXIS) — the first provisional pivot sat 7 mm off the line. */
+  p0: [-3.366668, 1.649, 8.887815],
+  /** Points spine-long, SIGNED so that +θ about it lifts the front edge (right-hand rule; the
+   *  first capture round shipped the mirror and the cover dove through the stack). */
+  dir: [-0.995003, 0, -0.099841],
+  across: [-0.099841, 0, 0.995003],
   /** The flex ramp: rotation weight 0 at the spine, 1 past the crease — the spine band curls the
    *  way cardstock does instead of shearing (the slab's 48 attachment triangles live at u < 0.1). */
   rampLo: 0.02,
@@ -330,6 +335,30 @@ export const BOOK_VERTEX_BODY = (() => {
      position.x >= ${f(b.box.min[0])} && position.x <= ${f(b.box.max[0])} &&
      position.y >= ${f(b.box.min[1])} && position.y <= ${f(b.box.max[1])} &&
      position.z >= ${f(b.box.min[2])} && position.z <= ${f(b.box.max[2])} ) {
+  vec3 bkP = vec3( ${f(b.p0[0])}, ${f(b.p0[1])}, ${f(b.p0[2])} );
+  vec3 bkAx = vec3( ${f(b.dir[0])}, ${f(b.dir[1])}, ${f(b.dir[2])} );
+  float bkU = dot( position - bkP, vec3( ${f(b.across[0])}, ${f(b.across[1])}, ${f(b.across[2])} ) );
+  float bkW = smoothstep( ${f(b.rampLo)}, ${f(b.rampHi)}, bkU );
+  float bkTh = uBookHinge.x * bkW;
+  float bkC = cos( bkTh );
+  float bkS = sin( bkTh );
+  vec3 bkQ = transformed - bkP;
+  transformed = bkP + bkQ * bkC + cross( bkAx, bkQ ) * bkS + bkAx * dot( bkAx, bkQ ) * ( 1.0 - bkC );
+}`
+})()
+
+/**
+ * The verso's own chunk — the SAME axis, angle and flex ramp as the cover's, minus the box (this
+ * material renders only the verso mesh). The verso was first opened as a rigid OBJECT rotation,
+ * and the capture round showed why that is wrong: the cover's flex zone curls, a rigid sheet
+ * cannot follow it, and the fillet showed the slab's unlit underside as a black band. Paper glued
+ * to board curls WITH the board; giving the verso the same weighted field is both the fix and the
+ * physically honest statement. One uniform writes both — they cannot disagree.
+ */
+export const VERSO_VERTEX_DECL = 'uniform vec4 uBookHinge;'
+export const VERSO_VERTEX_BODY = (() => {
+  const b = BOOK_HINGE
+  return `if ( uBookHinge.x != 0.0 ) {
   vec3 bkP = vec3( ${f(b.p0[0])}, ${f(b.p0[1])}, ${f(b.p0[2])} );
   vec3 bkAx = vec3( ${f(b.dir[0])}, ${f(b.dir[1])}, ${f(b.dir[2])} );
   float bkU = dot( position - bkP, vec3( ${f(b.across[0])}, ${f(b.across[1])}, ${f(b.across[2])} ) );

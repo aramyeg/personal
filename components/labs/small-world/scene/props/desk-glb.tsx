@@ -9,10 +9,11 @@ import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
-  BOOK_HINGE,
   BOOK_UNIFORM,
   BOOK_VERTEX_BODY,
   BOOK_VERTEX_DECL,
+  VERSO_VERTEX_BODY,
+  VERSO_VERTEX_DECL,
   STIR_FRAGMENT_BODY,
   STIR_FRAGMENT_DECL,
   STIR_UNIFORM,
@@ -219,13 +220,22 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
  * and NO hinge chunk — a shader hinge on top of the object rotation would open the book twice.
  */
 export function versoMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
-  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  // DoubleSide, deliberately: paper is visible from both faces, and during the opening spring's
+  // brief overshoot past ~112° the camera catches the sheet's back — single-sided that was a
+  // black flash (first capture round), double-sided it is the drawing seen through thin paper.
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, side: THREE.DoubleSide })
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
-    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
-      '#include <color_vertex>',
-      '#include <color_vertex>\n vDimColor = color_1.rgb;'
+    // The verso opens IN THE SHADER, with the cover's exact field (see VERSO_VERTEX_BODY for why
+    // the first, rigid-object version was wrong).
+    shader.uniforms.uBookHinge = BOOK_UNIFORM
+    shader.vertexShader = (
+      VERSO_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
     )
+      .replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + VERSO_VERTEX_BODY)
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
@@ -485,7 +495,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     glaze.material = glossMaterial(equirect, lights.current, gloss.current)
     // The notebook's verso (Task 92): present once the interior ships in the GLB; its absence is a
     // desk without a deep book, not a broken desk.
-    const verso = findMesh(scene, 'BookVerso' as DeskMeshName)
+    const verso = findMesh(scene, 'BookVerso')
     if (verso) verso.material = versoMaterial(lights.current)
     return { surface, baked, metal, glaze, verso, metalMat: metal.material as THREE.MeshStandardMaterial }
   }, [assets, env, equirect])
@@ -500,32 +510,10 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
   }, [built])
 
   const last = useRef(Number.NaN)
-  const lastHinge = useRef(0)
-  const hingeAxis = useMemo(
-    () => new THREE.Vector3(BOOK_HINGE.dir[0], BOOK_HINGE.dir[1], BOOK_HINGE.dir[2]),
-    []
-  )
-  const hingeP0 = useMemo(() => new THREE.Vector3(BOOK_HINGE.p0[0], BOOK_HINGE.p0[1], BOOK_HINGE.p0[2]), [])
-  const hingeTmp = useMemo(() => new THREE.Vector3(), [])
   useFrame(() => {
     if (!built) return
-    // The verso follows the cover: the SAME angle the slab's shader chunk reads, applied as a
-    // rigid rotation about the same axis. Written only on change; at exact 0 the transform is
-    // identity, so a rest frame is the authored mesh untouched.
-    if (built.verso && BOOK_UNIFORM.value[0] !== lastHinge.current) {
-      const th = BOOK_UNIFORM.value[0]
-      lastHinge.current = th
-      if (th === 0) {
-        built.verso.quaternion.identity()
-        built.verso.position.set(0, 0, 0)
-      } else {
-        built.verso.quaternion.setFromAxisAngle(hingeAxis, th)
-        // p' = P0 + R(p − P0) = Rp + (P0 − R·P0): the mesh keeps authored coordinates and the
-        // object transform supplies the pivot.
-        hingeTmp.copy(hingeP0).applyQuaternion(built.verso.quaternion)
-        built.verso.position.copy(hingeP0).sub(hingeTmp)
-      }
-    }
+    // The verso needs no per-frame transform: it opens in its own vertex shader, off the same
+    // BOOK_UNIFORM the cover's chunk reads (see versoMaterial).
     const u = studioLightsFor(journeyRef.current.ending)
     if (u === last.current) return
     last.current = u

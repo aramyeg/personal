@@ -32,7 +32,18 @@ export const DESK_GLB_URL = '/labs/small-world/desk.glb'
  *    ships DIFFUSE-baked with its specular added at runtime. One extra draw call, bought with the
  *    measurement in task-71-report.md rather than with a preference.
  */
-export const DESK_MESHES = ['DeskSurface', 'DeskBaked', 'DeskMetal', 'DeskGloss'] as const
+/**
+ * ...and a FIFTH, from Task 92: `BookVerso` — the paper glued to the notebook cover's underside,
+ * carrying the pencil sketch the deep tier's open reveals. It could not join `DeskBaked`, because
+ * it MOVES: the runtime rotates it about the spine axis by the same angle the cover's shader
+ * chunk reads (`desk-deep.ts`). It was spliced into the shipped file SURGICALLY
+ * (`t92_book_splice.mjs`) rather than re-exported through the pipeline, because a pipeline re-run
+ * re-bakes every vertex colour a little and the T92 rest gate is pixel-diff ZERO against the
+ * previous ship — every pre-existing byte of every pre-existing accessor is copied verbatim.
+ * Measured cost of the whole interior (page + gutter appended to `DeskBaked`, plus this mesh):
+ * +25,971 B gzipped on the file on disk, inside the standing budget below.
+ */
+export const DESK_MESHES = ['DeskSurface', 'DeskBaked', 'DeskMetal', 'DeskGloss', 'BookVerso'] as const
 export type DeskMeshName = (typeof DESK_MESHES)[number]
 
 /**

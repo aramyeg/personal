@@ -154,17 +154,20 @@ describe('desk GLB — payload and draw cost', () => {
     expect(width('DeskGloss', 'COLOR_1')).toBe('VEC4')
   })
 
-  it('costs four draw calls, not one per prop colour', () => {
+  it('costs five draw calls, not one per prop colour', () => {
     // glTF splits a mesh into one primitive per material and three.js draws one primitive per call.
     // The Blender set carries ~40 prop tints; they live in the vertex attribute, so one material per
-    // mesh is enough. FOUR rather than T68's three: the donut glaze cannot share the unlit material
-    // the matte set uses (see DESK_MESHES), and that draw call is the price of the exception.
+    // mesh is enough. FOUR from T71/T81 (the donut glaze cannot share the unlit material the matte
+    // set uses — see DESK_MESHES) plus ONE from T92: the notebook's verso, which moves and so
+    // cannot live inside the joined bake. The count is the contract's length, not a literal, so a
+    // sanctioned mesh cannot fail this gate while an accidental primitive split still does.
     const primitives = glb.json.meshes.reduce((s, m) => s + m.primitives.length, 0)
-    expect(primitives).toBe(4)
+    expect(primitives).toBe(DESK_MESHES.length)
+    // the verso shares T81_BAKED rather than adding a material — the runtime replaces materials
     expect(glb.json.materials).toHaveLength(4)
   })
 
-  it('ships exactly the four meshes the lab looks up by name', () => {
+  it('ships exactly the five meshes the lab looks up by name', () => {
     expect(glb.json.meshes.map((m) => m.name).sort()).toEqual([...DESK_MESHES].sort())
   })
 })

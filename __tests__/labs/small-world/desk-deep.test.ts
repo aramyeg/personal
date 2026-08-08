@@ -200,25 +200,32 @@ describe("the notebook's hinge, held to the shipped desk", () => {
     x >= hb.min[0] && x <= hb.max[0] && y >= hb.min[1] && y <= hb.max[1] && z >= hb.min[2] && z <= hb.max[2]
 
   it('selects the cover slab, the whole cover slab, and nothing but the cover slab', () => {
-    // the slab = Book2 vertices above the shell's own top plane; the hinge box must agree exactly
+    // Three layers meet under the hinge floor and the box must cut BETWEEN them: the slab's own
+    // bottom face at 1.6410 (moves), the spliced interior at 1.6398..1.6399 (static, Task 92's
+    // page + gutter), the pages block at 1.6390 and below (static). The floor 1.63995 is the cut.
     let slab = 0
     let boxed = 0
     let disagree = 0
+    let interior = 0
     for (let i = 0; i < pos.length; i += 3) {
       const x = pos[i]
       const y = pos[i + 1]
       const z = pos[i + 2]
       const inBook =
         x >= BOOK_ZONE.min[0] && x <= BOOK_ZONE.max[0] && z >= BOOK_ZONE.min[2] && z <= BOOK_ZONE.max[2]
-      const isSlab = inBook && y > 1.6395
+      const isSlab = inBook && y > hb.min[1]
       const b = inHinge(x, y, z)
       if (isSlab) slab++
       if (b) boxed++
       if (isSlab !== b) disagree++
+      // the revealed page + gutter: strictly between the pages block and the hinge floor
+      if (inBook && y > 1.6392 && y < hb.min[1]) interior++
     }
     expect(slab).toBeGreaterThanOrEqual(250)
     expect(disagree, 'vertices the hinge box tears off the slab (or steals from the shell)').toBe(0)
     expect(boxed).toBe(slab)
+    // the interior shipped, and none of it can be reached by the hinge
+    expect(interior).toBeGreaterThanOrEqual(300)
   })
 
   it("the spine axis lies along the slab's attachment edge (the measured yaw)", () => {
