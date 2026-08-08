@@ -8,6 +8,7 @@ import {
   type NudgeSpring,
 } from './desk-nudge'
 import { DESK_NUDGE_ZONES } from './desk-glb-contract'
+import { PENCUP_PENS } from './desk-pens'
 import { laneRayHit } from './desk-deep'
 import { globeRayHit } from '../globe-nudge'
 
@@ -398,21 +399,10 @@ export const PEN_CORE_R = 0.05
 
 /** The five pens: id-ranges for the gate, fitted CAPSULES for the pick (round 3 — their round-2
  *  AABBs still carried air at the corners that ate chip and bar clicks under the grazing eye;
- *  banded-mean endpoints, fitted max vert-to-segment 0.1026 incl. the clips → r 0.13). */
-export const PENCUP_PENS: readonly {
-  readonly id: string
-  readonly mesh: 'DeskBaked' | 'DeskMetal'
-  readonly range: readonly [number, number]
-  readonly a: readonly [number, number, number]
-  readonly b: readonly [number, number, number]
-  readonly r: number
-}[] = [
-  { id: 'darkRed', mesh: 'DeskBaked', range: [14348, 14928], a: [2.8033, 1.4615, 11.7933], b: [2.62, 2.5645, 11.6655], r: 0.13 },
-  { id: 'white1', mesh: 'DeskBaked', range: [14929, 15489], a: [2.9657, 1.4613, 11.8292], b: [3.1764, 2.4835, 11.7702], r: 0.13 },
-  { id: 'pink', mesh: 'DeskBaked', range: [15490, 16030], a: [2.9849, 1.4352, 11.8973], b: [3.166, 2.3957, 11.9857], r: 0.13 },
-  { id: 'white2', mesh: 'DeskBaked', range: [16031, 16591], a: [2.8766, 1.4615, 11.7367], b: [2.8936, 2.5345, 11.5203], r: 0.13 },
-  { id: 'roseGold', mesh: 'DeskMetal', range: [1106, 1686], a: [2.85, 1.452, 11.9415], b: [2.7856, 2.6162, 12.1518], r: 0.13 },
-] as const
+ *  banded-mean endpoints, fitted max vert-to-segment 0.1026 incl. the clips → r 0.13).
+ *  MEASURED IN `desk-pens.ts` since T100 — the clatter that DISPLACES a pen needs the same
+ *  per-pen identity this claim does, and a measurement with two consumers gets one owner. */
+export { PENCUP_PENS }
 
 /**
  * Ray vs a solid vertical cylinder (finite, capped): the intersection of the infinite

@@ -418,8 +418,9 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
     }
     sampleRock(globeSpring.current, GLOBE_ROCK, now, GLOBE_UNIFORM.value)
     NUDGE_UNIFORMS.donut.value[3] = sampleSquash(squash.current, now)
-    RATTLE_UNIFORM.value[0] = sampleRattle(rattle.current, now)
-    RATTLE_UNIFORM.value[1] = now
+    // The pens' clatter: two shared waveforms, five voices (T100). Both components are written by
+    // one call, and both snap to +0 together — see desk-pens.ts.
+    sampleRattle(rattle.current, now, RATTLE_UNIFORM.value)
     BEND_UNIFORM.value[0] = samplePeck(peck.current, now)
     NOTE_CURL_UNIFORM.value = samplePress(press.current, now)
     // ...and the station's seven uniforms, each sampler snapping its own exact +0 at rest.

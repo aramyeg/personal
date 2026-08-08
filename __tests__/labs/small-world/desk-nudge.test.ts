@@ -8,7 +8,11 @@ import {
   PECK,
   PRESS_CLICK,
   PRESS_EPS,
-  RATTLE,
+  CLATTER,
+  PENCUP_AXIS,
+  PENCUP_PENS,
+  PEN_GEOM,
+  PEN_RIM_Y,
   RATTLE_UNIFORM,
   ROCK_PARAMS,
   SQUASH_PARAMS,
@@ -249,38 +253,92 @@ describe("the donut's jelly squish", () => {
   })
 })
 
-describe("the pens' rattle", () => {
-  it('decays inside the budget and snaps to EXACT zero', () => {
+describe("the pens' clatter", () => {
+  const out = () => new Float32Array(4)
+
+  it('starts at EXACTLY zero displacement — a tap may not pop the pens into a pose', () => {
     const s = restingRattle()
+    const o = out()
     triggerRattle(s, 0, 1)
-    expect(sampleRattle(s, 0)).toBeCloseTo(RATTLE.amp, 5)
-    expect(sampleRattle(s, 0.7)).toBeLessThan(RATTLE.amp * 0.05)
-    let v = 1
-    for (let t = 0.7; t < 4 && v !== 0; t += 1 / 60) v = sampleRattle(s, t)
-    expect(Object.is(v, 0)).toBe(true)
-    expect(s.amp).toBe(0)
+    sampleRattle(s, 0, o)
+    // both waveforms are from-rest impulse responses: position 0, velocity everything
+    expect(o[0]).toBe(0)
+    expect(o[1]).toBe(0)
+  })
+
+  it('decays inside the budget and snaps to EXACT zero on both waveforms', () => {
+    const s = restingRattle()
+    const o = out()
+    triggerRattle(s, 0, 1)
+    let peak = 0
+    for (let t = 0; t < 0.4; t += 1 / 240) {
+      sampleRattle(s, t, o)
+      peak = Math.max(peak, Math.abs(o[0]!), Math.abs(o[1]!))
+    }
+    // the authored crest is 1 on each waveform; the pair never exceeds it from one tap
+    expect(peak).toBeGreaterThan(0.85)
+    expect(peak).toBeLessThanOrEqual(1.0001)
+    sampleRattle(s, 0.75, o)
+    expect(Math.max(Math.abs(o[0]!), Math.abs(o[1]!))).toBeLessThan(0.06)
+    let live = true
+    for (let t = 0.75; t < 4 && live; t += 1 / 60) live = sampleRattle(s, t, o)
+    expect(live).toBe(false)
+    expect(Object.is(o[0], 0)).toBe(true)
+    expect(Object.is(o[1], 0)).toBe(true)
+    expect(s.active).toBe(false)
   })
 
   it('re-triggers stack continuously and cap out', () => {
     const s = restingRattle()
+    const o = out()
     triggerRattle(s, 0, 1)
-    const before = sampleRattle(s, 0.1)
+    sampleRattle(s, 0.1, o)
+    const before = Math.hypot(o[0]!, o[1]!)
     triggerRattle(s, 0.1, 1)
-    // the envelope may only step UP by at most one fresh impulse, and never over the cap
-    const after = sampleRattle(s, 0.1)
-    expect(after).toBeGreaterThanOrEqual(before)
-    expect(after).toBeLessThanOrEqual(RATTLE.cap)
+    // velocity-continuous: the displacement itself may not jump at the instant of the re-tap
+    sampleRattle(s, 0.1, o)
+    expect(Math.hypot(o[0]!, o[1]!)).toBeCloseTo(before, 9)
     for (let i = 0; i < 20; i++) triggerRattle(s, 0.2 + i * 0.01, 1)
-    expect(sampleRattle(s, 0.4)).toBeLessThanOrEqual(RATTLE.cap)
+    let peak = 0
+    for (let t = 0.4; t < 1.2; t += 1 / 240) {
+      sampleRattle(s, t, o)
+      peak = Math.max(peak, Math.abs(o[0]!), Math.abs(o[1]!))
+    }
+    expect(peak).toBeLessThanOrEqual(CLATTER.cap * 1.02)
   })
 
-  it('the spatial phase splits pens without shearing one: cross-cup spread ≫ within-pen spread', () => {
-    // pens stand ~0.66 u apart across the cup and are ~0.1 u thick
-    const phase = (x: number, z: number) => x * RATTLE.kx + z * RATTLE.kz
-    const acrossCup = Math.abs(phase(3.19, 11.86) - phase(2.57, 11.7))
-    const withinPen = Math.abs(phase(2.67, 11.72) - phase(2.57, 11.7))
-    expect(acrossCup).toBeGreaterThan(1.5)
-    expect(withinPen).toBeLessThan(0.45)
+  it('the five pens are five distinct voices, and each one is DISPLACED, not sheared', () => {
+    // every pen levers about its own crossing of the cup rim, and its tip travels tipArm·lean
+    expect(PEN_GEOM).toHaveLength(5)
+    const seen = new Set<string>()
+    for (const g of PEN_GEOM) {
+      expect(g.pivot[1]).toBeCloseTo(PEN_RIM_Y, 9)
+      expect(Math.hypot(g.dir[0], g.dir[1])).toBeCloseTo(1, 9)
+      // the lean is signed and mixed differently per pen — no two share a voice
+      const key = `${g.fast.toFixed(3)}/${g.slow.toFixed(3)}`
+      expect(seen.has(key)).toBe(false)
+      seen.add(key)
+      // ...and no pen out-shouts the set
+      expect(Math.abs(g.fast) + Math.abs(g.slow)).toBeCloseTo(1, 9)
+    }
+    // THE T100 BAR: the shipped shear moved a tip 0.027 u (≈3.6 px). Every pen must now beat
+    // 0.09 u (≈12 px) at its worst-case lean, or the displacement is not a picture.
+    for (const g of PEN_GEOM) {
+      expect(g.tipArm * g.lean).toBeGreaterThan(0.09)
+      // ...and none of them flails: the gains stay inside a set that reads as one clatter
+      expect(g.tipArm * g.lean).toBeLessThan(0.14)
+    }
+  })
+
+  it('the pens fan APART: every lean direction points away from the cup axis', () => {
+    for (const g of PEN_GEOM) {
+      const pen = PENCUP_PENS.find((p) => p.id === g.id)!
+      const ox = pen.b[0] - PENCUP_AXIS[0]
+      const oz = pen.b[2] - PENCUP_AXIS[1]
+      const l = Math.hypot(ox, oz)
+      // the tangential share may skew the lean, never reverse it
+      expect((g.dir[0] * ox + g.dir[1] * oz) / l).toBeGreaterThan(0.9)
+    }
   })
 })
 
@@ -416,15 +474,19 @@ describe('the shader chunks: the signatures are in the codegen', () => {
     // the donut squashes — scale, not Rodrigues
     expect(baked.body).toMatch(/uNudge_donut[\s\S]*?transformed\.xz = vec2/)
     expect(baked.body).not.toMatch(/uNudge_donut[\s\S]{0,400}cross\( swAx/)
-    // the pens rattle above the measured rim, with the spatial phase
-    expect(baked.body).toContain('uRattle_pencup.x != 0.0')
-    expect(baked.body).toContain(RATTLE.rimY.toFixed(5))
-    expect(baked.body).toContain(RATTLE.kx.toFixed(5))
+    // the pens are DISPLACED one by one: per-pen gl_VertexID selects, levered about the rim
+    expect(baked.body).toContain('uPenClatter.x != 0.0 || uPenClatter.y != 0.0')
+    expect(baked.body).toContain(PEN_RIM_Y.toFixed(5))
+    for (const g of PEN_GEOM.filter((p) => p.mesh === 'DeskBaked')) {
+      expect(baked.body).toContain(`gl_VertexID >= ${g.range[0]} && gl_VertexID <= ${g.range[1]}`)
+    }
+    // ...rigidly: a rotation about the pivot, so the pen keeps its length
+    expect(baked.body).toContain('cross( pnAx, pnQ )')
     // the bird bends over a smooth neck band — no rigid head split
     expect(baked.body).toContain('uBend_bird.x != 0.0')
     expect(baked.body).toContain('smoothstep')
     // uniforms travel with the chunk
-    expect(baked.uniforms.uRattle_pencup).toBe(RATTLE_UNIFORM)
+    expect(baked.uniforms.uPenClatter).toBe(RATTLE_UNIFORM)
     expect(baked.uniforms.uBend_bird).toBe(BEND_UNIFORM)
   })
 
@@ -435,9 +497,12 @@ describe('the shader chunks: the signatures are in the codegen', () => {
     expect(zonesForMesh('DeskSurface')).toEqual([])
   })
 
-  it('the metal rattles its gold pen but never bends or squashes', () => {
+  it('the metal clatters its gold pen but never bends or squashes', () => {
     const metal = nudgeVertexChunk('DeskMetal')
-    expect(metal.body).toContain('uRattle_pencup.x != 0.0')
+    expect(metal.body).toContain('uPenClatter.x != 0.0')
+    // ...and ONLY its own pen: the four baked pens are not in this mesh
+    expect(metal.body).toContain('gl_VertexID >= 1106 && gl_VertexID <= 1686')
+    expect(metal.body).not.toContain('gl_VertexID >= 14348')
     expect(metal.body).not.toContain('uBend_bird')
     expect(metal.body).not.toContain('uNudge_donut')
   })
@@ -448,11 +513,14 @@ describe('the shader chunks: the signatures are in the codegen', () => {
     expect(gloss.body).toContain('transformed.xz')
   })
 
-  it('the normal twin turns only the rockers (a rattle translates, it does not turn)', () => {
+  it('the normal twin turns the rockers AND the rose gold pen (T100: the clatter rotates)', () => {
     const chunk = nudgeNormalChunk('DeskMetal', 'objectNormal')
     expect(chunk).toContain('objectNormal =')
     expect(chunk).toContain('uNudge_mug.w != 0.0')
     expect(chunk).toContain('uNudge_pencup.w != 0.0')
+    // the pen's rigid 11° turn must carry its normals, or the highlight slides off it
+    expect(chunk).toContain('uPenClatter.x != 0.0')
+    expect(chunk).toContain('gl_VertexID >= 1106 && gl_VertexID <= 1686')
     expect(chunk).not.toContain('transformed')
     expect(chunk).not.toContain('uRattle')
   })

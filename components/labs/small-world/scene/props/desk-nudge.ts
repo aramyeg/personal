@@ -7,6 +7,25 @@ import {
 import { DESK_NOTE } from '../desk-stage'
 import { STUDIO_LIGHTS_FULL } from '../desk-studio'
 import type { EndingState } from '../../ending-timeline'
+import { sampleAxis, type SpringAxis } from './desk-nudge-spring'
+import { PEN_CLATTER_DECL, penClatterNormalBlock, penClatterVertexBlock, RATTLE_UNIFORM } from './desk-pens'
+
+/** The one damped oscillator, re-exported from where it now lives — see desk-nudge-spring.ts for
+ *  why it moved (the pens needed it BELOW desk-station's import of this file). */
+export { sampleAxis, type SpringAxis }
+export {
+  CLATTER,
+  PENCUP_AXIS,
+  PENCUP_PENS,
+  PEN_EPS,
+  PEN_GEOM,
+  PEN_RIM_Y,
+  RATTLE_UNIFORM,
+  restingRattle,
+  sampleRattle,
+  triggerRattle,
+  type RattleState,
+} from './desk-pens'
 
 /**
  * THE DESK ANSWERS THE POINTER (Task 89) — every number and function the interactions are made of,
@@ -108,7 +127,6 @@ export const REST_EPS = 0.0004
 /** No pile-up: impulses that would swing past this multiple of the authored peak are clamped. */
 export const AMP_CAP = 1.75
 
-export type SpringAxis = { x0: number; v0: number }
 export type NudgeSpring = { t0: number; x: SpringAxis; z: SpringAxis; active: boolean }
 
 export const restingSpring = (): NudgeSpring => ({
@@ -117,25 +135,6 @@ export const restingSpring = (): NudgeSpring => ({
   z: { x0: 0, v0: 0 },
   active: false,
 })
-
-/** Position and velocity of one axis at `tau` seconds after its initial conditions — the closed
- *  form that makes the determinism clause cheap to keep. */
-export function sampleAxis(
-  s: SpringAxis,
-  omega: number,
-  zeta: number,
-  tau: number
-): { x: number; v: number } {
-  const wd = omega * Math.sqrt(1 - zeta * zeta)
-  const decay = Math.exp(-zeta * omega * tau)
-  const b = (s.v0 + zeta * omega * s.x0) / wd
-  const c = Math.cos(wd * tau)
-  const sn = Math.sin(wd * tau)
-  return {
-    x: decay * (s.x0 * c + b * sn),
-    v: decay * ((b * wd - zeta * omega * s.x0) * c - (s.x0 * wd + zeta * omega * b) * sn),
-  }
-}
 
 const TAU = Math.PI * 2
 
@@ -274,55 +273,13 @@ export function sampleSquash(s: SquashSpring, now: number): number {
   return cur.x
 }
 
-// --- the pens' rattle -------------------------------------------------------
-
-/**
- * The cup's signature lives ABOVE ITS RIM: every vertex there sways laterally in proportion to its
- * height over the rim — a lever about the rim contact, which is exactly how real pens rattle in a
- * real cup — with a per-pen phase read off rest position (the pens stand at different (x, z), so a
- * gentle spatial phase gives each its own beat; across ONE pen's width the phase varies < 0.4 rad,
- * sub-pixel shear at these amplitudes). The factor reaches zero exactly at the rim, so the field
- * is continuous and the cup itself — whose highest vertex IS the rim — never feels it. The foil
- * print sits below the rim and rides the cup.
- *
- * The oscillation is evaluated in-shader from a CPU-stamped envelope and the module's own clock:
- * still a closed form of the trigger sequence, still exact +0 when the envelope snaps.
- */
-export const RATTLE = {
-  /** Lateral sway per unit lever height, world units, at envelope 1. */
-  amp: 0.045,
-  cap: 0.08,
-  decay: 5.0,
-  /** rad/s of the two sway components; detuned so the jitter is elliptical, not a metronome. */
-  wx: 44.0,
-  wz: 49.7,
-  /** The static spatial phase: gentle enough to keep one pen coherent, steep enough to split pens. */
-  kx: 3.4,
-  kz: 2.6,
-  /** The rim line — `PenCup`'s measured top, where the lever factor reaches zero. */
-  rimY: 1.9626,
-}
-export const RATTLE_EPS = 0.0008
-
-export type RattleState = { amp: number; tA: number }
-export const restingRattle = (): RattleState => ({ amp: 0, tA: 0 })
-
-export function triggerRattle(s: RattleState, now: number, strength: number): void {
-  const cur = s.amp * Math.exp(-RATTLE.decay * (now - s.tA))
-  s.amp = Math.min(cur + RATTLE.amp * strength, RATTLE.cap)
-  s.tA = now
-}
-
-/** The rattle envelope for this frame — the shader multiplies it by the per-pen sine. */
-export function sampleRattle(s: RattleState, now: number): number {
-  if (s.amp === 0) return 0
-  const a = s.amp * Math.exp(-RATTLE.decay * (now - s.tA))
-  if (a < RATTLE_EPS) {
-    s.amp = 0
-    return 0
-  }
-  return a
-}
+// --- the pens' clatter ------------------------------------------------------
+//
+// The cup's signature used to live in a CONTINUOUS FIELD here — lateral sway proportional to
+// height over the rim, phased by rest position. T100 replaced it with a per-pen RIGID
+// displacement, which needs the per-pen identity `desk-station.ts` had already measured; both now
+// live in `desk-pens.ts` (one owner, two importers) and are re-exported above. The diagnosis that
+// forced the move — 3.6 px of shear at 7 Hz on the measured money shot — is written down there.
 
 // --- the bird's peck --------------------------------------------------------
 
@@ -580,8 +537,6 @@ export const NUDGE_UNIFORMS: Record<DeskNudgeKind, { value: Float32Array }> = {
   penguin: { value: new Float32Array(4) },
 }
 
-/** The pens' rattle: (envelope, module clock, 0, 0). */
-export const RATTLE_UNIFORM = { value: new Float32Array(4) }
 /** The bird's bend angle: (θ, 0, 0, 0). */
 export const BEND_UNIFORM = { value: new Float32Array(4) }
 /** ...and the note's one scalar. 1 is the authored curl; a press dips below it, never above. */
@@ -636,19 +591,11 @@ const squashBlock = (z: Zone, normalVar?: string): string => {
 }`
 }
 
-/** The pens' rattle: lateral sway ∝ height above the rim, phase from rest position. Zero exactly
- *  at the rim, so the cup — whose highest vertex IS the rim — never feels it. Purely a
- *  translation, so normals are untouched (the gold pen's reflection travels, it does not turn). */
-const rattleBlock = (z: Zone): string =>
-  `if ( uRattle_pencup.x != 0.0 &&
-     ${boxTest(z)} ) {
-  float swLever = max( 0.0, position.y - ${f(RATTLE.rimY)} );
-  if ( swLever > 0.0 ) {
-    float swPh = position.x * ${f(RATTLE.kx)} + position.z * ${f(RATTLE.kz)};
-    transformed.x += uRattle_pencup.x * swLever * sin( ${f(RATTLE.wx)} * uRattle_pencup.y + swPh );
-    transformed.z += uRattle_pencup.x * swLever * 0.62 * cos( ${f(RATTLE.wz)} * uRattle_pencup.y + swPh * 1.31 );
-  }
-}`
+/** The pens' clatter: five rigid per-pen displacements, selected by `gl_VertexID` range and
+ *  levered about each pen's own crossing of the cup rim. Built in `desk-pens.ts`, where the
+ *  geometry it reads also lives. */
+const clatterBlock = (mesh: DeskMeshName): string =>
+  mesh === 'DeskBaked' || mesh === 'DeskMetal' ? penClatterVertexBlock(mesh) : ''
 
 /** The bird's peck: a clay bend about the neck line, weight ramping smoothly over the neck band —
  *  no rigid split of a merged body, no tear possible from a continuous field. */
@@ -665,12 +612,14 @@ const bendBlock = (z: Zone): string =>
   }
 }`
 
-const blocksFor = (z: Zone, normalVar?: string): string => {
+const blocksFor = (z: Zone, mesh: DeskMeshName, normalVar?: string): string => {
   switch (z.kind) {
     case 'donut':
       return squashBlock(z, normalVar)
     case 'pencup':
-      return rockBlock(z, normalVar) + '\n' + rattleBlock(z)
+      // the cup rocks as a body; its PENS are displaced one by one, after it (deep-then-micro
+      // order is irrelevant here — the two touch disjoint vertex sets by construction)
+      return rockBlock(z, normalVar) + '\n' + clatterBlock(mesh)
     case 'bird':
       return rockBlock(z, normalVar) + '\n' + bendBlock(z)
     default:
@@ -699,8 +648,8 @@ export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): NudgeC
     uniforms[`uNudge_${z.kind}`] = NUDGE_UNIFORMS[z.kind]
     decls.push(`uniform vec4 uNudge_${z.kind};`)
     if (z.kind === 'pencup') {
-      uniforms.uRattle_pencup = RATTLE_UNIFORM
-      decls.push('uniform vec4 uRattle_pencup;')
+      uniforms.uPenClatter = RATTLE_UNIFORM
+      decls.push(PEN_CLATTER_DECL)
     }
     if (z.kind === 'bird') {
       uniforms.uBend_bird = BEND_UNIFORM
@@ -709,7 +658,7 @@ export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): NudgeC
   }
   return {
     decl: decls.join('\n'),
-    body: zones.map((z) => blocksFor(z, normalVar)).join('\n'),
+    body: zones.map((z) => blocksFor(z, mesh, normalVar)).join('\n'),
     uniforms,
   }
 }
@@ -717,11 +666,13 @@ export function nudgeVertexChunk(mesh: DeskMeshName, normalVar?: string): NudgeC
 /**
  * The normal-only twin, for `MeshStandardMaterial`: its chunk order consumes `objectNormal` in
  * `defaultnormal_vertex` BEFORE `begin_vertex` runs, so the rotation has to land in
- * `beginnormal_vertex` where the variable is born. Only the ROCKERS turn normals — the rattle is
- * a translation and the squash's hosts are not in the metal mesh.
+ * `beginnormal_vertex` where the variable is born. The rockers turn normals; so — since T100 — do
+ * the PENS, whose clatter became a rigid 11° rotation (the T89 rattle was a pure translation and
+ * correctly turned nothing; the rose gold would otherwise slide out from under its own highlight).
+ * The squash's hosts are not in the metal mesh.
  */
 export function nudgeNormalChunk(mesh: DeskMeshName, normalVar: string): string {
-  return zonesForMesh(mesh)
+  const rockers = zonesForMesh(mesh)
     .filter((z) => z.kind !== 'donut')
     .map(
       (z) => `if ( uNudge_${z.kind}.w != 0.0 &&
@@ -733,4 +684,7 @@ export function nudgeNormalChunk(mesh: DeskMeshName, normalVar: string): string 
 }`
     )
     .join('\n')
+  const pens =
+    mesh === 'DeskBaked' || mesh === 'DeskMetal' ? penClatterNormalBlock(mesh, normalVar) : ''
+  return pens ? rockers + '\n' + pens : rockers
 }
