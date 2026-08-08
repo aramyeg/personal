@@ -7,6 +7,7 @@ import { ZOOM_START } from '../ending-timeline'
 import { NOTE_SETTLED_ZOOM } from './note-settle'
 import { useConnectSpacing } from './use-connect-spacing'
 import { useNoteTracking } from './use-note-tracking'
+import { useFinePointer } from '../scene/use-reduced-motion'
 import { PALETTE } from '../palette'
 
 /**
@@ -210,7 +211,21 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
   // one only decides where the ring is drawn, and adds no branch to the reveal arithmetic.
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
   const items = controls()
-  const revealOf = (i: number) => (focused ? 1 : connectReveal(t, i))
+  /**
+   * THE FOCUS FORCE IS A KEYBOARD PROMISE, AND ON TOUCH IT WAS A LEAK (T97, blind review S4).
+   *
+   * On a phone the force had a second life the keyboard rationale never asked for: tapping any
+   * control FOCUSES it, touch scrolling never blurs it, and `_blank` navigation hands focus back
+   * exactly where it left. So the intended path — reach the end, tap LinkedIn, come back, swipe up
+   * to re-watch — pinned the whole row at full opacity over the farewell for the entire ending
+   * segment (measured at 88% of the track, the girl mid-wave under three pills). A control that is
+   * visible because a finger already found and USED it is not the case the force exists for: on a
+   * coarse pointer the row is only ever reached by sight, so the scroll schedule — which completes
+   * exactly with the arrival — is the honest gate. Fine pointers keep the force: a keyboard can
+   * reach what no finger can, and a focused control that cannot be seen is the worse failure.
+   */
+  const fine = useFinePointer()
+  const revealOf = (i: number) => (focused && fine ? 1 : connectReveal(t, i))
   const { navRef, spacing } = useConnectSpacing()
   // rides the camera's breath so the note never slides out from under the pills — see
   // `note-parallax-shift.ts` for why this is tracking rather than more clearance
@@ -337,7 +352,14 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
         <button
           type="button"
           data-testid="sw-connect-restart"
-          onClick={onRestart}
+          // Blur first: restart rewinds the whole track under this row, and a button that keeps
+          // focus through the rewind keeps the row forced visible over every beat it crosses
+          // (the fine-pointer half of the same S4 leak). Activation is the end of the promise —
+          // after it there is no focused-but-invisible control to protect.
+          onClick={(e) => {
+            e.currentTarget.blur()
+            onRestart()
+          }}
           onFocus={() => setFocusedKey('restart')}
           style={{
             ...handStyle(revealOf(items.length)),
