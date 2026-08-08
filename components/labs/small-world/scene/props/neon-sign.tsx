@@ -42,7 +42,7 @@ const HALO_CANVAS_H = 320
 /** World-unit pad around each word's bbox for the glow to breathe into. */
 const HALO_PAD = 0.55
 /** The halo's peak opacity — the tube stays the bright thing. */
-const HALO_MAX = 0.6
+const HALO_MAX = 0.8
 
 function paintHalo(canvas: HTMLCanvasElement | OffscreenCanvas): void {
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
@@ -61,15 +61,18 @@ function paintHalo(canvas: HTMLCanvasElement | OffscreenCanvas): void {
     const oy = HALO_CANVAS_H / 2 + (wH / 2) * s
     const px = (lx: number) => ox + (lx * SIGN_XHEIGHT - b.minX * SIGN_XHEIGHT + HALO_PAD) * s
     const py = (ly: number) => oy - (ly * SIGN_XHEIGHT - b.minY * SIGN_XHEIGHT + HALO_PAD) * s
-    // widening passes: far corona → near glow (the tube mesh itself is the core)
-    const passes: [number, number][] = [
-      [SIGN_TUBE_R * 11 * s, 0.05],
-      [SIGN_TUBE_R * 7 * s, 0.1],
-      [SIGN_TUBE_R * 4.5 * s, 0.16],
-      [SIGN_TUBE_R * 3 * s, 0.24],
+    // widening passes: far corona → near glow in the gas rose, then ONE narrow near-white
+    // pass — the hot core. The halo draws OVER the tube (renderOrder), so the additive core
+    // lands on the rose glass and reads as the tube's own heat.
+    const passes: [number, number, string][] = [
+      [SIGN_TUBE_R * 11 * s, 0.07, PALETTE.neonRose],
+      [SIGN_TUBE_R * 7 * s, 0.14, PALETTE.neonRose],
+      [SIGN_TUBE_R * 4.5 * s, 0.22, PALETTE.neonRose],
+      [SIGN_TUBE_R * 3 * s, 0.3, PALETTE.neonRose],
+      [SIGN_TUBE_R * 1.1 * s, 0.5, PALETTE.neonTube],
     ]
-    for (const [width, alpha] of passes) {
-      ctx.strokeStyle = PALETTE.neonRose
+    for (const [width, alpha, color] of passes) {
+      ctx.strokeStyle = color
       ctx.globalAlpha = alpha
       ctx.lineWidth = width
       for (const stroke of word.strokes) {
@@ -161,7 +164,7 @@ export function NeonSign({ journeyRef }: { journeyRef: JourneyRef }) {
   const tubeMat = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: PALETTE.neonTube,
+        color: PALETTE.neonRose,
         transparent: true,
         opacity: 0,
         toneMapped: false,
@@ -211,8 +214,10 @@ export function NeonSign({ journeyRef }: { journeyRef: JourneyRef }) {
 
   return (
     <group ref={group} visible={false}>
-      <mesh geometry={haloGeo} material={haloMat} renderOrder={2} />
-      <mesh geometry={tubeGeo} material={tubeMat} renderOrder={3} />
+      {/* the tube first, the halo OVER it: the halo canvas carries the near-white core pass,
+          and additive-over-rose is what makes the glass read hot rather than painted. */}
+      <mesh geometry={tubeGeo} material={tubeMat} renderOrder={2} />
+      <mesh geometry={haloGeo} material={haloMat} renderOrder={3} />
     </group>
   )
 }
