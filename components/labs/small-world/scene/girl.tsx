@@ -40,8 +40,8 @@ import { girlGlbHandoff } from '../loader/glb-handoff'
  *  measurably re-downloads it — see glb-handoff.ts). Runs at chunk eval, which
  *  precedes any render of <Girl/>. FileLoader keys its cache as `file:${url}`
  *  (three r185) and wants the raw ArrayBuffer. Released in an effect below once
- *  the mesh is parsed, so the cache never grows past this one entry and the 8MB
- *  buffer is freed. */
+ *  the mesh is parsed, so the cache never grows past this one entry and the
+ *  ~1.5MB buffer is freed. */
 if (girlGlbHandoff.buffer) {
   THREE.Cache.enabled = true
   THREE.Cache.add(`file:${GIRL_URL}`, girlGlbHandoff.buffer)
@@ -226,7 +226,7 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   const { actions, mixer } = useAnimations(animations, group)
   // The mesh is parsed (useGLTF resolved above), so release the prefetch
   // handoff: drop the cache entry, switch the global cache back off before any
-  // later asset (desk.glb) could accumulate in it, and free the 8MB buffer.
+  // later asset (desk.glb) could accumulate in it, and free the buffer.
   useEffect(() => {
     if (!girlGlbHandoff.buffer) return
     THREE.Cache.remove(`file:${GIRL_URL}`)

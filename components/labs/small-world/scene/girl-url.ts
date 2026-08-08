@@ -15,5 +15,11 @@ export const GIRL_URL = '/labs/small-world/girl.glb'
  *  does not — measured on the t95 isolated server). The streamed reader yields
  *  DECOMPRESSED bytes, so the file's own size is the correct total either way.
  *  Pinned to the real file by girl-url.test.ts — re-export the girl and that
- *  test tells you to update this number. */
-export const GIRL_GLB_BYTES = 8_121_684
+ *  test tells you to update this number.
+ *
+ *  The shipped GLB is COMPRESSED (T96 p2a): canonicalize-girl.mjs output run
+ *  through meshopt (EXT_meshopt_compression, decoded by drei's default
+ *  MeshoptDecoder) + WebP q95 texture (EXT_texture_webp — NOT KTX2, which
+ *  would break girl-clay's canvas-based pastel grade). Pipeline + gates:
+ *  scratchpad/t96/p2a/{compress,verify}-girl.mjs (see task-96 phase-2 report). */
+export const GIRL_GLB_BYTES = 1_563_576
