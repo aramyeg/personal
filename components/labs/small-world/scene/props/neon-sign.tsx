@@ -5,14 +5,16 @@ import * as THREE from 'three'
 import { PALETTE } from '../../palette'
 import { studioLightsFor } from '../desk-studio'
 import {
+  HALO_CANVAS_H,
+  HALO_CANVAS_W,
   SIGN_TUBE_R,
   SIGN_WORDS,
-  SIGN_XHEIGHT,
   flickerAt,
+  haloFrame,
+  haloPx,
+  haloPy,
   signPointsWorld,
-  wordBounds,
   wordPointsWorld,
-  sampleStroke,
 } from '../neon-sign'
 import type { JourneyRef } from '../use-journey'
 import { usePrefersReducedMotion } from '../use-reduced-motion'
@@ -35,59 +37,64 @@ import { usePrefersReducedMotion } from '../use-reduced-motion'
  * deliberately absent (the cyc's wash is an approved picture; see the module header).
  */
 
-/** Halo texture: painted once at mount, both words on one canvas — no ctx.filter (Safari
- *  guarantees), just widening soft passes of the room's rose. */
-const HALO_CANVAS_W = 1024
-const HALO_CANVAS_H = 320
-/** World-unit pad around each word's bbox for the glow to breathe into. */
-const HALO_PAD = 0.55
-/** The halo's peak opacity — the tube stays the bright thing. */
-const HALO_MAX = 0.8
+/**
+ * The halo's peak opacity, and the pass weights below it, RE-SOLVED in Task 103.
+ *
+ * T99's numbers were tuned against a halo that did not land on its own tube (see the frame note
+ * in `scene/neon-sign.ts`): the hot core sat beside every stroke, so the fill kept its colour
+ * and the additive load never stacked. Registered, the same numbers clip — the first capture of
+ * this lane came back with a WHITE sign, chroma 8 where the shipped build measured 30.
+ *
+ * So the weight moved outward. The corona passes carry more (they are what makes the room feel
+ * lit, and they land on the cyc rather than on the tube), the two near-tube passes carry less,
+ * and the filament is narrower and softer — at money-shot size a stroke is about seven pixels
+ * wide, so a core covering half of it is not a highlight, it is the letter.
+ */
+const HALO_MAX = 0.55
 
+/**
+ * Halo texture: painted once at mount, both words on one canvas — no ctx.filter (Safari
+ * guarantees), just widening soft passes of the room's rose.
+ *
+ * It paints the WORLD polylines through `haloFrame`, which is the same rectangle
+ * `buildHaloQuads` maps the cell onto (see the module header in `scene/neon-sign.ts`). Painting
+ * from the local unrolled bbox instead is what put a white ghost beside every tube in T99.
+ */
 function paintHalo(canvas: HTMLCanvasElement | OffscreenCanvas): void {
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
   ctx.clearRect(0, 0, HALO_CANVAS_W, HALO_CANVAS_H)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  // two atlas cells, one per word, sized by each word's padded bbox
   SIGN_WORDS.forEach((word, i) => {
-    const b = wordBounds(word.strokes)
-    const wW = (b.maxX - b.minX) * SIGN_XHEIGHT + 2 * HALO_PAD
-    const wH = (b.maxY - b.minY) * SIGN_XHEIGHT + 2 * HALO_PAD
-    const cell = atlasCell(i)
-    // uniform world→px scale, centred in the cell
-    const s = Math.min((cell.w - 8) / wW, (HALO_CANVAS_H - 8) / wH)
-    const ox = cell.x + cell.w / 2 - (wW / 2) * s
-    const oy = HALO_CANVAS_H / 2 + (wH / 2) * s
-    const px = (lx: number) => ox + (lx * SIGN_XHEIGHT - b.minX * SIGN_XHEIGHT + HALO_PAD) * s
-    const py = (ly: number) => oy - (ly * SIGN_XHEIGHT - b.minY * SIGN_XHEIGHT + HALO_PAD) * s
+    const f = haloFrame(i)
     // widening passes: far corona → near glow in the gas rose, then ONE narrow near-white
     // pass — the hot core. The halo draws OVER the tube (renderOrder), so the additive core
     // lands on the rose glass and reads as the tube's own heat.
     const passes: [number, number, string][] = [
-      [SIGN_TUBE_R * 11 * s, 0.07, PALETTE.neonRose],
-      [SIGN_TUBE_R * 7 * s, 0.14, PALETTE.neonRose],
-      [SIGN_TUBE_R * 4.5 * s, 0.22, PALETTE.neonRose],
-      [SIGN_TUBE_R * 3 * s, 0.3, PALETTE.neonRose],
-      [SIGN_TUBE_R * 1.1 * s, 0.5, PALETTE.neonTube],
+      [SIGN_TUBE_R * 11 * f.s, 0.1, PALETTE.neonRose],
+      [SIGN_TUBE_R * 7 * f.s, 0.17, PALETTE.neonRose],
+      [SIGN_TUBE_R * 4.5 * f.s, 0.16, PALETTE.neonRose],
+      [SIGN_TUBE_R * 3 * f.s, 0.12, PALETTE.neonRose],
+      [SIGN_TUBE_R * 0.8 * f.s, 0.3, PALETTE.neonTube],
     ]
+    const world = wordPointsWorld(word)
     for (const [width, alpha, color] of passes) {
       ctx.strokeStyle = color
       ctx.globalAlpha = alpha
       ctx.lineWidth = width
-      for (const stroke of word.strokes) {
-        const pts = sampleStroke(stroke)
+      for (const stroke of world) {
         ctx.beginPath()
-        pts.forEach(([x, y], k) => (k ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y))))
+        stroke.forEach(([x, y], k) =>
+          k
+            ? ctx.lineTo(haloPx(f, x), haloPy(f, y))
+            : ctx.moveTo(haloPx(f, x), haloPy(f, y))
+        )
         ctx.stroke()
       }
     }
   })
   ctx.globalAlpha = 1
 }
-
-const atlasCell = (i: number): { x: number; w: number } =>
-  i === 0 ? { x: 0, w: HALO_CANVAS_W * 0.42 } : { x: HALO_CANVAS_W * 0.42, w: HALO_CANVAS_W * 0.58 }
 
 /** All strokes of both words as ONE merged tube geometry, world-space baked. */
 export function buildNeonTube(): THREE.BufferGeometry {
@@ -113,37 +120,14 @@ export function buildNeonTube(): THREE.BufferGeometry {
   return geo
 }
 
-/** The halo quads: one per word, padded bbox in world space, atlas-mapped, merged. */
+/** The halo quads: one per word, the frame the painter used, atlas-mapped, merged. */
 export function buildHaloQuads(): THREE.BufferGeometry {
   const positions: number[] = []
   const uvs: number[] = []
   const index: number[] = []
   SIGN_WORDS.forEach((word, i) => {
-    const pts = wordPointsWorld(word)
-    // the transformed points' own bbox rather than the local bbox re-transformed: under the
-    // roll the two differ, and the quad must cover what actually shipped.
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    let z = 0
-    for (const stroke of pts) {
-      for (const [x, y, pz] of stroke) {
-        minX = Math.min(minX, x)
-        maxX = Math.max(maxX, x)
-        minY = Math.min(minY, y)
-        maxY = Math.max(maxY, y)
-        z = pz
-      }
-    }
-    const x0 = minX - HALO_PAD
-    const x1 = maxX + HALO_PAD
-    const y0 = minY - HALO_PAD
-    const y1 = maxY + HALO_PAD
-    const zq = z - 0.12
-    const cell = atlasCell(i)
-    const u0 = cell.x / HALO_CANVAS_W
-    const u1 = (cell.x + cell.w) / HALO_CANVAS_W
+    const { x0, x1, y0, y1, u0, u1 } = haloFrame(i)
+    const zq = wordPointsWorld(word)[0][0][2] - 0.12
     const base = positions.length / 3
     positions.push(x0, y0, zq, x1, y0, zq, x1, y1, zq, x0, y1, zq)
     uvs.push(u0, 0, u1, 0, u1, 1, u0, 1)

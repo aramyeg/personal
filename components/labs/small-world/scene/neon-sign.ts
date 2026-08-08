@@ -15,9 +15,11 @@ import { PARALLAX_REF_ASPECT } from './camera-parallax'
  * ============================================================================
  * Aram asked for "a stylistically similar neon sign over the globe from left and right side to
  * fill the white space with the note 'Let's Create'". The design that won the look-dev is a
- * SPLIT SCRIPT: "Let's" on the left flank, "Create" on the right, hand-bent monoline cursive in
+ * SPLIT SCRIPT: "Lets" on the left flank, "Create" on the right, hand-bent monoline cursive in
  * the room's own rose — the same family as the connect pill's border and the CV underlines, so
- * the sign and the connect row speak with one voice ("come say hi" / "Let's Create").
+ * the sign and the connect row speak with one voice ("come say hi" / "Lets Create").
+ *
+ * The apostrophe is gone as of Task 103, and the letterform block below says why.
  *
  * Everything the renderer and the gates both need lives HERE, with no three.js import: the
  * stroke control points, the sampling that turns them into a polyline, the world transforms
@@ -63,50 +65,92 @@ import { PARALLAX_REF_ASPECT } from './camera-parallax'
 
 /**
  * Stroke control points, authored over a Caveat template (the lab's hand — the desk note and
- * the connect row write in it) and then bent the way a tube bender would: each word is ONE
- * continuous main stroke plus the marks a bender adds separately (a t crossbar; the
- * apostrophe). Units: x-height = 1, baseline y = 0, x grows right.
+ * the connect row write in it) and then bent the way a tube bender would: a continuous main
+ * stroke per word plus the marks a bender runs separately (a t crossbar; the a's bowl).
+ * Units: x-height = 1, baseline y = 0, x grows right.
+ *
+ * ── TASK 103, and it is three letterform decisions rather than a nudge ─────────────────────
+ *
+ * THE `a` WAS UNREADABLE BECAUSE ITS LIGATURE BISECTED ITS COUNTER. T99 ran the whole word as
+ * one tube, so the join out of the `e` had to climb from the baseline to the top of the bowl —
+ * and since the bowl started at the same x the join left from, that climb was a CHORD straight
+ * across the counter. A round letter whose hole is crossed by a line is a blob at any size.
+ * The fix is topological, not cosmetic: the bowl is now ITS OWN TUBE (a bender runs it as one
+ * anyway) and the main stroke arcs OVER the bowl and comes down its right side as the stem.
+ * Nothing crosses the counter; `neon-sign.test.ts` gates the clear disc at `A_COUNTER`.
+ *
+ * THE `L` NOW READS AS A CAPITAL. Its loop was 0.32 wide against a 0.11 tube — the counter shut
+ * at money-shot size and the letter read as a hook. The loop is wider, the cap is 2.34 against
+ * T99's 2.04, and `ets` moved right so the `e` clears the L's bottom loop instead of sitting on
+ * it. Gated by `letsCapHeight()`.
+ *
+ * NO APOSTROPHE, AND THAT IS A SIGN-MAKER'S CHOICE. At the money shot the mark measured about
+ * ten pixels of tube in a gap between the t's ascender and the s's crest — it read as dirt on
+ * the cyc rather than as punctuation, and it was the second thing competing with the L in the
+ * upper band. Mocked both ways over the real capture (scratchpad/t103/sketch-b{,-apos}.png):
+ * `LETS` is the cleaner sign. Neon shops drop apostrophes for exactly this reason.
  */
 export type SignStroke = readonly (readonly [number, number])[]
 
 export const LETS_STROKES: readonly SignStroke[] = [
-  // main stroke: script L, into e, into t (narrow double-back), into s
+  // main stroke: script L (big top loop, long stem, bottom loop), into e, into t, into s
   [
-    [0.62, 1.72], [0.74, 1.95], [0.60, 2.04], [0.42, 1.86], [0.36, 1.35],
-    [0.42, 0.72], [0.50, 0.30], [0.40, 0.06], [0.20, 0.03], [0.10, 0.22],
-    [0.26, 0.38], [0.55, 0.32], [0.82, 0.16],
-    [1.06, 0.40], [1.22, 0.78], [1.18, 0.96], [1.00, 0.86], [0.96, 0.52],
-    [1.08, 0.14], [1.30, 0.04], [1.48, 0.16],
-    [1.66, 0.45], [1.78, 1.00], [1.86, 1.52],
-    [1.92, 1.00], [1.96, 0.45], [2.04, 0.10], [2.22, 0.05], [2.36, 0.16],
-    [2.52, 0.50], [2.64, 0.95],
-    [2.46, 0.78], [2.62, 0.50], [2.70, 0.26], [2.56, 0.03], [2.36, 0.12],
+    [0.72, 1.86], [0.86, 2.16], [0.74, 2.34], [0.50, 2.20], [0.40, 1.80],
+    [0.40, 1.20], [0.44, 0.70], [0.50, 0.28],
+    [0.36, 0.06], [0.14, 0.04], [0.04, 0.26], [0.18, 0.44],
+    [0.48, 0.40], [0.80, 0.20], [0.98, 0.14],
+    [1.22, 0.40], [1.38, 0.78], [1.34, 0.96], [1.16, 0.86], [1.12, 0.52],
+    [1.24, 0.14], [1.46, 0.04], [1.64, 0.16],
+    [1.82, 0.45], [1.94, 1.00], [2.02, 1.52],
+    [2.08, 1.00], [2.12, 0.45], [2.20, 0.10], [2.38, 0.05], [2.52, 0.16],
+    [2.68, 0.50], [2.80, 0.95],
+    [2.62, 0.78], [2.78, 0.50], [2.86, 0.26], [2.72, 0.03], [2.52, 0.12],
   ],
   // t crossbar
-  [[1.64, 1.10], [1.84, 1.17], [2.06, 1.12]],
-  // apostrophe
-  [[2.22, 1.85], [2.16, 1.60]],
+  [[1.80, 1.10], [2.00, 1.17], [2.22, 1.12]],
 ]
 
 export const CREATE_STROKES: readonly SignStroke[] = [
   [
+    // C, r, e — T99's, untouched: nobody complained about them
     [0.95, 1.60], [0.70, 1.76], [0.40, 1.55], [0.26, 1.00], [0.32, 0.42],
     [0.55, 0.08], [0.85, 0.05], [1.05, 0.22],
     [1.14, 0.16], [1.28, 0.60], [1.34, 0.98],
     [1.44, 0.80], [1.56, 0.70], [1.62, 0.40], [1.68, 0.08], [1.84, 0.12],
     [2.05, 0.38], [2.20, 0.74], [2.16, 0.95], [1.98, 0.85], [1.94, 0.50],
     [2.06, 0.12], [2.30, 0.03], [2.50, 0.16],
-    [2.88, 0.90], [2.66, 0.96], [2.52, 0.62], [2.58, 0.22], [2.82, 0.04],
-    [2.98, 0.35], [3.02, 0.78],
-    [3.06, 0.42], [3.12, 0.10], [3.28, 0.04], [3.42, 0.16],
-    [3.58, 0.45], [3.70, 1.00], [3.78, 1.52],
-    [3.84, 1.00], [3.88, 0.45], [3.96, 0.10], [4.14, 0.05], [4.28, 0.16],
-    [4.46, 0.40], [4.60, 0.76], [4.56, 0.96], [4.38, 0.86], [4.34, 0.52],
-    [4.46, 0.12], [4.68, 0.03], [4.88, 0.18],
+    // the a: the ligature arcs OVER the bowl and descends its right side as the stem
+    [2.68, 0.48], [2.88, 0.94], [3.10, 1.14], [3.32, 1.04],
+    [3.38, 0.62], [3.40, 0.26], [3.50, 0.08], [3.66, 0.18],
+    // t, e — T99's, shifted +0.14 to make room for the wider bowl
+    [3.72, 0.45], [3.84, 1.00], [3.92, 1.52],
+    [3.98, 1.00], [4.02, 0.45], [4.10, 0.10], [4.28, 0.05], [4.42, 0.16],
+    [4.60, 0.40], [4.74, 0.76], [4.70, 0.96], [4.52, 0.86], [4.48, 0.52],
+    [4.60, 0.12], [4.82, 0.03], [5.02, 0.18],
+  ],
+  // the a's bowl, its own run of tube — both terminals butt UNDER the stem, so the ring reads
+  // closed and no cap shows as a nub in the counter's rim
+  [
+    [3.34, 0.86], [3.16, 1.00], [2.92, 1.00], [2.74, 0.80], [2.70, 0.50],
+    [2.80, 0.22], [3.02, 0.08], [3.24, 0.18], [3.36, 0.46], [3.38, 0.74],
   ],
   // t crossbar
-  [[3.56, 1.10], [3.76, 1.17], [3.98, 1.12]],
+  [[3.70, 1.10], [3.90, 1.17], [4.12, 1.12]],
 ]
+
+/**
+ * The disc the a's counter must keep clear, in letterform units — the centre of the bowl and
+ * the radius inside which NOTHING may be drawn. This is Aram's complaint written as a number:
+ * a round letter reads by its hole, so the hole is a gate rather than a hope.
+ */
+export const A_COUNTER = { x: 3.04, y: 0.54, r: 0.3 } as const
+
+/** The L's cap height, which is what "the L is too small" was about. */
+export function letsCapHeight(): number {
+  let top = -Infinity
+  for (const stroke of LETS_STROKES) for (const [, y] of sampleStroke(stroke)) top = Math.max(top, y)
+  return top
+}
 
 // --- sampling ---------------------------------------------------------------
 
@@ -180,8 +224,16 @@ function centripetal(
  *  tube never enters the bake's ceiling (gated below). */
 export const SIGN_Z = -2
 
-/** World units per letterform unit (the script's x-height). */
-export const SIGN_XHEIGHT = 0.95
+/**
+ * World units per letterform unit (the script's x-height).
+ *
+ * TASK 103: 0.95 → 1.064, a flat +12% on Aram's "a bit bigger… just a tad bit bigger". The
+ * words grow a little more than that on top of it (the L's new loop and the a's new bowl widen
+ * `Lets` by 8% and `Create` by 3%), which is the point — he asked for the L specifically. The
+ * composition gates below are what say whether the result still flanks the globe, and they are
+ * re-swept at both viewports and every parallax corner.
+ */
+export const SIGN_XHEIGHT = 1.064
 
 /** Tube radius, as a fraction of the x-height — the look-dev's 8px stroke at its 66px x-height. */
 export const SIGN_TUBE_R = 0.058
@@ -268,6 +320,81 @@ export function wordPointsWorld(word: SignWord): [number, number, number][][] {
 export function signPointsWorld(): [number, number, number][][] {
   return SIGN_WORDS.flatMap((w) => wordPointsWorld(w))
 }
+
+// --- the halo's frame, and why it lives here --------------------------------
+
+/**
+ * ONE OWNER FOR THE GLOW'S REGISTRATION (Task 103).
+ *
+ * The halo is a painted canvas mapped onto a quad. T99 painted it from the word's LOCAL,
+ * UNROLLED bbox fitted uniformly inside its atlas cell, and then mapped the WHOLE cell onto a
+ * quad built from the ROLLED world bbox — two different rectangles. The canvas carries a narrow
+ * near-white core pass, so the mismatch was not a soft blur being soft: at the money shot every
+ * stroke showed a white ghost offset from its own tube, and the ghost is what filled the a's
+ * counter and the L's loop. Measured on the shipped capture (scratchpad/t103/crop-create-before
+ * .png) the stretch was 1.17× on the `Lets` cell alone.
+ *
+ * So the frame is solved ONCE, here, in world space, and both the painter and the quad builder
+ * read it: uniform scale `s` fits the word's padded WORLD bbox into its cell, and the quad is
+ * then EXPANDED to whatever the full cell covers at that scale. Full cell ↔ full quad, uniform
+ * scale, roll included — the mapping is exact by construction, and the gate re-derives it.
+ */
+export const HALO_CANVAS_W = 1024
+export const HALO_CANVAS_H = 320
+/** World-unit pad around each word for the glow to breathe into. */
+export const HALO_PAD = 0.55
+
+/** The atlas cell a word owns, in canvas px. `Create` is the wider word and gets the wider cell. */
+export const haloCell = (i: number): { x: number; w: number } =>
+  i === 0 ? { x: 0, w: HALO_CANVAS_W * 0.4 } : { x: HALO_CANVAS_W * 0.4, w: HALO_CANVAS_W * 0.6 }
+
+export type HaloFrame = {
+  /** canvas px per world unit */
+  s: number
+  /** the quad's world rect — exactly what the full cell maps onto */
+  x0: number
+  x1: number
+  y0: number
+  y1: number
+  /** the cell's uv range */
+  u0: number
+  u1: number
+}
+
+export function haloFrame(i: number): HaloFrame {
+  const cell = haloCell(i)
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const stroke of wordPointsWorld(SIGN_WORDS[i])) {
+    for (const [x, y] of stroke) {
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+    }
+  }
+  const wW = maxX - minX + 2 * HALO_PAD
+  const wH = maxY - minY + 2 * HALO_PAD
+  const s = Math.min(cell.w / wW, HALO_CANVAS_H / wH)
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+  return {
+    s,
+    x0: cx - cell.w / (2 * s),
+    x1: cx + cell.w / (2 * s),
+    y0: cy - HALO_CANVAS_H / (2 * s),
+    y1: cy + HALO_CANVAS_H / (2 * s),
+    u0: cell.x / HALO_CANVAS_W,
+    u1: (cell.x + cell.w) / HALO_CANVAS_W,
+  }
+}
+
+/** World → canvas px, for the painter. The inverse of the quad's uv, by construction. */
+export const haloPx = (f: HaloFrame, x: number): number =>
+  f.u0 * HALO_CANVAS_W + (x - f.x0) * f.s
+export const haloPy = (f: HaloFrame, y: number): number => (f.y1 - y) * f.s
 
 /** The closest any tube point comes to the world's centre — gated above the bake's ceiling
  *  (1.35·R) so the sign can never be speared by terrain, exactly as the cradle is argued. */

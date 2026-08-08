@@ -19,11 +19,24 @@ import {
 } from '@/components/labs/small-world/scene/camera-parallax'
 import { studioLightsFor } from '@/components/labs/small-world/scene/desk-studio'
 import {
+  A_COUNTER,
+  CREATE_STROKES,
+  HALO_CANVAS_H,
+  HALO_CANVAS_W,
+  LETS_STROKES,
   SIGN_IGNITE_AT,
   SIGN_STEADY_AT,
+  SIGN_TUBE_R,
   SIGN_WORDS,
   SIGN_WORLD_CEILING,
+  SIGN_XHEIGHT,
   flickerAt,
+  haloCell,
+  haloFrame,
+  haloPx,
+  haloPy,
+  letsCapHeight,
+  sampleStroke,
   signMinReachFromOrigin,
   signPointsWorld,
   wordPointsWorld,
@@ -173,6 +186,96 @@ describe('the composition gates at the money shot (1440×900 reference)', () => 
     const a = signPointsWorld()
     const b = signPointsWorld()
     expect(a).toEqual(b)
+  })
+})
+
+/**
+ * TASK 103 — the letterform gates. Aram read the sign and said the `a` was unreadable, the `L`
+ * too small and the apostrophe ill-fitting. Two of those three are geometry with a number in
+ * them, so they are pinned here rather than left to the next capture.
+ */
+describe('the letterforms (Task 103)', () => {
+  it("nothing crosses the a's counter — the hole is what makes it an a", () => {
+    const nearestOf = (stroke: readonly (readonly [number, number])[]) =>
+      Math.min(
+        ...sampleStroke(stroke).map(([x, y]) => Math.hypot(x - A_COUNTER.x, y - A_COUNTER.y))
+      )
+    // T99's ligature ran a chord straight across this disc — the counter's centre sat 0.03 from
+    // the main stroke, so the hole was ink. Now the bowl is its own tube and the main stroke
+    // arcs OVER it: the closest things to the centre are the bowl's rim and the stem, both of
+    // which are the letter's own outline.
+    const perStroke = CREATE_STROKES.map(nearestOf)
+    for (const d of perStroke) expect(d).toBeGreaterThan(A_COUNTER.r)
+    // and the hole is OPEN, not merely uncrossed: the clear air left once the tube's own
+    // thickness is taken off is four times the tube is wide, so the glow cannot close it.
+    const openDiameter = 2 * (Math.min(...perStroke) - SIGN_TUBE_R)
+    expect(openDiameter).toBeGreaterThan(8 * SIGN_TUBE_R)
+  })
+
+  it('the L reads as a capital — cap height and a loop wide enough to hold a counter', () => {
+    expect(letsCapHeight()).toBeGreaterThan(2.25)
+    // the loop's own width, measured over the strokes above the t's ascender
+    const loop = sampleStroke(LETS_STROKES[0]).filter(([, y]) => y > 1.8)
+    const w = Math.max(...loop.map((p) => p[0])) - Math.min(...loop.map((p) => p[0]))
+    expect(w).toBeGreaterThan(0.42) // T99's loop was 0.32 against a 0.116 tube — it shut
+  })
+
+  it('there is no apostrophe, and Create carries exactly one extra tube (its bowl)', () => {
+    expect(LETS_STROKES).toHaveLength(2) // main + t crossbar
+    expect(CREATE_STROKES).toHaveLength(3) // main + the a's bowl + t crossbar
+  })
+
+  it('the sign grew by a tad, not by a step', () => {
+    const T99_XHEIGHT = 0.95
+    const growth = SIGN_XHEIGHT / T99_XHEIGHT - 1
+    expect(growth).toBeGreaterThan(0.09)
+    expect(growth).toBeLessThan(0.16)
+  })
+})
+
+/**
+ * THE HALO'S REGISTRATION. The canvas carries a narrow near-white core pass, so a mismatch
+ * between the rectangle the painter uses and the rectangle the quad maps is not a soft blur
+ * being soft — it is a white ghost beside every tube, and that ghost is what filled the a's
+ * counter on the shipped build. One frame, two readers, gated by re-derivation.
+ */
+describe('the halo frame (Task 103)', () => {
+  it('the painted rectangle IS the quad — the cell maps onto it exactly', () => {
+    for (let i = 0; i < SIGN_WORDS.length; i++) {
+      const f = haloFrame(i)
+      const cell = haloCell(i)
+      expect(haloPx(f, f.x0)).toBeCloseTo(cell.x, 6)
+      expect(haloPx(f, f.x1)).toBeCloseTo(cell.x + cell.w, 6)
+      expect(haloPy(f, f.y1)).toBeCloseTo(0, 6)
+      expect(haloPy(f, f.y0)).toBeCloseTo(HALO_CANVAS_H, 6)
+      expect(f.u0 * HALO_CANVAS_W).toBeCloseTo(cell.x, 6)
+      expect(f.u1 * HALO_CANVAS_W).toBeCloseTo(cell.x + cell.w, 6)
+    }
+  })
+
+  it('every tube point is painted inside its own cell, with the glow room to breathe', () => {
+    // the far corona is SIGN_TUBE_R * 11 wide; half of it must still land on the canvas
+    const corona = (SIGN_TUBE_R * 11) / 2
+    for (let i = 0; i < SIGN_WORDS.length; i++) {
+      const f = haloFrame(i)
+      const cell = haloCell(i)
+      for (const stroke of wordPointsWorld(SIGN_WORDS[i])) {
+        for (const [x, y] of stroke) {
+          expect(haloPx(f, x)).toBeGreaterThan(cell.x + corona * f.s)
+          expect(haloPx(f, x)).toBeLessThan(cell.x + cell.w - corona * f.s)
+          expect(haloPy(f, y)).toBeGreaterThan(corona * f.s)
+          expect(haloPy(f, y)).toBeLessThan(HALO_CANVAS_H - corona * f.s)
+        }
+      }
+    }
+  })
+
+  it('the two cells tile the canvas and never overlap', () => {
+    const a = haloCell(0)
+    const b = haloCell(1)
+    expect(a.x).toBe(0)
+    expect(a.x + a.w).toBe(b.x)
+    expect(b.x + b.w).toBe(HALO_CANVAS_W)
   })
 })
 

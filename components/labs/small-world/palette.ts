@@ -365,6 +365,32 @@ export const PALETTE = {
   // large field of a hue the room only carries in centimetre accents, and rose is the room's own
   // accent voice — studioRoseDeep already borders the connect pill and underlines the CV links,
   // so the sign and the row beneath it read as one hand. Two tones, the classic tube pair:
-  neonTube: '#FFE9F2', // the glass core — near-white with the gas's blush, what the tube renders
-  neonRose: '#F272A8', // the gas colour — the halo's rose, between blossom and blossomDeep
+  //
+  // TASK 103 — PASTELISED, and the number that decided it is a LUMINANCE, not a taste.
+  //
+  // Aram: "the whole sign should be MORE PASTEL, in the lab's colours". Measured off the shipped
+  // money shot, the cyc behind the sign reads rgb(197,188,190) — luminance 190. T99's gas
+  // `#F272A8` is (242,114,168): chroma 128, luminance 145. So the one thing in the frame that is
+  // supposed to be EMITTING sat 45 points BELOW the wall it hangs on, and carried more chroma
+  // than anything else in a room whose every prop is chalk pink, mint and cream. It read as a
+  // sticker, not a tube.
+  //
+  // The new gas is `blossom` — the SAME HEX as the flower pink the clay planet is covered in,
+  // and that identity is the point: "in the lab's colours" is answerable with a token rather
+  // than with a new hue. Against T99's gas it is chroma 79 against 128 (−38%) and luminance 187
+  // against 145 (+42), which is exactly what pastel means. It also sits level with the cyc, so
+  // the tube's own fill contributes almost no value — what makes the sign read is the additive
+  // halo on top of it, which is where the emission belongs.
+  //
+  // FIRST TRY WENT TOO FAR, and the capture said so: at `#FFB3CE` with T99's halo alphas the
+  // sign railed to WHITE (sign-region mean chroma 8, against 30 on the shipped build). T99's
+  // alphas were tuned against a halo that was MISREGISTERED — the hot core landed beside its
+  // tube, so half of every stroke kept its colour. Registered, that core stacks on the fill and
+  // both clip. The halo's passes are re-weighted in `props/neon-sign.tsx` to match; the gas is
+  // one step deeper here so there is chroma left to survive the addition.
+  //
+  // The core stays near-white and gets a shade whiter: with the gas this soft, the core is what
+  // still says LIT GLASS rather than painted line.
+  neonTube: '#FFF3F8', // the glass core — near-white with the gas's blush, the filament pass
+  neonRose: '#F7A8C4', // the gas colour — `blossom`, the clay world's own flower pink
 } as const
