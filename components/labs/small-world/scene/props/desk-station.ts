@@ -9,7 +9,7 @@ import {
 } from './desk-nudge'
 import { DESK_NUDGE_ZONES } from './desk-glb-contract'
 import { PENCUP_PENS } from './desk-pens'
-import { laneRayHit } from './desk-deep'
+import { PLANT_CLAIM, laneRayHit } from './desk-deep'
 import { globeRayHit } from '../globe-nudge'
 
 /**
@@ -526,6 +526,52 @@ export function raySphereHit(
   if (t1 < 0) return null
   const t0 = (-b - root) / a
   return t0 >= 0 ? t0 : 0
+}
+
+/**
+ * THE PLANT'S CLAIM AGAINST A RAY (T102) — cylinder OR dome, nearest entry wins, in the family of
+ * `canRayHit`/`bookRayHit`/`laneRayHit`: one pure question both tiers ask, so the deep tier's click
+ * and the micro tier's cursor cannot disagree about whether the pointer is over the plant.
+ *
+ * WHY IT LIVES HERE AND NOT BESIDE ITS SIBLINGS IN `desk-deep.ts`. The two primitives it needs are
+ * this module's, and this module already imports `desk-deep` (for `laneRayHit`); a claim function
+ * there would have to import them back, and a cycle through a module whose top level BUILDS tables
+ * (`CAPSULE_CLAIMS`, `BOX_CLAIMS`) is a temporal-dead-zone trap waiting for an import-order change.
+ * The measurement stays with the plant (`PLANT_CLAIM` in `desk-deep.ts`); the ray solve sits with
+ * the ray solves. Neither number nor primitive is written twice.
+ *
+ * The plant is NOT registered in `resolveDeskPick`, for the same reason the can and the book are
+ * not: nothing on the desk answers a click with a watering except the watering, so the plant has
+ * no rival to be resolved against — it is a second door onto the can's own interaction. Standing
+ * outside the resolver is also what makes it harmless: it cannot outrank a station claim, and the
+ * micro tier consults it only where `resolveDeskPick` already found nothing. The claim's reach
+ * stops at x −3.65 and the nearest other claim on the desk is the mug's box at x −3.20, so the
+ * question does not arise geometrically either (gated by the sweep in desk-station.test.ts).
+ *
+ * The 44 px floor applies as everywhere else — fed each primitive's DIAMETER and added to its
+ * radius, it grows the diameter by exactly the shortfall. On this object it is normally +0: the
+ * body spans 0.80 and projects well over 44 px at the ending eye at both viewports.
+ */
+export function plantRayHit(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  fovDeg: number,
+  heightPx: number
+): { t: number; point: [number, number, number] } | null {
+  const b = PLANT_CLAIM.body
+  const c = PLANT_CLAIM.crown
+  const bodyDist = Math.hypot(b.centre[0] - ox, (b.yMin + b.yMax) / 2 - oy, b.centre[1] - oz)
+  const bodyR = b.r + hitPadFor(b.r * 2, bodyDist, fovDeg, heightPx)
+  const crownDist = Math.hypot(c.c[0] - ox, c.c[1] - oy, c.c[2] - oz)
+  const crownR = c.r + hitPadFor(c.r * 2, crownDist, fovDeg, heightPx)
+  const tb = rayCylinderHit(ox, oy, oz, dx, dy, dz, b.centre[0], b.centre[1], bodyR, b.yMin, b.yMax)
+  const tc = raySphereHit(ox, oy, oz, dx, dy, dz, c.c, crownR)
+  const t = tb === null ? tc : tc === null ? tb : Math.min(tb, tc)
+  return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
 }
 
 // --- the pick resolution (ONE owner: the component and the sweep gate both call THIS) ----------

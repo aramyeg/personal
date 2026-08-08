@@ -464,6 +464,50 @@ export const PLANT = {
   soil: [21526, 21803],
 } as const
 
+/**
+ * THE PLANT'S OWN CLAIM (T102 — Aram round 2: the plant must be clickable through and through,
+ * leaves, pot and soil, not only the can beside it).
+ *
+ * The same union-find that found the leaves and the soil finds the whole plant: FOUR contiguous
+ * components, and the two unnamed ones are named here. Leaves [5408, 10435] (30 comps, 5,028
+ * verts, y 1.6451–2.0285); pot wall [19082, 20843] (1,762 verts, y 1.3125–1.7815); saucer
+ * [20844, 21525] (682 verts, y 1.2675–1.3175); soil [21526, 21803] (278 verts, y 1.6314–1.6901).
+ * Every run holds only its own components — no foreign ids inside any of them, gated.
+ *
+ * THE CLAIM IS THE SHAPE THE PLANT ACTUALLY HAS — a squat body of revolution under a dome, which
+ * is what the pick layer's law asks for (see `desk-station.ts`, THE PICK LAYER IS PRIMITIVES, NOT
+ * BOXES: an AABB over this object would claim a solid column 0.376 wide at y 2.03, where the real
+ * crown is 0.068). Measured about the rosette axis (PLANT.origin's xz), banded max reach:
+ *   0.376 at the saucer, 0.256 at the pot's waist, 0.317 at 1.65–1.70, 0.393 where the leaf
+ *   skirt overhangs the rim (1.70–1.78), then 0.298 / 0.172 / 0.078 up the crown to the tip.
+ * No single capsule can say both 0.393 and 0.068 — a segment fitted to the rim carries a 0.26-wide
+ * cap of air over the crown — so the claim is TWO primitives sharing the one axis:
+ *
+ *  - BODY, a CAPPED CYLINDER: r 0.40 covers the widest measured reach in its band (0.3930, the
+ *    leaf skirt at y 1.7348) with 0.007 of slack; y runs from the desk top to the pot rim's own
+ *    measured 1.781468. FLAT caps, deliberately: the roof is exactly where the crown's claim takes
+ *    over, and a capsule's dome there is the tip air the tree's claim had to remove.
+ *  - CROWN, a SPHERE seated on that rim: the rosette IS a dome, so the capsule degenerates to its
+ *    cap. Fitted max vert-to-centre over everything the cylinder does not already hold is 0.3076
+ *    → r 0.31, and the sphere then tapers 0.286 / 0.260 / 0.220 / 0.188 at y 1.90 / 1.95 / 2.00 /
+ *    2.028 against a real crown of 0.238 / 0.159 / 0.085 / 0.078 — it narrows the way the foliage
+ *    narrows, and tops out at 2.091, 0.06 over the highest leaf. Its lower half is inside the
+ *    cylinder (0.31 < 0.40), so it adds no air below the rim at all.
+ * Together they cover all 7,750 plant vertices with none left out (gated), and nothing else on the
+ * desk is inside them: the nearest other claim is the mug's box at x −3.20, and the claim's own
+ * reach stops at −3.65.
+ */
+export const PLANT_CLAIM = {
+  /** The pot wall — one whole component, unnamed until T102. */
+  potRange: [19082, 20843],
+  /** ...and the saucer under it. */
+  saucerRange: [20844, 21525],
+  /** The body: a capped cylinder about the rosette axis, from the desk top to the pot rim. */
+  body: { centre: [-4.05, 10.6], r: 0.4, yMin: 1.26, yMax: 1.7815 },
+  /** The rosette: a dome seated on that rim. */
+  crown: { c: [-4.05, 1.7815, 10.6], r: 0.31 },
+} as const
+
 export type WaterState = { t0: number; active: boolean }
 export const restingWater = (): WaterState => ({ t0: 0, active: false })
 

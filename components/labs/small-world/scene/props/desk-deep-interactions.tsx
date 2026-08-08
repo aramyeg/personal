@@ -34,6 +34,9 @@ import {
   type StirState,
   type WaterState,
 } from './desk-deep'
+// The plant's claim is solved where the ray primitives live (see `plantRayHit`); the measurement
+// it reads is `PLANT_CLAIM`, next to the plant in `desk-deep.ts`.
+import { plantRayHit } from './desk-station'
 
 /**
  * THE DEEP TIER'S HANDS (Task 92) — the plumbing that turns pointer events into the set-piece
@@ -119,8 +122,13 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
         // the notebook: the cover opens on its spring; mid-arc clicks are absorbed
         triggerBook(book.current, now)
       }
-      if (canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
-        // the watering: the can lifts, tips, and the plant answers; mid-arc clicks are absorbed
+      if (
+        canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height) !== null ||
+        plantRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height) !== null
+      ) {
+        // the watering: the can lifts, tips, and the plant answers; mid-arc clicks are absorbed.
+        // THE PLANT IS THE SECOND DOOR (T102): leaves, pot, saucer and soil all ask for the same
+        // drink the can does — one interaction, two claims, so the two cannot fall out of step.
         triggerWater(water.current, now)
       }
       if (laneRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {

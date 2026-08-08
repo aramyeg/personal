@@ -3,6 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DESK_GLB_URL, DESK_NUDGE_ZONES } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { AMP_CAP } from '@/components/labs/small-world/scene/props/desk-nudge'
+import { PLANT, PLANT_CLAIM } from '@/components/labs/small-world/scene/props/desk-deep'
 import {
   CAMERA_FOV,
   ENDING_AIM_DROP,
@@ -31,6 +32,7 @@ import {
   TREE_CLAIM,
   TREE_SWAY,
   caseFlexWeight,
+  plantRayHit,
   rayCylinderHit,
   raySegmentHit,
   raySphereHit,
@@ -976,5 +978,125 @@ describe('the claim-resolution sweep under the settled ending eye (the decisive 
       'knife'
     ).toBe('station-knife-0')
     expect(resolveAt([1.5208, 1.333, 8.3157])?.id, 'case').toBe('station-case-0')
+  })
+
+  // --- the plant's claim under the same eye (T102) ---------------------------------------------
+  // The plant is CLICKABLE THROUGH AND THROUGH, so the sweep gets a second half: the plant answers
+  // a ray through every part of itself, and every station target still wins its own ray with the
+  // plant claiming nothing on it. `plantRayHit` stands OUTSIDE `resolveDeskPick` (see its comment),
+  // so the two questions are asked separately here — which is exactly how the two tiers ask them.
+  const rayTo = (target: readonly [number, number, number], heightPx = HEIGHT_PX) => {
+    const dx = target[0] - rig.cam[0]
+    const dy = target[1] - rig.cam[1]
+    const dz = target[2] - rig.cam[2]
+    const m = Math.hypot(dx, dy, dz)
+    return plantRayHit(
+      rig.cam[0], rig.cam[1], rig.cam[2],
+      dx / m, dy / m, dz / m,
+      CAMERA_FOV, heightPx
+    )
+  }
+
+  /** The vertex of a run that faces the eye — a point the visitor can actually put a cursor on. */
+  const nearestVertex = (range: readonly number[]): [number, number, number] => {
+    let best: [number, number, number] = [0, 0, 0]
+    let bestD = Infinity
+    for (let i = range[0]; i <= range[1]; i++) {
+      const p: [number, number, number] = [baked.pos[i * 3], baked.pos[i * 3 + 1], baked.pos[i * 3 + 2]]
+      const d = Math.hypot(p[0] - rig.cam[0], p[1] - rig.cam[1], p[2] - rig.cam[2])
+      if (d < bestD) {
+        bestD = d
+        best = p
+      }
+    }
+    return best
+  }
+
+  it('the plant answers a ray through EVERY part of it — leaves, pot, saucer, soil', () => {
+    const parts = [
+      ['leaves', PLANT.leaves],
+      ['pot wall', PLANT_CLAIM.potRange],
+      ['saucer', PLANT_CLAIM.saucerRange],
+      ['soil', PLANT.soil],
+    ] as const
+    for (const [label, range] of parts) {
+      const p = nearestVertex(range)
+      // both reference viewports: the phone's 44 px floor must not be what makes it work
+      for (const h of [900, 844]) {
+        const hit = rayTo(p, h)
+        expect(hit, `${label} at [${p.map((v) => v.toFixed(3)).join(', ')}] (h ${h})`).not.toBeNull()
+      }
+    }
+    // ...and the crown's own tip, the part a leaf-click actually lands on
+    expect(rayTo([PLANT.origin[0], 2.02, PLANT.origin[2]]), 'crown tip').not.toBeNull()
+    // the claim is the plant's alone: a ray a third of a unit clear of it finds nothing
+    expect(rayTo([PLANT.origin[0] + 0.75, 1.5, PLANT.origin[2]]), 'clear to the right').toBeNull()
+    expect(rayTo([PLANT.origin[0], 2.4, PLANT.origin[2]]), 'clear above the crown').toBeNull()
+  })
+
+  it('the plant claims nothing on any station target, the pen cup or the notebook', () => {
+    const alongOffset = [0, 0.3, 0, 0.3, 0, 0.5]
+    const refs: [string, [number, number, number]][] = [
+      ...STATION_BARS.map(
+        (b, i): [string, [number, number, number]] => [
+          `bar ${b.id}`,
+          [b.centre[0] + alongOffset[i] * SLOT_DIR[0], 1.44, b.centre[1] + alongOffset[i] * SLOT_DIR[2]],
+        ]
+      ),
+      ...STATION_CHIPS.map(
+        (c): [string, [number, number, number]] => [`chip ${c.id}`, [c.centre[0], c.aabb.max[1], c.centre[1]]]
+      ),
+      ['tree', [2.3833, 1.85, 10.7094]],
+      ['knife', [(KNIFE_CLAIM.a[0] + KNIFE_CLAIM.b[0]) / 2, 1.4, (KNIFE_CLAIM.a[2] + KNIFE_CLAIM.b[2]) / 2]],
+      ['case', [1.5208, 1.333, 8.3157]],
+      ['pen cup', [PENCUP_BODY.centre[0], PENCUP_BODY.yMax, PENCUP_BODY.centre[1]]],
+      // the notebook, whose click is the deep tier's other set piece and must never water. The ref
+      // sits on the cover slab's own top plane, re-derived at 1.6930 after T102 re-seated the book
+      // assembly +0.036 onto the pink pad — a book y read off the old bytes would aim at air.
+      ['notebook', [-3.4, 1.693, 9.2]],
+      // the watering can itself: it fires the SAME pour, so an overlap would be harmless — but the
+      // measured answer is that there is none, which is what keeps the two claims independent.
+      ['watering can', [-3.763, 1.502, 10.108]],
+      // ...and the T89 chunky props, the plant's real neighbours on this end of the desk
+      ...DESK_NUDGE_ZONES.map(
+        (z): [string, [number, number, number]] => [
+          `${z.kind} zone`,
+          [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2, (z.min[2] + z.max[2]) / 2],
+        ]
+      ),
+    ]
+    for (const [label, ref] of refs) {
+      expect(rayTo(ref), `${label} stolen by the plant's claim`).toBeNull()
+      // ...and the station's own resolution is untouched — the plant is not in the resolver
+      if (label.startsWith('bar ') || label === 'tree' || label === 'knife' || label === 'case')
+        expect(resolveAt(ref)?.id, `${label} resolution`).toContain('station-')
+    }
+  })
+
+  it('the cursor the plant promises is one nothing else already promised', () => {
+    // `desk-interactions.tsx` only consults the deep tier's claims where `resolveDeskPick` found
+    // nothing, so the plant's pointer is additive by construction — this is the geometric half of
+    // that: over the plant, the resolver really does find nothing to promise.
+    for (const range of [PLANT.leaves, PLANT_CLAIM.potRange, PLANT_CLAIM.saucerRange, PLANT.soil]) {
+      const p = nearestVertex(range)
+      expect(resolveAt(p)?.id ?? null, `a desk claim already owns [${p.map((v) => v.toFixed(3)).join(', ')}]`).toBeNull()
+    }
+  })
+
+  it('the plant claim never needs the 44 px floor — no depth-grown air at either viewport', () => {
+    // The body spans 0.80 across; at this eye it projects far over 44 px, so `hitPadFor` returns
+    // +0 and the claim on screen is exactly the claim measured off the bytes. Proven by shrinking
+    // the frame until the floor WOULD bite and showing the reference heights are nowhere near it.
+    const p = nearestVertex(PLANT_CLAIM.potRange)
+    const dist = Math.hypot(
+      PLANT_CLAIM.body.centre[0] - rig.cam[0],
+      (PLANT_CLAIM.body.yMin + PLANT_CLAIM.body.yMax) / 2 - rig.cam[1],
+      PLANT_CLAIM.body.centre[1] - rig.cam[2]
+    )
+    const px = (h: number): number =>
+      (PLANT_CLAIM.body.r * 2) / ((2 * dist * Math.tan((CAMERA_FOV * Math.PI) / 360)) / h)
+    expect(px(900), 'body width in px at 1440x900').toBeGreaterThan(44)
+    expect(px(844), 'body width in px at 390x844').toBeGreaterThan(44)
+    expect(rayTo(p, 900)!.t).toBeCloseTo(rayTo(p, 844)!.t, 12)
   })
 })

@@ -47,6 +47,7 @@ import {
   STATION_CLAIMS,
   STATION_TREE,
   STATION_UNIFORMS,
+  plantRayHit,
   resolveDeskPick,
   restingCasePop,
   restingChipPress,
@@ -364,8 +365,10 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         hovered.current = id
         if (hit) fire(hit, HOVER_SCALE)
       }
-      // The notebook and the watering can have no micro zones — their clicks belong to the deep
-      // tier (Task 92) — but the cursor's promise is this component's to keep, so both count.
+      // The notebook, the watering can and the plant have no micro zones — their clicks belong to
+      // the deep tier (Task 92; the plant T102) — but the cursor's promise is this component's to
+      // keep, so all of them count. The plant answers the can's own watering, and a target the
+      // desk answers must never look inert.
       const o = raycaster.current.ray.origin
       const d = raycaster.current.ray.direction
       const fovNow = (cam as THREE.PerspectiveCamera).fov
@@ -373,6 +376,7 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         id === null &&
         (bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
           canRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
+          plantRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null ||
           laneRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fovNow, heightPx) !== null)
       setCursor(id !== null || overDeep)
     } else {

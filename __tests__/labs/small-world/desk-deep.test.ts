@@ -19,6 +19,7 @@ import {
   CAN_ZONE,
   COFFEE_ZONE,
   PLANT,
+  PLANT_CLAIM,
   STIR,
   STIR_FRAGMENT_BODY,
   STIR_VERTEX_BODY,
@@ -384,6 +385,93 @@ describe('the watering, held to the shipped desk', () => {
       expect(pos[i * 3 + 1]).toBeGreaterThan(1.62)
       expect(pos[i * 3 + 1]).toBeLessThan(1.7)
     }
+  })
+
+  it('the plant is FOUR whole components — leaves, pot wall, saucer, soil (T102)', () => {
+    for (const [label, range, count, lo, hi] of [
+      ['pot wall', PLANT_CLAIM.potRange, 1762, [-4.4072, 1.3125, 10.2428], [-3.6928, 1.7815, 10.9572]],
+      ['saucer', PLANT_CLAIM.saucerRange, 682, [-4.426, 1.2675, 10.224], [-3.674, 1.3175, 10.976]],
+    ] as const) {
+      const { comps, torn } = wholeComponents(range[0], range[1])
+      expect(comps.size, `${label} components`).toBe(1)
+      expect(torn, `${label}: vertices of its component outside the run`).toBe(0)
+      expect(range[1] - range[0] + 1, `${label} vertex count`).toBe(count)
+      for (let i = range[0]; i <= range[1]; i++)
+        for (let c = 0; c < 3; c++) {
+          expect(pos[i * 3 + c], `${label} min ${c}`).toBeGreaterThanOrEqual(lo[c] - 1e-3)
+          expect(pos[i * 3 + c], `${label} max ${c}`).toBeLessThanOrEqual(hi[c] + 1e-3)
+        }
+    }
+    // ...and the four runs are the WHOLE plant: no other DeskBaked vertex stands in its footprint,
+    // so a claim fitted to these four cannot be claiming a neighbour's body by accident. (The can
+    // is a spliced mesh of its own, not DeskBaked; the sweep in desk-station.test.ts gates that.)
+    let strays = 0
+    for (let i = 0; i < n; i++) {
+      const inPlant =
+        (i >= PLANT.leaves[0] && i <= PLANT.leaves[1]) ||
+        (i >= PLANT_CLAIM.potRange[0] && i <= PLANT_CLAIM.saucerRange[1]) ||
+        (i >= PLANT.soil[0] && i <= PLANT.soil[1])
+      if (inPlant) continue
+      const d = Math.hypot(pos[i * 3] - PLANT.origin[0], pos[i * 3 + 2] - PLANT.origin[2])
+      if (d < 0.42 && pos[i * 3 + 1] > 1.26) strays++
+    }
+    expect(strays, 'foreign desk vertices standing inside the plant claim').toBe(0)
+  })
+
+  it('the claim primitives hold every plant vertex, fitted to the measured reaches (T102)', () => {
+    const b = PLANT_CLAIM.body
+    const c = PLANT_CLAIM.crown
+    // the claim stands on the rosette's own axis — one measurement, not a second one
+    expect(b.centre[0]).toBe(PLANT.origin[0])
+    expect(b.centre[1]).toBe(PLANT.origin[2])
+    expect(c.c[0]).toBe(PLANT.origin[0])
+    expect(c.c[2]).toBe(PLANT.origin[2])
+    // ...and the dome is seated exactly on the cylinder's roof, so neither carries the other's air
+    expect(c.c[1]).toBe(b.yMax)
+
+    const ranges = [PLANT.leaves, PLANT_CLAIM.potRange, PLANT_CLAIM.saucerRange, PLANT.soil] as const
+    let total = 0
+    let bandReach = 0
+    let crownFit = 0
+    for (const [lo, hi] of ranges)
+      for (let i = lo; i <= hi; i++) {
+        total++
+        const x = pos[i * 3]
+        const y = pos[i * 3 + 1]
+        const z = pos[i * 3 + 2]
+        const r = Math.hypot(x - b.centre[0], z - b.centre[1])
+        if (r <= b.r && y >= b.yMin && y <= b.yMax) {
+          if (r > bandReach) bandReach = r
+          continue
+        }
+        const d = Math.hypot(x - c.c[0], y - c.c[1], z - c.c[2])
+        if (d > crownFit) crownFit = d
+        expect(d, `plant vertex ${i} at [${x}, ${y}, ${z}] is outside BOTH claim primitives`)
+          .toBeLessThanOrEqual(c.r)
+      }
+    expect(total, 'plant vertices').toBe(7750)
+    // the widest thing in the cylinder's band is the leaf skirt overhanging the rim, not the pot
+    expect(bandReach, 'max reach inside the body band').toBeCloseTo(0.393, 3)
+    expect(b.r).toBeGreaterThanOrEqual(bandReach)
+    expect(crownFit, 'max vert-to-centre of everything the cylinder does not hold').toBeCloseTo(0.3076, 3)
+    expect(c.r).toBeGreaterThanOrEqual(crownFit)
+    // the dome NARROWS the way the foliage narrows — the tree claim's law, restated on this plant:
+    // at every height up the crown the claim's reach is within 0.15 of the real reach, and it dies
+    // 0.063 above the highest leaf rather than standing over it as a flat-topped column would.
+    const realAt = (y: number): number => {
+      let m = 0
+      for (const [lo, hi] of ranges)
+        for (let i = lo; i <= hi; i++)
+          if (Math.abs(pos[i * 3 + 1] - y) < 0.02)
+            m = Math.max(m, Math.hypot(pos[i * 3] - c.c[0], pos[i * 3 + 2] - c.c[2]))
+      return m
+    }
+    for (const y of [1.9, 1.95, 2.0]) {
+      const dy = y - c.c[1]
+      const claim = Math.sqrt(c.r * c.r - dy * dy)
+      expect(claim - realAt(y), `crown air at y ${y}`).toBeLessThan(0.15)
+    }
+    expect(c.c[1] + c.r, 'the claim tops out just over the highest leaf').toBeCloseTo(2.0915, 4)
   })
 
   it("the can zone is the spliced can's own measured footprint", () => {
