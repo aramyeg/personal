@@ -50,6 +50,7 @@ import { GlobeStand } from './props/globe-stand'
 import { XdatagroupSet } from './props/set-xdatagroup'
 import { CheckpointPeekers } from './props/peekers'
 import { LoadSignal } from '../loader/load-signal'
+import { ScenePrecompile } from './precompile'
 import { firePanelAdvance } from '../panel-tap'
 import type { ArrivalJourney } from '../use-arrival-journey'
 
@@ -205,6 +206,10 @@ function SceneContents({
   const journeyRef = useDampedJourney(progressRef, journey?.arrivalRef)
   return (
     <>
+      {/* Whole-graph shader precompile during the loader hold — eats the two
+          first-visit pipeline stalls (ch1 prop field, ending desk) off-screen.
+          Fire-and-forget: never wired into the loader's ready condition. */}
+      <ScenePrecompile />
       <CameraRig journeyRef={journeyRef} />
       <EndingDpr journeyRef={journeyRef} />
       {/* Backdrop + key/ambient light, both graded to the chapter's biome mood (Task 55). */}

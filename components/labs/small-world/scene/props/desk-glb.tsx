@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { studioEnvIntensity, studioLightsFor } from '../desk-studio'
+import { requestPrecompile } from '../precompile'
 import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
@@ -116,6 +117,12 @@ export function useDeskAssets(): DeskAssets | null {
       live = false
     }
   }, [])
+  // The desk's materials arrive AFTER the scene's mount-time shader precompile
+  // (own manager, own schedule) — announce them once their meshes have
+  // committed, so the ending's first-draw stall is eaten off-screen too (T96).
+  useEffect(() => {
+    if (assets) requestPrecompile()
+  }, [assets])
   return assets
 }
 
