@@ -41,7 +41,7 @@ import {
   type RattleState,
   type SquashSpring,
 } from './desk-nudge'
-import { coffeeRayHit, mugStirMail } from './desk-deep'
+import { bookRayHit, coffeeRayHit, mugStirMail } from './desk-deep'
 
 /**
  * THE POINTER'S HANDS (Task 89) — the plumbing that turns pointer events into the responses
@@ -272,7 +272,14 @@ export function DeskInteractions({ journeyRef }: { journeyRef: JourneyRef }) {
         hovered.current = id
         if (hit) fire(hit, HOVER_SCALE)
       }
-      setCursor(id !== null)
+      // The notebook has no micro zone — its click belongs to the deep tier (Task 92) — but the
+      // cursor's promise is this component's to keep, so the book counts toward it.
+      const o = raycaster.current.ray.origin
+      const d = raycaster.current.ray.direction
+      const overBook =
+        id === null &&
+        bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, (cam as THREE.PerspectiveCamera).fov, heightPx) !== null
+      setCursor(id !== null || overBook)
     } else {
       hovered.current = null
       setCursor(false)

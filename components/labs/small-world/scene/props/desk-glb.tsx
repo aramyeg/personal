@@ -9,6 +9,10 @@ import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
 import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
+  BOOK_HINGE,
+  BOOK_UNIFORM,
+  BOOK_VERTEX_BODY,
+  BOOK_VERTEX_DECL,
   STIR_FRAGMENT_BODY,
   STIR_FRAGMENT_DECL,
   STIR_UNIFORM,
@@ -183,19 +187,51 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
   const nudge = nudgeVertexChunk('DeskBaked')
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLights = lights
-    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
-      '#include <color_vertex>',
-      '#include <color_vertex>\n vDimColor = color_1.rgb;'
-    )
+    // The notebook's cover hinge (Task 92): the slab's shipped bytes stay in this mesh and the
+    // open is a weighted spine rotation, guarded to exact zero like every nudge field.
+    shader.uniforms.uBookHinge = BOOK_UNIFORM
+    shader.vertexShader = (
+      BOOK_VERTEX_DECL +
+      '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
+      shader.vertexShader
+    ).replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
     // unlit, so only positions move — there is no normal for the nudge to keep honest here: the
     // shading is baked into vertex colours, which travel with the vertices by construction
     wireNudge(shader, nudge)
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n' + BOOK_VERTEX_BODY
+    )
     shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
       '#include <color_fragment>',
       'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-baked'
+  return mat
+}
+
+/**
+ * THE VERSO (Task 92) — the paper glued to the notebook cover's underside, with the pencil sketch
+ * of the two souvenirs. Its own small mesh, because it MOVES as a rigid body (the component
+ * rotates the object about the spine axis by the same angle the cover's shader chunk reads —
+ * `BOOK_UNIFORM`, one writer). Same two-set bake mix as everything matte; deliberately NO nudge
+ * and NO hinge chunk — a shader hinge on top of the object rotation would open the book twice.
+ */
+export function versoMaterial(lights: { value: number }): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLights = lights
+    shader.vertexShader = ('attribute vec4 color_1;\nvarying vec3 vDimColor;\n' + shader.vertexShader).replace(
+      '#include <color_vertex>',
+      '#include <color_vertex>\n vDimColor = color_1.rgb;'
+    )
+    shader.fragmentShader = ('uniform float uLights;\nvarying vec3 vDimColor;\n' + shader.fragmentShader).replace(
+      '#include <color_fragment>',
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );'
+    )
+  }
+  mat.customProgramCacheKey = () => 'sw-desk-verso'
   return mat
 }
 
@@ -447,21 +483,49 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
     // already, so recomputing gives exactly the smooth-within-island normals the file would carry.
     glaze.geometry.computeVertexNormals()
     glaze.material = glossMaterial(equirect, lights.current, gloss.current)
-    return { surface, baked, metal, glaze, metalMat: metal.material as THREE.MeshStandardMaterial }
+    // The notebook's verso (Task 92): present once the interior ships in the GLB; its absence is a
+    // desk without a deep book, not a broken desk.
+    const verso = findMesh(scene, 'BookVerso' as DeskMeshName)
+    if (verso) verso.material = versoMaterial(lights.current)
+    return { surface, baked, metal, glaze, verso, metalMat: metal.material as THREE.MeshStandardMaterial }
   }, [assets, env, equirect])
 
   useEffect(() => {
     if (!built) return
     return () => {
-      for (const m of [built.surface, built.baked, built.metal, built.glaze]) {
-        ;(m.material as THREE.Material).dispose()
+      for (const m of [built.surface, built.baked, built.metal, built.glaze, built.verso]) {
+        if (m) (m.material as THREE.Material).dispose()
       }
     }
   }, [built])
 
   const last = useRef(Number.NaN)
+  const lastHinge = useRef(0)
+  const hingeAxis = useMemo(
+    () => new THREE.Vector3(BOOK_HINGE.dir[0], BOOK_HINGE.dir[1], BOOK_HINGE.dir[2]),
+    []
+  )
+  const hingeP0 = useMemo(() => new THREE.Vector3(BOOK_HINGE.p0[0], BOOK_HINGE.p0[1], BOOK_HINGE.p0[2]), [])
+  const hingeTmp = useMemo(() => new THREE.Vector3(), [])
   useFrame(() => {
     if (!built) return
+    // The verso follows the cover: the SAME angle the slab's shader chunk reads, applied as a
+    // rigid rotation about the same axis. Written only on change; at exact 0 the transform is
+    // identity, so a rest frame is the authored mesh untouched.
+    if (built.verso && BOOK_UNIFORM.value[0] !== lastHinge.current) {
+      const th = BOOK_UNIFORM.value[0]
+      lastHinge.current = th
+      if (th === 0) {
+        built.verso.quaternion.identity()
+        built.verso.position.set(0, 0, 0)
+      } else {
+        built.verso.quaternion.setFromAxisAngle(hingeAxis, th)
+        // p' = P0 + R(p − P0) = Rp + (P0 − R·P0): the mesh keeps authored coordinates and the
+        // object transform supplies the pivot.
+        hingeTmp.copy(hingeP0).applyQuaternion(built.verso.quaternion)
+        built.verso.position.copy(hingeP0).sub(hingeTmp)
+      }
+    }
     const u = studioLightsFor(journeyRef.current.ending)
     if (u === last.current) return
     last.current = u
@@ -477,6 +541,7 @@ export function DeskGlb({ journeyRef }: { journeyRef: JourneyRef }) {
       <primitive object={built.baked} />
       <primitive object={built.metal} />
       <primitive object={built.glaze} />
+      {built.verso ? <primitive object={built.verso} /> : null}
     </group>
   )
 }

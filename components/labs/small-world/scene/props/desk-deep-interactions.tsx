@@ -6,14 +6,20 @@ import type { JourneyRef } from '../use-journey'
 import { usePrefersReducedMotion } from '../use-reduced-motion'
 import { nudgeArmedFor, steamKickMail, tipDirFrom } from './desk-nudge'
 import {
+  BOOK_UNIFORM,
   COFFEE_ZONE,
   STIR,
   STIR_UNIFORM,
+  bookRayHit,
   coffeeRayHit,
   mugStirMail,
+  restingBook,
   restingStir,
+  sampleBook,
   sampleStir,
+  triggerBook,
   triggerStir,
+  type BookState,
   type StirState,
 } from './desk-deep'
 
@@ -38,6 +44,7 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
 
   const tap = useRef<{ x: number; y: number } | null>(null)
   const stir = useRef<StirState>(restingStir())
+  const book = useRef<BookState>(restingBook())
   const clock = useRef(0)
   const armed = useRef(false)
 
@@ -66,7 +73,9 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
       if (!nowArmed) {
         // Scroll-away: rest in the same frame — closed forms have no unwind to run.
         stir.current = restingStir()
+        book.current = restingBook()
         STIR_UNIFORM.value.fill(0)
+        BOOK_UNIFORM.value.fill(0)
         clock.current = 0
         tap.current = null
       }
@@ -83,16 +92,12 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
       raycaster.current.setFromCamera(ndc.current, state.camera)
       const o = raycaster.current.ray.origin
       const d = raycaster.current.ray.direction
-      const hit = coffeeRayHit(
-        o.x,
-        o.y,
-        o.z,
-        d.x,
-        d.y,
-        d.z,
-        (state.camera as THREE.PerspectiveCamera).fov,
-        state.size.height
-      )
+      const fov = (state.camera as THREE.PerspectiveCamera).fov
+      const hit = coffeeRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)
+      if (bookRayHit(o.x, o.y, o.z, d.x, d.y, d.z, fov, state.size.height)) {
+        // the notebook: the cover opens on its spring; mid-arc clicks are absorbed
+        triggerBook(book.current, now)
+      }
       if (hit) {
         triggerStir(stir.current, now, 1)
         // The cup answers the spoon: a low-strength micro rock, posted to the tier that owns the
@@ -115,6 +120,7 @@ export function DeskDeepInteractions({ journeyRef }: { journeyRef: JourneyRef })
     }
 
     sampleStir(stir.current, now, STIR_UNIFORM.value)
+    BOOK_UNIFORM.value[0] = sampleBook(book.current, now)
   })
 
   return null

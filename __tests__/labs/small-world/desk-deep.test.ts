@@ -6,13 +6,21 @@ import {
   DESK_NUDGE_ZONES,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import {
+  BOOK,
+  BOOK_HINGE,
+  BOOK_VERTEX_BODY,
+  BOOK_ZONE,
   COFFEE_ZONE,
   STIR,
   STIR_FRAGMENT_BODY,
   STIR_VERTEX_BODY,
+  bookRayHit,
   coffeeRayHit,
+  restingBook,
   restingStir,
+  sampleBook,
   sampleStir,
+  triggerBook,
   triggerStir,
 } from '@/components/labs/small-world/scene/props/desk-deep'
 
@@ -182,5 +190,107 @@ describe("the stir's closed forms", () => {
     expect(STIR_FRAGMENT_BODY).toContain('uStir.z != 0.0')
     // the dip profile is zero AT the rim — the ring that meets the mug's wall never moves
     expect(STIR_VERTEX_BODY).toContain('max( 0.0')
+  })
+})
+
+describe("the notebook's hinge, held to the shipped desk", () => {
+  const pos = positionsOf(json, bin, 'DeskBaked')
+  const hb = BOOK_HINGE.box
+  const inHinge = (x: number, y: number, z: number): boolean =>
+    x >= hb.min[0] && x <= hb.max[0] && y >= hb.min[1] && y <= hb.max[1] && z >= hb.min[2] && z <= hb.max[2]
+
+  it('selects the cover slab, the whole cover slab, and nothing but the cover slab', () => {
+    // the slab = Book2 vertices above the shell's own top plane; the hinge box must agree exactly
+    let slab = 0
+    let boxed = 0
+    let disagree = 0
+    for (let i = 0; i < pos.length; i += 3) {
+      const x = pos[i]
+      const y = pos[i + 1]
+      const z = pos[i + 2]
+      const inBook =
+        x >= BOOK_ZONE.min[0] && x <= BOOK_ZONE.max[0] && z >= BOOK_ZONE.min[2] && z <= BOOK_ZONE.max[2]
+      const isSlab = inBook && y > 1.6395
+      const b = inHinge(x, y, z)
+      if (isSlab) slab++
+      if (b) boxed++
+      if (isSlab !== b) disagree++
+    }
+    expect(slab).toBeGreaterThanOrEqual(250)
+    expect(disagree, 'vertices the hinge box tears off the slab (or steals from the shell)').toBe(0)
+    expect(boxed).toBe(slab)
+  })
+
+  it("the spine axis lies along the slab's attachment edge (the measured yaw)", () => {
+    // every slab vertex is on the front side of the spine line, none further than the book depth
+    const [ax, , az] = BOOK_HINGE.across
+    for (let i = 0; i < pos.length; i += 3) {
+      if (!inHinge(pos[i], pos[i + 1], pos[i + 2])) continue
+      const u = (pos[i] - BOOK_HINGE.p0[0]) * ax + (pos[i + 2] - BOOK_HINGE.p0[2]) * az
+      expect(u).toBeGreaterThan(-0.12)
+      expect(u).toBeLessThan(0.85)
+    }
+    // and the flex ramp saturates before the verso's authored start (0.16), so the sketch panel
+    // rides a RIGID cover
+    expect(BOOK_HINGE.rampHi).toBeLessThanOrEqual(0.16)
+  })
+
+  it('claims a click through the cover, and stays out of every micro zone', () => {
+    const cx = (BOOK_ZONE.min[0] + BOOK_ZONE.max[0]) / 2
+    const cz = (BOOK_ZONE.min[2] + BOOK_ZONE.max[2]) / 2
+    expect(bookRayHit(cx, 5, cz, 0, -1, 0, 40, 900)).not.toBeNull()
+    expect(bookRayHit(-2.595, 5, 11.3, 0, -1, 0, 40, 900)).toBeNull()
+    for (const z of DESK_NUDGE_ZONES) {
+      const overlaps =
+        BOOK_ZONE.min[0] <= z.max[0] && BOOK_ZONE.max[0] >= z.min[0] &&
+        BOOK_ZONE.min[2] <= z.max[2] && BOOK_ZONE.max[2] >= z.min[2]
+      expect(overlaps, `the book zone overlaps the ${z.kind} micro zone`).toBe(false)
+    }
+  })
+})
+
+describe("the notebook's arc", () => {
+  it('opens on the spring, overshooting like paper on board, and is near-open at the hold', () => {
+    const s = restingBook()
+    triggerBook(s, 1)
+    let peak = 0
+    for (let t = 0.02; t < BOOK.holdUntil; t += 0.02) {
+      const th = sampleBook(s, 1 + t)
+      if (th > peak) peak = th
+    }
+    expect(peak).toBeGreaterThan(BOOK.open)
+    expect(peak).toBeLessThan(BOOK.open * 1.15)
+    expect(sampleBook(s, 1 + BOOK.holdUntil - 0.01)).toBeGreaterThan(BOOK.open * 0.97)
+  })
+
+  it('falls shut, bounces without ever passing through the pages, and ends at EXACT zero', () => {
+    const s = restingBook()
+    triggerBook(s, 0)
+    let ended = 0
+    for (let t = BOOK.holdUntil; t < BOOK.holdUntil + 3; t += 0.01) {
+      const th = sampleBook(s, t)
+      expect(th).toBeGreaterThanOrEqual(0)
+      if (!s.active) {
+        ended = t
+        break
+      }
+    }
+    expect(ended).toBeGreaterThan(0)
+    expect(Object.is(sampleBook(s, ended + 1), 0)).toBe(true)
+    expect(s.active).toBe(false)
+  })
+
+  it('absorbs clicks mid-arc — the set piece finishes its sentence', () => {
+    const s = restingBook()
+    triggerBook(s, 5)
+    triggerBook(s, 5.5)
+    expect(s.t0).toBe(5)
+    // and before the trigger there is nothing
+    expect(sampleBook(restingBook(), 100)).toBe(0)
+  })
+
+  it('keeps the guard and the flex ramp in the chunk', () => {
+    expect(BOOK_VERTEX_BODY).toContain('uBookHinge.x != 0.0')
+    expect(BOOK_VERTEX_BODY).toContain('smoothstep')
   })
 })

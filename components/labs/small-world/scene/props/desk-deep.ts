@@ -1,5 +1,8 @@
 import { hitPadFor, rayBoxHit } from './desk-nudge'
 
+/** Compile-time literal formatting for every chunk in this file (measurements → GLSL). */
+const f = (v: number): string => v.toFixed(5)
+
 /**
  * THE DESK'S DEEP TIER (Task 92) — set-piece interactions, one per prop, built on the micro-tier's
  * law (`desk-nudge.ts`) and adding nothing to it: pointer-initiated, deterministic closed forms of
@@ -110,6 +113,39 @@ export function coffeeRayHit(
   return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
 }
 
+/** The book's claim, same shape as the coffee's: x/z inflated to the 44 px floor, y as authored.
+ *  The micro tier reads this too — not to fire, only to keep the cursor honest over a prop whose
+ *  click the DEEP tier answers. */
+export function bookRayHit(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  fovDeg: number,
+  heightPx: number
+): { t: number; point: [number, number, number] } | null {
+  const z = BOOK_ZONE
+  const cx = (z.min[0] + z.max[0]) / 2
+  const cy = (z.min[1] + z.max[1]) / 2
+  const cz = (z.min[2] + z.max[2]) / 2
+  const dist = Math.hypot(cx - ox, cy - oy, cz - oz)
+  const extent = Math.min(z.max[0] - z.min[0], z.max[2] - z.min[2])
+  const pad = hitPadFor(extent, dist, fovDeg, heightPx)
+  const t = rayBoxHit(
+    ox,
+    oy,
+    oz,
+    dx,
+    dy,
+    dz,
+    [z.min[0] - pad, z.min[1], z.min[2] - pad],
+    [z.max[0] + pad, z.max[1], z.max[2] + pad]
+  )
+  return t === null ? null : { t, point: [ox + dx * t, oy + dy * t, oz + dz * t] }
+}
+
 /**
  * The stir's mug nudge, as a MAILBOX (the `steamKickMail` pattern, and for the same reason): the
  * micro tier owns the mug's spring state, so the deep tier posts and the micro frame loop stamps.
@@ -165,14 +201,146 @@ export const STIR_UNIFORM = { value: new Float32Array(4) }
 
 // --- the stir's shader chunks ------------------------------------------------
 
-const f = (v: number): string => v.toFixed(5)
-
 const stirBox = (px: string, py: string, pz: string): string =>
   `${px} >= ${f(COFFEE_ZONE.min[0])} && ${px} <= ${f(COFFEE_ZONE.max[0])} &&
      ${py} >= ${f(COFFEE_ZONE.min[1])} && ${py} <= ${f(COFFEE_ZONE.max[1])} &&
      ${pz} >= ${f(COFFEE_ZONE.min[2])} && ${pz} <= ${f(COFFEE_ZONE.max[2])}`
 
 const INV_R2 = 1 / (COFFEE_ZONE.radius * COFFEE_ZONE.radius)
+
+// --- the notebook ------------------------------------------------------------
+
+/**
+ * Click the notebook and the cover opens on a spring, holds a beat over a pencil sketch of the two
+ * souvenirs, and falls shut with a bounce. The mechanism the measurements chose: `Book2` ships as
+ * a real hardcover — bottom board + spine + top slab, ONE component attached only along the spine
+ * (48 boundary triangles, all in z 8.779..8.965; the shell has no side walls — verified against
+ * the shipped bytes by `desk-deep.test.ts`). So the cover is NOT split out into its own mesh: its
+ * shipped bytes stay exactly where they are, and the open is a weighted rotation about the spine
+ * axis in the vertex shader — the same field family as the micro tier's bends, which makes rest
+ * bit-identity STRUCTURAL (guarded untouched path over unchanged bytes) instead of achieved.
+ * T91 §2.3 priced a separate rigid cover mesh; this diverges deliberately, for that reason.
+ *
+ * What IS new geometry (Task 92's Blender round): the interior the open reveals — the revealed
+ * page and a gutter shadow spliced into `DeskBaked` (static, hidden inside the closed book, so
+ * rest pixels cannot change), and `BookVerso` (+1 draw): the paper glued to the cover's underside,
+ * carrying the graphite sketch, riding the SAME axis/angle as an object transform.
+ */
+export const BOOK = {
+  /** Open pose, radians (108° — the spike's legibility verdict: the cover stands like a screen). */
+  open: 1.8849555921538759,
+  /** The opening spring: ζ 0.55 overshoots ~12% (paper-on-board mass), ω settles it in ~0.55 s. */
+  zetaOpen: 0.55,
+  omegaOpen: 13.2,
+  /** The cover starts falling shut this long after the click — open + the reading hold. */
+  holdUntil: 1.8,
+  /** The shut: a free fall toward closed whose undershoot is REFLECTED — |underdamped| is a
+   *  bounce with restitution built in, and a cover that slaps and micro-bounces is how a real
+   *  hardcover closes. */
+  zetaClose: 0.6,
+  omegaClose: 11.0,
+  /** Below this angle (rad) in the closing phase the book is DONE: exact +0. ~0.06°. */
+  restEps: 0.001,
+} as const
+
+/**
+ * The spine axis, measured off the shipped GLB (the slab's attachment line; direction is the
+ * book's own −5.7° yaw). `P0` sits on the line at slab mid-thickness; `dir` is unit, spine-long;
+ * `across` is unit, perpendicular in the desk plane, pointing from the spine toward the book's
+ * front edge — the coordinate the flex ramp reads.
+ */
+export const BOOK_HINGE = {
+  p0: [-3.4, 1.649, 8.8914],
+  dir: [0.99506, 0, 0.09932],
+  across: [-0.09932, 0, 0.99506],
+  /** The flex ramp: rotation weight 0 at the spine, 1 past the crease — the spine band curls the
+   *  way cardstock does instead of shearing (the slab's 48 attachment triangles live at u < 0.1). */
+  rampLo: 0.02,
+  rampHi: 0.15,
+  /** The shader box: the cover slab and ONLY it. Floor 1.63995 sits between the spliced interior
+   *  (PageR 1.6398, gutter 1.6399 — static) and the slab's own bottom face (1.6410). */
+  box: { min: [-3.99, 1.63995, 8.8, 0], max: [-2.81, 1.68, 9.69, 0] },
+} as const
+
+/** The whole notebook is the click target — its measured footprint, grown a little. */
+export const BOOK_ZONE = {
+  min: [-3.99, 1.54, 8.75],
+  max: [-2.81, 1.68, 9.69],
+} as const
+
+export type BookState = { t0: number; active: boolean }
+export const restingBook = (): BookState => ({ t0: 0, active: false })
+
+/** A click starts the arc; clicks mid-arc are absorbed (the set piece finishes its sentence). */
+export function triggerBook(s: BookState, now: number): void {
+  if (s.active) return
+  s.t0 = now
+  s.active = true
+}
+
+const springStep = (tau: number, zeta: number, omega: number): number => {
+  const wd = omega * Math.sqrt(1 - zeta * zeta)
+  return 1 - Math.exp(-zeta * omega * tau) * (Math.cos(wd * tau) + ((zeta * omega) / wd) * Math.sin(wd * tau))
+}
+
+const springStepVel = (tau: number, zeta: number, omega: number): number => {
+  const wd = omega * Math.sqrt(1 - zeta * zeta)
+  return Math.exp(-zeta * omega * tau) * ((omega * omega) / wd) * Math.sin(wd * tau)
+}
+
+/**
+ * The cover's angle at `now` — one closed form per phase, velocity-matched at the handover, exact
+ * +0 at the end. Pure in (now − t0): scrub-safe and deterministic by construction.
+ */
+export function sampleBook(s: BookState, now: number): number {
+  if (!s.active) return 0
+  const tau = now - s.t0
+  if (tau <= 0) return 0
+  if (tau < BOOK.holdUntil) return BOOK.open * springStep(tau, BOOK.zetaOpen, BOOK.omegaOpen)
+  // the shut: free response from the handover state toward 0, undershoot reflected into a bounce
+  const th1 = BOOK.open * springStep(BOOK.holdUntil, BOOK.zetaOpen, BOOK.omegaOpen)
+  const v1 = BOOK.open * springStepVel(BOOK.holdUntil, BOOK.zetaOpen, BOOK.omegaOpen)
+  const tc = tau - BOOK.holdUntil
+  const wz = BOOK.omegaClose
+  const wd = wz * Math.sqrt(1 - BOOK.zetaClose * BOOK.zetaClose)
+  const decay = Math.exp(-BOOK.zetaClose * wz * tc)
+  const b = (v1 + BOOK.zetaClose * wz * th1) / wd
+  const raw = decay * (th1 * Math.cos(wd * tc) + b * Math.sin(wd * tc))
+  const env = decay * Math.hypot(th1, b)
+  if (env < BOOK.restEps) {
+    s.active = false
+    return 0
+  }
+  return Math.abs(raw)
+}
+
+/** The cover's hinge uniform: (θ, 0, 0, 0). Written by the deep frame loop; read by the baked
+ *  material's hinge chunk AND by the verso mesh's object transform, so they cannot disagree. */
+export const BOOK_UNIFORM = { value: new Float32Array(4) }
+
+/**
+ * The cover's vertex chunk, for `DeskBaked` only. Selects the slab by rest-position box (the
+ * spliced interior sits under its floor; the shell and pages under that), rotates about the spine
+ * axis with the flex ramp's weight, and is guarded to exact zero like every field in this file.
+ */
+export const BOOK_VERTEX_DECL = 'uniform vec4 uBookHinge;'
+export const BOOK_VERTEX_BODY = (() => {
+  const b = BOOK_HINGE
+  return `if ( uBookHinge.x != 0.0 &&
+     position.x >= ${f(b.box.min[0])} && position.x <= ${f(b.box.max[0])} &&
+     position.y >= ${f(b.box.min[1])} && position.y <= ${f(b.box.max[1])} &&
+     position.z >= ${f(b.box.min[2])} && position.z <= ${f(b.box.max[2])} ) {
+  vec3 bkP = vec3( ${f(b.p0[0])}, ${f(b.p0[1])}, ${f(b.p0[2])} );
+  vec3 bkAx = vec3( ${f(b.dir[0])}, ${f(b.dir[1])}, ${f(b.dir[2])} );
+  float bkU = dot( position - bkP, vec3( ${f(b.across[0])}, ${f(b.across[1])}, ${f(b.across[2])} ) );
+  float bkW = smoothstep( ${f(b.rampLo)}, ${f(b.rampHi)}, bkU );
+  float bkTh = uBookHinge.x * bkW;
+  float bkC = cos( bkTh );
+  float bkS = sin( bkTh );
+  vec3 bkQ = transformed - bkP;
+  transformed = bkP + bkQ * bkC + cross( bkAx, bkQ ) * bkS + bkAx * dot( bkAx, bkQ ) * ( 1.0 - bkC );
+}`
+})()
 
 /**
  * The vertex half: the vortex dip, a paraboloid-squared of rest radius — C1 at the rim, so the
