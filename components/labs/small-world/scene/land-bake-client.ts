@@ -13,7 +13,15 @@
  * on the main thread (the pre-Task-47 behaviour), so the scene always renders.
  */
 import * as THREE from 'three'
-import { bakeLandArrays, PLANET_RADIUS, ICO_DETAIL, ICO_EDGE, type LandBake } from './land-bake'
+import {
+  bakeLandArrays,
+  equirectPlanetUV,
+  PLANET_RADIUS,
+  ICO_DETAIL,
+  ICO_EDGE,
+  type LandBake,
+  type LandBakeUV,
+} from './land-bake'
 import type { LandDials } from './tunables'
 
 /** The base (pre-displacement) icosphere positions, built on the main thread and transferred to
@@ -25,24 +33,40 @@ function baseIcospherePositions(): Float32Array {
   return src
 }
 
+/**
+ * The lighting-atlas UV, built once for the module's lifetime.
+ *
+ * It is a pure function of PLANET_RADIUS and ICO_DETAIL — no dial reaches it — so a rebake can
+ * never change it. Memoising it here is what keeps it off both hot paths: the worker never has to
+ * derive or transfer it, and a `?tune` rebake pays for it exactly zero times after the first.
+ */
+let uvMemo: Float32Array | null = null
+function atlasUV(): Float32Array {
+  if (!uvMemo) {
+    const src = baseIcospherePositions()
+    uvMemo = equirectPlanetUV(src, src.length / 3)
+  }
+  return uvMemo
+}
+
 /** The synchronous main-thread bake (the freeze) — used only when no worker is available. */
-export function bakeLandSync(dials: LandDials): LandBake {
+export function bakeLandSync(dials: LandDials): LandBakeUV {
   const geo = new THREE.IcosahedronGeometry(PLANET_RADIUS, ICO_DETAIL)
   const src = geo.attributes.position as THREE.BufferAttribute
   const bake = bakeLandArrays(src, src.count, ICO_EDGE, dials)
   geo.dispose()
-  return bake
+  return { ...bake, uv: atlasUV() }
 }
 
 export type LandBakeClient = {
   /** Request a bake tagged `id` with the by-value dial snapshot. Resolves with the LandBake
    *  (from the worker, or synchronously if the worker is unavailable). */
-  request: (id: number, dials: LandDials) => Promise<LandBake>
+  request: (id: number, dials: LandDials) => Promise<LandBakeUV>
   /** Terminate the worker and drop pending requests (component unmount). */
   dispose: () => void
 }
 
-type Pending = { resolve: (b: LandBake) => void; dials: LandDials }
+type Pending = { resolve: (b: LandBakeUV) => void; dials: LandDials }
 
 export function createLandBakeClient(): LandBakeClient {
   let worker: Worker | null = null
@@ -60,7 +84,7 @@ export function createLandBakeClient(): LandBakeClient {
       const entry = pending.get(id)
       if (entry) {
         pending.delete(id)
-        entry.resolve(bake)
+        entry.resolve({ ...bake, uv: atlasUV() })
       }
     }
     // A runtime worker fault must never hang the loader: finish every in-flight request on the
@@ -80,7 +104,7 @@ export function createLandBakeClient(): LandBakeClient {
       if (worker) {
         const src = baseIcospherePositions()
         const count = src.length / 3
-        return new Promise<LandBake>((resolve) => {
+        return new Promise<LandBakeUV>((resolve) => {
           pending.set(id, { resolve, dials })
           worker!.postMessage({ id, src, count, EDGE: ICO_EDGE, dials }, [src.buffer as ArrayBuffer])
         })

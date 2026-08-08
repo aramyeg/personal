@@ -17,9 +17,10 @@ import {
 } from './biomes'
 import { canonicalTheta } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
-import { makeBoilMaterial, boilAmplitude } from './boil-material'
+import { makeBoilMaterial, boilAmplitude, loadPlanetAtlas } from './boil-material'
+import { studioLightsFor } from './desk-studio'
 import { DIALS, subscribe, bakeVersion, readLandDials } from './tunables'
-import { PLANET_RADIUS, terrainBump, terrainBumpB, type LandBake } from './land-bake'
+import { PLANET_RADIUS, terrainBump, terrainBumpB, type LandBakeUV } from './land-bake'
 import { createLandBakeClient, type LandBakeClient } from './land-bake-client'
 import {
   type WaterParams,
@@ -85,11 +86,16 @@ type LandResult = { geometry: THREE.BufferGeometry; bake: MorphBake }
  * per-frame renewal/tide source; the front lerps them toward B / the flooded target. buildBuckets
  * runs here on the main thread (the bucketed morph is a main-thread concern).
  */
-function assembleLand(b: LandBake): LandResult {
+function assembleLand(b: LandBakeUV): LandResult {
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(b.positionsA.slice(), 3).setUsage(THREE.DynamicDrawUsage))
   geo.setAttribute('color', new THREE.BufferAttribute(b.colorsA.slice(), 3).setUsage(THREE.DynamicDrawUsage))
   geo.setAttribute('normal', new THREE.BufferAttribute(b.normalsA.slice(), 3).setUsage(THREE.DynamicDrawUsage))
+  // T90 — the lighting atlas's equirect UV. Unlike the three above it is STATIC: the renewal front
+  // and the tide rewrite position/colour/normal every frame, but nothing ever rewrites a UV. So it
+  // is shared (not `.slice()`d, since no one mutates it) and left at the default STATIC usage —
+  // marking it dynamic would tell the driver to re-upload a buffer that never changes.
+  geo.setAttribute('uv', new THREE.BufferAttribute(b.uv, 2))
   return {
     geometry: geo,
     bake: {
@@ -560,7 +566,20 @@ export function Planet({
   // Task 29 lever 5 — the land material carries the boil term (a stepped normal tilt
   // driven by one uniform). Water keeps the stock ramp material (it has its own molded
   // depth voice). Disposed on unmount like the other clay resources.
-  const boil = useMemo(() => makeBoilMaterial(ramp), [ramp])
+  // T90 — the baked lighting atlas. Requested once for the component's lifetime; `atlasReady`
+  // gates the crossfade so a mix can never sample a texture with no image behind it (which reads
+  // black). The whole journey is loading time: the crossfade is pinned at 0 until the ending's
+  // lights come up, and the atlas is not sampled at all until then.
+  const atlasReady = useRef(false)
+  const atlas = useMemo(() => loadPlanetAtlas(() => { atlasReady.current = true }), [])
+  useEffect(() => () => atlas.dispose(), [atlas])
+  const boil = useMemo(() => {
+    const b = makeBoilMaterial(ramp)
+    // Bound at construction, not in an effect, so the very first compile already has its sampler
+    // — and so a ramp change (which builds a new material) can never leave the new one blind.
+    b.uniforms.uBakeAtlas.value = atlas
+    return b
+  }, [ramp, atlas])
   useEffect(() => () => boil.material.dispose(), [boil])
   const boilStep = useRef(-1)
 
@@ -579,6 +598,12 @@ export function Planet({
       boilStep.current = step
       boil.uniforms.uBoilPhase.value = step * 1.618033988
     }
+    // T90 — the baked-lighting crossfade rides the ending's EXISTING lights-up. Not a new clock,
+    // not new state: `studioLightsFor` is the same pure function of `ending.zoom` that the desk's
+    // materials, the metal's environment and the DOM grade already read, so the planet cannot
+    // disagree with the room about how lit the ending is. It is exactly 0 through the whole
+    // journey and the still beat, and exactly 1 at the money shot.
+    boil.uniforms.uBakeMix.value = atlasReady.current ? studioLightsFor(j.ending) : 0
   })
 
   return (

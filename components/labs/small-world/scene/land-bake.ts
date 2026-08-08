@@ -799,6 +799,49 @@ export type LandBake = {
   capIdx: Int32Array; capNx: Float32Array; capNy: Float32Array; capNz: Float32Array
 }
 
+/** A LandBake plus the static lighting-atlas UV. The UV is NOT part of the bake — it is a pure
+ *  function of PLANET_RADIUS/ICO_DETAIL alone and never varies with a dial — so the client
+ *  attaches it once (see `land-bake-client.ts`) rather than the worker re-deriving and
+ *  re-transferring 300 kB of identical floats on every rebake. */
+export type LandBakeUV = LandBake & { uv: Float32Array }
+
+/**
+ * THE LIGHTING ATLAS UV — an equirectangular map of the BASE (undisplaced) icosphere direction.
+ *
+ * This is the map the Cycles bake was rendered against (T90 spike §5b), so it is reproduced here
+ * BIT-FOR-BIT rather than re-derived: any deviation slides the baked light off the terrain it was
+ * baked for. Two properties are load-bearing:
+ *
+ *  - It reads the UNDISPLACED sphere, not the baked terrain. That makes it a pure function of two
+ *    constants, which is why the atlas costs texture bytes and the UV accessor ships nothing.
+ *  - The per-face seam repair relies on the mesh being NON-INDEXED with contiguous face triplets
+ *    (which `IcosahedronGeometry` gives us). A face straddling the ±π meridian is repaired by
+ *    pushing only its own trailing corners past u = 1; no neighbour shares those vertices to be
+ *    dragged along. Hence `RepeatWrapping` in u at the sampler — u legitimately exceeds 1.
+ *
+ * `src` is the flat, non-interleaved position array of the base icosphere (xyz triplets).
+ */
+export function equirectPlanetUV(src: Float32Array, count: number): Float32Array {
+  const uv = new Float32Array(count * 2)
+  const inv2pi = 1 / (Math.PI * 2)
+  for (let i = 0; i < count; i++) {
+    const x = src[i * 3], y = src[i * 3 + 1], z = src[i * 3 + 2]
+    const r = Math.hypot(x, y, z) || 1
+    uv[i * 2] = Math.atan2(z, x) * inv2pi + 0.5
+    uv[i * 2 + 1] = Math.asin(Math.max(-1, Math.min(1, y / r))) / Math.PI + 0.5
+  }
+  for (let f = 0; f < count; f += 3) {
+    const u0 = uv[f * 2], u1 = uv[(f + 1) * 2], u2 = uv[(f + 2) * 2]
+    if (Math.max(u0, u1, u2) - Math.min(u0, u1, u2) > 0.5) {
+      for (let k = 0; k < 3; k++) {
+        const idx = (f + k) * 2
+        if (uv[idx] < 0.5) uv[idx] += 1.0
+      }
+    }
+  }
+  return uv
+}
+
 /**
  * Bakes both variant worlds over the pre-displacement icosahedron `src` (a position
  * BufferAttribute of `count` verts; `EDGE` is the local sub-triangle edge length). Pure —
