@@ -92,8 +92,15 @@ export const PALETTE = {
   // colours (reload-safe under the worker bake); one accent family each, tuned to the canyon.
   sinter: '#D8C7A2', // pale mineral sinter crust — the geyser cone / terrace rim
   sinterDeep: '#A98F66', // wet shaded sinter (cone base, terrace steps)
-  geyserPlume: '#DCE7EB', // pale steamy mineral water — the erupting clay plume
-  geyserPool: '#A9C6D0', // the deeper mineral pool bubbling at the vent
+  geyserPlume: '#DCE7EB', // pale steamy mineral water — the erupting clay plume's billowing crown
+  // Task 94 — the geyser's WATER got a real hue family. The old pool grey-blue (#A9C6D0)
+  // sat one step from the sinter tan and the whole prop read as "a bell with a button"
+  // (the T94 diagnosis crop). Hot-spring water is the one thing on a rust canyon that may
+  // be truly AQUA — a mineral-teal accent, cool against every warm strata tone around it —
+  // and the terraced pool is what says "thermal" before the jet even erupts.
+  geyserPool: '#6FB0BE', // the vent pool + splash — mineral aqua, deep enough to read wet
+  geyserTerrace: '#9AD4CB', // the wide terraced hot-spring sheet ringing the cone
+  geyserJet: '#F3F8F6', // the erupting water jet — near-white, the plume's bright core
   hoodooRock: '#B0673B', // terracotta hoodoo spire body (canyon rust family)
   hoodooCap: '#C79A6A', // lighter caprock crowning each hoodoo
   // Task 50 — winter feel (B2). Cold-palette discipline: blue-white / ice / cold-spruce

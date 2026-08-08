@@ -147,8 +147,13 @@ function CanyonProp({
 export function CanyonGeysers({ journeyRef }: { journeyRef: JourneyRef }) {
   return (
     <>
-      {/* three geysers in dry terrace pockets, staggered so they never erupt in lockstep */}
-      <Geyser t={0.467} x={0.3} phase={0} journeyRef={journeyRef} />
+      {/* three geysers in dry terrace pockets, staggered so they never erupt in lockstep.
+          Task 94 — the phases are SOLVED against the canyon's park rotation (9.2153 rad,
+          period 0.7), not arbitrary: at the checkpoint pose the field reads full jet (u=0.565)
+          / mid-rise jet (u=0.245 → ~0.65 height) / steaming dormant vent (u=0.885), the
+          classic staggered geyser-field picture. The old 0/0.4/0.72 parked TWO of three
+          dormant at the money frame (u=0.165/0.885) — tan cones, no geyser identity. */}
+      <Geyser t={0.467} x={0.3} phase={0.08} journeyRef={journeyRef} />
       <Geyser t={0.58} x={-0.32} phase={0.4} journeyRef={journeyRef} />
       <Geyser t={0.714} x={0.36} phase={0.72} journeyRef={journeyRef} />
       {/* hoodoo clusters flanking the gorge (badland spires, off the sacred cliffs) */}

@@ -749,25 +749,43 @@ export function ClayStiltHut({ wall = PALETTE.stiltWall, roof = PALETTE.stiltRoo
 // plume is built with its base at y=0 so a uniform scale about the vent grows it straight up.
 // Hoodoos add stratified-rock variety to the gorge (his "dirt ridge + cliffs" stay untouched).
 
-/** A geyser's mineral base: a pale sinter cone on a two-step terraced platform with a darker
- *  bubbling pool disc at the vent. ONE merged draw; base at y=0 so it seats on the canyon floor.
- *  The plume erupts from `ClayGeyserPlume` positioned at the cone's mouth. */
-export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep, pool = PALETTE.geyserPool, ...x }: Xform & { crust?: string; shade?: string; pool?: string }) {
+/** A geyser's mineral base: a pale sinter cone rising out of a TERRACED HOT-SPRING POOL.
+ *  ONE merged draw; base at y=0 so it seats on the canyon floor. The plume erupts from
+ *  `ClayGeyserPlume` positioned at the cone's mouth.
+ *
+ *  Task 94 — a dormant geyser must still read as a geyser. The old base was tan-on-tan
+ *  (sinter platform, sinter cone, one r=0.05 grey disc in the mouth): at the checkpoint two
+ *  of the three vents were resting and read as anthills. What says "thermal" from every
+ *  angle is WATER COLOUR AND A CRUST RIM: a wide aqua terrace sheet around the cone, a
+ *  raised sinter lip ringing it (a flat torus — the crusted terrace edge), a bigger aqua
+ *  vent pool, and a small permanent steam curl above the mouth. The curl is merged clay
+ *  (no clock, no extra draw): dormant vents visibly steam, and during an eruption the jet
+ *  simply engulfs it. */
+export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep, pool = PALETTE.geyserPool, terrace = PALETTE.geyserTerrace, steam = PALETTE.geyserPlume, ...x }: Xform & { crust?: string; shade?: string; pool?: string; terrace?: string; steam?: string }) {
   const ramp = useClayRamp()
   const geo = useMemo(
     () =>
       buildMergedClay([
-        // two-step terraced sinter platform (a wide grounding apron + a narrower seat)
-        { geo: new THREE.CylinderGeometry(0.2, 0.23, 0.04, 16), color: shade, pos: [0, 0.02, 0] },
-        { geo: new THREE.CylinderGeometry(0.15, 0.17, 0.04, 16), color: crust, pos: [0, 0.06, 0] },
+        // grounding apron — wet shaded sinter under everything
+        { geo: new THREE.CylinderGeometry(0.24, 0.26, 0.03, 16), color: shade, pos: [0, 0.015, 0] },
+        // the terraced hot-spring sheet — the wide aqua pool the cone stands in
+        { geo: new THREE.CylinderGeometry(0.215, 0.225, 0.025, 16), color: terrace, pos: [0, 0.042, 0] },
+        // crusted sinter lip around the terrace — a flat torus, the raised mineral rim
+        { geo: new THREE.TorusGeometry(0.215, 0.02, 8, 20), color: crust, pos: [0, 0.052, 0], rot: [Math.PI / 2, 0, 0] },
+        // an inner half-sunk terrace step (second ring of crust inside the sheet)
+        { geo: new THREE.TorusGeometry(0.15, 0.014, 8, 18), color: crust, pos: [0, 0.05, 0], rot: [Math.PI / 2, 0, 0] },
         // the sinter cone rising to the vent
-        { geo: new THREE.CylinderGeometry(0.055, 0.13, 0.16, 14), color: crust, pos: [0, 0.16, 0] },
+        { geo: new THREE.CylinderGeometry(0.055, 0.13, 0.16, 14), color: crust, pos: [0, 0.135, 0] },
         // shaded upper collar just under the rim
-        { geo: new THREE.CylinderGeometry(0.058, 0.07, 0.04, 14), color: shade, pos: [0, 0.235, 0] },
-        // the bubbling mineral pool sitting in the vent mouth
-        { geo: new THREE.CylinderGeometry(0.05, 0.05, 0.02, 14), color: pool, pos: [0, 0.255, 0] },
+        { geo: new THREE.CylinderGeometry(0.058, 0.07, 0.04, 14), color: shade, pos: [0, 0.21, 0] },
+        // the bubbling mineral pool sitting in the vent mouth — wider and truly aqua now
+        { geo: new THREE.CylinderGeometry(0.062, 0.062, 0.025, 14), color: pool, pos: [0, 0.235, 0] },
+        // the permanent steam curl — three small stretched puffs leaning off the mouth
+        { geo: new THREE.SphereGeometry(0.026, 10, 10), color: steam, pos: [0.008, 0.29, 0], scl: [1, 1.35, 1] },
+        { geo: new THREE.SphereGeometry(0.032, 10, 10), color: steam, pos: [0.024, 0.35, 0.01], scl: [1, 1.3, 1] },
+        { geo: new THREE.SphereGeometry(0.027, 10, 10), color: steam, pos: [0.046, 0.41, 0.02], scl: [1, 1.25, 1] },
       ]),
-    [crust, shade, pool]
+    [crust, shade, pool, terrace, steam]
   )
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
@@ -775,7 +793,7 @@ export function ClayGeyser({ crust = PALETTE.sinter, shade = PALETTE.sinterDeep,
 /** The erupting plume: a sculpted column of opaque clay puffs, base at y=0. ONE merged draw.
  *  The canyon component scales this uniformly by the rotation-driven plume height (geyser.ts),
  *  so it rises straight up from the vent and settles — a solid mineral jet, no flicker. */
-export function ClayGeyserPlume({ steam = PALETTE.geyserPlume, base = PALETTE.geyserPool, ...x }: Xform & { steam?: string; base?: string }) {
+export function ClayGeyserPlume({ steam = PALETTE.geyserPlume, base = PALETTE.geyserPool, jetColor = PALETTE.geyserJet, ...x }: Xform & { steam?: string; base?: string; jetColor?: string }) {
   const ramp = useClayRamp()
   const geo = useMemo(() => {
     // stacked blobby puffs, wider + wetter at the base, tapering to a steamy crown; a gentle
@@ -786,32 +804,47 @@ export function ClayGeyserPlume({ steam = PALETTE.geyserPlume, base = PALETTE.ge
       pos: [dx, y, dz],
       scl: [1, 1.15, 1],
     })
-    // Task 86 — the column WIDENS as it rises, and its puffs intersect.
+    // Task 86 widened the column as it rises so it stopped reading as a cairn of beads.
+    // Task 94 finishes the identity: a geyser is a bright VERTICAL JET that breaks into
+    // steam, not a grey lump. Three changes, all still opaque sculpted clay (the standing
+    // flicker veto), tip still ≤ 0.62 so the limb-rest gate in canyon.tsx keeps its margin:
     //
-    // It used to taper: nine-ish beads getting smaller toward the top, each clear of its
-    // neighbours. That is the silhouette of a cairn, not of a jet, and it is what the T84
-    // audit was looking at when it listed chapter 5's contents as "two beige bell shapes, a
-    // stack of white pebbles that reads as nothing" — the bells are the sinter cones and the
-    // pebbles are this. Steam reads by getting wider and looser as it leaves the vent, so the
-    // jet is now tight at the mouth and billows into a crown, and every puff overlaps its
-    // neighbour (each gap is smaller than the sum of the two radii) so the column merges into
-    // one mass instead of resolving into countable spheres.
-    //
-    // Still opaque sculpted clay, no transparency and no flicker — the standing veto — and
-    // the tip reaches 0.61, within a hundredth of the old 0.60, so the limb-rest gate in
-    // canyon.tsx keeps the margin it was solved against.
+    //  1. THE CORE IS NEAR-WHITE AND NARROW. The lower two-thirds is now a slim column of
+    //     vertically-stretched puffs in `geyserJet` (near-white) — value contrast against
+    //     the rust gorge is what gives the eruption vertical intent from across the frame.
+    //     The old build was all one grey (#DCE7EB) and read as a statue.
+    //  2. THE CROWN ALONE BILLOWS. Only the top third flares into the softer grey-blue
+    //     steam colour, so the silhouette is narrow→wide (a jet), not lumpy all the way up.
+    //  3. A SPLASH SKIRT AT THE VENT. Three flattened aqua beads around the base — water
+    //     falling back onto the cone. They scale with the plume, so a dying eruption's
+    //     splash dies with it.
+    const splash = (a: number, r: number): ClayPart => ({
+      geo: new THREE.SphereGeometry(r, 10, 10),
+      color: base,
+      pos: [Math.cos(a) * 0.055, 0.015, Math.sin(a) * 0.055],
+      scl: [1.25, 0.55, 1.25],
+    })
+    const jet = (y: number, r: number, dx = 0): ClayPart => ({
+      geo: new THREE.SphereGeometry(r, 12, 12),
+      color: jetColor,
+      pos: [dx, y, 0],
+      scl: [0.8, 1.8, 0.8],
+    })
     return buildMergedClay([
-      puff(0.04, 0.045, base), // the jet, tight at the vent mouth
-      puff(0.11, 0.055, base, 0.01),
-      puff(0.19, 0.07, steam, -0.012),
-      puff(0.27, 0.086, steam, 0.015),
-      puff(0.34, 0.079, steam, 0.045, 0.02), // a side billow
-      puff(0.36, 0.095, steam, -0.01), // the crown, the widest point
-      puff(0.45, 0.088, steam, -0.04),
-      puff(0.5, 0.075, steam, 0.03, -0.015),
-      puff(0.55, 0.06, steam, 0.01),
+      splash(0.4, 0.038),
+      splash(2.5, 0.042),
+      splash(4.4, 0.036),
+      jet(0.05, 0.05), // the jet — slim, bright, vertical
+      jet(0.15, 0.054, 0.006),
+      jet(0.25, 0.058, -0.006),
+      jet(0.33, 0.06, 0.004),
+      puff(0.42, 0.088, steam, 0.03, 0.015), // the crown breaks into steam
+      puff(0.45, 0.096, steam, -0.025), // widest point
+      puff(0.52, 0.08, steam, 0.035, -0.015),
+      puff(0.55, 0.06, steam, -0.045),
+      puff(0.548, 0.058, jetColor, 0.005), // the jet's bright heart still visible in the crown
     ])
-  }, [steam, base])
+  }, [steam, base, jetColor])
   return <mesh {...x} geometry={geo}><meshToonMaterial vertexColors gradientMap={ramp} /></mesh>
 }
 
