@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
-import type { Camera, Object3D } from 'three'
+import { WebGLRenderTarget } from 'three'
+import type { Camera, Mesh, Object3D, WebGLRenderer } from 'three'
 
 /**
  * FIRST-VISIT SHADER PRECOMPILE (T96 phase 2a, candidate: compileAsync).
@@ -84,6 +85,57 @@ export async function precompileScene(
   }
 }
 
+/** Renderer surface the warm draw needs — r185's WebGLRenderer satisfies it. */
+export type WarmDrawRenderer = Pick<
+  WebGLRenderer,
+  'getRenderTarget' | 'setRenderTarget' | 'render'
+>
+
+/**
+ * ONE HIDDEN FRAME, EVERYTHING DRAWN (the other half of the stall).
+ *
+ * compileAsync eats the program compiles, but the ch1 stall is also the first
+ * UPLOAD: the driver creates the prop fields' vertex/index buffers and binds
+ * their textures the first time each mesh is actually DRAWN, and measurement
+ * showed the ~167ms chapter-1 hitch survives a compile-only warm-up. So after
+ * the programs are ready, render the whole graph ONCE into a throwaway 2×2
+ * target — every mesh forced visible and un-culled for exactly that draw, so
+ * nothing is skipped by its journey gating or by the frustum (the desk is
+ * parked outside it on purpose). Vertex work at 4 pixels is negligible; the
+ * point is that the driver walks upload + bind for every geometry/material
+ * while the loader still holds the screen. Visibility and culling flags are
+ * restored exactly — the drawn frame goes nowhere the reader can see.
+ */
+export function warmDrawScene(gl: WarmDrawRenderer, scene: Object3D, camera: Camera): boolean {
+  const saved: Array<{ obj: Object3D; visible: boolean; frustumCulled: boolean }> = []
+  try {
+    scene.traverse((obj) => {
+      const m = obj as Mesh
+      if (!(m.isMesh || (obj as { isPoints?: boolean }).isPoints || (obj as { isLine?: boolean }).isLine)) return
+      saved.push({ obj, visible: obj.visible, frustumCulled: obj.frustumCulled })
+      obj.visible = true
+      obj.frustumCulled = false
+    })
+    const target = new WebGLRenderTarget(2, 2)
+    const previous = gl.getRenderTarget()
+    try {
+      gl.setRenderTarget(target)
+      gl.render(scene, camera)
+    } finally {
+      gl.setRenderTarget(previous)
+      target.dispose()
+    }
+    return true
+  } catch {
+    return false
+  } finally {
+    for (const s of saved) {
+      s.obj.visible = s.visible
+      s.obj.frustumCulled = s.frustumCulled
+    }
+  }
+}
+
 /** Mounts inside the Canvas; fires the precompile at mount and on every
  *  `requestPrecompile()` announcement, coalescing overlapping requests. */
 export function ScenePrecompile() {
@@ -101,13 +153,21 @@ export function ScenePrecompile() {
         return
       }
       inFlight = true
-      void precompileScene(gl, scene, camera).finally(() => {
-        inFlight = false
-        if (queued) {
-          queued = false
-          run()
-        }
-      })
+      void precompileScene(gl, scene, camera)
+        .then((compiled) => {
+          // Programs are ready (or compileAsync is unavailable and the warm
+          // draw compiles synchronously — still off-screen, still in the hold);
+          // now walk the driver through upload + bind for everything.
+          if (live) warmDrawScene(gl, scene, camera)
+          return compiled
+        })
+        .finally(() => {
+          inFlight = false
+          if (queued) {
+            queued = false
+            run()
+          }
+        })
     }
     listeners.add(run)
     run()
