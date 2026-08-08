@@ -54,6 +54,12 @@ import {
   STATION_VERTEX_BODY,
   STATION_VERTEX_DECL,
 } from './desk-station'
+import {
+  UNDERSIDE_FRAGMENT_BODY,
+  UNDERSIDE_FRAGMENT_DECL,
+  UNDERSIDE_VERTEX_BODY,
+  UNDERSIDE_VERTEX_DECL,
+} from './desk-underside'
 
 /**
  * THE NUDGE HOOK-UP (Task 89). Each baked material carries the vertex-shader block that lets the
@@ -273,6 +279,8 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
       BOOK_VERTEX_DECL +
       '\n' +
       WATER_VERTEX_DECL +
+      '\n' +
+      UNDERSIDE_VERTEX_DECL +
       '\nattribute vec4 color_1;\nvarying vec3 vDimColor;\n' +
       shader.vertexShader
     ).replace('#include <color_vertex>', '#include <color_vertex>\n vDimColor = color_1.rgb;')
@@ -293,14 +301,28 @@ export function bakedMaterial(lights: { value: number }): THREE.MeshBasicMateria
         '\n' +
         WATER_VERTEX_BODY
     )
+    // The black-underside lift (T102) measures its weight LAST, before <project_vertex> — which is
+    // downstream of begin_vertex and therefore of every block above AND of the nudge body, whose
+    // own insert put it at the end of that run. `transformed - position` there is exactly how far
+    // this motion moved this vertex, and at rest it is +0 by construction, so the resting frame
+    // takes the untouched path. See desk-underside.ts for which three interactions earned this.
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <project_vertex>',
+      UNDERSIDE_VERTEX_BODY + '\n#include <project_vertex>'
+    )
     shader.fragmentShader = (
       'uniform float uLights;\nvarying vec3 vDimColor;\n' +
       WATER_FRAGMENT_DECL +
       '\n' +
+      UNDERSIDE_FRAGMENT_DECL +
+      '\n' +
       shader.fragmentShader
     ).replace(
       '#include <color_fragment>',
-      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' + WATER_FRAGMENT_BODY
+      'diffuseColor.rgb *= mix( vDimColor, vColor.rgb, uLights );\n' +
+        WATER_FRAGMENT_BODY +
+        '\n' +
+        UNDERSIDE_FRAGMENT_BODY
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-baked'
