@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -127,5 +127,139 @@ describe('cloth-pull sprite manifest', () => {
       expect(f.anchorX, f.name).toBeLessThan(f.w)
       expect(f.anchorY, f.name).toBeLessThan(f.h)
     }
+  })
+
+  /* ---- horizontal registration ---------------------------------------- *
+   *
+   * The vertical law above has a twin. Every frame is cropped to its own ink
+   * bbox and that bbox is set by her FEET — in a stride they are her widest
+   * horizontal extent — so drawing each frame centred on its bbox slid her
+   * BODY sideways while her feet held station: 0.052 figure heights of head
+   * travel across the walk cycle, its worst jump between two ADJACENT keys and
+   * restated eight times per 0.85s stride, plus a 0.16 lurch when she changed
+   * pose group. That is the inverse of a walk.
+   *
+   * `regX` is the pipeline's answer: the world-px offset (at STAND_H) that
+   * lands every frame's measured body where the reference frame's sits. These
+   * assertions are the law it has to keep.
+   */
+
+  /** her drawn height on screen, world px at STAND_H — the unit of the law */
+  const figH = SPRITE_FRAMES[0].inkH * SPRITE_FRAMES[0].worldScale
+  /** where a frame-px landmark lands on screen under a given registration */
+  const lands = (f: (typeof SPRITE_FRAMES)[number], mark: number, reg: number) =>
+    (mark - f.w / 2) * f.worldScale + reg
+  const travel = (v: readonly number[]) => (Math.max(...v) - Math.min(...v)) / figH
+
+  /* The tolerance is the diagnosis's own ruler, not a number chosen to pass.
+   * The walk advances a foot S/8 = 0.026 figure heights per key, and half a
+   * step — 0.013 — is the loosest band that still preserves the ordering of
+   * the eight keys. Her body may not wander further than the stride's own
+   * half-step, or the shuffle is legible against the walk it sits on.
+   * Measured: 0.006 registered, against 0.052 bbox-centred. */
+  const WALK_CEIL = 0.013
+  /* Pose-group changes are deliberate events rather than a cycle, so they get
+   * a looser band. Measured 0.010 registered, against 0.161 bbox-centred. */
+  const ALL_CEIL = 0.02
+
+  it('holds her body still across the walk cycle', () => {
+    const now = SPRITE_WALK.map((f) => lands(f, f.headX, f.regX))
+    expect(
+      travel(now),
+      `head travels ${travel(now).toFixed(4)} figH across the walk`
+    ).toBeLessThan(WALK_CEIL)
+  })
+
+  it('does not move her sideways when she changes pose group', () => {
+    const now = SPRITE_FRAMES.map((f) => lands(f, f.headX, f.regX))
+    expect(
+      travel(now),
+      `head travels ${travel(now).toFixed(4)} figH across all frames`
+    ).toBeLessThan(ALL_CEIL)
+  })
+
+  /* Without this the pair above would be asserting their own construction: a
+   * `regX` of all zeros with a `headX` pinned to each frame's centre would
+   * satisfy them and ship the defect. This measures what the SAME landmarks do
+   * under the registration that was replaced — centre each frame on its crop —
+   * and requires it to fail the same ceilings. So the manifest has to carry a
+   * real per-frame correction, and the correction has to be the thing that
+   * removes the travel. */
+  it('carries a correction that is doing the work', () => {
+    const wasWalk = SPRITE_WALK.map((f) => lands(f, f.headX, 0))
+    const wasAll = SPRITE_FRAMES.map((f) => lands(f, f.headX, 0))
+    expect(
+      travel(wasWalk),
+      `bbox-centring leaves ${travel(wasWalk).toFixed(4)} figH of walk travel — ` +
+        `at or under the ${WALK_CEIL} ceiling the registration is a no-op`
+    ).toBeGreaterThan(WALK_CEIL)
+    expect(
+      travel(wasAll),
+      `bbox-centring leaves ${travel(wasAll).toFixed(4)} figH of travel across all frames`
+    ).toBeGreaterThan(ALL_CEIL)
+  })
+
+  /* `regX` is a derived number and `bodyX` is the measurement it derives from.
+   * If a regeneration re-measures the frames but the offsets are stale — or
+   * hand-edited — she is registered to art that is no longer there. */
+  it('derives every offset from the body landmark it claims to use', () => {
+    const put = (f: (typeof SPRITE_FRAMES)[number]) =>
+      (f.w / 2 - f.bodyX) * f.worldScale
+    const ref = put(SPRITE_FRAMES[0])
+    for (const f of SPRITE_FRAMES)
+      expect(f.regX, `${f.name} regX does not follow from its bodyX`).toBeCloseTo(
+        put(f) - ref,
+        1
+      )
+    // the reference frame is where she already stood; registering must not
+    // shift the whole character against the cloth and the stage
+    expect(SPRITE_FRAMES[0].regX).toBe(0)
+  })
+
+  /* `bodyX`, `headX` and `anchorX` are all in FRAME pixels, so they are only
+   * meaningful against the frame they were measured on. Re-derive each frame's
+   * dimensions from the shipped .webp itself — the VP8X chunk carries the
+   * canvas size — so a sheet re-exported at another size cannot silently leave
+   * the registration pointing at the wrong part of her. */
+  const webpSize = (file: string) => {
+    const b = readFileSync(file)
+    if (b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WEBP')
+      throw new Error(`${file} is not a WebP file`)
+    let o = 12
+    while (o + 8 <= b.length) {
+      const tag = b.toString('ascii', o, o + 4)
+      const size = b.readUInt32LE(o + 4)
+      if (tag === 'VP8X')
+        return { w: b.readUIntLE(o + 12, 3) + 1, h: b.readUIntLE(o + 15, 3) + 1 }
+      o += 8 + size + (size & 1)
+    }
+    throw new Error(`${file} carries no VP8X chunk`)
+  }
+
+  it('measures the frames it actually ships', () => {
+    for (const f of SPRITE_FRAMES) {
+      const got = webpSize(
+        join(process.cwd(), 'public/labs/cloth-pull/sprites', `${f.name}.webp`)
+      )
+      expect(got.w, `${f.name} ships ${got.w}px wide, manifest says ${f.w}`).toBe(f.w)
+      expect(got.h, `${f.name} ships ${got.h}px tall, manifest says ${f.h}`).toBe(f.h)
+      expect(f.bodyX, f.name).toBeGreaterThan(0)
+      expect(f.bodyX, f.name).toBeLessThan(f.w)
+      expect(f.headX, f.name).toBeGreaterThan(0)
+      expect(f.headX, f.name).toBeLessThan(f.w)
+    }
+  })
+
+  /* The strings hang off `anchorX`, which is offset from the frame centre and
+   * therefore rides `regX` with the rest of the frame. Her hands are clasped
+   * BEHIND her back and she faces +x, so the anchor must sit behind her body
+   * in every frame. It fires if the offset is ever applied to the anchor a
+   * second time, which would walk the strings off her hands. */
+  it('leaves the fist anchor behind her body, where her hands are drawn', () => {
+    for (const f of SPRITE_FRAMES)
+      expect(
+        f.anchorX,
+        `${f.name} puts the fist anchor ${f.anchorX} ahead of her body at ${f.bodyX}`
+      ).toBeLessThan(f.bodyX)
   })
 })

@@ -119,6 +119,13 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
       const k = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.worldScale
       const px = (f: SpriteFrame) => k(f) * f.h
       const pw = (f: SpriteFrame) => k(f) * f.w
+      // regX is the whole of her horizontal registration, in the same spirit:
+      // every frame is cropped to its own ink bbox and that bbox is set by her
+      // FEET, so centring on it slid her body sideways 0.065 of her height
+      // across the cycle and ~0.09 whenever she changed pose group. The
+      // pipeline measures where her body actually sits and bakes the offset
+      // that lands every frame on the same spot. See sprite-bodyx.mjs.
+      const rx = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.regX
       // heightPx changed (a resize): the cached frame index would skip the
       // scale write and leave her at the old viewport's size
       state.current.frame = -1
@@ -139,11 +146,14 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
           depthMaterial.needsUpdate = true
           m.scale.set(pw(f), px(f), 1)
         }
-        // feet line at the group origin; frame centered horizontally
-        m.position.set(position[0], position[1] + px(f) / 2 + bob, position[2])
+        // feet line at the group origin; frame registered on her BODY, so the
+        // drawn figure lands in the same place whatever the crop did
+        const cx = position[0] + rx(f)
+        m.position.set(cx, position[1] + px(f) / 2 + bob, position[2])
         // fist anchor in GROUP-LOCAL px (getFist lifts it to world space),
-        // followed rather than snapped — see FIST_TAU
-        const ax = position[0] + (f.anchorX / f.w - 0.5) * pw(f)
+        // followed rather than snapped — see FIST_TAU. It hangs off the frame
+        // centre, so it rides the registration offset and stays on her hands.
+        const ax = cx + (f.anchorX / f.w - 0.5) * pw(f)
         const ay = position[1] + px(f) - (f.anchorY / f.h) * px(f) + bob
         const fist = state.current.fist
         if (!state.current.fistSeeded) {
