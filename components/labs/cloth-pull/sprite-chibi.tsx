@@ -20,15 +20,24 @@ import * as THREE from 'three'
 import { useLoader } from '@react-three/fiber'
 import {
   SPRITE_FRAMES,
+  SPRITE_HOLD_I0,
   SPRITE_STAND_H,
+  SPRITE_STRAIN_I0,
+  SPRITE_WALK,
   type SpriteFrame,
 } from '@/lib/labs/cloth-pull/sprite-manifest'
 import type { ChibiHandle, ChibiProps } from './chibi'
 
 const URLS = SPRITE_FRAMES.map((f) => `/labs/cloth-pull/sprites/${f.name}.webp`)
 
-/** seconds per 8-frame walk cycle at full cruise */
+/** seconds per full stride at full cruise */
 const STRIDE_S = 0.85
+/* The art is true side profile, so a mirrored frame would face her left and
+ * read as walking backwards. Contact-left and contact-right are the same
+ * silhouette in profile, so one stride plays the 4 drawn phases TWICE rather
+ * than 4 phases plus 4 mirrors. Stepping the phase 8 times and folding by the
+ * frame count keeps the footfall cadence and STRIDE_S exactly as they were. */
+const WALK_STEPS = 8
 /** synthetic bob (the drawn sizes were too noisy to keep the baked bob) */
 const BOB_FRAC = 0.013
 
@@ -117,21 +126,21 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
           // strain frames only when she is genuinely stopped by a pull —
           // transient effort spikes at cruise must not pop the strain face
           if (!reduced && st.strainLevel > 0 && speedN < 0.45 && effort > 0.4) {
-            applyFrame(8 + (st.strainLevel - 1), 0)
+            applyFrame(SPRITE_STRAIN_I0 + (st.strainLevel - 1), 0)
             return
           }
           if (reduced || speedN < 0.06) {
-            // breathing on the hold frame (hold_02's outfit deviates — see
-            // report; single-frame breathe instead)
+            // one drawn hold pose, breathed rather than cross-faded
             st.phase += dt * 0.45
             const breathe =
               Math.sin(st.phase * Math.PI * 2) * heightPx * 0.004
-            applyFrame(11, breathe)
+            applyFrame(SPRITE_HOLD_I0, breathe)
             return
           }
 
           st.phase += (dt * Math.max(0.25, speedN)) / STRIDE_S
-          const walkIdx = Math.floor((st.phase % 1) * 8) % 8
+          const walkIdx =
+            Math.floor((st.phase % 1) * WALK_STEPS) % SPRITE_WALK.length
           const bob =
             Math.abs(Math.sin(st.phase * Math.PI * 2)) *
             heightPx *

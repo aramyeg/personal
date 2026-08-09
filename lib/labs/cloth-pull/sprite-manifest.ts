@@ -18,97 +18,67 @@ export const SPRITE_STAND_H = 900
 export const SPRITE_FRAMES: readonly SpriteFrame[] = [
   {
     "name": "walk_01",
-    "w": 790,
+    "w": 758,
     "h": 900,
-    "anchorX": 159,
-    "anchorY": 547
+    "anchorX": 187,
+    "anchorY": 489
   },
   {
     "name": "walk_02",
-    "w": 773,
-    "h": 893,
-    "anchorX": 175,
-    "anchorY": 558
-  },
-  {
-    "name": "walk_03",
-    "w": 811,
-    "h": 883,
-    "anchorX": 183,
-    "anchorY": 529
-  },
-  {
-    "name": "walk_04",
-    "w": 810,
-    "h": 851,
-    "anchorX": 180,
-    "anchorY": 495
-  },
-  {
-    "name": "walk_05",
-    "w": 811,
-    "h": 930,
-    "anchorX": 159,
-    "anchorY": 526
-  },
-  {
-    "name": "walk_06",
-    "w": 803,
-    "h": 908,
-    "anchorX": 169,
+    "w": 647,
+    "h": 949,
+    "anchorX": 107,
     "anchorY": 543
   },
   {
-    "name": "walk_07",
-    "w": 837,
-    "h": 906,
-    "anchorX": 219,
-    "anchorY": 514
+    "name": "walk_03",
+    "w": 596,
+    "h": 989,
+    "anchorX": 46,
+    "anchorY": 542
   },
   {
-    "name": "walk_08",
-    "w": 822,
-    "h": 886,
-    "anchorX": 185,
-    "anchorY": 514
+    "name": "walk_04",
+    "w": 646,
+    "h": 948,
+    "anchorX": 103,
+    "anchorY": 527
   },
   {
     "name": "strain_01",
-    "w": 932,
+    "w": 586,
     "h": 780,
-    "anchorX": 233,
-    "anchorY": 413
+    "anchorX": 111,
+    "anchorY": 430
   },
   {
     "name": "strain_02",
-    "w": 949,
-    "h": 776,
-    "anchorX": 240,
-    "anchorY": 402
+    "w": 684,
+    "h": 689,
+    "anchorX": 189,
+    "anchorY": 403
   },
   {
     "name": "strain_03",
-    "w": 978,
-    "h": 840,
-    "anchorX": 278,
-    "anchorY": 442
+    "w": 712,
+    "h": 751,
+    "anchorX": 217,
+    "anchorY": 410
   },
   {
     "name": "hold_01",
-    "w": 537,
+    "w": 480,
     "h": 930,
-    "anchorX": 37,
-    "anchorY": 486
-  },
-  {
-    "name": "hold_02",
-    "w": 536,
-    "h": 960,
-    "anchorX": 55,
-    "anchorY": 540
+    "anchorX": 28,
+    "anchorY": 515
   }
 ] as const
 
-export const SPRITE_WALK = SPRITE_FRAMES.slice(0, 8)
-export const SPRITE_STRAIN = SPRITE_FRAMES.slice(8, 11)
-export const SPRITE_HOLD = SPRITE_FRAMES.slice(11, 13)
+/** index of the first frame of each group in SPRITE_FRAMES */
+export const SPRITE_WALK_I0 = 0
+export const SPRITE_STRAIN_I0 = 4
+export const SPRITE_HOLD_I0 = 7
+
+export const SPRITE_WALK = SPRITE_FRAMES.slice(SPRITE_WALK_I0, SPRITE_STRAIN_I0)
+export const SPRITE_STRAIN = SPRITE_FRAMES.slice(SPRITE_STRAIN_I0, SPRITE_HOLD_I0)
+export const SPRITE_HOLD = SPRITE_FRAMES.slice(SPRITE_HOLD_I0)
