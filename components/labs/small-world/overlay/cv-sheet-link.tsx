@@ -1,6 +1,8 @@
 'use client'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { PALETTE } from '../palette'
+import { NO_TAP_HIGHLIGHT, PRESS_SHIFT_PX, isKeyboardFocus } from './control-states'
 import { CV_LABEL, CV_SHEET_LINK_TESTID, openCv } from './cv-open'
 
 /**
@@ -36,6 +38,18 @@ import { CV_LABEL, CV_SHEET_LINK_TESTID, openCv } from './cv-open'
  * around 12px, which is a fine thing to read and a poor thing to hit. The padding
  * is cancelled by an equal negative margin, so the target grows and the row does
  * not move.
+ *
+ * ============================================================================
+ * IT HAD NO STATES OF ITS OWN, SO THE PLATFORM SUPPLIED THEM (Task 105)
+ * ============================================================================
+ * A bare `<button>` on paper gets the browser's default focus ring, which on this
+ * stock is a black box around the word, and a phone adds its own grey tap flash
+ * on top. Aram saw the first of those as "some sort of black border" on the
+ * clicked state. Both are replaced here rather than removed: an INK ring on
+ * keyboard focus (see `control-states.ts` for why it is keyboard and not focus),
+ * and a press that moves the word a pixel the way a pen does. Ink on the sheet's
+ * paper is 13.6:1 — the same measurement the ending's ring was chosen on — and
+ * still no pink, for the reason above.
  */
 
 /**
@@ -60,11 +74,33 @@ const style: CSSProperties = {
   padding: '7px 5px',
   margin: '-7px -5px',
   pointerEvents: 'auto',
+  borderRadius: 3,
+  ...NO_TAP_HIGHLIGHT,
 }
 
+/** Paper inside, ink outside — the ring reads on the sheet without touching the word. */
+const FOCUS_RING = `0 0 0 2px ${PALETTE.pagePaper}, 0 0 0 4px ${PALETTE.ink}`
+
 export function CvSheetLink() {
+  const [focused, setFocused] = useState(false)
+  const [pressed, setPressed] = useState(false)
   return (
-    <button type="button" data-testid={CV_SHEET_LINK_TESTID} onClick={openCv} style={style}>
+    <button
+      type="button"
+      data-testid={CV_SHEET_LINK_TESTID}
+      onClick={openCv}
+      onFocus={(e) => setFocused(isKeyboardFocus(e.target))}
+      onBlur={() => setFocused(false)}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      style={{
+        ...style,
+        boxShadow: focused ? FOCUS_RING : undefined,
+        transform: pressed ? `translateY(${PRESS_SHIFT_PX}px)` : undefined,
+      }}
+    >
       {CV_LABEL}
     </button>
   )

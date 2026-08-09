@@ -9,6 +9,7 @@ import { useConnectSpacing } from './use-connect-spacing'
 import { useNoteTracking } from './use-note-tracking'
 import { useFinePointer } from '../scene/use-reduced-motion'
 import { PALETTE } from '../palette'
+import { NO_TAP_HIGHLIGHT, PRESS_SHIFT_PX, isKeyboardFocus } from './control-states'
 
 /**
  * THE CONNECT BLOCK (Task 65) — the ending's clickable half, in the `sw-ending` slot.
@@ -165,14 +166,17 @@ export const STUDIO_PAD_RENDERED = '#E7D8DB'
  *  used: that was a sticker on a clay world, and this is a card on a matte studio desk. */
 const PILL_SHADOW = '0 2px 7px rgba(43, 43, 51, 0.16)'
 
-function tabStyle(reveal: number, isFocused: boolean): CSSProperties {
+function tabStyle(reveal: number, isFocused: boolean, isPressed = false): CSSProperties {
   return {
     // NEVER 'auto' on a control nobody can read yet — see the click model above. `opacity` below is
     // the reveal itself, so this threshold and the rendered one are the same number for all four
     // controls; that is the point of dropping the restart's dim.
     pointerEvents: reveal >= LIVE_AT ? 'auto' : 'none',
     opacity: reveal,
-    transform: `translateY(${(1 - reveal) * 16}px)`,
+    // The entrance lift and the press are the SAME axis, so they are summed rather
+    // than fighting over the property. A pressed pill also loses its lift-off
+    // shadow, which is what "pressed" means on a card lying on a desk.
+    transform: `translateY(${(1 - reveal) * 16 + (isPressed ? PRESS_SHIFT_PX : 0)}px)`,
     display: 'inline-block',
     fontFamily: 'var(--sw-font-display)',
     fontWeight: 700,
@@ -184,10 +188,14 @@ function tabStyle(reveal: number, isFocused: boolean): CSSProperties {
     borderRadius: 999,
     border: `2px solid ${PALETTE.studioRoseDeep}`,
     background: PALETTE.studioPaper,
-    boxShadow: isFocused ? FOCUS_RING : PILL_SHADOW,
+    boxShadow: isFocused ? FOCUS_RING : isPressed ? PRESSED_SHADOW : PILL_SHADOW,
     cursor: 'pointer',
+    ...NO_TAP_HIGHLIGHT,
   }
 }
+
+/** A pressed card is closer to the desk, so its shadow tightens rather than vanishing. */
+const PRESSED_SHADOW = '0 1px 3px rgba(43, 43, 51, 0.22)'
 
 /**
  * The focus ring: INK, and that is a measurement rather than a preference.
@@ -210,6 +218,18 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
   // reveal (a focused control that cannot be seen is worse than one that cannot be reached); this
   // one only decides where the ring is drawn, and adds no branch to the reveal arithmetic.
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  // WHICH control is under a finger or a held mouse button. A press is not focus
+  // and must not be drawn as one — see `control-states.ts` for why the ring stopped
+  // riding `onFocus` at all. Cleared on cancel and on leave as well as on up: a
+  // pointer that slides off a control has released it, and a press that outlives
+  // the gesture is a stuck control.
+  const [pressedKey, setPressedKey] = useState<string | null>(null)
+  const pressHandlers = (key: string) => ({
+    onPointerDown: () => setPressedKey(key),
+    onPointerUp: () => setPressedKey(null),
+    onPointerCancel: () => setPressedKey(null),
+    onPointerLeave: () => setPressedKey(null),
+  })
   const items = controls()
   /**
    * THE FOCUS FORCE IS A KEYBOARD PROMISE, AND ON TOUCH IT WAS A LEAK (T97, blind review S4).
@@ -276,8 +296,12 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
             // gone — the branch that used to exempt `mailto:` went with it.
             target="_blank"
             rel="noopener noreferrer"
-            onFocus={() => setFocusedKey(c.key)}
-            style={tabStyle(revealOf(i), focusedKey === c.key)}
+            onFocus={(e) => setFocusedKey(isKeyboardFocus(e.target) ? c.key : null)}
+            onPointerDown={() => setPressedKey(c.key)}
+            onPointerUp={() => setPressedKey(null)}
+            onPointerCancel={() => setPressedKey(null)}
+            onPointerLeave={() => setPressedKey(null)}
+            style={tabStyle(revealOf(i), focusedKey === c.key, pressedKey === c.key)}
           >
             {c.label}
           </a>
@@ -321,10 +345,11 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
           type="button"
           data-testid={CV_ENDING_LINK_TESTID}
           onClick={openCv}
-          onFocus={() => setFocusedKey('cv')}
+          onFocus={(e) => setFocusedKey(isKeyboardFocus(e.target) ? 'cv' : null)}
+          {...pressHandlers('cv')}
           style={{
-            ...handStyle(revealOf(items.length)),
-            borderBottom: `2px solid ${PALETTE.studioRoseDeep}`,
+            ...handStyle(revealOf(items.length), pressedKey === 'cv'),
+            borderBottom: `2px solid ${pressedKey === 'cv' ? PALETTE.ink : PALETTE.studioRoseDeep}`,
             boxShadow: focusedKey === 'cv' ? FOCUS_RING : undefined,
           }}
         >
@@ -360,12 +385,13 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
             e.currentTarget.blur()
             onRestart()
           }}
-          onFocus={() => setFocusedKey('restart')}
+          onFocus={(e) => setFocusedKey(isKeyboardFocus(e.target) ? 'restart' : null)}
+          {...pressHandlers('restart')}
           style={{
-            ...handStyle(revealOf(items.length)),
+            ...handStyle(revealOf(items.length), pressedKey === 'restart'),
             // still the quiet sibling, and still by TYPE rather than by alpha: smaller, borderless,
             // dashed, in the hand. Only the rule's colour moves into the studio's family.
-            borderBottom: `2px dashed ${PALETTE.studioRoseDeep}`,
+            borderBottom: `2px dashed ${pressedKey === 'restart' ? PALETTE.ink : PALETTE.studioRoseDeep}`,
             boxShadow: focusedKey === 'restart' ? FOCUS_RING : undefined,
           }}
         >
@@ -384,11 +410,13 @@ export function EndingConnect({ t, onRestart }: { t: number; onRestart: () => vo
  * one of them is a different size or a different alpha, the line becomes a control
  * and an afterthought.
  */
-function handStyle(reveal: number): CSSProperties {
+function handStyle(reveal: number, isPressed = false): CSSProperties {
   return {
     pointerEvents: reveal >= LIVE_AT ? 'auto' : 'none',
     opacity: reveal,
-    transform: `translateY(${(1 - reveal) * 16}px)`,
+    // Entrance lift plus the press, on one axis — a hand-written control presses
+    // by MOVING, the way a pen does, and its rule goes to full ink underneath it.
+    transform: `translateY(${(1 - reveal) * 16 + (isPressed ? PRESS_SHIFT_PX : 0)}px)`,
     appearance: 'none',
     border: 'none',
     background: 'transparent',
@@ -399,5 +427,6 @@ function handStyle(reveal: number): CSSProperties {
     padding: '1px 2px 2px',
     borderRadius: 3,
     cursor: 'pointer',
+    ...NO_TAP_HIGHLIGHT,
   }
 }

@@ -18,6 +18,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   ALWINA,
   CONTACT_HREF,
+  EMAIL_HREF,
+  GITHUB_HREF,
   CREDITS,
   DEGREE,
   LANGUAGES,
@@ -189,15 +191,35 @@ describe('the plain CV page', () => {
     for (const s of STACK) expect(docText()).toContain(s)
   })
 
-  it('links the contact it prints, and INVENTS NO EMAIL', () => {
-    // The worst available failure on this page is a plausible-looking address that is
-    // not hers. The gate is on the shape rather than on anyone remembering.
+  it('links every contact it prints, and DERIVES none of them', () => {
+    /**
+     * THE LAW MOVED, IT DID NOT GO (Task 105).
+     *
+     * This used to assert that the page contained no `@` at all, because her real
+     * address was not known to the repo and a plausible-looking invented one on a
+     * real person's CV is the worst available failure. Aram supplied the address
+     * and the GitHub handle verbatim, so the ban on the CHARACTER is spent — but
+     * the thing it was protecting is not. What is asserted now is that every
+     * address on this page is EXACTLY the supplied string with nothing but a
+     * scheme in front of it, which is what "not guessed" actually means and what
+     * the old shape-gate was standing in for.
+     */
     render(<CvDocument />)
-    const link = screen.getByRole('link', { name: ALWINA.contact })
-    expect(link).toHaveAttribute('href', CONTACT_HREF)
+    const printed: [string, string][] = [
+      [ALWINA.email, EMAIL_HREF],
+      [ALWINA.contact, CONTACT_HREF],
+      [ALWINA.github, GITHUB_HREF],
+    ]
+    for (const [text, href] of printed) {
+      expect(screen.getByRole('link', { name: text })).toHaveAttribute('href', href)
+    }
     expect(CONTACT_HREF).toBe(`https://${ALWINA.contact}`)
-    expect(docText()).not.toContain('@')
-    expect(screen.getByTestId(CV_DOC_TESTID).innerHTML).not.toContain('mailto')
+    expect(GITHUB_HREF).toBe(`https://${ALWINA.github}`)
+    expect(EMAIL_HREF).toBe(`mailto:${ALWINA.email}`)
+    // ...and no OTHER address slipped onto the page beside them.
+    const text = docText()
+    expect([...text.matchAll(/@/g)]).toHaveLength(1)
+    expect([...screen.getByTestId(CV_DOC_TESTID).innerHTML.matchAll(/mailto:/g)]).toHaveLength(1)
   })
 
   it('never describes her from outside', () => {
@@ -321,7 +343,13 @@ describe('the two doors', () => {
   it('rides the contact row, and reads as one line when copied', () => {
     render(<InfoPage chapter={0} page={1} />)
     const sheet = screen.getByTestId('sw-cloth-line').textContent!.replace(/\s+/g, ' ').trim()
-    expect(sheet).toContain(`${ALWINA.contact} · ${CV_LABEL}`)
+    // THE ROW SPENDS ITS ONE LINE ON THE EMAIL NOW (Task 105). It printed the
+    // LinkedIn URL while that was the only contact the repo had; Aram supplied
+    // the real address, and the row could not carry both — measured at 390, the
+    // pair wrapped to two lines and the second came off chapter 1's hero panel.
+    // What this test is FOR is unchanged: the hatch rides an existing row and the
+    // row still concatenates as one readable line rather than as run-on text.
+    expect(sheet).toContain(`${ALWINA.email} · ${CV_LABEL}`)
   })
 
   it('says a word rather than showing an icon', () => {

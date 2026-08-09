@@ -4,6 +4,8 @@ import { ALWINA_STORY } from '../alwina-story'
 import {
   ALWINA,
   CONTACT_HREF,
+  EMAIL_HREF,
+  GITHUB_HREF,
   CREDITS,
   DEGREE,
   LANGUAGES,
@@ -321,9 +323,23 @@ export function CvDocument() {
         <MetaRow label="Stack" items={STACK} />
       </ul>
 
+      {/* THREE ADDRESSES, EMAIL FIRST, and the order is the document's argument
+          rather than a list: a recruiter reading a plain CV is looking for the way
+          to WRITE to her, and for five rounds this page could not offer one. The
+          separators are real text nodes for the reason every other split line on
+          this page carries one — three anchors concatenate with nothing between
+          them, and a copy-paste is one of the things a plain CV exists for. */}
       <p style={contact}>
+        <a href={EMAIL_HREF} style={link}>
+          {ALWINA.email}
+        </a>
+        {' · '}
         <a href={CONTACT_HREF} target="_blank" rel="noopener noreferrer" style={link}>
           {ALWINA.contact}
+        </a>
+        {' · '}
+        <a href={GITHUB_HREF} target="_blank" rel="noopener noreferrer" style={link}>
+          {ALWINA.github}
         </a>
       </p>
     </article>

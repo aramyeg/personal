@@ -4,6 +4,7 @@ import { PALETTE } from '../palette'
 import { CvSheetLink } from './cv-sheet-link'
 import type { InfoPageSpec } from './info-page-spec'
 import { SMALL_WORLD_PREMISE } from '../alwina-story'
+import { EMAIL_HREF } from '../alwina-cv'
 
 /**
  * THE SHEET — a slip of paper lying on the leaf, with the words printed on it.
@@ -127,6 +128,7 @@ export function ClothDrag({
     key: string
     text: string
     kind: keyof typeof ROW_STYLE
+    before?: ReactNode
     after?: ReactNode
   }[] = [
     ...(intro
@@ -154,8 +156,30 @@ export function ClothDrag({
       ? [
           {
             key: 'contact',
-            text: intro.contact,
+            // THE ROW PRINTS THE EMAIL, NOT THE LINKEDIN URL, and that is a
+            // measured swap rather than a preference. Adding the address BESIDE
+            // the profile was the first cut and the 390 capture convicted it: the
+            // row wrapped to two lines, and because the sheet is `flex: 0 0 auto`
+            // the second line came straight off chapter 1's hero panel — AND IT
+            // STUCK was cut in half by the panel's own edge. That is the budget
+            // this file has already been burned by twice, so the row is not
+            // allowed to grow; it is allowed to change what it spends its one
+            // line on. The address is 28 characters against the profile's 36, so
+            // the swapped row is SHORTER than the one that shipped.
+            // NOTHING IS LOST: LinkedIn is on the plain CV this row links to and
+            // on the ending's own pill, and the contact a recruiter reaches for
+            // first is the one you can write to.
+            text: '',
             kind: 'contact' as const,
+            // HER EMAIL (Task 105). For five rounds this sheet could offer a
+            // reader no way to WRITE to her, because the repo did not have the
+            // address and inventing one on a real person's CV is the worst
+            // available failure. Aram supplied it verbatim.
+            before: (
+              <a href={EMAIL_HREF} style={CONTACT_LINK}>
+                {intro.email}
+              </a>
+            ),
             after: (
               <>
                 {' · '}
@@ -226,6 +250,7 @@ export function ClothDrag({
       >
         {rows.map((row, i) => (
           <div key={row.key} style={ROW_STYLE[row.kind]}>
+            {row.before}
             {row.text}
             {row.after}
             {/* THE SEPARATOR IS A REAL TEXT NODE, and it is not decoration.
@@ -241,6 +266,13 @@ export function ClothDrag({
       </div>
     </div>
   )
+}
+
+/** The row's own links: ink, underlined, and never pink — the sheet's one law. */
+const CONTACT_LINK: CSSProperties = {
+  color: PALETTE.ink,
+  textDecoration: 'underline',
+  textUnderlineOffset: '2px',
 }
 
 const BASE_ROW: CSSProperties = {

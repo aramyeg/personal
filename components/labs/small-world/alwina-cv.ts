@@ -28,10 +28,15 @@
  * ============================================================================
  * Every field is the approved round-3 pack (`.superpowers/sdd/task-80-report.md`,
  * §2 "The sheet (final, verbatim)"), decomposed. Where the pack leaves a blank it
- * STAYS blank: there is no email, because her real address is not known to this
- * repo and a plausible invented one on a real person's CV is the worst available
- * failure. The contact is her LinkedIn, and `CONTACT_HREF` is the printed string
- * with a scheme in front of it rather than a URL anyone guessed.
+ * STAYS blank, and it stayed blank for five rounds: there was no email, because a
+ * plausible invented address on a real person's CV is the worst available failure.
+ *
+ * THE BLANK IS FILLED, AND ONLY BECAUSE ARAM FILLED IT (Task 105). He supplied
+ * both, verbatim: `alwinaharutyunyan@gmail.com` and the GitHub handle `alwihar`.
+ * They are transcribed exactly as given and nothing about them is derived — the
+ * mailto and the profile URL are the scheme in front of the string, the same rule
+ * `CONTACT_HREF` has always followed. THE OLD RULE STILL BINDS EVERYTHING ELSE:
+ * no other address, handle or profile may appear here unless he supplies it.
  */
 
 export type Credit = {
@@ -140,10 +145,14 @@ export const ALWINA = {
   short: 'Alwi',
   says: 'Frontend engineer with opinions about spacing.',
   contact: 'linkedin.com/in/alwina-harutyunyan',
+  email: 'alwinaharutyunyan@gmail.com',
+  github: 'github.com/alwihar',
 } as const
 
-/** The printed contact, made clickable. Nothing added but the scheme. */
+/** The printed contacts, made clickable. Nothing added but the scheme. */
 export const CONTACT_HREF = `https://${ALWINA.contact}`
+export const EMAIL_HREF = `mailto:${ALWINA.email}`
+export const GITHUB_HREF = `https://${ALWINA.github}`
 
 /**
  * NAMED ONCE, AS FACT. The research's story law 5: languages are stated, never

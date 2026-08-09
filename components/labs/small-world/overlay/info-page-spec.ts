@@ -163,13 +163,18 @@ export type InfoPageSpec = {
       /** The identity line — the one that gets quoted. */
       says: string
       /**
-       * How to reach her. LINKEDIN, NOT AN EMAIL: her real address is not known
-       * to this repo, and a plausible-looking invented one on a real person's CV
-       * is the worst possible failure here. It lives in `alwina-cv.ts` — swap it
-       * there when Aram supplies the real one, and both this sheet and the plain
-       * CV move together. Do not guess.
+       * How to reach her, the long way round: her LinkedIn.
+       *
+       * It was the only contact this sheet had, because her real address was not
+       * known to the repo and a plausible invented one on a real person's CV is
+       * the worst possible failure here. Aram supplied the real address at Task
+       * 105 (`email` below) and the row now leads with it. The rule that put this
+       * comment here still stands for everything else: it lives in
+       * `alwina-cv.ts`, both surfaces move together, and nothing is guessed.
        */
       contact: string
+      /** Her real address, supplied verbatim (Task 105). Printed as a `mailto:`. */
+      email: string
     }
   }
   footer: { role: string; org: string; period: string }
