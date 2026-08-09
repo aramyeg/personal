@@ -6,6 +6,7 @@ import {
   bakedMaterial,
   canMaterial,
   glossMaterial,
+  surfaceMaterial,
 } from '@/components/labs/small-world/scene/props/desk-glb'
 import {
   DESK_GLB_URL,
@@ -13,7 +14,7 @@ import {
   DESK_PAD,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { BOOK_HINGE, LANE, PLANT } from '@/components/labs/small-world/scene/props/desk-deep'
-import { ROCK_PARAMS } from '@/components/labs/small-world/scene/props/desk-nudge'
+import { NUDGE_UNIFORMS, ROCK_PARAMS, SQUASH_PARAMS } from '@/components/labs/small-world/scene/props/desk-nudge'
 import {
   LANE_BAR_INDEX,
   STATION_BARS,
@@ -23,6 +24,10 @@ import {
 import {
   FIGURINE_FOOT_TOP,
   FOOT_SOFT,
+  PATCH_SOFT,
+  SURFACE_PATCHES,
+  SURFACE_PATCH_FRAGMENT_BODY,
+  SURFACE_PATCH_FRAGMENT_DECL,
   LIFT_BAND,
   LIFT_K,
   LIFT_RAMP,
@@ -620,5 +625,117 @@ describe('the targets are the measured surfaces, scaled by one bounce', () => {
     }
     expect(LIFT_BAND.lumLo).toBeGreaterThan(0)
     expect(LIFT_BAND.lumHi).toBeGreaterThan(LIFT_BAND.lumLo)
+  })
+})
+
+// --- T104e: the desk's own contact patches -------------------------------------
+
+/**
+ * The third family (see `desk-underside.ts`'s T104e header): the black under a wiggler is not on
+ * the wiggler at all, it is a silhouette of the wiggler baked into the PAD's atlas, and the
+ * wobble uncovers it. This clause is fragment-side and mask-scoped, because `DeskSurface`'s pad
+ * top has no interior vertices for a region to select — so these tests hold the two things a
+ * vertex region got for free: that rest is still exact, and that the mask cannot reach a
+ * neighbour's patch.
+ */
+describe('the surface patches lift only what a nudge uncovers', () => {
+  const surf = compile(surfaceMaterial(null, null, { value: 1 }))
+  const zoneOf = (kind: string) => DESK_NUDGE_ZONES.find((z) => z.kind === kind)!
+
+  it('is behind the same exact-zero guard the motion itself is behind', () => {
+    // sampleRock writes an exact +0 into .w the moment the envelope falls under REST_EPS, so at
+    // rest no fragment enters the block at all and DeskSurface is bit-identical by construction.
+    expect(SURFACE_PATCHES.length).toBeGreaterThan(0)
+    for (const p of SURFACE_PATCHES) {
+      expect(SURFACE_PATCH_FRAGMENT_BODY).toContain(`if ( uNudge_${p.kind}.w != 0.0 ) {`)
+      expect(surf.fragmentShader).toContain(`if ( uNudge_${p.kind}.w != 0.0 ) {`)
+    }
+    // ...and the drive is a factor of the ramp's input too, so it is +0 inside the block as well
+    expect(SURFACE_PATCH_FRAGMENT_BODY).toContain('float spY = uNudge_')
+  })
+
+  it('reads the very uniform object the motion is driven by, not a copy of it', () => {
+    for (const p of SURFACE_PATCHES) {
+      expect(surf.uniforms[`uNudge_${p.kind}`]).toBe(NUDGE_UNIFORMS[p.kind])
+      expect(SURFACE_PATCH_FRAGMENT_DECL).toContain(`uniform vec4 uNudge_${p.kind};`)
+    }
+  })
+
+  it('takes its pivot and lift radius from the zone table rather than typing them again', () => {
+    // The drive is dy = angle * (baseR + (axis x d).y) about the zone's own pivot — the same
+    // arithmetic rockBlock moves the prop with. A typed copy could drift from the motion.
+    for (const p of SURFACE_PATCHES) {
+      const z = zoneOf(p.kind)
+      expect(SURFACE_PATCH_FRAGMENT_BODY).toContain(
+        `vec2 spD = vSurfXZ - vec2( ${z.pivot[0].toFixed(5)}, ${z.pivot[2].toFixed(5)} );`
+      )
+      expect(SURFACE_PATCH_FRAGMENT_BODY).toContain(`uNudge_${p.kind}.w * ( ${z.baseR.toFixed(5)}`)
+    }
+  })
+
+  it('shares the seat clause vSurfXZ instead of declaring a second copy of the same fact', () => {
+    // The coupling is real and silent: this body reads a varying desk-water-look.ts sets. If the
+    // seat ever stops setting it, this clause stops compiling — so the pairing is gated here.
+    expect(SURFACE_PATCH_FRAGMENT_BODY).toContain('vSurfXZ')
+    expect(SURFACE_PATCH_FRAGMENT_DECL).not.toContain('vSurfXZ')
+    expect(surf.vertexShader).toContain('vSurfXZ = position.xz;')
+    expect(surf.fragmentShader).toContain('varying vec2 vSurfXZ;')
+    expect(surf.fragmentShader.indexOf('varying vec2 vSurfXZ;')).toBeLessThan(
+      surf.fragmentShader.indexOf('vec2 spD = vSurfXZ')
+    )
+  })
+
+  it('keeps every mask inside the prop it belongs to, so no patch can reach a neighbour', () => {
+    for (const p of SURFACE_PATCHES) {
+      const z = zoneOf(p.kind)
+      for (const [i, axis] of ([0, 2] as const).entries()) {
+        expect(p.centre[i]! - p.half[i]! - PATCH_SOFT).toBeGreaterThanOrEqual(z.min[axis])
+        expect(p.centre[i]! + p.half[i]! + PATCH_SOFT).toBeLessThanOrEqual(z.max[axis])
+      }
+    }
+  })
+
+  it('does not let two patches overlap', () => {
+    for (let a = 0; a < SURFACE_PATCHES.length; a++)
+      for (let b = a + 1; b < SURFACE_PATCHES.length; b++) {
+        const p = SURFACE_PATCHES[a]!
+        const q = SURFACE_PATCHES[b]!
+        const apart = [0, 1].some(
+          (i) =>
+            Math.abs(p.centre[i]! - q.centre[i]!) >
+            p.half[i]! + q.half[i]! + 2 * PATCH_SOFT
+        )
+        expect(apart, `${p.kind} and ${q.kind} masks overlap`).toBe(true)
+      }
+  })
+
+  it('lifts toward a tone that is still a shadow — never toward the open pad', () => {
+    // The uncovered texel is still deep under the prop's body. Taking it to PAD_SURFACE would
+    // swap a black hole for a bright one, so each target is the ring the pad actually carries
+    // just outside that prop's own patch: darker than the open pad, and clear of the band.
+    const lum = (c: readonly number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!
+    for (const p of SURFACE_PATCHES) {
+      expect(lum(p.target)).toBeLessThan(lum(PAD_SURFACE))
+      expect(lum(p.target) * LIFT_K).toBeGreaterThan(LIFT_BAND.lumHi)
+    }
+  })
+
+  it('carries no row for a prop whose motion cannot uncover a patch', () => {
+    // The donut is excluded STRUCTURALLY, not by a threshold: its verb is a squash about a pivot
+    // whose y is the seat plane, so every point of it moves down or stays and the drive can never
+    // go positive. It has a 1,102-texel patch and it is permanently hidden.
+    expect(SURFACE_PATCHES.some((p) => p.kind === 'donut')).toBe(false)
+    expect(ROCK_PARAMS.donut).toBeUndefined()
+    expect(SQUASH_PARAMS.peak).toBeGreaterThan(0)
+  })
+
+  it('leaves the baked material own regions alone — this is a second, separate clause', () => {
+    const baked = compile(bakedMaterial({ value: 1 }))
+    expect(baked.fragmentShader).not.toContain('vec2 spD = vSurfXZ')
+    expect(surf.fragmentShader).not.toContain('vUnderLift')
+  })
+
+  it('rides uLights like every other lift on this desk', () => {
+    expect(SURFACE_PATCH_FRAGMENT_BODY).toContain(`* ${LIFT_K.toFixed(5)} * uLights`)
   })
 })

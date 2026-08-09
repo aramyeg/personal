@@ -1,5 +1,5 @@
 import { BOOK_HINGE, PLANT } from './desk-deep'
-import { DESK_NUDGE_ZONES, DESK_PAD } from './desk-glb-contract'
+import { DESK_NUDGE_ZONES, DESK_PAD, type DeskNudgeKind } from './desk-glb-contract'
 import { LANE_BAR_INDEX, STATION_BARS, STATION_CASE, TRAY_FLOOR_RANGE } from './desk-station'
 
 /**
@@ -134,9 +134,16 @@ import { LANE_BAR_INDEX, STATION_BARS, STATION_CASE, TRAY_FLOOR_RANGE } from './
  *   body and the plant's saucer (static, nothing moves them) and the sunk clay chips, whose press
  *   only ever squashes them DOWN toward their own seat. Mug, donut and pen cup sit exactly on the
  *   pad with zero vertices under it, and the tree's foliage, the knife's handle, the plant's
- *   leaves and its pot have none either — so no other motion on this desk can uncover one. The
- *   bluebird is the "other items as well": same slip, but 97 vertices and a 2° peck-recoil, so it
- *   lifts 21 of them by at most 0.0101 — which is exactly why it is not the one Aram named.
+ *   leaves and its pot have none either — so no other motion on this desk can uncover a buried
+ *   VERTEX. The bluebird is the "other items as well": same slip, but 97 vertices and a 2°
+ *   peck-recoil, so it lifts 21 of them by at most 0.0101 — which is exactly why it is not the one
+ *   Aram named.
+ *
+ *   THAT LAST CLAUSE IS THE ONE T104 GOT WRONG, and T104e corrects it in place: it read as "so no
+ *   other motion on this desk can uncover one [black]", and a buried vertex is not the only black
+ *   a motion can uncover. Every seated prop also stands on a black patch that belongs to the DESK
+ *   — see the T104e section below, which measures it. The buried-vertex census is sound; it was
+ *   the wrong census to close the question with.
  *
  * THE SCOPE IS THE ONE TERM T102 RULED OUT FOR THIS OBJECT, PLUS THE PLANE THAT MAKES IT SAFE.
  * A luminance band still cannot scope a penguin (83% of the whole figurine is under 0.12 — it is
@@ -580,6 +587,186 @@ export const UNDERSIDE_FRAGMENT_BODY = `if ( vUnderLift.x != 0.0 ) {
   float udB = 1.0 - smoothstep( ${f(LIFT_BAND.lumLo)}, ${f(LIFT_BAND.lumHi)}, udL );
   diffuseColor.rgb = mix( diffuseColor.rgb, vUnderLift.yzw, vUnderLift.x * udB * ${f(LIFT_K)} * uLights );
 }`
+
+/**
+ * ============================================================================
+ * T104e — THE THIRD FAMILY: THE BLACK IS NOT ON THE OBJECT AT ALL. IT IS ON THE DESK.
+ * ============================================================================
+ * T104d took the penguin's crest apart term by term and found the fix above working at full
+ * strength on the geometry it selects — and then found that NOT ONE near-black pixel in the
+ * penguin's crop, at any tilt from 4° to the re-poke cap, belongs to that geometry. Hiding
+ * `DeskBaked` at the frozen crest leaves a hard, foot-shaped black patch standing on the bare
+ * desk; hiding `DeskSurface` instead takes the whole band away. The black Aram named is drawn by
+ * the pad.
+ *
+ * WHAT THE PATCH IS, SETTLED (`scratchpad/t104/probe-pad.mjs`). It is texels of `t71_atlas_lit`.
+ * The file already said so and nobody followed it through: WHAT THE UNDERSIDES ARE LIFTED TOWARD,
+ * above, records that "the atlas is a Cycles bake of the desk WITH its props standing on it, so
+ * the cover under a mug is fully occluded". Fully occluded means BLACK, and it is: rasterising
+ * the pad's top plane top-down through its own uv map produces a photograph of the pink pad with
+ * every prop's contact patch on it as a hard black silhouette inside a soft ambient halo.
+ *
+ * T104d could not confirm this because its atlas probe read a smooth 0.61–0.63 with no shadow in
+ * it, and it blamed the covering-triangle test. The covering triangle was fine. THE V AXIS WAS
+ * FLIPPED: glTF puts the uv origin at the image's TOP-left (three loads these with
+ * `flipY = false`), the probe sampled `1 − v`, and the pad's island happens to sit in the mirror
+ * position of the SLAB's — so it read the desk's clean white top and reported no shadow, twice,
+ * consistently. The solve is now checked against a landmark before it is believed: the open pad's
+ * mean comes back [0.8064, 0.6840, 0.7111] against the `PAD_SURFACE` [0.8207, 0.7025, 0.7290]
+ * this file measured years earlier by a different route, chroma r/g 1.179 against 1.168.
+ *
+ * THE MECHANISM. At rest the prop's own base covers its patch almost exactly, so what shows is a
+ * thin dark contact line and it looks RIGHT — that line is the seat, and it is doing real work.
+ * The weeble lifts the whole figurine by `baseR · angle` and tilts it about its base pivot, the
+ * base moves off its own patch, and the uncovered patch is what appears: a black band that grows
+ * with the tilt and shrinks back as the wobble decays. The patch is STATIC. The wobble does not
+ * create it; it merely stops hiding it. That is exactly `trayFloor`'s defect above — a black
+ * baked under something that later moves — on a different surface with a different driver, which
+ * is why it takes the same shape of clause and not a new idea.
+ *
+ * ============================================================================
+ * WHY THIS ONE CANNOT BE A VERTEX REGION, WHICH IS WHAT MAKES IT A NEW DRIVE KIND
+ * ============================================================================
+ * Every region above selects VERTICES and resolves its weight in the vertex half. `DeskSurface`
+ * cannot: its pad top carries no interior vertices at all. It is a 76-vertex rounded-rectangle
+ * boundary loop, fan-triangulated, so the whole footprint of both figurines lies inside ONE
+ * triangle and a per-vertex weight would smear across the entire pad. The patch is a TEXEL
+ * region, and the only place a texel region can be selected is the fragment half.
+ *
+ * The surface already has a clause of exactly that shape and this one is built on it: the can's
+ * seat (`SURFACE_SHADOW_FRAGMENT_BODY` in desk-water-look.ts) is a footprint mask in world xz,
+ * scaled by its own driver, applied to the final colour. This clause shares that clause's
+ * `vSurfXZ` varying rather than declaring a second copy of the same fact — `desk-glb.tsx` inserts
+ * the two together and `desk-underside.test.ts` holds the pairing so the coupling cannot drift.
+ *
+ * ============================================================================
+ * THE WEIGHT RIDES THE DRIVE, NOT THE FOOTPRINT — THE CLAUSE'S WHOLE SAFETY ARGUMENT
+ * ============================================================================
+ * The patch is not a defect at rest. At rest it IS the contact shadow, it is covered by the base
+ * that cast it, and the sliver that shows is what seats the prop on the pad. So a clause scoped by
+ * the footprint alone would repaint a seat that was never broken. Three terms, in order:
+ *
+ *   THE DRIVE, PER FRAGMENT. How far this prop has lifted the pad point under THIS fragment:
+ *   Rodrigues to first order about the zone's own pivot plus the edge-rock lift the motion already
+ *   applies, `dy = angle · ( baseR + (axis × d).y )` with `d` the fragment's horizontal offset
+ *   from the pivot — the same arithmetic `rockBlock` moves the prop with, read off the same
+ *   uniform, so the lift and the motion cannot disagree. Reading it per fragment is what makes the
+ *   result a CRESCENT on the side that rose: on the side the base dug down, `dy` is negative and
+ *   the term clamps to zero, so the half of the patch that is pressed harder into the pad is not
+ *   touched at all. It is then ramped by `LIFT_RAMP`, this file's own ramp, unchanged.
+ *
+ *   REST IS STRUCTURAL, twice over. `uNudge_<kind>.w` is written as an exact +0 by `sampleRock`
+ *   the moment the envelope falls under `REST_EPS`, and the clause is behind `!= 0.0` exactly as
+ *   `rockBlock` is — so at rest no fragment enters the block and `DeskSurface` is bit-identical by
+ *   construction, not by a threshold. And inside the block `dy` is `angle × …`, so it is +0 too.
+ *
+ *   THE BAND DOES THE SHAPING, and it is why the halo is safe. `LIFT_BAND` is inherited unchanged
+ *   and it lands on a histogram it was measured for: the penguin's patch is 428 texels under the
+ *   band's ceiling of which 415 are under `lumLo`, while the soft halo AROUND it reads luminance
+ *   0.58 at two texels out, rising to 0.65 at 0.2 world units. The halo is a factor of two above
+ *   `lumHi`, so `1 − smoothstep(lumLo, lumHi, lum)` is EXACTLY zero on it and the ambient
+ *   occlusion that makes the prop sit on the pad is untouchable by this clause at any tilt.
+ *
+ * WHAT IT LIFTS TOWARD — READ FROM THE PAD ITSELF, not from `PAD_SURFACE`. The obvious target is
+ * the pad's own open colour and it is WRONG by measurement: the uncovered texel is still deep
+ * under the prop's body, and taking it to the open pad's 0.720 luminance while its own neighbours
+ * sit at 0.580 would swap a black hole for a bright one. So the target is the tone the pad
+ * actually carries immediately outside the patch — the honest answer to "what should this texel
+ * be", since a texel's neighbours are what it is being read against. It is not a knife-edge: the
+ * penguin's ring reads luminance 0.580 / 0.588 / 0.598 at 0.02 / 0.05 / 0.08 world units out. It
+ * is also not reconstructible from `PAD_SURFACE` times any scalar — the ring runs r/g 1.288
+ * against the open pad's 1.168, because it carries the warm bounce of the penguin's own feet
+ * (albedo r/g 1.318, measured above). `LIFT_K` is inherited, so a fully crushed texel lands 82%
+ * of the way to its neighbours and stays a little darker than them, which is what the deepest part
+ * of a contact shadow should do.
+ *
+ * ============================================================================
+ * THE CENSUS — WHICH PROPS GET A ROW, AND WHY THE OTHERS DO NOT
+ * ============================================================================
+ * All five nudge props stand on a patch; `scratchpad/t104/probe-final.mjs` measures every one.
+ * Standing on one is not the test — SHOWING one is, and the test is run at each prop's own frozen
+ * crest (see `SURFACE_PATCHES` for the per-prop verdicts and their evidence).
+ *
+ * THE DONUT IS EXCLUDED STRUCTURALLY, for the same reason it needs no seat band above: its verb is
+ * `squashBlock` about a pivot whose y IS the seat plane, so every point of it moves DOWN or stays.
+ * A squash cannot uncover a patch; there is no tilt for `dy` to be positive under. Its 1,102-texel
+ * patch is real and permanently hidden.
+ */
+
+/**
+ * A surface patch: a prop's contact silhouette in the pad's own atlas, and the nudge that uncovers
+ * it. Every number is a measurement from `scratchpad/t104/probe-final.mjs` against the shipped
+ * `desk.glb` — the patch's extent is flood-filled from the prop's nudge box using `LIFT_BAND`'s
+ * own `lumLo` as the definition of "a hole", and the target is the ring two texels outside it.
+ */
+export type SurfacePatch = {
+  /** The nudge zone whose uniform drives it — also the uniform's name suffix. */
+  readonly kind: DeskNudgeKind
+  /** The patch's measured centre and half-extent in world xz. */
+  readonly centre: readonly [number, number]
+  readonly half: readonly [number, number]
+  /** What the pad reads immediately outside it, linear rgb. */
+  readonly target: readonly [number, number, number]
+}
+
+/**
+ * THE PATCHES THAT SHOW. One row per prop whose patch was proven visible at its own frozen crest;
+ * the verdicts, with their numbers, are in `.superpowers/sdd/task-104e-report.md`.
+ *
+ * The extents are the PATCH's own, not the nudge box's, and that is deliberate: the thing being
+ * selected here is a region of a bake, so the honest scope is where that region measurably is.
+ * Every prop's patch does sit inside its nudge box (checked, with 0.10–0.34 world units of margin
+ * on the three that ship a row), but the boxes are looser than the patches and the mug's box in
+ * particular reaches 148 dark texels that are NOT its patch — its neighbour the donut's, which
+ * must not brighten when the mug rocks. Scoping to the measured patch drops those from 148 to the
+ * handful in the patch's own antialiased rim.
+ */
+export const SURFACE_PATCHES: readonly SurfacePatch[] = [
+  /** The one Aram named. 415 texels under `lumLo` of 428 under the band's ceiling, shaped like two
+   *  feet with the notch between them, and 60 of the 65 near-black pixels in his crop at the
+   *  re-poke cap (T104d §5/§6, by removal). Ring r/g 1.288 — the penguin's own warm bounce. */
+  { kind: 'penguin', centre: [0.8234, 9.5361], half: [0.1379, 0.1214], target: [0.701, 0.5442, 0.5719] },
+  /** 2,013 texels, the widest core on the pad and the one T102 already named when it wrote that
+   *  "the cover under a mug is fully occluded". Ring 0.540 — the mug sits in its own deeper well. */
+  { kind: 'mug', centre: [-2.5921, 11.3099], half: [0.2704, 0.2704], target: [0.6797, 0.4996, 0.5318] },
+  /** The "other items as well". 479 texels, and its ring is the darkest of the three at 0.400,
+   *  which is why its lift is the smallest even where it fires. */
+  { kind: 'bird', centre: [-0.9145, 9.5026], half: [0.1159, 0.149], target: [0.4828, 0.3719, 0.4413] },
+]
+
+/** How wide the patch mask's edge is, world units — `FOOT_SOFT`, for the same reason the lane
+ *  footprint uses it: the pad either side of a patch is visible at rest and must not move. The
+ *  band is what shapes the patch; this edge only has to not cut it. */
+export const PATCH_SOFT = FOOT_SOFT
+
+/**
+ * THE SURFACE HALF. Fragment-side, because the patch is a texel region (see the T104e header), and
+ * inserted after the can's seat so both read the same `vSurfXZ`. It declares only its uniforms:
+ * `uLights` and `vSurfXZ` are already in scope from the surface material's own preamble.
+ */
+export const SURFACE_PATCH_FRAGMENT_DECL = SURFACE_PATCHES.map(
+  (p) => `uniform vec4 uNudge_${p.kind};`
+).join('\n')
+
+const patchClause = (p: SurfacePatch): string => {
+  const z = DESK_NUDGE_ZONES.find((n) => n.kind === p.kind)!
+  return `if ( uNudge_${p.kind}.w != 0.0 ) {
+  vec2 spD = vSurfXZ - vec2( ${f(z.pivot[0])}, ${f(z.pivot[2])} );
+  float spY = uNudge_${p.kind}.w * ( ${f(z.baseR)}
+    + uNudge_${p.kind}.z * spD.x - uNudge_${p.kind}.x * spD.y );
+  vec2 spM = vSurfXZ - vec2( ${f(p.centre[0])}, ${f(p.centre[1])} );
+  float spW = smoothstep( ${f(LIFT_RAMP.dispLo)}, ${f(LIFT_RAMP.dispHi)}, spY )
+    * smoothstep( ${f(-PATCH_SOFT)}, ${f(PATCH_SOFT)}, ${f(p.half[0])} - abs( spM.x ) )
+    * smoothstep( ${f(-PATCH_SOFT)}, ${f(PATCH_SOFT)}, ${f(p.half[1])} - abs( spM.y ) );
+  if ( spW > 0.0 ) {
+    float spL = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+    float spB = 1.0 - smoothstep( ${f(LIFT_BAND.lumLo)}, ${f(LIFT_BAND.lumHi)}, spL );
+    diffuseColor.rgb = mix( diffuseColor.rgb, ${v3(p.target)}, spW * spB * ${f(LIFT_K)} * uLights );
+  }
+}`
+}
+
+export const SURFACE_PATCH_FRAGMENT_BODY = SURFACE_PATCHES.map(patchClause).join('\n')
 
 /** Every target the shader can resolve — region albedo times zone surface times the bounce — for
  *  the tests and for anyone reading numbers rather than GLSL. */

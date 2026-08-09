@@ -8,7 +8,7 @@ import { requestPrecompile } from '../precompile'
 import { studioEnvFor, studioEquirectShared } from '../studio-env'
 import type { JourneyRef } from '../use-journey'
 import { DESK_GLB_URL, type DeskMeshName } from './desk-glb-contract'
-import { nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
+import { NUDGE_UNIFORMS, nudgeNormalChunk, nudgeVertexChunk, type NudgeChunk } from './desk-nudge'
 import {
   BEAD_FRAGMENT_BODY,
   BEAD_FRAGMENT_DECL,
@@ -55,6 +55,9 @@ import {
   STATION_VERTEX_DECL,
 } from './desk-station'
 import {
+  SURFACE_PATCH_FRAGMENT_BODY,
+  SURFACE_PATCH_FRAGMENT_DECL,
+  SURFACE_PATCHES,
   UNDERSIDE_FRAGMENT_BODY,
   UNDERSIDE_FRAGMENT_DECL,
   UNDERSIDE_VERTEX_BODY,
@@ -234,16 +237,26 @@ export function surfaceMaterial(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n' + SURFACE_SHADOW_VERTEX_BODY
     )
+    // The props' own contact patches (T104e): the pad is baked WITH them standing on it, so each
+    // one stands on a black silhouette of itself. A nudge lifts the prop off its patch and the
+    // patch is what shows. Same drive uniforms the motion uses, so the two cannot disagree.
+    for (const p of SURFACE_PATCHES) shader.uniforms[`uNudge_${p.kind}`] = NUDGE_UNIFORMS[p.kind]
     shader.fragmentShader = (
       'uniform float uLights;\nuniform sampler2D uDimMap;\n' +
       SURFACE_SHADOW_FRAGMENT_DECL +
+      '\n' +
+      SURFACE_PATCH_FRAGMENT_DECL +
       '\n' +
       shader.fragmentShader
     ).replace(
       '#include <map_fragment>',
       `#include <map_fragment>
          diffuseColor.rgb = mix( texture2D( uDimMap, vMapUv ).rgb, diffuseColor.rgb, uLights );\n` +
-        SURFACE_SHADOW_FRAGMENT_BODY
+        SURFACE_SHADOW_FRAGMENT_BODY +
+        // AFTER the seat, and sharing its vSurfXZ: the patch clause reads the same world xz and
+        // the same final colour the rest gate sees.
+        '\n' +
+        SURFACE_PATCH_FRAGMENT_BODY
     )
   }
   mat.customProgramCacheKey = () => 'sw-desk-surface'
