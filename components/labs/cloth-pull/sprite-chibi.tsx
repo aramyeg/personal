@@ -33,10 +33,17 @@ const URLS = SPRITE_FRAMES.map((f) => `/labs/cloth-pull/sprites/${f.name}.webp`)
 /** seconds per full stride at full cruise */
 const STRIDE_S = 0.85
 /* The art is true side profile, so a mirrored frame would face her left and
- * read as walking backwards. Contact-left and contact-right are the same
- * silhouette in profile, so one stride plays the 4 drawn phases TWICE rather
- * than 4 phases plus 4 mirrors. Stepping the phase 8 times and folding by the
- * frame count keeps the footfall cadence and STRIDE_S exactly as they were. */
+ * read as walking backwards. That ruled out 4 phases plus 4 mirrors, and until
+ * Task 04 the stride played the 4 drawn phases TWICE — the same four keys for
+ * both halves of the stride, which is a hop rather than a walk because she
+ * never leads with the other leg.
+ *
+ * All 8 Williams keys are now drawn (contact, down, passing, up on each leg),
+ * so the fold below is the identity and every step of the stride shows its own
+ * frame. WALK_STEPS is unchanged, so footfall cadence and STRIDE_S are exactly
+ * what they were — this adds the missing half of the cycle, it does not
+ * retime it. The fold is kept rather than dropped so the runtime survives a
+ * manifest regenerated with fewer keys. */
 const WALK_STEPS = 8
 /** synthetic bob (the drawn sizes were too noisy to keep the baked bob) */
 const BOB_FRAC = 0.013
@@ -105,8 +112,10 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
     }, [announcedReady, onReady])
 
     const applyFrame = useMemo(() => {
-      // worldScale reconciles the pose groups — without it the strain frames
-      // draw 15.7% smaller than the walk (see sprite-worldscale.mjs)
+      // worldScale is the whole of her sizing: without it the strain frames
+      // draw 15.7% smaller than the walk, and the 8 walk sheets — generated
+      // separately, disagreeing about her head-to-body ratio by ~21% — pulse
+      // frame to frame. See sprite-worldscale.mjs for the landmark it rests on.
       const k = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.worldScale
       const px = (f: SpriteFrame) => k(f) * f.h
       const pw = (f: SpriteFrame) => k(f) * f.w

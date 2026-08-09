@@ -5,11 +5,21 @@
  * bottom; `anchor` is the clasped-fist cluster (string attachment).
  * STAND_H is the standing reference height all frames are scaled against.
  *
- * `worldScale` reconciles the pose groups: pass 2 matches head width WITHIN a
- * group, this factor matches it ACROSS groups, so her on-screen size does not
- * jump when she switches pose. The runtime MUST apply it — drawing a frame at
- * h alone shrank her 15.7% on entering strain. `headW` is the measured
- * landmark it was derived from, kept so the invariant test can re-derive it.
+ * `worldScale` fixes her on-screen size. Pass 2 matches head width WITHIN a
+ * pose group; this factor is what actually decides her rendered size, because
+ * pass 2's landmark cancels out of the composition. The runtime MUST apply it —
+ * drawing a frame at h alone shrank her 15.7% on entering strain.
+ *
+ * The landmark is `bodyR` = sqrt(drawn pixel area), NOT head width. The eight
+ * walk sheets were generated separately and disagree about her head-to-body
+ * ratio by ~21%; no uniform scale can make head width AND figure height both
+ * uniform, and normalising on head width put the whole 21% into her height
+ * (816..991px, strobing eight times a stride). sqrt(area) is the balanced
+ * split — ~10% residual on each axis instead of 21% on one — and a walk cycle
+ * rearranges limbs without adding body, so area is near pose-invariant.
+ *
+ * `headW` is still measured and still travels here so the residual art drift
+ * is visible to the invariant test rather than silently absorbed.
  */
 
 export interface SpriteFrame {
@@ -20,7 +30,11 @@ export interface SpriteFrame {
   anchorY: number
   /** silhouette head width measured on the shipped frame, px */
   headW: number
-  /** multiplier making on-screen head width equal across pose groups */
+  /** ink height (crown to lowest sole) measured on the shipped frame, px */
+  inkH: number
+  /** sqrt of drawn pixel area — the landmark `worldScale` is derived from */
+  bodyR: number
+  /** multiplier making her drawn size equal across frames and pose groups */
   worldScale: number
 }
 
@@ -29,39 +43,91 @@ export const SPRITE_STAND_H = 900
 export const SPRITE_FRAMES: readonly SpriteFrame[] = [
   {
     "name": "walk_01",
-    "w": 758,
+    "w": 655,
     "h": 900,
-    "anchorX": 187,
-    "anchorY": 489,
-    "headW": 530,
+    "anchorX": 137,
+    "anchorY": 514,
+    "headW": 502,
+    "inkH": 900,
+    "bodyR": 557.5,
     "worldScale": 1
   },
   {
     "name": "walk_02",
-    "w": 647,
-    "h": 949,
-    "anchorX": 107,
-    "anchorY": 543,
-    "headW": 530,
-    "worldScale": 1
+    "w": 662,
+    "h": 816,
+    "anchorX": 178,
+    "anchorY": 481,
+    "headW": 501,
+    "inkH": 816,
+    "bodyR": 528.8,
+    "worldScale": 1.0543
   },
   {
     "name": "walk_03",
-    "w": 596,
-    "h": 989,
-    "anchorX": 46,
-    "anchorY": 542,
-    "headW": 529,
-    "worldScale": 1.0019
+    "w": 678,
+    "h": 910,
+    "anchorX": 172,
+    "anchorY": 477,
+    "headW": 501,
+    "inkH": 909,
+    "bodyR": 538,
+    "worldScale": 1.0362
   },
   {
     "name": "walk_04",
-    "w": 646,
-    "h": 948,
-    "anchorX": 103,
-    "anchorY": 527,
-    "headW": 529,
-    "worldScale": 1.0019
+    "w": 604,
+    "h": 893,
+    "anchorX": 98,
+    "anchorY": 492,
+    "headW": 502,
+    "inkH": 893,
+    "bodyR": 540.9,
+    "worldScale": 1.0307
+  },
+  {
+    "name": "walk_05",
+    "w": 628,
+    "h": 923,
+    "anchorX": 133,
+    "anchorY": 497,
+    "headW": 502,
+    "inkH": 923,
+    "bodyR": 550.4,
+    "worldScale": 1.0129
+  },
+  {
+    "name": "walk_06",
+    "w": 650,
+    "h": 991,
+    "anchorX": 153,
+    "anchorY": 528,
+    "headW": 502,
+    "inkH": 991,
+    "bodyR": 581.4,
+    "worldScale": 0.9589
+  },
+  {
+    "name": "walk_07",
+    "w": 673,
+    "h": 856,
+    "anchorX": 167,
+    "anchorY": 473,
+    "headW": 503,
+    "inkH": 855,
+    "bodyR": 539.5,
+    "worldScale": 1.0334
+  },
+  {
+    "name": "walk_08",
+    "w": 663,
+    "h": 894,
+    "anchorX": 146,
+    "anchorY": 510,
+    "headW": 502,
+    "inkH": 893,
+    "bodyR": 552.1,
+    "worldScale": 1.0098
   },
   {
     "name": "strain_01",
@@ -70,7 +136,9 @@ export const SPRITE_FRAMES: readonly SpriteFrame[] = [
     "anchorX": 111,
     "anchorY": 430,
     "headW": 446,
-    "worldScale": 1.1883
+    "inkH": 780,
+    "bodyR": 491.1,
+    "worldScale": 1.1352
   },
   {
     "name": "strain_02",
@@ -79,7 +147,9 @@ export const SPRITE_FRAMES: readonly SpriteFrame[] = [
     "anchorX": 189,
     "anchorY": 403,
     "headW": 446,
-    "worldScale": 1.1883
+    "inkH": 689,
+    "bodyR": 469.7,
+    "worldScale": 1.1869
   },
   {
     "name": "strain_03",
@@ -88,7 +158,9 @@ export const SPRITE_FRAMES: readonly SpriteFrame[] = [
     "anchorX": 217,
     "anchorY": 410,
     "headW": 447,
-    "worldScale": 1.1857
+    "inkH": 750,
+    "bodyR": 495.7,
+    "worldScale": 1.1247
   },
   {
     "name": "hold_01",
@@ -97,14 +169,16 @@ export const SPRITE_FRAMES: readonly SpriteFrame[] = [
     "anchorX": 28,
     "anchorY": 515,
     "headW": 467,
-    "worldScale": 1.1349
+    "inkH": 930,
+    "bodyR": 532.7,
+    "worldScale": 1.0466
   }
 ] as const
 
 /** index of the first frame of each group in SPRITE_FRAMES */
 export const SPRITE_WALK_I0 = 0
-export const SPRITE_STRAIN_I0 = 4
-export const SPRITE_HOLD_I0 = 7
+export const SPRITE_STRAIN_I0 = 8
+export const SPRITE_HOLD_I0 = 11
 
 export const SPRITE_WALK = SPRITE_FRAMES.slice(SPRITE_WALK_I0, SPRITE_STRAIN_I0)
 export const SPRITE_STRAIN = SPRITE_FRAMES.slice(SPRITE_STRAIN_I0, SPRITE_HOLD_I0)
