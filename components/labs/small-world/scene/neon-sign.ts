@@ -500,18 +500,58 @@ export function flickerAt(lights: number, reduced = false): number {
  * rest-identity gate over the ending must mask the sign exactly as it already masks the plume.
  */
 
-/** The gas's constant unrest — deep enough to be alive, shallow enough that nobody can point at it. */
-export const NEON_HUM = 0.014
+/**
+ * ── WHAT "FLICKER" MEANS HERE (Task 106, second pass) ────────────────────────────────────────
+ *
+ * The first cut of this was a soft dip under a sine envelope, and Aram's verdict names exactly
+ * what was wrong with it: "I need the classic bar neon flickering, where you can almost hear the
+ * sound of it." A sine dip is a dimmer being turned down. A failing tube does not dim — it STOPS
+ * STRIKING and then catches again, and the sound you can almost hear is the clatter of that.
+ *
+ * So three things changed, and each of them is what makes the difference audible:
+ *
+ *  1. THE EDGES ARE HARD. A gate opens or shuts across NEON_EDGE — one frame — instead of easing.
+ *     Nothing about a stutter is smooth; the smoothness was the whole reason the first cut read
+ *     as weather rather than as electricity.
+ *  2. IT GOES NEARLY DARK. NEON_DARK, not eighty-something percent. The classic look is the word
+ *     dropping out of the picture and slamming back, not the word getting tired.
+ *  3. ONE TUBE AT A TIME. Every word gets its OWN schedule off its own salt, so `Lets` stutters
+ *     while `Create` holds. This is the single most identifying feature of bar neon and it is also
+ *     the physically honest one: a bender runs each word as its own run of glass, on its own
+ *     electrodes, and it is one of them that goes bad. A sign flickering in unison is a dimmer on
+ *     the whole circuit, which is a thing that does not happen to neon.
+ *
+ * The shape of one stutter: a train of 3–7 alternating dark/lit gates of 25–90 ms each, then a
+ * final dark hold, then a re-strike ramp back to full. It always ends dark-then-back, because the
+ * bit everyone actually pictures is the catch at the end.
+ */
 
-/** The deepest a flutter may pull the sign down. A struck tube dips; it does not go out. */
-export const NEON_DIP = 0.3
+/** The gas's constant unrest — the ripple you see filming a real tube, under everything else. */
+export const NEON_HUM = 0.02
+/** Its rate, Hz. Fast enough to read as electrical rather than as breathing. */
+export const NEON_HUM_HZ = 9.3
 
-/** One flutter may happen per cell of this many seconds, and most cells stay quiet. */
-export const NEON_CELL = 2.3
-/** How long one flutter lasts. Short — this is a bad connection, not a signal. */
-export const NEON_FLUTTER = 0.36
-/** A cell fires when its noise falls below this, so roughly one flutter every five seconds. */
+/** How dark a struck-out tube goes. Not 0 — the glass and the electrodes are still there. */
+export const NEON_DARK = 0.1
+
+/** One stutter opportunity per tube per cell, and most cells stay quiet. */
+export const NEON_CELL = 4
+/** A cell fires below this — so about one stutter per tube every nine seconds. */
 export const NEON_ODDS = 0.45
+
+/** A gate lasts between these, in seconds. This range IS the rhythm of the clatter. */
+export const NEON_GATE_MIN = 0.025
+export const NEON_GATE_MAX = 0.09
+/** How many dark/lit flips one stutter runs. */
+export const NEON_GATES_MIN = 3
+export const NEON_GATES_MAX = 7
+/** The beat of black before it catches again — the pause that makes the catch land. */
+export const NEON_HOLD_MIN = 0.05
+export const NEON_HOLD_MAX = 0.16
+/** The catch itself: the tube coming back. Quick, but not a gate — this one you can see arrive. */
+export const NEON_RESTRIKE = 0.055
+/** A gate's own edge. One frame at 60 Hz, which is what makes it clatter instead of fade. */
+export const NEON_EDGE = 0.012
 
 /**
  * The halo's extra bite. A gas discharge losing current dims FASTER than the filament does, so
@@ -524,9 +564,10 @@ const frac = (x: number): number => x - Math.floor(x)
 /** Deterministic unit noise for a cell. Integer in, the same number out, forever. */
 const cellNoise = (cell: number, salt: number): number =>
   frac(Math.sin(cell * 12.9898 + salt * 78.233) * 43758.5453)
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
 
 /**
- * The clock the ambient dip runs on: a gated accumulator, exactly `steamClockAt`'s contract.
+ * The clock the stutter runs on: a gated accumulator, exactly `steamClockAt`'s contract.
  * Closed gate returns `prev` UNCHANGED — the clock does not run outside the lit interval.
  */
 export function neonClockAt(prev: number, delta: number, envelope: number, reduced: boolean): number {
@@ -535,32 +576,58 @@ export function neonClockAt(prev: number, delta: number, envelope: number, reduc
   return prev + delta
 }
 
+/** How long a cell's stutter lasts, derived from its own gates rather than authored. */
+function stutterLength(cell: number, salt: number): number {
+  const gates = NEON_GATES_MIN + Math.floor(cellNoise(cell, 4 + salt) * (NEON_GATES_MAX - NEON_GATES_MIN + 1))
+  let total = 0
+  for (let i = 0; i < gates; i++) {
+    total += lerp(NEON_GATE_MIN, NEON_GATE_MAX, cellNoise(cell, 40 + i + salt))
+  }
+  return total + lerp(NEON_HOLD_MIN, NEON_HOLD_MAX, cellNoise(cell, 5 + salt)) + NEON_RESTRIKE
+}
+
 /**
- * The ambient multiplier at a point on that clock: 1 is the tube at full gas, and it never
- * reaches 0. Two terms — a shallow hum that is always there, and an occasional flutter that is
- * mostly not. Both are arithmetic over the clock, so the same instant always renders the same.
+ * One TUBE's ambient multiplier at a point on the clock: 1 is the tube at full gas, NEON_DARK is
+ * the tube struck out. `word` indexes `SIGN_WORDS` — each one carries its own schedule, so the
+ * two of them are almost never doing the same thing.
+ *
+ * Pure arithmetic over the clock and a per-cell hash: the same instant always renders the same
+ * value, which is what lets the tests hold it with `Object.is`.
  */
-export function neonAmbientAt(clock: number, reduced = false): number {
+export function neonAmbientAt(clock: number, word = 0, reduced = false): number {
   if (reduced) return 1
+  const salt = word * 131
 
-  // Two incommensurate rates, so the unrest never settles into a beat the eye can follow.
-  const hum = NEON_HUM * (1 - Math.cos(clock * 5.31) * Math.cos(clock * 2.07)) * 0.5
+  // The ripple that is always there, its phase offset per tube so they never hum in unison.
+  const hum = NEON_HUM * (0.5 - 0.5 * Math.cos((clock + word * 0.37) * NEON_HUM_HZ * 2 * Math.PI))
 
-  // At most one flutter per cell, entirely CONTAINED in its cell (the start is drawn from the
-  // room left over after the flutter's own length), so one cell is all this has to look at.
   const cell = Math.floor(clock / NEON_CELL)
-  let dip = 0
-  if (cellNoise(cell, 1) < NEON_ODDS) {
-    const start = cell * NEON_CELL + cellNoise(cell, 2) * (NEON_CELL - NEON_FLUTTER)
-    const u = (clock - start) / NEON_FLUTTER
-    if (u > 0 && u < 1) {
-      // Two or three sub-blinks under a sine envelope: the flutter has no edges at either end,
-      // and its depth is the cell's own so no two of them read as the same event.
-      const blinks = 2 + Math.floor(cellNoise(cell, 3) * 2)
-      const depth = NEON_DIP * (0.45 + 0.55 * cellNoise(cell, 4))
-      dip = depth * Math.sin(Math.PI * u) * (0.5 - 0.5 * Math.cos(u * blinks * 2 * Math.PI))
+  if (cellNoise(cell, 1 + salt) >= NEON_ODDS) return 1 - hum
+
+  // The stutter is CONTAINED in its cell: its start is drawn from the room left over after its
+  // own derived length, so one cell is all this ever has to look at.
+  const len = stutterLength(cell, salt)
+  const start = cell * NEON_CELL + cellNoise(cell, 3 + salt) * Math.max(0, NEON_CELL - len)
+  const u = clock - start
+  if (u <= 0 || u >= len) return 1 - hum
+
+  // Walk the gate train. It starts DARK — the tube drops out first and argues afterwards.
+  const gates = NEON_GATES_MIN + Math.floor(cellNoise(cell, 4 + salt) * (NEON_GATES_MAX - NEON_GATES_MIN + 1))
+  let t = 0
+  for (let i = 0; i < gates; i++) {
+    const span = lerp(NEON_GATE_MIN, NEON_GATE_MAX, cellNoise(cell, 40 + i + salt))
+    if (u < t + span) {
+      const dark = i % 2 === 0
+      const level = dark ? NEON_DARK : 1
+      const from = dark ? 1 : NEON_DARK
+      const into = (u - t) / NEON_EDGE
+      return (into < 1 ? lerp(from, level, into) : level) - hum
     }
+    t += span
   }
 
-  return (1 - hum) * (1 - dip)
+  // The hold, then the catch.
+  const hold = lerp(NEON_HOLD_MIN, NEON_HOLD_MAX, cellNoise(cell, 5 + salt))
+  if (u < t + hold) return NEON_DARK - hum
+  return lerp(NEON_DARK, 1, Math.min(1, (u - t - hold) / NEON_RESTRIKE)) - hum
 }

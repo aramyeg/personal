@@ -24,7 +24,7 @@ import {
   HALO_CANVAS_H,
   HALO_CANVAS_W,
   LETS_STROKES,
-  NEON_DIP,
+  NEON_DARK,
   NEON_HALO_BITE,
   NEON_HUM,
   SIGN_IGNITE_AT,
@@ -161,7 +161,7 @@ describe('the strike envelope (containment by light)', () => {
  * runs on. The laws here are the ones that keep a wall clock inside the ending: it does not run
  * while the sign is dark, it cannot put the sign out, and the preference switches it off.
  */
-describe('the ambient flicker (Task 106)', () => {
+describe('the bar-neon stutter (Task 106)', () => {
   it('the clock does not advance while the sign is dark — the whole journey costs it nothing', () => {
     let t = 0
     for (let i = 0; i <= 400; i++) {
@@ -175,41 +175,84 @@ describe('the ambient flicker (Task 106)', () => {
     expect(neonClockAt(7.25, 1 / 60, 0.4, false)).toBeGreaterThan(7.25)
   })
 
-  it('reduced motion is steady on — no hum, no dip, at any point of the clock', () => {
+  it('reduced motion is steady on — no hum, no stutter, on either tube', () => {
     expect(neonClockAt(9, 1 / 60, 1, true)).toBe(0)
-    for (let i = 0; i <= 200; i++) expect(neonAmbientAt(i * 0.37, true)).toBe(1)
-  })
-
-  it('a struck tube dips but never goes out, and never overdrives', () => {
-    for (let i = 0; i <= 60000; i++) {
-      const v = neonAmbientAt(i * 0.002)
-      expect(v).toBeLessThanOrEqual(1)
-      expect(v).toBeGreaterThan(1 - NEON_HUM - NEON_DIP)
+    for (let i = 0; i <= 200; i++) {
+      expect(neonAmbientAt(i * 0.37, 0, true)).toBe(1)
+      expect(neonAmbientAt(i * 0.37, 1, true)).toBe(1)
     }
   })
 
-  it('is occasional rather than a strobe — mostly steady, with real dips in it', () => {
-    const N = 60000
+  // A gate lasts at least 25 ms, so a 5 ms step cannot step over one — these sweeps are sized to
+  // the mechanism rather than to a round number, and they stay cheap enough to run under load.
+  const STEP = 0.005
+  const SAMPLES = 20000 // 100 s per tube, about eleven stutters
+
+  it('a struck-out tube goes nearly dark but never out, and never overdrives', () => {
+    for (let word = 0; word < SIGN_WORDS.length; word++) {
+      for (let i = 0; i <= SAMPLES; i++) {
+        const v = neonAmbientAt(i * STEP, word)
+        expect(v).toBeLessThanOrEqual(1)
+        expect(v).toBeGreaterThan(0)
+        expect(v).toBeGreaterThanOrEqual(NEON_DARK - NEON_HUM)
+      }
+    }
+  })
+
+  /**
+   * THE LAW THAT SEPARATES A STUTTER FROM A DIP, and it is the one Aram's note is about: a sine
+   * fade is a dimmer, a stutter CLATTERS. Sampled at the frame rate the renderer actually runs at,
+   * a real bar neon changes by most of its range between two adjacent frames.
+   */
+  it('clatters — adjacent frames swing most of the tube s range', () => {
+    let biggest = 0
+    let prev = neonAmbientAt(0, 0)
+    for (let i = 1; i <= 60 * 200; i++) {
+      const v = neonAmbientAt(i / 60, 0)
+      biggest = Math.max(biggest, Math.abs(v - prev))
+      prev = v
+    }
+    expect(biggest).toBeGreaterThan(0.6 * (1 - NEON_DARK))
+  })
+
+  it('is a lit sign that misbehaves, not a broken one', () => {
+    const N = SAMPLES
     let steady = 0
-    let deep = 0
+    let out = 0
     for (let i = 0; i <= N; i++) {
-      const v = neonAmbientAt(i * 0.002)
-      if (v > 0.97) steady++
-      if (v < 0.85) deep++
+      const v = neonAmbientAt(i * STEP, 0)
+      if (v > 0.95) steady++
+      if (v < 0.3) out++
     }
-    expect(steady / N).toBeGreaterThan(0.8) // the sign is a lit sign, not a broken one
-    expect(deep).toBeGreaterThan(0) // and it really does dip
+    expect(steady / N).toBeGreaterThan(0.9) // it holds far more than it stutters
+    expect(out).toBeGreaterThan(0) // and it really does drop out
+  })
+
+  it('one tube at a time — the words do not stutter in unison', () => {
+    let together = 0
+    let either = 0
+    for (let i = 0; i <= SAMPLES; i++) {
+      const t = i * STEP
+      const a = neonAmbientAt(t, 0) < 0.3
+      const b = neonAmbientAt(t, 1) < 0.3
+      if (a || b) either++
+      if (a && b) together++
+    }
+    expect(either).toBeGreaterThan(0)
+    // independent schedules, so overlap is rare rather than forbidden
+    expect(together / either).toBeLessThan(0.15)
   })
 
   it('is deterministic — the same instant replays bit-identically', () => {
     for (let i = 0; i <= 500; i++) {
       const t = i * 0.041
-      expect(Object.is(neonAmbientAt(t), neonAmbientAt(t))).toBe(true)
+      expect(Object.is(neonAmbientAt(t, 0), neonAmbientAt(t, 0))).toBe(true)
+      expect(Object.is(neonAmbientAt(t, 1), neonAmbientAt(t, 1))).toBe(true)
     }
   })
 
   it('the halo bite leaves the ignition alone: at full gas it is exactly 1', () => {
-    expect(Math.pow(neonAmbientAt(0, true), NEON_HALO_BITE)).toBe(1)
+    expect(Math.pow(neonAmbientAt(0, 0, true), NEON_HALO_BITE)).toBe(1)
   })
 })
 
