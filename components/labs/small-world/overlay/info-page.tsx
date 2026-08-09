@@ -83,8 +83,9 @@ import { leadingEdgeMask } from './leading-edge'
  *
  * So every FACT — the colophon, the stack, her line, the hero's value — renders
  * at full strength from the first frame, and the clock now drives only things
- * whose absence costs nothing: the border ink, the art wipe, the stamp punch, the
- * burst, the runner.
+ * whose absence costs nothing: the border ink, the art wipe, the stamp punch and
+ * the burst. (It drove a running chibi on the sheet too, until Task 105 took her
+ * off it — the sheet is printed, not revealed.)
  *
  * THE HERO NUMBER IS THE HARD CASE and the trade is recorded rather than hidden.
  * A count-up from zero is not a delayed fact, it is a WRONG one — a card caught
@@ -105,9 +106,10 @@ import { leadingEdgeMask } from './leading-edge'
  * a settled card is a finished card by construction rather than by timing. The
  * inversion above SURVIVES this — facts still print at full strength from the
  * first frame, and nothing below is allowed to gate one on `t`. What the fix
- * bought is that `cloth-drag.tsx` may put the words back on the sheet without
- * re-opening the hole: "the sheet is open" and "the reader is here" are now the
- * same statement.
+ * bought was that `cloth-drag.tsx` could put the words back on the sheet without
+ * re-opening the hole. Task 105 has since taken the reveal off that surface
+ * altogether, so the sheet is no longer an argument about clocks at all: it has
+ * none.
  */
 
 /**
@@ -237,14 +239,75 @@ function toneStyle(density: keyof typeof TONE | 'none'): CSSProperties {
 }
 
 /**
- * A panel whose border DRAWS ITSELF ON.
+ * ============================================================================
+ * THE FRAME NEVER CLOSED, AND THE DASH IS WHY (Task 105)
+ * ============================================================================
+ * Aram: "the middle part of the description card has a bug where the border is
+ * not shown fully". Measured on the shipped build, painting the drawn rect
+ * magenta and walking each panel's perimeter in the card's own rotated frame: at
+ * a SETTLED card — `stroke-dashoffset` reading exactly 0, i.e. the component
+ * asking for a complete frame — the hero panel drew 55.5% of its outline on
+ * chapters 2 through 6 (top edge whole, right edge 55%, bottom edge NOTHING,
+ * left edge 87%) and 49.9% on chapter 1. Every chapter, both panels, all the way
+ * back to whenever the dash was written.
  *
- * The rule is an SVG rect with `pathLength=1`, so one dashoffset from 1 to 0 inks
- * the whole frame at a constant rate regardless of its proportions — which is what
- * lets every panel on the page share one progress number without a per-panel
- * length calculation. `vectorEffect: non-scaling-stroke` keeps the weight honest
- * while the rect stretches to the panel.
+ * THE MECHANISM, by removal, one property at a time on the live page:
+ *   as shipped ................................. 55.5% of the perimeter
+ *   drop `vector-effect="non-scaling-stroke"` .. 100% on every edge
+ *   drop the dash entirely ..................... 100% on every edge
+ *
+ * `pathLength=1` normalises the dash against the path as it is measured in the
+ * SVG's OWN user space, where the rect is a 99x99 square and all four sides are
+ * a quarter of the walk each. `non-scaling-stroke` makes the engine stroke — and
+ * therefore dash — the path AFTER it has been transformed into device space,
+ * where `preserveAspectRatio="none"` has stretched a 100x100 viewBox across a
+ * 312x178 panel: 3.12x across, 1.78x down. The dash budget is spent against one
+ * metric and the pen walks the other, so it runs out before the corner. The
+ * severity follows the stretch, which is the prediction that holds: chapter 1's
+ * 3.2:1 panel closes less of its frame (49.9%) than the 1.76:1 panels (55.5%).
+ *
+ * SO THE DASH IS GONE AND THE ARC IS DRAWN. `framePath` builds the partial
+ * outline directly from `ink`, which is the same thing the sheet beside it
+ * already does (`cloth-drag.tsx` built its own outline rather than clipping one)
+ * and it removes the disagreement instead of arbitrating it. `non-scaling-stroke`
+ * stays — under a non-uniform stretch it is the only thing keeping the rule one
+ * weight on all four sides — and the two ends meet at the top-left corner at
+ * ink = 1 by construction rather than by an engine's arithmetic.
+ *
+ * WHAT IT COSTS, stated rather than discovered later: the walk is a quarter of
+ * the progress per SIDE, not per unit of length, so the pen crosses a long edge
+ * faster than a short one. The dash never delivered the constant rate the old
+ * note here claimed either — it could not, for exactly the reason above — and
+ * per-side apportionment is what "one progress number, no per-panel measurement"
+ * actually buys.
  */
+function framePath(ink: number): string {
+  const p = ink < 0 ? 0 : ink > 1 ? 1 : ink
+  if (p <= 0) return ''
+  const A = 0.5
+  const B = 99.5
+  const corners: readonly [number, number][] = [
+    [A, A],
+    [B, A],
+    [B, B],
+    [A, B],
+    [A, A],
+  ]
+  const walked = p * 4
+  // Every point is written to the same precision, so "the frame closes" is a
+  // string equality a test can hold rather than a float comparison.
+  const d = [`M ${A.toFixed(3)} ${A.toFixed(3)}`]
+  for (let i = 1; i < corners.length; i++) {
+    const t = Math.min(1, walked - (i - 1))
+    if (t <= 0) break
+    const [x0, y0] = corners[i - 1]
+    const [x1, y1] = corners[i]
+    d.push(`L ${(x0 + (x1 - x0) * t).toFixed(3)} ${(y0 + (y1 - y0) * t).toFixed(3)}`)
+  }
+  return d.join(' ')
+}
+
+/** A panel whose border DRAWS ITSELF ON. */
 function InkedPanel({
   ink,
   tone = 'none',
@@ -314,16 +377,12 @@ function InkedPanel({
           vectorEffect="non-scaling-stroke"
           style={{ strokeWidth: `${RULE_CQW}cqw` }}
         />
-        <rect
-          x="0.5"
-          y="0.5"
-          width="99"
-          height="99"
-          pathLength={1}
+        <path
+          data-testid="sw-panel-frame"
+          d={framePath(ink)}
           fill="none"
           stroke={inverted ? PALETTE.pagePaper : PALETTE.ink}
-          strokeDasharray={1}
-          strokeDashoffset={1 - ink}
+          strokeLinejoin="miter"
           vectorEffect="non-scaling-stroke"
           style={{ strokeWidth: `${RULE_CQW}cqw` }}
         />
@@ -977,9 +1036,9 @@ function HeroCount({
 /**
  * THE SHEET — the page's fact surface, and the last thing it says.
  *
- * She runs the width of the panel unrolling it, and the words are PRINTED ON IT.
- * `cloth-drag.tsx` owns the mechanism and the argument; this only gives it the
- * room and puts the colophon underneath.
+ * A slip of paper lying on the leaf with the words printed on it, and nothing
+ * arrives on it: `cloth-drag.tsx` owns the sheet and the argument for it, this
+ * only gives it the room and puts the colophon underneath.
  *
  * The band sizes itself to its own text rather than to a fraction of the panel:
  * the first sheet carries her name as well as her line, and a fixed height would
@@ -990,9 +1049,7 @@ function KetsuPanel({
   tools,
   intro,
   footer,
-  t,
-  reduced,
-}: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer']; t: number; reduced: boolean }) {
+}: InfoPageSpec['ketsu'] & { footer: InfoPageSpec['footer'] }) {
   return (
     // NOT AN `InkedPanel`, and that is the point. It wore a panel border for one
     // capture and the sheet inside it made two nested boxes and no sheet — a
@@ -1009,24 +1066,52 @@ function KetsuPanel({
       }}
     >
       <div style={{ position: 'relative', width: '100%', flex: '0 0 auto', alignSelf: 'stretch' }}>
-        <ClothDrag line={line} intro={intro} t={t} reduced={reduced} />
+        <ClothDrag line={line} intro={intro} />
       </div>
+      {/* THE COLOPHON, RANKED (Task 105).
+          Aram asked for the bottom of the card to be more noticeable. It was one
+          span carrying two different KINDS of fact at one size and one opacity —
+          the post held (role · org · period) and the tools worked in — separated
+          by a `<br>`, which made them look like two halves of one grey caption.
+          Emphasis here is RANK rather than volume: the post takes a step of size
+          and full ink because it is the fact a recruiter is scanning for, the
+          tools row keeps the smaller size and is opened up on tracking so it
+          reads as a rail rather than as a sentence. Same face, same palette, one
+          register apart.
+          THE SEPARATOR IS A REAL TEXT NODE for the reason the sheet's rows carry
+          one: two block elements concatenate their text content with nothing
+          between them, so a copy-paste used to hand back "…2021UI · UX". */}
       <span
         data-sw-text="info-footer"
         style={{
-          fontFamily: 'var(--sw-font-body)',
-          fontSize: type(3),
-          lineHeight: 1.24,
-          color: PALETTE.ink,
-          opacity: 0.82,
+          display: 'block',
           textAlign: 'center',
           marginTop: '1.4cqw',
           padding: '0 1.4cqw',
+          fontFamily: 'var(--sw-font-body)',
+          color: PALETTE.ink,
+          lineHeight: 1.24,
         }}
       >
-        {footer.role} · {footer.org} · {footer.period}
-        <br />
-        {tools.join(' · ')}
+        <span style={{ display: 'block', fontSize: type(3.4), letterSpacing: '0.01em' }}>
+          {footer.role} · {footer.org} · {footer.period}
+        </span>{' '}
+        <span
+          style={{
+            display: 'block',
+            // NEVER BELOW WHAT IT REPLACED. The first capture round ranked the
+            // rail by taking contrast OFF it (0.78 against the old 0.82), and on
+            // chapter 1 the tools row came out fainter than the version Aram
+            // asked to make MORE noticeable. The rank is carried by size and
+            // tracking instead, and both rows end up ahead of where they started.
+            fontSize: type(3.2, 10),
+            letterSpacing: '0.09em',
+            opacity: 0.85,
+            marginTop: '0.5cqw',
+          }}
+        >
+          {tools.join(' · ')}
+        </span>
       </span>
     </div>
   )
@@ -1103,8 +1188,6 @@ export function InfoPage({
         tools={spec.ketsu.tools}
         intro={spec.ketsu.intro}
         footer={spec.footer}
-        t={t}
-        reduced={still}
       />
     </div>
   )

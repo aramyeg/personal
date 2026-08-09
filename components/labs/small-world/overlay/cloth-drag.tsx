@@ -1,180 +1,65 @@
 'use client'
 import type { CSSProperties, ReactNode } from 'react'
-import { CHIBI_SHEET, anchorSrc } from '../manga/anchors'
 import { PALETTE } from '../palette'
 import { CvSheetLink } from './cv-sheet-link'
 import type { InfoPageSpec } from './info-page-spec'
 import { SMALL_WORLD_PREMISE } from '../alwina-story'
-import { KETSU_LINE, easeOut, phase } from './info-beats'
-import { leadingEdgeMask } from './leading-edge'
 
 /**
- * THE CLOTH-DRAG — a chibi runs across the leaf unrolling a sheet, AND THE WORDS
- * ARE PRINTED ON THE SHEET.
+ * THE SHEET — a slip of paper lying on the leaf, with the words printed on it.
  *
  * ============================================================================
- * THIS IS THE THIRD VERSION, AND THE FIRST ONE THAT IS BOTH THINGS AT ONCE
+ * V4: THE RUNNER IS GONE, AND WHAT IS LEFT IS WHAT V1–V3 KEPT AGREEING ON
  * ============================================================================
- * V1 REVEALED the line: the words were clipped to the region the cloth had swept,
- * so until she had run, the sentence did not exist. The blind audit named that
- * correctly as a fact gated on watching — on a flick the line was simply never
- * there — and it was right.
+ * V1 clipped the words to the region a running chibi had swept, so until she had
+ * run the sentence did not exist; the blind audit named that as a fact gated on
+ * watching and it was right. V2 printed the sentence from frame 1 and demoted the
+ * cloth to a translucent veil passing over it — the fact was safe and the gag was
+ * gone. V3 put the words back on an opaque sheet, which was honest once Task 82
+ * made the page's clock pure scroll.
  *
- * V2 was the remedy applied to that finding: print the sentence from frame 1 and
- * demote the cloth to a 0.66-opacity veil that passes OVER it. The fact was safe
- * and the gag was gone. A translucent thing sliding across a caption is not a
- * character unrolling a page, and Aram's verdict on it was exactly that.
+ * Aram's verdict on the shipped V3 (Task 105) is that the run itself does not
+ * belong on these cards. So the RUNNER, the trailing wave, the curled leading
+ * edge and the per-line hinge are all deleted, and the path that survives is the
+ * one every previous version already described as correct: V3's own reduced-motion
+ * branch. "p = 1, no runner, no wave: the sheet is simply open and the words are
+ * simply printed." That was two lines in a component; it is now the whole
+ * component.
  *
- * V3 — this one — is possible because Task 82 found the actual cause. The reason
- * a flicked-past card showed no sentence was never that text-on-a-reveal is
- * unsafe. It was that the page ran on a WALL CLOCK: `useInkClock` counted real
- * milliseconds from the leaf's arrival, so it could still be mid-count after the
- * reader had stopped and started reading. `t` is now a pure function of scroll
- * (`info-beats.ts`), and the unfurl closes before the story stop a fling snaps to.
- *
- * That dissolves the conflict rather than trading one side of it away: "the sheet
- * is open" and "the reader is looking at this card" are now the SAME CONDITION.
- * So the words can go back onto the paper.
+ * THIS IS A CV FOR RECRUITERS. Calm and readable beats clever, and a sheet that
+ * is already open the moment the card arrives is the calmest form of the thing
+ * the three previous versions were all reaching for.
  *
  * ============================================================================
- * WHAT KEEPS THE AUDIT'S LAW, CONCRETELY
+ * THE BLIND AUDIT'S LAW, NOW BY CONSTRUCTION
  * ============================================================================
- * Three separate guarantees, because one would be a promise and three are a
- * structure:
+ * The law is that information is present instantly and animation only ever
+ * embellishes — never gate a fact on watching. V3 kept it with three separate
+ * guarantees (text in the DOM from frame 1; a soft mask that dims and never
+ * removes; an unfurl that closes before the reader lands). With nothing to
+ * unfurl there is nothing left to guarantee: this component has no clock, no
+ * progress input and no reveal of any kind, so there is no state of it in which
+ * a word is missing. NOTHING HERE MAY EVER TAKE A `t` AGAIN — a reveal on this
+ * surface is the defect the audit was opened for.
  *
- *  1. THE TEXT IS IN THE DOM, COMPLETE, FROM FRAME 1. Every line element exists
- *     and is laid out at p = 0. Nothing is inserted as the sheet passes.
- *  2. THE TEXT IS NEVER CLIPPED TO THE SWEEP. The leading edge carries a SOFT
- *     MASK that fades words ahead of the paper toward `AHEAD_ALPHA` — it dims,
- *     it never removes, and it is dropped entirely once the sheet is open. A word
- *     ahead of the edge is grey ink on white, which is legible; it is not absent.
- *  3. THE UNFURL FINISHES BEFORE THE READER DOES. `KETSU_LINE` closes at 93% of
- *     the page's span and the span closes before `DWELL_MID`. A settled card is
- *     an open sheet by construction.
- *
- * REDUCED MOTION IS NOT A FASTER RUN. p = 1, no runner, no wave: the sheet is
- * simply open and the words are simply printed.
- *
- * ============================================================================
- * WHY THE 2.5D IS DOM AND NOT WEBGL
- * ============================================================================
- * A real roll needs a vertex shader — the Codrops author's "rolling things with
- * CSS or SVG is next to impossible" is honest — but a real roll also means the
- * text is a texture, and the only route to arbitrary HTML on that mesh is
- * html2canvas, i.e. words baked to pixels. Copy on this page is DATA (a story
- * rewrite is in flight), so anything that rasterises a sentence is disqualified
- * before it is judged on looks.
- *
- * What survives is a curl APPROXIMATED across a few line elements: a `perspective`
- * wrapper, `transform-style: preserve-3d`, and a per-line `rotateX`/`translateZ`
- * hinged at the line's top edge, easing to flat as the sheet settles. Piecewise
- * linear, and at a 100px band on a phone indistinguishable from a real curve. The
- * text stays real DOM text — selectable, searchable, and a prop.
+ * WHY THE SHEET STAYS. It is not scaffolding for the run: it is what makes the
+ * page's last block read as a slip of paper laid on a comic page rather than as a
+ * fourth panel. Captured without the outline and shadow, the block reads as loose
+ * type floating under the hero; with them it reads as a printed colophon slip,
+ * which is what it is. (The file keeps its name and its test ids: `sw-cloth-line`
+ * is what the unit suites reach for, and renaming it would be churn in two files
+ * to say the same thing — the same argument `sw-panel-data` already carries.)
  */
 
 /**
- * THE RUNNER'S BOX, and the one place the sheet and the sprite agree about where
- * her hand is.
+ * Break a sentence into whole-word runs, one line per ~6 words, between two and
+ * `max`.
  *
- * `HAND_LAG` used to be 0.14, hand-picked, because the bake she is drawn from has
- * no visible gripping hand at all and 0.14 was what stopped the words appearing
- * out of her chest. It is DERIVED now: her frame is `RUNNER_W` of the band, it is
- * anchored `RUNNER_ANCHOR_X` of its own width left of her travel position, and the
- * gripping hand sits `GRIP_X` across it. The lag is the distance between the two,
- * so the sheet's leading edge lands in her hand rather than near it.
- *
- * `GRIP_X` is a CONTRACT WITH THE BAKE, not an observation of it: the sprite is
- * re-baked with the trailing arm posed onto the banner line at this fraction. If
- * the bake moves the hand, this number moves with it and nothing else does.
- */
-export const RUNNER_W = 0.18
-export const RUNNER_ANCHOR_X = 0.3
-export const GRIP_X = 0.1
-export const HAND_LAG = (RUNNER_ANCHOR_X - GRIP_X) * RUNNER_W
-
-/** Where the runner is, 0 (off the left edge) → 1 (off the right), for a clock. */
-export function runnerAt(t: number): number {
-  return easeOut(phase(t, KETSU_LINE))
-}
-
-/**
- * How much of the sheet has been laid: her GRIP's position, remapped so the sheet
- * reaches the full width of the band exactly as she leaves it.
- */
-export function layAt(t: number): number {
-  return Math.max(0, Math.min(1, (runnerAt(t) - HAND_LAG) / (1 - HAND_LAG)))
-}
-
-/**
- * Amplitude of the trailing wave, which decays to nothing as the sheet rests.
- *
- * 2.1 of the path's 20 units — about a tenth of the band. The first pass used 0.9
- * and it measured as nothing: captured mid-unfurl the edges were straight, so the
- * sheet read as a rectangle sliding out rather than as cloth being pulled.
- */
-function waveAmp(run: number): number {
-  // Full while she is moving, gone by the time she is off the edge — the settle IS
-  // the wave dying, so there is no second animation to keep in step with this one.
-  return run >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, run / 0.92)) * 2.1 + (1 - run) * 0.2
-}
-
-/** How far the leading edge bulges past her hand, in path units — the roll's girth. */
-const LEAD_BULGE = 3
-
-/**
- * Where the sheet's long edges sit in the 0–20 path space, and therefore how much
- * air the words must keep from them.
- *
- * IT IS SHARED WITH THE TEXT'S PADDING ON PURPOSE. The first version drew the
- * edges at 1.4/18.6 (7% and 93% of the band) while the text wrapper padded by
- * about 4%, and captured on chapter 1 the contact line ran straight through the
- * paper's own outline. One number, converted once, so the two cannot drift.
- */
-const EDGE_Y = 1.0
-/** The same inset as a percentage of the band, for the text that sits on it. */
-const TEXT_INSET_PCT = (EDGE_Y / 20) * 100 + 3
-
-/**
- * The sheet's outline for a given sweep: a band whose long edges ripple and whose
- * LEADING EDGE IS A CURVE.
- *
- * Drawn in a 100 x 20 space so the wave's wavelength is expressed in the same
- * units at any leaf size, and stretched with `preserveAspectRatio: none`.
- *
- * The leading edge was a straight vertical line in the first pass and captured as
- * exactly what it was: a box clipped by a ruler. Paper coming off a roll in
- * somebody's hand is round there, so the two long edges are joined by a quadratic
- * that bulges past her grip. It is 3 units — about 1.5% of the band's width, six
- * pixels on a desktop leaf — because the job is to stop the cut reading as a cut,
- * not to draw a cylinder.
- */
-function clothPath(sweep: number, amp: number, phaseShift: number): string {
-  const right = sweep * 100
-  if (right <= 0) return ''
-  const step = 4
-  const top: string[] = []
-  const bottom: string[] = []
-  for (let x = 0; x <= right; x += step) {
-    // The ripple grows toward the TRAILING end (the left, away from her hand):
-    // the sheet is taut where she holds it and loose where it has been dropped.
-    const slack = right > 0 ? 1 - x / right : 0
-    const w = Math.sin((x / 100) * Math.PI * 3.2 + phaseShift) * amp * slack
-    top.push(`${x.toFixed(2)},${(EDGE_Y + w).toFixed(2)}`)
-    bottom.unshift(`${x.toFixed(2)},${(20 - EDGE_Y + w).toFixed(2)}`)
-  }
-  if (top.length === 0) return ''
-  const bulge = amp > 0 ? LEAD_BULGE : 0
-  return `M ${top.join(' L ')} Q ${(right + bulge).toFixed(2)},10 ${bottom[0]} L ${bottom
-    .slice(1)
-    .join(' L ')} Z`
-}
-
-/**
- * Break a sentence into whole-word runs, so each can carry its own curl.
- *
- * ONE LINE PER ~6 WORDS, between two and `max`. Fewer than two and there is no
- * curl to see; more than four and the sheet becomes a paragraph, which is the one
- * thing the text guard on this page exists to prevent.
+ * IT OUTLIVED THE CURL IT WAS BUILT FOR. The split existed so each run could
+ * carry its own hinge out of the page; with the hinge gone it is still what keeps
+ * the sheet's measure short — fewer than two lines and the sentence sets as a
+ * banner, more than four and the sheet becomes a paragraph, which is the one
+ * thing the page's text guard exists to prevent.
  *
  * Balanced by CHARACTERS rather than by word count — four short words and four
  * long ones are not two equal lines — and the `remaining` check is what stops a
@@ -203,104 +88,41 @@ export function sheetLines(text: string, max = 4): string[] {
 }
 
 /**
- * The runner sprite.
+ * Where the sheet's long edges sit in the 0–20 path space, and therefore how much
+ * air the words must keep from them.
  *
- * The stride rate is a property of the DISTANCE covered rather than of time, which
- * is why she never moonwalks when the clock eases — and it is why the mechanism
- * needed no change when the clock became the scroll.
- *
- * The fallback is deliberately a crude ink figure rather than an empty box: a box
- * tells a reviewer nothing about whether the RUN reads, and the run is the thing
- * being approved.
+ * IT IS SHARED WITH THE TEXT'S PADDING ON PURPOSE. An early version drew the
+ * edges at 1.4/18.6 (7% and 93% of the band) while the text wrapper padded by
+ * about 4%, and captured on chapter 1 the contact line ran straight through the
+ * paper's own outline. One number, converted once, so the two cannot drift.
  */
-function Runner({ frame }: { frame: number }) {
-  if (CHIBI_SHEET.ready) {
-    return (
-      <div
-        data-testid="sw-chibi"
-        style={{
-          width: '100%',
-          height: '100%',
-          backgroundImage: `url(${anchorSrc(CHIBI_SHEET.id)})`,
-          backgroundSize: `${CHIBI_SHEET.frames * 100}% 100%`,
-          backgroundPosition: `${(frame / (CHIBI_SHEET.frames - 1)) * 100}% 0`,
-        }}
-      />
-    )
-  }
-  // The stand-in: big head, tiny body, one arm trailing back to the sheet's edge.
-  const bob = frame % 2 === 0 ? 0 : -1.2
-  return (
-    <svg
-      data-testid="sw-chibi"
-      viewBox="0 0 24 30"
-      style={{ width: '100%', height: '100%', overflow: 'visible' }}
-      aria-hidden
-    >
-      <g transform={`translate(0 ${bob})`} stroke={PALETTE.ink} strokeWidth={1.4} fill={PALETTE.pagePaper}>
-        <circle cx="12" cy="9" r="8" />
-        <rect x="8.5" y="17" width="7" height="7.5" rx="1.6" />
-        {/* the trailing arm — the hand that holds the sheet, at GRIP_X of the frame */}
-        <path d="M9 19.5 L2.4 23.5" fill="none" strokeLinecap="round" />
-        <circle cx="2.4" cy="23.5" r="1.5" />
-        <path
-          d={frame % 2 === 0 ? 'M10.5 24.5 L8 29.5 M13.5 24.5 L16.5 28' : 'M10.5 24.5 L7 28 M13.5 24.5 L17 29.5'}
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* goggles, so it is recognisably her even as a stand-in */}
-        <path d="M5.5 7.5 L18.5 7.5" fill="none" strokeWidth={2.4} strokeLinecap="round" />
-      </g>
-    </svg>
-  )
-}
-
-// AHEAD_ALPHA AND FEATHER MOVED TO `leading-edge.ts`, and the move is the fix
-// rather than tidying: the ART on the same leaf was arriving on a `clip-path`
-// that removed rather than dimmed, and could park permanently on a blank panel.
-// Both now read one law from one file. See that file for the audit's repro.
-/** How far each line hinges out of the page before it settles flat. */
-const TILT_DEG = 17
-/** Stagger between one line settling and the next, as a fraction of the unfurl. */
-const STAGGER = 0.09
+const EDGE_Y = 1.0
+/** The same inset as a percentage of the band, for the text that sits on it. */
+const TEXT_INSET_PCT = (EDGE_Y / 20) * 100 + 3
 
 /**
- * The whole beat: the sheet, the words printed on it, and the runner who unrolls it.
+ * The sheet and the words printed on it.
+ *
+ * No `t`, no `reduced`: there is one path and it is the finished one. See the
+ * header — a progress input on this component is the defect, not a feature.
  */
 export function ClothDrag({
   line,
   intro,
-  t,
-  reduced = false,
 }: {
   line: string
   /** Present on the FIRST sheet only — see `info-page-spec.ts`. */
   intro?: InfoPageSpec['ketsu']['intro']
-  /** The leaf's page progress, in the beats' millisecond units. */
-  t: number
-  reduced?: boolean
 }) {
-  // REDUCED MOTION: the sheet is simply open. Same DOM, same sheet, no runner and
-  // no wave — the reduced path is the words, immediately, not a hurried version of
-  // the animation.
-  const p = reduced ? 1 : easeOut(phase(t, KETSU_LINE))
-  const run = reduced ? 1 : runnerAt(t)
-  const lay = reduced ? 1 : layAt(t)
-  const amp = reduced ? 0 : waveAmp(run)
-  const frame = Math.min(CHIBI_SHEET.frames - 1, Math.floor(run * 14) % CHIBI_SHEET.frames)
-  const path = clothPath(lay, amp, run * 9)
-
-  // NO ROLE-AND-YEARS ROW. It came over from the retired title card, it is not in
-  // the approved sheet copy, and it said a third time what the identity line above
-  // it and the colophon below it already say. It also cost a row the hero could
-  // not spare: the sheet is `0 0 auto` and the hero takes what is left, so every
-  // line here is a line off chapter 1's SELF-TAUGHT — captured, with the wordmark
-  // climbing out of its panel onto the photograph above.
-  // THE ESCAPE HATCH RIDES THE CONTACT ROW (Task 83) rather than taking one of its
-  // own, for exactly the budget reason in the note above: the first sheet is the
-  // tallest and every row here is a row off chapter 1's hero panel. `after` is a
-  // node so the middot stays a REAL TEXT NODE inside the row's own inline flow —
-  // see the separator note further down, which is the same defect twice.
+  // NO ROLE-AND-YEARS ROW HERE. It came over from the retired title card, it is
+  // not in the approved sheet copy, and it said a third time what the identity
+  // line above it and the colophon below it already say. The colophon under the
+  // sheet is where that fact lives (`info-page.tsx`).
+  // THE ESCAPE HATCH RIDES THE CONTACT ROW (Task 83) rather than taking one of
+  // its own: the first sheet is the tallest and every row here is a row off
+  // chapter 1's hero panel. `after` is a node so the middot stays a REAL TEXT
+  // NODE inside the row's own inline flow — see the separator note below, which
+  // is the same defect twice.
   const rows: {
     key: string
     text: string
@@ -319,9 +141,7 @@ export function ClothDrag({
           //
           // IT IS AN EYEBROW, which is the cheapest row this sheet can carry and
           // also the right shape: a title page states what the document is above
-          // whose it is. The budget note below is real — the sheet is `0 0 auto`
-          // and every row here is a row off chapter 1's SELF-TAUGHT — so this
-          // takes the smallest register on the page rather than a heading's.
+          // whose it is.
           { key: 'premise', text: SMALL_WORLD_PREMISE, kind: 'premise' as const },
           // `display`, not `name`: inside the world she is Alwi. The legal name is
           // the plain CV's and the tab's — see `alwina-cv.ts`.
@@ -347,61 +167,52 @@ export function ClothDrag({
       : []),
   ]
 
-  // Dropped entirely once the sheet is open: a mask is a compositing layer, and
-  // the settled page is the one that has to be crisp.
-  const mask = leadingEdgeMask(lay)
-
   return (
     <div
       data-testid="sw-cloth-drag"
-      data-unfurl={p.toFixed(3)}
       style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}
     >
-      {/* THE SHEET. OPAQUE PAPER, because it is a surface now and not a veil — the
-          words are printed ON it. It is drawn only as far as she has pulled it,
-          and it does NOT fade when she leaves: what she was dragging is the page
-          the reader is now reading. */}
-      {path ? (
-        <svg
-          viewBox="0 0 100 20"
-          preserveAspectRatio="none"
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            // The sheet is allowed past its own box: the leading edge bulges, and
-            // clipping the bulge would put the ruler back.
-            overflow: 'visible',
-          }}
-        >
-          {/* A SHADOW, because at rest the sheet is a rectangle of paper on paper.
-              Captured without one, the settled state read as a bordered text box
-              inside a bordered panel — two boxes, no sheet. An offset copy is what
-              says "this is lying ON the page" in one shape and no filter. */}
-          <path
-            d={path}
-            transform="translate(0.35 0.55)"
-            fill={PALETTE.ink}
-            opacity={0.17}
-            strokeLinejoin="round"
-          />
-          <path
-            d={path}
-            fill={PALETTE.pagePaper}
-            stroke={PALETTE.ink}
-            strokeWidth={0.6}
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-      ) : null}
+      {/* THE SHEET. Opaque paper, at its full width, with the words printed ON
+          it. Drawn in a 100 x 20 space and stretched with
+          `preserveAspectRatio: none` so one outline serves every leaf size. */}
+      <svg
+        viewBox="0 0 100 20"
+        preserveAspectRatio="none"
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+        }}
+      >
+        {/* A SHADOW, because the sheet is a rectangle of paper on paper. Captured
+            without one, it read as a bordered text box inside a bordered panel —
+            two boxes, no sheet. An offset copy is what says "this is lying ON the
+            page" in one shape and no filter. */}
+        <rect
+          x={0.35}
+          y={EDGE_Y + 0.55}
+          width={100}
+          height={20 - 2 * EDGE_Y}
+          fill={PALETTE.ink}
+          opacity={0.17}
+        />
+        <rect
+          x={0}
+          y={EDGE_Y}
+          width={100}
+          height={20 - 2 * EDGE_Y}
+          fill={PALETTE.pagePaper}
+          stroke={PALETTE.ink}
+          strokeWidth={0.6}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
 
-      {/* THE WORDS. Real DOM text, complete from the first frame, sitting on the
-          paper in a perspective wrapper so the leading lines are still hinged out
-          of the page while the trailing ones have lain flat. */}
+      {/* THE WORDS. Real DOM text, complete, sitting on the paper. */}
       <div
         data-sw-text="info-line"
         data-testid="sw-cloth-line"
@@ -411,66 +222,23 @@ export function ClothDrag({
           padding: `${TEXT_INSET_PCT}% 2.2cqw`,
           boxSizing: 'border-box',
           textAlign: 'center',
-          perspective: '46cqw',
-          maskImage: mask,
-          WebkitMaskImage: mask,
         }}
       >
-        <div style={{ transformStyle: 'preserve-3d' }}>
-          {rows.map((row, i) => {
-            // Each line flattens on its own beat, top first, so the sheet lies
-            // down rather than snapping. All of them are flat at p = 1.
-            const settle = easeOut(
-              Math.max(0, Math.min(1, (p - i * STAGGER) / Math.max(0.2, 1 - STAGGER * (rows.length - 1))))
-            )
-            const lift = 1 - settle
-            return (
-              <div
-                key={row.key}
-                style={{
-                  ...ROW_STYLE[row.kind],
-                  // Hinged at its TOP edge: paper falling forward, not a card
-                  // spinning about its middle.
-                  transformOrigin: '50% 0%',
-                  transform: `rotateX(${lift * TILT_DEG}deg) translateZ(${lift * -3.2}cqw)`,
-                }}
-              >
-                {row.text}
-                {row.after}
-                {/* THE SEPARATOR IS A REAL TEXT NODE, and it is not decoration.
-                    Splitting the sentence into block elements splits its TEXT
-                    CONTENT too, and without this the line reads "…choose — then
-                    taught…" on screen but concatenates as "thentaught" — which is
-                    what a copy-paste, a page search and an assistive reader all
-                    get. Caught by e2e asserting the leaf contains `ketsu.line`.
-                    A trailing space collapses visually, so it costs nothing. */}
-                {i < rows.length - 1 ? ' ' : ''}
-              </div>
-            )
-          })}
-        </div>
+        {rows.map((row, i) => (
+          <div key={row.key} style={ROW_STYLE[row.kind]}>
+            {row.text}
+            {row.after}
+            {/* THE SEPARATOR IS A REAL TEXT NODE, and it is not decoration.
+                Splitting the sentence into block elements splits its TEXT
+                CONTENT too, and without this the line reads "…choose — then
+                taught…" on screen but concatenates as "thentaught" — which is
+                what a copy-paste, a page search and an assistive reader all
+                get. Caught by e2e asserting the leaf contains `ketsu.line`.
+                A trailing space collapses visually, so it costs nothing. */}
+            {i < rows.length - 1 ? ' ' : ''}
+          </div>
+        ))}
       </div>
-
-      {/* THE RUNNER, ahead of her own hand. She leaves the frame; the sheet stays. */}
-      {run > 0 && run < 1 ? (
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: `${run * 100}%`,
-            top: '50%',
-            width: `${RUNNER_W * 100}%`,
-            aspectRatio: '24 / 30',
-            // Her BODY clears the sheet and only the trailing hand drops into it —
-            // captured with her at the band's centre, standing on the words she was
-            // supposed to be dragging.
-            transform: `translate(${-RUNNER_ANCHOR_X * 100}%, -88%)`,
-            pointerEvents: 'none',
-          }}
-        >
-          <Runner frame={frame} />
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -483,7 +251,7 @@ const BASE_ROW: CSSProperties = {
 }
 
 /**
- * The sheet's three registers. NO PINK anywhere on it: pink is the hero number's
+ * The sheet's registers. NO PINK anywhere on it: pink is the hero number's
  * semantic channel and the moment it decorates, numbers stop reading as the point.
  */
 const ROW_STYLE: Record<'premise' | 'name' | 'says' | 'line' | 'contact', CSSProperties> = {
@@ -516,7 +284,18 @@ const ROW_STYLE: Record<'premise' | 'name' | 'says' | 'line' | 'contact', CSSPro
     opacity: 0.9,
     marginBottom: '0.6cqw',
   },
-  line: { ...BASE_ROW, fontSize: 'max(11px, 5cqw)' },
+  /**
+   * THE HOOK LINE — the one sentence each chapter is allowed, and after Task 105
+   * the loudest thing on the sheet.
+   *
+   * Aram: the bottom of the card should be more noticeable. This is the row that
+   * carries the claim ("Eight months on a sports platform. All the small stuff"),
+   * so it takes the emphasis rather than the colophon under it: a step of size
+   * and a px floor one point up, inside the face the sheet already uses. It is
+   * still well under `name`, which is the only row on the page allowed to be a
+   * heading.
+   */
+  line: { ...BASE_ROW, fontSize: 'max(12px, 5.6cqw)' },
   contact: {
     ...BASE_ROW,
     fontFamily: 'var(--sw-font-body)',

@@ -1,5 +1,5 @@
 /**
- * THE INFO LEAF'S OWN ART — six generated anchor panels and two sprite sheets.
+ * THE INFO LEAF'S OWN ART — six generated anchor panels and a reaction sheet.
  *
  * ============================================================================
  * WHY THIS EXISTS: REDISTRIBUTION IS DEAD
@@ -25,11 +25,16 @@
  *    for that composition because the leaf used to ZOOM 2.4x into the centre for a
  *    second beat; that beat is gone (Task 82 — one drawing printed twice), and the
  *    composition is what still makes `BAND` below catch all six with one window.
- *  - CHIBI RUN SHEET, `chibi-run`: six side-view poses in a horizontal row, her
- *    trailing hand gripping a BLANK banner. The banner is blank because the site
- *    draws the cloth and the words on it (`cloth-drag.tsx`).
  *  - REACTION SHEET, `reactions`: six bust portraits in a 3x2 grid, for the
  *    chaser panel under the hero number.
+ *  - CHIBI RUN SHEET, `chibi-run`: RETIRED at Task 105 with the run it was baked
+ *    for. The pack's third sheet was ten side-view poses with her trailing hand
+ *    on a blank banner, and the site drew the cloth and the words on it; Aram's
+ *    ruling is that the run does not belong on a description card, so the sprite,
+ *    its `CHIBI_SHEET` entry and `public/labs/small-world/manga/chibi-run.webp`
+ *    are all gone. The bake recipe is in the git history of this file and the
+ *    rigged source is still in `.superpowers`, so it is recoverable rather than
+ *    lost — but nothing on the wire carries it.
  *
  * ============================================================================
  * HOW TO LAND THE ART
@@ -114,33 +119,6 @@ export const ANCHORS: readonly (SheetArt & { band: AnchorBand })[] = [
 
 export const anchorFor = (chapterIndex: number): (SheetArt & { band: AnchorBand }) | undefined =>
   ANCHORS[chapterIndex]
-
-/**
- * The chibi run cycle. Six poses in one horizontal row, so a frame is
- * `100 / FRAMES` percent of the sheet and the sprite is a background-position step.
- */
-/**
- * THE RUN CYCLE, PRE-RENDERED FROM THE RIG.
- *
- * The 2D run sheet the prompt pack asked for was cancelled: Aram delivered a
- * RIGGED 3D chibi instead. It cannot ship as it stands — `chibi-run.glb` is
- * 11,289,816 bytes, almost all of it one PNG texture, on a route that already
- * carries a WebGL scene. So the cycle is baked to sprite frames offline
- * (`scratchpad/t74/render-chibi.mjs` + `ink-frames.mjs` + `sheet.mjs`): ten poses
- * over the clip's 0.667s, side-on, orthographic, toon-shaded, then inked to a
- * hard contour and three flat bands.
- *
- *     11,289,816 B  ->  34,666 B      326x smaller, and it is the ONLY thing on
- *                                      the wire; the GLB stays in .superpowers.
- *
- * TEN, not the pack's six: the rig's cycle is one full stride and sampling it at
- * six left a visible skip at the foot plant.
- */
-export const CHIBI_SHEET: SheetArt & { frames: number } = {
-  id: 'chibi-run',
-  ready: true,
-  frames: 10,
-}
 
 /** The reaction busts: a 3x2 grid, indexed row-major in the pack's own order. */
 export const REACTION_SHEET: SheetArt & { cols: number; rows: number } = {

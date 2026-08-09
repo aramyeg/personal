@@ -34,7 +34,8 @@
  * The facts themselves still do not ride this clock at all — see the inversion
  * note in `info-page.tsx`. Colophon, stack, hero value and her line render at
  * full strength from the first frame, and `t` drives only the border ink, the
- * art wipe, the stamp punch, the burst, the sheet and the runner.
+ * art wipe, the stamp punch and the burst. The sheet used to be on this list
+ * too; Task 105 took the reveal off it and it is now simply printed.
  *
  * ============================================================================
  * STAGING: ONE IDEA AT A TIME
@@ -129,13 +130,15 @@ export const MARK_STEP = 60
 export const MARK_SPAN = 170
 
 /**
- * KETSU — the sheet.
+ * KETSU — the sheet, and it no longer has a window at all.
  *
- * There is no `KETSU_INK` any more: the sheet stopped being an `InkedPanel` when
- * a capture showed its own outline nested inside a drawn panel border, which is
- * two boxes and no sheet. Its unfurl IS its ink.
- */
-export const KETSU_LINE: Window = [TEN_BURST[1] + 120, TEN_BURST[1] + 900]
+ * There was never a `KETSU_INK`: the sheet stopped being an `InkedPanel` when a
+ * capture showed its own outline nested inside a drawn panel border, which is two
+ * boxes and no sheet, and its unfurl was its ink instead. `KETSU_LINE` was that
+ * unfurl's window, and Task 105 removed the unfurl — the sheet is printed the
+ * moment the card exists. Nothing is left here to time, and a window kept "in
+ * case" would be an invitation to put a reveal back on the one surface the blind
+ * audit was opened over.
 /**
  * Where the colophon used to fade in — RETIRED BY THE INVERSION for the same
  * reason as `TEN_SUFFIX`. It is what `PAGE_DONE` is measured from, so it stays.

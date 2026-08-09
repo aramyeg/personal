@@ -280,17 +280,55 @@ describe('the page is drawn by the SCROLL, and by nothing else', () => {
 
   it('draws less at a smaller page value, and everything at 1', () => {
     // The beats still stage — the fix changed the CLOCK, not the choreography.
-    const inkAt = (page: number) => {
+    const cornersAt = (page: number) => {
       cleanup()
       render(<InfoPage chapter={3} page={page} />)
-      const rects = Array.from(screen.getByTestId('sw-info-page').querySelectorAll('rect[stroke-dasharray]'))
-      return rects.map((r) => 1 - Number(r.getAttribute('stroke-dashoffset')))
+      return Array.from(
+        screen.getByTestId('sw-info-page').querySelectorAll('[data-testid="sw-panel-frame"]')
+      ).map((p) => (p.getAttribute('d') ?? '').split('L').length - 1)
     }
-    const early = inkAt(0.1)
-    const done = inkAt(1)
-    expect(done.every((v) => v > 0.999)).toBe(true)
-    expect(early.some((v) => v < 0.999)).toBe(true)
+    const early = cornersAt(0.1)
+    const done = cornersAt(1)
+    expect(done.every((v) => v === 4)).toBe(true)
+    expect(early.some((v) => v < 4)).toBe(true)
     expect(early.reduce((a, b) => a + b, 0)).toBeLessThan(done.reduce((a, b) => a + b, 0))
+  })
+
+  it('CLOSES every panel frame on a settled page', () => {
+    /**
+     * TASK 105 — THE BORDER WAS NEVER FULLY SHOWN, ON ANY CHAPTER.
+     *
+     * The frame used to be a `<rect pathLength=1>` inked by a dashoffset. At a
+     * settled card the component asked for a complete frame — the attribute read
+     * exactly 0 — and the browser drew 55.5% of the hero panel's outline on
+     * chapters 2 through 6 and 49.9% on chapter 1: top edge whole, right edge
+     * 55%, bottom edge NOTHING. Measured on the shipped build by painting the
+     * drawn rect magenta and walking each perimeter in the card's rotated frame.
+     *
+     * The cause is that `pathLength` normalises the dash against the path in the
+     * SVG's own user space while `vector-effect: non-scaling-stroke` dashes it
+     * after `preserveAspectRatio="none"` has stretched that space non-uniformly
+     * (3.12x across, 1.78x down). Removing EITHER property closed the frame.
+     *
+     * A dashoffset could not carry this law, which is the whole lesson: the
+     * attribute was correct and the pixels were not. The path is built from
+     * `ink` now, so "the frame closes" is a property of the `d` this file can
+     * read — the last point is the first point, on every panel of every chapter.
+     */
+    for (const i of chapters) {
+      cleanup()
+      render(<InfoPage chapter={i} page={1} />)
+      const frames = Array.from(
+        screen.getByTestId('sw-info-page').querySelectorAll('[data-testid="sw-panel-frame"]')
+      )
+      expect(frames.length, `chapter ${i + 1} has frames`).toBeGreaterThan(0)
+      for (const f of frames) {
+        const d = f.getAttribute('d')!
+        const pts = d.split(/[ML]\s*/).filter(Boolean).map((s) => s.trim())
+        expect(pts.length, `chapter ${i + 1}: the frame walks all four sides`).toBe(5)
+        expect(pts[pts.length - 1], `chapter ${i + 1}: the frame returns to its start`).toBe(pts[0])
+      }
+    }
   })
 })
 
@@ -511,10 +549,13 @@ describe('a reveal on the leaf dims and never removes', () => {
     }
   })
 
-  it('shares one law with the sheet beside it', () => {
-    // The sheet has kept this rule since Task 82 and the art did not. Two files
-    // agreeing today is not the same as one law, so `cloth-drag` reads the same
-    // function — asserted here so a future edit cannot fork them again.
+  it('keeps the floor the sheet taught it', () => {
+    // The sheet kept this rule from Task 82 and the art did not, so the art was
+    // moved onto the sheet's own function. TASK 105 retired the sheet's reveal
+    // altogether — `cloth-drag.tsx` has no mask and no progress input any more —
+    // which leaves `Spot` and `AnchorCrop` as the only consumers. The floor is
+    // still the law they answer to, and it is pinned here rather than left to
+    // drift now that the file that taught it no longer calls it.
     expect(MIN_VISIBLE_ALPHA).toBe(0.42)
     expect(leadingEdgeMask(0.4)).toContain('rgba(0,0,0,0.42)')
   })
