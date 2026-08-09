@@ -141,11 +141,16 @@ import { LANE_BAR_INDEX, STATION_BARS, STATION_CASE, TRAY_FLOOR_RANGE } from './
  * THE SCOPE IS THE ONE TERM T102 RULED OUT FOR THIS OBJECT, PLUS THE PLANE THAT MAKES IT SAFE.
  * A luminance band still cannot scope a penguin (83% of the whole figurine is under 0.12 — it is
  * a penguin), and T102's warning stands: catch its paint and the bird turns grey mid-wobble. So
- * the region is the nudge box that already owns the motion, CAPPED AT `DESK_PAD.top` — which is
- * not a tuned ceiling but the plane that separates what the pad hides from what it does not. Every
- * vertex the lift can reach is, at rest, inside a solid pad. The rest guard is therefore doubled:
- * the ramp's exact zero as everywhere else, and geometry that emits nothing visible even if it
- * failed. Nothing Aram can see standing still is inside a figurine region.
+ * the region is the nudge box that already owns the motion, capped at a ceiling that separates the
+ * hole from the paint. T104 set that ceiling at `DESK_PAD.top` — the plane that separates what the
+ * pad hides from what it does not — and its own capture round then proved the plane too low: the
+ * feet's undersides sit just above it. T104b walks the ceiling out of the vertex rings instead
+ * (`FIGURINE_FOOT_TOP`, `SEAT_BAND_TOP`, below), and the family grew from the two figurines to the
+ * four seated wigglers whose motion can lift a contact band at all.
+ *
+ * The rest guard is unchanged and still doubled: the ramp's exact zero as everywhere else, and
+ * geometry — every vertex the lift can reach is, at rest, either inside a solid pad or pressed
+ * against it under the object that stands on it.
  *
  * NOT THE FIGURINE TICKET, AND IT DOES NOT DISCHARGE IT. The ticket is to RE-SEAT the two, which
  * would put this same band on screen AT REST, where a displacement-driven lift structurally cannot
@@ -320,13 +325,19 @@ export type UndersideRegion = {
    * the region has no honest colour of its own to read.
    *
    * The four T102 regions each hold both a crushed core and their own lit family, so their albedo
-   * is the mean over their own vertices above luminance 0.35 and nothing else is needed. A
-   * FIGURINE BASE cannot: it is the part that was inside the pad, so 96-99% of it is under 0.12
-   * and there is no bright half to average — the region is all core. Its colour therefore comes
-   * from the body standing directly on top of it, sampled in the same xz column from the region's
-   * ceiling up by `FIGURINE_ALBEDO_BAND`, which is the feet and the lower belly: the geometry the
-   * emergent band is physically continuous with, and the only honest answer to "what colour is
-   * this thing" for a surface that has never been lit.
+   * is the mean over their own vertices above luminance 0.35 and nothing else is needed. A SEAT
+   * BAND cannot: it is the part that was inside the pad or pressed against it, so it is all core
+   * and there is no bright half to average. Its colour therefore comes from the body standing
+   * directly on top of it, sampled in the same xz column from the region's ceiling up by
+   * `BORROWED_ALBEDO_BAND` — the geometry the emergent band is physically continuous with, and the
+   * only honest answer to "what colour is this thing" for a surface that has never been lit.
+   *
+   * T104b RETIRED IT FOR THE PENGUIN, and that is the shape of the fix rather than a tidy-up: once
+   * the ceiling rises to the top of the feet (`FIGURINE_FOOT_TOP`), the region CONTAINS the feet's
+   * own lit family — 219 vertices over luminance 0.35 — so the T102 rule applies directly and the
+   * colour stops being borrowed at all. The two answers agree, which is the check: borrowed from
+   * above the pad it read [0.7287, 0.5620, 0.4171] (r/g 1.297, b/g 0.742); read from the region's
+   * own lit vertices it reads [0.7507, 0.5695, 0.3723] (r/g 1.318, b/g 0.654). The same warm foot.
    */
   readonly albedoAbove?: number
 } & (
@@ -335,44 +346,144 @@ export type UndersideRegion = {
 )
 
 /**
- * How far above a figurine's seat its own colour is read (see `albedoAbove`). 0.2 is five times
- * the deepest sink and about a quarter of either figurine's height, so the sample is the feet and
- * the lower belly rather than the head — and it is not a knife-edge: at 0.1, 0.2 and 0.3 the
- * penguin reads [0.7434, 0.5642, 0.3984], [0.7287, 0.5620, 0.4171] and [0.7231, 0.5664, 0.4341],
- * the same warm foot every time. It is set at 0.2 because that is where BOTH figurines have a
- * bright family big enough to mean something (258 and 302 vertices over luminance 0.35; at 0.1 the
- * bluebird has 34).
+ * How far above a seat band its own colour is read (see `albedoAbove`). 0.2 is five times the
+ * deepest sink and about a quarter of either figurine's height, so the sample is the body directly
+ * above the band rather than the head — and it is not a knife-edge for any of the three regions
+ * that still borrow: at sample bands 0.1 / 0.2 / 0.3 the bluebird reads r/g 0.759 / 0.765 / 0.771,
+ * the mug 2.023 / 2.015 / 1.995 and the pen cup 1.613 / 1.566 / 1.486. It is set at 0.2 because
+ * that is where every borrower has a bright family big enough to mean something (258, 210 and 206
+ * vertices over luminance 0.35; at 0.1 the bluebird has 34).
  */
-export const FIGURINE_ALBEDO_BAND = 0.2
+export const BORROWED_ALBEDO_BAND = 0.2
 
 /**
- * THE TWO FIGURINE BASES (T104) — each one its own nudge box, capped at the pad's top plane.
+ * ============================================================================
+ * T104b — THE TWO CEILINGS, WALKED OUT OF THE RINGS RATHER THAN CHOSEN
+ * ============================================================================
+ * T104 capped both figurine boxes at `DESK_PAD.top` and gated the result, and the capture round
+ * then convicted the fix at the FIRST CREST: at t=120 ms only 59 of 150 near-black pixels in the
+ * penguin's foot crop belonged to the region. The rest were the feet's OWN underside rims, sitting
+ * just ABOVE the pad, self-occluded at rest and swung into view only at maximum tilt. T104 refused
+ * to raise the ceiling by hand because the penguin's black does not stop above its feet — y
+ * (1.333, 1.343] is 32 vertices, ALL crushed, ZERO lit, and the pattern repeats up the body. That
+ * is paint, and a typed ceiling would eventually reach it.
  *
- * Neither bound here is typed: the xz extent and the floor are `DESK_NUDGE_ZONES`' own box, so the
- * region a figurine's colour is fixed in is BY CONSTRUCTION the box its motion is selected by and
- * a re-measure cannot move the two apart; the ceiling is `DESK_PAD.top`, the plane both figurines
- * stand on. What IS measured is the albedo — the mean over the vertices above luminance 0.35 in
- * the same xz column, from the ceiling up by `FIGURINE_ALBEDO_BAND` (see `albedoAbove`).
+ * So the ceiling is not typed. This geometry is authored as horizontal LOOPS at discrete y, and
+ * both ceilings are walked out of those loops by a rule, then placed at the MIDPOINT OF THE EMPTY
+ * GAP the walk stops in — never on a loop, so no float32 rounding can include or drop a whole ring.
+ * `scratchpad/t104/probe-ceil.mjs` runs the walk against the shipped bytes and prints it.
+ *
+ * THE FOOT RULE (figurines). Start at `DESK_PAD.top` and walk up. KEEP every ring that carries BOTH
+ * a crushed family and a lit family — a ring that is dark in places is a ring the bake shadowed by
+ * GEOMETRY, which is the whole defect. STOP at the first ring with no lit member at all: that is
+ * the object's own black paint, which has no lit half anywhere. The walk, printed:
+ *
+ *   penguin  1.30521(n64 c24 l39) 1.30823(c24 l37) 1.31091(c26 l32) 1.31320(c28 l28)
+ *            1.31505(c30 l25) 1.31640(c32 l15) 1.31722(c36 l13) | 1.31750(n2 c2 l0) <- STOP
+ *
+ * Seven mixed rings, and their lit family holds ONE colour throughout (b/g 0.614 → 0.621, the warm
+ * foot); the ring that stops the walk has no lit vertex, and the next lit ring above it reads
+ * b/g 0.938 — a different animal, the body. Ceiling = (1.317223 + 1.317500) / 2. It adds 200
+ * crushed vertices to the region, which the weeble lifts to +0.0472 above the pad at a single
+ * click and +0.0731 at the `AMP_CAP` re-poke ceiling.
+ *
+ *   bluebird 1.31591(n32 c0 l3) <- STOP on the FIRST ring above the pad
+ *
+ * The same rule returns the bluebird's EXISTING ceiling, because its run is empty: it has zero
+ * crushed vertices anywhere between 1.3030 and 1.4300. Its region is unchanged, byte for byte —
+ * a derived no-op rather than an assumed one.
  */
-const FIGURINE_ALBEDOS: Readonly<Record<string, readonly [number, number, number]>> = {
-  /** The bluebird's own blue, over its 258 lit vertices — chroma b/g 1.274, r/g 0.765. */
-  bird: [0.354, 0.4627, 0.5892],
-  /** ...and the penguin's FEET, which are warm, not black: r/g 1.297, b/g 0.742 over 302. This is
-   *  the measurement that decides the look — a penguin lifted toward its own body would go white
-   *  or go black, and neither is what a foot's shadowed side does over a pink pad. */
-  penguin: [0.7287, 0.562, 0.4171],
+export const FIGURINE_FOOT_TOP: Readonly<Record<string, number>> = {
+  /** The walk stops on the first ring, so this IS `DESK_PAD.top` — stated as a measurement. */
+  bird: DESK_PAD.top,
+  penguin: 1.317361,
 }
 
-const FIGURINE_BASES: readonly UndersideRegion[] = DESK_NUDGE_ZONES.filter(
-  (z) => z.kind === 'bird' || z.kind === 'penguin'
+/**
+ * THE SEAT RULE (vessels) — T104b's second family, and the trap inside it.
+ *
+ * Aram: it is not just the penguin, every wiggling desk object shows it, with one exception, the
+ * watering can. The can is the control and it settles the mechanism: its underside was visible to
+ * the rig at bake time and it has NO crushed vertices anywhere (minimum luminance 0.2930), while
+ * every SEATED object carries a crushed contact band at the pad. So the black is baked-in contact
+ * darkness on the object itself, and the figurines' buried band is one special case of it.
+ *
+ * HEIGHT ABOVE THE SEAT IS NOT A SUFFICIENT SCOPE, which is the trap: the mug's and the pen cup's
+ * crushed runs continue upward into their own INTERIORS, which are honestly dark and visible at
+ * rest, and repainting those would be a new defect rather than a fix. The rings say exactly where
+ * one stops and the other starts, and they say it in RADIUS as well as height:
+ *
+ *   mug     1.30300(n44 c44, loop r 0.2720) | 1.30447(n44 c13) <- STOP
+ *   pen cup 1.30300(n40 c40, loop r 0.2440) | 1.30437(n40 c0)  <- STOP
+ *
+ * Walk up from the object's lowest vertex and keep every ring that is ENTIRELY crushed — the
+ * contact CORE, where the bake reached nothing at all. Stop at the first ring that is not. Both
+ * vessels stop after one loop, and stopping on the core is also what keeps `LIFT_BAND`'s own
+ * precondition true: each band is 100% crushed with a 0.0% valley, the bimodal shape the band was
+ * measured for. (The mug's next ring is the wall's PENUMBRA — 13 crushed and 31 vertices strewn
+ * through the valley — and a region that included it would import the continuous gradient
+ * `LIFT_BAND` was chosen to avoid. That ring cost a test failure before it cost a picture.)
+ *
+ * What the stop buys is visible in the RADII, which is the second scoping term §7 asked for and
+ * the reason none had to be typed: the kept loops lie on the vessel's outer profile, which rises
+ * monotonically into its lit wall (mug 0.2720 → 0.2813 → 0.2896 → 0.2963 → 0.3005; cup 0.2440 →
+ * 0.2605 → 0.2667 → 0.2706). The crushed sets ABOVE the stop do not: the mug's next is a loop at
+ * r 0.2500 — inside its own wall — and the one after is a DISC spanning r 0.0000..0.2050, the
+ * interior floor you look straight down into. The pen cup's is the same disc at r 0.0000..0.1700.
+ * Those are exactly the vertices §7 warned about, and the walk never reaches them.
+ *
+ * THE DONUT IS ACQUITTED STRUCTURALLY, not on a band. It has the family's contact darkness (its
+ * bottom two rings are 225 crushed vertices of 234), but it is the one seated wiggler that does not
+ * ROCK: its verb is `squashBlock`, `transformed.y = pivotY + (transformed.y - pivotY) * (1 - w)`,
+ * about a pivot whose y IS the seat plane. So its bottom ring's height is invariant under its own
+ * motion — bit-exactly, since the factor multiplies zero — and every vertex above it moves DOWN.
+ * A squash cannot raise a crushed vertex above the pad; it can only press it harder into it. The
+ * donut needs no region for the same kind of reason the watering can needs no exclusion, and the
+ * capture round carries it as a second control.
+ */
+export const SEAT_BAND_TOP: Readonly<Record<string, number>> = {
+  mug: 1.303734,
+  pencup: 1.303685,
+}
+
+/**
+ * THE FOUR SEAT BANDS — each one its own nudge box, capped at its own derived ceiling.
+ *
+ * No bound here is typed: the xz extent and the floor are `DESK_NUDGE_ZONES`' own box, so the
+ * region an object's colour is fixed in is BY CONSTRUCTION the box its motion is selected by and a
+ * re-measure cannot move the two apart; the ceiling is the walk above. What IS measured is the
+ * albedo — the mean over the vertices above luminance 0.35, taken from the region's own vertices
+ * where it has a lit family and borrowed from the body above it where it does not (`albedoAbove`).
+ */
+const SEAT_CEILINGS: Readonly<Record<string, number>> = { ...FIGURINE_FOOT_TOP, ...SEAT_BAND_TOP }
+
+const SEAT_ALBEDOS: Readonly<Record<string, readonly [number, number, number]>> = {
+  /** The bluebird's own blue, over the 258 lit vertices above its ceiling — b/g 1.273, r/g 0.765. */
+  bird: [0.354, 0.4627, 0.5892],
+  /** ...and the penguin's FEET, which are warm, not black: r/g 1.318, b/g 0.654 over the 219 lit
+   *  vertices INSIDE its own region (see `albedoAbove`). This is the measurement that decides the
+   *  look — a penguin lifted toward its own body would go white or go black, and neither is what a
+   *  foot's shadowed side does over a pink pad. */
+  penguin: [0.7507, 0.5695, 0.3723],
+  /** The mug's ceramic, over 210 lit vertices of the wall above the band: r/g 2.015, b/g 1.188 —
+   *  much the pinkest object on the desk, which is why it could not be given the pad's own tint. */
+  mug: [0.7325, 0.3634, 0.4319],
+  /** ...and the pen cup's, over 206: r/g 1.566, b/g 1.103. */
+  pencup: [0.6599, 0.4213, 0.4648],
+}
+
+const SEAT_BANDS: readonly UndersideRegion[] = DESK_NUDGE_ZONES.filter(
+  (z) => SEAT_CEILINGS[z.kind] !== undefined
 ).map((z) => ({
   id: `${z.kind}Base`,
   kind: 'box' as const,
   min: [z.min[0], z.min[1], z.min[2]] as const,
-  max: [z.max[0], DESK_PAD.top, z.max[2]] as const,
-  albedo: FIGURINE_ALBEDOS[z.kind]!,
+  max: [z.max[0], SEAT_CEILINGS[z.kind]!, z.max[2]] as const,
+  albedo: SEAT_ALBEDOS[z.kind]!,
   drive: 'displacement' as const,
-  albedoAbove: FIGURINE_ALBEDO_BAND,
+  // the penguin's band contains the feet it belongs to, so it reads its own colour; the other
+  // three are all core and borrow from the body standing on them.
+  ...(z.kind === 'penguin' ? {} : { albedoAbove: BORROWED_ALBEDO_BAND }),
 }))
 
 export const UNDERSIDE_REGIONS: readonly UndersideRegion[] = [
@@ -394,7 +505,7 @@ export const UNDERSIDE_REGIONS: readonly UndersideRegion[] = [
     drive: 'bird',
     foot: { min: [LANE_AABB.min[0], LANE_AABB.min[2]], max: [LANE_AABB.max[0], LANE_AABB.max[2]] },
   },
-  ...FIGURINE_BASES,
+  ...SEAT_BANDS,
 ] as const
 
 /** How wide the lane footprint's edge is. Tight: the floor either side of it is visible at rest

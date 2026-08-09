@@ -13,6 +13,7 @@ import {
   DESK_PAD,
 } from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { BOOK_HINGE, LANE, PLANT } from '@/components/labs/small-world/scene/props/desk-deep'
+import { ROCK_PARAMS } from '@/components/labs/small-world/scene/props/desk-nudge'
 import {
   LANE_BAR_INDEX,
   STATION_BARS,
@@ -20,11 +21,13 @@ import {
   TRAY_FLOOR_RANGE,
 } from '@/components/labs/small-world/scene/props/desk-station'
 import {
+  FIGURINE_FOOT_TOP,
   FOOT_SOFT,
   LIFT_BAND,
   LIFT_K,
   LIFT_RAMP,
   PAD_SURFACE,
+  SEAT_BAND_TOP,
   TABLE_SURFACE,
   UNDERSIDE_BOUNCE,
   UNDERSIDE_DEFAULT,
@@ -46,7 +49,9 @@ import {
  * `desk-glb.tsx` still puts the weight after every motion block.
  *
  * T104 added the two FIGURINE BASES and moved one claim rather than adding a suite beside it: the
- * penguin is still out of reach above the pad's top plane, and now in reach below it.
+ * penguin is still out of reach above the pad's top plane, and now in reach below it. T104b moved
+ * that same claim's PLANE — the ceiling is the top of the foot, walked out of the vertex rings —
+ * and added the one law the vessel bands bring with them: a band stops below its own interior.
  */
 
 // --- the shipped bytes, read independently of the runtime loader -------------
@@ -138,10 +143,11 @@ const inRegion = (i: number, p: number[]): boolean =>
   UNDERSIDE_REGIONS.some((r) => regionHas(r, i, p))
 
 /**
- * Where a region's honest colour is read from (T104). Four of the six hold their own lit family
- * and answer with their own vertices; a figurine base is entirely crushed — it was inside the pad
- * — and declares `albedoAbove`, which reads the same xz column from its ceiling up by that much.
- * Both branches are the shipped bytes; neither is a number copied out of the source.
+ * Where a region's honest colour is read from (T104). Five of the eight hold their own lit family
+ * and answer with their own vertices — the penguin joined them at T104b, when its ceiling rose to
+ * take in the feet. The other three are all core, and declare `albedoAbove`, which reads the same
+ * xz column from the ceiling up by that much. Both branches are the shipped bytes; neither is a
+ * number copied out of the source.
  */
 function albedoSample(r: (typeof UNDERSIDE_REGIONS)[number]): number[][] {
   if (r.albedoAbove === undefined)
@@ -292,26 +298,33 @@ describe('the region table reaches the objects the diagnosis convicted, and noth
               p[1]! >= r.min[1] && p[1]! <= r.max[1] &&
               p[2]! >= r.min[2] && p[2]! <= r.max[2]
         )
-      // 60, because the smallest region in the table is the bluebird's buried base at 97 vertices
-      // — the whole reason its black band is a thin one and the penguin's is the one Aram named.
-      expect(inside.length, `${r.id} selects nothing`).toBeGreaterThan(60)
+      // 30, because the smallest region in the table is the pen cup's contact band — ONE authored
+      // loop of 40 vertices, 100% of it crushed, which is what a seat band looks like on a vessel
+      // that barely moves (its rock is 0.8°, the whisper on this desk). T104's 60 was the
+      // bluebird's 97; T104b's floor is the pen cup's 40.
+      expect(inside.length, `${r.id} selects nothing`).toBeGreaterThan(30)
       const crushed = inside.filter(({ i }) => lum(baked.col![i]!) < LIFT_BAND.lumLo).length
       expect(crushed / inside.length, `${r.id} has no crushed core`).toBeGreaterThan(0.02)
     }
   })
 
-  it('CANNOT reach a figurine vertex the pad does not hide — its black is paint (T104)', () => {
+  it('CANNOT reach a figurine vertex above its own foot — that black is paint (T104b)', () => {
     // T102 kept the penguin out of the table entirely, on the finding that its black is PAINT:
     // 83% of the whole figurine is under luminance 0.12, so no band can separate a hole from a
-    // penguin, and a lift that reached its body would turn it grey mid-wobble. T104 adds only the
-    // part of it that is UNDERGROUND — sunk into the pad by the authoring slip and dug up by its
-    // own weeble. The original law therefore survives with a plane in it, and this is that plane:
-    // every vertex either figurine puts inside a lift region is below `DESK_PAD.top`, which is to
-    // say invisible while the desk is at rest, no matter what the ramp does.
+    // penguin, and a lift that reached its body would turn it grey mid-wobble. T104 added only the
+    // part of it that is UNDERGROUND and capped the region at `DESK_PAD.top`; its own capture round
+    // then found the pad's plane too low, because the feet's undersides sit just above it.
+    //
+    // So the law keeps its shape and moves its plane: the ceiling is now the top of the FOOT,
+    // walked out of the vertex rings (`FIGURINE_FOOT_TOP`) rather than typed. Both halves are
+    // asserted here, and the second is the one that matters — that the paint above the foot is
+    // still out of reach, which is what T102 convicted and what a raised ceiling could betray.
     for (const zone of DESK_NUDGE_ZONES.filter((z) => z.kind === 'bird' || z.kind === 'penguin')) {
+      const ceiling = FIGURINE_FOOT_TOP[zone.kind]!
       let inZone = 0
       let dark = 0
       let lifted = 0
+      let paintAbove = 0
       for (let i = 0; i < baked.pos.length; i++) {
         const p = baked.pos[i]!
         if (
@@ -319,17 +332,77 @@ describe('the region table reaches the objects the diagnosis convicted, and noth
           p[1]! > zone.max[1] || p[2]! < zone.min[2] || p[2]! > zone.max[2]
         ) continue
         inZone++
-        if (lum(baked.col![i]!) < LIFT_BAND.lumLo) dark++
-        if (!inRegion(i, p)) continue
+        const crushed = lum(baked.col![i]!) < LIFT_BAND.lumLo
+        if (crushed) dark++
+        if (!inRegion(i, p)) {
+          // ...and the paint the ceiling refuses: crushed, above the foot, and NOT in any region.
+          if (crushed && p[1]! > ceiling) paintAbove++
+          continue
+        }
         lifted++
-        expect(p[1]!, `${zone.kind} vertex ${i} is lifted where the pad does not hide it`)
-          .toBeLessThanOrEqual(DESK_PAD.top)
+        expect(p[1]!, `${zone.kind} vertex ${i} is lifted above its own foot`)
+          .toBeLessThanOrEqual(ceiling)
       }
       expect(inZone, `${zone.kind} zone is empty`).toBeGreaterThan(1000)
       expect(dark / inZone, `${zone.kind} is not the painted-black family`).toBeGreaterThan(0.4)
-      expect(lifted, `${zone.kind} has no buried band to lift`).toBeGreaterThan(60)
-      expect(lifted / inZone, `${zone.kind}'s lift has spread past its base`).toBeLessThan(0.25)
+      expect(lifted, `${zone.kind} has no seat band to lift`).toBeGreaterThan(60)
+      // The lift is still the base and the foot, not the animal: 1,327 of the penguin's 5,355
+      // vertices and 97 of the bluebird's 3,410. 0.3 is the nearest round bound over the former.
+      expect(lifted / inZone, `${zone.kind}'s lift has spread past its foot`).toBeLessThan(0.3)
+      // ...and the paint is real and untouched — this is the assertion T102's warning becomes.
+      expect(paintAbove, `${zone.kind} has no painted black left above the ceiling to protect`)
+        .toBeGreaterThan(100)
     }
+  })
+
+  it('stops each vessel band below its own interior, which is honestly dark at rest (T104b)', () => {
+    // The trap T104 §7 named: height above the seat alone is NOT a sufficient scope, because the
+    // mug's and the pen cup's crushed runs continue upward into their INTERIORS — the floor you
+    // look straight down into — which are honestly dark, visible at rest, and would be a new
+    // defect if repainted. The ring walk stops before them, and the proof is RADIAL: everything
+    // the band keeps lies on the vessel's outer profile, and the interior floor is a disc reaching
+    // the axis. So no lifted vertex may sit near the axis, and the excluded interior must exist.
+    for (const kind of ['mug', 'pencup'] as const) {
+      const zone = DESK_NUDGE_ZONES.find((z) => z.kind === kind)!
+      // the object's OWN axis — its rock pivot, not the box centre: the nudge box is grown to
+      // cover the mug's handle, so its centre sits 0.11 off the ceramic's axis.
+      const ax = zone.pivot[0]
+      const az = zone.pivot[2]
+      const radii: number[] = []
+      let interior = 0
+      for (let i = 0; i < baked.pos.length; i++) {
+        const p = baked.pos[i]!
+        if (
+          p[0]! < zone.min[0] || p[0]! > zone.max[0] || p[1]! < zone.min[1] ||
+          p[1]! > zone.max[1] || p[2]! < zone.min[2] || p[2]! > zone.max[2]
+        ) continue
+        const r = Math.hypot(p[0]! - ax, p[2]! - az)
+        if (inRegion(i, p)) radii.push(r)
+        else if (lum(baked.col![i]!) < LIFT_BAND.lumLo && p[1]! > SEAT_BAND_TOP[kind]! && r < 0.15)
+          interior++
+      }
+      expect(radii.length, `${kind} band selects nothing`).toBeGreaterThan(30)
+      // every kept vertex is out on the wall, not on the floor: the mug's band sits at 0.272-0.281
+      // and the cup's at 0.244, against interior discs that reach r = 0.
+      expect(Math.min(...radii), `${kind} band reaches into its own interior`).toBeGreaterThan(0.2)
+      // ...and it is a CORE, not a penumbra: LIFT_BAND was measured for a bimodal region.
+      const dark = radii.length
+      expect(dark, `${kind} band is not one authored loop`).toBeLessThan(60)
+      expect(interior, `${kind} has no excluded interior — the trap would be untested`)
+        .toBeGreaterThan(40)
+    }
+    // ...and the third seated vessel gets no band at all, for a structural reason rather than a
+    // measured one: the donut is the one that does not ROCK. `squashBlock` scales y about a pivot
+    // whose y IS the seat plane, so its bottom ring's height is invariant (the factor multiplies
+    // zero) and every vertex above it moves DOWN — a squash can only press a contact band harder
+    // into the pad. Both halves of that argument are held here, because if the donut ever gains a
+    // rock or its pivot leaves the seat, the acquittal expires and the band has to be derived.
+    expect(UNDERSIDE_REGIONS.some((r) => r.id.startsWith('donut'))).toBe(false)
+    expect(ROCK_PARAMS.donut, 'the donut has acquired a rock and needs re-deriving').toBeUndefined()
+    expect(
+      DESK_NUDGE_ZONES.find((z) => z.kind === 'donut')!.pivot[1],
+      "the donut's squash pivot has left the seat plane"
+    ).toBeCloseTo(DESK_PAD.top, 5)
   })
 
   it('weights the tray floor by the driver that uncovers it, not by its own motion', () => {
