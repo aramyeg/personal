@@ -1,5 +1,5 @@
 import { BOOK_HINGE, PLANT } from './desk-deep'
-import { DESK_PAD } from './desk-glb-contract'
+import { DESK_NUDGE_ZONES, DESK_PAD } from './desk-glb-contract'
 import { LANE_BAR_INDEX, STATION_BARS, STATION_CASE, TRAY_FLOOR_RANGE } from './desk-station'
 
 /**
@@ -105,6 +105,54 @@ import { LANE_BAR_INDEX, STATION_BARS, STATION_CASE, TRAY_FLOOR_RANGE } from './
  * are a second line of defence, not the argument.
  *
  * ============================================================================
+ * T104 — THE SECOND FAMILY: A BLACK THAT WAS NEVER AN UNDERSIDE, BUT A BURIED ONE
+ * ============================================================================
+ * Aram, after T102 shipped: *"the bottom sides of the elements that wiggle are still black, like
+ * for example the penguin, when its animation is invoked the bottom of the penguin's feet are
+ * black... it happens with the other items as well, but it is super noticeable with the penguin."*
+ *
+ * T102's acquittal of the penguin was right about its own question and wrong about Aram's. It
+ * asked whether a downward face turns toward the eye — it does not; the weeble tilts 7° and the
+ * lid-dominant camera never sees under a foot. What it did not ask is what a 7° tilt LIFTS OUT OF
+ * THE PAD, and that is a different defect with a different cause:
+ *
+ *   BOTH FIGURINES ARE SUNK INTO THE DESK. The pad's top is 1.3030 and the bluebird is seated at
+ *   1.2653, the penguin at 1.2625 — the authoring slip the figurine ticket already costs. So the
+ *   penguin ships 879 of its 5,355 vertices UNDERGROUND (16.4%), and a face that was inside a
+ *   solid pad when the scene was baked is not shaded at all: 96% of them are under luminance 0.12
+ *   with a median of 0.0008. That is not a crushed bake, it is NO bake.
+ *
+ *   ITS OWN WEEBLE DIGS THEM UP. The rock is `baseR * angle` of lift plus a rotation about the
+ *   base pivot, so at the re-poke cap (12.25°) 854 of those 879 vertices rise ABOVE the pad's top
+ *   plane, by up to 0.0721 world units — a true-black band the height of the sink, wrapping the
+ *   feet, appearing and disappearing with the wobble. Simulated over 24 tilt directions against
+ *   the shipped bytes at both the single-click peak and the cap.
+ *
+ *   AND IT IS THE ONLY FAMILY LIKE IT. Every buried vertex on the desk was clustered and
+ *   attributed to the run that owns it: the two figurines (879 + 97), the kit case's base (364 —
+ *   already a region here, and its peel is height-weighted so the base never rises), the tray's
+ *   body and the plant's saucer (static, nothing moves them) and the sunk clay chips, whose press
+ *   only ever squashes them DOWN toward their own seat. Mug, donut and pen cup sit exactly on the
+ *   pad with zero vertices under it, and the tree's foliage, the knife's handle, the plant's
+ *   leaves and its pot have none either — so no other motion on this desk can uncover one. The
+ *   bluebird is the "other items as well": same slip, but 97 vertices and a 2° peck-recoil, so it
+ *   lifts 21 of them by at most 0.0101 — which is exactly why it is not the one Aram named.
+ *
+ * THE SCOPE IS THE ONE TERM T102 RULED OUT FOR THIS OBJECT, PLUS THE PLANE THAT MAKES IT SAFE.
+ * A luminance band still cannot scope a penguin (83% of the whole figurine is under 0.12 — it is
+ * a penguin), and T102's warning stands: catch its paint and the bird turns grey mid-wobble. So
+ * the region is the nudge box that already owns the motion, CAPPED AT `DESK_PAD.top` — which is
+ * not a tuned ceiling but the plane that separates what the pad hides from what it does not. Every
+ * vertex the lift can reach is, at rest, inside a solid pad. The rest guard is therefore doubled:
+ * the ramp's exact zero as everywhere else, and geometry that emits nothing visible even if it
+ * failed. Nothing Aram can see standing still is inside a figurine region.
+ *
+ * NOT THE FIGURINE TICKET, AND IT DOES NOT DISCHARGE IT. The ticket is to RE-SEAT the two, which
+ * would put this same band on screen AT REST, where a displacement-driven lift structurally cannot
+ * reach it; that still needs a re-bake or a static treatment. This fixes only what the wobble digs
+ * up, which is what the wobble is allowed to be judged on.
+ *
+ * ============================================================================
  * WHAT THE UNDERSIDES ARE LIFTED TOWARD — READ, NOT CHOSEN
  * ============================================================================
  * `DeskSurface` carries no vertex colour; it is atlas-textured. So both family colours were read
@@ -159,6 +207,10 @@ export const LIFT_K = 0.82
  * under `lumLo` is a hole and lifts fully; everything over `lumHi` is the object's own honest
  * tone and keeps its bake EXACTLY. The gap between them is the occlusion penumbra, which is thin
  * here by measurement: the notebook cover has zero vertices anywhere in it.
+ *
+ * The T104 figurine bases inherited it rather than re-tuning it, and the shipped bytes say they
+ * may: the bluebird's base has ZERO vertices in the gap and the penguin's 3.4%, against 99% and
+ * 93% below `lumLo`. A band that lands on a bimodal core is doing the same job it was measured for.
  */
 export const LIFT_BAND = { lumLo: 0.03, lumHi: 0.22 } as const
 
@@ -236,7 +288,7 @@ const LANE_AABB = STATION_BARS[LANE_BAR_INDEX]!.aabb
  * its measured ALBEDO (the mean of its own vertices over luminance 0.35 — the object's honest
  * colour, which is what the bounce lands on), and what DRIVES its weight.
  *
- * `drive` is the part the captures forced. Three of the four are 'displacement': the face that
+ * `drive` is the part the captures forced. Five of the six are 'displacement': the face that
  * goes black is the face that moved, so `transformed - position` both scopes the lift and gives
  * the exact-zero rest guard for free. The fourth is not, and could never have been:
  *
@@ -263,10 +315,65 @@ export type UndersideRegion = {
   readonly drive: 'displacement' | 'bird'
   /** Where the drive applies, xz, when the drive is not the vertex's own motion. */
   readonly foot?: { readonly min: readonly [number, number]; readonly max: readonly [number, number] }
+  /**
+   * How far ABOVE the region's own ceiling its albedo had to be read, world units — set only when
+   * the region has no honest colour of its own to read.
+   *
+   * The four T102 regions each hold both a crushed core and their own lit family, so their albedo
+   * is the mean over their own vertices above luminance 0.35 and nothing else is needed. A
+   * FIGURINE BASE cannot: it is the part that was inside the pad, so 96-99% of it is under 0.12
+   * and there is no bright half to average — the region is all core. Its colour therefore comes
+   * from the body standing directly on top of it, sampled in the same xz column from the region's
+   * ceiling up by `FIGURINE_ALBEDO_BAND`, which is the feet and the lower belly: the geometry the
+   * emergent band is physically continuous with, and the only honest answer to "what colour is
+   * this thing" for a surface that has never been lit.
+   */
+  readonly albedoAbove?: number
 } & (
   | { readonly kind: 'range'; readonly range: readonly [number, number] }
   | { readonly kind: 'box'; readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] }
 )
+
+/**
+ * How far above a figurine's seat its own colour is read (see `albedoAbove`). 0.2 is five times
+ * the deepest sink and about a quarter of either figurine's height, so the sample is the feet and
+ * the lower belly rather than the head — and it is not a knife-edge: at 0.1, 0.2 and 0.3 the
+ * penguin reads [0.7434, 0.5642, 0.3984], [0.7287, 0.5620, 0.4171] and [0.7231, 0.5664, 0.4341],
+ * the same warm foot every time. It is set at 0.2 because that is where BOTH figurines have a
+ * bright family big enough to mean something (258 and 302 vertices over luminance 0.35; at 0.1 the
+ * bluebird has 34).
+ */
+export const FIGURINE_ALBEDO_BAND = 0.2
+
+/**
+ * THE TWO FIGURINE BASES (T104) — each one its own nudge box, capped at the pad's top plane.
+ *
+ * Neither bound here is typed: the xz extent and the floor are `DESK_NUDGE_ZONES`' own box, so the
+ * region a figurine's colour is fixed in is BY CONSTRUCTION the box its motion is selected by and
+ * a re-measure cannot move the two apart; the ceiling is `DESK_PAD.top`, the plane both figurines
+ * stand on. What IS measured is the albedo — the mean over the vertices above luminance 0.35 in
+ * the same xz column, from the ceiling up by `FIGURINE_ALBEDO_BAND` (see `albedoAbove`).
+ */
+const FIGURINE_ALBEDOS: Readonly<Record<string, readonly [number, number, number]>> = {
+  /** The bluebird's own blue, over its 258 lit vertices — chroma b/g 1.274, r/g 0.765. */
+  bird: [0.354, 0.4627, 0.5892],
+  /** ...and the penguin's FEET, which are warm, not black: r/g 1.297, b/g 0.742 over 302. This is
+   *  the measurement that decides the look — a penguin lifted toward its own body would go white
+   *  or go black, and neither is what a foot's shadowed side does over a pink pad. */
+  penguin: [0.7287, 0.562, 0.4171],
+}
+
+const FIGURINE_BASES: readonly UndersideRegion[] = DESK_NUDGE_ZONES.filter(
+  (z) => z.kind === 'bird' || z.kind === 'penguin'
+).map((z) => ({
+  id: `${z.kind}Base`,
+  kind: 'box' as const,
+  min: [z.min[0], z.min[1], z.min[2]] as const,
+  max: [z.max[0], DESK_PAD.top, z.max[2]] as const,
+  albedo: FIGURINE_ALBEDOS[z.kind]!,
+  drive: 'displacement' as const,
+  albedoAbove: FIGURINE_ALBEDO_BAND,
+}))
 
 export const UNDERSIDE_REGIONS: readonly UndersideRegion[] = [
   { id: 'plantLeaves', kind: 'range', range: PLANT.leaves, albedo: [0.5542, 0.5494, 0.4788], drive: 'displacement' },
@@ -287,6 +394,7 @@ export const UNDERSIDE_REGIONS: readonly UndersideRegion[] = [
     drive: 'bird',
     foot: { min: [LANE_AABB.min[0], LANE_AABB.min[2]], max: [LANE_AABB.max[0], LANE_AABB.max[2]] },
   },
+  ...FIGURINE_BASES,
 ] as const
 
 /** How wide the lane footprint's edge is. Tight: the floor either side of it is visible at rest

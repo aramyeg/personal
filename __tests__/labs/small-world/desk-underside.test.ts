@@ -7,7 +7,11 @@ import {
   canMaterial,
   glossMaterial,
 } from '@/components/labs/small-world/scene/props/desk-glb'
-import { DESK_GLB_URL, DESK_PAD } from '@/components/labs/small-world/scene/props/desk-glb-contract'
+import {
+  DESK_GLB_URL,
+  DESK_NUDGE_ZONES,
+  DESK_PAD,
+} from '@/components/labs/small-world/scene/props/desk-glb-contract'
 import { BOOK_HINGE, LANE, PLANT } from '@/components/labs/small-world/scene/props/desk-deep'
 import {
   LANE_BAR_INDEX,
@@ -36,10 +40,13 @@ import {
  * THE BLACK-UNDERSIDE LIFT, HELD TO WHAT IT CLAIMS (T102).
  *
  * The claims worth pinning are the ones a later edit could quietly withdraw: that the resting
- * frame takes the untouched path STRUCTURALLY, that the lift reaches exactly the three objects
- * the diagnosis convicted and cannot reach the penguin's honest black paint, that the two family
+ * frame takes the untouched path STRUCTURALLY, that the lift reaches exactly the objects the
+ * diagnosis convicted and cannot reach the penguin's honest black paint, that the two family
  * colours are the surfaces the objects actually stand over, and that the composition order in
  * `desk-glb.tsx` still puts the weight after every motion block.
+ *
+ * T104 added the two FIGURINE BASES and moved one claim rather than adding a suite beside it: the
+ * penguin is still out of reach above the pad's top plane, and now in reach below it.
  */
 
 // --- the shipped bytes, read independently of the runtime loader -------------
@@ -129,6 +136,25 @@ function regionHas(r: (typeof UNDERSIDE_REGIONS)[number], i: number, p: number[]
 /** Does this vertex fall inside any convicted region? */
 const inRegion = (i: number, p: number[]): boolean =>
   UNDERSIDE_REGIONS.some((r) => regionHas(r, i, p))
+
+/**
+ * Where a region's honest colour is read from (T104). Four of the six hold their own lit family
+ * and answer with their own vertices; a figurine base is entirely crushed — it was inside the pad
+ * — and declares `albedoAbove`, which reads the same xz column from its ceiling up by that much.
+ * Both branches are the shipped bytes; neither is a number copied out of the source.
+ */
+function albedoSample(r: (typeof UNDERSIDE_REGIONS)[number]): number[][] {
+  if (r.albedoAbove === undefined)
+    return baked.pos.map((p, i) => ({ p, i })).filter(({ p, i }) => regionHas(r, i, p)).map(({ i }) => baked.col![i]!)
+  if (r.kind !== 'box') throw new Error(`${r.id}: albedoAbove needs a box to sit on top of`)
+  const out: number[][] = []
+  for (let i = 0; i < baked.pos.length; i++) {
+    const p = baked.pos[i]!
+    if (p[0]! < r.min[0] || p[0]! > r.max[0] || p[2]! < r.min[2] || p[2]! > r.max[2]) continue
+    if (p[1]! > r.max[1] && p[1]! <= r.max[1] + r.albedoAbove) out.push(baked.col![i]!)
+  }
+  return out
+}
 
 // --- the emitted GLSL ---------------------------------------------------------
 
@@ -244,7 +270,7 @@ describe('exactly one material is wired, and the diagnosis says which', () => {
   })
 })
 
-describe('the region table reaches the three the diagnosis convicted, and nothing else', () => {
+describe('the region table reaches the objects the diagnosis convicted, and nothing else', () => {
   it('selects each object the way its own motion selects it', () => {
     const byId = Object.fromEntries(UNDERSIDE_REGIONS.map((r) => [r.id, r]))
     expect(byId.plantLeaves).toMatchObject({ kind: 'range', range: PLANT.leaves })
@@ -266,31 +292,44 @@ describe('the region table reaches the three the diagnosis convicted, and nothin
               p[1]! >= r.min[1] && p[1]! <= r.max[1] &&
               p[2]! >= r.min[2] && p[2]! <= r.max[2]
         )
-      expect(inside.length, `${r.id} selects nothing`).toBeGreaterThan(100)
+      // 60, because the smallest region in the table is the bluebird's buried base at 97 vertices
+      // — the whole reason its black band is a thin one and the penguin's is the one Aram named.
+      expect(inside.length, `${r.id} selects nothing`).toBeGreaterThan(60)
       const crushed = inside.filter(({ i }) => lum(baked.col![i]!) < LIFT_BAND.lumLo).length
       expect(crushed / inside.length, `${r.id} has no crushed core`).toBeGreaterThan(0.02)
     }
   })
 
-  it('CANNOT reach the penguin, whose black is paint and not a hole', () => {
-    // 79% of the penguin's non-underside vertices — faces pointing at the key light — are under
-    // luminance 0.12. Any band tight enough to catch a crushed underside catches those, which is
-    // why the region and not the band is what scopes this family.
-    const zone = { min: [0.55, 1.23, 9.2], max: [1.11, 2.07, 9.79] }
-    let inZone = 0
-    let dark = 0
-    for (let i = 0; i < baked.pos.length; i++) {
-      const p = baked.pos[i]!
-      if (
-        p[0]! < zone.min[0] || p[0]! > zone.max[0] || p[1]! < zone.min[1] ||
-        p[1]! > zone.max[1] || p[2]! < zone.min[2] || p[2]! > zone.max[2]
-      ) continue
-      inZone++
-      if (lum(baked.col![i]!) < LIFT_BAND.lumLo) dark++
-      expect(inRegion(i, p), 'a penguin vertex is inside a lift region').toBe(false)
+  it('CANNOT reach a figurine vertex the pad does not hide — its black is paint (T104)', () => {
+    // T102 kept the penguin out of the table entirely, on the finding that its black is PAINT:
+    // 83% of the whole figurine is under luminance 0.12, so no band can separate a hole from a
+    // penguin, and a lift that reached its body would turn it grey mid-wobble. T104 adds only the
+    // part of it that is UNDERGROUND — sunk into the pad by the authoring slip and dug up by its
+    // own weeble. The original law therefore survives with a plane in it, and this is that plane:
+    // every vertex either figurine puts inside a lift region is below `DESK_PAD.top`, which is to
+    // say invisible while the desk is at rest, no matter what the ramp does.
+    for (const zone of DESK_NUDGE_ZONES.filter((z) => z.kind === 'bird' || z.kind === 'penguin')) {
+      let inZone = 0
+      let dark = 0
+      let lifted = 0
+      for (let i = 0; i < baked.pos.length; i++) {
+        const p = baked.pos[i]!
+        if (
+          p[0]! < zone.min[0] || p[0]! > zone.max[0] || p[1]! < zone.min[1] ||
+          p[1]! > zone.max[1] || p[2]! < zone.min[2] || p[2]! > zone.max[2]
+        ) continue
+        inZone++
+        if (lum(baked.col![i]!) < LIFT_BAND.lumLo) dark++
+        if (!inRegion(i, p)) continue
+        lifted++
+        expect(p[1]!, `${zone.kind} vertex ${i} is lifted where the pad does not hide it`)
+          .toBeLessThanOrEqual(DESK_PAD.top)
+      }
+      expect(inZone, `${zone.kind} zone is empty`).toBeGreaterThan(1000)
+      expect(dark / inZone, `${zone.kind} is not the painted-black family`).toBeGreaterThan(0.4)
+      expect(lifted, `${zone.kind} has no buried band to lift`).toBeGreaterThan(60)
+      expect(lifted / inZone, `${zone.kind}'s lift has spread past its base`).toBeLessThan(0.25)
     }
-    expect(inZone).toBeGreaterThan(1000)
-    expect(dark / inZone).toBeGreaterThan(0.5)
   })
 
   it('weights the tray floor by the driver that uncovers it, not by its own motion', () => {
@@ -343,7 +382,7 @@ describe('the region table reaches the three the diagnosis convicted, and nothin
     }
   })
 
-  it('the three regions do not overlap each other', () => {
+  it('the regions do not overlap each other', () => {
     const owners = new Map<number, string>()
     for (let i = 0; i < baked.pos.length; i++) {
       for (const r of UNDERSIDE_REGIONS) {
@@ -458,12 +497,7 @@ describe('the targets are the measured surfaces, scaled by one bounce', () => {
     // of colour and ignores a splice that moves a seat; the hue ratios below are the part the fix
     // actually depends on, so they are held tighter.
     for (const r of UNDERSIDE_REGIONS) {
-      const bright: number[][] = []
-      for (let i = 0; i < baked.pos.length; i++) {
-        if (!regionHas(r, i, baked.pos[i]!)) continue
-        const c = baked.col![i]!
-        if (lum(c) > 0.35) bright.push(c)
-      }
+      const bright = albedoSample(r).filter((c) => lum(c) > 0.35)
       expect(bright.length, `${r.id} has no bright family`).toBeGreaterThan(40)
       const mean = [0, 1, 2].map((k) => bright.reduce((a, c) => a + c[k]!, 0) / bright.length)
       for (const k of [0, 1, 2])
@@ -482,10 +516,9 @@ describe('the targets are the measured surfaces, scaled by one bounce', () => {
     for (const r of UNDERSIDE_REGIONS) {
       const t = UNDERSIDE_TARGETS[r.id]!
       const landing = Math.max(lum([...t.pad]), lum([...t.table])) * LIFT_K
-      const honest = baked.pos
-        .map((p, i) => ({ p, i }))
-        .filter(({ p, i }) => regionHas(r, i, p) && lum(baked.col![i]!) >= LIFT_BAND.lumHi)
-        .map(({ i }) => lum(baked.col![i]!))
+      const honest = albedoSample(r)
+        .map(lum)
+        .filter((v) => v >= LIFT_BAND.lumHi)
         .sort((a, b) => a - b)
       expect(honest.length, `${r.id} has no honest tone to compare against`).toBeGreaterThan(20)
       expect(honest[Math.floor(honest.length / 2)]!, `${r.id} would be outshone by its own lift`)
