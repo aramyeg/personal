@@ -252,9 +252,23 @@ export type SignWord = {
   /** screen-roll about the word's centre, radians — the hand-hung tilt from the look-dev. */
   roll: number
 }
+/**
+ * TASK 106 — both words moved 0.08 ndc FURTHER OUT, on Aram's "a little bit more displaced from
+ * the centre". That is 57.6 px per word at the money shot's own 1440.
+ *
+ * The complaint the number answers is an ASYMMETRY rather than a distance. `Create` is the wider
+ * word, so at T99's spacing its `C` stood 0.083 ndc from the globe's silhouette while `Lets` had
+ * 0.178 — better than twice the air on the left. The frame read as a globe with a word stuck to
+ * it and a word floating away from it. The sweep is in the report; 0.06 still crowds the C, 0.10
+ * starts trapping the outer tips against the frame edge under parallax, and 0.08 lands the tightest
+ * gap at 0.162 with the furthest tube point at |x| = 0.890 of the half-frame at the worst envelope
+ * corner. The delta is EQUAL on both sides deliberately: the two words are hand-hung (different
+ * rolls, different widths) and evening the gaps by moving one of them further would be tidying away
+ * the hand.
+ */
 export const SIGN_WORDS: readonly SignWord[] = [
-  { strokes: LETS_STROKES, ndcX: -0.55, roll: (-4 * Math.PI) / 180 },
-  { strokes: CREATE_STROKES, ndcX: 0.545, roll: (3 * Math.PI) / 180 },
+  { strokes: LETS_STROKES, ndcX: -0.63, roll: (-4 * Math.PI) / 180 },
+  { strokes: CREATE_STROKES, ndcX: 0.625, roll: (3 * Math.PI) / 180 },
 ]
 
 const TAN_HALF_FOV = Math.tan((CAMERA_FOV * Math.PI) / 360)
@@ -422,7 +436,7 @@ export const SIGN_WORLD_CEILING = 1.35 * WORLD_RADIUS
  *
  *   lights ≤ IGNITE:  exactly 0  (dark glass; the component unmounts its draws)
  *   strike window:    two authored pulses, then the hold ramp
- *   lights ≥ STEADY:  exactly 1  (the money shot is parked — nothing may crawl there)
+ *   lights ≥ STEADY:  exactly 1  (the ignition is over; the AMBIENT below owns the parked frame)
  *
  * Reduced motion takes the monotone ramp between the same endpoints: steady-on, no flicker,
  * same exact 0 and exact 1.
@@ -450,4 +464,103 @@ export function flickerAt(lights: number, reduced = false): number {
   const strike2 = 0.78 * pulse(u, 0.3, 0.46)
   const hold = smooth(0.52, 0.94, u)
   return Math.max(strike1, strike2, hold)
+}
+
+// --- the ambient flicker (Task 106) -----------------------------------------
+
+/**
+ * THE SECOND HALF OF THE FLICKER, AND WHY IT NEEDED A CLOCK AT ALL.
+ *
+ * `flickerAt` above is the IGNITION, and it is a pure function of scroll — two false starts and
+ * then the tube holds, replayed bit-identically by a scrub. That is the whole of what T99 built,
+ * and against the money shot it has one honest problem: once the visitor stops scrolling, the
+ * ignition is over and the sign is a decal. Aram asked for a sign that flickers, and a sign that
+ * only ever flickers while you are moving the page is a sign that flickers because you moved the
+ * page. Real neon dips when nobody is touching anything.
+ *
+ * So the ambient dip rides a WALL CLOCK, and it takes the shape of that permission from the one
+ * component that already holds it — the coffee steam (`desk-steam-field.ts`). This is deliberately
+ * the same three-part scoping rather than a new convention:
+ *
+ *  1. THE GATE IS THE STRIKE ENVELOPE. `neonClockAt` advances only while `flickerAt` is above 0,
+ *     which is exactly the interval the sign is drawn at all. Through the entire journey and the
+ *     whole still beat the envelope is a hard +0, so the accumulator does not merely go unused —
+ *     it does not move, and a visitor who reaches the ending after ten minutes sees the sign at
+ *     the same instant of its own life as one who gets there in ten seconds.
+ *  2. NOTHING STRUCTURAL READS IT. Visibility stays `envelope > 0`, and the envelope is pure
+ *     scroll. The clock reaches opacity and nothing else: not where the sign is, not whether it
+ *     exists, not the ignition. Scrub back and forth and the strike replays exactly as before.
+ *  3. REDUCED MOTION RETURNS EXACTLY 1. Not a shallow hum, not a slow one — steady on, both here
+ *     and in the ignition, so the sign under the preference is a photograph of a lit sign.
+ *
+ * WHAT CHANGES AT THE MONEY SHOT, stated plainly because the module used to promise the opposite.
+ * `flickerAt` still returns exactly 1 across the whole steady band and that promise is intact —
+ * but the sign's opacity is now that envelope TIMES this, so the parked frame is no longer
+ * bit-stable. It crawls, on purpose, in the same way and for the same reason the steam does. Any
+ * rest-identity gate over the ending must mask the sign exactly as it already masks the plume.
+ */
+
+/** The gas's constant unrest — deep enough to be alive, shallow enough that nobody can point at it. */
+export const NEON_HUM = 0.014
+
+/** The deepest a flutter may pull the sign down. A struck tube dips; it does not go out. */
+export const NEON_DIP = 0.3
+
+/** One flutter may happen per cell of this many seconds, and most cells stay quiet. */
+export const NEON_CELL = 2.3
+/** How long one flutter lasts. Short — this is a bad connection, not a signal. */
+export const NEON_FLUTTER = 0.36
+/** A cell fires when its noise falls below this, so roughly one flutter every five seconds. */
+export const NEON_ODDS = 0.45
+
+/**
+ * The halo's extra bite. A gas discharge losing current dims FASTER than the filament does, so
+ * the glow is the ambient factor raised past 1 while the tube takes it straight. At an ambient of
+ * exactly 1 this is exactly 1, which is what keeps the ignition's authored halo weights untouched.
+ */
+export const NEON_HALO_BITE = 1.35
+
+const frac = (x: number): number => x - Math.floor(x)
+/** Deterministic unit noise for a cell. Integer in, the same number out, forever. */
+const cellNoise = (cell: number, salt: number): number =>
+  frac(Math.sin(cell * 12.9898 + salt * 78.233) * 43758.5453)
+
+/**
+ * The clock the ambient dip runs on: a gated accumulator, exactly `steamClockAt`'s contract.
+ * Closed gate returns `prev` UNCHANGED — the clock does not run outside the lit interval.
+ */
+export function neonClockAt(prev: number, delta: number, envelope: number, reduced: boolean): number {
+  if (reduced) return 0
+  if (!(envelope > 0)) return prev
+  return prev + delta
+}
+
+/**
+ * The ambient multiplier at a point on that clock: 1 is the tube at full gas, and it never
+ * reaches 0. Two terms — a shallow hum that is always there, and an occasional flutter that is
+ * mostly not. Both are arithmetic over the clock, so the same instant always renders the same.
+ */
+export function neonAmbientAt(clock: number, reduced = false): number {
+  if (reduced) return 1
+
+  // Two incommensurate rates, so the unrest never settles into a beat the eye can follow.
+  const hum = NEON_HUM * (1 - Math.cos(clock * 5.31) * Math.cos(clock * 2.07)) * 0.5
+
+  // At most one flutter per cell, entirely CONTAINED in its cell (the start is drawn from the
+  // room left over after the flutter's own length), so one cell is all this has to look at.
+  const cell = Math.floor(clock / NEON_CELL)
+  let dip = 0
+  if (cellNoise(cell, 1) < NEON_ODDS) {
+    const start = cell * NEON_CELL + cellNoise(cell, 2) * (NEON_CELL - NEON_FLUTTER)
+    const u = (clock - start) / NEON_FLUTTER
+    if (u > 0 && u < 1) {
+      // Two or three sub-blinks under a sine envelope: the flutter has no edges at either end,
+      // and its depth is the cell's own so no two of them read as the same event.
+      const blinks = 2 + Math.floor(cellNoise(cell, 3) * 2)
+      const depth = NEON_DIP * (0.45 + 0.55 * cellNoise(cell, 4))
+      dip = depth * Math.sin(Math.PI * u) * (0.5 - 0.5 * Math.cos(u * blinks * 2 * Math.PI))
+    }
+  }
+
+  return (1 - hum) * (1 - dip)
 }

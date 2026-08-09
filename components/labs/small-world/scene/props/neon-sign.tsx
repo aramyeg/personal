@@ -7,12 +7,15 @@ import { studioLightsFor } from '../desk-studio'
 import {
   HALO_CANVAS_H,
   HALO_CANVAS_W,
+  NEON_HALO_BITE,
   SIGN_TUBE_R,
   SIGN_WORDS,
   flickerAt,
   haloFrame,
   haloPx,
   haloPy,
+  neonAmbientAt,
+  neonClockAt,
   signPointsWorld,
   wordPointsWorld,
 } from '../neon-sign'
@@ -182,18 +185,31 @@ export function NeonSign({ journeyRef }: { journeyRef: JourneyRef }) {
     }
   }, [tubeGeo, haloGeo, tubeMat, haloMat])
 
+  /**
+   * The ambient dip's accumulator (Task 106). It advances only while the strike envelope is above
+   * 0 — see `neonClockAt` and the scoping argument beside it in `scene/neon-sign.ts`. Held in a
+   * ref rather than in state because nothing renders from it: it reaches two material opacities.
+   */
+  const clock = useRef(0)
   // NaN so the mount frame always applies once; every dark frame after costs one compare.
   const last = useRef(Number.NaN)
-  useFrame(() => {
+  useFrame((_, delta) => {
     const g = group.current
     if (!g) return
     const lights = studioLightsFor(journeyRef.current.ending)
-    const v = flickerAt(lights, reduced)
+    const env = flickerAt(lights, reduced)
+    clock.current = neonClockAt(clock.current, delta, env, reduced)
+    const amb = neonAmbientAt(clock.current, reduced)
+    const v = env * amb
     if (v === last.current) return
     last.current = v
-    g.visible = v > 0
+    // VISIBILITY IS STILL THE ENVELOPE'S, not the product's: the ambient never reaches 0, so the
+    // containment argument ("dark exactly where the studio lights are dark") is untouched by it.
+    g.visible = env > 0
     tubeMat.opacity = v
-    haloMat.opacity = v * HALO_MAX
+    // The glow takes the ambient with extra bite and the ignition straight, so the strike's
+    // authored halo weights are the same numbers they were before the dip existed.
+    haloMat.opacity = env * Math.pow(amb, NEON_HALO_BITE) * HALO_MAX
   })
 
   return (

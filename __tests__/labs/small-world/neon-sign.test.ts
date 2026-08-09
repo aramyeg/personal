@@ -24,6 +24,9 @@ import {
   HALO_CANVAS_H,
   HALO_CANVAS_W,
   LETS_STROKES,
+  NEON_DIP,
+  NEON_HALO_BITE,
+  NEON_HUM,
   SIGN_IGNITE_AT,
   SIGN_STEADY_AT,
   SIGN_TUBE_R,
@@ -36,6 +39,8 @@ import {
   haloPx,
   haloPy,
   letsCapHeight,
+  neonAmbientAt,
+  neonClockAt,
   sampleStroke,
   signMinReachFromOrigin,
   signPointsWorld,
@@ -147,6 +152,64 @@ describe('the strike envelope (containment by light)', () => {
       expect(flickerAt(l)).toBe(flickerAt(l))
       expect(Object.is(flickerAt(l), flickerAt(l))).toBe(true)
     }
+  })
+})
+
+/**
+ * TASK 106 — the ambient flicker. `flickerAt` above is untouched and still exactly 1 across the
+ * steady band; what is new is the multiplier the component applies on top of it, and the clock it
+ * runs on. The laws here are the ones that keep a wall clock inside the ending: it does not run
+ * while the sign is dark, it cannot put the sign out, and the preference switches it off.
+ */
+describe('the ambient flicker (Task 106)', () => {
+  it('the clock does not advance while the sign is dark — the whole journey costs it nothing', () => {
+    let t = 0
+    for (let i = 0; i <= 400; i++) {
+      const progress = (i / 400) * (1 + ZOOM_START * ENDING_SPAN)
+      const env = flickerAt(studioLightsFor(endingStateAt(progress)))
+      t = neonClockAt(t, 1 / 60, env, false)
+    }
+    expect(t).toBe(0)
+    // and it holds whatever it had rather than resetting, exactly as the steam's does
+    expect(neonClockAt(7.25, 1 / 60, 0, false)).toBe(7.25)
+    expect(neonClockAt(7.25, 1 / 60, 0.4, false)).toBeGreaterThan(7.25)
+  })
+
+  it('reduced motion is steady on — no hum, no dip, at any point of the clock', () => {
+    expect(neonClockAt(9, 1 / 60, 1, true)).toBe(0)
+    for (let i = 0; i <= 200; i++) expect(neonAmbientAt(i * 0.37, true)).toBe(1)
+  })
+
+  it('a struck tube dips but never goes out, and never overdrives', () => {
+    for (let i = 0; i <= 60000; i++) {
+      const v = neonAmbientAt(i * 0.002)
+      expect(v).toBeLessThanOrEqual(1)
+      expect(v).toBeGreaterThan(1 - NEON_HUM - NEON_DIP)
+    }
+  })
+
+  it('is occasional rather than a strobe — mostly steady, with real dips in it', () => {
+    const N = 60000
+    let steady = 0
+    let deep = 0
+    for (let i = 0; i <= N; i++) {
+      const v = neonAmbientAt(i * 0.002)
+      if (v > 0.97) steady++
+      if (v < 0.85) deep++
+    }
+    expect(steady / N).toBeGreaterThan(0.8) // the sign is a lit sign, not a broken one
+    expect(deep).toBeGreaterThan(0) // and it really does dip
+  })
+
+  it('is deterministic — the same instant replays bit-identically', () => {
+    for (let i = 0; i <= 500; i++) {
+      const t = i * 0.041
+      expect(Object.is(neonAmbientAt(t), neonAmbientAt(t))).toBe(true)
+    }
+  })
+
+  it('the halo bite leaves the ignition alone: at full gas it is exactly 1', () => {
+    expect(Math.pow(neonAmbientAt(0, true), NEON_HALO_BITE)).toBe(1)
   })
 })
 
