@@ -3,7 +3,7 @@ import type { MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { journeyStateAt, type JourneyState } from '../journey-timeline'
-import { burstFromLatch, stepBurstLatch, type ArrivalState, type BurstLatch } from '../arrival'
+import { JUMP_MAX, burstFromLatch, stepBurstLatch, type ArrivalState, type BurstLatch } from '../arrival'
 
 export type JourneyRef = MutableRefObject<JourneyState>
 
@@ -40,6 +40,8 @@ export function useDampedJourney(
   arrivalRef?: MutableRefObject<ArrivalState>
 ): JourneyRef {
   const damped = useRef(progressRef.current)
+  /** Last frame's TARGET, so a teleport can be told from a scroll — see the note in the loop. */
+  const lastTarget = useRef(progressRef.current)
   const morphScratch = useRef<number[]>([])
   const burstLatch = useRef<BurstLatch>(null)
   const journeyRef = useRef<JourneyState>(
@@ -50,7 +52,27 @@ export function useDampedJourney(
   }
 
   useFrame((_, delta) => {
-    damped.current = THREE.MathUtils.damp(damped.current, progressRef.current, DAMP_LAMBDA, delta)
+    /**
+     * A TELEPORT IS NOT SMOOTHED (Task 106), which is a rule this file was already downstream of
+     * rather than a new one. `stepArrival` honours a one-frame jump exactly — "smoothing a
+     * teleport would fight the input and would be the one case that turns a scroll into a long
+     * automatic ride" — and then handed the jumped value to a damper that did precisely that.
+     * At lambda 4 a jump across the whole track takes about 2.4 s to converge, so a scrollbar
+     * drag, an End key, or Task 106's restart all glided the scene through every intervening
+     * biome afterwards. Measured on the restart: the page landed at scroll 0 in ONE frame and the
+     * world was still crossing the desert two thirds of a second later.
+     *
+     * The discriminator is the arrival machine's own ceiling, imported rather than restated: a
+     * target that moves more than a whole chapter between two frames is not a hand on a page.
+     * A fast fling is nowhere near it (a 8 000 px/s fling moves 0.011 of the track in a frame),
+     * so the smoothing every other input relies on is untouched.
+     */
+    const target = progressRef.current
+    const teleported = Math.abs(target - lastTarget.current) > JUMP_MAX
+    lastTarget.current = target
+    damped.current = teleported
+      ? target
+      : THREE.MathUtils.damp(damped.current, target, DAMP_LAMBDA, delta)
     const reveal = arrivalRef?.current.reveal ?? null
     burstLatch.current = stepBurstLatch(burstLatch.current, reveal, damped.current, delta)
     journeyRef.current = journeyStateAt(

@@ -10,6 +10,7 @@ import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
+import { useRestartVeil } from './restart-veil'
 import { advanceTargetFrom } from '../story-stops'
 import { useJourneyUi } from './use-journey-ui'
 
@@ -41,6 +42,14 @@ export function JourneyOverlay({
    */
   const [cvOpen, setCvOpen] = useState(false)
   useEffect(() => setCvOpener(() => setCvOpen(true)), [])
+  /**
+   * THE RESTART NO LONGER SCROLLS THE VISITOR BACKWARDS (Task 106). It used to be `onAdvance(0)`,
+   * i.e. the panels' own smooth-scroll aimed at the top of a 1680 vh track — measured, that is
+   * six authored worlds on screen for three frames apiece. `restart-transition.ts` carries the
+   * measurement and the replacement; all this file needs to know is that the ending's restart and
+   * the panels' tap-to-advance are no longer the same gesture and no longer share a handler.
+   */
+  const { veil, restart } = useRestartVeil()
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
@@ -116,13 +125,16 @@ export function JourneyOverlay({
               again, with the connect note the only thing that hangs here.
               `EndingConnect` never keyed off the page — it runs on `ui.ending.t`
               directly — so removing it leaves no hole to close. */}
-          <EndingConnect t={ui.ending.t} onRestart={() => onAdvance(0)} />
+          <EndingConnect t={ui.ending.t} onRestart={restart} />
         </div>
       )}
       {/* The rail reads RAW scroll: it is the "your input registered" affordance, so it must
           keep creeping even while an arrival absorbs the journey's own progress (Task 54). */}
       {SHOW_PROGRESS_RAIL && <JourneyProgress progressRef={journey?.rawProgressRef ?? progressRef} />}
       {cvOpen && <CvOverlay onClose={() => setCvOpen(false)} />}
+      {/* LAST, so it covers everything this tree draws — including the CV lightbox, which is the
+          only thing here that outranks the ending. Mounted only while the gesture runs. */}
+      {veil}
     </div>
   )
 }

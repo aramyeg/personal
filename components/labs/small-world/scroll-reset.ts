@@ -37,18 +37,50 @@ export function beginManualScrollRestoration(): () => void {
   }
 }
 
-/** Jump the document to the top INSTANTLY, bypassing the global
- *  `scroll-behavior: smooth` (otherwise the reset would animate as a visible
- *  "snap back" from the restored position). */
+/**
+ * Jump the document to the top INSTANTLY, bypassing the global
+ * `scroll-behavior: smooth` (otherwise the reset would animate as a visible
+ * "snap back" from the restored position).
+ *
+ * ── IT DID NOT BYPASS ANYTHING, AND FOR THREE ROUNDS NOBODY COULD TELL (Task 106) ────────────
+ *
+ * The old body set `documentElement.style.scrollBehavior = 'auto'`, called `scrollTo`, and put
+ * the previous value back — all in one synchronous block. That does not work in Chrome. The
+ * assignment only marks style dirty; `scrollTo` reads the CACHED computed `scroll-behavior`, so
+ * it still saw `smooth` from `app/globals.css`, and the restore meant a recalculation with
+ * `auto` in place never happened at all. Measured on the shipped build from the bottom of the
+ * track: the "instant" pin animated 14 220 px over 90 frames and 1 529 ms.
+ *
+ * It survived because the only caller was the mount pin, and on a fresh load the page is
+ * ALREADY at 0 — a no-op cannot animate. Task 106's restart is the first caller that runs it
+ * from a deep scroll, and it inherited exactly the clanky rewind the restart exists to remove.
+ *
+ * The fix is belt and braces because the two halves cover different engines. `behavior:
+ * 'instant'` is the spec's own override of the CSS property and needs no style mutation; it is
+ * also newer than the style trick, and an engine that does not know the enum value throws, which
+ * is what the fallback is for. Reading `offsetHeight` between the assignment and the scroll is
+ * what makes the style route actually take — a forced layout is a forced style recalculation.
+ * All three variants were measured against the shipped one (see the report); the shipped one is
+ * the only one that animates.
+ */
 export function pinScrollToTop(): void {
   if (typeof window === 'undefined') return
   const el = typeof document !== 'undefined' ? document.documentElement : null
   const prevBehavior = el?.style.scrollBehavior
-  if (el) el.style.scrollBehavior = 'auto'
+  if (el) {
+    el.style.scrollBehavior = 'auto'
+    // Force the recalculation the assignment above only asked for.
+    void el.offsetHeight
+  }
   try {
-    window.scrollTo(0, 0)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   } catch {
-    // ignore — best-effort
+    // Older engines reject the enum value; the style route above is already in force.
+    try {
+      window.scrollTo(0, 0)
+    } catch {
+      // ignore — best-effort
+    }
   }
   if (el && prevBehavior !== undefined) el.style.scrollBehavior = prevBehavior
 }
