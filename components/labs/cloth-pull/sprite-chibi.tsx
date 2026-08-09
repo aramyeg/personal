@@ -40,6 +40,24 @@ const STRIDE_S = 0.85
 const WALK_STEPS = 8
 /** synthetic bob (the drawn sizes were too noisy to keep the baked bob) */
 const BOB_FRAC = 0.013
+/**
+ * Follow time for the fist anchor, seconds.
+ *
+ * The frames sample a continuous hand path 8 times a stride; the drawn anchor
+ * therefore JUMPS 20-30px at every frame change, and the strings are pinned to
+ * it. A verlet chain reads a teleported pin as tension: the segments are 18px
+ * long and the effort curve saturates at 6% segment stretch, so the walk cycle
+ * was heaving on the cloth once per drawn frame — measured effort never fell
+ * below 0.45 at cruise and she spent 41% of a quiet walk in a strain pose.
+ * Following the anchor over ~3 frames restores the in-betweens the sprite
+ * sheet cannot draw. Only the group-LOCAL offset is followed; her stage x is
+ * fed through untouched, so the strings never lag her walk-in.
+ */
+const FIST_TAU = 0.05
+/** a drawn pose has to hold long enough to be read as a pose. Below this the
+ * strain gate chattered against the walk at ~5 Hz whenever effort hovered on
+ * its threshold, which is what read as "the cycle is broken". */
+const STRAIN_DWELL_S = 0.22
 
 export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
   function SpriteChibi({ position, heightPx, reduced, onReady }, ref) {
@@ -62,9 +80,19 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
     }, [])
 
     const state = useRef({
+      /** walk-stride phase; advances in EVERY pose so the cycle is continuous
+       * across a strain or a stop instead of resuming on a frozen foot */
       phase: 0,
+      /** hold-pose breathing, its own clock (it used to share `phase` and
+       * scrambled the stride every time she stood still) */
+      breath: 0,
       frame: -1,
+      /** the follower has to start ON the anchor, not at the origin */
+      fistSeeded: false,
       strainLevel: 0,
+      /** latched strain gate + seconds since it last flipped */
+      strained: false,
+      sinceSwitch: STRAIN_DWELL_S,
       fist: new THREE.Vector3(),
     })
 
@@ -77,9 +105,16 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
     }, [announcedReady, onReady])
 
     const applyFrame = useMemo(() => {
-      const px = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.h
-      const pw = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.w
-      return (idx: number, bob: number) => {
+      // worldScale reconciles the pose groups — without it the strain frames
+      // draw 15.7% smaller than the walk (see sprite-worldscale.mjs)
+      const k = (f: SpriteFrame) => (heightPx / SPRITE_STAND_H) * f.worldScale
+      const px = (f: SpriteFrame) => k(f) * f.h
+      const pw = (f: SpriteFrame) => k(f) * f.w
+      // heightPx changed (a resize): the cached frame index would skip the
+      // scale write and leave her at the old viewport's size
+      state.current.frame = -1
+      state.current.fistSeeded = false
+      return (idx: number, bob: number, dt: number) => {
         const st = state.current
         const f = SPRITE_FRAMES[idx]
         const m = mesh.current
@@ -97,10 +132,22 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
         }
         // feet line at the group origin; frame centered horizontally
         m.position.set(position[0], position[1] + px(f) / 2 + bob, position[2])
-        // fist anchor in GROUP-LOCAL px (getFist lifts it to world space)
+        // fist anchor in GROUP-LOCAL px (getFist lifts it to world space),
+        // followed rather than snapped — see FIST_TAU
         const ax = position[0] + (f.anchorX / f.w - 0.5) * pw(f)
         const ay = position[1] + px(f) - (f.anchorY / f.h) * px(f) + bob
-        state.current.fist.set(ax, ay, position[2] + 6)
+        const fist = state.current.fist
+        if (!state.current.fistSeeded) {
+          state.current.fistSeeded = true
+          fist.set(ax, ay, position[2] + 6)
+          return
+        }
+        const a = 1 - Math.exp(-Math.max(0, dt) / FIST_TAU)
+        fist.set(
+          fist.x + (ax - fist.x) * a,
+          fist.y + (ay - fist.y) * a,
+          position[2] + 6
+        )
       }
     }, [textures, depthMaterial, heightPx, position])
 
@@ -114,6 +161,11 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
         frame(dt: number, effort: number, speedN: number) {
           const st = state.current
 
+          // the stride clock runs in every pose, so leaving a strain or a
+          // stop re-enters the walk where the cycle had got to
+          st.phase += (dt * Math.max(0.25, speedN)) / STRIDE_S
+          st.sinceSwitch += dt
+
           // strain selection with hysteresis
           const target =
             effort < 0.28 ? 0 : effort < 0.6 ? 1 : effort < 0.95 ? 2 : 3
@@ -123,22 +175,43 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
             if (effort < backEdge) st.strainLevel = target
           }
 
-          // strain frames only when she is genuinely stopped by a pull —
-          // transient effort spikes at cruise must not pop the strain face
-          if (!reduced && st.strainLevel > 0 && speedN < 0.45 && effort > 0.4) {
-            applyFrame(SPRITE_STRAIN_I0 + (st.strainLevel - 1), 0)
+          // Strain frames only when she is genuinely stopped by a pull.
+          //
+          // The old gate (effort > 0.4, speedN < 0.45) sat on a knife edge:
+          // towing the cloth loads her permanently, so a quiet walk measures
+          // effort ~0.7 and speedN ~0.64 on the page and only the speed term
+          // held the strain face back. Any nudge crossed it. Measured on the
+          // production build: a quiet walk never drops below speedN 0.35, a
+          // real backward haul pins her at speedN 0 and effort 1.2 — so the
+          // gate belongs between those, not between cruise and cruise.
+          // Hysteretic (harder to start heaving than to keep heaving) and
+          // held for STRAIN_DWELL_S so a wobble cannot flicker it.
+          const wants =
+            !reduced &&
+            st.strainLevel > 0 &&
+            (st.strained
+              ? effort > 0.5 && speedN < 0.45
+              : effort > 0.8 && speedN < 0.3)
+          if (wants !== st.strained && st.sinceSwitch >= STRAIN_DWELL_S) {
+            st.strained = wants
+            st.sinceSwitch = 0
+          }
+
+          if (st.strained) {
+            // the level can relax to 0 inside the dwell; keep her on the
+            // gentlest strain frame rather than indexing off the group
+            applyFrame(SPRITE_STRAIN_I0 + Math.max(1, st.strainLevel) - 1, 0, dt)
             return
           }
           if (reduced || speedN < 0.06) {
             // one drawn hold pose, breathed rather than cross-faded
-            st.phase += dt * 0.45
+            st.breath += dt * 0.45
             const breathe =
-              Math.sin(st.phase * Math.PI * 2) * heightPx * 0.004
-            applyFrame(SPRITE_HOLD_I0, breathe)
+              Math.sin(st.breath * Math.PI * 2) * heightPx * 0.004
+            applyFrame(SPRITE_HOLD_I0, breathe, dt)
             return
           }
 
-          st.phase += (dt * Math.max(0.25, speedN)) / STRIDE_S
           const walkIdx =
             Math.floor((st.phase % 1) * WALK_STEPS) % SPRITE_WALK.length
           const bob =
@@ -146,7 +219,7 @@ export const SpriteChibi = forwardRef<ChibiHandle, ChibiProps>(
             heightPx *
             BOB_FRAC *
             Math.min(1, speedN + 0.3)
-          applyFrame(walkIdx, bob)
+          applyFrame(walkIdx, bob, dt)
         },
         getFist(out: THREE.Vector3) {
           out.copy(state.current.fist)

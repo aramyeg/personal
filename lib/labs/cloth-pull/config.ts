@@ -116,8 +116,10 @@ export const CFG = {
     stretchRef: 0.06,
     /** effort from speed deficit under cruise */
     deficitGain: 0.6,
-    /** max pointer pull distance from the grab point, px */
-    grabRange: 520,
+    /** how close to the drawn cloth a pointerdown must land to grab it, px.
+     * Was `grabRange`, declared and never wired: every pointerdown grabbed,
+     * anywhere on the stage, including on the chibi herself. */
+    grabPick: 36,
   },
 
   chibi: {

@@ -50,6 +50,23 @@ describe('cloth-pull sprite manifest', () => {
     }
   })
 
+  /* The law this asserts is scale continuity: the runtime draws every frame
+   * with one formula, so her on-screen size may only change when the ART
+   * changes, never because she switched pose group. Registration matches head
+   * width WITHIN a group; nothing reconciled the groups, and she shrank 15.7%
+   * the moment she started heaving. The measured landmark travels in the
+   * manifest so the invariant can be re-derived here rather than eyeballed. */
+  it('draws every pose group at one world scale', () => {
+    const onScreen = SPRITE_FRAMES.map((f) => f.headW * f.worldScale)
+    const ref = onScreen[0]
+    for (let i = 0; i < SPRITE_FRAMES.length; i++) {
+      expect(
+        Math.abs(onScreen[i] / ref - 1),
+        `${SPRITE_FRAMES[i].name} head width is ${((onScreen[i] / ref - 1) * 100).toFixed(1)}% off the reference`
+      ).toBeLessThan(0.02)
+    }
+  })
+
   it('keeps every fist anchor inside its own frame', () => {
     for (const f of SPRITE_FRAMES) {
       expect(f.anchorX, f.name).toBeGreaterThanOrEqual(0)

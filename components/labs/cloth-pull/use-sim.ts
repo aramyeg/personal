@@ -15,7 +15,7 @@ import {
   createChain,
   fistStretch,
   grabChain,
-  nearestHemIndex,
+  indexAtLength,
   releaseChain,
   setFist,
   stepChain,
@@ -105,11 +105,39 @@ export function createSimWorld(
   }
 }
 
-/** Route a pointer-down to a cloth grab. Returns true if something grabbed. */
+/**
+ * Route a pointer-down to a cloth grab. Returns true if something grabbed.
+ *
+ * The pick is against the DRAWN cloth — the posed banner vertices — not
+ * against the hem chain, because the cloth is what the visitor sees and aims
+ * at. The hem line alone is a bad proxy: it runs above the banner, so a pick
+ * radius wide enough to reach the cloth's bottom edge also swallowed clicks on
+ * the chibi (measured 158px from her torso to the nearest hem point) and on
+ * empty sky. That is what made a click on HER heave the cloth.
+ */
 export function tryGrab(world: SimWorld, x: number, y: number): boolean {
-  const idx = nearestHemIndex(world.chain, x, y)
-  if (idx < 0) return false
-  grabChain(world.chain, idx)
+  const nx = world.dims.segX + 1
+  const ny = world.dims.segY + 1
+  const sim = world.bannerSim
+  let bestD: number = CFG.motion.grabPick
+  let bestU = -1
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const o = (j * nx + i) * 3
+      const d = Math.hypot(sim[o] - x, sim[o + 1] - y)
+      if (d < bestD) {
+        bestD = d
+        bestU = i / world.dims.segX
+      }
+    }
+  }
+  if (bestU < 0) return false
+  // the hem point above the picked column: the cloth hangs off the chain there
+  const idx = indexAtLength(
+    world.chain,
+    world.chain.stringLen + bestU * world.dims.width
+  )
+  grabChain(world.chain, idx, x, y)
   return true
 }
 

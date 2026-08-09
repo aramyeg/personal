@@ -43,6 +43,12 @@ export interface Chain {
   droopPx: number
   /** index of the currently grabbed point, or -1 */
   grabIndex: number
+  /** grabbed point minus the pointer at grab time, px. The pin follows the
+   * pointer THROUGH this offset, so taking hold displaces nothing: a click
+   * that teleported the point to the cursor injected a tension spike the
+   * chibi read as a heave (measured stretch 1.4 against a 0.06 reference). */
+  grabDX: number
+  grabDY: number
 }
 
 export interface ChainStepEnv {
@@ -84,6 +90,8 @@ export function createChain(opts: {
     length,
     droopPx,
     grabIndex: -1,
+    grabDX: 0,
+    grabDY: 0,
   }
   rebuildArcTable(chain)
   return chain
@@ -168,12 +176,39 @@ export function nearestHemIndex(chain: Chain, x: number, y: number): number {
   return best
 }
 
-export function grabChain(chain: Chain, index: number): void {
-  chain.grabIndex = Math.max(1, Math.min(chain.n - 1, index))
+/** Index of the chain point at s px along the chain. */
+export function indexAtLength(chain: Chain, s: number): number {
+  const { cum, n } = chain
+  let best = 1
+  let bestD = Infinity
+  for (let i = 1; i < n; i++) {
+    const d = Math.abs(cum[i] - s)
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  }
+  return best
+}
+
+/** Take hold of a point. Pass the pointer position to hold it where it is
+ * rather than snapping it to the cursor. */
+export function grabChain(
+  chain: Chain,
+  index: number,
+  pointerX?: number,
+  pointerY?: number
+): void {
+  const i = Math.max(1, Math.min(chain.n - 1, index))
+  chain.grabIndex = i
+  chain.grabDX = pointerX === undefined ? 0 : chain.pts[i].x - pointerX
+  chain.grabDY = pointerY === undefined ? 0 : chain.pts[i].y - pointerY
 }
 
 export function releaseChain(chain: Chain): void {
   chain.grabIndex = -1
+  chain.grabDX = 0
+  chain.grabDY = 0
 }
 
 /** Mean stretch of the leading segments — the tension the chibi feels. */
@@ -211,8 +246,8 @@ export function stepChain(chain: Chain, dt: number, env: ChainStepEnv): void {
       // pointer pin: keep last displacement so release inherits velocity
       q.px = q.x
       q.py = q.y
-      q.x = env.grabX
-      q.y = env.grabY
+      q.x = env.grabX + chain.grabDX
+      q.y = env.grabY + chain.grabDY
       q.fx = 0
       q.fy = 0
       continue
