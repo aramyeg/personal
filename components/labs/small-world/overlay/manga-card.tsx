@@ -1,7 +1,6 @@
 'use client'
 import { mangaPageFor } from '../manga'
 import { mangaPageSrc, type MangaPage } from '../manga/types'
-import { usePrefersReducedMotion } from '../scene/use-reduced-motion'
 import { BookLeaf } from './book-leaf'
 import { MangaPageArt } from './manga-page'
 
@@ -52,8 +51,6 @@ export function MangaCard({
   enter: number
   onExpand: () => void
 }) {
-  const reduced = usePrefersReducedMotion()
-
   return (
     <BookLeaf
       side="left"
@@ -65,23 +62,14 @@ export function MangaCard({
       // the reader were counting from zero.
       ariaLabel={`Open chapter ${chapterNumber}'s comic page full size`}
     >
-      {/* The page starts inking once the leaf is most of the way in, so the
-          frames land on a page that has stopped moving.
-
-          NO PANEL ON BOTH LEAVES. The info page beside this one opens on a panel
-          of this very page (`DONATED_PANEL`), so the story leaf leaves it out and
-          re-pastes the remainder. `chapterNumber` counts from one, the spec's
-          index from zero — the whole reason that subtraction is spelled out here
-          rather than hidden behind another helper.
-
-          THE LIGHTBOX IS DELIBERATELY NOT GIVEN THIS. Opened full size the page
-          is the artefact itself and prints complete; the spread avoids the
-          duplication, the artefact does not pretend the panel was never drawn. */}
-      <MangaPageArt
-        page={page}
-        running={enter > 0.55}
-        instant={reduced}
-      />
+      {/* The page is COMPLETE ON ITS FIRST FRAME (T111). It used to be handed a
+          `running` flag off this leaf's own entrance — released at enter > 0.55 —
+          which started a 2.6s reveal of panels and typing inside a card that was
+          still sliding in. Aram asked for the pages preloaded, so the leaf now
+          animates and the page it carries does not. The clock is deleted, not
+          disabled, which is also what closes the T109 ticket about that flag
+          resetting the reveal to blank whenever `enter` wobbled back under 0.55. */}
+      <MangaPageArt page={page} />
     </BookLeaf>
   )
 }

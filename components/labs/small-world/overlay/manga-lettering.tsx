@@ -18,46 +18,14 @@ import { PALETTE } from '../palette'
  */
 
 /**
- * Trailing block cursor while a line is still arriving.
- *
- * THE CURSOR IS OUT OF FLOW, and that is a bug fix, not a flourish (T93). In flow it
- * has an advance width, so a typed prefix that lands near the end of a line measures
- * WIDER than the same words will once the cursor is gone — and the browser wraps the
- * last word to the next line for exactly as long as the cursor stands after it, then
- * snaps it back. Measured frame-by-frame on a settled card (probe under
- * scratchpad/t93/b-evidence): chapter 6's balloon held 3 lines through the whole
- * typing run, jumped to 4 on the final character (cursor still mounted), and reset
- * to 3 one frame later when the cursor unmounted — Aram's "flickering to the next
- * line then resetting", frame-exact, with the webfont long since loaded.
- *
- * `position: absolute` removes the cursor from inline layout entirely: it
- * contributes no width, so the prefix wraps exactly as the finished text will, and
- * its static position still paints it right where the next glyph would go. At a
- * line's very edge it may overhang the ink by a fraction of an em for a beat, which
- * is what a caret does — a whole word diving to the next line and back is not.
- */
-function Typed({ text, shown }: { text: string; shown: number }) {
-  const done = shown >= text.length
-  return (
-    <>
-      {text.slice(0, shown)}
-      {!done && shown > 0 ? (
-        <span aria-hidden style={{ position: 'absolute', opacity: 0.45 }}>
-          ▍
-        </span>
-      ) : null}
-    </>
-  )
-}
-
-/**
  * A balloon the ART does not contain, drawn in its style.
  *
  * Two of the pack's lines came back with no balloon at all (page-1's big panel,
  * page-4's foundation panel). Rather than drop those lines or letter them onto
  * bare art, the site draws the balloon: an ellipse in the same weight of ink as
- * the printed ones, with a tail toward the speaker — a cloud scallop with two
- * trailing bubbles for a thought, a straight spike for speech.
+ * the printed ones, and — when the manifest gives it one — a tail toward the
+ * speaker: a cloud scallop with two trailing bubbles for a thought, a straight
+ * spike for speech.
  *
  * The shape is drawn in the page's own coordinate space and stretched with it,
  * which is what keeps the balloon registered to the head its tail points at.
@@ -84,12 +52,14 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
   const ry = Y(box.h / 2) * MARGIN
   const cx = X(at.x)
   const cy = Y(at.y)
-  const tail = { x: X(drawn.tail.x), y: Y(drawn.tail.y) }
+  // No `tail` in the manifest = a tail-less balloon: the ellipse alone, and no
+  // spike or scallop drawn at all (see the `drawn` contract in manga/types.ts).
+  const tail = drawn.tail ? { x: X(drawn.tail.x), y: Y(drawn.tail.y) } : null
 
   // Where the tail leaves the balloon: the point on the ellipse toward the
   // speaker, found by normalising the direction in the ellipse's own units.
-  const dx = tail.x - cx
-  const dy = tail.y - cy
+  const dx = tail ? tail.x - cx : 0
+  const dy = tail ? tail.y - cy : 0
   const k = 1 / (Math.hypot(dx / rx, dy / ry) || 1)
   const edge = { x: cx + k * dx, y: cy + k * dy }
 
@@ -102,7 +72,7 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     >
       <g>
-        {voice === 'thought' ? (
+        {tail === null ? null : voice === 'thought' ? (
           <>
             {/* two trailing bubbles, shrinking toward the thinker */}
             <ellipse
@@ -142,15 +112,7 @@ function DrawnBalloon({ balloon, aspect }: { balloon: Balloon; aspect: number })
 }
 
 /** One balloon's lettering (and, for the two the art lacks, the balloon too). */
-export function BalloonText({
-  balloon,
-  page,
-  shown,
-}: {
-  balloon: Balloon
-  page: MangaPage
-  shown: number
-}) {
+export function BalloonText({ balloon, page }: { balloon: Balloon; page: MangaPage }) {
   const aspect = pageAspect(page)
   const font = balloonFontCqw(balloon, page)
   const style: CSSProperties = {
@@ -176,8 +138,8 @@ export function BalloonText({
     fontSize: `${font}cqw`,
     lineHeight: LINE_STEP,
     color: PALETTE.ink,
-    // Hyphenation would break a typing animation's rhythm; balloons are sized
-    // from the same estimate the browser is wrapping against, so leave it off.
+    // Balloons are sized from the same estimate the browser is wrapping against,
+    // so a hyphenated break would fall somewhere the fit never accounted for.
     hyphens: 'none',
     pointerEvents: 'none',
   }
@@ -185,9 +147,7 @@ export function BalloonText({
     <>
       {balloon.drawn ? <DrawnBalloon balloon={balloon} aspect={aspect} /> : null}
       <span data-sw-text="balloon" style={style}>
-        <span>
-          <Typed text={balloon.text} shown={shown} />
-        </span>
+        <span>{balloon.text}</span>
       </span>
     </>
   )
@@ -199,7 +159,7 @@ export function BalloonText({
  * the three places the pink is allowed on a page (trim, stamp ink, caption
  * rule), and never baked into the artwork.
  */
-export function CaptionBox({ caption, shown }: { caption: Caption; shown: number }) {
+export function CaptionBox({ caption }: { caption: Caption }) {
   // Sized from the line's LENGTH rather than from its box: unlike a balloon,
   // this box has no ceiling — it is drawn by the site, so a long caption simply
   // makes it taller instead of having to fit inside someone else's ink. That is
@@ -231,7 +191,7 @@ export function CaptionBox({ caption, shown }: { caption: Caption; shown: number
   }
   return (
     <span data-sw-text="caption" className="sw-manga-caption" style={style as CSSProperties}>
-      <Typed text={caption.text} shown={shown} />
+      {caption.text}
     </span>
   )
 }

@@ -138,6 +138,84 @@ export function resolveForwardGear(speedMag: number, prev: number): number {
   return 0
 }
 
+/**
+ * A GEAR IS CHOSEN ON THE GAIT'S OWN TIMESCALE, NOT THE FRAME'S (T111).
+ *
+ * Aram: "the girl always skips and it isn't based on the scroll speed." The
+ * thresholds above were not the fault, and neither was the signal: instrumented
+ * on the shipped build with real wheel input, `resolveForwardGear` was already
+ * naming walk 93% of a slow read-through and run 79% of a fling. What it was NOT
+ * doing was naming them for long enough to be seen.
+ *
+ * The per-frame surface speed is a 17ms quantity, and the journey's own shape
+ * cycles it several times a second (a chapter ramps out of its checkpoint, runs,
+ * then slows into the next). Measured over the live traces the driven clip
+ * changed 2.7 times a second on a steady browse and 8.4 on a fling, and 54-89% of
+ * those runs were SHORTER THAN THE MIXER'S CROSSFADE. A clip that is faded in
+ * over 0.25s, reset to time 0 as it enters, and faded out again 80ms later is
+ * never a gait — it is a smear. And because the gear index moves one step at a
+ * time, every walk↔run traverse drops a skip fragment into that smear, which is
+ * exactly why the answer to every input looked like the skip.
+ *
+ * So the chooser reads an EXPONENTIAL AVERAGE of the speed instead of the frame's
+ * own value, and a gear it enters keeps the mixer for a minimum hold. The cadence
+ * is untouched and still rides the instantaneous speed — the clip is picked by
+ * what the reader is doing, the rate is trimmed by what they are doing right now.
+ *
+ * Both numbers are derived from the crossfade rather than felt:
+ *  - GEAR_TAU_SECONDS 0.35 ≥ CROSSFADE 0.25, so the signal cannot demand a gait
+ *    faster than the mixer can show one. On the measured grid (0.25/0.30/0.35/
+ *    0.40) it is the smallest tau at which a slow read-through is 100% walk,
+ *    which is the guarantee WALK_MAX was chosen to give and the shipped
+ *    per-frame signal broke (93.2% walk, the rest skip fragments).
+ *  - GEAR_MIN_HOLD_SECONDS 0.30 = the crossfade plus a frame or two, so a gait
+ *    that is entered is always fully faded in before anything can fade it out.
+ *    It is a guarantee, not a decoration: it is what moves the browse trace from
+ *    19/81/0 to 26/74/0 by refusing the changes that arrive inside a fade.
+ */
+export const GEAR_TAU_SECONDS = 0.35
+export const GEAR_MIN_HOLD_SECONDS = 0.3
+
+/**
+ * The gear chooser's memory: the gear driving the mixer, the averaged speed it
+ * was chosen from, and how long the gear has held. Held in one ref by girl.tsx.
+ */
+export type GearState = {
+  readonly gear: number
+  readonly avgSpeed: number
+  readonly heldFor: number
+}
+
+export const initialGearState = (): GearState => ({ gear: 0, avgSpeed: 0, heldFor: Infinity })
+
+/**
+ * Advance the gear chooser one frame.
+ *
+ * The average tracks |speed| ALWAYS — through dwells and backward scrubs as well
+ * as travel — so resumed travel re-enters on what the reader is actually doing
+ * rather than on a value frozen a checkpoint ago. The GEAR only moves while
+ * travelling forward, which is the pre-existing rule: a dwell or a scrub leaves
+ * her in the gear she was last in.
+ *
+ * `heldFor` starts at Infinity so the very first gear change is immediate — the
+ * hold exists to stop churn, not to make her slow off the mark.
+ */
+export function stepForwardGear(
+  state: GearState,
+  speedMag: number,
+  dt: number,
+  forward: boolean
+): GearState {
+  const avgSpeed = dampTimeScale(state.avgSpeed, speedMag, 1 / GEAR_TAU_SECONDS, dt)
+  const heldFor = state.heldFor + dt
+  if (!forward) return { gear: state.gear, avgSpeed, heldFor }
+  const want = resolveForwardGear(avgSpeed, state.gear)
+  if (want === state.gear || heldFor < GEAR_MIN_HOLD_SECONDS) {
+    return { gear: state.gear, avgSpeed, heldFor }
+  }
+  return { gear: want, avgSpeed, heldFor: 0 }
+}
+
 /** Locomotion state derived from signed surface speed. */
 export type Locomotion = 'forward' | 'backward' | 'idle'
 

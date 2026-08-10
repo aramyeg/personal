@@ -107,7 +107,7 @@ export function MangaLightbox({
       data-testid="sw-manga-lightbox"
     >
       <div data-sw-lightbox-frame="" style={frame} onClick={(e) => e.stopPropagation()}>
-        <MangaPageArt page={page} running instant priority />
+        <MangaPageArt page={page} priority />
       </div>
       {/* A DRAWN CROSS, not a glyph. This was `×` set in `--sw-font-panel`, which is Bangers — a
           slanted comic face — so the control rendered as a leaning lowercase x with subpixel

@@ -181,11 +181,18 @@ export const STEP_MAX_SECONDS = 0.05
 export const PACE_SPAN = (PAGE_SPAN_END - TRAVEL_END) / CHAPTER_COUNT
 /**
  * Seconds that span takes at the cap — the authored pace, and the one number here
- * tuned by eye rather than derived. It is bracketed by the content on both sides:
- * the manga page's own reveal runs ~2.45 s and the info page's staging is written
- * in 3.87 s of research milliseconds, while anything under ~1.5 s leaves the
- * count-up and its burst reading as a single event. 2.2 s draws both leaves
- * together and lands the last character with the spread still up.
+ * tuned by eye rather than derived. It was bracketed by the content on both sides:
+ * the info page's staging is written in 3.87 s of research milliseconds, while
+ * anything under ~1.5 s leaves the count-up and its burst reading as a single
+ * event.
+ *
+ * ONE OF THOSE BRACKETS IS GONE and the number is not (T111). The upper bracket
+ * used to be a pair — the manga page's own 2.45 s reveal alongside the info
+ * page's staging — and the manga page does not reveal any more; it prints
+ * complete. What the cap paces is unchanged, because the governed span was always
+ * the INFO leaf's draw span (`PAGE_SPAN_END`, above) and never the manga clock,
+ * and 2.2 s still sits inside the surviving bracket. Re-measured on the shipped
+ * build after the removal: see task-111-report.md.
  */
 export const PACE_SECONDS = 2.2
 /** Progress per second inside the governed span. Outside it the cap is lifted. */

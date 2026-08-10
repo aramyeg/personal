@@ -30,7 +30,12 @@ export const PAGE_4: MangaPage = {
       at: { x: 0.8638, y: 0.1364 },
       box: { w: 0.1455, h: 0.0775 },
       voice: 'speech',
-      drawn: { tail: { x: 0.7188, y: 0.1549 } },
+      // TAIL-LESS ON PURPOSE (T111). The site still draws this balloon — the art
+      // never gave the foundation panel one — but not the spike: Aram read its
+      // direction as wrong and ruled it off rather than re-aimed. The panel holds
+      // one speaker with her hands on the brick she is talking about, so nothing
+      // about the line is ambiguous without it.
+      drawn: {},
     },
     {
       panel: 2,

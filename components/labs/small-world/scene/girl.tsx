@@ -20,15 +20,17 @@ import {
 import { usePrefersReducedMotion } from './use-reduced-motion'
 import {
   BASE_STRIDE,
+  initialGearState,
   nextTimeScale,
   resolveClipPlan,
-  resolveForwardGear,
   resolveLocomotionHysteretic,
   selectCelebrateClip,
   shouldTriggerCelebrate,
   shouldYieldCelebrate,
   speedToTimeScale,
+  stepForwardGear,
   type ClipPlan,
+  type GearState,
   type Locomotion,
   type SlotPlan,
 } from './girl-anim'
@@ -256,11 +258,12 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
    *  edge too — the state stays 'forward' across walk→run, but the cadence must
    *  still be seeded rather than eased out of the previous gear's value. */
   const drivingClip = useRef<string | null>(null)
-  /** Forward gear last driven (index into plan.forwardGears). Held across
-   *  dwells and backward scrubs so resumed travel re-enters the gear she left,
-   *  which is also what makes the hysteresis in `resolveForwardGear` mean
-   *  anything frame to frame. */
-  const prevGear = useRef(0)
+  /** The forward gear chooser's memory (girl-anim's `stepForwardGear`): the gear
+   *  driving the mixer, the averaged speed it was chosen from, and how long it
+   *  has held. Kept across dwells and backward scrubs so resumed travel re-enters
+   *  the gear she left, and stepped EVERY frame so the average is current when
+   *  she starts moving again. */
+  const gearState = useRef<GearState>(initialGearState())
   /** Ordinal of discoveries seen — alternates Jump_A/Jump_B on the celebrate cycle. */
   const celebrateIndex = useRef(0)
   const reduced = usePrefersReducedMotion()
@@ -532,10 +535,14 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
       // walk.
       let slot: SlotPlan = plan[loco]
       let stride = CLIP_STRIDE
+      gearState.current = stepForwardGear(
+        gearState.current,
+        Math.abs(signedSpeed),
+        dt,
+        loco === 'forward'
+      )
       if (loco === 'forward') {
-        const gear = resolveForwardGear(Math.abs(signedSpeed), prevGear.current)
-        prevGear.current = gear
-        const geared = plan.forwardGears[gear]
+        const geared = plan.forwardGears[gearState.current.gear]
         slot = geared
         stride = geared.stride
       }

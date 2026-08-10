@@ -127,9 +127,11 @@ const defaultFront = (chapter: number): Front => (chapter === 0 ? 'details' : 'c
  * from that clock lives in use-journey-ui; this component only eases what it gets,
  * so it renders the same whatever drives it.
  *
- * The PAGE's own reveal — panels inking in order, lettering typing a beat behind
- * each one — runs on its own clock inside `MangaPageArt`, because the arrival
- * clock is far too short to carry it. See `manga/reveal.ts`.
+ * THE PAGE ITSELF DOES NOT ANIMATE. It used to ink its panels in order and type
+ * its lettering a beat behind each one, on a second clock inside `MangaPageArt`;
+ * T111 removed that on Aram's order and a manga page now renders complete from
+ * its first frame. The entrance eased here, and the info leaf's own draw beside
+ * it, are what still move.
  */
 export function ChapterPanels({
   index,

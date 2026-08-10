@@ -98,8 +98,14 @@ describe('manga page manifests', () => {
     expect(drawn.sort()).toEqual(['page-1:0', 'page-4:1'])
     for (const page of ALL) {
       for (const b of page.balloons.filter((x) => x.drawn)) {
+        // A TAIL IS OPTIONAL, and page-4's is deliberately absent (T111 — Aram
+        // read its direction as wrong and ruled it off; a tail-less balloon is a
+        // legitimate manga form). What stays law is that a tail which IS drawn
+        // points at someone inside its own panel.
         const tail = b.drawn!.tail
-        expect(contains(page.panels[b.panel], { x: tail.x, y: tail.y, w: 0, h: 0 })).toBe(true)
+        if (tail) {
+          expect(contains(page.panels[b.panel], { x: tail.x, y: tail.y, w: 0, h: 0 })).toBe(true)
+        }
         // The INK, not just the words. The site draws an ellipse around the text
         // box with a margin past sqrt(2) (it has to contain the box's corners),
         // and that ellipse is what the reader sees leave the panel — page-1's
@@ -110,6 +116,20 @@ describe('manga page manifests', () => {
         ).toBe(true)
       }
     }
+  })
+
+  it('leaves the clay chapter’s second panel tail-less, and keeps the balloon', () => {
+    // Aram's order was REMOVE, not re-aim: "the speech bubble has a triangle
+    // attached on the 2nd panel which has the wrong direction". The balloon has
+    // to survive it — the art never printed one on that panel, so dropping
+    // `drawn` outright would letter "There. Now it holds." onto bare rock.
+    const b = PAGE_4.balloons[1]
+    expect(b.panel).toBe(1)
+    expect(b.drawn, 'the site still draws this balloon').toBeTruthy()
+    expect(b.drawn!.tail, 'and it draws no tail on it').toBeUndefined()
+    // The other drawn balloon is untouched, so this is a per-balloon switch and
+    // not a rule that quietly disarmed every tail in the pack.
+    expect(PAGE_1.balloons[0].drawn!.tail).toBeTruthy()
   })
 
   it('carries the approved dialogue, and only the approved dialogue', () => {

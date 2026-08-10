@@ -23,6 +23,11 @@ import {
   RUN_MIN,
   RUN_MIN_DOWN,
   resolveForwardGear,
+  stepForwardGear,
+  initialGearState,
+  GEAR_TAU_SECONDS,
+  GEAR_MIN_HOLD_SECONDS,
+  type GearState,
   type Locomotion,
 } from '@/components/labs/small-world/scene/girl-anim'
 
@@ -417,6 +422,95 @@ describe('forward gears (T110)', () => {
 
     it('leaves the gentle reader entirely in the walk (measured max 2.23 u/s)', () => {
       expect(resolveForwardGear(2.23, 0)).toBe(0)
+    })
+  })
+
+  describe('stepForwardGear — a gear on the gait’s timescale, not the frame’s', () => {
+    const DT = 1 / 60
+    /** Drive the chooser at 60fps for `seconds` at a constant speed. */
+    const hold = (state: GearState, speed: number, seconds: number, forward = true): GearState => {
+      let s = state
+      for (let i = 0; i < Math.round(seconds / DT); i++) s = stepForwardGear(s, speed, DT, forward)
+      return s
+    }
+
+    it('settles on the gear a sustained speed asks for', () => {
+      expect(hold(initialGearState(), 1.2, 2).gear).toBe(0)
+      expect(hold(initialGearState(), 4.0, 2).gear).toBe(1)
+      expect(hold(initialGearState(), 12.0, 2).gear).toBe(2)
+    })
+
+    it('gives a fling the run inside four tenths of a second from rest', () => {
+      // She climbs one gear at a time and each rung costs the hold: the average
+      // crosses WALK_MAX about 40ms in (that change is free — `heldFor` starts at
+      // Infinity), then the run waits out GEAR_MIN_HOLD_SECONDS behind it. The
+      // budget is the point: nothing can put a gait on screen faster than the
+      // 0.25s crossfade anyway, so a third of a second to the run costs nothing
+      // visible, and the skip she passes through is now long enough to BE a skip.
+      expect(hold(initialGearState(), 40, 0.15).gear).toBe(1)
+      expect(hold(initialGearState(), 40, 0.4).gear).toBe(2)
+    })
+
+    it('is unmoved by one fast frame inside a slow read', () => {
+      // THE DEFECT, in one law, at the size it actually occurs. Instrumented on
+      // the shipped build, a slow read-through peaked at 5.45 u/s in single
+      // frames while sitting at 1.31 — and the per-frame chooser answered each of
+      // those spikes with a clip change the mixer then spent a quarter-second
+      // crossfading into. Those frames must not move the gear.
+      let s = hold(initialGearState(), 1.31, 2)
+      s = stepForwardGear(s, 5.45, DT, true)
+      expect(s.gear).toBe(0)
+    })
+
+    it('never changes gear twice inside the mixer’s crossfade', () => {
+      // A gait that is faded in over CROSSFADE and out again before it lands is
+      // not a gait. Alternate a demand every frame and count the changes.
+      let s = hold(initialGearState(), 1.0, 2)
+      let changes = 0
+      let prev = s.gear
+      for (let i = 0; i < 240; i++) {
+        s = stepForwardGear(s, i % 2 === 0 ? 40 : 0, DT, true)
+        if (s.gear !== prev) changes += 1
+        prev = s.gear
+      }
+      // 4s of maximal churn, and each change costs at least GEAR_MIN_HOLD_SECONDS.
+      expect(changes).toBeLessThanOrEqual(Math.ceil(4 / GEAR_MIN_HOLD_SECONDS))
+    })
+
+    it('holds the gear through a dwell, and keeps averaging through it', () => {
+      // The gear index only moves while travelling forward — a checkpoint leaves
+      // her in the gear she arrived in — but the AVERAGE keeps tracking, so the
+      // frame travel resumes is answered with what she is doing now.
+      const running = hold(initialGearState(), 12, 2)
+      expect(running.gear).toBe(2)
+      const dwelt = hold(running, 0, 1.5, false)
+      expect(dwelt.gear, 'the gear survives the dwell').toBe(2)
+      expect(dwelt.avgSpeed).toBeLessThan(0.2)
+    })
+
+    it('answers a real change of pace inside a second', () => {
+      // The cure must not be worse than the disease: a reader who stops browsing
+      // and starts flinging sees the run before a second is out.
+      const browsing = hold(initialGearState(), 3.5, 2)
+      expect(browsing.gear).toBe(1)
+      expect(hold(browsing, 20, 1).gear).toBe(2)
+    })
+
+    it('is frame-rate independent — 30fps and 120fps reach the same gear', () => {
+      const at = (dt: number) => {
+        let s = initialGearState()
+        for (let i = 0; i < Math.round(1.5 / dt); i++) s = stepForwardGear(s, 12, dt, true)
+        return s
+      }
+      expect(at(1 / 30).gear).toBe(at(1 / 120).gear)
+      expect(at(1 / 30).avgSpeed).toBeCloseTo(at(1 / 120).avgSpeed, 1)
+    })
+
+    it('averages over at least the crossfade it is protecting', () => {
+      // The number is derived, not felt: a signal with a shorter memory than the
+      // mixer's fade can demand a gait faster than the mixer can show one.
+      expect(GEAR_TAU_SECONDS).toBeGreaterThanOrEqual(0.25)
+      expect(GEAR_MIN_HOLD_SECONDS).toBeGreaterThanOrEqual(0.25)
     })
   })
 

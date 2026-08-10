@@ -43,11 +43,21 @@ export type Balloon = {
   /**
    * Present ONLY for the two lines whose balloon is missing from the art
    * (page-1's big panel, page-4's foundation panel — the generator dropped
-   * both). The site draws a balloon in the art's style at `at`/`box`, with its
-   * tail pointing at `tail`. Absent means the art already has a blank balloon
-   * there and the site only sets the words.
+   * both). The site draws a balloon in the art's style at `at`/`box`. Absent
+   * means the art already has a blank balloon there and the site only sets the
+   * words.
    */
-  drawn?: { tail: Point }
+  drawn?: {
+    /**
+     * Where the tail points — the speaker's head, in page fractions.
+     *
+     * OMITTING IT DRAWS NO TAIL, which is a legitimate manga form and not a
+     * balloon missing a part: when the speaker is unambiguous the printed pages
+     * leave tails off too. It is per-balloon rather than per-page because that
+     * is the grain the decision is made at (T111 — Aram ruled page-4's tail off).
+     */
+    tail?: Point
+  }
 }
 
 /** A narrator box. Never in the art (the pack's rule) — always drawn here. */
