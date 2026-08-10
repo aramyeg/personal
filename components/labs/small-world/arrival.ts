@@ -1,5 +1,6 @@
 import { CHAPTER_COUNT } from './chapters'
 import { PANEL_END, TRAVEL_END, type RevealState } from './journey-timeline'
+import { PAGE_SPAN_END } from './overlay/info-beats'
 
 /**
  * CHECKPOINT ARRIVAL: the reveal clock + the scroll absorption that protects it.
@@ -92,6 +93,157 @@ export const CATCHUP_MAX_SPEED = 0.18
 export const CATCHUP_SNAP = 5e-4
 /** Frame steps are clamped so a backgrounded tab cannot resume with one giant step. */
 export const STEP_MAX_SECONDS = 0.05
+
+/**
+ * ============================================================================
+ * THE PACE GOVERNOR (Task 109) — a checkpoint beat unfolds in seconds, not pixels
+ * ============================================================================
+ * Aram: "when we reach a checkpoint of the story, the progression of the story
+ * and the UX is heavily dependent on the scroll and scroll pattern; this
+ * shouldn't be the case […] the scrolling should always have some certain speed
+ * or effect."
+ *
+ * WHAT WAS MEASURED (chapter 3's stop, shipped build, headed browser, real CDP
+ * input; the control row is a reader who arrives and stops). The beat's own
+ * authored content — the manga page inking its panels and typing its lettering —
+ * needs about 2.45 s of screen time and ends with 62 characters of her words on
+ * the page. What the three input styles actually delivered:
+ *
+ *   1440x900   readable   lettering        390x844   readable   lettering
+ *   control      5611 ms    62 chars        control    5677 ms    62 chars
+ *   fling         496 ms     0 chars        fling        691 ms     2 chars
+ *   steady       1011 ms    14 chars        steady      4871 ms    62 chars
+ *   hesitant     2136 ms    53 chars        hesitant    6614 ms    62 chars
+ *
+ * A 4.3x spread on desktop and 9.6x on the phone, and the number that matters is
+ * the last column: a reader scrolling steadily through the story was shown 14 of
+ * the 62 characters it is written in, and a reader who flung was shown none. The
+ * beat was not paced badly — it was not paced at all. Its length in seconds was
+ * whatever the reader's wheel happened to make it.
+ *
+ * THE FIX IS INPUT SHAPING, NOT A SECOND CLOCK. The scene stays a pure function
+ * of `progress`; what changes is how fast `progress` is allowed to follow the
+ * scroll. Inside a checkpoint's window progress advances toward the scroll-implied
+ * target at an authored maximum rate, so the beat takes BEAT_SECONDS however hard
+ * the reader scrolls. Outside it the cap is lifted entirely and scroll is direct,
+ * which is the whole of open-biome travel.
+ *
+ * WHY A RATE CAP AND NOT A STEP/CHECKPOINT MODE (the runner-up). Arming the next
+ * beat on a gesture and playing it out was the other candidate and it loses on
+ * one property: a rate cap NEVER STOPS FOLLOWING THE INPUT. `progress` can only
+ * move toward `raw` and can never pass it, so pushing forward always moves the
+ * world forward and pulling back always moves it back — the cap slows the
+ * unfolding, it does not seize the scroll. A step mode has to decide when a beat
+ * "owns" the input, and every such decision is a moment the reader is not driving.
+ * It would also have needed its own reduced-motion branch; this one degrades by
+ * setting the cap to infinity, which is the pre-Task-109 behaviour exactly.
+ *
+ * THE DEBT, AND WHY IT IS NOT A RIDE. Capping the rate means the world falls
+ * behind the document, and a debt paid back with the reader's hands off the wheel
+ * is exactly what Task 106 called a defect. It is not one here, and the reason is
+ * structural rather than a matter of degree: the governed span lies wholly inside
+ * the dwell, where `rotationAt` CLAMPS rotation to the chapter's stop. Nothing the
+ * debt buys back turns the planet. What plays out is the page drawing itself over
+ * a world that is standing still — which is the beat the reader scrolled to, not a
+ * ride through scenery they have already been shown. The part of the debt that
+ * survives past the span is given back by the existing unwind, speed-capped, and
+ * GOVERNOR_MAX_LAG is sized so that takes less than one retraction.
+ *
+ * THE ESCAPE HATCH is that ceiling. Past it the band bottoms out and progress
+ * tracks the finger 1:1 again, offset — so a determined push always moves the
+ * world, and a hard multi-chapter fling still leaves a checkpoint behind with the
+ * page half drawn. That is deliberate: a reader who flings three chapters is
+ * asking to be somewhere else, and the cap's job is to pace the reader who is
+ * simply scrolling, not to hold one who is leaving.
+ */
+
+/**
+ * WHERE THE CAP APPLIES, and why it is the page's own span rather than the whole
+ * checkpoint window.
+ *
+ * The first cut paced the entire dwell, `dwellChapterAt`'s window, which is the
+ * prettier rule — the paced span and the revealed span would have been the same
+ * span by construction. It is wrong for one reason and the tests said so: the tail
+ * of a dwell is where the reader READS a page that is already drawn, and pacing it
+ * meant leaving a finished checkpoint took up to the whole beat. Nothing is
+ * unfolding there, so there is nothing to pace, and slowing it is the exact
+ * definition of trapped.
+ *
+ * So the governed span is `[TRAVEL_END, PAGE_SPAN_END]` — the span the info leaf
+ * draws itself over, imported from the timeline that owns it rather than restated,
+ * so a retune of the page's staging moves the cap with it. It reaches down into
+ * `overlay/` from the core, which is the wrong direction on the face of it; the
+ * alternative was a second copy of the number, and a governor pacing a window the
+ * page no longer draws in would fail silently. `info-beats` is a pure table of
+ * constants with no DOM and no React, and there is no cycle: it imports the
+ * timeline, and so do we.
+ */
+export const PACE_SPAN = (PAGE_SPAN_END - TRAVEL_END) / CHAPTER_COUNT
+/**
+ * Seconds that span takes at the cap — the authored pace, and the one number here
+ * tuned by eye rather than derived. It is bracketed by the content on both sides:
+ * the manga page's own reveal runs ~2.45 s and the info page's staging is written
+ * in 3.87 s of research milliseconds, while anything under ~1.5 s leaves the
+ * count-up and its burst reading as a single event. 2.2 s draws both leaves
+ * together and lands the last character with the spread still up.
+ */
+export const PACE_SECONDS = 2.2
+/** Progress per second inside the governed span. Outside it the cap is lifted. */
+export const PACE_RATE = PACE_SPAN / PACE_SECONDS
+/**
+ * How far the governed world may fall behind the document before the band bottoms
+ * out. DERIVED, and from the one thing that bounds what the reader can see: the
+ * debt is given back at CATCHUP_MAX_SPEED once the cap lifts, and it must be gone
+ * before the spread has finished walking off, or the world would still be moving
+ * after the beat that caused it had left the screen. So it is exactly one
+ * retraction's worth of catch-up.
+ *
+ * It also has to stay under JUMP_MAX, and does by better than a factor of two: the
+ * largest debt the governor can build is smaller than the one-frame jump a teleport
+ * is defined by, so no catch-up of its own can ever be mistaken for a scrollbar drag
+ * by `stepArrival` here or by the damper downstream.
+ */
+export const GOVERNOR_MAX_LAG = CATCHUP_MAX_SPEED * RETRACT_SECONDS
+
+/**
+ * THE SHIPPED GUARANTEE, stated as a number rather than left implicit: a reader
+ * scrolling at or below this — progress per second — is given the full authored
+ * pace, because the debt they build over PACE_SECONDS still fits under the ceiling.
+ * Above it the band bottoms out part-way and the page draws faster than authored,
+ * approaching the ungoverned behaviour as the input approaches a fling.
+ *
+ * It works out at roughly 590 px/s on a 900px-tall desktop and 555 px/s on a phone,
+ * which covers reading and browsing speeds and does not pretend to cover a flick.
+ * Raising it means raising the ceiling, and the ceiling is what keeps the debt
+ * repayable inside the dwell — so this is the trade, made once, in the open.
+ */
+export const GOVERNED_MAX_SPEED = PACE_RATE + GOVERNOR_MAX_LAG / PACE_SECONDS
+
+/** The chapter whose page is drawing itself at this progress, or null. */
+export function pacedChapterAt(progress: number): number | null {
+  const p = Math.min(1, Math.max(0, progress))
+  const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / SEGMENT))
+  const local = (p - chapter * SEGMENT) / SEGMENT
+  return local >= TRAVEL_END && local < PAGE_SPAN_END ? chapter : null
+}
+
+/**
+ * The forward speed limit at a progress position, in progress per second.
+ * `Infinity` means direct — scroll is 1:1 and nothing is shaped.
+ */
+export function paceCapAt(progress: number, reducedMotion = false): number {
+  if (reducedMotion) return Infinity
+  return pacedChapterAt(progress) === null ? Infinity : PACE_RATE
+}
+
+/**
+ * Is progress somewhere the governor shapes it? Consumers that shortcut the
+ * driver (see `use-arrival-journey`'s scroll handler) must ask this before
+ * assigning raw scroll straight through.
+ */
+export function isGoverned(progress: number, reducedMotion = false): boolean {
+  return paceCapAt(progress, reducedMotion) !== Infinity
+}
 
 /**
  * 'pass'    — journey progress IS scroll progress (the normal, scroll-pure state).
@@ -240,6 +392,60 @@ export function stepArrival(
     }
   } else {
     progress = raw
+  }
+
+  // THE GOVERNOR, applied after every mode has had its say and before the reveal
+  // is stepped, so one clamp covers 'pass', the band's own bottoming-out and the
+  // release's catch-up alike — the release is the one that most needed it, since
+  // `unwind` closes at CATCHUP_MAX_SPEED, eight times a beat's authored rate, and
+  // would have blown through the moment the hold let go of.
+  //
+  // FORWARD ONLY. A retreat is never shaped: pulling back moves the world back 1:1
+  // from the first frame, which is the reader's fastest way out of a beat and the
+  // one thing that must never feel governed.
+  //
+  // The cap is read at PREV progress, not at the step's own destination, and that
+  // is load-bearing twice over. It makes the rule causal — you are governed
+  // because of where the world IS, not where an uncapped step would have put it —
+  // and it leaves the frame that ENTERS a checkpoint uncapped, so the hold still
+  // arms out of 'pass' exactly as it did before this existed.
+  if (!teleported && progress > prev.progress) {
+    const cap = paceCapAt(prev.progress, reducedMotion)
+    if (cap !== Infinity) {
+      const paced = Math.max(
+        Math.min(progress, prev.progress + cap * step),
+        // The escape hatch. Past the ceiling the band bottoms out and the world
+        // tracks the document again, one beat behind it — still visibly responding
+        // to every scroll, which is what "never trapped" has to mean when the cap
+        // itself is the point.
+        raw - GOVERNOR_MAX_LAG
+      )
+      if (paced < progress) {
+        progress = paced
+        // The debt now belongs to the unwind, which is the one piece that already
+        // knows how to give it back: eased, speed-capped, and cancelled outright by
+        // a retreat. Without this the machine would sit in 'pass' holding a lag the
+        // driver has no reason to keep ticking for, and the frame the cap lifted on
+        // would close the whole gap at once.
+        if (mode === 'pass') mode = 'release'
+      }
+    }
+  }
+
+  // THE JOURNEY NEVER OUTRUNS THE FINGER — now enforced here rather than only
+  // asserted downstream. Every branch above except the hold's builds progress
+  // INCREMENTALLY, and the hold's builds it from `raw` (anchor + overrun); that was
+  // safe while nothing else could hold progress back, and stopped being safe the
+  // moment the governor could. Measured: a hard fling into chapter 0's stop stepped
+  // 0.0306 in one frame — six times the input — on the frame the governed span
+  // ended, because the band's formula handed back the governor's whole debt at once.
+  //
+  // The bound is the renewal proofs' own: no frame moves further than the finger
+  // did, or than the capped unwind, whichever is larger. Stating it as code makes
+  // every future branch inherit it instead of having to remember it.
+  if (!teleported) {
+    const track = Math.max(0, raw - prev.raw)
+    progress = Math.min(progress, prev.progress + Math.max(track, CATCHUP_MAX_SPEED * step))
   }
 
   const reveal = stepReveal(prev.reveal, dwellChapterAt(progress), step, reducedMotion)

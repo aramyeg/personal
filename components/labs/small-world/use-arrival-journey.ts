@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
-import { initialArrival, stepArrival, type ArrivalState } from './arrival'
+import { initialArrival, isGoverned, stepArrival, type ArrivalState } from './arrival'
 import { trackProgressAt } from './ending-timeline'
 
 /**
@@ -69,8 +69,15 @@ export function useArrivalJourney(
       return trackProgressAt(window.scrollY, el.scrollHeight - window.innerHeight)
     }
 
+    // A driver frame is owed whenever anything is still moving on its own: the
+    // reveal clock, the rubber band — and now the pace governor's debt, which can
+    // outlive both (Task 109). `mode !== 'pass'` covers it, because a governed
+    // frame hands its lag to the release, but the equality is asserted rather than
+    // assumed: a debt with a sleeping loop is a world frozen mid-beat.
     const busy = () =>
-      arrivalRef.current.mode !== 'pass' || arrivalRef.current.reveal !== null
+      arrivalRef.current.mode !== 'pass' ||
+      arrivalRef.current.reveal !== null ||
+      arrivalRef.current.progress !== arrivalRef.current.raw
 
     const tick = (now: number) => {
       raf = 0
@@ -94,7 +101,19 @@ export function useArrivalJourney(
       rawProgressRef.current = readRaw()
       // While the journey is on the finger, keep the ref exactly as immediate as it
       // was before this hook existed — panels must not lag a frame behind a scroll.
-      if (arrivalRef.current.mode === 'pass') progressRef.current = rawProgressRef.current
+      //
+      // NOT INSIDE A CHECKPOINT (Task 109). This shortcut is a copy of the 'pass'
+      // branch of `stepArrival`, and 'pass' stopped meaning "progress is raw" the
+      // moment the pace governor could shape it. Left ungated it wrote the raw
+      // scroll straight past the cap on every scroll event, which is every frame of
+      // a fling: the governor would have been a no-op for exactly the input it
+      // exists for.
+      if (
+        arrivalRef.current.mode === 'pass' &&
+        !isGoverned(arrivalRef.current.progress, reduced.matches)
+      ) {
+        progressRef.current = rawProgressRef.current
+      }
       schedule()
     }
 

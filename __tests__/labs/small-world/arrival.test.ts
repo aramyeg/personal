@@ -4,17 +4,26 @@ import {
   ABSORB_MAX_SECONDS,
   ARM_FROM_RELEASE_LAG,
   CATCHUP_MAX_SPEED,
+  GOVERNOR_MAX_LAG,
   HOLD_UNTIL_T,
+  JUMP_MAX,
+  GOVERNED_MAX_SPEED,
+  PACE_RATE,
+  PACE_SECONDS,
+  PACE_SPAN,
   REVEAL_SECONDS,
   RETRACT_SECONDS,
   burstFromLatch,
   dwellChapterAt,
   initialArrival,
+  isGoverned,
+  pacedChapterAt,
   stepArrival,
   stepBurstLatch,
   type ArrivalState,
   type BurstLatch,
 } from '@/components/labs/small-world/arrival'
+import { PAGE_SPAN_END, PAGE_SPAN_START } from '@/components/labs/small-world/overlay/info-beats'
 import {
   BURST_END,
   PANEL_END,
@@ -107,21 +116,44 @@ describe('the reveal clock', () => {
     expect(frames[frames.length - 1].reveal!.phase).toBe('in')
   })
 
-  it('walks back out and ends when the visitor leaves, in either direction', () => {
-    for (const exit of [at(1, PANEL_END + 0.02), at(1, TRAVEL_END - 0.02)]) {
-      const { state, raw } = arriveAt(1)
-      const parked = drive(state, { frames: 120, scroll: () => raw })
-      const from = parked[parked.length - 1]
-      expect(from.reveal!.t).toBe(1)
+  /**
+   * The two directions are no longer symmetric and that is the pace governor's
+   * doing (Task 109). A retreat is never shaped, so leaving backwards is exactly as
+   * immediate as it always was. Leaving FORWARDS out of a page that has not
+   * finished drawing is paced: the reveal still walks out, and still inside one
+   * retraction — but only once the world has been let through the drawn span.
+   */
+  it('walks back out within one retraction when the visitor leaves backwards', () => {
+    const { state, raw } = arriveAt(1)
+    const parked = drive(state, { frames: 120, scroll: () => raw })
+    const from = parked[parked.length - 1]
+    expect(from.reveal!.t).toBe(1)
 
-      const out = drive(from, { frames: 120, scroll: () => exit })
-      const retracting = out.find((s) => s.reveal !== null && s.reveal.t < 1)!
-      expect(retracting.reveal!.phase).toBe('out')
-      expect(retracting.reveal!.chapter).toBe(1)
-      const gone = out.findIndex((s) => s.reveal === null)
-      expect(gone).toBeGreaterThanOrEqual(0)
-      expect((gone + 1) * FRAME).toBeLessThanOrEqual(RETRACT_SECONDS + FRAME * 2)
-    }
+    const out = drive(from, { frames: 120, scroll: () => at(1, TRAVEL_END - 0.02) })
+    const retracting = out.find((s) => s.reveal !== null && s.reveal.t < 1)!
+    expect(retracting.reveal!.phase).toBe('out')
+    expect(retracting.reveal!.chapter).toBe(1)
+    const gone = out.findIndex((s) => s.reveal === null)
+    expect(gone).toBeGreaterThanOrEqual(0)
+    expect((gone + 1) * FRAME).toBeLessThanOrEqual(RETRACT_SECONDS + FRAME * 2)
+  })
+
+  it('walks back out forwards too — after the page it was drawing has been shown', () => {
+    const { state, raw } = arriveAt(1)
+    const parked = drive(state, { frames: 120, scroll: () => raw })
+    const from = parked[parked.length - 1]
+
+    const out = drive(from, { frames: 400, scroll: () => at(1, PANEL_END + 0.02) })
+    const retracting = out.find((s) => s.reveal !== null && s.reveal.t < 1)!
+    expect(retracting.reveal!.phase).toBe('out')
+    expect(retracting.reveal!.chapter).toBe(1)
+    const gone = out.findIndex((s) => s.reveal === null)
+    expect(gone).toBeGreaterThanOrEqual(0)
+    // It leaves, and the wait before it starts leaving is the page's own span —
+    // never more, whatever the visitor does with the wheel.
+    expect((gone + 1) * FRAME).toBeLessThanOrEqual(
+      PACE_SECONDS + GOVERNOR_MAX_LAG / CATCHUP_MAX_SPEED + RETRACT_SECONDS + FRAME * 4
+    )
   })
 
   it('resumes rather than replays when scrubbing across the window edge', () => {
@@ -194,13 +226,21 @@ describe('scroll absorption', () => {
     expect(resumed.reveal!.t).toBeLessThan(0.1) // the clock did not jump
   })
 
+  /**
+   * THE CEILING MOVED (Task 109) and the law did not: a determined push always
+   * breaks through. What bounds the stretch inside a checkpoint is now the
+   * governor's ceiling rather than the band's, because the two apply to the same
+   * span and the governor's is the larger — so that is the number a push has to
+   * beat, and the band's own ABSORB_MAX_LAG now describes only where the anchor
+   * stops holding, not how far the world can fall behind.
+   */
   it('bottoms out: a determined push always breaks through and keeps moving', () => {
     const { state, raw } = arriveAt(0)
     // A hard fling — 0.3 progress/second, several viewport-heights a second.
-    const run = drive(state, { frames: 60, scroll: (f) => raw + f * 0.005 })
+    const run = drive(state, { frames: 120, scroll: (f) => raw + f * 0.005 })
     const last = run[run.length - 1]
-    const lastRaw = raw + 59 * 0.005
-    expect(lastRaw - last.progress).toBeLessThanOrEqual(ABSORB_MAX_LAG + 1e-9)
+    const lastRaw = raw + 119 * 0.005
+    expect(lastRaw - last.progress).toBeLessThanOrEqual(GOVERNOR_MAX_LAG + 1e-9)
     // It kept travelling: the band stretched, it did not lock.
     expect(last.progress).toBeGreaterThan(state.progress + 0.1)
   })
@@ -447,6 +487,138 @@ describe('the burst latch (the girl\'s discovery beat)', () => {
     const dwell = at(2, 0.75)
     expect(journeyStateAt(dwell, undefined, rising(2, 0.1), null).burst).toBeNull()
     expect(journeyStateAt(dwell, undefined, rising(2, 0.1), 0.5).burst).toBe(0.5)
+  })
+})
+
+/**
+ * THE PACE GOVERNOR (Task 109). The measured defect was that a checkpoint beat's
+ * length in SECONDS was whatever the reader's wheel made it — 496 ms under a fling
+ * and 2136 ms under a hesitant scroll on the same spread, with 0 and 53 of its 62
+ * characters of lettering delivered. These are the properties that stop that being
+ * possible; none of them restates a constant.
+ */
+describe('the pace governor', () => {
+  /** Raw scroll that leaves the checkpoint's stop behind at `speed` progress/second. */
+  const push = (from: number, speed: number) => (f: number) => from + (f * speed) / 60
+
+  it('gives every reader up to GOVERNED_MAX_SPEED the same authored pace', () => {
+    const from = at(2, TRAVEL_END + 0.001)
+    // Every input from just over the cap to the fastest the guarantee covers — a
+    // spread of more than 3x — and the drawn span takes the SAME time under all of
+    // them, which is the whole of what Task 109 was asked for. (Below the cap the
+    // reader is in charge and simply takes longer; nothing is ever sped up.)
+    for (const speed of [PACE_RATE * 1.5, GOVERNED_MAX_SPEED * 0.6, GOVERNED_MAX_SPEED]) {
+      const run = drive(initialArrival(from), { frames: 600, scroll: push(from, speed) })
+      const done = run.findIndex((s) => pacedChapterAt(s.progress) === null)
+      expect(done).toBeGreaterThanOrEqual(0)
+      expect(done * FRAME).toBeGreaterThanOrEqual(PACE_SECONDS * 0.9)
+      expect(done * FRAME).toBeLessThanOrEqual(PACE_SECONDS * 1.35)
+    }
+  })
+
+  it('slows a fling without holding it — faster than authored, slower than direct', () => {
+    const from = at(2, TRAVEL_END + 0.001)
+    // Past the guarantee the ceiling bottoms out and the escape hatch takes over.
+    // The claim is only that the beat is stretched and the reader still gets out.
+    const speed = GOVERNED_MAX_SPEED * 12
+    const run = drive(initialArrival(from), { frames: 400, scroll: push(from, speed) })
+    const done = run.findIndex((s) => pacedChapterAt(s.progress) === null)
+    const direct = (PACE_SPAN / speed) * 60
+    expect(done).toBeGreaterThan(direct)
+    expect(done * FRAME).toBeLessThan(PACE_SECONDS)
+  })
+
+  it('never advances faster than the cap inside the span, and is uncapped outside it', () => {
+    const from = at(2, TRAVEL_END - 0.02)
+    const run = drive(initialArrival(from), { frames: 400, scroll: push(from, GOVERNED_MAX_SPEED) })
+    let prev = initialArrival(from)
+    let cappedFrames = 0
+    let freeFrames = 0
+    for (const s of run) {
+      const inside = pacedChapterAt(prev.progress) !== null
+      const step = s.progress - prev.progress
+      // The ceiling is the one exception, and it is the escape hatch: past it the
+      // world tracks the document 1:1 instead of falling further behind.
+      const bottomed = s.raw - s.progress >= GOVERNOR_MAX_LAG - 1e-9
+      if (inside && !bottomed) {
+        expect(step).toBeLessThanOrEqual(PACE_RATE * FRAME + 1e-9)
+        cappedFrames++
+      } else if (!inside && step > PACE_RATE * FRAME) freeFrames++
+      prev = s
+    }
+    expect(cappedFrames).toBeGreaterThan(30)
+    expect(freeFrames).toBeGreaterThan(0)
+  })
+
+  it('always follows the input: forward moves the world forward, and never past it', () => {
+    const from = at(2, TRAVEL_END + 0.001)
+    const run = drive(initialArrival(from), { frames: 300, scroll: push(from, 0.3) })
+    let prev = initialArrival(from)
+    for (const s of run) {
+      expect(s.progress).toBeGreaterThanOrEqual(prev.progress)
+      // The scene is never shown a position the reader has not scrolled to.
+      expect(s.progress).toBeLessThanOrEqual(s.raw + 1e-9)
+      prev = s
+    }
+    expect(run[run.length - 1].progress).toBeGreaterThan(from)
+  })
+
+  it('never governs a retreat — pulling back is 1:1 from the first frame', () => {
+    const from = at(2, TRAVEL_END + 0.001)
+    // Build a real debt first: scroll hard forward, then reverse out of it.
+    const pushed = drive(initialArrival(from), { frames: 90, scroll: push(from, 2) })
+    const held = pushed[pushed.length - 1]
+    expect(held.raw - held.progress).toBeGreaterThan(0)
+    const back = drive(held, { frames: 20, scroll: (f) => held.progress - (f + 1) * 0.002 })
+    for (let f = 0; f < back.length; f++) {
+      expect(back[f].progress).toBeCloseTo(held.progress - (f + 1) * 0.002, 10)
+    }
+  })
+
+  it('gives the debt back — a governed visit always ends on the finger', () => {
+    const from = at(2, TRAVEL_END + 0.001)
+    const target = at(2, PANEL_END + 0.05)
+    const run = drive(initialArrival(from), { frames: 600, scroll: (f) => Math.min(target, from + (f * 2) / 60) })
+    const last = run[run.length - 1]
+    expect(last.progress).toBeCloseTo(target, 9)
+    expect(last.mode).toBe('pass')
+  })
+
+  it('lets a teleport through the span untouched — a scrollbar drag is not a beat', () => {
+    const landing = at(3, TRAVEL_END + 0.05)
+    const run = drive(initialArrival(0.02), { frames: 4, scroll: () => landing })
+    expect(run[0].progress).toBe(landing)
+    expect(run[0].mode).toBe('pass')
+  })
+
+  it('is not there at all under reduced motion', () => {
+    const from = at(2, TRAVEL_END - 0.02)
+    const run = drive(initialArrival(from), {
+      frames: 200,
+      scroll: (f) => from + (f * 2) / 60,
+      reducedMotion: true,
+    })
+    for (let f = 0; f < run.length; f++) expect(run[f].progress).toBe(from + (f * 2) / 60)
+  })
+
+  it('paces the span the page draws itself over, and stops where the page does', () => {
+    // The structural tie: the governed span is the info leaf's own, so a retune of
+    // the page's staging moves the cap with it rather than leaving it behind.
+    expect(pacedChapterAt(at(3, PAGE_SPAN_START + 0.001))).toBe(3)
+    expect(pacedChapterAt(at(3, PAGE_SPAN_END - 0.001))).toBe(3)
+    expect(pacedChapterAt(at(3, PAGE_SPAN_END + 0.001))).toBeNull()
+    expect(pacedChapterAt(at(3, PAGE_SPAN_START - 0.001))).toBeNull()
+    // ...and the reading tail of the dwell is deliberately NOT governed: nothing is
+    // unfolding there, so slowing it would only stop a reader leaving.
+    expect(dwellChapterAt(at(3, PANEL_END - 0.001))).toBe(3)
+    expect(isGoverned(at(3, PANEL_END - 0.001))).toBe(false)
+  })
+
+  it('can never build a debt big enough to read as a teleport', () => {
+    // Downstream (the damper, and `stepArrival`'s own discriminator) tells a jump
+    // from a scroll by JUMP_MAX. If the governor could accumulate one, its own
+    // catch-up would be mistaken for a scrollbar drag and hard-cut.
+    expect(GOVERNOR_MAX_LAG).toBeLessThan(JUMP_MAX)
   })
 })
 
