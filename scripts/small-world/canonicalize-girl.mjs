@@ -65,6 +65,14 @@ export const CANONICAL = {
   Happy_Sway_Standing: 'Idle',
   Idle: 'Idle',
   Walk_Backward: 'Walk_Backward',
+  // T110 C-lite: the two clean library clips that were sitting unshipped in the
+  // same GLB, now the slow and fast ends of forward travel (the skip keeps the
+  // middle). Census-clean as authored — Walking 0/32 frames, Running 1/20 —
+  // so they take no corrective offset.
+  Walking: 'Walk_Forward',
+  Walk_Forward: 'Walk_Forward',
+  Running: 'Run_Forward',
+  Run_Forward: 'Run_Forward',
   '019f93e1-9b5a-770c-8e20-0e3ad4d204da': 'Jump_A',
   Jump_A: 'Jump_A',
   '019f93e2-9461-703f-988c-ec193d9b734b': 'Jump_B',
@@ -72,11 +80,92 @@ export const CANONICAL = {
 }
 
 /** Canonical clips whose root (Hips) translation is frozen to bind — see step 3.
- *  Keyed by the CANONICAL slot name so it survives the rename. */
+ *  Keyed by the CANONICAL slot name so it survives the rename.
+ *
+ *  Only Walk_Backward travels. Measured per-axis Hips spans over the whole cycle
+ *  (armature space, cm): Walk_Backward X 3.2 / Y 121.8 / Z 3.3 — the Y is a
+ *  metre of real travel. Walking 6.2/5.1/7.1, Walking_Woman 5.3/3.9/4.6 and
+ *  Running 2.1/5.8/7.1 are in-place cycles whose largest span is the vertical
+ *  bounce (Z is up in the Z-up source), the same shape as Skip_Forward's
+ *  6.0/3.7/25.3 hop — which has never been de-drifted. So the three new
+ *  locomotion clips keep their root exactly as authored: freezing them would
+ *  flatten the bounce that IS the gait. */
 export const DEDRIFT = new Set(['Walk_Backward'])
 
+/**
+ * CORRECTIVE LEG OFFSETS — the T110 fix for the interpenetration census (T107).
+ *
+ * Three of the five shipped clips drove the legs through each other on nearly
+ * every frame: Idle 301/301 (worst depth 6.02 cm), Skip_Forward 71/87 (8.39 cm),
+ * Walk_Backward 28/28 (6.33 cm). The rig and the mesh are NOT at fault — the
+ * bind pose has zero leg-vs-leg intersection and the library's `Walking` clip is
+ * clean on this same skeleton — so the defect is per-clip keyframes, and the
+ * cheapest correct fix is an additive offset rather than 416 hand-keyed frames.
+ *
+ * The offset is stated as a DISTANCE, not an angle, and that is the whole
+ * design. A constant-angle abduction about a fixed hip axis was tried first and
+ * is provably the wrong instrument: rotating a leg by θ about the pelvis's
+ * fore-aft axis displaces the ankle by θ·L·cos(swing), so it separates a leg
+ * that hangs down and does almost NOTHING for a leg swung far forward — which
+ * is exactly the pose a skip spends its time in. Measured: a constant 5°
+ * abduction improved Idle but drove Skip_Forward's deepest shin×foot hit from
+ * 5.34 cm to 11.06 cm.
+ *
+ * So the axis is recomputed per frame. For a leg whose current hip→ankle vector
+ * in Hips space is p, the rotation that displaces the ankle along the lateral
+ * direction t̂ is about û = normalize(p̂ × t̂), and the angle that buys exactly
+ * `splayCm` of that displacement is θ = d / (|p|·√(1−(p̂·t̂)²)). It reduces to
+ * the plain abduction when the leg hangs, and it keeps its full effect when the
+ * leg is swung — the ankle moves `splayCm` outward in every pose. Hips-local
+ * axes come from the bind offsets (LeftUpLeg at +11.31 cm on Y, RightUpLeg at
+ * −9.20 cm), so +Y is the character's left and t̂ is +Y for the left leg, −Y for
+ * the right.
+ *
+ * Constant splay, not ramped: the offending ranges are 100% / 82% / 100% of
+ * their clips, so a windowed offset would buy nothing and would pop at the
+ * window edges.
+ *
+ * THE DISTANCES ARE LARGER THAN THE DEPTHS THEY CLEAR, and that is a finding
+ * rather than a slack safety margin. The response is a threshold, not a slope:
+ * Idle's deepest hit is 6.02 cm and moves only to 5.74 cm under 3.4 cm of
+ * splay, sits at 2.15 cm under 6 cm, and reaches zero at 9 cm. The reason is
+ * that these overlaps are trouser volume, not limb volume — the trousers are
+ * very baggy and are modelled to just clear at the BIND stance, whose ankles
+ * are 28.6 cm apart, while the stock Idle brings them to 10.4 cm. So the splay
+ * that fixes a clip is the one that restores roughly the stance the garment was
+ * built for, and the per-clip values below are each the measured minimum that
+ * reaches zero (Skip_Forward's 12 cm leaves one frame of zero-depth contact —
+ * surfaces touching, nothing inside anything).
+ *
+ * That is a real stance change up close, and it was gated at the size that
+ * matters instead of being argued about: rendered at the lab's own framing
+ * (1.198 units tall, 9.9 units away, 38° FOV → 158 px in a 900 px frame) the
+ * corrected and uncorrected figures are indistinguishable, while the close-up
+ * goes from two trouser legs fused into one pink mass with the shoes merged
+ * into a single white blob, to two legs and two shoes. Because the correction
+ * rotates the leg about the hip socket the sole also rises by L(1−cos θ), which
+ * the foot-plant check measures rather than assumes.
+ *
+ * Keyed by CANONICAL slot, applied after the rename. Gated by `bl_census2.py`
+ * (zero overlaps) and by the foot-plant diff — see task-110-report.md.
+ */
+export const LEG_CORRECTIONS = {
+  Idle: { splayCm: 9 },
+  Skip_Forward: { splayCm: 12 },
+  Walk_Backward: { splayCm: 10 },
+  Run_Forward: { splayCm: 6 },
+}
+
 /** The clips girl.glb must end up with, as a set (order-independent). */
-export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B']
+export const SHIPPED_SLOTS = [
+  'Skip_Forward',
+  'Idle',
+  'Walk_Backward',
+  'Jump_A',
+  'Jump_B',
+  'Walk_Forward',
+  'Run_Forward',
+]
 
 const DEFAULT_SRC = 'public/labs/small-world/girl-v2.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
@@ -116,6 +205,239 @@ function freezeRootTranslation(doc, anim, root) {
       .setArray(flat)
     sampler.setOutput(frozen)
   }
+}
+
+/**
+ * Pre-multiply a constant rotation onto every rotation key of one bone in one
+ * clip — the additive corrective layer described at LEG_CORRECTIONS.
+ *
+ * Pre- rather than post-multiplication is what makes the offset a hip-socket
+ * abduction: `q_offset ⊗ q_key` rotates the bone (and its whole subtree — shin,
+ * foot, toe) about the joint origin in the PARENT's frame, which is the frame
+ * the axis was derived in. Post-multiplying would instead twist the leg about
+ * its own already-animated axis, which changes meaning frame to frame.
+ *
+ * A fresh accessor per channel: sampler outputs can be shared between clips, so
+ * writing in place would silently corrupt a clip that is meant to stay untouched
+ * (Jump_A/Jump_B are clean and must remain bit-identical). The old outputs prune
+ * away. Throws rather than skipping when a bone or channel is missing, or when
+ * the interpolation is CUBICSPLINE (whose output is tangent-triples, not plain
+ * rotations) — a silent no-op here would ship the defect while the report
+ * claimed a fix.
+ */
+/** Largest corrective angle the splay is ever allowed to ask for. Only reachable
+ *  when a leg points nearly straight out sideways (√(1−(p̂·t̂)²) → 0), a pose none
+ *  of these clips contains; the clamp is there so a future clip cannot turn a
+ *  3 cm request into a cartwheel. */
+const MAX_SPLAY_RAD = (14 * Math.PI) / 180
+
+/** The rotation channel targeting `node` in `anim`, or null. */
+function rotationChannel(anim, node) {
+  return (
+    anim
+      .listChannels()
+      .find((c) => c.getTargetNode() === node && c.getTargetPath() === 'rotation') ?? null
+  )
+}
+
+/**
+ * A `time → local rotation` reader for one bone in one clip: the keyed rotation
+ * where the bone is animated, its static node rotation where it is not. Linear
+ * between keys, matching glTF LINEAR sampling, so the forward kinematics below
+ * see the same pose the runtime will.
+ */
+function rotationReaderFor(anim, node) {
+  const channel = rotationChannel(anim, node)
+  if (!channel) {
+    const fixed = new THREE.Quaternion(...node.getRotation())
+    return { times: null, at: () => fixed.clone() }
+  }
+  const sampler = channel.getSampler()
+  if (sampler.getInterpolation() === 'CUBICSPLINE') {
+    throw new Error(
+      `${anim.getName()}/${node.getName()}: CUBICSPLINE rotation cannot take a corrective offset`
+    )
+  }
+  const times = sampler.getInput().getArray()
+  const values = sampler.getOutput().getArray()
+  const step = sampler.getInterpolation() === 'STEP'
+  const get = (i) =>
+    new THREE.Quaternion(values[i * 4], values[i * 4 + 1], values[i * 4 + 2], values[i * 4 + 3])
+  const at = (t) => {
+    if (t <= times[0]) return get(0)
+    const last = times.length - 1
+    if (t >= times[last]) return get(last)
+    let hi = 1
+    while (hi < last && times[hi] < t) hi++
+    if (step) return get(hi - 1)
+    const span = times[hi] - times[hi - 1]
+    return get(hi - 1).slerp(get(hi), span > 0 ? (t - times[hi - 1]) / span : 0)
+  }
+  return { times, values, channel, sampler, at }
+}
+
+/** Local TRS of a node with its rotation overridden by the sampled one. */
+function localMatrix(node, rotation) {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(...node.getTranslation()),
+    rotation,
+    new THREE.Vector3(...node.getScale())
+  )
+}
+
+/**
+ * Splay ONE leg outward by a fixed lateral distance across a whole clip — the
+ * per-frame corrective described at LEG_CORRECTIONS.
+ *
+ * Per key: run forward kinematics down UpLeg → Leg → Foot with the clip's own
+ * rotations to find where the ankle currently sits relative to the hip socket
+ * (all in Hips space, the UpLeg's parent frame), solve for the rotation that
+ * slides that ankle `splayCm` along the outward lateral direction, and
+ * PRE-multiply it onto the UpLeg's key. Pre- rather than post-multiplication is
+ * what makes it a hip-socket rotation of the whole leg — shin, foot and toe ride
+ * along, so the limb stays rigid and only its plane moves.
+ *
+ * A fresh accessor: sampler outputs can be shared between clips, so writing in
+ * place would corrupt a clip meant to stay untouched (Jump_A/Jump_B are already
+ * clean and must stay bit-identical). The old outputs prune away.
+ */
+/**
+ * How many WORLD units one unit of a bone's local space is worth — the factor
+ * that turns a splay stated in centimetres into the rig's own numbers.
+ *
+ * It is not 1 and it is not guessable: this export nests the rig under an
+ * armature scaled by 0.01, so bone coordinates are centimetres while the scene
+ * is metres (the character measures 170 bone units and renders 1.70 world units
+ * tall). Deriving it from the chain rather than hardcoding 0.01 means a
+ * re-export in different units corrects by the same distance instead of
+ * silently by 100× too little — which is exactly the bug this replaced, caught
+ * only because the ankles moved 0.34 mm instead of 3.4 cm.
+ */
+function boneUnitInWorld(node) {
+  const s = new THREE.Vector3(1, 1, 1)
+  for (let n = node; n; n = n.listParents().find((p) => p.propertyType === 'Node') ?? null) {
+    s.multiply(new THREE.Vector3(...n.getScale()))
+  }
+  const avg = (s.x + s.y + s.z) / 3
+  if (Math.abs(s.x - avg) > 1e-6 || Math.abs(s.y - avg) > 1e-6 || Math.abs(s.z - avg) > 1e-6) {
+    throw new Error(`non-uniform rig scale ${s.toArray()} — a splay distance is meaningless`)
+  }
+  return avg
+}
+
+function splayLeg(doc, anim, joints, side, splayCm) {
+  const upLeg = joints.get(`${side}UpLeg`)
+  const shin = joints.get(`${side}Leg`)
+  const foot = joints.get(`${side}Foot`)
+  for (const [name, n] of [[`${side}UpLeg`, upLeg], [`${side}Leg`, shin], [`${side}Foot`, foot]]) {
+    if (!n) throw new Error(`rig has no joint named ${name}`)
+  }
+  const up = rotationReaderFor(anim, upLeg)
+  if (!up.times) throw new Error(`${anim.getName()}: no rotation channel targets ${side}UpLeg`)
+  const readShin = rotationReaderFor(anim, shin)
+  const readFoot = rotationReaderFor(anim, foot)
+
+  // Outward lateral direction in Hips space: +Y is the character's left.
+  const outward = new THREE.Vector3(0, side === 'Left' ? 1 : -1, 0)
+  // splayCm is a real-world distance; the rig thinks in its own units.
+  const d = splayCm / 100 / boneUnitInWorld(upLeg)
+  const out = new Float32Array(up.values.length)
+  const stats = { maxDeg: 0, minReach: Infinity }
+
+  for (let i = 0; i < up.times.length; i++) {
+    const t = up.times[i]
+    const qUp = new THREE.Quaternion(
+      up.values[i * 4],
+      up.values[i * 4 + 1],
+      up.values[i * 4 + 2],
+      up.values[i * 4 + 3]
+    )
+    // Ankle position in Hips space, then the hip→ankle vector.
+    const m = localMatrix(upLeg, qUp)
+      .multiply(localMatrix(shin, readShin.at(t)))
+      .multiply(localMatrix(foot, readFoot.at(t)))
+    const ankle = new THREE.Vector3().setFromMatrixPosition(m)
+    const hip = new THREE.Vector3(...upLeg.getTranslation())
+    const p = ankle.sub(hip)
+    const len = p.length()
+    const dir = p.clone().divideScalar(len)
+    // Displacement per radian along t̂ is |p|·√(1−(p̂·t̂)²) — zero only for a leg
+    // pointing straight out sideways, which the clamp below covers.
+    const reach = len * Math.sqrt(Math.max(0, 1 - dir.dot(outward) ** 2))
+    const theta = Math.min(MAX_SPLAY_RAD, reach > 1e-6 ? d / reach : MAX_SPLAY_RAD)
+    const axis = new THREE.Vector3().crossVectors(dir, outward)
+    const q =
+      axis.lengthSq() > 1e-12
+        ? new THREE.Quaternion().setFromAxisAngle(axis.normalize(), theta)
+        : new THREE.Quaternion()
+    qUp.premultiply(q)
+    out[i * 4] = qUp.x
+    out[i * 4 + 1] = qUp.y
+    out[i * 4 + 2] = qUp.z
+    out[i * 4 + 3] = qUp.w
+    stats.maxDeg = Math.max(stats.maxDeg, (theta * 180) / Math.PI)
+    stats.minReach = Math.min(stats.minReach, reach)
+  }
+
+  up.sampler.setOutput(
+    doc
+      .createAccessor(`${anim.getName()}_${side}UpLeg_splayed`)
+      .setType('VEC4')
+      .setArray(out)
+  )
+  return stats
+}
+
+/**
+ * Apply the whole corrective table to a renamed document. Returns one line per
+ * corrected clip for the caller's report. Bones are found by joint name on the
+ * skin, so a re-export that renamed the rig fails loudly here instead of
+ * silently shipping the defect.
+ */
+function applyLegCorrections(doc, table) {
+  const skin = doc.getRoot().listSkins()[0]
+  const joints = new Map((skin?.listJoints() ?? []).map((j) => [j.getName(), j]))
+  const applied = []
+  for (const anim of doc.getRoot().listAnimations()) {
+    const fix = table[anim.getName()]
+    if (!fix || !fix.splayCm) continue
+    const l = splayLeg(doc, anim, joints, 'Left', fix.splayCm)
+    const r = splayLeg(doc, anim, joints, 'Right', fix.splayCm)
+    applied.push(
+      `${anim.getName()}: splay ${fix.splayCm}cm/leg (max ${Math.max(l.maxDeg, r.maxDeg).toFixed(2)}°)`
+    )
+  }
+  return applied
+}
+
+/**
+ * MATERIAL HYGIENE (T110 E1). The export ships one material flagged
+ * `alphaMode: BLEND` + `doubleSided: true`, and neither flag is earning its
+ * cost: alpha-blending puts the whole character into the transparent pass (depth
+ * sorting per draw, and self-sorting artifacts where hair crosses shoulder), and
+ * two-sided rendering doubles her fill.
+ *
+ * Measured before flipping either — `scratchpad/t110/probe.mjs` reads the 2048²
+ * baseColor and histograms its alpha channel: **4,194,065 of 4,194,304 pixels
+ * are alpha 255 (99.9943%)**, the remaining 239 sit between 128 and 254, and
+ * **not one pixel is alpha 0**. There is no lash mask, no cutout, nothing that
+ * the transparent pass exists to draw — the 239 are PNG encoder noise at atlas
+ * island borders. So OPAQUE loses nothing visible, and MASK would be a cutoff
+ * chosen to preserve noise.
+ *
+ * Re-run that probe after any re-export: a Meshy re-export that DID carry a real
+ * alpha mask would need MASK with a measured cutoff instead, and this flip is
+ * the one step in the pipeline whose precondition lives outside the file.
+ */
+function makeOpaque(doc) {
+  const changed = []
+  for (const mat of doc.getRoot().listMaterials()) {
+    const before = `${mat.getAlphaMode()}/doubleSided=${mat.getDoubleSided()}`
+    mat.setAlphaMode('OPAQUE')
+    mat.setDoubleSided(false)
+    changed.push(`${mat.getName()}: ${before} → OPAQUE/doubleSided=false`)
+  }
+  return changed
 }
 
 /** The scene's top-level nodes (the rig lives under the first one). */
@@ -178,7 +500,7 @@ function standUpright(doc) {
  * @param {string} opts.out  shipping girl.glb to write
  * @returns {Promise<{out:string, animations:string[], stripped:string[], dedrifted:string[], oriented:boolean, height:number, meshes:number}>}
  */
-export async function canonicalizeGirl({ src, out }) {
+export async function canonicalizeGirl({ src, out, corrections = LEG_CORRECTIONS }) {
   const io = new NodeIO()
   const doc = await io.read(src)
   const root = doc.getRoot()
@@ -201,6 +523,8 @@ export async function canonicalizeGirl({ src, out }) {
     }
   }
 
+  const corrected = applyLegCorrections(doc, corrections)
+  const opaque = makeOpaque(doc)
   const orient = standUpright(doc)
 
   await doc.transform(prune())
@@ -213,6 +537,8 @@ export async function canonicalizeGirl({ src, out }) {
     animations: rRoot.listAnimations().map((a) => a.getName()),
     stripped,
     dedrifted,
+    corrected,
+    opaque,
     oriented: orient.applied,
     height: worldBindExtent(reloaded).y,
     meshes: rRoot.listMeshes().length,
@@ -362,6 +688,26 @@ async function selfTest() {
   assert(`extras stripped [${result.stripped.join(', ')}]`, result.stripped.length > 0)
   assert(`Walk_Backward de-drifted`, result.dedrifted.includes('Walk_Backward'))
   assert(`single mesh (not duplicated) — ${result.meshes}`, result.meshes === 1)
+
+  // T110 A: every clip the census found broken carries its corrective splay.
+  // Named individually rather than counted, so deleting one entry from the
+  // table fails here instead of quietly re-shipping that clip's interpenetration.
+  for (const slot of Object.keys(LEG_CORRECTIONS)) {
+    assert(
+      `${slot} leg-splayed [${result.corrected.find((c) => c.startsWith(`${slot}:`)) ?? 'MISSING'}]`,
+      result.corrected.some((c) => c.startsWith(`${slot}:`))
+    )
+  }
+
+  // T110 E1: the material flip actually landed in the written file.
+  {
+    const doc = await new NodeIO().read(out)
+    const bad = doc
+      .getRoot()
+      .listMaterials()
+      .filter((m) => m.getAlphaMode() !== 'OPAQUE' || m.getDoubleSided())
+    assert(`all materials OPAQUE + single-sided (${bad.length} offenders)`, bad.length === 0)
+  }
 
   // Orientation: the v2 export is Z-up; output must stand ~1.7u tall on +Y.
   assert(`stood upright (Z-up export corrected)`, result.oriented === true)

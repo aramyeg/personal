@@ -15,6 +15,14 @@ import {
   BACKWARD_SLOT,
   JUMP_A_SLOT,
   JUMP_B_SLOT,
+  WALK_SLOT,
+  RUN_SLOT,
+  BASE_STRIDE,
+  WALK_MAX,
+  WALK_MAX_DOWN,
+  RUN_MIN,
+  RUN_MIN_DOWN,
+  resolveForwardGear,
   type Locomotion,
 } from '@/components/labs/small-world/scene/girl-anim'
 
@@ -365,5 +373,94 @@ describe('speedToTimeScale', () => {
 
   it('takes only the magnitude (the caller has no reverse playback path)', () => {
     expect(speedToTimeScale(1.5, STRIDE, MIN, MAX)).toBeCloseTo(1.5, 10)
+  })
+})
+
+describe('forward gears (T110)', () => {
+  const ALL = [SKIP_CLIP, IDLE_SLOT, BACKWARD_SLOT, JUMP_A_SLOT, JUMP_B_SLOT, WALK_SLOT, RUN_SLOT]
+
+  describe('resolveForwardGear', () => {
+    it('picks walk / skip / run across the measured speed bands', () => {
+      expect(resolveForwardGear(0.5, 0)).toBe(0)
+      expect(resolveForwardGear(4.0, 0)).toBe(1)
+      expect(resolveForwardGear(12.0, 0)).toBe(2)
+    })
+
+    it('holds the current gear inside the dead band rather than flickering', () => {
+      // 2.2..2.5 and 7.2..8.0 belong to whichever gear is already driving.
+      expect(resolveForwardGear(2.3, 0)).toBe(0)
+      expect(resolveForwardGear(2.3, 1)).toBe(1)
+      expect(resolveForwardGear(7.5, 1)).toBe(1)
+      expect(resolveForwardGear(7.5, 2)).toBe(2)
+    })
+
+    it('needs the UP threshold to climb and the lower DOWN one to drop', () => {
+      expect(resolveForwardGear(WALK_MAX, 0)).toBe(1)
+      expect(resolveForwardGear(WALK_MAX - 0.01, 0)).toBe(0)
+      expect(resolveForwardGear(WALK_MAX_DOWN, 1)).toBe(1)
+      expect(resolveForwardGear(WALK_MAX_DOWN - 0.01, 1)).toBe(0)
+      expect(resolveForwardGear(RUN_MIN, 1)).toBe(2)
+      expect(resolveForwardGear(RUN_MIN - 0.01, 1)).toBe(1)
+      expect(resolveForwardGear(RUN_MIN_DOWN, 2)).toBe(2)
+      expect(resolveForwardGear(RUN_MIN_DOWN - 0.01, 2)).toBe(1)
+    })
+
+    it('drops two gears at once when a fling stops dead', () => {
+      expect(resolveForwardGear(0.1, 2)).toBe(0)
+    })
+
+    it('keeps the dead bands ordered — a DOWN never sits above its own UP', () => {
+      expect(WALK_MAX_DOWN).toBeLessThan(WALK_MAX)
+      expect(RUN_MIN_DOWN).toBeLessThan(RUN_MIN)
+      expect(WALK_MAX).toBeLessThan(RUN_MIN_DOWN)
+    })
+
+    it('leaves the gentle reader entirely in the walk (measured max 2.23 u/s)', () => {
+      expect(resolveForwardGear(2.23, 0)).toBe(0)
+    })
+  })
+
+  describe('resolveClipPlan forwardGears', () => {
+    it('names the three clips slow-to-fast when the GLB carries them', () => {
+      const gears = resolveClipPlan(ALL).forwardGears
+      expect(gears.map((g) => g.clip)).toEqual([WALK_SLOT, SKIP_CLIP, RUN_SLOT])
+      expect(gears.every((g) => !g.fallback)).toBe(true)
+      // Strides rise with the gear, or a faster clip would play slower.
+      expect(gears[0].stride).toBeLessThan(gears[1].stride)
+      expect(gears[1].stride).toBeLessThan(gears[2].stride)
+    })
+
+    it('degrades every missing gear onto the forward slot — the mixer is never empty', () => {
+      // A pre-T110 GLB: no walk, no run. Every gear must still name a real clip,
+      // which is what keeps T-pose immunity true by construction.
+      const gears = resolveClipPlan([SKIP_CLIP, IDLE_SLOT, BACKWARD_SLOT]).forwardGears
+      expect(gears).toHaveLength(3)
+      expect(gears.map((g) => g.clip)).toEqual([SKIP_CLIP, SKIP_CLIP, SKIP_CLIP])
+      expect(gears.map((g) => g.fallback)).toEqual([true, false, true])
+      // …and a fallback gear carries the pre-T110 stride, so the old GLB keeps
+      // exactly the old cadence law rather than a gear's retuned one.
+      expect(gears[0].stride).toBe(BASE_STRIDE)
+      expect(gears[2].stride).toBe(BASE_STRIDE)
+    })
+
+    it('degrades a partial GLB per gear, keeping the ones it does carry', () => {
+      const gears = resolveClipPlan([SKIP_CLIP, WALK_SLOT]).forwardGears
+      expect(gears.map((g) => g.clip)).toEqual([WALK_SLOT, SKIP_CLIP, SKIP_CLIP])
+      expect(gears.map((g) => g.fallback)).toEqual([false, false, true])
+    })
+
+    it('every gear index resolveForwardGear can return is a real gear', () => {
+      const gears = resolveClipPlan(ALL).forwardGears
+      for (const speed of [0, 1, 2.4, 2.6, 5, 7.9, 8.1, 30]) {
+        for (const prev of [0, 1, 2]) {
+          expect(gears[resolveForwardGear(speed, prev)]).toBeDefined()
+        }
+      }
+    })
+
+    it('leaves the base forward slot alone — the ending still walks on its own clip', () => {
+      // driveEnding reads plan.forward, not the gears; T110 must not move it.
+      expect(resolveClipPlan(ALL).forward.clip).toBe(SKIP_CLIP)
+    })
   })
 })
