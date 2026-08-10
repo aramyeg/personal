@@ -10,7 +10,8 @@ import { MangaPreload } from './manga-card'
 import { EndingConnect } from './ending-connect'
 import { JourneyProgress } from './journey-progress'
 import { SpeedLines } from './speed-lines'
-import { useRestartVeil } from './restart-veil'
+import { IRIS_DESK, IRIS_START } from './iris-transition'
+import { useIrisVeil } from './iris-veil'
 import { advanceTargetFrom } from '../story-stops'
 import { useJourneyUi } from './use-journey-ui'
 
@@ -23,11 +24,18 @@ export function JourneyOverlay({
   progressRef,
   journey,
   onAdvance,
+  onSeek,
 }: {
   progressRef: MutableRefObject<number>
   /** Supplies the arrival reveal clock; absent → panels key to the dwell as before (Task 54). */
   journey?: ArrivalJourney
   onAdvance: (targetProgress: number) => void
+  /**
+   * The same destination as `onAdvance`, arrived at INSTANTLY — the iris's one call to the
+   * document, made while the frame is covered. Absent → the skip control is not drawn, which is
+   * what keeps every existing unit mount of this tree unchanged.
+   */
+  onSeek?: (targetProgress: number) => void
 }) {
   const ui = useJourneyUi(progressRef, journey)
   /**
@@ -45,11 +53,15 @@ export function JourneyOverlay({
   /**
    * THE RESTART NO LONGER SCROLLS THE VISITOR BACKWARDS (Task 106). It used to be `onAdvance(0)`,
    * i.e. the panels' own smooth-scroll aimed at the top of a 1680 vh track — measured, that is
-   * six authored worlds on screen for three frames apiece. `restart-transition.ts` carries the
+   * six authored worlds on screen for three frames apiece. `iris-transition.ts` carries the
    * measurement and the replacement; all this file needs to know is that the ending's restart and
    * the panels' tap-to-advance are no longer the same gesture and no longer share a handler.
+   *
+   * Task 108 pointed the same iris at a second destination, so the hook is no longer named for the
+   * restart: `iris(target)` takes a journey progress, and the two controls differ only in which
+   * one they hand it.
    */
-  const { veil, restart } = useRestartVeil()
+  const { veil, iris } = useIrisVeil((p) => onSeek?.(p))
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* FIRST child on purpose: the per-biome grade must paint under the cards and the rail, so
@@ -125,12 +137,22 @@ export function JourneyOverlay({
               again, with the connect note the only thing that hangs here.
               `EndingConnect` never keyed off the page — it runs on `ui.ending.t`
               directly — so removing it leaves no hole to close. */}
-          <EndingConnect t={ui.ending.t} onRestart={restart} />
+          <EndingConnect t={ui.ending.t} onRestart={() => iris(IRIS_START)} />
         </div>
       )}
       {/* The rail reads RAW scroll: it is the "your input registered" affordance, so it must
           keep creeping even while an arrival absorbs the journey's own progress (Task 54). */}
-      {SHOW_PROGRESS_RAIL && <JourneyProgress progressRef={journey?.rawProgressRef ?? progressRef} />}
+      {/* THE SKIP RIDES THE SAME IRIS AS THE RESTART, pointed the other way (Task 108) — one
+          mechanism, two destinations, so the lab's two "leave where you are" gestures cannot drift
+          apart in timing or in look. It hangs on the rail because the rail is the journey's own
+          chrome: it is already the thing that says where you are in the story, so it is the honest
+          place for the control that says you can stop being there. */}
+      {SHOW_PROGRESS_RAIL && (
+        <JourneyProgress
+          progressRef={journey?.rawProgressRef ?? progressRef}
+          onSkip={onSeek ? () => iris(IRIS_DESK) : undefined}
+        />
+      )}
       {cvOpen && <CvOverlay onClose={() => setCvOpen(false)} />}
       {/* LAST, so it covers everything this tree draws — including the CV lightbox, which is the
           only thing here that outranks the ending. Mounted only while the gesture runs. */}

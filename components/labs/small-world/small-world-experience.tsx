@@ -6,7 +6,7 @@ import { TRACK_END, trackOffsetFor } from './ending-timeline'
 import { FALLBACK_CLASS } from './fallback-class'
 import { JourneyOverlay } from './overlay/journey-overlay'
 import { SmallWorldScene } from './scene/scene'
-import { beginManualScrollRestoration, pinScrollToTop } from './scroll-reset'
+import { beginManualScrollRestoration, pinScrollTo, pinScrollToTop } from './scroll-reset'
 import { StoryStopSnap } from './story-stop-snap'
 import { useArrivalJourney } from './use-arrival-journey'
 import { isTuneEnabled } from './scene/tunables'
@@ -101,6 +101,24 @@ export function SmallWorldExperience({
     window.scrollTo({ top: top + trackOffsetFor(p, total), behavior: 'smooth' })
   }
 
+  /**
+   * The same destination, arrived at in ONE FRAME (Task 108) — what the iris calls while the frame
+   * is covered.
+   *
+   * It is `advanceTo`'s body with the animation removed, and it lives here for the reason
+   * `advanceTo` does: the progress → pixels mapping needs the track element, and this component is
+   * the one that owns it. `pinScrollTo` rather than a plain `scrollTo` because the lab's global
+   * `scroll-behavior: smooth` would otherwise animate the jump — the exact defect Task 106 measured
+   * at 90 frames and 1.5 s, hidden for three rounds behind a caller that only ever jumped to 0.
+   */
+  const seekTo = (p: number) => {
+    const el = trackRef.current
+    if (!el) return
+    const total = el.scrollHeight - window.innerHeight
+    const top = el.getBoundingClientRect().top + window.scrollY
+    pinScrollTo(top + trackOffsetFor(p, total))
+  }
+
   if (!active) return null
 
   return (
@@ -113,7 +131,12 @@ export function SmallWorldExperience({
       <StoryStopSnap trackRef={trackRef} />
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} journey={journey} onLoadChange={onLoadChange} />
-        <JourneyOverlay progressRef={progressRef} journey={journey} onAdvance={advanceTo} />
+        <JourneyOverlay
+          progressRef={progressRef}
+          journey={journey}
+          onAdvance={advanceTo}
+          onSeek={seekTo}
+        />
         {tune && <TunePanel />}
       </div>
       {/* Collapse the now-pastel-styled fallback once the scene is live. Neutralises

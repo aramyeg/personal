@@ -64,6 +64,19 @@ export function beginManualScrollRestoration(): () => void {
  * the only one that animates.
  */
 export function pinScrollToTop(): void {
+  pinScrollTo(0)
+}
+
+/**
+ * The same instant jump, aimed anywhere (Task 108).
+ *
+ * The iris now covers TWO destinations — the top for the restart and the bottom of the track for
+ * "skip to the desk" — and both need the identical property: the document moves in ONE frame,
+ * because the whole point of the cover is that nothing under it is seen moving. A second
+ * implementation of the bypass would be a second chance to inherit the smooth-scroll bug the block
+ * above documents, so the top is now a special case of this rather than its own routine.
+ */
+export function pinScrollTo(top: number): void {
   if (typeof window === 'undefined') return
   const el = typeof document !== 'undefined' ? document.documentElement : null
   const prevBehavior = el?.style.scrollBehavior
@@ -73,11 +86,11 @@ export function pinScrollToTop(): void {
     void el.offsetHeight
   }
   try {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    window.scrollTo({ top, left: 0, behavior: 'instant' })
   } catch {
     // Older engines reject the enum value; the style route above is already in force.
     try {
-      window.scrollTo(0, 0)
+      window.scrollTo(0, top)
     } catch {
       // ignore — best-effort
     }

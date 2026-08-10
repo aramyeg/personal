@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import type { MutableRefObject } from 'react'
+import type { CSSProperties, MutableRefObject, ReactNode } from 'react'
+import { NO_TAP_HIGHLIGHT, PRESS_SHIFT_PX, isKeyboardFocus } from './control-states'
 import { CHAPTER_COUNT } from '../chapters'
 import { chapters } from '../chapters'
 import { STAND_END, endingStateAt } from '../ending-timeline'
@@ -87,6 +88,46 @@ import { PALETTE } from '../palette'
  * applied. A ~43 px window on a 15840 px track, and bounded in consequence, but
  * it is the same defect `ending-connect.tsx` refuses three files over. It now
  * uses that file's standard: a control is live only while it is legible.
+ *
+ * ============================================================================
+ * TASK 108 — THE × WAS A ONE-WAY DOOR WITH NO SIGN ON IT
+ * ============================================================================
+ * Aram: "we have an x button to close the visual aid for the story, which chapter
+ * it currently is, but we have no way of returning this overlay; also it should
+ * be clearer that this x button is going to remove this overlay."
+ *
+ * Two defects in one control, and the second is the serious one. The × was a bare
+ * glyph at 0.4 alpha pinned to the frame's right edge, so it read as a stray mark
+ * rather than as a control belonging to the rail beside it — and pressing it
+ * UNMOUNTED the whole component, which meant the chapter counter, the six dots and
+ * the fill line were gone for the rest of the visit with nothing left on screen to
+ * suggest they could come back.
+ *
+ * WHAT REPLACES IT IS A LINE, NOT A BUTTON. The rail now ends in a hand-written
+ * control row — the same register as the ending's `cv · start the story over` —
+ * carrying "skip to the desk" and "hide progress". Three things follow from that
+ * shape and each of them is the fix to something:
+ *
+ *  - THE WORD IS THE AFFORDANCE. "hide progress" cannot be mistaken for a close on
+ *    the story, on the page, or on the lab. The drawn cross stays beside it as the
+ *    icon a reader's eye already finds, and it is DRAWN rather than typed for the
+ *    reason `manga-lightbox.tsx` gives — `×` in a display face is a leaning
+ *    lowercase x with colour fringing on its strokes.
+ *  - THE CONTROL DOES NOT MOVE WHEN YOU PRESS IT. Hiding removes the readout ABOVE
+ *    the row (title, counter, dots, bar); the row itself is bottom-anchored and
+ *    stays exactly where it was, with the same button now reading "show progress"
+ *    over an upward chevron. The answer to "where did it go" is that the door is
+ *    still in the doorway — a stronger reply than an animation, because it is still
+ *    true a minute later.
+ *  - THE ESCAPE HATCH IS NOT A CASUALTY OF TIDYING. "skip to the desk" survives
+ *    hiding, because hiding the progress readout is a statement about the readout
+ *    and not about wanting fewer ways out of a 1680 vh scroll.
+ *
+ * THE HIDDEN STATE LASTS AS LONG AS THE SCENE DOES, exactly as the old dismiss did:
+ * it is component state, so a reload starts the rail up again. That is deliberate
+ * rather than inherited — the lab already pins scroll to the top on every load, so
+ * a reload is a fresh visit in every other respect too, and a persisted preference
+ * would be the one thing that remembered the last one.
  */
 
 const DOT = 9
@@ -168,15 +209,42 @@ function chapterAt(progress: number): number {
   return Math.min(CHAPTER_COUNT - 1, Math.floor(p * CHAPTER_COUNT))
 }
 
-export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject<number> }) {
+/**
+ * The control row's focus ring, and it is the SAME CONSTRUCTION as the ending's rather than the
+ * same colours: two stops, a near-white inner and an ink outer, so the ring clears its surround
+ * whichever way that surround is lit. The ending could measure one background because it only ever
+ * falls on the studio pad; this row falls on SIX authored biomes — jungle understory green through
+ * pale ice — so the paper stop is doing real work here rather than only separating the ring from a
+ * rose border. Drawn as a box-shadow, not an `outline`, for the same two reasons: it follows the
+ * radius and it needs no stylesheet.
+ */
+const FOCUS_RING = `0 0 0 2px ${PALETTE.pagePaper}, 0 0 0 4px ${PALETTE.ink}`
+
+export function JourneyProgress({
+  progressRef,
+  onSkip,
+}: {
+  progressRef: MutableRefObject<number>
+  /** Leave the story and land at the desk. Absent → the control is not drawn at all. */
+  onSkip?: () => void
+}) {
   const [chapter, setChapter] = useState(() => chapterAt(progressRef.current))
-  const [dismissed, setDismissed] = useState(false)
+  const [hidden, setHidden] = useState(false)
+  /**
+   * Whether the row's controls may be reached — REACT STATE, not a per-frame style write, and that
+   * is a correctness fix rather than a style preference. The controls now re-render on focus and on
+   * press, and React re-applies the whole `style` prop when they do; an imperative
+   * `el.style.visibility` written by the frame loop would be silently reverted to the JSX's own
+   * value by the very next press. It changes at most twice in a visit (the rail fades once), so it
+   * costs nothing to hold here.
+   */
+  const [live, setLive] = useState(() => railDismissLive(progressRef.current))
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  const [pressedKey, setPressedKey] = useState<string | null>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const dismissRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (dismissed) return
     let raf = 0
     const compute = () => {
       // the RAW value, unclamped: `railOpacity` reads the ending, and the clamp is what hides it
@@ -188,13 +256,8 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
         wrapRef.current.style.opacity = `${o}`
         wrapRef.current.style.visibility = o === 0 ? 'hidden' : 'visible'
       }
-      if (dismissRef.current) {
-        // `visibility` and not just `pointerEvents`: the second stops a click, the first is what
-        // takes the control out of sequential focus as well
-        const live = railDismissLive(raw)
-        dismissRef.current.style.pointerEvents = live ? 'auto' : 'none'
-        dismissRef.current.style.visibility = live ? 'visible' : 'hidden'
-      }
+      const l = railDismissLive(raw)
+      setLive((prev) => (prev === l ? prev : l))
       const c = chapterAt(p)
       setChapter((prev) => (prev === c ? prev : c))
     }
@@ -202,21 +265,55 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(compute)
     }
+    // `hidden` is a dependency because showing the rail again mounts a FRESH fill element at 0%,
+    // and a visitor who un-hides without scrolling would otherwise read an empty bar.
     compute()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('scroll', onScroll)
     }
-  }, [progressRef, dismissed])
+  }, [progressRef, hidden])
 
-  if (dismissed) return null
+  const press = (key: string) => ({
+    onPointerDown: () => setPressedKey(key),
+    onPointerUp: () => setPressedKey(null),
+    onPointerCancel: () => setPressedKey(null),
+    onPointerLeave: () => setPressedKey(null),
+  })
+
+  /**
+   * The hand-written row's shared register — stated once because the pair only reads as a pair
+   * while they match, which is the same argument `ending-connect.tsx`'s `handStyle` makes about the
+   * line it owns. `visibility` and not just `pointerEvents`: the second stops a click, the first is
+   * what takes a control out of sequential focus as well.
+   */
+  const controlStyle = (key: string): CSSProperties => ({
+    pointerEvents: live ? 'auto' : 'none',
+    visibility: live ? 'visible' : 'hidden',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    appearance: 'none',
+    border: 'none',
+    background: 'transparent',
+    fontFamily: 'var(--sw-font-hand)',
+    fontSize: 19,
+    lineHeight: 1,
+    color: PALETTE.ink,
+    padding: '2px 3px 3px',
+    borderRadius: 3,
+    cursor: 'pointer',
+    // a hand-written control presses by MOVING, the way a pen does — control-states.ts
+    transform: pressedKey === key ? `translateY(${PRESS_SHIFT_PX}px)` : undefined,
+    boxShadow: focusedKey === key ? FOCUS_RING : undefined,
+    ...NO_TAP_HIGHLIGHT,
+  })
 
   return (
     <div
       ref={wrapRef}
-      role="group"
-      aria-label={`Journey progress: chapter ${chapter + 1} of ${CHAPTER_COUNT}`}
+      data-testid="sw-journey-rail"
       style={{
         position: 'absolute',
         left: 0,
@@ -229,6 +326,16 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
         pointerEvents: 'none',
       }}
     >
+      {/* THE READOUT — everything "hide progress" hides, and nothing else. It carries the group
+          role and the label now that the wrapper also holds a control row that outlives it: a
+          group announcing "Journey progress: chapter 3 of 6" around a row whose only remaining
+          member says "show progress" would be describing something that is not on screen. */}
+      {!hidden && (
+        <div
+          role="group"
+          aria-label={`Journey progress: chapter ${chapter + 1} of ${CHAPTER_COUNT}`}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}
+        >
       {/* THE CHAPTER'S TITLE, and it is a PARITY FIX rather than decoration
           (Task 85, finding 10). `theme` — "The page builder", "The dashboards",
           "The small stuff" — reached only the reduced-motion fallback, so the
@@ -286,6 +393,7 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
         >
           <div
             ref={fillRef}
+            data-testid="sw-rail-fill"
             style={{
               position: 'absolute',
               left: 0,
@@ -334,35 +442,133 @@ export function JourneyProgress({ progressRef }: { progressRef: MutableRefObject
               </span>
             )
           })}
+          </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      <button
-        ref={dismissRef}
-        type="button"
-        onClick={() => setDismissed(true)}
-        aria-label="Hide journey progress"
+      {/* THE CONTROL ROW — bottom-anchored, so it does not move when the readout above it goes.
+          `nowrap` for the reason the ending's own hand row states: a wrapped line is a taller
+          block, and a bottom-anchored block that grows pushes everything above it up the frame.
+
+          IT IS THE ONE PART OF THE RAIL THAT OUTRANKS THE STORY, and that is a measurement rather
+          than a preference. On a phone `chapter-panels.tsx` stacks its two cards at z-index 1 and 2
+          and its own tab at 3, and those are not local to the spread — so at 390 the comic page
+          covered this row outright and `elementsFromPoint` at the skip's own centre came back
+          `sw-manga-card` on top of `sw-skip-to-desk`. The control was drawn, boxed and dead: a
+          press went to the card underneath and the visitor got a page flip instead of the desk.
+          4 clears all three. The READOUT above deliberately stays under the spread — a phone has no
+          room for both and the comic is what the visitor came for — so this raises the escape
+          hatch and nothing else. */}
+      <div
         style={{
-          position: 'absolute',
-          right: 'max(12px, env(safe-area-inset-right))',
-          bottom: 2,
-          // inert until the first compute says otherwise — the safe direction to be wrong in
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'center',
+          flexWrap: 'nowrap',
+          whiteSpace: 'nowrap',
+          marginTop: 1,
+          position: 'relative',
+          zIndex: 4,
           pointerEvents: 'none',
-          visibility: 'hidden',
-          appearance: 'none',
-          border: 'none',
-          background: 'transparent',
-          color: PALETTE.ink,
-          opacity: 0.4,
-          fontFamily: 'var(--sw-font-body)',
-          fontSize: 16,
-          lineHeight: 1,
-          cursor: 'pointer',
-          padding: 6,
         }}
       >
-        ×
-      </button>
+        {onSkip && (
+          <>
+            {/* THE WAY OUT OF 1680 vh. Aram: "a small button, skip to the desk, which will lead
+                the user to the final contact page essentially."
+                IT IS THE SOLID RULE, and the toggle beside it carries none — the same reading the
+                ending's line already uses, where an underline means this one GOES somewhere. It
+                goes under the iris (`iris-transition.ts`), which is the gesture the restart
+                already uses in the other direction: one manga-panel cut rather than a smooth
+                scroll through six worlds at three frames apiece. */}
+            <button
+              type="button"
+              data-testid="sw-skip-to-desk"
+              onClick={(e) => {
+                // Blur first, for the reason the restart does: this control jumps the whole track
+                // under the row, and focus surviving the jump would leave a forced-visible control
+                // over a frame it does not belong to.
+                e.currentTarget.blur()
+                setFocusedKey(null)
+                setPressedKey(null)
+                onSkip()
+              }}
+              onFocus={(e) => setFocusedKey(isKeyboardFocus(e.target) ? 'skip' : null)}
+              {...press('skip')}
+              aria-label="Skip to the desk — the ending, with her CV and contact links"
+              title="Skip to the desk — the ending, with her CV and contact links"
+              style={{
+                ...controlStyle('skip'),
+                borderBottom: `2px solid ${pressedKey === 'skip' ? PALETTE.ink : PALETTE.blossomDeep}`,
+              }}
+            >
+              skip to the desk
+            </button>
+            <span
+              aria-hidden
+              style={{
+                fontFamily: 'var(--sw-font-hand)',
+                fontSize: 19,
+                lineHeight: 1,
+                color: PALETTE.ink,
+                opacity: 0.7,
+                padding: '0 8px',
+              }}
+            >
+              ·
+            </span>
+          </>
+        )}
+
+        {/* THE TOGGLE. One control, one place, two words — the door stays in the doorway. */}
+        <button
+          type="button"
+          data-testid="sw-progress-toggle"
+          onClick={() => setHidden((v) => !v)}
+          onFocus={(e) => setFocusedKey(isKeyboardFocus(e.target) ? 'toggle' : null)}
+          {...press('toggle')}
+          aria-expanded={!hidden}
+          aria-label={hidden ? 'Show journey progress' : 'Hide journey progress'}
+          style={controlStyle('toggle')}
+        >
+          {hidden ? 'show progress' : 'hide progress'}
+          {hidden ? <ChevronUp /> : <Cross />}
+        </button>
+      </div>
     </div>
+  )
+}
+
+/**
+ * DRAWN, NOT TYPED — the rule `manga-lightbox.tsx` set for the same job. A `×` glyph set in a
+ * display face renders as a leaning lowercase x with subpixel colour fringing on its strokes, and
+ * this row is set in a HANDWRITING face, where it would lean further still. Two strokes at exact
+ * 45 degrees in `currentColor`, so the icon is the same ink as the word it follows.
+ */
+function Cross(): ReactNode {
+  return (
+    <Glyph d="M2.6 2.6 L9.4 9.4 M9.4 2.6 L2.6 9.4" />
+  )
+}
+
+/** ...and the way back points UP, at the readout that is about to reappear above it. */
+function ChevronUp(): ReactNode {
+  return <Glyph d="M2.4 8 L6 4.1 L9.6 8" />
+}
+
+function Glyph({ d }: { d: string }): ReactNode {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 12 12"
+      aria-hidden
+      focusable="false"
+      shapeRendering="geometricPrecision"
+      style={{ display: 'block', flex: 'none', opacity: 0.85 }}
+    >
+      <path d={d} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" fill="none" />
+    </svg>
   )
 }

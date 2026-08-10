@@ -1,5 +1,15 @@
+import { RETRACT_SECONDS } from '../arrival'
+import { TRACK_END } from '../ending-timeline'
+
 /**
- * THE RESTART'S IRIS (Task 106) — the transition that replaces the rewind, as data.
+ * THE IRIS (Task 106, generalized in Task 108) — the transition that replaces the rewind, as data.
+ *
+ * It was `restart-transition.ts` and it aimed at one place. Task 108 added a second control that
+ * needs the identical gesture pointed somewhere else ("skip to the desk"), so the file is named for
+ * the MECHANISM rather than for its first caller: an iris is a jump-anywhere-under-cover, and the
+ * destination is now a parameter (`IRIS_START`, `IRIS_DESK`) instead of a hard-coded `scrollTo(0)`.
+ * Building a second veil would have meant a second set of timings, a second mask and a second
+ * chance to get the "the document may not move while the frame is visible" law wrong.
  *
  * ============================================================================
  * WHAT WAS WRONG WITH THE REWIND, MEASURED
@@ -80,10 +90,61 @@ export const COVER_MS = 320
  * the ending instead of the first frame of the journey.
  */
 export const HOLD_MS = 110
+/**
+ * ...AND THE DESK NEEDS LONGER, because of what a skip leaves running behind the cover.
+ *
+ * The restart's 110 ms is enough because the top of the track has no wall clock on it: everything
+ * the scene draws there is a pure function of a scroll position the jump has already set. The skip
+ * lands somewhere the visitor may have been READING — the natural place to press it is parked at a
+ * checkpoint with a spread up — and a checkpoint's spread does not vanish when its dwell does. The
+ * arrival machine walks the reveal back out over `RETRACT_SECONDS` of WALL CLOCK, and that
+ * retraction starts on the frame the jump lands, so with a 110 ms hold the iris would open on a
+ * chapter spread whipping itself off the desk.
+ *
+ * So the hold is DERIVED from the beat it has to outlast rather than typed: the retraction, plus a
+ * margin. Retuning the walk-out in `arrival.ts` moves this with it.
+ *
+ * THE MARGIN IS SIX FRAMES AND THAT IS A MEASUREMENT (skip pressed at chapter 4's stop, shipped
+ * build, 1440×900 — the traces are in the report). The spread does not start walking out on the
+ * frame the jump lands: the arrival driver is idle until something makes it busy, so the retraction
+ * clock begins a tick or two late and the spread's real lifetime after the jump came out at 450 ms
+ * against `RETRACT_SECONDS`'s 420. A three-frame margin left ONE frame of cover to spare and lost
+ * that race in one run of two — the iris cracked open to 6.6% with the spread still mounted. Six
+ * frames leaves four, which is the same margin the restart's own hold keeps over the renderer.
+ */
+export const DESK_HOLD_MS = RETRACT_SECONDS * 1000 + 6 * (1000 / 60)
 /** The iris opens. Slower than it shut: arriving somewhere is worth more time than leaving. */
 export const REVEAL_MS = 470
 
-export const VEIL_MS = COVER_MS + HOLD_MS + REVEAL_MS
+/** The whole gesture, for a given covered hold. */
+export function veilMs(hold: number): number {
+  return COVER_MS + hold + REVEAL_MS
+}
+
+/** The restart's total — the shape of the gesture before it had a second destination. */
+export const VEIL_MS = veilMs(HOLD_MS)
+
+/**
+ * ============================================================================
+ * THE DESTINATIONS
+ * ============================================================================
+ * Both are JOURNEY PROGRESS, the same units `advanceTo` and the story stops speak, so a caller
+ * cannot mix up "a scroll position" with "a place in the story" — and so the desk stays defined as
+ * the END OF THE TRACK rather than as a pixel count that would need re-measuring per viewport.
+ */
+/** Page one. The restart. */
+export const IRIS_START = 0
+/** The desk: the last frame of the ending, where the note is settled and the connect block is up. */
+export const IRIS_DESK = TRACK_END
+
+/**
+ * How long the cover has to hold for a given destination — the top needs only the renderer's
+ * frames, the ending needs the checkpoint walk-out as well. Solved here rather than at the call
+ * site so the two controls cannot disagree about it.
+ */
+export function holdMsFor(target: number): number {
+  return target > 1 ? DESK_HOLD_MS : HOLD_MS
+}
 
 /** How wide the inked rim is, in the same percentage units as the radius. */
 export const VEIL_RIM = 1.1
@@ -105,16 +166,19 @@ export type VeilState = {
 /**
  * The gesture at a point on its own clock, in ms since it started. Pure, so the law that matters —
  * the document may not move until the iris is SHUT — is a property of this function rather than a
- * hope about the frame loop.
+ * hope about the frame loop. `hold` is the covered phase's length; it defaults to the restart's, so
+ * the law holds for whatever a destination asks for and the sweep that proves it does not have to
+ * be re-derived per caller.
  */
-export function veilStateAt(ms: number): VeilState {
+export function veilStateAt(ms: number, hold: number = HOLD_MS): VeilState {
+  const total = veilMs(hold)
   if (ms <= 0) return { radius: VEIL_OPEN, jump: false, done: false }
   if (ms < COVER_MS) {
     return { radius: VEIL_OPEN * (1 - easeIn(ms / COVER_MS)), jump: false, done: false }
   }
-  if (ms < COVER_MS + HOLD_MS) return { radius: 0, jump: true, done: false }
-  if (ms < VEIL_MS) {
-    const u = (ms - COVER_MS - HOLD_MS) / REVEAL_MS
+  if (ms < COVER_MS + hold) return { radius: 0, jump: true, done: false }
+  if (ms < total) {
+    const u = (ms - COVER_MS - hold) / REVEAL_MS
     return { radius: VEIL_OPEN * easeOut(u), jump: true, done: false }
   }
   return { radius: VEIL_OPEN, jump: true, done: true }
