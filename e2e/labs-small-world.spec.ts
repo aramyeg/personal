@@ -176,7 +176,13 @@ test.describe('Small World lab', () => {
     await waitForSceneReady(page)
     await scrollToProgress(page, chapterDwellProgress(0))
     await expect(page.getByTestId('sw-panel-data')).toBeVisible({ timeout: 10_000 })
-    await scrollToProgress(page, chapterTravelProgress(1))
+    // SCROLL ON WITHIN THE SAME CHAPTER (Task 109). This used to travel to chapter
+    // 2's release leg, which crosses chapter 2's OWN checkpoint on the way — and
+    // since the pace governor the journey genuinely stops there and plays its beat,
+    // so a spread was up at the destination and the assertion read the new one. The
+    // test's claim is that a spread dismisses when the reader moves on, and the
+    // release leg of the chapter it belongs to is where that is asked cleanly.
+    await scrollToProgress(page, chapterTravelProgress(0))
     await expect(page.getByTestId('sw-panel-data')).toBeHidden()
   })
 
