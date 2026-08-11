@@ -65,14 +65,14 @@ export const CANONICAL = {
   Happy_Sway_Standing: 'Idle',
   Idle: 'Idle',
   Walk_Backward: 'Walk_Backward',
-  // T110 C-lite: the two clean library clips that were sitting unshipped in the
-  // same GLB, now the slow and fast ends of forward travel (the skip keeps the
-  // middle). Census-clean as authored — Walking 0/32 frames, Running 1/20 —
-  // so they take no corrective offset.
-  Walking: 'Walk_Forward',
-  Walk_Forward: 'Walk_Forward',
-  Running: 'Run_Forward',
-  Run_Forward: 'Run_Forward',
+  // T110 shipped the source's spare Walking/Running clips as a slow and a fast
+  // gear either side of the skip; T112 removed the gears on Aram's verdict that
+  // he preferred the always-skipping version. A clip nothing can select is
+  // weight on the wire and nothing else, so the two slots are gone from this
+  // table rather than kept "in case" — the source still carries them, and
+  // re-adding two lines is the whole cost of changing our mind. Note that
+  // stripping them is not free of consequence for the OTHER clips: they shared
+  // sampler accessors, so `prune()` now reclaims that data too.
   '019f93e1-9b5a-770c-8e20-0e3ad4d204da': 'Jump_A',
   Jump_A: 'Jump_A',
   '019f93e2-9461-703f-988c-ec193d9b734b': 'Jump_B',
@@ -153,19 +153,10 @@ export const LEG_CORRECTIONS = {
   Idle: { splayCm: 9 },
   Skip_Forward: { splayCm: 12 },
   Walk_Backward: { splayCm: 10 },
-  Run_Forward: { splayCm: 6 },
 }
 
 /** The clips girl.glb must end up with, as a set (order-independent). */
-export const SHIPPED_SLOTS = [
-  'Skip_Forward',
-  'Idle',
-  'Walk_Backward',
-  'Jump_A',
-  'Jump_B',
-  'Walk_Forward',
-  'Run_Forward',
-]
+export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B']
 
 const DEFAULT_SRC = 'public/labs/small-world/girl-v2.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'

@@ -26,6 +26,27 @@
  * table below is kept purely so an older/partial GLB still degrades gracefully.
  */
 
+/**
+ * FORWARD TRAVEL IS ONE CLIP AT EVERY SPEED — the standing rule, not an accident
+ * of what the GLB happened to carry.
+ *
+ * T110/T111 shipped the alternative and it was reverted on sight: the GLB was
+ * given a walk and a run either side of the skip, speed picked the clip against
+ * measured thresholds, and the chooser was smoothed and hold-gated so a gait
+ * lasted longer than the mixer's crossfade. All of that worked as specified, and
+ * Aram's ruling on seeing it was that he liked the always-skipping version "way
+ * more". The reason is worth keeping, because gears will look like an obvious
+ * improvement to anyone reading the cadence law cold: the girl is not a
+ * simulation of a person moving at a speed, she is the reader's own hand made
+ * visible on a small planet, and a skip that quickens and slows reads as ONE
+ * continuous gesture answering ONE continuous input. Swapping her gait mid-scroll
+ * breaks that thread — each change is a little discontinuity the reader did not
+ * ask for, and the character stops being an extension of the scroll and starts
+ * being a thing being driven. The rate carries the speed; the clip carries who
+ * she is. So: only `speedToTimeScale` may respond to speed here, and the forward
+ * slot resolves to exactly one clip. Do not reintroduce gait selection.
+ */
+
 /** Canonical forward clip name shipped in girl.glb (v2). */
 export const SKIP_CLIP = 'Skip_Forward'
 /** Pre-v2 forward clip name — kept in the fallback chain so an old GLB still works. */
@@ -36,10 +57,6 @@ export const FORWARD_SLOTS = [SKIP_CLIP, LEGACY_SKIP_CLIP] as const
 /** Named clip slots the canonicalized girl.glb carries (see the task report). */
 export const IDLE_SLOT = 'Idle'
 export const BACKWARD_SLOT = 'Walk_Backward'
-/** The two library clips T110 brought into the shipping GLB, giving forward
- *  travel a slow and a fast gear either side of the skip. */
-export const WALK_SLOT = 'Walk_Forward'
-export const RUN_SLOT = 'Run_Forward'
 /** Aram's two jump exports, wired to the celebrate one-shot. */
 export const JUMP_A_SLOT = 'Jump_A'
 export const JUMP_B_SLOT = 'Jump_B'
@@ -59,162 +76,6 @@ export const CELEBRATE_SLOTS = [JUMP_A_SLOT, JUMP_B_SLOT, 'Wave', 'Celebrate'] a
  * skip/idle blend through the arc rather than showing a T-pose.
  */
 export const EXIT_JUMP_SLOTS = [JUMP_B_SLOT, JUMP_A_SLOT] as const
-
-/**
- * FORWARD TRAVEL HAS GEARS (T110).
- *
- * Until now one skip clip served every forward speed, from a gentle read to a
- * hard fling — which is what "the movement patterns feel too generic" meant in
- * practice: the only thing that changed with speed was playback rate. The GLB
- * now carries a walk and a run alongside the skip, so speed picks the clip and
- * the rate only trims within it.
- *
- * THE BOUNDARIES ARE MEASURED, not chosen by feel. Real wheel input was
- * captured from the live lab in a headed browser and replayed through this
- * lab's own scroll→progress→rotation chain (`scratchpad/t110/speed/`), giving
- * |surface speed| in world u/s over four reader behaviours:
- *
- *   slow read-through   p50 1.28   p95 2.16   MAX 2.23
- *   normal browse       p50 3.31   p95 8.61   max 9.04
- *   fast fling          p50 8.45   p95 20.1   max 23.9
- *   backward scrub      p50 3.53   p95 4.80   max 5.17
- *
- * WALK_MAX 2.5 sits just above the slow read-through's entire range, so a
- * reader who is actually reading never sees anything but a walk; it is also
- * exactly where the old cadence law saturated (speed/CLIP_STRIDE hits
- * MAX_TIMESCALE at 2.5), i.e. the speed past which one clip could no longer
- * express the difference anyway. RUN_MIN 8.0 is the pooled natural p99: about
- * 1–2% of ordinary reading frames reach a run, against 52% of fling frames. So
- * the run is what a fling looks like, not what browsing looks like.
- *
- * The DOWN thresholds are ~10% lower than the UP ones for the same reason
- * IDLE_REST_EPS sits below IDLE_MOVE_EPS: the per-frame speed is jittery, and
- * measured on those traces 4.7% of browse frames and 9.3% of fling frames cross
- * a bare 2.5 in a single frame. Without the dead band she would flicker between
- * gaits mid-stride.
- */
-export const WALK_MAX = 2.5
-export const WALK_MAX_DOWN = 2.2
-export const RUN_MIN = 8.0
-export const RUN_MIN_DOWN = 7.2
-
-/**
- * Each gear's stride: the surface speed at which that clip plays at its natural
- * rate. `speedToTimeScale` divides by it, so it is what keeps a gear from
- * running flat out across its whole band — the skip inherits 4.0 rather than
- * the old 1.0 precisely because it no longer covers 0–2.5 u/s, and at 1.0 it
- * would now sit pinned at MAX_TIMESCALE for every frame it is on screen.
- * Values are the measured centre of each band (walk: the slow reader's p50 of
- * 1.28; skip: the middle of 2.5–8.0; run: the fling's p50 of 8.45).
- */
-export const FORWARD_GEARS = [
-  { slot: WALK_SLOT, stride: 1.3 },
-  { slot: SKIP_CLIP, stride: 4.0 },
-  { slot: RUN_SLOT, stride: 9.0 },
-] as const
-
-/**
- * The stride every non-geared use of the cadence law measures against — the
- * backward step, the idle keep-alive, and any gear that had to fall back onto
- * the base forward clip. 1.0 is the pre-T110 value for ALL locomotion, kept
- * exactly so a GLB without the new clips behaves as it did before.
- */
-export const BASE_STRIDE = 1.0
-
-/**
- * Which gear this frame, given the magnitude of the forward surface speed and
- * the gear that was driving last frame. Hysteretic on both boundaries: a gear
- * is entered at the UP threshold and only left at the lower DOWN one, so a
- * speed hovering on a boundary holds whatever it is already doing.
- *
- * Pure and memoryless apart from `prev`, so girl.tsx can pin it frame to frame
- * the same way it pins the idle↔moving band.
- */
-export function resolveForwardGear(speedMag: number, prev: number): number {
-  const up = prev < 1 ? WALK_MAX : WALK_MAX_DOWN
-  const runUp = prev < 2 ? RUN_MIN : RUN_MIN_DOWN
-  if (speedMag >= runUp) return 2
-  if (speedMag >= up) return 1
-  return 0
-}
-
-/**
- * A GEAR IS CHOSEN ON THE GAIT'S OWN TIMESCALE, NOT THE FRAME'S (T111).
- *
- * Aram: "the girl always skips and it isn't based on the scroll speed." The
- * thresholds above were not the fault, and neither was the signal: instrumented
- * on the shipped build with real wheel input, `resolveForwardGear` was already
- * naming walk 93% of a slow read-through and run 79% of a fling. What it was NOT
- * doing was naming them for long enough to be seen.
- *
- * The per-frame surface speed is a 17ms quantity, and the journey's own shape
- * cycles it several times a second (a chapter ramps out of its checkpoint, runs,
- * then slows into the next). Measured over the live traces the driven clip
- * changed 2.7 times a second on a steady browse and 8.4 on a fling, and 54-89% of
- * those runs were SHORTER THAN THE MIXER'S CROSSFADE. A clip that is faded in
- * over 0.25s, reset to time 0 as it enters, and faded out again 80ms later is
- * never a gait — it is a smear. And because the gear index moves one step at a
- * time, every walk↔run traverse drops a skip fragment into that smear, which is
- * exactly why the answer to every input looked like the skip.
- *
- * So the chooser reads an EXPONENTIAL AVERAGE of the speed instead of the frame's
- * own value, and a gear it enters keeps the mixer for a minimum hold. The cadence
- * is untouched and still rides the instantaneous speed — the clip is picked by
- * what the reader is doing, the rate is trimmed by what they are doing right now.
- *
- * Both numbers are derived from the crossfade rather than felt:
- *  - GEAR_TAU_SECONDS 0.35 ≥ CROSSFADE 0.25, so the signal cannot demand a gait
- *    faster than the mixer can show one. On the measured grid (0.25/0.30/0.35/
- *    0.40) it is the smallest tau at which a slow read-through is 100% walk,
- *    which is the guarantee WALK_MAX was chosen to give and the shipped
- *    per-frame signal broke (93.2% walk, the rest skip fragments).
- *  - GEAR_MIN_HOLD_SECONDS 0.30 = the crossfade plus a frame or two, so a gait
- *    that is entered is always fully faded in before anything can fade it out.
- *    It is a guarantee, not a decoration: it is what moves the browse trace from
- *    19/81/0 to 26/74/0 by refusing the changes that arrive inside a fade.
- */
-export const GEAR_TAU_SECONDS = 0.35
-export const GEAR_MIN_HOLD_SECONDS = 0.3
-
-/**
- * The gear chooser's memory: the gear driving the mixer, the averaged speed it
- * was chosen from, and how long the gear has held. Held in one ref by girl.tsx.
- */
-export type GearState = {
-  readonly gear: number
-  readonly avgSpeed: number
-  readonly heldFor: number
-}
-
-export const initialGearState = (): GearState => ({ gear: 0, avgSpeed: 0, heldFor: Infinity })
-
-/**
- * Advance the gear chooser one frame.
- *
- * The average tracks |speed| ALWAYS — through dwells and backward scrubs as well
- * as travel — so resumed travel re-enters on what the reader is actually doing
- * rather than on a value frozen a checkpoint ago. The GEAR only moves while
- * travelling forward, which is the pre-existing rule: a dwell or a scrub leaves
- * her in the gear she was last in.
- *
- * `heldFor` starts at Infinity so the very first gear change is immediate — the
- * hold exists to stop churn, not to make her slow off the mark.
- */
-export function stepForwardGear(
-  state: GearState,
-  speedMag: number,
-  dt: number,
-  forward: boolean
-): GearState {
-  const avgSpeed = dampTimeScale(state.avgSpeed, speedMag, 1 / GEAR_TAU_SECONDS, dt)
-  const heldFor = state.heldFor + dt
-  if (!forward) return { gear: state.gear, avgSpeed, heldFor }
-  const want = resolveForwardGear(avgSpeed, state.gear)
-  if (want === state.gear || heldFor < GEAR_MIN_HOLD_SECONDS) {
-    return { gear: state.gear, avgSpeed, heldFor }
-  }
-  return { gear: want, avgSpeed, heldFor: 0 }
-}
 
 /** Locomotion state derived from signed surface speed. */
 export type Locomotion = 'forward' | 'backward' | 'idle'
@@ -338,11 +199,6 @@ export type SlotPlan = {
  */
 export type CelebratePlan = { readonly clips: readonly string[] } | null
 
-/** A resolved forward gear: the clip to play and the stride its cadence is
- *  measured against. `fallback` marks a gear whose own clip was absent and
- *  which is standing on the base forward slot instead. */
-export type GearPlan = SlotPlan & { readonly stride: number }
-
 export type ClipPlan = {
   readonly forward: SlotPlan
   readonly idle: SlotPlan
@@ -350,15 +206,6 @@ export type ClipPlan = {
   readonly celebrate: CelebratePlan
   /** The ending's exit jump, or null when the GLB carries no jump clip at all. */
   readonly exitJump: SlotPlan | null
-  /**
-   * Forward travel's three gears, slow to fast, indexed by `resolveForwardGear`.
-   * ALWAYS three entries, and every one of them names a clip the GLB actually
-   * carries: a GLB without the new walk/run degrades that gear onto the base
-   * forward slot (carrying the base stride with it, so the cadence law does not
-   * change either). That is what keeps the mixer's no-empty-action contract —
-   * and therefore T-pose immunity — true by construction rather than by luck.
-   */
-  readonly forwardGears: readonly GearPlan[]
 }
 
 const has = (available: readonly string[], name: string): boolean => available.includes(name)
@@ -389,13 +236,7 @@ export function resolveClipPlan(available: readonly string[]): ClipPlan {
   const exitClip = EXIT_JUMP_SLOTS.find((n) => has(available, n))
   const exitJump: SlotPlan | null = exitClip ? { clip: exitClip, fallback: false } : null
 
-  const forwardGears: readonly GearPlan[] = FORWARD_GEARS.map((gear) =>
-    has(available, gear.slot)
-      ? { clip: gear.slot, fallback: false, stride: gear.stride }
-      : { clip: forwardClip, fallback: true, stride: BASE_STRIDE }
-  )
-
-  return { forward, idle, backward, celebrate, exitJump, forwardGears }
+  return { forward, idle, backward, celebrate, exitJump }
 }
 
 /**

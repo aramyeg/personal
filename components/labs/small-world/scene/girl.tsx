@@ -19,8 +19,6 @@ import {
 } from './girl-exit'
 import { usePrefersReducedMotion } from './use-reduced-motion'
 import {
-  BASE_STRIDE,
-  initialGearState,
   nextTimeScale,
   resolveClipPlan,
   resolveLocomotionHysteretic,
@@ -28,9 +26,7 @@ import {
   shouldTriggerCelebrate,
   shouldYieldCelebrate,
   speedToTimeScale,
-  stepForwardGear,
   type ClipPlan,
-  type GearState,
   type Locomotion,
   type SlotPlan,
 } from './girl-anim'
@@ -55,11 +51,8 @@ if (girlGlbHandoff.buffer) {
  * Aram's Gate-2 note — she should command the planet, not decorate it.
  * Lives in `girl-exit.ts` now that the ending gives her a second one. */
 const GIRL_SCALE = GIRL_GLOBE_SCALE
-/** Surface distance one clip-cycle covers at timeScale 1. Forward travel now
- * carries a stride PER GEAR (girl-anim's FORWARD_GEARS); this is the value the
- * ungeared states — backward step, idle keep-alive — measure against, and it is
- * the pre-T110 number for all of them. */
-const CLIP_STRIDE = BASE_STRIDE
+/** Surface distance one skip-cycle covers at timeScale 1 — tune to the clip. */
+const CLIP_STRIDE = 1.0
 /** Damping rate for the skip cadence timeScale so it eases rather than snaps to
  * speed changes. */
 const DAMP_LAMBDA = 6
@@ -194,8 +187,7 @@ function driveLocomotion(
   signedSpeed: number,
   tsMagRef: { current: number },
   delta: number,
-  entering: boolean,
-  stride: number = CLIP_STRIDE
+  entering: boolean
 ): void {
   action.paused = false
   if (loco === 'idle' && !slot.fallback) {
@@ -205,7 +197,7 @@ function driveLocomotion(
   }
   const target = speedToTimeScale(
     Math.abs(signedSpeed),
-    stride,
+    CLIP_STRIDE,
     MIN_TIMESCALE,
     MAX_TIMESCALE
   )
@@ -254,16 +246,6 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
   /** Locomotion state currently driving the mixer — null while a celebrate owns
    * it. A change here is the "entering" edge that seeds the skip cadence. */
   const drivingLoco = useRef<Locomotion | null>(null)
-  /** Clip currently driving the mixer, so a GEAR change counts as an entering
-   *  edge too — the state stays 'forward' across walk→run, but the cadence must
-   *  still be seeded rather than eased out of the previous gear's value. */
-  const drivingClip = useRef<string | null>(null)
-  /** The forward gear chooser's memory (girl-anim's `stepForwardGear`): the gear
-   *  driving the mixer, the averaged speed it was chosen from, and how long it
-   *  has held. Kept across dwells and backward scrubs so resumed travel re-enters
-   *  the gear she left, and stepped EVERY frame so the average is current when
-   *  she starts moving again. */
-  const gearState = useRef<GearState>(initialGearState())
   /** Ordinal of discoveries seen — alternates Jump_A/Jump_B on the celebrate cycle. */
   const celebrateIndex = useRef(0)
   const reduced = usePrefersReducedMotion()
@@ -408,7 +390,6 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     }
     activeClip.current = null
     drivingLoco.current = null
-    drivingClip.current = null
     prevLoco.current = 'idle'
     tsMag.current = MIN_TIMESCALE
     endingOwned.current = false
@@ -528,33 +509,11 @@ export function Girl({ journeyRef }: { journeyRef: JourneyRef }) {
     // While a celebrate owns the mixer, leave it to the clip (it returns via the
     // 'finished' listener, or by yielding above). Otherwise drive locomotion.
     if (!celebrating.current) {
-      // Forward travel picks a GEAR from |speed| (T110); every other state keeps
-      // the single slot it always had. The gear index advances only while
-      // travelling forward, so a dwell or a backward scrub leaves her in the
-      // gear she was last in and she resumes on it rather than restarting at a
-      // walk.
-      let slot: SlotPlan = plan[loco]
-      let stride = CLIP_STRIDE
-      gearState.current = stepForwardGear(
-        gearState.current,
-        Math.abs(signedSpeed),
-        dt,
-        loco === 'forward'
-      )
-      if (loco === 'forward') {
-        const geared = plan.forwardGears[gearState.current.gear]
-        slot = geared
-        stride = geared.stride
-      }
+      const slot = plan[loco]
       const action = fadeTo(slot.clip, fade)
       if (action) {
-        // Changing GEAR is as much an "entering" edge as changing state: easing
-        // the cadence out of the walk's held timeScale into the run's would be
-        // the same stale-value sluggishness `nextTimeScale` exists to prevent.
-        const entering = drivingLoco.current !== loco || drivingClip.current !== slot.clip
-        driveLocomotion(action, loco, slot, signedSpeed, tsMag, dt, entering, stride)
+        driveLocomotion(action, loco, slot, signedSpeed, tsMag, dt, drivingLoco.current !== loco)
         drivingLoco.current = loco
-        drivingClip.current = slot.clip
       }
     }
 
