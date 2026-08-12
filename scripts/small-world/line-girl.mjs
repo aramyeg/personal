@@ -110,6 +110,18 @@ export const POSITION_SMOOTHING = 10
  *  offset, so the lining cannot be smoothed OUT through a fold's valley: the
  *  clearance is at least (1 − SMOOTH_CLAMP) x offset by construction. */
 export const SMOOTH_CLAMP = 0.5
+/**
+ * The floor on how far inside its own source vertex's tangent plane a lining
+ * vertex must finish, as a fraction of that vertex's offset.
+ *
+ * This is the stage's actual guarantee, and until T120b it was only ever an
+ * assumption: both smoothers work on smoothed quantities that are free to
+ * disagree with the local surface, and where they did, the lining came out on
+ * the wrong side of the shirt. A fraction rather than a fixed distance because
+ * the offset itself tapers to zero at the rim, where the two surfaces are
+ * coincident by design and a fixed floor would tear the weld open.
+ */
+export const CLEARANCE_FRACTION = 0.4
 /** Median-filter passes over the through-thickness field. Thickness is a
  *  property of the body and varies smoothly; a single wrinkle that reports
  *  1 mm is the shirt, and the median of its neighbours is the body. */
@@ -716,6 +728,33 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
     const L = Math.hypot(...s)
     const scale = L > limit && L > 0 ? limit / L : 1
     for (let k = 0; k < 3; k++) smoothed[w * 3 + k] = welded[w * 3 + k] + s[k] * scale
+
+    // THE CLEARANCE FLOOR — the guarantee this stage rests on, enforced instead
+    // of assumed.
+    //
+    // Everything above works on SMOOTHED quantities: the offset runs along a
+    // Laplacian-smoothed direction field, and the position is a Laplacian
+    // smoothing of the patch. Neither is anchored to the local surface. Where the
+    // patch folds hard, the smoothed direction can end up pointing outward
+    // (measured: dir·raw down to −0.83), and the smoothing displacement is
+    // clamped in magnitude but not in direction, so at a concave crease it pulls
+    // the lining back out through the shirt. Together they put 44 vertices — 193
+    // triangles, all across the back — OUTSIDE the garment before a single frame
+    // is posed, which is where the leak's shoulder-blade slivers come from.
+    //
+    // The invariant that makes the lining safe under skinning is d·n > 0 at bind,
+    // where n is the vertex's OWN unsmoothed normal: linear blend skinning maps
+    // the offset by M and the normal by M⁻ᵀ, and (Md)·(M⁻ᵀn) = d·n, so a vertex
+    // that starts inside stays inside. So project the result back onto that
+    // constraint with a margin, rather than hoping the smoothers respected it.
+    const r = [raw[w * 3], raw[w * 3 + 1], raw[w * 3 + 2]]
+    const ref = Math.hypot(...r) ? r : [dir[w * 3], dir[w * 3 + 1], dir[w * 3 + 2]]
+    const need = CLEARANCE_FRACTION * delta[w]
+    const have = [0, 1, 2].reduce(
+      (acc, k) => acc + (welded[w * 3 + k] - (smoothed[w * 3 + k] - dir[w * 3 + k] * delta[w])) * ref[k],
+      0
+    )
+    if (have < need) for (let k = 0; k < 3; k++) smoothed[w * 3 + k] -= ref[k] * (need - have)
   }
 
   // ---- build the lining ----------------------------------------------------
@@ -816,12 +855,70 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
     idxAccessor.setArray(merged)
   }
 
+  // CLEARANCE — the quantity the whole stage exists to make positive.
+  //
+  // A lining vertex must sit on the INSIDE of its own source vertex's tangent
+  // plane, measured against that vertex's own unsmoothed surface normal. Neither
+  // of the two things that move it guarantees that on its own: the offset is
+  // along a SMOOTHED direction field, which can disagree with the local normal by
+  // more than 90° where the patch folds, and the rim-pinned Laplacian's
+  // displacement is clamped in MAGNITUDE but not in DIRECTION, so at a concave
+  // crease it pulls the lining back out. The product of the two is what ships,
+  // so the product is what gets measured.
+  const clearance = new Float64Array(nWelded)
+  const noRaw = []
+  let negative = 0
+  for (const w of order) {
+    const r = [raw[w * 3], raw[w * 3 + 1], raw[w * 3 + 2]]
+    if (!Math.hypot(...r)) {
+      clearance[w] = NaN
+      noRaw.push(w)
+      continue
+    }
+    // (source − lining) · outward normal: positive means the lining is inside.
+    const c = [0, 1, 2].reduce(
+      (s, k) => s + (welded[w * 3 + k] - (smoothed[w * 3 + k] - dir[w * 3 + k] * delta[w])) * r[k],
+      0
+    )
+    clearance[w] = c
+    if (c <= 0) negative++
+  }
+  // The rim is coincident by construction, so a clearance of exactly zero there
+  // is the design, not a defect. Everything else with a non-positive clearance is
+  // a lining vertex sitting on the wrong side of the shirt.
+  const outside = order.filter((w) => !onRim[w] && Number.isFinite(clearance[w]) && clearance[w] < -1e-9)
+  const outsideTris = (() => {
+    const bad = new Set(outside)
+    let n = 0
+    for (let t = 0; t < idx.length / 3; t++) {
+      if (triLabel[t] !== 1) continue
+      if ([0, 1, 2].some((k) => bad.has(rep[idx[t * 3 + k]]))) n++
+    }
+    return n
+  })()
+  const outsideBox = outside.length
+    ? [0, 1, 2].map((k) => [
+        Math.min(...outside.map((w) => welded[w * 3 + k])),
+        Math.max(...outside.map((w) => welded[w * 3 + k])),
+      ])
+    : null
+  if (outside.length)
+    throw new Error(
+      `line-girl: ${outside.length} lining vertices (${outsideTris} triangles) finished OUTSIDE the garment, ` +
+        `worst ${(Math.min(...outside.map((w) => clearance[w])) * 1000).toFixed(2)} mm — the clearance floor did not hold`
+    )
+  const clearVals = order.map((w) => clearance[w]).filter(Number.isFinite).sort((a, b) => a - b)
+  const interiorVals = order
+    .filter((w) => !onRim[w] && Number.isFinite(clearance[w]))
+    .map((w) => clearance[w])
+    .sort((a, b) => a - b)
+
   const smoothShift = order.map((w) => Math.hypot(smoothed[w * 3] - welded[w * 3], smoothed[w * 3 + 1] - welded[w * 3 + 1], smoothed[w * 3 + 2] - welded[w * 3 + 2])).sort((a, b) => a - b)
   const finite = order.map((w) => thickness[w]).filter(Number.isFinite).sort((a, b) => a - b)
   const deltas = order.map((w) => delta[w]).sort((a, b) => a - b)
   const q = (arr, p) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] : null)
   const report = {
-    knobs: { offset, tau, thicknessFraction: THICKNESS_FRACTION, normalSmoothing: NORMAL_SMOOTHING, positionSmoothing: POSITION_SMOOTHING, smoothClamp: SMOOTH_CLAMP, thicknessMedian: THICKNESS_MEDIAN },
+    knobs: { offset, tau, thicknessFraction: THICKNESS_FRACTION, normalSmoothing: NORMAL_SMOOTHING, positionSmoothing: POSITION_SMOOTHING, smoothClamp: SMOOTH_CLAMP, thicknessMedian: THICKNESS_MEDIAN, clearanceFraction: CLEARANCE_FRACTION },
     garmentTriangles: nLiningTris,
     triangleTotal: T,
     liningVertices: nNew,
@@ -834,6 +931,24 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
     thickness: { min: finite[0] ?? null, p01: q(finite, 0.01), median: q(finite, 0.5), unreachable: nNew - finite.length },
     delta: { max: deltas[deltas.length - 1], median: q(deltas, 0.5), p10: q(deltas, 0.1), cappedByThickness: capped },
     smoothShiftMm: { median: q(smoothShift, 0.5) * 1000, p99: q(smoothShift, 0.99) * 1000, max: smoothShift[smoothShift.length - 1] * 1000 },
+    clearanceMm: {
+      min: clearVals.length ? clearVals[0] * 1000 : null,
+      p01: q(clearVals, 0.01) * 1000,
+      p10: q(clearVals, 0.1) * 1000,
+      median: q(clearVals, 0.5) * 1000,
+      nonPositive: negative,
+      under1mm: clearVals.filter((c) => c < 0.001).length,
+      noRawNormal: noRaw.length,
+      interior: {
+        min: interiorVals.length ? interiorVals[0] * 1000 : null,
+        p01: q(interiorVals, 0.01) * 1000,
+        p10: q(interiorVals, 0.1) * 1000,
+        median: q(interiorVals, 0.5) * 1000,
+        outsidePositions: outside.length,
+        outsideTriangles: outsideTris,
+        outsideBox,
+      },
+    },
     region: regionCount,
     regionUV,
     after: { vertices: nVerts + nNew, triangles: T + nLiningTris },
