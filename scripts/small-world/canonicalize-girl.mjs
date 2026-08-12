@@ -236,8 +236,25 @@ export const LEG_CORRECTIONS = {
 /** The clips girl.glb must end up with, as a set (order-independent). */
 export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B', 'Jump_Off']
 
-const DEFAULT_SRC = 'public/labs/small-world/girl-v2.glb'
+const RAW_SRC = 'public/labs/small-world/girl-v2.glb'
+/** T117's weight-rebind output — the raw export with clean skin weights and
+ *  nothing else changed. See scripts/small-world/rebind-girl.mjs. */
+const REBOUND_SRC = 'public/labs/small-world/girl-v2-rebound.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
+
+/**
+ * The source to canonicalize when none is named: the REBOUND export if the
+ * rebind stage has been run, otherwise the raw one.
+ *
+ * Stated as a preference rather than a switch so the pipeline has exactly one
+ * default path and it is the corrected one, while a worktree that has not run
+ * the rebind (or a re-export that has not been rebound yet) behaves exactly as
+ * it did before — same file, same output, no flag to remember. `--src` still
+ * overrides both, which is how the two are compared.
+ */
+export function defaultSource() {
+  return existsSync(REBOUND_SRC) ? REBOUND_SRC : RAW_SRC
+}
 
 /** The root joint of a skin (the one whose parent is not itself a joint). */
 function rootJoint(doc) {
@@ -759,7 +776,7 @@ async function openSkinned(path) {
 
 /** Parse `--src`, `--out`, `--self-test` from argv. */
 function parseArgs(argv) {
-  const opts = { src: DEFAULT_SRC, out: DEFAULT_OUT, selfTest: false }
+  const opts = { src: defaultSource(), out: DEFAULT_OUT, selfTest: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--src') opts.src = argv[++i]
@@ -774,12 +791,13 @@ function parseArgs(argv) {
  * re-run over the output and assert idempotency. Writes only to a temp file.
  */
 async function selfTest() {
-  if (!existsSync(DEFAULT_SRC)) {
-    console.log(`SKIP  ${DEFAULT_SRC} absent — nothing to self-test.`)
+  const src = defaultSource()
+  if (!existsSync(src)) {
+    console.log(`SKIP  ${src} absent — nothing to self-test.`)
     return
   }
   const out = join(tmpdir(), 'girl-canon-selftest.glb')
-  const result = await canonicalizeGirl({ src: DEFAULT_SRC, out })
+  const result = await canonicalizeGirl({ src, out })
 
   const checks = []
   const assert = (label, ok) => {
