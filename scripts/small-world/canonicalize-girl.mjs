@@ -156,9 +156,9 @@ export const DEDRIFT = new Set()
  * very baggy and are modelled to just clear at the BIND stance, whose ankles
  * are 28.6 cm apart, while the stock Idle brings them to 10.4 cm. So the splay
  * that fixes a clip is the one that restores roughly the stance the garment was
- * built for, and the per-clip values below are each the measured minimum that
- * reaches zero (Skip_Forward's 12 cm leaves one frame of zero-depth contact —
- * surfaces touching, nothing inside anything).
+ * built for, and each value was derived as the measured minimum that reaches
+ * zero. Skip_Forward's is no longer in the table — see SKIP_FORWARD at the end
+ * of this block, which overrides every "the values below" statement here.
  *
  * That is a real stance change up close, and it was gated at the size that
  * matters instead of being argued about: rendered at the lab's own framing
@@ -207,10 +207,29 @@ export const DEDRIFT = new Set()
  *   trouser and invisible in a natural render, where every foot-involving hit —
  *   white shoe through pink trouser, the defect a reader can actually see — is
  *   gone from all three corrected clips by 10 cm.
+ *
+ * SKIP_FORWARD IS EXEMPT AND STAYS EXEMPT — STANDING RULE (T116, Aram's verdict)
+ *
+ *   Skip_Forward carried 12 cm for exactly one shipped build (dbc924a). Aram
+ *   watched it and rejected it: "I saw that the skipping looks different, I
+ *   don't like this, I preferred the previous skipping, even if the trouser
+ *   goes through itself." The narrow stance IS the skip. Its self-clipping is
+ *   accepted, in his words, as the price of the look he wants.
+ *
+ *   So the census number is not a defect report for this clip. Skip_Forward
+ *   sits at 71/87 overlapping pair-frames uncorrected and that is the shipped,
+ *   approved state; the sweep row above is kept only as the history of what a
+ *   correction would have cost. Do not re-add the entry, and do not route
+ *   around this with a smaller value, a ramp, a windowed offset or a different
+ *   instrument — every one of those changes the stance he asked to keep, which
+ *   is the thing he objected to, not the magnitude. Idle and Walk_Backward were
+ *   never flagged and keep their 10 cm.
+ *
+ *   Same class as always-skip in girl-anim.ts: a verdict, not a finding. It is
+ *   overturned by Aram alone.
  */
 export const LEG_CORRECTIONS = {
   Idle: { splayCm: 10 },
-  Skip_Forward: { splayCm: 12 },
   Walk_Backward: { splayCm: 10 },
 }
 
