@@ -1,7 +1,6 @@
 import {
   CAMERA_DISTANCE,
   CAMERA_PITCH_DEG,
-  ZOOM_FACTOR,
   cameraZoomScale,
   endingAimDrop,
   ndcYAt,
@@ -108,6 +107,15 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  *    replaces the held goodbye beat is `GIRL_BRINK` — a short stand on the edge,
  *    still facing away, which motivates the leap instead of interrupting it.
  *
+ *    T114 CHECKED THE ACCIDENT SURVIVED THE CLIP SWAP, because a goodbye is
+ *    exactly what a geometry gate cannot see. It did not merely survive: across
+ *    the whole span the exit plays, `Jump_Off` holds BOTH her hands 0.18–0.26 u
+ *    ABOVE the top of her head, where the outgoing map (Jump_B, T87's window)
+ *    on this same asset kept them 0.58 u BELOW it for all but its last frames.
+ *    The wave was very nearly lost by attrition — T87's window was measured on
+ *    an older export — and the clip Aram cut for the beat gives it back with
+ *    both arms up for the whole flight (`scratchpad/t114/wave.mjs`).
+ *
  * 3. THE LEAP GOES TOWARD THE WALL. Task 87's `GIRL_JUMP_SWEEP` was 0.14 rad —
  *    0.09 u of ground covered by the apex against 0.35 u of rise, i.e. an 83°
  *    takeoff. That is not a jump off an edge, it is a hop straight up with a
@@ -130,7 +138,7 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * THE FALL IS WHAT HIDES HER, and it is a strictly stronger hiding than Task
  * 76's. The walk needed the two-horizon solve because her head stayed raised; the
  * jump ends with her head at radius `PLANET_RADIUS + jumpLiftAt(1) +
- * GIRL_GLOBE_HEIGHT` — INSIDE the planet's own ball. A camera outside a convex
+ * GIRL_PARK_HEAD` — INSIDE the planet's own ball. A camera outside a convex
  * body cannot see a point inside it from ANY distance (every sightline to it
  * crosses the surface), so the parked end state needs no margin arithmetic
  * against the pull-back at all. THAT ARGUMENT IS INDIFFERENT TO THE SWEEP: it is
@@ -157,7 +165,7 @@ import { ENDING_SPAN, endingStateAt, type EndingState } from '../ending-timeline
  * ============================================================================
  * Every number here is a pure function of `EndingState.t`. That includes the
  * jump: `GirlPose.jump` is the flight's own 0→1, `jumpLiftAt` is its authored
- * ballistics, and `jumpClipFracAt` maps it onto the Jump_B clip so `girl.tsx`
+ * ballistics, and `jumpClipFracAt` maps it onto the `Jump_Off` clip so `girl.tsx`
  * can write the action's TIME from scroll exactly as it writes the skip's from
  * `walked`. Scrubbing backwards un-jumps her, frame for frame. The
  * AnimationMixer stays off the frame delta for the whole ending (the Task 76
@@ -367,12 +375,50 @@ export const GIRL_JUMP_RISE = 0.35
 
 /**
  * ...and how far BELOW the surface line the flight ends. This is the hiding
- * solve: her head rides `GIRL_GLOBE_HEIGHT` above her feet, so a fall of 1.8
- * parks her head at radius 2.2 − 1.8 + 1.19 = 1.59 — 0.61 units INSIDE the
- * planet's ball, from which no camera outside a convex body can retrieve her.
- * The test holds the slack at ≥ 0.4 so a retune cannot walk her back out.
+ * solve: a fall of 1.8 parks her head at radius 2.2 − 1.8 + `GIRL_PARK_HEAD` =
+ * 1.60 — 0.60 units INSIDE the planet's ball, from which no camera outside a
+ * convex body can retrieve her. The test holds the slack at ≥ 0.4 so a retune
+ * cannot walk her back out.
+ *
+ * T114 RE-DERIVED THIS AGAINST THE NEW BODY and it survived unchanged, which was
+ * not a foregone conclusion: T113 shipped a re-export with a longer torso and
+ * shorter legs, and the old proof used her STANDING height as though a girl in a
+ * jump were a girl standing up. Measured on the frame the flight actually parks
+ * on she is 1.205 u tall rather than 1.190 — 1.5 cm more head to hide, and 1.5 cm
+ * out of 61 is not a retune. See `GIRL_PARK_HEAD`.
  */
 export const GIRL_JUMP_FALL = 1.8
+
+/**
+ * HOW TALL SHE IS IN THE AIR — the two numbers the hiding law actually needs,
+ * and the reason it needed re-deriving at all.
+ *
+ * Every hiding claim in this module is a claim about a RADIUS, and the radius of
+ * the top of her head is her ground point plus however far her head rides above
+ * it. Until T114 that was `GIRL_GLOBE_HEIGHT` — her STANDING height — on every
+ * frame of the flight, which is true of a girl standing up and false of a girl
+ * mid-jump: measured on the shipped asset through the skinned body (bones ×
+ * inverse-bind × bind position, `scratchpad/t114/profile.mjs`), she reaches
+ * 1.425 u at the clip's crest, 20% taller than the proxy, and parks at 1.205 u.
+ *
+ * Both directions matter and they are used in the two different places:
+ *   - `GIRL_FLIGHT_HEAD` is her TALLEST over the played span, so every "she is
+ *     hidden by now" claim is made about the worst frame there is. A taller head
+ *     hides LATER, so a gate that passes on this passes on the real body.
+ *   - `GIRL_PARK_HEAD` is the specific frame the flight ends on, because the
+ *     convex-body proof is a statement about one pose that really renders — an
+ *     envelope there would be a claim about a frame that never happens.
+ *
+ * Her feet are NOT given the same treatment: the sinking beat is about the point
+ * she STANDS on going behind the crest, which is her ground point, and at
+ * takeoff her toes dip 2.5 cm below it the way feet on ground always do. Measure
+ * the mesh there and the "inside the ball" branch fires on a toe.
+ *
+ * MEASURED, so re-measure on a re-export — `JUMP_CLIP_*` above carry the same
+ * obligation, and the same instrument prints all six.
+ */
+export const GIRL_FLIGHT_HEAD = 1.425
+export const GIRL_PARK_HEAD = 1.205
 
 /**
  * When in the flight she crests — SOLVED from the two authored numbers by the
@@ -447,24 +493,54 @@ export function jumpLiftAt(p: number): number {
 }
 
 /**
- * Where in the Jump_B CLIP a flight phase lands — the map `girl.tsx` writes the
+ * Where in the JUMP CLIP a flight phase lands — the map `girl.tsx` writes the
  * action's time through.
  *
- * The clip is a full jump that lands and recovers; she never lands. So the map
- * uses only the clip's airborne stretch, measured from the GLB itself (t87 clip
- * inventory, hips channel): the clip's own apex sits at 0.243 of its length and
- * its landing absorb begins at ~0.36. The rise plays the clip up to its apex in
- * step with the arc's rise; the fall stretches the clip's airborne descent
- * [0.243, JUMP_CLIP_HOLD] over the rest of the flight, so she is still slowly
- * extending into the drop as the crest takes her, and the clip never reaches the
- * frames where it lands on ground she no longer has.
+ * THE LAW IS UNCHANGED AND THE NUMBERS ARE ALL NEW (T114). The law has always
+ * been "play only the clip's airborne stretch": the clip is a whole jump that
+ * lands and recovers, and she never lands. What moved is the clip. T87 scrubbed
+ * `Jump_B`, whose airborne stretch happened to begin at frac 0, so the map was
+ * written as though clip-zero and takeoff were the same instant. `Jump_Off` —
+ * the clip Aram exported FOR this beat — is not built that way, and the four
+ * constants below are measured on the SHIPPED asset through the skinned body
+ * rather than the hips channel (`scratchpad/t114/profile.mjs`, 601 samples):
+ *
+ *   TAKEOFF 0.420  her lowest point leaves the height it started at, going up
+ *   APEX    0.528  hips highest
+ *   HOLD    0.5875 the last frame the flight plays
+ *   LAND    0.610  her lowest point is back at that height; the absorb follows,
+ *                  bottoming out in a squat at 0.697
+ *
+ * SO THE FIRST 42% OF THE CLIP IS NEVER PLAYED, and that is a decision rather
+ * than an oversight. Those frames are a wind-up crouch on the ground — her head
+ * drops from 1.18 u to 0.73 u before she pushes — and the arc's lift starts
+ * rising at flight phase 0. Mapped from clip-zero she would levitate in a
+ * crouch and then extend in mid-air. The wind-up could only be honest if it
+ * played on the BRINK, before the lift opens, and the brink cannot afford it:
+ * `GIRL_BRINK` is 0.022 of the ending against the flight's 0.099, so the 42% of
+ * clip would run at eleven times the rate of the 17% that follows it — a snap
+ * crouch. She stands on the edge, and then she goes.
+ *
+ * The takeoff frame is a lucky one to enter on: her head sits 1.172 u above her
+ * feet there against the 1.190 u she stands at, so `JUMP_BLEND_IN`'s ramp out of
+ * the idle sway has almost no height to travel.
+ *
+ * The rise plays [TAKEOFF, APEX] in step with the arc's rise; the fall stretches
+ * [APEX, HOLD] over the rest of the flight, so she is still slowly extending
+ * into the drop as the crest takes her. HOLD is two authored frames (2/89 of the
+ * clip) short of LAND — a margin the reader never even reaches, since the world
+ * has taken her head by flight phase 0.85, which plays clip 0.575.
  */
-export const JUMP_CLIP_APEX = 0.243
-export const JUMP_CLIP_HOLD = 0.3
+export const JUMP_CLIP_TAKEOFF = 0.42
+export const JUMP_CLIP_APEX = 0.528
+export const JUMP_CLIP_HOLD = 0.5875
+/** ...and where the clip lands, which the played span must never reach. */
+export const JUMP_CLIP_LAND = 0.61
 
 export function jumpClipFracAt(p: number): number {
   const x = clamp01(p)
-  if (x <= GIRL_JUMP_APEX) return (x / GIRL_JUMP_APEX) * JUMP_CLIP_APEX
+  if (x <= GIRL_JUMP_APEX)
+    return JUMP_CLIP_TAKEOFF + (x / GIRL_JUMP_APEX) * (JUMP_CLIP_APEX - JUMP_CLIP_TAKEOFF)
   return (
     JUMP_CLIP_APEX +
     ((x - GIRL_JUMP_APEX) / (1 - GIRL_JUMP_APEX)) * (JUMP_CLIP_HOLD - JUMP_CLIP_APEX)
@@ -473,9 +549,12 @@ export function jumpClipFracAt(p: number): number {
 
 /**
  * The jump action's mixer weight at a flight phase — a short scroll-pure ramp
- * out of the idle sway, because Jump_B's first frames are near the rest pose but
- * the sway's are not (its hips wander 0.24 u laterally), and a snap between the
- * two is a visible pop on the takeoff frame. Exactly 0 at p ≤ 0 and exactly 1
+ * out of the idle sway, because the clip's takeoff frame is near the rest pose
+ * but the sway's are not (its hips wander 0.24 u laterally), and a snap between
+ * the two is a visible pop on the takeoff frame. The ramp got cheaper with the
+ * clip swap rather than dearer: `JUMP_CLIP_TAKEOFF` enters on a frame whose head
+ * sits 1.172 u up against the 1.190 u she stands at, so there is 1.8 cm of
+ * height between the two poses. Exactly 0 at p ≤ 0 and exactly 1
  * from `JUMP_BLEND_IN` on, so the flight's body language is wholly the clip's
  * for everything past its first instants.
  */
@@ -507,9 +586,20 @@ export function pointHiddenAt(theta: number, radius: number, cameraDistance: num
   return Math.abs(theta - CAMERA_THETA) > horizon
 }
 
-/** Is the top of her head hidden, standing (or flying) at `theta` with radial offset `lift`? */
-export function headHiddenAt(theta: number, lift: number, cameraDistance: number): boolean {
-  return pointHiddenAt(theta, PLANET_RADIUS + lift + GIRL_GLOBE_HEIGHT, cameraDistance)
+/**
+ * Is the top of her head hidden at `theta` with radial offset `lift`?
+ *
+ * `head` is how far her head rides above her ground point, and it defaults to
+ * her STANDING height because that is what the walk and the brink are — the
+ * flight passes `GIRL_FLIGHT_HEAD` instead, which is measured off the clip.
+ */
+export function headHiddenAt(
+  theta: number,
+  lift: number,
+  cameraDistance: number,
+  head: number = GIRL_GLOBE_HEIGHT
+): boolean {
+  return pointHiddenAt(theta, PLANET_RADIUS + lift + head, cameraDistance)
 }
 
 /** ...and her feet, which the crest takes first — the sinking that makes the beat. */
@@ -530,7 +620,10 @@ export function exitSinkShare(cameraDistance: number): number {
     const p = i / N
     const theta = mix(GIRL_STOP_THETA, GIRL_JUMP_END_THETA, p)
     const lift = jumpLiftAt(p)
-    if (feetHiddenAt(theta, lift, cameraDistance) && !headHiddenAt(theta, lift, cameraDistance))
+    if (
+      feetHiddenAt(theta, lift, cameraDistance) &&
+      !headHiddenAt(theta, lift, cameraDistance, GIRL_FLIGHT_HEAD)
+    )
       sinking++
   }
   return sinking / (N + 1)
@@ -757,7 +850,7 @@ export type GirlPose = {
   readonly tilt: number
   /** Radial offset from the surface (world u) — the flight's lift. 0 on the ground. */
   readonly lift: number
-  /** The flight's own 0→1, 0 outside the jump window. Drives the Jump_B action. */
+  /** The flight's own 0→1, 0 outside the jump window. Drives the Jump_Off action. */
   readonly jump: number
   /** Desk-plane position. Meaningless on the globe. */
   readonly x: number

@@ -15,6 +15,7 @@ import {
   BACKWARD_SLOT,
   JUMP_A_SLOT,
   JUMP_B_SLOT,
+  JUMP_OFF_SLOT,
   type Locomotion,
 } from '@/components/labs/small-world/scene/girl-anim'
 
@@ -236,7 +237,16 @@ describe('resolveClipPlan — current GLB (skip clip only)', () => {
 })
 
 describe('resolveClipPlan — girl v2 delivery (his real clips)', () => {
-  const plan = resolveClipPlan([SKIP_CLIP, IDLE_SLOT, BACKWARD_SLOT, JUMP_A_SLOT, JUMP_B_SLOT])
+  // Exactly the six slots the shipped girl.glb carries (SHIPPED_SLOTS in
+  // canonicalize-girl.mjs), so this describe is the plan the browser resolves.
+  const plan = resolveClipPlan([
+    SKIP_CLIP,
+    IDLE_SLOT,
+    BACKWARD_SLOT,
+    JUMP_A_SLOT,
+    JUMP_B_SLOT,
+    JUMP_OFF_SLOT,
+  ])
 
   it('idle uses the dedicated Idle clip (real clip, not a fallback)', () => {
     expect(plan.idle).toEqual({ clip: IDLE_SLOT, fallback: false })
@@ -255,11 +265,24 @@ describe('resolveClipPlan — girl v2 delivery (his real clips)', () => {
     expect(plan.forward.fallback).toBe(false)
   })
 
-  it('the exit jump rides Jump_B — the cleaner launch and the higher apex (T87)', () => {
-    expect(plan.exitJump).toEqual({ clip: JUMP_B_SLOT, fallback: false })
+  it('the exit jump rides Jump_Off — the clip cut for the beat (T114)', () => {
+    expect(plan.exitJump).toEqual({ clip: JUMP_OFF_SLOT, fallback: false })
   })
 
-  it('the exit jump degrades to Jump_A when only it exists', () => {
+  it('never spends the leaving clip on a discovery', () => {
+    // The celebrate cycle is the journey's small delight; Jump_Off means she is
+    // going. Naming both halves so adding it to either list fails here.
+    expect(plan.celebrate?.clips).not.toContain(JUMP_OFF_SLOT)
+    expect(plan.exitJump?.clip).not.toBe(JUMP_A_SLOT)
+    expect(plan.exitJump?.clip).not.toBe(JUMP_B_SLOT)
+  })
+
+  it('the exit jump degrades down the chain when the leaving clip is absent', () => {
+    // An older GLB has no Jump_Off; T87's order survives underneath it.
+    expect(resolveClipPlan([SKIP_CLIP, JUMP_A_SLOT, JUMP_B_SLOT]).exitJump).toEqual({
+      clip: JUMP_B_SLOT,
+      fallback: false,
+    })
     const partial = resolveClipPlan([SKIP_CLIP, JUMP_A_SLOT])
     expect(partial.exitJump).toEqual({ clip: JUMP_A_SLOT, fallback: false })
   })

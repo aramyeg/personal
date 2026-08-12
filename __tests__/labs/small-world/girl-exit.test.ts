@@ -27,6 +27,7 @@ import {
   GIRL_DESK_SETTLED,
   GIRL_DESK_STAGING,
   GIRL_DESK_WALK_START,
+  GIRL_FLIGHT_HEAD,
   GIRL_GLOBE_HEIGHT,
   GIRL_GLOBE_SCALE,
   GIRL_JUMP_APEX,
@@ -37,6 +38,7 @@ import {
   GIRL_JUMP_START,
   GIRL_JUMP_SWEEP,
   GIRL_JUMP_TAKEOFF_DEG,
+  GIRL_PARK_HEAD,
   GIRL_STOP_THETA,
   GIRL_TRANSFER,
   GIRL_TURN_END,
@@ -50,6 +52,8 @@ import {
   JUMP_BLEND_IN,
   JUMP_CLIP_APEX,
   JUMP_CLIP_HOLD,
+  JUMP_CLIP_LAND,
+  JUMP_CLIP_TAKEOFF,
   deskFloatFor,
   exitSinkShare,
   feetHiddenAt,
@@ -369,7 +373,7 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
   it('is WHOLE at the apex — the leap must read before the fall takes her', () => {
     const { theta, lift } = flightAt(GIRL_JUMP_APEX)
     expect(feetHiddenAt(theta, lift, REST)).toBe(false)
-    expect(headHiddenAt(theta, lift, REST)).toBe(false)
+    expect(headHiddenAt(theta, lift, REST, GIRL_FLIGHT_HEAD)).toBe(false)
   })
 
   it('carries her AWAY FROM THE READER, at a pace a leap could produce (T101)', () => {
@@ -435,13 +439,22 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
     // The strongest hiding there is: a camera outside a convex body cannot see a
     // point inside it, from any distance. The slack keeps a retuned rise/fall
     // from quietly walking her back out.
-    const headRadius = PLANET_RADIUS + jumpLiftAt(1) + GIRL_GLOBE_HEIGHT
+    //
+    // T114: the head this is asserted about is the one the CLIP poses on the
+    // frame the flight parks on (1.205 u), not her standing height — a girl in a
+    // jump is not a girl standing up, and the re-export changed her proportions.
+    // It is the specific pose rather than the flight's envelope because this is a
+    // claim about a frame that really renders.
+    const headRadius = PLANET_RADIUS + jumpLiftAt(1) + GIRL_PARK_HEAD
     expect(headRadius).toBeLessThan(PLANET_RADIUS - 0.4)
+    // ...and the proxy this replaced was OPTIMISTIC, not pessimistic: she parks
+    // taller than she stands, so the old proof was claiming slack she lacked.
+    expect(GIRL_PARK_HEAD).toBeGreaterThan(GIRL_GLOBE_HEIGHT)
   })
 
   it('is fully hidden at the end of the flight at EVERY camera stop', () => {
     for (const d of [REST, FULL, (REST + FULL) / 2]) {
-      expect(headHiddenAt(GIRL_JUMP_END_THETA, jumpLiftAt(1), d)).toBe(true)
+      expect(headHiddenAt(GIRL_JUMP_END_THETA, jumpLiftAt(1), d, GIRL_FLIGHT_HEAD)).toBe(true)
       expect(feetHiddenAt(GIRL_JUMP_END_THETA, jumpLiftAt(1), d)).toBe(true)
     }
   })
@@ -449,8 +462,10 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
   it('...and was already hidden with slack to spare before the flight window closed', () => {
     // The hiding must complete INSIDE the flight, not on its last frame — a
     // margin a retune of the sweep or the fall would eat visibly here first.
+    // Asserted against the TALLEST she ever is in the air, so it is the worst
+    // frame of the flight that has to be hidden, not an average one.
     const { theta, lift } = flightAt(0.95)
-    for (const d of [REST, FULL]) expect(headHiddenAt(theta, lift, d)).toBe(true)
+    for (const d of [REST, FULL]) expect(headHiddenAt(theta, lift, d, GIRL_FLIGHT_HEAD)).toBe(true)
   })
 
   it('takes her feet BEFORE her head, which is what "off the edge" means', () => {
@@ -460,7 +475,7 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
       const p = i / 2000
       const { theta, lift } = flightAt(p)
       if (feetGone < 0 && feetHiddenAt(theta, lift, REST)) feetGone = p
-      if (headGone < 0 && headHiddenAt(theta, lift, REST)) headGone = p
+      if (headGone < 0 && headHiddenAt(theta, lift, REST, GIRL_FLIGHT_HEAD)) headGone = p
     }
     expect(feetGone).toBeGreaterThan(0)
     expect(headGone).toBeGreaterThan(feetGone)
@@ -495,8 +510,11 @@ describe('the jump: the ballistics are authored, the hiding is solved', () => {
 })
 
 describe('the jump clip mapping never reaches ground she no longer has', () => {
-  it('is zero at takeoff and monotone through the flight', () => {
-    expect(Object.is(jumpClipFracAt(0), 0)).toBe(true)
+  it('enters on the clip’s TAKEOFF frame, exactly, and is monotone after it', () => {
+    // Not zero: `Jump_Off` spends its first 42% winding up on the ground, and
+    // playing that against a rising arc levitates a crouching girl. Exactly,
+    // because the takeoff frame is the seam the blend ramp starts from.
+    expect(Object.is(jumpClipFracAt(0), JUMP_CLIP_TAKEOFF)).toBe(true)
     let prev = -Infinity
     for (let i = 0; i <= 1000; i++) {
       const f = jumpClipFracAt(i / 1000)
@@ -509,11 +527,24 @@ describe('the jump clip mapping never reaches ground she no longer has', () => {
     expect(jumpClipFracAt(GIRL_JUMP_APEX)).toBeCloseTo(JUMP_CLIP_APEX, 12)
   })
 
-  it('stops before the clip’s landing absorb — she never lands', () => {
-    // Jump_B's hips cross rest at ~0.32 of the clip and the landing squat is in
-    // full absorb by ~0.36 (t87 clip inventory). The hold must stay clear of it.
-    expect(JUMP_CLIP_HOLD).toBeLessThan(0.36)
+  it('plays only the clip’s AIRBORNE stretch — she never lands', () => {
+    // Measured on the shipped asset through the skinned body: her lowest point
+    // leaves its standing height at 0.420, the hips crest at 0.528, and the feet
+    // are back down at 0.610 with the absorb squat behind it. The played window
+    // must sit inside [TAKEOFF, LAND] at both ends, with the hold a real margin
+    // short of the landing rather than touching it.
+    expect(JUMP_CLIP_TAKEOFF).toBeLessThan(JUMP_CLIP_APEX)
+    expect(JUMP_CLIP_APEX).toBeLessThan(JUMP_CLIP_HOLD)
+    expect(JUMP_CLIP_HOLD).toBeLessThan(JUMP_CLIP_LAND)
+    // Two authored frames of a 89-frame clip. Stated as a distance so shaving it
+    // to nothing fails here rather than in a render nobody re-takes.
+    expect(JUMP_CLIP_LAND - JUMP_CLIP_HOLD).toBeGreaterThan(1.5 / 89)
     expect(jumpClipFracAt(1)).toBeCloseTo(JUMP_CLIP_HOLD, 12)
+    for (let i = 0; i <= 1000; i++) {
+      const f = jumpClipFracAt(i / 1000)
+      expect(f).toBeGreaterThanOrEqual(JUMP_CLIP_TAKEOFF)
+      expect(f).toBeLessThan(JUMP_CLIP_LAND)
+    }
   })
 
   it('blends in fast, exactly, and stays there', () => {

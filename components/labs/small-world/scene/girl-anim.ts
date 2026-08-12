@@ -67,15 +67,26 @@ export const JUMP_B_SLOT = 'Jump_B'
  */
 export const CELEBRATE_SLOTS = [JUMP_A_SLOT, JUMP_B_SLOT, 'Wave', 'Celebrate'] as const
 
+/** The clip Aram exported FOR the exit — a jump that goes somewhere. */
+export const JUMP_OFF_SLOT = 'Jump_Off'
+
 /**
- * The ENDING's exit jump (T87) — the clip the scroll scrubs by hand when she
- * leaps off the planet. Jump_B leads: its launch ramps from the first frame
- * (Jump_A holds four dead frames then snaps) and its apex rides higher
- * (+0.27 u against +0.15 in the hips channel — t87 clip inventory). A GLB with
- * neither degrades to no jump action at all, and the ending keeps her on the
- * skip/idle blend through the arc rather than showing a T-pose.
+ * The ENDING's exit jump — the clip the scroll scrubs by hand when she leaps off
+ * the planet. `Jump_Off` now leads, and it is the first clip in this list that
+ * was authored for the beat rather than borrowed from it: it carries her
+ * +0.266 u forward across its span (the celebrate jumps land where they took
+ * off, ±0.04 u), which is the difference between a hop and a departure.
+ *
+ * The trailing two are the degrade chain, in the order T87 established: Jump_B
+ * before Jump_A because its launch ramps from the first frame where Jump_A holds
+ * four dead frames and snaps. A GLB with none of the three leaves the ending on
+ * the skip/idle blend through the arc rather than showing a T-pose.
+ *
+ * `Jump_Off` deliberately does NOT join CELEBRATE_SLOTS: a discovery is a small
+ * delight in the middle of a journey, and the clip that means "she is leaving"
+ * must not be spent on finding a badge.
  */
-export const EXIT_JUMP_SLOTS = [JUMP_B_SLOT, JUMP_A_SLOT] as const
+export const EXIT_JUMP_SLOTS = [JUMP_OFF_SLOT, JUMP_B_SLOT, JUMP_A_SLOT] as const
 
 /** Locomotion state derived from signed surface speed. */
 export type Locomotion = 'forward' | 'backward' | 'idle'
