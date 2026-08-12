@@ -82,6 +82,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { realpathSync } from 'node:fs'
 import { pathToFileURL, fileURLToPath } from 'node:url'
+import { GARMENT_MATERIAL } from './detach-girl.mjs'
 
 /** The shipped rung. Every one of these is justified in the block above. */
 export const SIMPLIFY_ERROR = 0.001
@@ -91,6 +92,17 @@ export const SIMPLIFY_ERROR = 0.001
 export const SIMPLIFY_RATIO = 0.06
 export const TEXTURE_SIZE = 1024
 export const TEXTURE_QUALITY = 95
+/**
+ * The garment's own error budget, in the same whole-figure units as
+ * SIMPLIFY_ERROR (T121b). It is a SEPARATE number from the body's because the
+ * two shells are nested 12 mm apart and that gap TAPERS TO ZERO at the garment
+ * rim: near the hem, cuffs and placket any simplification drift on either shell
+ * crosses the other, and the crossing is what the poke-through gate counts.
+ * The body cannot be tightened cheaply (46,871 triangles), the garment can
+ * (7,920), so the gate is bought on the garment side and paid for out of cloth
+ * animation keys. T121b's frontier table is in .superpowers/sdd/task-121b-report.md.
+ */
+export const GARMENT_ERROR = 0.001
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const WORKTREE = path.resolve(HERE, '..', '..')
@@ -157,6 +169,7 @@ export async function compressGirl({
   src,
   out,
   error = SIMPLIFY_ERROR,
+  garmentError = GARMENT_ERROR,
   ratio = SIMPLIFY_RATIO,
   textureSize = TEXTURE_SIZE,
   quality = TEXTURE_QUALITY,
@@ -195,9 +208,11 @@ export async function compressGirl({
   await doc.transform(functions.weld())
   const budgets = []
   for (const prim of doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives())) {
+    const material = prim.getMaterial()?.getName() ?? null
     const scale = wholeExtent / extent([prim.getAttribute('POSITION').getArray()])
-    budgets.push({ material: prim.getMaterial()?.getName() ?? null, scale, error: error * scale })
-    functions.simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio, error: error * scale })
+    const budget = (material === GARMENT_MATERIAL ? garmentError : error) * scale
+    budgets.push({ material, scale, error: budget })
+    functions.simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio, error: budget })
   }
   const trisAfter = triangles(doc)
 
@@ -242,6 +257,7 @@ export async function compressGirl({
     textureSize,
     quality,
     error,
+    garmentError,
     budgets,
   }
 }
@@ -257,12 +273,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     src: arg('src', DEFAULT),
     out: arg('out', DEFAULT),
     error: Number(arg('error', SIMPLIFY_ERROR)),
+    garmentError: Number(arg('garment-error', GARMENT_ERROR)),
     ratio: Number(arg('ratio', SIMPLIFY_RATIO)),
     textureSize: Number(arg('texture', TEXTURE_SIZE)),
     quality: Number(arg('quality', TEXTURE_QUALITY)),
   })
   console.log(`wrote ${r.out}`)
-  console.log(`triangles ${r.trisBefore.toLocaleString()} → ${r.trisAfter.toLocaleString()}  (error ${r.error})`)
+  console.log(`triangles ${r.trisBefore.toLocaleString()} → ${r.trisAfter.toLocaleString()}  (error ${r.error}, garment ${r.garmentError})`)
+  for (const b of r.budgets) console.log(`  budget  ${(b.material ?? '(unnamed)').padEnd(14)} ×${b.scale.toFixed(3)} → ${b.error.toExponential(3)}`)
   console.log(`texture   ${r.textureSize}² q${r.quality} → ${r.texBytes.toLocaleString()} B`)
   console.log(`bytes     ${r.before.toLocaleString()} → ${r.raw.toLocaleString()} raw`)
   console.log(`wire      gzip ${r.gzip.toLocaleString()}  brotli ${r.brotli.toLocaleString()}`)

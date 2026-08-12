@@ -16,6 +16,14 @@ import * as THREE from 'three'
  * We do NOT touch girl.glb on disk; every change is in-memory at load.
  */
 
+/**
+ * Name the asset chain gives the shirt's material — the shipped file's own label
+ * for the garment primitive. It is `GARMENT_MATERIAL` in
+ * scripts/small-world/detach-girl.mjs, and girl-clay.test.ts asserts the two
+ * still agree rather than trusting a copied string.
+ */
+export const GARMENT_MATERIAL = 'girl_garment'
+
 /** Keep this fraction of the texture's chroma — compresses generated vividness. */
 const GRADE_SAT = 0.72
 /** Lift toward white for pastel airiness (0..1). */
@@ -137,5 +145,19 @@ export function toonifyGirl(
     })
 
     mesh.material = Array.isArray(mesh.material) ? next : next[0]
+
+    // The shirt draws LAST, and this is a correctness fix rather than a
+    // preference (T121b). The lining is the garment patch offset inward along a
+    // field that tapers to zero at the garment outline, so the 72 lining
+    // triangles whose three vertices all sit on that outline are bit-exact
+    // copies of the garment triangles above them — 43 cm² of two surfaces in
+    // one place. Every fragment there is a depth TIE, and three sorts opaque
+    // objects by distance, so which surface won depended on the camera: the
+    // shirt from one angle, the tank-coloured lining from another. renderOrder
+    // puts the garment after everything else, and the default LessEqual depth
+    // test lets an equal fragment overwrite, so the shirt wins every tie from
+    // every angle. Measured: 21.7 of the bind pose's 28.4 px/view of "lining in
+    // front of shirt" are these ties (scratchpad/t121b/{pokemargin,coincident}.mjs).
+    if (next.some((m) => m.name === GARMENT_MATERIAL)) mesh.renderOrder = 1
   })
 }

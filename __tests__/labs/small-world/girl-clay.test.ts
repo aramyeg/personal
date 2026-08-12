@@ -13,7 +13,9 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import * as THREE from 'three'
-import { toonifyGirl } from '@/components/labs/small-world/scene/girl-clay'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { toonifyGirl, GARMENT_MATERIAL } from '@/components/labs/small-world/scene/girl-clay'
 
 /** A canvas 2D context stub good enough for gradeGirlTexture's pixel walk. */
 function stubCanvas() {
@@ -37,7 +39,7 @@ function girlScene() {
   // One atlas, shared — which is what the two primitives of one glTF mesh get.
   const atlas = new THREE.Texture({ width: 8, height: 8 } as unknown as HTMLImageElement)
   const scene = new THREE.Group()
-  const meshes = ['body', 'garment'].map((name) => {
+  const meshes = ['body', GARMENT_MATERIAL].map((name) => {
     const mat = new THREE.MeshStandardMaterial({ map: atlas })
     mat.name = name
     const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat)
@@ -64,6 +66,31 @@ describe('toonifyGirl across the detached garment', () => {
     expect(mats[0].map).not.toBe(atlas)
     expect(disposed).toHaveBeenCalledTimes(1)
     vi.restoreAllMocks()
+  })
+
+  it('draws the shirt last so it wins every depth tie with the lining', () => {
+    // The lining tapers to zero offset at the garment outline, so 72 of its
+    // triangles are bit-exact copies of the garment triangles above them. three
+    // sorts opaque objects by camera distance, so without an explicit order the
+    // winner of those ties changes with the angle and the tank colour surfaces
+    // through the hem. This is the whole fix, and it costs no bytes.
+    stubCanvas()
+    const { scene, meshes } = girlScene()
+    toonifyGirl(scene, new THREE.Texture(), true)
+    const garment = meshes.find((m) => m.name === GARMENT_MATERIAL)!
+    const body = meshes.find((m) => m.name === 'body')!
+    expect(garment.renderOrder).toBeGreaterThan(body.renderOrder)
+    vi.restoreAllMocks()
+  })
+
+  it('names the garment material the same thing the asset chain does', () => {
+    // Read rather than import: detach-girl.mjs pulls the whole gltf-transform
+    // toolchain, which has no business loading inside a jsdom test. The string is
+    // what must not drift — if the cut renames the material, renderOrder silently
+    // stops being applied and the hem starts flickering again.
+    const src = readFileSync(path.join(process.cwd(), 'scripts/small-world/detach-girl.mjs'), 'utf8')
+    const declared = /export const GARMENT_MATERIAL = '([^']+)'/.exec(src)?.[1]
+    expect(declared).toBe(GARMENT_MATERIAL)
   })
 
   it('is idempotent, so a remount does not re-grade', () => {
