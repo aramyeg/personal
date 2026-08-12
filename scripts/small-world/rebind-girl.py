@@ -142,6 +142,19 @@ REACH_PAD = 0.25
 PRUNE_BELOW = 0.05
 MAX_INFLUENCES = 4
 
+#: T118 — path to a per-original-vertex garment mask (see shirt-region.mjs).
+#: When set, the garment's faces are held OUT of the body heat solve and its
+#: weights come from a harmonic extension of the body's field instead. Empty
+#: reproduces T117 exactly, so the two builds stay comparable.
+SHIRT_MASK = ""
+
+#: Laplacian passes applied to the garment's weights only (see garment_smooth).
+#: Swept against the census, not chosen: see task-118-report.md.
+SHIRT_SMOOTH = 0
+
+#: "anchor" (the shipped treatment) or "smooth" (falsified; kept for the record).
+GARMENT_MODE = "anchor"
+
 #: Envelope contrast, applied as w -> w**GAMMA before each renormalisation.
 #:
 #: A heat solve is smoother than a limb is. On a cylindrical limb only the skin
@@ -279,6 +292,139 @@ def weld(mesh):
         if len(set(f)) == len(f):
             faces.append(f)
     return orig2weld, co, faces
+
+
+def weld_mask(orig2weld, n_weld, shirt_orig):
+    """Lift a per-original-vertex garment mask into welded space.
+
+    A welded vertex is garment only when EVERY original it swallowed is garment,
+    which matches shirt-region.mjs's own rule and keeps the mask's boundary a
+    ring of body vertices — the ring the solve keeps and the cloth stage pins to.
+    """
+    m = [1] * n_weld
+    for i, j in enumerate(orig2weld):
+        if not shirt_orig[i]:
+            m[j] = 0
+    return m
+
+
+#: T118 — the two anchor groups the garment is split between. A chest panel is
+#: torso cloth and a sleeve is arm cloth; nothing on this garment is both.
+TORSO_ANCHORS = ("Hips", "Spine02", "Spine01", "Spine", "neck")
+ARM_ANCHORS = ("LeftShoulder", "LeftArm", "LeftForeArm",
+               "RightShoulder", "RightArm", "RightForeArm")
+#: Width of the transition, in the rig's centimetres. The mix is a smooth
+#: function of position across this band, so there is no dominance contest in it.
+ANCHOR_BAND = 6.0
+
+
+def garment_anchor_split(W, co, seg, shirt_weld):
+    """Give every garment vertex ONE anchor family, mixed smoothly in space.
+
+    T117 §6 named the defect by decomposition: two joints are near-tied across a
+    wide band of the fused garment, so the dominance boundary between them is a
+    sawtooth and the panel tears when the arm rises. The tie is the disease; a
+    smoother weight field is not the cure, and the census proved it — garment-
+    restricted Laplacian passes made every clip worse (12, 40 and 120 passes all
+    measured, table in task-118-report.md), because surface smoothing mixes
+    weights between parts of the garment that hang near DIFFERENT bones.
+
+    This removes the tie instead of blending it. Each garment vertex is scored by
+    how much nearer it lies to the arm chain than to the spine chain, that score
+    is turned into a mix factor over a 6 cm band, and the vertex's own solved
+    weights are then taken as `a` parts arm-family and `1-a` parts torso-family,
+    each renormalised inside its family. A chest panel ends up with no arm
+    influence to tie with; a sleeve ends up with no spine influence; and the
+    transition between them is monotone in a single spatial field, so it cannot
+    grow a sawtooth. The heat solve's own numbers are kept inside each family, so
+    this reweights the garment without inventing an envelope for it.
+    """
+    def near(p, group):
+        return min(dist_to_segment(p, *seg[b])[0] for b in group if b in seg)
+
+    interior = [v for v in range(len(co)) if shirt_weld[v]]
+    stats = {"garment_verts": len(interior), "torso_only": 0, "arm_only": 0, "mixed": 0,
+             "band_cm": ANCHOR_BAND}
+    for v in interior:
+        p = Vector(co[v])
+        d_arm = near(p, ARM_ANCHORS)
+        d_torso = near(p, TORSO_ANCHORS)
+        a = (d_torso - d_arm) / ANCHOR_BAND + 0.5
+        a = 0.0 if a < 0.0 else (1.0 if a > 1.0 else a)
+        w = W[v]
+        arm = {b: x for b, x in w.items() if b in ARM_ANCHORS}
+        torso = {b: x for b, x in w.items() if b not in ARM_ANCHORS}
+        sa, st = sum(arm.values()), sum(torso.values())
+        # A family with no solved support cannot contribute; hand its share to
+        # the other rather than inventing weights the solve never found.
+        if not sa:
+            a = 0.0
+        if not st:
+            a = 1.0
+        if a <= 0.0:
+            stats["torso_only"] += 1
+        elif a >= 1.0:
+            stats["arm_only"] += 1
+        else:
+            stats["mixed"] += 1
+        out = {}
+        if a > 0.0 and sa:
+            for b, x in arm.items():
+                out[b] = out.get(b, 0.0) + a * x / sa
+        if a < 1.0 and st:
+            for b, x in torso.items():
+                out[b] = out.get(b, 0.0) + (1.0 - a) * x / st
+        W[v] = {b: x for b, x in out.items() if x > 1e-4} or w
+    return stats
+
+
+def garment_smooth(W, faces, shirt_weld, iterations, lam=1.0):
+    """Iron the ragged dominance boundaries out of the garment, and only there.
+
+    T118 first tried holding the garment OUT of the heat solve, which is what the
+    brief asks for and what the defect description implies. It is wrong on this
+    mesh, and the census said so: the sleeve IS the only surface over the upper
+    arm and the panels ARE the only surface over the torso, so removing them
+    leaves `LeftArm`/`RightArm` with almost nothing to diffuse against. Body-wide
+    smear rose on five of six clips, `Idle` creasing went 12 -> 95 elbow frames,
+    and arm smear reached 47%. Measured, then reverted.
+
+    So the garment is held out of the RESULT instead. The solve runs on the whole
+    surface exactly as T117 ran it — which means every BODY vertex keeps T117's
+    weights bit for bit, and T117's torso wins are preserved by construction
+    rather than by re-measurement — and then the garment's own weights are
+    smoothed here, with the seam ring of body vertices pinned as fixed boundary
+    data so the surface cannot crack along the seam.
+
+    Smoothing is the right shape of tool for this defect. T117 proved (§3) that
+    smear comes from STEPS in the weight field: where two joints are near-tied
+    across a garment panel, the dominance boundary is a sawtooth and the panel
+    tears when the arm rises. A Laplacian pass is the direct inverse of that, and
+    T117 also measured that applying it body-wide is mildly harmful — there is
+    nothing left to heal on a body that a heat solve already blended. Restricting
+    it to the panels puts it exactly where the raggedness is.
+    """
+    adj = {}
+    for f in faces:
+        for a, b in ((f[0], f[1]), (f[1], f[2]), (f[2], f[0])):
+            if shirt_weld[a]:
+                adj.setdefault(a, set()).add(b)
+            if shirt_weld[b]:
+                adj.setdefault(b, set()).add(a)
+    interior = sorted(v for v in adj if shirt_weld[v])
+    for _ in range(iterations):
+        nxt = {}
+        for v in interior:
+            nb = adj[v]
+            acc = dict(W[v])
+            for u in nb:
+                for b, w in W[u].items():
+                    acc[b] = acc.get(b, 0.0) + lam * w
+            tot = sum(acc.values())
+            nxt[v] = {b: w / tot for b, w in acc.items() if w / tot > 1e-4} if tot else W[v]
+        for v, w in nxt.items():
+            W[v] = w
+    return {"garment_verts": len(interior), "iterations": iterations, "lambda": lam}
 
 
 def bone_heat(sc, arm, co, faces, matrix_world):
@@ -569,7 +715,7 @@ def census(W, names, label):
 
 
 def main():
-    global REACH_K, REACH_PAD, PRUNE_BELOW, GAMMA, SMOOTH_ITERS, SMOOTH_LAMBDA, REACH_CLAMP
+    global REACH_K, REACH_PAD, PRUNE_BELOW, GAMMA, SMOOTH_ITERS, SMOOTH_LAMBDA, REACH_CLAMP, SHIRT_MASK, SHIRT_SMOOTH, GARMENT_MODE
     argv = sys.argv[sys.argv.index("--") + 1:]
     src = os.path.abspath(argv[0])
     stem = os.path.abspath(argv[1])
@@ -591,6 +737,12 @@ def main():
             SMOOTH_LAMBDA = float(argv[i + 1])
         elif a == "--clamp":
             REACH_CLAMP = argv[i + 1] not in ("0", "off", "false")
+        elif a == "--shirt":
+            SHIRT_MASK = os.path.abspath(argv[i + 1])
+        elif a == "--shirt-smooth":
+            SHIRT_SMOOTH = int(argv[i + 1])
+        elif a == "--garment-mode":
+            GARMENT_MODE = argv[i + 1]
     log("knobs: clamp %s (k %.2f pad %.2f) prune %.3f gamma %.2f smooth %dx%.2f"
         % (REACH_CLAMP, REACH_K, REACH_PAD, PRUNE_BELOW, GAMMA, SMOOTH_ITERS, SMOOTH_LAMBDA))
 
@@ -610,8 +762,26 @@ def main():
     log("weld %d -> %d verts (%.2fx), %d faces kept of %d"
         % (len(orig2weld), len(co), len(orig2weld) / len(co), len(faces), len(obj.data.polygons)))
 
+    diag = {}
     names, W = bone_heat(sc, arm, co, faces, obj.matrix_world)
-    diag = {"raw": census(W, names, "raw heat")}
+    if SHIRT_MASK:
+        with open(SHIRT_MASK, "rb") as f:
+            shirt_orig = list(f.read())
+        assert len(shirt_orig) == len(orig2weld), (
+            "garment mask covers %d vertices, mesh has %d — the mask was built "
+            "against a different source" % (len(shirt_orig), len(orig2weld)))
+        shirt_weld = weld_mask(orig2weld, len(co), shirt_orig)
+        diag["garment"] = {"welded_verts": sum(shirt_weld),
+                           "mask": os.path.basename(SHIRT_MASK)}
+        if GARMENT_MODE == "anchor":
+            diag["garment"]["anchor"] = garment_anchor_split(W, co, seg, shirt_weld)
+            log("garment: %d of %d welded verts, anchor split %s (body weights untouched)"
+                % (sum(shirt_weld), len(co), diag["garment"]["anchor"]))
+        elif SHIRT_SMOOTH:
+            diag["garment"]["smooth"] = garment_smooth(W, faces, shirt_weld, SHIRT_SMOOTH)
+            log("garment: %d of %d welded verts, %d smoothing passes (body weights untouched)"
+                % (sum(shirt_weld), len(co), SHIRT_SMOOTH))
+    diag["raw"] = census(W, names, "raw heat")
 
     # PRUNE FIRST. A heat solve leaves a long tail of dust — the raw table
     # averages 4.92 influences per vertex and `Head` touches 68% of the surface
@@ -697,7 +867,9 @@ def main():
         "knobs": {"weld_quant": WELD_QUANT, "core_w": CORE_W, "reach_pct": REACH_PCT,
                   "reach_k": REACH_K, "reach_pad": REACH_PAD,
                   "prune_below": PRUNE_BELOW, "mirror_tol_frac": MIRROR_TOL_FRAC,
-                  "non_deform": list(NON_DEFORM)},
+                  "non_deform": list(NON_DEFORM),
+                  "shirt_mask": os.path.basename(SHIRT_MASK) if SHIRT_MASK else None,
+                  "shirt_smooth": SHIRT_SMOOTH, "garment_mode": GARMENT_MODE},
         "diagnostics": diag,
     }
     with open(stem + ".json", "w") as f:

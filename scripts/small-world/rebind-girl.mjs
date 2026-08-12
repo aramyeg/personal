@@ -50,12 +50,13 @@
  *   node scripts/small-world/compress-girl.mjs
  *   # then re-pin GIRL_GLB_BYTES in components/labs/small-world/scene/girl-url.ts
  */
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NodeIO } from '@gltf-transform/core'
+import { shirtMask } from './shirt-region.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const WORKTREE = path.resolve(HERE, '..', '..')
@@ -84,10 +85,11 @@ function blenderExe() {
  * Run the solve headlessly. `-b` is not optional: the standing rule for this lab
  * is that no agent ever occupies the GUI Blender the user may have open.
  */
-export function solve(src, stem) {
+export function solve(src, stem, shirt) {
   mkdirSync(path.dirname(stem), { recursive: true })
   const exe = blenderExe()
-  const r = spawnSync(exe, ['-b', '--python', SOLVER, '--', src, stem], {
+  const extra = shirt ? ['--shirt', shirt] : []
+  const r = spawnSync(exe, ['-b', '--python', SOLVER, '--', src, stem, ...extra], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   })
@@ -376,19 +378,42 @@ export async function verifyTransplant(srcPath, outPath) {
 }
 
 function parseArgs(argv) {
-  const opts = { src: RAW_SRC, out: REBOUND_OUT, stem: null, selfTest: false }
+  const opts = { src: RAW_SRC, out: REBOUND_OUT, stem: null, shirt: false, selfTest: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--src') opts.src = path.resolve(argv[++i])
     else if (a === '--out') opts.out = path.resolve(argv[++i])
     else if (a === '--table') opts.stem = path.resolve(argv[++i])
+    else if (a === '--shirt') opts.shirt = true
     else if (a === '--self-test') opts.selfTest = true
   }
   return opts
 }
 
+/**
+ * T118 — write the garment mask the solver holds out of the body solve.
+ *
+ * It lives beside the weight table rather than in the tree: it is a pure
+ * function of the source (shirt-region.mjs is seed-driven and has no RNG), so
+ * caching it would only create a second thing that can go stale.
+ */
+async function writeShirtMask(src, stem) {
+  const doc = await new NodeIO().read(src)
+  const { mask, report } = await shirtMask(doc)
+  const file = `${stem}-shirt.bin`
+  writeFileSync(file, Buffer.from(mask))
+  console.log(
+    `garment mask: ${report.triangles.toLocaleString()} of ${report.triangleTotal.toLocaleString()} triangles ` +
+      `(${((100 * report.triangles) / report.triangleTotal).toFixed(2)}%), ${report.vertices.toLocaleString()} vertices, ` +
+      `one component of ${report.shirtComponents[0].toLocaleString()}`
+  )
+  return file
+}
+
 async function run(opts) {
-  const stem = opts.stem ?? solve(opts.src, path.join(tmpdir(), 'girl-rebind-table'))
+  const tableStem = path.join(tmpdir(), 'girl-rebind-table')
+  const mask = opts.stem || !opts.shirt ? null : await writeShirtMask(opts.src, tableStem)
+  const stem = opts.stem ?? solve(opts.src, tableStem, mask)
   const r = await transplant({ src: opts.src, out: opts.out, stem })
   const d = r.table.meta.diagnostics
   console.log(`wrote ${r.out}  (${r.bytes.toLocaleString()} B)`)
@@ -414,7 +439,7 @@ async function selfTest() {
     return
   }
   const out = path.join(tmpdir(), 'girl-v2-rebound-selftest.glb')
-  await run({ src: RAW_SRC, out, stem: null })
+  await run({ src: RAW_SRC, out, stem: null, shirt: false })
   console.log(`\n(temp output: ${out} — not committed)`)
   console.log(process.exitCode === 1 ? 'SELF-TEST FAILED' : 'SELF-TEST PASSED')
 }
