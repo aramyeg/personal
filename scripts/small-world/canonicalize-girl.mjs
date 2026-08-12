@@ -172,23 +172,47 @@ export const DEDRIFT = new Set()
  * Keyed by CANONICAL slot, applied after the rename. Gated by `bl_census2.py`
  * (zero overlaps) and by the foot-plant diff — see task-110-report.md.
  *
- * T113 EMPTIES THIS TABLE, and empty is a derived answer here rather than a
- * deferral. The values above (9 / 12 / 10 cm) are stated against the convention
- * that +Y in Hips space is the character's LEFT. This export's skeleton family
- * INVERTS that: the old rig put LeftUpLeg at +11.31 on Y, this one puts it at
- * −5.02 (T112, rigdiff.mjs). Carried over unchanged, every value would pull the
- * legs INTO each other — strictly worse than no correction at all. So the
- * choice is not "correct vs uncorrected", it is "uncorrected vs miscorrected",
- * and uncorrected wins until a census on THIS rig says otherwise.
+ * T113 EMPTIED THIS TABLE and owed a census. T114 RAN IT, and the answer is
+ * that the new rig needs the correction just as badly — 853 overlapping
+ * pair-frames against the old body's 760 — so the table is back, re-derived
+ * end to end on the file that ships. Nothing below is carried over.
  *
- * The census is owed, and T112 recorded the reason to expect a small answer:
- * at the bind pose the old trousers read as one fused pink mass with no gap
- * between the legs, while this body's read as two separate legs with daylight
- * between them. A garment whose rest stance already clears is a garment whose
- * clips have less to clear. Derive it; do not assume either way, and do not
- * re-use a single digit from the block above.
+ * WHAT WAS RE-DERIVED, AND WHY EACH PART HAD TO BE:
+ *
+ *   THE AXIS. The old values are stated against "+Y in Hips space is her left".
+ *   This rig's sockets are LeftUpLeg (2.90, −5.02, −10.02) and RightUpLeg
+ *   (−6.89, 10.89, 0.68), so outward is (0.44, −0.74, −0.51) and no axis letter
+ *   is the answer — the old constant points 137° away from it, i.e. carried over
+ *   it would drive the legs together while reporting a fix. `lateralOutward()`
+ *   now derives it from the sockets and it is cross-checked against the skin.
+ *
+ *   THE EXPECTATION. T112 read daylight between this body's bind-pose trouser
+ *   legs and predicted a small or zero answer. The bind IS wider — ankles
+ *   30.07 cm apart against the old rig's 28.6 — but the bind was never the
+ *   problem: the CLIPS close it to 18.6 cm (Idle), 22.0 (Skip_Forward) and
+ *   10.2 (Walk_Backward), and a garment modelled to clear at 30 cm has nothing
+ *   left at 10. A wider rest stance did not buy a cleaner walk.
+ *
+ *   THE VALUES. Swept 4/6/8/9/10/11/12 cm with a census at each, the same
+ *   acceptance T110 used — zero overlapping pair-frames — and each entry below
+ *   is the smallest value on a 1 cm grid that reaches it:
+ *
+ *     splay/leg |  4  |  6  |  8  |  9  | 10 | 11 | 12
+ *     Idle      | 301 | 272 |  35 |   8 |  0 |  0 |  0
+ *     Skip_Fwd  |  82 |  55 |  29 |  20 | 11 |  2 |  1 (0.01 cm — surfaces touching)
+ *     Walk_Back |  25 |  12 |   7 |   3 |  0 |  0 |  0
+ *
+ *   The jumps are left alone, as they were in T110 and for the same reason:
+ *   what survives in them is shin×shin only, which is pink trouser inside pink
+ *   trouser and invisible in a natural render, where every foot-involving hit —
+ *   white shoe through pink trouser, the defect a reader can actually see — is
+ *   gone from all three corrected clips by 10 cm.
  */
-export const LEG_CORRECTIONS = {}
+export const LEG_CORRECTIONS = {
+  Idle: { splayCm: 10 },
+  Skip_Forward: { splayCm: 12 },
+  Walk_Backward: { splayCm: 10 },
+}
 
 /** The clips girl.glb must end up with, as a set (order-independent). */
 export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B', 'Jump_Off']
@@ -351,7 +375,40 @@ function boneUnitInWorld(node) {
   return avg
 }
 
-function splayLeg(doc, anim, joints, side, splayCm) {
+/**
+ * THE OUTWARD DIRECTION, DERIVED FROM THE RIG — the sign this whole correction
+ * hangs on, and the one thing about it that must never be remembered.
+ *
+ * T110 stated it as a fact about an axis: "+Y in Hips space is the character's
+ * left", true of that export and hardcoded here as `(0, ±1, 0)`. It is FALSE of
+ * the export that ships now, and not merely flipped: this rig's sockets sit at
+ * LeftUpLeg (2.90, −5.02, −10.02) and RightUpLeg (−6.89, 10.89, 0.68) in Hips
+ * space, so the line between them is (0.44, −0.74, −0.51) — no axis letter is
+ * the answer, and a flipped sign would still be 60° off. Carried over unchanged
+ * the old constant points 137° away from outward, i.e. it would drive the legs
+ * INTO each other while reporting a correction applied.
+ *
+ * So it is measured from the file: outward for the left leg is the direction
+ * from the right hip socket to the left one, normalized. That is a property of
+ * the skeleton in the frame the splay is solved in, and it survives a re-export
+ * that renames axes, mirrors the rig or re-orients the pelvis.
+ *
+ * Cross-checked against the SKIN rather than trusted: the centroids of the
+ * vertices each leg chain owns, brought into Hips space through the Hips
+ * inverse-bind matrix, give the same direction to cos = 0.9998
+ * (`scratchpad/t114/rig2.mjs`). Bone names could be mislabelled; two independent
+ * derivations agreeing to a fifth of a degree could not.
+ */
+function lateralOutward(joints) {
+  const l = joints.get('LeftUpLeg')
+  const r = joints.get('RightUpLeg')
+  if (!l || !r) throw new Error('rig has no LeftUpLeg/RightUpLeg — cannot derive an outward axis')
+  const v = new THREE.Vector3(...l.getTranslation()).sub(new THREE.Vector3(...r.getTranslation()))
+  if (v.length() < 1e-6) throw new Error('hip sockets coincide — outward is undefined')
+  return v.normalize()
+}
+
+function splayLeg(doc, anim, joints, side, splayCm, outwardLeft) {
   const upLeg = joints.get(`${side}UpLeg`)
   const shin = joints.get(`${side}Leg`)
   const foot = joints.get(`${side}Foot`)
@@ -363,8 +420,9 @@ function splayLeg(doc, anim, joints, side, splayCm) {
   const readShin = rotationReaderFor(anim, shin)
   const readFoot = rotationReaderFor(anim, foot)
 
-  // Outward lateral direction in Hips space: +Y is the character's left.
-  const outward = new THREE.Vector3(0, side === 'Left' ? 1 : -1, 0)
+  // Outward lateral direction in Hips space — DERIVED from the sockets above,
+  // never an axis letter. Away from the other leg is what a splay means.
+  const outward = side === 'Left' ? outwardLeft.clone() : outwardLeft.clone().negate()
   // splayCm is a real-world distance; the rig thinks in its own units.
   const d = splayCm / 100 / boneUnitInWorld(upLeg)
   const out = new Float32Array(up.values.length)
@@ -424,11 +482,12 @@ function applyLegCorrections(doc, table) {
   const skin = doc.getRoot().listSkins()[0]
   const joints = new Map((skin?.listJoints() ?? []).map((j) => [j.getName(), j]))
   const applied = []
+  const outward = Object.keys(table).length ? lateralOutward(joints) : null
   for (const anim of doc.getRoot().listAnimations()) {
     const fix = table[anim.getName()]
     if (!fix || !fix.splayCm) continue
-    const l = splayLeg(doc, anim, joints, 'Left', fix.splayCm)
-    const r = splayLeg(doc, anim, joints, 'Right', fix.splayCm)
+    const l = splayLeg(doc, anim, joints, 'Left', fix.splayCm, outward)
+    const r = splayLeg(doc, anim, joints, 'Right', fix.splayCm, outward)
     applied.push(
       `${anim.getName()}: splay ${fix.splayCm}cm/leg (max ${Math.max(l.maxDeg, r.maxDeg).toFixed(2)}°)`
     )
