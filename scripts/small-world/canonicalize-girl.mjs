@@ -65,6 +65,11 @@ export const CANONICAL = {
   Happy_Sway_Standing: 'Idle',
   Idle: 'Idle',
   Walk_Backward: 'Walk_Backward',
+  // T113's export names the backward cycle `Walk_Backward_inplace` and ships it
+  // with the root motion already baked out (per-axis Hips span 2.8/3.6/3.2 cm —
+  // all bounce, no travel), where the previous export travelled 1.22 u. Same
+  // slot, so the rename absorbs it and DEDRIFT no longer has anything to do.
+  Walk_Backward_inplace: 'Walk_Backward',
   // T110 shipped the source's spare Walking/Running clips as a slow and a fast
   // gear either side of the skip; T112 removed the gears on Aram's verdict that
   // he preferred the always-skipping version. A clip nothing can select is
@@ -77,6 +82,13 @@ export const CANONICAL = {
   Jump_A: 'Jump_A',
   '019f93e2-9461-703f-988c-ec193d9b734b': 'Jump_B',
   Jump_B: 'Jump_B',
+  // The standing broad jump Aram exported for the planet exit. Identified by
+  // trajectory, not by name (the name is a bare UUID): crouch to 0.570 u, apex
+  // 1.1024 u at clip fraction 0.528, 71 of 90 frames airborne-or-rising, and
+  // +0.266 u of forward travel — a jump that goes SOMEWHERE, unlike Jump_B's
+  // near-vertical celebrate leap. See girl-exit.ts.
+  '019ff2cd-967b-79e7-9ae0-0f0a73ae3227': 'Jump_Off',
+  Jump_Off: 'Jump_Off',
 }
 
 /** Canonical clips whose root (Hips) translation is frozen to bind — see step 3.
@@ -89,8 +101,19 @@ export const CANONICAL = {
  *  bounce (Z is up in the Z-up source), the same shape as Skip_Forward's
  *  6.0/3.7/25.3 hop — which has never been de-drifted. So the three new
  *  locomotion clips keep their root exactly as authored: freezing them would
- *  flatten the bounce that IS the gait. */
-export const DEDRIFT = new Set(['Walk_Backward'])
+ *  flatten the bounce that IS the gait.
+ *
+ *  T113 EMPTIES THIS SET, and the reason is a property of the source, not a
+ *  change of mind. Aram's new export ships the backward cycle as
+ *  `Walk_Backward_inplace` with the travel already baked out: per-axis Hips
+ *  spans 2.8 / 3.6 / 3.2 cm, no axis anywhere near the 121.8 cm that made the
+ *  freeze necessary. Every one of those spans is bounce. Freezing it now would
+ *  do to the backward walk exactly what the note above refuses to do to the
+ *  other cycles — flatten the gait — so nothing is de-drifted. The machinery
+ *  stays because the next export may travel again; the LAW that Walk_Backward
+ *  must not travel in the shipped file is asserted in selfTest() against the
+ *  OUTPUT, which holds whether the source arrives travelling or in place. */
+export const DEDRIFT = new Set()
 
 /**
  * CORRECTIVE LEG OFFSETS — the T110 fix for the interpenetration census (T107).
@@ -148,15 +171,27 @@ export const DEDRIFT = new Set(['Walk_Backward'])
  *
  * Keyed by CANONICAL slot, applied after the rename. Gated by `bl_census2.py`
  * (zero overlaps) and by the foot-plant diff — see task-110-report.md.
+ *
+ * T113 EMPTIES THIS TABLE, and empty is a derived answer here rather than a
+ * deferral. The values above (9 / 12 / 10 cm) are stated against the convention
+ * that +Y in Hips space is the character's LEFT. This export's skeleton family
+ * INVERTS that: the old rig put LeftUpLeg at +11.31 on Y, this one puts it at
+ * −5.02 (T112, rigdiff.mjs). Carried over unchanged, every value would pull the
+ * legs INTO each other — strictly worse than no correction at all. So the
+ * choice is not "correct vs uncorrected", it is "uncorrected vs miscorrected",
+ * and uncorrected wins until a census on THIS rig says otherwise.
+ *
+ * The census is owed, and T112 recorded the reason to expect a small answer:
+ * at the bind pose the old trousers read as one fused pink mass with no gap
+ * between the legs, while this body's read as two separate legs with daylight
+ * between them. A garment whose rest stance already clears is a garment whose
+ * clips have less to clear. Derive it; do not assume either way, and do not
+ * re-use a single digit from the block above.
  */
-export const LEG_CORRECTIONS = {
-  Idle: { splayCm: 9 },
-  Skip_Forward: { splayCm: 12 },
-  Walk_Backward: { splayCm: 10 },
-}
+export const LEG_CORRECTIONS = {}
 
 /** The clips girl.glb must end up with, as a set (order-independent). */
-export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B']
+export const SHIPPED_SLOTS = ['Skip_Forward', 'Idle', 'Walk_Backward', 'Jump_A', 'Jump_B', 'Jump_Off']
 
 const DEFAULT_SRC = 'public/labs/small-world/girl-v2.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
@@ -536,15 +571,24 @@ export async function canonicalizeGirl({ src, out, corrections = LEG_CORRECTIONS
   }
 }
 
-/** Largest world-space travel of the root joint across a clip (max of the three
- *  axis spans) — the orientation-independent metric that exposes the Walk_Backward
- *  root motion (huge before, ~0 after the freeze). */
-async function rootTravelSpan(path, clipName) {
+/**
+ * NET drift of the root across a clip: how far the last key sits from the
+ * first, in world units. This is the discriminator rootTravelSpan() is NOT.
+ *
+ * The span metric answers "how much did the root move at all", which conflates
+ * a metre of walking with the vertical hop that IS a skip and the lateral
+ * weight-shift that IS an idle sway — Skip_Forward spans 0.219 u and Idle
+ * 0.225 u without either going anywhere. Net drift separates them cleanly,
+ * because a cycle that returns to its own start closes the loop no matter how
+ * far it travelled in between: measured on real exports, the travelling
+ * backward walk drifts 1.219 u while Skip_Forward drifts 0.001 u and Idle
+ * 0.000 u. Three orders of magnitude, not a judgement call.
+ */
+async function rootNetDrift(path, clipName) {
   const doc = await new NodeIO().read(path)
   const hips = rootJoint(doc)
   const anim = doc.getRoot().listAnimations().find((a) => a.getName() === clipName)
   if (!hips || !anim) return null
-  // Compose the transform of every node above the root joint (the armature).
   const chain = []
   let cur = hips
   while (cur) {
@@ -564,17 +608,10 @@ async function rootTravelSpan(path, clipName) {
   for (const ch of anim.listChannels()) {
     if (ch.getTargetNode() !== hips || ch.getTargetPath() !== 'translation') continue
     const v = ch.getSampler().getOutput().getArray()
-    const min = [Infinity, Infinity, Infinity]
-    const max = [-Infinity, -Infinity, -Infinity]
-    const p = new THREE.Vector3()
-    for (let i = 0; i < v.length; i += 3) {
-      p.set(v[i], v[i + 1], v[i + 2]).applyMatrix4(arm)
-      for (const [k, c] of [p.x, p.y, p.z].entries()) {
-        min[k] = Math.min(min[k], c)
-        max[k] = Math.max(max[k], c)
-      }
-    }
-    return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2])
+    if (v.length < 6) return 0
+    const first = new THREE.Vector3(v[0], v[1], v[2]).applyMatrix4(arm)
+    const last = new THREE.Vector3(v[v.length - 3], v[v.length - 2], v[v.length - 1]).applyMatrix4(arm)
+    return first.distanceTo(last)
   }
   return 0
 }
@@ -677,7 +714,6 @@ async function selfTest() {
     set(result.animations) === set(SHIPPED_SLOTS)
   )
   assert(`extras stripped [${result.stripped.join(', ')}]`, result.stripped.length > 0)
-  assert(`Walk_Backward de-drifted`, result.dedrifted.includes('Walk_Backward'))
   assert(`single mesh (not duplicated) — ${result.meshes}`, result.meshes === 1)
 
   // T110 A: every clip the census found broken carries its corrective splay.
@@ -707,12 +743,21 @@ async function selfTest() {
     Math.abs(result.height - 1.7) < 0.05
   )
 
-  const beforeSpan = await rootTravelSpan(DEFAULT_SRC, 'Walk_Backward')
-  const afterSpan = await rootTravelSpan(out, 'Walk_Backward')
-  assert(
-    `Walk_Backward root motion neutralized (${beforeSpan.toFixed(3)}u → ${afterSpan.toFixed(3)}u)`,
-    beforeSpan > 0.5 && afterSpan < 1e-6
-  )
+  // The girl is fixed in place and the planet spins beneath her, so every
+  // shipped CYCLE must close its own loop. Asserted on the OUTPUT only: a source
+  // that travels must be de-drifted to get here, and a source that arrives in
+  // place passes untouched, so the law holds across both export generations.
+  //
+  // Net drift, NOT span — the distinction cost a red self-test on the way in.
+  // Span conflates travel with the hop that IS a skip (0.219 u) and the sway
+  // that IS an idle (0.225 u); both of those return to where they started and
+  // neither goes anywhere. The jumps are excluded because they are one-shots
+  // that legitimately land somewhere else: Jump_Off carries her 0.266 u forward
+  // off the planet, which is the whole point of it.
+  for (const clip of ['Skip_Forward', 'Idle', 'Walk_Backward']) {
+    const drift = await rootNetDrift(out, clip)
+    assert(`${clip} closes its loop (net root drift ${drift.toFixed(4)}u < 0.05u)`, drift < 0.05)
+  }
 
   // TRUE-SKINNED RENDER INVARIANT — the gap the accessor proxy leaves open.
   // worldBindExtent() (above) rotates the POSITION accessor by the root
