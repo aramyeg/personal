@@ -81,3 +81,4 @@ IMPROVEMENT_PLAN.md
 # T120's lining output: the rebound source with the body surface built under the
 # garment, produced by scripts/small-world/line-girl.mjs. Same class again.
 /public/labs/small-world/girl-v2-lined.glb
+public/labs/small-world/girl-v2-cloth.glb

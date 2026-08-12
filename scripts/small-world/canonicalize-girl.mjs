@@ -243,6 +243,9 @@ const REBOUND_SRC = 'public/labs/small-world/girl-v2-rebound.glb'
 /** T120's lining output — the rebound export with the body surface that Meshy
  *  never modelled built under the garment. See scripts/small-world/line-girl.mjs. */
 const LINED_SRC = 'public/labs/small-world/girl-v2-lined.glb'
+/** T121's detach output — the lined export with the garment cut into its own
+ *  primitive and the cloth bones parented in. See detach-girl.mjs. */
+const CLOTH_SRC = 'public/labs/small-world/girl-v2-cloth.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
 
 /**
@@ -256,6 +259,7 @@ const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
  * overrides both, which is how the two are compared.
  */
 export function defaultSource() {
+  if (existsSync(CLOTH_SRC)) return CLOTH_SRC
   if (existsSync(LINED_SRC)) return LINED_SRC
   return existsSync(REBOUND_SRC) ? REBOUND_SRC : RAW_SRC
 }
@@ -834,6 +838,94 @@ async function selfTest() {
       .listMaterials()
       .filter((m) => m.getAlphaMode() !== 'OPAQUE' || m.getDoubleSided())
     assert(`all materials OPAQUE + single-sided (${bad.length} offenders)`, bad.length === 0)
+  }
+
+  // T121 — THE CLOTH RIG SURVIVES CANONICALIZATION.
+  //
+  // Asserted against the SOURCE rather than against a constant: a worktree whose
+  // detach stage has not been run has no garment primitive and no cloth bones, and
+  // must behave exactly as it did before. But once the source carries them,
+  // canonicalize is not allowed to lose them, re-merge the primitives, reorder the
+  // joint list, or let a cloth bone drift off its parent — every one of which
+  // would silently change how the shirt deforms while every other check here
+  // stayed green.
+  //
+  // The load-bearing invariant is the last one. A cloth bone is an
+  // identity-at-bind child of a body joint, which is the ONLY reason redirecting a
+  // garment influence onto it is the same skin matrix (cloth-zone.mjs). If its
+  // local TRS or its inverse bind stops matching its parent's, the shirt tears
+  // away from the body at bind — before a single simulated frame.
+  {
+    const srcDoc = await new NodeIO().read(src)
+    const outDoc = await new NodeIO().read(out)
+    const prims = (d) => d.getRoot().listMeshes().flatMap((m) => m.listPrimitives())
+    const names = (d) => d.getRoot().listMaterials().map((m) => m.getName()).sort()
+    const cloth = (d) => d.getRoot().listSkins()[0].listJoints().filter((j) => j.getName().startsWith('Cloth_'))
+    const srcCloth = cloth(srcDoc)
+
+    assert(
+      `primitive count preserved (${prims(srcDoc).length} → ${prims(outDoc).length})`,
+      prims(outDoc).length === prims(srcDoc).length
+    )
+    assert(`materials preserved [${names(outDoc).join(', ')}]`, names(outDoc).join(',') === names(srcDoc).join(','))
+
+    const srcJoints = srcDoc.getRoot().listSkins()[0].listJoints().map((j) => j.getName())
+    const outJoints = outDoc.getRoot().listSkins()[0].listJoints().map((j) => j.getName())
+    assert(
+      `joint list identical and IN ORDER (${outJoints.length} joints, ${srcCloth.length} of them cloth)`,
+      outJoints.length === srcJoints.length && outJoints.every((n, i) => n === srcJoints[i])
+    )
+
+    if (srcCloth.length) {
+      const skin = outDoc.getRoot().listSkins()[0]
+      const joints = skin.listJoints()
+      const ibm = skin.getInverseBindMatrices()
+      const rowOf = new Map(joints.map((j, i) => [j, i]))
+      const offenders = []
+      for (const node of joints) {
+        if (!node.getName().startsWith('Cloth_')) continue
+        const parent = joints.find((p) => p.listChildren().includes(node))
+        if (!parent) { offenders.push(`${node.getName()}: no joint parent`); continue }
+        const t = node.getTranslation(), r = node.getRotation(), s = node.getScale()
+        const identity =
+          t.every((v) => v === 0) && r[0] === 0 && r[1] === 0 && r[2] === 0 && r[3] === 1 && s.every((v) => v === 1)
+        if (!identity) offenders.push(`${node.getName()}: local TRS is not identity`)
+        const a = new Array(16), b = new Array(16)
+        ibm.getElement(rowOf.get(node), a)
+        ibm.getElement(rowOf.get(parent), b)
+        if (a.some((v, i) => v !== b[i])) offenders.push(`${node.getName()}: inverse bind ≠ ${parent.getName()}'s`)
+      }
+      assert(
+        `every cloth bone is an identity-at-bind child of its body joint (${offenders.length} offenders${offenders.length ? ': ' + offenders.slice(0, 3).join('; ') : ''})`,
+        offenders.length === 0
+      )
+      assert(
+        `garment primitive present (materials include girl_garment)`,
+        names(outDoc).includes('girl_garment')
+      )
+    }
+
+    // Clip durations are load-bearing downstream — girl-exit.ts pins Jump_Off's
+    // timing in seconds — so canonicalization (and anything that runs after it)
+    // may add channels but may not lengthen or shorten a clip.
+    const dur = (d, name) => {
+      const a = d.getRoot().listAnimations().find((x) => x.getName() === name)
+      if (!a) return null
+      let m = 0
+      for (const c of a.listChannels()) {
+        const inp = c.getSampler().getInput().getArray()
+        m = Math.max(m, inp[inp.length - 1])
+      }
+      return m
+    }
+    const drift = []
+    for (const [srcName, slot] of Object.entries(CANONICAL)) {
+      const ds = dur(srcDoc, srcName)
+      const dOut = dur(outDoc, slot)
+      if (ds === null || dOut === null) continue
+      if (Math.abs(ds - dOut) > 1e-6) drift.push(`${slot} ${ds.toFixed(4)}→${dOut.toFixed(4)}`)
+    }
+    assert(`clip durations unchanged (${drift.length ? drift.join(', ') : 'all six'})`, drift.length === 0)
   }
 
   // Orientation: the v2 export is Z-up; output must stand ~1.7u tall on +Y.

@@ -91,6 +91,23 @@ export function toonifyGirl(
   ramp: THREE.Texture,
   flatShading: boolean
 ): void {
+  // The girl is TWO meshes since T121 cut the shirt into its own primitive, and
+  // both reference the same atlas. gradeGirlTexture reads a 1024² image into a
+  // canvas and walks every pixel, so without this cache it runs twice per mount
+  // and uploads a second identical texture. Keyed on the SOURCE texture rather
+  // than the material because GLTFLoader may hand out cloned materials for
+  // primitives with different attributes while still sharing one texture.
+  const graded = new Map<THREE.Texture, THREE.Texture | null>()
+  const gradeOnce = (src: THREE.Texture): THREE.Texture | null => {
+    if (graded.has(src)) return graded.get(src) ?? null
+    const out = gradeGirlTexture(src)
+    graded.set(src, out)
+    // The source map is superseded for every mesh at once, so it is released
+    // once here rather than once per material.
+    if (out) src.dispose()
+    return out
+  }
+
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh
     if (!mesh.isMesh) return
@@ -99,7 +116,7 @@ export function toonifyGirl(
 
     const next = src.map((m) => {
       const std = m as THREE.MeshStandardMaterial
-      const graded = std.map ? gradeGirlTexture(std.map) : null
+      const graded = std.map ? gradeOnce(std.map) : null
       const toon = new THREE.MeshToonMaterial({
         map: graded ?? std.map ?? undefined,
         color: graded || !std.map ? 0xffffff : GRADE_FALLBACK_TINT,
@@ -112,9 +129,9 @@ export function toonifyGirl(
       // from its three typings — cast to reach it.
       ;(toon as unknown as { flatShading: boolean }).flatShading = flatShading
       toon.name = std.name
-      // Free what we replaced. Dispose the source map only when a graded copy
-      // took over — otherwise the toon material still points at it.
-      if (graded && std.map) std.map.dispose()
+      // Free what we replaced. The source map is disposed by gradeOnce, once,
+      // when a graded copy takes over — otherwise the toon material still
+      // points at it.
       std.dispose()
       return toon
     })

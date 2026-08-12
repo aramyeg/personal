@@ -130,6 +130,20 @@ async function makeIO(deps) {
     .registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder })
 }
 
+/** Largest bounding-box dimension over a set of POSITION arrays — the same
+ *  quantity meshoptimizer normalises its target_error by. */
+const extent = (arrays) => {
+  const min = [Infinity, Infinity, Infinity]
+  const max = [-Infinity, -Infinity, -Infinity]
+  for (const a of arrays)
+    for (let i = 0; i < a.length; i += 3)
+      for (let k = 0; k < 3; k++) {
+        if (a[i + k] < min[k]) min[k] = a[i + k]
+        if (a[i + k] > max[k]) max[k] = a[i + k]
+      }
+  return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2])
+}
+
 const triangles = (doc) =>
   Math.round(
     doc
@@ -160,10 +174,31 @@ export async function compressGirl({
   // weld() first: it is bitwise-identical merging only, so it costs nothing here
   // (this export's vertices are split by UV at every island edge and almost none
   // of them are bitwise equal) but simplify() expects a welded input.
-  await doc.transform(
-    functions.weld(),
-    functions.simplify({ simplifier: MeshoptSimplifier, ratio, error })
+  //
+  // THE ERROR BUDGET IS PER PRIMITIVE, AND THAT MATTERS SINCE T121 CUT THE SHIRT
+  // OUT. meshoptimizer normalises target_error by the extent of the positions it
+  // is handed, and gltf-transform hands it one primitive at a time. While this
+  // asset was a single primitive that extent was the whole 1.7 u figure and the
+  // block above ("0.001 is about 1.5 mm") was true. The moment the garment became
+  // its own 0.58 u shell the same number bought it ~0.5 mm — three times finer
+  // than the body, by accident, and it kept 87% of its triangles for +4.8% on the
+  // wire (measured: scratchpad/t121/simsweep.mjs, 13,894 tri / gz 1,641,087
+  // against 7,920 tri / gz 1,569,049 scaled).
+  //
+  // So the error is scaled per primitive by the whole mesh's extent over that
+  // primitive's, which makes SIMPLIFY_ERROR mean one absolute distance on the
+  // figure again — the thing it was always documented to mean. A single-primitive
+  // asset scales by exactly 1 and is untouched.
+  const wholeExtent = extent(
+    doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives()).map((p) => p.getAttribute('POSITION').getArray())
   )
+  await doc.transform(functions.weld())
+  const budgets = []
+  for (const prim of doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives())) {
+    const scale = wholeExtent / extent([prim.getAttribute('POSITION').getArray()])
+    budgets.push({ material: prim.getMaterial()?.getName() ?? null, scale, error: error * scale })
+    functions.simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio, error: error * scale })
+  }
   const trisAfter = triangles(doc)
 
   await doc.transform(
@@ -207,6 +242,7 @@ export async function compressGirl({
     textureSize,
     quality,
     error,
+    budgets,
   }
 }
 
