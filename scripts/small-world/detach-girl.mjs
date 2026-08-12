@@ -70,7 +70,7 @@ const el = (acc, i, n) => {
 /**
  * @param {import('@gltf-transform/core').Document} doc  a lined source, in place
  */
-export function detachGirl(doc, { triLabel, threshold = PAIR_THRESHOLD, band = undefined, torsoRegions = undefined, sleeveRegions = undefined } = {}) {
+export function detachGirl(doc, { triLabel, threshold = PAIR_THRESHOLD, band = undefined, torsoRegions = undefined, sleeveRegions = undefined, yokeFraction = undefined, yokeRamp = undefined } = {}) {
   const root = doc.getRoot()
   const meshes = root.listMeshes()
   if (meshes.length !== 1) throw new Error(`detach-girl: expected 1 mesh, found ${meshes.length}`)
@@ -108,7 +108,7 @@ export function detachGirl(doc, { triLabel, threshold = PAIR_THRESHOLD, band = u
     for (let k = 0; k < 4; k++) { jnt[i * 4 + k] = j[k]; wgt[i * 4 + k] = w[k] }
   }
   const meshDesc = { nv, pos, tri: Int32Array.from(idx), jnt, wgt, jointNames }
-  const Z = clothZone(meshDesc, triLabel, { ...(band ? { band } : {}), ...(torsoRegions ? { torsoRegions } : {}), ...(sleeveRegions ? { sleeveRegions } : {}) })
+  const Z = clothZone(meshDesc, triLabel, { ...(band ? { band } : {}), ...(torsoRegions ? { torsoRegions } : {}), ...(sleeveRegions ? { sleeveRegions } : {}), ...(yokeFraction ? { yokeFraction } : {}), ...(yokeRamp ? { yokeRamp } : {}) })
   const { bones, redirect, keptMass, zoneMass } = clothBones(meshDesc, Z, threshold)
 
   // ---------- the cut ----------
@@ -264,7 +264,16 @@ export function detachGirl(doc, { triLabel, threshold = PAIR_THRESHOLD, band = u
       vertices: { source: nv, garment: garment.order.length, body: body.order.length, duplicated: garment.order.length + body.order.length - nv },
       rim: Z.gW.filter((w) => Z.wBody[w]).length,
       freeEdges: [...Z.edgeKind.values()].reduce((m, k) => ({ ...m, [k]: (m[k] ?? 0) + 1 }), {}),
-      zone: { weldedPositions: Z.zone.length, indexVertices: zoneVerts.size, regions: new Set([...Z.region.values()]).size },
+      // The zoning is echoed into the report because a rung is identified by it
+      // and a silently-defaulted flag produces a plausible file for a rung that
+      // was never built (T122 §5.2). Read this back, do not trust the command.
+      zone: {
+        weldedPositions: Z.zone.length, indexVertices: zoneVerts.size, regions: new Set([...Z.region.values()]).size,
+        mode: yokeFraction ? (yokeRamp ? 'yoke-pinned' : 'yoke-faded') : 'band', band: yokeFraction ? null : (band ?? null), yokeFraction: yokeFraction ?? null, yokeRamp: yokeRamp ?? null,
+        hardPinnedPositions: Z.gW.filter((w) => Z.alpha[w] <= 0.001).length,
+        meanAlphaOverGarment: Z.gW.reduce((s, w) => s + Z.alpha[w], 0) / Z.gW.length,
+        garmentPositions: Z.gW.length,
+      },
       clothBones: bones.map((b) => ({ name: b.name, parent: jointNames[b.joint], share: b.mass })),
       clothWeightCarried: keptMass,
       zoneMass,
@@ -347,6 +356,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const num = (n) => (arg(n, null) ? Number(arg(n, null)) : undefined)
   const { report, Z } = detachGirl(doc, {
     triLabel, band: num('band'), threshold: num('threshold') ?? PAIR_THRESHOLD, torsoRegions: num('torso-regions'),
+    sleeveRegions: num('sleeve-regions'), yokeFraction: num('yoke'), yokeRamp: num('yoke-ramp'),
   })
   await io.write(out, doc)
   writeFileSync(path.join(WORKTREE, 'scratchpad/t121/out/detach.json'), JSON.stringify(report, null, 1))

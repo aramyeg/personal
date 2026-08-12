@@ -63,7 +63,11 @@ COLLISION_QUALITY = 3
 # is also what disproved "the shirt is sinking into the lining" as the cause of
 # the leak (see the report: most of it is the hem lifting, which is the point).
 COLLISION_DISTANCE = 0.006
-SELF_COLLISION = False      # single layer; self-collision costs minutes and buys nothing
+SELF_COLLISION = False      # single layer; self-collision costs minutes and bought nothing
+                            # at the 5 cm zone. Overridable with --selfcoll 1: past ~14 cm
+                            # there is enough free panel for the shirt to reach itself and
+                            # nothing else in the solver would stop it (T122 §2).
+SELF_COLLISION_DISTANCE = 0.005
 COLLIDER_RANGE = 0.05       # metres: body surface further than this from the shirt is deleted
 COLLIDER_FACES = 9000       # decimate the collider to about this, so the solver is not walking a face count the shirt cannot use
 GARMENT_MATERIAL = 'girl_garment'
@@ -121,6 +125,12 @@ def main():
     collider_faces = int(args.get('colliderfaces', COLLIDER_FACES))
     collision_distance = float(args.get('cdist', COLLISION_DISTANCE))
     pin_stiffness = float(args.get('pinstiff', PIN_STIFFNESS))
+    # argv() hands back True for a bare flag and a string otherwise, so accept
+    # both and normalise to a bool ONCE — the value written into the sidecar has
+    # to be the one the solver ran with, not the module constant it overrode.
+    _sc = args.get('selfcoll', SELF_COLLISION)
+    self_collision = _sc is True or str(_sc).lower() in ('1', 'true', 'on', 'yes')
+    self_collision_distance = float(args.get('scdist', SELF_COLLISION_DISTANCE))
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     # THE SCENE FPS MUST BE SET BEFORE THE IMPORT. The glTF importer converts
@@ -359,7 +369,12 @@ def main():
     c = cloth.collision_settings
     c.collision_quality = COLLISION_QUALITY
     c.distance_min = collision_distance
-    c.use_self_collision = SELF_COLLISION
+    c.use_self_collision = self_collision
+    if self_collision:
+        c.self_distance_min = self_collision_distance
+        c.self_friction = 5.0
+    print(f'cloth-sim: self collision {"ON" if self_collision else "off"}'
+          + (f' at {self_collision_distance * 1000:.1f} mm' if self_collision else ''), flush=True)
     cloth.point_cache.frame_start = -preroll
     cloth.point_cache.frame_end = frames - 1
 
@@ -426,7 +441,8 @@ def main():
             'blenderVertices': len(garment.data.vertices), 'mapWorstMm': worst * 1000,
             'settings': {
                 'quality': quality, 'mass': mass, 'bending': bending, 'airDamping': air, 'pinPow': pinpow,
-                'tension': TENSION, 'collisionDistance': collision_distance, 'selfCollision': SELF_COLLISION,
+                'tension': TENSION, 'collisionDistance': collision_distance, 'selfCollision': self_collision,
+                'selfCollisionDistance': self_collision_distance if self_collision else None,
                 'colliderRange': collider_range, 'colliderFaces': collider_faces, 'pinStiffness': pin_stiffness,
             },
         }, fh, indent=1)

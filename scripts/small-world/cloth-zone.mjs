@@ -75,6 +75,37 @@ export const BAND = 0.05
 export const TORSO_REGIONS = 4
 export const SLEEVE_REGIONS = 1
 export const KMEANS_SEED = 12345
+/** T123 — YOKE PINNING, an alternative to the geodesic band.
+ *
+ *  The band grows cloth inward from the shirt's OPENINGS, so freedom is a
+ *  property of how far a point is from an edge and the middle of the chest is
+ *  skin no matter how wide the band gets. Yoke pinning inverts that: the shirt
+ *  hangs from its yoke — the top of the garment by bind height, which is the
+ *  same population sag.mjs measures the drop of — and everything below is cloth.
+ *  `yokeFraction` is that fraction of the garment's welded positions: alpha runs
+ *  0 at the garment's topmost point (the collar, pinned to the neck as always)
+ *  to 1 at the yoke's lower edge, and stays 1 all the way down.
+ *
+ *  Set it and the band is not consulted. It is the only rule here that can make
+ *  the CHEST cloth. */
+export const YOKE_FRACTION = 0.2
+/** How the yoke holds, and it is not a detail — it is the difference between a
+ *  shirt and a shirt on the floor.
+ *
+ *  With `yokeRamp` unset, alpha fades from 1 at the yoke's lower edge to 0 at the
+ *  garment's topmost point, so the yoke ITSELF is the transition and the only
+ *  fully pinned vertices are the last few at the collar. Measured (T123 R6): 13
+ *  of 8,611 vertices pinned, and the whole garment then rides 4.2 cm up the body
+ *  on a skip with half a metre of departure at the shoulders. A soft collar
+ *  spring cannot hold a free surface on a moving figure — nothing in the solver
+ *  models the friction and fit that hold a real shirt down.
+ *
+ *  Set it (metres) and the yoke is PINNED — alpha 0 across the whole top
+ *  `yokeFraction` — with alpha ramping to 1 over this distance BELOW the yoke
+ *  cut. At the shipped 0.05 m the ramp closes at 43.5 cm, which is where the
+ *  shoulder joint sits: the pin ends exactly at the shoulder seam, and
+ *  everything below the seam is cloth. */
+export const YOKE_RAMP = 0.05
 /** A (joint, region) pair earns a bone at this share of the zone's cloth weight;
  *  below it the influence keeps its body joint, which attenuates the deviation
  *  there rather than displacing the vertex. */
@@ -97,7 +128,7 @@ const smoothstep = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x))
  * @param {Uint8Array} triLabel per-ORIGINAL-triangle garment mask (1 = garment)
  */
 export function clothZone(mesh, triLabel, opts = {}) {
-  const { torsoRegions = TORSO_REGIONS, sleeveRegions = SLEEVE_REGIONS, band = BAND } = opts
+  const { torsoRegions = TORSO_REGIONS, sleeveRegions = SLEEVE_REGIONS, band = BAND, yokeFraction = 0, yokeRamp = 0 } = opts
   const nTri = mesh.tri.length / 3
   if (triLabel.length !== N_ORIG_TRI) throw new Error(`cloth-zone: mask is ${triLabel.length} triangles, expected ${N_ORIG_TRI}`)
 
@@ -190,9 +221,29 @@ export function clothZone(mesh, triLabel, opts = {}) {
   }
   const alpha = new Float64Array(nW)
   const zone = []
-  for (const w of gW) {
-    alpha[w] = 1 - smoothstep(dist[w] / band)
-    if (alpha[w] > 0) zone.push(w)
+  if (yokeFraction > 0) {
+    // Height in the SOURCE frame: −Z points at the head, so height = −z. The cut
+    // is a population quantile, not a distance, so it is the same set sag.mjs
+    // calls the yoke and the guard measures exactly what the pin holds.
+    const hs = gW.map((w) => -wpos[w * 3 + 2]).sort((a, b) => a - b)
+    const hLo = hs[Math.min(hs.length - 1, Math.floor(hs.length * (1 - yokeFraction)))]
+    const hHi = hs[hs.length - 1]
+    if (!(hHi > hLo)) throw new Error('cloth-zone: the yoke has no height to ramp over')
+    for (const w of gW) {
+      const h = -wpos[w * 3 + 2]
+      // Pinned yoke: 0 across the whole yoke, ramping to 1 over yokeRamp below it.
+      // Faded yoke: 1 at the yoke's lower edge falling to 0 at the collar, which
+      // leaves the garment hanging off a handful of vertices (see YOKE_RAMP).
+      alpha[w] = yokeRamp > 0
+        ? (h >= hLo ? 0 : smoothstep((hLo - h) / yokeRamp))
+        : 1 - smoothstep((h - hLo) / (hHi - hLo))
+      if (alpha[w] > 0) zone.push(w)
+    }
+  } else {
+    for (const w of gW) {
+      alpha[w] = 1 - smoothstep(dist[w] / band)
+      if (alpha[w] > 0) zone.push(w)
+    }
   }
 
   // Regions. Sleeves are separated before clustering: a centroid that straddles a

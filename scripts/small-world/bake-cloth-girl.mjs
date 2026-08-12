@@ -458,8 +458,19 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const runSim = !process.argv.includes('--no-sim')
   const tolPos = Number(arg('tol-pos', KEY_TOL_POS))
   const tolRot = Number(arg('tol-rot', KEY_TOL_ROT))
+  // The fabric knobs cloth-sim.py already accepts (bending, air, mass, pinpow,
+  // pinstiff, …) reach it through bakeCloth's simArgs, which until now no shell
+  // caller could set. A look-dev sweep needs them from the command line:
+  //   --sim-args "--bending 5 --air 1"
+  // Read straight out of argv rather than through arg(): the value legitimately
+  // BEGINS with "--", and arg() treats any such token as the next flag and hands
+  // back the default. That failure is silent — the sim runs with shipped
+  // constants and reports plausible numbers for a rung that was never simulated.
+  const simIdx = process.argv.indexOf('--sim-args')
+  const simArgs = simIdx >= 0 && process.argv[simIdx + 1] ? process.argv[simIdx + 1].trim().split(/\s+/).filter(Boolean) : []
+  if (simArgs.length) console.log(`sim overrides: ${simArgs.join(' ')}`)
 
-  const { rig, baked, report, clothJoints } = await bakeCloth(src, { only, runSim })
+  const { rig, baked, report, clothJoints } = await bakeCloth(src, { only, runSim, simArgs })
 
   if (!process.argv.includes('--sim-only')) {
     const io = new NodeIO()
