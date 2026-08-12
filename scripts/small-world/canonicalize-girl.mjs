@@ -240,11 +240,14 @@ const RAW_SRC = 'public/labs/small-world/girl-v2.glb'
 /** T117's weight-rebind output — the raw export with clean skin weights and
  *  nothing else changed. See scripts/small-world/rebind-girl.mjs. */
 const REBOUND_SRC = 'public/labs/small-world/girl-v2-rebound.glb'
+/** T120's lining output — the rebound export with the body surface that Meshy
+ *  never modelled built under the garment. See scripts/small-world/line-girl.mjs. */
+const LINED_SRC = 'public/labs/small-world/girl-v2-lined.glb'
 const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
 
 /**
- * The source to canonicalize when none is named: the REBOUND export if the
- * rebind stage has been run, otherwise the raw one.
+ * The source to canonicalize when none is named: the most finished stage that
+ * has actually been run — lined, else rebound, else raw.
  *
  * Stated as a preference rather than a switch so the pipeline has exactly one
  * default path and it is the corrected one, while a worktree that has not run
@@ -253,6 +256,7 @@ const DEFAULT_OUT = 'public/labs/small-world/girl.glb'
  * overrides both, which is how the two are compared.
  */
 export function defaultSource() {
+  if (existsSync(LINED_SRC)) return LINED_SRC
   return existsSync(REBOUND_SRC) ? REBOUND_SRC : RAW_SRC
 }
 
