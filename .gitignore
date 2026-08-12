@@ -70,3 +70,6 @@ IMPROVEMENT_PLAN.md
 # Playwright artifacts
 /playwright-report/
 /test-results/
+
+# raw Meshy character sources are never committed (shipped asset is girl.glb)
+/public/labs/small-world/girl-v2.glb
