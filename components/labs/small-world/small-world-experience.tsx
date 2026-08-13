@@ -98,6 +98,13 @@ export function SmallWorldExperience({
     if (!el) return
     const total = el.scrollHeight - window.innerHeight
     const top = el.getBoundingClientRect().top + window.scrollY
+    // DELIBERATELY NOT ANNOUNCED to the governor (Task 126). The glide lands on the
+    // NEXT checkpoint, so the only beat it crosses is the destination's own — and a
+    // reader who asked for the next chapter should be shown that chapter's page, at
+    // its pace, rather than dropped past it. Announcing it was tried and measured:
+    // `onPointerMissed` fires tap-to-advance at the end of a FLING over a spread, so
+    // the announcement handed a lab teleport to every fling that ended on a
+    // checkpoint and put whole-story traversal straight back to 4.5 s.
     window.scrollTo({ top: top + trackOffsetFor(p, total), behavior: 'smooth' })
   }
 
@@ -128,7 +135,7 @@ export function SmallWorldExperience({
           at all and slow scrolling never arms it — see story-stops.ts for the mechanism and its
           rails. `position: relative` above is what the areas are placed against; it changes no
           layout on its own. */}
-      <StoryStopSnap trackRef={trackRef} />
+      <StoryStopSnap trackRef={trackRef} progressRef={progressRef} />
       <div style={{ position: 'sticky', top: 0, height: '100dvh' }}>
         <SmallWorldScene progressRef={progressRef} journey={journey} onLoadChange={onLoadChange} />
         <JourneyOverlay

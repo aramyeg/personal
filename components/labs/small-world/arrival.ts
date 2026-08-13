@@ -155,6 +155,72 @@ export const STEP_MAX_SECONDS = 0.05
  * page half drawn. That is deliberate: a reader who flings three chapters is
  * asking to be somewhere else, and the cap's job is to pace the reader who is
  * simply scrolling, not to hold one who is leaving.
+ *
+ * ============================================================================
+ * THE ESCAPE HATCH IS GONE (Task 126) — READ THE PARAGRAPH ABOVE AS HISTORY
+ * ============================================================================
+ * Aram, on his phone, after Task 109 shipped: "in mobile I can still scroll like
+ * crazy and pass the whole story in a second figuratively speaking." That is a
+ * verdict on the last paragraph. "A reader who flings is asking to be somewhere
+ * else" was the trade Task 109 made in the open, and it is now overruled: the
+ * story is served, always, and the way out is the skip button rather than the
+ * strength of a flick.
+ *
+ * MEASURED FIRST, on the shipped build, a real phone viewport and real timestamped
+ * CDP touch flings (scripted scrollTo, headless Chromium and synthesizeScrollGesture
+ * all report this class of defect as absent — the harness law this lab has paid for
+ * three times now). Seven flings carried the reader from the first frame to the
+ * ending in 4.79 s against an authored 13.2 s, and each checkpoint's page was on
+ * screen for 225–915 ms against the 2200 ms it is written in. Replayed frame by
+ * frame through this very function, the same trace says exactly which parts failed:
+ *
+ *   THREE HOLES, and the one everybody suspected was innocent.
+ *
+ *   1. THE HATCH OUT-SIZED THE BEAT. `GOVERNOR_MAX_LAG` is 864 px on the measured
+ *      track and `PACE_SPAN` is 361 px — the hatch is 2.39x the span it guards. It
+ *      is a FLOOR under progress (`raw - GOVERNOR_MAX_LAG`), so once sustained
+ *      input holds `raw` more than a hatch-width ahead, that floor sits above
+ *      anything the cap would have allowed and THE CAP NEVER BINDS AT ALL. Not
+ *      "weakened under a fling": bypassed, on every frame, for as long as the
+ *      flinging lasts. Under fling spam the six spans got 217/120/95/49/244 ms and
+ *      one span got no frames whatsoever.
+ *   2. A SINGLE FRAME COULD STEP CLEAN OVER A BEAT. The cap is read at PREV
+ *      progress — deliberately, and for reasons that still hold — so a frame that
+ *      starts before a span and ends after it is ungoverned at both ends. Measured
+ *      peak forward step under spam: 932 px, against a 361 px span. That is the
+ *      chapter that got no frames.
+ *   3. THE TELEPORT CLASSIFIER WAS THE PRIME SUSPECT AND DID NOT FIRE ONCE.
+ *      `JUMP_MIN` is 952 px in a frame and the hardest measured fling delivered
+ *      932 px — it came within 2% and never crossed. So it is not the cause of
+ *      today's defect, and it is one taller viewport away from becoming one, which
+ *      is why it is fixed anyway (see `stepArrival`'s `jump` argument: distance is
+ *      no longer allowed to decide this on its own).
+ *
+ * WHAT REPLACES THE HATCH: the ceiling stops bounding the DEBT and starts bounding
+ * THE DOCUMENT. Task 109 kept the lag repayable by letting progress jump forward
+ * when it grew too large; Task 126 keeps it repayable by not letting the document
+ * get that far ahead in the first place — `leashTargetFor` below, written through
+ * the same `pinScrollTo` authority Task 125's carry already moves the document
+ * with. `GOVERNOR_MAX_LAG` keeps its value and its derivation; only its job
+ * changes, from "how far progress may jump" to "how far the finger may run".
+ *
+ * WHY THAT IS THE RIGHT PLACE TO PUT THE CEILING, and not a matter of taste: the
+ * scene is `position: sticky` and a pure function of `progress` alone. The
+ * document's own position is INVISIBLE — it shows up nowhere but the scrollbar. So
+ * letting it run ahead buys the reader nothing they can see, at the price of a
+ * scrollbar reporting a place the world has not reached; holding it costs nothing
+ * on screen and makes the scrollbar true again. This is Task 125's argument for
+ * moving the document rather than leading it, applied in the other direction.
+ *
+ * AND THE READER IS STILL NEVER TRAPPED, which was the whole force of "a rate cap
+ * never stops following the input". Three answers, in the order a reader meets them:
+ *   - the leash is SLACK, not a wall: a full 864 px — about one phone screen — of
+ *     free forward travel before it takes hold, so no ordinary scroll ever meets it;
+ *   - the ceiling RIDES FORWARD with progress, so a reader who keeps flinging keeps
+ *     the document pinned to it and the page keeps advancing — at exactly the pace
+ *     the story is written at, which is the only speed this task is about;
+ *   - backward is untouched and 1:1 from the first frame, and the way out forward is
+ *     the skip-to-desk affordance, which is instant by provenance (see below).
  */
 
 /**
@@ -216,15 +282,93 @@ export const GOVERNOR_MAX_LAG = CATCHUP_MAX_SPEED * RETRACT_SECONDS
  * THE SHIPPED GUARANTEE, stated as a number rather than left implicit: a reader
  * scrolling at or below this — progress per second — is given the full authored
  * pace, because the debt they build over PACE_SECONDS still fits under the ceiling.
- * Above it the band bottoms out part-way and the page draws faster than authored,
- * approaching the ungoverned behaviour as the input approaches a fling.
+ *
+ * TASK 126 DID NOT CHANGE THE NUMBER AND DID CHANGE WHAT IT PROMISES. It used to be
+ * the speed above which the page drew FASTER THAN AUTHORED, because the escape hatch
+ * took over; there is no such speed any more. It is now the speed at which the
+ * governor's own debt exactly fills the leash — the same arithmetic ((v − PACE_RATE)
+ * × PACE_SECONDS = GOVERNOR_MAX_LAG), reading a boundary between "never notices the
+ * ceiling exists" and "feels the page hold" rather than one between paced and unpaced.
+ *
+ * IT IS AN UPPER BOUND ON THAT BOUNDARY AND NOT THE BOUNDARY ITSELF, because the
+ * governor is not the only thing that spends the leash: an arrival's hold parks
+ * progress on its anchor and turns the whole of the reader's speed into lag until
+ * the band bottoms out at ABSORB_MAX_LAG. The two share one leash. Swept in
+ * arrival.test.ts rather than argued: half of this — a brisk read — crosses a whole
+ * beat without the document ever being held, and so does a reader at the cap.
  *
  * It works out at roughly 590 px/s on a 900px-tall desktop and 555 px/s on a phone,
  * which covers reading and browsing speeds and does not pretend to cover a flick.
- * Raising it means raising the ceiling, and the ceiling is what keeps the debt
- * repayable inside the dwell — so this is the trade, made once, in the open.
+ * It is also the number Task 125's floor is gated against, and that gate keeps its
+ * meaning exactly: a floor that could push the document harder than a reader can
+ * scroll without meeting the ceiling would be a floor fighting a ceiling.
  */
 export const GOVERNED_MAX_SPEED = PACE_RATE + GOVERNOR_MAX_LAG / PACE_SECONDS
+
+/**
+ * Global progress at which each chapter's page-draw span begins — the gates the
+ * boundary stop below honours. Derived from the same span `pacedChapterAt` reads,
+ * so a retune of the page's staging moves both together.
+ */
+const GOVERNED_ENTRIES: readonly number[] = Array.from(
+  { length: CHAPTER_COUNT },
+  (_, chapter) => (chapter + TRAVEL_END) / CHAPTER_COUNT
+)
+
+/**
+ * THE BOUNDARY STOP (Task 126, hole 2). The first governed span a forward step from
+ * `from` to `to` would cross INTO, or null when it crosses none.
+ *
+ * The cap is read at PREV progress and that is load-bearing (see `stepArrival`) —
+ * but it means a frame that begins outside a span and ends outside it is ungoverned
+ * even when the span was in between. Measured: a 932 px frame over a 361 px span,
+ * and the beat was never entered at all. So a forward step is not allowed to cross
+ * a gate; it stops ON the gate, and the next frame is governed because the world is
+ * now standing in the span. One frame of latency, and no beat can be jumped over.
+ *
+ * It is deliberately only the ENTRY that gates. Leaving a span is never held back:
+ * the exit is where the cap stops applying, and stopping a step on the way out
+ * would be pacing the reading tail, which Task 109 already established is the exact
+ * definition of trapped.
+ */
+export function governedEntryBetween(
+  from: number,
+  to: number,
+  reducedMotion = false
+): number | null {
+  if (reducedMotion || to <= from) return null
+  for (const entry of GOVERNED_ENTRIES) {
+    if (entry > from && entry < to) return entry
+  }
+  return null
+}
+
+/**
+ * THE LEASH (Task 126). The scroll position the document must be held at, in
+ * progress units — or null when the document is where it is allowed to be.
+ *
+ * The whole ceiling, in one line: the finger may run `GOVERNOR_MAX_LAG` ahead of the
+ * world and no further. Everything that makes this humane rather than a wall is a
+ * property of that line rather than a special case bolted onto it — the slack is a
+ * screen's worth so an ordinary scroll never meets it, and the ceiling is expressed
+ * against `progress` so it RIDES FORWARD at the authored pace, which is what lets a
+ * reader who keeps pushing keep moving.
+ *
+ * Reduced motion never leashes: its cap is `Infinity`, so `progress` is `raw` and
+ * the ceiling could not bind anyway — the guard is there to say so out loud.
+ *
+ * Pure, and returns a position rather than performing one, for the reason every
+ * number in this file is here: the driver owns the DOM, this owns the feel.
+ */
+export function leashTargetFor(
+  progress: number,
+  raw: number,
+  reducedMotion = false
+): number | null {
+  if (reducedMotion) return null
+  const ceiling = progress + GOVERNOR_MAX_LAG
+  return raw > ceiling ? ceiling : null
+}
 
 /** The chapter whose page is drawing itself at this progress, or null. */
 export function pacedChapterAt(progress: number): number | null {
@@ -354,16 +498,52 @@ function unwind(progress: number, prevRaw: number, raw: number, dt: number): num
  * Advances the arrival state one frame. `raw` is unfiltered scroll progress;
  * the returned `progress` is what the journey should render. Pure: same inputs,
  * same output, no clock read inside.
+ *
+ * `motion` is the PROVENANCE of this frame's document motion, and it is the heart of
+ * Task 126 (see `scroll-provenance.ts` for how it is decided, and this file's
+ * governor header for why the old distance-only rule had to go). Distance alone
+ * cannot tell a scrollbar drag from a hard flick — measured, the two differ by 2%
+ * on this track — so where the motion came from is asked directly:
+ *
+ *   'travel'  — never a teleport, at any distance. A push is a push, and that is the
+ *               whole demand.
+ *   'lab'     — always a teleport, at any distance, for every frame of the motion.
+ *               It has to be unconditional because a lab jump is not always a jump:
+ *               `scroll-behavior: smooth` turns the rail-dot glide into a second of
+ *               ORDINARY-SIZED steps, and judged by size those are scrolling — the
+ *               governor would pace the reader through every beat between here and
+ *               the chapter they asked for. Measured as a live e2e regression while
+ *               this task was being written.
+ *   'unknown' — the distance rule, unchanged, and the DEFAULT: every caller and every
+ *               proof written before provenance existed keeps exactly the behaviour
+ *               it was written against.
+ *
+ * INFERRED PLACEMENT — a scrollbar thumb, an anchor, a restoration — maps to
+ * 'unknown' and NOT to a kind of its own, and that is a correction made against a
+ * measurement rather than a simplification. It had its own unconditional kind for one
+ * build. Counted over ten real flings on a phone: 413 frames classified travel, and
+ * FIVE classified placement, of which two moved the document. Two frames out of 466,
+ * each handing back the entire accumulated debt at once, were enough to put the
+ * whole-story traversal back to 4.7 s. An inference that is right 99.6% of the time is
+ * not a foundation for an unconditional rule; the distance test underneath it is, and
+ * it still lets a scrollbar grab-and-release to a far point through untouched, because
+ * that is what a far grab looks like frame by frame. A SLOW thumb drag is paced, which
+ * is the one thing this policy gives up, and it is the right thing to give up: a drag
+ * is a continuous gesture, and this task is about continuous gestures.
  */
+export type MotionKind = 'travel' | 'lab' | 'unknown'
+
 export function stepArrival(
   prev: ArrivalState,
   raw: number,
   dt: number,
-  reducedMotion = false
+  reducedMotion = false,
+  motion: MotionKind = 'unknown'
 ): ArrivalState {
   const step = Math.min(Math.max(dt, 0), STEP_MAX_SECONDS)
   const allowance = Math.min(JUMP_MAX, Math.max(JUMP_MIN, JUMP_SPEED * step))
-  const teleported = Math.abs(raw - prev.raw) > allowance
+  const teleported =
+    motion === 'lab' || (motion === 'unknown' && Math.abs(raw - prev.raw) > allowance)
 
   let mode = prev.mode
   let anchor = prev.anchor
@@ -419,14 +599,13 @@ export function stepArrival(
   if (!teleported && progress > prev.progress) {
     const cap = paceCapAt(prev.progress, reducedMotion)
     if (cap !== Infinity) {
-      const paced = Math.max(
-        Math.min(progress, prev.progress + cap * step),
-        // The escape hatch. Past the ceiling the band bottoms out and the world
-        // tracks the document again, one beat behind it — still visibly responding
-        // to every scroll, which is what "never trapped" has to mean when the cap
-        // itself is the point.
-        raw - GOVERNOR_MAX_LAG
-      )
+      // NO FLOOR UNDER THIS ANY MORE (Task 126, hole 1). It used to be
+      // `Math.max(paced, raw - GOVERNOR_MAX_LAG)`, and because that floor is a
+      // function of `raw` rather than of the cap, sustained input parked it above
+      // the cap's own value and the cap stopped binding entirely. The lag it was
+      // bounding is bounded by `leashTargetFor` now, on the document, where it
+      // costs the reader nothing they can see.
+      const paced = Math.min(progress, prev.progress + cap * step)
       if (paced < progress) {
         progress = paced
         // The debt now belongs to the unwind, which is the one piece that already
@@ -436,6 +615,15 @@ export function stepArrival(
         // would close the whole gap at once.
         if (mode === 'pass') mode = 'release'
       }
+    } else {
+      // UNGOVERNED HERE, BUT NOT NECESSARILY THERE. The step may land past a beat
+      // it never stood inside; stop it on the beat's doorstep so the next frame is
+      // governed. The mode is deliberately left alone: a step that merely lands on
+      // the entry instead of past it is what an ordinary scroll into a checkpoint
+      // already does, and switching to `release` here would cost that reader the
+      // arrival hold, which arms out of `pass`.
+      const entry = governedEntryBetween(prev.progress, progress, reducedMotion)
+      if (entry !== null) progress = entry
     }
   }
 

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
+import type { MutableRefObject, RefObject } from 'react'
+import { isGoverned } from './arrival'
 import {
   SNAP_CLASS,
   flingArmed,
@@ -27,7 +28,29 @@ import {
  * exactly the moment the visitor is flinging it. The listeners are passive — nothing here can delay
  * or cancel a scroll, only decide where the platform's own animation is allowed to stop.
  */
-export function StoryStopSnap({ trackRef }: { trackRef: RefObject<HTMLElement | null> }) {
+/**
+ * IT STANDS DOWN INSIDE A GOVERNED BEAT (Task 126).
+ *
+ * The snap's whole job is to stop a fling at the next checkpoint. Once the pace
+ * governor has hold of the reader that job is already done — and the two would
+ * otherwise pull against each other, because a stop sits at the dwell's middle
+ * (local 0.49) while the governed span ends at local 0.43. `scroll-snap-type:
+ * mandatory` re-snaps after a programmatic scroll, so the leash writing the
+ * document back to its ceiling would be answered by the platform dragging it
+ * forward to the stop, every frame, for the length of the beat.
+ *
+ * The stand-down is one-directional and cheap: the class is never ARMED while the
+ * world is governed, and is dropped if the world becomes governed while it is on.
+ * A fling that has not reached a checkpoint yet is untouched, which is every fling
+ * the feature was built for.
+ */
+export function StoryStopSnap({
+  trackRef,
+  progressRef,
+}: {
+  trackRef: RefObject<HTMLElement | null>
+  progressRef: MutableRefObject<number>
+}) {
   const [available, setAvailable] = useState(false)
   const [offsets, setOffsets] = useState<number[]>([])
   const offsetsRef = useRef<number[]>([])
@@ -95,13 +118,18 @@ export function StoryStopSnap({ trackRef }: { trackRef: RefObject<HTMLElement | 
       const velocity = ((lastY - prevY) / dt) * 1000
       const trackTop = (trackRef.current?.getBoundingClientRect().top ?? 0) + window.scrollY
       const lastStopY = trackTop + stops[stops.length - 1]
-      if (flingArmed(velocity, window.scrollY, lastStopY)) root.classList.add(SNAP_CLASS)
+      if (flingArmed(velocity, window.scrollY, lastStopY) && !isGoverned(progressRef.current))
+        root.classList.add(SNAP_CLASS)
       else disarm()
     }
 
     // Let go once the page has come to rest, so nothing that is not a fling — a programmatic
     // scroll, the tap-to-advance glide, an anchor jump — ever finds the snap type armed.
     const onScroll = () => {
+      // Entering a governed beat drops it on the spot rather than 240 ms later:
+      // the frames in between are exactly the ones the leash and the platform
+      // would have spent fighting over the document.
+      if (isGoverned(progressRef.current)) disarm()
       window.clearTimeout(quiet)
       quiet = window.setTimeout(disarm, 240)
     }

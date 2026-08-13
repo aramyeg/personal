@@ -71,8 +71,20 @@ async function webglAvailable(page: import('@playwright/test').Page): Promise<bo
 // track fraction is progress / TRACK_END. Values past 1 scrub the ending.
 async function scrollToProgress(page: import('@playwright/test').Page, progress: number) {
   await page.evaluate((frac) => {
-    const total = document.documentElement.scrollHeight - window.innerHeight
-    window.scrollTo(0, total * frac)
+    // INSTANT, and it has to say so (Task 126). `globals.css` sets
+    // `scroll-behavior: smooth`, so a plain `scrollTo` ANIMATES this seek over a
+    // second of ordinary-sized steps — which is not what "put the reader at progress
+    // X" means, and is not a motion any production path produces: the lab's own
+    // glide announces itself to the governor and every other jump is already
+    // instant. Left animating, this helper asks the pace governor to pace it, and
+    // the tests below then measure the governor rather than the thing they name.
+    const el = document.documentElement
+    const prev = el.style.scrollBehavior
+    el.style.scrollBehavior = 'auto'
+    void el.offsetHeight
+    const total = el.scrollHeight - window.innerHeight
+    window.scrollTo({ top: total * frac, left: 0, behavior: 'instant' })
+    el.style.scrollBehavior = prev
   }, progress / TRACK_END)
 }
 
@@ -183,7 +195,14 @@ test.describe('Small World lab', () => {
     // test's claim is that a spread dismisses when the reader moves on, and the
     // release leg of the chapter it belongs to is where that is asked cleanly.
     await scrollToProgress(page, chapterTravelProgress(0))
-    await expect(page.getByTestId('sw-panel-data')).toBeHidden()
+    // THE WAIT IS THE BEAT (Task 126). Moving on does not cancel a page that is still
+    // drawing itself: the governor paces the world out of chapter 1's span at
+    // PACE_SECONDS, the arrival band may hold on top of that, and the reveal then
+    // takes a retraction to walk out. The default 5 s expired mid-beat. Nothing about
+    // the claim changed — the spread does dismiss when the reader moves on — only how
+    // long "moves on" is allowed to take, and that number is now authored rather than
+    // whatever the wheel used to make it.
+    await expect(page.getByTestId('sw-panel-data')).toBeHidden({ timeout: 15_000 })
   })
 
   // Task 63/66: past the journey the ending owns the track — the still beat

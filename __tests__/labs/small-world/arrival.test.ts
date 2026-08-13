@@ -15,8 +15,10 @@ import {
   RETRACT_SECONDS,
   burstFromLatch,
   dwellChapterAt,
+  governedEntryBetween,
   initialArrival,
   isGoverned,
+  leashTargetFor,
   pacedChapterAt,
   stepArrival,
   stepBurstLatch,
@@ -221,28 +223,54 @@ describe('scroll absorption', () => {
   it('lets go immediately when a backgrounded tab comes back', () => {
     const { state, raw } = arriveAt(0)
     const resumed = stepArrival(state, raw, 45)
-    // Straight back onto the finger — with the scroll unmoved there is nothing to unwind.
-    expect(resumed.mode).toBe('pass')
+    // The hold is over on the spot — a returning tab must never find itself still
+    // absorbing forty-five seconds of nothing.
+    //
+    // It lands in `release` rather than `pass` since Task 126, and that is the
+    // boundary stop rather than a change here: the frame that carried the reader
+    // into the checkpoint stopped on the span's entry, so a genuine step of debt is
+    // outstanding and the unwind owns it. What the old `pass` asserted — that a long
+    // frame invents no motion of its own — is the line below, which is unchanged.
+    expect(resumed.mode).not.toBe('hold')
+    expect(resumed.progress).toBeLessThanOrEqual(raw)
     expect(resumed.reveal!.t).toBeLessThan(0.1) // the clock did not jump
   })
 
   /**
-   * THE CEILING MOVED (Task 109) and the law did not: a determined push always
-   * breaks through. What bounds the stretch inside a checkpoint is now the
-   * governor's ceiling rather than the band's, because the two apply to the same
-   * span and the governor's is the larger — so that is the number a push has to
-   * beat, and the band's own ABSORB_MAX_LAG now describes only where the anchor
-   * stops holding, not how far the world can fall behind.
+   * THE CEILING MOVED AGAIN (Task 126), and this time the LAW moved with it.
+   *
+   * Task 109 read "a determined push always breaks through" as a promise about
+   * DISTANCE — past `GOVERNOR_MAX_LAG` the world tracked the finger again, one beat
+   * behind, and a hard fling left the checkpoint half drawn. That is the loophole
+   * Aram reported from his phone, so the promise is now about MOTION and not about
+   * distance: a push is never answered with a locked world, and what it moves the
+   * world at inside a beat is the authored pace.
+   *
+   * The lag this used to bound is bounded on the document instead — `leashTargetFor`,
+   * proved in "the fling ceiling" below. In this pure function it is unbounded by
+   * design, which is why the assertion that it stays under `GOVERNOR_MAX_LAG` is gone
+   * rather than relaxed.
    */
-  it('bottoms out: a determined push always breaks through and keeps moving', () => {
+  it('never locks: a determined push keeps the world moving, at the authored pace', () => {
     const { state, raw } = arriveAt(0)
     // A hard fling — 0.3 progress/second, several viewport-heights a second.
     const run = drive(state, { frames: 120, scroll: (f) => raw + f * 0.005 })
+    // The world is never stuck for longer than the absorption rail already allows —
+    // and that rail is the arrival band's, not the governor's. Outside a hold every
+    // frame moves.
+    let stalled = 0
+    let worstStall = 0
+    for (let i = 1; i < run.length; i++) {
+      stalled = run[i].progress > run[i - 1].progress ? 0 : stalled + 1
+      worstStall = Math.max(worstStall, stalled)
+    }
+    expect(worstStall * FRAME).toBeLessThanOrEqual(ABSORB_MAX_SECONDS)
+    // …and it moved at the pace, not at the fling: two seconds of the hardest input
+    // buys two seconds of the beat, which is the whole of what was asked for.
     const last = run[run.length - 1]
-    const lastRaw = raw + 119 * 0.005
-    expect(lastRaw - last.progress).toBeLessThanOrEqual(GOVERNOR_MAX_LAG + 1e-9)
-    // It kept travelling: the band stretched, it did not lock.
-    expect(last.progress).toBeGreaterThan(state.progress + 0.1)
+    expect(last.progress - state.progress).toBeLessThanOrEqual(PACE_RATE * 2 * 1.05)
+    // …and it never ran ahead of the finger while doing it.
+    expect(last.progress).toBeLessThan(raw + 119 * 0.005)
   })
 
   it('lets backward scroll through 1:1 from the first frame and cancels the hold', () => {
@@ -516,16 +544,26 @@ describe('the pace governor', () => {
     }
   })
 
-  it('slows a fling without holding it — faster than authored, slower than direct', () => {
+  /**
+   * THE INVERSION (Task 126). This test used to assert that a fling crossed the beat
+   * FASTER than authored — `expect(done * FRAME).toBeLessThan(PACE_SECONDS)` — which
+   * was Task 109's trade written down as a guarantee. It is the defect Aram reported,
+   * so the assertion is turned around rather than loosened: there is no longer any
+   * input speed at which a beat is served faster than it is written.
+   */
+  it('gives a fling the SAME authored pace — there is no speed that buys the beat cheaper', () => {
     const from = at(2, TRAVEL_END + 0.001)
-    // Past the guarantee the ceiling bottoms out and the escape hatch takes over.
-    // The claim is only that the beat is stretched and the reader still gets out.
-    const speed = GOVERNED_MAX_SPEED * 12
-    const run = drive(initialArrival(from), { frames: 400, scroll: push(from, speed) })
-    const done = run.findIndex((s) => pacedChapterAt(s.progress) === null)
-    const direct = (PACE_SPAN / speed) * 60
-    expect(done).toBeGreaterThan(direct)
-    expect(done * FRAME).toBeLessThan(PACE_SECONDS)
+    // Three speeds spanning a factor of forty, from just over the guarantee to well
+    // past anything Chromium's own fling will deliver.
+    for (const speed of [GOVERNED_MAX_SPEED * 1.5, GOVERNED_MAX_SPEED * 12, GOVERNED_MAX_SPEED * 60]) {
+      const run = drive(initialArrival(from), { frames: 400, scroll: push(from, speed) })
+      const done = run.findIndex((s) => pacedChapterAt(s.progress) === null)
+      expect(done).toBeGreaterThanOrEqual(0)
+      // The same window the sibling test above holds slow readers to — the upper
+      // edge is the arrival band's hold, which adds its own beat on top of the cap.
+      expect(done * FRAME).toBeGreaterThanOrEqual(PACE_SECONDS * 0.9)
+      expect(done * FRAME).toBeLessThanOrEqual(PACE_SECONDS * 1.35)
+    }
   })
 
   it('never advances faster than the cap inside the span, and is uncapped outside it', () => {
@@ -619,6 +657,210 @@ describe('the pace governor', () => {
     // from a scroll by JUMP_MAX. If the governor could accumulate one, its own
     // catch-up would be mistaken for a scrollbar drag and hard-cut.
     expect(GOVERNOR_MAX_LAG).toBeLessThan(JUMP_MAX)
+  })
+})
+
+/**
+ * ============================================================================
+ * THE FLING CEILING (Task 126) — no input pattern outruns the authored story
+ * ============================================================================
+ * Aram: "in mobile I can still scroll like crazy and pass the whole story in a
+ * second figuratively speaking." Measured before the fix, on a phone viewport with
+ * real timestamped CDP touch flings: seven flings, first frame to the ending, 4.79 s
+ * against the 13.2 s the six beats are written in.
+ *
+ * These are the laws that make that impossible, and they are deliberately about the
+ * things the old escape hatch was allowed to do rather than about the numbers it
+ * did them with.
+ */
+describe('the fling ceiling', () => {
+  /**
+   * THE DRIVER'S COMPOSITION, and the only place the tests model it.
+   *
+   * `stepArrival` alone cannot answer "how long does the story take", because the
+   * ceiling is split across two pieces on purpose: the cap decides how fast the
+   * WORLD may move, the leash decides how far the DOCUMENT may run. Five lines of
+   * `use-arrival-journey` join them, and those five lines are what is replayed here
+   * — the write, the re-read, and the stored raw. Anything less would be proving the
+   * half of the mechanism that was never in doubt.
+   */
+  function driveLeashed(
+    start: ArrivalState,
+    push: (f: number, raw: number) => number,
+    frames: number,
+    reducedMotion = false
+  ): { states: ArrivalState[]; docLead: number[] } {
+    const states: ArrivalState[] = []
+    const docLead: number[] = []
+    let state = start
+    let doc = start.raw
+    for (let f = 0; f < frames; f++) {
+      doc = push(f, doc)
+      // 'travel' — this models a fling, which is what the driver classifies one as.
+      // Left at its default ('unknown') the spam below would be honoured as a
+      // teleport by the distance rule, which is the pre-Task-126 behaviour and not
+      // the thing under test.
+      const next = stepArrival(state, doc, FRAME, reducedMotion, 'travel')
+      const target = leashTargetFor(next.progress, doc, reducedMotion)
+      if (target !== null) doc = target
+      state = { ...next, raw: doc }
+      states.push(state)
+      docLead.push(doc - state.progress)
+    }
+    return { states, docLead }
+  }
+
+  /** Fling spam: the reader's finger asks for a whole chapter every single frame. */
+  const spam = (_f: number, doc: number) => doc + SEG
+
+  it('cannot traverse the story faster than the authored total, however hard it is flung', () => {
+    const { states } = driveLeashed(initialArrival(0), spam, 3600)
+    const arrived = states.findIndex((s) => s.progress >= 1)
+    expect(arrived).toBeGreaterThanOrEqual(0)
+    // Six beats at their authored pace is the floor the whole task is about. The
+    // travel between them stays free, so the total is that floor plus a little.
+    const authoredTotal = CHAPTER_COUNT * PACE_SECONDS
+    expect(arrived * FRAME).toBeGreaterThanOrEqual(authoredTotal * 0.95)
+    // …and it is not a trap either: an infinite fling still finishes, promptly.
+    expect(arrived * FRAME).toBeLessThanOrEqual(authoredTotal * 1.3)
+  })
+
+  it('serves every one of the six beats — none is skipped, however large the step', () => {
+    const { states } = driveLeashed(initialArrival(0), spam, 3600)
+    const seen = new Set<number>()
+    for (const s of states) {
+      const ch = pacedChapterAt(s.progress)
+      if (ch !== null) seen.add(ch)
+    }
+    expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5])
+    // and each was inhabited for its authored length, not flashed through
+    for (let ch = 0; ch < CHAPTER_COUNT; ch++) {
+      const frames = states.filter((s) => pacedChapterAt(s.progress) === ch).length
+      expect(frames * FRAME).toBeGreaterThanOrEqual(PACE_SECONDS * 0.9)
+    }
+  })
+
+  it('holds the document within one leash of the world, at any input speed', () => {
+    const { docLead } = driveLeashed(initialArrival(0), spam, 3600)
+    expect(Math.max(...docLead)).toBeLessThanOrEqual(GOVERNOR_MAX_LAG + 1e-9)
+    expect(Math.min(...docLead)).toBeGreaterThanOrEqual(-1e-9)
+  })
+
+  it('rides the ceiling forward, so a reader who keeps pushing keeps moving', () => {
+    // Pinned against the leash for the whole of a beat, the document still advances
+    // — at the pace, which is the answer to "never trapped" that Task 126 gives.
+    const from = at(2, TRAVEL_END + 0.001)
+    const { states } = driveLeashed(initialArrival(from), spam, 120)
+    const doc = states.map((s) => s.raw)
+    expect(doc[doc.length - 1]).toBeGreaterThan(doc[0])
+    for (let i = 1; i < doc.length; i++) expect(doc[i]).toBeGreaterThanOrEqual(doc[i - 1] - 1e-9)
+  })
+
+  describe('the boundary stop', () => {
+    it('names the first beat a forward step would cross into, and only a forward one', () => {
+      const before = at(3, TRAVEL_END - 0.05)
+      const past = at(3, PAGE_SPAN_END + 0.05)
+      expect(governedEntryBetween(before, past)).toBeCloseTo(at(3, TRAVEL_END), 12)
+      // Backwards is never gated — a retreat is the reader's fastest way out.
+      expect(governedEntryBetween(past, before)).toBeNull()
+      // Neither is a step that lands short of the doorstep, or starts past it.
+      expect(governedEntryBetween(before, at(3, TRAVEL_END - 0.01))).toBeNull()
+      expect(governedEntryBetween(at(3, TRAVEL_END + 0.001), at(3, PAGE_SPAN_END))).toBeNull()
+    })
+
+    it('stops a single giant frame on the doorstep instead of over the beat', () => {
+      // The measured shape of the defect: a 932 px frame over a 361 px span. Here the
+      // step is a whole chapter, which is larger still.
+      const from = at(3, TRAVEL_END - 0.05)
+      const stepped = stepArrival(initialArrival(from), from + SEG, FRAME, false, 'travel')
+      expect(stepped.progress).toBeCloseTo(at(3, TRAVEL_END), 12)
+      expect(pacedChapterAt(stepped.progress)).toBe(3)
+    })
+
+    it('leaving a beat is never gated — only entering one is', () => {
+      const from = at(3, TRAVEL_END + 0.001)
+      const run = drive(initialArrival(from), { frames: 400, scroll: () => 1 })
+      const out = run.findIndex((s) => pacedChapterAt(s.progress) === null)
+      // It leaves under its own pace and is not held again on the way out.
+      expect(out * FRAME).toBeLessThanOrEqual(PACE_SECONDS * 1.1)
+    })
+  })
+
+  describe('provenance decides a teleport, not distance alone', () => {
+    it('refuses a jump-sized frame that came from travel, and honours one that did not', () => {
+      const from = at(1, 0.1)
+      const far = from + JUMP_MAX * 2
+      const placed = stepArrival(initialArrival(from), far, FRAME, false, 'lab')
+      expect(placed.progress).toBe(far)
+      expect(placed.mode).toBe('pass')
+
+      const flung = stepArrival(initialArrival(from), far, FRAME, false, 'travel')
+      // Not honoured, and stopped on the first beat it would have crossed.
+      expect(flung.progress).toBeLessThan(far)
+      expect(flung.progress).toBeCloseTo(at(1, TRAVEL_END), 12)
+    })
+
+    it('defaults to the pre-Task-126 rule, so every caller that does not know keeps it', () => {
+      const from = at(1, 0.1)
+      const far = from + JUMP_MAX * 2
+      expect(stepArrival(initialArrival(from), far, FRAME).progress).toBe(
+        stepArrival(initialArrival(from), far, FRAME, false, 'unknown').progress
+      )
+      // …and 'unknown' is still DISTANCE, not a free pass: an ordinary-sized step
+      // with no provenance is scrolled through, exactly as it always was.
+      const near = from + 0.002
+      expect(stepArrival(initialArrival(from), near, FRAME).progress).toBe(near)
+    })
+
+    it('honours a lab glide frame by frame, however small its steps are', () => {
+      // The rail-dot glide: `scroll-behavior: smooth` delivers a named chapter as a
+      // second of ordinary-sized steps. Judged by size they are scrolling, and the
+      // reader would be paced through every beat on the way.
+      const from = at(1, TRAVEL_END - 0.002)
+      let state = initialArrival(from)
+      let doc = from
+      for (let f = 0; f < 40; f++) {
+        doc += 0.004
+        state = stepArrival(state, doc, FRAME, false, 'lab')
+        expect(state.progress).toBe(doc)
+      }
+    })
+  })
+
+  describe('reduced motion keeps its contract', () => {
+    it('is never leashed and never gated', () => {
+      expect(leashTargetFor(0.1, 0.9, true)).toBeNull()
+      expect(governedEntryBetween(0, 1, true)).toBeNull()
+    })
+
+    it('still crosses the whole story in one frame of a giant scroll', () => {
+      const { states } = driveLeashed(initialArrival(0), spam, 10, true)
+      expect(states[0].progress).toBe(SEG)
+      expect(states[9].progress).toBeCloseTo(10 * SEG, 12)
+    })
+  })
+
+  it('the leash is slack, not a wall: a reading scroll never meets it', () => {
+    // WHERE THE SLACK ACTUALLY RUNS OUT, and it is below `GOVERNED_MAX_SPEED`.
+    //
+    // That constant is derived from the governor's debt alone — `(v − PACE_RATE) ×
+    // PACE_SECONDS` filling `GOVERNOR_MAX_LAG` exactly. But a checkpoint's arrival
+    // also spends the band: while the hold is on, progress sits on its anchor and
+    // the whole of the reader's speed becomes lag, up to `ABSORB_MAX_LAG`. The two
+    // share ONE leash, so the speed at which the document is first held back is the
+    // one this sweep finds, and the comment is a measurement rather than a claim.
+    const from = at(2, TRAVEL_END + 0.001)
+    const frames = Math.round(PACE_SECONDS * 2 * 60)
+    const meets = (speed: number) =>
+      Math.max(
+        ...driveLeashed(initialArrival(from), (_f, doc) => doc + speed / 60, frames).docLead
+      ) >= GOVERNOR_MAX_LAG - 1e-9
+    // A reader travelling at half the guarantee — a brisk read, ~280 px/s on a phone
+    // — goes the whole beat without the document ever being held.
+    expect(meets(GOVERNED_MAX_SPEED * 0.5)).toBe(false)
+    // The band's share is what brings the ceiling down from the guarantee, and it
+    // cannot bring it below the pace itself: a reader at the cap is never leashed.
+    expect(meets(PACE_RATE)).toBe(false)
   })
 })
 

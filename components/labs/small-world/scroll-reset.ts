@@ -68,6 +68,45 @@ export function pinScrollToTop(): void {
 }
 
 /**
+ * Whether a lab-issued JUMP is waiting to be accounted for by the driver's next
+ * frame (Task 126).
+ *
+ * Module-level mutable state, deliberately, and it is the narrowest thing that
+ * works. `pinScrollTo` is already this lab's single authority for a document jump
+ * that must not animate, so it is also the only place that knows a jump happened —
+ * and its callers are a button handler, an iris and a driver frame, with no shared
+ * object between them to thread a flag through. The alternative was to make every
+ * caller announce itself to the driver, which is three call sites remembering a
+ * convention instead of one function keeping a fact.
+ *
+ * It is a one-shot: read it and it clears, so a jump is honoured by exactly one
+ * frame and cannot leak into the next.
+ */
+let jumpPending = false
+
+/**
+ * WHAT KIND OF WRITE THIS IS, and why the driver's own writes must say so.
+ *
+ * 'jump'  — the reader asked to BE somewhere: skip to the desk, restart, the mount
+ *           pin. Honoured instantly by the governor, which is the point of them.
+ * 'pace'  — the lab moving the document as part of the reading itself: Task 125's
+ *           baseline carry topping a beat up, Task 126's leash holding it back.
+ *           These must NOT read as jumps, or the governor would teleport to the
+ *           position its own ceiling just wrote and the ceiling would undo itself
+ *           every frame.
+ *
+ * The default is 'jump' because every caller that predates this is one.
+ */
+export type PinKind = 'jump' | 'pace'
+
+/** Reads and clears the pending-jump flag. Called once per driver frame. */
+export function takePendingJump(): boolean {
+  const pending = jumpPending
+  jumpPending = false
+  return pending
+}
+
+/**
  * The same instant jump, aimed anywhere (Task 108).
  *
  * The iris now covers TWO destinations — the top for the restart and the bottom of the track for
@@ -76,8 +115,9 @@ export function pinScrollToTop(): void {
  * implementation of the bypass would be a second chance to inherit the smooth-scroll bug the block
  * above documents, so the top is now a special case of this rather than its own routine.
  */
-export function pinScrollTo(top: number): void {
+export function pinScrollTo(top: number, kind: PinKind = 'jump'): void {
   if (typeof window === 'undefined') return
+  if (kind === 'jump') jumpPending = true
   const el = typeof document !== 'undefined' ? document.documentElement : null
   const prevBehavior = el?.style.scrollBehavior
   if (el) {

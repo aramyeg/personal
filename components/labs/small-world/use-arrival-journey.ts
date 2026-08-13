@@ -1,10 +1,24 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
-import { initialArrival, isGoverned, stepArrival, type ArrivalState } from './arrival'
+import {
+  governedEntryBetween,
+  initialArrival,
+  isGoverned,
+  leashTargetFor,
+  stepArrival,
+  type ArrivalState,
+} from './arrival'
 import { CARRY_IDLE, carryBusy, carryInputEps, stepCarry, type CarryState } from './beat-carry'
 import { TRACK_END, trackOffsetFor, trackProgressAt } from './ending-timeline'
-import { pinScrollTo } from './scroll-reset'
+import {
+  PROVENANCE_IDLE,
+  isTravelKey,
+  motionKindOf,
+  stepProvenance,
+  type ProvenanceState,
+} from './scroll-provenance'
+import { pinScrollTo, takePendingJump } from './scroll-reset'
 
 /**
  * The journey's input pipeline: document scroll in, journey progress + the arrival
@@ -74,6 +88,16 @@ export function useArrivalJourney(
      * own motion over it.
      */
     let carryAnchor: number | null = null
+    /**
+     * WHO IS MOVING THE DOCUMENT (Task 126). The same `carryAnchor` that tells the
+     * carry what the reader did tells this what KIND of thing the reader did — the
+     * anchor is re-read after every write of ours, so what it measures is always
+     * the reader's own motion and never the lab's. See `scroll-provenance.ts` for
+     * the policy; this is only the wiring.
+     */
+    let provenance: ProvenanceState = PROVENANCE_IDLE
+    /** Set by the listeners below, consumed and cleared by the next driver frame. */
+    let travelInput = false
 
     // The track's domain is [0, TRACK_END]: the journey occupies [0, 1] and the ending
     // the rest (Task 63 — `trackProgressAt` owns the mapping and why it is a ratio).
@@ -101,8 +125,21 @@ export function useArrivalJourney(
     // gone to sleep is a beat that never finishes, which is the defect it exists
     // to remove. `carryBusy` goes false the moment a reverse disarms the beat, so
     // resting inside a window the reader has taken charge of costs nothing.
+    // ...and now a live motion EPISODE too (Task 126), which is the same lesson a
+    // third time. `stepProvenance` only advances its clocks on a driver frame, so a
+    // classifier with a sleeping loop is an episode that never ends — and an episode
+    // that never ends is a verdict about one gesture applied to every gesture after
+    // it. Measured, and it is not a corner: the mount's own `pinScrollToTop` opens a
+    // 'lab' episode, the loop then sleeps on a still page, and every fling for the
+    // rest of the session inherited that verdict and was waved through as a jump.
+    // Whole-story traversal read 4.3 s with the governor otherwise complete.
+    //
+    // The cost is seven frames of tail after the document stops, which is what
+    // REST_SECONDS is; during the motion itself the scroll events were scheduling
+    // these frames anyway.
     const busy = () =>
       carryBusy(carry) ||
+      provenance.episode !== null ||
       arrivalRef.current.mode !== 'pass' ||
       arrivalRef.current.reveal !== null ||
       arrivalRef.current.progress !== arrivalRef.current.raw
@@ -111,8 +148,14 @@ export function useArrivalJourney(
       raf = 0
       // A restarted loop assumes one nominal frame rather than 0, so the first step
       // after an idle stretch still measures input speed against a real interval.
-      const dt = last === 0 ? 1 / 60 : (now - last) / 1000
+      const waking = last === 0
+      const dt = waking ? 1 / 60 : (now - last) / 1000
       last = now
+      // BELT AND BRACES for the one way the loop can sleep with an episode still
+      // live: a hidden tab gets no frames at all, so `busy()` above cannot be
+      // consulted. A tab that went away has rested by any definition, and the
+      // episode it left behind must not survive the reader's return.
+      if (waking) provenance = PROVENANCE_IDLE
 
       // THE BASELINE CARRY (Task 125) runs FIRST, because what it produces is
       // scroll. It moves the document — through `pinScrollTo`, the lab's one
@@ -127,25 +170,67 @@ export function useArrivalJourney(
       // would land somewhere the next read disagreed with.
       const total = readTotal()
       const carryRaw = readRaw()
+      const eps = carryInputEps(TRACK_END, total)
+      const readerMoved = carryAnchor === null ? 0 : carryRaw - carryAnchor
+
+      // Classified BEFORE anything of ours moves the document this frame, on the
+      // reader's own delta, so the verdict describes the reader and nothing else.
+      // A lab jump outranks it: the skip, the restart and the iris are not the
+      // reader at all, and `pinScrollTo` is the one place that knows they happened.
+      provenance = stepProvenance(
+        provenance,
+        Math.abs(readerMoved) > eps,
+        travelInput,
+        dt,
+        takePendingJump()
+      )
+      travelInput = false
+      const motion = motionKindOf(provenance)
+
       carry = stepCarry(
         carry,
         arrivalRef.current.progress,
         carryRaw,
-        carryAnchor === null ? 0 : carryRaw - carryAnchor,
+        readerMoved,
         dt,
         reduced.matches,
-        carryInputEps(TRACK_END, total)
+        eps
       )
-      if (carry.target !== null && total > 0) pinScrollTo(trackOffsetFor(carry.target, total))
+      if (carry.target !== null && total > 0)
+        pinScrollTo(trackOffsetFor(carry.target, total), 'pace')
       // Re-MEASURED rather than assumed: the anchor has to be the position the
       // document actually took, or the browser's own rounding would read as the
       // reader on the next frame and cancel the carry it caused.
       rawProgressRef.current = readRaw()
       carryAnchor = rawProgressRef.current
 
-      const next = stepArrival(arrivalRef.current, rawProgressRef.current, dt, reduced.matches)
-      arrivalRef.current = next
-      progressRef.current = next.progress
+      const next = stepArrival(arrivalRef.current, rawProgressRef.current, dt, reduced.matches, motion)
+
+      // THE LEASH (Task 126). The governor has just decided where the world is; the
+      // document is not allowed to be more than `GOVERNOR_MAX_LAG` past it, so it
+      // is written back to the ceiling — through the same authority the carry moves
+      // it with, flagged 'pace' so the classifier and the jump gate both know it was
+      // not a reader and not a destination.
+      //
+      // It runs AFTER `stepArrival` and BEFORE the state is stored, and both halves
+      // of that matter. After, because the ceiling is a function of the progress
+      // this frame produced. Before, because the stored `raw` has to be where the
+      // document ACTUALLY ended the frame — that value is what the next frame
+      // measures a teleport and an unwind's tracking against, and a stale one would
+      // report the leash's own correction as the reader pulling back.
+      let leashed = next
+      if (total > 0) {
+        const target = leashTargetFor(next.progress, rawProgressRef.current, reduced.matches)
+        if (target !== null) {
+          pinScrollTo(trackOffsetFor(target, total), 'pace')
+          rawProgressRef.current = readRaw()
+          carryAnchor = rawProgressRef.current
+          leashed = { ...next, raw: rawProgressRef.current }
+        }
+      }
+
+      arrivalRef.current = leashed
+      progressRef.current = leashed.progress
       for (const listener of listeners.current) listener()
       if (busy()) schedule()
       else last = 0
@@ -166,20 +251,49 @@ export function useArrivalJourney(
       // scroll straight past the cap on every scroll event, which is every frame of
       // a fling: the governor would have been a no-op for exactly the input it
       // exists for.
+      //
+      // ...AND NOT OVER ONE EITHER (Task 126). `isGoverned` asks where the world
+      // IS; the boundary stop exists because a single fling frame can also land
+      // past a beat it never stood in, and this shortcut would write exactly that
+      // landing straight into the ref. Same defect as the one Task 109 found here,
+      // one span further along: the gate would hold in `stepArrival` and the scroll
+      // event would step around it.
       if (
         arrivalRef.current.mode === 'pass' &&
-        !isGoverned(arrivalRef.current.progress, reduced.matches)
+        !isGoverned(arrivalRef.current.progress, reduced.matches) &&
+        governedEntryBetween(
+          arrivalRef.current.progress,
+          rawProgressRef.current,
+          reduced.matches
+        ) === null
       ) {
         progressRef.current = rawProgressRef.current
       }
       schedule()
     }
 
+    // THE TRAVEL INPUTS, and the list is the policy (`scroll-provenance.ts`).
+    // `touchmove` rather than `touchstart`: a TAP is not travel, and it must not be
+    // — the skip-to-desk button is tapped, and a tap that armed the classifier
+    // would hand the lab's own instant jump to the governor.
+    const onTravelInput = () => {
+      travelInput = true
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTravelKey(e.key)) travelInput = true
+    }
+
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('wheel', onTravelInput, { passive: true })
+    window.addEventListener('touchmove', onTravelInput, { passive: true })
+    window.addEventListener('keydown', onKeyDown, { passive: true })
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('wheel', onTravelInput)
+      window.removeEventListener('touchmove', onTravelInput)
+      window.removeEventListener('keydown', onKeyDown)
     }
   }, [active, trackRef])
 

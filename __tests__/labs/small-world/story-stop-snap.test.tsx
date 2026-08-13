@@ -15,7 +15,7 @@ import { StoryStopSnap } from '@/components/labs/small-world/story-stop-snap'
  */
 const TRACK_TOTAL = 13335
 
-function mountWith(coarse: boolean, reduced = false) {
+function mountWith(coarse: boolean, reduced = false, progress = 0) {
   ;(window.matchMedia as unknown as ReturnType<typeof vi.fn>).mockImplementation(
     (query: string) => ({
       matches: query.includes('pointer: coarse') ? coarse : query.includes('reduce') ? reduced : false,
@@ -33,7 +33,8 @@ function mountWith(coarse: boolean, reduced = false) {
   document.body.appendChild(track)
   const ref = createRef<HTMLElement>()
   ;(ref as { current: HTMLElement | null }).current = track
-  return { ref, ...render(<StoryStopSnap trackRef={ref} />) }
+  const progressRef = { current: progress }
+  return { ref, progressRef, ...render(<StoryStopSnap trackRef={ref} progressRef={progressRef} />) }
 }
 
 afterEach(() => {
