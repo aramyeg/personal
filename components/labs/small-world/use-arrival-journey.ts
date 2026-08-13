@@ -2,7 +2,9 @@
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
 import { initialArrival, isGoverned, stepArrival, type ArrivalState } from './arrival'
-import { trackProgressAt } from './ending-timeline'
+import { CARRY_IDLE, carryBusy, carryInputEps, stepCarry, type CarryState } from './beat-carry'
+import { TRACK_END, trackOffsetFor, trackProgressAt } from './ending-timeline'
+import { pinScrollTo } from './scroll-reset'
 
 /**
  * The journey's input pipeline: document scroll in, journey progress + the arrival
@@ -58,6 +60,20 @@ export function useArrivalJourney(
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
     let raf = 0
     let last = 0
+    let carry: CarryState = CARRY_IDLE
+    /**
+     * The scroll position as of the end of the last driver frame, the carry's own
+     * write included. Any difference the next frame measures against it is THE
+     * READER, which is the one thing `stepCarry` cannot work out for itself — a
+     * carry that mistook its own writes for input would cancel itself every frame,
+     * and one that mistook the reader's for its own would fight them.
+     *
+     * Null means "no reference yet", not "no motion": the first frame of a session
+     * (and the first after the loop has slept) reports no input, and the frames
+     * either side of a sleep report the whole gap, which is exactly the reader's
+     * own motion over it.
+     */
+    let carryAnchor: number | null = null
 
     // The track's domain is [0, TRACK_END]: the journey occupies [0, 1] and the ending
     // the rest (Task 63 — `trackProgressAt` owns the mapping and why it is a ratio).
@@ -69,12 +85,24 @@ export function useArrivalJourney(
       return trackProgressAt(window.scrollY, el.scrollHeight - window.innerHeight)
     }
 
+    /** The scrollable height `readRaw` measures against — the carry writes through its inverse. */
+    const readTotal = () => {
+      const el = trackRef.current
+      return el ? el.scrollHeight - window.innerHeight : 0
+    }
+
     // A driver frame is owed whenever anything is still moving on its own: the
     // reveal clock, the rubber band — and now the pace governor's debt, which can
     // outlive both (Task 109). `mode !== 'pass'` covers it, because a governed
     // frame hands its lag to the release, but the equality is asserted rather than
     // assumed: a debt with a sleeping loop is a world frozen mid-beat.
+    // ...and now the baseline carry too (Task 125), which is the one source of
+    // motion that runs with the scroll perfectly still — a floor whose loop has
+    // gone to sleep is a beat that never finishes, which is the defect it exists
+    // to remove. `carryBusy` goes false the moment a reverse disarms the beat, so
+    // resting inside a window the reader has taken charge of costs nothing.
     const busy = () =>
+      carryBusy(carry) ||
       arrivalRef.current.mode !== 'pass' ||
       arrivalRef.current.reveal !== null ||
       arrivalRef.current.progress !== arrivalRef.current.raw
@@ -85,6 +113,36 @@ export function useArrivalJourney(
       // after an idle stretch still measures input speed against a real interval.
       const dt = last === 0 ? 1 / 60 : (now - last) / 1000
       last = now
+
+      // THE BASELINE CARRY (Task 125) runs FIRST, because what it produces is
+      // scroll. It moves the document — through `pinScrollTo`, the lab's one
+      // authority for a jump that must not animate — and `stepArrival` below then
+      // reads that document exactly as it reads a finger's. Nothing downstream can
+      // tell the two apart, which is the whole point: there is no second timeline
+      // for a reader to disagree with, and no lead for the scrollbar to hide.
+      //
+      // `trackOffsetFor` is the algebraic inverse of `readRaw` above, and is used
+      // WITHOUT the track's own offset for that reason: `readRaw` measures against
+      // the document origin, so the carry must write against it too, or every frame
+      // would land somewhere the next read disagreed with.
+      const total = readTotal()
+      const carryRaw = readRaw()
+      carry = stepCarry(
+        carry,
+        arrivalRef.current.progress,
+        carryRaw,
+        carryAnchor === null ? 0 : carryRaw - carryAnchor,
+        dt,
+        reduced.matches,
+        carryInputEps(TRACK_END, total)
+      )
+      if (carry.target !== null && total > 0) pinScrollTo(trackOffsetFor(carry.target, total))
+      // Re-MEASURED rather than assumed: the anchor has to be the position the
+      // document actually took, or the browser's own rounding would read as the
+      // reader on the next frame and cancel the carry it caused.
+      rawProgressRef.current = readRaw()
+      carryAnchor = rawProgressRef.current
+
       const next = stepArrival(arrivalRef.current, rawProgressRef.current, dt, reduced.matches)
       arrivalRef.current = next
       progressRef.current = next.progress
