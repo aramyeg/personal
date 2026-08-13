@@ -61,6 +61,11 @@ export const SWEEPS = 4
  *  of it (metres of bone origin / radians of bone rotation). */
 /** Binomial taps of temporal smoothing over the baked curves. */
 export const SMOOTH_TAPS = 7
+/** Metres. How far Blender's armature-only garment may sit from the browser's
+ *  LBS before the bake refuses to run. A healthy run is 3–5 µm; the observed
+ *  failure was 0.105 m. Anything between is a scene that is not the scene the
+ *  renderer will draw. */
+export const BLENDER_LBS_TOL = 0.0001
 export const KEY_TOL_POS = 0.005
 export const KEY_TOL_ROT = 0.020
 
@@ -189,6 +194,42 @@ export async function bakeCloth(srcPath, {
       lever.set(j, n ? s / n : 0)
     }
   }
+  // THE SOURCE HANDED TO BLENDER MUST CARRY NO CLOTH CURVES.
+  //
+  // A Blender action drives only the bones it keys; everything else keeps the
+  // pose it is already in, and the glTF importer leaves the armature posed by the
+  // FIRST animation in the file. So the moment that first clip has cloth curves —
+  // which happens as soon as a clip-by-clip bake writes them into the file it then
+  // feeds back in — every subsequent clip is simulated with the cloth bones frozen
+  // in that clip's pose. Measured: 24.5 cm of bone translation, a garment starting
+  // a quarter of a metre off the body, and three clips of plausible-looking sim
+  // that were draped onto the wrong figure.
+  //
+  // The sim has no use for cloth curves by construction (it re-creates that motion
+  // from scratch), so the fix is to remove them rather than to hope about pose
+  // inheritance. A source that has none is passed through untouched, so this is a
+  // provable no-op on the pipeline of record: re-simulating from a clean source
+  // reproduces the sim bit-identically.
+  let simSrcPath = srcPath
+  {
+    const doc = await new NodeIO().read(srcPath)
+    let removed = 0
+    for (const anim of doc.getRoot().listAnimations())
+      for (const ch of anim.listChannels())
+        if (ch.getTargetNode()?.getName().startsWith(CLOTH_PREFIX)) {
+          const s = ch.getSampler()
+          anim.removeChannel(ch)
+          ch.dispose()
+          if (s) { anim.removeSampler(s); s.dispose() }
+          removed++
+        }
+    if (removed) {
+      simSrcPath = path.join(WORK, 'sim-src.glb')
+      await new NodeIO().write(simSrcPath, doc)
+      console.log(`  stripped ${removed.toLocaleString()} cloth channels from the sim's source → ${path.basename(simSrcPath)}`)
+    }
+  }
+
   const clips = rig.clips.filter((c) => !only || c.name === only)
   const report = {
     clips: [], bones: clothJoints.map((j) => rig.jointNames[j]), preroll, sweeps,
@@ -203,7 +244,7 @@ export async function bakeCloth(srcPath, {
       const t0 = Date.now()
       const r = spawnSync(BLENDER, [
         '-b', '--factory-startup', '--python', path.join(WORKTREE, 'scripts/small-world/cloth-sim.py'), '--',
-        '--src', srcPath, '--map', path.join(WORK, 'clothmap.bin'), '--clip', clip.name,
+        '--src', simSrcPath, '--map', path.join(WORK, 'clothmap.bin'), '--clip', clip.name,
         '--fps', '30', '--frames', String(frames), '--preroll', String(preroll), '--out', simPath,
         '--span', String(clip.channels[0].track.times.length - 1),
         ...simArgs,
@@ -376,6 +417,21 @@ export async function bakeCloth(srcPath, {
         `deviation med ${(q(devs, 0.5) * 1000).toFixed(2)} p99 ${(q(devs, 0.99) * 1000).toFixed(2)} max ${(maxDev * 1000).toFixed(2)} mm  ` +
         `fit residual med ${(q(rs, 0.5) * 1000).toFixed(2)} p99 ${(q(rs, 0.99) * 1000).toFixed(2)} max ${(rs[rs.length - 1] * 1000).toFixed(2)} mm`
     )
+    // THE HARNESS CHECK IS A GATE, NOT A COLUMN. simBase is Blender's
+    // armature-only garment and lbs is the browser's; the whole bake is the
+    // DIFFERENCE between the simulated and the armature-only surface, so if
+    // Blender is not posing the figure the way the renderer will, the difference
+    // is measured against the wrong body and the number above says nothing.
+    // It reads 0.003–0.005 mm on a healthy run — four orders of magnitude of
+    // headroom — and it read 105 mm when a chained bake left the cloth bones
+    // posed by another clip's action (see cloth-sim.py). Printing that and
+    // carrying on shipped a corrupt sim for three clips.
+    if (worstBase > BLENDER_LBS_TOL)
+      throw new Error(
+        `bake-cloth: ${clip.name} — Blender's armature-only garment disagrees with LBS by ` +
+          `${(worstBase * 1000).toFixed(3)} mm (tolerance ${(BLENDER_LBS_TOL * 1000).toFixed(3)} mm). ` +
+          'The sim was run against a pose the renderer will not reproduce; do not bake it.'
+      )
   }
   return { rig, baked, report, clothJoints }
 }

@@ -83,6 +83,24 @@ describe('toonifyGirl across the detached garment', () => {
     vi.restoreAllMocks()
   })
 
+  it('renders the shirt double-sided and the body single-sided', () => {
+    // The garment is an OPEN SHEET and the cloth sim swings its panels, so the
+    // camera looks into the sleeves and at the inside of the open front. Culled,
+    // those faces leave a hole: 45.2 px/view of background showing through
+    // across the six clips (scratchpad/t124/backface.mjs). The exception is the
+    // shirt's alone — the body is a closed shell where a visible back face would
+    // be a real defect, and canonicalize-girl's self-test still requires the
+    // ASSET to be single-sided throughout.
+    stubCanvas()
+    const { scene, meshes } = girlScene()
+    toonifyGirl(scene, new THREE.Texture(), true)
+    const side = (name: string) =>
+      (meshes.find((m) => m.name === name)!.material as unknown as THREE.MeshToonMaterial).side
+    expect(side(GARMENT_MATERIAL)).toBe(THREE.DoubleSide)
+    expect(side('body')).not.toBe(THREE.DoubleSide)
+    vi.restoreAllMocks()
+  })
+
   it('names the garment material the same thing the asset chain does', () => {
     // Read rather than import: detach-girl.mjs pulls the whole gltf-transform
     // toolchain, which has no business loading inside a jsdom test. The string is

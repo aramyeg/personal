@@ -129,7 +129,27 @@ export function toonifyGirl(
         map: graded ?? std.map ?? undefined,
         color: graded || !std.map ? 0xffffff : GRADE_FALLBACK_TINT,
         gradientMap: ramp,
-        side: std.side,
+        // THE SHIRT IS THE ONE DOUBLE-SIDED SURFACE ON THE FIGURE, and it earns
+        // the exception by measurement rather than by taste. The garment is an
+        // OPEN SHEET — a shirt with a hem, two cuffs and a placket — and once the
+        // cloth sim lets its panels swing, the camera looks into the sleeves and
+        // at the inside of the open front. A single-sided material culls those
+        // faces and draws whatever is behind them, which is either the tank or
+        // NOTHING: measured across all six clips at 16 views, 45.2 px/view where
+        // the culled inner face is the nearest surface and the pixel falls
+        // through to the background, and another 45.5 px/view where it falls
+        // through to the body — up to 322 void pixels in one 384² view, with the
+        // culled face 10–20 cm in front of what gets drawn instead
+        // (scratchpad/t124/backface.mjs). That is what "torn" looks like, and it
+        // is worst exactly where a sleeve becomes a tube seen end-on
+        // (scratchpad/t124/sheets/innerzoom-JumpB-{single,double}.png).
+        //
+        // Deliberately scoped to the garment. The body is a closed shell, so a
+        // back face of it reaching the camera would be a real defect and must
+        // keep failing loudly — canonicalize-girl's "all materials OPAQUE +
+        // single-sided" self-test still holds on the ASSET, and this exception
+        // lives in the renderer beside renderOrder rather than weakening it.
+        side: m.name === GARMENT_MATERIAL ? THREE.DoubleSide : std.side,
         transparent: std.transparent,
         alphaTest: std.alphaTest,
       })

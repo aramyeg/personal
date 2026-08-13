@@ -22,4 +22,4 @@ export const GIRL_URL = '/labs/small-world/girl.glb'
  *  MeshoptDecoder) + WebP q95 texture (EXT_texture_webp — NOT KTX2, which
  *  would break girl-clay's canvas-based pastel grade). Pipeline + gates:
  *  scratchpad/t96/p2a/{compress,verify}-girl.mjs (see task-96 phase-2 report). */
-export const GIRL_GLB_BYTES = 2_037_620
+export const GIRL_GLB_BYTES = 2_185_944

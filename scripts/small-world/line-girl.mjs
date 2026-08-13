@@ -122,6 +122,25 @@ export const SMOOTH_CLAMP = 0.5
  * coincident by design and a fixed floor would tear the weld open.
  */
 export const CLEARANCE_FRACTION = 0.4
+/**
+ * The rim triangle split — T121b's coincident-triangle debt, paid here.
+ *
+ * The taper is zero AT the rim, which is the weld. A garment triangle all three
+ * of whose vertices sit on the rim therefore gets copied into the lining with no
+ * offset at all: 184 bit-exact duplicate triangles (47.9 cm2) occupying the same
+ * space as the shirt. Every pixel they cover is a depth TIE, resolved by buffer
+ * order, and T121's cut handed that order to the lining — the whole of the
+ * 7.4 → 28.4 px/view jump T121 mis-attributed to simplification.
+ *
+ * They cannot simply be deleted: their edges are rim edges, and body ∪ lining is
+ * only closed because each rim edge is used by one body triangle and one lining
+ * triangle. So each one is SPLIT — a vertex at the centroid, pushed inward — which
+ * keeps all three edges exactly where they were (the closure is untouched) and
+ * removes the duplicate. The centroid's offset follows the same taper law as
+ * every other lining vertex, evaluated at the only distance-from-rim it has: the
+ * triangle's inradius, which is exactly how far inside the rim its centre sits.
+ */
+export const SPLIT_MIN_DELTA = 0.0003
 /** Median-filter passes over the through-thickness field. Thickness is a
  *  property of the body and varies smoothly; a single wrinkle that reports
  *  1 mm is the shirt, and the median of its neighbours is the body. */
@@ -823,15 +842,86 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
   if (skinSplits) throw new Error(`line-girl: ${skinSplits} atlas splits disagree on skin data — cannot weld the lining`)
 
   const T = idx.length / 3
-  let nLiningTris = 0
-  for (let t = 0; t < T; t++) if (triLabel[t] === 1) nLiningTris++
-  const newIdx = new idx.constructor(nLiningTris * 3)
-  let o = 0
+  // A lining vertex that finished exactly on its source position — the taper is
+  // zero at the rim by design. A triangle of three such vertices is a bit-exact
+  // copy of the garment triangle above it; see SPLIT_MIN_DELTA.
+  const flatV = new Uint8Array(nWelded)
+  for (let n = 0; n < nNew; n++) {
+    const w = order[n]
+    if (newPos[n * 3] === welded[w * 3] && newPos[n * 3 + 1] === welded[w * 3 + 1] && newPos[n * 3 + 2] === welded[w * 3 + 2])
+      flatV[w] = 1
+  }
+
+  const tris = []
+  const extraPos = []
+  const extraNrm = []
+  const extraUV = []
+  const extraJoints = []
+  const extraWeights = []
+  const splitDeltas = []
   for (let t = 0; t < T; t++) {
     if (triLabel[t] !== 1) continue
     // Winding kept: an inward offset preserves orientation, so the lining faces
     // out of the figure, which is what a body surface does. See decision 1.
-    for (let k = 0; k < 3; k++) newIdx[o++] = lin[rep[idx[t * 3 + k]]]
+    const w3 = [0, 1, 2].map((k) => rep[idx[t * 3 + k]])
+    if (!w3.every((w) => flatV[w])) {
+      tris.push(w3.map((w) => lin[w]))
+      continue
+    }
+    // ---- the rim split ----
+    const P = w3.map((w) => [welded[w * 3], welded[w * 3 + 1], welded[w * 3 + 2]])
+    const e = [Math.hypot(...sub(P[1], P[0])), Math.hypot(...sub(P[2], P[1])), Math.hypot(...sub(P[0], P[2]))]
+    const twoA = Math.hypot(...cross(sub(P[1], P[0]), sub(P[2], P[0])))
+    const perim = e[0] + e[1] + e[2]
+    const inradius = perim > 0 ? twoA / perim : 0 // 2*area/perimeter
+    const d = w3.map((w) => [dir[w * 3], dir[w * 3 + 1], dir[w * 3 + 2]])
+    const dc = [0, 1, 2].map((k) => (d[0][k] + d[1][k] + d[2][k]) / 3)
+    const dcL = Math.hypot(...dc)
+    if (!(dcL > 1e-9)) throw new Error(`line-girl: rim triangle ${t} has no coherent offset direction`)
+    const dcn = dc.map((x) => x / dcL)
+    const capT = Math.min(...w3.map((w) => (Number.isFinite(thickness[w]) ? thickness[w] * THICKNESS_FRACTION : offset)))
+    const deltaC = Math.min(offset * (1 - Math.exp(-inradius / tau)), capT)
+    if (!(deltaC >= SPLIT_MIN_DELTA))
+      throw new Error(
+        `line-girl: rim triangle ${t} splits to only ${(deltaC * 1000).toFixed(4)} mm — the split would stay coincident`
+      )
+    splitDeltas.push(deltaC)
+    const c = [0, 1, 2].map((k) => (P[0][k] + P[1][k] + P[2][k]) / 3 - dcn[k] * deltaC)
+    const ci = nVerts + nNew + extraNrm.length / 3
+    extraPos.push(...c)
+    extraNrm.push(...dcn)
+    // The lining is labelled downstream by ZERO UV AREA (t115/lining.mjs), so the
+    // new vertex must carry its corners' UV rather than an interpolation of it.
+    extraUV.push(newUV[(lin[w3[0]] - nVerts) * 2], newUV[(lin[w3[0]] - nVerts) * 2 + 1])
+    // Skin data blended over the corners, top four influences renormalised — a
+    // centroid that took one corner's weights would shear away from the triangle
+    // it sits in the middle of.
+    const acc = new Map()
+    for (const w of w3) {
+      const s = sourceOf[w]
+      for (let k = 0; k < 4; k++) acc.set(joints[s * 4 + k], (acc.get(joints[s * 4 + k]) ?? 0) + weights[s * 4 + k] / 3)
+    }
+    const top = [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
+    const sum = top.reduce((s, [, x]) => s + x, 0) || 1
+    for (let k = 0; k < 4; k++) {
+      extraJoints.push(top[k] ? top[k][0] : 0)
+      extraWeights.push(top[k] ? top[k][1] / sum : 0)
+    }
+    tris.push([lin[w3[0]], lin[w3[1]], ci], [lin[w3[1]], lin[w3[2]], ci], [lin[w3[2]], lin[w3[0]], ci])
+  }
+  const nSplit = splitDeltas.length
+  const nLiningTris = tris.length
+  const newIdx = new idx.constructor(nLiningTris * 3)
+  {
+    let o = 0
+    for (const tr of tris) for (const v of tr) newIdx[o++] = v
+  }
+  const cat = (typed, extra) => {
+    if (!extra.length) return typed
+    const merged = new typed.constructor(typed.length + extra.length)
+    merged.set(typed)
+    merged.set(extra, typed.length)
+    return merged
   }
 
   const append = (attr, extra, stride) => {
@@ -842,11 +932,11 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
     attr.setArray(merged)
     return merged.length / stride
   }
-  append(posAttr, newPos, 3)
-  append(nrmAttr, newNrm, 3)
-  append(uvAttr, newUV, 2)
-  append(jointsAttr, newJoints, 4)
-  append(weightsAttr, newWeights, 4)
+  append(posAttr, cat(newPos, extraPos), 3)
+  append(nrmAttr, cat(newNrm, extraNrm), 3)
+  append(uvAttr, cat(newUV, extraUV), 2)
+  append(jointsAttr, cat(newJoints, extraJoints), 4)
+  append(weightsAttr, cat(newWeights, extraWeights), 4)
   {
     const old = idxAccessor.getArray()
     const merged = new old.constructor(old.length + newIdx.length)
@@ -919,10 +1009,22 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
   const q = (arr, p) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] : null)
   const report = {
     knobs: { offset, tau, thicknessFraction: THICKNESS_FRACTION, normalSmoothing: NORMAL_SMOOTHING, positionSmoothing: POSITION_SMOOTHING, smoothClamp: SMOOTH_CLAMP, thicknessMedian: THICKNESS_MEDIAN, clearanceFraction: CLEARANCE_FRACTION },
-    garmentTriangles: nLiningTris,
+    garmentTriangles: nLiningTris - nSplit * 2,
+    liningTriangles: nLiningTris,
     triangleTotal: T,
-    liningVertices: nNew,
+    liningVertices: nNew + nSplit,
     vertexTotal: nVerts,
+    rimSplit: {
+      triangles: nSplit,
+      addedTriangles: nSplit * 2,
+      deltaMm: nSplit
+        ? {
+            min: Math.min(...splitDeltas) * 1000,
+            median: [...splitDeltas].sort((a, b) => a - b)[nSplit >> 1] * 1000,
+            max: Math.max(...splitDeltas) * 1000,
+          }
+        : null,
+    },
     rimVertices: order.filter((w) => onRim[w]).length,
     signedVolume,
     outwardFraction,
@@ -951,7 +1053,7 @@ export async function lineGirl(doc, { offset = OFFSET, tau = TAU, maskPath = nul
     },
     region: regionCount,
     regionUV,
-    after: { vertices: nVerts + nNew, triangles: T + nLiningTris },
+    after: { vertices: nVerts + nNew + nSplit, triangles: T + nLiningTris },
     probe: probe
       ? order.map((w) => ({ p: [welded[w * 3], welded[w * 3 + 1], welded[w * 3 + 2]], delta: delta[w], thickness: thickness[w], rimDist: rimDist[w] }))
       : undefined,

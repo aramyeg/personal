@@ -387,6 +387,14 @@ def main():
         raise SystemExit(f'cloth-sim: no action named {clip}; have {[a.name for a in bpy.data.actions]}')
     if arm.animation_data is None:
         arm.animation_data_create()
+    # An action only drives the bones it KEYS; every other bone keeps whatever
+    # pose it is already in, and the glTF importer leaves the armature posed by
+    # the first animation in the file. That is harmless while no clip animates
+    # the cloth bones and silently catastrophic once one does — see
+    # bake-cloth-girl.mjs, which strips cloth curves out of the copy it hands
+    # this script for exactly that reason, and asserts the result. Clearing the
+    # pose here instead was tried and rejected: on a source that never had cloth
+    # curves it is meant to be a no-op, and it changed the sim.
     arm.animation_data.action = action
     for slot in getattr(arm.animation_data, 'action_suitable_slots', []):
         arm.animation_data.action_slot = slot
